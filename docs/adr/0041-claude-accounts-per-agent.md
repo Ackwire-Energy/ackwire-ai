@@ -1,6 +1,6 @@
 # 0041. Claude and Codex accounts on a connected computer, chosen per agent; effort per agent
 
-- Status: Accepted (2026-10-20). Superseded in part by ADR 0059 (§2 who adds accounts, §4 who decides, §7 removing). Amended 2026-10-30: §1 (the computer's own sign-in is offered only where it is signed in), §2.7 (a sign-in through a restart of the server or a reconnect of its computer); 2026-10-31: §5.1 (a background task signs in with the agent's account, as its turns); 2026-11-04: Grok accounts (ADR 0142)
+- Status: Accepted (2026-10-20). Superseded in part by ADR 0059 (§2 who adds accounts, §4 who decides, §7 removing). Amended 2026-10-30: §1 (the computer's own sign-in is offered only where it is signed in), §2.7 (a sign-in through a restart of the server or a reconnect of its computer); 2026-10-31: §5.1 (a background task signs in with the agent's account, as its turns); 2026-11-04: Grok accounts (ADR 0142) and Gemini accounts (ADR 0143)
 - Date: 2026-10-20
 - Extends: ADR 0025 (connected computers), ADR 0027 (secrets, end to end), ADR 0032 (Claude Code and Codex as brains), ADR 0036 (desktop app)
 - Out of scope for now: cloud computers, switching accounts by itself when a plan runs out
@@ -117,3 +117,5 @@ The CLI keeps the sign-in in the account folder, and the agent's commands run as
 - **Our own OAuth with the provider's client id, so the redirect comes to us.** That would be passing ourselves off as the CLI. Rejected.
 
 *Amended 2026-11-04:* an account can be a Grok one (`kind: "grok"`, runner protocol 43, ADR 0142): `grok login --device-auth` in its own folder, which is the CLI's `GROK_HOME`, the link and the one-time code shown like ChatGPT's; signed in when the folder holds `auth.json` and `grok models` doesn't say otherwise; `grok logout` before its folder goes. A Grok agent always thinks with one: the computer's own Grok sign-in is never used.
+
+*Amended 2026-11-04:* an account can be a Gemini one (`kind: "antigravity"`, runner protocol 44, ADR 0143): `agy acp --login` in its own folder, which is the CLI's whole `HOME`, Google's link opened and its code pasted back sealed like Claude's; `provider: "enterprise"` for a Gemini Enterprise seat; signed in when `agy models` lists models; `agy -p /logout` before its folder goes. Linux computers only (elsewhere the CLI keeps every sign-in in one keychain). A Gemini agent always thinks with one.

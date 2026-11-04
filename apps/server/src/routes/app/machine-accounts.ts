@@ -144,7 +144,7 @@ export function machineAccountRoutes(deps: AppDeps) {
             }),
             provider: z.string().max(20).optional().openapi({
               description:
-                "A coding plan on Claude Code (`zai`, `kimi`, `minimax`, `opencode`), `cursor` for a Cursor API key or `zen` for an OpenCode key: a key account. The key is sent next like a code, sealed to the computer (`account.invalid_plan`; a runner without plans' keys: `account.runner_old`).",
+                "A coding plan on Claude Code (`zai`, `kimi`, `minimax`, `opencode`), `cursor` for a Cursor API key or `zen` for an OpenCode key: a key account. The key is sent next like a code, sealed to the computer. `enterprise` on `antigravity`: a Gemini Enterprise sign-in, not a key (`account.invalid_plan`; a runner without plans' keys: `account.runner_old`).",
             }),
           }),
         ),
@@ -257,6 +257,7 @@ export function machineAccountRoutes(deps: AppDeps) {
                       cursor: z.boolean(),
                       opencode: z.boolean(),
                       grok: z.boolean(),
+                      antigravity: z.boolean(),
                       key: z.boolean(),
                     })
                     .openapi({
@@ -270,10 +271,11 @@ export function machineAccountRoutes(deps: AppDeps) {
                       cursor: z.boolean(),
                       opencode: z.boolean(),
                       grok: z.boolean(),
+                      antigravity: z.boolean(),
                     })
                     .openapi({
                       description:
-                        "What it can think with now: Claude Code (Claude, the coding plans), Codex (ChatGPT), Cursor, OpenCode and Grok Build.",
+                        "What it can think with now: Claude Code (Claude, the coding plans), Codex (ChatGPT), Cursor, OpenCode, Grok Build and the Antigravity CLI (Gemini).",
                     }),
                   own: z
                     .object({

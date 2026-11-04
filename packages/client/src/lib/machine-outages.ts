@@ -10,7 +10,7 @@
  */
 
 /** The brains a computer runs. */
-export type ComputerBrain = "claude_code" | "codex" | "cursor" | "opencode" | "grok";
+export type ComputerBrain = "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
 
 export interface OutageAgentLike {
   agentId: string;
@@ -232,7 +232,11 @@ export function brainUnavailableOf(meta: Record<string, unknown> | null | undefi
   const x = b as Record<string, unknown>;
   return {
     brain:
-      x.brain === "codex" || x.brain === "cursor" || x.brain === "opencode" || x.brain === "grok"
+      x.brain === "codex" ||
+      x.brain === "cursor" ||
+      x.brain === "opencode" ||
+      x.brain === "grok" ||
+      x.brain === "antigravity"
         ? x.brain
         : "claude_code",
     code: str(x.code) ?? "",

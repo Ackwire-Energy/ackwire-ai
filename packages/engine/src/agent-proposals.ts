@@ -67,7 +67,7 @@ export const AGENT_PROPOSAL_CARD = "agent_proposal";
 export type SuggestedAi =
   | {
       kind: "account";
-      brain: "claude_code" | "codex" | "cursor" | "opencode" | "grok";
+      brain: "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
       machineId: string;
       accountId: string;
       label: string;
@@ -497,7 +497,7 @@ export async function suggestAgentAi(
           eq(machineAccounts.orgId, orgId),
           eq(machineAccounts.createdBy, userId),
           eq(machineAccounts.status, "active"),
-          inArray(machineAccounts.kind, ["claude_code", "codex", "cursor", "opencode", "grok"]),
+          inArray(machineAccounts.kind, ["claude_code", "codex", "cursor", "opencode", "grok", "antigravity"]),
           notInArray(machineAccounts.id, used),
         ),
       )

@@ -85,6 +85,10 @@ export const MachineAccess = z
         .boolean()
         .optional()
         .openapi({ description: "Grok Build, xAI's CLI (protocol 43, ADR 0142); absent = follows `codex`." }),
+      antigravity: z
+        .boolean()
+        .optional()
+        .openapi({ description: "Google's Antigravity CLI (protocol 44, ADR 0143); absent = follows `codex`." }),
       commands: z.boolean(),
       browser: z
         .boolean()
@@ -268,7 +272,7 @@ const DeviceCode = z
 
 const AgentParams = OrgParams.extend({ agentId: z.uuid() });
 
-const ComputerBrain = z.enum(["claude_code", "codex", "cursor", "opencode", "grok"]);
+const ComputerBrain = z.enum(["claude_code", "codex", "cursor", "opencode", "grok", "antigravity"]);
 const Platform = z.string().openapi({
   description: "`mac`, `windows`, `linux`, `other` (the workspace's own computer), or the runner's `os` as reported.",
 });
@@ -523,7 +527,18 @@ export function machineAppRoutes(deps: AppDeps) {
             .object({
               removeFolder: z.object({ path: z.string().min(1).max(1024), agentId: z.uuid().optional() }).optional(),
               disableTool: z
-                .enum(["claude", "codex", "cursor", "opencode", "grok", "commands", "browser", "desktop", "terminal"])
+                .enum([
+                  "claude",
+                  "codex",
+                  "cursor",
+                  "opencode",
+                  "grok",
+                  "antigravity",
+                  "commands",
+                  "browser",
+                  "desktop",
+                  "terminal",
+                ])
                 .optional(),
             })
             .strict(),

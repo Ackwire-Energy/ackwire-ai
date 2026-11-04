@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 43;
+export const MACHINE_PROTOCOL_VERSION = 44;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -492,10 +492,26 @@ export const OPENCODE_KEY_PROVIDER = "zen";
  * the CLI's `init` like Claude Code's. The server never sends any of these to an older runner.
  */
 export const GROK_PROTOCOL = 43;
+/**
+ * From this protocol on (ADR 0143): the Antigravity brain. `brain.turn` takes `kind: "antigravity"` (Google's
+ * Antigravity CLI, `agy -p --output-format stream-json`, one process per turn), `account` takes `kind: "antigravity"`
+ * (a Google sign-in by a pasted code, `agy acp --login`, in the account's own home: a Google AI Pro or Ultra plan, or
+ * Gemini Enterprise with `provider: "enterprise"`, `GEMINI_ENTERPRISE_PROVIDER`), `hello.executors.antigravity` reports the CLI with the models it
+ * lists, and `access.tools.antigravity` turns it on or off. A `chat` turn is checked on the CLI's `init`. The server
+ * never sends any of these to an older runner.
+ */
+export const ANTIGRAVITY_PROTOCOL = 44;
 
 /** Which CLI an account signs in. */
-export type AccountKind = "claude_code" | "codex" | "cursor" | "opencode" | "grok";
-export const ACCOUNT_KINDS: readonly AccountKind[] = ["claude_code", "codex", "cursor", "opencode", "grok"];
+export type AccountKind = "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
+export const ACCOUNT_KINDS: readonly AccountKind[] = [
+  "claude_code",
+  "codex",
+  "cursor",
+  "opencode",
+  "grok",
+  "antigravity",
+];
 export const isAccountKind = (v: unknown): v is AccountKind => ACCOUNT_KINDS.some((k) => k === v);
 /** Account and sign-in ids: UUIDs (the server makes them; the desktop app's runner too). */
 export const isAccountId = (v: unknown): v is string =>
@@ -567,6 +583,7 @@ export const OWN_USAGE_ID: Record<AccountKind, string> = {
   cursor: "own:cursor",
   opencode: "own:opencode",
   grok: "own:grok",
+  antigravity: "own:antigravity",
 };
 
 export const PLAN_USAGE_LIMITS = { windows: 8, label: 40 } as const;
@@ -1155,7 +1172,7 @@ export interface RunnerExecutorInfo {
   /**
    * Protocol 36, `cursor`: the models its sign-in lists (`agent models`), and which its plan includes when the CLI
    * says. Protocol 39, `opencode`: the models `opencode models` lists (`provider/model`), `free` on OpenCode's free tier.
-   * Protocol 43, `grok`: the models `grok models` lists.
+   * Protocol 43, `grok`: the models `grok models` lists. Protocol 44, `antigravity`: the models `agy models` lists.
    */
   models?: CursorModelInfo[];
 }
@@ -1247,8 +1264,11 @@ export const STEER_LIMITS = { messages: 20, text: 100_000 } as const;
  */
 export interface BrainTurnRequest {
   runId: string;
-  /** `cursor`: protocol 36 (`CURSOR_PROTOCOL`); `opencode`: protocol 39 (`OPENCODE_PROTOCOL`); `grok`: 43 (`GROK_PROTOCOL`). */
-  kind: "claude_code" | "codex" | "cursor" | "opencode" | "grok";
+  /**
+   * `cursor`: protocol 36 (`CURSOR_PROTOCOL`); `opencode`: protocol 39 (`OPENCODE_PROTOCOL`); `grok`: 43
+   * (`GROK_PROTOCOL`); `antigravity`: 44 (`ANTIGRAVITY_PROTOCOL`).
+   */
+  kind: "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
   /** The executor's session (a UUID, stable per thread); `resume`: the server knows it ran before (a hint). */
   session: { id: string; resume: boolean };
   /** Relative to the agent's folder ("" = the folder). */
@@ -1446,6 +1466,8 @@ export interface RunnerTools {
   opencode?: boolean;
   /** Protocol 43: Grok Build (ADR 0142). Absent = off (older runners). */
   grok?: boolean;
+  /** Protocol 44: Google's Antigravity CLI (ADR 0143). Absent = off (older runners). */
+  antigravity?: boolean;
   /** Shell commands (`exec`, `shell` tasks). The same as `exec` in `hello` once protocol 10 is in use. */
   commands: boolean;
   /** Protocol 12: the agent browser (ADR 0040). Absent = off (older runners). */
@@ -1511,6 +1533,7 @@ export interface RunnerInfo {
     cursor?: RunnerExecutorInfo;
     opencode?: RunnerExecutorInfo;
     grok?: RunnerExecutorInfo;
+    antigravity?: RunnerExecutorInfo;
   };
   /** Protocol 9: whether the owner paused this computer. */
   paused?: RunnerPause;
@@ -2117,11 +2140,11 @@ export function parseCursorModels(v: unknown): CursorModelInfo[] {
   return out;
 }
 
-/** `hello.executors`: only `claude`, `codex`, `cursor`, `opencode` and `grok`, each with a short version line (and Claude Code's login). */
+/** `hello.executors`: only `claude`, `codex`, `cursor`, `opencode`, `grok` and `antigravity`, each with a short version line (and Claude Code's login). */
 export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerInfo["executors"]> {
   const out: NonNullable<RunnerInfo["executors"]> = {};
   const word = (x: unknown) => (isString(x) && /^[\w.-]{1,40}$/.test(x) ? x : undefined);
-  for (const name of ["claude", "codex", "cursor", "opencode", "grok"] as const) {
+  for (const name of ["claude", "codex", "cursor", "opencode", "grok", "antigravity"] as const) {
     const e = v[name];
     if (!isObject(e) || !isString(e.version)) continue;
     const authMethod = word(e.authMethod);
@@ -2987,6 +3010,8 @@ export function parseAccess(v: unknown): RunnerAccess | undefined {
       ...(typeof t.opencode === "boolean" ? { opencode: t.opencode } : {}),
       // Absent: a runner before Grok's switch (protocol 43), where Grok is off.
       ...(typeof t.grok === "boolean" ? { grok: t.grok } : {}),
+      // Absent: a runner before the Antigravity CLI's switch (protocol 44), where it is off.
+      ...(typeof t.antigravity === "boolean" ? { antigravity: t.antigravity } : {}),
       commands: t.commands === true,
       ...(t.browser === true ? { browser: true } : {}),
       ...(t.desktop === true ? { desktop: true } : {}),

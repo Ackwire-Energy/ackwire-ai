@@ -76,7 +76,8 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
       noAi?.own === "claude_code" ||
       noAi?.own === "cursor" ||
       noAi?.own === "opencode" ||
-      noAi?.own === "grok")
+      noAi?.own === "grok" ||
+      noAi?.own === "antigravity")
       ? noAi.own
       : null;
   if (own) {

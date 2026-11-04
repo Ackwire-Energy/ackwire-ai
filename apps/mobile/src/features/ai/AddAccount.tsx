@@ -8,7 +8,7 @@ import {
   loginReadPasses,
   otherThanHint,
 } from "@agenteschat/client/lib/machines";
-import { type PlanId, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
+import { GEMINI_ENTERPRISE_PROVIDER, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
 import { accountCodeAad } from "@agenteschat/client/lib/secret-box";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
@@ -40,8 +40,8 @@ export interface AddAccountProps {
   machineId: string;
   kind: MachineAccountKind;
   computer: string;
-  /** A coding plan's key account on Claude Code. */
-  provider?: PlanId;
+  /** A coding plan's key account on Claude Code, or a Gemini Enterprise sign-in (`signInProviderOf`). */
+  provider?: string;
   /** Sign in again to this account (signed out): same account, same agents. */
   again?: string;
   /**
@@ -96,7 +96,10 @@ function AddAccountFlow({
   const { colors: c } = useTheme();
   // Cursor: its sign-in, or (chosen under it) its API key, which goes like a coding plan's key.
   const [cursorKey, setCursorKey] = useState(false);
-  const { plan, provider } = signInKey(planId, kind, cursorKey);
+  const { plan, provider: keyProvider } = signInKey(planId, kind, cursorKey);
+  // Gemini: a personal Google account, or (chosen under it, or the account's own) Gemini Enterprise.
+  const [enterprise, setEnterprise] = useState(planId === GEMINI_ENTERPRISE_PROVIDER);
+  const provider = keyProvider ?? (kind === "antigravity" && enterprise ? GEMINI_ENTERPRISE_PROVIDER : undefined);
   const [login, setLogin] = useState<AccountLoginStart | null>(null);
   const [starting, setStarting] = useState(false);
   const [startFailed, setStartFailed] = useState(false);
@@ -391,6 +394,54 @@ function AddAccountFlow({
         </Step>
         {login && opened ? (
           <Step n={2} divider title={t("agentPage.work.brain.add.cursorFinish", { computer })} side={waiting} />
+        ) : null}
+      </>
+    );
+  } else if (kind === "antigravity") {
+    steps = (
+      <>
+        {!enterprise ? <Note icon="info">{t("connectAi.plan.gemini.warning")}</Note> : null}
+        <Step
+          n={1}
+          state={login && opened ? "done" : "now"}
+          title={t(
+            enterprise
+              ? "agentPage.work.brain.add.stepOne.antigravityEnterprise"
+              : "agentPage.work.brain.add.stepOne.antigravity",
+          )}
+          hint={signInHint}
+          side={login ? openAgain(login.url) : startButton(t("agentPage.work.brain.add.open.antigravity"), !ready)}
+        >
+          {starting ? <StepText>{t("agentPage.work.brain.add.starting", { computer })}</StepText> : null}
+          {!login && !again ? (
+            <View style={styles.send}>
+              <Button
+                size="sm"
+                variant="ghost"
+                label={t(
+                  enterprise ? "agentPage.work.brain.add.geminiPersonal" : "agentPage.work.brain.add.geminiEnterprise",
+                )}
+                onPress={() => setEnterprise((on) => !on)}
+              />
+            </View>
+          ) : null}
+        </Step>
+        {login && opened ? (
+          <Step
+            n={2}
+            divider
+            title={t("agentPage.work.brain.add.stepTwo")}
+            side={read === "reconnecting" ? waiting : undefined}
+          >
+            {busy
+              ? busyLine
+              : pasteRow(
+                  t("agentPage.work.brain.add.codeLabel"),
+                  t("agentPage.work.brain.add.codeLabel"),
+                  false,
+                  key.length > 0,
+                )}
+          </Step>
         ) : null}
       </>
     );

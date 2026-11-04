@@ -322,7 +322,7 @@ export const organizationSettings = pgTable("organization_settings", {
  * agents, is what new agents start with. Validated in code (`agent-setup.ts`).
  */
 export interface AgentSetup {
-  brain: "model" | "claude_code" | "codex" | "cursor" | "opencode" | "grok";
+  brain: "model" | "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
   /** The API brain: the agent's model (`auto` included). A computer brain: its model as stored (null: the default). */
   model: string | null;
   /** The API brain's key (null: the workspace's default). */

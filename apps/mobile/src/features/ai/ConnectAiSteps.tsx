@@ -36,7 +36,7 @@ import {
   planOfAccount,
   planTitle,
 } from "@agenteschat/client/lib/no-ai";
-import { isPlanId, PLAN_IDS, planOf } from "@agenteschat/client/lib/plans";
+import { isPlanId, PLAN_IDS, planOf, signInProviderOf } from "@agenteschat/client/lib/plans";
 import {
   AUTO,
   keyLooksValid,
@@ -424,7 +424,7 @@ function Home({
       ) : null}
       <GroupedHeader>{t("mobile.ai.yourPlan")}</GroupedHeader>
       <GroupedList>
-        {(["claude", "chatgpt", "grok"] as const).map((c) => (
+        {(["claude", "chatgpt", "grok", "gemini"] as const).map((c) => (
           <GroupedRow
             key={c}
             leading={<ProviderLogo id={planMark(c)} size="sm" off={dims(c)} />}
@@ -953,7 +953,11 @@ function PlanSteps({
           kind={kind}
           // The Cloud's one computer goes unnamed in the account choice: the sign-in is about the account, not where.
           computer={edition === "cloud" ? t("connectAi.theComputer") : computer}
-          {...(isPlanId(choice) ? { provider: choice } : {})}
+          {...(isPlanId(choice)
+            ? { provider: choice }
+            : signInProviderOf(signedOut?.provider)
+              ? { provider: signInProviderOf(signedOut?.provider) }
+              : {})}
           again={hint ? hint.again : signedOut?.id}
           email={hint ? hint.email : signedOut?.email}
           local={view?.ownSignIn}

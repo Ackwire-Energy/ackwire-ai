@@ -76,6 +76,7 @@ test("config: new fields are read and checked; a home without a token isn't pair
     cursor: false,
     opencode: false,
     grok: false,
+    antigravity: false,
     commands: false,
   });
 
@@ -92,7 +93,7 @@ test("config: new fields are read and checked; a home without a token isn't pair
 test("a home paired before protocol 10 keeps its behaviour: every tool follows exec", () => {
   expect(effectiveAccess({ ...base, exec: true })).toEqual({
     folders: [],
-    tools: { claude: true, codex: true, cursor: true, opencode: true, grok: true, commands: true },
+    tools: { claude: true, codex: true, cursor: true, opencode: true, grok: true, antigravity: true, commands: true },
   });
   expect(effectiveAccess({ ...base, exec: false }).tools).toEqual({
     claude: false,
@@ -100,6 +101,7 @@ test("a home paired before protocol 10 keeps its behaviour: every tool follows e
     cursor: false,
     opencode: false,
     grok: false,
+    antigravity: false,
     commands: false,
   });
   expect(effectiveAccess(null).tools.commands).toBe(false);
@@ -115,6 +117,11 @@ test("access stored before Cursor's switch: Cursor follows Codex's, and once sto
   // Grok's switch (protocol 43) the same way.
   expect(effectiveAccess(access({ claude: true, codex: true, cursor: true, commands: true })).tools.grok).toBe(true);
   expect(effectiveAccess(access({ claude: true, codex: true, grok: false, commands: true })).tools.grok).toBe(false);
+  // The Antigravity CLI's (protocol 44) too.
+  expect(effectiveAccess(access({ claude: true, codex: true, commands: true })).tools.antigravity).toBe(true);
+  expect(
+    effectiveAccess(access({ claude: true, codex: true, antigravity: false, commands: true })).tools.antigravity,
+  ).toBe(false);
 });
 
 test("a write from an app without Cursor's switch keeps Cursor following Codex's", () => {

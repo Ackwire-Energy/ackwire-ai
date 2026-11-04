@@ -17,7 +17,7 @@ test("Connect for it offers every plan the phone offers, ChatGPT's too, and its 
   expect(sheet).not.toContain("claudeCodeOnly");
   expect(sheet).toContain('setBrain(orgId, one.id, { brain: "model" })');
   const steps = source("ConnectAiSteps.tsx");
-  expect(steps).toContain('(["claude", "chatgpt", "grok"] as const).map(');
+  expect(steps).toContain('(["claude", "chatgpt", "grok", "gemini"] as const).map(');
 });
 
 test("Settings › Lodi: the plan row opens Connect, and Atende outras pessoas is there for whoever sets its AI", () => {
@@ -29,7 +29,7 @@ test("Settings › Lodi: the plan row opens Connect, and Atende outras pessoas i
   expect(screen).toContain("<PlanReplies");
   expect(screen).toContain(".setBrain(orgId, agent.id, { onlyOwner: !on })");
   expect(screen).toContain("disabled={!view.canEdit}");
-  // Any plan's CLI: Claude Code's, Codex's, Cursor's, OpenCode's or Grok Build's.
+  // Any plan's CLI: Claude Code's, Codex's, Cursor's, OpenCode's, Grok Build's or the Antigravity CLI's.
   expect(screen).toContain('agent.brain && agent.brain.kind !== "model" ? agent.brain.kind : null');
   expect(screen).toContain("t(`aiAccounts.connect.$" + "{kind}`)");
 });

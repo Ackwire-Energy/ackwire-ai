@@ -51,7 +51,7 @@ import {
   planTitle,
   signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
-import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
+import { geminiPersonal, isPlanId, planOf, signInProviderOf } from "@agenteschat/client/lib/plans";
 import {
   AUTO,
   keyLooksValid,
@@ -565,9 +565,14 @@ export function PlanWithoutAgent({
         sub={t(`connectAi.plan.${choice}.tiers`)}
       />
       {has ? (
-        <SettingNote icon="check" live>
-          {t("connectAi.forNewAgents", { label: has.label })}
-        </SettingNote>
+        <>
+          <SettingNote icon="check" live>
+            {t("connectAi.forNewAgents", { label: has.label })}
+          </SettingNote>
+          {choice === "gemini" && geminiPersonal(has) && (
+            <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
+          )}
+        </>
       ) : (
         <>
           <GateWait
@@ -1080,7 +1085,11 @@ function PlanSteps({
           kind={kind}
           // The Cloud's one computer goes unnamed in the account choice: the sign-in is about the account, not where.
           computer={edition === "cloud" ? t("connectAi.theComputer") : computer}
-          {...(coding ? { provider: choice } : {})}
+          {...(coding
+            ? { provider: choice }
+            : signInProviderOf(signedOut?.provider)
+              ? { provider: signInProviderOf(signedOut?.provider) }
+              : {})}
           again={login ? login.again : signedOut?.id}
           email={turn && sameAs ? sameAs : login ? login.email : signedOut?.email}
           local={view?.ownSignIn}

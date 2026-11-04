@@ -4,6 +4,7 @@ import {
   ACCOUNTS_PROTOCOL,
   type AccountKind,
   type AccountLoginState,
+  ANTIGRAVITY_PROTOCOL,
   accountCodeAad,
   CURSOR_KEY_PROVIDER,
   CURSOR_PROTOCOL,
@@ -40,6 +41,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import {
+  GEMINI_ENTERPRISE_PROVIDER,
   isPlanId,
   loginPerAgent,
   type PlanId,
@@ -752,11 +754,11 @@ export async function refreshAiAccounts(deps: MachineAccountHubDeps, userId: str
  */
 export function sharesSignIns(
   machine: Pick<MachineRow, "protocol" | "executors">,
-  which: "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "key",
+  which: "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity" | "key",
 ): boolean {
   if (machine.protocol < SHARED_ACCOUNTS_PROTOCOL) return false;
   if (machine.executors?.mode !== "system") return true;
-  if (which === "cursor" || which === "opencode" || which === "grok") return false;
+  if (which === "cursor" || which === "opencode" || which === "grok" || which === "antigravity") return false;
   return (which !== "codex" || machine.protocol >= SHARED_CODEX_PROTOCOL) && SHARED_SIGN_INS[which];
 }
 
@@ -932,7 +934,10 @@ export async function beginAccountLogin(
   provider?: string,
 ): Promise<AccountLoginView> {
   if (!isAccountKind(kind)) {
-    throw new ValidationError("Choose claude_code, codex, cursor, opencode or grok", "account.invalid_kind");
+    throw new ValidationError(
+      "Choose claude_code, codex, cursor, opencode, grok or antigravity",
+      "account.invalid_kind",
+    );
   }
   if (email !== undefined && (kind !== "claude_code" || provider !== undefined || !isLoginEmail(email))) {
     throw new ValidationError("Use a plain email address, like ana@example.com", "account.invalid_email");
@@ -941,7 +946,9 @@ export async function beginAccountLogin(
   const cliKey =
     (kind === "cursor" && provider === CURSOR_KEY_PROVIDER) ||
     (kind === "opencode" && provider === OPENCODE_KEY_PROVIDER);
-  if (provider !== undefined && !cliKey && (kind !== "claude_code" || !isPlanId(provider))) {
+  // Not a key: Gemini Enterprise's sign-in (ADR 0143), kept as the account's provider.
+  const enterprise = kind === "antigravity" && provider === GEMINI_ENTERPRISE_PROVIDER;
+  if (provider !== undefined && !cliKey && !enterprise && (kind !== "claude_code" || !isPlanId(provider))) {
     throw new ValidationError("Choose one of the coding plans", "account.invalid_plan");
   }
   if (kind === "opencode" && !cliKey) {
@@ -965,13 +972,15 @@ export async function beginAccountLogin(
     machine,
     kind === "cursor"
       ? CURSOR_PROTOCOL
-      : kind === "grok"
-        ? GROK_PROTOCOL
-        : kind === "opencode"
-          ? OPENCODE_PROTOCOL
-          : plan
-            ? PLAN_KEYS_PROTOCOL
-            : ACCOUNTS_PROTOCOL,
+      : kind === "antigravity"
+        ? ANTIGRAVITY_PROTOCOL
+        : kind === "grok"
+          ? GROK_PROTOCOL
+          : kind === "opencode"
+            ? OPENCODE_PROTOCOL
+            : plan
+              ? PLAN_KEYS_PROTOCOL
+              : ACCOUNTS_PROTOCOL,
   );
   // Once for every agent of its owner there, where the runner can (protocol 29; ChatGPT's 38).
   const shared =
@@ -988,7 +997,7 @@ export async function beginAccountLogin(
       label: defaultAccountLabel(kind, [], provider),
       status: "signing_in",
       createdBy: userId,
-      provider: plan || cliKey ? provider : null,
+      provider: plan || cliKey || enterprise ? provider : null,
     });
   }
   const fail = async () => {
@@ -1004,7 +1013,7 @@ export async function beginAccountLogin(
       loginId,
       ...(again ? { again: true } : {}),
       ...(email ? { email } : {}),
-      ...(plan || cliKey ? { provider } : {}),
+      ...(plan || cliKey || enterprise ? { provider } : {}),
       ...(shared ? { shared: true } : {}),
     });
   } catch (error) {

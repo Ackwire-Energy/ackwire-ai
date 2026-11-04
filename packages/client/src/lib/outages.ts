@@ -17,7 +17,9 @@ export const brainName = (brain: string | null | undefined) =>
         ? "OpenCode"
         : brain === "grok"
           ? "Grok Build"
-          : "Claude Code";
+          : brain === "antigravity"
+            ? "Antigravity CLI"
+            : "Claude Code";
 
 /** `meta.brainUnavailable` of an agent's notice ("the computer brain can't answer; I'll answer when it's back"). */
 export interface BrainUnavailable {
@@ -48,7 +50,9 @@ export function brainUnavailableOf(meta: Record<string, unknown> | null | undefi
           ? "opencode"
           : o.brain === "grok" || params.brain === "Grok Build"
             ? "grok"
-            : "claude_code";
+            : o.brain === "antigravity" || params.brain === "Antigravity CLI"
+              ? "antigravity"
+              : "claude_code";
   return {
     brain,
     code: str(o.code),

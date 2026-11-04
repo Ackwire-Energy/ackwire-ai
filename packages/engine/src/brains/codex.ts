@@ -1,5 +1,6 @@
 import {
   type AgentScope,
+  ANTIGRAVITY_PROTOCOL,
   BRAIN_PROFILES_PROTOCOL,
   BRAIN_PROTOCOL,
   type BrainTurnRequest,
@@ -64,6 +65,7 @@ export interface ComputerBrainLink {
       cursor?: { version: string };
       opencode?: { version: string };
       grok?: { version: string };
+      antigravity?: { version: string };
     };
     /** The owner paused the computer (protocol 9; absent: not checked). */
     paused?: { until: string | null; timezone: string | null } | null;
@@ -78,6 +80,7 @@ export interface ComputerBrainLink {
         cursor?: boolean;
         opencode?: boolean;
         grok?: boolean;
+        antigravity?: boolean;
         commands: boolean;
       };
     } | null;
@@ -155,7 +158,7 @@ function channel<T>() {
  * protocol 36, no version gate, no live steering). Everything else, from the request to the events, is shared.
  */
 interface CliBrainSpec {
-  kind: "codex" | "cursor" | "opencode" | "grok";
+  kind: "codex" | "cursor" | "opencode" | "grok" | "antigravity";
   name: string;
   /** The runner protocol it needs. */
   protocol: number;
@@ -165,6 +168,7 @@ interface CliBrainSpec {
     cursor?: { version: string };
     opencode?: { version: string };
     grok?: { version: string };
+    antigravity?: { version: string };
   }): BrainEvent | null;
 }
 
@@ -238,8 +242,23 @@ const GROK_CLI: CliBrainSpec = {
         },
 };
 
+const ANTIGRAVITY_CLI: CliBrainSpec = {
+  kind: "antigravity",
+  name: "Antigravity CLI",
+  protocol: ANTIGRAVITY_PROTOCOL,
+  check: ({ antigravity }) =>
+    antigravity
+      ? null
+      : {
+          type: "error",
+          code: "antigravity_missing",
+          message: "The Antigravity CLI, Google's, is not installed on the computer.",
+          retryable: true,
+        },
+};
+
 export class CodexBrain implements Brain {
-  readonly kind: "codex" | "cursor" | "opencode" | "grok";
+  readonly kind: "codex" | "cursor" | "opencode" | "grok" | "antigravity";
 
   constructor(
     private readonly deps: CodexBrainDeps,
@@ -456,6 +475,17 @@ export class OpencodeBrain extends CodexBrain {
 export class GrokBrain extends CodexBrain {
   constructor(deps: CodexBrainDeps) {
     super(deps, GROK_CLI);
+  }
+}
+
+/**
+ * The Antigravity brain (ADR 0143): Google's Antigravity CLI (`agy`) on the agent's computer with a person's Google
+ * AI Pro or Ultra plan or a Gemini Enterprise seat, through the same `brain.turn` as Codex (`kind: "antigravity"`,
+ * runner protocol 44, `brain-antigravity.ts` there). A person's messages wait for the turn's end.
+ */
+export class AntigravityBrain extends CodexBrain {
+  constructor(deps: CodexBrainDeps) {
+    super(deps, ANTIGRAVITY_CLI);
   }
 }
 

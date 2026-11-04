@@ -1,6 +1,6 @@
 # 0142. The Grok brain: agents think with a person's Grok plan through Grok Build
 
-- Status: Accepted (2026-11-04; built: runner, engine, server, the shared client, the web and the phone app). The flags in §2 and §5 are read from Grok Build 1.0.34's own docs and `--help`, not yet run against a signed-in plan: the probes in §8 come before it ships.
+- Status: Accepted (2026-11-04; amended 2026-11-04 by ADR 0143, Gemini through Antigravity built; built: runner, engine, server, the shared client, the web and the phone app). The flags in §2 and §5 are read from Grok Build 1.0.34's own docs and `--help`, not yet run against a signed-in plan: the probes in §8 come before it ships.
 - Date: 2026-11-04
 - Extends: ADR 0032 (computer brains), ADR 0041 (accounts per agent), ADR 0053 §3 (permission profiles), ADR 0059 (AI accounts belong to people), ADR 0114 (the Cursor brain, whose shape this mirrors), ADR 0137 §4 (the team's right hand on a plan)
 
@@ -33,7 +33,7 @@ What the CLI does, read in its bundled docs (`docs/user-guide/02-authentication.
 
 ## Not done
 
-- **Gemini plans through Antigravity's CLI (`agy`)**: not built. Google's FAQ says wrapping `agy` inside third-party applications "is not supported under consumer plans" and "can result in suspension or termination of your account", which is a stated rule, not a gray area; `agy` also documents no sign-in command a runner could drive, no way to move its config folder per account and no deny-all for its tools. Gemini already thinks through the model brain with an API key, the route Google recommends. Waiting on the owner: Gemini Enterprise sign-ins only, consumer plans behind a plain warning, or neither.
+- **Gemini plans through Antigravity's CLI (`agy`)**: built since in ADR 0143 (the owner chose personal plans behind a plain warning, Gemini Enterprise and the API key, 2026-11-04). What follows was the reason it waited: Google's FAQ says wrapping `agy` inside third-party applications "is not supported under consumer plans" and "can result in suspension or termination of your account", which is a stated rule, not a gray area; `agy` also documents no sign-in command a runner could drive, no way to move its config folder per account and no deny-all for its tools. Gemini already thinks through the model brain with an API key, the route Google recommends. Waiting on the owner: Gemini Enterprise sign-ins only, consumer plans behind a plain warning, or neither.
 - The computer's own Grok sign-in; Grok's plan usage (shown only in its TUI); live steering.
 
 ## Consequences

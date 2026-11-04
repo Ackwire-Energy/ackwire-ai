@@ -371,14 +371,26 @@ describe("the agent a plan starts on, and the order of the plans", () => {
     expect(firstAgent([], () => false)).toBeUndefined();
   });
 
-  test("Claude, ChatGPT, Cursor, OpenCode, Grok, then the coding plans; ChatGPT signs in through Codex, the others through their own CLIs", () => {
-    expect(PLAN_CHOICES).toEqual(["claude", "chatgpt", "cursor", "zen", "grok", "zai", "kimi", "minimax", "opencode"]);
+  test("Claude, ChatGPT, Cursor, OpenCode, Grok, Gemini, then the coding plans; ChatGPT signs in through Codex, the others through their own CLIs", () => {
+    expect(PLAN_CHOICES).toEqual([
+      "claude",
+      "chatgpt",
+      "cursor",
+      "zen",
+      "grok",
+      "gemini",
+      "zai",
+      "kimi",
+      "minimax",
+      "opencode",
+    ]);
     expect(PLAN_CHOICES.map((c: PlanChoice) => kindOf(c))).toEqual([
       "claude_code",
       "codex",
       "cursor",
       "opencode",
       "grok",
+      "antigravity",
       "claude_code",
       "claude_code",
       "claude_code",
@@ -497,6 +509,12 @@ describe("All agents: one login per agent, the key pasted once", () => {
     expect(agentAi({ brain: { kind: "model", model: null } }, "ready")).toBe("key");
     expect(agentAi({ brain: { kind: "grok", model: null } }, "ready")).toBe("grok");
     expect([planOfKind("grok"), planMark("grok")]).toEqual(["grok", "grok"]);
+    expect(agentAi({ brain: { kind: "antigravity", model: null } }, "ready")).toBe("gemini");
+    expect([planOfKind("antigravity"), planMark("gemini"), kindOf("gemini")]).toEqual([
+      "gemini",
+      "gemini",
+      "antigravity",
+    ]);
     expect(agentAi({ brain: { kind: "model", model: null } }, "no_ai")).toBeNull();
     expect(agentAi(undefined, undefined)).toBeNull();
   });

@@ -13,7 +13,7 @@ import {
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
-import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
+import { isPlanId, planOf, signInProviderOf } from "@agenteschat/client/lib/plans";
 import {
   Button,
   Card,
@@ -333,7 +333,7 @@ function AgainDialog({
           again={a.id}
           email={a.email}
           local={local}
-          {...(isPlanId(a.provider) ? { provider: a.provider } : {})}
+          {...(signInProviderOf(a.provider) ? { provider: signInProviderOf(a.provider) } : {})}
           {...(fanOut ? { fanOut } : {})}
           onBack={onClose}
           onAdded={(_, login) => {

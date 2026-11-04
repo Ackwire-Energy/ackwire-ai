@@ -169,7 +169,10 @@ function accountOf(req: MachineRequest): { kind: AccountKind; account: string } 
         : null;
   if (cli === null || !("account" in req) || typeof req.account !== "string" || !req.account) return null;
   return {
-    kind: cli === "codex" || cli === "cursor" || cli === "opencode" || cli === "grok" ? cli : "claude_code",
+    kind:
+      cli === "codex" || cli === "cursor" || cli === "opencode" || cli === "grok" || cli === "antigravity"
+        ? cli
+        : "claude_code",
     account: req.account,
   };
 }

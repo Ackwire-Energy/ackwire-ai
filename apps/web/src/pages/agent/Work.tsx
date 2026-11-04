@@ -88,11 +88,13 @@ import {
   type BrainModelChoice,
   brainModelChoice,
   brainModelChoices,
+  geminiPersonal,
   isPlanId,
   PLAN_IDS,
   planFreeHint,
   planModel as planModelOf,
   planOf,
+  signInProviderOf,
 } from "@agenteschat/client/lib/plans";
 import { AUTO, apiProviderOf, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
 import { cleanSite, SITE } from "@agenteschat/client/lib/sites";
@@ -790,9 +792,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     "key",
     "claude",
     "chatgpt",
-    // Cursor (ADR 0114), OpenCode (ADR 0132) and Grok (ADR 0142) only where a computer here runs them, or the agent
+    // Cursor (ADR 0114), OpenCode (ADR 0132), Grok (ADR 0142) and Gemini (ADR 0143) only where a computer here runs them, or the agent
     // thinks with them: Connect an AI shows them always.
-    ...(["cursor", "zen", "grok"] as const).filter(
+    ...(["cursor", "zen", "grok", "gemini"] as const).filter(
       (c) =>
         savedCard === c ||
         [view.options, ...machines.map((m) => m.options)].flat().some((o) => o.kind === kindOf(c) && o.available),
@@ -1441,7 +1443,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                     kind={accountKind}
                     computer={computerName}
                     again={again?.id}
-                    {...(isPlanId(card) ? { provider: card } : {})}
+                    {...(isPlanId(card)
+                      ? { provider: card }
+                      : signInProviderOf(again?.provider)
+                        ? { provider: signInProviderOf(again?.provider) }
+                        : {})}
                     email={signingIn?.email}
                     local={view.ownSignIn}
                     onBack={() => setAdding(false)}
@@ -1464,6 +1470,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             };
           })}
         />
+        {card === "gemini" && adding === false && geminiPersonal(accounts.find((a) => a.id === account)) && (
+          <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
+        )}
         {toolOffHere && (
           <SettingNote icon="settings">
             {t("machines.thisMac.toolsOff")}

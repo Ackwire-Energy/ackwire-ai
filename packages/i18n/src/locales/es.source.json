@@ -34565,5 +34565,77 @@
   },
   "chat.body.action_open_page": {
     "value": "Open a screen"
+  },
+  "noAi.notSignedIn.antigravity": {
+    "value": "Gemini isn't signed in on this computer. Connect a Gemini account on {{name}}'s page."
+  },
+  "connectAi.title.gemini": {
+    "value": "Connect your Gemini plan"
+  },
+  "connectAi.plan.gemini.title": {
+    "value": "Your Gemini plan"
+  },
+  "connectAi.plan.gemini.tiers": {
+    "value": "Google AI Pro, Google AI Ultra or Gemini Enterprise"
+  },
+  "connectAi.plan.gemini.warning": {
+    "value": "Google says using a personal Gemini plan inside other apps can get the account suspended. To avoid that risk, use an API key or Gemini Enterprise."
+  },
+  "connectAi.otherAccount.antigravity": {
+    "value": "Gemini signed in as {{email}}, not {{account}}. Sign out on Google's page and try again."
+  },
+  "agentPage.work.brain.add.title.antigravity": {
+    "value": "Add a Gemini account"
+  },
+  "agentPage.work.brain.add.stepOne.antigravity": {
+    "value": "The Google account with your plan"
+  },
+  "agentPage.work.brain.add.stepOne.antigravityEnterprise": {
+    "value": "Your Gemini Enterprise account"
+  },
+  "agentPage.work.brain.add.open.antigravity": {
+    "value": "Sign in with Google"
+  },
+  "agentPage.work.brain.add.geminiEnterprise": {
+    "value": "Use Gemini Enterprise instead"
+  },
+  "agentPage.work.brain.add.geminiPersonal": {
+    "value": "Use a personal Google account instead"
+  },
+  "agentPage.work.brain.add.duplicate.antigravity": {
+    "value": "Gemini signed in as {{account}}, an account you already connected. To use another, sign out on Google's page and try again."
+  },
+  "aiAccounts.connect.antigravity": {
+    "value": "Gemini"
+  },
+  "aiAccounts.connect.needsCloud.antigravity": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "brain.line.gemini": {
+    "value": "{{model}} on the Gemini plan"
+  },
+  "brain.line.geminiOf": {
+    "value": "{{model}} on {{owner}}'s Gemini plan"
+  },
+  "brain.line.geminiAuto": {
+    "value": "Gemini plan"
+  },
+  "brain.line.geminiAutoOf": {
+    "value": "{{owner}}'s Gemini plan"
+  },
+  "brain.card.antigravity": {
+    "value": "Antigravity CLI"
+  },
+  "brain.antigravityText": {
+    "value": "Uses the Gemini plan of whoever connected the computer."
+  },
+  "brain.summary.antigravity": {
+    "value": "Antigravity CLI · {{model}}"
+  },
+  "machines.access.tool.antigravity": {
+    "value": "Antigravity CLI"
+  },
+  "machines.access.toolText.antigravity": {
+    "value": "Like Claude Code, with a Gemini account. Only in the allowed folders."
   }
 }

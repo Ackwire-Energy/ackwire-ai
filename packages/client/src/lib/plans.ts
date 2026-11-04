@@ -2,6 +2,7 @@ import {
   CODING_PLANS,
   type CodingPlan,
   claudeCodeModel,
+  GEMINI_ENTERPRISE_PROVIDER,
   type PlanModel,
   planModel,
   planModelValue,
@@ -107,6 +108,13 @@ export function signInKey(provider: string | undefined, kind: string, cursorKey:
     : { plan: undefined, provider: undefined };
 }
 
+/**
+ * A Gemini plan chosen on a personal Google account, or with no account yet (ADR 0143): Google's warning about other
+ * apps shows plainly there, on the web and the phone. A Gemini Enterprise seat has only the usual note.
+ */
+export const geminiPersonal = (account: { provider?: string | null } | undefined) =>
+  account?.provider !== GEMINI_ENTERPRISE_PROVIDER;
+
 export const planName = (plan: string) => plan.charAt(0).toUpperCase() + plan.slice(1);
 
 /** Team and enterprise seats are one person's each, not a personal subscription. */
@@ -131,7 +139,7 @@ export function planReplies(
     agent: string | null;
     /** The plan's owner, to anyone else (an admin): "pelo plano do Claude de Walter". Absent: the viewer's own. */
     owner?: string;
-    brain: "claude_code" | "codex" | "cursor" | "opencode" | "grok";
+    brain: "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
     /** The account's plan as the CLI says it (`max`, `team`…): a seat has its own words. */
     plan?: string | null;
     coding?: CodingPlan;

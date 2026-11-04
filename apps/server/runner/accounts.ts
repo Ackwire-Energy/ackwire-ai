@@ -27,6 +27,7 @@ import {
 import { generateSecretKeyPair, openSecret, redactSecrets } from "@agenteschat/adapters/secret-box";
 import {
   type CodingPlan,
+  GEMINI_ENTERPRISE_PROVIDER,
   isPlanId,
   PLAN_ALIASES,
   type PlanId,
@@ -34,9 +35,11 @@ import {
   planModel,
   planOf,
 } from "@agenteschat/providers/plans";
+import { agyAuthOf, writeAgySettings } from "./agy-home";
 import { errnoCode, RunnerError } from "./errors";
 import { killTree } from "./exec";
 import {
+  AGY_BIN,
   CURSOR_BIN,
   claudeKeptPlan,
   claudePlan,
@@ -47,6 +50,7 @@ import {
 } from "./executors";
 import { readSmallJson, writeJson } from "./json-file";
 import {
+  antigravityUsage,
   codexUsage,
   fetchPlanKeyUsage,
   probeClaudeUsage,
@@ -126,6 +130,7 @@ const LABEL: Record<AccountKind, string> = {
   cursor: "Cursor",
   opencode: "OpenCode",
   grok: "Grok Build",
+  antigravity: "The Antigravity CLI",
 };
 /** Cursor's CLI keeps its config in `CURSOR_CONFIG_DIR` (cursor.com/docs/cli/reference/configuration). */
 const ENV_VAR: Record<AccountKind, string> = {
@@ -136,6 +141,8 @@ const ENV_VAR: Record<AccountKind, string> = {
   opencode: "XDG_DATA_HOME",
   // Its sign-in (`auth.json`), config, sessions and leader socket.
   grok: "GROK_HOME",
+  // `agy` documents no config folder of its own (ADR 0143): the account's folder is its whole home.
+  antigravity: "HOME",
 };
 const LOGIN_ARGS: Record<AccountKind, string[]> = {
   claude_code: ["auth", "login"],
@@ -145,6 +152,8 @@ const LOGIN_ARGS: Record<AccountKind, string[]> = {
   opencode: ["auth", "login"],
   // The device code: the person signs in on xAI's page from any device, nothing listens on the computer.
   grok: ["login", "--device-auth"],
+  // Google's sign-in by a pasted code, then it exits (antigravity.google/docs/ide/extensions/acp).
+  antigravity: ["acp", "--login"],
 };
 const STATUS_ARGS: Record<AccountKind, string[]> = {
   claude_code: ["auth", "status", "--json"],
@@ -153,6 +162,8 @@ const STATUS_ARGS: Record<AccountKind, string[]> = {
   opencode: ["auth", "list"],
   // Grok Build has no status command: `grok models` says "You are not authenticated." when signed out.
   grok: ["models"],
+  // No status command either: `agy models` lists the account's models once it is signed in.
+  antigravity: ["models"],
 };
 const LOGOUT_ARGS: Record<AccountKind, string[]> = {
   claude_code: ["auth", "logout"],
@@ -160,6 +171,8 @@ const LOGOUT_ARGS: Record<AccountKind, string[]> = {
   cursor: ["logout"],
   opencode: ["auth", "logout"],
   grok: ["logout"],
+  // `/logout`, answered by the CLI itself in print mode; deleting the folder ends the sign-in anyway.
+  antigravity: ["-p", "/logout"],
 };
 /** Each CLI's executable (Cursor's was `cursor-agent` before it was renamed). */
 const COMMAND: Record<AccountKind, string> = {
@@ -168,6 +181,7 @@ const COMMAND: Record<AccountKind, string> = {
   cursor: CURSOR_BIN,
   opencode: OPENCODE_BIN,
   grok: GROK_BIN,
+  antigravity: AGY_BIN,
 };
 
 /** What a brain turn says when its account folder is gone (people read it). */
@@ -181,14 +195,19 @@ export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
   opencode:
     "The OpenCode account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
   grok: "The Grok account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
+  antigravity:
+    "The Gemini account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
 };
 
 /**
  * What would make a CLI think with anything but its folder's sign-in: a key, a token, another endpoint or cloud. Every
- * `GROK_` switch too (folder trust, memory, managed config, sandbox…): Grok Build gets only `GROK_QUIET_ENV`'s.
+ * `GROK_` switch too (folder trust, memory, managed config, sandbox…): Grok Build gets only `GROK_QUIET_ENV`'s. And
+ * every way the Antigravity CLI thinks without its sign-in: a Gemini or Google key, Application Default Credentials,
+ * Vertex and Google Cloud switches, another endpoint, the enterprise gateway (`AGY_LLM_GATEWAY_*`) and every other
+ * `AGY_` switch (it gets only `AGY_QUIET_ENV`'s).
  */
 const STRAY_SIGN_IN =
-  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY|CURSOR_API_KEY|OPENCODE_API_KEY|OPENCODE_AUTH_CONTENT|XAI_API_KEY|GROK_\w+)$/;
+  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY|CURSOR_API_KEY|OPENCODE_API_KEY|OPENCODE_AUTH_CONTENT|XAI_API_KEY|GROK_\w+|GEMINI_API_KEY|GOOGLE_API_KEY|GOOGLE_APPLICATION_CREDENTIALS|GOOGLE_GEMINI_BASE_URL|GOOGLE_GENAI_\w+|GOOGLE_CLOUD_\w+|AGY_\w+)$/;
 
 /** `base` without any key, token, endpoint or cloud a CLI would think with instead of its own sign-in. */
 export function withoutSignIns(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -215,6 +234,18 @@ export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessE
     env.XDG_STATE_HOME = dir;
   }
   if (kind === "grok") Object.assign(env, GROK_QUIET_ENV);
+  if (kind === "antigravity") {
+    // Everything Go and the CLI keep under the home stays in the account's folder; no D-Bus session, so the CLI
+    // skips the keyring and keeps its sign-in in its own file there (changelog 1.2.x: "bypasses the keyring when no
+    // D-Bus session bus is present").
+    env.XDG_CONFIG_HOME = path.join(dir, ".config");
+    env.XDG_CACHE_HOME = path.join(dir, ".cache");
+    env.XDG_DATA_HOME = path.join(dir, ".local", "share");
+    env.XDG_STATE_HOME = path.join(dir, ".local", "state");
+    delete env.DBUS_SESSION_BUS_ADDRESS;
+    delete env.SSH_AUTH_SOCK;
+    Object.assign(env, AGY_QUIET_ENV);
+  }
   return env;
 }
 
@@ -243,6 +274,13 @@ export const GROK_QUIET_ENV: Readonly<Record<string, string>> = {
   GROK_DISABLE_AUTOUPDATER: "1",
   // Memory is shared by every turn on the account (several agents', Lodi's): forced off whatever a config says.
   GROK_MEMORY: "0",
+};
+
+/** What every Antigravity CLI process gets (ADR 0143): no updates of its own (the image pins it), no logo. */
+export const AGY_QUIET_ENV: Readonly<Record<string, string>> = {
+  AGY_CLI_DISABLE_AUTO_UPDATE: "true",
+  AGY_CLI_HIDE_LOGO: "1",
+  AGY_CLI_OSC7501: "off",
 };
 
 /** A Cursor account made with an API key keeps it here (600). */
@@ -929,6 +967,35 @@ export function parseGrokStatus(
   return { loggedIn: hasAuth && status === 0 && !/not (?:authenticated|logged in|signed in)/i.test(stripAnsi(output)) };
 }
 
+/**
+ * The Antigravity CLI's sign-in (`agy acp --login`): the first https URL on Google's accounts pages. The code Google
+ * shows after the sign-in is pasted back (`code`), as with Claude Code.
+ */
+export function parseAgyLoginUrl(output: string, final = false): string | null {
+  return urlsIn(stripAnsi(output), (h) => hostIs(h, "accounts.google.com"), final)[0]?.url ?? null;
+}
+
+/**
+ * `agy models`: signed in when it lists models and says nothing about signing in. An Enterprise sign-in says so in its
+ * settings (`provider: "enterprise"`).
+ */
+export function parseAgyStatus(
+  status: number | null,
+  output: string,
+  auth: string | null,
+): Omit<RunnerAccountInfo, "id" | "kind"> {
+  const text = stripAnsi(output);
+  const loggedIn =
+    status === 0 &&
+    /^\s*gemini-[\w.-]+\s{2,}\S/im.test(text) &&
+    !/auth(?:entication)? required|not (?:authenticated|logged in|signed in)|sign in/i.test(text);
+  // A seat: "Atende outras pessoas" says a seat's words for it.
+  return {
+    loggedIn,
+    ...(auth === "oauth-business" ? { provider: GEMINI_ENTERPRISE_PROVIDER, plan: "enterprise" } : {}),
+  };
+}
+
 /** Cursor's sign-in link (`agent login` with `NO_OPEN_BROWSER`): the first complete https URL on cursor.com. */
 export function parseCursorLoginUrl(output: string, final = false): string | null {
   return urlsIn(stripAnsi(output), (h) => hostIs(h, "cursor.com") || hostIs(h, "cursor.sh"), final)[0]?.url ?? null;
@@ -1035,6 +1102,8 @@ export interface AccountManagerOptions {
   onChange?: () => void;
   /** System mode: folders are lent to agents' users (`lendTo`); `chown` never follows a link (tests: a fake). */
   lending?: { chown: Chown };
+  /** Tests: the platform (the Antigravity CLI signs in only on Linux here). */
+  platform?: NodeJS.Platform;
 }
 
 /** The real `lending.chown`. */
@@ -1188,18 +1257,24 @@ export class AccountManager {
         : kind === "opencode" && provider === OPENCODE_KEY_PROVIDER
           ? OPENCODE_KEY_PROVIDER
           : null;
-    if (provider !== undefined && !cliKey && (kind !== "claude_code" || !isPlanId(provider))) {
+    const enterprise = kind === "antigravity" && provider === GEMINI_ENTERPRISE_PROVIDER;
+    if (provider !== undefined && !cliKey && !enterprise && (kind !== "claude_code" || !isPlanId(provider))) {
       throw new RunnerError("bad_request", "This computer doesn't know that plan");
     }
     if (kind === "opencode" && !cliKey) {
       throw new RunnerError("bad_request", "OpenCode signs in with its API key");
+    }
+    // ADR 0143: elsewhere the CLI keeps every sign-in in the one keychain of the computer's user, so two accounts
+    // would be one.
+    if (kind === "antigravity" && (this.opts.platform ?? process.platform) !== "linux") {
+      throw new RunnerError("bad_request", "Gemini accounts sign in on Linux computers only, for now.");
     }
     if (this.logins.get(loginId)?.state === "waiting") {
       throw new RunnerError("bad_request", "This sign-in already exists");
     }
     // Each one is a CLI waiting up to its TTL, and anyone in a workspace can start one on its shared computer.
     const running = [...this.logins.values()].filter((l) => l.state === "waiting" && (l.child || l.term)).length;
-    if (!provider && running >= SIGN_INS_AT_ONCE) {
+    if ((!provider || enterprise) && running >= SIGN_INS_AT_ONCE) {
       throw new RunnerError(
         "bad_request",
         "Too many sign-ins are in progress on this computer. Try again in a few minutes.",
@@ -1225,8 +1300,9 @@ export class AccountManager {
         throw new RunnerError("bad_request", "This computer already has too many accounts. Remove one first.");
       }
     }
-    // Claude Code: the key the browser seals the pasted code (or a plan's key) to; the private half stays in memory.
-    const pair = kind === "claude_code" || cliKey ? await generateSecretKeyPair() : undefined;
+    // Claude Code and the Antigravity CLI: the key the browser seals the pasted code (or a plan's key) to; the private
+    // half stays in memory.
+    const pair = kind === "claude_code" || kind === "antigravity" || cliKey ? await generateSecretKeyPair() : undefined;
     if (!again) {
       // System mode: agents' users pass through to the one folder lent to each, and list nothing.
       const parents = this.opts.lending ? 0o711 : 0o700;
@@ -1244,7 +1320,10 @@ export class AccountManager {
       await writeFile(path.join(dir, SIGNING_IN), "", { mode: 0o600 });
     }
     if (cliKey && pair) return this.beginKey(kind, loginId, dir, cliKey, pair, again, false);
-    if (provider && pair) return this.beginKey(kind, loginId, dir, provider as PlanId, pair, again, forAll);
+    if (provider && pair && !enterprise)
+      return this.beginKey(kind, loginId, dir, provider as PlanId, pair, again, forAll);
+    // Which Google sign-in the CLI asks for: a personal account's, or Gemini Enterprise's.
+    if (kind === "antigravity") writeAgySettings(dir, enterprise ? "oauth-business" : "oauth-personal");
 
     const login: Login = {
       id: loginId,
@@ -1282,9 +1361,11 @@ export class AccountManager {
           ? parseCodexLogin(login.output, final)
           : kind === "grok"
             ? parseGrokLogin(login.output, final)
-            : kind === "cursor"
-              ? toUrl(parseCursorLoginUrl(login.output, final))
-              : toUrl(parseClaudeLoginUrl(this.shown(login), final));
+            : kind === "antigravity"
+              ? toUrl(parseAgyLoginUrl(login.output, final))
+              : kind === "cursor"
+                ? toUrl(parseCursorLoginUrl(login.output, final))
+                : toUrl(parseClaudeLoginUrl(this.shown(login), final));
       let done = false;
       const finish = (v: { url: string; userCode?: string } | null) => {
         if (done) return;
@@ -1468,7 +1549,7 @@ export class AccountManager {
   async code(loginId: string, aad: string, box: WireSecretBox): Promise<void> {
     const login = this.waiting(loginId);
     const cliKey = login.provider === CURSOR_KEY_PROVIDER || login.provider === OPENCODE_KEY_PROVIDER;
-    if ((login.kind !== "claude_code" && !cliKey) || !login.privateKey) {
+    if ((login.kind !== "claude_code" && login.kind !== "antigravity" && !cliKey) || !login.privateKey) {
       throw new RunnerError("bad_request", "This sign-in doesn't take a code");
     }
     const org = this.opts.orgId?.();
@@ -1762,7 +1843,9 @@ export class AccountManager {
           ? parseCursorStatus(r.status, `${r.stdout}\n${r.stderr}`)
           : kind === "grok"
             ? parseGrokStatus(r.status, `${r.stdout}\n${r.stderr}`, existsSync(path.join(dir, "auth.json")))
-            : parseCodexStatus(r.status, `${r.stdout}\n${r.stderr}`);
+            : kind === "antigravity"
+              ? parseAgyStatus(r.status, `${r.stdout}\n${r.stderr}`, agyAuthOf(dir))
+              : parseCodexStatus(r.status, `${r.stdout}\n${r.stderr}`);
     return { id, kind, ...status, ...shared };
   }
 
@@ -2148,6 +2231,12 @@ export class AccountManager {
     // Cursor's CLI reports no plan usage: its turns' `usage` is all there is.
     // Nor does OpenCode's: its key's usage is on OpenCode's console. Grok Build shows its plan's only in its TUI.
     if (target.kind === "cursor" || target.kind === "opencode" || target.kind === "grok") return null;
+    // The Antigravity CLI answers `/usage` itself in print mode: the plan's quotas and when they refresh.
+    if (target.kind === "antigravity") {
+      if (own) return null;
+      const r = await runCli(probe.command, ["-p", "/usage"], probe.env, timeoutMs ?? STATUS_TIMEOUT_MS);
+      return r.status === 0 ? antigravityUsage(r.stdout, "probe") : null;
+    }
     return target.kind === "codex" ? probeCodexUsage(probe) : probeClaudeUsage(probe);
   }
 

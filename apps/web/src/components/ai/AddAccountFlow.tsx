@@ -9,7 +9,7 @@ import {
   loginReadPasses,
   otherThanHint,
 } from "@agenteschat/client/lib/machines";
-import { type PlanId, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
+import { GEMINI_ENTERPRISE_PROVIDER, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
 import { Button, cx, Icon, InfoHint, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -29,7 +29,9 @@ import { openPopup, sendPopup } from "@/lib/popup";
  * then the device page and the one-time code to type there. A coding plan:
  * its own key page, then the key, sealed the same way; it never reaches our
  * server. Cursor (ADR 0114): its sign-in page, and the computer finishes by
- * itself; or, chosen under it, a Cursor API key, sent like a plan's key. "Paste" shows only while the field is empty. Every start is a click,
+ * itself; or, chosen under it, a Cursor API key, sent like a plan's key. Gemini (ADR 0143): Google's sign-in page,
+ * then the code it shows, pasted like Claude's; a personal Google account under the plain warning about Google's
+ * terms, or (chosen under it) Gemini Enterprise. "Paste" shows only while the field is empty. Every start is a click,
  * never the block showing. The page asks every 2 s; Back or closing stops
  * the sign-in on the computer. "Copy link" beside a sign-in's button copies
  * its link instead, to open in another browser or profile (it begins the
@@ -46,8 +48,8 @@ export interface AddAccountProps {
   machineId: string;
   kind: MachineAccountKind;
   computer: string;
-  /** A coding plan's key account on Claude Code. */
-  provider?: PlanId;
+  /** A coding plan's key account on Claude Code, or a Gemini Enterprise sign-in (`signInProviderOf`). */
+  provider?: string;
   /** Sign in again to this account (signed out): same account, same agents. */
   again?: string;
   /**
@@ -210,6 +212,9 @@ function AddAccountFlow({
   // Cursor: its sign-in, or (chosen under it) its API key, which goes like a coding plan's key.
   const [cursorKey, setCursorKey] = useState(false);
   const { plan, provider: keyProvider } = signInKey(provider, kind, cursorKey);
+  // Gemini: a personal Google account, or (chosen under it, or the account's own) Gemini Enterprise.
+  const [enterprise, setEnterprise] = useState(provider === GEMINI_ENTERPRISE_PROVIDER);
+  const signInProvider = keyProvider ?? (kind === "antigravity" && enterprise ? GEMINI_ENTERPRISE_PROVIDER : undefined);
   const [login, setLogin] = useState<AccountLoginStart | null>(null);
   const [starting, setStarting] = useState(false);
   const [startFailed, setStartFailed] = useState(false);
@@ -255,7 +260,7 @@ function AddAccountFlow({
     try {
       const l = await beginLogin((input) => api.machines.beginAccountLogin(org.id, machineId, kind, input), kind, {
         again,
-        provider: keyProvider,
+        provider: signInProvider,
         hint,
       });
       if (gone.current) {
@@ -667,6 +672,43 @@ function AddAccountFlow({
         {!login && !again && (
           <Button size="sm" variant="ghost" icon="key" onClick={() => setCursorKey(true)}>
             {t("agentPage.work.brain.add.cursorKey")}
+          </Button>
+        )}
+      </>
+    );
+  } else if (kind === "antigravity") {
+    steps = (
+      <>
+        {!enterprise && <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>}
+        <Step side={signIn(signInLabel ?? t("agentPage.work.brain.add.open.antigravity"))}>
+          <StepTitle
+            title={t(
+              enterprise
+                ? "agentPage.work.brain.add.stepOne.antigravityEnterprise"
+                : "agentPage.work.brain.add.stepOne.antigravity",
+            )}
+            hint={signInHint}
+          />
+          {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
+        </Step>
+        {login && opened && (
+          <Step side={busy && !reads.includes("reconnecting") ? undefined : waiting}>
+            <label htmlFor={codeId}>
+              <b>{t("agentPage.work.brain.add.stepTwo")}</b>
+            </label>
+            {busy
+              ? busyLine
+              : pasteRow(
+                  t("agentPage.work.brain.add.codeLabel"),
+                  t("agentPage.work.brain.add.codeLabel"),
+                  false,
+                  key.length > 0,
+                )}
+          </Step>
+        )}
+        {!login && !again && (
+          <Button size="sm" variant="ghost" onClick={() => setEnterprise((on) => !on)}>
+            {t(enterprise ? "agentPage.work.brain.add.geminiPersonal" : "agentPage.work.brain.add.geminiEnterprise")}
           </Button>
         )}
       </>

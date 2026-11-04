@@ -46,6 +46,8 @@ export interface MachineExecutors {
   opencode?: { version: string; models?: { id: string; label?: string; free?: boolean }[] };
   /** Grok Build, xAI's CLI (protocol 43, ADR 0142), and the models it lists. */
   grok?: { version: string; models?: { id: string; label?: string }[] };
+  /** Google's Antigravity CLI (protocol 44, ADR 0143), and the models it lists. */
+  antigravity?: { version: string; models?: { id: string; label?: string }[] };
   /** `hello.browser` (ADR 0040): whether the agent browser can run there; absent = not reported. */
   browser?: { available: boolean; version?: string; chrome?: string; reason?: string; chromeMissing?: true };
   /** `hello.desktop` (ADR 0058): whether the agents' desktops can run there; absent = not reported. */
@@ -63,6 +65,7 @@ export interface MachineExecutors {
     cursor?: MachinePlanUsage;
     opencode?: MachinePlanUsage;
     grok?: MachinePlanUsage;
+    antigravity?: MachinePlanUsage;
   };
   detectedAt?: string;
 }
@@ -114,6 +117,7 @@ export interface MachineAccess {
     cursor?: boolean;
     opencode?: boolean;
     grok?: boolean;
+    antigravity?: boolean;
     commands: boolean;
     browser?: boolean;
     desktop?: boolean;

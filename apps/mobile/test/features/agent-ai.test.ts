@@ -3,7 +3,7 @@ import type { AgentBrain, Credential, MachineAccount, PlanUsage } from "@agentes
 import { newAgentStart } from "@agenteschat/client/lib/agent-setup";
 import { accountTitle, ownSignInTitle } from "@agenteschat/client/lib/ai-accounts";
 import { setupPlanQuestion } from "@agenteschat/client/lib/audience";
-import { CURSOR_KEY_PLAN, planOf, planReplies, signInKey } from "@agenteschat/client/lib/plans";
+import { CURSOR_KEY_PLAN, geminiPersonal, planOf, planReplies, signInKey } from "@agenteschat/client/lib/plans";
 import { markOf } from "@agenteschat/ui/brand/marks";
 import type { TFunction } from "i18next";
 import {
@@ -131,6 +131,15 @@ describe("the agent's AI", () => {
     expect(says(pt, false, { brain: "grok", plan: null }).text).toBe(
       "Os planos do Grok são para uso pessoal. Deixar outras pessoas usarem o seu é uma zona cinzenta nos termos do Grok.",
     );
+    // A Gemini Enterprise seat (ADR 0143): a seat's usual words; a personal plan has Google's warning, said plainly.
+    expect(says(en, false, { brain: "antigravity", plan: "enterprise" }).line).toBe(
+      "Ada answers only you, on your Gemini seat.",
+    );
+    expect(pt("connectAi.plan.gemini.warning")).toBe(
+      "O Google diz que usar um plano pessoal do Gemini dentro de outros apps pode suspender a conta. Para não correr esse risco, use uma chave de API ou o Gemini Enterprise.",
+    );
+    expect(geminiPersonal({ provider: "enterprise" })).toBe(false);
+    expect(geminiPersonal(undefined)).toBe(true);
     expect(says(pt, true, { agent: "Theo" }).line).toBe(
       "O Theo atende quem pode falar com ele, pelo seu plano do Claude.",
     );
@@ -284,8 +293,8 @@ describe("the agent's AI", () => {
     // The flow is a component the tests can't render: what it wires in, as text.
     const flow = await Bun.file(new URL("../../src/features/ai/AddAccount.tsx", import.meta.url).pathname).text();
     expect(flow).toContain("const busy = (sending || sent) && !ended;");
-    // Claude's code and a plan's key: the line in place of the field and its button, never beside them.
-    expect(flow.match(/\{busy\s+\? busyLine\s+: pasteRow\(/g)).toHaveLength(2);
+    // Claude's code, Gemini's and a plan's key: the line in place of the field and its button, never beside them.
+    expect(flow.match(/\{busy\s+\? busyLine\s+: pasteRow\(/g)).toHaveLength(3);
     expect(flow).toMatch(/<Note icon=\{<InkOrbit size=\{15\} \/>\} live>\s*\{busyText\}/);
     // A failed send brings the field back with what was in it: only a code that went clears it.
     expect(flow).toMatch(/setSent\(true\);\s+setCode\(""\);/);

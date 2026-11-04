@@ -1174,6 +1174,8 @@
     "paused": "一時停止中: 今週その決定を3回取り消しました。いつでもオンに戻せます。",
     "card": {
       "deciding": "{{name}}が{{for}}の代わりに確認しています…",
+      "approvedForYou": "{{name}}があなたの代わりに承認",
+      "decidingForYou": "{{name}}があなたの代わりに確認しています…",
       "approved": "{{name}}が{{for}}の代わりに承認",
       "passed": "{{name}}があなたに回しました",
       "passedWhy": "{{name}}があなたに回しました: {{reason}}",
@@ -1185,9 +1187,7 @@
       "why": "理由",
       "undo": "取り消す",
       "undoArchives": "取り消すと{{name}}をアーカイブします。{{until}}まで有効です。",
-      "undoSettings": "取り消すと設定が元に戻ります。{{until}}まで有効です。",
-      "approvedForYou": "{{name}}があなたの代わりに承認",
-      "decidingForYou": "{{name}}があなたの代わりに確認しています…"
+      "undoSettings": "取り消すと設定が元に戻ります。{{until}}まで有効です。"
     }
   },
   "noticePrefs": {
@@ -1918,6 +1918,7 @@
       "codex": "このコンピューターでCodexにログインしていません。{{name}}のページでChatGPTアカウントを接続してください。",
       "cursor": "このコンピューターでCursorにログインしていません。{{name}}のページでCursorアカウントを接続してください。",
       "grok": "このコンピューターでGrokにログインしていません。{{name}}のページでGrokアカウントを接続してください。",
+      "antigravity": "このコンピューターでGeminiにログインしていません。{{name}}のページでGeminiアカウントを接続してください。",
       "opencode": "このコンピューターではOpenCodeが動きません。{{name}}のページでOpenCodeのキーを接続してください。"
     },
     "card": {
@@ -1947,6 +1948,7 @@
       "chatgpt": "ChatGPTのプランを接続",
       "cursor": "Cursorのプランを接続",
       "grok": "Grokのプランを接続",
+      "gemini": "Geminiのプランを接続",
       "zen": "OpenCodeを接続",
       "api_key": "APIキーを追加"
     },
@@ -1973,6 +1975,11 @@
       "grok": {
         "title": "あなたのGrokプラン",
         "tiers": "SuperGrok、SuperGrok Heavy、X Premium+"
+      },
+      "gemini": {
+        "title": "あなたのGeminiプラン",
+        "tiers": "Google AI Pro、Google AI Ultra、またはGemini Enterprise",
+        "warning": "Googleによると、個人のGeminiプランを他のアプリ内で使うと、アカウントが停止されることがあります。このリスクを避けるには、APIキーかGemini Enterpriseを使ってください。"
       },
       "zen": {
         "title": "OpenCode",
@@ -2050,6 +2057,7 @@
       "codex": "ChatGPTは{{account}}ではなく{{email}}でログインしています。ChatGPTのページでログアウトして、もう一度お試しください。",
       "cursor": "Cursorは{{account}}ではなく{{email}}でログインしています。Cursorのページでログアウトして、もう一度お試しください。",
       "grok": "Grokは{{account}}ではなく{{email}}でログインしています。Grokのページでログアウトして、もう一度お試しください。",
+      "antigravity": "Geminiは{{account}}ではなく{{email}}でログインしています。Googleのページでログアウトして、もう一度お試しください。",
       "opencode": "OpenCodeは{{account}}ではなく{{email}}でログインしました。正しいキーでもう一度お試しください。"
     },
     "useAnyway": "{{email}}を使う",
@@ -3543,24 +3551,30 @@
             "codex": "ChatGPTアカウントを追加",
             "cursor": "Cursorアカウントを追加",
             "grok": "Grokアカウントを追加",
+            "antigravity": "Geminiアカウントを追加",
             "opencode": "OpenCodeのキーを追加"
           },
           "stepOne": {
             "claude_code": "プランを契約しているアカウント",
             "codex": "プランを契約しているアカウント",
             "cursor": "プランを契約しているアカウント",
-            "grok": "プランを契約しているアカウント"
+            "grok": "プランを契約しているアカウント",
+            "antigravity": "プランを契約しているGoogleアカウント",
+            "antigravityEnterprise": "あなたのGemini Enterpriseアカウント"
           },
           "stepOneHint": "アカウントが違いますか？ そちらでログアウトしてからもう一度お試しください。アカウントは{{computer}}にだけ保存されます。パスワードは{{brand}}のページで入力します。",
           "open": {
             "claude_code": "Claudeでログイン",
             "codex": "ChatGPTでログイン",
             "cursor": "Cursorでログイン",
-            "grok": "Grokでログイン"
+            "grok": "Grokでログイン",
+            "antigravity": "Googleでログイン"
           },
           "opencodeFree": "OpenCodeの無料モデルにキーは不要です。OpenCodeのコンソールのキーで有料モデルも使えます。",
           "cursorFinish": "Cursorのページでログインすると、{{computer}}でのログインは自動で完了します。",
           "grokFinish": "Grokのページでログインすると、{{computer}}でのログインは自動で完了します。",
+          "geminiEnterprise": "代わりにGemini Enterpriseを使う",
+          "geminiPersonal": "代わりに個人のGoogleアカウントを使う",
           "cursorKey": "代わりにCursorのAPIキーを使う",
           "copyLink": "リンクをコピー",
           "openAgain": "もう一度開く",
@@ -3584,6 +3598,7 @@
             "codex": "ChatGPTは{{account}}でログインしましたが、このアカウントはすでに接続済みです。別のアカウントを使うには、ChatGPTのページでログアウトしてからもう一度お試しください。",
             "cursor": "Cursorは{{account}}でログインしましたが、このアカウントはすでに接続済みです。別のアカウントを使うには、Cursorのページでログアウトしてからもう一度お試しください。",
             "grok": "Grokは{{account}}でログインしましたが、このアカウントはすでに接続済みです。別のアカウントを使うには、Grokのページでログアウトしてからもう一度お試しください。",
+            "antigravity": "Geminiは{{account}}でログインしましたが、このアカウントはすでに接続済みです。別のアカウントを使うには、Googleのページでログアウトしてからもう一度お試しください。",
             "opencode": "そのOpenCodeキーは{{account}}としてすでに接続されています。"
           },
           "startFailed": "{{computer}}から応答がありません。少し待ってからもう一度お試しください。",
@@ -6955,6 +6970,7 @@
       "codex": "ChatGPT",
       "cursor": "Cursor",
       "grok": "Grok",
+      "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
         "keys": "プランのキーを使うには、コンピューターのagentesをアップデートしてください"
@@ -6966,6 +6982,7 @@
         "codex": "{{computer}}ではまだ準備ができていません",
         "cursor": "{{computer}}ではまだ準備ができていません",
         "grok": "{{computer}}ではまだ準備ができていません",
+        "antigravity": "{{computer}}ではまだ準備ができていません",
         "opencode": "{{computer}}ではまだ準備できていません",
         "online": "{{computer}}は現在応答していません。対応中です。"
       }
@@ -8296,24 +8313,28 @@
       "chatgpt": "ChatGPTプランの{{model}}",
       "cursor": "Cursorプランの{{model}}",
       "grok": "Grokプランの{{model}}",
+      "gemini": "Geminiプランの{{model}}",
       "zen": "OpenCodeの{{model}}",
       "coding": "{{plan}}の{{model}}",
       "claudeOf": "{{owner}}のClaudeプランの{{model}}",
       "chatgptOf": "{{owner}}のChatGPTプランの{{model}}",
       "cursorOf": "{{owner}}のCursorプランの{{model}}",
       "grokOf": "{{owner}}のGrokプランの{{model}}",
+      "geminiOf": "{{owner}}のGeminiプランの{{model}}",
       "zenOf": "{{owner}}のOpenCodeの{{model}}",
       "codingOf": "{{owner}}の{{plan}}の{{model}}",
       "claudeAuto": "Claudeプラン",
       "chatgptAuto": "ChatGPTプラン",
       "cursorAuto": "Cursorプラン",
       "grokAuto": "Grokプラン",
+      "geminiAuto": "Geminiプラン",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "{{owner}}のClaudeプラン",
       "chatgptAutoOf": "{{owner}}のChatGPTプラン",
       "cursorAutoOf": "{{owner}}のCursorプラン",
       "grokAutoOf": "{{owner}}のGrokプラン",
+      "geminiAutoOf": "{{owner}}のGeminiプラン",
       "zenAutoOf": "{{owner}}のOpenCode",
       "codingAutoOf": "{{owner}}の{{plan}}",
       "on": "{{computer}}上の{{line}}"
@@ -8325,8 +8346,9 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
+      "opencode": "OpenCode",
       "grok": "Grok Build",
-      "opencode": "OpenCode"
+      "antigravity": "Antigravity CLI"
     },
     "foot": {
       "api": "API経由",
@@ -8338,6 +8360,7 @@
     "codexText": "コンピューターを接続した人のChatGPTプランを使います。",
     "cursorText": "コンピューターを接続した人のCursorプランを使います。",
     "grokText": "コンピューターを接続した人のGrokプランを使います。",
+    "antigravityText": "コンピューターを接続した人のGeminiプランを使います。",
     "opencodeText": "OpenCodeの無料モデル、またはコンピューターを接続した人のOpenCodeキーを使います。",
     "cursorModel": {
       "inPlan": "Cursorプランに含まれます",
@@ -8383,6 +8406,7 @@
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
       "grok": "Grok Build · {{model}}",
+      "antigravity": "Antigravity CLI · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}、APIへの切り替えなし"
     },
@@ -10665,6 +10689,7 @@
         "codex": "Codex",
         "cursor": "Cursor",
         "grok": "Grok Build",
+        "antigravity": "Antigravity CLI",
         "opencode": "OpenCode",
         "commands": "コマンド",
         "browser": "ブラウザ"
@@ -10674,6 +10699,7 @@
         "codex": "Claude Codeと同様で、ChatGPTアカウントを使います。許可されたフォルダ内のみです。",
         "cursor": "Claude Codeと同様で、Cursorアカウントを使います。許可されたフォルダ内のみです。",
         "grok": "Claude Codeと同様で、Grokアカウントを使います。許可されたフォルダ内のみです。",
+        "antigravity": "Claude Codeと同様で、Geminiアカウントを使います。許可されたフォルダ内のみです。",
         "opencode": "Claude Codeと同様で、OpenCodeの無料モデルかOpenCodeキーを使います。許可されたフォルダ内のみです。",
         "commands": "テストやビルドなど、ターミナルのコマンドを実行します。"
       },
@@ -12155,6 +12181,8 @@
       "action_invite_people": "メンバーを招待",
       "action_install_skill": "スキルをインストール",
       "action_update_skills": "スキルを更新",
+      "action_approvals": "あなたの承認待ち",
+      "action_open_page": "画面を開く",
       "agent_proposal": "新しいエージェントを提案しました: {{name}}",
       "settings_proposal": "{{names}}への変更を提案しました",
       "approval_request": "承認リクエスト: {{title}}",
@@ -12181,9 +12209,7 @@
       "stuck": "行き詰まったため、完了前に停止しました。",
       "forum_suggestion": "フォーラムで話し合いますか？「{{title}}」",
       "forum_concluded": "フォーラム「{{title}}」は終了しました。まとめは下のファイルにあります。",
-      "forum_concluded_issues": "フォーラム「{{title}}」は終了しました。まとめは下のファイルにあり、承認待ちの提案タスクが{{count}}件あります。",
-      "action_approvals": "あなたの承認待ち",
-      "action_open_page": "画面を開く"
+      "forum_concluded_issues": "フォーラム「{{title}}」は終了しました。まとめは下のファイルにあり、承認待ちの提案タスクが{{count}}件あります。"
     }
   },
   "builtinTools": {

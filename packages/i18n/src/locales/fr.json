@@ -1246,6 +1246,8 @@
     "paused": "En pause : vous avez annulé 3 de ses décisions cette semaine. Réactivez-le quand vous voulez.",
     "card": {
       "deciding": "{{name}} l'examine au nom de {{for}}…",
+      "approvedForYou": "Approuvé par {{name}} en votre nom",
+      "decidingForYou": "{{name}} l'examine en votre nom…",
       "approved": "Approuvé par {{name}} au nom de {{for}}",
       "passed": "{{name}} vous l'a passé",
       "passedWhy": "{{name}} vous l'a passé : {{reason}}",
@@ -1257,9 +1259,7 @@
       "why": "Pourquoi ?",
       "undo": "Annuler",
       "undoArchives": "Annuler archive {{name}}. Possible jusqu'à {{until}}.",
-      "undoSettings": "Annuler rétablit les réglages. Possible jusqu'à {{until}}.",
-      "approvedForYou": "Approuvé par {{name}} en votre nom",
-      "decidingForYou": "{{name}} l'examine en votre nom…"
+      "undoSettings": "Annuler rétablit les réglages. Possible jusqu'à {{until}}."
     }
   },
   "noticePrefs": {
@@ -2069,6 +2069,7 @@
       "codex": "Codex n'est pas connecté sur cet ordinateur. Connectez un compte ChatGPT sur la page de {{name}}.",
       "cursor": "Cursor n'est pas connecté sur cet ordinateur. Connectez un compte Cursor sur la page de {{name}}.",
       "grok": "Grok n'est pas connecté sur cet ordinateur. Connectez un compte Grok sur la page de {{name}}.",
+      "antigravity": "Gemini n'est pas connecté sur cet ordinateur. Connectez un compte Gemini sur la page de {{name}}.",
       "opencode": "OpenCode ne peut pas réfléchir sur cet ordinateur. Connectez une clé OpenCode sur la page de {{name}}."
     },
     "card": {
@@ -2098,6 +2099,7 @@
       "chatgpt": "Connecter votre abonnement ChatGPT",
       "cursor": "Connecter votre abonnement Cursor",
       "grok": "Connecter votre abonnement Grok",
+      "gemini": "Connecter votre abonnement Gemini",
       "zen": "Connecter OpenCode",
       "api_key": "Ajouter une clé API"
     },
@@ -2126,6 +2128,11 @@
       "grok": {
         "title": "Votre abonnement Grok",
         "tiers": "SuperGrok, SuperGrok Heavy ou X Premium+"
+      },
+      "gemini": {
+        "title": "Votre abonnement Gemini",
+        "tiers": "Google AI Pro, Google AI Ultra ou Gemini Enterprise",
+        "warning": "Google indique qu'utiliser un abonnement Gemini personnel dans d'autres applications peut entraîner la suspension du compte. Pour éviter ce risque, utilisez une clé API ou Gemini Enterprise."
       },
       "zen": {
         "title": "OpenCode",
@@ -2205,6 +2212,7 @@
       "codex": "ChatGPT est connecté en tant que {{email}}, et non {{account}}. Déconnectez-vous sur la page de ChatGPT et réessayez.",
       "cursor": "Cursor est connecté en tant que {{email}}, et non {{account}}. Déconnectez-vous sur la page de Cursor et réessayez.",
       "grok": "Grok est connecté en tant que {{email}}, et non {{account}}. Déconnectez-vous sur la page de Grok et réessayez.",
+      "antigravity": "Gemini est connecté en tant que {{email}}, et non {{account}}. Déconnectez-vous sur la page de Google et réessayez.",
       "opencode": "OpenCode est connecté en tant que {{email}}, pas {{account}}. Réessayez avec la bonne clé."
     },
     "useAnyway": "Utiliser {{email}}",
@@ -3816,24 +3824,30 @@
             "codex": "Ajouter un compte ChatGPT",
             "cursor": "Ajouter un compte Cursor",
             "grok": "Ajouter un compte Grok",
+            "antigravity": "Ajouter un compte Gemini",
             "opencode": "Ajouter une clé OpenCode"
           },
           "stepOne": {
             "claude_code": "Le compte avec votre abonnement",
             "codex": "Le compte avec votre abonnement",
             "cursor": "Le compte avec votre abonnement",
-            "grok": "Le compte avec votre abonnement"
+            "grok": "Le compte avec votre abonnement",
+            "antigravity": "Le compte Google avec votre abonnement",
+            "antigravityEnterprise": "Votre compte Gemini Enterprise"
           },
           "stepOneHint": "Mauvais compte ? Déconnectez-vous là-bas et réessayez. Le compte reste uniquement sur {{computer}}. Vous saisissez votre mot de passe sur la page de {{brand}}.",
           "open": {
             "claude_code": "Se connecter avec Claude",
             "codex": "Se connecter avec ChatGPT",
             "cursor": "Se connecter avec Cursor",
-            "grok": "Se connecter avec Grok"
+            "grok": "Se connecter avec Grok",
+            "antigravity": "Se connecter avec Google"
           },
           "opencodeFree": "Les modèles gratuits d'OpenCode ne demandent aucune clé. Une clé de la console OpenCode ajoute les modèles payants.",
           "cursorFinish": "Connectez-vous sur la page de Cursor, et la connexion se termine toute seule sur {{computer}}.",
           "grokFinish": "Connectez-vous sur la page de Grok, et la connexion se termine toute seule sur {{computer}}.",
+          "geminiEnterprise": "Utiliser plutôt Gemini Enterprise",
+          "geminiPersonal": "Utiliser plutôt un compte Google personnel",
           "cursorKey": "Utiliser plutôt une clé API Cursor",
           "copyLink": "Copier le lien",
           "openAgain": "Rouvrir",
@@ -3857,6 +3871,7 @@
             "codex": "ChatGPT s'est connecté en tant que {{account}}, un compte que vous avez déjà connecté. Pour en utiliser un autre, déconnectez-vous sur la page de ChatGPT et réessayez.",
             "cursor": "Cursor s'est connecté en tant que {{account}}, un compte que vous avez déjà connecté. Pour en utiliser un autre, déconnectez-vous sur la page de Cursor et réessayez.",
             "grok": "Grok s'est connecté en tant que {{account}}, un compte que vous avez déjà connecté. Pour en utiliser un autre, déconnectez-vous sur la page de Grok et réessayez.",
+            "antigravity": "Gemini s'est connecté en tant que {{account}}, un compte que vous avez déjà connecté. Pour en utiliser un autre, déconnectez-vous sur la page de Google et réessayez.",
             "opencode": "Cette clé OpenCode est déjà connectée en tant que {{account}}."
           },
           "startFailed": "Aucune réponse de {{computer}}. Réessayez dans un instant.",
@@ -7563,6 +7578,7 @@
       "codex": "ChatGPT",
       "cursor": "Cursor",
       "grok": "Grok",
+      "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
         "keys": "Mettez à jour agentes sur l'ordinateur pour utiliser la clé d'un abonnement"
@@ -7574,6 +7590,7 @@
         "codex": "Pas encore prêt sur {{computer}}",
         "cursor": "Pas encore prêt sur {{computer}}",
         "grok": "Pas encore prêt sur {{computer}}",
+        "antigravity": "Pas encore prêt sur {{computer}}",
         "opencode": "Pas encore prêt sur {{computer}}",
         "online": "{{computer}} ne répond pas pour le moment. On s'en occupe."
       }
@@ -9023,24 +9040,28 @@
       "chatgpt": "{{model}} avec l'abonnement ChatGPT",
       "cursor": "{{model}} avec l'abonnement Cursor",
       "grok": "{{model}} avec l'abonnement Grok",
+      "gemini": "{{model}} avec l'abonnement Gemini",
       "zen": "{{model}} avec OpenCode",
       "coding": "{{model}} avec {{plan}}",
       "claudeOf": "{{model}} avec l'abonnement Claude de {{owner}}",
       "chatgptOf": "{{model}} avec l'abonnement ChatGPT de {{owner}}",
       "cursorOf": "{{model}} avec l'abonnement Cursor de {{owner}}",
       "grokOf": "{{model}} avec l'abonnement Grok de {{owner}}",
+      "geminiOf": "{{model}} avec l'abonnement Gemini de {{owner}}",
       "zenOf": "{{model}} avec l'OpenCode de {{owner}}",
       "codingOf": "{{model}} avec {{plan}} de {{owner}}",
       "claudeAuto": "Abonnement Claude",
       "chatgptAuto": "Abonnement ChatGPT",
       "cursorAuto": "Abonnement Cursor",
       "grokAuto": "Abonnement Grok",
+      "geminiAuto": "Abonnement Gemini",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Abonnement Claude de {{owner}}",
       "chatgptAutoOf": "Abonnement ChatGPT de {{owner}}",
       "cursorAutoOf": "Abonnement Cursor de {{owner}}",
       "grokAutoOf": "Abonnement Grok de {{owner}}",
+      "geminiAutoOf": "Abonnement Gemini de {{owner}}",
       "zenAutoOf": "OpenCode de {{owner}}",
       "codingAutoOf": "{{plan}} de {{owner}}",
       "on": "{{line}} sur {{computer}}"
@@ -9053,8 +9074,9 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
+      "opencode": "OpenCode",
       "grok": "Grok Build",
-      "opencode": "OpenCode"
+      "antigravity": "Antigravity CLI"
     },
     "foot": {
       "api": "Via l'API",
@@ -9066,6 +9088,7 @@
     "codexText": "Utilise l'abonnement ChatGPT de la personne qui a connecté l'ordinateur.",
     "cursorText": "Utilise l'abonnement Cursor de la personne qui a connecté l'ordinateur.",
     "grokText": "Utilise l'abonnement Grok de la personne qui a connecté l'ordinateur.",
+    "antigravityText": "Utilise l'abonnement Gemini de la personne qui a connecté l'ordinateur.",
     "opencodeText": "Les modèles gratuits d'OpenCode, ou la clé OpenCode de la personne qui a connecté l'ordinateur.",
     "cursorModel": {
       "inPlan": "Inclus dans votre abonnement Cursor",
@@ -9111,6 +9134,7 @@
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
       "grok": "Grok Build · {{model}}",
+      "antigravity": "Antigravity CLI · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, sans repli sur l'API"
     },
@@ -11514,6 +11538,7 @@
         "codex": "Codex",
         "cursor": "Cursor",
         "grok": "Grok Build",
+        "antigravity": "Antigravity CLI",
         "opencode": "OpenCode",
         "commands": "Commandes",
         "browser": "Navigateur"
@@ -11523,6 +11548,7 @@
         "codex": "Comme Claude Code, avec un compte ChatGPT. Uniquement dans les dossiers autorisés.",
         "cursor": "Comme Claude Code, avec un compte Cursor. Uniquement dans les dossiers autorisés.",
         "grok": "Comme Claude Code, avec un compte Grok. Uniquement dans les dossiers autorisés.",
+        "antigravity": "Comme Claude Code, avec un compte Gemini. Uniquement dans les dossiers autorisés.",
         "opencode": "Comme Claude Code, avec les modèles gratuits d'OpenCode ou une clé OpenCode. Uniquement dans les dossiers autorisés.",
         "commands": "Lance des commandes dans le Terminal, comme des tests et des builds."
       },
@@ -13088,6 +13114,8 @@
       "action_invite_people": "Inviter des personnes",
       "action_install_skill": "Installer une compétence",
       "action_update_skills": "Mettre à jour des compétences",
+      "action_approvals": "Approbations qui vous attendent",
+      "action_open_page": "Ouvrir un écran",
       "agent_proposal": "A proposé un nouvel agent : {{name}}",
       "settings_proposal": "A proposé un changement pour {{names}}",
       "approval_request": "Demande d'approbation : {{title}}",
@@ -13120,9 +13148,7 @@
       "stuck": "J'ai été bloqué et je me suis arrêté avant de terminer.",
       "forum_suggestion": "Cela mérite un forum ? « {{title}} »",
       "forum_concluded": "Le forum « {{title}} » est terminé. La synthèse est dans le fichier ci-dessous.",
-      "forum_concluded_issues": "Le forum « {{title}} » est terminé. La synthèse est dans le fichier ci-dessous, avec {{count}} tâche(s) suggérée(s) à approuver.",
-      "action_approvals": "Approbations qui vous attendent",
-      "action_open_page": "Ouvrir un écran"
+      "forum_concluded_issues": "Le forum « {{title}} » est terminé. La synthèse est dans le fichier ci-dessous, avec {{count}} tâche(s) suggérée(s) à approuver."
     }
   },
   "builtinTools": {
@@ -13762,8 +13788,8 @@
       "backLabel": "Note pour {{name}}",
       "backLabel_female": "Note pour {{name}}",
       "backPlaceholder": "Facultatif : quelque chose que {{name}} devrait savoir ?",
-      "addNote": "Laisser un mot",
-      "backPlaceholder_female": "Facultatif : quelque chose que {{name}} devrait savoir ?"
+      "backPlaceholder_female": "Facultatif : quelque chose que {{name}} devrait savoir ?",
+      "addNote": "Laisser un mot"
     },
     "now": {
       "ready": "Prêt sur {{computer}}",

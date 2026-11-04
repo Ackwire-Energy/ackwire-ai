@@ -236,9 +236,9 @@ export function pairedConfig(stored: StoredConfig, file = "config.json"): Runner
 
 /**
  * The coding CLIs that follow Codex's switch until they have one of their own (Cursor's, protocol 36; OpenCode's, 39;
- * Grok's, 43).
+ * Grok's, 43; the Antigravity CLI's, 44).
  */
-const FOLLOW_CODEX = ["cursor", "opencode", "grok"] as const;
+const FOLLOW_CODEX = ["cursor", "opencode", "grok", "antigravity"] as const;
 
 /**
  * The access to write back: while Cursor or OpenCode has no switch of its own (and this write doesn't set one), it
@@ -270,11 +270,15 @@ export function effectiveAccess(config: StoredConfig | null): RunnerAccess {
         cursor: tools.cursor ?? tools.codex,
         opencode: tools.opencode ?? tools.codex,
         grok: tools.grok ?? tools.codex,
+        antigravity: tools.antigravity ?? tools.codex,
       },
     };
   }
   const on = config ? config.exec !== false : false;
-  return { folders: [], tools: { claude: on, codex: on, cursor: on, opencode: on, grok: on, commands: on } };
+  return {
+    folders: [],
+    tools: { claude: on, codex: on, cursor: on, opencode: on, grok: on, antigravity: on, commands: on },
+  };
 }
 
 /** The pause as the protocol says it (an `until` already past counts as not paused). */

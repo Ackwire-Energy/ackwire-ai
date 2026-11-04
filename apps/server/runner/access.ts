@@ -42,6 +42,7 @@ export const TOOL_NAMES: readonly (keyof RunnerTools)[] = [
   "cursor",
   "opencode",
   "grok",
+  "antigravity",
   "commands",
   "browser",
   "desktop",

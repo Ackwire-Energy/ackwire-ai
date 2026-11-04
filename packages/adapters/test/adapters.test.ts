@@ -149,6 +149,11 @@ test("secret names that would steer an AI CLI's sign-in or requests are reserved
     "DYLD_INSERT_LIBRARIES",
   ])
     expect(isReservedSecretName(name)).toBe(true);
-  for (const name of ["GITHUB_TOKEN", "NPM_TOKEN", "STRIPE_PASSWORD", "PROXY_HOST", "MY_CLAUDE"])
+  // The Antigravity CLI's (ADR 0143): its key, ADC, Vertex and gateway switches; other Google keys stay usable.
+  for (const name of ["GEMINI_API_KEY", "AGY_ADC_AUTH", "GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS"])
+    expect(isReservedSecretName(name)).toBe(true);
+  for (const name of ["GOOGLE_GEMINI_BASE_URL", "GOOGLE_GENAI_USE_VERTEXAI", "GOOGLE_CLOUD_PROJECT"])
+    expect(isReservedSecretName(name)).toBe(true);
+  for (const name of ["GITHUB_TOKEN", "NPM_TOKEN", "STRIPE_PASSWORD", "PROXY_HOST", "MY_CLAUDE", "GOOGLE_MAPS_KEY"])
     expect(isReservedSecretName(name)).toBe(false);
 });

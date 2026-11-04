@@ -21,7 +21,7 @@ import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
+import { planOf, signInProviderOf } from "@agenteschat/client/lib/plans";
 import { providerLabel } from "@agenteschat/client/lib/providers";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -298,7 +298,7 @@ export function AiAccountsScreen() {
                 again={again.id}
                 email={again.email}
                 local={ai.data?.computers.find((x) => x.machineId === again.machineId)?.mine}
-                {...(isPlanId(again.provider) ? { provider: again.provider } : {})}
+                {...(signInProviderOf(again.provider) ? { provider: signInProviderOf(again.provider) } : {})}
                 onAdded={() => {
                   setAgain(null);
                   refetch();

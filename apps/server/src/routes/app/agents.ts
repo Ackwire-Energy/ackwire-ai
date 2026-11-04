@@ -214,7 +214,7 @@ const AgentProposal = z
         ai: z.discriminatedUnion("kind", [
           z.object({
             kind: z.literal("account"),
-            brain: z.enum(["claude_code", "codex", "cursor", "opencode", "grok"]),
+            brain: z.enum(["claude_code", "codex", "cursor", "opencode", "grok", "antigravity"]),
             machineId: z.uuid(),
             accountId: z.uuid(),
             label: z.string(),
@@ -470,7 +470,7 @@ export function agentRoutes(deps: AppDeps) {
                     "plan_tools",
                   ])
                   .optional(),
-                own: z.enum(["claude_code", "codex", "cursor", "opencode", "grok"]).optional(),
+                own: z.enum(["claude_code", "codex", "cursor", "opencode", "grok", "antigravity"]).optional(),
               }),
             ),
             routing: z.object({
