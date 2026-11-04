@@ -134,5 +134,5 @@ export function CardHorizon({
       theme.disconnect();
     };
   }, [content, color]);
-  return <canvas ref={ref} className="ac-card-horizon" aria-hidden="true" hidden />;
+  return <canvas ref={ref} className="ac-card-horizon" aria-hidden="true" tabIndex={-1} hidden />;
 }

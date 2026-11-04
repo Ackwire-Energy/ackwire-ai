@@ -8,6 +8,8 @@
  * opened from another dims that one.
  */
 :root {
+  /* Under its parent's content, inside the parent's own stacking context (a card's horizon). */
+  --z-under: -1;
   --z-raised: 1;
   --z-lifted: 2;
   --z-sticky: 1;
