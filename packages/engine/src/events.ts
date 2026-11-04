@@ -102,6 +102,8 @@ export type ChannelEvent =
       text: string;
       /** The model call this text belongs to (1, 2…): a new turn starts a new segment, never glued to the last one. */
       turn: number;
+      /** Where `text` starts in its turn's text (UTF-16 units): an app that missed a piece sees the hole. */
+      at?: number;
     }
   /**
    * The text the agent streamed before calling tools was progress narration

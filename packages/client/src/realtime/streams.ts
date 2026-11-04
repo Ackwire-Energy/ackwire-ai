@@ -167,6 +167,10 @@ export interface LiveRun {
   output?: LiveOutput[];
   /** Messages sent with "Parar e mandar" it hasn't read yet. */
   steerNow?: string[];
+  /** How much of the current turn's text arrived (`agent.delta.at`), moved to the narration or not. */
+  turnChars?: number;
+  /** A piece of the current turn's text never arrived (a lost socket, a conversation opened mid-answer). */
+  gap?: boolean;
 }
 
 export type LiveWork =
@@ -710,17 +714,33 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       if (state.finished[event.runId]) return state;
       const current = state.runs[event.runId];
       if (current && event.seq <= current.lastSeq) return state;
+      const sameTurn = current?.turn !== undefined && event.turn === current.turn;
+      // A piece of this turn never reached us (`at` past what we heard): its text would read glued over the hole,
+      // so the turn shows no words until the next one or the message.
+      const heard = sameTurn ? current?.turnChars : 0;
+      const gap =
+        (sameTurn && current?.gap === true) || (event.at !== undefined && heard !== undefined && event.at > heard);
+      const turnPatch = {
+        gap,
+        ...(event.at !== undefined ? { turnChars: event.at + event.text.length } : {}),
+        ...(event.turn !== undefined ? { turn: event.turn } : {}),
+      };
       // A new model call. Narration (text before tool calls) already left the body with `agent.narration` or the
       // call; what is still here is a whole reply the server held and sent back for another try (a give-up, a
       // question it shouldn't ask), never posted: the next turn's text replaces it.
       if (current && event.turn !== undefined && current.turn !== undefined && event.turn > current.turn) {
-        return upsert(state, event, { status: "running", text: event.text, lastSeq: event.seq, turn: event.turn });
+        return upsert(state, event, {
+          status: "running",
+          text: gap ? "" : event.text,
+          lastSeq: event.seq,
+          ...turnPatch,
+        });
       }
       return upsert(state, event, {
         status: "running",
-        text: (current?.text ?? "") + event.text,
+        text: gap ? "" : (current?.text ?? "") + event.text,
         lastSeq: event.seq,
-        ...(event.turn !== undefined ? { turn: event.turn } : {}),
+        ...turnPatch,
       });
     }
     default:

@@ -335,6 +335,37 @@ describe("live agent runs (streaming)", () => {
   const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "atlas" };
   const delta = (seq: number, text: string): ChannelEvent => ({ type: "agent.delta", ...base, seq, text });
 
+  test("a piece of the text that never arrived: no glued text, it shows again from the next turn", () => {
+    const piece = (seq: number, turn: number, at: number, text: string): ChannelEvent => ({
+      type: "agent.delta",
+      ...base,
+      seq,
+      turn,
+      at,
+      text,
+    });
+    const text = (s: typeof emptyStreams) => s.runs.r1?.text;
+    let s = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "running" });
+    s = applyChannelEvent(s, piece(0, 1, 0, "O bot já existe "));
+    // Pieces 1 and 2 were lost (the socket went down a moment, or this conversation was closed meanwhile).
+    s = applyChannelEvent(s, piece(3, 1, 40, "no Entra ID."));
+    expect(text(s)).toBe("");
+    s = applyChannelEvent(s, piece(4, 1, 52, " Qual dos dois?"));
+    expect(text(s)).toBe("");
+    s = applyChannelEvent(s, piece(5, 2, 0, "Pronto: "));
+    s = applyChannelEvent(s, piece(6, 2, 8, "conferi."));
+    expect(text(s)).toBe("Pronto: conferi.");
+    // Opened in the middle of a turn: what came before is missing too.
+    let late = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "running" });
+    late = applyChannelEvent(late, piece(9, 3, 120, "metade de uma frase"));
+    expect(text(late)).toBe("");
+    // Nothing missed: every piece in place, also after a tool call moved the text so far to the narration.
+    let whole = applyChannelEvent(emptyStreams, piece(0, 1, 0, "Vou olhar. "));
+    whole = applyChannelEvent(whole, { type: "agent.tool", ...base, tool: "azure_monitor", toolUseId: "t1" });
+    whole = applyChannelEvent(whole, piece(1, 1, 11, "Achei."));
+    expect(text(whole)).toBe("Achei.");
+  });
+
   test("running → ordered deltas (duplicates ignored) → final message replaces the stream", () => {
     let s = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "running" });
     expect(runningAgents(s)).toEqual(new Set(["atlas"]));

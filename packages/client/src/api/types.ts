@@ -1227,6 +1227,8 @@ export type ChannelEvent =
       text: string;
       /** Which model call of the run this text belongs to (narration is keyed by it). */
       turn?: number;
+      /** Where `text` starts in its turn's text: past what arrived here, a piece was missed. */
+      at?: number;
     }
   | {
       type: "agent.run";
