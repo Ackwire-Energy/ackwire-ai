@@ -4,6 +4,7 @@ import type { AgentActionView } from "./agent-actions";
 import type { ConnectIntent } from "./ai-intent";
 import type { ApprovalView } from "./approvals";
 import type { ArtifactView } from "./artifacts";
+import type { BlockStateView } from "./block-state";
 import type { ChoicesView, PollView } from "./blocks";
 import type { BrowserHandoffView } from "./browser/handoff";
 import type { CalendarEventView } from "./calendar";
@@ -506,6 +507,8 @@ export type ChannelEvent =
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
   /** A vote came in or the poll closed (ADR 0113). */
   | { type: "poll.updated"; channelId: string; poll: PollView }
+  /** Someone changed what a live block shows, for everyone (ADR 0113): the newest `rev` wins. */
+  | { type: "block.state"; channelId: string; block: BlockStateView }
   /** A choice card was answered (ADR 0124). */
   | { type: "choices.updated"; channelId: string; choices: ChoicesView }
   /** A message was pinned in this channel (`GET …/channels/{id}/pins` lists them, newest first). */

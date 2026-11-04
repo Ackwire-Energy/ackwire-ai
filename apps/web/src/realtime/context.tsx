@@ -3,6 +3,7 @@ import type {
   Agent,
   AgentQuestion,
   ApiClient,
+  BlockState,
   BudgetEvent,
   ChannelEvent,
   ForumUserEvent,
@@ -81,6 +82,7 @@ import {
   useIssueLive,
   useSendWaiting,
 } from "@agenteschat/client";
+import { newerBlockState } from "@agenteschat/client/lib/blocks";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatPercent } from "@agenteschat/client/lib/format";
 import { isMediaAfterReply } from "@agenteschat/client/lib/media";
@@ -808,6 +810,12 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
           void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
       }
       if (event.type === "poll.updated") qc.setQueryData(keys.poll(orgId, event.poll.id), event.poll);
+      if (event.type === "block.state") {
+        const { block } = event;
+        qc.setQueryData<BlockState>(keys.blockState(orgId, block.id, block.version), (old) =>
+          newerBlockState(old, block),
+        );
+      }
       if (event.type === "choices.updated") qc.setQueryData(keys.choices(orgId, event.choices.id), event.choices);
       if (event.type === "thread.updated") applyThreadEvent(qc, orgId, event);
       // An agent's browser request changed (ADR 0040): its card, the live view, the agent's open request.

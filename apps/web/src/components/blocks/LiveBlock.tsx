@@ -1,4 +1,4 @@
-import { useArtifact, useBlockReply, useKeepBlock } from "@agenteschat/client";
+import { type BlockChange, useArtifact, useBlockReply, useKeepBlock, useSharedBlock } from "@agenteschat/client";
 import {
   type BlockEvent,
   type BlockHost,
@@ -23,18 +23,21 @@ import "./blocks.css";
 /** Taller than this and a block scrolls inside the card; "Abrir grande" shows it all. */
 const INLINE_MAX_HEIGHT = 640;
 
-/** What stays when a frame goes away (scrolled out, opened big): the same block comes back as it was. */
-const kept = new Map<
-  string,
-  { state?: Record<string, unknown>; height?: number; sent?: { text: string; at: string } }
->();
+/**
+ * What stays when a frame goes away (scrolled out, opened big). Its state is everyone's and lives on the server
+ * (`useSharedBlock`); this is only how tall it was and what this person sent from it.
+ */
+const kept = new Map<string, { height?: number; sent?: { text: string; at: string } }>();
 const keptOf = (key: string) => {
   const found = kept.get(key);
   if (found) return found;
   const fresh = {};
   kept.set(key, fresh);
-  return fresh as { state?: Record<string, unknown>; height?: number; sent?: { text: string; at: string } };
+  return fresh as { height?: number; sent?: { text: string; at: string } };
 };
+
+/** What a running page is told: everyone's state, without what this person is still changing. */
+type ForPage = { state: Record<string, unknown>; who: Record<string, BlockChange> };
 
 /** Our font for a block, inlined: it has no network. Loaded once, and a block just uses the system's if it fails. */
 let fontFace: Promise<string> | null = null;
@@ -69,6 +72,8 @@ function BlockFrame({
   title,
   color,
   maxHeight,
+  shared,
+  rev,
   onEvent,
   onFailed,
 }: {
@@ -77,6 +82,9 @@ function BlockFrame({
   title: string;
   color: Parameters<typeof chartRamp>[0];
   maxHeight: number;
+  /** Everyone's state; the page starts from it and is told each time it moves (`rev`). */
+  shared: ForPage | null;
+  rev: number;
   onEvent: (e: BlockEvent) => void;
   onFailed: () => void;
 }) {
@@ -88,6 +96,8 @@ function BlockFrame({
   const [height, setHeight] = useState(keptOf(blockKey).height ?? 0);
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
+  const sharedRef = useRef(shared);
+  sharedRef.current = shared;
 
   useEffect(() => {
     let alive = true;
@@ -108,7 +118,8 @@ function BlockFrame({
       ramp: chartRamp(color),
       locale: i18n.language,
       labels: { send: t("blocks.send"), more: t("blocks.more"), thousand: t("blocks.thousand") },
-      state: keptOf(blockKey).state,
+      state: sharedRef.current?.state,
+      who: sharedRef.current?.who,
       fontFace: face,
     };
     return blockPage(html, host);
@@ -124,12 +135,15 @@ function BlockFrame({
       if (!frame.current || e.source !== frame.current.contentWindow) return;
       const event = blockEvent(e.data);
       if (!event) return;
-      if (event.type === "ready") setReady(true);
+      if (event.type === "ready") {
+        setReady(true);
+        // What moved while it was starting.
+        if (sharedRef.current) frame.current.contentWindow?.postMessage(sharedRef.current, "*");
+      }
       if (event.type === "height") {
         keptOf(blockKey).height = event.height;
         setHeight(event.height);
       }
-      if (event.type === "state") keptOf(blockKey).state = event.state;
       onEventRef.current(event);
     };
     window.addEventListener("message", onMessage);
@@ -139,6 +153,12 @@ function BlockFrame({
   useEffect(() => {
     frame.current?.contentWindow?.postMessage({ theme: dark ? "dark" : "light" }, "*");
   }, [dark]);
+
+  // Someone changed the block: everyone's page shows it at once.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `rev` is when it moved; the values come from the ref
+  useEffect(() => {
+    if (sharedRef.current) frame.current?.contentWindow?.postMessage(sharedRef.current, "*");
+  }, [rev]);
 
   if (!page || !url) return <div className="live-block__room" style={{ height: height || 120 }} />;
   return (
@@ -185,6 +205,7 @@ export function LiveBlock({
   const [sent, setSent] = useState(keptOf(blockKey).sent ?? null);
   const changedAt = useRef(0);
   const reply = useBlockReply(org.id, id);
+  const shared = useSharedBlock(org.id, id, version);
   const toast = useToast();
 
   const say = (text: string, then?: () => void) =>
@@ -194,6 +215,8 @@ export function LiveBlock({
     );
 
   const onEvent = (e: BlockEvent) => {
+    if (e.type === "state") shared.fromPage(e.state, e.used);
+    if (e.type === "draw") void shared.draw(e.name, e.options);
     if (e.type !== "draft") return;
     setDraft((old) => {
       if (old?.text !== e.text) changedAt.current = Date.now();
@@ -230,13 +253,15 @@ export function LiveBlock({
   const same = sent !== null && sent.text === draft?.text;
   return (
     <div ref={ref}>
-      {near || big ? (
+      {(near || big) && shared.loaded ? (
         <BlockFrame
           blockKey={blockKey}
           html={html}
           title={title}
           color={colorOf(agent)}
           maxHeight={big ? 100_000 : INLINE_MAX_HEIGHT}
+          shared={shared.forPage}
+          rev={shared.block?.rev ?? 0}
           onEvent={onEvent}
           onFailed={() => setBroken(true)}
         />

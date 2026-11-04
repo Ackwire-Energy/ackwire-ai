@@ -236,6 +236,15 @@ export function createMockArtifacts(
       return view(orgId, s);
     },
     reply: async () => ({ id: mockId("msg") }),
+    blockState: async (_orgId, id, version) => ({ id, version, state: {}, changes: {}, rev: 0 }),
+    setBlockState: async (_orgId, id, version, values) => ({ id, version, state: values, changes: {}, rev: 1 }),
+    drawBlock: async (_orgId, id, version, name, options) => ({
+      id,
+      version,
+      state: { [name]: options[0] },
+      changes: { [name]: { by: "me", name: "", at: new Date().toISOString(), drawn: options.length } },
+      rev: 1,
+    }),
     poll: async (_orgId, id) => openPoll(id),
     vote: async (_orgId, id) => openPoll(id),
     choices: async (_orgId, id) => ({ id, answer: null }),
