@@ -188,4 +188,18 @@ describe("the right hand's Connect AI", () => {
     await click(within(panel).getByRole("button", { name: "Usar uma chave de API agora" }));
     expect(within(box).getByRole("region", { name: "Chave de API" })).toBeTruthy();
   });
+
+  test("someone else's right hand: the plan's panel says it thinks with a key only, not that its owner's plan would do", async () => {
+    const state = withRightHand(seedState(), { ownerUserId: "u-joao" });
+    state.aiStatus = { any: false, agents: [{ agentId: LODI_ID, state: "no_ai", reason: "no_key" }] };
+    await renderApp(`/org/${ORG_ID}/dm/agent/${LODI_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Conectar" }), 10);
+    const box = screen().getByRole("dialog", { name: "Conectar uma IA para o Lodi" });
+    const group = within(box).getByRole("group", { name: "Qual IA eles vão usar?" });
+    await click(within(group).getByRole("button", { name: "Claude" }), 10);
+    const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("O Lodi pensa só com uma chave de API.");
+    expect(panel.textContent).not.toContain("com o próprio plano");
+  });
 });

@@ -3,6 +3,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, choiceOfIntent, freePlanAccount, PLAN_CHOICES } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { keyLooksValid, type ProviderId, providerGuess, providerOf } from "@agenteschat/client/lib/providers";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
@@ -114,9 +115,11 @@ export function ConnectAiSheet() {
   const locked =
     agents.length > 0 || bare
       ? undefined
-      : one && owner
-        ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
-        : t("noAi.lockedAdmins");
+      : isRightHand(one)
+        ? t("connectAi.keyOnly", agentGrammar(one?.name ?? ""))
+        : one && owner
+          ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
+          : t("noAi.lockedAdmins");
   const close = () => {
     if (router.canGoBack()) router.back();
   };
