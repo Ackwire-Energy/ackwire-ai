@@ -1,6 +1,6 @@
 # 0137. The team's right hand
 
-- Status: Accepted (built: engine, server, the shared client, the web and the phone app); amended 2026-11-03 (§5, a person alone with the team; §4 and §6 written as decided)
+- Status: Accepted (built: engine, server, the shared client, the web and the phone app); amended 2026-11-03 (§5, a person alone with the team; §4 and §6 written as decided); amended 2026-11-04 (§1, Connect AI opens on the API key for it)
 - Date: 2026-11-03
 - Supersedes: ADR 0093 (the team's coordinator)
 - Amends: ADR 0081 (one-click Criar and Criar e testar on the right hand's cards), ADR 0092 §5 (a teammate's settings, on the right hand's card)
@@ -20,7 +20,7 @@ ADR 0093 tried a narrower fix: a switch that made one agent take the messages th
 - It is an ordinary `agents` row marked `builtin = 'right_hand'`, with a unique partial index on `org_id`. DMs, runs, budget, the Model Gateway's accounting, cards, the profile and the phone work as for any agent. Jev stays the router and judge behind the scenes; Ada stays a ready-made agent.
 - It is made with the workspace (`ensureRightHand` in `createOrganization`) and, for workspaces made before, by a backfill that runs off the boot path (`ensureRightHands`), so every workspace has it on the next load. No announcement is posted.
 - Its name is **Lodi**, the same in every language, with the teal look, happy eyes and the headset. Admins may rename it and change its look. Its label stays fixed: "seu braço direito" (en "your right hand", localized as each language says it).
-- It can't be archived or deleted (403 `agent.right_hand_permanent`). Only its name, handle, AI and model, budget, look and audience change (`RIGHT_HAND_EDITABLE`), and it never thinks on a computer. It is left out of exports, so imports never make one, and out of the team counts and the invitation page.
+- It can't be archived or deleted (403 `agent.right_hand_permanent`). Only its name, handle, AI and model, budget, look and audience change (`RIGHT_HAND_EDITABLE`), and it never thinks on a computer. So a plan (which signs in and runs on a computer, ADR 0059) can't think for it: Connect AI opens on the API key for it and says so on each plan (`key_only`, ADR 0061 §5, amended 2026-11-04). It is never given the workspace's computer (the attach on ready and on a computer's first token skip `builtin` rows). It is left out of exports, so imports never make one, and out of the team counts and the invitation page.
 - Its owner is the workspace's longest-standing owner who can still sign in, followed through role changes, people leaving and deleted accounts (`followOwner`).
 
 ### 2. One agent, a private DM per person, acting as that person

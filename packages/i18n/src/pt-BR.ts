@@ -1898,6 +1898,10 @@ export const ptBR = {
       useKey: "Usar uma chave de API agora",
       connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
     },
+    keyOnly:
+      "O {{name}} pensa só com uma chave de API. Os planos rodam no computador de um agente, e o {{name}} nunca usa um.",
+    keyOnly_female:
+      "A {{name}} pensa só com uma chave de API. Os planos rodam no computador de um agente, e a {{name}} nunca usa um.",
     /** Without its article: the sentences carry it ("Enviar ao {{computer}}", "O {{computer}} está…"). */
     theComputer: "computador",
     own: {

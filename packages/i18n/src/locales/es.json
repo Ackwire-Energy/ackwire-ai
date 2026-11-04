@@ -1966,6 +1966,7 @@
       "useKey": "Usar una clave de API ahora",
       "connecting": "La computadora de este servidor se conecta en menos de un minuto. Inicias sesión aquí en cuanto lo haga."
     },
+    "keyOnly": "{{name}} piensa solo con una clave de API. Los planes funcionan en la computadora de un agente, y {{name}} nunca usa una.",
     "theComputer": "la computadora",
     "own": {
       "shared": "La cuenta que comparten tus agentes",

@@ -1838,6 +1838,7 @@
       "useKey": "Pakai kunci API sekarang",
       "connecting": "Komputer server ini terhubung dalam semenit. Kamu bisa masuk di sini begitu terhubung."
     },
+    "keyOnly": "{{name}} hanya berpikir dengan kunci API. Paket berjalan di komputer agen, dan {{name}} tidak pernah memakainya.",
     "theComputer": "komputer",
     "own": {
       "shared": "Akun yang dipakai bersama agenmu",

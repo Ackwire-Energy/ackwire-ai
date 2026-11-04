@@ -4347,6 +4347,9 @@
   "connectAi.wait.connecting": {
     "value": "This server's computer connects within a minute. You sign in here as soon as it does."
   },
+  "connectAi.keyOnly": {
+    "value": "{{name}} thinks only with an API key. Plans run on an agent's computer, and {{name}} never uses one."
+  },
   "connectAi.theComputer": {
     "value": "the computer"
   },

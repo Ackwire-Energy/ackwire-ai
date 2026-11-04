@@ -1895,6 +1895,7 @@
       "useKey": "Şimdi bir API anahtarı kullan",
       "connecting": "Bu sunucunun bilgisayarı bir dakika içinde bağlanır. Bağlanır bağlanmaz burada giriş yaparsınız."
     },
+    "keyOnly": "{{name}} yalnızca bir API anahtarıyla düşünür. Planlar bir ajanın bilgisayarında çalışır ve {{name}} hiç bilgisayar kullanmaz.",
     "theComputer": "bilgisayar",
     "own": {
       "shared": "Ajanlarınızın paylaştığı hesap",
