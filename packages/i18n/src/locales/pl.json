@@ -9111,6 +9111,7 @@
     },
     "recommended": "Zalecany",
     "free": "Darmowy",
+    "opencodeFreeHint": "Inne darmowe modele działają przez OpenCode na komputerze agenta.",
     "modelHelp": "Większe modele myślą więcej i szybciej zużywają plan.",
     "hidden": "Kto myśli, wybiera {{owner}} lub administrator.",
     "hiddenAdmins": "Kto myśli, wybierają tylko administratorzy.",

@@ -6,7 +6,7 @@ import { advancedContents } from "@agenteschat/client/lib/brain-advanced";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { brainPlan, isPlanId, planOf } from "@agenteschat/client/lib/plans";
+import { brainPlan, isPlanId, planFreeHint, planOf } from "@agenteschat/client/lib/plans";
 import { apiProviderOf, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import { extraUsageOn, limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
@@ -398,6 +398,7 @@ export function AgentModelScreen({ agentId }: { agentId: string }) {
   const view = brain.data;
   const plan = view ? brainPlan(view) : undefined;
   const rows = view ? modelRows(t, view, plan) : [];
+  const freeHint = planFreeHint(t, plan);
   // A model without a maker of its own wears its plan's mark, else its brain's.
   const mark = (plan && view?.accounts.find((a) => a.id === view.account)?.provider) || (view?.brain ?? "");
   const hasModels = view !== undefined && view.brain !== "model";
@@ -445,6 +446,7 @@ export function AgentModelScreen({ agentId }: { agentId: string }) {
             </Fragment>
           ))
         )}
+        {view && freeHint ? <Note icon="info">{freeHint}</Note> : null}
       </ScrollView>
       {hasModels ? <EffortDock agentId={agentId} shown={fixed} onHeight={setDock} /> : null}
     </View>

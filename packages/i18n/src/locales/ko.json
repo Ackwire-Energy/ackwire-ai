@@ -8132,6 +8132,7 @@
     },
     "recommended": "추천",
     "free": "무료",
+    "opencodeFreeHint": "다른 무료 모델은 에이전트 컴퓨터의 OpenCode에서 실행돼요.",
     "modelHelp": "큰 모델일수록 더 많이 생각하고 요금제를 더 빨리 소진해요.",
     "hidden": "생각하는 AI는 {{owner}}님이나 관리자가 골라요.",
     "hiddenAdmins": "생각하는 AI는 관리자만 고를 수 있어요.",

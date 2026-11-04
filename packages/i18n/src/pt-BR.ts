@@ -8403,6 +8403,8 @@ export const ptBR = {
     },
     recommended: "Recomendado",
     free: "Grátis",
+    /** Under OpenCode Go's models: OpenCode's free tier answers only its own CLI (ADR 0132 §7). */
+    opencodeFreeHint: "Outros modelos grátis rodam pelo OpenCode no computador do agente.",
     modelHelp: "Os modelos maiores pensam mais e gastam o plano mais rápido.",
     hidden: "{{owner}} ou um admin escolhe quem pensa.",
     hiddenAdmins: "Só admins escolhem quem pensa.",

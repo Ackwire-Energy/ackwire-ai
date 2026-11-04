@@ -8204,6 +8204,7 @@
     },
     "recommended": "Disarankan",
     "free": "Gratis",
+    "opencodeFreeHint": "Model gratis lainnya berjalan lewat OpenCode di komputer agen.",
     "modelHelp": "Model yang lebih besar berpikir lebih banyak dan menghabiskan paket lebih cepat.",
     "hidden": "{{owner}} atau admin yang memilih siapa yang berpikir.",
     "hiddenAdmins": "Hanya admin yang memilih siapa yang berpikir.",

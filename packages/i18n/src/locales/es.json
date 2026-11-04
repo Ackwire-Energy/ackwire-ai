@@ -8785,6 +8785,7 @@
     },
     "recommended": "Recomendado",
     "free": "Gratis",
+    "opencodeFreeHint": "Otros modelos gratis funcionan con OpenCode en la computadora del agente.",
     "modelHelp": "Los modelos más grandes piensan más y consumen el plan más rápido.",
     "hidden": "{{owner}} o un admin elige quién piensa.",
     "hiddenAdmins": "Solo los admins eligen quién piensa.",

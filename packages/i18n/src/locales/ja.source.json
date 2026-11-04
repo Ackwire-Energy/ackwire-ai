@@ -20480,6 +20480,9 @@
   "brain.free": {
     "value": "Free"
   },
+  "brain.opencodeFreeHint": {
+    "value": "Other free models run through OpenCode on the agent's computer."
+  },
   "brain.modelHelp": {
     "value": "Bigger models think more and use up the plan faster."
   },

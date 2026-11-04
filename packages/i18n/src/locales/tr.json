@@ -8425,6 +8425,7 @@
     },
     "recommended": "Önerilen",
     "free": "Ücretsiz",
+    "opencodeFreeHint": "Diğer ücretsiz modeller ajanın bilgisayarındaki OpenCode ile çalışır.",
     "modelHelp": "Büyük modeller daha çok düşünür ve planı daha hızlı tüketir.",
     "hidden": "Düşünen yapay zekayı {{owner}} veya bir yönetici seçer.",
     "hiddenAdmins": "Düşünen yapay zekayı yalnızca yöneticiler seçer.",
