@@ -31,6 +31,7 @@ import { decryptCredential, usableCredentialRow } from "./credentials";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { maySql, type RolePermission } from "./permissions";
+import { addPersonSpend, assertPersonUnderLimit } from "./person-usage";
 import { assertCanWork } from "./standing";
 import { redactCredentials } from "./tool-detail";
 import { budgetPercent, monthStartUtc, withEffectiveBudget } from "./usage";
@@ -68,6 +69,11 @@ export interface GatewayCall {
    */
   agent?: Agent;
   runId?: string;
+  /**
+   * The person behind the run (ADR 0141): recorded on the usage row, added to their month and checked against their
+   * limit before the call. Absent or null: nobody's (an agent's own work).
+   */
+  personId?: string | null;
   system: SystemPrompt;
   messages: ModelMessage[];
   maxTokens: number;
@@ -286,6 +292,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       agentId: string | null;
       kind: "agent" | "router" | "summary";
       runId?: string;
+      personId?: string | null;
       credentialId: string | null;
       provider: string;
       model: string;
@@ -306,6 +313,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         agentId: input.agentId,
         kind: input.kind,
         runId: input.runId,
+        personId: input.personId ?? null,
         credentialId: input.credentialId,
         provider: input.provider,
         model: input.model,
@@ -484,6 +492,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     agent: Agent;
     reservation: Pick<typeof budgetReservations.$inferSelect, "id" | "agentId" | "periodStart"> | null;
     runId?: string;
+    personId?: string | null;
     credentialId: string | null;
     provider: string;
     model: string;
@@ -503,10 +512,11 @@ export function createModelGateway(deps: ModelGatewayDeps) {
           delete from ${budgetReservations} where id = ${input.reservation?.id ?? null}::uuid returning amount_nano_usd
         ), u as (
           insert into ${usageRecords} (id, org_id, agent_id, kind, run_id, credential_id, provider, model, requested_model,
-            input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_nano_usd, partial, created_at)
+            input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_nano_usd, partial, person_id, created_at)
           values (${id}::uuid, ${agent.orgId}::uuid, ${agent.id}::uuid, 'agent', ${input.runId ?? null}::uuid,
             ${input.credentialId}::uuid, ${input.provider}, ${input.model}, ${agent.model}, ${usage.inputTokens},
-            ${usage.outputTokens}, ${usage.cacheReadTokens}, ${usage.cacheWriteTokens}, ${cost}, false, ${at}::timestamptz)
+            ${usage.outputTokens}, ${usage.cacheReadTokens}, ${usage.cacheWriteTokens}, ${cost}, false,
+            ${input.personId ?? null}, ${at}::timestamptz)
           returning id
         ), p as (
           insert into ${agentBudgetPeriods} (org_id, agent_id, period_start, spent_nano_usd, reserved_nano_usd, updated_at)
@@ -615,6 +625,10 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       const promptTokens = Math.ceil(promptChars(request) / 3);
       // Only Claude's own API is asked for (and bills) 1-hour writes at our catalog prices; OpenRouter reports its cost.
       const longCache = request.cacheTtl === "1h" && providerId === "anthropic";
+      // ponytail: the person's month is checked, not reserved, so calls in flight together can pass the limit by
+      // one step each (as a plan's can, ADR 0141); a reservation like the agent's would close it.
+      const personId = call.personId ?? null;
+      if (personId) await assertPersonUnderLimit(db, agent.orgId, personId, now());
       const { reservation, maxTokens } = await reserve(
         agent,
         agent.model,
@@ -640,14 +654,15 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         });
       } catch (error) {
         const usage = error instanceof ProviderError ? await partialUsage(error, provider, request, key) : null;
+        let actual = 0;
         await db.transaction(async (tx) => {
-          let actual = 0;
           if (usage) {
             const record = await recordUsage(tx, {
               orgId: call.orgId,
               agentId: agent.id,
               kind: "agent",
               runId: call.runId,
+              personId,
               credentialId: key.credentialId,
               provider: providerId,
               model: agent.model,
@@ -659,6 +674,8 @@ export function createModelGateway(deps: ModelGatewayDeps) {
           }
           await settle(tx, reservation, actual, agent);
         });
+        if (personId && usage)
+          await addPersonSpend(db, { orgId: agent.orgId, personId, amountNanoUsd: actual, at: now() });
         throw masked(error);
       }
 
@@ -666,6 +683,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         agent,
         reservation,
         runId: call.runId,
+        personId,
         credentialId: key.credentialId,
         provider: providerId,
         model: result.model,
@@ -673,6 +691,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         reportedCost: result.costNanoUsd,
       });
       await checkThresholds(agent, spent, record.cost);
+      if (personId) await addPersonSpend(db, { orgId: agent.orgId, personId, amountNanoUsd: record.cost, at: now() });
       const refused = result.thinking?.refused;
       return {
         ...result,

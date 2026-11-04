@@ -72,6 +72,8 @@ export const RUN_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
 
 /** A run's error (and a routing decision's) when nobody could think: no AI connected. */
 export const NO_AI = "no_ai" as const;
+/** A run's error when the person behind it is at their monthly AI limit (ADR 0141): its card says so. */
+export const PERSON_LIMIT = "person_limit" as const;
 /** An older run's error from when a run waited at most 30 minutes for room on its computer (still worded). */
 export const COMPUTER_BUSY = "computer_busy" as const;
 /** A run's error when it went in circles and its kind of run can't end with Continuar (a routine's, a forum's). */
@@ -106,6 +108,7 @@ export function runErrorDetail(error: string | null | undefined): {
     "model_refused",
     "agent_archived",
     NO_AI,
+    PERSON_LIMIT,
     COMPUTER_BUSY,
     STUCK_ERROR,
   ];

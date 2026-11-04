@@ -169,6 +169,14 @@ export const NOTIFICATION_KINDS = [
    * Waiting; done once someone decides it.
    */
   "change_request",
+  /**
+   * A person's monthly AI limit (ADR 0141), `source.userId` the person, `latest.statusTo` what happened: `warning`
+   * (the person, at 80%), `reached` (who decides, with `limitUsd`, `limitFrom`, `runs` and the agent most used in
+   * `title` with its `share`; `reached_notify` to the person when the limit only notifies), `request` (who decides,
+   * waiting, with `raiseToUsd`: "Aumentar para US$ X este mês" or "Recusar"), `raised` or `refused` (the person,
+   * from who answered). The person's own rows carry percentages only.
+   */
+  "usage_limit",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -259,6 +267,15 @@ export interface NotificationLatest {
   failures?: RunFailure[];
   /** `run_failed` on a computer brain: the plan's name its cause may name ("the Claude account was disconnected"). */
   plan?: string;
+  /** `usage_limit`: the share of the person's limit used. */
+  percent?: number;
+  /** `usage_limit` to who decides: the limit, what "Aumentar" raises it to, where it comes from, this month's requests. */
+  limitUsd?: number;
+  raiseToUsd?: number;
+  limitFrom?: string;
+  runs?: number;
+  /** `usage_limit`: the share of the requests made with the agent in `title`. */
+  share?: number;
 }
 
 /** A run that failed, as its `run_failed` row lists it: `key` its agent and conversation, the rest its source. */

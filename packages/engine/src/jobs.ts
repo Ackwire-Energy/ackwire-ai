@@ -75,6 +75,7 @@ import { notifyMessage } from "./notification-producers";
 import { ORG_FILES_PURGE_ATTEMPTS, ORG_FILES_PURGE_JOB, USER_FILES_PURGE_JOB } from "./organizations";
 import { outOfOfficeIds } from "./out-of-office";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
+import { notifyPersonLimit, PERSON_LIMIT_JOB } from "./person-usage";
 import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
 import { reachOf, settleReach } from "./reach";
 import { routineCreatorOf } from "./requester";
@@ -972,6 +973,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         { db: deps.db, pubsub: deps.pubsub, judge: deps.context?.judge ?? null, gifs: deps.gifs ?? null },
         { orgId: orgOf(job), messageId: String(job.payload.messageId) },
       );
+    },
+    // A person's monthly AI limit neared or reached (ADR 0141): the person hears 80%, who decides hears 100%.
+    [PERSON_LIMIT_JOB]: async (job) => {
+      await notifyPersonLimit({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), {
+        personId: String(job.payload.personId),
+        level: job.payload.level === "reached" ? "reached" : "warning",
+        period: String(job.payload.period),
+      });
     },
     // In-app notifications of a message: mentions, thread replies, DMs.
     "notifications.message": async (job) => {
