@@ -186,9 +186,10 @@ function NextCard({ first }: { first: Agent }) {
         wide
         label={t("rightHand.intro.next.firstTask", agentGrammar(first.name))}
         onPress={() =>
-          void openDm({ agentId: first.id }, async (channelId) => {
-            if (preset) requestComposerText(channelId, t(`rightHand.intro.firstTask.${preset}`));
-          })
+          void openDm(
+            { agentId: first.id },
+            { compose: true, text: preset ? t(`rightHand.intro.firstTask.${preset}`) : "" },
+          )
         }
       />
     </IntroCard>

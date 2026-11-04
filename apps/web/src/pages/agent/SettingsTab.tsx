@@ -18,7 +18,6 @@ import {
   Meter,
   randomAppearance,
   Select,
-  SettingNote,
 } from "@agenteschat/ui";
 import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
