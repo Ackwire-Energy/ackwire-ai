@@ -6892,6 +6892,7 @@
     "autoUpdateHelp": "Lee su enlace todos los días. El texto nuevo entra con Deshacer. Los cambios en scripts esperan a alguien que gestione habilidades.",
     "autoChip": "Se actualiza sola",
     "waitingChip": "Actualización en espera",
+    "waitingChipEdited": "Enlace y agentes la cambiaron",
     "lastUpdate": "Actualizada desde su enlace {{when}}",
     "undoUpdate": "Deshacer actualización",
     "undone": "{{name}} volvió a la versión {{version}}.",
@@ -6900,16 +6901,47 @@
     "agentsImproveThis": "Los agentes mejoran esta habilidad solos",
     "agentChange": "{{agent}} la cambió {{when}}",
     "undoAgentChange": "Deshacer cambio",
+    "undo": "Deshacer",
+    "chosenLink": "Se quedó la versión del enlace {{when}}",
+    "history": {
+      "title": "Cambios de los agentes",
+      "empty": "Ningún agente cambió esta habilidad todavía.",
+      "show": "Ver cambio",
+      "hide": "Ocultar cambio",
+      "undone": "deshecho"
+    },
+    "diff": {
+      "label": "Cómo ver los cambios",
+      "agents": "Lo que cambiaron los agentes",
+      "link": "Lo que cambió en el enlace",
+      "compare": "Actual × enlace",
+      "same": "El texto es el mismo en los dos.",
+      "files": "Archivos que se ejecutan",
+      "newFile": "nuevo",
+      "changedFile": "cambió",
+      "large": "Demasiado grande para mostrarlo aquí. Míralo en el enlace.",
+      "unavailable": "Usa Actualizar desde el enlace para ver qué cambia."
+    },
     "pending": {
       "title": "La actualización de su enlace cambia archivos que se ejecutan: {{files}}",
       "lead": "Aplícala solo si confías en estos archivos. Los agentes los ejecutan en sus computadoras.",
-      "edited": "La actualización desde su enlace reemplazaría lo que los agentes cambiaron en ella",
-      "editedLead": "Aplícala para quedarte con la versión del enlace. Puedes deshacerla después.",
+      "edited": "El enlace tiene una versión nueva, y los agentes también cambiaron esta habilidad",
+      "editedLead": "Elige qué versión se queda. Puedes deshacerlo después.",
       "apply": "Aplicar actualización",
       "dismiss": "No aplicar",
       "applied": "{{name}} actualizada desde su enlace.",
       "changedAgain": "Su enlace cambió otra vez. Revisa los archivos nuevos.",
-      "dismissed": "Actualización no aplicada. Un cambio nuevo en su enlace vuelve a preguntar."
+      "dismissed": "Actualización no aplicada. Un cambio nuevo en su enlace vuelve a preguntar.",
+      "useLink": "Usar la versión del enlace",
+      "keepAgents": "Mantener la de los agentes",
+      "usedLink": "{{name}} ahora usa la versión del enlace.",
+      "keptAgents": "{{name}} se queda con la versión de los agentes.",
+      "reopened": "La actualización de {{name}} vuelve a esperar.",
+      "linkSince": "Versión nueva en el enlace {{when}}",
+      "keptLine": "Se quedó la versión de los agentes {{when}}",
+      "notAppliedLine": "Actualización del enlace no aplicada {{when}}",
+      "byAgents_one": "{{names}} cambió esta habilidad, la última vez {{when}}",
+      "byAgents_other": "{{names}} cambiaron esta habilidad, la última vez {{when}}"
     },
     "updateFailed": {
       "no_skill_md": "No se pudo actualizar: su enlace ya no tiene un SKILL.md.",
@@ -6922,7 +6954,7 @@
     "notice": {
       "updated": "{{name}} se actualizó desde su enlace",
       "waiting": "Una actualización de {{name}} cambia sus scripts",
-      "waitingEdited": "Una actualización de {{name}} reemplazaría lo que los agentes cambiaron",
+      "waitingEdited": "{{name}} cambió en su enlace y con los agentes: elige qué versión se queda",
       "failed": "{{name}} no se pudo actualizar desde su enlace",
       "edited": "Los agentes mejoraron {{name}}"
     },
@@ -11270,7 +11302,6 @@
         "install": "Agregar a {{app}}"
       },
       "note": {
-        "untested": "Todavía no probamos el inicio de sesión desde esta app. Si falla, avísanos.",
         "chatgptPlans": "En los planes de pago de ChatGPT, no en Free ni en Go. En Business, solo los admins pueden agregarlo.",
         "chatgptPhone": "No se puede agregar desde la app del teléfono. Una vez agregado en la web, también aparece en la computadora y en el teléfono.",
         "geminiPlans": "Solo en la web, con una cuenta personal de Google. Puede requerir Google AI Pro o Ultra.",

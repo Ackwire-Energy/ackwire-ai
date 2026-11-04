@@ -6612,6 +6612,7 @@
     "autoUpdateHelp": "Bağlantısını her gün okur. Yeni metin Geri al ile gelir. Betik değişiklikleri becerileri yöneten birini bekler.",
     "autoChip": "Kendi kendine güncellenir",
     "waitingChip": "Güncelleme bekliyor",
+    "waitingChipEdited": "Bağlantı ve ajanlar değiştirdi",
     "lastUpdate": "{{when}} bağlantısından güncellendi",
     "undoUpdate": "Güncellemeyi geri al",
     "undone": "{{name}} {{version}} sürümüne döndü.",
@@ -6620,16 +6621,47 @@
     "agentsImproveThis": "Ajanlar bu beceriyi kendileri geliştirir",
     "agentChange": "{{agent}} {{when}} değiştirdi",
     "undoAgentChange": "Değişikliği geri al",
+    "undo": "Geri al",
+    "chosenLink": "Bağlantının sürümü seçildi {{when}}",
+    "history": {
+      "title": "Ajanların değişiklikleri",
+      "empty": "Henüz hiçbir ajan bu beceriyi değiştirmedi.",
+      "show": "Değişikliği göster",
+      "hide": "Değişikliği gizle",
+      "undone": "geri alındı"
+    },
+    "diff": {
+      "label": "Değişiklikleri görme biçimi",
+      "agents": "Ajanların değiştirdikleri",
+      "link": "Bağlantıda değişenler",
+      "compare": "Şu anki × bağlantı",
+      "same": "Metin ikisinde de aynı.",
+      "files": "Çalışan dosyalar",
+      "newFile": "yeni",
+      "changedFile": "değişti",
+      "large": "Burada gösterilemeyecek kadar büyük. Bağlantıda bak.",
+      "unavailable": "Neyin değiştiğini görmek için Bağlantıdan güncelle'yi kullan."
+    },
     "pending": {
       "title": "Bağlantısından gelen güncelleme çalışan dosyaları değiştiriyor: {{files}}",
       "lead": "Yalnızca bu dosyalara güveniyorsanız uygulayın. Ajanlar bunları kendi bilgisayarlarında çalıştırır.",
-      "edited": "Bağlantısından gelen güncelleme, ajanların değiştirdiklerinin yerine geçer",
-      "editedLead": "Bağlantıdaki sürümü almak için uygula. Sonra geri alabilirsin.",
+      "edited": "Bağlantıda yeni bir sürüm var ve ajanlar da bu beceriyi değiştirdi",
+      "editedLead": "Hangi sürümün kalacağını seç. Sonra geri alabilirsin.",
       "apply": "Güncellemeyi uygula",
       "dismiss": "Uygulama",
       "applied": "{{name}} bağlantısından güncellendi.",
       "changedAgain": "Bağlantısı yine değişti. Yeni dosyaları inceleyin.",
-      "dismissed": "Güncelleme uygulanmadı. Bağlantısındaki yeni bir değişiklik yeniden sorar."
+      "dismissed": "Güncelleme uygulanmadı. Bağlantısındaki yeni bir değişiklik yeniden sorar.",
+      "useLink": "Bağlantının sürümünü kullan",
+      "keepAgents": "Ajanlarınkini koru",
+      "usedLink": "{{name}} artık bağlantının sürümünü kullanıyor.",
+      "keptAgents": "{{name}} ajanların sürümünde kalıyor.",
+      "reopened": "{{name}} güncellemesi yeniden bekliyor.",
+      "linkSince": "Bağlantıda yeni sürüm {{when}}",
+      "keptLine": "Ajanların sürümü korundu {{when}}",
+      "notAppliedLine": "Bağlantıdan gelen güncelleme uygulanmadı {{when}}",
+      "byAgents_one": "{{names}} bu beceriyi değiştirdi, en son {{when}}",
+      "byAgents_other": "{{names}} bu beceriyi değiştirdi, en son {{when}}"
     },
     "updateFailed": {
       "no_skill_md": "Güncellenemedi: bağlantısında artık SKILL.md yok.",
@@ -6642,7 +6674,7 @@
     "notice": {
       "updated": "{{name}} bağlantısından güncellendi",
       "waiting": "{{name}} güncellemesi betiklerini değiştiriyor",
-      "waitingEdited": "{{name}} güncellemesi, ajanların değiştirdiklerinin yerine geçer",
+      "waitingEdited": "{{name}} hem bağlantıda hem ajanlarca değişti: hangi sürümün kalacağını seç",
       "failed": "{{name}} bağlantısından güncellenemedi",
       "edited": "Ajanlar {{name}} becerisini geliştirdi"
     },
@@ -10849,7 +10881,6 @@
         "install": "{{app}} uygulamasına ekle"
       },
       "note": {
-        "untested": "Bu uygulamadan girişi henüz test etmedik. Başarısız olursa bize haber verin.",
         "chatgptPlans": "ChatGPT'nin ücretli planlarında, Free ve Go hariç. Business'ta yalnızca adminler ekleyebilir.",
         "chatgptPhone": "Telefon uygulamasından eklenemez. Web'de eklendikten sonra masaüstünde ve telefonda da görünür.",
         "geminiPlans": "Yalnızca web'de, kişisel bir Google hesabıyla. Google AI Pro veya Ultra gerekebilir.",

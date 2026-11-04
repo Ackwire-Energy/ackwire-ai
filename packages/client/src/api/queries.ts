@@ -3494,7 +3494,7 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
         | { type: "remove"; id: string }
         | { type: "revert"; id: string }
         | { type: "restore"; id: string }
-        | { type: "updateFromSource" | "approveUpdate" | "dismissUpdate" | "undoUpdate"; id: string }
+        | { type: "updateFromSource" | "approveUpdate" | "dismissUpdate" | "reopenUpdate" | "undoUpdate"; id: string }
         | { type: "settings"; settings: SkillSettings }
         | { type: "assign"; agentId: string; skills: { skillId: string; enabled: boolean }[] },
     ): Promise<unknown> => {
@@ -3520,6 +3520,7 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
         case "updateFromSource":
         case "approveUpdate":
         case "dismissUpdate":
+        case "reopenUpdate":
         case "undoUpdate":
           return api.skills[action.type]?.(orgId, action.id) ?? Promise.resolve();
         case "settings":

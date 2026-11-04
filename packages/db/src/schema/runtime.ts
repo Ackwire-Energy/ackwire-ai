@@ -623,6 +623,8 @@ export const agentActions = pgTable(
     foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
     index().on(t.orgId, t.messageId),
     index().on(t.runId),
+    // A skill's page lists the agents' changes to it.
+    index().on(t.orgId, t.targetId),
   ],
 );
 

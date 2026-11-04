@@ -3284,6 +3284,62 @@ html:not([data-pointer]) .skill-file--open:focus-visible {
   gap: 12px;
   min-width: 0;
 }
+/* A fact and its action on one line, the button on the words' centre ("Ficou a versão do link há 2 h · Desfazer"). */
+.skill-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+/* The waiting update takes the sheet's column, not a chat card's width. */
+.skill-wait {
+  max-width: none;
+}
+.skill-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.skill-diff h4 {
+  margin: 4px 0 0;
+}
+/* Long texts scroll inside their diff: every line stays, none cut. */
+.skill-diff .ac-diff,
+.skill-history .ac-diff {
+  max-height: 320px;
+  overflow: auto;
+}
+.skill-diff__file {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.skill-diff__file > .skill-file {
+  padding: 0;
+}
+.skill-history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skill-history h3 {
+  margin: 0;
+}
+.skill-history__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skill-history__row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .skill-sheet__files h3 {
   margin: 0 0 8px;
 }

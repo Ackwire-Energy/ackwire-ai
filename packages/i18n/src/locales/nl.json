@@ -6715,6 +6715,7 @@
     "autoUpdateHelp": "Leest de link elke dag. Nieuwe tekst komt erin met Ongedaan maken. Wijzigingen in scripts wachten op iemand die skills beheert.",
     "autoChip": "Werkt zichzelf bij",
     "waitingChip": "Update wacht",
+    "waitingChipEdited": "Link en agents hebben gewijzigd",
     "lastUpdate": "Bijgewerkt vanaf de link {{when}}",
     "undoUpdate": "Update ongedaan maken",
     "undone": "{{name}} is terug naar versie {{version}}.",
@@ -6723,16 +6724,47 @@
     "agentsImproveThis": "Agents verbeteren deze skill zelf",
     "agentChange": "{{agent}} heeft hem gewijzigd {{when}}",
     "undoAgentChange": "Wijziging ongedaan maken",
+    "undo": "Ongedaan maken",
+    "chosenLink": "Versie van de link gekozen {{when}}",
+    "history": {
+      "title": "Wijzigingen door agents",
+      "empty": "Nog geen agent heeft deze skill gewijzigd.",
+      "show": "Wijziging tonen",
+      "hide": "Wijziging verbergen",
+      "undone": "ongedaan gemaakt"
+    },
+    "diff": {
+      "label": "Wijzigingen bekijken",
+      "agents": "Wat agents veranderden",
+      "link": "Wat er in de link veranderde",
+      "compare": "Huidig × link",
+      "same": "De tekst is in beide hetzelfde.",
+      "files": "Bestanden die draaien",
+      "newFile": "nieuw",
+      "changedFile": "gewijzigd",
+      "large": "Te groot om hier te tonen. Bekijk het in de link.",
+      "unavailable": "Gebruik Bijwerken vanaf link om te zien wat er verandert."
+    },
     "pending": {
       "title": "De update vanaf de link wijzigt bestanden die worden uitgevoerd: {{files}}",
       "lead": "Pas het alleen toe als je deze bestanden vertrouwt. Agents voeren ze uit op hun computers.",
-      "edited": "De update via de link zou vervangen wat agents eraan hebben veranderd",
-      "editedLead": "Pas hem toe om de versie van de link te nemen. Je kunt het daarna ongedaan maken.",
+      "edited": "De link heeft een nieuwe versie, en agents hebben deze skill ook gewijzigd",
+      "editedLead": "Kies welke versie blijft. Je kunt het daarna ongedaan maken.",
       "apply": "Update toepassen",
       "dismiss": "Niet toepassen",
       "applied": "{{name}} bijgewerkt vanaf de link.",
       "changedAgain": "De link is weer gewijzigd. Bekijk de nieuwe bestanden.",
-      "dismissed": "Update niet toegepast. Een nieuwe wijziging in de link vraagt het opnieuw."
+      "dismissed": "Update niet toegepast. Een nieuwe wijziging in de link vraagt het opnieuw.",
+      "useLink": "Versie van de link gebruiken",
+      "keepAgents": "Die van de agents houden",
+      "usedLink": "{{name}} gebruikt nu de versie van de link.",
+      "keptAgents": "{{name}} houdt de versie van de agents.",
+      "reopened": "De update van {{name}} wacht weer.",
+      "linkSince": "Nieuwe versie in de link {{when}}",
+      "keptLine": "Versie van de agents gehouden {{when}}",
+      "notAppliedLine": "Update via de link niet toegepast {{when}}",
+      "byAgents_one": "{{names}} heeft deze skill gewijzigd, laatst {{when}}",
+      "byAgents_other": "{{names}} hebben deze skill gewijzigd, laatst {{when}}"
     },
     "updateFailed": {
       "no_skill_md": "Bijwerken lukte niet: de link heeft geen SKILL.md meer.",
@@ -6745,7 +6777,7 @@
     "notice": {
       "updated": "{{name}} is bijgewerkt vanaf de link",
       "waiting": "Een update van {{name}} wijzigt de scripts",
-      "waitingEdited": "Een update van {{name}} zou vervangen wat agents hebben veranderd",
+      "waitingEdited": "{{name}} is veranderd in de link en door agents: kies welke versie blijft",
       "failed": "{{name}} kon niet bijwerken vanaf de link",
       "edited": "Agents hebben {{name}} verbeterd"
     },
@@ -10990,7 +11022,6 @@
         "install": "Toevoegen aan {{app}}"
       },
       "note": {
-        "untested": "We hebben inloggen vanuit deze app nog niet getest. Lukt het niet, laat het ons weten.",
         "chatgptPlans": "Op betaalde ChatGPT-abonnementen, niet op Free of Go. Bij Business kunnen alleen admins hem toevoegen.",
         "chatgptPhone": "Toevoegen kan niet vanuit de telefoon-app. Zodra hij op het web is toegevoegd, verschijnt hij ook op desktop en telefoon.",
         "geminiPlans": "Alleen op het web, met een persoonlijk Google-account. Mogelijk is Google AI Pro of Ultra nodig.",

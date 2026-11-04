@@ -6945,6 +6945,7 @@
     "autoUpdateHelp": "Lit son lien chaque jour. Le nouveau texte arrive avec Annuler. Les changements de scripts attendent une personne qui gère les compétences.",
     "autoChip": "Se met à jour seule",
     "waitingChip": "Mise à jour en attente",
+    "waitingChipEdited": "Lien et agents l'ont modifiée",
     "lastUpdate": "Mise à jour depuis son lien {{when}}",
     "undoUpdate": "Annuler la mise à jour",
     "undone": "{{name}} est revenue à la version {{version}}.",
@@ -6953,16 +6954,47 @@
     "agentsImproveThis": "Les agents améliorent cette compétence eux-mêmes",
     "agentChange": "{{agent}} l'a modifiée {{when}}",
     "undoAgentChange": "Annuler la modification",
+    "undo": "Annuler",
+    "chosenLink": "Version du lien gardée {{when}}",
+    "history": {
+      "title": "Modifications des agents",
+      "empty": "Aucun agent n'a encore modifié cette compétence.",
+      "show": "Voir la modification",
+      "hide": "Masquer la modification",
+      "undone": "annulée"
+    },
+    "diff": {
+      "label": "Voir les modifications",
+      "agents": "Ce que les agents ont modifié",
+      "link": "Ce qui a changé dans le lien",
+      "compare": "Actuelle × lien",
+      "same": "Le texte est le même des deux côtés.",
+      "files": "Fichiers exécutés",
+      "newFile": "nouveau",
+      "changedFile": "modifié",
+      "large": "Trop volumineux pour l'afficher ici. Consultez-le dans le lien.",
+      "unavailable": "Utilisez Mettre à jour depuis le lien pour voir ce qui change."
+    },
     "pending": {
       "title": "La mise à jour depuis son lien modifie des fichiers qui s'exécutent : {{files}}",
       "lead": "Appliquez-la seulement si vous faites confiance à ces fichiers. Les agents les exécutent sur leurs ordinateurs.",
-      "edited": "La mise à jour depuis son lien remplacerait ce que les agents y ont changé",
-      "editedLead": "Applique-la pour prendre la version du lien. Tu pourras l'annuler ensuite.",
+      "edited": "Le lien a une nouvelle version, et des agents ont aussi modifié cette compétence",
+      "editedLead": "Choisissez la version qui reste. Vous pourrez annuler ensuite.",
       "apply": "Appliquer la mise à jour",
       "dismiss": "Ne pas appliquer",
       "applied": "{{name}} mise à jour depuis son lien.",
       "changedAgain": "Son lien a encore changé. Examinez les nouveaux fichiers.",
-      "dismissed": "Mise à jour non appliquée. Un nouveau changement de son lien redemandera."
+      "dismissed": "Mise à jour non appliquée. Un nouveau changement de son lien redemandera.",
+      "useLink": "Utiliser la version du lien",
+      "keepAgents": "Garder celle des agents",
+      "usedLink": "{{name}} utilise maintenant la version du lien.",
+      "keptAgents": "{{name}} garde la version des agents.",
+      "reopened": "La mise à jour de {{name}} attend de nouveau.",
+      "linkSince": "Nouvelle version dans le lien {{when}}",
+      "keptLine": "Version des agents gardée {{when}}",
+      "notAppliedLine": "Mise à jour du lien non appliquée {{when}}",
+      "byAgents_one": "{{names}} a modifié cette compétence, la dernière fois {{when}}",
+      "byAgents_other": "{{names}} ont modifié cette compétence, la dernière fois {{when}}"
     },
     "updateFailed": {
       "no_skill_md": "Mise à jour impossible : son lien n'a plus de SKILL.md.",
@@ -6975,7 +7007,7 @@
     "notice": {
       "updated": "{{name}} a été mise à jour depuis son lien",
       "waiting": "Une mise à jour de {{name}} modifie ses scripts",
-      "waitingEdited": "Une mise à jour de {{name}} remplacerait ce que les agents ont changé",
+      "waitingEdited": "{{name}} a changé dans son lien et chez les agents : choisissez la version qui reste",
       "failed": "{{name}} n'a pas pu se mettre à jour depuis son lien",
       "edited": "Des agents ont amélioré {{name}}"
     },
@@ -11340,7 +11372,6 @@
         "install": "Ajouter à {{app}}"
       },
       "note": {
-        "untested": "Nous n'avons pas encore testé la connexion depuis cette app. Si elle échoue, dites-le-nous.",
         "chatgptPlans": "Avec les abonnements payants de ChatGPT, sauf Free et Go. Avec Business, seuls les admins peuvent l'ajouter.",
         "chatgptPhone": "Impossible de l'ajouter depuis l'app mobile. Une fois ajouté sur le web, il apparaît aussi sur ordinateur et sur téléphone.",
         "geminiPlans": "Sur le web uniquement, avec un compte Google personnel. Google AI Pro ou Ultra peut être nécessaire.",

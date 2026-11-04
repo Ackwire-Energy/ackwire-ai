@@ -427,7 +427,7 @@ export function createSkillToolSource(
                     {
                       kind: "skill.updated",
                       target: { type: "skill", id: s.id, title: s.name },
-                      params: { name: s.name },
+                      params: { name: s.name, fromLink: true },
                       before: r.before,
                       after: { version: s.version, body: s.body, description: s.description, metadata: s.metadata },
                     },

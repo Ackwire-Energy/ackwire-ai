@@ -878,6 +878,8 @@ export interface ApiClient {
     approveUpdate?(orgId: string, id: string): Promise<SkillSourceUpdate>;
     /** Refuse the waiting update. */
     dismissUpdate?(orgId: string, id: string): Promise<SkillDetail>;
+    /** Undo `dismissUpdate`: the update it kept out waits again. */
+    reopenUpdate?(orgId: string, id: string): Promise<SkillDetail>;
     /** Back to the version before its last update from its link. */
     undoUpdate?(orgId: string, id: string): Promise<SkillDetail>;
     /** Bring back a skill archived for disuse. */

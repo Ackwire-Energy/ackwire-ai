@@ -6958,6 +6958,7 @@
     "autoUpdateHelp": "Legge il suo link ogni giorno. Il testo nuovo entra con Annulla. Le modifiche agli script aspettano chi gestisce le skill.",
     "autoChip": "Si aggiorna da sola",
     "waitingChip": "Aggiornamento in attesa",
+    "waitingChipEdited": "Link e agenti l'hanno cambiata",
     "lastUpdate": "Aggiornata dal suo link {{when}}",
     "undoUpdate": "Annulla aggiornamento",
     "undone": "{{name}} è tornata alla versione {{version}}.",
@@ -6966,16 +6967,47 @@
     "agentsImproveThis": "Gli agenti migliorano questa skill da soli",
     "agentChange": "{{agent}} l'ha modificata {{when}}",
     "undoAgentChange": "Annulla modifica",
+    "undo": "Annulla",
+    "chosenLink": "Tenuta la versione del link {{when}}",
+    "history": {
+      "title": "Modifiche degli agenti",
+      "empty": "Nessun agente ha ancora cambiato questa skill.",
+      "show": "Vedi modifica",
+      "hide": "Nascondi modifica",
+      "undone": "annullata"
+    },
+    "diff": {
+      "label": "Come vedere le modifiche",
+      "agents": "Cosa hanno cambiato gli agenti",
+      "link": "Cosa è cambiato nel link",
+      "compare": "Attuale × link",
+      "same": "Il testo è uguale in entrambi.",
+      "files": "File che vengono eseguiti",
+      "newFile": "nuovo",
+      "changedFile": "cambiato",
+      "large": "Troppo grande da mostrare qui. Guardalo nel link.",
+      "unavailable": "Usa Aggiorna dal link per vedere cosa cambia."
+    },
     "pending": {
       "title": "L'aggiornamento dal suo link cambia file che vengono eseguiti: {{files}}",
       "lead": "Applicalo solo se ti fidi di questi file. Gli agenti li eseguono sui loro computer.",
-      "edited": "L'aggiornamento dal suo link sostituirebbe ciò che gli agenti vi hanno cambiato",
-      "editedLead": "Applicalo per prendere la versione del link. Puoi annullarlo dopo.",
+      "edited": "Il link ha una nuova versione, e anche gli agenti hanno cambiato questa skill",
+      "editedLead": "Scegli quale versione resta. Puoi annullare dopo.",
       "apply": "Applica aggiornamento",
       "dismiss": "Non applicare",
       "applied": "{{name}} aggiornata dal suo link.",
       "changedAgain": "Il suo link è cambiato di nuovo. Rivedi i file nuovi.",
-      "dismissed": "Aggiornamento non applicato. Una nuova modifica al suo link chiederà di nuovo."
+      "dismissed": "Aggiornamento non applicato. Una nuova modifica al suo link chiederà di nuovo.",
+      "useLink": "Usa la versione del link",
+      "keepAgents": "Tieni quella degli agenti",
+      "usedLink": "{{name}} ora usa la versione del link.",
+      "keptAgents": "{{name}} resta con la versione degli agenti.",
+      "reopened": "L'aggiornamento di {{name}} è di nuovo in attesa.",
+      "linkSince": "Nuova versione nel link {{when}}",
+      "keptLine": "Tenuta la versione degli agenti {{when}}",
+      "notAppliedLine": "Aggiornamento dal link non applicato {{when}}",
+      "byAgents_one": "{{names}} ha cambiato questa skill, l'ultima volta {{when}}",
+      "byAgents_other": "{{names}} hanno cambiato questa skill, l'ultima volta {{when}}"
     },
     "updateFailed": {
       "no_skill_md": "Impossibile aggiornarla: il suo link non ha più un SKILL.md.",
@@ -6988,7 +7020,7 @@
     "notice": {
       "updated": "{{name}} è stata aggiornata dal suo link",
       "waiting": "Un aggiornamento di {{name}} cambia i suoi script",
-      "waitingEdited": "Un aggiornamento di {{name}} sostituirebbe ciò che gli agenti hanno cambiato",
+      "waitingEdited": "{{name}} è cambiata nel link e dagli agenti: scegli quale versione resta",
       "failed": "{{name}} non è riuscita ad aggiornarsi dal suo link",
       "edited": "Gli agenti hanno migliorato {{name}}"
     },
@@ -11347,7 +11379,6 @@
         "install": "Aggiungi a {{app}}"
       },
       "note": {
-        "untested": "Non abbiamo ancora provato l'accesso da questa app. Se non funziona, faccelo sapere.",
         "chatgptPlans": "Nei piani a pagamento di ChatGPT, non in Free o Go. In Business, solo gli admin possono aggiungerlo.",
         "chatgptPhone": "Non si può aggiungere dall'app del telefono. Una volta aggiunto sul web, compare anche sul computer e sul telefono.",
         "geminiPlans": "Solo sul web, con un account Google personale. Potrebbe servire Google AI Pro o Ultra.",
