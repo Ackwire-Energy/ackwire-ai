@@ -21,7 +21,7 @@ type Proposal = typeof contextProposals.$inferSelect;
 
 /**
  * Who decides a line (ADR 0137, amending 0092 §5): whoever may make that change on the agent's page. `admin`: who
- * manages agents (model, budget, owner, archive); `admin_or_owner`: they or the agent's owner (who talks to it, its
+ * manages agents (model, budget, owner, archive, delete); `admin_or_owner`: they or the agent's owner (who talks to it, its
  * channels and how it replies there); `account`: only the owner of the AI account, who must own the agent too
  * (a personal plan is assigned by its owner alone, ADR 0059 §3). One row per agent and group, so a row is decided
  * by one rule.
@@ -31,6 +31,7 @@ export const SETTING_GROUP: Record<SettingField, "admin" | "admin_or_owner" | "a
   budget: "admin",
   owner: "admin",
   archive: "admin",
+  delete: "admin",
   audience: "admin_or_owner",
   channel_add: "admin_or_owner",
   channel_remove: "admin_or_owner",
@@ -38,7 +39,7 @@ export const SETTING_GROUP: Record<SettingField, "admin" | "admin_or_owner" | "a
   ai_account: "account",
 };
 
-/** Archive goes last (the other changes need the agent active); Undo walks the lines backwards. */
+/** Archive and delete go last (the other changes need the agent active); Undo walks the lines backwards. */
 const ORDER: SettingField[] = [
   "ai_account",
   "model",
@@ -49,6 +50,7 @@ const ORDER: SettingField[] = [
   "channel_remove",
   "reply_mode",
   "archive",
+  "delete",
 ];
 
 const same = (a: unknown, b: unknown) => canonicalJson(a ?? null) === canonicalJson(b ?? null);
@@ -73,6 +75,8 @@ async function valueNow(db: Executor, agent: Agent, line: Pick<SettingLine, "fie
       return agent.ownerUserId;
     case "archive":
       return agent.archivedAt !== null;
+    case "delete":
+      return agent.deletedAt !== null;
     case "audience": {
       const { mode, userIds, roleIds } = audienceOf(agent);
       return { mode, userIds, roleIds };
@@ -111,6 +115,9 @@ async function setValue(
       return void (await updateAgent(db, actorId, orgId, agentId, { ownerUserId: value as string | null }, { pubsub }));
     case "archive":
       return value ? archiveAgent(db, actorId, orgId, agentId) : unarchiveAgent(db, actorId, orgId, agentId);
+    // Deleting stops its work and closes its missions outside the decision's transaction (`decideProposal`).
+    case "delete":
+      return;
     case "audience":
       return void (await setAgentAudience(
         db,
@@ -143,6 +150,9 @@ async function setValue(
     }
   }
 }
+
+/** A row that deletes its agent for good (ADR 0082's rules, applied as whoever clicks). */
+export const deletes = (p: Pick<Proposal, "settings">) => (p.settings ?? []).some((l) => l.field === "delete");
 
 /** The row's group (all its lines share one). */
 export const settingsGroup = (p: Pick<Proposal, "settings">) => SETTING_GROUP[p.settings?.[0]?.field ?? "model"];
@@ -251,6 +261,8 @@ async function refusal(db: Database, orgId: string, requesterId: string, agent: 
         : "its owner must be a member of the workspace.";
     case "archive":
       return w.to === true ? null : "only archiving is proposed here.";
+    case "delete":
+      return w.to === true ? null : "only deleting is proposed here.";
     case "ai_account": {
       const id = (w.to as AccountValue | null)?.accountId;
       const [account] = id
@@ -337,7 +349,8 @@ export async function recordSettingsReceipt(
   agentName: string,
   undoWindowMs: number,
 ) {
-  if (!p.proposedByAgentId) return;
+  // A deleted agent can't come back: no Undo.
+  if (!p.proposedByAgentId || deletes(p)) return;
   const now = new Date();
   await db.insert(agentActions).values({
     orgId: p.orgId,

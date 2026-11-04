@@ -123,6 +123,7 @@ const HERE = new Set([
   "offer_install_skill",
   "propose_agent",
   "propose_settings_change",
+  "propose_remove_agents",
   "follow_up",
   "cancel_follow_up",
 ]);

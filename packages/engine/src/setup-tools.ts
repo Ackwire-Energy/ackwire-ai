@@ -46,6 +46,10 @@ export const CREATE_CHANNEL_TOOL = "create_channel";
 export const PROPOSE_AGENT_TOOL = "propose_agent";
 export const OFFER_CONNECT_APP_TOOL = "offer_connect_app";
 export const OFFER_INVITES_TOOL = "offer_invites";
+/** Archiving or deleting teammates, one card for them all (ADR 0137 amendment): any agent with setup tools. */
+export const PROPOSE_REMOVE_AGENTS_TOOL = "propose_remove_agents";
+/** At most this many agents on one removal card. */
+export const MAX_REMOVALS_PER_CARD = 20;
 /** The right hand's settings card (ADR 0137): no other agent has it. */
 export const PROPOSE_SETTINGS_TOOL = "propose_settings_change";
 /** What one run may make: enough for a request, never a flood (also all a prompt injection gets). */
@@ -543,6 +547,91 @@ export function createSetupToolSource(deps: {
           return {
             content: `Posted the proposal of ${draft.name} (@${draft.handle}). A person creates it from the card, in one click or after reviewing it: nothing exists until they do, and you'll be told what they decided and what it got.${(await mayCreateAgents(ctx.db, ctx.orgId, forUserId)) ? "" : asks}${draft.routine ? ` Its routine «${draft.routine.name}» runs: ${draft.routine.description}.` : ""} Suggested AI: ${aiWords(draft.ai)}.`,
             data: { agentProposal: { messageId: message.id } },
+          };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
+    {
+      name: PROPOSE_REMOVE_AGENTS_TOOL,
+      description:
+        "Propose archiving teammates (or deleting them for good) with one card in this conversation that lists them all: whoever may archive or delete agents applies it from the card as themselves, all at once or leaving some out, and archiving has Undo. A person who can't sends it from the card to an admin. Use it when someone asks to remove, archive, delete or start the team over ('apaga os outros agentes'). Never you or the workspace's assistant. Nothing changes until someone clicks: never say it is done. To rebuild the team after, propose the new agents with propose_agent.",
+      scope: SETUP_SCOPE,
+      inputSchema: {
+        type: "object",
+        properties: {
+          agents: {
+            type: "array",
+            items: { type: "string", minLength: 1, maxLength: 64 },
+            minItems: 1,
+            maxItems: MAX_REMOVALS_PER_CARD,
+            description: "Their @handles.",
+          },
+          delete: {
+            type: "boolean",
+            description:
+              "True only when the person asked to delete them for good (their instructions, memory and routines go; no Undo). Default: archive.",
+          },
+          reason: {
+            type: "string",
+            minLength: 1,
+            maxLength: 500,
+            description: "One short line on the card, in the person's language: why.",
+          },
+        },
+        required: ["agents", "reason"],
+        additionalProperties: false,
+      },
+      async execute(input, ctx) {
+        try {
+          const forUserId = await personBehindCall(ctx);
+          if (!forUserId) return { content: "Only a person's request can propose removing agents.", isError: true };
+          const reason = str(input.reason).trim();
+          if (!reason) return { content: "Say in `reason` why: one short line.", isError: true };
+          const field = input.delete === true ? "delete" : "archive";
+          // An archived agent can still be deleted for good.
+          const named = await agentsByHandle(ctx.db, ctx.orgId, input.agents, { archived: field === "delete" });
+          if (named.missing.length > 0) return noAgents(ctx, named.missing);
+          const left: string[] = [];
+          const targets: { agentId: string; lines: WantedLine[] }[] = [];
+          for (const row of named.rows) {
+            if (row.id === ctx.agentId) left.push("you can't remove yourself");
+            else if (isRightHand(await getAgentCached(ctx.db, ctx.orgId, row.id)))
+              left.push(`@${row.handle} is the workspace's assistant and can't be archived or deleted`);
+            else targets.push({ agentId: row.id, lines: [{ field, to: true }] });
+          }
+          if (targets.length === 0) return { content: `Nothing to propose: ${left.join("; ")}.`, isError: true };
+          const full = await cardsLeft(ctx);
+          if (full) return full;
+          const { proposals, skipped } = await proposeSettings(
+            { db: ctx.db },
+            { orgId: ctx.orgId, agentId: ctx.agentId, targets, rationale: reason, requesterId: forUserId },
+          );
+          if (proposals.length === 0) return { content: `Nothing to propose. ${skipped.join(" ")}`, isError: true };
+          const card: SettingsProposalCard = {
+            kind: "settings_proposal",
+            forUserId,
+            proposalIds: proposals.map((p) => p.id),
+          };
+          const who = proposals.map((p) => named.rows.find((r) => r.id === p.agentId)?.name ?? "").join(", ");
+          const message = await insertMessage(ctx.db, {
+            orgId: ctx.orgId,
+            channelId: ctx.channelId,
+            threadId: replyThreadOf(ctx),
+            author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
+            body: `Proposed ${field === "delete" ? "deleting" : "archiving"} ${who}: ${reason}`,
+            meta: { ...bodyCode(SETTINGS_PROPOSAL_CARD, { names: who }), actionCard: card },
+          });
+          if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(message));
+          const decides = proposals.filter((p) => p.canDecide).length;
+          const whoDecides =
+            decides === proposals.length
+              ? "the person who asked applies it from the card."
+              : "the person who asked can't apply it all: the card lets them send it to an admin.";
+          return {
+            content: `Posted the card to ${field} ${who}; ${whoDecides} Nothing has changed yet.${[...left, ...skipped].length ? ` Left off: ${[...left, ...skipped].join("; ")}.` : ""} To rebuild the team, propose the new agents now with propose_agent.`,
+            data: { actionCard: { messageId: message.id } },
           };
         } catch (error) {
           return failed(error);

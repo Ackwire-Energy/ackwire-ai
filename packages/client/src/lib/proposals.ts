@@ -230,6 +230,8 @@ export function settingLineText(
       }
       case "archive":
         return v === true ? t("rightHand.value.archived") : t("rightHand.value.active");
+      case "delete":
+        return v === true ? t("rightHand.value.deleted") : t("rightHand.value.active");
       default:
         return v === null || v === undefined
           ? t("rightHand.value.notIn")
@@ -242,8 +244,20 @@ export function settingLineText(
       ? channel
         ? `#${channel}`
         : (line.label?.to ?? t("rightHand.field.channel"))
-      : (t as unknown as (key: string) => string)(`rightHand.field.${line.field}`);
+      : (t as unknown as (key: string) => string)(
+          `rightHand.field.${line.field === "delete" ? "archive" : line.field}`,
+        );
   return { field, from: value(line.from, "from"), to: value(line.to, "to") };
+}
+
+/**
+ * A removal card (`propose_remove_agents`): every row archives, or every row deletes, one agent. Null for any other
+ * settings card.
+ */
+export function removalOf(rows: Pick<Proposal, "settings">[]): "archive" | "delete" | null {
+  const fields = new Set(rows.map((p) => (p.settings?.length === 1 ? p.settings[0]?.field : undefined)));
+  const [field] = fields;
+  return fields.size === 1 && (field === "archive" || field === "delete") ? field : null;
 }
 
 /** Which "Só admins …" line a row the viewer can't decide reads, by what it changes. */

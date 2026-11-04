@@ -1862,6 +1862,7 @@
         "budget": "Nur Admins ändern das Budget eines Agenten",
         "owner": "Nur Admins ändern, wem ein Agent gehört",
         "archive": "Nur Admins archivieren einen Agenten",
+        "delete": "Nur Admins löschen einen Agenten",
         "audience": "Nur Admins und der Verantwortliche ändern, wer mit ihm spricht",
         "channels": "Nur Admins und der Verantwortliche ändern seine Kanäle",
         "ai_account": "Nur die Person, der das Konto gehört, vergibt es",
@@ -1886,9 +1887,23 @@
       "somePeople": "Einige Personen",
       "active": "Aktiv",
       "archived": "Archiviert",
+      "deleted": "Gelöscht",
       "notIn": "Nicht im Kanal",
       "withoutMention": "Von selbst",
       "mentionOnly": "Nur bei Erwähnung"
+    },
+    "remove": {
+      "archiveTitle_one": "{{count}} Agent archivieren?",
+      "archiveTitle_other": "{{count}} Agenten archivieren?",
+      "deleteTitle_one": "{{count}} Agent endgültig löschen?",
+      "deleteTitle_other": "{{count}} Agenten endgültig löschen?",
+      "archiveAll": "Alle archivieren",
+      "deleteAll": "Alle löschen",
+      "archiveSome_one": "{{count}} archivieren",
+      "archiveSome_other": "{{count}} archivieren",
+      "deleteSome_one": "{{count}} löschen",
+      "deleteSome_other": "{{count}} löschen",
+      "deleteHelp": "Ihre Anweisungen, ihr Gedächtnis und ihre Routinen sind dann endgültig weg. Ihre Nachrichten bleiben."
     }
   },
   "routing": {

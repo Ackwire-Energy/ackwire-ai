@@ -1861,6 +1861,7 @@
         "budget": "Alleen admins wijzigen het budget van een agent",
         "owner": "Alleen admins wijzigen wie verantwoordelijk is voor een agent",
         "archive": "Alleen admins archiveren een agent",
+        "delete": "Alleen admins verwijderen een agent",
         "audience": "Alleen admins en de verantwoordelijke wijzigen wie met hem praat",
         "channels": "Alleen admins en de verantwoordelijke wijzigen zijn kanalen",
         "ai_account": "Alleen de eigenaar van het account geeft het",
@@ -1885,9 +1886,23 @@
       "somePeople": "Sommige mensen",
       "active": "Actief",
       "archived": "Gearchiveerd",
+      "deleted": "Verwijderd",
       "notIn": "Niet in het kanaal",
       "withoutMention": "Uit zichzelf",
       "mentionOnly": "Alleen bij vermelding"
+    },
+    "remove": {
+      "archiveTitle_one": "{{count}} agent archiveren?",
+      "archiveTitle_other": "{{count}} agents archiveren?",
+      "deleteTitle_one": "{{count}} agent definitief verwijderen?",
+      "deleteTitle_other": "{{count}} agents definitief verwijderen?",
+      "archiveAll": "Alles archiveren",
+      "deleteAll": "Alles verwijderen",
+      "archiveSome_one": "{{count}} archiveren",
+      "archiveSome_other": "{{count}} archiveren",
+      "deleteSome_one": "{{count}} verwijderen",
+      "deleteSome_other": "{{count}} verwijderen",
+      "deleteHelp": "Hun instructies, geheugen en routines verdwijnen definitief. Hun berichten blijven."
     }
   },
   "routing": {

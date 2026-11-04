@@ -1791,6 +1791,7 @@
         "budget": "エージェントの予算を変えられるのは管理者だけです",
         "owner": "エージェントの責任者を変えられるのは管理者だけです",
         "archive": "エージェントをアーカイブできるのは管理者だけです",
+        "delete": "エージェントを削除できるのは管理者だけです",
         "audience": "話せる人を変えられるのは管理者と責任者だけです",
         "channels": "チャンネルを変えられるのは管理者と責任者だけです",
         "ai_account": "割り当てられるのはアカウントの持ち主だけです",
@@ -1815,9 +1816,19 @@
       "somePeople": "一部の人",
       "active": "有効",
       "archived": "アーカイブ済み",
+      "deleted": "削除済み",
       "notIn": "チャンネル外",
       "withoutMention": "自分の判断で",
       "mentionOnly": "メンションされたときだけ"
+    },
+    "remove": {
+      "archiveTitle_other": "{{count}}体のエージェントをアーカイブしますか？",
+      "deleteTitle_other": "{{count}}体のエージェントを完全に削除しますか？",
+      "archiveAll": "すべてアーカイブ",
+      "deleteAll": "すべて削除",
+      "archiveSome_other": "{{count}}体をアーカイブ",
+      "deleteSome_other": "{{count}}体を削除",
+      "deleteHelp": "指示、メモリー、ルーティンは完全に消えます。メッセージは残ります。"
     }
   },
   "routing": {

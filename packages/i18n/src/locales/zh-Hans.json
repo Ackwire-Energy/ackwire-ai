@@ -1790,6 +1790,7 @@
         "budget": "只有管理员能更改智能体的预算",
         "owner": "只有管理员能更改智能体的负责人",
         "archive": "只有管理员能归档智能体",
+        "delete": "只有管理员能删除智能体",
         "audience": "只有管理员和负责人能更改谁能和它交谈",
         "channels": "只有管理员和负责人能更改它的频道",
         "ai_account": "只有账户所有者能分配它",
@@ -1814,9 +1815,19 @@
       "somePeople": "部分人",
       "active": "启用",
       "archived": "已归档",
+      "deleted": "已删除",
       "notIn": "不在频道中",
       "withoutMention": "自主回复",
       "mentionOnly": "仅在被提及时"
+    },
+    "remove": {
+      "archiveTitle_other": "归档 {{count}} 个智能体？",
+      "deleteTitle_other": "永久删除 {{count}} 个智能体？",
+      "archiveAll": "全部归档",
+      "deleteAll": "全部删除",
+      "archiveSome_other": "归档 {{count}} 个",
+      "deleteSome_other": "删除 {{count}} 个",
+      "deleteHelp": "它们的指令、记忆和例行任务会被永久删除。消息会保留。"
     }
   },
   "routing": {

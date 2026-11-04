@@ -19,12 +19,13 @@ import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import { delegateLine } from "@agenteschat/client/lib/approval-words";
 import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { decidersOf, onlyKey, sentToText, settingLineText } from "@agenteschat/client/lib/proposals";
+import { decidersOf, onlyKey, removalOf, sentToText, settingLineText } from "@agenteschat/client/lib/proposals";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, Icon, Text } from "@/ui";
+import { openAgentDelete } from "../agents/DeleteAgentScreen";
 import { AgentProposalView } from "../agents/ProposalCard";
 import { DelegateUndo } from "../agents/RightHandDelegate";
 import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
@@ -229,7 +230,11 @@ function SettingsRow({
           wide
           label={t("rightHand.card.apply")}
           disabled={decide.isPending}
-          onPress={() => decide.mutate({ id: p.id, decision: "accept" }, { onError: failed })}
+          onPress={() =>
+            p.agentId && removalOf([p]) === "delete"
+              ? openAgentDelete(p.agentId, p.id)
+              : decide.mutate({ id: p.id, decision: "accept" }, { onError: failed })
+          }
         />
       }
       secondary={

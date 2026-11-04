@@ -1791,6 +1791,7 @@
         "budget": "에이전트의 예산은 관리자만 바꿀 수 있어요",
         "owner": "에이전트의 담당자는 관리자만 바꿀 수 있어요",
         "archive": "에이전트 보관은 관리자만 할 수 있어요",
+        "delete": "에이전트 삭제는 관리자만 할 수 있어요",
         "audience": "대화할 수 있는 사람은 관리자와 담당자만 바꿀 수 있어요",
         "channels": "채널은 관리자와 담당자만 바꿀 수 있어요",
         "ai_account": "계정 주인만 줄 수 있어요",
@@ -1815,9 +1816,19 @@
       "somePeople": "일부 사람",
       "active": "활성",
       "archived": "보관됨",
+      "deleted": "삭제됨",
       "notIn": "채널에 없음",
       "withoutMention": "스스로",
       "mentionOnly": "멘션될 때만"
+    },
+    "remove": {
+      "archiveTitle_other": "에이전트 {{count}}개를 보관할까요?",
+      "deleteTitle_other": "에이전트 {{count}}개를 영구 삭제할까요?",
+      "archiveAll": "모두 보관",
+      "deleteAll": "모두 삭제",
+      "archiveSome_other": "{{count}}개 보관",
+      "deleteSome_other": "{{count}}개 삭제",
+      "deleteHelp": "지시, 메모리, 루틴은 영구히 사라져요. 메시지는 남아요."
     }
   },
   "routing": {

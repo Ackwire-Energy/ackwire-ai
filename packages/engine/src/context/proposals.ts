@@ -24,6 +24,7 @@ import {
   withAccessLines,
 } from "../access";
 import { UNDO_WINDOW_MS } from "../agent-actions";
+import { type AgentDeletionDeps, deleteAgent } from "../agent-deletion";
 import { type Agent, getAgent, updateAgent } from "../agents";
 import { audienceNotice, canTalkTo, seesAgentDetails, speakerFor } from "../audience";
 import { recordAudit } from "../audit";
@@ -43,6 +44,7 @@ import { deliverNoticeToRun } from "../run-resume";
 import { userVisibleChannels } from "../search";
 import {
   applySettings,
+  deletes,
   maySettle,
   recordSettingsReceipt,
   type SettingLine,
@@ -238,7 +240,7 @@ async function proposalsVisible<T extends Proposal>(db: Database, actorId: strin
  * sees how it works (`seesAgentDetails`), `review_memory` or not.
  */
 async function proposalsShown<T extends Proposal>(db: Database, actorId: string, membership: Membership, rows: T[]) {
-  const seen = new Map<string, boolean>();
+  const seen = new Map<string, boolean | null>();
   const out: T[] = [];
   for (const r of rows) {
     if (r.target === "org_context") {
@@ -252,10 +254,11 @@ async function proposalsShown<T extends Proposal>(db: Database, actorId: string,
     let sees = seen.get(r.agentId);
     if (sees === undefined) {
       const agent = await getAgent(db, r.orgId, r.agentId);
-      sees = !!agent && seesAgentDetails(agent, actorId, membership);
+      sees = agent ? seesAgentDetails(agent, actorId, membership) : null;
       seen.set(r.agentId, sees);
     }
-    if (sees) out.push(r);
+    // A deleted agent: the card that deleted it still says how it ended (only that row: its other settings stay hidden).
+    if (sees ?? (r.target === "agent_settings" && r.status !== "pending" && deletes(r))) out.push(r);
   }
   return out;
 }
@@ -342,6 +345,8 @@ export async function decideProposal(
     blobs?: BlobStoreResolver;
     /** The right hand's name when it accepted for `actorId` (ADR 0139): the proposer reads it decided for them. */
     via?: string;
+    /** What deleting an agent from a card stops: its computer's work, its routines' mail. */
+    deletion?: Omit<AgentDeletionDeps, "db" | "pubsub">;
   } = {},
 ): Promise<Proposal> {
   const [p] = await db
@@ -375,7 +380,14 @@ export async function decideProposal(
         ? await tx
             .select()
             .from(agents)
-            .where(and(eq(agents.id, p.agentId), isNull(agents.archivedAt), isNull(agents.deletedAt)))
+            // An archived agent is still deleted (also on a retry after a delete that failed midway).
+            .where(
+              and(
+                eq(agents.id, p.agentId),
+                deletes(p) ? undefined : isNull(agents.archivedAt),
+                isNull(agents.deletedAt),
+              ),
+            )
             .for("update")
         : [];
       if (!agent) status = "stale";
@@ -428,6 +440,21 @@ export async function decideProposal(
     }
     return row;
   });
+  // Deleting closes its missions and stops its work on its computer, which can't run inside the decision's
+  // transaction; failing, the row is open again so someone can retry.
+  if (decided.status === "accepted" && decided.agentId && deletes(decided)) {
+    try {
+      if (!options.pubsub)
+        throw new ValidationError("Deleting an agent stops its work: the server's events are needed");
+      await deleteAgent({ ...options.deletion, db, pubsub: options.pubsub }, actorId, orgId, decided.agentId);
+    } catch (error) {
+      await db
+        .update(contextProposals)
+        .set({ status: "pending", decidedByUserId: null, decidedAt: null })
+        .where(eq(contextProposals.id, decided.id));
+      throw error;
+    }
+  }
   if (decided.agentId) caches.agents.delete(`${orgId}:${decided.agentId}`);
   caches.orgs.delete(`${orgId}:`);
   // The editors cleared these inside this transaction: a run reading in between may have cached the old ones.
@@ -838,15 +865,30 @@ function rowsChange(rows: { target: Proposal["target"]; proposedText: string; di
   return { added: [...added], removed: [...removed] };
 }
 
-/** The agents a card changes: active ones the person who asked can talk to (the proposer always). */
-async function cardAgents(db: Database, orgId: string, ids: string[], proposerId: string, requesterId: string) {
+/**
+ * The agents a card changes: active ones (`archived`: archived ones too, to delete them) the person who asked can talk
+ * to (the proposer always).
+ */
+async function cardAgents(
+  db: Database,
+  orgId: string,
+  ids: string[],
+  proposerId: string,
+  requesterId: string,
+  archived = false,
+) {
   if (ids.length > CARD_MAX_AGENTS) throw new ValidationError(`At most ${CARD_MAX_AGENTS} agents on one card`);
   const rows = ids.length
     ? await db
         .select()
         .from(agents)
         .where(
-          and(eq(agents.orgId, orgId), inArray(agents.id, ids), isNull(agents.archivedAt), isNull(agents.deletedAt)),
+          and(
+            eq(agents.orgId, orgId),
+            inArray(agents.id, ids),
+            archived ? undefined : isNull(agents.archivedAt),
+            isNull(agents.deletedAt),
+          ),
         )
     : [];
   if (rows.length !== ids.length) throw new NotFoundError("Agent not found");
@@ -1023,6 +1065,7 @@ export async function proposeSettings(
     [...new Set(input.targets.map((t) => t.agentId))],
     input.agentId,
     input.requesterId,
+    input.targets.every((t) => t.lines.every((l) => l.field === "delete")),
   );
   const rows: (typeof contextProposals.$inferInsert)[] = [];
   const skipped: string[] = [];
