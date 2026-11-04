@@ -1626,6 +1626,11 @@
     "machine": {
       "toolsHow": "Ketuk alat yang menyala untuk mematikannya. Menyalakannya lagi hanya bisa di komputer itu sendiri."
     },
+    "roles": {
+      "onComputer": "Urutan peran dan ikon tiap peran diubah di komputer.",
+      "items": "Satu per satu",
+      "create": "Buat"
+    },
     "import": {
       "preparing": "Menyiapkan file…",
       "failed": "Tidak bisa mengunduh file. Coba lagi."

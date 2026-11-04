@@ -1446,8 +1446,9 @@ export const ptBR = {
     collapseAll: "Recolher todos",
     expandAll: "Expandir todos",
     organize: "Organizar grupos na Equipe",
-    seeAll_one: "Ver o {{count}} agente",
-    seeAll_other: "Ver todos os {{count}} agentes",
+    /** Under the agents, only when some aren't listed (they don't talk to me): it opens Equipe, where all are. */
+    more_one: "Mais 1 agente na Equipe",
+    more_other: "Mais {{count}} agentes na Equipe",
     createFirst: "Criar o primeiro agente",
     working_one: "{{count}} trabalhando",
     working_other: "{{count}} trabalhando",
@@ -7468,6 +7469,7 @@ export const ptBR = {
       thinking: "pensando",
       wow: "uau",
       dizzy: "zonzo",
+      wave: "oi",
     },
     /** More words a search finds each mood by. */
     moodWords: {
@@ -7477,6 +7479,7 @@ export const ptBR = {
       thinking: "hmm dúvida será pensar",
       wow: "nossa surpresa caramba incrível",
       dizzy: "cansado sexta socorro ops tonto",
+      wave: "olá oi tchau acenar bom dia até logo",
     },
     picker: {
       /** The composer's button and the picker it opens. */

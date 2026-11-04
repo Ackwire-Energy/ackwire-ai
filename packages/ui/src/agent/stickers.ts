@@ -1,5 +1,5 @@
 /**
- * The agents' stickers (ADR 0091): each agent of a workspace has six, one per mood, drawn from its own look by the
+ * The agents' stickers (ADR 0091): each agent of a workspace has one per mood, drawn from its own look by the
  * agent engine (engine.js), so nothing is uploaded and a new agent has its stickers at once. A sticker is a moment
  * of a loop: `drawSticker` draws the frame at time `t` (seconds) on a square of side `S` (canvas pixels).
  *
@@ -18,14 +18,13 @@ import {
 } from "./engine.js";
 
 /** The moods, in the picker's order (the server's `STICKER_MOODS`). */
-export const STICKER_MOODS = ["celebrate", "love", "deal", "thinking", "wow", "dizzy"] as const;
+export const STICKER_MOODS = ["celebrate", "love", "deal", "thinking", "wow", "dizzy", "wave"] as const;
 export type StickerMood = (typeof STICKER_MOODS)[number];
 
 /**
- * The right hand's hello under its greeting on a person's first visit to its DM (ADR 0137 §6): drawn like a mood,
- * never one an agent or a person sends (not in `STICKER_MOODS`). One wave lasts `WAVE_SECONDS`, then the hand stays up.
+ * One wave of the hand: the sticker waves this long, then rests as long with the hand up. The right hand's hello on a
+ * person's first visit to its DM (ADR 0137 §6) plays one wave and stops on its still frame.
  */
-export type DrawnMood = StickerMood | "wave";
 export const WAVE_SECONDS = 1.6;
 
 /** An agent's look as stored (unknown values draw the default look). */
@@ -75,15 +74,15 @@ export function stickerSeed(key: string): number {
  * One frame of a sticker: the agent in its mood (pose and face), its shadow on the floor and the mood's pixel props
  * in the agent's tones. `S` is the square's side in canvas pixels; `t` seconds (a seed added keeps neighbors apart).
  */
-export function drawSticker(ctx: Ctx2D, look: StickerLook, mood: DrawnMood, t: number, S: number): void {
+export function drawSticker(ctx: Ctx2D, look: StickerLook, mood: StickerMood, t: number, S: number): void {
   const [c1, c2] = gradientOf(look.color);
   const s = Math.round(S * 0.56);
   const cell = S / 64;
   let bounce = 0;
   let ox = 0;
   let pose: Pose = {};
-  // The wave's rock in pixel steps (-1, 0, 1): none at the still frame and from the end on, so both draw the same.
-  const lean = mood === "wave" && t < WAVE_SECONDS ? Math.round(Math.sin(t * Math.PI * 5)) : 0;
+  // The wave's rock in pixel steps (-1, 0, 1): none at the still frame and while it rests, so both draw the same.
+  const lean = mood === "wave" && t % (WAVE_SECONDS * 2) < WAVE_SECONDS ? Math.round(Math.sin(t * Math.PI * 5)) : 0;
   switch (mood) {
     case "celebrate": {
       const k = Math.abs(Math.sin(t * 5));

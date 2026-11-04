@@ -1449,8 +1449,9 @@ export const en = {
     collapseAll: "Collapse all",
     expandAll: "Expand all",
     organize: "Organize groups in Team",
-    seeAll_one: "See the {{count}} agent",
-    seeAll_other: "See all {{count}} agents",
+    /** Under the agents, only when some aren't listed (they don't talk to me): it opens Team, where all are. */
+    more_one: "1 more agent in Team",
+    more_other: "{{count}} more agents in Team",
     createFirst: "Create the first agent",
     working_one: "{{count}} working",
     working_other: "{{count}} working",
@@ -7298,6 +7299,7 @@ export const en = {
       thinking: "thinking",
       wow: "wow",
       dizzy: "dizzy",
+      wave: "hi",
     },
     moodWords: {
       celebrate: "party congrats celebrate shipped launch yay",
@@ -7306,6 +7308,7 @@ export const en = {
       thinking: "hmm wondering think maybe",
       wow: "whoa surprise amazing omg",
       dizzy: "tired friday help oops confused",
+      wave: "hello hey bye wave good morning see you",
     },
     picker: {
       button: "Emoji, GIFs and stickers",

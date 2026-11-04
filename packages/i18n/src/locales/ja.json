@@ -1180,6 +1180,8 @@
     "paused": "一時停止中: 今週その決定を3回取り消しました。いつでもオンに戻せます。",
     "card": {
       "deciding": "{{name}}が{{for}}の代わりに確認しています…",
+      "approvedForYou": "{{name}}があなたの代わりに承認",
+      "decidingForYou": "{{name}}があなたの代わりに確認しています…",
       "approved": "{{name}}が{{for}}の代わりに承認",
       "passed": "{{name}}があなたに回しました",
       "passedWhy": "{{name}}があなたに回しました: {{reason}}",
@@ -1191,9 +1193,7 @@
       "why": "理由",
       "undo": "取り消す",
       "undoArchives": "取り消すと{{name}}をアーカイブします。{{until}}まで有効です。",
-      "undoSettings": "取り消すと設定が元に戻ります。{{until}}まで有効です。",
-      "approvedForYou": "{{name}}があなたの代わりに承認",
-      "decidingForYou": "{{name}}があなたの代わりに確認しています…"
+      "undoSettings": "取り消すと設定が元に戻ります。{{until}}まで有効です。"
     }
   },
   "noticePrefs": {
@@ -1424,7 +1424,7 @@
     "collapseAll": "すべて折りたたむ",
     "expandAll": "すべて展開",
     "organize": "チームでグループを整理",
-    "seeAll_other": "{{count}} 件のエージェントをすべて見る",
+    "more_other": "チームにエージェントがあと {{count}} 体",
     "createFirst": "最初のエージェントを作成",
     "working_other": "{{count}} 件が作業中",
     "count_other": "エージェント {{count}} 件",
@@ -7207,7 +7207,8 @@
       "deal": "了解",
       "thinking": "考え中",
       "wow": "すごい",
-      "dizzy": "くらくら"
+      "dizzy": "くらくら",
+      "wave": "やあ"
     },
     "moodWords": {
       "celebrate": "パーティー おめでとう お祝い リリース ローンチ やった",
@@ -7215,7 +7216,8 @@
       "deal": "OK オーケー 了解 はい いいよ 完了",
       "thinking": "うーん 気になる 考える たぶん",
       "wow": "わお びっくり すごい まじ",
-      "dizzy": "疲れた 金曜日 助けて おっと 混乱"
+      "dizzy": "疲れた 金曜日 助けて おっと 混乱",
+      "wave": "こんにちは やあ バイバイ 手を振る おはよう またね"
     },
     "picker": {
       "button": "絵文字、GIF、スタンプ",
@@ -12152,6 +12154,8 @@
       "action_invite_people": "メンバーを招待",
       "action_install_skill": "スキルをインストール",
       "action_update_skills": "スキルを更新",
+      "action_approvals": "あなたの承認待ち",
+      "action_open_page": "画面を開く",
       "agent_proposal": "新しいエージェントを提案しました: {{name}}",
       "settings_proposal": "{{names}}への変更を提案しました",
       "approval_request": "承認リクエスト: {{title}}",
@@ -12178,9 +12182,7 @@
       "stuck": "行き詰まったため、完了前に停止しました。",
       "forum_suggestion": "フォーラムで話し合いますか？「{{title}}」",
       "forum_concluded": "フォーラム「{{title}}」は終了しました。まとめは下のファイルにあります。",
-      "forum_concluded_issues": "フォーラム「{{title}}」は終了しました。まとめは下のファイルにあり、承認待ちの提案タスクが{{count}}件あります。",
-      "action_approvals": "あなたの承認待ち",
-      "action_open_page": "画面を開く"
+      "forum_concluded_issues": "フォーラム「{{title}}」は終了しました。まとめは下のファイルにあり、承認待ちの提案タスクが{{count}}件あります。"
     }
   },
   "builtinTools": {

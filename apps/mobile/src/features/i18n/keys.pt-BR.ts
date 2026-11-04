@@ -1724,6 +1724,13 @@ export const featureKeysPtBR = {
     machine: {
       toolsHow: "Toque numa ferramenta ligada para desligar. Para ligar de novo, só no próprio computador.",
     },
+    roles: {
+      /** Under the roles and a role's name and color: what only the web changes. */
+      onComputer: "A ordem dos papéis e o ícone de cada um mudam no computador.",
+      /** Over an area's permissions, each with its own switch. */
+      items: "Item por item",
+      create: "Criar",
+    },
     import: {
       preparing: "Preparando o arquivo…",
       failed: "Não deu para baixar o arquivo. Tente de novo.",

@@ -17535,6 +17535,9 @@
   "media.moods.dizzy": {
     "value": "dizzy"
   },
+  "media.moods.wave": {
+    "value": "hi"
+  },
   "media.moodWords.celebrate": {
     "value": "party congrats celebrate shipped launch yay"
   },
@@ -17552,6 +17555,9 @@
   },
   "media.moodWords.dizzy": {
     "value": "tired friday help oops confused"
+  },
+  "media.moodWords.wave": {
+    "value": "hello hey bye wave good morning see you"
   },
   "media.picker.button": {
     "value": "Emoji, GIFs and stickers"
@@ -33846,10 +33852,10 @@
   "sidebarAgents.organize": {
     "value": "Organize groups in Team"
   },
-  "sidebarAgents.seeAll": {
+  "sidebarAgents.more": {
     "value": {
-      "one": "See the {{count}} agent",
-      "other": "See all {{count}} agents"
+      "one": "1 more agent in Team",
+      "other": "{{count}} more agents in Team"
     }
   },
   "sidebarAgents.createFirst": {

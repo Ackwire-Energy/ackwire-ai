@@ -1721,6 +1721,11 @@
     "machine": {
       "toolsHow": "Tik op een tool die aan staat om hem uit te zetten. Weer aanzetten kan alleen op de computer zelf."
     },
+    "roles": {
+      "onComputer": "De volgorde van de rollen en het pictogram van elke rol wijzig je op de computer.",
+      "items": "Per onderdeel",
+      "create": "Maken"
+    },
     "import": {
       "preparing": "Het bestand voorbereiden…",
       "failed": "Het bestand kon niet worden gedownload. Probeer het opnieuw."

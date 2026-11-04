@@ -1721,6 +1721,11 @@
     "machine": {
       "toolsHow": "Kapatmak için açık bir araca dokunun. Yeniden açmak yalnızca bilgisayarın kendisinden yapılabilir."
     },
+    "roles": {
+      "onComputer": "Rollerin sırası ve her rolün simgesi bilgisayardan değiştirilir.",
+      "items": "Tek tek",
+      "create": "Oluştur"
+    },
     "import": {
       "preparing": "Dosya hazırlanıyor…",
       "failed": "Dosya indirilemedi. Tekrar deneyin."

@@ -1719,6 +1719,13 @@ export const featureKeysEn = {
     machine: {
       toolsHow: "Tap a tool that's on to turn it off. Turning it back on happens only on the computer itself.",
     },
+    roles: {
+      /** Under the roles and a role's name and color: what only the web changes. */
+      onComputer: "The roles' order and each role's icon change on the computer.",
+      /** Over an area's permissions, each with its own switch. */
+      items: "Item by item",
+      create: "Create",
+    },
     import: {
       preparing: "Preparing the file…",
       failed: "Couldn't download the file. Try again.",

@@ -1816,6 +1816,11 @@
     "machine": {
       "toolsHow": "Touchez un outil activé pour le désactiver. Le réactiver ne se fait que sur l'ordinateur lui-même."
     },
+    "roles": {
+      "onComputer": "L'ordre des rôles et l'icône de chacun se changent sur l'ordinateur.",
+      "items": "Un par un",
+      "create": "Créer"
+    },
     "import": {
       "preparing": "Préparation du fichier…",
       "failed": "Impossible de télécharger le fichier. Réessayez."

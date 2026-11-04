@@ -1216,6 +1216,8 @@
     "paused": "Gepauzeerd: je hebt deze week 3 beslissingen ongedaan gemaakt. Zet het weer aan wanneer je wilt.",
     "card": {
       "deciding": "{{name}} bekijkt het namens {{for}}…",
+      "approvedForYou": "Goedgekeurd door {{name}} namens jou",
+      "decidingForYou": "{{name}} bekijkt het namens jou…",
       "approved": "Goedgekeurd door {{name}} namens {{for}}",
       "passed": "{{name}} heeft het aan jou doorgegeven",
       "passedWhy": "{{name}} heeft het aan jou doorgegeven: {{reason}}",
@@ -1227,9 +1229,7 @@
       "why": "Waarom?",
       "undo": "Ongedaan maken",
       "undoArchives": "Ongedaan maken archiveert {{name}}. Kan tot {{until}}.",
-      "undoSettings": "Ongedaan maken zet de instellingen terug. Kan tot {{until}}.",
-      "approvedForYou": "Goedgekeurd door {{name}} namens jou",
-      "decidingForYou": "{{name}} bekijkt het namens jou…"
+      "undoSettings": "Ongedaan maken zet de instellingen terug. Kan tot {{until}}."
     }
   },
   "noticePrefs": {
@@ -1467,8 +1467,8 @@
     "collapseAll": "Alles inklappen",
     "expandAll": "Alles uitklappen",
     "organize": "Groepen ordenen in Team",
-    "seeAll_one": "De {{count}} agent bekijken",
-    "seeAll_other": "Alle {{count}} agents bekijken",
+    "more_one": "Nog 1 agent in Team",
+    "more_other": "Nog {{count}} agents in Team",
     "createFirst": "De eerste agent maken",
     "working_one": "{{count}} aan het werk",
     "working_other": "{{count}} aan het werk",
@@ -7585,7 +7585,8 @@
       "deal": "afgesproken",
       "thinking": "denkt na",
       "wow": "wauw",
-      "dizzy": "duizelig"
+      "dizzy": "duizelig",
+      "wave": "hoi"
     },
     "moodWords": {
       "celebrate": "feest gefeliciteerd vieren live lancering joepie",
@@ -7593,7 +7594,8 @@
       "deal": "ok oké akkoord ja prima klaar",
       "thinking": "hmm benieuwd denken misschien",
       "wow": "wauw verrassing geweldig omg",
-      "dizzy": "moe vrijdag help oeps verward"
+      "dizzy": "moe vrijdag help oeps verward",
+      "wave": "hallo hoi doei zwaaien goedemorgen tot zo"
     },
     "picker": {
       "button": "Emoji, GIF's en stickers",
@@ -12686,6 +12688,8 @@
       "action_invite_people": "Mensen uitnodigen",
       "action_install_skill": "Een skill installeren",
       "action_update_skills": "Skills bijwerken",
+      "action_approvals": "Goedkeuringen die op jou wachten",
+      "action_open_page": "Een scherm openen",
       "agent_proposal": "Nieuwe agent voorgesteld: {{name}}",
       "settings_proposal": "Stelde een wijziging voor {{names}} voor",
       "approval_request": "Goedkeuringsverzoek: {{title}}",
@@ -12715,9 +12719,7 @@
       "stuck": "Ik liep vast en stopte voordat ik klaar was.",
       "forum_suggestion": "Iets voor het forum? “{{title}}”",
       "forum_concluded": "Het forum “{{title}}” is afgelopen. De samenvatting staat in het bestand hieronder.",
-      "forum_concluded_issues": "Het forum “{{title}}” is afgelopen. De samenvatting staat in het bestand hieronder, met voorgestelde taken om goed te keuren ({{count}}).",
-      "action_approvals": "Goedkeuringen die op jou wachten",
-      "action_open_page": "Een scherm openen"
+      "forum_concluded_issues": "Het forum “{{title}}” is afgelopen. De samenvatting staat in het bestand hieronder, met voorgestelde taken om goed te keuren ({{count}})."
     }
   },
   "builtinTools": {
@@ -13354,8 +13356,8 @@
       "backLabel": "Notitie voor {{name}}",
       "backLabel_female": "Notitie voor {{name}}",
       "backPlaceholder": "Optioneel: iets wat {{name}} moet weten?",
-      "addNote": "Notitie achterlaten",
-      "backPlaceholder_female": "Optioneel: iets wat {{name}} moet weten?"
+      "backPlaceholder_female": "Optioneel: iets wat {{name}} moet weten?",
+      "addNote": "Notitie achterlaten"
     },
     "now": {
       "ready": "Klaar op {{computer}}",

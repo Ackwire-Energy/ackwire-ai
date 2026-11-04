@@ -1252,6 +1252,8 @@
     "paused": "En pausa: deshiciste 3 de sus decisiones esta semana. Vuelve a activarlo cuando quieras.",
     "card": {
       "deciding": "{{name}} lo está analizando en nombre de {{for}}…",
+      "approvedForYou": "Aprobado por {{name}} en tu nombre",
+      "decidingForYou": "{{name}} lo está analizando en tu nombre…",
       "approved": "Aprobado por {{name}} en nombre de {{for}}",
       "passed": "{{name}} te lo pasó",
       "passedWhy": "{{name}} te lo pasó: {{reason}}",
@@ -1263,9 +1265,7 @@
       "why": "¿Por qué?",
       "undo": "Deshacer",
       "undoArchives": "Deshacer archiva a {{name}}. Vale hasta {{until}}.",
-      "undoSettings": "Deshacer devuelve la configuración. Vale hasta {{until}}.",
-      "approvedForYou": "Aprobado por {{name}} en tu nombre",
-      "decidingForYou": "{{name}} lo está analizando en tu nombre…"
+      "undoSettings": "Deshacer devuelve la configuración. Vale hasta {{until}}."
     }
   },
   "noticePrefs": {
@@ -1510,9 +1510,9 @@
     "collapseAll": "Contraer todos",
     "expandAll": "Expandir todos",
     "organize": "Organizar grupos en Equipo",
-    "seeAll_one": "Ver el {{count}} agente",
-    "seeAll_many": "Ver los {{count}} agentes",
-    "seeAll_other": "Ver los {{count}} agentes",
+    "more_one": "1 agente más en Equipo",
+    "more_many": "{{count}} agentes más en Equipo",
+    "more_other": "{{count}} agentes más en Equipo",
     "createFirst": "Crear el primer agente",
     "working_one": "{{count}} trabajando",
     "working_many": "{{count}} trabajando",
@@ -7772,7 +7772,8 @@
       "deal": "trato hecho",
       "thinking": "pensando",
       "wow": "guau",
-      "dizzy": "mareado"
+      "dizzy": "mareado",
+      "wave": "hola"
     },
     "moodWords": {
       "celebrate": "fiesta felicidades celebrar lanzamiento salió bien yupi",
@@ -7780,7 +7781,8 @@
       "deal": "ok vale de acuerdo sí claro listo",
       "thinking": "mmm pregunto pensar quizás",
       "wow": "guau sorpresa increíble wow",
-      "dizzy": "cansado viernes ayuda ups confundido"
+      "dizzy": "cansado viernes ayuda ups confundido",
+      "wave": "hola adiós chao saludo buenos días hasta luego"
     },
     "picker": {
       "button": "Emojis, GIFs y stickers",
@@ -13007,6 +13009,8 @@
       "action_invite_people": "Invitar a personas",
       "action_install_skill": "Instalar una habilidad",
       "action_update_skills": "Actualizar habilidades",
+      "action_approvals": "Aprobaciones esperándote",
+      "action_open_page": "Abrir una pantalla",
       "agent_proposal": "Propuso un nuevo agente: {{name}}",
       "settings_proposal": "Propuso un cambio para {{names}}",
       "approval_request": "Solicitud de aprobación: {{title}}",
@@ -13039,9 +13043,7 @@
       "stuck": "Me trabé y me detuve antes de terminar.",
       "forum_suggestion": "¿Vale la pena un foro? \"{{title}}\"",
       "forum_concluded": "El foro \"{{title}}\" terminó. La síntesis está en el archivo de abajo.",
-      "forum_concluded_issues": "El foro \"{{title}}\" terminó. La síntesis está en el archivo de abajo, con {{count}} tarea(s) sugerida(s) para aprobar.",
-      "action_approvals": "Aprobaciones esperándote",
-      "action_open_page": "Abrir una pantalla"
+      "forum_concluded_issues": "El foro \"{{title}}\" terminó. La síntesis está en el archivo de abajo, con {{count}} tarea(s) sugerida(s) para aprobar."
     }
   },
   "builtinTools": {

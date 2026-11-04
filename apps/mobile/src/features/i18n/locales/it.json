@@ -1816,6 +1816,11 @@
     "machine": {
       "toolsHow": "Tocca uno strumento attivo per disattivarlo. Si riattiva solo dal computer stesso."
     },
+    "roles": {
+      "onComputer": "L'ordine dei ruoli e l'icona di ciascuno si cambiano dal computer.",
+      "items": "Uno per uno",
+      "create": "Crea"
+    },
     "import": {
       "preparing": "Preparazione del file…",
       "failed": "Non è stato possibile scaricare il file. Riprova."

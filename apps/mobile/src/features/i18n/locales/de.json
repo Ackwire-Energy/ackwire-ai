@@ -1721,6 +1721,11 @@
     "machine": {
       "toolsHow": "Tippe auf ein eingeschaltetes Tool, um es auszuschalten. Wieder einschalten geht nur am Computer selbst."
     },
+    "roles": {
+      "onComputer": "Die Reihenfolge der Rollen und das Symbol jeder Rolle änderst du am Computer.",
+      "items": "Einzeln",
+      "create": "Erstellen"
+    },
     "import": {
       "preparing": "Datei wird vorbereitet…",
       "failed": "Die Datei ließ sich nicht herunterladen. Versuch es noch einmal."

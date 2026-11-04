@@ -1911,6 +1911,11 @@
     "machine": {
       "toolsHow": "Stuknij włączone narzędzie, aby je wyłączyć. Ponowne włączenie jest możliwe tylko na samym komputerze."
     },
+    "roles": {
+      "onComputer": "Kolejność ról i ikonę każdej z nich zmienisz na komputerze.",
+      "items": "Pojedynczo",
+      "create": "Utwórz"
+    },
     "import": {
       "preparing": "Przygotowywanie pliku…",
       "failed": "Nie udało się pobrać pliku. Spróbuj ponownie."

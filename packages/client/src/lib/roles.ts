@@ -56,6 +56,22 @@ export function computerLevelOf(role: OrgRole, everyone: OrgRole | undefined) {
   return { level: levelIn(grants(role.permissions), role), base: levelIn(baseOf(role, everyone), role) };
 }
 
+const COMPUTER_LEVELS: readonly ComputerLevel[] = ["none", "browser", "full"];
+
+/**
+ * The computers' choice on `role`: the levels from what `everyone` already gives up (below it isn't offered), the one
+ * shown, and the reach its lines speak of (`rolesPage.computer.<reach>.<level>`).
+ */
+export function computerChoice(role: OrgRole, everyone: OrgRole | undefined) {
+  const { level, base } = computerLevelOf(role, everyone);
+  const options = COMPUTER_LEVELS.slice(COMPUTER_LEVELS.indexOf(base));
+  return {
+    options,
+    shown: options.includes(level) ? level : base,
+    reach: isEveryone(role) ? ("own" as const) : ("every" as const),
+  };
+}
+
 /** The role's keys with its computer level set (the rest untouched). */
 export function withComputerLevel(role: OrgRole, level: ComputerLevel): string[] {
   const keep = role.permissions.filter((k) => !COMPUTER_KEYS.includes(k));
@@ -97,6 +113,10 @@ const ALL_KEYS = SUMMARY_ORDER.filter((k) => k !== "administrator");
 
 export const isEveryone = (r: Pick<OrgRole, "kind">) => r.kind === "everyone";
 export const everyoneOf = (roles: readonly OrgRole[]) => roles.find(isEveryone);
+
+/** A role's name on screen: `everyone` is always "Todos". */
+export const roleName = (t: TFunction, r: Pick<OrgRole, "kind" | "name">) =>
+  isEveryone(r) ? t("rolesPage.everyoneName") : r.name;
 
 /** Top first, `everyone` last. */
 export const sortRoles = (roles: readonly OrgRole[]) =>
@@ -145,6 +165,14 @@ export function withLevel(role: OrgRole, area: PermissionArea, level: AreaLevel)
   return [...keep, ...add];
 }
 
+/** One key of a role: on, and where it comes from when the role can't turn it off (Administrador or Todos). */
+export function keyState(role: OrgRole, everyone: OrgRole | undefined, key: string) {
+  const viaAdmin = role.permissions.includes("administrator");
+  const viaAll = !isEveryone(role) && !role.permissions.includes(key) && grants(everyone?.permissions ?? []).has(key);
+  const from = viaAdmin ? ("admin" as const) : viaAll ? ("everyone" as const) : null;
+  return { on: role.permissions.includes(key) || from !== null, from };
+}
+
 /** The role's keys with one key on or off. */
 export const withKey = (role: OrgRole, key: string, on: boolean) =>
   on ? [...new Set([...role.permissions, key])] : role.permissions.filter((k) => k !== key);
@@ -165,6 +193,23 @@ const wordList = (t: TFunction, locale: string, items: string[]) =>
   typeof Intl.ListFormat === "function"
     ? new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(items)
     : joinNames(items, t);
+
+/** An area's level as said on screen: `everyone`'s lowest is "Nada", any other role's "Como Todos". */
+export const levelLabel = (t: TFunction, role: Pick<OrgRole, "kind">, level: AreaLevel) =>
+  level === "none" && isEveryone(role) ? t("rolesPage.levels.nothing") : t(`rolesPage.levels.${level}`);
+
+/** The line under an area: what the role reaches there (`everyone`'s included), or all of it as Administrador. */
+export function areaLine(t: TFunction, locale: string, role: OrgRole, area: PermissionArea, everyone?: OrgRole) {
+  if (!isEveryone(role) && role.permissions.includes("administrator")) return t("rolesPage.viaAdmin");
+  const reach = areaReach(role, area, everyone);
+  return reach.length
+    ? wordList(
+        t,
+        locale,
+        reach.map((k) => t(`permissions.${k as RolePermission}.short`)),
+      )
+    : t("rolesPage.nothing");
+}
 
 /** The sentence that sums a role up: its own keys past what `everyone` gives, the first three, "and N more". */
 export function roleSummary(t: TFunction, locale: string, role: OrgRole, everyone: OrgRole | undefined) {
@@ -235,4 +280,69 @@ export function holdersOf<P extends Pick<Person, "role" | "roleIds">>(
   return people.filter(
     (p) => p.role === "owner" || granting.some((r) => isEveryone(r) || (p.roleIds ?? []).includes(r.id)),
   );
+}
+
+/** Why the viewer can't change a role (`rolesPage.locked.*`), or null when they can. */
+export function roleLock(
+  viewer: { role: string; rank?: number | null; permissions?: readonly string[] },
+  role: Pick<OrgRole, "editable" | "position">,
+): "noPermission" | "own" | "above" | null {
+  if (role.editable) return null;
+  if (!can(viewer, "manage_roles")) return "noPermission";
+  return viewer.role !== "owner" && viewer.rank === role.position ? "own" : "above";
+}
+
+/** "Começar de" when creating a role (`rolesPage.templates.*`): each with its keys, icon and color. */
+export const ROLE_TEMPLATES: readonly {
+  id: "blank" | "mod" | "agents" | "costs";
+  keys: RolePermission[];
+  icon: string;
+  color: string;
+}[] = [
+  { id: "blank", keys: [], icon: "bolt", color: "graphite" },
+  { id: "mod", keys: ["create_channels", "manage_channels"], icon: "flag", color: "teal" },
+  {
+    id: "agents",
+    keys: ["create_agents", "manage_agents", "approve_actions", "manage_routines", "review_memory"],
+    icon: "code",
+    color: "indigo",
+  },
+  { id: "costs", keys: ["view_usage", "view_audit"], icon: "chart", color: "amber" },
+];
+
+/** What a new role starts from: a template's id, or `copy:<roleId>` for one of `copies`. */
+export function newRoleInput(name: string, from: string, copies: readonly OrgRole[]) {
+  const copy = from.startsWith("copy:") ? copies.find((r) => `copy:${r.id}` === from) : undefined;
+  const tpl = ROLE_TEMPLATES.find((x) => x.id === from);
+  return {
+    name,
+    icon: copy?.icon ?? tpl?.icon,
+    color: copy?.color ?? tpl?.color,
+    permissions: copy ? copy.permissions : [...(tpl?.keys ?? [])],
+  };
+}
+
+/** Past this many people to pick from, Adicionar pessoas gets its search. */
+export const PEOPLE_SEARCH_FROM = 8;
+
+/** Gives a role to each of `userIds`, one by one, on past a refusal: how many got it, and the first refusal. */
+export async function giveRole(
+  people: readonly Pick<Person, "userId" | "roleIds">[],
+  userIds: readonly string[],
+  roleId: string,
+  set: (v: { userId: string; roleIds: string[] }) => Promise<unknown>,
+) {
+  let added = 0;
+  let failed: unknown = null;
+  for (const userId of userIds) {
+    const p = people.find((x) => x.userId === userId);
+    if (!p) continue;
+    try {
+      await set({ userId, roleIds: [...(p.roleIds ?? []), roleId] });
+      added++;
+    } catch (e) {
+      failed ??= e;
+    }
+  }
+  return { added, failed };
 }
