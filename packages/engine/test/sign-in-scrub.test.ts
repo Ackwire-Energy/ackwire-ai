@@ -13,6 +13,8 @@ test("the right hand's reply: keys, tokens and a sign-in file's values become th
     [`cursor ${fake("key_", 64)}`, `cursor ${NOTE}`],
     [fake("crsr_", 40), NOTE],
     [`token ${fake("rt_", 30)}.`, `token ${NOTE}.`],
+    // Codex's own `auth.json` refresh token today.
+    [`token ${fake("rt.", 40)}.${"y".repeat(20)}`, `token ${NOTE}`],
     [`jwt eyJ${"F".repeat(12)}.${"F".repeat(12)}.${"F".repeat(12)}`, `jwt ${NOTE}`],
     ['{"refresh_token": "abcdefgh12345678"}', `{"refresh_token": ${NOTE}}`],
     ['{"accessToken":"abcdefgh12345678","x":1}', `{"accessToken":${NOTE},"x":1}`],

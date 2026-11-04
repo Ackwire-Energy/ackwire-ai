@@ -130,7 +130,8 @@ export function writeCursorMcp(folder: string, entry: Record<string, unknown>) {
  */
 export const CURSOR_CHAT_PERMISSIONS = {
   permissions: {
-    allow: [],
+    // Ours, said outright: a print-mode turn without `--force` may otherwise hold an MCP call for an approval.
+    allow: [`Mcp(${CODEX_MCP_SERVER}:*)`],
     deny: [
       "Shell(*)",
       "Shell(*:*)",
@@ -147,7 +148,8 @@ export const CURSOR_CHAT_PERMISSIONS = {
 
 /**
  * The runtime kill of a `chat` turn: a `tool_call` (started or completed) that isn't a call to our bridge
- * (`mcpToolCall` named `<server>-<tool>`, or a `function` named for our server) is a breach. Null for anything else.
+ * (`mcpToolCall` named `<server>-<tool>` or from our `providerIdentifier`, or a `function` named for our server) is a
+ * breach. Null for anything else.
  */
 export function cursorChatBreach(ev: Record<string, unknown>): string | null {
   if (ev.type !== "tool_call") return null;
@@ -155,8 +157,11 @@ export function cursorChatBreach(ev: Record<string, unknown>): string | null {
   const key = Object.keys(call)[0] ?? "";
   const body = isRecord(call[key]) ? (call[key] as Record<string, unknown>) : {};
   const args = isRecord(body.args) ? body.args : {};
-  const name = key === "function" ? str(body.name) : str(args.name) || str(args.toolName);
-  const ours = name.startsWith(`${CODEX_MCP_SERVER}-`) || name.startsWith(`mcp_${CODEX_MCP_SERVER}`);
+  const name = key === "function" ? str(body.name) : str(args.name);
+  const ours =
+    name.startsWith(`${CODEX_MCP_SERVER}-`) ||
+    name.startsWith(`mcp_${CODEX_MCP_SERVER}`) ||
+    (key === "mcpToolCall" && str(args.providerIdentifier) === CODEX_MCP_SERVER);
   if ((key === "mcpToolCall" || key === "function") && ours) return null;
   return `Cursor used a tool of its own (${(key.replace(/ToolCall$/, "") || "unknown").slice(0, 64)}), so the turn stopped.`;
 }

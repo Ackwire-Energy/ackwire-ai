@@ -204,6 +204,36 @@ test("its computer asleep: one line says why, the run fails at once, no wait and
   expect(usage.filter((u) => u.billedTo !== "plan")).toEqual([]);
 });
 
+test("its CLI killed at a tool of its own after a bridge call: nothing of the turn is posted, only its line", async () => {
+  const { fx, deps, lodi } = await world();
+  await setAgentBrain(deps, fx.owner.id, fx.org.id, (await lodi()).id, { brain: "claude_code", account: ANAS });
+  const agent = await lodi();
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run() {
+      yield { type: "text_delta", text: "Looking it up for you " };
+      yield { type: "tool_call", id: "c1", name: "search", input: {}, executed: { content: "ok" } };
+      yield { type: "error", code: "tools_not_locked", message: "Codex used a tool of its own", retryable: false };
+    },
+  };
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const dm = await openPersonAgentDm(fx.db, fx.org.id, fx.owner.id, agent.id);
+  await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, dm.id, { body: "oi" });
+  await drainOutbox(fx.db, handlers);
+  const [run] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, agent.id));
+  expect(run?.status).toBe("failed");
+  const said = (await fx.db.select().from(schema.messages).where(eq(schema.messages.channelId, dm.id))).filter(
+    (m) => m.authorAgentId === agent.id,
+  );
+  expect(said.map((m) => m.meta.bodyCode)).toEqual(["no_ai"]);
+  expect(said[0]?.meta.noAi).toMatchObject({ reason: "plan_tools" });
+  expect(said.some((m) => m.body.includes("Looking it up"))).toBe(false);
+});
+
 test("its turn goes to the runner as the locked-down chat profile, with no checkout and none of the owner's servers", async () => {
   const sent: Record<string, unknown>[] = [];
   const hub = {

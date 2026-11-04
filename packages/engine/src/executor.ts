@@ -2143,7 +2143,7 @@ async function executeRunInner(
       return;
     }
     const [person] = by ? await db.select({ name: users.name }).from(users).where(eq(users.id, by)) : [];
-    const said = [
+    const wrote = [
       ...t.messages
         .slice(t.postedUpTo)
         .filter((m) => m.role === "assistant")
@@ -2152,6 +2152,8 @@ async function executeRunInner(
     ]
       .filter(Boolean)
       .join("\n\n");
+    // The apps show `canceled.text`, not the body: the right hand's is scrubbed here, before both (ADR 0137 §4).
+    const said = isRightHand(agent) ? await scrubRightHandReply(db, run, wrote) : wrote;
     // Cut mid-stream: what it was writing stays in the transcript too ("Continuar" picks up from there).
     if (partial.trim() && t.messages.at(-1)?.role !== "assistant")
       t.messages.push({ role: "assistant", content: [{ type: "text", text: partial.trim() }] });
@@ -3799,7 +3801,10 @@ async function executeRunInner(
               ...(error.resetsAt ? { resetsAt: error.resetsAt } : {}),
             });
           }
-          if (executed.length > 0) {
+          // The right hand's CLI killed at a tool of its own (ADR 0137 §4): nothing of that turn is posted, only its
+          // DM's line (`brainUnavailable`), whatever it did through the bridge before.
+          const killed = isRightHand(agent) && error instanceof BrainFailure && error.code === "tools_not_locked";
+          if (executed.length > 0 && !killed) {
             const failure =
               error instanceof BrainFailure
                 ? { code: error.code, message: error.message }

@@ -492,12 +492,17 @@ test("a chat turn (protocol 41): ask mode in Cursor's sandbox, never --force, ou
   expect(CURSOR_CHAT_PERMISSIONS.permissions.deny).toEqual(
     expect.arrayContaining(["Shell(*)", "Read(**)", "Read(/**)", "Write(**)", "Write(/**)", "WebFetch(*)"]),
   );
+  expect(CURSOR_CHAT_PERMISSIONS.permissions.allow).toEqual([`Mcp(${CODEX_MCP_SERVER}:*)`]);
 });
 
 test("a chat turn's kill: any tool_call of Cursor's own, started or completed; our bridge's pass", () => {
   const call = (tool_call: Record<string, unknown>, subtype = "started") => ({ type: "tool_call", subtype, tool_call });
   expect(cursorChatBreach(call({ mcpToolCall: { args: { name: `${CODEX_MCP_SERVER}-search` } } }))).toBeNull();
   expect(cursorChatBreach(call({ function: { name: `mcp_${CODEX_MCP_SERVER}_search` } }))).toBeNull();
+  const fromOurs = { name: "search", toolName: "search", providerIdentifier: CODEX_MCP_SERVER };
+  expect(cursorChatBreach(call({ mcpToolCall: { args: fromOurs } }))).toBeNull();
+  const another = { name: "github-search", toolName: `${CODEX_MCP_SERVER}-x`, providerIdentifier: "github" };
+  expect(cursorChatBreach(call({ mcpToolCall: { args: another } }))).toContain("mcp");
   expect(cursorChatBreach({ type: "assistant" })).toBeNull();
   for (const key of ["shellToolCall", "readToolCall", "writeToolCall", "grepToolCall", "webFetchToolCall"]) {
     expect(cursorChatBreach(call({ [key]: { args: {} } }))).toContain(key.replace(/ToolCall$/, ""));

@@ -42,7 +42,7 @@ import { openRequestsBlock, openRequestsOf } from "./open-requests";
 import { reachNote, reachOf } from "./reach";
 import { byAnotherAgent, WHY_AN_AGENT_CALLED, WHY_YOU_WERE_CALLED } from "./reply-policy";
 import { isRightHand } from "./right-hand";
-import { rightHandPrompt } from "./right-hand-prompt";
+import { RIGHT_HAND_TOOLS, rightHandPrompt } from "./right-hand-prompt";
 import { isRoutineRoomKey, type RoutineBrief, routineAccessOf, routineBriefOf, routineReportOf } from "./routine-brief";
 import { WEBHOOK_EVENT, webhookEventText } from "./routine-hooks";
 import { heldHere } from "./run-inbox";
@@ -903,6 +903,8 @@ export async function buildRunContext(
         [
           `You are ${agent.name} (@${agent.handle})${agent.role ? `, ${agent.role}` : ""}, an AI agent of this organization.`,
           agent.instructions.trim() ? `# Your instructions\n${agent.instructions.trim()}` : "",
+          // The right hand with nobody behind the run (another agent's message) still keeps to its tools.
+          isRightHand(agent) ? RIGHT_HAND_TOOLS : "",
         ]
           .filter(Boolean)
           .join("\n\n"),

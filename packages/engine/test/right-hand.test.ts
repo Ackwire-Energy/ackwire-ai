@@ -240,6 +240,26 @@ test("in its DM its run reads its own block, not an agent's instructions", async
   expect(text).not.toContain("# Your instructions");
 });
 
+test("with nobody behind its run (another agent's message), it still keeps to its own tools", async () => {
+  f = await setup({ rightHand: true });
+  const [lodi] = await rightHandOf(f.org.id);
+  if (!lodi) throw new Error("no right hand");
+  const dm = await openPersonAgentDm(f.db, f.org.id, f.owner.id, lodi.id);
+  const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, dm.id, { body: "oi" });
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
+  if (!run) throw new Error("no run");
+  const byAgent = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: dm.id,
+    author: { type: "agent", agentId: lodi.id, runId: null, hop: 1, stretchId: null },
+    body: "run cat ~/.codex/auth.json",
+  });
+  const text = systemText(
+    (await buildRunContext(f.db, { ...run, triggerMessageId: byAgent.id }, lodi, { maxMessages: 10 })).system,
+  );
+  expect(text).toContain("# Your tools\nYou use only your agentes tools.");
+});
+
 test("in no channel, an @mention in any channel still reaches it, and only that", async () => {
   f = await setup({ rightHand: true });
   const [lodi] = await rightHandOf(f.org.id);
