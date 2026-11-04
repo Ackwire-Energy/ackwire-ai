@@ -303,6 +303,13 @@ describe("one person in control of the desktop", () => {
       controlRefusal: null,
     });
     expect((await open(bia.id, TERMINAL)).closed).toBeNull();
+    // A shell reaches the sign-in as the screen does: the owner hears it too.
+    expect(
+      await f.db
+        .select({ userId: schema.notifications.userId })
+        .from(schema.notifications)
+        .where(and(eq(schema.notifications.orgId, f.org.id), eq(schema.notifications.kind, "desktop_taken"))),
+    ).toEqual([{ userId: f.owner.id }]);
     // A member still doesn't.
     await expect(requireComputerDriver(f.db, dani.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
     await expect(startTakeover(deps(), dani.id, f.org.id, f.agent.id, null, "desktop")).rejects.toBeInstanceOf(

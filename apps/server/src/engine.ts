@@ -456,7 +456,10 @@ export function buildEngine(o: EngineOptions) {
     hub: machineHub,
     authorize: async (input) => {
       if (sessions && input.request.kind === "terminal") return { refused: STREAM_CLOSE.notFound, reason: NO_TERMINAL };
-      const target = await authorizeStream({ db, hub: machineHub, rateLimiter: adapters.rateLimiter }, input);
+      const target = await authorizeStream(
+        { db, hub: machineHub, rateLimiter: adapters.rateLimiter, pubsub: adapters.pubsub },
+        input,
+      );
       // Someone opened the agent's desktop: its browser gets ready for the agent's next command meanwhile.
       if (input.request.kind === "desktop" && "machineId" in target && !target.held) {
         warmBrowser({ orgId: input.orgId, agentId: input.agentId, machineId: target.machineId });

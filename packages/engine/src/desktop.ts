@@ -16,6 +16,7 @@ import {
   type BrowserHandoffView,
   CONTROL_GRACE_MS,
   handoffView,
+  noteComputerTaken,
   openHandoffOf,
   openHandoffOn,
   requireBrowserAccess,
@@ -115,6 +116,7 @@ export interface StreamPolicyDeps {
   db: Database;
   hub: Pick<MachineHub, "isLocal">;
   rateLimiter?: RateLimiter;
+  pubsub?: PubSub;
 }
 
 /**
@@ -137,6 +139,12 @@ export async function authorizeStream(deps: StreamPolicyDeps, input: StreamInput
   // The agent moved to another computer meanwhile: who drives that one wasn't checked.
   if (access.driven && target.machineId !== access.driven) return refused(STREAM_CLOSE.forbidden, "forbidden");
   if (access.control) await touchControl(deps.db, access.control, input.userId, new Date(), true).catch(() => {});
+  // A shell as the agent's user reaches what its screen does (the owner's sign-in): its owner hears it the same way.
+  if (input.request.kind === "terminal") {
+    await noteComputerTaken(deps, { orgId: input.orgId, agentId: input.agentId, actorId: input.userId }).catch(
+      () => {},
+    );
+  }
   if (input.request.kind === "desktop" && (await standingRefusal(deps.db, input.orgId, input.agentId))) {
     return { ...target, held: true };
   }

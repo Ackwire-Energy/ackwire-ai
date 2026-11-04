@@ -314,27 +314,45 @@ function noteControl(deps: HandoffDeps, row: BrowserHandoffRow) {
  * hears it quietly.
  */
 async function noteDesktopTaken(deps: HandoffDeps, row: BrowserHandoffRow) {
-  const actorId = row.controllerUserId;
-  if (row.screen !== "desktop" || !actorId) return;
+  if (row.screen !== "desktop" || !row.controllerUserId) return;
+  await noteComputerTaken(deps, {
+    orgId: row.orgId,
+    agentId: row.agentId,
+    actorId: row.controllerUserId,
+    audit: { machineId: row.machineId, handoffId: row.id },
+  });
+}
+
+/**
+ * Someone other than the agent's owner got its screen or a shell as its OS user: the owner's quiet notice and, with
+ * `audit`, the `desktop.control_taken` row. A terminal passes none: its stream is audited when it closes
+ * (`terminal.session`).
+ */
+export async function noteComputerTaken(
+  deps: HandoffDeps,
+  input: { orgId: string; agentId: string; actorId: string; audit?: Record<string, unknown> },
+) {
   const [agent] = await deps.db
     .select({ owner: agents.ownerUserId, name: agents.name, handle: agents.handle })
     .from(agents)
-    .where(and(eq(agents.id, row.agentId), eq(agents.orgId, row.orgId)));
-  if (!agent || agent.owner === actorId) return;
-  await recordAudit(deps.db, {
-    orgId: row.orgId,
-    actor: { type: "person", id: actorId },
-    action: "desktop.control_taken",
-    target: { type: "agent", id: row.agentId },
-    details: { machineId: row.machineId, handoffId: row.id },
-  });
+    .where(and(eq(agents.id, input.agentId), eq(agents.orgId, input.orgId)));
+  if (!agent || agent.owner === input.actorId) return;
+  if (input.audit) {
+    await recordAudit(deps.db, {
+      orgId: input.orgId,
+      actor: { type: "person", id: input.actorId },
+      action: "desktop.control_taken",
+      target: { type: "agent", id: input.agentId },
+      details: input.audit,
+    });
+  }
   if (!agent.owner) return;
   await notifyDesktopTaken(deps, {
-    orgId: row.orgId,
-    agentId: row.agentId,
+    orgId: input.orgId,
+    agentId: input.agentId,
     agentName: agent.name || agent.handle,
     ownerUserId: agent.owner,
-    actorId,
+    actorId: input.actorId,
     at: new Date(),
   }).catch(() => {});
 }
