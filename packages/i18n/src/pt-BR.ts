@@ -11130,7 +11130,7 @@ export const ptBR = {
       skills: "Instruções em Markdown que os agentes abrem quando precisam.",
       keys: "Seus planos e as chaves de API do workspace.",
       storage: "Onde ficam os arquivos do workspace.",
-      usage: "Orçamentos e quanto cada agente gastou este mês.",
+      usage: "Quanto cada pessoa e cada agente usa de IA, e os limites do mês.",
       audit: "O que os agentes fizeram fora da conversa e o que as pessoas mudaram. Só admins veem.",
       import: "Traga agentes de outro app ou de outro workspace, e leve este para onde quiser.",
       billing: "O plano do agentes.chat deste workspace, o cartão e as faturas ficam numa página nossa, fora do app.",

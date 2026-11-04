@@ -19,7 +19,15 @@ import {
   useSetPersonLimits,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { formatInt, formatMonth, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
+import {
+  capitalize,
+  formatDecimal,
+  formatInt,
+  formatMonth,
+  formatShortDate,
+  formatUsd,
+  relativeTime,
+} from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   chipCounts,
@@ -159,7 +167,7 @@ function UseMeter({ p, plansOnly }: { p: PersonRow; plansOnly: boolean }) {
         <span className="muted">
           {p.limitUsd === null
             ? t("peopleUsage.meter.noLimit")
-            : t("peopleUsage.meter.of", { limit: formatUsd(i18n.language, p.limitUsd) })}
+            : t("peopleUsage.meter.of", { limit: formatDecimal(i18n.language, p.limitUsd) })}
         </span>
         {p.state === "at" && <span className="pu-meter__at">{t("peopleUsage.chips.at")}</span>}
       </span>
@@ -203,7 +211,7 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
     sort.desc,
     i18n.language,
   );
-  const month = formatMonth(i18n.language, new Date(`${data.month}-15T12:00:00`));
+  const month = capitalize(formatMonth(i18n.language, new Date(`${data.month}-15T12:00:00`)), i18n.language);
   const head = (by: PeopleSort, label: string, className?: string) => (
     <th className={className} aria-sort={sort.by === by ? (sort.desc ? "descending" : "ascending") : undefined}>
       <button
@@ -237,7 +245,21 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
             })}
           </span>
         </div>
-        {switcher}
+        <span className="pu-head__acts">
+          <Button
+            size="sm"
+            icon="download"
+            onClick={() =>
+              fileSaver.save(
+                api.orgs.peopleUsageCsvUrl(org.id, range),
+                `usage-per-person-${new Date().toISOString().slice(0, 10)}.csv`,
+              )
+            }
+          >
+            {t("peopleUsage.export")}
+          </Button>
+          {switcher}
+        </span>
       </div>
       <div className="pu-toolbar">
         <Select
@@ -286,19 +308,6 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
             </button>
           );
         })}
-        <Button
-          size="sm"
-          icon="download"
-          className="pu-toolbar__end"
-          onClick={() =>
-            fileSaver.save(
-              api.orgs.peopleUsageCsvUrl(org.id, range),
-              `usage-per-person-${new Date().toISOString().slice(0, 10)}.csv`,
-            )
-          }
-        >
-          {t("peopleUsage.export")}
-        </Button>
       </div>
       <p className="pu-summary">
         <span data-tone="near">{t("peopleUsage.summary.near", { n: counts.near })}</span>
@@ -396,7 +405,7 @@ function Faces({ ids, titles }: { ids: string[]; titles?: string[] }) {
     <AvatarStack className="pu-faces">
       {ids.slice(0, 3).map((id, i) => (
         <span key={id} title={titles?.[i] ?? agentName(t, dir, id)}>
-          <AgentAvatar agentId={id} name={agentName(t, dir, id)} size="xs" />
+          <AgentAvatar agentId={id} name={agentName(t, dir, id)} size="xs" labelled />
         </span>
       ))}
     </AvatarStack>

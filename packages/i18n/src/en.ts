@@ -10949,7 +10949,7 @@ export const en = {
       skills: "Markdown instructions agents open when they need them.",
       keys: "Your plans and the workspace's API keys.",
       storage: "Where the workspace's files live.",
-      usage: "Budgets and what each agent spent this month.",
+      usage: "How much AI each person and each agent uses, and the month's limits.",
       audit: "What the agents did outside the conversation and what people changed. Only admins see it.",
       import: "Bring agents from another app or workspace, and take this one wherever you want.",
       billing: "This workspace's agentes.chat plan, card and invoices are on a page of ours, outside the app.",
