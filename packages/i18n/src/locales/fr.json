@@ -14605,6 +14605,10 @@
       "open": "Ouvrir"
     },
     "home": "Mon accueil",
+    "seeMore": "Voir plus",
+    "seeMoreHidden_one": "{{count}} de plus",
+    "seeMoreHidden_many": "{{count}} de plus",
+    "seeMoreHidden_other": "{{count}} de plus",
     "untitled": "Nouveau widget",
     "updatedAgo": "mis à jour {{when}}",
     "removed": {

@@ -13925,6 +13925,9 @@
       "open": "Aç"
     },
     "home": "Ana sayfam",
+    "seeMore": "Daha fazla gör",
+    "seeMoreHidden_one": "{{count}} tane daha",
+    "seeMoreHidden_other": "{{count}} tane daha",
     "untitled": "Yeni widget",
     "updatedAgo": "{{when}} güncellendi",
     "removed": {

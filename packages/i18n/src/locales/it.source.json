@@ -32658,6 +32658,15 @@
   "widgets.home": {
     "value": "My Home"
   },
+  "widgets.seeMore": {
+    "value": "See more"
+  },
+  "widgets.seeMoreHidden": {
+    "value": {
+      "one": "{{count}} more",
+      "other": "{{count}} more"
+    }
+  },
   "widgets.untitled": {
     "value": "New widget"
   },

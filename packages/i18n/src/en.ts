@@ -13483,6 +13483,11 @@ export const en = {
       open: "Open",
     },
     home: "My Home",
+    /** A card taller than the board allows: cut, faded out, this button on the fade opens all of it. */
+    seeMore: "See more",
+    /** What the cut hides, for screen readers, after "See more". */
+    seeMoreHidden_one: "{{count}} more",
+    seeMoreHidden_other: "{{count}} more",
     /** A widget's name until its agent names it, when its kind isn't known yet. */
     untitled: "New widget",
     updatedAgo: "updated {{when}}",

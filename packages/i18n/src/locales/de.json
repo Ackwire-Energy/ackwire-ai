@@ -13993,6 +13993,9 @@
       "open": "Öffnen"
     },
     "home": "Mein Start",
+    "seeMore": "Mehr anzeigen",
+    "seeMoreHidden_one": "{{count}} weitere",
+    "seeMoreHidden_other": "{{count}} weitere",
     "untitled": "Neues Widget",
     "updatedAgo": "aktualisiert {{when}}",
     "removed": {

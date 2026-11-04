@@ -1,9 +1,23 @@
 import type { Dashboard, HomeTile, Widget } from "@agenteschat/client";
 import { type BoardItem, boardItems, layoutOf, resizeItem, useRefreshWidget, useSaveLayout } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { Button, Card, cx, Icon, Menu, MenuItem, MenuSeparator, WidgetCard } from "@agenteschat/ui";
+import {
+  Button,
+  Card,
+  CardHorizon,
+  CardMore,
+  cx,
+  Dialog,
+  DialogBody,
+  Icon,
+  Menu,
+  MenuItem,
+  MenuSeparator,
+  useCardCut,
+  WidgetCard,
+} from "@agenteschat/ui";
 import { layoutToSize, nextSize, sizeToLayout } from "@agenteschat/ui/widgets/spec";
-import { type ButtonHTMLAttributes, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ButtonHTMLAttributes, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNow } from "@/hooks/useNow";
 import { type GridMove, useGridDrag } from "@/lib/grid-drag";
@@ -242,6 +256,7 @@ function BoardWidget({
   const update = () =>
     refresh.mutate(widget.id, { onError: (e) => toast.show(errorText(t, e, i18n.language), "error") });
   const size = layoutToSize(widget.layout);
+  const board = useBoardLabels();
   const removeLabel = t(boardKind === "home" ? "widgets.menu.removeHome" : "widgets.menu.removeBoard");
   return (
     <WidgetCard
@@ -256,6 +271,7 @@ function BoardWidget({
       buildingText={t("widgets.status.building", { name })}
       face={<WidgetFace agentId={widget.agentId} name={name} />}
       onOpen={onOpen}
+      board={board}
       footer={
         <WidgetFoot
           widget={widget}
@@ -338,30 +354,57 @@ function BoardWidget({
   );
 }
 
+/** "See more" on a board's cards, and what a cut hides for screen readers. */
+function useBoardLabels() {
+  const { t } = useTranslation();
+  return useMemo(
+    () => ({ seeMore: t("widgets.seeMore"), hidden: (count: number) => t("widgets.seeMoreHidden", { count }) }),
+    [t],
+  );
+}
+
 /**
  * A fixed tile of a board (Home's "Waiting on you", "Working now"): a card like a widget's, its title and count, an
- * action at the head's end; in Organize, "Fixed" and the grip (the board's drag) in their place.
+ * action at the head's end; in Organize, "Fixed" and the grip (the board's drag) in their place. Like a widget, its
+ * height is capped: rows past it fade out under "See more", which opens the tile whole in a dialog; with room to
+ * spare under its rows (nothing at work), the horizon at its foot.
  */
 export function BoardTile({
   title,
   count,
   action,
+  horizon = true,
   organize,
   children,
 }: {
   title: string;
   count?: number;
   action?: ReactNode;
+  /** False when the body draws its own sky. */
+  horizon?: boolean;
   organize: TileOrganize | null;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  const labels = useBoardLabels();
+  const body = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const capped = !organize;
+  const cut = useCardCut(body, capped);
+  const badge = count !== undefined && count > 0 && <span className="wg__badge">{count}</span>;
   return (
-    <Card as="section" className="wg wg--fixed" aria-label={title} data-organize={organize ? "" : undefined}>
+    <Card
+      as="section"
+      className="wg wg--fixed"
+      aria-label={title}
+      data-organize={organize ? "" : undefined}
+      data-capped={capped || undefined}
+      data-cut={cut.cut || undefined}
+    >
       <div className="wg__head">
         <h2 className="wg__title">
           {title}
-          {count !== undefined && count > 0 && <span className="wg__badge">{count}</span>}
+          {badge}
         </h2>
         {organize ? (
           <span className="wg__arr">
@@ -380,7 +423,33 @@ export function BoardTile({
           action
         )}
       </div>
-      <div className="wg__body">{children}</div>
+      <div ref={body} className="wg__body">
+        {children}
+        {cut.cut && (
+          <CardMore
+            label={labels.seeMore}
+            hiddenLabel={cut.hidden ? labels.hidden(cut.hidden) : undefined}
+            hidden={cut.hidden}
+            onOpen={() => setOpen(true)}
+          />
+        )}
+      </div>
+      {capped && horizon && <CardHorizon content={body} />}
+      <Dialog
+        open={open}
+        onOpenChange={setOpen}
+        title={
+          <span className="wg-whole__title">
+            {title}
+            {badge}
+          </span>
+        }
+        closeLabel={t("common.close")}
+        actions={action}
+        className="wg-whole"
+      >
+        <DialogBody className="wg-whole__body">{children}</DialogBody>
+      </Dialog>
     </Card>
   );
 }
