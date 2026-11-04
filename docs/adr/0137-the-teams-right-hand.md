@@ -63,7 +63,7 @@ It runs on the workspace's AI through the Model Gateway like any agent: budget c
 
 ## Consequences
 
-- Every workspace gets one more agent row. Lists that count "the team" leave it out; its pinned row is its entry (the sidebar on the web, the top of Conversas on the phone), never Mensagens diretas or Agentes.
+- Every workspace gets one more agent row. Lists that count "the team" leave it out; its row is its entry: the first row of Agentes, where the agents' DMs live (the web sidebar and Conversas on the phone), on a soft tint of the agent blue with "seu braço direito", outside the section's sorting and pins, never dragged or hidden, and still shown while Agentes is closed (alone on top of Conversas while there is no Agentes section); never under Mensagens diretas.
 - `agents.coordinator` and its index stay in the database, read and written by nothing, until no running version selects them (`check:migrations`); a later migration drops them. Workspaces that had a coordinator get an ordinary agent back, and nothing is posted.
 - Stored decisions keep their strategy `rule:coordinator`, read as the default rule's line, and still count toward the per-channel cap for their hour.
 - `PATCH …/agents/{agentId}` ignores an incoming `coordinator` and answers 200, because phones without an over-the-air update still send it.

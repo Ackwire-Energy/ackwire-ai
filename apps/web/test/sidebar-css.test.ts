@@ -84,6 +84,15 @@ test("a closed group of agents keeps in sight who works, waits or wrote; pinned 
   ).toBe("none");
 });
 
+test("the right hand stays in sight in a closed AGENTES, on a soft tint of the agent blue the open row's plate replaces", () => {
+  expect(value('.sidebar__section[data-open="false"] .sidebar__section-body > [data-right-hand]', "display")).toBe(
+    "flex",
+  );
+  expect(value('.sidebar__item[data-right-hand]:not([data-status="active"])', "background")).toContain(
+    "var(--agent-soft)",
+  );
+});
+
 test("a row's hidden hover buttons don't catch the pointer, so a drag over a row's end lands before or after it", () => {
   const shown = '.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"])) > .sidebar__row-acts';
   expect([value(".sidebar__row-acts", "pointer-events"), value(shown, "pointer-events")]).toEqual(["none", "auto"]);

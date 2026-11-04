@@ -42,22 +42,32 @@ const click = async (el: Element, rounds = 6) => {
 };
 
 describe("the right hand's row in the sidebar", () => {
-  test("first in the list, above the tools, with its label; never under Mensagens diretas", async () => {
+  test("the first row of AGENTES, above the pinned agents, tinted and with its label; never under Mensagens diretas", async () => {
     const state = withRightHand(seedState());
     seedDm(state, { type: "agent", id: LODI_ID }, { ago: 2 });
     seedDm(state, { type: "agent", id: ADA_ID }, { ago: 5 });
+    state.sidebarView = {
+      agentSort: "workspace",
+      showAllAgents: false,
+      pins: { agents: [ADA_ID], channels: [], people: [] },
+    };
     await go(state);
     const row = pinRow();
     expect(row).toBeTruthy();
-    const scroll = nav().querySelector(".sidebar__scroll") as HTMLElement;
-    // Before every section (it isn't one: nothing moves or hides it).
-    expect(scroll.firstElementChild?.contains(row)).toBe(true);
-    expect(row?.closest("[data-section]")).toBeNull();
+    const agents = nav().querySelector<HTMLElement>('[data-section="agents"]');
+    const body = agents?.querySelector(".sidebar__section-body");
+    expect(body?.firstElementChild).toBe(row);
+    expect(nav().querySelector('[data-section="people"]')?.contains(row)).toBe(false);
     expect(row?.getAttribute("href")).toBe(`/org/${ORG_ID}/dm/agent/${LODI_ID}`);
     expect(row?.querySelector(".sidebar__item-label")?.textContent).toBe("Lodi");
+    expect(row?.querySelector(".sidebar__item-role")?.textContent).toBe("seu braço direito");
     const dms = [...nav().querySelectorAll<HTMLElement>("[data-agent-row]")].map((r) => r.dataset.agentRow);
-    expect(dms).toContain(ADA_ID);
+    expect(dms[0]).toBe(ADA_ID);
     expect(dms).not.toContain(LODI_ID);
+    // Closed, AGENTES still shows it (the stylesheet keeps `[data-right-hand]` in sight).
+    await click(agents?.querySelector(".sidebar__section-toggle") as HTMLElement);
+    expect(agents?.querySelector(".sidebar__section")?.getAttribute("data-open")).toBe("false");
+    expect(body?.firstElementChild).toBe(pinRow());
   });
 
   test("Novo until it is first opened, then its label; its DM's unread count when it answered", async () => {
@@ -122,6 +132,16 @@ describe("the right hand elsewhere", () => {
     expect(topic?.textContent).toContain("seu braço direito · age com as suas permissões");
     expect(header.textContent).not.toContain("Computador");
     expect(screen().getByRole("combobox", { name: "Mensagem para Lodi · nada muda sem você" })).toBeTruthy();
+  });
+
+  test("its greeting's paragraphs sit in a typed message's Markdown wrapper, so its first line is where any message's is", async () => {
+    await go(withRightHand(seedState()), `dm/agent/${LODI_ID}`);
+    const greeting = [...document.querySelectorAll(".ac-msg__text b")].find((b) =>
+      b.textContent?.startsWith("Oi, eu sou o Lodi"),
+    );
+    const wrapper = greeting?.closest("p")?.parentElement;
+    expect(wrapper?.className).toBe("md md--message");
+    expect(wrapper?.parentElement?.classList.contains("ac-msg__text")).toBe(true);
   });
 
   test("Settings › Lodi: its name and face in the nav, the lock line and its audit link", async () => {

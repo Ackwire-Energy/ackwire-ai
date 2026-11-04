@@ -41,6 +41,7 @@ export const ConversationRowView = memo(function ConversationRowView({
   fresh = false,
   onOpen,
   pinned = false,
+  tinted = false,
 }: {
   row: ConversationRow;
   /** A hairline above (every row but the first). */
@@ -62,6 +63,8 @@ export const ConversationRowView = memo(function ConversationRowView({
   fresh?: boolean;
   /** Told when the row opens its conversation. */
   onOpen?: () => void;
+  /** On the agent blue's soft tint (the right hand's row, ADR 0137). */
+  tinted?: boolean;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -264,6 +267,7 @@ export const ConversationRowView = memo(function ConversationRowView({
       accessibilityRole="button"
       accessibilityLabel={a11y}
       divider={divider}
+      {...(tinted ? { background: c.agentSoft } : {})}
       unread={r.unread > 0}
       leading={leading}
       title={name}

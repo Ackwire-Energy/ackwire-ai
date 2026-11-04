@@ -403,8 +403,8 @@ export function agentStarters(
 }
 
 /**
- * The right hand's own row on top of Conversas (ADR 0137): its DM, or one to start (no channel yet), never under
- * Agentes; the other rows without it. No pin when there is none for this person (outside its audience).
+ * The right hand's own row (ADR 0137), first in Conversas' Agentes and never among its sorted rows: its DM, or one to
+ * start (no channel yet); the other rows without it. No pin when there is none for this person (outside its audience).
  */
 export function rightHandPin(
   rows: ConversationRow[],

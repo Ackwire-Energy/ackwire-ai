@@ -52,10 +52,13 @@ export function RightHandIntro({ agent }: { agent: Agent }) {
       time={<time dateTime={agent.createdAt}>{formatTime(i18n.language, agent.createdAt)}</time>}
     >
       <MessageText>
-        <p>
-          <b>{t("rightHand.intro.greeting", agentGrammar(agent.name))}</b>
-        </p>
-        <p>{t("rightHand.intro.lead")}</p>
+        {/* The wrapper a typed message's Markdown has (MessageBody): without it, a paragraph keeps the browser's margins. */}
+        <div className="md md--message">
+          <p>
+            <b>{t("rightHand.intro.greeting", agentGrammar(agent.name))}</b>
+          </p>
+          <p>{t("rightHand.intro.lead")}</p>
+        </div>
       </MessageText>
       {cards.includes("connect") && connect && (
         <div className="waitcard">
