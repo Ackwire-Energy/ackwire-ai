@@ -1210,6 +1210,8 @@
     "paused": "Duraklatıldı: bu hafta 3 kararını geri aldınız. İstediğinizde yeniden açın.",
     "card": {
       "deciding": "{{name}}, {{for}} adına inceliyor…",
+      "approvedForYou": "{{name}} sizin adınıza onayladı",
+      "decidingForYou": "{{name}} sizin adınıza inceliyor…",
       "approved": "{{name}}, {{for}} adına onayladı",
       "passed": "{{name}} bunu size iletti",
       "passedWhy": "{{name}} bunu size iletti: {{reason}}",
@@ -1221,9 +1223,7 @@
       "why": "Neden?",
       "undo": "Geri al",
       "undoArchives": "Geri almak {{name}} adlı ajanı arşivler. {{until}} saatine kadar geçerli.",
-      "undoSettings": "Geri almak ayarları eski haline getirir. {{until}} saatine kadar geçerli.",
-      "approvedForYou": "{{name}} sizin adınıza onayladı",
-      "decidingForYou": "{{name}} sizin adınıza inceliyor…"
+      "undoSettings": "Geri almak ayarları eski haline getirir. {{until}} saatine kadar geçerli."
     }
   },
   "noticePrefs": {
@@ -1461,8 +1461,8 @@
     "collapseAll": "Tümünü daralt",
     "expandAll": "Tümünü genişlet",
     "organize": "Grupları Ekip'te düzenle",
-    "seeAll_one": "{{count}} ajanı gör",
-    "seeAll_other": "{{count}} ajanın tümünü gör",
+    "more_one": "Ekip'te 1 ajan daha",
+    "more_other": "Ekip'te {{count}} ajan daha",
     "createFirst": "İlk ajanı oluştur",
     "working_one": "{{count}} çalışıyor",
     "working_other": "{{count}} çalışıyor",
@@ -7441,7 +7441,8 @@
       "deal": "anlaştık",
       "thinking": "düşünüyor",
       "wow": "vay",
-      "dizzy": "başı dönmüş"
+      "dizzy": "başı dönmüş",
+      "wave": "selam"
     },
     "moodWords": {
       "celebrate": "parti tebrikler kutlama yayında lansman yaşasın",
@@ -7449,7 +7450,8 @@
       "deal": "tamam olur anlaştık evet tabii bitti",
       "thinking": "hmm merak düşün belki",
       "wow": "vay sürpriz inanılmaz aman",
-      "dizzy": "yorgun cuma yardım hay aksi kafam karıştı"
+      "dizzy": "yorgun cuma yardım hay aksi kafam karıştı",
+      "wave": "merhaba selam hoşça kal el sallamak günaydın görüşürüz"
     },
     "picker": {
       "button": "Emoji, GIF ve çıkartmalar",
@@ -12512,6 +12514,8 @@
       "action_invite_people": "Kişileri davet et",
       "action_install_skill": "Beceri yükle",
       "action_update_skills": "Becerileri güncelle",
+      "action_approvals": "Sizi bekleyen onaylar",
+      "action_open_page": "Bir ekran aç",
       "agent_proposal": "Yeni bir ajan önerdi: {{name}}",
       "settings_proposal": "{{names}} için bir değişiklik önerdi",
       "approval_request": "Onay isteği: {{title}}",
@@ -12541,9 +12545,7 @@
       "stuck": "Takıldım ve bitirmeden durdum.",
       "forum_suggestion": "Forum açmaya değer mi? \"{{title}}\"",
       "forum_concluded": "\"{{title}}\" forumu sona erdi. Sentez aşağıdaki dosyada.",
-      "forum_concluded_issues": "\"{{title}}\" forumu sona erdi. Sentez, onaylanacak {{count}} önerilen görevle birlikte aşağıdaki dosyada.",
-      "action_approvals": "Sizi bekleyen onaylar",
-      "action_open_page": "Bir ekran aç"
+      "forum_concluded_issues": "\"{{title}}\" forumu sona erdi. Sentez, onaylanacak {{count}} önerilen görevle birlikte aşağıdaki dosyada."
     }
   },
   "builtinTools": {

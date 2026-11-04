@@ -1,13 +1,13 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { addLiveSticker, drawLiveSticker, type LiveSticker, stickerNow } from "../agent/sticker-live";
-import { type DrawnMood, stickerSeed } from "../agent/stickers";
+import { type StickerMood, stickerSeed } from "../agent/stickers";
 import { cx } from "../cx";
 import type { AgentAppearance } from "./AgentLook";
 
 export interface AgentStickerProps {
   /** The agent's look (color, eyes, accessory); none draws the default agent. */
   appearance?: AgentAppearance;
-  mood: DrawnMood;
+  mood: StickerMood;
   /** Plays once, for this many seconds from when it shows, then holds its last frame; without it, it loops. */
   playFor?: number;
   /** The side in CSS pixels: about 88 in the picker, 120 in a message. */

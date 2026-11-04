@@ -23,6 +23,7 @@ import {
   type StickerPickerLabels,
   stickerMoodsFor,
   stickerSeed,
+  WAVE_SECONDS,
 } from "../src";
 import type { Ctx2D } from "../src/agent/engine.js";
 
@@ -96,8 +97,8 @@ function recorder() {
 }
 
 describe("the agents' stickers (ADR 0091)", () => {
-  test("six moods, each drawn with the engine's subset only, the same frame for the same moment", () => {
-    expect([...STICKER_MOODS]).toEqual(["celebrate", "love", "deal", "thinking", "wow", "dizzy"]);
+  test("seven moods, each drawn with the engine's subset only, the same frame for the same moment", () => {
+    expect([...STICKER_MOODS]).toEqual(["celebrate", "love", "deal", "thinking", "wow", "dizzy", "wave"]);
     const look = { color: "amber", eyes: "round", accessory: "beanie" };
     for (const mood of STICKER_MOODS) {
       const a = recorder();
@@ -120,6 +121,18 @@ describe("the agents' stickers (ADR 0091)", () => {
     drawSticker(ctx, { color: "rose" }, "love", STICKER_STILL_T, 128);
     const hearts = calls.filter((c) => /^fillStyle=rgba\((245, 138, 166|201, 64, 106), 0\.\d+\)$/.test(c));
     expect(hearts.length).toBeGreaterThan(0);
+  });
+
+  test("the wave, a mood people and agents send, waves, rests on its still frame as long, then waves again", () => {
+    const frame = (t: number) => {
+      const r = recorder();
+      drawSticker(r.ctx, { color: "teal" }, "wave", t, 128);
+      return r.calls;
+    };
+    const still = frame(STICKER_STILL_T);
+    expect(frame(0.1)).not.toEqual(still);
+    expect(frame(WAVE_SECONDS + 0.5)).toEqual(still);
+    expect(frame(WAVE_SECONDS * 2 + 0.1)).toEqual(frame(0.1));
   });
 
   test("a seed keeps stickers side by side out of step, the same one for the same agent", () => {
@@ -436,6 +449,7 @@ const STICKER_LABELS: StickerPickerLabels = {
     thinking: "pensando",
     wow: "uau",
     dizzy: "zonzo",
+    wave: "oi",
   },
   moodWords: { love: "obrigado valeu", celebrate: "festa parabéns" },
   sticker: (name, mood) => `Figurinha de ${name}: ${STICKER_LABELS.moods[mood]}`,
@@ -447,21 +461,21 @@ describe("the stickers tab", () => {
     { id: "ag-infra", name: "Infra", appearance: { color: "rose" as const } },
   ];
 
-  test("a search finds an agent by name (all six) or the moods by their words", () => {
-    expect(stickerMoodsFor("", "Dev", STICKER_LABELS)).toHaveLength(6);
-    expect(stickerMoodsFor("de", "Dev", STICKER_LABELS)).toHaveLength(6);
+  test("a search finds an agent by name (all seven) or the moods by their words", () => {
+    expect(stickerMoodsFor("", "Dev", STICKER_LABELS)).toHaveLength(7);
+    expect(stickerMoodsFor("de", "Dev", STICKER_LABELS)).toHaveLength(7);
     expect(stickerMoodsFor("valeu", "Dev", STICKER_LABELS)).toEqual(["love"]);
     expect(stickerMoodsFor("Pensando", "Dev", STICKER_LABELS)).toEqual(["thinking"]);
     expect(stickerMoodsFor("xyz", "Dev", STICKER_LABELS)).toEqual([]);
   });
 
-  test("a section per agent with its six moods; a click picks; nothing found says so", async () => {
+  test("a section per agent with its seven moods; a click picks; nothing found says so", async () => {
     const picked: string[] = [];
     render(
       <StickerPicker labels={STICKER_LABELS} agents={agents} onPick={(a, mood) => picked.push(`${a.id}:${mood}`)} />,
     );
     const dev = body().getByRole("region", { name: "Dev" });
-    expect(within(dev).getAllByRole("button")).toHaveLength(6);
+    expect(within(dev).getAllByRole("button")).toHaveLength(7);
     expect(body().getByRole("region", { name: "Infra" })).toBeTruthy();
     await act(async () => fireEvent.click(within(dev).getByRole("button", { name: "Figurinha de Dev: amei" })));
     expect(picked).toEqual(["ag-dev:love"]);

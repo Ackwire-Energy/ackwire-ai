@@ -1810,6 +1810,11 @@
     "machine": {
       "toolsHow": "Toca una herramienta activada para desactivarla. Volver a activarla solo se puede en la propia computadora."
     },
+    "roles": {
+      "onComputer": "El orden de los roles y el ícono de cada uno se cambian en la computadora.",
+      "items": "Uno por uno",
+      "create": "Crear"
+    },
     "import": {
       "preparing": "Preparando el archivo…",
       "failed": "No se pudo descargar el archivo. Inténtalo de nuevo."

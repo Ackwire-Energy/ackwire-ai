@@ -1246,6 +1246,8 @@
     "paused": "In pausa: hai annullato 3 sue decisioni questa settimana. Riattivalo quando vuoi.",
     "card": {
       "deciding": "{{name}} lo sta valutando per conto di {{for}}…",
+      "approvedForYou": "Approvato da {{name}} a tuo nome",
+      "decidingForYou": "{{name}} lo sta valutando a tuo nome…",
       "approved": "Approvato da {{name}} per conto di {{for}}",
       "passed": "{{name}} l'ha passato a te",
       "passedWhy": "{{name}} l'ha passato a te: {{reason}}",
@@ -1257,9 +1259,7 @@
       "why": "Perché?",
       "undo": "Annulla",
       "undoArchives": "Annulla archivia {{name}}. Vale fino a {{until}}.",
-      "undoSettings": "Annulla ripristina le impostazioni. Vale fino a {{until}}.",
-      "approvedForYou": "Approvato da {{name}} a tuo nome",
-      "decidingForYou": "{{name}} lo sta valutando a tuo nome…"
+      "undoSettings": "Annulla ripristina le impostazioni. Vale fino a {{until}}."
     }
   },
   "noticePrefs": {
@@ -1504,9 +1504,9 @@
     "collapseAll": "Comprimi tutti",
     "expandAll": "Espandi tutti",
     "organize": "Organizza i gruppi in Team",
-    "seeAll_one": "Vedi l’agente",
-    "seeAll_many": "Vedi tutti i {{count}} agenti",
-    "seeAll_other": "Vedi tutti i {{count}} agenti",
+    "more_one": "1 altro agente in Team",
+    "more_many": "Altri {{count}} agenti in Team",
+    "more_other": "Altri {{count}} agenti in Team",
     "createFirst": "Crea il primo agente",
     "working_one": "{{count}} al lavoro",
     "working_many": "{{count}} al lavoro",
@@ -7831,7 +7831,8 @@
       "deal": "affare fatto",
       "thinking": "ci penso",
       "wow": "wow",
-      "dizzy": "confuso"
+      "dizzy": "confuso",
+      "wave": "ciao"
     },
     "moodWords": {
       "celebrate": "festa congratulazioni festeggiare rilasciato lancio evviva",
@@ -7839,7 +7840,8 @@
       "deal": "ok va bene d'accordo sì certo fatto",
       "thinking": "mmm chissà pensare forse",
       "wow": "wow sorpresa incredibile pazzesco",
-      "dizzy": "stanco venerdì aiuto ops confuso"
+      "dizzy": "stanco venerdì aiuto ops confuso",
+      "wave": "ciao salve arrivederci saluto buongiorno a dopo"
     },
     "picker": {
       "button": "Emoji, GIF e sticker",
@@ -13066,6 +13068,8 @@
       "action_invite_people": "Invita persone",
       "action_install_skill": "Installa una skill",
       "action_update_skills": "Aggiorna le skill",
+      "action_approvals": "Approvazioni che ti aspettano",
+      "action_open_page": "Apri una schermata",
       "agent_proposal": "Ha proposto un nuovo agente: {{name}}",
       "settings_proposal": "Ha proposto una modifica per {{names}}",
       "approval_request": "Richiesta di approvazione: {{title}}",
@@ -13098,9 +13102,7 @@
       "stuck": "Mi sono bloccato e mi sono fermato prima di finire.",
       "forum_suggestion": "Vale un forum? \"{{title}}\"",
       "forum_concluded": "Il forum \"{{title}}\" è concluso. La sintesi è nel file qui sotto.",
-      "forum_concluded_issues": "Il forum \"{{title}}\" è concluso. La sintesi è nel file qui sotto, con {{count}} attività suggerite da approvare.",
-      "action_approvals": "Approvazioni che ti aspettano",
-      "action_open_page": "Apri una schermata"
+      "forum_concluded_issues": "Il forum \"{{title}}\" è concluso. La sintesi è nel file qui sotto, con {{count}} attività suggerite da approvare."
     }
   },
   "builtinTools": {
@@ -13740,8 +13742,8 @@
       "backLabel": "Nota per {{name}}",
       "backLabel_female": "Nota per {{name}}",
       "backPlaceholder": "Facoltativo: c'è qualcosa che {{name}} deve sapere?",
-      "addNote": "Lascia una nota",
-      "backPlaceholder_female": "Facoltativo: c'è qualcosa che {{name}} deve sapere?"
+      "backPlaceholder_female": "Facoltativo: c'è qualcosa che {{name}} deve sapere?",
+      "addNote": "Lascia una nota"
     },
     "now": {
       "ready": "Pronto su {{computer}}",

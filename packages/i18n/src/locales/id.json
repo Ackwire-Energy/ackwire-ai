@@ -1174,6 +1174,8 @@
     "paused": "Dijeda: kamu membatalkan 3 keputusannya minggu ini. Nyalakan lagi kapan pun kamu mau.",
     "card": {
       "deciding": "{{name}} sedang meninjaunya atas nama {{for}}…",
+      "approvedForYou": "Disetujui oleh {{name}} atas namamu",
+      "decidingForYou": "{{name}} sedang meninjaunya atas namamu…",
       "approved": "Disetujui oleh {{name}} atas nama {{for}}",
       "passed": "{{name}} meneruskannya kepadamu",
       "passedWhy": "{{name}} meneruskannya kepadamu: {{reason}}",
@@ -1185,9 +1187,7 @@
       "why": "Kenapa?",
       "undo": "Batalkan",
       "undoArchives": "Membatalkan akan mengarsipkan {{name}}. Berlaku hingga {{until}}.",
-      "undoSettings": "Membatalkan akan mengembalikan pengaturan. Berlaku hingga {{until}}.",
-      "approvedForYou": "Disetujui oleh {{name}} atas namamu",
-      "decidingForYou": "{{name}} sedang meninjaunya atas namamu…"
+      "undoSettings": "Membatalkan akan mengembalikan pengaturan. Berlaku hingga {{until}}."
     }
   },
   "noticePrefs": {
@@ -1418,7 +1418,7 @@
     "collapseAll": "Ciutkan semua",
     "expandAll": "Bentangkan semua",
     "organize": "Atur grup di Tim",
-    "seeAll_other": "Lihat semua {{count}} agen",
+    "more_other": "{{count}} agen lagi di Tim",
     "createFirst": "Buat agen pertama",
     "working_other": "{{count}} sedang bekerja",
     "count_other": "{{count}} agen",
@@ -7236,7 +7236,8 @@
       "deal": "sepakat",
       "thinking": "berpikir",
       "wow": "wow",
-      "dizzy": "pusing"
+      "dizzy": "pusing",
+      "wave": "hai"
     },
     "moodWords": {
       "celebrate": "pesta selamat rayakan rilis luncur hore party congrats celebrate yay",
@@ -7244,7 +7245,8 @@
       "deal": "ok oke setuju ya siap beres deal sure done",
       "thinking": "hmm bingung pikir mungkin entahlah think maybe",
       "wow": "wah kaget luar biasa astaga whoa wow omg",
-      "dizzy": "capek jumat tolong ups bingung lelah tired help oops"
+      "dizzy": "capek jumat tolong ups bingung lelah tired help oops",
+      "wave": "halo hai dadah melambai selamat pagi sampai jumpa hello bye"
     },
     "picker": {
       "button": "Emoji, GIF, dan stiker",
@@ -12197,6 +12199,8 @@
       "action_invite_people": "Undang orang",
       "action_install_skill": "Pasang skill",
       "action_update_skills": "Perbarui skill",
+      "action_approvals": "Persetujuan yang menunggumu",
+      "action_open_page": "Buka layar",
       "agent_proposal": "Mengusulkan agen baru: {{name}}",
       "settings_proposal": "Mengusulkan perubahan untuk {{names}}",
       "approval_request": "Permintaan persetujuan: {{title}}",
@@ -12223,9 +12227,7 @@
       "stuck": "Aku macet dan berhenti sebelum selesai.",
       "forum_suggestion": "Layak dibawa ke forum? \"{{title}}\"",
       "forum_concluded": "Forum \"{{title}}\" sudah selesai. Sintesisnya ada di file di bawah.",
-      "forum_concluded_issues": "Forum \"{{title}}\" sudah selesai. Sintesisnya ada di file di bawah, dengan {{count}} usulan tugas untuk disetujui.",
-      "action_approvals": "Persetujuan yang menunggumu",
-      "action_open_page": "Buka layar"
+      "forum_concluded_issues": "Forum \"{{title}}\" sudah selesai. Sintesisnya ada di file di bawah, dengan {{count}} usulan tugas untuk disetujui."
     }
   },
   "builtinTools": {

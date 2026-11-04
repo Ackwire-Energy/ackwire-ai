@@ -2419,7 +2419,7 @@ export interface VoiceDroppedEvent {
 }
 
 /** The agents' stickers, one animation per mood (`STICKER_MOODS` in `lib/media.ts`). */
-export type StickerMood = "celebrate" | "love" | "deal" | "thinking" | "wow" | "dizzy";
+export type StickerMood = "celebrate" | "love" | "deal" | "thinking" | "wow" | "dizzy" | "wave";
 
 /** The GIF picker's chips (`GIF_CATEGORY_IDS` in `lib/media.ts`); the server searches each with its own words. */
 export type GifCategory =

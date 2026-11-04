@@ -1282,6 +1282,8 @@
     "paused": "Wstrzymano: w tym tygodniu cofnięto 3 decyzje. Włącz ponownie, kiedy zechcesz.",
     "card": {
       "deciding": "{{name}} sprawdza to w imieniu: {{for}}…",
+      "approvedForYou": "Zatwierdził(a) {{name}} w twoim imieniu",
+      "decidingForYou": "{{name}} sprawdza to w twoim imieniu…",
       "approved": "Zatwierdził(a) {{name}} w imieniu: {{for}}",
       "passed": "{{name}} przekazał(a) to tobie",
       "passedWhy": "{{name}} przekazał(a) to tobie: {{reason}}",
@@ -1293,9 +1295,7 @@
       "why": "Dlaczego?",
       "undo": "Cofnij",
       "undoArchives": "Cofnięcie archiwizuje: {{name}}. Możliwe do {{until}}.",
-      "undoSettings": "Cofnięcie przywraca ustawienia. Możliwe do {{until}}.",
-      "approvedForYou": "Zatwierdził(a) {{name}} w twoim imieniu",
-      "decidingForYou": "{{name}} sprawdza to w twoim imieniu…"
+      "undoSettings": "Cofnięcie przywraca ustawienia. Możliwe do {{until}}."
     }
   },
   "noticePrefs": {
@@ -1547,10 +1547,10 @@
     "collapseAll": "Zwiń wszystkie",
     "expandAll": "Rozwiń wszystkie",
     "organize": "Uporządkuj grupy w Zespole",
-    "seeAll_one": "Zobacz {{count}} agenta",
-    "seeAll_few": "Zobacz wszystkich {{count}} agentów",
-    "seeAll_many": "Zobacz wszystkich {{count}} agentów",
-    "seeAll_other": "Zobacz wszystkich {{count}} agentów",
+    "more_one": "Jeszcze 1 agent w Zespole",
+    "more_few": "Jeszcze {{count}} agenci w Zespole",
+    "more_many": "Jeszcze {{count}} agentów w Zespole",
+    "more_other": "Jeszcze {{count}} agenta w Zespole",
     "createFirst": "Utwórz pierwszego agenta",
     "working_one": "{{count}} pracuje",
     "working_few": "{{count}} pracują",
@@ -8054,7 +8054,8 @@
       "deal": "umowa stoi",
       "thinking": "myśli",
       "wow": "wow",
-      "dizzy": "oszołomiony"
+      "dizzy": "oszołomiony",
+      "wave": "cześć"
     },
     "moodWords": {
       "celebrate": "impreza gratulacje świętujemy wypuszczone premiera hura",
@@ -8062,7 +8063,8 @@
       "deal": "ok okej zgoda tak jasne gotowe",
       "thinking": "hmm zastanawiam myślę może",
       "wow": "ojej niespodzianka niesamowite omg",
-      "dizzy": "zmęczony piątek pomocy ups zagubiony"
+      "dizzy": "zmęczony piątek pomocy ups zagubiony",
+      "wave": "cześć hej pa machać dzień dobry do zobaczenia"
     },
     "picker": {
       "button": "Emoji, GIF-y i naklejki",
@@ -13421,6 +13423,8 @@
       "action_invite_people": "Zaproś osoby",
       "action_install_skill": "Zainstaluj umiejętność",
       "action_update_skills": "Zaktualizuj umiejętności",
+      "action_approvals": "Zatwierdzenia czekające na ciebie",
+      "action_open_page": "Otwórz ekran",
       "agent_proposal": "Propozycja nowego agenta: {{name}}",
       "settings_proposal": "Zaproponował zmianę dla: {{names}}",
       "approval_request": "Prośba o zatwierdzenie: {{title}}",
@@ -13456,9 +13460,7 @@
       "stuck": "Praca utknęła i została przerwana przed zakończeniem.",
       "forum_suggestion": "Warto na forum? „{{title}}”",
       "forum_concluded": "Forum „{{title}}” zakończone. Podsumowanie jest w pliku poniżej.",
-      "forum_concluded_issues": "Forum „{{title}}” zakończone. Podsumowanie jest w pliku poniżej, razem z propozycjami zadań do zatwierdzenia: {{count}}.",
-      "action_approvals": "Zatwierdzenia czekające na ciebie",
-      "action_open_page": "Otwórz ekran"
+      "forum_concluded_issues": "Forum „{{title}}” zakończone. Podsumowanie jest w pliku poniżej, razem z propozycjami zadań do zatwierdzenia: {{count}}."
     }
   },
   "builtinTools": {
@@ -14101,8 +14103,8 @@
       "backLabel": "Notatka dla {{name}}",
       "backLabel_female": "Notatka dla {{name}}",
       "backPlaceholder": "Opcjonalnie: czy {{name}} powinien coś wiedzieć?",
-      "addNote": "Zostaw notatkę",
-      "backPlaceholder_female": "Opcjonalnie: czy {{name}} powinna coś wiedzieć?"
+      "backPlaceholder_female": "Opcjonalnie: czy {{name}} powinna coś wiedzieć?",
+      "addNote": "Zostaw notatkę"
     },
     "now": {
       "ready": "Gotowa na komputerze {{computer}}",
