@@ -3106,7 +3106,11 @@ html:not([data-pointer]) .ac-receipt__action:focus-visible {
 }
 
 /* Popover (receipts): same surface as menus */
+/* A popover with words and controls of its own (`--menu-pad: var(--space-2)`): what touches its corners (a card, a
+   field, the actions' row) sits on that room, so the menu's concentric corner holds; its words this much further in,
+   14px from the edge. */
 .ac-popover {
+  --popover-in: 6px;
   min-width: 220px;
   max-width: 320px;
   gap: var(--space-1);
@@ -3521,15 +3525,17 @@ html:not([data-pointer]) .ac-receipt__check:focus-visible {
 .ac-date__foot {
   display: flex;
   justify-content: flex-end;
-  padding-top: var(--space-1);
+  padding-top: var(--menu-pad);
   border-top: 1px solid var(--line);
 }
+/* Its room is the menu's (`.ac-menu` sets the padding and the corner from it), so the head's buttons and the corner
+   days are concentric with the box; the hairline over the foot has that room on both sides. */
 .ac-date {
+  --menu-pad: var(--space-2);
   min-width: 0;
   width: 280px;
   max-height: none;
-  padding: var(--space-2);
-  gap: var(--space-2);
+  gap: var(--menu-pad);
 }
 .ac-date__head {
   display: flex;
@@ -3565,7 +3571,8 @@ html:not([data-pointer]) .ac-receipt__check:focus-visible {
   width: 100%;
   height: 32px;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  /* The box's corner less its room and the cell's 1px. */
+  border-radius: calc(var(--radius-item) - 1px);
   background: transparent;
   font: inherit;
   font-size: 13px;
@@ -5763,11 +5770,12 @@ html:not([data-pointer]) .ac-react:focus-visible {
 .ac-composer textarea::placeholder {
   color: var(--faint);
 }
+/* One room at both ends and under it, so its first and last buttons are concentric with the card's corners. */
 .ac-composer__tools {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px 8px 10px;
+  padding: 4px var(--space-2) var(--space-2);
 }
 .ac-composer__pills {
   display: flex;
@@ -7751,9 +7759,11 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
     display: none;
   }
 }
+/* As far from the field's end as from its top and bottom, its corner the field's less that room. */
 .ac-searchfield__clear {
+  --in: calc((var(--tool-h, var(--control-h-md)) - 22px) / 2);
   position: absolute;
-  right: 6px;
+  right: var(--in);
   top: 50%;
   transform: translateY(-50%);
   display: inline-grid;
@@ -7761,7 +7771,7 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   width: 22px;
   height: 22px;
   border: 0;
-  border-radius: 6px;
+  border-radius: calc(var(--tool-r, var(--control-r-md)) - var(--in));
   background: var(--sunken);
   color: var(--ink2);
   cursor: pointer;
@@ -7901,14 +7911,16 @@ html:not([data-pointer]) .ac-filter__clear:focus-visible {
   stroke-linecap: round;
   opacity: 0.7;
 }
+/* As far from the chip's end as from its top and bottom, its corner the chip's less that room. */
 .ac-filter__clear {
+  --in: calc((var(--tool-h, var(--control-h-sm)) - 22px) / 2);
   display: inline-grid;
   place-items: center;
   width: 22px;
   height: 22px;
-  margin-right: 5px;
+  margin-right: var(--in);
   border: 0;
-  border-radius: 6px;
+  border-radius: calc(var(--tool-r, var(--control-r-sm)) - var(--in));
   background: var(--sunken);
   color: var(--ink2);
   cursor: pointer;

@@ -1884,7 +1884,6 @@
   "rightHand": {
     "label": "il tuo braccio destro",
     "newDot": "Nuovo",
-    "callWith": "chiamalo con @{{handle}}",
     "role": "Assistente del workspace",
     "actsAsYou": "agisce con i tuoi permessi",
     "composerHint": "nulla cambia senza di te",

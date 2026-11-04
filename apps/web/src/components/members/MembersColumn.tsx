@@ -4,7 +4,6 @@ import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { memberGroups } from "@agenteschat/client/lib/member-groups";
 import { agentStatusShort, isOutOfOffice } from "@agenteschat/client/lib/presence";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { Avatar, Button, Icon, matchesWords, RoleMark, SearchField } from "@agenteschat/ui";
 import { type KeyboardEvent, type TouchEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -286,11 +285,7 @@ function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string;
   const line = shown?.line ? agentStatusShort(t, shown.line, i18n.language) : null;
   const full = agentLine(t, shown?.line ?? null, i18n.language)?.text;
   const doing = state !== "idle" ? t(`channel.agentState.${state}`) : null;
-  const text =
-    line?.text ??
-    doing ??
-    (isRightHand(agent) ? t("rightHand.callWith", { handle: agent.handle }) : agent.role) ??
-    word;
+  const text = line?.text ?? doing ?? agent.role ?? word;
   const shows = useId();
   return (
     <ProfileTrigger

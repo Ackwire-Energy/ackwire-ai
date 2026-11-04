@@ -1745,7 +1745,6 @@
   "rightHand": {
     "label": "tangan kanan Anda",
     "newDot": "Baru",
-    "callWith": "panggil dengan @{{handle}}",
     "role": "Asisten workspace",
     "actsAsYou": "bertindak dengan izin Anda",
     "composerHint": "tak ada yang berubah tanpa Anda",

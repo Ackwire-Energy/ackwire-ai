@@ -10,7 +10,6 @@ import {
 import { listsAgent } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -112,16 +111,15 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
         <Card>
           {list.map((w) => {
             const mine = w.kind === "person" && w.id === meId;
-            const builtin = w.kind === "agent" && isRightHand(dir.agentById.get(w.id));
             return (
               <Row
                 key={`${w.kind}:${w.id}`}
                 leading={<Face who={{ type: w.kind, id: w.id }} size={30} live={false} presence ring={c.raised} />}
                 title={mine ? `${w.name}${t("common.youSuffix")}` : w.name}
-                subtitle={builtin ? t("rightHand.callWith", { handle: w.handle }) : lineOf(t, w, routing)}
+                subtitle={lineOf(t, w, routing)}
                 subtitleLines={w.kind === "agent" ? 2 : 1}
                 // Not on my own row: taking myself out of my own list reads as a mistake (as on the web).
-                {...(!builtin && ((editable && !mine) || w.setsReply)
+                {...((editable && !mine) || w.setsReply
                   ? {
                       onPress: () => open(w),
                       meta: <Icon name="more" size={18} color={c.faint} />,

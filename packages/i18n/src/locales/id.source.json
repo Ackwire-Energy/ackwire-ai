@@ -33423,9 +33423,6 @@
   "rightHand.newDot": {
     "value": "New"
   },
-  "rightHand.callWith": {
-    "value": "call with @{{handle}}"
-  },
   "rightHand.role": {
     "value": "Workspace assistant"
   },
