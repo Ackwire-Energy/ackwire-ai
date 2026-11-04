@@ -232,7 +232,9 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
           <h3 className="pu-title">
             {t("peopleUsage.title")}
             <InfoHint name={t("common.about", { label: t("peopleUsage.title") })}>
-              {data.plansOnly ? `${t("peopleUsage.about")} ${t("peopleUsage.plansAbout")}` : t("peopleUsage.about")}
+              {data.plansOnly
+                ? t("common.joinSentences", { a: t("peopleUsage.about"), b: t("peopleUsage.plansAbout") })
+                : t("peopleUsage.about")}
             </InfoHint>
           </h3>
           <span className="muted">
