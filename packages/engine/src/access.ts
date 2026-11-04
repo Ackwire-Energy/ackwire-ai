@@ -66,6 +66,9 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
     "offer_invites",
     "propose_settings_change",
     "propose_remove_agents",
+    "offer_approvals",
+    "propose_member_changes",
+    "offer_open_page",
   ],
   "sandbox:run": [
     "run_code",

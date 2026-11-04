@@ -44,7 +44,7 @@ import type { WikiAccess } from "../lib/wiki";
 import type { RealtimeConnection } from "../realtime/connection";
 import { setOrgDeletion } from "../realtime/machines";
 import type { ApiClient } from "./client";
-import { type AgentReactionEffect, useAgentReaction, useApi } from "./context";
+import { type AgentReactionEffect, useAgentReaction, useApi, useCardVia } from "./context";
 import { ApiError } from "./http";
 import { keys } from "./keys";
 import { keepSending, outbox } from "./outbox";
@@ -405,8 +405,9 @@ export const useMembers = (orgId: string) => {
 export function useChangeRole(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: Role }) => api.orgs.changeRole(orgId, userId, role),
+    mutationFn: ({ userId, role }: { userId: string; role: Role }) => api.orgs.changeRole(orgId, userId, role, via),
     onSettled: () => refreshRoles(qc, orgId),
   });
 }
@@ -500,9 +501,10 @@ export function useReorderRoles(orgId: string) {
 export function useSetMemberRoles(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
     mutationFn: ({ userId, roleIds }: { userId: string; roleIds: string[] }) =>
-      api.roles.setFor(orgId, userId, roleIds),
+      api.roles.setFor(orgId, userId, roleIds, via),
     onMutate: async ({ userId, roleIds }) => {
       await qc.cancelQueries({ queryKey: keys.people(orgId) });
       const before = qc.getQueryData<Person[]>(keys.people(orgId));
@@ -535,8 +537,9 @@ export const useRemovalPreview = (orgId: string, userId: string | null) => {
 export function useRemoveMember(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
-    mutationFn: (userId: string) => api.orgs.removeMember(orgId, userId),
+    mutationFn: (userId: string) => api.orgs.removeMember(orgId, userId, via),
     onMutate: async (userId) => {
       await qc.cancelQueries({ queryKey: keys.people(orgId) });
       const before = qc.getQueryData<Person[]>(keys.people(orgId));
@@ -1602,6 +1605,7 @@ function keepOwnRights(previous: Approval | undefined, approval: Approval): Appr
 export function useDecideApproval(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
     mutationFn: ({
       id,
@@ -1615,8 +1619,8 @@ export function useDecideApproval(orgId: string) {
       always?: boolean;
     }) =>
       decision === "approve"
-        ? api.approvals.approve(orgId, id, reason, always)
-        : api.approvals.refuse(orgId, id, reason),
+        ? api.approvals.approve(orgId, id, reason, always, via)
+        : api.approvals.refuse(orgId, id, reason, via),
     onSuccess: (approval, { decision, always }) => {
       playSound(decision === "approve" ? "approved" : "error");
       cacheApproval(qc, orgId, approval);
@@ -1643,9 +1647,10 @@ export function useCancelApproval(orgId: string) {
 export function useDecideApprovals(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
     mutationFn: (input: { ids: string[]; decision: "approve" | "refuse"; reason?: string }) =>
-      api.approvals.decideMany(orgId, input),
+      api.approvals.decideMany(orgId, via ? { ...input, via } : input),
     onSuccess: (result, { decision }) => {
       playSound(decision === "approve" ? "approved" : "error");
       for (const approval of result.approvals) cacheApproval(qc, orgId, approval);

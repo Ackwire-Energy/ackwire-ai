@@ -1940,6 +1940,23 @@
       "deleteSome_one": "{{count}} verwijderen",
       "deleteSome_other": "{{count}} verwijderen",
       "deleteHelp": "Hun instructies, geheugen en routines verdwijnen definitief. Hun berichten blijven."
+    },
+    "people": {
+      "title": "Personen wijzigen",
+      "gets": "Krijgt {{roles}}",
+      "loses": "Verliest {{roles}}",
+      "done": "Klaar",
+      "onlyOwners": "Alleen eigenaren wijzigen wie eigenaar is",
+      "onlyAdmins": "Alleen admins wijzigen rollen en verwijderen personen"
+    },
+    "approvals": {
+      "title": "Goedkeuringen die op jou wachten",
+      "done": "Besloten"
+    },
+    "open": {
+      "open": "Openen",
+      "web": "Openen op de website",
+      "notAllowed": "Je hebt geen toegang tot dit scherm"
     }
   },
   "routing": {
@@ -12655,7 +12672,9 @@
       "stuck": "Ik liep vast en stopte voordat ik klaar was.",
       "forum_suggestion": "Iets voor het forum? “{{title}}”",
       "forum_concluded": "Het forum “{{title}}” is afgelopen. De samenvatting staat in het bestand hieronder.",
-      "forum_concluded_issues": "Het forum “{{title}}” is afgelopen. De samenvatting staat in het bestand hieronder, met voorgestelde taken om goed te keuren ({{count}})."
+      "forum_concluded_issues": "Het forum “{{title}}” is afgelopen. De samenvatting staat in het bestand hieronder, met voorgestelde taken om goed te keuren ({{count}}).",
+      "action_approvals": "Goedkeuringen die op jou wachten",
+      "action_open_page": "Een scherm openen"
     }
   },
   "builtinTools": {

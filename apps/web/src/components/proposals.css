@@ -71,3 +71,13 @@
 .rq .proposal-row + .proposal-row {
   box-shadow: 0 -1px 0 var(--line);
 }
+
+/* The right hand's approvals card: its line, then each approval as the conversation draws it. */
+.rh-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.rh-cards > p {
+  margin: 0;
+}

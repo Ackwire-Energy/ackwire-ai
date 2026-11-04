@@ -1937,6 +1937,23 @@
       "deleteSome_one": "{{count}} ajanı sil",
       "deleteSome_other": "{{count}} ajanı sil",
       "deleteHelp": "Talimatları, hafızaları ve rutinleri kalıcı olarak silinir. Mesajları kalır."
+    },
+    "people": {
+      "title": "Kişileri değiştir",
+      "gets": "{{roles}} alır",
+      "loses": "{{roles}} kaybeder",
+      "done": "Tamam",
+      "onlyOwners": "Sahibi yalnızca sahipler değiştirir",
+      "onlyAdmins": "Rolleri yalnızca yöneticiler değiştirir ve kişileri çıkarır"
+    },
+    "approvals": {
+      "title": "Sizi bekleyen onaylar",
+      "done": "Karar verildi"
+    },
+    "open": {
+      "open": "Aç",
+      "web": "Sitede aç",
+      "notAllowed": "Bu ekrana erişiminiz yok"
     }
   },
   "routing": {
@@ -12504,7 +12521,9 @@
       "stuck": "Takıldım ve bitirmeden durdum.",
       "forum_suggestion": "Forum açmaya değer mi? \"{{title}}\"",
       "forum_concluded": "\"{{title}}\" forumu sona erdi. Sentez aşağıdaki dosyada.",
-      "forum_concluded_issues": "\"{{title}}\" forumu sona erdi. Sentez, onaylanacak {{count}} önerilen görevle birlikte aşağıdaki dosyada."
+      "forum_concluded_issues": "\"{{title}}\" forumu sona erdi. Sentez, onaylanacak {{count}} önerilen görevle birlikte aşağıdaki dosyada.",
+      "action_approvals": "Sizi bekleyen onaylar",
+      "action_open_page": "Bir ekran aç"
     }
   },
   "builtinTools": {

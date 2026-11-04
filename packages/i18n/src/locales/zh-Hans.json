@@ -1865,6 +1865,23 @@
       "archiveSome_other": "归档 {{count}} 个",
       "deleteSome_other": "删除 {{count}} 个",
       "deleteHelp": "它们的指令、记忆和例行任务会被永久删除。消息会保留。"
+    },
+    "people": {
+      "title": "更改成员",
+      "gets": "获得{{roles}}",
+      "loses": "失去{{roles}}",
+      "done": "完成",
+      "onlyOwners": "只有所有者能更改谁是所有者",
+      "onlyAdmins": "只有管理员能更改角色和移除成员"
+    },
+    "approvals": {
+      "title": "等你处理的审批",
+      "done": "已决定"
+    },
+    "open": {
+      "open": "打开",
+      "web": "在网站上打开",
+      "notAllowed": "你无权访问此页面"
     }
   },
   "routing": {
@@ -12203,7 +12220,9 @@
       "stuck": "我卡住了，在完成前停了下来。",
       "forum_suggestion": "值得开个论坛讨论吗？“{{title}}”",
       "forum_concluded": "论坛“{{title}}”已结束。总结在下方的文件中。",
-      "forum_concluded_issues": "论坛“{{title}}”已结束。总结在下方的文件中，另有 {{count}} 个建议任务待批准。"
+      "forum_concluded_issues": "论坛“{{title}}”已结束。总结在下方的文件中，另有 {{count}} 个建议任务待批准。",
+      "action_approvals": "等你处理的审批",
+      "action_open_page": "打开页面"
     }
   },
   "builtinTools": {

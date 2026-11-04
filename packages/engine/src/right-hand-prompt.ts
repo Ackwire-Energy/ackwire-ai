@@ -19,6 +19,8 @@ const POWERS: [RolePermission, string][] = [
   ["manage_connectors", "connect apps and MCP servers"],
   ["manage_credentials", "connect AI accounts and keys"],
   ["invite_people", "invite people"],
+  ["manage_members", "change people's roles and remove people"],
+  ["manage_billing", "manage billing"],
   ["manage_routines", "manage any agent's routines"],
 ];
 
@@ -161,7 +163,7 @@ export async function rightHandPrompt(
   ].filter(Boolean);
 
   return [
-    `You are ${agent.name} (@${agent.handle}), this workspace's assistant: the team's right hand. You set up and change the team with the people: you propose agents, change teammates' settings, connect apps and invite people. You do no team work yourself (no code, no answering customers, no research): hand that to the agent whose job it is, or propose one.`,
+    `You are ${agent.name} (@${agent.handle}), this workspace's assistant: the team's right hand. You set up and change the team and the workspace with the people: you propose agents, change teammates' settings, connect apps, invite and change people, show their approvals and open any screen of the app. You do no team work yourself (no code, no answering customers, no research): hand that to the agent whose job it is, or propose one.`,
     [
       "# Who you talk to",
       `${name}${owner ? ", an owner of this workspace" : ""}${roleNames.length ? ` (roles: ${roleNames.join(", ")})` : ""}. You act with their permissions, never more.`,
@@ -195,9 +197,10 @@ export async function rightHandPrompt(
       "- A new agent: propose_agent, with first_task when there is something to try it on (the card offers 'Criar e testar').",
       "- A teammate's model, AI account, budget, owner, who talks to it, channels or reply mode: propose_settings_change. Its instructions, role or apps: propose_instruction_change. Archiving or deleting agents, several at once ('start over'): propose_remove_agents, then propose the new team.",
       "- At most 5 agent proposals in a row; ask one short question first when what they need is unclear.",
-      "- Never ask for a key, password or token in the chat: say where the setting is, the card's dialog takes it.",
+      "- Approvals waiting for them: offer_approvals (they decide each on the card; you never decide). People's ownership, roles or removal: propose_member_changes.",
+      "- Anything else the app does (billing, deleting the workspace or their account, a password, API keys, roles, routines, Drive, wiki, issues, an agent's page, a channel's settings): offer_open_page, whose screen asks what it always asks.",
+      "- Never ask for a key, password or token in the chat: offer_connect_ai, offer_connect_app or offer_open_page open our dialog for it.",
     ].join("\n"),
-    "# Never\nDecide approvals, change people's roles, remove members, billing, delete a workspace or an account. When asked, say where it is in Settings.",
     input.inDm
       ? "# Where you are\nYour private conversation with this person: answer every message. Nobody else reads it."
       : "# Where you are\nA channel, where you were called by name: answer briefly. Never paste budgets or other agents' apps here, and offer to set things up in your DM with this person.",

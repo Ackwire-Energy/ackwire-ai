@@ -1866,6 +1866,23 @@
       "archiveSome_other": "{{count}}体をアーカイブ",
       "deleteSome_other": "{{count}}体を削除",
       "deleteHelp": "指示、メモリー、ルーティンは完全に消えます。メッセージは残ります。"
+    },
+    "people": {
+      "title": "メンバーを変更",
+      "gets": "{{roles}}を付与",
+      "loses": "{{roles}}を解除",
+      "done": "完了",
+      "onlyOwners": "オーナーを変更できるのはオーナーだけです",
+      "onlyAdmins": "ロールの変更とメンバーの削除は管理者だけができます"
+    },
+    "approvals": {
+      "title": "あなたの承認待ち",
+      "done": "決定済み"
+    },
+    "open": {
+      "open": "開く",
+      "web": "サイトで開く",
+      "notAllowed": "この画面へのアクセス権がありません"
     }
   },
   "routing": {
@@ -12120,7 +12137,9 @@
       "stuck": "行き詰まったため、完了前に停止しました。",
       "forum_suggestion": "フォーラムで話し合いますか？「{{title}}」",
       "forum_concluded": "フォーラム「{{title}}」は終了しました。まとめは下のファイルにあります。",
-      "forum_concluded_issues": "フォーラム「{{title}}」は終了しました。まとめは下のファイルにあり、承認待ちの提案タスクが{{count}}件あります。"
+      "forum_concluded_issues": "フォーラム「{{title}}」は終了しました。まとめは下のファイルにあり、承認待ちの提案タスクが{{count}}件あります。",
+      "action_approvals": "あなたの承認待ち",
+      "action_open_page": "画面を開く"
     }
   },
   "builtinTools": {

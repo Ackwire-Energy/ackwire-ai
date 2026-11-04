@@ -1,7 +1,10 @@
 import {
   type Message,
+  useAgents,
   useAllInvitations,
+  useApprovals,
   useCatalog,
+  useChannels,
   useConnections,
   useCustomServers,
   useMembers,
@@ -12,8 +15,10 @@ import {
   connectAppDone,
   installSkillDone,
   inviteDone,
+  memberRowDone,
   skillUpdateState,
 } from "@agenteschat/client/lib/action-cards";
+import { APP_PAGES, appPagePath } from "@agenteschat/client/lib/app-pages";
 import { connectedItems } from "@agenteschat/client/lib/connected";
 import { hostOf } from "@agenteschat/client/lib/import/shared";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -21,14 +26,18 @@ import { connectorName } from "@agenteschat/client/lib/scopes";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
+import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, Text, useTheme } from "@/ui";
+import { Button, Icon, type IconName, Text, useTheme } from "@/ui";
 import { AskDone } from "../chat/asks";
+import { openPage } from "./parts";
 
 /**
  * The web's cards to connect an app or an MCP server (`offer_connect_app`) and to invite people (`offer_invites`) in
  * place of their text: the button opens the app's own screen, filled in (Conectores at the service or at connecting by
  * address with the address typed in; Convidar pessoas with the addresses). Done from live data, one quiet line.
+ * The right hand's approvals, people and "Abrir" cards (ADR 0137 §4) open the matching screen here (an approval, the
+ * members), or the page on the website where the phone has none.
  */
 export function OfferCard({ message: m }: { message: Message }) {
   const card = actionCardOf(m.meta);
@@ -37,6 +46,9 @@ export function OfferCard({ message: m }: { message: Message }) {
   if (card.kind === "invite_people") return <Invite card={card} />;
   if (card.kind === "install_skill") return <InstallSkill card={card} />;
   if (card.kind === "update_skills") return <UpdateSkills card={card} postedAt={m.createdAt} />;
+  if (card.kind === "approvals") return <Approvals card={card} />;
+  if (card.kind === "member_changes") return <People card={card} />;
+  if (card.kind === "open_page") return <OpenScreen card={card} />;
   return null;
 }
 
@@ -140,6 +152,78 @@ function UpdateSkills({ card, postedAt }: { card: Extract<Card, { kind: "update_
   );
 }
 
+function Approvals({ card }: { card: Extract<Card, { kind: "approvals" }> }) {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const approvals = useApprovals(orgId);
+  const rows = card.approvalIds.map((id) => approvals.data?.find((a) => a.id === id));
+  const next = rows.find((a) => a?.status === "pending");
+  const titles = rows
+    .map((a) => a?.title)
+    .filter(Boolean)
+    .join(", ");
+  return (
+    <Shell
+      icon="shield"
+      title={t("rightHand.approvals.title")}
+      why={card.why}
+      detail={titles}
+      done={approvals.isSuccess && !next ? `${t("rightHand.approvals.done")}: ${titles}` : null}
+      action={next ? t("rightHand.open.open") : null}
+      onAction={() => router.push(`/approval/${next?.id ?? ""}` as never)}
+      blocked=""
+    />
+  );
+}
+
+function People({ card }: { card: Extract<Card, { kind: "member_changes" }> }) {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const members = useMembers(orgId);
+  const names = [...new Set(card.rows.map((r) => r.name))].join(", ");
+  const done = members.isSuccess && card.rows.every((r) => memberRowDone(r, members.data));
+  return (
+    <Shell
+      icon="members"
+      title={t("rightHand.people.title")}
+      why={card.why}
+      detail={names}
+      done={done ? `${t("rightHand.people.done")}: ${names}` : null}
+      action={t("rightHand.open.open")}
+      onAction={() => router.push("/me/members" as never)}
+      blocked=""
+    />
+  );
+}
+
+function OpenScreen({ card }: { card: Extract<Card, { kind: "open_page" }> }) {
+  const { t } = useTranslation();
+  const { orgId, org } = useOrg();
+  const agents = useAgents(orgId);
+  const channels = useChannels(orgId);
+  const page = APP_PAGES[card.page];
+  const title =
+    card.page === "agent"
+      ? (agents.data?.find((a) => a.id === card.agentId)?.name ?? "")
+      : card.page === "channel"
+        ? `#${channels.data?.find((c) => c.id === card.channelId)?.name ?? ""}`
+        : t(page.label as never);
+  const here = appPagePath(page.phone, card);
+  const web = appPagePath(page.web, card);
+  const allowed = !page.may || can(org, page.may);
+  return (
+    <Shell
+      icon="out"
+      title={title}
+      why={card.why}
+      done={null}
+      action={allowed && (here || web) ? t(here ? "rightHand.open.open" : "rightHand.open.web") : null}
+      onAction={() => (here ? router.push(here as never) : openPage(`${serverUrl()}/org/${orgId}${web ?? ""}`))}
+      blocked={t("rightHand.open.notAllowed")}
+    />
+  );
+}
+
 function Shell({
   icon,
   title,
@@ -150,7 +234,7 @@ function Shell({
   onAction,
   blocked,
 }: {
-  icon: "globe" | "person" | "brain";
+  icon: IconName;
   title: string;
   why: string;
   detail?: string;

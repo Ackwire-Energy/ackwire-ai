@@ -34397,5 +34397,44 @@
   },
   "rightHandApprovals.card.decidingForYou": {
     "value": "{{name}} is looking at it for you…"
+  },
+  "rightHand.people.title": {
+    "value": "Change people"
+  },
+  "rightHand.people.gets": {
+    "value": "Gets {{roles}}"
+  },
+  "rightHand.people.loses": {
+    "value": "Loses {{roles}}"
+  },
+  "rightHand.people.done": {
+    "value": "Done"
+  },
+  "rightHand.people.onlyOwners": {
+    "value": "Only owners change who is an owner"
+  },
+  "rightHand.people.onlyAdmins": {
+    "value": "Only admins change people's roles and remove people"
+  },
+  "rightHand.approvals.title": {
+    "value": "Approvals waiting for you"
+  },
+  "rightHand.approvals.done": {
+    "value": "Decided"
+  },
+  "rightHand.open.open": {
+    "value": "Open"
+  },
+  "rightHand.open.web": {
+    "value": "Open on the website"
+  },
+  "rightHand.open.notAllowed": {
+    "value": "You don't have access to this screen"
+  },
+  "chat.body.action_approvals": {
+    "value": "Approvals waiting for you"
+  },
+  "chat.body.action_open_page": {
+    "value": "Open a screen"
   }
 }

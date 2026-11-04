@@ -118,7 +118,7 @@ describe("the setup group", () => {
     expect(deferrableGroups(granted).map((g) => [g.key, g.label])).toEqual([
       [
         "setup",
-        "Workspace setup (connect an AI, an app or an MCP server, invite people, create channels, propose agents, archive or delete agents)",
+        "Workspace setup (connect an AI, an app or an MCP server, invite people, create channels, propose agents, archive or delete agents; the right hand: approvals, people, any screen)",
       ],
     ]);
     // Not loaded: behind find_tools; loaded: as they are.

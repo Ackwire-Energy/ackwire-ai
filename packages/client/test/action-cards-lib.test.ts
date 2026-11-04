@@ -10,13 +10,16 @@ import {
   installSkillDone,
   inviteDone,
   mayContinueStretch,
+  memberRowDone,
   proposalLines,
   proposalStatus,
+  rolesAfter,
   skillUpdateState,
   stretchCardOf,
   stretchCardText,
   suggestedAiText,
 } from "../src/lib/action-cards";
+import { appPagePath } from "../src/lib/app-pages";
 
 const HOUR = 3_600_000;
 const NOW = Date.parse("2026-10-30T12:00:00Z");
@@ -249,4 +252,48 @@ test("skill cards: install done once a skill has its link; each update's state f
     skillUpdateState({ checkedAt: "2026-11-03T11:00:00.000Z", pendingUpdate: { ...waiting, dismissed: true } }, posted),
   ).toBe("done");
   expect(skillUpdateState(undefined, posted)).toBe("done");
+});
+
+test("the right hand's approvals, people and Abrir cards read back; a broken one is no card (ADR 0137 §4)", () => {
+  const card = (kind: string, params: Record<string, unknown>) =>
+    actionCardOf({ actionCard: { kind, forUserId: "u1", params } });
+  expect(card("approvals", { approvalIds: ["a1", 7], why: "w" })).toEqual({
+    kind: "approvals",
+    forUserId: "u1",
+    approvalIds: ["a1"],
+    why: "w",
+  });
+  expect(card("approvals", { approvalIds: [] })).toBeNull();
+  expect(
+    card("member_changes", {
+      rows: [
+        { userId: "u2", name: "Ana", role: "owner" },
+        { userId: "u2", name: "Ana", role: "admin" },
+        { userId: "u3", name: "Caio", remove: true },
+      ],
+      why: "w",
+    }),
+  ).toEqual({
+    kind: "member_changes",
+    forUserId: "u1",
+    rows: [
+      { userId: "u2", name: "Ana", role: "owner" },
+      { userId: "u3", name: "Caio", remove: true },
+    ],
+    why: "w",
+  });
+  expect(card("open_page", { page: "billing", why: "w" })).toMatchObject({ kind: "open_page", page: "billing" });
+  expect(card("open_page", { page: "elsewhere" })).toBeNull();
+  expect(appPagePath("/agents/{agentId}", { agentId: "x" })).toBe("/agents/x");
+  expect(appPagePath("/agents/{agentId}", {})).toBeNull();
+});
+
+test("a people row is settled when it holds, or once the person is gone", () => {
+  const members = [{ userId: "u2", role: "member" as const, roleIds: ["r1"] }];
+  expect(memberRowDone({ userId: "u2", name: "Ana", role: "owner" }, members)).toBe(false);
+  expect(memberRowDone({ userId: "u2", name: "Ana", role: "member" }, members)).toBe(true);
+  expect(memberRowDone({ userId: "u2", name: "Ana", addRoleIds: ["r1"], removeRoleIds: ["r2"] }, members)).toBe(true);
+  expect(memberRowDone({ userId: "u2", name: "Ana", remove: true }, members)).toBe(false);
+  expect(memberRowDone({ userId: "u9", name: "Zé", role: "owner" }, members)).toBe(true);
+  expect(rolesAfter({ addRoleIds: ["r3"], removeRoleIds: ["r1"] }, ["r1", "r2"])).toEqual(["r2", "r3"]);
 });

@@ -1943,6 +1943,19 @@ export const ptBR = {
       deleteSome_other: "Apagar {{count}}",
       deleteHelp: "Instruções, memória e rotinas vão embora para sempre. As mensagens ficam.",
     },
+    /** The right hand's people card (`propose_member_changes`, ADR 0137 §4): a row per change. */
+    people: {
+      title: "Mudar pessoas",
+      gets: "Ganha {{roles}}",
+      loses: "Perde {{roles}}",
+      done: "Feito",
+      onlyOwners: "Só donos mudam quem é dono",
+      onlyAdmins: "Só admins mudam papéis e removem pessoas",
+    },
+    /** Its approvals card (`offer_approvals`): each decided on it, as whoever clicks. */
+    approvals: { title: "Aprovações esperando você", done: "Decididas" },
+    /** Its "Abrir" card (`offer_open_page`): one of the app's screens. */
+    open: { open: "Abrir", web: "Abrir no site", notAllowed: "Você não tem acesso a esta tela" },
   },
   routing: {
     title: "Quem escolhe os agentes",
@@ -12219,6 +12232,8 @@ export const ptBR = {
       action_invite_people: "Convidar pessoas",
       action_install_skill: "Instalar uma skill",
       action_update_skills: "Atualizar skills",
+      action_approvals: "Aprovações esperando você",
+      action_open_page: "Abrir uma tela",
       agent_proposal: "Propôs um novo agente: {{name}}",
       settings_proposal: "Propôs uma mudança para {{names}}",
       approval_request: "Pedido de aprovação: {{title}}",

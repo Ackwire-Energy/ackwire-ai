@@ -1866,6 +1866,23 @@
       "archiveSome_other": "Arsipkan {{count}}",
       "deleteSome_other": "Hapus {{count}}",
       "deleteHelp": "Instruksi, memori, dan rutinnya hilang selamanya. Pesannya tetap ada."
+    },
+    "people": {
+      "title": "Ubah orang",
+      "gets": "Mendapat {{roles}}",
+      "loses": "Kehilangan {{roles}}",
+      "done": "Selesai",
+      "onlyOwners": "Hanya pemilik yang mengubah siapa pemilik",
+      "onlyAdmins": "Hanya admin yang mengubah peran dan mengeluarkan orang"
+    },
+    "approvals": {
+      "title": "Persetujuan yang menunggumu",
+      "done": "Sudah diputuskan"
+    },
+    "open": {
+      "open": "Buka",
+      "web": "Buka di situs",
+      "notAllowed": "Kamu tidak punya akses ke layar ini"
     }
   },
   "routing": {
@@ -12186,7 +12203,9 @@
       "stuck": "Aku macet dan berhenti sebelum selesai.",
       "forum_suggestion": "Layak dibawa ke forum? \"{{title}}\"",
       "forum_concluded": "Forum \"{{title}}\" sudah selesai. Sintesisnya ada di file di bawah.",
-      "forum_concluded_issues": "Forum \"{{title}}\" sudah selesai. Sintesisnya ada di file di bawah, dengan {{count}} usulan tugas untuk disetujui."
+      "forum_concluded_issues": "Forum \"{{title}}\" sudah selesai. Sintesisnya ada di file di bawah, dengan {{count}} usulan tugas untuk disetujui.",
+      "action_approvals": "Persetujuan yang menunggumu",
+      "action_open_page": "Buka layar"
     }
   },
   "builtinTools": {

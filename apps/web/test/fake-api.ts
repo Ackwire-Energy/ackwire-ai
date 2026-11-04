@@ -1450,8 +1450,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("roles.reorder", orgId, ids);
         state.roles = roles().map((r) => (ids.includes(r.id) ? { ...r, position: ids.indexOf(r.id) } : r));
       },
-      setFor: async (orgId, userId, roleIds) => {
+      setFor: async (orgId, userId, roleIds, via) => {
         log("roles.setFor", orgId, userId, roleIds);
+        if (via) log("via", via);
         const m = state.members.find((x) => x.userId === userId);
         if (m) m.roleIds = [...roleIds];
         return { roleIds: [...roleIds] };
@@ -1656,8 +1657,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           uploads: { usedBytes24h: 0, limitBytesPerDay: null },
         },
       members: async () => state.members,
-      changeRole: async (orgId, userId, role: Role) => {
+      changeRole: async (orgId, userId, role: Role, via) => {
         log("orgs.changeRole", orgId, userId, role);
+        if (via) log("via", via);
         const m = state.members.find((x) => x.userId === userId);
         if (m) m.role = role;
       },
@@ -1671,8 +1673,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           routines: 0,
         };
       },
-      removeMember: async (orgId, userId) => {
+      removeMember: async (orgId, userId, via) => {
         log("orgs.removeMember", orgId, userId);
+        if (via) log("via", via);
         state.members = state.members.filter((m) => m.userId !== userId);
         for (const a of state.agents) if (a.ownerUserId === userId) a.ownerUserId = state.me?.user.id ?? null;
       },
@@ -2858,7 +2861,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (!a) throw new ApiError(404, "not_found", "Approval not found");
         return structuredClone(a);
       },
-      approve: async (orgId, approvalId, reason, always) => {
+      approve: async (orgId, approvalId, reason, always, via) => {
+        if (via) log("via", via);
         if (!always) return decide(orgId, approvalId, "approved", reason);
         const a = state.approvals.find((x) => x.id === approvalId);
         const kind = a?.approveAlways;
@@ -2881,7 +2885,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         }
         return decided;
       },
-      refuse: async (orgId, id, reason) => decide(orgId, id, "refused", reason),
+      refuse: async (orgId, id, reason, via) => {
+        if (via) log("via", via);
+        return decide(orgId, id, "refused", reason);
+      },
       cancel: async (orgId, approvalId) => {
         log("approvals.cancel", orgId, approvalId);
         const a = state.approvals.find((x) => x.id === approvalId);
