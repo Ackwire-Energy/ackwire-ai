@@ -44,6 +44,7 @@ import type {
   AuditPage,
   AuthConfig,
   BatchInviteResult,
+  BlockState,
   BrainMachine,
   BrowserHandoff,
   BrowserProfile,
@@ -1104,6 +1105,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ id: string }>(`${org(orgId)}/artifacts/${enc(id)}/reply`, {
           json: { text, clientId },
         }),
+      blockState: (orgId, id, version) =>
+        request<BlockState>(`${org(orgId)}/blocks/${enc(id)}/state`, { query: { version } }),
+      setBlockState: (orgId, id, version, values) =>
+        request<BlockState>(`${org(orgId)}/blocks/${enc(id)}/state`, { method: "PUT", json: { version, values } }),
+      drawBlock: (orgId, id, version, name, options) =>
+        request<BlockState>(`${org(orgId)}/blocks/${enc(id)}/draw`, { json: { version, name, options } }),
       poll: (orgId, id) => request<Poll>(`${org(orgId)}/polls/${enc(id)}`),
       vote: (orgId, id, options) =>
         request<Poll>(`${org(orgId)}/polls/${enc(id)}/vote`, { method: "PUT", json: { options } }),

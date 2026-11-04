@@ -22,6 +22,7 @@ import { readerOf, readerOfMessage } from "./agents-dm-reads";
 import type { AiStatusDeps } from "./ai-status";
 import { NO_PERSON, speakerFor } from "./audience";
 import { runAuthority, UUID } from "./authority";
+import { blockStateNotes } from "./block-state";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import { type HandOff, handOffsFrom } from "./consultations";
@@ -1058,6 +1059,7 @@ export async function buildRunContext(
     messages: toTurns(history, agent.id, names, trigger.id, {
       canAddAgents: channel.kind === "channel",
       cutOld: options.expand === true,
+      blocks: await blockStateNotes(db, run.orgId, history, zone),
     }),
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
     issueId: workIssueId ?? (typeof trigger.meta?.issueId === "string" ? trigger.meta.issueId : null),
@@ -1925,7 +1927,12 @@ export function toTurns(
   agentId: string,
   names: Map<string, string>,
   currentId?: string,
-  options: { canAddAgents?: boolean; cutOld?: boolean } = {},
+  options: {
+    canAddAgents?: boolean;
+    cutOld?: boolean;
+    /** What people left in the blocks a message showed (`blockStateNotes`), by message id. */
+    blocks?: Map<string, string>;
+  } = {},
 ): ModelMessage[] {
   const turns: { role: "user" | "assistant"; parts: { id: string; text: string }[] }[] = [];
   const cutIds = new Set<string>();
@@ -2010,10 +2017,13 @@ export function toTurns(
           .filter(Boolean)
           .join("\n")
       : "";
-    if (news) {
+    // A block's state is everyone's (ADR 0113): the agent reads it on the people's side, right after the block.
+    const block = options.blocks?.get(m.id);
+    const after = [news, block].filter(Boolean).join("\n");
+    if (after) {
       const last = turns.at(-1);
-      if (last && last.role === "user") last.parts.push({ id: `${m.id}:notes`, text: news });
-      else turns.push({ role: "user", parts: [{ id: `${m.id}:notes`, text: news }] });
+      if (last && last.role === "user") last.parts.push({ id: `${m.id}:notes`, text: after });
+      else turns.push({ role: "user", parts: [{ id: `${m.id}:notes`, text: after }] });
     }
   }
   while (turns[0]?.role === "assistant") turns.shift();

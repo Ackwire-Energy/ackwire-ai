@@ -176,6 +176,7 @@ export const keys = {
     ["org", orgId, "artifacts", "one", id, version ?? "latest"] as const,
   artifactVersions: (orgId: string, id: string) => ["org", orgId, "artifacts", "versions", id] as const,
   poll: (orgId: string, id: string) => ["org", orgId, "polls", id] as const,
+  blockState: (orgId: string, id: string, version: number) => ["org", orgId, "blocks", id, version] as const,
   choices: (orgId: string, id: string) => ["org", orgId, "choices", id] as const,
   storageMigration: (orgId: string) => ["org", orgId, "storage", "migration"] as const,
   search: (orgId: string, q: string, kinds: string) => ["org", orgId, "search", q, kinds] as const,

@@ -1141,6 +1141,8 @@ export type ChannelEvent =
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
   /** A vote came in or the poll closed (ADR 0113). */
   | { type: "poll.updated"; channelId: string; poll: Poll }
+  /** Someone changed what a live block shows, for everyone (ADR 0113): keep the newest `rev`. */
+  | { type: "block.state"; channelId: string; block: BlockState }
   /** A choice card was answered (ADR 0124). */
   | { type: "choices.updated"; channelId: string; choices: Choices }
   | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
@@ -2754,6 +2756,24 @@ export interface ChoiceQuestion {
 export interface Choices {
   id: string;
   answer: { userId: string; picks: number[]; messageId: string | null; at: string } | null;
+}
+
+/** Who set a block's value last; `drawn`: the server picked it among that many options. */
+export interface BlockChange {
+  by: string;
+  name: string;
+  at: string;
+  drawn?: number;
+}
+
+/** What a live block shows, the same for everyone in its conversation (ADR 0113). */
+export interface BlockState {
+  id: string;
+  version: number;
+  state: Record<string, unknown>;
+  changes: Record<string, BlockChange>;
+  /** Goes up on every change: the newest one wins. */
+  rev: number;
 }
 
 /** One person's mark in a poll: a row per option they chose. */

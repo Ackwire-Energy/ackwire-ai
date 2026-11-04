@@ -53,6 +53,7 @@ import type {
   AuthConfig,
   BatchInviteResult,
   BillingFrom,
+  BlockState,
   BrainKind,
   BrainMachine,
   BrowserHandoff,
@@ -1302,6 +1303,12 @@ export interface ApiClient {
     keep(orgId: string, id: string): Promise<Artifact>;
     /** Sends what a person picked in a block to the agent that made it, as their own message. */
     reply(orgId: string, id: string, text: string, clientId: string): Promise<{ id: string }>;
+    /** A block's state, the same for everyone (ADR 0113). */
+    blockState(orgId: string, id: string, version: number): Promise<BlockState>;
+    /** Sets values in a block for everyone. */
+    setBlockState(orgId: string, id: string, version: number, values: Record<string, unknown>): Promise<BlockState>;
+    /** A random pick the server makes once, for everyone. */
+    drawBlock(orgId: string, id: string, version: number, name: string, options: string[]): Promise<BlockState>;
     poll(orgId: string, id: string): Promise<Poll>;
     /** Replaces the viewer's marks in a vote; empty takes them back. */
     vote(orgId: string, id: string, options: number[]): Promise<Poll>;

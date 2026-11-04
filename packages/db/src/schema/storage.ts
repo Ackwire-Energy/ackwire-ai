@@ -7,6 +7,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -345,4 +346,31 @@ export const choiceAnswers = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.orgId)],
+);
+
+/**
+ * What the people in a conversation set in a live block (ADR 0113): one state for everyone, per version of the block,
+ * so all who look at it see the same and the agent reads it. `changes` says who last set each value and when, and
+ * whether the server drew it (`drawn`: among how many options).
+ */
+export const blockStates = pgTable(
+  "block_states",
+  {
+    artifactId: uuid()
+      .notNull()
+      .references(() => artifacts.id, { onDelete: "cascade" }),
+    version: integer().notNull(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    state: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    changes: jsonb()
+      .$type<Record<string, { by: string; at: string; drawn?: number }>>()
+      .notNull()
+      .default({}),
+    /** Goes up on every change: an app keeps the newest it heard (a reply and a socket event can cross). */
+    rev: integer().notNull().default(0),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.artifactId, t.version] }), index().on(t.orgId)],
 );
