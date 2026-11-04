@@ -45,7 +45,15 @@ export function RightHandSettingsScreen() {
  * Its AI on a plan (ADR 0137 §1): the plan's account, a tap from Connect, and "Atende outras pessoas" as for any agent
  * on its owner's plan (the plan's owner chooses, an admin may override, the plan's owner hears it by email).
  */
-function PlanRows({ agent, kind, dir }: { agent: Agent; kind: "claude_code" | "opencode"; dir: Directory }) {
+function PlanRows({
+  agent,
+  kind,
+  dir,
+}: {
+  agent: Agent;
+  kind: Exclude<NonNullable<Agent["brain"]>["kind"], "model">;
+  dir: Directory;
+}) {
   const { t } = useTranslation();
   const { orgId } = useOrg();
   const api = useApi();
@@ -60,9 +68,9 @@ function PlanRows({ agent, kind, dir }: { agent: Agent; kind: "claude_code" | "o
         <GroupedRow
           icon="bolt"
           label={
-            kind === "opencode"
-              ? `OpenCode · ${signIn?.label ?? ""}`
-              : t("rightHand.settings.onPlan", { account: signIn?.label ?? "Claude" })
+            kind === "claude_code"
+              ? t("rightHand.settings.onPlan", { account: signIn?.label ?? "Claude" })
+              : `${t(`aiAccounts.connect.${kind}`)} · ${signIn?.label ?? ""}`
           }
           value={t("rightHand.settings.change")}
           chevron
@@ -98,7 +106,7 @@ function Form({ agent }: { agent: Agent }) {
   const failed = useFailed();
   const modelLabel = useModelLabel();
   const dir = useDirectory();
-  const planKind = agent.brain?.kind === "claude_code" || agent.brain?.kind === "opencode" ? agent.brain.kind : null;
+  const planKind = agent.brain && agent.brain.kind !== "model" ? agent.brain.kind : null;
   const roles = useRoles(orgId).data?.roles ?? [];
   const update = useUpdateAgent(orgId, agent.id);
   const [budget, setBudget] = useState(agent.monthlyBudgetUsd == null ? "" : String(agent.monthlyBudgetUsd));

@@ -11854,6 +11854,7 @@
       "no_ai_plan_not_shared": "Aku tidak bisa menjawabmu lewat paket ini: paket ini hanya menjawab pemiliknya.",
       "no_ai_runner_outdated": "Aku belum bisa menjawab sekarang: program di komputer paketku perlu diperbarui.",
       "no_ai_plan_tools": "Aku berhenti sebelum menjawab: AI paketku di komputer itu menawarkan alatnya sendiri.",
+      "redacted": "[dihapus: tampak seperti data masuk atau kunci]",
       "action_connect_ai": "Hubungkan AI",
       "action_connect_app": "Hubungkan {{name}}",
       "action_add_mcp": "Tambah server MCP",

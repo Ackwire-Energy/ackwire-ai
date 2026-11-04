@@ -12161,6 +12161,7 @@
       "no_ai_plan_not_shared": "Bu planla size yanıt veremiyorum: yalnızca sahibine yanıt veriyor.",
       "no_ai_runner_outdated": "Şu an yanıt veremiyorum: planımın bilgisayarındaki programın güncellenmesi gerekiyor.",
       "no_ai_plan_tools": "Yanıt vermeden durdum: o bilgisayarda planımın yapay zekâsı kendi araçlarını sunuyor.",
+      "redacted": "[kaldırıldı: bir oturum açma bilgisi ya da anahtar gibi görünüyordu]",
       "action_connect_ai": "Yapay zeka bağla",
       "action_connect_app": "{{name}} bağla",
       "action_add_mcp": "Bir MCP sunucusu ekle",

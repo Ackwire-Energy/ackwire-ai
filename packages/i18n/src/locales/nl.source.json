@@ -29434,6 +29434,9 @@
   "chat.body.no_ai_plan_tools": {
     "value": "I stopped before answering: my plan's AI on that computer offers tools of its own."
   },
+  "chat.body.redacted": {
+    "value": "[removed: it looked like a sign-in or a key]"
+  },
   "chat.body.action_connect_ai": {
     "value": "Connect an AI"
   },

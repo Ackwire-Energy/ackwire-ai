@@ -13054,6 +13054,7 @@
       "no_ai_plan_not_shared": "Nie mogę ci odpowiedzieć przez ten plan: odpowiada tylko swojemu właścicielowi.",
       "no_ai_runner_outdated": "Nie mogę teraz odpowiedzieć: program na komputerze mojego planu wymaga aktualizacji.",
       "no_ai_plan_tools": "Zatrzymałem się przed odpowiedzią: AI mojego planu na tym komputerze oferuje własne narzędzia.",
+      "redacted": "[usunięto: wyglądało na dane logowania lub klucz]",
       "action_connect_ai": "Połącz AI",
       "action_connect_app": "Połącz {{name}}",
       "action_add_mcp": "Dodaj serwer MCP",

@@ -1292,29 +1292,6 @@ test.if(posix)(
   },
 );
 
-test.if(posix)("only Claude Code takes a chat turn", async () => {
-  const ws = tempDir("brain-ws-");
-  dirs.push(ws);
-  await expect(
-    handleRequest(
-      { workspaceReal: ws, exec: true, token: "t" },
-      {
-        op: "brain.turn",
-        agent: AGENT,
-        runId: RUN(1),
-        kind: "codex",
-        session: { id: SESSION(1), resume: false },
-        cwd: "",
-        system: "",
-        prompt: "x",
-        mcp: { token: "t" },
-        permissions: { mode: "chat" },
-      },
-      { signal: new AbortController().signal, output: () => {} },
-    ),
-  ).rejects.toThrow(/Only Claude Code/);
-});
-
 test("a conversation that moves to a checkout keeps its Claude Code session (the newest copy)", () => {
   const home = tempDir("claude-home-");
   dirs.push(home);

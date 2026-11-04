@@ -11779,6 +11779,7 @@
       "no_ai_plan_not_shared": "이 요금제로는 답할 수 없어요: 주인에게만 답해요.",
       "no_ai_runner_outdated": "지금은 답할 수 없어요: 제 요금제 컴퓨터의 프로그램을 업데이트해야 해요.",
       "no_ai_plan_tools": "답하기 전에 멈췄어요: 그 컴퓨터에서 제 요금제의 AI가 자체 도구를 제공해요.",
+      "redacted": "[삭제됨: 로그인 정보나 키로 보였습니다]",
       "action_connect_ai": "AI 연결",
       "action_connect_app": "{{name}} 연결",
       "action_add_mcp": "MCP 서버 추가",

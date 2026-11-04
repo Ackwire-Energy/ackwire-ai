@@ -5,7 +5,7 @@
 // signed in, `logout` removes `auth.json`. `login` prints a cursor.com link, then (after $FAKE_CURSOR_LOGIN_MS,
 // default 200 ms) writes `auth.json` and exits 0.
 // `-p … <prompt>` prints stream-json for one turn: init (the chat: `--resume`'s, or a new one), three text deltas
-// with a pre-tool flush, a shell call, a call to our MCP bridge, the end-of-turn flush and the result with usage.
+// with a pre-tool flush, a shell call (none with "BRIDGE_ONLY" in the prompt), a call to our MCP bridge, the end-of-turn flush and the result with usage.
 // Not signed in: "Authentication required" on stderr, exit 1. A prompt with "LIMIT": a usage limit, exit 1.
 import { appendFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -110,16 +110,19 @@ if (args[0] === "-p") {
   line(text("check.", { timestamp_ms: 2 }));
   line(text("Let me check.", { timestamp_ms: 3, model_call_id: "m1" }));
   const shell = { shellToolCall: { args: { command: "npm test" } } };
-  line({ type: "tool_call", subtype: "started", call_id: "call_1", tool_call: shell, session_id: chat });
-  line({
-    type: "tool_call",
-    subtype: "completed",
-    call_id: "call_1",
-    tool_call: {
-      shellToolCall: { args: { command: "npm test" }, result: { success: { stdout: "2 passed\n", exitCode: 0 } } },
-    },
-    session_id: chat,
-  });
+  // "BRIDGE_ONLY": a turn that calls our bridge alone.
+  if (!prompt.includes("BRIDGE_ONLY")) {
+    line({ type: "tool_call", subtype: "started", call_id: "call_1", tool_call: shell, session_id: chat });
+    line({
+      type: "tool_call",
+      subtype: "completed",
+      call_id: "call_1",
+      tool_call: {
+        shellToolCall: { args: { command: "npm test" }, result: { success: { stdout: "2 passed\n", exitCode: 0 } } },
+      },
+      session_id: chat,
+    });
+  }
   line({
     type: "tool_call",
     subtype: "completed",

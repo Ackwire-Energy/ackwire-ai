@@ -609,15 +609,3 @@ test.skipIf(!posix)(
   },
   20_000,
 );
-
-test.skipIf(!posix)("Codex and Cursor never take a chat turn", async () => {
-  const root = tempDir("brain-opencode-");
-  dirs.push(root);
-  const { ctx } = turnContext(root);
-  const scope = { signal: new AbortController().signal, output: () => {}, emit: () => {} };
-  for (const kind of ["codex", "cursor"]) {
-    await expect(handleRequest(ctx, turn({ kind, permissions: { mode: "chat" } }), scope as never)).rejects.toThrow(
-      /Only Claude Code and OpenCode/,
-    );
-  }
-});

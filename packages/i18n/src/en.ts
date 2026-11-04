@@ -11726,6 +11726,8 @@ export const en = {
       no_ai_plan_not_shared: "I can't answer you on this plan: it answers only its owner.",
       no_ai_runner_outdated: "I can't answer now: the program on my plan's computer needs an update.",
       no_ai_plan_tools: "I stopped before answering: my plan's AI on that computer offers tools of its own.",
+      /** Where the server took a sign-in or a key out of the team's right hand's reply, in place of it. */
+      redacted: "[removed: it looked like a sign-in or a key]",
       action_connect_ai: "Connect an AI",
       action_connect_app: "Connect {{name}}",
       action_add_mcp: "Add an MCP server",

@@ -51,12 +51,12 @@ test("its plan's computer away: one plain line in its DM, and Usar uma chave de 
   await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Usar uma chave de API" })));
   await settle(6);
   const dialog = screen().getByRole("dialog", { name: /Lodi/ });
-  // Only the plans whose CLI the runner checks before each turn: Claude Code's (Claude, the coding plans) and OpenCode's.
+  // Every plan, as for any agent: Codex's and Cursor's too (ADR 0137 §4, the owner's accepted risk).
   const picker = within(dialog).getByRole("group", { name: "Qual IA eles vão usar?" });
-  expect(within(picker).queryByRole("button", { name: "Claude" })).toBeTruthy();
+  for (const name of ["Claude", "ChatGPT", "Cursor"]) {
+    expect(within(picker).queryByRole("button", { name })).toBeTruthy();
+  }
   expect(within(picker).queryAllByRole("button", { name: /OpenCode/ }).length).toBeGreaterThan(0);
-  expect(within(picker).queryByRole("button", { name: "ChatGPT" })).toBeNull();
-  expect(within(picker).queryByRole("button", { name: "Cursor" })).toBeNull();
 });
 
 test("someone else's plan: the line says it answers only its owner", async () => {

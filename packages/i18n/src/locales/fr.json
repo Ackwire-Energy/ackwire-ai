@@ -12705,6 +12705,7 @@
       "no_ai_plan_not_shared": "Je ne peux pas vous répondre avec cet abonnement : il ne répond qu'à son titulaire.",
       "no_ai_runner_outdated": "Je ne peux pas répondre pour l'instant : le programme sur l'ordinateur de mon abonnement doit être mis à jour.",
       "no_ai_plan_tools": "Je me suis arrêté avant de répondre : l'IA de mon abonnement sur cet ordinateur propose ses propres outils.",
+      "redacted": "[supprimé : cela ressemblait à une connexion ou à une clé]",
       "action_connect_ai": "Connecter une IA",
       "action_connect_app": "Connecter {{name}}",
       "action_add_mcp": "Ajouter un serveur MCP",

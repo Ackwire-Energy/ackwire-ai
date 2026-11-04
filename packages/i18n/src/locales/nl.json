@@ -12312,6 +12312,7 @@
       "no_ai_plan_not_shared": "Ik kan je via dit abonnement niet antwoorden: het antwoordt alleen de eigenaar.",
       "no_ai_runner_outdated": "Ik kan nu niet antwoorden: het programma op de computer van mijn abonnement heeft een update nodig.",
       "no_ai_plan_tools": "Ik stopte voordat ik antwoordde: de AI van mijn abonnement op die computer biedt eigen tools aan.",
+      "redacted": "[verwijderd: leek op inloggegevens of een sleutel]",
       "action_connect_ai": "AI koppelen",
       "action_connect_app": "{{name}} koppelen",
       "action_add_mcp": "Een MCP-server toevoegen",

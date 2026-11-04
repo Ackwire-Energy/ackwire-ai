@@ -24,7 +24,6 @@ import {
   gateDims,
   type PlanChoice,
   type PlanGate,
-  RIGHT_HAND_PLAN_CHOICES,
   signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -206,10 +205,7 @@ function ConnectAiDialog({
       ? []
       : allAgents({
           choice: c,
-          // A plan the right hand can't think with never takes it along.
-          agents: RIGHT_HAND_PLAN_CHOICES.includes(c)
-            ? agents
-            : agents.filter((a) => !isRightHand(dir.agentById.get(a.id))),
+          agents,
           aiOf,
           machineOf,
           sharedOn: (id) =>
@@ -366,7 +362,6 @@ function ConnectAiDialog({
                 setPickedTarget(defaultTarget({ agents, hasAi, set: setOf(next) }));
             }}
             dims={(c) => (agents.length > 0 || bare) && gateDims(gateOf(c))}
-            {...(rightHand ? { choices: RIGHT_HAND_PLAN_CHOICES } : {})}
             panel={
               choice === "key" ? (
                 <KeyPanel

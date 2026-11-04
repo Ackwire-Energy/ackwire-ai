@@ -12,12 +12,12 @@ test("its plan's line: one plain line and Usar uma chave de API, which opens Con
   expect(card).toContain('openConnectAi({ from: m.id, intent: "api_key", agentId: card.agentId })');
 });
 
-test("Connect for it offers only the plans through Claude Code, and its key moves it off the plan", () => {
+test("Connect for it offers every plan the phone offers, ChatGPT's too, and its key moves it off the plan", () => {
   const sheet = source("ConnectAi.tsx");
-  expect(sheet).toContain("claudeCodeOnly={rightHand}");
+  expect(sheet).not.toContain("claudeCodeOnly");
   expect(sheet).toContain('setBrain(orgId, one.id, { brain: "model" })');
   const steps = source("ConnectAiSteps.tsx");
-  expect(steps).toContain('(claudeCodeOnly ? (["claude"] as const) : (["claude", "chatgpt"] as const))');
+  expect(steps).toContain('(["claude", "chatgpt"] as const).map(');
 });
 
 test("Settings › Lodi: the plan row opens Connect, and Atende outras pessoas is there for whoever sets its AI", () => {
@@ -29,5 +29,7 @@ test("Settings › Lodi: the plan row opens Connect, and Atende outras pessoas i
   expect(screen).toContain("<PlanReplies");
   expect(screen).toContain(".setBrain(orgId, agent.id, { onlyOwner: !on })");
   expect(screen).toContain("disabled={!view.canEdit}");
-  expect(screen).toContain('agent.brain?.kind === "claude_code" || agent.brain?.kind === "opencode"');
+  // Any plan's CLI: Claude Code's, Codex's, Cursor's or OpenCode's.
+  expect(screen).toContain('agent.brain && agent.brain.kind !== "model" ? agent.brain.kind : null');
+  expect(screen).toContain("t(`aiAccounts.connect.$" + "{kind}`)");
 });

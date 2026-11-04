@@ -12623,6 +12623,7 @@
       "no_ai_plan_not_shared": "No puedo responderte con este plan: solo responde a su dueño.",
       "no_ai_runner_outdated": "Ahora no puedo responder: el programa en la computadora de mi plan necesita una actualización.",
       "no_ai_plan_tools": "Me detuve antes de responder: la IA de mi plan en esa computadora ofrece herramientas propias.",
+      "redacted": "[eliminado: parecía un inicio de sesión o una clave]",
       "action_connect_ai": "Conectar una IA",
       "action_connect_app": "Conectar {{name}}",
       "action_add_mcp": "Agregar un servidor MCP",

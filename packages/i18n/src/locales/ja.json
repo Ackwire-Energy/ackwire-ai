@@ -11788,6 +11788,7 @@
       "no_ai_plan_not_shared": "このプランではあなたに返信できません。持ち主にだけ返信するプランです。",
       "no_ai_runner_outdated": "今は返信できません。私のプランのコンピューターのプログラムを更新する必要があります。",
       "no_ai_plan_tools": "返信する前に止まりました。そのコンピューターで私のプランのAIが独自のツールを提供しています。",
+      "redacted": "[削除済み: ログイン情報またはキーのように見えました]",
       "action_connect_ai": "AIを接続",
       "action_connect_app": "{{name}}を接続",
       "action_add_mcp": "MCPサーバーを追加",

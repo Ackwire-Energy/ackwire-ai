@@ -880,12 +880,9 @@ async function doBrainTurn(
   requireTool(ctx, cli ?? "claude");
   if (!req.agent) throw new RunnerError("bad_request", "A brain turn belongs to an agent");
   const runId = requireString(req.runId, "runId");
-  // A locked-down turn (protocol 41) runs only where the CLI says which tools it has before it can use one (Claude
-  // Code's `init`, OpenCode's `debug agent`), and gets neither the agent's secrets nor its folders.
+  // A locked-down turn (protocol 41) gets neither the agent's secrets nor its folders, and stops at the first tool
+  // that isn't our bridge's.
   const chat = req.permissions?.mode === "chat";
-  if (chat && (cli === "codex" || cli === "cursor")) {
-    throw new RunnerError("bad_request", "Only Claude Code and OpenCode take a chat turn");
-  }
   if (cli) return doCodexTurn(ctx, req, scope, runId, chat);
   if (!ctx.brains) throw new RunnerError("bad_request", "This runner runs no brain turns");
   const final = await ctx.brains.turn(req, {
@@ -1037,9 +1034,9 @@ async function doCodexTurn(
           folder,
           exec: toolOn(ctx, "cursor"),
           runnerHome: codex.runnerHome,
-          ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
+          ...(ctx.secretsDir && !chat ? { secretsDir: ctx.secretsDir } : {}),
           ...(codex.mcp ? { mcp: codex.mcp } : {}),
-          ...(ctx.grants ? { grants: ctx.grants } : {}),
+          ...(ctx.grants && !chat ? { grants: ctx.grants } : {}),
           ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
           ...(codex.spawn ? { spawn: codex.spawn } : {}),
         },
@@ -1052,9 +1049,9 @@ async function doCodexTurn(
           folder,
           exec: toolOn(ctx, "codex"),
           runnerHome: codex.runnerHome,
-          ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
+          ...(ctx.secretsDir && !chat ? { secretsDir: ctx.secretsDir } : {}),
           ...(codex.mcp ? { mcp: codex.mcp } : {}),
-          ...(ctx.grants ? { grants: ctx.grants } : {}),
+          ...(ctx.grants && !chat ? { grants: ctx.grants } : {}),
           ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
           ...(codex.app ? { app: codex.app } : {}),
           ...(codex.spawn ? { spawn: codex.spawn } : {}),

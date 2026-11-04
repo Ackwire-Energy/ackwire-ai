@@ -60,7 +60,7 @@ import {
   requireOpen,
 } from "./missions";
 import { can, getMembership, requirePermission } from "./organizations";
-import { isRightHand, RIGHT_HAND_PLAN_BRAINS, rightHandPlanRefused } from "./right-hand";
+import { isRightHand } from "./right-hand";
 import { closedRefusal } from "./standing";
 import { wakeAgentUsageWaits } from "./usage-pause";
 
@@ -366,13 +366,9 @@ async function brainAccounts(
   if (!machine) return NO_ACCOUNTS;
   const supported = machine.protocol >= ACCOUNTS_PROTOCOL;
   const accounts = await listMachineAccounts({ db }, orgId, machine.id, userId);
-  // The right hand is offered only the plans whose CLI holds it to its tools.
-  const fits = (kind: string) => !isRightHand(agent) || RIGHT_HAND_PLAN_BRAINS.has(kind as BrainKind);
   return {
     accounts: accounts.filter(
-      (a) =>
-        fits(a.kind) &&
-        ((agent.ownerUserId !== null && a.ownerId === agent.ownerUserId) || a.id === agent.brainAccountId),
+      (a) => (agent.ownerUserId !== null && a.ownerId === agent.ownerUserId) || a.id === agent.brainAccountId,
     ),
     canManageAccounts: supported && agent.ownerUserId === userId && mayAddAccounts(machine, userId),
     accountsSupported: supported,
@@ -603,10 +599,6 @@ export async function setAgentBrain(
   }
   const brain = (input.brain as BrainKind | undefined) ?? from;
   const changed = brain !== from;
-  // The right hand thinks with a key or with a plan whose CLI holds it to its tools (ADR 0137 §1).
-  if (rightHand && brain !== "model" && !RIGHT_HAND_PLAN_BRAINS.has(brain)) {
-    throw rightHandPlanRefused(BRAIN_NAMES[brain]);
-  }
   const [machine, machines] = await Promise.all([
     agentMachine(deps.db, orgId, agent.machineId),
     candidateMachines(deps.db, userId, orgId, admin, agent.machineId),

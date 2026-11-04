@@ -123,13 +123,6 @@ export const PLAN_CHOICES: readonly PlanChoice[] = ["claude", "chatgpt", "cursor
 /** The account a plan signs in as: ChatGPT's through Codex, Cursor's and OpenCode's through their CLIs; the rest through Claude Code. */
 export const kindOf = (choice: PlanChoice): MachineAccountKind =>
   choice === "chatgpt" || choice === "cursor" || choice === "zen" ? PLAN_BRAIN[choice] : PLAN_BRAIN.claude;
-/**
- * The plans the team's right hand may think with: those through Claude Code and OpenCode, the CLIs the runner locks
- * down to its tools and checks before each turn (the server's `RIGHT_HAND_PLAN_BRAINS`, packages/engine/src/right-hand.ts).
- */
-export const RIGHT_HAND_PLAN_CHOICES: readonly PlanChoice[] = PLAN_CHOICES.filter(
-  (c) => kindOf(c) === "claude_code" || kindOf(c) === "opencode",
-);
 /** The plan an account signs in with: a coding plan's key, ChatGPT's through Codex, Cursor's, else Claude's. */
 export const planOfAccount = (a: Pick<MachineAccount, "kind" | "provider">): PlanChoice =>
   isPlanId(a.provider) ? a.provider : planOfKind(a.kind);

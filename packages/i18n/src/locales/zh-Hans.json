@@ -11871,6 +11871,7 @@
       "no_ai_plan_not_shared": "我无法用这个套餐回复你：它只回复自己的所有者。",
       "no_ai_runner_outdated": "我现在无法回复：我的套餐所在电脑上的程序需要更新。",
       "no_ai_plan_tools": "我在回复前停下了：那台电脑上我的套餐的 AI 提供了它自己的工具。",
+      "redacted": "[已删除：看起来像登录信息或密钥]",
       "action_connect_ai": "连接 AI",
       "action_connect_app": "连接 {{name}}",
       "action_add_mcp": "添加 MCP 服务器",

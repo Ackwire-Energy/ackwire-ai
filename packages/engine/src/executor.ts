@@ -199,7 +199,7 @@ import {
   visibleText,
 } from "./reply-policy";
 import { routineCreatorOf, wikiPersonOf } from "./requester";
-import { isRightHand, RIGHT_HAND_AUTO, rightHandNoAiReason } from "./right-hand";
+import { isRightHand, RIGHT_HAND_AUTO, rightHandNoAiReason, scrubRightHandReply } from "./right-hand";
 import { routineBriefOf } from "./routine-brief";
 import { missStaleRoutineRun, routineRunWaitingForComputer, routineRunWaitingForPlan } from "./routine-firing";
 import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
@@ -251,7 +251,7 @@ import {
 } from "./stuck";
 import { archivedAgentsPrompt, FIND_AGENT_TOOL, renamedAgentsPrompt, teammateMeans } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
-import { carriesCredential, maskCredentials, maskCredentialsExcept } from "./tool-detail";
+import { carriesCredential, maskCredentials, maskCredentialsExcept, scrubSignIns } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
 import {
   EVERY_TOOL,
@@ -1632,7 +1632,7 @@ async function executeRunInner(
     // from it stays low trust; once it has read outside, every later post is marked too. A credential in its reply is
     // masked unless a person wrote it here.
     if (!note && !readOutside) readOutside = await runReadOutside(tx, current, undefined, outsideMemo);
-    const said =
+    const masked =
       note || !carriesCredential(body)
         ? body
         : fedByRoutine(await runAuthority(tx, current))
@@ -1640,6 +1640,8 @@ async function executeRunInner(
           : readOutside
             ? maskCredentialsExcept(body, await personWords(tx, run.orgId, run.channelId, threadId))
             : body;
+    // The right hand never posts a sign-in or a key, not even one a person wrote (ADR 0137 §4).
+    const said = !note && isRightHand(agent) ? await scrubRightHandReply(tx, run, masked) : masked;
     // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
     const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
     // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0, and one call
@@ -3541,6 +3543,7 @@ async function executeRunInner(
               void publishQueueChanged(deps.pubsub, run.orgId, admitted.machineId).catch(() => {});
           },
           quiet: run.background,
+          scrub: isRightHand(agent),
         },
       );
       // "Stop and send" (`steer: "now"`) aborts only this model call: the loop goes on and reads the
@@ -4957,6 +4960,8 @@ function createDeltaPublisher(
     onFirst?: () => void;
     /** Background work (a routine's run): nothing of its text shows live in the conversation. */
     quiet?: boolean;
+    /** The right hand's (`scrubSignIns`): a sign-in or a key never shows, its last word held until it is whole. */
+    scrub?: boolean;
   },
 ) {
   let started = false;
@@ -4977,7 +4982,8 @@ function createDeltaPublisher(
     timer = null;
     sentUpTo = all.length;
     if (first.quiet) return;
-    const visible = visibleText(all, final);
+    const said = visibleText(all, final);
+    const visible = first.scrub ? scrubSignIns(final ? said : said.slice(0, said.search(/\S*$/)), "••••").text : said;
     // A held piece turned out to be the word (now cut): nothing new to show.
     if (!visible.startsWith(shown)) return;
     let rest = visible.slice(shown.length);

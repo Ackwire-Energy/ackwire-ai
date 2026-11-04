@@ -134,7 +134,6 @@ export function ConnectAiSheet() {
         <ConnectAiFlow
           view={view}
           onView={setView}
-          claudeCodeOnly={rightHand}
           sheetTitle={one ? t("connectAi.titleFor", agentGrammar(one.name)) : t("connectAi.title.any")}
           agents={agents}
           hasAi={hasAi}

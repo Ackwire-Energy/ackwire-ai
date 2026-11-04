@@ -1,14 +1,17 @@
 import { LOCKED_BRAIN_PROTOCOL } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, isNull, type SQL, schema, sql } from "@agenteschat/db";
+import { serverText } from "@agenteschat/i18n";
+import { appLocale } from "@agenteschat/i18n/locale";
 import { AUTO_MODEL } from "@agenteschat/providers";
 import type { Agent } from "./agents";
 import type { NoAiReason } from "./ai-status";
+import { recordAudit } from "./audit";
 import type { BrainUnavailability } from "./brains/select";
-import type { BrainKind } from "./brains/types";
 import { ForbiddenError } from "./errors";
 import type { MachineStatus } from "./machine-hub";
 import { personBehindCall } from "./requester";
 import type { AgentRun } from "./runs";
+import { scrubSignIns } from "./tool-detail";
 
 const { agents, agentBudgetPeriods, machineAccounts, organizationMembers, organizations, users } = schema;
 
@@ -171,21 +174,39 @@ export const rightHandReaches = (agent: SQL, channelId: SQL) =>
     where rhc.id = ${channelId} and rhc.kind = 'channel' and rhc.archived_at is null and rhc.deleted_at is null))`;
 
 /**
- * The plans it may think with (ADR 0137 §1 and §4, amended 2026-11-04): those whose CLI the runner locks down to our
- * tools alone (`permissions.mode: "chat"`, `LOCKED_BRAIN_PROTOCOL`) and that say which tools they have before they
- * can use one, so the runner stops a turn that has any other (`tools_not_locked`). Claude Code's (a Claude plan or a
- * coding plan's key; its `init` lists them) and OpenCode's (`opencode debug agent`). Not Codex nor Cursor: neither
- * lists its tools (Codex's `debug prompt-input` leaves out those it sends apart, Cursor's `init` has no list), and
- * their own sign-in sits in the folder their own commands could read.
+ * Its reply before it is posted (ADR 0137 §4): a sign-in or a key in it (`scrubSignIns`) becomes a note in the language
+ * of the person behind the run, and the audit log says how many were taken out, never what. On a Codex or Cursor
+ * plan a command could read the plan's own sign-in before the runner kills the turn: this is the last line.
  */
-export const RIGHT_HAND_PLAN_BRAINS: ReadonlySet<BrainKind> = new Set<BrainKind>(["claude_code", "opencode"]);
+export async function scrubRightHandReply(
+  db: Executor,
+  run: Pick<AgentRun, "orgId" | "id" | "agentId" | "channelId" | "triggerMessageId">,
+  text: string,
+): Promise<string> {
+  if (scrubSignIns(text, "").found === 0) return text;
+  const personId = await personBehindCall({
+    db,
+    orgId: run.orgId,
+    runId: run.id,
+    triggerMessageId: run.triggerMessageId,
+  }).catch(() => null);
+  const [person] = personId ? await db.select({ locale: users.locale }).from(users).where(eq(users.id, personId)) : [];
+  const out = scrubSignIns(text, serverText(appLocale([person?.locale], true) ?? "en", "chat.body.redacted"));
+  await recordAudit(db, {
+    orgId: run.orgId,
+    actor: { type: "agent", id: run.agentId },
+    action: "right_hand.reply_redacted",
+    target: { type: "agent", id: run.agentId },
+    details: { found: out.found },
+    runId: run.id,
+    channelId: run.channelId,
+    onBehalfOfUserId: personId,
+  });
+  return out.text;
+}
 
 /** Its computer turns' permission profile: the runner's locked-down `chat` (`LOCKED_BRAIN_PROTOCOL`). */
 export const RIGHT_HAND_TURN = { mode: "chat" } as const;
-
-/** 403 `brain.right_hand_plan`: a plan whose CLI can't be held to its tools. */
-export const rightHandPlanRefused = (brain: string) =>
-  new ForbiddenError(`The team's right hand can't think with ${brain}`, "brain.right_hand_plan", { brain });
 
 type ThinkingAgent = Pick<Agent, "orgId" | "brainAccountId" | "machineId"> &
   Partial<Pick<Agent, "builtin" | "ownerUserId">>;

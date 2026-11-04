@@ -88,13 +88,9 @@ async function world() {
 
 const codeOf = (p: Promise<unknown>) => p.then(() => null).catch((e: { code?: string }) => e.code);
 
-test("Lodi takes a Claude plan signed in as an account, never Codex nor a computer's own sign-in, and stays on no computer", async () => {
-  const { fx, deps, machineId, caio, lodi, account } = await world();
+test("Lodi takes a Claude plan signed in as an account, never a computer's own sign-in, and stays on no computer", async () => {
+  const { fx, deps, machineId, caio, lodi } = await world();
   const id = (await lodi()).id;
-  await account("0193dddd-0000-4000-8000-0000000000a2", fx.owner.id, "codex");
-  expect(await codeOf(setAgentBrain(deps, fx.owner.id, fx.org.id, id, { brain: "codex" }))).toBe(
-    "brain.right_hand_plan",
-  );
   expect(await codeOf(setAgentBrain(deps, fx.owner.id, fx.org.id, id, { brain: "claude_code" }))).toBe(
     "brain.right_hand_account",
   );
@@ -287,28 +283,38 @@ test("Atende outras pessoas: the plan's owner chooses, an admin may override, an
   expect(JSON.stringify(mail?.payload)).not.toContain(caio.email);
 });
 
-test("an OpenCode plan qualifies like Claude's; Codex and Cursor are refused", async () => {
+test("every plan qualifies: OpenCode's, Codex's and Cursor's like Claude's, each signed in as an account", async () => {
   const { fx, deps, machineId, lodi, account } = await world();
   const id = (await lodi()).id;
-  const ZEN = "0193dddd-0000-4000-8000-0000000000a3";
-  await account(ZEN, fx.owner.id, "opencode");
-  await account("0193dddd-0000-4000-8000-0000000000a4", fx.owner.id, "cursor");
-  for (const brain of ["codex", "cursor"]) {
-    expect(await codeOf(setAgentBrain(deps, fx.owner.id, fx.org.id, id, { brain }))).toBe("brain.right_hand_plan");
-  }
-  // Offered: only the accounts whose CLI the runner checks (Claude Code's and OpenCode's).
+  const plans = {
+    opencode: "0193dddd-0000-4000-8000-0000000000a3",
+    codex: "0193dddd-0000-4000-8000-0000000000a2",
+    cursor: "0193dddd-0000-4000-8000-0000000000a4",
+  } as const;
+  for (const [kind, accountId] of Object.entries(plans)) await account(accountId, fx.owner.id, kind);
   const kinds = (await getAgentBrain(deps, fx.owner.id, fx.org.id, id)).accounts.map((a) => a.kind).sort();
-  expect(kinds).toEqual(["claude_code", "opencode"]);
+  expect(kinds).toEqual(["claude_code", "codex", "cursor", "opencode"]);
   await fx.db
     .update(schema.machines)
     .set({
       protocol: MACHINE_PROTOCOL_VERSION,
-      executors: { opencode: { version: "1.19.5" }, detectedAt: new Date().toISOString() },
+      executors: {
+        codex: { version: "codex-cli 0.165.0" },
+        cursor: { version: "2026.10.28-1a2b3c4" },
+        opencode: { version: "1.19.5" },
+        detectedAt: new Date().toISOString(),
+      },
     })
     .where(eq(schema.machines.id, machineId));
-  const view = await setAgentBrain(deps, fx.owner.id, fx.org.id, id, { brain: "opencode", account: ZEN });
-  expect(view).toMatchObject({ brain: "opencode", account: ZEN, computer: { machineId } });
-  expect(await lodi()).toMatchObject({ brain: "opencode", brainAccountId: ZEN, machineId: null });
+  // Never a computer's own sign-in.
+  expect(await codeOf(setAgentBrain(deps, fx.owner.id, fx.org.id, id, { brain: "codex" }))).toBe(
+    "brain.right_hand_account",
+  );
+  for (const [kind, accountId] of Object.entries(plans)) {
+    const view = await setAgentBrain(deps, fx.owner.id, fx.org.id, id, { brain: kind, account: accountId });
+    expect(view).toMatchObject({ brain: kind, account: accountId, computer: { machineId } });
+    expect(await lodi()).toMatchObject({ brain: kind, brainAccountId: accountId, machineId: null });
+  }
 });
 
 test("its DM's line: a runner to update and a CLI with tools of its own each say so, never that it has no AI", () => {

@@ -12707,6 +12707,7 @@
       "no_ai_plan_not_shared": "Non posso risponderti con questo piano: risponde solo al suo titolare.",
       "no_ai_runner_outdated": "Ora non posso rispondere: il programma sul computer del mio piano va aggiornato.",
       "no_ai_plan_tools": "Mi sono fermato prima di rispondere: l'IA del mio piano su quel computer offre strumenti propri.",
+      "redacted": "[rimosso: sembrava un accesso o una chiave]",
       "action_connect_ai": "Collega un'IA",
       "action_connect_app": "Collega {{name}}",
       "action_add_mcp": "Aggiungi un server MCP",

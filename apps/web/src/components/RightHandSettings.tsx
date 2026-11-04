@@ -62,7 +62,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
   const connect = useConnectAi();
   const dir = useDirectory(org.id);
   // On a plan (ADR 0137 §1): whose, and whether other people's DMs think with it.
-  const planKind = agent.brain?.kind === "claude_code" || agent.brain?.kind === "opencode" ? agent.brain.kind : null;
+  const planKind = agent.brain && agent.brain.kind !== "model" ? agent.brain.kind : null;
   const onPlan = planKind !== null;
   const view = useAgentBrain(org.id, agent.id, onPlan).data;
   const signIn = view?.accounts.find((a) => a.id === view.account);
@@ -123,9 +123,9 @@ function RightHandForm({ agent }: { agent: Agent }) {
               onPlan ? (
                 <span className="rh-set__plan">
                   <span>
-                    {planKind === "opencode"
-                      ? `OpenCode · ${planAccount ?? ""}`
-                      : t("rightHand.settings.onPlan", { account: planAccount ?? "Claude" })}
+                    {planKind === "claude_code"
+                      ? t("rightHand.settings.onPlan", { account: planAccount ?? "Claude" })
+                      : `${t(`aiAccounts.connect.${planKind}`)} · ${planAccount ?? ""}`}
                   </span>
                   <Button size="sm" onClick={() => connect?.open({ agentId: agent.id })}>
                     {t("rightHand.settings.change")}

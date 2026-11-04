@@ -11936,6 +11936,7 @@ export const ptBR = {
       no_ai_runner_outdated:
         "Agora não consigo responder: o programa no computador do meu plano precisa ser atualizado.",
       no_ai_plan_tools: "Parei antes de responder: a IA do meu plano naquele computador oferece ferramentas próprias.",
+      redacted: "[removido: parecia um login ou uma chave]",
       action_connect_ai: "Conectar uma IA",
       action_connect_app: "Conectar {{name}}",
       action_add_mcp: "Adicionar um servidor MCP",

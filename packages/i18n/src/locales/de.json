@@ -12229,6 +12229,7 @@
       "no_ai_plan_not_shared": "Über dieses Abo kann ich dir nicht antworten: Es antwortet nur der Person, der es gehört.",
       "no_ai_runner_outdated": "Ich kann gerade nicht antworten: Das Programm auf dem Computer meines Abos braucht ein Update.",
       "no_ai_plan_tools": "Ich habe vor der Antwort gestoppt: Die KI meines Abos bietet auf diesem Computer eigene Werkzeuge an.",
+      "redacted": "[entfernt: sah aus wie eine Anmeldung oder ein Schlüssel]",
       "action_connect_ai": "KI verbinden",
       "action_connect_app": "{{name}} verbinden",
       "action_add_mcp": "Einen MCP-Server hinzufügen",

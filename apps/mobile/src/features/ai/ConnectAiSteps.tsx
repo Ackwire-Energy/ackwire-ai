@@ -163,8 +163,6 @@ const CODING_MARKS = ["zai", "kimi", "minimax", "opencode"] as const;
 export interface ConnectAiFlowProps {
   view: FlowView;
   onView: (view: FlowView) => void;
-  /** The team's right hand: no ChatGPT (`RIGHT_HAND_PLAN_CHOICES`; the phone offers OpenCode to nobody). */
-  claudeCodeOnly?: boolean;
   /** The person's agents a plan may think for, in the order offered. */
   agents: { id: string; name: string }[];
   /** Whether an agent already thinks with something (a plan starts on the first one without). */
@@ -341,7 +339,6 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
           }}
           dims={dims}
           have={have}
-          claudeCodeOnly={props.claudeCodeOnly === true}
           haveFor={startAgentId || theirs ? undefined : forAgent?.name}
           busy={busy}
           onHave={pickHave}
@@ -378,10 +375,8 @@ function Home({
   haveFor,
   busy,
   onHave,
-  claudeCodeOnly,
 }: {
   onView: (v: FlowView) => void;
-  claudeCodeOnly: boolean;
   dims: (choice: PlanChoice) => boolean;
   have: ReturnType<typeof existingRows>;
   /** The agent they are for, where the sheet's title doesn't say it. */
@@ -414,7 +409,7 @@ function Home({
       ) : null}
       <GroupedHeader>{t("mobile.ai.yourPlan")}</GroupedHeader>
       <GroupedList>
-        {(claudeCodeOnly ? (["claude"] as const) : (["claude", "chatgpt"] as const)).map((c) => (
+        {(["claude", "chatgpt"] as const).map((c) => (
           <GroupedRow
             key={c}
             leading={<ProviderLogo id={planMark(c)} size="sm" off={dims(c)} />}
