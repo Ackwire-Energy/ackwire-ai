@@ -255,3 +255,45 @@ test("a socket that fails or closes settles the attach and keeps what was counte
   expect(broken.take()).toEqual({ up: 0, down: 0 });
   broken.close();
 });
+
+test("the GET guard (ADR 0135): only while armed, every session's requests pause; one carrying the value fails", async () => {
+  const { c, cdp } = counter();
+  cdp.onopen?.();
+  cdp.reply(1);
+  await c.attached;
+  cdp.attach("page-1");
+  const sent = (method: string) => cdp.sent.filter((m) => m.method === method);
+  // Not armed: nothing pauses.
+  expect(sent("Fetch.enable")).toEqual([]);
+  let blocked = 0;
+  c.guard(["hunter2-guarded value"], 60, () => {
+    blocked++;
+  });
+  expect(sent("Fetch.enable").map((m) => m.sessionId)).toEqual(["page-1"]);
+  // A frame that opens meanwhile is guarded too.
+  cdp.event("Target.attachedToTarget", { sessionId: "frame-1", targetInfo: { type: "iframe" } }, "page-1");
+  expect(sent("Fetch.enable").map((m) => m.sessionId)).toEqual(["page-1", "frame-1"]);
+  const pause = (requestId: string, url: string, sessionId = "page-1") =>
+    cdp.event("Fetch.requestPaused", { requestId, request: { url } }, sessionId);
+  pause("a", `https://shop.example/?${new URLSearchParams({ pw: "hunter2-guarded value" })}`);
+  pause("b", `https://evil.example/c?d=${encodeURIComponent("hunter2-guarded value")}`, "frame-1");
+  pause("c", "https://shop.example/app.js");
+  expect(sent("Fetch.failRequest")).toEqual([
+    expect.objectContaining({ sessionId: "page-1", params: { requestId: "a", errorReason: "BlockedByClient" } }),
+    expect.objectContaining({ sessionId: "frame-1", params: { requestId: "b", errorReason: "BlockedByClient" } }),
+  ]);
+  expect(sent("Fetch.continueRequest")).toEqual([
+    expect.objectContaining({ sessionId: "page-1", params: { requestId: "c" } }),
+  ]);
+  expect(blocked).toBe(2);
+  // Its time over: every session lets go, and a request paused just then still goes on.
+  await Bun.sleep(100);
+  expect(sent("Fetch.disable").map((m) => m.sessionId)).toEqual(["page-1", "frame-1"]);
+  pause("d", `https://shop.example/?pw=${encodeURIComponent("hunter2-guarded value")}`);
+  expect(sent("Fetch.continueRequest").map((m) => (m.params as { requestId: string }).requestId)).toEqual(["c", "d"]);
+  expect(blocked).toBe(2);
+  // A value too short to tell apart from ordinary addresses arms nothing.
+  c.guard(["123"], 60, () => {});
+  expect(sent("Fetch.enable")).toHaveLength(2);
+  c.close();
+});

@@ -14,7 +14,8 @@
     "./redact": "./src/redact.ts",
     "./error-scrub": "./src/error-scrub.ts",
     "./host-stats": "./src/host-stats.ts",
-    "./browser-start": "./src/browser-start.ts"
+    "./browser-start": "./src/browser-start.ts",
+    "./vault/site": "./src/vault/site.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

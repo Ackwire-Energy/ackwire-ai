@@ -12,12 +12,16 @@ import { originOf } from "./browser";
 import { errnoCode, RunnerError } from "./errors";
 import { touchesGitInternals } from "./git-guard";
 import { agentFolderName, normalizeRequestPath, resolveInWorkspace } from "./paths";
+import { runnerVault } from "./vault";
 
 /**
  * Each agent's secrets on this machine (ADR 0027), outside the workspace so
  * the file tools never reach them: `<runner home>/secrets/<agent id8>/`
  * (mode 700), with `keys/<requestId>` (the private key of a pending request)
- * and `store.json` (delivered values), both mode 600.
+ * and `store.json` (delivered values), both mode 600. A site's password or
+ * code (target `site`) never goes in `store.json`: this process keeps it in
+ * memory for its browser for 15 minutes after activation (ADR 0135,
+ * `vault.ts`), and one an older runner left there is removed.
  */
 interface Stored {
   name: string;
@@ -67,7 +71,7 @@ async function ensureDir(dir: string) {
   await chmod(dir, 0o700).catch(() => undefined);
 }
 
-async function readStore(dir: string): Promise<Stored[]> {
+async function readRawStore(dir: string): Promise<Stored[]> {
   try {
     const raw = JSON.parse(await readFile(path.join(dir, "store.json"), "utf8")) as { secrets?: Stored[] };
     return Array.isArray(raw.secrets) ? raw.secrets : [];
@@ -75,6 +79,45 @@ async function readStore(dir: string): Promise<Stored[]> {
     if (errnoCode(err) === "ENOENT") return [];
     throw err;
   }
+}
+
+const isSite = (s: Stored | undefined) => s?.target?.kind === "site";
+
+/** The kept values: never a site's, even one an older runner wrote there before `purgeSitesLocked` removed it. */
+async function readStore(dir: string): Promise<Stored[]> {
+  return (await readRawStore(dir)).filter((s) => !isSite(s));
+}
+
+/** Folders whose `store.json` this process already rid of site secrets. */
+const purged = new Set<string>();
+
+/** ADR 0135: `store.json` rewritten without any `site` entry, once per folder per process (under its queue). */
+async function purgeSitesLocked(dir: string) {
+  if (purged.has(dir)) return;
+  purged.add(dir);
+  const all = await readRawStore(dir).catch(() => null);
+  if (!all?.some(isSite)) return;
+  await writeStore(
+    dir,
+    all.filter((s) => !isSite(s)),
+  );
+}
+
+/** From a reader (not under the queue): the rewrite waits its turn. */
+function purgeSoon(dir: string) {
+  if (purged.has(dir)) return;
+  void withQueue(dir, () => purgeSitesLocked(dir)).catch(() => {
+    purged.delete(dir);
+  });
+}
+
+/**
+ * At start: every agent's `store.json` under `root` loses the site passwords an older runner kept there (ADR 0135).
+ * Readers skip them meanwhile.
+ */
+export async function dropStoredSiteSecrets(root: string): Promise<void> {
+  const names = await readdir(root).catch(() => [] as string[]);
+  for (const name of names) purgeSoon(path.join(root, name));
 }
 
 /** Written whole, then renamed: a crash never leaves half a file. */
@@ -166,6 +209,23 @@ function checkAad(aad: string, requestId: string, name: string, target: Stored["
 
 const secretQueues = new Map<string, Promise<void>>();
 
+/** One agent folder's mutations, one after another. */
+async function withQueue<T>(dir: string, fn: () => Promise<T>): Promise<T> {
+  const previous = secretQueues.get(dir) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  secretQueues.set(dir, current);
+  await previous;
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (secretQueues.get(dir) === current) secretQueues.delete(dir);
+  }
+}
+
 /** Serialize an agent's secret mutations, including activation against removal. */
 export async function handleSecret(
   root: string,
@@ -176,19 +236,10 @@ export async function handleSecret(
 ): Promise<MachineReplies["secret"]> {
   if (!agent) throw new RunnerError("bad_request", "Secrets belong to an agent");
   const dir = dirOf(root, agent);
-  const previous = secretQueues.get(dir) ?? Promise.resolve();
-  let release!: () => void;
-  const current = new Promise<void>((resolve) => {
-    release = resolve;
+  return withQueue(dir, async () => {
+    await purgeSitesLocked(dir);
+    return handleSecretLocked(dir, workspaceReal, req, options);
   });
-  secretQueues.set(dir, current);
-  await previous;
-  try {
-    return await handleSecretLocked(dir, workspaceReal, req, options);
-  } finally {
-    release();
-    if (secretQueues.get(dir) === current) secretQueues.delete(dir);
-  }
 }
 
 async function handleSecretLocked(
@@ -273,7 +324,15 @@ async function handleSecretLocked(
         delivery = JSON.parse(await readFile(staged, "utf8")) as Staged;
       } catch (err) {
         if (errnoCode(err) !== "ENOENT") throw err;
-        // An activation reply can be lost after the store was written.
+        // An activation reply can be lost after the store (or, for a site, this process's memory) was written.
+        const held = runnerVault.siteByRequest(dir, req.requestId);
+        if (held) {
+          if ((await latestOrder(dir, held.name, undefined)) > req.order) {
+            await cancelStaged(dir, req.requestId);
+            return { superseded: true };
+          }
+          return { size: held.size };
+        }
         const secrets = await readStore(dir);
         const own = secrets.find((s) => s.requestId === req.requestId);
         const current = own ? secrets.filter((s) => s.name === own.name).at(-1) : null;
@@ -335,6 +394,14 @@ async function handleSecretLocked(
           (s.requestId !== undefined && req.requestIds.includes(s.requestId)) ||
           (req.throughOrder !== undefined && (s.order ?? "") <= req.throughOrder));
       const gone = secrets.filter(selected);
+      runnerVault.dropSites(
+        dir,
+        (s) =>
+          s.name === req.name &&
+          (!req.requestIds ||
+            req.requestIds.includes(s.requestId) ||
+            (req.throughOrder !== undefined && s.order <= req.throughOrder)),
+      );
       const otherPaths = new Set(
         secrets.flatMap((s) => (!selected(s) && s.target.kind === "file" ? [s.target.path] : [])),
       );
@@ -399,18 +466,33 @@ async function installLocked(
   await writeOrder(dir, req.name, req.order);
   const before = await readStore(dir);
   const next = before.filter((s) => s.name !== req.name);
-  next.push({
-    name: req.name,
-    target,
-    value: req.value,
-    deliveredAt: new Date().toISOString(),
-    requestId: req.requestId,
-    order: req.order,
-  });
+  if (target.kind === "site") {
+    // ADR 0135: only in this process's memory, for its browser, for 15 minutes; never in `store.json`.
+    runnerVault.putSite(dir, {
+      name: req.name,
+      site: target.site,
+      value: req.value,
+      requestId: req.requestId,
+      order: req.order,
+    });
+  } else {
+    runnerVault.dropSites(dir, (s) => s.name === req.name);
+    next.push({
+      name: req.name,
+      target,
+      value: req.value,
+      deliveredAt: new Date().toISOString(),
+      requestId: req.requestId,
+      order: req.order,
+    });
+  }
   const livePaths = new Set(next.flatMap((s) => (s.target.kind === "file" ? [s.target.path] : [])));
   const oldFiles = before.filter((s) => s.name === req.name && s.target.kind === "file");
   const filesToRemove = oldFiles.filter((s) => s.target.kind === "file" && !livePaths.has(s.target.path));
-  await writeStore(dir, [...oldFiles, ...next]);
+  // A site's own entry never goes in; one it replaces (an env or file secret of that name) goes out.
+  if (target.kind !== "site" || before.some((s) => s.name === req.name)) {
+    await writeStore(dir, [...oldFiles, ...next]);
+  }
   if (!options.storageOnly && fileTarget) {
     await mkdir(path.dirname(fileTarget), { recursive: true });
     await writeFile(fileTarget, req.value, { mode: 0o600 });
@@ -438,35 +520,66 @@ export async function activatedSecret(
   agent: AgentScope,
   requestId: string,
 ): Promise<ActivatedSecret | null> {
-  const secrets = await readStore(dirOf(root, agent));
+  const dir = dirOf(root, agent);
+  const secrets = await readStore(dir);
   const stored = secrets.find((s) => s.requestId === requestId);
-  if (!stored?.order) return null;
+  if (stored?.order) {
+    return {
+      action: "install",
+      requestId,
+      name: stored.name,
+      target: stored.target,
+      value: stored.value,
+      order: stored.order,
+    };
+  }
+  const site = runnerVault.siteByRequest(dir, requestId);
+  if (!site?.value) return null;
   return {
     action: "install",
     requestId,
-    name: stored.name,
-    target: stored.target,
-    value: stored.value,
-    order: stored.order,
+    name: site.name,
+    target: { kind: "site", site: site.site },
+    value: site.value,
+    order: site.order,
   };
+}
+
+/** Root handed a site's password to the agent's worker (ADR 0135): from here, only the worker's memory has it. */
+export function handOffSiteSecret(root: string, agent: AgentScope, requestId: string) {
+  runnerVault.handOff(dirOf(root, agent), requestId);
+}
+
+/** Whether root already handed this request's site password on (a lost activation reply asked again). */
+export function handedSiteSecret(root: string, agent: AgentScope, requestId: string): boolean {
+  const held = runnerVault.siteByRequest(dirOf(root, agent), requestId);
+  return held !== null && held.value === null;
 }
 
 /**
  * What commands of this agent get: env values (never a site's password: that one only its browser types), and a
- * redactor for everything that leaves the machine (every value, a site's password too).
+ * redactor for everything that leaves the machine: every value kept, a site's password in memory, and every Vault
+ * value opened here in the last 10 minutes (ADR 0135).
  */
 export async function agentSecrets(root: string | undefined, agent: AgentScope | undefined) {
-  if (!root || !agent) return null;
-  const secrets = await readStore(dirOf(root, agent)).catch(() => []);
-  if (secrets.length === 0) return null;
+  if (!agent) return null;
+  const dir = root ? dirOf(root, agent) : null;
+  if (dir) purgeSoon(dir);
+  const secrets = dir ? await readStore(dir).catch(() => [] as Stored[]) : [];
+  const values: { name: string; value: string }[] = [
+    ...secrets.map((s) => ({ name: s.name, value: s.value })),
+    ...(dir ? runnerVault.sitesOf(dir) : []).flatMap((s) => (s.value ? [{ name: s.name, value: s.value }] : [])),
+    ...runnerVault.armedOf(String(agent.id ?? "")),
+  ];
+  if (values.length === 0) return null;
   const env: Record<string, string> = {};
   // One kept before its name was reserved still never reaches the env.
   for (const s of secrets) if (s.target.kind === "env" && !isReservedSecretName(s.name)) env[s.name] = s.value;
   return {
     env,
     files: secrets.flatMap((s) => (s.target.kind === "file" ? [s.target.path] : [])),
-    hold: Math.max(0, ...secrets.map((s) => s.value.length - 1)),
-    redact: (text: string) => redactSecrets(text, secrets),
+    hold: Math.max(0, ...values.map((s) => s.value.length - 1)),
+    redact: (text: string) => redactSecrets(text, values),
   };
 }
 
@@ -480,7 +593,12 @@ export async function secretValue(
   name: string,
 ): Promise<{ value: string; site: string | null } | null> {
   if (!root) return null;
-  const secrets = await readStore(dirOf(root, agent)).catch(() => [] as Stored[]);
+  const dir = dirOf(root, agent);
+  purgeSoon(dir);
+  // A site's password: in memory only (ADR 0135).
+  const site = runnerVault.site(dir, name);
+  if (site?.value) return { value: site.value, site: site.site };
+  const secrets = await readStore(dir).catch(() => [] as Stored[]);
   const held = secrets.filter((s) => s.name === name).at(-1);
-  return held ? { value: held.value, site: held.target.kind === "site" ? held.target.site : null } : null;
+  return held ? { value: held.value, site: null } : null;
 }

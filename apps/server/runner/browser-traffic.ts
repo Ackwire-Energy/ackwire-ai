@@ -1,5 +1,6 @@
 import { isObject } from "@agenteschat/adapters/machine-protocol";
 import type { StreamSocket } from "./browser";
+import { urlCarries } from "./vault";
 
 /**
  * What one agent's Chrome sends and receives (protocol 23), from its own
@@ -24,6 +25,12 @@ import type { StreamSocket } from "./browser";
  * on its session: Chrome's sad tab) and opens it again or shows another page
  * there (`onCrash`), and asks Chrome to quit (`quit`), so each Chrome has one
  * socket of ours.
+ *
+ * It also guards a password just typed (ADR 0135, `guard`): for a while, every
+ * request of that Chrome pauses (`Fetch.enable` on each of its sessions, new
+ * ones too) and one whose address carries the password fails
+ * (`Fetch.failRequest`) instead of leaving; the rest go on at once. Only while
+ * armed: nothing is paused otherwise.
  */
 
 const AUTO_ATTACH = {
@@ -43,6 +50,8 @@ const AUTO_ATTACH_RELATED = {
 };
 /** Bodies never cross the socket, and Chrome buffers none of them for this client. */
 const NETWORK = { maxPostDataSize: 1, maxResourceBufferSize: 1, maxTotalBufferSize: 1 };
+/** The GET guard pauses every request before it is sent (its address is all it reads). */
+const FETCH = { patterns: [{ urlPattern: "*", requestStage: "Request" }] };
 
 export interface TrafficCounter {
   /** Settles once Chrome answered the first auto-attach, or the socket failed. */
@@ -51,6 +60,11 @@ export interface TrafficCounter {
   take(): { up: number; down: number };
   /** Asks Chrome to quit as a person quits it (`Browser.close`): it writes what it holds to its profile first. */
   quit(): void;
+  /**
+   * For `ms` from now (longer when armed again), fails every request whose address carries one of `values` (raw or
+   * encoded) and calls `onBlocked` for each (ADR 0135).
+   */
+  guard(values: string[], ms: number, onBlocked: () => void): void;
   close(): void;
 }
 
@@ -112,6 +126,9 @@ export function countChromeTraffic(
     settle = resolve;
   });
   let socket: StreamSocket | null = null;
+  /** The GET guard while armed: the values, until when, and who hears of a blocked request. */
+  let guarded: { values: string[]; until: number; onBlocked: () => void } | null = null;
+  let guardTimer: ReturnType<typeof setTimeout> | undefined;
   const send = (method: string, params: Params, sessionId?: string, then?: (result: Params) => void) => {
     const id = nextId++;
     if (then) answers.set(id, then);
@@ -135,6 +152,13 @@ export function countChromeTraffic(
     show: (url) => send("Page.navigate", { url }, sessionId),
   });
   let first = 0;
+  const targets = () => [...sessions.keys()].filter((id) => id !== "");
+  const disarm = () => {
+    if (!guarded) return;
+    guarded = null;
+    clearTimeout(guardTimer);
+    for (const id of targets()) send("Fetch.disable", {}, id);
+  };
   const entry = (sessionId: string, requestId: unknown) => {
     const requests = sessions.get(sessionId);
     if (!requests || typeof requestId !== "string") return null;
@@ -177,7 +201,26 @@ export function countChromeTraffic(
           pages.set(p.sessionId, target.targetId);
         }
         send("Network.enable", NETWORK, p.sessionId);
+        // A page or frame that opens while a password is guarded is guarded too.
+        if (guarded) send("Fetch.enable", FETCH, p.sessionId);
         send("Target.setAutoAttach", AUTO_ATTACH_RELATED, p.sessionId);
+        return;
+      }
+      case "Fetch.requestPaused": {
+        if (typeof p.requestId !== "string") return;
+        const url = isObject(p.request) && typeof p.request.url === "string" ? p.request.url : "";
+        const g = guarded && guarded.until > Date.now() ? guarded : null;
+        if (g?.values.some((v) => urlCarries(url, v))) {
+          send("Fetch.failRequest", { requestId: p.requestId, errorReason: "BlockedByClient" }, sessionId);
+          try {
+            g.onBlocked();
+          } catch {
+            // the request is stopped either way
+          }
+          return;
+        }
+        // Every paused request goes on, also one paused just before the guard ended.
+        send("Fetch.continueRequest", { requestId: p.requestId }, sessionId);
         return;
       }
       case "Target.detachedFromTarget":
@@ -232,6 +275,8 @@ export function countChromeTraffic(
     socket.onerror = () => settle();
     socket.onclose = () => {
       settle();
+      guarded = null;
+      clearTimeout(guardTimer);
       sessions.clear();
       pages.clear();
       answers.clear();
@@ -250,6 +295,20 @@ export function countChromeTraffic(
     },
     quit() {
       send("Browser.close", {});
+    },
+    guard(values, ms, onBlocked) {
+      const kept = values.filter((v) => v.length >= 4);
+      if (kept.length === 0 || ms <= 0) return;
+      const was = guarded;
+      guarded = {
+        values: [...new Set([...(was?.values ?? []), ...kept])],
+        until: Math.max(was?.until ?? 0, Date.now() + ms),
+        onBlocked,
+      };
+      if (!was) for (const id of targets()) send("Fetch.enable", FETCH, id);
+      clearTimeout(guardTimer);
+      guardTimer = setTimeout(disarm, Math.max(0, guarded.until - Date.now()));
+      (guardTimer as { unref?: () => void }).unref?.();
     },
     close() {
       try {

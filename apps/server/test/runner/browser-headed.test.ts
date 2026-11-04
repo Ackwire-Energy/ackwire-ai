@@ -193,6 +193,14 @@ test("headless as before: its own window size, none of the headed flags", () => 
   expect(args.at(-1)).toBe("about:blank");
 });
 
+/** Chrome's password manager, its sign-in with saved passwords, its leak check and its autofill: off (ADR 0135). */
+const NO_SAVED_LOGINS = {
+  credentials_enable_service: false,
+  credentials_enable_autosignin: false,
+  profile: { password_manager_enabled: false, password_manager_leak_detection: false },
+  autofill: { profile_enabled: false, credit_card_enabled: false },
+};
+
 test("the profile: Chrome's own frame, whenever its window manager came up, no sign-in to Chrome itself and no footer under the start page; its other settings stay", () => {
   const profile = tempDir("profile-");
   dirs.push(profile);
@@ -202,6 +210,7 @@ test("the profile: Chrome's own frame, whenever its window manager came up, no s
     browser: { custom_chrome_frame: true },
     signin: { allowed_on_next_startup: false },
     NewTabPage: { FooterVisible: false },
+    ...NO_SAVED_LOGINS,
   });
   // A profile Chrome already ran with its sign-in allowed: Chrome sets `signin.allowed` from the next-startup switch
   // as it starts.
@@ -220,7 +229,28 @@ test("the profile: Chrome's own frame, whenever its window manager came up, no s
     signin: { allowed: true, allowed_on_next_startup: false },
     NewTabPage: { FooterVisible: false, PrevNavigationTime: "1" },
     intl: { a: 1 },
+    ...NO_SAVED_LOGINS,
   });
+  // A profile whose password manager was on (Chrome's default) has it off, its other settings kept.
+  writeFileSync(
+    prefs,
+    JSON.stringify({
+      credentials_enable_service: true,
+      profile: { password_manager_enabled: true, name: "Person 1", exit_type: "Normal" },
+      autofill: { profile_enabled: true, last_version_deduped: 150 },
+    }),
+  );
+  prepareProfile(profile);
+  const saved = JSON.parse(readFileSync(prefs, "utf8"));
+  expect(saved.credentials_enable_service).toBe(false);
+  expect(saved.credentials_enable_autosignin).toBe(false);
+  expect(saved.profile).toEqual({
+    name: "Person 1",
+    exit_type: "Normal",
+    password_manager_enabled: false,
+    password_manager_leak_detection: false,
+  });
+  expect(saved.autofill).toEqual({ last_version_deduped: 150, profile_enabled: false, credit_card_enabled: false });
   // The old start page extension no longer answers new tabs (Google Chrome doesn't load it); others' entries stay.
   const old = { entry: "chrome-extension://mbgkclemiokgppkieijlfaoehgdjlhbl/start.html", active: true };
   const other = { entry: "chrome-extension://abcdefghijklmnopabcdefghijklmnop/tab.html", active: false };

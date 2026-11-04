@@ -182,8 +182,19 @@ export function runCommand(opts: ExecOptions): Promise<ExecReply> {
       return;
     }
 
+    // Redacted before it is kept (ADR 0135): the cut of a long output (its head and tail) can't split a value in
+    // two and leave each half readable. The last `hold` characters wait for the next chunk, as live output does.
+    const keptHeld = { stdout: "", stderr: "" };
+    const keepDecoders = { stdout: new StringDecoder("utf8"), stderr: new StringDecoder("utf8") };
+    const keep = (stream: "stdout" | "stderr", text: string, final = false) => {
+      const out = clean(keptHeld[stream] + text);
+      const cut = final ? out.length : Math.max(0, out.length - hold);
+      keptHeld[stream] = out.slice(cut);
+      if (cut > 0) (stream === "stdout" ? stdout : stderr).push(Buffer.from(out.slice(0, cut)));
+    };
     const onData = (stream: "stdout" | "stderr") => (chunk: Buffer) => {
-      (stream === "stdout" ? stdout : stderr).push(chunk);
+      if (opts.redact) keep(stream, keepDecoders[stream].write(chunk));
+      else (stream === "stdout" ? stdout : stderr).push(chunk);
       if (opts.onOutput && streamed < MAX_STREAMED_BYTES) pending[stream] += decoders[stream].write(chunk);
     };
     child.stdout?.on("data", onData("stdout"));
@@ -203,6 +214,9 @@ export function runCommand(opts: ExecOptions): Promise<ExecReply> {
       if (opts.onOutput) {
         for (const stream of ["stdout", "stderr"] as const) pending[stream] += decoders[stream].end();
         flush(true);
+      }
+      if (opts.redact) {
+        for (const stream of ["stdout", "stderr"] as const) keep(stream, keepDecoders[stream].end(), true);
       }
       // A background process may hold the pipes open; don't wait for it.
       child.stdout?.destroy();

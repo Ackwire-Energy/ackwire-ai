@@ -26,9 +26,11 @@ import {
   parseBrowserInputEvent,
   type RunnerBrowserInfo,
   type RunnerFrame,
+  type VaultTypeRefusal,
 } from "@agenteschat/adapters/machine-protocol";
 import type { ControlBrowser, ControlBrowserDoing } from "@agenteschat/adapters/runner-control";
 import { SECRET_NAME } from "@agenteschat/adapters/secret-box";
+import { vaultRuleLabel, vaultRuleMatches } from "@agenteschat/adapters/vault/site";
 import type { BrowserPorts } from "./browser-ports";
 import { type CrashedPage, countChromeTraffic, type TrafficCounter } from "./browser-traffic";
 import { BROWSER_WM_CLASS } from "./desktop-look";
@@ -39,6 +41,22 @@ import { readJson, writeJson } from "./json-file";
 import { agentFolderName, isInside, ownedSafely } from "./paths";
 import type { Spawn } from "./scope-gate";
 import { prepareStartPage, type StartPageData } from "./start-page";
+import {
+  FIELD_REFUSAL_MARK,
+  fieldRefusalOf,
+  fieldWant,
+  GET_BLOCKED,
+  GET_GUARD_MS,
+  parseSecretRefs,
+  parseTypeVault,
+  type RunnerVault,
+  runnerVault,
+  type VaultFieldVerdict,
+  type VaultFieldWant,
+  VaultOpening,
+  VaultRefusal,
+  vaultFieldScript,
+} from "./vault";
 
 /**
  * The agent browser (protocol 12, ADR 0040). The runner drives the pinned
@@ -291,6 +309,11 @@ export interface BrowserAnswer {
 
 /** An answer's `setup`, only when something was timed. */
 const withSetup = (setup: BrowserSetup) => (Object.keys(setup).length > 0 ? { setup } : {});
+
+/** A Vault refusal (ADR 0135): its `code` (`VAULT_TYPE_REFUSALS`) and a plain reason, never a value. */
+const refused = (code: VaultTypeRefusal, error: string): BrowserAnswer => ({ success: false, data: null, code, error });
+/** How a typed login's password shows where redacted (`[secret:VAULT_PASSWORD]`). */
+const VAULT_PASSWORD = "VAULT_PASSWORD";
 
 /** For the runner's log: `worker 1.2 s, install 28.1 s, launch 1.4 s`. */
 export function browserSetupText(setup: BrowserSetup): string {
@@ -621,6 +644,10 @@ const OLD_START_PAGE_ID = "mbgkclemiokgppkieijlfaoehgdjlhbl";
  *   `prefs::kNtpFooterVisible`).
  * - New tabs no longer point at the old start page extension, which isn't
  *   loaded anymore (its `extensions.chrome_url_overrides.newtab` entry).
+ * - Chrome's own password manager, its sign-in with saved passwords, its leak
+ *   check and its address and card autofill are off (ADR 0135): passwords
+ *   reach an agent's pages only through the runner's typing, which checks
+ *   where it types, and nothing an agent typed is saved in its profile.
  * A Preferences file that isn't JSON is Chrome's to deal with, and neither is
  * worth failing a start for.
  */
@@ -632,11 +659,17 @@ export function prepareProfile(profile: string) {
     const browser = isRecord(prefs.browser) ? prefs.browser : {};
     const signin = isRecord(prefs.signin) ? prefs.signin : {};
     const ntp = isRecord(prefs.NewTabPage) ? prefs.NewTabPage : {};
+    const profilePrefs = isRecord(prefs.profile) ? prefs.profile : {};
+    const autofill = isRecord(prefs.autofill) ? prefs.autofill : {};
     const next: Record<string, unknown> = {
       ...prefs,
       browser: { ...browser, custom_chrome_frame: true },
       signin: { ...signin, allowed_on_next_startup: false },
       NewTabPage: { ...ntp, FooterVisible: false },
+      credentials_enable_service: false,
+      credentials_enable_autosignin: false,
+      profile: { ...profilePrefs, password_manager_enabled: false, password_manager_leak_detection: false },
+      autofill: { ...autofill, profile_enabled: false, credit_card_enabled: false },
     };
     const extensions = isRecord(prefs.extensions) ? prefs.extensions : null;
     const overrides = isRecord(extensions?.chrome_url_overrides) ? extensions.chrome_url_overrides : null;
@@ -1039,6 +1072,8 @@ export interface BrowserManagerOptions {
   send: (frame: RunnerFrame) => boolean;
   /** A secret delivered to the agent (ADR 0027), by name, with the one site it was sealed to, or null. */
   secret: (agent: AgentScope, name: string) => Promise<{ value: string; site: string | null } | null>;
+  /** The Vault's keys and redaction in this process (ADR 0135; default: the process's own, `runnerVault`). */
+  vault?: RunnerVault;
   /** System mode: root preguards this UID's fixed CDP and stream listener ports. */
   fixedPorts?: BrowserPorts;
   /** Root-owned extension in system mode; absent uses the single-user runner home. */
@@ -1160,6 +1195,8 @@ interface Session {
   updatedTo?: string;
   /** When a sweep last found someone watching it or a person's turn open on it. */
   heldAt?: number;
+  /** The GET guard stopped a request carrying a typed password since the agent last heard (ADR 0135). */
+  guardBlocked?: boolean;
 }
 
 /** One Chrome in `chromes.json`. */
@@ -1182,6 +1219,7 @@ const DOING: Record<string, ControlBrowserDoing> = {
   type: "typing",
   press: "typing",
   "agentes:type_secret": "typing",
+  "agentes:type_vault": "typing",
   select: "choosing",
   check: "choosing",
   uncheck: "choosing",
@@ -1500,12 +1538,17 @@ export class BrowserManager {
 
   // ── Commands ───────────────────────────────────────────────────────────────
 
-  /** `browser.act`: one command in the agent's session, after the checks, and what it waited on (protocol 27). */
+  /**
+   * `browser.act`: one command in the agent's session, after the checks, and what it waited on (protocol 27).
+   * `actor`: the agent whose turn it is (a browser profile's session is shared, ADR 0110): its Vault keys open
+   * there (ADR 0135).
+   */
   async act(
     agent: AgentScope,
     folder: string,
     req: ActRequest,
     signal?: AbortSignal,
+    actor: AgentScope = agent,
   ): Promise<BrowserAnswer & { setup?: BrowserSetup }> {
     const allowed = allowedDomainsOf(req.allowedDomains);
     const prepared = this.checkCommand(req.command, req.args, req.timeoutSeconds, folder, allowed);
@@ -1519,8 +1562,16 @@ export class BrowserManager {
       // A page that died since the agent last heard, or while this ran, is an action's answer: it changed under it.
       const before = acts ? this.takeCrash(session, false) : null;
       if (before) return before;
-      const done = await this.perform(agent, session, prepared, allowed, req.link, desktop, signal, setup);
-      return (acts ? this.takeCrash(session, true) : null) ?? done;
+      const opening = this.vaultOpening(actor, session);
+      try {
+        const done = await this.perform(agent, session, prepared, allowed, req.link, desktop, signal, setup, {
+          actor,
+          opening,
+        });
+        return (acts ? (this.takeCrash(session, true) ?? this.takeBlocked(session)) : null) ?? done;
+      } finally {
+        opening.close();
+      }
     });
     return { ...answer, ...withSetup(setup) };
   }
@@ -1532,7 +1583,7 @@ export class BrowserManager {
    * whole batch before anything runs; a failure stops it unless that command
    * tolerates failing.
    */
-  async batch(agent: AgentScope, folder: string, req: BatchRequest, signal?: AbortSignal) {
+  async batch(agent: AgentScope, folder: string, req: BatchRequest, signal?: AbortSignal, actor: AgentScope = agent) {
     const list = Array.isArray(req.commands) ? req.commands : [];
     if (list.length === 0 || list.length > BROWSER_LIMITS.batchCommands) {
       throw new RunnerError("bad_request", `A batch takes 1 to ${BROWSER_LIMITS.batchCommands} commands`);
@@ -1564,28 +1615,46 @@ export class BrowserManager {
         answers.push(notice);
         return true;
       };
-      for (const p of prepared) {
-        if (signal?.aborted) break;
-        const acts = actsOnPage(p);
-        if (acts && died()) break;
-        if (acts) acted = answers.length;
-        let answer: BrowserAnswer;
-        try {
-          answer = await this.perform(agent, session, p, allowed, req.link, desktop, signal, setup);
-        } catch (err) {
-          // Nothing ran yet: refused as a whole (its error code reaches the server).
-          if (answers.length === 0) throw err;
-          // Something already ran: its answers are kept; this command failed and the batch stops.
-          answers.push({
-            success: false,
-            data: null,
-            error: (err instanceof Error ? err.message : String(err)).slice(0, 2000),
-          });
-          if (acted >= 0) died();
-          break;
+      /** A typed password the page tried to send in an address (ADR 0135): told in place of the action under it. */
+      const blocked = () => {
+        if (acted < 0) return false;
+        const notice = this.takeBlocked(session);
+        if (!notice) return false;
+        answers.length = acted;
+        answers.push(notice);
+        return true;
+      };
+      const opening = this.vaultOpening(actor, session);
+      try {
+        for (const p of prepared) {
+          if (signal?.aborted) break;
+          const acts = actsOnPage(p);
+          if (acts && died()) break;
+          if (acts) acted = answers.length;
+          let answer: BrowserAnswer;
+          try {
+            answer = await this.perform(agent, session, p, allowed, req.link, desktop, signal, setup, {
+              actor,
+              opening,
+            });
+          } catch (err) {
+            // Nothing ran yet: refused as a whole (its error code reaches the server).
+            if (answers.length === 0) throw err;
+            // Something already ran: its answers are kept; this command failed and the batch stops.
+            answers.push({
+              success: false,
+              data: null,
+              error: (err instanceof Error ? err.message : String(err)).slice(0, 2000),
+            });
+            if (acted >= 0) died();
+            break;
+          }
+          answers.push(answer);
+          if ((acted >= 0 && (died() || blocked())) || (!answer.success && !p.tolerate)) break;
         }
-        answers.push(answer);
-        if ((acted >= 0 && died()) || (!answer.success && !p.tolerate)) break;
+      } finally {
+        // Each Vault value this batch opened goes with it (ADR 0135).
+        opening.close();
       }
       return { answers, ...withSetup(setup) };
     });
@@ -1719,6 +1788,11 @@ export class BrowserManager {
     const timeoutMs = Math.max(1, Math.min(600, Number(timeoutSeconds) || 60)) * 1000;
     // Checked when it runs (the secret, the site, the field).
     if (command === "agentes:type_secret") return { command, args, timeoutMs };
+    // ADR 0135: a Vault login's shape is checked before anything of the batch runs; its site and field when it runs.
+    if (command === "agentes:type_vault") {
+      parseTypeVault(args);
+      return { command, args, timeoutMs };
+    }
     if (!COMMANDS.has(command)) throw new RunnerError("bad_request", `The browser doesn't take ${command}`);
     for (const a of args) {
       const flag = a.split("=")[0] as string;
@@ -1740,13 +1814,25 @@ export class BrowserManager {
     desktop: boolean,
     signal?: AbortSignal,
     setup?: BrowserSetup,
+    vault?: { actor: AgentScope; opening: VaultOpening },
   ): Promise<BrowserAnswer> {
     const { command, args, timeoutMs } = p;
     session.allowed = allowed;
+    const actor = vault?.actor ?? agent;
     if (command === "agentes:type_secret") {
-      const answer = await this.typeSecret(agent, session, args, timeoutMs, signal);
+      const answer = await this.typeSecret(agent, session, args, timeoutMs, signal, actor);
       this.noteAct(session, command, [], answer, link);
       return answer;
+    }
+    if (command === "agentes:type_vault") {
+      const opening = vault?.opening ?? this.vaultOpening(actor, session);
+      try {
+        const answer = await this.typeVault(actor, session, args, timeoutMs, opening, signal);
+        this.noteAct(session, command, [], answer, link);
+        return answer;
+      } finally {
+        if (!vault) opening.close();
+      }
     }
     // A screenshot or PDF into a folder that isn't there yet (`screenshots/…`): made first.
     if (FILE_OUTPUTS.has(command)) {
@@ -2487,9 +2573,9 @@ export class BrowserManager {
   }
 
   /**
-   * `agentes:type_secret [ref, NAME]`: types a secret delivered with
-   * `request_secret` into a password or one-time-code field. The value goes
-   * to `agent-browser` on stdin (never on a command line) and never back.
+   * `agentes:type_secret [ref, NAME, site, ...moreRefs]`: types a secret delivered with `request_secret` into a
+   * password or one-time-code field. The value goes to `agent-browser` on stdin (never on a command line) and never
+   * back. Protocol 41 (ADR 0135): with more refs, a code goes one character per field, in order (`typeCode`).
    */
   private async typeSecret(
     agent: AgentScope,
@@ -2497,11 +2583,16 @@ export class BrowserManager {
     args: string[],
     timeoutMs: number,
     signal?: AbortSignal,
+    actor: AgentScope = agent,
   ): Promise<BrowserAnswer> {
-    const [rawRef, name, rawSite] = args;
-    const ref = typeof rawRef === "string" && /^@?e\d{1,6}$/.test(rawRef) ? `@${rawRef.replace(/^@/, "")}` : null;
-    if (!ref || typeof name !== "string" || !SECRET_NAME.test(name)) {
-      throw new RunnerError("bad_request", "agentes:type_secret takes a ref (@e3) and a secret name (DB_PASSWORD)");
+    const [, name, rawSite] = args;
+    const refs = parseSecretRefs(args);
+    const ref = refs?.[0];
+    if (!refs || !ref || typeof name !== "string" || !SECRET_NAME.test(name)) {
+      throw new RunnerError(
+        "bad_request",
+        "agentes:type_secret takes a ref (@e3) and a secret name (DB_PASSWORD), then its site, then one more ref for each other field of a code",
+      );
     }
     // The one site the secret was asked for (the person saw it): never typed anywhere else.
     const site = typeof rawSite === "string" ? originOf(rawSite) : null;
@@ -2536,6 +2627,7 @@ export class BrowserManager {
         error: `${name} is only for ${new URL(site).host}, and the page is on ${at ? hostOf(at) : "no site"}; it wasn't typed`,
       };
     }
+    if (refs.length > 1) return this.typeCode(actor, session, name, value, refs, site, timeoutMs, signal);
     const attr = async (a: string) => {
       const got = await this.run(session, ["get", "attr", ref, a], {
         timeoutMs: QUICK_TIMEOUT_MS,
@@ -2563,9 +2655,215 @@ export class BrowserManager {
     const ok = first ? first.success === true : out.success;
     const error = first && typeof first.error === "string" ? first.error : out.error;
     const clean = (s: string) => s.split(value).join("[secret]");
-    return ok
-      ? { success: true, data: { typed: name, into: ref } }
-      : { success: false, data: null, error: clean(error ?? "Couldn't type the secret") };
+    if (!ok) return { success: false, data: null, error: clean(error ?? "Couldn't type the secret") };
+    // A password (not a one-time code) is guarded from leaving in an address (ADR 0135).
+    const password = type === "password" || /\b(current-password|new-password)\b/.test(autocomplete);
+    this.typed(session, actor, name, value, password);
+    return { success: true, data: { typed: name, into: ref } };
+  }
+
+  /**
+   * A code from `request_secret` split over one field per character (ADR 0135): each field checked in the page
+   * where it is typed (a text, number or one-time-code input, in a frame on the secret's site) and filled with its
+   * character, all in one `agent-browser` invocation (`fillChecked`).
+   */
+  private async typeCode(
+    actor: AgentScope,
+    session: Session,
+    name: string,
+    value: string,
+    refs: string[],
+    site: string,
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ): Promise<BrowserAnswer> {
+    const chars = Array.from(value);
+    if (chars.length !== refs.length) {
+      return {
+        success: false,
+        data: null,
+        error: `${name} doesn't have one character for each of the ${refs.length} fields given; it wasn't typed`,
+      };
+    }
+    const result = await this.fillChecked(
+      session,
+      refs.map((ref, i) => ({ ref, text: chars[i] as string })),
+      { exact: site, domain: null, top: site, field: "code" },
+      timeoutMs,
+      signal,
+    );
+    if (!result.ok) {
+      const host = new URL(site).host;
+      const at = result.ref ?? refs[0];
+      switch (result.verdict) {
+        case "wrong_site":
+          return refused(
+            "wrong_site",
+            `${name} is only for ${host}, and ${at} is in a frame on another site; the code wasn't typed there`,
+          );
+        case "in_frame":
+          return refused(
+            "not_code_field",
+            `${at} is inside a frame. Switch to that frame first, then type the code; it wasn't typed there`,
+          );
+        case "not_code_field":
+        case "not_password_field":
+        case "get_form":
+          return refused(
+            "not_code_field",
+            `${at} isn't a text, number or one-time-code field; a code is only typed into those`,
+          );
+        default:
+          // Its own words could hold a character of the code: only where it stopped.
+          return { success: false, data: null, error: `Couldn't type the code into ${at}` };
+      }
+    }
+    this.typed(session, actor, name, value, false);
+    return { success: true, data: { typed: name, into: refs[0], fields: refs } };
+  }
+
+  /**
+   * `agentes:type_vault [ref, rule, boxJson]` (protocol 41, ADR 0135): a Vault login's password, sealed to one of
+   * `actor`'s one-use keys for this rule, typed into a password field on a page the rule allows. The page's own
+   * address (`get url`, from the browser, not the page) must match the rule; then, in one invocation, the field is
+   * focused, checked in the page (`vaultFieldScript`: the frame that owns it and every frame around it on the rule's
+   * sites, a password field, no form sent with `get`) and filled. Refusals answer a `code` and a plain reason; the
+   * value never comes back, and a request that would carry it in its address is stopped for a while (`typed`).
+   */
+  private async typeVault(
+    actor: AgentScope,
+    session: Session,
+    args: string[],
+    timeoutMs: number,
+    opening: VaultOpening,
+    signal?: AbortSignal,
+  ): Promise<BrowserAnswer> {
+    const { ref, rule, ruleText, keyId, box } = parseTypeVault(args);
+    const agentId = String(actor.id ?? "");
+    if (!agentId || isProfileKey(agentId)) {
+      throw new RunnerError("bad_request", "agentes:type_vault needs the agent whose turn it is");
+    }
+    const label = vaultRuleLabel(rule);
+    if (!(await this.browserOpen(session, signal))) {
+      return { success: false, data: null, error: "The browser isn't open: open a page first" };
+    }
+    const at = await this.pageUrl(session, signal);
+    const top = at ? originOf(at) : null;
+    if (!top || !vaultRuleMatches(rule, top)) {
+      return refused(
+        "wrong_site",
+        `This login is for ${label}, and the page is on ${at ? hostOf(at) : "no site"}. It wasn't typed.`,
+      );
+    }
+    let value: string;
+    try {
+      value = await opening.open(keyId, box, { kind: "fill", rule: ruleText }, VAULT_PASSWORD);
+    } catch (err) {
+      if (err instanceof VaultRefusal) return refused(err.code, err.message);
+      throw err;
+    }
+    const want = fieldWant(rule, top, "password");
+    const result = await this.fillChecked(session, [{ ref, text: value }], want, timeoutMs, signal);
+    if (!result.ok) {
+      switch (result.verdict) {
+        case "wrong_site":
+          return refused(
+            "wrong_site",
+            `This login is for ${label}, and ${ref} is in a frame on another site. It wasn't typed.`,
+          );
+        case "in_frame":
+          return refused(
+            "not_password_field",
+            `${ref} is inside a frame. Switch to that frame first, then type the login. It wasn't typed.`,
+          );
+        case "not_password_field":
+        case "not_code_field":
+          return refused("not_password_field", `${ref} isn't a password field. A saved login is only typed into one.`);
+        case "get_form":
+          return refused(
+            "get_form",
+            `The form of ${ref} would send the password in the page's address. It wasn't typed.`,
+          );
+        default:
+          return { success: false, data: null, error: result.error.split(value).join("[secret]") };
+      }
+    }
+    this.typed(session, actor, VAULT_PASSWORD, value, true);
+    return { success: true, data: { typed: "vault", into: ref, origin: top } };
+  }
+
+  /**
+   * Types `fields` (a ref and its text each) in ONE `agent-browser` invocation (ADR 0135): each field is focused,
+   * checked in the page and only then filled, `--bail` stopping at the first check that throws, before its fill.
+   * The texts go on stdin and never come back; a failure says which field and, for a check, its verdict.
+   */
+  private async fillChecked(
+    session: Session,
+    fields: { ref: string; text: string }[],
+    want: VaultFieldWant,
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ): Promise<{ ok: true } | { ok: false; verdict: VaultFieldVerdict | null; error: string; ref: string | null }> {
+    const script = vaultFieldScript(want);
+    const commands = fields.flatMap((f) => [
+      ["focus", f.ref],
+      ["eval", script],
+      ["fill", f.ref, f.text],
+    ]);
+    const out = await this.run(session, ["batch", "--bail"], {
+      timeoutMs,
+      stdin: JSON.stringify(commands),
+      ...(signal ? { signal } : {}),
+    });
+    // One answer per command it ran (`--bail`: up to the first failure); without them, the invocation's own.
+    const results = Array.isArray(out.data)
+      ? out.data
+      : isRecord(out.data) && Array.isArray(out.data.results)
+        ? out.data.results
+        : null;
+    const failed = results ? results.findIndex((r) => !isRecord(r) || r.success !== true) : -1;
+    if (results ? failed < 0 && results.length === commands.length : out.success) return { ok: true };
+    const at = failed >= 0 ? failed : results ? results.length : 0;
+    const entry = results && failed >= 0 ? results[failed] : null;
+    const said = isRecord(entry) && typeof entry.error === "string" ? entry.error : (out.error ?? "");
+    const verdict = said.includes(FIELD_REFUSAL_MARK) ? fieldRefusalOf(said) : null;
+    return {
+      ok: false,
+      verdict,
+      error: (said || "Couldn't type it").slice(0, 2000),
+      ref: fields[Math.floor(at / 3)]?.ref ?? null,
+    };
+  }
+
+  /**
+   * A value just typed (ADR 0135): redacted from what this agent's browser (and a profile's session) sends back for
+   * 10 minutes, and, for a password, its Chrome stops any request that would carry it in an address for 2 minutes
+   * (`GET_BLOCKED`, told at the next action's answer).
+   */
+  private typed(session: Session, actor: AgentScope, name: string, value: string, guard: boolean) {
+    for (const id of new Set([String(actor.id ?? ""), session.agentId])) this.vault.arm(id, name, value);
+    const counter = guard && session.chrome ? this.counters.get(session.chrome) : undefined;
+    counter?.guard([value], GET_GUARD_MS, () => {
+      session.guardBlocked = true;
+      this.opts.log(`the browser of ${session.name} stopped a page sending a typed password in an address`);
+    });
+  }
+
+  /** The GET guard stopped a request since the agent last heard: its next action's answer says so, once. */
+  private takeBlocked(session: Session): BrowserAnswer | null {
+    if (!session.guardBlocked) return null;
+    session.guardBlocked = false;
+    return refused("get_blocked", GET_BLOCKED);
+  }
+
+  /** What one request opens from the Vault, for the agent whose turn it is (a profile's session redacts it too). */
+  private vaultOpening(actor: AgentScope, session: Session): VaultOpening {
+    const agentId = String(actor.id ?? "");
+    return new VaultOpening(this.vault, agentId, session.agentId !== agentId ? [session.agentId] : []);
+  }
+
+  private get vault(): RunnerVault {
+    return this.opts.vault ?? runnerVault;
   }
 
   /** `browser.stop`: closes the agent's browser (its profile stays). */

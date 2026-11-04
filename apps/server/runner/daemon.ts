@@ -120,7 +120,7 @@ import {
 import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrgLogo } from "./org-logo";
 import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspace } from "./pairing";
 import { agentId8, agentWorkspace } from "./paths";
-import { agentSecrets, secretValue } from "./secrets";
+import { agentSecrets, dropStoredSiteSecrets, secretValue } from "./secrets";
 import { AGENTS_CGROUP } from "./service";
 import {
   ensureSingleShared,
@@ -903,6 +903,8 @@ export class RunnerDaemon implements RequestObserver {
     this.shared = this.prepareShared(workspaceReal, sharedSpec);
     this.measureShared();
     const secretsDir = path.join(home, "secrets");
+    // Site passwords live in memory now (ADR 0135): one an older runner kept on disk goes.
+    void dropStoredSiteSecrets(secretsDir);
     const socketPath = mcpSocketPath(home);
     const mcpCommand = { socketPath, command: this.self.command };
     const tasks = new TaskManager({

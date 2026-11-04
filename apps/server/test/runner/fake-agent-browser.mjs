@@ -1,6 +1,9 @@
 // A fake `agent-browser` for browser tests: answers `--json` like the real one.
 // Each run appends `{ args, stdin }` to $FAKE_AB_LOG (one JSON line). The page
 // lives in $FAKE_AB_STATE: `{ open, url, attrs: { "@e3": { type } }, clickTo, tabTo, noHistory, port, delayMs }`.
+// In a `batch`, `focus` focuses a ref and `eval` runs its script against that field as a page would see it
+// (`attrs[ref]`: `tag`, `type`, `autocomplete`, `method` of its form; `frame`: `{ origin, ancestors }` when the
+// session is inside a frame); with `--bail` the batch stops at the first failure (ADR 0135).
 import { appendFileSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 const argv = process.argv.slice(2);
@@ -50,6 +53,31 @@ const out = (o) => {
   save();
 };
 
+/** A script run as the page would: its document's focused element, its frame's location, `window` and `top`. */
+const pageEval = (script, focused) => {
+  const field = focused ? (state.attrs?.[focused] ?? {}) : null;
+  const frame = state.frame ?? {};
+  let origin = "null";
+  try {
+    origin = new URL(state.url).origin;
+  } catch {
+    // not a page: an opaque origin
+  }
+  const el = field
+    ? {
+        tagName: field.tag ?? "INPUT",
+        type: field.type ?? "text",
+        getAttribute: (name) => (name === "autocomplete" ? (field.autocomplete ?? null) : null),
+        form: field.method === undefined ? null : { getAttribute: (name) => (name === "method" ? field.method : null) },
+      }
+    : null;
+  const win = {};
+  const ancestors = frame.ancestors ?? [];
+  const location = { origin: frame.origin ?? origin, ancestorOrigins: ancestors };
+  const run = new Function("document", "location", "window", "top", `return ${script}`);
+  return run({ activeElement: el }, location, win, ancestors.length > 0 ? {} : win);
+};
+
 // `delayMs`: every command takes that long (a page busy under it).
 if (state.delayMs) await new Promise((resolve) => setTimeout(resolve, state.delayMs));
 
@@ -93,7 +121,29 @@ switch (command) {
     break;
   case "batch": {
     const list = JSON.parse(stdin || "[]");
-    out(list.map((cmd) => ({ command: cmd, success: true, result: {}, error: null })));
+    const bail = argv.includes("--bail");
+    const results = [];
+    let focused = null;
+    for (const cmd of list) {
+      let result = { command: cmd[0], success: true, result: {}, error: null };
+      if (cmd[0] === "focus") focused = cmd[1];
+      if (cmd[0] === "eval") {
+        try {
+          result.result = { result: pageEval(cmd[1], focused) };
+        } catch (err) {
+          result = {
+            command: cmd[0],
+            success: false,
+            result: null,
+            error: `Evaluation failed: ${err?.message ?? err}`,
+          };
+        }
+      }
+      results.push(result);
+      if (!result.success && bail) break;
+    }
+    out(results);
+    if (results.some((r) => !r.success)) process.exitCode = 1;
     break;
   }
   case "close":

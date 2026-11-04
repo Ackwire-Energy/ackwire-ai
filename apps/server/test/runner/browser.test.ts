@@ -17,7 +17,7 @@ import {
   type RunnerAccess,
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
-import { sealSecret, secretAad } from "@agenteschat/adapters/secret-box";
+import { sealSecret, secretAad, vaultAad } from "@agenteschat/adapters/secret-box";
 import { browserErrorText, formatPlanReport, runPlan } from "@agenteschat/engine";
 import { type BrowserLink, type BrowserReply, browserSurface } from "../../../../packages/engine/src/browser/surface";
 import { reduceAccess, setTool, TOOL_NAMES, widens } from "../../runner/access";
@@ -52,6 +52,7 @@ import {
 import { handleRequest, type RequestScope } from "../../runner/handlers";
 import { agentWorkspace } from "../../runner/paths";
 import { handleSecret, secretValue } from "../../runner/secrets";
+import { GET_BLOCKED, runnerVault } from "../../runner/vault";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
@@ -2649,4 +2650,236 @@ test.if(posix)("deleting a profile stops its Chrome and removes its folder; syst
       handleRequest(system, { agent: dev, profile: { id: PROFILE }, op: "browser.warm" }, profileScope),
     ),
   ).toBe("not_allowed");
+});
+
+// ── The Vault (ADR 0135) ─────────────────────────────────────────────────────
+
+/** An agent of these tests only: what it arms in this process's Vault stays its own. */
+const keeper = { id: "5e5e5e5e-0135-7000-8000-000000000003", handle: "keeper" };
+const SHOP_RULE = "exact:https://shop.example.com";
+
+/** A login's password sealed as the server does: to a one-use key of the agent, for one rule. */
+async function sealLogin(agentId: string, rule: string, password: string) {
+  const { keyId, publicKey } = await runnerVault.issueKey(agentId);
+  const box = await sealSecret(publicKey, password, vaultAad({ keyId, agentId, use: { kind: "fill", rule } }));
+  return JSON.stringify({ keyId, box });
+}
+
+const batchesOf = (t: ReturnType<typeof setup>) => t.logged().filter((c) => c.args.includes("batch"));
+
+test.if(posix)("a Vault login is typed once on its site, checked in the page between focus and fill", async () => {
+  const t = setup();
+  const password = "correct-horse-battery-staple";
+  const act = (command: string, args: string[]) => t.act(command, args, { agent: keeper });
+  await act("open", ["https://shop.example.com/login"]);
+  t.page({ attrs: { "@e3": { type: "email", autocomplete: "username" }, "@e4": { type: "password" } } });
+  const box = await sealLogin(keeper.id, SHOP_RULE, password);
+  const typed = await act("agentes:type_vault", ["e4", SHOP_RULE, box]);
+  expect(typed).toEqual({ success: true, data: { typed: "vault", into: "@e4", origin: "https://shop.example.com" } });
+  expect(JSON.stringify(typed)).not.toContain(password);
+  // One invocation, the value on stdin only: focus, the check, then the fill, stopping at the first failure.
+  expect(batchesOf(t)).toHaveLength(1);
+  expect(batchesOf(t)[0]?.args).toContain("--bail");
+  const commands = JSON.parse(batchesOf(t)[0]?.stdin ?? "[]") as string[][];
+  expect(commands.map((c) => c[0])).toEqual(["focus", "eval", "fill"]);
+  expect(commands[0]).toEqual(["focus", "@e4"]);
+  expect(commands[2]).toEqual(["fill", "@e4", password]);
+  expect(commands[1]?.[1]).not.toContain(password);
+  expect(t.logged().some((c) => c.args.join(" ").includes(password))).toBe(false);
+  // Its key went at its first use: the same box again types nothing.
+  expect(await act("agentes:type_vault", ["e4", SHOP_RULE, box])).toMatchObject({
+    success: false,
+    code: "key_expired",
+  });
+  expect(batchesOf(t)).toHaveLength(1);
+  // What the browser reads back afterwards leaves redacted (a field that shows it).
+  t.page({ attrs: { "@e4": { type: "text", value: password } } });
+  const ctx = { workspaceReal: t.ws, exec: true, token: "agm_x", browser: t.manager };
+  const scope: RequestScope = { signal: new AbortController().signal, output: () => {} };
+  const get = { agent: keeper, op: "browser.act" as const, command: "get", args: ["attr", "@e4", "value"] };
+  expect(await handleRequest(ctx, { ...get, timeoutSeconds: 5 }, scope)).toMatchObject({
+    success: true,
+    data: { value: "[secret:VAULT_PASSWORD]" },
+  });
+});
+
+test.if(posix)("a Vault login isn't typed off its sites, outside a password field, into a GET form", async () => {
+  const t = setup();
+  const rule = "site:example.com";
+  const act = (command: string, args: string[]) => t.act(command, args, { agent: keeper });
+  const type = async (ref = "e4") =>
+    act("agentes:type_vault", [ref, rule, await sealLogin(keeper.id, rule, "hunter2-vault-refusals")]);
+  await act("open", ["https://evil.test/login"]);
+  t.page({ attrs: { "@e4": { type: "password" } } });
+  expect(await type()).toMatchObject({
+    success: false,
+    code: "wrong_site",
+    error: expect.stringContaining("This login is for example.com, and the page is on evil.test"),
+  });
+  await act("open", ["https://example.com.evil.test/login"]);
+  expect(await type()).toMatchObject({ success: false, code: "wrong_site" });
+  // The page's own address said no: nothing reached the page.
+  expect(batchesOf(t)).toHaveLength(0);
+  await act("open", ["https://shop.example.com/login"]);
+  t.page({
+    attrs: {
+      "@e3": { type: "text" },
+      "@e4": { type: "password", method: "get" },
+      "@e5": { tag: "IFRAME" },
+      "@e6": { type: "password" },
+    },
+  });
+  expect(await type("e3")).toMatchObject({ success: false, code: "not_password_field" });
+  expect(await type("e4")).toMatchObject({ success: false, code: "get_form" });
+  expect(await type("e5")).toMatchObject({
+    success: false,
+    code: "not_password_field",
+    error: expect.stringContaining("inside a frame"),
+  });
+  // The field in a frame from another site, inside the right page.
+  t.page({ frame: { origin: "https://ads.test", ancestors: ["https://shop.example.com"] } });
+  expect(await type("e6")).toMatchObject({ success: false, code: "wrong_site" });
+  // In a frame of the login's own site: typed.
+  t.page({ frame: { origin: "https://login.example.com", ancestors: ["https://shop.example.com"] } });
+  expect(await type("e6")).toMatchObject({ success: true, data: { typed: "vault", into: "@e6" } });
+});
+
+test.if(posix)("malformed Vault input is refused before anything runs; a box for another use won't open", async () => {
+  const t = setup();
+  const folder = await t.folder(keeper);
+  await t.act("open", ["https://shop.example.com/login"], { agent: keeper });
+  t.page({ attrs: { "@e4": { type: "password" } } });
+  const before = t.logged().length;
+  const batch = (args: string[]) =>
+    t.manager.batch(keeper, folder, {
+      op: "browser.batch",
+      commands: [
+        { command: "click", args: ["@e1"], timeoutSeconds: 5 },
+        { command: "agentes:type_vault", args, timeoutSeconds: 5 },
+      ],
+    });
+  expect(await errorCode(() => batch(["e4", SHOP_RULE, "{}"]))).toBe("bad_request");
+  expect(await errorCode(() => batch(["e4", "exact:http://shop.example.com", "{}"]))).toBe("bad_request");
+  expect(t.logged().length).toBe(before);
+  // Sealed for the exact address, asked for the whole site: it doesn't open.
+  const narrow = await sealLogin(keeper.id, SHOP_RULE, "hunter2-wrong-rule");
+  const widened = () => t.act("agentes:type_vault", ["e4", "site:example.com", narrow], { agent: keeper });
+  expect(await errorCode(widened)).toBe("bad_request");
+  // Another agent's key opens nothing here.
+  const theirs = await sealLogin(dev.id, SHOP_RULE, "hunter2-their-box");
+  expect(await t.act("agentes:type_vault", ["e4", SHOP_RULE, theirs], { agent: keeper })).toMatchObject({
+    success: false,
+    code: "key_expired",
+  });
+  expect(batchesOf(t)).toHaveLength(0);
+});
+
+test.if(posix)("in a profile's session a login opens for the agent whose turn it is, redacted for all", async () => {
+  const t = setup();
+  const ctx = { workspaceReal: t.ws, exec: true, token: "agm_x", access: browserOn, browser: t.manager };
+  const act = (agent: typeof dev, command: string, args: string[]) =>
+    handleRequest(
+      ctx,
+      { agent, profile: { id: PROFILE }, op: "browser.act", command, args, timeoutSeconds: 5 },
+      profileScope,
+    );
+  const password = "hunter2-profile-session";
+  await act(keeper, "open", ["https://shop.example.com/login"]);
+  t.page({ attrs: { "@e4": { type: "password" } } });
+  const box = await sealLogin(keeper.id, SHOP_RULE, password);
+  expect(await act(keeper, "agentes:type_vault", ["e4", SHOP_RULE, box])).toMatchObject({ success: true });
+  // Another agent acting in the same profile reads the field redacted.
+  t.page({ attrs: { "@e4": { type: "text", value: password } } });
+  expect(await act(dev, "get", ["attr", "@e4", "value"])).toMatchObject({
+    success: true,
+    data: { value: "[secret:VAULT_PASSWORD]" },
+  });
+});
+
+test.if(posix)("a code goes one character per field, each field checked where it is typed", async () => {
+  const code = "482913";
+  const t = setup({
+    secret: async (_agent, name) => (name === "SHOP_CODE" ? { value: code, site: "https://shop.example.com" } : null),
+  });
+  const refs = ["@e1", "@e2", "@e3", "@e4", "@e5", "@e6"];
+  const boxes = (over: Record<string, unknown> = {}) => ({
+    ...Object.fromEntries(refs.map((r) => [r, { type: "tel", autocomplete: "one-time-code" }])),
+    ...over,
+  });
+  const typeCode = (fields: string[]) =>
+    t.act("agentes:type_secret", [fields[0] as string, "SHOP_CODE", "https://shop.example.com", ...fields.slice(1)], {
+      agent: keeper,
+    });
+  await t.act("open", ["https://shop.example.com/verify"], { agent: keeper });
+  t.page({ attrs: boxes() });
+  expect(await typeCode(refs.map((r) => r.slice(1)))).toEqual({
+    success: true,
+    data: { typed: "SHOP_CODE", into: "@e1", fields: refs },
+  });
+  const commands = JSON.parse(batchesOf(t).at(-1)?.stdin ?? "[]") as string[][];
+  expect(commands.slice(0, 3).map((c) => c[0])).toEqual(["focus", "eval", "fill"]);
+  expect(commands.filter((c) => c[0] === "fill")).toEqual(refs.map((r, i) => ["fill", r, code[i] as string]));
+  // As many fields as characters, each one once.
+  expect(await typeCode(refs.slice(0, 4))).toMatchObject({
+    success: false,
+    error: expect.stringContaining("one character for each"),
+  });
+  expect(await errorCode(() => typeCode(["@e1", "@e1", "@e2", "@e3", "@e4", "@e5"]))).toBe("bad_request");
+  // A field that isn't a code's stops it there.
+  t.page({ attrs: boxes({ "@e3": { type: "password" } }) });
+  expect(await typeCode(refs)).toMatchObject({
+    success: false,
+    code: "not_code_field",
+    error: expect.stringContaining("@e3"),
+  });
+});
+
+test.if(posix)("a request carrying a typed login in its address is stopped; the next action says so", async () => {
+  const devtools: FakeSocket[] = [];
+  const chromes = fakeChromes();
+  const t = setup({
+    startChrome: async (exe, args, profile) => ({
+      ...(await chromes.start(exe, args, profile)),
+      wsPath: "/devtools/browser/guarded",
+    }),
+    connectDevtools: (url) => {
+      const s = new FakeSocket(url);
+      devtools.push(s);
+      queueMicrotask(() => {
+        s.onopen?.();
+        s.push({ id: 1, result: {} });
+      });
+      return s;
+    },
+  });
+  const password = "hunter2 & the get form";
+  const act = (command: string, args: string[]) => t.act(command, args, { agent: keeper });
+  await act("open", ["https://shop.example.com/login"]);
+  const cdp = devtools[0] as FakeSocket;
+  const page = { sessionId: "page-1", targetInfo: { type: "page", targetId: "t1" } };
+  cdp.push({ method: "Target.attachedToTarget", params: page });
+  t.page({ attrs: { "@e4": { type: "password" } } });
+  expect(cdp.sent.some((m) => m.method === "Fetch.enable")).toBe(false);
+  const box = await sealLogin(keeper.id, SHOP_RULE, password);
+  expect(await act("agentes:type_vault", ["e4", SHOP_RULE, box])).toMatchObject({ success: true });
+  // Armed: every request of that Chrome pauses until the runner looks at its address.
+  expect(cdp.sent).toContainEqual(expect.objectContaining({ method: "Fetch.enable", sessionId: "page-1" }));
+  const paused = (requestId: string, url: string) =>
+    cdp.push({ method: "Fetch.requestPaused", sessionId: "page-1", params: { requestId, request: { url } } });
+  // A GET form's submission (form-encoded), a script's own address (encodeURIComponent), a file of the page.
+  paused("r1", `https://shop.example.com/session?${new URLSearchParams({ user: "ana", password })}`);
+  paused("r2", `https://shop.example.com/session?password=${encodeURIComponent(password)}`);
+  paused("r3", "https://shop.example.com/assets/app.js");
+  const answered = (method: string, requestId: string) =>
+    cdp.sent.some((m) => {
+      const params = m.params as { requestId?: string } | undefined;
+      return m.method === method && m.sessionId === "page-1" && params?.requestId === requestId;
+    });
+  expect(answered("Fetch.failRequest", "r1")).toBe(true);
+  expect(answered("Fetch.failRequest", "r2")).toBe(true);
+  expect(answered("Fetch.continueRequest", "r3")).toBe(true);
+  expect(answered("Fetch.continueRequest", "r1")).toBe(false);
+  // The agent's next action hears it, once.
+  expect(await act("click", ["@e1"])).toMatchObject({ success: false, code: "get_blocked", error: GET_BLOCKED });
+  expect(await act("click", ["@e1"])).toMatchObject({ success: true });
 });
