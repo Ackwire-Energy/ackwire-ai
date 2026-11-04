@@ -352,6 +352,12 @@
       "desc": "プラン、カード、請求書。",
       "short": "請求",
       "say": "請求を管理"
+    },
+    "use_others_plans": {
+      "title": "他の人のプランを使う",
+      "desc": "編集できるエージェントに、他の人が接続したプランを割り当てます。プランの持ち主にはメールが届き、取り戻すこともできます。",
+      "short": "他の人のプランを使う",
+      "say": "他の人のプランを使う"
     }
   },
   "auth": {
@@ -3086,7 +3092,8 @@
       "usageLimitReached": "<b>{{name}}</b>さんが上限{{amount}}に達しました",
       "usageLimitRequest": "<b>{{name}}</b>さんが上限{{amount}}に達し、追加を求めています",
       "usageLimitRaised": "<b>{{name}}</b>さんが今月のあなたの上限を引き上げました",
-      "usageLimitRefused": "<b>{{name}}</b>さんが追加利用のリクエストを断りました"
+      "usageLimitRefused": "<b>{{name}}</b>さんが追加利用のリクエストを断りました",
+      "planLent": "<b>{{name}}</b>さんがあなたの {{plan}} プランを<b>{{agent}}</b>に接続しました"
     },
     "usageLimit": {
       "runs_other": "今月{{count}}件のリクエスト",
@@ -3193,7 +3200,12 @@
     "noneUnread": "すべて既読です。",
     "noneHere": "今は何もありません。",
     "noneDone": "過去30日間に完了にしたものはありません。",
-    "more": "さらに表示"
+    "more": "さらに表示",
+    "planLent": {
+      "takeBack": "取り戻す",
+      "takeBackAll": "すべてのエージェントから取り戻す",
+      "done": "プランが戻りました"
+    }
   },
   "approvals": {
     "title": "承認",
@@ -3580,7 +3592,8 @@
           "sendFailed": "コードを送信できませんでした。確認してもう一度お試しください。",
           "done": "{{account}}アカウントが{{computer}}に追加されました。「使う」をクリックして保存してください。"
         },
-        "offCloud": "{{computer}}が応答していません"
+        "offCloud": "{{computer}}が応答していません",
+        "accountOthers": "他の人のプランには持ち主の名前が表示されます。持ち主にはメールが届き、取り戻すこともできます。"
       },
       "computer": {
         "title": "{{name}}はどこで作業しますか？",

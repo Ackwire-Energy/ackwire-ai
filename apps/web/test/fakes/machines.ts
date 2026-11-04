@@ -287,6 +287,10 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
       },
       // Read whenever an accounts screen renders: not logged.
       aiAccounts: async () => clone(ai),
+      takeBackPlan: async (orgId, accountId, agentId) => {
+        log("machines.takeBackPlan", orgId, accountId, agentId);
+        return { agentIds: agentId ? [agentId] : [] };
+      },
       renameAccount: async (orgId, machineId, accountId, label) => {
         log("machines.renameAccount", orgId, machineId, accountId, label);
         // One listed, or one a sign-in here just finished.

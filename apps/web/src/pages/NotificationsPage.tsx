@@ -1,7 +1,9 @@
 import type { Agent, AppNotification, NotificationActor, NotificationFilter } from "@agenteschat/client";
 import {
   dropNotification,
+  keys,
   useAiStatus,
+  useApi,
   useApproval,
   useApprovals,
   useChannels,
@@ -17,7 +19,7 @@ import {
 import { approvalCardItems, approveAllScope } from "@agenteschat/client/lib/approval-card";
 import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { appCreatedLine } from "@agenteschat/client/lib/apps";
-import { restrictionLine } from "@agenteschat/client/lib/errors";
+import { errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { daysBetween, formatShortDate, formatTime, namesText, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
 import { mediaKindOf, mediaWord, messageMediaOf, textOrMedia } from "@agenteschat/client/lib/media";
@@ -188,6 +190,7 @@ function SourceChip({
     (n.kind === "browser_handoff" && s.screen === "desktop")
   )
     [icon, label] = ["computer", t("notifications.source.machine")];
+  else if (n.kind === "plan_lent") [icon, label] = ["bulb", t("settings.section.keys")];
   else if (n.kind === "browser_handoff") [icon, label] = ["globe", t("notifications.source.browser")];
   else if (s.topicId) [icon, label] = ["message", t("notifications.source.forum")];
   else if (s.issueNumber != null)
@@ -564,6 +567,41 @@ function UnreachedAllow({ agentId, userId }: { agentId: string; userId: string }
   );
 }
 
+/** "Tirar de volta" on `plan_lent`: the person's plan leaves that agent, or every agent someone else gave it to. */
+function PlanTakeBack({ n }: { n: AppNotification }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const accountId = n.source.accountId;
+  if (!accountId || n.doneAt) return null;
+  const take = async (agentId?: string) => {
+    setBusy(true);
+    try {
+      await api.machines.takeBackPlan(org.id, accountId, agentId);
+      toast.show(t("notifications.planLent.done"), "success");
+      for (const key of [keys.aiAccounts(org.id), keys.agents(org.id), keys.aiStatus(org.id)])
+        void qc.invalidateQueries({ queryKey: key });
+    } catch (error) {
+      toast.show(errorText(t, error), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="nt-steprow">
+      <Button size="sm" loading={busy} onClick={() => void take(n.source.agentId)}>
+        {t("notifications.planLent.takeBack")}
+      </Button>
+      <Button size="sm" variant="ghost" disabled={busy} onClick={() => void take()}>
+        {t("notifications.planLent.takeBackAll")}
+      </Button>
+    </div>
+  );
+}
+
 /** One item in a day group. */
 function Row({
   n,
@@ -748,6 +786,7 @@ function Row({
             {n.kind === "agent_unreached" && n.source.agentId && n.source.userId && (
               <UnreachedAllow agentId={n.source.agentId} userId={n.source.userId} />
             )}
+            {n.kind === "plan_lent" && <PlanTakeBack n={n} />}
             {widgetNoticeOf(n) && !n.doneAt && (
               <div className="nt-steprow">
                 <WidgetNoticeActions n={n} onOpen={() => h.onOpen(n)} open={false} />

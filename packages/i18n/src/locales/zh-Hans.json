@@ -352,6 +352,12 @@
       "desc": "套餐、银行卡和发票。",
       "short": "账单",
       "say": "管理账单"
+    },
+    "use_others_plans": {
+      "title": "使用其他人的套餐",
+      "desc": "把其他人连接的套餐给自己能编辑的智能体使用。套餐的主人会收到邮件，并且可以收回。",
+      "short": "使用其他人的套餐",
+      "say": "使用其他人的套餐"
     }
   },
   "auth": {
@@ -3089,7 +3095,8 @@
       "usageLimitReached": "<b>{{name}}</b> 已达到 {{amount}} 的额度",
       "usageLimitRequest": "<b>{{name}}</b> 已达到 {{amount}} 的额度并申请增加",
       "usageLimitRaised": "<b>{{name}}</b> 提高了你本月的额度",
-      "usageLimitRefused": "<b>{{name}}</b> 拒绝了你增加使用的申请"
+      "usageLimitRefused": "<b>{{name}}</b> 拒绝了你增加使用的申请",
+      "planLent": "<b>{{name}}</b> 把你的 {{plan}} 套餐连接到了 <b>{{agent}}</b>"
     },
     "usageLimit": {
       "runs_other": "本月 {{count}} 次请求",
@@ -3196,7 +3203,12 @@
     "noneUnread": "全部已读。",
     "noneHere": "这里暂时没有内容。",
     "noneDone": "过去 30 天内没有标记为完成的内容。",
-    "more": "显示更多"
+    "more": "显示更多",
+    "planLent": {
+      "takeBack": "收回",
+      "takeBackAll": "从所有智能体收回",
+      "done": "你的套餐已收回"
+    }
   },
   "approvals": {
     "title": "审批",
@@ -3604,7 +3616,8 @@
           "sendFailed": "无法发送代码，请检查后重试。",
           "done": "{{account}} 账号已在 {{computer}} 上。点击“使用”保存。"
         },
-        "offCloud": "{{computer}} 无响应"
+        "offCloud": "{{computer}} 无响应",
+        "accountOthers": "其他人的套餐会显示是谁的。主人会收到邮件，并且可以收回。"
       },
       "computer": {
         "title": "{{name}} 在哪里工作？",

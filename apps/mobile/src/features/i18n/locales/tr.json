@@ -838,7 +838,11 @@
       "computer_no_chrome_one": "Bir bilgisayarın Google Chrome'a ihtiyacı var. google.com/chrome adresinden indirin",
       "computer_no_chrome_other": "Bilgisayarların Google Chrome'a ihtiyacı var. google.com/chrome adresinden indirin",
       "app_created_one": "Bir yapay zeka uygulaması sizin için bir şeyler oluşturdu",
-      "app_created_other": "Bir yapay zeka uygulaması sizin için bir şeyler oluşturdu"
+      "app_created_other": "Bir yapay zeka uygulaması sizin için bir şeyler oluşturdu",
+      "plan_lent_one": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı",
+      "plan_lent_other": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı",
+      "plan_lent_female_one": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı",
+      "plan_lent_female_other": "{{names}}, {{plan}} planını {{agent}} ajanına bağladı"
     },
     "markRead": "Okundu olarak işaretle",
     "markUnread": "Okunmadı olarak işaretle",

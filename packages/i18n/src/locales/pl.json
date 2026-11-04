@@ -367,6 +367,12 @@
       "desc": "Plan, karta i faktury.",
       "short": "płatności",
       "say": "zarządza płatnościami"
+    },
+    "use_others_plans": {
+      "title": "Używanie planów innych osób",
+      "desc": "Dawanie agentom, których edycja jest dozwolona, planu połączonego przez inną osobę. Właściciel dostaje e-mail i może go odebrać.",
+      "short": "używanie planów innych osób",
+      "say": "używa planów innych osób"
     }
   },
   "auth": {
@@ -3404,7 +3410,8 @@
       "usageLimitReached": "<b>{{name}}</b> osiąga limit {{amount}}",
       "usageLimitRequest": "<b>{{name}}</b> osiąga limit {{amount}} i prosi o więcej",
       "usageLimitRaised": "<b>{{name}}</b> podnosi Twój limit na ten miesiąc",
-      "usageLimitRefused": "<b>{{name}}</b> odrzuca Twoją prośbę o więcej użycia"
+      "usageLimitRefused": "<b>{{name}}</b> odrzuca Twoją prośbę o więcej użycia",
+      "planLent": "<b>{{name}}</b> połączył(a) twój plan {{plan}} z agentem <b>{{agent}}</b>"
     },
     "usageLimit": {
       "runs_one": "{{count}} prośba w tym miesiącu",
@@ -3529,7 +3536,12 @@
     "noneUnread": "Wszystko przeczytane.",
     "noneHere": "Na razie nic tu nie ma.",
     "noneDone": "Nic nie oznaczono jako zakończone w ciągu ostatnich 30 dni.",
-    "more": "Pokaż więcej"
+    "more": "Pokaż więcej",
+    "planLent": {
+      "takeBack": "Odbierz",
+      "takeBackAll": "Odbierz od wszystkich agentów",
+      "done": "Twój plan wrócił"
+    }
   },
   "approvals": {
     "title": "Zatwierdzenia",
@@ -3964,7 +3976,8 @@
           "sendFailed": "Nie udało się wysłać kodu. Sprawdź go i spróbuj ponownie.",
           "done": "Konto {{account}} jest na komputerze {{computer}}. Kliknij Użyj, żeby zapisać."
         },
-        "offCloud": "{{computer}} nie odpowiada"
+        "offCloud": "{{computer}} nie odpowiada",
+        "accountOthers": "Plany innych osób pokazują, czyje są. Właściciel dostaje e-mail i może go odebrać."
       },
       "computer": {
         "title": "Gdzie pracuje {{name}}?",

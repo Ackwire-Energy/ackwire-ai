@@ -352,6 +352,12 @@
       "desc": "Paket, kartu, dan faktur.",
       "short": "tagihan",
       "say": "mengurus tagihan"
+    },
+    "use_others_plans": {
+      "title": "Pakai paket orang lain",
+      "desc": "Memberi agen yang bisa diedit paket yang dihubungkan orang lain. Pemiliknya menerima email dan bisa menariknya kembali.",
+      "short": "pakai paket orang lain",
+      "say": "memakai paket orang lain"
     }
   },
   "auth": {
@@ -3098,7 +3104,8 @@
       "usageLimitReached": "<b>{{name}}</b> mencapai batas {{amount}}",
       "usageLimitRequest": "<b>{{name}}</b> mencapai batas {{amount}} dan meminta tambahan",
       "usageLimitRaised": "<b>{{name}}</b> menaikkan batasmu bulan ini",
-      "usageLimitRefused": "<b>{{name}}</b> menolak permintaan tambahan pemakaianmu"
+      "usageLimitRefused": "<b>{{name}}</b> menolak permintaan tambahan pemakaianmu",
+      "planLent": "<b>{{name}}</b> menghubungkan paket {{plan}} kamu ke <b>{{agent}}</b>"
     },
     "usageLimit": {
       "runs_other": "{{count}} permintaan bulan ini",
@@ -3206,7 +3213,12 @@
     "noneUnread": "Semua sudah dibaca.",
     "noneHere": "Belum ada apa-apa di sini.",
     "noneDone": "Tidak ada yang ditandai selesai dalam 30 hari terakhir.",
-    "more": "Tampilkan lebih banyak"
+    "more": "Tampilkan lebih banyak",
+    "planLent": {
+      "takeBack": "Tarik kembali",
+      "takeBackAll": "Tarik kembali dari semua agen",
+      "done": "Paketmu sudah kembali"
+    }
   },
   "approvals": {
     "title": "Persetujuan",
@@ -3593,7 +3605,8 @@
           "sendFailed": "Tidak bisa mengirim kode. Periksa lalu coba lagi.",
           "done": "Akun {{account}} sudah ada di {{computer}}. Klik Pakai untuk menyimpan."
         },
-        "offCloud": "{{computer}} tidak merespons"
+        "offCloud": "{{computer}} tidak merespons",
+        "accountOthers": "Paket orang lain menunjukkan milik siapa. Pemiliknya menerima email dan bisa menariknya kembali."
       },
       "computer": {
         "title": "Di mana {{name}} bekerja?",

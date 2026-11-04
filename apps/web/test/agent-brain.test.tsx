@@ -747,6 +747,44 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(within(await advanced(d)).getByRole("slider", { name: "Esforço" })).toBeTruthy();
   });
 
+  test("who may use other people's plans gives Ada a teammate's, named whose it is; one another agent has stays off", async () => {
+    const bia: MachineAccount = {
+      ...work,
+      id: "acct_bia",
+      label: "Max da Bia",
+      email: null,
+      plan: null,
+      ownerId: "u-bia",
+      ownerName: "Bia Lima",
+      mine: false,
+    };
+    const busy: MachineAccount = { ...bia, id: "acct_caio", label: "Pro do Caio", ownerName: "Caio", usedBy: ["Theo"] };
+    const { state } = await onMac({
+      account: null,
+      accounts: [bia, busy],
+      canUsePlans: false,
+      canManageAccounts: false,
+      canUseOthersPlans: true,
+    });
+    const d = await brainDialog();
+    expect(d.textContent).toContain(
+      "Os planos de outras pessoas mostram de quem são. O dono recebe um e-mail e pode tirar de volta.",
+    );
+    const trigger = within(d).getByRole("combobox", { name: "Conta" });
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    expect(screen().getByRole("option", { name: /^Max da Bia/ }).textContent).toBe("Max da BiaDe Bia");
+    expect(
+      screen()
+        .getByRole("option", { name: /^Pro do Caio/ })
+        .getAttribute("aria-disabled"),
+    ).toBe("true");
+    await click(screen().getByRole("option", { name: /^Max da Bia/ }));
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_bia" });
+  });
+
   test("a signed-out account says so and offers to sign in again, its own email going to Claude's sign-in unasked", async () => {
     const { state } = await onMac({ account: "acct_work", accounts: [{ ...work, status: "signed_out" }] });
     const d = await brainDialog();

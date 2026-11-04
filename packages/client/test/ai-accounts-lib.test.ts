@@ -9,6 +9,7 @@ import {
   endsOnClaude,
   existingAi,
   groupPlans,
+  lendable,
   ownSignInListed,
   ownSignInName,
   ownSignInReady,
@@ -196,6 +197,30 @@ describe("existingAi: what a person already has for an agent with no AI", () => 
       claude("s", "walt@acme.com", { usedBy: ["Theo"], usedByIds: ["theo"], shared: true, ...over });
     expect(acts([forAll()], null)).toEqual([["use", "s"]]);
     expect(acts([forAll({ status: "signed_out" })], null)).toEqual([["again", "s"]]);
+  });
+
+  test("who may use other people's plans uses a teammate's in one click, never one another agent has (ADR 0059 §3)", () => {
+    const theirs = (id: string, over: Partial<MachineAccount> = {}) =>
+      claude(id, "", { mine: false, ownerId: "u_bia", email: null, ...over });
+    const accounts = [
+      theirs("free"),
+      theirs("busy", { usedBy: ["Theo"] }),
+      theirs("all", { usedBy: ["Theo"], shared: true }),
+      theirs("out", { status: "signed_out" }),
+    ];
+    const rows = (canUseOthersPlans: boolean) =>
+      existingAi({ accounts, account: null, canUseOthersPlans }, []).map((r) =>
+        r.kind === "key" ? ["key", r.key.id] : [r.act, r.choice.login.id],
+      );
+    expect(rows(true)).toEqual([
+      ["use", "free"],
+      ["use", "all"],
+      ["locked", "busy"],
+      ["locked", "out"],
+    ]);
+    expect(rows(false).every(([act]) => act === "locked")).toBe(true);
+    expect(lendable({ status: "active", shared: false, usedBy: ["Ada"] }, "Ada")).toBe(true);
+    expect(lendable({ status: "active", shared: false, usedBy: ["Theo"] }, "Ada")).toBe(false);
   });
 });
 

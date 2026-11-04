@@ -357,6 +357,12 @@
       "desc": "Plan, kart ve faturalar.",
       "short": "faturalandırma",
       "say": "faturalandırmayla ilgilenir"
+    },
+    "use_others_plans": {
+      "title": "Başkalarının planlarını kullanma",
+      "desc": "Düzenleyebildiği ajanlara başka birinin bağladığı bir planı verir. Sahibi bir e-posta alır ve geri alabilir.",
+      "short": "başkalarının planlarını kullanma",
+      "say": "başkalarının planlarını kullanır"
     }
   },
   "auth": {
@@ -3186,7 +3192,8 @@
       "usageLimitReached": "<b>{{name}}</b> {{amount}} limitine ulaştı",
       "usageLimitRequest": "<b>{{name}}</b> {{amount}} limitine ulaştı ve daha fazlasını istiyor",
       "usageLimitRaised": "<b>{{name}}</b> bu ayki limitini artırdı",
-      "usageLimitRefused": "<b>{{name}}</b> daha fazla kullanım isteğini reddetti"
+      "usageLimitRefused": "<b>{{name}}</b> daha fazla kullanım isteğini reddetti",
+      "planLent": "<b>{{name}}</b>, {{plan}} planını <b>{{agent}}</b> ajanına bağladı"
     },
     "usageLimit": {
       "runs_one": "Bu ay {{count}} istek",
@@ -3299,7 +3306,12 @@
     "noneUnread": "Hepsi okundu.",
     "noneHere": "Şimdilik burada bir şey yok.",
     "noneDone": "Son 30 günde tamamlandı olarak işaretlenen bir şey yok.",
-    "more": "Daha fazla göster"
+    "more": "Daha fazla göster",
+    "planLent": {
+      "takeBack": "Geri al",
+      "takeBackAll": "Tüm ajanlardan geri al",
+      "done": "Planın geri geldi"
+    }
   },
   "approvals": {
     "title": "Onaylar",
@@ -3695,7 +3707,8 @@
           "sendFailed": "Kod gönderilemedi. Kontrol edip tekrar deneyin.",
           "done": "{{account}} hesabı {{computer}} üzerinde. Kaydetmek için Kullan'a tıklayın."
         },
-        "offCloud": "{{computer}} yanıt vermiyor"
+        "offCloud": "{{computer}} yanıt vermiyor",
+        "accountOthers": "Başkalarının planları kimin olduğunu gösterir. Sahibi bir e-posta alır ve geri alabilir."
       },
       "computer": {
         "title": "{{name}} nerede çalışsın?",

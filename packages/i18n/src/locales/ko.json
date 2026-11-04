@@ -352,6 +352,12 @@
       "desc": "요금제, 카드, 청구서.",
       "short": "결제",
       "say": "결제 관리"
+    },
+    "use_others_plans": {
+      "title": "다른 사람의 플랜 사용",
+      "desc": "편집할 수 있는 에이전트에 다른 사람이 연결한 플랜을 줘요. 플랜 주인은 이메일을 받고 되돌려 받을 수 있어요.",
+      "short": "다른 사람의 플랜 사용",
+      "say": "다른 사람의 플랜을 사용해요"
     }
   },
   "auth": {
@@ -3084,7 +3090,8 @@
       "usageLimitReached": "<b>{{name}}</b> 님이 {{amount}} 한도에 도달했어요",
       "usageLimitRequest": "<b>{{name}}</b> 님이 {{amount}} 한도에 도달해 추가를 요청했어요",
       "usageLimitRaised": "<b>{{name}}</b> 님이 이번 달 내 한도를 올렸어요",
-      "usageLimitRefused": "<b>{{name}}</b> 님이 추가 사용 요청을 거절했어요"
+      "usageLimitRefused": "<b>{{name}}</b> 님이 추가 사용 요청을 거절했어요",
+      "planLent": "<b>{{name}}</b> 님이 내 {{plan}} 플랜을 <b>{{agent}}</b>에 연결했어요"
     },
     "usageLimit": {
       "runs_other": "이번 달 요청 {{count}}건",
@@ -3191,7 +3198,12 @@
     "noneUnread": "모두 읽었어요.",
     "noneHere": "지금은 아무것도 없어요.",
     "noneDone": "최근 30일 동안 완료로 표시한 항목이 없어요.",
-    "more": "더 보기"
+    "more": "더 보기",
+    "planLent": {
+      "takeBack": "되돌려 받기",
+      "takeBackAll": "모든 에이전트에서 되돌려 받기",
+      "done": "플랜을 되돌려 받았어요"
+    }
   },
   "approvals": {
     "title": "승인",
@@ -3578,7 +3590,8 @@
           "sendFailed": "코드를 보내지 못했어요. 확인하고 다시 시도하세요.",
           "done": "{{account}} 계정이 {{computer}}에 있어요. 사용을 클릭해 저장하세요."
         },
-        "offCloud": "{{computer}}이(가) 응답하지 않아요"
+        "offCloud": "{{computer}}이(가) 응답하지 않아요",
+        "accountOthers": "다른 사람의 플랜에는 주인이 표시돼요. 주인은 이메일을 받고 되돌려 받을 수 있어요."
       },
       "computer": {
         "title": "{{name}}은(는) 어디에서 일하나요?",

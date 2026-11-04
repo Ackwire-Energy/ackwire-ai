@@ -71,6 +71,7 @@ export const SUMMARY_ORDER: readonly RolePermission[] = [
   "control_browsers",
   "manage_connectors",
   "manage_credentials",
+  "use_others_plans",
   "manage_members",
   "manage_roles",
   "view_usage",

@@ -302,6 +302,12 @@ export const en = {
       short: "AI keys",
       say: "looks after AI keys",
     },
+    use_others_plans: {
+      title: "Use other people's plans",
+      desc: "Give the agents they can edit a plan someone else connected. Its owner gets an email and can take it back.",
+      short: "use other people's plans",
+      say: "uses other people's plans",
+    },
     edit_wiki: {
       title: "Edit the wiki",
       desc: "Create and change pages.",
@@ -3041,6 +3047,12 @@ export const en = {
   },
   notifications: {
     title: "Notifications",
+    /** "Tirar de volta" on `plan_lent`: the person's plan leaves the agent someone else gave it to, or all of them. */
+    planLent: {
+      takeBack: "Take it back",
+      takeBackAll: "Take it back from every agent",
+      done: "Your plan is back",
+    },
     docTitleUnread: "({{count}}) Notifications",
     summaryWaiting_one: "{{count}} thing waiting on you",
     summaryWaiting_other: "{{count}} things waiting on you",
@@ -3150,6 +3162,8 @@ export const en = {
       browserProfileRequest: "<b>{{name}}</b> asks for one more browser profile for <b>{{agent}}</b>",
       /** Someone other than its owner took control of the person's agent's desktop (`desktop_taken`). */
       desktopTaken: "<b>{{name}}</b> took control of the screen of <b>{{agent}}</b>'s computer",
+      /** Someone gave an agent the person's plan (`plan_lent`): `plan` its maker ("Claude"). */
+      planLent: "<b>{{name}}</b> connected your {{plan}} plan to <b>{{agent}}</b>",
       routineWaitingPlan: "<b>{{name}}</b> is waiting for its plan to reset to run a routine",
       planResetUnknown: "{{plan}} didn't say when its limit resets. <b>{{name}}</b>'s work is still waiting.",
       catchUpClosed_one: "<b>{{name}}</b> is back and skipped {{count}} conversation that didn't need an answer",
@@ -3556,6 +3570,8 @@ export const en = {
         accountMove: "In use by {{agents}} · Move it here",
         accountAlso: "Also used by {{agents}}",
         accountOf: "{{name}}'s",
+        /** Under the account for someone who may use other people's plans (`use_others_plans`). */
+        accountOthers: "Other people's plans show whose they are. Their owner gets an email and can take it back.",
         addAccount: "Add account",
         signInAgain: "Sign in again",
         connectPlan: "Connect another plan",

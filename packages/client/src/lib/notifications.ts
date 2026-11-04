@@ -342,7 +342,7 @@ export type OpenTarget =
   | { to: "/org/$orgId/settings/computers/$machineId"; params: { machineId: string } }
   | {
       to: "/org/$orgId/settings/$section";
-      params: { section: "computers" | "members" | "usage" | "connectors" | "billing" | "approvals" };
+      params: { section: "computers" | "members" | "usage" | "connectors" | "billing" | "approvals" | "keys" };
     }
   | { to: "/org/$orgId/home"; search?: { widget: string } }
   | { to: "/org/$orgId/dashboards" }
@@ -418,6 +418,8 @@ export function openTarget(n: AppNotification): OpenTarget | null {
       ...(theirs && s.userId ? { search: { person: s.userId } } : {}),
     };
   }
+  // Someone gave an agent the person's plan: Contas de IA, where their plans and the agents on them are.
+  if (n.kind === "plan_lent") return { to: "/org/$orgId/settings/$section", params: { section: "keys" } };
   // A server changed approved tools: accepted in Conectores.
   if (n.kind === "connector_tool_changed")
     return { to: "/org/$orgId/settings/$section", params: { section: "connectors" } };

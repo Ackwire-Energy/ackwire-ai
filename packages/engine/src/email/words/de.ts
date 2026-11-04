@@ -360,4 +360,21 @@ export const words: EmailWords = {
     why: (org) =>
       `Du erhältst diese E-Mail, weil einer deiner Agenten in ${org} mit deinem Abo denkt und jemand anderes geändert hat, wer mit ihm sprechen darf.`,
   },
+  planLent: {
+    subject: (plan) => `Dein ${plan}-Abo denkt jetzt für einen anderen Agenten`,
+    preheader: (plan) => `Seine Unterhaltungen nutzen dein ${plan}-Abo und seine Limits. Du kannst es zurücknehmen.`,
+    headline: "Jemand hat dein Abo mit einem Agenten verbunden",
+    body: (by, agent, plan) => [
+      { b: by },
+      ` hat dein ${plan}-Abo mit dem Agenten `,
+      { b: agent },
+      " verbunden. Seine Unterhaltungen nutzen dein Abo und seine Limits.",
+    ],
+    agent: "Agent",
+    by: "Verbunden von",
+    plan: "Abo",
+    note: "Nimm es mit einem Klick in deinen Benachrichtigungen zurück, dann denkt der Agent nicht mehr mit deinem Abo.",
+    button: "Benachrichtigungen öffnen",
+    why: (org) => `Du erhältst diese E-Mail, weil jemand in ${org} dein Abo mit einem Agenten verbunden hat.`,
+  },
 };

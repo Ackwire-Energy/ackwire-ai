@@ -1053,6 +1053,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       refreshAccountUsage: (orgId) => request<void>(`${org(orgId)}/ai-accounts/refresh`, { json: {} }),
       aiAccounts: (orgId) => request<AiAccounts>(`${org(orgId)}/ai-accounts`),
+      takeBackPlan: (orgId, accountId, agentId) =>
+        request<{ agentIds: string[] }>(`${org(orgId)}/ai-accounts/${enc(accountId)}/take-back`, {
+          json: agentId ? { agentId } : {},
+        }),
       renameAccount: (orgId, machineId, accountId, label) =>
         request<MachineAccount>(`${org(orgId)}/machines/${enc(machineId)}/accounts/${enc(accountId)}`, {
           method: "PATCH",

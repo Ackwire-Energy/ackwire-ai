@@ -164,6 +164,13 @@ export const agents = pgTable(
      * in code under a lock on the account's row).
      */
     brainAccountId: uuid(),
+    /**
+     * Who gave it `brainAccountId` though that plan isn't theirs and isn't the agent's owner's (`use_others_plans`,
+     * ADR 0059 §3 amended 2026-11-04): such a plan thinks for it while this is set, and its owner may take it back.
+     * Set whenever the account changes (`setAgentBrain`), only read together with `brainAccountId`. No foreign key:
+     * the plan stays lent if that person leaves.
+     */
+    brainAccountLentBy: text(),
     /** How hard its computer brain thinks (`low`…`max`, ADR 0041); null = the CLI's default. */
     brainEffort: text(),
     /**

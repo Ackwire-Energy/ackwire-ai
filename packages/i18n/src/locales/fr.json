@@ -362,6 +362,12 @@
       "desc": "L'abonnement, la carte et les factures.",
       "short": "facturation",
       "say": "gère la facturation"
+    },
+    "use_others_plans": {
+      "title": "Utiliser les forfaits d’autres personnes",
+      "desc": "Donner aux agents qu’on peut modifier un forfait connecté par quelqu’un d’autre. Son propriétaire reçoit un e-mail et peut le reprendre.",
+      "short": "utiliser les forfaits d’autres personnes",
+      "say": "utilise les forfaits d’autres personnes"
     }
   },
   "auth": {
@@ -3308,7 +3314,8 @@
       "usageLimitReached": "<b>{{name}}</b> a atteint sa limite de {{amount}}",
       "usageLimitRequest": "<b>{{name}}</b> a atteint sa limite de {{amount}} et en demande plus",
       "usageLimitRaised": "<b>{{name}}</b> a relevé votre limite pour ce mois",
-      "usageLimitRefused": "<b>{{name}}</b> a refusé votre demande d'utilisation supplémentaire"
+      "usageLimitRefused": "<b>{{name}}</b> a refusé votre demande d'utilisation supplémentaire",
+      "planLent": "<b>{{name}}</b> a connecté votre forfait {{plan}} à <b>{{agent}}</b>"
     },
     "usageLimit": {
       "runs_one": "{{count}} demande ce mois-ci",
@@ -3427,7 +3434,12 @@
     "noneUnread": "Tout est lu.",
     "noneHere": "Rien ici pour l'instant.",
     "noneDone": "Rien marqué comme terminé ces 30 derniers jours.",
-    "more": "Afficher plus"
+    "more": "Afficher plus",
+    "planLent": {
+      "takeBack": "Reprendre",
+      "takeBackAll": "Reprendre de tous les agents",
+      "done": "Votre forfait est revenu"
+    }
   },
   "approvals": {
     "title": "Approbations",
@@ -3853,7 +3865,8 @@
           "sendFailed": "Impossible d'envoyer le code. Vérifiez-le et réessayez.",
           "done": "Le compte {{account}} est sur {{computer}}. Cliquez sur Utiliser pour enregistrer."
         },
-        "offCloud": "{{computer}} ne répond pas"
+        "offCloud": "{{computer}} ne répond pas",
+        "accountOthers": "Les forfaits d’autres personnes indiquent à qui ils sont. Leur propriétaire reçoit un e-mail et peut les reprendre."
       },
       "computer": {
         "title": "Où {{name}} travaille-t-il ?",

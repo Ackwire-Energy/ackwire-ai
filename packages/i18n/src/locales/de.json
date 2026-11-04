@@ -357,6 +357,12 @@
       "desc": "Der Tarif, die Karte und die Rechnungen.",
       "short": "Abrechnung",
       "say": "kümmert sich um die Abrechnung"
+    },
+    "use_others_plans": {
+      "title": "Abos anderer Personen nutzen",
+      "desc": "Den Agenten, die man bearbeiten darf, ein Abo geben, das jemand anderes verbunden hat. Der Inhaber bekommt eine E-Mail und kann es zurücknehmen.",
+      "short": "Abos anderer Personen nutzen",
+      "say": "nutzt Abos anderer Personen"
     }
   },
   "auth": {
@@ -3199,7 +3205,8 @@
       "usageLimitReached": "<b>{{name}}</b> hat das Limit von {{amount}} erreicht",
       "usageLimitRequest": "<b>{{name}}</b> hat das Limit von {{amount}} erreicht und bittet um mehr",
       "usageLimitRaised": "<b>{{name}}</b> hat dein Limit für diesen Monat erhöht",
-      "usageLimitRefused": "<b>{{name}}</b> hat deine Bitte um mehr Nutzung abgelehnt"
+      "usageLimitRefused": "<b>{{name}}</b> hat deine Bitte um mehr Nutzung abgelehnt",
+      "planLent": "<b>{{name}}</b> hat dein {{plan}}-Abo mit <b>{{agent}}</b> verbunden"
     },
     "usageLimit": {
       "runs_one": "{{count}} Anfrage diesen Monat",
@@ -3313,7 +3320,12 @@
     "noneUnread": "Alles gelesen.",
     "noneHere": "Vorerst nichts hier.",
     "noneDone": "In den letzten 30 Tagen nichts als erledigt markiert.",
-    "more": "Mehr anzeigen"
+    "more": "Mehr anzeigen",
+    "planLent": {
+      "takeBack": "Zurücknehmen",
+      "takeBackAll": "Von allen Agenten zurücknehmen",
+      "done": "Dein Abo ist zurück"
+    }
   },
   "approvals": {
     "title": "Freigaben",
@@ -3709,7 +3721,8 @@
           "sendFailed": "Der Code konnte nicht gesendet werden. Prüf ihn und versuch es noch einmal.",
           "done": "Das Konto {{account}} ist auf {{computer}}. Klicke auf Verwenden, um zu speichern."
         },
-        "offCloud": "{{computer}} antwortet nicht"
+        "offCloud": "{{computer}} antwortet nicht",
+        "accountOthers": "Abos anderer Personen zeigen, wem sie gehören. Der Inhaber bekommt eine E-Mail und kann es zurücknehmen."
       },
       "computer": {
         "title": "Wo arbeitet {{name}}?",

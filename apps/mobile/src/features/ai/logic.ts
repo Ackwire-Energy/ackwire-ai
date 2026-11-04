@@ -16,6 +16,7 @@ import {
   accountTitle,
   type ExistingAi,
   existingAi,
+  lendable,
 } from "@agenteschat/client/lib/ai-accounts";
 import { thinksWith } from "@agenteschat/client/lib/brain";
 import { type Advanced, advancedParts } from "@agenteschat/client/lib/brain-advanced";
@@ -73,15 +74,21 @@ export const accountKindOf = (brain: BrainKind | undefined): MachineAccountKind 
 
 /**
  * The accounts the agent's page lists, as the web's picker: its owner's of that kind (a plan thinks only for its
- * owner's agents, ADR 0059 §3), which its owner or an admin picks, and someone else's only while it is this agent's.
+ * owner's agents, ADR 0059 §3), which its owner or an admin picks, and someone else's only while it is this agent's,
+ * or every one of that kind for whoever may use other people's plans (`canUseOthersPlans`) where it is `lendable`.
  */
 export const agentAccounts = (
-  view: Pick<AgentBrain, "accounts" | "account" | "canUsePlans">,
+  view: Pick<AgentBrain, "accounts" | "account" | "canUsePlans" | "canUseOthersPlans">,
   kind: MachineAccountKind,
   ownerUserId: string | null | undefined,
+  agentName = "",
 ) =>
   view.accounts.filter(
-    (a) => a.kind === kind && ((view.canUsePlans ? a.mine : a.ownerId === ownerUserId) || a.id === view.account),
+    (a) =>
+      a.kind === kind &&
+      ((view.canUsePlans ? a.mine : a.ownerId === ownerUserId) ||
+        a.id === view.account ||
+        (view.canUseOthersPlans === true && a.ownerId !== ownerUserId && lendable(a, agentName))),
   );
 
 /** The plan usage of what it thinks with: its account's, or the computer's own sign-in's where that thinks for it. */
@@ -225,7 +232,7 @@ export const accountRow = (t: TFunction, choice: AccountChoice<MachineAccount>, 
  */
 export function existingRows(
   t: TFunction,
-  view: Pick<AgentBrain, "accounts" | "account">,
+  view: Pick<AgentBrain, "accounts" | "account" | "canUseOthersPlans">,
   keys: readonly Credential[],
   agentName: string,
 ) {

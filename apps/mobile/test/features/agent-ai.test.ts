@@ -77,6 +77,32 @@ describe("the agent's AI", () => {
     expect(agentAccounts(admin, "claude_code", "u1").map((a) => a.id)).toEqual(["mine"]);
   });
 
+  test("who may use other people's plans sees a teammate's too, never one another agent has (ADR 0059 §3)", async () => {
+    const t = await translator("pt-BR");
+    const view = {
+      account: null,
+      ownSignIn: false,
+      ownUsage: {},
+      canUsePlans: false,
+      canUseOthersPlans: true,
+      accounts: [
+        account("owners"),
+        account("bias", { mine: false, ownerId: "u2", ownerName: "Bia" }),
+        account("busy", { mine: false, ownerId: "u3", usedBy: ["Theo"] }),
+        account("all", { mine: false, ownerId: "u3", usedBy: ["Theo"], shared: true }),
+        account("out", { mine: false, ownerId: "u3", status: "signed_out" }),
+      ],
+    };
+    expect(agentAccounts(view, "claude_code", "u1", "Ada").map((a) => a.id)).toEqual(["owners", "bias", "all"]);
+    expect(agentAccounts({ ...view, canUseOthersPlans: false }, "claude_code", "u1", "Ada").map((a) => a.id)).toEqual([
+      "owners",
+    ]);
+    // Connect an AI's first rows: Bia's in one tap, whose it is under it; one another agent has stays locked.
+    const rows = existingRows(t, view, [], "Ada").map((r) => [r.row.kind === "key" ? "key" : r.row.act, r.sub]);
+    expect(rows).toContainEqual(["use", "De Bia"]);
+    expect(rows.filter(([act]) => act === "locked")).toHaveLength(2);
+  });
+
   test("the usage shown is its account's, or the computer's own sign-in's only where that thinks for it", () => {
     const base: View = { account: "a1", ownSignIn: true, ownUsage: { claude_code: usage(40) }, accounts: [] };
     expect(thinkingUsage({ ...base, accounts: [account("a1", { usage: usage(90) })] }, "claude_code")).toEqual(
