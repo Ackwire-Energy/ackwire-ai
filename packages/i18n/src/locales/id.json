@@ -1902,6 +1902,7 @@
     "empty": "Tidak ada yang menunggu untuk dilanjutkan.",
     "waiting_other": "{{count}} percakapan menunggu",
     "closedTitle_other": "{{count}} tidak perlu dijawab",
+    "closedWhy": "Semuanya tampak sudah beres, jadi {{agent}} tidak menjawab.",
     "closedLine": "Semuanya tampak sudah beres, jadi {{agent}} tidak menjawab. Kalau ada yang masih perlu dijawab, pilih Tetap jawab.",
     "seeConversation": "Lihat percakapan",
     "answeredAnyway": "Seseorang tetap meminta jawaban",

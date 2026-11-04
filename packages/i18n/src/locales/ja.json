@@ -1892,6 +1892,7 @@
     "empty": "再開を待っているものはありません。",
     "waiting_other": "{{count}}件の会話が待機中",
     "closedTitle_other": "返信が不要だった会話{{count}}件",
+    "closedWhy": "解決済みに見えたため、{{agent}}は返信しませんでした。",
     "closedLine": "解決済みに見えたため、{{agent}}は返信しませんでした。まだ返信が必要なものがあれば、「それでも返信する」を選んでください。",
     "seeConversation": "会話を見る",
     "answeredAnyway": "それでも返信してほしいと頼まれました",

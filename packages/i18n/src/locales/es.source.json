@@ -4801,6 +4801,9 @@
       "other": "{{count}} didn't need an answer"
     }
   },
+  "usageQueue.closedWhy": {
+    "value": "They looked handled, so {{agent}} didn't answer."
+  },
   "usageQueue.closedLine": {
     "value": "They looked handled, so {{agent}} didn't answer. If one still needs an answer, choose Answer anyway."
   },

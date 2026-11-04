@@ -2049,6 +2049,7 @@
     "closedTitle_one": "{{count}} n'avait pas besoin de réponse",
     "closedTitle_many": "{{count}} n'avaient pas besoin de réponse",
     "closedTitle_other": "{{count}} n'avaient pas besoin de réponse",
+    "closedWhy": "Elles semblaient réglées, donc {{agent}} n'a pas répondu.",
     "closedLine": "Elles semblaient réglées, donc {{agent}} n'a pas répondu. Si l'une d'elles a encore besoin d'une réponse, choisissez Répondre quand même.",
     "seeConversation": "Voir la conversation",
     "answeredAnyway": "Quelqu'un a demandé une réponse quand même",

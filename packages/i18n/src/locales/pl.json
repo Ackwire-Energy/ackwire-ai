@@ -2115,6 +2115,7 @@
     "closedTitle_few": "{{count}} nie wymagały odpowiedzi",
     "closedTitle_many": "{{count}} nie wymagało odpowiedzi",
     "closedTitle_other": "{{count}} nie wymagały odpowiedzi",
+    "closedWhy": "Wyglądały na załatwione, więc {{agent}} nie odpowiedział.",
     "closedLine": "Wyglądały na załatwione, więc {{agent}} nie odpowiedział. Jeśli któraś nadal wymaga odpowiedzi, wybierz Odpowiedz mimo to.",
     "seeConversation": "Zobacz rozmowę",
     "answeredAnyway": "Ktoś poprosił o odpowiedź mimo to",

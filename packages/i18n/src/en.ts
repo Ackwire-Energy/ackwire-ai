@@ -1932,6 +1932,8 @@ export const en = {
     waiting_other: "{{count}} conversations waiting",
     closedTitle_one: "{{count}} didn't need an answer",
     closedTitle_other: "{{count}} didn't need an answer",
+    /** For someone who may not answer any of them: no pointer to a button they don't have. */
+    closedWhy: "They looked handled, so {{agent}} didn't answer.",
     closedLine: "They looked handled, so {{agent}} didn't answer. If one still needs an answer, choose Answer anyway.",
     seeConversation: "See conversation",
     answeredAnyway: "Someone asked for an answer anyway",

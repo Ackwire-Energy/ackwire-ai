@@ -2046,6 +2046,7 @@
     "closedTitle_one": "{{count}} no necesitó respuesta",
     "closedTitle_many": "{{count}} no necesitaron respuesta",
     "closedTitle_other": "{{count}} no necesitaron respuesta",
+    "closedWhy": "Parecían resueltas, así que {{agent}} no respondió.",
     "closedLine": "Parecían resueltas, así que {{agent}} no respondió. Si alguna todavía necesita respuesta, elige Responder de todos modos.",
     "seeConversation": "Ver conversación",
     "answeredAnyway": "Alguien pidió una respuesta de todos modos",

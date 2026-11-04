@@ -1971,6 +1971,7 @@
     "waiting_other": "{{count}} Unterhaltungen warten",
     "closedTitle_one": "{{count}} brauchte keine Antwort",
     "closedTitle_other": "{{count}} brauchten keine Antwort",
+    "closedWhy": "Sie schienen erledigt, also hat {{agent}} nicht geantwortet.",
     "closedLine": "Sie schienen erledigt, also hat {{agent}} nicht geantwortet. Wenn eine noch eine Antwort braucht, wähle Trotzdem antworten.",
     "seeConversation": "Unterhaltung ansehen",
     "answeredAnyway": "Jemand hat trotzdem um eine Antwort gebeten",

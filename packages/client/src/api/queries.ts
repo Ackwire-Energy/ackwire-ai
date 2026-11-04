@@ -2039,7 +2039,7 @@ export const useUsageQueue = (orgId: string, agentId: string, enabled = true) =>
     queryFn: () => api.agents.usageQueue(orgId, agentId),
     enabled: enabled && orgId.length > 0 && agentId.length > 0,
     retry: false,
-    refetchInterval: (q) => ((q.state.data?.rows.length ?? 0) > 0 ? 30_000 : false),
+    refetchInterval: (q) => ((q.state.data?.rows.length ?? 0) + (q.state.data?.hidden ?? 0) > 0 ? 30_000 : false),
     meta: { quiet: true },
   });
 };

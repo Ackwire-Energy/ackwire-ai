@@ -229,8 +229,8 @@ function WaitingRows({
                 <span className="cq__l2">{usageQueueMeta(t, i18n.language, row, person, new Date(now))}</span>
                 <span className="cq__l2">{usageQueueFacts(t, row, me.user.name)}</span>
                 <span className="cq__acts">
-                  <TextAction onClick={() => openConversation(row)}>{t("usageQueue.seeConversation")}</TextAction>
                   {row.state === "queued" && row.mayStop && <DontRunButton runId={row.runId} may />}
+                  <TextAction onClick={() => openConversation(row)}>{t("usageQueue.seeConversation")}</TextAction>
                 </span>
               </span>
             </li>
@@ -265,7 +265,11 @@ function SkippedRows({
   return (
     <section className="cq__group">
       <h3 className="cq__title">{t("usageQueue.closedTitle", { count: rows.length })}</h3>
-      <p className="cq__rule">{t("usageQueue.closedLine", { agent })}</p>
+      <p className="cq__rule">
+        {t(rows.some((r) => r.mayAnswer && !r.continuedRunId) ? "usageQueue.closedLine" : "usageQueue.closedWhy", {
+          agent,
+        })}
+      </p>
       <ol className="cq__rows">
         {rows.map((row) => (
           <li key={row.runId} className="cq__row" data-mine={row.closed.askers.includes(me.user.id) || undefined}>

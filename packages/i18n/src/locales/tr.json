@@ -1962,6 +1962,7 @@
     "waiting_other": "{{count}} konuşma bekliyor",
     "closedTitle_one": "{{count}} konuşma yanıt gerektirmedi",
     "closedTitle_other": "{{count}} konuşma yanıt gerektirmedi",
+    "closedWhy": "Çözülmüş göründükleri için {{agent}} yanıt vermedi.",
     "closedLine": "Çözülmüş göründükleri için {{agent}} yanıt vermedi. Hâlâ yanıt bekleyen varsa Yine de yanıtla seçeneğini seçin.",
     "seeConversation": "Konuşmayı gör",
     "answeredAnyway": "Biri yine de yanıt istedi",

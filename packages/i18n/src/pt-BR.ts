@@ -1959,6 +1959,7 @@ export const ptBR = {
     waiting_other: "{{count}} conversas esperando",
     closedTitle_one: "{{count}} não precisou de resposta",
     closedTitle_other: "{{count}} não precisaram de resposta",
+    closedWhy: "Pareciam resolvidas, então {{agent}} não respondeu.",
     closedLine:
       "Pareciam resolvidas, então {{agent}} não respondeu. Se alguma ainda precisa de resposta, escolha Responder mesmo assim.",
     seeConversation: "Ver conversa",

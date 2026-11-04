@@ -2048,6 +2048,7 @@
     "closedTitle_one": "{{count}} non aveva bisogno di risposta",
     "closedTitle_many": "{{count}} non avevano bisogno di risposta",
     "closedTitle_other": "{{count}} non avevano bisogno di risposta",
+    "closedWhy": "Sembravano risolte, quindi {{agent}} non ha risposto.",
     "closedLine": "Sembravano risolte, quindi {{agent}} non ha risposto. Se una ha ancora bisogno di risposta, scegli Rispondi comunque.",
     "seeConversation": "Vedi la conversazione",
     "answeredAnyway": "Qualcuno ha chiesto comunque una risposta",

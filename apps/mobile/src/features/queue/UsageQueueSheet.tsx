@@ -166,13 +166,13 @@ function WaitingRow({
           {facts}
         </Text>
         <View style={styles.textActs}>
+          {row.state === "queued" && row.mayStop ? <DontRunButton runId={row.runId} may /> : null}
           <Button
             variant="ghost"
             size="sm"
             label={t("usageQueue.seeConversation")}
             onPress={() => onLeave(() => router.push(chatHref(row.channelId, row.threadId, row.messageId)))}
           />
-          {row.state === "queued" && row.mayStop ? <DontRunButton runId={row.runId} may /> : null}
         </View>
       </View>
     </View>
@@ -211,7 +211,9 @@ function SkippedRows({
         {t("usageQueue.closedTitle", { count: rows.length })}
       </Text>
       <Text variant="footnote" tone="muted">
-        {t("usageQueue.closedLine", { agent })}
+        {t(rows.some((r) => r.mayAnswer && !r.continuedRunId) ? "usageQueue.closedLine" : "usageQueue.closedWhy", {
+          agent,
+        })}
       </Text>
       <View style={styles.rows}>
         {rows.map((row) => {
