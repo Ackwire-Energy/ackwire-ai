@@ -52,7 +52,7 @@ function Board({ id }: { id: string }) {
   if (!board) {
     return (
       <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-        <PushedHeader title={id === HOME ? t("dashboards.home") : ""} solid={false} grouped />
+        <PushedHeader title={id === HOME ? t("dashboards.home") : ""} grouped />
         <View style={styles.center}>
           {loading ? (
             <ActivityIndicator color={c.muted} />
@@ -80,7 +80,6 @@ function Board({ id }: { id: string }) {
       <PushedHeader
         title={title}
         subtitle={home ? t("dashboards.audience.private") : byline(board, false) || undefined}
-        solid={false}
         grouped
         right={
           <View style={styles.barRight}>

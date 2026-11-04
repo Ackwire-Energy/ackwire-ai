@@ -70,6 +70,7 @@ export function HomeWidgets() {
                   h: 1,
                 }}
                 onPress={() => router.push(widgetHref(w.id))}
+                compact
               />
             </View>
           ))}

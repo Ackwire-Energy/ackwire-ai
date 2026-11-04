@@ -54,7 +54,7 @@ export function OrganizeScreen({ id }: { id: string }) {
   if (!board) {
     return (
       <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-        <PushedHeader title={t("widgets.organize.start")} solid={false} grouped />
+        <PushedHeader title={t("widgets.organize.start")} grouped />
         <View style={styles.center}>
           {loading ? (
             <ActivityIndicator color={c.muted} />
@@ -181,7 +181,6 @@ function Arrange({ board }: { board: Dashboard }) {
       <PushedHeader
         title={t("widgets.organize.start")}
         subtitle={home ? t("dashboards.home") : board.title}
-        solid={false}
         grouped
         action={{ label: t("widgets.organize.done"), disabled: save.isPending, onPress: done }}
       />
