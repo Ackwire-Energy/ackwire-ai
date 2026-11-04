@@ -1,0 +1,84 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { setupDom } from "@agenteschat/ui/testing/dom";
+
+setupDom();
+
+import { decisionOutcome } from "@agenteschat/client/lib/approval-words";
+import { resources } from "@agenteschat/i18n";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import i18next from "i18next";
+import { createFakeApi, type FakeState, ORG_ID, seedState } from "./fake-api";
+import { renderApp, screen, settle } from "./render";
+
+afterEach(() => cleanup());
+
+const go = async (state: FakeState = seedState()) => {
+  const r = await renderApp(`/org/${ORG_ID}/settings/approvals`, { api: createFakeApi(state) });
+  await settle(6);
+  return { ...r, state };
+};
+const click = async (el: Element) => {
+  await act(async () => fireEvent.click(el));
+  await settle(4);
+};
+const section = () => within(document.querySelector(".settings__body") as HTMLElement);
+const pick = async (select: string, option: string) => {
+  const trigger = section().getByRole("combobox", { name: select });
+  trigger.focus();
+  await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+  await click(screen().getByRole("option", { name: option }));
+};
+const last = (state: FakeState, method: string) => state.calls.findLast((c) => c.method === method)?.args;
+const joao = (state: FakeState) => state.members.find((m) => m.userId === "u-joao")?.name ?? "";
+
+describe("Configurações › Você › Aprovações (ADR 0138)", () => {
+  test("Quem aprova por mim: one person, then when, until and risky actions, each saved at once", async () => {
+    const { state } = await go();
+    const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
+    expect(within(nav).getByRole("link", { name: "Aprovações" }).getAttribute("aria-current")).toBe("page");
+    expect(section().getByRole("region", { name: "Quem aprova por mim" })).toBeTruthy();
+    // No one yet: only the person to pick, and what never leaves you.
+    expect(section().queryByRole("switch", { name: "Merge, deploy e outras ações de risco" })).toBeNull();
+    expect(section().getByText(/Sempre com você: dinheiro/)).toBeTruthy();
+
+    await pick("Pessoa", joao(state));
+    expect(last(state, "approvals.setCover")).toEqual([
+      ORG_ID,
+      { userId: "u-joao", mode: "while_out", risky: false, endsAt: null },
+    ]);
+    expect(section().getByText("Desligado, essas continuam só com você.")).toBeTruthy();
+    await click(section().getByRole("switch", { name: "Merge, deploy e outras ações de risco" }));
+    expect(last(state, "approvals.setCover")?.[1]).toMatchObject({ userId: "u-joao", risky: true });
+    await pick("Quando", "Sempre");
+    expect(last(state, "approvals.setCover")?.[1]).toMatchObject({ mode: "always", risky: true });
+
+    await pick("Pessoa", "Ninguém");
+    expect(last(state, "approvals.endCover")).toEqual([ORG_ID, state.me?.user.id]);
+  });
+
+  test("whom I approve for, with Não quero cobrir", async () => {
+    const state = seedState();
+    state.approvalCovers = {
+      cover: null,
+      covering: [{ userId: "u-joao", mode: "always", risky: false, endsAt: null, active: true }],
+    };
+    await go(state);
+    const card = section().getByRole("region", { name: "Você aprova por" });
+    expect(within(card).getByText("Sempre · Cobrindo agora")).toBeTruthy();
+    await click(within(card).getByRole("button", { name: "Não quero cobrir" }));
+    expect(last(state, "approvals.endCover")).toEqual([ORG_ID, "u-joao"]);
+    expect(section().queryByRole("region", { name: "Você aprova por" })).toBeNull();
+  });
+
+  test("a decided card says who decided, covering whom", () => {
+    const i18n = i18next.createInstance();
+    void i18n.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });
+    const t = i18n.t;
+    const names: Record<string, string> = { b: "Bruno", a: "Ana" };
+    const name = (id: string) => names[id];
+    const approved = { status: "approved" as const, decidedByUserId: "b", decidedForUserId: "a" };
+    expect(decisionOutcome(t, approved, "x", name)).toBe("Aprovado por Bruno, cobrindo Ana");
+    expect(decisionOutcome(t, approved, "a", name)).toBe("Aprovado por Bruno, cobrindo você");
+    expect(decisionOutcome(t, { ...approved, status: "refused" }, "b", name)).toBe("Recusado por você, cobrindo Ana");
+  });
+});

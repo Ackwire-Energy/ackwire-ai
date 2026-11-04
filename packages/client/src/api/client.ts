@@ -40,6 +40,8 @@ import type {
   AppConsentDecision,
   AppNotification,
   Approval,
+  ApprovalCoverInput,
+  ApprovalCovers,
   ApprovalRule,
   AppsList,
   Artifact,
@@ -748,6 +750,11 @@ export interface ApiClient {
     rules(orgId: string, agentId: string): Promise<ApprovalRule[]>;
     /** The agent asks again for that kind (admins and the agent's owner). */
     removeRule(orgId: string, agentId: string, ruleId: string): Promise<void>;
+    /** Who approves for me, and whom I approve for (ADR 0138). */
+    covers(orgId: string): Promise<ApprovalCovers>;
+    setCover(orgId: string, input: ApprovalCoverInput): Promise<ApprovalCovers>;
+    /** Ends `userId`'s cover: mine, the one I give them ("Não quero cobrir"), or any as an admin. */
+    endCover(orgId: string, userId: string): Promise<void>;
   };
   connectors: {
     /** Connectors agentes.chat knows, with their scopes, plus the built-in scopes. */

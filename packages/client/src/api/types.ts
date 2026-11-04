@@ -1523,6 +1523,8 @@ export interface Approval {
   expiresAt: string;
   createdAt: string;
   decidedByUserId: string | null;
+  /** Decided by someone covering this person (ADR 0138): "Aprovado por Bruno, cobrindo Ana". */
+  decidedForUserId?: string | null;
   decidedAt: string | null;
   reason: string | null;
   /** You are the agent's owner or an admin, and it is pending. */
@@ -5754,7 +5756,38 @@ export type NotificationKind =
    * `source.proposalId` (or `source.messageId` for a new agent's card), `source.agentId` and `label` the agent,
    * `latest.text` why. Done once someone decides.
    */
-  | "change_request";
+  | "change_request"
+  /**
+   * ADR 0138: someone chose this person to approve for them (`latest.statusTo` `always` or `while_out`,
+   * `latest.expiresAt` its end), or the covered person hears the cover said no (`declined`) or an admin ended it
+   * (`ended`). The other person is the actor. Inbox only. Opens Configurações › Aprovações.
+   */
+  | "approval_cover";
+
+/** "Quem aprova por mim" (ADR 0138): how one cover reads, from either side. */
+export interface ApprovalCoverView {
+  /** Who covers me (`cover`), or whom I cover (`covering`). */
+  userId: string;
+  /** `while_out`: only while the covered person's status says out of office. */
+  mode: "always" | "while_out";
+  /** Merge, deploy and other high-risk actions are in. */
+  risky: boolean;
+  endsAt: string | null;
+  /** Deciding now. */
+  active: boolean;
+}
+
+export interface ApprovalCovers {
+  cover: ApprovalCoverView | null;
+  covering: ApprovalCoverView[];
+}
+
+export interface ApprovalCoverInput {
+  userId: string;
+  mode: "always" | "while_out";
+  risky: boolean;
+  endsAt: string | null;
+}
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {

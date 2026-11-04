@@ -1168,6 +1168,30 @@
       "privacy": "Este servidor no tiene página de privacidad"
     }
   },
+  "approvalCover": {
+    "title": "Quién aprueba por mí",
+    "subtitle": "Decide en tu nombre lo que te piden a ti, y nunca lo que esa persona pidió.",
+    "person": "Persona",
+    "nobody": "Nadie",
+    "when": "Cuándo",
+    "whenHelp": "Fuera: cuando tu estado dice que estás fuera de la oficina.",
+    "whileOut": "Solo cuando esté fuera",
+    "always": "Siempre",
+    "until": "Hasta",
+    "noDate": "Sin fecha",
+    "clearDate": "Quitar la fecha",
+    "risky": "Merge, deploy y otras acciones de riesgo",
+    "riskyOff": "Apagado, estas siguen solo contigo.",
+    "riskyOn": "Encendido, esta persona también decide estas.",
+    "lock": "Siempre tuyo: dinero, personas y roles, claves de IA, tu buzón y eliminar.",
+    "coveringTitle": "Apruebas por",
+    "coveringSubtitle": "Lo que les piden a estas personas te llega también, y decides en su nombre. Nunca lo que pediste tú.",
+    "coveringWhileOut": "Cuando esté fuera",
+    "coveringUntil": "hasta el {{date}}",
+    "coveringNow": "Cubriendo ahora",
+    "decline": "No quiero cubrir",
+    "failed": "No se pudo guardar. Inténtalo de nuevo."
+  },
   "noticePrefs": {
     "whereTitle": "Dónde llegan",
     "whatTitle": "Qué te notifica",
@@ -2840,6 +2864,12 @@
     "outcomeApprovedByYou": "Aprobado por ti",
     "outcomeRefusedBy": "Rechazado por {{name}}",
     "outcomeRefusedByYou": "Rechazado por ti",
+    "outcomeApprovedCovering": "Aprobado por {{name}}, en lugar de {{for}}",
+    "outcomeRefusedCovering": "Rechazado por {{name}}, en lugar de {{for}}",
+    "outcomeApprovedByYouCovering": "Aprobado por ti, en lugar de {{for}}",
+    "outcomeRefusedByYouCovering": "Rechazado por ti, en lugar de {{for}}",
+    "outcomeApprovedCoveringYou": "Aprobado por {{name}}, en tu lugar",
+    "outcomeRefusedCoveringYou": "Rechazado por {{name}}, en tu lugar",
     "refusedByYou": "Rechazado por ti · {{when}}",
     "expiresIn": "Vence en {{time}}",
     "expired": "Vencida",
@@ -3092,6 +3122,9 @@
       "joinSuggestion": "<b>{{by}}</b> sugirió a <b>{{name}}</b>",
       "changeRequest": "<b>{{name}}</b> pide un cambio en <b>{{agent}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> pide un agente nuevo: <b>{{agent}}</b>",
+      "approvalCover": "<b>{{name}}</b> te eligió en Quién aprueba por mí",
+      "approvalCoverDeclined": "<b>{{name}}</b> ya no aprobará por ti",
+      "approvalCoverEnded": "<b>{{name}}</b> quitó a quien aprueba por ti",
       "invitationAccepted": "<b>{{name}}</b> aceptó tu invitación y se unió a {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> aceptó tu invitación",
       "reaction_one": "<b>{{names}}</b> reaccionó a tu mensaje",
@@ -11816,7 +11849,8 @@
       "billing": "Plan y facturación",
       "media": "GIFs y stickers",
       "voice": "Voz",
-      "apps": "Apps de IA"
+      "apps": "Apps de IA",
+      "approvals": "Aprobaciones"
     },
     "sectionText": {
       "account": "Tu perfil y cómo se ve la app para ti.",
@@ -11836,7 +11870,8 @@
       "billing": "El plan de agentes.chat, la tarjeta y las facturas de este espacio de trabajo están en una página nuestra, fuera de la app.",
       "media": "Lo que las personas pueden enviar en una conversación, y cuándo los agentes envían un GIF o un sticker.",
       "voice": "Mensajes de voz en las conversaciones, y quién convierte la voz en texto.",
-      "apps": "Pide tareas a los agentes de este espacio de trabajo desde Claude, Cursor y otras apps."
+      "apps": "Pide tareas a los agentes de este espacio de trabajo desde Claude, Cursor y otras apps.",
+      "approvals": "Quién decide por ti cuando un agente pide algo que espera tu aprobación."
     },
     "title": "Configuración",
     "account": {

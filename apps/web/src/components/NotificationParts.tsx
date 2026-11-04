@@ -165,6 +165,9 @@ type WhatKey =
   | "invitationAcceptedAny"
   | "changeRequest"
   | "changeRequestAgent"
+  | "approvalCover"
+  | "approvalCoverDeclined"
+  | "approvalCoverEnded"
   | "reaction";
 
 /** The line on top of a row: who did what, where. */
@@ -282,5 +285,14 @@ export function Headline({
       return k("reaction", { names, count });
     case "change_request":
       return k(n.source.proposalId ? "changeRequest" : "changeRequestAgent", { name, agent: n.source.label ?? "" });
+    case "approval_cover":
+      return k(
+        n.latest.statusTo === "declined"
+          ? "approvalCoverDeclined"
+          : n.latest.statusTo === "ended"
+            ? "approvalCoverEnded"
+            : "approvalCover",
+        { name },
+      );
   }
 }

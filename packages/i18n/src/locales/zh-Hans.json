@@ -1096,6 +1096,30 @@
       "privacy": "此服务器没有隐私政策页面"
     }
   },
+  "approvalCover": {
+    "title": "谁替我审批",
+    "subtitle": "以你的名义决定发给你的请求，绝不决定此人自己提出的请求。",
+    "person": "成员",
+    "nobody": "无",
+    "when": "何时",
+    "whenHelp": "外出：你的状态显示外出时。",
+    "whileOut": "仅在我外出时",
+    "always": "始终",
+    "until": "截止",
+    "noDate": "无截止日期",
+    "clearDate": "移除日期",
+    "risky": "合并、部署和其他高风险操作",
+    "riskyOff": "关闭时，这些只由你决定。",
+    "riskyOn": "开启时，这些也由此人决定。",
+    "lock": "始终由你决定：资金、成员与角色、AI 密钥、你的邮箱和删除。",
+    "coveringTitle": "你替这些人审批",
+    "coveringSubtitle": "发给这些人的请求也会发给你，由你以他们的名义决定。绝不包括你自己提出的请求。",
+    "coveringWhileOut": "此人外出时",
+    "coveringUntil": "截至 {{date}}",
+    "coveringNow": "正在代审",
+    "decline": "不再代审",
+    "failed": "无法保存，请重试。"
+  },
   "noticePrefs": {
     "whereTitle": "通知去向",
     "whatTitle": "哪些事通知你",
@@ -2661,6 +2685,12 @@
     "outcomeApprovedByYou": "由你批准",
     "outcomeRefusedBy": "由 {{name}} 拒绝",
     "outcomeRefusedByYou": "由你拒绝",
+    "outcomeApprovedCovering": "由 {{name}} 代 {{for}} 批准",
+    "outcomeRefusedCovering": "由 {{name}} 代 {{for}} 拒绝",
+    "outcomeApprovedByYouCovering": "由你代 {{for}} 批准",
+    "outcomeRefusedByYouCovering": "由你代 {{for}} 拒绝",
+    "outcomeApprovedCoveringYou": "由 {{name}} 代你批准",
+    "outcomeRefusedCoveringYou": "由 {{name}} 代你拒绝",
     "refusedByYou": "由你拒绝 · {{when}}",
     "expiresIn": "{{time}}后过期",
     "expired": "已过期",
@@ -2889,6 +2919,9 @@
       "joinSuggestion": "<b>{{by}}</b> 推荐了 <b>{{name}}</b>",
       "changeRequest": "<b>{{name}}</b> 请求更改 <b>{{agent}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> 请求新的智能体：<b>{{agent}}</b>",
+      "approvalCover": "<b>{{name}}</b> 在“谁替我审批”中选了你",
+      "approvalCoverDeclined": "<b>{{name}}</b> 不再替你审批",
+      "approvalCoverEnded": "<b>{{name}}</b> 取消了替你审批的人",
       "invitationAccepted": "<b>{{name}}</b> 接受了你的邀请并加入了 {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> 接受了你的邀请",
       "reaction_other": "<b>{{names}}</b> 对你的消息发了表情回应"
@@ -11098,7 +11131,8 @@
       "billing": "套餐和账单",
       "media": "GIF 和贴纸",
       "voice": "语音",
-      "apps": "AI 应用"
+      "apps": "AI 应用",
+      "approvals": "审批"
     },
     "sectionText": {
       "account": "你的个人资料和应用外观。",
@@ -11118,7 +11152,8 @@
       "billing": "此工作区的 agentes.chat 套餐、银行卡和发票在我们的一个独立页面上，不在应用内。",
       "media": "成员可以在对话中发送什么，以及智能体何时发送 GIF 或贴纸。",
       "voice": "对话中的语音消息，以及由谁把语音转成文字。",
-      "apps": "在 Claude、Cursor 和其他应用中向这个工作区的智能体分配任务。"
+      "apps": "在 Claude、Cursor 和其他应用中向这个工作区的智能体分配任务。",
+      "approvals": "智能体提出等待你审批的请求时，由谁替你决定。"
     },
     "title": "设置",
     "account": {

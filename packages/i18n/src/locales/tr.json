@@ -1132,6 +1132,30 @@
       "privacy": "Bu sunucunun gizlilik sayfası yok"
     }
   },
+  "approvalCover": {
+    "title": "Benim yerime kim onaylar",
+    "subtitle": "Sizden istenenlere sizin adınıza karar verir, o kişinin kendi isteklerine asla.",
+    "person": "Kişi",
+    "nobody": "Kimse",
+    "when": "Ne zaman",
+    "whenHelp": "Dışarıda: durumunuz ofis dışında olduğunuzu söylediğinde.",
+    "whileOut": "Yalnızca dışarıdayken",
+    "always": "Her zaman",
+    "until": "Bitiş",
+    "noDate": "Tarih yok",
+    "clearDate": "Tarihi kaldırın",
+    "risky": "Merge, deploy ve diğer riskli işlemler",
+    "riskyOff": "Kapalı, bunlar yalnızca sizde kalır.",
+    "riskyOn": "Açık, bunlara da bu kişi karar verir.",
+    "lock": "Her zaman sizde: para, kişiler ve roller, yapay zeka anahtarları, posta kutunuz ve silme.",
+    "coveringTitle": "Yerine onayladığınız kişiler",
+    "coveringSubtitle": "Bu kişilerden istenenler size de gelir ve onların adına karar verirsiniz. Kendi isteklerinize asla.",
+    "coveringWhileOut": "Kişi dışarıdayken",
+    "coveringUntil": "{{date}} tarihine kadar",
+    "coveringNow": "Şu an yerine bakıyorsunuz",
+    "decline": "Yerine bakmayı bırakın",
+    "failed": "Kaydedilemedi. Tekrar deneyin."
+  },
   "noticePrefs": {
     "whereTitle": "Nereye gelir",
     "whatTitle": "Neler bildirim gönderir",
@@ -2742,6 +2766,12 @@
     "outcomeApprovedByYou": "Siz onayladınız",
     "outcomeRefusedBy": "{{name}} reddetti",
     "outcomeRefusedByYou": "Siz reddettiniz",
+    "outcomeApprovedCovering": "{{name}}, {{for}} yerine onayladı",
+    "outcomeRefusedCovering": "{{name}}, {{for}} yerine reddetti",
+    "outcomeApprovedByYouCovering": "{{for}} yerine siz onayladınız",
+    "outcomeRefusedByYouCovering": "{{for}} yerine siz reddettiniz",
+    "outcomeApprovedCoveringYou": "{{name}} sizin yerinize onayladı",
+    "outcomeRefusedCoveringYou": "{{name}} sizin yerinize reddetti",
     "refusedByYou": "Siz reddettiniz · {{when}}",
     "expiresIn": "{{time}} içinde sona erer",
     "expired": "Süresi doldu",
@@ -2980,6 +3010,9 @@
       "joinSuggestion": "<b>{{by}}</b>, <b>{{name}}</b> kişisini önerdi",
       "changeRequest": "<b>{{name}}</b>, <b>{{agent}}</b> için bir değişiklik istiyor",
       "changeRequestAgent": "<b>{{name}}</b> yeni bir ajan istiyor: <b>{{agent}}</b>",
+      "approvalCover": "<b>{{name}}</b> sizi Benim yerime kim onaylar bölümünde seçti",
+      "approvalCoverDeclined": "<b>{{name}}</b> artık sizin yerinize onaylamayacak",
+      "approvalCoverEnded": "<b>{{name}}</b> sizin yerinize onaylayan kişiyi kaldırdı",
       "invitationAccepted": "<b>{{name}}</b> davetinizi kabul etti ve {{org}} çalışma alanına katıldı",
       "invitationAcceptedAny": "<b>{{name}}</b> davetinizi kabul etti",
       "reaction_one": "<b>{{names}}</b> mesajınıza tepki verdi",
@@ -11380,7 +11413,8 @@
       "billing": "Plan ve faturalandırma",
       "media": "GIF'ler ve çıkartmalar",
       "voice": "Ses",
-      "apps": "Yapay zeka uygulamaları"
+      "apps": "Yapay zeka uygulamaları",
+      "approvals": "Onaylar"
     },
     "sectionText": {
       "account": "Profiliniz ve uygulamanın size nasıl göründüğü.",
@@ -11400,7 +11434,8 @@
       "billing": "Bu çalışma alanının agentes.chat planı, kartı ve faturaları uygulamanın dışında, bize ait bir sayfada.",
       "media": "Kişilerin bir konuşmada neler gönderebileceği ve ajanların ne zaman GIF ya da çıkartma göndereceği.",
       "voice": "Konuşmalardaki sesli mesajlar ve sesi metne kimin dönüştürdüğü.",
-      "apps": "Claude, Cursor ve diğer uygulamalardan bu çalışma alanının ajanlarına görev verin."
+      "apps": "Claude, Cursor ve diğer uygulamalardan bu çalışma alanının ajanlarına görev verin.",
+      "approvals": "Bir ajan onayınızı bekleyen bir şey istediğinde sizin yerinize kimin karar vereceği."
     },
     "title": "Ayarlar",
     "account": {

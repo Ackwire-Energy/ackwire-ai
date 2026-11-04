@@ -32489,5 +32489,104 @@
   },
   "chat.body.settings_proposal": {
     "value": "Proposed a change to {{names}}"
+  },
+  "settings.section.approvals": {
+    "value": "Approvals"
+  },
+  "settings.sectionText.approvals": {
+    "value": "Who decides for you when an agent asks for something that waits for your approval."
+  },
+  "approval.outcomeApprovedCovering": {
+    "value": "Approved by {{name}}, covering {{for}}"
+  },
+  "approval.outcomeRefusedCovering": {
+    "value": "Refused by {{name}}, covering {{for}}"
+  },
+  "approval.outcomeApprovedByYouCovering": {
+    "value": "Approved by you, covering {{for}}"
+  },
+  "approval.outcomeRefusedByYouCovering": {
+    "value": "Refused by you, covering {{for}}"
+  },
+  "approval.outcomeApprovedCoveringYou": {
+    "value": "Approved by {{name}}, covering for you"
+  },
+  "approval.outcomeRefusedCoveringYou": {
+    "value": "Refused by {{name}}, covering for you"
+  },
+  "notifications.what.approvalCover": {
+    "value": "<b>{{name}}</b> picked you in Who approves for me"
+  },
+  "notifications.what.approvalCoverDeclined": {
+    "value": "<b>{{name}}</b> won't approve for you any more"
+  },
+  "notifications.what.approvalCoverEnded": {
+    "value": "<b>{{name}}</b> ended who approves for you"
+  },
+  "approvalCover.title": {
+    "value": "Who approves for me"
+  },
+  "approvalCover.subtitle": {
+    "value": "Decides in your name what is asked of you, and never what that person asked for."
+  },
+  "approvalCover.person": {
+    "value": "Person"
+  },
+  "approvalCover.nobody": {
+    "value": "No one"
+  },
+  "approvalCover.when": {
+    "value": "When"
+  },
+  "approvalCover.whenHelp": {
+    "value": "Out: when your status says you're out of office."
+  },
+  "approvalCover.whileOut": {
+    "value": "Only when I'm out"
+  },
+  "approvalCover.always": {
+    "value": "Always"
+  },
+  "approvalCover.until": {
+    "value": "Until"
+  },
+  "approvalCover.noDate": {
+    "value": "No end date"
+  },
+  "approvalCover.clearDate": {
+    "value": "Remove the date"
+  },
+  "approvalCover.risky": {
+    "value": "Merge, deploy and other risky actions"
+  },
+  "approvalCover.riskyOff": {
+    "value": "Off, these stay with you only."
+  },
+  "approvalCover.riskyOn": {
+    "value": "On, this person decides these too."
+  },
+  "approvalCover.lock": {
+    "value": "Always yours: money, people and roles, AI keys, your mailbox and deleting."
+  },
+  "approvalCover.coveringTitle": {
+    "value": "You approve for"
+  },
+  "approvalCover.coveringSubtitle": {
+    "value": "What is asked of these people reaches you too, and you decide in their name. Never what you asked for."
+  },
+  "approvalCover.coveringWhileOut": {
+    "value": "When they're out"
+  },
+  "approvalCover.coveringUntil": {
+    "value": "until {{date}}"
+  },
+  "approvalCover.coveringNow": {
+    "value": "Covering now"
+  },
+  "approvalCover.decline": {
+    "value": "Stop covering"
+  },
+  "approvalCover.failed": {
+    "value": "Couldn't save. Try again."
   }
 }

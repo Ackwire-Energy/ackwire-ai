@@ -1096,6 +1096,30 @@
       "privacy": "このサーバーにはプライバシーのページがありません"
     }
   },
+  "approvalCover": {
+    "title": "代わりに承認する人",
+    "subtitle": "あなたへの依頼をあなたの名前で決めます。その人自身の依頼は決めません。",
+    "person": "人",
+    "nobody": "なし",
+    "when": "いつ",
+    "whenHelp": "不在：ステータスが不在のときです。",
+    "whileOut": "不在のときだけ",
+    "always": "常に",
+    "until": "期限",
+    "noDate": "期限なし",
+    "clearDate": "期限を外す",
+    "risky": "マージ、デプロイなどのリスクのある操作",
+    "riskyOff": "オフ：これらはあなただけが決めます。",
+    "riskyOn": "オン：これらもこの人が決めます。",
+    "lock": "常にあなたが決めるもの：お金、人とロール、AIキー、あなたのメールボックス、削除。",
+    "coveringTitle": "あなたが代わりに承認する人",
+    "coveringSubtitle": "この人たちへの依頼はあなたにも届き、その人の名前で決めます。あなた自身の依頼は決めません。",
+    "coveringWhileOut": "不在のとき",
+    "coveringUntil": "{{date}}まで",
+    "coveringNow": "代理中",
+    "decline": "代理をやめる",
+    "failed": "保存できませんでした。もう一度お試しください。"
+  },
   "noticePrefs": {
     "whereTitle": "届く場所",
     "whatTitle": "通知する内容",
@@ -2660,6 +2684,12 @@
     "outcomeApprovedByYou": "あなたが承認",
     "outcomeRefusedBy": "{{name}}が却下",
     "outcomeRefusedByYou": "あなたが却下",
+    "outcomeApprovedCovering": "{{name}}が{{for}}の代わりに承認",
+    "outcomeRefusedCovering": "{{name}}が{{for}}の代わりに却下",
+    "outcomeApprovedByYouCovering": "あなたが{{for}}の代わりに承認",
+    "outcomeRefusedByYouCovering": "あなたが{{for}}の代わりに却下",
+    "outcomeApprovedCoveringYou": "{{name}}があなたの代わりに承認",
+    "outcomeRefusedCoveringYou": "{{name}}があなたの代わりに却下",
     "refusedByYou": "あなたが却下 · {{when}}",
     "expiresIn": "あと{{time}}で期限切れ",
     "expired": "期限切れ",
@@ -2886,6 +2916,9 @@
       "joinSuggestion": "<b>{{by}}</b>が<b>{{name}}</b>を提案しました",
       "changeRequest": "<b>{{name}}</b>が<b>{{agent}}</b>の変更を依頼しています",
       "changeRequestAgent": "<b>{{name}}</b>が新しいエージェントを依頼しています：<b>{{agent}}</b>",
+      "approvalCover": "<b>{{name}}</b>が「代わりに承認する人」にあなたを選びました",
+      "approvalCoverDeclined": "<b>{{name}}</b>はあなたの代わりに承認しなくなりました",
+      "approvalCoverEnded": "<b>{{name}}</b>があなたの代わりに承認する人を解除しました",
       "invitationAccepted": "<b>{{name}}</b>があなたの招待を受けて{{org}}に参加しました",
       "invitationAcceptedAny": "<b>{{name}}</b>があなたの招待を受けました",
       "reaction_other": "<b>{{names}}</b>があなたのメッセージにリアクションしました"
@@ -11021,7 +11054,8 @@
       "billing": "プランと請求",
       "media": "GIFとステッカー",
       "voice": "音声",
-      "apps": "AIアプリ"
+      "apps": "AIアプリ",
+      "approvals": "承認"
     },
     "sectionText": {
       "account": "あなたのプロフィールと、アプリの表示設定。",
@@ -11041,7 +11075,8 @@
       "billing": "このワークスペースのagentes.chatのプラン、カード、請求書は、アプリ外の専用ページにあります。",
       "media": "会話で送れるものと、エージェントがGIFやステッカーを送るタイミング。",
       "voice": "会話でのボイスメッセージと、音声をテキストにするサービス。",
-      "apps": "ClaudeやCursorなどのアプリから、このワークスペースのエージェントにタスクを依頼できます。"
+      "apps": "ClaudeやCursorなどのアプリから、このワークスペースのエージェントにタスクを依頼できます。",
+      "approvals": "エージェントがあなたの承認を待つ依頼をしたとき、あなたの代わりに決める人です。"
     },
     "title": "設定",
     "account": {

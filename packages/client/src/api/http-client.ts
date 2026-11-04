@@ -35,6 +35,7 @@ import type {
   AppConsent,
   AppNotification,
   Approval,
+  ApprovalCovers,
   ApprovalRule,
   AppsList,
   Artifact,
@@ -880,6 +881,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         (await request<{ rules: ApprovalRule[] }>(`${org(orgId)}/agents/${enc(agentId)}/approval-rules`)).rules,
       removeRule: (orgId, agentId, ruleId) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}/approval-rules/${enc(ruleId)}`, { method: "DELETE" }),
+      covers: (orgId) => request<ApprovalCovers>(`${org(orgId)}/me/approval-cover`),
+      setCover: (orgId, input) =>
+        request<ApprovalCovers>(`${org(orgId)}/me/approval-cover`, { method: "PUT", json: input }),
+      endCover: (orgId, userId) => request<void>(`${org(orgId)}/approval-covers/${enc(userId)}`, { method: "DELETE" }),
     },
     connectors: {
       catalog: () => request<ConnectorCatalog>("/api/app/connectors/catalog"),

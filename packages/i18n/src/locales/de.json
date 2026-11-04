@@ -1132,6 +1132,30 @@
       "privacy": "Dieser Server hat keine Datenschutzseite"
     }
   },
+  "approvalCover": {
+    "title": "Wer für mich freigibt",
+    "subtitle": "Entscheidet in deinem Namen, was von dir erbeten wird, und nie, was diese Person selbst angefragt hat.",
+    "person": "Person",
+    "nobody": "Niemand",
+    "when": "Wann",
+    "whenHelp": "Abwesend: wenn dein Status sagt, dass du nicht da bist.",
+    "whileOut": "Nur wenn ich abwesend bin",
+    "always": "Immer",
+    "until": "Bis",
+    "noDate": "Ohne Datum",
+    "clearDate": "Datum entfernen",
+    "risky": "Merge, Deploy und andere riskante Aktionen",
+    "riskyOff": "Aus, diese bleiben nur bei dir.",
+    "riskyOn": "An, diese Person entscheidet auch diese.",
+    "lock": "Immer bei dir: Geld, Personen und Rollen, KI-Schlüssel, dein Postfach und Löschen.",
+    "coveringTitle": "Du gibst frei für",
+    "coveringSubtitle": "Was diese Personen gefragt werden, kommt auch zu dir, und du entscheidest in ihrem Namen. Nie, was du selbst angefragt hast.",
+    "coveringWhileOut": "Wenn die Person abwesend ist",
+    "coveringUntil": "bis {{date}}",
+    "coveringNow": "Gerade in Vertretung",
+    "decline": "Nicht mehr vertreten",
+    "failed": "Speichern ging nicht. Versuch es noch einmal."
+  },
   "noticePrefs": {
     "whereTitle": "Wo sie ankommen",
     "whatTitle": "Worüber du benachrichtigt wirst",
@@ -2754,6 +2778,12 @@
     "outcomeApprovedByYou": "Von dir freigegeben",
     "outcomeRefusedBy": "Abgelehnt von {{name}}",
     "outcomeRefusedByYou": "Von dir abgelehnt",
+    "outcomeApprovedCovering": "Freigegeben von {{name}} in Vertretung von {{for}}",
+    "outcomeRefusedCovering": "Abgelehnt von {{name}} in Vertretung von {{for}}",
+    "outcomeApprovedByYouCovering": "Von dir freigegeben in Vertretung von {{for}}",
+    "outcomeRefusedByYouCovering": "Von dir abgelehnt in Vertretung von {{for}}",
+    "outcomeApprovedCoveringYou": "Freigegeben von {{name}} in deiner Vertretung",
+    "outcomeRefusedCoveringYou": "Abgelehnt von {{name}} in deiner Vertretung",
     "refusedByYou": "Von dir abgelehnt · {{when}}",
     "expiresIn": "Läuft ab in {{time}}",
     "expired": "Abgelaufen",
@@ -2993,6 +3023,9 @@
       "joinSuggestion": "<b>{{by}}</b> hat <b>{{name}}</b> vorgeschlagen",
       "changeRequest": "<b>{{name}}</b> bittet um eine Änderung an <b>{{agent}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> bittet um einen neuen Agenten: <b>{{agent}}</b>",
+      "approvalCover": "<b>{{name}}</b> hat dich bei Wer für mich freigibt gewählt",
+      "approvalCoverDeclined": "<b>{{name}}</b> gibt nicht mehr für dich frei",
+      "approvalCoverEnded": "<b>{{name}}</b> hat deine Vertretung für Freigaben beendet",
       "invitationAccepted": "<b>{{name}}</b> hat deine Einladung angenommen und ist {{org}} beigetreten",
       "invitationAcceptedAny": "<b>{{name}}</b> hat deine Einladung angenommen",
       "reaction_one": "<b>{{names}}</b> hat auf deine Nachricht reagiert",
@@ -11442,7 +11475,8 @@
       "billing": "Tarif und Abrechnung",
       "media": "GIFs und Sticker",
       "voice": "Sprachnachrichten",
-      "apps": "KI-Apps"
+      "apps": "KI-Apps",
+      "approvals": "Freigaben"
     },
     "sectionText": {
       "account": "Dein Profil und wie die App für dich aussieht.",
@@ -11462,7 +11496,8 @@
       "billing": "Der agentes.chat-Tarif, die Karte und die Rechnungen dieses Workspace liegen auf einer eigenen Seite von uns, außerhalb der App.",
       "media": "Was Personen in einer Unterhaltung senden können und wann Agenten ein GIF oder einen Sticker senden.",
       "voice": "Sprachnachrichten in Unterhaltungen und wer Sprache in Text umwandelt.",
-      "apps": "Bitte die Agenten dieses Workspace aus Claude, Cursor und anderen Apps um Aufgaben."
+      "apps": "Bitte die Agenten dieses Workspace aus Claude, Cursor und anderen Apps um Aufgaben.",
+      "approvals": "Wer für dich entscheidet, wenn ein Agent etwas anfragt, das auf deine Freigabe wartet."
     },
     "title": "Einstellungen",
     "account": {

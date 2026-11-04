@@ -265,13 +265,21 @@ export function aheadEndLine(t: TFunction, a: Pick<Approval, "runAt" | "status" 
  */
 export function decisionOutcome(
   t: TFunction,
-  a: Pick<Approval, "status" | "decidedByUserId">,
+  a: Pick<Approval, "status" | "decidedByUserId" | "decidedForUserId">,
   meId: string | null,
   nameOf: (userId: string) => string | undefined,
 ): string {
   if (a.status === "expired" || a.status === "canceled") return t(`approvals.status.${a.status}`);
   const approved = a.status === "approved";
   const by = a.decidedByUserId;
+  // Someone covering decided it (ADR 0138): "Aprovado por Bruno, cobrindo Ana".
+  const covered = a.decidedForUserId;
+  if (by && covered) {
+    const verb = approved ? "Approved" : "Refused";
+    if (by === meId) return t(`approval.outcome${verb}ByYouCovering`, { for: nameOf(covered) ?? "" });
+    if (covered === meId) return t(`approval.outcome${verb}CoveringYou`, { name: nameOf(by) ?? "" });
+    return t(`approval.outcome${verb}Covering`, { name: nameOf(by) ?? "", for: nameOf(covered) ?? "" });
+  }
   if (by && by === meId) return t(approved ? "approval.outcomeApprovedByYou" : "approval.outcomeRefusedByYou");
   const name = by ? nameOf(by) : undefined;
   if (name) return t(approved ? "approval.outcomeApprovedBy" : "approval.outcomeRefusedBy", { name });

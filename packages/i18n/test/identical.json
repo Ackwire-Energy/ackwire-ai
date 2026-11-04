@@ -725,6 +725,7 @@
       "app.name",
       "approval.email.bcc",
       "approval.email.cc",
+      "approvalCover.person",
       "approvals.details",
       "approvals.refusePlaceholder",
       "apps.consent.workspace",

@@ -194,6 +194,13 @@ export const shortModel = (label: string) => label.replace(/^Claude\s+/i, "").to
 /** `YYYY-MM-DD` (a day, no time zone) → noon local time, so it never shifts a day. */
 export const dateOnly = (ymd: string) => new Date(`${ymd}T12:00:00`);
 
+/** `YYYY-MM-DD` → the end of that day in local time (ISO), for an end picked as a day. */
+export const endOfDay = (ymd: string) => {
+  const d = dateOnly(ymd);
+  d.setHours(23, 59, 0, 0);
+  return d.toISOString();
+};
+
 export const toYmd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 

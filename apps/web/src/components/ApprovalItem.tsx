@@ -62,6 +62,9 @@ export function decisionLabel(
   const when = at ? whenAt(t, locale, at, now) : t("common.now");
   if (approval.status === "expired") return t("approval.expiredChip", { when });
   if (approval.status === "canceled") return t("approval.canceledChip", { when });
+  // Decided by someone covering (ADR 0138): "Aprovado por Bruno, cobrindo Ana · agora".
+  if (approval.decidedForUserId)
+    return `${decisionOutcome(t, approval, meId, (id) => members.get(id)?.name)} · ${when}`;
   const mine = approval.decidedByUserId === meId;
   const name = members.get(approval.decidedByUserId ?? "")?.name ?? "";
   if (approval.status === "approved")

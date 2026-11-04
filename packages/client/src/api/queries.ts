@@ -62,6 +62,7 @@ import type {
   AppConsentDecision,
   AppNotification,
   Approval,
+  ApprovalCoverInput,
   ArtifactContent,
   ArtifactDetail,
   ArtifactFilters,
@@ -1660,6 +1661,39 @@ export function useRemoveApprovalRule(orgId: string, agentId: string) {
   return useMutation({
     mutationFn: (ruleId: string) => api.approvals.removeRule(orgId, agentId, ruleId),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, agentId) }),
+  });
+}
+
+/** "Quem aprova por mim" (ADR 0138): who covers me, and whom I cover. */
+export const useApprovalCovers = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.approvalCovers(orgId), queryFn: () => api.approvals.covers(orgId) });
+};
+
+/** Chooses who covers me (`input`), or with null ends it. */
+export function useSetApprovalCover(orgId: string, meId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ApprovalCoverInput | null) => {
+      if (input) return api.approvals.setCover(orgId, input);
+      await api.approvals.endCover(orgId, meId);
+      return null;
+    },
+    onSuccess: (covers) =>
+      covers
+        ? qc.setQueryData(keys.approvalCovers(orgId), covers)
+        : qc.invalidateQueries({ queryKey: keys.approvalCovers(orgId) }),
+  });
+}
+
+/** "Não quero cobrir": I stop covering `userId`. */
+export function useDeclineApprovalCover(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => api.approvals.endCover(orgId, userId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.approvalCovers(orgId) }),
   });
 }
 

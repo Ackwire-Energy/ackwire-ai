@@ -35,6 +35,7 @@ const BY_KIND: Partial<Record<NotificationKind, SoundName>> = {
   connector_tool_changed: "attention",
   skill_update: "done",
   invitation_accepted: "done",
+  approval_cover: "done",
   app_created: "done",
   mention: "mention",
   dm: "reply",

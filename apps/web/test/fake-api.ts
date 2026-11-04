@@ -15,6 +15,7 @@ import type {
   ApiClient,
   AppNotification,
   Approval,
+  ApprovalCovers,
   ApprovalRule,
   AuditRow,
   AuthConfig,
@@ -212,6 +213,8 @@ export interface FakeState {
   /** The code a new key is refused with, as a provider's own check refuses it (`provider_key_invalid`). */
   keyRefusal?: string;
   approvals: Approval[];
+  /** Who approves for me, and whom I approve for (ADR 0138). */
+  approvalCovers?: ApprovalCovers;
   /** How many of the newest the unfiltered list returns (the server's window); all when unset. */
   approvalsWindow?: number;
   /** What each agent runs without asking ("Aprovar sempre"), by agent id; unset = none. */
@@ -2840,6 +2843,24 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const list = state.approvalRules?.[agentId] ?? [];
         if (!list.some((r) => r.id === ruleId)) throw new ApiError(404, "not_found", "Rule not found");
         if (state.approvalRules) state.approvalRules[agentId] = list.filter((r) => r.id !== ruleId);
+      },
+      covers: async (orgId) => {
+        log("approvals.covers", orgId);
+        return structuredClone(state.approvalCovers ?? { cover: null, covering: [] });
+      },
+      setCover: async (orgId, input) => {
+        log("approvals.setCover", orgId, input);
+        const covers = state.approvalCovers ?? { cover: null, covering: [] };
+        state.approvalCovers = { ...covers, cover: { ...input, active: input.mode === "always" } };
+        return structuredClone(state.approvalCovers);
+      },
+      endCover: async (orgId, userId) => {
+        log("approvals.endCover", orgId, userId);
+        const covers = state.approvalCovers ?? { cover: null, covering: [] };
+        state.approvalCovers = {
+          cover: userId === state.me?.user.id ? null : covers.cover,
+          covering: covers.covering.filter((c) => c.userId !== userId),
+        };
       },
     },
     connectors: {

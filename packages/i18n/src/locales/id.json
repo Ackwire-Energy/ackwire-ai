@@ -1096,6 +1096,30 @@
       "privacy": "Server ini tidak punya halaman privasi"
     }
   },
+  "approvalCover": {
+    "title": "Siapa yang menyetujui untukku",
+    "subtitle": "Memutuskan atas namamu apa yang diminta darimu, dan tidak pernah apa yang orang itu minta sendiri.",
+    "person": "Orang",
+    "nobody": "Tidak ada",
+    "when": "Kapan",
+    "whenHelp": "Tidak ada: saat statusmu bilang kamu sedang tidak di kantor.",
+    "whileOut": "Hanya saat aku tidak ada",
+    "always": "Selalu",
+    "until": "Sampai",
+    "noDate": "Tanpa tanggal",
+    "clearDate": "Hapus tanggal",
+    "risky": "Merge, deploy, dan tindakan berisiko lainnya",
+    "riskyOff": "Mati, ini tetap hanya kamu yang memutuskan.",
+    "riskyOn": "Nyala, orang ini juga memutuskan ini.",
+    "lock": "Selalu di tanganmu: uang, orang dan peran, kunci AI, kotak suratmu, dan menghapus.",
+    "coveringTitle": "Kamu menyetujui untuk",
+    "coveringSubtitle": "Yang diminta dari orang-orang ini juga sampai padamu, dan kamu memutuskan atas nama mereka. Tidak pernah yang kamu minta sendiri.",
+    "coveringWhileOut": "Saat orang itu tidak ada",
+    "coveringUntil": "sampai {{date}}",
+    "coveringNow": "Sedang menggantikan",
+    "decline": "Berhenti menggantikan",
+    "failed": "Tidak bisa menyimpan. Coba lagi."
+  },
   "noticePrefs": {
     "whereTitle": "Ke mana notifikasi dikirim",
     "whatTitle": "Apa yang memberimu notifikasi",
@@ -2669,6 +2693,12 @@
     "outcomeApprovedByYou": "Disetujui olehmu",
     "outcomeRefusedBy": "Ditolak oleh {{name}}",
     "outcomeRefusedByYou": "Ditolak olehmu",
+    "outcomeApprovedCovering": "Disetujui oleh {{name}}, menggantikan {{for}}",
+    "outcomeRefusedCovering": "Ditolak oleh {{name}}, menggantikan {{for}}",
+    "outcomeApprovedByYouCovering": "Disetujui olehmu, menggantikan {{for}}",
+    "outcomeRefusedByYouCovering": "Ditolak olehmu, menggantikan {{for}}",
+    "outcomeApprovedCoveringYou": "Disetujui oleh {{name}}, menggantikanmu",
+    "outcomeRefusedCoveringYou": "Ditolak oleh {{name}}, menggantikanmu",
     "refusedByYou": "Ditolak olehmu · {{when}}",
     "expiresIn": "Kedaluwarsa dalam {{time}}",
     "expired": "Kedaluwarsa",
@@ -2898,6 +2928,9 @@
       "joinSuggestion": "<b>{{by}}</b> mengusulkan <b>{{name}}</b>",
       "changeRequest": "<b>{{name}}</b> meminta perubahan pada <b>{{agent}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> meminta agen baru: <b>{{agent}}</b>",
+      "approvalCover": "<b>{{name}}</b> memilihmu di Siapa yang menyetujui untukku",
+      "approvalCoverDeclined": "<b>{{name}}</b> tidak lagi menyetujui untukmu",
+      "approvalCoverEnded": "<b>{{name}}</b> mengakhiri siapa yang menyetujui untukmu",
       "invitationAccepted": "<b>{{name}}</b> menerima undanganmu dan bergabung ke {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> menerima undanganmu",
       "reaction_other": "<b>{{names}}</b> bereaksi pada pesanmu"
@@ -11087,7 +11120,8 @@
       "billing": "Paket dan tagihan",
       "media": "GIF dan stiker",
       "voice": "Suara",
-      "apps": "Aplikasi AI"
+      "apps": "Aplikasi AI",
+      "approvals": "Persetujuan"
     },
     "sectionText": {
       "account": "Profilmu dan tampilan aplikasi untukmu.",
@@ -11107,7 +11141,8 @@
       "billing": "Paket agentes.chat, kartu, dan faktur ruang kerja ini ada di halaman kami, di luar aplikasi.",
       "media": "Apa yang bisa dikirim orang di percakapan, dan kapan agen mengirim GIF atau stiker.",
       "voice": "Pesan suara di percakapan, dan siapa yang mengubah suara menjadi teks.",
-      "apps": "Minta tugas ke agen ruang kerja ini dari Claude, Cursor, dan aplikasi lain."
+      "apps": "Minta tugas ke agen ruang kerja ini dari Claude, Cursor, dan aplikasi lain.",
+      "approvals": "Siapa yang memutuskan untukmu saat agen meminta sesuatu yang menunggu persetujuanmu."
     },
     "title": "Pengaturan",
     "account": {
