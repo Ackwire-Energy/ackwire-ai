@@ -4167,5 +4167,17 @@
       "one": "{{names}} ended who approves for you",
       "other": "{{names}} ended who approves for you"
     }
+  },
+  "activity.kind.right_hand_decided": {
+    "value": {
+      "one": "{{names}} approved requests for you today",
+      "other": "{{names}} approved requests for you today"
+    }
+  },
+  "activity.kind.right_hand_paused": {
+    "value": {
+      "one": "{{names}} stopped approving for you",
+      "other": "{{names}} stopped approving for you"
+    }
   }
 }

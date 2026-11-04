@@ -753,6 +753,8 @@
       "approval_cover_other": "{{names}}님이 '나 대신 승인할 사람'으로 나를 골랐어요",
       "approval_cover_declined_other": "{{names}}님이 더 이상 나 대신 승인하지 않아요",
       "approval_cover_ended_other": "{{names}}님이 나 대신 승인할 사람을 해제했어요",
+      "right_hand_decided_other": "{{names}}이(가) 오늘 나 대신 요청을 승인했어요",
+      "right_hand_paused_other": "{{names}}이(가) 나 대신 승인하는 걸 멈췄어요",
       "browser_profile_request_other": "{{names}}이(가) 브라우저 프로필을 하나 더 요청해요",
       "connector_tool_changed_other": "연결된 서버가 내가 승인한 도구를 바꿨어요",
       "computer_disk_full_other": "컴퓨터 디스크가 거의 찼어요",

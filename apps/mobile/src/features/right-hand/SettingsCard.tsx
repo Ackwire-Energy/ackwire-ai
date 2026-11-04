@@ -1,5 +1,6 @@
 import {
   type AppNotification,
+  type CardDelegate,
   keys,
   type Message,
   type Proposal,
@@ -15,6 +16,7 @@ import {
   useSendDm,
 } from "@agenteschat/client";
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
+import { delegateLine } from "@agenteschat/client/lib/approval-words";
 import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { decidersOf, onlyKey, sentToText, settingLineText } from "@agenteschat/client/lib/proposals";
@@ -24,6 +26,7 @@ import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, Icon, Text } from "@/ui";
 import { AgentProposalView } from "../agents/ProposalCard";
+import { DelegateUndo } from "../agents/RightHandDelegate";
 import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
 import { markName } from "../chat/logic";
 import { useFailed } from "../routines/hooks";
@@ -42,8 +45,14 @@ export function SettingsProposals({ message: m }: { message: Message }) {
   if (m.author.type !== "agent") return null;
   return (
     <>
-      {rows.map((p) => (
-        <SettingsRow key={p.id} p={p} message={m} />
+      {rows.map((p, i) => (
+        <SettingsRow
+          key={p.id}
+          p={p}
+          message={m}
+          delegate={card?.kind === "settings_proposal" ? card.delegate : null}
+          first={i === 0}
+        />
       ))}
     </>
   );
@@ -75,7 +84,18 @@ export function ChangeRequestCard({ n }: { n: AppNotification }) {
  * Aplicar and Descartar (Recusar in the inbox); the person who asked and can't, Pedir a um admin, then whom it went
  * to; out of date, Refazer. Decided, one line with who did it, and Desfazer on its receipt while it lasts.
  */
-function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
+function SettingsRow({
+  p,
+  message,
+  delegate,
+  first = true,
+}: {
+  p: Proposal;
+  message?: Message;
+  /** The right hand looked at the card for the person it is for (ADR 0138): one decision, Desfazer on the first row. */
+  delegate?: CardDelegate | null;
+  first?: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const { orgId } = useOrg();
   const meId = useMeId();
@@ -104,12 +124,23 @@ function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
     }),
   );
   const mine = p.requestedBy?.userId === meId;
+  const delegated = delegate
+    ? delegateLine(
+        t,
+        delegate,
+        meId ?? null,
+        (id) => dir.memberById.get(id)?.name,
+        dir.anyAgent(delegate.agentId)?.name ?? "",
+      )
+    : null;
+  const byRightHand = delegated && (delegate?.state === "approved" || delegate?.state === "undone");
 
   if (p.status !== "pending") {
     const receipt = message?.actions?.find((a) => a.id === p.undoActionId);
     const byMe = p.decidedBy?.userId === meId;
-    const who =
-      p.status === "accepted"
+    const who = byRightHand
+      ? delegated
+      : p.status === "accepted"
         ? byMe
           ? t("rightHand.card.appliedByYou")
           : t("rightHand.card.appliedBy", { name: p.decidedBy?.name ?? "" })
@@ -126,9 +157,29 @@ function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
     return (
       <View style={styles.done}>
         <View style={styles.fill}>
-          <AskDone done={p.status === "accepted" && !receipt?.undoneAt} words={words} at={p.decidedAt} />
+          <AskDone
+            done={p.status === "accepted" && !receipt?.undoneAt && delegate?.state !== "undone"}
+            words={words}
+            at={p.decidedAt}
+            more={
+              byRightHand && delegate?.reason
+                ? {
+                    label: t("rightHandApprovals.card.why"),
+                    content: (
+                      <Text variant="footnote" tone="ink2">
+                        {delegate.reason}
+                      </Text>
+                    ),
+                  }
+                : undefined
+            }
+          />
         </View>
-        {undoable ? (
+        {byRightHand ? (
+          first ? (
+            <DelegateUndo d={delegate} />
+          ) : null
+        ) : undoable ? (
           <Button
             variant="ghost"
             size="sm"
@@ -225,6 +276,11 @@ function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
       body={
         lines.length > 0 ? (
           <View style={styles.lines}>
+            {first && delegated ? (
+              <Text variant="footnote" tone="muted">
+                {delegated}
+              </Text>
+            ) : null}
             {lines.map((l) => (
               <View
                 key={`${l.field}:${l.to}`}

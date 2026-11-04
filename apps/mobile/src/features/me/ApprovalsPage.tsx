@@ -1,7 +1,14 @@
-import type { ApprovalCoverInput } from "@agenteschat/client";
-import { useApprovalCovers, useDeclineApprovalCover, useSetApprovalCover } from "@agenteschat/client";
+import type { ApprovalCoverInput, RightHandApprovals, RightHandApprovalsInput } from "@agenteschat/client";
+import {
+  useApprovalCovers,
+  useDeclineApprovalCover,
+  useRightHandApprovals,
+  useSetApprovalCover,
+  useSetRightHandApprovals,
+} from "@agenteschat/client";
 import { coveringLine } from "@agenteschat/client/lib/approval-words";
 import { endOfDay, formatShortDate, toYmd } from "@agenteschat/client/lib/format";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
@@ -9,6 +16,7 @@ import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from 
 import { DUE_CHOICES, dueDateOf } from "../issues/logic";
 import { Face } from "../shared/Face";
 import { useDirectory, useMeId } from "../shared/hooks";
+import { TextArea } from "../shared/TextArea";
 import { Page } from "./parts";
 
 /**
@@ -23,6 +31,7 @@ export function ApprovalsPage() {
   const meId = useMeId() ?? "";
   const dir = useDirectory();
   const covers = useApprovalCovers(orgId);
+  const rightHand = useRightHandApprovals(orgId).data;
   const set = useSetApprovalCover(orgId, meId);
   const decline = useDeclineApprovalCover(orgId);
   const failed = () => toast({ title: t("approvalCover.failed"), icon: "x" });
@@ -101,6 +110,7 @@ export function ApprovalsPage() {
           </GroupedList>
         </>
       ) : null}
+      {rightHand?.rightHand ? <RightHandGroup view={rightHand} name={rightHand.rightHand.name} /> : null}
       <GroupedFooter>{t("approvalCover.lock")}</GroupedFooter>
       {(covers.data?.covering ?? []).length > 0 ? (
         <>
@@ -126,6 +136,97 @@ export function ApprovalsPage() {
         </>
       ) : null}
     </Page>
+  );
+}
+
+const USD = 1_000_000_000;
+/** The budgets offered per agent (the web takes any amount up to US$ 50). */
+const BUDGETS = [5, 10, 20, 50];
+
+/**
+ * "O Gerente aprova por você" (ADR 0138 §2), under the workspace's name for its right hand: the switch, the two kinds
+ * (greyed when the person can't decide them), the budget per agent and their own guidance, saved as they change.
+ */
+function RightHandGroup({ view, name }: { view: RightHandApprovals; name: string }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const { orgId } = useOrg();
+  const set = useSetRightHandApprovals(orgId);
+  const [guidance, setGuidance] = useState<string | null>(null);
+  const save = (patch: RightHandApprovalsInput) =>
+    set.mutate(patch, { onError: () => toast({ title: t("approvalCover.failed"), icon: "x" }) });
+  const on = view.enabled && !view.pausedAt;
+  const budget = Math.round(view.budgetCapNanoUsd / USD);
+  return (
+    <>
+      <View style={styles.gap} />
+      <GroupedList>
+        <GroupedRow
+          label={t("rightHandApprovals.title", { name })}
+          labelLines={2}
+          sub={t(view.pausedAt ? "rightHandApprovals.paused" : "rightHandApprovals.subtitle")}
+          subLines={3}
+          toggle={on}
+          onPress={() => save({ enabled: !on })}
+        />
+        {on ? (
+          <>
+            <GroupedRow
+              label={t("rightHandApprovals.newAgents")}
+              labelLines={2}
+              sub={t(view.mayDecide.newAgents ? "rightHandApprovals.newAgentsHelp" : "rightHandApprovals.cantDecide")}
+              subLines={2}
+              toggle={view.newAgents && view.mayDecide.newAgents}
+              disabled={!view.mayDecide.newAgents}
+              onPress={() => save({ newAgents: !view.newAgents })}
+            />
+            <GroupedRow
+              label={t("rightHandApprovals.agentChanges")}
+              labelLines={2}
+              sub={t(
+                view.mayDecide.agentChanges ? "rightHandApprovals.agentChangesHelp" : "rightHandApprovals.cantDecide",
+              )}
+              subLines={2}
+              toggle={view.agentChanges && view.mayDecide.agentChanges}
+              disabled={!view.mayDecide.agentChanges}
+              onPress={() => save({ agentChanges: !view.agentChanges })}
+            />
+          </>
+        ) : null}
+      </GroupedList>
+      {on ? (
+        <>
+          <GroupedHeader>{t("rightHandApprovals.budget")}</GroupedHeader>
+          <GroupedList>
+            {[...new Set([...BUDGETS, budget])]
+              .sort((a, b) => a - b)
+              .map((usd) => (
+                <GroupedRow
+                  key={usd}
+                  label={`US$ ${usd}${t("rightHandApprovals.perMonth")}`}
+                  checked={usd === budget}
+                  onPress={() => save({ budgetCapNanoUsd: usd * USD })}
+                />
+              ))}
+          </GroupedList>
+          <GroupedFooter>{t("rightHandApprovals.budgetHelp")}</GroupedFooter>
+          <GroupedHeader>{t("rightHandApprovals.guidanceLabel", { name })}</GroupedHeader>
+          <TextArea
+            value={guidance ?? view.guidance}
+            onChangeText={setGuidance}
+            onBlur={() => {
+              if (guidance !== null && guidance.trim() !== view.guidance) save({ guidance: guidance.trim() });
+              setGuidance(null);
+            }}
+            maxLength={2000}
+            minHeight={64}
+            placeholder={t("rightHandApprovals.guidancePlaceholder", { name })}
+            accessibilityLabel={t("rightHandApprovals.guidanceLabel", { name })}
+          />
+          <View style={styles.gap} />
+        </>
+      ) : null}
+    </>
   );
 }
 

@@ -753,6 +753,8 @@
       "approval_cover_other": "{{names}} memilihmu di Siapa yang menyetujui untukku",
       "approval_cover_declined_other": "{{names}} tidak lagi menyetujui untukmu",
       "approval_cover_ended_other": "{{names}} mengakhiri siapa yang menyetujui untukmu",
+      "right_hand_decided_other": "{{names}} menyetujui permintaan untukmu hari ini",
+      "right_hand_paused_other": "{{names}} berhenti menyetujui untukmu",
       "browser_profile_request_other": "{{names}} meminta satu profil browser lagi",
       "connector_tool_changed_other": "Server yang terhubung mengubah alat yang kamu setujui",
       "computer_disk_full_other": "Disk komputer hampir penuh",

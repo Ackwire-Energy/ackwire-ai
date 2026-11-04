@@ -21,6 +21,7 @@ import {
   routineLeft,
   suggestedAiText,
 } from "@agenteschat/client/lib/action-cards";
+import { delegateLine, delegateUndoLine } from "@agenteschat/client/lib/approval-words";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { can } from "@agenteschat/client/lib/permissions";
 import { sentToText } from "@agenteschat/client/lib/proposals";
@@ -43,6 +44,7 @@ import { useFailed } from "../routines/hooks";
 import { proposedRoutineWhen } from "../routines/rule";
 import { useDirectory, useMeId } from "../shared/hooks";
 import { fullLook } from "./edit";
+import { DelegateUndo } from "./RightHandDelegate";
 
 /**
  * An agent's proposal of a new agent (ADR 0081): while it is open, the request card (the agent's reason, the draft
@@ -108,6 +110,19 @@ export function AgentProposalView({
         )
       : null;
   const lines = proposalLines(card, { userId: meId ?? "", admin: can(org, "manage_agents") });
+  // The right hand looked at it for the person it is for (ADR 0138): its line, Desfazer and "Por quê?".
+  const delegate = card.delegate;
+  const delegated = delegate
+    ? delegateLine(
+        t,
+        delegate,
+        meId ?? null,
+        (id) => dir.memberById.get(id)?.name,
+        dir.agentById.get(delegate.agentId)?.name ?? "",
+      )
+    : null;
+  const byRightHand =
+    status === "created" && delegated && (delegate?.state === "approved" || delegate?.state === "undone");
   const outcome =
     status === "created"
       ? t("actionCard.agentProposal.created")
@@ -161,7 +176,18 @@ export function AgentProposalView({
             ),
           },
         }}
-        body={lines.length > 0 ? <Lines lines={lines} draft={draft} /> : undefined}
+        body={
+          delegated || lines.length > 0 ? (
+            <>
+              {delegated ? (
+                <Text variant="footnote" tone="muted">
+                  {delegated}
+                </Text>
+              ) : null}
+              {lines.length > 0 ? <Lines lines={lines} draft={draft} /> : null}
+            </>
+          ) : undefined
+        }
         foot={
           <AskFoot expiry={<ExpiryLine createdAt={sentAt} expiresAt={card.expiresAt} />}>
             {decides && rightHand ? (
@@ -260,11 +286,11 @@ export function AgentProposalView({
   }
   return (
     <AskDone
-      done={status === "created"}
-      words={`${outcome}: ${markName(draft.name)}`}
-      at={askEndedAt({ ...card, status })}
+      done={status === "created" && delegate?.state !== "undone"}
+      words={byRightHand ? `${markName(draft.name)} · ${delegated}` : `${outcome}: ${markName(draft.name)}`}
+      at={byRightHand ? delegate?.at : askEndedAt({ ...card, status })}
       more={{
-        label: t("ask.seeChange"),
+        label: t(byRightHand && delegate?.state === "approved" ? "rightHandApprovals.card.why" : "ask.seeChange"),
         content: (
           <View style={[styles.card, { backgroundColor: colors.sunken }]}>
             <View style={styles.row}>
@@ -278,15 +304,22 @@ export function AgentProposalView({
                 </Text>
               </View>
             </View>
-            {why ? (
+            {byRightHand && delegate?.reason ? (
+              <Text variant="footnote" tone="ink2">
+                {delegate.reason}
+              </Text>
+            ) : why ? (
               <Text variant="footnote" tone="ink2">
                 {why}
               </Text>
             ) : null}
             {lines.length > 0 ? <Lines lines={lines} draft={draft} /> : null}
             <Text variant="footnote" tone="muted">
-              {suggestedAiText(t, draft.ai)}
+              {byRightHand && delegate?.state === "approved"
+                ? delegateUndoLine(t, i18n.language, delegate, draft.name)
+                : suggestedAiText(t, draft.ai)}
             </Text>
+            {byRightHand ? <DelegateUndo d={delegate} /> : null}
             {status === "created" && (card.agentId || routineLeft(card)) ? (
               <View style={styles.acts}>
                 {card.agentId ? (
