@@ -35,7 +35,6 @@ const go = async (state = seedState(), path = `c/${GENERAL_ID}`) => {
   await settle(8);
   return { ...r, state };
 };
-const nav = () => screen().getByRole("navigation", { name: "Navegação do workspace" });
 const card = () => screen().getByText("Grupos de agentes").closest(".team-groups") as HTMLElement;
 /** A group on Equipe by its title, and the agents listed in it. */
 const group = (title: string) => {
@@ -60,14 +59,6 @@ const calls = (state: ReturnType<typeof seedState>, method: string) =>
 const team = (state = seedState()) => go(state, "team");
 
 describe("groups of agents on Equipe (ADR 0083)", () => {
-  test("the sidebar has no agents' part or groups: they are arranged on Equipe", async () => {
-    await go(withGroups());
-    const titles = [...nav().querySelectorAll(".sidebar__section-toggle")].map((b) => b.textContent);
-    expect(titles).toEqual(["Canais", "Mensagens diretas"]);
-    expect(nav().textContent).not.toContain("Integrations");
-    expect(nav().querySelector("[draggable='true'][data-agent-row]")).toBeNull();
-  });
-
   test("no groups: Agentes with everyone and nothing else to read", async () => {
     await team();
     expect(groupTitles()).toEqual(["Agentes"]);

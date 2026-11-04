@@ -9,17 +9,15 @@ import { type MenuEntry, openContextMenu } from "@/lib/context-menu";
 
 /** A section's name as its header (or, for the tools, the dialog) says it. */
 export const sectionName = (t: TFunction, id: SidebarSection) =>
-  id === "tools" ? t("shell.sidebarSetup.tools") : id === "channels" ? t("shell.channels") : t("shell.directMessages");
+  id === "tools"
+    ? t("shell.sidebarSetup.tools")
+    : id === "channels"
+      ? t("shell.channels")
+      : id === "agents"
+        ? t("shell.agents")
+        : t("shell.directMessages");
 
 const SECTION_DRAG = "application/x-agentes-section";
-
-/**
- * The agents' part left the sidebar (its agents are in the members column, DMs and Equipe), but the saved order
- * still has all four sections (the server checks it): the menus and drags move the three shown, and a save puts
- * "agents" back where it was.
- */
-const GONE: SidebarSection = "agents";
-export const SHOWN_SECTIONS = SIDEBAR_SECTIONS.filter((s) => s !== GONE);
 
 /**
  * The order of the sidebar's sections, the person's own in this workspace (`…/me/sidebar/order`): Mover para cima /
@@ -27,16 +25,12 @@ export const SHOWN_SECTIONS = SIDEBAR_SECTIONS.filter((s) => s !== GONE);
  */
 export function useSectionOrder(orgId: string) {
   const { t } = useTranslation();
-  const saved = useSidebarOrder(orgId);
-  const order = saved.filter((s) => s !== GONE);
+  const order = useSidebarOrder(orgId);
   const save = useSetSidebarOrder(orgId);
   const dragging = useRef<SidebarSection | null>(null);
   const [mark, setMark] = useState<{ id: SidebarSection; where: "before" | "after" } | null>(null);
   const put = (next: SidebarSection[]) => {
-    if (sameOrder(next, order)) return;
-    const full = [...next];
-    full.splice(Math.max(0, saved.indexOf(GONE)), 0, GONE);
-    save.mutate(sameOrder(next, SHOWN_SECTIONS) ? null : full);
+    if (!sameOrder(next, order)) save.mutate(sameOrder(next, SIDEBAR_SECTIONS) ? null : next);
   };
 
   const restore: MenuEntry = {
@@ -44,8 +38,8 @@ export function useSectionOrder(orgId: string) {
     id: "restore-order",
     label: t("contextMenu.restoreOrder"),
     icon: "undo",
-    disabled: sameOrder(order, SHOWN_SECTIONS),
-    run: () => put(SHOWN_SECTIONS),
+    disabled: sameOrder(order, SIDEBAR_SECTIONS),
+    run: () => put([...SIDEBAR_SECTIONS]),
   };
   const entries = (id: SidebarSection): MenuEntry[] => {
     const i = order.indexOf(id);

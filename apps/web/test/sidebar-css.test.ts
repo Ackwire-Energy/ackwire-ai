@@ -74,11 +74,11 @@ test("a row's hover buttons get their own room instead of covering the name and 
   expect(value('.sidebar[data-rail="true"] .sidebar__row-acts', "display")).toBe("none");
 });
 
-test("Equipe on the Agentes header shows like the header's +, and stays in sight on a plate while its page is open", () => {
-  const shown = declarations(css, '.sidebar__section-add[data-status="active"]');
-  expect(shown.findLast(([p]) => p === "opacity")?.[1]).toBe("1");
-  const active = '.sidebar__section-add.ac-btn[data-status="active"]';
-  expect([value(active, "background"), value(active, "color")]).toEqual(["var(--plate)", "var(--ink)"]);
+test("a closed group of agents keeps in sight who works, waits or wrote; pinned rows end with a thin line", () => {
+  expect(
+    value('.sidebar__section--group[data-open="false"] .sidebar__section-body > [data-live="true"]', "display"),
+  ).toBe("flex");
+  expect(value(".sidebar__pins-end", "border-top")).toBe("1px solid var(--line)");
 });
 
 test("a row's hidden hover buttons don't catch the pointer, so a drag over a row's end lands before or after it", () => {

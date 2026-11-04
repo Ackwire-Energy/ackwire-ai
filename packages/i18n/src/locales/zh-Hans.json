@@ -1183,14 +1183,14 @@
       "drive": "文件、报告和表格",
       "routines": "智能体按时自己完成的工作",
       "calendar": "会议和截止日期",
-      "forum": "当一个决定需要多方意见时"
+      "forum": "当一个决定需要多方意见时",
+      "team": "谁是谁：成员、智能体及其分组"
     },
     "customizeSidebar": "自定义侧边栏",
     "sidebarMenu": {
       "title": "侧边栏",
       "newChannel": "新建频道",
       "addToChannels": "新建频道或分类",
-      "addToDms": "新消息或智能体",
       "newMessage": "新消息",
       "addMembers": "添加成员或智能体",
       "channelSettings": "频道设置",
@@ -1306,7 +1306,45 @@
     "delete": "删除分组",
     "deleteTitle": "删除分组 {{name}}？",
     "deleteText": "其中的智能体会回到“智能体”。",
-    "dropHere": "把智能体拖到这里"
+    "dropHere": "把智能体拖到这里",
+    "moved": "{{name}} 已移到分组“{{group}}”",
+    "movedOut": "{{name}} 已离开分组“{{group}}”",
+    "undo": "撤销"
+  },
+  "sidebarAgents": {
+    "options": "智能体选项",
+    "add": "新建智能体或分组",
+    "order": "顺序",
+    "sort": {
+      "workspace": "工作区的顺序",
+      "mine": "我的优先",
+      "working": "工作中优先"
+    },
+    "showAll": "显示不与我对话的智能体",
+    "collapseAll": "全部收起",
+    "expandAll": "全部展开",
+    "organize": "在团队中整理分组",
+    "seeAll_other": "查看全部 {{count}} 个智能体",
+    "createFirst": "创建第一个智能体",
+    "working_other": "{{count}} 个工作中",
+    "count_other": "{{count}} 个智能体",
+    "workingIn": "正在 #{{channel}} 工作",
+    "talksOnly": "只与 {{name}} 对话",
+    "talksOnlyMore_other": "只与 {{name}} 和另外 {{count}} 人对话",
+    "changeGroup": "更换分组",
+    "newGroupWith": "与 {{name}} 新建分组",
+    "dmsEmpty": "你与成员的对话会显示在这里。"
+  },
+  "sidebarPins": {
+    "pin": "置顶",
+    "unpin": "取消置顶",
+    "pinned": "已置顶",
+    "hint": "你的智能体会保持在顶部。右键点击任意对话即可置顶。",
+    "full": {
+      "agents": "你已置顶 5 个智能体。取消一个才能置顶这个。",
+      "channels": "你已置顶 5 个频道。取消一个才能置顶这个。",
+      "people": "你已置顶 5 个人。取消一个才能置顶这位。"
+    }
   },
   "openOnPhone": {
     "qr": "用于登录 agentes 应用的二维码",
@@ -9644,6 +9682,13 @@
     "urlHelp": "以 postgres:// 开头。末尾的数据库名可以省略。加密保存在服务器上，之后没人能再看到，智能体也不能。",
     "urlPlaceholder": "postgres://user:password@host/db",
     "urlInvalid": "请粘贴以 postgres:// 开头的地址，或填写“高级”下的各项。",
+    "scope": "哪些数据库",
+    "scopeOne": "仅此数据库",
+    "scopeAll": "此服务器上的所有数据库",
+    "scopeAllHelp": "适合每个客户一个数据库的情况。智能体会看到列表，每次查询时选择一个数据库。",
+    "prefix": "仅名称以此开头的",
+    "prefixPlaceholder": "例如 customer_",
+    "prefixHelp": "留空表示全部。以此开头的新数据库会自动出现。",
     "howTitle": "如何创建只读用户？",
     "howText": "智能体只会执行查询，但只读用户能在数据库层面确保这一点。",
     "how": {
@@ -9678,11 +9723,13 @@
         "3": "拼出地址 postgres://agentes_leitura:password@server:5432/database，然后粘贴到这里。"
       }
     },
+    "howAll": "用于读取所有数据库（Postgres 14 或更新版本）。",
     "openPage": "打开 {{name}}",
     "dedicated": "提示：如果你有数据库的只读副本（replica），请连接那个副本。",
     "advancedText": "代替地址，或修改地址中的某项。",
     "host": "服务器",
     "database": "数据库",
+    "databaseOptional": "选择全部数据库时可不填。",
     "password": "密码",
     "passwordInvalid": "请输入数据库密码。",
     "ssl": "安全连接",
@@ -9699,10 +9746,22 @@
     },
     "connect": "连接",
     "connectedToast": "{{name}} 已连接。",
+    "connectedToastAll_other": "{{name}} 已连接，共 {{count}} 个数据库。",
+    "count_other": "{{count}} 个数据库",
+    "prefixRow": "以 {{prefix}} 开头的数据库",
+    "refresh": "刷新列表",
+    "refreshName": "刷新 {{name}} 的数据库列表",
+    "scopeEdit": "数据库",
+    "scopeEditName": "{{name}} 的数据库",
+    "scopeSaved": "{{name}} 已保存。",
+    "widenTitle": "开放整个服务器？",
+    "widenTitlePrefix": "开放更多数据库？",
+    "widenText_other": "有访问权限的 {{count}} 个智能体将可以读取此服务器上的所有数据库。可以在规则中按智能体限制。",
+    "widenTextPrefix_other": "有访问权限的 {{count}} 个智能体将可以读取所有以 {{prefix}} 开头的数据库。可以在规则中按智能体限制。",
     "testing": {
       "reach": "正在连接数据库…",
-      "tables": "正在查看数据表…",
-      "databases": "正在查看数据库…"
+      "databases": "正在查看数据库…",
+      "tables": "正在查看数据表…"
     },
     "canWrite": "这个用户可以更改数据。智能体本身只会读取，但最安全的做法是使用只读用户（创建方法见第 1 步）。",
     "toolsLead": "智能体在 {{name}} 中可以做什么。目前它们只读取，不会更改数据库中的任何内容。",
@@ -9741,22 +9800,22 @@
       "tablesLoading": "正在加载数据表…",
       "tablesError": "暂时无法读取数据表。",
       "tablesHelp": "不勾选 = 所有数据表。",
+      "tablesIn": "表（取自 {{database}}）",
+      "databases": "数据库",
+      "databasesAll": "全部",
+      "databasesSome": "仅这些",
+      "databasePlaceholder": "数据库名称",
+      "databasesHelp": "以下规则适用于此智能体读取的每个数据库。",
       "hidden": "永远看不到的列",
       "hiddenHelp": "格式为“表.列”，名称含大写字母、空格或符号时用双引号括起来（customers.\"Tax ID\"）。看起来像个人数据或密码的列，我们已经隐藏了。",
       "hiddenPlaceholder": "customers.cpf",
       "hiddenInvalid": "请输入 table.column（或 schema.table.column），名称含大写字母、空格或符号时用\"双引号\"括起来。",
       "cap": "每天查询次数",
       "capHelp": "留空 = 不限制。",
+      "capHelpAll": "留空 = 不限。按所有数据库合计。",
       "timeout": "每次查询的时间上限",
       "timeoutHelp": "超时的查询会被取消，以免给数据库造成负担。",
-      "seconds_other": "{{count}} 秒",
-      "databases": "数据库",
-      "databasesAll": "全部",
-      "databasesSome": "仅这些",
-      "databasePlaceholder": "数据库名称",
-      "databasesHelp": "以下规则适用于此智能体读取的每个数据库。",
-      "tablesIn": "表（取自 {{database}}）",
-      "capHelpAll": "留空 = 不限。按所有数据库合计。"
+      "seconds_other": "{{count}} 秒"
     },
     "agent": {
       "title": "数据库",
@@ -9766,28 +9825,7 @@
       "saved": "已保存 {{name}} 的数据库访问权限。",
       "allDatabases": "{{name}} 的所有数据库",
       "someDatabases_other": "{{name}} 的 {{count}} 个数据库"
-    },
-    "scope": "哪些数据库",
-    "scopeOne": "仅此数据库",
-    "scopeAll": "此服务器上的所有数据库",
-    "scopeAllHelp": "适合每个客户一个数据库的情况。智能体会看到列表，每次查询时选择一个数据库。",
-    "prefix": "仅名称以此开头的",
-    "prefixPlaceholder": "例如 customer_",
-    "prefixHelp": "留空表示全部。以此开头的新数据库会自动出现。",
-    "databaseOptional": "选择全部数据库时可不填。",
-    "connectedToastAll_other": "{{name}} 已连接，共 {{count}} 个数据库。",
-    "howAll": "用于读取所有数据库（Postgres 14 或更新版本）。",
-    "count_other": "{{count}} 个数据库",
-    "prefixRow": "以 {{prefix}} 开头的数据库",
-    "refresh": "刷新列表",
-    "refreshName": "刷新 {{name}} 的数据库列表",
-    "scopeEdit": "数据库",
-    "scopeEditName": "{{name}} 的数据库",
-    "scopeSaved": "{{name}} 已保存。",
-    "widenTitle": "开放整个服务器？",
-    "widenTitlePrefix": "开放更多数据库？",
-    "widenText_other": "有访问权限的 {{count}} 个智能体将可以读取此服务器上的所有数据库。可以在规则中按智能体限制。",
-    "widenTextPrefix_other": "有访问权限的 {{count}} 个智能体将可以读取所有以 {{prefix}} 开头的数据库。可以在规则中按智能体限制。"
+    }
   },
   "mail": {
     "choice": {

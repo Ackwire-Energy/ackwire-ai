@@ -62,6 +62,7 @@ describe("a channel", () => {
       "Marcar como lida",
       "Silenciar canal",
       "Editar canal",
+      "Fixar no topo",
       "Nova categoria com este canal",
       "Copiar link",
       "Arquivar canal",
@@ -81,7 +82,7 @@ describe("a channel", () => {
   test("the channel's header has the same menu", async () => {
     await go();
     await rightClick(screen().getByRole("heading", { level: 1, name: "eng" }));
-    expect(items()).toEqual(["Silenciar canal", "Editar canal", "Copiar link", "Arquivar canal"]);
+    expect(items()).toEqual(["Silenciar canal", "Editar canal", "Fixar no topo", "Copiar link", "Arquivar canal"]);
   });
 });
 
@@ -95,7 +96,7 @@ const withDms = () => {
 };
 
 describe("an agent", () => {
-  test("Shift+F10 on its row: talk, profile, copy @, edit (owner or admin), link, id", async () => {
+  test("Shift+F10 on its row: talk, profile, pin, copy @, a new group with it, edit (owner or admin), link, id", async () => {
     await go(undefined, withDms());
     const row = within(nav()).getByRole("link", { name: /^Ada/ });
     row.focus();
@@ -104,7 +105,9 @@ describe("an agent", () => {
     expect(items()).toEqual([
       "Mensagem direta",
       "Ver perfil",
+      "Fixar no topo",
       "Copiar @ada",
+      "Novo grupo com Ada",
       "Editar agente",
       "Copiar link",
       "Copiar ID",
@@ -130,7 +133,7 @@ describe("a person", () => {
     const row = nav().querySelector('a[href$="/dm/person/u-joao"]');
     if (!row) throw new Error("no row for João");
     await rightClick(row);
-    expect(items()).toEqual(["Mensagem direta", "Copiar @joao", "Remover do workspace", "Copiar ID"]);
+    expect(items()).toEqual(["Mensagem direta", "Fixar no topo", "Copiar @joao", "Remover do workspace", "Copiar ID"]);
     await pick("Copiar ID");
     expect(copied.at(-1)).toBe("u-joao");
   });
@@ -196,27 +199,26 @@ describe("the sidebar's sections, in my order", () => {
 
   test("the default order; Mover para baixo on Canais saves the new one; Restaurar ordem padrão goes back", async () => {
     const { state } = await go();
-    // The agents' part is gone: three sections show, the saved order still has all four.
-    expect(blocks()).toEqual(["tools", "channels", "people"]);
+    expect(blocks()).toEqual(["tools", "channels", "agents", "people"]);
     await act(async () => fireEvent.click(within(nav()).getByRole("button", { name: "Arrastar Canais" })));
     await settle(2);
     expect(within(menu()).getByRole("menuitem", { name: "Mover para cima" }).getAttribute("aria-disabled")).toBe(null);
     await pick("Mover para baixo");
-    expect(blocks()).toEqual(["tools", "people", "channels"]);
+    expect(blocks()).toEqual(["tools", "agents", "channels", "people"]);
     expect(state.calls.filter((c) => c.method === "orgs.setSidebarOrder").map((c) => c.args[1])).toEqual([
-      ["tools", "people", "agents", "channels"],
+      ["tools", "agents", "channels", "people"],
     ]);
 
     await rightClick(within(nav()).getByRole("button", { name: "Mensagens diretas" }));
     await pick("Restaurar ordem padrão");
-    expect(blocks()).toEqual(["tools", "channels", "people"]);
+    expect(blocks()).toEqual(["tools", "channels", "agents", "people"]);
     expect(state.calls.filter((c) => c.method === "orgs.setSidebarOrder").at(-1)?.args[1]).toBeNull();
   });
 
-  test("a saved order comes back: DMs first; the top one can't go up", async () => {
+  test("a saved order comes back: agents first; the top one can't go up", async () => {
     await go(`c/${ENG_ID}`, seedState({ sidebarOrder: ["agents", "people", "tools", "channels"] }));
-    expect(blocks()).toEqual(["people", "tools", "channels"]);
-    await rightClick(within(nav()).getByRole("button", { name: "Mensagens diretas" }));
+    expect(blocks()).toEqual(["agents", "people", "tools", "channels"]);
+    await rightClick(within(nav()).getByRole("button", { name: "Agentes" }));
     expect(within(menu()).getByRole("menuitem", { name: "Mover para cima" }).hasAttribute("data-disabled")).toBe(true);
   });
 });
