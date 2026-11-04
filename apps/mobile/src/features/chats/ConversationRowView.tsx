@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Count, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
+import { Count, Icon, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
 import { workTitle } from "../agents/work";
 import { agentIntro } from "../chat/intent";
 import { chatHref } from "../links/logic";
@@ -40,6 +40,7 @@ export const ConversationRowView = memo(function ConversationRowView({
   meta,
   fresh = false,
   onOpen,
+  pinned = false,
 }: {
   row: ConversationRow;
   /** A hairline above (every row but the first). */
@@ -47,8 +48,10 @@ export const ConversationRowView = memo(function ConversationRowView({
   live?: boolean;
   /** An agent DM: it waits on you, or what it is doing (from `agentRowState`). */
   agent?: AgentRowState;
-  /** A channel on the home: its menu ("Mover para…"), given the row's channel (stable, so the row stays memoized). */
-  onHold?: (channelId: string) => void;
+  /** A row on the home: its menu (Fixar no topo, a channel's Mover para…), given the row. */
+  onHold?: (row: ConversationRow) => void;
+  /** On top of its section ("Fixar no topo"): a small pin where the unread count would be. */
+  pinned?: boolean;
   /** What the long press does, for screen readers. */
   holdLabel?: string;
   /** An agent with no conversation yet (`channelId: ""`): opens one with it, given the agent (stable, memoized row). */
@@ -237,6 +240,7 @@ export const ConversationRowView = memo(function ConversationRowView({
     label,
     r.at ? when.short(r.at) : null,
     r.unread > 0 ? t("mobile.chats.unreadLabel", { count: r.unread }) : null,
+    pinned ? t("sidebarPins.pinned") : null,
     lines?.kind === "mission" && badge > 0
       ? t("mobile.tabs.withCount", { label: t("mobile.home.waiting"), count: badge })
       : null,
@@ -247,13 +251,13 @@ export const ConversationRowView = memo(function ConversationRowView({
   return (
     <ListRow
       onPress={open}
-      {...(onHold && r.kind === "channel"
+      {...(onHold
         ? {
-            onLongPress: () => onHold(r.channelId),
+            onLongPress: () => onHold(r),
             delayLongPress: 380,
             accessibilityActions: [{ name: "menu", label: holdLabel ?? name }],
             onAccessibilityAction: (e: { nativeEvent: { actionName: string } }) => {
-              if (e.nativeEvent.actionName === "menu") onHold(r.channelId);
+              if (e.nativeEvent.actionName === "menu") onHold(r);
             },
           }
         : {})}
@@ -273,7 +277,13 @@ export const ConversationRowView = memo(function ConversationRowView({
         ) : null
       }
       sub={line}
-      trailing={badge > 0 ? <Count value={badge} max={99} inverted /> : null}
+      trailing={
+        badge > 0 ? (
+          <Count value={badge} max={99} inverted />
+        ) : pinned ? (
+          <Icon name="pin" size={14} color={c.faint} />
+        ) : null
+      }
     />
   );
 });
