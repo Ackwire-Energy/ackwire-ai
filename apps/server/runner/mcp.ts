@@ -1124,6 +1124,78 @@ export function missionFolderRules(missionFolder: string | undefined, tools: rea
 }
 
 /**
+ * A `chat` turn's deny list (protocol 41): every tool of Claude Code's own that reaches the computer, the web, other
+ * agents or the plan's claude.ai account (cloud routines, artifacts), on top of `--tools ""` that lists none of them.
+ * Names a version doesn't know are ignored by it.
+ */
+export const CHAT_DENIED_TOOLS = [
+  "Bash",
+  "PowerShell",
+  "BashOutput",
+  "KillShell",
+  "Monitor",
+  "Read",
+  "Edit",
+  "MultiEdit",
+  "Write",
+  "NotebookEdit",
+  "Glob",
+  "Grep",
+  "LS",
+  "WebFetch",
+  "WebSearch",
+  "Task",
+  "Agent",
+  "Skill",
+  "SlashCommand",
+  "LSP",
+  "REPL",
+  "WebBrowser",
+  "SendMessage",
+  "TeamCreate",
+  "TeamDelete",
+  "TaskOutput",
+  "TaskStop",
+  "EnterWorktree",
+  "ExitWorktree",
+  "CronCreate",
+  "CronDelete",
+  "CronList",
+  "ScheduleWakeup",
+  "RemoteTrigger",
+  "PushNotification",
+  "Artifact",
+  "ArtifactComments",
+  "ArtifactData",
+  "DesignSync",
+  "Config",
+  "ListAgents",
+  "ReportFindings",
+  "Workflow",
+  "ToolSearch",
+] as const;
+
+/**
+ * A `chat` turn's guard, read on Claude Code's `system` `init` (it lists every tool the model gets, and the MCP
+ * servers): anything but our bridge (`mcp__agentes__…`, server `agentes`) is a breach, and so is an `init` without
+ * the lists. A tool a new version adds that `--tools ""` doesn't take away stops the turn before it can run.
+ */
+export function chatToolsBreach(init: Record<string, unknown>): string | null {
+  const version = typeof init.claude_code_version === "string" ? ` ${init.claude_code_version.slice(0, 40)}` : "";
+  if (!Array.isArray(init.tools) || !Array.isArray(init.mcp_servers)) {
+    return `Claude Code${version} didn't list its tools, so the turn stopped before it began.`;
+  }
+  const tools = init.tools.filter((t) => typeof t !== "string" || !t.startsWith("mcp__agentes__"));
+  const servers = init.mcp_servers.filter((s) => (s as { name?: unknown } | null)?.name !== "agentes");
+  if (tools.length === 0 && servers.length === 0) return null;
+  const names = [
+    ...tools.map((t) => String(t)),
+    ...servers.map((s) => `MCP ${String((s as { name?: unknown } | null)?.name)}`),
+  ];
+  return `Claude Code${version} offers tools of its own here (${names.slice(0, 8).join(", ")}), so the turn stopped before it could use them.`;
+}
+
+/**
  * Denied in every profile (Claude Code checks deny rules before allow rules):
  * the deny list, credential stores (shell and read tools) and code given
  * inline to an interpreter, which `Bash(node *)`, `Bash(python3 *)` would
@@ -1151,7 +1223,7 @@ const PLAN_DENY = ["Edit", "Write", "NotebookEdit"];
  * rules), so the prompt tool reads where it goes.
  */
 export function claudePermissionSettings(
-  mode: "plan" | "work",
+  mode: "plan" | "work" | "chat",
   missionAllow: string[] = [],
   /** An item's mission folder when it runs elsewhere (its worktree or subfolder). */
   missionFolder?: string,
@@ -1168,6 +1240,12 @@ export function claudePermissionSettings(
   const shellReads = opts.promptReads ? [] : readOnlyShell();
   const home = opts.runnerHome?.startsWith("/") && !opts.runnerHome.includes("*") ? opts.runnerHome : null;
   const homeDeny = home ? [`Read(/${home}/**)`, `Bash(*${home}/*)`] : [];
+  // The team's right hand on a person's plan (protocol 41): our tools only, every tool of Claude Code's own refused.
+  if (mode === "chat") {
+    return {
+      permissions: { allow: ["mcp__agentes"], deny: [...CHAT_DENIED_TOOLS, ...ALWAYS_DENY_RULES, ...homeDeny] },
+    };
+  }
   if (mode === "plan") {
     return {
       permissions: {

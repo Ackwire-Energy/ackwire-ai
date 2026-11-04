@@ -50,6 +50,8 @@ import { ownBranches } from "./command-gate";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import {
+  CHAT_DENIED_TOOLS,
+  chatToolsBreach,
   claudeMcpConfig,
   claudePermissionSettings,
   type McpTaskInfo,
@@ -580,6 +582,11 @@ export interface ClaudeLaunch {
   disallowedTools?: readonly string[];
   /** No `--fallback-model` (a plan's aliases may all be one model). */
   noFallback?: boolean;
+  /**
+   * `--disable-slash-commands` and `--no-chrome`: no skills or commands, the computer owner's or the CLI's own, and
+   * no Claude in Chrome (its setup adds its tools to the allowed ones).
+   */
+  noSlashCommands?: boolean;
 }
 
 /**
@@ -626,14 +633,34 @@ export function repoInstructions(cwd: string): string {
  * no settings files of the folder or the owner, no edits (the web stays), and every
  * command answered on the computer by `localVerdict` (reads only, never secrets);
  * nothing is ever asked of a person.
+ * `chat` (protocol 41, the team's right hand on a person's plan, ADR 0137 §4): our MCP tools and nothing else. None
+ * of Claude Code's own tools (`--tools ""`, each one denied too), no settings files, skills or slash commands, no
+ * permission prompt (`dontAsk`: whatever isn't allowed is refused), whatever `personalMcp` says.
  */
 export function brainProfileLaunch(
-  mode: "plan" | "work",
+  mode: "plan" | "work" | "chat",
   personalMcp: boolean,
 ): Pick<
   ClaudeLaunch,
-  "strictMcp" | "promptTool" | "permissionMode" | "settingSources" | "builtinTools" | "disallowedTools"
+  | "strictMcp"
+  | "promptTool"
+  | "permissionMode"
+  | "settingSources"
+  | "builtinTools"
+  | "disallowedTools"
+  | "noSlashCommands"
 > {
+  if (mode === "chat") {
+    return {
+      strictMcp: true,
+      promptTool: false,
+      permissionMode: "dontAsk",
+      settingSources: "",
+      builtinTools: [],
+      disallowedTools: CHAT_DENIED_TOOLS,
+      noSlashCommands: true,
+    };
+  }
   if (mode === "plan") {
     return {
       strictMcp: true,
@@ -684,6 +711,7 @@ export function claudeBrainArgs(l: ClaudeLaunch): string[] {
     ...(l.settingSources !== undefined ? ["--setting-sources", l.settingSources] : []),
     ...(l.builtinTools ? ["--tools", l.builtinTools.join(",")] : []),
     ...(l.disallowedTools?.length ? ["--disallowedTools", l.disallowedTools.join(",")] : []),
+    ...(l.noSlashCommands ? ["--disable-slash-commands", "--no-chrome"] : []),
     l.resume ? "--resume" : "--session-id",
     l.session,
   ];
@@ -725,6 +753,13 @@ export class ClaudeProcess {
   cliVersion?: string;
   /** What it can do (`system` `init` `capabilities`): live steering is decided by these (`steerSupport`). */
   capabilities: string[] = [];
+  /**
+   * A `chat` turn's guard (`chatToolsBreach`): read on every `system` `init`, before the turn's first request comes
+   * back. Anything it names kills the process at once and is the turn's answer (`breach`).
+   */
+  lock: ((init: Record<string, unknown>) => string | null) | null = null;
+  breach: string | null = null;
+  private lockPassed = false;
   /**
    * Claude Code started a turn by itself while no request listened (a background
    * task that ended after its turn): its output goes nowhere, and until its
@@ -777,6 +812,12 @@ export class ClaudeProcess {
       (rl as unknown as EventEmitter).on("line", (line: string) => {
         // Read whether a turn listens or not (the CLI may say it before the first turn's prompt).
         if (line.includes('"init"')) this.noteInit(line);
+        // A locked turn answers only after an `init` that passed: one that never listed its tools never runs.
+        if (this.lock && !this.lockPassed && /"type":\s*"(assistant|stream_event)"/.test(line)) {
+          this.breached("Claude Code answered before it listed its tools");
+        }
+        // Nothing after a breach reaches the turn, not even what was already on its way.
+        if (this.breach) return;
         if (line.includes('"task_')) this.noteTask(line);
         if (this.lineHandler) this.lineHandler(line);
         else this.noteIdle(line);
@@ -795,9 +836,21 @@ export class ClaudeProcess {
       this.initSeen = true;
       if (typeof ev.claude_code_version === "string") this.cliVersion = ev.claude_code_version.slice(0, 40);
       this.capabilities = claudeCapabilities(ev);
+      if (!this.lock) return;
+      const breach = this.lock(ev);
+      if (breach) this.breached(breach);
+      else this.lockPassed = true;
     } catch {
       // not a JSON line
     }
+  }
+
+  private breached(reason: string) {
+    if (this.breach) return;
+    this.breach = reason;
+    try {
+      this.child.kill("SIGKILL");
+    } catch {}
   }
 
   private noteTask(line: string) {
@@ -1407,7 +1460,8 @@ export class BrainManager {
     if (!SESSION_ID.test(session)) throw new RunnerError("bad_request", "The session must be a UUID");
     if (typeof req.prompt !== "string" || !req.prompt.trim()) throw new RunnerError("bad_request", "Empty prompt");
     let cwd = ctx.folder;
-    if (typeof req.cwd === "string" && req.cwd.trim() !== "") {
+    // A `chat` turn starts in the agent's own folder, whatever the request names.
+    if (req.permissions?.mode !== "chat" && typeof req.cwd === "string" && req.cwd.trim() !== "") {
       const resolved = await resolveForAgent(ctx.folder, ctx.grants, req.cwd);
       if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
       if (!statSync(resolved.abs).isDirectory()) throw new RunnerError("bad_request", `${req.cwd} is not a folder`);
@@ -1581,6 +1635,11 @@ export class BrainManager {
         ...(this.opts.steerFollowUpMs !== undefined ? { followUpMs: this.opts.steerFollowUpMs } : {}),
         ...(this.opts.steerBackgroundWaitMs !== undefined ? { backgroundWaitMs: this.opts.steerBackgroundWaitMs } : {}),
       });
+      if (live.proc.breach) {
+        this.log(`[${ctx.agent.handle}] chat turn stopped: ${live.proc.breach}`);
+        this.drop(live);
+        return { final: errorEvent("tools_not_locked", live.proc.breach, false) };
+      }
       if (out.final?.type === "done") this.ran.add(live.ranKey);
       const short = live.key.split(":")[1]?.slice(0, 8) ?? "";
       // A steered message it never read would start a turn nobody listens to: the process goes (the
@@ -1659,11 +1718,12 @@ export class BrainManager {
     const dir = path.join(this.opts.root, id);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const systemFile = path.join(dir, "system.txt");
-    const mode = req.permissions?.mode === "plan" ? "plan" : "work";
+    const mode = req.permissions?.mode === "plan" || req.permissions?.mode === "chat" ? req.permissions.mode : "work";
     const launch = brainProfileLaunch(mode, req.personalMcp === true);
     const system = typeof req.system === "string" ? req.system : "";
     const ranKey = ranKeyOf(req, session);
-    const withRepo = launch.settingSources === "";
+    // A `chat` turn reads nothing of the folder, its CLAUDE.md included.
+    const withRepo = launch.settingSources === "" && mode !== "chat";
     const keptSystem = this.keptSystemFile(ctx.agent.id, ranKey, cwd, withRepo);
     // Protocol 40: what holds for the conversation opens the session's first message instead (`turnPrompt`). The
     // checkout's instructions stay at the end of this text, under Claude Code's last cache breakpoint that sessions
@@ -1671,7 +1731,14 @@ export class BrainManager {
     const started = this.sessionSystem(keptSystem, resume, () => (withRepo ? system + repoInstructions(cwd) : system));
     writeFileSync(systemFile, started.text, { mode: 0o600 });
     let mcpConfigFile: string | undefined;
-    const base: NodeJS.ProcessEnv = { ...process.env, ...(ctx.secrets?.env ?? {}) };
+    // A `chat` turn never holds the agent's secrets, nor reads the auto memory Claude Code keeps in the account's
+    // folder (whoever else that folder is lent to can write there), nor loads the plan's claude.ai connectors.
+    const base: NodeJS.ProcessEnv = {
+      ...process.env,
+      ...(mode === "chat"
+        ? { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1", ENABLE_CLAUDEAI_MCP_SERVERS: "false" }
+        : (ctx.secrets?.env ?? {})),
+    };
     // ADR 0041: the account's folder is this process's Claude Code home, and nothing else signs it in.
     const env = ctx.accountHome ? accountEnv("claude_code", ctx.accountHome, base) : base;
     const plan = ctx.planKey ? planOf(ctx.planKey.provider) : undefined;
@@ -1695,7 +1762,7 @@ export class BrainManager {
             // Our tools behind Claude Code's ToolSearch, but those it reaches for on its own (`ALWAYS_LOADED`).
             alwaysLoad: false,
             // A plan turn's prompts are answered on the computer (reads only), never asked of anyone.
-            profile: mode,
+            profile: mode === "work" ? "work" : "plan",
             ...(this.opts.runnerHome ? { runnerHome: this.opts.runnerHome } : {}),
             // Its own branches: a push there needs nobody (ADR 0053 §3).
             branches: ownBranches(ctx.agent, missionBranchPrefix(ctx.agent.id, req.permissions?.branchPrefix)),
@@ -1731,17 +1798,17 @@ export class BrainManager {
         // With the owner's own settings loaded (`personalMcp`), theirs decide the computer's own sign-in.
         ...(ctx.accountHome
           ? { env: accountSettingsEnv(plan, model) }
-          : req.personalMcp === true
+          : req.personalMcp === true && mode !== "chat"
             ? {}
             : { env: accountSettingsEnv(undefined, model, process.env, true) }),
       }),
       { mode: 0o600 },
     );
     // Starting in one of its checkouts (`repos/owner/name`), the agent keeps its whole folder (its other checkouts).
-    const addDirs = [
-      ...(cwd !== ctx.folder ? [ctx.folder] : []),
-      ...(ctx.grants ?? []).filter((g) => !isInside(g, cwd)),
-    ];
+    const addDirs =
+      mode === "chat"
+        ? []
+        : [...(cwd !== ctx.folder ? [ctx.folder] : []), ...(ctx.grants ?? []).filter((g) => !isInside(g, cwd))];
     const args = claudeBrainArgs({
       session,
       resume,
@@ -1762,6 +1829,7 @@ export class BrainManager {
       this.opts.spawn,
       ctx.oauthToken,
     );
+    if (mode === "chat") proc.lock = chatToolsBreach;
     const live: Live = {
       key,
       agentId: ctx.agent.id,

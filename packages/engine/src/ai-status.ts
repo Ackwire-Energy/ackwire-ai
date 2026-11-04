@@ -8,6 +8,7 @@ import { type BrainKind, isComputerBrain } from "./brains/types";
 import type { ModelGateway } from "./gateway";
 import type { MachineStatus } from "./machine-hub";
 import { missionTurnFor } from "./missions-engine";
+import { thinkingAgent } from "./right-hand";
 import { orgKeyProviders, orgModelProvider, type RoutingSetup } from "./router";
 import { planSignInsOf } from "./router-plan";
 import type { AgentRun } from "./runs";
@@ -20,8 +21,21 @@ import type { AgentRun } from "./runs";
  */
 export type AiState = "ready" | "no_ai" | "waiting";
 
-/** Why an agent has no AI, as its card and the Connect dialog put it. */
-export type NoAiReason = "no_key" | "not_signed_in" | "no_computer" | "cli_missing";
+/**
+ * Why an agent has no AI, as its card and the Connect dialog put it. The team's right hand on a plan also says its
+ * computer is away, its plan is at its limit, the plan answers only its owner, the computer's runner needs an update,
+ * or the plan's CLI there offers tools of its own (`rightHandNoAiReason`).
+ */
+export type NoAiReason =
+  | "no_key"
+  | "not_signed_in"
+  | "no_computer"
+  | "cli_missing"
+  | "computer_away"
+  | "plan_limit"
+  | "plan_not_shared"
+  | "runner_outdated"
+  | "plan_tools";
 
 export interface AgentAi {
   state: AiState;
@@ -44,7 +58,8 @@ export interface AiStatusDeps {
 type AiAgent = Pick<
   Agent,
   "orgId" | "model" | "credentialId" | "brain" | "brainFallback" | "brainAccountId" | "machineId"
->;
+> &
+  Partial<Pick<Agent, "builtin" | "ownerUserId">>;
 
 /** The run being checked: a mission's turn thinks with the mission's brain, and background work never falls back. */
 type AiRun = Pick<AgentRun, "id" | "orgId" | "agentId" | "threadRootId" | "triggerMessageId" | "background">;
@@ -72,7 +87,8 @@ export const ownNotSignedIn = (code: string, kind: BrainKind, account: unknown):
   code === "not_logged_in" && !account && isComputerBrain(kind) ? { own: kind } : {};
 
 /** One agent (for one run, when given: right after its row is read, before any judge or model call). */
-export async function agentAiState(deps: AiStatusDeps, agent: AiAgent, run?: AiRun): Promise<AgentAi> {
+export async function agentAiState(deps: AiStatusDeps, given: AiAgent, run?: AiRun): Promise<AgentAi> {
+  const agent = await thinkingAgent(deps.db, given);
   const mission = run ? await missionTurnFor(deps.db, run).catch(() => null) : null;
   const kind = mission?.brain ?? brainOf(agent.brain);
   if (kind === "model") return (await modelReady(deps, agent)) ? READY : { state: "no_ai", reason: "no_key" };
@@ -99,6 +115,8 @@ const agentFields = {
   brainFallback: schema.agents.brainFallback,
   brainAccountId: schema.agents.brainAccountId,
   machineId: schema.agents.machineId,
+  builtin: schema.agents.builtin,
+  ownerUserId: schema.agents.ownerUserId,
 };
 
 const activeAgents = (db: Executor, orgId: string) =>

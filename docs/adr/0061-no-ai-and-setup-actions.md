@@ -1,6 +1,6 @@
 # 0061. No AI connected, and agents that set up the workspace
 
-- Status: Accepted; amended 2026-11-04 (§5, a plan's panel never waits with no end, `key_only`)
+- Status: Accepted; amended 2026-11-04 (§5, a plan's panel never waits with no end)
 - Date: 2026-10-24
 - Extends: ADR 0032 (brains and the fallback to the model), ADR 0037 (act with undo), ADR 0041 (plan sign-ins on a computer), ADR 0043 (tool groups chosen by the judge), ADR 0053 (who is behind a run)
 - Out of scope for now: invitation and app cards, agents creating agents or changing their own brain, plan sign-in from the phone app
@@ -60,7 +60,7 @@ This changes one behavior: a signed-out or missing command-line tool used to mak
 
 - `any`: the choice of a Claude plan, a ChatGPT plan or an API key.
 - A plan goes to the account sign-in on the agent's computer (ADR 0041); once the account is in, "Usar meu plano" makes it the agent's brain, with the plan warning shown first.
-- A plan's panel never waits with no end (amended 2026-11-04). When the Cloud's computer says ready and the agent's view still has none, the view and the accounts are asked again once, for at most `CATCH_UP_MS` (8 s, `catchUp` in `lib/no-ai.ts`), with the sign-in loading meanwhile. Still none after that, and the panel says no computer is there, with Conectar um computador (`missing`). A read that fails with nothing to show says so, with Tentar de novo. An agent that never thinks on a computer (the right hand, ADR 0137) is `key_only`: its plans dim, the dialog opens on the API key, and a plan's panel says the agent thinks only with an API key, with Usar uma chave de API agora. The web and the phone share these gates.
+- A plan's panel never waits with no end (amended 2026-11-04). When the Cloud's computer says ready and the agent's view still has none, the view and the accounts are asked again once, for at most `CATCH_UP_MS` (8 s, `catchUp` in `lib/no-ai.ts`), with the sign-in loading meanwhile. Still none after that, and the panel says no computer is there, with Conectar um computador (`missing`). A read that fails with nothing to show says so, with Tentar de novo. The web and the phone share these gates. The right hand gets these gates like any agent: its view carries the computer its plan signs in on (ADR 0137 §1).
 - An API key goes to the key dialog, with the provider already picked.
 - It shows what that person may do: keys need `manage_credentials` (admins), changing who thinks for an agent needs its owner or an admin, and a sign-in on a computer needs whoever may add accounts there.
 - The banner above the composer (the organization has no AI, or a DM's agent has none), the card, the receipt under a message ("Ninguém vai responder: falta uma IA") and the "Sem IA" chip by an agent's name all open it.

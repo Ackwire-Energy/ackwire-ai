@@ -4287,6 +4287,24 @@
   "noAi.lockedAdmins": {
     "value": "Only an admin can connect an AI."
   },
+  "noAi.rightHand.computer_away": {
+    "value": "{{name}} can't answer now: the computer the plan is signed in on is away."
+  },
+  "noAi.rightHand.plan_limit": {
+    "value": "{{name}} can't answer now: the plan reached its limit."
+  },
+  "noAi.rightHand.plan_not_shared": {
+    "value": "{{name}} thinks with a plan that answers only its owner."
+  },
+  "noAi.rightHand.runner_outdated": {
+    "value": "{{name}} can't answer now: the program on the plan's computer needs an update."
+  },
+  "noAi.rightHand.plan_tools": {
+    "value": "{{name}} stopped before answering: the plan's AI on that computer offers tools of its own."
+  },
+  "noAi.rightHand.useKey": {
+    "value": "Use an API key"
+  },
   "noAi.receipt": {
     "value": "Nobody will answer: no AI connected"
   },
@@ -4412,9 +4430,6 @@
   },
   "connectAi.wait.connecting": {
     "value": "This server's computer connects within a minute. You sign in here as soon as it does."
-  },
-  "connectAi.keyOnly": {
-    "value": "{{name}} thinks only with an API key. Plans run on an agent's computer, and {{name}} never uses one."
   },
   "connectAi.theComputer": {
     "value": "the computer"
@@ -29473,6 +29488,24 @@
   "chat.body.no_ai_not_signed_in": {
     "value": "I can't answer yet: {{brain}} isn't signed in on my computer."
   },
+  "chat.body.no_ai_computer_away": {
+    "value": "I can't answer now: the computer my plan is signed in on is away."
+  },
+  "chat.body.no_ai_plan_limit": {
+    "value": "I can't answer now: the plan I think with reached its limit."
+  },
+  "chat.body.no_ai_plan_not_shared": {
+    "value": "I can't answer you on this plan: it answers only its owner."
+  },
+  "chat.body.no_ai_runner_outdated": {
+    "value": "I can't answer now: the program on my plan's computer needs an update."
+  },
+  "chat.body.no_ai_plan_tools": {
+    "value": "I stopped before answering: my plan's AI on that computer offers tools of its own."
+  },
+  "chat.body.redacted": {
+    "value": "[removed: it looked like a sign-in or a key]"
+  },
   "chat.body.action_connect_ai": {
     "value": "Connect an AI"
   },
@@ -33512,6 +33545,24 @@
   },
   "rightHand.settings.audit": {
     "value": "See what {{name}} did"
+  },
+  "rightHand.settings.onPlan": {
+    "value": "Claude plan · {{account}}"
+  },
+  "rightHand.settings.change": {
+    "value": "Change"
+  },
+  "rightHand.settings.planHelp": {
+    "value": "The plan's owner pays. When its computer is away, the conversation says so and offers an API key."
+  },
+  "rightHand.settings.plan": {
+    "value": "A plan"
+  },
+  "rightHand.settings.planOffer": {
+    "value": "{{name}} can think with your plan instead of an API key. It runs on the computer where the plan is signed in and reaches only this workspace."
+  },
+  "rightHand.settings.usePlan": {
+    "value": "Use a plan"
   },
   "rightHand.card.settings": {
     "value": "{{name}} · Settings"

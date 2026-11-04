@@ -30,6 +30,14 @@ export const NO_AI_TEXT = "I can't answer yet: I have no AI connected.";
 const NO_AI_SIGNED_OUT_TEXT = "I can't answer yet: my AI is signed out.";
 const noAiNotSignedInText = (own: NonNullable<AgentAi["own"]>) =>
   `I can't answer yet: ${BRAIN_NAMES[own]} isn't signed in on my computer.`;
+/** The team's right hand on a plan (`rightHandNoAiReason`): why that plan can't think for this message. */
+const RIGHT_HAND_TEXT: Partial<Record<NoAiReason, string>> = {
+  computer_away: "I can't answer now: the computer my plan is signed in on is away.",
+  plan_limit: "I can't answer now: the plan I think with reached its limit.",
+  plan_not_shared: "I can't answer you on this plan: it answers only its owner.",
+  runner_outdated: "I can't answer now: the program on my plan's computer needs an update.",
+  plan_tools: "I stopped before answering: my plan's AI on that computer offers tools of its own.",
+};
 
 /** A conversation gets the card again only after this long (per agent; once while the organization has no AI). */
 export const NO_AI_CARD_EVERY_MS = 6 * 3600_000;
@@ -111,7 +119,9 @@ export async function postNoAiCard(
       channelId: run.channelId,
       threadId,
       author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
-      body: own ? noAiNotSignedInText(own) : reason === "not_signed_in" ? NO_AI_SIGNED_OUT_TEXT : NO_AI_TEXT,
+      body: own
+        ? noAiNotSignedInText(own)
+        : (RIGHT_HAND_TEXT[reason] ?? (reason === "not_signed_in" ? NO_AI_SIGNED_OUT_TEXT : NO_AI_TEXT)),
       meta: { ...bodyCode(NO_AI), noAi },
     });
   });

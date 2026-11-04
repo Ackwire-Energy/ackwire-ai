@@ -2010,7 +2010,13 @@
       "audience": "Kto może korzystać",
       "audienceHelp": "Osoba spoza tej grupy nie widzi {{name}} na pasku bocznym.",
       "lock": "{{name}} nie da się zarchiwizować ani usunąć. Nic nie publikuje, dopóki nikt do niego nie napisze.",
-      "audit": "Zobacz, co zrobił {{name}}"
+      "audit": "Zobacz, co zrobił {{name}}",
+      "onPlan": "Plan Claude · {{account}}",
+      "change": "Zmień",
+      "planHelp": "Płaci właściciel planu. Gdy jego komputer jest niedostępny, rozmowa o tym mówi i proponuje klucz API.",
+      "plan": "Plan",
+      "planOffer": "{{name}} może myśleć z twoim planem zamiast z kluczem API, na komputerze, na którym plan jest zalogowany, bez sięgania poza ten workspace.",
+      "usePlan": "Użyj planu"
     },
     "card": {
       "settings": "{{name}} · Ustawienia",
@@ -2146,6 +2152,14 @@
     "action": "Podłącz",
     "locked": "Kto podłącza AI agenta {{name}}: administrator, kluczem API, albo {{owner}}, własnym planem.",
     "lockedAdmins": "AI może podłączyć tylko administrator.",
+    "rightHand": {
+      "computer_away": "{{name}} nie może teraz odpowiedzieć: komputer planu jest niedostępny.",
+      "plan_limit": "{{name}} nie może teraz odpowiedzieć: plan osiągnął limit.",
+      "plan_not_shared": "{{name}} myśli z planem, który odpowiada tylko swojemu właścicielowi.",
+      "runner_outdated": "{{name}} nie może teraz odpowiedzieć: program na komputerze planu wymaga aktualizacji.",
+      "plan_tools": "{{name}} zatrzymał się przed odpowiedzią: AI planu na tym komputerze oferuje własne narzędzia.",
+      "useKey": "Użyj klucza API"
+    },
     "receipt": "Nikt nie odpowie: brak podłączonego AI",
     "chip": "Brak AI"
   },
@@ -2216,7 +2230,6 @@
       "useKey": "Użyj teraz klucza API",
       "connecting": "Komputer tego serwera połączy się w ciągu minuty. Zalogujesz się tutaj, gdy tylko to nastąpi."
     },
-    "keyOnly": "{{name}} myśli tylko z kluczem API. Plany działają na komputerze agenta, a {{name}} nigdy go nie używa.",
     "theComputer": "komputer",
     "own": {
       "shared": "Konto wspólne dla twoich agentów",
@@ -13396,6 +13409,12 @@
       "person_limit": "Osoba, która prosiła, osiągnęła limit użycia w tym miesiącu. Aby kontynuować teraz, poproś admina.",
       "no_ai_signed_out": "Nie mogę jeszcze odpowiadać: moje AI jest wylogowane.",
       "no_ai_not_signed_in": "Nie mogę jeszcze odpowiadać: {{brain}} nie jest zalogowany na moim komputerze.",
+      "no_ai_computer_away": "Nie mogę teraz odpowiedzieć: komputer mojego planu jest niedostępny.",
+      "no_ai_plan_limit": "Nie mogę teraz odpowiedzieć: plan, z którym myślę, osiągnął limit.",
+      "no_ai_plan_not_shared": "Nie mogę ci odpowiedzieć przez ten plan: odpowiada tylko swojemu właścicielowi.",
+      "no_ai_runner_outdated": "Nie mogę teraz odpowiedzieć: program na komputerze mojego planu wymaga aktualizacji.",
+      "no_ai_plan_tools": "Zatrzymałem się przed odpowiedzią: AI mojego planu na tym komputerze oferuje własne narzędzia.",
+      "redacted": "[usunięto: wyglądało na dane logowania lub klucz]",
       "action_connect_ai": "Połącz AI",
       "action_connect_app": "Połącz {{name}}",
       "action_add_mcp": "Dodaj serwer MCP",

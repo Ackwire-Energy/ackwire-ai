@@ -87,7 +87,11 @@ export function ConnectAiSheet() {
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
   const mayAddKey = can(org, "manage_credentials");
   // From the create-agent step: for the agent being made, never one I have.
-  const mine = params.forNew === "1" ? [] : dir.agents.filter((a) => a.ownerUserId === meId);
+  // The team's right hand thinks on the plan of whoever gives it one (ADR 0137 §1): theirs to connect, as an admin.
+  const mine =
+    params.forNew === "1"
+      ? []
+      : dir.agents.filter((a) => a.ownerUserId === meId || (isRightHand(a) && can(org, "manage_agents")));
   const named = params.agentId ? [params.agentId] : null;
   const agents = (named ? mine.filter((a) => named.includes(a.id)) : mine).map((a) => ({ id: a.id, name: a.name }));
   // The agents a plan was connected for here: they think with it before the AI status says so.
@@ -104,6 +108,7 @@ export function ConnectAiSheet() {
   };
   // Opened for one agent: its name in the title.
   const one = named?.length === 1 ? dir.agentById.get(named[0] ?? "") : undefined;
+  const rightHand = isRightHand(one);
   // No agent of theirs yet, and it isn't opened for someone else's: a plan signs in for the agents they create.
   const bare = !named && agents.length === 0;
   const [accountAdded, setAccountAdded] = useState(false);
@@ -115,11 +120,9 @@ export function ConnectAiSheet() {
   const locked =
     agents.length > 0 || bare
       ? undefined
-      : isRightHand(one)
-        ? t("connectAi.keyOnly", agentGrammar(one?.name ?? ""))
-        : one && owner
-          ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
-          : t("noAi.lockedAdmins");
+      : one && owner
+        ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
+        : t("noAi.lockedAdmins");
   const close = () => {
     if (router.canGoBack()) router.back();
   };
@@ -144,14 +147,21 @@ export function ConnectAiSheet() {
             void qc.invalidateQueries({ queryKey: keys.brainMachines(orgId) });
             answer();
           }}
-          {...(one && one.ownerUserId !== meId && mayAddKey ? { theirs: { id: one.id, name: one.name } } : {})}
+          {...(one && one.ownerUserId !== meId && mayAddKey && !(rightHand && can(org, "manage_agents"))
+            ? { theirs: { id: one.id, name: one.name } }
+            : {})}
           justReady={params.ready === "1"}
           mayAddKey={mayAddKey}
           keyForm={form}
           keySaved={keySaved}
           onSaveKey={() =>
-            void form.save().then((ok) => {
+            void form.save().then(async (ok) => {
               if (!ok) return;
+              // The right hand on a plan asked for a key ("Usar uma chave de API"): it thinks with the workspace's keys now.
+              if (one && rightHand && one.brain?.kind !== "model") {
+                await api.agents.setBrain(orgId, one.id, { brain: "model" }).catch(() => null);
+                void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+              }
               setKeySaved(true);
               answer();
             })

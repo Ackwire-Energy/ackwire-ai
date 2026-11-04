@@ -1865,6 +1865,14 @@ export const en = {
       audienceHelp: "Outside it, a person doesn't see {{name}} in the sidebar.",
       lock: "{{name}} can't be archived or deleted. It posts nothing unless someone talks to it.",
       audit: "See what {{name}} did",
+      /** On a person's plan (ADR 0137 §1): the AI row names the plan's account, with Change. */
+      onPlan: "Claude plan · {{account}}",
+      change: "Change",
+      planHelp: "The plan's owner pays. When its computer is away, the conversation says so and offers an API key.",
+      plan: "A plan",
+      planOffer:
+        "{{name}} can think with your plan instead of an API key. It runs on the computer where the plan is signed in and reaches only this workspace.",
+      usePlan: "Use a plan",
     },
     card: {
       settings: "{{name}} · Settings",
@@ -1992,6 +2000,15 @@ export const en = {
     action: "Connect",
     locked: "Who connects {{name}}'s AI: an admin, with an API key, or {{owner}}, with their own plan.",
     lockedAdmins: "Only an admin can connect an AI.",
+    /** The team's right hand on a plan that can't think now (ADR 0137 §7): one line, and the way to an API key. */
+    rightHand: {
+      computer_away: "{{name}} can't answer now: the computer the plan is signed in on is away.",
+      plan_limit: "{{name}} can't answer now: the plan reached its limit.",
+      plan_not_shared: "{{name}} thinks with a plan that answers only its owner.",
+      runner_outdated: "{{name}} can't answer now: the program on the plan's computer needs an update.",
+      plan_tools: "{{name}} stopped before answering: the plan's AI on that computer offers tools of its own.",
+      useKey: "Use an API key",
+    },
     receipt: "Nobody will answer: no\u00a0AI connected",
     chip: "No AI",
   },
@@ -2044,8 +2061,6 @@ export const en = {
       useKey: "Use an API key now",
       connecting: "This server's computer connects within a minute. You sign in here as soon as it does.",
     },
-    /** A plan's panel for an agent that never thinks on a computer (the team's right hand): an API key it can use. */
-    keyOnly: "{{name}} thinks only with an API key. Plans run on an agent's computer, and {{name}} never uses one.",
     /** The Cloud's one computer in a plan's sign-in, unnamed: "Send to the computer". */
     theComputer: "the computer",
     own: {
@@ -12026,6 +12041,13 @@ export const en = {
       person_limit: "The person who asked reached their usage limit for this month. To keep going now, ask an admin.",
       no_ai_signed_out: "I can't answer yet: my AI is signed out.",
       no_ai_not_signed_in: "I can't answer yet: {{brain}} isn't signed in on my computer.",
+      no_ai_computer_away: "I can't answer now: the computer my plan is signed in on is away.",
+      no_ai_plan_limit: "I can't answer now: the plan I think with reached its limit.",
+      no_ai_plan_not_shared: "I can't answer you on this plan: it answers only its owner.",
+      no_ai_runner_outdated: "I can't answer now: the program on my plan's computer needs an update.",
+      no_ai_plan_tools: "I stopped before answering: my plan's AI on that computer offers tools of its own.",
+      /** Where the server took a sign-in or a key out of the team's right hand's reply, in place of it. */
+      redacted: "[removed: it looked like a sign-in or a key]",
       action_connect_ai: "Connect an AI",
       action_connect_app: "Connect {{name}}",
       action_add_mcp: "Add an MCP server",

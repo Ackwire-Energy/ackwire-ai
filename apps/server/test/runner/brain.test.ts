@@ -6,6 +6,7 @@ import {
   BRAIN_PROFILES_PROTOCOL,
   BRAIN_PROTOCOL,
   type BrainTurnRequest,
+  LOCKED_BRAIN_PROTOCOL,
   MACHINE_PROTOCOL_VERSION,
   type MachineRequest,
   parseBrainEvent,
@@ -38,7 +39,7 @@ import {
 } from "../../runner/brain";
 import { claudeAuth } from "../../runner/executors";
 import { handleRequest } from "../../runner/handlers";
-import { type IpcReply, McpBridge, McpToolCache } from "../../runner/mcp";
+import { chatToolsBreach, type IpcReply, McpBridge, McpToolCache } from "../../runner/mcp";
 import { agentWorkspace } from "../../runner/paths";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
@@ -435,6 +436,47 @@ test("profiles (ADR 0053 §3): plan has our tools only, no settings files, no ed
   // Every tool of Claude Code but its web: ours read it.
   expect(at(personal, "--disallowedTools")).toBe("WebFetch,WebSearch");
   expect(work).not.toContain("--disallowedTools");
+});
+
+test("protocol 41: a chat turn (the team's right hand on a plan) gets our MCP tools and nothing else", () => {
+  expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(LOCKED_BRAIN_PROTOCOL);
+  const at = (args: string[], flag: string) => args[args.indexOf(flag) + 1];
+  // Whatever `personalMcp` says: never the owner's servers, settings or skills.
+  const chat = claudeBrainArgs({
+    session: SESSION(1),
+    resume: false,
+    systemFile: "/b/system.txt",
+    mcpConfigFile: "/b/mcp.json",
+    settingsFile: "/b/settings.json",
+    ...brainProfileLaunch("chat", true),
+  });
+  expect(at(chat, "--tools")).toBe("");
+  expect(chat).toContain("--strict-mcp-config");
+  expect(at(chat, "--setting-sources")).toBe("");
+  expect(at(chat, "--permission-mode")).toBe("dontAsk");
+  expect(at(chat, "--allowedTools")).toBe("mcp__agentes");
+  expect(chat).toContain("--disable-slash-commands");
+  expect(chat).toContain("--no-chrome");
+  expect(chat).not.toContain("--permission-prompt-tool");
+  expect(chat).not.toContain("--add-dir");
+  const denied = at(chat, "--disallowedTools")?.split(",") ?? [];
+  for (const tool of [
+    "Bash",
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "WebFetch",
+    "WebSearch",
+    "Task",
+    "Skill",
+    "RemoteTrigger",
+    "CronCreate",
+    "Artifact",
+  ]) {
+    expect(denied).toContain(tool);
+  }
 });
 
 // ── The manager with a fake Claude Code ──────────────────────────────────────
@@ -1173,6 +1215,82 @@ test.if(posix)("a turn in one of its checkouts keeps the agent's whole folder (-
   const args = spawns()[0]?.args ?? [];
   expect(args[args.indexOf("--add-dir") + 1]).toBe(folder);
 });
+
+test.if(posix)(
+  "a chat turn starts in the agent's own folder, reads none of it and may only call our tools",
+  async () => {
+    const { spawns, turn, ws } = setup();
+    const folder = await agentWorkspace(ws, AGENT);
+    mkdirSync(path.join(folder, "repos", "acme", "app"), { recursive: true });
+    writeFileSync(path.join(folder, "CLAUDE.md"), "SECRET NOTES");
+    const r = await turn(
+      1,
+      "hi",
+      { cwd: "repos/acme/app", permissions: { mode: "chat" }, personalMcp: true },
+      undefined,
+      { grants: ["/somewhere/else"] },
+    );
+    expect(r.final).toMatchObject({ type: "done" });
+    const spawn = spawns()[0] as unknown as {
+      args: string[];
+      cwd: string;
+      system: string | null;
+      autoMemoryOff: string | null;
+    };
+    expect(spawn.cwd).toBe(folder);
+    expect(spawn.autoMemoryOff).toBe("1");
+    expect(spawn.args).not.toContain("--add-dir");
+    expect(spawn.args[spawn.args.indexOf("--tools") + 1]).toBe("");
+    expect(spawn.system ?? "").not.toContain("SECRET NOTES");
+    const settings = JSON.parse(readFileSync(spawn.args[spawn.args.indexOf("--settings") + 1] ?? "", "utf8"));
+    expect(settings.permissions.allow).toEqual(["mcp__agentes"]);
+    expect(settings.permissions.deny).toContain("Bash");
+    expect(settings.permissions.deny).toContain("Read");
+  },
+);
+
+test("the chat guard reads Claude Code's init: our bridge's tools alone pass, anything else or no list stops the turn", () => {
+  // Claude Code 2.1.318's init with the chat flags, and without them (the default tools).
+  const locked = {
+    claude_code_version: "2.1.318",
+    tools: ["mcp__agentes__post_message"],
+    mcp_servers: [{ name: "agentes", status: "connected" }],
+  };
+  expect(chatToolsBreach(locked)).toBeNull();
+  expect(chatToolsBreach({ ...locked, tools: [] })).toBeNull();
+  expect(chatToolsBreach({ ...locked, tools: ["Task", "Bash", "Read", "Workflow", "ListAgents"] })).toContain("Bash");
+  expect(chatToolsBreach({ ...locked, mcp_servers: [...locked.mcp_servers, { name: "claude.ai Gmail" }] })).toContain(
+    "MCP claude.ai Gmail",
+  );
+  expect(chatToolsBreach({ claude_code_version: "2.1.318" })).toContain("didn't list");
+});
+
+test.if(posix)(
+  "a chat turn whose Claude Code offers a tool of its own stops at its init, before any answer",
+  async () => {
+    const { spawns, turn } = setup();
+    process.env.FAKE_CLAUDE_EXTRA_TOOL = "Workflow";
+    try {
+      const r = await turn(1, "hi", { permissions: { mode: "chat" } });
+      expect(r.final).toMatchObject({ type: "error", code: "tools_not_locked" });
+      expect((r.final as { message: string }).message).toContain("Workflow");
+      expect(r.events.some((e) => e.type === "text_delta")).toBe(false);
+      // Never tried again on a one-shot: one process, killed.
+      expect(spawns()).toHaveLength(1);
+      // Every other turn is as before (its tools are its profile's).
+      expect((await turn(2, "hi")).final).toMatchObject({ type: "done" });
+    } finally {
+      delete process.env.FAKE_CLAUDE_EXTRA_TOOL;
+    }
+    process.env.FAKE_CLAUDE_NO_TOOL_LIST = "1";
+    try {
+      const r = await turn(3, "hi", { permissions: { mode: "chat" } });
+      expect(r.final).toMatchObject({ type: "error", code: "tools_not_locked" });
+    } finally {
+      delete process.env.FAKE_CLAUDE_NO_TOOL_LIST;
+    }
+  },
+);
 
 test("a conversation that moves to a checkout keeps its Claude Code session (the newest copy)", () => {
   const home = tempDir("claude-home-");

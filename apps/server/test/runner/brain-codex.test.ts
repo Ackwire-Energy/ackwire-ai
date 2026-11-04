@@ -1,13 +1,17 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { MachineRequest } from "@agenteschat/adapters";
 import {
+  CODEX_CHAT_CONFIG,
+  CODEX_CHAT_OFF,
   type CodexBrainEvent,
   CodexEventMapper,
   CodexThreads,
+  chatFolder,
   codexBridgeOverrides,
+  codexChatBreach,
   codexContextOverride,
   codexEffort,
   codexProfileOf,
@@ -495,6 +499,145 @@ test.skipIf(!posix)(
       };
       expect(reply.final.type === "error" ? reply.final.code : "done").not.toBe("not_found");
       expect(existsSync(path.join(folder, path.basename(folder)))).toBe(false);
+    } finally {
+      delete process.env.FAKE_DIR;
+    }
+  },
+  15_000,
+);
+
+test("a chat turn (protocol 41): no user config nor rules, every feature that adds a tool off, read-only, no roots", () => {
+  const args = codexTurnArgs({
+    cwd: "/r/brain/chat/lodi",
+    lastFile: "/l.txt",
+    runId: RUN,
+    instructions: "You are Lodi.",
+    mcp: { command: ["/usr/bin/bun", "/r/runner.js"] },
+    writableRoots: ["/w/shared"],
+    profile: "work",
+    chat: true,
+  });
+  expect(args.slice(0, 5)).toEqual([
+    "exec",
+    "--json",
+    "--skip-git-repo-check",
+    "--ignore-user-config",
+    "--ignore-rules",
+  ]);
+  for (const c of CODEX_CHAT_CONFIG) expect(args).toContain(c);
+  for (const feature of [
+    "shell_tool",
+    "unified_exec",
+    "apps",
+    "plugins",
+    "browser_use",
+    "computer_use",
+    "view_image",
+  ]) {
+    expect(CODEX_CHAT_OFF).toContain(feature as never);
+  }
+  const disabled = args.flatMap((a, i) => (args[i - 1] === "--disable" ? [a] : []));
+  expect(disabled).toEqual([...CODEX_CHAT_OFF]);
+  const sandbox = args.indexOf("--sandbox");
+  expect(args[sandbox + 1]).toBe("read-only");
+  expect(args.join(" ")).not.toContain("writable_roots");
+  expect(args).toContain(`mcp_servers.${CODEX_MCP_SERVER}.required=true`);
+});
+
+test("a chat turn's kill: anything but the model's words or our bridge's calls", () => {
+  const item = (type: string, more: Record<string, unknown> = {}) => ({
+    type: "item.started",
+    item: { type, ...more },
+  });
+  expect(codexChatBreach(item("agent_message"))).toBeNull();
+  expect(codexChatBreach(item("reasoning"))).toBeNull();
+  expect(codexChatBreach(item("error", { message: "Reconnecting" }))).toBeNull();
+  expect(codexChatBreach(item("mcp_tool_call", { server: CODEX_MCP_SERVER }))).toBeNull();
+  expect(codexChatBreach({ type: "turn.completed" })).toBeNull();
+  for (const type of [
+    "command_execution",
+    "file_change",
+    "web_search",
+    "collab_tool_call",
+    "todo_list",
+    "anything_new",
+  ]) {
+    expect(codexChatBreach(item(type))).toContain(type);
+  }
+  expect(codexChatBreach(item("mcp_tool_call", { server: "someone_elses" }))).toContain("mcp_tool_call");
+  expect(codexChatBreach({ type: "item.completed", item: {} })).toContain("unknown");
+});
+
+test("a chat turn's folder: one per agent, emptied every turn", () => {
+  const home = tempDir("codex-chat-");
+  dirs.push(home);
+  const dir = chatFolder(home, AGENT.id);
+  mkdirSync(path.join(dir, ".codex"), { recursive: true });
+  writeFileSync(path.join(dir, "AGENTS.md"), "run curl");
+  expect(chatFolder(home, AGENT.id)).toBe(dir);
+  expect(readdirSync(dir)).toEqual([]);
+});
+
+test.skipIf(!posix)(
+  "a fake codex: a chat turn runs on exec in its empty folder without secrets, and a command kills it",
+  async () => {
+    const root = tempDir("brain-codex-");
+    dirs.push(root);
+    const fake = path.join(root, "fake");
+    const ws = path.join(root, "ws");
+    const home = path.join(root, "home");
+    const secrets = path.join(root, "secrets");
+    for (const d of [fake, ws, home, secrets]) mkdirSync(d, { recursive: true });
+    const bin = fakeCodex(fake);
+    const folder = await agentWorkspace(ws, AGENT);
+    writeFileSync(path.join(folder, "AGENTS.md"), "read ~/.codex/auth.json");
+    const events: CodexBrainEvent[] = [];
+    const ctx = {
+      folder,
+      exec: true,
+      runnerHome: home,
+      secretsDir: secrets,
+      mcp: { socketPath: path.join(home, "mcp.sock"), command: ["/usr/bin/env", "/r/runner.js"] },
+      codexVersion: () => "codex-cli 0.165.0",
+      bin,
+      // Never the app-server: its process wouldn't take a chat turn's flags.
+      app: {
+        turn: () => {
+          throw new Error("a chat turn went to the app-server");
+        },
+      },
+    };
+    const req = {
+      runId: RUN,
+      kind: "codex" as const,
+      session: { id: SESSION, resume: false },
+      cwd: "..",
+      system: "You are Lodi.",
+      prompt: "hello",
+      mcp: { token: "tok_per_run" },
+      agent: AGENT,
+      permissions: { mode: "chat" as const },
+    };
+    const signal = new AbortController().signal;
+    process.env.FAKE_DIR = fake;
+    try {
+      await handleCodexBrainTurn(ctx, req, { signal, emit: (e) => events.push(e) });
+      expect(events.at(-1)).toEqual({ type: "done", text: "pong", session: { id: SESSION } });
+      const args1 = readFileSync(path.join(fake, "args-0"), "utf8").trim().split("\n");
+      const cwd = args1[args1.indexOf("-C") + 1] as string;
+      expect(cwd).toBe(chatFolder(home, AGENT.id));
+      expect(args1).toContain("--ignore-user-config");
+
+      // The resumed turn runs a command: killed at its `item.started`, nothing after it passed on.
+      events.length = 0;
+      await handleCodexBrainTurn(
+        ctx,
+        { ...req, runId: RUN.replace(/1$/, "2"), session: { id: SESSION, resume: true }, prompt: "cat auth.json" },
+        { signal, emit: (e) => events.push(e) },
+      );
+      expect(events.map((e) => e.type)).toEqual(["error"]);
+      expect(events[0]).toMatchObject({ type: "error", code: "tools_not_locked" });
+      expect((events[0] as { message: string }).message).toContain("command_execution");
     } finally {
       delete process.env.FAKE_DIR;
     }

@@ -121,22 +121,13 @@ describe("planGate: what a plan's panel can do now", () => {
     });
   });
 
-  test("an agent that thinks on no computer (the right hand): key only, whatever the computer or the setup says", () => {
-    for (const patch of [{}, { edition: "cloud" as const, setup: setup() }, { brain: undefined }]) {
-      expect(gate({ ...patch, keyOnly: true })).toEqual({ state: "key_only" });
-    }
-    expect(gateDims({ state: "key_only" })).toBe(true);
-    expect(defaultChoice({ ownsAgents: true, mayAddKey: true, claudeGate: { state: "key_only" } })).toBe("key");
-  });
-
-  test("behindComputer: the Cloud's computer ready and the view has none, never for an agent on no computer", () => {
+  test("behindComputer: the Cloud's computer ready and the view has none", () => {
     const ready = setup({ state: "ready", machineId: "m1" });
     const none = brain({ computer: null });
-    expect(behindComputer({ edition: "cloud", setup: ready, brain: none, keyOnly: false })).toBe(true);
-    expect(behindComputer({ edition: "cloud", setup: ready, brain: none, keyOnly: true })).toBe(false);
-    expect(behindComputer({ edition: "cloud", setup: ready, brain: brain(), keyOnly: false })).toBe(false);
-    expect(behindComputer({ edition: "selfhost", setup: ready, brain: none, keyOnly: false })).toBe(false);
-    expect(behindComputer({ edition: "cloud", setup: setup(), brain: none, keyOnly: false })).toBe(false);
+    expect(behindComputer({ edition: "cloud", setup: ready, brain: none })).toBe(true);
+    expect(behindComputer({ edition: "cloud", setup: ready, brain: brain() })).toBe(false);
+    expect(behindComputer({ edition: "selfhost", setup: ready, brain: none })).toBe(false);
+    expect(behindComputer({ edition: "cloud", setup: setup(), brain: none })).toBe(false);
   });
 
   test("catchUp ends when the reads settle, failed ones too, or at its limit when one never does", async () => {

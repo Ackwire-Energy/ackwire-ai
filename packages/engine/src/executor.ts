@@ -201,7 +201,7 @@ import {
   visibleText,
 } from "./reply-policy";
 import { routineCreatorOf, wikiPersonOf } from "./requester";
-import { isRightHand, RIGHT_HAND_AUTO } from "./right-hand";
+import { isRightHand, RIGHT_HAND_AUTO, rightHandNoAiReason, scrubRightHandReply } from "./right-hand";
 import { routineBriefOf } from "./routine-brief";
 import { missStaleRoutineRun, routineRunWaitingForComputer, routineRunWaitingForPlan } from "./routine-firing";
 import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
@@ -254,7 +254,7 @@ import {
 } from "./stuck";
 import { archivedAgentsPrompt, FIND_AGENT_TOOL, renamedAgentsPrompt, teammateMeans } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
-import { carriesCredential, maskCredentials, maskCredentialsExcept } from "./tool-detail";
+import { carriesCredential, maskCredentials, maskCredentialsExcept, scrubSignIns } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
 import {
   EVERY_TOOL,
@@ -1674,7 +1674,7 @@ async function executeRunInner(
     // from it stays low trust; once it has read outside, every later post is marked too. A credential in its reply is
     // masked unless a person wrote it here.
     if (!note && !readOutside) readOutside = await runReadOutside(tx, current, undefined, outsideMemo);
-    const said =
+    const masked =
       note || !carriesCredential(body)
         ? body
         : fedByRoutine(await runAuthority(tx, current))
@@ -1682,6 +1682,8 @@ async function executeRunInner(
           : readOutside
             ? maskCredentialsExcept(body, await personWords(tx, run.orgId, run.channelId, threadId))
             : body;
+    // The right hand never posts a sign-in or a key, not even one a person wrote (ADR 0137 §4).
+    const said = !note && isRightHand(agent) ? await scrubRightHandReply(tx, run, masked) : masked;
     // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
     const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
     // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0, and one call
@@ -2185,7 +2187,7 @@ async function executeRunInner(
       return;
     }
     const [person] = by ? await db.select({ name: users.name }).from(users).where(eq(users.id, by)) : [];
-    const said = [
+    const wrote = [
       ...t.messages
         .slice(t.postedUpTo)
         .filter((m) => m.role === "assistant")
@@ -2194,6 +2196,8 @@ async function executeRunInner(
     ]
       .filter(Boolean)
       .join("\n\n");
+    // The apps show `canceled.text`, not the body: the right hand's is scrubbed here, before both (ADR 0137 §4).
+    const said = isRightHand(agent) ? await scrubRightHandReply(db, run, wrote) : wrote;
     // Cut mid-stream: what it was writing stays in the transcript too ("Continuar" picks up from there).
     if (partial.trim() && t.messages.at(-1)?.role !== "assistant")
       t.messages.push({ role: "assistant", content: [{ type: "text", text: partial.trim() }] });
@@ -2637,6 +2641,12 @@ async function executeRunInner(
       });
       if (back === null) return "canceled";
       if (back) return "back";
+    }
+    // The team's right hand on a plan (ADR 0137 §7): one line says why, with the way to an API key; it never stands
+    // in on a key nor waits for the computer. Only waiting its turn for room stays a wait.
+    if (isRightHand(agent) && u.code !== "busy" && !u.queued) {
+      await failNoAi(rightHandNoAiReason(u.code));
+      return "failed";
     }
     // Tools already ran in a turn cut off by its computer: only that computer may finish it (the model
     // brain would redo them), so the run waits for it. A turn the plan cut after it worked parks with no
@@ -3579,6 +3589,7 @@ async function executeRunInner(
               void publishQueueChanged(deps.pubsub, run.orgId, admitted.machineId).catch(() => {});
           },
           quiet: run.background,
+          scrub: isRightHand(agent),
         },
       );
       // "Stop and send" (`steer: "now"`) aborts only this model call: the loop goes on and reads the
@@ -3846,7 +3857,10 @@ async function executeRunInner(
               ...(error.resetsAt ? { resetsAt: error.resetsAt } : {}),
             });
           }
-          if (executed.length > 0) {
+          // The right hand's CLI killed at a tool of its own (ADR 0137 §4): nothing of that turn is posted, only its
+          // DM's line (`brainUnavailable`), whatever it did through the bridge before.
+          const killed = isRightHand(agent) && error instanceof BrainFailure && error.code === "tools_not_locked";
+          if (executed.length > 0 && !killed) {
             const failure =
               error instanceof BrainFailure
                 ? { code: error.code, message: error.message }
@@ -5010,6 +5024,8 @@ function createDeltaPublisher(
     onFirst?: () => void;
     /** Background work (a routine's run): nothing of its text shows live in the conversation. */
     quiet?: boolean;
+    /** The right hand's (`scrubSignIns`): a sign-in or a key never shows, its last word held until it is whole. */
+    scrub?: boolean;
   },
 ) {
   let started = false;
@@ -5031,7 +5047,8 @@ function createDeltaPublisher(
     timer = null;
     sentUpTo = all.length;
     if (first.quiet) return;
-    const visible = visibleText(all, final);
+    const said = visibleText(all, final);
+    const visible = first.scrub ? scrubSignIns(final ? said : said.slice(0, said.search(/\S*$/)), "••••").text : said;
     // A held piece turned out to be the word (now cut): nothing new to show.
     if (!visible.startsWith(shown)) return;
     let at = shown.length;

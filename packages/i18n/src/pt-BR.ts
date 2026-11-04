@@ -1867,6 +1867,15 @@ export const ptBR = {
       lock_female: "A {{name}} não pode ser arquivada nem apagada. Ela não posta nada sem que alguém fale com ela.",
       audit: "Ver o que o {{name}} fez",
       audit_female: "Ver o que a {{name}} fez",
+      onPlan: "Plano do Claude · {{account}}",
+      change: "Mudar",
+      planHelp: "Quem paga é o dono do plano. Sem o computador do plano, a conversa avisa e oferece uma chave de API.",
+      plan: "Um plano",
+      planOffer:
+        "O {{name}} pode pensar com o seu plano no lugar de uma chave de API. Ele roda no computador onde o plano está conectado e só alcança este workspace.",
+      planOffer_female:
+        "A {{name}} pode pensar com o seu plano no lugar de uma chave de API. Ela roda no computador onde o plano está conectado e só alcança este workspace.",
+      usePlan: "Usar um plano",
     },
     card: {
       settings: "{{name}} · Configurações",
@@ -2006,6 +2015,15 @@ export const ptBR = {
     action: "Conectar",
     locked: "Quem conecta a IA de {{name}}: um admin, com uma chave de API, ou {{owner}}, com o próprio plano.",
     lockedAdmins: "Só um admin pode conectar uma IA.",
+    rightHand: {
+      computer_away: "{{name}} não consegue responder agora: o computador do plano está fora do ar.",
+      plan_limit: "{{name}} não consegue responder agora: o plano chegou ao limite.",
+      plan_not_shared: "{{name}} pensa com um plano que só atende o próprio dono.",
+      runner_outdated:
+        "{{name}} não consegue responder agora: o programa no computador do plano precisa ser atualizado.",
+      plan_tools: "{{name}} parou antes de responder: a IA do plano naquele computador oferece ferramentas próprias.",
+      useKey: "Usar uma chave de API",
+    },
     receipt: "Ninguém vai responder: falta uma IA",
     chip: "Sem IA",
   },
@@ -2061,10 +2079,6 @@ export const ptBR = {
       useKey: "Usar uma chave de API agora",
       connecting: "O computador deste servidor conecta em até um minuto. Você entra aqui assim que ele conectar.",
     },
-    keyOnly:
-      "O {{name}} pensa só com uma chave de API. Os planos rodam no computador de um agente, e o {{name}} nunca usa um.",
-    keyOnly_female:
-      "A {{name}} pensa só com uma chave de API. Os planos rodam no computador de um agente, e a {{name}} nunca usa um.",
     /** Without its article: the sentences carry it ("Enviar ao {{computer}}", "O {{computer}} está…"). */
     theComputer: "computador",
     own: {
@@ -12230,6 +12244,13 @@ export const ptBR = {
       no_ai_signed_out: "Ainda não consigo responder: minha IA saiu da conta.",
       /** The computer's own sign-in of that CLI isn't there (`meta.noAi.own`); `brain`: Codex or Claude Code. */
       no_ai_not_signed_in: "Ainda não consigo responder: o {{brain}} está sem login no meu computador.",
+      no_ai_computer_away: "Agora não consigo responder: o computador do meu plano está fora do ar.",
+      no_ai_plan_limit: "Agora não consigo responder: o plano com que eu penso chegou ao limite.",
+      no_ai_plan_not_shared: "Não consigo te responder por este plano: ele só atende o próprio dono.",
+      no_ai_runner_outdated:
+        "Agora não consigo responder: o programa no computador do meu plano precisa ser atualizado.",
+      no_ai_plan_tools: "Parei antes de responder: a IA do meu plano naquele computador oferece ferramentas próprias.",
+      redacted: "[removido: parecia um login ou uma chave]",
       action_connect_ai: "Conectar uma IA",
       action_connect_app: "Conectar {{name}}",
       action_add_mcp: "Adicionar um servidor MCP",

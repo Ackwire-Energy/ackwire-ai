@@ -1938,7 +1938,13 @@
       "audience": "Quién puede usarlo",
       "audienceHelp": "Fuera del público, la persona no ve a {{name}} en la barra lateral.",
       "lock": "{{name}} no se puede archivar ni borrar. No publica nada si nadie le habla.",
-      "audit": "Ver lo que hizo {{name}}"
+      "audit": "Ver lo que hizo {{name}}",
+      "onPlan": "Plan de Claude · {{account}}",
+      "change": "Cambiar",
+      "planHelp": "Paga quien es dueño del plan. Si su computadora no está disponible, la conversación lo dice y ofrece una clave de API.",
+      "plan": "Un plan",
+      "planOffer": "{{name}} puede pensar con tu plan en lugar de una clave de API, en la computadora donde el plan tiene la sesión iniciada, sin llegar a nada fuera de este workspace.",
+      "usePlan": "Usar un plan"
     },
     "card": {
       "settings": "{{name}} · Configuración",
@@ -2070,6 +2076,14 @@
     "action": "Conectar",
     "locked": "Quién conecta la IA de {{name}}: un admin, con una clave de API, o {{owner}}, con su propio plan.",
     "lockedAdmins": "Solo un admin puede conectar una IA.",
+    "rightHand": {
+      "computer_away": "{{name}} no puede responder ahora: la computadora del plan no está disponible.",
+      "plan_limit": "{{name}} no puede responder ahora: el plan llegó a su límite.",
+      "plan_not_shared": "{{name}} piensa con un plan que solo responde a su dueño.",
+      "runner_outdated": "{{name}} no puede responder ahora: el programa en la computadora del plan necesita una actualización.",
+      "plan_tools": "{{name}} se detuvo antes de responder: la IA del plan en esa computadora ofrece herramientas propias.",
+      "useKey": "Usar una clave de API"
+    },
     "receipt": "Nadie responderá: no hay una IA conectada",
     "chip": "Sin IA"
   },
@@ -2142,7 +2156,6 @@
       "useKey": "Usar una clave de API ahora",
       "connecting": "La computadora de este servidor se conecta en menos de un minuto. Inicias sesión aquí en cuanto lo haga."
     },
-    "keyOnly": "{{name}} piensa solo con una clave de API. Los planes funcionan en la computadora de un agente, y {{name}} nunca usa una.",
     "theComputer": "la computadora",
     "own": {
       "shared": "La cuenta que comparten tus agentes",
@@ -12957,6 +12970,12 @@
       "person_limit": "Quien pidió llegó a su límite de uso de este mes. Para seguir ahora, pide a un admin.",
       "no_ai_signed_out": "Todavía no puedo responder: mi IA tiene la sesión cerrada.",
       "no_ai_not_signed_in": "Todavía no puedo responder: {{brain}} no tiene la sesión iniciada en mi computadora.",
+      "no_ai_computer_away": "Ahora no puedo responder: la computadora de mi plan no está disponible.",
+      "no_ai_plan_limit": "Ahora no puedo responder: el plan con el que pienso llegó a su límite.",
+      "no_ai_plan_not_shared": "No puedo responderte con este plan: solo responde a su dueño.",
+      "no_ai_runner_outdated": "Ahora no puedo responder: el programa en la computadora de mi plan necesita una actualización.",
+      "no_ai_plan_tools": "Me detuve antes de responder: la IA de mi plan en esa computadora ofrece herramientas propias.",
+      "redacted": "[eliminado: parecía un inicio de sesión o una clave]",
       "action_connect_ai": "Conectar una IA",
       "action_connect_app": "Conectar {{name}}",
       "action_add_mcp": "Agregar un servidor MCP",

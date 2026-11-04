@@ -7,11 +7,12 @@ import type { CommandProfile } from "@agenteschat/adapters/command-policy";
 import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
 import { isAccountId } from "@agenteschat/adapters/machine-protocol";
 import { redactSecrets } from "@agenteschat/adapters/secret-box";
-import { ACCOUNT_MISSING_MESSAGE, accountEnv, cursorKeyOf } from "./accounts";
+import { ACCOUNT_MISSING_MESSAGE, accountEnv, cursorKeyOf, withoutSignIns } from "./accounts";
 import {
   CODEX_TOOL_OUTPUT_MAX,
   type CodexBrainEvent,
   CodexThreads,
+  chatFolder,
   codexProfileOf,
   codexThreadKey,
 } from "./brain-codex";
@@ -78,7 +79,7 @@ export interface CursorBrainTurnRequest {
   mcp: { token: string; url?: string; tools?: string };
   agent?: AgentScope;
   account?: string;
-  permissions?: { mode?: "plan" | "work" };
+  permissions?: { mode?: "plan" | "work" | "chat" };
   keepAlive?: boolean;
 }
 
@@ -121,6 +122,50 @@ export function writeCursorMcp(folder: string, entry: Record<string, unknown>) {
   renameSync(tmp, file);
 }
 
+/**
+ * A `chat` turn's `.cursor/cli.json` (protocol 41): every built-in tool Cursor documents denied (its shell, reads and
+ * writes in the workspace and anywhere else, the web), as cursor.com/docs/cli/reference/permissions lists them (read
+ * 2026-11-04). A deny wins over any allow the account's own config has. MCP tools can't be denied but for ours (a
+ * deny wins over our allow too): the runner kills the turn on any other (`cursorChatBreach`).
+ */
+export const CURSOR_CHAT_PERMISSIONS = {
+  permissions: {
+    // Ours, said outright: a print-mode turn without `--force` may otherwise hold an MCP call for an approval.
+    allow: [`Mcp(${CODEX_MCP_SERVER}:*)`],
+    deny: [
+      "Shell(*)",
+      "Shell(*:*)",
+      "Read(**)",
+      "Read(/**)",
+      "Read(~/**)",
+      "Write(**)",
+      "Write(/**)",
+      "Write(~/**)",
+      "WebFetch(*)",
+    ],
+  },
+};
+
+/**
+ * The runtime kill of a `chat` turn: a `tool_call` (started or completed) that isn't a call to our bridge
+ * (`mcpToolCall` named `<server>-<tool>` or from our `providerIdentifier`, or a `function` named for our server) is a
+ * breach. Null for anything else.
+ */
+export function cursorChatBreach(ev: Record<string, unknown>): string | null {
+  if (ev.type !== "tool_call") return null;
+  const call = isRecord(ev.tool_call) ? ev.tool_call : {};
+  const key = Object.keys(call)[0] ?? "";
+  const body = isRecord(call[key]) ? (call[key] as Record<string, unknown>) : {};
+  const args = isRecord(body.args) ? body.args : {};
+  const name = key === "function" ? str(body.name) : str(args.name);
+  const ours =
+    name.startsWith(`${CODEX_MCP_SERVER}-`) ||
+    name.startsWith(`mcp_${CODEX_MCP_SERVER}`) ||
+    (key === "mcpToolCall" && str(args.providerIdentifier) === CODEX_MCP_SERVER);
+  if ((key === "mcpToolCall" || key === "function") && ours) return null;
+  return `Cursor used a tool of its own (${(key.replace(/ToolCall$/, "") || "unknown").slice(0, 64)}), so the turn stopped.`;
+}
+
 /** Whether `--approve-mcps` may go: `cwd` is `folder` or under it, with no `.cursor/mcp.json` but ours on the way. */
 export function cursorMayApproveMcps(folder: string, cwd: string): boolean {
   const rel = path.relative(folder, cwd);
@@ -153,6 +198,8 @@ export function cursorTurnArgs(input: {
   model?: string;
   profile?: CommandProfile;
   approveMcps?: boolean;
+  /** Protocol 41: the team's right hand, in ask mode inside Cursor's sandbox and never `--force`. */
+  locked?: boolean;
 }): string[] {
   return [
     "-p",
@@ -165,7 +212,11 @@ export function cursorTurnArgs(input: {
     // The CLI would otherwise download its own updates into each agent's home (CURSOR_CONFIG_DIR) on a turn.
     "--disable-auto-update",
     ...(input.approveMcps ? ["--approve-mcps"] : []),
-    ...(input.profile === "plan" ? ["--mode", "ask"] : ["--force", "--sandbox", "enabled"]),
+    ...(input.locked
+      ? ["--mode", "ask", "--sandbox", "enabled"]
+      : input.profile === "plan"
+        ? ["--mode", "ask"]
+        : ["--force", "--sandbox", "enabled"]),
     ...(input.model ? ["--model", input.model] : []),
     ...(input.chat ? ["--resume", input.chat] : []),
     input.prompt,
@@ -367,6 +418,8 @@ export interface CursorTurnInput {
   /** The account (its chats are its own): its folder, and its key when it was made with one. */
   account?: { id: string; home: string; key?: string };
   profile?: CommandProfile;
+  /** Protocol 41: the team's right hand (`cwd` and `folder` its empty `chatFolder`), killed at a tool of Cursor's own. */
+  chat?: boolean;
 }
 
 export interface CursorTurnOptions {
@@ -395,6 +448,11 @@ export async function runCursorTurn(input: CursorTurnInput, opts: CursorTurnOpti
   }
   try {
     writeCursorMcp(input.folder, cursorMcpEntry(input.mcp.url ? { url: input.mcp.url } : { command: opts.mcpCommand }));
+    if (input.chat) {
+      writeFileSync(path.join(input.folder, ".cursor", "cli.json"), JSON.stringify(CURSOR_CHAT_PERMISSIONS), {
+        mode: 0o600,
+      });
+    }
   } catch (err) {
     return fail("cursor_failed", `Couldn't set up the agent's tools for Cursor: ${(err as Error).message}`, true);
   }
@@ -407,9 +465,10 @@ export async function runCursorTurn(input: CursorTurnInput, opts: CursorTurnOpti
     ...(input.model ? { model: input.model } : {}),
     profile: input.profile ?? "work",
     approveMcps: cursorMayApproveMcps(input.folder, input.cwd),
+    ...(input.chat ? { locked: true } : {}),
   });
   const base: NodeJS.ProcessEnv = {
-    ...process.env,
+    ...(input.chat ? withoutSignIns(process.env) : process.env),
     ...(opts.env ?? {}),
     [CURSOR_RUN_ENV]: input.runId,
     [CODEX_MCP_ENV[0]]: input.mcp.token,
@@ -444,7 +503,22 @@ export async function runCursorTurn(input: CursorTurnInput, opts: CursorTurnOpti
     stderr = (stderr + c.toString("utf8")).slice(-2000);
   });
   const lines = createInterface({ input: child.stdout as NonNullable<ChildProcess["stdout"]> });
+  // A `chat` turn that used a tool of Cursor's own ends there: nothing after it is passed on.
+  let breach: string | null = null;
   (lines as unknown as EventEmitter).on("line", (line: string) => {
+    if (breach) return;
+    if (input.chat) {
+      try {
+        const ev = JSON.parse(line) as unknown;
+        breach = isRecord(ev) ? cursorChatBreach(ev) : null;
+      } catch {
+        breach = null;
+      }
+      if (breach) {
+        killTree(child, "SIGKILL");
+        return;
+      }
+    }
     for (const event of mapper.line(line)) opts.emit(event);
     if (mapper.chat) opts.chats.set(chatKey, mapper.chat);
   });
@@ -475,6 +549,7 @@ export async function runCursorTurn(input: CursorTurnInput, opts: CursorTurnOpti
   if (killTimer) clearTimeout(killTimer);
   lines.close();
   if (opts.signal.aborted) return fail("canceled", "The turn was canceled.");
+  if (breach) return fail("tools_not_locked", breach);
   if (exit.error) {
     const missing = (exit.error as NodeJS.ErrnoException).code === "ENOENT";
     return fail(
@@ -520,9 +595,11 @@ export async function handleCursorBrainTurn(
   }
   if (typeof req.mcp?.token !== "string" || !req.mcp.token)
     throw new RunnerError("bad_request", "mcp.token is required");
-  const folder = ctx.folder;
+  // A `chat` turn starts in an empty folder of its own (then our `.cursor` alone), whatever the request names.
+  const chat = req.permissions?.mode === "chat";
+  const folder = chat ? chatFolder(ctx.runnerHome, String(req.agent.id)) : ctx.folder;
   let cwd = folder;
-  if (typeof req.cwd === "string" && req.cwd.trim() !== "") {
+  if (!chat && typeof req.cwd === "string" && req.cwd.trim() !== "") {
     const resolved = await resolveForAgent(folder, ctx.grants, req.cwd);
     if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
     cwd = resolved.abs;
@@ -540,7 +617,7 @@ export async function handleCursorBrainTurn(
     const key = await cursorKeyOf(home);
     account = { id: accountId, home, ...(key ? { key } : {}) };
   }
-  const secrets = await agentSecrets(ctx.secretsDir, req.agent);
+  const secrets = chat ? null : await agentSecrets(ctx.secretsDir, req.agent);
   const file = cursorChatsFile(ctx.runnerHome);
   const chats = ctx.chats ?? chatStores.get(file) ?? new CodexThreads(file);
   chatStores.set(file, chats);
@@ -556,6 +633,7 @@ export async function handleCursorBrainTurn(
       mcp: { token: req.mcp.token, ...(typeof req.mcp.url === "string" && req.mcp.url ? { url: req.mcp.url } : {}) },
       ...(account ? { account } : {}),
       profile: codexProfileOf(req),
+      ...(chat ? { chat } : {}),
     },
     {
       chats,

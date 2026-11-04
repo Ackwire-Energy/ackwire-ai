@@ -38,12 +38,12 @@ import type { TFunction } from "i18next";
 /**
  * "Usar uma chave de API agora" under a plan that can't sign in on the agent's computer yet. On the phone the key's
  * row is a page away, so every wait for the workspace's computer offers it (not on hold: nothing runs then), as do
- * an offline computer, none, one that can't take the plan and an agent that thinks on no computer.
+ * an offline computer, none and one that can't take the plan.
  */
 export const offersKeyNow = (gate: PlanGate, held: boolean) =>
   gate.state === "preparing"
     ? gate.view !== null && !held
-    : gate.state === "offline" || gate.state === "missing" || gate.state === "unsupported" || gate.state === "key_only";
+    : gate.state === "offline" || gate.state === "missing" || gate.state === "unsupported";
 
 /** How often a plan's page asks again while it waits (the web's first run asks as often). */
 export const PLAN_POLL_MS = 5000;

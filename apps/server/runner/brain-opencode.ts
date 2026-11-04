@@ -76,7 +76,7 @@ export interface OpencodeBrainTurnRequest {
   mcp: { token: string; url?: string; tools?: string };
   agent?: AgentScope;
   account?: string;
-  permissions?: { mode?: "plan" | "work" };
+  permissions?: { mode?: "plan" | "work" | "chat" };
   keepAlive?: boolean;
   /** No account on a computer nobody connected: OpenCode's own free tier and nothing else (ADR 0132). */
   freeTier?: boolean;
@@ -134,6 +134,16 @@ export function opencodePermissions(profile: CommandProfile): Record<string, str
 }
 
 /**
+ * A `chat` turn's permissions (protocol 41, the team's right hand): every tool denied by `*`, ours (`<server>_<tool>`)
+ * allowed. OpenCode leaves out of the model's request every tool whose last matching rule is a `*` deny
+ * (`Permission.disabled`, `session/llm/request.ts`, v1.19.5), so a tool a new version adds is left out too.
+ */
+export const OPENCODE_CHAT_PERMISSION: Record<string, string> = { "*": "deny", [`${CODEX_MCP_SERVER}_*`]: "allow" };
+
+/** The agent a `chat` turn runs as, and asks OpenCode about first (`opencode debug agent`). */
+export const OPENCODE_CHAT_AGENT = "build";
+
+/**
  * The turn's `OPENCODE_CONFIG_CONTENT`: our MCP server alone, the permissions, the account's key. Every value that
  * changes per turn is an `{env:…}` reference.
  */
@@ -141,6 +151,8 @@ export function opencodeConfig(input: {
   command?: string[];
   url?: string;
   profile: CommandProfile;
+  /** A `chat` turn: `OPENCODE_CHAT_PERMISSION`, and its model as the default one (the guard's probe sees the same). */
+  chat?: { model?: string };
   /** The account has a key: the `opencode` provider reads it from `OPENCODE_API_KEY`. */
   key?: boolean;
   /** OpenCode's own provider alone. */
@@ -158,7 +170,8 @@ export function opencodeConfig(input: {
       };
   return JSON.stringify({
     mcp: { [CODEX_MCP_SERVER]: server },
-    permission: opencodePermissions(input.profile),
+    permission: input.chat ? OPENCODE_CHAT_PERMISSION : opencodePermissions(input.profile),
+    ...(input.chat?.model ? { model: input.chat.model } : {}),
     share: "disabled",
     autoupdate: false,
     ...(input.key ? { provider: { opencode: { options: { apiKey: env(OPENCODE_KEY_ENV) } } } } : {}),
@@ -166,15 +179,56 @@ export function opencodeConfig(input: {
   });
 }
 
-/** The `opencode` arguments for one turn (the prompt goes on standard input). */
-export function opencodeTurnArgs(input: { session?: string; model?: string }): string[] {
+/**
+ * The `opencode` arguments for one turn (the prompt goes on standard input). A `chat` turn names its agent and runs
+ * `--pure`: no plugins but OpenCode's own.
+ */
+export function opencodeTurnArgs(input: { session?: string; model?: string; chat?: boolean }): string[] {
   return [
     "run",
     "--format",
     "json",
+    ...(input.chat ? ["--agent", OPENCODE_CHAT_AGENT, "--pure"] : []),
     ...(input.model ? ["--model", input.model] : []),
     ...(input.session ? ["--session", input.session] : []),
   ];
+}
+
+/** The guard's probe: the tools the `chat` turn's agent gets, as OpenCode resolves them with the same config. */
+export const opencodeProbeArgs = () => ["debug", "agent", OPENCODE_CHAT_AGENT, "--pure"];
+
+/**
+ * A `chat` turn's guard: `opencode debug agent`'s answer (its `tools`, each true when the model would get it, and the
+ * agent's `permission` rules). Any tool on but our bridge's, or an answer without both, is a breach. `tools` leaves
+ * out MCP servers' tools, so the rules decide those: after the last `*` deny only rules that keep a tool hidden (a
+ * `*` pattern denied, `Permission.disabled`), ours, or `external_directory` (a path rule, no tool's name) may follow.
+ * An allow that a config read after ours adds (an MDM or OpenCode console org config) stops the turn too.
+ */
+export function opencodeToolsBreach(stdout: string): string | null {
+  let answer: unknown;
+  try {
+    answer = JSON.parse(stdout.slice(stdout.indexOf("{"), stdout.lastIndexOf("}") + 1));
+  } catch {
+    answer = undefined;
+  }
+  const tools = isRecord(answer) ? answer.tools : undefined;
+  const rules = isRecord(answer) && Array.isArray(answer.permission) ? (answer.permission as unknown[]) : undefined;
+  if (!isRecord(tools) || !rules) return "OpenCode didn't list its tools, so the turn stopped before it began.";
+  const hides = (r: unknown) => isRecord(r) && r.pattern === "*" && r.action === "deny";
+  const last = rules.map((r) => hides(r) && isRecord(r) && r.permission === "*").lastIndexOf(true);
+  const loose = (last < 0 ? [{ permission: "*" }] : rules.slice(last + 1)).filter((r) => {
+    const name = isRecord(r) ? str(r.permission) : "";
+    return !hides(r) && name !== "external_directory" && !name.startsWith(`${CODEX_MCP_SERVER}_`);
+  });
+  const on = new Set([
+    ...Object.entries(tools)
+      .filter(([id, enabled]) => enabled !== false && !id.startsWith(`${CODEX_MCP_SERVER}_`))
+      .map(([id]) => id),
+    ...loose.map((r) => (isRecord(r) && str(r.permission)) || "?"),
+  ]);
+  return on.size
+    ? `OpenCode offers tools of its own here (${[...on].slice(0, 8).join(", ")}), so the turn stopped before it began.`
+    : null;
 }
 
 /** The message: a new session's leads with the engine's context. */
@@ -323,6 +377,8 @@ export interface OpencodeTurnInput {
   account?: { id: string; home: string; key?: string };
   profile?: CommandProfile;
   freeTier?: boolean;
+  /** Protocol 41: the team's right hand, OpenCode's tools all off and checked before it starts (`opencodeToolsBreach`). */
+  chat?: boolean;
 }
 
 export interface OpencodeTurnOptions {
@@ -382,6 +438,7 @@ export async function runOpencodeTurn(input: OpencodeTurnInput, opts: OpencodeTu
   env.OPENCODE_CONFIG_CONTENT = opencodeConfig({
     ...(input.mcp.url ? { url: input.mcp.url } : { command: opts.mcpCommand }),
     profile: input.profile ?? "work",
+    ...(input.chat ? { chat: input.model ? { model: input.model } : {} } : {}),
     key: Boolean(key),
     freeTier: Boolean(input.freeTier && !input.account),
   });
@@ -390,13 +447,27 @@ export async function runOpencodeTurn(input: OpencodeTurnInput, opts: OpencodeTu
   env.OPENCODE_DISABLE_AUTOUPDATE = "1";
   // Language servers would be downloaded, unpinned, into each agent's home.
   env.OPENCODE_DISABLE_LSP_DOWNLOAD = "1";
+  // OpenCode reads the computer's `~/.claude/CLAUDE.md` into every session: none in a `chat` turn.
+  if (input.chat) env.OPENCODE_DISABLE_CLAUDE_CODE = "1";
   // The agent's shell could print the key (its env, its file in the lent folder).
   const redact = key
     ? (text: string) => redactSecrets(opts.redact ? opts.redact(text) : text, [{ name: OPENCODE_KEY_ENV, value: key }])
     : opts.redact;
 
+  if (input.chat) {
+    const probe = await opencodeProbe(opts, input.cwd, env);
+    if (opts.signal.aborted) return fail("canceled", "The turn was canceled.");
+    const breach = probe.missing ? null : opencodeToolsBreach(probe.stdout);
+    if (probe.missing) return fail("opencode_missing", "OpenCode's CLI is not installed on this computer.", true);
+    if (breach) return fail("tools_not_locked", breach);
+  }
+
   const once = async (session: string | undefined) => {
-    const args = opencodeTurnArgs({ ...(session ? { session } : {}), ...(input.model ? { model: input.model } : {}) });
+    const args = opencodeTurnArgs({
+      ...(session ? { session } : {}),
+      ...(input.model ? { model: input.model } : {}),
+      ...(input.chat ? { chat: true } : {}),
+    });
     const mapper = new OpencodeEventMapper({
       ...(input.model ? { model: input.model } : {}),
       ...(redact ? { redact } : {}),
@@ -410,7 +481,12 @@ export async function runOpencodeTurn(input: OpencodeTurnInput, opts: OpencodeTu
         detached: true,
       });
     } catch (err) {
-      return { mapper, exit: { code: null, error: err instanceof Error ? err : new Error(String(err)) }, stderr: "" };
+      return {
+        mapper,
+        exit: { code: null, error: err instanceof Error ? err : new Error(String(err)) },
+        stderr: "",
+        breach: undefined,
+      };
     }
     // A CLI gone before it read the prompt fails the turn by its exit, not by a broken pipe.
     child.stdin?.on("error", () => undefined);
@@ -420,8 +496,18 @@ export async function runOpencodeTurn(input: OpencodeTurnInput, opts: OpencodeTu
       stderr = (stderr + c.toString("utf8")).slice(-2000);
     });
     const lines = createInterface({ input: child.stdout as NonNullable<ChildProcess["stdout"]> });
+    // A `chat` turn that ran a tool of OpenCode's own anyway (the guard missed it) ends there: nothing it read is said.
+    let breach: string | undefined;
     (lines as unknown as EventEmitter).on("line", (line: string) => {
-      for (const event of mapper.line(line)) opts.emit(event);
+      if (breach) return;
+      for (const event of mapper.line(line)) {
+        if (input.chat && event.type === "tool_call") {
+          breach = `OpenCode ran a tool of its own (${event.name}), so the turn stopped.`;
+          killTree(child, "SIGKILL");
+          return;
+        }
+        opts.emit(event);
+      }
       if (mapper.session) opts.sessions.set(sessionKey, mapper.session);
     });
     let killTimer: ReturnType<typeof setTimeout> | undefined;
@@ -450,7 +536,7 @@ export async function runOpencodeTurn(input: OpencodeTurnInput, opts: OpencodeTu
     opts.signal.removeEventListener("abort", abort);
     if (killTimer) clearTimeout(killTimer);
     lines.close();
-    return { mapper, exit, stderr: stderr.trim() };
+    return { mapper, exit, stderr: stderr.trim(), breach };
   };
 
   const stored = opts.sessions.get(sessionKey);
@@ -468,6 +554,7 @@ export async function runOpencodeTurn(input: OpencodeTurnInput, opts: OpencodeTu
     turn = await once(undefined);
   }
   if (opts.signal.aborted) return fail("canceled", "The turn was canceled.");
+  if (turn.breach) return fail("tools_not_locked", turn.breach);
   const { mapper, exit, stderr } = turn;
   if (exit.error) {
     const missing = (exit.error as NodeJS.ErrnoException).code === "ENOENT";
@@ -480,6 +567,47 @@ export async function runOpencodeTurn(input: OpencodeTurnInput, opts: OpencodeTu
   for (const event of mapper.finish({ exitCode: exit.code, sessionId: input.sessionId, stderr })) {
     opts.emit(event);
   }
+}
+
+const PROBE_TIMEOUT_MS = 60_000;
+
+/** Runs `opencode debug agent` with the turn's env and folder: its standard output (empty when it failed). */
+function opencodeProbe(
+  opts: Pick<OpencodeTurnOptions, "bin" | "spawn" | "signal">,
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+): Promise<{ stdout: string; missing?: boolean }> {
+  return new Promise((resolve) => {
+    let child: ChildProcess;
+    try {
+      child = (opts.spawn ?? spawn)(resolveCommand(opts.bin ?? OPENCODE_BIN, env.PATH), opencodeProbeArgs(), {
+        cwd,
+        env,
+        stdio: ["ignore", "pipe", "pipe"],
+        detached: true,
+      });
+    } catch {
+      return resolve({ stdout: "" });
+    }
+    let stdout = "";
+    child.stdout?.on("data", (c: Buffer) => {
+      stdout = (stdout + c.toString("utf8")).slice(-1_000_000);
+    });
+    child.stderr?.on("data", () => undefined);
+    const stop = () => killTree(child, "SIGKILL");
+    const timer = setTimeout(stop, PROBE_TIMEOUT_MS);
+    opts.signal.addEventListener("abort", stop, { once: true });
+    const done = (out: { stdout: string; missing?: boolean }) => {
+      clearTimeout(timer);
+      opts.signal.removeEventListener("abort", stop);
+      resolve(out);
+    };
+    const proc = child as unknown as EventEmitter;
+    proc.on("error", (error: NodeJS.ErrnoException) =>
+      done({ stdout: "", ...(error.code === "ENOENT" ? { missing: true } : {}) }),
+    );
+    proc.on("close", (code: number | null) => done({ stdout: code === 0 ? stdout : "" }));
+  });
 }
 
 /** What the runner's `brain.turn` handler hands the OpenCode branch. */
@@ -521,8 +649,10 @@ export async function handleOpencodeBrainTurn(
   if (freeTier && typeof req.model === "string" && req.model && !req.model.startsWith("opencode/")) {
     throw new RunnerError("bad_request", "OpenCode's free tier thinks only with OpenCode's own models");
   }
+  const chat = req.permissions?.mode === "chat";
   let cwd = ctx.folder;
-  if (typeof req.cwd === "string" && req.cwd.trim() !== "") {
+  // A `chat` turn starts in the agent's own folder, whatever the request names.
+  if (!chat && typeof req.cwd === "string" && req.cwd.trim() !== "") {
     const resolved = await resolveForAgent(ctx.folder, ctx.grants, req.cwd);
     if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
     cwd = resolved.abs;
@@ -545,7 +675,7 @@ export async function handleOpencodeBrainTurn(
     const key = await opencodeKeyOf(home);
     account = { id: accountId, home, ...(key ? { key } : {}) };
   }
-  const secrets = await agentSecrets(ctx.secretsDir, req.agent);
+  const secrets = chat ? null : await agentSecrets(ctx.secretsDir, req.agent);
   const file = opencodeSessionsFile(ctx.runnerHome);
   const sessions = ctx.sessions ?? sessionStores.get(file) ?? new CodexThreads(file);
   sessionStores.set(file, sessions);
@@ -561,6 +691,7 @@ export async function handleOpencodeBrainTurn(
       ...(account ? { account } : {}),
       profile: codexProfileOf(req),
       ...(freeTier ? { freeTier } : {}),
+      ...(chat ? { chat } : {}),
     },
     {
       sessions,

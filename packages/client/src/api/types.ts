@@ -1073,7 +1073,16 @@ export interface AiStatus {
     agentId: string;
     /** `waiting`: its computer is away for now (not "no AI"). */
     state: "ready" | "no_ai" | "waiting";
-    reason?: "no_key" | "not_signed_in" | "no_computer" | "cli_missing";
+    reason?:
+      | "no_key"
+      | "not_signed_in"
+      | "no_computer"
+      | "cli_missing"
+      | "computer_away"
+      | "plan_limit"
+      | "plan_not_shared"
+      | "runner_outdated"
+      | "plan_tools";
   }[];
 }
 

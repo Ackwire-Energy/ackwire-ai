@@ -47,7 +47,6 @@ import {
   providerOf,
   providersForKey,
 } from "@agenteschat/client/lib/providers";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -95,7 +94,6 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
   const asks = agentId !== undefined;
   const brain = useAgentBrain(orgId, agentId ?? "", asks, poll);
   const ai = useAiAccounts(orgId, asks, poll);
-  const agents = useAgents(orgId);
   // Codex's own sign-in is known only by a usage read with it: looked up again here (it comes back as
   // `machine.updated`, or with the next poll), so a computer's own ChatGPT sign-in shows before any turn ran.
   useEffect(() => {
@@ -106,12 +104,11 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
   const view = brain.data;
   const row = ai.data?.computers.find((c) => c.machineId === view?.computer?.machineId);
-  const keyOnly = isRightHand(agents.data?.find((a) => a.id === agentId));
   // Once ready, the workspace's computer is every agent's: a view from before that still has none is asked again
   // now with the accounts (a coding plan reads that computer's row there), not at their next poll. Until both
   // answers are in (`catchUp`, bounded), every plan reads as ready with its sign-in loading, as the rest of the page
   // says ready. Asked once per agent: still none after it, and nothing is coming (`caughtUp`).
-  const behind = behindComputer({ edition, setup, brain: view, keyOnly });
+  const behind = behindComputer({ edition, setup, brain: view });
   const [caughtUp, setCaughtUp] = useState<string>();
   const caught = agentId !== undefined && caughtUp === agentId;
   const [asking, setAsking] = useState(false);
@@ -141,7 +138,6 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
           // computer the person connected whether its own sign-in is there (`ownSignInFor`).
           brain: view && (ai.data || !(isPlanId(choice) || view.ownSignIn)) ? view : undefined,
           computer: row,
-          keyOnly,
           caughtUp: caught,
         });
   // A poll that fails once keeps the last view: a sign-in in progress goes on. A read that failed with nothing to show
@@ -877,7 +873,6 @@ function PlanSteps({
     <GateWait
       gate={gate}
       kind={kind}
-      agent={agentName}
       coding={coding}
       machineId={view?.computer?.machineId}
       computer={computer}
@@ -981,7 +976,6 @@ function PlanSteps({
 function GateWait({
   gate,
   kind,
-  agent = "",
   coding,
   machineId,
   computer,
@@ -991,8 +985,6 @@ function GateWait({
 }: {
   gate: PlanGate;
   kind: MachineAccountKind;
-  /** The agent it's for, by name (none for the agents to come). */
-  agent?: string;
   coding: boolean;
   /** The computer the gate is about. */
   machineId: string | undefined;
@@ -1029,8 +1021,6 @@ function GateWait({
           : t("brain.offline", { computer })}
       </InfoCard>
     );
-  } else if (gate.state === "key_only") {
-    wait = <InfoCard icon="info">{t("connectAi.keyOnly", agentGrammar(agent))}</InfoCard>;
   } else if (gate.state === "missing") {
     wait = (
       <>

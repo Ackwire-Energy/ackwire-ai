@@ -1865,7 +1865,13 @@
       "audience": "Kimler kullanabilir",
       "audienceHelp": "Bunun dışındaki kişi kenar çubuğunda {{name}} adını görmez.",
       "lock": "{{name}} arşivlenemez ve silinemez. Biri onunla konuşmadıkça hiçbir şey paylaşmaz.",
-      "audit": "{{name}} neler yaptı, gör"
+      "audit": "{{name}} neler yaptı, gör",
+      "onPlan": "Claude planı · {{account}}",
+      "change": "Değiştir",
+      "planHelp": "Ücreti planın sahibi öder. Planın bilgisayarına ulaşılamadığında konuşma bunu söyler ve bir API anahtarı önerir.",
+      "plan": "Bir plan",
+      "planOffer": "{{name}}, API anahtarı yerine planınızla düşünebilir. Planın oturum açtığı bilgisayarda çalışır ve bu çalışma alanının dışına ulaşmaz.",
+      "usePlan": "Plan kullan"
     },
     "card": {
       "settings": "{{name}} · Ayarlar",
@@ -1993,6 +1999,14 @@
     "action": "Bağla",
     "locked": "{{name}} için yapay zekayı kim bağlar: API anahtarıyla bir yönetici ya da kendi planıyla {{owner}}.",
     "lockedAdmins": "Yapay zekayı yalnızca bir yönetici bağlayabilir.",
+    "rightHand": {
+      "computer_away": "{{name}} şu an yanıt veremiyor: planın bilgisayarına ulaşılamıyor.",
+      "plan_limit": "{{name}} şu an yanıt veremiyor: plan sınırına ulaştı.",
+      "plan_not_shared": "{{name}}, yalnızca sahibine yanıt veren bir planla düşünüyor.",
+      "runner_outdated": "{{name}} şu an yanıt veremiyor: planın bilgisayarındaki programın güncellenmesi gerekiyor.",
+      "plan_tools": "{{name}} yanıt vermeden durdu: o bilgisayardaki planın yapay zekâsı kendi araçlarını sunuyor.",
+      "useKey": "API anahtarı kullan"
+    },
     "receipt": "Kimse yanıt vermeyecek: bağlı yapay zeka yok",
     "chip": "Yapay zeka yok"
   },
@@ -2063,7 +2077,6 @@
       "useKey": "Şimdi bir API anahtarı kullan",
       "connecting": "Bu sunucunun bilgisayarı bir dakika içinde bağlanır. Bağlanır bağlanmaz burada giriş yaparsınız."
     },
-    "keyOnly": "{{name}} yalnızca bir API anahtarıyla düşünür. Planlar bir ajanın bilgisayarında çalışır ve {{name}} hiç bilgisayar kullanmaz.",
     "theComputer": "bilgisayar",
     "own": {
       "shared": "Ajanlarınızın paylaştığı hesap",
@@ -12487,6 +12500,12 @@
       "person_limit": "İsteyen kişi bu ayki kullanım limitine ulaştı. Şimdi devam etmek için bir yöneticiye sor.",
       "no_ai_signed_out": "Henüz yanıt veremiyorum: yapay zekamın oturumu kapalı.",
       "no_ai_not_signed_in": "Henüz yanıt veremiyorum: bilgisayarımda {{brain}} oturumu açık değil.",
+      "no_ai_computer_away": "Şu an yanıt veremiyorum: planımın bilgisayarına ulaşılamıyor.",
+      "no_ai_plan_limit": "Şu an yanıt veremiyorum: düşündüğüm plan sınırına ulaştı.",
+      "no_ai_plan_not_shared": "Bu planla size yanıt veremiyorum: yalnızca sahibine yanıt veriyor.",
+      "no_ai_runner_outdated": "Şu an yanıt veremiyorum: planımın bilgisayarındaki programın güncellenmesi gerekiyor.",
+      "no_ai_plan_tools": "Yanıt vermeden durdum: o bilgisayarda planımın yapay zekâsı kendi araçlarını sunuyor.",
+      "redacted": "[kaldırıldı: bir oturum açma bilgisi ya da anahtar gibi görünüyordu]",
       "action_connect_ai": "Yapay zeka bağla",
       "action_connect_app": "{{name}} bağla",
       "action_add_mcp": "Bir MCP sunucusu ekle",

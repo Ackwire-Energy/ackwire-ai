@@ -173,14 +173,17 @@ function ConnectAiDialog({
   const qc = useQueryClient();
   const navigate = useNavigate();
   const add = useAddCredential(org.id);
+  const api = useApi();
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
   const mayAddKey = can(org, "manage_credentials");
-  const mine = dir.agents.filter((a) => a.ownerUserId === me.user.id);
+  // The team's right hand thinks on the plan of whoever gives it one (ADR 0137 §1): theirs to connect, as an admin.
+  const mine = dir.agents.filter((a) => a.ownerUserId === me.user.id || (isRightHand(a) && can(org, "manage_agents")));
   // An agent's card names whom to choose from. Opened for one agent, it is for that agent alone: the title names it,
   // so no For offers another. Anywhere else every agent of the viewer's stays a choice.
   const named = request.agentIds?.length ? request.agentIds : null;
   const only = named ? (named.length === 1 ? named[0] : undefined) : request.agentId;
   const one = only ? dir.agentById.get(only) : undefined;
+  const rightHand = isRightHand(one);
   const pool = request.forNewAgent ? [] : one ? [one.id] : named;
   const agents = (pool ? mine.filter((a) => pool.includes(a.id)) : mine).map((a) => ({
     id: a.id,
@@ -218,7 +221,7 @@ function ConnectAiDialog({
   const aimed = { agents, hasAi, asked: request.agentId, picked: pickedTarget };
   // With no set, the agent whose computer the panel reads, "All agents" too (they're on that one's computer).
   const reader = heldReader ?? defaultTarget({ ...aimed, set: [] });
-  const theirs = one !== undefined && one.ownerUserId !== me.user.id;
+  const theirs = one !== undefined && one.ownerUserId !== me.user.id && !(rightHand && can(org, "manage_agents"));
   // The one agent the dialog is for: what the person already has comes first for it while it has no AI. An admin sees
   // the accounts of someone else's agent, locked, and may give it a workspace key (ADR 0041 §4).
   const mayUseKeys = can(org, "manage_agents");
@@ -267,7 +270,13 @@ function ConnectAiDialog({
     add.mutate(
       { provider: draft.provider, label: providerLabel(draft.provider), apiKey: draft.apiKey.trim() },
       {
-        onSuccess: () => {
+        onSuccess: async (key) => {
+          // The right hand on a plan asked for a key ("Usar uma chave de API"): it thinks with this one from now on.
+          if (one && rightHand && one.brain?.kind !== "model") {
+            await api.agents.setBrain(org.id, one.id, { brain: "model" }).catch(() => null);
+            await api.agents.update(org.id, one.id, { credentialId: key.id }).catch(() => null);
+            void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
+          }
           setKeySaved(true);
           done();
         },
@@ -277,13 +286,10 @@ function ConnectAiDialog({
 
   // Someone else's agent, or no agent of theirs among those: who connects a plan instead.
   const owner = one?.ownerUserId ? dir.memberById.get(one.ownerUserId)?.name : undefined;
-  // The right hand thinks on no computer (ADR 0137): nobody's plan can, its owner's neither.
   const locked = theirs
-    ? isRightHand(one)
-      ? t("connectAi.keyOnly", agentGrammar(one.name))
-      : owner
-        ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
-        : t("noAi.lockedAdmins")
+    ? owner
+      ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
+      : t("noAi.lockedAdmins")
     : named && agents.length === 0
       ? t("noAi.lockedAdmins")
       : undefined;
@@ -323,7 +329,8 @@ function ConnectAiDialog({
             // Kept while a row's sign-in is open: its panel, under that row, says when it's done.
             have={(held) =>
               forAgent &&
-              (login || noAi(forAgent.id)) && (
+              // The right hand on a plan that can't think now: the workspace's keys, a click from it.
+              (login || noAi(forAgent.id) || rightHand) && (
                 <ExistingRows
                   gates={gates}
                   agent={forAgent}
