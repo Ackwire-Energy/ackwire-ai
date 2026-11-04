@@ -285,6 +285,11 @@ describe("a board on Início (ADR 0135 §18)", () => {
     });
     const mural = section("Metas");
     expect(mural.textContent).toContain("Receita hoje");
+    // One grid: the fixed tiles among the board's widgets, so either moves anywhere in it.
+    const grids = mural.querySelectorAll(".wgrid");
+    expect(grids).toHaveLength(1);
+    expect(grids[0]?.textContent).toContain("Esperando você");
+    expect(grids[0]?.textContent).toContain("Receita hoje");
     expect(within(mural).getByRole("link", { name: "Ver todos" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/dashboards`,
     );

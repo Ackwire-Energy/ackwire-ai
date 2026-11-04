@@ -5,8 +5,7 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Icon, Text } from "@/ui";
 import { newWidgetHref } from "../dashboards/BoardScreen";
 import { HOME, widgetsInOrder } from "../dashboards/logic";
-import { WidgetCard } from "../dashboards/WidgetView";
-import { widgetHref } from "../links/logic";
+import { WidgetPeek } from "../dashboards/WidgetPeek";
 import { useColors, useOrgId } from "../shared/hooks";
 
 /** A widget's width on the strip: two and a bit show, so it reads as one that scrolls. */
@@ -57,19 +56,11 @@ export function HomeWidgets() {
         >
           {widgets.map((w) => (
             <View key={w.id} style={styles.item}>
-              <WidgetCard
-                widget={{
-                  title: w.title,
-                  kind: w.kind,
-                  spec: w.spec,
-                  status: w.status,
-                  agentId: w.agentId,
-                  refreshedAt: w.refreshedAt,
-                  schedule: w.schedule,
-                  w: 1,
-                  h: 1,
-                }}
-                onPress={() => router.push(widgetHref(w.id))}
+              <WidgetPeek
+                widget={w}
+                canEdit={canAdd}
+                board={{ id: home.chosenId ?? HOME, home: !home.chosenId }}
+                compact
               />
             </View>
           ))}

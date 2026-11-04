@@ -81,6 +81,11 @@ const lineSpec = (labels: string[], values: number[], unit?: string): ChartSpec 
   ...(unit ? { unit } : {}),
 });
 
+/** A card on the home's strip: its height, the same for every widget there. */
+export const COMPACT_HEIGHT = 152;
+/** The rows a list shows on the home's strip. */
+const COMPACT_ROWS = 3;
+
 /** What a widget shows: its data by kind, the building sweep, or a quiet line when it has nothing yet. */
 export const WidgetBody = memo(function WidgetBody({
   spec,
@@ -88,6 +93,7 @@ export const WidgetBody = memo(function WidgetBody({
   agentId,
   big = false,
   bleed = false,
+  compact = false,
 }: {
   spec: WidgetSpec | null;
   status: WidgetStatus;
@@ -96,6 +102,8 @@ export const WidgetBody = memo(function WidgetBody({
   big?: boolean;
   /** The card draws the trend (or the bare line) along its bottom (`bleedSeries`): not here. */
   bleed?: boolean;
+  /** The home's strip: a smaller number, one line of note, the first rows only. */
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
   const look = useAgentLook(agentId);
@@ -114,7 +122,7 @@ export const WidgetBody = memo(function WidgetBody({
   const dim = status === "updating" ? 0.45 : status === "failed" ? 0.5 : 1;
   return (
     <View style={{ opacity: dim }}>
-      <SpecBody spec={spec} color={look.color} big={big} bleed={bleed} />
+      <SpecBody spec={spec} color={look.color} big={big} bleed={bleed} compact={compact} />
     </View>
   );
 });
@@ -124,15 +132,17 @@ function SpecBody({
   color,
   big,
   bleed,
+  compact,
 }: {
   spec: WidgetSpec;
   color: AgentColorName;
   big: boolean;
   bleed: boolean;
+  compact: boolean;
 }) {
   switch (spec.kind) {
     case "kpi":
-      return <Kpi spec={spec} color={color} big={big} bleed={bleed} />;
+      return <Kpi spec={spec} color={color} big={big} bleed={bleed} compact={compact} />;
     case "goal":
       return <Goal spec={spec} color={color} big={big} />;
     case "bars":
@@ -140,9 +150,9 @@ function SpecBody({
     case "line":
       return <LineBody spec={spec} color={color} big={big} bleed={bleed} />;
     case "list":
-      return <List spec={spec} />;
+      return <List spec={spec} compact={compact} />;
     case "text":
-      return <Summary spec={spec} color={color} />;
+      return <Summary spec={spec} color={color} compact={compact} />;
   }
 }
 
@@ -152,11 +162,13 @@ function Kpi({
   color,
   big,
   bleed,
+  compact = false,
 }: {
   spec: KpiWidgetSpec;
   color: AgentColorName;
   big: boolean;
   bleed: boolean;
+  compact?: boolean;
 }) {
   const { i18n } = useTranslation();
   const { colors: c } = useTheme();
@@ -173,13 +185,17 @@ function Kpi({
   );
   return (
     <View>
-      <Text variant="display" numberOfLines={1} style={[styles.num, big ? styles.numBig : null, { color: c.ink }]}>
+      <Text
+        variant="display"
+        numberOfLines={1}
+        style={[styles.num, big ? styles.numBig : compact ? styles.numCompact : null, { color: c.ink }]}
+      >
         {spec.prefix ? <Text style={[styles.affix, { color: c.muted }]}>{`${spec.prefix} `}</Text> : null}
         {formatWidgetNumber(spec.value, i18n.language)}
         {spec.suffix ? <Text style={[styles.affix, { color: c.muted }]}>{` ${spec.suffix}`}</Text> : null}
       </Text>
       {spec.delta || spec.note ? (
-        <Text variant="footnote" tone="ink2" numberOfLines={2}>
+        <Text variant="footnote" tone="ink2" numberOfLines={compact ? 1 : 2}>
           {spec.delta ? (
             <Text variant="footnote" style={[styles.strong, { color: spec.delta.up ? c.ok : c.warn }]}>
               {spec.delta.text}
@@ -404,17 +420,21 @@ function BleedLine({ values, color, height }: { values: number[]; color: AgentCo
 }
 
 /** A few rows with a word each, in the warning or the good color when the agent says so. */
-function List({ spec }: { spec: ListWidgetSpec }) {
+function List({ spec, compact = false }: { spec: ListWidgetSpec; compact?: boolean }) {
   const { colors: c } = useTheme();
   return (
     <View>
-      {spec.rows.map((row, i) => (
+      {(compact ? spec.rows.slice(0, COMPACT_ROWS) : spec.rows).map((row, i) => (
         <View
           // biome-ignore lint/suspicious/noArrayIndexKey: the rows of one widget, in order
           key={i}
-          style={[styles.row, i > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line2 } : null]}
+          style={[
+            styles.row,
+            compact ? styles.rowCompact : null,
+            i > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line2 } : null,
+          ]}
         >
-          <Text variant="subhead" tone="ink" numberOfLines={1} style={styles.grow}>
+          <Text variant={compact ? "footnote" : "subhead"} tone="ink" numberOfLines={1} style={styles.grow}>
             {row.text}
           </Text>
           {row.meta ? (
@@ -437,16 +457,21 @@ function List({ spec }: { spec: ListWidgetSpec }) {
 }
 
 /** A few sentences, each after a small mark in the agent's tone. */
-function Summary({ spec, color }: { spec: TextWidgetSpec; color: AgentColorName }) {
+function Summary({ spec, color, compact = false }: { spec: TextWidgetSpec; color: AgentColorName; compact?: boolean }) {
   const { scheme } = useTheme();
   const tones = widgetTones(color, scheme === "dark");
   return (
     <View style={styles.items}>
-      {spec.items.map((item, i) => (
+      {(compact ? spec.items.slice(0, 2) : spec.items).map((item, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: the sentences of one widget, in order
         <View key={i} style={styles.item}>
           <View style={[styles.mark, { backgroundColor: tones.stroke }]} />
-          <Text variant="subhead" tone="ink" style={styles.grow}>
+          <Text
+            variant={compact ? "footnote" : "subhead"}
+            tone="ink"
+            numberOfLines={compact ? 2 : undefined}
+            style={styles.grow}
+          >
             {item}
           </Text>
         </View>
@@ -546,6 +571,7 @@ export function WidgetCard({
   footer,
   onPress,
   label,
+  compact = false,
 }: {
   widget: WidgetCardData;
   big?: boolean;
@@ -556,16 +582,23 @@ export function WidgetCard({
   onPress?: () => void;
   /** What a screen reader says for the whole card when it opens. */
   label?: string;
+  /**
+   * The home's strip (ADR 0135 §15): every card as tall as the others (`COMPACT_HEIGHT`) on a sunken surface that
+   * shows on the screen's own background, the data small and clipped to it, the footer and the trend kept.
+   */
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
-  const surface = useWidgetSurface();
+  const { colors: c } = useTheme();
+  const soft = useWidgetSurface();
+  const surface = compact ? [{ backgroundColor: c.sunken }, styles.compact] : soft;
   const look = useAgentLook(w.agentId);
   // A 2-high (L) widget on a board draws its data big, as on its own screen.
   const large = big || isTall(w.h ?? 1);
   const title = shownWidgetTitle(w.title, w.kind, (key) => t(key));
   const drawn = body === undefined && (w.status === "ok" || w.status === "updating" || w.status === "failed");
   const bleed = drawn ? bleedSeries(w.spec, large) : null;
-  const bleedHeight = w.spec?.kind === "line" ? (large ? 120 : 76) : large ? 72 : 48;
+  const bleedHeight = compact ? 34 : w.spec?.kind === "line" ? (large ? 120 : 76) : large ? 72 : 48;
   const content = (
     <>
       {head === undefined ? (
@@ -579,9 +612,16 @@ export function WidgetCard({
         head
       )}
       {above}
-      <View style={styles.body}>
+      <View style={compact ? styles.bodyCompact : styles.body}>
         {body === undefined ? (
-          <WidgetBody spec={w.spec} status={w.status} agentId={w.agentId} big={large} bleed={Boolean(bleed)} />
+          <WidgetBody
+            spec={w.spec}
+            status={w.status}
+            agentId={w.agentId}
+            big={large}
+            bleed={Boolean(bleed)}
+            compact={compact}
+          />
         ) : (
           body
         )}
@@ -602,7 +642,7 @@ export function WidgetCard({
       accessibilityRole="button"
       accessibilityLabel={label ?? title}
       style={[styles.card, surface]}
-      contentStyle={styles.cardIn}
+      contentStyle={compact ? [styles.cardIn, styles.cardInCompact] : styles.cardIn}
       fill={false}
     >
       {content}
@@ -665,6 +705,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   cardIn: { gap: 10, flexGrow: 1 },
+  cardInCompact: { gap: 6 },
   head: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
   title: { fontSize: 12.5, lineHeight: 16, fontWeight: "600", letterSpacing: 0.1 },
   body: { flexGrow: 1, minWidth: 0 },
@@ -710,4 +751,8 @@ const styles = StyleSheet.create({
   bleedBox: { marginHorizontal: -PAD_X, marginBottom: -PAD_Y, marginTop: -4 },
   bleed: { width: "100%" },
   dim: { opacity: 0.45 },
+  compact: { height: COMPACT_HEIGHT, flexGrow: 0, gap: 6 },
+  bodyCompact: { flex: 1, minHeight: 0, minWidth: 0, overflow: "hidden" },
+  numCompact: { fontSize: 24, lineHeight: 28, letterSpacing: -0.6 },
+  rowCompact: { paddingVertical: 3 },
 });

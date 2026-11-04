@@ -1,4 +1,4 @@
-import type { Dashboard, Widget } from "@agenteschat/client";
+import type { Dashboard, HomeTile, Widget } from "@agenteschat/client";
 import { type BoardItem, boardItems, layoutOf, resizeItem, useRefreshWidget, useSaveLayout } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { Button, Card, cx, Icon, Menu, MenuItem, MenuSeparator, WidgetCard } from "@agenteschat/ui";
@@ -34,6 +34,12 @@ export interface WidgetBoardProps {
   tiles?: Partial<Record<TileKey, BoardTileSlot>>;
   /** The fixed tiles' names, for what a screen reader hears while one moves. */
   tileNames?: Partial<Record<TileKey, string>>;
+  /**
+   * Início showing another board ("Use on Home", ADR 0135 §18): the person's own home board, whose fixed tiles sit
+   * among this board's widgets. Their places are saved on it (the person's alone), the widgets' order on the board
+   * (when the person edits it).
+   */
+  homeTiles?: { boardId: string; tiles: HomeTile[] };
   onOpen: (widgetId: string) => void;
   /** "Change when it updates" (else it opens the widget, whose panel changes it). */
   onChangeSchedule?: (widgetId: string) => void;
@@ -47,23 +53,45 @@ export interface WidgetBoardProps {
  * where it lands), the grip's keys, the size button, remove. Every change is saved at once (`useSaveLayout`,
  * optimistic) and the cells slide to their new places; a remove asks first (`RemoveWidgetDialog`).
  */
-export function WidgetBoard({ orgId, board, arranging, tiles, tileNames, onOpen, onChangeSchedule }: WidgetBoardProps) {
+export function WidgetBoard({
+  orgId,
+  board,
+  arranging,
+  tiles,
+  tileNames,
+  homeTiles,
+  onOpen,
+  onChangeSchedule,
+}: WidgetBoardProps) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const save = useSaveLayout(orgId);
   const [removing, setRemoving] = useState<Widget | null>(null);
   const now = useNow(60_000);
   const helpId = useId();
-  const items = boardItems(board.widgets, board.kind === "home" ? board.tiles.filter((x) => tiles?.[x.key]) : []);
+  const fixed = homeTiles ? homeTiles.tiles : board.kind === "home" ? board.tiles : [];
+  const items = boardItems(
+    board.widgets,
+    fixed.filter((x) => tiles?.[x.key]),
+  );
   const fresh = useArrivals(board.widgets);
   const editable = board.canEdit;
-  const organizing = arranging && editable;
+  // The fixed tiles are the person's own: they move even on a board on Início that the person only sees.
+  const organizing = arranging && (editable || Boolean(homeTiles));
 
-  const commit = (next: BoardItem[]) =>
+  const failed = (e: unknown) => toast.show(errorText(t, e, i18n.language), "error");
+  const commit = (next: BoardItem[]) => {
+    const layout = layoutOf(next);
+    if (!homeTiles) {
+      save.mutate({ dashboardId: board.id, home: board.kind === "home", ...layout }, { onError: failed });
+      return;
+    }
     save.mutate(
-      { dashboardId: board.id, home: board.kind === "home", ...layoutOf(next) },
-      { onError: (e) => toast.show(errorText(t, e, i18n.language), "error") },
+      { dashboardId: homeTiles.boardId, home: true, widgets: [], tiles: layout.tiles ?? [] },
+      { onError: failed },
     );
+    if (editable) save.mutate({ dashboardId: board.id, widgets: layout.widgets }, { onError: failed });
+  };
   const nameOf = (item: BoardItem) =>
     item.type === "widget" ? widgetTitle(t, item.widget) : (tileNames?.[item.id] ?? "");
   const grid = useGridDrag<BoardItem>({

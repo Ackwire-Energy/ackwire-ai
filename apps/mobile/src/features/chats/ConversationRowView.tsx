@@ -1,10 +1,11 @@
 import { previewBody } from "@agenteschat/client/lib/message-body";
-import { router } from "expo-router";
+import { Link, router } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { Count, Icon, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
 import { workTitle } from "../agents/work";
+import type { RowAction } from "../categories/menus";
 import { agentIntro } from "../chat/intent";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
@@ -41,6 +42,7 @@ export const ConversationRowView = memo(function ConversationRowView({
   fresh = false,
   onOpen,
   pinned = false,
+  holdActions,
 }: {
   row: ConversationRow;
   /** A hairline above (every row but the first). */
@@ -62,6 +64,8 @@ export const ConversationRowView = memo(function ConversationRowView({
   fresh?: boolean;
   /** Told when the row opens its conversation. */
   onOpen?: () => void;
+  /** The long press's actions for iOS's own menu under the preview (`onHold`'s sheet elsewhere). */
+  holdActions?: (row: ConversationRow) => RowAction[];
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -226,11 +230,21 @@ export const ConversationRowView = memo(function ConversationRowView({
   }
   if (r.kind === "thread" && r.closed) label = `${t("mobile.chats.closed")}, ${label}`;
 
+  const starts = Boolean(onStart && r.kind === "dm");
+  const href = r.channelId
+    ? chatHref(r.channelId, r.kind === "thread" || r.kind === "mission" ? r.threadId : null)
+    : null;
   const open = () => {
     onOpen?.();
     if (onStart && r.kind === "dm") onStart(r.with.id);
-    else router.push(chatHref(r.channelId, r.kind === "thread" || r.kind === "mission" ? r.threadId : null));
+    else if (href) router.push(href);
   };
+  // iOS's own long press: the conversation itself in the system preview (tapping it opens it), with the row's
+  // actions (Pin to the top, a channel's Move to…) in the system menu under it. An agent with no conversation yet
+  // peeks at its profile instead, with Talk first; a tap on its row still starts the conversation. Android keeps the
+  // plain press and the long press's sheet.
+  const peekHref = starts && r.kind === "dm" ? (`/agent/${r.with.id}` as const) : href;
+  const peeks = Platform.OS === "ios" && peekHref !== null;
   const a11y = [
     name,
     meta ?? null,
@@ -248,10 +262,10 @@ export const ConversationRowView = memo(function ConversationRowView({
     .filter(Boolean)
     .join(", ");
 
-  return (
+  const row = (press: () => void) => (
     <ListRow
-      onPress={open}
-      {...(onHold
+      onPress={press}
+      {...(onHold && !peeks
         ? {
             onLongPress: () => onHold(r),
             delayLongPress: 380,
@@ -286,7 +300,56 @@ export const ConversationRowView = memo(function ConversationRowView({
       }
     />
   );
+  if (!peeks || !peekHref) return row(open);
+  const actions = holdActions?.(r) ?? [];
+  return (
+    <Link href={peekHref} asChild>
+      <Link.Trigger>
+        {/* A row that starts a conversation keeps its own press; the link only serves its preview. */}
+        <RowTrigger row={row} onOpen={onOpen} own={starts ? open : undefined} />
+      </Link.Trigger>
+      <Link.Preview />
+      {starts || actions.length > 0 ? (
+        <Link.Menu>
+          {starts ? (
+            <Link.MenuAction icon="bubble.left" onPress={open}>
+              {t("mobile.agent.talk")}
+            </Link.MenuAction>
+          ) : null}
+          {actions.map((a) => (
+            <Link.MenuAction key={a.key} icon={a.symbol} onPress={a.run}>
+              {a.label}
+            </Link.MenuAction>
+          ))}
+        </Link.Menu>
+      ) : null}
+    </Link>
+  );
 });
+
+/**
+ * The row under the link's trigger: the link's press opens the conversation, after the row's own `onOpen`; `own`
+ * replaces it (a row that starts a conversation, whose link is only its preview).
+ */
+function RowTrigger({
+  row,
+  onOpen,
+  own,
+  onPress,
+}: {
+  row: (press: () => void) => ReactNode;
+  onOpen?: (() => void) | undefined;
+  own?: (() => void) | undefined;
+  onPress?: () => void;
+}) {
+  return row(
+    own ??
+      (() => {
+        onOpen?.();
+        onPress?.();
+      }),
+  );
+}
 
 const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },

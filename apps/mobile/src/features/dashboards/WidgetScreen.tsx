@@ -14,7 +14,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, RefreshControl, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -33,7 +33,8 @@ import {
 import { boardHref, routineHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { useOrgId, usePullRefresh } from "../shared/hooks";
-import { FocusLive, goBack, PushedHeader, successHaptic } from "../shared/parts";
+import { PushedLargeTitle } from "../shared/PushedLargeTitle";
+import { goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { useAgentLook, useWidgetWords } from "./hooks";
 import { HOME, shownWidgetTitle } from "./logic";
@@ -78,7 +79,6 @@ export function WidgetScreen({ id }: { id: string }) {
 function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => Promise<unknown> }) {
   const { t, i18n } = useTranslation();
   const { colors: c } = useTheme();
-  const insets = useSafeAreaInsets();
   const orgId = useOrgId();
   const toast = useToast();
   const failed = useFailed();
@@ -195,216 +195,211 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
     return notes.filter(Boolean).join(" · ");
   };
   return (
-    <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-      <PushedHeader
-        title={shown}
-        subtitle={t("mobile.dashboards.widget.caresFor", { name: look.name })}
-        solid={false}
-        grouped
-        right={
-          w.canEdit ? (
-            <IconButton icon="play" label={t("widgets.menu.refresh")} onPress={updateNow} disabled={busy} />
-          ) : undefined
-        }
-      />
-      <FocusLive>
-        <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
-          automaticallyAdjustKeyboardInsets
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
-          refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
-          contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + (w.canEdit ? 96 : 28) }]}
-        >
-          <WidgetCard
-            big
-            widget={{
-              title: w.title,
-              kind: w.kind,
-              spec: w.spec,
-              status: w.status,
-              agentId: w.agentId,
-              refreshedAt: w.refreshedAt,
-              schedule: w.schedule,
-              w: 2,
-            }}
-          />
-          {w.status === "failed" && w.failure ? (
-            <View style={styles.failure}>
-              <Icon name="info" size={16} color={c.warn} />
-              <Text variant="footnote" style={[styles.grow, { color: c.warn }]}>
-                {words.failure(w)}
-              </Text>
-              {w.canEdit ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  label={t("widgets.failure.resolve")}
-                  loading={refresh.isPending}
-                  onPress={updateNow}
-                />
-              ) : null}
-            </View>
-          ) : null}
+    <PushedLargeTitle
+      title={shown}
+      grouped
+      keyboard
+      bottomInset={w.canEdit ? 96 : 28}
+      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
+      right={
+        w.canEdit ? (
+          <IconButton icon="play" label={t("widgets.menu.refresh")} onPress={updateNow} disabled={busy} />
+        ) : undefined
+      }
+      dock={w.canEdit ? <AskChange widget={w} name={look.name} /> : null}
+    >
+      <View style={styles.in}>
+        {/* Who looks after it, under the title (as a board's line), not as a subtitle in the bar. */}
+        <Text variant="footnote" tone="muted" style={styles.cares}>
+          {t("mobile.dashboards.widget.caresFor", { name: look.name })}
+        </Text>
+        <WidgetCard
+          big
+          widget={{
+            title: w.title,
+            kind: w.kind,
+            spec: w.spec,
+            status: w.status,
+            agentId: w.agentId,
+            refreshedAt: w.refreshedAt,
+            schedule: w.schedule,
+            w: 2,
+          }}
+        />
+        {w.status === "failed" && w.failure ? (
+          <View style={styles.failure}>
+            <Icon name="info" size={16} color={c.warn} />
+            <Text variant="footnote" style={[styles.grow, { color: c.warn }]}>
+              {words.failure(w)}
+            </Text>
+            {w.canEdit ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                label={t("widgets.failure.resolve")}
+                loading={refresh.isPending}
+                onPress={updateNow}
+              />
+            ) : null}
+          </View>
+        ) : null}
 
-          {w.canEdit ? (
-            <>
-              <View style={styles.gap} />
-              <GroupedList>
-                <GroupedRow
-                  icon="pen"
-                  label={t("mobile.dashboards.widget.title")}
-                  value={shown}
-                  chevron
-                  onPress={() => toggle("title")}
-                />
-                {open === "title" ? (
-                  <View style={styles.alert}>
-                    <TextArea
-                      value={title}
-                      onChangeText={setTitle}
-                      placeholder={t("mobile.dashboards.widget.titlePlaceholder")}
-                      accessibilityLabel={t("mobile.dashboards.widget.title")}
-                      multiline={false}
-                      minHeight={46}
-                      style={styles.condition}
-                      maxLength={WIDGET_LIMITS.title}
-                      returnKeyType="done"
-                      autoFocus
-                      onSubmitEditing={saveTitle}
-                    />
-                    <View style={styles.alertSave}>
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        label={t("common.save")}
-                        loading={update.isPending}
-                        disabled={!title.trim()}
-                        onPress={saveTitle}
-                      />
-                    </View>
-                  </View>
-                ) : null}
-              </GroupedList>
-            </>
-          ) : null}
-
-          <GroupedHeader>{t("widgets.panel.how")}</GroupedHeader>
-          <GroupedList>
-            <GroupedRow
-              icon="clock"
-              label={t(`widgets.schedules.${w.schedule}`)}
-              sub={next}
-              subLines={2}
-              chevron={w.canEdit}
-              {...(w.canEdit ? { onPress: () => toggle("schedule") } : {})}
-            />
-            {open === "schedule"
-              ? WIDGET_SCHEDULES.map((s) => (
-                  <GroupedRow
-                    key={s}
-                    label={t(`widgets.schedules.${s}`)}
-                    checked={s === w.schedule}
-                    onPress={() => setSchedule(s)}
-                  />
-                ))
-              : null}
-            <GroupedRow
-              icon="bell"
-              label={alertLine}
-              labelLines={2}
-              sub={t("widgets.alert.where")}
-              chevron={w.canEdit}
-              {...(w.canEdit ? { onPress: () => toggle("alert") } : {})}
-            />
-            {open === "alert" ? (
-              <View style={styles.alert}>
-                <GroupedRow label={t("widgets.alert.label")} toggle={alertOn} onPress={() => setAlertOn((v) => !v)} />
-                {alertOn ? (
+        {w.canEdit ? (
+          <>
+            <View style={styles.gap} />
+            <GroupedList>
+              <GroupedRow
+                icon="pen"
+                label={t("mobile.dashboards.widget.title")}
+                value={shown}
+                chevron
+                onPress={() => toggle("title")}
+              />
+              {open === "title" ? (
+                <View style={styles.alert}>
                   <TextArea
-                    value={condition}
-                    onChangeText={setCondition}
-                    placeholder={t("widgets.alert.placeholder")}
-                    accessibilityLabel={t("widgets.alert.condition")}
+                    value={title}
+                    onChangeText={setTitle}
+                    placeholder={t("mobile.dashboards.widget.titlePlaceholder")}
+                    accessibilityLabel={t("mobile.dashboards.widget.title")}
                     multiline={false}
                     minHeight={46}
                     style={styles.condition}
-                    maxLength={CONDITION_MAX}
+                    maxLength={WIDGET_LIMITS.title}
                     returnKeyType="done"
-                    onSubmitEditing={saveAlert}
+                    autoFocus
+                    onSubmitEditing={saveTitle}
                   />
-                ) : null}
-                <View style={styles.alertSave}>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    label={t("common.save")}
-                    loading={update.isPending}
-                    onPress={saveAlert}
-                  />
+                  <View style={styles.alertSave}>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      label={t("common.save")}
+                      loading={update.isPending}
+                      disabled={!title.trim()}
+                      onPress={saveTitle}
+                    />
+                  </View>
                 </View>
-              </View>
-            ) : null}
-            {w.sources.length > 0 ? (
-              <GroupedRow
-                icon="server"
-                label={w.sources.join(" · ")}
-                labelLines={2}
-                sub={t("widgets.panel.reads", { name: look.name })}
-              />
-            ) : null}
-            {w.routineId && w.schedule !== "manual" ? (
-              <GroupedRow
-                icon="list"
-                label={t("mobile.dashboards.widget.routine")}
-                chevron
-                onPress={() => router.push(routineHref(w.routineId))}
-              />
-            ) : null}
-            <GroupedRow
-              icon="chart"
-              label={home ? t("dashboards.home") : w.dashboard.title}
-              sub={t("mobile.dashboards.widget.onBoard")}
-              chevron
-              onPress={() => router.push(boardHref(home ? HOME : w.dashboard.id))}
-            />
-          </GroupedList>
+              ) : null}
+            </GroupedList>
+          </>
+        ) : null}
 
-          <GroupedHeader>{t("widgets.panel.history")}</GroupedHeader>
-          <GroupedList>
-            {history.length === 0 ? (
-              <GroupedRow label={t("widgets.panel.noHistory")} faint />
-            ) : (
-              history.map((u) => (
+        <GroupedHeader>{t("widgets.panel.how")}</GroupedHeader>
+        <GroupedList>
+          <GroupedRow
+            icon="clock"
+            label={t(`widgets.schedules.${w.schedule}`)}
+            sub={next}
+            subLines={2}
+            chevron={w.canEdit}
+            {...(w.canEdit ? { onPress: () => toggle("schedule") } : {})}
+          />
+          {open === "schedule"
+            ? WIDGET_SCHEDULES.map((s) => (
                 <GroupedRow
-                  key={u.id}
-                  label={historyLabel(u)}
-                  labelLines={2}
-                  sub={whenAt(t, i18n.language, u.at)}
-                  belowText={historyNote(u)}
+                  key={s}
+                  label={t(`widgets.schedules.${s}`)}
+                  checked={s === w.schedule}
+                  onPress={() => setSchedule(s)}
                 />
               ))
-            )}
-          </GroupedList>
-
-          {w.canEdit ? (
-            <>
-              <View style={styles.gap} />
-              <GroupedList>
-                <GroupedRow
-                  icon="trash"
-                  label={home ? t("widgets.menu.removeHome") : t("widgets.menu.removeBoard")}
-                  danger
-                  disabled={remove.isPending}
-                  onPress={confirmRemove}
+            : null}
+          <GroupedRow
+            icon="bell"
+            label={alertLine}
+            labelLines={2}
+            sub={t("widgets.alert.where")}
+            chevron={w.canEdit}
+            {...(w.canEdit ? { onPress: () => toggle("alert") } : {})}
+          />
+          {open === "alert" ? (
+            <View style={styles.alert}>
+              <GroupedRow label={t("widgets.alert.label")} toggle={alertOn} onPress={() => setAlertOn((v) => !v)} />
+              {alertOn ? (
+                <TextArea
+                  value={condition}
+                  onChangeText={setCondition}
+                  placeholder={t("widgets.alert.placeholder")}
+                  accessibilityLabel={t("widgets.alert.condition")}
+                  multiline={false}
+                  minHeight={46}
+                  style={styles.condition}
+                  maxLength={CONDITION_MAX}
+                  returnKeyType="done"
+                  onSubmitEditing={saveAlert}
                 />
-              </GroupedList>
-            </>
+              ) : null}
+              <View style={styles.alertSave}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  label={t("common.save")}
+                  loading={update.isPending}
+                  onPress={saveAlert}
+                />
+              </View>
+            </View>
           ) : null}
-        </ScrollView>
-      </FocusLive>
-      {w.canEdit ? <AskChange widget={w} name={look.name} /> : null}
-    </View>
+          {w.sources.length > 0 ? (
+            <GroupedRow
+              icon="server"
+              label={w.sources.join(" · ")}
+              labelLines={2}
+              sub={t("widgets.panel.reads", { name: look.name })}
+            />
+          ) : null}
+          {w.routineId && w.schedule !== "manual" ? (
+            <GroupedRow
+              icon="list"
+              label={t("mobile.dashboards.widget.routine")}
+              chevron
+              onPress={() => router.push(routineHref(w.routineId))}
+            />
+          ) : null}
+          <GroupedRow
+            icon="chart"
+            label={home ? t("dashboards.home") : w.dashboard.title}
+            sub={t("mobile.dashboards.widget.onBoard")}
+            chevron
+            onPress={() => router.push(boardHref(home ? HOME : w.dashboard.id))}
+          />
+        </GroupedList>
+
+        <GroupedHeader>{t("widgets.panel.history")}</GroupedHeader>
+        <GroupedList>
+          {history.length === 0 ? (
+            <GroupedRow label={t("widgets.panel.noHistory")} faint />
+          ) : (
+            history.map((u) => (
+              <GroupedRow
+                key={u.id}
+                label={historyLabel(u)}
+                labelLines={2}
+                sub={whenAt(t, i18n.language, u.at)}
+                belowText={historyNote(u)}
+              />
+            ))
+          )}
+        </GroupedList>
+
+        {w.canEdit ? (
+          <>
+            <View style={styles.gap} />
+            <GroupedList>
+              <GroupedRow
+                icon="trash"
+                label={home ? t("widgets.menu.removeHome") : t("widgets.menu.removeBoard")}
+                danger
+                disabled={remove.isPending}
+                onPress={confirmRemove}
+              />
+            </GroupedList>
+          </>
+        ) : null}
+      </View>
+    </PushedLargeTitle>
   );
 }
 
@@ -473,7 +468,8 @@ function AskChange({ widget: w, name }: { widget: WidgetDetail; name: string }) 
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  in: { paddingHorizontal: 16, paddingTop: 8 },
+  in: { paddingHorizontal: 16 },
+  cares: { paddingHorizontal: 4, marginTop: -6, marginBottom: 10 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
   centerText: { textAlign: "center" },
   grow: { flex: 1, minWidth: 0 },

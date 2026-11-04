@@ -192,6 +192,7 @@ function Home() {
               pinned={i < (s.pinned ?? 0)}
               onHold={menus.openRowMenu}
               holdLabel={t("sidebarPins.pin")}
+              holdActions={menus.rowActionsOf}
               {...(r.kind === "dm" && !r.channelId ? { onStart: startDm } : {})}
             />
           );

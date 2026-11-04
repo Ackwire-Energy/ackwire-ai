@@ -13,6 +13,15 @@ import { arrangesCategories, categoryHrefs, movesChannel } from "./logic";
 
 const NO_CHANNELS: never[] = [];
 
+/** One of a row's long press actions: the app's sheet shows `icon`, iOS's own menu the SF Symbol `symbol`. */
+export interface RowAction {
+  key: "pin" | "move";
+  icon: "pin" | "list";
+  symbol: "pin" | "pin.slash" | "folder";
+  label: string;
+  run: () => void;
+}
+
 /**
  * The home's long presses (ADR 0080), as short sheets: a row's "Fixar no topo" (a channel, an agent's or a person's
  * DM) and a channel's "Mover para…" (only where `movesChannel`), and a category header's Renomear, Categorias and
@@ -35,7 +44,9 @@ export function useCategoryMenus() {
     },
     [sheet],
   );
-  const rowMenu = (r: ConversationRow) => {
+  // What a row's long press offers: pin it on top (a channel, an agent's or a person's DM) or take it off, and move
+  // a channel (only where `movesChannel`). The same list fills the app's sheet and iOS's own menu.
+  const rowActions = (r: ConversationRow): RowAction[] => {
     const channel = r.kind === "channel" ? channels.find((c) => c.id === r.channelId) : undefined;
     const pin =
       r.kind === "channel"
@@ -43,8 +54,33 @@ export function useCategoryMenus() {
         : r.kind === "dm"
           ? { kind: r.with.type === "agent" ? ("agents" as const) : ("people" as const), id: r.with.id }
           : null;
-    if (!pin || (r.kind === "channel" && !channel)) return;
+    if (!pin || (r.kind === "channel" && !channel)) return [];
     const pinned = pins.isPinned(pin.kind, pin.id);
+    return [
+      {
+        key: "pin",
+        icon: "pin",
+        symbol: pinned ? "pin.slash" : "pin",
+        label: pinned ? t("sidebarPins.unpin") : t("sidebarPins.pin"),
+        run: () => pins.toggle(pin.kind, pin.id),
+      },
+      ...(channel && movesChannel(channel, meId, org)
+        ? [
+            {
+              key: "move" as const,
+              icon: "list" as const,
+              symbol: "folder" as const,
+              label: t("channelCategories.move"),
+              run: () => router.push(categoryHrefs.pick(channel.id)),
+            },
+          ]
+        : []),
+    ];
+  };
+  const rowMenu = (r: ConversationRow) => {
+    const actions = rowActions(r);
+    if (actions.length === 0) return;
+    const channel = r.kind === "channel" ? channels.find((c) => c.id === r.channelId) : undefined;
     sheet.open(
       <>
         <SheetTitle
@@ -52,27 +88,15 @@ export function useCategoryMenus() {
           title={channel ? `#${channel.name}` : r.kind === "dm" ? dir.nameOf(r.with) : ""}
         />
         <ActionList
-          items={[
-            {
-              key: "pin",
-              icon: "pin",
-              label: pinned ? t("sidebarPins.unpin") : t("sidebarPins.pin"),
-              onPress: () => {
-                sheet.close();
-                pins.toggle(pin.kind, pin.id);
-              },
+          items={actions.map((a) => ({
+            key: a.key,
+            icon: a.icon,
+            label: a.label,
+            onPress: () => {
+              sheet.close();
+              a.run();
             },
-            ...(channel && movesChannel(channel, meId, org)
-              ? [
-                  {
-                    key: "move",
-                    icon: "list" as const,
-                    label: t("channelCategories.move"),
-                    onPress: () => go(categoryHrefs.pick(channel.id)),
-                  },
-                ]
-              : []),
-          ]}
+          }))}
         />
       </>,
     );
@@ -110,8 +134,9 @@ export function useCategoryMenus() {
       );
   };
   // One function for every render (the rows are memoized), always running the latest menu.
-  const latest = useRef(rowMenu);
-  latest.current = rowMenu;
-  const openRowMenu = useCallback((r: ConversationRow) => latest.current(r), []);
-  return { openRowMenu, categoryMenu };
+  const latest = useRef({ rowMenu, rowActions });
+  latest.current = { rowMenu, rowActions };
+  const openRowMenu = useCallback((r: ConversationRow) => latest.current.rowMenu(r), []);
+  const rowActionsOf = useCallback((r: ConversationRow) => latest.current.rowActions(r), []);
+  return { openRowMenu, rowActionsOf, categoryMenu };
 }
