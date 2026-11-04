@@ -4974,7 +4974,8 @@ function createDeltaPublisher(
     const visible = visibleText(all, final);
     // A held piece turned out to be the word (now cut): nothing new to show.
     if (!visible.startsWith(shown)) return;
-    let rest = visible.slice(shown.length);
+    let at = shown.length;
+    let rest = visible.slice(at);
     shown = visible;
     while (rest.length > 0) {
       const text = rest.slice(0, MAX_CHUNK);
@@ -4988,7 +4989,9 @@ function createDeltaPublisher(
         seq: seq++,
         text,
         turn: first.turn,
+        at,
       };
+      at += text.length;
       pending = pending.then(() => publishChannelEvent(pubsub, evt));
     }
   };

@@ -1099,18 +1099,20 @@ function ChannelView({
   const [holdTick, setHoldTick] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `holdTick` re-checks blocks waiting for their message
   const slots = useMemo(() => {
-    const live = liveRunsKey
+    const onScreen = liveRunsKey
       ? liveRunsKey.split("\n").map((line) => {
           const [runId = "", agentId = "", provisional] = line.split("\t");
           return { runId, agentId, provisional: provisional === "1" };
         })
       : [];
-    // Its message is in a cache already (it lands in the timeline on the next render): hold the block.
+    // Its message is in a cache already (it lands in the timeline on the next render), or came without its body and
+    // is being read: hold the block.
     const expected = (runId: string) =>
+      Boolean(live.get().streams.landing?.[runId]) ||
       qc
         .getQueriesData<MessageType[]>({ queryKey: ["org", org.id, "channel", channel.id] })
         .some(([, list]) => Array.isArray(list) && list.some((m) => m?.agentRunId === runId));
-    const next = nextSlots(slotsRef.current, live, {
+    const next = nextSlots(slotsRef.current, onScreen, {
       landed: (runId) => landedRuns.has(runId),
       expected,
       now: Date.now(),
@@ -1119,7 +1121,7 @@ function ChannelView({
     const kept = sameSlots(slotsRef.current, next) ? slotsRef.current : next;
     slotsRef.current = kept;
     return kept;
-  }, [liveRunsKey, landedRuns, holdTick, qc, org.id, channel.id]);
+  }, [liveRunsKey, landedRuns, holdTick, qc, org.id, channel.id, live]);
   // A block waiting for its message: look again once the wait is over (it goes if nothing came).
   useEffect(() => {
     if (!slots.some((x) => x.goneAt !== null)) return;

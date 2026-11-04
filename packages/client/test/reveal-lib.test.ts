@@ -31,4 +31,12 @@ describe("streamed Markdown shows whole", () => {
     expect(wholeMarkdown(long, MARKDOWN_HOLD_MAX + 10)).toBe(MARKDOWN_HOLD_MAX + 10);
     expect(revealStep(5, "Veja **o resumo do", 16, false)).toBeGreaterThan(5);
   });
+
+  test("a mark that never closes stops holding once the text runs past it: the reveal never freezes", () => {
+    const text = `Rode o comando \`az bot create ${"e confira no portal ".repeat(12)}`;
+    let shown = 0;
+    // About 30 s of frames, one at a time, with every character already here.
+    for (let frame = 0; frame < 2000 && shown < text.length; frame++) shown = revealStep(shown, text, 16);
+    expect(shown).toBe(text.length);
+  });
 });
