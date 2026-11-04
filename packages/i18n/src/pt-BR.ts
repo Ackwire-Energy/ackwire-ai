@@ -1848,6 +1848,7 @@ export const ptBR = {
       model: "Modelo",
       message: "Mensagem",
       configure: "Configurar",
+      nameStory: "O nome vem de lodestar, a estrela que guia os navegantes.",
     },
     settings: {
       name: "Nome e visual",
@@ -2317,7 +2318,6 @@ export const ptBR = {
   dm: {
     subtitle: "{{role}} · de {{owner}}",
     subtitleNoOwner: "{{role}} · sem responsável",
-    profile: "Ver perfil",
     emptyAgent: "Peça para lembrar, esquecer ou trabalhar de outro jeito.",
     opening: "Abrindo a conversa…",
     title: "Mensagem direta com {{name}}",

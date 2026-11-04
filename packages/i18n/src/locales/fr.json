@@ -1927,7 +1927,8 @@
       "channels": "Répond dans les canaux quand on l’appelle",
       "model": "Modèle",
       "message": "Message",
-      "configure": "Configurer"
+      "configure": "Configurer",
+      "nameStory": "Le nom vient de lodestar, l'étoile qui guide les marins."
     },
     "settings": {
       "name": "Nom et apparence",
@@ -2396,7 +2397,6 @@
   "dm": {
     "subtitle": "{{role}} · géré par {{owner}}",
     "subtitleNoOwner": "{{role}} · sans responsable",
-    "profile": "Voir le profil",
     "emptyAgent": "Demandez-lui de retenir, d'oublier ou de travailler autrement.",
     "emptyAgent_female": "Demandez-lui de retenir, d'oublier ou de travailler autrement.",
     "opening": "Ouverture de la conversation…",

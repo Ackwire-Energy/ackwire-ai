@@ -1924,7 +1924,8 @@
       "channels": "Responde en los canales cuando lo llaman",
       "model": "Modelo",
       "message": "Mensaje",
-      "configure": "Configurar"
+      "configure": "Configurar",
+      "nameStory": "El nombre viene de lodestar, la estrella que guía a los navegantes."
     },
     "settings": {
       "name": "Nombre y aspecto",
@@ -2393,7 +2394,6 @@
   "dm": {
     "subtitle": "{{role}} · de {{owner}}",
     "subtitleNoOwner": "{{role}} · sin dueño",
-    "profile": "Ver perfil",
     "emptyAgent": "Pídele que recuerde, olvide o trabaje de otra forma.",
     "emptyAgent_female": "Pídele que recuerde, olvide o trabaje de otra forma.",
     "opening": "Abriendo la conversación…",

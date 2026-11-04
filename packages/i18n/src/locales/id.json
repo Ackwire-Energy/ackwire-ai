@@ -1784,7 +1784,8 @@
       "channels": "Menjawab di kanal saat dipanggil",
       "model": "Model",
       "message": "Pesan",
-      "configure": "Atur"
+      "configure": "Atur",
+      "nameStory": "Namanya berasal dari lodestar, bintang penunjuk arah para pelaut."
     },
     "settings": {
       "name": "Nama dan tampilan",
@@ -2235,7 +2236,6 @@
   "dm": {
     "subtitle": "{{role}} · milik {{owner}}",
     "subtitleNoOwner": "{{role}} · tanpa pemilik",
-    "profile": "Lihat profil",
     "emptyAgent": "Minta dia mengingat, melupakan, atau bekerja dengan cara lain.",
     "emptyAgent_female": "Minta dia mengingat, melupakan, atau bekerja dengan cara lain.",
     "opening": "Membuka percakapan…",

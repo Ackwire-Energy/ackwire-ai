@@ -1996,7 +1996,8 @@
       "channels": "Odpowiada na kanałach, gdy ktoś go wywoła",
       "model": "Model",
       "message": "Wiadomość",
-      "configure": "Skonfiguruj"
+      "configure": "Skonfiguruj",
+      "nameStory": "Nazwa pochodzi od lodestar, gwiazdy, według której żeglarze wyznaczają kurs."
     },
     "settings": {
       "name": "Nazwa i wygląd",
@@ -2472,7 +2473,6 @@
   "dm": {
     "subtitle": "{{role}} · odpowiada: {{owner}}",
     "subtitleNoOwner": "{{role}} · bez opiekuna",
-    "profile": "Zobacz profil",
     "emptyAgent": "Poproś go, żeby coś zapamiętał, zapomniał albo pracował inaczej.",
     "emptyAgent_female": "Poproś ją, żeby coś zapamiętała, zapomniała albo pracowała inaczej.",
     "opening": "Otwieramy rozmowę…",

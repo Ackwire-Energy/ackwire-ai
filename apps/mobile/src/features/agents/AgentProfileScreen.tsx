@@ -24,7 +24,7 @@ import { agentPlan, aiStateOf, planLabel, planOfAccount } from "@agenteschat/cli
 import { can } from "@agenteschat/client/lib/permissions";
 import { usageShown } from "@agenteschat/client/lib/plan-usage";
 import { AUTO, isAuto } from "@agenteschat/client/lib/providers";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
@@ -306,6 +306,11 @@ function Profile({ id }: { id: string }) {
           {ownerLine ? (
             <Text variant="small" tone="muted" style={styles.center}>
               {ownerLine}
+            </Text>
+          ) : null}
+          {tellsNameStory(agent) ? (
+            <Text variant="small" tone="muted" style={styles.center}>
+              {t("rightHand.profile.nameStory")}
             </Text>
           ) : null}
           {status ? (

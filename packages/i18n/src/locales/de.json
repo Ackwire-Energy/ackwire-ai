@@ -1855,7 +1855,8 @@
       "channels": "Antwortet in Kanälen, wenn man ihn ruft",
       "model": "Modell",
       "message": "Nachricht",
-      "configure": "Einrichten"
+      "configure": "Einrichten",
+      "nameStory": "Der Name kommt von lodestar, dem Leitstern, nach dem Seeleute steuern."
     },
     "settings": {
       "name": "Name und Aussehen",
@@ -2313,7 +2314,6 @@
   "dm": {
     "subtitle": "{{role}} · gehört {{owner}}",
     "subtitleNoOwner": "{{role}} · kein Inhaber",
-    "profile": "Profil ansehen",
     "emptyAgent": "Bitte ihn, sich etwas zu merken, etwas zu vergessen oder anders zu arbeiten.",
     "emptyAgent_female": "Bitte sie, sich etwas zu merken, etwas zu vergessen oder anders zu arbeiten.",
     "opening": "Unterhaltung wird geöffnet…",

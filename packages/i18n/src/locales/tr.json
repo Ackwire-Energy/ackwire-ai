@@ -1851,7 +1851,8 @@
       "channels": "Çağrıldığında kanallarda yanıt verir",
       "model": "Model",
       "message": "Mesaj",
-      "configure": "Ayarla"
+      "configure": "Ayarla",
+      "nameStory": "Adı, denizcilere yol gösteren yıldız lodestar'dan gelir."
     },
     "settings": {
       "name": "Ad ve görünüm",
@@ -2305,7 +2306,6 @@
   "dm": {
     "subtitle": "{{role}} · sahibi: {{owner}}",
     "subtitleNoOwner": "{{role}} · sahibi yok",
-    "profile": "Profili gör",
     "emptyAgent": "Bir şeyi hatırlamasını, unutmasını ya da farklı çalışmasını isteyin.",
     "emptyAgent_female": "Bir şeyi hatırlamasını, unutmasını ya da farklı çalışmasını isteyin.",
     "opening": "Konuşma açılıyor…",

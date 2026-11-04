@@ -4983,9 +4983,6 @@
   "dm.subtitleNoOwner": {
     "value": "{{role}} · no owner"
   },
-  "dm.profile": {
-    "value": "View profile"
-  },
   "dm.emptyAgent": {
     "value": "Ask him to remember, forget or work differently.",
     "female": "Ask her to remember, forget or work differently."
@@ -33518,6 +33515,9 @@
   },
   "rightHand.profile.configure": {
     "value": "Configure"
+  },
+  "rightHand.profile.nameStory": {
+    "value": "The name comes from lodestar, the star sailors steer by."
   },
   "rightHand.settings.name": {
     "value": "Name and look"

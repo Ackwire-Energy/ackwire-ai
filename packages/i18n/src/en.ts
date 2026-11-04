@@ -1851,6 +1851,7 @@ export const en = {
       model: "Model",
       message: "Message",
       configure: "Configure",
+      nameStory: "The name comes from lodestar, the star sailors steer by.",
     },
     settings: {
       name: "Name and look",
@@ -2296,7 +2297,6 @@ export const en = {
   dm: {
     subtitle: "{{role}} · owned by {{owner}}",
     subtitleNoOwner: "{{role}} · no owner",
-    profile: "View profile",
     emptyAgent: "Ask him to remember, forget or work differently.",
     emptyAgent_female: "Ask her to remember, forget or work differently.",
     opening: "Opening the conversation…",

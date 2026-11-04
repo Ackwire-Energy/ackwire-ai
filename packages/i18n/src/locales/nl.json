@@ -1854,7 +1854,8 @@
       "channels": "Antwoordt in kanalen als je hem roept",
       "model": "Model",
       "message": "Bericht",
-      "configure": "Instellen"
+      "configure": "Instellen",
+      "nameStory": "De naam komt van lodestar, de ster waarop zeelieden koers houden."
     },
     "settings": {
       "name": "Naam en uiterlijk",
@@ -2316,7 +2317,6 @@
   "dm": {
     "subtitle": "{{role}} · eigenaar {{owner}}",
     "subtitleNoOwner": "{{role}} · geen eigenaar",
-    "profile": "Profiel bekijken",
     "emptyAgent": "Vraag hem iets te onthouden, te vergeten of anders te werken.",
     "emptyAgent_female": "Vraag haar iets te onthouden, te vergeten of anders te werken.",
     "opening": "Het gesprek openen…",
