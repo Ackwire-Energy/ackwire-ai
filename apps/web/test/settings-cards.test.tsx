@@ -280,6 +280,22 @@ describe("archiving several agents, on one card", () => {
     expect(accepted).toEqual(["rm-0"]);
   });
 
+  test("deleting for good asks for how many, typed, before any row is decided", async () => {
+    const { state } = await go(withRemoval(seedState(), { settings: [{ field: "delete", from: false, to: true }] }));
+    await click(within(card("Apagar 2 agentes para sempre?")).getByRole("button", { name: "Apagar todos" }));
+    expect(state.calls.some((x) => x.method === "proposals.accept")).toBe(false);
+    const dialog = screen().getByRole("dialog");
+    expect(dialog.textContent).toContain("Ada, Atlas");
+    const confirm = within(dialog).getByRole("button", { name: "Apagar" }) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    await act(async () => {
+      fireEvent.change(within(dialog).getByLabelText("Digite 2 para confirmar"), { target: { value: "2" } });
+    });
+    await click(confirm);
+    const accepted = state.calls.filter((x) => x.method === "proposals.accept").map((x) => x.args[1]);
+    expect(accepted).toEqual(["rm-0", "rm-1"]);
+  });
+
   test("a member who can't archive sends every row to an admin", async () => {
     const state = asMember(withRemoval(seedState(), { canDecide: false }));
     await go(state);

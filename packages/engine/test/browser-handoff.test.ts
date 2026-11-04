@@ -46,6 +46,7 @@ import {
   requireBrowserAccess,
   requireBrowserControl,
   requirePageRead,
+  setMessageLinkBase,
   startTakeover,
   stopAgentBrowser,
   stopChecksSettled,
@@ -613,10 +614,22 @@ describe("browser_ask_person", () => {
   test("what names our own app: its domains and this server's address, never a mailbox there", () => {
     expect(namesOwnApp("Entre no agentes.chat com a conta administradora")).toBe(true);
     expect(namesOwnApp("https://app.agentes.chat/org/1/settings")).toBe(true);
-    expect(namesOwnApp("Open http://localhost:3000/org/1 and sign in")).toBe(true);
+    expect(namesOwnApp("Abra https://admin@app.agentes.chat/login")).toBe(true);
+    expect(namesOwnApp("Abra app.agentes。chat e entre")).toBe(true);
+    expect(namesOwnApp("Abra APP.AGENTES.CHAT. e entre")).toBe(true);
     expect(namesOwnApp("Type the code sent to theo@acme.agentes.chat")).toBe(false);
     expect(namesOwnApp("Sign in to agentes.chatbot.com")).toBe(false);
     expect(namesOwnApp("Sign in to Stripe")).toBe(false);
+    // A loopback PUBLIC_URL (the default here) is another app on the agent's computer.
+    expect(namesOwnApp("Open http://localhost:3000/org/1 and sign in")).toBe(false);
+    setMessageLinkBase("https://chat.acme.dev/");
+    try {
+      expect(namesOwnApp("Open chat.acme.dev and sign in")).toBe(true);
+      expect(namesOwnApp("https://chat.acme.dev/org/1")).toBe(true);
+      expect(namesOwnApp("Sign in to acme.dev")).toBe(false);
+    } finally {
+      setMessageLinkBase("http://localhost:3000");
+    }
   });
 
   test("browser_ask_person is offered only when the agent's browser is ready", async () => {

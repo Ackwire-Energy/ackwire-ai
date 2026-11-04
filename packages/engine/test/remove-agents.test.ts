@@ -133,6 +133,9 @@ describe("propose_remove_agents", () => {
     f = await setup({ rightHand: true });
     const [ana] = await team(f);
     const ctx = await devRun(f, f.owner.id, "@dev apaga a Ana de vez");
+    await call(f, ctx, { agents: ["@ana"], reason: "primeiro arquiva" });
+    const [archived] = (await cardRows(f, f.owner.id)).rows;
+    await decideProposal(f.db, f.owner.id, f.org.id, archived?.id ?? "", "accept");
     await call(f, ctx, { agents: ["@ana"], delete: true, reason: "de vez" });
     const { card, rows } = await cardRows(f, f.owner.id);
     expect(rows[0]).toMatchObject({ settings: [{ field: "delete", from: false, to: true }] });
@@ -143,8 +146,9 @@ describe("propose_remove_agents", () => {
       .where(and(eq(schema.agents.orgId, f.org.id), eq(schema.agents.id, ana?.id ?? "")));
     expect(gone?.deletedAt).not.toBeNull();
     expect((await actionsFor(f.db, f.org.id, [card.id])).get(card.id) ?? []).toEqual([]);
-    // The card still reads how it ended.
+    // The card still reads how it ended; the agent's other decided settings rows stay hidden.
     expect((await cardRows(f, f.owner.id)).rows).toMatchObject([{ status: "accepted" }]);
+    expect(await listProposals(f.db, f.owner.id, f.org.id, { ids: [archived?.id ?? ""] })).toEqual([]);
   });
 
   test("the prompts: never sign in to our own app, and the right hand proposes removals too", async () => {

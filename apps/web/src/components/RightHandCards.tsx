@@ -34,6 +34,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentProposalCardView } from "@/components/ActionCard";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { DeleteAgentsDialog } from "@/components/DeleteAgentDialog";
 import { useOrg } from "@/components/org-context";
 import { RequestCard, RequestDone } from "@/components/RequestCard";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -69,7 +70,7 @@ function RemovalCard({
   removal,
 }: {
   rows: Proposal[];
-  message: Message;
+  message?: Message;
   removal: "archive" | "delete";
 }) {
   const { t, i18n } = useTranslation();
@@ -79,10 +80,11 @@ function RemovalCard({
   const roles = useRoles(org.id).data?.roles ?? [];
   const decide = useDecideProposals(org.id);
   const ask = useAskProposal(org.id);
-  const actions = useAgentActions(org.id, message.channelId);
+  const actions = useAgentActions(org.id, message?.channelId ?? "");
   const toast = useToast();
   const qc = useQueryClient();
   const [off, setOff] = useState<ReadonlySet<string>>(new Set());
+  const [confirming, setConfirming] = useState(false);
   const [first] = rows;
   if (!first) return null;
   const del = removal === "delete";
@@ -103,12 +105,15 @@ function RemovalCard({
   const run = (decision: "accept" | "refuse") =>
     decide.mutate(
       { ids: chosen.map((p) => p.id), decision },
-      { onSuccess: ({ failed: f }) => f[0] && failed(f[0].error) },
+      {
+        onSuccess: ({ failed: f }) => f[0] && failed(f[0].error),
+        onSettled: () => setConfirming(false),
+      },
     );
 
   if (open.length === 0) {
     const outcome = cardOutcome(t, rows);
-    const receipts = (message.actions ?? []).filter((a) => rows.some((p) => p.undoActionId === a.id));
+    const receipts = (message?.actions ?? []).filter((a) => rows.some((p) => p.undoActionId === a.id));
     const undoable = receipts.some((a) => !a.undoneAt && a.undoableUntil && Date.parse(a.undoableUntil) > Date.now());
     const undone = receipts.length > 0 && receipts.every((a) => a.undoneAt);
     const done = rows.filter((p) => p.status === "accepted");
@@ -137,6 +142,7 @@ function RemovalCard({
               variant="ghost"
               loading={actions.undoAll.isPending}
               onClick={() =>
+                message &&
                 actions.undoAll.mutate(message.id, {
                   onSuccess: () => void qc.invalidateQueries({ queryKey: keys.agents(org.id) }),
                   onError: failed,
@@ -165,7 +171,7 @@ function RemovalCard({
         variant={del ? "danger" : "primary"}
         disabled={decide.isPending || chosen.length === 0}
         loading={decide.isPending && decide.variables?.decision === "accept"}
-        onClick={() => run("accept")}
+        onClick={() => (del ? setConfirming(true) : run("accept"))}
       >
         {all
           ? t(del ? "rightHand.remove.deleteAll" : "rightHand.remove.archiveAll")
@@ -206,44 +212,53 @@ function RemovalCard({
     )
   );
   return (
-    <RequestCard
-      id={first.id}
-      kind="proposal"
-      agent={dir.anyAgent(first.proposedByAgentId ?? first.agentId)}
-      label={label}
-      mine={decides}
-      waitingFor={state}
-      lead={del ? `${first.why} ${t("rightHand.remove.deleteHelp")}` : first.why}
-      body={
-        <ul className="proposal-rows">
-          {rows.map((p) => {
-            const agent = dir.anyAgent(p.agentId);
-            const name = nameOf(p);
-            const status = rowStatus(t, p);
-            return (
-              <li key={p.id} className="proposal-row">
-                <AgentAvatar agentId={p.agentId} size="sm" name={name} />
-                <span className="proposal-row__what">
-                  <span className="proposal-row__name">{name}</span>
-                  {agent && <span>{[`@${agent.handle}`, agent.role].filter(Boolean).join(" · ")}</span>}
-                </span>
-                {status && <span className="proposal-row__status">{status}</span>}
-                {isOpen(p) && p.canDecide && (
-                  <Switch
-                    checked={!off.has(p.id)}
-                    disabled={decide.isPending}
-                    onCheckedChange={(on) => toggle(p.id, on)}
-                    aria-label={t("proposals.include", { name })}
-                  />
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      }
-      actions={decision || undefined}
-      what={label}
-    />
+    <>
+      <DeleteAgentsDialog
+        key={String(confirming)}
+        names={confirming ? chosen.map(nameOf) : null}
+        pending={decide.isPending}
+        onConfirm={() => run("accept")}
+        onClose={() => setConfirming(false)}
+      />
+      <RequestCard
+        id={first.id}
+        kind="proposal"
+        agent={dir.anyAgent(first.proposedByAgentId ?? first.agentId)}
+        label={label}
+        mine={decides}
+        waitingFor={state}
+        lead={del ? `${first.why} ${t("rightHand.remove.deleteHelp")}` : first.why}
+        body={
+          <ul className="proposal-rows">
+            {rows.map((p) => {
+              const agent = dir.anyAgent(p.agentId);
+              const name = nameOf(p);
+              const status = rowStatus(t, p);
+              return (
+                <li key={p.id} className="proposal-row">
+                  <AgentAvatar agentId={p.agentId} size="sm" name={name} />
+                  <span className="proposal-row__what">
+                    <span className="proposal-row__name">{name}</span>
+                    {agent && <span>{[`@${agent.handle}`, agent.role].filter(Boolean).join(" · ")}</span>}
+                  </span>
+                  {status && <span className="proposal-row__status">{status}</span>}
+                  {isOpen(p) && p.canDecide && (
+                    <Switch
+                      checked={!off.has(p.id)}
+                      disabled={decide.isPending}
+                      onCheckedChange={(on) => toggle(p.id, on)}
+                      aria-label={t("proposals.include", { name })}
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        }
+        actions={decision || undefined}
+        what={label}
+      />
+    </>
   );
 }
 
@@ -436,6 +451,8 @@ export function ChangeRequestCard({ n }: { n: AppNotification }) {
   const rows = useCardProposals(org.id, proposalId ? [proposalId] : []);
   const agentCard = useAgentProposal(org.id, proposalId ? null : (n.source.messageId ?? null)).data;
   const [p] = rows;
+  const removal = removalOf(rows);
+  if (p && removal) return <RemovalCard rows={rows} removal={removal} />;
   if (p) return <SettingsRow p={p} />;
   if (!agentCard) return null;
   return (

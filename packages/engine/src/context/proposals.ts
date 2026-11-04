@@ -257,8 +257,8 @@ async function proposalsShown<T extends Proposal>(db: Database, actorId: string,
       sees = agent ? seesAgentDetails(agent, actorId, membership) : null;
       seen.set(r.agentId, sees);
     }
-    // A deleted agent: the decided rows of a card that changed or deleted it still say how it ended.
-    if (sees ?? (r.target === "agent_settings" && r.status !== "pending")) out.push(r);
+    // A deleted agent: the card that deleted it still says how it ended (only that row: its other settings stay hidden).
+    if (sees ?? (r.target === "agent_settings" && r.status !== "pending" && deletes(r))) out.push(r);
   }
   return out;
 }
@@ -378,7 +378,14 @@ export async function decideProposal(
         ? await tx
             .select()
             .from(agents)
-            .where(and(eq(agents.id, p.agentId), isNull(agents.archivedAt), isNull(agents.deletedAt)))
+            // An archived agent is still deleted (also on a retry after a delete that failed midway).
+            .where(
+              and(
+                eq(agents.id, p.agentId),
+                deletes(p) ? undefined : isNull(agents.archivedAt),
+                isNull(agents.deletedAt),
+              ),
+            )
             .for("update")
         : [];
       if (!agent) status = "stale";
@@ -855,15 +862,30 @@ function rowsChange(rows: { target: Proposal["target"]; proposedText: string; di
   return { added: [...added], removed: [...removed] };
 }
 
-/** The agents a card changes: active ones the person who asked can talk to (the proposer always). */
-async function cardAgents(db: Database, orgId: string, ids: string[], proposerId: string, requesterId: string) {
+/**
+ * The agents a card changes: active ones (`archived`: archived ones too, to delete them) the person who asked can talk
+ * to (the proposer always).
+ */
+async function cardAgents(
+  db: Database,
+  orgId: string,
+  ids: string[],
+  proposerId: string,
+  requesterId: string,
+  archived = false,
+) {
   if (ids.length > CARD_MAX_AGENTS) throw new ValidationError(`At most ${CARD_MAX_AGENTS} agents on one card`);
   const rows = ids.length
     ? await db
         .select()
         .from(agents)
         .where(
-          and(eq(agents.orgId, orgId), inArray(agents.id, ids), isNull(agents.archivedAt), isNull(agents.deletedAt)),
+          and(
+            eq(agents.orgId, orgId),
+            inArray(agents.id, ids),
+            archived ? undefined : isNull(agents.archivedAt),
+            isNull(agents.deletedAt),
+          ),
         )
     : [];
   if (rows.length !== ids.length) throw new NotFoundError("Agent not found");
@@ -1040,6 +1062,7 @@ export async function proposeSettings(
     [...new Set(input.targets.map((t) => t.agentId))],
     input.agentId,
     input.requesterId,
+    input.targets.every((t) => t.lines.every((l) => l.field === "delete")),
   );
   const rows: (typeof contextProposals.$inferInsert)[] = [];
   const skipped: string[] = [];

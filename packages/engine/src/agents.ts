@@ -636,7 +636,7 @@ export async function oldHandlesByAgent(db: Executor, orgId: string): Promise<Ma
 }
 
 /** `@handles` (a tool's input, old ones too) → the organization's agents that aren't archived; the missing ones by handle. */
-export async function agentsByHandle(db: Executor, orgId: string, raw: unknown) {
+export async function agentsByHandle(db: Executor, orgId: string, raw: unknown, options: { archived?: boolean } = {}) {
   const written = (Array.isArray(raw) ? raw : []).map(handleOf);
   const current = await currentHandles(db, orgId, written);
   const handles = [...new Set(current)];
@@ -646,7 +646,13 @@ export async function agentsByHandle(db: Executor, orgId: string, raw: unknown) 
       : await db
           .select({ id: agents.id, handle: agents.handle, name: agents.name })
           .from(agents)
-          .where(and(eq(agents.orgId, orgId), inArray(agents.handle, handles), isNull(agents.archivedAt)));
+          .where(
+            and(
+              eq(agents.orgId, orgId),
+              inArray(agents.handle, handles),
+              isNull(options.archived ? agents.deletedAt : agents.archivedAt),
+            ),
+          );
   const missing = handles.filter((h) => !rows.some((r) => r.handle === h));
   /** The row a handle as written names, an old one included. */
   const rowOf = (h: unknown) => {

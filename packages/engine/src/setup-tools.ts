@@ -587,11 +587,12 @@ export function createSetupToolSource(deps: {
           if (!forUserId) return { content: "Only a person's request can propose removing agents.", isError: true };
           const reason = str(input.reason).trim();
           if (!reason) return { content: "Say in `reason` why: one short line.", isError: true };
-          const named = await agentsByHandle(ctx.db, ctx.orgId, input.agents);
+          const field = input.delete === true ? "delete" : "archive";
+          // An archived agent can still be deleted for good.
+          const named = await agentsByHandle(ctx.db, ctx.orgId, input.agents, { archived: field === "delete" });
           if (named.missing.length > 0) return noAgents(ctx, named.missing);
           const left: string[] = [];
           const targets: { agentId: string; lines: WantedLine[] }[] = [];
-          const field = input.delete === true ? "delete" : "archive";
           for (const row of named.rows) {
             if (row.id === ctx.agentId) left.push("you can't remove yourself");
             else if (isRightHand(await getAgentCached(ctx.db, ctx.orgId, row.id)))
