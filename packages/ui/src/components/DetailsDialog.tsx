@@ -121,7 +121,7 @@ export function DetailsDialog({
           <div className="ac-details__head">
             {/* With no eyebrow, the heading takes the bar's empty start, beside the buttons, instead of a row of its own. */}
             <div className={cx("ac-details__bar", inline && "ac-details__bar--titled")}>
-              {inline ? heading : <span className="ac-details__eyebrow">{eyebrow}</span>}
+              {inline ? heading : <div className="ac-details__eyebrow">{eyebrow}</div>}
               <div className="ac-details__actions ac-acts">
                 {actions}
                 {page &&

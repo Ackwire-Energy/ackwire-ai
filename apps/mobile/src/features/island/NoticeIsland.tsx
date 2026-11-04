@@ -221,7 +221,13 @@ export function NoticeIsland() {
               ) : item && shape === "small" ? (
                 <SmallIsland item={item} others={others} camera={camera} onPress={() => setOpen(true)} />
               ) : item ? (
-                <Pill item={item} others={others} clear={clear} onPress={() => setOpen(true)} />
+                <Pill
+                  item={item}
+                  others={others}
+                  clear={clear}
+                  onPress={() => setOpen(true)}
+                  onOpened={() => setOpen(false)}
+                />
               ) : null}
             </Animated.View>
           </Animated.View>
@@ -252,22 +258,25 @@ const useLine = (n: AppNotification) => {
   return noticeLine(n, (kind) => mediaWord(t, kind));
 };
 
-/** Closed: the face, who did what and the line; how many more. */
+/** Closed: the face, who did what and the line; how many more; "Ver" (where it happened) at its end. */
 function Pill({
   item,
   others,
   clear,
   onPress,
+  onOpened,
 }: {
   item: IslandItem;
   others: number;
   /** Room on top for the camera it grew out of. */
   clear: number;
   onPress: () => void;
+  onOpened: () => void;
 }) {
   const { t } = useTranslation();
   const { title } = useNoticeTitle(item.n);
   const line = useLine(item.n);
+  const opener = useOpenNotice(item.n, onOpened);
   // Said aloud as it arrives (VoiceOver, TalkBack).
   useEffect(() => {
     AccessibilityInfo.announceForAccessibility([title, line].filter(Boolean).join(". "));
@@ -296,8 +305,26 @@ function Pill({
           </Text>
         </View>
       ) : null}
+      {opener.canOpen ? <Chip label={t("island.see")} onPress={opener.open} /> : null}
     </Pressable>
   );
+}
+
+/** Where a notice happened: whether the app can open it, and opening it there (read, and off the island). */
+function useOpenNotice(n: AppNotification, onOpened: () => void) {
+  const orgId = useOrgId();
+  const act = useNotificationAction(orgId);
+  const href = notificationHref(n);
+  const web = href ? null : notificationWebPath(n, orgId);
+  const open = () => {
+    if (!n.readAt) act.mutate({ type: "read", item: n, read: true });
+    island.settle(n.id);
+    onOpened();
+    // An approval opens in its sheet (held to approve there); the rest, where it happened.
+    if (href) router.push(href);
+    else if (web) openPage(`${serverUrl()}${web}`);
+  };
+  return { canOpen: Boolean(href || web), open };
 }
 
 /** Only requests waiting on me are left: the face beside the camera and what it asks of me. */
@@ -353,19 +380,10 @@ function IslandRow({ n, onOpened }: { n: AppNotification; onOpened: () => void }
   const target = replyTarget(n);
   const waiting = n.waiting ? waitingCardOf(n) : null;
   const suggestions = n.kind === "agent_question" ? (n.latest.suggestions ?? []) : [];
-  const href = notificationHref(n);
-  const web = href ? null : notificationWebPath(n, orgId);
+  const { canOpen, open } = useOpenNotice(n, onOpened);
 
   const read = () => {
     if (!n.readAt) act.mutate({ type: "read", item: n, read: true });
-  };
-  const open = () => {
-    read();
-    island.settle(n.id);
-    onOpened();
-    // An approval opens in its sheet (held to approve there); the rest, where it happened.
-    if (href) router.push(href);
-    else if (web) openPage(`${serverUrl()}${web}`);
   };
   const answer = (text: string, choice = false) => {
     if (!target || !text.trim()) return;
@@ -387,7 +405,6 @@ function IslandRow({ n, onOpened }: { n: AppNotification; onOpened: () => void }
       },
     );
   };
-  const canOpen = Boolean(href || web);
   const primary = waiting && (waiting.action !== "answer" || isDashboardNotice(n.kind)) && canOpen;
 
   return (

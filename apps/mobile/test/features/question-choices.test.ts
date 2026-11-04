@@ -22,6 +22,17 @@ describe("an agent's answer choices grow with their text and wrap", () => {
     expect(src).toContain('const scrolls = shape === "open" && openHeight > openMax;');
   });
 
+  test("the closed island ends in 'Ver', opening where it happened with the open row's own open", async () => {
+    const src = await read("island/NoticeIsland.tsx");
+    const pill = src.slice(src.indexOf("function Pill("), src.indexOf("function useOpenNotice("));
+    expect(pill).toContain("const opener = useOpenNotice(item.n, onOpened);");
+    expect(pill).toContain('{opener.canOpen ? <Chip label={t("island.see")} onPress={opener.open} /> : null}');
+    // The "+N" count, then "Ver" last.
+    expect(pill.indexOf("+{others}")).toBeLessThan(pill.indexOf('t("island.see")'));
+    const row = src.slice(src.indexOf("function IslandRow("));
+    expect(row).toContain("const { canOpen, open } = useOpenNotice(n, onOpened);");
+  });
+
   test("the conversation's question card: each choice a row that grows, its words shrink to wrap", async () => {
     const src = await read("chat/cards.tsx");
     const opt = style(src, "opt");

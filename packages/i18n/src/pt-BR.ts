@@ -1122,6 +1122,8 @@ export const ptBR = {
     otherAnswer: "Outra resposta",
     review: "Revisar",
     open: "Abrir",
+    /** On the closed island, at its end: opens where the notice happened. */
+    see: "Ver",
     dismiss: "Dispensar",
     send: "Enviar",
     placeholder: "Escreva sua resposta…",

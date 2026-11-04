@@ -3051,8 +3051,21 @@ export interface Issue {
   subIssues?: { id: string; number: number; title: string; status: IssueStatus; assignee: Actor | null }[];
   /** On the detail: forum topics opened from it ("Avaliar no fórum"), oldest first. */
   forumTopics?: { id: string; title: string; status: ForumStatus; format: ForumFormat }[];
+  /** Its conversation (ADR 0144), once someone wrote or opened it; absent from servers that don't send it yet. */
+  conversation?: TaskConversationSummary | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** What a task's card and dialog show of its conversation: its replies, who took part, an agent at work now. */
+export interface TaskConversationSummary {
+  channelId: string;
+  rootId: string;
+  count: number;
+  lastAt: string | null;
+  /** The first ones to write, oldest first (at most 5). */
+  participants: Actor[];
+  working: boolean;
 }
 
 export interface IssueActivity {

@@ -2705,6 +2705,9 @@
   "island.open": {
     "value": "Open"
   },
+  "island.see": {
+    "value": "View"
+  },
   "island.dismiss": {
     "value": "Dismiss"
   },

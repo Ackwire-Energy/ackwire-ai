@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Artifact, Issue, IssueColumn } from "@agenteschat/client";
+import { taskConversationLine } from "@agenteschat/client/lib/issues";
 import { cardPreview, cardShape, driveSections, gridRows, kindKey, matchesType } from "../../src/features/drive/logic";
 import {
   columnChoices,
@@ -426,5 +427,58 @@ describe("drive", () => {
       ext: "PDF",
     });
     expect(cardPreview("x", { kind: "html", html: "" })).toEqual({ kind: "file", ext: "HTML" });
+  });
+});
+
+const read = (file: string) => Bun.file(new URL(`../../src/features/${file}`, import.meta.url).pathname).text();
+
+describe("a task's number and title on one row; its conversation on the card", () => {
+  test("the conversation line: how many, who (three faces), working or when; none before anyone wrote", () => {
+    const talk = (count: number, working = false) => ({
+      channelId: "c",
+      rootId: "m",
+      count,
+      lastAt: at(4, NOW),
+      participants: ["a", "b", "c", "d"].map((id) => ({ type: "person" as const, id })),
+      working,
+    });
+    expect(taskConversationLine(issue({ number: 1 }))).toBeNull();
+    expect(taskConversationLine(issue({ number: 2, conversation: null }))).toBeNull();
+    expect(taskConversationLine(issue({ number: 3, conversation: talk(0) }))).toBeNull();
+    const line = taskConversationLine(issue({ number: 4, conversation: talk(4) }));
+    expect(line).toEqual({
+      count: 4,
+      people: ["a", "b", "c"].map((id) => ({ type: "person", id })),
+      working: false,
+      at: at(4, NOW),
+    });
+    expect(taskConversationLine(issue({ number: 5, conversation: talk(2, true) }))?.working).toBe(true);
+    // An agent at work on the task counts too.
+    expect(taskConversationLine(issue({ number: 6, conversation: talk(2), work: work("running") }))?.working).toBe(
+      true,
+    );
+  });
+
+  test("the board card and the task's head: '#N' inside the title's line, the card's conversation last", async () => {
+    const parts = await read("issues/parts.tsx");
+    const card = parts.slice(parts.indexOf("export const BoardCard"), parts.indexOf("function CardConversation("));
+    expect(card).toMatch(
+      /<Text variant="callout" numberOfLines=\{3\} style=\{styles\.title\}>\s*<Text variant="callout" tone="faint" style=\{styles\.number\}>\s*#\{i\.number\}/,
+    );
+    // Not again in the meta row.
+    expect(card.split("#{i.number}")).toHaveLength(2);
+    expect(card.indexOf("<AssigneeFace")).toBeLessThan(card.indexOf("<CardConversation issue={i} />"));
+    const talk = parts.slice(parts.indexOf("function CardConversation("));
+    expect(talk).toContain("taskConversationLine(issue)");
+    expect(talk).toContain('t("threads.status.working")');
+    expect(talk).toContain("{ color: c.agent }");
+    const screen = await read("issues/IssueScreen.tsx");
+    const head = screen.slice(screen.indexOf("function Head("), screen.indexOf("function WorkCard("));
+    expect(head).toMatch(
+      /accessibilityRole="header"[^>]*>\s*<Text variant="display2" tone="faint"[^>]*>\s*#\{i\.number\}/,
+    );
+    // "Criada por…" under the title, the number no longer in it.
+    expect(head.indexOf('accessibilityRole="header"')).toBeLessThan(head.indexOf("{line}"));
+    expect(head).not.toMatch(/`#\$\{i\.number\}`,/);
   });
 });

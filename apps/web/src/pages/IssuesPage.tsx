@@ -3,6 +3,7 @@ import { useIssueColumns, useIssues, useIssuesView, useSetIssuesView } from "@ag
 import { dueLabel, relativeTime, toYmd } from "@agenteschat/client/lib/format";
 import { ISSUES_VIEW_DEFAULT, PRIORITY_ORDER, sortIssues } from "@agenteschat/client/lib/issues-view";
 import {
+  AvatarStack,
   Button,
   Chip,
   CriteriaPixels,
@@ -37,6 +38,7 @@ import {
   isWorking,
   rankAt,
   STATUS_ICON,
+  taskConversationLine,
   useAssigneeColor,
   useColumnTitle,
   useStageName,
@@ -51,6 +53,7 @@ import { IssueDialog } from "./IssuePage";
 import { DisplayButton, IssueFilters, PRIORITY_ICON } from "./IssuesToolbar";
 import { type CardMove, type DropResult, type IssueDrag, useIssueDrag } from "./issue-drag";
 import { NewIssueDialog } from "./NewIssueDialog";
+import "@/components/threads/threads.css";
 import "./issues.css";
 
 export { BOARD, PRIORITIES, STATUSES, splitCriteria } from "@/lib/issues";
@@ -663,14 +666,19 @@ function IssueCard({
       data-status={i.status}
       data-card={i.number}
     >
-      <span className="issue-card__top tabular">
-        <span>#{i.number}</span>
-        {fields.label && i.labels[0] && <span>· {i.labels[0]}</span>}
-        <span className="issue-card__grow" />
-        {fields.priority && <PriorityChip issue={i} />}
-        {fields.due && <DueChip issue={i} />}
+      <span className="issue-card__title">
+        <span className="issue-card__number tabular">#{i.number}</span> {i.title}
       </span>
-      <span className="issue-card__title">{i.title}</span>
+      {((fields.label && i.labels[0]) ||
+        (fields.priority && i.priority !== "normal") ||
+        (fields.due && i.dueDate && isOpen(i))) && (
+        <span className="issue-card__top tabular">
+          {fields.label && i.labels[0] && <span>{i.labels[0]}</span>}
+          <span className="issue-card__grow" />
+          {fields.priority && <PriorityChip issue={i} />}
+          {fields.due && <DueChip issue={i} />}
+        </span>
+      )}
       {fields.criteria && <Criteria issue={i} />}
       <IssueCardWork issue={i} />
       {(fields.assignee || pr) && (
@@ -684,8 +692,43 @@ function IssueCard({
           )}
         </span>
       )}
+      <CardConversation issue={i} />
       {isWorking(i) && <WorkSweep color={color(i) ?? "sky"} waiting={i.work?.state !== "running"} />}
     </Link>
+  );
+}
+
+/**
+ * Under a card's fields, its conversation as chat's thread line: faces, "N mensagens", then "Trabalhando" while an
+ * agent works on it, else when the last one came. Read-only: the card itself opens the task.
+ */
+function CardConversation({ issue }: { issue: Issue }) {
+  const { t, i18n } = useTranslation();
+  const actors = useActors();
+  const line = taskConversationLine(issue);
+  if (!line) return null;
+  return (
+    <span className="thread-line issue-card__talk">
+      <span className="thread-line__who" aria-hidden="true">
+        <AvatarStack>{line.people.map((p) => actors.avatar(p))}</AvatarStack>
+      </span>
+      <b>{t("threads.messages", { count: line.count })}</b>
+      {line.working ? (
+        <span className="thread-line__state thread-line__state--working">
+          <Icon name="bolt" size={14} />
+          {t("threads.status.working")}
+        </span>
+      ) : (
+        line.at && (
+          <>
+            <span className="thread-line__dot" aria-hidden="true">
+              ·
+            </span>
+            <time dateTime={line.at}>{relativeTime(t, i18n.language, line.at)}</time>
+          </>
+        )
+      )}
+    </span>
   );
 }
 

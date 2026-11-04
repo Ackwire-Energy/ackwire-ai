@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "../api/types";
+import type { Actor, Issue, IssueActivity, IssuePriority, IssueStatus } from "../api/types";
 
 export const BOARD: IssueStatus[] = ["todo", "in_progress", "in_review", "done"];
 export const STATUSES: IssueStatus[] = [...BOARD, "canceled"];
@@ -42,6 +42,25 @@ export const isWorking = (i: Pick<Issue, "work">) => Boolean(i.work && i.work.st
 /** In progress with an agent and no run alive: the agent took it but nobody is working. */
 export const isStalled = (i: Pick<Issue, "work">) => i.work?.state === "stalled";
 export const isOpen = (i: Pick<Issue, "status">) => i.status !== "done" && i.status !== "canceled";
+
+/** A card's conversation line, as chat's thread line: its faces, "N mensagens", "Trabalhando" or when. */
+export interface TaskConversationLine {
+  count: number;
+  people: Actor[];
+  /** An agent at work on the task now: "Trabalhando" in place of the time. */
+  working: boolean;
+  at: string | null;
+}
+
+/**
+ * The card's conversation line from the task's conversation summary (null before anyone wrote): the one place that
+ * reads it, so the board and the phone follow when that source changes.
+ */
+export function taskConversationLine(i: Pick<Issue, "conversation" | "work">): TaskConversationLine | null {
+  const c = i.conversation;
+  if (!c || c.count === 0) return null;
+  return { count: c.count, people: c.participants.slice(0, 3), working: c.working || isWorking(i), at: c.lastAt };
+}
 
 /** An issue someone asked an agent to implement, as a message carries it. */
 export interface IssueWorkRef {

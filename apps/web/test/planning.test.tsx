@@ -34,7 +34,9 @@ const go = async (path: string, api = createFakeApi(seedState())) => {
   return { ...r, api };
 };
 const column = (name: string) => screen().getByRole("region", { name });
-const cardTitles = (el: HTMLElement) => Array.from(el.querySelectorAll(".issue-card__title")).map((x) => x.textContent);
+// The title after its number ("#131 Confirmação…" on one row).
+const cardTitles = (el: HTMLElement) =>
+  Array.from(el.querySelectorAll(".issue-card__title")).map((x) => x.textContent?.replace(/^#\d+ /, ""));
 /** Radix tabs switch on mouse down. */
 const tab = async (name: string | RegExp) => {
   await act(async () => fireEvent.mouseDown(screen().getByRole("tab", { name }), { button: 0 }));
@@ -365,6 +367,13 @@ describe("Issue detail", () => {
       within(dialog).getByRole("heading", { level: 1, name: "Confirmação do agendamento por WhatsApp" }),
     ).toBeTruthy();
     expect(within(dialog).getByText(/^Criada por João/)).toBeTruthy();
+    // "#131" and the title on one row, on the bar that never scrolls; "Criada por…" under it, in the body.
+    const bar = dialog.querySelector(".ac-details__bar") as HTMLElement;
+    const row = bar.querySelector(".issue-bartitle") as HTMLElement;
+    expect(row.firstElementChild?.textContent).toBe("#131");
+    expect(within(row).getByRole("heading", { level: 1 }).textContent).toBe("Confirmação do agendamento por WhatsApp");
+    expect(dialog.querySelectorAll(".issue-details__title")).toHaveLength(1);
+    expect(bar.textContent).not.toContain("Criada por");
     await click(within(dialog).getByRole("button", { name: "Editar o título" }));
     const title = within(dialog).getByRole("textbox", { name: "Título" });
     await type(title, "Confirmação por WhatsApp");
