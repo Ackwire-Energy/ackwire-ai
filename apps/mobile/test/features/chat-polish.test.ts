@@ -124,3 +124,16 @@ describe("a conversation with a pinned message", () => {
     expect(src("features/chat/PinsSheet.tsx")).not.toMatch(/boxShadow|shadowOpacity|elevation/);
   });
 });
+
+describe("back to the latest messages", () => {
+  test("the round button sits at the bottom right, above the composer, riding the keyboard with it", () => {
+    const screen = src("features/chat/ChatScreen.tsx");
+    const dock = screen.indexOf("style={[styles.jumpAt, { bottom: composerHeight + 10 }]}");
+    expect(dock).toBeGreaterThan(0);
+    expect(screen.lastIndexOf("<KeyboardStickyView", dock)).toBeGreaterThan(
+      screen.lastIndexOf("</Animated.View>", dock),
+    );
+    expect(screen.indexOf("<ToLatest unseen={unseen} onPress={toEnd} />", dock)).toBeGreaterThan(dock);
+    expect(screen.indexOf("styles.composerDock", dock)).toBeGreaterThan(dock);
+  });
+});

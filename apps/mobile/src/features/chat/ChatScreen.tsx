@@ -1921,9 +1921,6 @@ function Chat({
                     </JumpToMessageContext.Provider>
                   </StickerStageContext.Provider>
                   <DatePill day={topDay} shown={dayShown} top={hasPin ? 8 : headerHeight + 8} />
-                  {showList && (readHold || (!atEnd && (far || unseen.messages > 0 || unseen.working.length > 0))) ? (
-                    <ToLatest top={hasPin ? 8 : headerHeight + 8} unseen={unseen} onPress={toEnd} />
-                  ) : null}
                 </View>
               </Animated.View>
               {showList ? null : (
@@ -1965,6 +1962,16 @@ function Chat({
               style={[styles.topFade, { height: headerHeight + 28 }]}
             />
           ) : null}
+          {/* Above the composer and its working line, riding the keyboard with them. */}
+          <KeyboardStickyView
+            offset={{ opened: lift }}
+            style={[styles.jumpAt, { bottom: composerHeight + 10 }]}
+            pointerEvents="box-none"
+          >
+            {showList && (readHold || (!atEnd && (far || unseen.messages > 0 || unseen.working.length > 0))) ? (
+              <ToLatest unseen={unseen} onPress={toEnd} />
+            ) : null}
+          </KeyboardStickyView>
           {peeking ? null : (
             <KeyboardStickyView offset={{ opened: lift }} style={styles.composerDock}>
               <View
@@ -2059,10 +2066,10 @@ function Chat({
 }
 
 /**
- * Back to the latest messages: a round button at the top right, under the bar (and the pinned card), as on the web.
+ * Back to the latest messages: a round button at the bottom right, right above the composer, as on the web.
  * It counts what arrived below, in red when one mentions me; its label says who spoke and who is writing.
  */
-function ToLatest({ top, unseen, onPress }: { top: number; unseen: Unseen; onPress: () => void }) {
+function ToLatest({ unseen, onPress }: { unseen: Unseen; onPress: () => void }) {
   const { t } = useTranslation();
   const dir = useDirectory();
   const { colors, shadows } = useTheme();
@@ -2079,12 +2086,7 @@ function ToLatest({ top, unseen, onPress }: { top: number; unseen: Unseen; onPre
     unseen.mentionsMe ? t("mobile.chat.unseen.mentionsYou") : "",
   ].filter(Boolean);
   return (
-    <Animated.View
-      entering={FadeIn.duration(160)}
-      exiting={FadeOut.duration(120)}
-      style={[styles.jumpAt, { top }]}
-      pointerEvents="box-none"
-    >
+    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)} pointerEvents="box-none">
       <PressScale
         to={0.92}
         onPress={onPress}

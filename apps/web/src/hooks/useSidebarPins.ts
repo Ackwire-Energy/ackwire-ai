@@ -1,4 +1,4 @@
-import { useDms, useSetSidebarView, useSidebarView } from "@agenteschat/client";
+import { useAgentGroups, useDms, useSetSidebarView, useSidebarView } from "@agenteschat/client";
 import { hiddenAgentIds } from "@agenteschat/client/lib/audience";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { dayOnePins, type PinKind, pinsOf, togglePin } from "@agenteschat/client/lib/sidebar-view";
@@ -20,6 +20,7 @@ export function useSidebarPins() {
   const setView = useSetSidebarView(org.id);
   const dir = useDirectory(org.id);
   const dms = useDms(org.id).data;
+  const groups = useAgentGroups(org.id).data;
   const hidden = hiddenAgentIds(org, dir.agents);
   const lastActive = new Map<string, string>();
   for (const d of dms ?? [])
@@ -28,6 +29,7 @@ export function useSidebarPins() {
     dir.agents.filter((a) => !isRightHand(a) && !hidden.has(a.id)),
     me.user.id,
     lastActive,
+    groups,
   );
   const pins = pinsOf(view, dayOne);
   const toggle = (kind: PinKind, id: string) => {
