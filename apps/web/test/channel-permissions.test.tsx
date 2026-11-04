@@ -85,7 +85,7 @@ describe("channel permissions (ADR 0134)", () => {
     await settle(1);
     const allow = within(post).getByRole("radio", { name: "Permitir" });
     expect(allow.getAttribute("aria-checked")).toBe("true");
-    expect(document.activeElement).toBe(allow);
+    expect(document.activeElement === allow).toBe(true);
     expect((allow as HTMLButtonElement).disabled).toBe(false);
     await settle(4);
     expect(state.calls.filter((c) => c.method === "chat.setPermission").map((c) => c.args.at(-1))).toEqual([

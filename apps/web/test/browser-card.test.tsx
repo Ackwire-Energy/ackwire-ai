@@ -149,7 +149,7 @@ describe("a help request opens the agent's browser in its card", () => {
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Pronto" })));
     expect(card.textContent).toContain("Pronto. Algum recado para a Ada?");
     const note = within(card).getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
-    expect(document.activeElement).toBe(note);
+    expect(document.activeElement === note).toBe(true);
     // The same note as on the screen: one line in the middle of its field that grows as it wraps, with no grip.
     expect([note.tagName, note.getAttribute("rows"), note.className]).toEqual([
       "TEXTAREA",

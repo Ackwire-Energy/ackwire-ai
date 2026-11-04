@@ -361,7 +361,7 @@ describe("message action bars", () => {
       await settle(2);
       await click(within(screen().getByRole("dialog")).getByRole("button", { name: "Fechar" }));
       await settle(2);
-      expect(document.activeElement).toBe(conectar);
+      expect(document.activeElement === conectar).toBe(true);
       await tap("w2");
       actionsOpen("w2");
       await act(async () => fireEvent.keyDown(screen().getByRole("menu"), { key: "Escape" }));

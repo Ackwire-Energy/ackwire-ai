@@ -263,7 +263,7 @@ describe("Criar agente: steps", () => {
     ]);
     expect(scratch?.nextElementSibling?.tagName).toBe("SECTION");
     expect(css).toMatch(/\n\.newag__scratch \{[^}]*gap: 12px;/);
-    expect(document.activeElement).toBe(screen().getByLabelText("Cargo"));
+    expect(document.activeElement === screen().getByLabelText("Cargo")).toBe(true);
     expect(screen().getByText("O que ele faz pelo time, ex.: Assistente de e-mails e agenda.")).toBeTruthy();
 
     // A role outside engineering fills the rest the same way.
@@ -284,7 +284,7 @@ describe("Criar agente: steps", () => {
     // Still here (the rail on its first step): the import's sources in the cards' place, no preview, no Continuar.
     expect(title()).toBe("Trazer agentes de outro app");
     expect(railStep("Papel").getAttribute("aria-current")).toBe("step");
-    expect(document.activeElement).toBe(screen().getByRole("heading", { level: 1 }));
+    expect(document.activeElement === screen().getByRole("heading", { level: 1 })).toBe(true);
     expect(screen().getByRole("group", { name: "De onde vêm os agentes" })).toBeTruthy();
     expect(screen().queryByRole("group", { name: "Papel" })).toBeNull();
     expect(screen().queryByRole("complementary", { name: "Prévia do agente" })).toBeNull();

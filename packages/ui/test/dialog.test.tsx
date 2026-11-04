@@ -42,7 +42,7 @@ describe("Dialog", () => {
       </Dialog>,
     );
     const dialog = body().getByRole("dialog", { name: "Conectar uma IA" });
-    expect(document.activeElement).toBe(dialog);
+    expect(document.activeElement === dialog).toBe(true);
   });
 
   test("from the dialog itself, Shift+Tab goes round to its last control that takes the focus", async () => {
@@ -57,7 +57,7 @@ describe("Dialog", () => {
     );
     const dialog = body().getByRole("dialog", { name: "Conectar uma IA" });
     await act(async () => fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true }));
-    expect(document.activeElement).toBe(body().getByRole("button", { name: "Salvar chave" }));
+    expect(document.activeElement === body().getByRole("button", { name: "Salvar chave" })).toBe(true);
   });
 
   test("a field that takes the focus on its own keeps it", () => {
@@ -66,7 +66,7 @@ describe("Dialog", () => {
         <Input aria-label="Nome" autoFocus />
       </Dialog>,
     );
-    expect(document.activeElement).toBe(body().getByRole("textbox", { name: "Nome" }));
+    expect(document.activeElement === body().getByRole("textbox", { name: "Nome" })).toBe(true);
   });
 
   test("Escape closes it and focus returns to the trigger", async () => {
@@ -178,7 +178,7 @@ describe("Dialog", () => {
     const open = body().getByRole("button", { name: "Nova categoria" });
     open.focus();
     await act(async () => fireEvent.click(open));
-    expect(document.activeElement).toBe(body().getByRole("textbox", { name: "Nome" }));
+    expect(document.activeElement === body().getByRole("textbox", { name: "Nome" })).toBe(true);
   });
 
   test("an ⓘ at the end of the description's line stays out of it: the dialog is described by the sentence alone", () => {

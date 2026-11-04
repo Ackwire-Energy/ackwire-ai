@@ -135,7 +135,7 @@ describe("the members column", () => {
     const rows = [...(column() as HTMLElement).querySelectorAll<HTMLElement>(".members-side__row")];
     rows[0]?.focus();
     await act(async () => fireEvent.keyDown(rows[0] as HTMLElement, { key: "ArrowDown" }));
-    expect(document.activeElement).toBe(rows[1] as HTMLElement);
+    expect(document.activeElement === (rows[1] as HTMLElement)).toBe(true);
   });
 
   test("someone offline sits under Offline, drawn quieter", async () => {
@@ -295,7 +295,7 @@ describe("the phone's members sheet: a dialog over the channel", () => {
     await settle(1);
     expect(sheet()).toBeNull();
     expect((screen().getByRole("main") as HTMLElement).inert).toBe(false);
-    expect(document.activeElement).toBe(toggle());
+    expect(document.activeElement === toggle()).toBe(true);
   });
 
   test("a swipe to the right closes it; a short one doesn't", async () => {

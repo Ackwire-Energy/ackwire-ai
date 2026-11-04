@@ -44,7 +44,7 @@ describe("optimistic send", () => {
     expect(pending[0]?.className).toContain("ac-msg--pending");
     expect(pending[0]?.textContent).toContain("enviando…");
     // Focus stays in the composer, which is empty again.
-    expect(document.activeElement).toBe(composer());
+    expect(document.activeElement === composer()).toBe(true);
     expect((composer() as HTMLTextAreaElement).value).toBe("");
     // The WebSocket echo (with clientId) can arrive before the HTTP response.
     const posted = state.calls.find((c) => c.method === "chat.post")?.args[2] as { clientId: string } | undefined;
@@ -1040,7 +1040,7 @@ describe("direct messages with an agent", () => {
     const suggestion = screen().getByRole("button", { name: "O que quebrou desde o último deploy?" });
     await act(async () => fireEvent.click(suggestion));
     expect((composer() as HTMLTextAreaElement).value).toBe("O que quebrou desde o último deploy?");
-    expect(document.activeElement).toBe(composer());
+    expect(document.activeElement === composer()).toBe(true);
   });
 
   test("a plan thinks for the agent: the DM header says its model by that plan, with its mark", async () => {

@@ -91,7 +91,7 @@ describe("buttons and kbd", () => {
     expect(body().getByRole("button", { name: "Salvar" }).hasAttribute("disabled")).toBe(true);
     const b = body().getByRole("button", { name: "Cancelar" });
     b.focus();
-    expect(document.activeElement).toBe(b);
+    expect(document.activeElement === b).toBe(true);
   });
 
   test("off, a button is a faint plate over what it sits on, so its shape shows on the dark page too", async () => {

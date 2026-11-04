@@ -470,18 +470,18 @@ describe("links everywhere", () => {
     await act(async () => fireEvent.pointerEnter(link, { pointerType: "mouse" }));
     await settle(2);
     expect(preview()).not.toBeNull();
-    expect(document.activeElement).toBe(box);
+    expect(document.activeElement === box).toBe(true);
     await act(async () => fireEvent.pointerLeave(link, { pointerType: "mouse" }));
     await settle(2);
     // A moment to come back before it closes.
     expect(preview()).not.toBeNull();
     await act(() => new Promise((r) => setTimeout(r, HOVER_CLOSE_MS + 20)));
     expect(preview()).toBeNull();
-    expect(document.activeElement).toBe(box);
+    expect(document.activeElement === box).toBe(true);
     await act(async () => link.focus());
     await settle(2);
     expect(preview()).not.toBeNull();
-    expect(document.activeElement).toBe(link);
+    expect(document.activeElement === link).toBe(true);
   });
 
   test("Salvar na wiki from an agent's message appends it with the source", async () => {
