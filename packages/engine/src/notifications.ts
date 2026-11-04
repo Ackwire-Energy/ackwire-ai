@@ -169,6 +169,12 @@ export const NOTIFICATION_KINDS = [
    * Waiting; done once someone decides it.
    */
   "change_request",
+  /**
+   * "Quem aprova por mim" (ADR 0138): the person chosen to cover someone hears it (`latest.statusTo` the mode,
+   * `always` or `while_out`, and `latest.expiresAt` its end), and the covered person hears when the cover said no
+   * (`declined`) or an admin ended it (`ended`). The covered person or who ended it is the actor. Inbox only.
+   */
+  "approval_cover",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 

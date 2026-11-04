@@ -1,12 +1,16 @@
 import {
+  COVER_MODES,
   cancelAheadApproval,
   decideApproval,
   decideApprovals,
+  endCover,
   getApproval,
+  getMyCovers,
   listApprovalRules,
   listApprovals,
   memoryJudging,
   removeApprovalRule,
+  setMyCover,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
@@ -66,6 +70,9 @@ export const Approval = z
     expiresAt: z.string(),
     createdAt: z.string(),
     decidedByUserId: z.string().nullable(),
+    decidedForUserId: z.string().nullable().openapi({
+      description: 'Decided by someone covering this person (ADR 0138): "Aprovado por Bruno, cobrindo Ana".',
+    }),
     decidedAt: z.string().nullable(),
     reason: z.string().nullable(),
     canDecide: z.boolean().openapi({ description: "You are the agent's owner or an admin, and it is pending." }),
@@ -123,6 +130,18 @@ export const Approval = z
       }),
   })
   .openapi("Approval");
+
+const CoverView = z.object({
+  userId: z.string().openapi({ description: "Who covers me (`cover`), or whom I cover (`covering`)." }),
+  mode: z.enum(COVER_MODES).openapi({ description: "`always`, or `while_out`: only while the status says out." }),
+  risky: z.boolean().openapi({ description: "Merge, deploy and other high-risk actions are in." }),
+  endsAt: z.string().nullable(),
+  active: z.boolean().openapi({ description: "Deciding now: not past its end, and `always` or the person is out." }),
+});
+
+export const ApprovalCovers = z
+  .object({ cover: CoverView.nullable(), covering: z.array(CoverView) })
+  .openapi("ApprovalCovers");
 
 export const ApprovalRule = z
   .object({
@@ -302,6 +321,70 @@ export function approvalRoutes(deps: AppDeps) {
       const view = await cancelAheadApproval({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, approvalId);
       deps.wakeWorkers?.();
       return c.json(view, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/me/approval-cover",
+      tags,
+      security,
+      summary: "Who approves for me, and whom I approve for (ADR 0138)",
+      request: { params: OrgParams },
+      responses: { 200: json(ApprovalCovers), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await getMyCovers(db, c.get("user").id, orgId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/approval-cover",
+      tags,
+      security,
+      summary: "Choose who approves for me",
+      description:
+        "One person of the workspace, never you (400 `approval_cover.self`, `approval_cover.not_member`), until `endsAt` (in the future: 400 `approval_cover.ends_past`) or null. They decide in your name what is asked of you personally, never their own requests, a mailbox's actions or access for good; merge, deploy and the like only with `risky`. They hear it in their inbox.",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            userId: z.string().min(1),
+            mode: z.enum(COVER_MODES),
+            risky: z.boolean(),
+            endsAt: z.iso.datetime({ offset: true }).nullable(),
+          }),
+        ),
+      },
+      responses: { 200: json(ApprovalCovers), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const input = c.req.valid("json");
+      return c.json(await setMyCover({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, input), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/approval-covers/{userId}",
+      tags,
+      security,
+      summary: 'End someone\'s cover: theirs, the one you give them ("Não quero cobrir"), or any as an admin',
+      description:
+        "The covered person, the person covering them or who manages members (403 otherwise; 404 `approval_cover.not_found`). The covered person hears it when someone else ends it.",
+      request: { params: OrgParams.extend({ userId: z.string().min(1) }) },
+      responses: { ...noContent, ...errors },
+    }),
+    async (c) => {
+      const { orgId, userId } = c.req.valid("param");
+      await endCover({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, userId);
+      return c.body(null, 204);
     },
   );
 

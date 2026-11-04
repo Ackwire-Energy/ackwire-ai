@@ -22,7 +22,7 @@ import { agents, providerCredentials } from "./agents";
 import { connectorConnections } from "./connectors";
 import { machines } from "./machines";
 import { missions } from "./missions";
-import { organizations } from "./tenancy";
+import { organizationMembers, organizations } from "./tenancy";
 import { issues } from "./work";
 
 export const outboxStatusEnum = pgEnum("outbox_status", ["pending", "processing", "done", "failed"]);
@@ -539,6 +539,18 @@ export const approvals = pgTable(
      * and whoever may approve actions, as for any other approval.
      */
     approvers: jsonb().$type<ApprovalApprovers>(),
+    /**
+     * The person behind the run that asked (`accountablePerson`), when there was one: whoever covers someone never
+     * decides their own request (`approval_covers`).
+     */
+    requestedByUserId: text(),
+    /**
+     * Merge, deploy, rollback, sends, deletes and the like (`highRisk` in the Tool Gateway): a cover decides these only
+     * when the person turned that on. Rows from before the column count as high risk.
+     */
+    highRisk: boolean().notNull().default(true),
+    /** Decided by someone covering this person (`approval_covers`): "Aprovado por Bruno, cobrindo Ana". */
+    decidedForUserId: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -547,6 +559,38 @@ export const approvals = pgTable(
     index().on(t.orgId, t.status, t.createdAt),
     index().on(t.expiresAt).where(sql`${t.status} = 'pending'`),
     index().on(t.routineId, t.runAt).where(sql`${t.runAt} is not null`),
+  ],
+);
+
+/**
+ * "Quem aprova por mim" (ADR 0138): one person who decides, in this person's name, the approvals asked of them
+ * personally (as the agent's owner, or named by `request_approval`), always or only while their status says they are
+ * out of office, until `ends_at`. Never what the cover asked for, a mailbox's actions or access for good; merge,
+ * deploy and other high-risk actions only with `risky`. Gone when either person leaves the workspace.
+ */
+export const approvalCovers = pgTable(
+  "approval_covers",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid().notNull(),
+    fromUserId: text().notNull(),
+    toUserId: text().notNull(),
+    mode: text().$type<"always" | "while_out">().notNull().default("while_out"),
+    risky: boolean().notNull().default(false),
+    endsAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.orgId, t.fromUserId],
+      foreignColumns: [organizationMembers.orgId, organizationMembers.userId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.orgId, t.toUserId],
+      foreignColumns: [organizationMembers.orgId, organizationMembers.userId],
+    }).onDelete("cascade"),
+    unique().on(t.orgId, t.fromUserId),
+    index().on(t.orgId, t.toUserId),
   ],
 );
 

@@ -1422,6 +1422,13 @@
       "when": 1793749430769,
       "tag": "0204_right_hand_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 204,
+      "version": "7",
+      "when": 1793756048378,
+      "tag": "0205_approval_covers",
+      "breakpoints": true
     }
   ]
 }

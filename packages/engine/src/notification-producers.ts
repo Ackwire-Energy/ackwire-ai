@@ -45,6 +45,7 @@ const {
   messageReactions,
   machines,
   approvals,
+  notifications,
 } = schema;
 
 type ApprovalRow = typeof schema.approvals.$inferSelect;
@@ -527,6 +528,39 @@ export async function resolveApprovalNotifications(
     const next = waiting.find((_, i) => deciders[i]?.has(userId));
     return next ? { source: { approvalId: next.id }, latest: approvalLatest(next) } : null;
   });
+}
+
+/**
+ * `userId`'s cover started, changed or ended, or they went out of office or came back (ADR 0138): the approvals
+ * waiting that they are asked personally reach whoever is asked now, and leave whoever isn't any more.
+ */
+export async function rerouteApprovals(deps: NotificationDeps, orgId: string, userId: string) {
+  const rows = await deps.db
+    .select()
+    .from(approvals)
+    .where(
+      and(
+        eq(approvals.orgId, orgId),
+        eq(approvals.status, "pending"),
+        sql`(${approvals.ownerUserId} = ${userId} or ${approvals.approvers} -> 'userIds' @> to_jsonb(${userId}::text))`,
+      ),
+    );
+  for (const row of rows) {
+    await resolveApprovalNotifications(deps, row);
+    const holding = await deps.db
+      .select({ userId: notifications.userId })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.orgId, orgId),
+          eq(notifications.groupKey, approvalGroupKey(row)),
+          isNull(notifications.doneAt),
+        ),
+      );
+    const held = new Set(holding.map((h) => h.userId));
+    const newcomers = (await approverIds(deps.db, row)).filter((id) => !held.has(id));
+    if (newcomers.length > 0) await notifyApproval(deps, row, newcomers);
+  }
 }
 
 // ── Issues ────────────────────────────────────────────────────────────────────

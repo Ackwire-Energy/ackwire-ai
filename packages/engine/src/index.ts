@@ -13,6 +13,7 @@ export * from "./agents";
 export * from "./ai-intent";
 export * from "./ai-status";
 export * from "./appearance";
+export * from "./approval-covers";
 export * from "./approval-requests";
 export * from "./approval-rules";
 export * from "./approvals";

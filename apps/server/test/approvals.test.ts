@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import { createReminder, grantScopes, type ToolSource } from "@agenteschat/engine";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 const merged: Record<string, unknown>[] = [];
 const github: ToolSource = {
@@ -188,4 +188,56 @@ test("approvals API: 'Aprovar tudo' decides exactly the ids sent and resumes the
     (await owner(`/api/app/organizations/${orgId}/approvals/decide`, { json: { ids: [], decision: "approve" } }))
       .status,
   ).toBe(400);
+});
+
+test("approvals API: who approves for me decides my approvals in my name while I'm out, and may say no", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId, agentId } = await seedOrg(owner);
+  await grantScopes(t.db, orgId, agentId, [{ connectionId: null, scope: "github:pr.merge" }]);
+  const ana = await joinByInvitation(t, owner, orgId, "ana@example.com");
+  const bruno = await joinByInvitation(t, owner, orgId, "bruno@example.com");
+  const idOf = async (email: string) =>
+    (await t.db.select().from(schema.users).where(eq(schema.users.email, email)))[0]?.id ?? "";
+  const [anaId, brunoId] = [await idOf("ana@example.com"), await idOf("bruno@example.com")];
+  await t.db.update(schema.agents).set({ ownerUserId: anaId }).where(eq(schema.agents.id, agentId));
+  const cover = `/api/app/organizations/${orgId}/me/approval-cover`;
+
+  const self = await ana(cover, {
+    method: "PUT",
+    json: { userId: anaId, mode: "while_out", risky: true, endsAt: null },
+  });
+  expect(self.status).toBe(400);
+  const set = await ana(cover, {
+    method: "PUT",
+    json: { userId: brunoId, mode: "while_out", risky: true, endsAt: null },
+  });
+  expect(set.status).toBe(200);
+  expect(await set.json()).toMatchObject({ cover: { userId: brunoId, mode: "while_out", risky: true, active: false } });
+  await t.db
+    .update(schema.organizationMembers)
+    .set({ availability: "out" })
+    .where(eq(schema.organizationMembers.userId, anaId));
+  expect(await (await bruno(cover)).json()).toMatchObject({ cover: null, covering: [{ userId: anaId, active: true }] });
+
+  await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`, { json: { body: "@dev merge 42" } });
+  await t.drain();
+  const list = (await (await bruno(`/api/app/organizations/${orgId}/approvals?status=pending`)).json()) as {
+    approvals: { id: string; canDecide: boolean }[];
+  };
+  expect(list.approvals).toMatchObject([{ canDecide: true }]);
+  const id = list.approvals[0]?.id;
+  const always = await bruno(`/api/app/organizations/${orgId}/approvals/${id}/approve`, { json: { always: true } });
+  expect(always.status).toBe(409);
+  const approved = await bruno(`/api/app/organizations/${orgId}/approvals/${id}/approve`, { json: {} });
+  expect(await approved.json()).toMatchObject({
+    status: "approved",
+    decidedByUserId: brunoId,
+    decidedForUserId: anaId,
+  });
+
+  expect((await bruno(`/api/app/organizations/${orgId}/approval-covers/${anaId}`, { method: "DELETE" })).status).toBe(
+    204,
+  );
+  expect(await (await ana(cover)).json()).toMatchObject({ cover: null });
 });
