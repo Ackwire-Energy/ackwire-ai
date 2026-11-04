@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { pbkdf2 } from "@noble/hashes/pbkdf2.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { createBitwardenSource } from "../src/vault/bitwarden";
+import { OutboundAddressError } from "../src/outbound-url";
+import { createBitwardenSource, derivationQueue } from "../src/vault/bitwarden";
 import {
+  ARGON2_MAX_WORK_MIB_ITERATIONS,
   BitwardenCryptoError,
   constantTimeEqual,
   decryptBytes,
@@ -12,6 +14,7 @@ import {
   encryptBytes,
   encryptString,
   fromBase64,
+  kdfSupported,
   stretchMasterKey,
   symmetricKeyFrom,
   toBase64,
@@ -229,6 +232,20 @@ describe("Bitwarden crypto: our own fixtures (built with the same primitives)", 
       deriveMasterKey("p", "e", { type: "argon2id", iterations: 3, memoryMiB: 1024, parallelism: 4 }),
     );
     expect(tooMuch.reason).toBe("kdf");
+    // Memory times iterations is capped too (ADR 0135): each within its range, together too slow to run here.
+    const tooLong = await cryptoError(() =>
+      deriveMasterKey("p", "e", { type: "argon2id", iterations: 3, memoryMiB: 128, parallelism: 4 }),
+    );
+    expect(tooLong.reason).toBe("kdf");
+    const argon2 = (iterations: number, memoryMiB: number) =>
+      kdfSupported({ type: "argon2id", iterations, memoryMiB, parallelism: 4 });
+    // Bitwarden's default, and the most at its memory.
+    expect(argon2(3, 64)).toBe(true);
+    expect(argon2(4, 64)).toBe(true);
+    expect(argon2(5, 64)).toBe(false);
+    expect(argon2(2, 128)).toBe(true);
+    expect(argon2(10, 16)).toBe(true);
+    expect(ARGON2_MAX_WORK_MIB_ITERATIONS).toBe(256);
   });
 
   test("constant-time comparison", () => {
@@ -551,5 +568,72 @@ describe("Bitwarden source", () => {
     const { source, connection } = await setup();
     const renamed = { ...connection, config: { ...connection.config, folder: "Robots" } };
     expect((await sourceError(() => source.list(renamed))).code).toBe("folder_missing");
+  });
+
+  test("a server address the guarded fetch refuses (our own network) is invalid_input, in plain words", async () => {
+    const asked: string[] = [];
+    // What the server's `publicHttpsFetch` throws for a private, loopback, link-local or internal host.
+    const guarded = (async (input: string | URL | Request): Promise<Response> => {
+      asked.push(String(input));
+      throw new OutboundAddressError();
+    }) as typeof fetch;
+    const source = createBitwardenSource({ fetch: guarded });
+    const refused = await sourceError(() =>
+      source.connect({ ...INPUT, server: "self", serverUrl: "https://10.0.0.5" }, undefined, { orgId: "org-1" }),
+    );
+    expect(refused.code).toBe("invalid_input");
+    expect(refused.message).toContain("private or internal network");
+    expect(asked).toEqual(["https://10.0.0.5/identity/connect/token"]);
+    // A network failure stays one.
+    const down = createBitwardenSource({
+      fetch: (async () => {
+        throw new TypeError("fetch failed");
+      }) as unknown as typeof fetch,
+    });
+    expect((await sourceError(() => down.connect(INPUT))).code).toBe("unreachable");
+  });
+});
+
+describe("Bitwarden key derivations", () => {
+  test("one at a time per workspace, two at most across the process; a caller that gave up never starts", async () => {
+    const queue = derivationQueue(2);
+    const started: string[] = [];
+    const finish = new Map<string, () => void>();
+    const job = (name: string) => () => {
+      started.push(name);
+      return new Promise<string>((resolve) => finish.set(name, () => resolve(name)));
+    };
+    const a1 = queue("org-a", job("a1"));
+    const a2 = queue("org-a", job("a2"));
+    const b1 = queue("org-b", job("b1"));
+    const c1 = queue("org-c", job("c1"));
+    await Bun.sleep(5);
+    // The workspace's second derivation waits on its first; another workspace's runs beside it; a third waits for
+    // one of the two slots.
+    expect(started).toEqual(["a1", "b1"]);
+    finish.get("a1")?.();
+    expect(await a1).toBe("a1");
+    await Bun.sleep(5);
+    expect(started).toEqual(["a1", "b1", "c1"]);
+    finish.get("b1")?.();
+    await b1;
+    await Bun.sleep(5);
+    expect(started).toEqual(["a1", "b1", "c1", "a2"]);
+
+    // A caller that gives up before its turn comes: told at once, and its derivation never runs.
+    const gone = new AbortController();
+    const d1 = queue("org-d", job("d1"), gone.signal);
+    gone.abort();
+    expect((await sourceError(() => d1)).code).toBe("unreachable");
+    finish.get("c1")?.();
+    finish.get("a2")?.();
+    expect(await Promise.all([c1, a2])).toEqual(["c1", "a2"]);
+    await Bun.sleep(5);
+    expect(started).not.toContain("d1");
+    // The slots are free again.
+    const e1 = queue("org-e", job("e1"));
+    await Bun.sleep(5);
+    finish.get("e1")?.();
+    expect(await e1).toBe("e1");
   });
 });

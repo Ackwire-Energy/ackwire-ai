@@ -51,7 +51,15 @@ import type { JsonSchema } from "../tools/json-schema";
 import { grantedScopeKeys, isAllowed, toolAccess, VAULT_LIST_TOOL, VAULT_READ_SCOPE } from "../tools/scopes";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { SHARE_HINT, SHARE_INPUT, shareSavedFile } from "../uploads";
-import { listUsableVault, recordVaultUse, releaseVaultLogin, type VaultDeps, VaultRefusal } from "../vault";
+import {
+  checkVaultLogin,
+  listUsableVault,
+  recordVaultUse,
+  releaseVaultLogin,
+  type VaultBrowserProfile,
+  type VaultDeps,
+  VaultRefusal,
+} from "../vault";
 import type { BrowserPageReader } from "../web-tools";
 import {
   agentUsesScreen,
@@ -69,6 +77,7 @@ import {
   getBrowserProfile,
   holderOf,
   PROFILE_WAIT_MS,
+  profileGrantees,
   profileMachineProblem,
   runBrowserProfile,
   type TurnResult,
@@ -378,6 +387,9 @@ export function runnerFailureText(error: string | undefined, code?: string): str
   }
   if (code === "not_code_field") {
     return "Those aren't fields for a code (text, number or one-time-code boxes), so nothing was typed. Read the page and give the code's boxes, in order.";
+  }
+  if (code === "unguarded") {
+    return "The browser couldn't get ready to keep the password out of the page's addresses, so nothing was typed. Run that step again; if it keeps failing, tell the person.";
   }
   if (code && (VAULT_TYPE_REFUSALS as readonly string[]).includes(code)) return browserErrorText(`${code}: ${said}`);
   return browserErrorText(said);
@@ -916,14 +928,28 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
   }
 
   /**
+   * The shared browser profile the run's commands go to, with every agent granted it (read now), as a Vault login
+   * typed there checks it (ADR 0135, ADR 0110); null in the agent's own browser.
+   */
+  async function vaultProfile(
+    ctx: ToolContext,
+    profile: { id: string; name: string } | null,
+  ): Promise<VaultBrowserProfile | null> {
+    if (!profile) return null;
+    return { name: profile.name, agentIds: await profileGrantees(ctx.db, ctx.orgId, profile.id) };
+  }
+
+  /**
    * Why a Vault login can't be typed in this run, checked before the plan starts (ADR 0135): the Vault on this
-   * server, "See the Vault" for the agent, a computer on protocol 41, and the login shared with this agent for the
-   * person behind the run. Null when it can be: its value is released only at the step that types it.
+   * server, "See the Vault" for the agent, a computer on protocol 41, the login shared with this agent for the
+   * person behind the run, and, in a shared browser profile, a login every agent granted it may hold (never a
+   * personal one). Null when it can be: its value is released only at the step that types it (checked again there).
    */
   async function loginRefusal(
     ctx: ToolContext,
     id: string,
     status: { machineName: string; protocol: number },
+    profile: { id: string; name: string } | null,
   ): Promise<string | null> {
     const vault = deps.vault;
     if (!vault) return "The Vault isn't available on this server: ask the person for the password with request_secret.";
@@ -934,7 +960,9 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     if (status.protocol < VAULT_PROTOCOL) return vaultUpdateText(status.machineName, "type Vault logins");
     try {
       const usable = await listUsableVault(vault, ids(ctx), { kind: "login" });
-      return usable.some((i) => i.id === id && i.kind === "login") ? null : NO_SUCH_LOGIN;
+      if (!usable.some((i) => i.id === id && i.kind === "login")) return NO_SUCH_LOGIN;
+      if (profile) await checkVaultLogin(vault, ids(ctx), id, await vaultProfile(ctx, profile));
+      return null;
     } catch (error) {
       return vaultErrorText(error);
     }
@@ -949,6 +977,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
   async function vaultLogin(
     ctx: ToolContext,
     status: { machineId: string; machineName: string },
+    profile: { id: string; name: string } | null,
     id: string,
     field: string,
     url: string | null,
@@ -959,7 +988,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     const origin = pageOrigin(url);
     let sealed: { box: unknown; keyId: string; rule: string; site: string; title: string };
     try {
-      const released = await releaseVaultLogin(vault, run, id, origin);
+      // The profile's grants are read again here: one given meanwhile counts before the value is read.
+      const released = await releaseVaultLogin(vault, run, id, origin, await vaultProfile(ctx, profile));
       const rule = formatVaultRule(released.rule);
       const agent = scopeOf(ctx.agentId, await getAgentCached(ctx.db, ctx.orgId, ctx.agentId));
       const key = await requestVaultKey(hub, status.machineId, agent, "type Vault logins", ctx.signal);
@@ -1016,7 +1046,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       const login = s.login?.trim();
       if (login) {
         if (logins.has(login)) continue;
-        const refused = await loginRefusal(ctx, login, linked.status);
+        const refused = await loginRefusal(ctx, login, linked.status, linked.profile);
         if (refused) return { content: refused, isError: true };
         logins.add(login);
         continue;
@@ -1041,7 +1071,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         surface: browserSurface({
           link: linked.link,
           secretSite: (name) => sites.get(name) ?? null,
-          vaultLogin: (login, field, url) => vaultLogin(ctx, linked.status, login, field, url),
+          vaultLogin: (login, field, url) => vaultLogin(ctx, linked.status, linked.profile, login, field, url),
           onLook: (o) => seen.remember(key, o),
         }),
         cache: targets,

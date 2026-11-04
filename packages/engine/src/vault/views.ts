@@ -13,7 +13,7 @@ import {
   type VaultViewer,
   viewerManages,
 } from "./access";
-import { openContact } from "./seal";
+import { openContact, sourceOf } from "./seal";
 import {
   VAULT_MAX_ITEMS,
   type VaultConnection,
@@ -56,7 +56,7 @@ export const hasValue = (item: ItemRow) =>
 /** A source's brand name (`1Password`), or its kind when this server doesn't have it any more. */
 export function sourceNameOf(sources: VaultSources, kind: string): string {
   try {
-    return sources[kind]?.describe().name ?? kind;
+    return sourceOf(sources, kind)?.describe().name ?? kind;
   } catch {
     return kind;
   }

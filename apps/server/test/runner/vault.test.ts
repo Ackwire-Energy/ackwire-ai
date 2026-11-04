@@ -13,7 +13,11 @@ import { describeRequest, handleRequest, NEW_WORK_OPS, OP_ROUTES, type RequestSc
 import { agentSecrets, dropStoredSiteSecrets, handleSecret, secretValue } from "../../runner/secrets";
 import {
   ARMED_TTL_MS,
+  FILL_MARK_ATTR,
   fieldRefusalOf,
+  fillMarkSelector,
+  fillUnmarkScript,
+  newFillMark,
   parseExecVault,
   parseTypeVault,
   RunnerVault,
@@ -224,6 +228,9 @@ test("the field's verdict: its frame and every frame around it on the rule's sit
   );
   expect(vaultFieldVerdict(facts({ formMethod: "get" }), exact)).toBe("get_form");
   expect(vaultFieldVerdict(facts({ formMethod: "" }), exact)).toBeNull();
+  // A submit button of the form can send it by GET on its own (formmethod).
+  expect(vaultFieldVerdict(facts({ formMethod: "post", submitGet: true }), exact)).toBe("get_form");
+  expect(vaultFieldVerdict(facts({ formMethod: "", submitGet: false }), exact)).toBeNull();
   // A code's field: text, tel, number or one-time-code.
   const code: VaultFieldWant = { ...exact, field: "code" };
   for (const type of ["text", "tel", "number"]) expect(vaultFieldVerdict(facts({ type }), code)).toBeNull();
@@ -279,6 +286,75 @@ test("the script the page runs answers the frame's origin, or throws the verdict
   ).toBe("wrong_site");
   expect(fieldRefusalOf("Evaluation failed: Error: agentes-vault:get_form")).toBe("get_form");
   expect(fieldRefusalOf("Element not found")).toBeNull();
+});
+
+test("a form a submit button sends by GET is refused; one with no method (a script signs in) isn't", () => {
+  const script = vaultFieldScript(exact);
+  const button = (formmethod: string | null, type: string | null = null, tagName = "BUTTON") => ({
+    tagName,
+    getAttribute: (n: string) => (n === "formmethod" ? formmethod : n === "type" ? type : null),
+  });
+  const field = (controls: unknown[], method: string | null = null) => ({
+    ...input("password"),
+    form: { getAttribute: (n: string) => (n === "method" ? method : null), elements: controls },
+  });
+  const verdict = (active: unknown) => {
+    try {
+      runInPage(script, { active: active as Record<string, unknown>, origin: SHOP });
+      return null;
+    } catch (err) {
+      return fieldRefusalOf(err instanceof Error ? err.message : String(err));
+    }
+  };
+  expect(verdict(field([]))).toBeNull();
+  expect(verdict(field([button(null)]))).toBeNull();
+  expect(verdict(field([button(" GET ")]))).toBe("get_form");
+  expect(verdict(field([button("get", "submit")]))).toBe("get_form");
+  expect(verdict(field([button("get", "image", "INPUT")]))).toBe("get_form");
+  expect(verdict(field([button("post", "submit"), button("get", "submit", "INPUT")], "post"))).toBe("get_form");
+  // Not a submit control: its formmethod does nothing.
+  expect(verdict(field([button("get", "button")]))).toBeNull();
+  expect(verdict(field([button("get", "text", "INPUT")]))).toBeNull();
+});
+
+test("the field the check lets through gets a one-time mark the fill finds it by, taken off after", () => {
+  const mark = newFillMark();
+  expect(mark).toMatch(/^[0-9a-f]{32}$/);
+  expect(newFillMark()).not.toBe(mark);
+  expect(fillMarkSelector(mark)).toBe(`[${FILL_MARK_ATTR}="${mark}"]`);
+  const attrs: Record<string, string> = {};
+  const field = {
+    ...input("password"),
+    setAttribute: (n: string, v: string) => {
+      attrs[n] = v;
+    },
+  };
+  expect(runInPage(vaultFieldScript(exact, mark), { active: field, origin: SHOP })).toBe(SHOP);
+  expect(attrs).toEqual({ [FILL_MARK_ATTR]: mark });
+  // A refused field is never marked.
+  const other: Record<string, string> = {};
+  const text = {
+    ...input("text"),
+    setAttribute: (n: string, v: string) => {
+      other[n] = v;
+    },
+  };
+  expect(() => runInPage(vaultFieldScript(exact, newFillMark()), { active: text, origin: SHOP })).toThrow();
+  expect(other).toEqual({});
+  // Taking it off never throws, whether the field is there or the page moved on.
+  const removed: string[] = [];
+  const unmark = (found: unknown) =>
+    new Function("document", `return ${fillUnmarkScript(mark)}`)({ querySelector: () => found });
+  expect(unmark({ removeAttribute: (n: string) => removed.push(n) })).toBe(true);
+  expect(removed).toEqual([FILL_MARK_ATTR]);
+  expect(unmark(null)).toBe(true);
+  expect(
+    new Function("document", `return ${fillUnmarkScript(mark)}`)({
+      querySelector: () => {
+        throw new Error("Execution context was destroyed");
+      },
+    }),
+  ).toBe(true);
 });
 
 // ── The GET guard ─────────────────────────────────────────────────────────────

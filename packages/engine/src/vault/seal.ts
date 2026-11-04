@@ -7,7 +7,9 @@
 import {
   type VaultConnection as SourceConnection,
   type VaultSecretField,
+  type VaultSource,
   VaultSourceError,
+  type VaultSources,
 } from "@agenteschat/adapters";
 import { openSecret, sealSecret } from "../crypto";
 import type { ConnectionRow, ItemRow } from "./access";
@@ -116,6 +118,14 @@ export async function sourceConnection(
 }
 
 /**
+ * The source of a kind, only when this server has one by that name: a kind comes from a request or a row, so a name
+ * like `constructor` or `__proto__` must find nothing rather than something on the object's prototype (ADR 0135).
+ */
+export function sourceOf(sources: VaultSources, kind: unknown): VaultSource | undefined {
+  return typeof kind === "string" && Object.hasOwn(sources, kind) ? sources[kind] : undefined;
+}
+
+/**
  * A login's password or a key's value, read now: a built-in item's opened, an external one's asked of its source.
  * Null when there is none. A source's failure throws its `VaultSourceError`; a source no longer installed throws one
  * too (`unsupported`).
@@ -126,7 +136,7 @@ export async function readItemValue(
   connection: ConnectionRow | undefined,
 ): Promise<string | null> {
   if (!item.connectionId) return openItemValue(deps, item);
-  const source = connection ? deps.sources[connection.kind] : undefined;
+  const source = connection ? sourceOf(deps.sources, connection.kind) : undefined;
   if (!connection || !source || !item.externalRef)
     throw new VaultSourceError("unsupported", "This source isn't available on this server.");
   const field: VaultSecretField = item.kind === "key" ? "key" : "password";
@@ -135,17 +145,27 @@ export async function readItemValue(
   const opened = await sourceConnection(deps, connection).catch(() => {
     throw new VaultSourceError("auth_failed", "Connect this password manager again.");
   });
-  const value = await sourceCall(() => source.reveal(opened, ref, field));
+  const value = await sourceCall((signal) => source.reveal(opened, ref, field, signal));
   return value === "" ? null : value;
 }
 
 /**
- * A call into a source: its own failures as they are (coded, in our words), anything else as `unreachable` with its
- * text dropped, since a provider's message may carry a token.
+ * The longest one call into a source may take, all its requests and its key derivation included (ADR 0135): past
+ * it the signal aborts, the source stops (or never starts) its work, and the call fails as `unreachable`.
  */
-export async function sourceCall<T>(work: () => Promise<T>): Promise<T> {
+export const VAULT_SOURCE_DEADLINE_MS = 60_000;
+
+/**
+ * A call into a source, with a signal that aborts at the deadline: its own failures as they are (coded, in our
+ * words), anything else as `unreachable` with its text dropped, since a provider's message may carry a token.
+ */
+export async function sourceCall<T>(
+  work: (signal: AbortSignal) => Promise<T>,
+  deadlineMs = VAULT_SOURCE_DEADLINE_MS,
+): Promise<T> {
+  const signal = AbortSignal.timeout(deadlineMs);
   try {
-    return await work();
+    return await work(signal);
   } catch (error) {
     if (error instanceof VaultSourceError) throw error;
     throw new VaultSourceError("unreachable", "Couldn't reach the password manager.");

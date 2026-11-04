@@ -52,7 +52,7 @@ import {
 import { handleRequest, type RequestScope } from "../../runner/handlers";
 import { agentWorkspace } from "../../runner/paths";
 import { handleSecret, secretValue } from "../../runner/secrets";
-import { GET_BLOCKED, runnerVault } from "../../runner/vault";
+import { FILL_MARK_ATTR, GET_BLOCKED, runnerVault, UNGUARDED } from "../../runner/vault";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
@@ -2677,14 +2677,23 @@ test.if(posix)("a Vault login is typed once on its site, checked in the page bet
   const typed = await act("agentes:type_vault", ["e4", SHOP_RULE, box]);
   expect(typed).toEqual({ success: true, data: { typed: "vault", into: "@e4", origin: "https://shop.example.com" } });
   expect(JSON.stringify(typed)).not.toContain(password);
-  // One invocation, the value on stdin only: focus, the check, then the fill, stopping at the first failure.
+  // One invocation, the value on stdin only: focus, the check (which marks the field it let through), the fill by
+  // that one-time mark (never the ref, looked up again), then the mark taken off; it stops at the first failure.
   expect(batchesOf(t)).toHaveLength(1);
   expect(batchesOf(t)[0]?.args).toContain("--bail");
   const commands = JSON.parse(batchesOf(t)[0]?.stdin ?? "[]") as string[][];
-  expect(commands.map((c) => c[0])).toEqual(["focus", "eval", "fill"]);
+  expect(commands.map((c) => c[0])).toEqual(["focus", "eval", "fill", "eval"]);
   expect(commands[0]).toEqual(["focus", "@e4"]);
-  expect(commands[2]).toEqual(["fill", "@e4", password]);
+  const mark = /^\[data-agentes-fill="([0-9a-f]{32})"\]$/.exec(commands[2]?.[1] ?? "")?.[1];
+  expect(mark).toBeDefined();
+  expect(commands[2]).toEqual(["fill", `[${FILL_MARK_ATTR}="${mark}"]`, password]);
+  expect(commands[1]?.[1]).toContain(mark as string);
+  expect(commands[3]?.[1]).toContain(mark as string);
   expect(commands[1]?.[1]).not.toContain(password);
+  // It went into the field the check let through, and the mark came off.
+  const state = JSON.parse(readFileSync(path.join(t.home, "ab-state.json"), "utf8"));
+  expect(state.filled).toEqual([{ ref: "@e4", url: "https://shop.example.com/login" }]);
+  expect(state.marks).toEqual({});
   expect(t.logged().some((c) => c.args.join(" ").includes(password))).toBe(false);
   // Its key went at its first use: the same box again types nothing.
   expect(await act("agentes:type_vault", ["e4", SHOP_RULE, box])).toMatchObject({
@@ -2731,6 +2740,18 @@ test.if(posix)("a Vault login isn't typed off its sites, outside a password fiel
   });
   expect(await type("e3")).toMatchObject({ success: false, code: "not_password_field" });
   expect(await type("e4")).toMatchObject({ success: false, code: "get_form" });
+  // A form without a method (a script signs in) is fine; one whose submit button says formmethod="get" isn't.
+  t.page({ attrs: { "@e4": { type: "password", submitMethod: "get" }, "@e6": { type: "password", method: "" } } });
+  expect(await type("e4")).toMatchObject({ success: false, code: "get_form" });
+  expect(await type("e6")).toMatchObject({ success: true });
+  t.page({
+    attrs: {
+      "@e3": { type: "text" },
+      "@e4": { type: "password", method: "get" },
+      "@e5": { tag: "IFRAME" },
+      "@e6": { type: "password" },
+    },
+  });
   expect(await type("e5")).toMatchObject({
     success: false,
     code: "not_password_field",
@@ -2817,8 +2838,13 @@ test.if(posix)("a code goes one character per field, each field checked where it
     data: { typed: "SHOP_CODE", into: "@e1", fields: refs },
   });
   const commands = JSON.parse(batchesOf(t).at(-1)?.stdin ?? "[]") as string[][];
-  expect(commands.slice(0, 3).map((c) => c[0])).toEqual(["focus", "eval", "fill"]);
-  expect(commands.filter((c) => c[0] === "fill")).toEqual(refs.map((r, i) => ["fill", r, code[i] as string]));
+  expect(commands.slice(0, 4).map((c) => c[0])).toEqual(["focus", "eval", "fill", "eval"]);
+  // Each character into the box its check marked, each mark new.
+  const fills = commands.filter((c) => c[0] === "fill");
+  expect(fills.map((c) => c[2])).toEqual(Array.from(code));
+  expect(new Set(fills.map((c) => c[1])).size).toBe(refs.length);
+  const filled = JSON.parse(readFileSync(path.join(t.home, "ab-state.json"), "utf8")).filled as { ref: string }[];
+  expect(filled.map((f) => f.ref)).toEqual(refs);
   // As many fields as characters, each one once.
   expect(await typeCode(refs.slice(0, 4))).toMatchObject({
     success: false,
@@ -2834,8 +2860,13 @@ test.if(posix)("a code goes one character per field, each field checked where it
   });
 });
 
-test.if(posix)("a request carrying a typed login in its address is stopped; the next action says so", async () => {
+/**
+ * A Chrome whose DevTools socket answers the counter's first command, and `Fetch.enable` as `fetch` says: acknowledged
+ * (noting how many `agent-browser` batches had run by then), never, or by closing.
+ */
+function guardedChrome(fetch: { answer: "reply" | "close" | "never" }) {
   const devtools: FakeSocket[] = [];
+  const acknowledgedAfter: number[] = [];
   const chromes = fakeChromes();
   const t = setup({
     startChrome: async (exe, args, profile) => ({
@@ -2844,6 +2875,17 @@ test.if(posix)("a request carrying a typed login in its address is stopped; the 
     }),
     connectDevtools: (url) => {
       const s = new FakeSocket(url);
+      const send = s.send.bind(s);
+      s.send = (data: string) => {
+        send(data);
+        const m = JSON.parse(data) as { id: number; method: string };
+        if (m.method !== "Fetch.enable" || fetch.answer === "never") return;
+        queueMicrotask(() => {
+          if (fetch.answer === "close") return s.close();
+          acknowledgedAfter.push(batchesOf(t).length);
+          s.push({ id: m.id, result: {} });
+        });
+      };
       devtools.push(s);
       queueMicrotask(() => {
         s.onopen?.();
@@ -2852,17 +2894,32 @@ test.if(posix)("a request carrying a typed login in its address is stopped; the 
       return s;
     },
   });
+  return { t, devtools, acknowledgedAfter };
+}
+
+test.if(posix)("a request carrying a typed login in its address is stopped; the next action says so", async () => {
+  const { t, devtools, acknowledgedAfter } = guardedChrome({ answer: "reply" });
   const password = "hunter2 & the get form";
   const act = (command: string, args: string[]) => t.act(command, args, { agent: keeper });
   await act("open", ["https://shop.example.com/login"]);
   const cdp = devtools[0] as FakeSocket;
   const page = { sessionId: "page-1", targetInfo: { type: "page", targetId: "t1" } };
   cdp.push({ method: "Target.attachedToTarget", params: page });
-  t.page({ attrs: { "@e4": { type: "password" } } });
+  t.page({ attrs: { "@e3": { type: "text" }, "@e4": { type: "password" } } });
   expect(cdp.sent.some((m) => m.method === "Fetch.enable")).toBe(false);
+  const methods = () => cdp.sent.map((m) => m.method).filter((m) => String(m).startsWith("Fetch."));
+  // A refused fill (not a password field) takes its guard back: nothing stays paused.
+  const wrong = await sealLogin(keeper.id, SHOP_RULE, password);
+  expect(await act("agentes:type_vault", ["e3", SHOP_RULE, wrong])).toMatchObject({
+    success: false,
+    code: "not_password_field",
+  });
+  expect(methods()).toEqual(["Fetch.enable", "Fetch.disable"]);
   const box = await sealLogin(keeper.id, SHOP_RULE, password);
   expect(await act("agentes:type_vault", ["e4", SHOP_RULE, box])).toMatchObject({ success: true });
-  // Armed: every request of that Chrome pauses until the runner looks at its address.
+  // Armed before the fill: Chrome acknowledged Fetch.enable on the page before any batch typed (each time).
+  expect(methods()).toEqual(["Fetch.enable", "Fetch.disable", "Fetch.enable"]);
+  expect(acknowledgedAfter).toEqual([batchesOf(t).length - 2, batchesOf(t).length - 1]);
   expect(cdp.sent).toContainEqual(expect.objectContaining({ method: "Fetch.enable", sessionId: "page-1" }));
   const paused = (requestId: string, url: string) =>
     cdp.push({ method: "Fetch.requestPaused", sessionId: "page-1", params: { requestId, request: { url } } });
@@ -2883,3 +2940,37 @@ test.if(posix)("a request carrying a typed login in its address is stopped; the 
   expect(await act("click", ["@e1"])).toMatchObject({ success: false, code: "get_blocked", error: GET_BLOCKED });
   expect(await act("click", ["@e1"])).toMatchObject({ success: true });
 });
+
+test.if(posix)("a login isn't typed when Chrome doesn't confirm the guard first", async () => {
+  const { t, devtools } = guardedChrome({ answer: "close" });
+  const act = (command: string, args: string[]) => t.act(command, args, { agent: keeper });
+  await act("open", ["https://shop.example.com/login"]);
+  const cdp = devtools[0] as FakeSocket;
+  cdp.push({ method: "Target.attachedToTarget", params: { sessionId: "page-1", targetInfo: { type: "page" } } });
+  t.page({ attrs: { "@e4": { type: "password" } } });
+  const box = await sealLogin(keeper.id, SHOP_RULE, "hunter2-unconfirmed guard");
+  expect(await act("agentes:type_vault", ["e4", SHOP_RULE, box])).toMatchObject({
+    success: false,
+    code: "unguarded",
+    error: UNGUARDED,
+  });
+  // Nothing reached the page.
+  expect(batchesOf(t)).toHaveLength(0);
+});
+
+test.if(posix)(
+  "a page that moves on between the check and the fill gets nothing: the fill finds no marked field",
+  async () => {
+    const t = setup();
+    const act = (command: string, args: string[]) => t.act(command, args, { agent: keeper });
+    await act("open", ["https://shop.example.com/login"]);
+    t.page({ attrs: { "@e4": { type: "password" } }, navigateAfterCheck: "https://evil.test/login" });
+    const password = "hunter2-moved-page";
+    const out = await act("agentes:type_vault", ["e4", SHOP_RULE, await sealLogin(keeper.id, SHOP_RULE, password)]);
+    expect(out).toMatchObject({ success: false });
+    expect(JSON.stringify(out)).not.toContain(password);
+    const state = JSON.parse(readFileSync(path.join(t.home, "ab-state.json"), "utf8"));
+    expect(state.url).toBe("https://evil.test/login");
+    expect(state.filled ?? []).toEqual([]);
+  },
+);

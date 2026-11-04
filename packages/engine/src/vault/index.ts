@@ -4,12 +4,14 @@
  */
 export { type VaultRunPerson, type VaultViewer, vaultPersonOfRun } from "./access";
 export {
+  checkVaultLogin,
   deleteVaultItemByAgent,
   listUsableVault,
   releaseVaultKeys,
   releaseVaultLogin,
   saveVaultItemByAgent,
   VAULT_MAX_KEYS,
+  type VaultBrowserProfile,
 } from "./agents";
 export { connectVaultSource, deleteVaultConnection, syncVaultConnection, updateVaultConnection } from "./connections";
 export { importVaultCsv } from "./csv";

@@ -9,9 +9,14 @@
  * - The user key lives in memory, per connection, for 10 minutes at most (then the account is opened again).
  * - JSON from Bitwarden and from Vaultwarden differ in casing (`Name` / `name`): every field is read either way.
  * - Every network call has a 15 s timeout. A 401 on a kept session signs in again once; nothing else retries.
+ * - The server's address is typed by a person: the server passes a `fetch` that connects only to public addresses
+ *   (`publicHttpsFetch`), and an address it refuses comes back as `invalid_input`.
+ * - Key derivations (Argon2id is pure JS, in the server's memory) run one at a time per workspace and two at most
+ *   across the process, so one workspace's account can't hold everyone else's up.
  */
 import { hmac } from "@noble/hashes/hmac.js";
 import { sha256 } from "@noble/hashes/sha2.js";
+import { OutboundAddressError } from "../outbound-url";
 import { readCapped } from "../read-capped";
 import {
   BitwardenCryptoError,
@@ -37,7 +42,10 @@ import {
 export const BITWARDEN_SOURCE_KIND = "bitwarden";
 
 export interface BitwardenSourceOptions {
-  /** How the server reaches Bitwarden (tests pass a fake). */
+  /**
+   * How the server reaches Bitwarden: the server passes one that connects only to public addresses
+   * (`publicHttpsFetch`, ADR 0135); tests pass a fake. An `OutboundAddressError` it throws is `invalid_input`.
+   */
   fetch?: typeof fetch;
   /** The clock for the key's lifetime and `retryAt` (tests pass a fake). */
   now?: () => number;
@@ -84,6 +92,8 @@ const MESSAGES = {
   folderMissing: "There's no folder with this name in the account.",
   notFound: "This login is no longer in the folder.",
   rateLimited: "Bitwarden asked us to wait before trying again.",
+  privateServer:
+    "This server's address is on a private or internal network, which this server doesn't connect to. Use its public HTTPS address.",
   unreachable: "Couldn't reach the Bitwarden server.",
   timeout: "The Bitwarden server took too long to answer.",
   cancelled: "The request was cancelled.",
@@ -240,7 +250,9 @@ async function send(http: Http, url: string, init: RequestInit, maxBytes: number
   try {
     // A redirect could carry the API key's secret to another host: Bitwarden's endpoints never redirect.
     res = await http.fetch(url, { ...init, signal: combined, redirect: "error" });
-  } catch {
+  } catch (err) {
+    // The guarded fetch refused the host (private, loopback, link-local, internal): what the person typed is wrong.
+    if (err instanceof OutboundAddressError) throw fail("invalid_input", MESSAGES.privateServer);
     throw failure();
   }
   let bytes: Uint8Array | null;
@@ -373,21 +385,64 @@ async function profileEmail(http: Http, apiUrl: string, accessToken: string, sig
   return email;
 }
 
-/** One key derivation at a time per source: Argon2id takes tens of MiB of memory and seconds of CPU. */
-function serialQueue() {
-  let tail: Promise<unknown> = Promise.resolve();
-  return <T>(work: () => Promise<T>): Promise<T> => {
-    const run = tail.then(work, work);
-    tail = run.catch(() => undefined);
-    return run;
+/** Key derivations running at once across the process: each Argon2id one holds up to 128 MiB (ADR 0135). */
+const MAX_DERIVATIONS = 2;
+
+/** Runs heavy work in a queue of its own, or stops waiting for it when the caller's signal aborts. */
+export type DerivationQueue = <T>(orgId: string, work: () => Promise<T>, signal?: AbortSignal) => Promise<T>;
+
+/**
+ * Key derivations (ADR 0135): one at a time per workspace, `MAX_DERIVATIONS` at most across the process. A workspace
+ * whose account asks for the heaviest settings waits on itself and takes one slot at most, so the others go on.
+ * Work whose caller gave up before its turn (`signal` aborted) never starts.
+ */
+export function derivationQueue(slots = MAX_DERIVATIONS): DerivationQueue {
+  const tails = new Map<string, Promise<unknown>>();
+  let running = 0;
+  const waiting: (() => void)[] = [];
+  const slot = async () => {
+    if (running < slots) {
+      running++;
+      return;
+    }
+    // Handed over by the one that ends (`running` stays counted for it).
+    await new Promise<void>((resolve) => waiting.push(resolve));
+  };
+  const release = () => {
+    const next = waiting.shift();
+    if (next) next();
+    else running--;
+  };
+  return <T>(orgId: string, work: () => Promise<T>, signal?: AbortSignal): Promise<T> => {
+    const turn = async () => {
+      if (signal?.aborted) throw fail("unreachable", MESSAGES.cancelled);
+      await slot();
+      try {
+        if (signal?.aborted) throw fail("unreachable", MESSAGES.cancelled);
+        return await work();
+      } finally {
+        release();
+      }
+    };
+    const previous = tails.get(orgId) ?? Promise.resolve();
+    const run = previous.then(turn, turn);
+    const tail = run.catch(() => undefined);
+    tails.set(orgId, tail);
+    // The workspace's queue is forgotten once nothing waits in it.
+    void tail.then(() => {
+      if (tails.get(orgId) === tail) tails.delete(orgId);
+    });
+    return untilAborted(run, signal);
   };
 }
 
 async function openUserKey(
-  serial: <T>(work: () => Promise<T>) => Promise<T>,
+  queue: DerivationQueue,
+  orgId: string,
   token: Token,
   email: string,
   masterPassword: string,
+  signal?: AbortSignal,
 ): Promise<SymmetricKey> {
   const protectedKey = token.protectedUserKey;
   const kdf = token.kdf;
@@ -395,7 +450,7 @@ async function openUserKey(
   if (!kdf) throw fail("unsupported", MESSAGES.kdf);
   let masterKey: Uint8Array;
   try {
-    masterKey = await serial(() => deriveMasterKey(masterPassword, email, kdf));
+    masterKey = await queue(orgId, () => deriveMasterKey(masterPassword, email, kdf), signal);
   } catch (err) {
     if (err instanceof BitwardenCryptoError) throw fail("unsupported", MESSAGES.kdf);
     throw err;
@@ -575,7 +630,7 @@ export function createBitwardenSource(options: BitwardenSourceOptions = {}): Vau
     now: options.now ?? Date.now,
     timeoutMs: options.timeoutMs ?? TIMEOUT_MS,
   };
-  const serial = serialQueue();
+  const queue = derivationQueue();
   const sessions = new Map<string, Session>();
   const opening = new Map<string, Promise<Session>>();
   /** Keys a session to what opened it, so changed settings or credentials never reuse an old key. */
@@ -603,12 +658,17 @@ export function createBitwardenSource(options: BitwardenSourceOptions = {}): Vau
     sessions.delete(connectionId);
   };
 
-  async function openSession(connectionId: string, settings: ConnectionSettings, print: string): Promise<Session> {
+  async function openSession(
+    connection: VaultConnection,
+    settings: ConnectionSettings,
+    print: string,
+  ): Promise<Session> {
+    const connectionId = connection.id;
     // Not bound to one caller's signal: a session may serve several calls. Each request has its own timeout.
     const token = await requestToken(http, settings.endpoints, settings.credentials, settings.deviceId);
     // Read each time the account is opened: the email is the key derivation's salt and may have changed.
     const email = await profileEmail(http, settings.endpoints.apiUrl, token.accessToken);
-    const userKey = await openUserKey(serial, token, email, settings.credentials.masterPassword);
+    const userKey = await openUserKey(queue, connection.orgId, token, email, settings.credentials.masterPassword);
     const expiresAt = Math.min(http.now() + KEY_TTL_MS, token.expiresAt - TOKEN_MARGIN_MS);
     const lifetime = Math.max(0, Math.min(KEY_TTL_MS, expiresAt - http.now()));
     const session: Session = {
@@ -631,7 +691,7 @@ export function createBitwardenSource(options: BitwardenSourceOptions = {}): Vau
     if (kept) forget(connection.id, kept);
     let pending = opening.get(connection.id);
     if (!pending) {
-      pending = openSession(connection.id, settings, print).finally(() => opening.delete(connection.id));
+      pending = openSession(connection, settings, print).finally(() => opening.delete(connection.id));
       opening.set(connection.id, pending);
     }
     const session = await untilAborted(pending, signal);
@@ -674,7 +734,7 @@ export function createBitwardenSource(options: BitwardenSourceOptions = {}): Vau
 
     describe: () => structuredClone(DESCRIPTOR),
 
-    async connect(input, signal): Promise<VaultConnectResult> {
+    async connect(input, signal, context): Promise<VaultConnectResult> {
       const server = (input.server ?? "bitwarden.com").trim();
       let endpoints: Endpoints;
       if (server === "self") {
@@ -693,7 +753,9 @@ export function createBitwardenSource(options: BitwardenSourceOptions = {}): Vau
 
       const token = await requestToken(http, endpoints, credentials, deviceId, signal);
       const email = await profileEmail(http, endpoints.apiUrl, token.accessToken, signal);
-      const userKey = await untilAborted(openUserKey(serial, token, email, credentials.masterPassword), signal);
+      // Queued with the workspace's other derivations; without one named (a module's own call), in a queue of its own.
+      const orgId = context?.orgId ?? `connect:${deviceId}`;
+      const userKey = await openUserKey(queue, orgId, token, email, credentials.masterPassword, signal);
       const sync = await apiGet(http, `${endpoints.apiUrl}/sync?excludeDomains=true`, token.accessToken, {
         maxBytes: MAX_SYNC_BYTES,
         signal,

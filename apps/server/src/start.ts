@@ -60,6 +60,7 @@ import {
   isAgentesCloud,
   isBlockedAddress,
   meterComposio,
+  publicHttpsFetch,
   resolveHostDns,
   retireHostTokens,
   retireMillionSendMailboxes,
@@ -229,9 +230,13 @@ async function boot(
         : null,
     // GIFs in chat (ADR 0091), only with a key: without one nothing reaches GIPHY and the app shows no GIFs.
     gifs: gifProvider(config, () => gifKey?.key() ?? null),
-    // The Vault's external sources (ADR 0135): nothing reaches them until a person connects one.
+    // The Vault's external sources (ADR 0135): nothing reaches them until a person connects one. A self-hosted
+    // Bitwarden's address is typed by a person, so its requests go only to public addresses, pinned at connect time.
     vaultSources: Object.fromEntries(
-      [createOnePasswordSource(), createBitwardenSource()].map((source) => [source.kind, source]),
+      [createOnePasswordSource(), createBitwardenSource({ fetch: publicHttpsFetch() })].map((source) => [
+        source.kind,
+        source,
+      ]),
     ),
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });

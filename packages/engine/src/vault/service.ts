@@ -248,8 +248,8 @@ export interface VaultItemForAgent {
 
 /**
  * What an agent may change (`vault_save`): without `itemId`, a new contact (personal to the person behind the run);
- * with one, an item it may use: a contact's title and fields, a login's username, any item's description. Built-in
- * items only.
+ * with one, an item it may use: a contact's title and fields, a login's username, any item's description (a team
+ * item only when the person behind the run manages credentials). Built-in items only.
  */
 export interface VaultAgentChange {
   itemId?: string;

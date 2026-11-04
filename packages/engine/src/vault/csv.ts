@@ -35,9 +35,10 @@ const unrecognized = () =>
 
 /**
  * RFC 4180: fields split by commas, quoted fields with commas, line breaks and doubled quotes inside, CRLF or LF
- * between rows, a byte order mark at the start. Blank lines are left out.
+ * between rows, a byte order mark at the start. Blank lines are left out. It stops once it holds `maxRows` rows (the
+ * header counts), so a file over the import's cap is never parsed whole (ADR 0135): the caller sees one row too many.
  */
-export function parseVaultCsv(text: string): string[][] {
+export function parseVaultCsv(text: string, maxRows = Number.POSITIVE_INFINITY): string[][] {
   const src = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   const rows: string[][] = [];
   let row: string[] = [];
@@ -51,7 +52,7 @@ export function parseVaultCsv(text: string): string[][] {
     field = "";
     started = false;
   };
-  for (let i = 0; i < src.length; i++) {
+  for (let i = 0; i < src.length && rows.length < maxRows; i++) {
     const c = src[i] as string;
     if (quoted) {
       if (c !== '"') field += c;
@@ -76,6 +77,7 @@ export function parseVaultCsv(text: string): string[][] {
       started = true;
     }
   }
+  if (rows.length >= maxRows) return rows.slice(0, maxRows);
   if (quoted) throw unrecognized();
   if (started || field !== "" || row.length > 0) endRow();
   return rows;
@@ -187,7 +189,8 @@ export async function importVaultCsv(
   const ownerUserId = scope === "personal" ? userId : null;
   if (typeof input.csv !== "string" || new TextEncoder().encode(input.csv).byteLength > VAULT_LIMITS.csvBytes)
     throw new ValidationError("The file is too large (max 2 MB)", "vault.csv_too_large", { maxMb: 2 });
-  const rows = parseVaultCsv(input.csv);
+  // The header, the most rows an import takes, and one more to tell a file over the cap.
+  const rows = parseVaultCsv(input.csv, VAULT_LIMITS.csvRows + 2);
   const [header, ...body] = rows;
   const layout = header ? csvLayout(header) : null;
   if (!layout) throw unrecognized();

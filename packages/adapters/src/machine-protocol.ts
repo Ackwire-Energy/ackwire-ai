@@ -492,6 +492,11 @@ export const VAULT_TYPE_REFUSALS = [
    * answer of the action that was going on says so.
    */
   "get_blocked",
+  /**
+   * Before a password: the guard that stops it leaving in an address wasn't confirmed by Chrome in time, so nothing
+   * was typed (the guard is armed, and acknowledged, before every fill).
+   */
+  "unguarded",
 ] as const;
 export type VaultTypeRefusal = (typeof VAULT_TYPE_REFUSALS)[number];
 /** Keys one `exec` may carry (`ExecVault`). */

@@ -155,21 +155,65 @@ async function valueForRun(deps: VaultDeps, item: ItemRow, connection: Connectio
 }
 
 /**
+ * A shared browser profile a login would be typed in (ADR 0110): its name and every agent granted it, this one
+ * included. A session it signs in to there is every one of those agents'.
+ */
+export interface VaultBrowserProfile {
+  name: string;
+  agentIds: readonly string[];
+}
+
+/**
+ * Whether a login may be typed in a shared browser profile (ADR 0135 §2, ADR 0110): the session it opens stays in
+ * the profile for every agent granted it, so a personal login never is, and a team login only when it is shared with
+ * all agents or with each agent the profile is granted to.
+ */
+function assertProfileMay(item: ItemRow, connection: ConnectionRow | undefined, profile: VaultBrowserProfile) {
+  if (item.ownerUserId) {
+    throw refuse.notAllowed(
+      `"${item.title}" is a personal login, and your browser now is the shared profile "${profile.name}": every agent granted that profile would be signed in as its owner. Switch to your own browser (browser_profile with "own") to sign in with it.`,
+    );
+  }
+  const columns = effectiveColumns(item, connection);
+  if (columns.allAgents || profile.agentIds.every((id) => columns.agentIds.includes(id))) return;
+  throw refuse.notAllowed(
+    `"${item.title}" isn't shared with every agent that uses the browser profile "${profile.name}", so it isn't typed there: they would all be signed in with it. Switch to your own browser (browser_profile with "own"), or ask a person who manages the login to share it with all of them in Settings, Vault.`,
+  );
+}
+
+/** A login the run may type, checked before anything runs (the shared profile too); its value isn't read. */
+export async function checkVaultLogin(
+  deps: VaultDeps,
+  run: VaultRun,
+  itemId: string,
+  profile: VaultBrowserProfile | null,
+): Promise<void> {
+  const person = await vaultPersonOfRun(deps.db, run);
+  const { item, connection } = await itemForRun(deps, run, person, itemId, "login");
+  if (item.kind !== "login")
+    throw refuse.notAllowed(`"${item.title}" is a ${item.kind}, not a login. Use a login's id from vault_list.`);
+  if (profile) assertProfileMay(item, connection, profile);
+}
+
+/**
  * A login's password and the rule of where it may be typed, for the tool that seals it for the agent's computer
  * (which checks the rule again against the field's own frame when it types). With `pageOrigin` (the page the agent
- * is on), a page the rule doesn't allow is refused before the value is read. The use is recorded by the caller once
- * the computer typed it (`recordVaultUse`).
+ * is on), a page the rule doesn't allow is refused before the value is read; with `profile` (the run's browser is a
+ * shared profile), so is a login that profile may not hold. The use is recorded by the caller once the computer
+ * typed it (`recordVaultUse`).
  */
 export async function releaseVaultLogin(
   deps: VaultDeps,
   run: VaultRun,
   itemId: string,
   pageOrigin: string | null,
+  profile: VaultBrowserProfile | null = null,
 ): Promise<VaultReleasedLogin> {
   const person = await vaultPersonOfRun(deps.db, run);
   const { item, connection, source } = await itemForRun(deps, run, person, itemId, "login");
   if (item.kind !== "login")
     throw refuse.notAllowed(`"${item.title}" is a ${item.kind}, not a login. Use a login's id from vault_list.`);
+  if (profile) assertProfileMay(item, connection, profile);
   const rule = item.website ? vaultRule(item.website, item.match === "site" ? "site" : "exact") : null;
   if (!rule) throw refuse.noWebsite();
   if (pageOrigin && !vaultRuleMatches(rule, pageOrigin))
@@ -255,8 +299,9 @@ function auditByAgent(
 
 /**
  * An agent's change (`vault_save`): a new contact, personal to the person behind the run (none behind it: refused),
- * or, on an item it may use, a contact's title and fields, a login's username or any item's description. Only
- * built-in items: an external one changes in its source.
+ * or, on an item it may use, a contact's title and fields, a login's username or any item's description. A personal
+ * item changes for its owner (only their runs see it); a team item only for someone who manages credentials, as in
+ * the app (ADR 0135 §2). Only built-in items: an external one changes in its source.
  */
 export async function saveVaultItemByAgent(
   deps: VaultDeps,
@@ -269,6 +314,11 @@ export async function saveVaultItemByAgent(
 
   const { item, source } = await itemForRun(deps, run, person, change.itemId, "item");
   if (item.connectionId) throw refuse.notAllowed(`"${item.title}" comes from ${source}. It changes there, not here.`);
+  if (!item.ownerUserId && !(person.personId && person.manages)) {
+    throw refuse.notAllowed(
+      `"${item.title}" is the team's: only someone who manages credentials changes it, and nobody behind this request does. Ask one of them, or a person can change it in Settings, Vault.`,
+    );
+  }
   const kind = item.kind as VaultItemKind;
   const set: Partial<typeof vaultItems.$inferInsert> = {};
   const fields: string[] = [];
@@ -364,8 +414,8 @@ async function createContact(
 }
 
 /**
- * An agent deletes an item it may use (`vault_delete`): one it created, or one the person behind the run manages
- * (their own personal item, or a team one when they manage credentials). Only built-in items.
+ * An agent deletes an item it may use (`vault_delete`), only one it saved itself (ADR 0135 §2): anything people saved,
+ * personal or the team's, is deleted by people in the app, where they see what goes. Only built-in items.
  */
 export async function deleteVaultItemByAgent(
   deps: VaultDeps,
@@ -375,9 +425,11 @@ export async function deleteVaultItemByAgent(
   const person = await vaultPersonOfRun(deps.db, run);
   const { item, source } = await itemForRun(deps, run, person, itemId, "item");
   if (item.connectionId) throw refuse.notAllowed(`"${item.title}" comes from ${source}. It goes from there, not here.`);
-  const manages = item.ownerUserId ? item.ownerUserId === person.personId : person.manages;
-  if (item.createdByAgentId !== run.agentId && !manages)
-    throw refuse.notAllowed(`Only someone who manages "${item.title}" can delete it, in Settings, Vault.`);
+  if (item.createdByAgentId !== run.agentId) {
+    throw refuse.notAllowed(
+      `You didn't save "${item.title}", so you can't delete it. Someone who manages it can, in Settings, Vault.`,
+    );
+  }
   const contact = item.kind === "contact" ? await contactOf(deps, item) : null;
   await deps.db.transaction(async (tx) => {
     await tx.delete(vaultItems).where(and(eq(vaultItems.orgId, run.orgId), eq(vaultItems.id, item.id)));

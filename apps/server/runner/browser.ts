@@ -45,12 +45,16 @@ import {
   FIELD_REFUSAL_MARK,
   fieldRefusalOf,
   fieldWant,
+  fillMarkSelector,
+  fillUnmarkScript,
   GET_BLOCKED,
   GET_GUARD_MS,
+  newFillMark,
   parseSecretRefs,
   parseTypeVault,
   type RunnerVault,
   runnerVault,
+  UNGUARDED,
   type VaultFieldVerdict,
   type VaultFieldWant,
   VaultOpening,
@@ -312,6 +316,11 @@ const withSetup = (setup: BrowserSetup) => (Object.keys(setup).length > 0 ? { se
 
 /** A Vault refusal (ADR 0135): its `code` (`VAULT_TYPE_REFUSALS`) and a plain reason, never a value. */
 const refused = (code: VaultTypeRefusal, error: string): BrowserAnswer => ({ success: false, data: null, code, error });
+/** No guard to take back: a code, or a Chrome with no DevTools socket of ours (ADR 0135). */
+const NO_GUARD = { release: () => {} };
+/** The commands `fillChecked` sends per field: focus, check and mark, fill by the mark, unmark; the fill's place. */
+const FILL_STEPS = 4;
+const FILL_AT = 2;
 /** How a typed login's password shows where redacted (`[secret:VAULT_PASSWORD]`). */
 const VAULT_PASSWORD = "VAULT_PASSWORD";
 
@@ -2646,6 +2655,11 @@ export class BrowserManager {
         error: `${ref} isn't a password or one-time-code field; secrets are only typed into those`,
       };
     }
+    // A password (not a one-time code) is guarded from leaving in an address, armed before it is typed (ADR 0135).
+    const password = type === "password" || /\b(current-password|new-password)\b/.test(autocomplete);
+    const guard = password ? await this.guardBeforeTyping(session, value) : NO_GUARD;
+    if (!guard) return refused("unguarded", UNGUARDED);
+    this.typed(session, actor, name, value);
     const out = await this.run(session, ["batch", "--bail"], {
       timeoutMs,
       stdin: JSON.stringify([["fill", ref, value]]),
@@ -2655,10 +2669,10 @@ export class BrowserManager {
     const ok = first ? first.success === true : out.success;
     const error = first && typeof first.error === "string" ? first.error : out.error;
     const clean = (s: string) => s.split(value).join("[secret]");
-    if (!ok) return { success: false, data: null, error: clean(error ?? "Couldn't type the secret") };
-    // A password (not a one-time code) is guarded from leaving in an address (ADR 0135).
-    const password = type === "password" || /\b(current-password|new-password)\b/.test(autocomplete);
-    this.typed(session, actor, name, value, password);
+    if (!ok) {
+      guard.release();
+      return { success: false, data: null, error: clean(error ?? "Couldn't type the secret") };
+    }
     return { success: true, data: { typed: name, into: ref } };
   }
 
@@ -2685,6 +2699,8 @@ export class BrowserManager {
         error: `${name} doesn't have one character for each of the ${refs.length} fields given; it wasn't typed`,
       };
     }
+    // Redacted from what the browser answers from before it is typed (a code isn't guarded from addresses).
+    this.typed(session, actor, name, value);
     const result = await this.fillChecked(
       session,
       refs.map((ref, i) => ({ ref, text: chars[i] as string })),
@@ -2718,17 +2734,18 @@ export class BrowserManager {
           return { success: false, data: null, error: `Couldn't type the code into ${at}` };
       }
     }
-    this.typed(session, actor, name, value, false);
     return { success: true, data: { typed: name, into: refs[0], fields: refs } };
   }
 
   /**
    * `agentes:type_vault [ref, rule, boxJson]` (protocol 41, ADR 0135): a Vault login's password, sealed to one of
    * `actor`'s one-use keys for this rule, typed into a password field on a page the rule allows. The page's own
-   * address (`get url`, from the browser, not the page) must match the rule; then, in one invocation, the field is
-   * focused, checked in the page (`vaultFieldScript`: the frame that owns it and every frame around it on the rule's
-   * sites, a password field, no form sent with `get`) and filled. Refusals answer a `code` and a plain reason; the
-   * value never comes back, and a request that would carry it in its address is stopped for a while (`typed`).
+   * address (`get url`, from the browser, not the page) must match the rule; the guard that stops a request carrying
+   * the password in its address is armed, and acknowledged by Chrome, before anything is typed
+   * (`guardBeforeTyping`); then, in one invocation, the field is focused, checked in the page (`vaultFieldScript`:
+   * the frame that owns it and every frame around it on the rule's sites, a password field, no form or submit button
+   * sending with `get`) and filled (`fillChecked`). Refusals answer a `code` and a plain reason; the value never comes
+   * back, and a refused fill takes the guard back.
    */
   private async typeVault(
     actor: AgentScope,
@@ -2763,8 +2780,11 @@ export class BrowserManager {
       throw err;
     }
     const want = fieldWant(rule, top, "password");
+    const guard = await this.guardBeforeTyping(session, value);
+    if (!guard) return refused("unguarded", UNGUARDED);
     const result = await this.fillChecked(session, [{ ref, text: value }], want, timeoutMs, signal);
     if (!result.ok) {
+      guard.release();
       switch (result.verdict) {
         case "wrong_site":
           return refused(
@@ -2788,14 +2808,17 @@ export class BrowserManager {
           return { success: false, data: null, error: result.error.split(value).join("[secret]") };
       }
     }
-    this.typed(session, actor, VAULT_PASSWORD, value, true);
+    this.typed(session, actor, VAULT_PASSWORD, value);
     return { success: true, data: { typed: "vault", into: ref, origin: top } };
   }
 
   /**
    * Types `fields` (a ref and its text each) in ONE `agent-browser` invocation (ADR 0135): each field is focused,
-   * checked in the page and only then filled, `--bail` stopping at the first check that throws, before its fill.
-   * The texts go on stdin and never come back; a failure says which field and, for a check, its verdict.
+   * checked in the page and marked there with a one-time attribute (`vaultFieldScript`), then filled by that mark,
+   * not by its ref (which `fill` would look up again: a page that navigated meanwhile, or a ref now pointing
+   * elsewhere, has no element with the mark, so nothing is typed), and the mark is taken off. `--bail` stops at the
+   * first check that throws, before its fill. The texts go on stdin and never come back; a failure says which field
+   * and, for a check, its verdict.
    */
   private async fillChecked(
     session: Session,
@@ -2804,12 +2827,15 @@ export class BrowserManager {
     timeoutMs: number,
     signal?: AbortSignal,
   ): Promise<{ ok: true } | { ok: false; verdict: VaultFieldVerdict | null; error: string; ref: string | null }> {
-    const script = vaultFieldScript(want);
-    const commands = fields.flatMap((f) => [
-      ["focus", f.ref],
-      ["eval", script],
-      ["fill", f.ref, f.text],
-    ]);
+    const commands = fields.flatMap((f) => {
+      const mark = newFillMark();
+      return [
+        ["focus", f.ref],
+        ["eval", vaultFieldScript(want, mark)],
+        ["fill", fillMarkSelector(mark), f.text],
+        ["eval", fillUnmarkScript(mark)],
+      ];
+    });
     const out = await this.run(session, ["batch", "--bail"], {
       timeoutMs,
       stdin: JSON.stringify(commands),
@@ -2821,8 +2847,12 @@ export class BrowserManager {
       : isRecord(out.data) && Array.isArray(out.data.results)
         ? out.data.results
         : null;
-    const failed = results ? results.findIndex((r) => !isRecord(r) || r.success !== true) : -1;
-    if (results ? failed < 0 && results.length === commands.length : out.success) return { ok: true };
+    const done = (r: unknown) => isRecord(r) && r.success === true;
+    // Typed once every fill went through. Taking the mark off never decides it: a page may move on the moment its
+    // field changes (a sign-in that sends itself), and the mark goes with the page then.
+    const filled = results ? results.filter((r, i) => i % FILL_STEPS === FILL_AT && done(r)).length : 0;
+    if (results ? filled === fields.length : out.success) return { ok: true };
+    const failed = results ? results.findIndex((r, i) => i % FILL_STEPS !== FILL_STEPS - 1 && !done(r)) : -1;
     const at = failed >= 0 ? failed : results ? results.length : 0;
     const entry = results && failed >= 0 ? results[failed] : null;
     const said = isRecord(entry) && typeof entry.error === "string" ? entry.error : (out.error ?? "");
@@ -2831,22 +2861,35 @@ export class BrowserManager {
       ok: false,
       verdict,
       error: (said || "Couldn't type it").slice(0, 2000),
-      ref: fields[Math.floor(at / 3)]?.ref ?? null,
+      ref: fields[Math.floor(at / FILL_STEPS)]?.ref ?? null,
     };
   }
 
   /**
-   * A value just typed (ADR 0135): redacted from what this agent's browser (and a profile's session) sends back for
-   * 10 minutes, and, for a password, its Chrome stops any request that would carry it in an address for 2 minutes
-   * (`GET_BLOCKED`, told at the next action's answer).
+   * A value typed, or about to be (ADR 0135): redacted from what this agent's browser (and a profile's session)
+   * sends back for 10 minutes.
    */
-  private typed(session: Session, actor: AgentScope, name: string, value: string, guard: boolean) {
+  private typed(session: Session, actor: AgentScope, name: string, value: string) {
     for (const id of new Set([String(actor.id ?? ""), session.agentId])) this.vault.arm(id, name, value);
-    const counter = guard && session.chrome ? this.counters.get(session.chrome) : undefined;
-    counter?.guard([value], GET_GUARD_MS, () => {
+  }
+
+  /**
+   * Before a password is typed (ADR 0135): its Chrome stops, for 2 minutes, any request that would carry it in an
+   * address (`GET_BLOCKED`, told at the next action's answer). Armed and acknowledged by Chrome on every session
+   * before the fill, so a page that sends the form the moment the field changes can't get the password out in
+   * between. Null when Chrome didn't confirm it: then nothing is typed. A Chrome the runner has no DevTools socket to
+   * (no traffic counter) has no guard, as before; the caller releases it when the fill is refused.
+   */
+  private async guardBeforeTyping(session: Session, value: string): Promise<{ release(): void } | null> {
+    const counter = session.chrome ? this.counters.get(session.chrome) : undefined;
+    if (!counter) return NO_GUARD;
+    const guard = counter.guard([value], GET_GUARD_MS, () => {
       session.guardBlocked = true;
       this.opts.log(`the browser of ${session.name} stopped a page sending a typed password in an address`);
     });
+    if (await guard.ready) return guard;
+    guard.release();
+    return null;
   }
 
   /** The GET guard stopped a request since the agent last heard: its next action's answer says so, once. */

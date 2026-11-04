@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { type ExecVault, VAULT_EXEC_KEYS, type VaultTypeRefusal } from "@agenteschat/adapters/machine-protocol";
 import {
   generateSecretKeyPair,
@@ -353,6 +353,8 @@ export interface VaultFieldFacts {
   autocomplete: string;
   /** Its form's `method` attribute (lowercase), "" without one. */
   formMethod: string;
+  /** A submit control of its form (inside it or naming it) says `formmethod="get"`: that button sends by GET. */
+  submitGet?: boolean;
   /** `location.origin` of the frame the field is in. */
   origin: string;
   /** `location.ancestorOrigins`, the parent's first. */
@@ -375,11 +377,16 @@ export interface VaultFieldWant {
 export type VaultFieldVerdict = "wrong_site" | "in_frame" | "not_password_field" | "not_code_field" | "get_form";
 
 /**
- * Whether a field may get the value (null) or why not. It runs in the page (`vaultFieldScript` sends its source),
- * so it uses only operators, index reads and loops: the page's own scripts can patch any built-in method, never
- * these, and `location.origin`, `ancestorOrigins` and `top` can't be faked. The runner already matched the page's
- * origin against the rule with the public suffix list; a frame is matched here by its host under the rule's
- * domain, and the frame tree's top must be that page.
+ * Whether a field may get the value (null) or why not (ADR 0135). It runs in the page (`vaultFieldScript` sends its
+ * source), where the page's own scripts run too and can patch any DOM method or accessor the script reads
+ * (`activeElement`, a field's `type` and `form`, `getAttribute`). What they can't fake is `location` (its `origin`
+ * and `ancestorOrigins`), `window` and `top`, which the platform makes unforgeable. So what this guarantees is where
+ * the value goes: into a frame whose origin, and every origin around it, the rule allows, the outermost being the
+ * page the runner checked. The field checks (a password field, no form or submit button that sends by GET) catch a
+ * wrong field or a GET form on an honest page; a script of the rule's own site that lies about them could read the
+ * field anyway. The verdict uses only operators, index reads and loops, so no patched built-in changes its answer.
+ * The runner already matched the page's origin against the rule with the public suffix list; a frame is matched here
+ * by its host under the rule's domain.
  */
 export function vaultFieldVerdict(facts: VaultFieldFacts, want: VaultFieldWant): VaultFieldVerdict | null {
   const scheme = "https://";
@@ -445,18 +452,29 @@ export function vaultFieldVerdict(facts: VaultFieldFacts, want: VaultFieldWant):
   if (type !== "password" && !hasToken(auto, "current-password") && !hasToken(auto, "new-password")) {
     return "not_password_field";
   }
-  return facts.formMethod === "get" ? "get_form" : null;
+  return facts.formMethod === "get" || facts.submitGet === true ? "get_form" : null;
 }
 
 /** The marker a refusal is thrown with in the page, as `agent-browser` reports it back. */
 export const FIELD_REFUSAL_MARK = "agentes-vault:";
 
+/** The attribute the check puts on the field it let through, with a one-time value the fill then finds it by. */
+export const FILL_MARK_ATTR = "data-agentes-fill";
+
+/** A one-time mark for one field's fill: random, so no page can have an element that carries it beforehand. */
+export const newFillMark = () => randomBytes(16).toString("hex");
+
+/** The selector of the field the check marked (`fill` takes it instead of the ref, which it would look up again). */
+export const fillMarkSelector = (mark: string) => `[${FILL_MARK_ATTR}="${mark}"]`;
+
 /**
  * The check `agentes:type_vault` (and a code typed into several fields) runs between focusing the field and filling
  * it, in the same `agent-browser` invocation: it throws unless `vaultFieldVerdict` lets the focused field have the
- * value, so `--bail` stops before the fill. It answers the frame's origin.
+ * value, so `--bail` stops before the fill. It answers the frame's origin. With `mark`, the field it let through
+ * gets that one-time mark (`FILL_MARK_ATTR`) and the fill goes to that element only (`fillMarkSelector`): a page
+ * that navigated, or a ref that now points elsewhere, has no element with it, and nothing is typed.
  */
-export function vaultFieldScript(want: VaultFieldWant): string {
+export function vaultFieldScript(want: VaultFieldWant, mark?: string): string {
   return `(() => {
   const el = document.activeElement;
   const form = el && el.form ? el.form : null;
@@ -469,18 +487,46 @@ export function vaultFieldScript(want: VaultFieldWant): string {
     if (a === undefined || a === null) break;
     ancestors[ancestors.length] = String(a);
   }
+  // A submit button of the form (inside it, or naming it with form=) can send it by GET on its own: formmethod.
+  let submitGet = false;
+  const controls = form ? form.elements : null;
+  for (let i = 0; controls && i < 1024; i++) {
+    const c = controls[i];
+    if (c === undefined || c === null) break;
+    const tag = String(c.tagName || "").toUpperCase();
+    const kind = attr(c, "type");
+    const submits = (tag === "BUTTON" && (kind === "" || kind === "submit")) || (tag === "INPUT" && (kind === "submit" || kind === "image"));
+    if (submits && attr(c, "formmethod") === "get") {
+      submitGet = true;
+      break;
+    }
+  }
   const facts = {
     tag: el ? String(el.tagName || "").toUpperCase() : null,
     type: el && typeof el.type === "string" ? el.type.toLowerCase() : "",
     autocomplete: attr(el, "autocomplete"),
     formMethod: attr(form, "method"),
+    submitGet: submitGet,
     origin: location.origin,
     ancestors: ancestors,
     top: window === top,
   };
   const refusal = (${vaultFieldVerdict.toString()})(facts, ${JSON.stringify(want)});
   if (refusal !== null) throw new Error(${JSON.stringify(FIELD_REFUSAL_MARK)} + refusal);
+  const mark = ${JSON.stringify(mark ?? null)};
+  if (mark !== null) el.setAttribute(${JSON.stringify(FILL_MARK_ATTR)}, mark);
   return facts.origin;
+})()`;
+}
+
+/** Takes a fill's one-time mark off its field after the fill; it never fails (the field may be gone by then). */
+export function fillUnmarkScript(mark: string): string {
+  return `(() => {
+  try {
+    const el = document.querySelector(${JSON.stringify(fillMarkSelector(mark))});
+    if (el) el.removeAttribute(${JSON.stringify(FILL_MARK_ATTR)});
+  } catch (e) {}
+  return true;
 })()`;
 }
 
@@ -525,3 +571,6 @@ export function urlCarries(url: string, value: string): boolean {
 }
 
 export const GET_BLOCKED = "The page tried to send the password in its address; I stopped it.";
+/** The guard against that couldn't be armed (Chrome didn't confirm it in time): nothing is typed without it. */
+export const UNGUARDED =
+  "The browser couldn't confirm it would stop the password leaving in an address, so it wasn't typed. Try again.";

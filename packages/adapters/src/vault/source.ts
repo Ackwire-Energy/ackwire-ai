@@ -108,11 +108,23 @@ export interface VaultConnectResult {
   secret: Record<string, string>;
 }
 
+/** Who a call into a source is for: the workspace connecting it (a source shares heavy work fairly by it). */
+export interface VaultSourceContext {
+  orgId: string;
+}
+
 export interface VaultSource {
   readonly kind: string;
   describe(): VaultSourceDescriptor;
-  /** Validates `input` against the provider and returns what to keep. Throws `VaultSourceError`. */
-  connect(input: Record<string, string>, signal?: AbortSignal): Promise<VaultConnectResult>;
+  /**
+   * Validates `input` against the provider and returns what to keep. Throws `VaultSourceError`. The engine passes a
+   * signal with a deadline, and the workspace connecting it.
+   */
+  connect(
+    input: Record<string, string>,
+    signal?: AbortSignal,
+    context?: VaultSourceContext,
+  ): Promise<VaultConnectResult>;
   /** Every item the connection reads, metadata only. Throws `VaultSourceError`. */
   list(connection: VaultConnection, signal?: AbortSignal): Promise<VaultSourceItem[]>;
   /** One value, read now and kept nowhere. Throws `VaultSourceError` (`not_found` when the item or field is gone). */

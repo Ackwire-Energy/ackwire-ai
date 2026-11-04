@@ -115,3 +115,15 @@ function copiesPrivateText(query: string, privateText: string[]) {
   }
   return false;
 }
+
+/**
+ * What a guarded `fetch` throws for an address it won't connect to (the server's `publicHttpsFetch`, for hosts people
+ * type): not https, or a host that is or resolves to a private, loopback, link-local or internal address. An adapter
+ * that takes a `fetch` tells it from a network failure by this class (ADR 0135).
+ */
+export class OutboundAddressError extends Error {
+  constructor(message = "This address points to an internal network") {
+    super(message);
+    this.name = "OutboundAddressError";
+  }
+}

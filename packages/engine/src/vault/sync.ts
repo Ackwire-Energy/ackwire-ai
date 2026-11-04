@@ -22,7 +22,7 @@ import { publishVaultChanged } from "../events";
 import { enqueue } from "../outbox";
 import { closedOrg } from "../standing";
 import type { ConnectionRow } from "./access";
-import { sourceCall, sourceConnection } from "./seal";
+import { sourceCall, sourceConnection, sourceOf } from "./seal";
 import {
   VAULT_ITEM_KINDS,
   VAULT_LIMITS,
@@ -96,7 +96,7 @@ export async function syncConnectionRow(
     return { row: row ?? { ...connection, ...set }, error } as { row: ConnectionRow; error: VaultSourceError | null };
   };
 
-  const source = deps.sources[connection.kind];
+  const source = sourceOf(deps.sources, connection.kind);
   if (!source) {
     const error = new VaultSourceError("unsupported", "This server can't read this password manager any more.");
     return ended({ status: "error", errorCode: error.code }, error);
@@ -105,7 +105,7 @@ export async function syncConnectionRow(
   let listed: VaultSourceItem[];
   try {
     const opened = await sourceConnection(deps, connection);
-    listed = await sourceCall(() => source.list(opened));
+    listed = await sourceCall((signal) => source.list(opened, signal));
   } catch (error) {
     const failure = failureOf(error);
     return ended({ status: "error", errorCode: failure.code }, failure);

@@ -34,6 +34,8 @@ export interface FakeSource extends VaultSource {
   listError: VaultSourceError | Error | null;
   /** The secrets `list` and `reveal` were handed (to prove they were unsealed). */
   seenTokens: string[];
+  /** Every call, with the signal the engine gave it and the workspace `connect` was told (ADR 0135). */
+  calls: { op: "connect" | "list" | "reveal"; signal: AbortSignal | undefined; orgId: string | undefined }[];
 }
 
 export function fakeSource(): FakeSource {
@@ -43,6 +45,7 @@ export function fakeSource(): FakeSource {
     values: new Map(),
     listError: null,
     seenTokens: [],
+    calls: [],
     describe: () => ({
       kind: "fakepass",
       name: "FakePass",
@@ -50,16 +53,19 @@ export function fakeSource(): FakeSource {
       steps: ["Create a vault for your agents", "Paste the token here"],
       fields: [{ id: "token", kind: "secret", label: "Token", required: true }],
     }),
-    connect: async (input) => {
+    connect: async (input, signal, context) => {
+      source.calls.push({ op: "connect", signal, orgId: context?.orgId });
       if (input.token !== SOURCE_TOKEN) throw new VaultSourceError("auth_failed", "The token was refused.");
       return { label: "Agents", config: { vaultId: "v1", vaultName: "Agents" }, secret: { token: input.token } };
     },
-    list: async (connection: SourceConnection) => {
+    list: async (connection: SourceConnection, signal) => {
+      source.calls.push({ op: "list", signal, orgId: connection.orgId });
       source.seenTokens.push(connection.secret.token ?? "");
       if (source.listError) throw source.listError;
       return source.items.map((item) => ({ ...item }));
     },
-    reveal: async (connection: SourceConnection, ref) => {
+    reveal: async (connection: SourceConnection, ref, _field, signal) => {
+      source.calls.push({ op: "reveal", signal, orgId: connection.orgId });
       source.seenTokens.push(connection.secret.token ?? "");
       const value = source.values.get(ref);
       if (value === undefined) throw new VaultSourceError("not_found", "It isn't there any more.");

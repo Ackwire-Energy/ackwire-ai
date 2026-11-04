@@ -297,3 +297,71 @@ test("the GET guard (ADR 0135): only while armed, every session's requests pause
   expect(sent("Fetch.enable")).toHaveLength(2);
   c.close();
 });
+
+test("the GET guard is ready only once Chrome answered Fetch.enable on every session; released, it lets go", async () => {
+  const { c, cdp } = counter();
+  cdp.onopen?.();
+  cdp.reply(1);
+  await c.attached;
+  cdp.attach("page-1");
+  cdp.event("Target.attachedToTarget", { sessionId: "frame-1", targetInfo: { type: "iframe" } }, "page-1");
+  const sent = (method: string) => cdp.sent.filter((m) => m.method === method);
+  let ready: boolean | null = null;
+  const first = c.guard(["hunter2-first value"], 60_000, () => {});
+  void first.ready.then((ok) => {
+    ready = ok;
+  });
+  const [page, frame] = sent("Fetch.enable");
+  expect([page?.sessionId, frame?.sessionId]).toEqual(["page-1", "frame-1"]);
+  cdp.reply(page?.id ?? 0);
+  await Bun.sleep(5);
+  // One session still paused nothing: not ready, so nothing may be typed yet.
+  expect(ready).toBeNull();
+  // An error answers too (a session that went away has nothing to pause).
+  cdp.onmessage?.({ data: JSON.stringify({ id: frame?.id, error: { code: -32001, message: "Session not found" } }) });
+  expect(await first.ready).toBe(true);
+  // Armed again meanwhile: ready at once, nothing asked of Chrome again.
+  const second = c.guard(["hunter2-second value"], 60_000, () => {});
+  expect(await second.ready).toBe(true);
+  expect(sent("Fetch.enable")).toHaveLength(2);
+  // A fill that was refused takes its value back out; the other stays guarded.
+  second.release();
+  const pause = (requestId: string, value: string) =>
+    cdp.event("Fetch.requestPaused", { requestId, request: { url: `https://shop.example/?pw=${value}` } }, "page-1");
+  pause("a", encodeURIComponent("hunter2-second value"));
+  pause("b", encodeURIComponent("hunter2-first value"));
+  const ids = (method: string) => sent(method).map((m) => (m.params as { requestId: string }).requestId);
+  expect(ids("Fetch.continueRequest")).toEqual(["a"]);
+  expect(ids("Fetch.failRequest")).toEqual(["b"]);
+  expect(sent("Fetch.disable")).toEqual([]);
+  // The last one released: every session lets go at once.
+  first.release();
+  expect(sent("Fetch.disable").map((m) => m.sessionId)).toEqual(["page-1", "frame-1"]);
+  c.close();
+});
+
+test("a guard Chrome doesn't confirm isn't ready (after a while, or once the socket closes); the next one asks again", async () => {
+  const { c, cdp } = counter();
+  cdp.onopen?.();
+  cdp.reply(1);
+  await c.attached;
+  cdp.attach("page-1");
+  const enables = () => cdp.sent.filter((m) => m.method === "Fetch.enable");
+  expect(await c.guard(["hunter2-slow chrome"], 60_000, () => {}, 20).ready).toBe(false);
+  const again = c.guard(["hunter2-slow chrome"], 60_000, () => {}, 1_000);
+  expect(enables()).toHaveLength(2);
+  cdp.reply(enables()[1]?.id ?? 0);
+  expect(await again.ready).toBe(true);
+  c.close();
+
+  const other = counter();
+  other.cdp.onopen?.();
+  other.cdp.reply(1);
+  await other.c.attached;
+  other.cdp.attach("page-1");
+  const waiting = other.c.guard(["hunter2-closing chrome"], 60_000, () => {}, 60_000);
+  other.cdp.close();
+  expect(await waiting.ready).toBe(false);
+  // Closed: never ready again.
+  expect(await other.c.guard(["hunter2-after close"], 60_000, () => {}).ready).toBe(false);
+});

@@ -23,6 +23,14 @@ describe("reading CSV", () => {
     expect(() => parseVaultCsv('a,"open\n')).toThrow();
   });
 
+  test("with a cap, it stops at that many rows and never reads the rest", () => {
+    expect(parseVaultCsv("h\n1\n2\n3\n4", 3)).toEqual([["h"], ["1"], ["2"]]);
+    // What comes after the cap isn't parsed: an unclosed quote there fails nothing.
+    expect(parseVaultCsv('h\n1\n2\n"open', 3)).toEqual([["h"], ["1"], ["2"]]);
+    // Blank lines don't count; a file under the cap reads whole.
+    expect(parseVaultCsv("h\n\n1\n\n", 3)).toEqual([["h"], ["1"]]);
+  });
+
   test("which export a header is", () => {
     expect(csvLayout(["name", "url", "username", "password", "note"])?.format).toBe("chrome");
     expect(

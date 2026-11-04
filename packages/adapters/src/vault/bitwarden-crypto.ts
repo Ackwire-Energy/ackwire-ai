@@ -56,6 +56,12 @@ const ARGON2_MIN_MEMORY_MIB = 16;
  * connection from taking the server down; the default (64 MiB) is well under it.
  */
 export const ARGON2_MAX_MEMORY_MIB = 256;
+/**
+ * The most work one derivation may take, as MiB of memory times iterations (ADR 0135): the account's server picks
+ * the settings, and the time Argon2id takes here grows with both, so their product is capped too. Bitwarden's
+ * default (64 MiB, 3 iterations) is under it; 64 MiB with 4 iterations is the most at that memory.
+ */
+export const ARGON2_MAX_WORK_MIB_ITERATIONS = 256;
 const ARGON2_MIN_PARALLELISM = 1;
 const ARGON2_MAX_PARALLELISM = 16;
 
@@ -108,7 +114,8 @@ export function kdfSupported(kdf: BitwardenKdf): boolean {
   return (
     int(kdf.iterations, ARGON2_MIN_ITERATIONS, ARGON2_MAX_ITERATIONS) &&
     int(kdf.memoryMiB, ARGON2_MIN_MEMORY_MIB, ARGON2_MAX_MEMORY_MIB) &&
-    int(kdf.parallelism, ARGON2_MIN_PARALLELISM, ARGON2_MAX_PARALLELISM)
+    int(kdf.parallelism, ARGON2_MIN_PARALLELISM, ARGON2_MAX_PARALLELISM) &&
+    kdf.memoryMiB * kdf.iterations <= ARGON2_MAX_WORK_MIB_ITERATIONS
   );
 }
 

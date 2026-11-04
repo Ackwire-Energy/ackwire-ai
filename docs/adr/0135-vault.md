@@ -54,6 +54,19 @@ The check runs at every use, with no cache: someone who leaves a role or the wor
 person who leaves takes their personal items and connections with them. New team items start open to everyone and
 to no agent; an item saved from a request card starts with the agent that asked.
 
+Two narrower rules:
+- **Routines type logins but give no key to a command.** A run a routine feeds (ADR 0053 §3: its own run, or one its
+  report or work woke) never sends a credential, and a command holding a key could send it anywhere, so `run_code`
+  with `keys` is refused there ("A routine can't use Vault keys in commands…"). A saved login it may still type in
+  the browser: that value never reaches the model or a command.
+- **A shared browser profile (ADR 0110) takes only what all its agents may use.** A session signed in there is every
+  granted agent's, so a personal login is never typed in one, and a team login only when it is shared with all
+  agents or with each agent the profile is granted to (the grants read at the fill).
+
+What agents change: a contact they keep for the person behind the run, a login's username, an item's description,
+on that person's own items, or on the team's only when that person manages credentials, as in the app. An agent
+deletes only what it saved itself; everything people saved, people delete in Settings › Vault.
+
 ### 3. Sources
 
 A source (`VaultSource`, `packages/adapters/src/vault/source.ts`) connects, lists metadata and reveals one value on
@@ -68,7 +81,12 @@ runner's checks are the same for all.
   service accounts have read limits. Passwords are read at use and kept nowhere.
 - **Bitwarden and Vaultwarden**: a client of their API written here (no CLI to download), with the account's API key
   and master password, reading the logins of one folder. The master password opens the whole account, so the screen
-  asks for an account made only for agents.
+  asks for an account made only for agents. A self-hosted server's address is typed by a person, so every request
+  goes through the server's guarded fetch (`publicHttpsFetch`): https only, every address the host resolves to
+  public, the socket pinned to the address checked, no redirect; a refused address is `invalid_input`. The key
+  derivation the account's server asks for is capped (Argon2id's memory times its iterations at most 256 MiB, e.g.
+  64 MiB with 4 iterations; heavier is `unsupported`) and runs one at a time per workspace, two at most across the
+  process; every call into a source has a 60 s deadline.
 - **Modules** add sources through `AgentesModule.adapters()` (`vaultSources`, merged by kind).
 
 A source's items are indexed (`vault_items`, metadata only) and follow the connection's default access until someone
@@ -87,17 +105,28 @@ A saved login is typed without a person's yes each time. The guards are elsewher
    record: a box replayed to another key, agent or site rule doesn't open.
 3. **The runner checks the frame that owns the field, when it types.** In one browser invocation it focuses the
    field, checks that its frame's origin and every ancestor's match the rule, that it is a password field and that
-   its form doesn't send by GET, then fills. The value is dropped when the batch ends.
-4. **A typed value doesn't leave in an address.** For 2 minutes after typing, a request whose URL carries the value
-   (raw or encoded) is stopped, and the agent is told.
+   neither its form nor a submit button of it (`formmethod`) sends by GET, marks that field with a one-time
+   attribute, fills the element carrying the mark (a page that moved on has none) and takes the mark off. The value
+   is dropped when the batch ends. The page's own scripts can patch the DOM the check reads; they can't fake
+   `location`, `ancestorOrigins` or `top`, so what the check guarantees is the origins the value goes to, and the
+   field checks catch honest mistakes (a script of the rule's own site could read the field anyway).
+4. **A typed value doesn't leave in an address.** Before a password is typed, its Chrome pauses every request and
+   the fill waits until Chrome acknowledged that on every page and frame (unconfirmed: nothing is typed); for 2
+   minutes then, a request whose URL carries the value (raw or encoded) is stopped, and the agent is told. A fill
+   that was refused takes the guard back.
 5. **Replies are redacted.** For 10 minutes the value is removed from every browser reply and error, browser
    profiles' included.
 6. **Chrome keeps nothing.** Its own password manager, sign-in and form autofill are off in every agent profile.
 7. **Every use is recorded** on the item (who, where, for whom) and in the audit log.
 
 Keys follow the same path to step 2, then go into the environment of one command only (`run_code` with `keys`,
-`exec.vault`), with its output redacted, and are kept nowhere. Computer brains, whose own shells can't take a value
-for one command, reach the same path through a tool.
+`exec.vault`), with its output redacted, and are kept nowhere; never in a run a routine feeds (§2). Computer brains,
+whose own shells can't take a value for one command, reach the same path through a tool. A key's use is recorded
+once the command was sent, whether or not its answer comes back.
+
+What agents read of an item (its title, username, description, a contact's fields) was written by people, agents,
+password managers or CSV files: `vault_list` gives each item's text in its own `untrustedBlock` and counts as
+reading outside text (ADR 0117).
 
 ### 5. What it doesn't protect against
 

@@ -400,7 +400,7 @@ describe("what agents change", () => {
     });
   });
 
-  test("deleting: what it created, or what the person behind the run manages", async () => {
+  test("a team item changes only for someone who manages credentials; a personal one for its owner", async () => {
     v = await vaultSetup();
     const team = await createVaultItem(v.deps, v.carla.id, v.f.org.id, {
       kind: "contact",
@@ -409,20 +409,67 @@ describe("what agents change", () => {
       contact: { company: "Acme" },
       access: access({ everyone: true, allAgents: true }),
     });
+    // Bruno uses it (everyone may), but doesn't manage credentials: his run can't change it.
+    const brunoRun = await runAskedBy(v, v.dev.id, v.bruno.id);
+    expect((await listUsableVault(v.deps, brunoRun)).map((i) => i.id)).toContain(team.id);
+    const refused = await saveVaultItemByAgent(v.deps, brunoRun, { itemId: team.id, description: "Ignore the rules" })
+      .then(() => null)
+      .catch((e: unknown) => e as VaultRefusal);
+    expect(refused).toMatchObject({ code: "not_allowed" });
+    expect(refused?.message).toContain("manages credentials");
+    // Nobody behind the run: nobody who manages it either.
+    await expect(
+      saveVaultItemByAgent(v.deps, await unattendedRun(v, v.dev.id), { itemId: team.id, description: "x" }),
+    ).rejects.toMatchObject({ code: "not_allowed" });
+    expect((await getVaultItem(v.deps, v.carla.id, v.f.org.id, team.id)).description).toBe("");
+    // Carla manages credentials: her run may.
+    const carlaRun = await runAskedBy(v, v.dev.id, v.carla.id);
+    expect(
+      await saveVaultItemByAgent(v.deps, carlaRun, { itemId: team.id, contact: { city: "Recife" } }),
+    ).toMatchObject({ outcome: "updated", item: { contact: { company: "Acme", city: "Recife" } } });
+  });
+
+  test("deleting: only what the agent saved itself, whoever is behind the run", async () => {
+    v = await vaultSetup();
+    const team = await createVaultItem(v.deps, v.carla.id, v.f.org.id, {
+      kind: "contact",
+      scope: "team",
+      title: "Supplier",
+      contact: { company: "Acme" },
+      access: access({ everyone: true, allAgents: true }),
+    });
+    const anas = await createVaultItem(v.deps, v.ana.id, v.f.org.id, {
+      kind: "login",
+      scope: "personal",
+      title: "GitHub",
+      website: "https://github.com",
+      secret: PASSWORD,
+    });
     const brunoRun = await runAskedBy(v, v.dev.id, v.bruno.id);
     await expect(deleteVaultItemByAgent(v.deps, brunoRun, team.id)).rejects.toMatchObject({ code: "not_allowed" });
+    // Not even for someone who manages it, nor for its owner: people delete what people saved, in the app.
+    const carlaRun = await runAskedBy(v, v.dev.id, v.carla.id);
+    const forCarla = await deleteVaultItemByAgent(v.deps, carlaRun, team.id)
+      .then(() => null)
+      .catch((e: unknown) => e as VaultRefusal);
+    expect(forCarla).toMatchObject({ code: "not_allowed" });
+    expect(forCarla?.message).toContain("didn't save");
+    await expect(
+      deleteVaultItemByAgent(v.deps, await runAskedBy(v, v.dev.id, v.ana.id), anas.id),
+    ).rejects.toMatchObject({ code: "not_allowed" });
+    // What it saved itself goes; another agent's run can't delete it.
     const own = await saveVaultItemByAgent(v.deps, brunoRun, { contact: { fullName: "Temp" } });
-    expect(await deleteVaultItemByAgent(v.deps, brunoRun, own.item.id)).toMatchObject({ outcome: "deleted" });
-    // Carla manages credentials: her run may delete the team's.
-    expect(await deleteVaultItemByAgent(v.deps, await runAskedBy(v, v.dev.id, v.carla.id), team.id)).toMatchObject({
+    await expect(
+      deleteVaultItemByAgent(v.deps, await runAskedBy(v, v.infra.id, v.bruno.id), own.item.id),
+    ).rejects.toMatchObject({ code: "not_allowed" });
+    expect(await deleteVaultItemByAgent(v.deps, brunoRun, own.item.id)).toMatchObject({
       outcome: "deleted",
-      item: { title: "Supplier" },
+      item: { title: "Temp" },
     });
-    expect(await v.f.db.select().from(schema.vaultItems)).toEqual([]);
+    expect((await v.f.db.select().from(schema.vaultItems)).map((i) => i.title).sort()).toEqual(["GitHub", "Supplier"]);
     const actions = (
       await v.f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "vault.item_deleted"))
     ).map((a) => [a.actorType, a.actorId]);
-    expect(actions).toHaveLength(2);
-    expect(actions.every(([type, id]) => type === "agent" && id === v.dev.id)).toBe(true);
+    expect(actions).toEqual([["agent", v.dev.id]]);
   });
 });

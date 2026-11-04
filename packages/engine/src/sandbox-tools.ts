@@ -31,6 +31,7 @@ import {
   updateArtifact,
 } from "./artifacts";
 import { recordAudit } from "./audit";
+import { fedByRoutine, runAuthorityById } from "./authority";
 import { sniffModelImage } from "./avatars";
 import { publishChannelEvent } from "./events";
 import { cutText, formatBytes, textOfBytes } from "./format";
@@ -164,6 +165,13 @@ async function missionGate(name: string, input: Record<string, unknown>, ctx: To
 
 /** Vault keys one `run_code` may take (ADR 0135). */
 export const MAX_RUN_KEYS = 10;
+
+/**
+ * Why a run a routine feeds gets no Vault key in a command (ADR 0135 §2, ADR 0053 §3). A saved login it may still
+ * type in the browser: that value never reaches the model or a command.
+ */
+export const ROUTINE_KEYS_REFUSAL =
+  "A routine can't use Vault keys in commands. Ask a person to run it, or have the routine's creator run it from a conversation.";
 
 /** `run_code`'s `keys`, checked: distinct variable names, none reserved; or why not. */
 export function runKeysOf(raw: unknown): string[] | string {
@@ -518,12 +526,16 @@ export function createSandboxToolSource(
   /**
    * Vault keys for one command (ADR 0135): released for the person behind the run, then sealed, each bound to its
    * variable, to a one-use key the computer just made. The values are in this process only while they are sealed;
-   * the runner opens them into that one command's environment and redacts them from what it prints.
+   * the runner opens them into that one command's environment and redacts them from what it prints. A run a routine
+   * feeds gets none (ADR 0053 §3: it never sends a credential, and a command holding a key could send it anywhere).
    */
   const vaultKeysFor = async (ctx: ToolContext, computer: ComputerHandle, names: string[]) => {
     const vault = deps.vault;
     const hub = deps.machines?.hub;
     if (!vault || !hub) throw new Error("The Vault isn't available on this server.");
+    if (fedByRoutine(await runAuthorityById(ctx.db, ctx.orgId, ctx.runId))) {
+      throw new VaultRefusal("not_allowed", ROUTINE_KEYS_REFUSAL);
+    }
     const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
     if (!isAllowed(toolAccess(granted, { name: VAULT_LIST_TOOL, scope: VAULT_READ_SCOPE }))) {
       throw new Error(
@@ -607,7 +619,7 @@ export function createSandboxToolSource(
   ): ToolDefinition[] => [
     {
       name: "run_code",
-      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo))}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; detached tasks need it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.${deps.vault ? " With `keys`, saved Vault keys (their variable names, from vault_list) are set as environment variables of this one command only: use them as `$NAME` (bash) or `os.environ` / `process.env`, never print them (output shows them as [secret:NAME])." : ""}`,
+      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo))}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; detached tasks need it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.${deps.vault ? " With `keys`, saved Vault keys (their variable names, from vault_list) are set as environment variables of this one command only: use them as `$NAME` (bash) or `os.environ` / `process.env`, never print them (output shows them as [secret:NAME]). A routine's run gets no keys." : ""}`,
       scope: SANDBOX_SCOPE,
       readsOutside: true,
       sensitive: requireApproval,
@@ -654,13 +666,19 @@ export function createSandboxToolSource(
             await computer.provider.writeFile(computer.id, file, new TextEncoder().encode(str(input.code)));
             // Sealed right before the command: the computer's one-use key lives two minutes (ADR 0135).
             const keys = names.length > 0 ? await vaultKeysFor(ctx, computer, names) : null;
-            const r = await execLive(ctx, computer, {
-              command: scriptCommand(runner.bin, file),
-              timeoutSeconds: timeout,
-              ...(ctx.approved ? { approved: true } : {}),
-              ...(keys ? { vault: keys.vault } : {}),
-            });
-            await keys?.used();
+            let r: ExecResult;
+            try {
+              r = await execLive(ctx, computer, {
+                command: scriptCommand(runner.bin, file),
+                timeoutSeconds: timeout,
+                ...(ctx.approved ? { approved: true } : {}),
+                ...(keys ? { vault: keys.vault } : {}),
+              });
+            } finally {
+              // Once the request is on its way the command may run with the keys, whether or not an answer comes
+              // back (a dropped connection, a cancel, a timeout): each use is recorded either way (ADR 0135 §4).
+              await keys?.used();
+            }
             await auditMachineExec(ctx, computer, `${lang}: ${str(input.code)}`, r, names);
             return r;
           });

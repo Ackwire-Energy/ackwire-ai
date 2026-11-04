@@ -16,7 +16,7 @@ import {
   VAULT_SYNC_JOB,
   type VaultAccess,
 } from "../src";
-import { sourceConnection } from "../src/vault/seal";
+import { sourceConnection, sourceOf } from "../src/vault/seal";
 import { everythingStored, SOURCE_PASSWORD, SOURCE_TOKEN, type VaultFixture, vaultSetup } from "./vault-fixtures";
 
 /**
@@ -83,6 +83,12 @@ describe("connecting", () => {
     });
     expect(connection.syncedAt).not.toBeNull();
     expect(v.source.seenTokens).toEqual([SOURCE_TOKEN]);
+    // Each call into the source has a deadline (a signal that aborts), and connecting names the workspace.
+    expect(v.source.calls.map((c) => [c.op, c.orgId])).toEqual([
+      ["connect", v.f.org.id],
+      ["list", v.f.org.id],
+    ]);
+    expect(v.source.calls.every((c) => c.signal instanceof AbortSignal && !c.signal.aborted)).toBe(true);
     const [row] = await v.f.db.select().from(schema.vaultConnections);
     expect(row?.secretCiphertext).not.toContain(SOURCE_TOKEN);
     if (!row) throw new Error("no row");
@@ -122,9 +128,15 @@ describe("connecting", () => {
     v.source.listError = new VaultSourceError("locked", "The vault is locked.");
     await expect(connectTeam()).rejects.toMatchObject({ code: "locked" });
     expect(await v.f.db.select().from(schema.vaultConnections)).toEqual([]);
-    await expect(
-      connectVaultSource(v.deps, v.carla.id, v.f.org.id, { kind: "nope", scope: "team", input: {} }),
-    ).rejects.toMatchObject({ code: "vault.source_unknown" });
+    // A kind is looked up among the sources' own names only: one on an object's prototype finds nothing.
+    for (const kind of ["nope", "constructor", "__proto__", "toString", "hasOwnProperty"]) {
+      await expect(
+        connectVaultSource(v.deps, v.carla.id, v.f.org.id, { kind, scope: "team", input: {} }),
+      ).rejects.toMatchObject({ code: "vault.source_unknown" });
+    }
+    expect(sourceOf(v.deps.sources, "fakepass")).toBe(v.source);
+    expect(sourceOf(v.deps.sources, "constructor")).toBeUndefined();
+    expect(sourceOf(v.deps.sources, 42)).toBeUndefined();
     v.source.listError = null;
     await expect(
       connectVaultSource(v.deps, v.bruno.id, v.f.org.id, {

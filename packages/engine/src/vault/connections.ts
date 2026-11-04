@@ -13,7 +13,7 @@ import { NotFoundError, ValidationError } from "../errors";
 import { publishVaultChanged } from "../events";
 import { type ConnectionRow, cleanAccess, scopeOf, type VaultViewer, viewerManages } from "./access";
 import { cleanScope, teamNeedsPermission, vaultViewer } from "./items";
-import { sealConnectionSecret, sourceCall } from "./seal";
+import { sealConnectionSecret, sourceCall, sourceOf } from "./seal";
 import {
   VAULT_LIMITS,
   type VaultConnectInput,
@@ -96,10 +96,10 @@ export async function connectVaultSource(
   const viewer = await vaultViewer(db, userId, orgId);
   const scope = cleanScope(input.scope);
   if (scope === "team" && !viewer.manages) throw teamNeedsPermission();
-  const source = typeof input.kind === "string" ? deps.sources[input.kind] : undefined;
+  const source = sourceOf(deps.sources, input.kind);
   if (!source) throw new ValidationError("This server can't connect that password manager", "vault.source_unknown");
   const access = await cleanAccess(db, orgId, scope, input.access);
-  const result = await sourceCall(() => source.connect(inputOf(input.input)));
+  const result = await sourceCall((signal) => source.connect(inputOf(input.input), signal, { orgId }));
 
   const ownerUserId = scope === "personal" ? userId : null;
   const id = Bun.randomUUIDv7();
@@ -153,9 +153,9 @@ export async function updateVaultConnection(
     fields.push("access");
   }
   if (patch.input !== undefined) {
-    const source = deps.sources[current.kind];
+    const source = sourceOf(deps.sources, current.kind);
     if (!source) throw new VaultSourceError("unsupported", "This server can't read this password manager any more.");
-    const result = await sourceCall(() => source.connect(inputOf(patch.input)));
+    const result = await sourceCall((signal) => source.connect(inputOf(patch.input), signal, { orgId }));
     Object.assign(set, await sealConnectionSecret(deps, current, result.secret), {
       label: (result.label ?? "").trim().slice(0, VAULT_LIMITS.title) || current.label,
       config: configOf(result.config ?? {}),
