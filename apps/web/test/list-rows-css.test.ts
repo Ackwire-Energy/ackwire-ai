@@ -18,6 +18,9 @@ test("a settings row's title line is one text line, and one gap token sits under
   expect(last(top, ".list-title", "align-items")).toBe("center");
   expect(last(top, ".list-title:not(:last-child)", "margin-block-end")).toBe("var(--list-part-gap)");
   expect(last(top, ".connected-row", "row-gap")).toBe("var(--list-part-gap)");
+  // The leading icon or logo keeps its top on the name's line, however far the details wrap.
+  expect(last(top, ".connected-row", "align-items")).toBe("start");
+  expect(last(top, ".app-row", "align-items")).toBe("flex-start");
   // Nothing else adds to the gap under the title: the details' column and the other lists' columns have none.
   for (const col of [".list-col", ".connected-row__text", ".machine-row__main", ".app-row__main"]) {
     expect(last(top, col, "gap")).toBeUndefined();

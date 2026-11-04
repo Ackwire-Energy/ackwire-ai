@@ -4312,8 +4312,9 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
 
 /* Settings → Conectores: one row per connected service. */
 /*
- * One grid for every connected row (service, email box, database): the icon beside the name and details, then who
- * uses it and the actions under them, one gap apart, the same way on every row. The details wrap whole, never cut.
+ * One grid for every connected row (service, email box, database): the icon beside the name and details, its top on
+ * the name's line however far the details wrap, then who uses it and the actions under them, one gap apart, the same
+ * way on every row. The details wrap whole, never cut.
  * A row with no actions (someone who can't manage connectors) has room for who uses it beside the text when the
  * list is wide; the actions never do: four or five buttons would leave the name a sliver.
  */
@@ -4323,7 +4324,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
 .connected-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   column-gap: 16px;
   row-gap: var(--list-part-gap);
 }

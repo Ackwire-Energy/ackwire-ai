@@ -52,6 +52,7 @@
 
 .app-row {
   flex-wrap: nowrap;
+  align-items: flex-start;
 }
 .app-row__main {
   flex: 1;
