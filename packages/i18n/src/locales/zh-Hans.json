@@ -13756,6 +13756,8 @@
       "open": "打开"
     },
     "home": "我的首页",
+    "seeMore": "查看更多",
+    "seeMoreHidden_other": "还有 {{count}} 项",
     "untitled": "新小组件",
     "updatedAgo": "{{when}}更新",
     "removed": {

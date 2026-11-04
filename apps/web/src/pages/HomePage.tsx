@@ -182,6 +182,7 @@ export function HomePage() {
             ) : (
               <p className="wg__empty">{t("home.summary.calm")}</p>
             ),
+          horizon: !(waitingCount === 0 && calm),
         }}
         working={{
           title: t("home.working.title"),

@@ -14910,6 +14910,11 @@
       "open": "Открыть"
     },
     "home": "Моя главная",
+    "seeMore": "Показать ещё",
+    "seeMoreHidden_one": "ещё {{count}}",
+    "seeMoreHidden_few": "ещё {{count}}",
+    "seeMoreHidden_many": "ещё {{count}}",
+    "seeMoreHidden_other": "ещё {{count}}",
     "untitled": "Новый виджет",
     "updatedAgo": "обновлено {{when}}",
     "removed": {

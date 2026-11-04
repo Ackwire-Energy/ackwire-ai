@@ -13555,6 +13555,8 @@
       "open": "열기"
     },
     "home": "내 홈",
+    "seeMore": "더 보기",
+    "seeMoreHidden_other": "{{count}}개 더",
     "untitled": "새 위젯",
     "updatedAgo": "{{when}} 업데이트",
     "removed": {

@@ -14646,6 +14646,10 @@
       "open": "Apri"
     },
     "home": "La mia Home",
+    "seeMore": "Mostra altro",
+    "seeMoreHidden_one": "altri {{count}}",
+    "seeMoreHidden_many": "altri {{count}}",
+    "seeMoreHidden_other": "altri {{count}}",
     "untitled": "Nuovo widget",
     "updatedAgo": "aggiornato {{when}}",
     "removed": {

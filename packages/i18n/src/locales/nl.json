@@ -14224,6 +14224,9 @@
       "open": "Openen"
     },
     "home": "Mijn start",
+    "seeMore": "Meer bekijken",
+    "seeMoreHidden_one": "nog {{count}}",
+    "seeMoreHidden_other": "nog {{count}}",
     "untitled": "Nieuwe widget",
     "updatedAgo": "bijgewerkt {{when}}",
     "removed": {

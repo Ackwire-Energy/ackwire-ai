@@ -13844,6 +13844,9 @@ export const ptBR = {
       open: "Abrir",
     },
     home: "Meu Início",
+    seeMore: "Ver mais",
+    seeMoreHidden_one: "mais {{count}}",
+    seeMoreHidden_other: "mais {{count}}",
     untitled: "Novo widget",
     updatedAgo: "atualizado {{when}}",
     removed: {
