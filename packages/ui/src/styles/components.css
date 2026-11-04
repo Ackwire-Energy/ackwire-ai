@@ -1426,12 +1426,25 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   height: 20px;
   padding: 0 6px;
   box-sizing: border-box;
-  display: inline-grid;
-  place-items: center;
   border-radius: var(--radius-full);
   background: var(--sunken);
   color: var(--ink2);
   font-size: 12px;
+}
+/*
+ * Every number on a pill (CountBadge, CountChip, the sidebar's red count, the notice island's +N): the figures' own
+ * box, cap height to baseline (`text-box`), centred on the pill, so "1", "12" and "99+" sit in its middle at any
+ * size. Centring the line box instead puts them where the font's ascent and descent fall, up to 1px high or low
+ * depending on the size. A pill that sets its own size keeps these and sets no line height of its own.
+ */
+.ac-count,
+.ac-countchip {
+  display: inline-block;
+  align-content: center;
+  text-align: center;
+  line-height: 1;
+  text-box: trim-both cap alphabetic;
+  white-space: nowrap;
 }
 
 /* Logo: the agent mark + the wordmark set in Onest */
@@ -4446,9 +4459,6 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
   --count-h: 18px;
   flex: none;
   align-self: center;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   box-sizing: border-box;
   height: var(--count-h);
   min-width: var(--count-h);
@@ -4457,9 +4467,6 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
   background: var(--sunken);
   color: var(--muted);
   font-size: 11.5px;
-  /* Centered on its box, not on the label's baseline. */
-  line-height: 1;
-  white-space: nowrap;
 }
 .ac-countchip--sm {
   --count-h: 16px;

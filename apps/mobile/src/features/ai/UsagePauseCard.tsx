@@ -34,7 +34,7 @@ function DontRunButton({ runId, may }: { runId: string | null; may: boolean }) {
   return (
     <>
       <Button
-        variant="secondary"
+        variant="text"
         size="sm"
         icon="stop"
         label={t("usageCard.dontRun")}
