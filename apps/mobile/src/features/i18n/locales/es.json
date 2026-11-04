@@ -1793,9 +1793,6 @@
   },
   "dashboards": {
     "homeRow": "Solo tú · tus propios widgets",
-    "count_one": "{{count}} panel",
-    "count_many": "{{count}} paneles",
-    "count_other": "{{count}} paneles",
     "loadFailed": "No se pudieron cargar los paneles.",
     "onlyHome": "Los paneles del espacio de trabajo o de tus roles aparecen aquí.",
     "create": "Crear",

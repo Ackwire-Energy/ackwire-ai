@@ -1621,7 +1621,6 @@
   },
   "dashboards": {
     "homeRow": "나만 · 내 위젯",
-    "count_other": "대시보드 {{count}}개",
     "loadFailed": "대시보드를 불러오지 못했어요.",
     "onlyHome": "워크스페이스나 내 역할의 대시보드가 여기에 표시돼요.",
     "create": "만들기",

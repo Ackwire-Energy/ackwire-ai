@@ -1711,8 +1711,6 @@ export const featureKeysPtBR = {
   // Dashboards on the phone (ADR 0135); the rest of their words are the web's, `dashboards.*` and `widgets.*`.
   dashboards: {
     homeRow: "Só você · seus próprios widgets",
-    count_one: "{{count}} painel",
-    count_other: "{{count}} painéis",
     loadFailed: "Não deu para carregar os painéis.",
     onlyHome: "Os painéis do workspace ou dos seus papéis aparecem aqui.",
     create: "Criar",

@@ -13598,6 +13598,11 @@
     "new": "Yeni pano",
     "back": "Panolar",
     "home": "Ana sayfam",
+    "seeAll": "Tümünü gör",
+    "useOnHome": "Ana sayfada göster",
+    "stopOnHome": "Ana sayfadan kaldır",
+    "onHome": "Ana sayfada",
+    "onHomeDone": "Ana sayfa artık bu panoyu gösteriyor",
     "groups": {
       "workspace": "Çalışma alanı",
       "workspaceHint": "herkes görür",

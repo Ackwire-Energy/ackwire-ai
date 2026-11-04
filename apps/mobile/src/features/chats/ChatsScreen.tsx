@@ -23,11 +23,11 @@ import { useActiveWork, useConversations, useHiddenAgents, useWorkingNow } from 
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
-import { DashboardsEntry } from "./DashboardsEntry";
 import { FirstSteps } from "./FirstSteps";
 import { FirstAgentEmpty, Greeting, GreetingSky } from "./Greeting";
 import { CollapsibleSection, SeeAllRow, useHomeCollapsed } from "./HomeSection";
 import { HomeServerError, HomeServerNotice } from "./HomeServerError";
+import { HomeWidgets } from "./HomeWidgets";
 import {
   agentStarters,
   type ConversationRow,
@@ -164,8 +164,8 @@ function Home() {
       ) : null}
       {failed || empty || list.loading ? null : (
         <>
-          {/* Dashboards open from here, not from a tab (ADR 0135 §15). */}
-          <DashboardsEntry />
+          {/* Início's widgets, and the way to Dashboards ("See all"), not a tab (ADR 0135 §15). */}
+          <HomeWidgets />
           <FirstSteps collapsed={collapsed} onToggle={toggle} />
         </>
       )}

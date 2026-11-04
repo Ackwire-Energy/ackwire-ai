@@ -13,10 +13,10 @@ import { BoardRow, useBoardByline } from "./parts";
 export const openNewBoard = () => router.push("/board-new");
 
 /**
- * Dashboards, pushed from the home's Dashboards row (ADR 0135; the tab bar stays as it is): My Home on top (the
+ * Dashboards, pushed from "See all" over the home's widgets (ADR 0135; the tab bar stays as it is): My Home on top (the
  * person's own widgets), then the boards of the whole workspace, of the person's roles and only theirs, each with a
- * thumbnail of its widgets. A row pushes the board; "+" in the bar makes a new one. With only My Home, a line under
- * it says where the others will be (no empty state: My Home is a board).
+ * thumbnail of its widgets (the one on Início says "On Home"). A row pushes the board; "+" in the bar makes a new one.
+ * With only My Home, a line under it says where the others will be (no empty state: My Home is a board).
  */
 export function DashboardsScreen() {
   const { t } = useTranslation();
@@ -26,13 +26,15 @@ export function DashboardsScreen() {
   const pull = usePullRefresh(list.refetch);
   const byline = useBoardByline();
   const groups = dashboardGroups(list.data?.dashboards ?? []);
+  // The board on Início ("Use on Home", ADR 0135 §18) says so first on its line.
+  const onHome = list.data?.homeDashboardId ?? null;
   const any = groups.workspace.length + groups.roles.length + groups.mine.length > 0;
   const row = (board: DashboardSummary) => (
     <BoardRow
       key={board.id}
       board={board}
       title={board.title}
-      sub={byline(board)}
+      sub={board.id === onHome ? [t("dashboards.onHome"), byline(board)].filter(Boolean).join(" · ") : byline(board)}
       locked={board.audience !== "workspace"}
       onPress={() => router.push(boardHref(board.id))}
     />

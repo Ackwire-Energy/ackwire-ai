@@ -19,7 +19,6 @@ import {
   bleedSeries,
   boardMenuKeys,
   confirmTitle,
-  dashboardsEntryLine,
   dashboardWaitingCard,
   destinationsOf,
   ditherCells,
@@ -313,6 +312,7 @@ describe("dashboards on the phone (ADR 0135)", () => {
         board({ id: "ro", title: "Finance", canEdit: false }),
         board({ id: "h", kind: "home", title: "" }),
       ],
+      homeDashboardId: null,
     };
     expect(destinationsOf(list).map((d) => d.id)).toEqual([HOME, "p", "a", "b"]);
     expect(destinationsOf(undefined)).toEqual([{ id: HOME, title: null, home: true }]);
@@ -427,13 +427,28 @@ describe("dashboards on the phone (ADR 0135)", () => {
 
   test("a board's menu offers only what the viewer may do; My Home is only organized", () => {
     const manager = { kind: "board" as const, canEdit: true, canManage: true, audience: "workspace" as const };
-    expect(boardMenuKeys({ ...manager, pinned: false })).toEqual(["organize", "share", "edit", "pin", "delete"]);
+    expect(boardMenuKeys({ ...manager, pinned: false })).toEqual([
+      "home",
+      "organize",
+      "share",
+      "edit",
+      "pin",
+      "delete",
+    ]);
     expect(boardMenuKeys({ ...manager, pinned: true })).toContain("unpin");
     const privateBoard = { ...manager, audience: "private" as const, pinned: false };
-    expect(boardMenuKeys(privateBoard)).toEqual(["organize", "share", "edit", "delete"]);
-    expect(boardMenuKeys({ ...manager, canManage: false, pinned: false })).toEqual(["organize", "edit"]);
-    expect(boardMenuKeys({ ...manager, canEdit: false, canManage: false, pinned: false })).toEqual([]);
-    expect(boardMenuKeys({ ...manager, kind: "home", audience: "private", pinned: false })).toEqual(["organize"]);
+    expect(boardMenuKeys(privateBoard)).toEqual(["home", "organize", "share", "edit", "delete"]);
+    expect(boardMenuKeys({ ...manager, canManage: false, pinned: false })).toEqual(["home", "organize", "edit"]);
+    expect(boardMenuKeys({ ...manager, canEdit: false, canManage: false, pinned: false })).toEqual(["home"]);
+    const home = { ...manager, kind: "home" as const, audience: "private" as const, pinned: false };
+    expect(boardMenuKeys(home, true)).toEqual(["organize"]);
+  });
+
+  test("Use on Home: any board seen; on Início it offers Remove; My Home brings Início back", () => {
+    const viewer = { kind: "board" as const, canEdit: false, canManage: false, audience: "workspace" as const };
+    expect(boardMenuKeys({ ...viewer, pinned: false }, true)).toEqual(["unhome"]);
+    const home = { ...viewer, kind: "home" as const, canEdit: true, audience: "private" as const, pinned: false };
+    expect(boardMenuKeys(home, false)).toEqual(["home", "organize"]);
   });
 
   test("a new widget's size: the one picked, else S for a number or a goal and M otherwise", () => {
@@ -507,14 +522,6 @@ describe("dashboards in links, notifications and routines", () => {
     expect(readFileSync(join(app, "_layout.tsx"), "utf8")).toContain('name="dashboards"');
     expect(readFileSync(join(app, "(tabs)", "_layout.tsx"), "utf8")).not.toContain("dashboards");
     expect([...TAB_GLYPHS]).toEqual(["chats", "threads", "agents", "activity", "search"]);
-  });
-
-  test("the home's Dashboards row: My Home and how many others, or My Home alone", () => {
-    const words = { home: "My Home", count: (n: number) => `${n} dashboard${n === 1 ? "" : "s"}` };
-    expect(dashboardsEntryLine(3, words)).toBe("My Home · 3 dashboards");
-    expect(dashboardsEntryLine(1, words)).toBe("My Home · 1 dashboard");
-    expect(dashboardsEntryLine(0, words)).toBe("My Home");
-    expect(dashboardsEntryLine(undefined, words)).toBe("My Home");
   });
 
   test("an alert or a failure opens its widget; a request to publish, its board", () => {

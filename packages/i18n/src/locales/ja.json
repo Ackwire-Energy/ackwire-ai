@@ -13206,6 +13206,11 @@
     "new": "新しいダッシュボード",
     "back": "ダッシュボード",
     "home": "マイホーム",
+    "seeAll": "すべて見る",
+    "useOnHome": "ホームに表示",
+    "stopOnHome": "ホームから外す",
+    "onHome": "ホームに表示中",
+    "onHomeDone": "ホームにこのダッシュボードを表示します",
     "groups": {
       "workspace": "ワークスペース",
       "workspaceHint": "全員が見られます",

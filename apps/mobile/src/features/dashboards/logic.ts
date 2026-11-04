@@ -261,15 +261,26 @@ export function layoutChanged(
 /** A tall (2-high, L) widget on the phone draws its data big, and stands taller. */
 export const isTall = (h: number) => h >= 2;
 
-/** What a board's "…" offers, by what the viewer may do (ADR 0135): My Home is only organized. */
-export type BoardMenuKey = "organize" | "share" | "edit" | "pin" | "unpin" | "delete";
+/** What a board's "…" offers (ADR 0135). */
+export type BoardMenuKey = "home" | "unhome" | "organize" | "share" | "edit" | "pin" | "unpin" | "delete";
 
+/**
+ * A board's "…", only what the viewer may do. First "Use on Home" or "Remove from Home" (ADR 0135 §18): anyone who
+ * sees a board may show it on their Início; `onHome` says Início shows it now (for My Home: no other board is
+ * chosen, and then it has nothing to offer there). My Home is otherwise only organized.
+ */
 export function boardMenuKeys(
   board: Pick<DashboardSummary, "kind" | "canEdit" | "canManage" | "audience" | "pinned">,
+  onHome = false,
 ): BoardMenuKey[] {
   const keys: BoardMenuKey[] = [];
+  if (board.kind === "home") {
+    if (!onHome) keys.push("home");
+    if (board.canEdit) keys.push("organize");
+    return keys;
+  }
+  keys.push(onHome ? "unhome" : "home");
   if (board.canEdit) keys.push("organize");
-  if (board.kind === "home") return keys;
   if (board.canManage) keys.push("share");
   if (board.canEdit) keys.push("edit");
   // Only a workspace board is featured at the top of everyone's list.
@@ -354,17 +365,6 @@ export const HOME = "home";
 /** A board id from a route or a picker: My Home's real id when `HOME` and the home board is loaded. */
 export const realBoardId = (id: string, homeId: string | null | undefined): string | null =>
   id === HOME ? (homeId ?? null) : id;
-
-/**
- * The home's Dashboards row's second line: "My Home · 3 dashboards", or "My Home" alone while the list loads or
- * when the person sees no other board (ADR 0135 §15).
- */
-export function dashboardsEntryLine(
-  count: number | null | undefined,
-  words: { home: string; count: (n: number) => string },
-): string {
-  return count ? `${words.home} · ${words.count(count)}` : words.home;
-}
 
 // ── Test before creating ─────────────────────────────────────────────────────
 

@@ -132,8 +132,9 @@ people than asked.
     widget". A widget opens in a side panel: the widget big, how it updates (its routine and next run, its alert,
     what the agent reads), its latest updates, remove, and a composer to ask its agent for a change. Removing a
     widget, from anywhere, asks first: its routine stops and its history goes. Charts in messages get "Pin".
-15. **On the phone.** Dashboards open from the home screen: a "Dashboards" row at the top of Chats (its icon,
-    "My Home · 3 dashboards", a chevron) pushes the list, `/dashboards`. The tab bar is unchanged (Chats, Threads,
+15. **On the phone.** Dashboards open from the home screen: at the top of Chats, what Início shows (My Home, or the
+    board chosen for it, §18) heads a strip of its widgets, small and side by side, that scrolls sideways (with none
+    yet, one card asks for a widget), and "See all" at its end pushes the list, `/dashboards`. The tab bar is unchanged (Chats, Threads,
     Agents, Activity and Search): a sixth tab would push search out of Android's bar, which holds five at most. The
     list shows "My Home" first, then the same groups. Everything is a pushed screen with a back button, never a sheet:
     the list, a board (two columns, a 2-wide widget across the row), a widget (big, how it updates, history, remove,
@@ -160,6 +161,13 @@ people than asked.
     given on create, a different title on confirm, or Rename). Until it is named the apps show a generic "New widget".
     A `note` longer than one short sentence (140 characters) is a tool error the agent fixes; the apps clamp a note to
     two lines with an ellipsis instead of cutting characters, and text the server keeps is clipped only at a word's end.
+18. **A board on Início.** "Use on Home" in any board's menu shows that board on the person's Início instead of My
+    Home, for them alone (`organization_members.home_dashboard_id`, `PUT …/dashboards/home-choice`); seeing the board
+    is enough, since Início only shows it. The fixed tiles stay (they are My Home's), the board's widgets follow them,
+    and "+" and Organize change that board when the person edits it. The choice has no foreign key: a board deleted or
+    no longer shown to them reads as none, and Início is My Home again. Meanwhile My Home opens as a board page of its
+    own (Dashboards' first card), whose menu brings Início back to it; the chosen board's card says "On Home". Home's
+    head says "See all", which opens Dashboards, on the web and the phone.
 
 ## Consequences
 

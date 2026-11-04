@@ -161,6 +161,7 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
 }
 .home-sec__acts .home-sec__more {
   margin-left: 0;
+  margin-right: 8px;
 }
 /* A fixed tile: its rows from edge to edge; the calm card fills it without a frame of its own. */
 .home-mural .wg--fixed .home-calm {

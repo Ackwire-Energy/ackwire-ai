@@ -123,6 +123,8 @@ export interface DashboardList {
   /** Null until the home board was first opened. */
   home: DashboardSummary | null;
   dashboards: DashboardSummary[];
+  /** The board Início shows instead of my own home (one of `dashboards`, "Use on Home"); null = my own. */
+  homeDashboardId: string | null;
 }
 
 export interface WidgetFailure {

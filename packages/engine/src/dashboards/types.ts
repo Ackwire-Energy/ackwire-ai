@@ -187,6 +187,8 @@ export interface DashboardListView {
   home: DashboardSummaryView | null;
   /** Every other board the viewer sees, pinned first, then by position and title. */
   dashboards: DashboardSummaryView[];
+  /** The board Início shows instead of the viewer's own home (one of `dashboards`); null = their own. */
+  homeDashboardId: string | null;
 }
 
 export interface WidgetView {

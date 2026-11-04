@@ -1793,9 +1793,6 @@
   },
   "dashboards": {
     "homeRow": "Vous seul · vos propres widgets",
-    "count_one": "{{count}} tableau de bord",
-    "count_many": "{{count}} tableaux de bord",
-    "count_other": "{{count}} tableaux de bord",
     "loadFailed": "Impossible de charger les tableaux de bord.",
     "onlyHome": "Les tableaux de bord de l'espace de travail ou de vos rôles apparaissent ici.",
     "create": "Créer",

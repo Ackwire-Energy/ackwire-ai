@@ -13197,6 +13197,11 @@
     "new": "새 대시보드",
     "back": "대시보드",
     "home": "내 홈",
+    "seeAll": "모두 보기",
+    "useOnHome": "홈에 표시",
+    "stopOnHome": "홈에서 빼기",
+    "onHome": "홈에 표시 중",
+    "onHomeDone": "이제 홈에 이 대시보드가 표시됩니다",
     "groups": {
       "workspace": "워크스페이스",
       "workspaceHint": "모두가 봐요",

@@ -1707,8 +1707,6 @@
   },
   "dashboards": {
     "homeRow": "Yalnızca siz · kendi widget'larınız",
-    "count_one": "{{count}} pano",
-    "count_other": "{{count}} pano",
     "loadFailed": "Panolar yüklenemedi.",
     "onlyHome": "Çalışma alanının ya da rollerinizin panoları burada görünür.",
     "create": "Oluştur",

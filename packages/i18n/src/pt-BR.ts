@@ -13504,6 +13504,11 @@ export const ptBR = {
     new: "Novo painel",
     back: "Painéis",
     home: "Meu Início",
+    seeAll: "Ver todos",
+    useOnHome: "Usar no Início",
+    stopOnHome: "Tirar do Início",
+    onHome: "No Início",
+    onHomeDone: "O Início agora mostra este painel",
     groups: {
       workspace: "Do workspace",
       workspaceHint: "todo mundo vê",

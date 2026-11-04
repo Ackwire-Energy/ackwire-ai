@@ -1621,7 +1621,6 @@
   },
   "dashboards": {
     "homeRow": "仅你自己 · 你自己的小组件",
-    "count_other": "{{count}} 个仪表盘",
     "loadFailed": "无法加载仪表盘。",
     "onlyHome": "工作区或你的角色的仪表盘会显示在这里。",
     "create": "创建",
