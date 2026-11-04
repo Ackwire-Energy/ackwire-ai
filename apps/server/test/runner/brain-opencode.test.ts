@@ -177,18 +177,18 @@ test("the CLI's models: provider/model lines, the free tier marked", () => {
   ]);
 });
 
-test.skipIf(!posix)("detection: OpenCode's semver and its models; another `opencode` is skipped", () => {
+test.skipIf(!posix)("detection: OpenCode's semver and its models; another `opencode` is skipped", async () => {
   const run = (version: string) => (command: string, args: string[]) =>
     command === "opencode"
       ? args[0] === "--version"
         ? { status: 0, stdout: `${version}\n` }
         : { status: 0, stdout: "opencode/big-pickle\n" }
       : { status: 1, stdout: "" };
-  expect(detectExecutors(run("1.19.5")).opencode).toEqual({
+  expect((await detectExecutors(run("1.19.5"))).found.opencode).toEqual({
     version: "1.19.5",
     models: [{ id: "opencode/big-pickle", label: "Big Pickle", free: true }],
   });
-  expect(detectExecutors(run("opencode the game")).opencode).toBeUndefined();
+  expect((await detectExecutors(run("opencode the game"))).found.opencode).toBeUndefined();
 });
 
 test("an account folder is all of OpenCode's XDG folders, and no other key leaks in", () => {

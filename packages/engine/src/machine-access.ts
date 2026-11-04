@@ -5,9 +5,10 @@ import {
   type PubSub,
   type RunnerAccess,
   type RunnerFrame,
+  type RunnerInfo,
   type RunnerTools,
 } from "@agenteschat/adapters";
-import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
+import { and, type Database, eq, isNull, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
@@ -64,6 +65,27 @@ export async function storeMachineAccess(deps: AccessDeps, machineId: string, ac
     .returning({ orgId: machines.orgId });
   // Members refetch; the folders themselves are only in the API, for admins and the pairer.
   if (row) await publishMachineUpdated(deps.pubsub, row.orgId, machineId, { access: true });
+}
+
+/**
+ * `executors.changed` (protocol 41): the coding CLIs the runner found since `hello`. Only those keys are replaced;
+ * what `hello` stored beside them (the browser, the desktops, the own sign-ins' usage) stays.
+ */
+export async function storeMachineExecutors(
+  deps: AccessDeps,
+  machineId: string,
+  executors: NonNullable<RunnerInfo["executors"]>,
+) {
+  const next = JSON.stringify({ ...executors, detectedAt: new Date().toISOString() });
+  const [row] = await deps.db
+    .update(machines)
+    .set({
+      executors: sql`(coalesce(${machines.executors}, '{}'::jsonb) - 'claude' - 'codex' - 'cursor' - 'opencode') || ${next}::jsonb`,
+      updatedAt: new Date(),
+    })
+    .where(eq(machines.id, machineId))
+    .returning({ orgId: machines.orgId });
+  if (row) await publishMachineUpdated(deps.pubsub, row.orgId, machineId, { executors: true });
 }
 
 export interface ReduceAccessInput {

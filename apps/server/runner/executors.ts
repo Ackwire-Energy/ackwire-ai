@@ -1,21 +1,38 @@
-import { spawnSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
-import type { CursorModelInfo, RunnerInfo } from "@agenteschat/adapters/machine-protocol";
+import {
+  type CursorModelInfo,
+  parseExecutors,
+  type RunnerExecutorInfo,
+  type RunnerInfo,
+} from "@agenteschat/adapters/machine-protocol";
 import { isOpencodeFreeModel, OPENCODE_FREE_MODELS } from "@agenteschat/providers/plans";
-import { readSmallJson } from "./json-file";
+import { readSmallJson, writeJson } from "./json-file";
 import { SHARED_BIN_ENV } from "./shared-folder";
 
 /**
  * Which coding CLIs this machine has (protocol 7, ADR 0029): `claude` and
  * `codex` on the PATH the runner (and so its tasks) sees, with the first line
- * of `--version`. Best effort and cached: `hello` carries it on every
- * connection, and a fresh look happens at most every `EXECUTORS_TTL_MS`.
+ * of `--version`. Best effort and cached: `hello` carries the last known list
+ * at once, a fresh look happens in the background at most every
+ * `EXECUTORS_TTL_MS`, and a list that changed goes out as `executors.changed`.
  */
 export const EXECUTORS_TTL_MS = 10 * 60_000;
+/** After a look that couldn't tell (a CLI timed out or failed), the next one comes this soon, then doubles up to the TTL. */
+export const EXECUTORS_RETRY_MS = 30_000;
 
-type Run = (command: string, args: string[]) => { status: number | null; stdout: string; error?: unknown };
+type Executors = NonNullable<RunnerInfo["executors"]>;
+type RunResult = { status: number | null; stdout: string; error?: unknown };
+export type ExecutorRun = (command: string, args: string[]) => RunResult | Promise<RunResult>;
+type Run = ExecutorRun;
+
+/**
+ * Only a binary that isn't there is missing. A timeout, a crash or a failing exit (a busy machine, a CLI mid-update)
+ * says nothing about what is installed, so the last good look stands.
+ */
+const missing = (r: RunResult) => (r.error as { code?: unknown } | undefined)?.code === "ENOENT";
 
 /**
  * `command`'s full path on the current `process.env.PATH`, or the bare name. The app mode adopts the login
@@ -40,17 +57,33 @@ export function resolveCommand(
   return sharedBin && dirs[0] ? join(dirs[0], command) : command;
 }
 
-const defaultRun: Run = (command, args) => {
-  const r = spawnSync(resolveCommand(command), args, {
-    encoding: "utf8",
-    timeout: 8000,
-    windowsHide: true,
-    env: process.env,
-    // Windows finds `claude.cmd` / `codex.cmd` only through the shell.
-    shell: process.platform === "win32",
+const defaultRun: Run = (command, args) =>
+  new Promise((resolve) => {
+    execFile(
+      resolveCommand(command),
+      args,
+      {
+        encoding: "utf8",
+        timeout: 8000,
+        maxBuffer: 1024 * 1024,
+        windowsHide: true,
+        env: process.env,
+        // Windows finds `claude.cmd` / `codex.cmd` only through the shell.
+        shell: process.platform === "win32",
+      },
+      (err, stdout) => {
+        const code = (err as { code?: unknown } | null)?.code;
+        const out = `${stdout ?? ""}`;
+        resolve(
+          typeof code === "number"
+            ? { status: code, stdout: out }
+            : err
+              ? { status: null, stdout: out, error: err }
+              : { status: 0, stdout: out },
+        );
+      },
+    );
   });
-  return { status: r.status, stdout: `${r.stdout ?? ""}`, error: r.error };
-};
 
 const word = (v: unknown) => (typeof v === "string" && /^[\w.-]{1,40}$/.test(v) ? v : undefined);
 
@@ -108,15 +141,15 @@ export function claudeKeptPlan(configDir: string): string | undefined {
  * Protocol 8: whether Claude Code is logged in (`claude auth status --json`:
  * `loggedIn`, `authMethod`, `subscriptionType`, the plan as `claudePlan` names
  * it). Only these three leave the machine (never the email or the
- * organization). Unknown on any failure.
+ * organization). Unknown on any failure; null when the CLI couldn't answer (timed out, failed to start).
  */
-export function claudeAuth(
+export async function claudeAuth(
   run: Run = defaultRun,
   tier: () => unknown = () => claudeTier(process.env.CLAUDE_CONFIG_DIR || homedir(), true),
-): { loggedIn?: boolean; authMethod?: string; plan?: string } {
+): Promise<{ loggedIn?: boolean; authMethod?: string; plan?: string } | null> {
   try {
-    const r = run("claude", ["auth", "status", "--json"]);
-    if (r.error) return {};
+    const r = await run("claude", ["auth", "status", "--json"]);
+    if (r.error) return missing(r) ? {} : null;
     const json = JSON.parse(r.stdout.trim() || "null") as Record<string, unknown> | null;
     if (!json || typeof json !== "object") return r.status !== 0 ? { loggedIn: false } : {};
     const authMethod = word(json.authMethod);
@@ -165,14 +198,8 @@ const CURSOR_VERSION = /^\d{4}\.\d{1,2}\.\d{1,2}\b/;
  * Protocol 36 (ADR 0114): Cursor's CLI (`agent`) and the models its sign-in lists (`agent models`, which asks
  * Cursor: none when signed out or offline).
  */
-function detectCursor(run: Run): NonNullable<RunnerInfo["executors"]>["cursor"] {
-  const r = run(CURSOR_BIN, ["--version"]);
-  if (r.error || r.status !== 0) return undefined;
-  const version = r.stdout.trim().split("\n")[0]?.trim().slice(0, 80) ?? "";
-  if (!CURSOR_VERSION.test(version)) return undefined;
-  const m = run(CURSOR_BIN, ["models"]);
-  const models = !m.error && m.status === 0 ? parseCursorModels(m.stdout) : [];
-  return { version, ...(models.length ? { models } : {}) };
+function detectCursor(run: Run): Promise<Probe> {
+  return detectWithModels(run, CURSOR_BIN, CURSOR_VERSION, parseCursorModels);
 }
 
 /** OpenCode's CLI (`opencode-ai` on npm). */
@@ -200,48 +227,130 @@ export function parseOpencodeModels(output: string): CursorModelInfo[] {
 const OPENCODE_VERSION = /^v?\d+\.\d+\.\d+\b/;
 
 /** Protocol 39 (ADR 0132): OpenCode's CLI and the models it lists (`opencode models`: the free tier with no key). */
-function detectOpencode(run: Run): NonNullable<RunnerInfo["executors"]>["opencode"] {
-  const r = run(OPENCODE_BIN, ["--version"]);
-  if (r.error || r.status !== 0) return undefined;
-  const version = r.stdout.trim().split("\n")[0]?.trim().slice(0, 80) ?? "";
-  if (!OPENCODE_VERSION.test(version)) return undefined;
-  const m = run(OPENCODE_BIN, ["models"]);
-  const models = !m.error && m.status === 0 ? parseOpencodeModels(m.stdout) : [];
-  return { version, ...(models.length ? { models } : {}) };
+function detectOpencode(run: Run): Promise<Probe> {
+  return detectWithModels(run, OPENCODE_BIN, OPENCODE_VERSION, parseOpencodeModels);
 }
 
-export function detectExecutors(run: Run = defaultRun): NonNullable<RunnerInfo["executors"]> {
-  const out: NonNullable<RunnerInfo["executors"]> = {};
-  for (const name of ["claude", "codex"] as const) {
-    try {
-      const r = run(name, ["--version"]);
-      if (r.error || r.status !== 0) continue;
-      const version = r.stdout.trim().split("\n")[0]?.trim().slice(0, 80) ?? "";
-      if (version) out[name] = { version, ...(name === "claude" ? claudeAuth(run) : {}) };
-    } catch {
-      // not installed
-    }
-  }
-  try {
-    const cursor = detectCursor(run);
-    if (cursor) out.cursor = cursor;
-  } catch {
-    // not installed
-  }
-  try {
-    const opencode = detectOpencode(run);
-    if (opencode) out.opencode = opencode;
-  } catch {
-    // not installed
-  }
-  return out;
-}
+/** One CLI's look: what it found, and whether it couldn't tell (then the last good look stands). */
+type Probe = { entry?: RunnerExecutorInfo; unsure?: boolean };
 
-/** `detectExecutors`, looked up again only after the TTL. */
-export function cachedExecutors(now: () => number = Date.now, run?: Run) {
-  let cache: { at: number; value: NonNullable<RunnerInfo["executors"]> } | null = null;
-  return () => {
-    if (!cache || now() - cache.at > EXECUTORS_TTL_MS) cache = { at: now(), value: detectExecutors(run) };
-    return cache.value;
+const firstLine = (r: RunResult) => r.stdout.trim().split("\n")[0]?.trim().slice(0, 80) ?? "";
+
+/** `<bin> --version` checked against `shape`, then `<bin> models` (none when signed out or offline). */
+async function detectWithModels(
+  run: Run,
+  bin: string,
+  shape: RegExp,
+  parse: (output: string) => CursorModelInfo[],
+): Promise<Probe> {
+  const r = await run(bin, ["--version"]);
+  if (r.error || r.status !== 0) return missing(r) ? {} : { unsure: true };
+  const version = firstLine(r);
+  if (!shape.test(version)) return {};
+  const m = await run(bin, ["models"]);
+  const models = !m.error && m.status === 0 ? parse(m.stdout) : [];
+  return {
+    entry: { version, ...(models.length ? { models } : {}) },
+    ...(m.error && !missing(m) ? { unsure: true } : {}),
   };
+}
+
+async function detectVersion(run: Run, name: "claude" | "codex"): Promise<Probe> {
+  const r = await run(name, ["--version"]);
+  if (r.error || r.status !== 0) return missing(r) ? {} : { unsure: true };
+  const version = firstLine(r);
+  if (!version) return {};
+  if (name !== "claude") return { entry: { version } };
+  const auth = await claudeAuth(run);
+  return auth ? { entry: { version, ...auth } } : { entry: { version }, unsure: true };
+}
+
+/**
+ * Every CLI looked up at once. One that couldn't tell keeps its entry from `prev` (the last good look), and the
+ * whole look is `unsure`, so it is retried soon instead of cached.
+ */
+export async function detectExecutors(
+  run: Run = defaultRun,
+  prev: Executors = {},
+): Promise<{ found: Executors; unsure: boolean }> {
+  const safe = (p: () => Promise<Probe>) => p().catch((): Probe => ({ unsure: true }));
+  const names = ["claude", "codex", "cursor", "opencode"] as const;
+  const probes = await Promise.all([
+    safe(() => detectVersion(run, "claude")),
+    safe(() => detectVersion(run, "codex")),
+    safe(() => detectCursor(run)),
+    safe(() => detectOpencode(run)),
+  ]);
+  const found: Executors = {};
+  let unsure = false;
+  names.forEach((name, i) => {
+    const p = probes[i] ?? {};
+    const entry = p.unsure ? (prev[name] ?? p.entry) : p.entry;
+    if (entry) found[name] = entry;
+    if (p.unsure) unsure = true;
+  });
+  return { found, unsure };
+}
+
+/** The last list kept on disk is believed only as far as `hello` would carry it. */
+function keptExecutors(file: string): Executors {
+  const kept = readSmallJson(file, 1024 * 1024);
+  return kept && typeof kept === "object" && !Array.isArray(kept)
+    ? parseExecutors(kept as Record<string, unknown>)
+    : {};
+}
+
+export interface ExecutorsCache {
+  /** The last known list, at once; a look starts in the background when it is due. */
+  (): Executors;
+  /** The list, waiting for the first look when none is known yet. */
+  ready(): Promise<Executors>;
+}
+
+/**
+ * `detectExecutors` in the background, looked up again only after the TTL (sooner after an unsure look). `file`
+ * keeps the last list across restarts, so the first `hello` after one already has it; `onChange` hears of a list
+ * that changed.
+ */
+export function cachedExecutors(
+  opts: { now?: () => number; run?: Run; file?: string; onChange?: (found: Executors) => void } = {},
+): ExecutorsCache {
+  const now = opts.now ?? Date.now;
+  let value: Executors = opts.file ? keptExecutors(opts.file) : {};
+  let known = Object.keys(value).length > 0;
+  let at = Number.NEGATIVE_INFINITY;
+  let wait = EXECUTORS_TTL_MS;
+  let retry = 0;
+  let running: Promise<Executors> | null = null;
+  const look = (): Promise<Executors> =>
+    (running ??= detectExecutors(opts.run, value)
+      .then(({ found, unsure }) => {
+        at = now();
+        retry = unsure ? Math.min(retry ? retry * 2 : EXECUTORS_RETRY_MS, EXECUTORS_TTL_MS) : 0;
+        wait = retry || EXECUTORS_TTL_MS;
+        if (unsure) setTimeout(() => void look(), wait).unref?.();
+        const changed = JSON.stringify(found) !== JSON.stringify(value);
+        value = found;
+        known = true;
+        if (changed) {
+          if (opts.file) {
+            try {
+              writeJson(opts.file, found);
+            } catch {}
+          }
+          try {
+            opts.onChange?.(found);
+          } catch {}
+        }
+        return value;
+      })
+      .finally(() => {
+        running = null;
+      }));
+  const get = (() => {
+    if (now() - at >= wait) void look();
+    return value;
+  }) as ExecutorsCache;
+  get.ready = () => (known ? Promise.resolve(get()) : look());
+  return get;
 }

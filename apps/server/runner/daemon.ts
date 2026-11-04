@@ -96,7 +96,7 @@ import { DesktopManager } from "./desktop";
 import { DesktopSessions, type DesktopUser, runnerUser, systemDesktopUser } from "./desktop-session";
 import { EgressObservation, probeEgress } from "./egress";
 import { NetworkChangingError, RUNNER_VERSION, RunnerError } from "./errors";
-import { cachedExecutors } from "./executors";
+import { cachedExecutors, type ExecutorRun } from "./executors";
 import { systemGitCache } from "./git";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
@@ -319,6 +319,8 @@ export interface DaemonOptions {
   /** Tests: an address observation without network or a real agent process. */
   probeEgress?: typeof probeEgress;
   executors?: () => RunnerInfo["executors"];
+  /** Tests: how the coding CLIs' looks run (the background cache stays real). */
+  executorRun?: ExecutorRun;
   /** How the accounts' CLIs start (default `claude` / `codex`). */
   accountCommands?: Partial<Record<AccountKind, string[]>>;
   now?: () => number;
@@ -409,7 +411,13 @@ export class RunnerDaemon implements RequestObserver {
     this.requests = new AccessRequests(opts.home, this.now);
     const proc = currentProcess();
     this.self = opts.self ?? { command: selfCommand(proc), compiled: isCompiled(proc) };
-    const exec = opts.executors ?? cachedExecutors();
+    const exec =
+      opts.executors ??
+      cachedExecutors({
+        file: path.join(opts.home, "executors.json"),
+        ...(opts.executorRun ? { run: opts.executorRun } : {}),
+        onChange: () => this.executorsChanged(),
+      });
     this.executors = () => exec() ?? {};
     // System mode is set at install and kept through pairings: account folders are lent to agents' users.
     let system = false;
@@ -1204,6 +1212,7 @@ export class RunnerDaemon implements RequestObserver {
         void this.sampleEgress();
         this.flushDecisions();
         this.syncLogo(config);
+        this.executorsChanged();
         const accounts = this.accounts.snapshot();
         const usage = this.ownUsage();
         if (accounts && JSON.stringify([accounts, usage]) !== told) {
@@ -1522,6 +1531,17 @@ export class RunnerDaemon implements RequestObserver {
     // Not filtered by the tools turned on: those reach the server on every change (`access.changed`),
     // while `hello` only goes out on connect, so a tool turned on later looked "not installed".
     return found;
+  }
+
+  /**
+   * A look found other CLIs than the server last heard of (`lastExecutors`): it hears now, or with `welcome` when the
+   * look ended between `hello` and `welcome`, or with the next `hello` when offline.
+   */
+  private executorsChanged() {
+    this.queueStatus();
+    const executors = this.executors();
+    const seen = JSON.stringify(executors);
+    if (seen !== this.lastExecutors && this.send({ type: "executors.changed", executors })) this.lastExecutors = seen;
   }
 
   private send(frame: RunnerFrame) {

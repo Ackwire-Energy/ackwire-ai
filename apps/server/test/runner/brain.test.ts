@@ -94,7 +94,7 @@ test("protocol 8: brain.turn requests and brain frames parse; bad events are dro
   ).toMatchObject({ event: { type: "usage", input: 3, output: 0, source: "plan" } });
 });
 
-test("hello: Claude Code's login state travels (never anything else from auth status)", () => {
+test("hello: Claude Code's login state travels (never anything else from auth status)", async () => {
   expect(
     parseExecutors({ claude: { version: "2.1", loggedIn: false, authMethod: "claude.ai", plan: "max", email: "a@b" } }),
   ).toEqual({ claude: { version: "2.1", loggedIn: false, authMethod: "claude.ai", plan: "max" } });
@@ -105,16 +105,20 @@ test("hello: Claude Code's login state travels (never anything else from auth st
           stdout: line({ loggedIn: true, authMethod: "claude.ai", subscriptionType: "team", email: "me@x.com" }),
         }
       : { status: 0, stdout: "2.1.300" };
-  expect(claudeAuth(run)).toEqual({ loggedIn: true, authMethod: "claude.ai", plan: "team" });
+  expect(await claudeAuth(run)).toEqual({ loggedIn: true, authMethod: "claude.ai", plan: "team" });
   // The computer's own sign-in on Ultra: `max` with the 20x tier its `.claude.json` keeps.
   const max = () => ({ status: 0, stdout: line({ loggedIn: true, authMethod: "claude.ai", subscriptionType: "max" }) });
-  expect(claudeAuth(max, () => "default_claude_max_20x")).toMatchObject({ plan: "ultra" });
-  expect(claudeAuth(max, () => undefined)).toMatchObject({ plan: "max" });
-  expect(claudeAuth(() => ({ status: 1, stdout: line({ loggedIn: false }) }))).toEqual({ loggedIn: false });
-  expect(claudeAuth(() => ({ status: null, stdout: "", error: new Error("ENOENT") }))).toEqual({});
+  expect(await claudeAuth(max, () => "default_claude_max_20x")).toMatchObject({ plan: "ultra" });
+  expect(await claudeAuth(max, () => undefined)).toMatchObject({ plan: "max" });
+  expect(await claudeAuth(() => ({ status: 1, stdout: line({ loggedIn: false }) }))).toEqual({ loggedIn: false });
+  const notFound = Object.assign(new Error("spawn claude ENOENT"), { code: "ENOENT" });
+  expect(await claudeAuth(() => ({ status: null, stdout: "", error: notFound }))).toEqual({});
+  // Timed out: it couldn't tell, so the last good look stands.
+  const timedOut = Object.assign(new Error("timed out"), { code: "ETIMEDOUT" });
+  expect(await claudeAuth(() => ({ status: null, stdout: "", error: timedOut }))).toBeNull();
 });
 
-test.if(posix)("the computer's own sign-in: its tier read through a link, as Claude Code reads it", () => {
+test.if(posix)("the computer's own sign-in: its tier read through a link, as Claude Code reads it", async () => {
   const dir = tempDir("own-claude-");
   dirs.push(dir);
   const kept = path.join(dir, "kept.json");
@@ -124,7 +128,7 @@ test.if(posix)("the computer's own sign-in: its tier read through a link, as Cla
   const before = process.env.CLAUDE_CONFIG_DIR;
   process.env.CLAUDE_CONFIG_DIR = dir;
   try {
-    expect(claudeAuth(max)).toMatchObject({ plan: "ultra" });
+    expect(await claudeAuth(max)).toMatchObject({ plan: "ultra" });
   } finally {
     if (before === undefined) delete process.env.CLAUDE_CONFIG_DIR;
     else process.env.CLAUDE_CONFIG_DIR = before;

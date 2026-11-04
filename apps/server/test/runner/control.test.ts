@@ -233,6 +233,38 @@ test("paired: status and hello carry pause and access; pause/resume persist, go 
   expect(s.closed).toBe(true);
 });
 
+test("hello never waits on the CLIs' looks; what a look finds later reaches the server mid-session", async () => {
+  const { home } = pairedHome();
+  writeFileSync(path.join(home, "executors.json"), JSON.stringify({ codex: { version: "codex-cli 0.80.0" } }));
+  let release: () => void = () => {};
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  const executorRun = async (command: string, args: string[]) => {
+    await gate;
+    if (command === "claude") {
+      return args[0] === "auth"
+        ? { status: 0, stdout: JSON.stringify({ loggedIn: true, authMethod: "claude.ai" }) }
+        : { status: 0, stdout: "2.1.300 (Claude Code)\n" };
+    }
+    return { status: null, stdout: "", error: Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" }) };
+  };
+  const c = control(home, { executors: undefined, executorRun });
+  // The looks hang: hello still goes out at once, with the list the last run kept.
+  const s = await c.connect();
+  expect(s.of("hello")[0]?.executors).toEqual({ codex: { version: "codex-cli 0.80.0" } });
+  release();
+  await waitFor(() => s.of("executors.changed").length === 1);
+  expect(s.of("executors.changed")[0]).toEqual({
+    type: "executors.changed",
+    executors: { claude: { version: "2.1.300 (Claude Code)", loggedIn: true, authMethod: "claude.ai" } },
+  });
+  // The next start's hello has it at once.
+  expect(JSON.parse(readFileSync(path.join(home, "executors.json"), "utf8"))).toMatchObject({
+    claude: { version: "2.1.300 (Claude Code)" },
+  });
+});
+
 test("reconnect from the app: the socket is dropped and dialed again at once, with a fresh hello", async () => {
   const unpaired = tempDir("home-");
   dirs.push(unpaired);

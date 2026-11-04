@@ -539,6 +539,42 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
     expect(woke).toEqual([paired.machineId]);
   });
 
+  test("CLIs found mid-session replace the hello's (the browser and the rest stay) and wake what waited", async () => {
+    f = await setup({ machines: true });
+    const hub = f.machineHub as MachineHub;
+    const woke: string[] = [];
+    hub.setMissionHooks({ online: async (id) => void woke.push(id) });
+    const paired = await pair();
+    const runner = fakeRunner(hub);
+    const row = async () =>
+      (await f.db.select().from(schema.machines).where(eq(schema.machines.id, paired.machineId)))[0]?.executors;
+    // The look timed out before this hello: it carried nothing for Claude Code.
+    await runner.hello(paired.token, {
+      executors: { codex: { version: "codex-cli 0.80.0" } },
+      browser: { available: true, chrome: "Google Chrome 156.0.8078.79" },
+    });
+    await Bun.sleep(5);
+    woke.length = 0;
+    await runner.frame({
+      type: "executors.changed",
+      executors: { claude: { version: "2.1.300", loggedIn: true, email: "never@stored" }, bogus: { version: "x" } },
+    });
+    await Bun.sleep(5);
+    const executors = await row();
+    expect(executors).toMatchObject({
+      claude: { version: "2.1.300", loggedIn: true },
+      browser: { available: true },
+    });
+    expect(executors?.codex).toBeUndefined();
+    expect(JSON.stringify(executors)).not.toContain("never@stored");
+    expect(JSON.stringify(executors)).not.toContain("bogus");
+    expect(woke).toEqual([paired.machineId]);
+    // Not an object: dropped, the row stays.
+    await runner.frame({ type: "executors.changed", executors: "nope" });
+    await Bun.sleep(5);
+    expect((await row())?.claude).toMatchObject({ version: "2.1.300" });
+  });
+
   test("a brain turn that goes quiet fails; its own events and bridge calls keep a long one alive", async () => {
     f = await setup({ machines: true });
     const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-i", brainIdleMs: 200 });

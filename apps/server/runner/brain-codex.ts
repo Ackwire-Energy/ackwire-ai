@@ -558,7 +558,7 @@ export async function runCodexTurn(input: CodexTurnInput, opts: CodexTurnOptions
   if ((opts.platform ?? process.platform) === "win32") {
     return fail("unsupported", "The Codex brain isn't supported on Windows yet.");
   }
-  const version = (opts.codexVersion ?? (() => detected().codex?.version))();
+  const version = await (opts.codexVersion ?? (async () => (await detected.ready()).codex?.version))();
   if (!version) return fail("codex_missing", "Codex is not installed on this computer.");
   if (!codexVersionOk(version)) {
     return fail("codex_too_old", `Codex here is ${version}. Agents need ${CODEX_MIN_VERSION} or newer.`);
