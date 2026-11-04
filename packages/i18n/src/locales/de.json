@@ -3017,6 +3017,7 @@
       "routineStalled": "<b>{{name}}</b> wartet auf den Computer, um eine Routine auszuführen",
       "agentUnreached": "Eine Routine konnte <b>{{name}}</b> nicht rufen",
       "browserProfileRequest": "<b>{{name}}</b> bittet um ein weiteres Browserprofil für <b>{{agent}}</b>",
+      "desktopTaken": "<b>{{name}}</b> hat den Bildschirm des Computers von <b>{{agent}}</b> übernommen",
       "routineWaitingPlan": "<b>{{name}}</b> wartet, bis sein Abo zurückgesetzt wird, um eine Routine auszuführen",
       "planResetUnknown": "{{plan}} hat nicht gesagt, wann das Limit zurückgesetzt wird. Die Arbeit von <b>{{name}}</b> wartet noch.",
       "catchUpClosed_one": "<b>{{name}}</b> ist zurück und hat {{count}} Unterhaltung übersprungen, die keine Antwort brauchte",
@@ -13370,7 +13371,8 @@
     "ask": {
       "watching": "Du schaust nur zu.",
       "title": "Steuerung übernehmen?",
-      "working": "{{name}} pausiert, solange du die Steuerung hast."
+      "working": "{{name}} pausiert, solange du die Steuerung hast.",
+      "titleBrowser": "Browser übernehmen?"
     },
     "sub": {
       "control": "Du hast die Steuerung · {{name}} wartet",
@@ -13384,6 +13386,7 @@
     },
     "retry": "Erneut versuchen",
     "takeover": "Steuerung übernehmen",
+    "takeBrowser": "Browser übernehmen",
     "taking": "Steuerung wird übernommen…",
     "clipboard": {
       "got": "Auf dem Computer von {{name}} kopiert:",
@@ -13451,6 +13454,11 @@
       "linuxOnly": "Agenten nutzen Apps auf eigenen Bildschirmen nur auf Linux-Computern.",
       "agent": "{{name}} kann auf {{computer}} noch keine Apps auf seinem Bildschirm nutzen.",
       "agent_female": "{{name}} kann auf {{computer}} noch keine Apps auf ihrem Bildschirm nutzen."
+    },
+    "browserOnly": {
+      "title": "Du bist im Browser, nicht auf dem ganzen Computer",
+      "plan": "{{name}} denkt mit dem Abo der Person, der der Agent gehört, deshalb steuern nur sie und Admins, die Agenten verwalten, den ganzen Computer",
+      "other": "Du kannst den Browser von {{name}} steuern, nicht den ganzen Computer"
     }
   },
   "agentComputer": {

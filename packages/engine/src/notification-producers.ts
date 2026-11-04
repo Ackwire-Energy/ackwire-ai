@@ -1308,6 +1308,25 @@ export async function notifyComputerNoChrome(
 }
 
 /**
+ * Someone other than its owner took control of an agent's desktop (ADR 0059 §8): the owner hears it in the inbox
+ * only, once a day per agent (`desktop_taken:{agentId}:{UTC day}`), since an admin may do so even while the agent
+ * thinks with the owner's plan.
+ */
+export async function notifyDesktopTaken(
+  deps: NotificationDeps,
+  input: { orgId: string; agentId: string; agentName: string; ownerUserId: string; actorId: string; at: Date },
+) {
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [input.ownerUserId],
+    kind: "desktop_taken",
+    groupKey: `desktop_taken:${input.agentId}:${input.at.toISOString().slice(0, 10)}`,
+    actor: { type: "user", id: input.actorId },
+    source: { agentId: input.agentId, screen: "desktop", label: input.agentName },
+  });
+}
+
+/**
  * The workspace's own computer is ready (ADR 0056 §10): its owners hear it, since preparing it may take
  * from seconds to an approval hours later. One row each time it gets ready.
  */

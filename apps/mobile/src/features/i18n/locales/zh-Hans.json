@@ -758,6 +758,7 @@
       "usage_limit_raised": "{{names}} 提高了你本月的额度",
       "usage_limit_refused": "{{names}} 拒绝了你增加使用的申请",
       "browser_profile_request_other": "{{names}} 请求再增加一个浏览器配置文件",
+      "desktop_taken_other": "{{names}} 接管了 {{agent}} 的电脑屏幕",
       "connector_tool_changed_other": "一个已连接的服务器更改了你批准过的工具",
       "computer_disk_full_other": "一台电脑的磁盘快满了",
       "computer_no_chrome_other": "电脑需要 Google Chrome。请在 google.com/chrome 下载",

@@ -149,6 +149,11 @@ export const NOTIFICATION_KINDS = [
    */
   "computer_no_chrome",
   /**
+   * Someone other than the agent's owner took control of its desktop (ADR 0059 §8): its owner, once a day per agent,
+   * the person as actor, `source.agentId` and its name in `source.label`. Inbox only (no category, no push).
+   */
+  "desktop_taken",
+  /**
    * An AI app connected as the person created agents, routines, skills, memories or channels for them (ADR 0119):
    * one row per connection merging while unread, `latest.title` the app's name and `latest.created` how many of each
    * kind; `source.agentId` or `source.routineId` the newest one it opens. Inbox only.

@@ -827,6 +827,8 @@ export const featureKeysEn = {
       usage_limit_refused: "{{names}} turned down your request for more",
       browser_profile_request_one: "{{names}} asks for one more browser profile",
       browser_profile_request_other: "{{names}} ask for one more browser profile",
+      desktop_taken_one: "{{names}} took control of the screen of {{agent}}'s computer",
+      desktop_taken_other: "{{names}} took control of the screen of {{agent}}'s computer",
       connector_tool_changed_one: "A connected server changed tools you approved",
       connector_tool_changed_other: "A connected server changed tools you approved",
       computer_disk_full_one: "A computer's disk is almost full",

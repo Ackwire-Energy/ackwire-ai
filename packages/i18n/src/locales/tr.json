@@ -3004,6 +3004,7 @@
       "routineStalled": "<b>{{name}}</b> bir rutini çalıştırmak için bilgisayarı bekliyor",
       "agentUnreached": "Bir rutin <b>{{name}}</b> ajanını çağıramadı",
       "browserProfileRequest": "<b>{{name}}</b>, <b>{{agent}}</b> için bir tarayıcı profili daha istiyor",
+      "desktopTaken": "<b>{{name}}</b>, <b>{{agent}}</b> ajanının bilgisayar ekranını devraldı",
       "routineWaitingPlan": "<b>{{name}}</b> bir rutini çalıştırmak için planının sıfırlanmasını bekliyor",
       "planResetUnknown": "{{plan}} sınırının ne zaman sıfırlanacağını söylemedi. <b>{{name}}</b> ajanının işi hâlâ bekliyor.",
       "catchUpClosed_one": "<b>{{name}}</b> döndü ve yanıt gerektirmeyen {{count}} konuşmayı atladı",
@@ -13302,7 +13303,8 @@
     "ask": {
       "watching": "Yalnızca izliyorsunuz.",
       "title": "Kontrolü almak ister misiniz?",
-      "working": "Kontrol sizdeyken {{name}} duraklar."
+      "working": "Kontrol sizdeyken {{name}} duraklar.",
+      "titleBrowser": "Tarayıcıyı devralmak ister misiniz?"
     },
     "sub": {
       "control": "Kontrol sizde · {{name}} bekliyor",
@@ -13316,6 +13318,7 @@
     },
     "retry": "Tekrar dene",
     "takeover": "Kontrolü al",
+    "takeBrowser": "Tarayıcıyı devral",
     "taking": "Kontrol alınıyor…",
     "clipboard": {
       "got": "{{name}} bilgisayarında kopyalandı:",
@@ -13383,6 +13386,11 @@
       "linuxOnly": "Ajanlar kendi ekranlarında uygulamaları yalnızca Linux bilgisayarlarda kullanır.",
       "agent": "{{name}}, {{computer}} üzerinde kendi ekranındaki uygulamaları henüz kullanamıyor.",
       "agent_female": "{{name}}, {{computer}} üzerinde kendi ekranındaki uygulamaları henüz kullanamıyor."
+    },
+    "browserOnly": {
+      "title": "Tüm bilgisayarda değil, tarayıcıdasınız",
+      "plan": "{{name}} sahibinin planıyla düşünüyor, bu yüzden tüm bilgisayarı yalnızca sahibi ve ajanları yöneten yöneticiler kontrol eder",
+      "other": "{{name}} adlı ajanın tarayıcısını kontrol edebilirsiniz, tüm bilgisayarı değil"
     }
   },
   "agentComputer": {

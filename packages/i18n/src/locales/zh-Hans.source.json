@@ -6959,6 +6959,9 @@
   "notifications.what.browserProfileRequest": {
     "value": "<b>{{name}}</b> asks for one more browser profile for <b>{{agent}}</b>"
   },
+  "notifications.what.desktopTaken": {
+    "value": "<b>{{name}}</b> took control of the screen of <b>{{agent}}</b>'s computer"
+  },
   "notifications.what.routineWaitingPlan": {
     "value": "<b>{{name}}</b> is waiting for its plan to reset to run a routine"
   },
@@ -31436,6 +31439,9 @@
   "desktop.ask.working": {
     "value": "{{name}} pauses while you’re in control."
   },
+  "desktop.ask.titleBrowser": {
+    "value": "Take over the browser?"
+  },
   "desktop.sub.control": {
     "value": "You're in control · {{name}} waits"
   },
@@ -31459,6 +31465,9 @@
   },
   "desktop.takeover": {
     "value": "Take control"
+  },
+  "desktop.takeBrowser": {
+    "value": "Take over the browser"
   },
   "desktop.taking": {
     "value": "Taking control…"
@@ -31601,6 +31610,15 @@
   "desktop.use.agent": {
     "value": "{{name}} can't use apps on his screen on {{computer}} yet.",
     "female": "{{name}} can't use apps on her screen on {{computer}} yet."
+  },
+  "desktop.browserOnly.title": {
+    "value": "You're in the browser, not the whole computer"
+  },
+  "desktop.browserOnly.plan": {
+    "value": "{{name}} thinks with the owner's plan, so only the owner and admins who manage agents control the whole computer"
+  },
+  "desktop.browserOnly.other": {
+    "value": "You can control {{name}}'s browser, not the whole computer"
   },
   "agentComputer.title": {
     "value": "{{name}}'s computer"

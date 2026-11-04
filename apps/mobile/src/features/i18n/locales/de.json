@@ -816,6 +816,8 @@
       "usage_limit_refused": "{{names}} hat deine Bitte um mehr Nutzung abgelehnt",
       "browser_profile_request_one": "{{names}} bittet um ein weiteres Browserprofil",
       "browser_profile_request_other": "{{names}} bitten um ein weiteres Browserprofil",
+      "desktop_taken_one": "{{names}} hat den Bildschirm des Computers von {{agent}} übernommen",
+      "desktop_taken_other": "{{names}} haben den Bildschirm des Computers von {{agent}} übernommen",
       "connector_tool_changed_one": "Ein verbundener Server hat Tools geändert, die du freigegeben hast",
       "connector_tool_changed_other": "Verbundene Server haben Tools geändert, die du freigegeben hast",
       "computer_disk_full_one": "Die Festplatte eines Computers ist fast voll",

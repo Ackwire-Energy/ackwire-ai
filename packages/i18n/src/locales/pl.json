@@ -3210,6 +3210,7 @@
       "routineStalled": "<b>{{name}}</b> czeka na komputer, by uruchomić rutynę",
       "agentUnreached": "Rutyna nie mogła zawołać <b>{{name}}</b>",
       "browserProfileRequest": "<b>{{name}}</b> prosi o kolejny profil przeglądarki dla <b>{{agent}}</b>",
+      "desktopTaken": "Ekran komputera <b>{{agent}}</b> przejęty przez <b>{{name}}</b>",
       "routineWaitingPlan": "<b>{{name}}</b> czeka na odnowienie limitu planu, by uruchomić rutynę",
       "planResetUnknown": "{{plan}} nie podaje, kiedy odnowi się limit. Praca <b>{{name}}</b> nadal czeka.",
       "catchUpClosed_one": "<b>{{name}}</b> wrócił i pominął {{count}} rozmowę, która nie wymagała odpowiedzi",
@@ -14275,7 +14276,8 @@
     "ask": {
       "watching": "Tylko oglądasz.",
       "title": "Chcesz przejąć kontrolę?",
-      "working": "{{name}} wstrzymuje pracę, gdy masz kontrolę."
+      "working": "{{name}} wstrzymuje pracę, gdy masz kontrolę.",
+      "titleBrowser": "Chcesz przejąć przeglądarkę?"
     },
     "sub": {
       "control": "Masz kontrolę · {{name}} czeka",
@@ -14289,6 +14291,7 @@
     },
     "retry": "Spróbuj ponownie",
     "takeover": "Przejmij kontrolę",
+    "takeBrowser": "Przejmij przeglądarkę",
     "taking": "Przejmowanie kontroli…",
     "clipboard": {
       "got": "Skopiowano na komputerze agenta {{name}}:",
@@ -14358,6 +14361,11 @@
       "linuxOnly": "Agenci korzystają z aplikacji na własnych ekranach tylko na komputerach z Linuksem.",
       "agent": "{{name}} nie może jeszcze korzystać z aplikacji na swoim ekranie na {{computer}}.",
       "agent_female": "{{name}} nie może jeszcze korzystać z aplikacji na swoim ekranie na {{computer}}."
+    },
+    "browserOnly": {
+      "title": "Jesteś w przeglądarce, a nie na całym komputerze",
+      "plan": "{{name}} myśli z planem właściciela, więc całym komputerem sterują tylko on i administratorzy zarządzający agentami",
+      "other": "Możesz sterować przeglądarką agenta {{name}}, ale nie całym komputerem"
     }
   },
   "agentComputer": {

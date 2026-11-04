@@ -1,6 +1,7 @@
 import type { AppNotification } from "@agenteschat/client";
 import { appCreatedLine } from "@agenteschat/client/lib/apps";
 import { formatUsd } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { restrictionOf, workspaceHeadline } from "@agenteschat/client/lib/notifications";
 import { useTranslation } from "react-i18next";
 import { isDashboardNotice } from "../dashboards/logic";
@@ -57,6 +58,10 @@ export function useNoticeTitle(n: AppNotification) {
               // `usage_limit`: the limit (who decides only) and the share used.
               amount: n.latest.limitUsd !== undefined ? formatUsd(i18n.language, n.latest.limitUsd) : "",
               percent: Math.round(n.latest.percent ?? 0),
+              // `desktop_taken`: whose computer, said with its name's gender.
+              ...(n.kind === "desktop_taken"
+                ? { agent: n.source.label ?? "", context: agentGrammar(n.source.label ?? "").context }
+                : {}),
               defaultValue: NAMES,
             });
   // Agents that failed for one cause close together: one line for all, who they are under it.

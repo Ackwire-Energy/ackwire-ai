@@ -16,6 +16,7 @@ import {
   type BrowserHandoffView,
   CONTROL_GRACE_MS,
   handoffView,
+  noteComputerTaken,
   openHandoffOf,
   openHandoffOn,
   requireBrowserAccess,
@@ -25,7 +26,7 @@ import {
 import { HANDOFF_KEEPALIVE_MS } from "./browser/live";
 import { ForbiddenError, NotFoundError } from "./errors";
 import type { MachineCaller, MachineHub } from "./machine-hub";
-import { getMachine, machineOnline, requireComputerDriver } from "./machines";
+import { computerDriving, type DriveRefusal, getMachine, machineOnline, requireComputerDriver } from "./machines";
 import { closedRefusal, OrgDeletingError, orgStanding, standingRefusal } from "./standing";
 import type { Stream, StreamBroker, StreamInput, StreamTarget } from "./streams";
 
@@ -115,6 +116,7 @@ export interface StreamPolicyDeps {
   db: Database;
   hub: Pick<MachineHub, "isLocal">;
   rateLimiter?: RateLimiter;
+  pubsub?: PubSub;
 }
 
 /**
@@ -137,6 +139,12 @@ export async function authorizeStream(deps: StreamPolicyDeps, input: StreamInput
   // The agent moved to another computer meanwhile: who drives that one wasn't checked.
   if (access.driven && target.machineId !== access.driven) return refused(STREAM_CLOSE.forbidden, "forbidden");
   if (access.control) await touchControl(deps.db, access.control, input.userId, new Date(), true).catch(() => {});
+  // A shell as the agent's user reaches what its screen does (the owner's sign-in): its owner hears it the same way.
+  if (input.request.kind === "terminal") {
+    await noteComputerTaken(deps, { orgId: input.orgId, agentId: input.agentId, actorId: input.userId }).catch(
+      () => {},
+    );
+  }
   if (input.request.kind === "desktop" && (await standingRefusal(deps.db, input.orgId, input.agentId))) {
     return { ...target, held: true };
   }
@@ -244,15 +252,11 @@ export interface DesktopStatus {
   viewers: number;
   /** This person may take control. */
   canControl: boolean;
+  /** Why not (`driveRefusal`), so the apps can say it; null when they may. */
+  controlRefusal: DriveRefusal | null;
   /** The agent is held, or its workspace on hold: people may watch, nobody takes control. */
   held: boolean;
 }
-
-const passes = (check: Promise<unknown>) =>
-  check.then(
-    () => true,
-    () => false,
-  );
 
 /** `GET …/agents/{agentId}/desktop`: for whoever may watch it. */
 export async function desktopStatus(
@@ -263,10 +267,13 @@ export async function desktopStatus(
 ): Promise<DesktopStatus> {
   const { db } = deps;
   await requireDesktopAccess(db, userId, orgId, agentId);
-  const [served, open, canControl, held] = await Promise.all([
+  const [served, open, controlRefusal, held] = await Promise.all([
     desktopTarget(db, ANYWHERE, orgId, agentId, "desktop"),
     openHandoffOn(db, orgId, agentId, "desktop"),
-    passes(requireComputerDriver(db, userId, orgId, agentId)),
+    computerDriving(db, userId, orgId, agentId).then(
+      (d) => d.refusal,
+      (): DriveRefusal => "not_allowed",
+    ),
     standingRefusal(db, orgId, agentId).then((refusal) => refusal !== null),
   ]);
   const online = "machineId" in served && deps.hub ? (await deps.hub.status(served.machineId))?.online === true : false;
@@ -305,7 +312,8 @@ export async function desktopStatus(
     controllerUserId: open?.status === "active" ? open.controllerUserId : null,
     handoff: open ? handoffView(open) : null,
     viewers: deps.streams?.count(agentId, "desktop") ?? 0,
-    canControl,
+    canControl: controlRefusal === null,
+    controlRefusal,
     held,
   };
 }

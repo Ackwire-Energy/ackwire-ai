@@ -2908,6 +2908,7 @@
       "routineStalled": "<b>{{name}}</b>이(가) 루틴을 실행하려고 컴퓨터를 기다리고 있어요",
       "agentUnreached": "루틴이 <b>{{name}}</b>을(를) 부르지 못했어요",
       "browserProfileRequest": "<b>{{name}}</b> 님이 <b>{{agent}}</b>의 브라우저 프로필을 하나 더 요청해요",
+      "desktopTaken": "<b>{{name}}</b> 님이 <b>{{agent}}</b>의 컴퓨터 화면 제어를 넘겨받았어요",
       "routineWaitingPlan": "<b>{{name}}</b>이(가) 루틴을 실행하려고 요금제 한도가 초기화되기를 기다리고 있어요",
       "planResetUnknown": "{{plan}}이(가) 한도 초기화 시점을 알려 주지 않았어요. <b>{{name}}</b>의 작업은 계속 대기 중이에요.",
       "catchUpClosed_other": "<b>{{name}}</b>이(가) 돌아와서 답할 필요가 없었던 대화 {{count}}개를 건너뛰었어요",
@@ -12906,7 +12907,8 @@
     "ask": {
       "watching": "보기만 하고 있어요.",
       "title": "제어할까요?",
-      "working": "내가 제어하는 동안 {{name}}은(는) 잠시 멈춰요."
+      "working": "내가 제어하는 동안 {{name}}은(는) 잠시 멈춰요.",
+      "titleBrowser": "브라우저를 제어할까요?"
     },
     "sub": {
       "control": "내가 제어 중 · {{name}} 대기 중",
@@ -12920,6 +12922,7 @@
     },
     "retry": "다시 시도",
     "takeover": "제어하기",
+    "takeBrowser": "브라우저 제어하기",
     "taking": "제어권을 가져오는 중…",
     "clipboard": {
       "got": "{{name}}의 컴퓨터에서 복사한 내용:",
@@ -12987,6 +12990,11 @@
       "linuxOnly": "에이전트는 Linux 컴퓨터에서만 자기 화면의 앱을 사용할 수 있어요.",
       "agent": "{{name}}은(는) 아직 {{computer}}에서 자기 화면의 앱을 사용할 수 없어요.",
       "agent_female": "{{name}}은(는) 아직 {{computer}}에서 자기 화면의 앱을 사용할 수 없어요."
+    },
+    "browserOnly": {
+      "title": "컴퓨터 전체가 아니라 브라우저만 제어하고 있어요",
+      "plan": "{{name}}은(는) 소유자의 요금제로 생각하므로 컴퓨터 전체는 소유자와 에이전트를 관리하는 관리자만 제어할 수 있어요",
+      "other": "{{name}}의 브라우저는 제어할 수 있지만 컴퓨터 전체는 제어할 수 없어요"
     }
   },
   "agentComputer": {

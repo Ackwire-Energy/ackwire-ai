@@ -816,6 +816,8 @@
       "usage_limit_refused": "{{names}} daha fazla kullanım isteğini reddetti",
       "browser_profile_request_one": "{{names}} bir tarayıcı profili daha istiyor",
       "browser_profile_request_other": "{{names}} bir tarayıcı profili daha istiyor",
+      "desktop_taken_one": "{{names}}, {{agent}} ajanının bilgisayar ekranını devraldı",
+      "desktop_taken_other": "{{names}}, {{agent}} ajanının bilgisayar ekranını devraldı",
       "connector_tool_changed_one": "Bağlı bir sunucu, onayladığınız araçları değiştirdi",
       "connector_tool_changed_other": "Bağlı bir sunucu, onayladığınız araçları değiştirdi",
       "computer_disk_full_one": "Bir bilgisayarın diski neredeyse dolu",

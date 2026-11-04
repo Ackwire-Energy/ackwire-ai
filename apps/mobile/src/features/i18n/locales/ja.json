@@ -758,6 +758,7 @@
       "usage_limit_raised": "{{names}}さんが今月のあなたの上限を引き上げました",
       "usage_limit_refused": "{{names}}さんが追加利用のリクエストを断りました",
       "browser_profile_request_other": "{{names}}がブラウザプロフィールの追加を求めています",
+      "desktop_taken_other": "{{names}}が{{agent}}のコンピューターの画面の操作を引き継ぎました",
       "connector_tool_changed_other": "接続中のサーバーが、承認済みのツールを変更しました",
       "computer_disk_full_other": "コンピューターのディスクがほぼいっぱいです",
       "computer_no_chrome_other": "コンピューターにGoogle Chromeが必要です。google.com/chromeからダウンロードしてください",

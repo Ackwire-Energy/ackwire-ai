@@ -1,5 +1,6 @@
 import type { Agent } from "@agenteschat/client";
 import {
+  browserOnlyWhy,
   controlledBy,
   handoffTimeLeft,
   isWaitingHandoff,
@@ -434,7 +435,13 @@ function ComputerStage({
             {...(manages && f.browser && !view.desktop?.canControl ? { onTakeBrowser: takeBrowser } : {})}
           />
         ) : (
-          <BrowserCard agentId={agent.id} name={agent.name} handoff={f.handoff} surface canTakeOver={canTakeOver} />
+          <>
+            {mine && view.desktop?.available && !view.desktop.canControl && (
+              // A computer with a screen whose browser alone this person drives: the page, labeled, not the screen.
+              <Banner tone="info" text={t("desktop.browserOnly.title")} help={t(browserOnlyWhy(view.desktop), g)} />
+            )}
+            <BrowserCard agentId={agent.id} name={agent.name} handoff={f.handoff} surface canTakeOver={canTakeOver} />
+          </>
         )}
       </>
     );
@@ -592,7 +599,7 @@ function Banner({
   help,
   action,
 }: {
-  tone: "pause" | "warn";
+  tone: "pause" | "warn" | "info";
   text: string;
   help?: string;
   action?: ReactNode;

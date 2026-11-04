@@ -1994,6 +1994,12 @@
       "other": "{{names}} ask for one more browser profile"
     }
   },
+  "activity.kind.desktop_taken": {
+    "value": {
+      "one": "{{names}} took control of the screen of {{agent}}'s computer",
+      "other": "{{names}} took control of the screen of {{agent}}'s computer"
+    }
+  },
   "activity.kind.connector_tool_changed": {
     "value": {
       "one": "A connected server changed tools you approved",

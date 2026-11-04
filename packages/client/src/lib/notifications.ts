@@ -439,7 +439,7 @@ export function openTarget(n: AppNotification): OpenTarget | null {
     return { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
   // A routine couldn't call the agent: its page, where who talks to it is set (the report's room may be private).
   // An agent held on agentes.chat Cloud: its page too, where the hold shows.
-  if ((n.kind === "agent_unreached" || n.kind === "org_standing") && s.agentId)
+  if ((n.kind === "agent_unreached" || n.kind === "org_standing" || n.kind === "desktop_taken") && s.agentId)
     return { to: "/org/$orgId/agents/$agentId", params: { agentId: s.agentId } };
   // The workspace held for its payment: Cobrança, where it is paid.
   if (n.kind === "org_standing" && n.latest.billingHold)

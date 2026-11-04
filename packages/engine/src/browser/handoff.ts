@@ -21,6 +21,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
+import { recordAudit } from "../audit";
 import { isChannelMember } from "../channels";
 import { answersAgentsOnly } from "../consultations";
 import { openPersonAgentDm } from "../dms";
@@ -35,6 +36,7 @@ import {
   browserHandoffRecipient,
   humanBehindRun,
   notifyBrowserHandoff,
+  notifyDesktopTaken,
   remindBrowserHandoffNotifications,
   resolveBrowserHandoffNotifications,
 } from "../notification-producers";
@@ -304,6 +306,55 @@ function noteControl(deps: HandoffDeps, row: BrowserHandoffRow) {
     },
     () => {},
   );
+}
+
+/**
+ * Someone other than the agent's owner took control of its desktop (ADR 0059 §8: an admin may, even while the agent
+ * thinks with the owner's plan, so could read that sign-in there): audited (who, which agent, when), and the owner
+ * hears it quietly.
+ */
+async function noteDesktopTaken(deps: HandoffDeps, row: BrowserHandoffRow) {
+  if (row.screen !== "desktop" || !row.controllerUserId) return;
+  await noteComputerTaken(deps, {
+    orgId: row.orgId,
+    agentId: row.agentId,
+    actorId: row.controllerUserId,
+    audit: { machineId: row.machineId, handoffId: row.id },
+  });
+}
+
+/**
+ * Someone other than the agent's owner got its screen or a shell as its OS user: the owner's quiet notice and, with
+ * `audit`, the `desktop.control_taken` row. A terminal passes none: its stream is audited when it closes
+ * (`terminal.session`).
+ */
+export async function noteComputerTaken(
+  deps: HandoffDeps,
+  input: { orgId: string; agentId: string; actorId: string; audit?: Record<string, unknown> },
+) {
+  const [agent] = await deps.db
+    .select({ owner: agents.ownerUserId, name: agents.name, handle: agents.handle })
+    .from(agents)
+    .where(and(eq(agents.id, input.agentId), eq(agents.orgId, input.orgId)));
+  if (!agent || agent.owner === input.actorId) return;
+  if (input.audit) {
+    await recordAudit(deps.db, {
+      orgId: input.orgId,
+      actor: { type: "person", id: input.actorId },
+      action: "desktop.control_taken",
+      target: { type: "agent", id: input.agentId },
+      details: input.audit,
+    });
+  }
+  if (!agent.owner) return;
+  await notifyDesktopTaken(deps, {
+    orgId: input.orgId,
+    agentId: input.agentId,
+    agentName: agent.name || agent.handle,
+    ownerUserId: agent.owner,
+    actorId: input.actorId,
+    at: new Date(),
+  }).catch(() => {});
 }
 
 /** Control ended: the page it ended on (best effort). */
@@ -990,6 +1041,7 @@ export async function claimHandoff(deps: HandoffDeps, actorId: string, orgId: st
   await syncCard(deps.db, row);
   noteControl(deps, row);
   await afterChange(deps, row);
+  await noteDesktopTaken(deps, row);
   return handoffView(row);
 }
 
@@ -1162,6 +1214,7 @@ export async function startTakeover(
   if (!row) throw new Error("takeover not created");
   noteControl(deps, row);
   await afterChange(deps, row);
+  await noteDesktopTaken(deps, row);
   return handoffView(row);
 }
 

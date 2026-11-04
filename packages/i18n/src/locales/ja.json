@@ -2910,6 +2910,7 @@
       "routineStalled": "<b>{{name}}</b>はルーティンを実行するため、コンピューターを待っています",
       "agentUnreached": "ルーティンが<b>{{name}}</b>を呼び出せませんでした",
       "browserProfileRequest": "<b>{{name}}</b>が<b>{{agent}}</b>用のブラウザプロファイルの追加を求めています",
+      "desktopTaken": "<b>{{name}}</b>が<b>{{agent}}</b>のコンピューターの画面の操作を引き継ぎました",
       "routineWaitingPlan": "<b>{{name}}</b>はルーティンを実行するため、プランのリセットを待っています",
       "planResetUnknown": "{{plan}}は上限がいつリセットされるかを伝えませんでした。<b>{{name}}</b>の作業はまだ待機中です。",
       "catchUpClosed_other": "<b>{{name}}</b>が再開し、返信が不要だった会話{{count}}件をスキップしました",
@@ -12915,7 +12916,8 @@
     "ask": {
       "watching": "見ているだけです。",
       "title": "操作を代わりますか？",
-      "working": "あなたが操作している間、{{name}}は一時停止します。"
+      "working": "あなたが操作している間、{{name}}は一時停止します。",
+      "titleBrowser": "ブラウザを操作しますか？"
     },
     "sub": {
       "control": "あなたが操作中 · {{name}}は待機中",
@@ -12929,6 +12931,7 @@
     },
     "retry": "もう一度試す",
     "takeover": "操作を代わる",
+    "takeBrowser": "ブラウザを操作する",
     "taking": "操作を切り替え中…",
     "clipboard": {
       "got": "{{name}}のコンピューターでコピーされた内容:",
@@ -12996,6 +12999,11 @@
       "linuxOnly": "エージェントが自分の画面でアプリを使えるのは、Linuxのコンピューターだけです。",
       "agent": "{{name}}はまだ{{computer}}の自分の画面でアプリを使えません。",
       "agent_female": "{{name}}はまだ{{computer}}の自分の画面でアプリを使えません。"
+    },
+    "browserOnly": {
+      "title": "操作できるのはブラウザだけで、コンピューター全体ではありません",
+      "plan": "{{name}}はオーナーのプランで思考しているため、コンピューター全体を操作できるのはオーナーとエージェントを管理する管理者だけです",
+      "other": "{{name}}のブラウザは操作できますが、コンピューター全体は操作できません"
     }
   },
   "agentComputer": {

@@ -32,12 +32,15 @@ export interface StartPageData {
 /**
  * The agent's start page as one file: Chrome opens `file://` pages, where it loads nothing beside them reliably, so
  * its style, script, font, picture and the agent's details are all inside. The details are JSON with `<` escaped, so
- * no name closes the script they sit in.
+ * no name closes the script they sit in. Its language is in the markup, not only set by its script: Chrome judges
+ * the page's language from what it loaded, and an `en` page in Portuguese gets the Translate bubble. `notranslate`
+ * keeps that bubble off this page alone; real sites still get it.
  */
 export function startPageHtml(agent: Pick<AgentScope, "name" | "handle">, data: StartPageData = {}): string {
+  const locale = startLocale(data.locale);
   const json = JSON.stringify({
     name: desktopName(agent),
-    locale: startLocale(data.locale),
+    locale,
     egress: data.egress ?? null,
     flag: countryFlagUrl(data.egress?.country),
   }).replace(/</g, "\\u003c");
@@ -46,8 +49,9 @@ export function startPageHtml(agent: Pick<AgentScope, "name" | "handle">, data: 
     JS,
     DATA: json,
     MARK: `data:image/png;base64,${MARK.trim()}`,
+    LANG: locale,
   };
-  return HTML.replace(/\{\{(CSS|JS|DATA|MARK)\}\}/g, (_, key: string) => parts[key] ?? "");
+  return HTML.replace(/\{\{(CSS|JS|DATA|MARK|LANG)\}\}/g, (_, key: string) => parts[key] ?? "");
 }
 
 /**

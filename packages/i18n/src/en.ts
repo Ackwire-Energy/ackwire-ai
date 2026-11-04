@@ -2996,6 +2996,8 @@ export const en = {
       routineStalled: "<b>{{name}}</b> is waiting for the computer to run a routine",
       agentUnreached: "A routine couldn't call <b>{{name}}</b>",
       browserProfileRequest: "<b>{{name}}</b> asks for one more browser profile for <b>{{agent}}</b>",
+      /** Someone other than its owner took control of the person's agent's desktop (`desktop_taken`). */
+      desktopTaken: "<b>{{name}}</b> took control of the screen of <b>{{agent}}</b>'s computer",
       routineWaitingPlan: "<b>{{name}}</b> is waiting for its plan to reset to run a routine",
       planResetUnknown: "{{plan}} didn't say when its limit resets. <b>{{name}}</b>'s work is still waiting.",
       catchUpClosed_one: "<b>{{name}}</b> is back and skipped {{count}} conversation that didn't need an answer",
@@ -12893,6 +12895,7 @@ export const en = {
       watching: "You're just watching.",
       title: "Want to take control?",
       working: "{{name}} pauses while you’re in control.",
+      titleBrowser: "Take over the browser?",
     },
     sub: {
       control: "You're in control · {{name}} waits",
@@ -12906,6 +12909,8 @@ export const en = {
     },
     retry: "Try again",
     takeover: "Take control",
+    /** Where this person may drive the agent's browser but not its whole computer (`controlRefusal`). */
+    takeBrowser: "Take over the browser",
     /** Over the last picture while control opens. */
     taking: "Taking control…",
     clipboard: {
@@ -12980,6 +12985,12 @@ export const en = {
       linuxOnly: "Agents use apps on their own screens only on Linux computers.",
       agent: "{{name}} can't use apps on his screen on {{computer}} yet.",
       agent_female: "{{name}} can't use apps on her screen on {{computer}} yet.",
+    },
+    /** In control of the browser alone on a computer with a screen, and why the whole computer isn't theirs. */
+    browserOnly: {
+      title: "You're in the browser, not the whole computer",
+      plan: "{{name}} thinks with the owner's plan, so only the owner and admins who manage agents control the whole computer",
+      other: "You can control {{name}}'s browser, not the whole computer",
     },
   },
   agentComputer: {
