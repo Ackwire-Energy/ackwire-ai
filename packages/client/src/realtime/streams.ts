@@ -171,6 +171,8 @@ export interface LiveRun {
   turnChars?: number;
   /** A piece of the current turn's text never arrived (a lost socket, a conversation opened mid-answer). */
   gap?: boolean;
+  /** The current turn's pieces heard past that hole, kept for the server's copy of the text before them. */
+  ahead?: { at: number; text: string }[];
 }
 
 export type LiveWork =
@@ -723,9 +725,18 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         (sameTurn && current?.gap === true) || (event.at !== undefined && heard !== undefined && event.at > heard);
       const turnPatch = {
         gap,
-        ...(event.at !== undefined ? { turnChars: event.at + event.text.length } : {}),
+        ahead:
+          gap && event.at !== undefined
+            ? [...((sameTurn && current?.ahead) || []), { at: event.at, text: event.text }]
+            : undefined,
+        ...(event.at !== undefined ? { turnChars: Math.max(heard ?? 0, event.at + event.text.length) } : {}),
         ...(event.turn !== undefined ? { turn: event.turn } : {}),
       };
+      // Sent before the server's copy of the turn was read, it arrived after it (`caughtUp`): only its tail is new.
+      const fresh =
+        event.at !== undefined && heard !== undefined && event.at < heard
+          ? event.text.slice(heard - event.at)
+          : event.text;
       // A new model call. Narration (text before tool calls) already left the body with `agent.narration` or the
       // call; what is still here is a whole reply the server held and sent back for another try (a give-up, a
       // question it shouldn't ask), never posted: the next turn's text replaces it.
@@ -739,7 +750,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       }
       return upsert(state, event, {
         status: "running",
-        text: gap ? (sameTurn ? (current?.text ?? "") : "") : (current?.text ?? "") + event.text,
+        text: gap ? (sameTurn ? (current?.text ?? "") : "") : (current?.text ?? "") + fresh,
         lastSeq: event.seq,
         ...turnPatch,
       });
@@ -840,7 +851,39 @@ export function reconcileRuns(
       ...(a.triggerMessageId ? { triggerMessageId: a.triggerMessageId } : {}),
     });
   }
+  for (const a of active) {
+    const r = a.live && known.has(a.runId) ? s.runs[a.runId] : undefined;
+    if (r && a.live) s = { ...s, runs: { ...s.runs, [a.runId]: caughtUp(r, a.live) } };
+  }
   return s;
+}
+
+/**
+ * Opened or back mid-answer: the server's body of the turn so far (from `live.at`), then the pieces heard past the
+ * hole (`ahead`) that continue it, so the next delta's `at` lines up. A row that heard the whole turn, or a later one,
+ * keeps its own.
+ */
+function caughtUp(r: LiveRun, live: NonNullable<ActiveRun["live"]>): LiveRun {
+  if (r.turn !== undefined && (r.turn > live.turn || (r.turn === live.turn && !r.gap))) return r;
+  let text = live.text;
+  let end = live.at + text.length;
+  const ahead = r.turn === live.turn ? [...(r.ahead ?? [])].sort((x, y) => x.at - y.at) : [];
+  for (const p of ahead) {
+    if (p.at > end || p.at + p.text.length <= end) continue;
+    text += p.text.slice(end - p.at);
+    end = p.at + p.text.length;
+  }
+  const heard = r.turn === live.turn ? (r.turnChars ?? 0) : 0;
+  const gap = heard > end;
+  return {
+    ...r,
+    status: "running",
+    text,
+    turn: live.turn,
+    turnChars: Math.max(heard, end),
+    gap,
+    ahead: gap ? ahead : undefined,
+  };
 }
 
 /** Forget a failed run after the person has seen it. */

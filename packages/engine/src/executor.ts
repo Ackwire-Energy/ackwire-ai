@@ -156,7 +156,7 @@ import {
   NotFoundError,
   ValidationError,
 } from "./errors";
-import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
+import { type ChannelEvent, liveTurns, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
 import { FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
 import { onForumRunFinished } from "./forum";
@@ -4958,6 +4958,7 @@ function createDeltaPublisher(
   let all = "";
   /** What was published so far (always a prefix of what may be shown). */
   let shown = "";
+  const live = { turn: first.turn, text: "", from: 0 };
   /** Length of `all` at the last send. */
   let sentUpTo = 0;
   /** When each piece arrived: [ms, length of `all` once it was added]. */
@@ -4977,6 +4978,10 @@ function createDeltaPublisher(
     let at = shown.length;
     let rest = visible.slice(at);
     shown = visible;
+    if (shown) {
+      live.text = shown;
+      liveTurns.set(run.id, live);
+    }
     while (rest.length > 0) {
       const text = rest.slice(0, MAX_CHUNK);
       rest = rest.slice(MAX_CHUNK);
@@ -5012,6 +5017,7 @@ function createDeltaPublisher(
     async flush() {
       // The turn's text is complete: what was held is shown now, unless it was the word.
       send(true);
+      liveTurns.delete(run.id);
       await pending;
     },
     seq: () => seq,

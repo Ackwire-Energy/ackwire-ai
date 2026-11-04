@@ -1152,6 +1152,11 @@ export interface ActiveRun {
   pendingMessageIds?: string[];
   /** A routine's run working in the background: it holds no conversation and shows no "trabalhando". */
   background?: boolean;
+  /**
+   * What its current model call streamed so far past its last tool: `text` starts at `at` of the call's text, so an
+   * app opened mid-answer goes on from `at` plus its length.
+   */
+  live?: { turn: number; at: number; text: string };
 }
 
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
