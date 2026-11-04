@@ -14024,6 +14024,7 @@
       "backLabel": "Notatka dla {{name}}",
       "backLabel_female": "Notatka dla {{name}}",
       "backPlaceholder": "Opcjonalnie: czy {{name}} powinien coś wiedzieć?",
+      "addNote": "Zostaw notatkę",
       "backPlaceholder_female": "Opcjonalnie: czy {{name}} powinna coś wiedzieć?"
     },
     "now": {
@@ -14391,6 +14392,7 @@
     "takeover": "Przejmij kontrolę",
     "takeBrowser": "Przejmij przeglądarkę",
     "taking": "Przejmowanie kontroli…",
+    "returning": "Oddawanie agentowi {{name}}…",
     "clipboard": {
       "got": "Skopiowano na komputerze agenta {{name}}:",
       "copy": "Kopiuj",

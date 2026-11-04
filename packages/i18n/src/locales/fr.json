@@ -13661,6 +13661,7 @@
       "backLabel": "Note pour {{name}}",
       "backLabel_female": "Note pour {{name}}",
       "backPlaceholder": "Facultatif : quelque chose que {{name}} devrait savoir ?",
+      "addNote": "Laisser un mot",
       "backPlaceholder_female": "Facultatif : quelque chose que {{name}} devrait savoir ?"
     },
     "now": {
@@ -14055,6 +14056,7 @@
     "takeover": "Prendre le contrôle",
     "takeBrowser": "Prendre le navigateur",
     "taking": "Prise de contrôle…",
+    "returning": "On rend la main à {{name}}…",
     "clipboard": {
       "got": "Copié sur l'ordinateur de {{name}} :",
       "got_female": "Copié sur l'ordinateur de {{name}} :",

@@ -12737,7 +12737,8 @@
       "backTitle": "Kembalikan ke {{name}}",
       "doneTitle": "Selesai. Ada catatan untuk {{name}}?",
       "backLabel": "Catatan untuk {{name}}",
-      "backPlaceholder": "Opsional: ada yang perlu diketahui {{name}}?"
+      "backPlaceholder": "Opsional: ada yang perlu diketahui {{name}}?",
+      "addNote": "Tinggalkan catatan"
     },
     "now": {
       "ready": "Siap di {{computer}}",
@@ -13121,6 +13122,7 @@
     "takeover": "Ambil kendali",
     "takeBrowser": "Ambil alih browser",
     "taking": "Mengambil kendali…",
+    "returning": "Mengembalikan ke {{name}}…",
     "clipboard": {
       "got": "Disalin di komputer {{name}}:",
       "got_female": "Disalin di komputer {{name}}:",

@@ -13254,6 +13254,7 @@
       "backLabel": "Notitie voor {{name}}",
       "backLabel_female": "Notitie voor {{name}}",
       "backPlaceholder": "Optioneel: iets wat {{name}} moet weten?",
+      "addNote": "Notitie achterlaten",
       "backPlaceholder_female": "Optioneel: iets wat {{name}} moet weten?"
     },
     "now": {
@@ -13644,6 +13645,7 @@
     "takeover": "Controle overnemen",
     "takeBrowser": "Browser overnemen",
     "taking": "Controle overnemen…",
+    "returning": "Teruggeven aan {{name}}…",
     "clipboard": {
       "got": "Gekopieerd op de computer van {{name}}:",
       "got_female": "Gekopieerd op de computer van {{name}}:",

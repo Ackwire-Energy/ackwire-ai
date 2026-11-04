@@ -22,7 +22,7 @@ import { computerKind, isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, ComputerPortrait, cx, Dialog, gradientOf, Icon, SkyStrip } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
-import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { type EntrySignal, QueueButton, useAgentMachineId } from "@/components/ComputerQueue";
@@ -39,7 +39,7 @@ import { colorOf } from "../Sky";
 import { SetupWait, useWaitReader } from "../WorkspaceComputer";
 import { CantShowCover, ScreenNotice, Stage } from "./covers";
 import { type AgentComputerView, useAgentComputer } from "./facts";
-import { DialogHead, DialogHeadContext, type DialogHeadSlots } from "./head";
+import { DialogHead, DialogHeadContext, type DialogHeadSlots, type KeptPicture } from "./head";
 import { OpenComputerContext, useOpenComputer } from "./open";
 import "./computer.css";
 
@@ -187,6 +187,7 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
   const [full, setFull] = useState(false);
   const [dismissAsk, setDismissAsk] = useState<(() => void) | null>(null);
   const setAsk = useCallback((dismiss: (() => void) | null) => setDismissAsk(() => dismiss), []);
+  const picture = useRef<KeptPicture | null>(null);
   useFullScreen(full, setFull);
   const g = agentGrammar(agent.name);
   const who = { name: agent.name, appearance: lookOf(agent) };
@@ -254,7 +255,7 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
         agent={agent}
         view={view}
         surface={surface}
-        slots={{ sub, actions: acts, full, setFull, setAsk, say: (text) => say(text, true) }}
+        slots={{ sub, actions: acts, full, setFull, setAsk, say: (text) => say(text, true), picture }}
         onLeave={close}
       />
     </Dialog>
@@ -303,6 +304,11 @@ function ComputerStage({
   const waiting = waitingFor && isWaitingHandoff(waitingFor, now) ? waitingFor : null;
   const mine = controlledBy(f?.handoff, me.user.id);
   const watching = f ? liveSubLine(t, f, { name: agent.name, person, nowMs: now }) : t("agentComputer.sub.watching");
+  // A picture kept for a view that doesn't come (a cover took the stage) is for none that comes later.
+  const kept = slots.picture;
+  useLayoutEffect(() => {
+    if (surface !== "screen" && surface !== "page") kept.current = null;
+  }, [surface, kept]);
   const head: DialogHeadSlots = { ...slots, watching };
   const refused = (err: unknown) =>
     slots.say((err as { status?: number }).status === 409 ? t("browser.card.busy") : t("browser.card.openFailed"));

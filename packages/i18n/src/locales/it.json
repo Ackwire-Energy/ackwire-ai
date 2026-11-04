@@ -13663,6 +13663,7 @@
       "backLabel": "Nota per {{name}}",
       "backLabel_female": "Nota per {{name}}",
       "backPlaceholder": "Facoltativo: c'è qualcosa che {{name}} deve sapere?",
+      "addNote": "Lascia una nota",
       "backPlaceholder_female": "Facoltativo: c'è qualcosa che {{name}} deve sapere?"
     },
     "now": {
@@ -14057,6 +14058,7 @@
     "takeover": "Prendi il controllo",
     "takeBrowser": "Prendi il browser",
     "taking": "Presa del controllo…",
+    "returning": "Restituzione a {{name}}…",
     "clipboard": {
       "got": "Copiato sul computer di {{name}}:",
       "got_female": "Copiato sul computer di {{name}}:",

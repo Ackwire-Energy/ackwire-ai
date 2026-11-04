@@ -34,6 +34,10 @@
   height: 100%;
   pointer-events: none;
 }
+/* Another view's last picture (the page, before the screen opens): its own shape, inside the screen's. */
+.dsk-screen > img.dsk-still {
+  object-fit: contain;
+}
 /*
  * In control the person's keys and pastes go here, a text field nobody sees, not to noVNC's canvas
  * (`useScreenKeys`). 16px: iOS zooms into a smaller field when it takes focus.
@@ -123,23 +127,6 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-/* A first click while watching asks; the live picture remains readable. */
-.dsk-stage > .brw-dim.dsk-ask {
-  background: color-mix(in srgb, var(--bg) 30%, transparent);
-  backdrop-filter: none;
-  animation: dsk-ask-in 150ms ease-out;
-}
-@keyframes dsk-ask-in {
-  from {
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dsk-stage > .brw-dim.dsk-ask {
-    animation: none;
-  }
 }
 
 .dsk-egress {

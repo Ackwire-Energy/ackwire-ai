@@ -12662,7 +12662,8 @@
       "backTitle": "{{name}}에게 돌려주기",
       "doneTitle": "완료했어요. {{name}}에게 남길 메모가 있나요?",
       "backLabel": "{{name}}에게 남길 메모",
-      "backPlaceholder": "선택 사항: {{name}}이(가) 알아야 할 게 있나요?"
+      "backPlaceholder": "선택 사항: {{name}}이(가) 알아야 할 게 있나요?",
+      "addNote": "메모 남기기"
     },
     "now": {
       "ready": "{{computer}}에서 준비됨",
@@ -13010,6 +13011,7 @@
     "takeover": "제어하기",
     "takeBrowser": "브라우저 제어하기",
     "taking": "제어권을 가져오는 중…",
+    "returning": "{{name}}에게 돌려주는 중…",
     "clipboard": {
       "got": "{{name}}의 컴퓨터에서 복사한 내용:",
       "copy": "복사",

@@ -13534,7 +13534,8 @@
       "backTitle": "Devolverle el control a {{name}}",
       "doneTitle": "Listo. ¿Una nota para {{name}}?",
       "backLabel": "Nota para {{name}}",
-      "backPlaceholder": "Opcional: ¿algo que {{name}} deba saber?"
+      "backPlaceholder": "Opcional: ¿algo que {{name}} deba saber?",
+      "addNote": "Dejar una nota"
     },
     "now": {
       "ready": "Listo en {{computer}}",
@@ -13926,6 +13927,7 @@
     "takeover": "Tomar el control",
     "takeBrowser": "Tomar el navegador",
     "taking": "Tomando el control…",
+    "returning": "Devolviéndole el control a {{name}}…",
     "clipboard": {
       "got": "Copiado en la computadora de {{name}}:",
       "got_female": "Copiado en la computadora de {{name}}:",

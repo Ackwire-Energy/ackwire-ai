@@ -73,8 +73,9 @@ describe("Assumir: the card stays the control while the agent waits", () => {
     expect(within(card).queryByRole("button", { name: "Pronto" })).toBeNull();
     expect(card.closest("article")?.textContent).toContain("Uma pessoa pegou o controle");
 
-    // Devolver asks for an optional word to the agent, then hands back: the card goes with the take over.
+    // Devolver offers an optional word to the agent, then hands back: the card goes with the take over.
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Devolver" })));
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Deixar um recado" })));
     const note = within(card).getByRole("textbox", { name: "Recado para a Ada" });
     await act(async () => fireEvent.change(note, { target: { value: "Entrei com a conta de teste" } }));
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Devolver" })));

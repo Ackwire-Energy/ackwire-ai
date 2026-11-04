@@ -13058,7 +13058,8 @@
       "backTitle": "{{name}} ajanına geri ver",
       "doneTitle": "Bitti. {{name}} için bir not?",
       "backLabel": "{{name}} için not",
-      "backPlaceholder": "İsteğe bağlı: {{name}} ajanının bilmesi gereken bir şey var mı?"
+      "backPlaceholder": "İsteğe bağlı: {{name}} ajanının bilmesi gereken bir şey var mı?",
+      "addNote": "Not bırak"
     },
     "now": {
       "ready": "{{computer}} üzerinde hazır",
@@ -13410,6 +13411,7 @@
     "takeover": "Kontrolü al",
     "takeBrowser": "Tarayıcıyı devral",
     "taking": "Kontrol alınıyor…",
+    "returning": "{{name}} ajanına geri veriliyor…",
     "clipboard": {
       "got": "{{name}} bilgisayarında kopyalandı:",
       "copy": "Kopyala",

@@ -156,9 +156,14 @@ describe("a help request opens the agent's browser in its card", () => {
     expect([why.getAttribute("rows"), why.className]).toEqual(["1", "ac-input brw-ac__note"]);
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Voltar" })));
 
-    // Pronto takes an optional word for Ada (Enter sends), then hands back: the card folds away.
+    // Pronto is one quiet row: Ada asked nothing, so no note field until "Deixar um recado", and Pronto has the focus.
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Pronto" })));
     expect(card.textContent).toContain("Pronto. Algum recado para a Ada?");
+    expect(within(card).queryByRole("textbox", { name: "Recado para a Ada" })).toBeNull();
+    const row = card.querySelector(".brw-ac__back") as HTMLElement;
+    expect(document.activeElement === within(row).getByRole("button", { name: "Pronto" })).toBe(true);
+    // The word for Ada (Enter sends), then it hands back: the card folds away.
+    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Deixar um recado" })));
     const note = within(card).getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
     expect(document.activeElement === note).toBe(true);
     // The same note as on the screen: one line in the middle of its field that grows as it wraps, with no grip.
@@ -229,8 +234,33 @@ describe("a help request opens the agent's browser in its card", () => {
     );
     await act(async () => fireEvent.click(within(top).getByRole("button", { name: "Devolver" })));
     expect(card.textContent).toContain("Devolver à Ada");
-    expect(within(card).getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
+    expect(within(card).queryByRole("textbox", { name: "Recado para a Ada" })).toBeNull();
+    expect(within(card).getByRole("button", { name: "Deixar um recado" })).toBeTruthy();
     expect(within(top).queryByRole("button", { name: "Devolver" })).toBeNull();
+    // A quick hand back: Devolver alone, no note.
+    const row = card.querySelector(".brw-ac__back") as HTMLElement;
+    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Devolver" })));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "browser.done").map((c) => c.args)).toEqual([[ORG_ID, HANDOFF_ID]]);
+  });
+
+  test("a request that asked the person something opens the hand back with its note", async () => {
+    const { state, handoff } = seedRequest();
+    const asked: BrowserHandoff = {
+      ...handoff,
+      instructions: "Entrar no painel e me dizer qual plano aparece?",
+      status: "active",
+      controllerUserId: "u-walter",
+    };
+    const api = createFakeApi(state);
+    fakeBrowserOf.get(api)?.handoffs.set(handoff.id, asked);
+    await renderPage(<BrowserCard agentId={ADA_ID} name="Ada" handoff={asked} canTakeOver />, { api, org: true });
+    await settle(6);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    await act(async () => fireEvent.click(within(card).getAllByRole("button", { name: "Pronto" })[0] as HTMLElement));
+    const note = within(card).getByRole("textbox", { name: "Recado para a Ada" });
+    expect(document.activeElement === note).toBe(true);
+    expect(within(card).queryByRole("button", { name: "Deixar um recado" })).toBeNull();
   });
 });
 

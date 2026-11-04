@@ -45,6 +45,16 @@ export const isOpenHandoff = (h: Pick<BrowserHandoff, "status">) => h.status ===
 /** Which screen a handoff is on (servers older than screens name none: the browser). */
 export const handoffScreen = (h: Pick<BrowserHandoff, "screen">): ScreenKind => h.screen ?? "browser";
 
+/**
+ * The agent's request asks the person something, or to tell it something: handing back opens with the note. A question
+ * mark in any script, or "tell me", "let me know" and their like.
+ * ponytail: a few cue phrases in the most used languages, a server-side flag on the request if this misses too often.
+ */
+const ASKS_WORDS =
+  /[?？؟]|\b(tell|let) me\b|\bme (diga|diz|fala|conta|avise|informe|passe|mande)\b|\b(dime|cu[eé]ntame|av[ií]same|dis-moi|sag mir)\b/i;
+export const handoffWantsWords = (h: Pick<BrowserHandoff, "kind" | "instructions"> | null | undefined): boolean =>
+  h?.kind === "ask" && ASKS_WORDS.test(h.instructions);
+
 /** Waiting for someone to open it, not yet expired. */
 export function isWaitingHandoff(h: Pick<BrowserHandoff, "status" | "expiresAt">, now = Date.now()): boolean {
   if (h.status !== "pending") return false;
