@@ -15,10 +15,10 @@ export type EngineState = "idle" | "working" | "off";
 
 /** An agent's brain (`agents.brain`: model, claude_code, codex) as its engine; anything else is the agent (API). */
 export function engineOfBrain(brain: BrainKind | string | null | undefined): EngineKind {
-  // ponytail: Cursor and OpenCode draw Codex's terminal until they have a portrait of their own (`portrait.js`).
+  // ponytail: Cursor, OpenCode and Grok draw Codex's terminal until they have a portrait of their own (`portrait.js`).
   return brain === "claude_code" || brain === "codex"
     ? brain
-    : brain === "cursor" || brain === "opencode"
+    : brain === "cursor" || brain === "opencode" || brain === "grok"
       ? "codex"
       : "agent";
 }
@@ -47,7 +47,8 @@ export function engineStateOfOption(
  * nobody chose its model ("Plano do Claude", no "Automático"); with `owner`, whose plan it is.
  */
 export function thinksWith(t: TFunction, plan: PlanChoice, model: string | null, owner?: string | null): string {
-  const kind = plan === "claude" || plan === "chatgpt" || plan === "cursor" || plan === "zen" ? plan : "coding";
+  const kind =
+    plan === "claude" || plan === "chatgpt" || plan === "cursor" || plan === "zen" || plan === "grok" ? plan : "coding";
   const line = model ? kind : (`${kind}Auto` as const);
   return owner
     ? t(`brain.line.${line}Of`, { model: model ?? "", plan: planLabel(t, plan), owner })

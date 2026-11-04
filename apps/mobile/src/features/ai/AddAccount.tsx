@@ -319,6 +319,24 @@ function AddAccountFlow({
   // Where the account stays and what to do on the wrong one: the sign-in step's ⓘ.
   const signInHint = t("agentPage.work.brain.add.stepOneHint", { computer, brand: t(`aiAccounts.connect.${kind}`) });
   let steps: ReactNode;
+  // A device sign-in's one-time code (ChatGPT's, Grok's), to type on the provider's page.
+  const deviceCode = (n: number, label: string, code: string) => (
+    <Step n={n} divider title={label} side={waiting}>
+      <View style={styles.code}>
+        <Text variant="title2" selectable accessibilityLabel={label} style={styles.codeText}>
+          {code}
+        </Text>
+        <Button
+          size="sm"
+          variant="secondary"
+          icon="copy"
+          label={copied ? t("common.copied") : t("common.copy")}
+          onPress={() => void copy()}
+        />
+      </View>
+      <StepText>{t("agentPage.work.brain.add.deviceCodeText")}</StepText>
+    </Step>
+  );
   if (plan) {
     const site = new URL(plan.site);
     steps = (
@@ -376,6 +394,25 @@ function AddAccountFlow({
         ) : null}
       </>
     );
+  } else if (kind === "grok") {
+    steps = (
+      <>
+        <Step
+          n={1}
+          state={login ? "done" : "now"}
+          title={t("agentPage.work.brain.add.stepOne.grok")}
+          hint={signInHint}
+          side={login ? openAgain(login.url) : startButton(t("agentPage.work.brain.add.open.grok"), !ready)}
+        >
+          {starting ? <StepText>{t("agentPage.work.brain.add.starting", { computer })}</StepText> : null}
+        </Step>
+        {login?.userCode ? (
+          deviceCode(2, t("agentPage.work.brain.add.grokCode"), login.userCode)
+        ) : login && opened ? (
+          <Step n={2} divider title={t("agentPage.work.brain.add.grokFinish", { computer })} side={waiting} />
+        ) : null}
+      </>
+    );
   } else if (kind === "codex") {
     steps = (
       <>
@@ -396,28 +433,7 @@ function AddAccountFlow({
         >
           {starting ? <StepText>{t("agentPage.work.brain.add.starting", { computer })}</StepText> : null}
         </Step>
-        {login?.userCode ? (
-          <Step n={3} divider title={t("agentPage.work.brain.add.deviceCode")} side={waiting}>
-            <View style={styles.code}>
-              <Text
-                variant="title2"
-                selectable
-                accessibilityLabel={t("agentPage.work.brain.add.deviceCode")}
-                style={styles.codeText}
-              >
-                {login.userCode}
-              </Text>
-              <Button
-                size="sm"
-                variant="secondary"
-                icon="copy"
-                label={copied ? t("common.copied") : t("common.copy")}
-                onPress={() => void copy()}
-              />
-            </View>
-            <StepText>{t("agentPage.work.brain.add.deviceCodeText")}</StepText>
-          </Step>
-        ) : null}
+        {login?.userCode ? deviceCode(3, t("agentPage.work.brain.add.deviceCode"), login.userCode) : null}
       </>
     );
   } else {

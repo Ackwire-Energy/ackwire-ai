@@ -76,6 +76,7 @@ import {
   emailArtAt,
   envSpeechEngines,
   type GitProxyDeps,
+  GrokBrain,
   getAgentCached,
   hubBrainLink,
   isAgentesCloud,
@@ -545,6 +546,15 @@ export function buildEngine(o: EngineOptions) {
     // ADR 0132: OpenCode's CLI, one process per turn like Cursor's.
     opencode: (_agent, _run, setup) =>
       new OpencodeBrain({
+        link: brainLink,
+        mcp: async () => ({ token: setup.mcpToken() }),
+        agent: agentScope,
+        permissions: turnPermissions,
+        prepare: prepareCode,
+      }),
+    // ADR 0142: Grok Build, one process per turn like Cursor's.
+    grok: (_agent, _run, setup) =>
+      new GrokBrain({
         link: brainLink,
         mcp: async () => ({ token: setup.mcpToken() }),
         agent: agentScope,

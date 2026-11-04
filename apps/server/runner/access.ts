@@ -41,6 +41,7 @@ export const TOOL_NAMES: readonly (keyof RunnerTools)[] = [
   "codex",
   "cursor",
   "opencode",
+  "grok",
   "commands",
   "browser",
   "desktop",

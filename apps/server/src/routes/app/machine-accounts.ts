@@ -256,6 +256,7 @@ export function machineAccountRoutes(deps: AppDeps) {
                       codex: z.boolean(),
                       cursor: z.boolean(),
                       opencode: z.boolean(),
+                      grok: z.boolean(),
                       key: z.boolean(),
                     })
                     .openapi({
@@ -268,10 +269,11 @@ export function machineAccountRoutes(deps: AppDeps) {
                       codex: z.boolean(),
                       cursor: z.boolean(),
                       opencode: z.boolean(),
+                      grok: z.boolean(),
                     })
                     .openapi({
                       description:
-                        "What it can think with now: Claude Code (Claude, the coding plans) and Codex (ChatGPT).",
+                        "What it can think with now: Claude Code (Claude, the coding plans), Codex (ChatGPT), Cursor, OpenCode and Grok Build.",
                     }),
                   own: z
                     .object({

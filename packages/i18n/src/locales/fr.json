@@ -2068,6 +2068,7 @@
       "claude_code": "Claude Code n'est pas connecté sur cet ordinateur. Connectez un compte Claude sur la page de {{name}}.",
       "codex": "Codex n'est pas connecté sur cet ordinateur. Connectez un compte ChatGPT sur la page de {{name}}.",
       "cursor": "Cursor n'est pas connecté sur cet ordinateur. Connectez un compte Cursor sur la page de {{name}}.",
+      "grok": "Grok n'est pas connecté sur cet ordinateur. Connectez un compte Grok sur la page de {{name}}.",
       "opencode": "OpenCode ne peut pas réfléchir sur cet ordinateur. Connectez une clé OpenCode sur la page de {{name}}."
     },
     "card": {
@@ -2096,6 +2097,7 @@
       "claude": "Connecter votre abonnement Claude",
       "chatgpt": "Connecter votre abonnement ChatGPT",
       "cursor": "Connecter votre abonnement Cursor",
+      "grok": "Connecter votre abonnement Grok",
       "zen": "Connecter OpenCode",
       "api_key": "Ajouter une clé API"
     },
@@ -2120,6 +2122,10 @@
       "cursor": {
         "title": "Votre abonnement Cursor",
         "tiers": "Pro, Pro+, Ultra ou Teams, ou une clé API Cursor"
+      },
+      "grok": {
+        "title": "Votre abonnement Grok",
+        "tiers": "SuperGrok, SuperGrok Heavy ou X Premium+"
       },
       "zen": {
         "title": "OpenCode",
@@ -2198,6 +2204,7 @@
       "claude_code": "Claude est connecté en tant que {{email}}, et non {{account}}. Déconnectez-vous sur la page de Claude et réessayez.",
       "codex": "ChatGPT est connecté en tant que {{email}}, et non {{account}}. Déconnectez-vous sur la page de ChatGPT et réessayez.",
       "cursor": "Cursor est connecté en tant que {{email}}, et non {{account}}. Déconnectez-vous sur la page de Cursor et réessayez.",
+      "grok": "Grok est connecté en tant que {{email}}, et non {{account}}. Déconnectez-vous sur la page de Grok et réessayez.",
       "opencode": "OpenCode est connecté en tant que {{email}}, pas {{account}}. Réessayez avec la bonne clé."
     },
     "useAnyway": "Utiliser {{email}}",
@@ -3808,21 +3815,25 @@
             "claude_code": "Ajouter un compte Claude",
             "codex": "Ajouter un compte ChatGPT",
             "cursor": "Ajouter un compte Cursor",
+            "grok": "Ajouter un compte Grok",
             "opencode": "Ajouter une clé OpenCode"
           },
           "stepOne": {
             "claude_code": "Le compte avec votre abonnement",
             "codex": "Le compte avec votre abonnement",
-            "cursor": "Le compte avec votre abonnement"
+            "cursor": "Le compte avec votre abonnement",
+            "grok": "Le compte avec votre abonnement"
           },
           "stepOneHint": "Mauvais compte ? Déconnectez-vous là-bas et réessayez. Le compte reste uniquement sur {{computer}}. Vous saisissez votre mot de passe sur la page de {{brand}}.",
           "open": {
             "claude_code": "Se connecter avec Claude",
             "codex": "Se connecter avec ChatGPT",
-            "cursor": "Se connecter avec Cursor"
+            "cursor": "Se connecter avec Cursor",
+            "grok": "Se connecter avec Grok"
           },
           "opencodeFree": "Les modèles gratuits d'OpenCode ne demandent aucune clé. Une clé de la console OpenCode ajoute les modèles payants.",
           "cursorFinish": "Connectez-vous sur la page de Cursor, et la connexion se termine toute seule sur {{computer}}.",
+          "grokFinish": "Connectez-vous sur la page de Grok, et la connexion se termine toute seule sur {{computer}}.",
           "cursorKey": "Utiliser plutôt une clé API Cursor",
           "copyLink": "Copier le lien",
           "openAgain": "Rouvrir",
@@ -3834,6 +3845,7 @@
           "sent": "Code envoyé. Fin de la connexion sur {{computer}}.",
           "local": "Sur {{computer}} lui-même ? Si son navigateur s'est ouvert tout seul, autorisez simplement là-bas.",
           "deviceCode": "Code pour ChatGPT",
+          "grokCode": "Code pour Grok",
           "deviceCodeText": "Saisissez ce code sur la page qui s'ouvre.",
           "starting": "Demande à {{computer}}…",
           "waiting": "En attente",
@@ -3844,6 +3856,7 @@
             "claude_code": "Claude s'est connecté en tant que {{account}}, un compte que vous avez déjà connecté. Pour en utiliser un autre, déconnectez-vous sur la page de Claude et réessayez.",
             "codex": "ChatGPT s'est connecté en tant que {{account}}, un compte que vous avez déjà connecté. Pour en utiliser un autre, déconnectez-vous sur la page de ChatGPT et réessayez.",
             "cursor": "Cursor s'est connecté en tant que {{account}}, un compte que vous avez déjà connecté. Pour en utiliser un autre, déconnectez-vous sur la page de Cursor et réessayez.",
+            "grok": "Grok s'est connecté en tant que {{account}}, un compte que vous avez déjà connecté. Pour en utiliser un autre, déconnectez-vous sur la page de Grok et réessayez.",
             "opencode": "Cette clé OpenCode est déjà connectée en tant que {{account}}."
           },
           "startFailed": "Aucune réponse de {{computer}}. Réessayez dans un instant.",
@@ -7549,6 +7562,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "grok": "Grok",
       "opencode": "OpenCode",
       "needs": {
         "keys": "Mettez à jour agentes sur l'ordinateur pour utiliser la clé d'un abonnement"
@@ -7559,6 +7573,7 @@
         "claude_code": "Pas encore prêt sur {{computer}}",
         "codex": "Pas encore prêt sur {{computer}}",
         "cursor": "Pas encore prêt sur {{computer}}",
+        "grok": "Pas encore prêt sur {{computer}}",
         "opencode": "Pas encore prêt sur {{computer}}",
         "online": "{{computer}} ne répond pas pour le moment. On s'en occupe."
       }
@@ -9007,21 +9022,25 @@
       "claude": "{{model}} avec l'abonnement Claude",
       "chatgpt": "{{model}} avec l'abonnement ChatGPT",
       "cursor": "{{model}} avec l'abonnement Cursor",
+      "grok": "{{model}} avec l'abonnement Grok",
       "zen": "{{model}} avec OpenCode",
       "coding": "{{model}} avec {{plan}}",
       "claudeOf": "{{model}} avec l'abonnement Claude de {{owner}}",
       "chatgptOf": "{{model}} avec l'abonnement ChatGPT de {{owner}}",
       "cursorOf": "{{model}} avec l'abonnement Cursor de {{owner}}",
+      "grokOf": "{{model}} avec l'abonnement Grok de {{owner}}",
       "zenOf": "{{model}} avec l'OpenCode de {{owner}}",
       "codingOf": "{{model}} avec {{plan}} de {{owner}}",
       "claudeAuto": "Abonnement Claude",
       "chatgptAuto": "Abonnement ChatGPT",
       "cursorAuto": "Abonnement Cursor",
+      "grokAuto": "Abonnement Grok",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Abonnement Claude de {{owner}}",
       "chatgptAutoOf": "Abonnement ChatGPT de {{owner}}",
       "cursorAutoOf": "Abonnement Cursor de {{owner}}",
+      "grokAutoOf": "Abonnement Grok de {{owner}}",
       "zenAutoOf": "OpenCode de {{owner}}",
       "codingAutoOf": "{{plan}} de {{owner}}",
       "on": "{{line}} sur {{computer}}"
@@ -9034,6 +9053,7 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
+      "grok": "Grok Build",
       "opencode": "OpenCode"
     },
     "foot": {
@@ -9045,6 +9065,7 @@
     "claude_codeText": "Utilise l'abonnement Claude de la personne qui a connecté l'ordinateur.",
     "codexText": "Utilise l'abonnement ChatGPT de la personne qui a connecté l'ordinateur.",
     "cursorText": "Utilise l'abonnement Cursor de la personne qui a connecté l'ordinateur.",
+    "grokText": "Utilise l'abonnement Grok de la personne qui a connecté l'ordinateur.",
     "opencodeText": "Les modèles gratuits d'OpenCode, ou la clé OpenCode de la personne qui a connecté l'ordinateur.",
     "cursorModel": {
       "inPlan": "Inclus dans votre abonnement Cursor",
@@ -9089,6 +9110,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "grok": "Grok Build · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, sans repli sur l'API"
     },
@@ -11491,6 +11513,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "grok": "Grok Build",
         "opencode": "OpenCode",
         "commands": "Commandes",
         "browser": "Navigateur"
@@ -11499,6 +11522,7 @@
         "claude": "Écrit et modifie des fichiers, uniquement dans les dossiers autorisés.",
         "codex": "Comme Claude Code, avec un compte ChatGPT. Uniquement dans les dossiers autorisés.",
         "cursor": "Comme Claude Code, avec un compte Cursor. Uniquement dans les dossiers autorisés.",
+        "grok": "Comme Claude Code, avec un compte Grok. Uniquement dans les dossiers autorisés.",
         "opencode": "Comme Claude Code, avec les modèles gratuits d'OpenCode ou une clé OpenCode. Uniquement dans les dossiers autorisés.",
         "commands": "Lance des commandes dans le Terminal, comme des tests et des builds."
       },

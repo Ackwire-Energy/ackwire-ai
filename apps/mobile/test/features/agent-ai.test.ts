@@ -122,6 +122,15 @@ describe("the agent's AI", () => {
       text: "Os planos do Claude são para uso pessoal. Deixar outras pessoas usarem o seu é uma zona cinzenta nos termos do Claude.",
     });
     expect(says(pt, true).line).toBe("A Ada atende quem pode falar com ela, pelo seu plano do Claude.");
+    // A Grok plan (ADR 0142): the same note, in Grok's name.
+    expect(says(en, false, { brain: "grok", plan: null })).toEqual({
+      line: "Ada answers only you, on your Grok plan.",
+      about: "About the plan's terms",
+      text: "Grok plans are for personal use. Letting other people use yours is a gray area in Grok's terms.",
+    });
+    expect(says(pt, false, { brain: "grok", plan: null }).text).toBe(
+      "Os planos do Grok são para uso pessoal. Deixar outras pessoas usarem o seu é uma zona cinzenta nos termos do Grok.",
+    );
     expect(says(pt, true, { agent: "Theo" }).line).toBe(
       "O Theo atende quem pode falar com ele, pelo seu plano do Claude.",
     );

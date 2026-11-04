@@ -604,6 +604,19 @@ function AddAccountFlow({
 
   const signInHint = t("agentPage.work.brain.add.stepOneHint", { computer, brand: t(`aiAccounts.connect.${kind}`) });
   let steps: ReactNode;
+  // A device sign-in's one-time code (ChatGPT's, Grok's), to type on the provider's page.
+  const deviceCode = (n: number, label: string, code: string) => (
+    <Step n={n} side={waiting}>
+      <b>{label}</b>
+      <span className="agp-addacct__code">
+        <output aria-label={label}>{code}</output>
+        <Button size="sm" icon={copied ? "check" : "copy"} onClick={() => void copy()}>
+          {copied ? t("common.copied") : t("common.copy")}
+        </Button>
+      </span>
+      <span>{t("agentPage.work.brain.add.deviceCodeText")}</span>
+    </Step>
+  );
   if (plan) {
     const site = new URL(plan.site);
     steps = (
@@ -658,6 +671,18 @@ function AddAccountFlow({
         )}
       </>
     );
+  } else if (kind === "grok") {
+    steps = (
+      <>
+        <Step n={1} side={signIn(signInLabel ?? t("agentPage.work.brain.add.open.grok"))}>
+          <StepTitle title={t("agentPage.work.brain.add.stepOne.grok")} hint={signInHint} />
+          {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
+        </Step>
+        {login?.userCode
+          ? deviceCode(2, t("agentPage.work.brain.add.grokCode"), login.userCode)
+          : login && opened && <Step side={waiting}>{t("agentPage.work.brain.add.grokFinish", { computer })}</Step>}
+      </>
+    );
   } else if (kind === "codex") {
     steps = (
       <>
@@ -669,18 +694,7 @@ function AddAccountFlow({
           <StepTitle title={t("agentPage.work.brain.add.stepOne.codex")} hint={signInHint} />
           {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
         </Step>
-        {login?.userCode && (
-          <Step n={3} side={waiting}>
-            <b>{t("agentPage.work.brain.add.deviceCode")}</b>
-            <span className="agp-addacct__code">
-              <output aria-label={t("agentPage.work.brain.add.deviceCode")}>{login.userCode}</output>
-              <Button size="sm" icon={copied ? "check" : "copy"} onClick={() => void copy()}>
-                {copied ? t("common.copied") : t("common.copy")}
-              </Button>
-            </span>
-            <span>{t("agentPage.work.brain.add.deviceCodeText")}</span>
-          </Step>
-        )}
+        {login?.userCode && deviceCode(3, t("agentPage.work.brain.add.deviceCode"), login.userCode)}
       </>
     );
   } else {

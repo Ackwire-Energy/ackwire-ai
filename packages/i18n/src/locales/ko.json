@@ -1915,6 +1915,7 @@
       "claude_code": "이 컴퓨터에서 Claude Code에 로그인되어 있지 않아요. {{name}}의 페이지에서 Claude 계정을 연결하세요.",
       "codex": "이 컴퓨터에서 Codex에 로그인되어 있지 않아요. {{name}}의 페이지에서 ChatGPT 계정을 연결하세요.",
       "cursor": "이 컴퓨터에서 Cursor에 로그인되어 있지 않아요. {{name}}의 페이지에서 Cursor 계정을 연결하세요.",
+      "grok": "이 컴퓨터에서 Grok에 로그인되어 있지 않아요. {{name}}의 페이지에서 Grok 계정을 연결하세요.",
       "opencode": "이 컴퓨터에서 OpenCode가 생각할 수 없어요. {{name}}의 페이지에서 OpenCode 키를 연결하세요."
     },
     "card": {
@@ -1943,6 +1944,7 @@
       "claude": "Claude 요금제 연결",
       "chatgpt": "ChatGPT 요금제 연결",
       "cursor": "Cursor 요금제 연결",
+      "grok": "Grok 요금제 연결",
       "zen": "OpenCode 연결",
       "api_key": "API 키 추가"
     },
@@ -1965,6 +1967,10 @@
       "cursor": {
         "title": "내 Cursor 요금제",
         "tiers": "Pro, Pro+, Ultra 또는 Teams, 또는 Cursor API 키"
+      },
+      "grok": {
+        "title": "내 Grok 요금제",
+        "tiers": "SuperGrok, SuperGrok Heavy 또는 X Premium+"
       },
       "zen": {
         "title": "OpenCode",
@@ -2041,6 +2047,7 @@
       "claude_code": "Claude에 {{account}}이(가) 아닌 {{email}}(으)로 로그인되어 있어요. Claude 페이지에서 로그아웃하고 다시 시도하세요.",
       "codex": "ChatGPT에 {{account}}이(가) 아닌 {{email}}(으)로 로그인되어 있어요. ChatGPT 페이지에서 로그아웃하고 다시 시도하세요.",
       "cursor": "Cursor에 {{account}}이(가) 아닌 {{email}}(으)로 로그인되어 있어요. Cursor 페이지에서 로그아웃하고 다시 시도하세요.",
+      "grok": "Grok에 {{account}}이(가) 아닌 {{email}}(으)로 로그인되어 있어요. Grok 페이지에서 로그아웃하고 다시 시도하세요.",
       "opencode": "OpenCode가 {{account}}이 아닌 {{email}}(으)로 로그인했어요. 올바른 키로 다시 시도하세요."
     },
     "useAnyway": "{{email}} 사용",
@@ -3533,21 +3540,25 @@
             "claude_code": "Claude 계정 추가",
             "codex": "ChatGPT 계정 추가",
             "cursor": "Cursor 계정 추가",
+            "grok": "Grok 계정 추가",
             "opencode": "OpenCode 키 추가"
           },
           "stepOne": {
             "claude_code": "요금제가 있는 계정",
             "codex": "요금제가 있는 계정",
-            "cursor": "요금제가 있는 계정"
+            "cursor": "요금제가 있는 계정",
+            "grok": "요금제가 있는 계정"
           },
           "stepOneHint": "다른 계정인가요? 그쪽에서 로그아웃하고 다시 시도하세요. 계정은 {{computer}}에만 남아요. 비밀번호는 {{brand}} 페이지에서 입력해요.",
           "open": {
             "claude_code": "Claude로 로그인",
             "codex": "ChatGPT로 로그인",
-            "cursor": "Cursor로 로그인"
+            "cursor": "Cursor로 로그인",
+            "grok": "Grok로 로그인"
           },
           "opencodeFree": "OpenCode의 무료 모델은 키가 필요 없어요. OpenCode 콘솔의 키를 쓰면 유료 모델도 쓸 수 있어요.",
           "cursorFinish": "Cursor 페이지에서 로그인하면 {{computer}}에서 로그인이 자동으로 완료돼요.",
+          "grokFinish": "Grok 페이지에서 로그인하면 {{computer}}에서 로그인이 자동으로 완료돼요.",
           "cursorKey": "대신 Cursor API 키 사용",
           "copyLink": "링크 복사",
           "openAgain": "다시 열기",
@@ -3559,6 +3570,7 @@
           "sent": "코드를 보냈어요. {{computer}}에서 로그인을 마무리하는 중이에요.",
           "local": "{{computer}}에서 직접 하고 있나요? 브라우저가 저절로 열렸다면 거기서 승인만 하세요.",
           "deviceCode": "ChatGPT용 코드",
+          "grokCode": "Grok용 코드",
           "deviceCodeText": "열리는 페이지에 이 코드를 입력하세요.",
           "starting": "{{computer}}에 요청하는 중…",
           "waiting": "기다리는 중",
@@ -3569,6 +3581,7 @@
             "claude_code": "Claude가 이미 연결한 계정인 {{account}}(으)로 로그인했어요. 다른 계정을 쓰려면 Claude 페이지에서 로그아웃하고 다시 시도하세요.",
             "codex": "ChatGPT가 이미 연결한 계정인 {{account}}(으)로 로그인했어요. 다른 계정을 쓰려면 ChatGPT 페이지에서 로그아웃하고 다시 시도하세요.",
             "cursor": "Cursor가 이미 연결한 계정인 {{account}}(으)로 로그인했어요. 다른 계정을 쓰려면 Cursor 페이지에서 로그아웃하고 다시 시도하세요.",
+            "grok": "Grok가 이미 연결한 계정인 {{account}}(으)로 로그인했어요. 다른 계정을 쓰려면 Grok 페이지에서 로그아웃하고 다시 시도하세요.",
             "opencode": "이 OpenCode 키는 이미 {{account}}(으)로 연결되어 있어요."
           },
           "startFailed": "{{computer}}에서 응답이 없어요. 잠시 후 다시 시도하세요.",
@@ -6934,6 +6947,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "grok": "Grok",
       "opencode": "OpenCode",
       "needs": {
         "keys": "요금제 키를 사용하려면 컴퓨터에서 agentes를 업데이트하세요"
@@ -6944,6 +6958,7 @@
         "claude_code": "{{computer}}에서 아직 준비되지 않았어요",
         "codex": "{{computer}}에서 아직 준비되지 않았어요",
         "cursor": "{{computer}}에서 아직 준비되지 않았어요",
+        "grok": "{{computer}}에서 아직 준비되지 않았어요",
         "opencode": "{{computer}}에서 아직 준비되지 않았어요",
         "online": "지금 {{computer}}이(가) 응답하지 않아요. 해결 중이에요."
       }
@@ -8273,21 +8288,25 @@
       "claude": "Claude 요금제의 {{model}}",
       "chatgpt": "ChatGPT 요금제의 {{model}}",
       "cursor": "Cursor 요금제의 {{model}}",
+      "grok": "Grok 요금제의 {{model}}",
       "zen": "OpenCode의 {{model}}",
       "coding": "{{plan}}의 {{model}}",
       "claudeOf": "{{model}} · {{owner}}님의 Claude 요금제",
       "chatgptOf": "{{owner}}님의 ChatGPT 요금제의 {{model}}",
       "cursorOf": "{{owner}}님의 Cursor 요금제의 {{model}}",
+      "grokOf": "{{owner}}님의 Grok 요금제의 {{model}}",
       "zenOf": "{{owner}}의 OpenCode에서 {{model}}",
       "codingOf": "{{owner}}님의 {{plan}}의 {{model}}",
       "claudeAuto": "Claude 요금제",
       "chatgptAuto": "ChatGPT 요금제",
       "cursorAuto": "Cursor 요금제",
+      "grokAuto": "Grok 요금제",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "{{owner}}님의 Claude 요금제",
       "chatgptAutoOf": "{{owner}}님의 ChatGPT 요금제",
       "cursorAutoOf": "{{owner}}님의 Cursor 요금제",
+      "grokAutoOf": "{{owner}}님의 Grok 요금제",
       "zenAutoOf": "{{owner}}의 OpenCode",
       "codingAutoOf": "{{owner}}님의 {{plan}}",
       "on": "{{computer}}의 {{line}}"
@@ -8299,6 +8318,7 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
+      "grok": "Grok Build",
       "opencode": "OpenCode"
     },
     "foot": {
@@ -8310,6 +8330,7 @@
     "claude_codeText": "컴퓨터를 연결한 사람의 Claude 요금제를 사용해요.",
     "codexText": "컴퓨터를 연결한 사람의 ChatGPT 요금제를 사용해요.",
     "cursorText": "컴퓨터를 연결한 사람의 Cursor 요금제를 사용해요.",
+    "grokText": "컴퓨터를 연결한 사람의 Grok 요금제를 사용해요.",
     "opencodeText": "OpenCode의 무료 모델, 또는 컴퓨터를 연결한 사람의 OpenCode 키를 사용해요.",
     "cursorModel": {
       "inPlan": "내 Cursor 요금제에 포함",
@@ -8354,6 +8375,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "grok": "Grok Build · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, API 대체 없음"
     },
@@ -10633,6 +10655,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "grok": "Grok Build",
         "opencode": "OpenCode",
         "commands": "명령",
         "browser": "브라우저"
@@ -10641,6 +10664,7 @@
         "claude": "허용된 폴더에서만 파일을 작성하고 수정해요.",
         "codex": "Claude Code와 같지만 ChatGPT 계정을 사용해요. 허용된 폴더에서만 작동해요.",
         "cursor": "Claude Code와 같지만 Cursor 계정을 사용해요. 허용된 폴더에서만 작동해요.",
+        "grok": "Claude Code와 같지만 Grok 계정을 사용해요. 허용된 폴더에서만 작동해요.",
         "opencode": "Claude Code와 같지만 OpenCode의 무료 모델이나 OpenCode 키를 사용해요. 허용된 폴더에서만 작동해요.",
         "commands": "테스트나 빌드 같은 터미널 명령을 실행해요."
       },

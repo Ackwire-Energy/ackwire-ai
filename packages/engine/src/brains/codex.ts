@@ -6,6 +6,7 @@ import {
   brainTopic,
   CODEX_FOLDER_PROTOCOL,
   CURSOR_PROTOCOL,
+  GROK_PROTOCOL,
   LOCKED_BRAIN_PROTOCOL,
   OPENCODE_PROTOCOL,
   type PubSub,
@@ -62,6 +63,7 @@ export interface ComputerBrainLink {
       claude?: { version: string };
       cursor?: { version: string };
       opencode?: { version: string };
+      grok?: { version: string };
     };
     /** The owner paused the computer (protocol 9; absent: not checked). */
     paused?: { until: string | null; timezone: string | null } | null;
@@ -70,7 +72,14 @@ export interface ComputerBrainLink {
     pairedByUserId?: string | null;
     /** What the machine allows (protocol 10): with it, Codex needs its own tool on, not commands. */
     access?: {
-      tools: { claude: boolean; codex: boolean; cursor?: boolean; opencode?: boolean; commands: boolean };
+      tools: {
+        claude: boolean;
+        codex: boolean;
+        cursor?: boolean;
+        opencode?: boolean;
+        grok?: boolean;
+        commands: boolean;
+      };
     } | null;
   } | null>;
   /** Sends `brain.turn` and calls `onEvent` per `brain.event`; resolves on `brain.done`. */
@@ -146,7 +155,7 @@ function channel<T>() {
  * protocol 36, no version gate, no live steering). Everything else, from the request to the events, is shared.
  */
 interface CliBrainSpec {
-  kind: "codex" | "cursor" | "opencode";
+  kind: "codex" | "cursor" | "opencode" | "grok";
   name: string;
   /** The runner protocol it needs. */
   protocol: number;
@@ -155,6 +164,7 @@ interface CliBrainSpec {
     codex?: { version: string };
     cursor?: { version: string };
     opencode?: { version: string };
+    grok?: { version: string };
   }): BrainEvent | null;
 }
 
@@ -213,8 +223,23 @@ const OPENCODE_CLI: CliBrainSpec = {
         },
 };
 
+const GROK_CLI: CliBrainSpec = {
+  kind: "grok",
+  name: "Grok Build",
+  protocol: GROK_PROTOCOL,
+  check: ({ grok }) =>
+    grok
+      ? null
+      : {
+          type: "error",
+          code: "grok_missing",
+          message: "Grok Build, xAI's CLI, is not installed on the computer.",
+          retryable: true,
+        },
+};
+
 export class CodexBrain implements Brain {
-  readonly kind: "codex" | "cursor" | "opencode";
+  readonly kind: "codex" | "cursor" | "opencode" | "grok";
 
   constructor(
     private readonly deps: CodexBrainDeps,
@@ -420,6 +445,17 @@ export class CursorBrain extends CodexBrain {
 export class OpencodeBrain extends CodexBrain {
   constructor(deps: CodexBrainDeps) {
     super(deps, OPENCODE_CLI);
+  }
+}
+
+/**
+ * The Grok brain (ADR 0142): xAI's Grok Build CLI on the agent's computer with a person's SuperGrok or X Premium+
+ * plan, through the same `brain.turn` as Codex (`kind: "grok"`, runner protocol 43, `brain-grok.ts` there). A person's
+ * messages wait for the turn's end: the runner answers `brain.steer` with `unsupported`.
+ */
+export class GrokBrain extends CodexBrain {
+  constructor(deps: CodexBrainDeps) {
+    super(deps, GROK_CLI);
   }
 }
 

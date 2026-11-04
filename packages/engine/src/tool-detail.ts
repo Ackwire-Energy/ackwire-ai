@@ -201,12 +201,13 @@ export const maskCredentialsExcept = (text: string, pasted: string) => {
 
 /**
  * What a CLI's sign-in holds beyond `SECRET`'s shapes (OpenAI and Anthropic keys and OAuth tokens, JWTs): Cursor keys
- * (`key_…`, `crsr_…`), OpenAI refresh tokens (`rt.…`, `rt_…`), and every value of a sign-in file's fields (Codex's
- * `auth.json`, Claude Code's `.credentials.json`, Cursor's and OpenCode's): `"refresh_token": "…"`, `accessToken: …`,
+ * (`key_…`, `crsr_…`), xAI keys (`xai-…`), OpenAI refresh tokens (`rt.…`, `rt_…`), and every value of a sign-in file's fields (Codex's
+ * `auth.json`, Claude Code's `.credentials.json`, Cursor's, OpenCode's and Grok Build's): `"refresh_token": "…"`, `accessToken: …`,
  * `OPENAI_API_KEY=…`.
  */
 // Codex 0.165's `auth.json` refresh token starts `rt.` (seen on a real sign-in, 2026-11-04), older ones `rt_`.
-const SIGN_IN_SHAPES = /\b(?:key|crsr)_[A-Za-z0-9]{32,}|\brt[._][A-Za-z0-9._-]{19,}[A-Za-z0-9_-]/g;
+const SIGN_IN_SHAPES =
+  /\b(?:key|crsr)_[A-Za-z0-9]{32,}|\bxai-[A-Za-z0-9]{20,}|\brt[._][A-Za-z0-9._-]{19,}[A-Za-z0-9_-]/g;
 const SIGN_IN_FIELD =
   /(["']?\b(?:access_?token|refresh_?token|id_?token|oauth_?token|api_?key|\w*_API_KEY|CLAUDE_CODE_OAUTH_TOKEN)["']?\s*[:=]\s*)("[^"\s]{8,}"|'[^'\s]{8,}'|[^\s"',}]{8,})/gi;
 

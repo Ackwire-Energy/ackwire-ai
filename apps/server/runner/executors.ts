@@ -242,6 +242,33 @@ function detectOpencode(run: Run): Promise<Probe> {
   return detectWithModels(run, OPENCODE_BIN, OPENCODE_VERSION, parseOpencodeModels);
 }
 
+/** xAI's Grok Build CLI. Always `grok`: its installer also makes `~/.local/bin/agent`, which is Cursor's name. */
+export const GROK_BIN = "grok";
+
+/**
+ * `grok models` → the models it lists: `  * grok-4.6 (default)` and `  - grok-4.5` under "Available models" (Grok Build
+ * 1.0.34). Anything else (its "Default model:" line, a sign-in notice) is skipped.
+ */
+export function parseGrokModels(output: string): CursorModelInfo[] {
+  const out: CursorModelInfo[] = [];
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the CLI's colors
+  for (const raw of output.replace(/\u001b\[[0-9;]*m/g, "").split("\n")) {
+    const id = /^\s*[*-]\s+([a-z0-9][\w.:/-]{0,79})(?:\s|$)/i.exec(raw)?.[1];
+    if (!id || out.some((x) => x.id === id)) continue;
+    out.push({ id });
+    if (out.length >= 60) break;
+  }
+  return out;
+}
+
+/** Grok Build's version line: `grok 1.0.34 (3736acbc8658) [stable]`; a `grok` that says anything else is skipped. */
+const GROK_VERSION = /^grok \d+\.\d+\.\d+\b/;
+
+/** Protocol 43 (ADR 0142): Grok Build and the models it lists (`grok models`). */
+function detectGrok(run: Run): Promise<Probe> {
+  return detectWithModels(run, GROK_BIN, GROK_VERSION, parseGrokModels);
+}
+
 /**
  * One CLI's look: what it found, and whether it couldn't tell (then the last good look stands). `exited`: unsure
  * because `--version` failed with an exit code, counted toward `EXECUTORS_EXIT_STRIKES`.
@@ -293,12 +320,13 @@ export async function detectExecutors(
   strikes: Partial<Record<string, number>> = {},
 ): Promise<{ found: Executors; unsure: boolean }> {
   const safe = (p: () => Promise<Probe>) => p().catch((): Probe => ({ unsure: true }));
-  const names = ["claude", "codex", "cursor", "opencode"] as const;
+  const names = ["claude", "codex", "cursor", "opencode", "grok"] as const;
   const probes = await Promise.all([
     safe(() => detectVersion(run, "claude")),
     safe(() => detectVersion(run, "codex")),
     safe(() => detectCursor(run)),
     safe(() => detectOpencode(run)),
+    safe(() => detectGrok(run)),
   ]);
   const found: Executors = {};
   let unsure = false;

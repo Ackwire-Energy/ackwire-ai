@@ -7,6 +7,7 @@ import {
   accountCodeAad,
   CURSOR_KEY_PROVIDER,
   CURSOR_PROTOCOL,
+  GROK_PROTOCOL,
   isAccountId,
   isAccountKind,
   isLoginEmail,
@@ -751,11 +752,11 @@ export async function refreshAiAccounts(deps: MachineAccountHubDeps, userId: str
  */
 export function sharesSignIns(
   machine: Pick<MachineRow, "protocol" | "executors">,
-  which: "claude_code" | "codex" | "cursor" | "opencode" | "key",
+  which: "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "key",
 ): boolean {
   if (machine.protocol < SHARED_ACCOUNTS_PROTOCOL) return false;
   if (machine.executors?.mode !== "system") return true;
-  if (which === "cursor" || which === "opencode") return false;
+  if (which === "cursor" || which === "opencode" || which === "grok") return false;
   return (which !== "codex" || machine.protocol >= SHARED_CODEX_PROTOCOL) && SHARED_SIGN_INS[which];
 }
 
@@ -931,7 +932,7 @@ export async function beginAccountLogin(
   provider?: string,
 ): Promise<AccountLoginView> {
   if (!isAccountKind(kind)) {
-    throw new ValidationError("Choose claude_code, codex, cursor or opencode", "account.invalid_kind");
+    throw new ValidationError("Choose claude_code, codex, cursor, opencode or grok", "account.invalid_kind");
   }
   if (email !== undefined && (kind !== "claude_code" || provider !== undefined || !isLoginEmail(email))) {
     throw new ValidationError("Use a plain email address, like ana@example.com", "account.invalid_email");
@@ -964,11 +965,13 @@ export async function beginAccountLogin(
     machine,
     kind === "cursor"
       ? CURSOR_PROTOCOL
-      : kind === "opencode"
-        ? OPENCODE_PROTOCOL
-        : plan
-          ? PLAN_KEYS_PROTOCOL
-          : ACCOUNTS_PROTOCOL,
+      : kind === "grok"
+        ? GROK_PROTOCOL
+        : kind === "opencode"
+          ? OPENCODE_PROTOCOL
+          : plan
+            ? PLAN_KEYS_PROTOCOL
+            : ACCOUNTS_PROTOCOL,
   );
   // Once for every agent of its owner there, where the runner can (protocol 29; ChatGPT's 38).
   const shared =

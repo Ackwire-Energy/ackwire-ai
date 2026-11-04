@@ -44,6 +44,8 @@ export interface MachineExecutors {
   cursor?: { version: string; models?: { id: string; label?: string; inPlan?: boolean }[] };
   /** OpenCode's CLI (protocol 39, ADR 0132) and the models it lists; `free`: OpenCode's free tier. */
   opencode?: { version: string; models?: { id: string; label?: string; free?: boolean }[] };
+  /** Grok Build, xAI's CLI (protocol 43, ADR 0142), and the models it lists. */
+  grok?: { version: string; models?: { id: string; label?: string }[] };
   /** `hello.browser` (ADR 0040): whether the agent browser can run there; absent = not reported. */
   browser?: { available: boolean; version?: string; chrome?: string; reason?: string; chromeMissing?: true };
   /** `hello.desktop` (ADR 0058): whether the agents' desktops can run there; absent = not reported. */
@@ -60,6 +62,7 @@ export interface MachineExecutors {
     codex?: MachinePlanUsage;
     cursor?: MachinePlanUsage;
     opencode?: MachinePlanUsage;
+    grok?: MachinePlanUsage;
   };
   detectedAt?: string;
 }
@@ -110,6 +113,7 @@ export interface MachineAccess {
     codex: boolean;
     cursor?: boolean;
     opencode?: boolean;
+    grok?: boolean;
     commands: boolean;
     browser?: boolean;
     desktop?: boolean;

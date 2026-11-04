@@ -987,19 +987,24 @@ no commands) and `--no-service`.
 
 That computer runs the commands agents execute, the browser they drive (the computer's own Google
 Chrome, which must be installed there: get it from google.com/chrome; it keeps itself up to date, and
-each agent uses a profile of its own, never yours), and Claude Code, Codex, Cursor's or OpenCode's CLI
-when an agent thinks with a subscription signed in there (OpenCode's free models need no sign-in at all).
+each agent uses a profile of its own, never yours), and Claude Code, Codex, Cursor's, OpenCode's or xAI's Grok
+Build CLI when an agent thinks with a subscription signed in there (OpenCode's free models need no sign-in at all).
 Install the ones you want on that computer, as the user that runs the runner: Cursor's with
 `curl https://cursor.com/install -fsS | bash` (it lands in `~/.local/bin`, which the runner's PATH must
-include), OpenCode's with `npm install -g opencode-ai@1.19.5`. A runner in system mode (each agent
+include), OpenCode's with `npm install -g opencode-ai@1.19.5`, Grok Build with
+`curl -fsSL https://x.ai/cli/install.sh | bash` (it puts `grok` in `~/.local/bin` too; agents think with it only
+through a Grok account added in Settings, AI accounts, never the computer's own sign-in). A runner in system mode (each agent
 its own system user) needs the CLI where every agent's user can run it, not in one user's home: install it
 under a shared folder and link it into `/usr/local/bin`, for example
 `sudo env HOME=/opt/cursor sh -c 'curl https://cursor.com/install -fsS | bash'`, then
 `sudo chmod -R a+rX /opt/cursor` and `sudo ln -sf /opt/cursor/.local/bin/agent /usr/local/bin/agent`;
 OpenCode's release binary (`opencode-linux-x64.tar.gz` of github.com/anomalyco/opencode's `v1.19.5`)
-extracted to `/usr/local/bin/opencode`.
+extracted to `/usr/local/bin/opencode`; Grok Build with
+`sudo env HOME=/opt/grok sh -c 'curl -fsSL https://x.ai/cli/install.sh | bash'`, then
+`sudo chmod -R a+rX /opt/grok` and `sudo ln -sf /opt/grok/.local/bin/grok /usr/local/bin/grok`. Grok's installer
+also makes `~/.local/bin/agent`, Cursor's name: where both are installed, link Cursor's `agent` last.
 Commands run as the user that runs the runner, so give it a dedicated user or a VM.
-`agentes-runner tools disable commands` (or `claude`, `codex`, `cursor` or `opencode`) turns a capability off on that
+`agentes-runner tools disable commands` (or `claude`, `codex`, `cursor`, `opencode` or `grok`) turns a capability off on that
 computer, and `agentes-runner folders allow <path>` shares a folder besides the agents' own.
 
 On a Linux server, the installer's `--system` option (below) installs Google Chrome from Google's apt

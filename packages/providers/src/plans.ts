@@ -336,3 +336,15 @@ export const OPENCODE_FREE_MODELS: readonly { id: string; label: string }[] = [
 /** A model of OpenCode's free tier by its `provider/model` id: one OpenCode serves (`opencode/`) named `-free`, or listed. */
 export const isOpencodeFreeModel = (id: string) =>
   /^opencode\/[\w.-]+-free$/.test(id) || OPENCODE_FREE_MODELS.some((m) => m.id === id);
+
+/**
+ * Grok Build's models (ADR 0142) where the agent's computer listed none (`grok models` asks xAI: none offline). What
+ * the CLI lists comes first; with none chosen its own default runs.
+ * ponytail: hand-copied list (grok-4.5 and grok-4.6 as Grok Build 1.0.34 listed them, grok-4.7 as OpenCode Go lists
+ * it, 2026-11-04), the CLI's own listing replaces it wherever the runner reports one.
+ */
+export const GROK_BUILD_MODELS: readonly { id: string; label: string }[] = [
+  { id: "grok-4.7", label: "Grok 4.7" },
+  { id: "grok-4.6", label: "Grok 4.6" },
+  { id: "grok-4.5", label: "Grok 4.5" },
+];

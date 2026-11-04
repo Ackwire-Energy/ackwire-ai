@@ -210,7 +210,7 @@ const chatgptPlus = account({
 });
 
 describe("Conectar uma IA: one picker, plans first", () => {
-  test("Settings › AI accounts opens the same picker: eight plans, then the API key, Claude chosen with its sign-in", async () => {
+  test("Settings › AI accounts opens the same picker: nine plans, then the API key, Claude chosen with its sign-in", async () => {
     const { dialog, tile } = await connect();
     const group = within(dialog).getByRole("group", { name: "Qual IA eles vão usar?" });
     const options = [...group.querySelectorAll(":scope > .ac-option")];
@@ -219,6 +219,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
       "ChatGPT",
       "Cursor",
       "OpenCode",
+      "Grok",
       "GLM Coding",
       "Kimi Code",
       "MiniMax",
@@ -228,7 +229,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // Each by its maker's mark; the key row by four of them, overlapped.
     expect(
       options.flatMap((o) => [...o.querySelectorAll(".ac-brand--sm")]).map((m) => m.getAttribute("data-mark")),
-    ).toEqual(["claude", "openai", "cursor", "opencode", "zai", "kimi", "minimax", "opencode"]);
+    ).toEqual(["claude", "openai", "cursor", "opencode", "grok", "zai", "kimi", "minimax", "opencode"]);
     const stack = tile("Chave de API").querySelector(".ac-brand-stack");
     expect([...(stack?.querySelectorAll(".ac-brand") ?? [])].map((m) => m.getAttribute("data-mark"))).toEqual([
       "claude",
@@ -240,7 +241,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(tile("Claude").getAttribute("aria-pressed")).toBe("true");
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
     // Right under the plans: the API key row comes after Claude's steps, never between Claude and them.
-    expect(options[7]?.nextElementSibling).toBe(panel);
+    expect(options[8]?.nextElementSibling).toBe(panel);
     expect(panel.compareDocumentPosition(tile("Chave de API")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(panel.textContent).toContain("Pro, Max, Ultra, Team ou Enterprise");
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();

@@ -234,8 +234,11 @@ export function pairedConfig(stored: StoredConfig, file = "config.json"): Runner
   };
 }
 
-/** The coding CLIs that follow Codex's switch until they have one of their own (Cursor's, protocol 36; OpenCode's, 39). */
-const FOLLOW_CODEX = ["cursor", "opencode"] as const;
+/**
+ * The coding CLIs that follow Codex's switch until they have one of their own (Cursor's, protocol 36; OpenCode's, 39;
+ * Grok's, 43).
+ */
+const FOLLOW_CODEX = ["cursor", "opencode", "grok"] as const;
 
 /**
  * The access to write back: while Cursor or OpenCode has no switch of its own (and this write doesn't set one), it
@@ -262,11 +265,16 @@ export function effectiveAccess(config: StoredConfig | null): RunnerAccess {
     if (FOLLOW_CODEX.every((name) => tools[name] !== undefined)) return config.access;
     return {
       ...config.access,
-      tools: { ...tools, cursor: tools.cursor ?? tools.codex, opencode: tools.opencode ?? tools.codex },
+      tools: {
+        ...tools,
+        cursor: tools.cursor ?? tools.codex,
+        opencode: tools.opencode ?? tools.codex,
+        grok: tools.grok ?? tools.codex,
+      },
     };
   }
   const on = config ? config.exec !== false : false;
-  return { folders: [], tools: { claude: on, codex: on, cursor: on, opencode: on, commands: on } };
+  return { folders: [], tools: { claude: on, codex: on, cursor: on, opencode: on, grok: on, commands: on } };
 }
 
 /** The pause as the protocol says it (an `until` already past counts as not paused). */

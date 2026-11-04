@@ -513,12 +513,13 @@ test("a coding plan's key: no sign-in page but the plan's key page, the key seal
       canAdd: true,
       keys: true,
       // A runner before protocol 29: a sign-in thinks for one agent.
-      shares: { claude_code: false, codex: false, cursor: false, opencode: false, key: false },
+      shares: { claude_code: false, codex: false, cursor: false, opencode: false, grok: false, key: false },
       brains: {
         claude_code: expect.any(Boolean),
         codex: expect.any(Boolean),
         cursor: expect.any(Boolean),
         opencode: expect.any(Boolean),
+        grok: expect.any(Boolean),
       },
       // Its Claude Code is signed in on its own, with no plan or usage known yet.
       own: { claude_code: {} },
@@ -1413,6 +1414,7 @@ test("one sign-in for all agents (protocol 29): asked for, it thinks for two age
     codex: true,
     cursor: true,
     opencode: true,
+    grok: true,
     key: true,
   });
 
@@ -1546,6 +1548,7 @@ test("where each agent is its own OS user, the switch decides: Claude's and Chat
     codex: true,
     cursor: false,
     opencode: false,
+    grok: false,
     key: true,
   });
   // A runner before protocol 38 shares Claude's and keys only, and an older one nothing.
@@ -1558,6 +1561,7 @@ test("where each agent is its own OS user, the switch decides: Claude's and Chat
     codex: false,
     cursor: false,
     opencode: false,
+    grok: false,
     key: true,
   });
   await f.db
@@ -1569,6 +1573,7 @@ test("where each agent is its own OS user, the switch decides: Claude's and Chat
     codex: false,
     cursor: false,
     opencode: false,
+    grok: false,
     key: false,
   });
 });

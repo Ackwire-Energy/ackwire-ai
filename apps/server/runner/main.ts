@@ -330,7 +330,7 @@ async function pair(p: Parsed): Promise<number> {
     grant,
     workspace: workspaceReal,
     ...(name ? { name } : {}),
-    tools: { claude: exec, codex: exec, cursor: exec, opencode: exec, commands: exec },
+    tools: { claude: exec, codex: exec, cursor: exec, opencode: exec, grok: exec, commands: exec },
     desktop: false,
   });
   writeConfig(next, home);
@@ -912,6 +912,7 @@ function tools(p: Parsed): number {
     codex: "Codex",
     cursor: "Cursor",
     opencode: "OpenCode",
+    grok: "Grok Build",
     commands: "Commands",
     browser: "Browser",
     desktop: "Desktops (each agent's own screen, watched and controlled from the app)",
@@ -1274,8 +1275,10 @@ async function main(argv: string[]): Promise<number> {
       return desktopCheck(p);
     case "mcp": {
       // `--task <taskId>`: a mission task's or a Claude Code brain process's server.
-      // `--run <runId>`: a Codex brain turn's (its token only in the env).
-      const runId = flagString(p, "run");
+      // `--run <runId>`: a Codex brain turn's (its token only in the env). Neither: the run in `AGENTES_MCP_RUN`, for a
+      // CLI whose config can't name it per turn (Grok Build's, shared by an account's turns).
+      const runId =
+        flagString(p, "run") ?? (flagString(p, "task") ? undefined : process.env.AGENTES_MCP_RUN || undefined);
       const taskId = runId ?? flagString(p, "task");
       if (!taskId || !/^[a-zA-Z0-9-]{8,64}$/.test(taskId)) {
         console.error("Usage: agentes-runner mcp --task <taskId> | --run <runId>");

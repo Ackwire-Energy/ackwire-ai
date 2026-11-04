@@ -865,7 +865,9 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
       <List aria-label={t("machines.access.tools")}>
         {MACHINE_TOOLS.map((tool) => {
           const on =
-            tool === "cursor" || tool === "opencode" ? (access.tools[tool] ?? access.tools.codex) : access.tools[tool];
+            tool === "cursor" || tool === "opencode" || tool === "grok"
+              ? (access.tools[tool] ?? access.tools.codex)
+              : access.tools[tool];
           const name = t(`machines.access.tool.${tool}`);
           return (
             <div key={tool} className="ac-list__row machine-tool" data-tool={tool}>

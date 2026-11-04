@@ -399,7 +399,8 @@ export function busyOnComputer(
   perDay: number,
   where: { selfHost: boolean; namesComputer: boolean },
 ): Words | null {
-  if (!where.selfHost || !brain || !["claude_code", "codex", "cursor", "opencode"].includes(brain.kind)) return null;
+  if (!where.selfHost || !brain || !["claude_code", "codex", "cursor", "opencode", "grok"].includes(brain.kind))
+    return null;
   if (perDay < BUSY_RUNS_PER_DAY) return null;
   const machine = where.namesComputer ? brain.machineName : null;
   return machine

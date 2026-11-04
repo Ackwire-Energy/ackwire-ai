@@ -36,7 +36,15 @@ import {
 } from "@agenteschat/providers/plans";
 import { errnoCode, RunnerError } from "./errors";
 import { killTree } from "./exec";
-import { CURSOR_BIN, claudeKeptPlan, claudePlan, claudeTier, OPENCODE_BIN, resolveCommand } from "./executors";
+import {
+  CURSOR_BIN,
+  claudeKeptPlan,
+  claudePlan,
+  claudeTier,
+  GROK_BIN,
+  OPENCODE_BIN,
+  resolveCommand,
+} from "./executors";
 import { readSmallJson, writeJson } from "./json-file";
 import {
   codexUsage,
@@ -117,6 +125,7 @@ const LABEL: Record<AccountKind, string> = {
   codex: "Codex",
   cursor: "Cursor",
   opencode: "OpenCode",
+  grok: "Grok Build",
 };
 /** Cursor's CLI keeps its config in `CURSOR_CONFIG_DIR` (cursor.com/docs/cli/reference/configuration). */
 const ENV_VAR: Record<AccountKind, string> = {
@@ -125,6 +134,8 @@ const ENV_VAR: Record<AccountKind, string> = {
   cursor: "CURSOR_CONFIG_DIR",
   // OpenCode keeps its config, sessions and sign-ins under the XDG folders (`accountEnv` sets them all).
   opencode: "XDG_DATA_HOME",
+  // Its sign-in (`auth.json`), config, sessions and leader socket.
+  grok: "GROK_HOME",
 };
 const LOGIN_ARGS: Record<AccountKind, string[]> = {
   claude_code: ["auth", "login"],
@@ -132,18 +143,23 @@ const LOGIN_ARGS: Record<AccountKind, string[]> = {
   cursor: ["login"],
   // Never run: an OpenCode account is its key alone (`begin` refuses a sign-in without one).
   opencode: ["auth", "login"],
+  // The device code: the person signs in on xAI's page from any device, nothing listens on the computer.
+  grok: ["login", "--device-auth"],
 };
 const STATUS_ARGS: Record<AccountKind, string[]> = {
   claude_code: ["auth", "status", "--json"],
   codex: ["login", "status"],
   cursor: ["status"],
   opencode: ["auth", "list"],
+  // Grok Build has no status command: `grok models` says "You are not authenticated." when signed out.
+  grok: ["models"],
 };
 const LOGOUT_ARGS: Record<AccountKind, string[]> = {
   claude_code: ["auth", "logout"],
   codex: ["logout"],
   cursor: ["logout"],
   opencode: ["auth", "logout"],
+  grok: ["logout"],
 };
 /** Each CLI's executable (Cursor's was `cursor-agent` before it was renamed). */
 const COMMAND: Record<AccountKind, string> = {
@@ -151,6 +167,7 @@ const COMMAND: Record<AccountKind, string> = {
   codex: "codex",
   cursor: CURSOR_BIN,
   opencode: OPENCODE_BIN,
+  grok: GROK_BIN,
 };
 
 /** What a brain turn says when its account folder is gone (people read it). */
@@ -163,11 +180,12 @@ export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
     "The Cursor account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
   opencode:
     "The OpenCode account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
+  grok: "The Grok account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
 };
 
 /** What would make a CLI think with anything but its folder's sign-in: a key, a token, another endpoint or cloud. */
 const STRAY_SIGN_IN =
-  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY|CURSOR_API_KEY|OPENCODE_API_KEY|OPENCODE_AUTH_CONTENT)$/;
+  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY|CURSOR_API_KEY|OPENCODE_API_KEY|OPENCODE_AUTH_CONTENT|XAI_API_KEY|GROK_(?:HOME|AUTH_\w+|OIDC_\w+|CLI_CHAT_PROXY_BASE_URL|CONFIG|CONFIG_PATH|SANDBOX))$/;
 
 /** `base` without any key, token, endpoint or cloud a CLI would think with instead of its own sign-in. */
 export function withoutSignIns(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -193,8 +211,34 @@ export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessE
     env.XDG_CACHE_HOME = dir;
     env.XDG_STATE_HOME = dir;
   }
+  if (kind === "grok") Object.assign(env, GROK_QUIET_ENV);
   return env;
 }
+
+/**
+ * What every Grok Build process gets (ADR 0142): none of the Claude Code and Cursor config it would otherwise read
+ * (their MCP servers, rules, skills, agents and hooks), no telemetry, no updates of its own (the computer's image
+ * pins it). Names as Grok Build 1.0.34's configuration docs list them.
+ */
+export const GROK_QUIET_ENV: Readonly<Record<string, string>> = {
+  GROK_CLAUDE_MCPS_ENABLED: "false",
+  GROK_CLAUDE_RULES_ENABLED: "false",
+  GROK_CLAUDE_SKILLS_ENABLED: "false",
+  GROK_CLAUDE_AGENTS_ENABLED: "false",
+  GROK_CLAUDE_HOOKS_ENABLED: "false",
+  GROK_CURSOR_MCPS_ENABLED: "false",
+  GROK_CURSOR_RULES_ENABLED: "false",
+  GROK_CURSOR_SKILLS_ENABLED: "false",
+  GROK_CURSOR_AGENTS_ENABLED: "false",
+  GROK_CURSOR_HOOKS_ENABLED: "false",
+  GROK_MANAGED_MCPS_ENABLED: "false",
+  GROK_MANAGED_MCP_GATEWAY_TOOLS_ENABLED: "false",
+  GROK_TELEMETRY_ENABLED: "false",
+  GROK_TELEMETRY_TRACE_UPLOAD: "false",
+  GROK_TELEMETRY_MIXPANEL_ENABLED: "false",
+  GROK_FEEDBACK_ENABLED: "false",
+  GROK_DISABLE_AUTOUPDATER: "1",
+};
 
 /** A Cursor account made with an API key keeps it here (600). */
 const CURSOR_KEY_FILE = "cursor-key.json";
@@ -858,6 +902,28 @@ export function parseClaudeStatus(
   };
 }
 
+/**
+ * Grok Build's device sign-in (`grok login --device-auth`): the first https URL on x.ai or grok.com, then its one-time
+ * code. A URL that carries the code itself (`?user_code=`) needs none after it.
+ */
+export function parseGrokLogin(output: string, final = false): { url: string; userCode?: string } | null {
+  const text = stripAnsi(output);
+  const first = urlsIn(text, (h) => hostIs(h, "x.ai") || hostIs(h, "grok.com"), final)[0];
+  if (!first) return null;
+  const m = (final ? CODE_AT_END : CODE).exec(text.slice(first.end));
+  if (m?.[1]) return { url: first.url, userCode: m[1] };
+  return final || /[?&](?:user_)?code=/i.test(first.url) ? { url: first.url } : null;
+}
+
+/** `grok models`: signed in unless it says it isn't, with a sign-in file in the folder. */
+export function parseGrokStatus(
+  status: number | null,
+  output: string,
+  hasAuth: boolean,
+): Omit<RunnerAccountInfo, "id" | "kind"> {
+  return { loggedIn: hasAuth && status === 0 && !/not (?:authenticated|logged in|signed in)/i.test(stripAnsi(output)) };
+}
+
 /** Cursor's sign-in link (`agent login` with `NO_OPEN_BROWSER`): the first complete https URL on cursor.com. */
 export function parseCursorLoginUrl(output: string, final = false): string | null {
   return urlsIn(stripAnsi(output), (h) => hostIs(h, "cursor.com") || hostIs(h, "cursor.sh"), final)[0]?.url ?? null;
@@ -1209,9 +1275,11 @@ export class AccountManager {
       const parse = (final: boolean) =>
         kind === "codex"
           ? parseCodexLogin(login.output, final)
-          : kind === "cursor"
-            ? toUrl(parseCursorLoginUrl(login.output, final))
-            : toUrl(parseClaudeLoginUrl(this.shown(login), final));
+          : kind === "grok"
+            ? parseGrokLogin(login.output, final)
+            : kind === "cursor"
+              ? toUrl(parseCursorLoginUrl(login.output, final))
+              : toUrl(parseClaudeLoginUrl(this.shown(login), final));
       let done = false;
       const finish = (v: { url: string; userCode?: string } | null) => {
         if (done) return;
@@ -1687,7 +1755,9 @@ export class AccountManager {
         ? parseClaudeStatus(r.status, r.stdout, () => claudeTier(dir))
         : kind === "cursor"
           ? parseCursorStatus(r.status, `${r.stdout}\n${r.stderr}`)
-          : parseCodexStatus(r.status, `${r.stdout}\n${r.stderr}`);
+          : kind === "grok"
+            ? parseGrokStatus(r.status, `${r.stdout}\n${r.stderr}`, existsSync(path.join(dir, "auth.json")))
+            : parseCodexStatus(r.status, `${r.stdout}\n${r.stderr}`);
     return { id, kind, ...status, ...shared };
   }
 
@@ -2071,8 +2141,8 @@ export class AccountManager {
     if (!own && (this.lentTo(target.kind, id) !== null || this.isShared(target.kind, id))) return null;
     const probe = { command: this.command(target.kind), cwd: target.cwd, env: target.env, ...limits };
     // Cursor's CLI reports no plan usage: its turns' `usage` is all there is.
-    // Nor does OpenCode's: its key's usage is on OpenCode's console.
-    if (target.kind === "cursor" || target.kind === "opencode") return null;
+    // Nor does OpenCode's: its key's usage is on OpenCode's console. Grok Build shows its plan's only in its TUI.
+    if (target.kind === "cursor" || target.kind === "opencode" || target.kind === "grok") return null;
     return target.kind === "codex" ? probeCodexUsage(probe) : probeClaudeUsage(probe);
   }
 

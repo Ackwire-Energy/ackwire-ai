@@ -72,7 +72,11 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
     typeof noAi?.reason === "string" && RIGHT_HAND_PLAN_LINES.has(noAi.reason) ? `no_ai_${noAi.reason}` : null;
   const own =
     signedOut &&
-    (noAi?.own === "codex" || noAi?.own === "claude_code" || noAi?.own === "cursor" || noAi?.own === "opencode")
+    (noAi?.own === "codex" ||
+      noAi?.own === "claude_code" ||
+      noAi?.own === "cursor" ||
+      noAi?.own === "opencode" ||
+      noAi?.own === "grok")
       ? noAi.own
       : null;
   if (own) {

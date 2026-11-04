@@ -251,9 +251,9 @@ export function brainPickOptions(
       );
     }
     if (on.length === 0) {
-      // Cursor (ADR 0114) and OpenCode (ADR 0132) only where a computer runs them; Claude's and ChatGPT's plans say
-      // why they can't.
-      if (choice === "cursor" || choice === "zen") return [];
+      // Cursor (ADR 0114), OpenCode (ADR 0132) and Grok (ADR 0142) only where a computer runs them; Claude's and
+      // ChatGPT's plans say why they can't.
+      if (choice === "cursor" || choice === "zen" || choice === "grok") return [];
       return [
         {
           value: `none:${choice}`,

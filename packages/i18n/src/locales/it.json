@@ -2066,6 +2066,8 @@
       "codex": "Codex non ha effettuato l'accesso su questo computer. Collega un account ChatGPT nella pagina di {{name}}.",
       "codex_female": "Codex non ha effettuato l'accesso su questo computer. Collega un account ChatGPT nella pagina di {{name}}.",
       "cursor": "Cursor non ha effettuato l'accesso su questo computer. Collega un account Cursor nella pagina di {{name}}.",
+      "grok": "Grok non ha effettuato l'accesso su questo computer. Collega un account Grok nella pagina di {{name}}.",
+      "grok_female": "Grok non ha effettuato l'accesso su questo computer. Collega un account Grok nella pagina di {{name}}.",
       "cursor_female": "Cursor non ha effettuato l'accesso su questo computer. Collega un account Cursor nella pagina di {{name}}.",
       "opencode": "OpenCode non può pensare su questo computer. Collega una chiave OpenCode nella pagina di {{name}}.",
       "opencode_female": "OpenCode non può pensare su questo computer. Collega una chiave OpenCode nella pagina di {{name}}."
@@ -2096,6 +2098,7 @@
       "claude": "Collega il tuo piano Claude",
       "chatgpt": "Collega il tuo piano ChatGPT",
       "cursor": "Collega il tuo piano Cursor",
+      "grok": "Collega il tuo piano Grok",
       "zen": "Collega OpenCode",
       "api_key": "Aggiungi una chiave API"
     },
@@ -2120,6 +2123,10 @@
       "cursor": {
         "title": "Il tuo piano Cursor",
         "tiers": "Pro, Pro+, Ultra o Teams, oppure una chiave API di Cursor"
+      },
+      "grok": {
+        "title": "Il tuo piano Grok",
+        "tiers": "SuperGrok, SuperGrok Heavy o X Premium+"
       },
       "zen": {
         "title": "OpenCode",
@@ -2198,6 +2205,7 @@
       "claude_code": "Claude ha effettuato l'accesso come {{email}}, non {{account}}. Esci dalla pagina di Claude e riprova.",
       "codex": "ChatGPT ha effettuato l'accesso come {{email}}, non {{account}}. Esci dalla pagina di ChatGPT e riprova.",
       "cursor": "Cursor ha effettuato l'accesso come {{email}}, non {{account}}. Esci dalla pagina di Cursor e riprova.",
+      "grok": "Grok ha effettuato l'accesso come {{email}}, non {{account}}. Esci dalla pagina di Grok e riprova.",
       "opencode": "OpenCode ha effettuato l'accesso come {{email}}, non come {{account}}. Riprova con la chiave giusta."
     },
     "useAnyway": "Usa {{email}}",
@@ -3808,21 +3816,25 @@
             "claude_code": "Aggiungi un account Claude",
             "codex": "Aggiungi un account ChatGPT",
             "cursor": "Aggiungi un account Cursor",
+            "grok": "Aggiungi un account Grok",
             "opencode": "Aggiungi una chiave OpenCode"
           },
           "stepOne": {
             "claude_code": "L'account con il tuo piano",
             "codex": "L'account con il tuo piano",
-            "cursor": "L'account con il tuo piano"
+            "cursor": "L'account con il tuo piano",
+            "grok": "L'account con il tuo piano"
           },
           "stepOneHint": "Account sbagliato? Esci da lì e riprova. L'account resta solo su {{computer}}. La password la inserisci sulla pagina di {{brand}}.",
           "open": {
             "claude_code": "Accedi con Claude",
             "codex": "Accedi con ChatGPT",
-            "cursor": "Accedi con Cursor"
+            "cursor": "Accedi con Cursor",
+            "grok": "Accedi con Grok"
           },
           "opencodeFree": "I modelli gratuiti di OpenCode non richiedono chiavi. Una chiave dalla console di OpenCode aggiunge quelli a pagamento.",
           "cursorFinish": "Accedi sulla pagina di Cursor e l'accesso si completa da solo su {{computer}}.",
+          "grokFinish": "Accedi sulla pagina di Grok e l'accesso si completa da solo su {{computer}}.",
           "cursorKey": "Usa invece una chiave API di Cursor",
           "copyLink": "Copia link",
           "openAgain": "Apri di nuovo",
@@ -3834,6 +3846,7 @@
           "sent": "Codice inviato. Completamento dell'accesso su {{computer}}.",
           "local": "Sei proprio su {{computer}}? Se il suo browser si è aperto da solo, autorizza lì.",
           "deviceCode": "Codice per ChatGPT",
+          "grokCode": "Codice per Grok",
           "deviceCodeText": "Inserisci questo codice nella pagina che si apre.",
           "starting": "Richiesta a {{computer}}…",
           "waiting": "In attesa",
@@ -3844,6 +3857,7 @@
             "claude_code": "Claude ha effettuato l'accesso come {{account}}, un account che hai già collegato. Per usarne un altro, esci sulla pagina di Claude e riprova.",
             "codex": "ChatGPT ha effettuato l'accesso come {{account}}, un account che hai già collegato. Per usarne un altro, esci sulla pagina di ChatGPT e riprova.",
             "cursor": "Cursor ha effettuato l'accesso come {{account}}, un account che hai già collegato. Per usarne un altro, esci sulla pagina di Cursor e riprova.",
+            "grok": "Grok ha effettuato l'accesso come {{account}}, un account che hai già collegato. Per usarne un altro, esci sulla pagina di Grok e riprova.",
             "opencode": "Questa chiave OpenCode è già collegata come {{account}}."
           },
           "startFailed": "Nessuna risposta da {{computer}}. Riprova tra un attimo.",
@@ -7564,6 +7578,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "grok": "Grok",
       "opencode": "OpenCode",
       "needs": {
         "keys": "Aggiorna agentes sul computer per usare la chiave di un piano"
@@ -7574,6 +7589,7 @@
         "claude_code": "Non ancora pronto su {{computer}}",
         "codex": "Non ancora pronto su {{computer}}",
         "cursor": "Non ancora pronto su {{computer}}",
+        "grok": "Non ancora pronto su {{computer}}",
         "opencode": "Non ancora pronto su {{computer}}",
         "online": "{{computer}} non risponde in questo momento. Ci stiamo lavorando."
       }
@@ -9019,21 +9035,25 @@
       "claude": "{{model}} con il piano Claude",
       "chatgpt": "{{model}} con il piano ChatGPT",
       "cursor": "{{model}} con il piano Cursor",
+      "grok": "{{model}} con il piano Grok",
       "zen": "{{model}} con OpenCode",
       "coding": "{{model}} con {{plan}}",
       "claudeOf": "{{model}} con il piano Claude di {{owner}}",
       "chatgptOf": "{{model}} con il piano ChatGPT di {{owner}}",
       "cursorOf": "{{model}} con il piano Cursor di {{owner}}",
+      "grokOf": "{{model}} con il piano Grok di {{owner}}",
       "zenOf": "{{model}} con l'OpenCode di {{owner}}",
       "codingOf": "{{model}} con {{plan}} di {{owner}}",
       "claudeAuto": "Piano Claude",
       "chatgptAuto": "Piano ChatGPT",
       "cursorAuto": "Piano Cursor",
+      "grokAuto": "Piano Grok",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Piano Claude di {{owner}}",
       "chatgptAutoOf": "Piano ChatGPT di {{owner}}",
       "cursorAutoOf": "Piano Cursor di {{owner}}",
+      "grokAutoOf": "Piano Grok di {{owner}}",
       "zenAutoOf": "OpenCode di {{owner}}",
       "codingAutoOf": "{{plan}} di {{owner}}",
       "on": "{{line}} su {{computer}}"
@@ -9046,6 +9066,7 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
+      "grok": "Grok Build",
       "opencode": "OpenCode"
     },
     "foot": {
@@ -9057,6 +9078,7 @@
     "claude_codeText": "Usa il piano Claude di chi ha collegato il computer.",
     "codexText": "Usa il piano ChatGPT di chi ha collegato il computer.",
     "cursorText": "Usa il piano Cursor di chi ha collegato il computer.",
+    "grokText": "Usa il piano Grok di chi ha collegato il computer.",
     "opencodeText": "I modelli gratuiti di OpenCode, o la chiave OpenCode di chi ha collegato il computer.",
     "cursorModel": {
       "inPlan": "Nel tuo piano Cursor",
@@ -9101,6 +9123,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "grok": "Grok Build · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, senza riserva tramite API"
     },
@@ -11499,6 +11522,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "grok": "Grok Build",
         "opencode": "OpenCode",
         "commands": "Comandi",
         "browser": "Browser"
@@ -11507,6 +11531,7 @@
         "claude": "Scrive e modifica file, solo nelle cartelle consentite.",
         "codex": "Come Claude Code, con un account ChatGPT. Solo nelle cartelle consentite.",
         "cursor": "Come Claude Code, con un account Cursor. Solo nelle cartelle consentite.",
+        "grok": "Come Claude Code, con un account Grok. Solo nelle cartelle consentite.",
         "opencode": "Come Claude Code, con i modelli gratuiti di OpenCode o una chiave OpenCode. Solo nelle cartelle consentite.",
         "commands": "Esegue comandi del Terminale, come test e build."
       },

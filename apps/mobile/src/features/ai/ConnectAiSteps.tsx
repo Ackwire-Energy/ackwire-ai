@@ -424,7 +424,7 @@ function Home({
       ) : null}
       <GroupedHeader>{t("mobile.ai.yourPlan")}</GroupedHeader>
       <GroupedList>
-        {(["claude", "chatgpt"] as const).map((c) => (
+        {(["claude", "chatgpt", "grok"] as const).map((c) => (
           <GroupedRow
             key={c}
             leading={<ProviderLogo id={planMark(c)} size="sm" off={dims(c)} />}
