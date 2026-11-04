@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { channelTopic, createMemoryPubSub, type RealtimeEvent } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   consolidateItem,
@@ -15,6 +16,7 @@ import {
   markChannelRead,
   openDm,
   postPersonMessage,
+  publishMessageCreated,
   requireChannelAccess,
   revertMemoryChange,
   undoAgentAction,
@@ -23,6 +25,30 @@ import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(() => f?.close());
+
+describe("a message too big for its event", () => {
+  test("goes out without its body, with the thread and the run it ends", async () => {
+    const pubsub = createMemoryPubSub();
+    const events: RealtimeEvent[] = [];
+    pubsub.subscribe(channelTopic("c1"), (e) => events.push(e));
+    await publishMessageCreated(pubsub, {
+      id: "m1",
+      channelId: "c1",
+      threadId: "t1",
+      author: { type: "agent", id: "a1" },
+      body: "Resposta longa. ".repeat(600),
+      mentionedAgentIds: [],
+      mentionedUserIds: [],
+      agentRunId: "r1",
+      meta: {},
+      clientId: null,
+      createdAt: new Date().toISOString(),
+    });
+    expect(events).toEqual([
+      { type: "message.created", channelId: "c1", messageId: "m1", threadId: "t1", agentRunId: "r1" },
+    ]);
+  });
+});
 
 describe("send path", () => {
   test("message.created goes out first with the clientId; mentioned agents show thinking at once", async () => {

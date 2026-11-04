@@ -83,6 +83,12 @@ test("a 3-call tool loop: narration goes to steps and live events, the message i
   const seqs = deltas.map((d) => d.seq);
   expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
   expect(new Set(seqs).size).toBe(seqs.length);
+  // Each piece says where it starts in its turn's text: an app that missed one knows its text has a hole.
+  const told = new Map<number, number>();
+  for (const d of deltas as { turn: number; at?: number; text: string }[]) {
+    expect(d.at).toBe(told.get(d.turn) ?? 0);
+    told.set(d.turn, (told.get(d.turn) ?? 0) + d.text.length);
+  }
 
   // Steps: the model calls keep the narration.
   const [run] = await f.db.select().from(schema.agentRuns);
