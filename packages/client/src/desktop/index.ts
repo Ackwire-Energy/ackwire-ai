@@ -174,3 +174,14 @@ export const useDesktopStatus = (
     refetchInterval: options.poll ?? false,
   });
 };
+
+/**
+ * Xvnc's MaxCutText (its default): a larger clipboard from a viewer is dropped without a word. It counts what noVNC
+ * sends: UTF-8 with every line break as CRLF, and a NUL at the end. The agent's browser takes the same at most: a
+ * paste goes in 10,000-character frames, and the server takes 60 frames a second.
+ */
+export const PASTE_MAX_BYTES = 262_144;
+
+/** What a text takes on the desktop's clipboard, in the bytes `PASTE_MAX_BYTES` counts. */
+export const pasteBytes = (text: string) =>
+  new TextEncoder().encode(text.replace(/\r\n|\r|\n/g, "\r\n")).byteLength + 1;

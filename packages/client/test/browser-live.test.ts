@@ -31,6 +31,7 @@ import {
   usesBrowser,
   wheelEvent,
 } from "../src/browser";
+import { PASTE_MAX_BYTES, pasteBytes } from "../src/desktop";
 import { toolActivity } from "../src/lib/activity";
 import { shownAddress } from "../src/lib/sites";
 
@@ -385,6 +386,9 @@ describe("agent browser live connection (ADR 0040)", () => {
     live.sendInput(pieces);
     expect(sent.map((f) => f.events?.length)).toEqual([1, 1, 1]);
     expect(pasteEvents("")).toEqual([]);
+    // The longest paste the apps send fits in the frames the server takes in a second (60), so none is dropped.
+    expect(pasteBytes("x".repeat(PASTE_MAX_BYTES))).toBeGreaterThan(PASTE_MAX_BYTES);
+    expect(pasteEvents("x".repeat(PASTE_MAX_BYTES)).length).toBeLessThan(60);
   });
 
   test("the address bar at rest: where the page is, as a browser shows it", () => {

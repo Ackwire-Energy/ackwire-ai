@@ -6,6 +6,8 @@ import {
   createTouchInput,
   frameMetadata,
   keyEvents,
+  PASTE_MAX_BYTES,
+  pasteBytes,
   pasteEvents,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -251,9 +253,10 @@ export function TypeBar({
   );
 }
 
-/** `TypeBar` on the agent's page: its text and keys as the page's input events. */
-export const browserTyping = (send: (events: BrowserInputEvent[]) => void) => ({
+/** `TypeBar` on the agent's page: its text and keys as the page's input events; a text too long is refused whole. */
+export const browserTyping = (send: (events: BrowserInputEvent[]) => void, tooLong: () => void) => ({
   onText: (text: string) => {
+    if (pasteBytes(text) > PASTE_MAX_BYTES) return tooLong();
     const events = pasteEvents(text);
     if (events.length) send(events);
   },
