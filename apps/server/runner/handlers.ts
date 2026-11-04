@@ -18,6 +18,7 @@ import {
   type RunnerTools,
   STEER_LIMITS,
 } from "@agenteschat/adapters/machine-protocol";
+import { redactSecrets } from "@agenteschat/adapters/secret-box";
 import { realFoldersFor } from "./access";
 import type { AccountFolders, AccountGrant, AccountManager } from "./accounts";
 import { type BrainManager, brainKey } from "./brain";
@@ -46,6 +47,7 @@ import { agentSecrets, handleSecret } from "./secrets";
 import type { DataSockets } from "./streams";
 import type { TaskManager } from "./tasks";
 import type { Terminals } from "./terminal";
+import { openExecKeys, parseExecVault, runnerVault } from "./vault";
 
 /**
  * Requests one connection runs at once, whatever they are: a bound on a flood, far above what room allows
@@ -98,6 +100,7 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "desktop.act",
   "desktop.capture",
   "desktop.apps",
+  "vault.key",
 ]);
 
 /**
@@ -150,6 +153,8 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "desktop.capture": "agent",
   "desktop.apps": "agent",
   "desktop.text": "agent",
+  // ADR 0144: the key lives in the process that opens the values (the agent's worker), so root never holds one.
+  "vault.key": "agent",
 };
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
@@ -316,19 +321,32 @@ async function doExec(
     if (!(await stat(resolved.abs)).isDirectory()) throw new RunnerError("bad_request", `${req.cwd} is not a folder`);
     cwd = resolved.abs;
   }
+  // ADR 0144: Vault keys for this one command, checked whole before anything opens.
+  const sealed = req.vault === undefined ? null : parseExecVault(req.vault);
+  if (sealed && !req.agent?.id) throw new RunnerError("bad_request", "Vault keys belong to an agent's command");
   // run_code and skill scripts: the command and the script it runs meet the command policy first, as the
   // brain's own commands do (ADR 0053 §3). A person's approval of this very command lets it through, unless
   // our git proxy would refuse it anyway (`never`).
   const held = await commandApproval(command, { cwd, own: ownBranches(req.agent), how: ASK_AGAIN, script: true });
   if (held?.never) throw new RunnerError("not_allowed", held.message);
   if (held && req.approved !== true) throw new RunnerError("approval_needed", held.message);
+  let env = secrets?.env;
+  let redact = secrets;
+  if (sealed && req.agent) {
+    // Opened in this process's memory, given to this command's environment only, and redacted from its output
+    // (and for 10 minutes from what else the agent's work sends out: they are armed).
+    const keys = await openExecKeys(runnerVault, String(req.agent.id), sealed);
+    env = { ...(env ?? {}), ...Object.fromEntries(keys.map((k) => [k.name, k.value])) };
+    redact = await agentSecrets(ctx.secretsDir, req.agent);
+  }
   return runCommand({
     command,
     cwd,
     timeoutSeconds: clampInt(req.timeoutSeconds, 1, 24 * 3600, 60),
     signal: scope.signal,
     onOutput: req.stream === true ? scope.output : undefined,
-    ...(secrets ? { env: secrets.env, redact: secrets.redact, redactHold: secrets.hold } : {}),
+    ...(env ? { env } : {}),
+    ...(redact ? { redact: redact.redact, redactHold: redact.hold } : {}),
   });
 }
 
@@ -462,8 +480,30 @@ export const PAUSED = "The owner paused this computer. Nothing new starts here u
 const workStream = (req: MachineRequest) =>
   req.op === "stream.open" && (req.kind === "terminal" || req.mode === "control");
 
-/** Runs one request; throws RunnerError (or fs errors) on failure. */
+/**
+ * Runs one request; throws RunnerError (or fs errors) on failure. An error's text leaves redacted like an answer
+ * (ADR 0144): a page's error can quote what was just typed.
+ */
 export async function handleRequest(ctx: HandlerContext, req: MachineRequest, scope: RequestScope): Promise<unknown> {
+  try {
+    return await routeRequest(ctx, req, scope);
+  } catch (err) {
+    throw await scrubbed(ctx, req, err);
+  }
+}
+
+/** The error with every secret value of the request's agent (and of its browser profile's session) redacted. */
+async function scrubbed(ctx: HandlerContext, req: MachineRequest, err: unknown): Promise<unknown> {
+  const own = await agentSecrets(ctx.secretsDir, req.agent).catch(() => null);
+  const profileId = req.profile?.id;
+  const profile = typeof profileId === "string" ? runnerVault.armedOf(profileKey(profileId)) : [];
+  if (!own && profile.length === 0) return err;
+  const { code, message } = toMachineError(err);
+  const clean = redactSecrets(own ? own.redact(message) : message, profile);
+  return clean === message ? err : new RunnerError(code, clean);
+}
+
+async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: RequestScope): Promise<unknown> {
   // Protocol 9: paused by the owner. What already runs finishes; status, output and cancel still answer.
   if ((NEW_WORK_OPS.has(req.op) || workStream(req)) && ctx.paused?.()) throw new RunnerError("paused", PAUSED);
   // Protocol 34: a browser profile's session, never an agent's worker or folder (ADR 0110).
@@ -494,6 +534,14 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
   if (req.op === "secret" && ctx.systemMode?.()) {
     if (!ctx.workers?.secret) throw new RunnerError("not_allowed", "The root secret broker is unavailable");
     return ctx.workers.secret(req, scope);
+  }
+  // Protocol 45 (ADR 0144): a one-use key in this process's memory (the agent's worker in system mode).
+  if (req.op === "vault.key") {
+    const agentId = req.agent?.id;
+    if (typeof agentId !== "string" || !agentId) {
+      throw new RunnerError("bad_request", "A Vault key belongs to an agent");
+    }
+    return { vaultKey: await runnerVault.issueKey(agentId) } satisfies MachineReplies["vault.key"];
   }
   // Protocol 10: the folders this agent may use besides its own.
   if (ctx.access && req.agent) ctx = { ...ctx, grants: await realFoldersFor(ctx.access(), String(req.agent.id)) };
@@ -743,9 +791,13 @@ async function handleBrowser(
         req.agent,
         await browser.batch(req.agent, ctx.workspaceReal, { ...req, desktop: onDesktop(ctx, req) }, scope.signal),
       );
-    case "browser.capture":
+    case "browser.capture": {
       requireTool(ctx, "browser");
-      return browser.capture(req.agent, ctx.workspaceReal, req.allowedDomains, scope.signal);
+      const shot = await browser.capture(req.agent, ctx.workspaceReal, req.allowedDomains, scope.signal);
+      // The page's address, redacted like any answer (ADR 0144); never the image's bytes, which a value could match.
+      if (!shot.url) return shot;
+      return { ...shot, url: await redacted(ctx, req.agent, shot.url) };
+    }
     case "browser.warm":
       requireTool(ctx, "browser");
       return browser.warm(req.agent, ctx.workspaceReal, onDesktop(ctx, req));
@@ -764,6 +816,20 @@ async function redacted<T>(ctx: HandlerContext, agent: AgentScope, reply: T): Pr
   return secrets ? (redactDeep(reply, secrets.redact) as T) : reply;
 }
 
+/** A browser profile's session key (ADR 0110), where what is typed in it is armed too (ADR 0144). */
+const profileKey = (id: string) => `profile:${id.toLowerCase()}`;
+
+/**
+ * A profile session's answer (ADR 0110), redacted like an agent's (ADR 0144): the acting agent's secrets and every
+ * value typed in that session, whoever typed it.
+ */
+async function profileRedacted<T>(ctx: HandlerContext, actor: AgentScope, session: AgentScope, reply: T): Promise<T> {
+  const own = actor.id === session.id ? null : await agentSecrets(ctx.secretsDir, actor);
+  const typed = runnerVault.armedOf(session.id);
+  if (!own && typed.length === 0) return reply;
+  return redactDeep(reply, (text) => redactSecrets(own ? own.redact(text) : text, typed)) as T;
+}
+
 export const PROFILES_SYSTEM_MODE =
   "Browser profiles don't work yet on a computer where each agent runs as its own user (system mode).";
 const PROFILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -780,10 +846,12 @@ async function handleProfileBrowser(ctx: HandlerContext, req: MachineRequest, sc
   const id = req.profile?.id;
   if (typeof id !== "string" || !PROFILE_ID.test(id)) throw new RunnerError("bad_request", "Which browser profile?");
   const agent: AgentScope = {
-    id: `profile:${id.toLowerCase()}`,
+    id: profileKey(id),
     handle: req.agent?.handle ?? "profile",
     ...(req.agent?.name ? { name: req.agent.name } : {}),
   };
+  // The agent whose turn it is: its Vault keys open here (ADR 0144); the session isn't its own.
+  const actor: AgentScope = req.agent && typeof req.agent.id === "string" && req.agent.id ? req.agent : agent;
   const folder = browser.profileFolder(id.toLowerCase());
   switch (req.op) {
     case "browser.profile.delete":
@@ -794,13 +862,27 @@ async function handleProfileBrowser(ctx: HandlerContext, req: MachineRequest, sc
       return browser.streamStop(agent);
     case "browser.act":
       requireTool(ctx, "browser");
-      return browser.act(agent, folder, { ...req, desktop: false }, scope.signal);
+      return profileRedacted(
+        ctx,
+        actor,
+        agent,
+        await browser.act(agent, folder, { ...req, desktop: false }, scope.signal, actor),
+      );
     case "browser.batch":
       requireTool(ctx, "browser");
-      return browser.batch(agent, folder, { ...req, desktop: false }, scope.signal);
-    case "browser.capture":
+      return profileRedacted(
+        ctx,
+        actor,
+        agent,
+        await browser.batch(agent, folder, { ...req, desktop: false }, scope.signal, actor),
+      );
+    case "browser.capture": {
       requireTool(ctx, "browser");
-      return browser.capture(agent, folder, req.allowedDomains, scope.signal);
+      const shot = await browser.capture(agent, folder, req.allowedDomains, scope.signal);
+      // The page's address, redacted like the session's other answers (ADR 0144); never the image's bytes.
+      if (!shot.url) return shot;
+      return { ...shot, url: await profileRedacted(ctx, actor, agent, shot.url) };
+    }
     case "browser.warm":
       requireTool(ctx, "browser");
       return browser.warm(agent, folder, false);
@@ -1130,6 +1212,10 @@ function handleTask(
   if (!tasks) throw new RunnerError("bad_request", "This runner runs no background tasks");
   switch (req.op) {
     case "task.start":
+      // ADR 0144: a Vault key goes with one command, never a task that outlives the request (and keeps its env).
+      if ((req as { vault?: unknown }).vault !== undefined) {
+        throw new RunnerError("bad_request", "Vault keys go with one command (exec), never a background task");
+      }
       requireTool(ctx, req.executor === "claude" ? "claude" : req.executor === "codex" ? "codex" : "commands");
       if (!req.agent) throw new RunnerError("bad_request", "A task belongs to an agent");
       return tasks.start(req.agent, req, ctx.grants ? { grants: ctx.grants } : undefined, ctx.grant);
@@ -1154,7 +1240,10 @@ function describeOp(req: MachineRequest): string {
       const head = String(req.command ?? "")
         .replace(/\s+/g, " ")
         .trim();
-      return `exec ${head.length > 80 ? `${head.slice(0, 80)}…` : head}${req.cwd ? ` (in ${req.cwd})` : ""}`;
+      // How many Vault keys it carries, never their values (ADR 0144).
+      const sealed = req.vault?.keys;
+      const keys = Array.isArray(sealed) ? ` (${sealed.length} Vault keys)` : "";
+      return `exec ${head.length > 80 ? `${head.slice(0, 80)}…` : head}${req.cwd ? ` (in ${req.cwd})` : ""}${keys}`;
     }
     case "read":
     case "write":

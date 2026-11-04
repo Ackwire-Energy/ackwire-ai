@@ -98,7 +98,10 @@ const clickAt = (at: { x: number; y: number }): BrowserBatchCommand[] => [
 /** Selects what the focused field holds, so typing replaces it (a fill on a point). */
 const SELECT_FOCUSED = "document.activeElement && document.activeElement.select && document.activeElement.select()";
 
-/** The commands for one action (`secretSite`: where a `type_secret`'s secret may be typed). */
+/**
+ * The commands for one action (`secretSite`: where a `type_secret`'s secret may be typed). A Vault login isn't one
+ * of them: it is sealed for its one use at its step (`BrowserSurfaceOptions.vaultLogin`).
+ */
 export function actionCommands(
   action: ScreenAction,
   secretSite: (name: string) => string | null,
@@ -140,9 +143,11 @@ export function actionCommands(
       if (isPoint(action.at)) throw new Error("a list is picked by its element, not a point on the page");
       return [c("select", ref(action.at), action.value)];
     case "type_secret": {
+      if ("login" in action) throw new Error("a Vault login is typed through the Vault, not as a named secret");
       const site = secretSite(action.secret);
       if (!site) throw new Error(`no secret named ${action.secret} was delivered for a site`);
-      return [c("agentes:type_secret", ref(action.at), action.secret, site)];
+      // A code split in one box per character: the runner types one character into each box, in order (protocol 45).
+      return [c("agentes:type_secret", ref(action.at), action.secret, site, ...(action.more ?? []).map(ref))];
     }
     default:
       throw new Error(`${action.kind.replace("_", " ")} is not in the browser: it is for a desktop`);
@@ -158,10 +163,27 @@ export function observationOf(data: unknown): ScreenObservation | null {
   return observeSnapshot({ text: d.snapshot, url, refs: d.refs });
 }
 
+/** A Vault login made ready to type once (ADR 0144): the runner's command and what follows its answer. */
+export interface VaultTyping {
+  /** `agentes:type_vault [ref, rule, box]`: the password sealed to a one-use key of the agent's computer. */
+  command: BrowserBatchCommand;
+  /** What the report names it by: the site of its rule (`github.com`), never its title (ADR 0144 §4) nor a value. */
+  label: string;
+  /** The runner typed it: the use is recorded. */
+  typed(): Promise<void>;
+  /** The runner refused or failed it: what the agent reads instead of the runner's words. */
+  refused(text: string): string;
+}
+
 export interface BrowserSurfaceOptions {
   link: BrowserLink;
   /** A `type_secret`'s site, from what `request_secret` delivered (never from the agent). */
   secretSite?: (name: string) => string | null;
+  /**
+   * A Vault login (ADR 0144), released and sealed at the step that types it, for the field `ref` on the page at `url`
+   * (where it was found); or why it can't be typed. Without it a login step fails.
+   */
+  vaultLogin?: (login: string, ref: string, url: string | null) => Promise<VaultTyping | string>;
   /** Every look, as it happens (the caller keeps the last one). */
   onLook?: (o: ScreenObservation) => void;
 }
@@ -183,10 +205,23 @@ export function browserSurface(options: BrowserSurfaceOptions): ScreenSurface {
     },
     async perform(action, { settle: wait }): Promise<ScreenActOutcome> {
       let commands: BrowserBatchCommand[];
-      try {
-        commands = actionCommands(action, options.secretSite ?? (() => null));
-      } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      let vault: VaultTyping | null = null;
+      if (action.kind === "type_secret" && "login" in action) {
+        // Released only now, on the page it goes into: a one-use key lives two minutes on the computer.
+        const ready = options.vaultLogin
+          ? await options
+              .vaultLogin(action.login, ref(action.at), action.url)
+              .catch((error: unknown) => (error instanceof Error ? error.message : String(error)))
+          : "this browser can't type Vault logins";
+        if (typeof ready === "string") return { ok: false, error: ready };
+        vault = ready;
+        commands = [ready.command];
+      } else {
+        try {
+          commands = actionCommands(action, options.secretSite ?? (() => null));
+        } catch (error) {
+          return { ok: false, error: error instanceof Error ? error.message : String(error) };
+        }
       }
       const first = LATE.has(action.kind) ? settleLate : settle;
       const all = wait ? [...commands, first, loaded, settledAgain, LOOK] : commands;
@@ -195,10 +230,17 @@ export function browserSurface(options: BrowserSurfaceOptions): ScreenSurface {
       for (let i = 0; i < commands.length; i++) {
         const r = replies[i];
         if (!r) return { ok: false, error: "the browser stopped before the action" };
-        if (!r.ok && !(commands[i] as BrowserBatchCommand).tolerate) return { ok: false, error: r.text };
+        if (!r.ok && !(commands[i] as BrowserBatchCommand).tolerate) {
+          return { ok: false, error: vault ? vault.refused(r.text) : r.text };
+        }
       }
+      if (vault) await vault.typed().catch(() => undefined);
       const last = wait ? replies[all.length - 1] : undefined;
-      return { ok: true, observation: last?.ok ? seen(observationOf(last.data)) : null };
+      return {
+        ok: true,
+        observation: last?.ok ? seen(observationOf(last.data)) : null,
+        ...(vault ? { typed: vault.label } : {}),
+      };
     },
     capture: () => link.capture(),
   };

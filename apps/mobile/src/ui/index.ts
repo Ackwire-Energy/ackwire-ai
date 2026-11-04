@@ -18,6 +18,7 @@ export { SpendBar, type SpendBarProps } from "@/sky/SpendBar";
 export { Button, type ButtonProps, type ButtonVariant } from "./Button";
 export { Card, type CardProps } from "./Card";
 export { Chip, type ChipProps } from "./Chip";
+export { CodeInput, type CodeInputProps } from "./CodeInput";
 export {
   Composer,
   type ComposerMentionState,

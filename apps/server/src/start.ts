@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
   type Adapters,
+  createBitwardenSource,
   createComposioClient,
   createComposioMailConnector,
   createDiskBlobStore,
@@ -17,6 +18,7 @@ import {
   createMemoryPubSub,
   createMemoryRateLimiter,
   createMillionSendSender,
+  createOnePasswordSource,
   createPostgresBlobStore,
   createPostgresDatabaseDriver,
   createPostgresPubSub,
@@ -59,6 +61,7 @@ import {
   isAgentesCloud,
   isBlockedAddress,
   meterComposio,
+  publicHttpsFetch,
   resolveHostDns,
   retireHostTokens,
   retireMillionSendMailboxes,
@@ -231,6 +234,14 @@ async function boot(
         : null,
     // GIFs in chat (ADR 0091), only with a key: without one nothing reaches GIPHY and the app shows no GIFs.
     gifs: gifProvider(config, () => gifKey?.key() ?? null),
+    // The Vault's external sources (ADR 0144): nothing reaches them until a person connects one. A self-hosted
+    // Bitwarden's address is typed by a person, so its requests go only to public addresses, pinned at connect time.
+    vaultSources: Object.fromEntries(
+      [createOnePasswordSource(), createBitwardenSource({ fetch: publicHttpsFetch() })].map((source) => [
+        source.kind,
+        source,
+      ]),
+    ),
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
   log.info("transactional email", { sender: defaults.email.id });

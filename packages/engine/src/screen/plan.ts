@@ -59,6 +59,10 @@ export interface ScreenStep {
   to?: string;
   key?: string;
   secret?: string;
+  /** `type_secret`: a Vault login's id (ADR 0144), typed instead of a named `secret`. */
+  login?: string;
+  /** `type_secret` of a code split in one box per character (ADR 0144): every box in order, instead of `target`. */
+  targets?: string[];
   direction?: "up" | "down" | "left" | "right";
   pixels?: number;
   /** `wait`: until this is true on the screen (words), this text shows, or for this long. */
@@ -83,6 +87,7 @@ const STEP_TEXT = [
   "value",
   "key",
   "secret",
+  "login",
   "until",
   "find",
   "expect",
@@ -97,6 +102,10 @@ export function screenStepOf(v: unknown, verbs: readonly ScreenVerb[]): ScreenSt
   for (const k of STEP_TEXT) if (typeof s[k] === "string") out[k] = s[k] as string;
   if (s.direction === "up" || s.direction === "down" || s.direction === "left" || s.direction === "right") {
     out.direction = s.direction;
+  }
+  if (Array.isArray(s.targets)) {
+    const boxes = s.targets.filter((t): t is string => typeof t === "string");
+    if (boxes.length > 0) out.targets = boxes;
   }
   if (typeof s.pixels === "number") out.pixels = s.pixels;
   if (typeof s.seconds === "number") out.seconds = s.seconds;
@@ -132,13 +141,23 @@ export type ScreenAction =
   | { kind: "type"; text: string }
   | { kind: "type"; text: string; at: ActTarget }
   | { kind: "select"; at: ActTarget; value: string }
-  | { kind: "type_secret"; at: { ref: string }; secret: string }
+  /** A named secret; `more`: the other boxes of a code split in one box per character, in order (ADR 0144). */
+  | { kind: "type_secret"; at: { ref: string }; secret: string; more?: { ref: string }[] }
+  /** A Vault login (ADR 0144): `url` is the page the field was found on, where the login is checked first. */
+  | { kind: "type_secret"; at: { ref: string }; login: string; url: string | null }
   | { kind: "press"; key: string }
   | Scroll
   | (Scroll & { at: ActTarget })
   | { kind: "pause"; ms: number };
 
-export type ScreenActOutcome = { ok: true; observation: ScreenObservation | null } | { ok: false; error: string };
+export type ScreenActOutcome =
+  | {
+      ok: true;
+      observation: ScreenObservation | null;
+      /** What was typed, as the report names it (the site a Vault login was typed for, ADR 0144): never a value. */
+      typed?: string;
+    }
+  | { ok: false; error: string };
 
 /** What a plan drives: looking, acting, and (when it can) taking an image. */
 export interface ScreenSurface {
@@ -203,6 +222,8 @@ export interface StepReport {
   expected?: { met: boolean | null; p: number };
   /** Its action went through (a failed step with this only failed its `expect`: it must not be done again). */
   ran?: boolean;
+  /** What a `type_secret` typed, by name (the site a Vault login was typed for, ADR 0144): never a value. */
+  typed?: string;
   /** `read` with `find`: the lines that answer it (page text, untrusted), or why there are none. */
   found?: {
     question: string;
@@ -245,6 +266,8 @@ export const needsTarget = (step: ScreenStep) => step.do in USES;
 
 const COVERED = /covered by|intercept|obscured|another element would receive/i;
 const STALE = /stale|unknown ref|ref\b.*\b(not found|no longer|invalid)|no element (for|matches) ref/i;
+/** Most boxes a code split in one box per character fills (ADR 0144). */
+export const MAX_CODE_BOXES = 12;
 /** Longest a `wait` step waits. */
 export const MAX_WAIT_MS = 120_000;
 const POLL_MS = 700;
@@ -515,11 +538,23 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
 
   /** What `step` acts on and how, its fields checked first. */
   function targetsOf(step: ScreenStep): Targets {
-    const words = step.target?.trim();
+    // A code split in one box per character names every box (ADR 0144); any other step one target.
+    const boxes =
+      step.do === "type_secret" ? (step.targets ?? []).map((t) => t.trim()).filter((t) => t.length > 0) : [];
+    const words = boxes[0] ?? step.target?.trim();
     if (!words) throw new Stop("say what to act on (`target`)");
     if (step.do === "fill" && step.text === undefined) throw new Stop("say what to write (`text`)");
     if (step.do === "select" && !step.value?.trim()) throw new Stop("say which option (`value`)");
-    if (step.do === "type_secret" && !step.secret?.trim()) throw new Stop("say which secret (`secret`)");
+    if (step.do === "type_secret") {
+      const login = step.login?.trim();
+      const secret = step.secret?.trim();
+      if (!login && !secret) throw new Stop("say which secret (`secret`) or Vault login (`login`)");
+      if (login && secret) throw new Stop("give either `secret` or `login`, not both");
+      if (login && boxes.length > 1) {
+        throw new Stop("a Vault login goes into one password field: give its `target`, not `targets`");
+      }
+      if (boxes.length > MAX_CODE_BOXES) throw new Stop(`a code goes into at most ${MAX_CODE_BOXES} boxes`);
+    }
     if (step.do === "type" && !step.text) throw new Stop("say what to type (`text`)");
     const to = step.to?.trim();
     if (step.do === "drag" && !to) throw new Stop("say where to drop it (`to`)");
@@ -533,11 +568,28 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
         return one("fill", (at) => ({ kind: "fill", at, text: step.text ?? "" }));
       case "select":
         return one("select", (at) => ({ kind: "select", at, value: (step.value ?? "").trim() }));
-      case "type_secret":
-        return one("type_secret", (at) => {
-          if (!("ref" in at)) throw new Stop(`a password goes only into a field found on the ${noun}`);
-          return { kind: "type_secret", at, secret: (step.secret ?? "").trim() };
-        });
+      case "type_secret": {
+        const login = step.login?.trim();
+        return {
+          words: boxes.length > 0 ? boxes : [words],
+          use: "type_secret",
+          act: (ats) => {
+            const refs = ats.map((at) => {
+              if (!("ref" in at)) throw new Stop(`a password goes only into a field found on the ${noun}`);
+              return at;
+            });
+            const [first, ...more] = refs as [{ ref: string }, ...{ ref: string }[]];
+            // The page the field was found on: the Vault checks the login's site against it before the value goes out.
+            if (login) return { kind: "type_secret", at: first, login, url: screen?.url ?? null };
+            return {
+              kind: "type_secret",
+              at: first,
+              secret: (step.secret ?? "").trim(),
+              ...(more.length > 0 ? { more } : {}),
+            };
+          },
+        };
+      }
       case "type":
         return one("click", (at) => ({ kind: "type", text: step.text ?? "", at }));
       case "scroll":
@@ -575,7 +627,11 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
       f.element ? quoted(f.element) : "ref" in f.at ? `element ${f.at.ref}` : `a spot on the ${noun}`;
     const describe = (found: Found[]) => {
       report.element = elementOf(found[0]?.element);
-      report.note = found.map(noteOf).join(" to ");
+      const [first, last] = [found[0], found.at(-1)];
+      report.note =
+        step.do === "type_secret" && found.length > 1 && first && last
+          ? `${found.length} boxes, ${noteOf(first)} to ${noteOf(last)}`
+          : found.map(noteOf).join(" to ");
       report.via = found.some((f) => f.via === "image") ? "image" : found[0]?.via;
     };
     const perform = (found: Found[]) => deps.surface.perform(act(found.map((f) => f.at)), { settle: true });
@@ -613,6 +669,7 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
     }
     if (!out.ok) throw new ActFailed(out.error);
     describe(found);
+    if (out.typed) report.typed = out.typed;
     await lookAfter(out.observation);
   }
 

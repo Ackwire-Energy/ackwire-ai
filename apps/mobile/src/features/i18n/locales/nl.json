@@ -1731,6 +1731,239 @@
       "failed": "Het bestand kon niet worden gedownload. Probeer het opnieuw."
     }
   },
+  "vault": {
+    "newItem": "Nieuw item",
+    "search": "Zoeken in de Vault",
+    "noResults": "Niets komt overeen met “{{q}}”.",
+    "personalText": "Alleen jij ziet deze. Je agenten gebruiken ze alleen als je erom vraagt.",
+    "teamText": "De logins, sleutels en contacten van het team. Jij kiest wie elk item ziet en welke agenten het gebruiken.",
+    "teamReadText": "Met je gedeeld door de mensen die de sleutels van de werkruimte beheren.",
+    "missing": "Ontbreekt",
+    "usedAt": "gebruikt {{when}}",
+    "neverUsed": "nog niet gebruikt",
+    "kindTitle": "Wat opslaan",
+    "teamAudience": "Iedereen in de werkruimte ziet het. Na het opslaan kun je het beperken.",
+    "savedToVault": "Opgeslagen in de Vault",
+    "tab": {
+      "team": "Team",
+      "personal": "Persoonlijk",
+      "connections": "Koppelingen"
+    },
+    "kind": {
+      "login": "Login",
+      "key": "Sleutel",
+      "contact": "Contact"
+    },
+    "kinds": {
+      "all": "Alles",
+      "login": "Logins",
+      "key": "Sleutels",
+      "contact": "Contacten"
+    },
+    "kindText": {
+      "login": "Een website, gebruikersnaam en wachtwoord. Agenten loggen in zonder het wachtwoord te zien.",
+      "key": "Een API-sleutel of token. Agenten gebruiken die in een opdracht zonder hem te zien.",
+      "contact": "Naam, bedrijf, e-mail, telefoon en adres die agenten in formulieren invullen."
+    },
+    "empty": {
+      "personalTitle": "Nog niets van jou",
+      "personalText": "Sla hier een login of sleutel op en je agenten gebruiken die als je erom vraagt.",
+      "teamTitle": "Nog niets gedeeld",
+      "teamText": "Sla de logins en sleutels op die je agenten voor het team gebruiken.",
+      "teamReadText": "Als iemand een login of sleutel met je deelt, verschijnt die hier."
+    },
+    "import": {
+      "title": "Importeren vanaf een computer",
+      "text": "Om wachtwoorden uit een browser of wachtwoordmanager over te zetten, open je op het web Instellingen, Vault en kies je Importeren."
+    },
+    "connections": {
+      "text": "Koppel een wachtwoordmanager en je agenten gebruiken de logins die daar staan. Er wordt niets gekopieerd: een wachtwoord wordt pas gelezen als het nodig is.",
+      "connected": "Gekoppeld",
+      "add": "Koppelen",
+      "none": "Hier kan geen wachtwoordmanager koppelen.",
+      "help": "Gebruik een kluis of map alleen voor je agenten, met precies wat ze nodig hebben."
+    },
+    "connect": {
+      "title": "{{name}} koppelen",
+      "reconnectTitle": "{{name}} opnieuw koppelen",
+      "action": "Koppelen",
+      "text": "Je agenten gebruiken de logins die {{name}} voor ze bewaart, zonder de wachtwoorden te zien.",
+      "steps": "Zo koppel je",
+      "guide": "De handleiding van {{name}} openen",
+      "fields": "Gegevens",
+      "private": "Deze gegevens worden versleuteld bewaard en nooit meer getoond.",
+      "teamHelp": "De items zijn eerst zichtbaar voor iedereen in de werkruimte en door geen agent gebruikt. Daarna kies je de agenten.",
+      "personalHelp": "Alleen jij ziet de items, en je agenten gebruiken ze als je erom vraagt.",
+      "checking": "Controleren bij {{name}}…",
+      "connected": "{{name}} gekoppeld",
+      "reconnected": "{{name}} opnieuw gekoppeld",
+      "unknown": "Deze wachtwoordmanager is hier niet beschikbaar."
+    },
+    "connection": {
+      "ready": "Gekoppeld",
+      "syncing": "Synchroniseren…",
+      "reads": "Leest {{label}}",
+      "items_one": "{{count}} item",
+      "items_other": "{{count}} items",
+      "synced": "gesynchroniseerd {{when}}",
+      "sync": "Nu synchroniseren",
+      "syncDone": "Gesynchroniseerd",
+      "reconnect": "Opnieuw koppelen",
+      "change": "Inloggegevens wijzigen",
+      "readOnly": "Logins uit {{name}} wijzig je in {{name}}. Hier kies je wie ze gebruikt.",
+      "disconnect": "Ontkoppelen",
+      "disconnectTitle": "{{name}} ontkoppelen?",
+      "disconnectText_one": "Het item verdwijnt uit de Vault en agenten gebruiken het niet meer. In {{name}} verandert niets.",
+      "disconnectText_other": "De {{count}} items verdwijnen uit de Vault en agenten gebruiken ze niet meer. In {{name}} verandert niets.",
+      "disconnected": "{{name}} ontkoppeld",
+      "gone": "Deze koppeling bestaat niet meer of je kunt hem niet zien."
+    },
+    "item": {
+      "gone": "Dit item bestaat niet meer of je kunt het niet zien.",
+      "missingText": "Het is sinds de laatste synchronisatie verdwenen uit {{name}}. Agenten kunnen het niet gebruiken.",
+      "unreadable": "De gegevens van dit contact kunnen hier niet worden gelezen. Wie het beheert, kan ze opnieuw invullen en opslaan.",
+      "externalText": "Het komt uit {{name}}. Wijzig daar de naam, het adres, de gebruikersnaam of het wachtwoord.",
+      "noValue": "Er is nog geen waarde opgeslagen.",
+      "sealedHelp": "Voor de veiligheid wordt wat hier is opgeslagen niet meer getoond. Typ het opnieuw om het te wijzigen.",
+      "changePassword": "Wachtwoord wijzigen",
+      "changeValue": "Waarde wijzigen",
+      "changeHelp": "Tik op Opslaan om het te bewaren. Daarna gebruiken agenten het nieuwe.",
+      "hidden": "Verborgen",
+      "saved": "Opgeslagen",
+      "delete": "Verwijderen",
+      "deleteTitle": "{{title}} verwijderen?",
+      "deleteText": "Agenten gebruiken het meteen niet meer. Dit kan niet ongedaan worden gemaakt.",
+      "deleteExternal": "Het verdwijnt uit de Vault en agenten gebruiken het niet meer. Het blijft in {{name}}.",
+      "deleted": "Verwijderd"
+    },
+    "field": {
+      "title": "Naam",
+      "titleOptional": "Optioneel",
+      "website": "Website",
+      "websitePlaceholder": "acme.example",
+      "username": "Gebruikersnaam",
+      "password": "Wachtwoord",
+      "newPassword": "Nieuw wachtwoord",
+      "keyName": "Variabele",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "keyNameHelp": "Hoofdletters, cijfers en _, zoals ACME_API_KEY. Agenten vragen de sleutel op met deze naam.",
+      "value": "Waarde",
+      "newValue": "Nieuwe waarde",
+      "description": "Beschrijving",
+      "descriptionPlaceholder": "Waarvoor het is",
+      "descriptionHelp": "Agenten lezen dit om te weten wanneer ze het gebruiken.",
+      "loginHelp": "Agenten typen het wachtwoord alleen op deze website, zonder het te zien.",
+      "contactHelp": "Geen geheim: agenten lezen deze gegevens en vullen ze in formulieren in."
+    },
+    "contact": {
+      "fullName": "Volledige naam",
+      "company": "Bedrijf",
+      "document": "Fiscaal nummer",
+      "email": "E-mail",
+      "phone": "Telefoon",
+      "address": "Adres",
+      "address2": "Adresregel 2",
+      "city": "Plaats",
+      "region": "Provincie",
+      "postalCode": "Postcode",
+      "country": "Land"
+    },
+    "match": {
+      "title": "Waar agenten het mogen typen",
+      "exact": "Alleen dit adres",
+      "exactText": "Het exacte adres hierboven",
+      "site": "Hele site",
+      "siteOn": "Elke pagina van dezelfde site als {{host}}",
+      "siteText": "Elke pagina van dezelfde site",
+      "help": "Alleen op beveiligde pagina's (https). Overal elders weigert de computer van de agent het te typen."
+    },
+    "problem": {
+      "secret": "Typ het wachtwoord of de waarde van de sleutel."
+    },
+    "scope": {
+      "title": "Wie het ziet",
+      "personal": "Persoonlijk",
+      "personalText": "Alleen jij ziet het. Je agenten gebruiken het alleen als je erom vraagt.",
+      "team": "Team",
+      "teamText": "Mensen met toegang zien het. Agenten gebruiken het als een van hen erom vraagt.",
+      "teamLocked": "Alleen wie de sleutels van de werkruimte beheert, slaat op voor het team."
+    },
+    "agents": {
+      "title": "Agenten die het mogen gebruiken",
+      "allText": "Alle agenten, ook nieuwe",
+      "personalHelp": "Ze gebruiken het alleen als je erom vraagt.",
+      "teamHelp": "Ze gebruiken het als iemand met toegang erom vraagt."
+    },
+    "access": {
+      "title": "Wie toegang heeft",
+      "defaultTitle": "Standaardtoegang",
+      "defaultText": "De items volgen dit tot iemand de toegang van een item wijzigt.",
+      "teamText": "Kies wie het ziet en welke agenten het voor die mensen gebruiken.",
+      "people": "Mensen",
+      "persons": "Bepaalde mensen",
+      "roles": "Rollen",
+      "agents": "Agenten",
+      "allAgents": "Alle agenten",
+      "noAgent": "Nog geen agent",
+      "onlyYou": "Alleen jij",
+      "everyone": "Iedereen in de werkruimte",
+      "everyoneText": "Iedereen hier ziet het, en agenten gebruiken het voor die persoon.",
+      "everyoneIn": "Ja",
+      "everyoneOut": "Nee",
+      "levelIn": "Heeft toegang",
+      "levelOut": "Geen toegang",
+      "everyoneHelp": "Tik op Iedereen in de werkruimte om in plaats daarvan rollen en mensen te kiezen.",
+      "managersHelp": "Wie de sleutels van de werkruimte beheert, ziet de items van het team altijd.",
+      "managersOnly": "Alleen wie sleutels beheert",
+      "inRole": "mensen met {{role}}",
+      "saved": "Toegang opgeslagen",
+      "useConnection": "De toegang van de koppeling volgen",
+      "followsConnection": "Het volgt de toegang van de koppeling.",
+      "tooManyRoles": "Kies maximaal 100 rollen.",
+      "tooManyPeople": "Kies maximaal 500 mensen.",
+      "tooManyAgents": "Kies maximaal 200 agenten.",
+      "sentence": {
+        "none": "Nog geen agent gebruikt het.",
+        "personalAll": "Je agenten gebruiken het als je erom vraagt.",
+        "everyAgent": "Alle agenten",
+        "personal_one": "{{agents}} gebruikt het als je erom vraagt.",
+        "personal_other": "{{agents}} gebruiken het als je erom vraagt.",
+        "everyone_one": "{{agents}} gebruikt het als iemand in de werkruimte erom vraagt.",
+        "everyone_other": "{{agents}} gebruiken het als iemand in de werkruimte erom vraagt.",
+        "managers_one": "{{agents}} gebruikt het als iemand die sleutels beheert erom vraagt.",
+        "managers_other": "{{agents}} gebruiken het als iemand die sleutels beheert erom vraagt.",
+        "people_one": "{{agents}} gebruikt het voor {{people}}.",
+        "people_other": "{{agents}} gebruiken het voor {{people}}."
+      }
+    },
+    "use": {
+      "fill": "{{name}} heeft ingelogd",
+      "fillOn": "{{name}}, op {{host}}",
+      "key": "{{name}} gebruikte het in een opdracht",
+      "read": "{{name}} heeft het gelezen",
+      "create": "{{name}} heeft het opgeslagen",
+      "edit": "{{name}} heeft het gewijzigd",
+      "for": "voor {{name}}",
+      "routine": "routine {{name}}"
+    },
+    "uses": {
+      "title": "Recent gebruik",
+      "none": "Nog niet gebruikt."
+    },
+    "card": {
+      "save": "Opslaan in de Vault",
+      "saveText": "De volgende keer gebruiken je agenten het zonder het jou te vragen.",
+      "personalOnly": "Opgeslagen als persoonlijk: alleen jij ziet het.",
+      "choose": "Kiezen",
+      "agentsText": "De agent die erom vroeg, is al gekozen.",
+      "as": "Logt in als {{username}}.",
+      "saved": "Opgeslagen in de Vault",
+      "notSaved": "Verstuurd, maar niet opgeslagen in de Vault",
+      "codeLabel": "Code voor {{name}}",
+      "codeIncomplete": "Typ elk cijfer van de code.",
+      "codeNote": "Versleuteld rechtstreeks naar de computer gestuurd. Codes worden nooit opgeslagen."
+    }
+  },
   "status": {
     "title": "Status",
     "doing": "Wat je aan het doen bent",

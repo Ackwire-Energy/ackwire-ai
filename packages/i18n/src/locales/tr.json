@@ -1556,6 +1556,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "E-posta",
+      "vault": "Vault",
       "custom": "Çalışma alanı araçları"
     }
   },
@@ -2798,6 +2799,360 @@
     "removeLabel": "{{name}} öğesini kaldır",
     "removed": "{{name}} bilgisayardan kaldırıldı.",
     "removeFailed": "Kaldırılamadı. Bilgisayar açık mı?"
+  },
+  "vault": {
+    "tab": {
+      "label": "Ne gösterilsin",
+      "team": "Ekip",
+      "personal": "Kişisel",
+      "connections": "Bağlantılar"
+    },
+    "list": {
+      "search": "Vault'ta ara",
+      "clearSearch": "Aramayı temizle",
+      "kind": "Tür",
+      "kindAll": "Tüm türler",
+      "noMatch": "Burada bu aramayla eşleşen bir şey yok.",
+      "clearFilters": "Aramayı temizle",
+      "personalNote": "Bu öğeleri yalnızca siz görürsünüz. Ajanlarınız bunları yalnızca siz istediğinizde kullanır.",
+      "personalEmpty": "Henüz kayıtlı bir şey yok",
+      "personalEmptyText": "Bu öğeleri yalnızca siz görürsünüz. Ajanlarınız bunları yalnızca siz istediğinizde kullanır.",
+      "teamEmpty": "Henüz ekiple paylaşılan bir şey yok",
+      "teamEmptyText": "Bir giriş bilgisini, anahtarı ya da iletişim bilgilerini bir kez kaydedin ve hangi ajanların kullanabileceğini seçin.",
+      "sharedEmpty": "Henüz sizinle paylaşılan bir şey yok",
+      "sharedEmptyText": "Biri sizinle ekibin bir giriş bilgisini ya da anahtarını paylaştığında burada görünür."
+    },
+    "row": {
+      "agents_one": "{{count}} ajan",
+      "agents_other": "{{count}} ajan",
+      "used": "{{when}} kullanıldı",
+      "never": "Hiç kullanılmadı"
+    },
+    "kind": {
+      "login": "Giriş bilgisi",
+      "key": "Anahtar",
+      "contact": "İletişim",
+      "loginText": "Bir web sitesinin kullanıcı adı ve şifresi",
+      "keyText": "Ajanlarınızın bir komutta kullandığı anahtar",
+      "contactText": "Ajanların formlara yazdığı bilgiler"
+    },
+    "kindPlural": {
+      "login": "giriş bilgileri",
+      "key": "anahtarlar",
+      "contact": "iletişim bilgileri",
+      "loginTitle": "Giriş bilgileri",
+      "keyTitle": "Anahtarlar",
+      "contactTitle": "İletişim bilgileri"
+    },
+    "scope": {
+      "personal": "Kişisel",
+      "team": "Ekip",
+      "personalText": "Yalnızca siz görürsünüz",
+      "teamText": "Çalışma alanıyla paylaşıldı"
+    },
+    "field": {
+      "title": "Ad",
+      "contactTitle": "Vault'taki adı",
+      "loginPlaceholder": "Şirket e-postası",
+      "keyPlaceholder": "Ödeme anahtarı",
+      "contactPlaceholder": "Fatura bilgileri",
+      "website": "Web sitesi",
+      "websitePlaceholder": "app.example.com",
+      "match": "Ajanların yazabileceği yer",
+      "username": "Kullanıcı adı",
+      "usernamePlaceholder": "E-posta ya da kullanıcı adı",
+      "password": "Şifre",
+      "keyName": "Değişken adı",
+      "keyNameHelp": "Ajanlarınız bir komutta anahtarı bu adla kullanır.",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "value": "Değer",
+      "description": "Ajanlarınız için not",
+      "descriptionHelp": "Ne zaman ve ne için kullanılacağı. Ajanlar doğru olanı seçmek için bunu okur.",
+      "descriptionPlaceholder": {
+        "login": "Gönderi yayınlamak için kullandığımız hesap",
+        "key": "Ödeme hizmeti için, test modu",
+        "contact": "Şirketin faturaları için kullanın"
+      }
+    },
+    "match": {
+      "exact": "Yalnızca bu adres",
+      "site": "Tüm site",
+      "exactHelp": "Ajanlar onu yalnızca {{origin}} üzerinde yazar.",
+      "exactHelpNone": "Ajanlar onu yalnızca tam olarak bu adreste yazar.",
+      "siteHelp": "Ajanlar onu bu sitenin her sayfasında yazar, örneğin başka bir alt alan adındaki giriş sayfasında."
+    },
+    "contact": {
+      "group": "İletişim bilgileri",
+      "fullName": "Ad soyad",
+      "company": "Şirket",
+      "document": "Vergi numarası",
+      "email": "E-posta",
+      "phone": "Telefon",
+      "address": "Adres",
+      "address2": "Adres satırı 2",
+      "city": "Şehir",
+      "region": "İl ya da bölge",
+      "postalCode": "Posta kodu",
+      "country": "Ülke"
+    },
+    "error": {
+      "title": "Bir ad verin.",
+      "website": "https adresi kullanın, örneğin app.example.com.",
+      "keyName": "Harfle başlayarak büyük harf, rakam ve _ kullanın, örneğin ACME_API_KEY.",
+      "password": "Şifreyi yazın.",
+      "value": "Değeri yazın.",
+      "contact": "En az bir alanı doldurun."
+    },
+    "item": {
+      "missing": "Kayıp",
+      "missingText": "Artık {{source}} içinde yok. Geri gelene kadar ajanlar onu kullanamaz.",
+      "editIn": "{{source}} içinde düzenleyin. Değişiklikler bir sonraki eşitlemede buraya gelir.",
+      "unreadable": "Bu kişinin bilgileri burada okunamıyor. Onu yöneten kişi bilgileri yeniden girip kaydedebilir.",
+      "hidden": "Gizli",
+      "endsIn": "sonu {{hint}}",
+      "noValue": "Kayıtlı bir şey yok",
+      "change": "Değiştir",
+      "add": "Ekle",
+      "newPassword": "Yeni şifre",
+      "newValue": "Yeni değer",
+      "newValueHelp": "Kaydettiğinizde kayıtlı olanın yerini alır.",
+      "sealedHelp": "Güvenlik için burada kaydedilenler bir daha gösterilmez. Değiştirmek için yeniden yazın.",
+      "keepValue": "Mevcut olanı koru",
+      "saved": "Kaydedildi",
+      "delete": "Sil",
+      "deleteTitle": "{{title}} silinsin mi?",
+      "deleteText": "Ajanlarınız artık onu kullanamaz. Bu işlem geri alınamaz.",
+      "deleted": "{{title}} Vault'tan silindi"
+    },
+    "use": {
+      "title": "Son kullanımlar",
+      "none": "Henüz kimse kullanmadı.",
+      "fill": "{{agent}}, {{host}} üzerinde",
+      "fillSomewhere": "{{agent}} yazdı",
+      "key": "{{agent}}, bir komutta",
+      "read": "{{who}} okudu",
+      "create": "{{who}} kaydetti",
+      "edit": "{{who}} değiştirdi",
+      "for": "{{name}} için",
+      "routine": "Rutin: {{name}}"
+    },
+    "access": {
+      "title": "Kimin erişimi var",
+      "people": "Kişiler",
+      "agents": "Ajanlar",
+      "edit": "Düzenle",
+      "editOf": "Düzenle: {{what}}",
+      "everyone": "Çalışma alanındaki herkes",
+      "everyoneText": "Herkes görür, ajanlar da o kişi istediğinde kullanır.",
+      "managersOnly": "Yalnızca Vault'u yönetenler",
+      "allAgents": "Tüm ajanlar",
+      "noAgents": "Henüz ajan yok",
+      "more_one": "diğer {{count}}",
+      "more_other": "diğer {{count}}",
+      "saved": "Erişim kaydedildi",
+      "peopleTitle": "Kim görebilir",
+      "peopleText": "Onlar görür, ajanlar da onlardan biri istediğinde kullanır. Vault'u yönetenler her zaman görür.",
+      "level": {
+        "use": "Görebilir ve kullanabilir",
+        "none": "Erişim yok"
+      },
+      "roleDetail": "Bu roldeki herkes",
+      "roles": "Roller",
+      "peopleGroup": "Kişiler",
+      "add": "Rol ya da kişi ekle",
+      "addSearch": "Rol ve kişi ara",
+      "noMatch": "Kimse bulunamadı",
+      "levelOf": "{{name}} neler yapabilir",
+      "follows": "{{source}} için varsayılan erişime uyar.",
+      "own": "{{source}} için varsayılan erişim yerine kendi erişimi var.",
+      "changeHere": "Bu öğe için değiştir",
+      "useConnection": "Varsayılana dön"
+    },
+    "agents": {
+      "title": "Hangi ajanlar kullanabilir",
+      "textPersonal": "Yalnızca siz istediğinizde kullanırlar.",
+      "textTeam": "Onu görebilen biri istediğinde kullanırlar.",
+      "all": "Tüm ajanlar",
+      "allDetail": "Sonradan eklenenler de dahil"
+    },
+    "summary": {
+      "noAgents": "Henüz hiçbir ajan kullanamaz.",
+      "allAgents": "Her ajan",
+      "inRole": "{{role}} rolündeki biri",
+      "personal_one": "{{agents}} kullanabilir, yalnızca siz istediğinizde.",
+      "personal_other": "{{agents}} kullanabilir, yalnızca siz istediğinizde.",
+      "everyone_one": "Çalışma alanından biri istediğinde {{agents}} kullanabilir.",
+      "everyone_other": "Çalışma alanından biri istediğinde {{agents}} kullanabilir.",
+      "people_one": "{{people}} istediğinde {{agents}} kullanabilir.",
+      "people_other": "{{people}} istediğinde {{agents}} kullanabilir.",
+      "nobody": "Henüz kimse ajanlardan bunu kullanmalarını isteyemez. Kimin görebileceğini seçin."
+    },
+    "new": {
+      "open": "Yeni öğe",
+      "title": "Yeni öğe",
+      "text": "Bir kez kaydedin. Ajanlarınız şifre ya da anahtar görmeden kullanır.",
+      "what": "Ne kaydetmek istiyorsunuz?",
+      "who": "Kim kullanabilir",
+      "teamLocked": "Ekip öğelerini yalnızca Vault'u yönetenler kaydedebilir. Bu öğe size ait kalır.",
+      "save": "Kaydet",
+      "saved": "Vault'a kaydedildi"
+    },
+    "import": {
+      "open": "İçe aktar",
+      "title": "Şifreleri içe aktar",
+      "text": "Tarayıcınızın ya da şifre yöneticinizin dışa aktardığı bir dosyadan (.csv).",
+      "dropTitle": "Dosyayı buraya bırakın",
+      "dropText": "ya da bilgisayarınızda seçmek için tıklayın",
+      "reading": "Dosya okunuyor…",
+      "choose": "Dosyayı seç",
+      "where": "Tarayıcınızda ya da şifre yöneticinizde Şifreleri dışa aktar seçeneğini bulun ve CSV'yi seçin.",
+      "tooLarge": "Bu dosya çok büyük (en fazla 2 MB).",
+      "notCsv": "Bir .csv dosyası seçin.",
+      "unreadable": "Bu dosya okunamadı. Yeniden dışa aktarmayı deneyin.",
+      "format": {
+        "chrome": "Chrome dışa aktarımı olarak okundu",
+        "1password": "1Password dışa aktarımı olarak okundu",
+        "bitwarden": "Bitwarden dışa aktarımı olarak okundu",
+        "generic": "Şifre dosyası olarak okundu"
+      },
+      "added_one": "yeni giriş bilgisi",
+      "added_other": "yeni giriş bilgisi",
+      "updated_one": "güncellendi",
+      "updated_other": "güncellendi",
+      "skipped_one": "dışarıda kaldı",
+      "skipped_other": "dışarıda kaldı",
+      "reason": {
+        "duplicate_one": "{{count}} tanesi zaten Vault'ta",
+        "duplicate_other": "{{count}} tanesi zaten Vault'ta",
+        "not_https_one": "{{count}} tanesi https adresinde değil",
+        "not_https_other": "{{count}} tanesi https adresinde değil",
+        "no_password_one": "{{count}} tanesi şifresiz",
+        "no_password_other": "{{count}} tanesi şifresiz",
+        "invalid_one": "Okuyamadığımız {{count}} satır",
+        "invalid_other": "Okuyamadığımız {{count}} satır"
+      },
+      "as": "Şu şekilde kaydet",
+      "asPersonal": "Yalnızca siz göreceksiniz.",
+      "asTeam": "Çalışma alanındaki herkes görür. Ardından her biri için ajanları seçin.",
+      "deleteFile": "Sonra dosyayı silin: şifreleriniz içinde şifrelenmeden duruyor.",
+      "confirm_one": "{{count}} tanesini içe aktar",
+      "confirm_other": "{{count}} tanesini içe aktar",
+      "done_one": "{{count}} giriş bilgisi içe aktarıldı",
+      "done_other": "{{count}} giriş bilgisi içe aktarıldı",
+      "another": "Başka dosya seç",
+      "close": "Bitti"
+    },
+    "connections": {
+      "none": "Burada hiçbir şifre yöneticisi bağlanamıyor.",
+      "lead": "Ajanlarınız, {{name}} içinde sakladığınız şu öğeleri kullanır: {{kinds}}.",
+      "connect": "Bağla",
+      "reconnect": "Yeniden bağla",
+      "reconnectName": "{{name}} bağlantısını yenile",
+      "open": "{{name}} rehberini aç",
+      "required": "Burayı doldurun.",
+      "for": "Kimin için bağlanacak",
+      "forTeam": "Öğeleri ekibe aittir. Kimin kullanacağına Vault'u yönetenler karar verir.",
+      "forPersonal": "Öğeleri yalnızca size aittir.",
+      "teamLocked": "Öğeleri yalnızca size ait olacak. Ekip için bağlantıyı yalnızca Vault'u yönetenler kurar.",
+      "sealed": "Buraya yazdıklarınız şifrelenir ve bir daha gösterilmez.",
+      "connected_one": "{{name}} bağlandı. {{count}} öğe geldi.",
+      "connected_other": "{{name}} bağlandı. {{count}} öğe geldi.",
+      "ready": "Bağlı",
+      "syncing": "Eşitleniyor",
+      "reads": "Okunan: {{label}}",
+      "items_one": "{{count}} öğe",
+      "items_other": "{{count}} öğe",
+      "synced": "{{when}} eşitlendi",
+      "syncNow": "Şimdi eşitle",
+      "access": "Varsayılan erişim",
+      "accessTitle": "{{label}} için varsayılan erişim",
+      "accessText": "Birini değiştirmediğiniz sürece öğeler buna uyar. Her değişiklik hemen kaydedilir.",
+      "actionsName": "{{name}} için diğer seçenekler",
+      "disconnect": "Bağlantıyı kes",
+      "removeTitle": "{{name}} bağlantısı kesilsin mi?",
+      "removeText_one": "Öğesi Vault'tan çıkar ve ajanlarınız onu kullanmayı bırakır. {{name}} içinde hiçbir şey değişmez.",
+      "removeText_other": "{{count}} öğesi Vault'tan çıkar ve ajanlarınız onları kullanmayı bırakır. {{name}} içinde hiçbir şey değişmez.",
+      "removed": "{{name}} bağlantısı kesildi",
+      "listOf": "{{name}} bağlantıları",
+      "note": "Ajanlarınız ihtiyaç duyduklarında oradakileri okur. agentes.chat'e adlar ve adresler dışında hiçbir şey kopyalanmaz.",
+      "error": {
+        "auth_failed": "Giriş reddedildi",
+        "locked": "Yanlış şifre",
+        "many_vaults": "Birden fazla kasa görüyor",
+        "no_vault": "Hiç kasa görmüyor",
+        "folder_missing": "Klasör bulunamadı",
+        "not_found": "Bulunamadı",
+        "rate_limited": "Çok fazla okuma",
+        "unreachable": "Ulaşılamıyor",
+        "unsupported": "Burada kullanılamıyor",
+        "invalid_input": "Alanları kontrol edin",
+        "too_many_items": "Vault dolu",
+        "other": "Okunamadı"
+      },
+      "fix": {
+        "auth_failed": "Anahtar ya da token reddedildi. Yenisiyle yeniden bağlayın.",
+        "locked": "Ana şifre hesabı açmadı. Doğru şifreyle yeniden bağlayın.",
+        "many_vaults": "Hizmet hesabına yalnızca bir kasaya erişim verin, sonra yeniden bağlayın.",
+        "no_vault": "Hizmet hesabına ajanların kasasına erişim verin, sonra yeniden bağlayın.",
+        "folder_missing": "Ajanlarınız için klasörü oluşturun ya da onun adıyla yeniden bağlayın.",
+        "not_found": "Okuduğu şey artık yok. Yeniden seçmek için yeniden bağlayın.",
+        "rate_limited": "Şifre yöneticisi beklememizi istedi. Kendisi tekrar deneyecek.",
+        "unreachable": "Sunucusu yanıt vermedi. Kendisi tekrar deneyecek.",
+        "unsupported": "Ayarları burada okunamıyor. Daha sonra tekrar deneyin ya da başka bir hesap kullanın.",
+        "invalid_input": "Alanlardaki bir şey reddedildi. Yeniden bağlayıp kontrol edin.",
+        "too_many_items": "Daha fazlasını eşitlemeden önce öğe silin.",
+        "other": "Şimdi eşitle'yi deneyin ya da yeniden bağlayın."
+      }
+    },
+    "source": {
+      "onepassword": {
+        "step": {
+          "1": "1Password'de yalnızca ajanlarınız için bir kasa oluşturun ve kullanabilecekleri giriş bilgilerini oraya taşıyın",
+          "2": "Yalnızca o kasaya erişimi olan bir hizmet hesabı oluşturun",
+          "3": "Hizmet hesabının token'ını buraya yapıştırın"
+        },
+        "field": {
+          "token": "Hizmet hesabı token'ı"
+        }
+      },
+      "bitwarden": {
+        "warning": "Yalnızca ajanlarınız için bir hesap kullanın. Ana şifresi tüm hesabı açar, bu yüzden içinde kişisel hiçbir şey olmamalı.",
+        "step": {
+          "1": "Yalnızca ajanlarınız için bir Bitwarden hesabı ve kullanabilecekleri giriş bilgilerini içeren Agents adlı bir klasör oluşturun",
+          "2": "O hesapta Ayarlar, Güvenlik, Anahtarlar'ı açın ve API anahtarını kopyalayın",
+          "3": "Aşağıdaki alanları doldurun"
+        },
+        "field": {
+          "server": "Sunucu",
+          "serverUrl": "Sunucu adresi",
+          "clientId": "İstemci kimliği",
+          "clientSecret": "İstemci gizli anahtarı",
+          "masterPassword": "Ana şifre",
+          "folder": "Klasör"
+        },
+        "choice": {
+          "server": {
+            "self": "Kendi sunucum"
+          }
+        }
+      }
+    },
+    "card": {
+      "save": "Vault'a kaydet",
+      "saveText": "Bir dahaki sefere ajanlarınız size sormadan kullanır.",
+      "scope": "Şu şekilde kaydet",
+      "personalText": "Yalnızca siz görürsünüz",
+      "teamText": "Çalışma alanı görür",
+      "teamLocked": "Ekip için yalnızca Vault'u yönetenler kaydeder",
+      "agents": "Kullananlar",
+      "choose": "Seç",
+      "saved": "Vault'a kaydedildi",
+      "notSaved": "Gönderildi ama Vault'a kaydedilmedi",
+      "codeBox": "Rakam {{n}}/{{total}}",
+      "codeShort_one": "Rakamı yazın.",
+      "codeShort_other": "{{count}} rakamın hepsini yazın.",
+      "codeWhere": "Bunu yalnızca {{agent}} ajanının tarayıcısı, {{host}} üzerinde yazar."
+    }
   },
   "question": {
     "answer": "Yanıtla",
@@ -5006,6 +5361,14 @@
     "setup_write": {
       "label": "Çalışma alanını kurma",
       "description": "Bir kişinin tıklayacağı bir kartla yapay zeka, uygulama veya MCP sunucusu bağlamayı ya da kişileri davet etmeyi önerme ve isteyen kişi için Geri al seçeneğiyle kanal oluşturma."
+    },
+    "vault_read": {
+      "label": "Vault'u görme",
+      "description": "Vault'un onunla paylaştığı giriş bilgilerini, anahtarları ve iletişim bilgilerini görme ve kullanma. Kayıtlı şifreleri yazar ve kayıtlı anahtarları kullanır, ama bunları hiç görmez."
+    },
+    "vault_write": {
+      "label": "Vault iletişim bilgilerini düzenleme",
+      "description": "Vault'ta iletişim bilgilerini kaydetme ve güncelleme, kayıtlı bir girişin kullanıcı adını ya da bir açıklamayı değiştirme ve kendi kaydettiklerini silme."
     },
     "github_git_read": {
       "label": "Depo klonlama (git)",
@@ -8852,7 +9215,8 @@
       "sandbox": "Kod çalıştırma",
       "browser": "Tarayıcı",
       "setup": "Çalışma alanı kurulumu",
-      "desktop": "Masaüstü"
+      "desktop": "Masaüstü",
+      "vault": "Vault"
     },
     "areaText": {
       "context": {
@@ -8898,6 +9262,10 @@
       "desktop": {
         "write": "Kişiler izlerken ya da kontrolü alırken, kendi bilgisayarındaki masaüstünde herhangi bir uygulamayı kullanır. Kod çalıştırma da gerekir.",
         "write_female": "Kişiler izlerken ya da kontrolü alırken, kendi bilgisayarındaki masaüstünde herhangi bir uygulamayı kullanır. Kod çalıştırma da gerekir."
+      },
+      "vault": {
+        "read": "Vault'un onunla paylaştıklarını görür ve kullanır, şifreleri ve anahtarları görmeden.",
+        "write": "Vault'ta iletişim bilgilerini de kaydeder ve günceller."
       }
     }
   },
@@ -10915,6 +11283,49 @@
       "invalid": "Bir @ adı {{min}} ile {{max}} arasında küçük harf, rakam, - veya _ içerir.",
       "taken": "@{{handle}} başka birine ait.",
       "takenByAgent": "@{{handle}} bir ajana ait."
+    },
+    "vault": {
+      "invalid": "Bu öğede doğru olmayan bir şey var. Kontrol edip tekrar deneyin.",
+      "notFound": "Bu öğe artık Vault'ta değil.",
+      "titleRequired": "Bir ad verin.",
+      "tooLong": "Çok uzun. Sınır {{max}}.",
+      "notHttps": "https:// ile başlayan bir adres kullanın",
+      "keyNameInvalid": "Adda büyük harf, rakam ve _ kullanın, örneğin ACME_API_KEY.",
+      "keyNameReserved": "Bu ad ayrılmış. Başka bir ad seçin.",
+      "keyNameTaken": "Burada bu adla kayıtlı bir anahtar zaten var.",
+      "contactEmpty": "En az bir alanı doldurun.",
+      "teamNeedsPermission": "Ekip öğelerini yalnızca kimlik bilgilerini yönetenler kaydedebilir.",
+      "externalReadOnly": "Bu bir şifre yöneticisinden geliyor. Orada değiştirin.",
+      "changedMeanwhile": "Bu arada biri değiştirdi. Tekrar açın.",
+      "noValue": "Kaydedilecek bir şey yok.",
+      "missing": "Şifre yöneticisinden kaybolmuş.",
+      "notAllowed": "Bu öğeyle bunu yapamazsınız.",
+      "tooManyItems": "Vault dolu. Artık kullanmadığınız öğeleri silin.",
+      "audienceInvalid": "Seçtiğiniz bir kişi ya da rol artık çalışma alanında değil.",
+      "agentsInvalid": "Seçtiğiniz bir ajan artık çalışma alanında değil.",
+      "tooManyAgents": "En fazla 200 ajan seçin.",
+      "tooManyRoles": "En fazla 100 rol seçin.",
+      "tooManyPeople": "En fazla 500 kişi seçin.",
+      "csvTooLarge": "Dosya çok büyük. Sınır 2 MB.",
+      "csvTooManyRows": "Dosyada 5.000'den fazla satır var. Bölüp her parçayı ayrı içe aktarın.",
+      "csvUnrecognized": "Bu bir şifre dosyasına benzemiyor. CSV olarak yeniden dışa aktarın.",
+      "requestNotDelivered": "Önce gönderin, sonra Vault'a kaydedin.",
+      "requestNotSavable": "Bu, Vault'a kaydedilemez.",
+      "sourceUnknown": "Bu şifre yöneticisi burada kullanılamıyor.",
+      "sourceError": "Şifre yöneticisinden okunamadı. Tekrar deneyin.",
+      "source": {
+        "authFailed": "Şifre yöneticisi bu bilgileri reddetti. Kontrol edip tekrar deneyin.",
+        "locked": "Ana şifre yanlış.",
+        "manyVaults": "Hizmet hesabı birden fazla kasa görüyor. Yalnızca birine erişim verin.",
+        "noVault": "Hizmet hesabı hiç kasa görmüyor. Birine erişim verin.",
+        "folderMissing": "Bu klasör hesapta yok.",
+        "notFound": "Artık şifre yöneticisinde yok.",
+        "rateLimited": "Şifre yöneticisi beklememizi istedi. Birkaç dakika sonra tekrar deneyin.",
+        "unreachable": "Şifre yöneticisine ulaşılamadı. Adresi kontrol edip tekrar deneyin.",
+        "unsupported": "Bu şifre yöneticisi burada bağlanamıyor.",
+        "invalidInput": "Alanları kontrol edip tekrar deneyin.",
+        "tooManyItems": "Vault dolu. Daha fazlasını eşitlemeden önce öğe silin."
+      }
     }
   },
   "machines": {
@@ -11538,6 +11949,16 @@
         "token_revoked": "{{app}} kişisel tokenını iptal etti",
         "message_sent": "{{app}} üzerinden mesaj gönderdi"
       },
+      "vault": {
+        "item_created": "Vault'a bir öğe kaydetti",
+        "item_changed": "Bir Vault öğesini değiştirdi",
+        "item_deleted": "Bir Vault öğesini sildi",
+        "item_used": "Bir Vault öğesini kullandı",
+        "imported": "Vault'a şifre aktardı",
+        "connection_added": "Vault'a bir şifre yöneticisi bağladı",
+        "connection_changed": "Bir şifre yöneticisinin bağlantısını değiştirdi",
+        "connection_removed": "Bir şifre yöneticisinin Vault bağlantısını kesti"
+      },
       "verb": {
         "created": "Oluşturdu",
         "deleted": "Sildi",
@@ -11570,6 +11991,9 @@
         "resent": "Yeniden gönderdi",
         "revoked": "İptal etti",
         "archived": "Arşivledi",
+        "shown": "Görüntüledi",
+        "copied": "Kopyaladı",
+        "used": "Kullandı",
         "other": "Değiştirdi"
       },
       "area": {
@@ -11602,6 +12026,7 @@
         "member": "bir üye",
         "invitation": "bir davet",
         "credential": "bir yapay zeka anahtarı",
+        "vault": "Vault",
         "other": "çalışma alanı"
       }
     },
@@ -11661,6 +12086,7 @@
       "right_hand": "Sağ kol",
       "members": "Üyeler ve davetler",
       "roles": "Roller ve izinler",
+      "vault": "Vault",
       "access": "Ajanlar ve erişim",
       "connectors": "Bağlayıcılar ve MCP'ler",
       "skills": "Beceriler",
@@ -11683,6 +12109,7 @@
       "right_hand": "Herkesle kendi DM'inde, kendi izinleriyle ekibi kuran asistan.",
       "members": "Çalışma alanında kimler var ve davetler.",
       "roles": "Her kişinin neler yapabileceği. Roller toplanır.",
+      "vault": "Ajanlarınızın kullandığı şifreler, anahtarlar ve iletişim bilgileri. Şifreleri yazar ve anahtarları kullanırlar, ama bunları hiç görmezler.",
       "access": "Her ajanın neleri kullanabileceği: bağlayıcı başına bir düzey.",
       "connectors": "Tüm çalışma alanı için bir kez bağlanan hizmetler ve MCP sunucuları.",
       "skills": "Ajanların ihtiyaç duyduklarında açtıkları Markdown talimatları.",
@@ -12623,6 +13050,18 @@
     "ask_user": {
       "label": "Kişiye sor",
       "description": "Kısa bir soru sorar ve yanıtı bekler."
+    },
+    "vault_list": {
+      "label": "Vault'a bak",
+      "description": "Ajanla paylaşılan giriş bilgilerini, anahtarları ve iletişim bilgilerini listeler, hiçbir zaman şifre ya da anahtar göstermez."
+    },
+    "vault_save": {
+      "label": "Vault'a kaydet",
+      "description": "İletişim bilgilerini, bir girişin kullanıcı adını ya da bir açıklamayı kaydeder veya günceller."
+    },
+    "vault_delete": {
+      "label": "Vault'tan sil",
+      "description": "Kendi kaydettiği bir öğeyi siler."
     },
     "react": {
       "label": "Tepki ver",

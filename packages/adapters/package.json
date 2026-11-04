@@ -14,18 +14,23 @@
     "./redact": "./src/redact.ts",
     "./error-scrub": "./src/error-scrub.ts",
     "./host-stats": "./src/host-stats.ts",
-    "./browser-start": "./src/browser-start.ts"
+    "./browser-start": "./src/browser-start.ts",
+    "./vault/site": "./src/vault/site.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@1password/sdk": "0.5.0",
     "@agenteschat/db": "workspace:*",
+    "@noble/ciphers": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
     "@sentry/core": "10.76.2",
     "imapflow": "^2.5.5",
     "mailparser": "^3.9.46",
     "nodemailer": "^10.1.7",
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9",
+    "tldts": "7.4.18"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

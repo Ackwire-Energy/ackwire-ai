@@ -1507,6 +1507,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "邮件",
+      "vault": "Vault",
       "custom": "工作区工具"
     }
   },
@@ -2714,6 +2715,342 @@
     "removeLabel": "移除 {{name}}",
     "removed": "已从电脑上移除 {{name}}。",
     "removeFailed": "无法移除。电脑开着吗？"
+  },
+  "vault": {
+    "tab": {
+      "label": "显示内容",
+      "team": "团队",
+      "personal": "个人",
+      "connections": "连接"
+    },
+    "list": {
+      "search": "搜索 Vault",
+      "clearSearch": "清除搜索",
+      "kind": "类型",
+      "kindAll": "所有类型",
+      "noMatch": "这里没有与此搜索匹配的内容。",
+      "clearFilters": "清除搜索",
+      "personalNote": "只有你能看到这些项目。你的智能体只在你要求时使用它们。",
+      "personalEmpty": "还没有保存任何内容",
+      "personalEmptyText": "只有你能看到这些项目。你的智能体只在你要求时使用它们。",
+      "teamEmpty": "还没有与团队共享任何内容",
+      "teamEmptyText": "只需保存一次登录信息、密钥或联系信息，然后选择哪些智能体可以使用。",
+      "sharedEmpty": "还没有与你共享的内容",
+      "sharedEmptyText": "有人与你共享团队的登录信息或密钥时，会显示在这里。"
+    },
+    "row": {
+      "agents_other": "{{count}} 个智能体",
+      "used": "{{when}}使用过",
+      "never": "从未使用"
+    },
+    "kind": {
+      "login": "登录信息",
+      "key": "密钥",
+      "contact": "联系信息",
+      "loginText": "网站的用户名和密码",
+      "keyText": "你的智能体在命令中使用的密钥",
+      "contactText": "智能体在表单中填写的信息"
+    },
+    "kindPlural": {
+      "login": "登录信息",
+      "key": "密钥",
+      "contact": "联系信息",
+      "loginTitle": "登录信息",
+      "keyTitle": "密钥",
+      "contactTitle": "联系信息"
+    },
+    "scope": {
+      "personal": "个人",
+      "team": "团队",
+      "personalText": "只有你能看到",
+      "teamText": "与工作区共享"
+    },
+    "field": {
+      "title": "名称",
+      "contactTitle": "在 Vault 中的名称",
+      "loginPlaceholder": "公司邮箱",
+      "keyPlaceholder": "支付密钥",
+      "contactPlaceholder": "账单信息",
+      "website": "网站",
+      "websitePlaceholder": "app.example.com",
+      "match": "智能体可以在哪里输入",
+      "username": "用户名",
+      "usernamePlaceholder": "邮箱或用户名",
+      "password": "密码",
+      "keyName": "变量名",
+      "keyNameHelp": "你的智能体在命令中按这个名称使用密钥。",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "value": "值",
+      "description": "给智能体的备注",
+      "descriptionHelp": "何时使用、用来做什么。智能体会读这段内容来选对项目。",
+      "descriptionPlaceholder": {
+        "login": "我们用来发布帖子的账号",
+        "key": "用于支付服务，测试模式",
+        "contact": "用于公司的发票"
+      }
+    },
+    "match": {
+      "exact": "仅此地址",
+      "site": "整个网站",
+      "exactHelp": "智能体只在 {{origin}} 上输入。",
+      "exactHelpNone": "智能体只在这个确切的地址上输入。",
+      "siteHelp": "智能体会在此网站的任意页面上输入，例如另一个子域名上的登录页面。"
+    },
+    "contact": {
+      "group": "联系信息",
+      "fullName": "全名",
+      "company": "公司",
+      "document": "税号",
+      "email": "邮箱",
+      "phone": "电话",
+      "address": "地址",
+      "address2": "地址第二行",
+      "city": "城市",
+      "region": "省/州或地区",
+      "postalCode": "邮政编码",
+      "country": "国家/地区"
+    },
+    "error": {
+      "title": "请给它起个名字。",
+      "website": "请使用 https 地址，例如 app.example.com。",
+      "keyName": "请使用大写字母、数字和 _，并以字母开头，例如 ACME_API_KEY。",
+      "password": "请输入密码。",
+      "value": "请输入值。",
+      "contact": "请至少填写一项。"
+    },
+    "item": {
+      "missing": "已丢失",
+      "missingText": "它已不在 {{source}} 中。在它回来之前，智能体无法使用它。",
+      "editIn": "请在 {{source}} 中编辑。更改会在下次同步时出现在这里。",
+      "unreadable": "此处无法读取该联系人的信息。管理它的人可以重新输入并保存。",
+      "hidden": "已隐藏",
+      "endsIn": "结尾为 {{hint}}",
+      "noValue": "未保存任何内容",
+      "change": "更改",
+      "add": "添加",
+      "newPassword": "新密码",
+      "newValue": "新值",
+      "newValueHelp": "保存时会替换已保存的值。",
+      "sealedHelp": "为了安全，这里保存的内容不会再显示。如需更改，请重新输入。",
+      "keepValue": "保留当前值",
+      "saved": "已保存",
+      "delete": "删除",
+      "deleteTitle": "要删除 {{title}} 吗？",
+      "deleteText": "你的智能体将无法再使用它。此操作无法撤销。",
+      "deleted": "已从 Vault 删除 {{title}}"
+    },
+    "use": {
+      "title": "最近使用",
+      "none": "还没有人使用过。",
+      "fill": "{{agent}}，在 {{host}}",
+      "fillSomewhere": "{{agent}} 输入了它",
+      "key": "{{agent}}，在命令中",
+      "read": "{{who}} 读取了它",
+      "create": "{{who}} 保存了它",
+      "edit": "{{who}} 修改了它",
+      "for": "为 {{name}}",
+      "routine": "例行工作 {{name}}"
+    },
+    "access": {
+      "title": "谁有权限",
+      "people": "成员",
+      "agents": "智能体",
+      "edit": "编辑",
+      "editOf": "编辑{{what}}",
+      "everyone": "工作区所有成员",
+      "everyoneText": "每个人都能看到，智能体会在其提出要求时使用。",
+      "managersOnly": "仅管理 Vault 的人",
+      "allAgents": "所有智能体",
+      "noAgents": "还没有智能体",
+      "more_other": "另外 {{count}} 个",
+      "saved": "权限已保存",
+      "peopleTitle": "谁能看到",
+      "peopleText": "这些人能看到，其中有人要求时智能体会使用。管理 Vault 的人始终能看到。",
+      "level": {
+        "use": "可查看和使用",
+        "none": "无权限"
+      },
+      "roleDetail": "拥有此角色的所有人",
+      "roles": "角色",
+      "peopleGroup": "成员",
+      "add": "添加角色或成员",
+      "addSearch": "搜索角色和成员",
+      "noMatch": "未找到任何人",
+      "levelOf": "{{name}} 可以做什么",
+      "follows": "它遵循 {{source}} 的默认权限。",
+      "own": "它有自己的权限，而不是 {{source}} 的默认权限。",
+      "changeHere": "仅为此项更改",
+      "useConnection": "恢复默认"
+    },
+    "agents": {
+      "title": "哪些智能体可以使用",
+      "textPersonal": "只在你要求时使用。",
+      "textTeam": "能看到它的人要求时使用。",
+      "all": "所有智能体",
+      "allDetail": "也包括以后添加的智能体"
+    },
+    "summary": {
+      "noAgents": "还没有智能体可以使用。",
+      "allAgents": "所有智能体",
+      "inRole": "{{role}} 角色中的某人",
+      "personal_other": "{{agents}} 可以使用，但只在你要求时。",
+      "everyone_other": "工作区中任何人提出要求时，{{agents}} 都可以使用。",
+      "people_other": "{{people}} 提出要求时，{{agents}} 可以使用。",
+      "nobody": "还没有人能要求智能体使用它。请选择谁能看到它。"
+    },
+    "new": {
+      "open": "新建项目",
+      "title": "新建项目",
+      "text": "只需保存一次。你的智能体使用时看不到密码或密钥。",
+      "what": "你想保存什么？",
+      "who": "谁可以使用",
+      "teamLocked": "只有管理 Vault 的人才能保存团队项目。此项将保留为你的个人项目。",
+      "save": "保存",
+      "saved": "已保存到 Vault"
+    },
+    "import": {
+      "open": "导入",
+      "title": "导入密码",
+      "text": "从浏览器或密码管理器导出的文件（.csv）导入。",
+      "dropTitle": "将文件拖放到这里",
+      "dropText": "或点击从电脑中选择",
+      "reading": "正在读取文件…",
+      "choose": "选择文件",
+      "where": "在浏览器或密码管理器中找到“导出密码”，并选择 CSV。",
+      "tooLarge": "此文件太大（最大 2 MB）。",
+      "notCsv": "请选择 .csv 文件。",
+      "unreadable": "无法读取此文件。请尝试重新导出。",
+      "format": {
+        "chrome": "按 Chrome 导出文件读取",
+        "1password": "按 1Password 导出文件读取",
+        "bitwarden": "按 Bitwarden 导出文件读取",
+        "generic": "按密码文件读取"
+      },
+      "added_other": "个新登录信息",
+      "updated_other": "个已更新",
+      "skipped_other": "个已跳过",
+      "reason": {
+        "duplicate_other": "{{count}} 个已在 Vault 中",
+        "not_https_other": "{{count}} 个不是 https 地址",
+        "no_password_other": "{{count}} 个没有密码",
+        "invalid_other": "{{count}} 行无法读取"
+      },
+      "as": "保存为",
+      "asPersonal": "只有你能看到它们。",
+      "asTeam": "工作区所有成员都能看到它们。之后再为每一项选择智能体。",
+      "deleteFile": "之后请删除此文件：其中的密码没有加密。",
+      "confirm_other": "导入 {{count}} 个",
+      "done_other": "已导入 {{count}} 个登录信息",
+      "another": "选择其他文件",
+      "close": "完成"
+    },
+    "connections": {
+      "none": "这里无法连接任何密码管理器。",
+      "lead": "你的智能体会使用你保存在 {{name}} 中的{{kinds}}。",
+      "connect": "连接",
+      "reconnect": "重新连接",
+      "reconnectName": "重新连接 {{name}}",
+      "open": "打开 {{name}}",
+      "required": "请填写此项。",
+      "for": "连接到",
+      "forTeam": "其中的项目属于团队。由管理 Vault 的人决定谁来使用。",
+      "forPersonal": "其中的项目只属于你。",
+      "teamLocked": "其中的项目将只属于你。只有管理 Vault 的人才能为团队连接。",
+      "sealed": "你在这里输入的内容会加密，不会再次显示。",
+      "connected_other": "已连接 {{name}}。导入了 {{count}} 个项目。",
+      "ready": "已连接",
+      "syncing": "正在同步",
+      "reads": "读取 {{label}}",
+      "items_other": "{{count}} 个项目",
+      "synced": "{{when}}已同步",
+      "syncNow": "立即同步",
+      "access": "默认权限",
+      "accessTitle": "{{label}} 的默认权限",
+      "accessText": "除非你单独修改某一项，其中的项目都遵循此设置。每次更改都会立即保存。",
+      "actionsName": "{{name}} 的更多操作",
+      "disconnect": "断开连接",
+      "removeTitle": "要断开 {{name}} 吗？",
+      "removeText_other": "{{count}} 个项目将离开 Vault，你的智能体也不再使用它们。{{name}} 中不会有任何变化。",
+      "removed": "已断开 {{name}}",
+      "listOf": "与 {{name}} 的连接",
+      "note": "你的智能体需要时会读取那里的内容。除名称和地址外，不会向 agentes.chat 复制任何内容。",
+      "error": {
+        "auth_failed": "登录被拒绝",
+        "locked": "密码错误",
+        "many_vaults": "能看到多个保险库",
+        "no_vault": "看不到保险库",
+        "folder_missing": "未找到文件夹",
+        "not_found": "未找到",
+        "rate_limited": "读取次数过多",
+        "unreachable": "无法连接",
+        "unsupported": "此处不可用",
+        "invalid_input": "请检查各字段",
+        "too_many_items": "Vault 已满",
+        "other": "无法读取"
+      },
+      "fix": {
+        "auth_failed": "密钥或令牌被拒绝。请用新的重新连接。",
+        "locked": "主密码未能打开账号。请用正确的密码重新连接。",
+        "many_vaults": "请只给服务账号一个保险库的权限，然后重新连接。",
+        "no_vault": "请给服务账号智能体专用保险库的权限，然后重新连接。",
+        "folder_missing": "请为智能体创建这个文件夹，或用它的名称重新连接。",
+        "not_found": "它读取的内容已不存在。请重新连接以重新选择。",
+        "rate_limited": "密码管理器要求稍等。它会自动重试。",
+        "unreachable": "它的服务器没有响应。它会自动重试。",
+        "unsupported": "这里无法读取它的设置。请稍后再试，或使用其他账户。",
+        "invalid_input": "字段中有内容被拒绝。请重新连接并检查。",
+        "too_many_items": "请先删除项目，再同步更多。",
+        "other": "请尝试“立即同步”，或重新连接。"
+      }
+    },
+    "source": {
+      "onepassword": {
+        "step": {
+          "1": "在 1Password 中创建一个只给智能体用的保险库，并把它们可以使用的登录信息移进去",
+          "2": "创建一个只能访问该保险库的服务账号",
+          "3": "在这里粘贴服务账号的令牌"
+        },
+        "field": {
+          "token": "服务账号令牌"
+        }
+      },
+      "bitwarden": {
+        "warning": "请使用只给智能体用的账号。它的主密码能打开整个账号，所以不要在里面放任何个人内容。",
+        "step": {
+          "1": "创建一个只给智能体用的 Bitwarden 账号，以及一个名为 Agents 的文件夹，放入它们可以使用的登录信息",
+          "2": "在该账号中打开“设置”、“安全”、“密钥”，然后复制 API 密钥",
+          "3": "填写下面的字段"
+        },
+        "field": {
+          "server": "服务器",
+          "serverUrl": "服务器地址",
+          "clientId": "客户端 ID",
+          "clientSecret": "客户端密钥",
+          "masterPassword": "主密码",
+          "folder": "文件夹"
+        },
+        "choice": {
+          "server": {
+            "self": "我自己的服务器"
+          }
+        }
+      }
+    },
+    "card": {
+      "save": "保存到 Vault",
+      "saveText": "下次，你的智能体会直接使用，无需再问你。",
+      "scope": "保存为",
+      "personalText": "只有你能看到",
+      "teamText": "工作区能看到",
+      "teamLocked": "只有管理 Vault 的人才能为团队保存",
+      "agents": "使用者",
+      "choose": "选择",
+      "saved": "已保存到 Vault",
+      "notSaved": "已发送，但未保存到 Vault",
+      "codeBox": "第 {{n}} 位，共 {{total}} 位",
+      "codeShort_other": "请输入全部 {{count}} 位数字。",
+      "codeWhere": "只有 {{agent}} 的浏览器会在 {{host}} 上输入它。"
+    }
   },
   "question": {
     "answer": "回答",
@@ -4899,6 +5236,14 @@
     "setup_write": {
       "label": "设置工作区",
       "description": "用一张由成员点击的卡片提议连接 AI、应用或 MCP 服务器，或邀请成员，并为提出请求的人创建频道，可撤销。"
+    },
+    "vault_read": {
+      "label": "查看 Vault",
+      "description": "查看 Vault 与它共享的登录信息、密钥和联系信息，并使用它们。它会输入已保存的密码、使用已保存的密钥，但从不看到它们。"
+    },
+    "vault_write": {
+      "label": "编辑 Vault 联系信息",
+      "description": "在 Vault 中保存和更新联系信息，修改已保存登录信息的用户名或描述，并删除它自己保存的内容。"
     },
     "github_git_read": {
       "label": "克隆仓库（git）",
@@ -8631,7 +8976,8 @@
       "sandbox": "运行代码",
       "browser": "浏览器",
       "setup": "工作区设置",
-      "desktop": "桌面"
+      "desktop": "桌面",
+      "vault": "Vault"
     },
     "areaText": {
       "context": {
@@ -8677,6 +9023,10 @@
       "desktop": {
         "write": "在他电脑的桌面上使用任意应用，成员可以旁观或接管。还需要“运行代码”权限。",
         "write_female": "在她电脑的桌面上使用任意应用，成员可以旁观或接管。还需要“运行代码”权限。"
+      },
+      "vault": {
+        "read": "查看并使用 Vault 与它共享的内容，但看不到密码或密钥。",
+        "write": "还会在 Vault 中保存和更新联系信息。"
       }
     }
   },
@@ -10639,6 +10989,49 @@
       "invalid": "@ 名称需为 {{min}} 到 {{max}} 个小写字母、数字、- 或 _。",
       "taken": "@{{handle}} 已被其他人使用。",
       "takenByAgent": "@{{handle}} 已被一个智能体使用。"
+    },
+    "vault": {
+      "invalid": "此项目有内容不正确。请检查后重试。",
+      "notFound": "此项目已不在 Vault 中。",
+      "titleRequired": "请给它起个名字。",
+      "tooLong": "太长了。上限是 {{max}}。",
+      "notHttps": "请使用以 https:// 开头的地址",
+      "keyNameInvalid": "名称中请使用大写字母、数字和 _，例如 ACME_API_KEY。",
+      "keyNameReserved": "此名称已被保留。请换一个。",
+      "keyNameTaken": "这里已保存了同名的密钥。",
+      "contactEmpty": "请至少填写一项。",
+      "teamNeedsPermission": "只有管理凭据的人才能保存团队项目。",
+      "externalReadOnly": "这来自密码管理器。请在那里修改。",
+      "changedMeanwhile": "有人在此期间修改了它。请重新打开。",
+      "noValue": "没有可保存的内容。",
+      "missing": "它已从密码管理器中消失。",
+      "notAllowed": "你不能对此项目执行此操作。",
+      "tooManyItems": "Vault 已满。请删除不再使用的项目。",
+      "audienceInvalid": "你选择的某个成员或角色已不在工作区中。",
+      "agentsInvalid": "你选择的某个智能体已不在工作区中。",
+      "tooManyAgents": "最多选择 200 个智能体。",
+      "tooManyRoles": "最多选择 100 个角色。",
+      "tooManyPeople": "最多选择 500 名成员。",
+      "csvTooLarge": "文件太大。上限是 2 MB。",
+      "csvTooManyRows": "文件超过 5,000 行。请拆分后分别导入。",
+      "csvUnrecognized": "这看起来不是密码文件。请重新导出为 CSV。",
+      "requestNotDelivered": "请先发送，再保存到 Vault。",
+      "requestNotSavable": "此项无法保存到 Vault。",
+      "sourceUnknown": "这里无法使用这个密码管理器。",
+      "sourceError": "无法从密码管理器读取。请重试。",
+      "source": {
+        "authFailed": "密码管理器拒绝了这些信息。请检查后重试。",
+        "locked": "主密码错误。",
+        "manyVaults": "服务账号能看到多个保险库。请只给它一个保险库的权限。",
+        "noVault": "服务账号看不到任何保险库。请给它一个保险库的权限。",
+        "folderMissing": "账号中没有这个文件夹。",
+        "notFound": "它已不在密码管理器中。",
+        "rateLimited": "密码管理器要求稍等。请几分钟后重试。",
+        "unreachable": "无法连接到密码管理器。请检查地址后重试。",
+        "unsupported": "这里无法连接这个密码管理器。",
+        "invalidInput": "请检查各字段后重试。",
+        "tooManyItems": "Vault 已满。请先删除项目，再同步更多。"
+      }
     }
   },
   "machines": {
@@ -11248,6 +11641,16 @@
         "token_revoked": "吊销了个人令牌 {{app}}",
         "message_sent": "通过 {{app}} 发送了一条消息"
       },
+      "vault": {
+        "item_created": "在 Vault 中保存了一个项目",
+        "item_changed": "修改了一个 Vault 项目",
+        "item_deleted": "删除了一个 Vault 项目",
+        "item_used": "使用了一个 Vault 项目",
+        "imported": "将密码导入了 Vault",
+        "connection_added": "将密码管理器连接到了 Vault",
+        "connection_changed": "修改了一个密码管理器的连接",
+        "connection_removed": "断开了一个密码管理器与 Vault 的连接"
+      },
       "verb": {
         "created": "创建了",
         "deleted": "删除了",
@@ -11280,6 +11683,9 @@
         "resent": "重新发送了",
         "revoked": "吊销了",
         "archived": "归档了",
+        "shown": "查看了",
+        "copied": "复制了",
+        "used": "使用了",
         "other": "更改了"
       },
       "area": {
@@ -11312,6 +11718,7 @@
         "member": "一位成员",
         "invitation": "一个邀请",
         "credential": "一个 AI 密钥",
+        "vault": "Vault",
         "other": "工作区"
       }
     },
@@ -11371,6 +11778,7 @@
       "right_hand": "得力助手",
       "members": "成员和邀请",
       "roles": "角色和权限",
+      "vault": "Vault",
       "access": "智能体和访问权限",
       "connectors": "连接器和 MCP",
       "skills": "技能",
@@ -11393,6 +11801,7 @@
       "right_hand": "和每个人在其私信里、以其权限组建团队的助手。",
       "members": "工作区里有谁，以及邀请。",
       "roles": "每个人可以做什么。角色权限会叠加。",
+      "vault": "你的智能体使用的密码、密钥和联系信息。它们输入密码、使用密钥，但从不看到它们。",
       "access": "每个智能体可以使用什么：每个连接器一个级别。",
       "connectors": "为整个工作区一次性连接的服务和 MCP 服务器。",
       "skills": "智能体在需要时打开的 Markdown 指令。",
@@ -12320,6 +12729,18 @@
     "ask_user": {
       "label": "询问成员",
       "description": "提出一个简短的问题并等待回答。"
+    },
+    "vault_list": {
+      "label": "查看 Vault",
+      "description": "列出与该智能体共享的登录信息、密钥和联系信息，从不包含密码或密钥。"
+    },
+    "vault_save": {
+      "label": "保存到 Vault",
+      "description": "保存或更新联系信息、登录信息的用户名或描述。"
+    },
+    "vault_delete": {
+      "label": "从 Vault 删除",
+      "description": "删除它自己保存的项目。"
     },
     "react": {
       "label": "回应表情",

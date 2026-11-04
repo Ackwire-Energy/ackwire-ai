@@ -169,4 +169,5 @@ test("a whole server: connect without a database name, its list, the tables of o
     databases: { policy: { databases?: string[] } }[];
   };
   expect(access.databases[0]?.policy.databases).toEqual(["cliente_b"]);
-});
+  // A server, a sign-up and a dozen requests: about 4.5 s on a CI runner, past the default 5 s when it is busy.
+}, 15_000);

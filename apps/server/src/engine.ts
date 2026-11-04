@@ -68,6 +68,7 @@ import {
   createTalker,
   createToolGateway,
   createUsageToolSource,
+  createVaultToolSource,
   createWebToolSource,
   createWikiToolSource,
   createWithdrawRequestToolSource,
@@ -109,6 +110,7 @@ import {
   standingJudge,
   streamClosed,
   type ToolSource,
+  type VaultDeps,
   type VoiceDeps,
   warmAgentBrowser,
   withComposio,
@@ -316,8 +318,18 @@ export function buildEngine(o: EngineOptions) {
     github: { connectors: connectorDeps, app: githubApp },
     pubsub: adapters.pubsub,
   };
+  // The Vault (ADR 0144): built-in items sealed with the installation's key wrapper, plus the external sources
+  // (1Password, Bitwarden, a module's) the adapters bring.
+  const vault: VaultDeps = {
+    db,
+    keyWrapper: adapters.keyWrapper,
+    keyWrappers,
+    sources: adapters.vaultSources ?? {},
+    pubsub: adapters.pubsub,
+  };
   // The agent's own browser on its connected computer (ADR 0040): `browser:use`, when the machine serves it.
   // Targets in words, checks and finds go to the judge (ADR 0054); screenshots only to Jev's vision model.
+  // A saved login from the Vault is sealed for the agent's computer at the step that types it (ADR 0144).
   const browserTools = createBrowserToolSource({
     machines: { hub: machineHub },
     pubsub: adapters.pubsub,
@@ -325,6 +337,7 @@ export function buildEngine(o: EngineOptions) {
     vision,
     publicUrl: config.PUBLIC_URL,
     errors: o.errors,
+    vault,
   });
   // The workspace's cap of live background works (ADR 0121 §7).
   setWorkOrgCap(config.AGENT_WORK_MAX_PER_ORG);
@@ -346,6 +359,8 @@ export function buildEngine(o: EngineOptions) {
       }),
       createFindAgentToolSource({ machines: machineHub }),
       createUsageToolSource(),
+      // What people saved for the agent in the Vault, found before it asks them (ADR 0144).
+      createVaultToolSource(vault),
       // What the agent says it is doing, next to its name (ADR 0084).
       createSetStatusToolSource({ pubsub: adapters.pubsub }),
       createReactToolSource({ pubsub: adapters.pubsub }),
@@ -413,6 +428,8 @@ export function buildEngine(o: EngineOptions) {
         artifacts,
         skills: { blobs: artifacts.blobs },
         pubsub: adapters.pubsub,
+        // Saved keys for one command (`run_code` with `keys`, ADR 0144).
+        vault,
       }),
       browserTools,
       // Reading the web, for every agent and run (ADR 0109): a search service when configured, else the agent's
@@ -634,6 +651,8 @@ export function buildEngine(o: EngineOptions) {
     skills: skillDeps,
     // A workspace's deletion revokes its grants at GitHub and Composio, and leaves a line in the log.
     connectors: connectorDeps,
+    // External Vault sources synced every few minutes (ADR 0144).
+    vault,
     mail: adapters.mail,
     // An agent's GIF after a light reply (ADR 0091): none without the server's GIF provider.
     gifs: adapters.gifs ?? null,
@@ -692,6 +711,8 @@ export function buildEngine(o: EngineOptions) {
     storage,
     artifacts,
     sandbox,
+    /** The Vault (ADR 0144), for its routes. */
+    vault,
     gitProxy,
     machineHub,
     browserLive,
