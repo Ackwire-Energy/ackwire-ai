@@ -1,5 +1,6 @@
 import {
   AGENT_MEDIA_LEVELS,
+  AGENT_SORTS,
   agentDetail,
   agentView,
   announceMembers,
@@ -34,6 +35,7 @@ import {
   mySidebarItems,
   mySidebarOrder,
   mySidebarToolOrder,
+  mySidebarView,
   orgOverview,
   pickerModels,
   queueInvitationEmail,
@@ -42,6 +44,7 @@ import {
   rotateCredential,
   runErrorDetail,
   SIDEBAR_ITEMS,
+  SIDEBAR_PIN_LIMIT,
   SIDEBAR_PLACES,
   SIDEBAR_SECTIONS,
   type SidebarItem,
@@ -57,6 +60,7 @@ import {
   setMySidebarItems,
   setMySidebarOrder,
   setMySidebarToolOrder,
+  setMySidebarView,
   setMyStatus,
   setShowActivity,
   setStartPage,
@@ -860,6 +864,57 @@ export function managementRoutes(deps: AppDeps) {
         { order: await setMySidebarToolOrder(db, orgId, c.get("user").id, c.req.valid("json").order) },
         200,
       );
+    },
+  );
+
+  const PinIds = z.array(z.string().min(1).max(64)).max(SIDEBAR_PIN_LIMIT);
+  const SidebarView = z
+    .object({
+      agentSort: z.enum(AGENT_SORTS).openapi({
+        description: "How AGENTES orders each group: the workspace's order, your agents first, or working first.",
+      }),
+      showAllAgents: z.boolean().openapi({
+        description: "Who manages agents also lists the ones that don't talk to them (each says who it talks to).",
+      }),
+      pins: z
+        .object({ agents: PinIds, channels: PinIds, people: PinIds })
+        .nullable()
+        .openapi({
+          description: `"Fixar no topo": agent, channel and user ids on top of their own section, at most ${SIDEBAR_PIN_LIMIT} each. \`null\` until you first pin or dismiss: the apps then pin your own agents.`,
+        }),
+    })
+    .openapi("SidebarView");
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/me/sidebar/view",
+      tags: ["Members"],
+      security,
+      summary: "How your sidebar shows the agents, and what you pinned, in this workspace",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ view: SidebarView })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ view: await mySidebarView(db, orgId, c.get("user").id) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/sidebar/view",
+      tags: ["Members"],
+      security,
+      summary: "Keep how your sidebar shows the agents, and what you pinned, in this workspace",
+      description: "Yours alone, on every device. Replaces the view; the tools' places and the orders stay.",
+      request: { params: OrgParams, body: body(z.object({ view: SidebarView })) },
+      responses: { 200: json(z.object({ view: SidebarView })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ view: await setMySidebarView(db, orgId, c.get("user").id, c.req.valid("json").view) }, 200);
     },
   );
 

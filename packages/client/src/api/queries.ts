@@ -33,6 +33,7 @@ import { replyOf } from "../lib/reply";
 import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
 import { SIDEBAR_DEFAULTS, SIDEBAR_ITEMS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
+import { SIDEBAR_VIEW_DEFAULT } from "../lib/sidebar-view";
 import { playSound } from "../lib/sounds";
 import { threadStartOf } from "../lib/threads";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
@@ -133,6 +134,7 @@ import type {
   SidebarItems,
   SidebarPlace,
   SidebarSection,
+  SidebarView,
   SkillInput,
   SkillPatch,
   SkillSettings,
@@ -4503,6 +4505,48 @@ export function useSetSidebarOrder(orgId: string) {
   });
 }
 
+/** How my sidebar shows the agents, and what I pinned, in this workspace (the default until it loads). */
+export const useSidebarView = (orgId: string): SidebarView => {
+  const api = useApi();
+  return (
+    useQuery({
+      queryKey: keys.sidebarView(orgId),
+      queryFn: () => api.orgs.sidebarView(orgId),
+      staleTime: 60_000,
+    }).data ?? SIDEBAR_VIEW_DEFAULT
+  );
+};
+
+/**
+ * Changes my sidebar view: the sidebar changes at once and the whole view goes to the server, one request at a time,
+ * so the last change is what stays. Each change starts from the latest view on screen, so two quick ones never undo
+ * each other; a refusal brings back what the server keeps.
+ */
+export function useSetSidebarView(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const key = keys.sidebarView(orgId);
+  const mutationKey = ["sidebar-view", orgId];
+  const save = useMutation({
+    mutationKey,
+    scope: { id: `sidebar-view:${orgId}` },
+    mutationFn: (view: SidebarView) => api.orgs.setSidebarView(orgId, view),
+    onError: () => {
+      if (qc.isMutating({ mutationKey }) > 1) return;
+      void qc.invalidateQueries({ queryKey: key });
+    },
+    onSuccess: (view) => {
+      if (qc.isMutating({ mutationKey }) <= 1) qc.setQueryData(key, view);
+    },
+  });
+  return (change: (now: SidebarView) => SidebarView) => {
+    void qc.cancelQueries({ queryKey: key });
+    const next = change(qc.getQueryData<SidebarView>(key) ?? SIDEBAR_VIEW_DEFAULT);
+    qc.setQueryData(key, next);
+    save.mutate(next);
+  };
+}
+
 /** How I look at Tarefas in this workspace (the default until it loads, or when it can't). */
 export const useIssuesView = (orgId: string) => {
   const api = useApi();
@@ -4545,16 +4589,18 @@ export function useSetIssuesView(orgId: string) {
   };
 }
 
-/** The sidebar's tools in my order in this workspace (the default until it loads). */
+/**
+ * The sidebar's tools in my order in this workspace (the default until it loads); a tool the app gained since the
+ * order was saved goes at its end, as the server's `sidebarToolOrderOf` does.
+ */
 export const useSidebarToolOrder = (orgId: string): SidebarItem[] => {
   const api = useApi();
-  return (
-    useQuery({
-      queryKey: keys.sidebarToolOrder(orgId),
-      queryFn: () => api.orgs.sidebarToolOrder(orgId),
-      staleTime: 60_000,
-    }).data ?? [...SIDEBAR_ITEMS]
-  );
+  const saved = useQuery({
+    queryKey: keys.sidebarToolOrder(orgId),
+    queryFn: () => api.orgs.sidebarToolOrder(orgId),
+    staleTime: 60_000,
+  }).data;
+  return saved ? [...new Set([...saved, ...SIDEBAR_ITEMS])] : [...SIDEBAR_ITEMS];
 };
 
 /** Saves my order of the tools (`null`: the default): the sidebar changes at once and goes back if the server refuses. */

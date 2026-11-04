@@ -232,6 +232,7 @@ import type {
   SidebarItems,
   SidebarPlace,
   SidebarSection,
+  SidebarView,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -427,6 +428,10 @@ export interface ApiClient {
     sidebarToolOrder(orgId: string): Promise<SidebarItem[]>;
     /** Saves my order of the tools here (`null`: the default). */
     setSidebarToolOrder(orgId: string, order: SidebarItem[] | null): Promise<SidebarItem[]>;
+    /** How my sidebar shows the agents, and what I pinned, here. */
+    sidebarView(orgId: string): Promise<SidebarView>;
+    /** Replaces my sidebar view here; answers with what the server kept. */
+    setSidebarView(orgId: string, view: SidebarView): Promise<SidebarView>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
     setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;

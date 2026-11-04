@@ -19,6 +19,7 @@ export const SIDEBAR_ITEMS = [
   "routines",
   "calendar",
   "forum",
+  "team",
 ] as const;
 export type SidebarItem = (typeof SIDEBAR_ITEMS)[number];
 export const SIDEBAR_PLACES = ["always", "more", "auto"] as const;
@@ -96,11 +97,12 @@ export async function setMySidebarItems(
   await requirePermission(db, userId, orgId, "read");
   const clean = sidebarItemsOf(items);
   const column = organizationMembers.sidebarItems;
-  // The section order and the tools' order share the row (`setMySidebarOrder`, `setMySidebarToolOrder`) and stay.
+  // The section order, the tools' order and the view share the row (`setMySidebarOrder`, `setMySidebarToolOrder`,
+  // `setMySidebarView`) and stay.
   await db
     .update(organizationMembers)
     .set({
-      sidebarItems: sql`${JSON.stringify(clean)}::jsonb || jsonb_strip_nulls(jsonb_build_object('order', ${column} -> 'order', 'tools', ${column} -> 'tools'))`,
+      sidebarItems: sql`${JSON.stringify(clean)}::jsonb || jsonb_strip_nulls(jsonb_build_object('order', ${column} -> 'order', 'tools', ${column} -> 'tools', 'view', ${column} -> 'view'))`,
     })
     .where(mine(orgId, userId));
   return clean;
@@ -200,4 +202,73 @@ export async function setMySidebarToolOrder(
     .where(mine(orgId, userId))
     .returning({ items });
   return sidebarToolOrderOf((row?.items as Record<string, unknown> | undefined)?.[TOOLS_KEY]);
+}
+
+const VIEW_KEY = "view";
+
+/** How the AGENTES section orders the agents inside each group: the workspace's order, mine first, working first. */
+export const AGENT_SORTS = ["workspace", "mine", "working"] as const;
+export type AgentSort = (typeof AGENT_SORTS)[number];
+/** At most this many pinned rows on top of each section ("Fixar no topo"). */
+export const SIDEBAR_PIN_LIMIT = 5;
+export const SIDEBAR_PIN_KINDS = ["agents", "channels", "people"] as const;
+export type SidebarPins = Record<(typeof SIDEBAR_PIN_KINDS)[number], string[]>;
+
+/**
+ * How the person sees the sidebar's agents and what they pinned (`view` in the same `sidebar_items` row): the AGENTES
+ * order, whether a manager shows the agents that don't talk to them, and the pinned agents, channels and people (agent,
+ * channel and user ids, in order). `pins: null` means never saved: the apps pin the person's own agents then.
+ */
+export interface SidebarView {
+  agentSort: AgentSort;
+  showAllAgents: boolean;
+  pins: SidebarPins | null;
+}
+
+const ids = (raw: unknown) =>
+  Array.isArray(raw)
+    ? [...new Set(raw.filter((x): x is string => typeof x === "string" && x.length > 0 && x.length <= 64))].slice(
+        0,
+        SIDEBAR_PIN_LIMIT,
+      )
+    : [];
+
+/** Only what the apps know, each pin list once per id and at most `SIDEBAR_PIN_LIMIT`: a row is never trusted as is. */
+export function sidebarViewOf(raw: unknown): SidebarView {
+  const v = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const sort = (AGENT_SORTS as readonly unknown[]).includes(v.agentSort) ? (v.agentSort as AgentSort) : "workspace";
+  const pins =
+    v.pins && typeof v.pins === "object"
+      ? (Object.fromEntries(
+          SIDEBAR_PIN_KINDS.map((k) => [k, ids((v.pins as Record<string, unknown>)[k])]),
+        ) as SidebarPins)
+      : null;
+  return { agentSort: sort, showAllAgents: v.showAllAgents === true, pins };
+}
+
+/** The person's sidebar view in this workspace. */
+export async function mySidebarView(db: Database, orgId: string, userId: string): Promise<SidebarView> {
+  await requirePermission(db, userId, orgId, "read");
+  const [row] = await db
+    .select({ items: organizationMembers.sidebarItems })
+    .from(organizationMembers)
+    .where(mine(orgId, userId));
+  return sidebarViewOf((row?.items as Record<string, unknown> | undefined)?.[VIEW_KEY]);
+}
+
+/** Replaces the person's sidebar view in this workspace; the tools' places and both orders stay. */
+export async function setMySidebarView(
+  db: Database,
+  orgId: string,
+  userId: string,
+  view: SidebarView,
+): Promise<SidebarView> {
+  await requirePermission(db, userId, orgId, "read");
+  const clean = sidebarViewOf(view);
+  const items = organizationMembers.sidebarItems;
+  await db
+    .update(organizationMembers)
+    .set({ sidebarItems: sql`${items} || jsonb_build_object(${VIEW_KEY}::text, ${JSON.stringify(clean)}::jsonb)` })
+    .where(mine(orgId, userId));
+  return clean;
 }

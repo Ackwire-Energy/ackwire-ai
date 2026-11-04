@@ -192,6 +192,7 @@ export const keys = {
   sidebarOrder: (orgId: string) => ["org", orgId, "sidebar-order"] as const,
   issuesView: (orgId: string) => ["org", orgId, "issues-view"] as const,
   sidebarToolOrder: (orgId: string) => ["org", orgId, "sidebar-tool-order"] as const,
+  sidebarView: (orgId: string) => ["org", orgId, "sidebar-view"] as const,
   forum: (orgId: string) => ["org", orgId, "forum"] as const,
   forumTopic: (orgId: string, topicId: string) => ["org", orgId, "forum", topicId] as const,
   wiki: (orgId: string) => ["org", orgId, "wiki"] as const,
