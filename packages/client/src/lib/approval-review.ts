@@ -86,8 +86,12 @@ export function stepsAround(
   const asked = new Date(a.createdAt).getTime();
   const decided = a.decidedAt ? new Date(a.decidedAt).getTime() : null;
   const at = (s: RunStep) => new Date(s.createdAt).getTime();
+  const later = a.status === "approved" && decided !== null ? steps.filter((s) => at(s) >= decided) : [];
+  // The approved call was made before the ask and answered after the decision: it reads after, with its result.
+  const answered = new Set(later.flatMap((s) => (s.kind === "tool_result" ? [s.data.toolUseId] : [])));
+  const held = (s: RunStep) => s.kind === "tool_call" && answered.has(s.data.toolUseId);
   return {
-    before: steps.filter((s) => at(s) <= asked),
-    after: a.status === "approved" && decided !== null ? steps.filter((s) => at(s) >= decided) : [],
+    before: steps.filter((s) => at(s) <= asked && !held(s)),
+    after: [...steps.filter((s) => at(s) < (decided ?? 0) && held(s)), ...later],
   };
 }

@@ -3455,7 +3455,7 @@ export const ptBR = {
       delivery: "Entrega",
       open: "Abrir",
     },
-    /** O pedido aberto na página Aprovações: os fatos, os cards e a barra de decisão. */
+    /** The open request on the Approvals page: its facts, its cards and the decision bar. */
     review: {
       list: "Pedidos",
       where: "Onde",

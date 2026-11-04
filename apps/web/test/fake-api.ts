@@ -75,6 +75,7 @@ import type {
   Role,
   Run,
   RunConsultation,
+  RunStep,
   ScopeGrant,
   SearchHit,
   SecretRequest,
@@ -240,6 +241,8 @@ export interface FakeState {
   agentRepos?: Record<string, string[]>;
   scopes: Record<string, ScopeGrant[]>;
   runs: Run[];
+  /** A run's steps by id (`GET …/runs/{id}`, what an approval's review reads); unset = none. */
+  runSteps?: Record<string, RunStep[]>;
   /** `GET …/channels/{id}/active-runs`; unset = the endpoint doesn't exist yet (404). */
   activeRuns?: Record<string, ActiveRun[]>;
   /** `GET …/channels/{id}/consultations`, by channel; unset = none. */
@@ -2444,9 +2447,29 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return state.consultationConversations?.[consultationId] ?? null;
       },
       run: async (_orgId, runId) => {
-        const r = state.runs.find((x) => x.id === runId);
+        // An approval's run: the one in `runs`, else one made from the request (the review reads its steps).
+        const asked = state.approvals.find((a) => a.runId === runId);
+        const r =
+          state.runs.find((x) => x.id === runId) ??
+          (asked
+            ? {
+                id: runId,
+                agentId: asked.agentId,
+                channelId: asked.channelId,
+                threadId: asked.threadId ?? "",
+                trigger: "mention",
+                status: "running",
+                error: null,
+                what: asked.title,
+                turns: 1,
+                inputTokens: 0,
+                outputTokens: 0,
+                createdAt: asked.createdAt,
+                finishedAt: null,
+              }
+            : undefined);
         if (!r) throw new ApiError(404, "not_found", "Run not found");
-        return { run: r, steps: [] };
+        return { run: r, steps: structuredClone(state.runSteps?.[runId] ?? []) };
       },
       usage: async () =>
         state.me?.organizations[0]?.role === "member"
