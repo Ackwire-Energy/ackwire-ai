@@ -20,7 +20,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "누구에게 맞나요",
         blocks: [
-          "이 컴퓨터가 켜져 있는 동안 혼자 또는 작은 팀이 쓰기 좋아요. 더 큰 팀이거나 항상 켜져 있는 서버가 필요하다면 서버에 agentes.chat을 설치하고 앱에서 **내 서버에 연결**을 고르세요. 데이터는 나중에 옮길 수 있어요.",
+          "이 컴퓨터가 켜져 있는 동안 혼자 또는 작은 팀이 쓰기 좋아요. 더 큰 팀이거나 항상 켜져 있는 서버가 필요하다면 [서버에 agentes.chat을 설치](/help/install-on-a-server)하고 앱에서 **내 서버에 연결**을 고르세요. 데이터는 나중에 옮길 수 있어요.",
         ],
       },
       {

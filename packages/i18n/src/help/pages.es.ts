@@ -20,7 +20,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "Para quién es",
         blocks: [
-          "Pensado para ti o un equipo pequeño, mientras esta computadora esté encendida. Para un equipo más grande, o un servidor siempre encendido, instala agentes.chat en un servidor y elige **Conectarme a mi servidor** en la app. Tus datos pueden mudarse allí más adelante.",
+          "Pensado para ti o un equipo pequeño, mientras esta computadora esté encendida. Para un equipo más grande, o un servidor siempre encendido, [instala agentes.chat en un servidor](/help/install-on-a-server) y elige **Conectarme a mi servidor** en la app. Tus datos pueden mudarse allí más adelante.",
         ],
       },
       {
@@ -585,7 +585,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
-          "La configuración acepta tu propio servidor de correo (SMTP) o la clave de una API compatible con Resend, como MillionSend o Resend. Los correos salen de `ping@` el dominio de tu servidor, salvo que elijas otro remitente, y ese dominio debe estar verificado con tu proveedor de correo. Para configurarlo más tarde, ejecuta la instalación otra vez.",
+          "La configuración acepta tu propio servidor de correo (SMTP) o la clave de una API compatible con Resend, como MillionSend o Resend. Los correos salen de `ping@<dominio de tu servidor>`, salvo que elijas otro remitente, y ese dominio debe estar verificado con tu proveedor de correo. Para configurarlo más tarde, ejecuta la instalación otra vez.",
         ],
       },
       {

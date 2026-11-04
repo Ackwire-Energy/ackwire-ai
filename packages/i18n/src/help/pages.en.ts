@@ -19,7 +19,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "who",
         heading: "Who it's for",
         blocks: [
-          "Made for you or a small team, while this computer is on. For a bigger team, or a server that's always on, install agentes.chat on a server and choose **Connect to my server** in the app. Your data can move there later.",
+          "Made for you or a small team, while this computer is on. For a bigger team, or a server that's always on, [install agentes.chat on a server](/help/install-on-a-server) and choose **Connect to my server** in the app. Your data can move there later.",
         ],
       },
       {
@@ -576,7 +576,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
-          "The setup takes your own mail server (SMTP) or a key for a Resend-compatible API, such as MillionSend or Resend. Emails come from `ping@` your server's domain unless you pick another sender, and that domain must be verified with your email provider. To set it up later, run the install again.",
+          "The setup takes your own mail server (SMTP) or a key for a Resend-compatible API, such as MillionSend or Resend. Emails come from `ping@<your server's domain>` unless you pick another sender, and that domain must be verified with your email provider. To set it up later, run the install again.",
         ],
       },
       {

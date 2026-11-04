@@ -20,7 +20,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "Voor wie het is",
         blocks: [
-          "Gemaakt voor jou of een klein team, zolang deze computer aanstaat. Voor een groter team, of een server die altijd aanstaat, installeer je agentes.chat op een server en kies je **Verbinden met mijn server** in de app. Je gegevens kunnen er later naartoe verhuizen.",
+          "Gemaakt voor jou of een klein team, zolang deze computer aanstaat. Voor een groter team, of een server die altijd aanstaat, [installeer je agentes.chat op een server](/help/install-on-a-server) en kies je **Verbinden met mijn server** in de app. Je gegevens kunnen er later naartoe verhuizen.",
         ],
       },
       {
@@ -583,7 +583,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
-          "De installatie neemt je eigen mailserver (SMTP) of een key voor een Resend-compatibele API, zoals MillionSend of Resend. E-mails komen van `ping@` het domein van je server, tenzij je een andere afzender kiest, en dat domein moet geverifieerd zijn bij je e-mailprovider. Om het later in te stellen, voer je de installatie opnieuw uit.",
+          "De installatie neemt je eigen mailserver (SMTP) of een key voor een Resend-compatibele API, zoals MillionSend of Resend. E-mails komen van `ping@<domein van je server>`, tenzij je een andere afzender kiest, en dat domein moet geverifieerd zijn bij je e-mailprovider. Om het later in te stellen, voer je de installatie opnieuw uit.",
         ],
       },
       {

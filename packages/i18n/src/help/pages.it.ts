@@ -20,7 +20,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "Per chi è",
         blocks: [
-          "Pensato per te o per un piccolo team, finché questo computer è acceso. Per un team più grande, o un server sempre acceso, installa agentes.chat su un server e scegli **Connetti al mio server** nell’app. I tuoi dati potranno spostarsi lì in seguito.",
+          "Pensato per te o per un piccolo team, finché questo computer è acceso. Per un team più grande, o un server sempre acceso, [installa agentes.chat su un server](/help/install-on-a-server) e scegli **Connetti al mio server** nell’app. I tuoi dati potranno spostarsi lì in seguito.",
         ],
       },
       {
@@ -585,7 +585,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
-          "La configurazione accetta il tuo server di posta (SMTP) o la chiave di un'API compatibile con Resend, come MillionSend o Resend. Le email partono da `ping@` il dominio del tuo server, a meno che tu non scelga un altro mittente, e quel dominio deve essere verificato presso il tuo provider di email. Per configurarla più tardi, esegui di nuovo l'installazione.",
+          "La configurazione accetta il tuo server di posta (SMTP) o la chiave di un'API compatibile con Resend, come MillionSend o Resend. Le email partono da `ping@<dominio del tuo server>`, a meno che tu non scelga un altro mittente, e quel dominio deve essere verificato presso il tuo provider di email. Per configurarla più tardi, esegui di nuovo l'installazione.",
         ],
       },
       {

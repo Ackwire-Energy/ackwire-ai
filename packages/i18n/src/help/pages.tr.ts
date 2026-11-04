@@ -20,7 +20,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "Kimin için",
         blocks: [
-          "Bu bilgisayar açıkken sizin ya da küçük bir ekibin kullanması için yapıldı. Daha büyük bir ekip ya da hep açık bir sunucu için agentes.chat'i bir sunucuya kurun ve uygulamada **Sunucuma bağlan** seçeneğini seçin. Verilerinizi sonra oraya taşıyabilirsiniz.",
+          "Bu bilgisayar açıkken sizin ya da küçük bir ekibin kullanması için yapıldı. Daha büyük bir ekip ya da hep açık bir sunucu için [agentes.chat'i bir sunucuya kurun](/help/install-on-a-server) ve uygulamada **Sunucuma bağlan** seçeneğini seçin. Verilerinizi sonra oraya taşıyabilirsiniz.",
         ],
       },
       {

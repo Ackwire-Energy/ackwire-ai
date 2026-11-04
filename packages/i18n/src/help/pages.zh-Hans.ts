@@ -19,7 +19,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "适合谁",
         blocks: [
-          "适合你自己或小团队在这台电脑开机时使用。如果团队更大，或需要一台始终在线的服务器，请把 agentes.chat 安装到服务器上，然后在应用中选择 **连接到我的服务器**。你的数据之后可以迁移过去。",
+          "适合你自己或小团队在这台电脑开机时使用。如果团队更大，或需要一台始终在线的服务器，请[把 agentes.chat 安装到服务器上](/help/install-on-a-server)，然后在应用中选择 **连接到我的服务器**。你的数据之后可以迁移过去。",
         ],
       },
       {

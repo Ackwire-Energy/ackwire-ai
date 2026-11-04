@@ -20,7 +20,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "Pour qui",
         blocks: [
-          "Conçu pour vous ou une petite équipe, tant que cet ordinateur est allumé. Pour une équipe plus grande, ou un serveur toujours allumé, installez agentes.chat sur un serveur et choisissez **Se connecter à mon serveur** dans l’app. Vos données pourront y être transférées plus tard.",
+          "Conçu pour vous ou une petite équipe, tant que cet ordinateur est allumé. Pour une équipe plus grande, ou un serveur toujours allumé, [installez agentes.chat sur un serveur](/help/install-on-a-server) et choisissez **Se connecter à mon serveur** dans l’app. Vos données pourront y être transférées plus tard.",
         ],
       },
       {
@@ -586,7 +586,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
-          "La configuration accepte votre propre serveur de messagerie (SMTP) ou la clé d'une API compatible avec Resend, comme MillionSend ou Resend. Les e-mails partent de `ping@` le domaine de votre serveur, sauf si vous choisissez un autre expéditeur, et ce domaine doit être vérifié chez votre fournisseur d'e-mail. Pour le configurer plus tard, relancez l'installation.",
+          "La configuration accepte votre propre serveur de messagerie (SMTP) ou la clé d'une API compatible avec Resend, comme MillionSend ou Resend. Les e-mails partent de `ping@<domaine de votre serveur>`, sauf si vous choisissez un autre expéditeur, et ce domaine doit être vérifié chez votre fournisseur d'e-mail. Pour le configurer plus tard, relancez l'installation.",
         ],
       },
       {

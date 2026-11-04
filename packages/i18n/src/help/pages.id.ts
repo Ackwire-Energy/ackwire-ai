@@ -20,7 +20,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "Untuk siapa",
         blocks: [
-          "Dibuat untukmu atau tim kecil, selama komputer ini menyala. Untuk tim yang lebih besar, atau server yang selalu menyala, pasang agentes.chat di server lalu pilih **Hubungkan ke serverku** di aplikasi. Datamu bisa dipindahkan ke sana nanti.",
+          "Dibuat untukmu atau tim kecil, selama komputer ini menyala. Untuk tim yang lebih besar, atau server yang selalu menyala, [pasang agentes.chat di server](/help/install-on-a-server) lalu pilih **Hubungkan ke serverku** di aplikasi. Datamu bisa dipindahkan ke sana nanti.",
         ],
       },
       {

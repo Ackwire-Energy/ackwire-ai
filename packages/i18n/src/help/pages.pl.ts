@@ -20,7 +20,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "Dla kogo to jest",
         blocks: [
-          "Dla ciebie albo małego zespołu, dopóki ten komputer jest włączony. Dla większego zespołu albo serwera, który działa bez przerwy, zainstaluj agentes.chat na serwerze i wybierz w aplikacji **Połącz z moim serwerem**. Dane możesz tam przenieść później.",
+          "Dla ciebie albo małego zespołu, dopóki ten komputer jest włączony. Dla większego zespołu albo serwera, który działa bez przerwy, [zainstaluj agentes.chat na serwerze](/help/install-on-a-server) i wybierz w aplikacji **Połącz z moim serwerem**. Dane możesz tam przenieść później.",
         ],
       },
       {
