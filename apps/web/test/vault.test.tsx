@@ -1,0 +1,430 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { setupDom } from "@agenteschat/ui/testing/dom";
+
+setupDom();
+
+import type {
+  ApiClient,
+  SecretTarget,
+  SecretToVaultInput,
+  VaultItem,
+  VaultItemDetail,
+  VaultOverview,
+} from "@agenteschat/client";
+import { ApiError } from "@agenteschat/client";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { generateSecretKeyPair } from "../../../packages/adapters/src/secret-box";
+import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
+import { renderApp, screen, settle } from "./render";
+
+/*
+ * Settings › Vault and the secret request card's "Save to the Vault" (ADR 0135), against a fake Vault: the lists and
+ * their counts, what a member without `manage_credentials` can't do, Show and Copy asking the server, the card saving
+ * only after it delivered and only when its box is checked, and a code typed one digit per box.
+ */
+
+afterEach(() => cleanup());
+
+const click = (el: Element) => act(async () => fireEvent.click(el));
+const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
+
+const NOW = new Date().toISOString();
+const access = (patch: Partial<VaultItem["access"]> = {}): VaultItem["access"] => ({
+  everyone: true,
+  roleIds: [],
+  userIds: [],
+  allAgents: false,
+  agentIds: [],
+  ...patch,
+});
+
+function vaultItem(patch: Partial<VaultItem> & Pick<VaultItem, "id" | "kind" | "title">): VaultItem {
+  return {
+    scope: "team",
+    ownerUserId: null,
+    description: "",
+    website: null,
+    match: "exact",
+    username: null,
+    keyName: null,
+    keyHint: null,
+    hasSecret: patch.kind !== "contact",
+    contact: null,
+    connectionId: null,
+    sourceName: null,
+    accessFromConnection: false,
+    access: access(),
+    missing: false,
+    createdByUserId: "u-walter",
+    createdByAgentId: null,
+    lastUsedAt: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+    can: { edit: true, reveal: true, delete: true },
+    ...patch,
+  };
+}
+
+const LOGIN = vaultItem({
+  id: "vi-login",
+  kind: "login",
+  title: "Acme mail",
+  website: "https://mail.acme.example",
+  username: "ana@acme.example",
+  access: access({ agentIds: [ADA_ID] }),
+});
+const KEY = vaultItem({
+  id: "vi-key",
+  kind: "key",
+  title: "Payments",
+  keyName: "ACME_API_KEY",
+  keyHint: "a1b2",
+  description: "Test mode",
+});
+const CONTACT = vaultItem({
+  id: "vi-contact",
+  kind: "contact",
+  scope: "personal",
+  ownerUserId: "u-walter",
+  title: "Billing details",
+  contact: { fullName: "Ana Souza", city: "Recife" },
+  access: access({ everyone: false, allAgents: true }),
+});
+
+function overviewOf(patch: Partial<VaultOverview> = {}): VaultOverview {
+  return {
+    items: [LOGIN, KEY, CONTACT],
+    connections: [
+      {
+        id: "vc-1",
+        kind: "onepassword",
+        name: "1Password",
+        scope: "team",
+        ownerUserId: null,
+        label: "Agents",
+        config: { vaultName: "Agents" },
+        access: access(),
+        status: "ready",
+        errorCode: null,
+        itemCount: 3,
+        syncedAt: NOW,
+        can: { edit: true },
+      },
+    ],
+    sources: [
+      {
+        kind: "onepassword",
+        name: "1Password",
+        kinds: ["login", "key"],
+        steps: ["Create a vault", "Create a service account", "Paste the token"],
+        fields: [{ id: "token", kind: "secret", label: "Service account token", required: true }],
+      },
+    ],
+    canManageTeam: true,
+    ...patch,
+  };
+}
+
+/** A fake Vault over `overview`, every call logged in `state.calls` as `vault.<method>`. */
+function fakeVault(state: FakeState, overview: VaultOverview): NonNullable<ApiClient["vault"]> {
+  const log = (method: string, ...args: unknown[]) => state.calls.push({ method: `vault.${method}`, args });
+  const find = (id: string) => {
+    const item = overview.items.find((i) => i.id === id);
+    if (!item) throw new ApiError(404, "not_found", "Not found");
+    return item;
+  };
+  return {
+    overview: async (orgId) => {
+      log("overview", orgId);
+      return structuredClone(overview);
+    },
+    item: async (orgId, itemId) => {
+      log("item", orgId, itemId);
+      const detail: VaultItemDetail = { ...structuredClone(find(itemId)), uses: [] };
+      return detail;
+    },
+    create: async (orgId, input) => {
+      log("create", orgId, input);
+      const item = vaultItem({ id: `vi-${overview.items.length + 1}`, kind: input.kind, title: input.title });
+      overview.items.push(item);
+      return structuredClone(item);
+    },
+    update: async (orgId, itemId, patch) => {
+      log("update", orgId, itemId, patch);
+      return structuredClone(Object.assign(find(itemId), patch));
+    },
+    remove: async (orgId, itemId) => {
+      log("remove", orgId, itemId);
+      overview.items = overview.items.filter((i) => i.id !== itemId);
+    },
+    reveal: async (orgId, itemId, purpose) => {
+      log("reveal", orgId, itemId, purpose);
+      return { value: "hunter2-from-the-vault" };
+    },
+    importCsv: async (orgId, input) => {
+      log("importCsv", orgId, input.scope, input.dryRun);
+      return { added: 2, updated: 0, skipped: [], format: "chrome" };
+    },
+    connect: async (orgId, input) => {
+      log("connect", orgId, input.kind, input.scope);
+      return structuredClone(overview.connections[0] as VaultOverview["connections"][number]);
+    },
+    updateConnection: async (orgId, connectionId, patch) => {
+      log("updateConnection", orgId, connectionId, patch);
+      return structuredClone(overview.connections[0] as VaultOverview["connections"][number]);
+    },
+    syncConnection: async (orgId, connectionId) => {
+      log("syncConnection", orgId, connectionId);
+      return structuredClone(overview.connections[0] as VaultOverview["connections"][number]);
+    },
+    removeConnection: async (orgId, connectionId) => {
+      log("removeConnection", orgId, connectionId);
+    },
+  };
+}
+
+async function openVault(state = seedState(), overview = overviewOf()) {
+  const api = createFakeApi(state);
+  api.vault = fakeVault(state, overview);
+  const r = await renderApp(`/org/${ORG_ID}/settings/vault`, { api });
+  await settle(6);
+  // The app's own words, whatever the keys say in this build.
+  const t = r.services.i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  return { ...r, state, t };
+}
+
+const rows = () => [...document.querySelectorAll<HTMLElement>(".vlt-row")];
+
+describe("Settings › Vault (ADR 0135)", () => {
+  test("lists the team's items and mine, each view with its count, and the connections", async () => {
+    const { t } = await openVault();
+    expect(document.querySelector(".settings__body h2")?.textContent).toBe(t("settings.section.vault"));
+    const views = screen().getByRole("radiogroup", { name: t("vault.tab.label") });
+    const tab = (key: string) => within(views).getByRole("radio", { name: new RegExp(`^${t(key)}`) });
+    expect(tab("vault.tab.team").textContent).toContain("2");
+    expect(tab("vault.tab.personal").textContent).toContain("1");
+    expect(tab("vault.tab.connections").textContent).toContain("1");
+
+    // Team: the login (its site and username, Ada may use it) and the key (its variable, in code).
+    expect(rows().map((r) => r.querySelector(".vlt-row__title")?.textContent)).toEqual(["Acme mail", "Payments"]);
+    const login = rows()[0] as HTMLElement;
+    expect(login.textContent).toContain("mail.acme.example · ana@acme.example");
+    expect(login.textContent).toContain("Ada");
+    expect(rows()[1]?.querySelector("code")?.textContent).toBe("ACME_API_KEY");
+    // Never a value in a list.
+    expect(document.body.textContent).not.toContain("hunter2");
+
+    // The search finds by what a person looks it up by.
+    const search = screen().getByRole("searchbox", { name: t("vault.list.search") });
+    await type(search, "acme_api");
+    expect(rows().map((r) => r.querySelector(".vlt-row__title")?.textContent)).toEqual(["Payments"]);
+    await type(search, "");
+
+    await click(tab("vault.tab.personal"));
+    expect(rows().map((r) => r.querySelector(".vlt-row__title")?.textContent)).toEqual(["Billing details"]);
+    expect(rows()[0]?.textContent).toContain("Ana Souza · Recife");
+    expect(document.body.textContent).toContain(t("vault.list.personalNote"));
+
+    await click(tab("vault.tab.connections"));
+    expect(rows()).toHaveLength(0);
+    const card = screen().getByRole("region", { name: "1Password" });
+    expect(card.textContent).toContain(t("vault.connections.items", { count: 3 }));
+    expect(within(card).getByRole("button", { name: t("vault.connections.syncNow") })).toBeTruthy();
+  });
+
+  test("a member who doesn't manage the Vault: a team item reads only, and new items stay personal", async () => {
+    const state = seedState();
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    const shared = { ...LOGIN, can: { edit: false, reveal: false, delete: false } };
+    const { t } = await openVault(state, overviewOf({ items: [shared], connections: [], canManageTeam: false }));
+
+    await click(rows()[0] as HTMLElement);
+    await settle(3);
+    const dialog = screen().getByRole("dialog", { name: "Acme mail" });
+    expect(within(dialog).queryByRole("button", { name: t("common.save") })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: t("vault.item.delete") })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: t("vault.item.show") })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: t("vault.item.change") })).toBeNull();
+    const editAgents = t("vault.access.editOf", { what: t("vault.access.agents") });
+    expect(within(dialog).queryByRole("button", { name: editAgents })).toBeNull();
+    expect((within(dialog).getByLabelText(t("vault.field.username")) as HTMLInputElement).readOnly).toBe(true);
+    // The footer's Close (the header's × has the same name).
+    await click(
+      within(dialog)
+        .getAllByRole("button", { name: t("common.close") })
+        .at(-1) as HTMLElement,
+    );
+    await settle(2);
+
+    await click(screen().getByRole("button", { name: t("vault.new.open") }));
+    await settle(2);
+    const create = screen().getByRole("dialog", { name: t("vault.new.title") });
+    const who = within(create).getByRole("radiogroup", { name: t("vault.new.who") });
+    for (const option of within(who).getAllByRole("radio")) expect((option as HTMLButtonElement).disabled).toBe(true);
+    expect(within(who).getByRole("radio", { checked: true }).textContent).toContain(t("vault.scope.personal"));
+    expect(create.textContent).toContain(t("vault.new.teamLocked"));
+  });
+
+  test("Show and Copy ask the server for the value, which records it; nothing else ever carries it", async () => {
+    const copied: string[] = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (text: string) => void copied.push(text) },
+    });
+    const { state, t } = await openVault();
+    expect(state.calls.some((c) => c.method === "vault.reveal")).toBe(false);
+    await click(rows()[0] as HTMLElement);
+    await settle(3);
+    const dialog = screen().getByRole("dialog", { name: "Acme mail" });
+    expect(dialog.textContent).not.toContain("hunter2");
+
+    await click(within(dialog).getByRole("button", { name: t("vault.item.show") }));
+    await settle(3);
+    expect(state.calls.filter((c) => c.method === "vault.reveal").map((c) => c.args)).toEqual([
+      [ORG_ID, "vi-login", "show"],
+    ]);
+    expect(dialog.textContent).toContain("hunter2-from-the-vault");
+    expect(within(dialog).getByRole("button", { name: t("vault.item.hide") })).toBeTruthy();
+
+    await click(within(dialog).getByRole("button", { name: t("common.copy") }));
+    await settle(3);
+    expect(state.calls.filter((c) => c.method === "vault.reveal").map((c) => c.args[2])).toEqual(["show", "copy"]);
+    expect(copied).toEqual(["hunter2-from-the-vault"]);
+  });
+});
+
+/** A pending secret request for me, with `saveToVault` on the fake api (logged as `secrets.saveToVault`). */
+async function withRequest(
+  target: SecretTarget,
+  extra: { name?: string; codeDigits?: number; username?: string } = {},
+) {
+  const pair = await generateSecretKeyPair();
+  const state = seedState();
+  const name = extra.name ?? "NPM_TOKEN";
+  const secretRequest = {
+    id: "00000000-0000-4000-8000-0000000000e1",
+    agentId: ADA_ID,
+    channelId: ENG_ID,
+    threadId: null,
+    messageId: "msg-s",
+    requestedForUserId: "u-walter",
+    name,
+    purpose: "publicar o pacote no npm",
+    target,
+    site: target.kind === "site" ? target.site : null,
+    machineId: null,
+    publicKey: pair.publicKey,
+    status: "pending" as const,
+    expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+    deliveredAt: null,
+    removed: false,
+    username: extra.username ?? null,
+    codeDigits: extra.codeDigits ?? null,
+  };
+  state.messages.push({
+    id: "msg-s",
+    channelId: ENG_ID,
+    threadId: null,
+    author: { type: "agent", id: ADA_ID },
+    body: `Pedido de segredo: ${name}`,
+    mentionedAgentIds: [],
+    agentRunId: "r-s",
+    meta: { secretRequestId: secretRequest.id, secretRequest },
+    createdAt: new Date().toISOString(),
+  });
+  const api = createFakeApi(state);
+  api.secrets.saveToVault = async (orgId: string, requestId: string, input: SecretToVaultInput) => {
+    state.calls.push({ method: "secrets.saveToVault", args: [orgId, requestId, input] });
+    return vaultItem({ id: "vi-saved", kind: "key", title: name, keyName: name });
+  };
+  const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+  await settle(5);
+  await act(async () => r.sockets.last().open());
+  await settle(2);
+  const t = r.services.i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const card = () => screen().getByRole("group", { name: t("secret.group", { agent: "Ada" }) });
+  return { state, t, card };
+}
+
+describe("the secret request card: Save to the Vault (ADR 0135)", () => {
+  test("checked (the default): saved after it was delivered, for Ada, as mine", async () => {
+    const { state, t, card } = await withRequest({ kind: "env" });
+    const save = within(card()).getByRole("checkbox", { name: t("vault.card.save") });
+    expect(save.getAttribute("aria-checked")).toBe("true");
+    // The asking agent is preselected.
+    expect(within(card()).getByRole("list", { name: t("vault.card.agents") }).textContent).toContain("Ada");
+    await type(within(card()).getByLabelText(t("secret.label", { name: "NPM_TOKEN" })), "npm_live_abc123");
+    await click(within(card()).getByRole("button", { name: t("secret.send") }));
+    await settle(6);
+
+    const methods = state.calls
+      .map((c) => c.method)
+      .filter((m) => m === "secrets.deliver" || m === "secrets.saveToVault");
+    expect(methods).toEqual(["secrets.deliver", "secrets.saveToVault"]);
+    const call = state.calls.find((c) => c.method === "secrets.saveToVault");
+    expect(call?.args.slice(0, 2)).toEqual([ORG_ID, "00000000-0000-4000-8000-0000000000e1"]);
+    expect(call?.args[2]).toEqual({
+      value: "npm_live_abc123",
+      username: undefined,
+      scope: "personal",
+      allAgents: false,
+      agentIds: [ADA_ID],
+    });
+    // The delivery itself never carried the value in the clear.
+    expect(JSON.stringify(state.calls.find((c) => c.method === "secrets.deliver")?.args)).not.toContain(
+      "npm_live_abc123",
+    );
+    expect(card().textContent).toContain(t("vault.card.saved"));
+  });
+
+  test("unchecked: delivered, and nothing goes to the Vault", async () => {
+    const site = { kind: "site" as const, site: "https://shop.example.com" };
+    const { state, t, card } = await withRequest(site, { name: "SHOP_PASSWORD", username: "ana@shop.example.com" });
+    // A site's password keeps its username with it, prefilled from the request.
+    expect((within(card()).getByLabelText(t("vault.field.username")) as HTMLInputElement).value).toBe(
+      "ana@shop.example.com",
+    );
+    await click(within(card()).getByRole("checkbox", { name: t("vault.card.save") }));
+    expect(within(card()).queryByLabelText(t("vault.field.username"))).toBeNull();
+    await type(within(card()).getByLabelText(t("secret.label", { name: "SHOP_PASSWORD" })), "hunter2-for-real");
+    await click(within(card()).getByRole("button", { name: t("secret.send") }));
+    await settle(6);
+    expect(state.calls.some((c) => c.method === "secrets.deliver")).toBe(true);
+    expect(state.calls.some((c) => c.method === "secrets.saveToVault")).toBe(false);
+    expect(card().textContent).not.toContain(t("vault.card.saved"));
+  });
+
+  test("a verification code: one box per digit, a paste fills them all, and it is never saved", async () => {
+    const { state, t, card } = await withRequest(
+      { kind: "site", site: "https://shop.example.com" },
+      { name: "SHOP_CODE", codeDigits: 6 },
+    );
+    const code = within(card()).getByRole("group", { name: t("secret.label", { name: "SHOP_CODE" }) });
+    const boxes = within(code).getAllByRole("textbox") as HTMLInputElement[];
+    expect(boxes).toHaveLength(6);
+    expect(boxes[0]?.getAttribute("aria-label")).toBe(t("vault.card.codeBox", { n: 1, total: 6 }));
+    expect(boxes[0]?.getAttribute("autocomplete")).toBe("one-time-code");
+    expect(boxes[0]?.getAttribute("inputmode")).toBe("numeric");
+    // No "Save to the Vault" for a code.
+    expect(within(card()).queryByRole("checkbox", { name: t("vault.card.save") })).toBeNull();
+    expect(card().textContent).toContain(t("vault.card.codeWhere", { agent: "Ada", host: "shop.example.com" }));
+
+    // A short code isn't sent.
+    await type(boxes[0] as HTMLInputElement, "12");
+    await click(within(card()).getByRole("button", { name: t("secret.send") }));
+    await settle(2);
+    expect(state.calls.some((c) => c.method === "secrets.deliver")).toBe(false);
+    expect(card().textContent).toContain(t("vault.card.codeShort", { count: 6 }));
+
+    // The system's suggestion (or a paste) lands in the first box and spreads over all of them.
+    await act(async () =>
+      fireEvent.paste(boxes[0] as HTMLInputElement, { clipboardData: { getData: () => "48 21 07" } }),
+    );
+    const filled = within(code).getAllByRole("textbox") as HTMLInputElement[];
+    expect(filled.map((b) => b.value)).toEqual(["4", "8", "2", "1", "0", "7"]);
+    await click(within(card()).getByRole("button", { name: t("secret.send") }));
+    await settle(6);
+    expect(state.calls.some((c) => c.method === "secrets.deliver")).toBe(true);
+    expect(state.calls.some((c) => c.method === "secrets.saveToVault")).toBe(false);
+  });
+});

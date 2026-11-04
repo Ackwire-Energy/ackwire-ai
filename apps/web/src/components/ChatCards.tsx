@@ -2,7 +2,7 @@ import type { AgentQuestion, MemoryUpdate, Proposal, SecretRequest } from "@agen
 import { keys, useCardProposals, useDecideProposal, useDecideProposals } from "@agenteschat/client";
 import { formatTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { undoesMemoryChange } from "@agenteschat/client/lib/permissions";
+import { can, undoesMemoryChange } from "@agenteschat/client/lib/permissions";
 import {
   appLabel,
   cardHead,
@@ -21,7 +21,19 @@ import {
 import { sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
 import { secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
 import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
-import { Button, Chip, Diff, diffLines, Field, Icon, Input, MessageText, Switch, Textarea } from "@agenteschat/ui";
+import {
+  Button,
+  Chip,
+  CodeInput,
+  Diff,
+  diffLines,
+  Field,
+  Icon,
+  Input,
+  MessageText,
+  Switch,
+  Textarea,
+} from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useRef, useState } from "react";
@@ -37,6 +49,7 @@ import { useOpenAgentPanel } from "./agent-panel-context";
 import { SiteIcon } from "./browser/SiteIcon";
 import { useOrg } from "./org-context";
 import { RequestCard, RequestDone, RequestTile, useExpired } from "./RequestCard";
+import { savesToVault, VaultSaveBlock, type VaultSaveChoice, vaultSaveDefaults } from "./vault/VaultSave";
 import "./proposals.css";
 
 /** The host of a site the request names (`https://host`), or null. */
@@ -691,11 +704,17 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
   const dir = useDirectory(org.id);
   const live = useLiveStore();
   const current = useLive((s) => s.secrets[request.id]) ?? request;
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // "Save to the Vault" (ADR 0135): a site's password or a variable, saved after it went to the computer.
+  const [keep, setKeep] = useState<VaultSaveChoice>(() => vaultSaveDefaults(request));
+  const [savedToVault, setSavedToVault] = useState(false);
+  const codeDigits = current.codeDigits ?? null;
   const agent = dir.anyAgent(request.agentId);
   const agentName = agent?.name ?? t("channel.unknownAgent");
   const mine = current.requestedForUserId === me.user.id;
@@ -707,17 +726,42 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     const status = (err as { status?: number }).status;
     setError(status === 409 ? t("secret.alreadyAnswered") : t("secret.failed"));
   };
+  const store = useMutation({
+    meta: { silent: true },
+    mutationFn: async ({ text, choice }: { text: string; choice: VaultSaveChoice }) => {
+      if (!api.secrets.saveToVault) throw new Error("unavailable");
+      return api.secrets.saveToVault(org.id, current.id, {
+        value: text,
+        username: current.target.kind === "site" ? choice.username.trim() || undefined : undefined,
+        scope: choice.scope,
+        allAgents: choice.allAgents,
+        agentIds: choice.allAgents ? [] : choice.agentIds,
+      });
+    },
+    onSuccess: () => {
+      setSavedToVault(true);
+      void qc.invalidateQueries({ queryKey: ["org", org.id, "vault"] });
+    },
+  });
+  // Delivered but not saved: the value went where it was asked, so the toast says only the Vault failed, and retries.
+  function saveToVault(vars: { text: string; choice: VaultSaveChoice }) {
+    store.mutate(vars, {
+      onError: () =>
+        toast.show(t("vault.card.notSaved"), "warning", { label: t("common.retry"), run: () => saveToVault(vars) }),
+    });
+  }
   const deliver = useMutation({
     meta: { silent: true },
-    mutationFn: async (text: string) => {
+    mutationFn: async ({ text }: { text: string; choice: VaultSaveChoice | null }) => {
       if (!current.publicKey) throw Object.assign(new Error("closed"), { status: 409 });
       const aad = secretAad({ requestId: current.id, orgId: org.id, name: current.name, target: current.target });
       return api.secrets.deliver(org.id, current.id, await sealSecret(current.publicKey, text, aad));
     },
     onMutate: () => setError(null),
-    onSuccess: (res) => {
+    onSuccess: (res, { text, choice }) => {
       setValue("");
       live.secretAnswered(res);
+      if (choice) saveToVault({ text, choice });
     },
     onError: failed,
   });
@@ -728,10 +772,12 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     onSuccess: (res) => live.secretAnswered(res),
     onError: failed,
   });
+  const savable = mine && savesToVault(current);
   const submit = () => {
     const problem = secretValueProblem(value);
     if (problem) return setError(t(problem));
-    deliver.mutate(value);
+    if (codeDigits && value.length !== codeDigits) return setError(t("vault.card.codeShort", { count: codeDigits }));
+    deliver.mutate({ text: value, choice: savable && keep.on ? keep : null });
   };
   const where = secretWhere(t, current, agentName);
   const until = t("secret.until", { time: formatTime(i18n.language, current.expiresAt) });
@@ -756,17 +802,30 @@ export function SecretCard({ request }: { request: SecretRequest }) {
           mine ? (
             <>
               <div className="rq__field">
-                <Input
-                  type="password"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={value}
-                  placeholder={t("secret.label", { name: current.name })}
-                  aria-label={t("secret.label", { name: current.name })}
-                  invalid={Boolean(error)}
-                  onChange={(e) => setValue(e.target.value)}
-                  data-1p-ignore
-                />
+                {codeDigits ? (
+                  // A verification code (ADR 0135): one box per digit, typed by the agent's browser, never saved.
+                  <CodeInput
+                    length={codeDigits}
+                    value={value}
+                    onChange={setValue}
+                    label={t("secret.label", { name: current.name })}
+                    boxLabel={(n, total) => t("vault.card.codeBox", { n, total })}
+                    invalid={Boolean(error)}
+                    disabled={deliver.isPending}
+                  />
+                ) : (
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={value}
+                    placeholder={t("secret.label", { name: current.name })}
+                    aria-label={t("secret.label", { name: current.name })}
+                    invalid={Boolean(error)}
+                    onChange={(e) => setValue(e.target.value)}
+                    data-1p-ignore
+                  />
+                )}
               </div>
               {error ? (
                 <p className="rq__error" role="alert">
@@ -775,8 +834,19 @@ export function SecretCard({ request }: { request: SecretRequest }) {
               ) : (
                 <p className="rq__note ac-iconline">
                   <Icon name="lock" size={14} />
-                  <span>{t("secret.private")}</span>
+                  <span>
+                    {codeDigits && host ? t("vault.card.codeWhere", { agent: agentName, host }) : t("secret.private")}
+                  </span>
                 </p>
+              )}
+              {savable && (
+                <VaultSaveBlock
+                  request={current}
+                  value={keep}
+                  onChange={setKeep}
+                  canManageTeam={can(org, "manage_credentials")}
+                  disabled={deliver.isPending}
+                />
               )}
             </>
           ) : undefined
@@ -822,6 +892,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       >
         {secretOutcome(t, current, mine, person)}: <b>{current.name}</b>
         {ended && ` · ${whenAt(t, i18n.language, ended)}`}
+        {savedToVault && ` · ${t("vault.card.saved")}`}
       </RequestDone>
       {error && (
         <p className="rq__error" role="alert">

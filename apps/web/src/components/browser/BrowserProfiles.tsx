@@ -10,64 +10,20 @@ import {
   DialogBody,
   DialogFooter,
   Field,
-  Icon,
   Input,
   Menu,
   MenuItem,
   SettingNote,
-  Switch,
 } from "@agenteschat/ui";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { AgentAvatar, AgentWho } from "../AgentAvatar";
+import { AgentSwitches } from "../AgentSwitches";
 import { useOrg } from "../org-context";
 import { BrowserCard } from "./BrowserCard";
 import "./browser.css";
-
-/** Which agents may use a profile: the workspace's agents, each on or off, "Todos os agentes" on top. */
-function AgentSwitches({ value, onChange }: { value: string[]; onChange: (ids: string[]) => void }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const dir = useDirectory(org.id);
-  const agents = dir.agents;
-  const all = agents.length > 0 && agents.every((a) => value.includes(a.id));
-  return (
-    <div>
-      {agents.length > 1 && (
-        <div className="cflow-agent cflow-agent--all">
-          <span className="cflow-agent__all-icon" aria-hidden="true">
-            <Icon name="members" size={16} />
-          </span>
-          <span className="cflow-agent__name">
-            <span>{t("browser.profiles.everyone")}</span>
-          </span>
-          <Switch
-            checked={all}
-            aria-label={t("browser.profiles.everyone")}
-            onCheckedChange={(on) => onChange(on ? agents.map((a) => a.id) : [])}
-          />
-        </div>
-      )}
-      <ul className="cflow-agents">
-        {agents.map((a) => (
-          <li key={a.id} className="cflow-agent">
-            <AgentAvatar agentId={a.id} name={a.name} size="sm" />
-            <span className="cflow-agent__name">
-              <span>{a.name}</span>
-            </span>
-            <Switch
-              checked={value.includes(a.id)}
-              aria-label={a.name}
-              onCheckedChange={(on) => onChange(on ? [...value, a.id] : value.filter((id) => id !== a.id))}
-            />
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 const errorCode = (err: unknown) => (err as { code?: string } | null)?.code;
 

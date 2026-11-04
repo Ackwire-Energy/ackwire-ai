@@ -12,6 +12,7 @@ export type SettingsSection =
   | "general"
   | "members"
   | "roles"
+  | "vault"
   | "audit"
   | "access"
   | "connectors"
@@ -45,6 +46,8 @@ export const SETTINGS_SECTIONS: {
   { id: "general", icon: "settings", group: "org", allowed: (o) => can(o, "configure") },
   { id: "members", icon: "members", group: "org", allowed: () => true },
   { id: "roles", icon: "audiencePeople", group: "org", allowed: (o) => can(o, "manage_roles") },
+  // Every member keeps their own logins, keys and contacts there; team items show to who they're shared with (ADR 0135).
+  { id: "vault", icon: "lock", group: "org", allowed: () => true },
   // What agents did and people changed: only for who may see it (it shows everyone's work).
   { id: "audit", icon: "shield", group: "org", allowed: (o) => can(o, "view_audit") },
   // GIFs and stickers in chat (ADR 0091): who configures the workspace.

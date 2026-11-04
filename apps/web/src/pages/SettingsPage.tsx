@@ -83,6 +83,7 @@ import { RolesSection } from "@/components/roles/RolesSection";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
 import { VoiceSettingsSection } from "@/components/VoiceSettings";
+import { VaultSection } from "@/components/vault/VaultSection";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useCentreCurrent } from "@/hooks/useCentreCurrent";
 import { useOpenParam } from "@/lib/open-param";
@@ -173,7 +174,7 @@ export function SettingsPage({
         </div>
       </nav>
       <div className="settings__body">
-        {current !== "members" && current !== "general" && current !== "roles" && (
+        {current !== "members" && current !== "general" && current !== "roles" && current !== "vault" && (
           <header className="page__header">
             <h2 className="page-title">{t(`settings.section.${current}`)}</h2>
             {current !== "computers" ? (
@@ -196,6 +197,7 @@ export function SettingsPage({
         {current === "general" && <GeneralSection />}
         {current === "members" && <MembersPage embedded />}
         {current === "roles" && <RolesSection />}
+        {current === "vault" && <VaultSection />}
         {current === "audit" && <AuditSection />}
         {current === "media" && <MediaSettingsSection />}
         {current === "voice" && <VoiceSettingsSection />}
