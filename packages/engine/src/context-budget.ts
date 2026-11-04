@@ -8,8 +8,17 @@ import {
   type ToolSpec,
   textOf,
 } from "@agenteschat/providers";
-import { cutText } from "./format";
+import { REQUEST_APPROVAL_TOOL } from "./approval-requests";
+import { ASK_CHOICES_TOOL, SHOW_BLOCK_TOOL, START_POLL_TOOL } from "./blocks";
+import { ASK_PERSON_TOOL, DESKTOP_ASK_PERSON_TOOL } from "./browser/handoff";
+import { ASK_AGENT_TOOL } from "./consultations";
+import { EXPAND_TOOL } from "./context/tools";
+import { cutText, cutTextEnd } from "./format";
 import type { Judge } from "./judge";
+import { ASK_USER_TOOL } from "./questions";
+import { REQUEST_SECRET_TOOL } from "./secrets";
+import { LOAD_SKILL_TOOL } from "./skill-tools";
+import { REQUEST_PERMISSION_TOOL } from "./tools/permission";
 
 /**
  * Context budget of a run: before each model call the request's size is
@@ -169,8 +178,15 @@ export function pickRemovals(
   return picked;
 }
 
-/** The messages with those tool results replaced by the placeholder (untouched messages are the same objects). */
-export function compactToolResults(messages: ModelMessage[], toolUseIds: Set<string>): ModelMessage[] {
+/**
+ * The messages with those tool results replaced by the placeholder (untouched messages are the same objects). A result
+ * in `keepText` (one the view shows cut, `cutResultIds`) loses only its images: `expand` reopens its text whole.
+ */
+export function compactToolResults(
+  messages: ModelMessage[],
+  toolUseIds: Set<string>,
+  keepText: Set<string> = new Set(),
+): ModelMessage[] {
   return messages.map((m) => {
     if (
       typeof m.content === "string" ||
@@ -182,9 +198,105 @@ export function compactToolResults(messages: ModelMessage[], toolUseIds: Set<str
       content: m.content.map((b) => {
         if (b.type !== "tool_result" || !toolUseIds.has(b.toolUseId)) return b;
         const { images: _images, ...rest } = b;
-        return { ...rest, content: removedPlaceholder(resultChars(b)) };
+        return keepText.has(b.toolUseId) ? rest : { ...rest, content: removedPlaceholder(resultChars(b)) };
       }),
     };
+  });
+}
+
+/** Tool steps (an assistant message with calls, and their results) at the end of a run that always read whole. */
+export const KEEP_TOOL_STEPS = 4;
+/** The cut moves this many steps at a time: the history a model already cached changes once per move, not per step. */
+const TOOL_STEP_ANCHOR = 4;
+/** An older result longer than this reads as its start and end, with the id `expand` reopens it by. */
+export const LONG_OLD_RESULT = 1500;
+const OLD_RESULT_HEAD = 500;
+/** An envelope's closing marker (`untrustedBlock`) stays. */
+const OLD_RESULT_TAIL = 100;
+/** An older call whose arguments are longer than this has its long strings cut. */
+export const LONG_OLD_INPUT = 1500;
+const LONG_INPUT_STRING = 300;
+const INPUT_STRING_HEAD = 200;
+
+/** Where a person's decision or answer, another agent's answer, or a skill's instructions come back: read whole. */
+const keptWhole = (name: string) =>
+  [
+    ASK_USER_TOOL,
+    ASK_PERSON_TOOL,
+    DESKTOP_ASK_PERSON_TOOL,
+    ASK_AGENT_TOOL,
+    LOAD_SKILL_TOOL,
+    ASK_CHOICES_TOOL,
+    SHOW_BLOCK_TOOL,
+    START_POLL_TOOL,
+    REQUEST_APPROVAL_TOOL,
+    REQUEST_PERMISSION_TOOL,
+    REQUEST_SECRET_TOOL,
+  ].includes(name);
+
+const cutStrings = (value: unknown, id: string): unknown =>
+  typeof value === "string"
+    ? value.length <= LONG_INPUT_STRING
+      ? value
+      : `${cutText(value, INPUT_STRING_HEAD)}[… cut: ${value.length - INPUT_STRING_HEAD} more characters; expand ${id} reopens the call]`
+    : Array.isArray(value)
+      ? value.map((v) => cutStrings(v, id))
+      : value && typeof value === "object"
+        ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, cutStrings(v, id)]))
+        : value;
+
+const reopensWhole = (id: string) => `expand ${id} reopens it whole]`;
+
+/** The tool results `view` (`cutOldToolSteps`) shows cut. */
+export const cutResultIds = (view: ModelMessage[]) =>
+  new Set(
+    view.flatMap((m) =>
+      typeof m.content === "string"
+        ? []
+        : m.content.flatMap((b) =>
+            b.type === "tool_result" && b.content.endsWith(reopensWhole(b.toolUseId)) ? [b.toolUseId] : [],
+          ),
+    ),
+  );
+
+/**
+ * The view of a run's messages a model reads when it can `expand` (`tools`): tool calls and results older than the
+ * last `KEEP_TOOL_STEPS` steps (to `TOOL_STEP_ANCHOR - 1` more) read cut, each with the call's id `expand` reopens
+ * it whole by (`toolCallText`). Never cut: errors, answers and skills (`keptWhole`), short ones, the
+ * text people and the agent wrote, images. A function of the messages alone: the same history gives the same bytes.
+ */
+export function cutOldToolSteps(messages: ModelMessage[], tools: readonly { name: string }[]): ModelMessage[] {
+  if (!tools.some((t) => t.name === EXPAND_TOOL)) return messages;
+  const steps = messages.flatMap((m, i) =>
+    m.role === "assistant" && typeof m.content !== "string" && m.content.some((b) => b.type === "tool_use") ? [i] : [],
+  );
+  const cutSteps = Math.floor(Math.max(0, steps.length - KEEP_TOOL_STEPS) / TOOL_STEP_ANCHOR) * TOOL_STEP_ANCHOR;
+  if (cutSteps === 0) return messages;
+  const end = steps[cutSteps] as number;
+  const calls = new Map<string, { name: string; cut: boolean }>();
+  return messages.map((m, i) => {
+    if (typeof m.content === "string" || (i >= end && m.role === "assistant")) return m;
+    let changed = false;
+    const content = m.content.map((b) => {
+      if (b.type === "tool_use") {
+        const cut = i < end && !keptWhole(b.name);
+        calls.set(b.id, { name: b.name, cut });
+        if (!cut || JSON.stringify(b.input).length <= LONG_OLD_INPUT) return b;
+        changed = true;
+        return { ...b, input: cutStrings(b.input, b.id) as Record<string, unknown> };
+      }
+      if (b.type !== "tool_result") return b;
+      const call = calls.get(b.toolUseId);
+      if (!call?.cut || b.isError || b.content.length <= LONG_OLD_RESULT) return b;
+      changed = true;
+      const cut = b.content.length - OLD_RESULT_HEAD - OLD_RESULT_TAIL;
+      return {
+        ...b,
+        // The note after the end: outside an envelope (`untrustedBlock`), read as ours, not as the data's.
+        content: `${cutText(b.content, OLD_RESULT_HEAD)}\n[…]\n${cutTextEnd(b.content, OLD_RESULT_TAIL)}\n[Cut: ${cut} of this ${call.name} result's ${b.content.length} characters, in the middle; ${reopensWhole(b.toolUseId)}`,
+      };
+    });
+    return changed ? { ...m, content } : m;
   });
 }
 
@@ -330,7 +442,7 @@ export async function fitContextWindow(
     task?: string;
     timeoutMs?: number;
   },
-): Promise<{ messages: ModelMessage[]; report: ContextBudgetReport } | null> {
+): Promise<{ messages: ModelMessage[]; removed: Set<string>; report: ContextBudgetReport } | null> {
   const windowTokens = contextWindowWithin(input.windowTokens ?? contextWindowOf(input.model), input.limitTokens);
   const budgetTokens = contextBudgetTokens(
     windowTokens,
@@ -367,6 +479,7 @@ export async function fitContextWindow(
   const afterTokens = estimateRequestTokens({ ...input, messages });
   return {
     messages,
+    removed,
     report: {
       windowTokens,
       budgetTokens,

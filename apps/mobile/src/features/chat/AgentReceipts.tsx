@@ -3,7 +3,6 @@ import {
   type Message,
   type MessageReceipt,
   receiptView,
-  useModelLabel,
   useReactions,
   useSteerState,
 } from "@agenteschat/client";
@@ -20,7 +19,6 @@ import {
   Icon,
   type IconName,
   InkOrbit,
-  ProviderLogo,
   Row,
   SectionHeader,
   Text,
@@ -31,7 +29,7 @@ import { openConnectAi } from "../ai/NoAiCard";
 import { Note, OpenPage } from "../ai/parts";
 import { QueueWaitRows } from "../queue/parts";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
+import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { useSheet } from "../shared/SheetHost";
 import {
@@ -230,18 +228,17 @@ function Mark({ mark, color }: { mark: ReceiptLine["mark"]; color: string }) {
   return <Icon name={mark} size={14} color={color} />;
 }
 
-/** The web's icon for what a rule follows: the reply, the one person with the agent, the thread, the coordinator. */
-const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> = {
+/** The web's icon for what a rule follows: the reply, the one person with the agent, the thread. */
+const RULE_ICON: Record<Exclude<Extract<DecidedBy, { step: "rule" }>["rule"], "coordinator" | "alone">, IconName> = {
   reply: "replyTo",
   only_agent: "person",
   follow_up: "reply",
-  coordinator: "flag",
   default: "check",
 };
 
 /**
- * "Agentes": each agent the message reached and where it is with it (an agent's reaction is its answer), who picked
- * them, and the line's action. When no agent will answer, or every one it was for passed, it says so and offers "Chamar um agente": a tap puts its
+ * "Agentes": each agent the message reached and where it is with it (an agent's reaction is its answer), the rule
+ * that picked them, and the line's action. When no agent will answer, or every one it was for passed, it says so and offers "Chamar um agente": a tap puts its
  * @handle in the box. When nothing could pick, why, and how agents are picked.
  */
 function ReceiptsSheet({
@@ -258,8 +255,6 @@ function ReceiptsSheet({
   const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const dir = useDirectory();
-  const meId = useMeId();
-  const modelLabel = useModelLabel();
   const sheet = useSheet();
   const reactions = useReactions(orgId, m.id, false).data ?? m.reactions;
   const rows = receiptRows(
@@ -276,12 +271,7 @@ function ReceiptsSheet({
       })
     : [];
   const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
-  const by = deciderOf(t, view, {
-    meId,
-    agent: name,
-    person: (id) => dir.memberById.get(id)?.name ?? t("channel.unknownPerson"),
-    model: modelLabel,
-  });
+  const by = deciderOf(t, view, { agent: name });
   const mentionNeeded = view.status?.kind === "nobody" && view.status.mentionNeeded === true;
   return (
     <>
@@ -296,11 +286,7 @@ function ReceiptsSheet({
           />
         ))}
       </Card>
-      {by ? (
-        <Note icon={"logo" in by.mark ? <ProviderLogo id={by.mark.logo} size="xs" /> : RULE_ICON[by.mark.rule]}>
-          {by.text}
-        </Note>
-      ) : null}
+      {by ? <Note icon={RULE_ICON[by.rule]}>{by.text}</Note> : null}
       {nobody ? (
         <Note icon="checks">
           {view.status?.kind === "passed"

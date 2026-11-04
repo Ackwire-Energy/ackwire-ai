@@ -8,7 +8,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { COMPACT_QUERY, DESKTOP_QUERY } from "@/components/NavDrawer";
 import { TABLET_QUERY } from "@/components/Sidebar";
 import { STORAGE_KEYS } from "@/lib/storage";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState, withRightHand } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 let media: { mockRestore: () => void } | null = null;
@@ -135,7 +135,7 @@ describe("the members column", () => {
     const rows = [...(column() as HTMLElement).querySelectorAll<HTMLElement>(".members-side__row")];
     rows[0]?.focus();
     await act(async () => fireEvent.keyDown(rows[0] as HTMLElement, { key: "ArrowDown" }));
-    expect(document.activeElement).toBe(rows[1] as HTMLElement);
+    expect(document.activeElement === (rows[1] as HTMLElement)).toBe(true);
   });
 
   test("someone offline sits under Offline, drawn quieter", async () => {
@@ -214,7 +214,7 @@ describe("the members column", () => {
 
   test("on a phone: a sheet with the threads, pins and settings buttons, and a field that finds members", async () => {
     widthIs(COMPACT_QUERY);
-    await open();
+    await open(withRightHand(seedState()));
     expect(column()).toBeNull();
     await act(async () => fireEvent.click(toggle()));
     await settle(2);
@@ -224,6 +224,7 @@ describe("the members column", () => {
     expect(within(panel).getByRole("button", { name: "Configurações do canal" })).toBeTruthy();
     expect(within(panel).getByRole("button", { name: "Mensagens fixadas" })).toBeTruthy();
     expect(within(panel).getByRole("button", { name: /^Threads/ })).toBeTruthy();
+    expect(row(panel, "Lodi")).toBeTruthy();
     await act(async () =>
       fireEvent.change(within(panel).getByRole("searchbox", { name: "Buscar pessoas e agentes" }), {
         target: { value: "atl" },
@@ -231,6 +232,8 @@ describe("the members column", () => {
     );
     expect(row(panel, "Ada")).toBeNull();
     expect(row(panel, "Atlas")).toBeTruthy();
+    // The right hand leads the agents only when it matches too.
+    expect(row(panel, "Lodi")).toBeNull();
     // The cog closes the sheet for the channel's details.
     await act(async () => fireEvent.click(within(panel).getByRole("button", { name: "Configurações do canal" })));
     await settle(3);
@@ -292,7 +295,7 @@ describe("the phone's members sheet: a dialog over the channel", () => {
     await settle(1);
     expect(sheet()).toBeNull();
     expect((screen().getByRole("main") as HTMLElement).inert).toBe(false);
-    expect(document.activeElement).toBe(toggle());
+    expect(document.activeElement === toggle()).toBe(true);
   });
 
   test("a swipe to the right closes it; a short one doesn't", async () => {
@@ -419,31 +422,6 @@ describe("answering without a mention, as true for my own messages as who picks 
       line: "Entra na conversa por conta própria",
       option: "Responde quando o assunto pede, sem precisar de @",
     });
-  });
-});
-
-describe("the team's coordinator here (ADR 0093)", () => {
-  test("its chip says it coordinates the team, and its line in the details what that means", async () => {
-    widthIs(DESKTOP_QUERY);
-    const state = seedState();
-    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
-    if (atlas) atlas.coordinator = true;
-    await open(state);
-    const agents = within(column() as HTMLElement).getByRole("region", { name: "Agentes" });
-    const chips = [...agents.querySelectorAll(".members-side__chip")];
-    expect(chips.map((c) => c.textContent).sort()).toEqual(["coordena o time", "responde sem menção"]);
-    await act(async () =>
-      fireEvent.click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" })),
-    );
-    await settle(3);
-    await act(async () =>
-      fireEvent.click(within(screen().getByRole("dialog", { name: /eng/ })).getByRole("button", { name: "Membros" })),
-    );
-    await settle(2);
-    const row = within(screen().getByRole("dialog", { name: /eng/ }))
-      .getByText("Atlas")
-      .closest(".member-row") as HTMLElement;
-    expect(row.querySelector(".small")?.textContent).toBe("Coordena o time: pega o que ninguém pegou");
   });
 });
 

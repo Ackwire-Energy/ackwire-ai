@@ -3,6 +3,7 @@ import { agentStateIn, useAiStatus, useRoles, useRoster } from "@agenteschat/cli
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { memberGroups } from "@agenteschat/client/lib/member-groups";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { picksForMe } from "@agenteschat/client/lib/routing";
 import { Avatar, Button, Icon, matchesWords, RoleMark, SearchField } from "@agenteschat/ui";
 import { type KeyboardEvent, type TouchEvent, useEffect, useId, useRef, useState } from "react";
@@ -15,6 +16,7 @@ import { ProfileTrigger } from "@/components/ProfileCard";
 import { unshownRow } from "@/components/Sidebar";
 import { AgentTrail, colorOf } from "@/components/Sky";
 import { ChannelThreadsButton } from "@/components/threads/ThreadLines";
+import { useDirectory } from "@/hooks/useDirectory";
 import { useModalSheet } from "@/hooks/useModalSheet";
 import { agentLine, personLine, useAgentPresence, usePersonPresence, usePresences } from "@/hooks/usePresence";
 import { useStreams } from "@/realtime/context";
@@ -31,6 +33,8 @@ interface Lists {
   agents: Agent[];
   /** Who manages the channel: "Adicionar pessoa ou agente" at the bottom, the channel details' add flow. */
   onAdd?: () => void;
+  /** The search the lists were filtered by, which the right hand must match too to be shown. */
+  matches?: (name: string, handle: string) => boolean;
 }
 
 /** The channel's members on the right, as Discord's: grouped by the owner, hoisted roles, agents, online, offline. */
@@ -134,6 +138,7 @@ export function MembersSheet({
             channelId={channel.id}
             people={lists.people.filter((m) => matches(m.name, m.handle))}
             agents={lists.agents.filter((a) => matches(a.name, a.handle))}
+            matches={matches}
             {...(lists.onAdd ? { onAdd: lists.onAdd } : {})}
           />
         </div>
@@ -142,9 +147,18 @@ export function MembersSheet({
   );
 }
 
-function MembersList({ channelId, people, agents, onAdd }: Lists) {
+function MembersList({ channelId, people, agents: members, onAdd, matches }: Lists) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
+  // The right hand (ADR 0137) is in no channel, yet an @mention reaches it anywhere: it leads the agents.
+  const rightHand = useDirectory(org.id).agents.find(isRightHand);
+  const agents =
+    rightHand &&
+    rightHand.canTalk !== false &&
+    !members.some(isRightHand) &&
+    (!matches || matches(rightHand.name, rightHand.handle))
+      ? [rightHand, ...members]
+      : members;
   const presences = usePresences();
   const roles = useRoles(org.id).data?.roles ?? [];
   const roster = useRoster(org.id, channelId);
@@ -303,7 +317,11 @@ function AgentRow({
   const word = shown ? t(`presence.${shown.presence}`) : null;
   const line = agentLine(t, shown?.line ?? null, i18n.language);
   const doing = state !== "idle" ? t(`channel.agentState.${state}`) : null;
-  const text = line?.text ?? doing ?? agent.role ?? word;
+  const text =
+    line?.text ??
+    doing ??
+    (isRightHand(agent) ? t("rightHand.callWith", { handle: agent.handle }) : agent.role) ??
+    word;
   const shows = useId();
   return (
     <ProfileTrigger
@@ -332,11 +350,7 @@ function AgentRow({
         <span className="members-side__text">
           <span className="members-side__name">
             <span className="members-side__label">{agent.name}</span>
-            {autoReply && (
-              <span className="members-side__chip">
-                {t(agent.coordinator ? "channel.coordinatorChip" : "channel.autoReplyChip")}
-              </span>
-            )}
+            {autoReply && <span className="members-side__chip">{t("channel.autoReplyChip")}</span>}
           </span>
           {text &&
             (line ? (

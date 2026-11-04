@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   CHROME_MAX_SCALE,
+  countBadge,
   leadBox,
   readingMiddle,
   type TypeStyle,
@@ -103,4 +104,23 @@ test("a line's lead, an icon or a maker's mark in its place, centers on the firs
   }
   // Taller than the line: from its top, the box as tall as the lead.
   expect(leadBox(line, 28)).toEqual({ paddingTop: 0, height: 28 });
+});
+
+describe("count badge", () => {
+  test("the number's line is the pill's height, centred both ways, Android's font padding off, even sides", () => {
+    for (const size of [10, 12, 14]) {
+      const { box, text } = countBadge(size);
+      expect(text.lineHeight).toBe(box.minHeight);
+      expect(box.minWidth).toBe(box.minHeight);
+      expect([box.alignItems, box.justifyContent, text.textAlign, text.textAlignVertical]).toEqual([
+        "center",
+        "center",
+        "center",
+        "center",
+      ]);
+      expect(text.includeFontPadding).toBe(false);
+      expect(box).not.toHaveProperty("paddingLeft");
+      expect(box).not.toHaveProperty("paddingTop");
+    }
+  });
 });

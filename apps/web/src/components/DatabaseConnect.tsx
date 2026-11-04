@@ -5,18 +5,21 @@ import type {
   DatabasePolicy,
   DatabaseProvider,
 } from "@agenteschat/client";
-import { keys, useAgentDatabases, useAgents, useDatabaseAction } from "@agenteschat/client";
+import { keys, useAgentDatabases, useAgents, useDatabaseAction, useServerDatabases } from "@agenteschat/client";
 import type { Level } from "@agenteschat/client/lib/access-levels";
 import {
+  activeGrantCount,
   DATABASE_PROVIDER_URLS,
   DATABASE_PROVIDERS,
   databaseErrorOf,
+  databaseNameOf,
   databaseOffActions,
   databaseReviewTools,
   defaultDatabasePolicy,
   isDatabaseUrl,
   POSTGRES_MARK,
   readOnlyRoleSql,
+  widensDatabaseScope,
 } from "@agenteschat/client/lib/databases";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import {
@@ -142,7 +145,15 @@ export function DatabaseConnectFlow({
 }
 
 /** "Como criar um usuário só de leitura?": where the address is, three steps, the SQL to paste and the provider's page. */
-export function ReadOnlyUserHelp({ provider, database }: { provider: DatabaseProvider; database: string }) {
+export function ReadOnlyUserHelp({
+  provider,
+  database,
+  wholeServer,
+}: {
+  provider: DatabaseProvider;
+  database: string;
+  wholeServer?: boolean;
+}) {
   const { t } = useTranslation();
   const url = DATABASE_PROVIDER_URLS[provider];
   return (
@@ -154,7 +165,8 @@ export function ReadOnlyUserHelp({ provider, database }: { provider: DatabasePro
           <li key={n}>{t(`database.how.${provider}.${n}`)}</li>
         ))}
       </ol>
-      <CommandBlock command={readOnlyRoleSql(database || "postgres")} />
+      <CommandBlock command={readOnlyRoleSql(database || "postgres", { wholeServer })} />
+      {wholeServer && <span className="small muted">{t("database.howAll")}</span>}
       {url && (
         <a className="ac-link small mail-howto__link" href={url} target="_blank" rel="noreferrer noopener">
           <Icon name="external" size={14} />
@@ -190,18 +202,22 @@ function ConnectStep({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [sslmode, setSslmode] = useState<"require" | "disable">("require");
+  /** "Quais bancos"; null = follows whether a database name was given. */
+  const [scope, setScope] = useState<"one" | "all" | null>(null);
+  const [prefix, setPrefix] = useState("");
   const [advanced, setAdvanced] = useState(false);
   const [touched, setTouched] = useState(false);
   const [error, setError] = useState<DatabaseConnectError | null>(null);
+  const fields = host.trim() !== "" && username.trim() !== "" && password !== "";
+  const urlError = touched && !fields && !isDatabaseUrl(url) ? t("database.urlInvalid") : undefined;
+  const dbName = database.trim() || databaseNameOf(url);
+  const whole = (scope ?? (dbName ? "one" : "all")) === "all";
   const testing = useStepText(connect.isPending, [
     t("database.testing.reach"),
+    ...(whole ? [t("database.testing.databases")] : []),
     t("database.testing.tables"),
     t("connectFlow.almost"),
   ]);
-  const fields = host.trim() !== "" && username.trim() !== "" && password !== "";
-  const urlError = touched && !fields && !isDatabaseUrl(url) ? t("database.urlInvalid") : undefined;
-  const dbName =
-    database.trim() || (/\/([^/?]+)(\?|$)/.exec(url.trim().replace(/^postgres(ql)?:\/\/[^/]+/, ""))?.[1] ?? "");
 
   const submit = () => {
     setTouched(true);
@@ -219,10 +235,15 @@ function ConnectStep({
         ...(username.trim() ? { username: username.trim() } : {}),
         ...(password ? { password } : {}),
         ...(sslmode === "disable" ? { sslmode } : {}),
+        ...(whole ? { wholeServer: true, ...(prefix.trim() ? { databasePrefix: prefix.trim() } : {}) } : {}),
       },
       {
         onSuccess: (connection) => {
-          toast.show(t("database.connectedToast", { name: connection.label }));
+          toast.show(
+            connection.wholeServer && connection.databaseCount !== null
+              ? t("database.connectedToastAll", { name: connection.label, count: connection.databaseCount })
+              : t("database.connectedToast", { name: connection.label }),
+          );
           onConnected(connection);
         },
         onError: (e) => setError(databaseErrorOf(e)),
@@ -264,7 +285,16 @@ function ConnectStep({
             }}
           />
         </Field>
-        <ReadOnlyUserHelp provider={provider} database={dbName} />
+        <ScopeFields
+          whole={whole}
+          prefix={prefix}
+          onScope={(v) => {
+            setScope(v);
+            setError(null);
+          }}
+          onPrefix={setPrefix}
+        />
+        <ReadOnlyUserHelp provider={provider} database={dbName} wholeServer={whole} />
         <p className="small muted mail-hint">
           <Icon name="info" size={14} />
           <span>{t("database.dedicated")}</span>
@@ -285,7 +315,11 @@ function ConnectStep({
                 <Input inputMode="numeric" value={port} onChange={(e) => setPort(e.target.value)} />
               </Field>
             </div>
-            <Field label={t("database.database")} id="db-database">
+            <Field
+              label={t("database.database")}
+              id="db-database"
+              help={whole ? t("database.databaseOptional") : undefined}
+            >
               <Input autoComplete="off" value={database} onChange={(e) => setDatabase(e.target.value)} />
             </Field>
             <Field label={t("mail.username")} id="db-username">
@@ -328,6 +362,51 @@ function ConnectStep({
         </Button>
       </DialogFooter>
     </form>
+  );
+}
+
+/** "Quais bancos" and, for every database, "Só os que começam com". */
+function ScopeFields({
+  whole,
+  prefix,
+  onScope,
+  onPrefix,
+}: {
+  whole: boolean;
+  prefix: string;
+  onScope: (scope: "one" | "all") => void;
+  onPrefix: (prefix: string) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className="ac-field">
+        <span className="ac-field__label">{t("database.scope")}</span>
+        <Segmented
+          size="sm"
+          label={t("database.scope")}
+          value={whole ? "all" : "one"}
+          onValueChange={onScope}
+          options={[
+            { value: "one", label: t("database.scopeOne") },
+            { value: "all", label: t("database.scopeAll") },
+          ]}
+        />
+        {whole && <span className="ac-field__help">{t("database.scopeAllHelp")}</span>}
+      </div>
+      {whole && (
+        <Field label={t("database.prefix")} id="db-prefix" help={t("database.prefixHelp")}>
+          <Input
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={63}
+            value={prefix}
+            placeholder={t("database.prefixPlaceholder")}
+            onChange={(e) => onPrefix(e.target.value)}
+          />
+        </Field>
+      )}
+    </>
   );
 }
 
@@ -608,7 +687,7 @@ function AgentRules({
         <b>{agent.name}</b>
       </span>
       <DatabaseRulesPanel
-        connectionId={connection.id}
+        connection={connection}
         policy={shown}
         onChange={(next) => {
           setCopied(null);
@@ -681,6 +760,7 @@ export function DatabaseRow({
   onTools,
   onWho,
   onReconnect,
+  onScope,
   onDisconnect,
 }: {
   connection: DatabaseConnection;
@@ -689,15 +769,26 @@ export function DatabaseRow({
   onTools: () => void;
   onWho: () => void;
   onReconnect: () => void;
+  onScope: () => void;
   onDisconnect: () => void;
 }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const servers = useServerDatabases(org.id, connection.id, connection.wholeServer);
   const using = agents.filter((a) => connection.agents.some((x) => x.agentId === a.id));
   const name = connection.label;
-  const meta = [
-    t("connectors.connectedAs", { account: `${connection.username}@${connection.host}/${connection.database}` }),
-    relativeTime(t, i18n.language, connection.createdAt),
-  ];
+  const count = servers.data?.length ?? connection.databaseCount;
+  const meta = connection.wholeServer
+    ? [
+        t("connectors.connectedAs", { account: `${connection.username}@${connection.host}` }),
+        ...(count !== null ? [t("database.count", { count })] : []),
+        ...(connection.databasePrefix ? [t("database.prefixRow", { prefix: connection.databasePrefix })] : []),
+        relativeTime(t, i18n.language, connection.createdAt),
+      ]
+    : [
+        t("connectors.connectedAs", { account: `${connection.username}@${connection.host}/${connection.database}` }),
+        relativeTime(t, i18n.language, connection.createdAt),
+      ];
   return (
     <div className="ac-list__row connected-row">
       <DatabaseIcon size="lg" />
@@ -738,8 +829,23 @@ export function DatabaseRow({
               {t("mail.reconnect")}
             </Button>
           )}
+          {connection.wholeServer && (
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={t("database.refreshName", { name })}
+              disabled={servers.refresh.isPending}
+              loading={servers.refresh.isPending}
+              onClick={() => servers.refresh.mutate()}
+            >
+              {t("database.refresh")}
+            </Button>
+          )}
           <Button size="sm" aria-label={t("connectors.whoName", { name })} onClick={onWho}>
             {t("connectors.who")}
+          </Button>
+          <Button size="sm" variant="ghost" aria-label={t("database.scopeEditName", { name })} onClick={onScope}>
+            {t("database.scopeEdit")}
           </Button>
           <Button size="sm" variant="ghost" aria-label={t("connectors.toolsName", { name })} onClick={onTools}>
             {t("connectors.tools")}
@@ -755,6 +861,123 @@ export function DatabaseRow({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * "Quais bancos" of a connected database (tested first, like a reconnect). Letting agents that already read it
+ * see more databases asks once, in place: "Abrir o servidor inteiro?".
+ */
+export function DatabaseScopeDialog({
+  connection,
+  onClose,
+}: {
+  connection: DatabaseConnection | null;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const { update } = useDatabaseAction(org.id);
+  const [scope, setScope] = useState<"one" | "all" | null>(null);
+  const [prefix, setPrefix] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<DatabaseConnectError | null>(null);
+  const whole = (scope ?? (connection?.wholeServer ? "all" : "one")) === "all";
+  const nextPrefix = (prefix ?? connection?.databasePrefix ?? "").trim();
+  const name = connection?.label ?? "";
+  const using = activeGrantCount(connection, useAgents(org.id).data);
+  const close = () => {
+    setScope(null);
+    setPrefix(null);
+    setConfirming(false);
+    setError(null);
+    onClose();
+  };
+  const save = () => {
+    if (!connection) return;
+    setConfirming(false);
+    setError(null);
+    if (whole === connection.wholeServer && (!whole || nextPrefix === (connection.databasePrefix ?? "")))
+      return close();
+    update.mutate(
+      { connectionId: connection.id, wholeServer: whole, ...(whole ? { databasePrefix: nextPrefix } : {}) },
+      {
+        onSuccess: (saved) => {
+          toast.show(
+            saved.wholeServer && saved.databaseCount !== null
+              ? t("database.connectedToastAll", { name: saved.label, count: saved.databaseCount })
+              : t("database.scopeSaved", { name: saved.label }),
+          );
+          close();
+        },
+        onError: (e) => setError(databaseErrorOf(e)),
+      },
+    );
+  };
+  const submit = () =>
+    connection && using > 0 && widensDatabaseScope(connection, { wholeServer: whole, databasePrefix: nextPrefix })
+      ? setConfirming(true)
+      : save();
+  return (
+    <Dialog
+      open={connection !== null}
+      onOpenChange={(o) => !o && close()}
+      title={
+        confirming
+          ? nextPrefix
+            ? t("database.widenTitlePrefix")
+            : t("database.widenTitle")
+          : t("database.scopeEditName", { name })
+      }
+      description={
+        confirming
+          ? nextPrefix
+            ? t("database.widenTextPrefix", { count: using, prefix: nextPrefix })
+            : t("database.widenText", { count: using })
+          : undefined
+      }
+      closeLabel={t("common.close")}
+      width={confirming ? 440 : 520}
+    >
+      {confirming ? (
+        <DialogFooter>
+          <Button onClick={() => setConfirming(false)}>{t("common.cancel")}</Button>
+          <Button variant="primary" onClick={save}>
+            {t("common.continue")}
+          </Button>
+        </DialogFooter>
+      ) : (
+        <form
+          style={{ display: "contents" }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
+          <DialogBody className="cflow__body">
+            <ScopeFields
+              whole={whole}
+              prefix={prefix ?? connection?.databasePrefix ?? ""}
+              onScope={(v) => {
+                setScope(v);
+                setError(null);
+              }}
+              onPrefix={setPrefix}
+            />
+            {error && <Alert>{t(`database.error.${error}`)}</Alert>}
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" onClick={close}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" variant="primary" disabled={update.isPending} loading={update.isPending}>
+              {t("common.save")}
+            </Button>
+          </DialogFooter>
+        </form>
+      )}
+    </Dialog>
   );
 }
 
@@ -852,7 +1075,7 @@ export function DatabaseDisconnectDialog({
   const toast = useToast();
   const { disconnect } = useDatabaseAction(org.id);
   const name = connection?.label ?? "";
-  const using = connection?.agents.length ?? 0;
+  const using = activeGrantCount(connection, useAgents(org.id).data);
   return (
     <Dialog
       open={connection !== null}

@@ -47,7 +47,14 @@ afterEach(async () => {
   await current?.close();
 });
 
-const NONE: OrgLimits = { members: null, storageBytes: null, uploadBytesPerDay: null, platformUsdPerMonth: null };
+const NONE: OrgLimits = {
+  members: null,
+  membersMax: null,
+  payerUserId: null,
+  storageBytes: null,
+  uploadBytesPerDay: null,
+  platformUsdPerMonth: null,
+};
 const limit = (over: Partial<OrgLimits>) => setOrgLimits(f.db, f.org.id, { ...NONE, ...over });
 const owner = () => ({ type: "person" as const, userId: f.owner.id });
 const upload = (bytes: number, name = "notes.txt") =>
@@ -80,12 +87,16 @@ describe("limits", () => {
     expect(await getOrgLimits(f.db, f.org.id)).toEqual({ ...NONE, updatedAt: null });
     const set = await limit({
       members: 10,
+      membersMax: 15,
+      payerUserId: "user_payer",
       storageBytes: 50 * 1024 ** 3,
       uploadBytesPerDay: 1024,
       platformUsdPerMonth: 3.5,
     });
     expect(set).toEqual({
       members: 10,
+      membersMax: 15,
+      payerUserId: "user_payer",
       storageBytes: 50 * 1024 ** 3,
       uploadBytesPerDay: 1024,
       platformUsdPerMonth: 3.5,
@@ -102,6 +113,8 @@ describe("limits", () => {
       .where(eq(schema.organizations.id, f.org.id));
     const again = await limit({
       members: 10,
+      membersMax: 15,
+      payerUserId: "user_payer",
       storageBytes: 50 * 1024 ** 3,
       uploadBytesPerDay: 1024,
       platformUsdPerMonth: 3.5,

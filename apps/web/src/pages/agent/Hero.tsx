@@ -7,10 +7,10 @@ import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { usd } from "@/components/AgentFields";
-import { CoordinatorChip } from "@/components/CoordinatorChip";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { AgentCover } from "@/components/Sky";
+import { UsageQueueChip } from "@/components/UsageQueue";
 import { thisMonth } from "@/lib/agent-edit";
 import { planMeterText, usageShown } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
@@ -234,7 +234,7 @@ export function AgentHero({
             {(draft.role.trim() || agent.role) && ` · ${draft.role.trim() || agent.role}`}
           </span>
           <NoAiChip agentId={agent.id} />
-          <CoordinatorChip agent={agent} />
+          <UsageQueueChip agentId={agent.id} />
         </div>
         {/* Narrow (the panel beside its DM, small screens): how it works stays up here, on every tab. Wide, it
             is the overview's side column (OverviewTab). In the panel the numbers stay on the full page. */}

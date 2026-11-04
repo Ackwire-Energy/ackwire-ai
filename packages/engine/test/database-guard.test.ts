@@ -223,3 +223,34 @@ test("proven read-only (Aprovar sempre leituras): SELECTs and EXPLAINs calling o
   for (const [sql] of cases) got.push([sql, await provenReadOnly(sql)]);
   expect(got).toEqual(cases);
 });
+
+test("a database name in a table is refused; a whole server also hides other databases and their sessions", async () => {
+  expect(await reason("select * from app.public.orders")).toBe("Name tables as schema.table, without a database name.");
+  const whole = async (sql: string) => {
+    const r = await guardSql(sql, open, { wholeServer: true });
+    return r.ok ? null : r.reason;
+  };
+  expect(await whole("select * from cliente_b.public.orders")).toContain("pass the database in `database`");
+  for (const sql of [
+    "select query from pg_stat_activity",
+    "select datname from pg_catalog.pg_database",
+    "select datname from pg_stat_database",
+    "select query from public.pg_stat_statements",
+    "select * from pg_stat_get_activity(null)",
+    "select pg_stat_get_backend_activity(s) from pg_stat_get_backend_idset() s",
+    "select pg_database_size('cliente_z')",
+  ]) {
+    expect(await whole(sql)).toContain("not allowed");
+    expect(await reason(sql)).toBeNull();
+  }
+  expect(await whole("select count(*) from orders")).toBeNull();
+});
+
+test("an agent's databases: exact names, deduplicated, none = every one", () => {
+  const base = { tables: [], hiddenColumns: [], dailyQueryCap: null, timeoutSeconds: 15 };
+  expect(
+    normalizeDatabasePolicy({ ...base, databases: [" cliente_a", "cliente_a", "Cliente_B", ""] }).databases,
+  ).toEqual(["cliente_a", "Cliente_B"]);
+  expect(normalizeDatabasePolicy({ ...base, databases: [] })).toEqual(base);
+  expect(() => normalizeDatabasePolicy({ ...base, databases: ["x".repeat(64)] })).toThrow("63");
+});

@@ -16,6 +16,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { can, requireActiveMembership, requirePermission } from "./organizations";
 import { maySql } from "./permissions";
+import { isRightHand, rightHandPermanent } from "./right-hand";
 
 const { machines, agents, users, organizationMembers } = schema;
 
@@ -640,6 +641,7 @@ export async function setAgentComputerTarget(
   const membership = await requirePermission(deps.db, actorId, orgId, "read");
   const agent = await getAgent(deps.db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
+  if (machineId && isRightHand(agent)) throw rightHandPermanent("given a computer");
   const admin = can(membership, "manage_agents");
   const machine = machineId ? await getMachine(deps.db, orgId, machineId) : null;
   if (machineId && !machine) throw new NotFoundError("Computer not found", "machine.not_found");

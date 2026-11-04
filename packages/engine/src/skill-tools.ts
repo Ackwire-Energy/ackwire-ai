@@ -57,6 +57,8 @@ const failed = (error: unknown): ToolOutput => ({
   isError: true,
 });
 
+export const LOAD_SKILL_TOOL = "load_skill";
+
 /**
  * Skills through the Tool Gateway (`skills:read`, on by default):
  * `load_skill` returns a skill's instructions and its files, and
@@ -92,7 +94,7 @@ export function createSkillToolSource(
   };
   const tools: ToolDefinition[] = [
     {
-      name: "load_skill",
+      name: LOAD_SKILL_TOOL,
       description:
         "Load one of your skills (from 'Available skills') before doing a task it covers: returns its instructions and the files you can read.",
       scope: "skills:read",
@@ -427,7 +429,7 @@ export function createSkillToolSource(
                     {
                       kind: "skill.updated",
                       target: { type: "skill", id: s.id, title: s.name },
-                      params: { name: s.name },
+                      params: { name: s.name, fromLink: true },
                       before: r.before,
                       after: { version: s.version, body: s.body, description: s.description, metadata: s.metadata },
                     },

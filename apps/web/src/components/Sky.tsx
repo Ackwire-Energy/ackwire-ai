@@ -7,8 +7,6 @@ import {
   agentTones,
   cloudAt,
   cx,
-  drawSprite,
-  EYE,
   HEADER_AREA,
   headerField,
   Icon,
@@ -16,7 +14,6 @@ import {
   Logo,
   mix,
   PixelSky,
-  parseColor,
   pixelBurst,
   pixelOf,
   SKY_TONES,
@@ -617,74 +614,6 @@ export function OnboardingHorizon({ progress }: { progress: number }) {
   };
   return (
     <span className="onb__horizon" aria-hidden="true">
-      <PixelSky options={opts} />
-    </span>
-  );
-}
-
-/** The top of the onboarding's computer offer: the agents' blue sky, densest at the top, fading into the banner. */
-export function OnboardingOfferSky() {
-  return (
-    <span className="onb__offer-sky" aria-hidden="true">
-      <PixelSky
-        options={{
-          pixel: 4,
-          surface: "--agent-soft",
-          palette: (bg) => softTones("sky", bg),
-          light: 0,
-          base: (u, v, tt) => {
-            const fade = Math.max(0, 1 - v);
-            return fade * fade * (0.86 + 0.06 * S(u * 6 + tt * 0.4));
-          },
-        }}
-      />
-    </span>
-  );
-}
-
-/**
- * The onboarding's progress at the top of the rail: a strip of pixel
- * sky that fills as steps get done, with a pixel agent walking at its front. `progress` is 0..1.
- */
-export function OnboardingProgress({ progress }: { progress: number }) {
-  const target = Math.max(0, Math.min(1, progress));
-  const reduced = usePrefersReducedMotion();
-  const level = useRef({ now: target, target });
-  level.current.target = target;
-  if (reduced) level.current.now = target;
-  const body = pixelOf(spriteTone("sky"));
-  const eye = pixelOf(EYE);
-  const opts: SkyOptions = {
-    pixel: 3,
-    surface: "--sunken",
-    light: 0,
-    palette: (bg) => {
-      const [r, g, b] = parseColor(bg);
-      const dark = r * 0.3 + g * 0.59 + b * 0.11 < 128;
-      const sky = dark ? ["#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff"] : ["#a6cfff", "#78b4ff", "#4b93ff", "#2b74e6"];
-      return [bg, mix(bg, "#78b4ff", dark ? 0.1 : 0.14), ...sky];
-    },
-    // Called once per frame, before the field: eases the fill toward the target.
-    blobs: () => {
-      const l = level.current;
-      l.now += (l.target - l.now) * 0.06;
-      return [];
-    },
-    base: (u, v, t) => {
-      const now = level.current.now;
-      if (u > now) return 0.12;
-      const head = Math.max(0, 1 - (now - u) * 12);
-      return Math.min(1, 0.45 + 0.4 * v + 0.08 * S(u * 22 + t * 1.2) + 0.2 * head);
-    },
-    after: (f) => {
-      const now = level.current.now;
-      if (now < 0.01) return;
-      const x = Math.max(0, Math.min(f.w - 9, Math.round(now * f.w) - 6));
-      drawSprite(f, x, Math.round((f.h - 9) / 2), 1, body, eye, f.t % 3.6 > 3.46);
-    },
-  };
-  return (
-    <span className="onb__progress-sky" aria-hidden="true">
       <PixelSky options={opts} />
     </span>
   );

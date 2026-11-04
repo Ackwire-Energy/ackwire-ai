@@ -413,3 +413,95 @@ html:not([data-pointer]) .rq__more:focus-visible {
   line-height: 18px;
   color: var(--muted);
 }
+
+/* A card a newer one replaced: still readable, plainly not the one to act on. */
+.rq--muted {
+  opacity: 0.6;
+}
+/* A settings card's lines (ADR 0137): the setting, then what it was struck through, an arrow and what it becomes. */
+.rq__settings {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 24px;
+  margin: 16px 0 0;
+}
+.rq__setting {
+  display: contents;
+}
+.rq__setting dt {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+}
+.rq__setting dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.rq__setting s {
+  color: var(--muted);
+}
+.rq__setting dd .ac-icon {
+  color: var(--muted);
+}
+/* Sent to whoever decides: where the decision would be, quiet. */
+.rq__sent {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* The right hand's first card (ADR 0137): the ready-made agents, four in a row (two on a phone), each a Criar. */
+.rh-intro__presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.rh-intro__preset {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 0;
+  border-radius: 12px 12px 12px 4px;
+  background: var(--card-well);
+  box-shadow: var(--card-well-shadow);
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.rh-intro__preset:hover:not(:disabled) {
+  background: var(--plate);
+}
+.rh-intro__preset:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+html:not([data-pointer]) .rh-intro__preset:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.rh-intro__preset-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 16px;
+}
+.rh-intro__preset-text small {
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .rh-intro__presets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

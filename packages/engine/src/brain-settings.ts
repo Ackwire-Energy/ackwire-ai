@@ -60,7 +60,9 @@ import {
   requireOpen,
 } from "./missions";
 import { can, getMembership, requirePermission } from "./organizations";
+import { isRightHand, rightHandPermanent } from "./right-hand";
 import { closedRefusal } from "./standing";
+import { wakeAgentUsageWaits } from "./usage-pause";
 
 /*
  * "Quem pensa" (ADR 0032 §5): the brain an agent thinks with, its model and
@@ -560,6 +562,8 @@ export async function setAgentBrain(
   }
   const brain = (input.brain as BrainKind | undefined) ?? from;
   const changed = brain !== from;
+  // It thinks through the workspace's AI, never on a computer (ADR 0137).
+  if (changed && isRightHand(agent)) throw rightHandPermanent("moved to a computer");
   const [machine, machines] = await Promise.all([
     agentMachine(deps.db, orgId, agent.machineId),
     candidateMachines(deps.db, userId, orgId, admin, agent.machineId),
@@ -732,6 +736,16 @@ export async function setAgentBrain(
     ...(audience ? { audienceMode: audience.mode } : {}),
   };
   if (thinks && options.remember !== false) await rememberAgentSetup(deps.db, membership, setupOfAgent(saved));
+  // Another AI, account or model, or extra usage on: what waited on the old one's plan or budget goes on now, in its
+  // line's order.
+  if (
+    changed ||
+    model !== agent.brainModel ||
+    account !== agent.brainAccountId ||
+    fallback !== agent.brainFallback ||
+    (extraUsage && !agent.brainExtraUsage)
+  )
+    await wakeAgentUsageWaits(deps.db, orgId, agentId).catch(() => null);
   // The account's `usedBy` changed with it.
   const fresh =
     account !== agent.brainAccountId ? await brainAccounts(deps.db, userId, orgId, saved, machine) : accounts;

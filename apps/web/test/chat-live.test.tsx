@@ -44,7 +44,7 @@ describe("optimistic send", () => {
     expect(pending[0]?.className).toContain("ac-msg--pending");
     expect(pending[0]?.textContent).toContain("enviando…");
     // Focus stays in the composer, which is empty again.
-    expect(document.activeElement).toBe(composer());
+    expect(document.activeElement === composer()).toBe(true);
     expect((composer() as HTMLTextAreaElement).value).toBe("");
     // The WebSocket echo (with clientId) can arrive before the HTTP response.
     const posted = state.calls.find((c) => c.method === "chat.post")?.args[2] as { clientId: string } | undefined;
@@ -847,29 +847,25 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
     expect(check.querySelector("path")?.getAttribute("d")).toBe("M10 6v4l2.6 1.8");
     const pop = await popoverOf("revisa o PR?");
     expect(pop.textContent).not.toContain("Escolhendo");
-    const by = pop.querySelector(".who-by") as HTMLElement;
-    expect(by.textContent).toBe("Escolhido pelo seu plano do Claude");
-    expect(by.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe("claude");
-    // Under the agents, as the popover's last line.
-    expect(pop.lastElementChild).toBe(by);
+    // Which AI picked (here the person's own plan) isn't said.
+    expect(pop.querySelector(".who-by")).toBeNull();
   });
 
-  test("the popover's last line names who picked, with its mark or our icon; a decision for nobody or from before says nothing", async () => {
+  test("the popover's last line says the rule that picked, with our icon; an AI's pick, a decision for nobody or from before says nothing", async () => {
     const { socket, state } = await open();
-    const cases: [Record<string, unknown>, string, string | null][] = [
-      [{ step: "jev" }, "Escolhido pelo Jev", "typesafe"],
-      [
-        { step: "model", model: "claude-haiku-5-5", provider: "anthropic" },
-        "Escolhido pelo Claude Haiku 5.5",
-        "claude",
-      ],
-      [{ step: "plan", brand: "chatgpt", ownerId: "u-joao" }, "Escolhido pelo plano do ChatGPT de João", "openai"],
-      [{ step: "rule", rule: "reply" }, "Uma resposta para a Ada", null],
-      [{ step: "rule", rule: "only_agent" }, "Só a Ada responde aqui sem menção", null],
-      [{ step: "rule", rule: "follow_up" }, "Segue a conversa com a Ada", null],
-      [{ step: "rule", rule: "coordinator" }, "A Ada coordena o time", null],
+    const cases: [Record<string, unknown>, string | null][] = [
+      [{ step: "jev" }, null],
+      [{ step: "model", model: "claude-haiku-5-5", provider: "anthropic" }, null],
+      [{ step: "plan", brand: "chatgpt", ownerId: "u-joao" }, null],
+      [{ step: "rule", rule: "reply" }, "Uma resposta para a Ada"],
+      [{ step: "rule", rule: "only_agent" }, "Só a Ada responde aqui sem menção"],
+      [{ step: "rule", rule: "follow_up" }, "Segue a conversa com a Ada"],
+      // Alone with the team: no line, the decision stays stored.
+      [{ step: "rule", rule: "alone" }, null],
+      // Stored before the team's coordinator was retired (ADR 0137): the default rule's line.
+      [{ step: "rule", rule: "coordinator" }, "Ninguém foi chamado, então a Ada respondeu"],
     ];
-    for (const [i, [decidedBy, words, mark]] of cases.entries()) {
+    for (const [i, [decidedBy, words]] of cases.entries()) {
       const text = `pergunta ${i + 1}`;
       await sendText(text);
       await settle(4);
@@ -882,14 +878,15 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
         decidedBy,
       });
       const pop = await popoverOf(text);
-      const by = pop.querySelector(".who-by") as HTMLElement;
-      expect([text, by.textContent]).toEqual([text, words]);
+      const by = pop.querySelector(".who-by") as HTMLElement | null;
+      expect([text, by?.textContent ?? null]).toEqual([text, words]);
+      if (!by) {
+        expect(pop.textContent).not.toContain("Escolhido");
+        await closePopover(pop);
+        continue;
+      }
       expect(by.className).toContain("ac-iconline");
-      if (mark) expect(by.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe(mark);
-      else expect(by.firstElementChild?.classList.contains("ac-icon")).toBe(true);
-      // The coordinator's line leads with its flag.
-      if ((decidedBy as { rule?: string }).rule === "coordinator")
-        expect(by.querySelector("path")?.getAttribute("d")).toBe("M5 17V3.5M5 3.5h9l-1.7 3.3L14 10H5");
+      expect(by.firstElementChild?.classList.contains("ac-icon")).toBe(true);
       await closePopover(pop);
     }
     for (const [text, routed] of [
@@ -1043,7 +1040,7 @@ describe("direct messages with an agent", () => {
     const suggestion = screen().getByRole("button", { name: "O que quebrou desde o último deploy?" });
     await act(async () => fireEvent.click(suggestion));
     expect((composer() as HTMLTextAreaElement).value).toBe("O que quebrou desde o último deploy?");
-    expect(document.activeElement).toBe(composer());
+    expect(document.activeElement === composer()).toBe(true);
   });
 
   test("a plan thinks for the agent: the DM header says its model by that plan, with its mark", async () => {

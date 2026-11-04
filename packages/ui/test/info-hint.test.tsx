@@ -68,7 +68,7 @@ describe("InfoHint", () => {
     expect(bubble?.textContent).toBe(TEXT);
     expect(container.contains(bubble)).toBe(false);
     // Focus stays on the ⓘ.
-    expect(document.activeElement).toBe(hintButton());
+    expect(document.activeElement === hintButton()).toBe(true);
     await press(hintButton());
     expect(tip()).toBeNull();
     await press(hintButton());
@@ -151,7 +151,7 @@ describe("InfoHint", () => {
     render(<Hint />);
     await tabTo(hintButton());
     expect(tip()?.textContent).toBe(TEXT);
-    expect(document.activeElement).toBe(hintButton());
+    expect(document.activeElement === hintButton()).toBe(true);
     await tabTo(body().getByRole("button", { name: "Depois" }));
     expect(tip()).toBeNull();
     // The pointer goes down on the ⓘ and focuses it; until the click, nothing opens.
@@ -160,7 +160,7 @@ describe("InfoHint", () => {
       hintButton().focus();
     });
     await wait(0);
-    expect(document.activeElement).toBe(hintButton());
+    expect(document.activeElement === hintButton()).toBe(true);
     expect(tip()).toBeNull();
   });
 

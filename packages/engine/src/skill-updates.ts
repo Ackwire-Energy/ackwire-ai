@@ -1,4 +1,4 @@
-import { and, type Database, eq, isNotNull, isNull, schema } from "@agenteschat/db";
+import { and, type Database, eq, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { sha256 } from "./crypto";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -21,6 +21,8 @@ import {
 } from "./skills";
 
 const { skills } = schema;
+type SkillPendingFile = schema.SkillPendingFile;
+type SkillPendingUpdate = schema.SkillPendingUpdate;
 
 /** The daily job that updates a workspace's skills that update by themselves ("Atualizar sozinha"). */
 export const SKILL_UPDATES_JOB = "skills.update";
@@ -72,8 +74,17 @@ async function sameAsInstalled(
   });
 }
 
-/** The files of `incoming` that run (`runsCode`) and are new or not byte for byte what the skill has now. */
-async function changedRunnables(deps: SkillDeps, s: SkillRow, files: SkillFileInput[]) {
+/** How much of a file that runs a waiting update keeps to show (`SkillPendingFile`): past it, only its name. */
+export const PENDING_FILE_CHARS = 64_000;
+
+const shownText = (data: Uint8Array | undefined) => {
+  if (!data) return null;
+  const text = new TextDecoder().decode(data);
+  return text.length > PENDING_FILE_CHARS || text.includes("\0") ? undefined : text;
+};
+
+/** The files of `incoming` that run (`runsCode`) and are new or not byte for byte what the skill has now, with both texts. */
+async function changedRunnables(deps: SkillDeps, s: SkillRow, files: SkillFileInput[]): Promise<SkillPendingFile[]> {
   const runs = files.filter((f) => f.skippedSize === undefined && runsCode(f.path));
   if (runs.length === 0) return [];
   const kept = await skillFolderFiles(
@@ -82,12 +93,15 @@ async function changedRunnables(deps: SkillDeps, s: SkillRow, files: SkillFileIn
     runs.map((f) => f.path),
   );
   const now = new Map(kept.map((f) => [f.path, f.data]));
-  return runs
-    .filter((f) => {
-      const was = now.get(f.path);
-      return !was || Buffer.compare(was, f.data) !== 0;
-    })
-    .map((f) => f.path);
+  return runs.flatMap((f) => {
+    const was = now.get(f.path);
+    if (was && Buffer.compare(was, f.data) === 0) return [];
+    const before = shownText(was);
+    const after = shownText(f.data);
+    return before === undefined || after === undefined
+      ? [{ path: f.path, before: null, after: null, large: true }]
+      : [{ path: f.path, before, after }];
+  });
 }
 
 /**
@@ -121,22 +135,39 @@ export async function updateSkillFromSource(
     if (s.pendingUpdate && !s.pendingUpdate.dismissed) await resolveSkillWaiting(deps, orgId, s.id);
     return { status: "unchanged", skill: await mark({ sourceHash: hash, pendingUpdate: null }) };
   }
-  const scripts = await changedRunnables(deps, s, incoming.files);
+  const files = await changedRunnables(deps, s, incoming.files);
+  const scripts = files.map((f) => f.path);
   const edited = s.editedSinceSource;
   if ((scripts.length > 0 || edited) && options.approved !== hash) {
     const fresh = s.pendingUpdate?.hash !== hash;
-    const skill = await mark(
-      fresh ? { pendingUpdate: { hash, scripts, at: checkedAt.toISOString(), ...(edited ? { edited } : {}) } } : {},
-    );
+    const pendingUpdate: SkillPendingUpdate = {
+      hash,
+      scripts,
+      at: checkedAt.toISOString(),
+      ...(edited ? { edited } : {}),
+      body: incoming.body,
+      description: incoming.description,
+      files,
+    };
+    // One waiting from before updates kept their content gets it, kept out or not, from the same time.
+    const old = s.pendingUpdate;
+    const filled = old && old.body === undefined ? { pendingUpdate: { ...old, ...pendingUpdate, at: old.at } } : {};
+    const skill = await mark(fresh ? { pendingUpdate } : filled);
     if (fresh) await notifySkillUpdate(deps, s, { state: "waiting", hash, scripts, edited }, null).catch(() => {});
     return { status: "waiting", skill, scripts, edited, fresh };
   }
   const before = snapshot(s);
   const saved = await saveSkill(deps, actorId, orgId, incoming);
-  if (s.pendingUpdate && !s.pendingUpdate.dismissed) await resolveSkillWaiting(deps, orgId, s.id);
+  const waiting = s.pendingUpdate && !s.pendingUpdate.dismissed ? s.pendingUpdate : null;
+  if (waiting) await resolveSkillWaiting(deps, orgId, s.id);
+  // A person chose the waiting update: Desfazer gives the choice back.
+  const waited =
+    waiting && options.approved === hash
+      ? { waited: { pending: waiting, sourceHash: s.sourceHash, linkBase: s.linkBase, edited: s.editedSinceSource } }
+      : {};
   const skill = await mark({
     pendingUpdate: null,
-    lastUpdate: { from: before, version: saved.version, at: checkedAt.toISOString() },
+    lastUpdate: { from: before, version: saved.version, at: checkedAt.toISOString(), ...waited },
   });
   return { status: "updated", skill, before };
 }
@@ -156,7 +187,7 @@ export async function dismissSkillUpdate(deps: SkillDeps, actorId: string, orgId
   if (!s.pendingUpdate) throw new ValidationError("No update of this skill waits", "skill.no_pending_update");
   const [row] = await deps.db
     .update(skills)
-    .set({ pendingUpdate: { ...s.pendingUpdate, dismissed: true } })
+    .set({ pendingUpdate: { ...s.pendingUpdate, dismissed: true, dismissedAt: new Date().toISOString() } })
     .where(eq(skills.id, s.id))
     .returning();
   await resolveSkillWaiting(deps, orgId, s.id);
@@ -170,6 +201,24 @@ export async function dismissSkillUpdate(deps: SkillDeps, actorId: string, orgId
   return skillDetail(deps.db, row ?? s);
 }
 
+/** Desfazer of `dismissSkillUpdate`: the update it kept out waits again, until a newer one from its link replaces it. */
+export async function reopenSkillUpdate(deps: SkillDeps, actorId: string, orgId: string, id: string) {
+  await requirePermission(deps.db, actorId, orgId, "manage_agents");
+  const s = await loadSkill(deps.db, orgId, id);
+  if (!s.pendingUpdate?.dismissed)
+    throw new ValidationError("No update of this skill was kept out", "skill.no_dismissed_update");
+  const { dismissed: _d, dismissedAt: _at, ...pending } = s.pendingUpdate;
+  const [row] = await deps.db.update(skills).set({ pendingUpdate: pending }).where(eq(skills.id, s.id)).returning();
+  await recordAudit(deps.db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "skill.update_reopened",
+    target: { type: "skill", id: s.id },
+    details: { name: s.name, scripts: pending.scripts },
+  });
+  return skillDetail(deps.db, row ?? s);
+}
+
 /** A new version with this version's text and its files: the skill as it was. */
 export const restoreSkillSnapshot = (db: Database, s: SkillRow, to: SkillSnapshot) =>
   writeSkillVersion(db, s, { body: to.body, description: to.description, metadata: to.metadata }, to.version);
@@ -177,6 +226,7 @@ export const restoreSkillSnapshot = (db: Database, s: SkillRow, to: SkillSnapsho
 /**
  * Back to the version before its last update from its link (a new version with its text and files), while the skill
  * is still at the version that update made. Its link isn't read: the next update applies only what changes there.
+ * An update a person chose while it waited (`waited`) waits again, as it was.
  */
 export async function undoSkillUpdate(deps: SkillDeps, actorId: string, orgId: string, id: string) {
   await requirePermission(deps.db, actorId, orgId, "manage_agents");
@@ -184,7 +234,33 @@ export async function undoSkillUpdate(deps: SkillDeps, actorId: string, orgId: s
   if (!s.lastUpdate || s.lastUpdate.version !== s.version)
     throw new ValidationError("There is no update from its link to undo", "skill.nothing_to_undo");
   const row = await restoreSkillSnapshot(deps.db, s, s.lastUpdate.from);
-  const [cleared] = await deps.db.update(skills).set({ lastUpdate: null }).where(eq(skills.id, s.id)).returning();
+  const { waited: back, prior, agentId } = s.lastUpdate;
+  const [cleared] = await deps.db
+    .update(skills)
+    .set({
+      lastUpdate: null,
+      ...(back
+        ? {
+            pendingUpdate: back.pending,
+            sourceHash: back.sourceHash,
+            linkBase: back.linkBase,
+            editedSinceSource: back.edited ?? !!back.pending.edited,
+          }
+        : {}),
+      ...(prior ? { editedSinceSource: prior.edited, linkBase: prior.linkBase } : {}),
+    })
+    .where(eq(skills.id, s.id))
+    .returning();
+  // An agent's change undone here is undone in its history too (the skill's page, `revertSkillChange`).
+  if (agentId)
+    await deps.db
+      .update(schema.agentActions)
+      .set({ undoneAt: new Date(), undoneByUserId: actorId })
+      .where(
+        sql`${schema.agentActions.id} = (select a.id from ${schema.agentActions} a where a.org_id = ${orgId}
+          and a.kind = 'skill.updated' and a.target_id = ${s.id} and a.agent_id = ${agentId} and a.undone_at is null
+          order by a.created_at desc limit 1)`,
+      );
   await recordAudit(deps.db, {
     orgId,
     actor: { type: "person", id: actorId },

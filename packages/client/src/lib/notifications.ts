@@ -243,12 +243,16 @@ export function restrictionOf(n: Pick<AppNotification, "kind" | "latest">) {
 
 /**
  * Whether an item's headline already names the place called `name` ("Theo replied in #general"), so nothing beside
- * it says that again. The headline names its `source.label` for a reply, an agent's answer and a mention in a thread.
+ * it says that again. The headline names its `source.label` for a reply, an agent's answer, a mention in a thread and a
+ * catch-up skipped for the person who asked ("Theo não respondeu em #suporte").
  */
 export const headlineNames = (n: Pick<AppNotification, "kind" | "source">, name: string) =>
   Boolean(name) &&
   n.source.label === name &&
-  (n.kind === "thread_reply" || n.kind === "agent_reply" || (n.kind === "mention" && !!n.source.threadId));
+  (n.kind === "thread_reply" ||
+    n.kind === "agent_reply" ||
+    n.kind === "catch_up_closed_asker" ||
+    (n.kind === "mention" && !!n.source.threadId));
 
 /** Grouped (several replies or comments, several agents' failures of one cause): it expands to show them. */
 export const isExpandable = (n: AppNotification) =>
@@ -372,6 +376,8 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   const at = s.messageId ? { search: { m: s.messageId } } : {};
   if (n.kind === "approval")
     return { to: "/org/$orgId/approvals", ...(s.approvalId ? { search: { open: s.approvalId } } : {}) };
+  // A change someone sent to whoever decides (ADR 0137) is decided on its card in the row: the DM it came from is theirs.
+  if (n.kind === "change_request") return null;
   // Requests to join are answered in Members (ADR 0068).
   if (n.kind === "join_request") return { to: "/org/$orgId/settings/$section", params: { section: "members" } };
   // Someone accepted an invitation (ADR 0090): a conversation with them, to say hi.

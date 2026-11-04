@@ -97,7 +97,7 @@ describe("memory mark", () => {
     await act(() => new Promise((r) => setTimeout(r, 500)));
     await settle(2);
     expect(within(screen().getByRole("dialog")).getByRole("button", { name: "Corrigir" })).toBeTruthy();
-    expect(document.activeElement).toBe(box);
+    expect(document.activeElement === box).toBe(true);
   });
 
   test("live: message.memories adds the mark for everyone in the channel", async () => {

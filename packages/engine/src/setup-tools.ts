@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, count, eq, schema, sql } from "@agenteschat/db";
+import { and, count, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { isKnownProvider, PROVIDERS } from "@agenteschat/providers";
 import { actWithUndo } from "./agent-actions";
 import {
@@ -10,6 +10,7 @@ import {
   mayCreateAgents,
   type SuggestedAi,
   suggestAgentAi,
+  supersedeOlderProposals,
 } from "./agent-proposals";
 import { agentsByHandle, getAgentCached } from "./agents";
 import type { AiStatusDeps } from "./ai-status";
@@ -19,20 +20,23 @@ import { findMember } from "./chat-tools";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
 import { connectorListing, type ServerCatalog } from "./connectors/listing";
 import { MCP_PRESETS, presetForServer } from "./connectors/presets";
+import { proposeSettings, type SettingsProposalCard } from "./context/proposals";
 import type { ContextDeps } from "./context/summaries";
 import { publishMessageCreated } from "./events";
 import { insertMessage, messageView } from "./messages";
 import { can, getMembership } from "./organizations";
 import type { RolePermission } from "./permissions";
 import { personBehindCall } from "./requester";
+import { isRightHand } from "./right-hand";
 import { bodyCode } from "./run-tools";
 import { replyThreadOf } from "./runs";
 import { REPORT_SCHEMA, SCHEDULE_INPUT } from "./schedule-tools";
+import type { WantedLine } from "./settings-proposals";
 import { noAgentText } from "./team";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
-const { agentActions, agentRuns, messages } = schema;
+const { agentActions, agentRuns, channels, machineAccounts, messages, orgRoles } = schema;
 
 /** The setup tools' scope: a tool group of its own, loaded when a message is about setting up (ADR 0043). */
 export const SETUP_SCOPE = "setup:write";
@@ -41,8 +45,14 @@ export const CREATE_CHANNEL_TOOL = "create_channel";
 export const PROPOSE_AGENT_TOOL = "propose_agent";
 export const OFFER_CONNECT_APP_TOOL = "offer_connect_app";
 export const OFFER_INVITES_TOOL = "offer_invites";
+/** The right hand's settings card (ADR 0137): no other agent has it. */
+export const PROPOSE_SETTINGS_TOOL = "propose_settings_change";
 /** What one run may make: enough for a request, never a flood (also all a prompt injection gets). */
 export const MAX_CARDS_PER_RUN = 3;
+/** The right hand sets a whole team up in one turn ("a team for my agency"): one card per agent, a few more. */
+export const MAX_CARDS_PER_RUN_RIGHT_HAND = 10;
+/** A settings card's `bodyCode` (`chat.body.settings_proposal`, with `names`). */
+export const SETTINGS_PROPOSAL_CARD = "settings_proposal";
 export const MAX_CHANNELS_PER_RUN = 5;
 /** A Connect card's `bodyCode` (the apps say it with `chat.body.action_connect_ai`). */
 export const CONNECT_AI_CARD = "action_connect_ai";
@@ -170,15 +180,17 @@ export async function hopOf(ctx: ToolContext) {
 
 /** The run's cards so far (Connect cards and proposals alike), or an error once it has made its share. */
 export async function cardsLeft(ctx: ToolContext): Promise<ToolOutput | null> {
-  const [made] = await ctx.db
-    .select({ n: count() })
-    .from(messages)
-    .where(
-      and(eq(messages.orgId, ctx.orgId), eq(messages.agentRunId, ctx.runId), sql`${messages.meta} ? 'actionCard'`),
-    );
-  return (made?.n ?? 0) >= MAX_CARDS_PER_RUN
-    ? { content: `You already offered ${MAX_CARDS_PER_RUN} cards in this turn.`, isError: true }
-    : null;
+  const [[made], self] = await Promise.all([
+    ctx.db
+      .select({ n: count() })
+      .from(messages)
+      .where(
+        and(eq(messages.orgId, ctx.orgId), eq(messages.agentRunId, ctx.runId), sql`${messages.meta} ? 'actionCard'`),
+      ),
+    getAgentCached(ctx.db, ctx.orgId, ctx.agentId),
+  ]);
+  const cap = isRightHand(self) ? MAX_CARDS_PER_RUN_RIGHT_HAND : MAX_CARDS_PER_RUN;
+  return (made?.n ?? 0) >= cap ? { content: `You already offered ${cap} cards in this turn.`, isError: true } : null;
 }
 
 /** How the tool result names the suggested AI to the agent. */
@@ -467,6 +479,13 @@ export function createSetupToolSource(deps: {
             maxLength: 300,
             description: "One short line on the card for the person, in their language: why this agent.",
           },
+          first_task: {
+            type: "string",
+            minLength: 1,
+            maxLength: 500,
+            description:
+              "A first thing for it to do, in the person's words and language: the card then offers 'Criar e testar', which creates it and sends this to it in the person's DM with it.",
+          },
         },
         required: ["name", "handle", "instructions", "why"],
         additionalProperties: false,
@@ -477,7 +496,9 @@ export function createSetupToolSource(deps: {
           if (!why) return { content: "Say in `why` why this agent: one short line.", isError: true };
           const full = await cardsLeft(ctx);
           if (full) return full;
-          if (!(await deciderCanOpen(ctx.db, ctx.orgId, ctx.channelId))) {
+          // The right hand's card goes to whoever may create agents when the person who asked can't ("Pedir a um admin").
+          const rightHand = isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId));
+          if (!rightHand && !(await deciderCanOpen(ctx.db, ctx.orgId, ctx.channelId))) {
             return {
               content:
                 "Nothing was posted: nobody who may create agents can open this conversation, so nobody could decide the card. Tell the person that an admin or owner creates agents: they can ask one, or ask you again in a public channel.",
@@ -493,7 +514,11 @@ export function createSetupToolSource(deps: {
           const card: AgentProposalCard = {
             kind: "agent_proposal",
             forUserId,
-            params: { draft, why },
+            params: {
+              draft,
+              why,
+              ...(str(input.first_task).trim() ? { firstTask: str(input.first_task).trim() } : {}),
+            },
             state: "pending",
             agentId: null,
             decidedByUserId: null,
@@ -509,8 +534,12 @@ export function createSetupToolSource(deps: {
             meta: { ...bodyCode(AGENT_PROPOSAL_CARD, { name: draft.name }), actionCard: card },
           });
           if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(message));
+          await supersedeOlderProposals({ db: ctx.db, pubsub: deps.pubsub }, message, draft.handle);
+          const asks = rightHand
+            ? " The person who asked can't create agents: the card lets them send it to an admin or owner, who creates it."
+            : " The person who asked can't create agents: an admin or owner reviews it.";
           return {
-            content: `Posted the proposal of ${draft.name} (@${draft.handle}). A person creates it from the card, in one click or after reviewing it: nothing exists until they do, and you'll be told what they decided and what it got.${(await mayCreateAgents(ctx.db, ctx.orgId, forUserId)) ? "" : " The person who asked can't create agents: an admin or owner reviews it."}${draft.routine ? ` Its routine «${draft.routine.name}» runs: ${draft.routine.description}.` : ""} Suggested AI: ${aiWords(draft.ai)}.`,
+            content: `Posted the proposal of ${draft.name} (@${draft.handle}). A person creates it from the card, in one click or after reviewing it: nothing exists until they do, and you'll be told what they decided and what it got.${(await mayCreateAgents(ctx.db, ctx.orgId, forUserId)) ? "" : asks}${draft.routine ? ` Its routine «${draft.routine.name}» runs: ${draft.routine.description}.` : ""} Suggested AI: ${aiWords(draft.ai)}.`,
             data: { agentProposal: { messageId: message.id } },
           };
         } catch (error) {
@@ -684,5 +713,257 @@ export function createSetupToolSource(deps: {
       },
     },
   ];
-  return { name: "setup", tools: async () => tools };
+  const settings = settingsTool(deps);
+  return {
+    name: "setup",
+    // Only the right hand changes teammates' settings with cards (ADR 0137).
+    tools: async (ctx) =>
+      isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId)) ? [...tools, settings] : tools,
+  };
+}
+
+/** A setting's change as the tool takes it, for one agent. */
+interface SettingsChangeInput {
+  agent?: unknown;
+  model?: unknown;
+  ai_account?: unknown;
+  budget_usd?: unknown;
+  budget_default?: unknown;
+  owner?: unknown;
+  who_talks?: { everyone?: unknown; roles?: unknown };
+  join?: unknown;
+  leave?: unknown;
+  replies?: unknown;
+  archive?: unknown;
+}
+
+const NANO_PER_USD = 1_000_000_000;
+const names = (v: unknown) => (Array.isArray(v) ? v.map((x) => str(x).trim()).filter(Boolean) : []);
+
+/** Each change's names read as ids (people, channels, roles, AI accounts), or why one can't be. */
+async function wantedLines(ctx: ToolContext, change: SettingsChangeInput): Promise<WantedLine[] | string> {
+  const lines: WantedLine[] = [];
+  if (typeof change.model === "string") lines.push({ field: "model", to: change.model.trim() });
+  if (change.budget_default === true) lines.push({ field: "budget", to: null });
+  else if (typeof change.budget_usd === "number")
+    lines.push({ field: "budget", to: Math.round(change.budget_usd * NANO_PER_USD) });
+  if (typeof change.owner === "string") {
+    const found = await findMember(ctx, change.owner);
+    if (found.length !== 1)
+      return found.length
+        ? `Several people match "${change.owner}": ask which one.`
+        : `No one called "${change.owner}" here.`;
+    const [person] = found;
+    if (person) lines.push({ field: "owner", to: person.userId, label: { to: person.name } });
+  }
+  if (change.who_talks) {
+    const roles = names(change.who_talks.roles);
+    if (change.who_talks.everyone === true || roles.length === 0)
+      lines.push({ field: "audience", to: { mode: "everyone", userIds: [], roleIds: [] } });
+    else {
+      const rows = await ctx.db
+        .select({ id: orgRoles.id, name: orgRoles.name })
+        .from(orgRoles)
+        .where(and(eq(orgRoles.orgId, ctx.orgId), eq(orgRoles.kind, "custom")));
+      const picked = roles.map((r) => rows.find((x) => x.name.toLowerCase() === r.toLowerCase()));
+      if (picked.some((r) => !r)) return `Roles here: ${rows.map((r) => r.name).join(", ")}.`;
+      lines.push({
+        field: "audience",
+        to: { mode: "people", userIds: [], roleIds: picked.map((r) => r?.id ?? "") },
+        label: { to: picked.map((r) => r?.name).join(", ") },
+      });
+    }
+  }
+  if (typeof change.ai_account === "string") {
+    const wanted = change.ai_account.trim().toLowerCase();
+    const rows = await ctx.db
+      .select()
+      .from(machineAccounts)
+      .where(and(eq(machineAccounts.orgId, ctx.orgId), eq(machineAccounts.status, "active")));
+    const account = rows.find((a) => a.id === change.ai_account || a.label.toLowerCase() === wanted);
+    if (!account) return `No AI account "${change.ai_account}" is connected.`;
+    lines.push({
+      field: "ai_account",
+      to: { brain: account.kind, accountId: account.id },
+      label: { to: account.label },
+    });
+  }
+  const replies = (Array.isArray(change.replies) ? change.replies : []) as {
+    channel?: unknown;
+    without_mention?: unknown;
+  }[];
+  const wantedChannels = [...names(change.join), ...names(change.leave), ...replies.map((r) => str(r.channel))].map(
+    (n) => n.replace(/^#/, "").toLowerCase(),
+  );
+  const found = wantedChannels.length
+    ? await ctx.db
+        .select({ id: channels.id, name: channels.name })
+        .from(channels)
+        .where(
+          and(
+            eq(channels.orgId, ctx.orgId),
+            eq(channels.kind, "channel"),
+            inArray(channels.name, wantedChannels),
+            isNull(channels.archivedAt),
+            isNull(channels.deletedAt),
+          ),
+        )
+    : [];
+  const channelOf = (n: string) => found.find((c) => c.name === n.replace(/^#/, "").toLowerCase());
+  const missing = wantedChannels.filter((n) => !channelOf(n));
+  if (missing.length > 0) return `No channel ${missing.map((n) => `#${n}`).join(", ")}.`;
+  const seat = (field: WantedLine["field"], name: string, to: boolean | null) => {
+    const c = channelOf(name);
+    if (c) lines.push({ field, channelId: c.id, to, label: { to: `#${c.name}` } });
+  };
+  // Joining with a reply mode is one line: it joins answering that way.
+  const replyIn = (n: string) => replies.find((r) => channelOf(str(r.channel))?.id === channelOf(n)?.id);
+  for (const n of names(change.join)) seat("channel_add", n, replyIn(n) ? replyIn(n)?.without_mention === true : true);
+  for (const n of names(change.leave)) seat("channel_remove", n, null);
+  for (const r of replies)
+    if (!names(change.join).some((n) => channelOf(n)?.id === channelOf(str(r.channel))?.id))
+      seat("reply_mode", str(r.channel), r.without_mention === true);
+  if (change.archive === true) lines.push({ field: "archive", to: true });
+  return lines;
+}
+
+/**
+ * `propose_settings_change` (ADR 0137, amending 0092 §5): a teammate's settings as one card in this conversation,
+ * one row per agent and whoever decides it. Nothing changes until someone who may clicks Aplicar.
+ */
+function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
+  return {
+    name: PROPOSE_SETTINGS_TOOL,
+    description:
+      "Propose changing teammates' settings with one card in this conversation: the model, the AI account it thinks with, its monthly budget, its owner, who may talk to it, the channels it joins or leaves and whether it answers there without a mention, or archiving it. Whoever may make each change applies it from the card as themselves, and a change the person who asked can't make they send from the card to whoever may. Nothing changes until someone clicks: never say it is done. Instructions, a role or apps go through propose_instruction_change.",
+    scope: SETUP_SCOPE,
+    inputSchema: {
+      type: "object",
+      properties: {
+        changes: {
+          type: "array",
+          minItems: 1,
+          maxItems: 10,
+          items: {
+            type: "object",
+            properties: {
+              agent: { type: "string", minLength: 1, maxLength: 64, description: "Its @handle." },
+              model: { type: "string", minLength: 1, maxLength: 200, description: 'A model id, or "auto".' },
+              ai_account: {
+                type: "string",
+                minLength: 1,
+                maxLength: 200,
+                description: "A Claude or ChatGPT plan signed in on a computer, by its name: only its owner gives it.",
+              },
+              budget_usd: { type: "number", minimum: 0, maximum: 100_000, description: "Monthly, in US dollars." },
+              budget_default: { type: "boolean", description: "True: back to the workspace's default budget." },
+              owner: {
+                type: "string",
+                minLength: 1,
+                maxLength: 200,
+                description: "A person's @handle, email or name.",
+              },
+              who_talks: {
+                type: "object",
+                properties: {
+                  everyone: { type: "boolean" },
+                  roles: { type: "array", items: { type: "string", minLength: 1, maxLength: 80 }, maxItems: 20 },
+                },
+                additionalProperties: false,
+                description: "Everyone, or only people with these roles (by name).",
+              },
+              join: { type: "array", items: { type: "string", minLength: 1, maxLength: 81 }, maxItems: 10 },
+              leave: { type: "array", items: { type: "string", minLength: 1, maxLength: 81 }, maxItems: 10 },
+              replies: {
+                type: "array",
+                maxItems: 10,
+                items: {
+                  type: "object",
+                  properties: {
+                    channel: { type: "string", minLength: 1, maxLength: 81 },
+                    without_mention: { type: "boolean", description: "False: it answers there only when @mentioned." },
+                  },
+                  required: ["channel", "without_mention"],
+                  additionalProperties: false,
+                },
+              },
+              archive: { type: "boolean", description: "True: archive it (it stops working; Undo brings it back)." },
+            },
+            required: ["agent"],
+            additionalProperties: false,
+          },
+        },
+        reason: {
+          type: "string",
+          minLength: 1,
+          maxLength: 500,
+          description: "One short line on the card, in the person's language: why.",
+        },
+      },
+      required: ["changes", "reason"],
+      additionalProperties: false,
+    },
+    async execute(input, ctx) {
+      try {
+        const forUserId = await personBehindCall(ctx);
+        if (!forUserId) return { content: "Only a person's request can propose a change.", isError: true };
+        const changes = (Array.isArray(input.changes) ? input.changes : []) as SettingsChangeInput[];
+        const named = await agentsByHandle(
+          ctx.db,
+          ctx.orgId,
+          changes.map((c) => c.agent),
+        );
+        if (named.missing.length > 0) return noAgents(ctx, named.missing);
+        const targets: { agentId: string; lines: WantedLine[] }[] = [];
+        for (const change of changes) {
+          const lines = await wantedLines(ctx, change);
+          if (typeof lines === "string") return { content: lines, isError: true };
+          targets.push({ agentId: named.rowOf(change.agent)?.id ?? "", lines });
+        }
+        const full = await cardsLeft(ctx);
+        if (full) return full;
+        const { proposals, skipped } = await proposeSettings(
+          { db: ctx.db },
+          {
+            orgId: ctx.orgId,
+            agentId: ctx.agentId,
+            targets,
+            rationale: str(input.reason).trim(),
+            requesterId: forUserId,
+          },
+        );
+        if (proposals.length === 0) return { content: `Nothing to propose. ${skipped.join(" ")}`, isError: true };
+        const card: SettingsProposalCard = {
+          kind: "settings_proposal",
+          forUserId,
+          proposalIds: proposals.map((p) => p.id),
+        };
+        const who = [...new Set(proposals.map((p) => named.rows.find((r) => r.id === p.agentId)?.name ?? ""))].join(
+          ", ",
+        );
+        const message = await insertMessage(ctx.db, {
+          orgId: ctx.orgId,
+          channelId: ctx.channelId,
+          threadId: replyThreadOf(ctx),
+          author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
+          body: `Proposed a change to ${who}: ${str(input.reason).trim()}`,
+          meta: { ...bodyCode(SETTINGS_PROPOSAL_CARD, { names: who }), actionCard: card },
+        });
+        if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(message));
+        const decides = proposals.filter((p) => p.canDecide).length;
+        const whoDecides =
+          decides === proposals.length
+            ? "the person who asked applies it from the card."
+            : decides === 0
+              ? "the person who asked can't apply it: the card lets them send it to whoever may."
+              : "the person who asked applies some rows; the card lets them send the rest to whoever may.";
+        return {
+          content: `Posted the card for ${who}; ${whoDecides} Nothing has changed yet.${skipped.length ? ` Left off the card: ${skipped.join(" ")}` : ""}`,
+          data: { actionCard: { messageId: message.id } },
+        };
+      } catch (error) {
+        return failed(error);
+      }
+    },
+  };
 }

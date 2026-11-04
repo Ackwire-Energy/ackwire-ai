@@ -75,6 +75,12 @@ export function useNotificationOpener() {
         openComputer(computerOf);
         return "dialog";
       }
+      // An agent skipped several catch-ups as handled: its queue, where each skip and "Responder mesmo assim" are.
+      const agent = n.actors[0];
+      if (openDetails && n.kind === "catch_up_closed" && n.count > 1 && agent?.type === "agent") {
+        openDetails({ kind: "usage_queue", id: agent.id });
+        return "dialog";
+      }
       const found = openTarget(n);
       if (!found) return null;
       // A widget of My Home opens on Home (ADR 0135), when this tab knows which board that is.

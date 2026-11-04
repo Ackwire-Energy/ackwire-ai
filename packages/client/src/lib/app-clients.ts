@@ -51,8 +51,6 @@ export interface AppClient {
   /** The line under the name: the app's own address or maker as is, or a kind of app (`apps.dialog.clientText.*`). */
   site?: string;
   kind?: "claude" | "terminal" | "editor" | "extension" | "desktop" | "other";
-  /** Its sign-in through this server isn't verified yet (ADR 0119's QA gates and its addendum): the guide says so. */
-  untested?: true;
   guide: (url: string) => AppGuide;
 }
 
@@ -156,7 +154,6 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "openai",
     group: "chat",
     site: "chatgpt.com",
-    untested: true,
     guide: () => ({
       steps: [
         step("open", { vars: { place: "chatgpt.com/plugins" }, open: "https://chatgpt.com/plugins" }),
@@ -196,7 +193,6 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "gemini",
     group: "chat",
     site: "gemini.google.com",
-    untested: true,
     guide: () => ({
       steps: [
         step("open", {
@@ -224,7 +220,6 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "grok",
     group: "chat",
     site: "grok.com",
-    untested: true,
     guide: () => ({
       steps: [
         step("open", { vars: { place: "grok.com/connectors" }, open: "https://grok.com/connectors" }),
@@ -241,7 +236,6 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "perplexity",
     group: "chat",
     site: "perplexity.ai",
-    untested: true,
     guide: () => ({
       steps: [
         step("open", { vars: { place: "Settings\u00a0›\u00a0Connectors" } }),
@@ -259,7 +253,6 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "mistral",
     group: "chat",
     site: "chat.mistral.ai",
-    untested: true,
     guide: () => ({
       steps: [
         step("open", { vars: { place: "Intelligence\u00a0›\u00a0Connectors" } }),
@@ -276,7 +269,6 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "raycast",
     group: "chat",
     kind: "desktop",
-    untested: true,
     guide: () => ({
       steps: [
         step("runCommand", { vars: { command: "Install MCP Server" } }),
@@ -320,7 +312,6 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "codex",
     group: "code",
     kind: "terminal",
-    untested: true,
     guide: (url) => ({
       steps: [
         { text: "codex.step", code: codexCommands(url) },
@@ -365,7 +356,6 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "devin",
     group: "code",
     site: "Windsurf",
-    untested: true,
     guide: (url) => ({
       steps: [
         step("file", { vars: { file: "~/.config/devin/mcp_config.json" }, code: devinConfig(url) }),
@@ -380,7 +370,6 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "jetbrains",
     group: "code",
     site: "IntelliJ IDEA, PyCharm, WebStorm",
-    untested: true,
     guide: (url) => ({
       steps: [
         step("open", { vars: { place: "Settings | Tools | AI Assistant | Model Context Protocol (MCP)" } }),
@@ -409,7 +398,6 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "zed",
     group: "code",
     kind: "editor",
-    untested: true,
     guide: (url) => ({
       steps: [
         step("open", { vars: { place: "Settings\u00a0›\u00a0AI\u00a0›\u00a0MCP Servers" } }),
@@ -426,7 +414,6 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "cline",
     group: "code",
     kind: "extension",
-    untested: true,
     guide: (url) => ({
       steps: [
         step("open", { vars: { place: "MCP Servers\u00a0›\u00a0Remote Servers" } }),
@@ -517,7 +504,6 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "githubcopilot",
     group: "code",
     kind: "terminal",
-    untested: true,
     guide: (url) => ({
       steps: [step("run", { code: copilotCliCommand(url) }), SIGN_IN_FIRST],
       notes: [COPILOT_POLICY],

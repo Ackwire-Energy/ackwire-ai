@@ -52,7 +52,9 @@
   max-width: 600px;
   padding: 40px var(--onb-gutter) 0;
   text-wrap: pretty;
-  animation: onb-in 0.36s var(--out) both;
+  transition:
+    opacity 0.36s var(--out),
+    transform 0.36s var(--out);
 }
 /* With no Back (the first step), an empty row in its place: the host starts where it does on every step. */
 @media (min-width: 761px) {
@@ -62,14 +64,15 @@
     margin: -16px 0 -8px;
   }
 }
-@keyframes onb-in {
-  from {
+/* A transition from the starting style, played once on insertion: a keyframe entrance replays whenever something
+   resets its `animation`, as password managers do to an input's container (see .auth__step in auth.css). */
+@starting-style {
+  .onb__body,
+  .onb__bubble,
+  .onb__answer,
+  .onb__actions {
     opacity: 0;
     transform: translateX(18px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
   }
 }
 .onb__back {
@@ -167,7 +170,9 @@ html:not([data-pointer]) .onb__signout:focus-visible {
   border-radius: 6px var(--radius-section) var(--radius-section) var(--radius-section);
   background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
   box-shadow: var(--card-shadow);
-  animation: onb-in 0.3s var(--out) 0.08s both;
+  transition:
+    opacity 0.3s var(--out) 0.08s,
+    transform 0.3s var(--out) 0.08s;
 }
 .onb__intro {
   margin: 0 0 4px;
@@ -209,7 +214,9 @@ html:not([data-pointer]) .onb__signout:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  animation: onb-in 0.36s var(--out) 0.12s both;
+  transition:
+    opacity 0.36s var(--out) 0.12s,
+    transform 0.36s var(--out) 0.12s;
 }
 .onb__ws {
   display: flex;
@@ -311,7 +318,9 @@ textarea.onb__big.ac-input {
   margin: auto calc(-1 * var(--onb-gutter)) 0;
   padding: 0 var(--onb-gutter) calc(env(safe-area-inset-bottom, 0px) + 24px);
   background: var(--pane);
-  animation: onb-in 0.36s var(--out) 0.16s both;
+  transition:
+    opacity 0.36s var(--out) 0.16s,
+    transform 0.36s var(--out) 0.16s;
 }
 .onb__actions::before {
   content: "";

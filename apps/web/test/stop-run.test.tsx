@@ -92,7 +92,7 @@ describe("Parar is immediate", () => {
     await settle(2);
     const card = () => screen().queryByRole("dialog", { name: "Perfil" });
     expect(card()).not.toBeNull();
-    expect(document.activeElement).toBe(box);
+    expect(document.activeElement === box).toBe(true);
     // What the page's own Esc handlers (an inbox reply that closes) would see.
     const reached: string[] = [];
     const onKey = (e: KeyboardEvent) => reached.push(e.key);

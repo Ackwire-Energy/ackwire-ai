@@ -9,9 +9,11 @@ import {
   DATABASE_SCOPE,
   type DatabaseDeps,
   type DbConnectionRow,
+  isServerDatabase,
   LIST_TABLES_SQL,
   markDatabaseNeedsReconnect,
   orgDbConnections,
+  serverDatabases,
 } from "./connections";
 import { allowedRelations, guardSql, hiddenColumnsOf, relationAllowed } from "./guard";
 import { identPath, parseIdentPath, quoteIdent } from "./identifiers";
@@ -63,6 +65,8 @@ const FOREIGN_KEYS_SQL = `select conname, pg_get_constraintdef(oid) from pg_cons
  * it was granted. Queries are checked by Postgres's parser and the agent's
  * rules (`checkCall`) before reaching the database, and run in a read-only
  * transaction with a time limit. Rows reach the model only as untrusted data.
+ * A whole-server connection keeps the same tools plus `pg_<slug>_list_databases`,
+ * and each of the others takes the one database it reads (`database`).
  */
 export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
   const now = () => deps.now?.() ?? new Date();
@@ -71,7 +75,14 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
     db: Database,
     ctx: ToolContext,
     connection: DbConnectionRow,
-    entry: { kind: string; statement: string; rowCount?: number; durationMs?: number; error?: string },
+    entry: {
+      kind: string;
+      statement: string;
+      database?: string;
+      rowCount?: number;
+      durationMs?: number;
+      error?: string;
+    },
   ) {
     await db
       .insert(dbQueries)
@@ -81,6 +92,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
         connectionId: connection.id,
         runId: ctx.runId || null,
         kind: entry.kind,
+        database: entry.database ?? null,
         statement: entry.statement.slice(0, 20_000),
         rowCount: entry.rowCount ?? null,
         durationMs: entry.durationMs ?? null,
@@ -104,7 +116,22 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
   }
 
   /** A database failure as the model sees it; a refused password marks the connection for reconnecting. */
-  async function failure(db: Database, connection: DbConnectionRow, error: unknown): Promise<ToolOutput> {
+  async function failure(
+    db: Database,
+    connection: DbConnectionRow,
+    error: unknown,
+    database = connection.database,
+  ): Promise<ToolOutput> {
+    // A whole server's access rules (pg_hba) may refuse the role on some databases only: that one is closed,
+    // the connection still works. A refused password (28P01) or the sample database refusing it is a reconnect.
+    if (
+      error instanceof DatabaseError &&
+      error.code === "auth" &&
+      connection.wholeServer &&
+      database !== connection.database &&
+      error.sqlState !== "28P01"
+    )
+      return { content: `Postgres refused this user on the database ${database}: ${error.message}`, isError: true };
     if (error instanceof DatabaseError && error.code === "auth") {
       await markDatabaseNeedsReconnect(db, connection.id, error.message).catch(() => {});
       return {
@@ -122,7 +149,40 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
   }
 
   function toolsFor(connection: DbConnectionRow, slug: string, policy: DatabasePolicy): ToolDefinition[] {
-    const label = `[Database ${connection.label}]`;
+    const whole = connection.wholeServer;
+    /** The one database a call reads: its `database` input on a whole server, else the connection's own. */
+    const dbOf = (input: Record<string, unknown>) => (whole ? str(input.database) : connection.database);
+    const labelOf = (database: string) =>
+      whole ? `[Database ${connection.label} · ${database}]` : `[Database ${connection.label}]`;
+    const mayRead = new Set(policy.databases ?? []);
+    const databaseCheck = async (input: Record<string, unknown>, ctx: ToolContext): Promise<CallCheck> => {
+      if (!whole) return { ok: true };
+      const name = str(input.database);
+      const known =
+        name !== "" &&
+        (mayRead.size === 0 || mayRead.has(name)) &&
+        (await isServerDatabase({ ...deps, db: ctx.db }, connection, name));
+      return known
+        ? { ok: true }
+        : {
+            ok: false,
+            message: `Not allowed: ${name || "(none)"} is not a database of ${connection.label}. Call pg_${slug}_list_databases.`,
+          };
+    };
+    const databaseInput = whole
+      ? {
+          database: {
+            type: "string",
+            minLength: 1,
+            maxLength: 63,
+            description: "One database of this server (from list_databases). Each call reads only that one.",
+          },
+        }
+      : {};
+    const databaseRequired = whole ? ["database"] : [];
+    const tenantNote = whole
+      ? " Each database may belong to a different customer: answer about the database the person asked about and name it. Combine databases only when the person asks."
+      : "";
     const allowed = allowedRelations(policy.tables);
     const rules = { tables: policy.tables, hiddenColumns: policy.hiddenColumns };
     const capCheck = async (ctx: ToolContext): Promise<CallCheck> => {
@@ -142,7 +202,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
       extra: Pick<ToolDefinition, "execute"> & Partial<ToolDefinition>,
     ): ToolDefinition => ({
       name: `pg_${slug}_${verb}`,
-      description: `${label} ${description}`.slice(0, 1024),
+      description: `[Database ${connection.label}] ${description}${tenantNote}`.slice(0, 1024),
       inputSchema: { type: "object", additionalProperties: false, ...inputSchema },
       scope: DATABASE_SCOPE,
       connectionId: connection.id,
@@ -155,19 +215,27 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
 
     const listTables = make(
       "list_tables",
-      "List the tables and views this agent may read (schema.name, kind, estimated rows, comment). Start here.",
-      { properties: {} },
+      `List the tables and views this agent may read (schema.name, kind, estimated rows, comment). ${whole ? "Start with list_databases." : "Start here."}`,
+      { properties: { ...databaseInput }, ...(whole ? { required: databaseRequired } : {}) },
       {
-        checkCall: (_input, ctx) => capCheck(ctx),
-        execute: async (_input, ctx) => {
+        checkCall: async (input, ctx) => {
+          const d = await databaseCheck(input, ctx);
+          return d.ok ? capCheck(ctx) : d;
+        },
+        execute: async (input, ctx) => {
+          const d = await databaseCheck(input, ctx);
+          if (!d.ok) return { content: d.message, isError: true };
+          const database = dbOf(input);
+          const label = labelOf(database);
           const started = Date.now();
           try {
-            const client = await clientFor({ ...deps, db: ctx.db }, connection);
+            const client = await clientFor({ ...deps, db: ctx.db }, connection, database);
             const rows = await client.readOnly(CATALOG_LIMITS, async (run) => (await run(LIST_TABLES_SQL)).rows);
             const visible = rows.filter((r) => relationAllowed(allowed, String(r[0]), String(r[1])));
             await log(ctx.db, ctx, connection, {
               kind: "list_tables",
               statement: "list tables",
+              ...(whole ? { database } : {}),
               rowCount: visible.length,
               durationMs: Date.now() - started,
             });
@@ -178,10 +246,10 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
             );
             return {
               content: `${label} ${visible.length} tables. Use schema.table names in queries (unqualified names are public.*).\n${wrapRows(lines.join("\n"))}`,
-              data: { dbConnectionId: connection.id, tables: visible.length },
+              data: { dbConnectionId: connection.id, tables: visible.length, ...(whole ? { database } : {}) },
             };
           } catch (error) {
-            return failure(ctx.db, connection, error);
+            return failure(ctx.db, connection, error, database);
           }
         },
       },
@@ -205,15 +273,22 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
             maxLength: 130,
             description: "schema.table (public.table if no schema).",
           },
+          ...databaseInput,
         },
-        required: ["table"],
+        required: [...databaseRequired, "table"],
       },
       {
         checkCall: async (input, ctx) => {
           const t = tableAllowed(str(input.table));
-          return t.ok ? capCheck(ctx) : t;
+          if (!t.ok) return t;
+          const d = await databaseCheck(input, ctx);
+          return d.ok ? capCheck(ctx) : d;
         },
         execute: async (input, ctx) => {
+          const d = await databaseCheck(input, ctx);
+          if (!d.ok) return { content: d.message, isError: true };
+          const database = dbOf(input);
+          const label = labelOf(database);
           const parts = parseIdentPath(str(input.table), 2);
           if (!parts)
             return {
@@ -227,7 +302,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
           );
           const started = Date.now();
           try {
-            const client = await clientFor({ ...deps, db: ctx.db }, connection);
+            const client = await clientFor({ ...deps, db: ctx.db }, connection, database);
             const { columns, fks } = await client.readOnly(CATALOG_LIMITS, async (run) => ({
               columns: (await run(DESCRIBE_SQL, [name])).rows,
               fks: (await run(FOREIGN_KEYS_SQL, [name])).rows,
@@ -235,6 +310,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
             await log(ctx.db, ctx, connection, {
               kind: "describe_table",
               statement: name,
+              ...(whole ? { database } : {}),
               rowCount: columns.length,
               durationMs: Date.now() - started,
             });
@@ -246,10 +322,10 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
             const keys = fks.map((f) => `${f[0]}: ${f[1]}`);
             return {
               content: `${label} ${name}\n${wrapRows([...lines, ...(keys.length > 0 ? ["foreign keys:", ...keys] : [])].join("\n"))}`,
-              data: { dbConnectionId: connection.id },
+              data: { dbConnectionId: connection.id, ...(whole ? { database } : {}) },
             };
           } catch (error) {
-            return failure(ctx.db, connection, error);
+            return failure(ctx.db, connection, error, database);
           }
         },
       },
@@ -267,25 +343,34 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
             items: { type: ["string", "number", "boolean", "null"] },
             description: "Values for $1, $2…",
           },
+          ...databaseInput,
         },
-        required: ["sql"],
+        required: [...databaseRequired, "sql"],
       },
       {
-        describe: (input) => ({ title: `Query ${connection.label}`, detail: str(input.sql).slice(0, 1500) }),
+        describe: (input) => ({
+          title: whole ? `Query ${connection.label} · ${str(input.database)}` : `Query ${connection.label}`,
+          detail: str(input.sql).slice(0, 1500),
+        }),
         checkCall: async (input, ctx) => {
-          const g = await guardSql(str(input.sql), rules);
+          const g = await guardSql(str(input.sql), rules, { wholeServer: whole });
           if (!g.ok) return { ok: false, message: `Not allowed: ${g.reason}` };
-          return capCheck(ctx);
+          const d = await databaseCheck(input, ctx);
+          return d.ok ? capCheck(ctx) : d;
         },
         execute: async (input, ctx) => {
-          const g = await guardSql(str(input.sql), rules);
+          const g = await guardSql(str(input.sql), rules, { wholeServer: whole });
           if (!g.ok) return { content: `Not allowed: ${g.reason}`, isError: true };
+          const d = await databaseCheck(input, ctx);
+          if (!d.ok) return { content: d.message, isError: true };
+          const database = dbOf(input);
+          const label = labelOf(database);
           const params = Array.isArray(input.params) ? input.params : [];
           const text =
             g.kind === "select" ? `select * from (\n${g.body}\n) as agentes_q limit ${MAX_ROWS + 1}` : g.body;
           const started = Date.now();
           try {
-            const client = await clientFor({ ...deps, db: ctx.db }, connection);
+            const client = await clientFor({ ...deps, db: ctx.db }, connection, database);
             const result = await client.readOnly(
               { statementTimeoutMs: policy.timeoutSeconds * 1000, searchPath: "public" },
               (run) => run(text, params),
@@ -295,6 +380,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
             await log(ctx.db, ctx, connection, {
               kind: "query",
               statement: g.body,
+              ...(whole ? { database } : {}),
               rowCount: result.rows.length,
               durationMs: ms,
             });
@@ -303,15 +389,60 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
               : `${out.shown} rows`;
             return {
               content: `${label} ${count}, ${ms} ms.\n${wrapRows(out.text)}`,
-              data: { dbConnectionId: connection.id, rows: out.shown, cut: out.cut, ms, sql: g.body },
+              data: {
+                dbConnectionId: connection.id,
+                rows: out.shown,
+                cut: out.cut,
+                ms,
+                sql: g.body,
+                ...(whole ? { database } : {}),
+              },
             };
           } catch (error) {
             await log(ctx.db, ctx, connection, {
               kind: "query",
               statement: g.body,
+              ...(whole ? { database } : {}),
               durationMs: Date.now() - started,
               error: error instanceof Error ? error.message : String(error),
             });
+            return failure(ctx.db, connection, error, database);
+          }
+        },
+      },
+    );
+
+    const listDatabases = make(
+      "list_databases",
+      "List the databases of this server this agent may read. Pass one as `database` to the other tools.",
+      {
+        properties: {
+          search: { type: "string", maxLength: 63, description: "Only names containing this (any case)." },
+        },
+      },
+      {
+        checkCall: (_input, ctx) => capCheck(ctx),
+        execute: async (input, ctx) => {
+          const started = Date.now();
+          try {
+            const all = await serverDatabases({ ...deps, db: ctx.db }, connection);
+            const search = str(input.search).trim().toLowerCase();
+            const names = all.filter(
+              (n) => (mayRead.size === 0 || mayRead.has(n)) && (!search || n.toLowerCase().includes(search)),
+            );
+            await log(ctx.db, ctx, connection, {
+              kind: "list_databases",
+              statement: search ? `list databases: ${search}` : "list databases",
+              rowCount: names.length,
+              durationMs: Date.now() - started,
+            });
+            const label = `[Database ${connection.label}]`;
+            if (names.length === 0) return { content: `${label} No databases this agent may read.` };
+            return {
+              content: `${label} ${names.length} databases.\n${wrapRows(names.join("\n"))}`,
+              data: { dbConnectionId: connection.id, databases: names.length },
+            };
+          } catch (error) {
             return failure(ctx.db, connection, error);
           }
         },
@@ -320,6 +451,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
 
     const off = new Set(connection.offActions);
     return [
+      ...(whole ? [listDatabases] : []),
       ...(off.has("list_tables") ? [] : [listTables]),
       ...(off.has("describe_table") ? [] : [describeTable]),
       ...(off.has("query") ? [] : [query]),

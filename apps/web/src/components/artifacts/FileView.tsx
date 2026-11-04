@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useOrg } from "@/components/org-context";
 import { fileSaver } from "./fileSaver";
+import { ImageZoom } from "./ImageZoom";
 
 /** Object URLs for blobs (swappable: test DOMs may lack `URL.createObjectURL`). */
 export const objectUrls = {
@@ -152,8 +153,16 @@ export function FileView({
   const canPreview = kind !== null && content.size <= MAX_PREVIEW_BYTES;
   const { url, failed } = usePreviewUrl(artifactId, version, content.contentType, canPreview);
 
+  // A picture fills the viewer, with its zoom.
+  if (kind === "image" && canPreview && url && !failed) {
+    return (
+      <div className="file-view file-view--image">
+        <ImageZoom key={url} src={url} alt={t("files.imageAlt", { title })} />
+      </div>
+    );
+  }
   return (
-    <div className="file-view">
+    <div className={kind === "image" && canPreview ? "file-view file-view--image" : "file-view"}>
       {canPreview && (
         <div className="file-view__preview">
           {failed ? (
@@ -163,8 +172,6 @@ export function FileView({
               <Spinner />
               {t("files.previewLoading")}
             </span>
-          ) : kind === "image" ? (
-            <img className="file-view__image" src={url} alt={t("files.imageAlt", { title })} />
           ) : (
             <iframe className="file-view__pdf" src={url} title={t("files.pdfFrame", { title })} />
           )}

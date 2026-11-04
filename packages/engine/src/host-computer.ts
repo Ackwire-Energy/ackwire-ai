@@ -224,7 +224,9 @@ async function joined(deps: HostDeps, row: MachineRow, now: Date) {
   const moved = await db
     .update(agents)
     .set({ machineId: row.id, brainAccountId: null, updatedAt: now })
-    .where(and(eq(agents.orgId, row.orgId), isNull(agents.machineId), isNull(agents.archivedAt)))
+    .where(
+      and(eq(agents.orgId, row.orgId), isNull(agents.machineId), isNull(agents.archivedAt), isNull(agents.builtin)),
+    )
     .returning({ id: agents.id });
   for (const a of moved) caches.agents.delete(`${row.orgId}:${a.id}`);
   await recordAudit(db, {

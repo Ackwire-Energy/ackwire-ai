@@ -37,6 +37,9 @@ export const ConversationRowView = memo(function ConversationRowView({
   onHold,
   holdLabel,
   onStart,
+  meta,
+  fresh = false,
+  onOpen,
 }: {
   row: ConversationRow;
   /** A hairline above (every row but the first). */
@@ -50,6 +53,12 @@ export const ConversationRowView = memo(function ConversationRowView({
   holdLabel?: string;
   /** An agent with no conversation yet (`channelId: ""`): opens one with it, given the agent (stable, memoized row). */
   onStart?: (agentId: string) => void;
+  /** In the time's place: the right hand's label (ADR 0137). */
+  meta?: string;
+  /** Not opened yet on this phone: the dot. */
+  fresh?: boolean;
+  /** Told when the row opens its conversation. */
+  onOpen?: () => void;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -214,12 +223,14 @@ export const ConversationRowView = memo(function ConversationRowView({
   }
   if (r.kind === "thread" && r.closed) label = `${t("mobile.chats.closed")}, ${label}`;
 
-  const open = () =>
-    onStart && r.kind === "dm"
-      ? onStart(r.with.id)
-      : router.push(chatHref(r.channelId, r.kind === "thread" || r.kind === "mission" ? r.threadId : null));
+  const open = () => {
+    onOpen?.();
+    if (onStart && r.kind === "dm") onStart(r.with.id);
+    else router.push(chatHref(r.channelId, r.kind === "thread" || r.kind === "mission" ? r.threadId : null));
+  };
   const a11y = [
     name,
+    meta ?? null,
     presenceWord,
     personShown?.status?.text ?? null,
     placeLine,
@@ -252,7 +263,8 @@ export const ConversationRowView = memo(function ConversationRowView({
       unread={r.unread > 0}
       leading={leading}
       title={name}
-      time={r.at ? when.short(r.at) : null}
+      time={meta ?? (r.at ? when.short(r.at) : null)}
+      dot={fresh && badge === 0}
       over={
         placeLine ? (
           <Text variant="caption" tone="faint" numberOfLines={1}>

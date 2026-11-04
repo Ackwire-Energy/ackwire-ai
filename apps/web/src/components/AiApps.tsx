@@ -533,7 +533,6 @@ function ClientSteps({ client, url, onToken }: { client: AppClient; url: string;
           ))}
         </ol>
       )}
-      {client.untested && <SettingNote icon="info">{t("apps.dialog.note.untested")}</SettingNote>}
       {guide.notes.map((n) => (
         <SettingNote key={n.text} icon={n.icon}>
           <Trans i18nKey={`apps.dialog.${n.text}`} components={CODE} />

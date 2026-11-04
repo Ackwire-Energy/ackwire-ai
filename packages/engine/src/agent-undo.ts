@@ -12,6 +12,7 @@ import { assertActiveMembership, can, getMembership } from "./organizations";
 import { hookMethodsOf, routineHookKeys } from "./routine-hooks";
 import { nextRoutineTime } from "./routines";
 import { enqueueIndex } from "./search";
+import { revertSettings } from "./settings-proposals";
 import { restoreSkillSnapshot, type SkillSnapshot } from "./skill-updates";
 import { writeSkillBody } from "./skills";
 import { closeThread, getThread, reopenThread, updateThread } from "./threads";
@@ -512,6 +513,11 @@ handlers["skill.updated"] = async (deps, a, _userId, direction) => {
     direction === "undo" ? [obj(a.after).body, obj(a.before).body] : [obj(a.before).body, obj(a.after).body];
   if (typeof to !== "string" || skill.body !== from) throw changedSince();
   await writeSkillBody(deps.db, skill, to);
+  return undefined;
+};
+
+handlers["agent.settings_changed"] = async (deps, a, userId, direction) => {
+  await revertSettings(deps, a, userId, direction, changedSince);
   return undefined;
 };
 

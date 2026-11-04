@@ -7,8 +7,17 @@
   font: inherit;
   font-weight: 600;
   color: var(--agent);
+  text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
+}
+.cq-link:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+.cq-link[aria-busy] {
+  color: var(--agent);
+  opacity: 0.6;
 }
 html:not([data-pointer]) .cq-link:focus-visible {
   outline: none;
@@ -94,8 +103,9 @@ html:not([data-pointer]) .cq-link:focus-visible {
   line-height: 20px;
 }
 .cq__l1 b {
+  min-width: 0;
   font-weight: 600;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .cq__nth {
   font-size: 12px;
@@ -119,6 +129,16 @@ html:not([data-pointer]) .cq-link:focus-visible {
 }
 .cq__row[data-mine] .cq__l2 {
   color: var(--ink2);
+}
+/* A row's or a waiting note's actions, words only: "Ver conversa", "Não rodar", "Responder mesmo assim", "Ver fila". */
+.cq__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 18px;
 }
 .cq__text > .cq-first {
   margin-top: 4px;
@@ -214,7 +234,42 @@ html:not([data-pointer]) .cq-link:focus-visible {
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
+  /* CountChip's own display: its text-box centring trims a block container, never an inline-flex box. */
   .cq-btn .cq-btn__count {
-    display: inline-flex;
+    display: inline-block;
+  }
+}
+
+/* An agent's usage line (UsageQueue.tsx): the row answering now, a row's "Não rodar", and "Não rodar nenhuma" asked in place. */
+.cq__time[data-now] {
+  color: var(--agent);
+  font-weight: 600;
+}
+.cq-confirm {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.cq-confirm__ask {
+  margin-right: auto;
+  font-weight: 600;
+}
+/* On a phone the dialog's footer note takes a row of its own; "Trocar a IA" is a few words, so it shares one with the button. */
+@media (max-width: 640px) {
+  .cq-dialog .ac-dialog__foot-note {
+    flex-basis: auto;
+  }
+  /* The question on its own line, its two answers together under it. */
+  .cq-confirm {
+    justify-content: flex-end;
+  }
+  .cq-confirm__ask {
+    flex-basis: 100%;
   }
 }

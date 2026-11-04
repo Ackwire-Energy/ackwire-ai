@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import { proposeChange } from "@agenteschat/engine";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { proposeChange, proposeSettings } from "@agenteschat/engine";
+import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 afterEach(() => t.close());
@@ -219,4 +219,45 @@ test("a card's rows are read by id, and deciding one answers with it however man
   const accepted = await api(`/proposals/${id}/accept`, { json: {} });
   expect(accepted.status).toBe(200);
   expect(await accepted.json()).toMatchObject({ id, status: "accepted" });
+});
+
+test("a settings row a member can't decide: only they send it, once, and not once decided (ADR 0137)", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const member = await joinByInvitation(t, owner, orgId, "bia@example.com");
+  const [bia] = await t.db.select().from(schema.users).where(eq(schema.users.email, "bia@example.com"));
+  const {
+    proposals: [row],
+  } = await proposeSettings(
+    { db: t.db },
+    {
+      orgId,
+      agentId,
+      targets: [{ agentId, lines: [{ field: "budget", to: 20_000_000_000 }] }],
+      rationale: "mais folga",
+      requesterId: bia?.id ?? "",
+    },
+  );
+  const id = row?.id ?? "";
+  const as = (b: typeof owner) => (path: string, init?: Parameters<typeof owner>[1]) =>
+    b(`/api/app/organizations/${orgId}${path}`, init);
+  const seen = (await (await as(member)(`/proposals?ids=${id}`)).json()) as { proposals: Record<string, unknown>[] };
+  expect(seen.proposals[0]).toMatchObject({
+    target: { type: "agent_settings", agentId },
+    settings: [{ field: "budget", from: 50_000_000_000, to: 20_000_000_000 }],
+    requestedBy: { userId: bia?.id },
+    askedAt: null,
+    canDecide: false,
+    decider: { type: "admins" },
+    undoActionId: null,
+  });
+  expect((await as(owner)(`/proposals/${id}/ask`, { json: {} })).status).toBe(403);
+  const asked = await as(member)(`/proposals/${id}/ask`, { json: {} });
+  expect(asked.status).toBe(200);
+  expect(((await asked.json()) as { askedAt: string | null }).askedAt).toBeString();
+  expect((await as(member)(`/proposals/${id}/ask`, { json: {} })).status).toBe(409);
+  expect((await as(owner)(`/proposals/${id}/accept`, { json: {} })).status).toBe(200);
+  expect((await as(member)(`/proposals/${id}/ask`, { json: {} })).status).toBe(409);
 });

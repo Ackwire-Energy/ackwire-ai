@@ -304,12 +304,15 @@ async function readPictures(dir: string) {
 /** How many agents a picture shows: two on each side of the computer still fit a 320 px phone. */
 const CREW = 4;
 
-/** The workspace's agents its emails picture: the `CREW` oldest, each with its look. */
+/**
+ * The workspace's agents its emails picture: the `CREW` oldest, each with its look. The team's own, not its right hand
+ * (ADR 0137), which every workspace has and which works on no computer.
+ */
 export async function emailCrew(db: Executor, orgId: string): Promise<Look[]> {
   const rows = await db
     .select({ appearance: agents.appearance })
     .from(agents)
-    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.builtin)))
     .orderBy(asc(agents.createdAt), asc(agents.id))
     .limit(CREW);
   return rows.map(({ appearance: a }) => ({ color: a?.color, eyes: a?.eyes, accessory: a?.accessory }));

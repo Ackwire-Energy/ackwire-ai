@@ -4,6 +4,7 @@ import {
   createDatabaseConnection,
   createDatabaseToolSource,
   createLocalKeyWrapper,
+  DATABASES_SQL,
   type DatabaseDeps,
   type DatabasePolicy,
   setAgentDatabase,
@@ -34,13 +35,33 @@ export async function customerDatabase() {
 /**
  * The engine fixture with the database tool source in the Tool Gateway and a
  * fake driver over `customerDatabase()`. `fail` makes the next opens fail;
- * DNS: `*.example.com` is public, anything else private.
+ * DNS: `*.example.com` is public, anything else private. `server` lists the
+ * server's databases (PGlite has one: every name opens the same tables);
+ * `listed` counts the times the list was read.
  */
 export async function databaseSetup() {
   const pg = await customerDatabase();
   const opened: DatabaseTarget[] = [];
-  const state: { fail: DatabaseError | null } = { fail: null };
-  const databases = createFakeDatabaseDriver({ db: pg, opened, refuse: () => state.fail });
+  const state: {
+    fail: DatabaseError | null;
+    server: string[] | null;
+    listed: number;
+    refuseDatabase?: (database: string) => DatabaseError | null;
+  } = { fail: null, server: null, listed: 0 };
+  const databases = createFakeDatabaseDriver({
+    db: pg,
+    opened,
+    refuse: (target) => state.fail ?? state.refuseDatabase?.(target.database) ?? null,
+    answer: (text, params) => {
+      if (text !== DATABASES_SQL || !state.server) return null;
+      state.listed++;
+      const prefix = String(params[0] ?? "");
+      return {
+        columns: [{ name: "datname", type: 19 }],
+        rows: state.server.filter((n) => n.startsWith(prefix)).map((n) => [n]),
+      };
+    },
+  });
   const keyWrappers = [createLocalKeyWrapper(SECRET)];
   const resolveHost = async (host: string) => (host.endsWith("example.com") ? ["93.184.216.34"] : ["10.0.0.5"]);
   const f = await setup({ toolSources: [createDatabaseToolSource({ keyWrappers, databases, resolveHost })] });

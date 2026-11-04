@@ -1,17 +1,23 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import { ApiError } from "../src/api/http";
-import type { AppNotification, GitHubRepositories } from "../src/api/types";
+import type { AppNotification, GitHubRepositories, SkillDetail } from "../src/api/types";
 import { openTarget, workspaceHeadline } from "../src/lib/notifications";
 import {
+  changedByText,
+  changesSinceLink,
   githubRepoLink,
   hiddenRepoOf,
   hiddenRepoText,
   searchRepos,
+  skillPendingViews,
   skillPickOf,
   skillRefusalText,
   skillSourceViaText,
+  skillUpdateWords,
   skillViaText,
+  skillWaitingChip,
+  waitingUpdate,
 } from "../src/lib/skills";
 
 /** The key and its values, so a test sees which words were picked (the words themselves: packages/i18n). */
@@ -126,5 +132,119 @@ describe("skill notices", () => {
       params: { section: "skills" },
       search: { skill: "s1" },
     });
+  });
+});
+
+describe("a skill's waiting update (web and phone)", () => {
+  const base = { body: "# v1", description: "Antes do deploy.", at: "2026-11-01T10:00:00.000Z" };
+  const change = (id: string, agentId: string, at: string, undone = false) => ({
+    id,
+    agentId,
+    at,
+    before: "# v1",
+    after: "# v1\nCache.",
+    undone,
+  });
+  const skill = (over: Partial<SkillDetail> = {}): SkillDetail =>
+    ({
+      id: "s1",
+      name: "deploy",
+      description: "Antes do deploy.",
+      version: 3,
+      source: "url",
+      sourceUrl: "https://github.com/acme/skills",
+      defaultForNewAgents: false,
+      metadata: {},
+      createdAt: base.at,
+      updatedAt: base.at,
+      body: "# v1\nCache.",
+      files: [],
+      pendingUpdate: { scripts: [], at: "2026-11-03T10:00:00.000Z", dismissed: false, edited: true },
+      pending: { body: "# v2", description: "Antes do deploy.", base, files: [] },
+      changes: [
+        change("c3", "bia", "2026-11-02T12:00:00.000Z"),
+        change("c2", "ada", "2026-11-02T10:00:00.000Z", true),
+        change("c1", "ada", "2026-11-01T11:00:00.000Z"),
+        change("c0", "caio", "2026-10-20T11:00:00.000Z"),
+      ],
+      ...over,
+    }) as SkillDetail;
+
+  test("the link and the agents both changed it: what each changed and the skill against the link", () => {
+    expect(skillPendingViews(skill()).map((v) => [v.id, v.before.body, v.after.body])).toEqual([
+      ["agents", "# v1", "# v1\nCache."],
+      ["link", "# v1", "# v2"],
+      ["compare", "# v1\nCache.", "# v2"],
+    ]);
+    // What its link last wrote isn't known: only the skill against the link.
+    const unknown = { body: "# v2", description: "Antes do deploy.", base: null, files: [] };
+    expect(skillPendingViews(skill({ pending: unknown })).map((v) => v.id)).toEqual(["compare"]);
+    // Files that run only: what the update changes.
+    const scripts = skill({ pendingUpdate: { scripts: ["run.sh"], at: base.at, dismissed: false, edited: false } });
+    expect(skillPendingViews(scripts).map((v) => v.id)).toEqual(["link"]);
+    expect(skillPendingViews(skill({ pending: null }))).toEqual([]);
+  });
+
+  test("the page's words: the choice while it waits, a line with Desfazer after either", () => {
+    const words = skillUpdateWords(t, "pt-BR", skill());
+    expect(words.waiting).toMatchObject({
+      title: "skills.pending.edited",
+      lead: "skills.pending.editedLead",
+      apply: "skills.pending.useLink",
+      keep: "skills.pending.keepAgents",
+      applied: "skills.pending.usedLink",
+      kept: "skills.pending.keptAgents",
+    });
+    expect([words.kept, words.last]).toEqual([null, null]);
+    // Files that run only: applied or not, and why it waits.
+    const scripts = skillUpdateWords(
+      t,
+      "pt-BR",
+      skill({ pendingUpdate: { scripts: ["run.sh"], at: base.at, dismissed: false, edited: false } }),
+    );
+    expect(scripts.waiting).toMatchObject({
+      title: 'skills.pending.title {"files":"run.sh"}',
+      lead: "skills.pending.lead",
+      apply: "skills.pending.apply",
+      keep: "skills.pending.dismiss",
+    });
+    // Kept as it is: no choice, a line (its Desfazer makes it wait again).
+    const kept = skillUpdateWords(
+      t,
+      "pt-BR",
+      skill({ pendingUpdate: { scripts: [], at: base.at, dismissed: true, dismissedAt: base.at, edited: true } }),
+    );
+    expect(kept.waiting).toBeNull();
+    expect(kept.kept?.startsWith("skills.pending.keptLine")).toBe(true);
+    // The link's version chosen: its line and Desfazer; an update applied by itself keeps its own words.
+    const chosen = { fromVersion: 2, at: base.at, agentId: null, waited: true };
+    expect(skillUpdateWords(t, "pt-BR", skill({ pendingUpdate: null, lastUpdate: chosen })).last).toMatchObject({
+      undo: "skills.undo",
+    });
+    const plain = skillUpdateWords(
+      t,
+      "pt-BR",
+      skill({ pendingUpdate: null, lastUpdate: { ...chosen, waited: false } }),
+    );
+    expect(plain.last?.undo).toBe("skills.undoUpdate");
+    expect(
+      skillUpdateWords(t, "pt-BR", skill({ pendingUpdate: null, lastUpdate: { ...chosen, agentId: "ada" } })).last,
+    ).toBeNull();
+  });
+
+  test("who changed it since the link, the undone ones and the older ones left out; the list's word", () => {
+    expect(changesSinceLink(skill()).map((c) => c.id)).toEqual(["c3", "c1"]);
+    expect(changesSinceLink(skill({ pending: null }))).toEqual([]);
+    const names: Record<string, string> = { ada: "Ada", bia: "Bia" };
+    const line = changedByText(t, "pt-BR", changesSinceLink(skill()), (id) => names[id] ?? "?") ?? "";
+    expect(line.startsWith('skills.pending.byAgents {"count":2,"names":"format.list')).toBe(true);
+    expect(changedByText(t, "pt-BR", [], () => "")).toBeNull();
+
+    expect(waitingUpdate(skill())).toMatchObject({ edited: true });
+    expect(waitingUpdate(skill({ pendingUpdate: { scripts: [], at: base.at, dismissed: true } }))).toBeNull();
+    expect(skillWaitingChip({ scripts: [], at: base.at, dismissed: false, edited: true })).toBe(
+      "skills.waitingChipEdited",
+    );
+    expect(skillWaitingChip({ scripts: ["run.sh"], at: base.at, dismissed: false })).toBe("skills.waitingChip");
   });
 });

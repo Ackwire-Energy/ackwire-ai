@@ -85,6 +85,17 @@ export const NOTIFICATION_KINDS = [
    * once per wait): `latest.title` the plan's name, `source.label` the agent's.
    */
   "plan_reset_unknown",
+  /**
+   * An agent back from its plan or budget skipped catch-ups that looked handled (ADR 0136): its owner, one row per line
+   * (`count` the conversations they can read), opening the latest skipped note. Inbox only (no category, no push).
+   */
+  "catch_up_closed",
+  /**
+   * The person who asked, when the agent skipped their catch-up crediting someone else (ADR 0136): `latest.reason`
+   * `solved` or `task_canceled`, `latest.title` who, `source.label` the conversation. Inbox only, opening the note
+   * with "Responder mesmo assim".
+   */
+  "catch_up_closed_asker",
   "reaction",
   "machine_connected",
   /** An agent needs a person in its browser (ADR 0040 §6). */
@@ -170,6 +181,13 @@ export const NOTIFICATION_KINDS = [
    * one row while unread). Inbox only.
    */
   "skill_update",
+  /**
+   * Someone asked the team's right hand for a change only others may decide, and sent it to them ("Pedir a um
+   * admin", ADR 0137): each person who may decide it, one row per proposal (`source.proposalId`, or `source.messageId`
+   * for a new agent's card), `source.agentId` and its name in `label` the agent it changes, `latest.text` why.
+   * Waiting; done once someone decides it.
+   */
+  "change_request",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -200,6 +218,8 @@ export interface NotificationSource {
   handoffId?: string;
   /** Which of the agent's screens it is on, when not its browser (ADR 0058). */
   screen?: ScreenKind;
+  /** `change_request`: the proposed change to decide (ADR 0137). */
+  proposalId?: string;
   /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
   userId?: string;
   /** The agent held on agentes.chat Cloud (`org_standing` to `agent_hold`, its name in `label`); a widget's agent. */
@@ -320,6 +340,8 @@ const MERGING: ReadonlySet<NotificationKind> = new Set([
   // An agent's changes to a skill gather in one row while unread (`notifySkillUpdate` `edited`); its other notices
   // have a key of their own each.
   "skill_update",
+  // An agent's skipped catch-ups of one line gather in one row while unread, counting them.
+  "catch_up_closed",
 ]);
 /** "Menções" in the inbox: what was said to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_reply", "agent_question"];

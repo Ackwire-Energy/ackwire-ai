@@ -227,9 +227,6 @@ export async function world(options: WorldOptions) {
       { name: capitalized(handle), handle, role: "", instructions: "", credentialId: f.credential.id },
       { model: "claude-sonnet-5-5" },
     );
-    // Nobody coordinates (ADR 0093); branches cut before it have no such column.
-    if ("coordinator" in schema.agents)
-      await f.db.update(schema.agents).set({ coordinator: false }).where(eq(schema.agents.id, agent.id));
     agents[handle] = agent;
   }
   const people: Record<string, { id: string; name: string }> = { ana: f.owner };

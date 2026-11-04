@@ -193,7 +193,7 @@ describe("the header search (Discord's)", () => {
       const sheet = screen().getByRole("dialog", { name: "Buscar" });
       expect(sheet.getAttribute("aria-modal")).toBe("true");
       const field = within(sheet).getByRole("combobox", { name: "Buscar" });
-      expect(document.activeElement).toBe(field);
+      expect(document.activeElement === field).toBe(true);
       await act(async () => fireEvent.change(field, { target: { value: "zebra" } }));
       await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
       await act(() => new Promise((r) => setTimeout(r, 300)));
@@ -237,7 +237,7 @@ describe("the header search (Discord's)", () => {
       await act(async () => fireEvent.keyDown(field, { key: "Escape" }));
       await settle(1);
       expect(screen().queryByRole("dialog", { name: "Buscar" })).toBeNull();
-      expect(document.activeElement).toBe(icon);
+      expect(document.activeElement === icon).toBe(true);
     } finally {
       media.mockRestore();
     }

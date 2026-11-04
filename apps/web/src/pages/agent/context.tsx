@@ -38,7 +38,6 @@ export interface Draft {
   channels: string[] | undefined;
   /** `NO_GROUP` or a group id; undefined until the groups load. */
   group: string | undefined;
-  coordinator: boolean;
 }
 
 export interface AgentEdit {

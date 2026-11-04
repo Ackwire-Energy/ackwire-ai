@@ -206,6 +206,10 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
 export const ANYWHERE: readonly string[] = [
   "connectFlow.needsKey",
   "database.error.blocked_host",
+  "database.error.no_databases",
+  "database.scopeAll",
+  "database.widenText_one",
+  "database.widenText_other",
   // "a server that's always on": what to install instead of this computer.
   "help.selfhost.run-on-your-computer.sections.1.blocks.0",
   "mobile.connectors.needsKey",

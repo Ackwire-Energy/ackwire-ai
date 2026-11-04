@@ -161,6 +161,12 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
 }
 .members-side__line.status-line {
   display: flex;
+  align-items: flex-start;
+}
+/* A written or automatic line too ("Sem limite no plano · volta às 15:00 · 4 conversas esperando"): wrapped, never cut. */
+.members-side__line .status-line__text {
+  overflow: visible;
+  white-space: normal;
 }
 .members-side__work {
   color: var(--ink2);

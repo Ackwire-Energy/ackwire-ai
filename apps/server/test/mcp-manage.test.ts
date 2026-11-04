@@ -441,7 +441,7 @@ describe("import_summary", () => {
       markdown: "---\nname: triage\ndescription: Sorts bugs\n---\nBody",
     });
     const summary = data(await callTool(t, app.access, "import_summary", {}));
-    expect((summary.agents as { handle: string }[]).map((a) => a.handle)).toEqual(["dev"]);
+    expect((summary.agents as { handle: string }[]).map((a) => a.handle)).toEqual(["lodi", "dev"]);
     expect((summary.skills as { name: string }[]).map((s) => s.name)).toEqual(["triage"]);
     expect((summary.channels as { name: string }[]).map((c) => c.name)).toContain("general");
     expect(summary.routines).toEqual([]);

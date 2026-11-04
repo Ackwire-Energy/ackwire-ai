@@ -191,12 +191,24 @@ test("updating from its link: text applies and is undone, a new script waits for
     scripts: ["run.sh"],
     skill: { version: 3, pendingUpdate: { scripts: ["run.sh"], dismissed: false } },
   });
+  expect(await (await owner(at(`/${id}`))).json()).toMatchObject({
+    pending: { files: [{ path: "run.sh", before: null, after: "echo hi", large: false }], base: null },
+    changes: [],
+  });
   const member = await joinByInvitation(t, owner, orgId, "member@example.com");
   expect((await member(at(`/${id}/update/approve`), { json: {} })).status).toBe(403);
+  expect((await member(at(`/${id}/update/reopen`), { json: {} })).status).toBe(403);
   expect((await member(at(`/${id}`), { method: "PATCH", json: { autoUpdate: true } })).status).toBe(403);
+  // Kept out, then Desfazer: it waits again.
+  expect(await (await owner(at(`/${id}/update/dismiss`), { json: {} })).json()).toMatchObject({
+    pendingUpdate: { dismissed: true },
+  });
+  expect(await (await owner(at(`/${id}/update/reopen`), { json: {} })).json()).toMatchObject({
+    pendingUpdate: { dismissed: false, dismissedAt: null },
+  });
   expect(await (await owner(at(`/${id}/update/approve`), { json: {} })).json()).toMatchObject({
     status: "updated",
-    skill: { version: 4, pendingUpdate: null },
+    skill: { version: 4, pendingUpdate: null, lastUpdate: { waited: true } },
   });
   expect(await (await owner(at(`/${id}`), { method: "PATCH", json: { autoUpdate: true } })).json()).toMatchObject({
     autoUpdate: true,

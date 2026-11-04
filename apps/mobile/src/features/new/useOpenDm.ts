@@ -11,7 +11,7 @@ import { closeSheetsAndOpen } from "./parts";
 
 /**
  * Opens (or creates) the direct conversation with an agent or a person, closing the sheets on the way. `compose`: the
- * conversation opens ready to type (its composer focused). `replace`: the screen it is opened from gives way to it
+ * conversation opens ready to type (its composer focused), with `text` in it when given. `replace`: the screen it is opened from gives way to it
  * ("New", pushed over the tabs: back from the conversation goes to the tabs, with no pop and push between).
  */
 export function useOpenDm() {
@@ -21,12 +21,15 @@ export function useOpenDm() {
   const qc = useQueryClient();
   const toast = useToast();
   return useCallback(
-    (target: { agentId: string } | { userId: string }, how: { compose?: boolean; replace?: boolean } = {}) =>
+    (
+      target: { agentId: string } | { userId: string },
+      how: { compose?: boolean; text?: string; replace?: boolean } = {},
+    ) =>
       api.dms
         .open(orgId, target)
         .then(({ channelId }) => {
           void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
-          if (how.compose) requestComposerText(channelId, "");
+          if (how.compose) requestComposerText(channelId, how.text ?? "");
           if (how.replace) router.replace(chatHref(channelId));
           else closeSheetsAndOpen(chatHref(channelId));
         })
