@@ -531,7 +531,7 @@ export function WorkingLine({
         p.agentId ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
           <RNText key={i} style={{ color: c.ink }}>
-            <AgentWho agentId={p.agentId} name={p.text} size={13} />
+            <AgentWho agentId={p.agentId} name={p.text} size={13} lead={i === 0} />
           </RNText>
         ) : p.bold ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order

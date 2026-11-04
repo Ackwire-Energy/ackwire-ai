@@ -140,20 +140,24 @@ function Badged({
 
 /**
  * An agent named in a line of text: its still face, the text's size, then its name (the web's `.ac-who`). A child of a
- * `<Text>`; the face is an inline view lifted onto the capitals.
+ * `<Text>`; the face is an inline view lifted onto the capitals. A space plus 0.2 of the size before it, 0.4 after, as
+ * on the web; `lead` (it opens the text) drops the one before.
  */
 export function AgentWho({
   agentId,
   name,
   size = 14,
+  lead = false,
 }: {
   agentId: string | null | undefined;
   name: string;
   size?: number;
+  lead?: boolean;
 }) {
+  const side = { marginLeft: lead ? 0 : Math.round(size * 0.2), marginRight: Math.round(size * 0.4) };
   return (
     <RNText style={whoStyles.who}>
-      <View style={[whoStyles.face, { width: size, height: size, marginRight: Math.round(size * 0.25) }]}>
+      <View style={[whoStyles.face, { width: size, height: size }, side]}>
         <AgentFace agentId={agentId} size={size} live={false} />
       </View>
       {name}
@@ -178,7 +182,7 @@ export function withAgentFaces(
       <Fragment key={i}>{p}</Fragment>
     ) : (
       // biome-ignore lint/suspicious/noArrayIndexKey: same
-      <AgentWho key={i} agentId={who[p]?.agentId} name={who[p]?.name ?? ""} size={size} />
+      <AgentWho key={i} agentId={who[p]?.agentId} name={who[p]?.name ?? ""} size={size} lead={i === 0} />
     ),
   );
 }

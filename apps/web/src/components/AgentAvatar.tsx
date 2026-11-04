@@ -16,6 +16,7 @@ import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
+import { opensItsBlock } from "@/lib/inline";
 import { lookOf } from "@/lib/look";
 import { useStreams } from "@/realtime/context";
 
@@ -63,14 +64,26 @@ export function AgentAvatar(props: AgentAvatarProps) {
 }
 
 /** An agent named in a line of text: its face at the text's size, then its name (`.ac-who`). */
-export function AgentWho({ agentId, name }: { agentId?: string; name: string }) {
+export function AgentWho({
+  agentId,
+  name,
+  appearance,
+}: {
+  agentId?: string;
+  name: string;
+  appearance?: AgentAppearance;
+}) {
   return (
-    <span className="ac-who">
-      <AgentAvatar agentId={agentId} size="xs" name={name} />
+    <span className="ac-who" ref={markLead}>
+      <AgentAvatar agentId={agentId} size="xs" name={name} appearance={appearance} />
       <b>{name}</b>
     </span>
   );
 }
+
+const markLead = (el: HTMLElement | null) => {
+  el?.toggleAttribute("data-lead", opensItsBlock(el));
+};
 
 /** `text` with the agent's name, where it first stands as a word, drawn as `AgentWho`. */
 export function withAgentFace(text: string, name: string, agentId?: string): ReactNode {

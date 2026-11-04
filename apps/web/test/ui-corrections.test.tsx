@@ -251,6 +251,23 @@ describe("agent faces in a line of text", () => {
     expect(value(css, ".ac-who", "white-space")).toBe("nowrap");
   });
 
+  test(".ac-who: the face sits a word's space apart on both sides, none before it where it opens the line", async () => {
+    const css = await sheet("packages/ui/src/styles/components.css");
+    expect(value(css, ".ac-who > .ac-avatar", "margin-inline")).toBe("0.2em 0.4em");
+    expect(value(css, ".ac-who[data-lead] > .ac-avatar", "margin-inline-start")).toBe("0");
+    await renderPage(
+      <>
+        <p>{withAgentFace("Você no controle · o Theo espera", "Theo")}</p>
+        <p>{withAgentFace("Theo espera", "Theo")}</p>
+      </>,
+      { api: createFakeApi(seedState()), org: true },
+    );
+    await settle(2);
+    const [mid, lead] = [...document.querySelectorAll("p .ac-who")];
+    expect(mid?.hasAttribute("data-lead")).toBe(false);
+    expect(lead?.hasAttribute("data-lead")).toBe(true);
+  });
+
   test("an approval's 'Ada pede aprovação' carries Ada's face before her name", async () => {
     const state = seedState();
     const api = createFakeApi(state);
