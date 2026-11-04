@@ -1721,7 +1721,7 @@
       "active": "有効",
       "archived": "アーカイブ済み",
       "notIn": "チャンネル外",
-      "withoutMention": "メンションなしで返信",
+      "withoutMention": "自分の判断で",
       "mentionOnly": "メンションされたときだけ"
     }
   },

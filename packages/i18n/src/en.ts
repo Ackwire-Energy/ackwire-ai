@@ -1786,7 +1786,7 @@ export const en = {
       active: "Active",
       archived: "Archived",
       notIn: "Not in it",
-      withoutMention: "Answers without a mention",
+      withoutMention: "On its own",
       mentionOnly: "Only when mentioned",
     },
   },

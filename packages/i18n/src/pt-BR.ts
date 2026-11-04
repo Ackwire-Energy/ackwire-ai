@@ -1790,7 +1790,7 @@ export const ptBR = {
       active: "Ativo",
       archived: "Arquivado",
       notIn: "Fora do canal",
-      withoutMention: "Responde sem menção",
+      withoutMention: "Por conta própria",
       mentionOnly: "Só quando mencionado",
     },
   },

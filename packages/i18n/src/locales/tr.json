@@ -1784,7 +1784,7 @@
       "active": "Etkin",
       "archived": "Arşivlendi",
       "notIn": "Kanalda değil",
-      "withoutMention": "Bahsetme olmadan yanıt verir",
+      "withoutMention": "Kendiliğinden",
       "mentionOnly": "Yalnızca bahsedilince"
     }
   },
