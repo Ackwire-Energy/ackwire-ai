@@ -145,6 +145,34 @@ describe("mintBillingLink", () => {
     expect(claims).toMatchObject({ role: "admin", locale: "en", usage: { members: 2 } });
   });
 
+  test("back to the page it was opened from when that is one of this workspace's; anything else, the default", async () => {
+    const org = `/org/${f.org.id}`;
+    const back = async (from: (typeof BILLING_FROM)[number], returnTo: string) =>
+      claimsOf(
+        (
+          await mintBillingLink(f.db, {
+            secret: SECRET,
+            baseUrl: "https://billing.example.com",
+            userId: f.owner.id,
+            orgId: f.org.id,
+            from,
+            returnTo,
+            now: NOW,
+          })
+        ).url,
+      ).return;
+    // The upload that hit the limit, in a channel: back to that channel, its thread open.
+    expect(await back("upload_full", `${org}/c/abc?thread=m-1`)).toBe(`${org}/c/abc?thread=m-1`);
+    expect(await back("hold", `${org}/settings/members`)).toBe(`${org}/settings/members`);
+    // Another workspace, another host, the onboarding outside any workspace, or a path that only starts like it.
+    expect(await back("upload_full", "/org/someone-else/c/abc")).toBe(org);
+    expect(await back("upload_full", "https://evil.example.com/org")).toBe(org);
+    expect(await back("upload_full", `//evil.example.com${org}/`)).toBe(org);
+    expect(await back("onboarding", "/onboarding")).toBe(`${org}/onboarding`);
+    expect(await back("settings", `${org}x/c/abc`)).toBe(`${org}/settings/billing`);
+    expect(await back("settings", `${org}/c/a\\b`)).toBe(`${org}/settings/billing`);
+  });
+
   test("usage counts the files on this server's storage; on the workspace's own bucket, none", async () => {
     const owner = { type: "person" as const, userId: f.owner.id };
     await createFileArtifact(f.artifactDeps, owner, f.org.id, { title: "a", name: "a.txt", bytes: new Uint8Array(42) });

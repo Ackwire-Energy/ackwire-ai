@@ -20,6 +20,7 @@ import { BootSplash } from "@/components/Sky";
 import { ZonePicker } from "@/components/ZoneSelect";
 import { sendNewLink } from "@/lib/email-confirmation";
 import { useOpenParam } from "@/lib/open-param";
+import { returnPlace } from "@/lib/return-to";
 import { STORAGE_KEYS, sessionStore, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import "./onboarding.css";
@@ -187,7 +188,7 @@ export function OnboardingPage() {
             <button
               type="button"
               className="onb__back"
-              onClick={() => void navigate({ to: "/org/$orgId", params: { orgId: leaveTo.id } })}
+              onClick={() => void navigate({ href: returnPlace(leaveTo.id) })}
               disabled={busy}
             >
               <Icon name="chevronLeft" size={16} />

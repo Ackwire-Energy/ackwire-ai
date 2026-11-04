@@ -105,6 +105,7 @@ import { useOrg } from "@/components/org-context";
 import { SkillPicker } from "@/components/Skills";
 import { AgentBornSky, AgentPreviewSky, OnboardingHorizon } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
+import { useFlowExit } from "@/hooks/useFlowExit";
 import {
   BLANK_LOOK,
   cleanHandle,
@@ -192,6 +193,7 @@ export function NewAgentPage({
   const { t } = useTranslation();
   const { org } = useOrg();
   const proposal = useAgentProposal(org.id, proposalId);
+  const exit = useFlowExit(org.id);
   // The draft as it was when it opened: once created here the proposal is closed, and the flow stays on.
   const opened = useRef<AgentProposal | null>(null);
   if (proposal.data?.canDecide && opened.current?.messageId !== proposal.data.messageId) opened.current = proposal.data;
@@ -225,9 +227,7 @@ export function NewAgentPage({
                         {t("newAgent.backToChat")}
                       </Link>
                     ) : (
-                      <Link to="/org/$orgId" params={{ orgId: org.id }}>
-                        {t("newAgent.backToChat")}
-                      </Link>
+                      <a {...exit}>{t("newAgent.backToChat")}</a>
                     )}
                   </Button>
                 )
@@ -289,6 +289,7 @@ function NewAgentFlow({
     [mail.data, me.user.id],
   );
   const navigate = useNavigate();
+  const exit = useFlowExit(org.id);
   const mood = useDraftMood();
   const root = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -1669,9 +1670,7 @@ function NewAgentFlow({
               </Button>
             ) : (
               <Button asChild variant="ghost" size="lg">
-                <Link to="/org/$orgId" params={{ orgId: org.id }}>
-                  {t("common.cancel")}
-                </Link>
+                <a {...exit}>{t("common.cancel")}</a>
               </Button>
             )}
             {from && last && (
@@ -1840,6 +1839,7 @@ function NewAgentRail({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const exit = useFlowExit(org.id);
   return (
     <aside className="onb__rail newag__rail">
       <div className="newag__rail-head">
@@ -1850,9 +1850,9 @@ function NewAgentRail({
           <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t("newAgent.leave")} onClick={onLeave} />
         ) : (
           <Button asChild variant="ghost" size="sm" iconOnly aria-label={t("newAgent.leave")}>
-            <Link to="/org/$orgId" params={{ orgId: org.id }} title={t("newAgent.leave")}>
+            <a {...exit} title={t("newAgent.leave")}>
               <Icon name="close" />
-            </Link>
+            </a>
           </Button>
         )}
       </div>

@@ -72,6 +72,8 @@ export const STORAGE_KEYS = {
   onboardingImports: "agentes.onboarding.imports",
   /** In `sessionStore`: the address this tab signed up with, when the server emailed it a confirmation link. */
   confirmationSent: "agentes.confirmation.sent",
+  /** In `sessionStore`: the last page this tab showed outside a flow, where the flow's exits go (lib/return-to.ts). */
+  flowReturn: "agentes.flow.return",
   /** In `sessionStore`: my messages waiting for the connection (the shared `outbox`), kept through a reload. */
   outbox: "agentes.outbox",
   /** The app's sounds on this device: "tactile" (default), "sky", "pixel" or "off" (lib/sounds.ts). */
