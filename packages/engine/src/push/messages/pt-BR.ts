@@ -46,4 +46,13 @@ export const ptBR: PushStrings = {
   sentGif: "Mandou um GIF",
   sentSticker: "Mandou uma figurinha",
   sentVoice: "Mandou uma mensagem de voz",
+  usageWarningTitle: (p) => `Você usou ${p}% do seu limite deste mês`,
+  usageReachedMineTitle: "Você chegou ao seu limite de uso deste mês",
+  usageMineBody: "Toque para ver seu uso.",
+  usageReachedTitle: (a) => `${a} chegou ao limite de uso deste mês`,
+  usageRequestTitle: (a) => `${a} pediu mais uso este mês`,
+  usageRequestBody: "Toque para aumentar o limite ou recusar.",
+  usageRaisedTitle: (a) => `${a} aumentou seu limite deste mês`,
+  usageRaisedBody: "Pode continuar.",
+  usageRefusedTitle: (a) => `${a} recusou seu pedido de mais uso`,
 };

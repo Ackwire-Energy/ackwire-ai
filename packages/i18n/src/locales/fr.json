@@ -12840,7 +12840,7 @@
       "work_end_canceled": "Arrêté au bout de {{minutes}} min.",
       "work_end_canceledBy": "Arrêté par {{name}} au bout de {{minutes}} min.",
       "no_ai": "Je ne peux pas encore répondre : je n'ai aucune IA connectée.",
-      "person_limit": "Vous avez atteint votre limite d'utilisation ce mois-ci. Pour continuer maintenant, demandez à un admin.",
+      "person_limit": "La personne qui a demandé a atteint sa limite d'utilisation ce mois-ci. Pour continuer maintenant, demandez à un admin.",
       "no_ai_signed_out": "Je ne peux pas encore répondre : mon IA est déconnectée.",
       "no_ai_not_signed_in": "Je ne peux pas encore répondre : {{brain}} n'est pas connecté sur mon ordinateur.",
       "action_connect_ai": "Connecter une IA",

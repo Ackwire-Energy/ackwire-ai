@@ -776,7 +776,7 @@ const retryableOutage = (error: unknown) =>
 
 /** The card's words when the person behind a run is at their monthly limit (`bodyCode` `person_limit`). */
 const PERSON_LIMIT_TEXT =
-  "You've reached your usage limit for this month. It renews on the 1st. To keep going now, ask an admin.";
+  "The person who asked reached their usage limit for this month. To keep going now, ask an admin.";
 
 /** The note a run parked on a provider outage posts once (`bodyCode` `provider_unavailable`). */
 const PROVIDER_UNAVAILABLE_TEXT = "My AI provider isn't answering right now. I'll answer as soon as it's back.";
@@ -1288,9 +1288,8 @@ async function executeRunInner(
    * ponytail: the run ends instead of waiting for the raise like a budget's wait does; parking it would need a usage
    * wait of its own (`USAGE_WAIT_CODES`).
    */
-  const failPersonLimit = async () => {
+  const failPersonLimit = async (forUserId: string) => {
     if (!run.background) {
-      const forUserId = await personOfMessage(db, run.orgId, run.triggerMessageId).catch(() => null);
       const card = await db.transaction((tx) =>
         post(
           tx,
@@ -3870,7 +3869,7 @@ async function executeRunInner(
           if (handled === "waited" || handled === "failed") return;
         }
         // The person behind it is at their monthly limit (ADR 0141): the agent says so with "Pedir mais" and stops.
-        if (error instanceof PersonLimitError) return failPersonLimit();
+        if (error instanceof PersonLimitError) return failPersonLimit(error.personId);
         // The agent's monthly budget: the run waits for the next month or a raise. A forum's turn fails instead:
         // the topic's order moves on without it.
         if (error instanceof BudgetExceededError && !forum) {

@@ -11825,7 +11825,7 @@ export const en = {
       work_end_canceled: "Stopped after {{minutes}} min.",
       work_end_canceledBy: "Stopped by {{name}} after {{minutes}} min.",
       no_ai: "I can't answer yet: I have no AI connected.",
-      person_limit: "You've reached your usage limit for this month. To keep going now, ask an admin.",
+      person_limit: "The person who asked reached their usage limit for this month. To keep going now, ask an admin.",
       no_ai_signed_out: "I can't answer yet: my AI is signed out.",
       no_ai_not_signed_in: "I can't answer yet: {{brain}} isn't signed in on my computer.",
       action_connect_ai: "Connect an AI",

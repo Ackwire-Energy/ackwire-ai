@@ -221,12 +221,20 @@ async function placesOf(
   const channelIds = [...new Set(runs.map((r) => r.channelId))];
   const chans = channelIds.length
     ? await db
-        .select({ id: channels.id, name: channels.name, kind: channels.kind })
+        .select({
+          id: channels.id,
+          name: channels.name,
+          kind: channels.kind,
+          visibility: channels.visibility,
+          archivedAt: channels.archivedAt,
+        })
         .from(channels)
         .where(and(eq(channels.orgId, orgId), inArray(channels.id, channelIds)))
     : [];
   const byId = new Map(chans.map((c) => [c.id, c]));
+  // A public channel is the viewer's to join and read, so its work is named even before they join.
   const readable = await readableChannelIds(db, orgId, viewerId, channelIds);
+  for (const c of chans) if (c.kind === "channel" && c.visibility === "public" && !c.archivedAt) readable.add(c.id);
   const routineNames = new Map<string, string>();
   const bg = runs.filter((r) => r.background).map((r) => r.id);
   if (bg.length)
@@ -601,8 +609,9 @@ export async function personUsageDetail(
 }
 
 const csvCell = (v: string | number) => {
-  const s = String(v);
-  return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+  // A name starting with = + - @ would run as a formula in a spreadsheet: a leading ' keeps it text.
+  const s = typeof v === "string" && /^[=+\-@\t\r]/.test(v) ? `'${v}` : String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
 };
 
 /**

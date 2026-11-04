@@ -12000,7 +12000,7 @@
       "work_end_canceled": "{{minutes}} 分钟后停止。",
       "work_end_canceledBy": "{{minutes}} 分钟后由 {{name}} 停止。",
       "no_ai": "我暂时无法回答：我还没有连接 AI。",
-      "person_limit": "你已达到本月的使用额度。如需现在继续,请联系管理员。",
+      "person_limit": "提出请求的人已达到本月的使用额度。如需现在继续,请联系管理员。",
       "no_ai_signed_out": "我暂时无法回答：我的 AI 已退出登录。",
       "no_ai_not_signed_in": "我暂时无法回答：{{brain}} 还没有在我的电脑上登录。",
       "action_connect_ai": "连接 AI",

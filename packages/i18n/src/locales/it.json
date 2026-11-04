@@ -12842,7 +12842,7 @@
       "work_end_canceled": "Fermato dopo {{minutes}} min.",
       "work_end_canceledBy": "Fermato da {{name}} dopo {{minutes}} min.",
       "no_ai": "Non posso ancora rispondere: non ho un'IA collegata.",
-      "person_limit": "Hai raggiunto il tuo limite di utilizzo di questo mese. Per continuare ora, chiedi a un admin.",
+      "person_limit": "Chi ha chiesto ha raggiunto il suo limite di utilizzo di questo mese. Per continuare ora, chiedi a un admin.",
       "no_ai_signed_out": "Non posso ancora rispondere: la mia IA è disconnessa.",
       "no_ai_not_signed_in": "Non posso ancora rispondere: {{brain}} non ha effettuato l'accesso sul mio computer.",
       "action_connect_ai": "Collega un'IA",

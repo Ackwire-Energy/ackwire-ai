@@ -14,6 +14,7 @@ import {
   postPersonMessage,
   raisePersonLimit,
   recordPlanUsage,
+  renderPush,
   requestMoreUsage,
   resolveLimit,
   setPersonLimits,
@@ -149,6 +150,14 @@ test("at the limit the agent posts the card instead of answering, and a raise tu
   const [asked] = await f.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "usage_limit"));
   expect(asked).toMatchObject({ userId: f.owner.id, waiting: true });
   expect(asked?.latest).toMatchObject({ statusTo: "request", limitUsd: 1e-9, raiseToUsd: 1 });
+  // Asking again while nobody answered tells nobody again.
+  await requestMoreUsage({ db: f.db, pubsub: f.pubsub }, member.id, f.org.id);
+  const again = await f.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "usage_limit"));
+  expect(again.map((n) => n.count)).toEqual([1]);
+  expect(renderPush("pt-BR", { kind: "usage_limit", waiting: true, actorName: "Mateus", status: "request" })).toEqual({
+    title: "Mateus pediu mais uso este mês",
+    body: "Toque para aumentar o limite ou recusar.",
+  });
 
   // A member can't raise anyone's limit; the owner can, for this month.
   await expect(
@@ -166,10 +175,11 @@ test("at the limit the agent posts the card instead of answering, and a raise tu
 
 test("admins see counts and cost of a DM, never its title; members see only their own, in percentages", async () => {
   f = await setup({ reply: () => ({ chunks: ["ok"], usage }) });
-  const member = await addMember(f.db, f.org.id, "member", "Mateus");
+  // A name a spreadsheet would run as a formula stays text in the CSV.
+  const member = await addMember(f.db, f.org.id, "member", "=Mateus");
+  // The admin isn't in #general: a public channel's work is still named for them.
   const admin = await addMember(f.db, f.org.id, "admin", "Kenji");
   await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: member.id });
-  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: admin.id });
   const fx = f;
   const say = (channelId: string, body: string) =>
     postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, member.id, fx.org.id, channelId, { body });
@@ -193,7 +203,7 @@ test("admins see counts and cost of a DM, never its title; members see only thei
   expect(JSON.stringify(report)).not.toContain("private plans");
   const csv = await peopleUsageCsv(f.db, admin.id, f.org.id);
   expect(csv.split("\n")[0]).toBe("person,email,roles,day,requests,tokens,cost_usd,plan_estimate_usd,agents");
-  expect(csv).toContain("Mateus");
+  expect(csv).toContain("'=Mateus");
   expect(csv).not.toContain("Lumen");
 
   // A member reads their own month in percentages, never someone else's, nor the people report.

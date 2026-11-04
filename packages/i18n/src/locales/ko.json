@@ -11908,7 +11908,7 @@
       "work_end_canceled": "{{minutes}}분 후 중지했어요.",
       "work_end_canceledBy": "{{name}}님이 {{minutes}}분 후 중지했어요.",
       "no_ai": "아직 답할 수 없어요: 연결된 AI가 없어요.",
-      "person_limit": "이번 달 사용 한도에 도달했어요. 지금 계속하려면 관리자에게 요청하세요.",
+      "person_limit": "요청한 사람이 이번 달 사용 한도에 도달했어요. 지금 계속하려면 관리자에게 요청하세요.",
       "no_ai_signed_out": "아직 답할 수 없어요: AI가 로그아웃됐어요.",
       "no_ai_not_signed_in": "아직 답할 수 없어요: 제 컴퓨터에서 {{brain}}에 로그인되어 있지 않아요.",
       "action_connect_ai": "AI 연결",

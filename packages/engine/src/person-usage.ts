@@ -348,6 +348,8 @@ export async function requestMoreUsage(deps: NoticeDeps, actorId: string, orgId:
   await requireActiveMembership(deps.db, actorId, orgId);
   const state = await personLimitState(deps.db, orgId, actorId, at);
   if (!state || state.limitNanoUsd === null) throw new ConflictError("You have no usage limit to raise");
+  // Asked already and nobody answered: who decides isn't told again.
+  if (state.requestedAt) return { requestedAt: state.requestedAt.toISOString() };
   const period = periodOf(at);
   await deps.db
     .insert(personUsageMonths)

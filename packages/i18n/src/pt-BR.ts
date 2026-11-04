@@ -12033,7 +12033,7 @@ export const ptBR = {
       work_end_canceled: "Parado aos {{minutes}} min.",
       work_end_canceledBy: "Parado por {{name}} aos {{minutes}} min.",
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",
-      person_limit: "Você chegou ao seu limite de uso deste mês. Para continuar agora, peça a um admin.",
+      person_limit: "Quem pediu chegou ao limite de uso deste mês. Para continuar agora, peça a um admin.",
       no_ai_signed_out: "Ainda não consigo responder: minha IA saiu da conta.",
       /** The computer's own sign-in of that CLI isn't there (`meta.noAi.own`); `brain`: Codex or Claude Code. */
       no_ai_not_signed_in: "Ainda não consigo responder: o {{brain}} está sem login no meu computador.",

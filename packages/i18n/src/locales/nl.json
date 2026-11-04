@@ -12444,7 +12444,7 @@
       "work_end_canceled": "Gestopt na {{minutes}} min.",
       "work_end_canceledBy": "Gestopt door {{name}} na {{minutes}} min.",
       "no_ai": "Ik kan nog niet antwoorden: ik heb geen AI gekoppeld.",
-      "person_limit": "Je hebt je gebruikslimiet voor deze maand bereikt. Om nu door te gaan, vraag het een admin.",
+      "person_limit": "Wie het vroeg, heeft de gebruikslimiet voor deze maand bereikt. Om nu door te gaan, vraag het een admin.",
       "no_ai_signed_out": "Ik kan nog niet antwoorden: mijn AI is uitgelogd.",
       "no_ai_not_signed_in": "Ik kan nog niet antwoorden: {{brain}} is niet ingelogd op mijn computer.",
       "action_connect_ai": "AI koppelen",

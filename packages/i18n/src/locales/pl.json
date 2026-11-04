@@ -13192,7 +13192,7 @@
       "work_end_canceled": "Zatrzymano po {{minutes}} min.",
       "work_end_canceledBy": "Zatrzymane przez: {{name}} po {{minutes}} min.",
       "no_ai": "Nie mogę jeszcze odpowiadać: nie mam połączonego AI.",
-      "person_limit": "Osiągnięto Twój limit użycia w tym miesiącu. Aby kontynuować teraz, poproś admina.",
+      "person_limit": "Osoba, która prosiła, osiągnęła limit użycia w tym miesiącu. Aby kontynuować teraz, poproś admina.",
       "no_ai_signed_out": "Nie mogę jeszcze odpowiadać: moje AI jest wylogowane.",
       "no_ai_not_signed_in": "Nie mogę jeszcze odpowiadać: {{brain}} nie jest zalogowany na moim komputerze.",
       "action_connect_ai": "Połącz AI",

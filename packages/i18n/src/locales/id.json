@@ -11983,7 +11983,7 @@
       "work_end_canceled": "Dihentikan setelah {{minutes}} menit.",
       "work_end_canceledBy": "Dihentikan oleh {{name}} setelah {{minutes}} menit.",
       "no_ai": "Aku belum bisa menjawab: aku belum punya AI yang terhubung.",
-      "person_limit": "Kamu sudah mencapai batas pemakaianmu bulan ini. Untuk lanjut sekarang, minta ke admin.",
+      "person_limit": "Orang yang meminta sudah mencapai batas pemakaiannya bulan ini. Untuk lanjut sekarang, minta ke admin.",
       "no_ai_signed_out": "Aku belum bisa menjawab: AI-ku sudah keluar.",
       "no_ai_not_signed_in": "Aku belum bisa menjawab: {{brain}} belum masuk di komputerku.",
       "action_connect_ai": "Hubungkan AI",

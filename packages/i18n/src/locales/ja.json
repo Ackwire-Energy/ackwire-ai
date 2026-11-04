@@ -11917,7 +11917,7 @@
       "work_end_canceled": "{{minutes}}分後に停止しました。",
       "work_end_canceledBy": "{{minutes}}分後に{{name}}が停止しました。",
       "no_ai": "まだ返信できません。AIが接続されていません。",
-      "person_limit": "今月の利用上限に達しました。今すぐ続けるには管理者に依頼してください。",
+      "person_limit": "依頼した人が今月の利用上限に達しました。今すぐ続けるには管理者に依頼してください。",
       "no_ai_signed_out": "まだ返信できません。AIがログアウトされています。",
       "no_ai_not_signed_in": "まだ返信できません。私のコンピューターで{{brain}}にログインしていません。",
       "action_connect_ai": "AIを接続",

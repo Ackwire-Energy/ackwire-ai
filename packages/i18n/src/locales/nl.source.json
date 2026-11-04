@@ -30158,7 +30158,7 @@
     "value": "I can't answer yet: I have no AI connected."
   },
   "chat.body.person_limit": {
-    "value": "You've reached your usage limit for this month. To keep going now, ask an admin."
+    "value": "The person who asked reached their usage limit for this month. To keep going now, ask an admin."
   },
   "chat.body.no_ai_signed_out": {
     "value": "I can't answer yet: my AI is signed out."

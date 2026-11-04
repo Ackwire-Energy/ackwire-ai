@@ -12361,7 +12361,7 @@
       "work_end_canceled": "Nach {{minutes}} Min. gestoppt.",
       "work_end_canceledBy": "Von {{name}} nach {{minutes}} Min. gestoppt.",
       "no_ai": "Ich kann noch nicht antworten: Ich habe keine KI verbunden.",
-      "person_limit": "Du hast dein Nutzungslimit für diesen Monat erreicht. Um jetzt weiterzumachen, frag einen Admin.",
+      "person_limit": "Die anfragende Person hat ihr Nutzungslimit für diesen Monat erreicht. Um jetzt weiterzumachen, frag einen Admin.",
       "no_ai_signed_out": "Ich kann noch nicht antworten: Meine KI ist abgemeldet.",
       "no_ai_not_signed_in": "Ich kann noch nicht antworten: {{brain}} ist auf meinem Computer nicht angemeldet.",
       "action_connect_ai": "KI verbinden",

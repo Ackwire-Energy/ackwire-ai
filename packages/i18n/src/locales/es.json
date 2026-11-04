@@ -12758,7 +12758,7 @@
       "work_end_canceled": "Detenido después de {{minutes}} min.",
       "work_end_canceledBy": "Detenido por {{name}} después de {{minutes}} min.",
       "no_ai": "Todavía no puedo responder: no tengo una IA conectada.",
-      "person_limit": "Llegaste a tu límite de uso de este mes. Para seguir ahora, pide a un admin.",
+      "person_limit": "Quien pidió llegó a su límite de uso de este mes. Para seguir ahora, pide a un admin.",
       "no_ai_signed_out": "Todavía no puedo responder: mi IA tiene la sesión cerrada.",
       "no_ai_not_signed_in": "Todavía no puedo responder: {{brain}} no tiene la sesión iniciada en mi computadora.",
       "action_connect_ai": "Conectar una IA",

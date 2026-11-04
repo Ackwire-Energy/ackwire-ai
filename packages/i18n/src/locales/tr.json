@@ -12293,7 +12293,7 @@
       "work_end_canceled": "{{minutes}} dk sonra durduruldu.",
       "work_end_canceledBy": "{{minutes}} dk sonra {{name}} durdurdu.",
       "no_ai": "Henüz yanıt veremiyorum: bağlı bir yapay zekam yok.",
-      "person_limit": "Bu ayki kullanım limitine ulaştın. Şimdi devam etmek için bir yöneticiye sor.",
+      "person_limit": "İsteyen kişi bu ayki kullanım limitine ulaştı. Şimdi devam etmek için bir yöneticiye sor.",
       "no_ai_signed_out": "Henüz yanıt veremiyorum: yapay zekamın oturumu kapalı.",
       "no_ai_not_signed_in": "Henüz yanıt veremiyorum: bilgisayarımda {{brain}} oturumu açık değil.",
       "action_connect_ai": "Yapay zeka bağla",
