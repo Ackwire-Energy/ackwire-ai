@@ -1865,6 +1865,14 @@ export const en = {
       audienceHelp: "Outside it, a person doesn't see {{name}} in the sidebar.",
       lock: "{{name}} can't be archived or deleted. It posts nothing unless someone talks to it.",
       audit: "See what {{name}} did",
+      /** On a person's plan (ADR 0137 §1): the AI row names the plan's account, with Change. */
+      onPlan: "Claude plan · {{account}}",
+      change: "Change",
+      planHelp: "The plan's owner pays. When its computer is away, the conversation says so and offers an API key.",
+      plan: "A plan",
+      planOffer:
+        "{{name}} can think with your plan instead of an API key. It runs on the computer where the plan is signed in and reaches only this workspace.",
+      usePlan: "Use a plan",
     },
     card: {
       settings: "{{name}} · Settings",
@@ -1941,6 +1949,19 @@ export const en = {
       deleteSome_other: "Delete {{count}}",
       deleteHelp: "Their instructions, memory and routines go for good. Their messages stay.",
     },
+    /** The right hand's people card (`propose_member_changes`, ADR 0137 §4): a row per change. */
+    people: {
+      title: "Change people",
+      gets: "Gets {{roles}}",
+      loses: "Loses {{roles}}",
+      done: "Done",
+      onlyOwners: "Only owners change who is an owner",
+      onlyAdmins: "Only admins change people's roles and remove people",
+    },
+    /** Its approvals card (`offer_approvals`): each decided on it, as whoever clicks. */
+    approvals: { title: "Approvals waiting for you", done: "Decided" },
+    /** Its "Abrir" card (`offer_open_page`): one of the app's screens. */
+    open: { open: "Open", web: "Open on the website", notAllowed: "You don't have access to this screen" },
   },
   routing: {
     title: "Who picks the agents",
@@ -1979,6 +2000,15 @@ export const en = {
     action: "Connect",
     locked: "Who connects {{name}}'s AI: an admin, with an API key, or {{owner}}, with their own plan.",
     lockedAdmins: "Only an admin can connect an AI.",
+    /** The team's right hand on a plan that can't think now (ADR 0137 §7): one line, and the way to an API key. */
+    rightHand: {
+      computer_away: "{{name}} can't answer now: the computer the plan is signed in on is away.",
+      plan_limit: "{{name}} can't answer now: the plan reached its limit.",
+      plan_not_shared: "{{name}} thinks with a plan that answers only its owner.",
+      runner_outdated: "{{name}} can't answer now: the program on the plan's computer needs an update.",
+      plan_tools: "{{name}} stopped before answering: the plan's AI on that computer offers tools of its own.",
+      useKey: "Use an API key",
+    },
     receipt: "Nobody will answer: no\u00a0AI connected",
     chip: "No AI",
   },
@@ -12011,12 +12041,21 @@ export const en = {
       person_limit: "The person who asked reached their usage limit for this month. To keep going now, ask an admin.",
       no_ai_signed_out: "I can't answer yet: my AI is signed out.",
       no_ai_not_signed_in: "I can't answer yet: {{brain}} isn't signed in on my computer.",
+      no_ai_computer_away: "I can't answer now: the computer my plan is signed in on is away.",
+      no_ai_plan_limit: "I can't answer now: the plan I think with reached its limit.",
+      no_ai_plan_not_shared: "I can't answer you on this plan: it answers only its owner.",
+      no_ai_runner_outdated: "I can't answer now: the program on my plan's computer needs an update.",
+      no_ai_plan_tools: "I stopped before answering: my plan's AI on that computer offers tools of its own.",
+      /** Where the server took a sign-in or a key out of the team's right hand's reply, in place of it. */
+      redacted: "[removed: it looked like a sign-in or a key]",
       action_connect_ai: "Connect an AI",
       action_connect_app: "Connect {{name}}",
       action_add_mcp: "Add an MCP server",
       action_invite_people: "Invite people",
       action_install_skill: "Install a skill",
       action_update_skills: "Update skills",
+      action_approvals: "Approvals waiting for you",
+      action_open_page: "Open a screen",
       agent_proposal: "Proposed a new agent: {{name}}",
       settings_proposal: "Proposed a change to {{names}}",
       approval_request: "Approval request: {{title}}",

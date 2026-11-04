@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
+import { memberCardVia } from "./card-via";
 import { announceChannelLeavers, type ChannelLeaver, dropRoleLeavers } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import {
@@ -471,9 +472,11 @@ export async function setMemberRoles(
   orgId: string,
   targetUserId: string,
   roleIds: string[],
-  options: { pubsub?: PubSub } = {},
+  /** `via`: the people card it was applied from (the audit's "via", `memberCardVia`). */
+  options: { pubsub?: PubSub; via?: string } = {},
 ) {
   const actor = await requirePermission(db, actorId, orgId, "manage_members");
+  const via = await memberCardVia(db, orgId, options.via, targetUserId);
   const target = await getMembership(db, targetUserId, orgId, { includeBlocked: true });
   if (!target) throw new ConflictError("That user is not a member");
   if (target.role === "owner" && actor.role !== "owner")
@@ -513,7 +516,7 @@ export async function setMemberRoles(
       actor: { type: "person", id: actorId },
       action: "member.roles_changed",
       target: { type: "person", id: targetUserId },
-      details: { added: added.map(nameOf), removed: removed.map(nameOf) },
+      details: { added: added.map(nameOf), removed: removed.map(nameOf), ...(via ? { via } : {}) },
     });
     return left;
   });

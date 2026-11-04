@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import type { CommandProfile } from "@agenteschat/adapters/command-policy";
@@ -18,10 +18,12 @@ import {
   type AccountGrant,
   accountEnv,
   accountSignIn,
+  withoutSignIns,
 } from "./accounts";
+import { CODEX_ROUTE_OFF } from "./brain-route";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
-import { cachedExecutors, resolveCommand } from "./executors";
+import { cachedCodexVersion, resolveCommand } from "./executors";
 import { CODEX_MCP_ENV, CODEX_MCP_SERVER, codexWritableRoots } from "./mcp";
 import { isInside, resolveForAgent } from "./paths";
 import type { Spawn } from "./scope-gate";
@@ -115,10 +117,70 @@ export interface CodexBrainTurnRequest {
   effort?: BrainEffort;
   /** Protocol 28: the agent's context limit in tokens. */
   contextTokens?: number;
-  /** Protocol 16: the turn's permission profile (absent: `work`). */
-  permissions?: { mode?: "plan" | "work" };
+  /** Protocol 16: the turn's permission profile (absent: `work`); protocol 41: `chat`, the team's right hand. */
+  permissions?: { mode?: "plan" | "work" | "chat" };
   /** Protocol 16: false for a background turn (no app-server is kept for it). */
   keepAlive?: boolean;
+}
+
+/**
+ * Codex features a `chat` turn turns off (protocol 41): the route's, and every other one of 0.165.0 that adds a tool
+ * or reads something of the computer's. A name Codex doesn't know fails the turn (`Unknown feature flag`). Codex
+ * 0.165.0 keeps its `exec` (a JavaScript sandbox with `apply_patch` and MCP resources in it) and its
+ * `collaboration` tools whatever is off: the runner kills the turn on any of their items (`codexChatBreach`).
+ */
+export const CODEX_CHAT_OFF = [
+  ...CODEX_ROUTE_OFF,
+  "unified_exec",
+  "unified_exec_tty",
+  "shell_snapshot",
+  "skill_mcp_dependency_install",
+  "remote_plugin",
+  "plugin_sharing",
+  "multi_agent_v2",
+  "browser_use_external",
+  "browser_use_full_cdp_access",
+  "browser_annotation_api",
+  "in_app_browser",
+  "in_app_local_automation",
+  "view_image",
+  "hooks",
+  "memories",
+  "goals",
+  "code_mode_host",
+  "workspace_dependencies",
+] as const;
+
+/**
+ * A `chat` turn's `-c` overrides: no approvals (`exec` forces it anyway), no web search, no `AGENTS.md`. Codex
+ * 0.165.0 refuses an unknown value for each of these keys.
+ */
+export const CODEX_CHAT_CONFIG = ['approval_policy="never"', 'web_search="disabled"', "project_doc_max_bytes=0"];
+
+/**
+ * The runtime kill of a `chat` turn: an item that is neither the model's words, a warning nor a call to our bridge
+ * (a command, a file change, a web search, a sub-agent, `exec`'s own…) is a breach, at its first event
+ * (`item.started` comes before a command runs). Null for anything else.
+ */
+export function codexChatBreach(ev: Record<string, unknown>): string | null {
+  if (ev.type !== "item.started" && ev.type !== "item.updated" && ev.type !== "item.completed") return null;
+  const item = (ev.item ?? {}) as Record<string, unknown>;
+  // `error`: a warning Codex reports as an item (a retry, a config note), no tool.
+  if (item.type === "agent_message" || item.type === "reasoning" || item.type === "error") return null;
+  if (item.type === "mcp_tool_call" && item.server === CODEX_MCP_SERVER) return null;
+  const what = typeof item.type === "string" ? item.type.slice(0, 64) : "unknown";
+  return `Codex used a tool of its own (${what}), so the turn stopped.`;
+}
+
+/**
+ * The folder a `chat` turn starts in (Codex's and Cursor's): one per agent under the runner home (Cursor finds a chat
+ * again by its folder), emptied on every turn, so no project config, rules or instructions are there to read.
+ */
+export function chatFolder(runnerHome: string, agentId: string): string {
+  const dir = path.join(runnerHome, "brain", "chat", agentId.replace(/[^\w-]/g, "_"));
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  for (const name of readdirSync(dir)) rmSync(path.join(dir, name), { recursive: true, force: true });
+  return dir;
 }
 
 /** The profile a request asks for: anything but `plan` is `work`. */
@@ -261,13 +323,23 @@ export function codexTurnArgs(input: {
   contextTokens?: number;
   /** Protocol 16: the sandbox (default `work`: workspace-write; `plan`: read-only). Never the network. */
   profile?: CommandProfile;
+  /** Protocol 41: the team's right hand. Read-only, none of the computer's config, rules or features. */
+  chat?: boolean;
 }): string[] {
   const instructions = input.instructions?.trim();
-  const sandbox = codexSandbox(input.profile ?? "work");
+  const sandbox = input.chat ? "read-only" : codexSandbox(input.profile ?? "work");
   return [
     "exec",
     "--json",
     "--skip-git-repo-check",
+    ...(input.chat
+      ? [
+          "--ignore-user-config",
+          "--ignore-rules",
+          ...CODEX_CHAT_CONFIG.flatMap((c) => ["-c", c]),
+          ...CODEX_CHAT_OFF.flatMap((feature) => ["--disable", feature]),
+        ]
+      : []),
     "-C",
     input.cwd,
     "--sandbox",
@@ -541,6 +613,8 @@ export interface CodexTurnInput {
   profile?: CommandProfile;
   /** Protocol 16: false for a background turn: its app-server closes when the turn ends. */
   keepAlive?: boolean;
+  /** Protocol 41: the team's right hand (`codexTurnArgs`' `chat`), always on `codex exec`, killed at a tool of Codex's own. */
+  chat?: boolean;
 }
 
 /** The app-server mode as `runCodexTurn` sees it (`CodexAppServers`). */
@@ -549,7 +623,7 @@ export interface CodexAppRunner {
   turn(input: CodexTurnInput & { version: string }, opts: CodexTurnOptions, exec: () => Promise<void>): Promise<void>;
 }
 
-const detected = cachedExecutors();
+const codexVersion = cachedCodexVersion();
 
 /** Runs one Codex turn and emits its events; ends with exactly one `done` or `error`. Never throws. */
 export async function runCodexTurn(input: CodexTurnInput, opts: CodexTurnOptions): Promise<void> {
@@ -558,13 +632,16 @@ export async function runCodexTurn(input: CodexTurnInput, opts: CodexTurnOptions
   if ((opts.platform ?? process.platform) === "win32") {
     return fail("unsupported", "The Codex brain isn't supported on Windows yet.");
   }
-  const version = (opts.codexVersion ?? (() => detected().codex?.version))();
+  const version = await (opts.codexVersion ?? codexVersion)();
+  if (version === null)
+    return fail("codex_failed", "Couldn't check Codex on this computer (`codex --version` didn't answer).", true);
   if (!version) return fail("codex_missing", "Codex is not installed on this computer.");
   if (!codexVersionOk(version)) {
     return fail("codex_too_old", `Codex here is ${version}. Agents need ${CODEX_MIN_VERSION} or newer.`);
   }
   // A long-lived app-server takes messages mid-turn; exec runs the turns it can't (an older CLI, a failed handshake…).
-  if (opts.app) return opts.app.turn({ ...input, version }, opts, () => runCodexExec(input, opts));
+  // A `chat` turn's flags exist only for `exec`.
+  if (opts.app && !input.chat) return opts.app.turn({ ...input, version }, opts, () => runCodexExec(input, opts));
   return runCodexExec(input, opts);
 }
 
@@ -589,9 +666,10 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
     ...(input.effort ? { effort: input.effort } : {}),
     ...(input.contextTokens ? { contextTokens: input.contextTokens } : {}),
     profile: input.profile ?? "work",
+    ...(input.chat ? { chat: true } : {}),
   });
   const base: NodeJS.ProcessEnv = {
-    ...process.env,
+    ...(input.chat ? withoutSignIns(process.env) : process.env),
     ...(opts.env ?? {}),
     [CODEX_MCP_ENV[0]]: input.mcp.token,
     ...(opts.socketPath ? { [CODEX_MCP_ENV[1]]: opts.socketPath } : {}),
@@ -623,7 +701,21 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
     stderr = (stderr + c.toString("utf8")).slice(-2000);
   });
   const lines = createInterface({ input: child.stdout as NonNullable<ChildProcess["stdout"]> });
+  // A `chat` turn that used a tool of Codex's own ends there: nothing after it is passed on.
+  let breach: string | null = null;
   (lines as unknown as EventEmitter).on("line", (line: string) => {
+    if (breach) return;
+    if (input.chat) {
+      try {
+        breach = codexChatBreach(JSON.parse(line) as Record<string, unknown>);
+      } catch {
+        breach = null;
+      }
+      if (breach) {
+        killTree(child, "SIGKILL");
+        return;
+      }
+    }
     for (const event of mapper.line(line)) opts.emit(event);
     if (mapper.thread) opts.threads.set(threadKey, mapper.thread);
   });
@@ -667,6 +759,7 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
   rmSync(opts.workDir, { recursive: true, force: true });
 
   if (opts.signal.aborted) return fail("canceled", "The turn was canceled.");
+  if (breach) return fail("tools_not_locked", breach);
   if (exit.error) {
     const missing = (exit.error as NodeJS.ErrnoException).code === "ENOENT";
     return fail(
@@ -738,8 +831,10 @@ export async function handleCodexBrainTurn(
   if (typeof req.mcp?.token !== "string" || !req.mcp.token)
     throw new RunnerError("bad_request", "mcp.token is required");
   const folder = ctx.folder;
-  let cwd = folder;
-  if (typeof req.cwd === "string" && req.cwd.trim() !== "") {
+  // A `chat` turn starts in an empty folder of its own, whatever the request names, with no grants nor secrets.
+  const chat = req.permissions?.mode === "chat";
+  let cwd = chat ? chatFolder(ctx.runnerHome, String(req.agent.id)) : folder;
+  if (!chat && typeof req.cwd === "string" && req.cwd.trim() !== "") {
     const resolved = await resolveForAgent(folder, ctx.grants, req.cwd);
     if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
     cwd = resolved.abs;
@@ -763,8 +858,10 @@ export async function handleCodexBrainTurn(
     release = signIn.release;
   }
   // Starting in one of its checkouts (`repos/owner/name`), the agent keeps its whole folder (its other checkouts).
-  const writableRoots = [...(cwd !== folder ? [folder] : []), ...(ctx.grants ?? []).filter((g) => !isInside(g, cwd))];
-  const secrets = await agentSecrets(ctx.secretsDir, req.agent);
+  const writableRoots = chat
+    ? []
+    : [...(cwd !== folder ? [folder] : []), ...(ctx.grants ?? []).filter((g) => !isInside(g, cwd))];
+  const secrets = chat ? null : await agentSecrets(ctx.secretsDir, req.agent);
   const file = codexThreadsFile(ctx.runnerHome);
   const threads = ctx.threads ?? threadStores.get(file) ?? new CodexThreads(file);
   threadStores.set(file, threads);
@@ -790,6 +887,7 @@ export async function handleCodexBrainTurn(
         folder,
         profile: codexProfileOf(req),
         ...(req.keepAlive === false ? { keepAlive: false } : {}),
+        ...(chat ? { chat } : {}),
       },
       {
         threads,

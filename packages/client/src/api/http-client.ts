@@ -548,10 +548,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           .order,
       update: (orgId, input) => request<void>(org(orgId), { method: "PATCH", json: input }),
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
-      changeRole: (orgId, userId, role) =>
-        request<void>(`${org(orgId)}/members/${enc(userId)}`, { method: "PATCH", json: { role } }),
+      changeRole: (orgId, userId, role, via) =>
+        request<void>(`${org(orgId)}/members/${enc(userId)}`, {
+          method: "PATCH",
+          json: { role },
+          query: via ? { via } : {},
+        }),
       removal: (orgId, userId) => request<RemovalPreview>(`${org(orgId)}/members/${enc(userId)}/removal`),
-      removeMember: (orgId, userId) => request<void>(`${org(orgId)}/members/${enc(userId)}`, { method: "DELETE" }),
+      removeMember: (orgId, userId, via) =>
+        request<void>(`${org(orgId)}/members/${enc(userId)}`, { method: "DELETE", query: via ? { via } : {} }),
       invitations: async (orgId) =>
         (await request<{ invitations: Invitation[] }>(`${org(orgId)}/invitations`)).invitations,
       invite: (orgId, input) =>
@@ -616,10 +621,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<void>(`${org(orgId)}/roles/${enc(roleId)}`, { method: "PATCH", json: patch }),
       remove: (orgId, roleId) => request<void>(`${org(orgId)}/roles/${enc(roleId)}`, { method: "DELETE" }),
       reorder: (orgId, ids) => request<void>(`${org(orgId)}/roles/order`, { method: "PUT", json: { ids } }),
-      setFor: (orgId, userId, roleIds) =>
+      setFor: (orgId, userId, roleIds, via) =>
         request<{ roleIds: string[] }>(`${org(orgId)}/members/${enc(userId)}/roles`, {
           method: "PUT",
           json: { roleIds },
+          query: via ? { via } : {},
         }),
     },
     agentGroups: {
@@ -895,12 +901,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       list: async (orgId, filter = {}) =>
         (await request<{ approvals: Approval[] }>(`${org(orgId)}/approvals`, { query: filter })).approvals,
       get: (orgId, id) => request<Approval>(`${org(orgId)}/approvals/${enc(id)}`),
-      approve: (orgId, id, reason, always) =>
+      approve: (orgId, id, reason, always, via) =>
         request<Approval>(`${org(orgId)}/approvals/${enc(id)}/approve`, {
-          json: { ...(reason ? { reason } : {}), ...(always ? { always: true } : {}) },
+          json: { ...(reason ? { reason } : {}), ...(always ? { always: true } : {}), ...(via ? { via } : {}) },
         }),
-      refuse: (orgId, id, reason) =>
-        request<Approval>(`${org(orgId)}/approvals/${enc(id)}/refuse`, { json: reason ? { reason } : {} }),
+      refuse: (orgId, id, reason, via) =>
+        request<Approval>(`${org(orgId)}/approvals/${enc(id)}/refuse`, {
+          json: { ...(reason ? { reason } : {}), ...(via ? { via } : {}) },
+        }),
       cancel: (orgId, id) => request<Approval>(`${org(orgId)}/approvals/${enc(id)}/cancel`, { json: {} }),
       decideMany: (orgId, input) =>
         request<{ approvals: Approval[]; skipped: string[] }>(`${org(orgId)}/approvals/decide`, { json: input }),

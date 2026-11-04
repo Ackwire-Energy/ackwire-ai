@@ -28,7 +28,7 @@ import {
 import { and, type Database, eq, inArray, lt, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { cutText } from "./format";
-import { applyAccessDecided, storeMachineAccess } from "./machine-access";
+import { applyAccessDecided, storedExecutors, storeMachineAccess, storeMachineExecutors } from "./machine-access";
 import {
   accountsToRemove,
   forgetRemovedAccount,
@@ -584,14 +584,16 @@ export function createMachineHub(deps: MachineHubDeps) {
         ...(frame.executors || frame.browser || frame.desktop || frame.terminal || frame.desktopUse
           ? {
               executors: {
-                ...(frame.executors ?? {}),
+                // A runner that hasn't looked yet leaves the CLIs out: the last ones stored stand.
+                ...(frame.executors
+                  ? { ...frame.executors, detectedAt: now.toISOString() }
+                  : storedExecutors(machine.executors)),
                 ...(frame.browser ? { browser: frame.browser } : {}),
                 ...(frame.desktop ? { desktop: frame.desktop } : {}),
                 ...(frame.terminal ? { terminal: frame.terminal } : {}),
                 ...(frame.desktopUse ? { desktopUse: frame.desktopUse } : {}),
                 ...(system ? { mode: "system" as const } : {}),
                 ...(Object.keys(ownUsage).length > 0 ? { ownUsage } : {}),
-                detectedAt: now.toISOString(),
               },
             }
           : {}),
@@ -1314,12 +1316,13 @@ export function createMachineHub(deps: MachineHubDeps) {
             );
           }
         }
-      } else if (frame.type === "access.changed") {
+      } else if (frame.type === "access.changed" || frame.type === "executors.changed") {
         const machineId = conn.machineId;
-        await storeMachineAccess({ db, pubsub }, machineId, frame.access).catch((error) =>
-          deps.log?.warn("access.changed failed", { machineId, error: String(error) }),
-        );
-        // A tool turned on (Claude Code, Codex, commands): what waited for this computer goes on.
+        await (frame.type === "access.changed"
+          ? storeMachineAccess({ db, pubsub }, machineId, frame.access)
+          : storeMachineExecutors({ db, pubsub }, machineId, frame.executors)
+        ).catch((error) => deps.log?.warn(`${frame.type} failed`, { machineId, error: String(error) }));
+        // A tool turned on or a CLI found (Claude Code, Codex, commands): what waited for this computer goes on.
         if (hooks.online) {
           const online = hooks.online;
           queueMicrotask(

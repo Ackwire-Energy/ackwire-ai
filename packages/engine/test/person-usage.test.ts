@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, schema, sql } from "@agenteschat/db";
 import { costNanoUsd } from "@agenteschat/providers";
 import {
   addChannelMember,
@@ -102,6 +102,24 @@ test("the gateway records the person and counts their month; at the limit the ne
     people: { [member.id]: callCost * 2 + 1 },
   });
   await call(f, member.id);
+});
+
+test("a member removed while the call settles: the call's usage is still recorded, their month is not", async () => {
+  f = await setup({ reply: () => ({ chunks: ["ok"], usage }) });
+  const member = await addMember(f.db, f.org.id, "member", "Mateus");
+  // The removal lands inside the settle statement, after its snapshot still showed the member.
+  await f.db.execute(
+    sql.raw(`create function remove_member_mid_settle() returns trigger language plpgsql as $$
+    begin delete from organization_members where user_id = new.person_id; return new; end $$`),
+  );
+  await f.db.execute(
+    sql.raw(`create trigger remove_member_mid_settle before insert on usage_records
+    for each row execute function remove_member_mid_settle()`),
+  );
+  await call(f, member.id);
+  const [row] = await f.db.select().from(schema.usageRecords);
+  expect(row).toMatchObject({ personId: member.id, costNanoUsd: callCost, agentId: f.agent.id });
+  expect(await month(f, member.id)).toBeUndefined();
 });
 
 test("a plan's turn counts for the person at what it would cost through the API", async () => {

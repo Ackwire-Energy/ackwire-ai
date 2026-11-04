@@ -43,12 +43,14 @@ export {
 } from "./agent/live";
 export { addLiveSticker, liveStickerCount } from "./agent/sticker-live";
 export {
+  type DrawnMood,
   drawSticker,
   STICKER_MOODS,
   STICKER_STILL_T,
   type StickerLook,
   type StickerMood,
   stickerSeed,
+  WAVE_SECONDS,
 } from "./agent/stickers";
 export {
   BRAIN_GRID,

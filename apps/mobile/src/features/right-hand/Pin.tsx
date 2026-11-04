@@ -7,9 +7,9 @@ import type { AgentRowState } from "../chats/now";
 import { useMeId, useOrgId } from "../shared/hooks";
 
 /**
- * The right hand's row on top of Conversas (ADR 0137): its face, its name, "seu braço direito" in the time's place
- * and its DM's last line and unread count; "Novo" with the dot until its DM first opens on this phone. Not part of
- * the sections, so it is never collapsed or moved.
+ * The right hand's row, first in Conversas' Agentes on a soft tint (ADR 0137): its face, its name, "seu braço
+ * direito" in the time's place and its DM's last line and unread count; "Novo" with the dot until its DM first opens
+ * on this phone. Never sorted or pinned, and a closed Agentes still shows it.
  */
 export function RightHandPin({
   row,
@@ -26,6 +26,7 @@ export function RightHandPin({
     <ConversationRowView
       row={row}
       live
+      tinted
       agent={agent}
       meta={fresh ? t("rightHand.newDot") : t("rightHand.label")}
       fresh={fresh}

@@ -31,6 +31,7 @@ import {
 } from "../lib/notifications";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
+import { firstVisitOf } from "../lib/right-hand";
 import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
 import { SIDEBAR_DEFAULTS, SIDEBAR_ITEMS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
@@ -43,7 +44,7 @@ import type { WikiAccess } from "../lib/wiki";
 import type { RealtimeConnection } from "../realtime/connection";
 import { setOrgDeletion } from "../realtime/machines";
 import type { ApiClient } from "./client";
-import { type AgentReactionEffect, useAgentReaction, useApi } from "./context";
+import { type AgentReactionEffect, useAgentReaction, useApi, useCardVia } from "./context";
 import { ApiError } from "./http";
 import { keys } from "./keys";
 import { keepSending, outbox } from "./outbox";
@@ -404,8 +405,9 @@ export const useMembers = (orgId: string) => {
 export function useChangeRole(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: Role }) => api.orgs.changeRole(orgId, userId, role),
+    mutationFn: ({ userId, role }: { userId: string; role: Role }) => api.orgs.changeRole(orgId, userId, role, via),
     onSettled: () => refreshRoles(qc, orgId),
   });
 }
@@ -499,9 +501,10 @@ export function useReorderRoles(orgId: string) {
 export function useSetMemberRoles(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
     mutationFn: ({ userId, roleIds }: { userId: string; roleIds: string[] }) =>
-      api.roles.setFor(orgId, userId, roleIds),
+      api.roles.setFor(orgId, userId, roleIds, via),
     onMutate: async ({ userId, roleIds }) => {
       await qc.cancelQueries({ queryKey: keys.people(orgId) });
       const before = qc.getQueryData<Person[]>(keys.people(orgId));
@@ -534,8 +537,9 @@ export const useRemovalPreview = (orgId: string, userId: string | null) => {
 export function useRemoveMember(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
-    mutationFn: (userId: string) => api.orgs.removeMember(orgId, userId),
+    mutationFn: (userId: string) => api.orgs.removeMember(orgId, userId, via),
     onMutate: async (userId) => {
       await qc.cancelQueries({ queryKey: keys.people(orgId) });
       const before = qc.getQueryData<Person[]>(keys.people(orgId));
@@ -1601,6 +1605,7 @@ function keepOwnRights(previous: Approval | undefined, approval: Approval): Appr
 export function useDecideApproval(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
     mutationFn: ({
       id,
@@ -1614,8 +1619,8 @@ export function useDecideApproval(orgId: string) {
       always?: boolean;
     }) =>
       decision === "approve"
-        ? api.approvals.approve(orgId, id, reason, always)
-        : api.approvals.refuse(orgId, id, reason),
+        ? api.approvals.approve(orgId, id, reason, always, via)
+        : api.approvals.refuse(orgId, id, reason, via),
     onSuccess: (approval, { decision, always }) => {
       playSound(decision === "approve" ? "approved" : "error");
       cacheApproval(qc, orgId, approval);
@@ -1642,9 +1647,10 @@ export function useCancelApproval(orgId: string) {
 export function useDecideApprovals(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
     mutationFn: (input: { ids: string[]; decision: "approve" | "refuse"; reason?: string }) =>
-      api.approvals.decideMany(orgId, input),
+      api.approvals.decideMany(orgId, via ? { ...input, via } : input),
     onSuccess: (result, { decision }) => {
       playSound(decision === "approve" ? "approved" : "error");
       for (const approval of result.approvals) cacheApproval(qc, orgId, approval);
@@ -5063,6 +5069,25 @@ export function useMarkChannelRead(orgId: string) {
       void qc.invalidateQueries({ queryKey: keys.unreadThreads(orgId) });
     },
   });
+}
+
+/**
+ * The right hand waves under its greeting on the person's first visit to its DM (ADR 0137 §6): decided once, as the
+ * DM opens, and kept for the visit. That visit marks the DM read, even with nothing in it yet, so the next one, on
+ * any device, has no wave.
+ */
+export function useRightHandWave(orgId: string, agentId: string): boolean {
+  const dms = useDms(orgId);
+  const markRead = useMarkChannelRead(orgId).mutate;
+  const first = firstVisitOf(dms.data, agentId);
+  const [wave, setWave] = useState(first);
+  const channelId = dms.data?.find((d) => d.with.type === "agent" && d.with.id === agentId)?.channelId;
+  useEffect(() => {
+    if (first === undefined) return;
+    setWave((w) => w ?? first);
+    if (first && channelId) markRead(channelId);
+  }, [first, channelId, markRead]);
+  return wave === true;
 }
 
 /** A conversation shows nothing unread in the cached lists (read here or on another device). */

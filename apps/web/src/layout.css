@@ -1107,16 +1107,13 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   font-size: 13px;
   color: var(--ink-muted);
 }
-/* The right hand's row (ADR 0137) above the tools: its label never pushes the name out; the label gives way first. */
-.sidebar__pin-row .sidebar__item-label {
-  flex: 0 0 auto;
-  max-width: 60%;
+/* The right hand's row (ADR 0137), first in AGENTES: a soft tint of the agent blue, under the hover and the chosen
+   plate. */
+.sidebar__item[data-right-hand]:not([data-status="active"]) {
+  background: color-mix(in srgb, var(--agent-soft) 60%, transparent);
 }
-.sidebar__pin-row .sidebar__item-meta {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: none;
-  text-align: right;
+.sidebar__item[data-right-hand]:not([data-status="active"]):hover {
+  background: var(--agent-soft);
 }
 /* Its one-time "Novo": a small dot in the info tone before the word. */
 .sidebar__new {
@@ -4378,7 +4375,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   gap: 6px;
   list-style: none;
   margin: 0;
-  padding: 0 20px 12px;
+  padding: 0 var(--dialog-pad) 12px;
 }
 .cflow__steps li {
   flex: 1;
@@ -10997,11 +10994,6 @@ html:not([data-pointer]) button.agp-roletag:focus-visible .agp-roletag__pen {
 .agp-spent__stats .ac-icon {
   color: var(--faint);
 }
-.look-dialog__body {
-  gap: 12px;
-  padding-bottom: 12px;
-}
-
 /* A full-screen menu is open (MenuOverlay): the app sinks behind it. */
 html[data-menu-overlay] .shell {
   filter: blur(22px) saturate(1.15);
@@ -11193,6 +11185,10 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
   .sidebar__section-body
   > :not([data-status="active"], :has(> [data-status="active"])) {
   display: none;
+}
+/* AGENTES closed still shows the right hand: it is never hidden. */
+.sidebar__section[data-open="false"] .sidebar__section-body > [data-right-hand] {
+  display: flex;
 }
 /* A part closed (Canais, Agentes) also hides its categories or groups after it, but the one with the open page. */
 .sidebar:not([data-rail="true"])
@@ -12995,7 +12991,8 @@ html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
   width: 280px;
   max-width: 100%;
 }
-.rh-set__budget {
+.rh-set__budget,
+.rh-set__plan {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -13012,13 +13009,6 @@ html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
 .rh-set__face {
   display: flex;
   justify-content: center;
-  margin-bottom: 16px;
-}
-.rh-set__acts {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 24px;
 }
 @media (max-width: 640px) {
   .rh-set__name {

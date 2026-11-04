@@ -594,7 +594,7 @@ function AddAccountFlow({
         size="sm"
         icon={linkCopied ? "check" : "copy"}
         loading={starting && copyingLink}
-        disabled={!ready || (starting && !copyingLink)}
+        disabled={!ready || loading || (starting && !copyingLink)}
         onClick={copyLink}
       >
         {linkCopied ? t("common.copied") : t("agentPage.work.brain.add.copyLink")}

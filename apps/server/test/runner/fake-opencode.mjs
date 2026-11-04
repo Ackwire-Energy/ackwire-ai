@@ -24,6 +24,41 @@ if (args[0] === "models") {
   process.stdout.write(`opencode/big-pickle\nopencode/glm-5.3-flash-free\n${paid}`);
   process.exit(0);
 }
+// The config's `permission` as OpenCode 1.19.5 orders the build agent's rules: its defaults, the config's, then
+// $FAKE_OPENCODE_ALLOW (a rule another config adds after ours, read last), then the truncation folder.
+const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? "{}");
+const rules = [
+  { permission: "*", pattern: "*", action: "allow" },
+  { permission: "question", pattern: "*", action: "allow" },
+  ...Object.entries(config.permission ?? {}).map(([permission, action]) => ({ permission, pattern: "*", action })),
+  ...(env.FAKE_OPENCODE_ALLOW ? [{ permission: env.FAKE_OPENCODE_ALLOW, pattern: "*", action: "allow" }] : []),
+  { permission: "external_directory", pattern: "/tmp/opencode/tool-output/*", action: "allow" },
+];
+const match = (id, p) => p === "*" || p === id || (p.endsWith("*") && id.startsWith(p.slice(0, -1)));
+// `Permission.disabled`: hidden when the last rule naming it denies `*`.
+const on = (id) => {
+  const rule = rules.findLast((r) => match(id === "write" ? "edit" : id, r.permission));
+  return !(rule?.pattern === "*" && rule.action === "deny");
+};
+// `debug agent <name>`: the agent's tools as OpenCode resolves them (its built-in ones, plus $FAKE_OPENCODE_EXTRA_TOOL,
+// one a new version adds; MCP servers' tools are never listed) and its rules. $FAKE_OPENCODE_PROBE_FAIL: exit 1.
+if (args[0] === "debug" && args[1] === "agent") {
+  if (env.FAKE_OPENCODE_LOG) {
+    appendFileSync(
+      env.FAKE_OPENCODE_LOG,
+      `${JSON.stringify({ probe: true, args, cwd: process.cwd(), config: env.OPENCODE_CONFIG_CONTENT ?? null })}\n`,
+    );
+  }
+  if (env.FAKE_OPENCODE_PROBE_FAIL) {
+    process.stderr.write("Error: No providers found\n");
+    process.exit(1);
+  }
+  const ids = ["bash", "read", "edit", "write", "glob", "grep", "webfetch", "task", "todowrite", "skill"];
+  if (env.FAKE_OPENCODE_EXTRA_TOOL) ids.push(env.FAKE_OPENCODE_EXTRA_TOOL);
+  const tools = Object.fromEntries(ids.map((id) => [id, on(id)]));
+  process.stdout.write(`${JSON.stringify({ name: args[2], mode: "primary", permission: rules, tools }, null, 2)}\n`);
+  process.exit(0);
+}
 if (args[0] !== "run" || flag("--format") !== "json") {
   process.stderr.write(`fake opencode: unknown command ${args.join(" ")}\n`);
   process.exit(2);
@@ -49,6 +84,7 @@ if (env.FAKE_OPENCODE_LOG) {
       permission: env.OPENCODE_PERMISSION ?? null,
       anthropicKey: env.ANTHROPIC_API_KEY ?? null,
       lspDownload: env.OPENCODE_DISABLE_LSP_DOWNLOAD ?? null,
+      claudeCode: env.OPENCODE_DISABLE_CLAUDE_CODE ?? null,
       run: env.AGENTES_MCP_RUN ?? null,
       token: env.AGENTES_MCP_TOKEN ?? null,
     })}\n`,
@@ -77,14 +113,17 @@ if (message.includes("ENV")) {
   process.exit(0);
 }
 line("text", { part: { type: "text", text: "Let me check.", time: { start: 1, end: 2 } } });
-line("tool_use", {
-  part: {
-    type: "tool",
-    tool: "bash",
-    callID: "call_1",
-    state: { status: "completed", input: { command: "npm test" }, output: "2 passed\n" },
-  },
-});
+// The bash call only where the config leaves bash on, or always with $FAKE_OPENCODE_RUN_BASH (a guard that missed).
+if (on("bash") || env.FAKE_OPENCODE_RUN_BASH) {
+  line("tool_use", {
+    part: {
+      type: "tool",
+      tool: "bash",
+      callID: "call_1",
+      state: { status: "completed", input: { command: "npm test" }, output: "2 passed\n" },
+    },
+  });
+}
 line("tool_use", {
   part: {
     type: "tool",

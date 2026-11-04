@@ -63,7 +63,12 @@ import { MailIcon } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
 import { PersonLimitCardView } from "@/components/PeopleUsage";
 import { RequestCard, RequestDone, RequestFuse, useExpired } from "@/components/RequestCard";
-import { SettingsProposalCardView } from "@/components/RightHandCards";
+import {
+  ApprovalsCardView,
+  MemberChangesCardView,
+  OpenPageCardView,
+  SettingsProposalCardView,
+} from "@/components/RightHandCards";
 import { DelegateNote, DelegateUndo, useDelegateLine } from "@/components/RightHandDelegate";
 import { InstallSkillDialog, SkillSheet } from "@/components/Skills";
 import { StretchCardView } from "@/components/StretchCard";
@@ -106,6 +111,9 @@ export function ActionCard({ message }: { message: Message }) {
       />
     );
   if (card.kind === "settings_proposal") return <SettingsProposalCardView message={message} card={card} />;
+  if (card.kind === "approvals") return <ApprovalsCardView message={message} card={card} />;
+  if (card.kind === "member_changes") return <MemberChangesCardView message={message} card={card} />;
+  if (card.kind === "open_page") return <OpenPageCardView card={card} />;
   if (card.kind === "stretch_paused") return <StretchCardView message={message} card={card} />;
   if (card.kind === "usage_paused") return <UsagePauseCardView message={message} card={card} />;
   if (card.kind === "person_limit") return <PersonLimitCardView message={message} card={card} />;

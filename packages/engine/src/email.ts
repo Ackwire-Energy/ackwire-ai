@@ -905,16 +905,23 @@ export async function queuePlanOpenedEmail(
   const { agentId, actorId } = payload as { agentId: string; actorId: string };
   const from = payload.from as { mode: PlanAudience["mode"]; userIds: string[]; roleIds: string[] };
   const to = payload.to as typeof from;
-  const [agent] = await db
+  const [row] = await db
     .select({
+      orgId: agents.orgId,
       name: agents.name,
+      builtin: agents.builtin,
       ownerUserId: agents.ownerUserId,
       brain: agents.brain,
-      accountId: agents.brainAccountId,
+      brainAccountId: agents.brainAccountId,
       machineId: agents.machineId,
+      planForOthers: agents.planForOthers,
     })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), eq(agents.id, agentId)));
+  // The team's right hand: its plan's owner and computer (ADR 0137 §1); nothing once the switch is off again.
+  const { thinkingAgent, isRightHand } = await import("./right-hand");
+  if (row && isRightHand(row) && !row.planForOthers) return;
+  const agent = row ? { ...(await thinkingAgent(db, row)), accountId: row.brainAccountId } : undefined;
   if (!agent?.ownerUserId || !isComputerBrain(agent.brain) || !agent.machineId) return;
   const ownerId = agent.ownerUserId;
   // Its owner's plan thinks there, and they are still in the workspace: not OpenCode's free tier on a computer nobody

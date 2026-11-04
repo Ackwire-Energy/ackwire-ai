@@ -251,6 +251,8 @@ export interface DmSummary {
     authorType: string;
   } | null;
   unread: number;
+  /** False until I first open it (no read of mine yet): the right hand waves on that first visit (ADR 0137 §6). */
+  everRead: boolean;
 }
 
 /** My direct conversations, newest activity first, with unread counts. */
@@ -356,6 +358,7 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
               }
             : null,
           unread: unread.get(c.id) ?? 0,
+          everRead: readAt.has(c.id),
           sortAt: m?.createdAt ?? c.createdAt,
         },
       ];

@@ -8,7 +8,7 @@ import {
   MIN_RUNNER_PROTOCOL,
   type PubSub,
 } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { type AuditEntry, recordAudit } from "./audit";
 import { caches } from "./cache";
@@ -16,7 +16,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { can, requireActiveMembership, requirePermission } from "./organizations";
 import { maySql } from "./permissions";
-import { isRightHand, rightHandPermanent } from "./right-hand";
+import { isRightHand, RIGHT_HAND, rightHandPermanent } from "./right-hand";
 
 const { machines, agents, users, organizationMembers } = schema;
 
@@ -510,7 +510,21 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
     })
     .from(agents)
     .leftJoin(users, eq(users.id, agents.ownerUserId))
-    .where(and(eq(agents.orgId, orgId), eq(agents.machineId, machineId), isNull(agents.archivedAt)))
+    .where(
+      and(
+        eq(agents.orgId, orgId),
+        isNull(agents.archivedAt),
+        // The team's right hand on a plan signed in here (ADR 0137 §1): its user holds that sign-in while it thinks.
+        or(
+          eq(agents.machineId, machineId),
+          and(
+            eq(agents.builtin, RIGHT_HAND),
+            sql`exists (select 1 from ${schema.machineAccounts} ma
+              where ma.id = ${agents.brainAccountId} and ma.org_id = ${agents.orgId} and ma.machine_id = ${machineId}::uuid)`,
+          ),
+        ),
+      ),
+    )
     .orderBy(agents.createdAt);
   return rows.map((a) => {
     const account = lentAccount(a);

@@ -459,10 +459,11 @@ export interface ApiClient {
     limits(orgId: string): Promise<WorkspaceLimits>;
     members(orgId: string): Promise<Member[]>;
     /** Makes a member an owner or not (owners only). What anyone may do is their roles (`roles.setFor`). */
-    changeRole(orgId: string, userId: string, role: Role): Promise<void>;
+    /** `via`: the right hand's people card it came from (the audit's "via", ADR 0137 §4). */
+    changeRole(orgId: string, userId: string, role: Role, via?: string): Promise<void>;
     /** What removing them (or leaving) does; refused as the removal would be. */
     removal(orgId: string, userId: string): Promise<RemovalPreview>;
-    removeMember(orgId: string, userId: string): Promise<void>;
+    removeMember(orgId: string, userId: string, via?: string): Promise<void>;
     invitations(orgId: string): Promise<Invitation[]>;
     invite(
       orgId: string,
@@ -521,7 +522,7 @@ export interface ApiClient {
     /** Every role but `everyone`, top first. */
     reorder(orgId: string, ids: string[]): Promise<void>;
     /** A person's roles, exactly these. */
-    setFor(orgId: string, userId: string, roleIds: string[]): Promise<{ roleIds: string[] }>;
+    setFor(orgId: string, userId: string, roleIds: string[], via?: string): Promise<{ roleIds: string[] }>;
   };
   /** Groups of agents (ADR 0083): everyone reads them, owners and admins change them; each change answers with all. */
   agentGroups: {
@@ -763,14 +764,15 @@ export interface ApiClient {
     ): Promise<Approval[]>;
     get(orgId: string, approvalId: string): Promise<Approval>;
     /** `always`: also approve this kind for good (409 `approval.always_unavailable` where it isn't offered). */
-    approve(orgId: string, approvalId: string, reason?: string, always?: boolean): Promise<Approval>;
-    refuse(orgId: string, approvalId: string, reason?: string): Promise<Approval>;
+    /** `via`: the right hand's approvals card it was decided from (the audit's "via", ADR 0137 §4). */
+    approve(orgId: string, approvalId: string, reason?: string, always?: boolean, via?: string): Promise<Approval>;
+    refuse(orgId: string, approvalId: string, reason?: string, via?: string): Promise<Approval>;
     /** Withdraws an action approved ahead before its time: its routine's run won't do it. */
     cancel(orgId: string, approvalId: string): Promise<Approval>;
     /** A card's "Aprovar tudo" / "Agora não para todos": exactly these ids; `skipped` the ones not decided. */
     decideMany(
       orgId: string,
-      input: { ids: string[]; decision: "approve" | "refuse"; reason?: string },
+      input: { ids: string[]; decision: "approve" | "refuse"; reason?: string; via?: string },
     ): Promise<{ approvals: Approval[]; skipped: string[] }>;
     /** What the agent runs without asking ("Aprovar sempre"), oldest first. */
     rules(orgId: string, agentId: string): Promise<ApprovalRule[]>;

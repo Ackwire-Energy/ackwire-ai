@@ -9369,7 +9369,7 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: -1;
+  z-index: var(--z-under);
   width: 100%;
   border-radius: 0 0 var(--radius-section) 4px;
   image-rendering: pixelated;
@@ -9384,7 +9384,7 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1;
+  z-index: var(--z-raised);
   display: flex;
   align-items: flex-end;
   justify-content: center;

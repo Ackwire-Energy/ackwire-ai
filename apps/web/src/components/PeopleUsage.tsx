@@ -49,6 +49,7 @@ import {
   Card,
   Checkbox,
   Dialog,
+  DialogBody,
   Icon,
   InfoHint,
   Input,
@@ -626,11 +627,13 @@ function PersonDrawer({ userId, onClose }: { userId: string | null; onClose: () 
       }
     >
       {!data ? (
-        usage.isError ? (
-          <ErrorState error={usage.error} onRetry={() => void usage.refetch()} />
-        ) : (
-          <LoadingList count={5} avatar trailing />
-        )
+        <DialogBody>
+          {usage.isError ? (
+            <ErrorState error={usage.error} onRetry={() => void usage.refetch()} />
+          ) : (
+            <LoadingList count={5} avatar trailing />
+          )}
+        </DialogBody>
       ) : (
         <div className="pu-drawer__body">
           {l && l.limitUsd != null ? (

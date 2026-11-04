@@ -62,15 +62,19 @@ export function NoAiCard({ message: m }: { message: Message }) {
   const mayAnswer =
     card.forUserId === meId || (meId !== null && agent?.ownerUserId === meId) || can(org, "manage_agents");
   const answering = answer === "answering";
+  // The team's right hand on a plan that can't think now (ADR 0137 §7): one plain line, and the way to an API key.
+  const planLine = card.planLine && !(card.planLine === "computer_away" && state === "ready") ? card.planLine : null;
   const title = answering
     ? t("noAi.card.answering", { name })
-    : ready
-      ? t("noAi.card.connected", { name })
-      : answer === "still_missing"
-        ? t("noAi.card.stillMissing", { name })
-        : card.own
-          ? t(`noAi.notSignedIn.${card.own}`, agentGrammar(name))
-          : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(name));
+    : planLine
+      ? t(`noAi.rightHand.${planLine}`, { name })
+      : ready
+        ? t("noAi.card.connected", { name })
+        : answer === "still_missing"
+          ? t("noAi.card.stillMissing", { name })
+          : card.own
+            ? t(`noAi.notSignedIn.${card.own}`, agentGrammar(name))
+            : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(name));
   const answerNow = async () => {
     setAnswer("pending");
     try {
@@ -89,7 +93,14 @@ export function NoAiCard({ message: m }: { message: Message }) {
           {title}
         </Text>
       </View>
-      {answering ? null : ready || answer === "pending" ? (
+      {answering ? null : planLine ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          label={t("noAi.rightHand.useKey")}
+          onPress={() => openConnectAi({ from: m.id, intent: "api_key", agentId: card.agentId })}
+        />
+      ) : ready || answer === "pending" ? (
         mayAnswer ? (
           <Button
             variant="primary"

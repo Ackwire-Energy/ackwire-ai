@@ -31,6 +31,7 @@ import {
   useMissionControl,
   usePins,
   usePostMessage,
+  useRightHandWave,
   useRoster,
   useSettings,
   useSteerState,
@@ -82,6 +83,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { frameClock } from "@/agent/clock";
 import { StickerStageContext } from "@/agent/StickerCanvas";
 import { createStickerStage } from "@/agent/sticker-stage";
 import { holdOpenConversation } from "@/lib/push";
@@ -332,6 +334,10 @@ function Chat({
   useEffect(() => {
     if (rightHand && meId) rightHandSeen.mark(rightHandSeenKey(meId, orgId));
   }, [rightHand, meId, orgId]);
+  // Its wave on the person's first visit, kept here: the greeting moves into the list with the first message, and
+  // the wave neither goes nor plays again.
+  const wave = useRightHandWave(orgId, rightHand && dmAgent ? dmAgent.id : "");
+  const waveFrom = useMemo(() => (wave ? frameClock.time() : undefined), [wave]);
   const member = dm ? true : (channel?.isMember ?? true);
   const roster = useRoster(orgId, channelId, Boolean(channel?.isMember) && !isThread);
   // The computer this conversation's agents share, while turns wait for it: the bar's way into its line.
@@ -1878,7 +1884,7 @@ function Chat({
                           // The right hand's greeting stays at the conversation's start, once the start is loaded.
                           ListHeaderComponent={
                             dmAgent && rightHand && (olderDone || (top.data?.length ?? 0) < MESSAGES_PAGE) ? (
-                              <RightHandIntro agent={dmAgent} channelId={channelId} />
+                              <RightHandIntro agent={dmAgent} channelId={channelId} waveFrom={waveFrom} />
                             ) : undefined
                           }
                         />
@@ -1896,7 +1902,7 @@ function Chat({
                 <View style={StyleSheet.absoluteFill}>
                   {dmAgent && rightHand ? (
                     <ScrollView contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: composerHeight }}>
-                      <RightHandIntro agent={dmAgent} channelId={channelId} />
+                      <RightHandIntro agent={dmAgent} channelId={channelId} waveFrom={waveFrom} />
                     </ScrollView>
                   ) : dmAgent && !isThread ? (
                     <FirstDay agent={dmAgent} bottomInset={composerHeight} keyboardLift={lift} onAsk={onSend} />

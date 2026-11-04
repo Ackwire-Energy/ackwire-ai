@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { dmReads, markChannelRead, openDm } from "../src";
+import { dmReads, listDms, markChannelRead, openDm } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -38,5 +38,21 @@ describe('"Visto" in a DM between people', () => {
     await markChannelRead(f.db, f.owner.id, f.org.id, f.general.id, new Date(), f.pubsub);
     expect(events.filter((e) => e.type === "channel.read")).toEqual([]);
     expect(await dmReads(f.db, f.owner.id, f.org.id, f.general.id)).toEqual([]);
+  });
+});
+
+describe("a DM's first visit (the right hand's wave, ADR 0137 §6)", () => {
+  test("never read by me until I first read it, whatever the other one does", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { userId: bia.id });
+    const everRead = async (userId: string) =>
+      (await listDms(f.db, userId, f.org.id)).find((d) => d.channelId === dm.id)?.everRead;
+    expect(await everRead(f.owner.id)).toBe(false);
+    await markChannelRead(f.db, bia.id, f.org.id, dm.id);
+    expect(await everRead(f.owner.id)).toBe(false);
+    expect(await everRead(bia.id)).toBe(true);
+    await markChannelRead(f.db, f.owner.id, f.org.id, dm.id);
+    expect(await everRead(f.owner.id)).toBe(true);
   });
 });

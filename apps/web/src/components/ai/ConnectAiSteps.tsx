@@ -32,6 +32,8 @@ import { toolOffReason } from "@agenteschat/client/lib/machines";
 import {
   type AiChoice,
   ALL_AGENTS,
+  behindComputer,
+  catchUp,
   type ExistingSignIn,
   freePlanAccount,
   gateDims,
@@ -119,17 +121,23 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
   const row = ai.data?.computers.find((c) => c.machineId === view?.computer?.machineId);
   // Once ready, the workspace's computer is every agent's: a view from before that still has none is asked again
   // now with the accounts (a coding plan reads that computer's row there), not at their next poll. Until both
-  // answers are in, every plan reads as ready with its sign-in loading, as the rest of the page says ready.
-  const behind = edition === "cloud" && setup?.phase === "ready" && view !== undefined && !view.computer;
+  // answers are in (`catchUp`, bounded), every plan reads as ready with its sign-in loading, as the rest of the page
+  // says ready. Asked once per agent: still none after it, and nothing is coming (`caughtUp`).
+  const behind = behindComputer({ edition, setup, brain: view });
+  const [caughtUp, setCaughtUp] = useState<string>();
+  const caught = agentId !== undefined && caughtUp === agentId;
   const [asking, setAsking] = useState(false);
   const { refetch: brainAgain } = brain;
   const { refetch: accountsAgain } = ai;
   useEffect(() => {
-    if (!behind) return;
+    if (!behind || caught) return;
     setAsking(true);
-    void Promise.allSettled([brainAgain(), accountsAgain()]).then(() => setAsking(false));
-  }, [behind, brainAgain, accountsAgain]);
-  const catching = behind || asking;
+    void catchUp([brainAgain(), accountsAgain()]).then(() => {
+      setAsking(false);
+      setCaughtUp(agentId);
+    });
+  }, [behind, caught, agentId, brainAgain, accountsAgain]);
+  const catching = (behind && !caught) || asking;
   // A panel here waited for that computer: once it's ready, it says so whenever it shows again (another plan, another
   // step and back).
   const [waited, setWaited] = useState(false);
@@ -145,9 +153,16 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
           // computer the person connected whether its own sign-in is there (`ownSignInFor`).
           brain: view && (ai.data || !(isPlanId(choice) || view.ownSignIn)) ? view : undefined,
           computer: row,
+          caughtUp: caught,
         });
-  // A poll that fails once keeps the last view: a sign-in in progress goes on.
-  return { gateOf, view, row, failed: brain.isError && !view, edition, waited, markWaited, catching };
+  // A poll that fails once keeps the last view: a sign-in in progress goes on. A read that failed with nothing to show
+  // ends the panel's wait with Tentar de novo.
+  const failed = (brain.isError && !view) || (ai.isError && !ai.data) || (setupQ.isError && !setupQ.data);
+  const { refetch: setupAgain } = setupQ;
+  const retry = useCallback(() => {
+    for (const again of [brainAgain, accountsAgain, setupAgain]) void again();
+  }, [brainAgain, accountsAgain, setupAgain]);
+  return { gateOf, view, row, failed, retry, edition, waited, markWaited, catching };
 }
 
 export type PlanGates = ReturnType<typeof usePlanGates>;
@@ -847,7 +862,17 @@ function PlanSteps({
     </div>
   );
 
-  if (gates.failed) return <SettingNote icon="alert">{t("common.loadFailed")}</SettingNote>;
+  if (gates.failed)
+    return (
+      <div className="ai-panel__row">
+        <SettingNote icon="alert" live>
+          {t("common.loadFailed")}
+        </SettingNote>
+        <Button size="sm" icon="refresh" onClick={gates.retry}>
+          {t("common.retry")}
+        </Button>
+      </div>
+    );
   // Done, or nothing to do: every agent of "All agents" already thought with this plan.
   if (allDone || (everyone && todo.length === 0)) {
     return (

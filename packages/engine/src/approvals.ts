@@ -20,6 +20,7 @@ import {
 import { type ActiveCover, activeCoversFrom, activeCoversTo } from "./approval-covers";
 import { addApprovalRules, COMMAND_RULE_TOOL, type RememberedKind, rememberedKindOf } from "./approval-rules";
 import { recordAudit } from "./audit";
+import { approvalCardVia } from "./card-via";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
 import { learnFromRefusal } from "./context/feedback";
 import type { MemoryJudging } from "./context/items";
@@ -716,7 +717,8 @@ export async function decideApproval(
   actorId: string,
   orgId: string,
   approvalId: string,
-  input: { decision: "approve" | "refuse"; reason?: string; always?: boolean },
+  /** `via`: the card message it was decided from (the audit's "via", `approvalCardVia`). */
+  input: { decision: "approve" | "refuse"; reason?: string; always?: boolean; via?: string },
 ): Promise<ApprovalView> {
   const { db } = deps;
   const at = deps.now?.() ?? new Date();
@@ -741,6 +743,7 @@ export async function decideApproval(
               : "Only the agent's owner or an admin can decide this",
     );
   }
+  const via = await approvalCardVia(db, orgId, input.via, approvalId);
   const kind = input.always ? alwaysKindOf(current) : null;
   // Approving for good outlives the cover and changes the agent for everyone: never in someone else's name.
   if (input.always && (input.decision !== "approve" || !kind || forUserId)) {
@@ -786,7 +789,7 @@ export async function decideApproval(
       await addApprovalRules(tx, { orgId, agentId: row.agentId, connectionId: always.connectionId }, always, actorId);
     }
     if (updated?.status === "refused") await settleAheadRoutine(tx, updated);
-    if (updated) await auditDecision(tx, updated, expired ? null : actorId, always);
+    if (updated) await auditDecision(tx, updated, expired ? null : actorId, always, via);
     return expired ? { error: "This request has expired" as const, row: updated } : { row: updated };
   });
   if (outcome.row) await publishApproval(deps, outcome.row, "approval.decided");
@@ -808,11 +811,13 @@ export async function decideApprovals(
   deps: { db: Database; pubsub: PubSub; now?: () => Date; memory?: MemoryJudging },
   actorId: string,
   orgId: string,
-  input: { ids: string[]; decision: "approve" | "refuse"; reason?: string },
+  input: { ids: string[]; decision: "approve" | "refuse"; reason?: string; via?: string },
 ): Promise<{ approvals: ApprovalView[]; skipped: string[] }> {
   const { db } = deps;
   const at = deps.now?.() ?? new Date();
   const ids = [...new Set(input.ids)];
+  const vias = new Map<string, string | null>();
+  if (input.via) for (const id of ids) vias.set(id, await approvalCardVia(db, orgId, input.via, id));
   const membership = await requirePermission(db, actorId, orgId, "read");
   const covers = await activeCoversTo(db, orgId, actorId, at);
   const forUserOf = (r: Approval) => (decides(r, actorId, membership) ? null : coveredFor(r, actorId, covers));
@@ -846,7 +851,7 @@ export async function decideApprovals(
         .where(eq(approvals.id, row.id))
         .returning();
       if (!updated) continue;
-      await auditDecision(tx, updated, expired ? null : actorId);
+      await auditDecision(tx, updated, expired ? null : actorId, null, vias.get(row.id) ?? null);
       if (updated.status === "refused") await settleAheadRoutine(tx, updated);
       if (!row.runId || !resumed.has(row.runId)) await enqueueResume(tx, row);
       if (row.runId) resumed.add(row.runId);
@@ -882,6 +887,7 @@ function auditDecision(
   row: Approval,
   personId: string | null,
   always: (RememberedKind & { connectionId: string | null }) | null = null,
+  via: string | null = null,
 ) {
   return recordAudit(tx, {
     orgId: row.orgId,
@@ -894,6 +900,7 @@ function auditDecision(
       title: row.title,
       ...(row.reason ? { reason: row.reason } : {}),
       ...(always ? { always } : {}),
+      ...(via ? { via } : {}),
     },
     runId: row.runId,
     channelId: row.channelId,

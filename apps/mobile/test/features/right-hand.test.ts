@@ -2,7 +2,9 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import type { DirectMessage } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
-import { introCards, presetsLeft, rightHandOf } from "@agenteschat/client/lib/right-hand";
+import { firstVisitOf, introCards, presetsLeft, rightHandOf } from "@agenteschat/client/lib/right-hand";
+import { STICKER_STILL_T, WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
+import { stickerFrame } from "../../src/agent/sticker";
 import { agentStarters, buildConversations, homeLayout, rightHandPin } from "../../src/features/chats/logic";
 import { SETTINGS_SECTIONS, visibleSections } from "../../src/features/settings/logic";
 import { agent, at } from "./fixtures";
@@ -16,12 +18,22 @@ const dm = (a: { id: string; name: string; handle: string }, minutesAgo: number,
   unread,
 });
 
-test("the right hand is pinned on top of Conversas, its DM's unread kept, and never under Agentes", () => {
+test("the right hand is its own row, its DM's unread kept, never one of Agentes' sorted rows", () => {
   const rows = buildConversations({ channels: [], dms: [dm(lodi, 1, 2), dm(theo, 5)], threads: [] });
   const { pin, rows: rest } = rightHandPin(rows, rightHandOf([theo, lodi]));
   expect(pin).toMatchObject({ kind: "dm", channelId: "d-a-lodi", unread: 2 });
   const agents = homeLayout(rest, []).find((s) => s.key === "agents");
   expect(agents?.rows.map((r) => r.key)).toEqual(["d:d-a-theo"]);
+});
+
+test("Conversas draws it first in Agentes, tinted, kept in sight while Agentes is closed; alone on top with no Agentes", () => {
+  const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
+  const chats = src("chats/ChatsScreen.tsx");
+  expect(chats).toContain('const lead = s.key === "agents" ? pin : null;');
+  expect(chats).toMatch(/\{lead\}\s*\{s\.rows\.map/);
+  expect(chats).toContain("{...(lead ? { kept: lead } : {})}");
+  expect(chats).toContain('!sections.some((b) => b.key === "agents")');
+  expect(src("right-hand/Pin.tsx")).toMatch(/live\s+tinted/);
 });
 
 test("with no DM yet its row starts one, and the Agentes starters leave it out", () => {
@@ -82,4 +94,30 @@ test("its DM, cards and profile treat it apart through the one shared helper", (
     "chat/ChannelMembers.tsx",
   ])
     expect(src(f)).not.toMatch(/coordinator/i);
+});
+
+test("it waves on the person's first visit only: its DM never read by them, on any device", () => {
+  expect(firstVisitOf(undefined, lodi.id)).toBeUndefined();
+  expect(firstVisitOf([dm(theo, 1)], lodi.id)).toBeUndefined();
+  expect(firstVisitOf([{ ...dm(lodi, 1), everRead: false }], lodi.id)).toBe(true);
+  expect(firstVisitOf([{ ...dm(lodi, 1), everRead: true }], lodi.id)).toBe(false);
+  // An older server says nothing: no wave.
+  expect(firstVisitOf([dm(lodi, 1)], lodi.id)).toBe(false);
+  // Decided by the conversation, so the greeting moving into the list with the first message keeps it, not playing
+  // again; under the greeting, decorative, playing once.
+  const chat = readFileSync(new URL("../../src/features/chat/ChatScreen.tsx", import.meta.url), "utf8");
+  expect(chat).toContain('useRightHandWave(orgId, rightHand && dmAgent ? dmAgent.id : "")');
+  expect(
+    chat.match(/<RightHandIntro agent=\{dmAgent\} channelId=\{channelId\} waveFrom=\{waveFrom\} \/>/g),
+  ).toHaveLength(2);
+  const intro = readFileSync(new URL("../../src/features/right-hand/Intro.tsx", import.meta.url), "utf8");
+  expect(intro).toMatch(/mood="wave"[\s\S]*playFor=\{WAVE_SECONDS\}[\s\S]*from=\{waveFrom\}/);
+  expect(intro).toContain('importantForAccessibility="no-hide-descendants"');
+});
+
+test("its wave moves, then ends on its still frame, so stopping shows no jump", () => {
+  const look = { color: "teal", eyes: "happy", accessory: "headset" };
+  const still = JSON.stringify(stickerFrame(look, "wave", 110, STICKER_STILL_T));
+  expect(JSON.stringify(stickerFrame(look, "wave", 110, 0.1))).not.toBe(still);
+  expect(JSON.stringify(stickerFrame(look, "wave", 110, WAVE_SECONDS))).toBe(still);
 });

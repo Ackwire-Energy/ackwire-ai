@@ -1,5 +1,5 @@
 import type { ApiClient } from "../api/client";
-import type { Agent } from "../api/types";
+import type { Agent, DirectMessage } from "../api/types";
 import { PRESETS } from "./onboarding";
 
 /** The workspace's right hand (ADR 0137): every surface that treats it apart asks here. */
@@ -7,6 +7,15 @@ export const isRightHand = (agent: Pick<Agent, "builtin"> | null | undefined) =>
 
 /** Its one-time "Novo" is per person and workspace (`seenList` entries), gone once its DM opened. */
 export const rightHandSeenKey = (userId: string, orgId: string) => `${userId}.${orgId}`;
+
+/**
+ * Whether this is the person's first visit to the right hand's DM, so it waves under its greeting (ADR 0137 §6):
+ * they never read it, on any device. Unknown (undefined) while their DMs load or before it is one of them.
+ */
+export function firstVisitOf(dms: readonly DirectMessage[] | undefined, agentId: string): boolean | undefined {
+  const dm = dms?.find((d) => d.with.type === "agent" && d.with.id === agentId);
+  return dm ? dm.everRead === false : undefined;
+}
 
 /** The workspace's right hand among its agents, when this person may see it. */
 export const rightHandOf = <A extends Pick<Agent, "builtin">>(agents: readonly A[]) => agents.find(isRightHand);

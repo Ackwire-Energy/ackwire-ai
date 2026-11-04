@@ -55,6 +55,7 @@ if (log) {
   const oauthEnv = process.env.CLAUDE_CODE_OAUTH_TOKEN ?? null;
   const baseUrl = process.env.ANTHROPIC_BASE_URL ?? null;
   const compactWindow = process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW ?? null;
+  const autoMemoryOff = process.env.CLAUDE_CODE_DISABLE_AUTO_MEMORY ?? null;
   const at = args.indexOf("--settings");
   let settingsEnv = null;
   try {
@@ -67,7 +68,7 @@ if (log) {
   } catch {}
   appendFileSync(
     log,
-    `${JSON.stringify({ pid: process.pid, args, configDir, cwd: process.cwd(), apiKey, authToken, oauthToken, oauthEnv, oauthFd, baseUrl, settingsEnv, compactWindow, system })}\n`,
+    `${JSON.stringify({ pid: process.pid, args, configDir, cwd: process.cwd(), apiKey, authToken, oauthToken, oauthEnv, oauthFd, baseUrl, settingsEnv, compactWindow, autoMemoryOff, system })}\n`,
   );
 }
 const flag = (name) => {
@@ -149,6 +150,21 @@ const resultUuids = !process.env.FAKE_CLAUDE_NO_RESULT_UUIDS;
 const lifecycleOf = (uuid, state) => {
   if (lifecycle && uuid) out({ type: "command_lifecycle", command_uuid: uuid, state });
 };
+// Its init lists its tools as Claude Code does: `--tools` (absent: its own), our bridge's, and $FAKE_CLAUDE_EXTRA_TOOL
+// (one a new version adds whatever `--tools` says). $FAKE_CLAUDE_NO_TOOL_LIST: no lists at all.
+const mcpServers = (() => {
+  try {
+    return Object.keys(JSON.parse(readFileSync(flag("--mcp-config") ?? "", "utf8")).mcpServers ?? {});
+  } catch {
+    return [];
+  }
+})();
+const toolsFlag = flag("--tools");
+const initTools = [
+  ...(toolsFlag === undefined ? ["Bash", "Read", "Edit"] : toolsFlag.split(",").filter(Boolean)),
+  ...(mcpServers.includes("agentes") ? ["mcp__agentes__post_message"] : []),
+  ...(process.env.FAKE_CLAUDE_EXTRA_TOOL ? [process.env.FAKE_CLAUDE_EXTRA_TOOL] : []),
+];
 // Claude Code says `init` as each turn starts.
 const init = () =>
   out({
@@ -157,6 +173,9 @@ const init = () =>
     model: flag("--model") ?? "claude-sonnet",
     ...(version ? { claude_code_version: version } : {}),
     ...(caps ? { capabilities: caps } : {}),
+    ...(process.env.FAKE_CLAUDE_NO_TOOL_LIST
+      ? {}
+      : { tools: initTools, mcp_servers: mcpServers.map((name) => ({ name, status: "connected" })) }),
   });
 init();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

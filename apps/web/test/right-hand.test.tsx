@@ -42,22 +42,42 @@ const click = async (el: Element, rounds = 6) => {
 };
 
 describe("the right hand's row in the sidebar", () => {
-  test("first in the list, above the tools, with its label; never under Mensagens diretas", async () => {
+  test("the first row of AGENTES, above the pinned agents, tinted and with its label; never under Mensagens diretas", async () => {
     const state = withRightHand(seedState());
     seedDm(state, { type: "agent", id: LODI_ID }, { ago: 2 });
     seedDm(state, { type: "agent", id: ADA_ID }, { ago: 5 });
+    state.sidebarView = {
+      agentSort: "workspace",
+      showAllAgents: false,
+      pins: { agents: [ADA_ID], channels: [], people: [] },
+    };
     await go(state);
     const row = pinRow();
     expect(row).toBeTruthy();
-    const scroll = nav().querySelector(".sidebar__scroll") as HTMLElement;
-    // Before every section (it isn't one: nothing moves or hides it).
-    expect(scroll.firstElementChild?.contains(row)).toBe(true);
-    expect(row?.closest("[data-section]")).toBeNull();
+    const agents = nav().querySelector<HTMLElement>('[data-section="agents"]');
+    const body = agents?.querySelector(".sidebar__section-body");
+    expect(body?.firstElementChild).toBe(row);
+    expect(nav().querySelector('[data-section="people"]')?.contains(row)).toBe(false);
     expect(row?.getAttribute("href")).toBe(`/org/${ORG_ID}/dm/agent/${LODI_ID}`);
     expect(row?.querySelector(".sidebar__item-label")?.textContent).toBe("Lodi");
+    expect(row?.querySelector(".sidebar__item-role")?.textContent).toBe("seu braço direito");
     const dms = [...nav().querySelectorAll<HTMLElement>("[data-agent-row]")].map((r) => r.dataset.agentRow);
-    expect(dms).toContain(ADA_ID);
+    expect(dms[0]).toBe(ADA_ID);
     expect(dms).not.toContain(LODI_ID);
+    // Closed, AGENTES still shows it (the stylesheet keeps `[data-right-hand]` in sight).
+    await click(agents?.querySelector(".sidebar__section-toggle") as HTMLElement);
+    expect(agents?.querySelector(".sidebar__section")?.getAttribute("data-open")).toBe("false");
+    expect(body?.firstElementChild).toBe(pinRow());
+  });
+
+  test("alone in AGENTES, it offers no first agent to a member who can't create one", async () => {
+    const state = withRightHand(seedState({ agents: [] }));
+    const org = state.me?.organizations[0];
+    if (org) org.role = "member";
+    await go(state);
+    const agents = nav().querySelector<HTMLElement>('[data-section="agents"]');
+    expect(agents?.querySelector(".sidebar__section-body")?.firstElementChild).toBe(pinRow());
+    expect(agents?.textContent).not.toContain("Criar o primeiro agente");
   });
 
   test("Novo until it is first opened, then its label; its DM's unread count when it answered", async () => {
@@ -124,6 +144,38 @@ describe("the right hand elsewhere", () => {
     expect(screen().getByRole("combobox", { name: "Mensagem para Lodi · nada muda sem você" })).toBeTruthy();
   });
 
+  test("its greeting's paragraphs sit in a typed message's Markdown wrapper, so its first line is where any message's is", async () => {
+    await go(withRightHand(seedState()), `dm/agent/${LODI_ID}`);
+    const greeting = [...document.querySelectorAll(".ac-msg__text b")].find((b) =>
+      b.textContent?.startsWith("Oi, eu sou o Lodi"),
+    );
+    const wrapper = greeting?.closest("p")?.parentElement;
+    expect(wrapper?.className).toBe("md md--message");
+    expect(wrapper?.parentElement?.classList.contains("ac-msg__text")).toBe(true);
+  });
+
+  test("on the first visit it waves under its greeting, once: the visit marks its DM read, so the next has no wave", async () => {
+    const state = withRightHand(seedState());
+    state.dms.push({
+      channelId: "dm-lodi",
+      with: { type: "agent", id: LODI_ID, name: "Lodi", handle: "lodi" },
+      everRead: false,
+    });
+    state.channelMembers["dm-lodi"] = [
+      { type: "person", id: state.me?.user.id ?? "" },
+      { type: "agent", id: LODI_ID },
+    ];
+    await go(state, `dm/agent/${LODI_ID}`);
+    const sticker = document.querySelector('.ac-msg canvas.ac-sticker[data-mood="wave"]');
+    expect(sticker?.getAttribute("aria-hidden")).toBe("true");
+    expect(sticker?.classList.contains("ac-msg-media")).toBe(true);
+    expect(state.calls).toContainEqual({ method: "dms.markRead", args: [ORG_ID, "dm-lodi"] });
+    cleanup();
+    await go(state, `dm/agent/${LODI_ID}`);
+    expect(document.querySelector(".ac-msg__text b")?.textContent).toStartWith("Oi, eu sou o Lodi");
+    expect(document.querySelector('canvas[data-mood="wave"]')).toBeNull();
+  });
+
   test("Settings › Lodi: its name and face in the nav, the lock line and its audit link", async () => {
     await go(withRightHand(seedState()), "settings/right_hand");
     const link = within(screen().getByRole("navigation", { name: "Seções das configurações" })).getByRole("link", {
@@ -137,6 +189,17 @@ describe("the right hand elsewhere", () => {
     expect(within(body).getByRole("link", { name: "Ver o que o Lodi fez" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/settings/audit?agent=${LODI_ID}`,
     );
+  });
+
+  test("Mudar visual: the face and the choices in the dialog's body, Cancelar and Salvar in its footer", async () => {
+    await go(withRightHand(seedState()), "settings/right_hand");
+    await click(screen().getByRole("button", { name: "Mudar visual" }));
+    const dialog = screen().getByRole("dialog", { name: "Mudar visual" });
+    const body = dialog.querySelector(":scope > .ac-dialog__body") as HTMLElement;
+    expect(body.querySelector(".rh-set__face")).not.toBeNull();
+    expect(body.querySelector(".agp-look")).not.toBeNull();
+    const foot = dialog.querySelector(":scope > .ac-dialog__foot") as HTMLElement;
+    expect([...foot.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Cancelar", "Salvar"]);
   });
 
   test("renaming it there saves the name and its @", async () => {

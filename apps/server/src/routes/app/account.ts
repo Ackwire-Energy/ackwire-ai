@@ -1168,6 +1168,8 @@ export function accountRoutes(deps: AppDeps) {
   );
 
   const MemberParams = OrgParams.extend({ userId: z.string() });
+  /** The right hand's people card it was applied from, for the audit's "via" (ADR 0137 §4). */
+  const ViaQuery = z.object({ via: z.uuid().optional() });
   app.openapi(
     createRoute({
       method: "patch",
@@ -1177,13 +1179,14 @@ export function accountRoutes(deps: AppDeps) {
       summary: "Make a member an owner, or not (owners)",
       description:
         "Only an owner does it; the last owner stays one. What anyone may do is their roles (`PUT …/roles`).",
-      request: { params: MemberParams, body: body(z.object({ role: Role })) },
+      request: { params: MemberParams, query: ViaQuery, body: body(z.object({ role: Role })) },
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
       const { orgId, userId } = c.req.valid("param");
       await changeMemberRole(db, c.get("user").id, orgId, userId, c.req.valid("json").role, {
         pubsub: deps.adapters.pubsub,
+        via: c.req.valid("query").via,
       });
       return c.body(null, 204);
     },
@@ -1227,12 +1230,15 @@ export function accountRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Remove a member (or leave)",
-      request: { params: MemberParams },
+      request: { params: MemberParams, query: ViaQuery },
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
       const { orgId, userId } = c.req.valid("param");
-      await removeMember(db, c.get("user").id, orgId, userId, { pubsub: deps.adapters.pubsub });
+      await removeMember(db, c.get("user").id, orgId, userId, {
+        pubsub: deps.adapters.pubsub,
+        via: c.req.valid("query").via,
+      });
       return c.body(null, 204);
     },
   );

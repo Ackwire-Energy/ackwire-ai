@@ -288,8 +288,8 @@ export function Sidebar() {
   const prefetch = usePrefetchMessages(orgId);
   // …and the unread and latest ones as soon as the workspace opens.
   usePrefetchRecent(orgId);
-  // The right hand (ADR 0137) has its own row on top; outside its audience, none.
-  const rightHand = dir.agents.find(isRightHand);
+  // The right hand (ADR 0137): the first row of AGENTES; outside its audience, none.
+  const rightHand = dir.agents.find((a) => isRightHand(a) && a.canTalk !== false);
   const dmOf = new Map((dms.data ?? []).map((d) => [d.with.id, d]));
   const rightHandDm = rightHand ? dmOf.get(rightHand.id) : undefined;
   const sections = useSidebarSections(me.user.id, orgId);
@@ -514,7 +514,9 @@ export function Sidebar() {
         pinned={pins.channels}
       />
     ),
-    agents: (dir.loading || (team.length > 0 ? shownAgents.length > 0 || manages : createAgentItem.length > 0)) && (
+    agents: (dir.loading ||
+      rightHand ||
+      (team.length > 0 ? shownAgents.length > 0 || manages : createAgentItem.length > 0)) && (
       <>
         <SidebarSection
           id="agents"
@@ -578,6 +580,14 @@ export function Sidebar() {
           }
           drop={organize ? drag.zone(null) : undefined}
         >
+          {rightHand && (
+            <RightHandRow
+              agent={rightHand}
+              unread={rightHandDm?.unread ?? 0}
+              onPrefetch={() => rightHandDm && prefetch(rightHandDm.channelId)}
+              onOpen={() => rightHandDm && markOpen(rightHandDm.channelId)}
+            />
+          )}
           {dir.loading && team.length === 0 && <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />}
           {pinnedAgents.map(agentRow)}
           {pinned.hint && (
@@ -598,7 +608,7 @@ export function Sidebar() {
             <hr className="sidebar__pins-end" />
           )}
           {ordered(byGroup.ungrouped).map(agentRow)}
-          {!dir.loading && team.length === 0 && (
+          {!dir.loading && team.length === 0 && createAgentItem.length > 0 && (
             <Link to="/org/$orgId/agents/new" params={{ orgId }} className="sidebar__item sidebar__item--quiet">
               <Icon name="plus" />
               <span className="sidebar__item-label">{t("sidebarAgents.createFirst")}</span>
@@ -762,16 +772,6 @@ export function Sidebar() {
         onKeyDown={(e) => spaceEvent(e) && sidebarMenu.onKeyDown(e)}
         onContextMenu={(e) => spaceEvent(e) && sidebarMenu.onContextMenu(e)}
       >
-        {rightHand && rightHand.canTalk !== false && (
-          <div className="sidebar__group sidebar__pin">
-            <RightHandRow
-              agent={rightHand}
-              unread={rightHandDm?.unread ?? 0}
-              onPrefetch={() => rightHandDm && prefetch(rightHandDm.channelId)}
-              onOpen={() => rightHandDm && markOpen(rightHandDm.channelId)}
-            />
-          </div>
-        )}
         {sectionOrder.order.filter((id) => blocks[id]).map((id) => sectionOrder.block(id, blocks[id], !rail))}
       </div>
 
@@ -1672,9 +1672,9 @@ function AgentRow({
 }
 
 /**
- * The team's right hand (ADR 0137), pinned above the tools: its face, its name and "seu braço direito" muted on the
- * right, a one-time "Novo" until its DM first opens (in this browser), and its DM's unread count. It opens the
- * person's DM with it. Not part of the sections, so it is never moved or hidden.
+ * The team's right hand (ADR 0137), always the first row of AGENTES on a soft tint: its face, its name over "seu braço
+ * direito", a one-time "Novo" until its DM first opens (in this browser), and its DM's unread count. It opens the
+ * person's DM with it. Never sorted, pinned, dragged or hidden; a closed AGENTES still shows it.
  */
 function RightHandRow({
   agent: a,
@@ -1696,7 +1696,7 @@ function RightHandRow({
     <Link
       to="/org/$orgId/dm/agent/$agentId"
       params={{ orgId: org.id, agentId: a.id }}
-      className="sidebar__item sidebar__pin-row"
+      className="sidebar__item"
       title={`${a.name} · ${label}`}
       onMouseEnter={onPrefetch}
       onFocus={onPrefetch}
@@ -1705,16 +1705,19 @@ function RightHandRow({
       data-right-hand=""
     >
       <AgentAvatar agentId={a.id} name={a.name} size="sm" presence={shown?.presence ?? null} />
-      <span className="sidebar__item-label">{a.name}</span>
+      <span className="sidebar__item-text">
+        <span className="sidebar__item-label">{a.name}</span>
+        <span className="sidebar__item-role">{label}</span>
+      </span>
       {unread > 0 ? (
         <UnreadCount count={unread} />
-      ) : fresh ? (
-        <span className="sidebar__item-meta sidebar__new">
-          <span className="sidebar__new-dot" aria-hidden="true" />
-          {t("rightHand.newDot")}
-        </span>
       ) : (
-        <span className="sidebar__item-meta">{label}</span>
+        fresh && (
+          <span className="sidebar__item-meta sidebar__new">
+            <span className="sidebar__new-dot" aria-hidden="true" />
+            {t("rightHand.newDot")}
+          </span>
+        )
       )}
     </Link>
   );

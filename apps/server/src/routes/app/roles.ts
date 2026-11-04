@@ -191,13 +191,19 @@ export function roleRoutes(deps: AppDeps) {
       summary: "Set a person's roles",
       description:
         "Needs `manage_members`. You only touch people below you (yourself aside) and roles below your own; an owner's roles only owners change.",
-      request: { params: MemberParams, body: body(z.object({ roleIds: z.array(z.uuid()).max(100) })) },
+      request: {
+        params: MemberParams,
+        // The right hand's people card it was applied from, for the audit's "via" (ADR 0137 §4).
+        query: z.object({ via: z.uuid().optional() }),
+        body: body(z.object({ roleIds: z.array(z.uuid()).max(100) })),
+      },
       responses: { 200: json(z.object({ roleIds: z.array(z.string()) })), ...errors },
     }),
     async (c) => {
       const { orgId, userId } = c.req.valid("param");
       const roleIds = await setMemberRoles(db, c.get("user").id, orgId, userId, c.req.valid("json").roleIds, {
         pubsub,
+        via: c.req.valid("query").via,
       });
       return c.json({ roleIds }, 200);
     },

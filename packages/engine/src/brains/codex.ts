@@ -6,6 +6,7 @@ import {
   brainTopic,
   CODEX_FOLDER_PROTOCOL,
   CURSOR_PROTOCOL,
+  LOCKED_BRAIN_PROTOCOL,
   OPENCODE_PROTOCOL,
   type PubSub,
   parseBrainEvent,
@@ -298,6 +299,18 @@ export class CodexBrain implements Brain {
       };
       return;
     }
+    // The team's right hand (ADR 0137 §4): only a runner that locks the CLI down to our tools gets the turn, with no
+    // checkout.
+    const chat = permissions?.mode === "chat";
+    if (chat && (status.protocol ?? 0) < LOCKED_BRAIN_PROTOCOL) {
+      yield {
+        type: "error",
+        code: "runner_outdated",
+        message: `The runner on the computer is too old to keep ${name} to the right hand's tools. Update it.`,
+        retryable: true,
+      };
+      return;
+    }
 
     // An older runner never finds the agent's checkouts from a Codex turn: it stays in the agent's folder, and in
     // its session, instead of being refused there.
@@ -305,7 +318,7 @@ export class CodexBrain implements Brain {
     const [mcp, agent, code] = await Promise.all([
       this.deps.mcp(turn),
       this.deps.agent?.(turn),
-      checkouts ? (turn.code ?? this.deps.prepare?.(turn, io.signal))?.catch(() => null) : null,
+      checkouts && !chat ? (turn.code ?? this.deps.prepare?.(turn, io.signal))?.catch(() => null) : null,
     ]);
     // A kept-alive Codex lists our tools once, as its thread opens: the runner starts it again when a name is new.
     const toolNames = turn.tools.map((t) => t.name).sort();

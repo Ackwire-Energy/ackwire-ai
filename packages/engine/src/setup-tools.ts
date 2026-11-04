@@ -15,7 +15,8 @@ import {
 import { agentsByHandle, getAgentCached } from "./agents";
 import type { AiStatusDeps } from "./ai-status";
 import { AGENT_LOOK } from "./appearance";
-import { addChannelMember, createChannel } from "./channels";
+import { listApprovals } from "./approvals";
+import { addChannelMember, createChannel, listChannels } from "./channels";
 import { findMember } from "./chat-tools";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
 import { connectorListing, type ServerCatalog } from "./connectors/listing";
@@ -52,6 +53,64 @@ export const PROPOSE_REMOVE_AGENTS_TOOL = "propose_remove_agents";
 export const MAX_REMOVALS_PER_CARD = 20;
 /** The right hand's settings card (ADR 0137): no other agent has it. */
 export const PROPOSE_SETTINGS_TOOL = "propose_settings_change";
+/** The right hand's cards for what a person does elsewhere in the app (ADR 0137 §4): no other agent has them. */
+export const OFFER_APPROVALS_TOOL = "offer_approvals";
+export const PROPOSE_MEMBER_CHANGES_TOOL = "propose_member_changes";
+export const OFFER_OPEN_PAGE_TOOL = "offer_open_page";
+/** At most this many approvals, or people's changes, on one card. */
+export const MAX_ROWS_PER_CARD = 20;
+/** The cards' `bodyCode`s (`chat.body.action_approvals`, `settings_proposal` with `names`, `action_open_page`). */
+export const APPROVALS_CARD = "action_approvals";
+export const MEMBER_CHANGES_CARD = "settings_proposal";
+export const OPEN_PAGE_CARD = "action_open_page";
+/**
+ * The screens an "Abrir" card opens (`offer_open_page`), each with what it is for the model. The screen asks what
+ * it always asks there (the email code and the typed name of a deletion, Stripe for billing, our dialogs for keys)
+ * and checks the clicker's permissions. Mirrored in `@agenteschat/client/lib/app-pages` (their paths on the web and
+ * the phone).
+ */
+export const APP_PAGES = {
+  billing: "Billing: the plan, payment method and invoices (Stripe's checkout and portal open from there)",
+  delete_workspace: "Deleting this workspace (owners): its email code, typed name and grace period",
+  delete_account: "Deleting their own account: its confirmation and grace period",
+  account: "Their profile, password and sign-in methods",
+  ai_accounts: "AI accounts and API keys (Settings › Keys), typed only in our dialogs",
+  workspace: "Workspace settings: name, logo, time zone and the context every agent reads",
+  members: "People: members, invitations, requests to join",
+  roles: "Roles and what each may do",
+  audit: "The audit log",
+  usage: "Usage and costs",
+  computers: "Computers for the agents",
+  connectors: "Apps, MCP servers, mailboxes and databases",
+  skills: "Skills",
+  storage: "File storage",
+  notifications: "Their notifications",
+  right_hand: "Your own settings (name, AI, budget, who may use you)",
+  import: "Importing agents",
+  approvals: "Approvals, waiting and decided",
+  routines: "Routines",
+  drive: "Drive (files)",
+  wiki: "Wiki",
+  issues: "Issues",
+  forum: "Forum",
+  calendar: "Calendar",
+  agent: "An agent's page (instructions, memory, access, its own delete): needs `agent`",
+  channel: "A channel (its settings, members, archiving): needs `channel`",
+} as const;
+export type AppPage = keyof typeof APP_PAGES;
+/** Who may use each screen, when not everyone (the screen still checks it). */
+const PAGE_PERMISSION: Partial<Record<AppPage, RolePermission | "manage_owners">> = {
+  billing: "manage_billing",
+  delete_workspace: "manage_owners",
+  workspace: "configure",
+  roles: "manage_roles",
+  audit: "view_audit",
+  skills: "manage_agents",
+  storage: "configure",
+  right_hand: "manage_agents",
+  import: "create_agents",
+};
+
 /** What one run may make: enough for a request, never a flood (also all a prompt injection gets). */
 export const MAX_CARDS_PER_RUN = 3;
 /** The right hand sets a whole team up in one turn ("a team for my agency"): one card per agent, a few more. */
@@ -112,6 +171,37 @@ export interface InviteCard {
   kind: "invite_people";
   forUserId: string | null;
   params: { emails: string[]; why: string };
+}
+
+/** "Decidir aprovações": the approvals waiting for this person, each decided on the card as whoever clicks. */
+export interface ApprovalsCard {
+  kind: "approvals";
+  forUserId: string;
+  params: { approvalIds: string[]; why: string };
+}
+
+/**
+ * One person's change on a people card: ownership, roles given or taken, or removal from the workspace. `name` as it
+ * was then, so a removed person's row still reads who it was.
+ */
+export type MemberChangeRow = { userId: string; name: string } & (
+  | { role: "owner" | "member" }
+  | { addRoleIds: string[]; removeRoleIds: string[] }
+  | { remove: true }
+);
+
+/** "Mudar pessoas": a row per change, applied with the members screen's own calls and confirmation. */
+export interface MemberChangesCard {
+  kind: "member_changes";
+  forUserId: string;
+  params: { rows: MemberChangeRow[]; why: string };
+}
+
+/** "Abrir …": opens one of the app's screens (`APP_PAGES`), at an agent or a channel for those two. */
+export interface OpenPageCard {
+  kind: "open_page";
+  forUserId: string | null;
+  params: { page: AppPage; agentId?: string; channelId?: string; why: string };
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -807,7 +897,252 @@ export function createSetupToolSource(deps: {
   // Any agent that may set the team up proposes teammates' settings too: the right hand decides another agent's card
   // for the person who asked (ADR 0139), never its own.
   const all = [...tools, settingsTool(deps)];
-  return { name: "setup", tools: async () => all };
+  const rightHand = [...all, ...rightHandCards(deps)];
+  return {
+    name: "setup",
+    // Only the right hand starts the rest of the app with cards (ADR 0137).
+    tools: async (ctx) => (isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId)) ? rightHand : all),
+  };
+}
+
+/** Posts an agent's card in this conversation (its reply's thread) and announces it. */
+async function postCard(
+  deps: { pubsub?: PubSub },
+  ctx: ToolContext,
+  body: string,
+  meta: Record<string, unknown>,
+): Promise<string> {
+  const message = await insertMessage(ctx.db, {
+    orgId: ctx.orgId,
+    channelId: ctx.channelId,
+    threadId: replyThreadOf(ctx),
+    author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
+    body,
+    meta,
+  });
+  if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(message));
+  return message.id;
+}
+
+/** A custom role by name, or the names there are. */
+async function rolesByName(ctx: ToolContext, wanted: string[]): Promise<string[] | string> {
+  if (wanted.length === 0) return [];
+  const rows = await ctx.db
+    .select({ id: orgRoles.id, name: orgRoles.name })
+    .from(orgRoles)
+    .where(and(eq(orgRoles.orgId, ctx.orgId), eq(orgRoles.kind, "custom")));
+  const picked = wanted.map((r) => rows.find((x) => x.name.toLowerCase() === r.toLowerCase()));
+  return picked.every(Boolean)
+    ? picked.map((r) => r?.id ?? "")
+    : `No role ${wanted.filter((_, i) => !picked[i]).join(", ")}. Roles here: ${rows.map((r) => r.name).join(", ") || "none"}.`;
+}
+
+/**
+ * What a person does elsewhere in the app, started by the right hand as a card (ADR 0137 §4): the approvals waiting
+ * for them, people's ownership, roles and removal, and every other screen by an "Abrir" card. Each is applied by
+ * whoever clicks, checked at the click, with the confirmation that screen asks for; it decides and moves nothing itself.
+ */
+function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
+  return [
+    {
+      name: OFFER_APPROVALS_TOOL,
+      description:
+        "Show the approvals waiting for this person (an agent's merge, deploy, email…) as one card in this conversation: they approve or refuse each there, as themselves. Use it when they ask what waits for them or to approve something. You never decide one yourself.",
+      scope: SETUP_SCOPE,
+      inputSchema: {
+        type: "object",
+        properties: {
+          agents: {
+            type: "array",
+            items: { type: "string", minLength: 1, maxLength: 64 },
+            maxItems: 10,
+            description: "Only these agents' (@handles). Default: all.",
+          },
+          why: { type: "string", minLength: 1, maxLength: 300, description: "One short line on the card." },
+        },
+        required: ["why"],
+        additionalProperties: false,
+      },
+      async execute(input, ctx) {
+        try {
+          const forUserId = await personBehindCall(ctx);
+          if (!forUserId) return { content: "Only a person's request shows their approvals.", isError: true };
+          const named = await agentsByHandle(ctx.db, ctx.orgId, input.agents);
+          if (named.missing.length > 0) return noAgents(ctx, named.missing);
+          const only = new Set(named.rows.map((a) => a.id));
+          const waiting = (await listApprovals(ctx.db, forUserId, ctx.orgId, { status: "pending", limit: 200 }))
+            .filter((a) => a.canDecide && (only.size === 0 || only.has(a.agentId)))
+            .slice(0, MAX_ROWS_PER_CARD);
+          if (waiting.length === 0) return { content: "Nothing waits for their decision: no card was posted." };
+          const full = await cardsLeft(ctx);
+          if (full) return full;
+          const card: ApprovalsCard = {
+            kind: "approvals",
+            forUserId,
+            params: { approvalIds: waiting.map((a) => a.id), why: str(input.why).trim() },
+          };
+          // No titles in the body: in a channel everyone reads it (and its notifications), while each viewer's card
+          // shows only the approvals they may see.
+          const messageId = await postCard(deps, ctx, `Approvals waiting: ${waiting.length}`, {
+            ...bodyCode(APPROVALS_CARD),
+            actionCard: card,
+          });
+          return {
+            content: `Posted ${waiting.length} approval${waiting.length > 1 ? "s" : ""} on a card: ${waiting.map((a) => a.title).join("; ")}. They decide each there; nothing is decided yet.`,
+            data: { actionCard: { messageId } },
+          };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
+    {
+      name: PROPOSE_MEMBER_CHANGES_TOOL,
+      description:
+        "Propose changing people in the workspace with one card in this conversation, a row per change: making someone an owner or not (owners only), giving or taking roles, or removing them from the workspace (with the confirmation the members screen shows). Whoever may applies each row from the card as themselves. Inviting is offer_invites. Nothing changes until someone clicks: never say it is done.",
+      scope: SETUP_SCOPE,
+      inputSchema: {
+        type: "object",
+        properties: {
+          changes: {
+            type: "array",
+            minItems: 1,
+            maxItems: MAX_ROWS_PER_CARD,
+            items: {
+              type: "object",
+              properties: {
+                person: { type: "string", minLength: 1, maxLength: 200, description: "@handle, email or name." },
+                owner: { type: "boolean", description: "True: make them an owner; false: no longer one." },
+                add_roles: { type: "array", items: { type: "string", minLength: 1, maxLength: 80 }, maxItems: 20 },
+                remove_roles: { type: "array", items: { type: "string", minLength: 1, maxLength: 80 }, maxItems: 20 },
+                remove: { type: "boolean", description: "True: remove them from the workspace." },
+              },
+              required: ["person"],
+              additionalProperties: false,
+            },
+          },
+          why: { type: "string", minLength: 1, maxLength: 300, description: "One short line on the card." },
+        },
+        required: ["changes", "why"],
+        additionalProperties: false,
+      },
+      async execute(input, ctx) {
+        try {
+          const forUserId = await personBehindCall(ctx);
+          if (!forUserId) return { content: "Only a person's request can propose changing people.", isError: true };
+          const changes = (Array.isArray(input.changes) ? input.changes : []) as Record<string, unknown>[];
+          const rows: MemberChangeRow[] = [];
+          for (const change of changes) {
+            const found = await findMember(ctx, str(change.person));
+            if (found.length !== 1)
+              return {
+                content: found.length
+                  ? `Several people match "${str(change.person)}": ask which one.`
+                  : `No one called "${str(change.person)}" in this workspace.`,
+                isError: true,
+              };
+            const [person] = found;
+            if (!person) continue;
+            const who = { userId: person.userId, name: person.name };
+            if (change.remove === true) rows.push({ ...who, remove: true });
+            else {
+              if (typeof change.owner === "boolean") rows.push({ ...who, role: change.owner ? "owner" : "member" });
+              const add = await rolesByName(ctx, names(change.add_roles));
+              if (typeof add === "string") return { content: add, isError: true };
+              const take = await rolesByName(ctx, names(change.remove_roles));
+              if (typeof take === "string") return { content: take, isError: true };
+              if (add.length || take.length) rows.push({ ...who, addRoleIds: add, removeRoleIds: take });
+            }
+          }
+          if (rows.length === 0)
+            return { content: "Say what changes: owner, add_roles, remove_roles or remove.", isError: true };
+          const full = await cardsLeft(ctx);
+          if (full) return full;
+          const kept = rows.slice(0, MAX_ROWS_PER_CARD);
+          const card: MemberChangesCard = {
+            kind: "member_changes",
+            forUserId,
+            params: { rows: kept, why: str(input.why).trim() },
+          };
+          const who = [...new Set(kept.map((r) => r.name))].join(", ");
+          const messageId = await postCard(deps, ctx, `Proposed a change to ${who}: ${card.params.why}`, {
+            ...bodyCode(MEMBER_CHANGES_CARD, { names: who }),
+            actionCard: card,
+          });
+          const membership = await getMembership(ctx.db, forUserId, ctx.orgId);
+          const may = kept.every((r) =>
+            "role" in r ? membership?.role === "owner" : can(membership, "manage_members"),
+          );
+          return {
+            content: `Posted the card for ${who}.${may ? " They apply each row there." : " Some rows need someone with more rights (an owner for ownership, an admin for the rest): say so."} Nothing has changed yet.`,
+            data: { actionCard: { messageId } },
+          };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
+    {
+      name: OFFER_OPEN_PAGE_TOOL,
+      description:
+        "Open one of the app's screens for this person with a card whose button takes them there: billing, deleting the workspace or their account, their password, API keys, roles, the audit log, routines, Drive, wiki, issues, an agent's page, a channel's settings and the rest. Use it for anything they ask that your other cards don't do: the screen asks for what it always does (an email code and the typed name to delete, Stripe to pay, our dialog for a key) and checks who may. Never take a key, password or token in the chat.",
+      scope: SETUP_SCOPE,
+      inputSchema: {
+        type: "object",
+        properties: {
+          page: {
+            type: "string",
+            enum: Object.keys(APP_PAGES),
+            description: Object.entries(APP_PAGES)
+              .map(([k, v]) => `${k}: ${v}`)
+              .join(". "),
+          },
+          agent: { type: "string", minLength: 1, maxLength: 64, description: "With `agent`: its @handle." },
+          channel: { type: "string", minLength: 1, maxLength: 81, description: "With `channel`: its name." },
+          why: { type: "string", minLength: 1, maxLength: 300, description: "One short line on the card." },
+        },
+        required: ["page", "why"],
+        additionalProperties: false,
+      },
+      async execute(input, ctx) {
+        try {
+          const page = str(input.page) as AppPage;
+          if (!Object.hasOwn(APP_PAGES, page)) return { content: `No page "${page}".`, isError: true };
+          const params: OpenPageCard["params"] = { page, why: str(input.why).trim() };
+          if (page === "agent") {
+            const named = await agentsByHandle(ctx.db, ctx.orgId, [input.agent]);
+            if (named.missing.length > 0 || !named.rows[0]) return noAgents(ctx, named.missing);
+            params.agentId = named.rows[0].id;
+          }
+          if (page === "channel") {
+            const forUserId = await personBehindCall(ctx);
+            const name = str(input.channel).trim().replace(/^#/, "").toLowerCase();
+            const seen = forUserId ? await listChannels(ctx.db, forUserId, ctx.orgId) : [];
+            const channel = seen.find((c) => c.name === name);
+            if (!channel) return { content: `They see no channel #${name}.`, isError: true };
+            params.channelId = channel.id;
+          }
+          const full = await cardsLeft(ctx);
+          if (full) return full;
+          const forUserId = await personBehindCall(ctx);
+          const card: OpenPageCard = { kind: "open_page", forUserId, params };
+          const messageId = await postCard(deps, ctx, `Open ${page}: ${params.why}`, {
+            ...bodyCode(OPEN_PAGE_CARD),
+            actionCard: card,
+          });
+          const needs = PAGE_PERMISSION[page];
+          const membership = forUserId ? await getMembership(ctx.db, forUserId, ctx.orgId) : null;
+          const may = !needs || (needs === "manage_owners" ? membership?.role === "owner" : can(membership, needs));
+          return {
+            content: `Posted the card that opens ${APP_PAGES[page].split(":")[0]}.${may ? "" : " This person can't use that screen: say who can (an owner or an admin)."} Nothing changed: they act there.`,
+            data: { actionCard: { messageId } },
+          };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
+  ];
 }
 
 /** A setting's change as the tool takes it, for one agent. */
