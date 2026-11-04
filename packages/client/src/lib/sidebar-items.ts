@@ -10,6 +10,7 @@ export const SIDEBAR_ITEMS: readonly SidebarItem[] = [
   "routines",
   "calendar",
   "forum",
+  "team",
 ];
 
 /** Where each tool goes for someone who never moved it. */
@@ -22,6 +23,7 @@ export const SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
   routines: "more",
   calendar: "more",
   forum: "more",
+  team: "always",
 };
 
 /** The tools with a count in the sidebar: only these can wait in More until there is something (`auto`). */

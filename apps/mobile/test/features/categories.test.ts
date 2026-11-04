@@ -60,6 +60,14 @@ describe("the home with channel categories", () => {
     ]);
   });
 
+  test("pinned channels go on top of Canais whatever their category, in their order, and say how many", () => {
+    const blocks = homeLayout(rows, CATEGORIES, undefined, [], { agents: [], channels: ["bugs", "novo"], people: [] });
+    expect(blocks.map((b) => [b.key, b.rows.map((r) => r.key), b.pinned ?? 0])).toEqual([
+      ["channels", ["c:bugs", "c:novo", "c:general"], 2],
+      ["category:mkt", ["c:campanhas", "c:marketing"], 0],
+    ]);
+  });
+
   test("a category's unread channels are kept for when it is closed", () => {
     const mkt = homeLayout(rows, CATEGORIES).find((b) => b.categoryId === "mkt");
     expect(mkt?.unread.map((r) => r.key)).toEqual(["c:campanhas"]);

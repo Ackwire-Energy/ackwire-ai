@@ -85,6 +85,12 @@ describe("Agentes: esperando você, trabalhando, livres", () => {
     expect(working.map((l) => l.agent.id)).toEqual(["nina"]);
     // No groups: Livres alone, as before.
     expect(freeSections(free, []).map((s) => [s.group, s.lines.length])).toEqual([[null, free.length]]);
+    // Pinned ("Fixar no topo", the web's pins): on top of Livres in their order, out of their groups.
+    const pinned = freeSections(free, groups, ["theo", "nina", "ana"]);
+    expect(pinned.map((s) => [s.group?.name ?? null, s.lines.map((l) => l.agent.id), s.pinnedCount])).toEqual([
+      [null, ["theo", "ana", "iris"], 2],
+      ["Integrations", ["zoe"], 0],
+    ]);
   });
 });
 

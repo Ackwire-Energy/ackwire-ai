@@ -1184,14 +1184,14 @@
       "drive": "文件、报告和表格",
       "routines": "智能体按时自己完成的工作",
       "calendar": "会议和截止日期",
-      "forum": "当一个决定需要多方意见时"
+      "forum": "当一个决定需要多方意见时",
+      "team": "谁是谁：成员、智能体及其分组"
     },
     "customizeSidebar": "自定义侧边栏",
     "sidebarMenu": {
       "title": "侧边栏",
       "newChannel": "新建频道",
       "addToChannels": "新建频道或分类",
-      "addToDms": "新消息或智能体",
       "newMessage": "新消息",
       "addMembers": "添加成员或智能体",
       "channelSettings": "频道设置",
@@ -1307,7 +1307,45 @@
     "delete": "删除分组",
     "deleteTitle": "删除分组 {{name}}？",
     "deleteText": "其中的智能体会回到“智能体”。",
-    "dropHere": "把智能体拖到这里"
+    "dropHere": "把智能体拖到这里",
+    "moved": "{{name}} 已移到分组“{{group}}”",
+    "movedOut": "{{name}} 已离开分组“{{group}}”",
+    "undo": "撤销"
+  },
+  "sidebarAgents": {
+    "options": "智能体选项",
+    "add": "新建智能体或分组",
+    "order": "顺序",
+    "sort": {
+      "workspace": "工作区的顺序",
+      "mine": "我的优先",
+      "working": "工作中优先"
+    },
+    "showAll": "显示不与我对话的智能体",
+    "collapseAll": "全部收起",
+    "expandAll": "全部展开",
+    "organize": "在团队中整理分组",
+    "seeAll_other": "查看全部 {{count}} 个智能体",
+    "createFirst": "创建第一个智能体",
+    "working_other": "{{count}} 个工作中",
+    "count_other": "{{count}} 个智能体",
+    "workingIn": "正在 #{{channel}} 工作",
+    "talksOnly": "只与 {{name}} 对话",
+    "talksOnlyMore_other": "只与 {{name}} 和另外 {{count}} 人对话",
+    "changeGroup": "更换分组",
+    "newGroupWith": "与 {{name}} 新建分组",
+    "dmsEmpty": "你与成员的对话会显示在这里。"
+  },
+  "sidebarPins": {
+    "pin": "置顶",
+    "unpin": "取消置顶",
+    "pinned": "已置顶",
+    "hint": "你的智能体会保持在顶部。右键点击任意对话即可置顶。",
+    "full": {
+      "agents": "你已置顶 5 个智能体。取消一个才能置顶这个。",
+      "channels": "你已置顶 5 个频道。取消一个才能置顶这个。",
+      "people": "你已置顶 5 个人。取消一个才能置顶这位。"
+    }
   },
   "openOnPhone": {
     "qr": "用于登录 agentes 应用的二维码",

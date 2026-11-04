@@ -174,6 +174,7 @@ import type {
   SidebarItem,
   SidebarItems,
   SidebarSection,
+  SidebarView,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -528,6 +529,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       issuesView: async (orgId) => (await request<{ view: IssuesView }>(`${org(orgId)}/me/issues-view`)).view,
       setIssuesView: async (orgId, view) =>
         (await request<{ view: IssuesView }>(`${org(orgId)}/me/issues-view`, { method: "PUT", json: { view } })).view,
+      sidebarView: async (orgId) => (await request<{ view: SidebarView }>(`${org(orgId)}/me/sidebar/view`)).view,
+      setSidebarView: async (orgId, view) =>
+        (await request<{ view: SidebarView }>(`${org(orgId)}/me/sidebar/view`, { method: "PUT", json: { view } })).view,
       sidebarToolOrder: async (orgId) =>
         (await request<{ order: SidebarItem[] }>(`${org(orgId)}/me/sidebar/tools`)).order,
       setSidebarToolOrder: async (orgId, order) =>

@@ -1256,14 +1256,14 @@
       "drive": "Archivos, informes y tablas",
       "routines": "Lo que los agentes hacen solos, a su hora",
       "calendar": "Reuniones y plazos",
-      "forum": "Cuando una decisión necesita varias miradas"
+      "forum": "Cuando una decisión necesita varias miradas",
+      "team": "Quién es quién: personas, agentes y sus grupos"
     },
     "customizeSidebar": "Personalizar la barra lateral",
     "sidebarMenu": {
       "title": "Barra lateral",
       "newChannel": "Nuevo canal",
       "addToChannels": "Nuevo canal o categoría",
-      "addToDms": "Nuevo mensaje o agente",
       "newMessage": "Nuevo mensaje",
       "addMembers": "Agregar personas o agentes",
       "channelSettings": "Configuración del canal",
@@ -1393,7 +1393,53 @@
     "delete": "Eliminar grupo",
     "deleteTitle": "¿Eliminar el grupo {{name}}?",
     "deleteText": "Sus agentes vuelven a Agentes.",
-    "dropHere": "Arrastra agentes aquí"
+    "dropHere": "Arrastra agentes aquí",
+    "moved": "{{name}} pasó al grupo {{group}}",
+    "movedOut": "{{name}} salió del grupo {{group}}",
+    "undo": "Deshacer"
+  },
+  "sidebarAgents": {
+    "options": "Opciones de Agentes",
+    "add": "Nuevo agente o grupo",
+    "order": "Orden",
+    "sort": {
+      "workspace": "El del espacio de trabajo",
+      "mine": "Los míos primero",
+      "working": "Trabajando primero"
+    },
+    "showAll": "Mostrar agentes que no hablan conmigo",
+    "collapseAll": "Contraer todos",
+    "expandAll": "Expandir todos",
+    "organize": "Organizar grupos en Equipo",
+    "seeAll_one": "Ver el {{count}} agente",
+    "seeAll_many": "Ver los {{count}} agentes",
+    "seeAll_other": "Ver los {{count}} agentes",
+    "createFirst": "Crear el primer agente",
+    "working_one": "{{count}} trabajando",
+    "working_many": "{{count}} trabajando",
+    "working_other": "{{count}} trabajando",
+    "count_one": "{{count}} agente",
+    "count_many": "{{count}} agentes",
+    "count_other": "{{count}} agentes",
+    "workingIn": "trabajando en #{{channel}}",
+    "talksOnly": "solo habla con {{name}}",
+    "talksOnlyMore_one": "solo habla con {{name}} y {{count}} más",
+    "talksOnlyMore_many": "solo habla con {{name}} y {{count}} más",
+    "talksOnlyMore_other": "solo habla con {{name}} y {{count}} más",
+    "changeGroup": "Cambiar de grupo",
+    "newGroupWith": "Nuevo grupo con {{name}}",
+    "dmsEmpty": "Tus conversaciones con personas aparecen aquí."
+  },
+  "sidebarPins": {
+    "pin": "Fijar arriba",
+    "unpin": "Quitar de arriba",
+    "pinned": "Fijado arriba",
+    "hint": "Tus agentes quedan arriba. Haz clic derecho en cualquier conversación para fijarla.",
+    "full": {
+      "agents": "Ya fijaste 5 agentes. Quita uno para fijar este.",
+      "channels": "Ya fijaste 5 canales. Quita uno para fijar este.",
+      "people": "Ya fijaste 5 personas. Quita una para fijar esta."
+    }
   },
   "openOnPhone": {
     "qr": "Código QR para iniciar sesión en la app agentes",

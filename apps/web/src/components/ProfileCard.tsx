@@ -614,7 +614,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
           />
         )
       }
-      more={agentEntries(agent, toComputer)}
+      more={agentEntries(agent, [], toComputer)}
       onDone={onDone}
     >
       <div className="list-col mcard__names">

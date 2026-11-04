@@ -36,6 +36,7 @@ import {
   type ListKind,
   rightHandPin,
 } from "./logic";
+import { usePins } from "./pins";
 import { useAgentRowStates, useFinished } from "./useHomeNow";
 import { useWaitingItems, WaitingStrip } from "./WaitingStrip";
 
@@ -116,7 +117,8 @@ function Home() {
       ),
     [dir.agents, hidden],
   );
-  const sections = homeLayout(pinned.rows, categories.data ?? [], undefined, starters);
+  const pins = usePins();
+  const sections = homeLayout(pinned.rows, categories.data ?? [], undefined, starters, pins.pins);
   // A section's title: a fixed one by its key, a category by its name.
   const sectionTitle = (b: HomeBlock) =>
     b.name !== undefined ? b.name : t(`mobile.chats.section.${b.key as ListKind}`);
@@ -172,20 +174,19 @@ function Home() {
       ) : (
         sections.map((s) => {
           const off = collapsed.includes(s.key);
-          const row = (r: ConversationRow, i: number, shown: boolean) => {
-            const hold = r.kind === "channel" && menus.movable(r.channelId);
-            return (
-              <ConversationRowView
-                key={r.key}
-                row={r}
-                divider={i > 0}
-                live={shown && live++ < LIVE_ROWS}
-                agent={agentStates.get(r.key)}
-                {...(r.kind === "dm" && !r.channelId ? { onStart: startDm } : {})}
-                {...(hold ? { onHold: menus.openChannelMenu, holdLabel: t("channelCategories.move") } : {})}
-              />
-            );
-          };
+          const row = (r: ConversationRow, i: number, shown: boolean) => (
+            <ConversationRowView
+              key={r.key}
+              row={r}
+              divider={i > 0}
+              live={shown && live++ < LIVE_ROWS}
+              agent={agentStates.get(r.key)}
+              pinned={i < (s.pinned ?? 0)}
+              onHold={menus.openRowMenu}
+              holdLabel={t("sidebarPins.pin")}
+              {...(r.kind === "dm" && !r.channelId ? { onStart: startDm } : {})}
+            />
+          );
           const hold = s.categoryId ? menus.categoryMenu(s.categoryId, s.name ?? "") : undefined;
           return (
             <CollapsibleSection

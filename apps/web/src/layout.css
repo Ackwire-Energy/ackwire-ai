@@ -11220,14 +11220,8 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 }
 .sidebar__section-head:hover .sidebar__section-add,
 .sidebar__section-add:focus-visible,
-.sidebar__section-add[data-state="open"],
-.sidebar__section-add[data-status="active"] {
+.sidebar__section-add[data-state="open"] {
   opacity: 1;
-}
-/* Equipe on the Mensagens diretas header: the page open, it stays in sight on the bell's plate. */
-.sidebar__section-add.ac-btn[data-status="active"] {
-  background: var(--plate);
-  color: var(--ink);
 }
 /*
  * Channel categories (ADR 0080). Closed, a category also keeps its unread channels in sight, not only the open
@@ -11577,6 +11571,79 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
   font-size: 13px;
   line-height: 18px;
   color: var(--faint);
+}
+/* AGENTES' groups (ADR 0083): the count at the header's end and, closed, how many work, in the trail's color. Closed,
+   a group keeps in sight its agents that work, wait or wrote to me (`data-live`), as a category keeps its unread. */
+.sidebar__section--group[data-open="false"] .sidebar__section-body > [data-live="true"] {
+  display: flex;
+}
+.sidebar__section-count {
+  min-width: 24px;
+  padding: 0 8px 0 4px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--faint);
+}
+.sidebar__section-working {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--agent);
+}
+/* An agent out of office (its plan or budget ran out) rests dim until it is back; its line says when. */
+.sidebar__item[data-presence="out"]:not([data-status="active"]) {
+  color: var(--ink-muted);
+}
+.sidebar__item[data-presence="out"]:not([data-status="active"]) .ac-avatar {
+  opacity: 0.6;
+}
+/* "Fixar no topo": a small pin at a pinned row's end, and a thin line under the pinned rows, in the names' column. */
+.sidebar__pinned {
+  display: inline-flex;
+  color: var(--faint);
+}
+.sidebar__pins-end {
+  flex: none;
+  margin: 3px 8px 3px 36px;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+/* Day one: the line about the pins, once, with its ✕. */
+.sidebar__pins-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 2px 0;
+  padding: 8px 4px 8px 12px;
+  border-radius: var(--control-r-sm);
+  background: var(--plate-soft);
+  font-size: 12.5px;
+  line-height: 17px;
+  color: var(--ink-muted);
+}
+.sidebar__pins-hint > span {
+  flex: 1;
+  min-width: 0;
+  padding-top: 3px;
+}
+.sidebar__see-all {
+  color: var(--ink-muted);
+}
+/* AGENTES closed hides its last row too, as it hides its groups. */
+.sidebar:not([data-rail="true"]) .sidebar__section--part[data-open="false"] ~ .sidebar__see-all {
+  display: none;
+}
+/* Mensagens diretas with no conversation with a person yet. */
+.sidebar__empty {
+  margin: 0;
+  padding: 4px 8px 4px 12px;
+  font-size: 12.5px;
+  line-height: 17px;
+  color: var(--faint);
+}
+.sidebar[data-rail="true"] :is(.sidebar__see-all, .sidebar__pins-hint, .sidebar__pins-end, .sidebar__section-count) {
+  display: none;
 }
 /* More: the other tools in a panel beside the sidebar, each with a line on what it is for. */
 .sidebar__more {

@@ -77,6 +77,7 @@ import type {
   SidebarItem,
   SidebarItems,
   SidebarSection,
+  SidebarView,
   SignInOptions,
   SpeechKey,
   StoragePlatform,
@@ -391,6 +392,8 @@ export interface FakeState {
   issuesView?: IssuesView;
   /** The sidebar's tools in my order (`orgs.sidebarToolOrder`); unset = the default. */
   sidebarToolOrder?: SidebarItem[];
+  /** How my sidebar shows the agents and what I pinned (`orgs.sidebarView`); unset = never changed. */
+  sidebarView?: SidebarView;
   /**
    * The task manager (ADR 0128, `working.taskManager`); unset = a server without it (no `working` part). Stopping a
    * task (`agents.cancelRun`) moves it to `ended`, stopped by me.
@@ -1579,6 +1582,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("orgs.setSidebarToolOrder", orgId, order);
         state.sidebarToolOrder = order ? [...order] : undefined;
         return [...(order ?? SIDEBAR_ITEMS)];
+      },
+      sidebarView: async () =>
+        structuredClone(state.sidebarView ?? { agentSort: "workspace", showAllAgents: false, pins: null }),
+      setSidebarView: async (orgId, view) => {
+        log("orgs.setSidebarView", orgId, view);
+        state.sidebarView = structuredClone(view);
+        return structuredClone(view);
       },
       setAvatar: async (orgId, input) => {
         log("orgs.setAvatar", orgId, { contentType: input.contentType, bytes: input.imageBase64.length });

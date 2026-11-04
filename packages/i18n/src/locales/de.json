@@ -1220,14 +1220,14 @@
       "drive": "Dateien, Berichte und Tabellen",
       "routines": "Was Agenten selbst erledigen, pünktlich",
       "calendar": "Meetings und Fristen",
-      "forum": "Wenn eine Entscheidung mehrere Sichtweisen braucht"
+      "forum": "Wenn eine Entscheidung mehrere Sichtweisen braucht",
+      "team": "Wer ist wer: Personen, Agenten und ihre Gruppen"
     },
     "customizeSidebar": "Seitenleiste anpassen",
     "sidebarMenu": {
       "title": "Seitenleiste",
       "newChannel": "Neuer Kanal",
       "addToChannels": "Neuer Kanal oder neue Kategorie",
-      "addToDms": "Neue Nachricht oder neuer Agent",
       "newMessage": "Neue Nachricht",
       "addMembers": "Personen oder Agenten hinzufügen",
       "channelSettings": "Kanaleinstellungen",
@@ -1350,7 +1350,49 @@
     "delete": "Gruppe löschen",
     "deleteTitle": "Gruppe {{name}} löschen?",
     "deleteText": "Ihre Agenten kommen zurück zu Agenten.",
-    "dropHere": "Agenten hierher ziehen"
+    "dropHere": "Agenten hierher ziehen",
+    "moved": "{{name}} ist jetzt in der Gruppe {{group}}",
+    "movedOut": "{{name}} hat die Gruppe {{group}} verlassen",
+    "undo": "Rückgängig"
+  },
+  "sidebarAgents": {
+    "options": "Optionen für Agenten",
+    "add": "Neuer Agent oder neue Gruppe",
+    "order": "Reihenfolge",
+    "sort": {
+      "workspace": "Wie im Workspace",
+      "mine": "Meine zuerst",
+      "working": "Arbeitende zuerst"
+    },
+    "showAll": "Agenten zeigen, die nicht mit mir sprechen",
+    "collapseAll": "Alle einklappen",
+    "expandAll": "Alle ausklappen",
+    "organize": "Gruppen in Team ordnen",
+    "seeAll_one": "Den {{count}} Agenten ansehen",
+    "seeAll_other": "Alle {{count}} Agenten ansehen",
+    "createFirst": "Den ersten Agenten erstellen",
+    "working_one": "{{count}} arbeitet",
+    "working_other": "{{count}} arbeiten",
+    "count_one": "{{count}} Agent",
+    "count_other": "{{count}} Agenten",
+    "workingIn": "arbeitet in #{{channel}}",
+    "talksOnly": "spricht nur mit {{name}}",
+    "talksOnlyMore_one": "spricht nur mit {{name}} und {{count}} weiteren",
+    "talksOnlyMore_other": "spricht nur mit {{name}} und {{count}} weiteren",
+    "changeGroup": "In Gruppe verschieben",
+    "newGroupWith": "Neue Gruppe mit {{name}}",
+    "dmsEmpty": "Deine Unterhaltungen mit Personen erscheinen hier."
+  },
+  "sidebarPins": {
+    "pin": "Oben anheften",
+    "unpin": "Lösen",
+    "pinned": "Oben angeheftet",
+    "hint": "Deine Agenten bleiben oben. Klicke mit rechts auf eine Unterhaltung, um sie anzuheften.",
+    "full": {
+      "agents": "Du hast schon 5 Agenten angeheftet. Löse einen, um diesen anzuheften.",
+      "channels": "Du hast schon 5 Kanäle angeheftet. Löse einen, um diesen anzuheften.",
+      "people": "Du hast schon 5 Personen angeheftet. Löse eine, um diese anzuheften."
+    }
   },
   "openOnPhone": {
     "qr": "QR-Code zum Anmelden in der agentes-App",

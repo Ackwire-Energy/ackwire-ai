@@ -1292,14 +1292,14 @@
       "drive": "Pliki, raporty i tabele",
       "routines": "Co agenci robią sami, o czasie",
       "calendar": "Spotkania i terminy",
-      "forum": "Gdy decyzja wymaga kilku punktów widzenia"
+      "forum": "Gdy decyzja wymaga kilku punktów widzenia",
+      "team": "Kto jest kim: ludzie, agenci i ich grupy"
     },
     "customizeSidebar": "Dostosuj pasek boczny",
     "sidebarMenu": {
       "title": "Pasek boczny",
       "newChannel": "Nowy kanał",
       "addToChannels": "Nowy kanał lub kategoria",
-      "addToDms": "Nowa wiadomość lub agent",
       "newMessage": "Nowa wiadomość",
       "addMembers": "Dodaj osoby lub agentów",
       "channelSettings": "Ustawienia kanału",
@@ -1436,7 +1436,57 @@
     "delete": "Usuń grupę",
     "deleteTitle": "Usunąć grupę {{name}}?",
     "deleteText": "Jej agenci wrócą do sekcji Agenci.",
-    "dropHere": "Przeciągnij tu agentów"
+    "dropHere": "Przeciągnij tu agentów",
+    "moved": "{{name}} jest teraz w grupie {{group}}",
+    "movedOut": "{{name}} opuścił grupę {{group}}",
+    "undo": "Cofnij"
+  },
+  "sidebarAgents": {
+    "options": "Opcje agentów",
+    "add": "Nowy agent lub grupa",
+    "order": "Kolejność",
+    "sort": {
+      "workspace": "Taka jak w przestrzeni roboczej",
+      "mine": "Moi najpierw",
+      "working": "Pracujący najpierw"
+    },
+    "showAll": "Pokaż agentów, którzy ze mną nie rozmawiają",
+    "collapseAll": "Zwiń wszystkie",
+    "expandAll": "Rozwiń wszystkie",
+    "organize": "Uporządkuj grupy w Zespole",
+    "seeAll_one": "Zobacz {{count}} agenta",
+    "seeAll_few": "Zobacz wszystkich {{count}} agentów",
+    "seeAll_many": "Zobacz wszystkich {{count}} agentów",
+    "seeAll_other": "Zobacz wszystkich {{count}} agentów",
+    "createFirst": "Utwórz pierwszego agenta",
+    "working_one": "{{count}} pracuje",
+    "working_few": "{{count}} pracują",
+    "working_many": "{{count}} pracuje",
+    "working_other": "{{count}} pracuje",
+    "count_one": "{{count}} agent",
+    "count_few": "{{count}} agentów",
+    "count_many": "{{count}} agentów",
+    "count_other": "{{count}} agenta",
+    "workingIn": "pracuje w #{{channel}}",
+    "talksOnly": "rozmawia tylko z {{name}}",
+    "talksOnlyMore_one": "rozmawia tylko z {{name}} i {{count}} inną osobą",
+    "talksOnlyMore_few": "rozmawia tylko z {{name}} i {{count}} innymi",
+    "talksOnlyMore_many": "rozmawia tylko z {{name}} i {{count}} innymi",
+    "talksOnlyMore_other": "rozmawia tylko z {{name}} i {{count}} innymi",
+    "changeGroup": "Zmień grupę",
+    "newGroupWith": "Nowa grupa z {{name}}",
+    "dmsEmpty": "Tu pojawiają się twoje rozmowy z ludźmi."
+  },
+  "sidebarPins": {
+    "pin": "Przypnij na górze",
+    "unpin": "Odepnij",
+    "pinned": "Przypięte na górze",
+    "hint": "Twoi agenci zostają na górze. Kliknij prawym przyciskiem dowolną rozmowę, aby ją przypiąć.",
+    "full": {
+      "agents": "Masz już 5 przypiętych agentów. Odepnij jednego, aby przypiąć tego.",
+      "channels": "Masz już 5 przypiętych kanałów. Odepnij jeden, aby przypiąć ten.",
+      "people": "Masz już 5 przypiętych osób. Odepnij jedną, aby przypiąć tę."
+    }
   },
   "openOnPhone": {
     "qr": "Kod QR do logowania w aplikacji agentes",

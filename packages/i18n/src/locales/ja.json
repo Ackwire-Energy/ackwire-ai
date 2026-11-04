@@ -1184,14 +1184,14 @@
       "drive": "ファイル、レポート、表",
       "routines": "エージェントが時間どおりに自動で行うこと",
       "calendar": "会議と締め切り",
-      "forum": "決定に複数の意見が必要なとき"
+      "forum": "決定に複数の意見が必要なとき",
+      "team": "誰が誰か：メンバー、エージェント、そのグループ"
     },
     "customizeSidebar": "サイドバーをカスタマイズ",
     "sidebarMenu": {
       "title": "サイドバー",
       "newChannel": "新しいチャンネル",
       "addToChannels": "新しいチャンネルまたはカテゴリ",
-      "addToDms": "新しいメッセージまたはエージェント",
       "newMessage": "新しいメッセージ",
       "addMembers": "人またはエージェントを追加",
       "channelSettings": "チャンネルの設定",
@@ -1307,7 +1307,45 @@
     "delete": "グループを削除",
     "deleteTitle": "グループ「{{name}}」を削除しますか？",
     "deleteText": "グループ内のエージェントは「エージェント」に戻ります。",
-    "dropHere": "ここにエージェントをドラッグ"
+    "dropHere": "ここにエージェントをドラッグ",
+    "moved": "{{name}} をグループ「{{group}}」に移動しました",
+    "movedOut": "{{name}} をグループ「{{group}}」から外しました",
+    "undo": "元に戻す"
+  },
+  "sidebarAgents": {
+    "options": "エージェントのオプション",
+    "add": "新しいエージェントまたはグループ",
+    "order": "並び順",
+    "sort": {
+      "workspace": "ワークスペースの順",
+      "mine": "自分のエージェントを先に",
+      "working": "作業中を先に"
+    },
+    "showAll": "自分と話さないエージェントも表示",
+    "collapseAll": "すべて折りたたむ",
+    "expandAll": "すべて展開",
+    "organize": "チームでグループを整理",
+    "seeAll_other": "{{count}} 件のエージェントをすべて見る",
+    "createFirst": "最初のエージェントを作成",
+    "working_other": "{{count}} 件が作業中",
+    "count_other": "エージェント {{count}} 件",
+    "workingIn": "#{{channel}} で作業中",
+    "talksOnly": "{{name}} とだけ話します",
+    "talksOnlyMore_other": "{{name}} とほか {{count}} 件とだけ話します",
+    "changeGroup": "グループを変更",
+    "newGroupWith": "{{name}} で新しいグループ",
+    "dmsEmpty": "メンバーとの会話はここに表示されます。"
+  },
+  "sidebarPins": {
+    "pin": "上部に固定",
+    "unpin": "固定を解除",
+    "pinned": "上部に固定済み",
+    "hint": "自分のエージェントは上部に固定されます。会話を右クリックすると固定できます。",
+    "full": {
+      "agents": "すでにエージェントを 5 件固定しています。固定するには 1 件解除してください。",
+      "channels": "すでにチャンネルを 5 件固定しています。固定するには 1 件解除してください。",
+      "people": "すでにメンバーを 5 人固定しています。固定するには 1 人解除してください。"
+    }
   },
   "openOnPhone": {
     "qr": "agentesアプリにログインするためのQRコード",

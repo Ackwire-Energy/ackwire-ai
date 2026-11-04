@@ -5968,13 +5968,38 @@ export interface NoticePrefs {
 }
 
 /** A tool at the top of the sidebar (`SIDEBAR_ITEMS` in packages/engine/src/sidebar-items.ts). */
-export type SidebarItem = "approvals" | "threads" | "issues" | "wiki" | "drive" | "routines" | "calendar" | "forum";
+export type SidebarItem =
+  | "approvals"
+  | "threads"
+  | "issues"
+  | "wiki"
+  | "drive"
+  | "routines"
+  | "calendar"
+  | "forum"
+  | "team";
 /** `always` in the list, `more` only in the More menu, `auto` in the list while its count is above zero. */
 export type SidebarPlace = "always" | "more" | "auto";
 /** Where I put each tool I moved, in one workspace (`GET …/me/sidebar`); the others keep their default. */
 export type SidebarItems = Partial<Record<SidebarItem, SidebarPlace>>;
 /** A section of the sidebar, in the order I put them (`SIDEBAR_SECTIONS` in packages/engine/src/sidebar-items.ts). */
 export type SidebarSection = "tools" | "channels" | "agents" | "people";
+/** How AGENTES orders each group (`AGENT_SORTS` in packages/engine/src/sidebar-items.ts). */
+export type AgentSort = "workspace" | "mine" | "working";
+/** "Fixar no topo": agent, channel and user ids on top of their own section, in order. */
+export interface SidebarPins {
+  agents: string[];
+  channels: string[];
+  people: string[];
+}
+/** How my sidebar shows the agents, and what I pinned, in one workspace (`GET …/me/sidebar/view`). */
+export interface SidebarView {
+  agentSort: AgentSort;
+  /** Who manages agents also lists the ones that don't talk to them. */
+  showAllAgents: boolean;
+  /** Never saved: the apps pin my own agents (`dayOnePins`). */
+  pins: SidebarPins | null;
+}
 
 /**
  * How I look at Tarefas in one workspace (`GET …/me/issues-view`), on every device: `ISSUES_VIEW_DEFAULT` in

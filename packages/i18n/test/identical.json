@@ -692,7 +692,8 @@
       "work.duration.hoursMinutes",
       "work.duration.minutes",
       "usageQueue.routine",
-      "rightHand.profile.message"
+      "rightHand.profile.message",
+      "sidebarAgents.count"
     ],
     "de": [
       "access.agentCol",
@@ -1758,7 +1759,8 @@
       "usageQueue.routine",
       "rightHand.field.archive",
       "rightHand.field.model",
-      "rightHand.profile.model"
+      "rightHand.profile.model",
+      "sidebarAgents.count"
     ],
     "ja": [
       "agent.builtinName",
@@ -2594,7 +2596,8 @@
       "wiki.props.addTag",
       "work.duration.minutes",
       "rightHand.field.model",
-      "rightHand.profile.model"
+      "rightHand.profile.model",
+      "sidebarAgents.count"
     ],
     "ru": [
       "agent.builtinName",

@@ -1220,14 +1220,14 @@
       "drive": "Dosyalar, raporlar ve tablolar",
       "routines": "Ajanların zamanında kendi başlarına yaptıkları",
       "calendar": "Toplantılar ve son tarihler",
-      "forum": "Bir kararın birkaç bakış açısına ihtiyacı olduğunda"
+      "forum": "Bir kararın birkaç bakış açısına ihtiyacı olduğunda",
+      "team": "Kim kimdir: kişiler, ajanlar ve grupları"
     },
     "customizeSidebar": "Kenar çubuğunu özelleştir",
     "sidebarMenu": {
       "title": "Kenar çubuğu",
       "newChannel": "Yeni kanal",
       "addToChannels": "Yeni kanal veya kategori",
-      "addToDms": "Yeni mesaj veya ajan",
       "newMessage": "Yeni mesaj",
       "addMembers": "Kişi veya ajan ekle",
       "channelSettings": "Kanal ayarları",
@@ -1350,7 +1350,49 @@
     "delete": "Grubu sil",
     "deleteTitle": "{{name}} grubu silinsin mi?",
     "deleteText": "Ajanları Ajanlar bölümüne geri döner.",
-    "dropHere": "Ajanları buraya sürükleyin"
+    "dropHere": "Ajanları buraya sürükleyin",
+    "moved": "{{name}} artık {{group}} grubunda",
+    "movedOut": "{{name}}, {{group}} grubundan ayrıldı",
+    "undo": "Geri al"
+  },
+  "sidebarAgents": {
+    "options": "Ajan seçenekleri",
+    "add": "Yeni ajan veya grup",
+    "order": "Sıra",
+    "sort": {
+      "workspace": "Çalışma alanı sırası",
+      "mine": "Önce benimkiler",
+      "working": "Önce çalışanlar"
+    },
+    "showAll": "Benimle konuşmayan ajanları göster",
+    "collapseAll": "Tümünü daralt",
+    "expandAll": "Tümünü genişlet",
+    "organize": "Grupları Ekip'te düzenle",
+    "seeAll_one": "{{count}} ajanı gör",
+    "seeAll_other": "{{count}} ajanın tümünü gör",
+    "createFirst": "İlk ajanı oluştur",
+    "working_one": "{{count}} çalışıyor",
+    "working_other": "{{count}} çalışıyor",
+    "count_one": "{{count}} ajan",
+    "count_other": "{{count}} ajan",
+    "workingIn": "#{{channel}} kanalında çalışıyor",
+    "talksOnly": "yalnızca {{name}} ile konuşur",
+    "talksOnlyMore_one": "yalnızca {{name}} ve {{count}} kişiyle daha konuşur",
+    "talksOnlyMore_other": "yalnızca {{name}} ve {{count}} kişiyle daha konuşur",
+    "changeGroup": "Grubu değiştir",
+    "newGroupWith": "{{name}} ile yeni grup",
+    "dmsEmpty": "Kişilerle konuşmalarınız burada görünür."
+  },
+  "sidebarPins": {
+    "pin": "En üste sabitle",
+    "unpin": "Sabitlemeyi kaldır",
+    "pinned": "En üste sabitlendi",
+    "hint": "Ajanlarınız en üstte kalır. Sabitlemek için herhangi bir konuşmaya sağ tıklayın.",
+    "full": {
+      "agents": "Zaten 5 ajan sabitlediniz. Bunu sabitlemek için birini kaldırın.",
+      "channels": "Zaten 5 kanal sabitlediniz. Bunu sabitlemek için birini kaldırın.",
+      "people": "Zaten 5 kişi sabitlediniz. Bunu sabitlemek için birini kaldırın."
+    }
   },
   "openOnPhone": {
     "qr": "agentes uygulamasına giriş yapmak için QR kodu",

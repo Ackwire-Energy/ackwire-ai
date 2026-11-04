@@ -1184,14 +1184,14 @@
       "drive": "파일, 보고서, 표",
       "routines": "에이전트가 정해진 시간에 스스로 하는 일",
       "calendar": "회의와 마감일",
-      "forum": "여러 의견이 필요한 결정"
+      "forum": "여러 의견이 필요한 결정",
+      "team": "누가 누구인지: 사람, 에이전트, 그룹"
     },
     "customizeSidebar": "사이드바 맞춤 설정",
     "sidebarMenu": {
       "title": "사이드바",
       "newChannel": "새 채널",
       "addToChannels": "새 채널 또는 카테고리",
-      "addToDms": "새 메시지 또는 에이전트",
       "newMessage": "새 메시지",
       "addMembers": "사람 또는 에이전트 추가",
       "channelSettings": "채널 설정",
@@ -1307,7 +1307,45 @@
     "delete": "그룹 삭제",
     "deleteTitle": "{{name}} 그룹을 삭제할까요?",
     "deleteText": "그룹의 에이전트는 에이전트 목록으로 돌아가요.",
-    "dropHere": "에이전트를 여기로 드래그하세요"
+    "dropHere": "에이전트를 여기로 드래그하세요",
+    "moved": "{{name}}을(를) {{group}} 그룹으로 옮겼어요",
+    "movedOut": "{{name}}이(가) {{group}} 그룹에서 빠졌어요",
+    "undo": "실행 취소"
+  },
+  "sidebarAgents": {
+    "options": "에이전트 옵션",
+    "add": "새 에이전트 또는 그룹",
+    "order": "순서",
+    "sort": {
+      "workspace": "워크스페이스 순서",
+      "mine": "내 에이전트 먼저",
+      "working": "작업 중 먼저"
+    },
+    "showAll": "나와 대화하지 않는 에이전트 표시",
+    "collapseAll": "모두 접기",
+    "expandAll": "모두 펼치기",
+    "organize": "팀에서 그룹 정리",
+    "seeAll_other": "에이전트 {{count}}개 모두 보기",
+    "createFirst": "첫 에이전트 만들기",
+    "working_other": "{{count}}개 작업 중",
+    "count_other": "에이전트 {{count}}개",
+    "workingIn": "#{{channel}}에서 작업 중",
+    "talksOnly": "{{name}}와(과)만 대화",
+    "talksOnlyMore_other": "{{name}} 외 {{count}}명과만 대화",
+    "changeGroup": "그룹 변경",
+    "newGroupWith": "{{name}}와(과) 새 그룹",
+    "dmsEmpty": "사람과의 대화가 여기에 표시돼요."
+  },
+  "sidebarPins": {
+    "pin": "맨 위에 고정",
+    "unpin": "고정 해제",
+    "pinned": "맨 위에 고정됨",
+    "hint": "내 에이전트는 맨 위에 있어요. 고정하려면 대화를 오른쪽 클릭하세요.",
+    "full": {
+      "agents": "이미 에이전트 5개를 고정했어요. 이걸 고정하려면 하나를 해제하세요.",
+      "channels": "이미 채널 5개를 고정했어요. 이걸 고정하려면 하나를 해제하세요.",
+      "people": "이미 5명을 고정했어요. 이분을 고정하려면 한 명을 해제하세요."
+    }
   },
   "openOnPhone": {
     "qr": "agentes 앱에 로그인하는 QR 코드",

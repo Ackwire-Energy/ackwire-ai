@@ -2975,9 +2975,6 @@
   "shell.sidebarMenu.addToChannels": {
     "value": "New channel or category"
   },
-  "shell.sidebarMenu.addToDms": {
-    "value": "New message or agent"
-  },
   "shell.sidebarMenu.newMessage": {
     "value": "New message"
   },
@@ -32492,5 +32489,110 @@
   },
   "chat.body.settings_proposal": {
     "value": "Proposed a change to {{names}}"
+  },
+  "shell.moreWhat.team": {
+    "value": "Who's who: people, agents and their groups"
+  },
+  "agentGroups.moved": {
+    "value": "{{name}} moved to the group {{group}}"
+  },
+  "agentGroups.movedOut": {
+    "value": "{{name}} left the group {{group}}"
+  },
+  "agentGroups.undo": {
+    "value": "Undo"
+  },
+  "sidebarAgents.options": {
+    "value": "Agents options"
+  },
+  "sidebarAgents.add": {
+    "value": "New agent or group"
+  },
+  "sidebarAgents.order": {
+    "value": "Order"
+  },
+  "sidebarAgents.sort.workspace": {
+    "value": "Workspace's order"
+  },
+  "sidebarAgents.sort.mine": {
+    "value": "Mine first"
+  },
+  "sidebarAgents.sort.working": {
+    "value": "Working first"
+  },
+  "sidebarAgents.showAll": {
+    "value": "Show agents that don't talk to me"
+  },
+  "sidebarAgents.collapseAll": {
+    "value": "Collapse all"
+  },
+  "sidebarAgents.expandAll": {
+    "value": "Expand all"
+  },
+  "sidebarAgents.organize": {
+    "value": "Organize groups in Team"
+  },
+  "sidebarAgents.seeAll": {
+    "value": {
+      "one": "See the {{count}} agent",
+      "other": "See all {{count}} agents"
+    }
+  },
+  "sidebarAgents.createFirst": {
+    "value": "Create the first agent"
+  },
+  "sidebarAgents.working": {
+    "value": {
+      "one": "{{count}} working",
+      "other": "{{count}} working"
+    }
+  },
+  "sidebarAgents.count": {
+    "value": {
+      "one": "{{count}} agent",
+      "other": "{{count}} agents"
+    }
+  },
+  "sidebarAgents.workingIn": {
+    "value": "working in #{{channel}}"
+  },
+  "sidebarAgents.talksOnly": {
+    "value": "only talks to {{name}}"
+  },
+  "sidebarAgents.talksOnlyMore": {
+    "value": {
+      "one": "only talks to {{name}} and {{count}} more",
+      "other": "only talks to {{name}} and {{count}} more"
+    }
+  },
+  "sidebarAgents.changeGroup": {
+    "value": "Move to group"
+  },
+  "sidebarAgents.newGroupWith": {
+    "value": "New group with {{name}}"
+  },
+  "sidebarAgents.dmsEmpty": {
+    "value": "Your conversations with people show up here."
+  },
+  "sidebarPins.pin": {
+    "value": "Pin to top"
+  },
+  "sidebarPins.unpin": {
+    "value": "Unpin"
+  },
+  "sidebarPins.pinned": {
+    "value": "Pinned"
+  },
+  "sidebarPins.hint": {
+    "value": "Your agents stay on top. Right-click any conversation to pin it."
+  },
+  "sidebarPins.full.agents": {
+    "value": "You already pinned 5 agents. Unpin one to pin this one."
+  },
+  "sidebarPins.full.channels": {
+    "value": "You already pinned 5 channels. Unpin one to pin this one."
+  },
+  "sidebarPins.full.people": {
+    "value": "You already pinned 5 people. Unpin one to pin this one."
   }
 }

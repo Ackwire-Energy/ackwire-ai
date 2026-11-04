@@ -1220,14 +1220,14 @@
       "drive": "Bestanden, rapporten en tabellen",
       "routines": "Wat agents zelf doen, op tijd",
       "calendar": "Vergaderingen en deadlines",
-      "forum": "Als een besluit meerdere blikken nodig heeft"
+      "forum": "Als een besluit meerdere blikken nodig heeft",
+      "team": "Wie is wie: mensen, agents en hun groepen"
     },
     "customizeSidebar": "Zijbalk aanpassen",
     "sidebarMenu": {
       "title": "Zijbalk",
       "newChannel": "Nieuw kanaal",
       "addToChannels": "Nieuw kanaal of nieuwe categorie",
-      "addToDms": "Nieuw bericht of agent",
       "newMessage": "Nieuw bericht",
       "addMembers": "Mensen of agents toevoegen",
       "channelSettings": "Kanaalinstellingen",
@@ -1350,7 +1350,49 @@
     "delete": "Groep verwijderen",
     "deleteTitle": "Groep {{name}} verwijderen?",
     "deleteText": "De agents gaan terug naar Agents.",
-    "dropHere": "Sleep agents hierheen"
+    "dropHere": "Sleep agents hierheen",
+    "moved": "{{name}} zit nu in de groep {{group}}",
+    "movedOut": "{{name}} heeft de groep {{group}} verlaten",
+    "undo": "Ongedaan maken"
+  },
+  "sidebarAgents": {
+    "options": "Opties voor agents",
+    "add": "Nieuwe agent of groep",
+    "order": "Volgorde",
+    "sort": {
+      "workspace": "Die van de werkruimte",
+      "mine": "Mijn agents eerst",
+      "working": "Aan het werk eerst"
+    },
+    "showAll": "Agents tonen die niet met mij praten",
+    "collapseAll": "Alles inklappen",
+    "expandAll": "Alles uitklappen",
+    "organize": "Groepen ordenen in Team",
+    "seeAll_one": "De {{count}} agent bekijken",
+    "seeAll_other": "Alle {{count}} agents bekijken",
+    "createFirst": "De eerste agent maken",
+    "working_one": "{{count}} aan het werk",
+    "working_other": "{{count}} aan het werk",
+    "count_one": "{{count}} agent",
+    "count_other": "{{count}} agents",
+    "workingIn": "aan het werk in #{{channel}}",
+    "talksOnly": "praat alleen met {{name}}",
+    "talksOnlyMore_one": "praat alleen met {{name}} en {{count}} ander",
+    "talksOnlyMore_other": "praat alleen met {{name}} en {{count}} anderen",
+    "changeGroup": "Naar groep verplaatsen",
+    "newGroupWith": "Nieuwe groep met {{name}}",
+    "dmsEmpty": "Je gesprekken met mensen verschijnen hier."
+  },
+  "sidebarPins": {
+    "pin": "Bovenaan vastzetten",
+    "unpin": "Losmaken",
+    "pinned": "Bovenaan vastgezet",
+    "hint": "Je agents blijven bovenaan. Klik met rechts op een gesprek om het vast te zetten.",
+    "full": {
+      "agents": "Je hebt al 5 agents vastgezet. Maak er een los om deze vast te zetten.",
+      "channels": "Je hebt al 5 kanalen vastgezet. Maak er een los om dit vast te zetten.",
+      "people": "Je hebt al 5 mensen vastgezet. Maak er een los om deze vast te zetten."
+    }
   },
   "openOnPhone": {
     "qr": "QR-code om in te loggen in de agentes-app",

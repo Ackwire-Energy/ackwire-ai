@@ -1,6 +1,7 @@
 import type { Agent, AgentGroup } from "@agenteschat/client";
 import { useAgentGroupAction } from "@agenteschat/client";
 import { groupOf, NO_GROUP } from "@agenteschat/client/lib/agent-groups";
+import { errorText } from "@agenteschat/client/lib/errors";
 import {
   Button,
   Dialog,
@@ -15,6 +16,8 @@ import {
 } from "@agenteschat/ui";
 import { type DragEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useDirectory } from "@/hooks/useDirectory";
+import { useToast } from "@/lib/toast";
 import { useOrg } from "./org-context";
 
 /** What Equipe's group dialog is for: a new group (with these agents in it), or renaming one. */
@@ -220,13 +223,49 @@ export function AgentGroupMenu({
 const AGENT_DRAG = "application/x-agentes-agent";
 
 /**
- * Dragging agents between Equipe's groups (owners and admins): rows are draggable, groups take the drop.
+ * Moves an agent into a group (`null`: out of any), at `index` among its agents, and says so in a toast with Desfazer,
+ * which puts it back where it was.
+ */
+export function useMoveAgent(groups: AgentGroup[]) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const dir = useDirectory(org.id);
+  const action = useAgentGroupAction(org.id);
+  return (agentId: string, groupId: string | null, index?: number) => {
+    const from = groupOf(groups, agentId);
+    const at = from?.agentIds.indexOf(agentId);
+    const name = dir.agentById.get(agentId)?.name ?? "";
+    const to = groups.find((g) => g.id === groupId);
+    action.mutate(
+      { type: "move", agentId, groupId, index },
+      {
+        onError: (e) => toast.show(errorText(t, e), "error"),
+        onSuccess: () => {
+          if ((from?.id ?? null) === groupId) return;
+          toast.show(
+            to
+              ? t("agentGroups.moved", { name, group: to.name })
+              : t("agentGroups.movedOut", { name, group: from?.name ?? "" }),
+            "info",
+            {
+              label: t("agentGroups.undo"),
+              run: () => action.mutate({ type: "move", agentId, groupId: from?.id ?? null, index: at }),
+            },
+          );
+        },
+      },
+    );
+  };
+}
+
+/**
+ * Dragging agents between groups (Equipe and the sidebar's AGENTES, for who manages agents) (owners and admins): rows are draggable, groups take the drop.
  * Inside a group the row lands where the pointer is (`over.index`, before the first row whose middle is below it);
  * the agents in no group keep the workspace's order.
  */
 export function useAgentDrag(groups: AgentGroup[]) {
-  const { org } = useOrg();
-  const action = useAgentGroupAction(org.id);
+  const move = useMoveAgent(groups);
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<{ groupId: string | null; index: number } | null>(null);
   const indexAt = (e: DragEvent<HTMLElement>) => {
@@ -276,7 +315,7 @@ export function useAgentDrag(groups: AgentGroup[]) {
         end();
         const from = groupOf(groups, agentId);
         if ((from?.id ?? null) === groupId && (groupId === null || from?.agentIds.indexOf(agentId) === index)) return;
-        action.mutate({ type: "move", agentId, groupId, index });
+        move(agentId, groupId, index);
       },
     }),
   };

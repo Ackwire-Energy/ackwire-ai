@@ -1184,14 +1184,14 @@
       "drive": "File, laporan, dan tabel",
       "routines": "Yang dikerjakan agen sendiri, tepat waktu",
       "calendar": "Rapat dan tenggat",
-      "forum": "Saat keputusan butuh beberapa sudut pandang"
+      "forum": "Saat keputusan butuh beberapa sudut pandang",
+      "team": "Siapa siapa: orang, agen, dan grupnya"
     },
     "customizeSidebar": "Sesuaikan sidebar",
     "sidebarMenu": {
       "title": "Bilah samping",
       "newChannel": "Kanal baru",
       "addToChannels": "Kanal atau kategori baru",
-      "addToDms": "Pesan baru atau agen",
       "newMessage": "Pesan baru",
       "addMembers": "Tambah orang atau agen",
       "channelSettings": "Pengaturan kanal",
@@ -1307,7 +1307,45 @@
     "delete": "Hapus grup",
     "deleteTitle": "Hapus grup {{name}}?",
     "deleteText": "Agen di dalamnya kembali ke Agen.",
-    "dropHere": "Seret agen ke sini"
+    "dropHere": "Seret agen ke sini",
+    "moved": "{{name}} pindah ke grup {{group}}",
+    "movedOut": "{{name}} keluar dari grup {{group}}",
+    "undo": "Urungkan"
+  },
+  "sidebarAgents": {
+    "options": "Opsi agen",
+    "add": "Agen atau grup baru",
+    "order": "Urutan",
+    "sort": {
+      "workspace": "Urutan ruang kerja",
+      "mine": "Milik saya dulu",
+      "working": "Yang bekerja dulu"
+    },
+    "showAll": "Tampilkan agen yang tidak berbicara dengan saya",
+    "collapseAll": "Ciutkan semua",
+    "expandAll": "Bentangkan semua",
+    "organize": "Atur grup di Tim",
+    "seeAll_other": "Lihat semua {{count}} agen",
+    "createFirst": "Buat agen pertama",
+    "working_other": "{{count}} sedang bekerja",
+    "count_other": "{{count}} agen",
+    "workingIn": "bekerja di #{{channel}}",
+    "talksOnly": "hanya berbicara dengan {{name}}",
+    "talksOnlyMore_other": "hanya berbicara dengan {{name}} dan {{count}} lainnya",
+    "changeGroup": "Pindah grup",
+    "newGroupWith": "Grup baru dengan {{name}}",
+    "dmsEmpty": "Percakapanmu dengan orang muncul di sini."
+  },
+  "sidebarPins": {
+    "pin": "Sematkan di atas",
+    "unpin": "Lepas sematan",
+    "pinned": "Disematkan di atas",
+    "hint": "Agenmu tetap di atas. Klik kanan percakapan mana pun untuk menyematkannya.",
+    "full": {
+      "agents": "Kamu sudah menyematkan 5 agen. Lepaskan satu untuk menyematkan yang ini.",
+      "channels": "Kamu sudah menyematkan 5 kanal. Lepaskan satu untuk menyematkan yang ini.",
+      "people": "Kamu sudah menyematkan 5 orang. Lepaskan satu untuk menyematkan yang ini."
+    }
   },
   "openOnPhone": {
     "qr": "Kode QR untuk masuk ke aplikasi agentes",
