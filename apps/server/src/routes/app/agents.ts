@@ -812,6 +812,7 @@ export function agentRoutes(deps: AppDeps) {
     threadId: z.uuid().nullable(),
     channelKind: z.string(),
     channelName: z.string().nullable().openapi({ description: "Null for a DM." }),
+    messageId: z.uuid().openapi({ description: 'What it answers ("Ver conversa" opens it).' }),
     askers: z
       .array(z.string())
       .openapi({ description: "Who asked (people's ids): the trigger's author, then who joined." }),

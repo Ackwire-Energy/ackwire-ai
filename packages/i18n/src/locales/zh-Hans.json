@@ -1898,7 +1898,9 @@
     "closedTitle_other": "{{count}} 个对话无需回复",
     "closedLine": "它们看起来已经解决，所以 {{agent}} 没有回复。如果还有需要回复的，请选择“仍然回复”。",
     "seeConversation": "查看对话",
-    "answeredAnyway": "有人要求仍然回复"
+    "answeredAnyway": "有人要求仍然回复",
+    "toResume": "待继续",
+    "switchAi": "更换 {{name}} 的 AI"
   },
   "actionCard": {
     "connect_ai": {

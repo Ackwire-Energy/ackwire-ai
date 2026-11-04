@@ -1,6 +1,7 @@
 import { useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { type DetailsItem, OpenDetailsContext } from "@/components/details-link";
+import { UsageQueueDialog } from "@/components/UsageQueue";
 import { ApprovalDetailsDialog } from "@/pages/ApprovalsPage";
 import { RoutineDetailsDialog } from "@/pages/RoutinesPage";
 
@@ -20,6 +21,9 @@ export function DetailsHost({ children }: { children: ReactNode }) {
       {children}
       {item?.kind === "routine" && <RoutineDetailsDialog key={item.id} routineId={item.id} onClose={close} />}
       {item?.kind === "approval" && <ApprovalDetailsDialog key={item.id} approvalId={item.id} onClose={close} />}
+      {item?.kind === "usage_queue" && (
+        <UsageQueueDialog key={item.id} agentId={item.id} open onOpenChange={(open) => !open && close()} />
+      )}
     </OpenDetailsContext.Provider>
   );
 }

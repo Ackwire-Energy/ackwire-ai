@@ -1935,6 +1935,8 @@ export const en = {
     closedLine: "They looked handled, so {{agent}} didn't answer. If one still needs an answer, choose Answer anyway.",
     seeConversation: "See conversation",
     answeredAnyway: "Someone asked for an answer anyway",
+    toResume: "To pick up",
+    switchAi: "Change {{name}}'s AI",
   },
   actionCard: {
     connect_ai: {

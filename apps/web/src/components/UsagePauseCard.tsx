@@ -1,5 +1,5 @@
 import type { CatchUpClosed, Message } from "@agenteschat/client";
-import { useApi } from "@agenteschat/client";
+import { keys, useApi } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { clockAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -12,7 +12,8 @@ import {
   usagePauseText,
 } from "@agenteschat/client/lib/usage-pause";
 import { Button, Icon } from "@agenteschat/ui";
-import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { type ButtonHTMLAttributes, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { SeeUsageQueue } from "@/components/UsageQueue";
@@ -20,13 +21,35 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 
 /**
- * "Don't run it" on what waits for a plan's or budget's limit: cancels the run (`cancelRun`), so nothing runs when the
- * limit is back. For the person behind it, the agent's owner and admins; anyone else sees it greyed.
+ * A minor action under a note or in a queue row ("Não rodar", "Responder mesmo assim", "Ver fila"): words only, in the
+ * agent's color, lined up with the text above. Greyed with its reason in `title` when the viewer may not press it.
  */
-function useDontRun(runId: string | null) {
+export function TextAction({
+  pending,
+  disabled,
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & { pending?: boolean }) {
+  return (
+    <button
+      type="button"
+      className="cq-link"
+      disabled={disabled || pending}
+      aria-busy={pending || undefined}
+      {...rest}
+    />
+  );
+}
+
+/**
+ * "Don't run it" on what waits for a plan's or budget's limit: cancels the run (`cancelRun`), so nothing runs when the
+ * limit is back. For the person behind it, the agent's owner and admins; anyone else sees it greyed. The agent's
+ * status and its queue follow.
+ */
+export function useDontRun(runId: string | null) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
+  const qc = useQueryClient();
   const toast = useToast();
   const [pending, setPending] = useState(false);
   const run = async () => {
@@ -39,27 +62,25 @@ function useDontRun(runId: string | null) {
       toast.show(errorText(t, error), "error");
     } finally {
       setPending(false);
+      void qc.invalidateQueries({ queryKey: keys.agentStatus(org.id) });
     }
   };
   return { run, pending };
 }
 
-function DontRunButton({ runId, may, count = 1 }: { runId: string | null; may: boolean; count?: number }) {
+export function DontRunButton({ runId, may, count = 1 }: { runId: string | null; may: boolean; count?: number }) {
   const { t } = useTranslation();
   const dontRun = useDontRun(runId);
   if (!runId) return null;
   return (
-    <Button
-      size="sm"
-      variant="ghost"
-      icon="stop"
-      loading={dontRun.pending}
+    <TextAction
+      pending={dontRun.pending}
       disabled={!may}
       title={t(may ? "usageCard.dontRunHint" : "usageCard.dontRunForbidden")}
       onClick={dontRun.run}
     >
       {count > 1 ? t("usageCard.dontRunThese", { count }) : t("usageCard.dontRun")}
-    </Button>
+    </TextAction>
   );
 }
 
@@ -73,7 +94,7 @@ export function UsageWaitCancel({ message, wait }: { message: Message; wait: Usa
   const owner = dir.agentById.get(message.author.id ?? "")?.ownerUserId;
   const may = mayContinueUsage(wait, me.user.id, owner, can(org, "manage_agents"));
   return (
-    <span className="waitcard__acts">
+    <span className="cq__acts">
       <DontRunButton runId={wait.runId} may={may} count={wait.count} />
       {message.author.id && <SeeUsageQueue agentId={message.author.id} />}
     </span>
@@ -97,17 +118,15 @@ export function AnswerAnywayButton({
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const api = useApi();
+  const qc = useQueryClient();
   const toast = useToast();
   const [pending, setPending] = useState(false);
   const owner = dir.agentById.get(agentId ?? "")?.ownerUserId;
   const may = mayAnswerAnyway(closed, me.user.id, owner, can(org, "manage_agents"));
   if (!answerAnywayOpen(closed)) return null;
   return (
-    <Button
-      size="sm"
-      variant="ghost"
-      icon="reply"
-      loading={pending}
+    <TextAction
+      pending={pending}
       disabled={!may}
       title={t(may ? "usageCard.answerAnywayHint" : "usageCard.answerAnywayForbidden")}
       onClick={async () => {
@@ -118,18 +137,19 @@ export function AnswerAnywayButton({
           toast.show(errorText(t, error), "error");
         } finally {
           setPending(false);
+          void qc.invalidateQueries({ queryKey: keys.agentStatus(org.id) });
         }
       }}
     >
       {t("usageCard.answerAnyway")}
-    </Button>
+    </TextAction>
   );
 }
 
 /** Under a skipped catch-up's note: "Responder mesmo assim" until someone presses it, and "Ver fila". */
 export function UsageWaitClosed({ message, wait }: { message: Message; wait: UsageWait & { closed: CatchUpClosed } }) {
   return (
-    <span className="waitcard__acts">
+    <span className="cq__acts">
       {!wait.continuedByUserId && (
         <AnswerAnywayButton runId={wait.runId} agentId={message.author.id ?? null} closed={wait.closed} />
       )}

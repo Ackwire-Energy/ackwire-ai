@@ -54,12 +54,13 @@ export function usageQueueMeta(
   return say(t)("usageQueue.askedBy", { names: joinNames(row.askers.map(person), t), ago });
 }
 
-/** "12 mensagens depois · Nina e Ada escreveram depois", or "Nada depois". */
-export function usageQueueFacts(t: TFunction, row: UsageQueueRow) {
+/** "12 mensagens depois · Nina e Ada escreveram depois", or "Nada depois"; `you`: the viewer's name, said "você". */
+export function usageQueueFacts(t: TFunction, row: UsageQueueRow, you?: string) {
   if (row.after.count === 0) return say(t)("usageQueue.nothingAfter");
   const count = say(t)("usageQueue.after", { count: row.after.count });
   if (row.after.names.length === 0) return count;
-  return `${count} · ${say(t)("usageQueue.wrote", { names: joinNames(row.after.names, t), count: row.after.names.length })}`;
+  const names = row.after.names.map((n) => (n === you ? say(t)("common.you") : n));
+  return `${count} · ${say(t)("usageQueue.wrote", { names: joinNames(names, t), count: names.length })}`;
 }
 
 /** "Na fila" or "Respondendo agora". */

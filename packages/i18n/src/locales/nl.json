@@ -1977,7 +1977,9 @@
     "closedTitle_other": "{{count}} hadden geen antwoord nodig",
     "closedLine": "Ze leken geregeld, dus {{agent}} heeft niet geantwoord. Heeft er een nog een antwoord nodig, kies dan Toch antwoorden.",
     "seeConversation": "Gesprek bekijken",
-    "answeredAnyway": "Iemand vroeg toch om een antwoord"
+    "answeredAnyway": "Iemand vroeg toch om een antwoord",
+    "toResume": "Om op te pakken",
+    "switchAi": "AI van {{name}} wijzigen"
   },
   "actionCard": {
     "connect_ai": {

@@ -2048,7 +2048,9 @@
     "closedTitle_other": "{{count}} no necesitaron respuesta",
     "closedLine": "Parecían resueltas, así que {{agent}} no respondió. Si alguna todavía necesita respuesta, elige Responder de todos modos.",
     "seeConversation": "Ver conversación",
-    "answeredAnyway": "Alguien pidió una respuesta de todos modos"
+    "answeredAnyway": "Alguien pidió una respuesta de todos modos",
+    "toResume": "Por retomar",
+    "switchAi": "Cambiar la IA de {{name}}"
   },
   "actionCard": {
     "connect_ai": {

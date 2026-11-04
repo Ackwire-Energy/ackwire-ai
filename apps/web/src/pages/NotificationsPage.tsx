@@ -159,8 +159,9 @@ function SourceChip({
   const { t } = useTranslation();
   const s = n.source;
   const channel = channelOf(n);
-  // Agents failing in many conversations: each says its own when the row opens.
-  if (runFailedGroupOf(n)) return null;
+  // Agents failing in many conversations: each says its own when the row opens. Several skipped catch-ups open
+  // the agent's queue, which lists where each was.
+  if (runFailedGroupOf(n) || (n.kind === "catch_up_closed" && n.count > 1)) return null;
   let icon: IconName = "channel";
   let label = "";
   if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];

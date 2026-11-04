@@ -972,3 +972,37 @@ describe("a click on a browser notification (ADR 0071)", () => {
     expect(state.calls.find((c) => c.method === "notifications.read")?.args).toEqual([ORG_ID, "n-routine", true]);
   });
 });
+
+describe("catch-ups an agent skipped as already handled (ADR 0136)", () => {
+  test("the owner's grouped row opens the agent's queue in place; the asker's names the place once", async () => {
+    const skipped = notification({
+      id: "n-skip",
+      kind: "catch_up_closed",
+      actors: [{ type: "agent", id: ATLAS_ID }],
+      count: 2,
+      source: { channelId: ENG_ID, messageId: "m-note", label: "Atlas" },
+      latest: {},
+      updatedAt: ago(3),
+    });
+    const asker = notification({
+      id: "n-asker",
+      kind: "catch_up_closed_asker",
+      actors: [{ type: "agent", id: ATLAS_ID }],
+      source: { channelId: ENG_ID, messageId: "m-note", label: "eng" },
+      latest: { title: "Ada", reason: "solved" },
+      updatedAt: ago(4),
+    });
+    const { router } = await go(seedState({ notifications: [skipped, asker] }));
+    const owners = document.querySelector('[data-n="n-skip"]') as HTMLElement;
+    expect(owners.textContent).toContain("Atlas retomou e pulou 2 conversas que não precisavam de resposta");
+    // Two places: the queue lists each, so no single channel beside it.
+    expect(owners.textContent).not.toContain("#eng");
+    const askers = document.querySelector('[data-n="n-asker"]') as HTMLElement;
+    expect(askers.textContent?.match(/#eng/g)).toHaveLength(1);
+    const before = router.state.location.pathname;
+    await click(within(owners).getByRole("button", { name: "Abrir" }));
+    await settle(4);
+    expect(router.state.location.pathname).toBe(before);
+    expect(screen().getByRole("dialog").textContent).toContain("Atlas");
+  });
+});

@@ -1894,7 +1894,9 @@
     "closedTitle_other": "返信が不要だった会話{{count}}件",
     "closedLine": "解決済みに見えたため、{{agent}}は返信しませんでした。まだ返信が必要なものがあれば、「それでも返信する」を選んでください。",
     "seeConversation": "会話を見る",
-    "answeredAnyway": "それでも返信してほしいと頼まれました"
+    "answeredAnyway": "それでも返信してほしいと頼まれました",
+    "toResume": "再開する会話",
+    "switchAi": "{{name}}のAIを変更"
   },
   "actionCard": {
     "connect_ai": {

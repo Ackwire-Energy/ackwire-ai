@@ -3860,6 +3860,8 @@ export interface UsageQueueRow {
   channelKind: string;
   /** Null for a DM. */
   channelName: string | null;
+  /** What it answers ("Ver conversa" opens it). */
+  messageId: string;
   /** Who asked (people's ids): the trigger's author, then whoever joined. */
   askers: string[];
   /** When it first paused. */

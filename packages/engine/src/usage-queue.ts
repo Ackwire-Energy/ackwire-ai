@@ -19,6 +19,8 @@ export interface UsageQueueRow {
   channelKind: string;
   /** The channel's name (a DM has none). */
   channelName: string | null;
+  /** What it answers: where "Ver conversa" goes. */
+  messageId: string;
   /** Who asked (people's ids): the trigger's author, then whoever joined it, in order. */
   askers: string[];
   /** When it first paused, ISO. */
@@ -169,6 +171,7 @@ export async function usageQueue(db: Database, viewerId: string, orgId: string, 
       threadId,
       channelKind: r.channelKind,
       channelName: r.channelKind === "dm" ? null : r.channelName,
+      messageId: r.run.triggerMessageId,
       askers,
       since: new Date(r.sinceMs).toISOString(),
       after: await writtenSince(db, orgId, {

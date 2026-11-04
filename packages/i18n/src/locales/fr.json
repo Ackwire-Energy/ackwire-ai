@@ -2051,7 +2051,9 @@
     "closedTitle_other": "{{count}} n'avaient pas besoin de réponse",
     "closedLine": "Elles semblaient réglées, donc {{agent}} n'a pas répondu. Si l'une d'elles a encore besoin d'une réponse, choisissez Répondre quand même.",
     "seeConversation": "Voir la conversation",
-    "answeredAnyway": "Quelqu'un a demandé une réponse quand même"
+    "answeredAnyway": "Quelqu'un a demandé une réponse quand même",
+    "toResume": "À reprendre",
+    "switchAi": "Changer l'IA de {{name}}"
   },
   "actionCard": {
     "connect_ai": {

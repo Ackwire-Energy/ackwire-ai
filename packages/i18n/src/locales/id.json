@@ -1904,7 +1904,9 @@
     "closedTitle_other": "{{count}} tidak perlu dijawab",
     "closedLine": "Semuanya tampak sudah beres, jadi {{agent}} tidak menjawab. Kalau ada yang masih perlu dijawab, pilih Tetap jawab.",
     "seeConversation": "Lihat percakapan",
-    "answeredAnyway": "Seseorang tetap meminta jawaban"
+    "answeredAnyway": "Seseorang tetap meminta jawaban",
+    "toResume": "Untuk dilanjutkan",
+    "switchAi": "Ganti AI {{name}}"
   },
   "actionCard": {
     "connect_ai": {

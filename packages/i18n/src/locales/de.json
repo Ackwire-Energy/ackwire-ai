@@ -1973,7 +1973,9 @@
     "closedTitle_other": "{{count}} brauchten keine Antwort",
     "closedLine": "Sie schienen erledigt, also hat {{agent}} nicht geantwortet. Wenn eine noch eine Antwort braucht, wähle Trotzdem antworten.",
     "seeConversation": "Unterhaltung ansehen",
-    "answeredAnyway": "Jemand hat trotzdem um eine Antwort gebeten"
+    "answeredAnyway": "Jemand hat trotzdem um eine Antwort gebeten",
+    "toResume": "Wieder aufzunehmen",
+    "switchAi": "KI von {{name}} wechseln"
   },
   "actionCard": {
     "connect_ai": {

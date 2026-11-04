@@ -4810,6 +4810,12 @@
   "usageQueue.answeredAnyway": {
     "value": "Someone asked for an answer anyway"
   },
+  "usageQueue.toResume": {
+    "value": "To pick up"
+  },
+  "usageQueue.switchAi": {
+    "value": "Change {{name}}'s AI"
+  },
   "actionCard.connect_ai.title": {
     "value": "Connect an AI for {{agents}}"
   },

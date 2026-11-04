@@ -1964,7 +1964,9 @@
     "closedTitle_other": "{{count}} konuşma yanıt gerektirmedi",
     "closedLine": "Çözülmüş göründükleri için {{agent}} yanıt vermedi. Hâlâ yanıt bekleyen varsa Yine de yanıtla seçeneğini seçin.",
     "seeConversation": "Konuşmayı gör",
-    "answeredAnyway": "Biri yine de yanıt istedi"
+    "answeredAnyway": "Biri yine de yanıt istedi",
+    "toResume": "Kaldığı yerden sürecek",
+    "switchAi": "{{name}} için yapay zekayı değiştir"
   },
   "actionCard": {
     "connect_ai": {

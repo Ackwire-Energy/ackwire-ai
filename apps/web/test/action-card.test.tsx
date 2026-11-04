@@ -312,6 +312,7 @@ describe("what waits on a plan's limit: Não rodar", () => {
       threadId: null,
       channelKind: "channel",
       channelName: "eng",
+      messageId: "w-line",
       askers: ["u-joao"],
       since: new Date(NOW.getTime() - 3 * 24 * 3600_000).toISOString(),
       after: { count: 12, names: ["Nina", "Ada"] },
@@ -348,6 +349,11 @@ describe("what waits on a plan's limit: Não rodar", () => {
     expect(dialog.textContent).toContain("+1 em conversas que você não vê");
     // The row answering now has nothing to cancel; the one in line does.
     expect(within(dialog).getAllByRole("button", { name: "Não rodar" })).toHaveLength(1);
+    // Every row opens its conversation; the owner and admins may change the agent's AI from here.
+    expect(within(dialog).getAllByRole("button", { name: "Ver conversa" })).toHaveLength(2);
+    expect(within(dialog).getByRole("link", { name: "Trocar a IA do Atlas" }).getAttribute("href")).toContain(
+      "sec=brain",
+    );
     await click(within(dialog).getByRole("button", { name: "Não rodar" }));
     expect(state.calls.some((c) => c.method === "agents.cancelRun" && c.args[1] === "r-b")).toBe(true);
     await click(within(dialog).getByRole("button", { name: "Não rodar nenhuma" }));

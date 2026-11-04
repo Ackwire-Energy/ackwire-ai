@@ -1963,6 +1963,9 @@ export const ptBR = {
       "Pareciam resolvidas, então {{agent}} não respondeu. Se alguma ainda precisa de resposta, escolha Responder mesmo assim.",
     seeConversation: "Ver conversa",
     answeredAnyway: "Pediram para responder mesmo assim",
+    toResume: "Para retomar",
+    switchAi: "Trocar a IA do {{name}}",
+    switchAi_female: "Trocar a IA da {{name}}",
   },
   actionCard: {
     connect_ai: {

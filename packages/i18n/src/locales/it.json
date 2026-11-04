@@ -2050,7 +2050,9 @@
     "closedTitle_other": "{{count}} non avevano bisogno di risposta",
     "closedLine": "Sembravano risolte, quindi {{agent}} non ha risposto. Se una ha ancora bisogno di risposta, scegli Rispondi comunque.",
     "seeConversation": "Vedi la conversazione",
-    "answeredAnyway": "Qualcuno ha chiesto comunque una risposta"
+    "answeredAnyway": "Qualcuno ha chiesto comunque una risposta",
+    "toResume": "Da riprendere",
+    "switchAi": "Cambia l'IA di {{name}}"
   },
   "actionCard": {
     "connect_ai": {

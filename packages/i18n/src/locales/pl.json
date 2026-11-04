@@ -2117,7 +2117,9 @@
     "closedTitle_other": "{{count}} nie wymagały odpowiedzi",
     "closedLine": "Wyglądały na załatwione, więc {{agent}} nie odpowiedział. Jeśli któraś nadal wymaga odpowiedzi, wybierz Odpowiedz mimo to.",
     "seeConversation": "Zobacz rozmowę",
-    "answeredAnyway": "Ktoś poprosił o odpowiedź mimo to"
+    "answeredAnyway": "Ktoś poprosił o odpowiedź mimo to",
+    "toResume": "Do podjęcia",
+    "switchAi": "Zmień AI agenta {{name}}"
   },
   "actionCard": {
     "connect_ai": {

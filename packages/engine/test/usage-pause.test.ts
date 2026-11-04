@@ -1091,6 +1091,8 @@ test("the usage queue: rows in line order with what happened since, hidden rows 
   expect(q.rows[0]).toMatchObject({
     kind: "conversation",
     threadId: root.id,
+    // "Ver conversa" opens the ask itself.
+    messageId: a?.triggerMessageId,
     // A reply in the thread joins its catch-up: Nina is one more person waiting on it.
     askers: [f.owner.id, nina.id],
     state: "queued",

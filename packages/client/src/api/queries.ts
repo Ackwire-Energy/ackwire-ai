@@ -2029,10 +2029,9 @@ function withStatus(p: Person, input: StatusInput): Person {
 const AVAILABILITY_PRESENCE = { auto: "online", away: "away", busy: "busy", out: "out", hidden: "hidden" } as const;
 
 /**
- * Each agent's presence and line (ADR 0084). Refetched on `agent.status`, and every 30 s: presence also follows
- * time (busy after 2 minutes on one run, away after 30 idle) and runs elsewhere in the workspace.
+ * What an agent picks up when its plan or budget is back (ADR 0118). `agent.status` events refetch it (a row joined,
+ * started or ended); while anything waits it also refetches every 30 s, so "Respondendo agora" moves down the line.
  */
-/** What an agent picks up when its plan or budget is back (ADR 0118); `agent.status` events refetch it. */
 export const useUsageQueue = (orgId: string, agentId: string, enabled = true) => {
   const api = useApi();
   return useQuery({
@@ -2040,6 +2039,7 @@ export const useUsageQueue = (orgId: string, agentId: string, enabled = true) =>
     queryFn: () => api.agents.usageQueue(orgId, agentId),
     enabled: enabled && orgId.length > 0 && agentId.length > 0,
     retry: false,
+    refetchInterval: (q) => ((q.state.data?.rows.length ?? 0) > 0 ? 30_000 : false),
     meta: { quiet: true },
   });
 };
@@ -2054,6 +2054,10 @@ export function useCancelUsageQueue(orgId: string, agentId: string) {
   });
 }
 
+/**
+ * Each agent's presence and line (ADR 0084). Refetched on `agent.status`, and every 30 s: presence also follows
+ * time (busy after 2 minutes on one run, away after 30 idle) and runs elsewhere in the workspace.
+ */
 export const useAgentStatuses = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({

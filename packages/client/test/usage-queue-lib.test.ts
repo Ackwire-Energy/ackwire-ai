@@ -29,6 +29,7 @@ const row = (over: Partial<UsageQueueRow> = {}): UsageQueueRow => ({
   threadId: null,
   channelKind: "channel",
   channelName: "suporte",
+  messageId: "m1",
   askers: ["ana", "bruno"],
   since: new Date(now.getTime() - 3 * 24 * 3600_000).toISOString(),
   after: { count: 12, names: ["Nina", "Ada"] },
@@ -77,6 +78,10 @@ test("the queue's words: how many, when, where, who asked and what happened sinc
     "1 mensagem depois · Nina escreveu depois",
   );
   expect(usageQueueFacts(pt, row({ after: { count: 0, names: [] } }))).toBe("Nada depois");
+  // The viewer's own messages are theirs: "você", not their own name.
+  expect(usageQueueFacts(pt, row({ after: { count: 3, names: ["Heitor Lima"] } }), "Heitor Lima")).toBe(
+    "3 mensagens depois · você escreveu depois",
+  );
   expect(usageQueueState(pt, row())).toBe("Na fila");
   expect(usageQueueState(pt, row({ state: "answering" }))).toBe("Respondendo agora");
 });
