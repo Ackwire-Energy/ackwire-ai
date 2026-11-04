@@ -122,17 +122,15 @@ export function VaultSection() {
     i18n.language,
   );
   const filtered = query.trim() !== "" || kind !== "all";
+  // The kind filter only where it can narrow something: a view that holds more than one kind.
+  const kinds = new Set(inTab.map((i) => i.kind)).size;
   const open = (which: "new" | "import") => () => setDialog(which);
-  const actions = (
-    <>
-      <Button icon="upload" onClick={open("import")}>
-        {t("vault.import.open")}
-      </Button>
-      <Button icon="plus" onClick={open("new")}>
-        {t("vault.new.open")}
-      </Button>
-    </>
-  );
+  const pickTab = (next: Tab) => {
+    setTab(next);
+    // Each view starts unfiltered: a search or a kind from the other one would hide what this one holds.
+    setQuery("");
+    setKind("all");
+  };
 
   const list = () => {
     if (shown.length > 0)
@@ -162,19 +160,16 @@ export function VaultSection() {
           {t("vault.list.noMatch")}
         </EmptyState>
       );
+    // Empty: what goes here and why, with no buttons of its own (Import and New item are right above, in the header).
     if (current === "personal")
       return (
-        <EmptyState icon="lock" title={t("vault.list.personalEmpty")} actions={actions}>
+        <EmptyState icon="lock" title={t("vault.list.personalEmpty")}>
           {t("vault.list.personalEmptyText")}
         </EmptyState>
       );
-    return canManageTeam ? (
-      <EmptyState icon="lock" title={t("vault.list.teamEmpty")} actions={actions}>
-        {t("vault.list.teamEmptyText")}
-      </EmptyState>
-    ) : (
-      <EmptyState icon="lock" title={t("vault.list.sharedEmpty")}>
-        {t("vault.list.sharedEmptyText")}
+    return (
+      <EmptyState icon="members" title={canManageTeam ? t("vault.list.teamEmpty") : t("vault.list.sharedEmpty")}>
+        {canManageTeam ? t("vault.list.teamEmptyText") : t("vault.list.sharedEmptyText")}
       </EmptyState>
     );
   };
@@ -206,7 +201,7 @@ export function VaultSection() {
           <Segmented<Tab>
             label={t("vault.tab.label")}
             value={current}
-            onValueChange={setTab}
+            onValueChange={pickTab}
             options={[
               { value: "team", label: t("vault.tab.team"), count: team.length },
               { value: "personal", label: t("vault.tab.personal"), count: personal.length },
@@ -236,20 +231,22 @@ export function VaultSection() {
                     />
                   }
                   actions={
-                    <Select<KindFilter>
-                      size="sm"
-                      className="vlt-kind"
-                      value={kind}
-                      onValueChange={setKind}
-                      aria-label={t("vault.list.kind")}
-                      align="end"
-                      options={[
-                        { value: "all", label: t("vault.list.kindAll") },
-                        { value: "login", label: t("vault.kindPlural.loginTitle") },
-                        { value: "key", label: t("vault.kindPlural.keyTitle") },
-                        { value: "contact", label: t("vault.kindPlural.contactTitle") },
-                      ]}
-                    />
+                    (kinds > 1 || kind !== "all") && (
+                      <Select<KindFilter>
+                        size="sm"
+                        className="vlt-kind"
+                        value={kind}
+                        onValueChange={setKind}
+                        aria-label={t("vault.list.kind")}
+                        align="end"
+                        options={[
+                          { value: "all", label: t("vault.list.kindAll") },
+                          { value: "login", label: t("vault.kindPlural.loginTitle") },
+                          { value: "key", label: t("vault.kindPlural.keyTitle") },
+                          { value: "contact", label: t("vault.kindPlural.contactTitle") },
+                        ]}
+                      />
+                    )
                   }
                 />
               )}

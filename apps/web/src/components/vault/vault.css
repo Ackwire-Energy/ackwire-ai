@@ -284,6 +284,11 @@ html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
 }
 
 /* Recent uses: a face, what happened, for whom and when. */
+.vlt-uses__none {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
 .vlt-uses {
   display: flex;
   flex-direction: column;
@@ -312,10 +317,21 @@ html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
   color: var(--muted);
 }
 
-/* Who has access: a line each for the people and the agents, then the sentence. */
-.vlt-aside {
-  gap: 20px;
+/* The aside: who has access, then the recent uses, each a section of the dialog (the first without its rule). It
+   scrolls with the dialog: the uses can make it taller than the window. */
+.ac-details .issue-aside.vlt-aside {
+  position: static;
+  gap: 16px;
 }
+.vlt-aside > .ac-details__section {
+  gap: 12px;
+}
+.vlt-aside > .ac-details__section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* Who has access: a line each for the people and the agents, then the sentence. */
 .vlt-access {
   display: flex;
   flex-direction: column;
@@ -346,7 +362,14 @@ html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
   font-weight: 600;
   color: var(--muted);
 }
-.vlt-access__text span {
+.vlt-access__value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.vlt-access__value > span {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 .vlt-access__sentence {
@@ -537,14 +560,28 @@ html:not([data-pointer]) .vlt-drop__area:focus-visible {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
+/* The box on the first line of its label (the checkbox's own 2px top margin), why it helps under the label. */
 .vlt-save__check {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
   gap: 8px;
-  align-self: flex-start;
+}
+.vlt-save__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.vlt-save__text label {
   font-size: 13.5px;
+  line-height: 20px;
   font-weight: 600;
   cursor: pointer;
+}
+.vlt-save__text small {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
 }
 .vlt-save__more {
   display: flex;
@@ -566,4 +603,11 @@ html:not([data-pointer]) .vlt-drop__area:focus-visible {
   font-size: 12.5px;
   font-weight: 600;
   color: var(--muted);
+}
+/* Under a closed request card: "Sent, but not saved to the Vault", with Retry while the value is kept (ADR 0135). */
+.rq__note.vlt-save__failed {
+  align-items: center;
+}
+.vlt-save__failed > .ac-btn {
+  margin-block: -6px;
 }

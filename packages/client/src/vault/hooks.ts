@@ -95,7 +95,8 @@ export function useDeleteVaultItem(orgId: string) {
 
 /**
  * "Show" or "Copy": the value comes back to the caller only (`mutateAsync`), recorded as a use, so the open item's
- * uses refetch.
+ * uses refetch. Until the caller calls `reset()` the mutation holds the value as its `data`, so callers reset it as
+ * soon as they've read it.
  */
 export function useRevealVaultItem(orgId: string) {
   const api = useApi();

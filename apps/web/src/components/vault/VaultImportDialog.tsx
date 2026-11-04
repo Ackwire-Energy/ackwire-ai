@@ -181,6 +181,8 @@ export function VaultImportDialog({
               </span>
             </p>
             <ImportCounts result={preview} />
+            {/* Where they go: a choice for who manages the Vault, a plain line for everyone else (always theirs). */}
+            {!canManageTeam && <SettingNote icon="lock">{t("vault.import.asPersonal")}</SettingNote>}
             {canManageTeam && (
               <div className="ac-field">
                 <span className="ac-field__label">{t("vault.import.as")}</span>

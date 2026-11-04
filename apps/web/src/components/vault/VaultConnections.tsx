@@ -299,7 +299,12 @@ function ConnectionRow({
               {t("vault.connections.syncNow")}
             </Button>
           )}
-          <Button size="sm" variant="ghost" onClick={onAccess}>
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label={t("vault.connections.accessTitle", { label: c.label })}
+            onClick={onAccess}
+          >
             {t("vault.connections.access")}
           </Button>
           <Menu
@@ -352,7 +357,9 @@ function ConnectionAccessDialog({ connection: c, onClose }: { connection: VaultC
           editable={c.can.edit}
           saving={actions.updating}
           onChange={async (access) => {
-            if (await actions.update(c.id, { access })) toast.show(t("vault.access.saved"));
+            const saved = await actions.update(c.id, { access });
+            if (saved) toast.show(t("vault.access.saved"));
+            return saved !== null;
           }}
         />
       </DialogBody>
@@ -398,9 +405,10 @@ function SourceCard({
         title={source.name}
         subtitle={t("vault.connections.lead", { name: source.name, kinds })}
         action={
+          // Secondary: the page's primary is New item, and every password manager has this button.
           connections.length === 0 &&
           !form && (
-            <Button size="sm" variant="primary" onClick={() => setForm({})}>
+            <Button size="sm" onClick={() => setForm({})}>
               {t("vault.connections.connect")}
             </Button>
           )

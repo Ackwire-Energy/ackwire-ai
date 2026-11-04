@@ -1369,6 +1369,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "メール",
+      "vault": "Vault",
       "custom": "ワークスペースのツール"
     }
   },
@@ -2477,6 +2478,7 @@
       "newValue": "新しい値",
       "newValueHelp": "保存すると、保存済みの値が置き換わります。",
       "keepValue": "今の値を残す",
+      "revealHelp": "表示とコピーは最近の使用に記録されます。",
       "saved": "保存しました",
       "delete": "削除",
       "deleteTitle": "{{title}}を削除しますか？",
@@ -2682,6 +2684,7 @@
     },
     "card": {
       "save": "Vaultに保存",
+      "saveText": "次回からは、あなたに聞かずにエージェントが使います。",
       "scope": "保存先",
       "personalText": "あなただけに表示",
       "teamText": "ワークスペースに表示",

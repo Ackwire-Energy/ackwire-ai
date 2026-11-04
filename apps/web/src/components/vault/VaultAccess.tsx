@@ -11,6 +11,7 @@ import {
   DialogBody,
   DialogFooter,
   Icon,
+  type IconName,
   RoleMark,
 } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
@@ -256,15 +257,20 @@ export function AgentFaces({ access }: { access: VaultAccess }) {
   );
 }
 
-/** One line of the access block: what it is, who, and Edit. */
+/**
+ * One line of the access block: its icon, what it is, who (after the agents' faces, for the agents), and Edit. The
+ * icon keeps one width on every line, so the words line up.
+ */
 function AccessLine({
-  lead,
+  icon,
+  faces,
   label,
   value,
   editLabel,
   onEdit,
 }: {
-  lead: ReactNode;
+  icon: IconName;
+  faces?: ReactNode;
   label: string;
   value: string;
   editLabel?: string;
@@ -273,10 +279,15 @@ function AccessLine({
   const { t } = useTranslation();
   return (
     <div className="vlt-access__line">
-      <span className="vlt-access__lead">{lead}</span>
+      <span className="vlt-access__lead" aria-hidden="true">
+        <Icon name={icon} size={18} />
+      </span>
       <span className="vlt-access__text">
         <b>{label}</b>
-        <span>{value}</span>
+        <span className="vlt-access__value">
+          {faces}
+          <span>{value}</span>
+        </span>
       </span>
       {onEdit && (
         <Button size="sm" variant="ghost" aria-label={editLabel} onClick={onEdit}>
@@ -304,7 +315,8 @@ export function AccessBlock({
   /** Who may change it: false shows it, without Edit. */
   editable: boolean;
   saving?: boolean;
-  onChange: (access: VaultAccess) => Promise<unknown> | void;
+  /** Saves (or changes the draft): `false` when it failed, and the dialog stays open with the person's choice. */
+  onChange: (access: VaultAccess) => Promise<boolean> | boolean;
   /** Under the sentence: a note on where the access comes from. */
   children?: ReactNode;
 }) {
@@ -313,8 +325,7 @@ export function AccessBlock({
   const dir = useDirectory(org.id);
   const [editing, setEditing] = useState<null | "people" | "agents">(null);
   const save = async (next: VaultAccess) => {
-    await onChange(next);
-    setEditing(null);
+    if (await onChange(next)) setEditing(null);
   };
   const peopleLabel = t("vault.access.people");
   const agentsLabel = t("vault.access.agents");
@@ -322,7 +333,7 @@ export function AccessBlock({
     <div className="vlt-access">
       {scope === "team" && (
         <AccessLine
-          lead={<Icon name="audienceEveryone" size={18} />}
+          icon={access.everyone ? "audienceEveryone" : "audiencePeople"}
           label={peopleLabel}
           value={peopleSummary(t, i18n.language, dir, access)}
           editLabel={t("vault.access.editOf", { what: peopleLabel })}
@@ -330,13 +341,8 @@ export function AccessBlock({
         />
       )}
       <AccessLine
-        lead={
-          access.allAgents || access.agentIds.length > 0 ? (
-            <AgentFaces access={access} />
-          ) : (
-            <Icon name="agent" size={18} />
-          )
-        }
+        icon="agent"
+        faces={<AgentFaces access={access} />}
         label={agentsLabel}
         value={agentsSummary(t, i18n.language, dir, access)}
         editLabel={t("vault.access.editOf", { what: agentsLabel })}

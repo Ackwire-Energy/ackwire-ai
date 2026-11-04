@@ -1397,6 +1397,7 @@ export const en = {
       sentry: "Sentry",
       linear: "Linear",
       mail: "Email",
+      vault: "Vault",
       custom: "Workspace tools",
     },
   },
@@ -2524,6 +2525,8 @@ export const en = {
       newValue: "New value",
       newValueHelp: "It replaces the saved one when you save.",
       keepValue: "Keep the current one",
+      /** Under a saved value, for who may show or copy it. */
+      revealHelp: "Show and Copy are recorded in its recent uses.",
       saved: "Saved",
       delete: "Delete",
       deleteTitle: "Delete {{title}}?",
@@ -2751,6 +2754,8 @@ export const en = {
     },
     card: {
       save: "Save to the Vault",
+      /** Under “Save to the Vault” on the request card: why it helps. */
+      saveText: "Next time your agents use it without asking you.",
       scope: "Save as",
       personalText: "Only you see it",
       teamText: "The workspace sees it",

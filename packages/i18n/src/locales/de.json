@@ -1414,6 +1414,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "E-Mail",
+      "vault": "Vault",
       "custom": "Workspace-Tools"
     }
   },
@@ -2557,6 +2558,7 @@
       "newValue": "Neuer Wert",
       "newValueHelp": "Er ersetzt den gespeicherten, sobald du speicherst.",
       "keepValue": "Den aktuellen behalten",
+      "revealHelp": "Anzeigen und Kopieren werden in den letzten Verwendungen festgehalten.",
       "saved": "Gespeichert",
       "delete": "Löschen",
       "deleteTitle": "{{title}} löschen?",
@@ -2778,6 +2780,7 @@
     },
     "card": {
       "save": "Im Vault speichern",
+      "saveText": "Beim nächsten Mal verwenden deine Agenten es, ohne dich zu fragen.",
       "scope": "Speichern als",
       "personalText": "Nur du siehst es",
       "teamText": "Der Workspace sieht es",

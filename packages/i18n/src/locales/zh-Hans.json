@@ -1369,6 +1369,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "邮件",
+      "vault": "Vault",
       "custom": "工作区工具"
     }
   },
@@ -2479,6 +2480,7 @@
       "newValue": "新值",
       "newValueHelp": "保存时会替换已保存的值。",
       "keepValue": "保留当前值",
+      "revealHelp": "显示和复制会记录在最近使用中。",
       "saved": "已保存",
       "delete": "删除",
       "deleteTitle": "要删除 {{title}} 吗？",
@@ -2684,6 +2686,7 @@
     },
     "card": {
       "save": "保存到 Vault",
+      "saveText": "下次，你的智能体会直接使用，无需再问你。",
       "scope": "保存为",
       "personalText": "只有你能看到",
       "teamText": "工作区能看到",

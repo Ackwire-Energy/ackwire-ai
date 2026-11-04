@@ -1414,6 +1414,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "E-mail",
+      "vault": "Vault",
       "custom": "Tools van de werkruimte"
     }
   },
@@ -2559,6 +2560,7 @@
       "newValue": "Nieuwe waarde",
       "newValueHelp": "Vervangt de opgeslagen waarde zodra je opslaat.",
       "keepValue": "De huidige houden",
+      "revealHelp": "Tonen en Kopiëren worden vastgelegd bij het recente gebruik.",
       "saved": "Opgeslagen",
       "delete": "Verwijderen",
       "deleteTitle": "{{title}} verwijderen?",
@@ -2780,6 +2782,7 @@
     },
     "card": {
       "save": "Opslaan in de Vault",
+      "saveText": "De volgende keer gebruiken je agenten het zonder het jou te vragen.",
       "scope": "Opslaan als",
       "personalText": "Alleen jij ziet het",
       "teamText": "De werkruimte ziet het",

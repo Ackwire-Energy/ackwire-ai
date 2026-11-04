@@ -57,10 +57,20 @@ export function VaultSaveBlock({
   const set = (patch: Partial<VaultSaveChoice>) => onChange({ ...value, ...patch });
   return (
     <div className="vlt-save">
-      <label className="vlt-save__check" htmlFor={`${id}-on`}>
-        <Checkbox id={`${id}-on`} checked={value.on} disabled={disabled} onCheckedChange={(on) => set({ on })} />
-        <span>{t("vault.card.save")}</span>
-      </label>
+      <div className="vlt-save__check">
+        <Checkbox
+          id={`${id}-on`}
+          checked={value.on}
+          disabled={disabled}
+          aria-describedby={`${id}-why`}
+          onCheckedChange={(on) => set({ on })}
+        />
+        {/* The label names the box; why it helps is its description, under it. */}
+        <span className="vlt-save__text">
+          <label htmlFor={`${id}-on`}>{t("vault.card.save")}</label>
+          <small id={`${id}-why`}>{t("vault.card.saveText")}</small>
+        </span>
+      </div>
       {value.on && (
         <div className="vlt-save__more">
           {site && (

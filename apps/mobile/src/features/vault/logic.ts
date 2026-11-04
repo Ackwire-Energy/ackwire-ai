@@ -523,7 +523,7 @@ const OWN_SERVER = "self";
 function ownServerChoice(fields: readonly VaultConnectField[], i: number): VaultConnectField | null {
   const f = fields[i];
   const before = fields[i - 1];
-  if (!f || f.kind !== "url" || f.required || before?.kind !== "choice") return null;
+  if (f?.kind !== "url" || f.required || before?.kind !== "choice") return null;
   return before.choices?.some((c) => c.value === OWN_SERVER) ? before : null;
 }
 

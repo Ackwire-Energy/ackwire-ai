@@ -162,7 +162,15 @@ export function VaultNewDialog({
               ]}
             />
             {!canManageTeam && <SettingNote icon="lock">{t("vault.new.teamLocked")}</SettingNote>}
-            <AccessBlock scope={scope} access={access} editable onChange={setAccess} />
+            <AccessBlock
+              scope={scope}
+              access={access}
+              editable
+              onChange={(next) => {
+                setAccess(next);
+                return true;
+              }}
+            />
           </section>
         </DialogBody>
         <DialogFooter>

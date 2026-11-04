@@ -1459,6 +1459,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "Correo",
+      "vault": "Vault",
       "custom": "Herramientas del espacio de trabajo"
     }
   },
@@ -2630,6 +2631,7 @@
       "newValue": "Nuevo valor",
       "newValueHelp": "Reemplaza al guardado cuando guardes.",
       "keepValue": "Mantener el actual",
+      "revealHelp": "Mostrar y Copiar quedan registrados en los usos recientes.",
       "saved": "Guardado",
       "delete": "Eliminar",
       "deleteTitle": "¿Eliminar {{title}}?",
@@ -2851,6 +2853,7 @@
     },
     "card": {
       "save": "Guardar en el Vault",
+      "saveText": "La próxima vez, tus agentes lo usan sin preguntarte.",
       "scope": "Guardar como",
       "personalText": "Solo tú lo ves",
       "teamText": "El espacio de trabajo lo ve",

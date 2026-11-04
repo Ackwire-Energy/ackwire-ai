@@ -1369,6 +1369,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "이메일",
+      "vault": "Vault",
       "custom": "워크스페이스 도구"
     }
   },
@@ -2475,6 +2476,7 @@
       "newValue": "새 값",
       "newValueHelp": "저장하면 저장된 값을 대신해요.",
       "keepValue": "지금 값 유지",
+      "revealHelp": "보기와 복사는 최근 사용에 기록돼요.",
       "saved": "저장했어요",
       "delete": "삭제",
       "deleteTitle": "{{title}} 항목을 삭제할까요?",
@@ -2680,6 +2682,7 @@
     },
     "card": {
       "save": "Vault에 저장",
+      "saveText": "다음부터는 에이전트가 나에게 묻지 않고 사용해요.",
       "scope": "저장 방식",
       "personalText": "나만 볼 수 있어요",
       "teamText": "워크스페이스에서 볼 수 있어요",

@@ -239,9 +239,20 @@ export function AgentPickSheet({
 
 /**
  * A saved password or key, hidden: "Show" for 30 seconds and "Copy", for who may (each one recorded as a use on the
- * item). The value is asked of the server at that moment and kept only while it shows, never in a cache.
+ * item). The value is asked of the server at that moment and kept only while it shows, never in a cache. A key shows
+ * in code type (`code`); a password in the text's own.
  */
-export function SavedValue({ itemId, label, canReveal }: { itemId: string; label: string; canReveal: boolean }) {
+export function SavedValue({
+  itemId,
+  label,
+  canReveal,
+  code = false,
+}: {
+  itemId: string;
+  label: string;
+  canReveal: boolean;
+  code?: boolean;
+}) {
   const { t } = useTranslation();
   const toast = useToast();
   const reveal = useRevealVaultItem(useOrgId());
@@ -289,7 +300,7 @@ export function SavedValue({ itemId, label, canReveal }: { itemId: string; label
           variant="callout"
           selectable={shown !== null}
           numberOfLines={shown ? 3 : 1}
-          style={[styles.grow, shown ? styles.mono : null]}
+          style={[styles.grow, shown && code ? styles.mono : null]}
           accessibilityLabel={shown ? undefined : t("mobile.vault.item.hidden")}
         >
           {shown ?? "••••••••••"}

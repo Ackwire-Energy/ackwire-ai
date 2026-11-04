@@ -1369,6 +1369,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "Email",
+      "vault": "Vault",
       "custom": "Alat ruang kerja"
     }
   },
@@ -2488,6 +2489,7 @@
       "newValue": "Nilai baru",
       "newValueHelp": "Menggantikan yang tersimpan saat kamu menyimpan.",
       "keepValue": "Pertahankan yang sekarang",
+      "revealHelp": "Tampilkan dan Salin tercatat di penggunaan terbaru.",
       "saved": "Tersimpan",
       "delete": "Hapus",
       "deleteTitle": "Hapus {{title}}?",
@@ -2693,6 +2695,7 @@
     },
     "card": {
       "save": "Simpan ke Vault",
+      "saveText": "Lain kali agenmu menggunakannya tanpa bertanya kepadamu.",
       "scope": "Simpan sebagai",
       "personalText": "Hanya kamu yang melihatnya",
       "teamText": "Ruang kerja melihatnya",

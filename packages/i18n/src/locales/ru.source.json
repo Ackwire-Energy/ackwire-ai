@@ -3490,6 +3490,9 @@
   "team.cap.mail": {
     "value": "Email"
   },
+  "team.cap.vault": {
+    "value": "Vault"
+  },
   "team.cap.custom": {
     "value": "Workspace tools"
   },
@@ -6225,6 +6228,9 @@
   "vault.item.keepValue": {
     "value": "Keep the current one"
   },
+  "vault.item.revealHelp": {
+    "value": "Show and Copy are recorded in its recent uses."
+  },
   "vault.item.saved": {
     "value": "Saved"
   },
@@ -6755,6 +6761,9 @@
   },
   "vault.card.save": {
     "value": "Save to the Vault"
+  },
+  "vault.card.saveText": {
+    "value": "Next time your agents use it without asking you."
   },
   "vault.card.scope": {
     "value": "Save as"

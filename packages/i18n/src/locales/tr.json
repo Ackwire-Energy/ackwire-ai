@@ -1414,6 +1414,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "E-posta",
+      "vault": "Vault",
       "custom": "Çalışma alanı araçları"
     }
   },
@@ -2545,6 +2546,7 @@
       "newValue": "Yeni değer",
       "newValueHelp": "Kaydettiğinizde kayıtlı olanın yerini alır.",
       "keepValue": "Mevcut olanı koru",
+      "revealHelp": "Göster ve Kopyala son kullanımlara kaydedilir.",
       "saved": "Kaydedildi",
       "delete": "Sil",
       "deleteTitle": "{{title}} silinsin mi?",
@@ -2766,6 +2768,7 @@
     },
     "card": {
       "save": "Vault'a kaydet",
+      "saveText": "Bir dahaki sefere ajanlarınız size sormadan kullanır.",
       "scope": "Şu şekilde kaydet",
       "personalText": "Yalnızca siz görürsünüz",
       "teamText": "Çalışma alanı görür",

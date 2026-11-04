@@ -10,7 +10,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { secretAad } from "@agenteschat/client/lib/secret-box";
 import { secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
 import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { sealSecret } from "@/lib/secret-box";
@@ -27,6 +27,9 @@ import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore, useExpi
 import { markName } from "./logic";
 
 type AgentPick = Pick<VaultAccess, "allAgents" | "agentIds">;
+
+/** How long a failed save keeps the typed value for "Try again" (ADR 0135), at most. */
+const RETRY_MS = 2 * 60_000;
 
 /**
  * An agent asks for a secret for its computer (`request_secret`, ADR 0027), as the request card. Only the
@@ -64,9 +67,19 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const [scope, setScope] = useState<VaultScope>("personal");
   const [pick, setPick] = useState<AgentPick>(() => ({ allAgents: false, agentIds: [request.agentId] }));
   const [username, setUsername] = useState(request.username ?? "");
-  const [kept, setKept] = useState<"saved" | "failed" | "saving" | null>(null);
-  // A save that failed keeps what it sent, for "Try again", only while this card is on screen.
+  // "dropped": it failed and the time to try again is over, so the typed value is gone.
+  const [kept, setKept] = useState<"saved" | "failed" | "saving" | "dropped" | null>(null);
+  // A save that failed keeps what it sent, for "Try again", while this card is on screen and for two minutes at most.
+  // The mutation itself forgets it as soon as it ends (`reset`, `gcTime: 0`).
   const retry = useRef<(SecretToVaultInput & { requestId: string }) | null>(null);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      retry.current = null;
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+    },
+    [],
+  );
   // It closes at its expiry even when no event says so (as the line above the composer stops counting it).
   const expired = useExpired(r.expiresAt);
   const agentName = dir.agentById.get(r.agentId)?.name ?? t("channel.unknownAgent");
@@ -87,11 +100,20 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     try {
       await saveToVault.mutateAsync(input);
       retry.current = null;
+      if (retryTimer.current) clearTimeout(retryTimer.current);
       setKept("saved");
     } catch {
-      retry.current = input;
+      if (!retry.current) {
+        retry.current = input;
+        retryTimer.current = setTimeout(() => {
+          retry.current = null;
+          setKept((k) => (k === "failed" ? "dropped" : k));
+        }, RETRY_MS);
+      }
       setKept("failed");
       toast({ title: t("mobile.vault.card.notSaved"), icon: "x" });
+    } finally {
+      saveToVault.reset();
     }
   };
   const send = async () => {
@@ -172,21 +194,23 @@ export function SecretCard({ request }: { request: SecretRequest }) {
             ),
           }}
         />
-        {kept === "failed" || (kept === "saving" && retry.current) ? (
+        {kept === "failed" || kept === "dropped" || (kept === "saving" && retry.current) ? (
           <View style={styles.retry}>
             <Icon name="x" size={13} color={c.danger} />
             <Text variant="footnote" tone="muted" style={styles.grow}>
               {t("mobile.vault.card.notSaved")}
             </Text>
-            <Button
-              variant="ghost"
-              size="sm"
-              label={t("common.retry")}
-              loading={kept === "saving"}
-              onPress={() => {
-                if (retry.current) void keep(retry.current);
-              }}
-            />
+            {kept === "dropped" ? null : (
+              <Button
+                variant="ghost"
+                size="sm"
+                label={t("common.retry")}
+                loading={kept === "saving"}
+                onPress={() => {
+                  if (retry.current) void keep(retry.current);
+                }}
+              />
+            )}
           </View>
         ) : null}
       </>

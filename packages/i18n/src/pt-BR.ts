@@ -1392,6 +1392,7 @@ export const ptBR = {
       sentry: "Sentry",
       linear: "Linear",
       mail: "Email",
+      vault: "Vault",
       custom: "Ferramentas do workspace",
     },
   },
@@ -2550,6 +2551,7 @@ export const ptBR = {
       newValue: "Novo valor",
       newValueHelp: "Substitui o salvo quando você salvar.",
       keepValue: "Manter o atual",
+      revealHelp: "Mostrar e Copiar ficam registrados nos usos recentes.",
       saved: "Salvo",
       delete: "Excluir",
       deleteTitle: "Excluir {{title}}?",
@@ -2772,6 +2774,7 @@ export const ptBR = {
     },
     card: {
       save: "Salvar no Vault",
+      saveText: "Da próxima vez, seus agentes usam sem pedir a você.",
       scope: "Salvar como",
       personalText: "Só você vê",
       teamText: "O workspace vê",

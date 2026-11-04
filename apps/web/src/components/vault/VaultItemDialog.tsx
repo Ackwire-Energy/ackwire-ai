@@ -171,6 +171,8 @@ export function ItemFields({
   const { t } = useTranslation();
   const fixed = readOnly || locked;
   const origin = vaultOrigin(draft.website);
+  // Read only, an empty field says nothing: only what has a value shows.
+  const filled = (value: string | undefined, fixedHere = readOnly) => !fixedHere || Boolean(value?.trim());
   const title = (
     <Field label={t(kind === "contact" ? "vault.field.contactTitle" : "vault.field.title")} error={errors.title}>
       <Input
@@ -182,7 +184,7 @@ export function ItemFields({
       />
     </Field>
   );
-  const description = (
+  const description = filled(draft.description) && (
     <Field label={t("vault.field.description")} help={readOnly ? undefined : t("vault.field.descriptionHelp")}>
       <Textarea
         rows={2}
@@ -231,18 +233,20 @@ export function ItemFields({
               : t("vault.match.siteHelp")}
           </span>
         </div>
-        <Field label={t("vault.field.username")}>
-          <Input
-            value={draft.username}
-            maxLength={LIMITS.username}
-            readOnly={fixed}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={fixed ? undefined : t("vault.field.usernamePlaceholder")}
-            onChange={(e) => onDraft({ username: e.target.value })}
-            data-1p-ignore
-          />
-        </Field>
+        {filled(draft.username, fixed) && (
+          <Field label={t("vault.field.username")}>
+            <Input
+              value={draft.username}
+              maxLength={LIMITS.username}
+              readOnly={fixed}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={fixed ? undefined : t("vault.field.usernamePlaceholder")}
+              onChange={(e) => onDraft({ username: e.target.value })}
+              data-1p-ignore
+            />
+          </Field>
+        )}
         {secret}
         {title}
         {description}
@@ -277,7 +281,7 @@ export function ItemFields({
     <div className="vlt-fields">
       {title}
       <fieldset className="vlt-contact" aria-label={t("vault.contact.group")}>
-        {CONTACT_FIELDS.map((f: ContactField) => (
+        {CONTACT_FIELDS.filter((f: ContactField) => filled(draft.contact[f])).map((f: ContactField) => (
           <Field key={f} label={t(`vault.contact.${f}`)} className={f.startsWith("address") ? "vlt-wide" : undefined}>
             <Input
               value={draft.contact[f] ?? ""}
@@ -396,7 +400,11 @@ function SecretValue({
           )}
         </span>
       </div>
-      {error && <span className="ac-field__error">{error}</span>}
+      {error ? (
+        <span className="ac-field__error">{error}</span>
+      ) : (
+        item.can.reveal && item.hasSecret && <span className="ac-field__help">{t("vault.item.revealHelp")}</span>
+      )}
     </div>
   );
 }
@@ -460,6 +468,7 @@ export function VaultItemDialog({
       item={item}
       uses={detail.data?.uses}
       usesLoading={detail.isPending}
+      usesFailed={detail.isError}
       connection={connection}
       onClose={onClose}
     />
@@ -470,12 +479,15 @@ function ItemDialog({
   item,
   uses,
   usesLoading,
+  usesFailed,
   connection,
   onClose,
 }: {
   item: VaultItem;
   uses: VaultUse[] | undefined;
   usesLoading: boolean;
+  /** The item's details didn't load: its uses are unknown, not none. */
+  usesFailed: boolean;
   connection: VaultConnection | undefined;
   onClose: () => void;
 }) {
@@ -503,7 +515,9 @@ function ItemDialog({
     onClose();
   };
   const setAccess = async (next: VaultItem["access"]) => {
-    if (await actions.update(item.id, { access: next })) toast.show(t("vault.access.saved"));
+    const saved = await actions.update(item.id, { access: next });
+    if (saved) toast.show(t("vault.access.saved"));
+    return saved !== null;
   };
   const follow = async (on: boolean) => {
     const saved = await actions.update(item.id, on ? { accessFromConnection: true } : { access: item.access });
@@ -584,9 +598,37 @@ function ItemDialog({
               )
             }
           />
+        </div>
+        {/* The fields on the left; who has access and its recent uses beside them (ADR 0135 §7). */}
+        <aside className="issue-aside vlt-aside">
+          <DetailsSection title={t("vault.access.title")}>
+            <ScopeLine scope={item.scope} />
+            <AccessBlock
+              scope={item.scope}
+              access={item.access}
+              editable={editable && !item.accessFromConnection}
+              saving={actions.updating}
+              onChange={setAccess}
+            >
+              {external && editable && (
+                <div className="vlt-access__follow">
+                  <span className="small muted">
+                    {item.accessFromConnection
+                      ? t("vault.access.follows", { source })
+                      : t("vault.access.own", { source })}
+                  </span>
+                  <Button size="sm" disabled={actions.updating} onClick={() => void follow(!item.accessFromConnection)}>
+                    {item.accessFromConnection ? t("vault.access.changeHere") : t("vault.access.useConnection")}
+                  </Button>
+                </div>
+              )}
+            </AccessBlock>
+          </DetailsSection>
           <DetailsSection title={t("vault.use.title")} count={uses?.length || undefined}>
             {usesLoading && !uses ? (
               <LoadingList count={2} />
+            ) : usesFailed && !uses ? (
+              <p className="vlt-uses__none">{t("common.loadFailed")}</p>
             ) : uses && uses.length > 0 ? (
               <ul className="vlt-uses">
                 {uses.map((u) => (
@@ -594,35 +636,9 @@ function ItemDialog({
                 ))}
               </ul>
             ) : (
-              <p className="small muted">{t("vault.use.none")}</p>
+              <p className="vlt-uses__none">{t("vault.use.none")}</p>
             )}
           </DetailsSection>
-        </div>
-        <aside className="issue-aside vlt-aside" aria-label={t("vault.access.title")}>
-          <div className="issue-aside__item">
-            <span className="ac-field__label">{t("vault.access.title")}</span>
-            <ScopeLine scope={item.scope} />
-          </div>
-          <AccessBlock
-            scope={item.scope}
-            access={item.access}
-            editable={editable && !item.accessFromConnection}
-            saving={actions.updating}
-            onChange={setAccess}
-          >
-            {external && editable && (
-              <div className="vlt-access__follow">
-                <span className="small muted">
-                  {item.accessFromConnection
-                    ? t("vault.access.follows", { source })
-                    : t("vault.access.own", { source })}
-                </span>
-                <Button size="sm" disabled={actions.updating} onClick={() => void follow(!item.accessFromConnection)}>
-                  {item.accessFromConnection ? t("vault.access.changeHere") : t("vault.access.useConnection")}
-                </Button>
-              </div>
-            )}
-          </AccessBlock>
         </aside>
       </div>
       <Dialog

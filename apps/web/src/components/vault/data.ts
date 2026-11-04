@@ -49,9 +49,18 @@ export function useVaultItemActions(orgId: string) {
         await remove.mutateAsync(itemId);
         return true;
       })) === true,
-    /** The value, shown or copied: the server records it as a use. */
-    reveal: async (itemId: string, purpose: "show" | "copy"): Promise<string | null> =>
-      (await attempt(() => reveal.mutateAsync({ itemId, purpose })))?.value ?? null,
+    /**
+     * The value, shown or copied: the server records it as a use. The mutation forgets it as soon as it's read
+     * (`reset`, with `gcTime: 0` in the hook), so the caller's own state (a shown value's 30 seconds, the copy) is the
+     * only place it lives (ADR 0135).
+     */
+    reveal: async (itemId: string, purpose: "show" | "copy"): Promise<string | null> => {
+      try {
+        return (await attempt(() => reveal.mutateAsync({ itemId, purpose })))?.value ?? null;
+      } finally {
+        reveal.reset();
+      }
+    },
     creating: create.isPending,
     updating: update.isPending,
     removing: remove.isPending,

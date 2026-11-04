@@ -1504,6 +1504,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "E-mail",
+      "vault": "Vault",
       "custom": "Narzędzia przestrzeni roboczej"
     }
   },
@@ -2698,6 +2699,7 @@
       "newValue": "Nowa wartość",
       "newValueHelp": "Zastąpi zapisaną wartość, gdy zapiszesz.",
       "keepValue": "Zachowaj obecną",
+      "revealHelp": "Pokaż i Kopiuj są zapisywane w ostatnich użyciach.",
       "saved": "Zapisano",
       "delete": "Usuń",
       "deleteTitle": "Usunąć {{title}}?",
@@ -2951,6 +2953,7 @@
     },
     "card": {
       "save": "Zapisz w Vault",
+      "saveText": "Następnym razem twoi agenci użyją tego bez pytania cię.",
       "scope": "Zapisz jako",
       "personalText": "Widzisz to tylko ty",
       "teamText": "Widzi to przestrzeń robocza",

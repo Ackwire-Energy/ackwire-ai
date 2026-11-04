@@ -191,7 +191,7 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
           />
         ) : null}
         {hasValue && item.hasSecret ? (
-          <SavedValue itemId={item.id} label={valueLabel} canReveal={item.can.reveal} />
+          <SavedValue itemId={item.id} label={valueLabel} canReveal={item.can.reveal} code={item.kind === "key"} />
         ) : null}
         {item.kind === "contact"
           ? CONTACT_FIELDS.map((field) => (
