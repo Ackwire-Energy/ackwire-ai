@@ -508,7 +508,7 @@
     "otherLead": "Vous êtes connecté en tant que {{other}}. Connectez-vous avec l'e-mail invité et vous arriverez dans {{org}}.",
     "switch": "Se connecter en tant que {{email}}",
     "fullTitle": "{{org}} n'a plus de place pour le moment.",
-    "fullLead": "Votre invitation reste valable. Dès qu'une place se libère, vous rejoignez via ce même lien.",
+    "fullLead": "Votre invitation reste valable. Demandez à la personne qui vous a invité de libérer une place, et vous rejoignez via ce même lien.",
     "fullFine": "Aucun compte n'a été créé. Il n'y a rien à faire tant qu'une place ne se libère pas.",
     "usedTitle": "Vous faites déjà partie de {{org}}.",
     "usedLead": "Cette invitation a été utilisée le {{date}}. Il suffit de l'ouvrir.",
@@ -10848,7 +10848,7 @@
     },
     "org": {
       "createInviteOnly": "Les nouveaux espaces de travail nécessitent une invitation pour le moment.",
-      "membersFull": "Cet espace de travail ne peut pas accueillir plus de personnes pour le moment. Prévenez la personne qui vous a invité.",
+      "membersFull": "Toutes les places de cet espace de travail sont prises pour le moment. Demandez à la personne qui vous a invité de libérer une place.",
       "deleting": "Cet espace de travail est en cours de suppression.",
       "notRestorable": "Cet espace de travail ne peut plus être restauré."
     },
@@ -13389,6 +13389,9 @@
     "people": "Personnes",
     "files": "Fichiers",
     "usedOf": "{{used}} sur {{limit}}",
+    "seatsPaid_one": "{{count}} place payée",
+    "seatsPaid_many": "{{count}} places payées",
+    "seatsPaid_other": "{{count}} places payées",
     "noLimit": "Sans limite",
     "ownBucket": "Sur votre propre bucket, sans limite de notre part"
   },
@@ -13397,7 +13400,16 @@
       "full": "Cet espace de travail compte {{members}} personnes sur {{limit}}.",
       "fullOne": "L'abonnement agentes.chat de cet espace de travail est prévu pour 1 personne.",
       "fullAdmin": "Pour faire venir plus de monde, consultez les options de l'abonnement agentes.chat.",
-      "fullMember": "Demandez à la personne qui gère l'espace de travail de faire de la place."
+      "fullMember": "Demandez à la personne qui gère l'espace de travail de faire de la place.",
+      "fullAddSeat": "Toutes les places payées sont prises. Ajoutez une place dans Abonnement et facturation.",
+      "fullTop": "Cet abonnement ne peut pas accueillir plus de personnes. Changez d'abonnement dans Abonnement et facturation.",
+      "fullMemberSeat": "Demandez à la personne qui gère l'espace de travail d'ajouter une place.",
+      "fullAskPayerSeat": "Demandez à {{payer}}, qui paie cet espace de travail, d'ajouter une place.",
+      "fullAskSeat": "Demandez à la personne qui paie cet espace de travail d'ajouter une place.",
+      "fullAskPayerTop": "Demandez à {{payer}}, qui paie cet espace de travail, de changer d'abonnement.",
+      "fullAskTop": "Demandez à la personne qui paie cet espace de travail de changer d'abonnement.",
+      "fullPhone": "Toutes les places payées sont prises. Adressez-vous à la personne qui paie cet espace de travail.",
+      "fullPhonePayer": "Toutes les places payées sont prises."
     },
     "storage": {
       "meter": "Vous avez utilisé {{used}} sur {{limit}}.",

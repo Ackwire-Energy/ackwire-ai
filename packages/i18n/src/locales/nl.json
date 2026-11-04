@@ -501,7 +501,7 @@
     "otherLead": "Je bent ingelogd als {{other}}. Log in met het uitgenodigde e-mailadres en je komt in {{org}} terecht.",
     "switch": "Inloggen als {{email}}",
     "fullTitle": "{{org}} heeft nu geen plek meer vrij.",
-    "fullLead": "Je uitnodiging werkt nog. Komt er een plek vrij, dan doe je mee via deze zelfde link.",
+    "fullLead": "Je uitnodiging werkt nog. Vraag wie je heeft uitgenodigd om een plek vrij te maken, en je doet mee via deze zelfde link.",
     "fullFine": "Er is geen account aangemaakt. Je hoeft niets te doen tot er een plek vrijkomt.",
     "usedTitle": "Je zit al in {{org}}.",
     "usedLead": "Deze uitnodiging is gebruikt op {{date}}. Open hem gewoon.",
@@ -10500,7 +10500,7 @@
     },
     "org": {
       "createInviteOnly": "Nieuwe werkruimtes hebben voorlopig een uitnodiging nodig.",
-      "membersFull": "Er is nu geen plek meer voor extra mensen in deze werkruimte. Laat het weten aan wie je heeft uitgenodigd.",
+      "membersFull": "Alle plekken in deze werkruimte zijn nu bezet. Vraag wie je heeft uitgenodigd om een plek vrij te maken.",
       "deleting": "Deze werkruimte wordt verwijderd.",
       "notRestorable": "Deze werkruimte kan niet meer hersteld worden."
     },
@@ -12992,6 +12992,8 @@
     "people": "Mensen",
     "files": "Bestanden",
     "usedOf": "{{used}} van {{limit}}",
+    "seatsPaid_one": "{{count}} betaalde plek",
+    "seatsPaid_other": "{{count}} betaalde plekken",
     "noLimit": "Geen limiet",
     "ownBucket": "Op je eigen bucket, zonder limiet van ons"
   },
@@ -13000,7 +13002,16 @@
       "full": "Deze werkruimte heeft {{members}} van de {{limit}} mensen.",
       "fullOne": "Het agentes.chat-abonnement van deze werkruimte is voor 1 persoon.",
       "fullAdmin": "Bekijk de opties van het agentes.chat-abonnement om meer mensen toe te voegen.",
-      "fullMember": "Vraag degene die de werkruimte beheert om ruimte te maken."
+      "fullMember": "Vraag degene die de werkruimte beheert om ruimte te maken.",
+      "fullAddSeat": "Alle betaalde plekken zijn bezet. Voeg een plek toe in Abonnement en facturatie.",
+      "fullTop": "Dit abonnement heeft geen ruimte voor meer mensen. Kies een ander abonnement in Abonnement en facturatie.",
+      "fullMemberSeat": "Vraag degene die de werkruimte beheert om een plek toe te voegen.",
+      "fullAskPayerSeat": "Vraag {{payer}}, die voor deze werkruimte betaalt, om een plek toe te voegen.",
+      "fullAskSeat": "Vraag degene die voor deze werkruimte betaalt om een plek toe te voegen.",
+      "fullAskPayerTop": "Vraag {{payer}}, die voor deze werkruimte betaalt, om een ander abonnement te kiezen.",
+      "fullAskTop": "Vraag degene die voor deze werkruimte betaalt om een ander abonnement te kiezen.",
+      "fullPhone": "Alle betaalde plekken zijn bezet. Neem contact op met degene die voor deze werkruimte betaalt.",
+      "fullPhonePayer": "Alle betaalde plekken zijn bezet."
     },
     "storage": {
       "meter": "Je hebt {{used}} van {{limit}} gebruikt.",

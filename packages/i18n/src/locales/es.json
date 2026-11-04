@@ -508,7 +508,7 @@
     "otherLead": "Iniciaste sesión como {{other}}. Inicia sesión con el correo invitado y llegarás a {{org}}.",
     "switch": "Iniciar sesión como {{email}}",
     "fullTitle": "{{org}} no tiene lugares libres ahora.",
-    "fullLead": "Tu invitación sigue funcionando. Cuando se libere un lugar, entras con este mismo enlace.",
+    "fullLead": "Tu invitación sigue funcionando. Pide a quien te invitó que libere un lugar y entras con este mismo enlace.",
     "fullFine": "No se creó ninguna cuenta. No hay nada que hacer hasta que se libere un lugar.",
     "usedTitle": "Ya estás en {{org}}.",
     "usedLead": "Esta invitación se usó el {{date}}. Solo ábrelo.",
@@ -10778,7 +10778,7 @@
     },
     "org": {
       "createInviteOnly": "Por ahora, los espacios de trabajo nuevos necesitan una invitación.",
-      "membersFull": "Este espacio de trabajo no tiene lugar para más personas ahora. Avísale a quien te invitó.",
+      "membersFull": "Todos los lugares de este espacio de trabajo están ocupados ahora. Pide a quien te invitó que libere un lugar.",
       "deleting": "Este espacio de trabajo se está eliminando.",
       "notRestorable": "Este espacio de trabajo ya no se puede restaurar."
     },
@@ -13260,6 +13260,9 @@
     "people": "Personas",
     "files": "Archivos",
     "usedOf": "{{used}} de {{limit}}",
+    "seatsPaid_one": "{{count}} lugar pagado",
+    "seatsPaid_many": "{{count}} lugares pagados",
+    "seatsPaid_other": "{{count}} lugares pagados",
     "noLimit": "Sin límite",
     "ownBucket": "En tu propio bucket, sin límite de nuestra parte"
   },
@@ -13268,7 +13271,16 @@
       "full": "Este espacio de trabajo tiene {{members}} de {{limit}} personas.",
       "fullOne": "El plan de agentes.chat de este espacio de trabajo es para 1 persona.",
       "fullAdmin": "Para sumar más personas, mira las opciones del plan de agentes.chat.",
-      "fullMember": "Pide a quien administra el espacio de trabajo que haga lugar."
+      "fullMember": "Pide a quien administra el espacio de trabajo que haga lugar.",
+      "fullAddSeat": "Todos los lugares pagados están ocupados. Agrega un lugar en Plan y facturación.",
+      "fullTop": "Este plan no admite más personas. Cambia de plan en Plan y facturación.",
+      "fullMemberSeat": "Pide a quien administra el espacio de trabajo que agregue un lugar.",
+      "fullAskPayerSeat": "Pide a {{payer}}, que paga este espacio de trabajo, que agregue un lugar.",
+      "fullAskSeat": "Pide a quien paga este espacio de trabajo que agregue un lugar.",
+      "fullAskPayerTop": "Pide a {{payer}}, que paga este espacio de trabajo, que cambie de plan.",
+      "fullAskTop": "Pide a quien paga este espacio de trabajo que cambie de plan.",
+      "fullPhone": "Todos los lugares pagados están ocupados. Habla con quien paga este espacio de trabajo.",
+      "fullPhonePayer": "Todos los lugares pagados están ocupados."
     },
     "storage": {
       "meter": "Usaste {{used}} de {{limit}}.",

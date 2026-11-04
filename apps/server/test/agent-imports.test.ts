@@ -457,6 +457,8 @@ describe("an imported agent's own files into the Drive", () => {
     // The Drive's limits: the workspace's storage.
     await setOrgLimits((t as TestServer).db, orgId, {
       members: null,
+      membersMax: null,
+      payerUserId: null,
       storageBytes: 10,
       uploadBytesPerDay: null,
       platformUsdPerMonth: null,
@@ -466,6 +468,8 @@ describe("an imported agent's own files into the Drive", () => {
     expect(((await full.json()) as { error: { code: string } }).error.code).toBe("storage.full");
     await setOrgLimits((t as TestServer).db, orgId, {
       members: null,
+      membersMax: null,
+      payerUserId: null,
       storageBytes: null,
       uploadBytesPerDay: null,
       platformUsdPerMonth: null,

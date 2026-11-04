@@ -1239,7 +1239,7 @@
     "value": "{{org}} has no seat left right now."
   },
   "invite.fullLead": {
-    "value": "Your invitation still works. When a seat opens, you join through this same link."
+    "value": "Your invitation still works. Ask whoever invited you to open a seat, and you join through this same link."
   },
   "invite.fullFine": {
     "value": "No account was made. There's nothing to do until a seat opens."
@@ -25286,7 +25286,7 @@
     "value": "New workspaces need an invitation for now."
   },
   "errors.org.membersFull": {
-    "value": "This workspace has no room for more people right now. Let whoever invited you know."
+    "value": "Every seat in this workspace is taken right now. Ask whoever invited you to open a seat."
   },
   "errors.org.deleting": {
     "value": "This workspace is being deleted."
@@ -31149,6 +31149,12 @@
   "billing.usedOf": {
     "value": "{{used}} of {{limit}}"
   },
+  "billing.seatsPaid": {
+    "value": {
+      "one": "{{count}} paid seat",
+      "other": "{{count}} paid seats"
+    }
+  },
   "billing.noLimit": {
     "value": "No limit"
   },
@@ -31166,6 +31172,33 @@
   },
   "limits.members.fullMember": {
     "value": "Ask whoever runs the workspace to make room."
+  },
+  "limits.members.fullAddSeat": {
+    "value": "Every paid seat is taken. Add a seat in Plan and billing."
+  },
+  "limits.members.fullTop": {
+    "value": "This plan can't take more people. Switch plans in Plan and billing."
+  },
+  "limits.members.fullMemberSeat": {
+    "value": "Ask whoever runs the workspace to add a seat."
+  },
+  "limits.members.fullAskPayerSeat": {
+    "value": "Ask {{payer}}, who pays for this workspace, to add a seat."
+  },
+  "limits.members.fullAskSeat": {
+    "value": "Ask whoever pays for this workspace to add a seat."
+  },
+  "limits.members.fullAskPayerTop": {
+    "value": "Ask {{payer}}, who pays for this workspace, to switch plans."
+  },
+  "limits.members.fullAskTop": {
+    "value": "Ask whoever pays for this workspace to switch plans."
+  },
+  "limits.members.fullPhone": {
+    "value": "Every paid seat is taken. Talk to whoever pays for this workspace."
+  },
+  "limits.members.fullPhonePayer": {
+    "value": "Every paid seat is taken."
   },
   "limits.storage.meter": {
     "value": "You've used {{used}} of {{limit}}."

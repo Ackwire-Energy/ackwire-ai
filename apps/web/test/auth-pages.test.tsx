@@ -935,14 +935,16 @@ describe("Aceitar convite", () => {
     await settle(4);
     await press("Entrar na Acme");
     expect(screen().getByRole("alert").textContent).toBe(
-      "Este workspace está sem lugar para mais pessoas agora. Avise quem convidou você.",
+      "Todas as vagas deste workspace estão ocupadas agora. Peça a quem convidou você para abrir uma vaga.",
     );
   });
 
   test("a full workspace says so before any account is made; a paused one's invitation takes nobody", async () => {
     await openInvite({ full: true });
-    expect(heading()).toBe("A Acme está sem lugar agora.");
-    expect(lead()).toBe("Seu convite continua valendo. Quando abrir um lugar, você entra por este mesmo link.");
+    expect(heading()).toBe("A Acme está com todas as vagas ocupadas agora.");
+    expect(lead()).toBe(
+      "Seu convite continua valendo. Peça a quem convidou você para abrir uma vaga, e você entra por este mesmo link.",
+    );
     expect(document.querySelector(".invite button, .invite input")).toBeNull();
     cleanup();
 

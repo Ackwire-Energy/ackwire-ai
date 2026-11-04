@@ -508,7 +508,8 @@ export const en = {
     otherLead: "You're signed in as {{other}}. Sign in with the invited email and you'll land in {{org}}.",
     switch: "Sign in as {{email}}",
     fullTitle: "{{org}} has no seat left right now.",
-    fullLead: "Your invitation still works. When a seat opens, you join through this same link.",
+    fullLead:
+      "Your invitation still works. Ask whoever invited you to open a seat, and you join through this same link.",
     fullFine: "No account was made. There's nothing to do until a seat opens.",
     usedTitle: "You're already in {{org}}.",
     usedLead: "This invitation was used on {{date}}. Just open it.",
@@ -9856,7 +9857,7 @@ export const en = {
     },
     org: {
       createInviteOnly: "New workspaces need an invitation for now.",
-      membersFull: "This workspace has no room for more people right now. Let whoever invited you know.",
+      membersFull: "Every seat in this workspace is taken right now. Ask whoever invited you to open a seat.",
       deleting: "This workspace is being deleted.",
       notRestorable: "This workspace can't be restored anymore.",
     },
@@ -12365,6 +12366,9 @@ export const en = {
     people: "People",
     files: "Files",
     usedOf: "{{used}} of {{limit}}",
+    /** Under the people meter, when it counts against the plan's top rather than the seats paid for. */
+    seatsPaid_one: "{{count}} paid seat",
+    seatsPaid_other: "{{count}} paid seats",
     noLimit: "No limit",
     ownBucket: "On your own bucket, with no limit from us",
   },
@@ -12375,6 +12379,22 @@ export const en = {
       fullOne: "This workspace's agentes.chat plan fits 1 person.",
       fullAdmin: "To bring more people in, see the agentes.chat plan's options.",
       fullMember: "Ask whoever runs the workspace to make room.",
+      /** To whoever manages billing, below the plan's top. "Plan and billing" is the section in Settings. */
+      fullAddSeat: "Every paid seat is taken. Add a seat in Plan and billing.",
+      /** To whoever manages billing, at the plan's top. */
+      fullTop: "This plan can't take more people. Switch plans in Plan and billing.",
+      /** To anyone else, below the plan's top. */
+      fullMemberSeat: "Ask whoever runs the workspace to add a seat.",
+      /** To whoever else manages billing, when someone else pays: only the payer adds seats or changes plans. */
+      fullAskPayerSeat: "Ask {{payer}}, who pays for this workspace, to add a seat.",
+      /** The same when the payer's name can't be shown. */
+      fullAskSeat: "Ask whoever pays for this workspace to add a seat.",
+      fullAskPayerTop: "Ask {{payer}}, who pays for this workspace, to switch plans.",
+      fullAskTop: "Ask whoever pays for this workspace to switch plans.",
+      /** On the phone, to everyone on a server with a billing service: no purchase and no way to one (App Store 3.1.1). */
+      fullPhone: "Every paid seat is taken. Talk to whoever pays for this workspace.",
+      /** On the phone, to the payer. */
+      fullPhonePayer: "Every paid seat is taken.",
     },
     storage: {
       meter: "You've used {{used}} of {{limit}}.",
