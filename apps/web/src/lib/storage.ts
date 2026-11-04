@@ -1,3 +1,5 @@
+import { seenList } from "@agenteschat/client/lib/seen-list";
+
 const safe = (area: () => Storage) => ({
   get(key: string): string | null {
     try {
@@ -60,6 +62,8 @@ export const STORAGE_KEYS = {
   outagesDismissed: "agentes.outages.dismissed",
   /** The workspace computer's notice the person closed (`setupNoticeKey`), until its state changes. */
   setupNoticeHidden: "agentes.setup.hidden",
+  /** `<user id>.<org id>` entries (JSON array): the person opened the right hand's DM there, so its "Novo" dot is gone. */
+  rightHandSeen: "agentes.rightHand.seen",
   /** The desktop app's right click: "ours" (default) or "system" (lib/context-menu.ts). */
   menuLook: "agentes.desktop.menu",
   /** Prefix (`.<message id>`, in `sessionStore`): the Connect dialog already opened by itself for that message. */
@@ -95,3 +99,9 @@ export const STORAGE_KEYS = {
    */
   composerDrafts: "agentes.drafts",
 } as const;
+
+/** The right hand's DM opened, here or from any other way in (`rightHandSeenKey`): its row's "Novo" is gone. */
+export const rightHandSeen = seenList(
+  () => storage.get(STORAGE_KEYS.rightHandSeen),
+  (value) => storage.set(STORAGE_KEYS.rightHandSeen, value),
+);

@@ -1793,7 +1793,6 @@ describe("Quem pensa: the draft", () => {
     owner: "u-joao",
     audience: { mode: "everyone", userIds: [] },
     brain: { brain: "model", model: null, fallback: true },
-    coordinator: false,
   };
   const api: BrainChoice = { brain: "model", model: null, fallback: true };
 

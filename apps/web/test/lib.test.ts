@@ -30,15 +30,7 @@ import {
   settingUp,
   webUrl,
 } from "@agenteschat/client/lib/guards";
-import {
-  addInvites,
-  aheadOf,
-  crewOf,
-  firstAskOrder,
-  ONBOARDING_STEPS,
-  stepIndex,
-  validInvites,
-} from "@agenteschat/client/lib/onboarding";
+import { ONBOARDING_STEPS, stepIndex } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   addressesIn,
@@ -196,31 +188,17 @@ describe("text", () => {
       { email: "ana@x", valid: false },
     ]);
   });
-  test("onboarding: typed or pasted e-mails become chips (commas, spaces, new lines); invalid ones stay marked", () => {
+  test("onboarding: typed or pasted e-mails are read apart (commas, spaces, new lines); invalid ones stay", () => {
     expect(addressesIn(" A@x.com,b@x.com\n\nc@x.com;  bad  a@x.com ").map((a) => a.email)).toEqual([
       "a@x.com",
       "b@x.com",
       "c@x.com",
       "bad",
     ]);
-    const first = addInvites([], "Marina@acme.com.br, joao@acme.com.br\nnão-é-email");
-    expect(first).toEqual([
-      { email: "marina@acme.com.br", admin: false, valid: true },
-      { email: "joao@acme.com.br", admin: false, valid: true },
-      { email: "não-é-email", admin: false, valid: false },
-    ]);
-    // Already there: kept as is ("Admin" too); nothing new returns the same list.
-    const admin = first.map((i) => (i.email === "joao@acme.com.br" ? { ...i, admin: true } : i));
-    expect(addInvites(admin, "joao@acme.com.br")).toBe(admin);
-    expect(addInvites(admin, "  ,\n ")).toBe(admin);
-    expect(addInvites(admin, "ana@acme.com.br", true).at(-1)).toEqual({
-      email: "ana@acme.com.br",
-      admin: true,
-      valid: true,
-    });
-    expect(validInvites(first).map((i) => i.email)).toEqual(["marina@acme.com.br", "joao@acme.com.br"]);
   });
-  test("onboarding steps: ordered, the optional ones marked", () => {
+  test("onboarding steps: ordered, the optional ones marked, each by its place", () => {
+    expect(stepIndex("context")).toBe(1);
+    expect(stepIndex("done")).toBe(ONBOARDING_STEPS.length - 1);
     expect(ONBOARDING_STEPS.map((s) => s.id)).toEqual([
       "workspace",
       "context",
@@ -232,10 +210,6 @@ describe("text", () => {
       "done",
     ]);
     expect(ONBOARDING_STEPS.filter((s) => s.optional).map((s) => s.id)).toEqual(["import", "computer", "team"]);
-  });
-  test("onboarding's first message: Lia offers it where the agents can browse, Theo where they can't, then Ada", () => {
-    expect(firstAskOrder(true)).toEqual(["lia", "theo", "ada"]);
-    expect(firstAskOrder(false)).toEqual(["theo", "lia", "ada"]);
   });
   test("password and amounts", () => {
     expect(passwordState("")).toBe("empty");
@@ -399,44 +373,6 @@ describe("guards and permissions", () => {
     expect(settingUp({ ...mine, role: "member" })).toBe(false);
     expect(landingFor({ ...me, organizations: [{ ...mine, role: "member" }] }, null)).toEqual({ orgId: "n" });
     expect(settingUp({ id: "n", name: "N", role: "owner" })).toBe(false);
-  });
-  test("a resumed onboarding knows its ready-made agents by name and look; the rest are imported", () => {
-    const look = { color: "indigo", eyes: "round", accessory: "cap" };
-    const mark = (p: "theo" | "lia") =>
-      p === "theo"
-        ? { name: "Theo", handle: "theo", ...look }
-        : { name: "Lia", handle: "lia", color: "rose", eyes: "dots", accessory: "flower" };
-    const agents = [
-      { id: "1", name: "Theo", handle: "theo", appearance: look },
-      { id: "2", name: "Theo", handle: "theo-2", appearance: { ...look, color: "green" } },
-      { id: "3", name: "Lia", handle: "lia", appearance: { color: "rose", eyes: "dots", accessory: "flower" } },
-      { id: "4", name: "Theo", handle: "theo-3", appearance: look },
-      { id: "5", name: "Dev", handle: "dev" },
-    ];
-    const crew = crewOf(agents, ["theo", "lia"] as const, mark);
-    expect(Object.keys(crew.presets)).toEqual(["theo", "lia"]);
-    expect([crew.presets.theo?.id, crew.presets.lia?.id]).toEqual(["1", "3"]);
-    expect(crew.others.map((a) => a.id)).toEqual(["2", "4", "5"]);
-    // A create cut short after the agent but before its look: known by its handle, never made again (a 409).
-    const halfMade = crewOf(
-      [{ id: "6", name: "Lia", handle: "lia", appearance: null }],
-      ["theo", "lia"] as const,
-      mark,
-    );
-    expect(halfMade.presets.lia?.id).toBe("6");
-    // Its handle with another look, or another name: someone else's.
-    expect(
-      crewOf([{ id: "7", name: "Lia", handle: "lia", appearance: look }], ["lia"] as const, mark).others,
-    ).toHaveLength(1);
-    expect(crewOf([{ id: "8", name: "Lia B", handle: "lia" }], ["lia"] as const, mark).others).toHaveLength(1);
-    expect(stepIndex("context")).toBe(1);
-    expect(stepIndex("done")).toBe(ONBOARDING_STEPS.length - 1);
-  });
-  test("the server's answer to a step saved: further on or finished elsewhere is followed, the same step isn't", () => {
-    expect(aheadOf({ step: "computer", finished: false }, "computer")).toBe(false);
-    expect(aheadOf({ step: "computer", finished: false }, "agents")).toBe(true);
-    expect(aheadOf({ step: "ai", finished: false }, "computer")).toBe(true);
-    expect(aheadOf({ step: "done", finished: true }, "team")).toBe(true);
   });
   test("what a membership may do is what the server resolved from its roles", () => {
     const member = { id: "b", name: "B", role: "member" as const, permissions: ["read", "post"] };

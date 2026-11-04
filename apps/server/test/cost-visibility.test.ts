@@ -67,7 +67,8 @@ test("members never receive money: only percentages and tokens", async () => {
   expect(detail.budgetUsedPercent).toBe(0);
   expect(detail).not.toHaveProperty("monthlyBudgetUsd");
   const agents = (await (await w.member("/agents")).json()) as { agents: Record<string, unknown>[] };
-  expect(agents.agents[0]).toMatchObject({ handle: "dev", budgetUsedPercent: 0 });
+  expect(agents.agents.find((a) => a.handle === "dev")).toMatchObject({ budgetUsedPercent: 0 });
+  for (const a of agents.agents) expect(a).not.toHaveProperty("monthlyBudgetUsd");
 
   // The money screens stay closed.
   expect((await w.member("/usage/report")).status).toBe(403);

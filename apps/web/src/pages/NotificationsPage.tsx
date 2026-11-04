@@ -81,6 +81,7 @@ import { useNotificationHref, useNotificationOpener } from "@/components/Notific
 import { type Dir, Face, Headline, joinerOf, nameOf, SystemFace, sayWords } from "@/components/NotificationParts";
 import { useOrg } from "@/components/org-context";
 import { AllowTalkButton } from "@/components/ReachLines";
+import { ChangeRequestCard } from "@/components/RightHandCards";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { matchesNow } from "@/hooks/useMatchMedia";
@@ -723,6 +724,11 @@ function Row({
                 </Chip>
               </div>
             )}
+            {n.kind === "change_request" && (
+              <div className="nt-wr__card">
+                <ChangeRequestCard n={n} />
+              </div>
+            )}
             {n.kind === "agent_unreached" && n.source.agentId && n.source.userId && (
               <UnreachedAllow agentId={n.source.agentId} userId={n.source.userId} />
             )}
@@ -1083,6 +1089,11 @@ function WaitCard({
     return (
       <WaitRow n={n} s={s} h={h} dir={dir} channelName={channelName} label={label} face={face} tail={tail}>
         {fuse}
+        {n.kind === "change_request" && (
+          <div className="nt-wr__card">
+            <ChangeRequestCard n={n} />
+          </div>
+        )}
       </WaitRow>
     );
   let meta: ReactNode;

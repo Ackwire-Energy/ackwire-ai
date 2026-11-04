@@ -81,6 +81,7 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     expect(SETTINGS_SECTIONS.map((s) => `${s.group}:${s.id}`)).toEqual([
       "you:apps",
       "org:general",
+      "org:right_hand",
       "org:members",
       "org:audit",
       "org:media",
@@ -105,6 +106,7 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     expect(ids(["read", "post"])).toEqual(["apps", "members", "connectors", "computers", "usage", "keys"]);
     expect(ids(["read", "manage_agents"])).toEqual([
       "apps",
+      "right_hand",
       "members",
       "access",
       "connectors",

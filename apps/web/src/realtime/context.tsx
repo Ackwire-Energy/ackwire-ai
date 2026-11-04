@@ -484,6 +484,11 @@ export function RealtimeProvider({
         void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
       }
       if (isAgentUnavailable(event)) streams.unavailable(event);
+      // A change I asked the right hand for was decided by someone else (ADR 0137): "Aplicado por …" on my card.
+      if (event.type === "proposal.decided") {
+        void qc.invalidateQueries({ queryKey: keys.proposals(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      }
       // Unread marks: a message where I am, and my reads and mutes from any device.
       applyUnreadEvent(qc, orgId, event);
       // My inbox: new or merged items, auto-resolved ones, and the badge's numbers.

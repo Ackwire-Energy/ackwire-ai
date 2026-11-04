@@ -1,13 +1,14 @@
 import { useChannelCategories } from "@agenteschat/client";
+import { rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmptyState, Text } from "@/ui";
-import { useColors, useOrgId, usePullRefresh } from "../shared/hooks";
+import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { FocusLive, PushedHeader } from "../shared/parts";
 import { useConversations, useWorkingNow } from "../shared/queries";
 import { ConversationRowView } from "./ConversationRowView";
-import { type ConversationRow, type ListKind, rowsOfKind } from "./logic";
+import { type ConversationRow, type ListKind, rightHandPin, rowsOfKind } from "./logic";
 import { useAgentRowStates } from "./useHomeNow";
 import { useWaitingItems } from "./WaitingStrip";
 
@@ -23,11 +24,14 @@ export function ConversationListScreen({ kind, categoryId }: { kind: ListKind; c
   const c = useColors();
   const insets = useSafeAreaInsets();
   const list = useConversations();
+  const dir = useDirectory();
   const categories = useChannelCategories(useOrgId());
   // One channel category's "Ver todos": its channels, titled with its name.
   const category = categoryId ? categories.data?.find((x) => x.id === categoryId) : undefined;
   const inCategory = (r: ConversationRow) => r.kind === "channel" && r.categoryId === categoryId;
-  const rows = categoryId ? rowsOfKind(list.rows, "channels").filter(inCategory) : rowsOfKind(list.rows, kind);
+  // The right hand has its own row on Conversas, never one in Agentes (ADR 0137).
+  const all = rightHandPin(list.rows, rightHandOf(dir.agents)).rows;
+  const rows = categoryId ? rowsOfKind(all, "channels").filter(inCategory) : rowsOfKind(all, kind);
   const work = useWorkingNow();
   const waiting = useWaitingItems();
   const agentStates = useAgentRowStates(list.rows, work, waiting.items);

@@ -13,6 +13,7 @@ import {
   enqueueOverdueDeletions,
   enqueueSkillUpdates,
   enqueueWaitlistContacts,
+  expireAgentProposalAsks,
   expireApprovals,
   expireBrowserHandoffs,
   expireConsultations,
@@ -237,6 +238,8 @@ export function startWorkers(deps: WorkerDeps) {
   every("consultations", WORKER_INTERVALS_MS.approvals, async () => {
     const expired = await expireConsultations({ db, pubsub: deps.pubsub });
     if (expired > 0) log.info("agent consultations expired", { expired });
+    const asks = await expireAgentProposalAsks({ db, pubsub: deps.pubsub });
+    if (asks > 0) log.info("expired agent proposals left the inbox", { asks });
   });
 
   every("secrets", WORKER_INTERVALS_MS.approvals, async () => {

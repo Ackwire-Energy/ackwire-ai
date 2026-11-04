@@ -516,11 +516,17 @@ export interface ApiClient {
     create(orgId: string, input: AgentInput): Promise<Agent>;
     /** An agent's proposal of a new agent, by its card's message (ADR 0081). */
     proposal(orgId: string, messageId: string): Promise<AgentProposal>;
-    /** "Criar" on the card: the agent as proposed, with each line the person may give it. */
+    /**
+     * "Criar" on the card: the agent as proposed, with each line the person may give it. With `test` ("Criar e
+     * testar", ADR 0137) the clicker's DM with it opens (`testChannelId`), its `firstTask` in the composer, unsent.
+     */
     createProposed(
       orgId: string,
       messageId: string,
-    ): Promise<{ agent: Agent; proposal: AgentProposal; ai: SuggestedAi["kind"] }>;
+      options?: { test?: boolean },
+    ): Promise<{ agent: Agent; proposal: AgentProposal; ai: SuggestedAi["kind"]; testChannelId?: string | null }>;
+    /** "Pedir a um admin" on a card the person it is for can't create (ADR 0137): to whoever may, once. */
+    askProposal(orgId: string, messageId: string): Promise<AgentProposal>;
     /** The routine it came with, for the agent created from the review (once it is where it reports). */
     proposalRoutine(orgId: string, messageId: string): Promise<AgentProposal>;
     /** Says no to it (who may create agents): the card stays, marked denied. */
@@ -926,6 +932,8 @@ export interface ApiClient {
     list(orgId: string, filter?: { ids?: string[] }): Promise<Proposal[]>;
     accept(orgId: string, proposalId: string, finalText?: string): Promise<Proposal>;
     refuse(orgId: string, proposalId: string): Promise<Proposal>;
+    /** "Pedir a um admin" (ADR 0137): the person who asked sends a row they can't decide to whoever may, once. */
+    ask(orgId: string, proposalId: string): Promise<Proposal>;
   };
   customConnectors: {
     list(orgId: string): Promise<CustomServer[]>;

@@ -35,6 +35,7 @@ import {
   providerLabel,
   providerOf,
 } from "@agenteschat/client/lib/providers";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { parseAmount } from "@agenteschat/client/lib/text";
 import {
   Button,
@@ -60,6 +61,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AccountSection } from "@/components/AccountSettings";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { AiAppsSection } from "@/components/AiApps";
 import { AuditSection } from "@/components/Audit";
 import { AutoModelsRow } from "@/components/AutoModels";
@@ -79,12 +81,14 @@ import { useOrg } from "@/components/org-context";
 import { PlanUsageCards } from "@/components/PlanUsage";
 import { MyFace, OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { KeyMismatch, KeySite } from "@/components/ProviderKey";
+import { RightHandSettingsSection } from "@/components/RightHandSettings";
 import { RolesSection } from "@/components/roles/RolesSection";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
 import { VoiceSettingsSection } from "@/components/VoiceSettings";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useCentreCurrent } from "@/hooks/useCentreCurrent";
+import { useDirectory } from "@/hooks/useDirectory";
 import { useOpenParam } from "@/lib/open-param";
 import { workspaceUsesApi } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
@@ -105,6 +109,7 @@ export function SettingsPage({
   machineId,
   install,
   skill,
+  agent,
 }: {
   section?: SettingsSection;
   connected?: string;
@@ -120,6 +125,8 @@ export function SettingsPage({
   skill?: string;
   /** Computadores → one computer (`/settings/computers/{id}`). */
   machineId?: string;
+  /** Auditoria: the agent it opens filtered to. */
+  agent?: string;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -131,6 +138,10 @@ export function SettingsPage({
   const edition = computerEdition(setup.data);
   const strip = useRef<HTMLDivElement>(null);
   useCentreCurrent(strip, current);
+  // The right hand's section goes by its name and face (admins may rename it).
+  const rightHand = useDirectory(org.id).agents.find(isRightHand);
+  const sectionName = (id: SettingsSection) =>
+    id === "right_hand" && rightHand ? rightHand.name : t(`settings.section.${id}`);
 
   return (
     <div className="settings">
@@ -161,8 +172,14 @@ export function SettingsPage({
                         className="settings__link"
                         aria-current={s.id === current ? "page" : undefined}
                       >
-                        {s.id === "account" ? <MyFace size="xs" /> : <Icon name={s.icon} size={18} />}
-                        {t(`settings.section.${s.id}`)}
+                        {s.id === "account" ? (
+                          <MyFace size="xs" />
+                        ) : s.id === "right_hand" && rightHand ? (
+                          <AgentAvatar agentId={rightHand.id} name={rightHand.name} size="xs" />
+                        ) : (
+                          <Icon name={s.icon} size={18} />
+                        )}
+                        {sectionName(s.id)}
                       </Link>
                     </li>
                   ))}
@@ -175,7 +192,7 @@ export function SettingsPage({
       <div className="settings__body">
         {current !== "members" && current !== "general" && current !== "roles" && (
           <header className="page__header">
-            <h2 className="page-title">{t(`settings.section.${current}`)}</h2>
+            <h2 className="page-title">{sectionName(current)}</h2>
             {current !== "computers" ? (
               <p className="muted" style={{ margin: 0 }}>
                 {t(`settings.sectionText.${current}`)}
@@ -196,7 +213,8 @@ export function SettingsPage({
         {current === "general" && <GeneralSection />}
         {current === "members" && <MembersPage embedded />}
         {current === "roles" && <RolesSection />}
-        {current === "audit" && <AuditSection />}
+        {current === "right_hand" && <RightHandSettingsSection />}
+        {current === "audit" && <AuditSection agent={agent} />}
         {current === "media" && <MediaSettingsSection />}
         {current === "voice" && <VoiceSettingsSection />}
         {current === "access" && <AccessMatrixSection />}

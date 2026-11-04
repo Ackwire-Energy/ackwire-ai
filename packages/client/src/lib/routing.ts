@@ -37,14 +37,15 @@ export function routingLineOf(status: AiStatus | undefined, modelLabel: (id: str
 
 /** Why the agent was picked, as the receipt's last line: the rule it followed (ADR 0074). */
 export interface Decider {
-  rule: Extract<DecidedBy, { step: "rule" }>["rule"];
+  rule: Exclude<Extract<DecidedBy, { step: "rule" }>["rule"], "coordinator" | "alone">;
   text: string;
 }
 
 /**
  * The receipt's last line, once a rule picked an agent ("Uma resposta para a Ada"). Null when an AI picked (Jev, a
- * small model, a plan: which one means nothing to most people, the decision stays stored), for a decision for nobody
- * (the line under the message says it) and one made before the server said who decided.
+ * small model, a plan: which one means nothing to most people, the decision stays stored), for `alone` (a person with
+ * nobody else here: the reason adds nothing for them, it stays stored), for a decision for nobody (the line under the
+ * message says it) and one made before the server said who decided.
  */
 export function deciderOf(t: TFunction, view: ReceiptView, names: { agent: (id: string) => string }): Decider | null {
   const by = view.decidedBy;
@@ -53,6 +54,8 @@ export function deciderOf(t: TFunction, view: ReceiptView, names: { agent: (id: 
     status && status.kind !== "nobody" && status.kind !== "no_ai" && status.kind !== "platform_cap"
       ? status.agents[0]
       : undefined;
-  if (by?.step !== "rule" || first === undefined) return null;
-  return { rule: by.rule, text: t(`receipts.by.${by.rule}`, agentGrammar(names.agent(first))) };
+  if (by?.step !== "rule" || by.rule === "alone" || first === undefined) return null;
+  // A coordinator's pick (before ADR 0137) reads as the default it was.
+  const rule = by.rule === "coordinator" ? "default" : by.rule;
+  return { rule, text: t(`receipts.by.${rule}`, agentGrammar(names.agent(first))) };
 }

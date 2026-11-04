@@ -257,7 +257,6 @@
       "connectors.category.marketing",
       "connectors.names.cloudflare_bindings",
       "connectors.names.cloudflare_observability",
-      "coordinator.no",
       "database.provider.neon",
       "database.provider.railway",
       "database.provider.rds",
@@ -692,7 +691,8 @@
       "work.duration.hours",
       "work.duration.hoursMinutes",
       "work.duration.minutes",
-      "usageQueue.routine"
+      "usageQueue.routine",
+      "rightHand.profile.message"
     ],
     "de": [
       "access.agentCol",
@@ -1022,7 +1022,8 @@
       "wiki.rich.blocks.code",
       "wiki.tags",
       "usageQueue.thread",
-      "usageQueue.routine"
+      "usageQueue.routine",
+      "rightHand.field.archive"
     ],
     "it": [
       "access.area.browser",
@@ -1101,7 +1102,6 @@
       "connectors.category.marketing",
       "connectors.names.cloudflare_bindings",
       "connectors.toolChanges.input",
-      "coordinator.no",
       "database.count",
       "database.database",
       "database.host",
@@ -1755,7 +1755,10 @@
       "wiki.tags",
       "work.duration.minutes",
       "usageQueue.thread",
-      "usageQueue.routine"
+      "usageQueue.routine",
+      "rightHand.field.archive",
+      "rightHand.field.model",
+      "rightHand.profile.model"
     ],
     "ja": [
       "agent.builtinName",
@@ -2254,7 +2257,10 @@
       "toolReview.ok",
       "wiki.legend.obsidian",
       "wiki.markdown",
-      "wiki.props.addTag"
+      "wiki.props.addTag",
+      "rightHand.field.archive",
+      "rightHand.field.model",
+      "rightHand.profile.model"
     ],
     "tr": [
       "access.area.forum",
@@ -2377,7 +2383,9 @@
       "team.cap.sentry",
       "toolNames.order",
       "wiki.legend.obsidian",
-      "wiki.markdown"
+      "wiki.markdown",
+      "rightHand.field.model",
+      "rightHand.profile.model"
     ],
     "pl": [
       "access.agentCol",
@@ -2584,7 +2592,9 @@
       "wiki.legend.obsidian",
       "wiki.markdown",
       "wiki.props.addTag",
-      "work.duration.minutes"
+      "work.duration.minutes",
+      "rightHand.field.model",
+      "rightHand.profile.model"
     ],
     "ru": [
       "agent.builtinName",
@@ -2674,18 +2684,55 @@
     ]
   },
   "mobile-base": {
-    "pt-BR": ["push.ask.minutes"],
-    "es": ["push.ask.minutes"],
-    "fr": ["a11y.agent", "a11y.agentPlain", "push.ask.minutes"],
-    "de": ["a11y.agentPlain", "auth.connect.on", "auth.server.line"],
-    "it": ["auth.connect.on", "auth.server.line", "push.ask.minutes"],
-    "nl": ["a11y.agent", "a11y.agentPlain", "auth.connect.on", "auth.server.line", "push.ask.minutes"],
-    "ja": ["auth.server.placeholder"],
-    "ko": ["auth.server.placeholder"],
-    "zh-Hans": ["auth.server.placeholder"],
-    "id": ["auth.connect.on", "auth.server.line"],
-    "pl": ["a11y.agent", "a11y.agentPlain", "push.ask.minutes"],
-    "ru": ["auth.server.placeholder"]
+    "pt-BR": [
+      "push.ask.minutes"
+    ],
+    "es": [
+      "push.ask.minutes"
+    ],
+    "fr": [
+      "a11y.agent",
+      "a11y.agentPlain",
+      "push.ask.minutes"
+    ],
+    "de": [
+      "a11y.agentPlain",
+      "auth.connect.on",
+      "auth.server.line"
+    ],
+    "it": [
+      "auth.connect.on",
+      "auth.server.line",
+      "push.ask.minutes"
+    ],
+    "nl": [
+      "a11y.agent",
+      "a11y.agentPlain",
+      "auth.connect.on",
+      "auth.server.line",
+      "push.ask.minutes"
+    ],
+    "ja": [
+      "auth.server.placeholder"
+    ],
+    "ko": [
+      "auth.server.placeholder"
+    ],
+    "zh-Hans": [
+      "auth.server.placeholder"
+    ],
+    "id": [
+      "auth.connect.on",
+      "auth.server.line"
+    ],
+    "pl": [
+      "a11y.agent",
+      "a11y.agentPlain",
+      "push.ask.minutes"
+    ],
+    "ru": [
+      "auth.server.placeholder"
+    ]
   },
   "mobile-features": {
     "pt-BR": [

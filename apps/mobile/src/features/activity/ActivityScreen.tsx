@@ -34,6 +34,7 @@ import {
 import { openPage } from "../ai/parts";
 import { ApprovalWhy } from "../approvals/parts";
 import { notificationHref, notificationWebPath, routineHref } from "../links/logic";
+import { ChangeRequestCard } from "../right-hand/SettingsCard";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook, fuseRemaining } from "../shared/logic";
@@ -448,6 +449,12 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
           />
         </View>
       </SwipeRow>
+      {/* A change someone sent with "Pedir a um admin" (ADR 0137): decided on its card, here. */}
+      {n.kind === "change_request" ? (
+        <View style={styles.change}>
+          <ChangeRequestCard n={n} />
+        </View>
+      ) : null}
       {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
     </View>
   );
@@ -460,6 +467,7 @@ const faceOf = (a: AppNotification["actors"][number] | undefined) =>
 
 const styles = StyleSheet.create({
   cards: { gap: 10, paddingHorizontal: 16 },
+  change: { paddingHorizontal: 16, paddingBottom: 12 },
   noneDone: { paddingHorizontal: 16, paddingVertical: 24, textAlign: "center" },
   wcard: { borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, gap: 9 },
   wpressed: { opacity: 0.85 },

@@ -1461,7 +1461,6 @@
       "writing": "撰写中"
     },
     "autoReplyChip": "无需提及即回复",
-    "coordinatorChip": "协调团队",
     "more": "更多消息操作",
     "copyLink": "复制链接",
     "linkCopied": "链接已复制。",
@@ -1607,22 +1606,123 @@
       "reply": "回复 {{name}}",
       "only_agent": "在这里只有 {{name}} 不用提及也会回答",
       "follow_up": "延续与 {{name}} 的对话",
-      "coordinator": "{{name}} 负责协调团队",
       "default": "没有人被呼叫，所以由 {{name}} 回答"
     }
   },
-  "coordinator": {
-    "chip": "协调团队",
-    "help": "当需要智能体的消息没有被其他智能体接手时，由他接手，并把工作交给懂行的智能体。在他会自主回复的频道中生效。",
-    "help_female": "当需要智能体的消息没有被其他智能体接手时，由她接手，并把工作交给懂行的智能体。在她会自主回复的频道中生效。",
-    "one": "同一时间只能有一个智能体负责协调。",
-    "current": "现在由 {{name}} 协调团队。",
-    "current_female": "现在由 {{name}} 协调团队。",
-    "none": "现在没有人协调团队。",
-    "archive": "{{name}} 正在协调团队。此后将无人协调，直到有人选择另一个智能体。",
-    "archive_female": "{{name}} 正在协调团队。此后将无人协调，直到有人选择另一个智能体。",
-    "yes": "是",
-    "no": "否"
+  "rightHand": {
+    "label": "你的得力助手",
+    "newDot": "新",
+    "callWith": "用 @{{handle}} 呼叫",
+    "role": "工作区助手",
+    "actsAsYou": "以你的权限行事",
+    "composerHint": "没有你，什么都不会变",
+    "intro": {
+      "greeting": "你好，我是 {{name}}。我和你一起组建团队。",
+      "lead": "我创建智能体、连接应用、邀请成员。没有你的点击，什么都不会变，而且我只做你能做的事。",
+      "connect": {
+        "title": "为团队连接 AI",
+        "text": "智能体用工作区的 AI 思考。用你的 Claude 或 ChatGPT 套餐登录，不需要 API 密钥。",
+        "action": "连接"
+      },
+      "start": {
+        "question": "你想怎么开始？",
+        "createOne": "创建 {{name}}",
+        "team": "组建一个入门团队",
+        "describe": "描述我的需求",
+        "import": "导入我的智能体",
+        "form": "填写表单"
+      },
+      "next": {
+        "question": "团队到齐了。接下来呢？",
+        "invite": "邀请成员",
+        "firstTask": "给 {{name}} 第一个任务"
+      },
+      "firstTask": {
+        "theo": "制定我们第一周的计划：我们每个人先做什么？",
+        "ada": "你能先为我们构建或自动化什么？",
+        "lia": "我们最接近的 5 个竞争对手是谁，他们哪些地方做得比我们好？",
+        "atlas": "在我们的错误、队列和部署中，你会先关注什么？出问题时你怎么通知我？"
+      }
+    },
+    "profile": {
+      "how": "运作方式",
+      "permissions": "以你的权限行事",
+      "private": "只在你的私信里和你交谈",
+      "channels": "被呼叫时在频道里回复",
+      "model": "模型",
+      "message": "发消息",
+      "configure": "设置"
+    },
+    "settings": {
+      "name": "名称和外观",
+      "nameHelp": "在侧边栏里它总是显示为“{{label}}”。",
+      "changeLook": "更换外观",
+      "ai": "AI 和模型",
+      "aiHelp": "自动会选能完成任务的最便宜模型。",
+      "budget": "每月预算",
+      "perMonth": "/月",
+      "budgetHelp": "达到上限时，它会像其他智能体一样停下并通知。",
+      "audience": "谁可以使用",
+      "audienceHelp": "不在范围内的人在侧边栏里看不到{{name}}。",
+      "lock": "{{name}}不能归档或删除。没人和它说话时，它不会发任何内容。",
+      "audit": "查看{{name}}做了什么"
+    },
+    "card": {
+      "settings": "{{name}} · 设置",
+      "apply": "应用",
+      "dismiss": "放弃",
+      "decline": "拒绝",
+      "askAdmin": "请管理员处理",
+      "sentTo": "已发送给 {{names}} · {{when}}",
+      "sentToAny": "已发送给决定的人 · {{when}}",
+      "appliedBy": "由 {{name}} 应用",
+      "appliedByYou": "由你应用",
+      "declinedBy": "由 {{name}} 拒绝",
+      "declinedByYou": "由你拒绝",
+      "undo": "撤销",
+      "undone": "已撤销",
+      "stale": "已过时",
+      "staleHelp": "这张卡片之后{{name}}有了变化。没有应用任何内容。",
+      "redo": "重做",
+      "redoMessage": "用现在的值重做{{name}}的卡片",
+      "createTest": "创建并试用",
+      "to": "改为",
+      "editFirst": "先编辑",
+      "superseded": "已被更新的提议取代",
+      "onlyCreators": "只有管理员能创建智能体",
+      "only": {
+        "model": "只有管理员能更改智能体的模型",
+        "budget": "只有管理员能更改智能体的预算",
+        "owner": "只有管理员能更改智能体的负责人",
+        "archive": "只有管理员能归档智能体",
+        "audience": "只有管理员和负责人能更改谁能和它交谈",
+        "channels": "只有管理员和负责人能更改它的频道",
+        "ai_account": "只有账户所有者能分配它",
+        "many": "只有管理员能做这些更改"
+      }
+    },
+    "field": {
+      "model": "模型",
+      "ai_account": "AI 账户",
+      "budget": "每月预算",
+      "owner": "负责人",
+      "audience": "谁能交谈",
+      "archive": "状态",
+      "channel": "频道"
+    },
+    "value": {
+      "none": "无",
+      "budgetDefault": "工作区默认",
+      "anAccount": "一个 AI 账户",
+      "everyone": "所有人",
+      "ownerOnly": "只有负责人",
+      "somePeople": "部分人",
+      "active": "启用",
+      "archived": "已归档",
+      "notIn": "不在频道中",
+      "withoutMention": "无需提及即回复",
+      "mentionOnly": "仅在被提及时"
+    }
   },
   "routing": {
     "title": "谁来挑选智能体",
@@ -2055,6 +2155,9 @@
       "created": "把学到的内容整理成了技能 <b>{{name}}</b>",
       "updated": "修正了技能 <b>{{name}}</b>"
     },
+    "agent": {
+      "settings_changed": "更改了 <b>{{agentName}}</b> 的设置"
+    },
     "other": "做了一项更改",
     "copyWebhook": "复制 Webhook 地址",
     "issueFields": {
@@ -2218,7 +2321,6 @@
     "replyMentionHelp": "只有有人输入 @{{handle}} 时才回复",
     "aloneLine": "会主动加入对话",
     "aloneLine_female": "会主动加入对话",
-    "coordinatorLine": "协调团队：接手没人接的事",
     "mentionLine": "等待有人输入 @{{handle}}",
     "readOnly": "只有频道创建者和管理员可以更改成员。",
     "people": "成员",
@@ -2785,6 +2887,8 @@
       "joinRequest": "<b>{{name}}</b> 申请加入",
       "joinRequestMany": "<b>{{names}}</b> 申请加入",
       "joinSuggestion": "<b>{{by}}</b> 推荐了 <b>{{name}}</b>",
+      "changeRequest": "<b>{{name}}</b> 请求更改 <b>{{agent}}</b>",
+      "changeRequestAgent": "<b>{{name}}</b> 请求新的智能体：<b>{{agent}}</b>",
       "invitationAccepted": "<b>{{name}}</b> 接受了你的邀请并加入了 {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> 接受了你的邀请",
       "reaction_other": "<b>{{names}}</b> 对你的消息发了表情回应"
@@ -3380,8 +3484,7 @@
       "brain": "思考方式",
       "repos": "GitHub 仓库",
       "group": "分组",
-      "handle": "提及",
-      "coordinator": "协调团队"
+      "handle": "提及"
     },
     "lines": {
       "added_other": "新增 {{count}} 行",
@@ -3769,6 +3872,7 @@
     "proposesManyChanges": "<b>{{agent}}</b> 提议 · 修改 {{count}} 个智能体",
     "targetInstructions": "{{name}} 的指令",
     "targetRole": "{{name}} 的角色",
+    "targetSettings": "{{name}}的设置",
     "targetAccess": "{{name}} 的访问权限",
     "targetSkill": "技能 {{skill}}",
     "targetChanges": "对 {{name}} 的修改",
@@ -3812,6 +3916,7 @@
     "titleInstructions": "更新 {{name}} 的指令",
     "titleRole": "更改 {{name}} 的角色",
     "titleAccess": "更改 {{name}} 的访问权限",
+    "titleSettings": "更改{{name}}的设置",
     "titleSkill": "修复技能 {{skill}}",
     "titleContext": "更新 {{org}} 的背景信息",
     "evidence": {
@@ -10978,6 +11083,7 @@
       "account": "你的账号",
       "notifications": "通知",
       "general": "常规",
+      "right_hand": "得力助手",
       "members": "成员和邀请",
       "roles": "角色和权限",
       "access": "智能体和访问权限",
@@ -10998,6 +11104,7 @@
       "account": "你的个人资料和应用外观。",
       "notifications": "收件箱会保留所有内容。你可以在这里选择在此工作区中哪些内容以通知形式推送给你。",
       "general": "名称、时区，以及每个智能体都知道的工作区信息。",
+      "right_hand": "和每个人在其私信里、以其权限组建团队的助手。",
       "members": "工作区里有谁，以及邀请。",
       "roles": "每个人可以做什么。角色权限会叠加。",
       "access": "每个智能体可以使用什么：每个连接器一个级别。",
@@ -11744,6 +11851,7 @@
       "action_install_skill": "安装技能",
       "action_update_skills": "更新技能",
       "agent_proposal": "提议了一个新智能体：{{name}}",
+      "settings_proposal": "提议更改 {{names}}",
       "approval_request": "审批请求：{{title}}",
       "secret_request": "{{agent}} 请求了一个密钥：{{name}}",
       "secret_requestAnon": "请求了一个密钥：{{name}}",

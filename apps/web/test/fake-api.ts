@@ -592,6 +592,28 @@ function mediaSettings(state: FakeState): Pick<OrgSettings, MediaSetting> {
  * A DM of mine with a message in it, so the sidebar's "Mensagens diretas" lists it (`ago`: minutes since that
  * message). The person's are from the seed's members, the agent's from its agents.
  */
+export const LODI_ID = "00000000-0000-4000-8000-0000000000a9";
+
+/** The workspace's right hand (ADR 0137), as the server makes it: Lodi, teal, owned by the workspace owner. */
+export function withRightHand(state: FakeState, extra: Partial<Agent> = {}) {
+  state.agents.push({
+    id: LODI_ID,
+    name: "Lodi",
+    handle: "lodi",
+    role: "",
+    instructions: "",
+    model: "auto",
+    ownerUserId: "u-walter",
+    hasCredential: true,
+    monthlyBudgetUsd: null,
+    createdAt: NOW.toISOString(),
+    appearance: { color: "teal", eyes: "happy", accessory: "headset" },
+    builtin: "right_hand",
+    ...extra,
+  });
+  return state;
+}
+
 export function seedDm(
   state: FakeState,
   partner: { type: "person" | "agent"; id: string },
@@ -1424,6 +1446,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           isMember: true,
           createdAt: NOW.toISOString(),
         });
+        // Its right hand comes with it (ADR 0137).
+        if (!state.agents.some((a) => a.builtin === "right_hand")) withRightHand(state, { ownerUserId: me.user.id });
         return {
           organization: { id: orgId, name: input.name, role: "owner", context: input.context },
           generalChannelId: general,
@@ -1756,6 +1780,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           (r) =>
             (!query.actorType || r.actor.type === query.actorType) &&
             (!query.actorId || r.actor.id === query.actorId) &&
+            (!query.via || (r.actor.type === "agent" && r.actor.id === query.via) || r.details.via === query.via) &&
             (!query.outcome?.length || (r.outcome !== null && query.outcome.includes(r.outcome))) &&
             (!query.waiting ||
               (r.outcome === "pending" && (r.approval?.status === "pending" || r.secret?.status === "pending"))) &&
@@ -1945,8 +1970,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return proposalView(messageId);
       },
       // As the server: the draft as it is, owned by me, with the lines I may give (my own mailboxes).
-      createProposed: async (orgId, messageId) => {
-        log("agents.createProposed", orgId, messageId);
+      createProposed: async (orgId, messageId, options) => {
+        log("agents.createProposed", orgId, messageId, ...(options ? [options] : []));
         const { card } = proposalCard(messageId);
         if (card.state !== "pending") throw new ApiError(409, "agent_proposal.decided", "Already decided");
         const me = state.me?.user.id ?? null;
@@ -1977,7 +2002,18 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           },
           routineId: draft.routine ? id("routine") : null,
         });
-        return { agent: { ...agent }, proposal: proposalView(messageId), ai: state.proposalAi ?? draft.ai.kind };
+        const testChannelId = options?.test && card.params.firstTask ? `dm-${agent.id}` : null;
+        return {
+          agent: { ...agent },
+          proposal: proposalView(messageId),
+          ai: state.proposalAi ?? draft.ai.kind,
+          testChannelId,
+        };
+      },
+      askProposal: async (orgId, messageId) => {
+        log("agents.askProposal", orgId, messageId);
+        Object.assign(proposalCard(messageId).card, { askedAt: new Date().toISOString() });
+        return proposalView(messageId);
       },
       proposalRoutine: async (orgId, messageId) => {
         log("agents.proposalRoutine", orgId, messageId);
@@ -2004,8 +2040,6 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (mailLossSeen && (state.mailLoss?.[agentId] ?? []).some((m) => !mailLossSeen.includes(m.accountId))) {
           throw new ApiError(409, "agent.mail_loss_changed", "It holds a mailbox you weren't asked about");
         }
-        // One agent coordinates the team at a time (ADR 0093).
-        if (fields.coordinator) for (const a of state.agents) a.coordinator = false;
         Object.assign(agent, fields);
         return { ...agent };
       },
@@ -3053,6 +3087,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         });
         return structuredClone(p);
       },
+      ask: async (orgId, id) => {
+        log("proposals.ask", orgId, id);
+        const p = findProposal(id);
+        Object.assign(p, { askedAt: new Date().toISOString() });
+        return structuredClone(p);
+      },
       refuse: async (orgId, id) => {
         log("proposals.refuse", orgId, id);
         const p = findProposal(id);
@@ -3169,7 +3209,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     const message = state.messages.find((m) => m.id === messageId);
     const card = message?.meta?.actionCard as AgentProposalCard | undefined;
     if (!message || card?.kind !== "agent_proposal") throw new ApiError(404, "not_found", "Proposal not found");
-    if (!state.channels.find((c) => c.id === message.channelId)?.isMember) {
+    const inDm = state.dms.some((d) => d.channelId === message.channelId);
+    if (!inDm && !state.channels.find((c) => c.id === message.channelId)?.isMember) {
       throw new ApiError(403, "forbidden", "Join this channel first");
     }
     return { message, card };

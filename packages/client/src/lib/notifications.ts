@@ -366,6 +366,8 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   const at = s.messageId ? { search: { m: s.messageId } } : {};
   if (n.kind === "approval")
     return { to: "/org/$orgId/approvals", ...(s.approvalId ? { search: { open: s.approvalId } } : {}) };
+  // A change someone sent to whoever decides (ADR 0137) is decided on its card in the row: the DM it came from is theirs.
+  if (n.kind === "change_request") return null;
   // Requests to join are answered in Members (ADR 0068).
   if (n.kind === "join_request") return { to: "/org/$orgId/settings/$section", params: { section: "members" } };
   // Someone accepted an invitation (ADR 0090): a conversation with them, to say hi.

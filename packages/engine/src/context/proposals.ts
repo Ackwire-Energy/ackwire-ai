@@ -23,6 +23,7 @@ import {
   setAgentAccess,
   withAccessLines,
 } from "../access";
+import { UNDO_WINDOW_MS } from "../agent-actions";
 import { type Agent, getAgent, updateAgent } from "../agents";
 import { audienceNotice, canTalkTo, seesAgentDetails, speakerFor } from "../audience";
 import { recordAudit } from "../audit";
@@ -33,11 +34,23 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from ".
 import { publishUserEvent } from "../events";
 import { cutText } from "../format";
 import type { Judge } from "../judge";
+import { notify, resolveNotifications } from "../notifications";
 import { can, type Membership, requirePermission } from "../organizations";
 import { enqueue } from "../outbox";
 import { maySql } from "../permissions";
+import { isRightHand } from "../right-hand";
 import { deliverNoticeToRun } from "../run-resume";
 import { userVisibleChannels } from "../search";
+import {
+  applySettings,
+  maySettle,
+  recordSettingsReceipt,
+  type SettingLine,
+  settingLines,
+  settingsDeciders,
+  settingsRows,
+  type WantedLine,
+} from "../settings-proposals";
 import { editedByAgents, pinBlobs, runsCode, skillFolderFiles, writeSkillBody, writeSkillChange } from "../skills";
 import { ALL_TOOLS } from "../tools/scopes";
 import {
@@ -177,7 +190,7 @@ async function announce(deps: { db: Database; pubsub?: PubSub }, proposals: Prop
 
 /** Role and access are decided as on the agent's page: by who manages agents (its owner only takes access away). */
 const isAgentSetting = (p: Pick<Proposal, "target">) =>
-  p.target === "agent_role" || p.target === "agent_access" || p.target === "skill";
+  p.target === "agent_role" || p.target === "agent_access" || p.target === "skill" || p.target === "agent_settings";
 
 /** The agent's owner decides it too: its instructions, or access that only goes away. */
 export const ownerDecides = (p: Pick<Proposal, "target" | "access">) =>
@@ -188,6 +201,7 @@ export const ownerDecides = (p: Pick<Proposal, "target" | "access">) =>
  * (role, access), plus the agent's owner when `ownerDecides`.
  */
 async function deciders(db: Database, p: Proposal) {
+  if (p.target === "agent_settings") return settingsDeciders(db, p);
   const key = isAgentSetting(p) ? "manage_agents" : p.target === "org_context" ? "configure" : "review_memory";
   const admins = await db
     .select({ userId: organizationMembers.userId })
@@ -246,8 +260,19 @@ async function proposalsShown<T extends Proposal>(db: Database, actorId: string,
   return out;
 }
 
+/**
+ * A settings row the right hand made from a person's request and not yet sent on (ADR 0137): until they send it,
+ * only they and whoever reads the conversation its card is in hear of it.
+ */
+async function unsentHidden(db: Database, actorId: string, p: Proposal) {
+  if (p.target !== "agent_settings" || p.askedAt || p.requestedByUserId === actorId) return false;
+  const card = await cardOf(db, p);
+  return !card || !(await userVisibleChannels(db, p.orgId, actorId)).includes(card.channelId);
+}
+
 async function mayDecide(db: Database, actorId: string, p: Proposal) {
   const membership = await requirePermission(db, actorId, p.orgId, "read");
+  if (p.target === "agent_settings") return !(await unsentHidden(db, actorId, p)) && maySettle(db, actorId, p);
   if (isAgentSetting(p)) {
     if (can(membership, "manage_agents")) return true;
     return ownerDecides(p) && !!p.agentId && (await getAgent(db, p.orgId, p.agentId))?.ownerUserId === actorId;
@@ -288,7 +313,10 @@ export async function listProposals(
   const shown = await proposalsShown(db, actorId, membership, all);
   const rows = can(membership, "review_memory") ? shown : await proposalsVisible(db, actorId, orgId, shown);
   const out: (Proposal & { canDecide: boolean })[] = [];
-  for (const r of rows) out.push({ ...r, canDecide: r.status === "pending" && (await mayDecide(db, actorId, r)) });
+  for (const r of rows) {
+    if (await unsentHidden(db, actorId, r)) continue;
+    out.push({ ...r, canDecide: r.status === "pending" && (await mayDecide(db, actorId, r)) });
+  }
   return out;
 }
 
@@ -343,7 +371,14 @@ export async function decideProposal(
             .where(and(eq(agents.id, p.agentId), isNull(agents.archivedAt), isNull(agents.deletedAt)))
             .for("update")
         : [];
-      if (!agent || !(await applied(as, actorId, p, agent, finalText))) status = "stale";
+      if (!agent) status = "stale";
+      else if (p.target === "agent_settings") {
+        if (!(await applySettings({ db: as, pubsub: options.pubsub }, actorId, p, agent))) status = "stale";
+        else {
+          const card = await cardOf(tx, p);
+          if (card) await recordSettingsReceipt(tx, p, actorId, card, agent.name, UNDO_WINDOW_MS);
+        }
+      } else if (!(await applied(as, actorId, p, agent, finalText))) status = "stale";
     }
     const [row] = await tx
       .update(contextProposals)
@@ -363,7 +398,13 @@ export async function decideProposal(
         actor: { type: "person", id: actorId },
         action: status === "accepted" ? "proposal.accepted" : "proposal.refused",
         target: p.agentId ? { type: "agent", id: p.agentId } : { type: "organization", id: orgId },
-        details: { proposalId: p.id, target: p.target, proposedByAgentId: p.proposedByAgentId },
+        details: {
+          proposalId: p.id,
+          target: p.target,
+          proposedByAgentId: p.proposedByAgentId,
+          // "Ver o que o Lodi fez": what a person applied from its cards (ADR 0137).
+          ...(p.target === "agent_settings" ? { via: p.proposedByAgentId, settings: p.settings } : {}),
+        },
       });
     // The lesson now lives in the instructions (or the org context): its memory item leaves memory,
     // or the prompt would carry it twice.
@@ -387,12 +428,82 @@ export async function decideProposal(
     caches.agents.delete(`${orgId}:team`);
     caches.scopes.deletePrefix(`${orgId}:${decided.agentId}`);
   }
-  if (decided.status === "rejected") await recordRefusal(db, actorId, decided);
+  // The right hand keeps no memory (ADR 0137): a refusal teaches it nothing one person could carry to another.
+  if (decided.status === "rejected" && !isRightHand(await proposerOf(db, decided)))
+    await recordRefusal(db, actorId, decided);
   // Also for a row gone stale: it may be the card's last open one.
   await tellProposer({ db, pubsub: options.pubsub }, decided).catch(() => {});
+  await settled({ db, pubsub: options.pubsub }, decided).catch(() => {});
   if (decided.status === "stale")
     throw new ConflictError("What this was proposed against changed since, so it can't be applied.");
   return decided;
+}
+
+const proposerOf = async (db: Database, p: Proposal) =>
+  p.proposedByAgentId ? getAgent(db, p.orgId, p.proposedByAgentId) : null;
+
+/**
+ * After a decision: the inbox entries asking for it are done, and the person who asked sees "Aplicado por …" or
+ * "Recusado por …" on their card live (`proposal.decided`).
+ */
+async function settled(deps: { db: Database; pubsub?: PubSub }, p: Proposal) {
+  await resolveNotifications(deps, p.orgId, { groupKey: askGroup(p.id) });
+  if (p.requestedByUserId && p.requestedByUserId !== p.decidedByUserId)
+    await publishUserEvent(deps.pubsub, p.orgId, p.requestedByUserId, {
+      type: "proposal.decided",
+      proposalId: p.id,
+      status: p.status,
+    });
+}
+
+const askGroup = (proposalId: string) => `change_request:${proposalId}`;
+
+/**
+ * "Pedir a um admin" (ADR 0137): the person who asked for a change they can't decide sends the row to whoever may.
+ * Until then nobody else hears of it. Once per row; each decider gets an inbox entry (waiting) with who asked and why,
+ * and the row's card shows it was sent (`askedAt`).
+ */
+export async function askProposal(
+  deps: { db: Database; pubsub?: PubSub },
+  actorId: string,
+  orgId: string,
+  proposalId: string,
+) {
+  const { db } = deps;
+  const [p] = await db
+    .select()
+    .from(contextProposals)
+    .where(and(eq(contextProposals.id, proposalId), eq(contextProposals.orgId, orgId)));
+  if (!p) throw new NotFoundError("Proposal not found");
+  await requirePermission(db, actorId, orgId, "read");
+  if (p.requestedByUserId !== actorId)
+    throw new ForbiddenError("Only the person who asked for it can send it", "proposal.not_requester");
+  if (p.status !== "pending") throw new ConflictError("This proposal was already decided", "proposal.decided");
+  if (p.askedAt) throw new ConflictError("It was already sent", "proposal.asked");
+  if (await mayDecide(db, actorId, p)) throw new ConflictError("You can decide this yourself", "proposal.yours");
+  const [row] = await db
+    .update(contextProposals)
+    .set({ askedAt: new Date() })
+    .where(and(eq(contextProposals.id, p.id), eq(contextProposals.status, "pending"), isNull(contextProposals.askedAt)))
+    .returning();
+  if (!row) throw new ConflictError("It was already sent", "proposal.asked");
+  await announce(deps, [row]);
+  const [card, target] = await Promise.all([cardOf(db, row), row.agentId ? getAgent(db, orgId, row.agentId) : null]);
+  await notify(deps, {
+    orgId,
+    userIds: await deciders(db, row),
+    kind: "change_request",
+    groupKey: askGroup(row.id),
+    waiting: true,
+    actor: { type: "user", id: actorId },
+    source: {
+      proposalId: row.id,
+      ...(card ? { messageId: card.messageId, channelId: card.channelId } : {}),
+      ...(target ? { agentId: target.id, label: target.name } : {}),
+    },
+    latest: { text: cutText(row.rationale, 280) },
+  }).catch(() => {});
+  return row;
 }
 
 /** The skill a `skill` proposal changes: its id is the proposal's one access line (`proposeSkillChange`). */
@@ -512,6 +623,8 @@ function refusedChange(p: Proposal) {
       .filter((l) => l && l !== LEARNED)
       .join(" ");
   if (p.target === "agent_role") return `role: ${p.proposedText}`;
+  if (p.target === "agent_settings")
+    return `settings: ${(p.settings ?? []).map((l) => `${l.field} ${JSON.stringify(l.label?.from ?? l.from)} → ${JSON.stringify(l.label?.to ?? l.to)}`).join(", ")}`;
   if (p.target === "skill") return `skill ${p.access?.[0]?.label ?? ""}: ${lines("+")}`.trim();
   if (p.target === "agent_access")
     return `access: ${(p.access ?? []).map((l) => `${l.label} ${l.on ? "on" : "off"}`).join(", ")}`;
@@ -590,15 +703,17 @@ async function cardResult(db: Executor, proposerId: string, rows: Proposal[]) {
 }
 
 /**
- * The card a proposal is on, from the agent's message that shows it (`meta.memoryUpdates`): the run that proposed
- * it and every row on the card. None before that message is posted, or for a proposal no message shows.
+ * The card a proposal is on, from the agent's message that shows it (`meta.memoryUpdates`, or a settings card's
+ * `meta.actionCard`): the run that proposed it and every row on the card. None before that message is posted, or for
+ * a proposal no message shows.
  */
 async function cardOf(db: Executor, p: Proposal) {
   if (!p.proposedByAgentId) return null;
   const has = (update: Record<string, unknown>) =>
     sql`${messages.meta}->'memoryUpdates' @> ${JSON.stringify([update])}::jsonb`;
+  const onSettingsCard = sql`${messages.meta}->'actionCard'->'proposalIds' @> ${JSON.stringify([p.id])}::jsonb`;
   const [message] = await db
-    .select({ agentRunId: messages.agentRunId, meta: messages.meta })
+    .select({ id: messages.id, channelId: messages.channelId, agentRunId: messages.agentRunId, meta: messages.meta })
     .from(messages)
     .where(
       and(
@@ -606,15 +721,18 @@ async function cardOf(db: Executor, p: Proposal) {
         eq(messages.authorAgentId, p.proposedByAgentId),
         // Written after the proposal; the minute only covers clocks that disagree.
         gte(messages.createdAt, new Date(p.createdAt.getTime() - 60_000)),
-        or(has({ proposalIds: [p.id] }), has({ proposalId: p.id })),
+        or(has({ proposalIds: [p.id] }), has({ proposalId: p.id }), onSettingsCard),
       ),
     )
     .orderBy(asc(messages.createdAt))
     .limit(1);
   if (!message?.agentRunId) return null;
+  const at = { runId: message.agentRunId, messageId: message.id, channelId: message.channelId };
+  const settings = settingsCardOf(message.meta);
+  if (settings) return { ...at, ids: settings.proposalIds };
   const updates = message.meta.memoryUpdates as { proposalId?: string; proposalIds?: string[] }[];
   const update = updates.find((u) => u.proposalId === p.id || u.proposalIds?.includes(p.id));
-  return { runId: message.agentRunId, ids: update?.proposalIds?.length ? update.proposalIds : [p.id] };
+  return { ...at, ids: update?.proposalIds?.length ? update.proposalIds : [p.id] };
 }
 
 /**
@@ -771,6 +889,7 @@ export async function proposeChange(
     orgId,
     proposedByAgentId: input.agentId,
     rationale: input.rationale.slice(0, 1000) || "Asked in conversation.",
+    requestedByUserId: input.requesterId,
   };
   const rows: (typeof contextProposals.$inferInsert)[] = [];
   const skipped: string[] = [];
@@ -855,6 +974,70 @@ export async function proposeChange(
   await checkPermissionText(deps.judge, orgId, [...added, ...removed.map((l) => `Removes: ${l}`)].join("\n"));
   const proposals = await db.insert(contextProposals).values(rows).returning();
   await announce(deps, proposals);
+  const out: (Proposal & { canDecide: boolean })[] = [];
+  for (const p of proposals) out.push({ ...p, canDecide: await mayDecide(db, input.requesterId, p) });
+  return { proposals: out, skipped };
+}
+
+/** `meta.actionCard` of the right hand's settings card (ADR 0137): its rows, read live (`GET …/proposals?ids=`). */
+export interface SettingsProposalCard {
+  kind: "settings_proposal";
+  forUserId: string | null;
+  proposalIds: string[];
+}
+
+export const settingsCardOf = (meta: Record<string, unknown> | null | undefined): SettingsProposalCard | null => {
+  const card = meta?.actionCard as Partial<SettingsProposalCard> | undefined;
+  return card?.kind === "settings_proposal" && Array.isArray(card.proposalIds) ? (card as SettingsProposalCard) : null;
+};
+
+/**
+ * The right hand's settings card (ADR 0137, amending 0092 §5): a teammate's model, AI account, budget, owner, who
+ * talks to it, its channels and reply mode, or archiving it, one row per agent and decider group. Only agents the
+ * person who asked can talk to. Nothing is applied here: whoever may make each change applies it as themselves, and a
+ * row the person who asked can't decide waits until they send it ("Pedir a um admin", `askProposal`), so nobody else
+ * is told now. What can't be proposed is left off, with why in `skipped`.
+ */
+export async function proposeSettings(
+  deps: { db: Database },
+  input: {
+    orgId: string;
+    agentId: string;
+    targets: { agentId: string; lines: WantedLine[] }[];
+    rationale: string;
+    requesterId: string;
+  },
+): Promise<{ proposals: (Proposal & { canDecide: boolean })[]; skipped: string[] }> {
+  const { db } = deps;
+  const team = await cardAgents(
+    db,
+    input.orgId,
+    [...new Set(input.targets.map((t) => t.agentId))],
+    input.agentId,
+    input.requesterId,
+  );
+  const rows: (typeof contextProposals.$inferInsert)[] = [];
+  const skipped: string[] = [];
+  for (const [agentId, agent] of team) {
+    const wanted = input.targets.filter((t) => t.agentId === agentId).flatMap((t) => t.lines);
+    const checked = await settingLines(db, input.orgId, input.requesterId, agent, wanted);
+    skipped.push(...checked.skipped);
+    for (const row of settingsRows(checked.lines))
+      rows.push({
+        orgId: input.orgId,
+        target: "agent_settings",
+        agentId,
+        proposedByAgentId: input.agentId,
+        requestedByUserId: input.requesterId,
+        baseHash: row.baseHash,
+        proposedText: "",
+        diff: "",
+        settings: row.settings as SettingLine[],
+        rationale: input.rationale.slice(0, 1000) || "Asked in conversation.",
+      });
+  }
+  if (rows.length === 0) return { proposals: [], skipped };
+  const proposals = await db.insert(contextProposals).values(rows).returning();
   const out: (Proposal & { canDecide: boolean })[] = [];
   for (const p of proposals) out.push({ ...p, canDecide: await mayDecide(db, input.requesterId, p) });
   return { proposals: out, skipped };

@@ -1461,7 +1461,6 @@
       "writing": "menulis"
     },
     "autoReplyChip": "menjawab tanpa disebut",
-    "coordinatorChip": "mengoordinasikan tim",
     "more": "Tindakan pesan lainnya",
     "copyLink": "Salin tautan",
     "linkCopied": "Tautan disalin.",
@@ -1607,24 +1606,124 @@
       "only_agent_female": "Hanya {{name}} yang menjawab di sini tanpa disebut",
       "follow_up": "Melanjutkan obrolan dengan {{name}}",
       "follow_up_female": "Melanjutkan obrolan dengan {{name}}",
-      "coordinator": "{{name}} mengoordinasi tim",
-      "coordinator_female": "{{name}} mengoordinasi tim",
       "default": "Tidak ada yang dipanggil, jadi {{name}} yang menjawab",
       "default_female": "Tidak ada yang dipanggil, jadi {{name}} yang menjawab"
     }
   },
-  "coordinator": {
-    "chip": "Mengoordinasi tim",
-    "help": "Mengambil pesan yang butuh agen saat tidak ada agen lain yang mengambilnya, lalu menyerahkan pekerjaannya ke yang paling paham. Berlaku di kanal tempat dia menjawab sendiri.",
-    "help_female": "Mengambil pesan yang butuh agen saat tidak ada agen lain yang mengambilnya, lalu menyerahkan pekerjaannya ke yang paling paham. Berlaku di kanal tempat dia menjawab sendiri.",
-    "one": "Hanya satu agen yang mengoordinasi dalam satu waktu.",
-    "current": "{{name}} sekarang mengoordinasi tim.",
-    "current_female": "{{name}} sekarang mengoordinasi tim.",
-    "none": "Saat ini tidak ada yang mengoordinasi tim.",
-    "archive": "{{name}} mengoordinasi tim. Setelah ini, tidak ada yang mengoordinasi sampai seseorang memilih agen lain.",
-    "archive_female": "{{name}} mengoordinasi tim. Setelah ini, tidak ada yang mengoordinasi sampai seseorang memilih agen lain.",
-    "yes": "Ya",
-    "no": "Tidak"
+  "rightHand": {
+    "label": "tangan kanan Anda",
+    "newDot": "Baru",
+    "callWith": "panggil dengan @{{handle}}",
+    "role": "Asisten workspace",
+    "actsAsYou": "bertindak dengan izin Anda",
+    "composerHint": "tak ada yang berubah tanpa Anda",
+    "intro": {
+      "greeting": "Halo, saya {{name}}. Saya menyusun tim bersama Anda.",
+      "lead": "Saya membuat agen, menghubungkan aplikasi, dan mengundang orang. Tidak ada yang berubah tanpa klik Anda, dan saya hanya melakukan apa yang bisa Anda lakukan.",
+      "connect": {
+        "title": "Hubungkan AI untuk tim",
+        "text": "Agen berpikir dengan AI workspace. Masuk dengan paket Claude atau ChatGPT Anda, tanpa kunci API.",
+        "action": "Hubungkan"
+      },
+      "start": {
+        "question": "Bagaimana Anda ingin mulai?",
+        "createOne": "Buat {{name}}",
+        "team": "Susun tim awal",
+        "describe": "Jelaskan yang saya butuhkan",
+        "import": "Impor agen saya",
+        "form": "Isi formulir"
+      },
+      "next": {
+        "question": "Timnya sudah datang. Lalu apa?",
+        "invite": "Undang orang",
+        "firstTask": "Beri {{name}} tugas pertama"
+      },
+      "firstTask": {
+        "theo": "Susun rencana minggu pertama kita: apa yang dikerjakan masing-masing dari kita lebih dulu?",
+        "ada": "Apa yang bisa kamu bangun atau otomatiskan untuk kami lebih dulu?",
+        "lia": "Siapa 5 pesaing terdekat kita, dan apa yang mereka lakukan lebih baik dari kita?",
+        "atlas": "Apa yang akan kamu pantau lebih dulu dari error, antrean, dan deploy kita, dan bagaimana kamu memberi tahu saya saat ada yang rusak?"
+      }
+    },
+    "profile": {
+      "how": "Cara kerjanya",
+      "permissions": "Bertindak dengan izin Anda",
+      "private": "Hanya bicara dengan Anda di DM Anda",
+      "channels": "Menjawab di kanal saat dipanggil",
+      "model": "Model",
+      "message": "Pesan",
+      "configure": "Atur"
+    },
+    "settings": {
+      "name": "Nama dan tampilan",
+      "nameHelp": "Di bilah samping selalu tampil sebagai “{{label}}”.",
+      "changeLook": "Ubah tampilan",
+      "ai": "AI dan model",
+      "aiHelp": "Otomatis memilih model termurah yang sanggup.",
+      "budget": "Anggaran bulanan",
+      "perMonth": "/bulan",
+      "budgetHelp": "Saat mencapai batas, ia berhenti dan memberi tahu, seperti agen lain.",
+      "audience": "Siapa yang bisa memakai",
+      "audienceHelp": "Di luar itu, orang tidak melihat {{name}} di bilah samping.",
+      "lock": "{{name}} tidak bisa diarsipkan atau dihapus. Ia tidak memposting apa pun kalau tak ada yang mengajaknya bicara.",
+      "audit": "Lihat apa yang dilakukan {{name}}"
+    },
+    "card": {
+      "settings": "{{name}} · Pengaturan",
+      "apply": "Terapkan",
+      "dismiss": "Abaikan",
+      "decline": "Tolak",
+      "askAdmin": "Minta ke admin",
+      "sentTo": "Dikirim ke {{names}} · {{when}}",
+      "sentToAny": "Dikirim ke yang memutuskan · {{when}}",
+      "appliedBy": "Diterapkan oleh {{name}}",
+      "appliedByYou": "Diterapkan oleh Anda",
+      "declinedBy": "Ditolak oleh {{name}}",
+      "declinedByYou": "Ditolak oleh Anda",
+      "undo": "Urungkan",
+      "undone": "Diurungkan",
+      "stale": "Kedaluwarsa",
+      "staleHelp": "{{name}} berubah setelah kartu ini. Tidak ada yang diterapkan.",
+      "redo": "Ulangi",
+      "redoMessage": "Buat ulang kartu {{name}} dengan nilai sekarang",
+      "createTest": "Buat dan coba",
+      "to": "menjadi",
+      "editFirst": "Edit dulu",
+      "superseded": "Diganti oleh usulan yang lebih baru",
+      "onlyCreators": "Hanya admin yang membuat agen",
+      "only": {
+        "model": "Hanya admin yang mengubah model agen",
+        "budget": "Hanya admin yang mengubah anggaran agen",
+        "owner": "Hanya admin yang mengubah penanggung jawab agen",
+        "archive": "Hanya admin yang mengarsipkan agen",
+        "audience": "Hanya admin dan penanggung jawabnya yang mengubah siapa yang bicara dengannya",
+        "channels": "Hanya admin dan penanggung jawabnya yang mengubah kanalnya",
+        "ai_account": "Hanya pemilik akun yang memberikannya",
+        "many": "Hanya admin yang membuat perubahan ini"
+      }
+    },
+    "field": {
+      "model": "Model",
+      "ai_account": "Akun AI",
+      "budget": "Anggaran bulanan",
+      "owner": "Penanggung jawab",
+      "audience": "Siapa yang bisa bicara",
+      "archive": "Status",
+      "channel": "Kanal"
+    },
+    "value": {
+      "none": "Tidak ada",
+      "budgetDefault": "Bawaan workspace",
+      "anAccount": "Sebuah akun AI",
+      "everyone": "Semua orang",
+      "ownerOnly": "Hanya penanggung jawabnya",
+      "somePeople": "Beberapa orang",
+      "active": "Aktif",
+      "archived": "Diarsipkan",
+      "notIn": "Tidak di kanal",
+      "withoutMention": "Menjawab tanpa disebut",
+      "mentionOnly": "Hanya saat disebut"
+    }
   },
   "routing": {
     "title": "Siapa yang memilih agen",
@@ -2064,6 +2163,9 @@
       "created": "Mengubah yang aku pelajari menjadi skill <b>{{name}}</b>",
       "updated": "Memperbaiki skill <b>{{name}}</b>"
     },
+    "agent": {
+      "settings_changed": "Mengubah pengaturan <b>{{agentName}}</b>"
+    },
     "other": "Membuat perubahan",
     "copyWebhook": "Salin alamat webhook",
     "issueFields": {
@@ -2227,7 +2329,6 @@
     "replyMentionHelp": "Hanya menjawab saat ada yang menulis @{{handle}}",
     "aloneLine": "Ikut percakapan atas inisiatif sendiri",
     "aloneLine_female": "Ikut percakapan atas inisiatif sendiri",
-    "coordinatorLine": "Mengoordinasikan tim: mengambil yang tidak diambil siapa pun",
     "mentionLine": "Menunggu seseorang menulis @{{handle}}",
     "readOnly": "Hanya pembuat kanal dan admin yang bisa mengubah anggota.",
     "people": "Orang",
@@ -2795,6 +2896,8 @@
       "joinRequest": "<b>{{name}}</b> meminta bergabung",
       "joinRequestMany": "<b>{{names}}</b> meminta bergabung",
       "joinSuggestion": "<b>{{by}}</b> mengusulkan <b>{{name}}</b>",
+      "changeRequest": "<b>{{name}}</b> meminta perubahan pada <b>{{agent}}</b>",
+      "changeRequestAgent": "<b>{{name}}</b> meminta agen baru: <b>{{agent}}</b>",
       "invitationAccepted": "<b>{{name}}</b> menerima undanganmu dan bergabung ke {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> menerima undanganmu",
       "reaction_other": "<b>{{names}}</b> bereaksi pada pesanmu"
@@ -3364,8 +3467,7 @@
       "brain": "Siapa yang berpikir",
       "repos": "Repositori GitHub",
       "group": "Grup",
-      "handle": "Sebutan",
-      "coordinator": "Mengoordinasikan tim"
+      "handle": "Sebutan"
     },
     "lines": {
       "added_other": "{{count}} baris baru",
@@ -3738,6 +3840,7 @@
     "targetInstructions_female": "instruksi {{name}}",
     "targetRole": "peran {{name}}",
     "targetRole_female": "peran {{name}}",
+    "targetSettings": "pengaturan {{name}}",
     "targetAccess": "akses {{name}}",
     "targetAccess_female": "akses {{name}}",
     "targetSkill": "skill {{skill}}",
@@ -3787,6 +3890,7 @@
     "titleRole_female": "Ubah peran {{name}}",
     "titleAccess": "Ubah akses {{name}}",
     "titleAccess_female": "Ubah akses {{name}}",
+    "titleSettings": "Ubah pengaturan {{name}}",
     "titleSkill": "Perbaiki skill {{skill}}",
     "titleContext": "Perbarui konteks {{org}}",
     "evidence": {
@@ -10968,6 +11072,7 @@
       "account": "Akunmu",
       "notifications": "Notifikasi",
       "general": "Umum",
+      "right_hand": "Tangan kanan",
       "members": "Anggota dan undangan",
       "roles": "Peran dan izin",
       "access": "Agen dan akses",
@@ -10988,6 +11093,7 @@
       "account": "Profilmu dan tampilan aplikasi untukmu.",
       "notifications": "Kotak masuk menyimpan semuanya. Di sini kamu memilih apa yang sampai padamu sebagai notifikasi, di ruang kerja ini.",
       "general": "Nama, zona waktu, dan apa yang diketahui setiap agen tentang ruang kerja.",
+      "right_hand": "Asisten yang menyusun tim bersama tiap orang, di DM mereka dan dengan izin mereka.",
       "members": "Siapa saja yang ada di ruang kerja, dan undangan.",
       "roles": "Yang bisa dilakukan tiap orang. Peran saling menambah.",
       "access": "Yang bisa dipakai tiap agen: satu tingkat per konektor.",
@@ -11728,6 +11834,7 @@
       "action_install_skill": "Pasang skill",
       "action_update_skills": "Perbarui skill",
       "agent_proposal": "Mengusulkan agen baru: {{name}}",
+      "settings_proposal": "Mengusulkan perubahan untuk {{names}}",
       "approval_request": "Permintaan persetujuan: {{title}}",
       "secret_request": "{{agent}} meminta kunci: {{name}}",
       "secret_requestAnon": "Meminta kunci: {{name}}",

@@ -1512,7 +1512,6 @@
       "writing": "yazıyor"
     },
     "autoReplyChip": "bahsetme olmadan yanıt verir",
-    "coordinatorChip": "ekibi koordine eder",
     "more": "Diğer mesaj işlemleri",
     "copyLink": "Bağlantıyı kopyala",
     "linkCopied": "Bağlantı kopyalandı.",
@@ -1671,20 +1670,123 @@
       "reply": "{{name}} kişisine bir yanıt",
       "only_agent": "Burada bahsedilmeden yalnızca {{name}} yanıtlar",
       "follow_up": "{{name}} ile konuşmayı sürdürüyor",
-      "coordinator": "Ekibi {{name}} koordine ediyor",
       "default": "Kimse çağrılmadı, bu yüzden {{name}} yanıtladı"
     }
   },
-  "coordinator": {
-    "chip": "Ekibi koordine eder",
-    "help": "Başka bir ajanın almadığı ve bir ajan gerektiren mesajları alır, işi bilen kişiye devreder. Kendiliğinden yanıt verdiği kanallarda geçerlidir.",
-    "help_female": "Başka bir ajanın almadığı ve bir ajan gerektiren mesajları alır, işi bilen kişiye devreder. Kendiliğinden yanıt verdiği kanallarda geçerlidir.",
-    "one": "Aynı anda tek bir ajan koordine eder.",
-    "current": "Ekibi şu anda {{name}} koordine ediyor.",
-    "none": "Ekibi şu anda kimse koordine etmiyor.",
-    "archive": "Ekibi {{name}} koordine ediyor. Bundan sonra biri başka bir ajan seçene kadar kimse koordine etmez.",
-    "yes": "Evet",
-    "no": "Hayır"
+  "rightHand": {
+    "label": "sağ kolun",
+    "newDot": "Yeni",
+    "callWith": "@{{handle}} ile çağır",
+    "role": "Çalışma alanı asistanı",
+    "actsAsYou": "senin izinlerinle çalışır",
+    "composerHint": "sen olmadan hiçbir şey değişmez",
+    "intro": {
+      "greeting": "Merhaba, ben {{name}}. Ekibi seninle birlikte kuruyorum.",
+      "lead": "Ajanları oluşturur, uygulamaları bağlar ve kişileri davet ederim. Sen tıklamadan hiçbir şey değişmez ve yalnızca senin yapabildiklerini yaparım.",
+      "connect": {
+        "title": "Ekip için bir yapay zeka bağla",
+        "text": "Ajanlar çalışma alanının yapay zekasıyla düşünür. Claude veya ChatGPT planınla giriş yap, API anahtarı gerekmez.",
+        "action": "Bağla"
+      },
+      "start": {
+        "question": "Nasıl başlamak istersin?",
+        "createOne": "{{name}} oluştur",
+        "team": "Başlangıç ekibi kur",
+        "describe": "Neye ihtiyacım olduğunu anlat",
+        "import": "Ajanlarımı içe aktar",
+        "form": "Formu doldur"
+      },
+      "next": {
+        "question": "Ekip geldi. Şimdi ne yapalım?",
+        "invite": "Kişileri davet et",
+        "firstTask": "{{name}} için ilk görevi ver"
+      },
+      "firstTask": {
+        "theo": "İlk haftamızın planını çıkar: her birimiz önce ne yapıyor?",
+        "ada": "Bizim için önce neyi geliştirebilir ya da otomatikleştirebilirsin?",
+        "lia": "En yakın 5 rakibimiz kim ve bizden daha iyi ne yapıyorlar?",
+        "atlas": "Hatalarımızda, kuyruklarımızda ve deploy'larımızda önce neyi izleyeceksin, bir şey bozulduğunda bana nasıl haber vereceksin?"
+      }
+    },
+    "profile": {
+      "how": "Nasıl çalışır",
+      "permissions": "Senin izinlerinle çalışır",
+      "private": "DM'inde yalnızca seninle konuşur",
+      "channels": "Çağrıldığında kanallarda yanıt verir",
+      "model": "Model",
+      "message": "Mesaj",
+      "configure": "Ayarla"
+    },
+    "settings": {
+      "name": "Ad ve görünüm",
+      "nameHelp": "Kenar çubuğunda hep “{{label}}” olarak görünür.",
+      "changeLook": "Görünümü değiştir",
+      "ai": "Yapay zekâ ve model",
+      "aiHelp": "Otomatik, işi görecek en ucuz modeli seçer.",
+      "budget": "Aylık bütçe",
+      "perMonth": "/ay",
+      "budgetHelp": "Sınıra ulaşınca her ajan gibi durur ve haber verir.",
+      "audience": "Kimler kullanabilir",
+      "audienceHelp": "Bunun dışındaki kişi kenar çubuğunda {{name}} adını görmez.",
+      "lock": "{{name}} arşivlenemez ve silinemez. Biri onunla konuşmadıkça hiçbir şey paylaşmaz.",
+      "audit": "{{name}} neler yaptı, gör"
+    },
+    "card": {
+      "settings": "{{name}} · Ayarlar",
+      "apply": "Uygula",
+      "dismiss": "Vazgeç",
+      "decline": "Reddet",
+      "askAdmin": "Bir yöneticiye sor",
+      "sentTo": "{{names}} kişisine gönderildi · {{when}}",
+      "sentToAny": "Karar verene gönderildi · {{when}}",
+      "appliedBy": "{{name}} uyguladı",
+      "appliedByYou": "Sen uyguladın",
+      "declinedBy": "{{name}} reddetti",
+      "declinedByYou": "Sen reddettin",
+      "undo": "Geri al",
+      "undone": "Geri alındı",
+      "stale": "Güncel değil",
+      "staleHelp": "Bu karttan sonra {{name}} değişti. Hiçbir şey uygulanmadı.",
+      "redo": "Yeniden yap",
+      "redoMessage": "{{name}} kartını şimdiki değerlerle yeniden yap",
+      "createTest": "Oluştur ve dene",
+      "to": "yerine",
+      "editFirst": "Önce düzenle",
+      "superseded": "Daha yeni öneriyle değiştirildi",
+      "onlyCreators": "Ajanları yalnızca yöneticiler oluşturur",
+      "only": {
+        "model": "Bir ajanın modelini yalnızca yöneticiler değiştirir",
+        "budget": "Bir ajanın bütçesini yalnızca yöneticiler değiştirir",
+        "owner": "Bir ajanın sorumlusunu yalnızca yöneticiler değiştirir",
+        "archive": "Bir ajanı yalnızca yöneticiler arşivler",
+        "audience": "Onunla kimin konuşacağını yalnızca yöneticiler ve sorumlusu değiştirir",
+        "channels": "Kanallarını yalnızca yöneticiler ve sorumlusu değiştirir",
+        "ai_account": "Yalnızca hesabın sahibi verebilir",
+        "many": "Bu değişiklikleri yalnızca yöneticiler yapar"
+      }
+    },
+    "field": {
+      "model": "Model",
+      "ai_account": "Yapay zekâ hesabı",
+      "budget": "Aylık bütçe",
+      "owner": "Sorumlu",
+      "audience": "Kimler konuşabilir",
+      "archive": "Durum",
+      "channel": "Kanal"
+    },
+    "value": {
+      "none": "Yok",
+      "budgetDefault": "Çalışma alanı varsayılanı",
+      "anAccount": "Bir yapay zekâ hesabı",
+      "everyone": "Herkes",
+      "ownerOnly": "Yalnızca sorumlusu",
+      "somePeople": "Bazı kişiler",
+      "active": "Etkin",
+      "archived": "Arşivlendi",
+      "notIn": "Kanalda değil",
+      "withoutMention": "Bahsetme olmadan yanıt verir",
+      "mentionOnly": "Yalnızca bahsedilince"
+    }
   },
   "routing": {
     "title": "Ajanları kim seçer",
@@ -2123,6 +2225,9 @@
       "created": "Öğrendiklerimi <b>{{name}}</b> becerisine dönüştürdüm",
       "updated": "<b>{{name}}</b> becerisini düzelttim"
     },
+    "agent": {
+      "settings_changed": "<b>{{agentName}}</b> ayarlarını değiştirdim"
+    },
     "other": "Bir değişiklik yaptım",
     "copyWebhook": "Webhook adresini kopyala",
     "issueFields": {
@@ -2293,7 +2398,6 @@
     "replyMentionHelp": "Yalnızca biri @{{handle}} yazdığında yanıt verir",
     "aloneLine": "Sohbete kendiliğinden katılır",
     "aloneLine_female": "Sohbete kendiliğinden katılır",
-    "coordinatorLine": "Ekibi koordine eder: kimsenin almadığını alır",
     "mentionLine": "Birinin @{{handle}} yazmasını bekler",
     "readOnly": "Üyeleri yalnızca kanalı oluşturan kişi ve yöneticiler değiştirebilir.",
     "people": "Kişiler",
@@ -2874,6 +2978,8 @@
       "joinRequest": "<b>{{name}}</b> katılmak istiyor",
       "joinRequestMany": "<b>{{names}}</b> katılmak istiyor",
       "joinSuggestion": "<b>{{by}}</b>, <b>{{name}}</b> kişisini önerdi",
+      "changeRequest": "<b>{{name}}</b>, <b>{{agent}}</b> için bir değişiklik istiyor",
+      "changeRequestAgent": "<b>{{name}}</b> yeni bir ajan istiyor: <b>{{agent}}</b>",
       "invitationAccepted": "<b>{{name}}</b> davetinizi kabul etti ve {{org}} çalışma alanına katıldı",
       "invitationAcceptedAny": "<b>{{name}}</b> davetinizi kabul etti",
       "reaction_one": "<b>{{names}}</b> mesajınıza tepki verdi",
@@ -3458,8 +3564,7 @@
       "brain": "Düşünen yapay zeka",
       "repos": "GitHub depoları",
       "group": "Grup",
-      "handle": "Bahsetmeler",
-      "coordinator": "Ekibi koordine eder"
+      "handle": "Bahsetmeler"
     },
     "lines": {
       "added_one": "{{count}} yeni satır",
@@ -3846,6 +3951,7 @@
     "proposesManyChanges": "<b>{{agent}}</b> öneriyor · {{count}} ajanda değişiklik",
     "targetInstructions": "{{name}} talimatları",
     "targetRole": "{{name}} rolü",
+    "targetSettings": "{{name}} ayarları",
     "targetAccess": "{{name}} erişimi",
     "targetSkill": "{{skill}} becerisi",
     "targetChanges": "{{name}} için değişiklikler",
@@ -3891,6 +3997,7 @@
     "titleInstructions": "{{name}} talimatlarını güncelle",
     "titleRole": "{{name}} rolünü değiştir",
     "titleAccess": "{{name}} erişimini değiştir",
+    "titleSettings": "{{name}} ayarlarını değiştir",
     "titleSkill": "{{skill}} becerisini düzelt",
     "titleContext": "{{org}} bağlamını güncelle",
     "evidence": {
@@ -11258,6 +11365,7 @@
       "account": "Hesabınız",
       "notifications": "Bildirimler",
       "general": "Genel",
+      "right_hand": "Sağ kol",
       "members": "Üyeler ve davetler",
       "roles": "Roller ve izinler",
       "access": "Ajanlar ve erişim",
@@ -11278,6 +11386,7 @@
       "account": "Profiliniz ve uygulamanın size nasıl göründüğü.",
       "notifications": "Gelen kutusu her şeyi saklar. Burada, bu çalışma alanında size neyin bildirim olarak ulaşacağını seçersiniz.",
       "general": "Ad, saat dilimi ve her ajanın çalışma alanı hakkında bildikleri.",
+      "right_hand": "Herkesle kendi DM'inde, kendi izinleriyle ekibi kuran asistan.",
       "members": "Çalışma alanında kimler var ve davetler.",
       "roles": "Her kişinin neler yapabileceği. Roller toplanır.",
       "access": "Her ajanın neleri kullanabileceği: bağlayıcı başına bir düzey.",
@@ -12032,6 +12141,7 @@
       "action_install_skill": "Beceri yükle",
       "action_update_skills": "Becerileri güncelle",
       "agent_proposal": "Yeni bir ajan önerdi: {{name}}",
+      "settings_proposal": "{{names}} için bir değişiklik önerdi",
       "approval_request": "Onay isteği: {{title}}",
       "secret_request": "{{agent}} bir anahtar istedi: {{name}}",
       "secret_requestAnon": "Bir anahtar istendi: {{name}}",

@@ -265,13 +265,13 @@ describe("imports and the export", () => {
       (
         (await (await b(`/api/app/organizations/${orgId}/agents`)).json()) as { agents: { handle: string }[] }
       ).agents.map((a) => a.handle);
-    expect(await agents()).toEqual(["dev"]);
+    expect(await agents()).toEqual(["lodi", "dev"]);
     // Planned only: nothing came yet.
     expect(await sources()).toEqual([]);
 
     const applied = (await (await b(imports, { json: { bundle: BUNDLE, dryRun: false } })).json()) as Plan;
     expect(applied.items.every((i) => i.action === "create" && i.targetId)).toBe(true);
-    expect(await agents()).toEqual(["dev", "scout"]);
+    expect(await agents()).toEqual(["lodi", "dev", "scout"]);
     const routines = (await (await b(`/api/app/organizations/${orgId}/routines`)).json()) as {
       routines: { name: string; active: boolean; nextRunAt: string | null }[];
     };

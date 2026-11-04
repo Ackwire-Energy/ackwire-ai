@@ -38,6 +38,7 @@ import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can, managesChannel } from "@agenteschat/client/lib/permissions";
 import { AVAILABILITIES, clearsText, presenceOfAvailability } from "@agenteschat/client/lib/presence";
 import { recentDms } from "@agenteschat/client/lib/recent";
+import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
 import { inSidebarList, SIDEBAR_ITEMS, sidebarPlace } from "@agenteschat/client/lib/sidebar-items";
 import { looksUnread } from "@agenteschat/client/lib/unread";
 import {
@@ -97,7 +98,7 @@ import { entityMenu } from "@/lib/entity-menu";
 import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
 import { ownPlanLines, planNearLimit, planWord } from "@/lib/plan-usage";
-import { STORAGE_KEYS, storage, storedStrings } from "@/lib/storage";
+import { rightHandSeen, STORAGE_KEYS, storage, storedStrings } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
 import { useStreams } from "@/realtime/context";
@@ -281,7 +282,13 @@ export function Sidebar() {
   usePrefetchRecent(orgId);
   // "Mensagens diretas", as on Discord: the conversations that have a message, people and agents together, latest
   // first. Agents and people with no conversation are found in the members column, Equipe and Ir para….
+  // The right hand (ADR 0137) has its own row on top, never one under Mensagens diretas; outside its audience, none.
+  const rightHand = dir.agents.find(isRightHand);
+  const rightHandDm = rightHand
+    ? (dms.data ?? []).find((d) => d.with.type === "agent" && d.with.id === rightHand.id)
+    : undefined;
   const directs = recentDms(dms.data ?? [], hiddenAgents).flatMap((d) => {
+    if (d.with.type === "agent" && d.with.id === rightHand?.id) return [];
     const agent = d.with.type === "agent" ? dir.agentById.get(d.with.id) : undefined;
     const member = d.with.type === "person" ? dir.memberById.get(d.with.id) : undefined;
     return agent || member ? [{ dm: d, agent, member }] : [];
@@ -530,6 +537,16 @@ export function Sidebar() {
         onKeyDown={(e) => spaceEvent(e) && sidebarMenu.onKeyDown(e)}
         onContextMenu={(e) => spaceEvent(e) && sidebarMenu.onContextMenu(e)}
       >
+        {rightHand && rightHand.canTalk !== false && (
+          <div className="sidebar__group sidebar__pin">
+            <RightHandRow
+              agent={rightHand}
+              unread={rightHandDm?.unread ?? 0}
+              onPrefetch={() => rightHandDm && prefetch(rightHandDm.channelId)}
+              onOpen={() => rightHandDm && markOpen(rightHandDm.channelId)}
+            />
+          </div>
+        )}
         {sectionOrder.order.filter((id) => blocks[id]).map((id) => sectionOrder.block(id, blocks[id], !rail))}
       </div>
 
@@ -1330,6 +1347,55 @@ function AgentRow({
         </span>
       )}
     </div>
+  );
+}
+
+/**
+ * The team's right hand (ADR 0137), pinned above the tools: its face, its name and "seu braço direito" muted on the
+ * right, a one-time "Novo" until its DM first opens (in this browser), and its DM's unread count. It opens the
+ * person's DM with it. Not part of the sections, so it is never moved or hidden.
+ */
+function RightHandRow({
+  agent: a,
+  unread,
+  onPrefetch,
+  onOpen,
+}: {
+  agent: Agent;
+  unread: number;
+  onPrefetch: () => void;
+  onOpen: () => void;
+}) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const fresh = rightHandSeen.useFresh(rightHandSeenKey(me.user.id, org.id));
+  const shown = useAgentPresence(a.id);
+  const label = t("rightHand.label");
+  return (
+    <Link
+      to="/org/$orgId/dm/agent/$agentId"
+      params={{ orgId: org.id, agentId: a.id }}
+      className="sidebar__item sidebar__pin-row"
+      title={`${a.name} · ${label}`}
+      onMouseEnter={onPrefetch}
+      onFocus={onPrefetch}
+      onClick={onOpen}
+      data-unread={unread > 0}
+      data-right-hand=""
+    >
+      <AgentAvatar agentId={a.id} name={a.name} size="sm" presence={shown?.presence ?? null} />
+      <span className="sidebar__item-label">{a.name}</span>
+      {unread > 0 ? (
+        <UnreadCount count={unread} />
+      ) : fresh ? (
+        <span className="sidebar__item-meta sidebar__new">
+          <span className="sidebar__new-dot" aria-hidden="true" />
+          {t("rightHand.newDot")}
+        </span>
+      ) : (
+        <span className="sidebar__item-meta">{label}</span>
+      )}
+    </Link>
   );
 }
 

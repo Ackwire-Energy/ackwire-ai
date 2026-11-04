@@ -199,6 +199,7 @@ import {
   visibleText,
 } from "./reply-policy";
 import { routineCreatorOf, wikiPersonOf } from "./requester";
+import { isRightHand, RIGHT_HAND_AUTO } from "./right-hand";
 import { routineBriefOf } from "./routine-brief";
 import { missStaleRoutineRun, routineRunWaitingForComputer, routineRunWaitingForPlan } from "./routine-firing";
 import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
@@ -1401,7 +1402,9 @@ async function executeRunInner(
           orgId: run.orgId,
           agentId: agent.id,
           runId: run.id,
-          agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
+          agent: isRightHand(agent)
+            ? { name: agent.name, role: RIGHT_HAND_AUTO.role, instructions: RIGHT_HAND_AUTO.instructions }
+            : { name: agent.name, role: agent.role, instructions: agent.instructions },
           message: trigger?.body ?? topTrigger?.body ?? "",
           recent,
           routine: run.background || Boolean(trigger?.meta?.routine),

@@ -228,16 +228,20 @@ describe("the agents' receipt line under a person's message", () => {
       text: "Only Ada answers here without a mention",
     });
     expect(by({ step: "rule", rule: "reply" }, [])).toBeNull();
+    // Alone with the team: the reason says nothing new to the person, so no line (the decision stays stored).
+    expect(by({ step: "rule", rule: "alone" })).toBeNull();
     expect(deciderOf(en, receiptView(routed({}).m1), names)).toBeNull();
     const pt = await translator("pt-BR");
     const reply = receiptView(routed({}, { decidedBy: { step: "rule", rule: "reply" } }).m1);
     expect(deciderOf(pt, reply, names)?.text).toBe("Uma resposta para a Ada");
-    // Nobody else took it, so the team's coordinator did (ADR 0093).
+    // A decision stored before the team's coordinator was retired (ADR 0137) reads as the default rule's line.
     const coordinated = receiptView(
       routed({}, { pickedBy: ["theo"], decidedBy: { step: "rule", rule: "coordinator" } }).m1,
     );
-    expect(deciderOf(pt, coordinated, names)).toEqual({ rule: "coordinator", text: "O Theo coordena o time" });
-    expect(deciderOf(en, coordinated, names)?.text).toBe("Theo coordinates the team");
+    expect(deciderOf(pt, coordinated, names)).toEqual({
+      rule: "default",
+      text: "Ninguém foi chamado, então o Theo respondeu",
+    });
   });
 
   test("waiting on its plan: a line under the message that says so, never 'waiting for your answer'; canceled: two ticks", async () => {

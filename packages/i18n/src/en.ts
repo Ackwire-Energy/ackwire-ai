@@ -1491,7 +1491,6 @@ export const en = {
     you: "you",
     agentState: { idle: "available", thinking: "thinking", writing: "writing" },
     autoReplyChip: "answers without a mention",
-    coordinatorChip: "coordinates the team",
     more: "More message actions",
     copyLink: "Copy link",
     linkCopied: "Link copied.",
@@ -1657,21 +1656,139 @@ export const en = {
       reply: "A reply to {{name}}",
       only_agent: "Only {{name}} answers here without a mention",
       follow_up: "Follows the talk with {{name}}",
-      coordinator: "{{name}} coordinates the team",
       default: "Nobody was called, so {{name}} answered",
     },
   },
-  coordinator: {
-    chip: "Coordinates the team",
-    help: "Takes the messages that need an agent when no other agent took them, and hands the work to whoever knows it. Works in channels where he answers on his own.",
-    help_female:
-      "Takes the messages that need an agent when no other agent took them, and hands the work to whoever knows it. Works in channels where she answers on her own.",
-    one: "One agent coordinates at a time.",
-    current: "{{name}} coordinates the team now.",
-    none: "Nobody coordinates the team now.",
-    archive: "{{name}} coordinates the team. After this, nobody does until someone picks another agent.",
-    yes: "Yes",
-    no: "No",
+  /**
+   * The team's right hand (ADR 0137): its pin row, its DM, its profile, its page in Settings and its cards. Its name
+   * is the admins' to change (`{{name}}`); "Lodi" only by default.
+   */
+  rightHand: {
+    /** Muted, lowercase, on the right of its row in the sidebar; capitalized where it starts a line. */
+    label: "your right hand",
+    /** The one-time dot on its row until it is first opened. */
+    newDot: "New",
+    /** Under its name in a channel's members column. */
+    callWith: "call with @{{handle}}",
+    /** Its role, wherever an agent's role shows. */
+    role: "Workspace assistant",
+    /** In its DM's header, after the label. */
+    actsAsYou: "acts with your permissions",
+    /** After "Message to {{name}} ·" in its DM's composer. */
+    composerHint: "nothing changes without you",
+    /** The top of its DM, drawn by the app (no model): its greeting and the first card the workspace needs. */
+    intro: {
+      greeting: "Hi, I'm {{name}}. I'll build the team with you.",
+      lead: "I create the agents, connect the apps and invite the people. Nothing changes without your click, and I only do what you can do.",
+      connect: {
+        title: "Connect an AI for the team",
+        text: "The agents think with the workspace's AI. Sign in with your Claude or ChatGPT plan, no API key needed.",
+        action: "Connect",
+      },
+      start: {
+        question: "How do you want to start?",
+        /** A ready-made agent's tile: creates it alone. */
+        createOne: "Create {{name}}",
+        team: "Build a starter team",
+        describe: "Describe what I need",
+        import: "Import my agents",
+        form: "Fill in the form",
+      },
+      next: {
+        question: "The team is here. What next?",
+        invite: "Invite people",
+        firstTask: "Give {{name}} a first task",
+      },
+      /** Written in the ready-made agent's DM composer by "Give … a first task", for the person to send or change. */
+      firstTask: {
+        theo: "Plan our first week: what does each of us do first?",
+        ada: "What could you build or automate for us first?",
+        lia: "Who are our 5 closest competitors, and what do they do better than us?",
+        atlas:
+          "What will you watch first in our errors, queues and deploys, and how will you tell me when something breaks?",
+      },
+    },
+    profile: {
+      how: "How it works",
+      permissions: "Acts with your permissions",
+      private: "Talks only with you in your DM",
+      channels: "Replies in channels when called",
+      model: "Model",
+      message: "Message",
+      configure: "Configure",
+    },
+    settings: {
+      name: "Name and look",
+      nameHelp: "In the sidebar it always shows as “{{label}}”.",
+      changeLook: "Change look",
+      ai: "AI and model",
+      aiHelp: "Automatic picks the cheapest model that does the job.",
+      budget: "Monthly budget",
+      perMonth: "/month",
+      budgetHelp: "When it reaches the limit, it stops and tells you, like any agent.",
+      audience: "Who can use it",
+      audienceHelp: "Outside it, a person doesn't see {{name}} in the sidebar.",
+      lock: "{{name}} can't be archived or deleted. It posts nothing unless someone talks to it.",
+      audit: "See what {{name}} did",
+    },
+    card: {
+      settings: "{{name}} · Settings",
+      apply: "Apply",
+      dismiss: "Dismiss",
+      decline: "Decline",
+      askAdmin: "Ask an admin",
+      sentTo: "Sent to {{names}} · {{when}}",
+      sentToAny: "Sent to whoever decides · {{when}}",
+      appliedBy: "Applied by {{name}}",
+      appliedByYou: "Applied by you",
+      declinedBy: "Declined by {{name}}",
+      declinedByYou: "Declined by you",
+      undo: "Undo",
+      undone: "Undone",
+      stale: "Out of date",
+      staleHelp: "{{name}} changed since this card. Nothing was applied.",
+      redo: "Redo",
+      /** Sent from the person to the right hand when they press Redo on an out-of-date card. */
+      redoMessage: "Redo the card for {{name}} with today's values",
+      createTest: "Create and try it",
+      /** Read aloud for the arrow between a setting's old and new value ("Model Haiku 4.5 to Sonnet 4.5"). */
+      to: "to",
+      editFirst: "Edit first",
+      superseded: "Replaced by the newer proposal",
+      onlyCreators: "Only admins create agents",
+      only: {
+        model: "Only admins change an agent's model",
+        budget: "Only admins change an agent's budget",
+        owner: "Only admins change who owns an agent",
+        archive: "Only admins archive an agent",
+        audience: "Only admins and its owner change who talks to it",
+        channels: "Only admins and its owner change its channels",
+        ai_account: "Only the account's owner gives it",
+        many: "Only admins make these changes",
+      },
+    },
+    field: {
+      model: "Model",
+      ai_account: "AI account",
+      budget: "Monthly budget",
+      owner: "Owner",
+      audience: "Who can talk",
+      archive: "Status",
+      channel: "Channel",
+    },
+    value: {
+      none: "None",
+      budgetDefault: "Workspace default",
+      anAccount: "An AI account",
+      everyone: "Everyone",
+      ownerOnly: "Only its owner",
+      somePeople: "Some people",
+      active: "Active",
+      archived: "Archived",
+      notIn: "Not in it",
+      withoutMention: "Answers without a mention",
+      mentionOnly: "Only when mentioned",
+    },
   },
   routing: {
     title: "Who picks the agents",
@@ -2102,6 +2219,10 @@ export const en = {
       created: "Turned what I learned into the skill <b>{{name}}</b>",
       updated: "Fixed the skill <b>{{name}}</b>",
     },
+    /** A teammate's settings changed from the right hand's card, by the person who clicked Aplicar (ADR 0137). */
+    agent: {
+      settings_changed: "Changed the settings of <b>{{agentName}}</b>",
+    },
     other: "Made a change",
     /** On the line of a webhook routine the agent created: copies its secret address (only for who manages it). */
     copyWebhook: "Copy webhook address",
@@ -2276,7 +2397,6 @@ export const en = {
     replyMentionHelp: "Only answers when someone writes @{{handle}}",
     aloneLine: "Joins the conversation on his own",
     aloneLine_female: "Joins the conversation on her own",
-    coordinatorLine: "Coordinates the team: takes what nobody took",
     mentionLine: "Waits for someone to write @{{handle}}",
     readOnly: "Only the channel's creator and admins change members.",
     people: "People",
@@ -2846,6 +2966,9 @@ export const en = {
       joinRequest: "<b>{{name}}</b> asks to join",
       joinRequestMany: "<b>{{names}}</b> ask to join",
       joinSuggestion: "<b>{{by}}</b> suggested <b>{{name}}</b>",
+      /** ADR 0137: someone sent a change they can't make to the people who may ("Pedir a um admin"). */
+      changeRequest: "<b>{{name}}</b> asks for a change to <b>{{agent}}</b>",
+      changeRequestAgent: "<b>{{name}}</b> asks for a new agent: <b>{{agent}}</b>",
       invitationAccepted: "<b>{{name}}</b> accepted your invitation and joined {{org}}",
       invitationAcceptedAny: "<b>{{name}}</b> accepted your invitation",
       reaction_one: "<b>{{names}}</b> reacted to your message",
@@ -3431,7 +3554,6 @@ export const en = {
       repos: "GitHub repositories",
       group: "Group",
       handle: "Mentions",
-      coordinator: "Coordinates the team",
     },
     lines: {
       added_one: "{{count}} new line",
@@ -3800,6 +3922,7 @@ export const en = {
     proposesManyChanges: "<b>{{agent}}</b> proposes · changes to {{count}} agents",
     targetInstructions: "{{name}}'s instructions",
     targetRole: "{{name}}'s role",
+    targetSettings: "{{name}}'s settings",
     targetAccess: "{{name}}'s access",
     targetSkill: "the skill {{skill}}",
     targetChanges: "changes for {{name}}",
@@ -3845,6 +3968,7 @@ export const en = {
     titleInstructions: "Update {{name}}'s instructions",
     titleRole: "Change {{name}}'s role",
     titleAccess: "Change {{name}}'s access",
+    titleSettings: "Change {{name}}'s settings",
     titleSkill: "Fix the skill {{skill}}",
     titleContext: "Update the {{org}} context",
     evidence: {
@@ -10776,6 +10900,7 @@ export const en = {
       account: "Your account",
       notifications: "Notifications",
       general: "General",
+      right_hand: "Right hand",
       members: "Members and invitations",
       roles: "Roles and permissions",
       access: "Agents and access",
@@ -10797,6 +10922,7 @@ export const en = {
       notifications:
         "The inbox keeps everything. Here you choose what reaches you as a notification, in this workspace.",
       general: "Name, time zone and what every agent knows about the workspace.",
+      right_hand: "The assistant that builds the team with each person, in their DM and with their permissions.",
       members: "Who is in the workspace, and invitations.",
       roles: "What each person can do. Roles add up.",
       access: "What each agent can use: one level per connector.",
@@ -11576,6 +11702,7 @@ export const en = {
       action_install_skill: "Install a skill",
       action_update_skills: "Update skills",
       agent_proposal: "Proposed a new agent: {{name}}",
+      settings_proposal: "Proposed a change to {{names}}",
       approval_request: "Approval request: {{title}}",
       secret_request: "{{agent}} asked for a key: {{name}}",
       secret_requestAnon: "Asked for a key: {{name}}",

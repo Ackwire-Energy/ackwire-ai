@@ -54,7 +54,8 @@ export async function exportBundle(db: Database, actorId: string, orgId: string)
     db
       .select()
       .from(agents)
-      .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
+      // The right hand is the product's, not the team's (ADR 0137): never exported, so never imported elsewhere.
+      .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.builtin)))
       .orderBy(asc(agents.createdAt)),
     db
       .select()

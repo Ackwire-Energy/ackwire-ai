@@ -1512,7 +1512,6 @@
       "writing": "schrijft"
     },
     "autoReplyChip": "antwoordt zonder vermelding",
-    "coordinatorChip": "coördineert het team",
     "more": "Meer berichtacties",
     "copyLink": "Link kopiëren",
     "linkCopied": "Link gekopieerd.",
@@ -1674,22 +1673,123 @@
       "reply": "Een antwoord aan {{name}}",
       "only_agent": "Alleen {{name}} antwoordt hier zonder vermelding",
       "follow_up": "Volgt het gesprek met {{name}}",
-      "coordinator": "{{name}} coördineert het team",
       "default": "Niemand werd geroepen, dus {{name}} antwoordde"
     }
   },
-  "coordinator": {
-    "chip": "Coördineert het team",
-    "help": "Neemt de berichten die een agent nodig hebben als geen andere agent ze heeft opgepakt, en geeft het werk aan wie er verstand van heeft. Werkt in kanalen waar hij uit zichzelf antwoordt.",
-    "help_female": "Neemt de berichten die een agent nodig hebben als geen andere agent ze heeft opgepakt, en geeft het werk aan wie er verstand van heeft. Werkt in kanalen waar zij uit zichzelf antwoordt.",
-    "one": "Er coördineert één agent tegelijk.",
-    "current": "{{name}} coördineert nu het team.",
-    "current_female": "{{name}} coördineert nu het team.",
-    "none": "Niemand coördineert nu het team.",
-    "archive": "{{name}} coördineert het team. Hierna doet niemand dat tot iemand een andere agent kiest.",
-    "archive_female": "{{name}} coördineert het team. Hierna doet niemand dat tot iemand een andere agent kiest.",
-    "yes": "Ja",
-    "no": "Nee"
+  "rightHand": {
+    "label": "je rechterhand",
+    "newDot": "Nieuw",
+    "callWith": "roep aan met @{{handle}}",
+    "role": "Workspace-assistent",
+    "actsAsYou": "handelt met jouw rechten",
+    "composerHint": "niets verandert zonder jou",
+    "intro": {
+      "greeting": "Hoi, ik ben {{name}}. Ik bouw het team samen met jou.",
+      "lead": "Ik maak de agents, koppel de apps en nodig de mensen uit. Niets verandert zonder jouw klik, en ik doe alleen wat jij mag doen.",
+      "connect": {
+        "title": "Een AI voor het team koppelen",
+        "text": "De agents denken met de AI van de workspace. Log in met je Claude- of ChatGPT-abonnement, zonder API-sleutel.",
+        "action": "Koppelen"
+      },
+      "start": {
+        "question": "Hoe wil je beginnen?",
+        "createOne": "{{name}} maken",
+        "team": "Een startteam samenstellen",
+        "describe": "Beschrijven wat ik nodig heb",
+        "import": "Mijn agents importeren",
+        "form": "Het formulier invullen"
+      },
+      "next": {
+        "question": "Het team is er. En nu?",
+        "invite": "Mensen uitnodigen",
+        "firstTask": "{{name}} een eerste taak geven"
+      },
+      "firstTask": {
+        "theo": "Maak het plan voor onze eerste week: wat doet ieder van ons eerst?",
+        "ada": "Wat zou je als eerste voor ons kunnen bouwen of automatiseren?",
+        "lia": "Wie zijn onze 5 naaste concurrenten, en wat doen ze beter dan wij?",
+        "atlas": "Wat ga je als eerste volgen in onze fouten, wachtrijen en deploys, en hoe laat je het me weten als er iets stukgaat?"
+      }
+    },
+    "profile": {
+      "how": "Zo werkt het",
+      "permissions": "Handelt met jouw rechten",
+      "private": "Praat alleen met jou in je DM",
+      "channels": "Antwoordt in kanalen als je hem roept",
+      "model": "Model",
+      "message": "Bericht",
+      "configure": "Instellen"
+    },
+    "settings": {
+      "name": "Naam en uiterlijk",
+      "nameHelp": "In de zijbalk staat er altijd “{{label}}” bij.",
+      "changeLook": "Uiterlijk wijzigen",
+      "ai": "AI en model",
+      "aiHelp": "Automatisch kiest het goedkoopste model dat het werk aankan.",
+      "budget": "Maandbudget",
+      "perMonth": "/maand",
+      "budgetHelp": "Bij de limiet stopt hij en laat het weten, zoals elke agent.",
+      "audience": "Wie het mag gebruiken",
+      "audienceHelp": "Wie erbuiten valt, ziet {{name}} niet in de zijbalk.",
+      "lock": "{{name}} kan niet gearchiveerd of verwijderd worden. Hij plaatst niets zolang niemand met hem praat.",
+      "audit": "Bekijk wat {{name}} deed"
+    },
+    "card": {
+      "settings": "{{name}} · Instellingen",
+      "apply": "Toepassen",
+      "dismiss": "Negeren",
+      "decline": "Weigeren",
+      "askAdmin": "Een admin vragen",
+      "sentTo": "Verstuurd naar {{names}} · {{when}}",
+      "sentToAny": "Verstuurd naar wie beslist · {{when}}",
+      "appliedBy": "Toegepast door {{name}}",
+      "appliedByYou": "Toegepast door jou",
+      "declinedBy": "Geweigerd door {{name}}",
+      "declinedByYou": "Geweigerd door jou",
+      "undo": "Ongedaan maken",
+      "undone": "Ongedaan gemaakt",
+      "stale": "Verouderd",
+      "staleHelp": "{{name}} is veranderd sinds deze kaart. Er is niets toegepast.",
+      "redo": "Opnieuw",
+      "redoMessage": "Maak de kaart voor {{name}} opnieuw met de huidige waarden",
+      "createTest": "Maken en testen",
+      "to": "naar",
+      "editFirst": "Eerst bewerken",
+      "superseded": "Vervangen door het nieuwere voorstel",
+      "onlyCreators": "Alleen admins maken agents",
+      "only": {
+        "model": "Alleen admins wijzigen het model van een agent",
+        "budget": "Alleen admins wijzigen het budget van een agent",
+        "owner": "Alleen admins wijzigen wie verantwoordelijk is voor een agent",
+        "archive": "Alleen admins archiveren een agent",
+        "audience": "Alleen admins en de verantwoordelijke wijzigen wie met hem praat",
+        "channels": "Alleen admins en de verantwoordelijke wijzigen zijn kanalen",
+        "ai_account": "Alleen de eigenaar van het account geeft het",
+        "many": "Alleen admins maken deze wijzigingen"
+      }
+    },
+    "field": {
+      "model": "Model",
+      "ai_account": "AI-account",
+      "budget": "Maandbudget",
+      "owner": "Verantwoordelijke",
+      "audience": "Wie mag praten",
+      "archive": "Status",
+      "channel": "Kanaal"
+    },
+    "value": {
+      "none": "Geen",
+      "budgetDefault": "Standaard van de workspace",
+      "anAccount": "Een AI-account",
+      "everyone": "Iedereen",
+      "ownerOnly": "Alleen de verantwoordelijke",
+      "somePeople": "Sommige mensen",
+      "active": "Actief",
+      "archived": "Gearchiveerd",
+      "notIn": "Niet in het kanaal",
+      "withoutMention": "Antwoordt zonder vermelding",
+      "mentionOnly": "Alleen bij vermelding"
+    }
   },
   "routing": {
     "title": "Wie de agents kiest",
@@ -2137,6 +2237,9 @@
       "created": "Wat ik leerde omgezet in de skill <b>{{name}}</b>",
       "updated": "Skill <b>{{name}}</b> verbeterd"
     },
+    "agent": {
+      "settings_changed": "Heb de instellingen van <b>{{agentName}}</b> gewijzigd"
+    },
     "other": "Iets gewijzigd",
     "copyWebhook": "Webhookadres kopiëren",
     "issueFields": {
@@ -2307,7 +2410,6 @@
     "replyMentionHelp": "Antwoordt alleen als iemand @{{handle}} schrijft",
     "aloneLine": "Doet uit zichzelf mee aan het gesprek",
     "aloneLine_female": "Doet uit zichzelf mee aan het gesprek",
-    "coordinatorLine": "Coördineert het team: pakt op wat niemand oppakte",
     "mentionLine": "Wacht tot iemand @{{handle}} schrijft",
     "readOnly": "Alleen de maker van het kanaal en beheerders wijzigen de leden.",
     "people": "Mensen",
@@ -2892,6 +2994,8 @@
       "joinRequest": "<b>{{name}}</b> vraagt om mee te doen",
       "joinRequestMany": "<b>{{names}}</b> vragen om mee te doen",
       "joinSuggestion": "<b>{{by}}</b> stelde <b>{{name}}</b> voor",
+      "changeRequest": "<b>{{name}}</b> vraagt een wijziging voor <b>{{agent}}</b>",
+      "changeRequestAgent": "<b>{{name}}</b> vraagt een nieuwe agent: <b>{{agent}}</b>",
       "invitationAccepted": "<b>{{name}}</b> heeft je uitnodiging geaccepteerd en doet mee in {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> heeft je uitnodiging geaccepteerd",
       "reaction_one": "<b>{{names}}</b> heeft op je bericht gereageerd",
@@ -3504,8 +3608,7 @@
       "brain": "Wie denkt",
       "repos": "GitHub-repository's",
       "group": "Groep",
-      "handle": "Vermeldingen",
-      "coordinator": "Coördineert het team"
+      "handle": "Vermeldingen"
     },
     "lines": {
       "added_one": "{{count}} nieuwe regel",
@@ -3917,6 +4020,7 @@
     "proposesManyChanges": "<b>{{agent}}</b> stelt voor · wijzigingen voor {{count}} agents",
     "targetInstructions": "instructies van {{name}}",
     "targetRole": "rol van {{name}}",
+    "targetSettings": "instellingen van {{name}}",
     "targetAccess": "toegang van {{name}}",
     "targetSkill": "de skill {{skill}}",
     "targetChanges": "wijzigingen voor {{name}}",
@@ -3962,6 +4066,7 @@
     "titleInstructions": "Instructies van {{name}} bijwerken",
     "titleRole": "Rol van {{name}} wijzigen",
     "titleAccess": "Toegang van {{name}} wijzigen",
+    "titleSettings": "De instellingen van {{name}} wijzigen",
     "titleSkill": "De skill {{skill}} verbeteren",
     "titleContext": "De context van {{org}} bijwerken",
     "evidence": {
@@ -11399,6 +11504,7 @@
       "account": "Je account",
       "notifications": "Meldingen",
       "general": "Algemeen",
+      "right_hand": "Rechterhand",
       "members": "Leden en uitnodigingen",
       "roles": "Rollen en rechten",
       "access": "Agents en toegang",
@@ -11419,6 +11525,7 @@
       "account": "Je profiel en hoe de app er voor jou uitziet.",
       "notifications": "De inbox bewaart alles. Hier kies je wat je als melding bereikt, in deze werkruimte.",
       "general": "Naam, tijdzone en wat elke agent over de werkruimte weet.",
+      "right_hand": "De assistent die met elke persoon het team samenstelt, in hun DM en met hun rechten.",
       "members": "Wie er in de werkruimte zit, en uitnodigingen.",
       "roles": "Wat iedereen kan doen. Rollen tellen op.",
       "access": "Wat elke agent kan gebruiken: één niveau per connector.",
@@ -12185,6 +12292,7 @@
       "action_install_skill": "Een skill installeren",
       "action_update_skills": "Skills bijwerken",
       "agent_proposal": "Nieuwe agent voorgesteld: {{name}}",
+      "settings_proposal": "Stelde een wijziging voor {{names}} voor",
       "approval_request": "Goedkeuringsverzoek: {{title}}",
       "secret_request": "{{agent}} vroeg om een sleutel: {{name}}",
       "secret_requestAnon": "Vroeg om een sleutel: {{name}}",

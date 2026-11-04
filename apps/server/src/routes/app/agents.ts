@@ -7,6 +7,7 @@ import {
   agentView,
   applyAgentSetup,
   archiveAgent,
+  askAgentProposal,
   audienceMailLoss,
   audienceOf,
   budgetPercent,
@@ -51,7 +52,6 @@ import {
   setAgentAppearance,
   setAgentAudience,
   setAgentBrain,
-  setCoordinator,
   speakerOf,
   updateAgent,
   updateAgentGroup,
@@ -224,8 +224,17 @@ const AgentProposal = z
         ]),
       }),
       why: z.string(),
+      firstTask: z.string().optional().openapi({
+        description: 'What "Criar e testar" sends the new agent, from the clicker, in their DM with it.',
+      }),
     }),
-    state: z.enum(["pending", "creating", "created", "denied"]),
+    state: z.enum(["pending", "creating", "created", "denied", "superseded"]).openapi({
+      description: "`superseded`: a newer card of the same agent for the same handle, here, took its place.",
+    }),
+    askedAt: z.string().optional().openapi({
+      description:
+        'When the person it is for, who can\'t create agents, sent it to whoever may ("Pedir a um admin"): they may open it from their inbox.',
+    }),
     agentId: z.uuid().nullable(),
     decidedByUserId: z.string().nullable(),
     decidedAt: z.string().nullable(),
@@ -726,8 +735,11 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Create a proposed agent as it is, in one click (who may create agents)",
       description:
-        "The agent from the draft, owned by whoever creates it, with each line they may give it: its AI (an account of theirs), its channels, its access to the connected apps (an admin's), the mailboxes (only their owner's) and its routine. The card (`applied`, `routineId`) says what it got; the agent that proposed it is told what waits for whom.",
-      request: { params: ProposalParams },
+        "The agent from the draft, owned by whoever creates it, with each line they may give it: its AI (an account of theirs), its channels, its access to the connected apps (an admin's), the mailboxes (only their owner's) and its routine. The card (`applied`, `routineId`) says what it got; the agent that proposed it is told what waits for whom. With `test` (\"Criar e testar\") and a card that has a `firstTask`, the task is then sent from you in your DM with it (`testChannelId`).",
+      request: {
+        params: ProposalParams,
+        body: { ...body(z.object({ test: z.boolean().optional() })), required: false },
+      },
       responses: {
         201: json(
           z.object({
@@ -736,6 +748,10 @@ export function agentRoutes(deps: AppDeps) {
             ai: z.enum(["account", "model", "none"]).openapi({
               description: "What it thinks with now (the clicker's account, the workspace's model or nothing yet).",
             }),
+            testChannelId: z
+              .uuid()
+              .nullable()
+              .openapi({ description: '"Criar e testar": the DM its first task went to.' }),
           }),
           "Created",
         ),
@@ -746,7 +762,10 @@ export function agentRoutes(deps: AppDeps) {
       const { orgId, messageId } = c.req.valid("param");
       const userId = c.get("user").id;
       const gateway = deps.extras?.context?.gateway;
-      const made = await createProposedAgent({ db, pubsub: adapters.pubsub, gateway }, userId, orgId, messageId);
+      const test = c.req.valid("json")?.test === true;
+      const made = await createProposedAgent({ db, pubsub: adapters.pubsub, gateway }, userId, orgId, messageId, {
+        test,
+      });
       if (made.agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.json(
         {
@@ -760,6 +779,7 @@ export function agentRoutes(deps: AppDeps) {
           ),
           proposal: made.proposal,
           ai: made.ai,
+          testChannelId: made.testChannelId,
         },
         201,
       );
@@ -800,6 +820,24 @@ export function agentRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, messageId } = c.req.valid("param");
       return c.json(await denyAgentProposal({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, messageId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agent-proposals/{messageId}/ask",
+      tags,
+      security,
+      summary: "Send a proposed agent you can't create to whoever may (\"Pedir a um admin\", the right hand's cards)",
+      description:
+        "Only the person it was proposed for, once (409 `agent_proposal.asked`), while it is open. Each person who may create agents gets a waiting inbox entry (`change_request`) and may open the card from it.",
+      request: { params: ProposalParams },
+      responses: { 200: json(AgentProposal), ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      return c.json(await askAgentProposal({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, messageId), 200);
     },
   );
 
@@ -914,8 +952,8 @@ export function agentRoutes(deps: AppDeps) {
                 "Its new @handle (admins): the one it leaves keeps reaching it. Taken by another agent (now or before) or a person: 409 `agent.handle_taken` with a free `suggestion`.",
             }),
             coordinator: z.boolean().optional().openapi({
-              description:
-                "It coordinates the team (ADR 0093): true takes it from whoever had it, false leaves the team with none. Admins (audited); the workspace's open apps hear `agent.coordinator`.",
+              deprecated: true,
+              description: "Ignored. Older apps send it: the team's coordinator (ADR 0093) is retired (ADR 0137).",
             }),
             acceptPlanTerms: z.boolean().optional().openapi({
               deprecated: true,
@@ -936,7 +974,7 @@ export function agentRoutes(deps: AppDeps) {
         monthlyBudgetUsd,
         audience,
         appearance,
-        coordinator,
+        coordinator: _coordinator,
         acceptPlanTerms: _,
         mailLossSeen,
         brakes,
@@ -944,10 +982,9 @@ export function agentRoutes(deps: AppDeps) {
       } = c.req.valid("json");
       const input = { ...rest, ...(brakes ? { autonomyBrakes: brakes } : {}) };
       const actor = c.get("user").id;
-      // The audience and the look can be changed by the agent's owner too, and who coordinates has its own call;
-      // everything else needs an admin.
+      // The audience and the look can be changed by the agent's owner too; everything else needs an admin.
       const other =
-        (!audience && appearance === undefined && coordinator === undefined) ||
+        (!audience && appearance === undefined) ||
         Object.values(input).some((v) => v !== undefined) ||
         monthlyBudgetUsd !== undefined;
       let agent = other
@@ -962,8 +999,6 @@ export function agentRoutes(deps: AppDeps) {
         : null;
       if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience, mailLossSeen);
       if (appearance !== undefined) agent = await setAgentAppearance(db, actor, orgId, agentId, appearance);
-      if (coordinator !== undefined)
-        agent = await setCoordinator({ db, pubsub: adapters.pubsub }, actor, orgId, agentId, coordinator);
       if (!agent) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");

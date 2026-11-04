@@ -1,4 +1,5 @@
 import type { MemberPresence, OrgRole, Role } from "../api/types";
+import { isRightHand } from "./right-hand";
 
 interface GroupPerson {
   userId: string;
@@ -10,6 +11,7 @@ interface GroupPerson {
 interface GroupAgent {
   id: string;
   name: string;
+  builtin?: "right_hand" | null;
 }
 
 export type MemberRow<P, A> = { kind: "person"; person: P } | { kind: "agent"; agent: A };
@@ -27,7 +29,8 @@ const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompar
 
 /**
  * A channel's members as the members column lists them: the owners online, each hoisted role (top first) with the
- * online people whose highest hoisted role it is, the agents (busy first), everyone else online, then offline. A
+ * online people whose highest hoisted role it is, the agents (the right hand first, then busy ones), everyone else
+ * online, then offline. A
  * person shows once; a hidden one reads offline (ADR 0084). Empty groups are left out.
  */
 export function memberGroups<P extends GroupPerson, A extends GroupAgent>({
@@ -56,7 +59,10 @@ export function memberGroups<P extends GroupPerson, A extends GroupAgent>({
       (top ? (byRole.get(top.id) as P[]) : online).push(p);
     }
   }
-  const sortedAgents = [...agents].sort((a, b) => Number(busy(b.id)) - Number(busy(a.id)) || byName(a, b));
+  const sortedAgents = [...agents].sort(
+    (a, b) =>
+      Number(isRightHand(b)) - Number(isRightHand(a)) || Number(busy(b.id)) - Number(busy(a.id)) || byName(a, b),
+  );
   const person = (ps: P[]) => ps.map((p): MemberRow<P, A> => ({ kind: "person", person: p }));
   const groups: MemberGroup<P, A>[] = [
     { key: "owner", rows: person(owner) },

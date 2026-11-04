@@ -13,7 +13,7 @@ export const Route = createFileRoute("/org/$orgId/settings_/$section")({
   },
   component: function SettingsSectionRoute() {
     const { section } = Route.useParams();
-    const { connected, outcome, review, mail, account, install, skill } = Route.useSearch();
+    const { connected, outcome, review, mail, account, install, skill, agent } = Route.useSearch();
     return (
       <Main>
         <SettingsPage
@@ -25,6 +25,7 @@ export const Route = createFileRoute("/org/$orgId/settings_/$section")({
           account={account}
           install={install}
           skill={skill}
+          agent={agent}
         />
       </Main>
     );

@@ -1,10 +1,10 @@
 import { useUpdateAgent } from "@agenteschat/client";
 import { audienceOf, consultableLocked, offersConsultable } from "@agenteschat/client/lib/audience";
 import { engineOfBrain } from "@agenteschat/client/lib/brain";
-import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { cleanHandle, handleAfterRename, handleProblemText, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { router, usePreventRemove } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -29,8 +29,9 @@ export const openAgentEdit = (id: string) => router.push({ pathname: "/agent-edi
 
 /**
  * "Editar agente", as the web's Configurações › Identidade and Instruções: name, its @ (Menções, which follows a
- * new name until typed), role, look, whether it coordinates the team and instructions for admins; the look only for
- * the agent's own person (the server's rules). One Salvar.
+ * new name until typed), role, look and instructions for admins; the look only for
+ * the agent's own person (the server's rules). One Salvar. The team's right hand (ADR 0137) is its name, @ and look
+ * only: its instructions are the product's, and it is never archived or deleted.
  */
 export function AgentEditScreen({ id }: { id: string }) {
   const { t } = useTranslation();
@@ -44,6 +45,7 @@ export function AgentEditScreen({ id }: { id: string }) {
   const update = useUpdateAgent(useOrgId(), id);
   const ask = useWidenAsk(agent);
   const admin = can(org, "manage_agents");
+  const rightHand = isRightHand(agent);
   const owner = Boolean(meId && agent?.ownerUserId === meId);
   const fields = editableFields({ admin, owner });
   const onPlan = engineOfBrain(agent?.brain?.kind) !== "agent";
@@ -56,7 +58,6 @@ export function AgentEditScreen({ id }: { id: string }) {
             role: agent.role,
             instructions: agent.instructions,
             look: fullLook(agent.appearance),
-            coordinator: agent.coordinator === true,
             audience: audienceOf(agent),
           }
         : null,
@@ -109,7 +110,6 @@ export function AgentEditScreen({ id }: { id: string }) {
     });
   };
   const field = [styles.field, fieldText("body"), { backgroundColor: c.raised, color: c.ink, borderColor: c.line }];
-  const coordination = coordinatorNote(t, dir.agents, id, draft.coordinator);
   const readOnly = (label: string, value: string) => (
     <>
       <Text variant="footnote" tone="faint">
@@ -181,7 +181,7 @@ export function AgentEditScreen({ id }: { id: string }) {
           readOnly(t("agent.nameLabel"), agent.name)
         )}
 
-        {fields.has("role") ? (
+        {rightHand ? null : fields.has("role") ? (
           <RoleInput value={draft.role} onChangeText={(v) => set("role", v)} placeholder={t("agent.roleHelp")} />
         ) : (
           <View style={styles.gapTop}>{readOnly(t("agent.roleLabel"), agent.role)}</View>
@@ -196,27 +196,8 @@ export function AgentEditScreen({ id }: { id: string }) {
           </View>
         ) : null}
 
-        <View style={styles.section}>
-          <GroupedList>
-            <GroupedRow
-              icon="flag"
-              label={t("coordinator.chip")}
-              sub={t("coordinator.help", agentGrammar(agent.name))}
-              subLines={4}
-              toggle={draft.coordinator}
-              disabled={!fields.has("coordinator")}
-              onPress={() => set("coordinator", !draft.coordinator)}
-            />
-          </GroupedList>
-          {coordination ? (
-            <Text variant="footnote" tone="faint">
-              {coordination}
-            </Text>
-          ) : null}
-        </View>
-
         {/* Only an audience that leaves someone out has anyone to be consulted for. */}
-        {offersConsultable(draft.audience, onPlan) ? (
+        {!rightHand && offersConsultable(draft.audience, onPlan) ? (
           <View style={styles.section}>
             <GroupedList>
               <GroupedRow
@@ -237,35 +218,43 @@ export function AgentEditScreen({ id }: { id: string }) {
           </View>
         ) : null}
 
-        <BrakesSection agent={agent} />
-
-        <View style={styles.section}>
-          <Text variant="title" accessibilityRole="header">
-            {t("agent.instructions")}
+        {rightHand ? (
+          <Text variant="footnote" tone="faint" style={styles.section}>
+            {t("rightHand.settings.lock", agentGrammar(agent.name))}
           </Text>
-          {fields.has("instructions") ? (
-            <TextArea
-              value={draft.instructions}
-              onChangeText={(v) => set("instructions", v)}
-              placeholder={t("newAgent.instructionsPlaceholder")}
-              accessibilityLabel={t("agent.instructions")}
-              minHeight={180}
-              scrollEnabled={false}
-            />
-          ) : (
-            <Text variant="body" tone="ink2" selectable>
-              {agent.instructions || t("agentPage.none")}
-            </Text>
-          )}
-          {!fields.has("name") ? (
-            <Text variant="footnote" tone="faint">
-              {t("mobile.agentEdit.adminsOnly")}
-            </Text>
-          ) : null}
-        </View>
+        ) : (
+          <>
+            <BrakesSection agent={agent} />
+
+            <View style={styles.section}>
+              <Text variant="title" accessibilityRole="header">
+                {t("agent.instructions")}
+              </Text>
+              {fields.has("instructions") ? (
+                <TextArea
+                  value={draft.instructions}
+                  onChangeText={(v) => set("instructions", v)}
+                  placeholder={t("newAgent.instructionsPlaceholder")}
+                  accessibilityLabel={t("agent.instructions")}
+                  minHeight={180}
+                  scrollEnabled={false}
+                />
+              ) : (
+                <Text variant="body" tone="ink2" selectable>
+                  {agent.instructions || t("agentPage.none")}
+                </Text>
+              )}
+              {!fields.has("name") ? (
+                <Text variant="footnote" tone="faint">
+                  {t("mobile.agentEdit.adminsOnly")}
+                </Text>
+              ) : null}
+            </View>
+          </>
+        )}
 
         {/* Deleting for good asks for its name on a screen of its own (ADR 0082). */}
-        {admin ? (
+        {admin && !rightHand ? (
           <View style={styles.section}>
             <GroupedList>
               <GroupedRow

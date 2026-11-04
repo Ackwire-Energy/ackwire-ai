@@ -1563,7 +1563,6 @@
       "writing": "sta scrivendo"
     },
     "autoReplyChip": "risponde senza menzione",
-    "coordinatorChip": "coordina il team",
     "more": "Altre azioni sul messaggio",
     "copyLink": "Copia link",
     "linkCopied": "Link copiato.",
@@ -1739,22 +1738,123 @@
       "reply": "Una risposta a {{name}}",
       "only_agent": "Qui solo {{name}} risponde senza menzione",
       "follow_up": "Prosegue la conversazione con {{name}}",
-      "coordinator": "{{name}} coordina il team",
       "default": "Nessuno è stato chiamato, quindi ha risposto {{name}}"
     }
   },
-  "coordinator": {
-    "chip": "Coordina il team",
-    "help": "Prende i messaggi che richiedono un agente quando nessun altro agente li ha presi, e passa il lavoro a chi lo conosce. Lavora nei canali dove risponde da solo.",
-    "help_female": "Prende i messaggi che richiedono un agente quando nessun altro agente li ha presi, e passa il lavoro a chi lo conosce. Lavora nei canali dove risponde da sola.",
-    "one": "Un solo agente coordina alla volta.",
-    "current": "Ora {{name}} coordina il team.",
-    "current_female": "Ora {{name}} coordina il team.",
-    "none": "Al momento nessuno coordina il team.",
-    "archive": "{{name}} coordina il team. Dopo questo, nessuno lo farà finché qualcuno non sceglie un altro agente.",
-    "archive_female": "{{name}} coordina il team. Dopo questo, nessuno lo farà finché qualcuno non sceglie un altro agente.",
-    "yes": "Sì",
-    "no": "No"
+  "rightHand": {
+    "label": "il tuo braccio destro",
+    "newDot": "Nuovo",
+    "callWith": "chiamalo con @{{handle}}",
+    "role": "Assistente del workspace",
+    "actsAsYou": "agisce con i tuoi permessi",
+    "composerHint": "nulla cambia senza di te",
+    "intro": {
+      "greeting": "Ciao, sono {{name}}. Costruisco il team con te.",
+      "lead": "Creo gli agenti, collego le app e invito le persone. Nulla cambia senza il tuo clic, e faccio solo quello che puoi fare tu.",
+      "connect": {
+        "title": "Collega un’IA per il team",
+        "text": "Gli agenti pensano con l’IA del workspace. Accedi con il tuo piano di Claude o di ChatGPT, senza chiave API.",
+        "action": "Collega"
+      },
+      "start": {
+        "question": "Come vuoi iniziare?",
+        "createOne": "Crea {{name}}",
+        "team": "Costruisci un team per iniziare",
+        "describe": "Descrivi di cosa ho bisogno",
+        "import": "Importa i miei agenti",
+        "form": "Compila il modulo"
+      },
+      "next": {
+        "question": "Il team è arrivato. E adesso?",
+        "invite": "Invita persone",
+        "firstTask": "Dai un primo compito a {{name}}"
+      },
+      "firstTask": {
+        "theo": "Prepara il piano della nostra prima settimana: cosa fa per primo ognuno di noi?",
+        "ada": "Cosa potresti costruire o automatizzare per noi per primo?",
+        "lia": "Chi sono i nostri 5 concorrenti più vicini, e cosa fanno meglio di noi?",
+        "atlas": "Cosa terrai d’occhio per primo tra i nostri errori, le code e i deploy, e come mi avvisi quando qualcosa si rompe?"
+      }
+    },
+    "profile": {
+      "how": "Come funziona",
+      "permissions": "Agisce con i tuoi permessi",
+      "private": "Parla solo con te nella tua DM",
+      "channels": "Risponde nei canali quando lo chiamano",
+      "model": "Modello",
+      "message": "Messaggio",
+      "configure": "Configura"
+    },
+    "settings": {
+      "name": "Nome e aspetto",
+      "nameHelp": "Nella barra laterale appare sempre come “{{label}}”.",
+      "changeLook": "Cambia aspetto",
+      "ai": "IA e modello",
+      "aiHelp": "Automatico sceglie il modello più economico che basta.",
+      "budget": "Budget mensile",
+      "perMonth": "/mese",
+      "budgetHelp": "Quando arriva al limite, si ferma e avvisa, come qualsiasi agente.",
+      "audience": "Chi può usarlo",
+      "audienceHelp": "Fuori dal pubblico, la persona non vede {{name}} nella barra laterale.",
+      "lock": "{{name}} non si può archiviare né eliminare. Non pubblica nulla finché nessuno gli parla.",
+      "audit": "Vedi cosa ha fatto {{name}}"
+    },
+    "card": {
+      "settings": "{{name}} · Impostazioni",
+      "apply": "Applica",
+      "dismiss": "Scarta",
+      "decline": "Rifiuta",
+      "askAdmin": "Chiedi a un admin",
+      "sentTo": "Inviato a {{names}} · {{when}}",
+      "sentToAny": "Inviato a chi decide · {{when}}",
+      "appliedBy": "Applicato da {{name}}",
+      "appliedByYou": "Applicato da te",
+      "declinedBy": "Rifiutato da {{name}}",
+      "declinedByYou": "Rifiutato da te",
+      "undo": "Annulla",
+      "undone": "Annullato",
+      "stale": "Non aggiornato",
+      "staleHelp": "{{name}} è cambiato dopo questa scheda. Non è stato applicato nulla.",
+      "redo": "Rifai",
+      "redoMessage": "Rifai la scheda di {{name}} con i valori di adesso",
+      "createTest": "Crea e prova",
+      "to": "a",
+      "editFirst": "Modifica prima",
+      "superseded": "Sostituita dalla proposta più recente",
+      "onlyCreators": "Solo gli admin creano agenti",
+      "only": {
+        "model": "Solo gli admin cambiano il modello di un agente",
+        "budget": "Solo gli admin cambiano il budget di un agente",
+        "owner": "Solo gli admin cambiano il responsabile di un agente",
+        "archive": "Solo gli admin archiviano un agente",
+        "audience": "Solo gli admin e il responsabile cambiano chi gli parla",
+        "channels": "Solo gli admin e il responsabile cambiano i suoi canali",
+        "ai_account": "Solo il proprietario dell’account lo assegna",
+        "many": "Solo gli admin fanno queste modifiche"
+      }
+    },
+    "field": {
+      "model": "Modello",
+      "ai_account": "Account di IA",
+      "budget": "Budget mensile",
+      "owner": "Responsabile",
+      "audience": "Chi può parlare",
+      "archive": "Stato",
+      "channel": "Canale"
+    },
+    "value": {
+      "none": "Nessuno",
+      "budgetDefault": "Predefinito del workspace",
+      "anAccount": "Un account di IA",
+      "everyone": "Tutti",
+      "ownerOnly": "Solo il responsabile",
+      "somePeople": "Alcune persone",
+      "active": "Attivo",
+      "archived": "Archiviato",
+      "notIn": "Fuori dal canale",
+      "withoutMention": "Risponde senza menzione",
+      "mentionOnly": "Solo quando menzionato"
+    }
   },
   "routing": {
     "title": "Chi sceglie gli agenti",
@@ -2212,6 +2312,9 @@
       "created": "Ho trasformato ciò che ho imparato nella skill <b>{{name}}</b>",
       "updated": "Ho corretto la skill <b>{{name}}</b>"
     },
+    "agent": {
+      "settings_changed": "Ho cambiato le impostazioni di <b>{{agentName}}</b>"
+    },
     "other": "Ho fatto una modifica",
     "copyWebhook": "Copia indirizzo del webhook",
     "issueFields": {
@@ -2389,7 +2492,6 @@
     "replyMentionHelp": "Risponde solo quando qualcuno scrive @{{handle}}",
     "aloneLine": "Entra nella conversazione da solo",
     "aloneLine_female": "Entra nella conversazione da sola",
-    "coordinatorLine": "Coordina il team: prende ciò che nessuno ha preso",
     "mentionLine": "Aspetta che qualcuno scriva @{{handle}}",
     "readOnly": "Solo chi ha creato il canale e gli admin cambiano i membri.",
     "people": "Persone",
@@ -2991,6 +3093,8 @@
       "joinRequest": "<b>{{name}}</b> chiede di entrare",
       "joinRequestMany": "<b>{{names}}</b> chiedono di entrare",
       "joinSuggestion": "<b>{{by}}</b> ha suggerito <b>{{name}}</b>",
+      "changeRequest": "<b>{{name}}</b> chiede una modifica a <b>{{agent}}</b>",
+      "changeRequestAgent": "<b>{{name}}</b> chiede un nuovo agente: <b>{{agent}}</b>",
       "invitationAccepted": "<b>{{name}}</b> ha accettato il tuo invito ed è entrato in {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> ha accettato il tuo invito",
       "reaction_one": "<b>{{names}}</b> ha reagito al tuo messaggio",
@@ -3619,8 +3723,7 @@
       "brain": "Chi pensa",
       "repos": "Repository GitHub",
       "group": "Gruppo",
-      "handle": "Menzioni",
-      "coordinator": "Coordina il team"
+      "handle": "Menzioni"
     },
     "lines": {
       "added_one": "{{count}} riga nuova",
@@ -4051,6 +4154,7 @@
     "proposesManyChanges": "<b>{{agent}}</b> propone · modifiche a {{count}} agenti",
     "targetInstructions": "istruzioni di {{name}}",
     "targetRole": "ruolo di {{name}}",
+    "targetSettings": "impostazioni di {{name}}",
     "targetAccess": "accessi di {{name}}",
     "targetSkill": "la skill {{skill}}",
     "targetChanges": "modifiche per {{name}}",
@@ -4098,6 +4202,7 @@
     "titleInstructions": "Aggiorna le istruzioni di {{name}}",
     "titleRole": "Cambia il ruolo di {{name}}",
     "titleAccess": "Cambia gli accessi di {{name}}",
+    "titleSettings": "Cambia le impostazioni di {{name}}",
     "titleSkill": "Correggi la skill {{skill}}",
     "titleContext": "Aggiorna il contesto di {{org}}",
     "evidence": {
@@ -11774,6 +11879,7 @@
       "account": "Il tuo account",
       "notifications": "Notifiche",
       "general": "Generali",
+      "right_hand": "Braccio destro",
       "members": "Membri e inviti",
       "roles": "Ruoli e permessi",
       "access": "Agenti e accessi",
@@ -11794,6 +11900,7 @@
       "account": "Il tuo profilo e come appare l'app per te.",
       "notifications": "La posta in arrivo conserva tutto. Qui scegli cosa ti arriva come notifica, in questo spazio di lavoro.",
       "general": "Nome, fuso orario e ciò che ogni agente sa dello spazio di lavoro.",
+      "right_hand": "L’assistente che forma il team con ogni persona, nella sua DM e con i suoi permessi.",
       "members": "Chi fa parte dello spazio di lavoro, e gli inviti.",
       "roles": "Cosa può fare ogni persona. I ruoli si sommano.",
       "access": "Cosa può usare ogni agente: un livello per connettore.",
@@ -12580,6 +12687,7 @@
       "action_install_skill": "Installa una skill",
       "action_update_skills": "Aggiorna le skill",
       "agent_proposal": "Ha proposto un nuovo agente: {{name}}",
+      "settings_proposal": "Ha proposto una modifica per {{names}}",
       "approval_request": "Richiesta di approvazione: {{title}}",
       "secret_request": "{{agent}} ha chiesto una chiave: {{name}}",
       "secret_requestAnon": "Ha chiesto una chiave: {{name}}",

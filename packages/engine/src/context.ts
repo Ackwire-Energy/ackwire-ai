@@ -39,6 +39,8 @@ import { handoffGuidance, noticeForOthers, noticeText } from "./notices";
 import { openRequestsBlock, openRequestsOf } from "./open-requests";
 import { reachNote, reachOf } from "./reach";
 import { byAnotherAgent, WHY_AN_AGENT_CALLED, WHY_YOU_WERE_CALLED } from "./reply-policy";
+import { isRightHand } from "./right-hand";
+import { rightHandPrompt } from "./right-hand-prompt";
 import { isRoutineRoomKey, type RoutineBrief, routineAccessOf, routineBriefOf, routineReportOf } from "./routine-brief";
 import { WEBHOOK_EVENT, webhookEventText } from "./routine-hooks";
 import { heldHere } from "./run-inbox";
@@ -821,6 +823,14 @@ export async function buildRunContext(
       };
 
   const capabilities = await options.capabilities;
+  // The right hand's own block (ADR 0137), in place of instructions: read live for the person behind the run.
+  const rightHand =
+    isRightHand(agent) && requester
+      ? await rightHandPrompt(
+          { db, ai: options.ai },
+          { orgId: run.orgId, agent, personId: requester, inDm: channel.kind === "dm" },
+        )
+      : null;
   // Most stable first, so prompt-cache prefixes are shared: the rules are the same for every agent with the same
   // tools, the organization's block for every agent of the organization (a breakpoint after it, token-trim B5),
   // the agent's block per agent.
@@ -886,12 +896,14 @@ export async function buildRunContext(
       cache: true,
     },
     {
-      text: [
-        `You are ${agent.name} (@${agent.handle})${agent.role ? `, ${agent.role}` : ""}, an AI agent of this organization.`,
-        agent.instructions.trim() ? `# Your instructions\n${agent.instructions.trim()}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n\n"),
+      text:
+        rightHand ??
+        [
+          `You are ${agent.name} (@${agent.handle})${agent.role ? `, ${agent.role}` : ""}, an AI agent of this organization.`,
+          agent.instructions.trim() ? `# Your instructions\n${agent.instructions.trim()}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
     },
     ...(capabilities ? [{ text: capabilities }] : []),
     // Follows the requester (whose part of the team it names).
@@ -1012,17 +1024,6 @@ export async function buildRunContext(
               : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying ${flat ? "in the channel" : "in a thread"}. Members: ${memberList}.${
                   otherAgents
                     ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself (ask_agent) when you need its answer, or hand it work or news (tell_agent): what comes of either reaches you here by itself. Never relay to another agent what the person asked that agent directly: it got the message and answers it itself. An @mention of an agent wakes it: mention one only to hand it work or ask it something, never to thank or confirm${options.followUp ? ", and to wait for something use follow_up, not a mention" : ""}. Never name your tools to people.`
-                    : ""
-                }${
-                  // The team's coordinator (ADR 0093): what nobody else took comes to it.
-                  agent.coordinator && otherAgents
-                    ? `\nYou coordinate the team. A message that needs an agent and that no other agent took comes to you, so work nobody owns is in your area. Do what is yours. Hand the rest to the agent whose job it is: mention it with what you need, one agent per line, and leave that part to it.${
-                        // What a person alone here writes reaches it when nobody else took it, as a run that may
-                        // pass: without this, "# Why you were called" reads a greeting as nothing to answer.
-                        requester && members.every((m) => m.agentId || m.userId === requester)
-                          ? "\nThis person is the only one here with the agents: what they write to the room is for the team. Answer a greeting or a question; only a thanks or an ok needs no answer."
-                          : ""
-                      }`
                     : ""
                 }${
                   alsoAnswering.length > 0

@@ -1,5 +1,6 @@
 import type { AgentAction, Message } from "@agenteschat/client";
 import { ApiError, useAgentActions, useApi } from "@agenteschat/client";
+import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import {
   actionErrorKey,
   actionPhase,
@@ -42,7 +43,9 @@ import "./agent-actions.css";
  * again). Optimistic, rolled back with a toast on error.
  */
 export function AgentActionReceipts({ message }: { message: Message }) {
-  const list = message.actions ?? [];
+  // The right hand's settings card says what was applied and has its own Desfazer (ADR 0137).
+  const onCard = actionCardOf(message.meta)?.kind === "settings_proposal";
+  const list = (message.actions ?? []).filter((a) => !(onCard && a.kind === "agent.settings_changed"));
   if (message.author.type !== "agent" || list.length === 0) return null;
   return <Receipts message={message} list={list} />;
 }
@@ -67,6 +70,7 @@ export const RECEIPT_ICONS: Record<AgentAction["kind"], IconName> = {
   "thread.closed": "thread",
   "skill.created": "book",
   "skill.updated": "book",
+  "agent.settings_changed": "settings",
 };
 
 /** A kind a newer server sends that this build doesn't know yet gets the plain check. */

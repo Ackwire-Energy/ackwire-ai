@@ -1408,6 +1408,20 @@
       "when": 1793748230769,
       "tag": "0202_db_whole_server",
       "breakpoints": true
+    },
+    {
+      "idx": 202,
+      "version": "7",
+      "when": 1793748830769,
+      "tag": "0203_right_hand",
+      "breakpoints": true
+    },
+    {
+      "idx": 203,
+      "version": "7",
+      "when": 1793749430769,
+      "tag": "0204_right_hand_settings",
+      "breakpoints": true
     }
   ]
 }

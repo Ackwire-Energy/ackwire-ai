@@ -15,12 +15,15 @@ import {
 import { computerEdition } from "@agenteschat/client/lib/computer";
 import { can } from "@agenteschat/client/lib/permissions";
 import { workspaceUsesApi } from "@agenteschat/client/lib/plan-usage";
+import { rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { router } from "expo-router";
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import { Text } from "@/ui";
-import { CoverPage, PageRow, PageSection } from "../shared/CoverPage";
+import { CoverPage, PageRow, PageSection, TILE } from "../shared/CoverPage";
+import { AgentFace } from "../shared/Face";
+import { useDirectory } from "../shared/hooks";
 import { OrgAvatar } from "../shared/OrgAvatar";
 import { SETTINGS_GROUPS, type SettingsEntry, tileStates, visibleSections } from "./logic";
 
@@ -36,6 +39,8 @@ export function WorkspaceScreen() {
   const areas = visibleSections(org).filter((s) => s.id !== "general");
   const states = useAreaStates(areas);
   const overview = useOverview(orgId).data;
+  // The right hand's row goes by its name and face (admins may rename it).
+  const rightHand = rightHandOf(useDirectory().agents);
   const headline = [
     role ? t(`mobile.me.role.${role}`) : null,
     overview ? t("mobile.chat.people", { count: overview.people }) : null,
@@ -65,7 +70,10 @@ export function WorkspaceScreen() {
               <PageRow
                 key={s.id}
                 icon={s.icon}
-                label={t(`settings.section.${s.id}`)}
+                {...(s.id === "right_hand" && rightHand
+                  ? { leading: <AgentFace agentId={rightHand.id} size={TILE} live={false} /> }
+                  : {})}
+                label={s.id === "right_hand" && rightHand ? rightHand.name : t(`settings.section.${s.id}`)}
                 below={states[s.id] ? <Line text={states[s.id] ?? ""} /> : undefined}
                 divider={own || i > 0}
                 onPress={() => router.push(s.href as never)}

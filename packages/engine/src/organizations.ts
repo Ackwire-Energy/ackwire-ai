@@ -35,6 +35,7 @@ import { addressDomain } from "./mail/text";
 import { recordOperatorEvent } from "./operator-events";
 import { enqueue } from "./outbox";
 import { memberKeysSql, memberRankSql, type Permission, resolvePermissions } from "./permissions";
+import { ensureRightHand, followOwner } from "./right-hand";
 import { addMemberRolesInTx, createDefaultRoles, givableRoleIds, rolesStillThere, stillGivableRoleIds } from "./roles";
 import {
   assertCanWork,
@@ -288,6 +289,9 @@ export async function createOrganization(
     await tx.insert(organizationMembers).values({ orgId: organization.id, userId, role: "owner" });
     await createDefaultRoles(tx, organization.id);
     await assignHandle(tx, organization.id, userId);
+    // The team's right hand comes with the workspace (ADR 0137), after the owner's handle so `@lodi` stays theirs if
+    // it is their own.
+    await ensureRightHand(tx, organization.id);
     const [general] = await tx
       .insert(channels)
       .values({ orgId: organization.id, name: "general", createdByUserId: userId })
@@ -584,6 +588,7 @@ export async function onUserCreated(db: Database, userId: string) {
     .insert(organizationMembers)
     .values(existing.map((o) => ({ orgId: o.id, userId, role: "owner" as const })))
     .onConflictDoNothing();
+  for (const o of existing) await followOwner(db, o.id);
 }
 
 // ── Members ──────────────────────────────────────────────────────────────────
@@ -933,6 +938,7 @@ export async function changeMemberRole(
       .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, targetUserId)));
     if (target.role !== role) {
       await auditMember(tx, orgId, actorId, "member.role_changed", targetUserId, { from: target.role, to: role });
+      await followOwner(tx, orgId);
     }
   });
   await announceMembers(options.pubsub, orgId);
@@ -1176,6 +1182,7 @@ export async function removeMember(
     const touched = [...new Set([...handed.map((a) => a.id), ...removed.flatMap((r) => r.freed)])];
     await offPlansNotOwners(tx, orgId, touched);
     const changed = [...new Set([...touched, ...released.agents.flatMap((a) => a.agentIds)])];
+    await followOwner(tx, orgId);
     return { released, removed, handed, changed, heir, secrets, mailActions };
   });
   for (const row of secrets) await publishSecret({ db, pubsub: options.pubsub }, row, "secret.updated");
@@ -1304,6 +1311,7 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
       : [];
     if (options.emails) await queueAccountDeletedEmail(tx, userId, closed, options.emails);
     await tx.delete(users).where(eq(users.id, userId));
+    for (const org of plan.leaves) await followOwner(tx, org.id);
     // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls; and their
     // GIPHY key would go on serving every workspace's GIFs, with nobody left who could remove it (ADR 0091); so would
     // the speech provider's key (ADR 0100).
@@ -1736,7 +1744,8 @@ async function inviteAgents(db: Database, orgId: string) {
   const rows = await db
     .select({ id: agents.id, name: agents.name, appearance: agents.appearance, total: sql<number>`count(*) over ()` })
     .from(agents)
-    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
+    // Every workspace has its right hand (ADR 0137): the page names the team's own agents.
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.builtin)))
     .orderBy(asc(agents.createdAt))
     .limit(INVITE_AGENTS);
   const more = Number(rows[0]?.total ?? 0) - rows.length;

@@ -60,6 +60,7 @@ import {
   requireOpen,
 } from "./missions";
 import { can, getMembership, requirePermission } from "./organizations";
+import { isRightHand, rightHandPermanent } from "./right-hand";
 import { closedRefusal } from "./standing";
 import { wakeAgentUsageWaits } from "./usage-pause";
 
@@ -561,6 +562,8 @@ export async function setAgentBrain(
   }
   const brain = (input.brain as BrainKind | undefined) ?? from;
   const changed = brain !== from;
+  // It thinks through the workspace's AI, never on a computer (ADR 0137).
+  if (changed && isRightHand(agent)) throw rightHandPermanent("moved to a computer");
   const [machine, machines] = await Promise.all([
     agentMachine(deps.db, orgId, agent.machineId),
     candidateMachines(deps.db, userId, orgId, admin, agent.machineId),

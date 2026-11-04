@@ -201,6 +201,8 @@ export async function setup(
     forumTools?: boolean;
     /** Add the scheduling tools (schedule_reminder, create_routine…). */
     scheduleTools?: boolean;
+    /** Keep the workspace's right hand (ADR 0137). Off: its only agent is `@dev`. */
+    rightHand?: boolean;
     /** Add the wiki tools (search_wiki, read_wiki_page, create_wiki_page…). */
     wikiTools?: boolean;
     /** Add the sandbox tools with connected machines (a machine hub on this db). */
@@ -240,6 +242,8 @@ export async function setup(
     name: "Acme",
     context: "Acme builds rockets.",
   });
+  // Every workspace comes with its right hand (ADR 0137); the tests about it keep it, the others count only theirs.
+  if (!options.rightHand) await db.delete(schema.agents).where(eq(schema.agents.orgId, org.id));
   const credential = await createCredential(db, keyWrapper, owner.id, org.id, {
     provider: "anthropic",
     label: "main",
@@ -259,9 +263,7 @@ export async function setup(
     },
     { model: "claude-sonnet-5-5" },
   );
-  // The first agent coordinates its team (ADR 0093); here nobody does, and the tests about it pick one themselves.
-  await db.update(schema.agents).set({ coordinator: false }).where(eq(schema.agents.id, first.id));
-  const agent = { ...first, coordinator: false };
+  const agent = first;
   // New agents get their computer by default; tests that use it grant it themselves.
   await db
     .delete(schema.agentScopes)

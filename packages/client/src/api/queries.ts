@@ -648,7 +648,8 @@ export function useCreateProposedAgent(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (messageId: string) => api.agents.createProposed(orgId, messageId),
+    mutationFn: ({ messageId, test }: { messageId: string; test?: boolean }) =>
+      api.agents.createProposed(orgId, messageId, test ? { test } : undefined),
     onSuccess: ({ proposal }) => {
       cacheAgentProposal(qc, orgId, proposal, proposal);
       for (const key of [keys.agents(orgId), keys.channels(orgId), keys.routines(orgId)])
@@ -667,6 +668,16 @@ export function useCreateProposedRoutine(orgId: string) {
       cacheAgentProposal(qc, orgId, proposal, proposal);
       void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
     },
+  });
+}
+
+/** "Pedir a um admin" on an agent's proposal the viewer can't create (ADR 0137): the card says it was sent. */
+export function useAskAgentProposal(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => api.agents.askProposal(orgId, messageId),
+    onSuccess: (proposal) => cacheAgentProposal(qc, orgId, proposal, proposal),
   });
 }
 
@@ -1158,7 +1169,7 @@ export function cacheAgentProposal(
   qc: ReturnType<typeof useQueryClient>,
   orgId: string,
   where: { channelId: string; messageId: string },
-  { state, agentId, decidedByUserId, decidedAt, applied, routineId }: AgentProposalDecision,
+  { state, agentId, decidedByUserId, decidedAt, applied, routineId, askedAt }: AgentProposalDecision,
 ) {
   cacheMessageMeta(qc, orgId, where.channelId, where.messageId, (meta) => ({
     actionCard: {
@@ -1169,6 +1180,7 @@ export function cacheAgentProposal(
       decidedAt,
       ...(applied ? { applied } : {}),
       ...(routineId ? { routineId } : {}),
+      ...(askedAt ? { askedAt } : {}),
     },
   }));
   void qc.invalidateQueries({ queryKey: keys.agentProposal(orgId, where.messageId) });
@@ -2865,6 +2877,9 @@ function refreshAccepted(qc: QueryClient, orgId: string, decided: Proposal[]) {
   }
   if (accepted.some((p) => p.target.type === "agent_access"))
     void qc.invalidateQueries({ queryKey: keys.access(orgId) });
+  // A settings card may seat an agent in a channel or take it out.
+  if (accepted.some((p) => p.target.type === "agent_settings"))
+    void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
 }
 
 export function useDecideProposal(orgId: string) {
@@ -2878,6 +2893,16 @@ export function useDecideProposal(orgId: string) {
     // The page explains a stale proposal (409) itself.
     meta: { silent: true },
     onSuccess: (row) => refreshAccepted(qc, orgId, [row]),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
+  });
+}
+
+/** "Pedir a um admin" on a settings row the viewer can't decide (ADR 0137): the card says whom it went to. */
+export function useAskProposal(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.proposals.ask(orgId, id),
     onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
   });
 }

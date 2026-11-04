@@ -569,8 +569,8 @@ export interface Agent {
   appearance?: AgentLookInput;
   /** Who thinks for it (ADR 0032): the brain, a computer brain's model label, its computer (owner and admins). */
   brain?: AgentBrainLine;
-  /** It coordinates the team (ADR 0093): one per workspace; absent from an older server. */
-  coordinator?: boolean;
+  /** A built-in agent the product ships (ADR 0137): `right_hand`, the team's right hand. Null or absent for the others. */
+  builtin?: "right_hand" | null;
   /** No longer in the team (ADR 0082): only its name, role and look, from `FormerAgent`. */
   former?: "archived" | "deleted";
   /**
@@ -699,8 +699,6 @@ export interface AgentInput {
   /** With `audience`: the mailboxes the person agreed it loses; losing another refuses the save (409). */
   mailLossSeen?: string[];
   appearance?: AgentLookInput;
-  /** Editing only, admins: it coordinates the team (true takes it from whoever had it), ADR 0093. */
-  coordinator?: boolean;
   /** Created from an agent's proposal (its card's message id, ADR 0081): the card is marked created. */
   proposal?: string;
   /** Its stickers and GIFs after a light reply (ADR 0091); same permission as editing the agent. */
@@ -776,9 +774,12 @@ export interface AgentProposalCard {
   kind: "agent_proposal";
   /** The person behind the run that proposed it. */
   forUserId: string | null;
-  params: { draft: AgentDraft; why: string };
-  /** `creating`: a person is creating it right now. */
-  state: "pending" | "creating" | "created" | "denied";
+  /** `firstTask`: what "Criar e testar" puts in the composer of the clicker's DM with the new agent (ADR 0137). */
+  params: { draft: AgentDraft; why: string; firstTask?: string };
+  /** `creating`: a person is creating it right now; `superseded`: a newer card for the same handle took its place. */
+  state: "pending" | "creating" | "created" | "denied" | "superseded";
+  /** When the person it is for, who can't create agents, sent it to whoever may ("Pedir a um admin"). */
+  askedAt?: string;
   agentId: string | null;
   decidedByUserId: string | null;
   decidedAt: string | null;
@@ -793,7 +794,7 @@ export interface AgentProposalCard {
 /** What a person decided on a proposal: all that `agent.proposal.updated` carries of its card. */
 export type AgentProposalDecision = Pick<
   AgentProposalCard,
-  "state" | "agentId" | "decidedByUserId" | "decidedAt" | "applied" | "routineId"
+  "state" | "agentId" | "decidedByUserId" | "decidedAt" | "applied" | "routineId" | "askedAt"
 >;
 
 /** `GET …/agent-proposals/{messageId}`: the card, where it is and what the viewer may do. */
@@ -1034,14 +1035,14 @@ export interface MessageReceipts {
 
 /**
  * Which step picked the agents for a message nobody mentioned (ADR 0074): Jev, the organization's small model
- * (its catalog id and provider), the author's own plan (`ownerId`: the author), or a rule (`coordinator`: nobody
- * else took it, so the team's coordinator did, ADR 0093).
+ * (its catalog id and provider), the author's own plan (`ownerId`: the author), or a rule. `coordinator` is only in
+ * decisions stored before ADR 0137 retired the team's coordinator: the apps read it as `default`.
  */
 export type DecidedBy =
   | { step: "jev" }
   | { step: "model"; model: string; provider: string }
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
-  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" | "coordinator" | "default" };
+  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" | "coordinator" | "default" | "alone" };
 
 /**
  * Who picks the agents for a message nobody mentioned (`ai-status`, ADR 0074): `by` for the workspace, `mine` for
@@ -1760,6 +1761,32 @@ export interface ProposalAccessLine {
   on: boolean;
 }
 
+/** A setting the right hand's card changes on an agent (ADR 0137). */
+export type ProposalSettingField =
+  | "model"
+  | "ai_account"
+  | "budget"
+  | "owner"
+  | "audience"
+  | "channel_add"
+  | "channel_remove"
+  | "reply_mode"
+  | "archive";
+
+/**
+ * One line of a settings card: `model` a model id; `ai_account` `{ brain, accountId }`; `budget` nano-USD a month or
+ * null (the workspace's default); `owner` a user id; `audience` `{ mode, userIds, roleIds }`; `channel_add` /
+ * `channel_remove` / `reply_mode` its seat in `channelId` (null: not in it, else whether it answers without a
+ * mention); `archive` true. `label`: the server's names for ids.
+ */
+export interface ProposalSettingLine {
+  field: ProposalSettingField;
+  from: unknown;
+  to: unknown;
+  channelId?: string;
+  label?: { from?: string; to?: string };
+}
+
 export interface Proposal {
   id: string;
   /** The agent it changes; empty for the org context. */
@@ -1771,9 +1798,18 @@ export interface Proposal {
     | { type: "org_context" }
     | { type: "agent_role"; agentId: string }
     | { type: "agent_access"; agentId: string }
+    | { type: "agent_settings"; agentId: string }
     | { type: "skill"; agentId: string; skillId: string; name: string };
   /** `agent_access`: each app turned on or off. */
   access?: ProposalAccessLine[] | null;
+  /** `agent_settings` (the right hand's card, ADR 0137): each setting then and proposed. */
+  settings?: ProposalSettingLine[] | null;
+  /** The person who asked for it in conversation (null: memory promotions, older rows). */
+  requestedBy?: { userId: string; name: string } | null;
+  /** When the person who asked sent it to whoever may decide it ("Pedir a um admin"). */
+  askedAt?: string | null;
+  /** `agent_settings` once applied: its receipt, for Desfazer (`agentActions.undo`). */
+  undoActionId?: string | null;
   title: string;
   why: string;
   /** `type` names the source for translation; `where` is the server's English text. */
@@ -1792,7 +1828,7 @@ export interface Proposal {
   /** You may make this change on the agent's page (the org context: you review memory). */
   canDecide: boolean;
   /** Who decides besides admins: the agent's owner, for its instructions and for access it only takes away. */
-  decider: { type: "user"; userId: string; name: string } | { type: "admins" };
+  decider: { type: "user"; userId: string; name: string } | { type: "admins" } | { type: "account_owner" };
   createdAt: string;
   decidedBy: { userId: string; name: string } | null;
   decidedAt: string | null;
@@ -2442,12 +2478,13 @@ export const AGENT_ACTION_KINDS = [
   "thread.closed",
   "skill.created",
   "skill.updated",
+  "agent.settings_changed",
 ] as const;
 export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
 /** What the change was made to (link it: issue → Issues, wiki_page → Wiki, routine → Rotinas…). */
 export interface AgentActionTarget {
-  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill";
+  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill" | "agent";
   id: string;
   /** Issues. */
   number?: number;
@@ -2473,6 +2510,8 @@ export interface AgentActionTarget {
  * - `channel.created`: `name` (undo archives it)
  * - `wiki.page_created` / `wiki.page_edited`: `title`, `slug`
  * - `thread.renamed`: `from`, `to`; `thread.closed`: `title`
+ * - `agent.settings_changed` (ADR 0137): `agentName`, `fields`, `proposalId` (the right hand's card, applied by the
+ *   person who clicked: Undo puts each setting back)
  */
 export type AgentActionParams = Record<string, string | number | boolean | null | string[] | ApiRule>;
 
@@ -5709,7 +5748,13 @@ export type NotificationKind =
    * skills, waiting, the files in `latest.title`) or `failed` (`latest.reason` its code). `source.skillId`, its name in
    * `source.label`. Opens the skill.
    */
-  | "skill_update";
+  | "skill_update"
+  /**
+   * ADR 0137: someone asked the right hand for a change only others decide and sent it ("Pedir a um admin"). Waiting;
+   * `source.proposalId` (or `source.messageId` for a new agent's card), `source.agentId` and `label` the agent,
+   * `latest.text` why. Done once someone decides.
+   */
+  | "change_request";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5736,6 +5781,8 @@ export interface NotificationSource {
   machineId?: string;
   /** `browser_handoff`: the request (its chat card has the same id). */
   handoffId?: string;
+  /** `change_request`: the proposal to decide. */
+  proposalId?: string;
   /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0058: `desktop`). */
   screen?: ScreenKind;
   /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
@@ -5863,6 +5910,8 @@ export interface AuditPage {
 export interface AuditQuery {
   actorType?: "person" | "agent" | "system";
   actorId?: string;
+  /** An agent's id: what it did, and what people applied from its cards. */
+  via?: string;
   outcome?: AuditOutcome[];
   /** Only calls whose approval or secret nobody has answered yet. */
   waiting?: boolean;
