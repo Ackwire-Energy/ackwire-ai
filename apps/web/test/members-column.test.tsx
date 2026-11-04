@@ -252,7 +252,7 @@ describe("the members column", () => {
     expect(within(panel).getByRole("button", { name: "Configurações do canal" })).toBeTruthy();
     expect(within(panel).getByRole("button", { name: "Mensagens fixadas" })).toBeTruthy();
     expect(within(panel).getByRole("button", { name: /^Threads/ })).toBeTruthy();
-    expect(row(panel, "Lodi")).toBeTruthy();
+    expect(row(panel, "Lodi")).toBeNull();
     await act(async () =>
       fireEvent.change(within(panel).getByRole("searchbox", { name: "Buscar pessoas e agentes" }), {
         target: { value: "atl" },
@@ -260,8 +260,6 @@ describe("the members column", () => {
     );
     expect(row(panel, "Ada")).toBeNull();
     expect(row(panel, "Atlas")).toBeTruthy();
-    // The right hand leads the agents only when it matches too.
-    expect(row(panel, "Lodi")).toBeNull();
     // The cog closes the sheet for the channel's details.
     await act(async () => fireEvent.click(within(panel).getByRole("button", { name: "Configurações do canal" })));
     await settle(3);

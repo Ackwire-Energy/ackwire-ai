@@ -19,7 +19,7 @@ test("a card's last settings row is as deep under its control as above its title
   // The rows reach the card's edges (`--card-pad`) and the card spaces its children by `--space-3`: over a foot the
   // rows give that gap back, so the last row's own padding is all that's under it.
   expect(declarations(css, ".settings-rows")).toContainEqual(["margin", "calc(-1 * var(--card-pad))"]);
-  expect(declarations(css, ".settings-row")).toContainEqual(["padding", "14px var(--card-pad)"]);
+  expect(declarations(css, ".settings-row")).toContainEqual(["padding", "var(--row-py) var(--card-pad)"]);
   expect(declarations(css, ".settings-rows:has(+ .ac-card__foot)")).toEqual([
     ["margin-bottom", "calc(-1 * var(--space-3))"],
   ]);

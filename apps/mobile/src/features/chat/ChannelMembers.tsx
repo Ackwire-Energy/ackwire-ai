@@ -7,10 +7,10 @@ import {
   useChannels,
   useRoster,
 } from "@agenteschat/client";
-import { canTalk, listsAgent } from "@agenteschat/client/lib/audience";
+import { listsAgent } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
-import { isRightHand, rightHandOf } from "@agenteschat/client/lib/right-hand";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -87,29 +87,12 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
     autoReply: Boolean(m.autoReply),
     setsReply: m.type === "agent" && setsAutoReply(channel, dir.agentById.get(m.id), meId, org),
   }));
-  // The right hand (ADR 0137) is in no channel, yet an @mention reaches it anywhere: it leads the agents.
-  const rightHand = rightHandOf(dir.agents);
-  const lead: Who[] =
-    rightHand && canTalk(rightHand) && !all.some((w) => w.id === rightHand.id)
-      ? [
-          {
-            kind: "agent",
-            id: rightHand.id,
-            name: rightHand.name,
-            handle: rightHand.handle,
-            email: "",
-            autoReply: false,
-            setsReply: false,
-          },
-        ]
-      : [];
+  // The right hand (ADR 0137) is in no channel and isn't listed as a member: an @mention reaches it anywhere.
   const needle = q.trim().toLowerCase();
-  const shown = [...lead, ...all].filter(
-    (w) => !needle || `${w.name} ${w.handle} ${w.email}`.toLowerCase().includes(needle),
-  );
+  const shown = all.filter((w) => !needle || `${w.name} ${w.handle} ${w.email}`.toLowerCase().includes(needle));
   const agents = shown.filter((w) => w.kind === "agent");
   const people = shown.filter((w) => w.kind === "person");
-  const agentCount = lead.length + all.filter((w) => w.kind === "agent").length;
+  const agentCount = all.filter((w) => w.kind === "agent").length;
 
   const open = (w: Who) => {
     tapHaptic();

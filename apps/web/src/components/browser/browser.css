@@ -1098,7 +1098,7 @@ html:not([data-pointer]) .brw-kc:focus-visible {
 }
 .brw-mmenu span {
   padding: 3px 7px;
-  border-radius: 5px;
+  border-radius: 4px;
   white-space: nowrap;
 }
 .brw-mmenu span[data-hl] {

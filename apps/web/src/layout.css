@@ -3519,7 +3519,7 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
   top: 24px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--space-4);
 }
 .settings__head {
   display: flex;
@@ -3550,7 +3550,7 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
 .settings__groups {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--space-4);
 }
 .settings__group-label {
   display: block;
@@ -3567,13 +3567,14 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
   flex-direction: column;
   gap: 2px;
 }
+/* The compact step of the control ruler, as the sidebar's rows; a finger keeps the default step (below). */
 .settings__link {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: var(--control-h-md);
+  min-height: var(--control-h-sm);
   padding: 0 10px;
-  border-radius: var(--control-r-md);
+  border-radius: var(--control-r-sm);
   color: var(--ink2);
   text-decoration: none;
   font-size: 14px;
@@ -3602,6 +3603,12 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
 html:not([data-pointer]) .settings__link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+@media (pointer: coarse) {
+  .settings__link {
+    min-height: var(--control-h-md);
+    border-radius: var(--control-r-md);
+  }
 }
 .settings__body {
   flex: 1 1 560px;
@@ -3647,7 +3654,7 @@ html:not([data-pointer]) .settings__link:focus-visible {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 14px var(--card-pad);
+  padding: var(--row-py) var(--card-pad);
   border-top: 1px solid var(--line);
 }
 .settings-row:first-child {
@@ -12797,7 +12804,7 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px var(--card-pad);
+  padding: var(--row-py) var(--card-pad);
   border-top: 1px solid var(--line);
 }
 .voice-engine__title {

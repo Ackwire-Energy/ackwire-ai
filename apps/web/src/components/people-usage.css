@@ -403,7 +403,7 @@ th.pu-num .pu-sort {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 0;
+  padding: var(--row-py) 0;
   border-top: 1px solid var(--line);
 }
 .pu-limits__label {

@@ -1599,11 +1599,13 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
 
 /*
  * Menu (listbox of the Select, dropdown menus, the right click). Its rows are as dense as the message's hover bar:
- * one height and side padding for every menu's item (taller under a finger, below).
+ * one height and side padding for every menu's item (taller under a finger, below), and one room between the menu's
+ * edge and its rows on all four sides (`--menu-pad`).
  */
 :root {
   --menu-item-h: 28px;
   --menu-item-px: 8px;
+  --menu-pad: var(--space-1);
 }
 .ac-menu {
   z-index: var(--z-floating);
@@ -1612,7 +1614,7 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: var(--space-1);
+  padding: var(--menu-pad);
   background: var(--surface-raised);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -1634,7 +1636,7 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding-block: var(--space-1);
+  padding-block: var(--menu-pad);
 }
 .ac-menu--dropdown {
   min-width: 200px;
@@ -1663,7 +1665,7 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   place-items: center;
   width: 32px;
   height: var(--menu-item-h);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-item);
   font-size: 17px;
   cursor: pointer;
   outline: none;
@@ -3107,7 +3109,6 @@ html:not([data-pointer]) .ac-receipt__action:focus-visible {
 .ac-popover {
   min-width: 220px;
   max-width: 320px;
-  padding: var(--space-2);
   gap: var(--space-1);
 }
 .ac-popover:focus {
@@ -4649,8 +4650,15 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
     backdrop-filter: blur(18px) saturate(1.6);
   }
 }
+/* Concentric: the box is its rows' corner (--radius-item) plus the room around them. */
 .ac-menu {
-  padding: 4px;
+  padding: var(--menu-pad);
+  border-radius: calc(var(--radius-item) + var(--menu-pad));
+}
+/* A select's room at its ends is inside its viewport (above), so the last row keeps it when scrolled: the menu adds
+   none there, or it would be twice the room at the sides. */
+.ac-menu--select {
+  padding-block: 0;
 }
 .ac-menu__item {
   min-height: var(--menu-item-h);
@@ -4819,7 +4827,7 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
 .ac-card__foot {
   /* A quiet line under a hairline, edge to edge of the card (no gray well). */
   margin: 0 calc(0px - var(--card-pad, 20px)) calc(0px - var(--card-pad, 20px));
-  padding: 12px var(--card-pad, 20px);
+  padding: var(--row-py) var(--card-pad, 20px);
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 12.5px;
@@ -5145,13 +5153,15 @@ html:not([data-pointer]) .ac-hint:focus-visible {
  * the first line of text.
  */
 .ac-msg__actions {
+  --bar-r: 10px;
+  --bar-pad: 2px;
   top: 0;
   right: 12px;
   z-index: var(--z-sticky);
   gap: 0;
-  padding: 2px;
+  padding: var(--bar-pad);
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--bar-r);
   background: var(--raised);
   box-shadow: var(--e2);
   /* Placed by its middle (-50%), 4px lower at rest. One transform: the build's minifier (Lightning CSS) drops a
@@ -5178,7 +5188,7 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   min-width: 26px;
   width: 26px;
   height: 26px;
-  border-radius: 8px;
+  border-radius: calc(var(--bar-r) - var(--bar-pad));
 }
 .ac-msg__actions .ac-btn--sm .ac-icon {
   width: 16px;
@@ -6403,9 +6413,10 @@ html:not([data-pointer]) .ac-composer__file-remove:focus-visible {
 /* Emoji picker: glass popover, search, category tabs, grids */
 /* It never scrolls sideways, an emoji growing under the pointer included. */
 .ac-emoji-popover {
+  --menu-pad: var(--space-2);
   width: 332px;
   max-width: calc(100vw - 32px);
-  padding: 8px;
+  padding: var(--menu-pad);
   overflow-x: hidden;
 }
 /* Its popover stops at a menu's 280px (`.ac-menu`): only the grid gives up height, so it is the one scroll and its last
@@ -6863,6 +6874,7 @@ html:not([data-pointer]) .ac-gif:focus-visible {
   background: var(--scrim);
 }
 .ac-palette {
+  --palette-pad: 6px;
   position: fixed;
   z-index: var(--z-dialog);
   left: 50%;
@@ -6903,7 +6915,7 @@ html:not([data-pointer]) .ac-gif:focus-visible {
   color: var(--faint);
 }
 .ac-palette__list {
-  padding: 6px;
+  padding: var(--palette-pad);
   max-height: min(420px, 60vh);
   overflow-y: auto;
 }
@@ -6913,6 +6925,7 @@ html:not([data-pointer]) .ac-gif:focus-visible {
   gap: 10px;
   min-height: 40px;
   padding: 0 10px;
+  border-radius: calc(var(--radius-section) - var(--palette-pad));
   cursor: pointer;
   font-size: 14px;
 }
@@ -8068,7 +8081,7 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
     position: relative;
     min-width: var(--control-h-sm);
     min-height: var(--control-h-sm);
-    border-radius: var(--control-r-sm);
+    border-radius: calc(var(--bar-r) - var(--bar-pad));
   }
   .ac-msg__actions .ac-btn--sm::after {
     content: "";
