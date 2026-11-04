@@ -178,6 +178,22 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
 .home-row__acts {
   padding: 0 16px 12px 60px;
 }
+/* A notice with one action: the button at the row's end, where "Review" sits on the others. */
+.home-wrow--side {
+  position: relative;
+}
+.home-wrow--side > .home-row {
+  padding-bottom: 12px;
+}
+.home-wrow--side:has(.home-row__acts--side) > .home-row {
+  padding-right: 128px;
+}
+.home-row__acts--side {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  padding: 0;
+}
 
 /* A phone: the button goes under the text, from its start, so the text keeps the row's width. */
 @media (max-width: 640px) {
@@ -188,6 +204,14 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
     grid-column: 2;
     justify-self: start;
     margin-top: 4px;
+  }
+  .home-wrow--side:has(.home-row__acts--side) > .home-row {
+    padding-right: 16px;
+    padding-bottom: 6px;
+  }
+  .home-row__acts--side {
+    position: static;
+    padding: 0 16px 12px 60px;
   }
   .home-start {
     width: 100%;
