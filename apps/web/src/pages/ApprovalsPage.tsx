@@ -1,4 +1,4 @@
-import type { Agent, Approval, ConnectorDef, Member } from "@agenteschat/client";
+import type { Agent, Approval, ConnectorDef } from "@agenteschat/client";
 import {
   sendHelpers,
   useApprovals,
@@ -90,8 +90,8 @@ import {
   useMissionsWaitingYou,
 } from "@/components/missions/MissionWaiting";
 import { useOrg } from "@/components/org-context";
-import { TaskStepsBlock, useCallLogo } from "@/components/ToolCalls";
 import { colorOf, prepareBurst } from "@/components/Sky";
+import { TaskStepsBlock, useCallLogo } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
 import { TYPED_VALUES } from "@/i18n";
 import { Markdown } from "@/lib/markdown";
@@ -857,17 +857,8 @@ export function RefuseBox({ approval, agent, onCancel }: { approval: Approval; a
   );
 }
 
-/** A request waiting on a person (or running right after approval). */
 /** Where a list row of a request goes: its agent, what it wants in one line, where and when, its time left. */
-function ReqRow({
-  approval: a,
-  selected,
-  onOpen,
-}: {
-  approval: Approval;
-  selected: boolean;
-  onOpen: () => void;
-}) {
+function ReqRow({ approval: a, selected, onOpen }: { approval: Approval; selected: boolean; onOpen: () => void }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
@@ -1226,10 +1217,7 @@ function ReviewBody({ approval: a, channel }: { approval: Approval; channel: str
           title={t("approvals.review.trail")}
           subtitle={
             around
-              ? [
-                  t("chat.work.steps", { count: track.length }),
-                  durationMs ? formatDuration(t, durationMs) : "",
-                ]
+              ? [t("chat.work.steps", { count: track.length }), durationMs ? formatDuration(t, durationMs) : ""]
                   .filter(Boolean)
                   .join(" · ")
               : undefined
