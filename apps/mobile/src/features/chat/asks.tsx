@@ -32,7 +32,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
+import { Pressable, Text as RNText, StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated, {
   FadeIn,
   useAnimatedStyle,
@@ -510,12 +510,17 @@ export function AskFoot({ expiry, children }: { expiry?: ReactNode; children?: R
   );
 }
 
-/** The decision: the main action wide (dark) and the other beside it. */
+/**
+ * The decision: the main action wide (dark) and the other beside it, or under it when both don't fit their words
+ * (a narrow phone, a larger text size): each keeps a least width that grows with the text, and the row wraps.
+ */
 export function AskButtons({ primary, secondary }: { primary: ReactNode; secondary?: ReactNode }) {
+  const { fontScale } = useWindowDimensions();
+  const scale = Math.min(2, Math.max(1, fontScale));
   return (
     <View style={styles.buttons}>
-      <View style={styles.primary}>{primary}</View>
-      {secondary ? <View style={styles.secondary}>{secondary}</View> : null}
+      <View style={[styles.primary, { flexBasis: 128 * scale }]}>{primary}</View>
+      {secondary ? <View style={[styles.secondary, { flexBasis: 96 * scale }]}>{secondary}</View> : null}
     </View>
   );
 }
@@ -779,12 +784,12 @@ const styles = StyleSheet.create({
     gap: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  buttons: { flexDirection: "row", alignItems: "center", gap: 8 },
-  primary: { flex: 1.5, minWidth: 0 },
-  secondary: { flex: 1, minWidth: 0 },
+  buttons: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
+  primary: { flexGrow: 1.5, flexShrink: 1, minWidth: 0 },
+  secondary: { flexGrow: 1, flexShrink: 1, minWidth: 0 },
   expiry: { flexDirection: "row", alignItems: "center", gap: 8 },
   fuse: { width: 56 },
-  expiryText: { fontWeight: "500", fontVariant: ["tabular-nums"] },
+  expiryText: { flexShrink: 1, fontWeight: "500", fontVariant: ["tabular-nums"] },
   // A decided request: a line on the conversation itself, nothing around it.
   done: {
     flexDirection: "row",

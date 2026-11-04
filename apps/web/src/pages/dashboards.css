@@ -98,6 +98,10 @@ html:not([data-pointer]) .db-card:focus-visible {
   flex: none;
   color: var(--muted);
 }
+/* The board on Início: a chip under its title. */
+.db-card__home {
+  align-self: flex-start;
+}
 .db-card__name {
   min-width: 0;
   white-space: nowrap;
@@ -662,6 +666,9 @@ html:not([data-pointer]) .nwc-ask:focus-visible {
   gap: 8px;
   min-width: 0;
 }
+.nwc-row--format {
+  margin-top: auto;
+}
 /* After the test: the ask as one line that opens it again. */
 .nwc-asked {
   display: flex;
@@ -724,6 +731,13 @@ html:not([data-pointer]) .nwc-pk .ac-select__trigger:focus-visible {
 .nwc-pk .ac-select__chev {
   width: 12px;
   height: 12px;
+}
+/* Format and size side by side. */
+.nwc-pks {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 .nwc-pk--box .ac-select__trigger {
   box-shadow: inset 0 0 0 1px var(--line);

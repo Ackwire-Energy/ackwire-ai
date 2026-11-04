@@ -1,6 +1,6 @@
 {
-  "id": "b20cf6dd-a566-46f8-839d-c4d61d0503bf",
-  "prevId": "81ff6c6d-eb72-4e87-ae3c-94b395ae171d",
+  "id": "81ff6c6d-eb72-4e87-ae3c-94b395ae171d",
+  "prevId": "79543761-3b6f-467e-b43f-12c976df9a3c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -14479,133 +14479,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.approval_covers": {
-      "name": "approval_covers",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "org_id": {
-          "name": "org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "from_user_id": {
-          "name": "from_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "to_user_id": {
-          "name": "to_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mode": {
-          "name": "mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'while_out'"
-        },
-        "risky": {
-          "name": "risky",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "ends_at": {
-          "name": "ends_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "approval_covers_org_id_to_user_id_index": {
-          "name": "approval_covers_org_id_to_user_id_index",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "to_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "approval_covers_org_id_from_user_id_organization_members_org_id_user_id_fk": {
-          "name": "approval_covers_org_id_from_user_id_organization_members_org_id_user_id_fk",
-          "tableFrom": "approval_covers",
-          "tableTo": "organization_members",
-          "columnsFrom": [
-            "org_id",
-            "from_user_id"
-          ],
-          "columnsTo": [
-            "org_id",
-            "user_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "approval_covers_org_id_to_user_id_organization_members_org_id_user_id_fk": {
-          "name": "approval_covers_org_id_to_user_id_organization_members_org_id_user_id_fk",
-          "tableFrom": "approval_covers",
-          "tableTo": "organization_members",
-          "columnsFrom": [
-            "org_id",
-            "to_user_id"
-          ],
-          "columnsTo": [
-            "org_id",
-            "user_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "approval_covers_orgId_fromUserId_unique": {
-          "name": "approval_covers_orgId_fromUserId_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "org_id",
-            "from_user_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.approval_rules": {
       "name": "approval_rules",
       "schema": "",
@@ -14950,25 +14823,6 @@
         "approvers": {
           "name": "approvers",
           "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "requested_by_user_id": {
-          "name": "requested_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "high_risk": {
-          "name": "high_risk",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "decided_for_user_id": {
-          "name": "decided_for_user_id",
-          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -20546,6 +20400,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "home_dashboard_id": {
+          "name": "home_dashboard_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",

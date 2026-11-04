@@ -13366,6 +13366,16 @@
       "m": "중",
       "l": "대"
     },
+    "sizeNames": {
+      "s": "작게",
+      "m": "보통",
+      "l": "크게"
+    },
+    "sizeHints": {
+      "s": "한 칸",
+      "m": "두 열",
+      "l": "두 열, 두 행"
+    },
     "status": {
       "building": "{{name}}이(가) 위젯과 이를 업데이트할 루틴을 만들고 있어요…",
       "updating": "{{name}}이(가) 업데이트 중…",
@@ -13533,6 +13543,11 @@
     "new": "새 대시보드",
     "back": "대시보드",
     "home": "내 홈",
+    "seeAll": "모두 보기",
+    "useOnHome": "홈에 표시",
+    "stopOnHome": "홈에서 빼기",
+    "onHome": "홈에 표시 중",
+    "onHomeDone": "이제 홈에 이 대시보드가 표시됩니다",
     "groups": {
       "workspace": "워크스페이스",
       "workspaceHint": "모두가 봐요",

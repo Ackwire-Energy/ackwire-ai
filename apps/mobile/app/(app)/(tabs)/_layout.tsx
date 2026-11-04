@@ -1,30 +1,25 @@
 import { NativeTabs } from "expo-router/native-tabs";
 import { useTranslation } from "react-i18next";
-import { Platform } from "react-native";
 import { useUnreadConversations, useUnreadThreads, useWaitingCount } from "@/features/shared/queries";
-import { barTabs, TAB_BADGE, tabBadge } from "@/lib/nav";
+import { TAB_BADGE, tabBadge } from "@/lib/nav";
 import { haptics, useTheme } from "@/ui";
 import { type TabGlyph, tabGlyphKey } from "@/ui/tabGlyphs";
 import { tabGlyphFamily } from "@/ui/tabIcons";
 
 const TABS: { name: string; glyph: TabGlyph; label: string; role?: "search" }[] = [
   { name: "(chats)", glyph: "chats", label: "mobile.tabs.chats" },
-  { name: "dashboards", glyph: "dashboards", label: "mobile.tabs.dashboards" },
   { name: "threads", glyph: "threads", label: "mobile.tabs.threads" },
   { name: "agents", glyph: "agents", label: "mobile.tabs.agents" },
   { name: "activity", glyph: "activity", label: "mobile.tabs.activity" },
-  // The search role: on iOS 26 the round button apart at the bar's end (like Music). Where it would take a sixth
-  // slot (Android, iOS before 26) it leaves the bar and opens from the tabs' headers (`barTabs`, `/find`).
+  // The search role: on iOS 26 the round button apart at the bar's end (like Music); a plain tab on Android.
   { name: "search", glyph: "search", label: "mobile.tabs.search", role: "search" },
 ];
-const SHOWN = barTabs(TABS, Platform.OS, Platform.Version);
 
 /**
- * Chats (the home), Dashboards (ADR 0135), Threads (threads and missions), Agents, Activity and Search in the
- * system tab bar (UITabBarController on iOS, Liquid Glass on iOS 26; Material bottom navigation on Android). Our own
- * glyphs on both platforms (outline, filled when selected), drawn as template images the bar tints. Badges for unread
- * conversations (Chats: channels and DMs; Threads: its rows, never both) and what waits on you. Every tab holds a
- * stack with a native header.
+ * Conversas (the home), Threads (threads and missions), Agentes, Atividade and Buscar in the system tab bar
+ * (UITabBarController on iOS, Liquid Glass on iOS 26; Material bottom navigation on Android). Our own glyphs on both platforms (outline, filled when
+ * selected), drawn as template images the bar tints. Badges for unread conversations (Conversas: channels
+ * and DMs; Threads: its rows, never both) and what waits on you. Every tab holds a stack with a native header.
  */
 export default function TabsLayout() {
   const { t } = useTranslation();
@@ -48,7 +43,7 @@ export default function TabsLayout() {
       // The system tab bars give no haptic on a tab change; ours did.
       screenListeners={{ tabPress: () => haptics.selection() }}
     >
-      {SHOWN.map((tab) => {
+      {TABS.map((tab) => {
         const label = t(tab.label);
         const count = counts[tab.name] ?? 0;
         const badge = tabBadge(count);

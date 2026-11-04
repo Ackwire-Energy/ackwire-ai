@@ -14790,6 +14790,16 @@
       "m": "M",
       "l": "L"
     },
+    "sizeNames": {
+      "s": "Mały",
+      "m": "Średni",
+      "l": "Duży"
+    },
+    "sizeHints": {
+      "s": "Jeden kwadrat",
+      "m": "Dwie kolumny",
+      "l": "Dwie kolumny, dwa wiersze"
+    },
     "status": {
       "building": "{{name}} tworzy widżet i rutynę, która będzie go aktualizować…",
       "updating": "{{name}} aktualizuje…",
@@ -14957,6 +14967,11 @@
     "new": "Nowy dashboard",
     "back": "Dashboardy",
     "home": "Mój Start",
+    "seeAll": "Zobacz wszystkie",
+    "useOnHome": "Pokaż na Starcie",
+    "stopOnHome": "Usuń ze Startu",
+    "onHome": "Na Starcie",
+    "onHomeDone": "Start pokazuje teraz ten pulpit",
     "groups": {
       "workspace": "Przestrzeń robocza",
       "workspaceHint": "widzą wszyscy",

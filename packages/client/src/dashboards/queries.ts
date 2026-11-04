@@ -7,6 +7,7 @@ import type {
   CreateWidgetInput,
   Dashboard,
   DashboardLayoutInput,
+  DashboardList,
   DashboardProposalDecision,
   PinWidgetInput,
   ShareDashboardInput,
@@ -69,7 +70,7 @@ export function dropWidget(qc: QueryClient, orgId: string, widgetId: string) {
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
-/** The Dashboards page and the phone's tab. */
+/** The Dashboards page, the phone's Dashboards list and its row on the home. */
 export function useDashboards(orgId: string, enabled = true) {
   const api = useApi();
   return useQuery({
@@ -172,6 +173,46 @@ export function usePinnableBlocks(orgId: string, enabled = true) {
 }
 
 // ── Boards ───────────────────────────────────────────────────────────────────
+
+/**
+ * "Use on Home" / "Stop using on Home" (ADR 0135 §18): Início shows the board (null: my own home again). The list
+ * holds the choice, so it changes there at once.
+ */
+export function useSetHomeDashboard(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (dashboardId: string | null) => api.dashboards.setHome(orgId, dashboardId),
+    onSuccess: ({ homeDashboardId }) => {
+      qc.setQueryData<DashboardList>(keys.dashboardList(orgId), (list) => (list ? { ...list, homeDashboardId } : list));
+      void qc.invalidateQueries({ queryKey: keys.dashboardList(orgId) });
+    },
+  });
+}
+
+/**
+ * What Início shows (ADR 0135 §18): the board chosen for it while I still see it, else my own home board. `chosen`
+ * is the board (null on my own home); `loading` until the list (and the chosen board) came.
+ */
+export function useHomeBoard(orgId: string, enabled = true) {
+  const list = useDashboards(orgId, enabled);
+  const chosenId = list.data?.homeDashboardId ?? null;
+  const chosen = useDashboard(orgId, enabled ? chosenId : null);
+  const own = useHomeDashboard(orgId, enabled);
+  return {
+    chosenId,
+    /** The chosen board's title from the list, before the board itself came. */
+    chosenTitle: list.data?.dashboards.find((d) => d.id === chosenId)?.title ?? null,
+    chosen: chosenId ? (chosen.data ?? null) : null,
+    own: own.data ?? null,
+    board: chosenId ? (chosen.data ?? null) : (own.data ?? null),
+    loading: list.isPending || (chosenId ? chosen.isPending : own.isPending),
+    refetch: async () => {
+      await Promise.all([list.refetch(), own.refetch(), ...(chosenId ? [chosen.refetch()] : [])]);
+    },
+  };
+}
 
 export function useCreateDashboard(orgId: string) {
   const api = useApi();

@@ -23,6 +23,7 @@ import {
   requireDashboard,
   saveDashboardLayout,
   setDashboardAudience,
+  setHomeDashboard,
   setMemberRoles,
   shareDashboard,
   updateDashboard,
@@ -463,6 +464,43 @@ describe("My Home (ADR 0135 §9)", () => {
       { key: "working", position: 2, w: 2, h: 1 },
     ]);
     expect(saved.widgets[0]?.layout).toEqual({ position: 0, w: 2, h: 2 });
+  });
+});
+
+describe("a board on Início (ADR 0135 §18)", () => {
+  test("any board the person sees, for them only; null is their own home again", async () => {
+    const nina = await addMember(f.db, f.org.id, "member", "nina");
+    const sales = await board(f.owner.id);
+    expect((await listDashboards(deps, nina.id, f.org.id)).homeDashboardId).toBeNull();
+    expect(await setHomeDashboard(deps, nina.id, f.org.id, sales.id)).toEqual({ homeDashboardId: sales.id });
+    expect((await listDashboards(deps, nina.id, f.org.id)).homeDashboardId).toBe(sales.id);
+    expect((await listDashboards(deps, f.owner.id, f.org.id)).homeDashboardId).toBeNull();
+    await setHomeDashboard(deps, nina.id, f.org.id, null);
+    expect((await listDashboards(deps, nina.id, f.org.id)).homeDashboardId).toBeNull();
+  });
+
+  test("never a board they can't see, nor a home board", async () => {
+    const nina = await addMember(f.db, f.org.id, "member", "nina");
+    const mine = await board(f.owner.id, { audience: "private" });
+    await expect(setHomeDashboard(deps, nina.id, f.org.id, mine.id)).rejects.toMatchObject({
+      code: "dashboard.not_found",
+    });
+    const home = await getOrCreateHome(deps, nina.id, f.org.id);
+    await expect(setHomeDashboard(deps, nina.id, f.org.id, home.id)).rejects.toMatchObject({
+      code: "dashboard.home_fixed",
+    });
+  });
+
+  test("a board deleted or no longer shown to them falls back to their own home", async () => {
+    const nina = await addMember(f.db, f.org.id, "member", "nina");
+    const sales = await board(f.owner.id);
+    const ops = await board(f.owner.id, { title: "Ops" });
+    await setHomeDashboard(deps, nina.id, f.org.id, sales.id);
+    await deleteDashboard(deps, f.owner.id, f.org.id, sales.id);
+    expect((await listDashboards(deps, nina.id, f.org.id)).homeDashboardId).toBeNull();
+    await setHomeDashboard(deps, nina.id, f.org.id, ops.id);
+    await shareDashboard(deps, f.owner.id, f.org.id, ops.id, { audience: "private", roleIds: [], editPolicy: "owner" });
+    expect((await listDashboards(deps, nina.id, f.org.id)).homeDashboardId).toBeNull();
   });
 });
 

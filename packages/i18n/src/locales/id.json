@@ -13489,6 +13489,16 @@
       "m": "M",
       "l": "L"
     },
+    "sizeNames": {
+      "s": "Kecil",
+      "m": "Sedang",
+      "l": "Besar"
+    },
+    "sizeHints": {
+      "s": "Satu kotak",
+      "m": "Dua kolom",
+      "l": "Dua kolom, dua baris"
+    },
     "status": {
       "building": "{{name}} sedang membuat widget dan rutinitas yang akan memperbaruinya…",
       "updating": "{{name}} sedang memperbarui…",
@@ -13656,6 +13666,11 @@
     "new": "Dasbor baru",
     "back": "Dasbor",
     "home": "Berandaku",
+    "seeAll": "Lihat semua",
+    "useOnHome": "Pakai di Beranda",
+    "stopOnHome": "Hapus dari Beranda",
+    "onHome": "Di Beranda",
+    "onHomeDone": "Beranda kini menampilkan dasbor ini",
     "groups": {
       "workspace": "Ruang kerja",
       "workspaceHint": "semua orang melihat",

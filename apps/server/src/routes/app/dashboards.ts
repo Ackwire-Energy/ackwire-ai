@@ -16,6 +16,7 @@ import {
   refreshWidgetNow,
   removeWidget,
   saveDashboardLayout,
+  setHomeDashboard,
   shareDashboard,
   testWidget,
   updateDashboard,
@@ -43,6 +44,7 @@ import {
   DashboardList,
   DashboardParams,
   DashboardProposalBody,
+  HomeChoice,
   PinnableBlock,
   PinnableQuery,
   PinWidgetBody,
@@ -117,6 +119,28 @@ export function dashboardRoutes(deps: AppDeps) {
       responses: { 200: json(Dashboard), ...errors },
     }),
     async (c) => c.json(await getOrCreateHome(boards, c.get("user").id, c.req.valid("param").orgId), 200),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/dashboards/home-choice",
+      tags,
+      security,
+      summary: "Use a board on Início instead of my own home board (null: my own again), for me only",
+      request: { params: OrgParams, body: body(HomeChoice) },
+      responses: { 200: json(HomeChoice), ...errors },
+    }),
+    async (c) =>
+      c.json(
+        await setHomeDashboard(
+          boards,
+          c.get("user").id,
+          c.req.valid("param").orgId,
+          c.req.valid("json").homeDashboardId,
+        ),
+        200,
+      ),
   );
 
   app.openapi(

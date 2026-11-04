@@ -95,7 +95,6 @@ export const featureKeysPtBR = {
   },
   tabs: {
     chats: "Conversas",
-    dashboards: "Painéis",
     threads: "Threads",
     agents: "Agentes",
     activity: "Atividade",

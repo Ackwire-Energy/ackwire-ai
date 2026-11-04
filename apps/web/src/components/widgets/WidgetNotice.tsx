@@ -35,11 +35,14 @@ export function WidgetNoticeActions({
   n,
   onOpen,
   open = true,
+  quiet = false,
 }: {
   n: AppNotification;
   onOpen: () => void;
   /** Also "Open widget" / "View dashboard" (where the row doesn't already have Open). */
   open?: boolean;
+  /** Resolve as the row's one quiet button at its end (Home), not the primary one. */
+  quiet?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -104,8 +107,8 @@ export function WidgetNoticeActions({
       {notice.kind === "failed" && widgetId && (
         <Button
           size="sm"
-          variant="primary"
-          icon="refresh"
+          variant={quiet ? undefined : "primary"}
+          icon={quiet ? undefined : "refresh"}
           loading={refresh.isPending}
           onClick={stop(() =>
             refresh.mutate(widgetId, {

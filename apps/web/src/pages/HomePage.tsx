@@ -454,10 +454,14 @@ function WidgetNoticeRow({ n, dir, now }: { n: AppNotification; dir: Dir; now: n
     opener(n, org.id);
   };
   const actor = n.actors[0];
+  // One action sits at the row's end like every other row's ("Review"): an alert opens its widget (the row's own
+  // press), a failure has Resolve there. A request to publish keeps its choices under the text.
+  const kind = widgetNoticeOf(n)?.kind;
   return (
-    <li className="home-wrow">
+    <li className={kind === "proposal" ? "home-wrow" : "home-wrow home-wrow--side"}>
       <button type="button" className="home-row" onClick={open}>
         <RowBody
+          action={kind === "alert" ? t("widgets.notice.openWidget") : undefined}
           face={
             actor ? (
               <Face actor={actor} dir={dir} state={n.waiting ? "waiting" : undefined} />
@@ -470,9 +474,15 @@ function WidgetNoticeRow({ n, dir, now }: { n: AppNotification; dir: Dir; now: n
           meta={relativeTime(t, i18n.language, n.updatedAt, new Date(now))}
         />
       </button>
-      <div className="home-row__acts">
-        <WidgetNoticeActions n={n} onOpen={open} />
-      </div>
+      {kind === "proposal" ? (
+        <div className="home-row__acts">
+          <WidgetNoticeActions n={n} onOpen={open} />
+        </div>
+      ) : kind === "failed" ? (
+        <div className="home-row__acts home-row__acts--side">
+          <WidgetNoticeActions n={n} onOpen={open} open={false} quiet />
+        </div>
+      ) : null}
     </li>
   );
 }

@@ -1915,8 +1915,10 @@ function Chat({
               )}
             </>
           )}
-          {!pinned ? (
-            // The conversation fades under the floating header, as it does under the box.
+          {!hasPin ? (
+            // The conversation fades under the floating header, as it does under the box. Not under a pinned bar
+            // or card: the list already starts below them, and a header-tall fade there was a dark band over the
+            // first messages (the pinned bar's own hairline is the edge).
             <LinearGradient
               pointerEvents="none"
               colors={[c.bg, withOpacity(c.bg, 0.86), withOpacity(c.bg, 0)]}
