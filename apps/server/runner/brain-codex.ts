@@ -23,7 +23,7 @@ import {
 import { CODEX_ROUTE_OFF } from "./brain-route";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
-import { cachedExecutors, resolveCommand } from "./executors";
+import { cachedCodexVersion, resolveCommand } from "./executors";
 import { CODEX_MCP_ENV, CODEX_MCP_SERVER, codexWritableRoots } from "./mcp";
 import { isInside, resolveForAgent } from "./paths";
 import type { Spawn } from "./scope-gate";
@@ -623,7 +623,7 @@ export interface CodexAppRunner {
   turn(input: CodexTurnInput & { version: string }, opts: CodexTurnOptions, exec: () => Promise<void>): Promise<void>;
 }
 
-const detected = cachedExecutors();
+const codexVersion = cachedCodexVersion();
 
 /** Runs one Codex turn and emits its events; ends with exactly one `done` or `error`. Never throws. */
 export async function runCodexTurn(input: CodexTurnInput, opts: CodexTurnOptions): Promise<void> {
@@ -632,7 +632,9 @@ export async function runCodexTurn(input: CodexTurnInput, opts: CodexTurnOptions
   if ((opts.platform ?? process.platform) === "win32") {
     return fail("unsupported", "The Codex brain isn't supported on Windows yet.");
   }
-  const version = (opts.codexVersion ?? (() => detected().codex?.version))();
+  const version = await (opts.codexVersion ?? codexVersion)();
+  if (version === null)
+    return fail("codex_failed", "Couldn't check Codex on this computer (`codex --version` didn't answer).", true);
   if (!version) return fail("codex_missing", "Codex is not installed on this computer.");
   if (!codexVersionOk(version)) {
     return fail("codex_too_old", `Codex here is ${version}. Agents need ${CODEX_MIN_VERSION} or newer.`);

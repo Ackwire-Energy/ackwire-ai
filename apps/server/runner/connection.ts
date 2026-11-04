@@ -372,7 +372,7 @@ export class RunnerConnection {
                 type: "hello",
                 token: opts.token,
                 ...(typeof opts.info === "function" ? opts.info() : opts.info),
-                ...(opts.executors ? { executors: opts.executors() ?? {} } : {}),
+                ...((executors) => (executors ? { executors } : {}))(opts.executors?.()),
                 ...(tasks ? { tasks: tasks.list() } : {}),
               }),
             );

@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 41;
+export const MACHINE_PROTOCOL_VERSION = 42;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -475,6 +475,13 @@ export const CONVERSATION_PROTOCOL = 40;
  * `tools_not_locked`. An older runner reads any mode but `plan` as `work`: the server never sends it a `chat` turn.
  */
 export const LOCKED_BRAIN_PROTOCOL = 41;
+
+/**
+ * From this protocol on, the runner sends `executors.changed` when the coding CLIs it finds change mid-session (its
+ * looks run in the background, so `hello` carries the last known list). An older server ignores the frame and learns
+ * the list at the next `hello`; an older runner never sends it.
+ */
+export const EXECUTORS_CHANGED_PROTOCOL = 42;
 /** `account` `begin`'s `provider` for an OpenCode account: an OpenCode (Zen / Go) API key, its only sign-in. */
 export const OPENCODE_KEY_PROVIDER = "zen";
 
@@ -1991,6 +1998,8 @@ export type RunnerFrame =
    * done, a status changed). Protocol 19: or their usage did (`ownUsage`: the computer's own sign-ins').
    */
   | { type: "accounts.changed"; accounts: RunnerAccountInfo[]; ownUsage?: OwnPlanUsage }
+  /** Protocol 41: the coding CLIs found changed since `hello` (`hello.executors`, whole). */
+  | { type: "executors.changed"; executors: NonNullable<RunnerInfo["executors"]> }
   /**
    * Protocol 10: the person answered an `access.request` on the machine (or it
    * expired). `granted` also comes with an `access.changed`.
@@ -2381,6 +2390,8 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       const ownUsage = parseOwnUsage(f.ownUsage);
       return { type: "accounts.changed", accounts: parseAccounts(f.accounts), ...(ownUsage ? { ownUsage } : {}) };
     }
+    case "executors.changed":
+      return isObject(f.executors) ? { type: "executors.changed", executors: parseExecutors(f.executors) } : null;
     case "access.decided": {
       if (!isString(f.requestId)) return null;
       const decision = (["granted", "denied", "expired"] as const).find((d) => d === f.decision);

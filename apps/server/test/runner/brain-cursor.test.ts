@@ -273,18 +273,18 @@ test("an account folder is Cursor's config folder, its sign-in kept there, and n
 
 test.skipIf(!posix)(
   "detection: Cursor's dated version and the models its sign-in lists; another `agent` is skipped",
-  () => {
+  async () => {
     const run = (version: string) => (command: string, args: string[]) =>
       command === "agent"
         ? args[0] === "--version"
           ? { status: 0, stdout: `${version}\n` }
           : { status: 0, stdout: "grok-5-code - Grok 5 Code (included)\n" }
         : { status: 1, stdout: "" };
-    expect(detectExecutors(run("2026.10.28-1a2b3c4")).cursor).toEqual({
+    expect((await detectExecutors(run("2026.10.28-1a2b3c4"))).found.cursor).toEqual({
       version: "2026.10.28-1a2b3c4",
       models: [{ id: "grok-5-code", label: "Grok 5 Code", inPlan: true }],
     });
-    expect(detectExecutors(run("agent 1.0.0")).cursor).toBeUndefined();
+    expect((await detectExecutors(run("agent 1.0.0"))).found.cursor).toBeUndefined();
   },
 );
 
