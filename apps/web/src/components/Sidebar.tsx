@@ -608,7 +608,7 @@ export function Sidebar() {
             <hr className="sidebar__pins-end" />
           )}
           {ordered(byGroup.ungrouped).map(agentRow)}
-          {!dir.loading && team.length === 0 && (
+          {!dir.loading && team.length === 0 && createAgentItem.length > 0 && (
             <Link to="/org/$orgId/agents/new" params={{ orgId }} className="sidebar__item sidebar__item--quiet">
               <Icon name="plus" />
               <span className="sidebar__item-label">{t("sidebarAgents.createFirst")}</span>

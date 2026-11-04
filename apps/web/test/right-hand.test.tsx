@@ -70,6 +70,16 @@ describe("the right hand's row in the sidebar", () => {
     expect(body?.firstElementChild).toBe(pinRow());
   });
 
+  test("alone in AGENTES, it offers no first agent to a member who can't create one", async () => {
+    const state = withRightHand(seedState({ agents: [] }));
+    const org = state.me?.organizations[0];
+    if (org) org.role = "member";
+    await go(state);
+    const agents = nav().querySelector<HTMLElement>('[data-section="agents"]');
+    expect(agents?.querySelector(".sidebar__section-body")?.firstElementChild).toBe(pinRow());
+    expect(agents?.textContent).not.toContain("Criar o primeiro agente");
+  });
+
   test("Novo until it is first opened, then its label; its DM's unread count when it answered", async () => {
     const state = withRightHand(seedState());
     await go(state);
