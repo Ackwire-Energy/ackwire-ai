@@ -8,7 +8,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { COMPACT_QUERY, DESKTOP_QUERY } from "@/components/NavDrawer";
 import { TABLET_QUERY } from "@/components/Sidebar";
 import { STORAGE_KEYS } from "@/lib/storage";
-import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState, withRightHand } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState, withRightHand } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 let media: { mockRestore: () => void } | null = null;
@@ -108,7 +108,8 @@ describe("the members column", () => {
     expect(within(side).getByRole("region", { name: "Admin" }).textContent).toContain("João");
     const agents = within(side).getByRole("region", { name: "Agentes" });
     expect(agents.textContent).toContain("Dev");
-    expect(agents.textContent).toContain("responde sem menção");
+    // Answering without a mention is said on the agent's card, not as a chip in the row.
+    expect(agents.textContent).not.toContain("sem menção");
     // Ada starts thinking: her state here, and the trail behind her row.
     await act(async () =>
       sockets.last().push({
@@ -195,6 +196,33 @@ describe("the members column", () => {
     await settle(6);
     expect(row(column() as HTMLElement, "João Pedro")).toBeTruthy();
     expect(row(column() as HTMLElement, "João")).toBeNull();
+  });
+
+  test("an agent out of its plan: one short line with no emoji, the whole line on hover and on its card", async () => {
+    widthIs(DESKTOP_QUERY);
+    const until = new Date(Date.now() + 60_000).toISOString();
+    const state = seedState({
+      agentStatuses: [
+        {
+          agentId: ADA_ID,
+          presence: "out",
+          status: { by: "auto", text: null, kind: "out_of_plan", subject: null, emoji: null, until, count: 4 },
+          activeAt: new Date().toISOString(),
+        },
+      ],
+    });
+    await open(state);
+    await settle(4);
+    const ada = row(column() as HTMLElement, "Ada") as HTMLElement;
+    const line = ada.querySelector(".members-side__line") as HTMLElement;
+    expect(line.textContent).toMatch(/^Sem limite · volta às \d{1,2}:\d{2}$/);
+    expect(line.querySelector(".status-line__emoji")).toBeNull();
+    const inner = ada.querySelector(".members-side__inner") as HTMLElement;
+    expect(inner.getAttribute("title")).toContain("Sem limite no plano");
+    expect(inner.getAttribute("title")).toContain("4 conversas esperando");
+    await act(async () => fireEvent.click(ada));
+    await settle(3);
+    expect(screen().getByRole("dialog", { name: "Perfil" }).textContent).toContain("4 conversas esperando");
   });
 
   test("a row opens the member's card", async () => {
@@ -389,14 +417,23 @@ describe("answering without a mention, as true for my own messages as who picks 
     return { line, option: option.querySelector(".ac-menu__desc")?.textContent };
   };
 
-  test("my own plan picks: the chip, and the topic is what calls it", async () => {
+  /** The card an agent's row in the column opens. */
+  const cardOf = async (name: string) => {
+    await act(async () => fireEvent.click(row(column() as HTMLElement, name) as HTMLElement));
+    await settle(3);
+    return screen().getByRole("dialog", { name: "Perfil" }).textContent;
+  };
+
+  test("my own plan picks: no chip in the column; the agent's card opened here says it answers without an @", async () => {
     await withRouting("plan");
-    expect(await columnAgents()).toContain("responde sem menção");
+    expect(await columnAgents()).not.toContain("sem menção");
+    expect(await cardOf("Atlas")).toContain("Responde aqui sem precisar de @");
   });
 
-  test("only rules for my messages: no chip; it still takes replies and follow-ups", async () => {
+  test("only rules for my messages: no line on its card; it still takes replies and follow-ups", async () => {
     await withRouting("rules");
-    expect(await columnAgents()).not.toContain("responde sem menção");
+    expect(await columnAgents()).not.toContain("sem menção");
+    expect(await cardOf("Atlas")).not.toContain("Responde aqui sem precisar de @");
     cleanup();
     await withRouting("rules");
     expect(await onItsOwn()).toEqual({
@@ -407,7 +444,7 @@ describe("answering without a mention, as true for my own messages as who picks 
 
   test("the router off: for now only a mention calls it", async () => {
     await withRouting("off");
-    expect(await columnAgents()).not.toContain("responde sem menção");
+    expect(await columnAgents()).not.toContain("sem menção");
     cleanup();
     await withRouting("off");
     expect(await onItsOwn()).toEqual({
@@ -437,5 +474,22 @@ describe("Settings › Papéis: listed apart", () => {
     await act(async () => fireEvent.click(hoist));
     await settle(2);
     expect(state.calls.find((c) => c.method === "roles.update")?.args[2]).toEqual({ hoist: false });
+  });
+});
+
+describe("an agent out of office", () => {
+  test("sleeps in the members column while its plan is spent, and wakes when it is back", async () => {
+    widthIs(DESKTOP_QUERY);
+    const state = seedState();
+    const line = { by: "auto" as const, text: null, subject: null, emoji: null, until: null, count: 2 };
+    state.agentStatuses = [
+      { agentId: ADA_ID, presence: "away", status: { ...line, kind: "out_of_plan" }, activeAt: null },
+      { agentId: ATLAS_ID, presence: "online", status: null, activeAt: null },
+    ];
+    await open(state);
+    const ada = row(column() as HTMLElement, "Ada") as HTMLElement;
+    expect(ada.querySelector(".ac-avatar")?.getAttribute("data-state")).toBe("sleeping");
+    const atlas = row(column() as HTMLElement, "Atlas") as HTMLElement;
+    expect(atlas.querySelector(".ac-avatar")?.getAttribute("data-state")).toBe("idle");
   });
 });

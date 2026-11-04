@@ -425,6 +425,42 @@ describe("the computer dialog, live", () => {
     expect(couldnt.className).toContain("cmp-couldnt ac-btn--glyph");
   });
 
+  test("a sign-in request in the browser, its window on the screen: who may drive the screen helps on the whole screen, the request on top", async () => {
+    const browserAsk = screenAsk({ id: "h-sign-in", screen: "browser", instructions: "Entrar no painel da loja" });
+    const b = await backend({ handoff: browserAsk, browser: true });
+    b.fake.sameWindow.add(ADA_ID);
+    const ada = b.state.agents.find((a) => a.id === ADA_ID) as Agent;
+    await renderPage(<ComputerDialog agent={ada} open onClose={() => {}} />, {
+      api: b.api,
+      org: true,
+      createSocket: b.sockets.factory,
+    });
+    await settle(8);
+    const banner = box().querySelector(".cmp-banner") as HTMLElement;
+    expect(banner.textContent).toContain("Entrar no painel da loja");
+    await click(within(banner).getByRole("button", { name: "Ajudar" }));
+    expect(calls(b, "browser.takeControl")).toEqual([[ORG_ID, "h-sign-in"]]);
+    await settle(4);
+    // The screen in control, never the page alone: the keys and the paste go through the screen.
+    expect(box().querySelector(":scope > .cmp-body > .dsk.is-control")).not.toBeNull();
+    expect(box().querySelector(".brw-ac")).toBeNull();
+    expect(b.sockets.screens.at(-1)?.url).toContain("mode=control");
+    expect(box().querySelector(":scope > .cmp-body > .dsk > .cmp-asked")?.textContent).toBe(
+      "“Entrar no painel da loja”",
+    );
+    expect(view().getByRole("button", { name: "Pronto" })).toBeTruthy();
+  });
+
+  test("the same request for who may drive only the browser: the page, labelled as the browser", async () => {
+    const browserAsk = screenAsk({ id: "h-sign-in", screen: "browser", instructions: "Entrar no painel da loja" });
+    const t = await dialog({ handoff: browserAsk, browser: true, desktop: { ...RUNNING, canControl: false } });
+    t.fake.sameWindow.add(ADA_ID);
+    await click(within(box().querySelector(".cmp-banner") as HTMLElement).getByRole("button", { name: "Ajudar" }));
+    await settle(4);
+    expect(box().querySelector(".brw-ac.is-surface.is-control")).not.toBeNull();
+    expect(box().querySelector(".dsk")).toBeNull();
+  });
+
   test("Ajudar refused (someone got there first): said in the head for a moment, not in a toast over the window", async () => {
     const t = await dialog({ handoff: screenAsk() });
     t.api.browser.takeControl = async () => {
@@ -459,6 +495,64 @@ describe("the computer dialog, live", () => {
     expect(t.sockets.screens).toHaveLength(1);
     expect(sub()).toBe("");
     expect(box().textContent).toContain("Abrindo o computador da Ada…");
+  });
+});
+
+/** A JPEG's first bytes (SOI + a start-of-frame for 1280×800): enough for the page's size. */
+const FRAME_DATA = btoa(String.fromCharCode(0xff, 0xd8, 0xff, 0xc0, 0, 17, 8, 3, 32, 5, 0, 3, 0, 0, 0));
+const pageFrame = {
+  type: "browser.frame",
+  agentId: ADA_ID,
+  seq: 1,
+  data: FRAME_DATA,
+  metadata: { deviceWidth: 1280, deviceHeight: 800 },
+};
+
+describe("switching between the page and the screen, and watching the page", () => {
+  test("handing the page back: the screen opens over the page's last picture, dimmed under Devolvendo à Ada…, never Abrindo", async () => {
+    const mine = screenAsk({
+      id: "h-page",
+      screen: "browser",
+      kind: "takeover",
+      status: "active",
+      controllerUserId: "u-walter",
+      expiresAt: null,
+    });
+    const t = await dialog({ handoff: mine, browser: true, desktop: { ...RUNNING, canControl: false } });
+    await act(async () => t.sockets.realtime.last().open());
+    await act(async () => t.sockets.realtime.last().push(pageFrame));
+    await settle(2);
+    expect(box().querySelector(".brw-ac.is-surface.is-control")).not.toBeNull();
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await settle(6);
+    expect(calls(t, "browser.done")).toEqual([[ORG_ID, "h-page"]]);
+    expect(box().querySelector(".brw-ac")).toBeNull();
+    const still = box().querySelector(".dsk-screen > img.dsk-still") as HTMLImageElement | null;
+    expect(still?.getAttribute("src")).toBe(`data:image/jpeg;base64,${FRAME_DATA}`);
+    expect(screen().getByText("Devolvendo à Ada…").closest(".brw-dim")?.classList.contains("is-clear")).toBe(true);
+    expect(box().textContent).not.toContain("Abrindo o computador da Ada…");
+  });
+
+  test("watching the page: a click or a key on it asks, the question stays until Cancelar, and nothing reaches the page", async () => {
+    const t = await dialog({ desktop: { available: false, reason: "no_desktop" }, browser: true });
+    await act(async () => t.sockets.realtime.last().open());
+    await act(async () => t.sockets.realtime.last().push(pageFrame));
+    await settle(2);
+    const stage = box().querySelector(".brw-ac__stage") as HTMLElement;
+    const img = stage.querySelector(".brw-ac__page img") as HTMLElement;
+    const prompt = () => box().querySelector(".dsk-ask") as HTMLElement | null;
+    await act(async () => fireEvent.pointerDown(img, { pointerType: "mouse", button: 0 }));
+    expect(prompt()?.textContent).toContain("Quer assumir o controle?");
+    await act(async () => fireEvent.pointerDown(img, { pointerType: "mouse", button: 0 }));
+    expect(prompt()).not.toBeNull();
+    await click(within(prompt() as HTMLElement).getByRole("button", { name: "Cancelar" }));
+    expect(prompt()).toBeNull();
+    stage.focus();
+    await act(async () => void fireEvent.keyDown(stage, { key: "a" }));
+    expect(prompt()).not.toBeNull();
+    const sent = t.sockets.realtime.last().sent.filter((f) => (f as { type: string }).type === "browser.input");
+    expect(sent).toEqual([]);
   });
 });
 
@@ -580,5 +674,66 @@ describe("the links", () => {
       });
       cleanup();
     }
+  });
+});
+
+describe("the profile card's computer button", () => {
+  /** Ada's card in #eng, as Walter (an owner) sees it. */
+  async function card(o: Options = {}) {
+    const b = await backend(o);
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: b.api, createSocket: b.sockets.factory });
+    await settle(8);
+    const trigger = screen()
+      .getAllByRole("button", { name: "Perfil de Ada" })
+      .find((x) => !x.hasAttribute("aria-hidden"));
+    if (!trigger) throw new Error("no trigger");
+    await click(trigger);
+    await settle(6);
+    return { ...b, card: screen().getByRole("dialog", { name: "Perfil" }) };
+  }
+  const menuOf = async (c: HTMLElement) => {
+    await act(async () => fireEvent.pointerDown(within(c).getByRole("button", { name: "Mais" }), { button: 0 }));
+    await settle(2);
+    return within(screen().getByRole("menu", { name: "Mais" }))
+      .getAllByRole("menuitem")
+      .map((i) => i.textContent);
+  };
+
+  test("beside the ⋯, round like it, it opens her computer in its dialog and closes the card", async () => {
+    const { card: c } = await card();
+    const button = within(c).getByRole("button", { name: "Abrir o computador da Ada" });
+    expect(button.getAttribute("title")).toBe("Abrir o computador da Ada");
+    expect(button.classList.contains("mcard__act")).toBe(true);
+    expect(within(c).getByRole("button", { name: "Mais" }).classList.contains("mcard__act")).toBe(true);
+    // First of the banner's buttons, the ⋯ last.
+    expect(button.nextElementSibling?.getAttribute("aria-label") ?? "").toBe("Mais");
+    await click(button);
+    await settle(6);
+    expect(screen().getByRole("dialog", { name: "Computador da Ada" })).toBeTruthy();
+    expect(screen().queryByRole("dialog", { name: "Perfil" })).toBeNull();
+  });
+
+  test("the ⋯ lists Abrir o computador under Ver perfil, and it opens the dialog too", async () => {
+    const { card: c } = await card();
+    expect((await menuOf(c)).slice(0, 3)).toEqual(["Mensagem direta", "Ver perfil", "Abrir o computador"]);
+    await click(
+      within(screen().getByRole("menu", { name: "Mais" })).getByRole("menuitem", { name: "Abrir o computador" }),
+    );
+    await settle(6);
+    expect(screen().getByRole("dialog", { name: "Computador da Ada" })).toBeTruthy();
+  });
+
+  test("nothing for whoever may not watch it, nor for a self-hosted agent with no computer yet", async () => {
+    for (const o of [{ forbidden: true }, { machine: null }] satisfies Options[]) {
+      const { card: c } = await card(o);
+      expect(within(c).queryByRole("button", { name: "Abrir o computador da Ada" })).toBeNull();
+      expect(await menuOf(c)).not.toContain("Abrir o computador");
+      cleanup();
+    }
+  });
+
+  test("the Cloud's agents have the workspace's computer: the button shows with no computer of their own", async () => {
+    const { card: c } = await card({ setup: {}, machine: null });
+    expect(within(c).getByRole("button", { name: "Abrir o computador da Ada" })).toBeTruthy();
   });
 });

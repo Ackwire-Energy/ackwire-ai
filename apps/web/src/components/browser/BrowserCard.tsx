@@ -5,6 +5,7 @@ import type {
   BrowserProfileWait,
   BrowserStep,
   LiveRun,
+  PageTarget,
   ScreenKind,
 } from "@agenteschat/client";
 import {
@@ -15,18 +16,19 @@ import {
   dragEvent,
   frameMetadata,
   HELD_STALE_MS,
+  handoffWantsWords,
   isHeldTakeover,
   isOpenHandoff,
   keyboardEvents,
   keyEvents,
   modifiersOf,
   pagePoint,
+  pasteEvents,
   pressEvents,
   profileLiveKey,
   releaseEvent,
   rememberHeldPlace,
   runProfile,
-  textEvent,
   useAgentBrowserHandoff,
   useAgentBrowserSettings,
   useAgentScreenControl,
@@ -50,10 +52,11 @@ import {
   FilterToggle,
   Icon,
   type IconName,
-  onScreenKeyboard,
+  isApple,
   onScreenNow,
   PixelSpinner,
   SkyStrip,
+  shortcut,
   Textarea,
 } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
@@ -64,6 +67,7 @@ import {
   type PointerEvent,
   type ReactNode,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -72,11 +76,14 @@ import { Trans, useTranslation } from "react-i18next";
 import { withAgentFace } from "@/components/AgentAvatar";
 import { useDirectory } from "@/hooks/useDirectory";
 import { TOUCH, useMatchMedia } from "@/hooks/useMatchMedia";
+import { pastes } from "@/lib/keys";
 import { useToast } from "@/lib/toast";
 import { useBrowserLive, useConnectionStatus, useStreams } from "@/realtime/context";
 import { AgentWho } from "../AgentAvatar";
+import { AskActions, HandBackFoot, useAskControl } from "../computer/control";
 import { DialogHead, FullButton, FullScreenButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
 import { useOpenComputer } from "../computer/open";
+import { PASTE_MAX_BYTES, pasteBytes } from "../desktop/paste";
 import { useOrg } from "../org-context";
 import { ComputerSky, colorOf } from "../Sky";
 import { useComputerEdition } from "../WorkspaceComputer";
@@ -225,7 +232,7 @@ export function RunBrowserCard({ run, name }: { run: LiveRun; name: string }) {
               id: inProfile.id,
               name: inProfile.name,
               agentIds: inProfile.agentIds,
-              canDrive: canDo(org, "manage_connectors") && canDo(org, "control_computers"),
+              canDrive: canDo(org, "manage_connectors") && canDo(org, "control_browsers"),
             },
           }
         : {})}
@@ -278,10 +285,11 @@ export function Cover({
   help,
   action,
   className,
-  onDismiss,
+  clear,
 }: {
   className?: string;
-  onDismiss?: () => void;
+  /** Dimmed, not frosted: the picture under it stays in sight (a switch between watching and control, a question). */
+  clear?: boolean;
   icon?: IconName;
   /** A picture over the words instead of the icon (the computer's portrait). */
   art?: ReactNode;
@@ -295,12 +303,7 @@ export function Cover({
 }) {
   const box = useRef<HTMLSpanElement>(null);
   return (
-    <div
-      className={cx("brw-dim", sky && "brw-dim--sky", className)}
-      onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onDismiss?.();
-      }}
-    >
+    <div className={cx("brw-dim", sky && "brw-dim--sky", clear && "is-clear", className)}>
       {sky && <ComputerSky color={color} clear={() => [box.current]} />}
       <span className="brw-dim__box" role="status" ref={box}>
         {art}
@@ -449,16 +452,16 @@ export function BrowserCard({
   const [note, setNote] = useState("");
   const [handingBack, setHandingBack] = useState(false);
   const [backNote, setBackNote] = useState("");
-  const backRef = useRef<HTMLTextAreaElement>(null);
   const [confirmStop, setConfirmStop] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
-  const [goOpen, setGoOpen] = useState(false);
   // On touch the text bar types into the page; a mouse and keyboard type into it directly (`onPageKey`).
   const touch = useMatchMedia(TOUCH);
   const [full, setFull] = useState(false);
   // The wheel scrolls the conversation; a click into the page (in control) hands it to the page until Esc.
   const [capturing, setCapturing] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
+  // Where the person's paste keys put the focus for a moment: only an editable element gets a paste in every browser.
+  const pasteRef = useRef<HTMLTextAreaElement>(null);
   // The wheel is scrolling the page right now: only then the hint says how to give the wheel back.
   const [scrolling, setScrolling] = useState(false);
   const scrollIdle = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -690,22 +693,58 @@ export function BrowserCard({
     fingers.cancel();
     setSliding(false);
   }, [pointing, fingers]);
+  // The screen's last picture, when the dialog switches from it to this page (or back), shows dimmed until the page's
+  // first frame: the layout effects of the view going and of the one coming run before anything paints
+  // (`DialogHeadSlots.picture`).
+  const kept = head?.picture;
+  const [keptSrc, setKeptSrc] = useState<string | null>(null);
+  const leaving = useRef({ still, inControl });
+  leaving.current = { still, inControl };
+  useLayoutEffect(() => {
+    if (!kept) return;
+    if (kept.current && kept.current.control !== leaving.current.inControl) setKeptSrc(kept.current.src);
+    kept.current = null;
+    return () => {
+      const { still: last, inControl: control } = leaving.current;
+      kept.current = last ? { src: `data:image/jpeg;base64,${last.data}`, control } : null;
+    };
+  }, [kept]);
   useEffect(() => {
-    if (handingBack) backRef.current?.focus();
-  }, [handingBack]);
+    if (live.frame) setKeptSrc(null);
+  }, [live.frame]);
 
   const onPageKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!inControl) return;
+    // The browser's own paste, into the field nobody sees: its paste event brings the person's text (`pasteText`).
+    if (pastes(e.nativeEvent, isApple())) {
+      pasteRef.current?.focus({ preventScroll: true });
+      return;
+    }
     const events = keyboardEvents(e, remoteIsMac);
     if (!events) return;
     e.preventDefault();
     send(events);
   };
 
+  /** What the person pasted, typed into the page's focused field as text (CDP `Input.insertText`). */
+  const pasteText = (pasted: string) => {
+    if (!pasted) return sayFailed(t("desktop.clipboard.textOnly", g));
+    if (pasteBytes(pasted) > PASTE_MAX_BYTES) return sayFailed(t("desktop.clipboard.tooLong", g));
+    send(pasteEvents(pasted));
+  };
+  /** Colar: the person's clipboard, where their browser lets the page read it (it may ask first). */
+  const pasteClipboard = async () => {
+    try {
+      pasteText(await navigator.clipboard.readText());
+    } catch {
+      sayFailed(t("browser.inCard.pasteBlocked", { keys: shortcut("V") }));
+    }
+    pageRef.current?.focus({ preventScroll: true });
+  };
+
   const sendText = () => {
-    const ev = textEvent(text);
-    if (!ev) return;
-    send([ev]);
+    if (!text) return;
+    send(pasteEvents(text));
     setText("");
   };
 
@@ -790,15 +829,14 @@ export function BrowserCard({
       onError: didntWork,
     });
 
-  /** A site typed in the address bar: the card waits for its first frame. */
-  const openSite = (url: string) => {
+  /** A site typed in the address bar (the card waits for its first frame), or its arrows and reload. */
+  const openSite = (url: PageTarget) => {
     const before = live.frame;
     const opened = profile
       ? profileActions.open.mutateAsync({ profileId: profile.id, url })
       : actions.open.mutateAsync({ agentId, url });
     return opened.then(() => {
-      setGoOpen(false);
-      setWait({ frame: before, why: "opening", site: hostAndPath(url)[0] || url });
+      if (typeof url === "string") setWait({ frame: before, why: "opening", site: hostAndPath(url)[0] || url });
     });
   };
 
@@ -811,7 +849,7 @@ export function BrowserCard({
       : unavailable?.reason === "no_computer"
         ? t(cloud ? "browser.inCard.noComputerCloud" : "browser.inCard.noComputer", g)
         : unavailable?.reason === "forbidden" || live.error === "forbidden" || live.error === "not_found"
-          ? t("browser.inCard.forbidden")
+          ? t(canDo(org, "own_browsers") ? "browser.inCard.forbidden" : "browser.inCard.noRole")
           : live.error === "too_many_browsers"
             ? t("browser.inCard.tooMany")
             : null;
@@ -827,6 +865,22 @@ export function BrowserCard({
     if (mayDrive && !profile) actions.restart.mutate(agentId, { onError: didntWork, onSettled: () => live.retry() });
     else live.retry();
   };
+
+  // Handing back or taking, the last picture stays in sight, dimmed under what is happening: never a cold cover.
+  const switchingTo =
+    actions.takeover.isPending || profileActions.takeover.isPending
+      ? t("desktop.taking")
+      : actions.done.isPending
+        ? t("desktop.returning", g)
+        : keptSrc && starting && !stuck
+          ? inControl
+            ? t("desktop.taking")
+            : t("desktop.returning", g)
+          : null;
+  // Watching in the dialog, a click, a key or a paste on the page asks before control (`useAskControl`).
+  const asking = useAskControl(
+    surface && canTakeOver && !inControl && !otherInControl && Boolean(frame) && !blocker && !switchingTo,
+  );
 
   // The agent's own request is open and mine: its card (under the request) is the control, not this one.
   if (!given && handoff?.kind === "ask" && inControl) return null;
@@ -911,9 +965,9 @@ export function BrowserCard({
   // The frame (the conversation, not full screen): the steps are its history on hover, not a column.
   const framed = chat && !full;
   const showLog = working && !starting && steps.length > 0 && !surface && !framed;
-  // A blank page or a closed browser: the person in control gets the address bar without asking.
-  const goForced = closed || (Boolean(frame) && isBlankPage(frame?.metadata.url));
-  const goShown = inControl && (goOpen || goForced);
+  // A blank page or a closed browser: the address bar takes the person's typing at once.
+  const goFocus = closed || (Boolean(frame) && isBlankPage(frame?.metadata.url));
+  const pageUrl = pic?.metadata.url ?? null;
 
   const asTitle = titleKind({ inControl, ask, host, opening: starting && !stuck });
   const title =
@@ -1016,20 +1070,6 @@ export function BrowserCard({
       </>
     ))
   );
-  const goToggle = (tool: boolean) => (
-    <Button
-      size="sm"
-      variant="ghost"
-      iconOnly
-      icon="globe"
-      className={tool ? "brw-tfield__tool" : undefined}
-      aria-pressed={goShown}
-      aria-label={t("browser.inCard.goToggle")}
-      title={t("browser.inCard.goToggle")}
-      disabled={goForced}
-      onClick={() => setGoOpen((v) => !v)}
-    />
-  );
   const controlActs = (
     <>
       {ask && (
@@ -1059,7 +1099,6 @@ export function BrowserCard({
           <span className="cmp-act-label">{handBackLabel}</span>
         </Button>
       )}
-      {!touch && goToggle(false)}
     </>
   );
   const seeWhole = onDesktop && !full && (
@@ -1087,40 +1126,69 @@ export function BrowserCard({
       <span>{withAgentFace(sub, name, agentId)}</span>
     </small>
   );
-  const cover = profileWait ? (
-    <ProfileWaitCover wait={profileWait} waiter={{ agentId, name }} />
-  ) : blocker ? (
-    <Cover color={color} text={blocker} />
-  ) : hidden ? (
-    // Its head says who is in control.
-    <Cover color={color} icon="eyeOff" text={t("browser.inCard.hiddenHelp", g)} />
-  ) : closed ? (
-    <Cover
-      color={color}
-      sky
-      icon="globe"
-      text={t("browser.inCard.closed", g)}
-      help={inControl ? t("browser.inCard.closedControl") : t("browser.inCard.closedHelp", g)}
-    />
-  ) : stuck ? (
-    <Cover
-      color={color}
-      icon="alert"
-      text={t("browser.inCard.stuck", g)}
-      help={mayDrive ? t("browser.inCard.stuckHelp") : undefined}
-      action={
-        <Button size="sm" icon="refresh" loading={actions.restart.isPending} onClick={retry}>
-          {t("common.retry")}
-        </Button>
-      }
-    />
-  ) : opening ? (
-    <Cover color={color} spinner text={t("browser.inCard.goOpening", { site: waitingFor?.site ?? "" })} />
-  ) : reconnecting ? (
-    <Cover color={color} spinner text={t("browser.live.reconnecting")} help={t("browser.inCard.reconnectHelp", g)} />
-  ) : starting ? (
-    <Cover color={color} spinner text={t("browser.inCard.openingLong", g)} help={t("browser.inCard.openingHelp")} />
-  ) : null;
+  const cover =
+    switchingTo && (src || keptSrc) ? (
+      <Cover clear color={color} spinner text={switchingTo} />
+    ) : asking.asking ? (
+      <Cover
+        className="dsk-ask"
+        clear
+        color={color}
+        icon={mayDrive ? "person" : "eye"}
+        text={t(mayDrive ? "desktop.ask.title" : "desktop.ask.watching")}
+        action={
+          <AskActions
+            onCancel={asking.cancel}
+            take={
+              mayDrive && (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  icon="person"
+                  loading={actions.takeover.isPending}
+                  onClick={takeover}
+                >
+                  {t("desktop.takeover")}
+                </Button>
+              )
+            }
+          />
+        }
+      />
+    ) : profileWait ? (
+      <ProfileWaitCover wait={profileWait} waiter={{ agentId, name }} />
+    ) : blocker ? (
+      <Cover color={color} text={blocker} />
+    ) : hidden ? (
+      // Its head says who is in control.
+      <Cover color={color} icon="eyeOff" text={t("browser.inCard.hiddenHelp", g)} />
+    ) : closed ? (
+      <Cover
+        color={color}
+        sky
+        icon="globe"
+        text={t("browser.inCard.closed", g)}
+        help={inControl ? t("browser.inCard.closedControl") : t("browser.inCard.closedHelp", g)}
+      />
+    ) : stuck ? (
+      <Cover
+        color={color}
+        icon="alert"
+        text={t("browser.inCard.stuck", g)}
+        help={mayDrive ? t("browser.inCard.stuckHelp") : undefined}
+        action={
+          <Button size="sm" icon="refresh" loading={actions.restart.isPending} onClick={retry}>
+            {t("common.retry")}
+          </Button>
+        }
+      />
+    ) : opening ? (
+      <Cover color={color} spinner text={t("browser.inCard.goOpening", { site: waitingFor?.site ?? "" })} />
+    ) : reconnecting ? (
+      <Cover color={color} spinner text={t("browser.live.reconnecting")} help={t("browser.inCard.reconnectHelp", g)} />
+    ) : starting ? (
+      <Cover color={color} spinner text={t("browser.inCard.openingLong", g)} help={t("browser.inCard.openingHelp")} />
+    ) : null;
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
@@ -1194,19 +1262,7 @@ export function BrowserCard({
               </>
             }
           />
-          {asTitle === "ask" ? (
-            <p className="cmp-asked">“{title}”</p>
-          ) : (
-            asTitle === "host" && (
-              <p className="cmp-site">
-                <Icon name="globe" size={14} />
-                <span>
-                  {host}
-                  {path && <span className="brw-ac__path">{path}</span>}
-                </span>
-              </p>
-            )
-          )}
+          {asTitle === "ask" && <p className="cmp-asked">“{title}”</p>}
         </>
       ) : (
         <div className="brw-ac__head">
@@ -1237,9 +1293,34 @@ export function BrowserCard({
         </div>
       )}
 
-      {goShown && <AddressBar grammar={g} focus={closed} onOpen={openSite} cloud={cloud} />}
+      {(inControl || (surface && pic)) && (
+        // Watching in the dialog, the address alone; in control, the person's to type in, like a browser's own.
+        <AddressBar
+          grammar={g}
+          url={pageUrl}
+          host={host}
+          readOnly={!inControl}
+          focus={inControl && goFocus}
+          onOpen={openSite}
+          cloud={cloud}
+          end={
+            inControl &&
+            !touch && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                title={t("browser.inCard.pasteHint")}
+                onClick={() => void pasteClipboard()}
+              >
+                {t("browser.inCard.paste")}
+              </Button>
+            )
+          }
+        />
+      )}
       <div className={showLog ? "brw-ac__body brw-ac__body--split" : "brw-ac__body"}>
-        <div className="brw-ac__stage">
+        <div className="brw-ac__stage" {...asking.stage}>
           {src ? (
             // biome-ignore lint/a11y/noStaticElementInteractions: the page takes the person's keys while in control
             <div
@@ -1256,13 +1337,13 @@ export function BrowserCard({
               onPointerLeave={onPagePointerLeave}
               onLostPointerCapture={onPagePointerCancel}
               onPaste={(e) => {
-                const pasted = e.clipboardData.getData("text");
-                if (pasted) {
-                  e.preventDefault();
-                  send([{ kind: "text", text: pasted }]);
-                }
+                if (!inControl) return;
+                e.preventDefault();
+                pasteText(e.clipboardData.getData("text/plain"));
+                if (e.target === pasteRef.current) pageRef.current?.focus({ preventScroll: true });
               }}
             >
+              {inControl && <textarea ref={pasteRef} className="brw-paste" tabIndex={-1} aria-hidden="true" />}
               <img ref={imgRef} src={src} alt={t("browser.live.page", g)} draggable={false} />
               {mark && <span key={mark.key} className="brw-mark" style={{ left: mark.x, top: mark.y }} />}
               {(sliding || scrolling) && (
@@ -1270,6 +1351,10 @@ export function BrowserCard({
                   {sliding ? t("browser.inCard.touchHint") : t("browser.inCard.scrollHint")}
                 </span>
               )}
+            </div>
+          ) : keptSrc ? (
+            <div className="brw-ac__page" aria-hidden="true">
+              <img src={keptSrc} alt="" draggable={false} />
             </div>
           ) : (
             <div className="brw-ac__page brw-ac__page--blank" aria-hidden="true">
@@ -1340,52 +1425,22 @@ export function BrowserCard({
             </div>
           </div>
         ) : handingBack ? (
-          // Pronto or Devolver: an optional word to the agent, which it reads as the person's own, on one line that
-          // grows as it wraps (`.brw-ac__note`), so all of it stays in sight. Enter hands back as in the chat:
-          // Shift+Enter, an input method's Enter and a phone's return key add a line instead.
-          <div className="brw-ac__foot brw-ac__fail">
-            <b>
-              {profile
+          <HandBackFoot
+            title={
+              profile
                 ? t("browser.profiles.backTitle", { name: profile.name })
                 : handoff?.kind === "ask"
                   ? t("browser.inCard.doneTitle", g)
-                  : t("browser.inCard.backTitle", g)}
-            </b>
-            {!profile && (
-              <Textarea
-                rows={1}
-                autoGrow
-                className="brw-ac__note"
-                ref={backRef}
-                value={backNote}
-                onChange={(e) => setBackNote(e.target.value)}
-                placeholder={t("browser.inCard.backPlaceholder", g)}
-                aria-label={t("browser.inCard.backLabel", g)}
-                maxLength={1000}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") setHandingBack(false);
-                  if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || onScreenKeyboard()) return;
-                  e.preventDefault();
-                  finish();
-                }}
-              />
-            )}
-            <div className="brw-ac__row">
-              <span className="brw-grow" />
-              <Button size="sm" variant="ghost" onClick={() => setHandingBack(false)}>
-                {t("browser.live.back")}
-              </Button>
-              <Button
-                size="sm"
-                variant="primary"
-                icon="check"
-                loading={profile ? profileActions.handback.isPending : actions.done.isPending}
-                onClick={finish}
-              >
-                {handBackLabel}
-              </Button>
-            </div>
-          </div>
+                  : t("browser.inCard.backTitle", g)
+            }
+            label={handBackLabel}
+            grammar={g}
+            {...(profile ? {} : { note: backNote, onNote: setBackNote })}
+            noteFirst={handoffWantsWords(handoff)}
+            pending={profile ? profileActions.handback.isPending : actions.done.isPending}
+            onBack={finish}
+            onCancel={() => setHandingBack(false)}
+          />
         ) : touch ? (
           // One quiet field like the message composer: where the text goes, the field, Senha, Teclas, a site, send.
           <div className="brw-ac__foot brw-type">
@@ -1453,7 +1508,6 @@ export function BrowserCard({
                 title={t("browser.inCard.keysLabel")}
                 onClick={() => setKeysOpen((v) => !v)}
               />
-              {goToggle(true)}
               <Button
                 variant="primary"
                 size="sm"

@@ -41,6 +41,8 @@ import type {
   AppConsentDecision,
   AppNotification,
   Approval,
+  ApprovalCoverInput,
+  ApprovalCovers,
   ApprovalRule,
   AppsList,
   Artifact,
@@ -193,8 +195,12 @@ import type {
   OrgPlanUsage,
   OrgRoles,
   OrgSettings,
+  PageTarget,
+  PeopleUsage,
   Person,
   PersonalTokenInput,
+  PersonLimits,
+  PersonUsage,
   PhoneSignIn,
   Poll,
   PostMedia,
@@ -205,6 +211,8 @@ import type {
   Reminder,
   ReminderInput,
   RemovalPreview,
+  RightHandApprovals,
+  RightHandApprovalsInput,
   Role,
   RoleInput,
   RosterMember,
@@ -234,6 +242,7 @@ import type {
   SidebarItems,
   SidebarPlace,
   SidebarSection,
+  SidebarView,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -429,6 +438,10 @@ export interface ApiClient {
     sidebarToolOrder(orgId: string): Promise<SidebarItem[]>;
     /** Saves my order of the tools here (`null`: the default). */
     setSidebarToolOrder(orgId: string, order: SidebarItem[] | null): Promise<SidebarItem[]>;
+    /** How my sidebar shows the agents, and what I pinned, here. */
+    sidebarView(orgId: string): Promise<SidebarView>;
+    /** Replaces my sidebar view here; answers with what the server kept. */
+    setSidebarView(orgId: string, view: SidebarView): Promise<SidebarView>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
     setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;
@@ -438,9 +451,10 @@ export interface ApiClient {
     /**
      * A signed link that opens the workspace's plan and billing on the billing service (owners and admins; ADR
      * 0079). Navigate to it at once and keep it nowhere else: it lasts 5 minutes and opens once. `billing.off` 404
-     * on a server without billing.
+     * on a server without billing. `returnTo`: the page it was opened from, where the billing service sends the
+     * person back.
      */
-    billingLink(orgId: string, from: BillingFrom): Promise<{ url: string; expiresAt: string }>;
+    billingLink(orgId: string, from: BillingFrom, returnTo?: string): Promise<{ url: string; expiresAt: string }>;
     /** People, files and today's uploads against the workspace's limits (any member; ADR 0079). */
     limits(orgId: string): Promise<WorkspaceLimits>;
     members(orgId: string): Promise<Member[]>;
@@ -483,6 +497,18 @@ export interface ApiClient {
     usageReport(orgId: string, since?: string): Promise<UsageReport>;
     /** Every plan account by computer and the API per agent, this month (ADR 0063). */
     planUsage(orgId: string): Promise<OrgPlanUsage>;
+    /** Uso › Pessoas (ADR 0141): each person's use, their limit and what they do now (`view_usage`). */
+    peopleUsage(orgId: string, period?: { since?: string; until?: string }): Promise<PeopleUsage>;
+    /** Where the CSV of `peopleUsage` downloads from, one row per person per day. */
+    peopleUsageCsvUrl(orgId: string, period?: { since?: string; until?: string }): string;
+    /** A person's month; one's own in percentages. */
+    personUsage(orgId: string, userId: string, period?: { since?: string; until?: string }): Promise<PersonUsage>;
+    personLimits(orgId: string): Promise<PersonLimits>;
+    setPersonLimits(orgId: string, limits: PersonLimits): Promise<PersonLimits>;
+    /** "Pedir mais": the caller asks who decides for more this month. */
+    requestMoreUsage(orgId: string): Promise<{ requestedAt: string }>;
+    raisePersonLimit(orgId: string, userId: string, limitUsd: number): Promise<void>;
+    refuseMoreUsage(orgId: string, userId: string): Promise<void>;
     /** The audit log, newest first (admins): agents' tool calls and people's changes. `before`: `next`. */
     audit(orgId: string, query?: AuditQuery & { before?: string; limit?: number }): Promise<AuditPage>;
   };
@@ -750,6 +776,16 @@ export interface ApiClient {
     rules(orgId: string, agentId: string): Promise<ApprovalRule[]>;
     /** The agent asks again for that kind (admins and the agent's owner). */
     removeRule(orgId: string, agentId: string, ruleId: string): Promise<void>;
+    /** Who approves for me, and whom I approve for (ADR 0139). */
+    covers(orgId: string): Promise<ApprovalCovers>;
+    setCover(orgId: string, input: ApprovalCoverInput): Promise<ApprovalCovers>;
+    /** Ends `userId`'s cover: mine, the one I give them ("Não quero cobrir"), or any as an admin. */
+    endCover(orgId: string, userId: string): Promise<void>;
+    /** What the right hand may approve for me (ADR 0139 §2). */
+    rightHand(orgId: string): Promise<RightHandApprovals>;
+    setRightHand(orgId: string, input: RightHandApprovalsInput): Promise<RightHandApprovals>;
+    /** Desfazer, for 24 hours: a new agent is archived, settings go back. */
+    undoRightHand(orgId: string, decisionId: string): Promise<void>;
   };
   connectors: {
     /** Connectors agentes.chat knows, with their scopes, plus the built-in scopes. */
@@ -1558,11 +1594,11 @@ export interface ApiClient {
      */
     takeover(orgId: string, agentId: string, runId?: string, screen?: ScreenKind): Promise<BrowserHandoff>;
     /**
-     * The person in control opens a site (a bare host gets https://); a closed browser opens. 409
-     * `browser.not_in_control`, 403 `browser.not_allowed` (outside the agent's sites), 400
+     * The person in control opens a site (a bare host gets https://), or goes back, forward or reloads; a closed
+     * browser opens. 409 `browser.not_in_control`, 403 `browser.not_allowed` (outside the agent's sites), 400
      * `browser.bad_address` or `browser.open_failed`.
      */
-    open(orgId: string, agentId: string, url: string): Promise<void>;
+    open(orgId: string, agentId: string, to: PageTarget): Promise<void>;
     /** "Parar": closes the agent's browser now (its logins stay). Its screen has no stop: it stays on. */
     stop(orgId: string, agentId: string): Promise<void>;
     /**
@@ -1586,8 +1622,8 @@ export interface ApiClient {
     takeover(orgId: string, profileId: string): Promise<BrowserProfile>;
     /** "Devolver". */
     handback(orgId: string, profileId: string): Promise<BrowserProfile>;
-    /** The person in control opens a site. */
-    open(orgId: string, profileId: string, url: string): Promise<void>;
+    /** The person in control opens a site, or goes back, forward or reloads. */
+    open(orgId: string, profileId: string, to: PageTarget): Promise<void>;
     /** The agent's default browser: a profile it may use, or null for its own. */
     setDefault(orgId: string, agentId: string, profileId: string | null): Promise<void>;
     /** "Pedir mais um perfil": the people who grant profiles hear of it. */

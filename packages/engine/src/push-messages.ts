@@ -49,6 +49,9 @@ export interface PushTextInput {
   screen?: string | null;
   /** `browser_handoff` still unanswered an hour later: the title says the agent still needs them. */
   reminder?: boolean;
+  /** `usage_limit`: what happened (`latest.statusTo`) and the share of the limit used. */
+  status?: string | null;
+  percent?: number | null;
   /** `widget_failed`: its coded reason (ADR 0135 §6); `agent_reported` sends the agent's words in `text`. */
   reason?: string | null;
 }
@@ -100,6 +103,9 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     case "routine_paused":
       // Its name only: the app says why, in the person's words.
       return out(s.routinePausedTitle, what || s.routinePausedBody);
+    case "right_hand_paused":
+      // The right hand's name (what the workspace calls it).
+      return out(s.rightHandPausedTitle(actor), s.rightHandPausedBody);
     case "agent_unreached":
       return out(s.agentUnreachedTitle(actor), what || s.agentUnreachedBody);
     case "routine_stalled":
@@ -150,6 +156,22 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       if (by) return out(s.joinSuggestionTitle(by, who, input.label?.trim() || ""), s.joinRequestBody);
       return out(s.joinRequestTitle(who, input.label?.trim() || ""), s.joinRequestBody);
     }
+    case "usage_limit":
+      // Percentages only for the person; who decides reads the person's name (ADR 0141).
+      switch (input.status) {
+        case "warning":
+          return out(s.usageWarningTitle(Math.round(input.percent ?? 80)), s.usageMineBody);
+        case "reached_notify":
+          return out(s.usageReachedMineTitle, s.usageMineBody);
+        case "reached":
+          return out(s.usageReachedTitle(actor), s.openBody);
+        case "request":
+          return out(s.usageRequestTitle(actor), s.usageRequestBody);
+        case "raised":
+          return out(s.usageRaisedTitle(actor), s.usageRaisedBody);
+        default:
+          return out(s.usageRefusedTitle(actor), s.openBody);
+      }
     default:
       return out(input.waiting ? s.waitingTitle : actor, text || what || s.openBody);
   }

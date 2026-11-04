@@ -130,6 +130,7 @@ describe("inbox items", () => {
   test("people, connectors, computers and an agent's hold open their screens", () => {
     const joined = notification({ id: "n", kind: "invitation_accepted", source: { label: "Acme" } });
     expect(notificationHref(joined)).toBe("/me/members");
+    expect(notificationHref(notification({ id: "n", kind: "approval_cover", source: {} }))).toBe("/me/approvals");
     expect(notificationHref(notification({ id: "n", kind: "connector_tool_changed", source: {} }))).toBe("/connectors");
     expect(notificationHref(notification({ id: "n", kind: "skill_update", source: { skillId: "s1" } }))).toBe(
       "/settings/skills/s1",

@@ -87,6 +87,24 @@
     "fromAdmin": "Von Administrator",
     "viaAdmin": "Alles, als Administrator",
     "nothing": "Nichts",
+    "computer": {
+      "title": "Computer der Agenten",
+      "levels": {
+        "none": "Keiner",
+        "browser": "Nur der Browser",
+        "full": "Ganzer Computer"
+      },
+      "every": {
+        "none": "Nur, was Alle schon dürfen",
+        "browser": "Der Browser jedes Agenten und die Anmeldeanfragen, nie der ganze Bildschirm oder das Terminal",
+        "full": "Der ganze Bildschirm, die Steuerung und das Terminal jedes Agenten"
+      },
+      "own": {
+        "none": "Niemand sieht oder nutzt die Computer oder Browser der Agenten, auch keine Anmeldeanfragen",
+        "browser": "Der Browser der eigenen Agenten und die Anmeldeanfragen an die Person, nie der ganze Bildschirm",
+        "full": "Der ganze Bildschirm und das Terminal der eigenen Agenten und der Computer, die die Person verbunden hat"
+      }
+    },
     "everyoneNote": "Gilt für jede Person im Workspace. Andere Rollen fügen nur etwas hinzu.",
     "summary": {
       "owner": "Darf immer alles. Jeder Workspace hat mindestens einen Inhaber.",
@@ -249,6 +267,24 @@
       "desc": "Ihren Desktop und ihren Browser steuern.",
       "short": "Bildschirme übernehmen",
       "say": "übernimmt die Bildschirme der Agenten"
+    },
+    "control_browsers": {
+      "title": "Browser der Agenten nutzen",
+      "desc": "Den Browser jedes Agenten sehen und steuern und Anmeldeanfragen beantworten.",
+      "short": "Browser der Agenten nutzen",
+      "say": "nutzt die Browser der Agenten"
+    },
+    "own_computers": {
+      "title": "Computer der eigenen Agenten nutzen",
+      "desc": "Der ganze Bildschirm und das Terminal der Agenten, für die die Person verantwortlich ist, und der Computer, die sie verbunden hat.",
+      "short": "Computer der eigenen Agenten nutzen",
+      "say": "nutzt die Computer der eigenen Agenten"
+    },
+    "own_browsers": {
+      "title": "Browser der eigenen Agenten nutzen",
+      "desc": "Der Browser der Agenten, für die die Person verantwortlich ist, und die Anmeldeanfragen an sie.",
+      "short": "Browser der eigenen Agenten nutzen",
+      "say": "nutzt die Browser der eigenen Agenten"
     },
     "manage_connectors": {
       "title": "Apps verbinden",
@@ -1091,6 +1127,7 @@
     "copyText": "Text kopieren",
     "textCopied": "Text kopiert.",
     "copyLink": "Link kopieren",
+    "openComputer": "Computer öffnen",
     "linkCopied": "Link kopiert.",
     "saveToWiki": "Im Wiki speichern",
     "pin": "Nachricht anheften",
@@ -1130,6 +1167,63 @@
     "none": {
       "terms": "Dieser Server hat keine Seite mit Nutzungsbedingungen",
       "privacy": "Dieser Server hat keine Datenschutzseite"
+    }
+  },
+  "approvalCover": {
+    "title": "Wer für mich freigibt",
+    "subtitle": "Entscheidet in deinem Namen, was von dir erbeten wird, und nie, was diese Person selbst angefragt hat.",
+    "person": "Person",
+    "nobody": "Niemand",
+    "when": "Wann",
+    "whenHelp": "Abwesend: wenn dein Status sagt, dass du nicht da bist.",
+    "whileOut": "Nur wenn ich abwesend bin",
+    "always": "Immer",
+    "until": "Bis",
+    "noDate": "Ohne Datum",
+    "clearDate": "Datum entfernen",
+    "risky": "Merge, Deploy und andere riskante Aktionen",
+    "riskyOff": "Aus, diese bleiben nur bei dir.",
+    "riskyOn": "An, diese Person entscheidet auch diese.",
+    "lock": "Immer bei dir: Geld, Personen und Rollen, KI-Schlüssel, dein Postfach und Löschen.",
+    "coveringTitle": "Du gibst frei für",
+    "coveringSubtitle": "Was diese Personen gefragt werden, kommt auch zu dir, und du entscheidest in ihrem Namen. Nie, was du selbst angefragt hast.",
+    "coveringWhileOut": "Wenn die Person abwesend ist",
+    "coveringUntil": "bis {{date}}",
+    "coveringNow": "Gerade in Vertretung",
+    "decline": "Nicht mehr vertreten",
+    "failed": "Speichern ging nicht. Versuch es noch einmal."
+  },
+  "rightHandApprovals": {
+    "title": "{{name}} gibt für dich frei",
+    "subtitle": "Nur was aus einer deiner Anfragen kam. Was nicht freigegeben würde, geht an dich.",
+    "newAgents": "Agenten erstellen, die andere Agenten vorschlagen",
+    "newAgentsHelp": "Ohne Apps, nur in offenen Kanälen. Du kannst es 24 Std. lang rückgängig machen.",
+    "agentChanges": "Modell, Budget und Kanäle eines Agenten ändern",
+    "agentChangesHelp": "Das Modell nur im selben KI-Konto.",
+    "cantDecide": "Das entscheidest du derzeit nicht",
+    "budget": "Zusätzliches Budget pro Agent",
+    "budgetHelp": "Darüber geht die Anfrage an dich.",
+    "perMonth": "/Monat",
+    "guidanceLabel": "Wie {{name}} für dich entscheidet",
+    "guidanceHelp": "{{name}} liest das vor jeder Entscheidung. Optional.",
+    "guidancePlaceholder": "Z. B.: keine doppelten Agenten\nNur günstige Modelle für neue Agenten\nNie in Kundenkanälen",
+    "paused": "Pausiert: Du hast diese Woche 3 Entscheidungen rückgängig gemacht. Schalte es wieder ein, wann du willst.",
+    "card": {
+      "deciding": "{{name}} prüft es im Namen von {{for}}…",
+      "approved": "Freigegeben von {{name}} im Namen von {{for}}",
+      "passed": "{{name}} hat es an dich weitergegeben",
+      "passedWhy": "{{name}} hat es an dich weitergegeben: {{reason}}",
+      "outside": "Außerhalb dessen, was {{name}} für dich freigeben darf",
+      "own": "{{name}} entscheidet nicht über die eigene Anfrage",
+      "limit": "{{name}} hat das heutige Limit erreicht: Das bleibt bei dir",
+      "undoneByYou": "Von dir rückgängig gemacht",
+      "undoneBy": "Von {{name}} rückgängig gemacht",
+      "why": "Warum?",
+      "undo": "Rückgängig",
+      "undoArchives": "Rückgängig archiviert {{name}}. Möglich bis {{until}}.",
+      "undoSettings": "Rückgängig stellt die Einstellungen wieder her. Möglich bis {{until}}.",
+      "approvedForYou": "Freigegeben von {{name}} in deinem Namen",
+      "decidingForYou": "{{name}} prüft es in deinem Namen…"
     }
   },
   "noticePrefs": {
@@ -1219,14 +1313,14 @@
       "drive": "Dateien, Berichte und Tabellen",
       "routines": "Was Agenten selbst erledigen, pünktlich",
       "calendar": "Meetings und Fristen",
-      "forum": "Wenn eine Entscheidung mehrere Sichtweisen braucht"
+      "forum": "Wenn eine Entscheidung mehrere Sichtweisen braucht",
+      "team": "Wer ist wer: Personen, Agenten und ihre Gruppen"
     },
     "customizeSidebar": "Seitenleiste anpassen",
     "sidebarMenu": {
       "title": "Seitenleiste",
       "newChannel": "Neuer Kanal",
       "addToChannels": "Neuer Kanal oder neue Kategorie",
-      "addToDms": "Neue Nachricht oder neuer Agent",
       "newMessage": "Neue Nachricht",
       "addMembers": "Personen oder Agenten hinzufügen",
       "channelSettings": "Kanaleinstellungen",
@@ -1349,7 +1443,49 @@
     "delete": "Gruppe löschen",
     "deleteTitle": "Gruppe {{name}} löschen?",
     "deleteText": "Ihre Agenten kommen zurück zu Agenten.",
-    "dropHere": "Agenten hierher ziehen"
+    "dropHere": "Agenten hierher ziehen",
+    "moved": "{{name}} ist jetzt in der Gruppe {{group}}",
+    "movedOut": "{{name}} hat die Gruppe {{group}} verlassen",
+    "undo": "Rückgängig"
+  },
+  "sidebarAgents": {
+    "options": "Optionen für Agenten",
+    "add": "Neuer Agent oder neue Gruppe",
+    "order": "Reihenfolge",
+    "sort": {
+      "workspace": "Wie im Workspace",
+      "mine": "Meine zuerst",
+      "working": "Arbeitende zuerst"
+    },
+    "showAll": "Agenten zeigen, die nicht mit mir sprechen",
+    "collapseAll": "Alle einklappen",
+    "expandAll": "Alle ausklappen",
+    "organize": "Gruppen in Team ordnen",
+    "seeAll_one": "Den {{count}} Agenten ansehen",
+    "seeAll_other": "Alle {{count}} Agenten ansehen",
+    "createFirst": "Den ersten Agenten erstellen",
+    "working_one": "{{count}} arbeitet",
+    "working_other": "{{count}} arbeiten",
+    "count_one": "{{count}} Agent",
+    "count_other": "{{count}} Agenten",
+    "workingIn": "arbeitet in #{{channel}}",
+    "talksOnly": "spricht nur mit {{name}}",
+    "talksOnlyMore_one": "spricht nur mit {{name}} und {{count}} weiteren",
+    "talksOnlyMore_other": "spricht nur mit {{name}} und {{count}} weiteren",
+    "changeGroup": "In Gruppe verschieben",
+    "newGroupWith": "Neue Gruppe mit {{name}}",
+    "dmsEmpty": "Deine Unterhaltungen mit Personen erscheinen hier."
+  },
+  "sidebarPins": {
+    "pin": "Oben anheften",
+    "unpin": "Lösen",
+    "pinned": "Oben angeheftet",
+    "hint": "Deine Agenten bleiben oben. Klicke mit rechts auf eine Unterhaltung, um sie anzuheften.",
+    "full": {
+      "agents": "Du hast schon 5 Agenten angeheftet. Löse einen, um diesen anzuheften.",
+      "channels": "Du hast schon 5 Kanäle angeheftet. Löse einen, um diesen anzuheften.",
+      "people": "Du hast schon 5 Personen angeheftet. Löse eine, um diese anzuheften."
+    }
   },
   "openOnPhone": {
     "qr": "QR-Code zum Anmelden in der agentes-App",
@@ -1511,7 +1647,6 @@
       "thinking": "denkt nach",
       "writing": "schreibt"
     },
-    "autoReplyChip": "antwortet ohne Erwähnung",
     "more": "Weitere Nachrichtenaktionen",
     "copyLink": "Link kopieren",
     "linkCopied": "Link kopiert.",
@@ -1593,13 +1728,14 @@
     "typing_other": "{{names}} schreiben…",
     "callAgent": "Agenten rufen",
     "callAgentMenu": "Agenten in diesem Kanal",
-    "newMessages": "Neue Nachrichten",
+    "toLatest": "Zu den neuesten Nachrichten",
     "newPill": {
-      "label": "Neue Nachrichten: {{text}}",
+      "label": "Zu den neuesten Nachrichten: {{text}}",
       "count_one": "{{count}} neue",
       "count_other": "{{count}} neue",
       "more": "{{names}} und {{count}} weitere",
-      "writing": "{{name}} schreibt"
+      "writing": "{{name}} schreibt",
+      "mentionsYou": "du wurdest erwähnt"
     },
     "unreadDivider": "Neu",
     "offline": "Keine Verbindung. Was du sendest, geht von selbst raus, sobald sie wieder da ist.",
@@ -1763,6 +1899,7 @@
         "budget": "Nur Admins ändern das Budget eines Agenten",
         "owner": "Nur Admins ändern, wem ein Agent gehört",
         "archive": "Nur Admins archivieren einen Agenten",
+        "delete": "Nur Admins löschen einen Agenten",
         "audience": "Nur Admins und der Verantwortliche ändern, wer mit ihm spricht",
         "channels": "Nur Admins und der Verantwortliche ändern seine Kanäle",
         "ai_account": "Nur die Person, der das Konto gehört, vergibt es",
@@ -1787,9 +1924,23 @@
       "somePeople": "Einige Personen",
       "active": "Aktiv",
       "archived": "Archiviert",
+      "deleted": "Gelöscht",
       "notIn": "Nicht im Kanal",
       "withoutMention": "Von selbst",
       "mentionOnly": "Nur bei Erwähnung"
+    },
+    "remove": {
+      "archiveTitle_one": "{{count}} Agent archivieren?",
+      "archiveTitle_other": "{{count}} Agenten archivieren?",
+      "deleteTitle_one": "{{count}} Agent endgültig löschen?",
+      "deleteTitle_other": "{{count}} Agenten endgültig löschen?",
+      "archiveAll": "Alle archivieren",
+      "deleteAll": "Alle löschen",
+      "archiveSome_one": "{{count}} archivieren",
+      "archiveSome_other": "{{count}} archivieren",
+      "deleteSome_one": "{{count}} löschen",
+      "deleteSome_other": "{{count}} löschen",
+      "deleteHelp": "Ihre Anweisungen, ihr Gedächtnis und ihre Routinen sind dann endgültig weg. Ihre Nachrichten bleiben."
     }
   },
   "routing": {
@@ -2038,12 +2189,16 @@
     "extraHint": "Mit eingeschalteter Zusatznutzung im Abo läuft längere Arbeit über 95 % hinaus weiter. Ausgeschaltet pausiert sie bei 95 % und geht weiter, wenn sich das Abo zurücksetzt."
   },
   "usageQueue": {
-    "title_one": "{{agent}} hat {{count}} Unterhaltung wieder aufzunehmen",
-    "title_other": "{{agent}} hat {{count}} Unterhaltungen wieder aufzunehmen",
-    "line": "Macht {{when}} weiter, wenn sich das {{plan}}-Abo zurücksetzt. Eine nach der anderen, in dieser Reihenfolge.",
-    "lineUnknown": "Macht weiter, sobald sich das {{plan}}-Abo zurücksetzt. Eine nach der anderen, in dieser Reihenfolge.",
-    "lineBudget": "Macht {{when}} weiter, wenn sich das Budget erneuert, oder früher, wenn ein Admin es erhöht. Eine nach der anderen, in dieser Reihenfolge.",
-    "shared": "Die Warteschlange gehört zum Abo: {{agents}} teilen sich dasselbe Konto.",
+    "back": "{{agent}} ist {{when}} zurück",
+    "backPlan": "{{agent}} ist zurück, wenn sich das Abo erneuert",
+    "backBudget": "{{agent}} ist zurück, wenn sich das Budget erneuert",
+    "resuming": "{{agent}} macht weiter",
+    "shared_one": "{{agents}} nutzt dasselbe {{plan}}-Abo. Die Unterhaltungen beider kommen in dieselbe Warteschlange.",
+    "shared_other": "{{agents}} nutzen dasselbe {{plan}}-Abo. Alle ihre Unterhaltungen kommen in dieselbe Warteschlange.",
+    "about": "Über die Warteschlange",
+    "lists": "Unterhaltungen",
+    "queuedTab": "In der Warteschlange",
+    "skippedTab": "Übersprungen",
     "dm": "DM mit {{name}}",
     "yourDm": "Deine DM",
     "thread": "Thread in #{{channel}}",
@@ -2051,32 +2206,24 @@
     "work": "Arbeit: {{name}}",
     "askedBy": "Gefragt von {{names}} · {{ago}}",
     "paused": "Pausiert {{ago}}",
-    "after_one": "{{count}} Nachricht seitdem",
-    "after_other": "{{count}} Nachrichten seitdem",
-    "nothingAfter": "Seitdem nichts",
-    "wrote_one": "{{names}} hat seitdem geschrieben",
-    "wrote_other": "{{names}} haben seitdem geschrieben",
-    "queued": "In der Warteschlange",
-    "answering": "Antwortet gerade",
-    "hidden_one": "+{{count}} in Unterhaltungen, die du nicht siehst",
-    "hidden_other": "+{{count}} in Unterhaltungen, die du nicht siehst",
+    "answering": "Antwortet",
+    "hidden_one": "+{{count}}, die du nicht siehst",
+    "hidden_other": "+{{count}}, die du nicht siehst",
     "dontRunAll": "Keine ausführen",
-    "confirmAll_one": "{{count}} Unterhaltung nicht ausführen?",
-    "confirmAll_other": "Diese {{count}} Unterhaltungen nicht ausführen?",
+    "confirmAll_one": "Diese nicht ausführen?",
+    "confirmAll_other": "Alle {{count}} nicht ausführen?",
     "yesDontRun": "Ja, nicht ausführen",
     "keep": "Behalten",
-    "canceledAll_one": "{{count}} Unterhaltung abgebrochen. {{agent}} antwortet nicht darauf, wenn das Limit zurück ist.",
-    "canceledAll_other": "{{count}} Unterhaltungen abgebrochen. {{agent}} antwortet nicht darauf, wenn das Limit zurück ist.",
-    "empty": "Nichts wartet darauf, wieder aufgenommen zu werden.",
+    "canceledAll_one": "{{count}} Unterhaltung abgebrochen. {{agent}} antwortet nicht darauf.",
+    "canceledAll_other": "{{count}} Unterhaltungen abgebrochen. {{agent}} antwortet nicht darauf.",
+    "empty": "Nichts wartet auf das Abo.",
     "waiting_one": "{{count}} Unterhaltung wartet",
     "waiting_other": "{{count}} Unterhaltungen warten",
-    "closedTitle_one": "{{count}} brauchte keine Antwort",
-    "closedTitle_other": "{{count}} brauchten keine Antwort",
-    "closedWhy": "Sie schienen erledigt, also hat {{agent}} nicht geantwortet.",
-    "closedLine": "Sie schienen erledigt, also hat {{agent}} nicht geantwortet. Wenn eine noch eine Antwort braucht, wähle Trotzdem antworten.",
-    "seeConversation": "Unterhaltung ansehen",
-    "answeredAnyway": "Jemand hat trotzdem um eine Antwort gebeten",
-    "toResume": "Wieder aufzunehmen",
+    "skip_solved": "{{name}} hat sich schon darum gekümmert",
+    "skip_withdrawn": "{{name}} sagte, dass es nicht mehr nötig ist",
+    "skip_task_canceled": "{{name}} hat die Aufgabe abgebrochen",
+    "skip_mixed": "Schon erledigt",
+    "answeredAnyway": "Antwortet trotzdem",
     "switchAi": "KI von {{name}} wechseln"
   },
   "actionCard": {
@@ -2422,6 +2569,7 @@
     "messageTo": "Nachricht an {{name}}",
     "audienceEdit": "Bearbeiten",
     "nowIn": "jetzt in #{{channel}}",
+    "answersHere": "Antwortet hier ohne @",
     "more": "Mehr",
     "of": "Profil von {{name}}",
     "presence": "Status",
@@ -2520,6 +2668,8 @@
       "provider_down": "Der KI-Anbieter ist ausgefallen · versucht es von selbst erneut",
       "out_of_plan": "Planlimit erreicht",
       "out_of_budget": "Monatsbudget aufgebraucht",
+      "out_of_planShort": "Limit erreicht",
+      "out_of_budgetShort": "Budget aufgebraucht",
       "backAt": "zurück {{when}}",
       "work": "Im Hintergrund: {{subject}}"
     },
@@ -2754,6 +2904,12 @@
     "outcomeApprovedByYou": "Von dir freigegeben",
     "outcomeRefusedBy": "Abgelehnt von {{name}}",
     "outcomeRefusedByYou": "Von dir abgelehnt",
+    "outcomeApprovedCovering": "Freigegeben von {{name}} in Vertretung von {{for}}",
+    "outcomeRefusedCovering": "Abgelehnt von {{name}} in Vertretung von {{for}}",
+    "outcomeApprovedByYouCovering": "Von dir freigegeben in Vertretung von {{for}}",
+    "outcomeRefusedByYouCovering": "Von dir abgelehnt in Vertretung von {{for}}",
+    "outcomeApprovedCoveringYou": "Freigegeben von {{name}} in deiner Vertretung",
+    "outcomeRefusedCoveringYou": "Abgelehnt von {{name}} in deiner Vertretung",
     "refusedByYou": "Von dir abgelehnt · {{when}}",
     "expiresIn": "Läuft ab in {{time}}",
     "expired": "Abgelaufen",
@@ -2976,6 +3132,7 @@
       "routineStalled": "<b>{{name}}</b> wartet auf den Computer, um eine Routine auszuführen",
       "agentUnreached": "Eine Routine konnte <b>{{name}}</b> nicht rufen",
       "browserProfileRequest": "<b>{{name}}</b> bittet um ein weiteres Browserprofil für <b>{{agent}}</b>",
+      "desktopTaken": "<b>{{name}}</b> hat den Bildschirm des Computers von <b>{{agent}}</b> übernommen",
       "routineWaitingPlan": "<b>{{name}}</b> wartet, bis sein Abo zurückgesetzt wird, um eine Routine auszuführen",
       "planResetUnknown": "{{plan}} hat nicht gesagt, wann das Limit zurückgesetzt wird. Die Arbeit von <b>{{name}}</b> wartet noch.",
       "catchUpClosed_one": "<b>{{name}}</b> ist zurück und hat {{count}} Unterhaltung übersprungen, die keine Antwort brauchte",
@@ -2994,10 +3151,31 @@
       "joinSuggestion": "<b>{{by}}</b> hat <b>{{name}}</b> vorgeschlagen",
       "changeRequest": "<b>{{name}}</b> bittet um eine Änderung an <b>{{agent}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> bittet um einen neuen Agenten: <b>{{agent}}</b>",
+      "approvalCover": "<b>{{name}}</b> hat dich bei Wer für mich freigibt gewählt",
+      "approvalCoverDeclined": "<b>{{name}}</b> gibt nicht mehr für dich frei",
+      "approvalCoverEnded": "<b>{{name}}</b> hat deine Vertretung für Freigaben beendet",
+      "rightHandDecided": "Heute von <b>{{name}}</b> für dich freigegebene Anfragen: {{count}}",
+      "rightHandPaused": "<b>{{name}}</b> gibt nicht mehr für dich frei: Du hast diese Woche 3 Entscheidungen rückgängig gemacht",
       "invitationAccepted": "<b>{{name}}</b> hat deine Einladung angenommen und ist {{org}} beigetreten",
       "invitationAcceptedAny": "<b>{{name}}</b> hat deine Einladung angenommen",
       "reaction_one": "<b>{{names}}</b> hat auf deine Nachricht reagiert",
-      "reaction_other": "<b>{{names}}</b> haben auf deine Nachricht reagiert"
+      "reaction_other": "<b>{{names}}</b> haben auf deine Nachricht reagiert",
+      "usageLimitWarning": "Du hast {{percent}} % deines Limits in diesem Monat verbraucht",
+      "usageLimitReachedSelf": "Du hast dein Nutzungslimit für diesen Monat erreicht",
+      "usageLimitReached": "<b>{{name}}</b> hat das Limit von {{amount}} erreicht",
+      "usageLimitRequest": "<b>{{name}}</b> hat das Limit von {{amount}} erreicht und bittet um mehr",
+      "usageLimitRaised": "<b>{{name}}</b> hat dein Limit für diesen Monat erhöht",
+      "usageLimitRefused": "<b>{{name}}</b> hat deine Bitte um mehr Nutzung abgelehnt"
+    },
+    "usageLimit": {
+      "runs_one": "{{count}} Anfrage diesen Monat",
+      "runs_other": "{{count}} Anfragen diesen Monat",
+      "top": "{{share}} % mit {{agent}}",
+      "fromRole": "Limit der Rolle {{role}}.",
+      "fromRaised": "Limit in diesem Monat erhöht.",
+      "fromPerson": "Ein Limit für diese Person.",
+      "fromDefault": "Das Standardlimit des Workspace.",
+      "line": "{{runs}}. {{from}}"
     },
     "source": {
       "channel": "#{{name}}",
@@ -3808,6 +3986,7 @@
         "credential_wrong_provider": "Das Modell ist von {{modelProvider}}, der Schlüssel aber von {{keyProvider}}.",
         "model_unlisted": "OpenRouter bietet {{model}} nicht mehr an. Wähle in den Einstellungen des Agenten ein anderes Modell.",
         "no_ai": "Der Agent hat keine KI verbunden.",
+        "person_limit": "Die anfragende Person hat ihr Nutzungslimit für diesen Monat erreicht.",
         "org_paused": "Die Agenten des Workspace sind pausiert.",
         "org_suspended": "Der Workspace ist nicht verfügbar.",
         "org_deleting": "Der Workspace wird gelöscht.",
@@ -5547,6 +5726,7 @@
       "agent_archived": "Der Agent wurde archiviert",
       "interrupted": "Durch einen Serverneustart unterbrochen",
       "no_ai": "Der Agent hat keine KI verbunden",
+      "person_limit": "Nicht gelaufen: Die erstellende Person hat ihr Nutzungslimit für diesen Monat erreicht",
       "org_paused": "Nicht gelaufen: Die Agenten des Workspace waren pausiert",
       "org_suspended": "Nicht gelaufen: Der Workspace war nicht verfügbar",
       "org_deleting": "Nicht gelaufen: Der Workspace wurde gerade gelöscht",
@@ -8491,6 +8671,7 @@
     },
     "recommended": "Empfohlen",
     "free": "Kostenlos",
+    "opencodeFreeHint": "Andere kostenlose Modelle laufen über OpenCode auf dem Computer des Agenten.",
     "modelHelp": "Größere Modelle denken mehr nach und verbrauchen das Abo schneller.",
     "hidden": "{{owner}} oder ein Admin wählt, wer denkt.",
     "hiddenAdmins": "Nur Admins wählen, wer denkt.",
@@ -9968,6 +10149,13 @@
     "urlHelp": "Beginnt mit postgres://. Der Datenbankname am Ende ist optional. Verschlüsselt auf dem Server gespeichert. Niemand sieht sie wieder, nicht einmal die Agenten.",
     "urlPlaceholder": "postgres://benutzer:passwort@host/db",
     "urlInvalid": "Füg eine Adresse ein, die mit postgres:// beginnt, oder füll die Felder unter Erweitert aus.",
+    "scope": "Welche Datenbanken",
+    "scopeOne": "Nur diese Datenbank",
+    "scopeAll": "Alle Datenbanken dieses Servers",
+    "scopeAllHelp": "Für eine Datenbank pro Kunde. Agenten sehen die Liste und wählen bei jeder Abfrage die Datenbank.",
+    "prefix": "Nur Namen, die beginnen mit",
+    "prefixPlaceholder": "Z. B. kunde_",
+    "prefixHelp": "Leer lassen für alle. Neue Datenbanken mit diesem Anfang erscheinen von selbst.",
     "howTitle": "Wie erstelle ich einen Benutzer mit reinem Lesezugriff?",
     "howText": "Agenten führen nur Abfragen aus, aber ein Benutzer, der nur lesen darf, stellt das in der Datenbank selbst sicher.",
     "how": {
@@ -10002,11 +10190,13 @@
         "3": "Bau die Adresse postgres://agentes_leitura:passwort@server:5432/datenbank und füg sie hier ein."
       }
     },
+    "howAll": "Um alle Datenbanken zu lesen (Postgres 14 oder neuer).",
     "openPage": "{{name}} öffnen",
     "dedicated": "Tipp: Wenn du eine Kopie der Datenbank nur zum Lesen hast (Replica), verbinde diese.",
     "advancedText": "Statt der Adresse, oder um etwas daran zu ändern.",
     "host": "Server",
     "database": "Datenbank",
+    "databaseOptional": "Optional bei allen Datenbanken.",
     "password": "Passwort",
     "passwordInvalid": "Gib das Passwort der Datenbank ein.",
     "ssl": "Sichere Verbindung",
@@ -10023,10 +10213,26 @@
     },
     "connect": "Verbinden",
     "connectedToast": "{{name}} verbunden.",
+    "connectedToastAll_one": "{{name}} mit {{count}} Datenbank verbunden.",
+    "connectedToastAll_other": "{{name}} mit {{count}} Datenbanken verbunden.",
+    "count_one": "{{count}} Datenbank",
+    "count_other": "{{count}} Datenbanken",
+    "prefixRow": "Datenbanken, die mit {{prefix}} beginnen",
+    "refresh": "Liste aktualisieren",
+    "refreshName": "Liste der Datenbanken von {{name}} aktualisieren",
+    "scopeEdit": "Datenbanken",
+    "scopeEditName": "Datenbanken von {{name}}",
+    "scopeSaved": "{{name}} gespeichert.",
+    "widenTitle": "Den ganzen Server öffnen?",
+    "widenTitlePrefix": "Mehr Datenbanken öffnen?",
+    "widenText_one": "Der Agent mit Zugriff liest dann alle Datenbanken dieses Servers. Unter Regeln lässt sich das pro Agent begrenzen.",
+    "widenText_other": "Die {{count}} Agenten mit Zugriff lesen dann alle Datenbanken dieses Servers. Unter Regeln lässt sich das pro Agent begrenzen.",
+    "widenTextPrefix_one": "Der Agent mit Zugriff liest dann alle Datenbanken, die mit {{prefix}} beginnen. Unter Regeln lässt sich das pro Agent begrenzen.",
+    "widenTextPrefix_other": "Die {{count}} Agenten mit Zugriff lesen dann alle Datenbanken, die mit {{prefix}} beginnen. Unter Regeln lässt sich das pro Agent begrenzen.",
     "testing": {
       "reach": "Datenbank wird erreicht…",
-      "tables": "Tabellen werden angesehen…",
-      "databases": "Datenbanken werden angesehen…"
+      "databases": "Datenbanken werden angesehen…",
+      "tables": "Tabellen werden angesehen…"
     },
     "canWrite": "Dieser Benutzer kann Daten ändern. Agenten lesen sowieso nur, aber am sichersten ist ein Benutzer mit reinem Lesezugriff (wie du einen erstellst, steht in Schritt 1).",
     "toolsLead": "Was Agenten in {{name}} tun können. Vorerst lesen sie nur: In der Datenbank wird nichts geändert.",
@@ -10065,23 +10271,23 @@
       "tablesLoading": "Tabellen werden geladen…",
       "tablesError": "Die Tabellen konnten gerade nicht gelesen werden.",
       "tablesHelp": "Keine ausgewählt = alle Tabellen.",
+      "tablesIn": "Tabellen (gesehen in {{database}})",
+      "databases": "Datenbanken",
+      "databasesAll": "Alle",
+      "databasesSome": "Nur diese",
+      "databasePlaceholder": "Name der Datenbank",
+      "databasesHelp": "Die Regeln unten gelten für jede Datenbank, die dieser Agent liest.",
       "hidden": "Spalten, die er nie sieht",
       "hiddenHelp": "tabelle.spalte, Namen mit Großbuchstaben, Leerzeichen oder Symbolen in doppelten Anführungszeichen (kunden.\"Steuer-ID\"). Spalten, die nach persönlichen Daten oder Passwörtern aussehen, haben wir schon versteckt.",
       "hiddenPlaceholder": "kunden.steuer_id",
       "hiddenInvalid": "Gib tabelle.spalte (oder schema.tabelle.spalte) ein, mit \"doppelten Anführungszeichen\" um Namen mit Großbuchstaben, Leerzeichen oder Symbolen.",
       "cap": "Abfragen pro Tag",
       "capHelp": "Leer = kein Limit.",
+      "capHelpAll": "Leer = kein Limit. Über alle Datenbanken gezählt.",
       "timeout": "Zeitlimit pro Abfrage",
       "timeoutHelp": "Eine Abfrage, die länger dauert, wird abgebrochen, damit sie die Datenbank nicht belastet.",
       "seconds_one": "{{count}} Sekunde",
-      "seconds_other": "{{count}} Sekunden",
-      "databases": "Datenbanken",
-      "databasesAll": "Alle",
-      "databasesSome": "Nur diese",
-      "databasePlaceholder": "Name der Datenbank",
-      "databasesHelp": "Die Regeln unten gelten für jede Datenbank, die dieser Agent liest.",
-      "tablesIn": "Tabellen (gesehen in {{database}})",
-      "capHelpAll": "Leer = kein Limit. Über alle Datenbanken gezählt."
+      "seconds_other": "{{count}} Sekunden"
     },
     "agent": {
       "title": "Datenbanken",
@@ -10092,32 +10298,7 @@
       "allDatabases": "Alle Datenbanken von {{name}}",
       "someDatabases_one": "{{count}} Datenbank von {{name}}",
       "someDatabases_other": "{{count}} Datenbanken von {{name}}"
-    },
-    "scope": "Welche Datenbanken",
-    "scopeOne": "Nur diese Datenbank",
-    "scopeAll": "Alle Datenbanken dieses Servers",
-    "scopeAllHelp": "Für eine Datenbank pro Kunde. Agenten sehen die Liste und wählen bei jeder Abfrage die Datenbank.",
-    "prefix": "Nur Namen, die beginnen mit",
-    "prefixPlaceholder": "Z. B. kunde_",
-    "prefixHelp": "Leer lassen für alle. Neue Datenbanken mit diesem Anfang erscheinen von selbst.",
-    "databaseOptional": "Optional bei allen Datenbanken.",
-    "connectedToastAll_one": "{{name}} mit {{count}} Datenbank verbunden.",
-    "connectedToastAll_other": "{{name}} mit {{count}} Datenbanken verbunden.",
-    "howAll": "Um alle Datenbanken zu lesen (Postgres 14 oder neuer).",
-    "count_one": "{{count}} Datenbank",
-    "count_other": "{{count}} Datenbanken",
-    "prefixRow": "Datenbanken, die mit {{prefix}} beginnen",
-    "refresh": "Liste aktualisieren",
-    "refreshName": "Liste der Datenbanken von {{name}} aktualisieren",
-    "scopeEdit": "Datenbanken",
-    "scopeEditName": "Datenbanken von {{name}}",
-    "scopeSaved": "{{name}} gespeichert.",
-    "widenTitle": "Den ganzen Server öffnen?",
-    "widenTitlePrefix": "Mehr Datenbanken öffnen?",
-    "widenText_one": "Der Agent mit Zugriff liest dann alle Datenbanken dieses Servers. Unter Regeln lässt sich das pro Agent begrenzen.",
-    "widenText_other": "Die {{count}} Agenten mit Zugriff lesen dann alle Datenbanken dieses Servers. Unter Regeln lässt sich das pro Agent begrenzen.",
-    "widenTextPrefix_one": "Der Agent mit Zugriff liest dann alle Datenbanken, die mit {{prefix}} beginnen. Unter Regeln lässt sich das pro Agent begrenzen.",
-    "widenTextPrefix_other": "Die {{count}} Agenten mit Zugriff lesen dann alle Datenbanken, die mit {{prefix}} beginnen. Unter Regeln lässt sich das pro Agent begrenzen."
+    }
   },
   "mail": {
     "choice": {
@@ -10888,7 +11069,7 @@
     "leadCloud": "Wo deine Agenten arbeiten: ein Computer nur für diesen Workspace, immer an.",
     "about": "Über diesen Computer",
     "how": "So funktionieren Computer",
-    "hostMissing": "Dieser Server kann auch der Computer deiner Agenten sein: Die Schritte stehen unter „This server as the agents' computer“ in <code>SELF_HOSTING.md</code>.",
+    "hostMissing": "Dieser Server kann auch der Computer deiner Agenten sein: <guide>so geht's</guide>.",
     "other": {
       "title": "Andere Computer",
       "text": "Mit einem Code verbunden, etwa ein Mac mini zu Hause oder ein anderer Server. Was jeder erlaubt, wird auf dem jeweiligen Computer festgelegt.",
@@ -11450,7 +11631,8 @@
       "billing": "Tarif und Abrechnung",
       "media": "GIFs und Sticker",
       "voice": "Sprachnachrichten",
-      "apps": "KI-Apps"
+      "apps": "KI-Apps",
+      "approvals": "Freigaben"
     },
     "sectionText": {
       "account": "Dein Profil und wie die App für dich aussieht.",
@@ -11464,13 +11646,14 @@
       "skills": "Markdown-Anweisungen, die Agenten öffnen, wenn sie sie brauchen.",
       "keys": "Deine Abos und die API-Schlüssel des Workspace.",
       "storage": "Wo die Dateien des Workspace liegen.",
-      "usage": "Budgets und was jeder Agent diesen Monat ausgegeben hat.",
+      "usage": "Wie viel KI jede Person und jeder Agent nutzt, und die Limits des Monats.",
       "audit": "Was die Agenten außerhalb der Unterhaltung getan und was Personen geändert haben. Nur Admins sehen es.",
       "import": "Hol Agenten aus einer anderen App oder einem anderen Workspace und nimm diesen mit, wohin du willst.",
       "billing": "Der agentes.chat-Tarif, die Karte und die Rechnungen dieses Workspace liegen auf einer eigenen Seite von uns, außerhalb der App.",
       "media": "Was Personen in einer Unterhaltung senden können und wann Agenten ein GIF oder einen Sticker senden.",
       "voice": "Sprachnachrichten in Unterhaltungen und wer Sprache in Text umwandelt.",
-      "apps": "Bitte die Agenten dieses Workspace aus Claude, Cursor und anderen Apps um Aufgaben."
+      "apps": "Bitte die Agenten dieses Workspace aus Claude, Cursor und anderen Apps um Aufgaben.",
+      "approvals": "Wer für dich entscheidet, wenn ein Agent etwas anfragt, das auf deine Freigabe wartet."
     },
     "title": "Einstellungen",
     "account": {
@@ -11654,6 +11837,149 @@
         "jev": "Agenten senden nur mit Jev von selbst Sticker.",
         "jevLink": "Jev einrichten"
       }
+    }
+  },
+  "peopleUsage": {
+    "tabs": {
+      "summary": "Übersicht",
+      "people": "Personen",
+      "mine": "Deine Nutzung"
+    },
+    "view": {
+      "usage": "Nutzung",
+      "limits": "Limits"
+    },
+    "title": "Nutzung pro Person",
+    "about": "Du siehst, wie viel jede Person nutzt und mit welchen Agenten. Was in privaten Unterhaltungen steht, erscheint hier nie.",
+    "plansAbout": "Der Plan ist schon bezahlt. Dieser Betrag vergleicht nur die Nutzung zwischen Personen.",
+    "sub_one": "{{month}} · {{count}} Person · {{amount}} für KI",
+    "sub_other": "{{month}} · {{count}} Personen · {{amount}} für KI",
+    "periodLabel": "Zeitraum",
+    "period": {
+      "month": "Dieser Monat",
+      "last7": "Letzte 7 Tage",
+      "last30": "Letzte 30 Tage",
+      "lastMonth": "Letzter Monat"
+    },
+    "role": "Rolle",
+    "roleAll": "Rolle: alle",
+    "agent": "Agent",
+    "agentAll": "Agent: alle",
+    "chips": {
+      "near": "Nah am Limit",
+      "at": "Am Limit",
+      "idle": "Keine Nutzung"
+    },
+    "summary": {
+      "near": "{{n}} nah am Limit",
+      "at": "{{n}} am Limit",
+      "idle": "{{n}} ohne Nutzung im Zeitraum"
+    },
+    "export": "CSV exportieren",
+    "limitsHint": "Lege unter Limits ein Limit pro Person fest",
+    "empty": "Diesen Monat hat noch niemand Agenten genutzt.",
+    "owner": "Inhaber",
+    "member": "Mitglied",
+    "columns": {
+      "person": "Person",
+      "now": "Jetzt",
+      "runs": "Anfragen",
+      "agents": "Am meisten genutzt",
+      "usage": "Diesen Monat",
+      "caresFor": "Betreut",
+      "created": "Erstellt"
+    },
+    "now": {
+      "channel": "Mit {{agent}} in #{{channel}}",
+      "private": "In einer privaten Unterhaltung mit {{agent}}",
+      "hidden": "Mit {{agent}} in einem privaten Kanal",
+      "routine": "Routine {{name}}",
+      "last": "Zuletzt genutzt {{when}}",
+      "never": "Keine Nutzung"
+    },
+    "meter": {
+      "of": "von {{limit}}",
+      "noLimit": "· ohne Limit",
+      "estimate": "≈ {{amount}} über die API"
+    },
+    "live": {
+      "title": "Jetzt",
+      "routineOf": "Routine von {{name}}"
+    },
+    "from": {
+      "raised": "in diesem Monat erhöht",
+      "person": "für diese Person festgelegt",
+      "role": "aus der Rolle {{role}}",
+      "default": "Standard des Workspace"
+    },
+    "drawer": {
+      "limit": "Limit dieses Monats: {{amount}}",
+      "noLimit": "Kein Nutzungslimit in diesem Monat.",
+      "reached": "Limit erreicht am {{date}} · {{used}} genutzt",
+      "used": "{{used}} genutzt · {{percent}} %",
+      "raise": "Limit erhöhen",
+      "raiseTo": "Neues Limit für diesen Monat in US$",
+      "raiseSave": "Erhöhen",
+      "raised": "Limit für diesen Monat erhöht",
+      "asked": "Hat um mehr gebeten",
+      "days": "Nutzung pro Tag",
+      "agents": "Mit welchen Agenten",
+      "runs_one": "{{count}} Anfrage",
+      "runs_other": "{{count}} Anfragen",
+      "recent": "Was die Person zuletzt gemacht hat",
+      "untitled": "Ohne Titel",
+      "with": "mit {{agent}}",
+      "minutes": "{{n}} Min.",
+      "private": "Private Unterhaltung mit {{agent}}",
+      "hidden": "In einem privaten Kanal mit {{agent}}",
+      "routine": "Routine {{name}}",
+      "created": "Erstellte Agenten",
+      "createdAt": "erstellt am {{date}}",
+      "audit": "Aktionen der Agenten im Audit ansehen",
+      "noUse": "Keine Nutzung in diesem Zeitraum."
+    },
+    "limits": {
+      "title": "Nutzungslimit pro Person",
+      "lead": "Wie viel KI jede Person pro Monat nutzen darf, über alle Agenten hinweg. Es zählt, was sie anfragt, und die Routinen, die sie erstellt hat.",
+      "default": "Standard des Workspace",
+      "defaultHint": "Gilt für alle ohne Limit aus einer Rolle oder einer Ausnahme.",
+      "byRole": "Nach Rolle",
+      "people": "Ausnahmen",
+      "addPerson": "Person hinzufügen",
+      "useDefault": "Standard verwenden",
+      "none": "Kein Limit",
+      "amount": "Monatslimit",
+      "rule": "Es gilt das eigene Limit der Person. Ohne eines das höchste ihrer Rollen. Ohne jedes der Standard. Inhaber haben kein Limit.",
+      "whenTitle": "Wenn jemand das Limit erreicht",
+      "block": "Agenten beginnen keine neue Arbeit mehr für diese Person",
+      "notify": "Nur die Admins benachrichtigen",
+      "warn": "Bei 80 % warnen",
+      "warnHint": "Die Person bekommt einen Hinweis, und die Admins bekommen einen weiteren bei 100 %.",
+      "saved": "Limits gespeichert"
+    },
+    "mine": {
+      "title": "Du hast {{percent}} % deines Limits in diesem Monat verbraucht",
+      "noLimit": "Du hast in diesem Monat kein Nutzungslimit",
+      "renews": "Es erneuert sich am {{date}}.",
+      "near": "Nah am Limit, bitte einen Admin um mehr.",
+      "recent": "Was du zuletzt gemacht hast",
+      "ofLimit": "{{percent}} % des Limits"
+    },
+    "card": {
+      "title": "Du hast dein Nutzungslimit für diesen Monat erreicht",
+      "text": "Es erneuert sich am {{date}}. Um jetzt weiterzumachen, frag einen Admin.",
+      "ask": "Um mehr bitten",
+      "asked": "Anfrage gesendet",
+      "see": "Meine Nutzung ansehen",
+      "other": "{{name}} hat das Nutzungslimit für diesen Monat erreicht",
+      "raised": "{{name}} hat dein Limit für diesen Monat erhöht. Du kannst weitermachen.",
+      "raisedOther": "{{name}} hat das Limit für diesen Monat erhöht",
+      "refused": "{{name}} hat die Anfrage abgelehnt. Das Limit erneuert sich am {{date}}."
+    },
+    "actions": {
+      "raise": "Auf {{amount}} für diesen Monat erhöhen",
+      "refuse": "Ablehnen",
+      "see": "Nutzung ansehen"
     }
   },
   "usageViews": {
@@ -12208,6 +12534,7 @@
       "work_end_canceled": "Nach {{minutes}} Min. gestoppt.",
       "work_end_canceledBy": "Von {{name}} nach {{minutes}} Min. gestoppt.",
       "no_ai": "Ich kann noch nicht antworten: Ich habe keine KI verbunden.",
+      "person_limit": "Die anfragende Person hat ihr Nutzungslimit für diesen Monat erreicht. Um jetzt weiterzumachen, frag einen Admin.",
       "no_ai_signed_out": "Ich kann noch nicht antworten: Meine KI ist abgemeldet.",
       "no_ai_not_signed_in": "Ich kann noch nicht antworten: {{brain}} ist auf meinem Computer nicht angemeldet.",
       "action_connect_ai": "KI verbinden",
@@ -12808,6 +13135,7 @@
       "noComputer": "{{name}} hat keinen verbundenen Computer.",
       "noComputerCloud": "Der Computer von {{name}} wird vorbereitet.",
       "forbidden": "Du kannst diesen Browser nicht sehen.",
+      "noRole": "Deine Rolle gibt dir keinen Zugang zu den Browsern der Agenten.",
       "tooMany": "Zu viele Browser gleichzeitig offen. Dieser erscheint, sobald ein anderer geschlossen wird.",
       "unavailable": "Der Browser kann gerade nicht angezeigt werden. Neuer Versuch…",
       "closed": "Der Browser von {{name}} ist geschlossen.",
@@ -12820,7 +13148,12 @@
       "subHidden": "{{person}} hat die Steuerung · Bildschirm verborgen",
       "full": "Vollbild",
       "fullExit": "Vollbild beenden",
-      "goToggle": "Website öffnen",
+      "navBack": "Zurück",
+      "navForward": "Vorwärts",
+      "navReload": "Seite neu laden",
+      "paste": "Einfügen",
+      "pasteHint": "Das Kopierte in die Seite einfügen",
+      "pasteBlocked": "Dein Browser hat die Seite nicht lesen lassen, was du kopiert hast. Nutze {{keys}} auf der Seite.",
       "goLabel": "Adresse der Website",
       "goPlaceholder": "Gib eine Adresse ein, z. B. example.com",
       "go": "Öffnen",
@@ -12831,7 +13164,8 @@
       "backTitle": "An {{name}} zurückgeben",
       "doneTitle": "Fertig. Eine Notiz für {{name}}?",
       "backLabel": "Notiz für {{name}}",
-      "backPlaceholder": "Optional: Gibt es etwas, das {{name}} wissen sollte?"
+      "backPlaceholder": "Optional: Gibt es etwas, das {{name}} wissen sollte?",
+      "addNote": "Notiz hinterlassen"
     },
     "now": {
       "ready": "Bereit auf {{computer}}",
@@ -13166,7 +13500,8 @@
     "ask": {
       "watching": "Du schaust nur zu.",
       "title": "Steuerung übernehmen?",
-      "working": "{{name}} pausiert, solange du die Steuerung hast."
+      "working": "{{name}} pausiert, solange du die Steuerung hast.",
+      "titleBrowser": "Browser übernehmen?"
     },
     "sub": {
       "control": "Du hast die Steuerung · {{name}} wartet",
@@ -13180,7 +13515,9 @@
     },
     "retry": "Erneut versuchen",
     "takeover": "Steuerung übernehmen",
+    "takeBrowser": "Browser übernehmen",
     "taking": "Steuerung wird übernommen…",
+    "returning": "Wird an {{name}} zurückgegeben…",
     "clipboard": {
       "got": "Auf dem Computer von {{name}} kopiert:",
       "copy": "Kopieren",
@@ -13247,11 +13584,18 @@
       "linuxOnly": "Agenten nutzen Apps auf eigenen Bildschirmen nur auf Linux-Computern.",
       "agent": "{{name}} kann auf {{computer}} noch keine Apps auf seinem Bildschirm nutzen.",
       "agent_female": "{{name}} kann auf {{computer}} noch keine Apps auf ihrem Bildschirm nutzen."
+    },
+    "browserOnly": {
+      "title": "Du bist im Browser, nicht auf dem ganzen Computer",
+      "plan": "{{name}} denkt mit dem Abo der Person, der der Agent gehört, deshalb steuern nur sie und Admins, die Agenten verwalten, den ganzen Computer",
+      "other": "Du kannst den Browser von {{name}} steuern, nicht den ganzen Computer",
+      "role": "Deine Rolle gibt dir den Browser von {{name}}, nicht den ganzen Computer"
     }
   },
   "agentComputer": {
     "title": "Computer von {{name}}",
     "open": "Öffnen",
+    "openOf": "Computer von {{name}} öffnen",
     "help": "Hilfe",
     "button": "Computer",
     "choose": "Computer wählen",
@@ -13307,7 +13651,8 @@
       "noScreenHelp": "Erlaube den Bildschirm oder den Browser unter Tools und Zugriff.",
       "noComputer": "Wähle einen Computer für {{name}}.",
       "browserOff": "Der Browser von {{name}} ist auf {{computer}} aus",
-      "forbidden": "Du kannst diesen Computer nicht sehen."
+      "forbidden": "Du kannst diesen Computer nicht sehen.",
+      "noRole": "Deine Rolle gibt dir keinen Zugang zu den Computern der Agenten."
     },
     "closeAsk": "{{name}} wartet 2 Min., bis du zurückkommst.",
     "openAccess": "Tools und Zugriff öffnen",

@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, like, schema, sql } from "@agenteschat/db";
+import { and, eq, inArray, isNull, like, ne, or, schema, sql } from "@agenteschat/db";
 import { deletedHandle } from "./agents";
 import { recordAudit } from "./audit";
 import { invalidateOrg } from "./cache";
@@ -117,9 +117,18 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
     await tx
       .delete(searchDocuments)
       .where(and(eq(searchDocuments.kind, "context_item"), inArray(searchDocuments.sourceId, memory)));
+    // A decided card's rows stay: the card that deleted it (or changed it before) still reads how it ended.
+    await tx
+      .delete(contextProposals)
+      .where(
+        and(
+          eq(contextProposals.orgId, orgId),
+          eq(contextProposals.agentId, agentId),
+          or(ne(contextProposals.target, "agent_settings"), eq(contextProposals.status, "pending")),
+        ),
+      );
     for (const table of [
       contextItems,
-      contextProposals,
       outcomes,
       agentSkills,
       agentScopes,

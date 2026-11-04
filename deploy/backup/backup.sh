@@ -1,7 +1,8 @@
 #!/bin/sh
 # The `backup` service of docker-compose.yml: every day at 03:00 UTC (or every BACKUP_INTERVAL_HOURS
 # hours from then), a pg_dump of the database to an S3-compatible bucket, deleting dumps older than
-# BACKUP_RETENTION_DAYS (14 by default). Settings and the restore: SELF_HOSTING.md, Backups.
+# BACKUP_RETENTION_DAYS (14 by default). Settings and the restore:
+# https://agentes.chat/docs/install-on-a-server#backups
 #   backup.sh             the schedule (what the service runs)
 #   backup.sh now         one dump, right away
 #   backup.sh list        the dumps in the bucket
@@ -9,7 +10,7 @@
 set -eu
 
 if [ -z "${S3_BACKUP_BUCKET:-}" ]; then
-  echo "backup: off, S3_BACKUP_BUCKET is not set (SELF_HOSTING.md, Backups)" >&2
+  echo "backup: off, S3_BACKUP_BUCKET is not set (https://agentes.chat/docs/install-on-a-server#backups)" >&2
   # The service idles instead of exiting, which restart: unless-stopped would turn into a loop.
   [ "$#" -gt 0 ] || exec sleep infinity
   exit 1

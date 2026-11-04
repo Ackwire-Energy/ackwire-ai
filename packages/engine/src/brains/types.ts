@@ -70,6 +70,8 @@ export interface BrainTurn {
   runId: string;
   orgId: string;
   agentId: string;
+  /** The person behind the run (ADR 0141): the model brain's calls count for them; null: nobody's. */
+  personId?: string | null;
   channelId: string;
   threadRootId: string | null;
   /** The engine-built context (context.ts): system text + conversation, same for every brain. */

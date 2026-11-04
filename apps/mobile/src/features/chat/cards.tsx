@@ -742,7 +742,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
                       pressed && styles.optPressed,
                     ]}
                   >
-                    <Text variant="callout" style={{ color: on ? c.bg : c.ink }}>
+                    <Text variant="callout" style={[styles.optText, { color: on ? c.bg : c.ink }]}>
                       {choice}
                     </Text>
                   </Pressable>
@@ -860,6 +860,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 14,
   },
+  optText: { flexShrink: 1 },
   optPressed: { transform: [{ scale: 0.98 }] },
   other: { backgroundColor: "transparent", borderWidth: 1 },
   tlink: {

@@ -5,9 +5,10 @@ import { inPlaceClick } from "@/lib/navigate";
 
 /**
  * An item whose details dialog opens over whatever page the person is on (`DetailsHost`). `usage_queue` is an agent's
- * line waiting on its plan (its id), which has no page of its own to link to.
+ * line waiting on its plan (its id), which has no page of its own to link to; `tab` "skipped" opens it on what it
+ * skipped.
  */
-export type DetailsItem = { kind: "routine" | "approval" | "usage_queue"; id: string };
+export type DetailsItem = { kind: "routine" | "approval" | "usage_queue"; id: string; tab?: "skipped" };
 
 export const OpenDetailsContext = createContext<((item: DetailsItem) => void) | null>(null);
 

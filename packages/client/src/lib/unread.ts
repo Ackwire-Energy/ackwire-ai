@@ -23,6 +23,9 @@ export function unreadTotal(
 
 const COUNTED = /^\(\d+\+?\) /;
 
+/** A count as a badge shows it: "99+" past 99. */
+export const badgeCount = (n: number) => (n > 99 ? "99+" : String(n));
+
 /**
  * A title with the total in front, "(3) agentes.chat" (99+ past 99). `mine` is the prefix this put on last time:
  * only that comes off, so a title that arrives with its own count (the Notifications page's) keeps it, untouched.
@@ -30,6 +33,6 @@ const COUNTED = /^\(\d+\+?\) /;
 export function titledWithUnread(title: string, total: number, mine = ""): { title: string; prefix: string } {
   const bare = mine && title.startsWith(mine) ? title.slice(mine.length) : title;
   if (COUNTED.test(bare)) return { title: bare, prefix: "" };
-  const prefix = total > 0 ? `(${total > 99 ? "99+" : total}) ` : "";
+  const prefix = total > 0 ? `(${badgeCount(total)}) ` : "";
   return { title: prefix + bare, prefix };
 }

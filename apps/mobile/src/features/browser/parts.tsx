@@ -6,10 +6,13 @@ import {
   createTouchInput,
   frameMetadata,
   keyEvents,
-  textEvent,
+  PASTE_MAX_BYTES,
+  pasteBytes,
+  pasteEvents,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { openRefusalKey } from "@agenteschat/client/lib/sites";
+import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Image, type LayoutChangeEvent, Pressable, StyleSheet, TextInput, View } from "react-native";
@@ -159,6 +162,12 @@ export function TypeBar({
     tapHaptic();
     onKey(k);
   };
+  /** Colar: what the person copied, into the page's focused field as it is (the field's own paste waits for Send). */
+  const paste = async () => {
+    tapHaptic();
+    const copied = await Clipboard.getStringAsync().catch(() => "");
+    if (copied) onText(copied);
+  };
   const tool = (on: boolean) => [styles.tool, { backgroundColor: on ? c.sunken : "transparent" }];
   return (
     <View style={styles.typeWrap}>
@@ -177,6 +186,16 @@ export function TypeBar({
               </Text>
             </Pressable>
           ))}
+          <Pressable
+            onPress={() => void paste()}
+            accessibilityRole="button"
+            accessibilityLabel={t("mobile.browser.live.pasteHint")}
+            style={[styles.keyCap, { backgroundColor: c.sunken }]}
+          >
+            <Text variant="footnote" tone="ink2" style={styles.medium}>
+              {t("mobile.browser.live.paste")}
+            </Text>
+          </Pressable>
         </View>
       ) : null}
       <View style={[styles.field, { backgroundColor: c.raised, borderColor: c.line }]}>
@@ -234,11 +253,12 @@ export function TypeBar({
   );
 }
 
-/** `TypeBar` on the agent's page: its text and keys as the page's input events. */
-export const browserTyping = (send: (events: BrowserInputEvent[]) => void) => ({
+/** `TypeBar` on the agent's page: its text and keys as the page's input events; a text too long is refused whole. */
+export const browserTyping = (send: (events: BrowserInputEvent[]) => void, tooLong: () => void) => ({
   onText: (text: string) => {
-    const event = textEvent(text);
-    if (event) send([event]);
+    if (pasteBytes(text) > PASTE_MAX_BYTES) return tooLong();
+    const events = pasteEvents(text);
+    if (events.length) send(events);
   },
   onKey: (key: LiveKey) => send(keyEvents(key)),
 });

@@ -104,6 +104,7 @@ export const RUN_CODES = [
   "agent_archived",
   "interrupted",
   "no_ai",
+  "person_limit",
   "org_paused",
   "org_suspended",
   "org_deleting",

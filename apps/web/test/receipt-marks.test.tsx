@@ -168,7 +168,11 @@ describe("a receipt never changes a message's height", () => {
     const check = px(value(kit, ".ac-receipt__check .ac-icon", "width")) + 2 * 2;
     expect(value(kit, ".ac-receipt__check", "padding")).toBe("0 2px");
     expect(
-      value(kit, ".ac-msg:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions", "right"),
+      value(
+        kit,
+        ".ac-msg:has(> .ac-msg__body > .ac-msg__aside--floating:not(:empty)) > .ac-msg__body > .ac-msg__actions",
+        "right",
+      ),
     ).toBe(`calc(var(--msg-inline) + ${check + 8}px)`);
     // The reader's face (18px) with 1px each side: the same 20px, and no taller than the name's line.
     const face = px(value(kit, ".ac-avatar--xs", "width"));
@@ -180,8 +184,10 @@ describe("a receipt never changes a message's height", () => {
     // A DM's face slot takes no width of its own: empty, it leaves the time on the bubble's edge.
     expect(value(app, ".ac-receipt__seen", "width")).toBeUndefined();
     expect(px(value(app, ".ac-receipt__seen", "height"))).toBe(16);
-    // The mark ends the first line: in the name's line, or floated on a grouped message's text.
+    // The mark ends the first line: right after the time in the name's line (never pushed to the row's far end), or
+    // floated on a grouped message's text.
     expect(value(kit, ".ac-msg__head > .ac-msg__aside", "align-self")).toBe("center");
+    expect(value(kit, ".ac-msg__aside", "margin-left")).toBeUndefined();
     expect(value(kit, ".ac-msg__aside--floating", "float")).toBe("right");
     // On my own rows it ends the time's line, no taller than the time, so it never adds a line either.
     expect(px(value(kit, ".ac-msg__own-foot > .ac-msg__aside", "height"))).toBe(16);

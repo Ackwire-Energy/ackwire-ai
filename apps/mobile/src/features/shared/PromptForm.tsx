@@ -1,15 +1,37 @@
 import { type ReactNode, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Button, type IconName, Text } from "@/ui";
+import { Button, type IconName, InfoHint, Text } from "@/ui";
 import { TextArea } from "./TextArea";
 
-/** A sheet's title row: an optional face or tile, the title and a line under it. */
-export function SheetTitle({ leading, title, subtitle }: { leading?: ReactNode; title: string; subtitle?: string }) {
+/**
+ * A sheet's title row: an optional face or tile, the title (with an ⓘ, "About <title>", when `hint` says why) and a
+ * line under it.
+ */
+export function SheetTitle({
+  leading,
+  title,
+  subtitle,
+  hint,
+}: {
+  leading?: ReactNode;
+  title: string;
+  subtitle?: string;
+  hint?: string;
+}) {
+  const { t } = useTranslation();
+  const text = <Text variant="title">{title}</Text>;
   return (
-    <View style={styles.title}>
+    <View style={[styles.title, hint ? styles.top : null]}>
       {leading}
       <View style={styles.grow}>
-        <Text variant="title">{title}</Text>
+        {hint ? (
+          <InfoHint name={t("common.about", { label: title })} text={hint} variant="title">
+            {text}
+          </InfoHint>
+        ) : (
+          text
+        )}
         {subtitle ? (
           <Text variant="small" tone="muted">
             {subtitle}
@@ -84,5 +106,7 @@ export function PromptForm({
 
 const styles = StyleSheet.create({
   title: { flexDirection: "row", alignItems: "center", gap: 10 },
+  // The hint opens under the title: the face stays on its first line.
+  top: { alignItems: "flex-start" },
   grow: { flex: 1 },
 });

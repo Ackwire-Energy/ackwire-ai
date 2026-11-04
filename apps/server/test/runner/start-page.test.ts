@@ -33,6 +33,9 @@ test("the start page is one self-contained file: no network, no other file, the 
   // A name can't close the script its details sit in.
   expect(html.match(/<\/script>/g)?.length).toBe(2);
   expect(pageData(html)).toMatchObject({ name: evil.name, locale: "pt-BR" });
+  // Chrome reads the page's language from the markup: the agent's, and no Translate bubble over it.
+  expect(html).toContain('<html lang="pt-BR" translate="no">');
+  expect(html).toContain('<meta name="google" content="notranslate">');
   expect(html).toContain('aria-hidden="true"');
   expect(html).not.toMatch(/<a\b|<button\b/);
   // The desktop's band right below the window shows the agentes.chat logo: the page carries no second one, and
@@ -46,6 +49,7 @@ test("the start page is one self-contained file: no network, no other file, the 
   expect(statSync(file).mtimeMs).toBe(before);
   prepareStartPage(dir, { name: "Ada", handle: "ada" }, { locale: "en", egress: null });
   expect(pageData(readFileSync(file, "utf8"))).toEqual({ name: "Ada", locale: "en", egress: null, flag: null });
+  expect(readFileSync(file, "utf8")).toContain('<html lang="en" translate="no">');
 });
 
 test("Chrome opens on the start page file; it and Chrome's new tab page are the only pages the allowlist lets by", () => {

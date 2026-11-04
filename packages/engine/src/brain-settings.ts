@@ -103,12 +103,18 @@ export interface BrainModelOption {
 
 /**
  * OpenCode's models: what its CLI listed on the agent's computer (`opencode models`, `provider/model`), else OpenCode's
- * free tier; the free ones first. With none chosen its CLI's own default runs. Any other `provider/model` is accepted
- * as typed (a key's paid models, which the computer's own CLI may not list).
+ * free tier; the free ones first, but a free variant (`opencode/glm-5.3-flash-free`) right after its paid model when
+ * that is listed too, as OpenCode's console shows them. With none chosen its CLI's own default runs. Any other
+ * `provider/model` is accepted as typed (a key's paid models, which the computer's own CLI may not list).
  */
-export const opencodeModels = (listed: readonly { id: string; label?: string; free?: boolean }[] = []) =>
-  [...(listed.length ? listed : OPENCODE_FREE_MODELS.map((m) => ({ ...m, free: true })))]
+export const opencodeModels = (listed: readonly { id: string; label?: string; free?: boolean }[] = []) => {
+  const all = listed.length ? listed : OPENCODE_FREE_MODELS.map((m) => ({ ...m, free: true }));
+  const variantOf = (m: { id: string }) => all.find((f) => f.free && f.id === `${m.id}-free`);
+  const paired = new Set(all.map(variantOf));
+  return all
+    .filter((m) => !paired.has(m))
     .sort((a, b) => Number(b.free === true) - Number(a.free === true))
+    .flatMap((m) => [m, variantOf(m)].filter((x) => x !== undefined))
     .map(
       (m): BrainModelOption => ({
         value: m.id,
@@ -116,6 +122,7 @@ export const opencodeModels = (listed: readonly { id: string; label?: string; fr
         ...(m.free ? { free: true } : {}),
       }),
     );
+};
 
 /**
  * Cursor's models: what its CLI listed on the agent's computer (`agent models`), the plan's own first (its CLI's

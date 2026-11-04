@@ -863,9 +863,13 @@ describe("Message aside and foot", () => {
     const reach = -Number.parseFloat(value(`${buttons}::after`, "inset", touch) ?? "");
     expect(32 + 2 * reach).toBe(40);
     expect(Number.parseFloat(value(bar, "gap", touch) ?? "")).toBe(2 * reach);
-    // Left of the check (a 16px icon, 2px each side) and 8px from it, past the row's own side padding.
+    // Left of a grouped message's check at the row's end (a 16px icon, 2px each side) and 8px from it, past the row's
+    // own side padding; a check right after the time in the name's line is out of its way.
     expect(
-      value(".ac-msg:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions", "right"),
+      value(
+        ".ac-msg:has(> .ac-msg__body > .ac-msg__aside--floating:not(:empty)) > .ac-msg__body > .ac-msg__actions",
+        "right",
+      ),
     ).toBe("calc(var(--msg-inline) + 28px)");
     expect(value(".ac-receipt__check", "padding")).toBe("0 2px");
     expect(value(".ac-receipt__check .ac-icon", "width")).toBe("16px");

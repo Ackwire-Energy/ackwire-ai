@@ -236,6 +236,7 @@ html:not([data-pointer]) .rq__more:focus-visible {
   padding-block: 6px;
   white-space: normal;
   text-align: left;
+  overflow-wrap: anywhere;
 }
 .rq__foot > .ap-refuse {
   flex: 1 1 100%;
@@ -411,6 +412,14 @@ html:not([data-pointer]) .rq__more:focus-visible {
   margin: 10px 0 0;
   font-size: 12.5px;
   line-height: 18px;
+  color: var(--muted);
+}
+
+/* The right hand's line on a card it looked at for someone (ADR 0139): deciding, passed and why, out of its reach. */
+.rq__delegate {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 20px;
   color: var(--muted);
 }
 

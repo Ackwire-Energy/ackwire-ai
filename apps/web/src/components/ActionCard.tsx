@@ -34,6 +34,7 @@ import {
   suggestedAiText,
   type UpdateSkillsCard,
 } from "@agenteschat/client/lib/action-cards";
+import { delegateUndoLine } from "@agenteschat/client/lib/approval-words";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { errorText } from "@agenteschat/client/lib/errors";
@@ -60,8 +61,10 @@ import { CostlyProposalCardView } from "@/components/CostlyProposalCard";
 import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { MailIcon } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
+import { PersonLimitCardView } from "@/components/PeopleUsage";
 import { RequestCard, RequestDone, RequestFuse, useExpired } from "@/components/RequestCard";
 import { SettingsProposalCardView } from "@/components/RightHandCards";
+import { DelegateNote, DelegateUndo, useDelegateLine } from "@/components/RightHandDelegate";
 import { InstallSkillDialog, SkillSheet } from "@/components/Skills";
 import { StretchCardView } from "@/components/StretchCard";
 import { UsagePauseCardView } from "@/components/UsagePauseCard";
@@ -105,6 +108,7 @@ export function ActionCard({ message }: { message: Message }) {
   if (card.kind === "settings_proposal") return <SettingsProposalCardView message={message} card={card} />;
   if (card.kind === "stretch_paused") return <StretchCardView message={message} card={card} />;
   if (card.kind === "usage_paused") return <UsagePauseCardView message={message} card={card} />;
+  if (card.kind === "person_limit") return <PersonLimitCardView message={message} card={card} />;
   if (card.kind === "connect_app") return <ConnectAppCardView card={card} />;
   if (card.kind === "invite_people") return <InviteCardView card={card} />;
   if (card.kind === "install_skill") return <InstallSkillCardView card={card} />;
@@ -415,6 +419,9 @@ export function AgentProposalCardView({
   const openPanel = useOpenAgentPanel();
   const { draft, why } = card.params;
   const status = proposalStatus(card);
+  // The right hand looked at it for the person it is for (ADR 0139): its line, Desfazer and "Por quê?".
+  const delegate = card.delegate;
+  const delegated = useDelegateLine(delegate);
   // Open until it expires: drawn again at that moment, even before the server's event says so.
   useExpired(status === "open" ? card.expiresAt : null);
   const decides = status === "open" && can(org, "create_agents");
@@ -478,7 +485,14 @@ export function AgentProposalCardView({
             // The AI comes last: where the line runs out, it is what gives way.
             detail: [`@${draft.handle}`, draft.role, suggestedAiText(t, draft.ai)].filter(Boolean).join(" · "),
           }}
-          body={lines.length > 0 ? <ProposalLines lines={lines} draft={draft} /> : undefined}
+          body={
+            delegated || lines.length > 0 ? (
+              <>
+                <DelegateNote d={delegate} />
+                {lines.length > 0 && <ProposalLines lines={lines} draft={draft} />}
+              </>
+            ) : undefined
+          }
           actions={
             decides ? (
               <>
@@ -564,6 +578,8 @@ export function AgentProposalCardView({
     );
   }
   // Created, refused or expired: one line. No one decided one that ran out: it expired at its deadline.
+  const byRightHand =
+    status === "created" && delegated && (delegate?.state === "approved" || delegate?.state === "undone");
   const ended =
     status === "created"
       ? t("actionCard.agentProposal.created")
@@ -578,12 +594,19 @@ export function AgentProposalCardView({
           <span className="small muted">{[`@${draft.handle}`, draft.role].filter(Boolean).join(" · ")}</span>
         </span>
       </span>
-      {why && <p>{why}</p>}
+      {byRightHand && delegate?.reason ? <p>{delegate.reason}</p> : why && <p>{why}</p>}
       {lines.length > 0 && <ProposalLines lines={lines} draft={draft} />}
-      <span className="small muted ac-iconline">
-        <Icon name="bolt" size={14} />
-        <span>{suggestedAiText(t, draft.ai)}</span>
-      </span>
+      {byRightHand && delegate?.state === "approved" ? (
+        <span className="small muted ac-iconline">
+          <Icon name="clock" size={14} />
+          <span>{delegateUndoLine(t, i18n.language, delegate, draft.name)}</span>
+        </span>
+      ) : (
+        <span className="small muted ac-iconline">
+          <Icon name="bolt" size={14} />
+          <span>{suggestedAiText(t, draft.ai)}</span>
+        </span>
+      )}
       {status === "created" && (card.agentId || routineLeft(card)) && (
         <div className="ac-acts">
           {card.agentId && (
@@ -613,6 +636,21 @@ export function AgentProposalCardView({
       )}
     </>
   );
+  if (byRightHand)
+    return (
+      <RequestDone
+        done={delegate?.state === "approved"}
+        label={title}
+        action={<DelegateUndo d={delegate} />}
+        more={{
+          label: t(delegate?.state === "approved" ? "rightHandApprovals.card.why" : "approval.seeDetails"),
+          content: details,
+        }}
+      >
+        <b>{draft.name}</b> · {delegated}
+        {delegate?.at && ` · ${whenAt(t, i18n.language, delegate.at)}`}
+      </RequestDone>
+    );
   return (
     <RequestDone done={status === "created"} label={title} more={{ label: t("approval.seeDetails"), content: details }}>
       {ended}: <b>{draft.name}</b>

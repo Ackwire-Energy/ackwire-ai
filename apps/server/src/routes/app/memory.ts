@@ -132,7 +132,7 @@ const Proposal = z
       .nullable()
       .openapi({
         description:
-          "`agent_settings`: each setting then (`from`) and proposed (`to`): `model` a model id; `ai_account` `{ brain, accountId }`; `budget` nano-USD a month or null (the workspace's default); `owner` a user id; `audience` `{ mode, userIds, roleIds }`; `channel_add` / `channel_remove` / `reply_mode` its seat in `channelId` (null: not in it, else whether it answers without a mention); `archive` true. `label`: names for ids.",
+          "`agent_settings`: each setting then (`from`) and proposed (`to`): `model` a model id; `ai_account` `{ brain, accountId }`; `budget` nano-USD a month or null (the workspace's default); `owner` a user id; `audience` `{ mode, userIds, roleIds }`; `channel_add` / `channel_remove` / `reply_mode` its seat in `channelId` (null: not in it, else whether it answers without a mention); `archive` / `delete` true (deleting is for good, ADR 0082). `label`: names for ids.",
       }),
     requestedBy: z
       .object({ userId: z.string(), name: z.string() })
@@ -641,6 +641,7 @@ export function memoryRoutes(deps: AppDeps) {
           finalText: decision === "accept" ? c.req.valid("json").text : undefined,
           pubsub: deps.adapters.pubsub,
           blobs: deps.extras?.artifacts?.blobs,
+          deletion: { hub: deps.extras?.sandbox?.machines?.hub ?? null, mail: deps.adapters.mail },
         });
         const [row] = await listProposals(db, actorId, orgId, { ids: [proposalId] });
         if (!row) throw new NotFoundError("Proposal not found");

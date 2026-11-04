@@ -21,6 +21,7 @@ import {
   queueWhereText,
   waitingFor,
 } from "@agenteschat/client/lib/computer-queue";
+import { badgeCount } from "@agenteschat/client/lib/unread";
 import {
   Button,
   Chip,
@@ -378,7 +379,7 @@ export function QueueButton({
         >
           <span className="cq-btn__label">{queueButtonText(t, q.data)}</span>
           <CountChip size="sm" className="cq-btn__count" aria-hidden="true">
-            {waiting > 99 ? "99+" : waiting}
+            {badgeCount(waiting)}
           </CountChip>
           {signal?.line && <span className="ac-visually-hidden">{signal.line}</span>}
         </Button>

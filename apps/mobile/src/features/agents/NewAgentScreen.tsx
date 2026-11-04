@@ -62,7 +62,7 @@ import { useFailed } from "../routines/hooks";
 import { proposedRoutineWhen } from "../routines/rule";
 import { chooseAction } from "../settings/parts";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
-import { PushedHeader, successHaptic, tapHaptic, useSurface } from "../shared/parts";
+import { goBack, PushedHeader, successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { BrainPickSheet } from "./BrainPickSheet";
 import { type FullLook, fullLook } from "./edit";
@@ -115,7 +115,7 @@ export function NewAgentScreen({
                   ? t("newAgent.proposalNoAccess")
                   : t("newAgent.proposalClosed")}
               </Text>
-              <Button variant="secondary" label={t("newAgent.backToChat")} onPress={() => router.back()} />
+              <Button variant="secondary" label={t("newAgent.backToChat")} onPress={() => goBack()} />
             </>
           )}
         </View>

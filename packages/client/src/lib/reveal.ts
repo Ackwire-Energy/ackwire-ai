@@ -140,7 +140,8 @@ export function wholeMarkdown(text: string, end: number) {
     i = readMark(text, i, scan);
     if (scan.open.length === 0) return wordEnd(text, i);
   }
-  return mark.at;
+  // The text already runs past the hold with no closing: a literal mark. Waiting at it froze the reveal there.
+  return i >= mark.at + MARKDOWN_HOLD_MAX ? end : mark.at;
 }
 
 /**

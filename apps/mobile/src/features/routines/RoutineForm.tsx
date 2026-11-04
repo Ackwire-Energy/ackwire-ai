@@ -77,7 +77,7 @@ import { setRoutineZone, useRoutineZone } from "./zone";
 
 type Open = "agent" | "target" | "mailbox" | "folder" | null;
 
-const close = () => (router.canGoBack() ? router.back() : router.replace("/routines"));
+const close = () => goBack("/routines");
 
 /** A zone as the form says it: "Horário de Brasília" (a friendly name) or the city. */
 const zoneLabel = (zone: string, locale: string) =>

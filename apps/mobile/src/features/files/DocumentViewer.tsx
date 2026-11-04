@@ -1,6 +1,5 @@
 import { type ArtifactDetail, useApi, useArtifact } from "@agenteschat/client";
 import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Platform, Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,7 +7,7 @@ import { WebView } from "react-native-webview";
 import { Button, IconButton, Text, ToastHost } from "@/ui";
 import { MessageText } from "../chat/MessageText";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
-import { MONO } from "../shared/parts";
+import { goBack, MONO } from "../shared/parts";
 import { useFileActions } from "./actions";
 import { type FileInfo, fileInfo } from "./logic";
 import { FileTile, useFileLine } from "./MessageFiles";
@@ -38,7 +37,7 @@ function Viewer({ id, version }: { id: string; version?: number }) {
   const detail = query.data;
   const actions = useFileActions(detail);
   const info = detail ? fileInfo(detail) : null;
-  const close = () => (router.canGoBack() ? router.back() : router.replace("/"));
+  const close = () => goBack();
   // A PDF is drawn in the web view on iOS only (Android's WebView has no PDF viewer).
   const pdf = info?.view === "pdf" && Platform.OS === "ios";
   const shows = info ? info.view === "markdown" || info.view === "text" || pdf : false;

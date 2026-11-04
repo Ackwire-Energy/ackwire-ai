@@ -20,7 +20,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "Voor wie het is",
         blocks: [
-          "Gemaakt voor jou of een klein team, zolang deze computer aanstaat. Voor een groter team, of een server die altijd aanstaat, installeer je agentes.chat op een server en kies je **Verbinden met mijn server** in de app. Je gegevens kunnen er later naartoe verhuizen.",
+          "Gemaakt voor jou of een klein team, zolang deze computer aanstaat. Voor een groter team, of een server die altijd aanstaat, [installeer je agentes.chat op een server](/help/install-on-a-server) en kies je **Verbinden met mijn server** in de app. Je gegevens kunnen er later naartoe verhuizen.",
         ],
       },
       {
@@ -515,6 +515,142 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
               "**Cursor blijft hangen op een oude login:** sluit Cursor af, verwijder de map `~/.mcp-auth` en koppel opnieuw.",
             ],
           },
+        ],
+      },
+    ],
+  },
+  "install-on-a-server": {
+    title: "agentes.chat op een server installeren",
+    summary: "Draai agentes.chat op je eigen server, gratis, voor je hele team. Eén opdracht zet alles klaar.",
+    sections: [
+      {
+        id: "need",
+        heading: "Wat je nodig hebt",
+        blocks: [
+          {
+            list: [
+              "Een server of VPS met 64-bit Linux, op x64 of arm64. Voor een klein team zijn 2 CPU's, 4 GB geheugen en 20 GB schijf een goed begin. Om het te proberen werkt ook een Mac met Docker Desktop, OrbStack of Colima.",
+              "Docker met Compose. Op Linux zet het installatieprogramma ze erop als ze ontbreken, nadat het heeft gevraagd.",
+              "Een manier om erbij te komen: een gratis Tailscale-account (de standaard, privé, zonder domein en zonder open poort), of een domein dat naar de server wijst, met poort 80 en 443 open.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "install",
+        heading: "Installeren",
+        blocks: [
+          "Voer op de server uit:",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh",
+          },
+          "Het installeert wat ontbreekt en stelt dan een paar vragen: hoe mensen erbij komen, e-mail, of deze server ook de computer van je agents is en of het anonieme gebruiksstatistieken stuurt. Enter neemt het voorgestelde antwoord. Het komt in `/opt/agentes` (`~/agentes` voor een gebruiker die Docker al kan gebruiken), en de eerste keer downloadt het ongeveer 2 GB.",
+          "Aan het eind toont het het adres van je server en een QR-code voor je telefoon. Het opnieuw uitvoeren kan geen kwaad: je instellingen blijven, en alleen wat ontbreekt wordt aangevuld.",
+          "Met Node.js 18 of nieuwer is `npx @agenteschat/setup` in een lege map dezelfde installatie. Zonder Node draait die vanuit de image van de app, in de huidige map, en eindigt met de opdrachten die de rest starten:",
+          {
+            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup',
+          },
+        ],
+      },
+      {
+        id: "reach",
+        heading: "Hoe mensen erbij komen",
+        blocks: [
+          {
+            list: [
+              "**Tailscale**, de standaard: privé HTTPS op `https://agentes.<jouw-tailnet>.ts.net`, alleen voor apparaten in je Tailscale-netwerk. Zet vóór de installatie MagicDNS en HTTPS aan op https://console.tailscale.com/admin/dns en maak een auth key op https://console.tailscale.com/admin/settings/keys, waar de installatie om vraagt.",
+              "**Een openbaar domein**: iedereen op internet kan het openen, bijvoorbeeld op `https://chat.example.com`. Laat het domein naar de server wijzen en open poort 80 en 443. De installatie haalt het certificaat op en vernieuwt het, en laat je je account maken voordat het domein online gaat.",
+              "**Alleen deze machine**: `http://localhost:3000`, om het op je eigen computer te proberen.",
+            ],
+          },
+          "Bij Tailscale verlaat de server je netwerk als zijn key verloopt, na 180 dagen. Om hem te houden, open je het menu **⋯** van de server op https://console.tailscale.com/admin/machines en kies je **Disable Key Expiry**.",
+          "Webhooks die routines starten, en AI-apps die vanaf hun eigen servers bellen, hebben een openbaar adres nodig. Bij Tailscale opent Funnel hetzelfde adres voor internet: voeg Funnel toe aan het beleid van je tailnet op https://console.tailscale.com/admin/acls en zet `TAILSCALE_FUNNEL=true` in `.env`, voer daarna `docker compose up -d` uit.",
+        ],
+      },
+      {
+        id: "owner",
+        heading: "Je account",
+        blocks: [
+          "Open het adres van je server en meld je aan: het eerste account wordt de eigenaar. Daarna gaat aanmelden dicht, en mensen komen erbij via een uitnodiging, vanuit **Instellingen\u00a0›\u00a0Leden en uitnodigingen**.",
+          "Bij Tailscale hebben de mensen die je uitnodigt ook je tailnet nodig. Nodig ze eerst uit op https://console.tailscale.com/admin/users en daarna in agentes.chat.",
+        ],
+      },
+      {
+        id: "email",
+        heading: "E-mail",
+        blocks: [
+          "Zonder e-mail schrijft agentes.chat elke e-mail in zijn log in plaats van hem te versturen, dus een uitnodigingslink kun je daar nog kopiëren. Wachtwoord herstellen blijft uit.",
+          {
+            code: "docker compose logs agentes | grep 'email (not sent'",
+          },
+          "De installatie neemt je eigen mailserver (SMTP) of een key voor een Resend-compatibele API, zoals MillionSend of Resend. E-mails komen van `ping@<domein van je server>`, tenzij je een andere afzender kiest, en dat domein moet geverifieerd zijn bij je e-mailprovider. Om het later in te stellen, voer je de installatie opnieuw uit.",
+        ],
+      },
+      {
+        id: "phone",
+        heading: "Je telefoon",
+        blocks: [
+          {
+            list: [
+              "Bij Tailscale installeer je de Tailscale-app op je telefoon en log je in op dezelfde tailnet.",
+              "Installeer de agentes.chat-app.",
+              "Scan de QR-code die de installatie toonde, of die in **Instellingen\u00a0›\u00a0Je account\u00a0›\u00a0Openen op je telefoon**, die je ook meteen inlogt.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "computers",
+        heading: "De computers van je agents",
+        blocks: [
+          "De installatie kan van deze server ook de computer van je agents maken, waar ze opdrachten uitvoeren, een browser gebruiken en hun bestanden bewaren. Ze vraagt het, en stelt ja voor waar de server het goed kan. Op Linux krijgt elke agent een eigen gebruiker, met een scherm. Zei je nee, voer de installatie dan opnieuw uit met `--computer yes`:",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
+          },
+          "Meer computers, zoals een Mac met de agentes.chat-app of een andere server, koppel je via **Instellingen\u00a0›\u00a0Computers**, zoals in [Computers voor je agents](/help/computers). Bij Tailscale komen ze eerst in je tailnet.",
+        ],
+      },
+      {
+        id: "backups",
+        heading: "Back-ups en herstellen",
+        blocks: [
+          "Je server bestaat uit drie dingen: de database, de geüploade bestanden en `AGENTES_SECRET` in `.env`. Bewaar een kopie van `.env` op een veilige plek, los van de back-ups: zonder het secret zijn de keys in een herstelde database niet te lezen.",
+          "Voor elke dag een back-up maak je een privé bucket op Cloudflare R2 of een andere S3-compatibele opslag, en een key die erin kan lezen, schrijven en verwijderen. Zet ze in `.env`, met `backup` in `COMPOSE_PROFILES` (`https,backup` met een openbaar domein):",
+          {
+            code: "S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com\nS3_ACCESS_KEY_ID=…\nS3_SECRET_ACCESS_KEY=…\nS3_BACKUP_BUCKET=agentes-backups\nCOMPOSE_PROFILES=tailscale,backup",
+          },
+          "Voer daarna `docker compose up -d` uit in de installatiemap. De database wordt om 03:00 UTC gedumpt en elke dump blijft 14 dagen. `docker compose run --rm backup now` maakt er meteen een, en `docker compose run --rm backup list` toont ze. De dumps bevatten alleen de database: de geüploade bestanden, in het volume `files`, hebben een eigen kopie nodig, en de volledige handleiding hieronder heeft de opdrachten.",
+          "Om te herstellen haal je een dump op met `docker compose run --rm -T backup fetch <naam> > agentes.dump` en laad je die in een lege database, met de app gestopt:",
+          {
+            code: "docker compose stop agentes\ndocker compose exec -T postgres dropdb -U agentes --force agentes\ndocker compose exec -T postgres createdb -U agentes agentes\ndocker compose exec -T postgres pg_restore -U agentes -d agentes --exit-on-error < agentes.dump\ndocker compose start agentes",
+          },
+          "Herstel in de versie die de dump maakte, of in een nieuwere.",
+        ],
+      },
+      {
+        id: "upgrades",
+        heading: "Updates",
+        blocks: [
+          "Voer in de installatiemap uit:",
+          {
+            code: "curl -fsSLO https://agentes.chat/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
+          },
+          "De database werkt zichzelf bij als de nieuwe versie start. Houd je instellingen in `.env` en bewerk `docker-compose.yml` nooit, want elke update vervangt het. Maak een back-up vóór een grote sprong: een database die een nieuwere versie heeft bijgewerkt, opent niet in een oudere.",
+        ],
+      },
+      {
+        id: "data",
+        heading: "Wat het verstuurt",
+        blocks: [
+          "Eén keer per dag stuurt de server agentes.chat anonieme gebruiksstatistieken: aantallen zoals mensen, agents, grootte van de machines, gebruikte AI-tokens en hoeveel data de browsers van de agents versturen en ontvangen. Nooit berichten, bestanden, namen of sites. `docker compose run --rm agentes telemetry` toont precies wat er verstuurd zou worden. De eigenaar zet het uit in **Instellingen\u00a0›\u00a0Algemeen**, of met `TELEMETRY=off` in `.env`.",
+          "Foutrapporten gaan nergens heen, tenzij je `SENTRY_DSN` instelt op een Sentry-compatibele server die je zelf kiest. Een rapport bevat de fout en waar die gebeurde, nooit berichten, e-mails, IP-adressen, cookies of tokens.",
+        ],
+      },
+      {
+        id: "reference",
+        heading: "De volledige handleiding",
+        blocks: [
+          "Alle instellingen, een eigen proxy zoals nginx, draaien zonder Docker, een draaiboek voor AI-agents die het zelf installeren en wat je doet als iets misgaat staan in `SELF_HOSTING.md`, in de repository van agentes.chat.",
         ],
       },
     ],

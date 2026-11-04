@@ -149,6 +149,11 @@ export const NOTIFICATION_KINDS = [
    */
   "computer_no_chrome",
   /**
+   * Someone other than the agent's owner took control of its desktop (ADR 0059 §8): its owner, once a day per agent,
+   * the person as actor, `source.agentId` and its name in `source.label`. Inbox only (no category, no push).
+   */
+  "desktop_taken",
+  /**
    * An AI app connected as the person created agents, routines, skills, memories or channels for them (ADR 0119):
    * one row per connection merging while unread, `latest.title` the app's name and `latest.created` how many of each
    * kind; `source.agentId` or `source.routineId` the newest one it opens. Inbox only.
@@ -188,6 +193,30 @@ export const NOTIFICATION_KINDS = [
    * Waiting; done once someone decides it.
    */
   "change_request",
+  /**
+   * A person's monthly AI limit (ADR 0141), `source.userId` the person, `latest.statusTo` what happened: `warning`
+   * (the person, at 80%), `reached` (who decides, with `limitUsd`, `limitFrom`, `runs` and the agent most used in
+   * `title` with its `share`; `reached_notify` to the person when the limit only notifies), `request` (who decides,
+   * waiting, with `raiseToUsd`: "Aumentar para US$ X este mês" or "Recusar"), `raised` or `refused` (the person,
+   * from who answered). The person's own rows carry percentages only.
+   */
+  "usage_limit",
+  /**
+   * "Quem aprova por mim" (ADR 0139): the person chosen to cover someone hears it (`latest.statusTo` the mode,
+   * `always` or `while_out`, and `latest.expiresAt` its end), and the covered person hears when the cover said no
+   * (`declined`) or an admin ended it (`ended`). The covered person or who ended it is the actor. Inbox only.
+   */
+  "approval_cover",
+  /**
+   * The right hand approved a card for this person (ADR 0139 §2): one row a day while unread, `count` how many,
+   * `latest.title` the newest one's agent, `source.agentId` the right hand (its name in `label`). Inbox only.
+   */
+  "right_hand_decided",
+  /**
+   * The right hand stopped deciding for this person: three of its decisions undone in a week (ADR 0139 §2). Waiting
+   * until they turn it back on, so it reaches their devices.
+   */
+  "right_hand_paused",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -282,6 +311,15 @@ export interface NotificationLatest {
   failures?: RunFailure[];
   /** `run_failed` on a computer brain: the plan's name its cause may name ("the Claude account was disconnected"). */
   plan?: string;
+  /** `usage_limit`: the share of the person's limit used. */
+  percent?: number;
+  /** `usage_limit` to who decides: the limit, what "Aumentar" raises it to, where it comes from, this month's requests. */
+  limitUsd?: number;
+  raiseToUsd?: number;
+  limitFrom?: string;
+  runs?: number;
+  /** `usage_limit`: the share of the requests made with the agent in `title`. */
+  share?: number;
 }
 
 /** A run that failed, as its `run_failed` row lists it: `key` its agent and conversation, the rest its source. */
@@ -342,6 +380,8 @@ const MERGING: ReadonlySet<NotificationKind> = new Set([
   "skill_update",
   // An agent's skipped catch-ups of one line gather in one row while unread, counting them.
   "catch_up_closed",
+  // The day's decisions the right hand made for the person, one row while unread.
+  "right_hand_decided",
 ]);
 /** "Menções" in the inbox: what was said to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_reply", "agent_question"];

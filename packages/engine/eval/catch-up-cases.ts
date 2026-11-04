@@ -633,3 +633,17 @@ export function fooledAnswers(c: CatchUpCase, s: TriageSnapshot): Record<string,
   }
   return out;
 }
+
+/**
+ * What the real Jev answered on "olvídalo, ya lo reinicié yo" and "もう大丈夫です、自分で作りました": sure the asker
+ * is the source, its certainty split between solved and not_needed (neither alone at the bar).
+ */
+export function splitAnswers(s: TriageSnapshot, who?: string): Record<string, JudgeAnswer> {
+  const out: Record<string, JudgeAnswer> = {};
+  for (const a of s.askers) {
+    const key = s.participants.find((p) => p.name === (who ?? a.name))?.key ?? "nobody";
+    out[`status_${a.key}`] = { choice: "solved", probabilities: { needs_agent: 0.04, solved: 0.5, not_needed: 0.46 } };
+    out[`who_${a.key}`] = { choice: key, probabilities: { [key]: 0.97 } };
+  }
+  return out;
+}

@@ -21,6 +21,7 @@ import { STORED } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import { Chip, EmptyState, Icon, LargeTitleScreen, LIST_PREVIEW, ListRow, PixelOrbit, SectionHeader, Text } from "@/ui";
 import { CollapsibleSection, useCollapsedSections } from "../chats/HomeSection";
+import { usePins } from "../chats/pins";
 import { useMachineOutages } from "../outages/queries";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
@@ -145,14 +146,15 @@ export function AgentsScreen() {
 function FreeSections({ free, groups, before }: { free: TeamLine[]; groups: AgentGroup[]; before: number }) {
   const { t } = useTranslation();
   const { collapsed, toggle } = useCollapsedSections<string>(STORED.agentGroupsCollapsed, null);
+  const pins = usePins();
   let shown = before;
   return (
     <>
-      {freeSections(free, groups).map(({ group, lines }) => {
+      {freeSections(free, groups, pins.pins.agents).map(({ group, lines, pinnedCount }) => {
         const first = shown;
         shown += lines.length;
         const rows = lines.map((l, i) => (
-          <AgentRow key={l.agent.id} line={l} divider={i > 0} live={first + i < LIVE_ROWS} />
+          <AgentRow key={l.agent.id} line={l} divider={i > 0} live={first + i < LIVE_ROWS} pinned={i < pinnedCount} />
         ));
         return group ? (
           <CollapsibleSection
@@ -183,7 +185,18 @@ function FreeSections({ free, groups, before }: { free: TeamLine[]; groups: Agen
  * request), what it is on (its line when it has one, ADR 0084; since when), or its role in plain words (when you
  * last talked).
  */
-function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean; live: boolean }) {
+function AgentRow({
+  line: l,
+  divider,
+  live,
+  pinned = false,
+}: {
+  line: TeamLine;
+  divider: boolean;
+  live: boolean;
+  /** On top of Livres ("Fixar no topo"): a small pin after the name. */
+  pinned?: boolean;
+}) {
   const { t } = useTranslation();
   const c = useColors();
   const when = useWhen();
@@ -223,6 +236,7 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
             : computer !== undefined
               ? t("mobile.outage.rowWaitingLabel", { name: a.name, computer })
               : a.name,
+        pinned ? t("sidebarPins.pinned") : null,
         a.role.trim() || null,
         time,
         computer !== undefined ? null : sub || null,
@@ -244,6 +258,7 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
           <Text variant="title" numberOfLines={1} style={styles.name}>
             {a.name}
           </Text>
+          {pinned ? <Icon name="pin" size={14} color={c.faint} /> : null}
           {a.role.trim() ? (
             <View style={styles.role}>
               <Chip label={a.role.trim()} />

@@ -1,13 +1,25 @@
-import { afterEach, describe, expect, setSystemTime, spyOn, test } from "bun:test";
+import { afterEach, describe, expect, mock, setSystemTime, spyOn, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { BROWSER_STUCK_MS, type BrowserHandoff } from "@agenteschat/client";
-import { icons } from "@agenteschat/ui";
+/** noVNC as the screen drives it, connected to nothing. */
+mock.module("@novnc/novnc", () => ({
+  default: class {
+    addEventListener() {}
+    sendKey() {}
+    clipboardPasteFrom() {}
+    focus() {}
+    disconnect() {}
+  },
+}));
+
+import { BROWSER_STUCK_MS, type BrowserHandoff, type SocketFactory } from "@agenteschat/client";
+import { icons, isApple } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { BrowserCard, titleKind } from "@/components/browser/BrowserCard";
 import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
+import { fakeSockets } from "./fake-socket";
 import { onScreen, renderApp, renderPage, screen, settle } from "./render";
 
 let untouch: (() => void) | undefined;
@@ -115,11 +127,10 @@ describe("a help request opens the agent's browser in its card", () => {
     // Nothing marked yet: the field says where to start, the line before it only its pointer.
     expect(field.placeholder).toBe("Toque num campo da página e digite aqui");
     expect(card.querySelector(".brw-tfield__to")?.textContent).toBe("");
-    // On touch "Abrir um site" stays in the bar, not the header.
-    expect(within(top).queryByRole("button", { name: "Abrir um site" })).toBeNull();
-    expect(
-      within(card.querySelector(".brw-tfield") as HTMLElement).getByRole("button", { name: "Abrir um site" }),
-    ).toBeTruthy();
+    // The address bar is always at the page's top, as a browser's own: nothing toggles it.
+    expect(card.querySelector(".brw-go")?.nextElementSibling?.classList.contains("brw-ac__body")).toBe(true);
+    expect(within(card).getByRole("textbox", { name: "Endereço do site" })).toBeTruthy();
+    expect(within(card).queryByRole("button", { name: "Abrir um site" })).toBeNull();
     // Desistir next to Pronto (the old "Não consegui" under the field is gone).
     expect(within(top).getByRole("button", { name: "Desistir" })).toBeTruthy();
     expect(within(card).queryByRole("button", { name: "Não consegui" })).toBeNull();
@@ -145,9 +156,14 @@ describe("a help request opens the agent's browser in its card", () => {
     expect([why.getAttribute("rows"), why.className]).toEqual(["1", "ac-input brw-ac__note"]);
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Voltar" })));
 
-    // Pronto takes an optional word for Ada (Enter sends), then hands back: the card folds away.
+    // Pronto is one quiet row: Ada asked nothing, so no note field until "Deixar um recado", and Pronto has the focus.
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Pronto" })));
     expect(card.textContent).toContain("Pronto. Algum recado para a Ada?");
+    expect(within(card).queryByRole("textbox", { name: "Recado para a Ada" })).toBeNull();
+    const row = card.querySelector(".brw-ac__back") as HTMLElement;
+    expect(document.activeElement === within(row).getByRole("button", { name: "Pronto" })).toBe(true);
+    // The word for Ada (Enter sends), then it hands back: the card folds away.
+    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Deixar um recado" })));
     const note = within(card).getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
     expect(document.activeElement === note).toBe(true);
     // The same note as on the screen: one line in the middle of its field that grows as it wraps, with no grip.
@@ -171,7 +187,35 @@ describe("a help request opens the agent's browser in its card", () => {
     expect(document.querySelector(".brw-ac")).toBeNull();
   });
 
-  test("with a mouse: no text bar (keys go to the page), Abrir um site in the header, Devolver asks for a note", async () => {
+  test("its window on the agent's screen and I may drive the screen: Abrir aqui opens the whole screen, not the page", async () => {
+    const { state, handoff } = seedRequest();
+    const api = createFakeApi(state);
+    const fake = fakeBrowserOf.get(api);
+    fake?.handoffs.set(handoff.id, handoff);
+    fake?.desktops.set(ADA_ID, { available: true, reason: null, running: true, canControl: true });
+    fake?.sameWindow.add(ADA_ID);
+    // The screen's sockets never connect here: what opens is the point, not the stream.
+    const realtime = fakeSockets();
+    const screens: string[] = [];
+    const createSocket: SocketFactory = (url) => {
+      if (!url.includes("/api/desktop")) return realtime.factory(url);
+      screens.push(url);
+      return { addEventListener() {}, close() {}, binaryType: "blob" } as unknown as ReturnType<SocketFactory>;
+    };
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api, createSocket });
+    await settle(6);
+    await act(async () => realtime.last().open());
+    await act(async () => fireEvent.click(within(waitingRequest()).getByRole("button", { name: "Abrir aqui" })));
+    await settle(6);
+    expect(state.calls.filter((c) => c.method === "browser.takeControl").map((c) => c.args)).toEqual([
+      [ORG_ID, HANDOFF_ID],
+    ]);
+    expect(screen().getByRole("dialog", { name: "Computador da Ada" })).toBeTruthy();
+    expect(document.querySelector(".brw-ac")).toBeNull();
+    expect(screens.at(-1)).toContain("mode=control");
+  });
+
+  test("with a mouse: no text bar (keys go to the page), the address bar with Colar on top, Devolver asks for a note", async () => {
     const { state, handoff } = seedRequest();
     const active: BrowserHandoff = { ...handoff, kind: "takeover", status: "active", controllerUserId: "u-walter" };
     const api = createFakeApi(state);
@@ -182,11 +226,41 @@ describe("a help request opens the agent's browser in its card", () => {
     expect(card.querySelector(".brw-type")).toBeNull();
     expect(within(card).queryByRole("textbox", { name: "Texto para a página" })).toBeNull();
     const top = card.querySelector(".brw-mf__top") as HTMLElement;
-    expect(within(top).getByRole("button", { name: "Abrir um site" })).toBeTruthy();
+    expect(within(card).queryByRole("button", { name: "Abrir um site" })).toBeNull();
+    const bar = card.querySelector(".brw-go") as HTMLElement;
+    expect(within(bar).getByRole("textbox", { name: "Endereço do site" })).toBeTruthy();
+    expect(within(bar).getByRole("button", { name: "Colar" }).getAttribute("title")).toBe(
+      "Colar na página o que você copiou",
+    );
     await act(async () => fireEvent.click(within(top).getByRole("button", { name: "Devolver" })));
     expect(card.textContent).toContain("Devolver à Ada");
-    expect(within(card).getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
+    expect(within(card).queryByRole("textbox", { name: "Recado para a Ada" })).toBeNull();
+    expect(within(card).getByRole("button", { name: "Deixar um recado" })).toBeTruthy();
     expect(within(top).queryByRole("button", { name: "Devolver" })).toBeNull();
+    // A quick hand back: Devolver alone, no note.
+    const row = card.querySelector(".brw-ac__back") as HTMLElement;
+    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Devolver" })));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "browser.done").map((c) => c.args)).toEqual([[ORG_ID, HANDOFF_ID]]);
+  });
+
+  test("a request that asked the person something opens the hand back with its note", async () => {
+    const { state, handoff } = seedRequest();
+    const asked: BrowserHandoff = {
+      ...handoff,
+      instructions: "Entrar no painel e me dizer qual plano aparece?",
+      status: "active",
+      controllerUserId: "u-walter",
+    };
+    const api = createFakeApi(state);
+    fakeBrowserOf.get(api)?.handoffs.set(handoff.id, asked);
+    await renderPage(<BrowserCard agentId={ADA_ID} name="Ada" handoff={asked} canTakeOver />, { api, org: true });
+    await settle(6);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    await act(async () => fireEvent.click(within(card).getAllByRole("button", { name: "Pronto" })[0] as HTMLElement));
+    const note = within(card).getByRole("textbox", { name: "Recado para a Ada" });
+    expect(document.activeElement === note).toBe(true);
+    expect(within(card).queryByRole("button", { name: "Deixar um recado" })).toBeNull();
   });
 });
 
@@ -296,7 +370,10 @@ describe("the card in the message", () => {
         );
     // The card sends a drag's moves every 25 ms: this waits for them.
     const flushed = () => act(() => new Promise((r) => setTimeout(r, 40)));
-    return { card, page, img, sentToPage, flushed };
+    /** The input frames sent since, each as its events. */
+    const frames = () =>
+      (socket.sent.slice(before) as Sent[]).filter((f) => f.type === "browser.input").map((f) => f.events ?? []);
+    return { card, page, img, sentToPage, flushed, frames };
   }
   const pointer = (pointerId: number, x: number, y: number, pointerType = "mouse") => ({
     pointerId,
@@ -464,6 +541,67 @@ describe("the card in the message", () => {
     await act(async () => fireEvent.pointerDown(page, { ...pointer(5, 100, 100, "touch"), isPrimary: true }));
     await act(async () => fireEvent.pointerMove(page, pointer(5, 130, 100, "touch")));
     expect(sentToPage().slice(5)).toEqual(["moved+none@200,200", "pressed@200,200", "moved+left@260,200"]);
+  });
+
+  const pasteOn = (el: Element, text: string) =>
+    act(
+      async () =>
+        void fireEvent.paste(el, { clipboardData: { getData: (type: string) => (type === "text/plain" ? text : "") } }),
+    );
+  const toast = () => [...document.querySelectorAll(".ac-toast")].at(-1)?.textContent ?? null;
+
+  test("the person's paste keys paste their text into the page's field as text, in pieces a frame carries", async () => {
+    const { page, frames } = await inControlOfPage("dialog");
+    await act(async () => page.focus());
+    // ⌘V (Ctrl+V elsewhere) is the browser's own paste: not sent as keys, not stopped, into the field nobody sees.
+    const keys = isApple() ? { metaKey: true } : { ctrlKey: true };
+    expect(fireEvent.keyDown(page, { key: "v", code: "KeyV", ...keys })).toBe(true);
+    const field = page.querySelector("textarea.brw-paste") as HTMLTextAreaElement;
+    expect(document.activeElement).toBe(field);
+    expect(frames()).toEqual([]);
+    await pasteOn(field, "Olá, ação: 日本 😀\r\nfim");
+    expect(frames()).toEqual([[{ kind: "text", text: "Olá, ação: 日本 😀\nfim" }]]);
+    // The page has the keys again.
+    expect(document.activeElement).toBe(page);
+    // Longer than one event carries: pieces of 10,000, each in a frame of its own, an emoji never split.
+    const long = `${"x".repeat(9_999)}😀${"y".repeat(12_000)}`;
+    await pasteOn(page, long);
+    const pieces = frames()
+      .slice(1)
+      .map((f) => f.map((e) => (e as { text: string }).text));
+    expect(pieces.map((f) => f.length)).toEqual([1, 1, 1]);
+    expect(pieces.flat().join("")).toBe(long);
+    expect(pieces.flat()[0]).toBe("x".repeat(9_999));
+    // No text (a picture), or more than the computer takes: said, nothing sent.
+    await pasteOn(page, "");
+    expect(toast()).toBe("No computador da Ada só dá para colar texto.");
+    await pasteOn(page, "x".repeat(262_144));
+    expect(toast()).toContain("No máximo 256 KB.");
+    expect(frames()).toHaveLength(4);
+  });
+
+  test("Colar pastes the person's clipboard where their browser lets the page read it, else says how", async () => {
+    const { card, page, frames } = await inControlOfPage("dialog");
+    const colar = within(card.querySelector(".brw-go") as HTMLElement).getByRole("button", { name: "Colar" });
+    const real = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    let readText: () => Promise<string> = async () => "senha-de-teste";
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { readText: () => readText() } });
+    try {
+      await act(async () => fireEvent.click(colar));
+      await settle(2);
+      expect(frames()).toEqual([[{ kind: "text", text: "senha-de-teste" }]]);
+      expect(document.activeElement).toBe(page);
+      readText = () => Promise.reject(new DOMException("Read permission denied.", "NotAllowedError"));
+      await act(async () => fireEvent.click(colar));
+      await settle(2);
+      expect(toast()).toBe(
+        `O navegador não deixou ler o que você copiou. Use ${isApple() ? "⌘V" : "Ctrl+V"} na página.`,
+      );
+      expect(frames()).toHaveLength(1);
+    } finally {
+      if (real) Object.defineProperty(navigator, "clipboard", real);
+      else delete (navigator as { clipboard?: unknown }).clipboard;
+    }
   });
 
   test("its Chrome on the agent's desktop: Ver a tela inteira over the page, and in the frame's top in control", async () => {

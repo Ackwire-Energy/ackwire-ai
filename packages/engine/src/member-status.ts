@@ -2,6 +2,7 @@ import type { Presence, PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, schema } from "@agenteschat/db";
 import { ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
+import { rerouteApprovals } from "./notification-producers";
 import { requirePermission } from "./organizations";
 
 /**
@@ -117,6 +118,8 @@ export async function setMyStatus(
     orgId,
     event: { type: "member.status", orgId, userId },
   });
+  // Out of office or back: whoever covers them gets (or gives back) what waits for them (ADR 0139).
+  if (set.availability !== undefined) await rerouteApprovals(deps, orgId, userId).catch(() => {});
 }
 
 /**

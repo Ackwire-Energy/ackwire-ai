@@ -86,6 +86,24 @@
     "fromAdmin": "来自“管理员”",
     "viaAdmin": "全部，作为管理员",
     "nothing": "无",
+    "computer": {
+      "title": "智能体的电脑",
+      "levels": {
+        "none": "无",
+        "browser": "仅浏览器",
+        "full": "整台电脑"
+      },
+      "every": {
+        "none": "仅限所有人已能做的",
+        "browser": "任何智能体的浏览器和登录请求，绝不包括整个屏幕或终端",
+        "full": "任何智能体的整个屏幕、控制和终端"
+      },
+      "own": {
+        "none": "任何人都不能查看或使用智能体的电脑、浏览器或登录请求",
+        "browser": "自己智能体的浏览器和发给本人的登录请求，绝不包括整个屏幕",
+        "full": "自己智能体以及本人连接的电脑的整个屏幕和终端"
+      }
+    },
     "everyoneNote": "适用于工作区中的每位成员。其他角色只会在此基础上增加权限。",
     "summary": {
       "owner": "始终可以做所有事。每个工作区至少有一位所有者。",
@@ -244,6 +262,24 @@
       "desc": "控制它们的桌面和浏览器。",
       "short": "接管屏幕",
       "say": "接管智能体的屏幕"
+    },
+    "control_browsers": {
+      "title": "使用智能体的浏览器",
+      "desc": "查看和控制任何智能体的浏览器，并处理登录请求。",
+      "short": "使用智能体的浏览器",
+      "say": "使用智能体的浏览器"
+    },
+    "own_computers": {
+      "title": "使用自己智能体的电脑",
+      "desc": "本人负责的智能体以及本人连接的电脑的整个屏幕和终端。",
+      "short": "使用自己智能体的电脑",
+      "say": "使用自己智能体的电脑"
+    },
+    "own_browsers": {
+      "title": "使用自己智能体的浏览器",
+      "desc": "本人负责的智能体的浏览器，以及发给本人的登录请求。",
+      "short": "使用自己智能体的浏览器",
+      "say": "使用自己智能体的浏览器"
     },
     "manage_connectors": {
       "title": "连接应用",
@@ -1055,6 +1091,7 @@
     "copyText": "复制文本",
     "textCopied": "文本已复制。",
     "copyLink": "复制链接",
+    "openComputer": "打开电脑",
     "linkCopied": "链接已复制。",
     "saveToWiki": "保存到 Wiki",
     "pin": "置顶消息",
@@ -1094,6 +1131,63 @@
     "none": {
       "terms": "此服务器没有服务条款页面",
       "privacy": "此服务器没有隐私政策页面"
+    }
+  },
+  "approvalCover": {
+    "title": "谁替我审批",
+    "subtitle": "以你的名义决定发给你的请求，绝不决定此人自己提出的请求。",
+    "person": "成员",
+    "nobody": "无",
+    "when": "何时",
+    "whenHelp": "外出：你的状态显示外出时。",
+    "whileOut": "仅在我外出时",
+    "always": "始终",
+    "until": "截止",
+    "noDate": "无截止日期",
+    "clearDate": "移除日期",
+    "risky": "合并、部署和其他高风险操作",
+    "riskyOff": "关闭时，这些只由你决定。",
+    "riskyOn": "开启时，这些也由此人决定。",
+    "lock": "始终由你决定：资金、成员与角色、AI 密钥、你的邮箱和删除。",
+    "coveringTitle": "你替这些人审批",
+    "coveringSubtitle": "发给这些人的请求也会发给你，由你以他们的名义决定。绝不包括你自己提出的请求。",
+    "coveringWhileOut": "此人外出时",
+    "coveringUntil": "截至 {{date}}",
+    "coveringNow": "正在代审",
+    "decline": "不再代审",
+    "failed": "无法保存，请重试。"
+  },
+  "rightHandApprovals": {
+    "title": "{{name}} 替你审批",
+    "subtitle": "只处理来自你自己请求的事项。不会批准的，转交给你。",
+    "newAgents": "创建其他智能体提议的智能体",
+    "newAgentsHelp": "不含应用，只在公开频道。24 小时内可撤销。",
+    "agentChanges": "更改智能体的模型、预算和频道",
+    "agentChangesHelp": "模型只能在同一个 AI 账号内更换。",
+    "cantDecide": "你目前不能决定这个",
+    "budget": "每个智能体的额外预算",
+    "budgetHelp": "超过这个金额，请求会交给你。",
+    "perMonth": "/月",
+    "guidanceLabel": "{{name}} 如何替你决定",
+    "guidanceHelp": "{{name}} 决定前会先读这些。可选。",
+    "guidancePlaceholder": "例如: 不要重复的智能体\n新智能体只用便宜的模型\n绝不进客户频道",
+    "paused": "已暂停: 你本周撤销了它的 3 个决定。随时可以重新打开。",
+    "card": {
+      "deciding": "{{name}} 正在代 {{for}} 审阅…",
+      "approved": "由 {{name}} 代 {{for}} 批准",
+      "passed": "{{name}} 已转交给你",
+      "passedWhy": "{{name}} 已转交给你：{{reason}}",
+      "outside": "超出你允许 {{name}} 批准的范围",
+      "own": "{{name}} 不决定自己的请求",
+      "limit": "{{name}} 已达今日上限：这个由你决定",
+      "undoneByYou": "已由你撤销",
+      "undoneBy": "已由 {{name}} 撤销",
+      "why": "为什么？",
+      "undo": "撤销",
+      "undoArchives": "撤销会归档 {{name}}。有效期至 {{until}}。",
+      "undoSettings": "撤销会恢复设置。有效期至 {{until}}。",
+      "approvedForYou": "由 {{name}} 代你批准",
+      "decidingForYou": "{{name}} 正在代你审阅…"
     }
   },
   "noticePrefs": {
@@ -1183,14 +1277,14 @@
       "drive": "文件、报告和表格",
       "routines": "智能体按时自己完成的工作",
       "calendar": "会议和截止日期",
-      "forum": "当一个决定需要多方意见时"
+      "forum": "当一个决定需要多方意见时",
+      "team": "谁是谁：成员、智能体及其分组"
     },
     "customizeSidebar": "自定义侧边栏",
     "sidebarMenu": {
       "title": "侧边栏",
       "newChannel": "新建频道",
       "addToChannels": "新建频道或分类",
-      "addToDms": "新消息或智能体",
       "newMessage": "新消息",
       "addMembers": "添加成员或智能体",
       "channelSettings": "频道设置",
@@ -1306,7 +1400,45 @@
     "delete": "删除分组",
     "deleteTitle": "删除分组 {{name}}？",
     "deleteText": "其中的智能体会回到“智能体”。",
-    "dropHere": "把智能体拖到这里"
+    "dropHere": "把智能体拖到这里",
+    "moved": "{{name}} 已移到分组“{{group}}”",
+    "movedOut": "{{name}} 已离开分组“{{group}}”",
+    "undo": "撤销"
+  },
+  "sidebarAgents": {
+    "options": "智能体选项",
+    "add": "新建智能体或分组",
+    "order": "顺序",
+    "sort": {
+      "workspace": "工作区的顺序",
+      "mine": "我的优先",
+      "working": "工作中优先"
+    },
+    "showAll": "显示不与我对话的智能体",
+    "collapseAll": "全部收起",
+    "expandAll": "全部展开",
+    "organize": "在团队中整理分组",
+    "seeAll_other": "查看全部 {{count}} 个智能体",
+    "createFirst": "创建第一个智能体",
+    "working_other": "{{count}} 个工作中",
+    "count_other": "{{count}} 个智能体",
+    "workingIn": "正在 #{{channel}} 工作",
+    "talksOnly": "只与 {{name}} 对话",
+    "talksOnlyMore_other": "只与 {{name}} 和另外 {{count}} 人对话",
+    "changeGroup": "更换分组",
+    "newGroupWith": "与 {{name}} 新建分组",
+    "dmsEmpty": "你与成员的对话会显示在这里。"
+  },
+  "sidebarPins": {
+    "pin": "置顶",
+    "unpin": "取消置顶",
+    "pinned": "已置顶",
+    "hint": "你的智能体会保持在顶部。右键点击任意对话即可置顶。",
+    "full": {
+      "agents": "你已置顶 5 个智能体。取消一个才能置顶这个。",
+      "channels": "你已置顶 5 个频道。取消一个才能置顶这个。",
+      "people": "你已置顶 5 个人。取消一个才能置顶这位。"
+    }
   },
   "openOnPhone": {
     "qr": "用于登录 agentes 应用的二维码",
@@ -1460,7 +1592,6 @@
       "thinking": "思考中",
       "writing": "撰写中"
     },
-    "autoReplyChip": "无需提及即回复",
     "more": "更多消息操作",
     "copyLink": "复制链接",
     "linkCopied": "链接已复制。",
@@ -1544,12 +1675,13 @@
     "typing_other": "{{names}} 正在输入…",
     "callAgent": "呼叫智能体",
     "callAgentMenu": "这个频道中的智能体",
-    "newMessages": "新消息",
+    "toLatest": "前往最新消息",
     "newPill": {
-      "label": "新消息：{{text}}",
+      "label": "前往最新消息：{{text}}",
       "count_other": "{{count}} 条新消息",
       "more": "{{names}} 等另外 {{count}} 位",
-      "writing": "{{name}} 正在撰写"
+      "writing": "{{name}} 正在撰写",
+      "mentionsYou": "有人提及了你"
     },
     "unreadDivider": "新",
     "offline": "没有网络连接。你发送的内容会在恢复连接后自动发出。",
@@ -1695,6 +1827,7 @@
         "budget": "只有管理员能更改智能体的预算",
         "owner": "只有管理员能更改智能体的负责人",
         "archive": "只有管理员能归档智能体",
+        "delete": "只有管理员能删除智能体",
         "audience": "只有管理员和负责人能更改谁能和它交谈",
         "channels": "只有管理员和负责人能更改它的频道",
         "ai_account": "只有账户所有者能分配它",
@@ -1719,9 +1852,19 @@
       "somePeople": "部分人",
       "active": "启用",
       "archived": "已归档",
+      "deleted": "已删除",
       "notIn": "不在频道中",
       "withoutMention": "自主回复",
       "mentionOnly": "仅在被提及时"
+    },
+    "remove": {
+      "archiveTitle_other": "归档 {{count}} 个智能体？",
+      "deleteTitle_other": "永久删除 {{count}} 个智能体？",
+      "archiveAll": "全部归档",
+      "deleteAll": "全部删除",
+      "archiveSome_other": "归档 {{count}} 个",
+      "deleteSome_other": "删除 {{count}} 个",
+      "deleteHelp": "它们的指令、记忆和例行任务会被永久删除。消息会保留。"
     }
   },
   "routing": {
@@ -1970,11 +2113,15 @@
     "extraHint": "如果套餐开启了额外用量，长时间工作在超过 95% 后仍会继续。关闭时，会在 95% 时暂停，并在套餐重置后继续。"
   },
   "usageQueue": {
-    "title_other": "{{agent}} 有 {{count}} 个对话待继续",
-    "line": "{{plan}} 套餐在{{when}}重置后继续。一次一个，按这个顺序。",
-    "lineUnknown": "{{plan}} 套餐一重置就继续。一次一个，按这个顺序。",
-    "lineBudget": "预算在{{when}}更新后继续，管理员提高预算则会更早。一次一个，按这个顺序。",
-    "shared": "这个队列属于套餐：{{agents}} 共用同一个账号。",
+    "back": "{{agent}} {{when}}回来",
+    "backPlan": "{{agent}} 会在套餐重置后回来",
+    "backBudget": "{{agent}} 会在预算更新后回来",
+    "resuming": "{{agent}} 正在继续",
+    "shared_other": "{{agents}} 也在用同一个 {{plan}} 套餐。所有对话都进入同一个队列。",
+    "about": "关于队列",
+    "lists": "对话",
+    "queuedTab": "排队中",
+    "skippedTab": "已跳过",
     "dm": "与 {{name}} 的私信",
     "yourDm": "你的私信",
     "thread": "#{{channel}} 中的话题",
@@ -1982,25 +2129,20 @@
     "work": "工作：{{name}}",
     "askedBy": "{{names}} 的请求 · {{ago}}",
     "paused": "已暂停 · {{ago}}",
-    "after_other": "之后有 {{count}} 条消息",
-    "nothingAfter": "之后没有消息",
-    "wrote_other": "之后 {{names}} 发过消息",
-    "queued": "排队中",
     "answering": "正在回复",
-    "hidden_other": "+{{count}} 个在你看不到的对话里",
+    "hidden_other": "+{{count}} 个你看不到",
     "dontRunAll": "全部不运行",
-    "confirmAll_other": "不运行这 {{count}} 个对话？",
+    "confirmAll_other": "这 {{count}} 个都不运行？",
     "yesDontRun": "是，不运行",
     "keep": "保留",
-    "canceledAll_other": "已取消 {{count}} 个对话。限额恢复后 {{agent}} 不会再回复。",
-    "empty": "没有等待继续的内容。",
+    "canceledAll_other": "已取消 {{count}} 个对话。{{agent}} 不会回复。",
+    "empty": "没有在等套餐的对话。",
     "waiting_other": "{{count}} 个对话在等待",
-    "closedTitle_other": "{{count}} 个对话无需回复",
-    "closedWhy": "它们看起来已经解决，所以 {{agent}} 没有回复。",
-    "closedLine": "它们看起来已经解决，所以 {{agent}} 没有回复。如果还有需要回复的，请选择“仍然回复”。",
-    "seeConversation": "查看对话",
-    "answeredAnyway": "有人要求仍然回复",
-    "toResume": "待继续",
+    "skip_solved": "{{name}} 已经处理好了",
+    "skip_withdrawn": "{{name}} 说已经不需要了",
+    "skip_task_canceled": "{{name}} 取消了任务",
+    "skip_mixed": "已经解决了",
+    "answeredAnyway": "仍在回复",
     "switchAi": "更换 {{name}} 的 AI"
   },
   "actionCard": {
@@ -2334,6 +2476,7 @@
     "messageTo": "发给 {{name}} 的消息",
     "audienceEdit": "编辑",
     "nowIn": "正在 #{{channel}} 中",
+    "answersHere": "在这里无需 @ 也会回复",
     "more": "更多",
     "of": "{{name}} 的个人资料",
     "presence": "在线状态",
@@ -2432,6 +2575,8 @@
       "provider_down": "AI 服务商出现故障 · 会自动重试",
       "out_of_plan": "套餐额度已用完",
       "out_of_budget": "本月预算已用完",
+      "out_of_planShort": "额度已用完",
+      "out_of_budgetShort": "预算已用完",
       "backAt": "恢复：{{when}}",
       "work": "后台进行中：{{subject}}"
     },
@@ -2661,6 +2806,12 @@
     "outcomeApprovedByYou": "由你批准",
     "outcomeRefusedBy": "由 {{name}} 拒绝",
     "outcomeRefusedByYou": "由你拒绝",
+    "outcomeApprovedCovering": "由 {{name}} 代 {{for}} 批准",
+    "outcomeRefusedCovering": "由 {{name}} 代 {{for}} 拒绝",
+    "outcomeApprovedByYouCovering": "由你代 {{for}} 批准",
+    "outcomeRefusedByYouCovering": "由你代 {{for}} 拒绝",
+    "outcomeApprovedCoveringYou": "由 {{name}} 代你批准",
+    "outcomeRefusedCoveringYou": "由 {{name}} 代你拒绝",
     "refusedByYou": "由你拒绝 · {{when}}",
     "expiresIn": "{{time}}后过期",
     "expired": "已过期",
@@ -2873,6 +3024,7 @@
       "routineStalled": "<b>{{name}}</b> 正在等待电脑来运行例行工作",
       "agentUnreached": "一个例行工作无法叫到 <b>{{name}}</b>",
       "browserProfileRequest": "<b>{{name}}</b> 申请为 <b>{{agent}}</b> 再添加一个浏览器配置文件",
+      "desktopTaken": "<b>{{name}}</b> 接管了 <b>{{agent}}</b> 的电脑屏幕",
       "routineWaitingPlan": "<b>{{name}}</b> 正在等待套餐额度重置后运行例行工作",
       "planResetUnknown": "{{plan}} 没有说明额度何时重置。<b>{{name}}</b> 的工作仍在等待。",
       "catchUpClosed_other": "<b>{{name}}</b> 已恢复，并跳过了 {{count}} 个无需回复的对话",
@@ -2890,9 +3042,29 @@
       "joinSuggestion": "<b>{{by}}</b> 推荐了 <b>{{name}}</b>",
       "changeRequest": "<b>{{name}}</b> 请求更改 <b>{{agent}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> 请求新的智能体：<b>{{agent}}</b>",
+      "approvalCover": "<b>{{name}}</b> 在“谁替我审批”中选了你",
+      "approvalCoverDeclined": "<b>{{name}}</b> 不再替你审批",
+      "approvalCoverEnded": "<b>{{name}}</b> 取消了替你审批的人",
+      "rightHandDecided": "<b>{{name}}</b> 今天替你批准的请求：{{count}}",
+      "rightHandPaused": "<b>{{name}}</b> 已停止替你审批：你本周撤销了它的 3 个决定",
       "invitationAccepted": "<b>{{name}}</b> 接受了你的邀请并加入了 {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> 接受了你的邀请",
-      "reaction_other": "<b>{{names}}</b> 对你的消息发了表情回应"
+      "reaction_other": "<b>{{names}}</b> 对你的消息发了表情回应",
+      "usageLimitWarning": "本月你已用掉额度的 {{percent}}%",
+      "usageLimitReachedSelf": "你已达到本月的使用额度",
+      "usageLimitReached": "<b>{{name}}</b> 已达到 {{amount}} 的额度",
+      "usageLimitRequest": "<b>{{name}}</b> 已达到 {{amount}} 的额度并申请增加",
+      "usageLimitRaised": "<b>{{name}}</b> 提高了你本月的额度",
+      "usageLimitRefused": "<b>{{name}}</b> 拒绝了你增加使用的申请"
+    },
+    "usageLimit": {
+      "runs_other": "本月 {{count}} 次请求",
+      "top": "{{share}}% 用 {{agent}}",
+      "fromRole": "角色 {{role}} 的额度。",
+      "fromRaised": "本月已提高额度。",
+      "fromPerson": "为此人单独设定的额度。",
+      "fromDefault": "工作区的默认额度。",
+      "line": "{{runs}}。{{from}}"
     },
     "source": {
       "channel": "#{{name}}",
@@ -3704,6 +3876,7 @@
         "credential_wrong_provider": "模型来自 {{modelProvider}}，但密钥来自 {{keyProvider}}。",
         "model_unlisted": "OpenRouter 不再提供 {{model}}。请在智能体设置中选择其他模型。",
         "no_ai": "该智能体没有连接 AI。",
+        "person_limit": "提出请求的人已达到本月的使用额度。",
         "org_paused": "工作区的智能体已暂停。",
         "org_suspended": "工作区不可用。",
         "org_deleting": "工作区正在删除中。",
@@ -5401,6 +5574,7 @@
       "agent_archived": "智能体已归档",
       "interrupted": "因服务器重启而中断",
       "no_ai": "智能体未连接 AI",
+      "person_limit": "未运行:创建者已达到本月的使用额度",
       "org_paused": "未运行：工作区的智能体已暂停",
       "org_suspended": "未运行：工作区不可用",
       "org_deleting": "未运行：工作区正在被删除",
@@ -8227,6 +8401,7 @@
     },
     "recommended": "推荐",
     "free": "免费",
+    "opencodeFreeHint": "其他免费模型通过智能体电脑上的 OpenCode 运行。",
     "modelHelp": "模型越大，思考越多，套餐额度消耗也越快。",
     "hidden": "由 {{owner}} 或管理员选择思考方式。",
     "hiddenAdmins": "只有管理员可以选择思考方式。",
@@ -9652,6 +9827,13 @@
     "urlHelp": "以 postgres:// 开头。末尾的数据库名可以省略。加密保存在服务器上，之后没人能再看到，智能体也不能。",
     "urlPlaceholder": "postgres://user:password@host/db",
     "urlInvalid": "请粘贴以 postgres:// 开头的地址，或填写“高级”下的各项。",
+    "scope": "哪些数据库",
+    "scopeOne": "仅此数据库",
+    "scopeAll": "此服务器上的所有数据库",
+    "scopeAllHelp": "适合每个客户一个数据库的情况。智能体会看到列表，每次查询时选择一个数据库。",
+    "prefix": "仅名称以此开头的",
+    "prefixPlaceholder": "例如 customer_",
+    "prefixHelp": "留空表示全部。以此开头的新数据库会自动出现。",
     "howTitle": "如何创建只读用户？",
     "howText": "智能体只会执行查询，但只读用户能在数据库层面确保这一点。",
     "how": {
@@ -9686,11 +9868,13 @@
         "3": "拼出地址 postgres://agentes_leitura:password@server:5432/database，然后粘贴到这里。"
       }
     },
+    "howAll": "用于读取所有数据库（Postgres 14 或更新版本）。",
     "openPage": "打开 {{name}}",
     "dedicated": "提示：如果你有数据库的只读副本（replica），请连接那个副本。",
     "advancedText": "代替地址，或修改地址中的某项。",
     "host": "服务器",
     "database": "数据库",
+    "databaseOptional": "选择全部数据库时可不填。",
     "password": "密码",
     "passwordInvalid": "请输入数据库密码。",
     "ssl": "安全连接",
@@ -9707,10 +9891,22 @@
     },
     "connect": "连接",
     "connectedToast": "{{name}} 已连接。",
+    "connectedToastAll_other": "{{name}} 已连接，共 {{count}} 个数据库。",
+    "count_other": "{{count}} 个数据库",
+    "prefixRow": "以 {{prefix}} 开头的数据库",
+    "refresh": "刷新列表",
+    "refreshName": "刷新 {{name}} 的数据库列表",
+    "scopeEdit": "数据库",
+    "scopeEditName": "{{name}} 的数据库",
+    "scopeSaved": "{{name}} 已保存。",
+    "widenTitle": "开放整个服务器？",
+    "widenTitlePrefix": "开放更多数据库？",
+    "widenText_other": "有访问权限的 {{count}} 个智能体将可以读取此服务器上的所有数据库。可以在规则中按智能体限制。",
+    "widenTextPrefix_other": "有访问权限的 {{count}} 个智能体将可以读取所有以 {{prefix}} 开头的数据库。可以在规则中按智能体限制。",
     "testing": {
       "reach": "正在连接数据库…",
-      "tables": "正在查看数据表…",
-      "databases": "正在查看数据库…"
+      "databases": "正在查看数据库…",
+      "tables": "正在查看数据表…"
     },
     "canWrite": "这个用户可以更改数据。智能体本身只会读取，但最安全的做法是使用只读用户（创建方法见第 1 步）。",
     "toolsLead": "智能体在 {{name}} 中可以做什么。目前它们只读取，不会更改数据库中的任何内容。",
@@ -9749,22 +9945,22 @@
       "tablesLoading": "正在加载数据表…",
       "tablesError": "暂时无法读取数据表。",
       "tablesHelp": "不勾选 = 所有数据表。",
+      "tablesIn": "表（取自 {{database}}）",
+      "databases": "数据库",
+      "databasesAll": "全部",
+      "databasesSome": "仅这些",
+      "databasePlaceholder": "数据库名称",
+      "databasesHelp": "以下规则适用于此智能体读取的每个数据库。",
       "hidden": "永远看不到的列",
       "hiddenHelp": "格式为“表.列”，名称含大写字母、空格或符号时用双引号括起来（customers.\"Tax ID\"）。看起来像个人数据或密码的列，我们已经隐藏了。",
       "hiddenPlaceholder": "customers.cpf",
       "hiddenInvalid": "请输入 table.column（或 schema.table.column），名称含大写字母、空格或符号时用\"双引号\"括起来。",
       "cap": "每天查询次数",
       "capHelp": "留空 = 不限制。",
+      "capHelpAll": "留空 = 不限。按所有数据库合计。",
       "timeout": "每次查询的时间上限",
       "timeoutHelp": "超时的查询会被取消，以免给数据库造成负担。",
-      "seconds_other": "{{count}} 秒",
-      "databases": "数据库",
-      "databasesAll": "全部",
-      "databasesSome": "仅这些",
-      "databasePlaceholder": "数据库名称",
-      "databasesHelp": "以下规则适用于此智能体读取的每个数据库。",
-      "tablesIn": "表（取自 {{database}}）",
-      "capHelpAll": "留空 = 不限。按所有数据库合计。"
+      "seconds_other": "{{count}} 秒"
     },
     "agent": {
       "title": "数据库",
@@ -9774,28 +9970,7 @@
       "saved": "已保存 {{name}} 的数据库访问权限。",
       "allDatabases": "{{name}} 的所有数据库",
       "someDatabases_other": "{{name}} 的 {{count}} 个数据库"
-    },
-    "scope": "哪些数据库",
-    "scopeOne": "仅此数据库",
-    "scopeAll": "此服务器上的所有数据库",
-    "scopeAllHelp": "适合每个客户一个数据库的情况。智能体会看到列表，每次查询时选择一个数据库。",
-    "prefix": "仅名称以此开头的",
-    "prefixPlaceholder": "例如 customer_",
-    "prefixHelp": "留空表示全部。以此开头的新数据库会自动出现。",
-    "databaseOptional": "选择全部数据库时可不填。",
-    "connectedToastAll_other": "{{name}} 已连接，共 {{count}} 个数据库。",
-    "howAll": "用于读取所有数据库（Postgres 14 或更新版本）。",
-    "count_other": "{{count}} 个数据库",
-    "prefixRow": "以 {{prefix}} 开头的数据库",
-    "refresh": "刷新列表",
-    "refreshName": "刷新 {{name}} 的数据库列表",
-    "scopeEdit": "数据库",
-    "scopeEditName": "{{name}} 的数据库",
-    "scopeSaved": "{{name}} 已保存。",
-    "widenTitle": "开放整个服务器？",
-    "widenTitlePrefix": "开放更多数据库？",
-    "widenText_other": "有访问权限的 {{count}} 个智能体将可以读取此服务器上的所有数据库。可以在规则中按智能体限制。",
-    "widenTextPrefix_other": "有访问权限的 {{count}} 个智能体将可以读取所有以 {{prefix}} 开头的数据库。可以在规则中按智能体限制。"
+    }
   },
   "mail": {
     "choice": {
@@ -10558,7 +10733,7 @@
     "leadCloud": "你的智能体工作的地方：一台专属这个工作区、始终开机的电脑。",
     "about": "关于这台电脑",
     "how": "电脑如何运作",
-    "hostMissing": "这台服务器也可以作为智能体的电脑：步骤见 <code>SELF_HOSTING.md</code> 中的 “This server as the agents' computer”。",
+    "hostMissing": "这台服务器也可以作为智能体的电脑：<guide>查看方法</guide>。",
     "other": {
       "title": "其他电脑",
       "text": "通过代码连接，比如家里的 Mac mini 或另一台服务器。每台电脑允许做什么，在那台电脑上设置。",
@@ -11106,7 +11281,8 @@
       "billing": "套餐和账单",
       "media": "GIF 和贴纸",
       "voice": "语音",
-      "apps": "AI 应用"
+      "apps": "AI 应用",
+      "approvals": "审批"
     },
     "sectionText": {
       "account": "你的个人资料和应用外观。",
@@ -11120,13 +11296,14 @@
       "skills": "智能体在需要时打开的 Markdown 指令。",
       "keys": "你的套餐和工作区的 API 密钥。",
       "storage": "工作区文件的存放位置。",
-      "usage": "预算以及每个智能体本月的花费。",
+      "usage": "每个人和每个智能体的 AI 用量,以及本月的额度。",
       "audit": "智能体在对话之外做了什么，以及成员改了什么。仅管理员可见。",
       "import": "从其他应用或工作区导入智能体，也可以把这个工作区带到任何地方。",
       "billing": "此工作区的 agentes.chat 套餐、银行卡和发票在我们的一个独立页面上，不在应用内。",
       "media": "成员可以在对话中发送什么，以及智能体何时发送 GIF 或贴纸。",
       "voice": "对话中的语音消息，以及由谁把语音转成文字。",
-      "apps": "在 Claude、Cursor 和其他应用中向这个工作区的智能体分配任务。"
+      "apps": "在 Claude、Cursor 和其他应用中向这个工作区的智能体分配任务。",
+      "approvals": "智能体提出等待你审批的请求时，由谁替你决定。"
     },
     "title": "设置",
     "account": {
@@ -11301,6 +11478,147 @@
         "jev": "只有使用 Jev 时，智能体才会主动发送贴纸。",
         "jevLink": "设置 Jev"
       }
+    }
+  },
+  "peopleUsage": {
+    "tabs": {
+      "summary": "概览",
+      "people": "成员",
+      "mine": "你的用量"
+    },
+    "view": {
+      "usage": "用量",
+      "limits": "额度"
+    },
+    "title": "按成员查看用量",
+    "about": "你可以看到每个人用了多少、用了哪些智能体。私聊的内容永远不会出现在这里。",
+    "plansAbout": "套餐已付费。这个金额只用于比较成员之间的用量。",
+    "sub_other": "{{month}} · {{count}} 人 · AI 用量 {{amount}}",
+    "periodLabel": "时间段",
+    "period": {
+      "month": "本月",
+      "last7": "最近 7 天",
+      "last30": "最近 30 天",
+      "lastMonth": "上个月"
+    },
+    "role": "角色",
+    "roleAll": "角色:全部",
+    "agent": "智能体",
+    "agentAll": "智能体:全部",
+    "chips": {
+      "near": "接近额度",
+      "at": "已达额度",
+      "idle": "未使用"
+    },
+    "summary": {
+      "near": "{{n}} 人接近额度",
+      "at": "{{n}} 人已达额度",
+      "idle": "{{n}} 人在此期间未使用"
+    },
+    "export": "导出 CSV",
+    "limitsHint": "在额度中为每个人设定额度",
+    "empty": "本月还没有人使用智能体。",
+    "owner": "所有者",
+    "member": "成员",
+    "columns": {
+      "person": "成员",
+      "now": "现在",
+      "runs": "请求",
+      "agents": "最常用",
+      "usage": "本月",
+      "caresFor": "负责",
+      "created": "创建"
+    },
+    "now": {
+      "channel": "在 #{{channel}} 与 {{agent}}",
+      "private": "正在与 {{agent}} 私聊",
+      "hidden": "在私密频道与 {{agent}}",
+      "routine": "例行任务 {{name}}",
+      "last": "上次使用 {{when}}",
+      "never": "未使用"
+    },
+    "meter": {
+      "of": "/ {{limit}}",
+      "noLimit": "· 无额度",
+      "estimate": "按 API 计 ≈ {{amount}}"
+    },
+    "live": {
+      "title": "现在",
+      "routineOf": "{{name}} 的例行任务"
+    },
+    "from": {
+      "raised": "本月已提高",
+      "person": "为此人设定",
+      "role": "来自角色 {{role}}",
+      "default": "工作区默认"
+    },
+    "drawer": {
+      "limit": "本月额度:{{amount}}",
+      "noLimit": "本月没有使用额度。",
+      "reached": "{{date}} 达到额度 · 已用 {{used}}",
+      "used": "已用 {{used}} · {{percent}}%",
+      "raise": "提高额度",
+      "raiseTo": "本月新额度(US$)",
+      "raiseSave": "提高",
+      "raised": "已提高本月额度",
+      "asked": "已申请增加",
+      "days": "每日用量",
+      "agents": "用了哪些智能体",
+      "runs_other": "{{count}} 次请求",
+      "recent": "最近做了什么",
+      "untitled": "无标题",
+      "with": "与 {{agent}}",
+      "minutes": "{{n}} 分钟",
+      "private": "与 {{agent}} 的私聊",
+      "hidden": "在私密频道与 {{agent}}",
+      "routine": "例行任务 {{name}}",
+      "created": "创建的智能体",
+      "createdAt": "创建于 {{date}}",
+      "audit": "在审计中查看智能体的操作",
+      "noUse": "此期间没有用量。"
+    },
+    "limits": {
+      "title": "每人使用额度",
+      "lead": "每个人每月可使用的 AI 量,合计所有智能体。包括本人提出的请求和本人创建的例行任务。",
+      "default": "工作区默认",
+      "defaultHint": "适用于没有角色额度或例外的人。",
+      "byRole": "按角色",
+      "people": "例外",
+      "addPerson": "添加成员",
+      "useDefault": "使用默认",
+      "none": "无额度",
+      "amount": "每月额度",
+      "rule": "优先使用本人的额度。没有时取其角色中最高的额度。都没有时使用默认值。所有者没有额度。",
+      "whenTitle": "有人达到额度时",
+      "block": "智能体不再为此人开始新工作",
+      "notify": "只通知管理员",
+      "warn": "达到 80% 时提醒",
+      "warnHint": "本人会收到提醒,管理员会在 100% 时再收到一条。",
+      "saved": "额度已保存"
+    },
+    "mine": {
+      "title": "本月你已用掉额度的 {{percent}}%",
+      "noLimit": "你本月没有使用额度",
+      "renews": "将于 {{date}} 重置。",
+      "near": "接近额度,请向管理员申请增加。",
+      "recent": "你最近做了什么",
+      "ofLimit": "额度的 {{percent}}%"
+    },
+    "card": {
+      "title": "你已达到本月的使用额度",
+      "text": "将于 {{date}} 重置。如需现在继续,请联系管理员。",
+      "ask": "申请增加",
+      "asked": "已发送申请",
+      "see": "查看我的用量",
+      "other": "{{name}} 已达到本月的使用额度",
+      "raised": "{{name}} 提高了你本月的额度。可以继续了。",
+      "raisedOther": "{{name}} 提高了本月的额度",
+      "refused": "{{name}} 拒绝了申请。额度将于 {{date}} 重置。"
+    },
+    "actions": {
+      "raise": "本月提高到 {{amount}}",
+      "refuse": "拒绝",
+      "see": "查看用量"
     }
   },
   "usageViews": {
@@ -11850,6 +12168,7 @@
       "work_end_canceled": "{{minutes}} 分钟后停止。",
       "work_end_canceledBy": "{{minutes}} 分钟后由 {{name}} 停止。",
       "no_ai": "我暂时无法回答：我还没有连接 AI。",
+      "person_limit": "提出请求的人已达到本月的使用额度。如需现在继续,请联系管理员。",
       "no_ai_signed_out": "我暂时无法回答：我的 AI 已退出登录。",
       "no_ai_not_signed_in": "我暂时无法回答：{{brain}} 还没有在我的电脑上登录。",
       "action_connect_ai": "连接 AI",
@@ -12482,6 +12801,7 @@
       "noComputerCloud": "{{name}} 的电脑正在准备中。",
       "noComputerCloud_female": "{{name}} 的电脑正在准备中。",
       "forbidden": "你无法查看这个浏览器。",
+      "noRole": "你的角色无权访问智能体的浏览器。",
       "tooMany": "同时打开的浏览器太多。其他浏览器关闭后，这个就会显示。",
       "unavailable": "暂时无法显示浏览器，正在重试…",
       "closed": "{{name}} 的浏览器已关闭。",
@@ -12496,7 +12816,12 @@
       "subHidden": "{{person}} 正在控制 · 屏幕已隐藏",
       "full": "全屏",
       "fullExit": "退出全屏",
-      "goToggle": "打开网站",
+      "navBack": "后退",
+      "navForward": "前进",
+      "navReload": "重新加载页面",
+      "paste": "粘贴",
+      "pasteHint": "把你复制的内容粘贴到页面",
+      "pasteBlocked": "浏览器不允许读取你复制的内容。请在页面上使用 {{keys}}。",
       "goLabel": "网站地址",
       "goPlaceholder": "输入地址，例如 example.com",
       "go": "打开",
@@ -12512,6 +12837,7 @@
       "backLabel": "给 {{name}} 的备注",
       "backLabel_female": "给 {{name}} 的备注",
       "backPlaceholder": "可选：有什么需要 {{name}} 知道的吗？",
+      "addNote": "留个言",
       "backPlaceholder_female": "可选：有什么需要 {{name}} 知道的吗？"
     },
     "now": {
@@ -12879,7 +13205,8 @@
     "ask": {
       "watching": "你只是在观看。",
       "title": "要接管控制吗？",
-      "working": "你控制期间，{{name}} 会暂停。"
+      "working": "你控制期间，{{name}} 会暂停。",
+      "titleBrowser": "要接管浏览器吗？"
     },
     "sub": {
       "control": "由你控制 · {{name}} 等待中",
@@ -12895,7 +13222,9 @@
     },
     "retry": "重试",
     "takeover": "接管控制",
+    "takeBrowser": "接管浏览器",
     "taking": "正在接管控制…",
+    "returning": "正在交还给 {{name}}…",
     "clipboard": {
       "got": "在 {{name}} 的电脑上复制了：",
       "got_female": "在 {{name}} 的电脑上复制了：",
@@ -12974,12 +13303,19 @@
       "linuxOnly": "智能体只能在 Linux 电脑上使用自己屏幕上的应用。",
       "agent": "{{name}} 还不能在 {{computer}} 上使用他屏幕上的应用。",
       "agent_female": "{{name}} 还不能在 {{computer}} 上使用她屏幕上的应用。"
+    },
+    "browserOnly": {
+      "title": "你控制的是浏览器，不是整台电脑",
+      "plan": "{{name}} 使用其所有者的套餐思考，因此只有所有者和管理智能体的管理员能控制整台电脑",
+      "other": "你可以控制 {{name}} 的浏览器，但不能控制整台电脑",
+      "role": "你的角色只能使用 {{name}} 的浏览器，不能使用整台电脑"
     }
   },
   "agentComputer": {
     "title": "{{name}} 的电脑",
     "title_female": "{{name}} 的电脑",
     "open": "打开",
+    "openOf": "打开 {{name}} 的电脑",
     "help": "帮助",
     "button": "电脑",
     "choose": "选择电脑",
@@ -13047,7 +13383,8 @@
       "noComputer_female": "为 {{name}} 选择一台电脑。",
       "browserOff": "{{name}} 的浏览器在 {{computer}} 上已关闭",
       "browserOff_female": "{{name}} 的浏览器在 {{computer}} 上已关闭",
-      "forbidden": "你无法查看这台电脑。"
+      "forbidden": "你无法查看这台电脑。",
+      "noRole": "你的角色无权访问智能体的电脑。"
     },
     "closeAsk": "{{name}} 会等你 2 分钟。",
     "closeAsk_female": "{{name}} 会等你 2 分钟。",

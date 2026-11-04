@@ -12,6 +12,7 @@ import {
   type LayoutChangeEvent,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   useWindowDimensions,
@@ -63,7 +64,7 @@ export function NoticeIsland() {
   const { t } = useTranslation();
   const { motion, reducedMotion } = useTheme();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height: screenHeight } = useWindowDimensions();
   const { status } = useRealtime();
   const snap = useSyncExternalStore(island.subscribe, island.get, island.get);
   const [open, setOpen] = useState(false);
@@ -107,11 +108,15 @@ export function NoticeIsland() {
   // the camera (never behind it) and the status bar steps aside meanwhile, as with the system's own island.
   const clear = camera ? CAMERA.height : 0;
   const coversBar = camera && (shape === "pill" || shape === "open");
+  // Open, it stops above the bottom edge and scrolls inside: long choices never run off the screen.
+  const openMax = screenHeight - top - insets.bottom - 16;
+  // Only while open: the last open height outlives it, and a closed pill must keep its swipe away.
+  const scrolls = shape === "open" && openHeight > openMax;
   const size = {
     none: camera ? { w: CAMERA.width, h: CAMERA.height } : { w: 44, h: 44 },
     pill: { w: Math.min(width - 20, 420), h: PILL_HEIGHT + clear },
     small: { w: camera ? 250 : 200, h: camera ? CAMERA.height : 40 },
-    open: { w: Math.min(width - 16, 440), h: openHeight },
+    open: { w: Math.min(width - 16, 440), h: Math.min(openHeight, openMax) },
   }[shape];
   const corner = shape === "open" ? (camera ? 44 : 28) : shape === "pill" ? 36 : size.h / 2;
 
@@ -145,6 +150,8 @@ export function NoticeIsland() {
   const pan = useMemo(
     () =>
       Gesture.Pan()
+        // Scrolling, a swipe moves the list; the backdrop still closes it.
+        .enabled(!scrolls)
         .activeOffsetY([-8, 8])
         .onChange((e) => {
           drag.value = Math.min(0, drag.value + e.changeY);
@@ -153,7 +160,7 @@ export function NoticeIsland() {
           if (drag.value < PUT_AWAY) scheduleOnRN(putAway);
           drag.value = withSpring(0, { damping: 18, stiffness: 260 });
         }),
-    [drag, putAway],
+    [drag, putAway, scrolls],
   );
 
   const box = useAnimatedStyle(() => ({
@@ -184,31 +191,33 @@ export function NoticeIsland() {
           <Animated.View pointerEvents={shape === "none" ? "none" : "auto"} style={[styles.island, box]}>
             <Animated.View style={[styles.fill, inner]}>
               {shape === "open" ? (
-                <View
-                  style={{ width: size.w, paddingTop: clear }}
-                  onLayout={(e: LayoutChangeEvent) => setOpenHeight(Math.ceil(e.nativeEvent.layout.height))}
-                >
-                  {snap.items.slice(0, OPEN_MAX).map((i, k) => (
-                    <Fragment key={i.n.id}>
-                      {k > 0 ? <View style={styles.rule} /> : null}
-                      <IslandRow n={i.n} onOpened={() => setOpen(false)} />
-                    </Fragment>
-                  ))}
-                  {snap.items.length > OPEN_MAX ? (
-                    <Pressable
-                      onPress={() => {
-                        setOpen(false);
-                        router.push("/activity");
-                      }}
-                      style={styles.all}
-                      accessibilityRole="link"
-                    >
-                      <Text variant="footnote" style={{ color: MUTED }}>
-                        {t("island.all")}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                </View>
+                <ScrollView scrollEnabled={scrolls} bounces={false} showsVerticalScrollIndicator={scrolls}>
+                  <View
+                    style={{ width: size.w, paddingTop: clear }}
+                    onLayout={(e: LayoutChangeEvent) => setOpenHeight(Math.ceil(e.nativeEvent.layout.height))}
+                  >
+                    {snap.items.slice(0, OPEN_MAX).map((i, k) => (
+                      <Fragment key={i.n.id}>
+                        {k > 0 ? <View style={styles.rule} /> : null}
+                        <IslandRow n={i.n} onOpened={() => setOpen(false)} />
+                      </Fragment>
+                    ))}
+                    {snap.items.length > OPEN_MAX ? (
+                      <Pressable
+                        onPress={() => {
+                          setOpen(false);
+                          router.push("/activity");
+                        }}
+                        style={styles.all}
+                        accessibilityRole="link"
+                      >
+                        <Text variant="footnote" style={{ color: MUTED }}>
+                          {t("island.all")}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </ScrollView>
               ) : item && shape === "small" ? (
                 <SmallIsland item={item} others={others} camera={camera} onPress={() => setOpen(true)} />
               ) : item ? (
@@ -501,7 +510,7 @@ function Chip({
     >
       {icon ? <Icon name={icon} size={16} color={ink} /> : null}
       {iconOnly ? null : (
-        <Text variant="subhead" style={{ color: ink, fontWeight: "600" }}>
+        <Text variant="subhead" style={[styles.chipText, { color: ink }]}>
           {label}
         </Text>
       )}
@@ -561,15 +570,20 @@ const styles = StyleSheet.create({
   rule: { height: StyleSheet.hairlineWidth, backgroundColor: LINE, marginHorizontal: 16 },
   text: { color: WHITE, marginTop: 2 },
   acts: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
+  // Choices can be whole sentences: a chip grows with its text and wraps inside the island, a pill while it is one
+  // line and a rounded box once it takes more.
   chip: {
-    height: 36,
+    maxWidth: "100%",
+    minHeight: 36,
     paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
   },
+  chipText: { flexShrink: 1, fontWeight: "600" },
   chipIcon: { width: 36, paddingHorizontal: 0 },
   chipPrimary: { backgroundColor: WHITE },
   chipSoft: { backgroundColor: "rgba(255,255,255,0.14)" },

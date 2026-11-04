@@ -29,7 +29,7 @@ main() {
   COMPOSE_VERSION=5.5.1
   MIN_COMPOSE=2.23.1
   INSTALL_URL=https://agentes.chat/install
-  GUIDE=https://github.com/agentes-chat/agentes-chat/blob/main/SELF_HOSTING.md
+  GUIDE=https://agentes.chat/docs/install-on-a-server
   DOCKER_DOCS=https://docs.docker.com/engine/install/
 
   # Refusals below go to stderr, drawn for stdout until the options say where the rest goes.
@@ -237,8 +237,8 @@ Usage: curl -fsSL https://agentes.chat/install | sh -s -- [options] [setup optio
                       again with sudo).
   -h, --help
 
-Every other option goes to the setup, like --network local or --email skip. The guide lists them:
-$GUIDE
+Every other option goes to the setup, like --network local or --email skip (the setup's own
+--help lists them). The guide: $GUIDE
 
 AGENTES_INSTALL_SETUP=<file> runs that build of the setup instead of the published one."
 }

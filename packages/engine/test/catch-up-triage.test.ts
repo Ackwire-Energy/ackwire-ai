@@ -113,13 +113,32 @@ test("the strict bar is 0.9", () => {
   expect(catchUpDecision(a, s, CATCH_UP_CLOSE_AT_STRICT).outcome).toBe("unsure");
 });
 
-test("solved and not needed are never added up for one asker", () => {
-  const v = catchUpDecision(
-    { status_a1: status({ solved: 0.5, not_needed: 0.45 }), who_a1: who("p1") },
-    snapshot(),
-    0.8,
-  );
-  expect(v.outcome).toBe("unsure");
+test("solved and not needed add up only when the asker themselves is the source", () => {
+  const split = status({ solved: 0.5, not_needed: 0.45, needs_agent: 0.05 });
+  // Nina posted the answer: a split from someone else is doubt.
+  expect(catchUpDecision({ status_a1: split, who_a1: who("p3") }, snapshot(), 0.8).outcome).toBe("unsure");
+  // Ana's one ask alone is never the asker closing it.
+  expect(catchUpDecision({ status_a1: split, who_a1: who("p1") }, snapshot(), 0.8).outcome).toBe("unsure");
+  // Ana wrote "olvídalo, ya lo hice": 0.95 together closes, credited to the larger reason, and counts in the product.
+  const s = snapshot({
+    posts: [{ id: "m4", key: "p1", kind: "person", from: "Ana", text: "olvídalo, ya lo hice", at: at(60_000) }],
+  });
+  expect(catchUpDecision({ status_a1: split, who_a1: who("p1") }, s, 0.8)).toMatchObject({
+    outcome: "closed",
+    askers: [{ reason: "solved", who: "p1" }],
+    p: 0.95,
+  });
+  expect(
+    catchUpDecision({ status_a1: status({ solved: 0.3, not_needed: 0.6 }), who_a1: who("p1") }, s, 0.8),
+  ).toMatchObject({ outcome: "closed", askers: [{ reason: "withdrawn" }] });
+  // The bar still holds on the sum.
+  expect(
+    catchUpDecision(
+      { status_a1: status({ solved: 0.4, not_needed: 0.39, needs_agent: 0.21 }), who_a1: who("p1") },
+      s,
+      0.8,
+    ).outcome,
+  ).toBe("unsure");
 });
 
 test("a close needs a source code checks", () => {

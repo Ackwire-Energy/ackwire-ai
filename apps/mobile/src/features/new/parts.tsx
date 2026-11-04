@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { IconButton, type IconName, Text } from "@/ui";
 import type { AppHref } from "../links/logic";
+import { goBack } from "../shared/parts";
 
 /**
  * Pieces of the forms "New" opens (the "+" of the tabs), each a native form sheet: the title row, and leaving every
@@ -27,7 +28,7 @@ export function SheetHeader({
         icon={icon}
         label={icon === "x" ? t("mobile.common.close") : t("mobile.common.back")}
         plate
-        onPress={onPress ?? (() => (router.canGoBack() ? router.back() : router.replace("/")))}
+        onPress={onPress ?? (() => goBack())}
       />
       <Text variant="title" style={styles.title} accessibilityRole="header" numberOfLines={1}>
         {title}

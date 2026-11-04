@@ -78,6 +78,7 @@ export class ModelBrain implements Brain {
       agentId: turn.agentId,
       agent,
       runId: turn.runId,
+      personId: turn.personId ?? null,
       system: laid.system,
       messages: laid.messages ?? messages,
       ...(laid.notes ? { notes: laid.notes } : {}),

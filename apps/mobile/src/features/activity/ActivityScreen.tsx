@@ -10,6 +10,7 @@ import { approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { timeLeft } from "@agenteschat/client/lib/format";
 import { mediaWord } from "@agenteschat/client/lib/media";
+import { usageLimitLine } from "@agenteschat/client/lib/person-usage";
 import { router, useLocalSearchParams } from "expo-router";
 import { Fragment, memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -42,6 +43,7 @@ import { agentLook, fuseRemaining } from "../shared/logic";
 import { Tile, useSurface } from "../shared/parts";
 import { useWaitingApprovals } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
+import { UsageLimitActions } from "../usage/people";
 import {
   type ActivityFilter,
   activitySections,
@@ -155,6 +157,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const onCard = request?.messageId ? waitingApprovals.filter((a) => a.messageId === request.messageId).length : 0;
   // Someone asking to join: who asked (the first names, how many in all), with their faces.
   const join = card.kind === "join" ? joinRequestLine(t, n) : null;
+  const notice = useNoticeTitle(n);
   const title =
     card.kind === "approval" && request
       ? [approvalTitle(t, request), onCard > 1 ? t("approval.all.waitingCount", { count: onCard }) : null]
@@ -162,10 +165,12 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
           .join(" · ")
       : join
         ? join.text
-        : // The server's name in words, as the web says it; the tools themselves are in its review.
-          card.kind === "tools"
-          ? t("connectors.toolChanges.notice", { name: n.source.label ?? "" })
-          : (dash?.title ?? card.title);
+        : card.kind === "limit"
+          ? notice.title
+          : // The server's name in words, as the web says it; the tools themselves are in its review.
+            card.kind === "tools"
+            ? t("connectors.toolChanges.notice", { name: n.source.label ?? "" })
+            : (dash?.title ?? card.title);
   // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
   const href = notificationHref(n, ai);
@@ -229,6 +234,14 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
       {card.kind === "approval" ? (
         <ApprovalWhy approval={{ origin: n.latest.origin ?? null, why: n.latest.text ?? null }} name={name} />
       ) : null}
+      {card.kind === "limit" ? (
+        <>
+          <Text variant="footnote" tone="muted">
+            {usageLimitLine(t, n)}
+          </Text>
+          <UsageLimitActions n={n} />
+        </>
+      ) : null}
       <View style={styles.ft}>
         {left !== null && card.expiresAt ? (
           <>
@@ -243,7 +256,9 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
           </Text>
         )}
         <View style={styles.grow} />
-        {href || web ? <Button variant="primary" size="sm" label={button} onPress={open} /> : null}
+        {(href || web) && card.kind !== "limit" ? (
+          <Button variant="primary" size="sm" label={button} onPress={open} />
+        ) : null}
       </View>
     </Pressable>
   );
@@ -257,6 +272,7 @@ const KIND_ICON = {
   secret: "lock",
   join: "members",
   tools: "bolt",
+  limit: "chart",
 } as const;
 
 /** Faces of the crew drawn over "Nada esperando você". */
@@ -373,9 +389,11 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const line = subtitleOf(n, say, (kind) => mediaWord(t, kind));
   const sub = restriction
     ? restrictionLine(t, restriction.code, restriction.facts)
-    : failed
-      ? failed.sub
-      : [emojisOf(n).join(" "), [line, placeOf(n)].filter(Boolean).join(" · ")].filter(Boolean).join(" ");
+    : n.kind === "usage_limit"
+      ? usageLimitLine(t, n)
+      : failed
+        ? failed.sub
+        : [emojisOf(n).join(" "), [line, placeOf(n)].filter(Boolean).join(" · ")].filter(Boolean).join(" ");
   const time = when.short(n.updatedAt);
 
   // The swipe taps on its own (SwipeRow); VoiceOver's actions call these too.
@@ -456,6 +474,12 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
       {n.kind === "change_request" ? (
         <View style={styles.change}>
           <ChangeRequestCard n={n} />
+        </View>
+      ) : null}
+      {/* A person asks for more (ADR 0141): raised or refused right here. */}
+      {n.kind === "usage_limit" && n.latest.statusTo === "request" && !n.doneAt ? (
+        <View style={styles.change}>
+          <UsageLimitActions n={n} />
         </View>
       ) : null}
       {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}

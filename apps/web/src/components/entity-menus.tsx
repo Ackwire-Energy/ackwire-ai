@@ -11,11 +11,13 @@ import {
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can, managesChannel } from "@agenteschat/client/lib/permissions";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { leaves, removes } from "@agenteschat/client/lib/roles";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { useSidebarPins } from "@/hooks/useSidebarPins";
 import { requestChannelDetails } from "@/lib/channel-details";
 import { copyText, type MenuEntry } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
@@ -146,6 +148,7 @@ export function useChannelMenu() {
   const markRead = useMarkRead();
   const mute = useMuteChannel(org.id);
   const archive = useArchiveChannelWithUndo();
+  const pins = useSidebarPins();
   return (c: Channel, extra: MenuEntry[] = []): MenuEntry[] => {
     const manages = managesChannel(c, me.user.id, org);
     return [
@@ -177,6 +180,7 @@ export function useChannelMenu() {
           void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: org.id, channelId: c.id } });
         },
       },
+      ...(c.isMember ? [pins.entry("channels", c.id)] : []),
       ...extra,
       { kind: "separator" },
       {
@@ -204,8 +208,9 @@ export function useChannelMenu() {
 }
 
 /**
- * An agent (sidebar row, its face or name in a message, its card's ⋯): talk, its profile, mention, copy @, mark its DM
- * read, edit (its owner and admins), its link, stop while it works, its id.
+ * An agent (sidebar row, its face or name in a message, its card's ⋯): talk, its profile, its computer (`openComputer`,
+ * where the caller knows this person may open it), mention, copy @, mark its DM read, edit (its owner and admins), its
+ * link, stop while it works, its id.
  */
 export function useAgentMenu() {
   const { t } = useTranslation();
@@ -220,7 +225,13 @@ export function useAgentMenu() {
   const copyHandle = useCopyHandle();
   const copyId = useCopyId();
   const mention = useMention();
-  return (a: Pick<Agent, "id" | "name" | "handle" | "ownerUserId">): MenuEntry[] => {
+  const pins = useSidebarPins();
+  /** `extra`: the sidebar row's own items (Mudar de grupo), after Fixar no topo. */
+  return (
+    a: Pick<Agent, "id" | "name" | "handle" | "ownerUserId" | "builtin">,
+    extra: MenuEntry[] = [],
+    openComputer?: () => void,
+  ): MenuEntry[] => {
     const dm = dms?.find((d) => d.with.id === a.id);
     const edits = can(org, "manage_agents") || a.ownerUserId === me.user.id;
     const working = Object.values(live.get().streams.runs).filter(
@@ -248,9 +259,23 @@ export function useAgentMenu() {
         icon: "agent",
         run: () => (openPanel ? openPanel(a.id) : page()),
       },
+      ...(openComputer
+        ? ([
+            {
+              kind: "item",
+              id: "computer",
+              label: t("contextMenu.openComputer"),
+              icon: "computer",
+              run: openComputer,
+            },
+          ] satisfies MenuEntry[])
+        : []),
+      // The right hand has its own row on top of the sidebar.
+      ...(isRightHand(a) ? [] : [pins.entry("agents", a.id)]),
       ...mention(a.handle),
       ...copyHandle(a.handle),
       ...markRead(dm?.channelId, dm?.unread ?? 0),
+      ...extra,
       { kind: "separator" },
       ...(edits
         ? ([
@@ -301,6 +326,7 @@ export function usePersonMenu() {
   const copyHandle = useCopyHandle();
   const copyId = useCopyId();
   const mention = useMention();
+  const pins = useSidebarPins();
   const viewer = { role: org.role, rank: org.rank, userId: me.user.id, permissions: org.permissions };
   return (p: { userId: string; name: string; handle?: string | null }, openCard?: () => void): MenuEntry[] => {
     const dm = dms?.find((d) => d.with.id === p.userId);
@@ -327,6 +353,7 @@ export function usePersonMenu() {
             { kind: "item", id: "profile", label: t("profile.viewProfile"), icon: "person", run: openCard },
           ] satisfies MenuEntry[])
         : []),
+      ...(mine ? [] : [pins.entry("people", p.userId)]),
       ...mention(handle),
       ...copyHandle(handle),
       ...markRead(dm?.channelId, dm?.unread ?? 0),

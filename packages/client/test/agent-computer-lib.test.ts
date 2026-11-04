@@ -419,6 +419,10 @@ describe("what the dialog's stage shows", () => {
     expect(surfaceOf(preparing())).toBe("preparing");
     const mine = request({ status: "active", controllerUserId: "me", expiresAt: null });
     expect(surfaceOf(facts({ handoff: mine }))).toBe("page");
+    // Its window on the screen, and this person may drive the screen: they help on the whole screen.
+    const screen = { available: true, reason: null, canControl: true, handoff: mine };
+    expect(surfaceOf(facts({ handoff: mine, desktop: screen }))).toBe("screen");
+    expect(surfaceOf(facts({ handoff: mine, desktop: { ...screen, canControl: false } }))).toBe("page");
     // Held with a ready computer: the screen, under the pause's banner.
     expect(surfaceOf(facts({ held: true }))).toBe("screen");
   });

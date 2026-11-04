@@ -56,6 +56,27 @@ type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator" | "defaul
 /** Why a routed message reached no agent: no step could read it, and no rule fit (`strategy` `none`). */
 export const MENTION_NEEDED = "mention_needed";
 
+/**
+ * The text each run executing here has streamed so far in its current model call (what its `agent.delta` events
+ * carried), until that call ends; `from`: where its body starts, past the text before the call's last tool (the app
+ * moved that to the narration). An app opened mid-answer reads it with the active runs and goes on from there.
+ * ponytail: per process; a request served by another replica gets none and the app shows the waiting row until the
+ * call ends, as before. Ask the run's replica over pub/sub if replicas ever split one workspace.
+ */
+export const liveTurns = new Map<string, { turn: number; text: string; from: number }>();
+
+/** A tool starts inside the model call (a computer brain's): the body so far became narration. */
+export function liveTurnToolStarted(runId: string) {
+  const live = liveTurns.get(runId);
+  if (live) live.from = live.text.length;
+}
+
+/** What `GET …/active-runs` gives of it: the body so far and where it starts in the call's text (`agent.delta.at`). */
+export function liveTurnOf(runId: string) {
+  const live = liveTurns.get(runId);
+  return live ? { turn: live.turn, at: live.from, text: live.text.slice(live.from) } : undefined;
+}
+
 const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator", "default", "alone"]);
 
 /**
@@ -80,8 +101,18 @@ export function decidedByOf(strategy: string, authorUserId: string | null): Deci
  */
 /** `threadId` null on agent events = the main timeline (DMs are flat). */
 export type ChannelEvent =
-  /** A message was committed. `message` is omitted when too large for pub/sub: fetch it by id. */
-  | { type: "message.created"; channelId: string; messageId: string; message?: MessageView }
+  /**
+   * A message was committed. `message` is omitted when too large for pub/sub: read it over HTTP. Its thread and run
+   * come either way, so the app knows which live answer it ends while that read is on its way.
+   */
+  | {
+      type: "message.created";
+      channelId: string;
+      messageId: string;
+      message?: MessageView;
+      threadId?: string | null;
+      agentRunId?: string | null;
+    }
   /** A fragment of an agent's reply while it is generated (not persisted; the final message follows). */
   | {
       type: "agent.delta";
@@ -93,6 +124,8 @@ export type ChannelEvent =
       text: string;
       /** The model call this text belongs to (1, 2…): a new turn starts a new segment, never glued to the last one. */
       turn: number;
+      /** Where `text` starts in its turn's text (UTF-16 units): an app that missed a piece sees the hole. */
+      at?: number;
     }
   /**
    * The text the agent streamed before calling tools was progress narration
@@ -596,6 +629,14 @@ export type ChannelEvent =
       applied?: { channelIds: string[]; connectionIds: string[]; mailAccountIds: string[] };
       /** The routine made with it. */
       routineId?: string | null;
+    }
+  /** The right hand looked at a card for someone (ADR 0139): its `meta.actionCard.delegate` now (null: nothing to say). */
+  | {
+      type: "card.delegate";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      delegate: Record<string, unknown> | null;
     };
 
 const INLINE_LIMIT = 6000;
@@ -615,7 +656,7 @@ export async function publishMessageCreated(pubsub: PubSub, message: MessageView
     type: "message.created",
     channelId: message.channelId,
     messageId: message.id,
-    ...(inline ? { message } : {}),
+    ...(inline ? { message } : { threadId: message.threadId, agentRunId: message.agentRunId }),
   });
   try {
     await pubsub.publish(chatActivityTopic, {

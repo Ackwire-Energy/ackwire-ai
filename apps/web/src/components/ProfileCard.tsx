@@ -2,10 +2,12 @@ import type { Actor, Agent, AgentAudience, DmTarget } from "@agenteschat/client"
 import {
   agentWorkingIn,
   useAgentDetail,
+  useAiStatus,
   useChannels,
   useModels,
   usePeople,
   useRoles,
+  useRoster,
   useSendDm,
   useSetMemberRoles,
   useSettings,
@@ -36,11 +38,12 @@ import {
 } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
-import { clearsText } from "@agenteschat/client/lib/presence";
+import { clearsText, isOutOfOffice } from "@agenteschat/client/lib/presence";
 import { isAuto } from "@agenteschat/client/lib/providers";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { rolesOf } from "@agenteschat/client/lib/roles";
 import { timezoneName } from "@agenteschat/client/lib/routines";
+import { picksForMe } from "@agenteschat/client/lib/routing";
 import {
   Avatar,
   Button,
@@ -55,12 +58,14 @@ import {
   Token,
   useHoverCard,
 } from "@agenteschat/ui";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AudienceChoice, audienceValid } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { useOpensComputer } from "@/components/computer/facts";
+import { useOpenComputer } from "@/components/computer/open";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
@@ -74,6 +79,7 @@ import { type AgentShown, agentLine, personLine, useAgentPresence, usePersonPres
 import { type MenuEntry, tidy } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import { planMeterText, usageShown } from "@/lib/plan-usage";
+import { channelOfPath } from "@/lib/start";
 import { useToast } from "@/lib/toast";
 import { AskAccessButton } from "@/pages/agent/PublicCard";
 import { useStreams } from "@/realtime/context";
@@ -160,11 +166,12 @@ export function ProfileTrigger({
   );
 }
 
-/** Discord's shape: the banner, the ⋯ on it, the big face over its edge, then the body. */
+/** Discord's shape: the banner, its round buttons (a shortcut, then ⋯), the big face over its edge, then the body. */
 function CardShell({
   sky,
   face,
   agent,
+  act,
   more,
   onDone,
   children,
@@ -172,6 +179,8 @@ function CardShell({
   sky: ReactNode;
   face: ReactNode;
   agent?: boolean;
+  /** A round button before the ⋯ (an agent's computer). */
+  act?: ReactNode;
   /** The ⋯ menu: the same entries as the right click. */
   more?: MenuEntry[];
   /** Closes the card (a ⋯ entry ran). */
@@ -185,25 +194,28 @@ function CardShell({
       <div className="mcard__banner" aria-hidden="true">
         {sky}
       </div>
-      {entries.length > 0 && (
+      {(act || entries.length > 0) && (
         <div className="mcard__acts">
-          <Menu
-            label={t("profile.more")}
-            side="right"
-            align="start"
-            trigger={
-              <Button
-                size="sm"
-                variant="ghost"
-                iconOnly
-                icon="more"
-                className="mcard__more"
-                aria-label={t("profile.more")}
-              />
-            }
-          >
-            <MenuEntries entries={entries} onRun={onDone} />
-          </Menu>
+          {act}
+          {entries.length > 0 && (
+            <Menu
+              label={t("profile.more")}
+              side="right"
+              align="start"
+              trigger={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconOnly
+                  icon="more"
+                  className="mcard__act"
+                  aria-label={t("profile.more")}
+                />
+              }
+            >
+              <MenuEntries entries={entries} onRun={onDone} />
+            </Menu>
+          )}
         </div>
       )}
       <div className={agent ? "mcard__face mcard__face--agent" : "mcard__face"}>{face}</div>
@@ -542,6 +554,8 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   const roles = useRoles(org.id).data?.roles ?? [];
   const channels = useChannels(org.id).data;
   const agentEntries = useAgentMenu();
+  const openComputer = useOpenComputer();
+  const opensComputer = useOpensComputer(agent);
   const seesSpend = can(org, "view_usage") || agent.ownerUserId === me.user.id;
   const details = seesDetails(agent);
   const g = agentGrammar(agent.name);
@@ -560,6 +574,18 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   const busy = workingIn !== null;
   const here = workingIn ? channels?.find((c) => c.id === workingIn)?.name : undefined;
   const lines = audienceLines(agent, roles, dir.members);
+  // Opened in a channel where it answers without being mentioned, while something reads my unmentioned messages.
+  const channelHere = channelOfPath(useRouterState({ select: (st) => st.location.pathname }));
+  const roster = useRoster(org.id, channelHere ?? "", channelHere !== null);
+  const routing = useAiStatus(org.id).data?.routing;
+  const answersHere =
+    picksForMe(routing) && (roster.data ?? []).some((r) => r.type === "agent" && r.id === agent.id && r.autoReply);
+  const toComputer = opensComputer
+    ? () => {
+        onDone();
+        openComputer(agent.id);
+      }
+    : undefined;
   return (
     <CardShell
       agent
@@ -571,9 +597,24 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
           name={agent.name}
           presence={shown?.presence ?? null}
           presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
+          asleep={isOutOfOffice(shown?.line)}
         />
       }
-      more={agentEntries(agent)}
+      act={
+        toComputer && (
+          <Button
+            size="sm"
+            variant="ghost"
+            iconOnly
+            icon="computer"
+            className="mcard__act"
+            aria-label={t("agentComputer.openOf", g)}
+            title={t("agentComputer.openOf", g)}
+            onClick={toComputer}
+          />
+        )
+      }
+      more={agentEntries(agent, [], toComputer)}
       onDone={onDone}
     >
       <div className="list-col mcard__names">
@@ -586,12 +627,13 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
             .filter(Boolean)
             .join(" · ")}
         </span>
-        <NoAiChip agentId={agent.id} />
+        {answersHere && <span className="small muted">{t("profile.answersHere")}</span>}
       </div>
+      <NoAiChip agentId={agent.id} />
       {line && shown?.line && (
-        <div className="profile-card__status">
+        <div className={line.icon ? "profile-card__status ac-iconline" : "profile-card__status"}>
           <span className="profile-card__status-emoji" aria-hidden="true">
-            {line.emoji}
+            {line.icon ? <Icon name={line.icon} size={16} /> : line.emoji}
           </span>
           <span>
             {line.text}
@@ -603,9 +645,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
                   : t("presence.byAuto")}
             </small>
             {/* Out of office with conversations waiting (ADR 0118): what it picks up when it is back, in order. */}
-            {(shown.line.kind === "out_of_plan" || shown.line.kind === "out_of_budget") && shown.line.count ? (
-              <SeeUsageQueue agentId={agent.id} />
-            ) : null}
+            {isOutOfOffice(shown.line) && shown.line.count ? <SeeUsageQueue agentId={agent.id} /> : null}
           </span>
         </div>
       )}

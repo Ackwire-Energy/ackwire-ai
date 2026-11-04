@@ -85,13 +85,14 @@ async function cardRows(fx: Fixture, viewer: string) {
 const USD = 1_000_000_000;
 
 describe("the settings card", () => {
-  test("only the right hand has it, and its run may post 10 cards (3 for the others)", async () => {
+  test("every agent that sets the team up has it, and the right hand's run may post 10 cards (3 for the others)", async () => {
     f = await setup({ rightHand: true });
     expect([MAX_CARDS_PER_RUN, MAX_CARDS_PER_RUN_RIGHT_HAND]).toEqual([3, 10]);
     const ctx = await lodiRun(f, f.owner.id, "coloca o dev no haiku");
     expect((await gatewayOf(f).granted(ctx)).map((t) => t.name)).toContain(PROPOSE_SETTINGS_TOOL);
     const dev = { ...ctx, agentId: f.agent.id };
-    expect((await gatewayOf(f).granted(dev)).map((t) => t.name)).not.toContain(PROPOSE_SETTINGS_TOOL);
+    // Another agent proposes too, and the right hand may decide its card for the person (ADR 0139).
+    expect((await gatewayOf(f).granted(dev)).map((t) => t.name)).toContain(PROPOSE_SETTINGS_TOOL);
     for (let i = 0; i < 10; i++) {
       const out = await call(f, ctx, { changes: [{ agent: "@dev", budget_usd: i + 1 }], reason: "mais folga" });
       expect(out.isError).toBeFalsy();

@@ -120,7 +120,13 @@ describe("the sticker or GIF an agent adds after its reply", () => {
       { key: "after", kind: "message", who: "agent:dev", silent: true },
       { key: "b", kind: "message", who: "person:u2" },
     ];
-    expect(unseenBelow(rows, "a")).toEqual({ messages: 1, firstKey: "b", authors: ["person:u2"], working: [] });
+    expect(unseenBelow(rows, "a")).toEqual({
+      messages: 1,
+      firstKey: "b",
+      authors: ["person:u2"],
+      working: [],
+      mentionsMe: false,
+    });
     expect(unseenBelow(rows.slice(0, 2), "a").messages).toBe(0);
   });
 });

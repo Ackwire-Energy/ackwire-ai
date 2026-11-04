@@ -6,6 +6,7 @@ import {
   type SidebarItem,
   sidebarPlaceAllowed,
   sidebarToolOrderOf,
+  sidebarViewOf,
 } from "@agenteschat/engine";
 import {
   SIDEBAR_COUNTED as APP_COUNTED,
@@ -33,6 +34,21 @@ test("a stored tools' order is never trusted as is: unknown tools dropped, repea
     ...SIDEBAR_ITEMS.filter((i) => i !== "forum" && i !== "drive"),
   ]);
   expect(sidebarToolOrderOf("drive")).toEqual([...SIDEBAR_ITEMS]);
+});
+
+test("a stored sidebar view is never trusted as is: known orders only, each pin once, five at most", () => {
+  expect(sidebarViewOf(undefined)).toEqual({ agentSort: "workspace", showAllAgents: false, pins: null });
+  expect(
+    sidebarViewOf({
+      agentSort: "nope",
+      showAllAgents: "yes",
+      pins: { agents: ["a", "a", 3, "b"], channels: ["1", "2", "3", "4", "5", "6"], extra: ["x"] },
+    }),
+  ).toEqual({
+    agentSort: "workspace",
+    showAllAgents: false,
+    pins: { agents: ["a", "b"], channels: ["1", "2", "3", "4", "5"], people: [] },
+  });
 });
 
 /** A new workspace, set up (one still in its onboarding would come back instead of another). */
@@ -183,7 +199,7 @@ test("the tools' order: each person's own, per workspace, every tool once, besid
   await owner(sidebar, { method: "PATCH", json: { item: "wiki", place: "always" } });
   await owner(`${sidebar}/order`, { method: "PUT", json: { order: ["people", "tools", "channels", "agents"] } });
 
-  const driveFirst = ["drive", "approvals", "threads", "issues", "wiki", "routines", "calendar", "forum"];
+  const driveFirst = ["drive", "approvals", "threads", "issues", "wiki", "routines", "calendar", "forum", "team"];
   const saved = await put({ order: driveFirst });
   expect(saved.status).toBe(200);
   expect(await saved.json()).toEqual({ order: driveFirst });
@@ -212,4 +228,40 @@ test("the tools' order: each person's own, per workspace, every tool once, besid
   // Back to the default; the places stay.
   expect(await (await put({ order: null })).json()).toEqual({ order: [...SIDEBAR_ITEMS] });
   expect(((await (await owner(sidebar)).json()) as { items: unknown }).items).toEqual({ forum: "always" });
+});
+
+test("the sidebar view: each person's own, per workspace, beside the tools' places and both orders", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const orgId = await workspace(owner, "Acme");
+  const sidebar = `/api/app/organizations/${orgId}/me/sidebar`;
+  const view = async (b = owner) => ((await (await b(`${sidebar}/view`)).json()) as { view: unknown }).view;
+  const put = (json: unknown, b = owner) => b(`${sidebar}/view`, { method: "PUT", json });
+
+  // Never saved: no pins yet, so the apps pin the person's own agents.
+  expect(await view()).toEqual({ agentSort: "workspace", showAllAgents: false, pins: null });
+  await owner(sidebar, { method: "PATCH", json: { item: "wiki", place: "always" } });
+  const mine = {
+    agentSort: "mine",
+    showAllAgents: true,
+    pins: { agents: ["agent-1"], channels: ["channel-1", "channel-2"], people: [] },
+  };
+  const saved = await put({ view: mine });
+  expect(saved.status).toBe(200);
+  expect(await saved.json()).toEqual({ view: mine });
+  expect(await view()).toEqual(mine);
+  // Resetting the tools' places keeps the view, and the view keeps the places.
+  await owner(sidebar, { method: "PUT", json: { items: {} } });
+  expect(await view()).toEqual(mine);
+
+  // Six pins in a section, or an order the apps don't know: refused, kept.
+  const six = { ...mine, pins: { ...mine.pins, channels: ["1", "2", "3", "4", "5", "6"] } };
+  expect((await put({ view: six })).status).toBe(400);
+  expect((await put({ view: { ...mine, agentSort: "alphabetical" } })).status).toBe(400);
+  expect(await view()).toEqual(mine);
+
+  // Someone else keeps their own.
+  const member = await joinByInvitation(t, owner, orgId, "member@example.com");
+  expect(await view(member)).toEqual({ agentSort: "workspace", showAllAgents: false, pins: null });
 });

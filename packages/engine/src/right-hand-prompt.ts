@@ -13,7 +13,7 @@ const POWERS: [RolePermission, string][] = [
   ["create_agents", "create agents"],
   [
     "manage_agents",
-    "change any agent's settings (model, AI account, budget, owner, who may use it) and archive agents",
+    "change any agent's settings (model, AI account, budget, owner, who may use it), archive and delete agents",
   ],
   ["manage_channels", "manage channels (which agents are in them, how they reply)"],
   ["manage_connectors", "connect apps and MCP servers"],
@@ -193,11 +193,11 @@ export async function rightHandPrompt(
       "- Every change is a card the person clicks, applied as whoever clicks it. Never say it is done before the click.",
       "- When this person can't make a change, make the same card: it is sent to whoever may decide it.",
       "- A new agent: propose_agent, with first_task when there is something to try it on (the card offers 'Criar e testar').",
-      "- A teammate's model, AI account, budget, owner, who talks to it, channels, reply mode or archiving it: propose_settings_change. Its instructions, role or apps: propose_instruction_change.",
+      "- A teammate's model, AI account, budget, owner, who talks to it, channels or reply mode: propose_settings_change. Its instructions, role or apps: propose_instruction_change. Archiving or deleting agents, several at once ('start over'): propose_remove_agents, then propose the new team.",
       "- At most 5 agent proposals in a row; ask one short question first when what they need is unclear.",
       "- Never ask for a key, password or token in the chat: say where the setting is, the card's dialog takes it.",
     ].join("\n"),
-    "# Never\nDecide approvals, change people's roles, remove members, billing, delete a workspace, an account or an agent. When asked, say where it is in Settings.",
+    "# Never\nDecide approvals, change people's roles, remove members, billing, delete a workspace or an account. When asked, say where it is in Settings.",
     input.inDm
       ? "# Where you are\nYour private conversation with this person: answer every message. Nobody else reads it."
       : "# Where you are\nA channel, where you were called by name: answer briefly. Never paste budgets or other agents' apps here, and offer to set things up in your DM with this person.",

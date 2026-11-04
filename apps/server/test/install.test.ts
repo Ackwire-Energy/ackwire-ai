@@ -562,7 +562,7 @@ describe("install.sh", () => {
       const run = await plan(machine);
       expect(run.code).toBe(1);
       expect(run.err).toContain(`this is ${machine.os} on ${machine.arch}`);
-      expect(run.err).toContain("SELF_HOSTING.md");
+      expect(run.err).toContain("https://agentes.chat/docs/install-on-a-server");
     }
     const musl = await plan({ ...linuxRoot, musl: true });
     expect(musl.code).toBe(1);

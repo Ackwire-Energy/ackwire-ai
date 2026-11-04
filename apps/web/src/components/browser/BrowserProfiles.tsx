@@ -297,7 +297,7 @@ function ProfileView({ profile, onClose }: { profile: BrowserProfile; onClose: (
             id: profile.id,
             name: profile.name,
             agentIds: profile.agentIds,
-            canDrive: canDo(org, "manage_connectors") && canDo(org, "control_computers"),
+            canDrive: canDo(org, "manage_connectors") && canDo(org, "control_browsers"),
           }}
         />
       </DialogBody>
@@ -322,7 +322,7 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
   const actions = useBrowserProfileMutations(org.id);
   const [open, setOpen] = useState<Open>(null);
   const manage = canDo(org, "manage_connectors");
-  const drive = manage && canDo(org, "control_computers");
+  const drive = manage && canDo(org, "control_browsers");
   const mine = (profiles.data ?? []).filter((p) => p.machineId === m.id);
   const outdated = m.browserProfiles === false;
   const login = (p: BrowserProfile) =>

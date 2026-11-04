@@ -342,7 +342,7 @@ export type OpenTarget =
   | { to: "/org/$orgId/settings/computers/$machineId"; params: { machineId: string } }
   | {
       to: "/org/$orgId/settings/$section";
-      params: { section: "computers" | "members" | "usage" | "connectors" | "billing" };
+      params: { section: "computers" | "members" | "usage" | "connectors" | "billing" | "approvals" };
     }
   | { to: "/org/$orgId/home"; search?: { widget: string } }
   | { to: "/org/$orgId/dashboards" }
@@ -378,6 +378,9 @@ export function openTarget(n: AppNotification): OpenTarget | null {
     return { to: "/org/$orgId/approvals", ...(s.approvalId ? { search: { open: s.approvalId } } : {}) };
   // A change someone sent to whoever decides (ADR 0137) is decided on its card in the row: the DM it came from is theirs.
   if (n.kind === "change_request") return null;
+  // Who approves for whom (ADR 0139) is set, seen and declined in Configurações › Você › Aprovações.
+  if (n.kind === "approval_cover" || n.kind === "right_hand_paused")
+    return { to: "/org/$orgId/settings/$section", params: { section: "approvals" } };
   // Requests to join are answered in Members (ADR 0068).
   if (n.kind === "join_request") return { to: "/org/$orgId/settings/$section", params: { section: "members" } };
   // Someone accepted an invitation (ADR 0090): a conversation with them, to say hi.
@@ -406,6 +409,15 @@ export function openTarget(n: AppNotification): OpenTarget | null {
         : null;
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return { to: "/org/$orgId/settings/$section", params: { section: "usage" } };
+  // A person's limit (ADR 0141): who decides opens that person's month in Uso › Pessoas; the person, Seu uso.
+  if (n.kind === "usage_limit") {
+    const theirs = n.latest.statusTo === "reached" || n.latest.statusTo === "request";
+    return {
+      to: "/org/$orgId/settings/$section",
+      params: { section: "usage" },
+      ...(theirs && s.userId ? { search: { person: s.userId } } : {}),
+    };
+  }
   // A server changed approved tools: accepted in Conectores.
   if (n.kind === "connector_tool_changed")
     return { to: "/org/$orgId/settings/$section", params: { section: "connectors" } };
@@ -430,7 +442,7 @@ export function openTarget(n: AppNotification): OpenTarget | null {
     return { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
   // A routine couldn't call the agent: its page, where who talks to it is set (the report's room may be private).
   // An agent held on agentes.chat Cloud: its page too, where the hold shows.
-  if ((n.kind === "agent_unreached" || n.kind === "org_standing") && s.agentId)
+  if ((n.kind === "agent_unreached" || n.kind === "org_standing" || n.kind === "desktop_taken") && s.agentId)
     return { to: "/org/$orgId/agents/$agentId", params: { agentId: s.agentId } };
   // The workspace held for its payment: Cobrança, where it is paid.
   if (n.kind === "org_standing" && n.latest.billingHold)
@@ -540,7 +552,7 @@ export function snoozeTimes(now = new Date()) {
  * What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser, give
  * a secret, let someone in, or review tools a connected server changed.
  */
-export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "secret" | "join" | "tools";
+export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "secret" | "join" | "tools" | "limit";
 
 export interface WaitingCard {
   kind: WaitingCardKind;
@@ -576,6 +588,8 @@ export function waitingCardOf(n: Pick<AppNotification, "kind" | "count" | "lates
   // A connected server changed approved tools (ADR 0117): reviewed in Connectors, never answered like a question.
   if (n.kind === "connector_tool_changed")
     return { kind: "tools", title: l.title ?? "", expiresAt: null, action: "review" };
+  // A person at their limit asks for more (ADR 0141): raised or refused on the card itself.
+  if (n.kind === "usage_limit") return { kind: "limit", title: "", expiresAt: null, action: "review" };
   return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "answer" };
 }
 

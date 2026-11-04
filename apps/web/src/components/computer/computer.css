@@ -364,8 +364,16 @@
   overflow: visible;
   animation: none;
 }
+/* The page edge to edge, as the screen is: no ground or padding round it. */
 .cmp-body .brw-ac__stage {
+  padding: 0;
   border-radius: 12px;
+  background: none;
+}
+/* The address bar on the page's top, as wide as the page, no line under it. */
+.cmp-body .brw-go {
+  padding: 0;
+  border-bottom: 0;
 }
 /*
  * The screen's stage takes what the banner, the steps and the tools leave, and the screen the most of that it
@@ -435,10 +443,11 @@
   flex: 1 1 0;
   min-height: 0;
 }
+/* Right under the address bar, as a browser's page is: what its shape leaves goes under it. */
 .cmp-body > .brw-ac.is-surface .brw-ac__stage {
   container-type: size;
   display: grid;
-  place-items: center;
+  place-items: start center;
 }
 .cmp-body .brw-ac__page {
   width: min(100cqw, 100cqh * 16 / 10);
@@ -489,17 +498,14 @@
   font-size: 12.5px;
 }
 
-/* The request this person helps with, and the site the page is on, above the stage. */
-.cmp-asked,
-.cmp-site {
+/* The request this person helps with, above the stage. */
+.cmp-asked {
   display: flex;
   align-items: center;
   gap: 6px;
   margin: 0;
   font-size: 13px;
   color: var(--ink2);
-}
-.cmp-asked {
   font-weight: 600;
 }
 

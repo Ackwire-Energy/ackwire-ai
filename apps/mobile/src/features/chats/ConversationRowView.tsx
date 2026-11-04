@@ -3,8 +3,9 @@ import { Link, router } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, StyleSheet, View } from "react-native";
-import { Count, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
+import { Count, Icon, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
 import { workTitle } from "../agents/work";
+import type { RowAction } from "../categories/menus";
 import { agentIntro } from "../chat/intent";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
@@ -40,6 +41,8 @@ export const ConversationRowView = memo(function ConversationRowView({
   meta,
   fresh = false,
   onOpen,
+  pinned = false,
+  holdActions,
 }: {
   row: ConversationRow;
   /** A hairline above (every row but the first). */
@@ -47,8 +50,10 @@ export const ConversationRowView = memo(function ConversationRowView({
   live?: boolean;
   /** An agent DM: it waits on you, or what it is doing (from `agentRowState`). */
   agent?: AgentRowState;
-  /** A channel on the home: its menu ("Mover para…"), given the row's channel (stable, so the row stays memoized). */
-  onHold?: (channelId: string) => void;
+  /** A row on the home: its menu (Fixar no topo, a channel's Mover para…), given the row. */
+  onHold?: (row: ConversationRow) => void;
+  /** On top of its section ("Fixar no topo"): a small pin where the unread count would be. */
+  pinned?: boolean;
   /** What the long press does, for screen readers. */
   holdLabel?: string;
   /** An agent with no conversation yet (`channelId: ""`): opens one with it, given the agent (stable, memoized row). */
@@ -59,6 +64,8 @@ export const ConversationRowView = memo(function ConversationRowView({
   fresh?: boolean;
   /** Told when the row opens its conversation. */
   onOpen?: () => void;
+  /** The long press's actions for iOS's own menu under the preview (`onHold`'s sheet elsewhere). */
+  holdActions?: (row: ConversationRow) => RowAction[];
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -232,10 +239,10 @@ export const ConversationRowView = memo(function ConversationRowView({
     if (onStart && r.kind === "dm") onStart(r.with.id);
     else if (href) router.push(href);
   };
-  const holds = Boolean(onHold && r.kind === "channel");
-  // iOS's own long press: the conversation itself in the system preview (tapping it opens it), and the row's menu
-  // ("Move to…") under it. An agent with no conversation yet peeks at its profile instead, with "Talk" in the menu;
-  // a tap on its row still starts the conversation. Android keeps the plain press.
+  // iOS's own long press: the conversation itself in the system preview (tapping it opens it), with the row's
+  // actions (Pin to the top, a channel's Move to…) in the system menu under it. An agent with no conversation yet
+  // peeks at its profile instead, with Talk first; a tap on its row still starts the conversation. Android keeps the
+  // plain press and the long press's sheet.
   const peekHref = starts && r.kind === "dm" ? (`/agent/${r.with.id}` as const) : href;
   const peeks = Platform.OS === "ios" && peekHref !== null;
   const a11y = [
@@ -247,6 +254,7 @@ export const ConversationRowView = memo(function ConversationRowView({
     label,
     r.at ? when.short(r.at) : null,
     r.unread > 0 ? t("mobile.chats.unreadLabel", { count: r.unread }) : null,
+    pinned ? t("sidebarPins.pinned") : null,
     lines?.kind === "mission" && badge > 0
       ? t("mobile.tabs.withCount", { label: t("mobile.home.waiting"), count: badge })
       : null,
@@ -257,13 +265,13 @@ export const ConversationRowView = memo(function ConversationRowView({
   const row = (press: () => void) => (
     <ListRow
       onPress={press}
-      {...(onHold && r.kind === "channel" && !peeks
+      {...(onHold && !peeks
         ? {
-            onLongPress: () => onHold(r.channelId),
+            onLongPress: () => onHold(r),
             delayLongPress: 380,
             accessibilityActions: [{ name: "menu", label: holdLabel ?? name }],
             onAccessibilityAction: (e: { nativeEvent: { actionName: string } }) => {
-              if (e.nativeEvent.actionName === "menu") onHold(r.channelId);
+              if (e.nativeEvent.actionName === "menu") onHold(r);
             },
           }
         : {})}
@@ -283,10 +291,17 @@ export const ConversationRowView = memo(function ConversationRowView({
         ) : null
       }
       sub={line}
-      trailing={badge > 0 ? <Count value={badge} max={99} inverted /> : null}
+      trailing={
+        badge > 0 ? (
+          <Count value={badge} max={99} inverted />
+        ) : pinned ? (
+          <Icon name="pin" size={14} color={c.faint} />
+        ) : null
+      }
     />
   );
   if (!peeks || !peekHref) return row(open);
+  const actions = holdActions?.(r) ?? [];
   return (
     <Link href={peekHref} asChild>
       <Link.Trigger>
@@ -294,18 +309,18 @@ export const ConversationRowView = memo(function ConversationRowView({
         <RowTrigger row={row} onOpen={onOpen} own={starts ? open : undefined} />
       </Link.Trigger>
       <Link.Preview />
-      {starts ? (
+      {starts || actions.length > 0 ? (
         <Link.Menu>
-          <Link.MenuAction icon="bubble.left" onPress={open}>
-            {t("mobile.agent.talk")}
-          </Link.MenuAction>
-        </Link.Menu>
-      ) : null}
-      {holds && onHold ? (
-        <Link.Menu>
-          <Link.MenuAction icon="folder" onPress={() => onHold(r.channelId)}>
-            {holdLabel ?? t("channelCategories.move")}
-          </Link.MenuAction>
+          {starts ? (
+            <Link.MenuAction icon="bubble.left" onPress={open}>
+              {t("mobile.agent.talk")}
+            </Link.MenuAction>
+          ) : null}
+          {actions.map((a) => (
+            <Link.MenuAction key={a.key} icon={a.symbol} onPress={a.run}>
+              {a.label}
+            </Link.MenuAction>
+          ))}
         </Link.Menu>
       ) : null}
     </Link>

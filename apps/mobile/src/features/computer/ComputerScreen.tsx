@@ -185,7 +185,12 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
   if (!f || !view.ready) {
     body = <Cover sky spinner color={agentLook(agent).color} text={t("agentComputer.state.opening", g)} />;
   } else if (view.forbidden) {
-    body = <Cover icon="lock" text={t("agentComputer.state.forbidden")} />;
+    body = (
+      <Cover
+        icon="lock"
+        text={t(can(org, "own_browsers") ? "agentComputer.state.forbidden" : "agentComputer.state.noRole")}
+      />
+    );
   } else if (flashing) {
     body = <Cover icon="check" text={t("agentComputer.state.ready")} />;
   } else if (stage === "held") {
@@ -200,6 +205,9 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
     body = (
       <>
         {pauseBanner}
+        {f.desktop?.reason === "browser_only" ? (
+          <Banner icon="lock" text={t("desktop.browserOnly.title")} help={t("desktop.browserOnly.role", g)} />
+        ) : null}
         <BrowserCard
           agentId={agentId}
           run={run}
