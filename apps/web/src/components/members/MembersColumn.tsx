@@ -3,6 +3,7 @@ import { agentStateIn, useAiStatus, useRoles, useRoster } from "@agenteschat/cli
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { memberGroups } from "@agenteschat/client/lib/member-groups";
+import { isOutOfOffice } from "@agenteschat/client/lib/presence";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { picksForMe } from "@agenteschat/client/lib/routing";
 import { Avatar, Button, Icon, matchesWords, RoleMark, SearchField } from "@agenteschat/ui";
@@ -346,6 +347,7 @@ function AgentRow({
           name={agent.name}
           presence={shown?.presence ?? null}
           presenceLabel={word ?? undefined}
+          asleep={isOutOfOffice(shown?.line)}
         />
         <span className="members-side__text">
           <span className="members-side__name">

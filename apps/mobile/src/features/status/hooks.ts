@@ -10,7 +10,7 @@ import {
 } from "@agenteschat/client";
 import { lowerFirst } from "@agenteschat/client/lib/format";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
-import { agentPresenceShown, agentStatusText, clearsText } from "@agenteschat/client/lib/presence";
+import { agentPresenceShown, agentStatusText, clearsText, isOutOfOffice } from "@agenteschat/client/lib/presence";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useMeId, useOrgId, useWhen } from "../shared/hooks";
@@ -134,7 +134,7 @@ export function useAgentProfileStatus(agentId: string, name: string): AgentProfi
     presence: shown.presence,
     line: `${t(`presence.${shown.presence}`)} · ${why}`,
     card: shown.line ? { ...shown.line, note } : null,
-    waiting: own && (own.kind === "out_of_plan" || own.kind === "out_of_budget") ? (own.count ?? 0) : 0,
+    waiting: own && isOutOfOffice(own) ? (own.count ?? 0) : 0,
   };
 }
 

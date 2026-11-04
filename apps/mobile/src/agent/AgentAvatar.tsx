@@ -1,4 +1,11 @@
-import { drawAccessory, drawAgent, type Expression } from "@agenteschat/ui/agent/engine";
+import {
+  bodyTones,
+  drawAccessory,
+  drawAgent,
+  drawSleep,
+  type Expression,
+  EYE_COLOR,
+} from "@agenteschat/ui/agent/engine";
 import { avatarSkyCell, avatarSkyCells, avatarSkyTones } from "@agenteschat/ui/sky/avatar";
 import { Canvas, createPicture, Picture } from "@shopify/react-native-skia";
 import { memo, useMemo } from "react";
@@ -39,6 +46,7 @@ export function agentFrame(
   reduced: boolean,
   frame?: { dark: boolean },
   expression?: Expression,
+  dark = frame?.dark ?? false,
 ) {
   const accessory = agent.accessory && agent.accessory !== "none" ? agent.accessory : undefined;
   const box = frame ? framedLayout(size, Boolean(accessory)) : agentLayout(size, Boolean(accessory));
@@ -61,10 +69,19 @@ export function agentFrame(
     pose: expression
       ? { ...poseFor(mode, t, seed, reduced), expression, blink: false }
       : poseFor(mode, t, seed, reduced),
-    after:
-      box.withAccessory && accessory
-        ? (ctx, side, frame) => drawAccessory(ctx, side, accessory, frame, t, mode === "run")
-        : undefined,
+    after: (ctx, side, body) => {
+      if (box.withAccessory && accessory) drawAccessory(ctx, side, accessory, body, t, mode === "run");
+      // A sleeping agent's zz: the body's darkest tone on a light page, white on a dark one.
+      if (mode === "sleep")
+        drawSleep(
+          ctx,
+          side,
+          body,
+          dark ? EYE_COLOR : (bodyTones(agent.color)[0] ?? EYE_COLOR),
+          // A still frame shows both z's.
+          reduced || t === STILL_T ? undefined : t,
+        );
+    },
   });
   return compile(rec.commands);
 }
@@ -88,6 +105,7 @@ function AgentAvatarView({ agent, size, mode = "idle", live = true, name, framed
       reduced,
       tile ? { dark } : undefined,
       expression,
+      dark,
     );
     return createPicture((canvas) => replay(canvas, frame), { width: size, height: size });
   }, [color, eyes, accessory, size, mode, t, seed, reduced, tile, dark, expression]);

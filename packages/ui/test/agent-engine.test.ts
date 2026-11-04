@@ -4,6 +4,7 @@ import {
   bodyPath,
   bodyTones,
   customGradient,
+  drawSleep,
   EYE_COLOR,
   EYE_STYLES,
   eyeShapes,
@@ -14,6 +15,8 @@ import {
   luminance,
   nearestPreset,
   pickerStart,
+  SLEEP_SPOTS,
+  sleepPose,
   spriteBody,
   spriteGrid,
 } from "../src/agent/engine.js";
@@ -128,5 +131,30 @@ describe("agent engine: one agent everywhere", () => {
     expect(normalizeAppearance({ color: "teal" }).color).toBe("teal");
     const [top, bottom] = customGradient("#abcdef");
     expect(appearanceStyle({ color: "#abcdef" })).toEqual({ "--av-top": top, "--av-bottom": bottom } as never);
+  });
+});
+
+describe("a sleeping agent (paused until its plan or budget is back)", () => {
+  const rects = (t?: number) => {
+    const out: [number, number][] = [];
+    const ctx = { fillStyle: "", fillRect: (x: number, y: number) => out.push([x, y]) };
+    drawSleep(ctx as never, 16, undefined, "#000000", t);
+    return out;
+  };
+  test("eyes closed and still without time; two pixel z's, the high one coming and going with it", () => {
+    expect(sleepPose(undefined).expression).toBe("closed");
+    expect(sleepPose(undefined).squash).toBe(0);
+    expect(rects()).toHaveLength(16);
+    expect(rects(0)).toHaveLength(8);
+    expect(rects(0.9)).toHaveLength(16);
+    expect(rects(1.7)).toHaveLength(16);
+  });
+  test("the zz stay inside a tile's room around a bare head (4.8 cells above, 4.1 right) and off the face", () => {
+    for (const [x, y] of rects()) {
+      expect(y).toBeGreaterThanOrEqual(-4.8);
+      expect(x + 1).toBeLessThanOrEqual(16 + 4.1);
+      expect(x).toBeGreaterThanOrEqual(14);
+    }
+    expect(SLEEP_SPOTS).toHaveLength(2);
   });
 });

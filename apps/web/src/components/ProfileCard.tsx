@@ -36,7 +36,7 @@ import {
 } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
-import { clearsText } from "@agenteschat/client/lib/presence";
+import { clearsText, isOutOfOffice } from "@agenteschat/client/lib/presence";
 import { isAuto } from "@agenteschat/client/lib/providers";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { rolesOf } from "@agenteschat/client/lib/roles";
@@ -571,6 +571,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
           name={agent.name}
           presence={shown?.presence ?? null}
           presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
+          asleep={isOutOfOffice(shown?.line)}
         />
       }
       more={agentEntries(agent)}
@@ -603,9 +604,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
                   : t("presence.byAuto")}
             </small>
             {/* Out of office with conversations waiting (ADR 0118): what it picks up when it is back, in order. */}
-            {(shown.line.kind === "out_of_plan" || shown.line.kind === "out_of_budget") && shown.line.count ? (
-              <SeeUsageQueue agentId={agent.id} />
-            ) : null}
+            {isOutOfOffice(shown.line) && shown.line.count ? <SeeUsageQueue agentId={agent.id} /> : null}
           </span>
         </div>
       )}

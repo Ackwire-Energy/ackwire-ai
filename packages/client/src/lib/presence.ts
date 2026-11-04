@@ -115,6 +115,10 @@ export const AGENT_KIND_EMOJI: Record<AgentStatusKind, string> = {
   work: "🛠️",
 };
 
+/** Out of office (§12): its plan or its budget hit the limit, so it sleeps until it is back. */
+export const isOutOfOffice = (line: Pick<AgentStatusLine, "kind"> | null | undefined) =>
+  line?.kind === "out_of_plan" || line?.kind === "out_of_budget";
+
 /**
  * An agent's line in words (its own, or the server's kind worded in the app's language), with its emoji. Out of
  * office (§12) says when it is back ("Sem limite do plano · volta às 15:00"), in `locale`.
@@ -128,7 +132,7 @@ export function agentStatusText(
   if (line.text) return { emoji: line.emoji ?? AGENT_KIND_EMOJI.task, text: line.text };
   if (!line.kind) return null;
   if (line.kind === "work") return { emoji: line.emoji ?? AGENT_KIND_EMOJI.work, text: workStatusText(t, line) };
-  if (line.kind === "out_of_plan" || line.kind === "out_of_budget") {
+  if (isOutOfOffice(line)) {
     const what = t(`presence.agent.${line.kind}`);
     const back = line.until ? t("presence.agent.backAt", { when: usageWhen(t, locale, line.until, now) }) : null;
     // How many conversations wait for it (ADR 0118): the same count its queue shows.
