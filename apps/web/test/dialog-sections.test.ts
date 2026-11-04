@@ -17,7 +17,7 @@ const WRAPPERS = new Set(["form", "Suspense"]);
  * grid, a channel's settings with their nav).
  */
 const OWN_INSET =
-  /\b(ac-dialog__\w+|cflow__steps|catalog__tools|catalog__body|catalog-svc__body|catalog-svc__act|channel-settings|ac-steps)\b/;
+  /\b(ac-dialog__\w+|cflow__steps|catalog__tools|catalog__body|catalog-svc__body|catalog-svc__act|channel-settings|ac-steps|pu-drawer__body)\b/;
 /** Components from other files that render sections (checked where they are defined). */
 const SECTION_COMPONENTS = new Set([
   "ConnectFlow",
