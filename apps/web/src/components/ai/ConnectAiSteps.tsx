@@ -28,7 +28,6 @@ import {
 import { holdText } from "@agenteschat/client/lib/errors";
 import { NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { toolOffReason } from "@agenteschat/client/lib/machines";
 import {
   type AiChoice,
   ALL_AGENTS,
@@ -37,6 +36,7 @@ import {
   type ExistingSignIn,
   freePlanAccount,
   gateDims,
+  gateLine,
   KEY_MARKS,
   kindOf,
   ownSignInFor,
@@ -1082,6 +1082,7 @@ function PlanSteps({
           computer={edition === "cloud" ? t("connectAi.theComputer") : computer}
           {...(coding ? { provider: choice } : {})}
           again={login ? login.again : signedOut?.id}
+          fresh={existing.length > 0 && otherChosen}
           email={turn && sameAs ? sameAs : login ? login.email : signedOut?.email}
           local={view?.ownSignIn}
           ready={ready}
@@ -1155,6 +1156,8 @@ function GateWait({
     </p>
   );
   const hold = holdText(t, org.standing);
+  // Offline or unsupported: what's going on there and what comes next (on the Cloud, by itself as events arrive).
+  const why = gateLine(t, { gate, edition, kind, computer, machine: machines.data?.find((m) => m.id === machineId) });
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <Spinner />;
   else if (gate.state === "preparing") {
@@ -1198,15 +1201,13 @@ function GateWait({
         )}
       </div>
     );
-  } else if (gate.state === "offline" && !signingIn) {
-    wait = hostConnecting ? (
-      line(<Spinner size={14} />, t("connectAi.wait.connecting"))
-    ) : (
+  } else if (gate.state === "offline" && hostConnecting && !signingIn) {
+    wait = line(<Spinner size={14} />, t("connectAi.wait.connecting"));
+  } else if (why && !(gate.state === "offline" && signingIn)) {
+    wait = (
       <>
-        <SettingNote icon="alert">
-          {edition === "cloud"
-            ? t("aiAccounts.connect.needsCloud.online", { computer })
-            : t("brain.offline", { computer })}
+        <SettingNote icon={why.rechecks ? "clock" : "alert"} live={why.rechecks}>
+          {why.text}
         </SettingNote>
         {useKey}
       </>
@@ -1220,26 +1221,6 @@ function GateWait({
             {t("aiAccounts.connect.addComputer")}
           </Button>
         </span>
-      </>
-    );
-  } else if (gate.state === "unsupported") {
-    const off = toolOffReason(
-      machines.data?.find((m) => m.id === machineId),
-      kind,
-    );
-    const program = t(`brain.card.${kind}`);
-    wait = (
-      <>
-        <SettingNote icon="alert">
-          {edition === "cloud"
-            ? t(`aiAccounts.connect.needsCloud.${kind}`, { computer })
-            : gate.reason === "keys"
-              ? t("aiAccounts.connect.needs.keys")
-              : gate.reason === "tool_off"
-                ? t(off.key, { computer, command: off.command, program })
-                : t(`brain.reasons.${gate.reason}`, { computer, program })}
-        </SettingNote>
-        {useKey}
       </>
     );
   } else if (gate.state === "locked") {

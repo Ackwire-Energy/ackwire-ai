@@ -184,6 +184,10 @@ describe("connected computers helpers (ADR 0036)", () => {
     applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", access: true } as { type: string });
     expect(stale()).toEqual([true, true]);
     fresh();
+    // A plan's program installed there since it connected (`executors.changed`): its sign-in turns on in place.
+    applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", executors: true } as { type: string });
+    expect(stale()).toEqual([true, true]);
+    fresh();
     applyComputerEvent(qc, "o1", { type: "agent.computer", agentId: "a1", target: { kind: "none" } } as {
       type: string;
     });

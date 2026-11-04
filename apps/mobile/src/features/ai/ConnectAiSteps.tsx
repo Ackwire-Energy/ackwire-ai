@@ -15,7 +15,6 @@ import { computerEdition, computerName, setupView } from "@agenteschat/client/li
 import { holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { toolOffReason } from "@agenteschat/client/lib/machines";
 import {
   type AiChoice,
   behindComputer,
@@ -24,6 +23,7 @@ import {
   firstAgent,
   freePlanAccount,
   gateDims,
+  gateLine,
   KEY_MARKS,
   kindOf,
   ownSignInFor,
@@ -249,8 +249,10 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
     forAgent && gates.view?.agentId === forAgent.id && !hasAi(forAgent.id)
       ? existingRows(t, gates.view, credentials.data ?? [], forAgent.name)
       : [];
-  const shown = gates.gateOf(view.page === "plan" ? view.choice : "claude").state;
-  useEffect(() => setPolls(agentId !== undefined && pollsPlan(shown)), [agentId, shown]);
+  const shownGate = gates.gateOf(view.page === "plan" ? view.choice : "claude");
+  const shown = shownGate.state;
+  const asksAgain = agentId !== undefined && pollsPlan(shownGate, gates.edition);
+  useEffect(() => setPolls(asksAgain), [asksAgain]);
   const { markWaited } = gates;
   const onPlan = view.page === "plan";
   useEffect(() => {
@@ -954,6 +956,7 @@ function PlanSteps({
           // The Cloud's one computer goes unnamed in the account choice: the sign-in is about the account, not where.
           computer={edition === "cloud" ? t("connectAi.theComputer") : computer}
           {...(isPlanId(choice) ? { provider: choice } : {})}
+          fresh={existing.length > 0 && other}
           again={hint ? hint.again : signedOut?.id}
           email={hint ? hint.email : signedOut?.email}
           local={view?.ownSignIn}
@@ -999,6 +1002,8 @@ function GateWait({
   const { colors: c } = useTheme();
   const machines = useMachines(orgId, edition !== null);
   const hold = holdText(t, org?.standing);
+  // Offline or unsupported: what's going on there and what comes next (on the Cloud, by itself: the page asks again).
+  const why = gateLine(t, { gate, edition, kind, computer, machine: machines.data?.find((m) => m.id === machineId) });
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <ActivityIndicator color={c.muted} style={styles.loading} />;
   else if (gate.state === "preparing") {
@@ -1013,14 +1018,8 @@ function GateWait({
         <InfoCard icon="clock">{t(coding ? "connectAi.wait.key" : "connectAi.wait.signIn")}</InfoCard>
       </View>
     );
-  } else if (gate.state === "offline" && !signingIn) {
-    wait = (
-      <InfoCard icon="laptop">
-        {edition === "cloud"
-          ? t("aiAccounts.connect.needsCloud.online", { computer })
-          : t("brain.offline", { computer })}
-      </InfoCard>
-    );
+  } else if (why && !(gate.state === "offline" && signingIn)) {
+    wait = <InfoCard icon={why.rechecks ? "clock" : "laptop"}>{why.text}</InfoCard>;
   } else if (gate.state === "missing") {
     wait = (
       <>
@@ -1034,23 +1033,6 @@ function GateWait({
         </InfoCard>
         <Note icon="lock">{t("mobile.ai.meanwhile")}</Note>
       </>
-    );
-  } else if (gate.state === "unsupported") {
-    const off = toolOffReason(
-      machines.data?.find((m) => m.id === machineId),
-      kind,
-    );
-    const program = t(`brain.card.${kind}`);
-    wait = (
-      <InfoCard icon="laptop">
-        {edition === "cloud"
-          ? t(`aiAccounts.connect.needsCloud.${kind}`, { computer })
-          : gate.reason === "keys"
-            ? t("aiAccounts.connect.needs.keys")
-            : gate.reason === "tool_off"
-              ? t(off.key, { computer, command: off.command, program })
-              : t(`brain.reasons.${gate.reason}`, { computer, program })}
-      </InfoCard>
     );
   } else if (gate.state === "locked") {
     const pairer = machines.data?.find((m) => m.id === machineId)?.pairedBy?.name.split(" ")[0];

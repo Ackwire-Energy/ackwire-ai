@@ -2191,6 +2191,10 @@
     "onceHint": "Tutti condividono i limiti del tuo piano.",
     "use": "Usa {{label}}",
     "another": "Un altro account",
+    "reuse": {
+      "active": "Hai già {{label}} qui. Accedi di nuovo a questo account, oppure usane un altro.",
+      "signedOut": "{{label}} è disconnesso qui. Accedi di nuovo e i suoi agenti continuano a usarlo."
+    },
     "signInFor": "Accedi per {{name}}",
     "signInFor_female": "Accedi per {{name}}",
     "doneAll": "Ora {{names}} ragionano con {{label}}.",
@@ -7571,11 +7575,13 @@
       "noComputer": "Gli account restano su un computer collegato. Prima collega uno dei tuoi.",
       "addComputer": "Collega un computer",
       "needsCloud": {
-        "claude_code": "Non ancora pronto su {{computer}}",
-        "codex": "Non ancora pronto su {{computer}}",
-        "cursor": "Non ancora pronto su {{computer}}",
-        "opencode": "Non ancora pronto su {{computer}}",
-        "online": "{{computer}} non risponde in questo momento. Ci stiamo lavorando."
+        "online": "{{computer}} si sta riavviando o riconnettendo. Questo cambia da solo appena torna.",
+        "installing": "{{program}} è in installazione su {{computer}}. Questo cambia da solo quando ha finito.",
+        "updating": "{{program}} è in aggiornamento su {{computer}}. Questo cambia da solo quando ha finito.",
+        "runnerOld": "Il programma agentes.chat su {{computer}} non è aggiornato e l'aggiornamento è in arrivo. Questo cambia da solo quando ha finito.",
+        "execOff": "{{computer}} non può ancora eseguire {{program}}. Ci stiamo lavorando, e questo cambia da solo.",
+        "toolOff": "{{program}} non è consentito su {{computer}}. Chiedi al supporto di consentirlo.",
+        "preparing": "{{computer}} si sta preparando. Questo cambia da solo quando ha finito."
       }
     },
     "done": {
@@ -7603,6 +7609,13 @@
       "rename": "Rinomina",
       "signInAgain": "Accedi di nuovo",
       "newKey": "Sostituisci la chiave",
+      "copies_one": "{{count}} accesso in più di questo account, senza agenti.",
+      "copies_many": "{{count}} accessi in più di questo account, senza agenti.",
+      "copies_other": "{{count}} accessi in più di questo account, senza agenti.",
+      "removeCopies": "Rimuovi",
+      "copiesRemoved_one": "{{count}} accesso inutilizzato rimosso.",
+      "copiesRemoved_many": "{{count}} accessi inutilizzati rimossi.",
+      "copiesRemoved_other": "{{count}} accessi inutilizzati rimossi.",
       "disconnect": "Scollega",
       "renameTitle": "Rinomina {{label}}",
       "nameLabel": "Nome",

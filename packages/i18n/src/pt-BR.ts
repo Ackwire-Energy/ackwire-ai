@@ -2110,6 +2110,11 @@ export const ptBR = {
     onceHint: "Todos dividem os limites do seu plano.",
     use: "Usar {{label}}",
     another: "Outra conta",
+    /** Before a new sign-in, where the person already has an account of that plan on that computer (`reusableAccount`). */
+    reuse: {
+      active: "Você já tem {{label}} aqui. Entre de novo nela, ou use outra conta.",
+      signedOut: "{{label}} saiu da conta aqui. Entre de novo nela e os agentes dela continuam com ela.",
+    },
     signInFor: "Fazer login para o {{name}}",
     signInFor_female: "Fazer login para a {{name}}",
     doneAll: "{{names}} agora pensam com {{label}}.",
@@ -7178,12 +7183,19 @@ export const ptBR = {
       },
       noComputer: "As contas ficam num computador conectado. Conecte um seu primeiro.",
       addComputer: "Conectar um computador",
+      /**
+       * The Cloud's: why a plan can't sign in on the workspace's computer yet (`gateLine`), with what happens next.
+       * `program`: "Claude Code", "Codex", "Cursor" or "OpenCode" (`brain.card`).
+       */
       needsCloud: {
-        claude_code: "Ainda não está pronto no {{computer}}",
-        codex: "Ainda não está pronto no {{computer}}",
-        cursor: "Ainda não está pronto no {{computer}}",
-        opencode: "Ainda não está pronto no {{computer}}",
-        online: "O {{computer}} não está respondendo agora. Já estamos cuidando.",
+        online: "O {{computer}} está reiniciando ou se reconectando. Isto muda sozinho quando ele voltar.",
+        installing: "O {{program}} está sendo instalado no {{computer}}. Isto muda sozinho quando terminar.",
+        updating: "O {{program}} está sendo atualizado no {{computer}}. Isto muda sozinho quando terminar.",
+        runnerOld:
+          "O programa do agentes.chat no {{computer}} está desatualizado e a atualização já está a caminho. Isto muda sozinho quando ela terminar.",
+        execOff: "O {{computer}} ainda não consegue rodar o {{program}}. Já estamos cuidando, e isto muda sozinho.",
+        toolOff: "O {{program}} não está liberado no {{computer}}. Peça ao suporte para liberar.",
+        preparing: "O {{computer}} está ficando pronto. Isto muda sozinho quando terminar.",
       },
     },
     done: {
@@ -7209,6 +7221,12 @@ export const ptBR = {
       rename: "Renomear",
       signInAgain: "Entrar de novo",
       newKey: "Trocar a chave",
+      /** Logins of one account that think for no agent (`unusedCopies`), each a sign-in made again. */
+      copies_one: "Mais {{count}} login desta conta, sem nenhum agente.",
+      copies_other: "Mais {{count}} logins desta conta, sem nenhum agente.",
+      removeCopies: "Remover",
+      copiesRemoved_one: "{{count}} login sem uso removido.",
+      copiesRemoved_other: "{{count}} logins sem uso removidos.",
       disconnect: "Desconectar",
       renameTitle: "Renomear {{label}}",
       nameLabel: "Nome",

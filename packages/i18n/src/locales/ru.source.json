@@ -4500,6 +4500,12 @@
   "connectAi.another": {
     "value": "Another account"
   },
+  "connectAi.reuse.active": {
+    "value": "You already have {{label}} here. Sign in to it again, or use another account."
+  },
+  "connectAi.reuse.signedOut": {
+    "value": "{{label}} is signed out here. Sign in to it again and its agents keep it."
+  },
   "connectAi.signInFor": {
     "value": "Sign in for {{name}}"
   },
@@ -16910,20 +16916,26 @@
   "aiAccounts.connect.addComputer": {
     "value": "Connect a computer"
   },
-  "aiAccounts.connect.needsCloud.claude_code": {
-    "value": "Not ready on {{computer}} yet"
-  },
-  "aiAccounts.connect.needsCloud.codex": {
-    "value": "Not ready on {{computer}} yet"
-  },
-  "aiAccounts.connect.needsCloud.cursor": {
-    "value": "Not ready on {{computer}} yet"
-  },
-  "aiAccounts.connect.needsCloud.opencode": {
-    "value": "Not ready on {{computer}} yet"
-  },
   "aiAccounts.connect.needsCloud.online": {
-    "value": "{{computer}} isn't answering right now. We're on it."
+    "value": "{{computer}} is restarting or reconnecting. This changes by itself once it's back."
+  },
+  "aiAccounts.connect.needsCloud.installing": {
+    "value": "{{program}} is being installed on {{computer}}. This changes by itself when it's done."
+  },
+  "aiAccounts.connect.needsCloud.updating": {
+    "value": "{{program}} is being updated on {{computer}}. This changes by itself when it's done."
+  },
+  "aiAccounts.connect.needsCloud.runnerOld": {
+    "value": "The agentes.chat program on {{computer}} is out of date and an update is on its way. This changes by itself when it's done."
+  },
+  "aiAccounts.connect.needsCloud.execOff": {
+    "value": "{{computer}} can't run {{program}} yet. We're on it, and this changes by itself."
+  },
+  "aiAccounts.connect.needsCloud.toolOff": {
+    "value": "{{program}} isn't allowed on {{computer}}. Ask support to allow it."
+  },
+  "aiAccounts.connect.needsCloud.preparing": {
+    "value": "{{computer}} is getting ready. This changes by itself when it's done."
   },
   "aiAccounts.done.name": {
     "value": "What do you want to call it? Others see this name."
@@ -16984,6 +16996,21 @@
   },
   "aiAccounts.page.newKey": {
     "value": "Replace the key"
+  },
+  "aiAccounts.page.copies": {
+    "value": {
+      "one": "{{count}} more login of this account, with no agent.",
+      "other": "{{count}} more logins of this account, with no agent."
+    }
+  },
+  "aiAccounts.page.removeCopies": {
+    "value": "Remove"
+  },
+  "aiAccounts.page.copiesRemoved": {
+    "value": {
+      "one": "{{count}} unused login removed.",
+      "other": "{{count}} unused logins removed."
+    }
   },
   "aiAccounts.page.disconnect": {
     "value": "Disconnect"

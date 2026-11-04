@@ -1442,6 +1442,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                     kind={accountKind}
                     computer={computerName}
                     again={again?.id}
+                    // "Adicionar conta" beside the accounts the agent's choice already lists: another one.
+                    fresh
                     {...(isPlanId(card) ? { provider: card } : {})}
                     email={signingIn?.email}
                     local={view.ownSignIn}

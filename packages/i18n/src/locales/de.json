@@ -2116,6 +2116,10 @@
     "onceHint": "Alle teilen sich die Limits deines Abos.",
     "use": "{{label}} nutzen",
     "another": "Anderes Konto",
+    "reuse": {
+      "active": "Du hast {{label}} hier schon. Melde dich erneut an oder nimm ein anderes Konto.",
+      "signedOut": "{{label}} ist hier abgemeldet. Melde dich erneut an, und seine Agenten behalten es."
+    },
     "signInFor": "Für {{name}} anmelden",
     "doneAll": "{{names}} denken jetzt mit {{label}}.",
     "otherAccount": {
@@ -7251,11 +7255,13 @@
       "noComputer": "Konten bleiben auf einem verbundenen Computer. Verbinde zuerst einen deiner Computer.",
       "addComputer": "Computer verbinden",
       "needsCloud": {
-        "claude_code": "Auf {{computer}} noch nicht bereit",
-        "codex": "Auf {{computer}} noch nicht bereit",
-        "cursor": "Auf {{computer}} noch nicht bereit",
-        "opencode": "Auf {{computer}} noch nicht bereit",
-        "online": "{{computer}} antwortet gerade nicht. Wir kümmern uns."
+        "online": "{{computer}} startet neu oder verbindet sich wieder. Das ändert sich von selbst, sobald er zurück ist.",
+        "installing": "{{program}} wird auf {{computer}} installiert. Das ändert sich von selbst, wenn es fertig ist.",
+        "updating": "{{program}} wird auf {{computer}} aktualisiert. Das ändert sich von selbst, wenn es fertig ist.",
+        "runnerOld": "Das agentes.chat-Programm auf {{computer}} ist veraltet und ein Update ist unterwegs. Das ändert sich von selbst, wenn es fertig ist.",
+        "execOff": "{{computer}} kann {{program}} noch nicht ausführen. Wir kümmern uns, und das ändert sich von selbst.",
+        "toolOff": "{{program}} ist auf {{computer}} nicht freigegeben. Bitte den Support, es freizugeben.",
+        "preparing": "{{computer}} wird gerade fertig. Das ändert sich von selbst, wenn es so weit ist."
       }
     },
     "done": {
@@ -7281,6 +7287,11 @@
       "rename": "Umbenennen",
       "signInAgain": "Erneut anmelden",
       "newKey": "Schlüssel ersetzen",
+      "copies_one": "{{count}} weitere Anmeldung dieses Kontos, ohne Agenten.",
+      "copies_other": "{{count}} weitere Anmeldungen dieses Kontos, ohne Agenten.",
+      "removeCopies": "Entfernen",
+      "copiesRemoved_one": "{{count}} ungenutzte Anmeldung entfernt.",
+      "copiesRemoved_other": "{{count}} ungenutzte Anmeldungen entfernt.",
       "disconnect": "Trennen",
       "renameTitle": "{{label}} umbenennen",
       "nameLabel": "Name",

@@ -1,5 +1,6 @@
 import type { AccountLoginStart, AccountLoginStatus, MachineAccount, MachineAccountKind } from "@agenteschat/client";
-import { keys, useAccountLogin, useApi } from "@agenteschat/client";
+import { keys, useAccountLogin, useAiAccounts, useApi } from "@agenteschat/client";
+import { accountTitle, reusableAccount } from "@agenteschat/client/lib/ai-accounts";
 import {
   beginLogin,
   freeDuplicate,
@@ -51,6 +52,11 @@ export interface AddAccountProps {
   /** Sign in again to this account (signed out): same account, same agents. */
   again?: string;
   /**
+   * The person already chose another account: no offer to sign in again to one they have there (`reusableAccount`),
+   * which every other new sign-in makes first.
+   */
+  fresh?: boolean;
+  /**
    * Claude's login hint, never asked: the email of the account signing in again, or of the one a turn shares. A sign-in
    * that comes back as another account says so instead of thinking with it.
    */
@@ -89,22 +95,68 @@ export interface AddAccountProps {
 }
 
 export function AddAccount(props: AddAccountProps) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
   // "Tentar de novo" starts over with a new sign-in: of a `fanOut`, only for the targets that didn't sign in, so no
   // login is left on the computer with none to think for.
   const [attempt, setAttempt] = useState(0);
   const [signedIn, setSignedIn] = useState<string[]>([]);
   const { fanOut, onAdded } = props;
+  // A new sign-in where the person already has that plan's account on that computer: Entrar de novo on it first
+  // (already chosen when it's signed out), Outra conta beside it. Decided once, so the account signing in doesn't
+  // change it.
+  const offers = !props.again && !fanOut && !props.email && !props.signInLabel && !props.fresh;
+  const ai = useAiAccounts(org.id, offers);
+  const [reuse, setReuse] = useState<MachineAccount | null>();
+  const [pick, setPick] = useState<"again" | "new">();
+  useEffect(() => {
+    if (reuse !== undefined || (offers && ai.isPending)) return;
+    const found = offers
+      ? reusableAccount(ai.data?.accounts, { machineId: props.machineId, kind: props.kind, provider: props.provider })
+      : undefined;
+    setReuse(found ?? null);
+  }, [reuse, offers, ai.isPending, ai.data, props.machineId, props.kind, props.provider]);
+  if (reuse === undefined) return <Icon name="spinner" size={14} />;
+  const chosen = reuse ? (pick ?? (reuse.status === "signed_out" ? "again" : undefined)) : "new";
+  const label = reuse ? accountTitle(reuse) : "";
+  const another = (
+    <Button size="sm" onClick={() => setPick("new")}>
+      {t("connectAi.another")}
+    </Button>
+  );
+  if (reuse && chosen === undefined)
+    return (
+      <div className="ai-panel__row">
+        <SettingNote icon="repeat">{t("connectAi.reuse.active", { label })}</SettingNote>
+        <span className="ac-acts">
+          <Button size="sm" variant="primary" onClick={() => setPick("again")}>
+            {t("aiAccounts.page.signInAgain")}
+          </Button>
+          {another}
+        </span>
+      </div>
+    );
+  const again = reuse && chosen === "again" ? { again: reuse.id, email: reuse.email } : {};
   return (
-    <AddAccountFlow
-      key={attempt}
-      {...props}
-      {...(fanOut ? { fanOut: fanOut.filter((x) => !signedIn.includes(x.id)) } : {})}
-      onAdded={(account, target) => {
-        if (target) setSignedIn((s) => [...s, target]);
-        onAdded(account, target);
-      }}
-      onRetry={() => setAttempt((n) => n + 1)}
-    />
+    <>
+      {reuse && chosen === "again" && pick === undefined && (
+        <div className="ai-panel__row">
+          <SettingNote icon="repeat">{t("connectAi.reuse.signedOut", { label })}</SettingNote>
+          {another}
+        </div>
+      )}
+      <AddAccountFlow
+        key={`${attempt}:${chosen}`}
+        {...props}
+        {...again}
+        {...(fanOut ? { fanOut: fanOut.filter((x) => !signedIn.includes(x.id)) } : {})}
+        onAdded={(account, target) => {
+          if (target) setSignedIn((s) => [...s, target]);
+          onAdded(account, target);
+        }}
+        onRetry={() => setAttempt((n) => n + 1)}
+      />
+    </>
   );
 }
 

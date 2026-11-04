@@ -4128,6 +4128,8 @@ export type MachineEvent =
       access?: MachineAccess | null | true;
       /** `true`: its Claude Code / Codex accounts changed (ADR 0041); refetch the agents' brain settings. */
       accounts?: true;
+      /** `true`: the coding CLIs it found changed (protocol 41); refetch the agents' brain settings. */
+      executors?: true;
     }
   /** ADR 0036: a new pause state or access reported by the machine (also accepted inside `machine.updated`). */
   | { type: "machine.state"; machineId: string; paused?: MachinePause | null }

@@ -3,12 +3,13 @@ import type {
   Agent,
   AgentBrain,
   AgentBrainLine,
+  AiAccounts,
   AiComputer,
   ComputerSetup,
   Machine,
   MachineAccount,
 } from "@agenteschat/client";
-import { ApiError, keys } from "@agenteschat/client";
+import { ApiError, applyMachineEvent, keys } from "@agenteschat/client";
 import { LOGIN_RECONNECT_MS } from "@agenteschat/client/lib/machines";
 import { LOGIN_PER_AGENT } from "@agenteschat/client/lib/plans";
 import { en } from "@agenteschat/i18n";
@@ -98,6 +99,7 @@ async function connect({
   path = `/org/${ORG_ID}/settings/keys`,
   role,
   ada: adaRow,
+  accounts = [],
 }: {
   computers?: AiComputer[];
   setup?: Partial<ComputerSetup>;
@@ -113,6 +115,8 @@ async function connect({
   role?: "admin" | "member";
   /** Over Ada's row (what she thinks with, whom she replies to). */
   ada?: Partial<Agent>;
+  /** Walter's accounts on the computers (`/ai-accounts`). */
+  accounts?: AiAccounts["accounts"];
 } = {}) {
   const state = seedState();
   const workspace = state.me?.organizations[0];
@@ -138,7 +142,7 @@ async function connect({
         .map((a) => ({ id: a.id, name: a.name, handle: a.handle })),
       ...machine,
     });
-  machines?.setAiAccounts({ accounts: [], computers });
+  machines?.setAiAccounts({ accounts, computers });
   const viewOf = api.agents.brain;
   api.agents.brain = async (orgId, agentId) => ({ ...(await viewOf(orgId, agentId)), ownSignIn: false, ...brain });
   const { router, services } = await renderApp(path, { api });
@@ -815,9 +819,61 @@ describe("Conectar uma IA: one picker, plans first", () => {
       setup: { state: "ready" },
       brain: { computer: { machineId: "managed_1", name: "Computador da Acme", online: false } },
     });
-    expect(dialog.textContent).toContain("O Computador da Acme não está respondendo agora. Já estamos cuidando.");
+    expect(dialog.textContent).toContain(
+      "O Computador da Acme está reiniciando ou se reconectando. Isto muda sozinho quando ele voltar.",
+    );
     expect(within(dialog).getByRole("button", { name: "Usar uma chave de API agora" })).toBeTruthy();
     expect(dialog.textContent).not.toMatch(/Seu computador está desligado|desligado/);
+  });
+
+  test("on the Cloud, a plan's program being installed: said so, a key meanwhile, and its sign-in once it's there", async () => {
+    const workspace: AiComputer = { ...MAC, machineId: "managed_1", name: "Computador da Acme" };
+    const options = (available: boolean) =>
+      fakeAgentBrain(ADA_ID).options.map((o) =>
+        o.kind === "codex" ? { ...o, available, ...(available ? {} : { reason: "not_installed" as const }) } : o,
+      );
+    const where = { machineId: "managed_1", name: "Computador da Acme", online: true };
+    const { api, dialog, tile, services } = await connect({
+      computers: [workspace],
+      setup: { state: "ready", machineId: "managed_1" },
+      brain: { computer: where, options: options(false) },
+    });
+    await click(tile("ChatGPT"));
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do ChatGPT" });
+    expect(panel.textContent).toContain(
+      "O Codex está sendo instalado no Computador da Acme. Isto muda sozinho quando terminar.",
+    );
+    expect(panel.textContent).not.toContain("Ainda não está pronto");
+    expect(within(panel).getByRole("button", { name: "Usar uma chave de API agora" })).toBeTruthy();
+    // The computer says it found the program: the panel signs in, with no reload.
+    const viewOf = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({ ...(await viewOf(orgId, agentId)), options: options(true) });
+    await act(async () => {
+      applyMachineEvent(services.queryClient, ORG_ID, {
+        type: "machine.updated",
+        machineId: "managed_1",
+        executors: true,
+      } as { type: string });
+    });
+    await settle(6);
+    expect(within(panel).getByRole("button", { name: "Entrar com ChatGPT" })).toBeTruthy();
+    expect(panel.textContent).not.toContain("sendo instalado");
+  });
+
+  test("on the Cloud, the program not allowed there: who to ask, never a wait", async () => {
+    const options = fakeAgentBrain(ADA_ID).options.map((o) =>
+      o.kind === "codex" ? { ...o, available: false, reason: "tool_off" as const } : o,
+    );
+    const { dialog, tile } = await connect({
+      computers: [{ ...MAC, machineId: "managed_1", name: "Computador da Acme" }],
+      setup: { state: "ready", machineId: "managed_1" },
+      brain: { computer: { machineId: "managed_1", name: "Computador da Acme", online: true }, options },
+    });
+    await click(tile("ChatGPT"));
+    expect(dialog.textContent).toContain(
+      "O Codex não está liberado no Computador da Acme. Peça ao suporte para liberar.",
+    );
+    expect(within(dialog).getByRole("button", { name: "Usar uma chave de API agora" })).toBeTruthy();
   });
 
   test("the email's link on a cold load: once the agents arrive, Claude's sign-in for the viewer's agent", async () => {
@@ -1539,6 +1595,56 @@ describe("All agents: one plan for the team, a login per agent", () => {
       expect(within(dialog).queryByRole("button", { name: /^Usar / })).toBeNull();
       cleanup();
     }
+  });
+
+  test("a ChatGPT account already on the computer, signed out: Entrar de novo on it by default, Outra conta for a new one", async () => {
+    const gpt = {
+      ...account({ id: "acct_gpt", kind: "codex", label: "ChatGPT", provider: null, keyHint: null }),
+      email: "walt@acme.com",
+      status: "signed_out" as const,
+      machineId: "machine_1",
+      computer: "MacBook",
+    };
+    const { state, dialog, tile } = await connect({ accounts: [gpt] });
+    await click(tile("ChatGPT"));
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do ChatGPT" });
+    expect(panel.textContent).toContain(
+      "ChatGPT saiu da conta aqui. Entre de novo nela e os agentes dela continuam com ela.",
+    );
+    await withPopup(() => click(within(panel).getByRole("button", { name: "Entrar com ChatGPT" })));
+    await settle(6);
+    expect(calls(state, "machines.beginAccountLogin").map((c) => c.args)).toEqual([
+      [ORG_ID, "machine_1", "codex", { accountId: "acct_gpt" }],
+    ]);
+    // Another account instead: the sign-in on the computer stops, and a new one starts on its button.
+    await click(within(panel).getByRole("button", { name: "Outra conta" }));
+    expect(calls(state, "machines.cancelAccountLogin").map((c) => c.args)).toEqual([[ORG_ID, "machine_1", "login_1"]]);
+    await withPopup(() => click(within(panel).getByRole("button", { name: "Entrar com ChatGPT" })));
+    await settle(6);
+    expect(calls(state, "machines.beginAccountLogin").map((c) => c.args)[1]).toEqual([ORG_ID, "machine_1", "codex"]);
+  });
+
+  test("a ChatGPT account already signed in there: Entrar de novo first, beside Outra conta, so a retry makes no new one", async () => {
+    const gpt = {
+      ...account({ id: "acct_gpt", kind: "codex", label: "ChatGPT", provider: null, keyHint: null }),
+      email: "walt@acme.com",
+      usedBy: ["Atlas"],
+      machineId: "machine_1",
+      computer: "MacBook",
+    };
+    const { state, dialog, tile } = await connect({ accounts: [gpt] });
+    await click(tile("ChatGPT"));
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do ChatGPT" });
+    expect(panel.textContent).toContain("Você já tem ChatGPT aqui. Entre de novo nela, ou use outra conta.");
+    expect(within(panel).queryByRole("button", { name: "Entrar com ChatGPT" })).toBeNull();
+    const again = within(panel).getByRole("button", { name: "Entrar de novo" });
+    expect(again.className).toContain("primary");
+    await click(again);
+    await withPopup(() => click(within(panel).getByRole("button", { name: "Entrar com ChatGPT" })));
+    await settle(6);
+    expect(calls(state, "machines.beginAccountLogin").map((c) => c.args)).toEqual([
+      [ORG_ID, "machine_1", "codex", { accountId: "acct_gpt" }],
+    ]);
   });
 
   test("signing in again: no address asked, the account's own goes to Claude's sign-in as its hint", async () => {

@@ -2118,6 +2118,10 @@
     "onceHint": "Ze delen allemaal de limieten van je abonnement.",
     "use": "{{label}} gebruiken",
     "another": "Een ander account",
+    "reuse": {
+      "active": "Je hebt {{label}} hier al. Log er opnieuw op in, of gebruik een ander account.",
+      "signedOut": "{{label}} is hier uitgelogd. Log opnieuw in en de agents ervan houden het."
+    },
     "signInFor": "Inloggen voor {{name}}",
     "signInFor_female": "Inloggen voor {{name}}",
     "doneAll": "{{names}} denken nu met {{label}}.",
@@ -7307,11 +7311,13 @@
       "noComputer": "Accounts blijven op een gekoppelde computer. Koppel eerst een van jouw computers.",
       "addComputer": "Computer koppelen",
       "needsCloud": {
-        "claude_code": "Nog niet klaar op {{computer}}",
-        "codex": "Nog niet klaar op {{computer}}",
-        "cursor": "Nog niet klaar op {{computer}}",
-        "opencode": "Nog niet klaar op {{computer}}",
-        "online": "{{computer}} reageert nu niet. We zijn ermee bezig."
+        "online": "{{computer}} start opnieuw op of maakt opnieuw verbinding. Dit verandert vanzelf zodra hij terug is.",
+        "installing": "{{program}} wordt geïnstalleerd op {{computer}}. Dit verandert vanzelf als het klaar is.",
+        "updating": "{{program}} wordt bijgewerkt op {{computer}}. Dit verandert vanzelf als het klaar is.",
+        "runnerOld": "Het agentes.chat-programma op {{computer}} is verouderd en een update is onderweg. Dit verandert vanzelf als het klaar is.",
+        "execOff": "{{computer}} kan {{program}} nog niet uitvoeren. We zijn ermee bezig, en dit verandert vanzelf.",
+        "toolOff": "{{program}} is niet toegestaan op {{computer}}. Vraag de support om het toe te staan.",
+        "preparing": "{{computer}} wordt klaargemaakt. Dit verandert vanzelf als het klaar is."
       }
     },
     "done": {
@@ -7337,6 +7343,11 @@
       "rename": "Hernoemen",
       "signInAgain": "Opnieuw inloggen",
       "newKey": "Sleutel vervangen",
+      "copies_one": "Nog {{count}} login van dit account, zonder agent.",
+      "copies_other": "Nog {{count}} logins van dit account, zonder agent.",
+      "removeCopies": "Verwijderen",
+      "copiesRemoved_one": "{{count}} ongebruikte login verwijderd.",
+      "copiesRemoved_other": "{{count}} ongebruikte logins verwijderd.",
       "disconnect": "Ontkoppelen",
       "renameTitle": "{{label}} hernoemen",
       "nameLabel": "Naam",

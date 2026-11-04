@@ -2188,6 +2188,10 @@
     "onceHint": "Todos comparten los límites de tu plan.",
     "use": "Usar {{label}}",
     "another": "Otra cuenta",
+    "reuse": {
+      "active": "Ya tienes {{label}} aquí. Vuelve a iniciar sesión en ella o usa otra cuenta.",
+      "signedOut": "{{label}} cerró sesión aquí. Vuelve a iniciar sesión y sus agentes la siguen usando."
+    },
     "signInFor": "Iniciar sesión para {{name}}",
     "signInFor_female": "Iniciar sesión para {{name}}",
     "doneAll": "{{names}} ahora piensan con {{label}}.",
@@ -7497,11 +7501,13 @@
       "noComputer": "Las cuentas quedan en una computadora conectada. Primero conecta una de las tuyas.",
       "addComputer": "Conectar una computadora",
       "needsCloud": {
-        "claude_code": "Todavía no está listo en {{computer}}",
-        "codex": "Todavía no está listo en {{computer}}",
-        "cursor": "Todavía no está listo en {{computer}}",
-        "opencode": "Todavía no está listo en {{computer}}",
-        "online": "{{computer}} no responde ahora. Ya estamos en eso."
+        "online": "{{computer}} se está reiniciando o reconectando. Esto cambia solo cuando vuelva.",
+        "installing": "{{program}} se está instalando en {{computer}}. Esto cambia solo cuando termine.",
+        "updating": "{{program}} se está actualizando en {{computer}}. Esto cambia solo cuando termine.",
+        "runnerOld": "El programa de agentes.chat en {{computer}} está desactualizado y la actualización ya viene en camino. Esto cambia solo cuando termine.",
+        "execOff": "{{computer}} todavía no puede ejecutar {{program}}. Ya estamos en eso, y esto cambia solo.",
+        "toolOff": "{{program}} no está habilitado en {{computer}}. Pide al soporte que lo habilite.",
+        "preparing": "{{computer}} se está preparando. Esto cambia solo cuando termine."
       }
     },
     "done": {
@@ -7529,6 +7535,13 @@
       "rename": "Cambiar nombre",
       "signInAgain": "Volver a iniciar sesión",
       "newKey": "Reemplazar la clave",
+      "copies_one": "{{count}} inicio de sesión más de esta cuenta, sin ningún agente.",
+      "copies_many": "{{count}} inicios de sesión más de esta cuenta, sin ningún agente.",
+      "copies_other": "{{count}} inicios de sesión más de esta cuenta, sin ningún agente.",
+      "removeCopies": "Quitar",
+      "copiesRemoved_one": "{{count}} inicio de sesión sin uso quitado.",
+      "copiesRemoved_many": "{{count}} inicios de sesión sin uso quitados.",
+      "copiesRemoved_other": "{{count}} inicios de sesión sin uso quitados.",
       "disconnect": "Desconectar",
       "renameTitle": "Cambiar el nombre de {{label}}",
       "nameLabel": "Nombre",

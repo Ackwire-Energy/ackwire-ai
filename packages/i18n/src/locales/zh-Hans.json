@@ -2039,6 +2039,10 @@
     "onceHint": "它们共享你套餐的用量上限。",
     "use": "使用 {{label}}",
     "another": "其他账号",
+    "reuse": {
+      "active": "你在这里已经有 {{label}}。重新登录它，或使用其他账号。",
+      "signedOut": "{{label}} 在这里已退出登录。重新登录后，它的智能体会继续使用它。"
+    },
     "signInFor": "为 {{name}} 登录",
     "signInFor_female": "为 {{name}} 登录",
     "doneAll": "{{names}} 现在用 {{label}} 思考。",
@@ -7004,11 +7008,13 @@
       "noComputer": "账号保存在已连接的电脑上。请先连接一台你的电脑。",
       "addComputer": "连接电脑",
       "needsCloud": {
-        "claude_code": "{{computer}} 上还没准备好",
-        "codex": "{{computer}} 上还没准备好",
-        "cursor": "{{computer}} 上还没准备好",
-        "opencode": "{{computer}} 上还没准备好",
-        "online": "{{computer}} 目前无响应，我们正在处理。"
+        "online": "{{computer}} 正在重启或重新连接。它回来后这里会自动更新。",
+        "installing": "正在 {{computer}} 上安装 {{program}}。完成后这里会自动更新。",
+        "updating": "正在 {{computer}} 上更新 {{program}}。完成后这里会自动更新。",
+        "runnerOld": "{{computer}} 上的 agentes.chat 程序版本较旧，更新正在路上。完成后这里会自动更新。",
+        "execOff": "{{computer}} 暂时还不能运行 {{program}}。我们正在处理，这里会自动更新。",
+        "toolOff": "{{computer}} 上未允许 {{program}}。请联系支持团队开通。",
+        "preparing": "{{computer}} 正在准备中。完成后这里会自动更新。"
       }
     },
     "done": {
@@ -7032,6 +7038,9 @@
       "rename": "重命名",
       "signInAgain": "重新登录",
       "newKey": "更换密钥",
+      "copies_other": "这个账号还有 {{count}} 个登录，没有任何智能体使用。",
+      "removeCopies": "移除",
+      "copiesRemoved_other": "已移除 {{count}} 个未使用的登录。",
       "disconnect": "断开连接",
       "renameTitle": "重命名 {{label}}",
       "nameLabel": "名称",

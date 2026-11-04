@@ -2191,6 +2191,10 @@
     "onceHint": "Ils partagent tous les limites de votre abonnement.",
     "use": "Utiliser {{label}}",
     "another": "Un autre compte",
+    "reuse": {
+      "active": "Vous avez déjà {{label}} ici. Reconnectez-vous à ce compte, ou utilisez-en un autre.",
+      "signedOut": "{{label}} est déconnecté ici. Reconnectez-vous, et ses agents le gardent."
+    },
     "signInFor": "Se connecter pour {{name}}",
     "signInFor_female": "Se connecter pour {{name}}",
     "doneAll": "{{names}} réfléchissent désormais avec {{label}}.",
@@ -7556,11 +7560,13 @@
       "noComputer": "Les comptes restent sur un ordinateur connecté. Connectez d'abord l'un des vôtres.",
       "addComputer": "Connecter un ordinateur",
       "needsCloud": {
-        "claude_code": "Pas encore prêt sur {{computer}}",
-        "codex": "Pas encore prêt sur {{computer}}",
-        "cursor": "Pas encore prêt sur {{computer}}",
-        "opencode": "Pas encore prêt sur {{computer}}",
-        "online": "{{computer}} ne répond pas pour le moment. On s'en occupe."
+        "online": "{{computer}} redémarre ou se reconnecte. Ceci change tout seul dès son retour.",
+        "installing": "{{program}} est en cours d'installation sur {{computer}}. Ceci change tout seul une fois terminé.",
+        "updating": "{{program}} est en cours de mise à jour sur {{computer}}. Ceci change tout seul une fois terminé.",
+        "runnerOld": "Le programme agentes.chat sur {{computer}} n'est pas à jour et la mise à jour est en route. Ceci change tout seul une fois terminé.",
+        "execOff": "{{computer}} ne peut pas encore lancer {{program}}. On s'en occupe, et ceci change tout seul.",
+        "toolOff": "{{program}} n'est pas autorisé sur {{computer}}. Demandez au support de l'autoriser.",
+        "preparing": "{{computer}} se prépare. Ceci change tout seul une fois terminé."
       }
     },
     "done": {
@@ -7588,6 +7594,13 @@
       "rename": "Renommer",
       "signInAgain": "Se reconnecter",
       "newKey": "Remplacer la clé",
+      "copies_one": "{{count}} connexion de plus de ce compte, sans agent.",
+      "copies_many": "{{count}} connexions de plus de ce compte, sans agent.",
+      "copies_other": "{{count}} connexions de plus de ce compte, sans agent.",
+      "removeCopies": "Supprimer",
+      "copiesRemoved_one": "{{count}} connexion inutilisée supprimée.",
+      "copiesRemoved_many": "{{count}} connexions inutilisées supprimées.",
+      "copiesRemoved_other": "{{count}} connexions inutilisées supprimées.",
       "disconnect": "Déconnecter",
       "renameTitle": "Renommer {{label}}",
       "nameLabel": "Nom",
