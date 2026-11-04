@@ -164,10 +164,6 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   margin-right: 8px;
 }
 /* A fixed tile: its rows from edge to edge; the calm card fills it without a frame of its own. */
-/* With a board on Início the fixed tiles and the board's widgets are two grids: the board's gap between them too. */
-.home-mural .wgrid ~ .wgrid {
-  margin-top: 12px;
-}
 .home-mural .wg--fixed .home-calm {
   margin: 0 16px 8px;
 }
