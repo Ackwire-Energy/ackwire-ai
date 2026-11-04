@@ -205,13 +205,19 @@ export interface HeaderWordAction {
   disabled?: boolean;
 }
 
+/**
+ * How far the bar's own title and subtitle grow with the text size: two lines must stay inside the system bar (44 pt
+ * on iOS), which doesn't grow with them; past this they spilled under it, over the screen's content.
+ */
+const BAR_TEXT_SCALE = 1.15;
+
 /** A title with a subtitle under it, in the native bar (centered on iOS, leading on Android). */
 function HeaderTitle({ text, node, subtitle }: { text: string; node: HeaderSlotStore; subtitle?: string | undefined }) {
   const { width } = useWindowDimensions();
   return (
     <View style={[styles.headerTitle, { maxWidth: width - 150 }]}>
       {text ? (
-        <Text variant="body" numberOfLines={1} style={styles.titleText}>
+        <Text variant="body" numberOfLines={1} maxFontSizeMultiplier={BAR_TEXT_SCALE} style={styles.titleText}>
           {text}
         </Text>
       ) : (
@@ -221,7 +227,13 @@ function HeaderTitle({ text, node, subtitle }: { text: string; node: HeaderSlotS
         </BarPressable>
       )}
       {subtitle ? (
-        <Text variant="caption" tone="faint" numberOfLines={1}>
+        <Text
+          variant="caption"
+          tone="faint"
+          numberOfLines={1}
+          maxFontSizeMultiplier={BAR_TEXT_SCALE}
+          style={styles.subtitleText}
+        >
           {subtitle}
         </Text>
       ) : null}
@@ -261,7 +273,8 @@ const styles = StyleSheet.create({
   actionText: { flex: 1, minWidth: 0 },
   mono: { fontFamily: MONO, fontSize: 13 },
   headerTitle: { alignItems: Platform.OS === "ios" ? "center" : "flex-start", minWidth: 0 },
-  titleText: { fontWeight: "600" },
+  titleText: { fontWeight: "600", fontSize: 16, lineHeight: 20 },
+  subtitleText: { fontSize: 12, lineHeight: 15 },
   headerRight: { flexDirection: "row", alignItems: "center" },
 });
 
