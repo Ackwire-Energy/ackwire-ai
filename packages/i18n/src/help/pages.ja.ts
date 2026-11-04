@@ -519,4 +519,140 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
       },
     ],
   },
+  "install-on-a-server": {
+    title: "サーバーに agentes.chat をインストールする",
+    summary: "自分のサーバーで agentes.chat を無料で動かし、チーム全員で使えます。コマンドひとつで準備できます。",
+    sections: [
+      {
+        id: "need",
+        heading: "必要なもの",
+        blocks: [
+          {
+            list: [
+              "64 ビット Linux (x64 または arm64) のサーバーか VPS。小さなチームなら、2 CPU、メモリ 4 GB、ディスク 20 GB から始めるのがおすすめです。試すだけなら、Docker Desktop、OrbStack、Colima のいずれかを入れた Mac でも動きます。",
+              "Docker と Compose。Linux では、足りなければインストーラーが確認したうえで入れます。",
+              "アクセスの方法。無料の Tailscale アカウント (標準。非公開で、ドメインも開いたポートも不要) か、サーバーを指すドメインとポート 80 と 443 の開放のどちらかです。",
+            ],
+          },
+        ],
+      },
+      {
+        id: "install",
+        heading: "インストール",
+        blocks: [
+          "サーバーで次を実行します。",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh",
+          },
+          "足りないものを入れてから、いくつか質問します。アクセスの方法、メール、このサーバーをエージェントのコンピューターにもするか、匿名の利用統計を送るかです。Enter で提案された答えになります。インストール先は `/opt/agentes` (すでに Docker を使えるユーザーなら `~/agentes`) で、初回は約 2 GB をダウンロードします。",
+          "最後に、サーバーのアドレスとスマートフォン用の QR コードが表示されます。もう一度実行しても問題ありません。設定はそのままで、足りないものだけを補います。",
+          "Node.js 18 以降があれば、空のフォルダーで `npx @agenteschat/setup` を実行しても同じセットアップです。Node がなければアプリのイメージから現在のフォルダーで実行でき、最後に残りを起動するコマンドが表示されます。",
+          {
+            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup',
+          },
+        ],
+      },
+      {
+        id: "reach",
+        heading: "アクセスの方法",
+        blocks: [
+          {
+            list: [
+              "**Tailscale** (標準): `https://agentes.<あなたのtailnet>.ts.net` で非公開の HTTPS。Tailscale のネットワークにある端末だけが開けます。インストール前に https://console.tailscale.com/admin/dns で MagicDNS と HTTPS をオンにし、セットアップで聞かれる認証キー (auth key) を https://console.tailscale.com/admin/settings/keys で作っておきます。",
+              "**公開ドメイン**: インターネット上の誰でも開けます (例: `https://chat.example.com`)。ドメインをサーバーに向け、ポート 80 と 443 を開けます。セットアップが証明書を取得して更新し、ドメインを公開する前にアカウントを作るよう案内します。",
+              "**このマシンだけ**: `http://localhost:3000`。自分のコンピューターで試すためのものです。",
+            ],
+          },
+          "Tailscale では、キーの期限 (180 日) が切れるとサーバーがネットワークから外れます。外れないようにするには、https://console.tailscale.com/admin/machines でサーバーの **⋯** メニューを開き、**Disable Key Expiry** を選びます。",
+          "ルーティンを始める Webhook や、自分のサーバーから呼び出す AI アプリには公開アドレスが必要です。Tailscale では Funnel で同じアドレスをインターネットに公開できます。https://console.tailscale.com/admin/acls で tailnet のポリシーに Funnel を追加し、`.env` に `TAILSCALE_FUNNEL=true` を設定してから `docker compose up -d` を実行します。",
+        ],
+      },
+      {
+        id: "owner",
+        heading: "あなたのアカウント",
+        blocks: [
+          "サーバーのアドレスを開いて登録します。最初のアカウントがオーナーになります。その後は登録が閉じ、ほかの人は **設定\u00a0›\u00a0メンバーと招待** からの招待で参加します。",
+          "Tailscale では、招待する人もあなたの tailnet に入る必要があります。先に https://console.tailscale.com/admin/users で招待し、それから agentes.chat で招待します。",
+        ],
+      },
+      {
+        id: "email",
+        heading: "メール",
+        blocks: [
+          "メールを設定しないと、agentes.chat はメールを送らずにログに書き出すので、招待リンクはそこからコピーできます。パスワードの再設定は使えません。",
+          {
+            code: "docker compose logs agentes | grep 'email (not sent'",
+          },
+          "セットアップでは、自分のメールサーバー (SMTP) か、MillionSend や Resend など Resend 互換 API のキーを使えます。差出人を選ばなければ、メールはサーバーのドメインの `ping@` から送られます。そのドメインはメールの提供元で認証しておく必要があります。あとで設定するには、インストールをもう一度実行します。",
+        ],
+      },
+      {
+        id: "phone",
+        heading: "スマートフォン",
+        blocks: [
+          {
+            list: [
+              "Tailscale の場合は、スマートフォンに Tailscale アプリを入れ、同じ tailnet にサインインします。",
+              "agentes.chat アプリを入れます。",
+              "セットアップが表示した QR コードか、**設定\u00a0›\u00a0アカウント\u00a0›\u00a0スマートフォンで開く** の QR コードを読み取ります。後者はサインインもします。",
+            ],
+          },
+        ],
+      },
+      {
+        id: "computers",
+        heading: "エージェントのコンピューター",
+        blocks: [
+          "セットアップでは、このサーバーをエージェントのコンピューターにもできます。エージェントはそこでコマンドを実行し、ブラウザーを使い、ファイルを置きます。確認があり、サーバーが十分に対応できるときは「はい」が提案されます。Linux では、エージェントごとに専用のユーザーと画面があります。「いいえ」と答えた場合は、`--computer yes` を付けてもう一度インストールします。",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
+          },
+          "agentes.chat アプリを入れた Mac や別のサーバーなど、ほかのコンピューターは **設定\u00a0›\u00a0コンピューター** からつなぎます ([エージェント用のコンピューター](/help/computers) を参照)。Tailscale の場合は、先にあなたの tailnet に入れます。",
+        ],
+      },
+      {
+        id: "backups",
+        heading: "バックアップと復元",
+        blocks: [
+          "サーバーは 3 つでできています。データベース、アップロードされたファイル、`.env` の `AGENTES_SECRET` です。`.env` のコピーはバックアップとは別の安全な場所に保管してください。この秘密がないと、復元したデータベースに保存されたキーは読めません。",
+          "毎日バックアップするには、Cloudflare R2 などの S3 互換ストレージに非公開のバケットと、その中で読み書きと削除ができるキーを作ります。それらを `.env` に追加し、`COMPOSE_PROFILES` に `backup` を加えます (公開ドメインなら `https,backup`)。",
+          {
+            code: "S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com\nS3_ACCESS_KEY_ID=…\nS3_SECRET_ACCESS_KEY=…\nS3_BACKUP_BUCKET=agentes-backups\nCOMPOSE_PROFILES=tailscale,backup",
+          },
+          "それからインストールフォルダーで `docker compose up -d` を実行します。データベースは 03:00 UTC にダンプされ、各ダンプは 14 日間保存されます。`docker compose run --rm backup now` ですぐに 1 つ作り、`docker compose run --rm backup list` で一覧を出せます。ダンプに入るのはデータベースだけです。`files` ボリュームにあるアップロードされたファイルは別にコピーが必要で、そのコマンドは下の完全なガイドにあります。",
+          "復元するには、`docker compose run --rm -T backup fetch <名前> > agentes.dump` でダンプを取り出し、アプリを止めて空のデータベースに読み込みます。",
+          {
+            code: "docker compose stop agentes\ndocker compose exec -T postgres dropdb -U agentes --force agentes\ndocker compose exec -T postgres createdb -U agentes agentes\ndocker compose exec -T postgres pg_restore -U agentes -d agentes --exit-on-error < agentes.dump\ndocker compose start agentes",
+          },
+          "復元先は、ダンプを作ったバージョンかそれより新しいバージョンにします。",
+        ],
+      },
+      {
+        id: "upgrades",
+        heading: "アップデート",
+        blocks: [
+          "インストールフォルダーで次を実行します。",
+          {
+            code: "curl -fsSLO https://agentes.chat/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
+          },
+          "新しいバージョンが起動すると、データベースは自動で更新されます。設定は `.env` に置き、`docker-compose.yml` は編集しないでください。アップデートのたびに置き換わります。大きく上げる前にはバックアップを取ってください。新しいバージョンが更新したデータベースは、古いバージョンでは開けません。",
+        ],
+      },
+      {
+        id: "data",
+        heading: "送信される情報",
+        blocks: [
+          "サーバーは 1 日に 1 回、匿名の利用統計を agentes.chat に送ります。人数、エージェント数、マシンのサイズ、使った AI トークン、エージェントのブラウザーが送受信したデータ量などの数です。メッセージ、ファイル、名前、サイトは送りません。`docker compose run --rm agentes telemetry` で送られる内容をそのまま表示できます。オーナーは **設定\u00a0›\u00a0一般** か、`.env` の `TELEMETRY=off` でオフにできます。",
+          "エラーレポートは、自分で選んだ Sentry 互換サーバーを `SENTRY_DSN` に設定しない限りどこにも送られません。レポートにはエラーと発生場所が入り、メッセージ、メールアドレス、IP アドレス、Cookie、トークンは入りません。",
+        ],
+      },
+      {
+        id: "reference",
+        heading: "完全なガイド",
+        blocks: [
+          "すべての設定、nginx など自前のプロキシ、Docker を使わない動かし方、自分でインストールする AI エージェント向けの手順、うまくいかないときの対処は、agentes.chat のリポジトリにある `SELF_HOSTING.md` にあります。",
+        ],
+      },
+    ],
+  },
 };

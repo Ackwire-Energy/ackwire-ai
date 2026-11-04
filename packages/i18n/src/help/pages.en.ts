@@ -512,4 +512,140 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
       },
     ],
   },
+  "install-on-a-server": {
+    title: "Install agentes.chat on a server",
+    summary: "Run agentes.chat on a server of your own, free, for your whole team. One command sets it up.",
+    sections: [
+      {
+        id: "need",
+        heading: "What you need",
+        blocks: [
+          {
+            list: [
+              "A server or VPS with 64-bit Linux, on x64 or arm64. For a small team, 2 CPUs, 4 GB of memory and 20 GB of disk are a good start. To try it, a Mac with Docker Desktop, OrbStack or Colima works too.",
+              "Docker with Compose. On Linux the installer adds them when they're missing, after asking.",
+              "A way in: a free Tailscale account (the default, private, with no domain and no open port), or a domain that points at the server, with ports 80 and 443 open.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "install",
+        heading: "Install it",
+        blocks: [
+          "On the server, run:",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh",
+          },
+          "It installs what's missing, then asks a few questions: how people reach it, email, whether this server is also your agents' computer, and whether to send anonymous usage statistics. Press Enter for the suggested answer. It installs into `/opt/agentes` (`~/agentes` for a user who can already use Docker), and the first time it downloads about 2 GB.",
+          "It ends with your server's address and a QR code for your phone. Running it again is safe: it keeps your settings and fills in only what's missing.",
+          "With Node.js 18 or newer, `npx @agenteschat/setup` in an empty folder is the same setup. Without Node, it runs from the app's image, in the current folder, and ends with the commands that start the rest:",
+          {
+            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup',
+          },
+        ],
+      },
+      {
+        id: "reach",
+        heading: "How people reach it",
+        blocks: [
+          {
+            list: [
+              "**Tailscale**, the default: private HTTPS at `https://agentes.<your-tailnet>.ts.net`, only for devices on your Tailscale network. Before you install, turn on MagicDNS and HTTPS at https://console.tailscale.com/admin/dns and create an auth key at https://console.tailscale.com/admin/settings/keys for the setup to ask for.",
+              "**A public domain**: anyone on the internet can open it, at `https://chat.example.com` for example. Point the domain at the server and open ports 80 and 443. The setup gets the certificate and renews it, and has you create your account before the domain goes live.",
+              "**This machine only**: `http://localhost:3000`, to try it on your own computer.",
+            ],
+          },
+          "On Tailscale, the server leaves your network when its key expires, after 180 days. To keep it, open the server's **⋯** menu at https://console.tailscale.com/admin/machines and choose **Disable Key Expiry**.",
+          "Webhooks that start routines, and AI apps that call from their own servers, need a public address. On Tailscale, Funnel opens the same address to the internet: add Funnel to your tailnet's policy at https://console.tailscale.com/admin/acls and set `TAILSCALE_FUNNEL=true` in `.env`, then run `docker compose up -d`.",
+        ],
+      },
+      {
+        id: "owner",
+        heading: "Your account",
+        blocks: [
+          "Open your server's address and sign up: the first account becomes the owner. Sign-up then closes, and people join by invitation, from **Settings\u00a0›\u00a0Members and invitations**.",
+          "On Tailscale, the people you invite need your tailnet too. Invite them first at https://console.tailscale.com/admin/users and then in agentes.chat.",
+        ],
+      },
+      {
+        id: "email",
+        heading: "Email",
+        blocks: [
+          "Without email, agentes.chat writes each email to its log instead of sending it, so an invitation link can still be copied from there. Password resets stay off.",
+          {
+            code: "docker compose logs agentes | grep 'email (not sent'",
+          },
+          "The setup takes your own mail server (SMTP) or a key for a Resend-compatible API, such as MillionSend or Resend. Emails come from `ping@` your server's domain unless you pick another sender, and that domain must be verified with your email provider. To set it up later, run the install again.",
+        ],
+      },
+      {
+        id: "phone",
+        heading: "Your phone",
+        blocks: [
+          {
+            list: [
+              "On Tailscale, install the Tailscale app on your phone and sign in to the same tailnet.",
+              "Install the agentes.chat app.",
+              "Scan the QR code the setup printed, or the one in **Settings\u00a0›\u00a0Your account\u00a0›\u00a0Open on your phone**, which signs you in too.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "computers",
+        heading: "Your agents' computers",
+        blocks: [
+          "The setup can make this server your agents' computer too, where they run commands, use a browser and keep their files. It asks, and suggests yes where the server can do it well. On Linux each agent gets a user of its own, with a screen. If you said no, run the install again with `--computer yes`:",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
+          },
+          "More computers, such as a Mac with the agentes.chat app or another server, connect from **Settings\u00a0›\u00a0Computers**, as in [Computers for your agents](/help/computers). On Tailscale, they join your tailnet first.",
+        ],
+      },
+      {
+        id: "backups",
+        heading: "Backups and restore",
+        blocks: [
+          "Your server is three things: the database, the uploaded files, and `AGENTES_SECRET` in `.env`. Keep a copy of `.env` somewhere safe, apart from the backups: without the secret, the keys stored in a restored database can't be read.",
+          "For a backup every day, create a private bucket on Cloudflare R2 or another S3-compatible store, and a key that can read, write and delete in it. Add them to `.env`, with `backup` in `COMPOSE_PROFILES` (`https,backup` with a public domain):",
+          {
+            code: "S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com\nS3_ACCESS_KEY_ID=…\nS3_SECRET_ACCESS_KEY=…\nS3_BACKUP_BUCKET=agentes-backups\nCOMPOSE_PROFILES=tailscale,backup",
+          },
+          "Then run `docker compose up -d` in the install folder. The database is dumped at 03:00 UTC and each dump is kept 14 days. `docker compose run --rm backup now` takes one right away, and `docker compose run --rm backup list` lists them. The dumps hold the database only: uploaded files, in the `files` volume, need a copy of their own, and the full guide below has the commands.",
+          "To restore, bring a dump down with `docker compose run --rm -T backup fetch <name> > agentes.dump`, then load it into an empty database with the app stopped:",
+          {
+            code: "docker compose stop agentes\ndocker compose exec -T postgres dropdb -U agentes --force agentes\ndocker compose exec -T postgres createdb -U agentes agentes\ndocker compose exec -T postgres pg_restore -U agentes -d agentes --exit-on-error < agentes.dump\ndocker compose start agentes",
+          },
+          "Restore into the version that took the dump, or a newer one.",
+        ],
+      },
+      {
+        id: "upgrades",
+        heading: "Upgrades",
+        blocks: [
+          "In the install folder, run:",
+          {
+            code: "curl -fsSLO https://agentes.chat/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
+          },
+          "The database updates itself when the new version starts. Keep your settings in `.env` and never edit `docker-compose.yml`, since each upgrade replaces it. Back up before a big jump: a database a newer version updated doesn't open in an older one.",
+        ],
+      },
+      {
+        id: "data",
+        heading: "What it sends",
+        blocks: [
+          "Once a day the server sends agentes.chat anonymous usage statistics: counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites. `docker compose run --rm agentes telemetry` prints exactly what it would send. The owner turns it off in **Settings\u00a0›\u00a0General**, or with `TELEMETRY=off` in `.env`.",
+          "Error reports go nowhere unless you set `SENTRY_DSN` to a Sentry-compatible server you choose. A report holds the error and where it happened, never messages, emails, IP addresses, cookies or tokens.",
+        ],
+      },
+      {
+        id: "reference",
+        heading: "The full guide",
+        blocks: [
+          "Every setting, a proxy of your own such as nginx, running without Docker, a runbook for AI agents that install it, and what to do when something fails are in `SELF_HOSTING.md`, in the agentes.chat repository.",
+        ],
+      },
+    ],
+  },
 };

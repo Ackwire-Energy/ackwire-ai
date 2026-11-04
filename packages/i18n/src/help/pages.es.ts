@@ -521,4 +521,140 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
       },
     ],
   },
+  "install-on-a-server": {
+    title: "Instala agentes.chat en un servidor",
+    summary: "Usa agentes.chat en un servidor tuyo, gratis, para todo tu equipo. Un comando lo deja listo.",
+    sections: [
+      {
+        id: "need",
+        heading: "Lo que necesitas",
+        blocks: [
+          {
+            list: [
+              "Un servidor o VPS con Linux de 64 bits, en x64 o arm64. Para un equipo pequeño, 2 CPU, 4 GB de memoria y 20 GB de disco son un buen comienzo. Para probarlo, también sirve un Mac con Docker Desktop, OrbStack o Colima.",
+              "Docker con Compose. En Linux, el instalador los añade si faltan, después de preguntar.",
+              "Una forma de llegar: una cuenta gratis de Tailscale (la opción por defecto, privada, sin dominio y sin puertos abiertos) o un dominio que apunte al servidor, con los puertos 80 y 443 abiertos.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "install",
+        heading: "Instálalo",
+        blocks: [
+          "En el servidor, ejecuta:",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh",
+          },
+          "Instala lo que falta y luego hace unas preguntas: cómo llega la gente, el correo, si este servidor también es la computadora de tus agentes y si envía estadísticas de uso anónimas. Enter acepta la respuesta sugerida. Se instala en `/opt/agentes` (`~/agentes` si tu usuario ya puede usar Docker) y la primera vez descarga unos 2 GB.",
+          "Al final muestra la dirección de tu servidor y un código QR para tu teléfono. Ejecutarlo otra vez no rompe nada: conserva tus ajustes y solo completa lo que falta.",
+          "Con Node.js 18 o más reciente, `npx @agenteschat/setup` en una carpeta vacía es la misma configuración. Sin Node, se ejecuta desde la imagen de la app, en la carpeta actual, y termina con los comandos que arrancan el resto:",
+          {
+            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup',
+          },
+        ],
+      },
+      {
+        id: "reach",
+        heading: "Cómo llega la gente",
+        blocks: [
+          {
+            list: [
+              "**Tailscale**, la opción por defecto: HTTPS privado en `https://agentes.<tu-tailnet>.ts.net`, solo para los dispositivos de tu red de Tailscale. Antes de instalar, activa MagicDNS y HTTPS en https://console.tailscale.com/admin/dns y crea una clave de acceso (auth key) en https://console.tailscale.com/admin/settings/keys para cuando la configuración la pida.",
+              "**Un dominio público**: cualquiera en internet puede abrirlo, por ejemplo en `https://chat.example.com`. Apunta el dominio al servidor y abre los puertos 80 y 443. La configuración obtiene el certificado y lo renueva, y te hace crear tu cuenta antes de que el dominio esté en línea.",
+              "**Solo esta máquina**: `http://localhost:3000`, para probarlo en tu propia computadora.",
+            ],
+          },
+          "En Tailscale, el servidor sale de tu red cuando vence su clave, a los 180 días. Para mantenerlo, abre el menú **⋯** del servidor en https://console.tailscale.com/admin/machines y elige **Disable Key Expiry**.",
+          "Los webhooks que inician rutinas y las apps de IA que llaman desde sus propios servidores necesitan una dirección pública. En Tailscale, Funnel abre la misma dirección a internet: añade Funnel a la política de tu tailnet en https://console.tailscale.com/admin/acls y pon `TAILSCALE_FUNNEL=true` en `.env`, luego ejecuta `docker compose up -d`.",
+        ],
+      },
+      {
+        id: "owner",
+        heading: "Tu cuenta",
+        blocks: [
+          "Abre la dirección de tu servidor y regístrate: la primera cuenta es la del dueño. Después el registro se cierra y la gente entra por invitación, desde **Configuración\u00a0›\u00a0Miembros e invitaciones**.",
+          "En Tailscale, las personas que invitas también necesitan estar en tu tailnet. Invítalas primero en https://console.tailscale.com/admin/users y luego en agentes.chat.",
+        ],
+      },
+      {
+        id: "email",
+        heading: "Correo",
+        blocks: [
+          "Sin correo, agentes.chat escribe cada correo en su registro en vez de enviarlo, así que puedes copiar de ahí un enlace de invitación. Restablecer la contraseña queda desactivado.",
+          {
+            code: "docker compose logs agentes | grep 'email (not sent'",
+          },
+          "La configuración acepta tu propio servidor de correo (SMTP) o la clave de una API compatible con Resend, como MillionSend o Resend. Los correos salen de `ping@` el dominio de tu servidor, salvo que elijas otro remitente, y ese dominio debe estar verificado con tu proveedor de correo. Para configurarlo más tarde, ejecuta la instalación otra vez.",
+        ],
+      },
+      {
+        id: "phone",
+        heading: "Tu teléfono",
+        blocks: [
+          {
+            list: [
+              "En Tailscale, instala la app de Tailscale en tu teléfono e inicia sesión en la misma tailnet.",
+              "Instala la app de agentes.chat.",
+              "Escanea el código QR que mostró la configuración, o el de **Configuración\u00a0›\u00a0Tu cuenta\u00a0›\u00a0Abrir en tu teléfono**, que además inicia tu sesión.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "computers",
+        heading: "Las computadoras de tus agentes",
+        blocks: [
+          "La configuración puede hacer de este servidor también la computadora de tus agentes, donde ejecutan comandos, usan un navegador y guardan sus archivos. Pregunta, y sugiere que sí donde el servidor puede hacerlo bien. En Linux, cada agente tiene su propio usuario, con una pantalla. Si dijiste que no, ejecuta la instalación otra vez con `--computer yes`:",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
+          },
+          "Otras computadoras, como un Mac con la app de agentes.chat u otro servidor, se conectan desde **Configuración\u00a0›\u00a0Computadoras**, como en [Computadoras para tus agentes](/help/computers). En Tailscale, antes entran en tu tailnet.",
+        ],
+      },
+      {
+        id: "backups",
+        heading: "Copias de seguridad y restauración",
+        blocks: [
+          "Tu servidor son tres cosas: la base de datos, los archivos subidos y `AGENTES_SECRET` en `.env`. Guarda una copia de `.env` en un lugar seguro, aparte de las copias de seguridad: sin el secreto, las claves guardadas en una base restaurada no se pueden leer.",
+          "Para una copia cada día, crea un bucket privado en Cloudflare R2 o en otro servicio compatible con S3, y una clave que pueda leer, escribir y borrar en él. Añádelos a `.env`, con `backup` en `COMPOSE_PROFILES` (`https,backup` con un dominio público):",
+          {
+            code: "S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com\nS3_ACCESS_KEY_ID=…\nS3_SECRET_ACCESS_KEY=…\nS3_BACKUP_BUCKET=agentes-backups\nCOMPOSE_PROFILES=tailscale,backup",
+          },
+          "Luego ejecuta `docker compose up -d` en la carpeta de la instalación. La base se copia a las 03:00 UTC y cada copia se guarda 14 días. `docker compose run --rm backup now` hace una al momento y `docker compose run --rm backup list` las lista. Las copias solo tienen la base: los archivos subidos, en el volumen `files`, necesitan su propia copia, y la guía completa, más abajo, tiene los comandos.",
+          "Para restaurar, baja una copia con `docker compose run --rm -T backup fetch <nombre> > agentes.dump` y cárgala en una base vacía, con la app detenida:",
+          {
+            code: "docker compose stop agentes\ndocker compose exec -T postgres dropdb -U agentes --force agentes\ndocker compose exec -T postgres createdb -U agentes agentes\ndocker compose exec -T postgres pg_restore -U agentes -d agentes --exit-on-error < agentes.dump\ndocker compose start agentes",
+          },
+          "Restaura en la versión que hizo la copia o en una más reciente.",
+        ],
+      },
+      {
+        id: "upgrades",
+        heading: "Actualizaciones",
+        blocks: [
+          "En la carpeta de la instalación, ejecuta:",
+          {
+            code: "curl -fsSLO https://agentes.chat/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
+          },
+          "La base se actualiza sola cuando arranca la versión nueva. Deja tus ajustes en `.env` y nunca edites `docker-compose.yml`, porque cada actualización lo reemplaza. Haz una copia antes de un salto grande: una base que actualizó una versión más nueva no abre en una más antigua.",
+        ],
+      },
+      {
+        id: "data",
+        heading: "Lo que envía",
+        blocks: [
+          "Una vez al día, el servidor envía a agentes.chat estadísticas de uso anónimas: recuentos como personas, agentes, tamaño de las máquinas, tokens de IA usados y cuántos datos envían y reciben los navegadores de los agentes. Nunca mensajes, archivos, nombres ni sitios. `docker compose run --rm agentes telemetry` muestra exactamente lo que enviaría. El dueño lo desactiva en **Configuración\u00a0›\u00a0General**, o con `TELEMETRY=off` en `.env`.",
+          "Los informes de errores no van a ningún sitio salvo que pongas en `SENTRY_DSN` un servidor compatible con Sentry que tú elijas. Un informe lleva el error y dónde pasó, nunca mensajes, correos, direcciones IP, cookies ni tokens.",
+        ],
+      },
+      {
+        id: "reference",
+        heading: "La guía completa",
+        blocks: [
+          "Todos los ajustes, un proxy propio como nginx, usarlo sin Docker, una guía para agentes de IA que lo instalan solos y qué hacer cuando algo falla están en `SELF_HOSTING.md`, en el repositorio de agentes.chat.",
+        ],
+      },
+    ],
+  },
 };

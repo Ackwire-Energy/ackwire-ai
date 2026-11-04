@@ -10,6 +10,8 @@ import {
   helpDocsUrl,
   helpDocument,
   helpInline,
+  INSTALL_DOCS_URL,
+  INSTALL_PAGE,
   isHelpSlug,
 } from "../src/help";
 import { en, ptBR } from "../src/index";
@@ -32,7 +34,7 @@ const pages = () =>
 
 describe("help pages", () => {
   test("every page in both languages, with the same sections in the same order and blocks of the same shape", () => {
-    expect(SLUGS.length).toBe(10);
+    expect(SLUGS.length).toBe(11);
     // Jev's key is a self-hosted server's own; who answers a message, every edition's.
     expect([HELP_PAGES.jev, HELP_PAGES["who-answers"]]).toEqual(["selfhost", "both"]);
     for (const slug of SLUGS) {
@@ -102,12 +104,13 @@ describe("help pages", () => {
     expect(deadHelpLinks([probe])).toEqual(["/help/nope", "/help/memory#nope"]);
   });
 
-  test("the repository is linked only once the install page is listed: the two go public together", () => {
-    if ("install-on-a-server" in HELP_PAGES) return;
+  test("no page links the repository: it isn't public yet, so the install page names SELF_HOSTING.md instead", () => {
     for (const { slug, locale, doc } of pages())
       expect({ slug, locale, github: linesOf(doc).some((l) => l.includes("github.com")) }).toMatchObject({
         github: false,
       });
+    for (const doc of Object.values(HELP).map((p) => p[INSTALL_PAGE]))
+      expect(doc?.sections.at(-1)?.blocks.join(" ")).toContain("`SELF_HOSTING.md`");
   });
 });
 
@@ -199,6 +202,31 @@ describe("links to the help pages", () => {
         if (!ids || (section && !ids.includes(section))) wrong.push(`${relative(REPO, file)}: ${slug}#${section}`);
       }
     expect(wrong).toEqual([]);
+  });
+});
+
+describe("the install page", () => {
+  test("is a self-hosted page, at agentes.chat/docs in English for the CLI and the settings", () => {
+    expect(HELP_PAGES[INSTALL_PAGE]).toBe("selfhost");
+    expect(INSTALL_DOCS_URL).toBe("https://agentes.chat/docs/install-on-a-server");
+    expect(helpDocsUrl(INSTALL_PAGE, "pt-BR")).toBe("https://agentes.chat/pt/docs/install-on-a-server");
+  });
+
+  test("every self-hosted pointer outside this package says its URL, and none points at the repository's file", () => {
+    const files = [
+      "install.sh",
+      "deploy/backup/backup.sh",
+      "packages/setup/src/lib.ts",
+      "packages/setup/README.md",
+      "packages/setup/package.json",
+      "packages/config/src/schema.ts",
+      ".env.example",
+    ];
+    for (const file of files) {
+      const text = readFileSync(join(REPO, file), "utf8");
+      expect({ file, url: text.includes(INSTALL_DOCS_URL) }).toEqual({ file, url: true });
+      expect({ file, github: text.includes("blob/main/SELF_HOSTING.md") }).toEqual({ file, github: false });
+    }
   });
 });
 
