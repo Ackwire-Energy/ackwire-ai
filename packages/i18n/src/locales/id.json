@@ -3327,6 +3327,33 @@
       "review": "Tinjauan",
       "delivery": "Hasil kerja",
       "open": "Buka"
+    },
+    "review": {
+      "list": "Permintaan",
+      "where": "Di mana",
+      "effect": "Efek",
+      "effects": {
+        "external": "Keluar dari perusahaan",
+        "production": "Masuk ke produksi",
+        "unsent": "Tidak ada yang dikirim",
+        "readsOnly": "Hanya membaca"
+      },
+      "undo": "Batalkan",
+      "deadline": "Sisa waktu",
+      "decides": "Siapa yang memutuskan",
+      "state": "Status",
+      "why": "Mengapa {{name}} meminta",
+      "email": "Email-nya",
+      "text": "Yang akan diterbitkan",
+      "textDone": "Yang sudah diterbitkan",
+      "values": "Yang akan dilakukan",
+      "more": "Tampilkan semua",
+      "less": "Tampilkan lebih sedikit",
+      "trail": "Bagaimana sampai di sini",
+      "showSteps": "Lihat setiap langkah",
+      "hideSteps": "Sembunyikan langkah",
+      "asked": "Meminta persetujuan",
+      "grants": "{{name}} akan {{doing}}, kali ini saja, dengan nilai-nilai ini."
     }
   },
   "agent": {

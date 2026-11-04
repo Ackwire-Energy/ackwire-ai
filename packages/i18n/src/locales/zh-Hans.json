@@ -3321,6 +3321,33 @@
       "review": "审核",
       "delivery": "交付",
       "open": "打开"
+    },
+    "review": {
+      "list": "请求",
+      "where": "位置",
+      "effect": "影响",
+      "effects": {
+        "external": "会发到公司外部",
+        "production": "会进入生产环境",
+        "unsent": "不会发送任何内容",
+        "readsOnly": "只读取"
+      },
+      "undo": "撤销",
+      "deadline": "剩余时间",
+      "decides": "由谁决定",
+      "state": "状态",
+      "why": "{{name}}为什么请求",
+      "email": "邮件",
+      "text": "将要发布的内容",
+      "textDone": "已发布的内容",
+      "values": "将要做的事",
+      "more": "显示全部",
+      "less": "收起",
+      "trail": "来龙去脉",
+      "showSteps": "查看每一步",
+      "hideSteps": "隐藏步骤",
+      "asked": "请求了批准",
+      "grants": "{{name}}将仅此一次、按这些值{{doing}}。"
     }
   },
   "agent": {

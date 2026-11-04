@@ -3312,6 +3312,33 @@
       "review": "검토",
       "delivery": "전달",
       "open": "열기"
+    },
+    "review": {
+      "list": "요청",
+      "where": "위치",
+      "effect": "영향",
+      "effects": {
+        "external": "회사 밖으로 나갑니다",
+        "production": "프로덕션에 반영됩니다",
+        "unsent": "아무것도 보내지 않습니다",
+        "readsOnly": "읽기만 합니다"
+      },
+      "undo": "되돌리기",
+      "deadline": "남은 시간",
+      "decides": "결정하는 사람",
+      "state": "상태",
+      "why": "{{name}}이(가) 요청하는 이유",
+      "email": "이메일",
+      "text": "게시될 내용",
+      "textDone": "게시한 내용",
+      "values": "할 일",
+      "more": "모두 보기",
+      "less": "간단히 보기",
+      "trail": "여기까지 온 과정",
+      "showSteps": "단계별로 보기",
+      "hideSteps": "단계 숨기기",
+      "asked": "승인을 요청함",
+      "grants": "{{name}}이(가) 이번 한 번만, 이 값으로 {{doing}}."
     }
   },
   "agent": {

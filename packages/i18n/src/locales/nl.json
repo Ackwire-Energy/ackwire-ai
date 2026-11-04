@@ -3444,6 +3444,33 @@
       "review": "Beoordeling",
       "delivery": "Oplevering",
       "open": "Openen"
+    },
+    "review": {
+      "list": "Verzoeken",
+      "where": "Waar",
+      "effect": "Effect",
+      "effects": {
+        "external": "Gaat buiten het bedrijf",
+        "production": "Gaat naar productie",
+        "unsent": "Er wordt niets verstuurd",
+        "readsOnly": "Leest alleen"
+      },
+      "undo": "Ongedaan maken",
+      "deadline": "Resterende tijd",
+      "decides": "Wie beslist",
+      "state": "Status",
+      "why": "Waarom {{name}} het vraagt",
+      "email": "De e-mail",
+      "text": "Wat er gepubliceerd wordt",
+      "textDone": "Wat er gepubliceerd is",
+      "values": "Wat er gaat gebeuren",
+      "more": "Alles tonen",
+      "less": "Minder tonen",
+      "trail": "Hoe het zover kwam",
+      "showSteps": "Elke stap bekijken",
+      "hideSteps": "Stappen verbergen",
+      "asked": "Vroeg om goedkeuring",
+      "grants": "{{name}} gaat {{doing}}, alleen deze keer en met deze waarden."
     }
   },
   "agent": {

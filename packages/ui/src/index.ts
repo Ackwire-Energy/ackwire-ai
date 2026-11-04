@@ -114,6 +114,7 @@ export {
   RadioGroup,
   Switch,
 } from "./components/Checkbox";
+export { type Fact, FactStrip, type FactTone } from "./components/FactStrip";
 export { AttentionNote, Chip, type ChipProps, type ChipTone, CountBadge, CountChip } from "./components/Chip";
 export { ColorPicker, type ColorPickerLabels } from "./components/ColorPicker";
 export { CommandPalette, filterPalette, type PaletteItem } from "./components/CommandPalette";
@@ -336,6 +337,7 @@ export {
   OptionCard,
   Steps,
 } from "./components/Surfaces";
+export { StepTrack, type StepTrackState, type StepTrackStep } from "./components/StepTrack";
 export { type TabItem, TabPanel, Tabs } from "./components/Tabs";
 export { normalizeTime, TimeSelect, type TimeSelectProps, timeOptions } from "./components/TimeSelect";
 export { TimezoneSelect, type TimezoneSelectLabels, type TimezoneSelectProps } from "./components/TimezoneSelect";

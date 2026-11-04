@@ -3558,6 +3558,33 @@
       "review": "Revisione",
       "delivery": "Consegna",
       "open": "Apri"
+    },
+    "review": {
+      "list": "Richieste",
+      "where": "Dove",
+      "effect": "Effetto",
+      "effects": {
+        "external": "Esce dall'azienda",
+        "production": "Va in produzione",
+        "unsent": "Non viene inviato nulla",
+        "readsOnly": "Legge soltanto"
+      },
+      "undo": "Annullare",
+      "deadline": "Tempo rimasto",
+      "decides": "Chi decide",
+      "state": "Stato",
+      "why": "Perché {{name}} lo chiede",
+      "email": "L'email",
+      "text": "Cosa verrà pubblicato",
+      "textDone": "Cosa è stato pubblicato",
+      "values": "Cosa farà",
+      "more": "Mostra tutto",
+      "less": "Mostra meno",
+      "trail": "Come ci è arrivato",
+      "showSteps": "Vedi ogni passo",
+      "hideSteps": "Nascondi i passi",
+      "asked": "Ha chiesto un'approvazione",
+      "grants": "{{name}} potrà {{doing}}, solo questa volta e con questi valori."
     }
   },
   "agent": {

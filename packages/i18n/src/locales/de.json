@@ -3437,6 +3437,33 @@
       "review": "Prüfung",
       "delivery": "Lieferung",
       "open": "Öffnen"
+    },
+    "review": {
+      "list": "Anfragen",
+      "where": "Wo",
+      "effect": "Wirkung",
+      "effects": {
+        "external": "Verlässt das Unternehmen",
+        "production": "Geht in die Produktion",
+        "unsent": "Nichts wird gesendet",
+        "readsOnly": "Liest nur"
+      },
+      "undo": "Rückgängig",
+      "deadline": "Verbleibende Zeit",
+      "decides": "Wer entscheidet",
+      "state": "Status",
+      "why": "Warum {{name}} fragt",
+      "email": "Die E-Mail",
+      "text": "Was veröffentlicht wird",
+      "textDone": "Was veröffentlicht wurde",
+      "values": "Was passieren wird",
+      "more": "Alles anzeigen",
+      "less": "Weniger anzeigen",
+      "trail": "Wie es dazu kam",
+      "showSteps": "Jeden Schritt ansehen",
+      "hideSteps": "Schritte ausblenden",
+      "asked": "Hat um Freigabe gebeten",
+      "grants": "{{name}} wird {{doing}}, nur dieses Mal und mit diesen Werten."
     }
   },
   "agent": {

@@ -9406,3 +9406,134 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Fact strip: short facts in one row, icon + label over a one-line value, split by hairlines ── */
+.ac-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  row-gap: 12px;
+  margin: 0;
+}
+.ac-facts__item {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 0 16px;
+  border-left: 1px solid var(--line);
+}
+.ac-facts__item:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.ac-facts__icon {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.ac-facts__label {
+  font-size: 11.5px;
+  line-height: 15px;
+  color: var(--faint);
+}
+.ac-facts__value {
+  margin: 0;
+  min-width: 0;
+  font-size: 13.5px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ac-facts__item--waiting :is(.ac-facts__icon, .ac-facts__value) {
+  color: var(--attention);
+}
+.ac-facts__item--done :is(.ac-facts__icon, .ac-facts__value) {
+  color: var(--success);
+}
+
+/* ── Step track: a run's steps in one row, nodes joined by a line, a short label and the time under each ── */
+.ac-track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr));
+}
+.ac-track__step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  text-align: center;
+}
+.ac-track__step + .ac-track__step::before {
+  content: "";
+  position: absolute;
+  top: 13px;
+  left: calc(-50% + 18px);
+  right: calc(50% + 18px);
+  height: 2px;
+  border-radius: 2px;
+  background: var(--line2);
+}
+.ac-track__step.is-after::before {
+  background: color-mix(in srgb, var(--success) 50%, var(--line2));
+}
+.ac-track__node {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--ink2);
+  background: var(--sunken);
+}
+.ac-track__node svg {
+  width: 14px;
+  height: 14px;
+}
+.ac-track__label {
+  max-width: 100%;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ac-track__time {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.ac-track__step.is-now .ac-track__node {
+  background: var(--attention-soft);
+  color: var(--attention);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--attention) 18%, transparent);
+}
+.ac-track__step.is-now .ac-track__label {
+  color: var(--attention);
+}
+.ac-track__step.is-after .ac-track__node {
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success);
+}
+.ac-track__step.is-failed .ac-track__node {
+  color: var(--danger);
+}
+.ac-track__step.is-more .ac-track__node {
+  color: var(--muted);
+}

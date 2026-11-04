@@ -3558,6 +3558,33 @@
       "review": "Relecture",
       "delivery": "Livraison",
       "open": "Ouvrir"
+    },
+    "review": {
+      "list": "Demandes",
+      "where": "Où",
+      "effect": "Effet",
+      "effects": {
+        "external": "Sort de l'entreprise",
+        "production": "Part en production",
+        "unsent": "Rien n'est envoyé",
+        "readsOnly": "Lecture seule"
+      },
+      "undo": "Annuler",
+      "deadline": "Temps restant",
+      "decides": "Qui décide",
+      "state": "Statut",
+      "why": "Pourquoi {{name}} demande",
+      "email": "L'e-mail",
+      "text": "Ce qui sera publié",
+      "textDone": "Ce qui a été publié",
+      "values": "Ce qui sera fait",
+      "more": "Tout afficher",
+      "less": "Afficher moins",
+      "trail": "Comment on en est arrivé là",
+      "showSteps": "Voir chaque étape",
+      "hideSteps": "Masquer les étapes",
+      "asked": "A demandé une approbation",
+      "grants": "{{name}} va {{doing}}, cette fois seulement, avec ces valeurs."
     }
   },
   "agent": {

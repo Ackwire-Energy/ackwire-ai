@@ -34499,5 +34499,74 @@
   },
   "chat.body.action_open_page": {
     "value": "Open a screen"
+  },
+  "approvals.review.list": {
+    "value": "Requests"
+  },
+  "approvals.review.where": {
+    "value": "Where"
+  },
+  "approvals.review.effect": {
+    "value": "Effect"
+  },
+  "approvals.review.effects.external": {
+    "value": "Leaves the company"
+  },
+  "approvals.review.effects.production": {
+    "value": "Goes to production"
+  },
+  "approvals.review.effects.unsent": {
+    "value": "Nothing is sent"
+  },
+  "approvals.review.effects.readsOnly": {
+    "value": "Only reads"
+  },
+  "approvals.review.undo": {
+    "value": "Undo"
+  },
+  "approvals.review.deadline": {
+    "value": "Time left"
+  },
+  "approvals.review.decides": {
+    "value": "Who decides"
+  },
+  "approvals.review.state": {
+    "value": "Status"
+  },
+  "approvals.review.why": {
+    "value": "Why {{name}} asks"
+  },
+  "approvals.review.email": {
+    "value": "The email"
+  },
+  "approvals.review.text": {
+    "value": "What it will publish"
+  },
+  "approvals.review.textDone": {
+    "value": "What it published"
+  },
+  "approvals.review.values": {
+    "value": "What it will do"
+  },
+  "approvals.review.more": {
+    "value": "Show all"
+  },
+  "approvals.review.less": {
+    "value": "Show less"
+  },
+  "approvals.review.trail": {
+    "value": "How it got here"
+  },
+  "approvals.review.showSteps": {
+    "value": "See each step"
+  },
+  "approvals.review.hideSteps": {
+    "value": "Hide the steps"
+  },
+  "approvals.review.asked": {
+    "value": "Asked for approval"
+  },
+  "approvals.review.grants": {
+    "value": "{{name}} will {{doing}}, this once, with these values."
   }
 }
