@@ -1624,6 +1624,236 @@
       "failed": "Tidak bisa mengunduh file. Coba lagi."
     }
   },
+  "vault": {
+    "newItem": "Item baru",
+    "search": "Cari di Vault",
+    "noResults": "Tidak ada yang cocok dengan “{{q}}”.",
+    "personalText": "Hanya kamu yang melihat ini. Agenmu hanya menggunakannya saat kamu minta.",
+    "teamText": "Login, kunci, dan kontak tim. Kamu memilih siapa yang melihat masing-masing dan agen mana yang menggunakannya.",
+    "teamReadText": "Dibagikan kepadamu oleh orang yang mengelola kunci ruang kerja.",
+    "missing": "Hilang",
+    "usedAt": "digunakan {{when}}",
+    "neverUsed": "belum digunakan",
+    "kindTitle": "Yang mau disimpan",
+    "teamAudience": "Semua orang di ruang kerja melihatnya. Kamu bisa mempersempitnya setelah menyimpan.",
+    "savedToVault": "Tersimpan di Vault",
+    "tab": {
+      "team": "Tim",
+      "personal": "Pribadi",
+      "connections": "Koneksi"
+    },
+    "kind": {
+      "login": "Login",
+      "key": "Kunci",
+      "contact": "Kontak"
+    },
+    "kinds": {
+      "all": "Semua",
+      "login": "Login",
+      "key": "Kunci",
+      "contact": "Kontak"
+    },
+    "kindText": {
+      "login": "Situs web, nama pengguna, dan kata sandi. Agen masuk tanpa melihat kata sandinya.",
+      "key": "Kunci API atau token. Agen memakainya dalam perintah tanpa melihatnya.",
+      "contact": "Nama, perusahaan, email, telepon, dan alamat yang diisi agen di formulir."
+    },
+    "empty": {
+      "personalTitle": "Belum ada milikmu",
+      "personalText": "Simpan login atau kunci di sini, dan agenmu menggunakannya saat kamu minta.",
+      "teamTitle": "Belum ada yang dibagikan",
+      "teamText": "Simpan login dan kunci yang digunakan agenmu untuk tim.",
+      "teamReadText": "Saat seseorang membagikan login atau kunci kepadamu, item itu muncul di sini."
+    },
+    "import": {
+      "title": "Impor dari komputer",
+      "text": "Untuk membawa kata sandi dari browser atau pengelola kata sandi, buka Pengaturan, Vault di web lalu pilih Impor."
+    },
+    "connections": {
+      "text": "Hubungkan pengelola kata sandi, dan agenmu menggunakan login yang disimpan di sana. Tidak ada yang disalin: kata sandi hanya dibaca saat digunakan.",
+      "connected": "Terhubung",
+      "add": "Hubungkan",
+      "none": "Tidak ada pengelola kata sandi yang bisa dihubungkan di server ini.",
+      "help": "Gunakan brankas atau folder khusus untuk agenmu, berisi hanya yang mereka perlukan."
+    },
+    "connect": {
+      "title": "Hubungkan {{name}}",
+      "reconnectTitle": "Hubungkan ulang {{name}}",
+      "action": "Hubungkan",
+      "text": "Agenmu akan menggunakan login yang disimpan {{name}} untuk mereka, tanpa melihat kata sandinya.",
+      "steps": "Cara menghubungkan",
+      "guide": "Buka panduan {{name}}",
+      "fields": "Data",
+      "private": "Data ini disimpan terenkripsi dan tidak pernah ditampilkan lagi.",
+      "teamHelp": "Item-itemnya awalnya terlihat oleh semua orang di ruang kerja dan tidak dipakai agen mana pun. Kamu memilih agennya nanti.",
+      "personalHelp": "Hanya kamu yang melihat item-itemnya, dan agenmu menggunakannya saat kamu minta.",
+      "checking": "Memeriksa dengan {{name}}…",
+      "connected": "{{name}} terhubung",
+      "reconnected": "{{name}} terhubung ulang",
+      "unknown": "Pengelola kata sandi ini tidak tersedia di sini."
+    },
+    "connection": {
+      "ready": "Terhubung",
+      "syncing": "Menyinkronkan…",
+      "reads": "Membaca {{label}}",
+      "items_other": "{{count}} item",
+      "synced": "disinkronkan {{when}}",
+      "sync": "Sinkronkan sekarang",
+      "syncDone": "Tersinkron",
+      "reconnect": "Hubungkan ulang",
+      "change": "Ganti data masuk",
+      "readOnly": "Login dari {{name}} diubah di {{name}}. Di sini kamu memilih siapa yang menggunakannya.",
+      "disconnect": "Putuskan",
+      "disconnectTitle": "Putuskan {{name}}?",
+      "disconnectText_other": "{{count}} item keluar dari Vault dan agen berhenti menggunakannya. Tidak ada yang berubah di {{name}}.",
+      "disconnected": "{{name}} diputus",
+      "gone": "Koneksi ini sudah tidak ada atau kamu tidak bisa melihatnya."
+    },
+    "item": {
+      "gone": "Item ini sudah tidak ada atau kamu tidak bisa melihatnya.",
+      "missingText": "Item ini hilang dari {{name}} sejak sinkronisasi terakhir. Agen tidak bisa menggunakannya.",
+      "externalText": "Item ini berasal dari {{name}}. Ubah nama, alamat, nama pengguna, atau kata sandinya di sana.",
+      "noValue": "Belum ada nilai yang tersimpan.",
+      "changePassword": "Ganti kata sandi",
+      "changeValue": "Ganti nilai",
+      "changeHelp": "Ketuk Simpan untuk menyimpannya. Setelah itu agen menggunakan yang baru.",
+      "show": "Tampilkan",
+      "hide": "Sembunyikan",
+      "hidden": "Tersembunyi",
+      "saved": "Tersimpan",
+      "copied": "Tersalin. Tempel di tempat yang kamu perlukan.",
+      "delete": "Hapus",
+      "deleteTitle": "Hapus {{title}}?",
+      "deleteText": "Agen langsung berhenti menggunakannya. Ini tidak bisa diurungkan.",
+      "deleteExternal": "Item ini keluar dari Vault dan agen berhenti menggunakannya. Item tetap ada di {{name}}.",
+      "deleted": "Terhapus"
+    },
+    "field": {
+      "title": "Nama",
+      "titleOptional": "Opsional",
+      "website": "Situs web",
+      "websitePlaceholder": "acme.example",
+      "username": "Nama pengguna",
+      "password": "Kata sandi",
+      "newPassword": "Kata sandi baru",
+      "keyName": "Variabel",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "keyNameHelp": "Huruf kapital, angka, dan _, misalnya ACME_API_KEY. Agen meminta kunci dengan nama ini.",
+      "value": "Nilai",
+      "newValue": "Nilai baru",
+      "description": "Deskripsi",
+      "descriptionPlaceholder": "Untuk apa",
+      "descriptionHelp": "Agen membaca ini untuk tahu kapan menggunakannya.",
+      "loginHelp": "Agen mengetik kata sandi hanya di situs web ini, tanpa melihatnya.",
+      "contactHelp": "Bukan rahasia: agen membaca data ini dan mengisinya di formulir."
+    },
+    "contact": {
+      "fullName": "Nama lengkap",
+      "company": "Perusahaan",
+      "document": "NPWP",
+      "email": "Email",
+      "phone": "Telepon",
+      "address": "Alamat",
+      "address2": "Alamat baris 2",
+      "city": "Kota",
+      "region": "Provinsi",
+      "postalCode": "Kode pos",
+      "country": "Negara"
+    },
+    "match": {
+      "title": "Tempat agen boleh mengetiknya",
+      "exact": "Hanya alamat ini",
+      "exactText": "Alamat persis di atas",
+      "site": "Seluruh situs",
+      "siteOn": "Halaman mana pun di situs yang sama dengan {{host}}",
+      "siteText": "Halaman mana pun di situs yang sama",
+      "help": "Hanya di halaman aman (https). Di tempat lain, komputer agen menolak mengetiknya."
+    },
+    "problem": {
+      "secret": "Ketik kata sandi atau nilai kunci."
+    },
+    "scope": {
+      "title": "Siapa yang melihat",
+      "personal": "Pribadi",
+      "personalText": "Hanya kamu yang melihatnya. Agenmu hanya menggunakannya saat kamu minta.",
+      "team": "Tim",
+      "teamText": "Orang yang punya akses melihatnya. Agen menggunakannya saat salah satu dari mereka meminta.",
+      "teamLocked": "Hanya orang yang mengelola kunci ruang kerja yang menyimpan untuk tim."
+    },
+    "agents": {
+      "title": "Agen yang boleh menggunakannya",
+      "allText": "Semua agen, termasuk yang baru",
+      "personalHelp": "Mereka hanya menggunakannya saat kamu minta.",
+      "teamHelp": "Mereka menggunakannya saat orang yang punya akses meminta."
+    },
+    "access": {
+      "title": "Siapa yang punya akses",
+      "defaultTitle": "Akses bawaan",
+      "defaultText": "Item-itemnya mengikuti ini sampai seseorang mengubah akses salah satunya.",
+      "teamText": "Pilih siapa yang melihatnya dan agen mana yang menggunakannya untuk mereka.",
+      "people": "Orang",
+      "persons": "Orang tertentu",
+      "roles": "Peran",
+      "agents": "Agen",
+      "allAgents": "Semua agen",
+      "noAgent": "Belum ada agen",
+      "onlyYou": "Hanya kamu",
+      "everyone": "Semua orang di ruang kerja",
+      "everyoneText": "Siapa pun di sini melihatnya, dan agen menggunakannya untuk orang itu.",
+      "everyoneIn": "Ya",
+      "everyoneOut": "Tidak",
+      "levelIn": "Punya akses",
+      "levelOut": "Tanpa akses",
+      "everyoneHelp": "Ketuk Semua orang di ruang kerja untuk memilih peran dan orang.",
+      "managersHelp": "Orang yang mengelola kunci ruang kerja selalu melihat item tim.",
+      "managersOnly": "Hanya pengelola kunci",
+      "inRole": "orang dengan peran {{role}}",
+      "saved": "Akses tersimpan",
+      "useConnection": "Ikuti akses koneksi",
+      "followsConnection": "Mengikuti akses koneksi.",
+      "tooManyRoles": "Pilih paling banyak 100 peran.",
+      "tooManyPeople": "Pilih paling banyak 500 orang.",
+      "tooManyAgents": "Pilih paling banyak 200 agen.",
+      "sentence": {
+        "none": "Belum ada agen yang menggunakannya.",
+        "personalAll": "Agenmu menggunakannya saat kamu minta.",
+        "everyAgent": "Semua agen",
+        "personal_other": "{{agents}} menggunakannya saat kamu minta.",
+        "everyone_other": "{{agents}} menggunakannya saat siapa pun di ruang kerja meminta.",
+        "managers_other": "{{agents}} menggunakannya saat orang yang mengelola kunci meminta.",
+        "people_other": "{{agents}} menggunakannya untuk {{people}}."
+      }
+    },
+    "use": {
+      "fill": "{{name}} masuk",
+      "fillOn": "{{name}}, di {{host}}",
+      "key": "{{name}} memakainya dalam perintah",
+      "read": "{{name}} membacanya",
+      "show": "{{name}} menampilkannya",
+      "copy": "{{name}} menyalinnya",
+      "create": "{{name}} menyimpannya",
+      "edit": "{{name}} mengubahnya",
+      "for": "untuk {{name}}",
+      "routine": "rutinitas {{name}}"
+    },
+    "uses": {
+      "title": "Penggunaan terbaru",
+      "none": "Belum pernah digunakan."
+    },
+    "card": {
+      "save": "Simpan ke Vault",
+      "saveText": "Lain kali agenmu menggunakannya tanpa bertanya kepadamu.",
+      "personalOnly": "Disimpan sebagai pribadi: hanya kamu yang melihatnya.",
+      "choose": "Pilih",
+      "agentsText": "Agen yang meminta sudah dipilih.",
+      "as": "Masuk sebagai {{username}}.",
+      "saved": "Tersimpan di Vault",
+      "notSaved": "Terkirim, tapi tidak disimpan ke Vault",
+      "codeLabel": "Kode untuk {{name}}",
+      "codeIncomplete": "Ketik setiap digit kode.",
+      "codeNote": "Dikirim terenkripsi langsung ke komputer. Kode tidak pernah disimpan."
+    }
+  },
   "status": {
     "title": "Status",
     "doing": "Yang sedang kamu lakukan",

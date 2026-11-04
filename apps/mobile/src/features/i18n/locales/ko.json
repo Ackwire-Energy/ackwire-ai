@@ -1624,6 +1624,236 @@
       "failed": "파일을 다운로드하지 못했어요. 다시 시도해 주세요."
     }
   },
+  "vault": {
+    "newItem": "새 항목",
+    "search": "Vault 검색",
+    "noResults": "“{{q}}”에 맞는 결과가 없어요.",
+    "personalText": "나만 볼 수 있어요. 내가 부탁할 때만 에이전트가 사용해요.",
+    "teamText": "팀의 로그인, 키, 연락처예요. 각 항목을 누가 볼지, 어떤 에이전트가 쓸지 내가 정해요.",
+    "teamReadText": "워크스페이스의 키를 관리하는 사람이 나와 공유한 항목이에요.",
+    "missing": "사라짐",
+    "usedAt": "{{when}} 사용",
+    "neverUsed": "아직 사용 안 함",
+    "kindTitle": "저장할 항목",
+    "teamAudience": "워크스페이스의 모든 사람이 볼 수 있어요. 저장한 뒤에 범위를 좁힐 수 있어요.",
+    "savedToVault": "Vault에 저장했어요",
+    "tab": {
+      "team": "팀",
+      "personal": "개인",
+      "connections": "연결"
+    },
+    "kind": {
+      "login": "로그인",
+      "key": "키",
+      "contact": "연락처"
+    },
+    "kinds": {
+      "all": "전체",
+      "login": "로그인",
+      "key": "키",
+      "contact": "연락처"
+    },
+    "kindText": {
+      "login": "웹사이트, 사용자 이름, 비밀번호예요. 에이전트는 비밀번호를 보지 않고 로그인해요.",
+      "key": "API 키나 토큰이에요. 에이전트는 내용을 보지 않고 명령어에서 사용해요.",
+      "contact": "에이전트가 양식에 채우는 이름, 회사, 이메일, 전화번호, 주소예요."
+    },
+    "empty": {
+      "personalTitle": "아직 내 항목이 없어요",
+      "personalText": "여기에 로그인이나 키를 저장하면, 내가 부탁할 때 에이전트가 사용해요.",
+      "teamTitle": "아직 공유된 항목이 없어요",
+      "teamText": "에이전트가 팀을 위해 쓰는 로그인과 키를 저장하세요.",
+      "teamReadText": "누군가 로그인이나 키를 나와 공유하면 여기에 보여요."
+    },
+    "import": {
+      "title": "컴퓨터에서 가져오기",
+      "text": "브라우저나 비밀번호 관리자에서 비밀번호를 가져오려면 웹에서 “설정”, “Vault”를 열고 “가져오기”를 고르세요."
+    },
+    "connections": {
+      "text": "비밀번호 관리자를 연결하면 거기에 보관된 로그인을 에이전트가 사용해요. 아무것도 복사되지 않아요. 비밀번호는 쓸 때만 읽어요.",
+      "connected": "연결됨",
+      "add": "연결",
+      "none": "이 서버에서는 연결할 수 있는 비밀번호 관리자가 없어요.",
+      "help": "에이전트 전용 보관함이나 폴더를 쓰고, 꼭 필요한 것만 넣으세요."
+    },
+    "connect": {
+      "title": "{{name}} 연결",
+      "reconnectTitle": "{{name}} 다시 연결",
+      "action": "연결",
+      "text": "에이전트는 {{name}}에 보관된 로그인을 비밀번호를 보지 않고 사용해요.",
+      "steps": "연결 방법",
+      "guide": "{{name}} 안내서 열기",
+      "fields": "입력 정보",
+      "private": "이 정보는 암호화되어 보관되고 다시는 표시되지 않아요.",
+      "teamHelp": "항목은 처음에 워크스페이스의 모든 사람에게 보이고, 어떤 에이전트도 쓰지 않아요. 에이전트는 다음에 골라요.",
+      "personalHelp": "항목은 나만 볼 수 있고, 내가 부탁할 때 에이전트가 사용해요.",
+      "checking": "{{name}}에서 확인하는 중…",
+      "connected": "{{name}} 연결됨",
+      "reconnected": "{{name}} 다시 연결됨",
+      "unknown": "여기서는 이 비밀번호 관리자를 쓸 수 없어요."
+    },
+    "connection": {
+      "ready": "연결됨",
+      "syncing": "동기화하는 중…",
+      "reads": "{{label}} 읽기",
+      "items_other": "항목 {{count}}개",
+      "synced": "{{when}} 동기화",
+      "sync": "지금 동기화",
+      "syncDone": "동기화했어요",
+      "reconnect": "다시 연결",
+      "change": "로그인 정보 변경",
+      "readOnly": "{{name}}의 로그인은 {{name}}에서 바꿔요. 여기서는 누가 쓸지 정해요.",
+      "disconnect": "연결 해제",
+      "disconnectTitle": "{{name}} 연결을 해제할까요?",
+      "disconnectText_other": "항목 {{count}}개가 Vault에서 빠지고 에이전트가 더 이상 쓰지 않아요. {{name}}에서는 아무것도 바뀌지 않아요.",
+      "disconnected": "{{name}} 연결 해제됨",
+      "gone": "이 연결이 더 이상 없거나 볼 수 없어요."
+    },
+    "item": {
+      "gone": "이 항목이 더 이상 없거나 볼 수 없어요.",
+      "missingText": "지난 동기화 이후 {{name}}에서 사라졌어요. 에이전트가 쓸 수 없어요.",
+      "externalText": "{{name}}에서 가져온 항목이에요. 이름, 주소, 사용자 이름, 비밀번호는 거기서 바꾸세요.",
+      "noValue": "아직 저장된 값이 없어요.",
+      "changePassword": "비밀번호 변경",
+      "changeValue": "값 변경",
+      "changeHelp": "“저장”을 누르면 반영돼요. 그 뒤로 에이전트는 새 값을 써요.",
+      "show": "보기",
+      "hide": "숨기기",
+      "hidden": "숨겨짐",
+      "saved": "저장했어요",
+      "copied": "복사했어요. 필요한 곳에 붙여 넣으세요.",
+      "delete": "삭제",
+      "deleteTitle": "{{title}} 항목을 삭제할까요?",
+      "deleteText": "에이전트가 바로 쓰지 않게 돼요. 되돌릴 수 없어요.",
+      "deleteExternal": "Vault에서 빠지고 에이전트가 더 이상 쓰지 않아요. {{name}}에는 남아 있어요.",
+      "deleted": "삭제했어요"
+    },
+    "field": {
+      "title": "이름",
+      "titleOptional": "선택 사항",
+      "website": "웹사이트",
+      "websitePlaceholder": "acme.example",
+      "username": "사용자 이름",
+      "password": "비밀번호",
+      "newPassword": "새 비밀번호",
+      "keyName": "변수",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "keyNameHelp": "대문자, 숫자, _를 써요. 예: ACME_API_KEY. 에이전트는 이 이름으로 키를 요청해요.",
+      "value": "값",
+      "newValue": "새 값",
+      "description": "설명",
+      "descriptionPlaceholder": "용도",
+      "descriptionHelp": "에이전트는 이것을 읽고 언제 쓸지 판단해요.",
+      "loginHelp": "에이전트는 이 웹사이트에서만 비밀번호를 보지 않고 입력해요.",
+      "contactHelp": "비밀 정보가 아니에요. 에이전트가 읽고 양식에 채워요."
+    },
+    "contact": {
+      "fullName": "전체 이름",
+      "company": "회사",
+      "document": "사업자 또는 납세자 번호",
+      "email": "이메일",
+      "phone": "전화번호",
+      "address": "주소",
+      "address2": "상세 주소",
+      "city": "시/군/구",
+      "region": "시/도",
+      "postalCode": "우편번호",
+      "country": "국가"
+    },
+    "match": {
+      "title": "에이전트가 입력할 수 있는 곳",
+      "exact": "이 주소만",
+      "exactText": "위의 주소와 정확히 같은 곳",
+      "site": "사이트 전체",
+      "siteOn": "{{host}}와(과) 같은 사이트의 모든 페이지",
+      "siteText": "같은 사이트의 모든 페이지",
+      "help": "보안 페이지(https)에서만 입력해요. 다른 곳에서는 에이전트의 컴퓨터가 입력을 거부해요."
+    },
+    "problem": {
+      "secret": "비밀번호나 키 값을 입력하세요."
+    },
+    "scope": {
+      "title": "볼 수 있는 사람",
+      "personal": "개인",
+      "personalText": "나만 볼 수 있어요. 내가 부탁할 때만 에이전트가 사용해요.",
+      "team": "팀",
+      "teamText": "접근 권한이 있는 사람이 볼 수 있어요. 그중 누군가 부탁하면 에이전트가 사용해요.",
+      "teamLocked": "팀용으로 저장하는 건 워크스페이스의 키를 관리하는 사람만 할 수 있어요."
+    },
+    "agents": {
+      "title": "사용할 수 있는 에이전트",
+      "allText": "새 에이전트를 포함한 모든 에이전트",
+      "personalHelp": "내가 부탁할 때만 사용해요.",
+      "teamHelp": "접근 권한이 있는 사람이 부탁할 때 사용해요."
+    },
+    "access": {
+      "title": "접근 권한이 있는 사람",
+      "defaultTitle": "기본 접근 권한",
+      "defaultText": "누군가 항목별로 바꾸기 전까지 항목은 이 설정을 따라요.",
+      "teamText": "누가 볼지, 그 사람들을 위해 어떤 에이전트가 쓸지 고르세요.",
+      "people": "사람",
+      "persons": "특정 사람",
+      "roles": "역할",
+      "agents": "에이전트",
+      "allAgents": "모든 에이전트",
+      "noAgent": "아직 에이전트가 없어요",
+      "onlyYou": "나만",
+      "everyone": "워크스페이스의 모든 사람",
+      "everyoneText": "여기 있는 누구나 볼 수 있고, 에이전트가 그 사람을 위해 사용해요.",
+      "everyoneIn": "예",
+      "everyoneOut": "아니요",
+      "levelIn": "접근 가능",
+      "levelOut": "접근 권한 없음",
+      "everyoneHelp": "역할과 사람을 고르려면 “워크스페이스의 모든 사람”을 누르세요.",
+      "managersHelp": "워크스페이스의 키를 관리하는 사람은 팀 항목을 항상 볼 수 있어요.",
+      "managersOnly": "키를 관리하는 사람만",
+      "inRole": "{{role}} 역할의 사람",
+      "saved": "접근 권한을 저장했어요",
+      "useConnection": "연결의 접근 권한 따르기",
+      "followsConnection": "연결의 접근 권한을 따라요.",
+      "tooManyRoles": "역할은 최대 100개까지 고를 수 있어요.",
+      "tooManyPeople": "사람은 최대 500명까지 고를 수 있어요.",
+      "tooManyAgents": "에이전트는 최대 200개까지 고를 수 있어요.",
+      "sentence": {
+        "none": "아직 이 항목을 쓰는 에이전트가 없어요.",
+        "personalAll": "내가 부탁할 때 에이전트가 사용해요.",
+        "everyAgent": "모든 에이전트",
+        "personal_other": "내가 부탁할 때 {{agents}}이(가) 사용해요.",
+        "everyone_other": "워크스페이스의 누군가 부탁할 때 {{agents}}이(가) 사용해요.",
+        "managers_other": "키를 관리하는 사람이 부탁할 때 {{agents}}이(가) 사용해요.",
+        "people_other": "{{people}}을(를) 위해 {{agents}}이(가) 사용해요."
+      }
+    },
+    "use": {
+      "fill": "{{name}} 로그인함",
+      "fillOn": "{{name}}, {{host}}에서",
+      "key": "{{name}}, 명령어에서 사용함",
+      "read": "{{name}} 읽음",
+      "show": "{{name}} 표시함",
+      "copy": "{{name}} 복사함",
+      "create": "{{name}} 저장함",
+      "edit": "{{name}} 변경함",
+      "for": "{{name}} 님을 위해",
+      "routine": "루틴 {{name}}"
+    },
+    "uses": {
+      "title": "최근 사용",
+      "none": "아직 사용하지 않았어요."
+    },
+    "card": {
+      "save": "Vault에 저장",
+      "saveText": "다음부터는 에이전트가 나에게 묻지 않고 사용해요.",
+      "personalOnly": "개인 항목으로 저장했어요. 나만 볼 수 있어요.",
+      "choose": "고르기",
+      "agentsText": "요청한 에이전트가 이미 선택되어 있어요.",
+      "as": "{{username}}(으)로 로그인해요.",
+      "saved": "Vault에 저장했어요",
+      "notSaved": "보냈지만 Vault에는 저장하지 않았어요",
+      "codeLabel": "{{name}}의 코드",
+      "codeIncomplete": "코드의 모든 숫자를 입력하세요.",
+      "codeNote": "암호화되어 컴퓨터로 바로 전송돼요. 코드는 저장되지 않아요."
+    }
+  },
   "status": {
     "title": "상태",
     "doing": "지금 하는 일",

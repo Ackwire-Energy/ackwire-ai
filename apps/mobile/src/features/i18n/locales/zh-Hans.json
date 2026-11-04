@@ -1624,6 +1624,236 @@
       "failed": "无法下载文件，请重试。"
     }
   },
+  "vault": {
+    "newItem": "新建项目",
+    "search": "搜索 Vault",
+    "noResults": "没有与“{{q}}”匹配的内容。",
+    "personalText": "只有你能看到这些。你的智能体只在你要求时使用它们。",
+    "teamText": "团队的登录信息、密钥和联系信息。由你决定每一项谁能看到、哪些智能体使用。",
+    "teamReadText": "由管理工作区密钥的人与你共享。",
+    "missing": "已丢失",
+    "usedAt": "{{when}}使用过",
+    "neverUsed": "尚未使用",
+    "kindTitle": "要保存什么",
+    "teamAudience": "工作区的所有成员都能看到。保存后可以缩小范围。",
+    "savedToVault": "已保存到 Vault",
+    "tab": {
+      "team": "团队",
+      "personal": "个人",
+      "connections": "连接"
+    },
+    "kind": {
+      "login": "登录信息",
+      "key": "密钥",
+      "contact": "联系信息"
+    },
+    "kinds": {
+      "all": "全部",
+      "login": "登录信息",
+      "key": "密钥",
+      "contact": "联系信息"
+    },
+    "kindText": {
+      "login": "网站、用户名和密码。智能体登录时看不到密码。",
+      "key": "API 密钥或令牌。智能体在命令中使用它，但看不到它。",
+      "contact": "智能体在表单中填写的姓名、公司、邮箱、电话和地址。"
+    },
+    "empty": {
+      "personalTitle": "还没有你的项目",
+      "personalText": "在这里保存登录信息或密钥，你提出要求时智能体就会使用。",
+      "teamTitle": "还没有共享的项目",
+      "teamText": "保存智能体为团队使用的登录信息和密钥。",
+      "teamReadText": "有人与你共享登录信息或密钥时，会显示在这里。"
+    },
+    "import": {
+      "title": "从电脑导入",
+      "text": "要从浏览器或密码管理器导入密码，请在网页版打开“设置”、“Vault”，然后选择“导入”。"
+    },
+    "connections": {
+      "text": "连接密码管理器后，你的智能体会使用其中保存的登录信息。不会复制任何内容：密码只在使用时读取。",
+      "connected": "已连接",
+      "add": "连接",
+      "none": "此服务器上无法连接任何密码管理器。",
+      "help": "请使用只给智能体用的保险库或文件夹，只放它们需要的内容。"
+    },
+    "connect": {
+      "title": "连接 {{name}}",
+      "reconnectTitle": "重新连接 {{name}}",
+      "action": "连接",
+      "text": "你的智能体会使用 {{name}} 为它们保存的登录信息，但看不到密码。",
+      "steps": "如何连接",
+      "guide": "打开 {{name}} 指南",
+      "fields": "填写信息",
+      "private": "这些信息会加密保存，不会再次显示。",
+      "teamHelp": "其中的项目一开始对工作区所有成员可见，不由任何智能体使用。之后再选择智能体。",
+      "personalHelp": "只有你能看到其中的项目，你提出要求时智能体会使用它们。",
+      "checking": "正在向 {{name}} 确认…",
+      "connected": "已连接 {{name}}",
+      "reconnected": "已重新连接 {{name}}",
+      "unknown": "这里无法使用这个密码管理器。"
+    },
+    "connection": {
+      "ready": "已连接",
+      "syncing": "正在同步…",
+      "reads": "读取 {{label}}",
+      "items_other": "{{count}} 个项目",
+      "synced": "{{when}}已同步",
+      "sync": "立即同步",
+      "syncDone": "已同步",
+      "reconnect": "重新连接",
+      "change": "更改登录信息",
+      "readOnly": "{{name}} 的登录信息要在 {{name}} 中修改。你可以在这里选择谁来使用。",
+      "disconnect": "断开连接",
+      "disconnectTitle": "要断开 {{name}} 吗？",
+      "disconnectText_other": "{{count}} 个项目将离开 Vault，智能体也不再使用它们。{{name}} 中不会有任何变化。",
+      "disconnected": "已断开 {{name}}",
+      "gone": "此连接已不存在，或你无法查看。"
+    },
+    "item": {
+      "gone": "此项目已不存在，或你无法查看。",
+      "missingText": "自上次同步以来，它已从 {{name}} 中消失。智能体无法使用它。",
+      "externalText": "它来自 {{name}}。请在那里修改名称、地址、用户名或密码。",
+      "noValue": "还没有保存任何值。",
+      "changePassword": "更改密码",
+      "changeValue": "更改值",
+      "changeHelp": "点按“保存”即可保留。之后智能体会使用新的值。",
+      "show": "显示",
+      "hide": "隐藏",
+      "hidden": "已隐藏",
+      "saved": "已保存",
+      "copied": "已复制。粘贴到需要的地方即可。",
+      "delete": "删除",
+      "deleteTitle": "要删除 {{title}} 吗？",
+      "deleteText": "智能体会立即停止使用它。此操作无法撤销。",
+      "deleteExternal": "它会离开 Vault，智能体也不再使用它。它仍保留在 {{name}} 中。",
+      "deleted": "已删除"
+    },
+    "field": {
+      "title": "名称",
+      "titleOptional": "可选",
+      "website": "网站",
+      "websitePlaceholder": "acme.example",
+      "username": "用户名",
+      "password": "密码",
+      "newPassword": "新密码",
+      "keyName": "变量",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "keyNameHelp": "使用大写字母、数字和 _，例如 ACME_API_KEY。智能体按这个名称请求密钥。",
+      "value": "值",
+      "newValue": "新值",
+      "description": "描述",
+      "descriptionPlaceholder": "用途",
+      "descriptionHelp": "智能体会读这段内容，判断何时使用。",
+      "loginHelp": "智能体只在这个网站上输入密码，而且看不到它。",
+      "contactHelp": "这不是机密：智能体会读取这些信息并填到表单中。"
+    },
+    "contact": {
+      "fullName": "全名",
+      "company": "公司",
+      "document": "税号",
+      "email": "邮箱",
+      "phone": "电话",
+      "address": "地址",
+      "address2": "地址第二行",
+      "city": "城市",
+      "region": "省/州",
+      "postalCode": "邮政编码",
+      "country": "国家/地区"
+    },
+    "match": {
+      "title": "智能体可以在哪里输入",
+      "exact": "仅此地址",
+      "exactText": "与上面的地址完全一致",
+      "site": "整个网站",
+      "siteOn": "与 {{host}} 同一网站的任意页面",
+      "siteText": "同一网站的任意页面",
+      "help": "仅限安全页面（https）。在其他任何地方，智能体的电脑都会拒绝输入。"
+    },
+    "problem": {
+      "secret": "请输入密码或密钥的值。"
+    },
+    "scope": {
+      "title": "谁能看到",
+      "personal": "个人",
+      "personalText": "只有你能看到。你的智能体只在你要求时使用它。",
+      "team": "团队",
+      "teamText": "有权限的人能看到。其中有人要求时，智能体会使用它。",
+      "teamLocked": "只有管理工作区密钥的人才能为团队保存。"
+    },
+    "agents": {
+      "title": "可以使用的智能体",
+      "allText": "所有智能体，包括新的",
+      "personalHelp": "只在你要求时使用。",
+      "teamHelp": "有权限的人要求时使用。"
+    },
+    "access": {
+      "title": "谁有权限",
+      "defaultTitle": "默认权限",
+      "defaultText": "在有人单独修改某一项之前，其中的项目都遵循此设置。",
+      "teamText": "选择谁能看到，以及哪些智能体为这些人使用它。",
+      "people": "成员",
+      "persons": "指定成员",
+      "roles": "角色",
+      "agents": "智能体",
+      "allAgents": "所有智能体",
+      "noAgent": "还没有智能体",
+      "onlyYou": "仅你自己",
+      "everyone": "工作区所有成员",
+      "everyoneText": "这里的任何人都能看到，智能体会为其使用。",
+      "everyoneIn": "是",
+      "everyoneOut": "否",
+      "levelIn": "有权限",
+      "levelOut": "无权限",
+      "everyoneHelp": "点按“工作区所有成员”可改为选择角色和成员。",
+      "managersHelp": "管理工作区密钥的人始终能看到团队项目。",
+      "managersOnly": "仅管理密钥的人",
+      "inRole": "{{role}} 角色的成员",
+      "saved": "权限已保存",
+      "useConnection": "遵循连接的权限",
+      "followsConnection": "它遵循连接的权限。",
+      "tooManyRoles": "最多选择 100 个角色。",
+      "tooManyPeople": "最多选择 500 名成员。",
+      "tooManyAgents": "最多选择 200 个智能体。",
+      "sentence": {
+        "none": "还没有智能体使用它。",
+        "personalAll": "你提出要求时，你的智能体会使用它。",
+        "everyAgent": "所有智能体",
+        "personal_other": "你提出要求时，{{agents}} 会使用它。",
+        "everyone_other": "工作区中有人提出要求时，{{agents}} 会使用它。",
+        "managers_other": "管理密钥的人提出要求时，{{agents}} 会使用它。",
+        "people_other": "{{agents}} 为 {{people}} 使用它。"
+      }
+    },
+    "use": {
+      "fill": "{{name}} 已登录",
+      "fillOn": "{{name}}，在 {{host}}",
+      "key": "{{name}} 在命令中使用了它",
+      "read": "{{name}} 读取了它",
+      "show": "{{name}} 显示了它",
+      "copy": "{{name}} 复制了它",
+      "create": "{{name}} 保存了它",
+      "edit": "{{name}} 修改了它",
+      "for": "为 {{name}}",
+      "routine": "例行工作 {{name}}"
+    },
+    "uses": {
+      "title": "最近使用",
+      "none": "尚未使用。"
+    },
+    "card": {
+      "save": "保存到 Vault",
+      "saveText": "下次，你的智能体会直接使用，无需再问你。",
+      "personalOnly": "已保存为个人项目：只有你能看到。",
+      "choose": "选择",
+      "agentsText": "提出请求的智能体已被选中。",
+      "as": "以 {{username}} 身份登录。",
+      "saved": "已保存到 Vault",
+      "notSaved": "已发送，但未保存到 Vault",
+      "codeLabel": "{{name}} 的验证码",
+      "codeIncomplete": "请输入验证码的所有数字。",
+      "codeNote": "加密后直接发送到电脑。验证码从不保存。"
+    }
+  },
   "status": {
     "title": "状态",
     "doing": "你在做什么",

@@ -2441,6 +2441,359 @@
     "removed": "{{name}} van de computer verwijderd.",
     "removeFailed": "Verwijderen lukte niet. Staat de computer aan?"
   },
+  "vault": {
+    "tab": {
+      "label": "Wat tonen",
+      "team": "Team",
+      "personal": "Persoonlijk",
+      "connections": "Koppelingen"
+    },
+    "list": {
+      "search": "Zoeken in de Vault",
+      "clearSearch": "Zoekopdracht wissen",
+      "kind": "Soort",
+      "kindAll": "Alle soorten",
+      "noMatch": "Niets hier komt overeen met deze zoekopdracht.",
+      "clearFilters": "Zoekopdracht wissen",
+      "personalNote": "Alleen jij ziet deze items. Je agenten gebruiken ze alleen als je erom vraagt.",
+      "personalEmpty": "Nog niets opgeslagen",
+      "personalEmptyText": "Alleen jij ziet deze items. Je agenten gebruiken ze alleen als je erom vraagt.",
+      "teamEmpty": "Nog niets gedeeld met het team",
+      "teamEmptyText": "Sla een login, een sleutel of contactgegevens één keer op en kies welke agenten het mogen gebruiken.",
+      "sharedEmpty": "Nog niets met je gedeeld",
+      "sharedEmptyText": "Als iemand een login of sleutel van het team met je deelt, verschijnt die hier."
+    },
+    "row": {
+      "agents_one": "{{count}} agent",
+      "agents_other": "{{count}} agenten",
+      "used": "Gebruikt {{when}}",
+      "never": "Nooit gebruikt"
+    },
+    "kind": {
+      "login": "Login",
+      "key": "Sleutel",
+      "contact": "Contact",
+      "loginText": "De gebruikersnaam en het wachtwoord van een website",
+      "keyText": "Een sleutel die je agenten in een opdracht gebruiken",
+      "contactText": "Gegevens die agenten in formulieren typen"
+    },
+    "kindPlural": {
+      "login": "logins",
+      "key": "sleutels",
+      "contact": "contacten",
+      "loginTitle": "Logins",
+      "keyTitle": "Sleutels",
+      "contactTitle": "Contacten"
+    },
+    "scope": {
+      "personal": "Persoonlijk",
+      "team": "Team",
+      "personalText": "Alleen jij ziet het",
+      "teamText": "Gedeeld met de werkruimte"
+    },
+    "field": {
+      "title": "Naam",
+      "contactTitle": "Naam in de Vault",
+      "loginPlaceholder": "Zakelijk e-mailadres",
+      "keyPlaceholder": "Betaalsleutel",
+      "contactPlaceholder": "Factuurgegevens",
+      "website": "Website",
+      "websitePlaceholder": "app.example.com",
+      "match": "Waar agenten het mogen typen",
+      "username": "Gebruikersnaam",
+      "usernamePlaceholder": "E-mail of gebruikersnaam",
+      "password": "Wachtwoord",
+      "keyName": "Naam van de variabele",
+      "keyNameHelp": "Je agenten gebruiken de sleutel met deze naam in een opdracht.",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "value": "Waarde",
+      "description": "Notitie voor je agenten",
+      "descriptionHelp": "Wanneer je het gebruikt en waarvoor het is. Agenten lezen dit om de juiste te kiezen.",
+      "descriptionPlaceholder": {
+        "login": "Het account waarmee we berichten publiceren",
+        "key": "Voor de betaaldienst, testmodus",
+        "contact": "Gebruik dit voor de facturen van het bedrijf"
+      }
+    },
+    "match": {
+      "exact": "Alleen dit adres",
+      "site": "Hele site",
+      "exactHelp": "Agenten typen het alleen op {{origin}}.",
+      "exactHelpNone": "Agenten typen het alleen op precies dit adres.",
+      "siteHelp": "Agenten typen het op elke pagina van deze site, zoals een inlogpagina op een ander subdomein."
+    },
+    "contact": {
+      "group": "Contactgegevens",
+      "fullName": "Volledige naam",
+      "company": "Bedrijf",
+      "document": "Fiscaal nummer",
+      "email": "E-mail",
+      "phone": "Telefoon",
+      "address": "Adres",
+      "address2": "Adresregel 2",
+      "city": "Plaats",
+      "region": "Provincie of regio",
+      "postalCode": "Postcode",
+      "country": "Land"
+    },
+    "error": {
+      "title": "Geef het een naam.",
+      "website": "Gebruik een https-adres, zoals app.example.com.",
+      "keyName": "Gebruik hoofdletters, cijfers en _, beginnend met een letter, zoals ACME_API_KEY.",
+      "password": "Typ het wachtwoord.",
+      "value": "Typ de waarde.",
+      "contact": "Vul minstens één veld in."
+    },
+    "item": {
+      "missing": "Ontbreekt",
+      "missingText": "Het staat niet meer in {{source}}. Agenten kunnen het niet gebruiken tot het terug is.",
+      "editIn": "Bewerk het in {{source}}. Wijzigingen komen hier binnen bij de volgende synchronisatie.",
+      "hidden": "Verborgen",
+      "endsIn": "eindigt op {{hint}}",
+      "noValue": "Niets opgeslagen",
+      "show": "Tonen",
+      "hide": "Verbergen",
+      "change": "Wijzigen",
+      "add": "Toevoegen",
+      "newPassword": "Nieuw wachtwoord",
+      "newValue": "Nieuwe waarde",
+      "newValueHelp": "Vervangt de opgeslagen waarde zodra je opslaat.",
+      "keepValue": "De huidige houden",
+      "saved": "Opgeslagen",
+      "delete": "Verwijderen",
+      "deleteTitle": "{{title}} verwijderen?",
+      "deleteText": "Je agenten kunnen het niet meer gebruiken. Dit kan niet ongedaan worden gemaakt.",
+      "deleted": "{{title}} verwijderd uit de Vault"
+    },
+    "use": {
+      "title": "Recent gebruik",
+      "none": "Nog niemand heeft het gebruikt.",
+      "fill": "{{agent}}, op {{host}}",
+      "fillSomewhere": "{{agent}} heeft het getypt",
+      "key": "{{agent}}, in een opdracht",
+      "read": "{{who}} heeft het gelezen",
+      "show": "{{who}} heeft het getoond",
+      "copy": "{{who}} heeft het gekopieerd",
+      "create": "{{who}} heeft het opgeslagen",
+      "edit": "{{who}} heeft het gewijzigd",
+      "for": "voor {{name}}",
+      "routine": "Routine {{name}}"
+    },
+    "access": {
+      "title": "Wie toegang heeft",
+      "people": "Mensen",
+      "agents": "Agenten",
+      "edit": "Bewerken",
+      "editOf": "{{what}} bewerken",
+      "everyone": "Iedereen in de werkruimte",
+      "everyoneText": "Iedereen ziet het, en agenten gebruiken het als die persoon erom vraagt.",
+      "managersOnly": "Alleen wie de Vault beheert",
+      "allAgents": "Alle agenten",
+      "noAgents": "Nog geen agent",
+      "more_one": "{{count}} andere",
+      "more_other": "{{count}} andere",
+      "saved": "Toegang opgeslagen",
+      "peopleTitle": "Wie het mag zien",
+      "peopleText": "Zij zien het, en agenten gebruiken het als een van hen erom vraagt. Wie de Vault beheert, ziet het altijd.",
+      "level": {
+        "use": "Mag zien en gebruiken",
+        "none": "Geen toegang"
+      },
+      "roleDetail": "Iedereen met deze rol",
+      "roles": "Rollen",
+      "peopleGroup": "Mensen",
+      "add": "Een rol of persoon toevoegen",
+      "addSearch": "Rollen en mensen zoeken",
+      "noMatch": "Niemand gevonden",
+      "levelOf": "Wat {{name}} mag doen",
+      "follows": "Het volgt de standaardtoegang van {{source}}.",
+      "own": "Het heeft eigen toegang, niet de standaard van {{source}}.",
+      "changeHere": "Wijzigen voor dit item",
+      "useConnection": "Weer de standaard gebruiken"
+    },
+    "agents": {
+      "title": "Welke agenten het mogen gebruiken",
+      "textPersonal": "Ze gebruiken het alleen als je erom vraagt.",
+      "textTeam": "Ze gebruiken het als iemand die het mag zien erom vraagt.",
+      "all": "Alle agenten",
+      "allDetail": "Ook de agenten die later bijkomen"
+    },
+    "summary": {
+      "noAgents": "Nog geen agent mag het gebruiken.",
+      "allAgents": "Elke agent",
+      "inRole": "iemand met {{role}}",
+      "personal_one": "{{agents}} mag het gebruiken, alleen als jij erom vraagt.",
+      "personal_other": "{{agents}} mogen het gebruiken, alleen als jij erom vraagt.",
+      "everyone_one": "{{agents}} mag het gebruiken als iemand in de werkruimte erom vraagt.",
+      "everyone_other": "{{agents}} mogen het gebruiken als iemand in de werkruimte erom vraagt.",
+      "people_one": "{{agents}} mag het gebruiken als {{people}} erom vraagt.",
+      "people_other": "{{agents}} mogen het gebruiken als {{people}} erom vraagt.",
+      "nobody": "Nog niemand kan agenten vragen het te gebruiken. Kies wie het mag zien."
+    },
+    "new": {
+      "open": "Nieuw item",
+      "title": "Nieuw item",
+      "text": "Sla het één keer op. Je agenten gebruiken het zonder een wachtwoord of sleutel te zien.",
+      "what": "Wat wil je opslaan?",
+      "who": "Wie het mag gebruiken",
+      "teamLocked": "Alleen wie de Vault beheert, kan items van het team opslaan. Dit item blijft van jou.",
+      "save": "Opslaan",
+      "saved": "Opgeslagen in de Vault"
+    },
+    "import": {
+      "open": "Importeren",
+      "title": "Wachtwoorden importeren",
+      "text": "Uit een bestand dat je browser of wachtwoordmanager exporteert (.csv).",
+      "dropTitle": "Zet het bestand hier neer",
+      "dropText": "of klik om het op je computer te kiezen",
+      "reading": "Bestand lezen…",
+      "choose": "Bestand kiezen",
+      "where": "Zoek in je browser of wachtwoordmanager naar Wachtwoorden exporteren en kies CSV.",
+      "tooLarge": "Dit bestand is te groot (maximaal 2 MB).",
+      "notCsv": "Kies een .csv-bestand.",
+      "unreadable": "Kon dit bestand niet lezen. Probeer het opnieuw te exporteren.",
+      "format": {
+        "chrome": "Gelezen als export van Chrome",
+        "1password": "Gelezen als export van 1Password",
+        "bitwarden": "Gelezen als export van Bitwarden",
+        "generic": "Gelezen als wachtwoordbestand"
+      },
+      "added_one": "nieuwe login",
+      "added_other": "nieuwe logins",
+      "updated_one": "bijgewerkt",
+      "updated_other": "bijgewerkt",
+      "skipped_one": "overgeslagen",
+      "skipped_other": "overgeslagen",
+      "reason": {
+        "duplicate_one": "{{count}} al in de Vault",
+        "duplicate_other": "{{count}} al in de Vault",
+        "not_https_one": "{{count}} niet op een https-adres",
+        "not_https_other": "{{count}} niet op een https-adres",
+        "no_password_one": "{{count}} zonder wachtwoord",
+        "no_password_other": "{{count}} zonder wachtwoord",
+        "invalid_one": "{{count}} regel die we niet konden lezen",
+        "invalid_other": "{{count}} regels die we niet konden lezen"
+      },
+      "as": "Opslaan als",
+      "asPersonal": "Alleen jij ziet ze.",
+      "asTeam": "Iedereen in de werkruimte ziet ze. Kies daarna de agenten voor elk item.",
+      "deleteFile": "Verwijder het bestand daarna: het bevat je wachtwoorden onversleuteld.",
+      "confirm_one": "{{count}} importeren",
+      "confirm_other": "{{count}} importeren",
+      "done_one": "{{count}} login geïmporteerd",
+      "done_other": "{{count}} logins geïmporteerd",
+      "another": "Ander bestand kiezen",
+      "close": "Klaar"
+    },
+    "connections": {
+      "none": "Op deze server kan geen wachtwoordmanager koppelen.",
+      "lead": "Je agenten gebruiken de {{kinds}} die je in {{name}} bewaart.",
+      "connect": "Koppelen",
+      "reconnect": "Opnieuw koppelen",
+      "reconnectName": "{{name}} opnieuw koppelen",
+      "open": "{{name}} openen",
+      "required": "Vul dit in.",
+      "for": "Koppelen voor",
+      "forTeam": "De items zijn van het team. Wie de Vault beheert, bepaalt wie ze gebruikt.",
+      "forPersonal": "De items zijn alleen van jou.",
+      "teamLocked": "De items worden alleen van jou. Alleen wie de Vault beheert, koppelt er een voor het team.",
+      "sealed": "Wat je hier typt, wordt versleuteld en nooit meer getoond.",
+      "connected_one": "{{name}} gekoppeld. Er is {{count}} item binnengekomen.",
+      "connected_other": "{{name}} gekoppeld. Er zijn {{count}} items binnengekomen.",
+      "ready": "Gekoppeld",
+      "syncing": "Synchroniseren",
+      "reads": "Leest {{label}}",
+      "items_one": "{{count}} item",
+      "items_other": "{{count}} items",
+      "synced": "gesynchroniseerd {{when}}",
+      "syncNow": "Nu synchroniseren",
+      "access": "Standaardtoegang",
+      "accessTitle": "Standaardtoegang van {{label}}",
+      "accessText": "De items volgen dit, tenzij je er een wijzigt. Elke wijziging wordt meteen opgeslagen.",
+      "actionsName": "Meer voor {{name}}",
+      "disconnect": "Ontkoppelen",
+      "removeTitle": "{{name}} ontkoppelen?",
+      "removeText_one": "Het item verdwijnt uit de Vault en je agenten gebruiken het niet meer. In {{name}} verandert niets.",
+      "removeText_other": "De {{count}} items verdwijnen uit de Vault en je agenten gebruiken ze niet meer. In {{name}} verandert niets.",
+      "removed": "{{name}} ontkoppeld",
+      "listOf": "Koppelingen met {{name}}",
+      "note": "Je agenten lezen wat daar staat als ze het nodig hebben. Naar agentes.chat wordt niets gekopieerd behalve namen en adressen.",
+      "error": {
+        "auth_failed": "Inloggen geweigerd",
+        "locked": "Verkeerd wachtwoord",
+        "many_vaults": "Ziet meer dan één kluis",
+        "no_vault": "Ziet geen kluis",
+        "folder_missing": "Map niet gevonden",
+        "not_found": "Niet gevonden",
+        "rate_limited": "Te veel leesacties",
+        "unreachable": "Onbereikbaar",
+        "unsupported": "Hier niet beschikbaar",
+        "invalid_input": "Controleer de velden",
+        "other": "Kon niet lezen"
+      },
+      "fix": {
+        "auth_failed": "De sleutel of het token is geweigerd. Koppel opnieuw met een nieuwe.",
+        "locked": "Het hoofdwachtwoord opende het account niet. Koppel opnieuw met het juiste.",
+        "many_vaults": "Geef het serviceaccount toegang tot maar één kluis en koppel dan opnieuw.",
+        "no_vault": "Geef het serviceaccount toegang tot de kluis van de agenten en koppel dan opnieuw.",
+        "folder_missing": "Maak de map voor je agenten aan of koppel opnieuw met de naam ervan.",
+        "not_found": "Wat het las, is weg. Koppel opnieuw om weer te kiezen.",
+        "rate_limited": "De wachtwoordmanager vroeg ons te wachten. Het probeert het zelf opnieuw.",
+        "unreachable": "De server antwoordde niet. Het probeert het zelf opnieuw.",
+        "unsupported": "Deze server kan het niet lezen. Vraag het aan wie hem beheert.",
+        "invalid_input": "Iets in de velden is geweigerd. Koppel opnieuw en controleer ze.",
+        "other": "Probeer Nu synchroniseren of koppel opnieuw."
+      }
+    },
+    "source": {
+      "onepassword": {
+        "step": {
+          "1": "Maak in 1Password een kluis alleen voor je agenten en zet daar de logins in die ze mogen gebruiken",
+          "2": "Maak een serviceaccount met alleen toegang tot die kluis",
+          "3": "Plak hier het token van het serviceaccount"
+        },
+        "field": {
+          "token": "Token van het serviceaccount"
+        }
+      },
+      "bitwarden": {
+        "warning": "Gebruik een account alleen voor je agenten. Het hoofdwachtwoord opent het hele account, dus er mag niets persoonlijks in staan.",
+        "step": {
+          "1": "Maak een Bitwarden-account alleen voor je agenten en een map met de naam Agents met de logins die ze mogen gebruiken",
+          "2": "Open in dat account Instellingen, Beveiliging, Sleutels en kopieer de API-sleutel",
+          "3": "Vul de velden hieronder in"
+        },
+        "field": {
+          "server": "Server",
+          "serverUrl": "Serveradres",
+          "clientId": "Client-ID",
+          "clientSecret": "Clientgeheim",
+          "masterPassword": "Hoofdwachtwoord",
+          "folder": "Map"
+        },
+        "choice": {
+          "server": {
+            "self": "Mijn eigen server"
+          }
+        }
+      }
+    },
+    "card": {
+      "save": "Opslaan in de Vault",
+      "scope": "Opslaan als",
+      "personalText": "Alleen jij ziet het",
+      "teamText": "De werkruimte ziet het",
+      "teamLocked": "Alleen wie de Vault beheert, slaat op voor het team",
+      "agents": "Gebruikt door",
+      "choose": "Kiezen",
+      "saved": "Opgeslagen in de Vault",
+      "notSaved": "Verstuurd, maar niet opgeslagen in de Vault",
+      "codeBox": "Cijfer {{n}} van {{total}}",
+      "codeShort_one": "Typ het cijfer.",
+      "codeShort_other": "Typ alle {{count}} cijfers.",
+      "codeWhere": "Alleen de browser van {{agent}} typt het, op {{host}}."
+    }
+  },
   "question": {
     "answer": "Antwoorden",
     "placeholder": "Je antwoord",
@@ -4657,6 +5010,14 @@
       "label": "De werkruimte inrichten",
       "description": "Aanbieden om een AI, een app of een MCP-server te koppelen of mensen uit te nodigen met een kaart waarop iemand klikt, en kanalen maken voor wie erom vroeg, met Ongedaan maken."
     },
+    "vault_read": {
+      "label": "De Vault bekijken",
+      "description": "De logins, sleutels en contactgegevens bekijken die de Vault met hem deelt, en ze gebruiken. Hij typt opgeslagen wachtwoorden en gebruikt opgeslagen sleutels zonder ze ooit te zien."
+    },
+    "vault_write": {
+      "label": "Contacten in de Vault bewerken",
+      "description": "Contactgegevens in de Vault opslaan en bijwerken, de gebruikersnaam van een opgeslagen login of een beschrijving wijzigen, en verwijderen wat hij heeft opgeslagen."
+    },
     "github_git_read": {
       "label": "Repositories klonen (git)",
       "description": "Repositories klonen en bijwerken op de computer van de agent met git, via onze proxy. Het GitHub-token komt nooit op de machine."
@@ -6845,8 +7206,8 @@
       "savedEveryone": "{{name}} antwoordt nu ook andere mensen.",
       "savedEveryone_female": "{{name}} antwoordt nu ook andere mensen.",
       "savedOwner": "{{name}} antwoordt nu alleen jou.",
-      "savedOwnerOf": "{{name}} antwoordt nu alleen {{owner}}.",
       "savedOwner_female": "{{name}} antwoordt nu alleen jou.",
+      "savedOwnerOf": "{{name}} antwoordt nu alleen {{owner}}.",
       "backOnApi": "{{name}} werkt weer via de API en antwoordt nog steeds alleen jou.",
       "backOnApi_female": "{{name}} werkt weer via de API en antwoordt nog steeds alleen jou.",
       "letEveryone": "Laat {{name}} iedereen antwoorden",
@@ -8496,7 +8857,8 @@
       "sandbox": "Code uitvoeren",
       "browser": "Browser",
       "setup": "Werkruimte inrichten",
-      "desktop": "Bureaublad"
+      "desktop": "Bureaublad",
+      "vault": "Vault"
     },
     "areaText": {
       "context": {
@@ -8542,6 +8904,10 @@
       "desktop": {
         "write": "Gebruikt elke app op zijn eigen bureaublad op zijn computer, terwijl mensen meekijken of het overnemen. Heeft ook Code uitvoeren nodig.",
         "write_female": "Gebruikt elke app op haar eigen bureaublad op haar computer, terwijl mensen meekijken of het overnemen. Heeft ook Code uitvoeren nodig."
+      },
+      "vault": {
+        "read": "Ziet en gebruikt wat de Vault met hem deelt, zonder wachtwoorden of sleutels te zien.",
+        "write": "Slaat ook contactgegevens in de Vault op en werkt ze bij."
       }
     }
   },
@@ -10510,6 +10876,48 @@
       "invalid": "Een @ heeft {{min}} tot {{max}} kleine letters, cijfers, - of _.",
       "taken": "@{{handle}} is van iemand anders.",
       "takenByAgent": "@{{handle}} is van een agent."
+    },
+    "vault": {
+      "invalid": "Er klopt iets niet aan dit item. Controleer het en probeer het opnieuw.",
+      "notFound": "Dit item staat niet meer in de Vault.",
+      "titleRequired": "Geef het een naam.",
+      "tooLong": "Dat is te lang. De limiet is {{max}}.",
+      "notHttps": "Gebruik een adres dat begint met https://",
+      "keyNameInvalid": "Gebruik hoofdletters, cijfers en _ in de naam, zoals ACME_API_KEY.",
+      "keyNameReserved": "Deze naam is gereserveerd. Kies een andere.",
+      "keyNameTaken": "Er staat hier al een sleutel met deze naam.",
+      "contactEmpty": "Vul minstens één veld in.",
+      "teamNeedsPermission": "Alleen wie inloggegevens beheert, kan items van het team opslaan.",
+      "externalReadOnly": "Dit komt uit een wachtwoordmanager. Wijzig het daar.",
+      "changedMeanwhile": "Iemand heeft het intussen gewijzigd. Open het opnieuw.",
+      "noValue": "Er is niets opgeslagen om te tonen.",
+      "missing": "Het is verdwenen uit de wachtwoordmanager.",
+      "notAllowed": "Dat kun je niet doen met dit item.",
+      "tooManyItems": "De Vault is vol. Verwijder items die je niet meer gebruikt.",
+      "audienceInvalid": "Iemand of een rol die je koos, zit niet meer in de werkruimte.",
+      "agentsInvalid": "Een agent die je koos, zit niet meer in de werkruimte.",
+      "tooManyAgents": "Kies maximaal 200 agenten.",
+      "tooManyRoles": "Kies maximaal 100 rollen.",
+      "tooManyPeople": "Kies maximaal 500 mensen.",
+      "csvTooLarge": "Het bestand is te groot. De limiet is 2 MB.",
+      "csvTooManyRows": "Het bestand heeft meer dan 5.000 rijen. Splits het en importeer elk deel.",
+      "csvUnrecognized": "Dit lijkt geen wachtwoordbestand. Exporteer het opnieuw als CSV.",
+      "requestNotDelivered": "Stuur het eerst en sla het daarna op in de Vault.",
+      "requestNotSavable": "Dit kan niet in de Vault worden opgeslagen.",
+      "sourceUnknown": "Deze wachtwoordmanager is niet beschikbaar op deze server.",
+      "sourceError": "Kon het niet lezen uit de wachtwoordmanager. Probeer het opnieuw.",
+      "source": {
+        "authFailed": "De wachtwoordmanager heeft deze gegevens geweigerd. Controleer ze en probeer het opnieuw.",
+        "locked": "Het hoofdwachtwoord klopt niet.",
+        "manyVaults": "Het serviceaccount ziet meer dan één kluis. Geef het toegang tot maar één.",
+        "noVault": "Het serviceaccount ziet geen kluis. Geef het toegang tot één kluis.",
+        "folderMissing": "Die map staat niet in het account.",
+        "notFound": "Het staat niet meer in de wachtwoordmanager.",
+        "rateLimited": "De wachtwoordmanager vroeg ons te wachten. Probeer het over een paar minuten opnieuw.",
+        "unreachable": "Kon de wachtwoordmanager niet bereiken. Controleer het adres en probeer het opnieuw.",
+        "unsupported": "Deze server kan niet met deze wachtwoordmanager koppelen.",
+        "invalidInput": "Controleer de velden en probeer het opnieuw."
+      }
     }
   },
   "machines": {
@@ -11130,6 +11538,18 @@
         "token_revoked": "Persoonlijk token {{app}} ingetrokken",
         "message_sent": "Een bericht verstuurd via {{app}}"
       },
+      "vault": {
+        "item_created": "Een item in de Vault opgeslagen",
+        "item_changed": "Een Vault-item gewijzigd",
+        "item_deleted": "Een Vault-item verwijderd",
+        "item_shown": "Een wachtwoord of sleutel in de Vault bekeken",
+        "item_copied": "Een wachtwoord of sleutel uit de Vault gekopieerd",
+        "item_used": "Een Vault-item gebruikt",
+        "imported": "Wachtwoorden in de Vault geïmporteerd",
+        "connection_added": "Een wachtwoordmanager aan de Vault gekoppeld",
+        "connection_changed": "De koppeling van een wachtwoordmanager gewijzigd",
+        "connection_removed": "Een wachtwoordmanager van de Vault ontkoppeld"
+      },
       "verb": {
         "created": "Aangemaakt",
         "deleted": "Verwijderd",
@@ -11162,6 +11582,9 @@
         "resent": "Opnieuw verstuurd",
         "revoked": "Ingetrokken",
         "archived": "Gearchiveerd",
+        "shown": "Bekeken",
+        "copied": "Gekopieerd",
+        "used": "Gebruikt",
         "other": "Gewijzigd"
       },
       "area": {
@@ -11194,6 +11617,7 @@
         "member": "een lid",
         "invitation": "een uitnodiging",
         "credential": "een AI-sleutel",
+        "vault": "de Vault",
         "other": "de werkruimte"
       }
     },
@@ -11252,6 +11676,7 @@
       "general": "Algemeen",
       "members": "Leden en uitnodigingen",
       "roles": "Rollen en rechten",
+      "vault": "Vault",
       "access": "Agents en toegang",
       "connectors": "Connectors en MCP's",
       "skills": "Skills",
@@ -11272,6 +11697,7 @@
       "general": "Naam, tijdzone en wat elke agent over de werkruimte weet.",
       "members": "Wie er in de werkruimte zit, en uitnodigingen.",
       "roles": "Wat iedereen kan doen. Rollen tellen op.",
+      "vault": "Wachtwoorden, sleutels en contactgegevens die je agenten gebruiken. Ze typen wachtwoorden en gebruiken sleutels zonder ze ooit te zien.",
       "access": "Wat elke agent kan gebruiken: één niveau per connector.",
       "connectors": "Diensten en MCP-servers die één keer voor de hele werkruimte zijn gekoppeld.",
       "skills": "Markdown-instructies die agents openen als ze ze nodig hebben.",
@@ -12064,6 +12490,18 @@
     "ask_user": {
       "label": "De persoon vragen",
       "description": "Stelt een korte vraag en wacht op het antwoord."
+    },
+    "vault_list": {
+      "label": "In de Vault kijken",
+      "description": "Toont de logins, sleutels en contacten die met de agent gedeeld zijn, nooit een wachtwoord of sleutel."
+    },
+    "vault_save": {
+      "label": "Opslaan in de Vault",
+      "description": "Slaat contactgegevens, de gebruikersnaam van een login of een beschrijving op of werkt ze bij."
+    },
+    "vault_delete": {
+      "label": "Verwijderen uit de Vault",
+      "description": "Verwijdert een item dat hij heeft opgeslagen, of een item dat de vragende persoon beheert."
     },
     "react": {
       "label": "Reageren",

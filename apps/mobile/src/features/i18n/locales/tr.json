@@ -1706,6 +1706,242 @@
       "failed": "Dosya indirilemedi. Tekrar deneyin."
     }
   },
+  "vault": {
+    "newItem": "Yeni öğe",
+    "search": "Vault'ta ara",
+    "noResults": "“{{q}}” ile eşleşen bir şey yok.",
+    "personalText": "Bunları yalnızca siz görürsünüz. Ajanlarınız bunları yalnızca siz istediğinizde kullanır.",
+    "teamText": "Ekibin giriş bilgileri, anahtarları ve iletişim bilgileri. Her birini kimin göreceğini ve hangi ajanların kullanacağını siz seçersiniz.",
+    "teamReadText": "Çalışma alanının anahtarlarını yönetenler tarafından sizinle paylaşıldı.",
+    "missing": "Kayıp",
+    "usedAt": "{{when}} kullanıldı",
+    "neverUsed": "henüz kullanılmadı",
+    "kindTitle": "Ne kaydedilecek",
+    "teamAudience": "Çalışma alanındaki herkes görür. Kaydettikten sonra daraltabilirsiniz.",
+    "savedToVault": "Vault'a kaydedildi",
+    "tab": {
+      "team": "Ekip",
+      "personal": "Kişisel",
+      "connections": "Bağlantılar"
+    },
+    "kind": {
+      "login": "Giriş bilgisi",
+      "key": "Anahtar",
+      "contact": "İletişim"
+    },
+    "kinds": {
+      "all": "Tümü",
+      "login": "Giriş bilgileri",
+      "key": "Anahtarlar",
+      "contact": "İletişim bilgileri"
+    },
+    "kindText": {
+      "login": "Bir web sitesi, kullanıcı adı ve şifre. Ajanlar şifreyi görmeden giriş yapar.",
+      "key": "Bir API anahtarı ya da token. Ajanlar onu görmeden bir komutta kullanır.",
+      "contact": "Ajanların formlara doldurduğu ad, şirket, e-posta, telefon ve adres."
+    },
+    "empty": {
+      "personalTitle": "Henüz size ait bir şey yok",
+      "personalText": "Buraya bir giriş bilgisi ya da anahtar kaydedin, ajanlarınız siz istediğinizde kullanır.",
+      "teamTitle": "Henüz paylaşılan bir şey yok",
+      "teamText": "Ajanlarınızın ekip için kullandığı giriş bilgilerini ve anahtarları kaydedin.",
+      "teamReadText": "Biri sizinle bir giriş bilgisi ya da anahtar paylaştığında burada görünür."
+    },
+    "import": {
+      "title": "Bir bilgisayardan içe aktar",
+      "text": "Bir tarayıcıdan ya da şifre yöneticisinden şifre getirmek için web'de Ayarlar, Vault'u açın ve İçe aktar'ı seçin."
+    },
+    "connections": {
+      "text": "Bir şifre yöneticisi bağlayın, ajanlarınız orada saklanan giriş bilgilerini kullansın. Hiçbir şey kopyalanmaz: şifre yalnızca kullanıldığı anda okunur.",
+      "connected": "Bağlı olanlar",
+      "add": "Bağla",
+      "none": "Bu sunucuda hiçbir şifre yöneticisi bağlanamıyor.",
+      "help": "Yalnızca ajanlarınız için, sadece ihtiyaç duydukları şeyleri içeren bir kasa ya da klasör kullanın."
+    },
+    "connect": {
+      "title": "{{name}} bağlantısı kur",
+      "reconnectTitle": "{{name}} bağlantısını yenile",
+      "action": "Bağla",
+      "text": "Ajanlarınız, {{name}} içinde onlar için saklanan giriş bilgilerini şifreleri görmeden kullanır.",
+      "steps": "Nasıl bağlanır",
+      "guide": "{{name}} rehberini aç",
+      "fields": "Bilgiler",
+      "private": "Bu bilgiler şifrelenmiş olarak saklanır ve bir daha gösterilmez.",
+      "teamHelp": "Öğeleri başta çalışma alanındaki herkese görünür ve hiçbir ajan kullanmaz. Ajanları sonra seçersiniz.",
+      "personalHelp": "Öğelerini yalnızca siz görürsünüz, ajanlarınız da siz istediğinizde kullanır.",
+      "checking": "{{name}} ile kontrol ediliyor…",
+      "connected": "{{name}} bağlandı",
+      "reconnected": "{{name}} yeniden bağlandı",
+      "unknown": "Bu şifre yöneticisi burada kullanılamıyor."
+    },
+    "connection": {
+      "ready": "Bağlı",
+      "syncing": "Eşitleniyor…",
+      "reads": "Okunan: {{label}}",
+      "items_one": "{{count}} öğe",
+      "items_other": "{{count}} öğe",
+      "synced": "{{when}} eşitlendi",
+      "sync": "Şimdi eşitle",
+      "syncDone": "Eşitlendi",
+      "reconnect": "Yeniden bağla",
+      "change": "Giriş bilgilerini değiştir",
+      "readOnly": "{{name}} giriş bilgileri {{name}} içinde değiştirilir. Burada kimin kullanacağını seçersiniz.",
+      "disconnect": "Bağlantıyı kes",
+      "disconnectTitle": "{{name}} bağlantısı kesilsin mi?",
+      "disconnectText_one": "Öğesi Vault'tan çıkar ve ajanlar onu kullanmayı bırakır. {{name}} içinde hiçbir şey değişmez.",
+      "disconnectText_other": "{{count}} öğesi Vault'tan çıkar ve ajanlar onları kullanmayı bırakır. {{name}} içinde hiçbir şey değişmez.",
+      "disconnected": "{{name}} bağlantısı kesildi",
+      "gone": "Bu bağlantı artık yok ya da onu göremiyorsunuz."
+    },
+    "item": {
+      "gone": "Bu öğe artık yok ya da onu göremiyorsunuz.",
+      "missingText": "Son eşitlemeden beri {{name}} içinde yok. Ajanlar onu kullanamaz.",
+      "externalText": "{{name}} kaynağından geliyor. Adını, adresini, kullanıcı adını ya da şifresini orada değiştirin.",
+      "noValue": "Henüz kayıtlı bir değer yok.",
+      "changePassword": "Şifreyi değiştir",
+      "changeValue": "Değeri değiştir",
+      "changeHelp": "Saklamak için Kaydet'e dokunun. Ajanlar bundan sonra yenisini kullanır.",
+      "show": "Göster",
+      "hide": "Gizle",
+      "hidden": "Gizli",
+      "saved": "Kaydedildi",
+      "copied": "Kopyalandı. İhtiyacınız olan yere yapıştırın.",
+      "delete": "Sil",
+      "deleteTitle": "{{title}} silinsin mi?",
+      "deleteText": "Ajanlar onu hemen kullanmayı bırakır. Bu işlem geri alınamaz.",
+      "deleteExternal": "Vault'tan çıkar ve ajanlar onu kullanmayı bırakır. {{name}} içinde kalır.",
+      "deleted": "Silindi"
+    },
+    "field": {
+      "title": "Ad",
+      "titleOptional": "İsteğe bağlı",
+      "website": "Web sitesi",
+      "websitePlaceholder": "acme.example",
+      "username": "Kullanıcı adı",
+      "password": "Şifre",
+      "newPassword": "Yeni şifre",
+      "keyName": "Değişken",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "keyNameHelp": "Büyük harf, rakam ve _, örneğin ACME_API_KEY. Ajanlar anahtarı bu adla ister.",
+      "value": "Değer",
+      "newValue": "Yeni değer",
+      "description": "Açıklama",
+      "descriptionPlaceholder": "Ne için",
+      "descriptionHelp": "Ajanlar ne zaman kullanacaklarını bilmek için bunu okur.",
+      "loginHelp": "Ajanlar şifreyi yalnızca bu web sitesinde, görmeden yazar.",
+      "contactHelp": "Gizli değil: ajanlar bunları okur ve formlara doldurur."
+    },
+    "contact": {
+      "fullName": "Ad soyad",
+      "company": "Şirket",
+      "document": "Vergi numarası",
+      "email": "E-posta",
+      "phone": "Telefon",
+      "address": "Adres",
+      "address2": "Adres satırı 2",
+      "city": "Şehir",
+      "region": "İl",
+      "postalCode": "Posta kodu",
+      "country": "Ülke"
+    },
+    "match": {
+      "title": "Ajanların yazabileceği yer",
+      "exact": "Yalnızca bu adres",
+      "exactText": "Yukarıdaki adresin tam kendisi",
+      "site": "Tüm site",
+      "siteOn": "{{host}} ile aynı sitedeki her sayfa",
+      "siteText": "Aynı sitedeki her sayfa",
+      "help": "Yalnızca güvenli sayfalarda (https). Başka her yerde ajanın bilgisayarı yazmayı reddeder."
+    },
+    "problem": {
+      "secret": "Şifreyi ya da anahtarın değerini yazın."
+    },
+    "scope": {
+      "title": "Kim görür",
+      "personal": "Kişisel",
+      "personalText": "Yalnızca siz görürsünüz. Ajanlarınız onu yalnızca siz istediğinizde kullanır.",
+      "team": "Ekip",
+      "teamText": "Erişimi olanlar görür. Ajanlar, onlardan biri istediğinde kullanır.",
+      "teamLocked": "Ekip için yalnızca çalışma alanının anahtarlarını yönetenler kaydeder."
+    },
+    "agents": {
+      "title": "Kullanabilecek ajanlar",
+      "allText": "Tüm ajanlar, yeniler de dahil",
+      "personalHelp": "Yalnızca siz istediğinizde kullanırlar.",
+      "teamHelp": "Erişimi olan biri istediğinde kullanırlar."
+    },
+    "access": {
+      "title": "Kimin erişimi var",
+      "defaultTitle": "Varsayılan erişim",
+      "defaultText": "Biri bir öğenin erişimini değiştirene kadar öğeler buna uyar.",
+      "teamText": "Kimin göreceğini ve onlar için hangi ajanların kullanacağını seçin.",
+      "people": "Kişiler",
+      "persons": "Belirli kişiler",
+      "roles": "Roller",
+      "agents": "Ajanlar",
+      "allAgents": "Tüm ajanlar",
+      "noAgent": "Henüz ajan yok",
+      "onlyYou": "Yalnızca siz",
+      "everyone": "Çalışma alanındaki herkes",
+      "everyoneText": "Buradaki herkes görür, ajanlar da o kişi için kullanır.",
+      "everyoneIn": "Evet",
+      "everyoneOut": "Hayır",
+      "levelIn": "Erişimi var",
+      "levelOut": "Erişim yok",
+      "everyoneHelp": "Bunun yerine rol ve kişi seçmek için Çalışma alanındaki herkes'e dokunun.",
+      "managersHelp": "Çalışma alanının anahtarlarını yönetenler ekip öğelerini her zaman görür.",
+      "managersOnly": "Yalnızca anahtarları yönetenler",
+      "inRole": "{{role}} rolündeki kişiler",
+      "saved": "Erişim kaydedildi",
+      "useConnection": "Bağlantının erişimine uy",
+      "followsConnection": "Bağlantının erişimine uyuyor.",
+      "tooManyRoles": "En fazla 100 rol seçin.",
+      "tooManyPeople": "En fazla 500 kişi seçin.",
+      "tooManyAgents": "En fazla 200 ajan seçin.",
+      "sentence": {
+        "none": "Henüz hiçbir ajan kullanmıyor.",
+        "personalAll": "Ajanlarınız siz istediğinizde kullanır.",
+        "everyAgent": "Tüm ajanlar",
+        "personal_one": "{{agents}} siz istediğinizde kullanır.",
+        "personal_other": "{{agents}} siz istediğinizde kullanır.",
+        "everyone_one": "{{agents}} çalışma alanından biri istediğinde kullanır.",
+        "everyone_other": "{{agents}} çalışma alanından biri istediğinde kullanır.",
+        "managers_one": "{{agents}} anahtarları yöneten biri istediğinde kullanır.",
+        "managers_other": "{{agents}} anahtarları yöneten biri istediğinde kullanır.",
+        "people_one": "{{agents}}, {{people}} için kullanır.",
+        "people_other": "{{agents}}, {{people}} için kullanır."
+      }
+    },
+    "use": {
+      "fill": "{{name}} giriş yaptı",
+      "fillOn": "{{name}}, {{host}} üzerinde",
+      "key": "{{name}} bir komutta kullandı",
+      "read": "{{name}} okudu",
+      "show": "{{name}} gösterdi",
+      "copy": "{{name}} kopyaladı",
+      "create": "{{name}} kaydetti",
+      "edit": "{{name}} değiştirdi",
+      "for": "{{name}} için",
+      "routine": "rutin: {{name}}"
+    },
+    "uses": {
+      "title": "Son kullanımlar",
+      "none": "Henüz kullanılmadı."
+    },
+    "card": {
+      "save": "Vault'a kaydet",
+      "saveText": "Bir dahaki sefere ajanlarınız size sormadan kullanır.",
+      "personalOnly": "Kişisel olarak kaydedildi: yalnızca siz görürsünüz.",
+      "choose": "Seç",
+      "agentsText": "İsteyen ajan zaten seçili.",
+      "as": "{{username}} olarak giriş yapar.",
+      "saved": "Vault'a kaydedildi",
+      "notSaved": "Gönderildi ama Vault'a kaydedilmedi",
+      "codeLabel": "{{name}} için kod",
+      "codeIncomplete": "Kodun tüm rakamlarını yazın.",
+      "codeNote": "Şifrelenmiş olarak doğrudan bilgisayara gönderilir. Kodlar hiçbir zaman kaydedilmez."
+    }
+  },
   "status": {
     "title": "Durum",
     "doing": "Ne yapıyorsunuz",

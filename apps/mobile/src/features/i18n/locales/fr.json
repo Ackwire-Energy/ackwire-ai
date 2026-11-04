@@ -1788,6 +1788,242 @@
       "failed": "Impossible de télécharger le fichier. Réessayez."
     }
   },
+  "vault": {
+    "newItem": "Nouvel élément",
+    "search": "Chercher dans le Vault",
+    "noResults": "Rien ne correspond à “{{q}}”.",
+    "personalText": "Vous seul les voyez. Vos agents les utilisent seulement quand vous le demandez.",
+    "teamText": "Les identifiants, clés et coordonnées de l'équipe. Vous choisissez qui voit chacun et quels agents l'utilisent.",
+    "teamReadText": "Partagés avec vous par les personnes qui gèrent les clés de l'espace de travail.",
+    "missing": "Introuvable",
+    "usedAt": "utilisé {{when}}",
+    "neverUsed": "pas encore utilisé",
+    "kindTitle": "Quoi enregistrer",
+    "teamAudience": "Tout l'espace de travail le voit. Vous pourrez restreindre après l'enregistrement.",
+    "savedToVault": "Enregistré dans le Vault",
+    "tab": {
+      "team": "Équipe",
+      "personal": "Personnel",
+      "connections": "Connexions"
+    },
+    "kind": {
+      "login": "Identifiant",
+      "key": "Clé",
+      "contact": "Coordonnées"
+    },
+    "kinds": {
+      "all": "Tout",
+      "login": "Identifiants",
+      "key": "Clés",
+      "contact": "Coordonnées"
+    },
+    "kindText": {
+      "login": "Un site web, un nom d'utilisateur et un mot de passe. Les agents se connectent sans voir le mot de passe.",
+      "key": "Une clé API ou un jeton. Les agents l'utilisent dans une commande sans la voir.",
+      "contact": "Nom, entreprise, e-mail, téléphone et adresse que les agents remplissent dans les formulaires."
+    },
+    "empty": {
+      "personalTitle": "Rien à vous pour l'instant",
+      "personalText": "Enregistrez ici un identifiant ou une clé, et vos agents l'utilisent quand vous le demandez.",
+      "teamTitle": "Rien de partagé pour l'instant",
+      "teamText": "Enregistrez les identifiants et les clés que vos agents utilisent pour l'équipe.",
+      "teamReadText": "Quand quelqu'un partage un identifiant ou une clé avec vous, il apparaît ici."
+    },
+    "import": {
+      "title": "Importer depuis un ordinateur",
+      "text": "Pour importer des mots de passe d'un navigateur ou d'un gestionnaire de mots de passe, ouvrez Paramètres, Vault sur le web et choisissez Importer."
+    },
+    "connections": {
+      "text": "Connectez un gestionnaire de mots de passe et vos agents utilisent les identifiants qui y sont gardés. Rien n'est copié : un mot de passe n'est lu qu'au moment où il sert.",
+      "connected": "Connectés",
+      "add": "Connecter",
+      "none": "Aucun gestionnaire de mots de passe ne peut être connecté sur ce serveur.",
+      "help": "Utilisez un coffre ou un dossier réservé à vos agents, avec juste ce dont ils ont besoin."
+    },
+    "connect": {
+      "title": "Connecter {{name}}",
+      "reconnectTitle": "Reconnecter {{name}}",
+      "action": "Connecter",
+      "text": "Vos agents utiliseront les identifiants que {{name}} garde pour eux, sans voir les mots de passe.",
+      "steps": "Comment connecter",
+      "guide": "Ouvrir le guide de {{name}}",
+      "fields": "Informations",
+      "private": "Ces informations sont gardées chiffrées et ne sont plus jamais affichées.",
+      "teamHelp": "Ses éléments sont d'abord visibles par tout l'espace de travail et utilisés par aucun agent. Vous choisissez les agents ensuite.",
+      "personalHelp": "Vous seul voyez ses éléments, et vos agents les utilisent quand vous le demandez.",
+      "checking": "Vérification avec {{name}}…",
+      "connected": "{{name}} connecté",
+      "reconnected": "{{name}} reconnecté",
+      "unknown": "Ce gestionnaire de mots de passe n'est pas disponible ici."
+    },
+    "connection": {
+      "ready": "Connecté",
+      "syncing": "Synchronisation…",
+      "reads": "Lit {{label}}",
+      "items_one": "{{count}} élément",
+      "items_other": "{{count}} éléments",
+      "synced": "synchronisé {{when}}",
+      "sync": "Synchroniser",
+      "syncDone": "Synchronisé",
+      "reconnect": "Reconnecter",
+      "change": "Changer les informations de connexion",
+      "readOnly": "Les identifiants de {{name}} se modifient dans {{name}}. Ici, vous choisissez qui les utilise.",
+      "disconnect": "Déconnecter",
+      "disconnectTitle": "Déconnecter {{name}} ?",
+      "disconnectText_one": "Son élément quitte le Vault et les agents cessent de l'utiliser. Rien ne change dans {{name}}.",
+      "disconnectText_other": "Ses {{count}} éléments quittent le Vault et les agents cessent de les utiliser. Rien ne change dans {{name}}.",
+      "disconnected": "{{name}} déconnecté",
+      "gone": "Cette connexion n'existe plus ou vous ne pouvez pas la voir."
+    },
+    "item": {
+      "gone": "Cet élément n'existe plus ou vous ne pouvez pas le voir.",
+      "missingText": "Il a disparu de {{name}} depuis la dernière synchronisation. Les agents ne peuvent pas l'utiliser.",
+      "externalText": "Il vient de {{name}}. Modifiez son nom, son adresse, son nom d'utilisateur ou son mot de passe là-bas.",
+      "noValue": "Aucune valeur n'est encore enregistrée.",
+      "changePassword": "Changer le mot de passe",
+      "changeValue": "Changer la valeur",
+      "changeHelp": "Touchez Enregistrer pour le garder. Les agents utilisent ensuite le nouveau.",
+      "show": "Afficher",
+      "hide": "Masquer",
+      "hidden": "Masqué",
+      "saved": "Enregistré",
+      "copied": "Copié. Collez-le où vous en avez besoin.",
+      "delete": "Supprimer",
+      "deleteTitle": "Supprimer {{title}} ?",
+      "deleteText": "Les agents cessent aussitôt de l'utiliser. Cette action est définitive.",
+      "deleteExternal": "Il quitte le Vault et les agents cessent de l'utiliser. Il reste dans {{name}}.",
+      "deleted": "Supprimé"
+    },
+    "field": {
+      "title": "Nom",
+      "titleOptional": "Facultatif",
+      "website": "Site web",
+      "websitePlaceholder": "acme.example",
+      "username": "Nom d'utilisateur",
+      "password": "Mot de passe",
+      "newPassword": "Nouveau mot de passe",
+      "keyName": "Variable",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "keyNameHelp": "Majuscules, chiffres et _, comme ACME_API_KEY. Les agents demandent la clé par ce nom.",
+      "value": "Valeur",
+      "newValue": "Nouvelle valeur",
+      "description": "Description",
+      "descriptionPlaceholder": "À quoi ça sert",
+      "descriptionHelp": "Les agents lisent ceci pour savoir quand l'utiliser.",
+      "loginHelp": "Les agents saisissent le mot de passe uniquement sur ce site, sans le voir.",
+      "contactHelp": "Ce n'est pas un secret : les agents les lisent et les remplissent dans les formulaires."
+    },
+    "contact": {
+      "fullName": "Nom complet",
+      "company": "Entreprise",
+      "document": "Numéro fiscal",
+      "email": "E-mail",
+      "phone": "Téléphone",
+      "address": "Adresse",
+      "address2": "Complément d'adresse",
+      "city": "Ville",
+      "region": "Région",
+      "postalCode": "Code postal",
+      "country": "Pays"
+    },
+    "match": {
+      "title": "Où les agents peuvent le saisir",
+      "exact": "Uniquement cette adresse",
+      "exactText": "L'adresse exacte ci-dessus",
+      "site": "Tout le site",
+      "siteOn": "Toute page du même site que {{host}}",
+      "siteText": "Toute page du même site",
+      "help": "Uniquement sur les pages sécurisées (https). Partout ailleurs, l'ordinateur de l'agent refuse de le saisir."
+    },
+    "problem": {
+      "secret": "Saisissez le mot de passe ou la valeur de la clé."
+    },
+    "scope": {
+      "title": "Qui le voit",
+      "personal": "Personnel",
+      "personalText": "Vous seul le voyez. Vos agents l'utilisent seulement quand vous le demandez.",
+      "team": "Équipe",
+      "teamText": "Les personnes qui ont accès le voient. Les agents l'utilisent quand l'une d'elles le demande.",
+      "teamLocked": "Seules les personnes qui gèrent les clés de l'espace de travail enregistrent pour l'équipe."
+    },
+    "agents": {
+      "title": "Agents qui peuvent l'utiliser",
+      "allText": "Tous les agents, y compris les nouveaux",
+      "personalHelp": "Ils l'utilisent seulement quand vous le leur demandez.",
+      "teamHelp": "Ils l'utilisent quand une personne qui a accès le demande."
+    },
+    "access": {
+      "title": "Qui a accès",
+      "defaultTitle": "Accès par défaut",
+      "defaultText": "Ses éléments suivent ce réglage jusqu'à ce que quelqu'un change celui d'un élément.",
+      "teamText": "Choisissez qui le voit et quels agents l'utilisent pour ces personnes.",
+      "people": "Personnes",
+      "persons": "Personnes précises",
+      "roles": "Rôles",
+      "agents": "Agents",
+      "allAgents": "Tous les agents",
+      "noAgent": "Aucun agent pour l'instant",
+      "onlyYou": "Vous seul",
+      "everyone": "Tout l'espace de travail",
+      "everyoneText": "Toute personne d'ici le voit, et les agents l'utilisent pour elle.",
+      "everyoneIn": "Oui",
+      "everyoneOut": "Non",
+      "levelIn": "A accès",
+      "levelOut": "Aucun accès",
+      "everyoneHelp": "Touchez Tout l'espace de travail pour choisir plutôt des rôles et des personnes.",
+      "managersHelp": "Les personnes qui gèrent les clés de l'espace de travail voient toujours les éléments de l'équipe.",
+      "managersOnly": "Seulement qui gère les clés",
+      "inRole": "les personnes du rôle {{role}}",
+      "saved": "Accès enregistré",
+      "useConnection": "Suivre l'accès de la connexion",
+      "followsConnection": "Il suit l'accès de la connexion.",
+      "tooManyRoles": "Choisissez au plus 100 rôles.",
+      "tooManyPeople": "Choisissez au plus 500 personnes.",
+      "tooManyAgents": "Choisissez au plus 200 agents.",
+      "sentence": {
+        "none": "Aucun agent ne l'utilise pour l'instant.",
+        "personalAll": "Vos agents l'utilisent quand vous le demandez.",
+        "everyAgent": "Tous les agents",
+        "personal_one": "{{agents}} l'utilise quand vous le demandez.",
+        "personal_other": "{{agents}} l'utilisent quand vous le demandez.",
+        "everyone_one": "{{agents}} l'utilise quand n'importe qui dans l'espace de travail le demande.",
+        "everyone_other": "{{agents}} l'utilisent quand n'importe qui dans l'espace de travail le demande.",
+        "managers_one": "{{agents}} l'utilise quand une personne qui gère les clés le demande.",
+        "managers_other": "{{agents}} l'utilisent quand une personne qui gère les clés le demande.",
+        "people_one": "{{agents}} l'utilise pour {{people}}.",
+        "people_other": "{{agents}} l'utilisent pour {{people}}."
+      }
+    },
+    "use": {
+      "fill": "Connexion par {{name}}",
+      "fillOn": "{{name}}, sur {{host}}",
+      "key": "{{name}} l'a utilisé dans une commande",
+      "read": "{{name}} l'a lu",
+      "show": "{{name}} l'a affiché",
+      "copy": "{{name}} l'a copié",
+      "create": "{{name}} l'a enregistré",
+      "edit": "{{name}} l'a modifié",
+      "for": "pour {{name}}",
+      "routine": "routine {{name}}"
+    },
+    "uses": {
+      "title": "Utilisations récentes",
+      "none": "Pas encore utilisé."
+    },
+    "card": {
+      "save": "Enregistrer dans le Vault",
+      "saveText": "La prochaine fois, vos agents l'utilisent sans vous le demander.",
+      "personalOnly": "Enregistré comme personnel : vous seul le voyez.",
+      "choose": "Choisir",
+      "agentsText": "L'agent qui l'a demandé est déjà choisi.",
+      "as": "Se connecte en tant que {{username}}.",
+      "saved": "Enregistré dans le Vault",
+      "notSaved": "Envoyé, mais pas enregistré dans le Vault",
+      "codeLabel": "Code pour {{name}}",
+      "codeIncomplete": "Saisissez tous les chiffres du code.",
+      "codeNote": "Envoyé chiffré directement à l'ordinateur. Les codes ne sont jamais enregistrés."
+    }
+  },
   "status": {
     "title": "Statut",
     "doing": "Ce que vous faites",
