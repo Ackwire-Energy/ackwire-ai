@@ -26031,7 +26031,7 @@
     "value": "How computers work"
   },
   "computers.hostMissing": {
-    "value": "This server can be your agents' computer too: the steps are under “This server as the agents' computer” in <code>SELF_HOSTING.md</code>."
+    "value": "This server can be your agents' computer too: <guide>here's how</guide>."
   },
   "computers.other.title": {
     "value": "Other computers"

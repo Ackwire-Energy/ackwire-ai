@@ -11240,7 +11240,7 @@
     "leadCloud": "Donde trabajan tus agentes: una computadora solo para este espacio de trabajo, siempre encendida.",
     "about": "Acerca de esta computadora",
     "how": "Cómo funcionan las computadoras",
-    "hostMissing": "Este servidor también puede ser la computadora de tus agentes: los pasos están en “Este servidor como computadora de los agentes” en <code>SELF_HOSTING.md</code>.",
+    "hostMissing": "Este servidor también puede ser la computadora de tus agentes: <guide>mira cómo</guide>.",
     "other": {
       "title": "Otras computadoras",
       "text": "Conectadas con un código, como una Mac mini en casa u otro servidor. Lo que permite cada una se configura en esa computadora.",

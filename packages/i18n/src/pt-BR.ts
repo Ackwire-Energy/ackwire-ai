@@ -10522,8 +10522,7 @@ export const ptBR = {
     about: "Sobre este computador",
     /** Settings › Computers (self-host) ends with its help page's link. */
     how: "Como os computadores funcionam",
-    hostMissing:
-      "Este servidor também pode ser o computador dos agentes: os passos estão em “This server as the agents' computer”, no <code>SELF_HOSTING.md</code>.",
+    hostMissing: "Este servidor também pode ser o computador dos agentes: <guide>veja como</guide>.",
     other: {
       title: "Outros computadores",
       /** The title's ⓘ. */

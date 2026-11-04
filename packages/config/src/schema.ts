@@ -916,7 +916,7 @@ export const envVars = {
       .transform((on) => (on ? "on" : "off") as "on" | "off")
       .default("on"),
     description:
-      "Send anonymous usage statistics to agentes.chat once a day: counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites. `off` stops it, whatever the switch in Settings → General says (the installation's owner can turn it off there too). `docker compose run --rm agentes telemetry` prints exactly what would be sent. SELF_HOSTING.md lists every field.",
+      "Send anonymous usage statistics to agentes.chat once a day: counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites. `off` stops it, whatever the switch in Settings → General says (the installation's owner can turn it off there too). `docker compose run --rm agentes telemetry` prints exactly what would be sent (https://agentes.chat/docs/install-on-a-server#data).",
     section: "Usage report",
   },
   TELEMETRY_URL: {
@@ -938,7 +938,7 @@ export const envVars = {
   SENTRY_DSN: {
     schema: z.string().regex(DSN, DSN_MESSAGE).optional(),
     description:
-      "Error reports from this server to a Sentry-compatible server: the DSN of a project there. Each report holds the error, its stack, the release and internal ids, never message content, emails, IP addresses, cookies or tokens (SELF_HOSTING.md). Unset (default): no reports, and the reporting code isn't loaded.",
+      "Error reports from this server to a Sentry-compatible server: the DSN of a project there. Each report holds the error, its stack, the release and internal ids, never message content, emails, IP addresses, cookies or tokens (https://agentes.chat/docs/install-on-a-server#data). Unset (default): no reports, and the reporting code isn't loaded.",
     section: "Observability",
     example: "https://<key>@errors.example.com/1",
     secret: true,

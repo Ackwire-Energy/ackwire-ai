@@ -10336,8 +10336,7 @@ export const en = {
     leadCloud: "Where your agents work: a computer just for this workspace, always on.",
     about: "About this computer",
     how: "How computers work",
-    hostMissing:
-      "This server can be your agents' computer too: the steps are under “This server as the agents' computer” in <code>SELF_HOSTING.md</code>.",
+    hostMissing: "This server can be your agents' computer too: <guide>here's how</guide>.",
     other: {
       title: "Other computers",
       text: "Connected with a code, like a Mac mini at home or another server. What each one allows is set on that computer.",

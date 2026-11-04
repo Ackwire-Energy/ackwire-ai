@@ -11310,7 +11310,7 @@
     "leadCloud": "Là où vos agents travaillent : un ordinateur rien que pour cet espace de travail, toujours allumé.",
     "about": "À propos de cet ordinateur",
     "how": "Comment fonctionnent les ordinateurs",
-    "hostMissing": "Ce serveur peut aussi être l'ordinateur de vos agents : les étapes sont dans « Ce serveur comme ordinateur des agents » de <code>SELF_HOSTING.md</code>.",
+    "hostMissing": "Ce serveur peut aussi être l'ordinateur de vos agents : <guide>voici comment</guide>.",
     "other": {
       "title": "Autres ordinateurs",
       "text": "Connectés avec un code, comme un Mac mini à la maison ou un autre serveur. Ce que chacun autorise se règle sur l'ordinateur lui-même.",

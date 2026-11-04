@@ -10550,7 +10550,7 @@
     "leadCloud": "你的智能体工作的地方：一台专属这个工作区、始终开机的电脑。",
     "about": "关于这台电脑",
     "how": "电脑如何运作",
-    "hostMissing": "这台服务器也可以作为智能体的电脑：步骤见 <code>SELF_HOSTING.md</code> 中的 “This server as the agents' computer”。",
+    "hostMissing": "这台服务器也可以作为智能体的电脑：<guide>查看方法</guide>。",
     "other": {
       "title": "其他电脑",
       "text": "通过代码连接，比如家里的 Mac mini 或另一台服务器。每台电脑允许做什么，在那台电脑上设置。",
