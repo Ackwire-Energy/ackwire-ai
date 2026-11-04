@@ -585,7 +585,10 @@ export function HostComputerCard() {
         </List>
       ) : (
         <p className="small" style={{ margin: 0 }}>
-          <Trans i18nKey="computers.hostMissing" components={{ code: <code /> }} />
+          <Trans
+            i18nKey="computers.hostMissing"
+            components={{ guide: <HelpLink slug="install-on-a-server" section="computers" /> }}
+          />
         </p>
       )}
       <RenameDialog machine={renaming} onClose={() => setRenaming(null)} />

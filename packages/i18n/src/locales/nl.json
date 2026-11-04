@@ -11094,7 +11094,7 @@
     "leadCloud": "Waar je agents werken: een computer alleen voor deze werkruimte, altijd aan.",
     "about": "Over deze computer",
     "how": "Zo werken computers",
-    "hostMissing": "Deze server kan ook de computer van je agents zijn: de stappen staan onder “Deze server als computer van de agents” in <code>SELF_HOSTING.md</code>.",
+    "hostMissing": "Deze server kan ook de computer van je agents zijn: <guide>zo werkt het</guide>.",
     "other": {
       "title": "Andere computers",
       "text": "Gekoppeld met een code, zoals een Mac mini thuis of een andere server. Wat elke computer toestaat, stel je op die computer zelf in.",

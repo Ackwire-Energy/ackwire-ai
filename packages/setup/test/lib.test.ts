@@ -695,7 +695,9 @@ describe("the agents' computer", () => {
         "This machine's systemd isn't built with BPF_FRAMEWORK (Ubuntu's isn't), which keeps each agent's user off the others' ports.",
       fix: "Use Debian 13 for it, or connect a computer later in Settings → Computers.",
     });
-    expect(why(server, null, true)?.fix).toContain("This server as the agents' computer");
+    expect(why(server, null, true)?.fix).toBe(
+      "Run the installer on the server for this folder instead, with --dir <folder> --computer yes: https://agentes.chat/docs/install-on-a-server#computers",
+    );
     expect(why({ ...server, platform: "win32" })?.error).toBe("The agents' computer runs on Linux or a Mac.");
     // Already a computer of some server: its service would be replaced.
     for (const machine of [server, mac]) {

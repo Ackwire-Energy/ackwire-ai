@@ -19,7 +19,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "适合谁",
         blocks: [
-          "适合你自己或小团队在这台电脑开机时使用。如果团队更大，或需要一台始终在线的服务器，请把 agentes.chat 安装到服务器上，然后在应用中选择 **连接到我的服务器**。你的数据之后可以迁移过去。",
+          "适合你自己或小团队在这台电脑开机时使用。如果团队更大，或需要一台始终在线的服务器，请[把 agentes.chat 安装到服务器上](/help/install-on-a-server)，然后在应用中选择 **连接到我的服务器**。你的数据之后可以迁移过去。",
         ],
       },
       {
@@ -496,6 +496,142 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
               "**Cursor 卡在旧的登录上：** 退出 Cursor，删除 `~/.mcp-auth` 文件夹，然后重新连接。",
             ],
           },
+        ],
+      },
+    ],
+  },
+  "install-on-a-server": {
+    title: "在服务器上安装 agentes.chat",
+    summary: "在你自己的服务器上免费运行 agentes.chat，供整个团队使用。一条命令就能装好。",
+    sections: [
+      {
+        id: "need",
+        heading: "你需要什么",
+        blocks: [
+          {
+            list: [
+              "一台 64 位 Linux（x64 或 arm64）服务器或 VPS。小团队可以从 2 个 CPU、4 GB 内存和 20 GB 磁盘起步。只是试用的话，装了 Docker Desktop、OrbStack 或 Colima 的 Mac 也可以。",
+              "带 Compose 的 Docker。在 Linux 上，缺少时安装程序会先问你，再帮你装上。",
+              "一种访问方式：一个免费的 Tailscale 账号（默认方式，私有，不需要域名，也不用开放端口），或者一个指向服务器的域名，并开放 80 和 443 端口。",
+            ],
+          },
+        ],
+      },
+      {
+        id: "install",
+        heading: "安装",
+        blocks: [
+          "在服务器上运行：",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh",
+          },
+          "它会装好缺少的东西，然后问几个问题：大家怎么访问、邮件、这台服务器是否也当作智能体的电脑，以及是否发送匿名使用统计。按 Enter 采用建议的答案。它装在 `/opt/agentes`（已经能用 Docker 的用户装在 `~/agentes`），第一次会下载大约 2 GB。",
+          "最后它会显示服务器的地址和一个给手机用的二维码。再运行一次也没关系：它会保留你的设置，只补上缺少的部分。",
+          "有 Node.js 18 或更新版本时，在空文件夹里运行 `npx @agenteschat/setup` 是同样的设置。没有 Node 的话，它可以从应用的镜像在当前文件夹里运行，最后会给出启动其余部分的命令：",
+          {
+            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup',
+          },
+        ],
+      },
+      {
+        id: "reach",
+        heading: "大家怎么访问",
+        blocks: [
+          {
+            list: [
+              "**Tailscale**，默认方式：在 `https://agentes.<你的tailnet>.ts.net` 上的私有 HTTPS，只有你 Tailscale 网络里的设备能打开。安装前，先在 https://console.tailscale.com/admin/dns 打开 MagicDNS 和 HTTPS，并在 https://console.tailscale.com/admin/settings/keys 创建一个认证密钥（auth key），设置时会要用。",
+              "**公开域名**：互联网上任何人都能打开，比如 `https://chat.example.com`。把域名指向服务器，开放 80 和 443 端口。设置会申请并续期证书，并在域名上线前让你先创建账号。",
+              "**只在这台机器**：`http://localhost:3000`，用来在你自己的电脑上试用。",
+            ],
+          },
+          "在 Tailscale 上，服务器的密钥 180 天后过期，过期后服务器会离开你的网络。要让它一直在，打开 https://console.tailscale.com/admin/machines ，在服务器的 **⋯** 菜单里选择 **Disable Key Expiry**。",
+          "启动例行任务的 Webhook，以及从自己服务器发起调用的 AI 应用，需要一个公开地址。在 Tailscale 上，Funnel 可以把同一个地址开放到互联网：在 https://console.tailscale.com/admin/acls 把 Funnel 加进你 tailnet 的策略，在 `.env` 里设置 `TAILSCALE_FUNNEL=true`，然后运行 `docker compose up -d`。",
+        ],
+      },
+      {
+        id: "owner",
+        heading: "你的账号",
+        blocks: [
+          "打开服务器的地址并注册：第一个账号就是所有者。之后注册会关闭，其他人通过邀请加入，邀请在 **设置\u00a0›\u00a0成员和邀请** 里发出。",
+          "在 Tailscale 上，你邀请的人也需要加入你的 tailnet。先在 https://console.tailscale.com/admin/users 邀请他们，再在 agentes.chat 里邀请。",
+        ],
+      },
+      {
+        id: "email",
+        heading: "邮件",
+        blocks: [
+          "没有配置邮件时，agentes.chat 会把每封邮件写进日志而不是发出去，所以邀请链接可以从日志里复制。重置密码不可用。",
+          {
+            code: "docker compose logs agentes | grep 'email (not sent'",
+          },
+          "设置可以使用你自己的邮件服务器（SMTP），或者一个兼容 Resend 的 API 密钥，比如 MillionSend 或 Resend。除非你另选发件人，邮件会从服务器域名的 `ping@` 发出，这个域名需要在你的邮件服务商那里验证过。以后想配置，再运行一次安装就行。",
+        ],
+      },
+      {
+        id: "phone",
+        heading: "你的手机",
+        blocks: [
+          {
+            list: [
+              "使用 Tailscale 时，在手机上安装 Tailscale 应用，并登录同一个 tailnet。",
+              "安装 agentes.chat 应用。",
+              "扫描设置显示的二维码，或者 **设置\u00a0›\u00a0你的账号\u00a0›\u00a0在手机上打开** 里的二维码，后者还会帮你登录。",
+            ],
+          },
+        ],
+      },
+      {
+        id: "computers",
+        heading: "智能体的电脑",
+        blocks: [
+          "设置可以把这台服务器也当作智能体的电脑，它们在上面运行命令、使用浏览器、存放文件。设置会先问你，在服务器能胜任时建议选是。在 Linux 上，每个智能体都有自己的用户和屏幕。如果你选了否，加上 `--computer yes` 再运行一次安装：",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
+          },
+          "其他电脑，比如装了 agentes.chat 应用的 Mac 或另一台服务器，在 **设置\u00a0›\u00a0电脑** 里连接，详见 [给智能体用的电脑](/help/computers)。使用 Tailscale 时，它们要先加入你的 tailnet。",
+        ],
+      },
+      {
+        id: "backups",
+        heading: "备份和恢复",
+        blocks: [
+          "你的服务器由三样东西组成：数据库、上传的文件，以及 `.env` 里的 `AGENTES_SECRET`。把 `.env` 的副本放在安全的地方，和备份分开：没有这个密钥，恢复后的数据库里存的密钥就读不出来。",
+          "要每天备份，在 Cloudflare R2 或其他兼容 S3 的存储上建一个私有存储桶，再建一个能在里面读、写、删除的密钥。把它们加到 `.env`，并在 `COMPOSE_PROFILES` 里加上 `backup`（用公开域名时是 `https,backup`）：",
+          {
+            code: "S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com\nS3_ACCESS_KEY_ID=…\nS3_SECRET_ACCESS_KEY=…\nS3_BACKUP_BUCKET=agentes-backups\nCOMPOSE_PROFILES=tailscale,backup",
+          },
+          "然后在安装文件夹里运行 `docker compose up -d`。数据库会在 03:00 UTC 导出，每份导出保留 14 天。`docker compose run --rm backup now` 立即做一份，`docker compose run --rm backup list` 列出所有导出。导出只包含数据库：`files` 卷里上传的文件需要单独复制，命令在下面的完整指南里。",
+          "要恢复，先用 `docker compose run --rm -T backup fetch <名称> > agentes.dump` 取回一份导出，然后在应用停止时把它载入一个空数据库：",
+          {
+            code: "docker compose stop agentes\ndocker compose exec -T postgres dropdb -U agentes --force agentes\ndocker compose exec -T postgres createdb -U agentes agentes\ndocker compose exec -T postgres pg_restore -U agentes -d agentes --exit-on-error < agentes.dump\ndocker compose start agentes",
+          },
+          "恢复到做这份导出的版本，或者更新的版本。",
+        ],
+      },
+      {
+        id: "upgrades",
+        heading: "升级",
+        blocks: [
+          "在安装文件夹里运行：",
+          {
+            code: "curl -fsSLO https://agentes.chat/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
+          },
+          "新版本启动时，数据库会自动更新。把设置放在 `.env` 里，不要修改 `docker-compose.yml`，每次升级都会替换它。大版本跨越前先备份：被新版本更新过的数据库，旧版本打不开。",
+        ],
+      },
+      {
+        id: "data",
+        heading: "它会发送什么",
+        blocks: [
+          "服务器每天向 agentes.chat 发送一次匿名使用统计：人数、智能体数量、机器大小、用掉的 AI 令牌，以及智能体的浏览器收发了多少数据等计数。从不发送消息、文件、名字或网站。`docker compose run --rm agentes telemetry` 会原样显示将要发送的内容。所有者可以在 **设置\u00a0›\u00a0常规** 里关闭，或者在 `.env` 里设置 `TELEMETRY=off`。",
+          "除非你把 `SENTRY_DSN` 设为你自己选的兼容 Sentry 的服务器，否则错误报告不会发到任何地方。报告包含错误和发生的位置，从不包含消息、邮箱地址、IP 地址、Cookie 或令牌。",
+        ],
+      },
+      {
+        id: "reference",
+        heading: "完整指南",
+        blocks: [
+          "所有设置、自己的代理（比如 nginx）、不用 Docker 的运行方式、给自行安装的 AI 智能体的步骤，以及出问题时怎么办，都在 agentes.chat 仓库里的 `SELF_HOSTING.md` 中。",
         ],
       },
     ],

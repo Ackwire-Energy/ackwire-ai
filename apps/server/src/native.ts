@@ -34,6 +34,7 @@ import {
   pgliteUrl,
   restorePglite,
 } from "@agenteschat/db";
+import { INSTALL_DOCS_URL } from "@agenteschat/i18n/help";
 import { envEntries, upsertEnv } from "@agenteschat/setup/src/lib";
 import { expandHome } from "../runner/config";
 import { acquireLock, type LockResult } from "../runner/lock";
@@ -105,9 +106,9 @@ export function nativeFiles(dir: string) {
 /** Where a restore builds the new database, and where it waits once complete, before taking `db`'s place. */
 const restoreFolders = (db: string) => ({ building: `${db}.new`, complete: `${db}.restored` });
 
-const ENV_HEADER = `# agentes.chat on this computer, with its database built in (agentes-server). Every value is
-# explained in SELF_HOSTING.md. AGENTES_SECRET encrypts the keys stored in the database: it travels
-# with the folder in a backup, and changing it makes them unreadable.
+const ENV_HEADER = `# agentes.chat on this computer, with its database built in (agentes-server). The guide:
+# ${INSTALL_DOCS_URL}. AGENTES_SECRET encrypts the keys stored in the database: it
+# travels with the folder in a backup, and changing it makes them unreadable.
 `;
 
 /** Whether something already answers on 127.0.0.1:<port>. */

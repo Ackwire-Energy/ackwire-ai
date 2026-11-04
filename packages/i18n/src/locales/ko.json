@@ -10599,7 +10599,7 @@
     "leadCloud": "에이전트가 일하는 곳이에요. 이 워크스페이스 전용 컴퓨터로 항상 켜져 있어요.",
     "about": "이 컴퓨터에 대해 알아보기",
     "how": "컴퓨터 작동 방식",
-    "hostMissing": "이 서버도 에이전트의 컴퓨터가 될 수 있어요. <code>SELF_HOSTING.md</code>의 “This server as the agents' computer”에 방법이 있어요.",
+    "hostMissing": "이 서버도 에이전트의 컴퓨터가 될 수 있어요. <guide>방법 보기</guide>",
     "other": {
       "title": "다른 컴퓨터",
       "text": "집에 있는 Mac mini나 다른 서버처럼 코드로 연결한 컴퓨터예요. 각 컴퓨터에서 무엇을 허용할지는 그 컴퓨터에서 정해요.",

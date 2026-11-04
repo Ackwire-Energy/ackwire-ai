@@ -10674,7 +10674,7 @@
     "leadCloud": "Tempat agenmu bekerja: komputer khusus untuk ruang kerja ini, selalu menyala.",
     "about": "Tentang komputer ini",
     "how": "Cara kerja komputer",
-    "hostMissing": "Server ini juga bisa jadi komputer agenmu: langkah-langkahnya ada di bagian “This server as the agents' computer” di <code>SELF_HOSTING.md</code>.",
+    "hostMissing": "Server ini juga bisa jadi komputer agenmu: <guide>begini caranya</guide>.",
     "other": {
       "title": "Komputer lain",
       "text": "Dihubungkan dengan kode, seperti Mac mini di rumah atau server lain. Apa yang diizinkan tiap komputer diatur di komputer itu sendiri.",

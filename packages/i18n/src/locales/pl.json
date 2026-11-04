@@ -11771,7 +11771,7 @@
     "leadCloud": "Gdzie pracują twoi agenci: komputer tylko dla tej przestrzeni roboczej, zawsze włączony.",
     "about": "O tym komputerze",
     "how": "Jak działają komputery",
-    "hostMissing": "Ten serwer też może być komputerem twoich agentów: kroki znajdziesz w sekcji „This server as the agents' computer” w <code>SELF_HOSTING.md</code>.",
+    "hostMissing": "Ten serwer też może być komputerem twoich agentów: <guide>zobacz jak</guide>.",
     "other": {
       "title": "Inne komputery",
       "text": "Podłączone kodem, np. Mac mini w domu albo inny serwer. Na co każdy z nich pozwala, ustawia się na tym komputerze.",

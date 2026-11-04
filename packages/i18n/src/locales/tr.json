@@ -10955,7 +10955,7 @@
     "leadCloud": "Ajanlarınızın çalıştığı yer: yalnızca bu çalışma alanına ait, her zaman açık bir bilgisayar.",
     "about": "Bu bilgisayar hakkında",
     "how": "Bilgisayarlar nasıl çalışır",
-    "hostMissing": "Bu sunucu da ajanlarınızın bilgisayarı olabilir: adımlar <code>SELF_HOSTING.md</code> içindeki “This server as the agents' computer” bölümünde.",
+    "hostMissing": "Bu sunucu da ajanlarınızın bilgisayarı olabilir: <guide>nasıl yapılır</guide>.",
     "other": {
       "title": "Diğer bilgisayarlar",
       "text": "Evdeki bir Mac mini ya da başka bir sunucu gibi, bir kodla bağlanır. Her birinin neye izin verdiği o bilgisayarda ayarlanır.",
