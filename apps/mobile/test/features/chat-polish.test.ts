@@ -114,3 +114,13 @@ describe("my message's clock from the moment it is sent", () => {
     expect(receiptTicks(routed.m)).toBe("checks");
   });
 });
+
+describe("a conversation with a pinned message", () => {
+  test("no header fade over the first messages: the list starts below the pinned bar, whose hairline is the edge", () => {
+    const screen = src("features/chat/ChatScreen.tsx");
+    const fade = screen.indexOf("styles.topFade, { height: headerHeight + 28 }");
+    expect(fade).toBeGreaterThan(0);
+    expect(screen.lastIndexOf("{!hasPin ? (", fade)).toBeGreaterThan(screen.lastIndexOf("<KeyboardGestureArea", fade));
+    expect(src("features/chat/PinsSheet.tsx")).not.toMatch(/boxShadow|shadowOpacity|elevation/);
+  });
+});

@@ -13347,6 +13347,8 @@ export const ptBR = {
       manual: "quando pedem",
     },
     sizes: { label: "Tamanho", s: "P", m: "M", l: "G" },
+    sizeNames: { s: "Pequeno", m: "Médio", l: "Grande" },
+    sizeHints: { s: "Um quadrado", m: "Duas colunas", l: "Duas colunas, duas linhas" },
     status: {
       building: "{{name}} está montando o widget e a rotina que vai atualizar…",
       updating: "{{name}} atualizando…",
@@ -13504,6 +13506,11 @@ export const ptBR = {
     new: "Novo painel",
     back: "Painéis",
     home: "Meu Início",
+    seeAll: "Ver todos",
+    useOnHome: "Usar no Início",
+    stopOnHome: "Tirar do Início",
+    onHome: "No Início",
+    onHomeDone: "O Início agora mostra este painel",
     groups: {
       workspace: "Do workspace",
       workspaceHint: "todo mundo vê",

@@ -2894,7 +2894,6 @@
       "plus.audio",
       "status.title",
       "tabs.chats",
-      "tabs.dashboards",
       "tabs.threads",
       "thread.missionIn",
       "thread.threadIn",
@@ -2978,7 +2977,6 @@
       "plus.camera",
       "status.title",
       "tabs.agents",
-      "tabs.dashboards",
       "tabs.threads",
       "thread.threadIn",
       "threads.section.threads"

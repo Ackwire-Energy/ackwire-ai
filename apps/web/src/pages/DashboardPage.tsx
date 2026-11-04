@@ -1,5 +1,11 @@
 import type { Dashboard } from "@agenteschat/client";
-import { useDashboard, useDeleteDashboard, useUpdateDashboard } from "@agenteschat/client";
+import {
+  useDashboard,
+  useDashboards,
+  useDeleteDashboard,
+  useSetHomeDashboard,
+  useUpdateDashboard,
+} from "@agenteschat/client";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import {
@@ -41,7 +47,8 @@ import "./dashboards.css";
  * One board (ADR 0135 §14): back to Dashboards, its title with Share, Organize and "+", a line with who sees it, who
  * made it, how many widgets and when it was updated, an agent's request to publish it, then its widgets (the
  * 4-column grid, Organize to drag and resize) or an empty state. `?widget=<id>` opens a widget's side panel, so a
- * notification or a link opens it. A home board belongs on Home.
+ * notification or a link opens it. A home board belongs on Home, unless Início shows another board ("Use on Home",
+ * ADR 0135 §18): then it is a page like this one, its menu bringing Início back to it.
  */
 export function DashboardPage({ dashboardId }: { dashboardId: string }) {
   const { t } = useTranslation();
@@ -50,16 +57,20 @@ export function DashboardPage({ dashboardId }: { dashboardId: string }) {
   const query = useDashboard(org.id, dashboardId);
   const [widgetId, setWidgetId] = useOpenParam("widget");
   const board = query.data;
-  // A person's home board is their Home page: its widgets open there.
+  const list = useDashboards(org.id);
+  // A person's home board is their Home page: its widgets open there, unless Início shows another board (ADR 0135
+  // §18); then "My Home" is a page like any board's.
+  const homeElsewhere = Boolean(list.data?.homeDashboardId);
+  const redirectHome = board?.kind === "home" && list.data !== undefined && !homeElsewhere;
   useEffect(() => {
-    if (board?.kind !== "home") return;
+    if (!redirectHome) return;
     void navigate({
       to: "/org/$orgId/home",
       params: { orgId: org.id },
       search: (widgetId ? { widget: widgetId } : {}) as never,
       replace: true,
     });
-  }, [board?.kind, navigate, org.id, widgetId]);
+  }, [redirectHome, navigate, org.id, widgetId]);
   if (query.isLoading)
     return (
       <div className="page page--list dashboards">
@@ -79,7 +90,7 @@ export function DashboardPage({ dashboardId }: { dashboardId: string }) {
       </div>
     );
   }
-  if (board.kind === "home") return null;
+  if (board.kind === "home" && !homeElsewhere) return null;
   return <Board board={board} widgetId={widgetId} onWidget={setWidgetId} />;
 }
 
@@ -121,14 +132,28 @@ function Board({
   const artAgent = dir.anyAgent(board.owner?.kind === "agent" ? board.owner.id : (dir.agents[0]?.id ?? ""));
   const setPinned = (pinned: boolean) =>
     update.mutate({ dashboardId: board.id, pinned }, { onError: (error) => toast.show(errorText(t, error), "error") });
+  // "Use on Home" (ADR 0135 §18): anyone who sees the board may show it on their own Início; on "My Home" it
+  // brings Início back to it.
+  const isHome = board.kind === "home";
+  const title = isHome ? t("dashboards.home") : board.title;
+  const list = useDashboards(org.id);
+  const setHome = useSetHomeDashboard(org.id);
+  const onHome = isHome ? !list.data?.homeDashboardId : list.data?.homeDashboardId === board.id;
+  const toggleHome = () =>
+    setHome.mutate(onHome || isHome ? null : board.id, {
+      onSuccess: () => {
+        if (!onHome) toast.show(t("dashboards.onHomeDone"));
+      },
+      onError: (error) => toast.show(errorText(t, error), "error"),
+    });
   return (
     <div className="page page--list dashboards db-page">
       <header className="db-head">
         <BackCrumb />
         <div className="db-head__row">
-          <h1>{board.title}</h1>
+          <h1>{title}</h1>
           <div className="db-acts">
-            {board.canManage && (
+            {board.canManage && !isHome && (
               <Button
                 size="sm"
                 icon={board.audience === "workspace" ? "globe" : "lock"}
@@ -139,36 +164,39 @@ function Board({
             )}
             {board.canEdit && (
               <BoardActionsPill
-                label={board.title}
+                label={title}
                 arranging={arranging}
                 onArrange={empty ? undefined : () => setArranging((a) => !a)}
                 onAdd={() => setAdding(true)}
               />
             )}
-            {(board.canEdit || board.canManage) && (
-              <Menu
-                label={t("widgets.menu.label")}
-                align="end"
-                trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={t("widgets.menu.label")} />}
-              >
-                {board.canEdit && (
-                  <MenuItem icon="edit" onSelect={() => setRenaming(true)}>
-                    {t("dashboards.rename")}
-                  </MenuItem>
-                )}
-                {board.canManage && (
-                  <MenuItem icon="pin" onSelect={() => setPinned(!board.pinned)}>
-                    {board.pinned ? t("dashboards.unpin") : t("dashboards.pinTop")}
-                  </MenuItem>
-                )}
-                {board.canManage && <MenuSeparator />}
-                {board.canManage && (
-                  <MenuItem icon="trash" danger onSelect={() => setDeleting(true)}>
-                    {t("dashboards.delete.action")}
-                  </MenuItem>
-                )}
-              </Menu>
-            )}
+            <Menu
+              label={t("widgets.menu.label")}
+              align="end"
+              trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={t("widgets.menu.label")} />}
+            >
+              {!(isHome && onHome) && (
+                <MenuItem icon="home" onSelect={toggleHome}>
+                  {onHome ? t("dashboards.stopOnHome") : t("dashboards.useOnHome")}
+                </MenuItem>
+              )}
+              {board.canEdit && !isHome && (
+                <MenuItem icon="edit" onSelect={() => setRenaming(true)}>
+                  {t("dashboards.rename")}
+                </MenuItem>
+              )}
+              {board.canManage && !isHome && (
+                <MenuItem icon="pin" onSelect={() => setPinned(!board.pinned)}>
+                  {board.pinned ? t("dashboards.unpin") : t("dashboards.pinTop")}
+                </MenuItem>
+              )}
+              {board.canManage && !isHome && <MenuSeparator />}
+              {board.canManage && !isHome && (
+                <MenuItem icon="trash" danger onSelect={() => setDeleting(true)}>
+                  {t("dashboards.delete.action")}
+                </MenuItem>
+              )}
+            </Menu>
           </div>
         </div>
         {board.about && <p className="list-head__sub">{board.about}</p>}
@@ -209,7 +237,12 @@ function Board({
         />
       )}
       <WidgetPanel orgId={org.id} widgetId={widgetId} onClose={() => onWidget(null)} />
-      <NewWidgetDialog orgId={org.id} open={adding} onClose={() => setAdding(false)} dashboardId={board.id} />
+      <NewWidgetDialog
+        orgId={org.id}
+        open={adding}
+        onClose={() => setAdding(false)}
+        dashboardId={isHome ? null : board.id}
+      />
       <ShareDashboardDialog board={board} open={sharing} onClose={() => setSharing(false)} />
       <RenameDialog board={board} open={renaming} onClose={() => setRenaming(false)} />
       <DeleteDialog board={board} open={deleting} onClose={() => setDeleting(false)} />

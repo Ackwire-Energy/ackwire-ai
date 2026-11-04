@@ -53,7 +53,7 @@ type Board = {
   widgets: Widget[];
   tiles: Tile[];
 };
-type List = { home: Board | null; dashboards: Board[] };
+type List = { home: Board | null; dashboards: Board[]; homeDashboardId: string | null };
 type Detail = Widget & {
   dashboard: { id: string; kind: string; title: string };
   canEdit: boolean;
@@ -279,6 +279,24 @@ test("a roles board: whoever holds one of its roles sees it, admins too, nobody 
   });
   expect(untitled.status).toBe(400);
   expect(await codeOf(untitled)).toBe("invalid_request");
+});
+
+test("Use on Home: a board Ana sees goes on her Início alone; one she can't see is a 404", async () => {
+  const s = await start();
+  const sales = await s.newBoard(s.owner, { title: "Sales" });
+  const hidden = await s.newBoard(s.owner, { title: "Mine", audience: "private" });
+  const choose = (b: Browser, homeDashboardId: string | null) =>
+    s.api(b, "/dashboards/home-choice", { method: "PUT", json: { homeDashboardId } });
+  expect(await read<{ homeDashboardId: string | null }>(await choose(s.ana, sales.id))).toEqual({
+    homeDashboardId: sales.id,
+  });
+  expect((await s.list(s.ana)).homeDashboardId).toBe(sales.id);
+  expect((await s.list(s.owner)).homeDashboardId).toBeNull();
+  const refused = await choose(s.ana, hidden.id);
+  expect(refused.status).toBe(404);
+  expect(await codeOf(refused)).toBe("dashboard.not_found");
+  await read(await choose(s.ana, null));
+  expect((await s.list(s.ana)).homeDashboardId).toBeNull();
 });
 
 test("My Home: made on first read, then the same board, its person's alone, never shared or deleted", async () => {

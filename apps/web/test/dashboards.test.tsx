@@ -256,6 +256,49 @@ describe("a board's page", () => {
   });
 });
 
+describe("a board on Início (ADR 0135 §18)", () => {
+  const metas = (fake: FakeDashboards) => {
+    fake.addBoard({ id: "dash-m", title: "Metas", owner: { kind: "person", id: "u-walter", name: "Walter" } });
+    fake.addWidget("dash-m", { agentId: ATLAS_ID, title: "Receita hoje", layout: { position: 0, w: 1, h: 1 } });
+  };
+
+  test("Use on Home in the board's menu, for whoever sees it", async () => {
+    const s = await open(`/org/${ORG_ID}/dashboards/dash-m`, metas);
+    const trigger = screen()
+      .getAllByRole("button", { name: "Mais" })
+      .find((b) => b.closest(".db-acts")) as HTMLElement;
+    trigger.focus();
+    await key(trigger, "Enter");
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Usar no Início" }));
+    await settle(4);
+    expect(s.state.calls.find((c) => c.method === "dashboards.setHome")?.args).toEqual([ORG_ID, "dash-m"]);
+    expect(screen().getByText("O Início agora mostra este painel")).toBeTruthy();
+    trigger.focus();
+    await key(trigger, "Enter");
+    expect(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Tirar do Início" })).toBeTruthy();
+  });
+
+  test("Início shows the board with See all; Dashboards marks it and My Home is a page", async () => {
+    await open(`/org/${ORG_ID}/home`, (fake) => {
+      metas(fake);
+      fake.homeDashboardId = "dash-m";
+    });
+    const mural = section("Metas");
+    expect(mural.textContent).toContain("Receita hoje");
+    expect(within(mural).getByRole("link", { name: "Ver todos" }).getAttribute("href")).toBe(
+      `/org/${ORG_ID}/dashboards`,
+    );
+    cleanup();
+    await open(`/org/${ORG_ID}/dashboards`, (fake) => {
+      metas(fake);
+      fake.homeDashboardId = "dash-m";
+    });
+    const home = within(section("Meu Início")).getByRole("link", { name: /Meu Início/ });
+    expect(home.getAttribute("href")).toBe(`/org/${ORG_ID}/dashboards/home`);
+    expect(within(section("Só seus")).getByRole("link", { name: "Metas" }).textContent).toContain("No Início");
+  });
+});
+
 /** A routine as the server sends it (ADR 0053 §11). */
 const routine = (over: Partial<Routine> & Pick<Routine, "id" | "name">): Routine => ({
   agentId: ADA_ID,

@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-11-03
 - Extends: ADR 0053 (routines and unattended work: a widget is redone by a routine of its own), 0085 (roles and permissions: who sees a board), 0108 (Home: "My Home" is its board), 0113 (live blocks: what is pinned is a chart, not a live block), 0125 (an audience by role, the same model), 0071 (notifications: alerts and requests wait on the person)
-- Code: `packages/db/src/schema/dashboards.ts` (`dashboards`, `dashboard_widgets`, `dashboard_widget_updates`), migration `0199_dashboards.sql`; `packages/ui/src/widgets/spec.ts` (`@agenteschat/ui/widgets/spec`: `WidgetSpec`, `validateWidgetSpec`, `chartBlockToWidgetSpec`, schedules, sizes, caps); `packages/engine/src/dashboards/*` (`access.ts`, `service.ts`, `pin.ts`, `cost.ts`, `suggestions.ts`, `refresh.ts`, `proposals.ts`, `tools.ts`, `events.ts`, `types.ts`), `routines.ts` and `routine-ledger.ts` (the `widget` target), `tools/run-policy.ts` (a widget's refresh run), `notifications.ts` (`widget_alert`, `widget_failed`, `dashboard_proposal`); server `routes/app/dashboards.ts`, `dashboard-schemas.ts`; client `packages/client/src/dashboards/*`; web `packages/ui/src/widgets/*`, `pages/HomePage.tsx` (the mural), `pages/DashboardsPage.tsx`, `pages/DashboardPage.tsx`, `components/dashboards/*`; phone `app/(app)/(tabs)/dashboards/*`, `src/features/dashboards/*`
+- Code: `packages/db/src/schema/dashboards.ts` (`dashboards`, `dashboard_widgets`, `dashboard_widget_updates`), migration `0199_dashboards.sql`; `packages/ui/src/widgets/spec.ts` (`@agenteschat/ui/widgets/spec`: `WidgetSpec`, `validateWidgetSpec`, `chartBlockToWidgetSpec`, schedules, sizes, caps); `packages/engine/src/dashboards/*` (`access.ts`, `service.ts`, `pin.ts`, `cost.ts`, `suggestions.ts`, `refresh.ts`, `proposals.ts`, `tools.ts`, `events.ts`, `types.ts`), `routines.ts` and `routine-ledger.ts` (the `widget` target), `tools/run-policy.ts` (a widget's refresh run), `notifications.ts` (`widget_alert`, `widget_failed`, `dashboard_proposal`); server `routes/app/dashboards.ts`, `dashboard-schemas.ts`; client `packages/client/src/dashboards/*`; web `packages/ui/src/widgets/*`, `pages/HomePage.tsx` (the mural), `pages/DashboardsPage.tsx`, `pages/DashboardPage.tsx`, `components/dashboards/*`; phone `app/(app)/dashboards.tsx` (pushed from `src/features/chats/DashboardsEntry.tsx` on the home), `src/features/dashboards/*`
 
 ## Context
 
@@ -132,15 +132,14 @@ people than asked.
     widget". A widget opens in a side panel: the widget big, how it updates (its routine and next run, its alert,
     what the agent reads), its latest updates, remove, and a composer to ask its agent for a change. Removing a
     widget, from anywhere, asks first: its routine stops and its history goes. Charts in messages get "Pin".
-15. **On the phone.** A "Dashboards" tab between Chats and Threads. Its root lists "My Home" first, then the same
-    groups. Everything else is a pushed screen with a back button, never a sheet: a board (two columns, a 2-wide
-    widget across the row), a widget (big, how it updates, history, remove, ask for a change), a new widget (preview on
-    top, text and suggestions, agent, format, schedule, alert, board), share and a new board. The tab bar then holds
-    six tabs with search, and a system bar holds five at most (Android's bottom navigation throws on a sixth, an
-    iPhone's folds the rest into "More"; `BAR_TABS_MAX`). iOS 26 draws search apart from the bar, so it keeps its own
-    button there; on Android and on iOS before 26 search leaves the bar for a header button that pushes the search
-    screen (`/find`), and links to search open that screen (`barTabs`, `searchInBar` in `apps/mobile/src/lib/nav.ts`,
-    `searchHref`).
+15. **On the phone.** Dashboards open from the home screen: at the top of Chats, what Início shows (My Home, or the
+    board chosen for it, §18) heads a strip of its widgets, small and side by side, that scrolls sideways (with none
+    yet, one card asks for a widget), and "See all" at its end pushes the list, `/dashboards`. The tab bar is unchanged (Chats, Threads,
+    Agents, Activity and Search): a sixth tab would push search out of Android's bar, which holds five at most. The
+    list shows "My Home" first, then the same groups. Everything is a pushed screen with a back button, never a sheet:
+    the list, a board (two columns, a 2-wide widget across the row), a widget (big, how it updates, history, remove,
+    ask for a change), a new widget (preview on top, text and suggestions, agent, format, schedule, alert, board),
+    share and a new board.
 16. **Test before creating.** "+ Widget" asks the agent first and creates after: "Test" makes a draft
     (`dashboard_widgets.draft`) that its agent builds at once with real data, through the same refresh run as any
     widget (`update_widget`, a history row, failure reasons, its cost recorded); the card shows it building in place,
@@ -162,6 +161,13 @@ people than asked.
     given on create, a different title on confirm, or Rename). Until it is named the apps show a generic "New widget".
     A `note` longer than one short sentence (140 characters) is a tool error the agent fixes; the apps clamp a note to
     two lines with an ellipsis instead of cutting characters, and text the server keeps is clipped only at a word's end.
+18. **A board on Início.** "Use on Home" in any board's menu shows that board on the person's Início instead of My
+    Home, for them alone (`organization_members.home_dashboard_id`, `PUT …/dashboards/home-choice`); seeing the board
+    is enough, since Início only shows it. The fixed tiles stay (they are My Home's), the board's widgets follow them,
+    and "+" and Organize change that board when the person edits it. The choice has no foreign key: a board deleted or
+    no longer shown to them reads as none, and Início is My Home again. Meanwhile My Home opens as a board page of its
+    own (Dashboards' first card), whose menu brings Início back to it; the chosen board's card says "On Home". Home's
+    head says "See all", which opens Dashboards, on the web and the phone.
 
 ## Consequences
 

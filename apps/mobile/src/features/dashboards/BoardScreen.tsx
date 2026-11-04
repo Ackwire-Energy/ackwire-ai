@@ -117,7 +117,10 @@ function Board({ id }: { id: string }) {
                 {t("dashboards.empty.text")}
               </Text>
               {board.canEdit ? (
-                <Button variant="primary" size="sm" icon="plus" label={t("widgets.add.label")} onPress={add} />
+                // The button sizes to its label and sits at the start on its own: centered under the text.
+                <View style={styles.emptyAction}>
+                  <Button variant="primary" size="sm" icon="plus" label={t("widgets.add.label")} onPress={add} />
+                </View>
               ) : null}
             </View>
           ) : (
@@ -172,4 +175,5 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1.5,
   },
+  emptyAction: { alignSelf: "center", marginTop: 10 },
 });

@@ -26,6 +26,8 @@ export interface DashboardsApi {
   get(orgId: string, dashboardId: string): Promise<Dashboard>;
   /** My home board, made on first use. */
   home(orgId: string): Promise<Dashboard>;
+  /** "Use on Home": Início shows this board instead of my own home (null: my own again). */
+  setHome(orgId: string, dashboardId: string | null): Promise<{ homeDashboardId: string | null }>;
   /** "New dashboard": an empty board (an agent builds one when asked in a chat). */
   create(orgId: string, input: CreateDashboardInput): Promise<Dashboard>;
   /** Title, about, pinned. */
@@ -72,6 +74,11 @@ export function createDashboardsApi(request: Requester): DashboardsApi {
     list: (orgId) => request<DashboardList>(`${org(orgId)}/dashboards`),
     get: (orgId, dashboardId) => request<Dashboard>(board(orgId, dashboardId)),
     home: (orgId) => request<Dashboard>(`${org(orgId)}/dashboards/home`),
+    setHome: (orgId, dashboardId) =>
+      request<{ homeDashboardId: string | null }>(`${org(orgId)}/dashboards/home-choice`, {
+        method: "PUT",
+        json: { homeDashboardId: dashboardId },
+      }),
     create: (orgId, input) => request<Dashboard>(`${org(orgId)}/dashboards`, { json: input }),
     update: (orgId, dashboardId, patch) =>
       request<Dashboard>(board(orgId, dashboardId), { method: "PATCH", json: patch }),

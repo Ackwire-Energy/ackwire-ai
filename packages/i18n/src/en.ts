@@ -13025,6 +13025,8 @@ export const en = {
       manual: "when asked",
     },
     sizes: { label: "Size", s: "S", m: "M", l: "L" },
+    sizeNames: { s: "Small", m: "Medium", l: "Large" },
+    sizeHints: { s: "One square", m: "Two columns", l: "Two columns, two rows" },
     status: {
       building: "{{name}} is building the widget and the routine that will update it…",
       updating: "{{name}} updating…",
@@ -13185,6 +13187,11 @@ export const en = {
     new: "New dashboard",
     back: "Dashboards",
     home: "My Home",
+    seeAll: "See all",
+    useOnHome: "Use on Home",
+    stopOnHome: "Remove from Home",
+    onHome: "On Home",
+    onHomeDone: "Home now shows this dashboard",
     groups: {
       workspace: "Workspace",
       workspaceHint: "everyone sees",

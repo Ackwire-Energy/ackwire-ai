@@ -491,8 +491,12 @@ describe("a board's notices in Waiting on you", () => {
     await settle(3);
     expect(last(state, "dashboards.refreshWidget")).toEqual([ORG_ID, s.builds.id]);
 
-    // The alert opens its widget, on Home (it is on my home board).
-    await click(within(alert).getByRole("button", { name: "Abrir widget" }));
+    // One action at the row's end, as on every other row: Resolve on a failure; on an alert the row itself opens
+    // the widget ("Open widget" at its end), on Home (it is on my home board).
+    expect(within(failed).getAllByRole("button")).toHaveLength(2);
+    expect(within(alert).getAllByRole("button")).toHaveLength(1);
+    expect(alert.querySelector(".home-row__act")?.textContent).toBe("Abrir widget");
+    await click(within(alert).getByRole("button"));
     await settle(4);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/home`);
     expect((router.state.location.search as { widget?: string }).widget).toBe(s.sales.id);

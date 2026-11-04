@@ -1,7 +1,6 @@
 import { openOwnPage } from "@/features/ai/parts";
-import { appLinkFromUrl, searchHref } from "@/features/links/app-links";
+import { appLinkFromUrl } from "@/features/links/app-links";
 import { rememberLink } from "@/features/links/pending";
-import { SEARCH_IN_BAR } from "@/features/shared/tabHeader";
 
 /**
  * Every URL the system opens the app with (a universal link / App Link to the website, or `agenteschat://`), before
@@ -11,8 +10,7 @@ import { SEARCH_IN_BAR } from "@/features/shared/tabHeader";
 export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }): string {
   try {
     const link = appLinkFromUrl(path);
-    // The app's own address: search opens at `/find` where it isn't a tab (`searchHref`).
-    if (!link) return searchHref(path, SEARCH_IN_BAR);
+    if (!link) return path;
     if ("web" in link) {
       openOwnPage(path);
       return initial ? "/" : "";

@@ -394,7 +394,10 @@ export function BlockScreen({ id, version }: { id: string; version?: number }) {
 }
 
 const styles = StyleSheet.create({
+  // As wide as the message, under what comes before it (the files' cards keep the same gap).
   card: {
+    alignSelf: "stretch",
+    marginTop: 8,
     overflow: "hidden",
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 16,

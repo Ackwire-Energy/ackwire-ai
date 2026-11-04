@@ -572,29 +572,34 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
           <GroupedFooter>{t("dashboards.newWidget.noAgents")}</GroupedFooter>
         ) : null}
 
-        <View style={styles.gap} />
-        <GroupedList>
-          <GroupedRow
-            icon="chart"
-            label={t("dashboards.newWidget.destination")}
-            value={where}
-            chevron
-            onPress={() => setPickDest((v) => !v)}
-          />
-          {pickDest
-            ? destinations.map((d) => (
-                <GroupedRow
-                  key={d.id}
-                  label={d.home ? t("dashboards.home") : (d.title ?? "")}
-                  checked={d.id === destination?.id}
-                  onPress={() => {
-                    setDest(d.id);
-                    setPickDest(false);
-                  }}
-                />
-              ))
-            : null}
-        </GroupedList>
+        {/* Only when there is a choice: with My Home alone, nothing to pick. */}
+        {destinations.length > 1 ? (
+          <>
+            <View style={styles.gap} />
+            <GroupedList>
+              <GroupedRow
+                icon="chart"
+                label={t("dashboards.newWidget.destination")}
+                value={where}
+                chevron
+                onPress={() => setPickDest((v) => !v)}
+              />
+              {pickDest
+                ? destinations.map((d) => (
+                    <GroupedRow
+                      key={d.id}
+                      label={d.home ? t("dashboards.home") : (d.title ?? "")}
+                      checked={d.id === destination?.id}
+                      onPress={() => {
+                        setDest(d.id);
+                        setPickDest(false);
+                      }}
+                    />
+                  ))
+                : null}
+            </GroupedList>
+          </>
+        ) : null}
       </ScrollView>
     </View>
   );

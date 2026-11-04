@@ -14105,6 +14105,16 @@
       "m": "M",
       "l": "G"
     },
+    "sizeNames": {
+      "s": "Piccolo",
+      "m": "Medio",
+      "l": "Grande"
+    },
+    "sizeHints": {
+      "s": "Un quadrato",
+      "m": "Due colonne",
+      "l": "Due colonne, due righe"
+    },
     "status": {
       "building": "{{name}} sta creando il widget e la routine che lo aggiornerà…",
       "updating": "{{name}} sta aggiornando…",
@@ -14272,6 +14282,11 @@
     "new": "Nuova dashboard",
     "back": "Dashboard",
     "home": "La mia Home",
+    "seeAll": "Vedi tutti",
+    "useOnHome": "Usa nella Home",
+    "stopOnHome": "Togli dalla Home",
+    "onHome": "Nella Home",
+    "onHomeDone": "La Home ora mostra questa dashboard",
     "groups": {
       "workspace": "Spazio di lavoro",
       "workspaceHint": "la vedono tutti",

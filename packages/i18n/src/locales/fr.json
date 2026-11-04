@@ -14103,6 +14103,16 @@
       "m": "M",
       "l": "G"
     },
+    "sizeNames": {
+      "s": "Petit",
+      "m": "Moyen",
+      "l": "Grand"
+    },
+    "sizeHints": {
+      "s": "Un carré",
+      "m": "Deux colonnes",
+      "l": "Deux colonnes, deux lignes"
+    },
     "status": {
       "building": "{{name}} crée le widget et la routine qui le mettra à jour…",
       "updating": "{{name}} met à jour…",
@@ -14270,6 +14280,11 @@
     "new": "Nouveau tableau de bord",
     "back": "Tableaux de bord",
     "home": "Mon accueil",
+    "seeAll": "Tout voir",
+    "useOnHome": "Afficher sur l'accueil",
+    "stopOnHome": "Retirer de l'accueil",
+    "onHome": "Sur l'accueil",
+    "onHomeDone": "L'accueil affiche maintenant ce tableau de bord",
     "groups": {
       "workspace": "Espace de travail",
       "workspaceHint": "visible par tous",

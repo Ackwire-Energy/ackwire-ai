@@ -34,6 +34,8 @@ export interface FakeDashboards {
   client: ApiClient["dashboards"];
   /** Every board, homes included (`kind: "home"`, `ownerUserId` the person). */
   boards: Dashboard[];
+  /** The board Início shows instead of my own home ("Use on Home"); null = my own. */
+  homeDashboardId: string | null;
   history: Map<string, WidgetUpdate[]>;
   suggestions: Map<string, WidgetSuggestions>;
   pinnable: PinnableBlock[];
@@ -208,6 +210,7 @@ export function createFakeDashboards(
 
   const fake: FakeDashboards = {
     boards: [],
+    homeDashboardId: null,
     drafts: [],
     holdDrafts: false,
     testCostUsd: 0.01,
@@ -249,9 +252,16 @@ export function createFakeDashboards(
         return {
           home: mine ? summary(mine) : null,
           dashboards: fake.boards.filter((x) => x.kind === "board").map(summary),
+          homeDashboardId: fake.boards.some((x) => x.id === fake.homeDashboardId) ? fake.homeDashboardId : null,
         };
       },
-      get: async (_orgId, dashboardId) => clone(board(dashboardId)),
+      setHome: async (orgId, dashboardId) => {
+        log("dashboards.setHome", orgId, dashboardId);
+        fake.homeDashboardId = dashboardId;
+        return { homeDashboardId: dashboardId };
+      },
+      // `home` is My Home's own address on the server (`GET …/dashboards/home`).
+      get: async (_orgId, dashboardId) => clone(dashboardId === "home" ? home() : board(dashboardId)),
       home: async () => clone(home()),
       create: async (orgId, input) => {
         log("dashboards.create", orgId, input);

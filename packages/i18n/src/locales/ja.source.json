@@ -32184,6 +32184,24 @@
   "widgets.sizes.l": {
     "value": "L"
   },
+  "widgets.sizeNames.s": {
+    "value": "Small"
+  },
+  "widgets.sizeNames.m": {
+    "value": "Medium"
+  },
+  "widgets.sizeNames.l": {
+    "value": "Large"
+  },
+  "widgets.sizeHints.s": {
+    "value": "One square"
+  },
+  "widgets.sizeHints.m": {
+    "value": "Two columns"
+  },
+  "widgets.sizeHints.l": {
+    "value": "Two columns, two rows"
+  },
   "widgets.status.building": {
     "value": "{{name}} is building the widget and the routine that will update it…"
   },
@@ -32582,6 +32600,21 @@
   },
   "dashboards.home": {
     "value": "My Home"
+  },
+  "dashboards.seeAll": {
+    "value": "See all"
+  },
+  "dashboards.useOnHome": {
+    "value": "Use on Home"
+  },
+  "dashboards.stopOnHome": {
+    "value": "Remove from Home"
+  },
+  "dashboards.onHome": {
+    "value": "On Home"
+  },
+  "dashboards.onHomeDone": {
+    "value": "Home now shows this dashboard"
   },
   "dashboards.groups.workspace": {
     "value": "Workspace"

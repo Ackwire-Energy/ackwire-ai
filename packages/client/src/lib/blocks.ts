@@ -24,6 +24,12 @@ export interface BlockHost {
   font?: string;
 }
 
+/**
+ * The page is as wide as what shows it. A frame on the web ignores this; the phone's web view needs it, or it lays
+ * the block out 980 points wide and shrinks it to fit the message: tiny text, and rows cut at the edge.
+ */
+export const BLOCK_VIEWPORT = '<meta name="viewport" content="width=device-width,initial-scale=1">';
+
 /** The whole document of a block: the policy first, then the kit, then what the agent wrote. */
 export function blockPage(html: string, host: BlockHost): string {
   const { fontFace, font, ...boot } = host;
@@ -31,7 +37,7 @@ export function blockPage(html: string, host: BlockHost): string {
   const style = `${fontFace ?? ""}${BLOCK_KIT_CSS}${font ? `:root{--font:${font}}` : ""}`;
   return isolatedPage(
     html,
-    `<style>${style}</style><script>${blockBoot(json)}</script><script>${BLOCK_KIT_JS}</script>`,
+    `${BLOCK_VIEWPORT}<style>${style}</style><script>${blockBoot(json)}</script><script>${BLOCK_KIT_JS}</script>`,
   );
 }
 

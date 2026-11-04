@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { DashboardList, DashboardSummary } from "@agenteschat/client";
 import { type OpenTarget, targetPath } from "@agenteschat/client/lib/notifications";
 import { chartAreaTones, chartInk } from "@agenteschat/ui/sky/chart";
@@ -58,7 +60,7 @@ import {
   withAudience,
   withEditors,
 } from "../../src/features/dashboards/logic";
-import { appLinkFromUrl, searchHref } from "../../src/features/links/app-links";
+import { appLinkFromUrl } from "../../src/features/links/app-links";
 import {
   boardHref,
   hrefForPush,
@@ -68,6 +70,7 @@ import {
   widgetHref,
 } from "../../src/features/links/logic";
 import { routineTitle, targetIcon } from "../../src/features/routines/logic";
+import { TAB_GLYPHS } from "../../src/ui/tabGlyphs";
 import { notification } from "./fixtures";
 
 const board = (over: Partial<DashboardSummary> & { id: string }): DashboardSummary => ({
@@ -309,6 +312,7 @@ describe("dashboards on the phone (ADR 0135)", () => {
         board({ id: "ro", title: "Finance", canEdit: false }),
         board({ id: "h", kind: "home", title: "" }),
       ],
+      homeDashboardId: null,
     };
     expect(destinationsOf(list).map((d) => d.id)).toEqual([HOME, "p", "a", "b"]);
     expect(destinationsOf(undefined)).toEqual([{ id: HOME, title: null, home: true }]);
@@ -423,13 +427,28 @@ describe("dashboards on the phone (ADR 0135)", () => {
 
   test("a board's menu offers only what the viewer may do; My Home is only organized", () => {
     const manager = { kind: "board" as const, canEdit: true, canManage: true, audience: "workspace" as const };
-    expect(boardMenuKeys({ ...manager, pinned: false })).toEqual(["organize", "share", "edit", "pin", "delete"]);
+    expect(boardMenuKeys({ ...manager, pinned: false })).toEqual([
+      "home",
+      "organize",
+      "share",
+      "edit",
+      "pin",
+      "delete",
+    ]);
     expect(boardMenuKeys({ ...manager, pinned: true })).toContain("unpin");
     const privateBoard = { ...manager, audience: "private" as const, pinned: false };
-    expect(boardMenuKeys(privateBoard)).toEqual(["organize", "share", "edit", "delete"]);
-    expect(boardMenuKeys({ ...manager, canManage: false, pinned: false })).toEqual(["organize", "edit"]);
-    expect(boardMenuKeys({ ...manager, canEdit: false, canManage: false, pinned: false })).toEqual([]);
-    expect(boardMenuKeys({ ...manager, kind: "home", audience: "private", pinned: false })).toEqual(["organize"]);
+    expect(boardMenuKeys(privateBoard)).toEqual(["home", "organize", "share", "edit", "delete"]);
+    expect(boardMenuKeys({ ...manager, canManage: false, pinned: false })).toEqual(["home", "organize", "edit"]);
+    expect(boardMenuKeys({ ...manager, canEdit: false, canManage: false, pinned: false })).toEqual(["home"]);
+    const home = { ...manager, kind: "home" as const, audience: "private" as const, pinned: false };
+    expect(boardMenuKeys(home, true)).toEqual(["organize"]);
+  });
+
+  test("Use on Home: any board seen; on Início it offers Remove; My Home brings Início back", () => {
+    const viewer = { kind: "board" as const, canEdit: false, canManage: false, audience: "workspace" as const };
+    expect(boardMenuKeys({ ...viewer, pinned: false }, true)).toEqual(["unhome"]);
+    const home = { ...viewer, kind: "home" as const, canEdit: true, audience: "private" as const, pinned: false };
+    expect(boardMenuKeys(home, false)).toEqual(["home", "organize"]);
   });
 
   test("a new widget's size: the one picked, else S for a number or a goal and M otherwise", () => {
@@ -450,7 +469,7 @@ describe("dashboards on the phone (ADR 0135)", () => {
 });
 
 describe("dashboards in links, notifications and routines", () => {
-  test("a board, My Home, a widget, else the Dashboards tab", () => {
+  test("a board, My Home, a widget, else the Dashboards list", () => {
     expect(boardHref("d1")).toBe("/board/d1");
     expect(boardHref(HOME)).toBe("/board/home");
     expect(boardHref(undefined)).toBe("/dashboards");
@@ -496,19 +515,13 @@ describe("dashboards in links, notifications and routines", () => {
     ).toBe("/widget/w1");
   });
 
-  test("search opens at /find where it isn't a tab of the bar, its tab where it is", () => {
-    const web = appLinkFromUrl("https://app.agentes.chat/org/org-1/search");
-    const to = new URLSearchParams((web && "href" in web ? web.href : "").slice("/link?".length)).get("to") ?? "";
-    expect(to).toBe("/search");
-    expect(searchHref(to, false)).toBe("/find");
-    expect(searchHref(to, true)).toBe("/search");
-    expect(searchHref("agenteschat://search", false)).toBe("/find");
-    expect(searchHref("/search?q=sales", false)).toBe("/find?q=sales");
-    expect(searchHref("agenteschat://search", true)).toBe("agenteschat://search");
-    // Anything else as it is.
-    expect(searchHref("/searches", false)).toBe("/searches");
-    expect(searchHref("/chat/c1", false)).toBe("/chat/c1");
-    expect(searchHref("https://app.agentes.chat/search", false)).toBe("https://app.agentes.chat/search");
+  test("Dashboards is a screen pushed from the home, never a tab; the tab bar stays as it was", () => {
+    const app = join(import.meta.dir, "..", "..", "app", "(app)");
+    expect(existsSync(join(app, "dashboards.tsx"))).toBe(true);
+    expect(existsSync(join(app, "(tabs)", "dashboards"))).toBe(false);
+    expect(readFileSync(join(app, "_layout.tsx"), "utf8")).toContain('name="dashboards"');
+    expect(readFileSync(join(app, "(tabs)", "_layout.tsx"), "utf8")).not.toContain("dashboards");
+    expect([...TAB_GLYPHS]).toEqual(["chats", "threads", "agents", "activity", "search"]);
   });
 
   test("an alert or a failure opens its widget; a request to publish, its board", () => {

@@ -13231,6 +13231,16 @@
       "m": "中",
       "l": "大"
     },
+    "sizeNames": {
+      "s": "小",
+      "m": "中",
+      "l": "大"
+    },
+    "sizeHints": {
+      "s": "一格",
+      "m": "两列",
+      "l": "两列两行"
+    },
     "status": {
       "building": "{{name}} 正在创建小组件和负责更新它的例行工作…",
       "updating": "{{name}} 正在更新…",
@@ -13398,6 +13408,11 @@
     "new": "新建仪表盘",
     "back": "仪表盘",
     "home": "我的首页",
+    "seeAll": "查看全部",
+    "useOnHome": "在首页显示",
+    "stopOnHome": "从首页移除",
+    "onHome": "首页显示中",
+    "onHomeDone": "首页现在显示此仪表板",
     "groups": {
       "workspace": "工作区",
       "workspaceHint": "所有人可见",

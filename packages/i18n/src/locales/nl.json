@@ -13691,6 +13691,16 @@
       "m": "M",
       "l": "L"
     },
+    "sizeNames": {
+      "s": "Klein",
+      "m": "Middel",
+      "l": "Groot"
+    },
+    "sizeHints": {
+      "s": "Eén vak",
+      "m": "Twee kolommen",
+      "l": "Twee kolommen, twee rijen"
+    },
     "status": {
       "building": "{{name}} bouwt de widget en de routine die hem bijwerkt…",
       "updating": "{{name}} werkt bij…",
@@ -13858,6 +13868,11 @@
     "new": "Nieuw dashboard",
     "back": "Dashboards",
     "home": "Mijn start",
+    "seeAll": "Alles bekijken",
+    "useOnHome": "Op Start tonen",
+    "stopOnHome": "Van Start halen",
+    "onHome": "Op Start",
+    "onHomeDone": "Start toont nu dit dashboard",
     "groups": {
       "workspace": "Werkruimte",
       "workspaceHint": "iedereen ziet het",

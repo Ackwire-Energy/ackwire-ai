@@ -89,7 +89,6 @@ export const featureKeysEn = {
   },
   tabs: {
     chats: "Chats",
-    dashboards: "Dashboards",
     threads: "Threads",
     agents: "Agents",
     activity: "Activity",
