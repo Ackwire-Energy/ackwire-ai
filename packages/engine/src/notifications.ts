@@ -85,6 +85,17 @@ export const NOTIFICATION_KINDS = [
    * once per wait): `latest.title` the plan's name, `source.label` the agent's.
    */
   "plan_reset_unknown",
+  /**
+   * An agent back from its plan or budget skipped catch-ups that looked handled (ADR 0136): its owner, one row per line
+   * (`count` the conversations they can read), opening the latest skipped note. Inbox only (no category, no push).
+   */
+  "catch_up_closed",
+  /**
+   * The person who asked, when the agent skipped their catch-up crediting someone else (ADR 0136): `latest.reason`
+   * `solved` or `task_canceled`, `latest.title` who, `source.label` the conversation. Inbox only, opening the note
+   * with "Responder mesmo assim".
+   */
+  "catch_up_closed_asker",
   "reaction",
   "machine_connected",
   /** An agent needs a person in its browser (ADR 0040 §6). */
@@ -295,6 +306,8 @@ const MERGING: ReadonlySet<NotificationKind> = new Set([
   // An agent's changes to a skill gather in one row while unread (`notifySkillUpdate` `edited`); its other notices
   // have a key of their own each.
   "skill_update",
+  // An agent's skipped catch-ups of one line gather in one row while unread, counting them.
+  "catch_up_closed",
 ]);
 /** "Menções" in the inbox: what was said to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_reply", "agent_question"];

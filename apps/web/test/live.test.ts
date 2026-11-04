@@ -179,7 +179,7 @@ describe("receipts", () => {
     ]);
   });
 
-  test("a run canceled before it ran didn't reply; one canceled at work did", () => {
+  test("a run canceled before it ran didn't reply; one canceled once started reads canceled", () => {
     let s = seedReceipt({}, person(["ada"]));
     s = step(s, {
       type: "message.routed",
@@ -208,7 +208,55 @@ describe("receipts", () => {
         },
       } as Message);
     expect(receiptView(listed(true).m1).status?.kind).toBe("passed");
-    expect(receiptView(listed(false).m1).status?.kind).toBe("handled");
+    expect(receiptView(listed(false).m1).status).toEqual({ kind: "canceled", agents: ["ada"] });
+    expect(receiptTicks(listed(false).m1)).toBe("checks");
+  });
+
+  test("waiting on its plan or budget reads that wait, never 'waiting for your answer', and a cancel ends it", () => {
+    const routed = step(seedReceipt({}, person(["ada"])), {
+      type: "message.routed",
+      messageId: "m1",
+      seenBy: ["ada"],
+      pickedBy: ["ada"],
+      runs: [{ agentId: "ada", runId: "r" }],
+    });
+    // executor.ts `waitForUsage`: the run parks on the plan's limit.
+    let s = step(routed, {
+      type: "run.finished",
+      threadId: "m1",
+      runId: "r",
+      agentId: "ada",
+      status: "waiting_input",
+      usage: "plan",
+    });
+    expect(receiptView(s.m1).status).toEqual({ kind: "plan", agents: ["ada"] });
+    expect(receiptTicks(s.m1)).toBe("check");
+    // A message sent into it while it waits shows the same wait.
+    s = step(s, { type: "agent.run.steered", messageId: "m2", runId: "r", agentId: "ada", usage: "plan" } as never);
+    expect(receiptView(s.m2).status).toEqual({ kind: "plan", agents: ["ada"] });
+    // "Não rodar": cancel.ts finishes a run nobody executes.
+    s = step(s, { type: "run.finished", threadId: "m1", runId: "r", agentId: "ada", status: "canceled" });
+    expect(receiptView(s.m1).status).toEqual({ kind: "canceled", agents: ["ada"] });
+    expect(receiptView(s.m2).status).toEqual({ kind: "canceled", agents: ["ada"] });
+    // The budget, after a reload.
+    const listed = seedReceipt({}, {
+      ...person(["ada"]),
+      receipts: {
+        seenBy: ["ada"],
+        pickedBy: ["ada"],
+        handled: [{ agentId: "ada", runId: "r", status: "waiting_input", usage: "budget" }],
+      },
+    } as Message);
+    expect(receiptView(listed.m1).status).toEqual({ kind: "budget", agents: ["ada"] });
+    // A question asked is still "waiting for your answer".
+    const asked = step(routed, {
+      type: "run.finished",
+      threadId: "m1",
+      runId: "r",
+      agentId: "ada",
+      status: "waiting_input",
+    });
+    expect(receiptView(asked.m1).status?.kind).toBe("asking");
   });
 
   test("a message sent into a run that then passed didn't get a reply either, live as after a reload", () => {

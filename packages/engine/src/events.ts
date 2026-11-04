@@ -120,7 +120,9 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage: it retries by itself, nobody is asked. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
       error?: string;
       /** Stable code of `error` (`run.budget_exceeded`, `run.provider_error`…) and its params. */
       errorCode?: string;
@@ -280,7 +282,9 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
       /** It ended without answering: on every message the run answers (a steered one too), as `message.handled`. */
       passed?: true;
       error?: string;
@@ -304,7 +308,9 @@ export type ChannelEvent =
       now?: true;
       stop?: boolean;
       /** Into a run waiting for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
+      /** Into a run waiting on its plan's limit or its budget. */
+      usage?: "plan" | "budget";
     }
   /** The run read these messages sent while it worked (they are in its conversation now): "Ada leu". */
   | {
@@ -427,7 +433,9 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
       /** It ended without answering: passed and posted nothing, or canceled before it ran. */
       passed?: true;
     }

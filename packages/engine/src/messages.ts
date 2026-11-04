@@ -39,8 +39,8 @@ import { readableBody, voiceOf } from "./message-preview";
 import { quietNoticeSql } from "./notices";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
-import { inChannelRun, workKeepsThread } from "./run-scope";
-import { computerWaitSql, NO_AI, outageParkedSql, passedSql } from "./runs";
+import { inChannelRun, waitsOnUsage, workKeepsThread } from "./run-scope";
+import { computerWaitSql, NO_AI, outageParkedSql, passedSql, usageWaitSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
 import { WEB_USAGE_PROVIDER } from "./web-tools";
@@ -188,7 +188,9 @@ export interface Receipts {
     /** `waiting_input` parked on a provider outage: it retries by itself. */
     outage?: true;
     /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-    computer?: "queued" | "away";
+    computer?: "queued" | "away" | "line";
+    /** `waiting_input` on its plan's limit or its budget: it answers when that renews. */
+    usage?: "plan" | "budget";
     /** It ended without answering: passed and posted nothing, or canceled before it started. */
     passed?: true;
   }[];
@@ -235,6 +237,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
     error: schema.agentRuns.error,
     outage: outageParkedSql,
     computer: computerWaitSql,
+    usage: usageWaitSql,
     passed: passedSql,
   };
   const [decisions, runs, steeredRuns, answeredRuns] = await Promise.all([
@@ -302,6 +305,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
         ...(r.error === NO_AI ? { reason: NO_AI } : {}),
         ...(r.outage ? { outage: true as const } : {}),
         ...(r.computer ? { computer: r.computer } : {}),
+        ...(r.usage ? { usage: r.usage } : {}),
         ...(r.passed ? { passed: true as const } : {}),
       })),
       // A person's mention always starts, steers or resumes a run, unless that agent can't answer them
@@ -694,7 +698,8 @@ export async function insertMessageWithRuns(
         -- thread, any agent working in that thread (no mention needed to talk to it there). A new
         -- message in the channel joins the agent's run that answers in the channel itself (not one in
         -- a thread's panel, a range thread or a mission), while it is queued or working (one waiting for
-        -- an approval or an answer would hold the new request): two people calling Ada get one Ada.
+        -- an approval or an answer would hold the new request), or while it waits for its computer, its plan or its
+        -- budget (one catch-up per conversation): two people calling Ada get one Ada.
         -- Background runs (a routine's) hold no conversation: a person's message never goes to one.
         -- Nor does a run waiting on an approval: the agent answers in a run of its own meanwhile
         -- (one waiting on a secret or a mission's decision hands it on after the insert: steering.ts).
@@ -719,7 +724,8 @@ export async function insertMessageWithRuns(
                     : sql`(${inChannelRun(sql`r`)} and exists (
                 select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm'))
                 or (r.status in ('queued', 'running') and ${inChannelRun(sql`r`)})
-                or (r.status = 'waiting_input' and r.waiting_machine_id is not null and ${inChannelRun(sql`r`)})`
+                or (r.status = 'waiting_input' and (r.waiting_machine_id is not null or ${waitsOnUsage(sql`r`)})
+                  and ${inChannelRun(sql`r`)})`
                 }))
             or (${threadId}::uuid is not null and r.thread_root_id = ${threadId}::uuid
               and ${audienceSql("ra", sql`${userId}::text`, inChannel)})

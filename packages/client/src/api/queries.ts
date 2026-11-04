@@ -2029,6 +2029,32 @@ function withStatus(p: Person, input: StatusInput): Person {
 const AVAILABILITY_PRESENCE = { auto: "online", away: "away", busy: "busy", out: "out", hidden: "hidden" } as const;
 
 /**
+ * What an agent picks up when its plan or budget is back (ADR 0118). `agent.status` events refetch it (a row joined,
+ * started or ended); while anything waits it also refetches every 30 s, so "Respondendo agora" moves down the line.
+ */
+export const useUsageQueue = (orgId: string, agentId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.usageQueue(orgId, agentId),
+    queryFn: () => api.agents.usageQueue(orgId, agentId),
+    enabled: enabled && orgId.length > 0 && agentId.length > 0,
+    retry: false,
+    refetchInterval: (q) => ((q.state.data?.rows.length ?? 0) + (q.state.data?.hidden ?? 0) > 0 ? 30_000 : false),
+    meta: { quiet: true },
+  });
+};
+
+/** "Don't run any" on an agent's usage queue: the queue and the statuses follow. */
+export function useCancelUsageQueue(orgId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.agents.cancelUsageQueue(orgId, agentId),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.agentStatus(orgId) }),
+  });
+}
+
+/**
  * Each agent's presence and line (ADR 0084). Refetched on `agent.status`, and every 30 s: presence also follows
  * time (busy after 2 minutes on one run, away after 30 idle) and runs elsewhere in the workspace.
  */

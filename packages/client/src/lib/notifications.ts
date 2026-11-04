@@ -243,12 +243,16 @@ export function restrictionOf(n: Pick<AppNotification, "kind" | "latest">) {
 
 /**
  * Whether an item's headline already names the place called `name` ("Theo replied in #general"), so nothing beside
- * it says that again. The headline names its `source.label` for a reply, an agent's answer and a mention in a thread.
+ * it says that again. The headline names its `source.label` for a reply, an agent's answer, a mention in a thread and a
+ * catch-up skipped for the person who asked ("Theo não respondeu em #suporte").
  */
 export const headlineNames = (n: Pick<AppNotification, "kind" | "source">, name: string) =>
   Boolean(name) &&
   n.source.label === name &&
-  (n.kind === "thread_reply" || n.kind === "agent_reply" || (n.kind === "mention" && !!n.source.threadId));
+  (n.kind === "thread_reply" ||
+    n.kind === "agent_reply" ||
+    n.kind === "catch_up_closed_asker" ||
+    (n.kind === "mention" && !!n.source.threadId));
 
 /** Grouped (several replies or comments, several agents' failures of one cause): it expands to show them. */
 export const isExpandable = (n: AppNotification) =>

@@ -61,6 +61,7 @@ import {
 } from "./missions";
 import { can, getMembership, requirePermission } from "./organizations";
 import { closedRefusal } from "./standing";
+import { wakeAgentUsageWaits } from "./usage-pause";
 
 /*
  * "Quem pensa" (ADR 0032 §5): the brain an agent thinks with, its model and
@@ -732,6 +733,16 @@ export async function setAgentBrain(
     ...(audience ? { audienceMode: audience.mode } : {}),
   };
   if (thinks && options.remember !== false) await rememberAgentSetup(deps.db, membership, setupOfAgent(saved));
+  // Another AI, account or model, or extra usage on: what waited on the old one's plan or budget goes on now, in its
+  // line's order.
+  if (
+    changed ||
+    model !== agent.brainModel ||
+    account !== agent.brainAccountId ||
+    fallback !== agent.brainFallback ||
+    (extraUsage && !agent.brainExtraUsage)
+  )
+    await wakeAgentUsageWaits(deps.db, orgId, agentId).catch(() => null);
   // The account's `usedBy` changed with it.
   const fresh =
     account !== agent.brainAccountId ? await brainAccounts(deps.db, userId, orgId, saved, machine) : accounts;

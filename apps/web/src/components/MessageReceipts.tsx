@@ -6,7 +6,6 @@ import {
   receiptTicks,
   receiptView,
   useApi,
-  useModelLabel,
   useReactions,
   useSteerState,
 } from "@agenteschat/client";
@@ -14,7 +13,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
 import { deciderOf } from "@agenteschat/client/lib/routing";
-import { Icon, type IconName, PixelSpinner, Popover, ProviderLogo } from "@agenteschat/ui";
+import { Icon, type IconName, PixelSpinner, Popover } from "@agenteschat/ui";
 import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
@@ -74,14 +73,13 @@ function SteerMark({ steer, name, size }: { steer: SteerState; name: string; siz
  * with "Chamar um agente" for one it only mentioned, ADR 0089): a small muted mark at the end of its first line, or of
  * the time's line under my own turn (`part="check"`), never a line of its own, so it never changes the message's
  * height or the room before the next one. Clicking or focusing it opens a popover with each agent and its status, and
- * who picked them. The mark is the clock, one tick or two (`receiptTicks`). While the author's own plan picks, and
- * when no agent will answer or every one it was for passed (an agent's reaction counts as acting), "Chamar um agente"
- * is in its popover: never a line
- * in the timeline, which read as wrong beside an agent's reaction. A message sent into a task at work wears what
- * became of it there instead of the check ("Ada leu" is Ada's face), the words said to screen readers as they change.
- * Words only for what you can act on (a failure, no AI connected) or what nobody can (the AI provider is down, it
- * retries by itself): then the whole receipt is a line under the message (`part="line"`), so the text still follows
- * the name.
+ * the rule that picked them. The mark is the clock, one tick or two (`receiptTicks`). While the author's own plan
+ * picks, and when no agent will answer or every one it was for passed (an agent's reaction counts as acting), "Chamar
+ * um agente" is in its popover: never a line in the timeline, which read as wrong beside an agent's reaction. A
+ * message sent into a task at work wears what became of it there instead of the check ("Ada leu" is Ada's face), the
+ * words said to screen readers as they change. Words only for what you can act on (a failure, no AI connected) or
+ * what nobody can (the AI provider is down, it retries by itself; the plan or budget has to renew): then the whole
+ * receipt is a line under the message (`part="line"`), so the text still follows the name.
  */
 export function MessageReceipts({ message, part }: { message: Message; part: "check" | "line" }) {
   const { t } = useTranslation();
@@ -91,7 +89,6 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const api = useApi();
   const toast = useToast();
   const connect = useConnectAi();
-  const modelLabel = useModelLabel();
   const steerId = useId();
   const [retrying, setRetrying] = useState(false);
   const receipt = useLive((s) => s.receipts[message.id]);
@@ -116,6 +113,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
     status?.kind === "outage" ||
     status?.kind === "queued" ||
     status?.kind === "away" ||
+    status?.kind === "plan" ||
+    status?.kind === "budget" ||
     status?.kind === "no_ai" ||
     status?.kind === "platform_cap" ||
     (status?.kind === "failed" && actions !== null && message.author.type === "person");
@@ -157,12 +156,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       ? t("receipts.status.referenced")
       : t(`receipts.status.${phase}`);
   };
-  const by = deciderOf(t, view, {
-    meId: me.user.id,
-    agent: name,
-    person: (id) => dir.memberById.get(id)?.name ?? t("channel.unknownPerson"),
-    model: modelLabel,
-  });
+  const by = deciderOf(t, view, { agent: name });
 
   const check = marked && (
     <Popover
@@ -216,11 +210,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       )}
       {by && (
         <div className="who-by ac-iconline">
-          {"logo" in by.mark ? (
-            <ProviderLogo id={by.mark.logo} size="xs" />
-          ) : (
-            <Icon name={RULE_ICON[by.mark.rule]} size={14} />
-          )}
+          <Icon name={RULE_ICON[by.rule]} size={14} />
           <span>{by.text}</span>
         </div>
       )}
@@ -256,7 +246,10 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const words = (
     <div className="ac-receipt">
       {check}
-      {(status?.kind === "outage" || status?.kind === "away") && (
+      {(status?.kind === "outage" ||
+        status?.kind === "away" ||
+        status?.kind === "plan" ||
+        status?.kind === "budget") && (
         <span className="ac-receipt__words">
           <span>{statusText}</span>
         </span>

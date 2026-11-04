@@ -263,6 +263,7 @@ import type {
   ToolDecision,
   TrashedArtifact,
   UndoAllResult,
+  UsageQueue,
   UsageReport,
   WikiFolderAudience,
   WikiGraph,
@@ -562,6 +563,10 @@ export interface ApiClient {
     aiStatus(orgId: string): Promise<AiStatus>;
     /** Each agent's presence and what it says it is doing (ADR 0084). */
     statuses(orgId: string): Promise<AgentStatus[]>;
+    /** What the agent picks up when its plan or budget is back, in order (ADR 0118). */
+    usageQueue(orgId: string, agentId: string): Promise<UsageQueue>;
+    /** "Don't run any": nothing waiting on its plan or budget runs (the agent's owner and admins). */
+    cancelUsageQueue(orgId: string, agentId: string): Promise<{ canceled: number; skipped: number }>;
     /** The team file / agent definitions behind a GitHub link, read by the backend (onboarding import; nothing saved). */
     importFromGithub(
       orgId: string,

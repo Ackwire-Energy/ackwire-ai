@@ -989,7 +989,9 @@ export interface MessageReceipts {
     /** `waiting_input` because its AI provider is down: it retries by itself. */
     outage?: true;
     /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-    computer?: "queued" | "away";
+    computer?: "queued" | "away" | "line";
+    /** `waiting_input` on its plan's limit or its budget: it answers when that renews. */
+    usage?: "plan" | "budget";
     /** It ended without answering: passed and posted nothing, or canceled before it started. */
     passed?: true;
   }[];
@@ -1210,7 +1212,9 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage: it retries by itself, nobody is asked. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
     }
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval }
   /** An agent's forum suggestion card was accepted or dismissed: its `meta.forumSuggestion` now. */
@@ -1297,7 +1301,9 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
       /** It ended without answering: on every message the run answers (a steered one too), as `message.handled`. */
       passed?: true;
       error?: string;
@@ -1389,7 +1395,9 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
       /** It ended without answering: passed and posted nothing, or canceled before it started. */
       passed?: true;
     }
@@ -3887,6 +3895,70 @@ export interface QueueWaiting {
 }
 
 /** `GET …/machines/{machineId}/queue`: a computer's line; `computer.queue` org events say it changed. */
+/** One conversation (or routine, or long work) an agent picks up when its plan or budget is back (ADR 0118). */
+export interface UsageQueueRow {
+  runId: string;
+  kind: "conversation" | "routine" | "work";
+  channelId: string;
+  threadId: string | null;
+  channelKind: string;
+  /** Null for a DM. */
+  channelName: string | null;
+  /** What it answers ("Ver conversa" opens it). */
+  messageId: string;
+  /** Who asked (people's ids): the trigger's author, then whoever joined. */
+  askers: string[];
+  /** When it first paused. */
+  since: string;
+  /** What was posted after it in its conversation. */
+  after: { count: number; names: string[] };
+  state: "queued" | "answering";
+  /** A routine's or a long work's title. */
+  title: string | null;
+  /** The viewer may say not to run it. */
+  mayStop: boolean;
+}
+
+/** What an agent picks up when its plan or budget is back, in order (`GET …/agents/{agentId}/usage-queue`). */
+export interface UsageQueue {
+  agentId: string;
+  reason: "plan" | "budget" | null;
+  plan: string | null;
+  resetsAt: string | null;
+  /** Other agents in the same plan's line. */
+  sharedWith: string[];
+  rows: UsageQueueRow[];
+  /** Waiting in conversations the viewer can't read. */
+  hidden: number;
+  /** "Don't run any": the agent's owner and admins. */
+  mayStopAll: boolean;
+  /** Skipped in the last day as already handled (ADR 0136), newest first. */
+  closed: UsageQueueClosedRow[];
+}
+
+/** Why a catch-up was skipped (`meta.usageWait.closed`), and who may answer it anyway. */
+export interface CatchUpClosed {
+  reason: "solved" | "withdrawn" | "task_canceled" | "mixed";
+  who?: { name: string; userId?: string; agentId?: string };
+  askers: string[];
+  at: string;
+}
+
+export interface UsageQueueClosedRow {
+  runId: string;
+  channelId: string;
+  threadId: string | null;
+  channelKind: string;
+  channelName: string | null;
+  /** The skipped note ("Ver conversa" opens it). */
+  messageId: string;
+  closed: CatchUpClosed;
+  /** Someone asked it to answer anyway. */
+  continuedRunId: string | null;
+  /** The viewer may press "Responder mesmo assim". */
+  mayAnswer: boolean;
+}
+
 export interface ComputerQueue {
   machineId: string;
   name: string;
@@ -5557,6 +5629,10 @@ export type NotificationKind =
   /** A routine's run waits for its agent's plan to reset (once per outage). Opens it in Rotinas. */
   | "routine_waiting_plan"
   | "plan_reset_unknown"
+  /** ADR 0136: an agent back from its plan or budget skipped catch-ups that looked handled (its owner; `count`). */
+  | "catch_up_closed"
+  /** ADR 0136: who asked, when their catch-up was skipped crediting someone else (`latest.title` who, `latest.reason`). */
+  | "catch_up_closed_asker"
   | "reaction"
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
   | "machine_connected"

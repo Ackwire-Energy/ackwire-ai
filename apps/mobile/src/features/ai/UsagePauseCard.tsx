@@ -1,22 +1,34 @@
-import { type Message, useApi } from "@agenteschat/client";
+import { type CatchUpClosed, keys, type Message, useApi } from "@agenteschat/client";
 import { clockAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { mayContinueUsage, usagePauseCardOf, usagePauseText, usageWaitOf } from "@agenteschat/client/lib/usage-pause";
+import {
+  answerAnywayOpen,
+  mayAnswerAnyway,
+  mayContinueUsage,
+  usagePauseCardOf,
+  usagePauseText,
+  usageWaitOf,
+} from "@agenteschat/client/lib/usage-pause";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, Icon, Text, useTheme } from "@/ui";
+import { UsageQueueSheet } from "../queue/UsageQueueSheet";
 import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
+import { useSheetIfAny } from "../shared/SheetHost";
 
 /**
  * "Don't run it" on what waits for a plan's or budget's limit (the web's): cancels the run, so nothing runs when the
- * limit is back. Greyed for anyone but the person behind it, the agent's owner and admins.
+ * limit is back. Words only (a ghost button): put it in `textActs`. Greyed for anyone but the person behind it, the
+ * agent's owner and admins; the agent's status and its queue follow.
  */
-function DontRunButton({ runId, may }: { runId: string | null; may: boolean }) {
+export function DontRunButton({ runId, may, count = 1 }: { runId: string | null; may: boolean; count?: number }) {
   const { t } = useTranslation();
   const api = useApi();
+  const qc = useQueryClient();
   const { orgId } = useOrg();
   const failed = useFailed();
   const [pending, setPending] = useState(false);
@@ -29,38 +41,112 @@ function DontRunButton({ runId, may }: { runId: string | null; may: boolean }) {
       failed(error);
     } finally {
       setPending(false);
+      void qc.invalidateQueries({ queryKey: keys.agentStatus(orgId) });
     }
   };
   return (
-    <>
-      <Button
-        variant="text"
-        size="sm"
-        icon="stop"
-        label={t("usageCard.dontRun")}
-        disabled={pending || !may}
-        onPress={() => void go()}
-      />
-      {!may ? (
-        <Text variant="footnote" tone="faint">
-          {t("usageCard.dontRunForbidden")}
-        </Text>
-      ) : null}
-    </>
+    <Button
+      variant="text"
+      size="sm"
+      label={count > 1 ? t("usageCard.dontRunThese", { count }) : t("usageCard.dontRun")}
+      loading={pending}
+      disabled={!may}
+      onPress={() => void go()}
+    />
   );
 }
 
-/** Under an agent's "I'll answer when the plan resets" (the web's): "Don't run it" while the run still waits. */
+/**
+ * "Responder mesmo assim" on a catch-up skipped as already handled (ADR 0136, the web's): the agent answers now. Anyone
+ * who asked in it, the agent's owner and admins, for a week; anyone else sees it greyed. Words only, like Não rodar.
+ */
+export function AnswerAnywayButton({
+  runId,
+  agentId,
+  closed,
+}: {
+  runId: string;
+  agentId: string | null;
+  closed: CatchUpClosed;
+}) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const qc = useQueryClient();
+  const { orgId, org } = useOrg();
+  const dir = useDirectory();
+  const meId = useMeId();
+  const failed = useFailed();
+  const [pending, setPending] = useState(false);
+  if (!answerAnywayOpen(closed)) return null;
+  const owner = dir.agentById.get(agentId ?? "")?.ownerUserId;
+  const may = mayAnswerAnyway(closed, meId, owner, can(org, "manage_agents"));
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      label={t("usageCard.answerAnyway")}
+      loading={pending}
+      disabled={!may}
+      onPress={() => {
+        setPending(true);
+        api.agents
+          .continueRun(orgId, runId)
+          .catch(failed)
+          .finally(() => {
+            setPending(false);
+            void qc.invalidateQueries({ queryKey: keys.agentStatus(orgId) });
+          });
+      }}
+    />
+  );
+}
+
+/**
+ * Under an agent's "I'll answer when the plan resets" (the web's): "Don't run it" while the run still waits; once the
+ * catch-up was skipped as already handled, "Responder mesmo assim" until someone presses it.
+ */
 export function UsageWaitCancel({ message: m }: { message: Message }) {
+  const { t } = useTranslation();
+  const sheet = useSheetIfAny();
   const { org } = useOrg();
   const dir = useDirectory();
   const meId = useMeId();
   const wait = m.author.type === "agent" ? usageWaitOf(m.meta) : null;
-  if (!wait || wait.canceled || wait.ended) return null;
+  const skipped = wait?.closed && !wait.continuedByUserId ? wait.closed : null;
+  if (!wait || (!skipped && (wait.canceled || wait.ended))) return null;
   const owner = dir.agentById.get(m.author.id ?? "")?.ownerUserId;
+  const admin = can(org, "manage_agents");
+  const mayStop = mayContinueUsage(wait, meId, owner, admin);
+  // Who may press it, under the row, for anyone it is greyed for.
+  const forbidden = skipped
+    ? answerAnywayOpen(skipped) && !mayAnswerAnyway(skipped, meId, owner, admin)
+      ? "usageCard.answerAnywayForbidden"
+      : null
+    : wait.runId && !mayStop
+      ? "usageCard.dontRunForbidden"
+      : null;
   return (
     <View style={styles.acts}>
-      <DontRunButton runId={wait.runId} may={mayContinueUsage(wait, meId, owner, can(org, "manage_agents"))} />
+      <View style={styles.textActs}>
+        {skipped ? (
+          <AnswerAnywayButton runId={wait.runId} agentId={m.author.id ?? null} closed={skipped} />
+        ) : (
+          <DontRunButton runId={wait.runId} may={mayStop} count={wait.count} />
+        )}
+        {m.author.id && sheet ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            label={t("queue.see")}
+            onPress={() => sheet.open(<UsageQueueSheet agentId={m.author.id ?? ""} />)}
+          />
+        ) : null}
+      </View>
+      {forbidden ? (
+        <Text variant="footnote" tone="faint">
+          {t(forbidden)}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -128,7 +214,9 @@ export function UsagePauseCard({ message: m }: { message: Message }) {
             disabled={pending || !may}
             onPress={() => void go()}
           />
-          <DontRunButton runId={card.runId} may={may} />
+          <View style={styles.textActs}>
+            <DontRunButton runId={card.runId} may={may} />
+          </View>
           {!may ? (
             <Text variant="footnote" tone="faint">
               {t("usageCard.forbidden")}
@@ -144,5 +232,7 @@ const styles = StyleSheet.create({
   card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontWeight: "600" },
-  acts: { marginTop: 8, gap: 6, alignItems: "flex-start" },
+  acts: { marginTop: 4, gap: 2, alignItems: "flex-start" },
+  // Words-only actions: the ghost buttons' own side padding hangs outside, so their words line up with the text.
+  textActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginLeft: -14 },
 });

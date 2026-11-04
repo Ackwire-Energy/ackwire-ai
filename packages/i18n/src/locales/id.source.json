@@ -4033,6 +4033,30 @@
       "other": "{{names}} are waiting for the computer"
     }
   },
+  "receipts.plan": {
+    "value": {
+      "one": "{{names}} answers when the plan resets",
+      "other": "{{names}} answer when the plan resets"
+    }
+  },
+  "receipts.budget": {
+    "value": {
+      "one": "{{names}} answers when the budget renews",
+      "other": "{{names}} answer when the budget renews"
+    }
+  },
+  "receipts.line": {
+    "value": {
+      "one": "{{names}} starts when another work ends",
+      "other": "{{names}} start when other works end"
+    }
+  },
+  "receipts.canceled": {
+    "value": {
+      "one": "{{names}} won't answer",
+      "other": "{{names}} won't answer"
+    }
+  },
   "receipts.queuedNext": {
     "value": "{{names}} is in line for the computer · next"
   },
@@ -4062,6 +4086,18 @@
   },
   "receipts.status.away": {
     "value": "Waiting for the computer"
+  },
+  "receipts.status.plan": {
+    "value": "Answers when the plan resets"
+  },
+  "receipts.status.budget": {
+    "value": "Answers when the budget renews"
+  },
+  "receipts.status.line": {
+    "value": "Starts when another work ends"
+  },
+  "receipts.status.canceled": {
+    "value": "Canceled"
   },
   "receipts.status.handled": {
     "value": "Answered"
@@ -4101,18 +4137,6 @@
   },
   "receipts.picking": {
     "value": "Picking who answers"
-  },
-  "receipts.by.jev": {
-    "value": "Picked by Jev"
-  },
-  "receipts.by.model": {
-    "value": "Picked by {{model}}"
-  },
-  "receipts.by.planYours": {
-    "value": "Picked by your {{brand}} plan"
-  },
-  "receipts.by.planOf": {
-    "value": "Picked by {{person}}'s {{brand}} plan"
   },
   "receipts.by.reply": {
     "value": "A reply to {{name}}"
@@ -4651,17 +4675,149 @@
   "usageCard.dontRun": {
     "value": "Don't run it"
   },
+  "usageCard.dontRunThese": {
+    "value": "Don't run these {{count}}"
+  },
   "usageCard.dontRunHint": {
     "value": "Cancel it: nothing runs when the limit is back"
   },
   "usageCard.dontRunForbidden": {
     "value": "Only who asked, the agent's owner or an admin can cancel it"
   },
+  "usageCard.answerAnyway": {
+    "value": "Answer anyway"
+  },
+  "usageCard.answerAnywayHint": {
+    "value": "Answers now, reading everything posted since"
+  },
+  "usageCard.answerAnywayForbidden": {
+    "value": "Only who asked, the agent's owner or an admin can ask for this"
+  },
   "usageCard.extraTitle": {
     "value": "Long work may use paid extra usage"
   },
   "usageCard.extraHint": {
     "value": "With extra usage on in the plan, long work goes on past 95%. Off, it pauses at 95% and picks up when the plan resets."
+  },
+  "usageQueue.title": {
+    "value": {
+      "one": "{{agent}} has {{count}} conversation to pick up",
+      "other": "{{agent}} has {{count}} conversations to pick up"
+    }
+  },
+  "usageQueue.line": {
+    "value": "Picks up {{when}}, when the {{plan}} plan resets. One at a time, in this order."
+  },
+  "usageQueue.lineUnknown": {
+    "value": "Picks up as soon as the {{plan}} plan resets. One at a time, in this order."
+  },
+  "usageQueue.lineBudget": {
+    "value": "Picks up {{when}}, when the budget renews, or sooner if an admin raises it. One at a time, in this order."
+  },
+  "usageQueue.shared": {
+    "value": "The line belongs to the plan: {{agents}} share the same account."
+  },
+  "usageQueue.dm": {
+    "value": "DM with {{name}}"
+  },
+  "usageQueue.yourDm": {
+    "value": "Your DM"
+  },
+  "usageQueue.thread": {
+    "value": "Thread in #{{channel}}"
+  },
+  "usageQueue.routine": {
+    "value": "Routine {{name}}"
+  },
+  "usageQueue.work": {
+    "value": "Work: {{name}}"
+  },
+  "usageQueue.askedBy": {
+    "value": "Asked by {{names}} · {{ago}}"
+  },
+  "usageQueue.paused": {
+    "value": "Paused {{ago}}"
+  },
+  "usageQueue.after": {
+    "value": {
+      "one": "{{count}} message since",
+      "other": "{{count}} messages since"
+    }
+  },
+  "usageQueue.nothingAfter": {
+    "value": "Nothing since"
+  },
+  "usageQueue.wrote": {
+    "value": {
+      "one": "{{names}} wrote since",
+      "other": "{{names}} wrote since"
+    }
+  },
+  "usageQueue.queued": {
+    "value": "In line"
+  },
+  "usageQueue.answering": {
+    "value": "Answering now"
+  },
+  "usageQueue.hidden": {
+    "value": {
+      "one": "+{{count}} in conversations you can't see",
+      "other": "+{{count}} in conversations you can't see"
+    }
+  },
+  "usageQueue.dontRunAll": {
+    "value": "Don't run any"
+  },
+  "usageQueue.confirmAll": {
+    "value": {
+      "one": "Don't run {{count}} conversation?",
+      "other": "Don't run these {{count}} conversations?"
+    }
+  },
+  "usageQueue.yesDontRun": {
+    "value": "Yes, don't run"
+  },
+  "usageQueue.keep": {
+    "value": "Keep"
+  },
+  "usageQueue.canceledAll": {
+    "value": {
+      "one": "{{count}} conversation canceled. {{agent}} won't answer it when the limit is back.",
+      "other": "{{count}} conversations canceled. {{agent}} won't answer them when the limit is back."
+    }
+  },
+  "usageQueue.empty": {
+    "value": "Nothing waiting to pick up."
+  },
+  "usageQueue.waiting": {
+    "value": {
+      "one": "{{count}} conversation waiting",
+      "other": "{{count}} conversations waiting"
+    }
+  },
+  "usageQueue.closedTitle": {
+    "value": {
+      "one": "{{count}} didn't need an answer",
+      "other": "{{count}} didn't need an answer"
+    }
+  },
+  "usageQueue.closedWhy": {
+    "value": "They looked handled, so {{agent}} didn't answer."
+  },
+  "usageQueue.closedLine": {
+    "value": "They looked handled, so {{agent}} didn't answer. If one still needs an answer, choose Answer anyway."
+  },
+  "usageQueue.seeConversation": {
+    "value": "See conversation"
+  },
+  "usageQueue.answeredAnyway": {
+    "value": "Someone asked for an answer anyway"
+  },
+  "usageQueue.toResume": {
+    "value": "To pick up"
+  },
+  "usageQueue.switchAi": {
+    "value": "Change {{name}}'s AI"
   },
   "actionCard.connect_ai.title": {
     "value": "Connect an AI for {{agents}}"
@@ -6824,6 +6980,24 @@
   },
   "notifications.what.planResetUnknown": {
     "value": "{{plan}} didn't say when its limit resets. <b>{{name}}</b>'s work is still waiting."
+  },
+  "notifications.what.catchUpClosed": {
+    "value": {
+      "one": "<b>{{name}}</b> is back and skipped {{count}} conversation that didn't need an answer",
+      "other": "<b>{{name}}</b> is back and skipped {{count}} conversations that didn't need an answer"
+    }
+  },
+  "notifications.what.catchUpClosedAsker": {
+    "value": "<b>{{name}}</b> didn't answer in {{label}}: {{who}} already took care of it"
+  },
+  "notifications.what.catchUpClosedAskerAny": {
+    "value": "<b>{{name}}</b> didn't answer: {{who}} already took care of it"
+  },
+  "notifications.what.catchUpClosedAskerTask": {
+    "value": "<b>{{name}}</b> didn't answer in {{label}}: {{who}} canceled the task"
+  },
+  "notifications.what.catchUpClosedAskerTaskAny": {
+    "value": "<b>{{name}}</b> didn't answer: {{who}} canceled the task"
   },
   "notifications.what.machineConnected": {
     "value": "<b>{{name}}</b> connected the computer <b>{{label}}</b>"
@@ -29164,6 +29338,24 @@
   },
   "chat.body.usage_wait_canceled": {
     "value": "Canceled. It won't run when the limit is back."
+  },
+  "chat.body.usage_wait_archived": {
+    "value": "It won't run: the agent was archived."
+  },
+  "chat.body.usage_wait_closed_solved": {
+    "value": "I didn't answer: {{name}} already took care of it."
+  },
+  "chat.body.usage_wait_closed_withdrawn": {
+    "value": "I didn't answer: {{name}} said it's no longer needed."
+  },
+  "chat.body.usage_wait_closed_task_canceled": {
+    "value": "I didn't answer: {{name}} canceled the task."
+  },
+  "chat.body.usage_wait_closed_mixed": {
+    "value": "I didn't answer: what was asked here was already handled."
+  },
+  "chat.body.usage_wait_anyway": {
+    "value": "{{name}} asked me to answer anyway."
   },
   "chat.body.usage_paused": {
     "value": "{{agent}} paused this work · {{plan}} plan at {{percent}}% {{window}}"

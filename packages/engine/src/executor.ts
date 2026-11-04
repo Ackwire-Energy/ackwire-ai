@@ -94,6 +94,24 @@ import {
   unregisterTurnAbort,
 } from "./cancel";
 import { describeCapabilities, forComputerBrain } from "./capabilities";
+import { CATCH_UP_AFTER_MS, catchUpText, isCatchUp } from "./catch-up";
+import {
+  askCatchUp,
+  BUSY_RETRIES,
+  BUSY_RETRY_MS,
+  CATCH_UP_CLOSE_AT,
+  catchUpBar,
+  catchUpDecision,
+  closedNoteOf,
+  otherAgentAnswering,
+  overruledHere,
+  type TriageRecord,
+  type TriageVerdict,
+  triageBrief,
+  triageGate,
+  triageRecordOf,
+  triageSnapshot,
+} from "./catch-up-triage";
 import { REACT_TOOL } from "./chat-tools";
 import { kickRoomQueue, publishQueueChanged, roomGate, roomHead } from "./computer-queue";
 import { announceConsultationChange, answersOpen, onConsultedRunFinished } from "./consultations";
@@ -157,7 +175,12 @@ import { MEDIA_TOOLS } from "./media";
 import { getMessage, insertMessage, type Message, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./missions-engine";
 import { postNoAiCard } from "./no-ai";
-import { notifyPlanResetUnknown, resolveRunFailed } from "./notification-producers";
+import {
+  notifyCatchUpClosed,
+  notifyCatchUpClosedAsker,
+  notifyPlanResetUnknown,
+  resolveRunFailed,
+} from "./notification-producers";
 import { openRequestNudge, openRequestsOf, WITHDRAW_REQUEST_TOOL } from "./open-requests";
 import { enqueue, PermanentJobError } from "./outbox";
 import { type OutsideMemo, personWords, runReadOutside } from "./outside";
@@ -248,22 +271,29 @@ import {
   budgetUsedPercent,
   continuesPastPlan,
   isLongWork,
+  joinUsageNote,
+  LINE_SAFETY_MS,
   ladderDelay,
+  lineHeadLooks,
   nextMonthStart,
   overrideHolds,
   type PlanReadingRef,
   planName,
   RESUME_AFTER_MS,
   RESUME_GAP_MS,
+  retimeLine,
   routineRunByHand,
   UNKNOWN_RESET_NOTICE_MS,
   USAGE_WAIT_CODES,
   USAGE_WINDOW_WORDS,
   usageCardResumed,
+  usageNoteHandOn,
   usageNoticeText,
+  usageWaitClosed,
   usageWaitKey,
   usageWaitNoteEnded,
   usageWaitPlace,
+  wakeNextInLine,
   wakePlanWaits,
 } from "./usage-pause";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
@@ -507,6 +537,8 @@ export interface Transcript {
     source?: "plan" | "budget";
     /** When the limit resets, when known (Rotinas says "Pausada até…"; `until` is later by the stagger). */
     resetsAt?: string;
+    /** A usage wait's: when its conversation first paused (`usageWait.since`), its place in line (`usageWaitPlace`). */
+    since?: number;
     /** A usage wait's plan in words ("Claude", "ChatGPT"): Rotinas says what it waits for. */
     plan?: string;
     /** A plan wait's model (null: the brain's default): a turn through on another model doesn't wake it. */
@@ -545,6 +577,10 @@ export interface Transcript {
   roomAsked?: boolean;
   /** When this run last sent a turn to its computer: agents' turns there are spaced (`roomGate`). */
   roomAsk?: { machineId: string; at: number };
+  /** Caught up after a long wait on its plan or budget (`catch-up.ts`): since when it paused; whether it may pass. */
+  catchUp?: { since: number; mayPass?: true };
+  /** The check before that catch-up (`catch-up-triage.ts`): its last verdict, reused while nothing new came in. */
+  catchUpTriage?: TriageRecord;
   /** Time spent working before this claim (ms), without its waits: the long-work safety net counts it (ADR 0121). */
   activeMs?: number;
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
@@ -849,10 +885,50 @@ async function executeRunInner(
         cut: sql<string | null>`${agentRuns.transcript}->'interruptedTurn'->>'cause'`,
         orgId: agentRuns.orgId,
         machineId: agentRuns.waitingMachineId,
+        agentId: agentRuns.agentId,
+        channelId: agentRuns.channelId,
+        threadRootId: agentRuns.threadRootId,
+        triggerMessageId: agentRuns.triggerMessageId,
+        workId: agentRuns.workId,
+        since: sql<
+          string | null
+        >`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'since', ${agentRuns.transcript}->'usageWait'->>'since')`,
+        busyRetries: sql<number | null>`(${agentRuns.transcript}->'catchUpTriage'->>'busyRetries')::int`,
       })
       .from(agentRuns)
       .where(eq(agentRuns.id, runId));
     if (row?.status !== "waiting_input" || row.waitId !== options.wait) return;
+    // A catch-up about to be checked while another agent still answers in its conversation: it waits for that answer
+    // (60 s at a time, `BUSY_RETRIES` times), so the check reads it whole instead of half of it. Its place holds.
+    const busyTries = row.busyRetries ?? 0;
+    if (
+      (row.code === "plan_limit" || row.code === "budget") &&
+      !row.background &&
+      !row.workId &&
+      !row.cut &&
+      deps.context?.judge &&
+      deps.context.judge.name !== "llm" &&
+      Date.now() - Number(row.since ?? Date.now()) >= CATCH_UP_AFTER_MS &&
+      busyTries < BUSY_RETRIES &&
+      (await otherAgentAnswering(db, row).catch(() => false))
+    ) {
+      await db
+        .update(agentRuns)
+        .set({
+          transcript: sql`jsonb_set(${agentRuns.transcript}, '{catchUpTriage}', coalesce(${agentRuns.transcript}->'catchUpTriage', '{"calls":0}'::jsonb)
+            || jsonb_build_object('busyRetries', ${busyTries + 1}::int, 'outcome', 'skipped_busy', 'at', ${Date.now()}::bigint))`,
+        })
+        .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, "waiting_input")));
+      await enqueue(db, {
+        orgId: row.orgId,
+        kind: "agent_run.execute",
+        payload: { runId, wait: options.wait },
+        dedupeKey: `agent_run.execute:${runId}:busy:${options.wait}:${busyTries + 1}`,
+        runAt: new Date(Date.now() + BUSY_RETRY_MS),
+        maxAttempts: 4,
+      });
+      return;
+    }
     // A routine's slot that waited on usage for more than 12 hours doesn't run late: it is missed. One the plan
     // cut mid-work finishes what it started (only the next slot replaces it).
     if (row.background && USAGE_WAIT_CODES.has(row.code ?? "") && row.cut !== "plan_limit") {
@@ -888,6 +964,12 @@ async function executeRunInner(
   let backFromWait = false;
   /** What it waited on, when it comes back from a wait for its computer, plan or budget. */
   let waitedOn: string | undefined;
+  /** And since when, and on which plan in words, for its catch-up (`catch-up.ts`). */
+  let waitedSince: number | undefined;
+  let waitedPlan: string | undefined;
+  /** And the line it waited in (`usageWaitKey`), on which model. */
+  let waitedKey: string | undefined;
+  let waitedModel: string | null | undefined;
   const started = await transitionRun(db, runId, "queued", "running");
   if (started) {
     run = started;
@@ -920,6 +1002,10 @@ async function executeRunInner(
       run = resumed;
       backFromWait = true;
       waitedOn = stored?.waitingForBrain?.code;
+      waitedSince = stored?.usageWait?.since;
+      waitedPlan = stored?.waitingForBrain?.plan;
+      waitedKey = stored?.waitingForBrain?.waitKey;
+      waitedModel = stored?.waitingForBrain?.model;
       // This job runs the run from now on, not its wait: handed back at a shutdown or retried, it goes on with the
       // run instead of finding it no longer waiting and doing nothing.
       if (options.wait && options.jobId) {
@@ -1003,8 +1089,10 @@ async function executeRunInner(
     status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled",
     error?: string,
     outage?: true,
-    computer?: "queued" | "away",
+    computer?: "queued" | "away" | "line",
     passed?: true,
+    /** `waiting_input` on its plan's limit or its budget: the apps say it answers when that renews. */
+    usage?: "plan" | "budget",
   ) => {
     for (const id of withReceipts.splice(0)) {
       await publishMessageActions({ db, pubsub: deps.pubsub }, run.orgId, id).catch(() => {});
@@ -1026,6 +1114,7 @@ async function executeRunInner(
       ...(outage ? { outage } : {}),
       ...(computer ? { computer } : {}),
       ...(passed ? { passed } : {}),
+      ...(usage ? { usage } : {}),
     });
     // Long work (ADR 0121): a wait pauses its promise (the card that stopped it is the update); an end goes home.
     if (run.workId) {
@@ -1040,6 +1129,13 @@ async function executeRunInner(
     }
     // Its line ends with the run (checked on read); the apps refresh now (ADR 0084 §11).
     await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
+    // Back from its plan or budget and over: the turns its note took in still wait, so the note speaks on for them.
+    if (waitedOn && USAGE_WAIT_CODES.has(waitedOn) && status !== "waiting_input" && status !== "waiting_approval") {
+      await usageNoteHandOn(deps, run).catch(() => {});
+      // It may have headed its line with no reset known and left without a turn through (failed, ended early, moved
+      // to another sign-in): the next one re-checks the plan now instead of sleeping on its safety timer.
+      if (waitedKey) await lineHeadLooks(db, run.orgId, waitedKey).catch(() => {});
+    }
     // It left its computer's "working now" (still in line, `brainUnavailable` already said so).
     if (transcript?.roomAsk && computer !== "queued")
       await publishQueueChanged(deps.pubsub, run.orgId, transcript.roomAsk.machineId);
@@ -1054,6 +1150,7 @@ async function executeRunInner(
       ...(outage ? { outage } : {}),
       ...(computer ? { computer } : {}),
       ...(passed ? { passed } : {}),
+      ...(usage ? { usage } : {}),
     });
     deps.onTiming?.("run_ms", Date.now() - claimedAt, { runId: run.id, status });
     // A forum turn ended: announce the post and move the topic on (ADR 0022). A question to people
@@ -1095,7 +1192,13 @@ async function executeRunInner(
     );
   };
 
-  const event = (status: RunStatus, error?: string, outage?: true, computer?: "queued" | "away"): ChannelEvent => ({
+  const event = (
+    status: RunStatus,
+    error?: string,
+    outage?: true,
+    computer?: "queued" | "away" | "line",
+    usage?: "plan" | "budget",
+  ): ChannelEvent => ({
     type: "agent.run",
     channelId: run.channelId,
     threadId: replyThreadId,
@@ -1105,6 +1208,7 @@ async function executeRunInner(
     ...bg,
     ...(outage ? { outage } : {}),
     ...(computer ? { computer } : {}),
+    ...(usage ? { usage } : {}),
     ...(error ? { error, ...runErrorDetail(error) } : {}),
   });
   /** Writes that don't need to finish before the model call (steps, usage log); flushed after it. */
@@ -1371,10 +1475,139 @@ async function executeRunInner(
   // Woken by a routine's report (ADR 0053 §7): its message carries the routine, and the routine run links to it.
   const report = routineReportTagOf(triggerMessage);
   // Who must answer (reply-policy.ts): a run nobody called by name may pass; a background run never posts.
+  /** Back from a wait on its plan or budget long enough to catch up (`catch-up.ts`): since when it paused. */
+  const catchUpSince = isCatchUp(run, waitedOn, waitedSince) ? waitedSince : undefined;
+  const atClaim = run.transcript as unknown as Transcript | null;
+  /** Catching up before it did anything: what it was asked may have been handled meanwhile, so it may pass. A run
+   * cut mid-work still reads what it missed, but owes what it started. */
+  const catchUpMayPass = catchUpSince !== undefined && !atClaim?.executedCalls && !atClaim?.interruptedTurn;
   const policy = replyPolicyFor(run, triggerMessage, {
     followUp: await routedAsFollowUp(db, run).catch(() => false),
-    answerOwed: Boolean((run.transcript as unknown as Transcript | null)?.answerOwed),
+    answerOwed: Boolean(atClaim?.answerOwed),
+    catchUp: catchUpMayPass,
   });
+
+  // Before a catch-up, one Jev call per asker: is what they asked still open (`catch-up-triage.ts`)? It ends here,
+  // quietly, only when every ask was closed by a source code checks; in any doubt the agent runs, told what was found.
+  /** What the check found, for the agent's catch-up block. */
+  let catchUpBrief = atClaim?.catchUpTriage?.brief;
+  if (catchUpSince !== undefined && catchUpMayPass && triggerMessage && judge) {
+    const snapshot = await triageSnapshot(db, run, triggerMessage, agent.name, catchUpSince).catch(() => null);
+    const prior = atClaim?.catchUpTriage;
+    const gate = snapshot
+      ? triageGate({
+          snapshot,
+          prior,
+          owed: Boolean(atClaim?.answerOwed),
+          mission: await inMission(db, run).catch(() => false),
+          overruled: await overruledHere(db, run).catch(() => true),
+          noJev: judge.name === "llm",
+        })
+      : ({ skip: "skipped_rule" } as const);
+    const at = Date.now();
+    const base = { calls: prior?.calls ?? 0, ...(prior?.busyRetries ? { busyRetries: prior.busyRetries } : {}) };
+    let record: TriageRecord | null = null;
+    let verdict: TriageVerdict | null = null;
+    if (gate && "skip" in gate) {
+      record = { at, outcome: gate.skip, ...base };
+      catchUpBrief = snapshot ? triageBrief(snapshot, null) || undefined : undefined;
+    } else if (!gate && snapshot) {
+      const bar = await catchUpBar(db, run.orgId).catch(() => CATCH_UP_CLOSE_AT);
+      const facts = { at, bar, judge: judge.name, calls: base.calls + 1, seenThrough: snapshot.latest };
+      try {
+        const answers = await askCatchUp(judge, snapshot, { orgId: run.orgId, agentId: agent.id, runId: run.id });
+        verdict = catchUpDecision(answers, snapshot, bar);
+        catchUpBrief = triageBrief(snapshot, verdict) || undefined;
+        record = triageRecordOf(verdict, { ...facts, ...base, calls: facts.calls }, catchUpBrief ?? "");
+      } catch {
+        catchUpBrief = triageBrief(snapshot, null) || undefined;
+        record = { ...base, ...facts, outcome: "judge_error" };
+      }
+    }
+    if (record && verdict?.outcome === "closed" && snapshot) {
+      const pending = run.pendingMessageIds;
+      // Compare-and-set: a message that joined while Jev answered makes it run instead.
+      const done = await db.transaction(async (tx) => {
+        const [cleared] = await tx
+          .update(agentRuns)
+          .set({ pendingMessageIds: [] })
+          .where(
+            and(
+              eq(agentRuns.id, run.id),
+              eq(agentRuns.status, "running"),
+              sql`${agentRuns.pendingMessageIds} = ${`{${pending.join(",")}}`}::uuid[]`,
+            ),
+          )
+          .returning({ id: agentRuns.id });
+        if (!cleared) return null;
+        return transitionRun(tx, run.id, "running", "done", {
+          error: null,
+          transcript: sql`jsonb_set(coalesce(${agentRuns.transcript}, '{}'::jsonb), '{catchUpTriage}', ${JSON.stringify(record)}::jsonb)`,
+        });
+      });
+      if (done) {
+        turnEnd = { outcome: "done", rule: "catch_up_closed" };
+        const { brief: _, ...step } = record;
+        await addRunStep(db, run, "context", {
+          continuation: { outcome: "done", rule: "catch_up_closed" },
+          catchUpTriage: step,
+        }).catch(() => {});
+        withReceipts.push(...pending);
+        await publishChannelEvent(deps.pubsub, { type: "agent.passed", ...where });
+        await publishChannelEvent(deps.pubsub, event("done"));
+        await finished("done", undefined, undefined, undefined, true);
+        // After `finished`: a note that also speaks for other waiting turns was handed on to them and keeps its promise.
+        const closed = closedNoteOf(snapshot, verdict);
+        const note = await usageWaitClosed(deps, run, closed as unknown as Record<string, unknown>).catch(() => null);
+        if (note) {
+          const nd = { db, pubsub: deps.pubsub };
+          const at = { channelId: run.channelId, threadId: note.threadId, messageId: note.id };
+          if (waitedKey)
+            await notifyCatchUpClosed(nd, {
+              orgId: run.orgId,
+              agentId: agent.id,
+              agentName: agent.name,
+              waitKey: waitedKey,
+              askers: closed.askers,
+              ...at,
+            }).catch(() => {});
+          // Who asked hears it when someone else was credited: a wrong skip reaches who would miss the answer.
+          const label = channelRow && channelRow.kind !== "dm" && channelRow.name ? `#${channelRow.name}` : null;
+          for (const a of verdict.askers) {
+            const who = snapshot.participants.find((p) => p.key === a.who);
+            if (!who || (who.kind === "person" && who.id === a.userId)) continue;
+            if (a.reason !== "solved" && a.reason !== "task_canceled") continue;
+            await notifyCatchUpClosedAsker(nd, {
+              orgId: run.orgId,
+              userId: a.userId,
+              agentId: agent.id,
+              runId: run.id,
+              reason: a.reason,
+              who: who.name,
+              label,
+              ...at,
+            }).catch(() => {});
+          }
+        }
+        if (waitedKey) await wakeNextInLine(db, run.orgId, waitedKey, waitedModel).catch(() => null);
+        return;
+      }
+      record = { ...record, outcome: "unsure" };
+      catchUpBrief = triageBrief(snapshot, null) || undefined;
+    }
+    if (record) {
+      const { brief: _, ...step } = record;
+      await addRunStep(db, run, "context", { catchUpTriage: step }).catch(() => {});
+      if (transcript) transcript.catchUpTriage = record;
+      await db
+        .update(agentRuns)
+        .set({
+          transcript: sql`jsonb_set(coalesce(${agentRuns.transcript}, '{}'::jsonb), '{catchUpTriage}', ${JSON.stringify(record)}::jsonb)`,
+        })
+        .where(eq(agentRuns.id, run.id))
+        .catch(() => {});
+    }
+  }
   /** Whether this run read outside content (`runReadOutside`): sticky once true. */
   let readOutside = false;
   const outsideMemo: OutsideMemo = {};
@@ -2175,6 +2408,24 @@ async function executeRunInner(
       if (plan.kind !== "model") nextPrompt = [nextPrompt ?? triggerText, meanwhile].join("\n\n");
     }
   }
+  // Back after a long wait on its plan or budget: it reads how long it was away and everything posted here since, and
+  // answers once for what is still open. Its transcript takes it once; a computer brain reads it fresh at every claim.
+  if (catchUpSince !== undefined && triggerMessage) {
+    const why = waitedOn === "budget" ? ("budget" as const) : ("plan" as const);
+    const text = await catchUpText(db, run, triggerMessage, {
+      since: catchUpSince,
+      why,
+      ...(waitedPlan ? { plan: waitedPlan } : {}),
+      mayPass: policy.mayPass,
+      ...(catchUpBrief ? { brief: catchUpBrief } : {}),
+    }).catch(() => null);
+    if (text) {
+      if (!transcript.catchUp) appendUserText(transcript, text);
+      if (plan.kind !== "model") nextPrompt = [nextPrompt ?? triggerText, text].join("\n\n");
+      transcript.catchUp = { since: catchUpSince, ...(catchUpMayPass ? { mayPass: true as const } : {}) };
+      await saveTranscript(db, transcript);
+    }
+  }
 
   /**
    * A forum's turn or synthesis belongs to the topic's order (ADR 0022): at the cap it fails, so the topic stalls
@@ -2751,16 +3002,24 @@ async function executeRunInner(
     const paused = u.code === "usage_pause";
     const machineId = plan.session?.machineId ?? agent.machineId ?? "";
     const wait = t.usageWait ?? { since: now, step: 0 };
+    const key = budget
+      ? usageWaitKey({ code: "budget", agentId: agent.id })
+      : usageWaitKey({ code: "plan_limit", machineId, kind: plan.kind, accountId: plan.account?.id });
+    // Its place in line: by when its conversation first paused, so parking again never moves it back.
+    const line = await usageWaitPlace(db, run, key, wait.since, budget ? null : (plan.model ?? ""));
     let at = budget ? (u.soon ? Number.NaN : nextMonthStart(now)) : u.resetsAt ? Date.parse(u.resetsAt) : Number.NaN;
     if (!budget && !(at > now) && machineId) {
       const stored = await storedPlanUsage(db, run.orgId, machineId, plan.kind, plan.account?.id).catch(() => null);
       at = bindingReset(stored, now) ?? Number.NaN;
     }
     const known = at > now;
-    if (!known) {
+    // An unknown reset: only the head of the line asks the plan again (one re-check an hour per plan, not one per
+    // conversation). The others sleep on a safety timer and go on when the head gets through (`wakePlanWaits`).
+    const head = line.head || u.soon === true;
+    if (!known && head) {
       at = now + ladderDelay(wait.step);
       wait.step++;
-    }
+    } else if (!known) at = now + LINE_SAFETY_MS;
     const resetsAt = known ? new Date(at).toISOString() : undefined;
     // Thinking through the API only because its computer brain couldn't: that brain may be back (its plan reset)
     // long before the budget renews, and a resume picks it again. The note still says when the budget renews.
@@ -2768,10 +3027,7 @@ async function executeRunInner(
       const brainBack = Date.parse(t.fallback.resetsAt ?? "");
       at = Math.min(at, brainBack > now ? brainBack : now + ladderDelay(wait.step++));
     }
-    const key = budget
-      ? usageWaitKey({ code: "budget", agentId: agent.id })
-      : usageWaitKey({ code: "plan_limit", machineId, kind: plan.kind, accountId: plan.account?.id });
-    const runAt = new Date(at + RESUME_AFTER_MS + RESUME_GAP_MS * (await usageWaitPlace(db, run, key)));
+    const runAt = new Date(at + RESUME_AFTER_MS + RESUME_GAP_MS * line.place);
     const tellOwner = !budget && !paused && !known && !wait.noticed && now - wait.since >= UNKNOWN_RESET_NOTICE_MS;
     if (tellOwner) wait.noticed = true;
     t.usageWait = wait;
@@ -2781,6 +3037,7 @@ async function executeRunInner(
     const firstPark = t.brainNotice !== u.code;
     const say = !(run.background || viaRoutine !== null || u.soon) && firstPark;
     const waitId = Bun.randomUUIDv7();
+    let joined = null as Message | null;
     const note = say
       ? await db.transaction(async (tx) => {
           if (u.pause) {
@@ -2788,6 +3045,13 @@ async function executeRunInner(
             t.usagePause = { ...t.usagePause, cardId: card.id };
             t.postedCount++;
             return card;
+          }
+          const forUserId = await personOfMessage(tx, run.orgId, run.triggerMessageId).catch(() => null);
+          // Its conversation already heard it waits on this limit: one note speaks for every turn waiting there.
+          const join = cut ? null : await joinUsageNote(tx, run, replyThreadId, forUserId, u.code, resetsAt, now);
+          if (join) {
+            joined = join.note;
+            return null;
           }
           const [code, text] = budget
             ? [
@@ -2803,7 +3067,6 @@ async function executeRunInner(
                   known ? "plan_limit_wait" : "plan_limit_wait_unknown",
                   `The ${name} plan hit its limit. I'll answer ${known ? "when" : "as soon as"} it resets.`,
                 ];
-          const forUserId = await personOfMessage(tx, run.orgId, run.triggerMessageId).catch(() => null);
           const m = await post(
             tx,
             replyThreadId,
@@ -2820,8 +3083,8 @@ async function executeRunInner(
           return m;
         })
       : null;
-    // Parked again on the same wait, with no new note: its old one offers "Don't run it" again.
-    if (!note) await usageWaitNoteEnded(deps, run, false).catch(() => {});
+    // Parked again on the same wait, with no new note: its old one offers "Don't run it" again, with the new reset.
+    if (!note) await usageWaitNoteEnded(deps, run, false, u.pause ? undefined : (resetsAt ?? null)).catch(() => {});
     t.postedUpTo = t.messages.length;
     if (!u.soon) t.brainNotice = u.code;
     delete t.roomWaitSince;
@@ -2840,6 +3103,7 @@ async function executeRunInner(
       waitId,
       waitKey: key,
       until: runAt.toISOString(),
+      since: wait.since,
       ...(resetsAt ? { resetsAt } : {}),
       ...(budget ? {} : { plan: name, model: plan.model ?? null }),
       ...(u.pause ? { source: u.pause.source } : {}),
@@ -2871,6 +3135,12 @@ async function executeRunInner(
       runAt,
       maxAttempts: 4,
     });
+    // The line pauses together: whoever is behind it waits for the same reset, in its place, 60 s apart (with an
+    // unknown reset, on the safety timer until the head gets through).
+    if (!u.soon) {
+      const base = known ? at : now + LINE_SAFETY_MS;
+      await retimeLine(db, line.behind, (i) => new Date(base + RESUME_AFTER_MS + RESUME_GAP_MS * (line.place + 1 + i)));
+    }
     const moved = await transitionRun(db, run.id, "running", "waiting_input", {
       transcript: storedTranscript(t),
       waitingMachineId: null,
@@ -2880,6 +3150,7 @@ async function executeRunInner(
       const [view] = await withWikiLinks(db, run.orgId, [messageView(note)]);
       if (view) await publishMessageCreated(deps.pubsub, view);
     }
+    if (joined) await publishMessageCreated(deps.pubsub, messageView(joined));
     // A routine's run says nothing in the conversation: its people hear it once per outage instead.
     if (firstPark && !budget) await routineRunWaitingForPlan({ db, pubsub: deps.pubsub }, run).catch(() => {});
     if (tellOwner) {
@@ -2890,14 +3161,15 @@ async function executeRunInner(
           agentId: agent.id,
           agentName: agent.name,
           plan: name,
-          runId: run.id,
+          waitKey: key,
           channelId: run.channelId,
           threadId: replyThreadId,
         },
       ).catch(() => {});
     }
-    await publishChannelEvent(deps.pubsub, event("waiting_input"));
-    await finished("waiting_input");
+    const usage = budget ? "budget" : "plan";
+    await publishChannelEvent(deps.pubsub, event("waiting_input", undefined, undefined, undefined, usage));
+    await finished("waiting_input", undefined, undefined, undefined, undefined, usage);
   };
 
   if (plan.unavailable) {
@@ -2962,8 +3234,9 @@ async function executeRunInner(
       waitingMachineId: null,
     });
     if (!moved) throw new PermanentJobError("run changed state while executing");
-    await publishChannelEvent(deps.pubsub, event("waiting_input"));
-    await finished("waiting_input");
+    // In the agent's line of work, not waiting on anyone: the apps say so, not "waiting for your answer".
+    await publishChannelEvent(deps.pubsub, event("waiting_input", undefined, undefined, "line"));
+    await finished("waiting_input", undefined, undefined, "line");
     // Released between the check and the park: it goes on now.
     if (!(await workQueued(db, workId))) await wakeQueuedRun(db, run.orgId, run.id, workId, "parked");
   };

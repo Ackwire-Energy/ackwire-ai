@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, isNotNull, isNull, schema, sql } from "@agentesc
 import { approvalCardThreads, approvalOriginOf, approverIds } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { autonomyNoteFor, proposalCardOf } from "./brakes";
+import { readableChannelIds } from "./channels";
 import { threadFollowChoices } from "./follows";
 import { type TaskEnd, taskEndText } from "./machine-task-text";
 import { isMediaAfterReply } from "./media";
@@ -877,7 +878,7 @@ export async function notifyRoutineWaitingPlan(
 
 /**
  * An agent's work has waited `UNKNOWN_RESET_NOTICE_MS` on its plan's limit and the plan never said when it resets:
- * the agent's owner hears it once per wait, opening the conversation the work waits in.
+ * the agent's owner hears it once per plan line (the count says how many conversations), opening the first one.
  */
 export async function notifyPlanResetUnknown(
   deps: NotificationDeps,
@@ -886,7 +887,8 @@ export async function notifyPlanResetUnknown(
     agentId: string;
     agentName: string;
     plan: string;
-    runId: string;
+    /** The plan's line (`usageWaitKey`): one notice per line, each conversation that waits a day merges in. */
+    waitKey: string;
     channelId: string;
     threadId: string | null;
   },
@@ -895,7 +897,7 @@ export async function notifyPlanResetUnknown(
     orgId: input.orgId,
     userIds: [await agentOwner(deps, input.agentId)],
     kind: "plan_reset_unknown",
-    groupKey: `plan_reset_unknown:${input.runId}`,
+    groupKey: `plan_reset_unknown:${input.waitKey}`,
     actor: agent(input.agentId),
     source: {
       channelId: input.channelId,
@@ -903,6 +905,78 @@ export async function notifyPlanResetUnknown(
       label: input.agentName,
     },
     latest: { title: input.plan },
+  });
+}
+
+/**
+ * An agent back from its plan or budget skipped a catch-up that looked handled (ADR 0136): its owner hears it once per
+ * line, each skip merging in, and only for conversations they can read.
+ */
+export async function notifyCatchUpClosed(
+  deps: NotificationDeps,
+  input: {
+    orgId: string;
+    agentId: string;
+    agentName: string;
+    waitKey: string;
+    channelId: string;
+    threadId: string | null;
+    messageId: string;
+    /** Who asked in it: an owner among them hears it as the asker, or withdrew it themselves. */
+    askers?: string[];
+  },
+) {
+  const owner = await agentOwner(deps, input.agentId);
+  if (!owner || input.askers?.includes(owner)) return;
+  if (!(await readableChannelIds(deps.db, input.orgId, owner, [input.channelId])).has(input.channelId)) return;
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [owner],
+    kind: "catch_up_closed",
+    groupKey: `catch_up_closed:${input.agentId}:${input.waitKey}`,
+    actor: agent(input.agentId),
+    source: {
+      channelId: input.channelId,
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+      messageId: input.messageId,
+      label: input.agentName,
+    },
+  });
+}
+
+/**
+ * The person who asked, when their catch-up was skipped crediting someone else (ADR 0136): an inbox row opening the
+ * note, so a wrong skip reaches who would miss the answer. Never when they withdrew or confirmed it themselves.
+ */
+export async function notifyCatchUpClosedAsker(
+  deps: NotificationDeps,
+  input: {
+    orgId: string;
+    userId: string;
+    agentId: string;
+    runId: string;
+    reason: "solved" | "task_canceled";
+    who: string;
+    channelId: string;
+    threadId: string | null;
+    messageId: string;
+    /** The conversation's name ("#suporte"), none for a DM. */
+    label: string | null;
+  },
+) {
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [input.userId],
+    kind: "catch_up_closed_asker",
+    groupKey: `catch_up_closed_asker:${input.runId}:${input.userId}`,
+    actor: agent(input.agentId),
+    source: {
+      channelId: input.channelId,
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+      messageId: input.messageId,
+      ...(input.label ? { label: input.label } : {}),
+    },
+    latest: { title: input.who, reason: input.reason },
   });
 }
 

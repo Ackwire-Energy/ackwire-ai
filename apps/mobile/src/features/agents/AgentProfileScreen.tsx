@@ -56,6 +56,7 @@ import { LetMeTalkPill } from "../chat/ReachLines";
 import { AgentComputerRow } from "../computer/AgentComputerRow";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
+import { UsageQueueSheet } from "../queue/UsageQueueSheet";
 import { useConnectedById } from "../settings/hooks";
 import { agentBadgeInset } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
@@ -313,6 +314,17 @@ function Profile({ id }: { id: string }) {
           {status?.card ? (
             <View style={styles.status}>
               <StatusCard emoji={status.card.emoji} text={status.card.text} note={status.card.note} />
+            </View>
+          ) : null}
+          {status?.waiting ? (
+            <View style={styles.status}>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="wait"
+                label={t("queue.see")}
+                onPress={() => sheet.open(<UsageQueueSheet agentId={id} />)}
+              />
             </View>
           ) : null}
           {waitingNow ? (

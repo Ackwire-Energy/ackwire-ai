@@ -490,9 +490,12 @@ const MessageBase = z.object({
             .literal(true)
             .optional()
             .openapi({ description: "`waiting_input` because its AI provider is down: it retries by itself." }),
-          computer: z.enum(["queued", "away"]).optional().openapi({
+          computer: z.enum(["queued", "away", "line"]).optional().openapi({
             description:
-              "`waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`).",
+              "`waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`); long work in the agent's line of work (`line`).",
+          }),
+          usage: z.enum(["plan", "budget"]).optional().openapi({
+            description: "`waiting_input` on its plan's limit or its budget: it answers when that renews.",
           }),
           passed: z.literal(true).optional().openapi({
             description: "It ended without answering: passed and posted nothing, or canceled before it started.",

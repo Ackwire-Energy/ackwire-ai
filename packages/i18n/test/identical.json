@@ -689,7 +689,8 @@
       "wiki.tree",
       "work.duration.hours",
       "work.duration.hoursMinutes",
-      "work.duration.minutes"
+      "work.duration.minutes",
+      "usageQueue.routine"
     ],
     "de": [
       "access.agentCol",
@@ -1016,7 +1017,9 @@
       "wiki.markdown",
       "wiki.props.addTag",
       "wiki.rich.blocks.code",
-      "wiki.tags"
+      "wiki.tags",
+      "usageQueue.thread",
+      "usageQueue.routine"
     ],
     "it": [
       "access.area.browser",
@@ -1283,7 +1286,9 @@
       "wiki.props.addTag",
       "work.duration.hours",
       "work.duration.hoursMinutes",
-      "work.duration.minutes"
+      "work.duration.minutes",
+      "usageQueue.thread",
+      "usageQueue.routine"
     ],
     "nl": [
       "access.agentCol",
@@ -1739,7 +1744,9 @@
       "wiki.rich.blocks.code",
       "wiki.rich.codeText",
       "wiki.tags",
-      "work.duration.minutes"
+      "work.duration.minutes",
+      "usageQueue.thread",
+      "usageQueue.routine"
     ],
     "ja": [
       "agent.builtinName",

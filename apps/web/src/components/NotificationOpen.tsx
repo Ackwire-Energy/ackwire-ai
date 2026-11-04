@@ -68,6 +68,12 @@ export function useNotificationOpener() {
         openComputer(computerOf);
         return "dialog";
       }
+      // An agent skipped several catch-ups as handled: its queue, where each skip and "Responder mesmo assim" are.
+      const agent = n.actors[0];
+      if (openDetails && n.kind === "catch_up_closed" && n.count > 1 && agent?.type === "agent") {
+        openDetails({ kind: "usage_queue", id: agent.id });
+        return "dialog";
+      }
       const target = openTarget(n);
       if (!target) return null;
       // A routine's trouble: its details over the page the person is on, its state and fix in view.

@@ -332,7 +332,7 @@ import {
   ThreadStartLine,
   useChannelThreadsView,
 } from "@/components/threads/ThreadLines";
-import { UsageWaitCancel } from "@/components/UsagePauseCard";
+import { UsageWaitCancel, UsageWaitClosed } from "@/components/UsagePauseCard";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { BarAlsoTyping, BarPhrase, BarStep, ConsultClock, WaitLine, WorkingStack } from "@/components/WorkingLine";
 import { useChannelSearch } from "@/hooks/useChannelSearch";
@@ -4192,7 +4192,11 @@ export const TimelineMessage = memo(function TimelineMessage({
             {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
             {noAi && <NoAiCard message={m} />}
             {actionCard && <ActionCard message={m} />}
-            {usageWait && !usageWait.canceled && !usageWait.ended && <UsageWaitCancel message={m} wait={usageWait} />}
+            {usageWait?.closed ? (
+              <UsageWaitClosed message={m} wait={{ ...usageWait, closed: usageWait.closed }} />
+            ) : (
+              usageWait && !usageWait.canceled && !usageWait.ended && <UsageWaitCancel message={m} wait={usageWait} />
+            )}
             {question && <QuestionCard question={question} />}
             {secretRequest && <SecretCard request={secretRequest} />}
             {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}

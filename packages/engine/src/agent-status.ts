@@ -66,7 +66,7 @@ export interface AgentStatusLine {
   until: string | null;
   /** Since when (a work's start). */
   since?: string;
-  /** How many background works it is on (with `kind` `work`). */
+  /** How many background works it is on (with `kind` `work`), or conversations wait for it (out of office). */
   count?: number;
   /** A second work's title, for "Em 2 trabalhos: A e B". */
   second?: string | null;
@@ -182,6 +182,11 @@ export async function loadAgentStatuses(
         waitCode: sql<string | null>`case when ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'usage_pause'
           then (case when ${agentRuns.transcript}->'waitingForBrain'->>'source' = 'budget' then 'budget' else 'plan_limit' end)
           else ${agentRuns.transcript}->'waitingForBrain'->>'code' end`,
+        /** A conversation's catch-up: waiting on its plan or budget itself (not long work paused near one). */
+        catchUp: sql<"plan_limit" | "budget" | null>`case when ${agentRuns.status} = 'waiting_input'
+          and ${agentRuns.transcript}->'waitingForBrain'->>'code' in ('plan_limit', 'budget')
+          then ${agentRuns.transcript}->'waitingForBrain'->>'code' end`,
+        resetsAt: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'resetsAt'`,
       })
       .from(agentRuns)
       .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE, ...WAITING]), ...ofRuns)),
@@ -245,13 +250,15 @@ export async function loadAgentStatuses(
       (stored?.busy === true && working.length > 0);
     const activeAt = runs.length > 0 || mine.length > 0 ? now : (lastAt.get(a.id) ?? null);
     // Out of office (§12) while nothing of its own is thinking: whatever waits, waits for the reset. Its own words
-    // stay.
-    const out = outs.get(a.id);
+    // stay. A conversation waiting on its plan or budget says so too (nothing could stand in for it), with how many
+    // wait: one story for its status, its queue and its notes.
+    const catchUps = runs.filter((r) => r.catchUp !== null && !r.background);
+    const out = outs.get(a.id) ?? catchUpOut(catchUps, now);
     const outNow =
       out &&
       !working.some((r) => r.status === "running") &&
       !mine.some((w) => w.status === "live" && (w.state === null || w.state === "working"));
-    if (outNow && stored?.line.by !== "self") status = outLine(out);
+    if (outNow && stored?.line.by !== "self") status = outLine(out, catchUps.length);
     const presence: AgentPresence = a.heldAt
       ? "offline"
       : outNow
@@ -265,15 +272,31 @@ export async function loadAgentStatuses(
   });
 }
 
-/** An out-of-office agent's line (§12): why, and when it is back. */
-const outLine = (out: OutOfOffice): AgentStatusLine => ({
+/** An out-of-office agent's line (§12): why, when it is back, and how many conversations wait for it (`count`). */
+const outLine = (out: OutOfOffice, waiting: number): AgentStatusLine => ({
   by: "auto",
   text: null,
   kind: out.reason === "plan" ? "out_of_plan" : "out_of_budget",
   subject: null,
   emoji: null,
   until: out.until?.toISOString() ?? null,
+  ...(waiting > 0 ? { count: waiting } : {}),
 });
+
+/**
+ * Out of office read from its conversations waiting on its plan or budget: the earliest reset still ahead (one past
+ * while the line drains, 60 s apart, says no time rather than one gone by).
+ */
+function catchUpOut(
+  list: { catchUp: "plan_limit" | "budget" | null; resetsAt: string | null }[],
+  now: Date,
+): OutOfOffice | undefined {
+  const first = list[0];
+  if (!first) return undefined;
+  const reason = list.some((r) => r.catchUp === "plan_limit") ? ("plan" as const) : ("budget" as const);
+  const resets = list.map((r) => Date.parse(r.resetsAt ?? "")).filter((t) => t > now.getTime());
+  return { reason, until: resets.length > 0 ? new Date(Math.min(...resets)) : null };
+}
 
 const WORK_WAITS: Partial<Record<NonNullable<WorkView["state"]>, AgentStatusLine["wait"]>> = {
   waiting_approval: "approval",
@@ -408,7 +431,7 @@ export function lineInEnglish(line: AgentStatusLine): string | null {
     waiting_plan: "waiting for its plan to reset",
     waiting_budget: "waiting for its budget to renew",
     provider_down: "waiting for its AI provider to come back (it retries by itself)",
-    out_of_plan: `out of office: its AI plan hit its limit${line.until ? `, back at ${line.until}` : ""}; what you send waits until then`,
+    out_of_plan: `out of office: its AI plan hit its limit${line.until ? `, back at ${line.until}` : ""}; what you send waits until then${line.count ? ` (${line.count} conversation${line.count === 1 ? "" : "s"} already waiting)` : ""}`,
     out_of_budget: `out of office: its monthly budget is spent${line.until ? `, back at ${line.until}` : ""}; what you send waits until then`,
     work:
       (line.count ?? 1) > 1
