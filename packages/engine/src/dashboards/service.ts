@@ -91,7 +91,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // ── Checks shared by the calls ───────────────────────────────────────────────
 
 function boardTitle(raw: string | undefined): string {
-  const title = oneLine(raw ?? "").slice(0, DASHBOARD_TITLE_MAX).trim();
+  const title = oneLine(raw ?? "")
+    .slice(0, DASHBOARD_TITLE_MAX)
+    .trim();
   if (!title) throw new ValidationError("A dashboard needs a title", DASHBOARD_ERRORS.titleRequired);
   return title;
 }
@@ -1260,10 +1262,7 @@ export async function getWidget(
   widgetId: string,
 ): Promise<WidgetDetailView> {
   const { widget, board, viewer } = await requireWidget(deps.db, actorId, orgId, widgetId, "see");
-  const [view, history] = await Promise.all([
-    widgetView(deps.db, widget),
-    widgetHistory(deps.db, orgId, widget.id),
-  ]);
+  const [view, history] = await Promise.all([widgetView(deps.db, widget), widgetHistory(deps.db, orgId, widget.id)]);
   return {
     ...view,
     dashboard: { id: board.id, kind: board.kind === "home" ? "home" : "board", title: board.title },

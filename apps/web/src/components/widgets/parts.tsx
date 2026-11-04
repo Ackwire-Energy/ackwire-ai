@@ -108,18 +108,16 @@ export function WidgetFoot({
     );
   // The agent's face leads the card's title (`WidgetCard`'s `face`): the footer only says who and when.
   return (
-    <>
-      <span className="wg__when">
-        <b>{name}</b>
-        {widget.refreshedAt && (
-          <>
-            {" "}
-            <span className="wg__dot">·</span> {relativeTime(t, i18n.language, widget.refreshedAt, new Date(now))}
-          </>
-        )}{" "}
-        <span className="wg__dot">·</span> {schedule}
-      </span>
-    </>
+    <span className="wg__when">
+      <b>{name}</b>
+      {widget.refreshedAt && (
+        <>
+          {" "}
+          <span className="wg__dot">·</span> {relativeTime(t, i18n.language, widget.refreshedAt, new Date(now))}
+        </>
+      )}{" "}
+      <span className="wg__dot">·</span> {schedule}
+    </span>
   );
 }
 

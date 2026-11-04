@@ -490,7 +490,11 @@ export async function applyWidgetUpdate(
   // The agent names it on its first build (a draft's test too) and on a change request, never over a person's title
   // and never on a plain refresh (ADR 0134 §17). Too long is refused, never cut mid-word.
   const naming = (firstBuild || change !== null) && !widget.titleSetByUser;
-  const named = (update.title ?? "").replace(/\s+/g, " ").trim().replace(/(?<!\.)\.$/, "").trim();
+  const named = (update.title ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/(?<!\.)\.$/, "")
+    .trim();
   if (naming && named.length > WIDGET_AGENT_TITLE_MAX) {
     return refuseData(
       db,

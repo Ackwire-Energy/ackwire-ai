@@ -1,12 +1,5 @@
 import type { Dashboard, Widget } from "@agenteschat/client";
-import {
-  type BoardItem,
-  boardItems,
-  layoutOf,
-  resizeItem,
-  useRefreshWidget,
-  useSaveLayout,
-} from "@agenteschat/client";
+import { type BoardItem, boardItems, layoutOf, resizeItem, useRefreshWidget, useSaveLayout } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { Button, Card, cx, Icon, Menu, MenuItem, MenuSeparator, WidgetCard } from "@agenteschat/ui";
 import { layoutToSize, nextSize, sizeToLayout } from "@agenteschat/ui/widgets/spec";
@@ -54,15 +47,7 @@ export interface WidgetBoardProps {
  * where it lands), the grip's keys, the size button, remove. Every change is saved at once (`useSaveLayout`,
  * optimistic) and the cells slide to their new places; a remove asks first (`RemoveWidgetDialog`).
  */
-export function WidgetBoard({
-  orgId,
-  board,
-  arranging,
-  tiles,
-  tileNames,
-  onOpen,
-  onChangeSchedule,
-}: WidgetBoardProps) {
+export function WidgetBoard({ orgId, board, arranging, tiles, tileNames, onOpen, onChangeSchedule }: WidgetBoardProps) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const save = useSaveLayout(orgId);

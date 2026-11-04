@@ -76,7 +76,9 @@ const openEditors = async (dialog: HTMLElement) => {
 };
 const closeMenu = () => act(async () => fireEvent.keyDown(screen().getByRole("menu"), { key: "Escape" }));
 const editorsShown = (dialog: HTMLElement) =>
-  within(dialog).getByRole("button", { name: /^Quem edita/ }).querySelector(".ac-select__value")?.textContent;
+  within(dialog)
+    .getByRole("button", { name: /^Quem edita/ })
+    .querySelector(".ac-select__value")?.textContent;
 
 describe("New dashboard (ADR 0134 §8, §10)", () => {
   const start = async (prepareState?: (state: FakeState) => void) => {
@@ -90,7 +92,11 @@ describe("New dashboard (ADR 0134 §8, §10)", () => {
     const { state, router, dialog } = await start();
     const create = within(dialog).getByRole("button", { name: "Criar painel" }) as HTMLButtonElement;
     expect(create.disabled).toBe(true);
-    expect(within(dialog).getByRole("radio", { name: /^Só você/ }).getAttribute("aria-checked")).toBe("true");
+    expect(
+      within(dialog)
+        .getByRole("radio", { name: /^Só você/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
     // No "How to start": an agent builds a dashboard when asked in a chat, as the line under the name says.
     expect(dialog.textContent).not.toContain("Como começar");
     expect(dialog.textContent).not.toContain("Pedir a um agente");
@@ -315,13 +321,11 @@ describe("New widget (ADR 0134 §3)", () => {
     expect(schedule.textContent).toContain("a cada hora");
     schedule.focus();
     await act(async () => fireEvent.keyDown(schedule, { key: "Enter" }));
-    expect(screen().getAllByRole("option").map((o) => o.textContent)).toEqual([
-      "A cada 30 min",
-      "A cada hora",
-      "Todo dia às 8h",
-      "Toda segunda às 8h",
-      "Só quando eu pedir",
-    ]);
+    expect(
+      screen()
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["A cada 30 min", "A cada hora", "Todo dia às 8h", "Toda segunda às 8h", "Só quando eu pedir"]);
     await click(screen().getByRole("option", { name: "A cada hora" }));
     await settle(2);
     expect(dialog.textContent).not.toMatch(/US\$|orçamento/);

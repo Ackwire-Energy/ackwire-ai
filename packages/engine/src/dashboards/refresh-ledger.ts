@@ -188,20 +188,17 @@ export async function failWidget(
   await trimWidgetHistory(db, widget.orgId, widget.id);
   // A draft's failure shows in the test's preview only: nobody is told (ADR 0134 §16).
   if (firstOfStreak && !widget.draft) {
-    await notifyWidgetFailed(
-      deps,
-      {
-        orgId: widget.orgId,
-        userId: await failureRecipient(db, widget, board),
-        widgetId: widget.id,
-        dashboardId: board.id,
-        agentId: widget.agentId,
-        title: widget.title,
-        streakKey: failure.routineRunId ?? String(Date.now()),
-        reason: shown,
-        text: code === WIDGET_FAILURES.agentReported ? detail : null,
-      },
-    ).catch(() => {});
+    await notifyWidgetFailed(deps, {
+      orgId: widget.orgId,
+      userId: await failureRecipient(db, widget, board),
+      widgetId: widget.id,
+      dashboardId: board.id,
+      agentId: widget.agentId,
+      title: widget.title,
+      streakKey: failure.routineRunId ?? String(Date.now()),
+      reason: shown,
+      text: code === WIDGET_FAILURES.agentReported ? detail : null,
+    }).catch(() => {});
   }
   await publishWidgetChanged(deps.pubsub, board, widgetEvent(widget, "failed")).catch(() => {});
   return row;

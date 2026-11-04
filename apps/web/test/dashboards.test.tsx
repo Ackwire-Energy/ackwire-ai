@@ -220,7 +220,10 @@ describe("a board's page", () => {
     const s = await open(`/org/${ORG_ID}/dashboards/dash-m`, (fake) => {
       fake.addBoard({ id: "dash-m", title: "Metas", owner: { kind: "person", id: "u-walter", name: "Walter" } });
     });
-    const more = () => screen().getAllByRole("button", { name: "Mais" }).find((b) => b.closest(".db-acts")) as Element;
+    const more = () =>
+      screen()
+        .getAllByRole("button", { name: "Mais" })
+        .find((b) => b.closest(".db-acts")) as Element;
     const pick = async (item: string) => {
       const trigger = more();
       (trigger as HTMLElement).focus();

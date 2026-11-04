@@ -32,13 +32,7 @@ export function NewDashboardDialog({ open, onClose }: { open: boolean; onClose: 
   );
 }
 
-function NewDashboardBody({
-  nameRef,
-  onClose,
-}: {
-  nameRef: RefObject<HTMLInputElement | null>;
-  onClose: () => void;
-}) {
+function NewDashboardBody({ nameRef, onClose }: { nameRef: RefObject<HTMLInputElement | null>; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const navigate = useNavigate();

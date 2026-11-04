@@ -440,8 +440,7 @@ function createEngine<T extends GridItem>(ctx: EngineContext<T>) {
     if (spot) flip?.rects.set(g.id, spot);
     const order = placed(g.base, g.id, g.index);
     const taken =
-      itemOf(g.id) !== undefined &&
-      ctx.options().onDrop({ id: g.id, index: g.index, fromIndex: g.fromIndex, order });
+      itemOf(g.id) !== undefined && ctx.options().onDrop({ id: g.id, index: g.index, fromIndex: g.fromIndex, order });
     ctx.setMove(taken ? { kind: "held", id: g.id, order } : null);
     after = () => landed(g.id);
   }
@@ -470,7 +469,7 @@ function createEngine<T extends GridItem>(ctx: EngineContext<T>) {
     const own = slotOf(id);
     const r = own ? restRect(own) : null;
     // Nothing laid out (a hidden board): one card.
-    if (!r || !r.width || !r.height) return one;
+    if (!r?.width || !r.height) return one;
     const cx = r.left + r.width / 2;
     const row = others
       .map((x, j) => {

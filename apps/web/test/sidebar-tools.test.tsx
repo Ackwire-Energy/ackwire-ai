@@ -91,7 +91,11 @@ describe("the tools on top", () => {
     const more = await openMore();
     // Dashboards (ADR 0134) and the task manager (ADR 0128) are always there, after the tools a person places.
     expect(inMore(more)).toEqual(["Wiki", "Rotinas", "Calendário", "Fórum", "Painéis", "Gerenciador de tarefas"]);
-    expect(within(more).getByRole("link", { name: /Painéis/ }).getAttribute("href")).toBe(`/org/${ORG_ID}/dashboards`);
+    expect(
+      within(more)
+        .getByRole("link", { name: /Painéis/ })
+        .getAttribute("href"),
+    ).toBe(`/org/${ORG_ID}/dashboards`);
     expect(
       within(more)
         .getByRole("link", { name: /Gerenciador de tarefas/ })

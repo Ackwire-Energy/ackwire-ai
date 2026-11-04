@@ -86,8 +86,7 @@ export function createDashboardsApi(request: Requester): DashboardsApi {
       request<Widget>(`${board(orgId, dashboardId)}/widgets`, { json: input }),
     testWidget: (orgId, dashboardId, input) =>
       request<Widget>(`${board(orgId, dashboardId)}/widgets/test`, { json: input }),
-    confirmWidget: (orgId, widgetId, input) =>
-      request<Widget>(`${widget(orgId, widgetId)}/confirm`, { json: input }),
+    confirmWidget: (orgId, widgetId, input) => request<Widget>(`${widget(orgId, widgetId)}/confirm`, { json: input }),
     pinWidget: (orgId, dashboardId, input) =>
       request<Widget>(`${board(orgId, dashboardId)}/widgets/pin`, { json: input }),
     widget: (orgId, widgetId) => request<WidgetDetail>(widget(orgId, widgetId)),

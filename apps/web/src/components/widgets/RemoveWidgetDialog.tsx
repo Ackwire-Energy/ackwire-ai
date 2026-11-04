@@ -56,9 +56,7 @@ export function RemoveWidgetDialog({
       open={widget !== null}
       onOpenChange={(o) => !o && !remove.isPending && onClose()}
       title={t("widgets.removeConfirm.title", { title })}
-      description={
-        scheduled ? t("widgets.removeConfirm.textRoutine", { name }) : t("widgets.removeConfirm.textManual")
-      }
+      description={scheduled ? t("widgets.removeConfirm.textRoutine", { name }) : t("widgets.removeConfirm.textManual")}
       closeLabel={t("common.close")}
       width={440}
     >
