@@ -1,6 +1,6 @@
 import { useChannels } from "@agenteschat/client";
 import { router } from "expo-router";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import type { ConversationRow } from "../chats/logic";
@@ -35,8 +35,7 @@ export function useCategoryMenus() {
     },
     [sheet],
   );
-  // A new function when the pins change: the rows re-render with their new place anyway.
-  const openRowMenu = (r: ConversationRow) => {
+  const rowMenu = (r: ConversationRow) => {
     const channel = r.kind === "channel" ? channels.find((c) => c.id === r.channelId) : undefined;
     const pin =
       r.kind === "channel"
@@ -110,5 +109,9 @@ export function useCategoryMenus() {
         </>,
       );
   };
+  // One function for every render (the rows are memoized), always running the latest menu.
+  const latest = useRef(rowMenu);
+  latest.current = rowMenu;
+  const openRowMenu = useCallback((r: ConversationRow) => latest.current(r), []);
   return { openRowMenu, categoryMenu };
 }

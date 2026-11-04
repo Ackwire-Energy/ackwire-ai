@@ -79,6 +79,9 @@ test("a closed group of agents keeps in sight who works, waits or wrote; pinned 
     value('.sidebar__section--group[data-open="false"] .sidebar__section-body > [data-live="true"]', "display"),
   ).toBe("flex");
   expect(value(".sidebar__pins-end", "border-top")).toBe("1px solid var(--line)");
+  expect(
+    value('.sidebar:not([data-rail="true"]) .sidebar__section--part[data-open="false"] ~ .sidebar__see-all', "display"),
+  ).toBe("none");
 });
 
 test("a row's hidden hover buttons don't catch the pointer, so a drag over a row's end lands before or after it", () => {

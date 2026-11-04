@@ -11630,6 +11630,10 @@ html:not([data-pointer]) .channel-perms__target:focus-visible {
 .sidebar__see-all {
   color: var(--ink-muted);
 }
+/* AGENTES closed hides its last row too, as it hides its groups. */
+.sidebar:not([data-rail="true"]) .sidebar__section--part[data-open="false"] ~ .sidebar__see-all {
+  display: none;
+}
 /* Mensagens diretas with no conversation with a person yet. */
 .sidebar__empty {
   margin: 0;
