@@ -1170,7 +1170,6 @@
     "guidanceLabel": "Hoe {{name}} voor je beslist",
     "guidancePlaceholder": "Hoe {{name}} voor je beslist (optioneel). Bijv.: geen dubbele agents.",
     "paused": "Gepauzeerd: je hebt deze week 3 beslissingen ongedaan gemaakt. Zet het weer aan wanneer je wilt.",
-    "you": "jou",
     "card": {
       "deciding": "{{name}} bekijkt het namens {{for}}…",
       "approved": "Goedgekeurd door {{name}} namens {{for}}",
@@ -1184,7 +1183,9 @@
       "why": "Waarom?",
       "undo": "Ongedaan maken",
       "undoArchives": "Ongedaan maken archiveert {{name}}. Kan tot {{until}}.",
-      "undoSettings": "Ongedaan maken zet de instellingen terug. Kan tot {{until}}."
+      "undoSettings": "Ongedaan maken zet de instellingen terug. Kan tot {{until}}.",
+      "approvedForYou": "Goedgekeurd door {{name}} namens jou",
+      "decidingForYou": "{{name}} bekijkt het namens jou…"
     }
   },
   "noticePrefs": {

@@ -1170,7 +1170,6 @@
     "guidanceLabel": "Wie {{name}} für dich entscheidet",
     "guidancePlaceholder": "Wie {{name}} für dich entscheidet (optional). Z. B.: keine doppelten Agenten.",
     "paused": "Pausiert: Du hast diese Woche 3 Entscheidungen rückgängig gemacht. Schalte es wieder ein, wann du willst.",
-    "you": "dich",
     "card": {
       "deciding": "{{name}} prüft es im Namen von {{for}}…",
       "approved": "Freigegeben von {{name}} im Namen von {{for}}",
@@ -1184,7 +1183,9 @@
       "why": "Warum?",
       "undo": "Rückgängig",
       "undoArchives": "Rückgängig archiviert {{name}}. Möglich bis {{until}}.",
-      "undoSettings": "Rückgängig stellt die Einstellungen wieder her. Möglich bis {{until}}."
+      "undoSettings": "Rückgängig stellt die Einstellungen wieder her. Möglich bis {{until}}.",
+      "approvedForYou": "Freigegeben von {{name}} in deinem Namen",
+      "decidingForYou": "{{name}} prüft es in deinem Namen…"
     }
   },
   "noticePrefs": {

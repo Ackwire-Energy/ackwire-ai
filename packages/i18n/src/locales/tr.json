@@ -1170,7 +1170,6 @@
     "guidanceLabel": "{{name}} sizin yerinize nasıl karar verir",
     "guidancePlaceholder": "{{name}} sizin yerinize nasıl karar verir (isteğe bağlı). Ör.: aynı işi yapan ajan olmasın.",
     "paused": "Duraklatıldı: bu hafta 3 kararını geri aldınız. İstediğinizde yeniden açın.",
-    "you": "siz",
     "card": {
       "deciding": "{{name}}, {{for}} adına inceliyor…",
       "approved": "{{name}}, {{for}} adına onayladı",
@@ -1184,7 +1183,9 @@
       "why": "Neden?",
       "undo": "Geri al",
       "undoArchives": "Geri almak {{name}} adlı ajanı arşivler. {{until}} saatine kadar geçerli.",
-      "undoSettings": "Geri almak ayarları eski haline getirir. {{until}} saatine kadar geçerli."
+      "undoSettings": "Geri almak ayarları eski haline getirir. {{until}} saatine kadar geçerli.",
+      "approvedForYou": "{{name}} sizin adınıza onayladı",
+      "decidingForYou": "{{name}} sizin adınıza inceliyor…"
     }
   },
   "noticePrefs": {

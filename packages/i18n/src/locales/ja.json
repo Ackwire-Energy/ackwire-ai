@@ -1134,7 +1134,6 @@
     "guidanceLabel": "{{name}}があなたの代わりにどう決めるか",
     "guidancePlaceholder": "{{name}}があなたの代わりにどう決めるか (任意)。例: 重複するエージェントは作らない。",
     "paused": "一時停止中: 今週その決定を3回取り消しました。いつでもオンに戻せます。",
-    "you": "あなた",
     "card": {
       "deciding": "{{name}}が{{for}}の代わりに確認しています…",
       "approved": "{{name}}が{{for}}の代わりに承認",
@@ -1148,7 +1147,9 @@
       "why": "理由",
       "undo": "取り消す",
       "undoArchives": "取り消すと{{name}}をアーカイブします。{{until}}まで有効です。",
-      "undoSettings": "取り消すと設定が元に戻ります。{{until}}まで有効です。"
+      "undoSettings": "取り消すと設定が元に戻ります。{{until}}まで有効です。",
+      "approvedForYou": "{{name}}があなたの代わりに承認",
+      "decidingForYou": "{{name}}があなたの代わりに確認しています…"
     }
   },
   "noticePrefs": {

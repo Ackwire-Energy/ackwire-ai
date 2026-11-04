@@ -1185,9 +1185,10 @@ export const en = {
     guidanceLabel: "How {{name}} decides for you",
     guidancePlaceholder: "How {{name}} decides for you (optional). E.g.: no duplicate agents.",
     paused: "Paused: you undid 3 of its decisions this week. Turn it back on when you want.",
-    you: "you",
     card: {
       deciding: "{{name}} is looking at it for {{for}}…",
+      approvedForYou: "Approved by {{name}} for you",
+      decidingForYou: "{{name}} is looking at it for you…",
       approved: "Approved by {{name}} for {{for}}",
       passed: "{{name}} passed it to you",
       passedWhy: "{{name}} passed it to you: {{reason}}",

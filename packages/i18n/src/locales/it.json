@@ -1206,7 +1206,6 @@
     "guidanceLabel": "Come {{name}} decide per te",
     "guidancePlaceholder": "Come {{name}} decide per te (facoltativo). Es.: niente agenti duplicati.",
     "paused": "In pausa: hai annullato 3 sue decisioni questa settimana. Riattivalo quando vuoi.",
-    "you": "te",
     "card": {
       "deciding": "{{name}} lo sta valutando per conto di {{for}}…",
       "approved": "Approvato da {{name}} per conto di {{for}}",
@@ -1220,7 +1219,9 @@
       "why": "Perché?",
       "undo": "Annulla",
       "undoArchives": "Annulla archivia {{name}}. Vale fino a {{until}}.",
-      "undoSettings": "Annulla ripristina le impostazioni. Vale fino a {{until}}."
+      "undoSettings": "Annulla ripristina le impostazioni. Vale fino a {{until}}.",
+      "approvedForYou": "Approvato da {{name}} a tuo nome",
+      "decidingForYou": "{{name}} lo sta valutando a tuo nome…"
     }
   },
   "noticePrefs": {

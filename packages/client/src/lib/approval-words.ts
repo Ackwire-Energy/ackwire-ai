@@ -349,12 +349,16 @@ export function delegateLine(
 ): string | null {
   const mine = d.forUserId === meId;
   const name = rightHandName;
-  const forName = mine ? t("rightHandApprovals.you") : (nameOf(d.forUserId) ?? "");
+  const forName = nameOf(d.forUserId) ?? "";
   switch (d.state) {
     case "deciding":
-      return t("rightHandApprovals.card.deciding", { name, for: forName });
+      return mine
+        ? t("rightHandApprovals.card.decidingForYou", { name })
+        : t("rightHandApprovals.card.deciding", { name, for: forName });
     case "approved":
-      return t("rightHandApprovals.card.approved", { name, for: forName });
+      return mine
+        ? t("rightHandApprovals.card.approvedForYou", { name })
+        : t("rightHandApprovals.card.approved", { name, for: forName });
     case "undone":
       return d.undoneByUserId === meId
         ? t("rightHandApprovals.card.undoneByYou")

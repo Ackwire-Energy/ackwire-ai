@@ -318,17 +318,15 @@ function RightHandCard({ view, name }: { view: RightHandApprovals; name: string 
               </span>
             </div>
           </div>
-          <div className="rh-guidance">
-            <Textarea
-              rows={2}
-              maxLength={2000}
-              value={guidance ?? view.guidance}
-              onChange={(e) => setGuidance(e.target.value)}
-              onBlur={saveGuidance}
-              placeholder={t("rightHandApprovals.guidancePlaceholder", { name })}
-              aria-label={t("rightHandApprovals.guidanceLabel", { name })}
-            />
-          </div>
+          <Textarea
+            rows={2}
+            maxLength={2000}
+            value={guidance ?? view.guidance}
+            onChange={(e) => setGuidance(e.target.value)}
+            onBlur={saveGuidance}
+            placeholder={t("rightHandApprovals.guidancePlaceholder", { name })}
+            aria-label={t("rightHandApprovals.guidanceLabel", { name })}
+          />
         </>
       )}
       <CardFooter icon="lock">{t("approvalCover.lock")}</CardFooter>

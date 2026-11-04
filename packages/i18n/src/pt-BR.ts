@@ -1182,9 +1182,10 @@ export const ptBR = {
     guidanceLabel: "Como {{name}} decide por você",
     guidancePlaceholder: "Como {{name}} decide por você (opcional). Ex.: nada de agente duplicado.",
     paused: "Pausado: você desfez 3 decisões nesta semana. Ligue de novo quando quiser.",
-    you: "você",
     card: {
       deciding: "{{name}} está analisando em nome de {{for}}…",
+      approvedForYou: "Aprovado por {{name}} em seu nome",
+      decidingForYou: "{{name}} está analisando em seu nome…",
       approved: "Aprovado por {{name}} em nome de {{for}}",
       passed: "{{name}} passou para você",
       passedWhy: "{{name}} passou para você: {{reason}}",

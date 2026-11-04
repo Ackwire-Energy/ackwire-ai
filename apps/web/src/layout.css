@@ -12659,9 +12659,6 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .rh-money .ac-input-affix {
   width: 120px;
 }
-.rh-guidance {
-  padding: 0 var(--card-pad) var(--card-pad);
-}
 /* Configurações › Sua conta: a line that opens something is a button, its chevron at the end. Its hover stays inside
    the card's corners. */
 .ac-card:has(> .settings-rows > .settings-row--open) {

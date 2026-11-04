@@ -147,7 +147,7 @@ describe("a card the right hand looked at", () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(6);
     const line = screen().getByRole("group", { name: "Atlas propõe um novo agente" });
-    expect(line.textContent).toContain("Nina · Aprovado por Lodi em nome de você");
+    expect(line.textContent).toContain("Nina · Aprovado por Lodi em seu nome");
     await click(within(line).getByRole("button", { name: "Por quê?" }));
     expect(line.textContent).toContain("Veio do seu pedido e não há outro igual.");
     expect(line.textContent).toContain("Desfazer arquiva Nina. Vale até");

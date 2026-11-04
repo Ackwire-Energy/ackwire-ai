@@ -32628,9 +32628,6 @@
   "rightHandApprovals.paused": {
     "value": "Paused: you undid 3 of its decisions this week. Turn it back on when you want."
   },
-  "rightHandApprovals.you": {
-    "value": "you"
-  },
   "rightHandApprovals.card.deciding": {
     "value": "{{name}} is looking at it for {{for}}…"
   },
@@ -32675,5 +32672,11 @@
   },
   "notifications.what.rightHandPaused": {
     "value": "<b>{{name}}</b> stopped approving for you: you undid 3 of its decisions this week"
+  },
+  "rightHandApprovals.card.approvedForYou": {
+    "value": "Approved by {{name}} for you"
+  },
+  "rightHandApprovals.card.decidingForYou": {
+    "value": "{{name}} is looking at it for you…"
   }
 }

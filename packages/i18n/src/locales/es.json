@@ -1206,7 +1206,6 @@
     "guidanceLabel": "Cómo decide {{name}} por ti",
     "guidancePlaceholder": "Cómo decide {{name}} por ti (opcional). Ej.: nada de agentes duplicados.",
     "paused": "En pausa: deshiciste 3 de sus decisiones esta semana. Vuelve a activarlo cuando quieras.",
-    "you": "ti",
     "card": {
       "deciding": "{{name}} lo está analizando en nombre de {{for}}…",
       "approved": "Aprobado por {{name}} en nombre de {{for}}",
@@ -1220,7 +1219,9 @@
       "why": "¿Por qué?",
       "undo": "Deshacer",
       "undoArchives": "Deshacer archiva a {{name}}. Vale hasta {{until}}.",
-      "undoSettings": "Deshacer devuelve la configuración. Vale hasta {{until}}."
+      "undoSettings": "Deshacer devuelve la configuración. Vale hasta {{until}}.",
+      "approvedForYou": "Aprobado por {{name}} en tu nombre",
+      "decidingForYou": "{{name}} lo está analizando en tu nombre…"
     }
   },
   "noticePrefs": {

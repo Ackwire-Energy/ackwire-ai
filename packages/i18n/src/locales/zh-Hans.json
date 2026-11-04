@@ -1134,7 +1134,6 @@
     "guidanceLabel": "{{name}} 如何替你决定",
     "guidancePlaceholder": "{{name}} 如何替你决定 (可选)。例如: 不要重复的智能体。",
     "paused": "已暂停: 你本周撤销了它的 3 个决定。随时可以重新打开。",
-    "you": "你",
     "card": {
       "deciding": "{{name}} 正在代 {{for}} 审阅…",
       "approved": "由 {{name}} 代 {{for}} 批准",
@@ -1148,7 +1147,9 @@
       "why": "为什么？",
       "undo": "撤销",
       "undoArchives": "撤销会归档 {{name}}。有效期至 {{until}}。",
-      "undoSettings": "撤销会恢复设置。有效期至 {{until}}。"
+      "undoSettings": "撤销会恢复设置。有效期至 {{until}}。",
+      "approvedForYou": "由 {{name}} 代你批准",
+      "decidingForYou": "{{name}} 正在代你审阅…"
     }
   },
   "noticePrefs": {

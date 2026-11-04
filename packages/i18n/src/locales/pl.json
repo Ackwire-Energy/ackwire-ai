@@ -1242,7 +1242,6 @@
     "guidanceLabel": "Jak {{name}} decyduje za ciebie",
     "guidancePlaceholder": "Jak {{name}} decyduje za ciebie (opcjonalnie). Np.: bez zdublowanych agentów.",
     "paused": "Wstrzymano: w tym tygodniu cofnięto 3 decyzje. Włącz ponownie, kiedy zechcesz.",
-    "you": "ciebie",
     "card": {
       "deciding": "{{name}} sprawdza to w imieniu: {{for}}…",
       "approved": "Zatwierdził(a) {{name}} w imieniu: {{for}}",
@@ -1256,7 +1255,9 @@
       "why": "Dlaczego?",
       "undo": "Cofnij",
       "undoArchives": "Cofnięcie archiwizuje: {{name}}. Możliwe do {{until}}.",
-      "undoSettings": "Cofnięcie przywraca ustawienia. Możliwe do {{until}}."
+      "undoSettings": "Cofnięcie przywraca ustawienia. Możliwe do {{until}}.",
+      "approvedForYou": "Zatwierdził(a) {{name}} w twoim imieniu",
+      "decidingForYou": "{{name}} sprawdza to w twoim imieniu…"
     }
   },
   "noticePrefs": {

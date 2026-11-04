@@ -1134,7 +1134,6 @@
     "guidanceLabel": "Cara {{name}} memutuskan untukmu",
     "guidancePlaceholder": "Cara {{name}} memutuskan untukmu (opsional). Mis.: jangan ada agen ganda.",
     "paused": "Dijeda: kamu membatalkan 3 keputusannya minggu ini. Nyalakan lagi kapan pun kamu mau.",
-    "you": "kamu",
     "card": {
       "deciding": "{{name}} sedang meninjaunya atas nama {{for}}…",
       "approved": "Disetujui oleh {{name}} atas nama {{for}}",
@@ -1148,7 +1147,9 @@
       "why": "Kenapa?",
       "undo": "Batalkan",
       "undoArchives": "Membatalkan akan mengarsipkan {{name}}. Berlaku hingga {{until}}.",
-      "undoSettings": "Membatalkan akan mengembalikan pengaturan. Berlaku hingga {{until}}."
+      "undoSettings": "Membatalkan akan mengembalikan pengaturan. Berlaku hingga {{until}}.",
+      "approvedForYou": "Disetujui oleh {{name}} atas namamu",
+      "decidingForYou": "{{name}} sedang meninjaunya atas namamu…"
     }
   },
   "noticePrefs": {

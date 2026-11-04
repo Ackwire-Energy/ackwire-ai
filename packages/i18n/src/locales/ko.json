@@ -1134,7 +1134,6 @@
     "guidanceLabel": "{{name}}이(가) 나 대신 결정하는 방법",
     "guidancePlaceholder": "{{name}}이(가) 나 대신 결정하는 방법 (선택). 예: 중복 에이전트는 안 돼요.",
     "paused": "일시 중지됨: 이번 주에 결정을 3번 되돌렸어요. 원할 때 다시 켜세요.",
-    "you": "나",
     "card": {
       "deciding": "{{name}}이(가) {{for}} 대신 검토하고 있어요…",
       "approved": "{{name}}이(가) {{for}} 대신 승인함",
@@ -1148,7 +1147,9 @@
       "why": "이유",
       "undo": "되돌리기",
       "undoArchives": "되돌리면 {{name}}이(가) 보관돼요. {{until}}까지 가능해요.",
-      "undoSettings": "되돌리면 설정이 원래대로 돌아가요. {{until}}까지 가능해요."
+      "undoSettings": "되돌리면 설정이 원래대로 돌아가요. {{until}}까지 가능해요.",
+      "approvedForYou": "{{name}}이(가) 나 대신 승인함",
+      "decidingForYou": "{{name}}이(가) 나 대신 검토하고 있어요…"
     }
   },
   "noticePrefs": {

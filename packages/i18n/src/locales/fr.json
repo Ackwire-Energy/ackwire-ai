@@ -1206,7 +1206,6 @@
     "guidanceLabel": "Comment {{name}} décide pour vous",
     "guidancePlaceholder": "Comment {{name}} décide pour vous (facultatif). Ex. : pas d'agent en double.",
     "paused": "En pause : vous avez annulé 3 de ses décisions cette semaine. Réactivez-le quand vous voulez.",
-    "you": "vous",
     "card": {
       "deciding": "{{name}} l'examine au nom de {{for}}…",
       "approved": "Approuvé par {{name}} au nom de {{for}}",
@@ -1220,7 +1219,9 @@
       "why": "Pourquoi ?",
       "undo": "Annuler",
       "undoArchives": "Annuler archive {{name}}. Possible jusqu'à {{until}}.",
-      "undoSettings": "Annuler rétablit les réglages. Possible jusqu'à {{until}}."
+      "undoSettings": "Annuler rétablit les réglages. Possible jusqu'à {{until}}.",
+      "approvedForYou": "Approuvé par {{name}} en votre nom",
+      "decidingForYou": "{{name}} l'examine en votre nom…"
     }
   },
   "noticePrefs": {
