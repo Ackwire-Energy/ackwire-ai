@@ -232,6 +232,18 @@ html:not([data-pointer]) .roles-back:focus-visible {
 .roles-area .ac-seg__item {
   gap: 7px;
 }
+.roles-computer {
+  display: flex;
+  align-items: center;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+  margin: 12px 0 0 32px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.roles-computer .roles-key__text {
+  flex: 1 1 220px;
+}
 .roles-area__items {
   margin: 10px 0 -4px 32px;
 }

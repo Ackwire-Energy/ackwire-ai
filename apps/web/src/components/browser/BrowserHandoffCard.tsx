@@ -13,7 +13,6 @@ import {
 } from "@agenteschat/client";
 import { formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Icon } from "@agenteschat/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -108,7 +107,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   if (waiting) {
     const asked = current.requestedForUserId;
     // Its buttons only for whom it waits on (the server checks again when they open it).
-    const mine = handoffIsMine(current, me.user.id, agent?.ownerUserId, can(org, "control_computers"));
+    const mine = handoffIsMine(current, me.user.id, agent?.ownerUserId, org);
     const askedName = asked ? dir.memberById.get(asked)?.name : undefined;
     return (
       <>

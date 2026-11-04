@@ -88,6 +88,24 @@
     "fromAdmin": "De Administrador",
     "viaAdmin": "Todo, como Administrador",
     "nothing": "Nada",
+    "computer": {
+      "title": "Computadoras de los agentes",
+      "levels": {
+        "none": "Ninguno",
+        "browser": "Solo el navegador",
+        "full": "Computadora entera"
+      },
+      "every": {
+        "none": "Solo lo que Todos ya pueden",
+        "browser": "El navegador de cualquier agente y las solicitudes de inicio de sesión, nunca la pantalla completa ni la terminal",
+        "full": "La pantalla completa, el control y la terminal de cualquier agente"
+      },
+      "own": {
+        "none": "Nadie ve ni usa las computadoras o navegadores de los agentes, ni las solicitudes de inicio de sesión",
+        "browser": "El navegador de sus propios agentes y las solicitudes de inicio de sesión hechas a la persona, nunca la pantalla completa",
+        "full": "La pantalla completa y la terminal de sus propios agentes y de las computadoras que la persona conectó"
+      }
+    },
     "everyoneNote": "Se aplica a todas las personas del espacio de trabajo. Los demás roles solo suman.",
     "summary": {
       "owner": "Puede hacer todo, siempre. Todo espacio de trabajo tiene al menos un propietario.",
@@ -254,6 +272,24 @@
       "desc": "Controlar su escritorio y su navegador.",
       "short": "tomar el control de pantallas",
       "say": "toma el control de las pantallas de los agentes"
+    },
+    "control_browsers": {
+      "title": "Usar el navegador de los agentes",
+      "desc": "Ver y controlar el navegador de cualquier agente y atender las solicitudes de inicio de sesión.",
+      "short": "usar el navegador de los agentes",
+      "say": "usa el navegador de los agentes"
+    },
+    "own_computers": {
+      "title": "Usar la computadora de sus propios agentes",
+      "desc": "La pantalla completa y la terminal de los agentes de los que es responsable y de las computadoras que conectó.",
+      "short": "usar la computadora de sus propios agentes",
+      "say": "usa la computadora de sus propios agentes"
+    },
+    "own_browsers": {
+      "title": "Usar el navegador de sus propios agentes",
+      "desc": "El navegador de los agentes de los que es responsable y las solicitudes de inicio de sesión hechas a la persona.",
+      "short": "usar el navegador de sus propios agentes",
+      "say": "usa el navegador de sus propios agentes"
     },
     "manage_connectors": {
       "title": "Conectar apps",
@@ -13506,6 +13542,7 @@
       "noComputer": "{{name}} no tiene una computadora conectada.",
       "noComputerCloud": "La computadora de {{name}} se está preparando.",
       "forbidden": "No puedes ver este navegador.",
+      "noRole": "Tu rol no te da acceso a los navegadores de los agentes.",
       "tooMany": "Hay demasiados navegadores abiertos a la vez. Este aparece cuando se cierre otro.",
       "unavailable": "El navegador no se puede mostrar ahora. Reintentando…",
       "closed": "El navegador de {{name}} está cerrado.",
@@ -14010,7 +14047,8 @@
     "browserOnly": {
       "title": "Estás en el navegador, no en todo el computador",
       "plan": "{{name}} piensa con el plan de quien es su dueño, así que solo esa persona y los admins que gestionan agentes controlan todo el computador",
-      "other": "Puedes controlar el navegador de {{name}}, no todo el computador"
+      "other": "Puedes controlar el navegador de {{name}}, no todo el computador",
+      "role": "Tu rol te da el navegador de {{name}}, no la computadora entera"
     }
   },
   "agentComputer": {
@@ -14072,7 +14110,8 @@
       "noScreenHelp": "Permite la pantalla o el navegador en Herramientas y acceso.",
       "noComputer": "Elige una computadora para {{name}}.",
       "browserOff": "El navegador de {{name}} está desactivado en {{computer}}",
-      "forbidden": "No puedes ver esta computadora."
+      "forbidden": "No puedes ver esta computadora.",
+      "noRole": "Tu rol no te da acceso a las computadoras de los agentes."
     },
     "closeAsk": "{{name}} te espera 2 min para que vuelvas.",
     "openAccess": "Abrir Herramientas y acceso",

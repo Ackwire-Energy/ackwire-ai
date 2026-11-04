@@ -89,6 +89,24 @@
     "fromAdmin": "Z roli Administrator",
     "viaAdmin": "Wszystko, jako Administrator",
     "nothing": "Nic",
+    "computer": {
+      "title": "Komputery agentów",
+      "levels": {
+        "none": "Brak",
+        "browser": "Tylko przeglądarka",
+        "full": "Cały komputer"
+      },
+      "every": {
+        "none": "Tylko to, co Wszyscy już mogą",
+        "browser": "Przeglądarka każdego agenta i prośby o zalogowanie, nigdy cały ekran ani terminal",
+        "full": "Cały ekran, sterowanie i terminal każdego agenta"
+      },
+      "own": {
+        "none": "Nikt nie widzi ani nie używa komputerów i przeglądarek agentów, także próśb o zalogowanie",
+        "browser": "Przeglądarka własnych agentów i prośby o zalogowanie skierowane do tej osoby, nigdy cały ekran",
+        "full": "Cały ekran i terminal własnych agentów oraz komputerów podłączonych przez tę osobę"
+      }
+    },
     "everyoneNote": "Dotyczy każdej osoby w przestrzeni roboczej. Inne role tylko coś do tego dodają.",
     "summary": {
       "owner": "Może wszystko, zawsze. Każda przestrzeń robocza ma co najmniej jednego właściciela.",
@@ -259,6 +277,24 @@
       "desc": "Sterowanie ich pulpitem i przeglądarką.",
       "short": "przejmowanie ekranów",
       "say": "przejmuje ekrany agentów"
+    },
+    "control_browsers": {
+      "title": "Używanie przeglądarek agentów",
+      "desc": "Oglądanie i sterowanie przeglądarką każdego agenta oraz odpowiadanie na prośby o zalogowanie.",
+      "short": "używanie przeglądarek agentów",
+      "say": "używa przeglądarek agentów"
+    },
+    "own_computers": {
+      "title": "Używanie komputerów własnych agentów",
+      "desc": "Cały ekran i terminal agentów, za których ta osoba odpowiada, oraz komputerów, które podłączyła.",
+      "short": "używanie komputerów własnych agentów",
+      "say": "używa komputerów własnych agentów"
+    },
+    "own_browsers": {
+      "title": "Używanie przeglądarek własnych agentów",
+      "desc": "Przeglądarka agentów, za których ta osoba odpowiada, i prośby o zalogowanie skierowane do niej.",
+      "short": "używanie przeglądarek własnych agentów",
+      "say": "używa przeglądarek własnych agentów"
     },
     "manage_connectors": {
       "title": "Łączenie aplikacji",
@@ -13989,6 +14025,7 @@
       "noComputerCloud": "Komputer agenta {{name}} jest w przygotowaniu.",
       "noComputerCloud_female": "Komputer agentki {{name}} jest w przygotowaniu.",
       "forbidden": "Nie możesz zobaczyć tej przeglądarki.",
+      "noRole": "Twoja rola nie daje dostępu do przeglądarek agentów.",
       "tooMany": "Za dużo otwartych przeglądarek naraz. Ta pojawi się, gdy inna się zamknie.",
       "unavailable": "Nie można teraz pokazać przeglądarki. Ponawiamy próbę…",
       "closed": "Przeglądarka agenta {{name}} jest zamknięta.",
@@ -14465,7 +14502,8 @@
     "browserOnly": {
       "title": "Jesteś w przeglądarce, a nie na całym komputerze",
       "plan": "{{name}} myśli z planem właściciela, więc całym komputerem sterują tylko on i administratorzy zarządzający agentami",
-      "other": "Możesz sterować przeglądarką agenta {{name}}, ale nie całym komputerem"
+      "other": "Możesz sterować przeglądarką agenta {{name}}, ale nie całym komputerem",
+      "role": "Twoja rola daje ci przeglądarkę agenta {{name}}, a nie cały komputer"
     }
   },
   "agentComputer": {
@@ -14540,7 +14578,8 @@
       "noComputer_female": "Wybierz komputer dla agentki {{name}}.",
       "browserOff": "Przeglądarka agenta {{name}} jest wyłączona na komputerze {{computer}}",
       "browserOff_female": "Przeglądarka agentki {{name}} jest wyłączona na komputerze {{computer}}",
-      "forbidden": "Nie możesz zobaczyć tego komputera."
+      "forbidden": "Nie możesz zobaczyć tego komputera.",
+      "noRole": "Twoja rola nie daje dostępu do komputerów agentów."
     },
     "closeAsk": "{{name}} czeka 2 min na twój powrót.",
     "closeAsk_female": "{{name}} czeka 2 min na twój powrót.",

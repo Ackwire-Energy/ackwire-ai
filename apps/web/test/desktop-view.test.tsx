@@ -8,7 +8,7 @@ import { ApiError, keys } from "@agenteschat/client";
 import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ComputerDialog } from "@/components/computer/ComputerDialog";
-import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, meWithRole, ORG_ID, seedState } from "./fake-api";
 import { fakeSockets } from "./fake-socket";
 import { renderPage, screen, settle } from "./render";
 
@@ -375,6 +375,31 @@ describe("the agent's screen in the computer dialog", () => {
     await settle(8);
     const banner = document.querySelector(".cmp-banner[data-tone=info]") as HTMLElement;
     expect(banner.textContent).toBe(`Você está no navegador, não no computador inteiro${why}`);
+  });
+
+  test("whose role gives none of the agents' computers: no Assumir o navegador, and a click on the screen only says so, with Fechar", async () => {
+    const b = await backend({ ...RUNNING, canControl: false, controlRefusal: "role" }, true);
+    b.state.scopes[ADA_ID] = [...(b.state.scopes[ADA_ID] ?? []), { connectionId: null, scope: "browser:use" }];
+    b.fake.settings.set(ADA_ID, { allowedDomains: null, available: true, reason: null, detail: null, machine: null });
+    meWithRole(b.state, ["manage_agents"]);
+    b.state.roles = (b.state.roles ?? []).map((r) =>
+      r.kind === "everyone" ? { ...r, permissions: r.permissions.filter((p) => p !== "own_computers") } : r,
+    );
+    const ada = b.state.agents.find((a) => a.id === ADA_ID) as Agent;
+    await renderPage(<ComputerDialog agent={ada} open onClose={() => {}} />, {
+      api: b.api,
+      org: true,
+      createSocket: b.sockets.factory,
+    });
+    await settle(8);
+    await connected();
+    expect(view().queryByRole("button", { name: "Assumir o navegador" })).toBeNull();
+    await act(async () => fireEvent.pointerDown(rfb().canvas, { pointerType: "mouse", button: 0 }));
+    await settle(3);
+    const prompt = document.querySelector(".dsk-ask") as HTMLElement;
+    expect(prompt.textContent).toContain("Você está só assistindo.");
+    expect(within(prompt).queryByRole("button", { name: /Assumir/ })).toBeNull();
+    expect(within(prompt).getByRole("button", { name: "Fechar" })).toBeTruthy();
   });
 
   test("watching: a socket of its own in binary, view-only at quality 3, scaled; live once noVNC connects", async () => {

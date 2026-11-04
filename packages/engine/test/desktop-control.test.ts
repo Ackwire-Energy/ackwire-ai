@@ -12,6 +12,7 @@ import {
   authorizeStream,
   BROWSER_SCOPE,
   type BrowserLiveMessage,
+  browserHandoffRecipient,
   ConflictError,
   computerDrivers,
   createBrowserHandoffToolSource,
@@ -34,6 +35,7 @@ import {
   reauthorizeStream,
   recheckStream,
   renderPush,
+  requireBrowserAccess,
   requireComputerDriver,
   type Stream,
   type StreamBroker,
@@ -421,6 +423,113 @@ describe("one person in control of the desktop", () => {
       (await f.db.select().from(handoff).where(eq(handoff.id, taken.id)))[0]?.expiresAt.getTime() ?? 0;
     await until(async () => (await deadline()) > Date.now() + 60_000, "the controller's presence");
     expect(driving.closed).toBeNull();
+  });
+});
+
+describe("the agents' computers by role (ADR 0085 §12): none, the browser, the whole computer", () => {
+  /** Sets `everyone`'s keys; a role holding `keys` for `userId`. */
+  const everyone = (keys: string[]) =>
+    f.db
+      .update(schema.orgRoles)
+      .set({ permissions: keys })
+      .where(and(eq(schema.orgRoles.orgId, f.org.id), eq(schema.orgRoles.kind, "everyone")));
+  const giveRole = async (userId: string, keys: string[]) => {
+    const [role] = await f.db
+      .insert(schema.orgRoles)
+      .values({ orgId: f.org.id, name: `role-${keys.join("-")}`, position: 1, permissions: keys })
+      .returning();
+    await f.db.insert(schema.organizationMemberRoles).values({ orgId: f.org.id, userId, roleId: role?.id ?? "" });
+  };
+  const ownedBy = (userId: string | null) =>
+    f.db.update(schema.agents).set({ ownerUserId: userId }).where(eq(schema.agents.id, f.agent.id));
+  const BASE = ["post", "create_channels", "talk_to_agents", "assign_work", "pair_computers", "edit_wiki"];
+
+  test("a role with every agent's browser only: the browser and its requests, never the screen, control or terminal", async () => {
+    const { open, systemMode, setMachine } = await start();
+    await systemMode();
+    const caio = await addMember(f.db, f.org.id, "member", "caio");
+    await giveRole(caio.id, ["control_browsers"]);
+    expect((await requireBrowserAccess(f.db, caio.id, f.org.id, f.agent.id)).admin).toBe(true);
+    expect(await desktopStatus({ db: f.db }, caio.id, f.org.id, f.agent.id)).toMatchObject({
+      available: false,
+      reason: "browser_only",
+      canControl: false,
+      controlRefusal: "role",
+    });
+    await expect(requireComputerDriver(f.db, caio.id, f.org.id, f.agent.id)).rejects.toThrow(
+      "not their whole computer",
+    );
+    expect((await open(caio.id, WATCH)).closed?.code).toBe(STREAM_CLOSE.forbidden);
+    expect((await open(caio.id, CONTROL)).closed?.code).toBe(STREAM_CLOSE.forbidden);
+    expect((await open(caio.id, TERMINAL)).closed?.code).toBe(STREAM_CLOSE.forbidden);
+    await expect(startTakeover(deps(), caio.id, f.org.id, f.agent.id, null, "desktop")).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    // The browser is theirs to take, on its own page: the screen it runs on stays out of reach.
+    const taken = await startTakeover(deps(), caio.id, f.org.id, f.agent.id);
+    expect(taken.screen).toBe("browser");
+    expect((await open(caio.id, CONTROL)).closed?.code).toBe(STREAM_CLOSE.forbidden);
+    await finishHandoff(deps(), caio.id, f.org.id, taken.id, { result: "done" });
+    // A computer whose screen is switched off has none to keep from them: no "browser only".
+    await setMachine({ access: { ...ACCESS, tools: { ...ACCESS.tools, desktop: false } } });
+    expect(await desktopStatus({ db: f.db }, caio.id, f.org.id, f.agent.id)).toMatchObject({
+      reason: "not_allowed",
+      controlRefusal: null,
+    });
+  });
+
+  test("a role with the whole computer drives every agent's screen and terminal", async () => {
+    const { open, systemMode } = await start();
+    await systemMode();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await everyone(BASE);
+    await giveRole(bia.id, ["control_computers"]);
+    expect(await desktopStatus({ db: f.db }, bia.id, f.org.id, f.agent.id)).toMatchObject({ canControl: true });
+    expect((await open(bia.id, WATCH)).closed).toBeNull();
+    expect((await open(bia.id, TERMINAL)).closed).toBeNull();
+    // Asked for help on the screen when the agent has no owner who may.
+    await ownedBy(null);
+    expect(await computerDrivers(f.db, f.org.id, f.agent.id)).toContain(bia.id);
+  });
+
+  test("everyone's level bounds what is a person's own: their agent, their requests, the computer they connected", async () => {
+    const { open, systemMode, setMachine } = await start();
+    await systemMode();
+    const dani = await addMember(f.db, f.org.id, "member", "dani");
+    await ownedBy(dani.id);
+    // The default, what any member could do before: the whole computer of their own agent.
+    expect((await requireComputerDriver(f.db, dani.id, f.org.id, f.agent.id)).id).toBeTruthy();
+    expect(await computerDrivers(f.db, f.org.id, f.agent.id)).toEqual([dani.id]);
+    expect(await browserHandoffRecipient({ db: f.db }, f.org.id, null, f.agent.id)).toBe(dani.id);
+
+    // The browser only: its page and its requests, not the screen.
+    await everyone([...BASE, "own_browsers"]);
+    expect((await requireBrowserAccess(f.db, dani.id, f.org.id, f.agent.id)).owner).toBe(dani.id);
+    expect(await desktopStatus({ db: f.db }, dani.id, f.org.id, f.agent.id)).toMatchObject({
+      reason: "browser_only",
+      controlRefusal: "role",
+    });
+    expect((await open(dani.id, TERMINAL)).closed?.code).toBe(STREAM_CLOSE.forbidden);
+    expect(await computerDrivers(f.db, f.org.id, f.agent.id)).not.toContain(dani.id);
+    expect(await browserHandoffRecipient({ db: f.db }, f.org.id, null, f.agent.id)).toBe(dani.id);
+
+    // None: not even the browser or a request, on their own agent; the workspace's owner still has it all.
+    await everyone(BASE);
+    await expect(requireBrowserAccess(f.db, dani.id, f.org.id, f.agent.id)).rejects.toThrow(
+      "don't give you the agents' computers",
+    );
+    await expect(desktopStatus({ db: f.db }, dani.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(startTakeover(deps(), dani.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+    expect((await open(dani.id, WATCH)).closed?.code).toBe(STREAM_CLOSE.forbidden);
+    expect(await browserHandoffRecipient({ db: f.db }, f.org.id, null, f.agent.id)).toBeNull();
+    expect((await requireComputerDriver(f.db, f.owner.id, f.org.id, f.agent.id)).id).toBeTruthy();
+    expect((await open(f.owner.id, TERMINAL)).closed).toBeNull();
+
+    // A computer they connected, off system mode, is theirs only with the whole computer too.
+    await setMachine({ pairedByUserId: dani.id, executors: { desktop: { available: true } } });
+    await expect(requireComputerDriver(f.db, dani.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+    await everyone([...BASE, "own_computers"]);
+    expect((await requireComputerDriver(f.db, dani.id, f.org.id, f.agent.id)).id).toBeTruthy();
   });
 });
 

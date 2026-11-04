@@ -86,6 +86,24 @@
     "fromAdmin": "Dari Administrator",
     "viaAdmin": "Semuanya, sebagai Administrator",
     "nothing": "Tidak ada",
+    "computer": {
+      "title": "Komputer agen",
+      "levels": {
+        "none": "Tidak ada",
+        "browser": "Hanya browser",
+        "full": "Seluruh komputer"
+      },
+      "every": {
+        "none": "Hanya yang sudah bisa dilakukan Semua orang",
+        "browser": "Browser agen mana pun dan permintaan login, tidak pernah layar penuh atau terminal",
+        "full": "Layar penuh, kendali, dan terminal agen mana pun"
+      },
+      "own": {
+        "none": "Tidak ada yang bisa melihat atau memakai komputer atau browser agen, termasuk permintaan login",
+        "browser": "Browser agen miliknya sendiri dan permintaan login untuknya, tidak pernah layar penuh",
+        "full": "Layar penuh dan terminal agen miliknya sendiri dan komputer yang ia hubungkan"
+      }
+    },
     "everyoneNote": "Berlaku untuk setiap orang di ruang kerja. Peran lain hanya menambahkan.",
     "summary": {
       "owner": "Bisa melakukan apa saja, kapan saja. Setiap ruang kerja punya setidaknya satu pemilik.",
@@ -244,6 +262,24 @@
       "desc": "Kendalikan desktop dan browser mereka.",
       "short": "ambil alih layar",
       "say": "mengambil alih layar agen"
+    },
+    "control_browsers": {
+      "title": "Pakai browser agen",
+      "desc": "Melihat dan mengendalikan browser agen mana pun serta menjawab permintaan login.",
+      "short": "pakai browser agen",
+      "say": "memakai browser agen"
+    },
+    "own_computers": {
+      "title": "Pakai komputer agen sendiri",
+      "desc": "Layar penuh dan terminal agen yang menjadi tanggung jawabnya dan komputer yang ia hubungkan.",
+      "short": "pakai komputer agen sendiri",
+      "say": "memakai komputer agen sendiri"
+    },
+    "own_browsers": {
+      "title": "Pakai browser agen sendiri",
+      "desc": "Browser agen yang menjadi tanggung jawabnya dan permintaan login untuknya.",
+      "short": "pakai browser agen sendiri",
+      "say": "memakai browser agen sendiri"
     },
     "manage_connectors": {
       "title": "Hubungkan aplikasi",
@@ -12709,6 +12745,7 @@
       "noComputer": "{{name}} tidak punya komputer yang terhubung.",
       "noComputerCloud": "Komputer {{name}} sedang disiapkan.",
       "forbidden": "Kamu tidak bisa melihat browser ini.",
+      "noRole": "Peranmu tidak memberi akses ke browser agen.",
       "tooMany": "Terlalu banyak browser terbuka sekaligus. Yang ini muncul saat yang lain ditutup.",
       "unavailable": "Browser tidak bisa ditampilkan sekarang. Mencoba lagi…",
       "closed": "Browser {{name}} ditutup.",
@@ -13205,7 +13242,8 @@
     "browserOnly": {
       "title": "Kamu di browser, bukan di seluruh komputer",
       "plan": "{{name}} berpikir dengan paket pemiliknya, jadi hanya pemiliknya dan admin yang mengelola agen yang mengendalikan seluruh komputer",
-      "other": "Kamu bisa mengendalikan browser {{name}}, bukan seluruh komputer"
+      "other": "Kamu bisa mengendalikan browser {{name}}, bukan seluruh komputer",
+      "role": "Peranmu memberimu browser {{name}}, bukan seluruh komputer"
     }
   },
   "agentComputer": {
@@ -13267,7 +13305,8 @@
       "noScreenHelp": "Izinkan layar atau browser di Alat dan akses.",
       "noComputer": "Pilih komputer untuk {{name}}.",
       "browserOff": "Browser {{name}} mati di {{computer}}",
-      "forbidden": "Kamu tidak bisa melihat komputer ini."
+      "forbidden": "Kamu tidak bisa melihat komputer ini.",
+      "noRole": "Peranmu tidak memberi akses ke komputer agen."
     },
     "closeAsk": "{{name}} menunggu 2 menit sampai kamu kembali.",
     "openAccess": "Buka Alat dan akses",

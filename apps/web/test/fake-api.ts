@@ -450,6 +450,7 @@ export function seedRoles(): OrgRole[] {
         "talk_to_agents",
         "assign_work",
         "pair_computers",
+        "own_computers",
         "edit_wiki",
         "upload_files",
       ],
@@ -486,8 +487,16 @@ const PERMISSION_AREAS = [
   },
   {
     id: "tools",
-    use: ["pair_computers", "control_computers"],
-    keys: ["pair_computers", "control_computers", "manage_connectors", "manage_credentials"],
+    use: ["pair_computers"],
+    keys: [
+      "pair_computers",
+      "own_browsers",
+      "own_computers",
+      "control_browsers",
+      "control_computers",
+      "manage_connectors",
+      "manage_credentials",
+    ],
   },
   {
     id: "knowledge",

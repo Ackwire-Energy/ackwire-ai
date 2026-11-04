@@ -676,21 +676,22 @@ export async function runBrowserProfile(
   return agent?.id ?? null;
 }
 
-/** Who may drive a profile (log in, open a site, take control): `manage_connectors` with `control_computers`. */
+/** Who may drive a profile (log in, open a site, take control): `manage_connectors` with `control_browsers`. */
 export async function requireProfileDriver(db: Database, userId: string, orgId: string, profileId: string) {
   const membership = await requirePermission(db, userId, orgId, "manage_connectors");
-  if (!can(membership, "control_computers")) throw new ForbiddenError();
+  if (!can(membership, "control_browsers")) throw new ForbiddenError();
   return requireProfile(db, orgId, profileId);
 }
 
 /**
- * Who may watch a profile live: its drivers and the owners of the agents granted it. Never the person behind a
- * run: a profile shows a whole account, so the asker gets the agent's answer, not the screen.
+ * Who may watch a profile live: its drivers and the owners of the agents granted it (with `own_browsers`). Never the
+ * person behind a run: a profile shows a whole account, so the asker gets the agent's answer, not the screen.
  */
 export async function requireProfileWatcher(db: Database, userId: string, orgId: string, profileId: string) {
   const membership = await requireActiveMembership(db, userId, orgId);
   const row = await requireProfile(db, orgId, profileId);
-  if (can(membership, "manage_connectors") && can(membership, "control_computers")) return row;
+  if (can(membership, "manage_connectors") && can(membership, "control_browsers")) return row;
+  if (!can(membership, "own_browsers")) throw new ForbiddenError();
   const [owned] = await db
     .select({ id: agents.id })
     .from(browserProfileGrants)

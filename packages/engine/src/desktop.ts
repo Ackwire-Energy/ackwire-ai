@@ -19,6 +19,7 @@ import {
   noteComputerTaken,
   openHandoffOn,
   requireBrowserAccess,
+  screenAccess,
   setControlDeadline,
   touchControl,
 } from "./browser/handoff";
@@ -237,6 +238,7 @@ export interface DesktopDeps {
 
 /** The REST reaches a computer through whichever server holds its socket (`hub.call`), unlike a stream. */
 const ANYWHERE = { isLocal: () => true };
+const NO_SCREEN = ["no_agent", "no_desktop", "no_computer", "not_allowed"];
 
 /**
  * An agent's desktop as one person sees it: whether it can be shown and runs, who controls it, what they may
@@ -263,7 +265,10 @@ export interface DesktopStatus {
   held: boolean;
 }
 
-/** `GET …/agents/{agentId}/desktop`: for whoever may watch it. */
+/**
+ * `GET …/agents/{agentId}/desktop`: for whoever may watch it. Who may see the agent's browser but whose roles don't
+ * give them its whole computer gets a screen that can't be shown (`browser_only`), so the apps show the browser.
+ */
 export async function desktopStatus(
   deps: DesktopDeps,
   userId: string,
@@ -271,6 +276,25 @@ export async function desktopStatus(
   agentId: string,
 ): Promise<DesktopStatus> {
   const { db } = deps;
+  if ((await screenAccess(db, userId, orgId, agentId, undefined, "desktop")).refusal === "level") {
+    await requireBrowserAccess(db, userId, orgId, agentId);
+    const served = await desktopTarget(db, ANYWHERE, orgId, agentId, "desktop");
+    // An agent with no screen to show isn't one whose browser alone they get.
+    const none = "refused" in served && NO_SCREEN.includes(served.reason) ? served.reason : null;
+    return {
+      available: false,
+      reason: none ?? "browser_only",
+      detail: null,
+      running: false,
+      startedAt: null,
+      controllerUserId: null,
+      handoff: null,
+      viewers: 0,
+      canControl: false,
+      controlRefusal: none ? null : "role",
+      held: await standingRefusal(db, orgId, agentId).then((refusal) => refusal !== null),
+    };
+  }
   await requireDesktopAccess(db, userId, orgId, agentId);
   const [served, open, controlRefusal, held] = await Promise.all([
     desktopTarget(db, ANYWHERE, orgId, agentId, "desktop"),

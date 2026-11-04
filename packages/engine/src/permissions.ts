@@ -19,8 +19,16 @@ export const PERMISSION_AREAS = [
   },
   {
     id: "tools",
-    use: ["pair_computers", "control_computers"],
-    keys: ["pair_computers", "control_computers", "manage_connectors", "manage_credentials"],
+    use: ["pair_computers"],
+    keys: [
+      "pair_computers",
+      "own_browsers",
+      "own_computers",
+      "control_browsers",
+      "control_computers",
+      "manage_connectors",
+      "manage_credentials",
+    ],
   },
   {
     id: "knowledge",
@@ -48,6 +56,25 @@ export type RolePermission = "administrator" | (typeof PERMISSION_AREAS)[number]
 /** What the server checks: a role's keys, plus `read` (every member) and `manage_owners` (owners only). */
 export type Permission = RolePermission | "read" | "manage_owners";
 
+/**
+ * The agents' computers, one choice per role on the roles screen (none, the browser, the whole computer), stored as
+ * one of two keys per reach. `control_*`: every agent's. `own_*`: an agent the person is responsible for, a computer
+ * they connected, a run they asked for and a request addressed to them; `everyone` holds these, the other roles the
+ * `control_*` pair. The browser is the agent's browser view and its sign-in requests; the whole computer adds its
+ * full screen, taking control of it and its terminal. Each key gives the ones below it, so a check names only the
+ * least it needs.
+ */
+const IMPLIED: Partial<Record<RolePermission, readonly RolePermission[]>> = {
+  control_computers: ["control_browsers", "own_computers", "own_browsers"],
+  control_browsers: ["own_browsers"],
+  own_computers: ["own_browsers"],
+};
+/** The keys that give `permission`, itself first. */
+const givers = (permission: RolePermission): RolePermission[] => [
+  permission,
+  ...(Object.keys(IMPLIED) as RolePermission[]).filter((k) => IMPLIED[k]?.includes(permission)),
+];
+
 /** Every key but `administrator`, in the areas' order. */
 export const AREA_PERMISSIONS: readonly RolePermission[] = PERMISSION_AREAS.flatMap((a) => a.keys);
 export const ROLE_PERMISSIONS: readonly RolePermission[] = ["administrator", ...AREA_PERMISSIONS];
@@ -57,7 +84,7 @@ export const isRolePermission = (v: unknown): v is RolePermission =>
 
 /**
  * What the `everyone` role ("Todos") holds in a new workspace: what any member could do before roles, now as
- * keys (the same list as migration 0130).
+ * keys (the same list as migration 0130, with `own_computers` from migration 0210).
  */
 export const EVERYONE_DEFAULTS: readonly RolePermission[] = [
   "post",
@@ -65,6 +92,7 @@ export const EVERYONE_DEFAULTS: readonly RolePermission[] = [
   "talk_to_agents",
   "assign_work",
   "pair_computers",
+  "own_computers",
   "edit_wiki",
   "upload_files",
 ];
@@ -101,6 +129,7 @@ export function resolvePermissions(owner: boolean, keys: Iterable<string>): Read
   const out = new Set<Permission>(["read"]);
   for (const k of keys) if (isRolePermission(k)) out.add(k);
   if (out.has("administrator")) for (const k of AREA_PERMISSIONS) out.add(k);
+  for (const k of [...out]) for (const i of IMPLIED[k as RolePermission] ?? []) out.add(i);
   return out;
 }
 
@@ -109,6 +138,7 @@ export function roleGrants(keys: Iterable<string>): ReadonlySet<RolePermission> 
   const out = new Set<RolePermission>();
   for (const k of keys) if (isRolePermission(k)) out.add(k);
   if (out.has("administrator")) for (const k of AREA_PERMISSIONS) out.add(k);
+  for (const k of [...out]) for (const i of IMPLIED[k] ?? []) out.add(i);
   return out;
 }
 
@@ -144,6 +174,10 @@ export const memberRankSql = ({ orgId, userId }: { orgId: unknown; userId: unkno
  * lists of who may decide).
  */
 export function maySql(orgId: unknown, userId: unknown, permission: RolePermission): SQL<boolean> {
+  const keys = sql.join(
+    [...givers(permission), "administrator"].map((k) => sql`${k}`),
+    sql`, `,
+  );
   return sql<boolean>`exists (
     select 1 from organization_members pm
     where pm.org_id = ${qualified(orgId)} and pm.user_id = ${qualified(userId)}
@@ -152,7 +186,7 @@ export function maySql(orgId: unknown, userId: unknown, permission: RolePermissi
         where pr.org_id = pm.org_id
           and (pr.kind = 'everyone' or pr.id in (
             select pmr.role_id from organization_member_roles pmr where pmr.org_id = pm.org_id and pmr.user_id = pm.user_id))
-          and pr.permissions && array[${permission}, 'administrator']::text[])))`;
+          and pr.permissions && array[${keys}]::text[])))`;
 }
 
 /** The ids of the members of `orgId` who may `permission` (owners included), as a SQL subquery. */

@@ -232,7 +232,7 @@ export function RunBrowserCard({ run, name }: { run: LiveRun; name: string }) {
               id: inProfile.id,
               name: inProfile.name,
               agentIds: inProfile.agentIds,
-              canDrive: canDo(org, "manage_connectors") && canDo(org, "control_computers"),
+              canDrive: canDo(org, "manage_connectors") && canDo(org, "control_browsers"),
             },
           }
         : {})}
@@ -849,7 +849,7 @@ export function BrowserCard({
       : unavailable?.reason === "no_computer"
         ? t(cloud ? "browser.inCard.noComputerCloud" : "browser.inCard.noComputer", g)
         : unavailable?.reason === "forbidden" || live.error === "forbidden" || live.error === "not_found"
-          ? t("browser.inCard.forbidden")
+          ? t(canDo(org, "own_browsers") ? "browser.inCard.forbidden" : "browser.inCard.noRole")
           : live.error === "too_many_browsers"
             ? t("browser.inCard.tooMany")
             : null;

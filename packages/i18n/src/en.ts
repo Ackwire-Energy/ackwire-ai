@@ -93,6 +93,22 @@ export const en = {
     fromAdmin: "From Administrator",
     viaAdmin: "Everything, as Administrator",
     nothing: "Nothing",
+    computer: {
+      title: "Agents' computers",
+      levels: { none: "None", browser: "Browser only", full: "Whole computer" },
+      /** A role but Everyone: on every agent of the workspace. */
+      every: {
+        none: "Only what Everyone can already do",
+        browser: "Any agent's browser and sign-in requests, never the full screen or the terminal",
+        full: "Any agent's full screen, control and terminal",
+      },
+      /** Everyone: on the agents each person is responsible for, the computers they connected and when asked. */
+      own: {
+        none: "Nobody sees or uses the agents' computers or browsers, sign-in requests included",
+        browser: "Their own agents' browser and sign-in requests made to them, never the full screen",
+        full: "The full screen and terminal of their own agents and of the computers they connected",
+      },
+    },
     everyoneNote: "Applies to every person in the workspace. Other roles only add to it.",
     summary: {
       owner: "Can do everything, always. Every workspace has at least one owner.",
@@ -255,6 +271,24 @@ export const en = {
       desc: "Control their desktop and their browser.",
       short: "take over screens",
       say: "takes over the agents' screens",
+    },
+    control_browsers: {
+      title: "Use the agents' browsers",
+      desc: "See and control any agent's browser and answer sign-in requests.",
+      short: "use the agents' browsers",
+      say: "uses the agents' browsers",
+    },
+    own_computers: {
+      title: "Use their own agents' computers",
+      desc: "The full screen and terminal of the agents they're responsible for and of the computers they connected.",
+      short: "use their own agents' computers",
+      say: "uses their own agents' computers",
+    },
+    own_browsers: {
+      title: "Use their own agents' browsers",
+      desc: "The browser of the agents they're responsible for and sign-in requests made to them.",
+      short: "use their own agents' browsers",
+      say: "uses their own agents' browsers",
     },
     manage_connectors: {
       title: "Connect apps",
@@ -12578,6 +12612,7 @@ export const en = {
       noComputer: "{{name}} has no connected computer.",
       noComputerCloud: "{{name}}'s computer is being prepared.",
       forbidden: "You can't see this browser.",
+      noRole: "Your role doesn't give you the agents' browsers.",
       tooMany: "Too many browsers open at once. This one shows when another one closes.",
       unavailable: "The browser can't be shown right now. Trying again…",
       closed: "{{name}}'s browser is closed.",
@@ -13091,6 +13126,7 @@ export const en = {
       title: "You're in the browser, not the whole computer",
       plan: "{{name}} thinks with the owner's plan, so only the owner and admins who manage agents control the whole computer",
       other: "You can control {{name}}'s browser, not the whole computer",
+      role: "Your role gives you {{name}}'s browser, not the whole computer",
     },
   },
   agentComputer: {
@@ -13153,6 +13189,7 @@ export const en = {
       noComputer: "Choose a computer for {{name}}.",
       browserOff: "{{name}}'s browser is off on {{computer}}",
       forbidden: "You can't see this computer.",
+      noRole: "Your role doesn't give you the agents' computers.",
     },
     closeAsk: "{{name}} waits 2 min for you to come back.",
     openAccess: "Open Tools and access",

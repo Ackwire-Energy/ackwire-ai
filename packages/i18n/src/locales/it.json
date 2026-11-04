@@ -88,6 +88,24 @@
     "fromAdmin": "Da Amministratore",
     "viaAdmin": "Tutto, come Amministratore",
     "nothing": "Niente",
+    "computer": {
+      "title": "Computer degli agenti",
+      "levels": {
+        "none": "Nessuno",
+        "browser": "Solo il browser",
+        "full": "Computer intero"
+      },
+      "every": {
+        "none": "Solo ciò che Tutti possono già fare",
+        "browser": "Il browser di qualsiasi agente e le richieste di accesso, mai lo schermo intero né il terminale",
+        "full": "Lo schermo intero, il controllo e il terminale di qualsiasi agente"
+      },
+      "own": {
+        "none": "Nessuno vede né usa i computer o i browser degli agenti, né le richieste di accesso",
+        "browser": "Il browser dei propri agenti e le richieste di accesso fatte alla persona, mai lo schermo intero",
+        "full": "Lo schermo intero e il terminale dei propri agenti e dei computer che la persona ha collegato"
+      }
+    },
     "everyoneNote": "Vale per ogni persona dello spazio di lavoro. Gli altri ruoli possono solo aggiungere.",
     "summary": {
       "owner": "Può fare tutto, sempre. Ogni spazio di lavoro ha almeno un proprietario.",
@@ -254,6 +272,24 @@
       "desc": "Controllare il loro desktop e il loro browser.",
       "short": "prendere il controllo degli schermi",
       "say": "prende il controllo degli schermi degli agenti"
+    },
+    "control_browsers": {
+      "title": "Usare il browser degli agenti",
+      "desc": "Vedere e controllare il browser di qualsiasi agente e rispondere alle richieste di accesso.",
+      "short": "usare il browser degli agenti",
+      "say": "usa il browser degli agenti"
+    },
+    "own_computers": {
+      "title": "Usare il computer dei propri agenti",
+      "desc": "Lo schermo intero e il terminale degli agenti di cui la persona è responsabile e dei computer che ha collegato.",
+      "short": "usare il computer dei propri agenti",
+      "say": "usa il computer dei propri agenti"
+    },
+    "own_browsers": {
+      "title": "Usare il browser dei propri agenti",
+      "desc": "Il browser degli agenti di cui la persona è responsabile e le richieste di accesso fatte a lei.",
+      "short": "usare il browser dei propri agenti",
+      "say": "usa il browser dei propri agenti"
     },
     "manage_connectors": {
       "title": "Collegare app",
@@ -13628,6 +13664,7 @@
       "noComputerCloud": "Il computer di {{name}} è in preparazione.",
       "noComputerCloud_female": "Il computer di {{name}} è in preparazione.",
       "forbidden": "Non puoi vedere questo browser.",
+      "noRole": "Il tuo ruolo non ti dà accesso ai browser degli agenti.",
       "tooMany": "Troppi browser aperti insieme. Questo compare quando un altro si chiude.",
       "unavailable": "Il browser non si può mostrare in questo momento. Nuovo tentativo…",
       "closed": "Il browser di {{name}} è chiuso.",
@@ -14141,7 +14178,8 @@
     "browserOnly": {
       "title": "Sei nel browser, non in tutto il computer",
       "plan": "{{name}} ragiona con il piano di chi lo possiede, quindi solo quella persona e gli admin che gestiscono gli agenti controllano tutto il computer",
-      "other": "Puoi controllare il browser di {{name}}, non tutto il computer"
+      "other": "Puoi controllare il browser di {{name}}, non tutto il computer",
+      "role": "Il tuo ruolo ti dà il browser di {{name}}, non tutto il computer"
     }
   },
   "agentComputer": {
@@ -14216,7 +14254,8 @@
       "noComputer_female": "Scegli un computer per {{name}}.",
       "browserOff": "Il browser di {{name}} è disattivato su {{computer}}",
       "browserOff_female": "Il browser di {{name}} è disattivato su {{computer}}",
-      "forbidden": "Non puoi vedere questo computer."
+      "forbidden": "Non puoi vedere questo computer.",
+      "noRole": "Il tuo ruolo non ti dà accesso ai computer degli agenti."
     },
     "closeAsk": "{{name}} aspetta 2 min che tu torni.",
     "closeAsk_female": "{{name}} aspetta 2 min che tu torni.",

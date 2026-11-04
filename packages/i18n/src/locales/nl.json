@@ -87,6 +87,24 @@
     "fromAdmin": "Van Beheerder",
     "viaAdmin": "Alles, als Beheerder",
     "nothing": "Niets",
+    "computer": {
+      "title": "Computers van agents",
+      "levels": {
+        "none": "Geen",
+        "browser": "Alleen de browser",
+        "full": "Hele computer"
+      },
+      "every": {
+        "none": "Alleen wat Iedereen al mag",
+        "browser": "De browser van elke agent en de inlogverzoeken, nooit het hele scherm of de terminal",
+        "full": "Het hele scherm, de bediening en de terminal van elke agent"
+      },
+      "own": {
+        "none": "Niemand ziet of gebruikt de computers of browsers van agents, ook geen inlogverzoeken",
+        "browser": "De browser van de eigen agents en inlogverzoeken aan de persoon, nooit het hele scherm",
+        "full": "Het hele scherm en de terminal van de eigen agents en van de computers die de persoon heeft gekoppeld"
+      }
+    },
     "everyoneNote": "Geldt voor iedereen in de werkruimte. Andere rollen voegen er alleen iets aan toe.",
     "summary": {
       "owner": "Kan altijd alles. Elke werkruimte heeft minstens één eigenaar.",
@@ -249,6 +267,24 @@
       "desc": "Hun bureaublad en browser bedienen.",
       "short": "schermen overnemen",
       "say": "neemt de schermen van agents over"
+    },
+    "control_browsers": {
+      "title": "Browser van agents gebruiken",
+      "desc": "De browser van elke agent zien en bedienen en inlogverzoeken beantwoorden.",
+      "short": "browser van agents gebruiken",
+      "say": "gebruikt de browser van agents"
+    },
+    "own_computers": {
+      "title": "Computer van eigen agents gebruiken",
+      "desc": "Het hele scherm en de terminal van de agents waarvoor de persoon verantwoordelijk is en van de computers die die heeft gekoppeld.",
+      "short": "computer van eigen agents gebruiken",
+      "say": "gebruikt de computer van eigen agents"
+    },
+    "own_browsers": {
+      "title": "Browser van eigen agents gebruiken",
+      "desc": "De browser van de agents waarvoor de persoon verantwoordelijk is en inlogverzoeken aan die persoon.",
+      "short": "browser van eigen agents gebruiken",
+      "say": "gebruikt de browser van eigen agents"
     },
     "manage_connectors": {
       "title": "Apps koppelen",
@@ -13219,6 +13255,7 @@
       "noComputerCloud": "De computer van {{name}} wordt klaargezet.",
       "noComputerCloud_female": "De computer van {{name}} wordt klaargezet.",
       "forbidden": "Je kunt deze browser niet zien.",
+      "noRole": "Je rol geeft je geen toegang tot de browsers van agents.",
       "tooMany": "Te veel browsers tegelijk open. Deze verschijnt als er een andere sluit.",
       "unavailable": "De browser kan nu niet getoond worden. Opnieuw proberen…",
       "closed": "De browser van {{name}} is gesloten.",
@@ -13728,7 +13765,8 @@
     "browserOnly": {
       "title": "Je zit in de browser, niet op de hele computer",
       "plan": "{{name}} denkt met het abonnement van de eigenaar, dus alleen die en beheerders die agents beheren bedienen de hele computer",
-      "other": "Je kunt de browser van {{name}} bedienen, niet de hele computer"
+      "other": "Je kunt de browser van {{name}} bedienen, niet de hele computer",
+      "role": "Je rol geeft je de browser van {{name}}, niet de hele computer"
     }
   },
   "agentComputer": {
@@ -13803,7 +13841,8 @@
       "noComputer_female": "Kies een computer voor {{name}}.",
       "browserOff": "De browser van {{name}} staat uit op {{computer}}",
       "browserOff_female": "De browser van {{name}} staat uit op {{computer}}",
-      "forbidden": "Je kunt deze computer niet zien."
+      "forbidden": "Je kunt deze computer niet zien.",
+      "noRole": "Je rol geeft je geen toegang tot de computers van agents."
     },
     "closeAsk": "{{name}} wacht 2 min tot je terug bent.",
     "closeAsk_female": "{{name}} wacht 2 min tot je terug bent.",
