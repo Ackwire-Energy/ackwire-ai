@@ -178,8 +178,15 @@ export function pickRemovals(
   return picked;
 }
 
-/** The messages with those tool results replaced by the placeholder (untouched messages are the same objects). */
-export function compactToolResults(messages: ModelMessage[], toolUseIds: Set<string>): ModelMessage[] {
+/**
+ * The messages with those tool results replaced by the placeholder (untouched messages are the same objects). A result
+ * in `keepText` (one the view shows cut, `cutResultIds`) loses only its images: `expand` reopens its text whole.
+ */
+export function compactToolResults(
+  messages: ModelMessage[],
+  toolUseIds: Set<string>,
+  keepText: Set<string> = new Set(),
+): ModelMessage[] {
   return messages.map((m) => {
     if (
       typeof m.content === "string" ||
@@ -191,7 +198,7 @@ export function compactToolResults(messages: ModelMessage[], toolUseIds: Set<str
       content: m.content.map((b) => {
         if (b.type !== "tool_result" || !toolUseIds.has(b.toolUseId)) return b;
         const { images: _images, ...rest } = b;
-        return { ...rest, content: removedPlaceholder(resultChars(b)) };
+        return keepText.has(b.toolUseId) ? rest : { ...rest, content: removedPlaceholder(resultChars(b)) };
       }),
     };
   });
@@ -238,6 +245,20 @@ const cutStrings = (value: unknown, id: string): unknown =>
         ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, cutStrings(v, id)]))
         : value;
 
+const reopensWhole = (id: string) => `expand ${id} reopens it whole]`;
+
+/** The tool results `view` (`cutOldToolSteps`) shows cut. */
+export const cutResultIds = (view: ModelMessage[]) =>
+  new Set(
+    view.flatMap((m) =>
+      typeof m.content === "string"
+        ? []
+        : m.content.flatMap((b) =>
+            b.type === "tool_result" && b.content.endsWith(reopensWhole(b.toolUseId)) ? [b.toolUseId] : [],
+          ),
+    ),
+  );
+
 /**
  * The view of a run's messages a model reads when it can `expand` (`tools`): tool calls and results older than the
  * last `KEEP_TOOL_STEPS` steps (to `TOOL_STEP_ANCHOR - 1` more) read cut, each with the call's id `expand` reopens
@@ -272,7 +293,7 @@ export function cutOldToolSteps(messages: ModelMessage[], tools: readonly { name
       return {
         ...b,
         // The note after the end: outside an envelope (`untrustedBlock`), read as ours, not as the data's.
-        content: `${cutText(b.content, OLD_RESULT_HEAD)}\n[…]\n${cutTextEnd(b.content, OLD_RESULT_TAIL)}\n[Cut: ${cut} of this ${call.name} result's ${b.content.length} characters, in the middle; expand ${b.toolUseId} reopens it whole]`,
+        content: `${cutText(b.content, OLD_RESULT_HEAD)}\n[…]\n${cutTextEnd(b.content, OLD_RESULT_TAIL)}\n[Cut: ${cut} of this ${call.name} result's ${b.content.length} characters, in the middle; ${reopensWhole(b.toolUseId)}`,
       };
     });
     return changed ? { ...m, content } : m;

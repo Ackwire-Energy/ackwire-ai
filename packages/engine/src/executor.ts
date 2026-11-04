@@ -131,7 +131,7 @@ import { recordContextUse } from "./context/feedback";
 import { afterTurnDone, learnTags, reportLearnFailure } from "./context/learn";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { EXPAND_TOOL, itemLabel, retrieveForRun } from "./context/tools";
-import { compactToolResults, cutOldToolSteps, dropOldImages, fitContextWindow } from "./context-budget";
+import { compactToolResults, cutOldToolSteps, cutResultIds, dropOldImages, fitContextWindow } from "./context-budget";
 import {
   advance as advanceContinuation,
   type ContinuationState,
@@ -3583,6 +3583,7 @@ async function executeRunInner(
           transcript.messages = pictured;
           await saveTranscript(db, transcript);
         }
+        const view = cutOldToolSteps(transcript.messages, turnTools);
         const fitted = await fitContextWindow(judge, {
           orgId: run.orgId,
           agentId: agent.id,
@@ -3593,12 +3594,12 @@ async function executeRunInner(
           maxOutputTokens: deps.maxOutputTokens,
           system: transcript.system,
           // Measured as the model reads it: results the view already cuts stay reachable by `expand`.
-          messages: cutOldToolSteps(transcript.messages, turnTools),
+          messages: view,
           tools: turnTools,
           task: triggerText,
         }).catch(() => null);
         if (fitted) {
-          transcript.messages = compactToolResults(transcript.messages, fitted.removed);
+          transcript.messages = compactToolResults(transcript.messages, fitted.removed, cutResultIds(view));
           await saveTranscript(db, transcript);
           const report = fitted.report;
           later(() => addRunStep(db, run, "context", { contextBudget: report }));

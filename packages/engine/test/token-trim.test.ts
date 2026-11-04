@@ -28,7 +28,13 @@ import {
   toTurns,
 } from "../src";
 import { TYPING_GRACE_MS, typingLogFor, waitForBurst } from "../src/burst";
-import { cutOldToolSteps, KEEP_TOOL_STEPS } from "../src/context-budget";
+import {
+  compactToolResults,
+  cutOldToolSteps,
+  cutResultIds,
+  fitContextWindow,
+  KEEP_TOOL_STEPS,
+} from "../src/context-budget";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
@@ -324,6 +330,36 @@ test("B12: old tool calls and results read cut, reopened by expand; the last ste
     `B12, ${steps} steps of 3.6k-character results: API messages ${size(run)} -> ${size(cut)} chars; computer prompt ${flat(run)} -> ${flat(cut)}`,
   );
   expect(size(cut)).toBeLessThan(size(run) * 0.8);
+});
+
+test("B12: a compaction that removes old results keeps every cut one's text whole for expand", async () => {
+  const run = toolRun(14);
+  // A screenshot on a cut result: the only part of it a compaction may still take.
+  const shot = run[2]?.content;
+  if (typeof shot !== "string" && shot?.[0]?.type === "tool_result")
+    shot[0].images = [{ mediaType: "image/png", data: "A".repeat(200) }];
+  const view = cutOldToolSteps(run, withExpand);
+  const cut = cutResultIds(view);
+  expect([...cut].sort()).toEqual(["toolu_0", "toolu_4", "toolu_5", "toolu_6", "toolu_7"]);
+  const fitted = await fitContextWindow(null, {
+    orgId: "org",
+    model: "claude-sonnet-4-5",
+    windowTokens: 4_000,
+    maxOutputTokens: 1_000,
+    system: [],
+    messages: view,
+  });
+  expect(fitted?.removed.has("toolu_0")).toBe(true);
+  const kept = compactToolResults(run, fitted?.removed ?? new Set(), cut);
+  const results = new Map(
+    kept
+      .flatMap((m) => (typeof m.content === "string" ? [] : m.content))
+      .flatMap((b) => (b.type === "tool_result" ? [[b.toolUseId, b] as const] : [])),
+  );
+  for (const id of cut) expect(results.get(id)?.content, id).toBe(`linha ${id.slice(6)} `.repeat(400));
+  expect(results.get("toolu_0")?.images).toBeUndefined();
+  // A result the view shows whole may still go, with the placeholder.
+  expect([...(fitted?.removed ?? [])].some((id) => results.get(id)?.content.startsWith("[Result removed"))).toBe(true);
 });
 
 test("B12: an agent that needs a cut tool result calls expand and reads it whole", async () => {
