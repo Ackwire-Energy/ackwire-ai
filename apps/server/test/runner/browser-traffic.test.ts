@@ -255,3 +255,165 @@ test("a socket that fails or closes settles the attach and keeps what was counte
   expect(broken.take()).toEqual({ up: 0, down: 0 });
   broken.close();
 });
+
+test("the GET guard (ADR 0144): only while armed, every session's requests pause; one carrying the value fails", async () => {
+  const { c, cdp } = counter();
+  cdp.onopen?.();
+  cdp.reply(1);
+  await c.attached;
+  cdp.attach("page-1");
+  const sent = (method: string) => cdp.sent.filter((m) => m.method === method);
+  // Not armed: nothing pauses.
+  expect(sent("Fetch.enable")).toEqual([]);
+  let blocked = 0;
+  c.guard(["hunter2-guarded value"], 60, () => {
+    blocked++;
+  });
+  expect(sent("Fetch.enable").map((m) => m.sessionId)).toEqual(["page-1"]);
+  // A frame that opens meanwhile is guarded too.
+  cdp.event("Target.attachedToTarget", { sessionId: "frame-1", targetInfo: { type: "iframe" } }, "page-1");
+  expect(sent("Fetch.enable").map((m) => m.sessionId)).toEqual(["page-1", "frame-1"]);
+  const pause = (requestId: string, url: string, sessionId = "page-1") =>
+    cdp.event("Fetch.requestPaused", { requestId, request: { url } }, sessionId);
+  pause("a", `https://shop.example/?${new URLSearchParams({ pw: "hunter2-guarded value" })}`);
+  pause("b", `https://evil.example/c?d=${encodeURIComponent("hunter2-guarded value")}`, "frame-1");
+  pause("c", "https://shop.example/app.js");
+  expect(sent("Fetch.failRequest")).toEqual([
+    expect.objectContaining({ sessionId: "page-1", params: { requestId: "a", errorReason: "BlockedByClient" } }),
+    expect.objectContaining({ sessionId: "frame-1", params: { requestId: "b", errorReason: "BlockedByClient" } }),
+  ]);
+  expect(sent("Fetch.continueRequest")).toEqual([
+    expect.objectContaining({ sessionId: "page-1", params: { requestId: "c" } }),
+  ]);
+  expect(blocked).toBe(2);
+  // Its time over: every session lets go, and a request paused just then still goes on.
+  await Bun.sleep(100);
+  expect(sent("Fetch.disable").map((m) => m.sessionId)).toEqual(["page-1", "frame-1"]);
+  pause("d", `https://shop.example/?pw=${encodeURIComponent("hunter2-guarded value")}`);
+  expect(sent("Fetch.continueRequest").map((m) => (m.params as { requestId: string }).requestId)).toEqual(["c", "d"]);
+  expect(blocked).toBe(2);
+  // A value too short to tell apart from ordinary addresses arms nothing.
+  c.guard(["123"], 60, () => {});
+  expect(sent("Fetch.enable")).toHaveLength(2);
+  c.close();
+});
+
+test("the GET guard is ready only once Chrome answered Fetch.enable on every session; released, it lets go", async () => {
+  const { c, cdp } = counter();
+  cdp.onopen?.();
+  cdp.reply(1);
+  await c.attached;
+  cdp.attach("page-1");
+  cdp.event("Target.attachedToTarget", { sessionId: "frame-1", targetInfo: { type: "iframe" } }, "page-1");
+  cdp.event("Target.attachedToTarget", { sessionId: "worker-1", targetInfo: { type: "worker" } }, "page-1");
+  const sent = (method: string) => cdp.sent.filter((m) => m.method === method);
+  let ready: boolean | null = null;
+  const first = c.guard(["hunter2-first value"], 60_000, () => {});
+  void first.ready.then((ok) => {
+    ready = ok;
+  });
+  const [page, frame, worker] = sent("Fetch.enable");
+  expect([page?.sessionId, frame?.sessionId, worker?.sessionId]).toEqual(["page-1", "frame-1", "worker-1"]);
+  cdp.reply(page?.id ?? 0);
+  // A session that went away answers with an error: nothing is left there to pause.
+  cdp.event("Target.detachedFromTarget", { sessionId: "worker-1" });
+  cdp.onmessage?.({ data: JSON.stringify({ id: worker?.id, error: { code: -32001, message: "Session not found" } }) });
+  await Bun.sleep(5);
+  // One session still paused nothing: not ready, so nothing may be typed yet.
+  expect(ready).toBeNull();
+  cdp.reply(frame?.id ?? 0);
+  expect(await first.ready).toBe(true);
+  // Armed again meanwhile: ready at once, nothing asked of Chrome again.
+  const second = c.guard(["hunter2-second value"], 60_000, () => {});
+  expect(await second.ready).toBe(true);
+  expect(sent("Fetch.enable")).toHaveLength(3);
+  // A fill that was refused takes its value back out; the other stays guarded.
+  second.release();
+  const pause = (requestId: string, value: string) =>
+    cdp.event("Fetch.requestPaused", { requestId, request: { url: `https://shop.example/?pw=${value}` } }, "page-1");
+  pause("a", encodeURIComponent("hunter2-second value"));
+  pause("b", encodeURIComponent("hunter2-first value"));
+  const ids = (method: string) => sent(method).map((m) => (m.params as { requestId: string }).requestId);
+  expect(ids("Fetch.continueRequest")).toEqual(["a"]);
+  expect(ids("Fetch.failRequest")).toEqual(["b"]);
+  expect(sent("Fetch.disable")).toEqual([]);
+  // The last one released: every session lets go at once.
+  first.release();
+  expect(sent("Fetch.disable").map((m) => m.sessionId)).toEqual(["page-1", "frame-1"]);
+  c.close();
+});
+
+test("a guard Chrome doesn't confirm isn't ready (after a while, or once the socket closes); the next one asks again", async () => {
+  const { c, cdp } = counter();
+  cdp.onopen?.();
+  cdp.reply(1);
+  await c.attached;
+  cdp.attach("page-1");
+  const enables = () => cdp.sent.filter((m) => m.method === "Fetch.enable");
+  expect(await c.guard(["hunter2-slow chrome"], 60_000, () => {}, 20).ready).toBe(false);
+  const again = c.guard(["hunter2-slow chrome"], 60_000, () => {}, 1_000);
+  expect(enables()).toHaveLength(2);
+  cdp.reply(enables()[1]?.id ?? 0);
+  expect(await again.ready).toBe(true);
+  c.close();
+
+  const other = counter();
+  other.cdp.onopen?.();
+  other.cdp.reply(1);
+  await other.c.attached;
+  other.cdp.attach("page-1");
+  const waiting = other.c.guard(["hunter2-closing chrome"], 60_000, () => {}, 60_000);
+  other.cdp.close();
+  expect(await waiting.ready).toBe(false);
+  // Closed: never ready again.
+  expect(await other.c.guard(["hunter2-after close"], 60_000, () => {}).ready).toBe(false);
+});
+
+test("a session that answers Fetch.enable with an error isn't paused: the guard isn't ready, and the next one asks it again", async () => {
+  const { c, cdp } = counter();
+  cdp.onopen?.();
+  cdp.reply(1);
+  await c.attached;
+  cdp.attach("page-1");
+  cdp.event("Target.attachedToTarget", { sessionId: "frame-1", targetInfo: { type: "iframe" } }, "page-1");
+  const enables = () => cdp.sent.filter((m) => m.method === "Fetch.enable");
+  const first = c.guard(["hunter2-refused fetch"], 60_000, () => {});
+  const [page, frame] = enables();
+  cdp.reply(page?.id ?? 0);
+  // Still attached, so its requests would leave unchecked: nothing may be typed (the runner says `unguarded`).
+  cdp.onmessage?.({ data: JSON.stringify({ id: frame?.id, error: { code: -32000, message: "Fetch unavailable" } }) });
+  expect(await first.ready).toBe(false);
+  // The next guard asks that session again (the page stays paused, not asked twice).
+  const again = c.guard(["hunter2-refused fetch"], 60_000, () => {});
+  expect(enables().map((m) => m.sessionId)).toEqual(["page-1", "frame-1", "frame-1"]);
+  cdp.reply(enables()[2]?.id ?? 0);
+  expect(await again.ready).toBe(true);
+  c.close();
+});
+
+test("a session attached after a guard was ready: the next guard waits for its Fetch.enable too", async () => {
+  const { c, cdp } = counter();
+  cdp.onopen?.();
+  cdp.reply(1);
+  await c.attached;
+  cdp.attach("page-1");
+  const enables = () => cdp.sent.filter((m) => m.method === "Fetch.enable");
+  const first = c.guard(["hunter2-first fill"], 60_000, () => {});
+  cdp.reply(enables()[0]?.id ?? 0);
+  expect(await first.ready).toBe(true);
+  // A frame opens while the guard is armed: paused like the rest, but Chrome hasn't said so yet.
+  cdp.event("Target.attachedToTarget", { sessionId: "frame-1", targetInfo: { type: "iframe" } }, "page-1");
+  expect(enables().map((m) => m.sessionId)).toEqual(["page-1", "frame-1"]);
+  let ready: boolean | null = null;
+  const second = c.guard(["hunter2-second fill"], 60_000, () => {});
+  void second.ready.then((ok) => {
+    ready = ok;
+  });
+  await Bun.sleep(5);
+  expect(ready).toBeNull();
+  // Nothing asked twice: the frame's own acknowledgement is what it waits for.
+  expect(enables()).toHaveLength(2);
+  cdp.reply(enables()[1]?.id ?? 0);
+  expect(await second.ready).toBe(true);
+  c.close();
+});

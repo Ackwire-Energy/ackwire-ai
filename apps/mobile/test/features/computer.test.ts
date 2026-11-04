@@ -348,7 +348,19 @@ describe("the workspace's computer on its way, on Conversas", () => {
   });
 
   test("a plan's page asks again only while it waits on something no event may bring", () => {
-    for (const state of ["preparing", "offline", "loading"] as const) expect(pollsPlan(state)).toBe(true);
-    for (const state of ["ready", "missing", "unsupported", "locked"] as const) expect(pollsPlan(state)).toBe(false);
+    for (const edition of ["cloud", "selfhost"] as const) {
+      expect(pollsPlan({ state: "preparing", view: null }, edition)).toBe(true);
+      expect(pollsPlan({ state: "offline" }, edition)).toBe(true);
+      expect(pollsPlan({ state: "loading" }, edition)).toBe(true);
+      expect(pollsPlan({ state: "ready" }, edition)).toBe(false);
+      expect(pollsPlan({ state: "missing" }, edition)).toBe(false);
+      expect(pollsPlan({ state: "locked", who: "owner" }, edition)).toBe(false);
+      // A program not allowed there waits for someone.
+      expect(pollsPlan({ state: "unsupported", reason: "tool_off" }, edition)).toBe(false);
+    }
+    // The Cloud's computer installing or updating a program comes back by itself; a self-hosted one waits for its person.
+    expect(pollsPlan({ state: "unsupported", reason: "not_installed" }, "cloud")).toBe(true);
+    expect(pollsPlan({ state: "unsupported", reason: "runner_old" }, "cloud")).toBe(true);
+    expect(pollsPlan({ state: "unsupported", reason: "not_installed" }, "selfhost")).toBe(false);
   });
 });

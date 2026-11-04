@@ -21,6 +21,7 @@ export type RolePermission =
   | "control_computers"
   | "manage_connectors"
   | "manage_credentials"
+  | "use_others_plans"
   | "edit_wiki"
   | "upload_files"
   | "review_memory"

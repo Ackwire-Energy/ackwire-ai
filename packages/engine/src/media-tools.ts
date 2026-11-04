@@ -62,11 +62,12 @@ const NO_SEARCH = 'Say what the GIF shows in a few English words, e.g. "good mor
 /** What each sticker shows, for the model picking one. */
 const MOODS: Record<StickerMood, string> = {
   celebrate: "a win, a launch, good news",
-  love: "thanks, warmth, a friendly hello or goodbye",
+  love: "thanks, warmth",
   deal: "agreed, done, on it",
   thinking: "pondering, give me a moment",
   wow: "amazed, impressed",
   dizzy: "confused or overwhelmed, in fun",
+  wave: "a hello or a goodbye",
 };
 /** The moods as the model reads them: "celebrate (a win, a launch, good news), love (…)". */
 const MOOD_HELP = Object.entries(MOODS)

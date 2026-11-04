@@ -193,7 +193,26 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
     description:
       "Offer to connect an AI, an app or an MCP server, or to invite people, with a card a person clicks, and create channels for the person who asked, with Undo.",
   },
+  "vault:read": {
+    label: "See the Vault",
+    description:
+      "See the logins, keys and contact details the Vault shares with it, and use them: it types saved passwords and uses saved keys without ever seeing them.",
+  },
+  "vault:write": {
+    label: "Edit Vault contacts",
+    description:
+      "Save and update contact details in the Vault, change a saved login's username or a description, and delete what it saved.",
+  },
 };
+
+/**
+ * The Vault (ADR 0144): seeing what it shares with the agent and using it (`vault:read`, also what typing a saved
+ * login or giving a command a saved key needs), and editing its contacts (`vault:write`).
+ */
+export const VAULT_READ_SCOPE = "vault:read";
+export const VAULT_WRITE_SCOPE = "vault:write";
+/** The tool whose grant stands for using the Vault at all: a login typed or a key given to a command checks it. */
+export const VAULT_LIST_TOOL = "vault_list";
 
 /** A built-in scope by name: own keys only, so "constructor" or "toString" never passes as one. */
 export const isBuiltinScope = (scope: string) => Object.hasOwn(BUILTIN_SCOPES, scope);
@@ -202,8 +221,8 @@ export const isBuiltinScope = (scope: string) => Object.hasOwn(BUILTIN_SCOPES, s
  * Granted to every new agent: reading context, keeping its own notes,
  * reading and writing Drive files, and reading issues (so any agent can check
  * the org's issues before answering about them; low risk), setting up the
- * workspace for whoever asks (cards a person clicks, channels with Undo), and
- * its computer (running commands, its own browser and desktop): on a connected
+ * workspace for whoever asks (cards a person clicks, channels with Undo), the
+ * Vault (what people share with it there, ADR 0144), and its computer (running commands, its own browser and desktop): on a connected
  * computer each still needs the switch the person at that computer turned on.
  * Admins and owners can revoke them.
  */
@@ -222,6 +241,8 @@ export const DEFAULT_AGENT_SCOPES = [
   "sandbox:run",
   "browser:use",
   "desktop:use",
+  "vault:read",
+  "vault:write",
 ];
 
 export interface ScopeGrant {

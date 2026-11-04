@@ -2,7 +2,7 @@ import type { BrainEffort } from "@agenteschat/adapters";
 import { planOf } from "@agenteschat/providers/plans";
 import type { CodeSetup } from "../git/machine";
 
-export type BrainKind = "model" | "claude_code" | "codex" | "cursor" | "opencode";
+export type BrainKind = "model" | "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
 
 /** A brain that runs on the agent's computer with a person's plan (ADR 0114 adds Cursor). */
 export type ComputerBrainKind = Exclude<BrainKind, "model">;
@@ -13,6 +13,8 @@ export const BRAIN_NAMES: Readonly<Record<ComputerBrainKind, string>> = {
   codex: "Codex",
   cursor: "Cursor",
   opencode: "OpenCode",
+  grok: "Grok Build",
+  antigravity: "Antigravity CLI",
 };
 
 /** The plan each computer brain thinks with, as people buy it. */
@@ -21,11 +23,13 @@ export const BRAIN_PLAN_NAMES: Readonly<Record<ComputerBrainKind, string>> = {
   codex: "ChatGPT",
   cursor: "Cursor",
   opencode: "OpenCode",
+  grok: "Grok",
+  antigravity: "Gemini",
 };
 
 /** Brains that run on the agent's computer with a person's plan. */
 export const isComputerBrain = (v: unknown): v is ComputerBrainKind =>
-  v === "claude_code" || v === "codex" || v === "cursor" || v === "opencode";
+  v === "claude_code" || v === "codex" || v === "cursor" || v === "opencode" || v === "grok" || v === "antigravity";
 
 /** The plan's name in a note: the coding plan's maker, else Claude's or ChatGPT's. */
 export function planName(kind: BrainKind, provider?: string): string {

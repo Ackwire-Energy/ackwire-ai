@@ -7,13 +7,20 @@ import {
   browserSetupOf,
   chromeFailureKind,
   type ErrorReporter,
+  formatVaultRule,
   type MachineReplies,
   type PubSub,
+  sealSecret,
+  VAULT_PROTOCOL,
+  VAULT_TYPE_REFUSALS,
+  vaultAad,
+  vaultRuleLabel,
 } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, isNull, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import type { Judge } from "../judge";
 import { callWhenBack, type MachineCaller, MachineRequestError } from "../machine-hub";
+import { requestVaultKey, vaultUpdateText } from "../machine-provider";
 import { MachineOfflineError, MachinePausedError } from "../machines";
 import { missionOfRun } from "../mission-context";
 import { getSandboxSettings, SANDBOX_SCOPE, withConnectedMachine } from "../sandbox";
@@ -25,6 +32,7 @@ import {
   findInPage,
   formatPlanReport,
   KNOWN_LOOK_MS,
+  MAX_CODE_BOXES,
   MAX_WAIT_MS,
   type PlanReport,
   resolveTarget,
@@ -37,14 +45,23 @@ import {
   type TargetCache,
 } from "../screen";
 import { requestSecretTool } from "../secret-request-tool";
-import { REQUEST_SECRET_TOOL } from "../secrets";
+import { REQUEST_SECRET_TOOL, SITE_SECRET_TTL_TEXT, siteSecretGone } from "../secrets";
 import { toolDetail } from "../tool-detail";
 import type { JsonSchema } from "../tools/json-schema";
-import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
+import { grantedScopeKeys, isAllowed, toolAccess, VAULT_LIST_TOOL, VAULT_READ_SCOPE } from "../tools/scopes";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { SHARE_HINT, SHARE_INPUT, shareSavedFile } from "../uploads";
+import {
+  checkVaultLogin,
+  recordVaultUse,
+  releaseVaultLogin,
+  type VaultBrowserProfile,
+  type VaultDeps,
+  VaultRefusal,
+} from "../vault";
 import type { BrowserPageReader } from "../web-tools";
 import {
+  ASK_PERSON_TOOL,
   agentUsesScreen,
   browserOnDesktop,
   endHandoffForRestart,
@@ -60,6 +77,7 @@ import {
   getBrowserProfile,
   holderOf,
   PROFILE_WAIT_MS,
+  profileGrantees,
   profileMachineProblem,
   runBrowserProfile,
   type TurnResult,
@@ -74,6 +92,7 @@ import {
   LOOK,
   OPEN_SECONDS,
   observationOf,
+  type VaultTyping,
 } from "./surface";
 import { BROWSER_SCOPE, BROWSER_TOOL_INFO, type BrowserToolName } from "./types";
 
@@ -169,12 +188,18 @@ export async function warmAgentBrowser(
 }
 
 /**
- * A secret delivered to the computer the browser runs on, with the one site it
- * may be typed on (`request_secret` with `site`). Null when there is none.
+ * A secret delivered to the computer the browser runs on, with the one site it may be typed on (`request_secret`
+ * with `site`). Null when there is none. `gone`: a site's password past the minutes its runner keeps it in memory
+ * (ADR 0144 §6), which the computer no longer has.
  */
 async function browserSecret(ctx: ToolContext, name: string, machineId: string) {
   const [held] = await ctx.db
-    .select({ id: secretRequests.id, site: secretRequests.site })
+    .select({
+      id: secretRequests.id,
+      site: secretRequests.site,
+      targetKind: secretRequests.targetKind,
+      deliveredAt: secretRequests.deliveredAt,
+    })
     .from(secretRequests)
     .where(
       and(
@@ -188,7 +213,7 @@ async function browserSecret(ctx: ToolContext, name: string, machineId: string) 
     )
     .orderBy(desc(secretRequests.deliveredAt))
     .limit(1);
-  return held ?? null;
+  return held ? { id: held.id, site: held.site, gone: siteSecretGone(held) } : null;
 }
 
 /** "14:02" in UTC, for "in use since". */
@@ -248,6 +273,8 @@ export interface BrowserToolDeps {
   profilePollMs?: number;
   /** Error reports (ADR 0104): a computer's Google Chrome failing an agent goes there (`reportChromeFailure`). */
   errors?: ErrorReporter;
+  /** The Vault (ADR 0144): a `type_secret` with `login` types a saved login. Without it, logins are refused. */
+  vault?: VaultDeps;
 }
 
 /** One report per computer and kind of Chrome failure this often, at most: an agent may try again and again. */
@@ -354,12 +381,81 @@ export function browserErrorText(error: string) {
   return `The browser said: ${error}`;
 }
 
+/**
+ * A runner's failed command as the agent reads it (protocol 45 adds a `code` to Vault and code refusals, ADR 0144):
+ * a typed password the page tried to send in an address, a field that takes no code, a field inside an embedded
+ * frame (a person types there, through the hand-off), or the refusal's code ahead of the runner's words, which
+ * `vaultTypingRefusal` reads for a login.
+ */
+export function runnerFailureText(error: string | undefined, code?: string): string {
+  const said = error || "the command failed";
+  if (code === "get_blocked") {
+    return "The page tried to send the password in its address, and the computer stopped that request: nothing was sent. Don't type it on that page again; tell the person the site's sign-in looks wrong.";
+  }
+  if (code === "not_code_field") {
+    return "Those aren't fields for a code (text, number or one-time-code boxes), so nothing was typed. Read the page and give the code's boxes, in order.";
+  }
+  if (code === "unguarded") {
+    return "The browser couldn't get ready to keep the password out of the page's addresses, so nothing was typed. Run that step again; if it keeps failing, tell the person.";
+  }
+  // Its code stays ahead of the words: `vaultTypingRefusal` reads it for a login and words it its own way.
+  if (code === "in_frame") {
+    return `in_frame: That field is inside an embedded frame, where your browser can't type a secret, so nothing was typed. Ask the person to do that step themselves with ${ASK_PERSON_TOOL}.`;
+  }
+  if (code && (VAULT_TYPE_REFUSALS as readonly string[]).includes(code)) return browserErrorText(`${code}: ${said}`);
+  return browserErrorText(said);
+}
+
 /** Why a secret can't be typed in the browser. */
-function secretMissingText(name: string, held: { site: string | null } | null) {
+function secretMissingText(name: string, held: { site: string | null; gone?: boolean } | null) {
   if (!held) {
     return `No secret named ${name} was delivered to the computer your browser runs on. Ask for it first with request_secret, giving \`site\` (the person types it; you never see it).`;
   }
+  if (held.gone && held.site) {
+    return `${name}, the password for ${new URL(held.site).host}, was kept in your computer's memory only, for ${SITE_SECRET_TTL_TEXT} after it was given, and it is gone now. Ask for it again with request_secret (with \`site\`), or ask the person to save it to the Vault, so you can sign in with it from vault_list next time.`;
+  }
   return `${name} wasn't asked for a site, so the browser won't type it. Ask for it again with request_secret and \`site\` set to the address of the page it goes into (https://…).`;
+}
+
+/** The page's origin (`https://host`), what a Vault login is checked against before its value goes out; else null. */
+function pageOrigin(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A login id the run can't use: the same words whether it exists or not (ADR 0144). */
+const NO_SUCH_LOGIN =
+  "No Vault login like that is shared with you for this request. Look with vault_list, or ask the person for the password with request_secret.";
+
+/** A Vault refusal (its own words, ADR 0144) or any other failure, as the agent reads it. Never a value. */
+const vaultErrorText = (error: unknown) =>
+  error instanceof VaultRefusal ? error.message : error instanceof Error ? error.message : String(error);
+
+/**
+ * The runner's refusals of `agentes:type_vault` (ADR 0144), as the agent reads them; any other failure (a stale
+ * number, a covered field) as the browser said it, so the plan finds the field again as for any step.
+ */
+export function vaultTypingRefusal(text: string, site: string): string {
+  const code = /\b(wrong_site|in_frame|not_password_field|get_form|key_expired)\b/.exec(text)?.[1];
+  switch (code) {
+    case "wrong_site":
+      return `The field isn't on ${site} (the page, or the frame that holds the field, is on another site), so the login wasn't typed. Open the sign-in page of ${site} and try again.`;
+    case "in_frame":
+      return `That field is inside an embedded frame, where a Vault login can't be typed, so it wasn't typed. Ask the person to sign in to ${site} themselves with ${ASK_PERSON_TOOL}.`;
+    case "not_password_field":
+      return "That field isn't a password field, so the login wasn't typed. Give the password field as `target` (its number from the page); type the username yourself with a `fill` step.";
+    case "get_form":
+      return "That form would send the password in the page's address, so the login wasn't typed. Look for the site's own sign-in form.";
+    case "key_expired":
+      return "The one-use key for this login ran out before it was typed: run that step again.";
+    default:
+      return text;
+  }
 }
 
 /** Runner refusals → what the agent reads. */
@@ -437,7 +533,13 @@ function trailOf(report: PlanReport) {
     .filter((s) => s.status !== "skipped")
     .map((s) => {
       const tool = TRAIL_TOOL[s.step.do];
-      const detail = tool === "browser_open" ? toolDetail(tool, { url: s.step.url ?? s.step.target }) : undefined;
+      // A Vault login's step says the site it was typed for (ADR 0144); an open says where. Never a value.
+      const detail =
+        tool === "browser_open"
+          ? toolDetail(tool, { url: s.step.url ?? s.step.target })
+          : s.typed
+            ? s.typed.slice(0, 120)
+            : undefined;
       return {
         tool,
         ...(detail ? { detail } : {}),
@@ -490,6 +592,20 @@ const STEP_SCHEMA: JsonSchema = {
       type: "string",
       description: "`type_secret`: the secret's name, asked with request_secret for this site.",
       maxLength: 128,
+    },
+    login: {
+      type: "string",
+      description:
+        "`type_secret`: a Vault login's id (from vault_list) instead of `secret`: its password, typed only on its site. Type its username yourself with a `fill` step.",
+      maxLength: 64,
+    },
+    targets: {
+      type: "array",
+      minItems: 2,
+      maxItems: MAX_CODE_BOXES,
+      items: { type: "string", maxLength: 500 },
+      description:
+        "`type_secret` of a code split in one box per character: every box, in order (numbers or words), instead of `target`.",
     },
     direction: { type: "string", enum: ["up", "down", "left", "right"] },
     pixels: { type: "integer", minimum: 50, maximum: 10_000 },
@@ -704,9 +820,9 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       reached = true;
       await rememberBrowserMachine(ctx.db, ctx.orgId, ctx.agentId, status.machineId).catch(() => {});
     };
-    const failed = (error: string | undefined): BrowserReply => ({
+    const failed = (error: string | undefined, code?: string): BrowserReply => ({
       ok: false,
-      text: browserErrorText(error || "the command failed"),
+      text: runnerFailureText(error, code),
     });
     const act = async (c: BrowserBatchCommand): Promise<BrowserReply> => {
       const refused = await renew();
@@ -730,7 +846,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       }
       addSetup(reply);
       await reachedOnce();
-      return reply.success ? { ok: true, data: reply.data } : failed(reply.error);
+      return reply.success ? { ok: true, data: reply.data } : failed(reply.error, reply.code);
     };
     const link: BrowserLink = {
       act,
@@ -770,7 +886,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         }
         addSetup(reply);
         await reachedOnce();
-        return reply.answers.map((a) => (a.success ? { ok: true, data: a.data } : failed(a.error)));
+        return reply.answers.map((a) => (a.success ? { ok: true, data: a.data } : failed(a.error, a.code)));
       },
       async capture() {
         if (!fast || !deps.vision?.()) return null;
@@ -828,6 +944,99 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
   }
 
   /**
+   * The shared browser profile the run's commands go to, with every agent granted it (read now), as a Vault login
+   * typed there checks it (ADR 0144, ADR 0110); null in the agent's own browser.
+   */
+  async function vaultProfile(
+    ctx: ToolContext,
+    profile: { id: string; name: string } | null,
+  ): Promise<VaultBrowserProfile | null> {
+    if (!profile) return null;
+    return { name: profile.name, agentIds: await profileGrantees(ctx.db, ctx.orgId, profile.id) };
+  }
+
+  /**
+   * Why a Vault login can't be typed in this run, checked before the plan starts (ADR 0144): the Vault on this
+   * server, "See the Vault" for the agent, a computer on protocol 45, the login shared with this agent for the
+   * person behind the run, still in its source and with a value, and, in a shared browser profile, a login every
+   * agent granted it may hold (never a personal one, nor one open only to some people). Null when it can be: its
+   * value is released only at the step that types it (checked again there). An id the run doesn't know, or one not
+   * shared with this agent, reads the same.
+   */
+  async function loginRefusal(
+    ctx: ToolContext,
+    id: string,
+    status: { machineName: string; protocol: number },
+    profile: { id: string; name: string } | null,
+  ): Promise<string | null> {
+    const vault = deps.vault;
+    if (!vault) return "The Vault isn't available on this server: ask the person for the password with request_secret.";
+    const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
+    if (!isAllowed(toolAccess(granted, { name: VAULT_LIST_TOOL, scope: VAULT_READ_SCOPE }))) {
+      return 'You may not use the Vault ("See the Vault" is off for you). Ask for it with request_permission, or ask the person for the password with request_secret.';
+    }
+    if (status.protocol < VAULT_PROTOCOL) return vaultUpdateText(status.machineName, "type Vault logins");
+    try {
+      await checkVaultLogin(vault, ids(ctx), id, await vaultProfile(ctx, profile));
+      return null;
+    } catch (error) {
+      if (error instanceof VaultRefusal && (error.code === "not_found" || error.code === "not_shared"))
+        return NO_SUCH_LOGIN;
+      return vaultErrorText(error);
+    }
+  }
+
+  /**
+   * A Vault login made ready for one step (ADR 0144): released for the page the field is on (the Vault refuses
+   * another site), sealed to a one-use key the agent's computer just made, with the site rule in the box's
+   * additional data, so the runner types it only into a password field of a frame on that site. The value is in
+   * this process only while it is sealed; the use is recorded once the runner typed it.
+   */
+  async function vaultLogin(
+    ctx: ToolContext,
+    status: { machineId: string; machineName: string },
+    profile: { id: string; name: string } | null,
+    id: string,
+    field: string,
+    url: string | null,
+  ): Promise<VaultTyping | string> {
+    const vault = deps.vault;
+    if (!vault || !hub) return "The Vault isn't available on this server.";
+    const run = ids(ctx);
+    const origin = pageOrigin(url);
+    let sealed: { box: unknown; keyId: string; rule: string; site: string };
+    try {
+      // The profile's grants are read again here: one given meanwhile counts before the value is read.
+      const released = await releaseVaultLogin(vault, run, id, origin, await vaultProfile(ctx, profile));
+      const rule = formatVaultRule(released.rule);
+      const agent = scopeOf(ctx.agentId, await getAgentCached(ctx.db, ctx.orgId, ctx.agentId));
+      const key = await requestVaultKey(hub, status.machineId, agent, "type Vault logins", ctx.signal);
+      const box = await sealSecret(
+        key.publicKey,
+        released.password,
+        vaultAad({ keyId: key.keyId, agentId: ctx.agentId, use: { kind: "fill", rule } }),
+      ).catch(() => {
+        // Never the sealing's own words (they could name the value's size), nor the login's title (ADR 0144 §4).
+        throw new Error(`The Vault login ${id} couldn't be prepared for your computer.`);
+      });
+      sealed = { box, keyId: key.keyId, rule, site: vaultRuleLabel(released.rule) };
+    } catch (error) {
+      return vaultErrorText(error);
+    }
+    return {
+      command: {
+        command: "agentes:type_vault",
+        args: [field, sealed.rule, JSON.stringify({ keyId: sealed.keyId, box: sealed.box })],
+        timeoutSeconds: COMMAND_SECONDS,
+      },
+      // The site of its rule, which the engine read from the saved address: never its title (ADR 0144 §4).
+      label: sealed.site,
+      typed: () => recordVaultUse(vault, run, id, { action: "fill", ...(origin ? { origin } : {}) }),
+      refused: (text) => vaultTypingRefusal(text, sealed.site),
+    };
+  }
+
+  /**
    * Runs steps on the agent's browser (`runPlan`) and answers with the report:
    * what was done, where it stopped, and the page at the end. `trail`: the
    * steps go to the chat's trail from here (a `browser_do`; single tools are
@@ -842,11 +1051,29 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     if (!linked.ok) return { content: linked.text, isError: true };
     // A secret is typed only on the site the person gave it for: found before anything runs.
     const sites = new Map<string, string>();
+    const logins = new Set<string>();
     for (const s of steps) {
-      const name = s.do === "type_secret" ? s.secret?.trim() : undefined;
+      if (s.do !== "type_secret") continue;
+      // A code in one box per character: only a runner of protocol 45 types one character into each (ADR 0144).
+      const boxes = (s.targets ?? []).filter((t) => t.trim()).length;
+      if (boxes > 1 && linked.status.protocol < VAULT_PROTOCOL) {
+        return {
+          content: vaultUpdateText(linked.status.machineName, "type a code into several boxes"),
+          isError: true,
+        };
+      }
+      const login = s.login?.trim();
+      if (login) {
+        if (logins.has(login)) continue;
+        const refused = await loginRefusal(ctx, login, linked.status, linked.profile);
+        if (refused) return { content: refused, isError: true };
+        logins.add(login);
+        continue;
+      }
+      const name = s.secret?.trim();
       if (!name || sites.has(name)) continue;
       const held = await browserSecret(ctx, name, linked.status.machineId);
-      if (!held?.site) return { content: secretMissingText(name, held), isError: true };
+      if (!held?.site || held.gone) return { content: secretMissingText(name, held), isError: true };
       sites.set(name, held.site);
     }
     const key = seenKey(ctx);
@@ -863,6 +1090,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         surface: browserSurface({
           link: linked.link,
           secretSite: (name) => sites.get(name) ?? null,
+          vaultLogin: (login, field, url) => vaultLogin(ctx, linked.status, linked.profile, login, field, url),
           onLook: (o) => seen.remember(key, o),
         }),
         cache: targets,
@@ -1293,19 +1521,54 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     ),
     step(
       "browser_type_secret",
-      `${BROWSER_TOOL_INFO.browser_type_secret.description} \`secret\` is the name you asked for with request_secret, giving its \`site\` (it must have been delivered to this computer). It is typed only into password or one-time-code fields, and only while the page is on that site.`,
-      targetSchema(
-        { secret: { type: "string", description: "The secret's name (`STRIPE_TEST_PASSWORD`).", maxLength: 128 } },
-        ["secret"],
-      ),
-      (input) => ({ do: "type_secret", target: str(input.target), secret: str(input.secret) }),
+      `${BROWSER_TOOL_INFO.browser_type_secret.description} Give \`secret\`, the name you asked for with request_secret giving its \`site\` (it must have been delivered to this computer), or \`login\`, a Vault login's id from vault_list (type its username yourself with browser_fill). It is typed only into password or one-time-code fields, and only while the page is on that site. A code split in one box per character: give \`targets\`, every box in order, instead of \`target\`.`,
+      {
+        type: "object",
+        properties: {
+          target: targetProp,
+          targets: {
+            type: "array",
+            minItems: 2,
+            maxItems: MAX_CODE_BOXES,
+            items: { type: "string", maxLength: 500 },
+            description: "A code split in one box per character: every box, in order (numbers or words).",
+          },
+          secret: { type: "string", description: "The secret's name (`STRIPE_TEST_PASSWORD`).", maxLength: 128 },
+          login: {
+            type: "string",
+            description: "A Vault login's id (from vault_list), instead of `secret`.",
+            maxLength: 64,
+          },
+        },
+        additionalProperties: false,
+      },
+      (input) => {
+        const secret = str(input.secret).trim();
+        const login = str(input.login).trim();
+        if (Boolean(secret) === Boolean(login)) {
+          return "Give `secret` (a name you asked for with request_secret) or `login` (a Vault login's id from vault_list).";
+        }
+        const target = str(input.target).trim();
+        const targets = Array.isArray(input.targets)
+          ? input.targets.filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+          : [];
+        if (!target && targets.length === 0) return "Say which field (`target`).";
+        return {
+          do: "type_secret",
+          ...(target ? { target } : {}),
+          ...(targets.length > 0 ? { targets } : {}),
+          ...(login ? { login } : { secret }),
+        };
+      },
       {
         async checkCall(input, ctx): Promise<CallCheck> {
+          // A Vault login is checked by the plan (the Vault, the computer's protocol, who it is shared with).
+          if (str(input.login).trim()) return { ok: true };
           const name = str(input.secret);
           const status = await machineOf(ctx);
           if (!status.available) return { ok: false, message: browserUnavailableText(status) };
           const held = await browserSecret(ctx, name, status.machineId);
-          return held?.site ? { ok: true } : { ok: false, message: secretMissingText(name, held) };
+          return held?.site && !held.gone ? { ok: true } : { ok: false, message: secretMissingText(name, held) };
         },
       },
     ),

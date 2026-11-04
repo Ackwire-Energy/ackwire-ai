@@ -1,5 +1,7 @@
 import { lookup } from "node:dns/promises";
+import type { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
+import { OutboundAddressError } from "@agenteschat/adapters";
 import { ValidationError } from "./errors";
 
 /** Resolves a host name to its addresses (injected in tests). */
@@ -245,4 +247,127 @@ export async function fetchPublicDocument(
     req.on("error", fail);
     req.end();
   });
+}
+
+/** Every address a host resolves to, with its family (injected in tests). */
+export type ResolveAddresses = (host: string) => Promise<{ address: string; family: number }[]>;
+
+const resolveAddresses: ResolveAddresses = (host) => lookup(host, { all: true, verbatim: true });
+
+/** Names that never leave the local network, refused without being resolved (as `assertPublicHttpsUrl` does). */
+const internalName = (host: string) =>
+  host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal");
+
+/** A request's body as bytes: what the guarded fetch sends (strings, bytes and form parameters). */
+function bodyBytes(body: RequestInit["body"]): Uint8Array | null {
+  if (body === undefined || body === null) return null;
+  if (typeof body === "string") return new TextEncoder().encode(body);
+  if (body instanceof URLSearchParams) return new TextEncoder().encode(body.toString());
+  if (body instanceof Uint8Array) return body;
+  if (body instanceof ArrayBuffer) return new Uint8Array(body);
+  throw new TypeError("This request body isn't supported here");
+}
+
+/**
+ * A `fetch` for hosts people type (a self-hosted password manager's server, ADR 0144), with `assertPublicHttpsUrl`'s
+ * checks made on every request, at connect time: https only, no user or password in the address, no internal name,
+ * and every address the host resolves to public (not private, loopback, link-local, metadata, CGNAT or reserved). The
+ * socket connects to one of those addresses (IPv4 first, `pinnedLookup`), never to the name resolved again, so a
+ * name that changes after the check (DNS rebinding) can't move it. A redirect is never followed: it fails as with
+ * `redirect: "error"`. A refused address throws `OutboundAddressError`, which callers tell from a network failure (a
+ * `TypeError`, as `fetch` throws); `signal` aborts the request. Bodies: strings, bytes and form parameters.
+ */
+export function publicHttpsFetch(
+  options: { resolve?: ResolveAddresses; request?: typeof httpsRequest } = {},
+): typeof fetch {
+  const resolve = options.resolve ?? resolveAddresses;
+  const guarded = async (input: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
+    const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
+    if (url.protocol !== "https:" || url.username || url.password) {
+      throw new OutboundAddressError("Only https:// addresses without a user or password");
+    }
+    const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    if (internalName(host)) throw new OutboundAddressError();
+    let pinned: { address: string; family: number };
+    const family = isIP(host);
+    if (family) {
+      if (isBlockedAddress(host)) throw new OutboundAddressError();
+      pinned = { address: host, family };
+    } else {
+      let addresses: { address: string; family: number }[];
+      try {
+        addresses = await resolve(host);
+      } catch {
+        throw new TypeError(`Couldn't find ${host}`);
+      }
+      if (addresses.length === 0) throw new TypeError(`Couldn't find ${host}`);
+      if (addresses.some((a) => isBlockedAddress(a.address))) throw new OutboundAddressError();
+      pinned = addresses.find((a) => a.family === 4) ?? (addresses[0] as { address: string; family: number });
+    }
+    const body = bodyBytes(init.body);
+    const headers: Record<string, string> = {};
+    new Headers(init.headers).forEach((value, name) => {
+      headers[name] = value;
+    });
+    if (body) headers["content-length"] = String(body.byteLength);
+    const signal = init.signal ?? undefined;
+    if (signal?.aborted) throw signal.reason ?? new DOMException("The operation was aborted.", "AbortError");
+    const send = options.request ?? (await import("node:https")).request;
+    return new Promise<Response>((resolveResponse, reject) => {
+      const req = send(
+        {
+          protocol: "https:",
+          hostname: host,
+          port: url.port || 443,
+          path: `${url.pathname}${url.search}`,
+          method: (init.method ?? "GET").toUpperCase(),
+          // The name the certificate is checked against, though the socket goes to the pinned address.
+          ...(family ? {} : { servername: host }),
+          headers,
+          lookup: pinnedLookup(pinned.address, pinned.family) as never,
+        },
+        (res) => {
+          const status = res.statusCode ?? 0;
+          if (status >= 300 && status < 400) {
+            res.resume();
+            req.destroy();
+            reject(new TypeError("A redirect isn't followed for this address"));
+            return;
+          }
+          const out = new Headers();
+          for (const [name, value] of Object.entries(res.headers)) {
+            if (value === undefined) continue;
+            for (const v of Array.isArray(value) ? value : [value]) out.append(name, v);
+          }
+          // Pulled as the reader reads: a caller that stops reading (a capped body) stops the socket too.
+          const stream = new ReadableStream<Uint8Array>({
+            start(controller) {
+              res.on("data", (chunk: Buffer) => {
+                controller.enqueue(new Uint8Array(chunk));
+                if ((controller.desiredSize ?? 0) <= 0) res.pause();
+              });
+              res.on("end", () => controller.close());
+              res.on("error", (error) => controller.error(error));
+            },
+            pull() {
+              res.resume();
+            },
+            cancel() {
+              res.destroy();
+            },
+          });
+          const empty = status === 204 || status === 205 || status === 304;
+          resolveResponse(new Response(empty ? null : stream, { status, headers: out }));
+        },
+      );
+      const onAbort = () => req.destroy(signal?.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+      signal?.addEventListener("abort", onAbort, { once: true });
+      req.on("close", () => signal?.removeEventListener("abort", onAbort));
+      req.on("error", (error) =>
+        reject(error instanceof DOMException || error?.name === "AbortError" ? error : new TypeError(error.message)),
+      );
+      req.end(body ?? undefined);
+    });
+  };
+  return guarded as typeof fetch;
 }

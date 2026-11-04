@@ -352,6 +352,12 @@
       "desc": "Paket, kartu, dan faktur.",
       "short": "tagihan",
       "say": "mengurus tagihan"
+    },
+    "use_others_plans": {
+      "title": "Pakai paket orang lain",
+      "desc": "Memberi agen yang bisa diedit paket yang dihubungkan orang lain. Pemiliknya menerima email dan bisa menariknya kembali.",
+      "short": "pakai paket orang lain",
+      "say": "memakai paket orang lain"
     }
   },
   "auth": {
@@ -1174,6 +1180,8 @@
     "paused": "Dijeda: kamu membatalkan 3 keputusannya minggu ini. Nyalakan lagi kapan pun kamu mau.",
     "card": {
       "deciding": "{{name}} sedang meninjaunya atas nama {{for}}…",
+      "approvedForYou": "Disetujui oleh {{name}} atas namamu",
+      "decidingForYou": "{{name}} sedang meninjaunya atas namamu…",
       "approved": "Disetujui oleh {{name}} atas nama {{for}}",
       "passed": "{{name}} meneruskannya kepadamu",
       "passedWhy": "{{name}} meneruskannya kepadamu: {{reason}}",
@@ -1185,9 +1193,7 @@
       "why": "Kenapa?",
       "undo": "Batalkan",
       "undoArchives": "Membatalkan akan mengarsipkan {{name}}. Berlaku hingga {{until}}.",
-      "undoSettings": "Membatalkan akan mengembalikan pengaturan. Berlaku hingga {{until}}.",
-      "approvedForYou": "Disetujui oleh {{name}} atas namamu",
-      "decidingForYou": "{{name}} sedang meninjaunya atas namamu…"
+      "undoSettings": "Membatalkan akan mengembalikan pengaturan. Berlaku hingga {{until}}."
     }
   },
   "noticePrefs": {
@@ -1418,7 +1424,7 @@
     "collapseAll": "Ciutkan semua",
     "expandAll": "Bentangkan semua",
     "organize": "Atur grup di Tim",
-    "seeAll_other": "Lihat semua {{count}} agen",
+    "more_other": "{{count}} agen lagi di Tim",
     "createFirst": "Buat agen pertama",
     "working_other": "{{count}} sedang bekerja",
     "count_other": "{{count}} agen",
@@ -1501,6 +1507,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "Email",
+      "vault": "Vault",
       "custom": "Alat ruang kerja"
     }
   },
@@ -1745,7 +1752,6 @@
   "rightHand": {
     "label": "tangan kanan Anda",
     "newDot": "Baru",
-    "callWith": "panggil dengan @{{handle}}",
     "role": "Asisten workspace",
     "actsAsYou": "bertindak dengan izin Anda",
     "composerHint": "tak ada yang berubah tanpa Anda",
@@ -1784,7 +1790,8 @@
       "channels": "Menjawab di kanal saat dipanggil",
       "model": "Model",
       "message": "Pesan",
-      "configure": "Atur"
+      "configure": "Atur",
+      "nameStory": "Namanya berasal dari lodestar, bintang penunjuk arah para pelaut."
     },
     "settings": {
       "name": "Nama dan tampilan",
@@ -1920,6 +1927,10 @@
       "codex_female": "Codex belum masuk di komputer ini. Hubungkan akun ChatGPT di halaman {{name}}.",
       "cursor": "Cursor belum masuk di komputer ini. Hubungkan akun Cursor di halaman {{name}}.",
       "cursor_female": "Cursor belum masuk di komputer ini. Hubungkan akun Cursor di halaman {{name}}.",
+      "grok": "Grok belum masuk di komputer ini. Hubungkan akun Grok di halaman {{name}}.",
+      "grok_female": "Grok belum masuk di komputer ini. Hubungkan akun Grok di halaman {{name}}.",
+      "antigravity": "Gemini belum masuk di komputer ini. Hubungkan akun Gemini di halaman {{name}}.",
+      "antigravity_female": "Gemini belum masuk di komputer ini. Hubungkan akun Gemini di halaman {{name}}.",
       "opencode": "OpenCode tidak bisa berpikir di komputer ini. Hubungkan kunci OpenCode di halaman {{name}}.",
       "opencode_female": "OpenCode tidak bisa berpikir di komputer ini. Hubungkan kunci OpenCode di halaman {{name}}."
     },
@@ -1949,6 +1960,8 @@
       "claude": "Hubungkan paket Claude-mu",
       "chatgpt": "Hubungkan paket ChatGPT-mu",
       "cursor": "Hubungkan paket Cursor-mu",
+      "grok": "Hubungkan paket Grok-mu",
+      "gemini": "Hubungkan paket Gemini-mu",
       "zen": "Hubungkan OpenCode",
       "api_key": "Tambahkan kunci API"
     },
@@ -1973,6 +1986,15 @@
       "cursor": {
         "title": "Paket Cursor-mu",
         "tiers": "Pro, Pro+, Ultra, atau Teams, atau kunci API Cursor"
+      },
+      "grok": {
+        "title": "Paket Grok-mu",
+        "tiers": "SuperGrok, SuperGrok Heavy, atau X Premium+"
+      },
+      "gemini": {
+        "title": "Paket Gemini-mu",
+        "tiers": "Google AI Pro, Google AI Ultra, atau Gemini Enterprise",
+        "warning": "Google menyatakan bahwa memakai paket Gemini pribadi di dalam aplikasi lain bisa membuat akun ditangguhkan. Agar tidak mengambil risiko itu, pakai kunci API atau Gemini Enterprise."
       },
       "zen": {
         "title": "OpenCode",
@@ -2044,6 +2066,10 @@
     "onceHint": "Semuanya berbagi batas paketmu.",
     "use": "Pakai {{label}}",
     "another": "Akun lain",
+    "reuse": {
+      "active": "Kamu sudah punya {{label}} di sini. Masuk lagi ke akun itu, atau pakai akun lain.",
+      "signedOut": "{{label}} sudah keluar di sini. Masuk lagi dan agennya tetap memakainya."
+    },
     "signInFor": "Masuk untuk {{name}}",
     "signInFor_female": "Masuk untuk {{name}}",
     "doneAll": "{{names}} sekarang berpikir dengan {{label}}.",
@@ -2051,6 +2077,8 @@
       "claude_code": "Claude masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman Claude lalu coba lagi.",
       "codex": "ChatGPT masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman ChatGPT lalu coba lagi.",
       "cursor": "Cursor masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman Cursor lalu coba lagi.",
+      "grok": "Grok masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman Grok lalu coba lagi.",
+      "antigravity": "Gemini masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman Google lalu coba lagi.",
       "opencode": "OpenCode masuk sebagai {{email}}, bukan {{account}}. Coba lagi dengan kunci yang benar."
     },
     "useAnyway": "Pakai {{email}}",
@@ -2235,7 +2263,6 @@
   "dm": {
     "subtitle": "{{role}} · milik {{owner}}",
     "subtitleNoOwner": "{{role}} · tanpa pemilik",
-    "profile": "Lihat profil",
     "emptyAgent": "Minta dia mengingat, melupakan, atau bekerja dengan cara lain.",
     "emptyAgent_female": "Minta dia mengingat, melupakan, atau bekerja dengan cara lain.",
     "opening": "Membuka percakapan…",
@@ -2699,6 +2726,342 @@
     "removed": "{{name}} dihapus dari komputer.",
     "removeFailed": "Tidak bisa menghapusnya. Apakah komputernya menyala?"
   },
+  "vault": {
+    "tab": {
+      "label": "Yang ditampilkan",
+      "team": "Tim",
+      "personal": "Pribadi",
+      "connections": "Koneksi"
+    },
+    "list": {
+      "search": "Cari di Vault",
+      "clearSearch": "Hapus pencarian",
+      "kind": "Jenis",
+      "kindAll": "Semua jenis",
+      "noMatch": "Tidak ada yang cocok dengan pencarian ini.",
+      "clearFilters": "Hapus pencarian",
+      "personalNote": "Hanya kamu yang melihat item ini. Agenmu hanya menggunakannya saat kamu minta.",
+      "personalEmpty": "Belum ada yang disimpan",
+      "personalEmptyText": "Hanya kamu yang melihat item ini. Agenmu hanya menggunakannya saat kamu minta.",
+      "teamEmpty": "Belum ada yang dibagikan dengan tim",
+      "teamEmptyText": "Simpan login, kunci, atau kontak sekali, lalu pilih agen mana yang boleh menggunakannya.",
+      "sharedEmpty": "Belum ada yang dibagikan kepadamu",
+      "sharedEmptyText": "Saat seseorang membagikan login atau kunci tim kepadamu, item itu muncul di sini."
+    },
+    "row": {
+      "agents_other": "{{count}} agen",
+      "used": "Digunakan {{when}}",
+      "never": "Belum pernah digunakan"
+    },
+    "kind": {
+      "login": "Login",
+      "key": "Kunci",
+      "contact": "Kontak",
+      "loginText": "Nama pengguna dan kata sandi sebuah situs web",
+      "keyText": "Kunci yang dipakai agenmu dalam perintah",
+      "contactText": "Data yang diketik agen di formulir"
+    },
+    "kindPlural": {
+      "login": "login",
+      "key": "kunci",
+      "contact": "kontak",
+      "loginTitle": "Login",
+      "keyTitle": "Kunci",
+      "contactTitle": "Kontak"
+    },
+    "scope": {
+      "personal": "Pribadi",
+      "team": "Tim",
+      "personalText": "Hanya kamu yang melihatnya",
+      "teamText": "Dibagikan dengan ruang kerja"
+    },
+    "field": {
+      "title": "Nama",
+      "contactTitle": "Nama di Vault",
+      "loginPlaceholder": "Email perusahaan",
+      "keyPlaceholder": "Kunci pembayaran",
+      "contactPlaceholder": "Data penagihan",
+      "website": "Situs web",
+      "websitePlaceholder": "app.example.com",
+      "match": "Tempat agen boleh mengetiknya",
+      "username": "Nama pengguna",
+      "usernamePlaceholder": "Email atau nama pengguna",
+      "password": "Kata sandi",
+      "keyName": "Nama variabel",
+      "keyNameHelp": "Agenmu memakai kunci dengan nama ini dalam perintah.",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "value": "Nilai",
+      "description": "Catatan untuk agenmu",
+      "descriptionHelp": "Kapan digunakan dan untuk apa. Agen membaca ini untuk memilih yang tepat.",
+      "descriptionPlaceholder": {
+        "login": "Akun yang kami pakai untuk menerbitkan postingan",
+        "key": "Untuk layanan pembayaran, mode uji",
+        "contact": "Gunakan untuk faktur perusahaan"
+      }
+    },
+    "match": {
+      "exact": "Hanya alamat ini",
+      "site": "Seluruh situs",
+      "exactHelp": "Agen mengetiknya hanya di {{origin}}.",
+      "exactHelpNone": "Agen mengetiknya hanya di alamat persis ini.",
+      "siteHelp": "Agen mengetiknya di halaman mana pun di situs ini, seperti halaman masuk di subdomain lain."
+    },
+    "contact": {
+      "group": "Data kontak",
+      "fullName": "Nama lengkap",
+      "company": "Perusahaan",
+      "document": "NPWP",
+      "email": "Email",
+      "phone": "Telepon",
+      "address": "Alamat",
+      "address2": "Alamat baris 2",
+      "city": "Kota",
+      "region": "Provinsi atau wilayah",
+      "postalCode": "Kode pos",
+      "country": "Negara"
+    },
+    "error": {
+      "title": "Beri nama.",
+      "website": "Gunakan alamat https, misalnya app.example.com.",
+      "keyName": "Gunakan huruf kapital, angka, dan _, diawali huruf, misalnya ACME_API_KEY.",
+      "password": "Ketik kata sandinya.",
+      "value": "Ketik nilainya.",
+      "contact": "Isi setidaknya satu kolom."
+    },
+    "item": {
+      "missing": "Hilang",
+      "missingText": "Item ini sudah tidak ada di {{source}}. Agen tidak bisa menggunakannya sampai kembali.",
+      "editIn": "Edit di {{source}}. Perubahan masuk ke sini pada sinkronisasi berikutnya.",
+      "unreadable": "Detail kontak ini tidak bisa dibaca di sini. Orang yang mengelolanya bisa mengetiknya lagi lalu menyimpan.",
+      "hidden": "Tersembunyi",
+      "endsIn": "berakhiran {{hint}}",
+      "noValue": "Belum ada yang disimpan",
+      "change": "Ganti",
+      "add": "Tambah",
+      "newPassword": "Kata sandi baru",
+      "newValue": "Nilai baru",
+      "newValueHelp": "Menggantikan yang tersimpan saat kamu menyimpan.",
+      "sealedHelp": "Demi keamanan, yang tersimpan di sini tidak ditampilkan lagi. Untuk mengubahnya, ketik ulang.",
+      "keepValue": "Pertahankan yang sekarang",
+      "saved": "Tersimpan",
+      "delete": "Hapus",
+      "deleteTitle": "Hapus {{title}}?",
+      "deleteText": "Agenmu tidak bisa menggunakannya lagi. Ini tidak bisa diurungkan.",
+      "deleted": "{{title}} dihapus dari Vault"
+    },
+    "use": {
+      "title": "Penggunaan terbaru",
+      "none": "Belum ada yang menggunakannya.",
+      "fill": "{{agent}}, di {{host}}",
+      "fillSomewhere": "{{agent}} mengetiknya",
+      "key": "{{agent}}, dalam perintah",
+      "read": "{{who}} membacanya",
+      "create": "{{who}} menyimpannya",
+      "edit": "{{who}} mengubahnya",
+      "for": "untuk {{name}}",
+      "routine": "Rutinitas {{name}}"
+    },
+    "access": {
+      "title": "Siapa yang punya akses",
+      "people": "Orang",
+      "agents": "Agen",
+      "edit": "Edit",
+      "editOf": "Edit {{what}}",
+      "everyone": "Semua orang di ruang kerja",
+      "everyoneText": "Setiap orang melihatnya, dan agen menggunakannya saat orang itu meminta.",
+      "managersOnly": "Hanya pengelola Vault",
+      "allAgents": "Semua agen",
+      "noAgents": "Belum ada agen",
+      "more_other": "{{count}} lainnya",
+      "saved": "Akses tersimpan",
+      "peopleTitle": "Siapa yang bisa melihatnya",
+      "peopleText": "Mereka melihatnya, dan agen menggunakannya saat salah satu dari mereka meminta. Pengelola Vault selalu melihatnya.",
+      "level": {
+        "use": "Bisa melihat dan menggunakan",
+        "none": "Tanpa akses"
+      },
+      "roleDetail": "Semua orang dengan peran ini",
+      "roles": "Peran",
+      "peopleGroup": "Orang",
+      "add": "Tambahkan peran atau orang",
+      "addSearch": "Cari peran dan orang",
+      "noMatch": "Tidak ada yang ditemukan",
+      "levelOf": "Yang bisa dilakukan {{name}}",
+      "follows": "Mengikuti akses bawaan {{source}}.",
+      "own": "Punya akses sendiri, bukan akses bawaan {{source}}.",
+      "changeHere": "Ubah untuk item ini",
+      "useConnection": "Kembali ke bawaan"
+    },
+    "agents": {
+      "title": "Agen mana yang bisa menggunakannya",
+      "textPersonal": "Mereka hanya menggunakannya saat kamu minta.",
+      "textTeam": "Mereka menggunakannya saat orang yang bisa melihatnya meminta.",
+      "all": "Semua agen",
+      "allDetail": "Juga agen yang ditambahkan nanti"
+    },
+    "summary": {
+      "noAgents": "Belum ada agen yang bisa menggunakannya.",
+      "allAgents": "Setiap agen",
+      "inRole": "seseorang dengan peran {{role}}",
+      "personal_other": "{{agents}} bisa menggunakannya, hanya saat kamu minta.",
+      "everyone_other": "{{agents}} bisa menggunakannya saat siapa pun di ruang kerja meminta.",
+      "people_other": "{{agents}} bisa menggunakannya saat {{people}} meminta.",
+      "nobody": "Belum ada yang bisa meminta agen menggunakannya. Pilih siapa yang bisa melihatnya."
+    },
+    "new": {
+      "open": "Item baru",
+      "title": "Item baru",
+      "text": "Simpan sekali. Agenmu menggunakannya tanpa melihat kata sandi atau kunci.",
+      "what": "Apa yang ingin kamu simpan?",
+      "who": "Siapa yang bisa menggunakannya",
+      "teamLocked": "Hanya pengelola Vault yang bisa menyimpan item tim. Item ini tetap milikmu.",
+      "save": "Simpan",
+      "saved": "Tersimpan di Vault"
+    },
+    "import": {
+      "open": "Impor",
+      "title": "Impor kata sandi",
+      "text": "Dari file yang diekspor browser atau pengelola kata sandimu (.csv).",
+      "dropTitle": "Letakkan file di sini",
+      "dropText": "atau klik untuk memilihnya di komputermu",
+      "reading": "Membaca file…",
+      "choose": "Pilih file",
+      "where": "Di browser atau pengelola kata sandimu, cari Ekspor kata sandi lalu pilih CSV.",
+      "tooLarge": "File ini terlalu besar (paling besar 2 MB).",
+      "notCsv": "Pilih file .csv.",
+      "unreadable": "Tidak bisa membaca file ini. Coba ekspor lagi.",
+      "format": {
+        "chrome": "Dibaca sebagai ekspor Chrome",
+        "1password": "Dibaca sebagai ekspor 1Password",
+        "bitwarden": "Dibaca sebagai ekspor Bitwarden",
+        "generic": "Dibaca sebagai file kata sandi"
+      },
+      "added_other": "login baru",
+      "updated_other": "diperbarui",
+      "skipped_other": "dilewati",
+      "reason": {
+        "duplicate_other": "{{count}} sudah ada di Vault",
+        "not_https_other": "{{count}} tidak di alamat https",
+        "no_password_other": "{{count}} tanpa kata sandi",
+        "invalid_other": "{{count}} baris yang tidak bisa kami baca"
+      },
+      "as": "Simpan sebagai",
+      "asPersonal": "Hanya kamu yang akan melihatnya.",
+      "asTeam": "Semua orang di ruang kerja melihatnya. Pilih agen untuk masing-masing setelah itu.",
+      "deleteFile": "Hapus file setelahnya: file itu berisi kata sandimu tanpa enkripsi.",
+      "confirm_other": "Impor {{count}}",
+      "done_other": "{{count}} login diimpor",
+      "another": "Pilih file lain",
+      "close": "Selesai"
+    },
+    "connections": {
+      "none": "Tidak ada pengelola kata sandi yang bisa dihubungkan di sini.",
+      "lead": "Agenmu menggunakan {{kinds}} yang kamu simpan di {{name}}.",
+      "connect": "Hubungkan",
+      "reconnect": "Hubungkan ulang",
+      "reconnectName": "Hubungkan ulang {{name}}",
+      "open": "Buka {{name}}",
+      "required": "Isi kolom ini.",
+      "for": "Hubungkan untuk",
+      "forTeam": "Item-itemnya milik tim. Pengelola Vault memutuskan siapa yang menggunakannya.",
+      "forPersonal": "Item-itemnya hanya milikmu.",
+      "teamLocked": "Item-itemnya akan hanya milikmu. Hanya pengelola Vault yang menghubungkan satu untuk tim.",
+      "sealed": "Yang kamu ketik di sini dienkripsi dan tidak pernah ditampilkan lagi.",
+      "connected_other": "{{name}} terhubung. {{count}} item masuk.",
+      "ready": "Terhubung",
+      "syncing": "Menyinkronkan",
+      "reads": "Membaca {{label}}",
+      "items_other": "{{count}} item",
+      "synced": "disinkronkan {{when}}",
+      "syncNow": "Sinkronkan sekarang",
+      "access": "Akses bawaan",
+      "accessTitle": "Akses bawaan {{label}}",
+      "accessText": "Item-itemnya mengikuti ini, kecuali kamu mengubah salah satunya. Setiap perubahan langsung tersimpan.",
+      "actionsName": "Lainnya untuk {{name}}",
+      "disconnect": "Putuskan",
+      "removeTitle": "Putuskan {{name}}?",
+      "removeText_other": "{{count}} item keluar dari Vault dan agenmu berhenti menggunakannya. Tidak ada yang berubah di {{name}}.",
+      "removed": "{{name}} diputus",
+      "listOf": "Koneksi ke {{name}}",
+      "note": "Agenmu membaca isinya saat perlu. Tidak ada yang disalin ke agentes.chat selain nama dan alamat.",
+      "error": {
+        "auth_failed": "Masuk ditolak",
+        "locked": "Kata sandi salah",
+        "many_vaults": "Melihat lebih dari satu brankas",
+        "no_vault": "Tidak melihat brankas",
+        "folder_missing": "Folder tidak ditemukan",
+        "not_found": "Tidak ditemukan",
+        "rate_limited": "Terlalu banyak pembacaan",
+        "unreachable": "Tidak terjangkau",
+        "unsupported": "Tidak tersedia di sini",
+        "invalid_input": "Periksa kolomnya",
+        "too_many_items": "Vault penuh",
+        "other": "Tidak bisa dibaca"
+      },
+      "fix": {
+        "auth_failed": "Kunci atau token ditolak. Hubungkan ulang dengan yang baru.",
+        "locked": "Kata sandi utama tidak membuka akun. Hubungkan ulang dengan yang benar.",
+        "many_vaults": "Beri akun layanan akses ke satu brankas saja, lalu hubungkan ulang.",
+        "no_vault": "Beri akun layanan akses ke brankas para agen, lalu hubungkan ulang.",
+        "folder_missing": "Buat folder untuk agenmu, atau hubungkan ulang dengan namanya.",
+        "not_found": "Yang dibacanya sudah tidak ada. Hubungkan ulang untuk memilih lagi.",
+        "rate_limited": "Pengelola kata sandi meminta kami menunggu. Ia mencoba lagi sendiri.",
+        "unreachable": "Servernya tidak menjawab. Ia mencoba lagi sendiri.",
+        "unsupported": "Pengaturannya tidak bisa dibaca di sini. Coba lagi nanti atau pakai akun lain.",
+        "invalid_input": "Ada isi kolom yang ditolak. Hubungkan ulang dan periksa.",
+        "too_many_items": "Hapus item sebelum menyinkronkan lebih banyak.",
+        "other": "Coba Sinkronkan sekarang, atau hubungkan ulang."
+      }
+    },
+    "source": {
+      "onepassword": {
+        "step": {
+          "1": "Buat brankas di 1Password khusus untuk agenmu dan pindahkan ke sana login yang boleh mereka gunakan",
+          "2": "Buat akun layanan yang hanya punya akses ke brankas itu",
+          "3": "Tempel token akun layanan di sini"
+        },
+        "field": {
+          "token": "Token akun layanan"
+        }
+      },
+      "bitwarden": {
+        "warning": "Gunakan akun khusus untuk agenmu. Kata sandi utamanya membuka seluruh akun, jadi jangan simpan hal pribadi di sana.",
+        "step": {
+          "1": "Buat akun Bitwarden khusus untuk agenmu dan folder bernama Agents berisi login yang boleh mereka gunakan",
+          "2": "Di akun itu, buka Pengaturan, Keamanan, Kunci lalu salin kunci API",
+          "3": "Isi kolom di bawah"
+        },
+        "field": {
+          "server": "Server",
+          "serverUrl": "Alamat server",
+          "clientId": "ID klien",
+          "clientSecret": "Rahasia klien",
+          "masterPassword": "Kata sandi utama",
+          "folder": "Folder"
+        },
+        "choice": {
+          "server": {
+            "self": "Server saya sendiri"
+          }
+        }
+      }
+    },
+    "card": {
+      "save": "Simpan ke Vault",
+      "saveText": "Lain kali agenmu menggunakannya tanpa bertanya kepadamu.",
+      "scope": "Simpan sebagai",
+      "personalText": "Hanya kamu yang melihatnya",
+      "teamText": "Ruang kerja melihatnya",
+      "teamLocked": "Hanya pengelola Vault yang menyimpan untuk tim",
+      "agents": "Digunakan oleh",
+      "choose": "Pilih",
+      "saved": "Tersimpan di Vault",
+      "notSaved": "Terkirim, tapi tidak disimpan ke Vault",
+      "codeBox": "Digit {{n}} dari {{total}}",
+      "codeShort_other": "Ketik semua {{count}} digitnya.",
+      "codeWhere": "Hanya browser {{agent}} yang mengetiknya, di {{host}}."
+    }
+  },
   "question": {
     "answer": "Jawab",
     "placeholder": "Jawabanmu",
@@ -3095,7 +3458,8 @@
       "usageLimitReached": "<b>{{name}}</b> mencapai batas {{amount}}",
       "usageLimitRequest": "<b>{{name}}</b> mencapai batas {{amount}} dan meminta tambahan",
       "usageLimitRaised": "<b>{{name}}</b> menaikkan batasmu bulan ini",
-      "usageLimitRefused": "<b>{{name}}</b> menolak permintaan tambahan pemakaianmu"
+      "usageLimitRefused": "<b>{{name}}</b> menolak permintaan tambahan pemakaianmu",
+      "planLent": "<b>{{name}}</b> menghubungkan paket {{plan}} kamu ke <b>{{agent}}</b>"
     },
     "usageLimit": {
       "runs_other": "{{count}} permintaan bulan ini",
@@ -3203,7 +3567,12 @@
     "noneUnread": "Semua sudah dibaca.",
     "noneHere": "Belum ada apa-apa di sini.",
     "noneDone": "Tidak ada yang ditandai selesai dalam 30 hari terakhir.",
-    "more": "Tampilkan lebih banyak"
+    "more": "Tampilkan lebih banyak",
+    "planLent": {
+      "takeBack": "Tarik kembali",
+      "takeBackAll": "Tarik kembali dari semua agen",
+      "done": "Paketmu sudah kembali"
+    }
   },
   "approvals": {
     "title": "Persetujuan",
@@ -3576,21 +3945,31 @@
             "claude_code": "Tambah akun Claude",
             "codex": "Tambah akun ChatGPT",
             "cursor": "Tambah akun Cursor",
+            "grok": "Tambah akun Grok",
+            "antigravity": "Tambah akun Gemini",
             "opencode": "Tambah kunci OpenCode"
           },
           "stepOne": {
             "claude_code": "Akun dengan paketmu",
             "codex": "Akun dengan paketmu",
-            "cursor": "Akun dengan paketmu"
+            "cursor": "Akun dengan paketmu",
+            "grok": "Akun dengan paketmu",
+            "antigravity": "Akun Google dengan paketmu",
+            "antigravityEnterprise": "Akun Gemini Enterprise-mu"
           },
           "stepOneHint": "Akun yang salah? Keluar di sana lalu coba lagi. Akun hanya tersimpan di {{computer}}. Kamu mengetik kata sandi di halaman {{brand}}.",
           "open": {
             "claude_code": "Masuk dengan Claude",
             "codex": "Masuk dengan ChatGPT",
-            "cursor": "Masuk dengan Cursor"
+            "cursor": "Masuk dengan Cursor",
+            "grok": "Masuk dengan Grok",
+            "antigravity": "Masuk dengan Google"
           },
           "opencodeFree": "Model gratis OpenCode tidak perlu kunci. Kunci dari konsol OpenCode menambahkan model berbayarnya.",
           "cursorFinish": "Masuk di halaman Cursor, dan proses masuk selesai sendiri di {{computer}}.",
+          "grokFinish": "Masuk di halaman Grok, dan proses masuk selesai sendiri di {{computer}}.",
+          "geminiEnterprise": "Pakai Gemini Enterprise saja",
+          "geminiPersonal": "Pakai akun Google pribadi saja",
           "cursorKey": "Pakai kunci API Cursor saja",
           "copyLink": "Salin tautan",
           "openAgain": "Buka lagi",
@@ -3602,6 +3981,7 @@
           "sent": "Kode terkirim. Menyelesaikan proses masuk di {{computer}}.",
           "local": "Sedang di {{computer}} itu sendiri? Jika browsernya terbuka sendiri, cukup beri izin di sana.",
           "deviceCode": "Kode untuk ChatGPT",
+          "grokCode": "Kode untuk Grok",
           "deviceCodeText": "Ketik kode ini di halaman yang terbuka.",
           "starting": "Menghubungi {{computer}}…",
           "waiting": "Menunggu",
@@ -3612,13 +3992,16 @@
             "claude_code": "Claude masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman Claude lalu coba lagi.",
             "codex": "ChatGPT masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman ChatGPT lalu coba lagi.",
             "cursor": "Cursor masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman Cursor lalu coba lagi.",
+            "grok": "Grok masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman Grok lalu coba lagi.",
+            "antigravity": "Gemini masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman Google lalu coba lagi.",
             "opencode": "Kunci OpenCode itu sudah terhubung sebagai {{account}}."
           },
           "startFailed": "Tidak ada jawaban dari {{computer}}. Coba lagi sebentar lagi.",
           "sendFailed": "Tidak bisa mengirim kode. Periksa lalu coba lagi.",
           "done": "Akun {{account}} sudah ada di {{computer}}. Klik Pakai untuk menyimpan."
         },
-        "offCloud": "{{computer}} tidak merespons"
+        "offCloud": "{{computer}} tidak merespons",
+        "accountOthers": "Paket orang lain menunjukkan milik siapa. Pemiliknya menerima email dan bisa menariknya kembali."
       },
       "computer": {
         "title": "Di mana {{name}} bekerja?",
@@ -4867,6 +5250,14 @@
     "setup_write": {
       "label": "Siapkan ruang kerja",
       "description": "Tawarkan untuk menghubungkan AI, aplikasi, atau server MCP, atau mengundang orang, lewat kartu yang diklik seseorang, dan buat kanal untuk yang meminta, dengan Urungkan."
+    },
+    "vault_read": {
+      "label": "Melihat Vault",
+      "description": "Melihat login, kunci, dan kontak yang dibagikan Vault kepadanya, lalu menggunakannya. Ia mengetik kata sandi tersimpan dan memakai kunci tersimpan tanpa pernah melihatnya."
+    },
+    "vault_write": {
+      "label": "Mengedit kontak Vault",
+      "description": "Menyimpan dan memperbarui kontak di Vault, mengubah nama pengguna login tersimpan atau deskripsi, dan menghapus yang ia simpan."
     },
     "github_git_read": {
       "label": "Kloning repositori (git)",
@@ -7016,6 +7407,8 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "grok": "Grok",
+      "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
         "keys": "Perbarui agentes di komputer untuk memakai kunci paket"
@@ -7023,11 +7416,13 @@
       "noComputer": "Akun disimpan di komputer yang terhubung. Hubungkan salah satu komputermu dulu.",
       "addComputer": "Hubungkan komputer",
       "needsCloud": {
-        "claude_code": "Belum siap di {{computer}}",
-        "codex": "Belum siap di {{computer}}",
-        "cursor": "Belum siap di {{computer}}",
-        "opencode": "Belum siap di {{computer}}",
-        "online": "{{computer}} sedang tidak merespons. Kami sedang menanganinya."
+        "online": "{{computer}} sedang memulai ulang atau menyambung lagi. Ini berubah sendiri begitu ia kembali.",
+        "installing": "{{program}} sedang dipasang di {{computer}}. Ini berubah sendiri setelah selesai.",
+        "updating": "{{program}} sedang diperbarui di {{computer}}. Ini berubah sendiri setelah selesai.",
+        "runnerOld": "Program agentes.chat di {{computer}} sudah usang dan pembaruannya sedang dalam perjalanan. Ini berubah sendiri setelah selesai.",
+        "execOff": "{{computer}} belum bisa menjalankan {{program}}. Kami sedang menanganinya, dan ini berubah sendiri.",
+        "toolOff": "{{program}} tidak diizinkan di {{computer}}. Minta tim dukungan untuk mengizinkannya.",
+        "preparing": "{{computer}} sedang disiapkan. Ini berubah sendiri setelah selesai."
       }
     },
     "done": {
@@ -7051,6 +7446,9 @@
       "rename": "Ganti nama",
       "signInAgain": "Masuk lagi",
       "newKey": "Ganti kunci",
+      "copies_other": "{{count}} login lain dari akun ini, tanpa agen.",
+      "removeCopies": "Hapus",
+      "copiesRemoved_other": "{{count}} login yang tidak dipakai dihapus.",
       "disconnect": "Putuskan",
       "renameTitle": "Ganti nama {{label}}",
       "nameLabel": "Nama",
@@ -7264,7 +7662,8 @@
       "deal": "sepakat",
       "thinking": "berpikir",
       "wow": "wow",
-      "dizzy": "pusing"
+      "dizzy": "pusing",
+      "wave": "hai"
     },
     "moodWords": {
       "celebrate": "pesta selamat rayakan rilis luncur hore party congrats celebrate yay",
@@ -7272,7 +7671,8 @@
       "deal": "ok oke setuju ya siap beres deal sure done",
       "thinking": "hmm bingung pikir mungkin entahlah think maybe",
       "wow": "wah kaget luar biasa astaga whoa wow omg",
-      "dizzy": "capek jumat tolong ups bingung lelah tired help oops"
+      "dizzy": "capek jumat tolong ups bingung lelah tired help oops",
+      "wave": "halo hai dadah melambai selamat pagi sampai jumpa hello bye"
     },
     "picker": {
       "button": "Emoji, GIF, dan stiker",
@@ -8373,21 +8773,29 @@
       "claude": "{{model}} dengan paket Claude",
       "chatgpt": "{{model}} dengan paket ChatGPT",
       "cursor": "{{model}} dengan paket Cursor",
+      "grok": "{{model}} dengan paket Grok",
+      "gemini": "{{model}} dengan paket Gemini",
       "zen": "{{model}} lewat OpenCode",
       "coding": "{{model}} dengan {{plan}}",
       "claudeOf": "{{model}} dengan paket Claude milik {{owner}}",
       "chatgptOf": "{{model}} dengan paket ChatGPT milik {{owner}}",
       "cursorOf": "{{model}} dengan paket Cursor milik {{owner}}",
+      "grokOf": "{{model}} dengan paket Grok milik {{owner}}",
+      "geminiOf": "{{model}} dengan paket Gemini milik {{owner}}",
       "zenOf": "{{model}} lewat OpenCode milik {{owner}}",
       "codingOf": "{{model}} dengan {{plan}} milik {{owner}}",
       "claudeAuto": "Paket Claude",
       "chatgptAuto": "Paket ChatGPT",
       "cursorAuto": "Paket Cursor",
+      "grokAuto": "Paket Grok",
+      "geminiAuto": "Paket Gemini",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Paket Claude milik {{owner}}",
       "chatgptAutoOf": "Paket ChatGPT milik {{owner}}",
       "cursorAutoOf": "Paket Cursor milik {{owner}}",
+      "grokAutoOf": "Paket Grok milik {{owner}}",
+      "geminiAutoOf": "Paket Gemini milik {{owner}}",
       "zenAutoOf": "OpenCode milik {{owner}}",
       "codingAutoOf": "{{plan}} milik {{owner}}",
       "on": "{{line}} di {{computer}}"
@@ -8399,7 +8807,9 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
-      "opencode": "OpenCode"
+      "opencode": "OpenCode",
+      "grok": "Grok Build",
+      "antigravity": "Antigravity CLI"
     },
     "foot": {
       "api": "Lewat API",
@@ -8410,6 +8820,8 @@
     "claude_codeText": "Memakai paket Claude milik orang yang menghubungkan komputer.",
     "codexText": "Memakai paket ChatGPT milik orang yang menghubungkan komputer.",
     "cursorText": "Memakai paket Cursor milik orang yang menghubungkan komputer.",
+    "grokText": "Memakai paket Grok milik orang yang menghubungkan komputer.",
+    "antigravityText": "Memakai paket Gemini milik orang yang menghubungkan komputer.",
     "opencodeText": "Model gratis OpenCode, atau kunci OpenCode milik orang yang menghubungkan komputer.",
     "cursorModel": {
       "inPlan": "Termasuk dalam paket Cursor-mu",
@@ -8454,6 +8866,8 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "grok": "Grok Build · {{model}}",
+      "antigravity": "Antigravity CLI · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, tanpa cadangan API"
     },
@@ -8577,7 +8991,8 @@
       "sandbox": "Jalankan kode",
       "browser": "Browser",
       "setup": "Pengaturan ruang kerja",
-      "desktop": "Desktop"
+      "desktop": "Desktop",
+      "vault": "Vault"
     },
     "areaText": {
       "context": {
@@ -8623,6 +9038,10 @@
       "desktop": {
         "write": "Memakai aplikasi apa pun di desktopnya sendiri di komputernya, sementara orang menonton atau mengambil alih. Juga butuh Jalankan kode.",
         "write_female": "Memakai aplikasi apa pun di desktopnya sendiri di komputernya, sementara orang menonton atau mengambil alih. Juga butuh Jalankan kode."
+      },
+      "vault": {
+        "read": "Melihat dan menggunakan apa yang dibagikan Vault kepadanya, tanpa melihat kata sandi atau kunci.",
+        "write": "Juga menyimpan dan memperbarui kontak di Vault."
       }
     }
   },
@@ -10589,6 +11008,49 @@
       "invalid": "@ terdiri dari {{min}} sampai {{max}} huruf kecil, angka, - atau _.",
       "taken": "@{{handle}} sudah dipakai orang lain.",
       "takenByAgent": "@{{handle}} sudah dipakai agen."
+    },
+    "vault": {
+      "invalid": "Ada yang tidak benar di item ini. Periksa lalu coba lagi.",
+      "notFound": "Item ini sudah tidak ada di Vault.",
+      "titleRequired": "Beri nama.",
+      "tooLong": "Terlalu panjang. Batasnya {{max}}.",
+      "notHttps": "Gunakan alamat yang diawali https://",
+      "keyNameInvalid": "Gunakan huruf kapital, angka, dan _ pada nama, misalnya ACME_API_KEY.",
+      "keyNameReserved": "Nama ini dicadangkan. Pilih nama lain.",
+      "keyNameTaken": "Sudah ada kunci tersimpan dengan nama ini di sini.",
+      "contactEmpty": "Isi setidaknya satu kolom.",
+      "teamNeedsPermission": "Hanya orang yang mengelola kredensial yang bisa menyimpan item tim.",
+      "externalReadOnly": "Ini berasal dari pengelola kata sandi. Ubah di sana.",
+      "changedMeanwhile": "Seseorang mengubahnya sementara itu. Buka lagi.",
+      "noValue": "Tidak ada yang bisa disimpan.",
+      "missing": "Item ini hilang dari pengelola kata sandinya.",
+      "notAllowed": "Kamu tidak bisa melakukan ini pada item ini.",
+      "tooManyItems": "Vault penuh. Hapus item yang tidak kamu gunakan lagi.",
+      "audienceInvalid": "Seseorang atau peran yang kamu pilih sudah tidak ada di ruang kerja.",
+      "agentsInvalid": "Agen yang kamu pilih sudah tidak ada di ruang kerja.",
+      "tooManyAgents": "Pilih paling banyak 200 agen.",
+      "tooManyRoles": "Pilih paling banyak 100 peran.",
+      "tooManyPeople": "Pilih paling banyak 500 orang.",
+      "csvTooLarge": "File terlalu besar. Batasnya 2 MB.",
+      "csvTooManyRows": "File memiliki lebih dari 5.000 baris. Pisahkan lalu impor setiap bagian.",
+      "csvUnrecognized": "Ini tidak tampak seperti file kata sandi. Ekspor lagi sebagai CSV.",
+      "requestNotDelivered": "Kirim dulu, lalu simpan ke Vault.",
+      "requestNotSavable": "Ini tidak bisa disimpan ke Vault.",
+      "sourceUnknown": "Pengelola kata sandi ini tidak tersedia di sini.",
+      "sourceError": "Tidak bisa membacanya dari pengelola kata sandinya. Coba lagi.",
+      "source": {
+        "authFailed": "Pengelola kata sandi menolak data ini. Periksa lalu coba lagi.",
+        "locked": "Kata sandi utama salah.",
+        "manyVaults": "Akun layanan melihat lebih dari satu brankas. Beri akses ke satu saja.",
+        "noVault": "Akun layanan tidak melihat brankas apa pun. Beri akses ke satu brankas.",
+        "folderMissing": "Folder itu tidak ada di akun.",
+        "notFound": "Item ini sudah tidak ada di pengelola kata sandinya.",
+        "rateLimited": "Pengelola kata sandi meminta kami menunggu. Coba lagi dalam beberapa menit.",
+        "unreachable": "Tidak bisa menghubungi pengelola kata sandi. Periksa alamatnya lalu coba lagi.",
+        "unsupported": "Pengelola kata sandi ini tidak bisa dihubungkan di sini.",
+        "invalidInput": "Periksa kolom-kolomnya lalu coba lagi.",
+        "tooManyItems": "Vault penuh. Hapus item sebelum menyinkronkan lebih banyak."
+      }
     }
   },
   "machines": {
@@ -10736,6 +11198,8 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "grok": "Grok Build",
+        "antigravity": "Antigravity CLI",
         "opencode": "OpenCode",
         "commands": "Perintah",
         "browser": "Browser"
@@ -10744,6 +11208,8 @@
         "claude": "Menulis dan mengubah file, hanya di folder yang diizinkan.",
         "codex": "Seperti Claude Code, dengan akun ChatGPT. Hanya di folder yang diizinkan.",
         "cursor": "Seperti Claude Code, dengan akun Cursor. Hanya di folder yang diizinkan.",
+        "grok": "Seperti Claude Code, dengan akun Grok. Hanya di folder yang diizinkan.",
+        "antigravity": "Seperti Claude Code, dengan akun Gemini. Hanya di folder yang diizinkan.",
         "opencode": "Seperti Claude Code, dengan model gratis OpenCode atau kunci OpenCode. Hanya di folder yang diizinkan.",
         "commands": "Menjalankan perintah Terminal, seperti tes dan build."
       },
@@ -11194,6 +11660,16 @@
         "token_revoked": "Mencabut token pribadi {{app}}",
         "message_sent": "Mengirim pesan lewat {{app}}"
       },
+      "vault": {
+        "item_created": "Menyimpan item ke Vault",
+        "item_changed": "Mengubah item Vault",
+        "item_deleted": "Menghapus item Vault",
+        "item_used": "Menggunakan item Vault",
+        "imported": "Mengimpor kata sandi ke Vault",
+        "connection_added": "Menghubungkan pengelola kata sandi ke Vault",
+        "connection_changed": "Mengubah koneksi pengelola kata sandi",
+        "connection_removed": "Memutus pengelola kata sandi dari Vault"
+      },
       "verb": {
         "created": "Membuat",
         "deleted": "Menghapus",
@@ -11226,6 +11702,9 @@
         "resent": "Mengirim ulang",
         "revoked": "Mencabut",
         "archived": "Mengarsipkan",
+        "shown": "Melihat",
+        "copied": "Menyalin",
+        "used": "Menggunakan",
         "other": "Mengubah"
       },
       "area": {
@@ -11258,6 +11737,7 @@
         "member": "anggota",
         "invitation": "undangan",
         "credential": "kunci AI",
+        "vault": "Vault",
         "other": "ruang kerja"
       }
     },
@@ -11317,6 +11797,7 @@
       "right_hand": "Tangan kanan",
       "members": "Anggota dan undangan",
       "roles": "Peran dan izin",
+      "vault": "Vault",
       "access": "Agen dan akses",
       "connectors": "Konektor dan MCP",
       "skills": "Skill",
@@ -11339,6 +11820,7 @@
       "right_hand": "Asisten yang menyusun tim bersama tiap orang, di DM mereka dan dengan izin mereka.",
       "members": "Siapa saja yang ada di ruang kerja, dan undangan.",
       "roles": "Yang bisa dilakukan tiap orang. Peran saling menambah.",
+      "vault": "Kata sandi, kunci, dan kontak yang digunakan agenmu. Mereka mengetik kata sandi dan memakai kunci tanpa pernah melihatnya.",
       "access": "Yang bisa dipakai tiap agen: satu tingkat per konektor.",
       "connectors": "Layanan dan server MCP yang dihubungkan sekali untuk seluruh ruang kerja.",
       "skills": "Instruksi Markdown yang dibuka agen saat dibutuhkan.",
@@ -12225,6 +12707,8 @@
       "action_invite_people": "Undang orang",
       "action_install_skill": "Pasang skill",
       "action_update_skills": "Perbarui skill",
+      "action_approvals": "Persetujuan yang menunggumu",
+      "action_open_page": "Buka layar",
       "agent_proposal": "Mengusulkan agen baru: {{name}}",
       "settings_proposal": "Mengusulkan perubahan untuk {{names}}",
       "approval_request": "Permintaan persetujuan: {{title}}",
@@ -12251,15 +12735,25 @@
       "stuck": "Aku macet dan berhenti sebelum selesai.",
       "forum_suggestion": "Layak dibawa ke forum? \"{{title}}\"",
       "forum_concluded": "Forum \"{{title}}\" sudah selesai. Sintesisnya ada di file di bawah.",
-      "forum_concluded_issues": "Forum \"{{title}}\" sudah selesai. Sintesisnya ada di file di bawah, dengan {{count}} usulan tugas untuk disetujui.",
-      "action_approvals": "Persetujuan yang menunggumu",
-      "action_open_page": "Buka layar"
+      "forum_concluded_issues": "Forum \"{{title}}\" sudah selesai. Sintesisnya ada di file di bawah, dengan {{count}} usulan tugas untuk disetujui."
     }
   },
   "builtinTools": {
     "ask_user": {
       "label": "Tanya orangnya",
       "description": "Mengajukan pertanyaan singkat dan menunggu jawabannya."
+    },
+    "vault_list": {
+      "label": "Lihat di Vault",
+      "description": "Menampilkan login, kunci, dan kontak yang dibagikan kepada agen, tidak pernah kata sandi atau kunci."
+    },
+    "vault_save": {
+      "label": "Simpan ke Vault",
+      "description": "Menyimpan atau memperbarui kontak, nama pengguna login, atau deskripsi."
+    },
+    "vault_delete": {
+      "label": "Hapus dari Vault",
+      "description": "Menghapus item yang ia simpan."
     },
     "react": {
       "label": "Beri reaksi",

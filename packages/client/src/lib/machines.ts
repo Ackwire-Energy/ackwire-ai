@@ -74,7 +74,7 @@ export const allowsInApp = (os: string | null | undefined) => os === "darwin" ||
  */
 export function toolOffReason(
   m: Pick<Machine, "os" | "mode"> | null | undefined,
-  kind: "claude_code" | "codex" | "cursor" | "opencode",
+  kind: "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity",
 ) {
   if (!m || allowsInApp(m.os)) return { key: "brain.reasons.tool_off" as const, command: "" };
   return {
@@ -89,7 +89,15 @@ export function folderName(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
-export const MACHINE_TOOLS: MachineToolName[] = ["claude", "codex", "cursor", "opencode", "commands"];
+export const MACHINE_TOOLS: MachineToolName[] = [
+  "claude",
+  "codex",
+  "cursor",
+  "opencode",
+  "grok",
+  "antigravity",
+  "commands",
+];
 
 /** The folders of a machine an agent may use (beyond its own folder). */
 export const foldersOfAgent = (access: MachineAccess | null | undefined, agentId: string): MachineFolderGrant[] =>

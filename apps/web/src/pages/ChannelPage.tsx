@@ -399,7 +399,8 @@ const WORKING: ReadonlySet<string> = new Set(["thinking", "queued", "running", "
 
 /** Header and empty state of a channel, or of a DM (same layout). */
 export interface ChannelChrome {
-  header?: ReactNode;
+  /** A page's own header; a function gets the header search's way into its results (a DM's). */
+  header?: ReactNode | ((h: { onSearch: () => void }) => ReactNode);
   emptyText?: string;
   /** Composer label/placeholder target, e.g. "Ada" instead of "#eng". */
   composerTarget?: string;
@@ -600,7 +601,7 @@ export function ChannelSkeleton({
 }: {
   thread?: boolean;
   panel?: boolean;
-  /** A DM's header: the face (an agent's square, a person's circle), the name and its line, Ver perfil. */
+  /** A DM's header: the face (an agent's square, a person's circle), the name and its line, the computer. */
   dm?: "agent" | "person";
 } = {}) {
   const { t } = useTranslation();
@@ -785,12 +786,13 @@ function ChannelView({
   // A DM with an agent: its tasks (ADR 0128), from the pill in the header; one panel too, any other one closes it.
   const [tasksOpen, setTasksOpen] = useState(false);
   useEffect(() => {
-    if (panel || profile || consultId) setTasksOpen(false);
-  }, [panel, profile, consultId]);
+    if (panel || profile || consultId || searchOpen) setTasksOpen(false);
+  }, [panel, profile, consultId, searchOpen]);
   const toggleTasks = useCallback(() => {
     setPanel(null);
     setProfile(null);
     setConsultId(null);
+    setSearchOpen(false);
     setTasksOpen((open) => !open);
   }, []);
   const outerPanel = useOpenAgentPanel();
@@ -2010,6 +2012,13 @@ function ChannelView({
     [tasksAgentId, agentTasks, tasksOpen, toggleTasks],
   );
   const Tag = chrome?.panel ? "section" : "main";
+  // Enter in the header search: its results in the panel, in place of any other.
+  const openSearch = () => {
+    setPanel(null);
+    setProfile(null);
+    setConsultId(null);
+    setSearchOpen(true);
+  };
   // It takes over from the conversation's skeleton (`ChannelSkeleton`): no second entrance of the whole view.
   const [continues] = useState(skeletonOnScreen);
 
@@ -2026,7 +2035,9 @@ function ChannelView({
           >
             {/* A page's own header (a DM's) gets the agent's tasks for its pill (`AgentTasksPill`). */}
             {chrome?.header ? (
-              <AgentTasksContext.Provider value={tasksControl}>{chrome.header}</AgentTasksContext.Provider>
+              <AgentTasksContext.Provider value={tasksControl}>
+                {typeof chrome.header === "function" ? chrome.header({ onSearch: openSearch }) : chrome.header}
+              </AgentTasksContext.Provider>
             ) : (
               <ChannelHeader
                 channel={channel}
@@ -2045,12 +2056,7 @@ function ChannelView({
                     : membersColumn.toggle
                 }
                 onDetails={() => setDetailsOpen(true)}
-                onSearch={() => {
-                  setPanel(null);
-                  setProfile(null);
-                  setConsultId(null);
-                  setSearchOpen(true);
-                }}
+                onSearch={openSearch}
               />
             )}
             {/* Under the header: the conversation, and the members beside it (the header spans both, as Discord's). */}

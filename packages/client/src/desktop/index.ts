@@ -135,6 +135,44 @@ export const browserOnlyWhy = (status: Pick<DesktopStatus, "controlRefusal"> | n
       ? ("desktop.browserOnly.role" as const)
       : ("desktop.browserOnly.other" as const);
 
+/**
+ * "Quer assumir o controle?" over the agent's screen while watching, on the web and the phone. `browser`: this person
+ * may take the agent's browser where its screen isn't theirs; `working`: the agent is at work and pauses for it.
+ */
+export function askControlWords(
+  status: Pick<DesktopStatus, "canControl" | "controlRefusal"> | null | undefined,
+  browser: boolean,
+  working: boolean,
+) {
+  const mayTake = Boolean(status?.canControl) || browser;
+  const browserOnly = !status?.canControl && browser;
+  return {
+    mayTake,
+    browserOnly,
+    title: !mayTake
+      ? ("desktop.ask.watching" as const)
+      : browserOnly
+        ? ("desktop.ask.titleBrowser" as const)
+        : ("desktop.ask.title" as const),
+    help: browserOnly ? browserOnlyWhy(status) : mayTake && working ? ("desktop.ask.working" as const) : null,
+  };
+}
+
+/**
+ * Which way control is switching over the last picture, or null: the person's own step on its way (`taking`,
+ * `returning`), or the screen's session (`session`, null until one opens) still in the other mode than `mode`.
+ */
+export function desktopSwitch(s: {
+  taking: boolean;
+  returning: boolean;
+  mode: DesktopMode;
+  session: DesktopMode | null;
+}): "taking" | "returning" | null {
+  if (s.taking || (s.mode === "control" && s.session === "watch")) return "taking";
+  if (s.returning || (s.mode === "watch" && s.session === "control")) return "returning";
+  return null;
+}
+
 /** Waits between tries to open the screen again: 1 s, then up to 10 s. */
 const RETRY_MS = [1000, 2000, 5000, 10_000];
 export const desktopRetryMs = (attempt: number) => RETRY_MS[Math.min(attempt, RETRY_MS.length - 1)] ?? 10_000;

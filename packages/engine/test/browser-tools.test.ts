@@ -421,6 +421,25 @@ test("a box found only on the image isn't ticked by a click there (a click would
   ]);
 });
 
+test("a code split in boxes goes to the runner with every box; a Vault login is never a named secret", () => {
+  const site = () => "https://acme.example";
+  expect(
+    actionCommands(
+      { kind: "type_secret", at: { ref: "e4" }, secret: "ACME_CODE", more: [{ ref: "e5" }, { ref: "e6" }] },
+      site,
+    ),
+  ).toMatchObject([
+    { command: "agentes:type_secret", args: ["@e4", "ACME_CODE", "https://acme.example", "@e5", "@e6"] },
+  ]);
+  expect(actionCommands({ kind: "type_secret", at: { ref: "e4" }, secret: "ACME_PASSWORD" }, site)).toMatchObject([
+    { command: "agentes:type_secret", args: ["@e4", "ACME_PASSWORD", "https://acme.example"] },
+  ]);
+  // A login is sealed at its step (ADR 0144), never sent by name.
+  expect(() =>
+    actionCommands({ kind: "type_secret", at: { ref: "e4" }, login: "item-1", url: "https://acme.example/" }, site),
+  ).toThrow("Vault");
+});
+
 test("a read with `find` returns only the lines that answer it", async () => {
   const judge = createFakeJudge((kind, id) => {
     if (kind !== "screen_find") return undefined;

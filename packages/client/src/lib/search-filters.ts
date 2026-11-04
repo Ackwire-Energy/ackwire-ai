@@ -203,6 +203,20 @@ export const searchChipKey = (c: SearchChip) => {
   }
 };
 
+/** Who and where: a DM's search offers neither, the DM is both. */
+const WHO_OR_WHERE = new Set<SearchOp>(["from", "mentions", "in", "author"]);
+export const DM_SEARCH_OPS: readonly SearchOp[] = SEARCH_OPS.filter((op) => !WHO_OR_WHERE.has(op));
+
+/** Whether a chip may stand in a search held to one DM: its own `in:` chip, and no other who or where. */
+export const chipFitsDm = (c: SearchChip, placeId: string) =>
+  c.op === "in" ? c.place.id === placeId : !WHO_OR_WHERE.has(c.op);
+
+/** A search held to one DM: its `in:` chip first, then the chips that fit it. */
+export const inDmOnly = (chips: readonly SearchChip[], place: SearchPlace): SearchChip[] => [
+  { op: "in", place },
+  ...chips.filter((c) => c.op !== "in" && chipFitsDm(c, place.id)),
+];
+
 /** Each chip once; for a date operator and `author:` the last one wins. */
 export function dedupe(chips: SearchChip[]): SearchChip[] {
   const byKey = new Map<string, SearchChip>();

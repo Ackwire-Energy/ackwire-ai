@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
+  chipFitsDm,
+  DM_SEARCH_OPS,
   formatSearch,
   groupByChannel,
   groupHitsByPlace,
+  inDmOnly,
   markTerms,
   parseSearch,
   periodOf,
@@ -157,5 +160,34 @@ describe("search filters", () => {
     expect(marked("convites", ["convite", "vites"])).toBe("[convites]");
     expect(markTerms("nada aqui", ["zebra"])).toEqual([{ text: "nada aqui" }]);
     expect(markTerms("", ["x"])).toEqual([{ text: "" }]);
+  });
+});
+
+describe("a search held to one DM", () => {
+  const here = { id: "c2", name: "Lia Moreira", dm: true };
+  const lia = { type: "person" as const, id: "u1", name: "Lia Moreira" };
+  test("offers no who or where", () => {
+    expect(DM_SEARCH_OPS).toEqual(["has", "before", "after", "during", "pinned"]);
+  });
+  test("its own in: chip first, the rest only what fits a DM", () => {
+    const chips = inDmOnly(
+      [
+        { op: "has", value: "file" },
+        { op: "in", place: { id: "c1", name: "geral" } },
+        { op: "from", actor: lia },
+        { op: "author", value: "agent" },
+        { op: "after", value: "2026-10" },
+      ],
+      here,
+    );
+    expect(chips).toEqual([
+      { op: "in", place: here },
+      { op: "has", value: "file" },
+      { op: "after", value: "2026-10" },
+    ]);
+    expect(inDmOnly(chips, here)).toEqual(chips);
+    expect(chipFitsDm({ op: "in", place: here }, "c2")).toBe(true);
+    expect(chipFitsDm({ op: "in", place: { id: "c1", name: "geral" } }, "c2")).toBe(false);
+    expect(chipFitsDm({ op: "mentions", actor: lia }, "c2")).toBe(false);
   });
 });

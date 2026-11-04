@@ -362,6 +362,12 @@
       "desc": "El plan, la tarjeta y las facturas.",
       "short": "facturación",
       "say": "gestiona la facturación"
+    },
+    "use_others_plans": {
+      "title": "Usar planes de otras personas",
+      "desc": "Dar a los agentes que puede editar un plan que otra persona conectó. Su dueño recibe un correo y puede recuperarlo.",
+      "short": "usar planes de otras personas",
+      "say": "usa planes de otras personas"
     }
   },
   "auth": {
@@ -1246,6 +1252,8 @@
     "paused": "En pausa: deshiciste 3 de sus decisiones esta semana. Vuelve a activarlo cuando quieras.",
     "card": {
       "deciding": "{{name}} lo está analizando en nombre de {{for}}…",
+      "approvedForYou": "Aprobado por {{name}} en tu nombre",
+      "decidingForYou": "{{name}} lo está analizando en tu nombre…",
       "approved": "Aprobado por {{name}} en nombre de {{for}}",
       "passed": "{{name}} te lo pasó",
       "passedWhy": "{{name}} te lo pasó: {{reason}}",
@@ -1257,9 +1265,7 @@
       "why": "¿Por qué?",
       "undo": "Deshacer",
       "undoArchives": "Deshacer archiva a {{name}}. Vale hasta {{until}}.",
-      "undoSettings": "Deshacer devuelve la configuración. Vale hasta {{until}}.",
-      "approvedForYou": "Aprobado por {{name}} en tu nombre",
-      "decidingForYou": "{{name}} lo está analizando en tu nombre…"
+      "undoSettings": "Deshacer devuelve la configuración. Vale hasta {{until}}."
     }
   },
   "noticePrefs": {
@@ -1504,9 +1510,9 @@
     "collapseAll": "Contraer todos",
     "expandAll": "Expandir todos",
     "organize": "Organizar grupos en Equipo",
-    "seeAll_one": "Ver el {{count}} agente",
-    "seeAll_many": "Ver los {{count}} agentes",
-    "seeAll_other": "Ver los {{count}} agentes",
+    "more_one": "1 agente más en Equipo",
+    "more_many": "{{count}} agentes más en Equipo",
+    "more_other": "{{count}} agentes más en Equipo",
     "createFirst": "Crear el primer agente",
     "working_one": "{{count}} trabajando",
     "working_many": "{{count}} trabajando",
@@ -1599,6 +1605,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "Correo",
+      "vault": "Vault",
       "custom": "Herramientas del espacio de trabajo"
     }
   },
@@ -1885,7 +1892,6 @@
   "rightHand": {
     "label": "tu mano derecha",
     "newDot": "Nuevo",
-    "callWith": "llámalo con @{{handle}}",
     "role": "Asistente del workspace",
     "actsAsYou": "actúa con tus permisos",
     "composerHint": "nada cambia sin ti",
@@ -1924,7 +1930,8 @@
       "channels": "Responde en los canales cuando lo llaman",
       "model": "Modelo",
       "message": "Mensaje",
-      "configure": "Configurar"
+      "configure": "Configurar",
+      "nameStory": "El nombre viene de lodestar, la estrella que guía a los navegantes."
     },
     "settings": {
       "name": "Nombre y aspecto",
@@ -2065,6 +2072,8 @@
       "claude_code": "Claude Code no tiene la sesión iniciada en esta computadora. Conecta una cuenta de Claude en la página de {{name}}.",
       "codex": "Codex no tiene la sesión iniciada en esta computadora. Conecta una cuenta de ChatGPT en la página de {{name}}.",
       "cursor": "Cursor no tiene la sesión iniciada en esta computadora. Conecta una cuenta de Cursor en la página de {{name}}.",
+      "grok": "Grok no tiene la sesión iniciada en esta computadora. Conecta una cuenta de Grok en la página de {{name}}.",
+      "antigravity": "Gemini no tiene la sesión iniciada en esta computadora. Conecta una cuenta de Gemini en la página de {{name}}.",
       "opencode": "OpenCode no puede pensar en esta computadora. Conecta una clave de OpenCode en la página de {{name}}."
     },
     "card": {
@@ -2093,6 +2102,8 @@
       "claude": "Conecta tu plan de Claude",
       "chatgpt": "Conecta tu plan de ChatGPT",
       "cursor": "Conecta tu plan de Cursor",
+      "grok": "Conecta tu plan de Grok",
+      "gemini": "Conecta tu plan de Gemini",
       "zen": "Conectar OpenCode",
       "api_key": "Agrega una clave de API"
     },
@@ -2117,6 +2128,15 @@
       "cursor": {
         "title": "Tu plan de Cursor",
         "tiers": "Pro, Pro+, Ultra o Teams, o una clave de API de Cursor"
+      },
+      "grok": {
+        "title": "Tu plan de Grok",
+        "tiers": "SuperGrok, SuperGrok Heavy o X Premium+"
+      },
+      "gemini": {
+        "title": "Tu plan de Gemini",
+        "tiers": "Google AI Pro, Google AI Ultra o Gemini Enterprise",
+        "warning": "Google dice que usar un plan personal de Gemini dentro de otras apps puede hacer que suspendan la cuenta. Para no correr ese riesgo, usa una clave de API o Gemini Enterprise."
       },
       "zen": {
         "title": "OpenCode",
@@ -2188,6 +2208,10 @@
     "onceHint": "Todos comparten los límites de tu plan.",
     "use": "Usar {{label}}",
     "another": "Otra cuenta",
+    "reuse": {
+      "active": "Ya tienes {{label}} aquí. Vuelve a iniciar sesión en ella o usa otra cuenta.",
+      "signedOut": "{{label}} cerró sesión aquí. Vuelve a iniciar sesión y sus agentes la siguen usando."
+    },
     "signInFor": "Iniciar sesión para {{name}}",
     "signInFor_female": "Iniciar sesión para {{name}}",
     "doneAll": "{{names}} ahora piensan con {{label}}.",
@@ -2195,6 +2219,8 @@
       "claude_code": "Claude inició sesión como {{email}}, no como {{account}}. Cierra sesión en la página de Claude e intenta de nuevo.",
       "codex": "ChatGPT inició sesión como {{email}}, no como {{account}}. Cierra sesión en la página de ChatGPT e intenta de nuevo.",
       "cursor": "Cursor inició sesión como {{email}}, no como {{account}}. Cierra sesión en la página de Cursor e intenta de nuevo.",
+      "grok": "Grok inició sesión como {{email}}, no como {{account}}. Cierra sesión en la página de Grok e intenta de nuevo.",
+      "antigravity": "Gemini inició sesión como {{email}}, no como {{account}}. Cierra sesión en la página de Google e intenta de nuevo.",
       "opencode": "OpenCode inició sesión como {{email}}, no como {{account}}. Inténtalo de nuevo con la clave correcta."
     },
     "useAnyway": "Usar {{email}}",
@@ -2393,7 +2419,6 @@
   "dm": {
     "subtitle": "{{role}} · de {{owner}}",
     "subtitleNoOwner": "{{role}} · sin dueño",
-    "profile": "Ver perfil",
     "emptyAgent": "Pídele que recuerde, olvide o trabaje de otra forma.",
     "emptyAgent_female": "Pídele que recuerde, olvide o trabaje de otra forma.",
     "opening": "Abriendo la conversación…",
@@ -2874,6 +2899,360 @@
     "removed": "{{name}} se quitó de la computadora.",
     "removeFailed": "No se pudo quitar. ¿La computadora está encendida?"
   },
+  "vault": {
+    "tab": {
+      "label": "Qué mostrar",
+      "team": "Equipo",
+      "personal": "Personal",
+      "connections": "Conexiones"
+    },
+    "list": {
+      "search": "Buscar en el Vault",
+      "clearSearch": "Borrar la búsqueda",
+      "kind": "Tipo",
+      "kindAll": "Todos los tipos",
+      "noMatch": "Nada aquí coincide con esta búsqueda.",
+      "clearFilters": "Borrar la búsqueda",
+      "personalNote": "Solo tú ves estos elementos. Tus agentes los usan solo cuando se lo pides.",
+      "personalEmpty": "Nada guardado todavía",
+      "personalEmptyText": "Solo tú ves estos elementos. Tus agentes los usan solo cuando se lo pides.",
+      "teamEmpty": "Nada compartido con el equipo todavía",
+      "teamEmptyText": "Guarda una vez un inicio de sesión, una clave o datos de contacto, y elige qué agentes pueden usarlo.",
+      "sharedEmpty": "Nada compartido contigo todavía",
+      "sharedEmptyText": "Cuando alguien comparta contigo un inicio de sesión o una clave del equipo, aparecerá aquí."
+    },
+    "row": {
+      "agents_one": "{{count}} agente",
+      "agents_other": "{{count}} agentes",
+      "used": "Usado {{when}}",
+      "never": "Nunca usado"
+    },
+    "kind": {
+      "login": "Inicio de sesión",
+      "key": "Clave",
+      "contact": "Contacto",
+      "loginText": "El usuario y la contraseña de un sitio web",
+      "keyText": "Una clave que tus agentes usan en un comando",
+      "contactText": "Datos que los agentes escriben en formularios"
+    },
+    "kindPlural": {
+      "login": "inicios de sesión",
+      "key": "claves",
+      "contact": "contactos",
+      "loginTitle": "Inicios de sesión",
+      "keyTitle": "Claves",
+      "contactTitle": "Contactos"
+    },
+    "scope": {
+      "personal": "Personal",
+      "team": "Equipo",
+      "personalText": "Solo tú lo ves",
+      "teamText": "Compartido con el espacio de trabajo"
+    },
+    "field": {
+      "title": "Nombre",
+      "contactTitle": "Nombre en el Vault",
+      "loginPlaceholder": "Correo de la empresa",
+      "keyPlaceholder": "Clave de pagos",
+      "contactPlaceholder": "Datos de facturación",
+      "website": "Sitio web",
+      "websitePlaceholder": "app.example.com",
+      "match": "Dónde pueden escribirlo los agentes",
+      "username": "Usuario",
+      "usernamePlaceholder": "Correo o usuario",
+      "password": "Contraseña",
+      "keyName": "Nombre de la variable",
+      "keyNameHelp": "Tus agentes usan la clave con este nombre en un comando.",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "value": "Valor",
+      "description": "Nota para tus agentes",
+      "descriptionHelp": "Cuándo usarlo y para qué sirve. Los agentes leen esto para elegir el correcto.",
+      "descriptionPlaceholder": {
+        "login": "La cuenta que usamos para publicar posts",
+        "key": "Para el servicio de pagos, modo de prueba",
+        "contact": "Úsalo para las facturas de la empresa"
+      }
+    },
+    "match": {
+      "exact": "Solo esta dirección",
+      "site": "Todo el sitio",
+      "exactHelp": "Los agentes lo escriben solo en {{origin}}.",
+      "exactHelpNone": "Los agentes lo escriben solo en esta dirección exacta.",
+      "siteHelp": "Los agentes lo escriben en cualquier página de este sitio, como una página de inicio de sesión en otro subdominio."
+    },
+    "contact": {
+      "group": "Datos de contacto",
+      "fullName": "Nombre completo",
+      "company": "Empresa",
+      "document": "Identificación fiscal",
+      "email": "Correo",
+      "phone": "Teléfono",
+      "address": "Dirección",
+      "address2": "Línea de dirección 2",
+      "city": "Ciudad",
+      "region": "Estado o región",
+      "postalCode": "Código postal",
+      "country": "País"
+    },
+    "error": {
+      "title": "Ponle un nombre.",
+      "website": "Usa una dirección https, como app.example.com.",
+      "keyName": "Usa mayúsculas, números y _, empezando con una letra, como ACME_API_KEY.",
+      "password": "Escribe la contraseña.",
+      "value": "Escribe el valor.",
+      "contact": "Completa al menos un campo."
+    },
+    "item": {
+      "missing": "Ya no está",
+      "missingText": "Ya no está en {{source}}. Los agentes no pueden usarlo hasta que vuelva.",
+      "editIn": "Edítalo en {{source}}. Los cambios llegan aquí en la próxima sincronización.",
+      "unreadable": "Los datos de este contacto no se pueden leer aquí. Quien lo gestiona puede escribirlos de nuevo y guardar.",
+      "hidden": "Oculto",
+      "endsIn": "termina en {{hint}}",
+      "noValue": "Nada guardado",
+      "change": "Cambiar",
+      "add": "Agregar",
+      "newPassword": "Nueva contraseña",
+      "newValue": "Nuevo valor",
+      "newValueHelp": "Reemplaza al guardado cuando guardes.",
+      "sealedHelp": "Por seguridad, lo que se guardó aquí ya no se muestra. Para cambiarlo, escríbelo de nuevo.",
+      "keepValue": "Mantener el actual",
+      "saved": "Guardado",
+      "delete": "Eliminar",
+      "deleteTitle": "¿Eliminar {{title}}?",
+      "deleteText": "Tus agentes ya no podrán usarlo. No se puede deshacer.",
+      "deleted": "{{title}} eliminado del Vault"
+    },
+    "use": {
+      "title": "Usos recientes",
+      "none": "Nadie lo ha usado todavía.",
+      "fill": "{{agent}}, en {{host}}",
+      "fillSomewhere": "{{agent}} lo escribió",
+      "key": "{{agent}}, en un comando",
+      "read": "{{who}} lo leyó",
+      "create": "{{who}} lo guardó",
+      "edit": "{{who}} lo cambió",
+      "for": "para {{name}}",
+      "routine": "Rutina {{name}}"
+    },
+    "access": {
+      "title": "Quién tiene acceso",
+      "people": "Personas",
+      "agents": "Agentes",
+      "edit": "Editar",
+      "editOf": "Editar {{what}}",
+      "everyone": "Todos en el espacio de trabajo",
+      "everyoneText": "Cada persona lo ve, y los agentes lo usan cuando ella lo pide.",
+      "managersOnly": "Solo quien administra el Vault",
+      "allAgents": "Todos los agentes",
+      "noAgents": "Ningún agente todavía",
+      "more_one": "{{count}} más",
+      "more_other": "{{count}} más",
+      "saved": "Acceso guardado",
+      "peopleTitle": "Quién puede verlo",
+      "peopleText": "Lo ven, y los agentes lo usan cuando alguna de ellas lo pide. Quien administra el Vault siempre lo ve.",
+      "level": {
+        "use": "Puede ver y usar",
+        "none": "Sin acceso"
+      },
+      "roleDetail": "Todos con este rol",
+      "roles": "Roles",
+      "peopleGroup": "Personas",
+      "add": "Agregar un rol o una persona",
+      "addSearch": "Buscar roles y personas",
+      "noMatch": "No se encontró a nadie",
+      "levelOf": "Qué puede hacer {{name}}",
+      "follows": "Sigue el acceso predeterminado de {{source}}.",
+      "own": "Tiene su propio acceso, no el predeterminado de {{source}}.",
+      "changeHere": "Cambiar para este elemento",
+      "useConnection": "Volver al predeterminado"
+    },
+    "agents": {
+      "title": "Qué agentes pueden usarlo",
+      "textPersonal": "Lo usan solo cuando se lo pides.",
+      "textTeam": "Lo usan cuando alguien que puede verlo se lo pide.",
+      "all": "Todos los agentes",
+      "allDetail": "También los que se agreguen después"
+    },
+    "summary": {
+      "noAgents": "Ningún agente puede usarlo todavía.",
+      "allAgents": "Cualquier agente",
+      "inRole": "alguien de {{role}}",
+      "personal_one": "{{agents}} puede usarlo, solo cuando lo pides.",
+      "personal_other": "{{agents}} pueden usarlo, solo cuando lo pides.",
+      "everyone_one": "{{agents}} puede usarlo cuando cualquiera del espacio de trabajo lo pide.",
+      "everyone_other": "{{agents}} pueden usarlo cuando cualquiera del espacio de trabajo lo pide.",
+      "people_one": "{{agents}} puede usarlo cuando {{people}} lo pide.",
+      "people_other": "{{agents}} pueden usarlo cuando {{people}} lo pide.",
+      "nobody": "Nadie puede pedir a los agentes que lo usen todavía. Elige quién puede verlo."
+    },
+    "new": {
+      "open": "Nuevo elemento",
+      "title": "Nuevo elemento",
+      "text": "Guárdalo una vez. Tus agentes lo usan sin ver ninguna contraseña ni clave.",
+      "what": "¿Qué quieres guardar?",
+      "who": "Quién puede usarlo",
+      "teamLocked": "Solo quienes administran el Vault pueden guardar elementos del equipo. Este queda como tuyo.",
+      "save": "Guardar",
+      "saved": "Guardado en el Vault"
+    },
+    "import": {
+      "open": "Importar",
+      "title": "Importar contraseñas",
+      "text": "Desde un archivo que exporta tu navegador o gestor de contraseñas (.csv).",
+      "dropTitle": "Suelta el archivo aquí",
+      "dropText": "o haz clic para elegirlo en tu computadora",
+      "reading": "Leyendo el archivo…",
+      "choose": "Elegir el archivo",
+      "where": "En tu navegador o gestor de contraseñas, busca Exportar contraseñas y elige CSV.",
+      "tooLarge": "Este archivo es demasiado grande (2 MB como máximo).",
+      "notCsv": "Elige un archivo .csv.",
+      "unreadable": "No se pudo leer este archivo. Intenta exportarlo de nuevo.",
+      "format": {
+        "chrome": "Leído como exportación de Chrome",
+        "1password": "Leído como exportación de 1Password",
+        "bitwarden": "Leído como exportación de Bitwarden",
+        "generic": "Leído como archivo de contraseñas"
+      },
+      "added_one": "inicio de sesión nuevo",
+      "added_other": "inicios de sesión nuevos",
+      "updated_one": "actualizado",
+      "updated_other": "actualizados",
+      "skipped_one": "omitido",
+      "skipped_other": "omitidos",
+      "reason": {
+        "duplicate_one": "{{count}} ya está en el Vault",
+        "duplicate_other": "{{count}} ya están en el Vault",
+        "not_https_one": "{{count}} sin dirección https",
+        "not_https_other": "{{count}} sin dirección https",
+        "no_password_one": "{{count}} sin contraseña",
+        "no_password_other": "{{count}} sin contraseña",
+        "invalid_one": "{{count}} línea que no pudimos leer",
+        "invalid_other": "{{count}} líneas que no pudimos leer"
+      },
+      "as": "Guardarlos como",
+      "asPersonal": "Solo tú los verás.",
+      "asTeam": "Todos en el espacio de trabajo los ven. Después elige los agentes de cada uno.",
+      "deleteFile": "Elimina el archivo después: guarda tus contraseñas sin cifrar.",
+      "confirm_one": "Importar {{count}}",
+      "confirm_other": "Importar {{count}}",
+      "done_one": "{{count}} inicio de sesión importado",
+      "done_other": "{{count}} inicios de sesión importados",
+      "another": "Elegir otro archivo",
+      "close": "Listo"
+    },
+    "connections": {
+      "none": "Aquí no se puede conectar ningún gestor de contraseñas.",
+      "lead": "Tus agentes usan {{kinds}} que guardas en {{name}}.",
+      "connect": "Conectar",
+      "reconnect": "Reconectar",
+      "reconnectName": "Reconectar {{name}}",
+      "open": "Abrir {{name}}",
+      "required": "Completa este campo.",
+      "for": "Conectar para",
+      "forTeam": "Sus elementos son del equipo. Quien administra el Vault decide quién los usa.",
+      "forPersonal": "Sus elementos son solo tuyos.",
+      "teamLocked": "Sus elementos serán solo tuyos. Solo quien administra el Vault conecta uno para el equipo.",
+      "sealed": "Lo que escribes aquí se cifra y no se vuelve a mostrar.",
+      "connected_one": "{{name}} conectado. Llegó {{count}} elemento.",
+      "connected_other": "{{name}} conectado. Llegaron {{count}} elementos.",
+      "ready": "Conectado",
+      "syncing": "Sincronizando",
+      "reads": "Lee {{label}}",
+      "items_one": "{{count}} elemento",
+      "items_other": "{{count}} elementos",
+      "synced": "sincronizado {{when}}",
+      "syncNow": "Sincronizar ahora",
+      "access": "Acceso predeterminado",
+      "accessTitle": "Acceso predeterminado de {{label}}",
+      "accessText": "Sus elementos siguen esto, salvo que cambies alguno. Cada cambio se guarda al instante.",
+      "actionsName": "Más opciones de {{name}}",
+      "disconnect": "Desconectar",
+      "removeTitle": "¿Desconectar {{name}}?",
+      "removeText_one": "Su elemento sale del Vault y tus agentes dejan de usarlo. En {{name}} no cambia nada.",
+      "removeText_other": "Sus {{count}} elementos salen del Vault y tus agentes dejan de usarlos. En {{name}} no cambia nada.",
+      "removed": "{{name}} desconectado",
+      "listOf": "Conexiones con {{name}}",
+      "note": "Tus agentes leen lo que hay allí cuando lo necesitan. A agentes.chat solo se copian nombres y direcciones.",
+      "error": {
+        "auth_failed": "Acceso rechazado",
+        "locked": "Contraseña incorrecta",
+        "many_vaults": "Ve más de una bóveda",
+        "no_vault": "No ve ninguna bóveda",
+        "folder_missing": "Carpeta no encontrada",
+        "not_found": "No encontrado",
+        "rate_limited": "Demasiadas lecturas",
+        "unreachable": "Sin conexión",
+        "unsupported": "No disponible aquí",
+        "invalid_input": "Revisa los campos",
+        "too_many_items": "Vault lleno",
+        "other": "No se pudo leer"
+      },
+      "fix": {
+        "auth_failed": "Se rechazó la clave o el token. Reconecta con uno nuevo.",
+        "locked": "La contraseña maestra no abrió la cuenta. Reconecta con la correcta.",
+        "many_vaults": "Da a la cuenta de servicio acceso a una sola bóveda y luego reconecta.",
+        "no_vault": "Da a la cuenta de servicio acceso a la bóveda de los agentes y luego reconecta.",
+        "folder_missing": "Crea la carpeta para tus agentes o reconecta con su nombre.",
+        "not_found": "Lo que leía ya no está. Reconecta para elegir de nuevo.",
+        "rate_limited": "El gestor de contraseñas pidió esperar. Lo vuelve a intentar solo.",
+        "unreachable": "Su servidor no respondió. Lo vuelve a intentar solo.",
+        "unsupported": "Aquí no se puede leer su configuración. Inténtalo más tarde o usa otra cuenta.",
+        "invalid_input": "Se rechazó algo en los campos. Reconecta y revísalos.",
+        "too_many_items": "Elimina elementos antes de sincronizar más.",
+        "other": "Prueba Sincronizar ahora o reconecta."
+      }
+    },
+    "source": {
+      "onepassword": {
+        "step": {
+          "1": "Crea en 1Password una bóveda solo para tus agentes y mueve a ella los inicios de sesión que pueden usar",
+          "2": "Crea una cuenta de servicio con acceso solo a esa bóveda",
+          "3": "Pega aquí el token de la cuenta de servicio"
+        },
+        "field": {
+          "token": "Token de la cuenta de servicio"
+        }
+      },
+      "bitwarden": {
+        "warning": "Usa una cuenta solo para tus agentes. Su contraseña maestra abre toda la cuenta, así que no debe tener nada personal.",
+        "step": {
+          "1": "Crea una cuenta de Bitwarden solo para tus agentes y una carpeta llamada Agents con los inicios de sesión que pueden usar",
+          "2": "En esa cuenta, abre Configuración, Seguridad, Claves y copia la clave de API",
+          "3": "Completa los campos de abajo"
+        },
+        "field": {
+          "server": "Servidor",
+          "serverUrl": "Dirección del servidor",
+          "clientId": "ID de cliente",
+          "clientSecret": "Secreto de cliente",
+          "masterPassword": "Contraseña maestra",
+          "folder": "Carpeta"
+        },
+        "choice": {
+          "server": {
+            "self": "Mi propio servidor"
+          }
+        }
+      }
+    },
+    "card": {
+      "save": "Guardar en el Vault",
+      "saveText": "La próxima vez, tus agentes lo usan sin preguntarte.",
+      "scope": "Guardar como",
+      "personalText": "Solo tú lo ves",
+      "teamText": "El espacio de trabajo lo ve",
+      "teamLocked": "Solo quien administra el Vault guarda para el equipo",
+      "agents": "Usado por",
+      "choose": "Elegir",
+      "saved": "Guardado en el Vault",
+      "notSaved": "Enviado, pero no guardado en el Vault",
+      "codeBox": "Dígito {{n}} de {{total}}",
+      "codeShort_one": "Escribe el {{count}} dígito.",
+      "codeShort_other": "Escribe los {{count}} dígitos.",
+      "codeWhere": "Solo el navegador de {{agent}} lo escribe, en {{host}}."
+    }
+  },
   "question": {
     "answer": "Responder",
     "placeholder": "Tu respuesta",
@@ -3301,7 +3680,8 @@
       "usageLimitReached": "<b>{{name}}</b> llegó al límite de {{amount}}",
       "usageLimitRequest": "<b>{{name}}</b> llegó al límite de {{amount}} y pide más",
       "usageLimitRaised": "<b>{{name}}</b> subió tu límite de este mes",
-      "usageLimitRefused": "<b>{{name}}</b> rechazó tu pedido de más uso"
+      "usageLimitRefused": "<b>{{name}}</b> rechazó tu pedido de más uso",
+      "planLent": "<b>{{name}}</b> conectó tu plan de {{plan}} a <b>{{agent}}</b>"
     },
     "usageLimit": {
       "runs_one": "{{count}} pedido este mes",
@@ -3420,7 +3800,12 @@
     "noneUnread": "Todo leído.",
     "noneHere": "Nada por aquí por ahora.",
     "noneDone": "Nada marcado como completado en los últimos 30 días.",
-    "more": "Mostrar más"
+    "more": "Mostrar más",
+    "planLent": {
+      "takeBack": "Recuperar",
+      "takeBackAll": "Recuperar de todos los agentes",
+      "done": "Tu plan volvió"
+    }
   },
   "approvals": {
     "title": "Aprobaciones",
@@ -3811,21 +4196,31 @@
             "claude_code": "Agregar una cuenta de Claude",
             "codex": "Agregar una cuenta de ChatGPT",
             "cursor": "Agregar una cuenta de Cursor",
+            "grok": "Agregar una cuenta de Grok",
+            "antigravity": "Agregar una cuenta de Gemini",
             "opencode": "Agregar una clave de OpenCode"
           },
           "stepOne": {
             "claude_code": "La cuenta con tu plan",
             "codex": "La cuenta con tu plan",
-            "cursor": "La cuenta con tu plan"
+            "cursor": "La cuenta con tu plan",
+            "grok": "La cuenta con tu plan",
+            "antigravity": "La cuenta de Google con tu plan",
+            "antigravityEnterprise": "Tu cuenta de Gemini Enterprise"
           },
           "stepOneHint": "¿Cuenta equivocada? Cierra sesión allí e inténtalo de nuevo. La cuenta queda solo en {{computer}}. Escribes tu contraseña en la página de {{brand}}.",
           "open": {
             "claude_code": "Iniciar sesión con Claude",
             "codex": "Iniciar sesión con ChatGPT",
-            "cursor": "Iniciar sesión con Cursor"
+            "cursor": "Iniciar sesión con Cursor",
+            "grok": "Iniciar sesión con Grok",
+            "antigravity": "Iniciar sesión con Google"
           },
           "opencodeFree": "Los modelos gratis de OpenCode no necesitan clave. Una clave de la consola de OpenCode suma los de pago.",
           "cursorFinish": "Inicia sesión en la página de Cursor y el inicio de sesión termina solo en {{computer}}.",
+          "grokFinish": "Inicia sesión en la página de Grok y el inicio de sesión termina solo en {{computer}}.",
+          "geminiEnterprise": "Usar Gemini Enterprise",
+          "geminiPersonal": "Usar una cuenta personal de Google",
           "cursorKey": "Usar una clave de API de Cursor",
           "copyLink": "Copiar enlace",
           "openAgain": "Abrir de nuevo",
@@ -3837,6 +4232,7 @@
           "sent": "Código enviado. Terminando el inicio de sesión en {{computer}}.",
           "local": "¿Estás en {{computer}}? Si su navegador se abrió solo, autoriza allí.",
           "deviceCode": "Código para ChatGPT",
+          "grokCode": "Código para Grok",
           "deviceCodeText": "Escribe este código en la página que se abre.",
           "starting": "Consultando a {{computer}}…",
           "waiting": "Esperando",
@@ -3847,13 +4243,16 @@
             "claude_code": "Claude inició sesión como {{account}}, una cuenta que ya conectaste. Para usar otra, cierra sesión en la página de Claude e inténtalo de nuevo.",
             "codex": "ChatGPT inició sesión como {{account}}, una cuenta que ya conectaste. Para usar otra, cierra sesión en la página de ChatGPT e inténtalo de nuevo.",
             "cursor": "Cursor inició sesión como {{account}}, una cuenta que ya conectaste. Para usar otra, cierra sesión en la página de Cursor e inténtalo de nuevo.",
+            "grok": "Grok inició sesión como {{account}}, una cuenta que ya conectaste. Para usar otra, cierra sesión en la página de Grok e inténtalo de nuevo.",
+            "antigravity": "Gemini inició sesión como {{account}}, una cuenta que ya conectaste. Para usar otra, cierra sesión en la página de Google e inténtalo de nuevo.",
             "opencode": "Esa clave de OpenCode ya está conectada como {{account}}."
           },
           "startFailed": "{{computer}} no respondió. Inténtalo de nuevo en un momento.",
           "sendFailed": "No se pudo enviar el código. Revísalo e inténtalo de nuevo.",
           "done": "La cuenta {{account}} está en {{computer}}. Haz clic en Usar para guardar."
         },
-        "offCloud": "{{computer}} no responde"
+        "offCloud": "{{computer}} no responde",
+        "accountOthers": "Los planes de otras personas muestran de quién son. Su dueño recibe un correo y puede recuperarlo."
       },
       "computer": {
         "title": "¿Dónde trabaja {{name}}?",
@@ -5173,6 +5572,14 @@
     "setup_write": {
       "label": "Configurar el espacio de trabajo",
       "description": "Ofrecer conectar una IA, una app o un servidor MCP, o invitar personas, con una tarjeta en la que una persona hace clic, y crear canales para quien lo pidió, con Deshacer."
+    },
+    "vault_read": {
+      "label": "Ver el Vault",
+      "description": "Ver los inicios de sesión, claves y datos de contacto que el Vault comparte con él, y usarlos. Escribe las contraseñas guardadas y usa las claves guardadas sin verlas nunca."
+    },
+    "vault_write": {
+      "label": "Editar contactos del Vault",
+      "description": "Guardar y actualizar datos de contacto en el Vault, cambiar el usuario de un inicio de sesión guardado o una descripción, y eliminar lo que guardó."
     },
     "github_git_read": {
       "label": "Clonar repositorios (git)",
@@ -7518,6 +7925,8 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "grok": "Grok",
+      "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
         "keys": "Actualiza agentes en la computadora para usar la clave de un plan"
@@ -7525,11 +7934,13 @@
       "noComputer": "Las cuentas quedan en una computadora conectada. Primero conecta una de las tuyas.",
       "addComputer": "Conectar una computadora",
       "needsCloud": {
-        "claude_code": "Todavía no está listo en {{computer}}",
-        "codex": "Todavía no está listo en {{computer}}",
-        "cursor": "Todavía no está listo en {{computer}}",
-        "opencode": "Todavía no está listo en {{computer}}",
-        "online": "{{computer}} no responde ahora. Ya estamos en eso."
+        "online": "{{computer}} se está reiniciando o reconectando. Esto cambia solo cuando vuelva.",
+        "installing": "{{program}} se está instalando en {{computer}}. Esto cambia solo cuando termine.",
+        "updating": "{{program}} se está actualizando en {{computer}}. Esto cambia solo cuando termine.",
+        "runnerOld": "El programa de agentes.chat en {{computer}} está desactualizado y la actualización ya viene en camino. Esto cambia solo cuando termine.",
+        "execOff": "{{computer}} todavía no puede ejecutar {{program}}. Ya estamos en eso, y esto cambia solo.",
+        "toolOff": "{{program}} no está habilitado en {{computer}}. Pide al soporte que lo habilite.",
+        "preparing": "{{computer}} se está preparando. Esto cambia solo cuando termine."
       }
     },
     "done": {
@@ -7557,6 +7968,13 @@
       "rename": "Cambiar nombre",
       "signInAgain": "Volver a iniciar sesión",
       "newKey": "Reemplazar la clave",
+      "copies_one": "{{count}} inicio de sesión más de esta cuenta, sin ningún agente.",
+      "copies_many": "{{count}} inicios de sesión más de esta cuenta, sin ningún agente.",
+      "copies_other": "{{count}} inicios de sesión más de esta cuenta, sin ningún agente.",
+      "removeCopies": "Quitar",
+      "copiesRemoved_one": "{{count}} inicio de sesión sin uso quitado.",
+      "copiesRemoved_many": "{{count}} inicios de sesión sin uso quitados.",
+      "copiesRemoved_other": "{{count}} inicios de sesión sin uso quitados.",
       "disconnect": "Desconectar",
       "renameTitle": "Cambiar el nombre de {{label}}",
       "nameLabel": "Nombre",
@@ -7775,7 +8193,8 @@
       "deal": "trato hecho",
       "thinking": "pensando",
       "wow": "guau",
-      "dizzy": "mareado"
+      "dizzy": "mareado",
+      "wave": "hola"
     },
     "moodWords": {
       "celebrate": "fiesta felicidades celebrar lanzamiento salió bien yupi",
@@ -7783,7 +8202,8 @@
       "deal": "ok vale de acuerdo sí claro listo",
       "thinking": "mmm pregunto pensar quizás",
       "wow": "guau sorpresa increíble wow",
-      "dizzy": "cansado viernes ayuda ups confundido"
+      "dizzy": "cansado viernes ayuda ups confundido",
+      "wave": "hola adiós chao saludo buenos días hasta luego"
     },
     "picker": {
       "button": "Emojis, GIFs y stickers",
@@ -8966,21 +9386,29 @@
       "claude": "{{model}} con el plan de Claude",
       "chatgpt": "{{model}} con el plan de ChatGPT",
       "cursor": "{{model}} con el plan de Cursor",
+      "grok": "{{model}} con el plan de Grok",
+      "gemini": "{{model}} con el plan de Gemini",
       "zen": "{{model}} con OpenCode",
       "coding": "{{model}} con {{plan}}",
       "claudeOf": "{{model}} con el plan de Claude de {{owner}}",
       "chatgptOf": "{{model}} con el plan de ChatGPT de {{owner}}",
       "cursorOf": "{{model}} con el plan de Cursor de {{owner}}",
+      "grokOf": "{{model}} con el plan de Grok de {{owner}}",
+      "geminiOf": "{{model}} con el plan de Gemini de {{owner}}",
       "zenOf": "{{model}} con el OpenCode de {{owner}}",
       "codingOf": "{{model}} con {{plan}} de {{owner}}",
       "claudeAuto": "Plan de Claude",
       "chatgptAuto": "Plan de ChatGPT",
       "cursorAuto": "Plan de Cursor",
+      "grokAuto": "Plan de Grok",
+      "geminiAuto": "Plan de Gemini",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Plan de Claude de {{owner}}",
       "chatgptAutoOf": "Plan de ChatGPT de {{owner}}",
       "cursorAutoOf": "Plan de Cursor de {{owner}}",
+      "grokAutoOf": "Plan de Grok de {{owner}}",
+      "geminiAutoOf": "Plan de Gemini de {{owner}}",
       "zenAutoOf": "OpenCode de {{owner}}",
       "codingAutoOf": "{{plan}} de {{owner}}",
       "on": "{{line}} en {{computer}}"
@@ -8992,7 +9420,9 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
-      "opencode": "OpenCode"
+      "opencode": "OpenCode",
+      "grok": "Grok Build",
+      "antigravity": "Antigravity CLI"
     },
     "foot": {
       "api": "A través de la API",
@@ -9003,6 +9433,8 @@
     "claude_codeText": "Usa el plan de Claude de quien conectó la computadora.",
     "codexText": "Usa el plan de ChatGPT de quien conectó la computadora.",
     "cursorText": "Usa el plan de Cursor de quien conectó la computadora.",
+    "grokText": "Usa el plan de Grok de quien conectó la computadora.",
+    "antigravityText": "Usa el plan de Gemini de quien conectó la computadora.",
     "opencodeText": "Los modelos gratis de OpenCode, o la clave de OpenCode de quien conectó la computadora.",
     "cursorModel": {
       "inPlan": "Incluido en tu plan de Cursor",
@@ -9047,6 +9479,8 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "grok": "Grok Build · {{model}}",
+      "antigravity": "Antigravity CLI · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, sin respaldo por API"
     },
@@ -9180,7 +9614,8 @@
       "sandbox": "Ejecutar código",
       "browser": "Navegador",
       "setup": "Configuración del espacio de trabajo",
-      "desktop": "Escritorio"
+      "desktop": "Escritorio",
+      "vault": "Vault"
     },
     "areaText": {
       "context": {
@@ -9226,6 +9661,10 @@
       "desktop": {
         "write": "Usa cualquier app en su propio escritorio, en su computadora, mientras las personas miran o toman el control. También necesita Ejecutar código.",
         "write_female": "Usa cualquier app en su propio escritorio, en su computadora, mientras las personas miran o toman el control. También necesita Ejecutar código."
+      },
+      "vault": {
+        "read": "Ve y usa lo que el Vault comparte con él, sin ver contraseñas ni claves.",
+        "write": "También guarda y actualiza datos de contacto en el Vault."
       }
     }
   },
@@ -11302,6 +11741,49 @@
       "invalid": "Un @ tiene de {{min}} a {{max}} minúsculas, números, - o _.",
       "taken": "@{{handle}} es de otra persona.",
       "takenByAgent": "@{{handle}} es de un agente."
+    },
+    "vault": {
+      "invalid": "Algo en este elemento no está bien. Revísalo e inténtalo de nuevo.",
+      "notFound": "Este elemento ya no está en el Vault.",
+      "titleRequired": "Ponle un nombre.",
+      "tooLong": "Es demasiado largo. El límite es {{max}}.",
+      "notHttps": "Usa una dirección que empiece con https://",
+      "keyNameInvalid": "Usa mayúsculas, dígitos y _ en el nombre, como ACME_API_KEY.",
+      "keyNameReserved": "Este nombre está reservado. Elige otro.",
+      "keyNameTaken": "Ya hay una clave guardada con este nombre aquí.",
+      "contactEmpty": "Completa al menos un campo.",
+      "teamNeedsPermission": "Solo quienes administran las credenciales pueden guardar elementos del equipo.",
+      "externalReadOnly": "Esto viene de un gestor de contraseñas. Cámbialo allí.",
+      "changedMeanwhile": "Alguien lo cambió mientras tanto. Ábrelo de nuevo.",
+      "noValue": "No hay nada que guardar.",
+      "missing": "Ya no está en su gestor de contraseñas.",
+      "notAllowed": "No puedes hacer esto con este elemento.",
+      "tooManyItems": "El Vault está lleno. Elimina los elementos que ya no uses.",
+      "audienceInvalid": "Alguien o un rol que elegiste ya no está en el espacio de trabajo.",
+      "agentsInvalid": "Un agente que elegiste ya no está en el espacio de trabajo.",
+      "tooManyAgents": "Elige como máximo 200 agentes.",
+      "tooManyRoles": "Elige como máximo 100 roles.",
+      "tooManyPeople": "Elige como máximo 500 personas.",
+      "csvTooLarge": "El archivo es demasiado grande. El límite es 2 MB.",
+      "csvTooManyRows": "El archivo tiene más de 5000 filas. Divídelo e importa cada parte.",
+      "csvUnrecognized": "Esto no parece un archivo de contraseñas. Expórtalo de nuevo como CSV.",
+      "requestNotDelivered": "Envíalo primero y luego guárdalo en el Vault.",
+      "requestNotSavable": "Este no se puede guardar en el Vault.",
+      "sourceUnknown": "Este gestor de contraseñas no está disponible aquí.",
+      "sourceError": "No se pudo leer de su gestor de contraseñas. Inténtalo de nuevo.",
+      "source": {
+        "authFailed": "El gestor de contraseñas rechazó estos datos. Revísalos e inténtalo de nuevo.",
+        "locked": "La contraseña maestra es incorrecta.",
+        "manyVaults": "La cuenta de servicio ve más de una bóveda. Dale acceso a una sola.",
+        "noVault": "La cuenta de servicio no ve ninguna bóveda. Dale acceso a una.",
+        "folderMissing": "Esa carpeta no está en la cuenta.",
+        "notFound": "Ya no está en su gestor de contraseñas.",
+        "rateLimited": "El gestor de contraseñas pidió esperar. Inténtalo de nuevo en unos minutos.",
+        "unreachable": "No se pudo conectar con el gestor de contraseñas. Revisa la dirección e inténtalo de nuevo.",
+        "unsupported": "Este gestor de contraseñas no se puede conectar aquí.",
+        "invalidInput": "Revisa los campos e inténtalo de nuevo.",
+        "tooManyItems": "El Vault está lleno. Elimina elementos antes de sincronizar más."
+      }
     }
   },
   "machines": {
@@ -11449,6 +11931,8 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "grok": "Grok Build",
+        "antigravity": "Antigravity CLI",
         "opencode": "OpenCode",
         "commands": "Comandos",
         "browser": "Navegador"
@@ -11457,6 +11941,8 @@
         "claude": "Escribe y cambia archivos, solo en las carpetas permitidas.",
         "codex": "Como Claude Code, con una cuenta de ChatGPT. Solo en las carpetas permitidas.",
         "cursor": "Como Claude Code, con una cuenta de Cursor. Solo en las carpetas permitidas.",
+        "grok": "Como Claude Code, con una cuenta de Grok. Solo en las carpetas permitidas.",
+        "antigravity": "Como Claude Code, con una cuenta de Gemini. Solo en las carpetas permitidas.",
         "opencode": "Como Claude Code, con los modelos gratis de OpenCode o una clave de OpenCode. Solo en las carpetas permitidas.",
         "commands": "Ejecuta comandos en la Terminal, como pruebas y builds."
       },
@@ -11935,6 +12421,16 @@
         "token_revoked": "Revocó el token personal {{app}}",
         "message_sent": "Envió un mensaje a través de {{app}}"
       },
+      "vault": {
+        "item_created": "Guardó un elemento en el Vault",
+        "item_changed": "Cambió un elemento del Vault",
+        "item_deleted": "Eliminó un elemento del Vault",
+        "item_used": "Usó un elemento del Vault",
+        "imported": "Importó contraseñas al Vault",
+        "connection_added": "Conectó un gestor de contraseñas al Vault",
+        "connection_changed": "Cambió la conexión de un gestor de contraseñas",
+        "connection_removed": "Desconectó un gestor de contraseñas del Vault"
+      },
       "verb": {
         "created": "Creó",
         "deleted": "Eliminó",
@@ -11967,6 +12463,9 @@
         "resent": "Reenvió",
         "revoked": "Revocó",
         "archived": "Archivó",
+        "shown": "Vio",
+        "copied": "Copió",
+        "used": "Usó",
         "other": "Cambió"
       },
       "area": {
@@ -11999,6 +12498,7 @@
         "member": "un miembro",
         "invitation": "una invitación",
         "credential": "una clave de IA",
+        "vault": "el Vault",
         "other": "el espacio de trabajo"
       }
     },
@@ -12058,6 +12558,7 @@
       "right_hand": "Mano derecha",
       "members": "Miembros e invitaciones",
       "roles": "Roles y permisos",
+      "vault": "Vault",
       "access": "Agentes y accesos",
       "connectors": "Conectores y MCP",
       "skills": "Habilidades",
@@ -12080,6 +12581,7 @@
       "right_hand": "El asistente que arma el equipo con cada persona, en su DM y con sus permisos.",
       "members": "Quién está en el espacio de trabajo, e invitaciones.",
       "roles": "Lo que puede hacer cada persona. Los roles se suman.",
+      "vault": "Contraseñas, claves y datos de contacto que usan tus agentes. Escriben contraseñas y usan claves sin verlas nunca.",
       "access": "Lo que puede usar cada agente: un nivel por conector.",
       "connectors": "Servicios y servidores MCP conectados una sola vez para todo el espacio de trabajo.",
       "skills": "Instrucciones en Markdown que los agentes abren cuando las necesitan.",
@@ -13010,6 +13512,8 @@
       "action_invite_people": "Invitar a personas",
       "action_install_skill": "Instalar una habilidad",
       "action_update_skills": "Actualizar habilidades",
+      "action_approvals": "Aprobaciones esperándote",
+      "action_open_page": "Abrir una pantalla",
       "agent_proposal": "Propuso un nuevo agente: {{name}}",
       "settings_proposal": "Propuso un cambio para {{names}}",
       "approval_request": "Solicitud de aprobación: {{title}}",
@@ -13042,15 +13546,25 @@
       "stuck": "Me trabé y me detuve antes de terminar.",
       "forum_suggestion": "¿Vale la pena un foro? \"{{title}}\"",
       "forum_concluded": "El foro \"{{title}}\" terminó. La síntesis está en el archivo de abajo.",
-      "forum_concluded_issues": "El foro \"{{title}}\" terminó. La síntesis está en el archivo de abajo, con {{count}} tarea(s) sugerida(s) para aprobar.",
-      "action_approvals": "Aprobaciones esperándote",
-      "action_open_page": "Abrir una pantalla"
+      "forum_concluded_issues": "El foro \"{{title}}\" terminó. La síntesis está en el archivo de abajo, con {{count}} tarea(s) sugerida(s) para aprobar."
     }
   },
   "builtinTools": {
     "ask_user": {
       "label": "Preguntar a la persona",
       "description": "Hace una pregunta breve y espera la respuesta."
+    },
+    "vault_list": {
+      "label": "Buscar en el Vault",
+      "description": "Lista los inicios de sesión, claves y contactos compartidos con el agente, nunca una contraseña ni una clave."
+    },
+    "vault_save": {
+      "label": "Guardar en el Vault",
+      "description": "Guarda o actualiza datos de contacto, el usuario de un inicio de sesión o una descripción."
+    },
+    "vault_delete": {
+      "label": "Eliminar del Vault",
+      "description": "Elimina un elemento que guardó."
     },
     "react": {
       "label": "Reaccionar",

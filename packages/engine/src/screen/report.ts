@@ -71,7 +71,10 @@ function stepLine(r: StepReport, kind: ScreenKind): string {
         : r.step.do === "type"
           ? `${DONE.type}${r.note ? ` into ${r.note}` : ""}`
           : r.step.do === "type_secret"
-            ? `${DONE.type_secret} ${r.note ?? "the field"} (${r.step.secret ?? ""})`
+            ? r.step.login
+              ? // The site it was typed for, never the login's title (ADR 0144 §4).
+                `Typed the Vault login${r.typed ? ` for ${r.typed}` : ""} into ${r.note ?? "the field"}`
+              : `${DONE.type_secret} ${r.note ?? "the field"} (${r.step.secret ?? ""})`
             : `${DONE[r.step.do]}${r.note ? ` ${r.note}` : ""}`;
   const extra = [
     r.dismissed ? `closed ${r.dismissed} first: it covered the ${SCREEN_NOUN[kind]}` : null,

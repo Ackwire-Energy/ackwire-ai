@@ -3,7 +3,7 @@
 - Status: Accepted (built)
 - Date: 2026-11-02
 - Extends: ADR 0017 (search visibility), 0064 (the team's actions in search)
-- Code: `packages/adapters/src/search.ts` (`MessageFilter`, `MESSAGE_HAS`, `after`/`before`, `sort`), `packages/engine/src/search.ts` (`searchForUser` with `channelIds` and `UserSearchFilters`), `apps/server/src/routes/app/knowledge.ts` (`GET …/search` filter parameters); client `lib/search-filters.ts` (parser, chips, API input, recent searches), `api/types.ts` (`SearchFilterInput`); web `components/search/SearchBox.tsx`, `SearchHereButton.tsx`, `pages/SearchPage.tsx`, route `org.$orgId.search.tsx` (`?in=`); phone `features/search/SearchFilters.tsx`, `SearchScreen.tsx`; strings `searchPage.*`; migration `0177_search_filters.sql`
+- Code: `packages/adapters/src/search.ts` (`MessageFilter`, `MESSAGE_HAS`, `after`/`before`, `sort`), `packages/engine/src/search.ts` (`searchForUser` with `channelIds` and `UserSearchFilters`), `apps/server/src/routes/app/knowledge.ts` (`GET …/search` filter parameters); client `lib/search-filters.ts` (parser, chips, API input, recent searches), `api/types.ts` (`SearchFilterInput`); web `components/search/SearchBox.tsx`, `HeaderSearch.tsx` (a DM's held to it: `inDmOnly`), `pages/SearchPage.tsx`, route `org.$orgId.search.tsx` (`?in=`); phone `features/search/SearchFilters.tsx`, `SearchScreen.tsx`; strings `searchPage.*`; migration `0177_search_filters.sql`
 
 ## Context
 

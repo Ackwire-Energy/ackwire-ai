@@ -43,7 +43,6 @@ export {
 } from "./agent/live";
 export { addLiveSticker, liveStickerCount } from "./agent/sticker-live";
 export {
-  type DrawnMood,
   drawSticker,
   STICKER_MOODS,
   STICKER_STILL_T,
@@ -115,6 +114,7 @@ export {
   Switch,
 } from "./components/Checkbox";
 export { AttentionNote, Chip, type ChipProps, type ChipTone, CountBadge, CountChip } from "./components/Chip";
+export { CodeInput, type CodeInputProps } from "./components/CodeInput";
 export { ColorPicker, type ColorPickerLabels } from "./components/ColorPicker";
 export { CommandPalette, filterPalette, type PaletteItem } from "./components/CommandPalette";
 export {

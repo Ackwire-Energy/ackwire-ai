@@ -7,6 +7,7 @@ import { useConnection, useRememberAgentLooks } from "@/features/shared/hooks";
 import { useAppIconBadge } from "@/features/shared/queries";
 import { ScreenError } from "@/features/shared/ScreenError";
 import { useUserEvents } from "@/features/shared/userEvents";
+import { useVaultEvents } from "@/features/vault/live";
 import { useVoiceOutbox } from "@/features/voice/useVoiceOutbox";
 import { useSounds } from "@/lib/sounds";
 import { useOrg, useOrgGate } from "@/providers/org";
@@ -52,6 +53,8 @@ export default function AppLayout() {
 function AppStack() {
   const { colors } = useTheme();
   useUserEvents();
+  // The Vault's screens follow changes made anywhere (ADR 0144).
+  useVaultEvents();
   useVoiceOutbox();
   useAppIconBadge();
   // The app's sounds (ADR 0070): the player and its audio session.
@@ -167,6 +170,12 @@ function AppStack() {
       <Stack.Screen name="settings/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/telemetry" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/access" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/roles/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/roles/[roleId]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/roles/area" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/roles/add" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/roles/rename" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/roles/new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/skills/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/skills/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/skills/new" options={{ ...pushed, ...scrollUnder }} />
@@ -182,6 +191,12 @@ function AppStack() {
       <Stack.Screen name="settings/media" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/storage" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/import" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/vault" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/vault-item" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/vault-new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/vault-access" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/vault-connect" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/vault-connection" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="push-ask" options={pushSheet} />
       <Stack.Screen name="wiki-new" options={wikiSheet} />
       <Stack.Screen name="new-channel" options={channelSheet} />

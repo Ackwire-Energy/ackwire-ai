@@ -1,13 +1,14 @@
 import type { DesktopMode, DesktopViewState, Edition, Machine } from "@agenteschat/client";
 import {
   ApiError,
-  browserOnlyWhy,
+  askControlWords,
   DESKTOP_CLOSE,
   desktopCloseState,
   desktopMode,
   desktopRetryMs,
   desktopSocketUrl,
   desktopStatusState,
+  desktopSwitch,
   handoffWantsWords,
   useBrowserHandoffMutations,
   useDesktopStatus,
@@ -392,11 +393,17 @@ export function DesktopView({
   // Handing back or taking, the last picture stays in sight under what is happening: never a cold cover.
   const switching = actions.done.isPending || actions.takeover.isPending || taking || returning;
   const offer = live && !inControl && !switching && !head?.full && !s?.controllerUserId && canTakeOver;
-  const mayTake = Boolean(s?.canControl || onTakeBrowser);
   // Only the browser is theirs to drive here: the button and the question say so, and why.
-  const browserOnly = !s?.canControl && Boolean(onTakeBrowser);
+  const words = askControlWords(s, Boolean(onTakeBrowser), Boolean(working));
+  const { mayTake, browserOnly } = words;
   const takeLabel = t(browserOnly ? "desktop.takeBrowser" : "desktop.takeover");
-  const whyBrowser = browserOnly ? t(browserOnlyWhy(s), g) : undefined;
+  const whyBrowser = browserOnly && words.help ? t(words.help, g) : undefined;
+  const switchingTo = desktopSwitch({
+    taking: taking || actions.takeover.isPending,
+    returning: returning || actions.done.isPending,
+    mode,
+    session: screenMode,
+  });
   const ask = useAskControl(offer);
   const settled = SETTLED.includes(shown);
   // A cover only a person's own step changes (`SETTLED`): the window's foot keeps no line under it.
@@ -611,10 +618,13 @@ export function DesktopView({
         )}
         {shown !== "live" ? (
           cover[shown]
-        ) : taking || actions.takeover.isPending || (inControl && screenMode === "watch") ? (
-          <Cover clear color={color} spinner text={t("desktop.taking")} />
-        ) : returning || actions.done.isPending || (!inControl && screenMode === "control") ? (
-          <Cover clear color={color} spinner text={t("desktop.returning", g)} />
+        ) : switchingTo ? (
+          <Cover
+            clear
+            color={color}
+            spinner
+            text={t(switchingTo === "taking" ? "desktop.taking" : "desktop.returning", g)}
+          />
         ) : (
           ask.asking && (
             <Cover
@@ -622,10 +632,8 @@ export function DesktopView({
               clear
               color={color}
               icon={mayTake ? "person" : "eye"}
-              text={t(
-                !mayTake ? "desktop.ask.watching" : browserOnly ? "desktop.ask.titleBrowser" : "desktop.ask.title",
-              )}
-              help={whyBrowser ?? (mayTake && working ? t("desktop.ask.working", g) : undefined)}
+              text={t(words.title)}
+              help={words.help ? t(words.help, g) : undefined}
               action={
                 <AskActions
                   onCancel={ask.cancel}

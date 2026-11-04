@@ -61,6 +61,7 @@ const CAPS = {
   sentry: "alert",
   linear: "layers",
   mail: "mail",
+  vault: "lock",
   custom: "plug",
 } as const satisfies Record<string, IconName>;
 type CapKey = keyof typeof CAPS;

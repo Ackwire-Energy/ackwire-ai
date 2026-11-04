@@ -15,24 +15,35 @@ import { FAILED_REASONS, NOTE_MAX } from "./logic";
  * Ending a person's turn on an agent's browser or screen: Pronto or Devolver and "Não consegui", each a sheet with what
  * the person wants the agent to know, which it reads as their own words. Pronto or Devolver is one button with "Deixar
  * um recado" under it, the note open from the start only where the request asked the person something
- * (`handoffWantsWords`). `doneLabel`: the word the turn ends with.
+ * (`handoffWantsWords`). `doneLabel`: the word the turn ends with. `finishing`: from the answer until `after` (the
+ * screen's status read again) settles, so a switch cover never sees the old mode in between.
  */
-export function useFinishHandoff(handoff: BrowserHandoff | null | undefined, name: string, doneLabel: string) {
+export function useFinishHandoff(
+  handoff: BrowserHandoff | null | undefined,
+  name: string,
+  doneLabel: string,
+  after?: () => Promise<unknown>,
+) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const toast = useToast();
   const sheet = useSheet();
   const actions = useBrowserHandoffActions(orgId);
   const g = genderOf(name);
+  const [finishing, setFinishing] = useState(false);
   const finish = async (ok: boolean, said?: string) => {
     if (!handoff) return;
     const text = said?.slice(0, NOTE_MAX) || undefined;
+    setFinishing(true);
     try {
       if (ok) await actions.done(handoff.id, text);
       else await actions.failed(handoff.id, text);
       successHaptic();
+      await after?.();
     } catch {
       toast({ title: t("mobile.app.failed"), icon: "x" });
+    } finally {
+      setFinishing(false);
     }
   };
   const handBack = () => {
@@ -81,7 +92,7 @@ export function useFinishHandoff(handoff: BrowserHandoff | null | undefined, nam
       </PromptForm>,
     );
   };
-  return { handBack, couldnt };
+  return { handBack, couldnt, finishing };
 }
 
 function HandBackSheet({

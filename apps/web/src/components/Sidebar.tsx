@@ -655,10 +655,12 @@ export function Sidebar() {
             </SidebarSection>
           );
         })}
-        {team.length > 0 && (
+        {team.length > shownAgents.length && (
           <Link to="/org/$orgId/team" params={{ orgId }} className="sidebar__item sidebar__see-all">
             <Icon name="agent" />
-            <span className="sidebar__item-label">{t("sidebarAgents.seeAll", { count: team.length })}</span>
+            <span className="sidebar__item-label">
+              {t("sidebarAgents.more", { count: team.length - shownAgents.length })}
+            </span>
           </Link>
         )}
       </>

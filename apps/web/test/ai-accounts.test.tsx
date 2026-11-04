@@ -181,6 +181,48 @@ describe("Contas de IA", () => {
   });
 });
 
+describe("Contas de IA: the same account signed in again and again", () => {
+  const copy = (id: string, over: Partial<AiAccounts["accounts"][number]> = {}): AiAccounts["accounts"][number] => ({
+    ...base,
+    kind: "codex",
+    id,
+    label: "ChatGPT",
+    email: "walt@acme.com",
+    plan: "plus",
+    usedBy: [],
+    ...over,
+  });
+
+  test("one row, its logins with no agent flagged, and Remover takes only those: the agents keep theirs", async () => {
+    const { state, rows } = await page([
+      copy("gpt_ada", { usedBy: ["Ada"] }),
+      copy("gpt_2", { status: "signed_out" }),
+      copy("gpt_3"),
+      copy("gpt_4", { status: "signed_out" }),
+    ]);
+    expect(rows()).toHaveLength(1);
+    const row = rows()[0] as HTMLElement;
+    expect(row.textContent).toContain("Mais 3 logins desta conta, sem nenhum agente.");
+    await click(within(row).getByRole("button", { name: "Remover" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "machines.removeAccount").map((c) => c.args.slice(1))).toEqual([
+      ["machine_1", "gpt_2"],
+      ["machine_1", "gpt_3"],
+      ["machine_1", "gpt_4"],
+    ]);
+    expect(screen().getByText("3 logins sem uso removidos.")).toBeTruthy();
+  });
+
+  test("none with an agent: the signed-in one stays; a single login is never flagged", async () => {
+    const { rows } = await page([copy("gpt_1", { status: "signed_out" }), copy("gpt_2")]);
+    expect(rows()[0]?.textContent).toContain("Mais 1 login desta conta, sem nenhum agente.");
+    cleanup();
+    const one = await page([copy("gpt_1")]);
+    expect(one.rows()[0]?.textContent).not.toContain("desta conta, sem nenhum agente");
+    expect(within(one.rows()[0] as HTMLElement).queryByRole("button", { name: "Remover" })).toBeNull();
+  });
+});
+
 describe("Contas de IA: a plan with a login per agent", () => {
   const usage = (percent: number, at: string) => ({
     windows: [{ kind: "five_hour" as const, usedPercent: percent, resetsAt: "2099-01-01T15:40:00.000Z" }],

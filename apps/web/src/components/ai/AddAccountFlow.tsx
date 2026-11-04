@@ -1,5 +1,6 @@
 import type { AccountLoginStart, AccountLoginStatus, MachineAccount, MachineAccountKind } from "@agenteschat/client";
-import { keys, useAccountLogin, useApi } from "@agenteschat/client";
+import { keys, useAccountLogin, useAiAccounts, useApi } from "@agenteschat/client";
+import { accountTitle, reusableAccount } from "@agenteschat/client/lib/ai-accounts";
 import {
   beginLogin,
   freeDuplicate,
@@ -9,7 +10,7 @@ import {
   loginReadPasses,
   otherThanHint,
 } from "@agenteschat/client/lib/machines";
-import { type PlanId, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
+import { GEMINI_ENTERPRISE_PROVIDER, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
 import { Button, cx, Icon, InfoHint, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -29,7 +30,9 @@ import { openPopup, sendPopup } from "@/lib/popup";
  * then the device page and the one-time code to type there. A coding plan:
  * its own key page, then the key, sealed the same way; it never reaches our
  * server. Cursor (ADR 0114): its sign-in page, and the computer finishes by
- * itself; or, chosen under it, a Cursor API key, sent like a plan's key. "Paste" shows only while the field is empty. Every start is a click,
+ * itself; or, chosen under it, a Cursor API key, sent like a plan's key. Gemini (ADR 0143): Google's sign-in page,
+ * then the code it shows, pasted like Claude's; a personal Google account under the plain warning about Google's
+ * terms, or (chosen under it) Gemini Enterprise. "Paste" shows only while the field is empty. Every start is a click,
  * never the block showing. The page asks every 2 s; Back or closing stops
  * the sign-in on the computer. "Copy link" beside a sign-in's button copies
  * its link instead, to open in another browser or profile (it begins the
@@ -46,10 +49,15 @@ export interface AddAccountProps {
   machineId: string;
   kind: MachineAccountKind;
   computer: string;
-  /** A coding plan's key account on Claude Code. */
-  provider?: PlanId;
+  /** A coding plan's key account on Claude Code, or a Gemini Enterprise sign-in (`signInProviderOf`). */
+  provider?: string;
   /** Sign in again to this account (signed out): same account, same agents. */
   again?: string;
+  /**
+   * The person already chose another account: no offer to sign in again to one they have there (`reusableAccount`),
+   * which every other new sign-in makes first.
+   */
+  fresh?: boolean;
   /**
    * Claude's login hint, never asked: the email of the account signing in again, or of the one a turn shares. A sign-in
    * that comes back as another account says so instead of thinking with it.
@@ -89,22 +97,68 @@ export interface AddAccountProps {
 }
 
 export function AddAccount(props: AddAccountProps) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
   // "Tentar de novo" starts over with a new sign-in: of a `fanOut`, only for the targets that didn't sign in, so no
   // login is left on the computer with none to think for.
   const [attempt, setAttempt] = useState(0);
   const [signedIn, setSignedIn] = useState<string[]>([]);
   const { fanOut, onAdded } = props;
+  // A new sign-in where the person already has that plan's account on that computer: Entrar de novo on it first
+  // (already chosen when it's signed out), Outra conta beside it. Decided once, so the account signing in doesn't
+  // change it.
+  const offers = !props.again && !fanOut && !props.email && !props.signInLabel && !props.fresh;
+  const ai = useAiAccounts(org.id, offers);
+  const [reuse, setReuse] = useState<MachineAccount | null>();
+  const [pick, setPick] = useState<"again" | "new">();
+  useEffect(() => {
+    if (reuse !== undefined || (offers && ai.isPending)) return;
+    const found = offers
+      ? reusableAccount(ai.data?.accounts, { machineId: props.machineId, kind: props.kind, provider: props.provider })
+      : undefined;
+    setReuse(found ?? null);
+  }, [reuse, offers, ai.isPending, ai.data, props.machineId, props.kind, props.provider]);
+  if (reuse === undefined) return <Icon name="spinner" size={14} />;
+  const chosen = reuse ? (pick ?? (reuse.status === "signed_out" ? "again" : undefined)) : "new";
+  const label = reuse ? accountTitle(reuse) : "";
+  const another = (
+    <Button size="sm" onClick={() => setPick("new")}>
+      {t("connectAi.another")}
+    </Button>
+  );
+  if (reuse && chosen === undefined)
+    return (
+      <div className="ai-panel__row">
+        <SettingNote icon="repeat">{t("connectAi.reuse.active", { label })}</SettingNote>
+        <span className="ac-acts">
+          <Button size="sm" variant="primary" onClick={() => setPick("again")}>
+            {t("aiAccounts.page.signInAgain")}
+          </Button>
+          {another}
+        </span>
+      </div>
+    );
+  const again = reuse && chosen === "again" ? { again: reuse.id, email: reuse.email } : {};
   return (
-    <AddAccountFlow
-      key={attempt}
-      {...props}
-      {...(fanOut ? { fanOut: fanOut.filter((x) => !signedIn.includes(x.id)) } : {})}
-      onAdded={(account, target) => {
-        if (target) setSignedIn((s) => [...s, target]);
-        onAdded(account, target);
-      }}
-      onRetry={() => setAttempt((n) => n + 1)}
-    />
+    <>
+      {reuse && chosen === "again" && pick === undefined && (
+        <div className="ai-panel__row">
+          <SettingNote icon="repeat">{t("connectAi.reuse.signedOut", { label })}</SettingNote>
+          {another}
+        </div>
+      )}
+      <AddAccountFlow
+        key={`${attempt}:${chosen}`}
+        {...props}
+        {...again}
+        {...(fanOut ? { fanOut: fanOut.filter((x) => !signedIn.includes(x.id)) } : {})}
+        onAdded={(account, target) => {
+          if (target) setSignedIn((s) => [...s, target]);
+          onAdded(account, target);
+        }}
+        onRetry={() => setAttempt((n) => n + 1)}
+      />
+    </>
   );
 }
 
@@ -210,6 +264,9 @@ function AddAccountFlow({
   // Cursor: its sign-in, or (chosen under it) its API key, which goes like a coding plan's key.
   const [cursorKey, setCursorKey] = useState(false);
   const { plan, provider: keyProvider } = signInKey(provider, kind, cursorKey);
+  // Gemini: a personal Google account, or (chosen under it, or the account's own) Gemini Enterprise.
+  const [enterprise, setEnterprise] = useState(provider === GEMINI_ENTERPRISE_PROVIDER);
+  const signInProvider = keyProvider ?? (kind === "antigravity" && enterprise ? GEMINI_ENTERPRISE_PROVIDER : undefined);
   const [login, setLogin] = useState<AccountLoginStart | null>(null);
   const [starting, setStarting] = useState(false);
   const [startFailed, setStartFailed] = useState(false);
@@ -255,7 +312,7 @@ function AddAccountFlow({
     try {
       const l = await beginLogin((input) => api.machines.beginAccountLogin(org.id, machineId, kind, input), kind, {
         again,
-        provider: keyProvider,
+        provider: signInProvider,
         hint,
       });
       if (gone.current) {
@@ -604,6 +661,19 @@ function AddAccountFlow({
 
   const signInHint = t("agentPage.work.brain.add.stepOneHint", { computer, brand: t(`aiAccounts.connect.${kind}`) });
   let steps: ReactNode;
+  // A device sign-in's one-time code (ChatGPT's, Grok's), to type on the provider's page.
+  const deviceCode = (n: number, label: string, code: string) => (
+    <Step n={n} side={waiting}>
+      <b>{label}</b>
+      <span className="agp-addacct__code">
+        <output aria-label={label}>{code}</output>
+        <Button size="sm" icon={copied ? "check" : "copy"} onClick={() => void copy()}>
+          {copied ? t("common.copied") : t("common.copy")}
+        </Button>
+      </span>
+      <span>{t("agentPage.work.brain.add.deviceCodeText")}</span>
+    </Step>
+  );
   if (plan) {
     const site = new URL(plan.site);
     steps = (
@@ -658,6 +728,55 @@ function AddAccountFlow({
         )}
       </>
     );
+  } else if (kind === "antigravity") {
+    steps = (
+      <>
+        {!enterprise && <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>}
+        <Step side={signIn(signInLabel ?? t("agentPage.work.brain.add.open.antigravity"))}>
+          <StepTitle
+            title={t(
+              enterprise
+                ? "agentPage.work.brain.add.stepOne.antigravityEnterprise"
+                : "agentPage.work.brain.add.stepOne.antigravity",
+            )}
+            hint={signInHint}
+          />
+          {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
+        </Step>
+        {login && opened && (
+          <Step side={busy && !reads.includes("reconnecting") ? undefined : waiting}>
+            <label htmlFor={codeId}>
+              <b>{t("agentPage.work.brain.add.stepTwo")}</b>
+            </label>
+            {busy
+              ? busyLine
+              : pasteRow(
+                  t("agentPage.work.brain.add.codeLabel"),
+                  t("agentPage.work.brain.add.codeLabel"),
+                  false,
+                  key.length > 0,
+                )}
+          </Step>
+        )}
+        {!login && !again && (
+          <Button size="sm" variant="ghost" onClick={() => setEnterprise((on) => !on)}>
+            {t(enterprise ? "agentPage.work.brain.add.geminiPersonal" : "agentPage.work.brain.add.geminiEnterprise")}
+          </Button>
+        )}
+      </>
+    );
+  } else if (kind === "grok") {
+    steps = (
+      <>
+        <Step n={1} side={signIn(signInLabel ?? t("agentPage.work.brain.add.open.grok"))}>
+          <StepTitle title={t("agentPage.work.brain.add.stepOne.grok")} hint={signInHint} />
+          {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
+        </Step>
+        {login?.userCode
+          ? deviceCode(2, t("agentPage.work.brain.add.grokCode"), login.userCode)
+          : login && opened && <Step side={waiting}>{t("agentPage.work.brain.add.grokFinish", { computer })}</Step>}
+      </>
+    );
   } else if (kind === "codex") {
     steps = (
       <>
@@ -669,18 +788,7 @@ function AddAccountFlow({
           <StepTitle title={t("agentPage.work.brain.add.stepOne.codex")} hint={signInHint} />
           {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
         </Step>
-        {login?.userCode && (
-          <Step n={3} side={waiting}>
-            <b>{t("agentPage.work.brain.add.deviceCode")}</b>
-            <span className="agp-addacct__code">
-              <output aria-label={t("agentPage.work.brain.add.deviceCode")}>{login.userCode}</output>
-              <Button size="sm" icon={copied ? "check" : "copy"} onClick={() => void copy()}>
-                {copied ? t("common.copied") : t("common.copy")}
-              </Button>
-            </span>
-            <span>{t("agentPage.work.brain.add.deviceCodeText")}</span>
-          </Step>
-        )}
+        {login?.userCode && deviceCode(3, t("agentPage.work.brain.add.deviceCode"), login.userCode)}
       </>
     );
   } else {

@@ -17,7 +17,7 @@ export const SEND_STICKER_TOOL = "send_sticker";
 export const MEDIA_TOOLS: ReadonlySet<string> = new Set([SEND_GIF_TOOL, SEND_STICKER_TOOL]);
 
 /** The agents' stickers: one animation of the agent per mood. */
-export const STICKER_MOODS = ["celebrate", "love", "deal", "thinking", "wow", "dizzy"] as const;
+export const STICKER_MOODS = ["celebrate", "love", "deal", "thinking", "wow", "dizzy", "wave"] as const;
 export type StickerMood = (typeof STICKER_MOODS)[number];
 
 /** The moods an agent may send on its own after a reply (the others are for people to send). */

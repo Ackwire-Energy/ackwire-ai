@@ -4,6 +4,7 @@ import type { OnboardingStepId } from "../lib/onboarding";
 import { CLOUD_SERVER } from "../lib/server";
 import { consultSeeds } from "../realtime/consults";
 import { steerStore } from "../realtime/steer";
+import type { VaultConnection, VaultImportResult, VaultItem, VaultItemDetail, VaultOverview } from "../vault/types";
 import type { HttpApi } from "./client";
 import { ApiError, createFileRequester, createRequester, enc, type TransportOptions } from "./http";
 import type {
@@ -430,6 +431,25 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     desktop: {
       status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),
+    },
+    vault: {
+      overview: (orgId) => request<VaultOverview>(`${org(orgId)}/vault`),
+      item: (orgId, itemId) => request<VaultItemDetail>(`${org(orgId)}/vault/items/${enc(itemId)}`),
+      create: (orgId, input) => request<VaultItem>(`${org(orgId)}/vault/items`, { json: input }),
+      update: (orgId, itemId, patch) =>
+        request<VaultItem>(`${org(orgId)}/vault/items/${enc(itemId)}`, { method: "PATCH", json: patch }),
+      remove: (orgId, itemId) => request<void>(`${org(orgId)}/vault/items/${enc(itemId)}`, { method: "DELETE" }),
+      importCsv: (orgId, input) => request<VaultImportResult>(`${org(orgId)}/vault/import`, { json: input }),
+      connect: (orgId, input) => request<VaultConnection>(`${org(orgId)}/vault/connections`, { json: input }),
+      updateConnection: (orgId, connectionId, patch) =>
+        request<VaultConnection>(`${org(orgId)}/vault/connections/${enc(connectionId)}`, {
+          method: "PATCH",
+          json: patch,
+        }),
+      syncConnection: (orgId, connectionId) =>
+        request<VaultConnection>(`${org(orgId)}/vault/connections/${enc(connectionId)}/sync`, { json: {} }),
+      removeConnection: (orgId, connectionId) =>
+        request<void>(`${org(orgId)}/vault/connections/${enc(connectionId)}`, { method: "DELETE" }),
     },
     gifs: {
       search: (orgId, query) =>
@@ -1053,6 +1073,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       refreshAccountUsage: (orgId) => request<void>(`${org(orgId)}/ai-accounts/refresh`, { json: {} }),
       aiAccounts: (orgId) => request<AiAccounts>(`${org(orgId)}/ai-accounts`),
+      takeBackPlan: (orgId, accountId, agentId) =>
+        request<{ agentIds: string[] }>(`${org(orgId)}/ai-accounts/${enc(accountId)}/take-back`, {
+          json: agentId ? { agentId } : {},
+        }),
       renameAccount: (orgId, machineId, accountId, label) =>
         request<MachineAccount>(`${org(orgId)}/machines/${enc(machineId)}/accounts/${enc(accountId)}`, {
           method: "PATCH",
@@ -1584,6 +1608,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           `${org(orgId)}/agents/${enc(agentId)}/secrets/${enc(name)}${machineId ? `?machineId=${enc(machineId)}` : ""}`,
           { method: "DELETE" },
         ),
+      saveToVault: (orgId, requestId, input) =>
+        request<VaultItem>(`${org(orgId)}/secret-requests/${enc(requestId)}/vault`, { json: input }),
     },
     proposals: {
       list: async (orgId, filter) =>

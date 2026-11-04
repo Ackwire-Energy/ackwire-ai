@@ -1,4 +1,10 @@
-import { type BrowserHandoff, controlledBy, handoffScreen, useBrowserHandoffActions } from "@agenteschat/client";
+import {
+  type BrowserHandoff,
+  browserOnlyWhy,
+  controlledBy,
+  handoffScreen,
+  useBrowserHandoffActions,
+} from "@agenteschat/client";
 import { liveSubLine } from "@agenteschat/client/lib/agent-computer";
 import { computerName, READY_FLASH_MS, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { clockAt } from "@agenteschat/client/lib/format";
@@ -206,7 +212,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
       <>
         {pauseBanner}
         {f.desktop?.reason === "browser_only" ? (
-          <Banner icon="lock" text={t("desktop.browserOnly.title")} help={t("desktop.browserOnly.role", g)} />
+          <Banner icon="lock" text={t("desktop.browserOnly.title")} help={t(browserOnlyWhy(view.desktopQ.data), g)} />
         ) : null}
         <BrowserCard
           agentId={agentId}

@@ -362,6 +362,12 @@
       "desc": "Il piano, la carta e le fatture.",
       "short": "fatturazione",
       "say": "gestisce la fatturazione"
+    },
+    "use_others_plans": {
+      "title": "Usare i piani di altre persone",
+      "desc": "Dare agli agenti che può modificare un piano collegato da un’altra persona. Il proprietario riceve un’email e può riprenderlo.",
+      "short": "usare i piani di altre persone",
+      "say": "usa i piani di altre persone"
     }
   },
   "auth": {
@@ -1246,6 +1252,8 @@
     "paused": "In pausa: hai annullato 3 sue decisioni questa settimana. Riattivalo quando vuoi.",
     "card": {
       "deciding": "{{name}} lo sta valutando per conto di {{for}}…",
+      "approvedForYou": "Approvato da {{name}} a tuo nome",
+      "decidingForYou": "{{name}} lo sta valutando a tuo nome…",
       "approved": "Approvato da {{name}} per conto di {{for}}",
       "passed": "{{name}} l'ha passato a te",
       "passedWhy": "{{name}} l'ha passato a te: {{reason}}",
@@ -1257,9 +1265,7 @@
       "why": "Perché?",
       "undo": "Annulla",
       "undoArchives": "Annulla archivia {{name}}. Vale fino a {{until}}.",
-      "undoSettings": "Annulla ripristina le impostazioni. Vale fino a {{until}}.",
-      "approvedForYou": "Approvato da {{name}} a tuo nome",
-      "decidingForYou": "{{name}} lo sta valutando a tuo nome…"
+      "undoSettings": "Annulla ripristina le impostazioni. Vale fino a {{until}}."
     }
   },
   "noticePrefs": {
@@ -1504,9 +1510,9 @@
     "collapseAll": "Comprimi tutti",
     "expandAll": "Espandi tutti",
     "organize": "Organizza i gruppi in Team",
-    "seeAll_one": "Vedi l’agente",
-    "seeAll_many": "Vedi tutti i {{count}} agenti",
-    "seeAll_other": "Vedi tutti i {{count}} agenti",
+    "more_one": "1 altro agente in Team",
+    "more_many": "Altri {{count}} agenti in Team",
+    "more_other": "Altri {{count}} agenti in Team",
     "createFirst": "Crea il primo agente",
     "working_one": "{{count}} al lavoro",
     "working_many": "{{count}} al lavoro",
@@ -1599,6 +1605,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "Email",
+      "vault": "Vault",
       "custom": "Strumenti dello spazio di lavoro"
     }
   },
@@ -1884,7 +1891,6 @@
   "rightHand": {
     "label": "il tuo braccio destro",
     "newDot": "Nuovo",
-    "callWith": "chiamalo con @{{handle}}",
     "role": "Assistente del workspace",
     "actsAsYou": "agisce con i tuoi permessi",
     "composerHint": "nulla cambia senza di te",
@@ -1923,7 +1929,8 @@
       "channels": "Risponde nei canali quando lo chiamano",
       "model": "Modello",
       "message": "Messaggio",
-      "configure": "Configura"
+      "configure": "Configura",
+      "nameStory": "Il nome viene da lodestar, la stella che guida i naviganti."
     },
     "settings": {
       "name": "Nome e aspetto",
@@ -2067,6 +2074,10 @@
       "codex_female": "Codex non ha effettuato l'accesso su questo computer. Collega un account ChatGPT nella pagina di {{name}}.",
       "cursor": "Cursor non ha effettuato l'accesso su questo computer. Collega un account Cursor nella pagina di {{name}}.",
       "cursor_female": "Cursor non ha effettuato l'accesso su questo computer. Collega un account Cursor nella pagina di {{name}}.",
+      "grok": "Grok non ha effettuato l'accesso su questo computer. Collega un account Grok nella pagina di {{name}}.",
+      "grok_female": "Grok non ha effettuato l'accesso su questo computer. Collega un account Grok nella pagina di {{name}}.",
+      "antigravity": "Gemini non ha effettuato l'accesso su questo computer. Collega un account Gemini nella pagina di {{name}}.",
+      "antigravity_female": "Gemini non ha effettuato l'accesso su questo computer. Collega un account Gemini nella pagina di {{name}}.",
       "opencode": "OpenCode non può pensare su questo computer. Collega una chiave OpenCode nella pagina di {{name}}.",
       "opencode_female": "OpenCode non può pensare su questo computer. Collega una chiave OpenCode nella pagina di {{name}}."
     },
@@ -2096,6 +2107,8 @@
       "claude": "Collega il tuo piano Claude",
       "chatgpt": "Collega il tuo piano ChatGPT",
       "cursor": "Collega il tuo piano Cursor",
+      "grok": "Collega il tuo piano Grok",
+      "gemini": "Collega il tuo piano Gemini",
       "zen": "Collega OpenCode",
       "api_key": "Aggiungi una chiave API"
     },
@@ -2120,6 +2133,15 @@
       "cursor": {
         "title": "Il tuo piano Cursor",
         "tiers": "Pro, Pro+, Ultra o Teams, oppure una chiave API di Cursor"
+      },
+      "grok": {
+        "title": "Il tuo piano Grok",
+        "tiers": "SuperGrok, SuperGrok Heavy o X Premium+"
+      },
+      "gemini": {
+        "title": "Il tuo piano Gemini",
+        "tiers": "Google AI Pro, Google AI Ultra o Gemini Enterprise",
+        "warning": "Google dice che usare un piano Gemini personale all'interno di altre app può portare alla sospensione dell'account. Per non correre questo rischio, usa una chiave API o Gemini Enterprise."
       },
       "zen": {
         "title": "OpenCode",
@@ -2191,6 +2213,10 @@
     "onceHint": "Tutti condividono i limiti del tuo piano.",
     "use": "Usa {{label}}",
     "another": "Un altro account",
+    "reuse": {
+      "active": "Hai già {{label}} qui. Accedi di nuovo a questo account, oppure usane un altro.",
+      "signedOut": "{{label}} è disconnesso qui. Accedi di nuovo e i suoi agenti continuano a usarlo."
+    },
     "signInFor": "Accedi per {{name}}",
     "signInFor_female": "Accedi per {{name}}",
     "doneAll": "Ora {{names}} ragionano con {{label}}.",
@@ -2198,6 +2224,8 @@
       "claude_code": "Claude ha effettuato l'accesso come {{email}}, non {{account}}. Esci dalla pagina di Claude e riprova.",
       "codex": "ChatGPT ha effettuato l'accesso come {{email}}, non {{account}}. Esci dalla pagina di ChatGPT e riprova.",
       "cursor": "Cursor ha effettuato l'accesso come {{email}}, non {{account}}. Esci dalla pagina di Cursor e riprova.",
+      "grok": "Grok ha effettuato l'accesso come {{email}}, non {{account}}. Esci dalla pagina di Grok e riprova.",
+      "antigravity": "Gemini ha effettuato l'accesso come {{email}}, non {{account}}. Esci dalla pagina di Google e riprova.",
       "opencode": "OpenCode ha effettuato l'accesso come {{email}}, non come {{account}}. Riprova con la chiave giusta."
     },
     "useAnyway": "Usa {{email}}",
@@ -2396,7 +2424,6 @@
   "dm": {
     "subtitle": "{{role}} · di {{owner}}",
     "subtitleNoOwner": "{{role}} · senza responsabile",
-    "profile": "Vedi profilo",
     "emptyAgent": "Chiedigli di ricordare, dimenticare o lavorare in modo diverso.",
     "emptyAgent_female": "Chiedile di ricordare, dimenticare o lavorare in modo diverso.",
     "opening": "Apertura della conversazione…",
@@ -2876,6 +2903,360 @@
     "removed": "{{name}} rimosso dal computer.",
     "removeFailed": "Impossibile rimuoverlo. Il computer è acceso?"
   },
+  "vault": {
+    "tab": {
+      "label": "Cosa mostrare",
+      "team": "Team",
+      "personal": "Personale",
+      "connections": "Collegamenti"
+    },
+    "list": {
+      "search": "Cerca nel Vault",
+      "clearSearch": "Cancella la ricerca",
+      "kind": "Tipo",
+      "kindAll": "Tutti i tipi",
+      "noMatch": "Niente qui corrisponde a questa ricerca.",
+      "clearFilters": "Cancella la ricerca",
+      "personalNote": "Solo tu vedi questi elementi. I tuoi agenti li usano solo quando glielo chiedi.",
+      "personalEmpty": "Ancora niente di salvato",
+      "personalEmptyText": "Solo tu vedi questi elementi. I tuoi agenti li usano solo quando glielo chiedi.",
+      "teamEmpty": "Ancora niente di condiviso con il team",
+      "teamEmptyText": "Salva una volta un login, una chiave o dei contatti, e scegli quali agenti possono usarli.",
+      "sharedEmpty": "Ancora niente di condiviso con te",
+      "sharedEmptyText": "Quando qualcuno condivide con te un login o una chiave del team, compare qui."
+    },
+    "row": {
+      "agents_one": "{{count}} agente",
+      "agents_other": "{{count}} agenti",
+      "used": "Usato {{when}}",
+      "never": "Mai usato"
+    },
+    "kind": {
+      "login": "Login",
+      "key": "Chiave",
+      "contact": "Contatto",
+      "loginText": "Nome utente e password di un sito web",
+      "keyText": "Una chiave che i tuoi agenti usano in un comando",
+      "contactText": "Dati che gli agenti digitano nei moduli"
+    },
+    "kindPlural": {
+      "login": "login",
+      "key": "chiavi",
+      "contact": "contatti",
+      "loginTitle": "Login",
+      "keyTitle": "Chiavi",
+      "contactTitle": "Contatti"
+    },
+    "scope": {
+      "personal": "Personale",
+      "team": "Team",
+      "personalText": "Lo vedi solo tu",
+      "teamText": "Condiviso con lo spazio di lavoro"
+    },
+    "field": {
+      "title": "Nome",
+      "contactTitle": "Nome nel Vault",
+      "loginPlaceholder": "Email aziendale",
+      "keyPlaceholder": "Chiave dei pagamenti",
+      "contactPlaceholder": "Dati di fatturazione",
+      "website": "Sito web",
+      "websitePlaceholder": "app.example.com",
+      "match": "Dove gli agenti possono digitarlo",
+      "username": "Nome utente",
+      "usernamePlaceholder": "Email o nome utente",
+      "password": "Password",
+      "keyName": "Nome della variabile",
+      "keyNameHelp": "I tuoi agenti usano la chiave con questo nome in un comando.",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "value": "Valore",
+      "description": "Nota per i tuoi agenti",
+      "descriptionHelp": "Quando usarlo e a cosa serve. Gli agenti la leggono per scegliere quello giusto.",
+      "descriptionPlaceholder": {
+        "login": "L'account che usiamo per pubblicare i post",
+        "key": "Per il servizio di pagamento, modalità di test",
+        "contact": "Usalo per le fatture dell'azienda"
+      }
+    },
+    "match": {
+      "exact": "Solo questo indirizzo",
+      "site": "Tutto il sito",
+      "exactHelp": "Gli agenti lo digitano solo su {{origin}}.",
+      "exactHelpNone": "Gli agenti lo digitano solo su questo indirizzo esatto.",
+      "siteHelp": "Gli agenti lo digitano su qualsiasi pagina di questo sito, come una pagina di accesso su un altro sottodominio."
+    },
+    "contact": {
+      "group": "Dati di contatto",
+      "fullName": "Nome completo",
+      "company": "Azienda",
+      "document": "Codice fiscale o partita IVA",
+      "email": "Email",
+      "phone": "Telefono",
+      "address": "Indirizzo",
+      "address2": "Indirizzo, riga 2",
+      "city": "Città",
+      "region": "Provincia o regione",
+      "postalCode": "CAP",
+      "country": "Paese"
+    },
+    "error": {
+      "title": "Dagli un nome.",
+      "website": "Usa un indirizzo https, come app.example.com.",
+      "keyName": "Usa lettere maiuscole, numeri e _, iniziando con una lettera, come ACME_API_KEY.",
+      "password": "Digita la password.",
+      "value": "Digita il valore.",
+      "contact": "Compila almeno un campo."
+    },
+    "item": {
+      "missing": "Mancante",
+      "missingText": "Non è più in {{source}}. Gli agenti non possono usarlo finché non torna.",
+      "editIn": "Modificalo in {{source}}. Le modifiche arrivano qui alla prossima sincronizzazione.",
+      "unreadable": "I dati di questo contatto non si possono leggere qui. Chi lo gestisce può inserirli di nuovo e salvare.",
+      "hidden": "Nascosto",
+      "endsIn": "termina con {{hint}}",
+      "noValue": "Niente di salvato",
+      "change": "Cambia",
+      "add": "Aggiungi",
+      "newPassword": "Nuova password",
+      "newValue": "Nuovo valore",
+      "newValueHelp": "Sostituisce quello salvato quando salvi.",
+      "sealedHelp": "Per sicurezza, ciò che è salvato qui non si vede più. Per cambiarlo, scrivilo di nuovo.",
+      "keepValue": "Mantieni quello attuale",
+      "saved": "Salvato",
+      "delete": "Elimina",
+      "deleteTitle": "Eliminare {{title}}?",
+      "deleteText": "I tuoi agenti non potranno più usarlo. Non si può annullare.",
+      "deleted": "{{title}} eliminato dal Vault"
+    },
+    "use": {
+      "title": "Usi recenti",
+      "none": "Nessuno l'ha ancora usato.",
+      "fill": "{{agent}}, su {{host}}",
+      "fillSomewhere": "{{agent}} l'ha digitato",
+      "key": "{{agent}}, in un comando",
+      "read": "{{who}} l'ha letto",
+      "create": "{{who}} l'ha salvato",
+      "edit": "{{who}} l'ha modificato",
+      "for": "per {{name}}",
+      "routine": "Routine {{name}}"
+    },
+    "access": {
+      "title": "Chi ha accesso",
+      "people": "Persone",
+      "agents": "Agenti",
+      "edit": "Modifica",
+      "editOf": "Modifica {{what}}",
+      "everyone": "Tutti nello spazio di lavoro",
+      "everyoneText": "Ogni persona lo vede, e gli agenti lo usano quando lei lo chiede.",
+      "managersOnly": "Solo chi gestisce il Vault",
+      "allAgents": "Tutti gli agenti",
+      "noAgents": "Ancora nessun agente",
+      "more_one": "altri {{count}}",
+      "more_other": "altri {{count}}",
+      "saved": "Accesso salvato",
+      "peopleTitle": "Chi può vederlo",
+      "peopleText": "Lo vedono, e gli agenti lo usano quando una di loro lo chiede. Chi gestisce il Vault lo vede sempre.",
+      "level": {
+        "use": "Può vedere e usare",
+        "none": "Nessun accesso"
+      },
+      "roleDetail": "Tutti con questo ruolo",
+      "roles": "Ruoli",
+      "peopleGroup": "Persone",
+      "add": "Aggiungi un ruolo o una persona",
+      "addSearch": "Cerca ruoli e persone",
+      "noMatch": "Nessun risultato",
+      "levelOf": "Cosa può fare {{name}}",
+      "follows": "Segue l'accesso predefinito di {{source}}.",
+      "own": "Ha un accesso suo, non quello predefinito di {{source}}.",
+      "changeHere": "Cambia per questo elemento",
+      "useConnection": "Torna a quello predefinito"
+    },
+    "agents": {
+      "title": "Quali agenti possono usarlo",
+      "textPersonal": "Lo usano solo quando glielo chiedi.",
+      "textTeam": "Lo usano quando lo chiede qualcuno che può vederlo.",
+      "all": "Tutti gli agenti",
+      "allDetail": "Anche quelli aggiunti dopo"
+    },
+    "summary": {
+      "noAgents": "Ancora nessun agente può usarlo.",
+      "allAgents": "Ogni agente",
+      "inRole": "qualcuno con {{role}}",
+      "personal_one": "{{agents}} può usarlo, solo quando lo chiedi tu.",
+      "personal_other": "{{agents}} possono usarlo, solo quando lo chiedi tu.",
+      "everyone_one": "{{agents}} può usarlo quando lo chiede chiunque nello spazio di lavoro.",
+      "everyone_other": "{{agents}} possono usarlo quando lo chiede chiunque nello spazio di lavoro.",
+      "people_one": "{{agents}} può usarlo quando lo chiede {{people}}.",
+      "people_other": "{{agents}} possono usarlo quando lo chiede {{people}}.",
+      "nobody": "Nessuno può ancora chiedere agli agenti di usarlo. Scegli chi può vederlo."
+    },
+    "new": {
+      "open": "Nuovo elemento",
+      "title": "Nuovo elemento",
+      "text": "Salvalo una volta. I tuoi agenti lo usano senza vedere password o chiavi.",
+      "what": "Cosa vuoi salvare?",
+      "who": "Chi può usarlo",
+      "teamLocked": "Solo chi gestisce il Vault può salvare elementi del team. Questo resta tuo.",
+      "save": "Salva",
+      "saved": "Salvato nel Vault"
+    },
+    "import": {
+      "open": "Importa",
+      "title": "Importa password",
+      "text": "Da un file che esporta il tuo browser o gestore di password (.csv).",
+      "dropTitle": "Trascina qui il file",
+      "dropText": "oppure fai clic per sceglierlo sul tuo computer",
+      "reading": "Lettura del file…",
+      "choose": "Scegli il file",
+      "where": "Nel tuo browser o gestore di password, cerca Esporta password e scegli CSV.",
+      "tooLarge": "Questo file è troppo grande (al massimo 2 MB).",
+      "notCsv": "Scegli un file .csv.",
+      "unreadable": "Impossibile leggere questo file. Prova a esportarlo di nuovo.",
+      "format": {
+        "chrome": "Letto come esportazione di Chrome",
+        "1password": "Letto come esportazione di 1Password",
+        "bitwarden": "Letto come esportazione di Bitwarden",
+        "generic": "Letto come file di password"
+      },
+      "added_one": "nuovo login",
+      "added_other": "nuovi login",
+      "updated_one": "aggiornato",
+      "updated_other": "aggiornati",
+      "skipped_one": "escluso",
+      "skipped_other": "esclusi",
+      "reason": {
+        "duplicate_one": "{{count}} già nel Vault",
+        "duplicate_other": "{{count}} già nel Vault",
+        "not_https_one": "{{count}} non su un indirizzo https",
+        "not_https_other": "{{count}} non su un indirizzo https",
+        "no_password_one": "{{count}} senza password",
+        "no_password_other": "{{count}} senza password",
+        "invalid_one": "{{count}} riga che non siamo riusciti a leggere",
+        "invalid_other": "{{count}} righe che non siamo riusciti a leggere"
+      },
+      "as": "Salvali come",
+      "asPersonal": "Li vedrai solo tu.",
+      "asTeam": "Tutti nello spazio di lavoro li vedono. Dopo scegli gli agenti per ciascuno.",
+      "deleteFile": "Elimina il file dopo: contiene le tue password in chiaro.",
+      "confirm_one": "Importa {{count}}",
+      "confirm_other": "Importa {{count}}",
+      "done_one": "{{count}} login importato",
+      "done_other": "{{count}} login importati",
+      "another": "Scegli un altro file",
+      "close": "Fatto"
+    },
+    "connections": {
+      "none": "Qui non si può collegare nessun gestore di password.",
+      "lead": "I tuoi agenti usano i {{kinds}} che conservi in {{name}}.",
+      "connect": "Collega",
+      "reconnect": "Ricollega",
+      "reconnectName": "Ricollega {{name}}",
+      "open": "Apri {{name}}",
+      "required": "Compila questo campo.",
+      "for": "Collega per",
+      "forTeam": "I suoi elementi sono del team. Chi gestisce il Vault decide chi li usa.",
+      "forPersonal": "I suoi elementi sono solo tuoi.",
+      "teamLocked": "I suoi elementi saranno solo tuoi. Solo chi gestisce il Vault ne collega uno per il team.",
+      "sealed": "Ciò che digiti qui viene cifrato e non viene più mostrato.",
+      "connected_one": "{{name}} collegato. È arrivato {{count}} elemento.",
+      "connected_other": "{{name}} collegato. Sono arrivati {{count}} elementi.",
+      "ready": "Collegato",
+      "syncing": "Sincronizzazione",
+      "reads": "Legge {{label}}",
+      "items_one": "{{count}} elemento",
+      "items_other": "{{count}} elementi",
+      "synced": "sincronizzato {{when}}",
+      "syncNow": "Sincronizza ora",
+      "access": "Accesso predefinito",
+      "accessTitle": "Accesso predefinito di {{label}}",
+      "accessText": "I suoi elementi seguono questo, a meno che tu non ne cambi uno. Ogni modifica si salva subito.",
+      "actionsName": "Altre opzioni per {{name}}",
+      "disconnect": "Scollega",
+      "removeTitle": "Scollegare {{name}}?",
+      "removeText_one": "Il suo elemento esce dal Vault e i tuoi agenti smettono di usarlo. In {{name}} non cambia niente.",
+      "removeText_other": "I suoi {{count}} elementi escono dal Vault e i tuoi agenti smettono di usarli. In {{name}} non cambia niente.",
+      "removed": "{{name}} scollegato",
+      "listOf": "Collegamenti a {{name}}",
+      "note": "I tuoi agenti leggono ciò che c'è lì quando serve. In agentes.chat non viene copiato niente oltre a nomi e indirizzi.",
+      "error": {
+        "auth_failed": "Accesso rifiutato",
+        "locked": "Password sbagliata",
+        "many_vaults": "Vede più di una cassaforte",
+        "no_vault": "Non vede nessuna cassaforte",
+        "folder_missing": "Cartella non trovata",
+        "not_found": "Non trovato",
+        "rate_limited": "Troppe letture",
+        "unreachable": "Non raggiungibile",
+        "unsupported": "Non disponibile qui",
+        "invalid_input": "Controlla i campi",
+        "too_many_items": "Vault pieno",
+        "other": "Lettura non riuscita"
+      },
+      "fix": {
+        "auth_failed": "La chiave o il token è stato rifiutato. Ricollega con uno nuovo.",
+        "locked": "La password principale non ha aperto l'account. Ricollega con quella giusta.",
+        "many_vaults": "Dai all'account di servizio accesso a una sola cassaforte, poi ricollega.",
+        "no_vault": "Dai all'account di servizio accesso alla cassaforte degli agenti, poi ricollega.",
+        "folder_missing": "Crea la cartella per i tuoi agenti, o ricollega con il suo nome.",
+        "not_found": "Ciò che leggeva non c'è più. Ricollega per scegliere di nuovo.",
+        "rate_limited": "Il gestore di password ci ha chiesto di aspettare. Riprova da solo.",
+        "unreachable": "Il suo server non ha risposto. Riprova da solo.",
+        "unsupported": "Qui non si possono leggere le sue impostazioni. Riprova più tardi o usa un altro account.",
+        "invalid_input": "Qualcosa nei campi è stato rifiutato. Ricollega e controllali.",
+        "too_many_items": "Elimina degli elementi prima di sincronizzarne altri.",
+        "other": "Prova Sincronizza ora, oppure ricollega."
+      }
+    },
+    "source": {
+      "onepassword": {
+        "step": {
+          "1": "Crea in 1Password una cassaforte solo per i tuoi agenti e spostaci i login che possono usare",
+          "2": "Crea un account di servizio con accesso solo a quella cassaforte",
+          "3": "Incolla qui il token dell'account di servizio"
+        },
+        "field": {
+          "token": "Token dell'account di servizio"
+        }
+      },
+      "bitwarden": {
+        "warning": "Usa un account solo per i tuoi agenti. La sua password principale apre tutto l'account, quindi non deve contenere niente di personale.",
+        "step": {
+          "1": "Crea un account Bitwarden solo per i tuoi agenti e una cartella chiamata Agents con i login che possono usare",
+          "2": "In quell'account, apri Impostazioni, Sicurezza, Chiavi e copia la chiave API",
+          "3": "Compila i campi qui sotto"
+        },
+        "field": {
+          "server": "Server",
+          "serverUrl": "Indirizzo del server",
+          "clientId": "ID client",
+          "clientSecret": "Segreto client",
+          "masterPassword": "Password principale",
+          "folder": "Cartella"
+        },
+        "choice": {
+          "server": {
+            "self": "Il mio server"
+          }
+        }
+      }
+    },
+    "card": {
+      "save": "Salva nel Vault",
+      "saveText": "La prossima volta i tuoi agenti lo usano senza chiedertelo.",
+      "scope": "Salva come",
+      "personalText": "Lo vedi solo tu",
+      "teamText": "Lo spazio di lavoro lo vede",
+      "teamLocked": "Solo chi gestisce il Vault salva per il team",
+      "agents": "Usato da",
+      "choose": "Scegli",
+      "saved": "Salvato nel Vault",
+      "notSaved": "Inviato, ma non salvato nel Vault",
+      "codeBox": "Cifra {{n}} di {{total}}",
+      "codeShort_one": "Digita la cifra.",
+      "codeShort_other": "Digita tutte le {{count}} cifre.",
+      "codeWhere": "Solo il browser di {{agent}} lo digita, su {{host}}."
+    }
+  },
   "question": {
     "answer": "Rispondi",
     "placeholder": "La tua risposta",
@@ -3304,7 +3685,8 @@
       "usageLimitReached": "<b>{{name}}</b> ha raggiunto il limite di {{amount}}",
       "usageLimitRequest": "<b>{{name}}</b> ha raggiunto il limite di {{amount}} e chiede di più",
       "usageLimitRaised": "<b>{{name}}</b> ha alzato il tuo limite di questo mese",
-      "usageLimitRefused": "<b>{{name}}</b> ha rifiutato la tua richiesta di più utilizzo"
+      "usageLimitRefused": "<b>{{name}}</b> ha rifiutato la tua richiesta di più utilizzo",
+      "planLent": "<b>{{name}}</b> ha collegato il tuo piano {{plan}} a <b>{{agent}}</b>"
     },
     "usageLimit": {
       "runs_one": "{{count}} richiesta questo mese",
@@ -3424,7 +3806,12 @@
     "noneUnread": "Tutto letto.",
     "noneHere": "Per ora niente qui.",
     "noneDone": "Niente segnato come completato negli ultimi 30 giorni.",
-    "more": "Mostra altro"
+    "more": "Mostra altro",
+    "planLent": {
+      "takeBack": "Riprendi",
+      "takeBackAll": "Riprendi da tutti gli agenti",
+      "done": "Il tuo piano è tornato"
+    }
   },
   "approvals": {
     "title": "Approvazioni",
@@ -3836,21 +4223,31 @@
             "claude_code": "Aggiungi un account Claude",
             "codex": "Aggiungi un account ChatGPT",
             "cursor": "Aggiungi un account Cursor",
+            "grok": "Aggiungi un account Grok",
+            "antigravity": "Aggiungi un account Gemini",
             "opencode": "Aggiungi una chiave OpenCode"
           },
           "stepOne": {
             "claude_code": "L'account con il tuo piano",
             "codex": "L'account con il tuo piano",
-            "cursor": "L'account con il tuo piano"
+            "cursor": "L'account con il tuo piano",
+            "grok": "L'account con il tuo piano",
+            "antigravity": "L'account Google con il tuo piano",
+            "antigravityEnterprise": "Il tuo account Gemini Enterprise"
           },
           "stepOneHint": "Account sbagliato? Esci da lì e riprova. L'account resta solo su {{computer}}. La password la inserisci sulla pagina di {{brand}}.",
           "open": {
             "claude_code": "Accedi con Claude",
             "codex": "Accedi con ChatGPT",
-            "cursor": "Accedi con Cursor"
+            "cursor": "Accedi con Cursor",
+            "grok": "Accedi con Grok",
+            "antigravity": "Accedi con Google"
           },
           "opencodeFree": "I modelli gratuiti di OpenCode non richiedono chiavi. Una chiave dalla console di OpenCode aggiunge quelli a pagamento.",
           "cursorFinish": "Accedi sulla pagina di Cursor e l'accesso si completa da solo su {{computer}}.",
+          "grokFinish": "Accedi sulla pagina di Grok e l'accesso si completa da solo su {{computer}}.",
+          "geminiEnterprise": "Usa invece Gemini Enterprise",
+          "geminiPersonal": "Usa invece un account Google personale",
           "cursorKey": "Usa invece una chiave API di Cursor",
           "copyLink": "Copia link",
           "openAgain": "Apri di nuovo",
@@ -3862,6 +4259,7 @@
           "sent": "Codice inviato. Completamento dell'accesso su {{computer}}.",
           "local": "Sei proprio su {{computer}}? Se il suo browser si è aperto da solo, autorizza lì.",
           "deviceCode": "Codice per ChatGPT",
+          "grokCode": "Codice per Grok",
           "deviceCodeText": "Inserisci questo codice nella pagina che si apre.",
           "starting": "Richiesta a {{computer}}…",
           "waiting": "In attesa",
@@ -3872,13 +4270,16 @@
             "claude_code": "Claude ha effettuato l'accesso come {{account}}, un account che hai già collegato. Per usarne un altro, esci sulla pagina di Claude e riprova.",
             "codex": "ChatGPT ha effettuato l'accesso come {{account}}, un account che hai già collegato. Per usarne un altro, esci sulla pagina di ChatGPT e riprova.",
             "cursor": "Cursor ha effettuato l'accesso come {{account}}, un account che hai già collegato. Per usarne un altro, esci sulla pagina di Cursor e riprova.",
+            "grok": "Grok ha effettuato l'accesso come {{account}}, un account che hai già collegato. Per usarne un altro, esci sulla pagina di Grok e riprova.",
+            "antigravity": "Gemini ha effettuato l'accesso come {{account}}, un account che hai già collegato. Per usarne un altro, esci sulla pagina di Google e riprova.",
             "opencode": "Questa chiave OpenCode è già collegata come {{account}}."
           },
           "startFailed": "Nessuna risposta da {{computer}}. Riprova tra un attimo.",
           "sendFailed": "Impossibile inviare il codice. Controllalo e riprova.",
           "done": "L'account {{account}} è su {{computer}}. Fai clic su Usa per salvare."
         },
-        "offCloud": "{{computer}} non risponde"
+        "offCloud": "{{computer}} non risponde",
+        "accountOthers": "I piani di altre persone mostrano di chi sono. Il proprietario riceve un’email e può riprenderlo."
       },
       "computer": {
         "title": "Dove lavora {{name}}?",
@@ -5231,6 +5632,14 @@
     "setup_write": {
       "label": "Configurare lo spazio di lavoro",
       "description": "Proporre di collegare un'IA, un'app o un server MCP, o di invitare persone, con una scheda su cui una persona fa clic, e creare canali per chi li chiede, con Annulla."
+    },
+    "vault_read": {
+      "label": "Vedere il Vault",
+      "description": "Vedere i login, le chiavi e i contatti che il Vault condivide con lui, e usarli. Digita le password salvate e usa le chiavi salvate senza mai vederle."
+    },
+    "vault_write": {
+      "label": "Modificare i contatti del Vault",
+      "description": "Salvare e aggiornare i contatti nel Vault, cambiare il nome utente di un login salvato o una descrizione, ed eliminare ciò che ha salvato."
     },
     "github_git_read": {
       "label": "Clonare repository (git)",
@@ -7592,6 +8001,8 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "grok": "Grok",
+      "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
         "keys": "Aggiorna agentes sul computer per usare la chiave di un piano"
@@ -7599,11 +8010,13 @@
       "noComputer": "Gli account restano su un computer collegato. Prima collega uno dei tuoi.",
       "addComputer": "Collega un computer",
       "needsCloud": {
-        "claude_code": "Non ancora pronto su {{computer}}",
-        "codex": "Non ancora pronto su {{computer}}",
-        "cursor": "Non ancora pronto su {{computer}}",
-        "opencode": "Non ancora pronto su {{computer}}",
-        "online": "{{computer}} non risponde in questo momento. Ci stiamo lavorando."
+        "online": "{{computer}} si sta riavviando o riconnettendo. Questo cambia da solo appena torna.",
+        "installing": "{{program}} è in installazione su {{computer}}. Questo cambia da solo quando ha finito.",
+        "updating": "{{program}} è in aggiornamento su {{computer}}. Questo cambia da solo quando ha finito.",
+        "runnerOld": "Il programma agentes.chat su {{computer}} non è aggiornato e l'aggiornamento è in arrivo. Questo cambia da solo quando ha finito.",
+        "execOff": "{{computer}} non può ancora eseguire {{program}}. Ci stiamo lavorando, e questo cambia da solo.",
+        "toolOff": "{{program}} non è consentito su {{computer}}. Chiedi al supporto di consentirlo.",
+        "preparing": "{{computer}} si sta preparando. Questo cambia da solo quando ha finito."
       }
     },
     "done": {
@@ -7631,6 +8044,13 @@
       "rename": "Rinomina",
       "signInAgain": "Accedi di nuovo",
       "newKey": "Sostituisci la chiave",
+      "copies_one": "{{count}} accesso in più di questo account, senza agenti.",
+      "copies_many": "{{count}} accessi in più di questo account, senza agenti.",
+      "copies_other": "{{count}} accessi in più di questo account, senza agenti.",
+      "removeCopies": "Rimuovi",
+      "copiesRemoved_one": "{{count}} accesso inutilizzato rimosso.",
+      "copiesRemoved_many": "{{count}} accessi inutilizzati rimossi.",
+      "copiesRemoved_other": "{{count}} accessi inutilizzati rimossi.",
       "disconnect": "Scollega",
       "renameTitle": "Rinomina {{label}}",
       "nameLabel": "Nome",
@@ -7859,7 +8279,8 @@
       "deal": "affare fatto",
       "thinking": "ci penso",
       "wow": "wow",
-      "dizzy": "confuso"
+      "dizzy": "confuso",
+      "wave": "ciao"
     },
     "moodWords": {
       "celebrate": "festa congratulazioni festeggiare rilasciato lancio evviva",
@@ -7867,7 +8288,8 @@
       "deal": "ok va bene d'accordo sì certo fatto",
       "thinking": "mmm chissà pensare forse",
       "wow": "wow sorpresa incredibile pazzesco",
-      "dizzy": "stanco venerdì aiuto ops confuso"
+      "dizzy": "stanco venerdì aiuto ops confuso",
+      "wave": "ciao salve arrivederci saluto buongiorno a dopo"
     },
     "picker": {
       "button": "Emoji, GIF e sticker",
@@ -9047,21 +9469,29 @@
       "claude": "{{model}} con il piano Claude",
       "chatgpt": "{{model}} con il piano ChatGPT",
       "cursor": "{{model}} con il piano Cursor",
+      "grok": "{{model}} con il piano Grok",
+      "gemini": "{{model}} con il piano Gemini",
       "zen": "{{model}} con OpenCode",
       "coding": "{{model}} con {{plan}}",
       "claudeOf": "{{model}} con il piano Claude di {{owner}}",
       "chatgptOf": "{{model}} con il piano ChatGPT di {{owner}}",
       "cursorOf": "{{model}} con il piano Cursor di {{owner}}",
+      "grokOf": "{{model}} con il piano Grok di {{owner}}",
+      "geminiOf": "{{model}} con il piano Gemini di {{owner}}",
       "zenOf": "{{model}} con l'OpenCode di {{owner}}",
       "codingOf": "{{model}} con {{plan}} di {{owner}}",
       "claudeAuto": "Piano Claude",
       "chatgptAuto": "Piano ChatGPT",
       "cursorAuto": "Piano Cursor",
+      "grokAuto": "Piano Grok",
+      "geminiAuto": "Piano Gemini",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Piano Claude di {{owner}}",
       "chatgptAutoOf": "Piano ChatGPT di {{owner}}",
       "cursorAutoOf": "Piano Cursor di {{owner}}",
+      "grokAutoOf": "Piano Grok di {{owner}}",
+      "geminiAutoOf": "Piano Gemini di {{owner}}",
       "zenAutoOf": "OpenCode di {{owner}}",
       "codingAutoOf": "{{plan}} di {{owner}}",
       "on": "{{line}} su {{computer}}"
@@ -9074,7 +9504,9 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
-      "opencode": "OpenCode"
+      "opencode": "OpenCode",
+      "grok": "Grok Build",
+      "antigravity": "Antigravity CLI"
     },
     "foot": {
       "api": "Tramite l'API",
@@ -9085,6 +9517,8 @@
     "claude_codeText": "Usa il piano Claude di chi ha collegato il computer.",
     "codexText": "Usa il piano ChatGPT di chi ha collegato il computer.",
     "cursorText": "Usa il piano Cursor di chi ha collegato il computer.",
+    "grokText": "Usa il piano Grok di chi ha collegato il computer.",
+    "antigravityText": "Usa il piano Gemini di chi ha collegato il computer.",
     "opencodeText": "I modelli gratuiti di OpenCode, o la chiave OpenCode di chi ha collegato il computer.",
     "cursorModel": {
       "inPlan": "Nel tuo piano Cursor",
@@ -9129,6 +9563,8 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "grok": "Grok Build · {{model}}",
+      "antigravity": "Antigravity CLI · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, senza riserva tramite API"
     },
@@ -9262,7 +9698,8 @@
       "sandbox": "Esecuzione di codice",
       "browser": "Browser",
       "setup": "Configurazione dello spazio di lavoro",
-      "desktop": "Desktop"
+      "desktop": "Desktop",
+      "vault": "Vault"
     },
     "areaText": {
       "context": {
@@ -9308,6 +9745,10 @@
       "desktop": {
         "write": "Usa qualsiasi app sul suo desktop, sul suo computer, mentre le persone guardano o prendono il controllo. Richiede anche Esecuzione di codice.",
         "write_female": "Usa qualsiasi app sul suo desktop, sul suo computer, mentre le persone guardano o prendono il controllo. Richiede anche Esecuzione di codice."
+      },
+      "vault": {
+        "read": "Vede e usa ciò che il Vault condivide con lui, senza vedere password o chiavi.",
+        "write": "Salva e aggiorna anche i contatti nel Vault."
       }
     }
   },
@@ -11380,6 +11821,49 @@
       "invalid": "Una @ ha da {{min}} a {{max}} lettere minuscole, numeri, - o _.",
       "taken": "@{{handle}} appartiene a qualcun altro.",
       "takenByAgent": "@{{handle}} appartiene a un agente."
+    },
+    "vault": {
+      "invalid": "Qualcosa in questo elemento non va. Controllalo e riprova.",
+      "notFound": "Questo elemento non è più nel Vault.",
+      "titleRequired": "Dagli un nome.",
+      "tooLong": "È troppo lungo. Il limite è {{max}}.",
+      "notHttps": "Usa un indirizzo che inizia con https://",
+      "keyNameInvalid": "Usa lettere maiuscole, cifre e _ nel nome, come ACME_API_KEY.",
+      "keyNameReserved": "Questo nome è riservato. Scegline un altro.",
+      "keyNameTaken": "Qui c'è già una chiave salvata con questo nome.",
+      "contactEmpty": "Compila almeno un campo.",
+      "teamNeedsPermission": "Solo chi gestisce le credenziali può salvare elementi del team.",
+      "externalReadOnly": "Questo viene da un gestore di password. Modificalo lì.",
+      "changedMeanwhile": "Qualcuno l'ha modificato nel frattempo. Riaprilo.",
+      "noValue": "Non c'è niente da salvare.",
+      "missing": "È sparito dal suo gestore di password.",
+      "notAllowed": "Non puoi farlo con questo elemento.",
+      "tooManyItems": "Il Vault è pieno. Elimina gli elementi che non usi più.",
+      "audienceInvalid": "Una persona o un ruolo che hai scelto non è più nello spazio di lavoro.",
+      "agentsInvalid": "Un agente che hai scelto non è più nello spazio di lavoro.",
+      "tooManyAgents": "Scegli al massimo 200 agenti.",
+      "tooManyRoles": "Scegli al massimo 100 ruoli.",
+      "tooManyPeople": "Scegli al massimo 500 persone.",
+      "csvTooLarge": "Il file è troppo grande. Il limite è 2 MB.",
+      "csvTooManyRows": "Il file ha più di 5.000 righe. Dividilo e importa ogni parte.",
+      "csvUnrecognized": "Non sembra un file di password. Esportalo di nuovo come CSV.",
+      "requestNotDelivered": "Prima invialo, poi salvalo nel Vault.",
+      "requestNotSavable": "Questo non si può salvare nel Vault.",
+      "sourceUnknown": "Questo gestore di password non è disponibile qui.",
+      "sourceError": "Non è stato possibile leggerlo dal suo gestore di password. Riprova.",
+      "source": {
+        "authFailed": "Il gestore di password ha rifiutato questi dati. Controllali e riprova.",
+        "locked": "La password principale è sbagliata.",
+        "manyVaults": "L'account di servizio vede più di una cassaforte. Dagli accesso a una sola.",
+        "noVault": "L'account di servizio non vede nessuna cassaforte. Dagli accesso a una.",
+        "folderMissing": "Quella cartella non è nell'account.",
+        "notFound": "Non è più nel suo gestore di password.",
+        "rateLimited": "Il gestore di password ci ha chiesto di aspettare. Riprova tra qualche minuto.",
+        "unreachable": "Impossibile raggiungere il gestore di password. Controlla l'indirizzo e riprova.",
+        "unsupported": "Questo gestore di password non si può collegare qui.",
+        "invalidInput": "Controlla i campi e riprova.",
+        "tooManyItems": "Il Vault è pieno. Elimina degli elementi prima di sincronizzarne altri."
+      }
     }
   },
   "machines": {
@@ -11527,6 +12011,8 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "grok": "Grok Build",
+        "antigravity": "Antigravity CLI",
         "opencode": "OpenCode",
         "commands": "Comandi",
         "browser": "Browser"
@@ -11535,6 +12021,8 @@
         "claude": "Scrive e modifica file, solo nelle cartelle consentite.",
         "codex": "Come Claude Code, con un account ChatGPT. Solo nelle cartelle consentite.",
         "cursor": "Come Claude Code, con un account Cursor. Solo nelle cartelle consentite.",
+        "grok": "Come Claude Code, con un account Grok. Solo nelle cartelle consentite.",
+        "antigravity": "Come Claude Code, con un account Gemini. Solo nelle cartelle consentite.",
         "opencode": "Come Claude Code, con i modelli gratuiti di OpenCode o una chiave OpenCode. Solo nelle cartelle consentite.",
         "commands": "Esegue comandi del Terminale, come test e build."
       },
@@ -12013,6 +12501,16 @@
         "token_revoked": "Ha revocato il token personale {{app}}",
         "message_sent": "Ha inviato un messaggio tramite {{app}}"
       },
+      "vault": {
+        "item_created": "Ha salvato un elemento nel Vault",
+        "item_changed": "Ha modificato un elemento del Vault",
+        "item_deleted": "Ha eliminato un elemento del Vault",
+        "item_used": "Ha usato un elemento del Vault",
+        "imported": "Ha importato password nel Vault",
+        "connection_added": "Ha collegato un gestore di password al Vault",
+        "connection_changed": "Ha modificato il collegamento di un gestore di password",
+        "connection_removed": "Ha scollegato un gestore di password dal Vault"
+      },
       "verb": {
         "created": "Ha creato",
         "deleted": "Ha eliminato",
@@ -12045,6 +12543,9 @@
         "resent": "Ha reinviato",
         "revoked": "Ha revocato",
         "archived": "Ha archiviato",
+        "shown": "Ha visto",
+        "copied": "Ha copiato",
+        "used": "Ha usato",
         "other": "Ha cambiato"
       },
       "area": {
@@ -12077,6 +12578,7 @@
         "member": "un membro",
         "invitation": "un invito",
         "credential": "una chiave IA",
+        "vault": "il Vault",
         "other": "lo spazio di lavoro"
       }
     },
@@ -12136,6 +12638,7 @@
       "right_hand": "Braccio destro",
       "members": "Membri e inviti",
       "roles": "Ruoli e permessi",
+      "vault": "Vault",
       "access": "Agenti e accessi",
       "connectors": "Connettori e MCP",
       "skills": "Skill",
@@ -12158,6 +12661,7 @@
       "right_hand": "L’assistente che forma il team con ogni persona, nella sua DM e con i suoi permessi.",
       "members": "Chi fa parte dello spazio di lavoro, e gli inviti.",
       "roles": "Cosa può fare ogni persona. I ruoli si sommano.",
+      "vault": "Password, chiavi e contatti che usano i tuoi agenti. Digitano le password e usano le chiavi senza mai vederle.",
       "access": "Cosa può usare ogni agente: un livello per connettore.",
       "connectors": "Servizi e server MCP collegati una sola volta per tutto lo spazio di lavoro.",
       "skills": "Istruzioni in Markdown che gli agenti aprono quando ne hanno bisogno.",
@@ -13094,6 +13598,8 @@
       "action_invite_people": "Invita persone",
       "action_install_skill": "Installa una skill",
       "action_update_skills": "Aggiorna le skill",
+      "action_approvals": "Approvazioni che ti aspettano",
+      "action_open_page": "Apri una schermata",
       "agent_proposal": "Ha proposto un nuovo agente: {{name}}",
       "settings_proposal": "Ha proposto una modifica per {{names}}",
       "approval_request": "Richiesta di approvazione: {{title}}",
@@ -13126,15 +13632,25 @@
       "stuck": "Mi sono bloccato e mi sono fermato prima di finire.",
       "forum_suggestion": "Vale un forum? \"{{title}}\"",
       "forum_concluded": "Il forum \"{{title}}\" è concluso. La sintesi è nel file qui sotto.",
-      "forum_concluded_issues": "Il forum \"{{title}}\" è concluso. La sintesi è nel file qui sotto, con {{count}} attività suggerite da approvare.",
-      "action_approvals": "Approvazioni che ti aspettano",
-      "action_open_page": "Apri una schermata"
+      "forum_concluded_issues": "Il forum \"{{title}}\" è concluso. La sintesi è nel file qui sotto, con {{count}} attività suggerite da approvare."
     }
   },
   "builtinTools": {
     "ask_user": {
       "label": "Chiedi alla persona",
       "description": "Fa una domanda breve e aspetta la risposta."
+    },
+    "vault_list": {
+      "label": "Cercare nel Vault",
+      "description": "Elenca i login, le chiavi e i contatti condivisi con l'agente, mai una password o una chiave."
+    },
+    "vault_save": {
+      "label": "Salva nel Vault",
+      "description": "Salva o aggiorna un contatto, il nome utente di un login o una descrizione."
+    },
+    "vault_delete": {
+      "label": "Elimina dal Vault",
+      "description": "Elimina un elemento che ha salvato."
     },
     "react": {
       "label": "Reagisci",
@@ -13768,8 +14284,8 @@
       "backLabel": "Nota per {{name}}",
       "backLabel_female": "Nota per {{name}}",
       "backPlaceholder": "Facoltativo: c'è qualcosa che {{name}} deve sapere?",
-      "addNote": "Lascia una nota",
-      "backPlaceholder_female": "Facoltativo: c'è qualcosa che {{name}} deve sapere?"
+      "backPlaceholder_female": "Facoltativo: c'è qualcosa che {{name}} deve sapere?",
+      "addNote": "Lascia una nota"
     },
     "now": {
       "ready": "Pronto su {{computer}}",

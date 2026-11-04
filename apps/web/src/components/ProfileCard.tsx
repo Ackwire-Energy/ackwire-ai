@@ -40,7 +40,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { clearsText, isOutOfOffice } from "@agenteschat/client/lib/presence";
 import { isAuto } from "@agenteschat/client/lib/providers";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import { rolesOf } from "@agenteschat/client/lib/roles";
 import { timezoneName } from "@agenteschat/client/lib/routines";
 import { picksForMe } from "@agenteschat/client/lib/routing";
@@ -492,6 +492,7 @@ function RightHandCardBody({ agent, onDone }: { agent: Agent; onDone: () => void
         <span className="small muted">
           {[`@${agent.handle}`, t("rightHand.role"), t("rightHand.label")].join(" · ")}
         </span>
+        {tellsNameStory(agent) && <span className="small muted">{t("rightHand.profile.nameStory")}</span>}
       </div>
       <section className="mcard__section" aria-label={t("rightHand.profile.how")}>
         <span className="mcard__label">{t("rightHand.profile.how")}</span>

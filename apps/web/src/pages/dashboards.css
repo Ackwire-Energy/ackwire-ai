@@ -837,18 +837,29 @@ html:not([data-pointer]) .nwc-bell:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .nw-alert.ac-popover {
+  --menu-pad: var(--space-2);
   display: flex;
   flex-direction: column;
   gap: 10px;
   width: min(320px, calc(100vw - 16px));
   max-width: none;
-  padding: 14px;
+  padding: var(--menu-pad);
 }
+/* Pronto on the room (`.ac-popover`), in its corner; the switch, the words, the field and the suggestions further in. */
 .nw-alert__row {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  padding: var(--popover-in) var(--popover-in) 0;
   font-size: 14px;
+}
+.nw-alert__cond,
+.nw-alert__sugs {
+  padding-inline: var(--popover-in);
+}
+.nw-alert > .ac-input {
+  width: auto;
+  margin-inline: var(--popover-in);
 }
 .nw-alert__row .ac-switch {
   flex: none;

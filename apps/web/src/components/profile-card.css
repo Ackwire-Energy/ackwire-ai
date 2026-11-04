@@ -185,6 +185,7 @@ html:not([data-pointer]) .mcard__emoji:focus-visible {
 }
 /* The audience editor, beside the card. */
 .mcard-audience.ac-popover {
+  --menu-pad: var(--space-2);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -192,9 +193,14 @@ html:not([data-pointer]) .mcard__emoji:focus-visible {
   max-width: calc(100vw - 16px);
   max-height: min(640px, var(--radix-popover-content-available-height, calc(100dvh - 16px)));
   overflow-y: auto;
-  padding: 16px;
+  padding: var(--menu-pad);
+}
+/* Cancelar and Salvar on the room (`.ac-popover`), everything over them further in. */
+.mcard-audience.ac-popover > :not(.mcard-audience__acts) {
+  margin-inline: var(--popover-in);
 }
 .mcard-audience__title {
+  padding-top: var(--popover-in);
   font-size: 15px;
   font-weight: 650;
 }

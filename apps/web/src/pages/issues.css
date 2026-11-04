@@ -178,10 +178,11 @@ html:not([data-pointer]) .issues-now__card:focus-visible {
 
 /* "Exibição": layout cards with their pictures, the grouping, the order, what the cards show, canceled ones. */
 .issues-display.ac-popover {
+  --menu-pad: var(--space-2);
   width: 344px;
   max-width: calc(100vw - 24px);
   max-height: none;
-  padding: 14px;
+  padding: var(--menu-pad);
   gap: 14px;
 }
 .issues-layouts {
@@ -196,7 +197,8 @@ html:not([data-pointer]) .issues-now__card:focus-visible {
   gap: 6px;
   padding: 10px 8px 8px;
   border: 0;
-  border-radius: 14px 14px 14px 4px;
+  /* On the popover's room, in its top corners: its corner less that room. */
+  border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
   background: var(--raised);
   box-shadow:
     0 0 0 1px var(--line2),
@@ -238,6 +240,7 @@ html:not([data-pointer]) .issues-layout:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding-inline: var(--popover-in);
 }
 .issues-display__row--col {
   flex-direction: column;
@@ -258,7 +261,8 @@ html:not([data-pointer]) .issues-layout:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding-top: 10px;
+  /* Its words as far under the hairline as over the popover's edge. */
+  padding: 14px var(--popover-in) var(--popover-in);
   border-top: 1px solid var(--line);
   font-size: 13px;
   color: var(--ink-muted);

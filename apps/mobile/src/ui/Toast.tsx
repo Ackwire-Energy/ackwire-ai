@@ -28,6 +28,9 @@ type ToastFn = (input: ToastInput) => void;
 
 const ToastContext = createContext<ToastFn | null>(null);
 const SHOW_MS = 2600;
+/** The toast's corner and the room around its icon tile: the tile's corner is the toast's less that room (concentric). */
+const TOAST_R = 22;
+const TOAST_PAD = 12;
 
 const noop: ToastFn = () => {};
 
@@ -85,18 +88,25 @@ function ToastView({ item, onDone }: { item: ToastInput; onDone: () => void }) {
       accessibilityLiveRegion="polite"
       accessibilityRole="alert"
       style={[
-        { position: "absolute", top: insets.top + 6, left: 12, right: 12, borderRadius: 22, boxShadow: shadows.e3 },
+        {
+          position: "absolute",
+          top: insets.top + 6,
+          left: 12,
+          right: 12,
+          borderRadius: TOAST_R,
+          boxShadow: shadows.e3,
+        },
         style,
       ]}
     >
       <Glass
         intensity={70}
         style={{
-          borderRadius: 22,
+          borderRadius: TOAST_R,
           flexDirection: "row",
           alignItems: "center",
           gap: 12,
-          padding: 12,
+          padding: TOAST_PAD,
           paddingHorizontal: 14,
         }}
       >
@@ -105,7 +115,7 @@ function ToastView({ item, onDone }: { item: ToastInput; onDone: () => void }) {
           locations={glow.locations}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
-          style={[StyleSheet.absoluteFill, { borderRadius: 22 }]}
+          style={[StyleSheet.absoluteFill, { borderRadius: TOAST_R }]}
           pointerEvents="none"
         />
         {look ? (
@@ -115,7 +125,7 @@ function ToastView({ item, onDone }: { item: ToastInput; onDone: () => void }) {
             style={{
               width: 34,
               height: 34,
-              borderRadius: 12,
+              borderRadius: TOAST_R - TOAST_PAD,
               backgroundColor: colors.raised,
               boxShadow: shadows.e1,
               alignItems: "center",

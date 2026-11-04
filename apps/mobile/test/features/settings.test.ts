@@ -83,6 +83,8 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
       "org:general",
       "org:right_hand",
       "org:members",
+      "org:roles",
+      "org:vault",
       "org:audit",
       "org:media",
       "agents:access",
@@ -99,15 +101,26 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
   test("each section opens with its permission (ADR 0085); a member keeps only their own and what they use", () => {
     const as = (role: "owner" | "member", permissions: string[]) => ({ id: "o", name: "Acme", role, permissions });
     const ids = (permissions: string[]) => visibleSections(as("member", permissions)).map((s) => s.id);
-    const all = ["read", "invite_people", "view_audit", "view_usage", "manage_agents", "configure", "create_agents"];
+    const all = [
+      "read",
+      "invite_people",
+      "view_audit",
+      "view_usage",
+      "manage_agents",
+      "configure",
+      "create_agents",
+      "manage_roles",
+    ];
     expect(visibleSections(as("owner", all)).length).toBe(SETTINGS_SECTIONS.length);
     // No Geral (what the agents know of the workspace) or GIFs: those are the workspace's, for admins. Uso stays:
     // their own plans' meters, in percentages (ADR 0063).
-    expect(ids(["read", "post"])).toEqual(["apps", "members", "connectors", "computers", "usage", "keys"]);
+    // The Vault is every member's (ADR 0144): their own items, and the team's shared with them.
+    expect(ids(["read", "post"])).toEqual(["apps", "members", "vault", "connectors", "computers", "usage", "keys"]);
     expect(ids(["read", "manage_agents"])).toEqual([
       "apps",
       "right_hand",
       "members",
+      "vault",
       "access",
       "connectors",
       "skills",

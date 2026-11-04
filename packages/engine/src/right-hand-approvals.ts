@@ -119,8 +119,8 @@ async function usage(db: Database, orgId: string, userId: string, now: Date) {
   const counted = or(eq(rightHandDecisions.outcome, "approved"), eq(rightHandDecisions.outcome, "deciding"));
   const [row] = await db
     .select({
-      calls: sql<number>`count(*) filter (where ${rightHandDecisions.called} and ${rightHandDecisions.createdAt} >= ${since})::int`,
-      newAgents: sql<number>`count(*) filter (where ${counted} and ${rightHandDecisions.kind} = 'agent_new' and ${rightHandDecisions.createdAt} >= ${since})::int`,
+      calls: sql<number>`count(*) filter (where ${rightHandDecisions.called} and ${rightHandDecisions.createdAt} >= ${since.toISOString()}::timestamptz)::int`,
+      newAgents: sql<number>`count(*) filter (where ${counted} and ${rightHandDecisions.kind} = 'agent_new' and ${rightHandDecisions.createdAt} >= ${since.toISOString()}::timestamptz)::int`,
       month: sql<number>`coalesce(sum(${rightHandDecisions.budgetAddedNanoUsd}) filter (where ${counted} and ${rightHandDecisions.undoneAt} is null and ${rightHandDecisions.createdAt} >= ${monthStart}), 0)::bigint`,
     })
     .from(rightHandDecisions)

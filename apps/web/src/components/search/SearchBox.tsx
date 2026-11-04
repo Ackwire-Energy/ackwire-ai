@@ -86,6 +86,7 @@ export function SearchBox({
   inputRef,
   onClear,
   className,
+  ops = SEARCH_OPS,
 }: {
   chips: SearchChip[];
   onChipsChange: (chips: SearchChip[]) => void;
@@ -109,6 +110,8 @@ export function SearchBox({
   /** A ✕ in the field while it holds something. */
   onClear?: () => void;
   className?: string;
+  /** The operators it offers and turns into chips while typed (a DM's: no who or where). */
+  ops?: readonly SearchOp[];
 }) {
   const { t, i18n } = useTranslation();
   const own = useRef<HTMLInputElement>(null);
@@ -125,7 +128,8 @@ export function SearchBox({
     setActive(-1);
     input.current?.focus();
   };
-  const typing = typingOperator(text, words);
+  const typed = typingOperator(text, words);
+  const typing = typed && ops.includes(typed.op) ? typed : null;
   // What the box holds before the operator being typed.
   const before = typing ? text.slice(0, typing.start).trimEnd() : text;
   const withSpace = (s: string) => (s ? `${s} ` : "");
@@ -194,7 +198,7 @@ export function SearchBox({
       });
     }
   } else if (!text.trim() && compact) {
-    for (const op of SEARCH_OPS) {
+    for (const op of ops) {
       const main = MAIN_OPS.includes(op);
       if (!main && !more) continue;
       const icon = OP_ICONS[op];
@@ -245,7 +249,7 @@ export function SearchBox({
       });
     }
   } else if (!text.trim()) {
-    for (const op of SEARCH_OPS) {
+    for (const op of ops) {
       options.push({
         key: op,
         label: `${words.ops[op]}:`,

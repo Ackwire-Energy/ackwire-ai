@@ -82,16 +82,15 @@ const shown = (el: Element) => {
 };
 
 describe("Agentes and its groups", () => {
-  test("the agents in no group first, with no header; each group a header with its count; Ver todos to Equipe", async () => {
+  test("the agents in no group first, with no header; each group a header with its count", async () => {
     await go(withGroups());
     expect(rowsIn(section("Agentes"))).toEqual(["Ada"]);
     expect(rowsIn(section("Integrations"))).toEqual(["Atlas"]);
     expect(head("Integrations").querySelector(".sidebar__section-count")?.textContent).toBe("1");
     // An empty group is for who arranges the agents: it says where they go.
     expect(section("Diretoria").textContent).toContain("Arraste agentes para cá");
-    expect(within(nav()).getByRole("link", { name: "Ver todos os 2 agentes" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/team`,
-    );
+    // Every agent is listed: no row under them says so again.
+    expect(nav().querySelector(".sidebar__see-all")).toBeNull();
   });
 
   test("a member never sees an empty group, nor drags agents", async () => {
@@ -157,11 +156,16 @@ describe("Agentes and its groups", () => {
     if (ada) ada.audience = { mode: "owner", userIds: [] };
     await go(state);
     expect(rowsIn(section("Agentes"))).toEqual(["Atlas"]);
+    // The one not listed is in Equipe, and the row under the agents says how many.
+    expect(within(nav()).getByRole("link", { name: "Mais 1 agente na Equipe" }).getAttribute("href")).toBe(
+      `/org/${ORG_ID}/team`,
+    );
     const menu = await openMenu("Opções de Agentes");
     await click(within(menu).getByRole("menuitemcheckbox", { name: "Mostrar agentes que não falam comigo" }));
     await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
     await settle(2);
     expect(rowsIn(section("Agentes"))).toEqual(["Ada", "Atlas"]);
+    expect(nav().querySelector(".sidebar__see-all")).toBeNull();
     expect(views(state).at(-1)).toMatchObject({ showAllAgents: true });
     cleanup();
     await go(asMember(seedState()));

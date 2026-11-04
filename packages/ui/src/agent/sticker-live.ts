@@ -3,7 +3,7 @@
  * ones in view (a picker full of them, or a long conversation, costs what is visible). With reduced motion the loop
  * stands still: each sticker is drawn once, at its still frame, and again when what it shows changes.
  */
-import { type DrawnMood, drawSticker, STICKER_STILL_T, type StickerLook } from "./stickers";
+import { drawSticker, STICKER_STILL_T, type StickerLook, type StickerMood } from "./stickers";
 
 export interface LiveSticker {
   canvas: HTMLCanvasElement;
@@ -11,7 +11,7 @@ export interface LiveSticker {
    * Read at each frame: what to draw, and the canvas's side in CSS pixels. With `end`, it plays once: `seed` is minus
    * the moment it started, and from `end` seconds in it holds that frame.
    */
-  spec: () => { look: StickerLook; mood: DrawnMood; size: number; seed: number; end?: number };
+  spec: () => { look: StickerLook; mood: StickerMood; size: number; seed: number; end?: number };
 }
 
 const stickers = new Set<LiveSticker>();

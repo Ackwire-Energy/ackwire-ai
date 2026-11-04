@@ -90,6 +90,7 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
     paused?: unknown;
     access?: unknown;
     accounts?: unknown;
+    executors?: unknown;
     egress?: unknown;
     networkTransition?: unknown;
   };
@@ -106,9 +107,11 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
   }
   // Whether agents can use their browser (ADR 0040) and what can think for them follow the computer: its
   // switches (the app's Ferramentas: `machine.updated` with `access`), a reconnect, a move. No reload needed.
-  // ADR 0041: an account added, removed or signed out on the computer (`machine.updated` with `accounts`).
+  // ADR 0041: an account added, removed or signed out on the computer (`machine.updated` with `accounts`). The CLIs it
+  // found since it connected (`executors`, protocol 41): a plan whose program was being installed signs in now.
   const accounts = e.type === "machine.updated" && e.accounts !== undefined;
-  if ((e.type !== "machine.state" && e.type !== "machine.updated") || e.access !== undefined || accounts) {
+  const executors = e.type === "machine.updated" && e.executors !== undefined;
+  if ((e.type !== "machine.state" && e.type !== "machine.updated") || e.access !== undefined || accounts || executors) {
     void qc.invalidateQueries({ queryKey: keys.browser(orgId) });
     void qc.invalidateQueries({ predicate: (q) => isAgentBrainKey(q.queryKey, orgId) });
     void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });

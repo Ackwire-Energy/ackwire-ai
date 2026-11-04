@@ -1,4 +1,17 @@
 import type { Agent, Channel, DirectMessage, SearchHit, SearchKind } from "@agenteschat/client";
+import {
+  DM_SEARCH_OPS,
+  dedupe,
+  inDmOnly,
+  parseSearch,
+  SEARCH_OPS,
+  type SearchChip,
+  type SearchDirectory,
+  type SearchOp,
+  type SearchPlace,
+  type SearchWords,
+} from "@agenteschat/client/lib/search-filters";
+import { type AppHref, chatHref } from "../links/logic";
 
 /**
  * Busca (the search bar of Conversas): actions, agents and conversations match the words here; the team's
@@ -98,3 +111,59 @@ export const isEmpty = (r: SearchResults) =>
     r.messages.length +
     r.files.length ===
   0;
+
+/**
+ * What the box holds after `value` is typed: a space after a complete operator makes it a chip, unless one of them
+ * isn't offered here (`ops`), then it all stays as typed.
+ */
+export function typeSearch(
+  value: string,
+  chips: readonly SearchChip[],
+  dir: SearchDirectory,
+  words: SearchWords,
+  ops: readonly SearchOp[] = SEARCH_OPS,
+): { chips: SearchChip[]; q: string } {
+  if (!/\s$/.test(value)) return { chips: [...chips], q: value };
+  const parsed = parseSearch(value, dir, words);
+  if (parsed.chips.length === 0 || parsed.chips.some((c) => !ops.includes(c.op)))
+    return { chips: [...chips], q: value };
+  return { chips: dedupe([...chips, ...parsed.chips]), q: parsed.text ? `${parsed.text} ` : "" };
+}
+
+/**
+ * The search inside one conversation, as the web's header search: a channel starts in itself (an `in:` chip the
+ * person may remove) with every operator; a DM holds to itself (no chip to remove, no who or where).
+ * `searched` is what the API is asked, `shown` the chips on the box (and in a recent search).
+ */
+export function conversationScope(place: SearchPlace, chips: readonly SearchChip[]) {
+  const searched = place.dm ? inDmOnly(chips, place) : [...chips];
+  return {
+    searched,
+    shown: place.dm ? searched.slice(1) : searched,
+    ops: place.dm ? DM_SEARCH_OPS : SEARCH_OPS,
+  };
+}
+
+/** Nothing asked beyond the conversation itself: the options and recent searches show, not results. */
+export const idleIn = (place: SearchPlace, searched: readonly SearchChip[], text: string) =>
+  !text.trim() && searched.every((c) => c.op === "in" && c.place.id === place.id);
+
+type HitPlace = Pick<SearchHit, "channelIds" | "messageId" | "threadId">;
+/** A thread's root says its own id as its thread: it stands on the timeline. */
+const threadOf = (hit: HitPlace) => (hit.threadId && hit.threadId !== hit.messageId ? hit.threadId : null);
+
+/** Where a message hit opens: its conversation at it, a reply in its thread. */
+export const hitHref = (hit: HitPlace): AppHref => chatHref(hit.channelIds[0] ?? "", threadOf(hit), hit.messageId);
+
+/**
+ * Where a message hit goes from the conversation `channelId`: one on its own timeline is gone to in place (lit for a
+ * moment); a thread's reply opens the thread at it, another conversation's opens there.
+ */
+export function hitTarget(
+  hit: HitPlace,
+  channelId: string,
+): { kind: "here"; messageId: string } | { kind: "open"; href: AppHref } {
+  if (hit.channelIds[0] === channelId && !threadOf(hit) && hit.messageId)
+    return { kind: "here", messageId: hit.messageId };
+  return { kind: "open", href: hitHref(hit) };
+}

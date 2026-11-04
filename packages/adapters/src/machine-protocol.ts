@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 42;
+export const MACHINE_PROTOCOL_VERSION = 45;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -484,12 +484,93 @@ export const LOCKED_BRAIN_PROTOCOL = 41;
 export const EXECUTORS_CHANGED_PROTOCOL = 42;
 /** `account` `begin`'s `provider` for an OpenCode account: an OpenCode (Zen / Go) API key, its only sign-in. */
 export const OPENCODE_KEY_PROVIDER = "zen";
+/**
+ * From this protocol on (ADR 0142): the Grok brain. `brain.turn` takes `kind: "grok"` (xAI's Grok Build CLI,
+ * `grok -p --output-format streaming-messages-json`, one process per turn), `account` takes `kind: "grok"` (a
+ * device-code sign-in to a SuperGrok or X Premium+ plan in the account's own `GROK_HOME`), `hello.executors.grok`
+ * reports the CLI with the models it lists, and `access.tools.grok` turns it on or off. A `chat` turn is checked on
+ * the CLI's `init` like Claude Code's. The server never sends any of these to an older runner.
+ */
+export const GROK_PROTOCOL = 43;
+/**
+ * From this protocol on (ADR 0143): the Antigravity brain. `brain.turn` takes `kind: "antigravity"` (Google's
+ * Antigravity CLI, `agy -p --output-format stream-json`, one process per turn), `account` takes `kind: "antigravity"`
+ * (a Google sign-in by a pasted code, `agy acp --login`, in the account's own home: a Google AI Pro or Ultra plan, or
+ * Gemini Enterprise with `provider: "enterprise"`, `GEMINI_ENTERPRISE_PROVIDER`), `hello.executors.antigravity` reports the CLI with the models it
+ * lists, and `access.tools.antigravity` turns it on or off. A `chat` turn is checked on the CLI's `init`. The server
+ * never sends any of these to an older runner.
+ */
+export const ANTIGRAVITY_PROTOCOL = 44;
+/**
+ * From this protocol on (ADR 0144): the Vault. `vault.key` makes a one-use key pair in the agent's process (its
+ * worker in system mode) and answers its public key; the private key lives only in that process's memory, for two
+ * minutes, and goes at its first use. Sealed to it: a login's password, typed by the browser command
+ * `agentes:type_vault [ref, rule, boxJson]` only into a password field of a frame the rule allows (refusals answer a
+ * `code`, `VAULT_TYPE_REFUSALS`), and keys for one command (`exec`'s `vault`, never `task.start`). A `request_secret`
+ * code is typed one character per field (`agentes:type_secret [ref, NAME, site, ...moreRefs]`). Site passwords from
+ * `request_secret` stay in memory only, every value opened is redacted from what leaves the computer, and a page
+ * that tries to send a typed password in an address is stopped. The server sends none of these to an older runner.
+ */
+export const VAULT_PROTOCOL = 45;
+/**
+ * Protocol 45 (ADR 0144 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
+ * only, from the moment it got it (never across its own restart). The server counts a `site` delivery older than this
+ * as gone too: it doesn't tell the agent it holds it, nor list it on the agent's page.
+ */
+export const SITE_SECRET_TTL_MS = 15 * 60_000;
+/** What `agentes:type_vault` (and a code typed into several fields) answers in `code` when it types nothing. */
+export const VAULT_TYPE_REFUSALS = [
+  /** The frame that owns the field (or one around it, or the page) is on no site the login's rule allows. */
+  "wrong_site",
+  /**
+   * The field is inside an embedded frame (the ref is the frame's element): nothing of the Vault, nor a code, is
+   * typed there; a person signs in through the browser hand-off.
+   */
+  "in_frame",
+  /** The focused element isn't a password field. */
+  "not_password_field",
+  /** A code's field isn't a text, number or one-time-code input. */
+  "not_code_field",
+  /** The field's form is sent with an explicit `get`: the password would end up in an address. */
+  "get_form",
+  /** The key the value was sealed to is gone from the computer (expired, used, or the runner restarted). */
+  "key_expired",
+  /**
+   * After a typed password: the page tried to send it in an address and the runner stopped that request; the
+   * answer of the action that was going on says so.
+   */
+  "get_blocked",
+  /**
+   * Before a password: the guard that stops it leaving in an address wasn't confirmed by Chrome in time, so nothing
+   * was typed (the guard is armed, and acknowledged, before every fill).
+   */
+  "unguarded",
+] as const;
+export type VaultTypeRefusal = (typeof VAULT_TYPE_REFUSALS)[number];
+/** Keys one `exec` may carry (`ExecVault`). */
+export const VAULT_EXEC_KEYS = 10;
+
+/**
+ * Protocol 45 (ADR 0144): keys from the Vault for one command, each sealed to the agent's `vault.key` with the
+ * additional data `vaultAad({ keyId, agentId, use: { kind: "env", name } })`. They go into that one command's
+ * environment and its output is redacted; they are never written anywhere.
+ */
+export interface ExecVault {
+  keyId: string;
+  keys: { name: string; box: WireSecretBox }[];
+}
 
 /** Which CLI an account signs in. */
-export type AccountKind = "claude_code" | "codex" | "cursor" | "opencode";
-export const ACCOUNT_KINDS: readonly AccountKind[] = ["claude_code", "codex", "cursor", "opencode"];
-export const isAccountKind = (v: unknown): v is AccountKind =>
-  v === "claude_code" || v === "codex" || v === "cursor" || v === "opencode";
+export type AccountKind = "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
+export const ACCOUNT_KINDS: readonly AccountKind[] = [
+  "claude_code",
+  "codex",
+  "cursor",
+  "opencode",
+  "grok",
+  "antigravity",
+];
+export const isAccountKind = (v: unknown): v is AccountKind => ACCOUNT_KINDS.some((k) => k === v);
 /** Account and sign-in ids: UUIDs (the server makes them; the desktop app's runner too). */
 export const isAccountId = (v: unknown): v is string =>
   typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v);
@@ -559,6 +640,8 @@ export const OWN_USAGE_ID: Record<AccountKind, string> = {
   codex: "own:codex",
   cursor: "own:cursor",
   opencode: "own:opencode",
+  grok: "own:grok",
+  antigravity: "own:antigravity",
 };
 
 export const PLAN_USAGE_LIMITS = { windows: 8, label: 40 } as const;
@@ -1147,6 +1230,7 @@ export interface RunnerExecutorInfo {
   /**
    * Protocol 36, `cursor`: the models its sign-in lists (`agent models`), and which its plan includes when the CLI
    * says. Protocol 39, `opencode`: the models `opencode models` lists (`provider/model`), `free` on OpenCode's free tier.
+   * Protocol 43, `grok`: the models `grok models` lists. Protocol 44, `antigravity`: the models `agy models` lists.
    */
   models?: CursorModelInfo[];
 }
@@ -1238,8 +1322,11 @@ export const STEER_LIMITS = { messages: 20, text: 100_000 } as const;
  */
 export interface BrainTurnRequest {
   runId: string;
-  /** `cursor`: protocol 36 (`CURSOR_PROTOCOL`); `opencode`: protocol 39 (`OPENCODE_PROTOCOL`). */
-  kind: "claude_code" | "codex" | "cursor" | "opencode";
+  /**
+   * `cursor`: protocol 36 (`CURSOR_PROTOCOL`); `opencode`: protocol 39 (`OPENCODE_PROTOCOL`); `grok`: 43
+   * (`GROK_PROTOCOL`); `antigravity`: 44 (`ANTIGRAVITY_PROTOCOL`).
+   */
+  kind: "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
   /** The executor's session (a UUID, stable per thread); `resume`: the server knows it ran before (a hint). */
   session: { id: string; resume: boolean };
   /** Relative to the agent's folder ("" = the folder). */
@@ -1435,6 +1522,10 @@ export interface RunnerTools {
   cursor?: boolean;
   /** Protocol 39: OpenCode's CLI (ADR 0132). Absent = off (older runners). */
   opencode?: boolean;
+  /** Protocol 43: Grok Build (ADR 0142). Absent = off (older runners). */
+  grok?: boolean;
+  /** Protocol 44: Google's Antigravity CLI (ADR 0143). Absent = off (older runners). */
+  antigravity?: boolean;
   /** Shell commands (`exec`, `shell` tasks). The same as `exec` in `hello` once protocol 10 is in use. */
   commands: boolean;
   /** Protocol 12: the agent browser (ADR 0040). Absent = off (older runners). */
@@ -1499,6 +1590,8 @@ export interface RunnerInfo {
     codex?: RunnerExecutorInfo;
     cursor?: RunnerExecutorInfo;
     opencode?: RunnerExecutorInfo;
+    grok?: RunnerExecutorInfo;
+    antigravity?: RunnerExecutorInfo;
   };
   /** Protocol 9: whether the owner paused this computer. */
   paused?: RunnerPause;
@@ -1556,6 +1649,8 @@ export type MachineRequest = (
       stream: boolean;
       /** A person approved this very command (an approval card): it runs even when the command policy would hold it. */
       approved?: boolean;
+      /** Protocol 45: Vault keys for this command only (ADR 0144). */
+      vault?: ExecVault;
     }
   | { op: "read"; path: string; maxBytes: number }
   | { op: "write"; path: string; base64: string }
@@ -1664,6 +1759,8 @@ export type MachineRequest = (
   | { op: "desktop.apps" }
   /** Protocol 25: the text on the agent's screen, read on the computer. */
   | { op: "desktop.text" }
+  /** Protocol 45: a one-use key the request's agent's Vault values are sealed to (ADR 0144). */
+  | { op: "vault.key" }
 ) & {
   agent?: AgentScope;
   /** Protocol 34: a `browser.*` op in this browser profile's session instead of the agent's (ADR 0110). */
@@ -1718,6 +1815,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "desktop.capture",
   "desktop.apps",
   "desktop.text",
+  "vault.key",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -1773,8 +1871,11 @@ export interface MachineReplies {
   "mission.worktree": Partial<MissionWorktreeEnsured> & { removed?: boolean };
   "access.request": { requestId: string; status: "pending" | "granted" };
   "access.reduce": { access: RunnerAccess };
-  /** `agent-browser`'s own JSON answer: `success: false` with its `error` is a page-level failure (stale ref, covered click). */
-  "browser.act": { success: boolean; data: unknown; error?: string; setup?: BrowserSetup };
+  /**
+   * `agent-browser`'s own JSON answer: `success: false` with its `error` is a page-level failure (stale ref, covered
+   * click). Protocol 45: `code` names a Vault refusal (`VAULT_TYPE_REFUSALS`).
+   */
+  "browser.act": { success: boolean; data: unknown; error?: string; code?: string; setup?: BrowserSetup };
   /** `false`: there was no session. */
   "browser.stop": { stopped: boolean };
   "browser.stream.start": { mode: BrowserStreamMode };
@@ -1783,7 +1884,10 @@ export interface MachineReplies {
   /** `failed`: events the browser didn't confirm (absent when all went through). */
   "browser.input": { accepted: number; failed?: number };
   /** One answer per command run, in order: fewer than asked when one failed without `tolerate`. */
-  "browser.batch": { answers: { success: boolean; data: unknown; error?: string }[]; setup?: BrowserSetup };
+  "browser.batch": {
+    answers: { success: boolean; data: unknown; error?: string; code?: string }[];
+    setup?: BrowserSetup;
+  };
   /** `false`: nothing was started (it runs or starts already, a person has the browser, or no room). */
   "browser.warm": { started: boolean; setup?: BrowserSetup };
   "browser.profile.delete": { deleted: boolean };
@@ -1825,6 +1929,8 @@ export interface MachineReplies {
   "desktop.apps": { apps: { id: string; name: string; generic?: string }[] };
   /** The screen's text (trimmed, `DESKTOP_TEXT_MAX` at most), or `same`: the capture didn't change since the last read. */
   "desktop.text": { text: string } | { same: true };
+  /** Protocol 45: the key's id, its public key (raw P-256, base64) and when it stops opening anything (ISO). */
+  "vault.key": { vaultKey: { keyId: string; publicKey: string; expiresAt: string } };
 }
 
 /** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */
@@ -2105,11 +2211,11 @@ export function parseCursorModels(v: unknown): CursorModelInfo[] {
   return out;
 }
 
-/** `hello.executors`: only `claude`, `codex`, `cursor` and `opencode`, each with a short version line (and Claude Code's login). */
+/** `hello.executors`: only `claude`, `codex`, `cursor`, `opencode`, `grok` and `antigravity`, each with a short version line (and Claude Code's login). */
 export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerInfo["executors"]> {
   const out: NonNullable<RunnerInfo["executors"]> = {};
   const word = (x: unknown) => (isString(x) && /^[\w.-]{1,40}$/.test(x) ? x : undefined);
-  for (const name of ["claude", "codex", "cursor", "opencode"] as const) {
+  for (const name of ["claude", "codex", "cursor", "opencode", "grok", "antigravity"] as const) {
     const e = v[name];
     if (!isObject(e) || !isString(e.version)) continue;
     const authMethod = word(e.authMethod);
@@ -2120,7 +2226,7 @@ export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerIn
       ...(authMethod ? { authMethod } : {}),
       ...(plan ? { plan } : {}),
     };
-    const models = name === "cursor" || name === "opencode" ? parseCursorModels(e.models) : [];
+    const models = name === "claude" || name === "codex" ? [] : parseCursorModels(e.models);
     if (models.length) out[name] = { ...out[name], models } as RunnerExecutorInfo;
   }
   return out;
@@ -2973,6 +3079,10 @@ export function parseAccess(v: unknown): RunnerAccess | undefined {
       ...(typeof t.cursor === "boolean" ? { cursor: t.cursor } : {}),
       // Absent: a runner before OpenCode's switch, where OpenCode follows Codex.
       ...(typeof t.opencode === "boolean" ? { opencode: t.opencode } : {}),
+      // Absent: a runner before Grok's switch (protocol 43), where Grok is off.
+      ...(typeof t.grok === "boolean" ? { grok: t.grok } : {}),
+      // Absent: a runner before the Antigravity CLI's switch (protocol 44), where it is off.
+      ...(typeof t.antigravity === "boolean" ? { antigravity: t.antigravity } : {}),
       commands: t.commands === true,
       ...(t.browser === true ? { browser: true } : {}),
       ...(t.desktop === true ? { desktop: true } : {}),

@@ -17,6 +17,7 @@ import { PLAN_OPENED_JOB } from "./audience";
 import { routinePostRun, runAuthorityById } from "./authority";
 import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
 import { closePoll, POLL_CLOSE_JOB } from "./blocks";
+import { PLAN_LENT_JOB } from "./brain-settings";
 import { type BrakeReport, brakeWakes, callableAgents, LATER_JOB, notCallableText } from "./brakes";
 import { HANDOFF_REMIND_JOB, remindBrowserHandoff } from "./browser/handoff";
 import { typingLogFor } from "./burst";
@@ -44,7 +45,7 @@ import {
   requesterOf,
 } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
-import { type EmailArt, queuePlanOpenedEmail, sendQueuedEmail } from "./email";
+import { type EmailArt, queuePlanLent, queuePlanOpenedEmail, sendQueuedEmail } from "./email";
 import { forgetCodeEmail } from "./email-codes";
 import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
@@ -102,6 +103,7 @@ import { purgeOrgFiles, purgeUserFiles, runMigration, type StorageDeps } from ".
 import { postStretchCard, STRETCH_JOB, type StretchHold } from "./stretch";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
+import { runVaultSync, VAULT_SYNC_JOB, type VaultDeps } from "./vault";
 import { transcribeVoiceClip, VOICE_JOB, type VoiceDeps } from "./voice";
 import { saveWaitlistContact } from "./waitlist";
 import { checkInWork, WORK_CHECK_IN_JOB } from "./works";
@@ -146,6 +148,8 @@ export interface JobDeps extends RunExecutorDeps {
   skills?: SkillDeps;
   /** Voice messages (job `voice.transcribe`, ADR 0100). */
   voice?: VoiceDeps;
+  /** The Vault's sources (job `vault.sync`, ADR 0144); absent: connections aren't read again. */
+  vault?: VaultDeps;
   /** Connectors: job `org.delete` revokes a workspace's GitHub OAuth grants at GitHub before its rows go. */
   connectors?: ConnectorDeps;
   /** People's mailboxes: job `org.delete` has Composio forget a workspace's mailboxes before its rows go. */
@@ -909,6 +913,16 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (!deps.emailArt) return;
       await queuePlanOpenedEmail(deps.db, deps.emailArt.home, orgOf(job), job.id, job.payload);
     },
+    // Someone gave an agent another person's plan: that person's inbox note and email (`setAgentBrain`).
+    [PLAN_LENT_JOB]: async (job) => {
+      await queuePlanLent(
+        { db: deps.db, pubsub: deps.pubsub },
+        deps.emailArt?.home ?? null,
+        orgOf(job),
+        job.id,
+        job.payload,
+      );
+    },
     "waitlist.contact": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");
       await saveWaitlistContact(deps.db, deps.email, String(job.payload.entryId));
@@ -1007,6 +1021,11 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     [SKILL_UPDATES_JOB]: async (job) => {
       if (!deps.skills) return;
       await runSkillUpdates(deps.skills, orgOf(job));
+    },
+    // A Vault connection read again (ADR 0144); a source's refusal stays on the connection, never retried here.
+    [VAULT_SYNC_JOB]: async (job) => {
+      if (!deps.vault) return;
+      await runVaultSync(deps.vault, orgOf(job), String(job.payload.connectionId));
     },
     "context.consolidate": async (job) => {
       if (!deps.context) return;

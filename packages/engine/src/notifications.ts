@@ -154,6 +154,13 @@ export const NOTIFICATION_KINDS = [
    */
   "desktop_taken",
   /**
+   * Someone gave an agent a plan of this person's that isn't theirs (`use_others_plans`, ADR 0059 §3): the plan's
+   * owner, one row per agent and account (`plan_lent:{accountId}:{agentId}`), the person as actor, `source.agentId` and
+   * its name in `source.label`, `source.accountId`, the plan's name in `latest.plan`. Inbox only, with "Tirar de volta";
+   * done once taken back.
+   */
+  "plan_lent",
+  /**
    * An AI app connected as the person created agents, routines, skills, memories or channels for them (ADR 0119):
    * one row per connection merging while unread, `latest.title` the app's name and `latest.created` how many of each
    * kind; `source.agentId` or `source.routineId` the newest one it opens. Inbox only.
@@ -259,6 +266,8 @@ export interface NotificationSource {
   widgetId?: string;
   /** A skill of the library (`skill_update`). */
   skillId?: string;
+  /** A plan's account (`plan_lent`). */
+  accountId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name, widget or board title. */
   label?: string;
 }

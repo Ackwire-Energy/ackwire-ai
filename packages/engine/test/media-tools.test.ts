@@ -197,6 +197,22 @@ describe("which runs list them", () => {
 });
 
 describe("send_sticker", () => {
+  test("the wave is a mood like the others: listed for a hello or a goodbye, and sent", async () => {
+    f = await setup({ mediaTools: true });
+    const { ctx } = await personRun();
+    const sticker = (await tools().list(ctx)).find((t) => t.name === "send_sticker");
+    const mood = (sticker?.inputSchema.properties as { mood: { enum: string[]; description: string } } | undefined)
+      ?.mood;
+    expect(mood?.enum).toContain("wave");
+    expect(mood?.description).toContain("wave (a hello or a goodbye)");
+    expect(await call(ctx, "send_sticker", { mood: "wave" })).toMatchObject({
+      type: "result",
+      output: { data: { mediaSent: { kind: "sticker" } } },
+    });
+    const [sent] = await agentMessages();
+    expect(sent?.meta.media).toEqual({ kind: "sticker", agentId: f.agent.id, mood: "wave" });
+  });
+
   test("as the whole answer: a message of the run where it answers, no text, live, telling whoever asked, starting nothing", async () => {
     f = await setup({ mediaTools: true, reply: script([{ name: "send_sticker", input: { mood: "celebrate" } }]) });
     const events = f.listen(f.general.id);

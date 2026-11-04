@@ -53,6 +53,8 @@ describe("the page behind the agent's screen", () => {
     expect(heard({ type: "ready" }, "https://evil.example/screen.html")).toBeNull();
     expect(heard({ type: "view", state: "nonsense" })).toBeNull();
     expect(heard({ type: "size", width: 0, height: 900 })).toBeNull();
+    expect(heard({ type: "session", mode: "control" })).toEqual({ type: "session", mode: "control" });
+    expect(heard({ type: "session", mode: "drive" })).toBeNull();
     expect(screenEvent(SERVER, { url, data: "{" })).toBeNull();
     expect(screenEvent(SERVER, { url, data: "null" })).toBeNull();
   });

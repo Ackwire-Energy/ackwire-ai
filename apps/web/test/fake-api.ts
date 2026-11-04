@@ -503,6 +503,7 @@ const PERMISSION_AREAS = [
       "control_computers",
       "manage_connectors",
       "manage_credentials",
+      "use_others_plans",
     ],
   },
   {
@@ -3190,6 +3191,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
     },
     secrets: {
+      // "Save to the Vault" on the card (ADR 0144): logged, so a test can check it came after the delivery.
+      saveToVault: async (orgId, requestId, input) => {
+        log("secrets.saveToVault", orgId, requestId, input);
+        return {} as never;
+      },
       // Like the server: only the person asked answers, once; the fake keeps the box to check it was sealed.
       deliver: async (orgId, requestId, box) => {
         log("secrets.deliver", orgId, requestId, box);

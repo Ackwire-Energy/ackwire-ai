@@ -27,7 +27,7 @@ People wanted to answer with a GIF, and agents had no light way to show they wer
 
 ### 3. Stickers are the agents' own
 
-- Every agent has six stickers, one per mood (`STICKER_MOODS`: celebrate, love, deal, thinking, wow, dizzy), drawn by each app from the agent's look with the agent engine (`packages/ui/src/agent/engine.js`). Nothing is uploaded or stored but the agent and the mood, a new agent has its stickers at once, and a changed look changes them.
+- Every agent has seven stickers, one per mood (`STICKER_MOODS`: celebrate, love, deal, thinking, wow, dizzy, wave; wave added 2026-11-04, first drawn for the right hand's hello in ADR 0137), drawn by each app from the agent's look with the agent engine (`packages/ui/src/agent/engine.js`). Nothing is uploaded or stored but the agent and the mood, a new agent has its stickers at once, and a changed look changes them.
 - They animate while on screen, and stand still with reduced motion.
 - On the phone, a frame is a recording of the engine's drawing replayed on Skia, on the JS thread, so only a few play: the newest three rows in view of a conversation (from the list's viewability), the first eight of the picker, none under a sheet, on a screen that isn't showing or in the background. All of them run on the app's one frame clock, at half its rate (`useFrameTime` with `fps`, `STICKER_FPS`), and the others hold their still frame.
 

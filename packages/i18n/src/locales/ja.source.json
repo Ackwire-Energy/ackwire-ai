@@ -3556,6 +3556,9 @@
   "team.cap.mail": {
     "value": "Email"
   },
+  "team.cap.vault": {
+    "value": "Vault"
+  },
   "team.cap.custom": {
     "value": "Workspace tools"
   },
@@ -4263,6 +4266,9 @@
   "noAi.notSignedIn.cursor": {
     "value": "Cursor isn't signed in on this computer. Connect a Cursor account on {{name}}'s page."
   },
+  "noAi.notSignedIn.grok": {
+    "value": "Grok isn't signed in on this computer. Connect a Grok account on {{name}}'s page."
+  },
   "noAi.notSignedIn.opencode": {
     "value": "OpenCode can't think on this computer. Connect an OpenCode key on {{name}}'s page."
   },
@@ -4323,6 +4329,9 @@
   "connectAi.title.cursor": {
     "value": "Connect your Cursor plan"
   },
+  "connectAi.title.grok": {
+    "value": "Connect your Grok plan"
+  },
   "connectAi.title.zen": {
     "value": "Connect OpenCode"
   },
@@ -4361,6 +4370,12 @@
   },
   "connectAi.plan.cursor.tiers": {
     "value": "Pro, Pro+, Ultra or Teams, or a Cursor API key"
+  },
+  "connectAi.plan.grok.title": {
+    "value": "Your Grok plan"
+  },
+  "connectAi.plan.grok.tiers": {
+    "value": "SuperGrok, SuperGrok Heavy or X Premium+"
   },
   "connectAi.plan.zen.title": {
     "value": "OpenCode"
@@ -4500,6 +4515,12 @@
   "connectAi.another": {
     "value": "Another account"
   },
+  "connectAi.reuse.active": {
+    "value": "You already have {{label}} here. Sign in to it again, or use another account."
+  },
+  "connectAi.reuse.signedOut": {
+    "value": "{{label}} is signed out here. Sign in to it again and its agents keep it."
+  },
   "connectAi.signInFor": {
     "value": "Sign in for {{name}}"
   },
@@ -4514,6 +4535,9 @@
   },
   "connectAi.otherAccount.cursor": {
     "value": "Cursor signed in as {{email}}, not {{account}}. Sign out on Cursor's page and try again."
+  },
+  "connectAi.otherAccount.grok": {
+    "value": "Grok signed in as {{email}}, not {{account}}. Sign out on Grok's page and try again."
   },
   "connectAi.otherAccount.opencode": {
     "value": "OpenCode signed in as {{email}}, not {{account}}. Try again with the right key."
@@ -4982,9 +5006,6 @@
   },
   "dm.subtitleNoOwner": {
     "value": "{{role}} · no owner"
-  },
-  "dm.profile": {
-    "value": "View profile"
   },
   "dm.emptyAgent": {
     "value": "Ask him to remember, forget or work differently.",
@@ -6166,6 +6187,858 @@
   },
   "agentSecrets.removeFailed": {
     "value": "Couldn't remove it. Is the computer on?"
+  },
+  "vault.tab.label": {
+    "value": "What to show"
+  },
+  "vault.tab.team": {
+    "value": "Team"
+  },
+  "vault.tab.personal": {
+    "value": "Personal"
+  },
+  "vault.tab.connections": {
+    "value": "Connections"
+  },
+  "vault.list.search": {
+    "value": "Search the Vault"
+  },
+  "vault.list.clearSearch": {
+    "value": "Clear the search"
+  },
+  "vault.list.kind": {
+    "value": "Kind"
+  },
+  "vault.list.kindAll": {
+    "value": "All kinds"
+  },
+  "vault.list.noMatch": {
+    "value": "Nothing here matches this search."
+  },
+  "vault.list.clearFilters": {
+    "value": "Clear the search"
+  },
+  "vault.list.personalNote": {
+    "value": "Only you see these. Your agents use them only when you ask."
+  },
+  "vault.list.personalEmpty": {
+    "value": "Nothing saved yet"
+  },
+  "vault.list.personalEmptyText": {
+    "value": "Only you see these. Your agents use them only when you ask."
+  },
+  "vault.list.teamEmpty": {
+    "value": "Nothing shared with the team yet"
+  },
+  "vault.list.teamEmptyText": {
+    "value": "Save a login, a key or contact details once, and choose which agents may use it."
+  },
+  "vault.list.sharedEmpty": {
+    "value": "Nothing shared with you yet"
+  },
+  "vault.list.sharedEmptyText": {
+    "value": "When someone shares a team login or key with you, it shows here."
+  },
+  "vault.row.agents": {
+    "value": {
+      "one": "{{count}} agent",
+      "other": "{{count}} agents"
+    }
+  },
+  "vault.row.used": {
+    "value": "Used {{when}}"
+  },
+  "vault.row.never": {
+    "value": "Never used"
+  },
+  "vault.kind.login": {
+    "value": "Login"
+  },
+  "vault.kind.key": {
+    "value": "Key"
+  },
+  "vault.kind.contact": {
+    "value": "Contact"
+  },
+  "vault.kind.loginText": {
+    "value": "A website's username and password"
+  },
+  "vault.kind.keyText": {
+    "value": "A key your agents use in a command"
+  },
+  "vault.kind.contactText": {
+    "value": "Details agents type in forms"
+  },
+  "vault.kindPlural.login": {
+    "value": "logins"
+  },
+  "vault.kindPlural.key": {
+    "value": "keys"
+  },
+  "vault.kindPlural.contact": {
+    "value": "contacts"
+  },
+  "vault.kindPlural.loginTitle": {
+    "value": "Logins"
+  },
+  "vault.kindPlural.keyTitle": {
+    "value": "Keys"
+  },
+  "vault.kindPlural.contactTitle": {
+    "value": "Contacts"
+  },
+  "vault.scope.personal": {
+    "value": "Personal"
+  },
+  "vault.scope.team": {
+    "value": "Team"
+  },
+  "vault.scope.personalText": {
+    "value": "Only you see it"
+  },
+  "vault.scope.teamText": {
+    "value": "Shared with the workspace"
+  },
+  "vault.field.title": {
+    "value": "Name"
+  },
+  "vault.field.contactTitle": {
+    "value": "Name in the Vault"
+  },
+  "vault.field.loginPlaceholder": {
+    "value": "Company email"
+  },
+  "vault.field.keyPlaceholder": {
+    "value": "Payments key"
+  },
+  "vault.field.contactPlaceholder": {
+    "value": "Billing details"
+  },
+  "vault.field.website": {
+    "value": "Website"
+  },
+  "vault.field.websitePlaceholder": {
+    "value": "app.example.com"
+  },
+  "vault.field.match": {
+    "value": "Where agents may type it"
+  },
+  "vault.field.username": {
+    "value": "Username"
+  },
+  "vault.field.usernamePlaceholder": {
+    "value": "Email or username"
+  },
+  "vault.field.password": {
+    "value": "Password"
+  },
+  "vault.field.keyName": {
+    "value": "Variable name"
+  },
+  "vault.field.keyNameHelp": {
+    "value": "Your agents use the key by this name in a command."
+  },
+  "vault.field.keyNamePlaceholder": {
+    "value": "ACME_API_KEY"
+  },
+  "vault.field.value": {
+    "value": "Value"
+  },
+  "vault.field.description": {
+    "value": "Note for your agents"
+  },
+  "vault.field.descriptionHelp": {
+    "value": "When to use it and what it's for. Agents read this to pick the right one."
+  },
+  "vault.field.descriptionPlaceholder.login": {
+    "value": "The account we use to publish posts"
+  },
+  "vault.field.descriptionPlaceholder.key": {
+    "value": "For the payments service, test mode"
+  },
+  "vault.field.descriptionPlaceholder.contact": {
+    "value": "Use it for the company's invoices"
+  },
+  "vault.match.exact": {
+    "value": "Only this address"
+  },
+  "vault.match.site": {
+    "value": "Whole site"
+  },
+  "vault.match.exactHelp": {
+    "value": "Agents type it only on {{origin}}."
+  },
+  "vault.match.exactHelpNone": {
+    "value": "Agents type it only on this exact address."
+  },
+  "vault.match.siteHelp": {
+    "value": "Agents type it on any page of this site, like a sign-in page on another subdomain."
+  },
+  "vault.contact.group": {
+    "value": "Contact details"
+  },
+  "vault.contact.fullName": {
+    "value": "Full name"
+  },
+  "vault.contact.company": {
+    "value": "Company"
+  },
+  "vault.contact.document": {
+    "value": "Tax ID"
+  },
+  "vault.contact.email": {
+    "value": "Email"
+  },
+  "vault.contact.phone": {
+    "value": "Phone"
+  },
+  "vault.contact.address": {
+    "value": "Address"
+  },
+  "vault.contact.address2": {
+    "value": "Address line 2"
+  },
+  "vault.contact.city": {
+    "value": "City"
+  },
+  "vault.contact.region": {
+    "value": "State or region"
+  },
+  "vault.contact.postalCode": {
+    "value": "Postal code"
+  },
+  "vault.contact.country": {
+    "value": "Country"
+  },
+  "vault.error.title": {
+    "value": "Give it a name."
+  },
+  "vault.error.website": {
+    "value": "Use an https address, like app.example.com."
+  },
+  "vault.error.keyName": {
+    "value": "Use capital letters, numbers and _, starting with a letter, like ACME_API_KEY."
+  },
+  "vault.error.password": {
+    "value": "Type the password."
+  },
+  "vault.error.value": {
+    "value": "Type the value."
+  },
+  "vault.error.contact": {
+    "value": "Fill in at least one field."
+  },
+  "vault.item.missing": {
+    "value": "Missing"
+  },
+  "vault.item.missingText": {
+    "value": "It's gone from {{source}}. Agents can't use it until it's back."
+  },
+  "vault.item.editIn": {
+    "value": "Edit it in {{source}}. Changes arrive here at the next sync."
+  },
+  "vault.item.unreadable": {
+    "value": "This contact's details can't be read here. Whoever manages it can type them again and save."
+  },
+  "vault.item.hidden": {
+    "value": "Hidden"
+  },
+  "vault.item.endsIn": {
+    "value": "ends in {{hint}}"
+  },
+  "vault.item.noValue": {
+    "value": "Nothing saved"
+  },
+  "vault.item.change": {
+    "value": "Change"
+  },
+  "vault.item.add": {
+    "value": "Add"
+  },
+  "vault.item.newPassword": {
+    "value": "New password"
+  },
+  "vault.item.newValue": {
+    "value": "New value"
+  },
+  "vault.item.newValueHelp": {
+    "value": "It replaces the saved one when you save."
+  },
+  "vault.item.sealedHelp": {
+    "value": "For safety, what's saved here never shows again. To change it, type it again."
+  },
+  "vault.item.keepValue": {
+    "value": "Keep the current one"
+  },
+  "vault.item.saved": {
+    "value": "Saved"
+  },
+  "vault.item.delete": {
+    "value": "Delete"
+  },
+  "vault.item.deleteTitle": {
+    "value": "Delete {{title}}?"
+  },
+  "vault.item.deleteText": {
+    "value": "Your agents can no longer use it. This can't be undone."
+  },
+  "vault.item.deleted": {
+    "value": "{{title}} deleted from the Vault"
+  },
+  "vault.use.title": {
+    "value": "Recent uses"
+  },
+  "vault.use.none": {
+    "value": "No one has used it yet."
+  },
+  "vault.use.fill": {
+    "value": "{{agent}}, on {{host}}"
+  },
+  "vault.use.fillSomewhere": {
+    "value": "{{agent}} typed it"
+  },
+  "vault.use.key": {
+    "value": "{{agent}}, in a command"
+  },
+  "vault.use.read": {
+    "value": "{{who}} read it"
+  },
+  "vault.use.create": {
+    "value": "{{who}} saved it"
+  },
+  "vault.use.edit": {
+    "value": "{{who}} changed it"
+  },
+  "vault.use.for": {
+    "value": "for {{name}}"
+  },
+  "vault.use.routine": {
+    "value": "Routine {{name}}"
+  },
+  "vault.access.title": {
+    "value": "Who has access"
+  },
+  "vault.access.people": {
+    "value": "People"
+  },
+  "vault.access.agents": {
+    "value": "Agents"
+  },
+  "vault.access.edit": {
+    "value": "Edit"
+  },
+  "vault.access.editOf": {
+    "value": "Edit {{what}}"
+  },
+  "vault.access.everyone": {
+    "value": "Everyone in the workspace"
+  },
+  "vault.access.everyoneText": {
+    "value": "Each person sees it, and agents use it when they ask."
+  },
+  "vault.access.managersOnly": {
+    "value": "Only who manages the Vault"
+  },
+  "vault.access.allAgents": {
+    "value": "All agents"
+  },
+  "vault.access.noAgents": {
+    "value": "No agent yet"
+  },
+  "vault.access.more": {
+    "value": {
+      "one": "{{count}} more",
+      "other": "{{count}} more"
+    }
+  },
+  "vault.access.saved": {
+    "value": "Access saved"
+  },
+  "vault.access.peopleTitle": {
+    "value": "Who can see it"
+  },
+  "vault.access.peopleText": {
+    "value": "They see it, and agents use it when one of them asks. Who manages the Vault always sees it."
+  },
+  "vault.access.level.use": {
+    "value": "Can see and use"
+  },
+  "vault.access.level.none": {
+    "value": "No access"
+  },
+  "vault.access.roleDetail": {
+    "value": "Everyone with this role"
+  },
+  "vault.access.roles": {
+    "value": "Roles"
+  },
+  "vault.access.peopleGroup": {
+    "value": "People"
+  },
+  "vault.access.add": {
+    "value": "Add a role or a person"
+  },
+  "vault.access.addSearch": {
+    "value": "Search roles and people"
+  },
+  "vault.access.noMatch": {
+    "value": "No one found"
+  },
+  "vault.access.levelOf": {
+    "value": "What {{name}} can do"
+  },
+  "vault.access.follows": {
+    "value": "It follows the default access of {{source}}."
+  },
+  "vault.access.own": {
+    "value": "It has its own access, not the default of {{source}}."
+  },
+  "vault.access.changeHere": {
+    "value": "Change for this item"
+  },
+  "vault.access.useConnection": {
+    "value": "Use the default again"
+  },
+  "vault.agents.title": {
+    "value": "Which agents can use it"
+  },
+  "vault.agents.textPersonal": {
+    "value": "They use it only when you ask them."
+  },
+  "vault.agents.textTeam": {
+    "value": "They use it when someone who can see it asks."
+  },
+  "vault.agents.all": {
+    "value": "All agents"
+  },
+  "vault.agents.allDetail": {
+    "value": "Also the ones added later"
+  },
+  "vault.summary.noAgents": {
+    "value": "No agent can use it yet."
+  },
+  "vault.summary.allAgents": {
+    "value": "Every agent"
+  },
+  "vault.summary.inRole": {
+    "value": "someone in {{role}}"
+  },
+  "vault.summary.personal": {
+    "value": {
+      "one": "{{agents}} can use it, only when you ask.",
+      "other": "{{agents}} can use it, only when you ask."
+    }
+  },
+  "vault.summary.everyone": {
+    "value": {
+      "one": "{{agents}} can use it when anyone in the workspace asks.",
+      "other": "{{agents}} can use it when anyone in the workspace asks."
+    }
+  },
+  "vault.summary.people": {
+    "value": {
+      "one": "{{agents}} can use it when {{people}} asks.",
+      "other": "{{agents}} can use it when {{people}} asks."
+    }
+  },
+  "vault.summary.nobody": {
+    "value": "No one can ask agents to use it yet. Choose who can see it."
+  },
+  "vault.new.open": {
+    "value": "New item"
+  },
+  "vault.new.title": {
+    "value": "New item"
+  },
+  "vault.new.text": {
+    "value": "Save it once. Your agents use it without seeing a password or a key."
+  },
+  "vault.new.what": {
+    "value": "What do you want to save?"
+  },
+  "vault.new.who": {
+    "value": "Who can use it"
+  },
+  "vault.new.teamLocked": {
+    "value": "Only people who manage the Vault can save team items. This one stays yours."
+  },
+  "vault.new.save": {
+    "value": "Save"
+  },
+  "vault.new.saved": {
+    "value": "Saved to the Vault"
+  },
+  "vault.import.open": {
+    "value": "Import"
+  },
+  "vault.import.title": {
+    "value": "Import passwords"
+  },
+  "vault.import.text": {
+    "value": "From a file your browser or password manager exports (.csv)."
+  },
+  "vault.import.dropTitle": {
+    "value": "Drop the file here"
+  },
+  "vault.import.dropText": {
+    "value": "or click to choose it on your computer"
+  },
+  "vault.import.reading": {
+    "value": "Reading the file…"
+  },
+  "vault.import.choose": {
+    "value": "Choose the file"
+  },
+  "vault.import.where": {
+    "value": "In your browser or password manager, look for Export passwords and choose CSV."
+  },
+  "vault.import.tooLarge": {
+    "value": "This file is too large (2 MB at most)."
+  },
+  "vault.import.notCsv": {
+    "value": "Choose a .csv file."
+  },
+  "vault.import.unreadable": {
+    "value": "Couldn't read this file. Try exporting it again."
+  },
+  "vault.import.format.chrome": {
+    "value": "Read as a Chrome export"
+  },
+  "vault.import.format.1password": {
+    "value": "Read as a 1Password export"
+  },
+  "vault.import.format.bitwarden": {
+    "value": "Read as a Bitwarden export"
+  },
+  "vault.import.format.generic": {
+    "value": "Read as a passwords file"
+  },
+  "vault.import.added": {
+    "value": {
+      "one": "new login",
+      "other": "new logins"
+    }
+  },
+  "vault.import.updated": {
+    "value": {
+      "one": "updated",
+      "other": "updated"
+    }
+  },
+  "vault.import.skipped": {
+    "value": {
+      "one": "left out",
+      "other": "left out"
+    }
+  },
+  "vault.import.reason.duplicate": {
+    "value": {
+      "one": "{{count}} already in the Vault",
+      "other": "{{count}} already in the Vault"
+    }
+  },
+  "vault.import.reason.not_https": {
+    "value": {
+      "one": "{{count}} not on an https address",
+      "other": "{{count}} not on an https address"
+    }
+  },
+  "vault.import.reason.no_password": {
+    "value": {
+      "one": "{{count}} without a password",
+      "other": "{{count}} without a password"
+    }
+  },
+  "vault.import.reason.invalid": {
+    "value": {
+      "one": "{{count}} line we couldn't read",
+      "other": "{{count}} lines we couldn't read"
+    }
+  },
+  "vault.import.as": {
+    "value": "Save them as"
+  },
+  "vault.import.asPersonal": {
+    "value": "Only you will see them."
+  },
+  "vault.import.asTeam": {
+    "value": "Everyone in the workspace sees them. Choose agents for each one afterwards."
+  },
+  "vault.import.deleteFile": {
+    "value": "Delete the file afterwards: it holds your passwords unencrypted."
+  },
+  "vault.import.confirm": {
+    "value": {
+      "one": "Import {{count}}",
+      "other": "Import {{count}}"
+    }
+  },
+  "vault.import.done": {
+    "value": {
+      "one": "{{count}} login imported",
+      "other": "{{count}} logins imported"
+    }
+  },
+  "vault.import.another": {
+    "value": "Choose another file"
+  },
+  "vault.import.close": {
+    "value": "Done"
+  },
+  "vault.connections.none": {
+    "value": "No password manager can be connected here."
+  },
+  "vault.connections.lead": {
+    "value": "Your agents use the {{kinds}} you keep in {{name}}."
+  },
+  "vault.connections.connect": {
+    "value": "Connect"
+  },
+  "vault.connections.reconnect": {
+    "value": "Reconnect"
+  },
+  "vault.connections.reconnectName": {
+    "value": "Reconnect {{name}}"
+  },
+  "vault.connections.open": {
+    "value": "Open {{name}}"
+  },
+  "vault.connections.required": {
+    "value": "Fill this in."
+  },
+  "vault.connections.for": {
+    "value": "Connect for"
+  },
+  "vault.connections.forTeam": {
+    "value": "Its items are the team's. Who manages the Vault decides who uses them."
+  },
+  "vault.connections.forPersonal": {
+    "value": "Its items are yours alone."
+  },
+  "vault.connections.teamLocked": {
+    "value": "Its items will be yours alone. Only who manages the Vault connects one for the team."
+  },
+  "vault.connections.sealed": {
+    "value": "What you type here is encrypted and never shown again."
+  },
+  "vault.connections.connected": {
+    "value": {
+      "one": "{{name}} connected. {{count}} item came in.",
+      "other": "{{name}} connected. {{count}} items came in."
+    }
+  },
+  "vault.connections.ready": {
+    "value": "Connected"
+  },
+  "vault.connections.syncing": {
+    "value": "Syncing"
+  },
+  "vault.connections.reads": {
+    "value": "Reads {{label}}"
+  },
+  "vault.connections.items": {
+    "value": {
+      "one": "{{count}} item",
+      "other": "{{count}} items"
+    }
+  },
+  "vault.connections.synced": {
+    "value": "synced {{when}}"
+  },
+  "vault.connections.syncNow": {
+    "value": "Sync now"
+  },
+  "vault.connections.access": {
+    "value": "Default access"
+  },
+  "vault.connections.accessTitle": {
+    "value": "Default access of {{label}}"
+  },
+  "vault.connections.accessText": {
+    "value": "Its items follow this, unless you change one of them. Each change saves at once."
+  },
+  "vault.connections.actionsName": {
+    "value": "More for {{name}}"
+  },
+  "vault.connections.disconnect": {
+    "value": "Disconnect"
+  },
+  "vault.connections.removeTitle": {
+    "value": "Disconnect {{name}}?"
+  },
+  "vault.connections.removeText": {
+    "value": {
+      "one": "Its item leaves the Vault and your agents stop using it. Nothing changes in {{name}}.",
+      "other": "Its {{count}} items leave the Vault and your agents stop using them. Nothing changes in {{name}}."
+    }
+  },
+  "vault.connections.removed": {
+    "value": "{{name}} disconnected"
+  },
+  "vault.connections.listOf": {
+    "value": "Connections to {{name}}"
+  },
+  "vault.connections.note": {
+    "value": "Your agents read what is there when they need it. Nothing is copied into agentes.chat but names and addresses."
+  },
+  "vault.connections.error.auth_failed": {
+    "value": "Sign-in refused"
+  },
+  "vault.connections.error.locked": {
+    "value": "Wrong password"
+  },
+  "vault.connections.error.many_vaults": {
+    "value": "Sees more than one vault"
+  },
+  "vault.connections.error.no_vault": {
+    "value": "Sees no vault"
+  },
+  "vault.connections.error.folder_missing": {
+    "value": "Folder not found"
+  },
+  "vault.connections.error.not_found": {
+    "value": "Not found"
+  },
+  "vault.connections.error.rate_limited": {
+    "value": "Too many reads"
+  },
+  "vault.connections.error.unreachable": {
+    "value": "Can't reach it"
+  },
+  "vault.connections.error.unsupported": {
+    "value": "Not available here"
+  },
+  "vault.connections.error.invalid_input": {
+    "value": "Check the fields"
+  },
+  "vault.connections.error.too_many_items": {
+    "value": "Vault full"
+  },
+  "vault.connections.error.other": {
+    "value": "Couldn't read it"
+  },
+  "vault.connections.fix.auth_failed": {
+    "value": "The key or token was refused. Reconnect with a new one."
+  },
+  "vault.connections.fix.locked": {
+    "value": "The master password didn't open the account. Reconnect with the right one."
+  },
+  "vault.connections.fix.many_vaults": {
+    "value": "Give the service account access to one vault only, then reconnect."
+  },
+  "vault.connections.fix.no_vault": {
+    "value": "Give the service account access to the agents' vault, then reconnect."
+  },
+  "vault.connections.fix.folder_missing": {
+    "value": "Create the folder for your agents, or reconnect with its name."
+  },
+  "vault.connections.fix.not_found": {
+    "value": "What it read is gone. Reconnect to choose again."
+  },
+  "vault.connections.fix.rate_limited": {
+    "value": "The password manager asked us to wait. It tries again by itself."
+  },
+  "vault.connections.fix.unreachable": {
+    "value": "Its server didn't answer. It tries again by itself."
+  },
+  "vault.connections.fix.unsupported": {
+    "value": "Its settings can't be read here. Try again later or use another account."
+  },
+  "vault.connections.fix.invalid_input": {
+    "value": "Something in the fields was refused. Reconnect and check them."
+  },
+  "vault.connections.fix.too_many_items": {
+    "value": "Remove items before syncing more."
+  },
+  "vault.connections.fix.other": {
+    "value": "Try Sync now, or reconnect."
+  },
+  "vault.source.onepassword.step.1": {
+    "value": "Create a vault in 1Password only for your agents and move into it the logins they may use"
+  },
+  "vault.source.onepassword.step.2": {
+    "value": "Create a service account with access to that vault only"
+  },
+  "vault.source.onepassword.step.3": {
+    "value": "Paste the service account token here"
+  },
+  "vault.source.onepassword.field.token": {
+    "value": "Service account token"
+  },
+  "vault.source.bitwarden.warning": {
+    "value": "Use an account only for your agents. Its master password opens the whole account, so nothing personal should be in it."
+  },
+  "vault.source.bitwarden.step.1": {
+    "value": "Create a Bitwarden account only for your agents and a folder named Agents with the logins they may use"
+  },
+  "vault.source.bitwarden.step.2": {
+    "value": "In that account, open Settings, Security, Keys and copy the API key"
+  },
+  "vault.source.bitwarden.step.3": {
+    "value": "Fill in the fields below"
+  },
+  "vault.source.bitwarden.field.server": {
+    "value": "Server"
+  },
+  "vault.source.bitwarden.field.serverUrl": {
+    "value": "Server address"
+  },
+  "vault.source.bitwarden.field.clientId": {
+    "value": "Client ID"
+  },
+  "vault.source.bitwarden.field.clientSecret": {
+    "value": "Client secret"
+  },
+  "vault.source.bitwarden.field.masterPassword": {
+    "value": "Master password"
+  },
+  "vault.source.bitwarden.field.folder": {
+    "value": "Folder"
+  },
+  "vault.source.bitwarden.choice.server.self": {
+    "value": "My own server"
+  },
+  "vault.card.save": {
+    "value": "Save to the Vault"
+  },
+  "vault.card.saveText": {
+    "value": "Next time your agents use it without asking you."
+  },
+  "vault.card.scope": {
+    "value": "Save as"
+  },
+  "vault.card.personalText": {
+    "value": "Only you see it"
+  },
+  "vault.card.teamText": {
+    "value": "The workspace sees it"
+  },
+  "vault.card.teamLocked": {
+    "value": "Only who manages the Vault saves for the team"
+  },
+  "vault.card.agents": {
+    "value": "Used by"
+  },
+  "vault.card.choose": {
+    "value": "Choose"
+  },
+  "vault.card.saved": {
+    "value": "Saved to the Vault"
+  },
+  "vault.card.notSaved": {
+    "value": "Sent, but not saved to the Vault"
+  },
+  "vault.card.codeBox": {
+    "value": "Digit {{n}} of {{total}}"
+  },
+  "vault.card.codeShort": {
+    "value": {
+      "one": "Type the {{count}} digit.",
+      "other": "Type all {{count}} digits."
+    }
+  },
+  "vault.card.codeWhere": {
+    "value": "Only {{agent}}'s browser types it, on {{host}}."
   },
   "question.answer": {
     "value": "Answer"
@@ -8282,6 +9155,9 @@
   "agentPage.work.brain.add.title.cursor": {
     "value": "Add a Cursor account"
   },
+  "agentPage.work.brain.add.title.grok": {
+    "value": "Add a Grok account"
+  },
   "agentPage.work.brain.add.title.opencode": {
     "value": "Add an OpenCode key"
   },
@@ -8292,6 +9168,9 @@
     "value": "The account with your plan"
   },
   "agentPage.work.brain.add.stepOne.cursor": {
+    "value": "The account with your plan"
+  },
+  "agentPage.work.brain.add.stepOne.grok": {
     "value": "The account with your plan"
   },
   "agentPage.work.brain.add.stepOneHint": {
@@ -8306,11 +9185,17 @@
   "agentPage.work.brain.add.open.cursor": {
     "value": "Sign in with Cursor"
   },
+  "agentPage.work.brain.add.open.grok": {
+    "value": "Sign in with Grok"
+  },
   "agentPage.work.brain.add.opencodeFree": {
     "value": "No key needed for OpenCode's free models. A key from OpenCode's console adds its paid ones."
   },
   "agentPage.work.brain.add.cursorFinish": {
     "value": "Sign in on Cursor's page, and the sign-in finishes on {{computer}} by itself."
+  },
+  "agentPage.work.brain.add.grokFinish": {
+    "value": "Sign in on Grok's page, and the sign-in finishes on {{computer}} by itself."
   },
   "agentPage.work.brain.add.cursorKey": {
     "value": "Use a Cursor API key instead"
@@ -8345,6 +9230,9 @@
   "agentPage.work.brain.add.deviceCode": {
     "value": "Code for ChatGPT"
   },
+  "agentPage.work.brain.add.grokCode": {
+    "value": "Code for Grok"
+  },
   "agentPage.work.brain.add.deviceCodeText": {
     "value": "Type this code on the page that opens."
   },
@@ -8371,6 +9259,9 @@
   },
   "agentPage.work.brain.add.duplicate.cursor": {
     "value": "Cursor signed in as {{account}}, an account you already connected. To use another, sign out on Cursor's page and try again."
+  },
+  "agentPage.work.brain.add.duplicate.grok": {
+    "value": "Grok signed in as {{account}}, an account you already connected. To use another, sign out on Grok's page and try again."
   },
   "agentPage.work.brain.add.duplicate.opencode": {
     "value": "That OpenCode key is already connected as {{account}}."
@@ -11377,6 +12268,18 @@
   },
   "scopes.setup_write.description": {
     "value": "Offer to connect an AI, an app or an MCP server, or to invite people, with a card a person clicks, and create channels for whoever asked, with Undo."
+  },
+  "scopes.vault_read.label": {
+    "value": "See the Vault"
+  },
+  "scopes.vault_read.description": {
+    "value": "See the logins, keys and contact details the Vault shares with it, and use them. It types saved passwords and uses saved keys without ever seeing them."
+  },
+  "scopes.vault_write.label": {
+    "value": "Edit Vault contacts"
+  },
+  "scopes.vault_write.description": {
+    "value": "Save and update contact details in the Vault, change a saved login's username or a description, and delete what it saved."
   },
   "scopes.github_git_read.label": {
     "value": "Clone repositories (git)"
@@ -16898,6 +17801,9 @@
   "aiAccounts.connect.cursor": {
     "value": "Cursor"
   },
+  "aiAccounts.connect.grok": {
+    "value": "Grok"
+  },
   "aiAccounts.connect.opencode": {
     "value": "OpenCode"
   },
@@ -16910,20 +17816,26 @@
   "aiAccounts.connect.addComputer": {
     "value": "Connect a computer"
   },
-  "aiAccounts.connect.needsCloud.claude_code": {
-    "value": "Not ready on {{computer}} yet"
-  },
-  "aiAccounts.connect.needsCloud.codex": {
-    "value": "Not ready on {{computer}} yet"
-  },
-  "aiAccounts.connect.needsCloud.cursor": {
-    "value": "Not ready on {{computer}} yet"
-  },
-  "aiAccounts.connect.needsCloud.opencode": {
-    "value": "Not ready on {{computer}} yet"
-  },
   "aiAccounts.connect.needsCloud.online": {
-    "value": "{{computer}} isn't answering right now. We're on it."
+    "value": "{{computer}} is restarting or reconnecting. This changes by itself once it's back."
+  },
+  "aiAccounts.connect.needsCloud.installing": {
+    "value": "{{program}} is being installed on {{computer}}. This changes by itself when it's done."
+  },
+  "aiAccounts.connect.needsCloud.updating": {
+    "value": "{{program}} is being updated on {{computer}}. This changes by itself when it's done."
+  },
+  "aiAccounts.connect.needsCloud.runnerOld": {
+    "value": "The agentes.chat program on {{computer}} is out of date and an update is on its way. This changes by itself when it's done."
+  },
+  "aiAccounts.connect.needsCloud.execOff": {
+    "value": "{{computer}} can't run {{program}} yet. We're on it, and this changes by itself."
+  },
+  "aiAccounts.connect.needsCloud.toolOff": {
+    "value": "{{program}} isn't allowed on {{computer}}. Ask support to allow it."
+  },
+  "aiAccounts.connect.needsCloud.preparing": {
+    "value": "{{computer}} is getting ready. This changes by itself when it's done."
   },
   "aiAccounts.done.name": {
     "value": "What do you want to call it? Others see this name."
@@ -16984,6 +17896,21 @@
   },
   "aiAccounts.page.newKey": {
     "value": "Replace the key"
+  },
+  "aiAccounts.page.copies": {
+    "value": {
+      "one": "{{count}} more login of this account, with no agent.",
+      "other": "{{count}} more logins of this account, with no agent."
+    }
+  },
+  "aiAccounts.page.removeCopies": {
+    "value": "Remove"
+  },
+  "aiAccounts.page.copiesRemoved": {
+    "value": {
+      "one": "{{count}} unused login removed.",
+      "other": "{{count}} unused logins removed."
+    }
   },
   "aiAccounts.page.disconnect": {
     "value": "Disconnect"
@@ -17511,6 +18438,9 @@
   "media.moods.dizzy": {
     "value": "dizzy"
   },
+  "media.moods.wave": {
+    "value": "hi"
+  },
   "media.moodWords.celebrate": {
     "value": "party congrats celebrate shipped launch yay"
   },
@@ -17528,6 +18458,9 @@
   },
   "media.moodWords.dizzy": {
     "value": "tired friday help oops confused"
+  },
+  "media.moodWords.wave": {
+    "value": "hello hey bye wave good morning see you"
   },
   "media.picker.button": {
     "value": "Emoji, GIFs and stickers"
@@ -20417,6 +21350,9 @@
   "brain.line.cursor": {
     "value": "{{model}} on the Cursor plan"
   },
+  "brain.line.grok": {
+    "value": "{{model}} on the Grok plan"
+  },
   "brain.line.zen": {
     "value": "{{model}} on OpenCode"
   },
@@ -20431,6 +21367,9 @@
   },
   "brain.line.cursorOf": {
     "value": "{{model}} on {{owner}}'s Cursor plan"
+  },
+  "brain.line.grokOf": {
+    "value": "{{model}} on {{owner}}'s Grok plan"
   },
   "brain.line.zenOf": {
     "value": "{{model}} on {{owner}}'s OpenCode"
@@ -20447,6 +21386,9 @@
   "brain.line.cursorAuto": {
     "value": "Cursor plan"
   },
+  "brain.line.grokAuto": {
+    "value": "Grok plan"
+  },
   "brain.line.zenAuto": {
     "value": "OpenCode"
   },
@@ -20461,6 +21403,9 @@
   },
   "brain.line.cursorAutoOf": {
     "value": "{{owner}}'s Cursor plan"
+  },
+  "brain.line.grokAutoOf": {
+    "value": "{{owner}}'s Grok plan"
   },
   "brain.line.zenAutoOf": {
     "value": "{{owner}}'s OpenCode"
@@ -20489,6 +21434,9 @@
   "brain.card.cursor": {
     "value": "Cursor"
   },
+  "brain.card.grok": {
+    "value": "Grok Build"
+  },
   "brain.card.opencode": {
     "value": "OpenCode"
   },
@@ -20512,6 +21460,9 @@
   },
   "brain.cursorText": {
     "value": "Uses the Cursor plan of whoever connected the computer."
+  },
+  "brain.grokText": {
+    "value": "Uses the Grok plan of whoever connected the computer."
   },
   "brain.opencodeText": {
     "value": "OpenCode's free models, or the OpenCode key of whoever connected the computer."
@@ -20611,6 +21562,9 @@
   },
   "brain.summary.cursor": {
     "value": "Cursor · {{model}}"
+  },
+  "brain.summary.grok": {
+    "value": "Grok Build · {{model}}"
   },
   "brain.summary.opencode": {
     "value": "OpenCode · {{model}}"
@@ -20921,6 +21875,9 @@
   "access.area.desktop": {
     "value": "Desktop"
   },
+  "access.area.vault": {
+    "value": "Vault"
+  },
   "access.areaText.context.read": {
     "value": "Searches messages, summaries and facts in the channels."
   },
@@ -20974,6 +21931,12 @@
   "access.areaText.desktop.write": {
     "value": "Uses any app on his own desktop on his computer, while people watch or take control. Needs Run code too.",
     "female": "Uses any app on her own desktop on her computer, while people watch or take control. Needs Run code too."
+  },
+  "access.areaText.vault.read": {
+    "value": "Sees and uses what the Vault shares with it, without seeing passwords or keys."
+  },
+  "access.areaText.vault.write": {
+    "value": "Also saves and updates contact details in the Vault."
   },
   "artifacts.downloadMenu": {
     "value": "Download"
@@ -25662,6 +26625,123 @@
   "errors.handle.takenByAgent": {
     "value": "@{{handle}} belongs to an agent."
   },
+  "errors.vault.invalid": {
+    "value": "Something in this item isn't right. Check it and try again."
+  },
+  "errors.vault.notFound": {
+    "value": "This item isn't in the Vault anymore."
+  },
+  "errors.vault.titleRequired": {
+    "value": "Give it a name."
+  },
+  "errors.vault.tooLong": {
+    "value": "That's too long. The limit is {{max}}."
+  },
+  "errors.vault.notHttps": {
+    "value": "Use an address that starts with https://"
+  },
+  "errors.vault.keyNameInvalid": {
+    "value": "Use capital letters, digits and _ in the name, like ACME_API_KEY."
+  },
+  "errors.vault.keyNameReserved": {
+    "value": "This name is reserved. Pick another one."
+  },
+  "errors.vault.keyNameTaken": {
+    "value": "A key with this name is already saved here."
+  },
+  "errors.vault.contactEmpty": {
+    "value": "Fill in at least one field."
+  },
+  "errors.vault.teamNeedsPermission": {
+    "value": "Only people who manage credentials can save team items."
+  },
+  "errors.vault.externalReadOnly": {
+    "value": "This comes from a password manager. Change it there."
+  },
+  "errors.vault.changedMeanwhile": {
+    "value": "Someone changed it in the meantime. Open it again."
+  },
+  "errors.vault.noValue": {
+    "value": "There's nothing to save."
+  },
+  "errors.vault.missing": {
+    "value": "It's gone from its password manager."
+  },
+  "errors.vault.notAllowed": {
+    "value": "You can't do this with this item."
+  },
+  "errors.vault.tooManyItems": {
+    "value": "The Vault is full. Delete items you no longer use."
+  },
+  "errors.vault.audienceInvalid": {
+    "value": "Someone or a role you picked is no longer in the workspace."
+  },
+  "errors.vault.agentsInvalid": {
+    "value": "An agent you picked is no longer in the workspace."
+  },
+  "errors.vault.tooManyAgents": {
+    "value": "Pick at most 200 agents."
+  },
+  "errors.vault.tooManyRoles": {
+    "value": "Pick at most 100 roles."
+  },
+  "errors.vault.tooManyPeople": {
+    "value": "Pick at most 500 people."
+  },
+  "errors.vault.csvTooLarge": {
+    "value": "The file is too large. The limit is 2 MB."
+  },
+  "errors.vault.csvTooManyRows": {
+    "value": "The file has more than 5,000 rows. Split it and import each part."
+  },
+  "errors.vault.csvUnrecognized": {
+    "value": "This doesn't look like a passwords file. Export it again as CSV."
+  },
+  "errors.vault.requestNotDelivered": {
+    "value": "Send it first, then save it to the Vault."
+  },
+  "errors.vault.requestNotSavable": {
+    "value": "This one can't be saved to the Vault."
+  },
+  "errors.vault.sourceUnknown": {
+    "value": "This password manager isn't available here."
+  },
+  "errors.vault.sourceError": {
+    "value": "Couldn't read it from its password manager. Try again."
+  },
+  "errors.vault.source.authFailed": {
+    "value": "The password manager refused these details. Check them and try again."
+  },
+  "errors.vault.source.locked": {
+    "value": "The master password is wrong."
+  },
+  "errors.vault.source.manyVaults": {
+    "value": "The service account sees more than one vault. Give it access to only one."
+  },
+  "errors.vault.source.noVault": {
+    "value": "The service account sees no vault. Give it access to one."
+  },
+  "errors.vault.source.folderMissing": {
+    "value": "That folder isn't in the account."
+  },
+  "errors.vault.source.notFound": {
+    "value": "It's no longer in its password manager."
+  },
+  "errors.vault.source.rateLimited": {
+    "value": "The password manager asked us to wait. Try again in a few minutes."
+  },
+  "errors.vault.source.unreachable": {
+    "value": "Couldn't reach the password manager. Check the address and try again."
+  },
+  "errors.vault.source.unsupported": {
+    "value": "This password manager can't be connected here."
+  },
+  "errors.vault.source.invalidInput": {
+    "value": "Check the fields and try again."
+  },
+  "errors.vault.source.tooManyItems": {
+    "value": "The Vault is full. Remove items before syncing more."
+  },
   "machines.egress.draining": {
     "value": "Network settings are changing. Open computer sessions will restart at {{when}}."
   },
@@ -26036,6 +27116,9 @@
   "machines.access.tool.cursor": {
     "value": "Cursor"
   },
+  "machines.access.tool.grok": {
+    "value": "Grok Build"
+  },
   "machines.access.tool.opencode": {
     "value": "OpenCode"
   },
@@ -26053,6 +27136,9 @@
   },
   "machines.access.toolText.cursor": {
     "value": "Like Claude Code, with a Cursor account. Only in the allowed folders."
+  },
+  "machines.access.toolText.grok": {
+    "value": "Like Claude Code, with a Grok account. Only in the allowed folders."
   },
   "machines.access.toolText.opencode": {
     "value": "Like Claude Code, with OpenCode's free models or an OpenCode key. Only in the allowed folders."
@@ -27161,6 +28247,30 @@
   "audit.change.apps.message_sent": {
     "value": "Sent a message through {{app}}"
   },
+  "audit.change.vault.item_created": {
+    "value": "Saved an item to the Vault"
+  },
+  "audit.change.vault.item_changed": {
+    "value": "Changed a Vault item"
+  },
+  "audit.change.vault.item_deleted": {
+    "value": "Deleted a Vault item"
+  },
+  "audit.change.vault.item_used": {
+    "value": "Used a Vault item"
+  },
+  "audit.change.vault.imported": {
+    "value": "Imported passwords into the Vault"
+  },
+  "audit.change.vault.connection_added": {
+    "value": "Connected a password manager to the Vault"
+  },
+  "audit.change.vault.connection_changed": {
+    "value": "Changed a password manager's connection"
+  },
+  "audit.change.vault.connection_removed": {
+    "value": "Disconnected a password manager from the Vault"
+  },
   "audit.change.verb.created": {
     "value": "Created"
   },
@@ -27254,6 +28364,15 @@
   "audit.change.verb.archived": {
     "value": "Archived"
   },
+  "audit.change.verb.shown": {
+    "value": "Viewed"
+  },
+  "audit.change.verb.copied": {
+    "value": "Copied"
+  },
+  "audit.change.verb.used": {
+    "value": "Used"
+  },
   "audit.change.verb.other": {
     "value": "Changed"
   },
@@ -27343,6 +28462,9 @@
   },
   "audit.change.area.credential": {
     "value": "an AI key"
+  },
+  "audit.change.area.vault": {
+    "value": "the Vault"
   },
   "audit.change.area.other": {
     "value": "the workspace"
@@ -27485,6 +28607,9 @@
   "settings.section.roles": {
     "value": "Roles and permissions"
   },
+  "settings.section.vault": {
+    "value": "Vault"
+  },
   "settings.section.access": {
     "value": "Agents and access"
   },
@@ -27538,6 +28663,9 @@
   },
   "settings.sectionText.roles": {
     "value": "What each person can do. Roles add up."
+  },
+  "settings.sectionText.vault": {
+    "value": "Passwords, keys and contact details your agents use. They type passwords and use keys without ever seeing them."
   },
   "settings.sectionText.access": {
     "value": "What each agent can use: one level per connector."
@@ -29610,6 +30738,24 @@
   },
   "builtinTools.ask_user.description": {
     "value": "Asks a short question and waits for the answer."
+  },
+  "builtinTools.vault_list.label": {
+    "value": "Look in the Vault"
+  },
+  "builtinTools.vault_list.description": {
+    "value": "Lists the logins, keys and contacts shared with the agent, never a password or a key."
+  },
+  "builtinTools.vault_save.label": {
+    "value": "Save to the Vault"
+  },
+  "builtinTools.vault_save.description": {
+    "value": "Saves or updates contact details, a login's username or a description."
+  },
+  "builtinTools.vault_delete.label": {
+    "value": "Delete from the Vault"
+  },
+  "builtinTools.vault_delete.description": {
+    "value": "Deletes an item it saved."
   },
   "builtinTools.react.label": {
     "value": "React"
@@ -33432,9 +34578,6 @@
   "rightHand.newDot": {
     "value": "New"
   },
-  "rightHand.callWith": {
-    "value": "call with @{{handle}}"
-  },
   "rightHand.role": {
     "value": "Workspace assistant"
   },
@@ -33518,6 +34661,9 @@
   },
   "rightHand.profile.configure": {
     "value": "Configure"
+  },
+  "rightHand.profile.nameStory": {
+    "value": "The name comes from lodestar, the star sailors steer by."
   },
   "rightHand.settings.name": {
     "value": "Name and look"
@@ -33822,10 +34968,10 @@
   "sidebarAgents.organize": {
     "value": "Organize groups in Team"
   },
-  "sidebarAgents.seeAll": {
+  "sidebarAgents.more": {
     "value": {
-      "one": "See the {{count}} agent",
-      "other": "See all {{count}} agents"
+      "one": "1 more agent in Team",
+      "other": "{{count}} more agents in Team"
     }
   },
   "sidebarAgents.createFirst": {
@@ -34499,6 +35645,126 @@
   },
   "chat.body.action_open_page": {
     "value": "Open a screen"
+  },
+  "noAi.notSignedIn.antigravity": {
+    "value": "Gemini isn't signed in on this computer. Connect a Gemini account on {{name}}'s page."
+  },
+  "connectAi.title.gemini": {
+    "value": "Connect your Gemini plan"
+  },
+  "connectAi.plan.gemini.title": {
+    "value": "Your Gemini plan"
+  },
+  "connectAi.plan.gemini.tiers": {
+    "value": "Google AI Pro, Google AI Ultra or Gemini Enterprise"
+  },
+  "connectAi.plan.gemini.warning": {
+    "value": "Google says using a personal Gemini plan inside other apps can get the account suspended. To avoid that risk, use an API key or Gemini Enterprise."
+  },
+  "connectAi.otherAccount.antigravity": {
+    "value": "Gemini signed in as {{email}}, not {{account}}. Sign out on Google's page and try again."
+  },
+  "agentPage.work.brain.add.title.antigravity": {
+    "value": "Add a Gemini account"
+  },
+  "agentPage.work.brain.add.stepOne.antigravity": {
+    "value": "The Google account with your plan"
+  },
+  "agentPage.work.brain.add.stepOne.antigravityEnterprise": {
+    "value": "Your Gemini Enterprise account"
+  },
+  "agentPage.work.brain.add.open.antigravity": {
+    "value": "Sign in with Google"
+  },
+  "agentPage.work.brain.add.geminiEnterprise": {
+    "value": "Use Gemini Enterprise instead"
+  },
+  "agentPage.work.brain.add.geminiPersonal": {
+    "value": "Use a personal Google account instead"
+  },
+  "agentPage.work.brain.add.duplicate.antigravity": {
+    "value": "Gemini signed in as {{account}}, an account you already connected. To use another, sign out on Google's page and try again."
+  },
+  "aiAccounts.connect.antigravity": {
+    "value": "Gemini"
+  },
+  "brain.line.gemini": {
+    "value": "{{model}} on the Gemini plan"
+  },
+  "brain.line.geminiOf": {
+    "value": "{{model}} on {{owner}}'s Gemini plan"
+  },
+  "brain.line.geminiAuto": {
+    "value": "Gemini plan"
+  },
+  "brain.line.geminiAutoOf": {
+    "value": "{{owner}}'s Gemini plan"
+  },
+  "brain.card.antigravity": {
+    "value": "Antigravity CLI"
+  },
+  "brain.antigravityText": {
+    "value": "Uses the Gemini plan of whoever connected the computer."
+  },
+  "brain.summary.antigravity": {
+    "value": "Antigravity CLI · {{model}}"
+  },
+  "machines.access.tool.antigravity": {
+    "value": "Antigravity CLI"
+  },
+  "machines.access.toolText.antigravity": {
+    "value": "Like Claude Code, with a Gemini account. Only in the allowed folders."
+  },
+  "permissions.use_others_plans.title": {
+    "value": "Use other people's plans"
+  },
+  "permissions.use_others_plans.desc": {
+    "value": "Give the agents they can edit a plan someone else connected. Its owner gets an email and can take it back."
+  },
+  "permissions.use_others_plans.short": {
+    "value": "use other people's plans"
+  },
+  "permissions.use_others_plans.say": {
+    "value": "uses other people's plans"
+  },
+  "notifications.planLent.takeBack": {
+    "value": "Take it back"
+  },
+  "notifications.planLent.takeBackAll": {
+    "value": "Take it back from every agent"
+  },
+  "notifications.planLent.done": {
+    "value": "Your plan is back"
+  },
+  "notifications.what.planLent": {
+    "value": "<b>{{name}}</b> connected your {{plan}} plan to <b>{{agent}}</b>"
+  },
+  "agentPage.work.brain.accountOthers": {
+    "value": "Other people's plans show whose they are. Their owner gets an email and can take it back."
+  },
+  "dm.profile": {
+    "value": "View profile"
+  },
+  "aiAccounts.connect.needsCloud.claude_code": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "aiAccounts.connect.needsCloud.codex": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "aiAccounts.connect.needsCloud.cursor": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "aiAccounts.connect.needsCloud.opencode": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "rightHand.callWith": {
+    "value": "call with @{{handle}}"
+  },
+  "sidebarAgents.seeAll": {
+    "value": {
+      "one": "See the {{count}} agent",
+      "other": "See all {{count}} agents"
+    }
   },
   "approvals.review.list": {
     "value": "Requests"

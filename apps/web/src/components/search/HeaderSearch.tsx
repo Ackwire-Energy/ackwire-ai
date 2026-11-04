@@ -1,3 +1,10 @@
+import {
+  chipFitsDm,
+  DM_SEARCH_OPS,
+  inDmOnly,
+  parseSearch,
+  searchChipKey,
+} from "@agenteschat/client/lib/search-filters";
 import { Button } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,9 +18,10 @@ import { useHeaderSearch } from "@/hooks/useWorkspaceSearch";
 /**
  * The channel header's search (Discord's): a field whose mini menu offers the filters and recent searches, Enter
  * shows the results in the panel (`onOpen`). On a phone, an icon that opens the search over the whole screen. It
- * starts in the channel it sits in (an `in:` chip the person may remove).
+ * starts in the channel it sits in (an `in:` chip the person may remove). In a DM (`dm`) it stays in the DM: no chip
+ * to remove, no who or where to filter by, recent searches only those that fit it.
  */
-export function HeaderSearch({ channelId, onOpen }: { channelId: string; onOpen: () => void }) {
+export function HeaderSearch({ channelId, onOpen, dm }: { channelId: string; onOpen: () => void; dm?: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const ws = useHeaderSearch();
@@ -36,6 +44,12 @@ export function HeaderSearch({ channelId, onOpen }: { channelId: string; onOpen:
     const only = ws.chips.length === 1 ? ws.chips[0] : undefined;
     if (ws.chips.length === 0 || (only?.op === "in" && only.place.id !== place.id)) ws.setChips([{ op: "in", place }]);
   }, [place?.id]);
+  // A DM's search always holds to it, whatever was searched before or picked from the recent ones.
+  const held = dm && ws && place ? inDmOnly(ws.chips, place) : null;
+  const heldKey = held?.map(searchChipKey).join(" ");
+  useEffect(() => {
+    if (ws && held && heldKey !== ws.chips.map(searchChipKey).join(" ")) ws.setChips(held);
+  });
   if (!ws) return null;
   const submit = () => {
     if (!ws.chips.length && !ws.input.trim()) return;
@@ -49,16 +63,21 @@ export function HeaderSearch({ channelId, onOpen }: { channelId: string; onOpen:
       className="channel__search"
       inputRef={sheetBox ? undefined : input}
       autoFocus={sheetBox}
-      placeholder={t("searchPage.header.placeholder", { org: org.name })}
-      chips={ws.chips}
-      onChipsChange={ws.setChips}
+      placeholder={dm ? t("searchPage.searchHere") : t("searchPage.header.placeholder", { org: org.name })}
+      chips={held ? held.slice(1) : ws.chips}
+      onChipsChange={held && place ? (chips) => ws.setChips(inDmOnly(chips, place)) : ws.setChips}
+      ops={dm ? DM_SEARCH_OPS : undefined}
       text={ws.input}
       onTextChange={ws.setInput}
       onSubmit={submit}
       onClear={ws.clear}
       directory={ws.directory}
       words={ws.words}
-      recent={ws.recent}
+      recent={
+        dm && place
+          ? ws.recent.filter((r) => parseSearch(r, ws.directory, ws.words).chips.every((c) => chipFitsDm(c, place.id)))
+          : ws.recent
+      }
       onPickRecent={ws.pickRecent}
       onClearRecent={() => ws.saveRecent([])}
     />

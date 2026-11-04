@@ -118,9 +118,11 @@ html:not([data-pointer]) .thread-marker__open:focus-visible {
 
 /* ── "Threads (N)" ─────────────────────────────────────────────────────── */
 /* The count as the same small neutral chip as the tabs' (no parentheses). */
+/* Its rows on the menu's concentric rule: the box is their radius plus its room (`.ac-menu`). */
 .thread-pop {
+  --menu-pad: var(--space-2);
   width: min(400px, calc(100vw - 24px));
-  padding: 8px;
+  padding: var(--menu-pad);
 }
 .thread-pop__head {
   display: flex;
@@ -154,7 +156,7 @@ html:not([data-pointer]) .thread-marker__open:focus-visible {
   width: 100%;
   padding: 8px 12px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-item);
   background: transparent;
   font: inherit;
   color: inherit;
@@ -200,7 +202,7 @@ html:not([data-pointer]) .thread-pop__row:focus-visible {
   display: flex;
   align-items: center;
   padding-right: 8px;
-  border-radius: 12px;
+  border-radius: var(--radius-item);
 }
 .pins-pop__item:hover,
 html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {

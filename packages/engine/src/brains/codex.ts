@@ -1,11 +1,13 @@
 import {
   type AgentScope,
+  ANTIGRAVITY_PROTOCOL,
   BRAIN_PROFILES_PROTOCOL,
   BRAIN_PROTOCOL,
   type BrainTurnRequest,
   brainTopic,
   CODEX_FOLDER_PROTOCOL,
   CURSOR_PROTOCOL,
+  GROK_PROTOCOL,
   LOCKED_BRAIN_PROTOCOL,
   OPENCODE_PROTOCOL,
   type PubSub,
@@ -62,6 +64,8 @@ export interface ComputerBrainLink {
       claude?: { version: string };
       cursor?: { version: string };
       opencode?: { version: string };
+      grok?: { version: string };
+      antigravity?: { version: string };
     };
     /** The owner paused the computer (protocol 9; absent: not checked). */
     paused?: { until: string | null; timezone: string | null } | null;
@@ -70,7 +74,15 @@ export interface ComputerBrainLink {
     pairedByUserId?: string | null;
     /** What the machine allows (protocol 10): with it, Codex needs its own tool on, not commands. */
     access?: {
-      tools: { claude: boolean; codex: boolean; cursor?: boolean; opencode?: boolean; commands: boolean };
+      tools: {
+        claude: boolean;
+        codex: boolean;
+        cursor?: boolean;
+        opencode?: boolean;
+        grok?: boolean;
+        antigravity?: boolean;
+        commands: boolean;
+      };
     } | null;
   } | null>;
   /** Sends `brain.turn` and calls `onEvent` per `brain.event`; resolves on `brain.done`. */
@@ -146,7 +158,7 @@ function channel<T>() {
  * protocol 36, no version gate, no live steering). Everything else, from the request to the events, is shared.
  */
 interface CliBrainSpec {
-  kind: "codex" | "cursor" | "opencode";
+  kind: "codex" | "cursor" | "opencode" | "grok" | "antigravity";
   name: string;
   /** The runner protocol it needs. */
   protocol: number;
@@ -155,6 +167,8 @@ interface CliBrainSpec {
     codex?: { version: string };
     cursor?: { version: string };
     opencode?: { version: string };
+    grok?: { version: string };
+    antigravity?: { version: string };
   }): BrainEvent | null;
 }
 
@@ -213,8 +227,38 @@ const OPENCODE_CLI: CliBrainSpec = {
         },
 };
 
+const GROK_CLI: CliBrainSpec = {
+  kind: "grok",
+  name: "Grok Build",
+  protocol: GROK_PROTOCOL,
+  check: ({ grok }) =>
+    grok
+      ? null
+      : {
+          type: "error",
+          code: "grok_missing",
+          message: "Grok Build, xAI's CLI, is not installed on the computer.",
+          retryable: true,
+        },
+};
+
+const ANTIGRAVITY_CLI: CliBrainSpec = {
+  kind: "antigravity",
+  name: "Antigravity CLI",
+  protocol: ANTIGRAVITY_PROTOCOL,
+  check: ({ antigravity }) =>
+    antigravity
+      ? null
+      : {
+          type: "error",
+          code: "antigravity_missing",
+          message: "The Antigravity CLI, Google's, is not installed on the computer.",
+          retryable: true,
+        },
+};
+
 export class CodexBrain implements Brain {
-  readonly kind: "codex" | "cursor" | "opencode";
+  readonly kind: "codex" | "cursor" | "opencode" | "grok" | "antigravity";
 
   constructor(
     private readonly deps: CodexBrainDeps,
@@ -420,6 +464,28 @@ export class CursorBrain extends CodexBrain {
 export class OpencodeBrain extends CodexBrain {
   constructor(deps: CodexBrainDeps) {
     super(deps, OPENCODE_CLI);
+  }
+}
+
+/**
+ * The Grok brain (ADR 0142): xAI's Grok Build CLI on the agent's computer with a person's SuperGrok or X Premium+
+ * plan, through the same `brain.turn` as Codex (`kind: "grok"`, runner protocol 43, `brain-grok.ts` there). A person's
+ * messages wait for the turn's end: the runner answers `brain.steer` with `unsupported`.
+ */
+export class GrokBrain extends CodexBrain {
+  constructor(deps: CodexBrainDeps) {
+    super(deps, GROK_CLI);
+  }
+}
+
+/**
+ * The Antigravity brain (ADR 0143): Google's Antigravity CLI (`agy`) on the agent's computer with a person's Google
+ * AI Pro or Ultra plan or a Gemini Enterprise seat, through the same `brain.turn` as Codex (`kind: "antigravity"`,
+ * runner protocol 44, `brain-antigravity.ts` there). A person's messages wait for the turn's end.
+ */
+export class AntigravityBrain extends CodexBrain {
+  constructor(deps: CodexBrainDeps) {
+    super(deps, ANTIGRAVITY_CLI);
   }
 }
 

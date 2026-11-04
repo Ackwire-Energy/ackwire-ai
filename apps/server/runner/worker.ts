@@ -30,7 +30,7 @@ import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
 import { agentWorkspace } from "./paths";
 import type { FetchLike } from "./push";
 import { ENTER_MS, type ScopeKind, type Spawn, spawnGated } from "./scope-gate";
-import { type ActivatedSecret, agentSecrets, handleSecret, secretValue } from "./secrets";
+import { type ActivatedSecret, agentSecrets, dropStoredSiteSecrets, handleSecret, secretValue } from "./secrets";
 import { AGENTS_CGROUP, agentCgroup, systemdBooted } from "./service";
 import { systemStartPage } from "./start-page";
 import {
@@ -399,6 +399,8 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   const workspaceReal = prepareWorkspace(o.dir);
   const self = o.self ?? { command: selfCommand(currentProcess()), compiled: isCompiled(currentProcess()) };
   const secretsDir = path.join(home, "secrets");
+  // Site passwords live in memory now (ADR 0144): one an older runner kept on disk goes.
+  void dropStoredSiteSecrets(secretsDir);
   const socketPath = mcpSocketPath(home);
   const mcpCommand = { socketPath, command: self.command };
   let state = NOTHING_ALLOWED;

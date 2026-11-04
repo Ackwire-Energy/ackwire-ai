@@ -319,6 +319,16 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     now: { mode: "everyone", names: [] },
     url: `${APP}/org/${ORG}/agents/${ORG}?tab=settings&sec=audience`,
   },
+  /** An admin gave an agent a teammate's Claude plan (`use_others_plans`). */
+  "plan_lent.pt-BR": {
+    kind: "plan_lent",
+    locale: "pt-BR",
+    orgName: "Padaria Souza",
+    byName: "Carlos Souza",
+    agentName: "Ada",
+    plan: "Claude",
+    url: `${APP}/org/${ORG}/notifications`,
+  },
   /** Two workspaces closed with it, on a server with a support address. */
   "account_deleted.en": {
     kind: "account_deleted",

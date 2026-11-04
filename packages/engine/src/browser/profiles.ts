@@ -458,6 +458,18 @@ export async function isGranted(db: Executor, profileId: string, agentId: string
   return Boolean(g);
 }
 
+/**
+ * Every agent a profile is granted to, read now (never cached): who shares the sessions signed in there, as a Vault
+ * login typed in it checks (ADR 0144).
+ */
+export async function profileGrantees(db: Executor, orgId: string, profileId: string): Promise<string[]> {
+  const rows = await db
+    .select({ agentId: browserProfileGrants.agentId })
+    .from(browserProfileGrants)
+    .where(and(eq(browserProfileGrants.orgId, orgId), eq(browserProfileGrants.profileId, profileId)));
+  return rows.map((r) => r.agentId);
+}
+
 /** The profiles an agent is granted (live ones), oldest grant first. */
 export async function agentBrowserProfiles(db: Executor, orgId: string, agentId: string) {
   return db

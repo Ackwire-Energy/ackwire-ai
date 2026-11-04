@@ -769,7 +769,9 @@
       "connector_tool_changed_other": "接続中のサーバーが、承認済みのツールを変更しました",
       "computer_disk_full_other": "コンピューターのディスクがほぼいっぱいです",
       "computer_no_chrome_other": "コンピューターにGoogle Chromeが必要です。google.com/chromeからダウンロードしてください",
-      "app_created_other": "AIアプリがあなたのために作成しました"
+      "app_created_other": "AIアプリがあなたのために作成しました",
+      "plan_lent_other": "{{names}}があなたの {{plan}} プランを{{agent}}に接続しました",
+      "plan_lent_female_other": "{{names}}があなたの {{plan}} プランを{{agent}}に接続しました"
     },
     "markRead": "既読にする",
     "markUnread": "未読にする",
@@ -1624,9 +1626,241 @@
     "machine": {
       "toolsHow": "オンのツールをタップするとオフになります。再びオンにするには、そのコンピューター上で操作する必要があります。"
     },
+    "roles": {
+      "onComputer": "ロールの順番と各ロールのアイコンはコンピューターで変更します。",
+      "items": "項目ごと",
+      "create": "作成"
+    },
     "import": {
       "preparing": "ファイルを準備中…",
       "failed": "ファイルをダウンロードできませんでした。もう一度お試しください。"
+    }
+  },
+  "vault": {
+    "newItem": "新しい項目",
+    "search": "Vaultを検索",
+    "noResults": "「{{q}}」に一致するものはありません。",
+    "personalText": "これらはあなただけに表示されます。エージェントは、あなたが頼んだときだけ使います。",
+    "teamText": "チームのログイン、キー、連絡先です。それぞれを誰が見られるか、どのエージェントが使うかを選べます。",
+    "teamReadText": "ワークスペースのキーを管理する人から共有されたものです。",
+    "missing": "見つかりません",
+    "usedAt": "{{when}}に使用",
+    "neverUsed": "未使用",
+    "kindTitle": "保存するもの",
+    "teamAudience": "ワークスペースの全員が見られます。保存後に絞り込めます。",
+    "savedToVault": "Vaultに保存しました",
+    "tab": {
+      "team": "チーム",
+      "personal": "個人",
+      "connections": "接続"
+    },
+    "kind": {
+      "login": "ログイン",
+      "key": "キー",
+      "contact": "連絡先"
+    },
+    "kinds": {
+      "all": "すべて",
+      "login": "ログイン",
+      "key": "キー",
+      "contact": "連絡先"
+    },
+    "kindText": {
+      "login": "Webサイト、ユーザー名、パスワードです。エージェントはパスワードを見ずにログインします。",
+      "key": "APIキーまたはトークンです。エージェントは中身を見ずにコマンドで使います。",
+      "contact": "エージェントがフォームに入力する名前、会社、メール、電話番号、住所です。"
+    },
+    "empty": {
+      "personalTitle": "まだ何もありません",
+      "personalText": "ここにログインやキーを保存すると、頼んだときにエージェントが使います。",
+      "teamTitle": "まだ共有されたものはありません",
+      "teamText": "エージェントがチームのために使うログインとキーを保存しましょう。",
+      "teamReadText": "誰かがログインやキーを共有すると、ここに表示されます。"
+    },
+    "import": {
+      "title": "コンピューターからインポート",
+      "text": "ブラウザーやパスワードマネージャーからパスワードを取り込むには、Webで「設定」、「Vault」を開き、「インポート」を選んでください。"
+    },
+    "connections": {
+      "text": "パスワードマネージャーを接続すると、そこに保存されたログインをエージェントが使います。何もコピーされません。パスワードは使うときにだけ読み取られます。",
+      "connected": "接続済み",
+      "add": "接続",
+      "none": "ここではパスワードマネージャーを接続できません。",
+      "help": "エージェント専用の保管庫かフォルダーを使い、必要なものだけを入れてください。"
+    },
+    "connect": {
+      "title": "{{name}}を接続",
+      "reconnectTitle": "{{name}}を再接続",
+      "action": "接続",
+      "text": "エージェントは、{{name}}が保管しているログインを、パスワードを見ずに使います。",
+      "steps": "接続の手順",
+      "guide": "{{name}}のガイドを開く",
+      "fields": "入力情報",
+      "private": "この情報は暗号化して保管され、二度と表示されません。",
+      "teamHelp": "項目は最初、ワークスペースの全員に表示され、どのエージェントも使いません。エージェントはあとで選びます。",
+      "personalHelp": "項目はあなただけに表示され、あなたが頼んだときにエージェントが使います。",
+      "checking": "{{name}}で確認しています…",
+      "connected": "{{name}}を接続しました",
+      "reconnected": "{{name}}を再接続しました",
+      "unknown": "このパスワードマネージャーはここでは使えません。"
+    },
+    "connection": {
+      "ready": "接続済み",
+      "syncing": "同期しています…",
+      "reads": "{{label}}を読み取り",
+      "items_other": "{{count}}件",
+      "synced": "{{when}}に同期",
+      "sync": "今すぐ同期",
+      "syncDone": "同期しました",
+      "reconnect": "再接続",
+      "change": "ログイン情報を変更",
+      "readOnly": "{{name}}のログインは{{name}}で変更します。ここでは誰が使うかを選べます。",
+      "disconnect": "切断",
+      "disconnectTitle": "{{name}}を切断しますか？",
+      "disconnectText_other": "{{count}}件の項目がVaultから外れ、エージェントは使わなくなります。{{name}}側は何も変わりません。",
+      "disconnected": "{{name}}を切断しました",
+      "gone": "この接続はもう存在しないか、表示する権限がありません。"
+    },
+    "item": {
+      "gone": "この項目はもう存在しないか、表示する権限がありません。",
+      "missingText": "前回の同期以降、{{name}}から消えています。エージェントは使えません。",
+      "unreadable": "この連絡先の情報はここでは読み取れません。管理している人がもう一度入力して保存できます。",
+      "externalText": "{{name}}から来ています。名前、アドレス、ユーザー名、パスワードはそちらで変更してください。",
+      "noValue": "まだ値が保存されていません。",
+      "sealedHelp": "安全のため、ここに保存した内容は二度と表示されません。変更するには、もう一度入力してください。",
+      "changePassword": "パスワードを変更",
+      "changeValue": "値を変更",
+      "changeHelp": "「保存」をタップすると反映されます。それ以降、エージェントは新しいものを使います。",
+      "hidden": "非表示",
+      "saved": "保存しました",
+      "delete": "削除",
+      "deleteTitle": "{{title}}を削除しますか？",
+      "deleteText": "エージェントはすぐに使わなくなります。元に戻せません。",
+      "deleteExternal": "Vaultから外れ、エージェントは使わなくなります。{{name}}には残ります。",
+      "deleted": "削除しました"
+    },
+    "field": {
+      "title": "名前",
+      "titleOptional": "任意",
+      "website": "Webサイト",
+      "websitePlaceholder": "acme.example",
+      "username": "ユーザー名",
+      "password": "パスワード",
+      "newPassword": "新しいパスワード",
+      "keyName": "変数",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "keyNameHelp": "大文字、数字、_を使います。例: ACME_API_KEY。エージェントはこの名前でキーを求めます。",
+      "value": "値",
+      "newValue": "新しい値",
+      "description": "説明",
+      "descriptionPlaceholder": "用途",
+      "descriptionHelp": "エージェントはこれを読んで、いつ使うかを判断します。",
+      "loginHelp": "エージェントはこのWebサイトでだけ、パスワードを見ずに入力します。",
+      "contactHelp": "秘密情報ではありません。エージェントはこれを読んでフォームに入力します。"
+    },
+    "contact": {
+      "fullName": "氏名",
+      "company": "会社",
+      "document": "納税者番号",
+      "email": "メール",
+      "phone": "電話番号",
+      "address": "住所",
+      "address2": "住所2",
+      "city": "市区町村",
+      "region": "都道府県",
+      "postalCode": "郵便番号",
+      "country": "国"
+    },
+    "match": {
+      "title": "エージェントが入力できる場所",
+      "exact": "このアドレスだけ",
+      "exactText": "上のアドレスと完全に一致する場所",
+      "site": "サイト全体",
+      "siteOn": "{{host}}と同じサイトのすべてのページ",
+      "siteText": "同じサイトのすべてのページ",
+      "help": "安全なページ（https）だけです。それ以外では、エージェントのコンピューターが入力を拒否します。"
+    },
+    "problem": {
+      "secret": "パスワードかキーの値を入力してください。"
+    },
+    "scope": {
+      "title": "表示できる人",
+      "personal": "個人",
+      "personalText": "あなただけに表示されます。エージェントは、あなたが頼んだときだけ使います。",
+      "team": "チーム",
+      "teamText": "アクセスできる人に表示されます。そのうちの誰かが頼んだときにエージェントが使います。",
+      "teamLocked": "チーム用に保存できるのは、ワークスペースのキーを管理する人だけです。"
+    },
+    "agents": {
+      "title": "使えるエージェント",
+      "allText": "すべてのエージェント（新しいエージェントも含む）",
+      "personalHelp": "あなたが頼んだときだけ使います。",
+      "teamHelp": "アクセスできる人が頼んだときに使います。"
+    },
+    "access": {
+      "title": "アクセスできる人",
+      "defaultTitle": "デフォルトのアクセス",
+      "defaultText": "項目ごとに誰かが変更するまでは、この設定に従います。",
+      "teamText": "誰が見られるか、その人のためにどのエージェントが使うかを選んでください。",
+      "people": "人",
+      "persons": "特定の人",
+      "roles": "ロール",
+      "agents": "エージェント",
+      "allAgents": "すべてのエージェント",
+      "noAgent": "まだエージェントはいません",
+      "onlyYou": "あなただけ",
+      "everyone": "ワークスペースの全員",
+      "everyoneText": "ここにいる誰でも見られ、その人のためにエージェントが使います。",
+      "everyoneIn": "はい",
+      "everyoneOut": "いいえ",
+      "levelIn": "アクセスあり",
+      "levelOut": "アクセスなし",
+      "everyoneHelp": "ロールや人を選ぶには、「ワークスペースの全員」をタップしてください。",
+      "managersHelp": "ワークスペースのキーを管理する人は、チームの項目を常に見られます。",
+      "managersOnly": "キーを管理する人だけ",
+      "inRole": "{{role}}の人",
+      "saved": "アクセスを保存しました",
+      "useConnection": "接続のアクセスに従う",
+      "followsConnection": "接続のアクセスに従っています。",
+      "tooManyRoles": "ロールは最大100件まで選べます。",
+      "tooManyPeople": "人は最大500人まで選べます。",
+      "tooManyAgents": "エージェントは最大200件まで選べます。",
+      "sentence": {
+        "none": "まだどのエージェントも使っていません。",
+        "personalAll": "あなたが頼んだときにエージェントが使います。",
+        "everyAgent": "すべてのエージェント",
+        "personal_other": "あなたが頼んだときに{{agents}}が使います。",
+        "everyone_other": "ワークスペースの誰かが頼んだときに{{agents}}が使います。",
+        "managers_other": "キーを管理する人が頼んだときに{{agents}}が使います。",
+        "people_other": "{{people}}のために{{agents}}が使います。"
+      }
+    },
+    "use": {
+      "fill": "{{name}}がログイン",
+      "fillOn": "{{name}}、{{host}}で",
+      "key": "{{name}}がコマンドで使用",
+      "read": "{{name}}が読み取り",
+      "create": "{{name}}が保存",
+      "edit": "{{name}}が変更",
+      "for": "{{name}}のため",
+      "routine": "ルーティン{{name}}"
+    },
+    "uses": {
+      "title": "最近の使用",
+      "none": "まだ使われていません。"
+    },
+    "card": {
+      "save": "Vaultに保存",
+      "saveText": "次回からは、あなたに聞かずにエージェントが使います。",
+      "personalOnly": "個人として保存しました。あなただけに表示されます。",
+      "choose": "選ぶ",
+      "agentsText": "依頼したエージェントはすでに選ばれています。",
+      "as": "{{username}}としてログインします。",
+      "saved": "Vaultに保存しました",
+      "notSaved": "送信しましたが、Vaultには保存していません",
+      "codeLabel": "{{name}}のコード",
+      "codeIncomplete": "コードの数字をすべて入力してください。",
+      "codeNote": "暗号化してコンピューターに直接送ります。コードは保存されません。"
     }
   },
   "status": {

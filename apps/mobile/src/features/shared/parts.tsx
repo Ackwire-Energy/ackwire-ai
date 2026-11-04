@@ -1,3 +1,4 @@
+import { markTerms } from "@agenteschat/client/lib/search-filters";
 import * as Clipboard from "expo-clipboard";
 import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-router";
 import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
@@ -22,6 +23,7 @@ import {
   useScrollUnderPushedOptions,
   useTheme,
 } from "@/ui";
+import { withAlpha } from "@/ui/palette";
 import { useColors } from "./hooks";
 
 /**
@@ -50,6 +52,8 @@ export interface ActionItem {
   icon?: IconName;
   leading?: ReactNode;
   label: string;
+  /** Search words lit in the label, as the web's results mark them. */
+  marks?: readonly string[];
   hint?: string;
   /** The label and the hint each on one line, cut with an ellipsis (a pick list of names and roles). */
   oneLine?: boolean;
@@ -86,7 +90,18 @@ export function ActionList({ items }: { items: ActionItem[] }) {
           {it.leading ?? (it.icon ? <Icon name={it.icon} size={20} color={it.danger ? c.danger : c.muted} /> : null)}
           <View style={styles.actionText}>
             <Text variant="body" tone={it.danger ? "danger" : "ink"} {...(it.oneLine ? { numberOfLines: 1 } : {})}>
-              {it.label}
+              {it.marks
+                ? markTerms(it.label, it.marks).map((part, k) =>
+                    part.mark ? (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: segments of one fixed text
+                      <Text key={k} variant="body" style={{ backgroundColor: withAlpha(c.info, 0.22) }}>
+                        {part.text}
+                      </Text>
+                    ) : (
+                      part.text
+                    ),
+                  )
+                : it.label}
             </Text>
             {it.hint ? (
               <Text variant="small" tone="faint" {...(it.oneLine ? { numberOfLines: 1 } : {})}>

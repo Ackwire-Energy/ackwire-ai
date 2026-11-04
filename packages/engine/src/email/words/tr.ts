@@ -362,4 +362,21 @@ export const words: EmailWords = {
     why: (org) =>
       `Bu e-postayı, ${org} içindeki bir ajanın senin planınla düşündüğü ve başka biri onunla kimlerin konuşabileceğini değiştirdiği için aldın.`,
   },
+  planLent: {
+    subject: (plan) => `${plan} planın artık başka bir ajan için düşünüyor`,
+    preheader: (plan) => `Onun konuşmaları ${plan} planını ve limitlerini kullanır. Geri alabilirsin.`,
+    headline: "Biri planını bir ajana bağladı",
+    body: (by, agent, plan) => [
+      { b: by },
+      ` ${plan} planını `,
+      { b: agent },
+      " ajanına bağladı. Onun konuşmaları planını ve limitlerini kullanır.",
+    ],
+    agent: "Ajan",
+    by: "Bağlayan",
+    plan: "Plan",
+    note: "Bildirimlerinden tek tıkla geri al, ajan artık planınla düşünmez.",
+    button: "Bildirimleri aç",
+    why: (org) => `Bu e-postayı ${org} içinde biri planını bir ajana bağladığı için aldın.`,
+  },
 };
