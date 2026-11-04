@@ -12,7 +12,7 @@ import {
   usageQueueWho,
 } from "@agenteschat/client/lib/usage-queue";
 import { router } from "expo-router";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Button, PixelOrbit, Segmented, Text } from "@/ui";
@@ -67,6 +67,40 @@ export function UsageQueueSheet({ agentId, tab: initialTab = "queued" }: { agent
     queue.sharedWith.flatMap((id) => dir.anyAgent(id)?.name ?? []),
   );
   const resuming = usageQueueResuming(queue);
+  const queuedList = (
+    <>
+      <View>
+        {queue.rows.map((row, i) => (
+          <WaitingRow key={row.runId} n={i + 1} row={row} agentId={agentId} now={now} />
+        ))}
+        {queue.hidden > 0 ? (
+          <Text variant="footnote" tone="faint" style={styles.hidden}>
+            {t("usageQueue.hidden", { count: queue.hidden })}
+          </Text>
+        ) : null}
+      </View>
+      {queue.mayStopAll ? (
+        <View style={styles.owner}>
+          {usageQueueStoppable(queue) > 0 ? <StopAll agentId={agentId} count={usageQueueStoppable(queue)} /> : null}
+          <View style={styles.ghostActs}>
+            <Button
+              variant="ghost"
+              size="sm"
+              label={t("usageQueue.switchAi", agentGrammar(agent))}
+              onPress={() => openAgentAi(agentId)}
+            />
+          </View>
+        </View>
+      ) : null}
+    </>
+  );
+  const skippedList = (
+    <View>
+      {queue.closed.map((row) => (
+        <SkippedRow key={row.runId} row={row} agentId={agentId} now={now} />
+      ))}
+    </View>
+  );
   return (
     <>
       <SheetTitle
@@ -89,40 +123,39 @@ export function UsageQueueSheet({ agentId, tab: initialTab = "queued" }: { agent
         <Text variant="small" tone="muted">
           {t("usageQueue.empty")}
         </Text>
+      ) : waiting > 0 && skipped > 0 ? (
+        <SameHeight
+          shown={tab === "queued" ? queuedList : skippedList}
+          other={tab === "queued" ? skippedList : queuedList}
+        />
       ) : tab === "queued" ? (
-        <>
-          <View>
-            {queue.rows.map((row, i) => (
-              <WaitingRow key={row.runId} n={i + 1} row={row} agentId={agentId} now={now} />
-            ))}
-            {queue.hidden > 0 ? (
-              <Text variant="footnote" tone="faint" style={styles.hidden}>
-                {t("usageQueue.hidden", { count: queue.hidden })}
-              </Text>
-            ) : null}
-          </View>
-          {queue.mayStopAll ? (
-            <View style={styles.owner}>
-              {usageQueueStoppable(queue) > 0 ? <StopAll agentId={agentId} count={usageQueueStoppable(queue)} /> : null}
-              <View style={styles.ghostActs}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  label={t("usageQueue.switchAi", agentGrammar(agent))}
-                  onPress={() => openAgentAi(agentId)}
-                />
-              </View>
-            </View>
-          ) : null}
-        </>
+        queuedList
       ) : (
-        <View>
-          {queue.closed.map((row) => (
-            <SkippedRow key={row.runId} row={row} agentId={agentId} now={now} />
-          ))}
-        </View>
+        skippedList
       )}
     </>
+  );
+}
+
+/**
+ * The list shown, with the other laid out unseen under it: the sheet keeps the taller one's height, so its top stays
+ * put between the two lists.
+ */
+function SameHeight({ shown, other }: { shown: ReactNode; other: ReactNode }) {
+  const [minHeight, setMinHeight] = useState(0);
+  return (
+    <View style={[styles.lists, { minHeight }]}>
+      {shown}
+      <View
+        style={[styles.lists, styles.unseen]}
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        onLayout={(e) => setMinHeight(e.nativeEvent.layout.height)}
+      >
+        {other}
+      </View>
+    </View>
   );
 }
 
@@ -266,4 +299,7 @@ const styles = StyleSheet.create({
   owner: { gap: 4, marginTop: 4, alignItems: "flex-start" },
   confirm: { gap: 8 },
   confirmActs: { flexDirection: "row", gap: 8 },
+  // The sheet's own gap between its rows (SheetHost).
+  lists: { gap: 12 },
+  unseen: { position: "absolute", top: 0, left: 0, right: 0, opacity: 0 },
 });

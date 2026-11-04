@@ -278,6 +278,45 @@ html:not([data-pointer]) .cq-link:focus-visible {
  * An agent's usage queue (UsageQueue.tsx): its face and the phase as the title, a switch between the two lists when
  * both have something, then one short row per conversation: number, where · who and when, and the action slot.
  */
+/*
+ * Its top stays put while its height changes (the other list, a row gone, the footer only under Na fila): held by its
+ * top instead of centered and, on a phone, a sheet of one height while the switch shows.
+ */
+@media (min-width: 641px) {
+  .ac-dialog.uq-dialog {
+    top: 12vh;
+    transform: translateX(-50%);
+    max-height: calc(88vh - 24px);
+    /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
+    max-height: calc(100dvh - 12vh - 24px);
+  }
+}
+@media (prefers-reduced-motion: no-preference) and (min-width: 641px) {
+  .ac-dialog.uq-dialog[data-state="open"] {
+    animation-name: uq-dialog-in;
+  }
+}
+@keyframes uq-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+@media (max-width: 640px) {
+  .ac-dialog.uq-dialog:has(.ac-seg) {
+    height: min(520px, calc(100vh - 12px));
+    /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
+    height: min(520px, calc(100dvh - 12px - env(safe-area-inset-top, 0px)));
+  }
+  /* The footer keeps to the sheet's bottom edge. */
+  .uq-dialog:has(.ac-seg) .ac-dialog__body {
+    flex-grow: 1;
+  }
+}
 /* A title that wraps keeps the face on its first line. */
 .uq-dialog .ac-dialog__head {
   align-items: flex-start;
