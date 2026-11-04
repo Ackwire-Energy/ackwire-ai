@@ -29,6 +29,7 @@ function StickerCanvasView({
   seed,
   live,
   playFor,
+  from,
 }: {
   look: StickerLook;
   mood: DrawnMood;
@@ -38,23 +39,26 @@ function StickerCanvasView({
   live: boolean;
   /** Plays once, for this many seconds from when it shows, then stands at its still frame; without it, it loops. */
   playFor?: number;
+  /** When that one play started on the frame clock, if before it showed here (it then goes on, not again). */
+  from?: number;
 }) {
   const reduced = useReducedMotion();
-  const [from] = useState(() => frameClock.time());
+  const [shownAt] = useState(() => frameClock.time());
+  const start = from ?? shownAt;
   const [done, setDone] = useState(false);
   useEffect(() => {
     if (playFor === undefined) return;
-    const id = setTimeout(() => setDone(true), playFor * 1000);
+    const id = setTimeout(() => setDone(true), Math.max(0, start + playFor - frameClock.time()) * 1000);
     return () => clearTimeout(id);
-  }, [playFor]);
+  }, [playFor, start]);
   const t = useFrameTime(live && !reduced && !done, STOPPED, STICKER_FPS);
   const { color, eyes, accessory } = look;
   const picture = useMemo(() => {
-    const once = playFor === undefined ? undefined : Math.min(Math.max(0, t - from), playFor);
+    const once = playFor === undefined ? undefined : Math.min(Math.max(0, t - start), playFor);
     const at = t === STOPPED ? STICKER_STILL_T : (once ?? t + stickerSeed(seed));
     const ops = stickerFrame({ color, eyes, accessory }, mood, size, at);
     return createPicture((canvas) => replay(canvas, ops), { width: size, height: size });
-  }, [color, eyes, accessory, mood, size, seed, t, from, playFor]);
+  }, [color, eyes, accessory, mood, size, seed, t, start, playFor]);
   return (
     <Canvas style={{ width: size, height: size }}>
       <Picture picture={picture} />
@@ -76,6 +80,7 @@ export const StickerCanvas = memo(
     a.seed === b.seed &&
     a.live === b.live &&
     a.playFor === b.playFor &&
+    a.from === b.from &&
     a.look.color === b.look.color &&
     a.look.eyes === b.look.eyes &&
     a.look.accessory === b.look.accessory,

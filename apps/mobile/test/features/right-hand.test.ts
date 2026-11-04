@@ -103,10 +103,15 @@ test("it waves on the person's first visit only: its DM never read by them, on a
   expect(firstVisitOf([{ ...dm(lodi, 1), everRead: true }], lodi.id)).toBe(false);
   // An older server says nothing: no wave.
   expect(firstVisitOf([dm(lodi, 1)], lodi.id)).toBe(false);
-  // Under the greeting, decorative, playing once.
+  // Decided by the conversation, so the greeting moving into the list with the first message keeps it, not playing
+  // again; under the greeting, decorative, playing once.
+  const chat = readFileSync(new URL("../../src/features/chat/ChatScreen.tsx", import.meta.url), "utf8");
+  expect(chat).toContain('useRightHandWave(orgId, rightHand && dmAgent ? dmAgent.id : "")');
+  expect(
+    chat.match(/<RightHandIntro agent=\{dmAgent\} channelId=\{channelId\} waveFrom=\{waveFrom\} \/>/g),
+  ).toHaveLength(2);
   const intro = readFileSync(new URL("../../src/features/right-hand/Intro.tsx", import.meta.url), "utf8");
-  expect(intro).toContain("useRightHandWave(orgId, agent.id)");
-  expect(intro).toMatch(/mood="wave"[\s\S]*playFor=\{WAVE_SECONDS\}/);
+  expect(intro).toMatch(/mood="wave"[\s\S]*playFor=\{WAVE_SECONDS\}[\s\S]*from=\{waveFrom\}/);
   expect(intro).toContain('importantForAccessibility="no-hide-descendants"');
 });
 

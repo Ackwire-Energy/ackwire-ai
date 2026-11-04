@@ -1,4 +1,4 @@
-import { type Agent, keys, useAiStatus, useApi, useChannels, useMembers, useRightHandWave } from "@agenteschat/client";
+import { type Agent, keys, useAiStatus, useApi, useChannels, useMembers } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
@@ -29,15 +29,15 @@ import { tapHaptic, useSurface } from "../shared/parts";
  * any AI is connected: its greeting, then the first card the workspace needs, as on the web. No AI yet: Connect AI.
  * An AI and no agent besides it: how to start (the ready-made agents, describing the need, an import or the form). A
  * team and nobody else here yet: inviting people and the first task, written in that agent's composer. On the
- * person's first visit, its waving sticker under the greeting, drawn as a sticker message is and decorative.
+ * person's first visit (`waveFrom`, when its wave started), its waving sticker under the greeting, drawn as a sticker
+ * message is and decorative.
  */
-export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: string }) {
+export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; channelId: string; waveFrom?: number }) {
   const { t } = useTranslation();
   const { orgId, org } = useOrg();
   const dir = useDirectory();
   const status = useAiStatus(orgId);
   const members = useMembers(orgId);
-  const wave = useRightHandWave(orgId, agent.id);
   const team = dir.agents.filter((a) => !isRightHand(a));
   const first = team[0];
   const teamHandles = team.map((a) => a.handle);
@@ -63,7 +63,7 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
         <Text variant="body" tone="ink2">
           {t("rightHand.intro.lead")}
         </Text>
-        {wave ? (
+        {waveFrom !== undefined ? (
           <View style={styles.sticker} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             <StickerCanvas
               look={agentLook(agent)}
@@ -72,6 +72,7 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
               seed={agent.id}
               live
               playFor={WAVE_SECONDS}
+              from={waveFrom}
             />
           </View>
         ) : null}
