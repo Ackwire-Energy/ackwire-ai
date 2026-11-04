@@ -520,10 +520,21 @@ html:not([data-pointer]) .cal-band:focus-visible {
   height: 30px;
 }
 
-/* Details popover */
+/* Details popover: the menu's room and corner (`.ac-popover`), its words further in, its buttons back on the room. */
 .cal-pop.ac-popover {
+  --menu-pad: var(--space-2);
   width: min(320px, 90vw);
-  padding: 14px;
+  padding: var(--menu-pad);
+}
+.cal-pop .cal-details {
+  padding: var(--popover-in);
+}
+.cal-pop .cal-details__actions:has(> .ac-btn) {
+  margin-inline: calc(-1 * var(--popover-in));
+  margin-bottom: calc(-1 * var(--popover-in));
+}
+.cal-pop .cal-details__actions:has(> .ac-btn) > .ac-link {
+  margin-left: var(--popover-in);
 }
 .cal-details {
   display: flex;
@@ -645,9 +656,11 @@ html:not([data-pointer]) .cal-band:focus-visible {
 .cal-month__more:hover {
   background: var(--plate-soft);
 }
+/* Its chips on the menu's concentric rule: the box is their corner plus its room (`.ac-menu`). */
 .cal-more.ac-popover {
+  --menu-pad: var(--space-2);
   width: 260px;
-  padding: 10px;
+  padding: var(--menu-pad);
 }
 .cal-more__title {
   margin: 0 0 6px;

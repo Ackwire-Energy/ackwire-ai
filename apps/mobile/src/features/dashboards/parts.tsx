@@ -143,19 +143,19 @@ export function BoardRow({
   );
 }
 
-/** A role's small mark: a square of dither in its color (the web's role chips). */
-export function RoleMark({ color }: { color: string }) {
+/** A role's mark: a square of dither in its color (the web's role chips), 10 points by default. */
+export function RoleMark({ color, size = 10 }: { color: string; size?: number }) {
   const { scheme } = useTheme();
   const tones = widgetTones(color, scheme === "dark");
   return (
-    <Canvas style={styles.roleMark}>
+    <Canvas style={{ width: size, height: size }}>
       <DitherShape
-        width={10}
-        height={10}
-        shape={roundRectPath(0, 0, 10, 10, 3)}
+        width={size}
+        height={size}
+        shape={roundRectPath(0, 0, size, size, size * 0.3)}
         fill={tones.stroke}
         density={0.7}
-        cell={1}
+        cell={size >= 20 ? 2 : 1}
       />
     </Canvas>
   );
@@ -511,7 +511,6 @@ const styles = StyleSheet.create({
   thumb: { width: THUMB_W, height: THUMB_H, borderRadius: 10, overflow: "hidden" },
   boardRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, paddingVertical: 10 },
   titleLine: { flexDirection: "row", alignItems: "center", gap: 5 },
-  roleMark: { width: 10, height: 10 },
   audience: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 },
   role: { flexDirection: "row", alignItems: "center", gap: 4 },
   proposal: {

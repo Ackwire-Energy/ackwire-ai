@@ -905,6 +905,11 @@ export interface ApiClient {
     refreshAccountUsage(orgId: string): Promise<void>;
     /** "Contas de IA": the viewer's accounts on every computer, and where they can add one. */
     aiAccounts(orgId: string): Promise<AiAccounts>;
+    /**
+     * "Tirar de volta" (ADR 0059 §3): the viewer's plan leaves an agent someone else gave it to (`agentId`), or every
+     * such agent.
+     */
+    takeBackPlan(orgId: string, accountId: string, agentId?: string): Promise<{ agentIds: string[] }>;
     /** Its owner names it (1 to 40 characters). */
     renameAccount(orgId: string, machineId: string, accountId: string, label: string): Promise<MachineAccount>;
     /** Its owner (or whoever connected the computer) disconnects it; the computer signs it out and deletes it. */

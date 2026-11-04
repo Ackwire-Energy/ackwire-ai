@@ -2,6 +2,7 @@ import type { Agent } from "@agenteschat/client";
 import { useAgentDetail } from "@agenteschat/client";
 import { audienceSummary } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import { type AgentColor, Avatar, Button, Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -67,6 +68,7 @@ export function AgentPublicCard({ agent, onClose }: { agent: Agent; onClose?: ()
               @{agent.handle}
               {agent.role && ` · ${agent.role}`}
             </span>
+            {tellsNameStory(agent) && <span className="small muted agp-story">{t("rightHand.profile.nameStory")}</span>}
           </div>
         </section>
       </header>

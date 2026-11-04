@@ -769,7 +769,9 @@
       "connector_tool_changed_other": "연결된 서버가 내가 승인한 도구를 바꿨어요",
       "computer_disk_full_other": "컴퓨터 디스크가 거의 찼어요",
       "computer_no_chrome_other": "컴퓨터에 Google Chrome이 필요해요. google.com/chrome에서 받으세요",
-      "app_created_other": "AI 앱이 나를 위해 항목을 만들었어요"
+      "app_created_other": "AI 앱이 나를 위해 항목을 만들었어요",
+      "plan_lent_other": "{{names}} 님이 내 {{plan}} 플랜을 {{agent}}에 연결했어요",
+      "plan_lent_female_other": "{{names}} 님이 내 {{plan}} 플랜을 {{agent}}에 연결했어요"
     },
     "markRead": "읽음으로 표시",
     "markUnread": "안 읽음으로 표시",
@@ -1623,6 +1625,11 @@
     },
     "machine": {
       "toolsHow": "켜진 도구를 탭하면 꺼져요. 다시 켜는 건 그 컴퓨터에서만 할 수 있어요."
+    },
+    "roles": {
+      "onComputer": "역할 순서와 각 역할의 아이콘은 컴퓨터에서 바꿔요.",
+      "items": "항목별",
+      "create": "만들기"
     },
     "import": {
       "preparing": "파일을 준비하는 중…",

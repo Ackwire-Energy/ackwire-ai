@@ -4199,6 +4199,15 @@
   "settings.machine.toolsHow": {
     "value": "Tap a tool that's on to turn it off. Turning it back on happens only on the computer itself."
   },
+  "settings.roles.onComputer": {
+    "value": "The roles' order and each role's icon change on the computer."
+  },
+  "settings.roles.items": {
+    "value": "Item by item"
+  },
+  "settings.roles.create": {
+    "value": "Create"
+  },
   "settings.import.preparing": {
     "value": "Preparing the file…"
   },
@@ -4936,5 +4945,15 @@
   },
   "dashboards.notice.card.proposal": {
     "value": "Dashboard"
+  },
+  "activity.kind.plan_lent": {
+    "value": {
+      "one": "{{names}} connected your {{plan}} plan to {{agent}}",
+      "other": "{{names}} connected your {{plan}} plan to {{agent}}"
+    },
+    "female": {
+      "one": "{{names}} connected your {{plan}} plan to {{agent}}",
+      "other": "{{names}} connected your {{plan}} plan to {{agent}}"
+    }
   }
 }

@@ -64,6 +64,13 @@ describe("what a message carries (ADR 0091)", () => {
     expect<string[]>([...GIF_CATEGORY_IDS]).toEqual([...categories.matchAll(/^\s*(\w+):/gm)].map((m) => m[1] ?? ""));
   });
 
+  test("the wave is a sticker people send: a mood the client reads and posts", () => {
+    expect(STICKER_MOODS).toContain("wave");
+    const wave = { kind: "sticker", agentId: "ag-1", mood: "wave" };
+    expect(messageMediaOf({ media: wave })).toEqual(wave as never);
+    expect(stickerMedia("ag-1", "wave")).toEqual({ kind: "sticker", agentId: "ag-1", mood: "wave" });
+  });
+
   test("messageMediaOf reads meta.media as the server does; anything malformed is none", () => {
     for (const media of [
       { kind: "gif", id: "" },

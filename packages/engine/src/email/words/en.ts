@@ -372,6 +372,23 @@ export const en = {
     why: (org: string) =>
       `You got this email because an agent of yours in ${org} thinks with your plan and someone else changed who can talk to it.`,
   },
+  planLent: {
+    subject: (plan: string) => `Your ${plan} plan now thinks for another agent`,
+    preheader: (plan: string) => `Its conversations use your ${plan} plan and its limits. You can take it back.`,
+    headline: "Someone connected your plan to an agent",
+    body: (by: string, agent: string, plan: string): Text => [
+      { b: by },
+      ` connected your ${plan} plan to `,
+      { b: agent },
+      ". Its conversations use your plan and its limits.",
+    ],
+    agent: "Agent",
+    by: "Connected by",
+    plan: "Plan",
+    note: "Take it back in one click from your notifications, and the agent stops thinking with your plan.",
+    button: "Open notifications",
+    why: (org: string) => `You got this email because someone in ${org} connected your plan to an agent.`,
+  },
 };
 
 /** Every email's words: English has them all; another language what it translated (`Partial`), English for the rest. */

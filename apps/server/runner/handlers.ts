@@ -22,9 +22,11 @@ import { redactSecrets } from "@agenteschat/adapters/secret-box";
 import { realFoldersFor } from "./access";
 import type { AccountFolders, AccountGrant, AccountManager } from "./accounts";
 import { type BrainManager, brainKey } from "./brain";
+import { type AntigravityBrainTurnRequest, handleAntigravityBrainTurn } from "./brain-antigravity";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import type { CodexAppServers } from "./brain-codex-app";
 import { type CursorBrainTurnRequest, handleCursorBrainTurn } from "./brain-cursor";
+import { type GrokBrainTurnRequest, handleGrokBrainTurn } from "./brain-grok";
 import { handleOpencodeBrainTurn, type OpencodeBrainTurnRequest } from "./brain-opencode";
 import { routeWithPlan } from "./brain-route";
 import { type BrowserManager, browserSetupText } from "./browser";
@@ -276,6 +278,8 @@ const TOOL_LABEL: Record<keyof RunnerTools, string> = {
   codex: "Codex",
   cursor: "Cursor",
   opencode: "OpenCode",
+  grok: "Grok Build",
+  antigravity: "Antigravity CLI",
   commands: "Commands",
   browser: "Browser",
   desktop: "The desktop",
@@ -958,7 +962,14 @@ async function doBrainTurn(
   scope: RequestScope,
   secrets: Secrets,
 ): Promise<MachineReplies["brain.turn"]> {
-  const cli = req.kind === "codex" || req.kind === "cursor" || req.kind === "opencode" ? req.kind : null;
+  const cli =
+    req.kind === "codex" ||
+    req.kind === "cursor" ||
+    req.kind === "opencode" ||
+    req.kind === "grok" ||
+    req.kind === "antigravity"
+      ? req.kind
+      : null;
   requireTool(ctx, cli ?? "claude");
   if (!req.agent) throw new RunnerError("bad_request", "A brain turn belongs to an agent");
   const runId = requireString(req.runId, "runId");
@@ -982,10 +993,10 @@ async function doBrainTurn(
 }
 
 /**
- * Cursor and OpenCode turns in progress, by run: `brain.steer` answers `unsupported` for them (`agent -p` and
- * `opencode run` take nothing mid-turn).
+ * Cursor, OpenCode, Grok and Antigravity turns in progress, by run: `brain.steer` answers `unsupported` for them
+ * (`agent -p`, `opencode run`, `grok -p` and `agy -p` take nothing mid-turn).
  */
-const turnOnlyRuns = new Map<string, "Cursor" | "OpenCode">();
+const turnOnlyRuns = new Map<string, "Cursor" | "OpenCode" | "Grok Build" | "Antigravity CLI">();
 
 const STEER_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -1036,7 +1047,14 @@ function signedOut(
   const accounts = ctx.accounts;
   if (!accounts || typeof req.account !== "string" || !req.account || final?.type !== "error") return;
   if (final.code !== "not_logged_in" && final.code !== "account_missing") return;
-  const kind = req.kind === "codex" || req.kind === "cursor" || req.kind === "opencode" ? req.kind : "claude_code";
+  const kind =
+    req.kind === "codex" ||
+    req.kind === "cursor" ||
+    req.kind === "opencode" ||
+    req.kind === "grok" ||
+    req.kind === "antigravity"
+      ? req.kind
+      : "claude_code";
   void (final.code === "not_logged_in" ? accounts.refused(kind, req.account) : Promise.resolve())
     .catch(() => undefined)
     .then(() => {
@@ -1063,11 +1081,13 @@ async function doCodexTurn(
   const codex = ctx.codex;
   const cursor = req.kind === "cursor";
   const opencode = req.kind === "opencode";
-  const name = cursor ? "Cursor" : opencode ? "OpenCode" : "Codex";
+  const grok = req.kind === "grok";
+  const agy = req.kind === "antigravity";
+  const name = cursor ? "Cursor" : opencode ? "OpenCode" : grok ? "Grok Build" : agy ? "Antigravity CLI" : "Codex";
   if (!codex) throw new RunnerError("bad_request", `This runner runs no ${name} brain turns`);
   let final: CodexBrainEvent = {
     type: "error",
-    code: `${cursor ? "cursor" : opencode ? "opencode" : "codex"}_failed`,
+    code: `${cursor ? "cursor" : opencode ? "opencode" : grok ? "grok" : agy ? "antigravity" : "codex"}_failed`,
     message: `${name} ended without an answer.`,
   };
   let ended = false;
@@ -1093,9 +1113,41 @@ async function doCodexTurn(
     }
     scope.emit?.({ type: "brain.event", runId, event });
   };
-  if (cursor || opencode) turnOnlyRuns.set(runId, cursor ? "Cursor" : "OpenCode");
+  if (cursor || opencode || grok || agy) {
+    turnOnlyRuns.set(runId, cursor ? "Cursor" : opencode ? "OpenCode" : grok ? "Grok Build" : "Antigravity CLI");
+  }
   try {
-    if (opencode) {
+    if (agy) {
+      await handleAntigravityBrainTurn(
+        {
+          folder,
+          exec: toolOn(ctx, "antigravity"),
+          runnerHome: codex.runnerHome,
+          ...(ctx.secretsDir && !chat ? { secretsDir: ctx.secretsDir } : {}),
+          ...(codex.mcp ? { mcp: codex.mcp } : {}),
+          ...(ctx.grants && !chat ? { grants: ctx.grants } : {}),
+          ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
+          ...(codex.spawn ? { spawn: codex.spawn } : {}),
+        },
+        req as unknown as AntigravityBrainTurnRequest,
+        { signal: scope.signal, emit },
+      );
+    } else if (grok) {
+      await handleGrokBrainTurn(
+        {
+          folder,
+          exec: toolOn(ctx, "grok"),
+          runnerHome: codex.runnerHome,
+          ...(ctx.secretsDir && !chat ? { secretsDir: ctx.secretsDir } : {}),
+          ...(codex.mcp ? { mcp: codex.mcp } : {}),
+          ...(ctx.grants && !chat ? { grants: ctx.grants } : {}),
+          ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
+          ...(codex.spawn ? { spawn: codex.spawn } : {}),
+        },
+        req as unknown as GrokBrainTurnRequest,
+        { signal: scope.signal, emit },
+      );
+    } else if (opencode) {
       await handleOpencodeBrainTurn(
         {
           folder,

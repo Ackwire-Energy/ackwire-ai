@@ -340,4 +340,21 @@ export const words: EmailWords = {
     why: (org) =>
       `Kamu menerima email ini karena agenmu di ${org} berpikir dengan paketmu dan orang lain mengubah siapa yang bisa bicara dengannya.`,
   },
+  planLent: {
+    subject: (plan) => `Paket ${plan} kamu sekarang berpikir untuk agen lain`,
+    preheader: (plan) => `Percakapannya memakai paket ${plan} kamu dan batasnya. Kamu bisa menariknya kembali.`,
+    headline: "Seseorang menghubungkan paketmu ke sebuah agen",
+    body: (by, agent, plan) => [
+      { b: by },
+      ` menghubungkan paket ${plan} kamu ke agen `,
+      { b: agent },
+      ". Percakapannya memakai paketmu dan batasnya.",
+    ],
+    agent: "Agen",
+    by: "Dihubungkan oleh",
+    plan: "Paket",
+    note: "Tarik kembali dengan satu klik dari notifikasimu, dan agen itu berhenti berpikir dengan paketmu.",
+    button: "Buka notifikasi",
+    why: (org) => `Kamu menerima email ini karena seseorang di ${org} menghubungkan paketmu ke sebuah agen.`,
+  },
 };

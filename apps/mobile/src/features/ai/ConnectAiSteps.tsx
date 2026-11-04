@@ -15,7 +15,6 @@ import { computerEdition, computerName, setupView } from "@agenteschat/client/li
 import { holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { toolOffReason } from "@agenteschat/client/lib/machines";
 import {
   type AiChoice,
   behindComputer,
@@ -24,6 +23,7 @@ import {
   firstAgent,
   freePlanAccount,
   gateDims,
+  gateLine,
   KEY_MARKS,
   kindOf,
   ownSignInFor,
@@ -36,7 +36,14 @@ import {
   planOfAccount,
   planTitle,
 } from "@agenteschat/client/lib/no-ai";
-import { isPlanId, PLAN_IDS, planOf } from "@agenteschat/client/lib/plans";
+import {
+  geminiPersonal,
+  isPlanId,
+  PLAN_IDS,
+  planOf,
+  providerFitsChoice,
+  signInProviderOf,
+} from "@agenteschat/client/lib/plans";
 import {
   AUTO,
   keyLooksValid,
@@ -249,8 +256,10 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
     forAgent && gates.view?.agentId === forAgent.id && !hasAi(forAgent.id)
       ? existingRows(t, gates.view, credentials.data ?? [], forAgent.name)
       : [];
-  const shown = gates.gateOf(view.page === "plan" ? view.choice : "claude").state;
-  useEffect(() => setPolls(agentId !== undefined && pollsPlan(shown)), [agentId, shown]);
+  const shownGate = gates.gateOf(view.page === "plan" ? view.choice : "claude");
+  const shown = shownGate.state;
+  const asksAgain = agentId !== undefined && pollsPlan(shownGate, gates.edition);
+  useEffect(() => setPolls(asksAgain), [asksAgain]);
   const { markWaited } = gates;
   const onPlan = view.page === "plan";
   useEffect(() => {
@@ -424,7 +433,7 @@ function Home({
       ) : null}
       <GroupedHeader>{t("mobile.ai.yourPlan")}</GroupedHeader>
       <GroupedList>
-        {(["claude", "chatgpt"] as const).map((c) => (
+        {(["claude", "chatgpt", "grok", "gemini"] as const).map((c) => (
           <GroupedRow
             key={c}
             leading={<ProviderLogo id={planMark(c)} size="sm" off={dims(c)} />}
@@ -708,9 +717,14 @@ function PlanWithoutAgent({
   const elsewhere = gate.state === "locked" && !cloud;
   if (has) {
     return (
-      <InfoCard icon="check" live>
-        {t("connectAi.forNewAgents", { label: has.label })}
-      </InfoCard>
+      <View style={styles.gap}>
+        <InfoCard icon="check" live>
+          {t("connectAi.forNewAgents", { label: has.label })}
+        </InfoCard>
+        {choice === "gemini" && geminiPersonal(has) ? (
+          <Note icon="info">{t("connectAi.plan.gemini.warning")}</Note>
+        ) : null}
+      </View>
     );
   }
   return (
@@ -890,7 +904,7 @@ function PlanSteps({
   // The shared sign-in's plan, where the computer says it ("Claude Max").
   const ownPlan = planWordOf(gates.row?.own?.[kind]?.plan ?? null);
   const current = view?.accounts.find(
-    (a) => a.id === view.account && a.kind === kind && (coding ? a.provider === choice : !a.provider),
+    (a) => a.id === view.account && a.kind === kind && providerFitsChoice(a.provider, choice, coding),
   );
   // Signed in again: the agent's own login, unless this sign-in is another account's (`hint`).
   const signedOut = !hint && current?.status === "signed_out" ? current : undefined;
@@ -905,7 +919,7 @@ function PlanSteps({
               a.mine &&
               a.status === "active" &&
               a.kind === kind &&
-              (coding ? a.provider === choice : !a.provider) &&
+              providerFitsChoice(a.provider, choice, coding) &&
               a.id !== view?.account,
           ),
         ).flatMap((g) => g.logins.slice(0, 1))
@@ -920,6 +934,9 @@ function PlanSteps({
         <InfoCard icon="check" live>
           {t("connectAi.wait.ready")}
         </InfoCard>
+      ) : null}
+      {choice === "gemini" && choosing && !other && existing.some(geminiPersonal) ? (
+        <Note icon="info">{t("connectAi.plan.gemini.warning")}</Note>
       ) : null}
       {choosing ? (
         <GroupedList>
@@ -953,7 +970,12 @@ function PlanSteps({
           kind={kind}
           // The Cloud's one computer goes unnamed in the account choice: the sign-in is about the account, not where.
           computer={edition === "cloud" ? t("connectAi.theComputer") : computer}
-          {...(isPlanId(choice) ? { provider: choice } : {})}
+          {...(isPlanId(choice)
+            ? { provider: choice }
+            : signInProviderOf(signedOut?.provider)
+              ? { provider: signInProviderOf(signedOut?.provider) }
+              : {})}
+          fresh={existing.length > 0 && other}
           again={hint ? hint.again : signedOut?.id}
           email={hint ? hint.email : signedOut?.email}
           local={view?.ownSignIn}
@@ -999,6 +1021,8 @@ function GateWait({
   const { colors: c } = useTheme();
   const machines = useMachines(orgId, edition !== null);
   const hold = holdText(t, org?.standing);
+  // Offline or unsupported: what's going on there and what comes next (on the Cloud, by itself: the page asks again).
+  const why = gateLine(t, { gate, edition, kind, computer, machine: machines.data?.find((m) => m.id === machineId) });
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <ActivityIndicator color={c.muted} style={styles.loading} />;
   else if (gate.state === "preparing") {
@@ -1013,14 +1037,8 @@ function GateWait({
         <InfoCard icon="clock">{t(coding ? "connectAi.wait.key" : "connectAi.wait.signIn")}</InfoCard>
       </View>
     );
-  } else if (gate.state === "offline" && !signingIn) {
-    wait = (
-      <InfoCard icon="laptop">
-        {edition === "cloud"
-          ? t("aiAccounts.connect.needsCloud.online", { computer })
-          : t("brain.offline", { computer })}
-      </InfoCard>
-    );
+  } else if (why && !(gate.state === "offline" && signingIn)) {
+    wait = <InfoCard icon={why.rechecks ? "clock" : "laptop"}>{why.text}</InfoCard>;
   } else if (gate.state === "missing") {
     wait = (
       <>
@@ -1034,23 +1052,6 @@ function GateWait({
         </InfoCard>
         <Note icon="lock">{t("mobile.ai.meanwhile")}</Note>
       </>
-    );
-  } else if (gate.state === "unsupported") {
-    const off = toolOffReason(
-      machines.data?.find((m) => m.id === machineId),
-      kind,
-    );
-    const program = t(`brain.card.${kind}`);
-    wait = (
-      <InfoCard icon="laptop">
-        {edition === "cloud"
-          ? t(`aiAccounts.connect.needsCloud.${kind}`, { computer })
-          : gate.reason === "keys"
-            ? t("aiAccounts.connect.needs.keys")
-            : gate.reason === "tool_off"
-              ? t(off.key, { computer, command: off.command, program })
-              : t(`brain.reasons.${gate.reason}`, { computer, program })}
-      </InfoCard>
     );
   } else if (gate.state === "locked") {
     const pairer = machines.data?.find((m) => m.id === machineId)?.pairedBy?.name.split(" ")[0];

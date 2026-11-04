@@ -47,6 +47,7 @@ import {
 } from "@agenteschat/client/lib/agent-setup";
 import {
   accountChoices,
+  lendable,
   ownSignInListed,
   ownSignInName,
   ownSignInReady,
@@ -71,13 +72,13 @@ import {
   commandInReason,
   computerKind,
   computerState,
-  toolOffReason,
   toolOnCommand,
 } from "@agenteschat/client/lib/machines";
 import {
   type AiChoice,
   aiChoiceOf,
   aiStateOf,
+  gateLine,
   kindOf,
   planLabel,
   planMark,
@@ -88,11 +89,13 @@ import {
   type BrainModelChoice,
   brainModelChoice,
   brainModelChoices,
+  geminiPersonal,
   isPlanId,
   PLAN_IDS,
   planFreeHint,
   planModel as planModelOf,
   planOf,
+  signInProviderOf,
 } from "@agenteschat/client/lib/plans";
 import { AUTO, apiProviderOf, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
 import { cleanSite, SITE } from "@agenteschat/client/lib/sites";
@@ -286,7 +289,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
         : ownSignInName(t, view?.ownSignIn === true && view.canUsePlans, view?.computer?.name ?? "");
   // Near or at its plan's limit: said where the account is.
   const usage =
-    !view || (kind !== "claude_code" && kind !== "codex" && kind !== "cursor" && kind !== "opencode")
+    !view || kind === "model"
       ? null
       : view.account
         ? view.accounts.find((a) => a.id === view.account)?.usage
@@ -750,8 +753,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const moves = home && home.machineId !== work.machineId ? home : null;
   const option = (home?.options ?? view.options).find((o) => o.kind === kind);
   // Accounts live on the agent's computer: none when the brain moves elsewhere or the app there is old.
-  const accountKind =
-    kind === "claude_code" || kind === "codex" || kind === "cursor" || kind === "opencode" ? kind : null;
+  const accountKind = kind === "model" ? null : kind;
   const accountsOn = accountKind !== null && view.accountsSupported && view.computer !== null && !moves;
   const computerName = view.computer?.name ?? "";
   // What a sign-in just reported wins over the last fetch (an account signed in again shows active at once).
@@ -760,8 +762,14 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     ...added.filter((a) => !view.accounts.some((v) => v.id === a.id)),
   ];
   // A plan thinks only for its owner's agents (ADR 0059 §3): the agent's owner's accounts of the card's plan, which its
-  // owner or an admin picks; anyone else's shows only while it is this agent's.
-  const ofOwner = (a: MachineAccount) => (view.canUsePlans ? a.mine : a.ownerId === agent.ownerUserId);
+  // owner or an admin picks; anyone else's shows only while it is this agent's, or to whoever may use other people's
+  // plans (every one there, each with its owner's name).
+  const ofOwner = (a: MachineAccount) =>
+    view.canUseOthersPlans === true || (view.canUsePlans ? a.mine : a.ownerId === agent.ownerUserId);
+  // Someone else's account, for whoever may use other people's plans: the agent's owner's as an admin picks them,
+  // anyone else's where it thinks for no other agent (`lendable`).
+  const usable = (a: MachineAccount) =>
+    a.mine || view.canUseOthersPlans !== true ? undefined : a.ownerId === agent.ownerUserId || lendable(a, agent.name);
   const accounts = allAccounts.filter((a) => planOfAccount(a) === card && (ofOwner(a) || a.id === view.account));
   const current = accounts.find((a) => a.id === account) ?? null;
   // Moved onto a plan it starts on its owner alone (ADR 0059 §5): "Atende outras pessoas" on then opens that plan.
@@ -791,9 +799,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     "key",
     "claude",
     "chatgpt",
-    // Cursor (ADR 0114) and OpenCode (ADR 0132) only where a computer here runs them, or the agent thinks with them:
-    // Connect an AI shows them always.
-    ...(["cursor", "zen"] as const).filter(
+    // Cursor (ADR 0114), OpenCode (ADR 0132), Grok (ADR 0142) and Gemini (ADR 0143) only where a computer here runs them, or the agent
+    // thinks with them: Connect an AI shows them always.
+    ...(["cursor", "zen", "grok", "gemini"] as const).filter(
       (c) =>
         savedCard === c ||
         [view.options, ...machines.map((m) => m.options)].flat().some((o) => o.kind === kindOf(c) && o.available),
@@ -1115,16 +1123,16 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     // The Cloud's agent without a computer yet gets the workspace's own: the plan signs in there once it's ready.
     if (o.reason === "no_computer" && edition === "cloud")
       return t("brain.reasons.no_computerCloud", { computer: t("computerSetup.title", { org: org.name }) });
-    // The card names the plan: the line names the program on the computer that can't run it.
-    const program = t(`brain.card.${k}`);
-    if (o.reason === "tool_off") {
-      const off = toolOffReason(
-        work.machines.data?.find((m) => m.id === view.computer?.machineId),
-        k,
-      );
-      return t(off.key, { computer: view.computer?.name ?? "", command: off.command, program });
-    }
-    return t(`brain.reasons.${o.reason}`, { computer: view.computer?.name ?? "", program });
+    // The card names the plan: the line names the program on the computer that can't run it, as the plan's panel.
+    return (
+      gateLine(t, {
+        gate: { state: "unsupported", reason: o.reason },
+        edition,
+        kind: k,
+        computer: view.computer?.name ?? "",
+        machine: work.machines.data?.find((m) => m.id === view.computer?.machineId),
+      })?.text ?? null
+    );
   };
   const whereName = home?.name ?? "";
   const keyChoices = keyOptions(
@@ -1164,7 +1172,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     // agent's, moved here.
     ...accountChoices(accounts, [account, view.account]).map((c) => ({
       value: c.also ? `${ALSO}${c.login.id}` : c.login.id,
-      ...accountOption(t, i18n.language, c, agent.name),
+      ...accountOption(t, i18n.language, c, agent.name, usable(c.login)),
       leading: c.login.shared === true ? sharedIcon : loginIcon,
     })),
     {
@@ -1188,13 +1196,17 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const pairer = work.machines.data?.find((m) => m.id === view.computer?.machineId)?.pairedBy?.name.split(" ")[0];
   // The account says why only when it must: signed out, whose accounts these are to an admin, or only whoever
   // connected the computer adds one there.
+  // Someone else's plans listed for whoever may use them: whose they are, and that their owner hears it.
+  const lends = view.canUseOthersPlans === true && accounts.some((a) => !a.mine && a.ownerId !== agent.ownerUserId);
   const accountNote = signedOut
     ? t(isPlanId(card) ? "aiAccounts.page.keyRefused" : "agentPage.work.brain.accountSignedOut")
-    : !view.canUsePlans && ownerFirst
-      ? t("agentPage.work.brain.accountWho", { ...g, owner: ownerFirst })
-      : lockedHere
-        ? t("connectAi.accountsLocked", { name: pairer ?? "", computer: computerName })
-        : null;
+    : lends
+      ? t("agentPage.work.brain.accountOthers")
+      : !view.canUsePlans && ownerFirst
+        ? t("agentPage.work.brain.accountWho", { ...g, owner: ownerFirst })
+        : lockedHere
+          ? t("connectAi.accountsLocked", { name: pairer ?? "", computer: computerName })
+          : null;
   const accountField = accountsOn && accountKind && (
     <BrainField label={t("agentPage.work.brain.account")}>
       {/* The account and its plan's usage in one outline: the meters hang under its picker, they are that account's. */}
@@ -1222,7 +1234,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         </div>
       )}
       {accountNote && (
-        <SettingNote icon={signedOut ? "alert" : view.canUsePlans ? "lock" : "info"}>{accountNote}</SettingNote>
+        <SettingNote icon={signedOut ? "alert" : view.canUsePlans && !lends ? "lock" : "info"}>
+          {accountNote}
+        </SettingNote>
       )}
       {usage && extraUsageOn(usage) && (
         <div className="agp-advswitch">
@@ -1231,7 +1245,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             id={extraId}
             aria-describedby={`${extraId}-hint`}
             checked={extraUsage}
-            disabled={!view.canUsePlans}
+            // Paid extra usage bills the plan's owner: someone else's plan given to this agent is theirs to turn on.
+            disabled={!(current ? current.mine : view.canUsePlans)}
             onCheckedChange={setExtraUsage}
           />
         </div>
@@ -1442,7 +1457,13 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                     kind={accountKind}
                     computer={computerName}
                     again={again?.id}
-                    {...(isPlanId(card) ? { provider: card } : {})}
+                    // "Adicionar conta" beside the accounts the agent's choice already lists: another one.
+                    fresh
+                    {...(isPlanId(card)
+                      ? { provider: card }
+                      : signInProviderOf(again?.provider)
+                        ? { provider: signInProviderOf(again?.provider) }
+                        : {})}
                     email={signingIn?.email}
                     local={view.ownSignIn}
                     onBack={() => setAdding(false)}
@@ -1465,6 +1486,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             };
           })}
         />
+        {card === "gemini" && adding === false && geminiPersonal(accounts.find((a) => a.id === account)) && (
+          <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
+        )}
         {toolOffHere && (
           <SettingNote icon="settings">
             {t("machines.thisMac.toolsOff")}

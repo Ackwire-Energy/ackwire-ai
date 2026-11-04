@@ -302,6 +302,12 @@ export const en = {
       short: "AI keys",
       say: "looks after AI keys",
     },
+    use_others_plans: {
+      title: "Use other people's plans",
+      desc: "Give the agents they can edit a plan someone else connected. Its owner gets an email and can take it back.",
+      short: "use other people's plans",
+      say: "uses other people's plans",
+    },
     edit_wiki: {
       title: "Edit the wiki",
       desc: "Create and change pages.",
@@ -1443,8 +1449,9 @@ export const en = {
     collapseAll: "Collapse all",
     expandAll: "Expand all",
     organize: "Organize groups in Team",
-    seeAll_one: "See the {{count}} agent",
-    seeAll_other: "See all {{count}} agents",
+    /** Under the agents, only when some aren't listed (they don't talk to me): it opens Team, where all are. */
+    more_one: "1 more agent in Team",
+    more_other: "{{count}} more agents in Team",
     createFirst: "Create the first agent",
     working_one: "{{count}} working",
     working_other: "{{count}} working",
@@ -1804,8 +1811,6 @@ export const en = {
     label: "your right hand",
     /** The one-time dot on its row until it is first opened. */
     newDot: "New",
-    /** Under its name in a channel's members column. */
-    callWith: "call with @{{handle}}",
     /** Its role, wherever an agent's role shows. */
     role: "Workspace assistant",
     /** In its DM's header, after the label. */
@@ -1852,6 +1857,7 @@ export const en = {
       model: "Model",
       message: "Message",
       configure: "Configure",
+      nameStory: "The name comes from lodestar, the star sailors steer by.",
     },
     settings: {
       name: "Name and look",
@@ -1990,6 +1996,8 @@ export const en = {
       claude_code: "Claude Code isn't signed in on this computer. Connect a Claude account on {{name}}'s\u00a0page.",
       codex: "Codex isn't signed in on this computer. Connect a ChatGPT account on {{name}}'s\u00a0page.",
       cursor: "Cursor isn't signed in on this computer. Connect a Cursor account on {{name}}'s\u00a0page.",
+      grok: "Grok isn't signed in on this computer. Connect a Grok account on {{name}}'s\u00a0page.",
+      antigravity: "Gemini isn't signed in on this computer. Connect a Gemini account on {{name}}'s\u00a0page.",
       opencode: "OpenCode can't think on this computer. Connect an OpenCode key on {{name}}'s\u00a0page.",
     },
     card: {
@@ -2019,6 +2027,8 @@ export const en = {
       claude: "Connect your Claude plan",
       chatgpt: "Connect your ChatGPT plan",
       cursor: "Connect your Cursor plan",
+      grok: "Connect your Grok plan",
+      gemini: "Connect your Gemini plan",
       zen: "Connect OpenCode",
       api_key: "Add an API key",
     },
@@ -2034,6 +2044,15 @@ export const en = {
       claude: { title: "Your Claude plan", tiers: "Pro, Max, Ultra, Team or Enterprise" },
       chatgpt: { title: "Your ChatGPT plan", tiers: "Plus, Pro, Business or Enterprise" },
       cursor: { title: "Your Cursor plan", tiers: "Pro, Pro+, Ultra or Teams, or a Cursor API key" },
+      grok: { title: "Your Grok plan", tiers: "SuperGrok, SuperGrok Heavy or X Premium+" },
+      /** A personal Google account (Google AI Pro or Ultra) or a Gemini Enterprise seat (ADR 0143). */
+      gemini: {
+        title: "Your Gemini plan",
+        tiers: "Google AI Pro, Google AI Ultra or Gemini Enterprise",
+        /** Shown plainly wherever a personal Gemini plan is connected or chosen: Google's own rule for consumer plans. */
+        warning:
+          "Google says using a personal Gemini plan inside other apps can get the account suspended. To avoid that risk, use an API key or Gemini Enterprise.",
+      },
       /** OpenCode's CLI (ADR 0132): its free models with no sign-in, or a key from OpenCode's console. */
       zen: { title: "OpenCode", tiers: "Free models, or your OpenCode key" },
       zai: { tiers: "Lite, Pro or Max" },
@@ -2091,12 +2110,19 @@ export const en = {
     /** An account of this plan the person already has on that computer, for all of their agents there. */
     use: "Use {{label}}",
     another: "Another account",
+    /** Before a new sign-in, where the person already has an account of that plan on that computer (`reusableAccount`). */
+    reuse: {
+      active: "You already have {{label}} here. Sign in to it again, or use another account.",
+      signedOut: "{{label}} is signed out here. Sign in to it again and its agents keep it.",
+    },
     signInFor: "Sign in for {{name}}",
     doneAll: "{{names}} now think with {{label}}.",
     otherAccount: {
       claude_code: "Claude signed in as {{email}}, not {{account}}. Sign out on Claude's page and try again.",
       codex: "ChatGPT signed in as {{email}}, not {{account}}. Sign out on ChatGPT's page and try again.",
       cursor: "Cursor signed in as {{email}}, not {{account}}. Sign out on Cursor's page and try again.",
+      grok: "Grok signed in as {{email}}, not {{account}}. Sign out on Grok's page and try again.",
+      antigravity: "Gemini signed in as {{email}}, not {{account}}. Sign out on Google's page and try again.",
       opencode: "OpenCode signed in as {{email}}, not {{account}}. Try again with the right key.",
     },
     useAnyway: "Use {{email}}",
@@ -2297,7 +2323,6 @@ export const en = {
   dm: {
     subtitle: "{{role}} · owned by {{owner}}",
     subtitleNoOwner: "{{role}} · no owner",
-    profile: "View profile",
     emptyAgent: "Ask him to remember, forget or work differently.",
     emptyAgent_female: "Ask her to remember, forget or work differently.",
     opening: "Opening the conversation…",
@@ -3406,6 +3431,12 @@ export const en = {
   },
   notifications: {
     title: "Notifications",
+    /** "Tirar de volta" on `plan_lent`: the person's plan leaves the agent someone else gave it to, or all of them. */
+    planLent: {
+      takeBack: "Take it back",
+      takeBackAll: "Take it back from every agent",
+      done: "Your plan is back",
+    },
     docTitleUnread: "({{count}}) Notifications",
     summaryWaiting_one: "{{count}} thing waiting on you",
     summaryWaiting_other: "{{count}} things waiting on you",
@@ -3515,6 +3546,8 @@ export const en = {
       browserProfileRequest: "<b>{{name}}</b> asks for one more browser profile for <b>{{agent}}</b>",
       /** Someone other than its owner took control of the person's agent's desktop (`desktop_taken`). */
       desktopTaken: "<b>{{name}}</b> took control of the screen of <b>{{agent}}</b>'s computer",
+      /** Someone gave an agent the person's plan (`plan_lent`): `plan` its maker ("Claude"). */
+      planLent: "<b>{{name}}</b> connected your {{plan}} plan to <b>{{agent}}</b>",
       routineWaitingPlan: "<b>{{name}}</b> is waiting for its plan to reset to run a routine",
       planResetUnknown: "{{plan}} didn't say when its limit resets. <b>{{name}}</b>'s work is still waiting.",
       catchUpClosed_one: "<b>{{name}}</b> is back and skipped {{count}} conversation that didn't need an answer",
@@ -3921,6 +3954,8 @@ export const en = {
         accountMove: "In use by {{agents}} · Move it here",
         accountAlso: "Also used by {{agents}}",
         accountOf: "{{name}}'s",
+        /** Under the account for someone who may use other people's plans (`use_others_plans`). */
+        accountOthers: "Other people's plans show whose they are. Their owner gets an email and can take it back.",
         addAccount: "Add account",
         signInAgain: "Sign in again",
         connectPlan: "Connect another plan",
@@ -4013,20 +4048,35 @@ export const en = {
             claude_code: "Add a Claude account",
             codex: "Add a ChatGPT account",
             cursor: "Add a Cursor account",
+            grok: "Add a Grok account",
+            antigravity: "Add a Gemini account",
             opencode: "Add an OpenCode key",
           },
           stepOne: {
             claude_code: "The account with your plan",
             codex: "The account with your plan",
             cursor: "The account with your plan",
+            grok: "The account with your plan",
+            antigravity: "The Google account with your plan",
+            antigravityEnterprise: "Your Gemini Enterprise account",
           },
           stepOneHint:
             "Wrong account? Sign out there and try again. The account stays only on {{computer}}. You type your password on\u00a0{{brand}}'s\u00a0page.",
-          open: { claude_code: "Sign in with Claude", codex: "Sign in with ChatGPT", cursor: "Sign in with Cursor" },
+          open: {
+            claude_code: "Sign in with Claude",
+            codex: "Sign in with ChatGPT",
+            cursor: "Sign in with Cursor",
+            grok: "Sign in with Grok",
+            antigravity: "Sign in with Google",
+          },
           /** OpenCode thinks with its free models without any key: the key is for its paid models. */
           opencodeFree: "No key needed for OpenCode's free models. A key from OpenCode's console adds its paid ones.",
           /** Cursor's sign-in ends on the computer by itself once the person signs in on its page. */
           cursorFinish: "Sign in on Cursor's page, and the sign-in finishes on {{computer}} by itself.",
+          grokFinish: "Sign in on Grok's page, and the sign-in finishes on {{computer}} by itself.",
+          /** Under the Gemini sign-in: the other kind of Google account. */
+          geminiEnterprise: "Use Gemini Enterprise instead",
+          geminiPersonal: "Use a personal Google account instead",
           cursorKey: "Use a Cursor API key instead",
           /** Beside the sign-in button: its link, to open in another browser or profile. */
           copyLink: "Copy link",
@@ -4039,6 +4089,7 @@ export const en = {
           sent: "Code sent. Finishing the sign-in on {{computer}}.",
           local: "On {{computer}} itself? If its browser opened by itself, just authorize there.",
           deviceCode: "Code for ChatGPT",
+          grokCode: "Code for Grok",
           deviceCodeText: "Type this code on the page that opens.",
           starting: "Asking {{computer}}…",
           waiting: "Waiting",
@@ -4052,6 +4103,9 @@ export const en = {
               "ChatGPT signed in as {{account}}, an account you already connected. To use another, sign out on ChatGPT's page and try again.",
             cursor:
               "Cursor signed in as {{account}}, an account you already connected. To use another, sign out on Cursor's page and try again.",
+            grok: "Grok signed in as {{account}}, an account you already connected. To use another, sign out on Grok's page and try again.",
+            antigravity:
+              "Gemini signed in as {{account}}, an account you already connected. To use another, sign out on Google's page and try again.",
             opencode: "That OpenCode key is already connected as {{account}}.",
           },
           startFailed: "No answer from {{computer}}. Try again in a moment.",
@@ -7401,18 +7455,27 @@ export const en = {
       claude_code: "Claude",
       codex: "ChatGPT",
       cursor: "Cursor",
+      grok: "Grok",
+      antigravity: "Gemini",
       opencode: "OpenCode",
       needs: {
         keys: "Update agentes on the computer to use a plan's key",
       },
       noComputer: "Accounts stay on a connected computer. Connect one of yours first.",
       addComputer: "Connect a computer",
+      /**
+       * The Cloud's: why a plan can't sign in on the workspace's computer yet (`gateLine`), with what happens next.
+       * `program`: "Claude Code", "Codex", "Cursor", "Grok Build", "Antigravity CLI" or "OpenCode" (`brain.card`).
+       */
       needsCloud: {
-        claude_code: "Not ready on {{computer}} yet",
-        codex: "Not ready on {{computer}} yet",
-        cursor: "Not ready on {{computer}} yet",
-        opencode: "Not ready on {{computer}} yet",
-        online: "{{computer}} isn't answering right now. We're on it.",
+        online: "{{computer}} is restarting or reconnecting. This changes by itself once it's back.",
+        installing: "{{program}} is being installed on {{computer}}. This changes by itself when it's done.",
+        updating: "{{program}} is being updated on {{computer}}. This changes by itself when it's done.",
+        runnerOld:
+          "The agentes.chat program on {{computer}} is out of date and an update is on its way. This changes by itself when it's done.",
+        execOff: "{{computer}} can't run {{program}} yet. We're on it, and this changes by itself.",
+        toolOff: "{{program}} isn't allowed on {{computer}}. Ask support to allow it.",
+        preparing: "{{computer}} is getting ready. This changes by itself when it's done.",
       },
     },
     done: {
@@ -7438,6 +7501,12 @@ export const en = {
       rename: "Rename",
       signInAgain: "Sign in again",
       newKey: "Replace the key",
+      /** Logins of one account that think for no agent (`unusedCopies`), each a sign-in made again. */
+      copies_one: "{{count}} more login of this account, with no agent.",
+      copies_other: "{{count}} more logins of this account, with no agent.",
+      removeCopies: "Remove",
+      copiesRemoved_one: "{{count}} unused login removed.",
+      copiesRemoved_other: "{{count}} unused logins removed.",
       disconnect: "Disconnect",
       renameTitle: "Rename {{label}}",
       nameLabel: "Name",
@@ -7644,6 +7713,7 @@ export const en = {
       thinking: "thinking",
       wow: "wow",
       dizzy: "dizzy",
+      wave: "hi",
     },
     moodWords: {
       celebrate: "party congrats celebrate shipped launch yay",
@@ -7652,6 +7722,7 @@ export const en = {
       thinking: "hmm wondering think maybe",
       wow: "whoa surprise amazing omg",
       dizzy: "tired friday help oops confused",
+      wave: "hello hey bye wave good morning see you",
     },
     picker: {
       button: "Emoji, GIFs and stickers",
@@ -8744,21 +8815,29 @@ export const en = {
       claude: "{{model}} on the Claude plan",
       chatgpt: "{{model}} on the ChatGPT plan",
       cursor: "{{model}} on the Cursor plan",
+      grok: "{{model}} on the Grok plan",
+      gemini: "{{model}} on the Gemini plan",
       zen: "{{model}} on OpenCode",
       coding: "{{model}} on {{plan}}",
       claudeOf: "{{model}} on {{owner}}'s Claude plan",
       chatgptOf: "{{model}} on {{owner}}'s ChatGPT plan",
       cursorOf: "{{model}} on {{owner}}'s Cursor plan",
+      grokOf: "{{model}} on {{owner}}'s Grok plan",
+      geminiOf: "{{model}} on {{owner}}'s Gemini plan",
       zenOf: "{{model}} on {{owner}}'s OpenCode",
       codingOf: "{{model}} on {{owner}}'s {{plan}}",
       claudeAuto: "Claude plan",
       chatgptAuto: "ChatGPT plan",
       cursorAuto: "Cursor plan",
+      grokAuto: "Grok plan",
+      geminiAuto: "Gemini plan",
       zenAuto: "OpenCode",
       codingAuto: "{{plan}}",
       claudeAutoOf: "{{owner}}'s Claude plan",
       chatgptAutoOf: "{{owner}}'s ChatGPT plan",
       cursorAutoOf: "{{owner}}'s Cursor plan",
+      grokAutoOf: "{{owner}}'s Grok plan",
+      geminiAutoOf: "{{owner}}'s Gemini plan",
       zenAutoOf: "{{owner}}'s OpenCode",
       codingAutoOf: "{{owner}}'s {{plan}}",
       on: "{{line}} on {{computer}}",
@@ -8766,7 +8845,14 @@ export const en = {
     model: "Model (API)",
     modelText: "An AI model through the API, with a workspace key.",
     countsBudget: "Counts against {{name}}'s budget.",
-    card: { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor", opencode: "OpenCode" },
+    card: {
+      claude_code: "Claude Code",
+      codex: "Codex",
+      cursor: "Cursor",
+      opencode: "OpenCode",
+      grok: "Grok Build",
+      antigravity: "Antigravity CLI",
+    },
     foot: {
       api: "Through the API",
       noComputer: "No computer",
@@ -8776,6 +8862,8 @@ export const en = {
     claude_codeText: "Uses the Claude plan of whoever connected the computer.",
     codexText: "Uses the ChatGPT plan of whoever connected the computer.",
     cursorText: "Uses the Cursor plan of whoever connected the computer.",
+    grokText: "Uses the Grok plan of whoever connected the computer.",
+    antigravityText: "Uses the Gemini plan of whoever connected the computer.",
     opencodeText: "OpenCode's free models, or the OpenCode key of whoever connected the computer.",
     /** Cursor's models (ADR 0114), where its CLI said which the plan includes. */
     cursorModel: { inPlan: "In your Cursor plan", apiPrice: "Billed by Cursor at API prices" },
@@ -8825,6 +8913,8 @@ export const en = {
       claude_code: "Claude Code · {{model}}",
       codex: "Codex · {{model}}",
       cursor: "Cursor · {{model}}",
+      grok: "Grok Build · {{model}}",
+      antigravity: "Antigravity CLI · {{model}}",
       opencode: "OpenCode · {{model}}",
       noFallback: "{{brain}}, no API fallback",
     },
@@ -10953,6 +11043,8 @@ export const en = {
         claude: "Claude Code",
         codex: "Codex",
         cursor: "Cursor",
+        grok: "Grok Build",
+        antigravity: "Antigravity CLI",
         opencode: "OpenCode",
         commands: "Commands",
         browser: "Browser",
@@ -10961,6 +11053,8 @@ export const en = {
         claude: "Writes and changes files, only in the allowed folders.",
         codex: "Like Claude Code, with a ChatGPT account. Only in the allowed folders.",
         cursor: "Like Claude Code, with a Cursor account. Only in the allowed folders.",
+        grok: "Like Claude Code, with a Grok account. Only in the allowed folders.",
+        antigravity: "Like Claude Code, with a Gemini account. Only in the allowed folders.",
         opencode: "Like Claude Code, with OpenCode's free models or an OpenCode key. Only in the allowed folders.",
         commands: "Runs Terminal commands, like tests and builds.",
       },

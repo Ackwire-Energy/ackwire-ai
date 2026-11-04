@@ -4266,6 +4266,9 @@
   "noAi.notSignedIn.cursor": {
     "value": "Cursor isn't signed in on this computer. Connect a Cursor account on {{name}}'s page."
   },
+  "noAi.notSignedIn.grok": {
+    "value": "Grok isn't signed in on this computer. Connect a Grok account on {{name}}'s page."
+  },
   "noAi.notSignedIn.opencode": {
     "value": "OpenCode can't think on this computer. Connect an OpenCode key on {{name}}'s page."
   },
@@ -4326,6 +4329,9 @@
   "connectAi.title.cursor": {
     "value": "Connect your Cursor plan"
   },
+  "connectAi.title.grok": {
+    "value": "Connect your Grok plan"
+  },
   "connectAi.title.zen": {
     "value": "Connect OpenCode"
   },
@@ -4364,6 +4370,12 @@
   },
   "connectAi.plan.cursor.tiers": {
     "value": "Pro, Pro+, Ultra or Teams, or a Cursor API key"
+  },
+  "connectAi.plan.grok.title": {
+    "value": "Your Grok plan"
+  },
+  "connectAi.plan.grok.tiers": {
+    "value": "SuperGrok, SuperGrok Heavy or X Premium+"
   },
   "connectAi.plan.zen.title": {
     "value": "OpenCode"
@@ -4503,6 +4515,12 @@
   "connectAi.another": {
     "value": "Another account"
   },
+  "connectAi.reuse.active": {
+    "value": "You already have {{label}} here. Sign in to it again, or use another account."
+  },
+  "connectAi.reuse.signedOut": {
+    "value": "{{label}} is signed out here. Sign in to it again and its agents keep it."
+  },
   "connectAi.signInFor": {
     "value": "Sign in for {{name}}"
   },
@@ -4517,6 +4535,9 @@
   },
   "connectAi.otherAccount.cursor": {
     "value": "Cursor signed in as {{email}}, not {{account}}. Sign out on Cursor's page and try again."
+  },
+  "connectAi.otherAccount.grok": {
+    "value": "Grok signed in as {{email}}, not {{account}}. Sign out on Grok's page and try again."
   },
   "connectAi.otherAccount.opencode": {
     "value": "OpenCode signed in as {{email}}, not {{account}}. Try again with the right key."
@@ -4985,9 +5006,6 @@
   },
   "dm.subtitleNoOwner": {
     "value": "{{role}} · no owner"
-  },
-  "dm.profile": {
-    "value": "View profile"
   },
   "dm.emptyAgent": {
     "value": "Ask him to remember, forget or work differently.",
@@ -9137,6 +9155,9 @@
   "agentPage.work.brain.add.title.cursor": {
     "value": "Add a Cursor account"
   },
+  "agentPage.work.brain.add.title.grok": {
+    "value": "Add a Grok account"
+  },
   "agentPage.work.brain.add.title.opencode": {
     "value": "Add an OpenCode key"
   },
@@ -9147,6 +9168,9 @@
     "value": "The account with your plan"
   },
   "agentPage.work.brain.add.stepOne.cursor": {
+    "value": "The account with your plan"
+  },
+  "agentPage.work.brain.add.stepOne.grok": {
     "value": "The account with your plan"
   },
   "agentPage.work.brain.add.stepOneHint": {
@@ -9161,11 +9185,17 @@
   "agentPage.work.brain.add.open.cursor": {
     "value": "Sign in with Cursor"
   },
+  "agentPage.work.brain.add.open.grok": {
+    "value": "Sign in with Grok"
+  },
   "agentPage.work.brain.add.opencodeFree": {
     "value": "No key needed for OpenCode's free models. A key from OpenCode's console adds its paid ones."
   },
   "agentPage.work.brain.add.cursorFinish": {
     "value": "Sign in on Cursor's page, and the sign-in finishes on {{computer}} by itself."
+  },
+  "agentPage.work.brain.add.grokFinish": {
+    "value": "Sign in on Grok's page, and the sign-in finishes on {{computer}} by itself."
   },
   "agentPage.work.brain.add.cursorKey": {
     "value": "Use a Cursor API key instead"
@@ -9200,6 +9230,9 @@
   "agentPage.work.brain.add.deviceCode": {
     "value": "Code for ChatGPT"
   },
+  "agentPage.work.brain.add.grokCode": {
+    "value": "Code for Grok"
+  },
   "agentPage.work.brain.add.deviceCodeText": {
     "value": "Type this code on the page that opens."
   },
@@ -9226,6 +9259,9 @@
   },
   "agentPage.work.brain.add.duplicate.cursor": {
     "value": "Cursor signed in as {{account}}, an account you already connected. To use another, sign out on Cursor's page and try again."
+  },
+  "agentPage.work.brain.add.duplicate.grok": {
+    "value": "Grok signed in as {{account}}, an account you already connected. To use another, sign out on Grok's page and try again."
   },
   "agentPage.work.brain.add.duplicate.opencode": {
     "value": "That OpenCode key is already connected as {{account}}."
@@ -17765,6 +17801,9 @@
   "aiAccounts.connect.cursor": {
     "value": "Cursor"
   },
+  "aiAccounts.connect.grok": {
+    "value": "Grok"
+  },
   "aiAccounts.connect.opencode": {
     "value": "OpenCode"
   },
@@ -17777,20 +17816,26 @@
   "aiAccounts.connect.addComputer": {
     "value": "Connect a computer"
   },
-  "aiAccounts.connect.needsCloud.claude_code": {
-    "value": "Not ready on {{computer}} yet"
-  },
-  "aiAccounts.connect.needsCloud.codex": {
-    "value": "Not ready on {{computer}} yet"
-  },
-  "aiAccounts.connect.needsCloud.cursor": {
-    "value": "Not ready on {{computer}} yet"
-  },
-  "aiAccounts.connect.needsCloud.opencode": {
-    "value": "Not ready on {{computer}} yet"
-  },
   "aiAccounts.connect.needsCloud.online": {
-    "value": "{{computer}} isn't answering right now. We're on it."
+    "value": "{{computer}} is restarting or reconnecting. This changes by itself once it's back."
+  },
+  "aiAccounts.connect.needsCloud.installing": {
+    "value": "{{program}} is being installed on {{computer}}. This changes by itself when it's done."
+  },
+  "aiAccounts.connect.needsCloud.updating": {
+    "value": "{{program}} is being updated on {{computer}}. This changes by itself when it's done."
+  },
+  "aiAccounts.connect.needsCloud.runnerOld": {
+    "value": "The agentes.chat program on {{computer}} is out of date and an update is on its way. This changes by itself when it's done."
+  },
+  "aiAccounts.connect.needsCloud.execOff": {
+    "value": "{{computer}} can't run {{program}} yet. We're on it, and this changes by itself."
+  },
+  "aiAccounts.connect.needsCloud.toolOff": {
+    "value": "{{program}} isn't allowed on {{computer}}. Ask support to allow it."
+  },
+  "aiAccounts.connect.needsCloud.preparing": {
+    "value": "{{computer}} is getting ready. This changes by itself when it's done."
   },
   "aiAccounts.done.name": {
     "value": "What do you want to call it? Others see this name."
@@ -17851,6 +17896,21 @@
   },
   "aiAccounts.page.newKey": {
     "value": "Replace the key"
+  },
+  "aiAccounts.page.copies": {
+    "value": {
+      "one": "{{count}} more login of this account, with no agent.",
+      "other": "{{count}} more logins of this account, with no agent."
+    }
+  },
+  "aiAccounts.page.removeCopies": {
+    "value": "Remove"
+  },
+  "aiAccounts.page.copiesRemoved": {
+    "value": {
+      "one": "{{count}} unused login removed.",
+      "other": "{{count}} unused logins removed."
+    }
   },
   "aiAccounts.page.disconnect": {
     "value": "Disconnect"
@@ -18378,6 +18438,9 @@
   "media.moods.dizzy": {
     "value": "dizzy"
   },
+  "media.moods.wave": {
+    "value": "hi"
+  },
   "media.moodWords.celebrate": {
     "value": "party congrats celebrate shipped launch yay"
   },
@@ -18395,6 +18458,9 @@
   },
   "media.moodWords.dizzy": {
     "value": "tired friday help oops confused"
+  },
+  "media.moodWords.wave": {
+    "value": "hello hey bye wave good morning see you"
   },
   "media.picker.button": {
     "value": "Emoji, GIFs and stickers"
@@ -21284,6 +21350,9 @@
   "brain.line.cursor": {
     "value": "{{model}} on the Cursor plan"
   },
+  "brain.line.grok": {
+    "value": "{{model}} on the Grok plan"
+  },
   "brain.line.zen": {
     "value": "{{model}} on OpenCode"
   },
@@ -21298,6 +21367,9 @@
   },
   "brain.line.cursorOf": {
     "value": "{{model}} on {{owner}}'s Cursor plan"
+  },
+  "brain.line.grokOf": {
+    "value": "{{model}} on {{owner}}'s Grok plan"
   },
   "brain.line.zenOf": {
     "value": "{{model}} on {{owner}}'s OpenCode"
@@ -21314,6 +21386,9 @@
   "brain.line.cursorAuto": {
     "value": "Cursor plan"
   },
+  "brain.line.grokAuto": {
+    "value": "Grok plan"
+  },
   "brain.line.zenAuto": {
     "value": "OpenCode"
   },
@@ -21328,6 +21403,9 @@
   },
   "brain.line.cursorAutoOf": {
     "value": "{{owner}}'s Cursor plan"
+  },
+  "brain.line.grokAutoOf": {
+    "value": "{{owner}}'s Grok plan"
   },
   "brain.line.zenAutoOf": {
     "value": "{{owner}}'s OpenCode"
@@ -21356,6 +21434,9 @@
   "brain.card.cursor": {
     "value": "Cursor"
   },
+  "brain.card.grok": {
+    "value": "Grok Build"
+  },
   "brain.card.opencode": {
     "value": "OpenCode"
   },
@@ -21379,6 +21460,9 @@
   },
   "brain.cursorText": {
     "value": "Uses the Cursor plan of whoever connected the computer."
+  },
+  "brain.grokText": {
+    "value": "Uses the Grok plan of whoever connected the computer."
   },
   "brain.opencodeText": {
     "value": "OpenCode's free models, or the OpenCode key of whoever connected the computer."
@@ -21478,6 +21562,9 @@
   },
   "brain.summary.cursor": {
     "value": "Cursor · {{model}}"
+  },
+  "brain.summary.grok": {
+    "value": "Grok Build · {{model}}"
   },
   "brain.summary.opencode": {
     "value": "OpenCode · {{model}}"
@@ -27029,6 +27116,9 @@
   "machines.access.tool.cursor": {
     "value": "Cursor"
   },
+  "machines.access.tool.grok": {
+    "value": "Grok Build"
+  },
   "machines.access.tool.opencode": {
     "value": "OpenCode"
   },
@@ -27046,6 +27136,9 @@
   },
   "machines.access.toolText.cursor": {
     "value": "Like Claude Code, with a Cursor account. Only in the allowed folders."
+  },
+  "machines.access.toolText.grok": {
+    "value": "Like Claude Code, with a Grok account. Only in the allowed folders."
   },
   "machines.access.toolText.opencode": {
     "value": "Like Claude Code, with OpenCode's free models or an OpenCode key. Only in the allowed folders."
@@ -34485,9 +34578,6 @@
   "rightHand.newDot": {
     "value": "New"
   },
-  "rightHand.callWith": {
-    "value": "call with @{{handle}}"
-  },
   "rightHand.role": {
     "value": "Workspace assistant"
   },
@@ -34571,6 +34661,9 @@
   },
   "rightHand.profile.configure": {
     "value": "Configure"
+  },
+  "rightHand.profile.nameStory": {
+    "value": "The name comes from lodestar, the star sailors steer by."
   },
   "rightHand.settings.name": {
     "value": "Name and look"
@@ -34875,10 +34968,10 @@
   "sidebarAgents.organize": {
     "value": "Organize groups in Team"
   },
-  "sidebarAgents.seeAll": {
+  "sidebarAgents.more": {
     "value": {
-      "one": "See the {{count}} agent",
-      "other": "See all {{count}} agents"
+      "one": "1 more agent in Team",
+      "other": "{{count}} more agents in Team"
     }
   },
   "sidebarAgents.createFirst": {
@@ -35552,5 +35645,101 @@
   },
   "chat.body.action_open_page": {
     "value": "Open a screen"
+  },
+  "noAi.notSignedIn.antigravity": {
+    "value": "Gemini isn't signed in on this computer. Connect a Gemini account on {{name}}'s page."
+  },
+  "connectAi.title.gemini": {
+    "value": "Connect your Gemini plan"
+  },
+  "connectAi.plan.gemini.title": {
+    "value": "Your Gemini plan"
+  },
+  "connectAi.plan.gemini.tiers": {
+    "value": "Google AI Pro, Google AI Ultra or Gemini Enterprise"
+  },
+  "connectAi.plan.gemini.warning": {
+    "value": "Google says using a personal Gemini plan inside other apps can get the account suspended. To avoid that risk, use an API key or Gemini Enterprise."
+  },
+  "connectAi.otherAccount.antigravity": {
+    "value": "Gemini signed in as {{email}}, not {{account}}. Sign out on Google's page and try again."
+  },
+  "agentPage.work.brain.add.title.antigravity": {
+    "value": "Add a Gemini account"
+  },
+  "agentPage.work.brain.add.stepOne.antigravity": {
+    "value": "The Google account with your plan"
+  },
+  "agentPage.work.brain.add.stepOne.antigravityEnterprise": {
+    "value": "Your Gemini Enterprise account"
+  },
+  "agentPage.work.brain.add.open.antigravity": {
+    "value": "Sign in with Google"
+  },
+  "agentPage.work.brain.add.geminiEnterprise": {
+    "value": "Use Gemini Enterprise instead"
+  },
+  "agentPage.work.brain.add.geminiPersonal": {
+    "value": "Use a personal Google account instead"
+  },
+  "agentPage.work.brain.add.duplicate.antigravity": {
+    "value": "Gemini signed in as {{account}}, an account you already connected. To use another, sign out on Google's page and try again."
+  },
+  "aiAccounts.connect.antigravity": {
+    "value": "Gemini"
+  },
+  "brain.line.gemini": {
+    "value": "{{model}} on the Gemini plan"
+  },
+  "brain.line.geminiOf": {
+    "value": "{{model}} on {{owner}}'s Gemini plan"
+  },
+  "brain.line.geminiAuto": {
+    "value": "Gemini plan"
+  },
+  "brain.line.geminiAutoOf": {
+    "value": "{{owner}}'s Gemini plan"
+  },
+  "brain.card.antigravity": {
+    "value": "Antigravity CLI"
+  },
+  "brain.antigravityText": {
+    "value": "Uses the Gemini plan of whoever connected the computer."
+  },
+  "brain.summary.antigravity": {
+    "value": "Antigravity CLI · {{model}}"
+  },
+  "machines.access.tool.antigravity": {
+    "value": "Antigravity CLI"
+  },
+  "machines.access.toolText.antigravity": {
+    "value": "Like Claude Code, with a Gemini account. Only in the allowed folders."
+  },
+  "permissions.use_others_plans.title": {
+    "value": "Use other people's plans"
+  },
+  "permissions.use_others_plans.desc": {
+    "value": "Give the agents they can edit a plan someone else connected. Its owner gets an email and can take it back."
+  },
+  "permissions.use_others_plans.short": {
+    "value": "use other people's plans"
+  },
+  "permissions.use_others_plans.say": {
+    "value": "uses other people's plans"
+  },
+  "notifications.planLent.takeBack": {
+    "value": "Take it back"
+  },
+  "notifications.planLent.takeBackAll": {
+    "value": "Take it back from every agent"
+  },
+  "notifications.planLent.done": {
+    "value": "Your plan is back"
+  },
+  "notifications.what.planLent": {
+    "value": "<b>{{name}}</b> connected your {{plan}} plan to <b>{{agent}}</b>"
+  },
+  "agentPage.work.brain.accountOthers": {
+    "value": "Other people's plans show whose they are. Their owner gets an email and can take it back."
   }
 }

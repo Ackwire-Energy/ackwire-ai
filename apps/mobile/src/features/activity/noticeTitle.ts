@@ -53,15 +53,15 @@ export function useNoticeTitle(n: AppNotification) {
               names: NAMES,
               // `catch_up_closed`: the conversations it skipped.
               count: n.kind === "catch_up_closed" ? n.count : who.total,
-              // `plan_reset_unknown`: the plan's name.
-              plan: n.latest.title ?? "",
+              // `plan_reset_unknown`: the plan's name (`plan_lent`: its maker's, in `plan`).
+              plan: (n.kind === "plan_lent" ? n.latest.plan : n.latest.title) ?? "",
               // `catch_up_closed_asker`: who was credited.
               who: n.latest.title ?? "",
               // `usage_limit`: the limit (who decides only) and the share used.
               amount: n.latest.limitUsd !== undefined ? formatUsd(i18n.language, n.latest.limitUsd) : "",
               percent: Math.round(n.latest.percent ?? 0),
-              // `desktop_taken`: whose computer, said with its name's gender.
-              ...(n.kind === "desktop_taken"
+              // `desktop_taken`: whose computer, said with its name's gender; `plan_lent`: the agent given the plan.
+              ...(n.kind === "desktop_taken" || n.kind === "plan_lent"
                 ? { agent: n.source.label ?? "", context: agentGrammar(n.source.label ?? "").context }
                 : {}),
               defaultValue: NAMES,

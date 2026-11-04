@@ -97,6 +97,9 @@ describe("Configurações › Você › Aprovações: the right hand (ADR 0139 �
     expect(guidanceRow).not.toBe(budget.closest(".settings-row"));
     expect(within(guidanceRow).queryByRole("textbox", { name: "Orçamento a mais, por agente" })).toBeNull();
     expect(guidance.getAttribute("aria-describedby")).toBe("rh-guidance-help");
+    // The last row, right over the card's foot: the rule that gives it its own depth below (stacked-ask-css).
+    expect(guidanceRow.nextElementSibling).toBeNull();
+    expect(guidanceRow.parentElement?.nextElementSibling?.classList.contains("ac-card__foot")).toBe(true);
     expect(within(guidanceRow).getByText("Lodi lê isto antes de decidir. Opcional.")).toBeTruthy();
     expect(guidance.getAttribute("placeholder")).toContain("Ex.: nada de agente duplicado\n");
     await act(async () => {

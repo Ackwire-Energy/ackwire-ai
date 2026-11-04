@@ -322,7 +322,11 @@ test("every plan qualifies: OpenCode's, Codex's and Cursor's like Claude's, each
     cursor: "0193dddd-0000-4000-8000-0000000000a4",
   } as const;
   for (const [kind, accountId] of Object.entries(plans)) await account(accountId, fx.owner.id, kind);
-  const kinds = (await getAgentBrain(deps, fx.owner.id, fx.org.id, id)).accounts.map((a) => a.kind).sort();
+  // Hers, of every kind (an owner sees Caio's there too: owners may use other people's plans).
+  const kinds = (await getAgentBrain(deps, fx.owner.id, fx.org.id, id)).accounts
+    .filter((a) => a.mine)
+    .map((a) => a.kind)
+    .sort();
   expect(kinds).toEqual(["claude_code", "codex", "cursor", "opencode"]);
   await fx.db
     .update(schema.machines)

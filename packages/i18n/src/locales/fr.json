@@ -362,6 +362,12 @@
       "desc": "L'abonnement, la carte et les factures.",
       "short": "facturation",
       "say": "gère la facturation"
+    },
+    "use_others_plans": {
+      "title": "Utiliser les forfaits d’autres personnes",
+      "desc": "Donner aux agents qu’on peut modifier un forfait connecté par quelqu’un d’autre. Son propriétaire reçoit un e-mail et peut le reprendre.",
+      "short": "utiliser les forfaits d’autres personnes",
+      "say": "utilise les forfaits d’autres personnes"
     }
   },
   "auth": {
@@ -1246,6 +1252,8 @@
     "paused": "En pause : vous avez annulé 3 de ses décisions cette semaine. Réactivez-le quand vous voulez.",
     "card": {
       "deciding": "{{name}} l'examine au nom de {{for}}…",
+      "approvedForYou": "Approuvé par {{name}} en votre nom",
+      "decidingForYou": "{{name}} l'examine en votre nom…",
       "approved": "Approuvé par {{name}} au nom de {{for}}",
       "passed": "{{name}} vous l'a passé",
       "passedWhy": "{{name}} vous l'a passé : {{reason}}",
@@ -1257,9 +1265,7 @@
       "why": "Pourquoi ?",
       "undo": "Annuler",
       "undoArchives": "Annuler archive {{name}}. Possible jusqu'à {{until}}.",
-      "undoSettings": "Annuler rétablit les réglages. Possible jusqu'à {{until}}.",
-      "approvedForYou": "Approuvé par {{name}} en votre nom",
-      "decidingForYou": "{{name}} l'examine en votre nom…"
+      "undoSettings": "Annuler rétablit les réglages. Possible jusqu'à {{until}}."
     }
   },
   "noticePrefs": {
@@ -1504,9 +1510,9 @@
     "collapseAll": "Tout replier",
     "expandAll": "Tout déplier",
     "organize": "Organiser les groupes dans Équipe",
-    "seeAll_one": "Voir l’agent",
-    "seeAll_many": "Voir les {{count}} agents",
-    "seeAll_other": "Voir les {{count}} agents",
+    "more_one": "1 agent de plus dans Équipe",
+    "more_many": "{{count}} agents de plus dans Équipe",
+    "more_other": "{{count}} agents de plus dans Équipe",
     "createFirst": "Créer le premier agent",
     "working_one": "{{count}} au travail",
     "working_many": "{{count}} au travail",
@@ -1889,7 +1895,6 @@
   "rightHand": {
     "label": "votre bras droit",
     "newDot": "Nouveau",
-    "callWith": "appelez avec @{{handle}}",
     "role": "Assistant du workspace",
     "actsAsYou": "agit avec vos permissions",
     "composerHint": "rien ne change sans vous",
@@ -1928,7 +1933,8 @@
       "channels": "Répond dans les canaux quand on l’appelle",
       "model": "Modèle",
       "message": "Message",
-      "configure": "Configurer"
+      "configure": "Configurer",
+      "nameStory": "Le nom vient de lodestar, l'étoile qui guide les marins."
     },
     "settings": {
       "name": "Nom et apparence",
@@ -2069,6 +2075,8 @@
       "claude_code": "Claude Code n'est pas connecté sur cet ordinateur. Connectez un compte Claude sur la page de {{name}}.",
       "codex": "Codex n'est pas connecté sur cet ordinateur. Connectez un compte ChatGPT sur la page de {{name}}.",
       "cursor": "Cursor n'est pas connecté sur cet ordinateur. Connectez un compte Cursor sur la page de {{name}}.",
+      "grok": "Grok n'est pas connecté sur cet ordinateur. Connectez un compte Grok sur la page de {{name}}.",
+      "antigravity": "Gemini n'est pas connecté sur cet ordinateur. Connectez un compte Gemini sur la page de {{name}}.",
       "opencode": "OpenCode ne peut pas réfléchir sur cet ordinateur. Connectez une clé OpenCode sur la page de {{name}}."
     },
     "card": {
@@ -2097,6 +2105,8 @@
       "claude": "Connecter votre abonnement Claude",
       "chatgpt": "Connecter votre abonnement ChatGPT",
       "cursor": "Connecter votre abonnement Cursor",
+      "grok": "Connecter votre abonnement Grok",
+      "gemini": "Connecter votre abonnement Gemini",
       "zen": "Connecter OpenCode",
       "api_key": "Ajouter une clé API"
     },
@@ -2121,6 +2131,15 @@
       "cursor": {
         "title": "Votre abonnement Cursor",
         "tiers": "Pro, Pro+, Ultra ou Teams, ou une clé API Cursor"
+      },
+      "grok": {
+        "title": "Votre abonnement Grok",
+        "tiers": "SuperGrok, SuperGrok Heavy ou X Premium+"
+      },
+      "gemini": {
+        "title": "Votre abonnement Gemini",
+        "tiers": "Google AI Pro, Google AI Ultra ou Gemini Enterprise",
+        "warning": "Google indique qu'utiliser un abonnement Gemini personnel dans d'autres applications peut entraîner la suspension du compte. Pour éviter ce risque, utilisez une clé API ou Gemini Enterprise."
       },
       "zen": {
         "title": "OpenCode",
@@ -2192,6 +2211,10 @@
     "onceHint": "Ils partagent tous les limites de votre abonnement.",
     "use": "Utiliser {{label}}",
     "another": "Un autre compte",
+    "reuse": {
+      "active": "Vous avez déjà {{label}} ici. Reconnectez-vous à ce compte, ou utilisez-en un autre.",
+      "signedOut": "{{label}} est déconnecté ici. Reconnectez-vous, et ses agents le gardent."
+    },
     "signInFor": "Se connecter pour {{name}}",
     "signInFor_female": "Se connecter pour {{name}}",
     "doneAll": "{{names}} réfléchissent désormais avec {{label}}.",
@@ -2199,6 +2222,8 @@
       "claude_code": "Claude est connecté en tant que {{email}}, et non {{account}}. Déconnectez-vous sur la page de Claude et réessayez.",
       "codex": "ChatGPT est connecté en tant que {{email}}, et non {{account}}. Déconnectez-vous sur la page de ChatGPT et réessayez.",
       "cursor": "Cursor est connecté en tant que {{email}}, et non {{account}}. Déconnectez-vous sur la page de Cursor et réessayez.",
+      "grok": "Grok est connecté en tant que {{email}}, et non {{account}}. Déconnectez-vous sur la page de Grok et réessayez.",
+      "antigravity": "Gemini est connecté en tant que {{email}}, et non {{account}}. Déconnectez-vous sur la page de Google et réessayez.",
       "opencode": "OpenCode est connecté en tant que {{email}}, pas {{account}}. Réessayez avec la bonne clé."
     },
     "useAnyway": "Utiliser {{email}}",
@@ -2397,7 +2422,6 @@
   "dm": {
     "subtitle": "{{role}} · géré par {{owner}}",
     "subtitleNoOwner": "{{role}} · sans responsable",
-    "profile": "Voir le profil",
     "emptyAgent": "Demandez-lui de retenir, d'oublier ou de travailler autrement.",
     "emptyAgent_female": "Demandez-lui de retenir, d'oublier ou de travailler autrement.",
     "opening": "Ouverture de la conversation…",
@@ -3660,7 +3684,8 @@
       "usageLimitReached": "<b>{{name}}</b> a atteint sa limite de {{amount}}",
       "usageLimitRequest": "<b>{{name}}</b> a atteint sa limite de {{amount}} et en demande plus",
       "usageLimitRaised": "<b>{{name}}</b> a relevé votre limite pour ce mois",
-      "usageLimitRefused": "<b>{{name}}</b> a refusé votre demande d'utilisation supplémentaire"
+      "usageLimitRefused": "<b>{{name}}</b> a refusé votre demande d'utilisation supplémentaire",
+      "planLent": "<b>{{name}}</b> a connecté votre forfait {{plan}} à <b>{{agent}}</b>"
     },
     "usageLimit": {
       "runs_one": "{{count}} demande ce mois-ci",
@@ -3779,7 +3804,12 @@
     "noneUnread": "Tout est lu.",
     "noneHere": "Rien ici pour l'instant.",
     "noneDone": "Rien marqué comme terminé ces 30 derniers jours.",
-    "more": "Afficher plus"
+    "more": "Afficher plus",
+    "planLent": {
+      "takeBack": "Reprendre",
+      "takeBackAll": "Reprendre de tous les agents",
+      "done": "Votre forfait est revenu"
+    }
   },
   "approvals": {
     "title": "Approbations",
@@ -4163,21 +4193,31 @@
             "claude_code": "Ajouter un compte Claude",
             "codex": "Ajouter un compte ChatGPT",
             "cursor": "Ajouter un compte Cursor",
+            "grok": "Ajouter un compte Grok",
+            "antigravity": "Ajouter un compte Gemini",
             "opencode": "Ajouter une clé OpenCode"
           },
           "stepOne": {
             "claude_code": "Le compte avec votre abonnement",
             "codex": "Le compte avec votre abonnement",
-            "cursor": "Le compte avec votre abonnement"
+            "cursor": "Le compte avec votre abonnement",
+            "grok": "Le compte avec votre abonnement",
+            "antigravity": "Le compte Google avec votre abonnement",
+            "antigravityEnterprise": "Votre compte Gemini Enterprise"
           },
           "stepOneHint": "Mauvais compte ? Déconnectez-vous là-bas et réessayez. Le compte reste uniquement sur {{computer}}. Vous saisissez votre mot de passe sur la page de {{brand}}.",
           "open": {
             "claude_code": "Se connecter avec Claude",
             "codex": "Se connecter avec ChatGPT",
-            "cursor": "Se connecter avec Cursor"
+            "cursor": "Se connecter avec Cursor",
+            "grok": "Se connecter avec Grok",
+            "antigravity": "Se connecter avec Google"
           },
           "opencodeFree": "Les modèles gratuits d'OpenCode ne demandent aucune clé. Une clé de la console OpenCode ajoute les modèles payants.",
           "cursorFinish": "Connectez-vous sur la page de Cursor, et la connexion se termine toute seule sur {{computer}}.",
+          "grokFinish": "Connectez-vous sur la page de Grok, et la connexion se termine toute seule sur {{computer}}.",
+          "geminiEnterprise": "Utiliser plutôt Gemini Enterprise",
+          "geminiPersonal": "Utiliser plutôt un compte Google personnel",
           "cursorKey": "Utiliser plutôt une clé API Cursor",
           "copyLink": "Copier le lien",
           "openAgain": "Rouvrir",
@@ -4189,6 +4229,7 @@
           "sent": "Code envoyé. Fin de la connexion sur {{computer}}.",
           "local": "Sur {{computer}} lui-même ? Si son navigateur s'est ouvert tout seul, autorisez simplement là-bas.",
           "deviceCode": "Code pour ChatGPT",
+          "grokCode": "Code pour Grok",
           "deviceCodeText": "Saisissez ce code sur la page qui s'ouvre.",
           "starting": "Demande à {{computer}}…",
           "waiting": "En attente",
@@ -4199,13 +4240,16 @@
             "claude_code": "Claude s'est connecté en tant que {{account}}, un compte que vous avez déjà connecté. Pour en utiliser un autre, déconnectez-vous sur la page de Claude et réessayez.",
             "codex": "ChatGPT s'est connecté en tant que {{account}}, un compte que vous avez déjà connecté. Pour en utiliser un autre, déconnectez-vous sur la page de ChatGPT et réessayez.",
             "cursor": "Cursor s'est connecté en tant que {{account}}, un compte que vous avez déjà connecté. Pour en utiliser un autre, déconnectez-vous sur la page de Cursor et réessayez.",
+            "grok": "Grok s'est connecté en tant que {{account}}, un compte que vous avez déjà connecté. Pour en utiliser un autre, déconnectez-vous sur la page de Grok et réessayez.",
+            "antigravity": "Gemini s'est connecté en tant que {{account}}, un compte que vous avez déjà connecté. Pour en utiliser un autre, déconnectez-vous sur la page de Google et réessayez.",
             "opencode": "Cette clé OpenCode est déjà connectée en tant que {{account}}."
           },
           "startFailed": "Aucune réponse de {{computer}}. Réessayez dans un instant.",
           "sendFailed": "Impossible d'envoyer le code. Vérifiez-le et réessayez.",
           "done": "Le compte {{account}} est sur {{computer}}. Cliquez sur Utiliser pour enregistrer."
         },
-        "offCloud": "{{computer}} ne répond pas"
+        "offCloud": "{{computer}} ne répond pas",
+        "accountOthers": "Les forfaits d’autres personnes indiquent à qui ils sont. Leur propriétaire reçoit un e-mail et peut les reprendre."
       },
       "computer": {
         "title": "Où {{name}} travaille-t-il ?",
@@ -7912,6 +7956,8 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "grok": "Grok",
+      "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
         "keys": "Mettez à jour agentes sur l'ordinateur pour utiliser la clé d'un abonnement"
@@ -7919,11 +7965,13 @@
       "noComputer": "Les comptes restent sur un ordinateur connecté. Connectez d'abord l'un des vôtres.",
       "addComputer": "Connecter un ordinateur",
       "needsCloud": {
-        "claude_code": "Pas encore prêt sur {{computer}}",
-        "codex": "Pas encore prêt sur {{computer}}",
-        "cursor": "Pas encore prêt sur {{computer}}",
-        "opencode": "Pas encore prêt sur {{computer}}",
-        "online": "{{computer}} ne répond pas pour le moment. On s'en occupe."
+        "online": "{{computer}} redémarre ou se reconnecte. Ceci change tout seul dès son retour.",
+        "installing": "{{program}} est en cours d'installation sur {{computer}}. Ceci change tout seul une fois terminé.",
+        "updating": "{{program}} est en cours de mise à jour sur {{computer}}. Ceci change tout seul une fois terminé.",
+        "runnerOld": "Le programme agentes.chat sur {{computer}} n'est pas à jour et la mise à jour est en route. Ceci change tout seul une fois terminé.",
+        "execOff": "{{computer}} ne peut pas encore lancer {{program}}. On s'en occupe, et ceci change tout seul.",
+        "toolOff": "{{program}} n'est pas autorisé sur {{computer}}. Demandez au support de l'autoriser.",
+        "preparing": "{{computer}} se prépare. Ceci change tout seul une fois terminé."
       }
     },
     "done": {
@@ -7951,6 +7999,13 @@
       "rename": "Renommer",
       "signInAgain": "Se reconnecter",
       "newKey": "Remplacer la clé",
+      "copies_one": "{{count}} connexion de plus de ce compte, sans agent.",
+      "copies_many": "{{count}} connexions de plus de ce compte, sans agent.",
+      "copies_other": "{{count}} connexions de plus de ce compte, sans agent.",
+      "removeCopies": "Supprimer",
+      "copiesRemoved_one": "{{count}} connexion inutilisée supprimée.",
+      "copiesRemoved_many": "{{count}} connexions inutilisées supprimées.",
+      "copiesRemoved_other": "{{count}} connexions inutilisées supprimées.",
       "disconnect": "Déconnecter",
       "renameTitle": "Renommer {{label}}",
       "nameLabel": "Nom",
@@ -8178,7 +8233,8 @@
       "deal": "marché conclu",
       "thinking": "je réfléchis",
       "wow": "waouh",
-      "dizzy": "étourdi"
+      "dizzy": "étourdi",
+      "wave": "coucou"
     },
     "moodWords": {
       "celebrate": "fête bravo félicitations célébrer livré lancement youpi",
@@ -8186,7 +8242,8 @@
       "deal": "ok d'accord oui bien sûr fait",
       "thinking": "hmm je me demande réfléchir peut-être",
       "wow": "waouh surprise incroyable oh là là",
-      "dizzy": "fatigué vendredi aide oups perdu"
+      "dizzy": "fatigué vendredi aide oups perdu",
+      "wave": "bonjour salut au revoir coucou bonne journée à plus"
     },
     "picker": {
       "button": "Emojis, GIFs et stickers",
@@ -9370,21 +9427,29 @@
       "claude": "{{model}} avec l'abonnement Claude",
       "chatgpt": "{{model}} avec l'abonnement ChatGPT",
       "cursor": "{{model}} avec l'abonnement Cursor",
+      "grok": "{{model}} avec l'abonnement Grok",
+      "gemini": "{{model}} avec l'abonnement Gemini",
       "zen": "{{model}} avec OpenCode",
       "coding": "{{model}} avec {{plan}}",
       "claudeOf": "{{model}} avec l'abonnement Claude de {{owner}}",
       "chatgptOf": "{{model}} avec l'abonnement ChatGPT de {{owner}}",
       "cursorOf": "{{model}} avec l'abonnement Cursor de {{owner}}",
+      "grokOf": "{{model}} avec l'abonnement Grok de {{owner}}",
+      "geminiOf": "{{model}} avec l'abonnement Gemini de {{owner}}",
       "zenOf": "{{model}} avec l'OpenCode de {{owner}}",
       "codingOf": "{{model}} avec {{plan}} de {{owner}}",
       "claudeAuto": "Abonnement Claude",
       "chatgptAuto": "Abonnement ChatGPT",
       "cursorAuto": "Abonnement Cursor",
+      "grokAuto": "Abonnement Grok",
+      "geminiAuto": "Abonnement Gemini",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Abonnement Claude de {{owner}}",
       "chatgptAutoOf": "Abonnement ChatGPT de {{owner}}",
       "cursorAutoOf": "Abonnement Cursor de {{owner}}",
+      "grokAutoOf": "Abonnement Grok de {{owner}}",
+      "geminiAutoOf": "Abonnement Gemini de {{owner}}",
       "zenAutoOf": "OpenCode de {{owner}}",
       "codingAutoOf": "{{plan}} de {{owner}}",
       "on": "{{line}} sur {{computer}}"
@@ -9397,7 +9462,9 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
-      "opencode": "OpenCode"
+      "opencode": "OpenCode",
+      "grok": "Grok Build",
+      "antigravity": "Antigravity CLI"
     },
     "foot": {
       "api": "Via l'API",
@@ -9408,6 +9475,8 @@
     "claude_codeText": "Utilise l'abonnement Claude de la personne qui a connecté l'ordinateur.",
     "codexText": "Utilise l'abonnement ChatGPT de la personne qui a connecté l'ordinateur.",
     "cursorText": "Utilise l'abonnement Cursor de la personne qui a connecté l'ordinateur.",
+    "grokText": "Utilise l'abonnement Grok de la personne qui a connecté l'ordinateur.",
+    "antigravityText": "Utilise l'abonnement Gemini de la personne qui a connecté l'ordinateur.",
     "opencodeText": "Les modèles gratuits d'OpenCode, ou la clé OpenCode de la personne qui a connecté l'ordinateur.",
     "cursorModel": {
       "inPlan": "Inclus dans votre abonnement Cursor",
@@ -9452,6 +9521,8 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "grok": "Grok Build · {{model}}",
+      "antigravity": "Antigravity CLI · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, sans repli sur l'API"
     },
@@ -11902,6 +11973,8 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "grok": "Grok Build",
+        "antigravity": "Antigravity CLI",
         "opencode": "OpenCode",
         "commands": "Commandes",
         "browser": "Navigateur"
@@ -11910,6 +11983,8 @@
         "claude": "Écrit et modifie des fichiers, uniquement dans les dossiers autorisés.",
         "codex": "Comme Claude Code, avec un compte ChatGPT. Uniquement dans les dossiers autorisés.",
         "cursor": "Comme Claude Code, avec un compte Cursor. Uniquement dans les dossiers autorisés.",
+        "grok": "Comme Claude Code, avec un compte Grok. Uniquement dans les dossiers autorisés.",
+        "antigravity": "Comme Claude Code, avec un compte Gemini. Uniquement dans les dossiers autorisés.",
         "opencode": "Comme Claude Code, avec les modèles gratuits d'OpenCode ou une clé OpenCode. Uniquement dans les dossiers autorisés.",
         "commands": "Lance des commandes dans le Terminal, comme des tests et des builds."
       },
@@ -13491,6 +13566,8 @@
       "action_invite_people": "Inviter des personnes",
       "action_install_skill": "Installer une compétence",
       "action_update_skills": "Mettre à jour des compétences",
+      "action_approvals": "Approbations qui vous attendent",
+      "action_open_page": "Ouvrir un écran",
       "agent_proposal": "A proposé un nouvel agent : {{name}}",
       "settings_proposal": "A proposé un changement pour {{names}}",
       "approval_request": "Demande d'approbation : {{title}}",
@@ -13523,9 +13600,7 @@
       "stuck": "J'ai été bloqué et je me suis arrêté avant de terminer.",
       "forum_suggestion": "Cela mérite un forum ? « {{title}} »",
       "forum_concluded": "Le forum « {{title}} » est terminé. La synthèse est dans le fichier ci-dessous.",
-      "forum_concluded_issues": "Le forum « {{title}} » est terminé. La synthèse est dans le fichier ci-dessous, avec {{count}} tâche(s) suggérée(s) à approuver.",
-      "action_approvals": "Approbations qui vous attendent",
-      "action_open_page": "Ouvrir un écran"
+      "forum_concluded_issues": "Le forum « {{title}} » est terminé. La synthèse est dans le fichier ci-dessous, avec {{count}} tâche(s) suggérée(s) à approuver."
     }
   },
   "builtinTools": {
@@ -14177,8 +14252,8 @@
       "backLabel": "Note pour {{name}}",
       "backLabel_female": "Note pour {{name}}",
       "backPlaceholder": "Facultatif : quelque chose que {{name}} devrait savoir ?",
-      "addNote": "Laisser un mot",
-      "backPlaceholder_female": "Facultatif : quelque chose que {{name}} devrait savoir ?"
+      "backPlaceholder_female": "Facultatif : quelque chose que {{name}} devrait savoir ?",
+      "addNote": "Laisser un mot"
     },
     "now": {
       "ready": "Prêt sur {{computer}}",

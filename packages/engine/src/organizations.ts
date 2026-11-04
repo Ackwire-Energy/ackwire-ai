@@ -1064,7 +1064,7 @@ export async function removalPreview(
 
 /**
  * A plan thinks only for its owner's agents (ADR 0059 §3, `updateAgent`): of these agents, each one on a computer
- * brain (any of them: Claude Code, Codex, Cursor, OpenCode) whose plan (an account, or the computer's own sign-in)
+ * brain (any of them: Claude Code, Codex, Cursor, OpenCode, Grok, Antigravity) whose plan (an account, or the computer's own sign-in)
  * isn't its owner's, or that has no computer left, goes back to the API.
  */
 async function offPlansNotOwners(tx: Executor, orgId: string, ids: string[]) {

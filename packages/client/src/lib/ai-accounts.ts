@@ -89,6 +89,41 @@ export function accountChoices<A extends MachineAccount & { machineId?: string }
 }
 
 /**
+ * The person's own account of this plan on that computer, before a new sign-in there: one signed out first, else one
+ * signed in. Signing in to it again keeps its id, its folder and its agents, where each new sign-in leaves one more
+ * account on the computer (a retry after a failed check made several). Only a login free to take (`freeDuplicate`'s
+ * rule): one for all of their agents there, or one no agent thinks with. Another agent's own login can't think for a
+ * second one, and signing in to it again starts its folder over. `provider`: a coding plan's (or a CLI's key); none
+ * for the CLI's own sign-in.
+ */
+export function reusableAccount<A extends MachineAccount & { machineId: string }>(
+  accounts: readonly A[] | undefined,
+  { machineId, kind, provider }: { machineId: string; kind: MachineAccountKind; provider?: string },
+): A | undefined {
+  const theirs = (accounts ?? []).filter(
+    (a) =>
+      a.mine &&
+      a.machineId === machineId &&
+      a.kind === kind &&
+      (a.provider ?? undefined) === provider &&
+      (a.shared === true || a.usedBy.length === 0),
+  );
+  return theirs.find((a) => a.status === "signed_out") ?? theirs[0];
+}
+
+/**
+ * The logins of one account (`groupPlans`) that think for no agent: what signing in again and again left behind,
+ * removed in one click. One stays when none thinks for an agent (a signed-in one first), so the account is still
+ * there.
+ */
+export function unusedCopies<A extends MachineAccount>({ logins }: Pick<PlanAccount<A>, "logins">): A[] {
+  const unused = logins.filter((l) => l.mine && l.usedBy.length === 0);
+  if (unused.length < logins.length) return unused;
+  const keep = logins.find((l) => l.status === "active") ?? logins[0];
+  return unused.filter((l) => l !== keep);
+}
+
+/**
  * "Use for…" an account that thinks for all of its owner's agents there (`shared`): the viewer's agents on its
  * computer that don't think with it yet. Never one on the workspace's API key: a plan makes an agent answer only
  * its owner, so that one moves on its own page.
@@ -164,9 +199,18 @@ export function accountAbout(
 }
 
 /**
+ * Someone else's plan that a person who may use other people's plans (`use_others_plans`, ADR 0059 §3) can give the
+ * agent named `agentName`: signed in, and thinking for nobody else or for all of its owner's agents there. It is
+ * never taken from an agent that has it.
+ */
+export const lendable = (a: Pick<MachineAccount, "status" | "shared" | "usedBy">, agentName: string) =>
+  a.status !== "signed_out" && (a.shared === true || a.usedBy.every((n) => n === agentName));
+
+/**
  * What a row of what the person already has does for the agent: `use` it at once; `also` signs the agent in to that
  * account once more (one login per agent); `again` signs a free login of it back in; `move` takes it from the agent
- * on it; `locked`: someone else's, which only its owner picks (ADR 0041 §4, ADR 0059).
+ * on it; `locked`: someone else's, which only its owner picks (ADR 0041 §4, ADR 0059), unless the viewer may use
+ * other people's plans and it is `lendable`.
  */
 export type ExistingAct = "use" | "also" | "again" | "move" | "locked";
 
@@ -176,9 +220,12 @@ export type ExistingAi<A extends MachineAccount = MachineAccount> =
 
 const EXISTING_RANK: Record<ExistingAct | "key", number> = { use: 0, also: 1, again: 1, move: 1, key: 2, locked: 3 };
 
-/** What an account's row does (`ExistingAct`); null for a signed-out login another agent thinks with. */
-function existingAct({ login: a, also }: AccountChoice<MachineAccount>): ExistingAct | null {
-  if (!a.mine) return "locked";
+/**
+ * What an account's row does (`ExistingAct`); null for a signed-out login another agent thinks with. Someone else's is
+ * `use` where the viewer may use other people's plans (`others`) and it is `lendable`.
+ */
+function existingAct({ login: a, also }: AccountChoice<MachineAccount>, others: boolean): ExistingAct | null {
+  if (!a.mine) return others && lendable(a, "") ? "use" : "locked";
   if (also) return "also";
   // One made for all of its owner's agents there is never taken from the others.
   const used = a.usedBy.length > 0 && a.shared !== true;
@@ -193,14 +240,14 @@ function existingAct({ login: a, also }: AccountChoice<MachineAccount>): Existin
  * signed-out login another agent thinks with stays out: it thinks for nobody until its owner signs it in again.
  */
 export function existingAi<A extends MachineAccount>(
-  view: { accounts: readonly A[]; account: string | null },
+  view: { accounts: readonly A[]; account: string | null; canUseOthersPlans?: boolean },
   keys: readonly Credential[],
 ): ExistingAi<A>[] {
   const accounts = accountChoices(
     view.accounts.filter((a) => a.id !== view.account),
     [],
   ).flatMap((choice): ExistingAi<A>[] => {
-    const act = existingAct(choice);
+    const act = existingAct(choice, view.canUseOthersPlans === true);
     return act ? [{ kind: "account", choice, act }] : [];
   });
   const live = keys.filter((k) => !k.revokedAt).map((key): ExistingAi<A> => ({ kind: "key", key }));

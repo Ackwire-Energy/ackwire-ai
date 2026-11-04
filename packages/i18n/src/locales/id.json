@@ -352,6 +352,12 @@
       "desc": "Paket, kartu, dan faktur.",
       "short": "tagihan",
       "say": "mengurus tagihan"
+    },
+    "use_others_plans": {
+      "title": "Pakai paket orang lain",
+      "desc": "Memberi agen yang bisa diedit paket yang dihubungkan orang lain. Pemiliknya menerima email dan bisa menariknya kembali.",
+      "short": "pakai paket orang lain",
+      "say": "memakai paket orang lain"
     }
   },
   "auth": {
@@ -1174,6 +1180,8 @@
     "paused": "Dijeda: kamu membatalkan 3 keputusannya minggu ini. Nyalakan lagi kapan pun kamu mau.",
     "card": {
       "deciding": "{{name}} sedang meninjaunya atas nama {{for}}…",
+      "approvedForYou": "Disetujui oleh {{name}} atas namamu",
+      "decidingForYou": "{{name}} sedang meninjaunya atas namamu…",
       "approved": "Disetujui oleh {{name}} atas nama {{for}}",
       "passed": "{{name}} meneruskannya kepadamu",
       "passedWhy": "{{name}} meneruskannya kepadamu: {{reason}}",
@@ -1185,9 +1193,7 @@
       "why": "Kenapa?",
       "undo": "Batalkan",
       "undoArchives": "Membatalkan akan mengarsipkan {{name}}. Berlaku hingga {{until}}.",
-      "undoSettings": "Membatalkan akan mengembalikan pengaturan. Berlaku hingga {{until}}.",
-      "approvedForYou": "Disetujui oleh {{name}} atas namamu",
-      "decidingForYou": "{{name}} sedang meninjaunya atas namamu…"
+      "undoSettings": "Membatalkan akan mengembalikan pengaturan. Berlaku hingga {{until}}."
     }
   },
   "noticePrefs": {
@@ -1418,7 +1424,7 @@
     "collapseAll": "Ciutkan semua",
     "expandAll": "Bentangkan semua",
     "organize": "Atur grup di Tim",
-    "seeAll_other": "Lihat semua {{count}} agen",
+    "more_other": "{{count}} agen lagi di Tim",
     "createFirst": "Buat agen pertama",
     "working_other": "{{count}} sedang bekerja",
     "count_other": "{{count}} agen",
@@ -1746,7 +1752,6 @@
   "rightHand": {
     "label": "tangan kanan Anda",
     "newDot": "Baru",
-    "callWith": "panggil dengan @{{handle}}",
     "role": "Asisten workspace",
     "actsAsYou": "bertindak dengan izin Anda",
     "composerHint": "tak ada yang berubah tanpa Anda",
@@ -1785,7 +1790,8 @@
       "channels": "Menjawab di kanal saat dipanggil",
       "model": "Model",
       "message": "Pesan",
-      "configure": "Atur"
+      "configure": "Atur",
+      "nameStory": "Namanya berasal dari lodestar, bintang penunjuk arah para pelaut."
     },
     "settings": {
       "name": "Nama dan tampilan",
@@ -1921,6 +1927,10 @@
       "codex_female": "Codex belum masuk di komputer ini. Hubungkan akun ChatGPT di halaman {{name}}.",
       "cursor": "Cursor belum masuk di komputer ini. Hubungkan akun Cursor di halaman {{name}}.",
       "cursor_female": "Cursor belum masuk di komputer ini. Hubungkan akun Cursor di halaman {{name}}.",
+      "grok": "Grok belum masuk di komputer ini. Hubungkan akun Grok di halaman {{name}}.",
+      "grok_female": "Grok belum masuk di komputer ini. Hubungkan akun Grok di halaman {{name}}.",
+      "antigravity": "Gemini belum masuk di komputer ini. Hubungkan akun Gemini di halaman {{name}}.",
+      "antigravity_female": "Gemini belum masuk di komputer ini. Hubungkan akun Gemini di halaman {{name}}.",
       "opencode": "OpenCode tidak bisa berpikir di komputer ini. Hubungkan kunci OpenCode di halaman {{name}}.",
       "opencode_female": "OpenCode tidak bisa berpikir di komputer ini. Hubungkan kunci OpenCode di halaman {{name}}."
     },
@@ -1950,6 +1960,8 @@
       "claude": "Hubungkan paket Claude-mu",
       "chatgpt": "Hubungkan paket ChatGPT-mu",
       "cursor": "Hubungkan paket Cursor-mu",
+      "grok": "Hubungkan paket Grok-mu",
+      "gemini": "Hubungkan paket Gemini-mu",
       "zen": "Hubungkan OpenCode",
       "api_key": "Tambahkan kunci API"
     },
@@ -1974,6 +1986,15 @@
       "cursor": {
         "title": "Paket Cursor-mu",
         "tiers": "Pro, Pro+, Ultra, atau Teams, atau kunci API Cursor"
+      },
+      "grok": {
+        "title": "Paket Grok-mu",
+        "tiers": "SuperGrok, SuperGrok Heavy, atau X Premium+"
+      },
+      "gemini": {
+        "title": "Paket Gemini-mu",
+        "tiers": "Google AI Pro, Google AI Ultra, atau Gemini Enterprise",
+        "warning": "Google menyatakan bahwa memakai paket Gemini pribadi di dalam aplikasi lain bisa membuat akun ditangguhkan. Agar tidak mengambil risiko itu, pakai kunci API atau Gemini Enterprise."
       },
       "zen": {
         "title": "OpenCode",
@@ -2045,6 +2066,10 @@
     "onceHint": "Semuanya berbagi batas paketmu.",
     "use": "Pakai {{label}}",
     "another": "Akun lain",
+    "reuse": {
+      "active": "Kamu sudah punya {{label}} di sini. Masuk lagi ke akun itu, atau pakai akun lain.",
+      "signedOut": "{{label}} sudah keluar di sini. Masuk lagi dan agennya tetap memakainya."
+    },
     "signInFor": "Masuk untuk {{name}}",
     "signInFor_female": "Masuk untuk {{name}}",
     "doneAll": "{{names}} sekarang berpikir dengan {{label}}.",
@@ -2052,6 +2077,8 @@
       "claude_code": "Claude masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman Claude lalu coba lagi.",
       "codex": "ChatGPT masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman ChatGPT lalu coba lagi.",
       "cursor": "Cursor masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman Cursor lalu coba lagi.",
+      "grok": "Grok masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman Grok lalu coba lagi.",
+      "antigravity": "Gemini masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman Google lalu coba lagi.",
       "opencode": "OpenCode masuk sebagai {{email}}, bukan {{account}}. Coba lagi dengan kunci yang benar."
     },
     "useAnyway": "Pakai {{email}}",
@@ -2236,7 +2263,6 @@
   "dm": {
     "subtitle": "{{role}} · milik {{owner}}",
     "subtitleNoOwner": "{{role}} · tanpa pemilik",
-    "profile": "Lihat profil",
     "emptyAgent": "Minta dia mengingat, melupakan, atau bekerja dengan cara lain.",
     "emptyAgent_female": "Minta dia mengingat, melupakan, atau bekerja dengan cara lain.",
     "opening": "Membuka percakapan…",
@@ -3432,7 +3458,8 @@
       "usageLimitReached": "<b>{{name}}</b> mencapai batas {{amount}}",
       "usageLimitRequest": "<b>{{name}}</b> mencapai batas {{amount}} dan meminta tambahan",
       "usageLimitRaised": "<b>{{name}}</b> menaikkan batasmu bulan ini",
-      "usageLimitRefused": "<b>{{name}}</b> menolak permintaan tambahan pemakaianmu"
+      "usageLimitRefused": "<b>{{name}}</b> menolak permintaan tambahan pemakaianmu",
+      "planLent": "<b>{{name}}</b> menghubungkan paket {{plan}} kamu ke <b>{{agent}}</b>"
     },
     "usageLimit": {
       "runs_other": "{{count}} permintaan bulan ini",
@@ -3540,7 +3567,12 @@
     "noneUnread": "Semua sudah dibaca.",
     "noneHere": "Belum ada apa-apa di sini.",
     "noneDone": "Tidak ada yang ditandai selesai dalam 30 hari terakhir.",
-    "more": "Tampilkan lebih banyak"
+    "more": "Tampilkan lebih banyak",
+    "planLent": {
+      "takeBack": "Tarik kembali",
+      "takeBackAll": "Tarik kembali dari semua agen",
+      "done": "Paketmu sudah kembali"
+    }
   },
   "approvals": {
     "title": "Persetujuan",
@@ -3885,21 +3917,31 @@
             "claude_code": "Tambah akun Claude",
             "codex": "Tambah akun ChatGPT",
             "cursor": "Tambah akun Cursor",
+            "grok": "Tambah akun Grok",
+            "antigravity": "Tambah akun Gemini",
             "opencode": "Tambah kunci OpenCode"
           },
           "stepOne": {
             "claude_code": "Akun dengan paketmu",
             "codex": "Akun dengan paketmu",
-            "cursor": "Akun dengan paketmu"
+            "cursor": "Akun dengan paketmu",
+            "grok": "Akun dengan paketmu",
+            "antigravity": "Akun Google dengan paketmu",
+            "antigravityEnterprise": "Akun Gemini Enterprise-mu"
           },
           "stepOneHint": "Akun yang salah? Keluar di sana lalu coba lagi. Akun hanya tersimpan di {{computer}}. Kamu mengetik kata sandi di halaman {{brand}}.",
           "open": {
             "claude_code": "Masuk dengan Claude",
             "codex": "Masuk dengan ChatGPT",
-            "cursor": "Masuk dengan Cursor"
+            "cursor": "Masuk dengan Cursor",
+            "grok": "Masuk dengan Grok",
+            "antigravity": "Masuk dengan Google"
           },
           "opencodeFree": "Model gratis OpenCode tidak perlu kunci. Kunci dari konsol OpenCode menambahkan model berbayarnya.",
           "cursorFinish": "Masuk di halaman Cursor, dan proses masuk selesai sendiri di {{computer}}.",
+          "grokFinish": "Masuk di halaman Grok, dan proses masuk selesai sendiri di {{computer}}.",
+          "geminiEnterprise": "Pakai Gemini Enterprise saja",
+          "geminiPersonal": "Pakai akun Google pribadi saja",
           "cursorKey": "Pakai kunci API Cursor saja",
           "copyLink": "Salin tautan",
           "openAgain": "Buka lagi",
@@ -3911,6 +3953,7 @@
           "sent": "Kode terkirim. Menyelesaikan proses masuk di {{computer}}.",
           "local": "Sedang di {{computer}} itu sendiri? Jika browsernya terbuka sendiri, cukup beri izin di sana.",
           "deviceCode": "Kode untuk ChatGPT",
+          "grokCode": "Kode untuk Grok",
           "deviceCodeText": "Ketik kode ini di halaman yang terbuka.",
           "starting": "Menghubungi {{computer}}…",
           "waiting": "Menunggu",
@@ -3921,13 +3964,16 @@
             "claude_code": "Claude masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman Claude lalu coba lagi.",
             "codex": "ChatGPT masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman ChatGPT lalu coba lagi.",
             "cursor": "Cursor masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman Cursor lalu coba lagi.",
+            "grok": "Grok masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman Grok lalu coba lagi.",
+            "antigravity": "Gemini masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman Google lalu coba lagi.",
             "opencode": "Kunci OpenCode itu sudah terhubung sebagai {{account}}."
           },
           "startFailed": "Tidak ada jawaban dari {{computer}}. Coba lagi sebentar lagi.",
           "sendFailed": "Tidak bisa mengirim kode. Periksa lalu coba lagi.",
           "done": "Akun {{account}} sudah ada di {{computer}}. Klik Pakai untuk menyimpan."
         },
-        "offCloud": "{{computer}} tidak merespons"
+        "offCloud": "{{computer}} tidak merespons",
+        "accountOthers": "Paket orang lain menunjukkan milik siapa. Pemiliknya menerima email dan bisa menariknya kembali."
       },
       "computer": {
         "title": "Di mana {{name}} bekerja?",
@@ -7333,6 +7379,8 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "grok": "Grok",
+      "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
         "keys": "Perbarui agentes di komputer untuk memakai kunci paket"
@@ -7340,11 +7388,13 @@
       "noComputer": "Akun disimpan di komputer yang terhubung. Hubungkan salah satu komputermu dulu.",
       "addComputer": "Hubungkan komputer",
       "needsCloud": {
-        "claude_code": "Belum siap di {{computer}}",
-        "codex": "Belum siap di {{computer}}",
-        "cursor": "Belum siap di {{computer}}",
-        "opencode": "Belum siap di {{computer}}",
-        "online": "{{computer}} sedang tidak merespons. Kami sedang menanganinya."
+        "online": "{{computer}} sedang memulai ulang atau menyambung lagi. Ini berubah sendiri begitu ia kembali.",
+        "installing": "{{program}} sedang dipasang di {{computer}}. Ini berubah sendiri setelah selesai.",
+        "updating": "{{program}} sedang diperbarui di {{computer}}. Ini berubah sendiri setelah selesai.",
+        "runnerOld": "Program agentes.chat di {{computer}} sudah usang dan pembaruannya sedang dalam perjalanan. Ini berubah sendiri setelah selesai.",
+        "execOff": "{{computer}} belum bisa menjalankan {{program}}. Kami sedang menanganinya, dan ini berubah sendiri.",
+        "toolOff": "{{program}} tidak diizinkan di {{computer}}. Minta tim dukungan untuk mengizinkannya.",
+        "preparing": "{{computer}} sedang disiapkan. Ini berubah sendiri setelah selesai."
       }
     },
     "done": {
@@ -7368,6 +7418,9 @@
       "rename": "Ganti nama",
       "signInAgain": "Masuk lagi",
       "newKey": "Ganti kunci",
+      "copies_other": "{{count}} login lain dari akun ini, tanpa agen.",
+      "removeCopies": "Hapus",
+      "copiesRemoved_other": "{{count}} login yang tidak dipakai dihapus.",
       "disconnect": "Putuskan",
       "renameTitle": "Ganti nama {{label}}",
       "nameLabel": "Nama",
@@ -7581,7 +7634,8 @@
       "deal": "sepakat",
       "thinking": "berpikir",
       "wow": "wow",
-      "dizzy": "pusing"
+      "dizzy": "pusing",
+      "wave": "hai"
     },
     "moodWords": {
       "celebrate": "pesta selamat rayakan rilis luncur hore party congrats celebrate yay",
@@ -7589,7 +7643,8 @@
       "deal": "ok oke setuju ya siap beres deal sure done",
       "thinking": "hmm bingung pikir mungkin entahlah think maybe",
       "wow": "wah kaget luar biasa astaga whoa wow omg",
-      "dizzy": "capek jumat tolong ups bingung lelah tired help oops"
+      "dizzy": "capek jumat tolong ups bingung lelah tired help oops",
+      "wave": "halo hai dadah melambai selamat pagi sampai jumpa hello bye"
     },
     "picker": {
       "button": "Emoji, GIF, dan stiker",
@@ -8690,21 +8745,29 @@
       "claude": "{{model}} dengan paket Claude",
       "chatgpt": "{{model}} dengan paket ChatGPT",
       "cursor": "{{model}} dengan paket Cursor",
+      "grok": "{{model}} dengan paket Grok",
+      "gemini": "{{model}} dengan paket Gemini",
       "zen": "{{model}} lewat OpenCode",
       "coding": "{{model}} dengan {{plan}}",
       "claudeOf": "{{model}} dengan paket Claude milik {{owner}}",
       "chatgptOf": "{{model}} dengan paket ChatGPT milik {{owner}}",
       "cursorOf": "{{model}} dengan paket Cursor milik {{owner}}",
+      "grokOf": "{{model}} dengan paket Grok milik {{owner}}",
+      "geminiOf": "{{model}} dengan paket Gemini milik {{owner}}",
       "zenOf": "{{model}} lewat OpenCode milik {{owner}}",
       "codingOf": "{{model}} dengan {{plan}} milik {{owner}}",
       "claudeAuto": "Paket Claude",
       "chatgptAuto": "Paket ChatGPT",
       "cursorAuto": "Paket Cursor",
+      "grokAuto": "Paket Grok",
+      "geminiAuto": "Paket Gemini",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Paket Claude milik {{owner}}",
       "chatgptAutoOf": "Paket ChatGPT milik {{owner}}",
       "cursorAutoOf": "Paket Cursor milik {{owner}}",
+      "grokAutoOf": "Paket Grok milik {{owner}}",
+      "geminiAutoOf": "Paket Gemini milik {{owner}}",
       "zenAutoOf": "OpenCode milik {{owner}}",
       "codingAutoOf": "{{plan}} milik {{owner}}",
       "on": "{{line}} di {{computer}}"
@@ -8716,7 +8779,9 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
-      "opencode": "OpenCode"
+      "opencode": "OpenCode",
+      "grok": "Grok Build",
+      "antigravity": "Antigravity CLI"
     },
     "foot": {
       "api": "Lewat API",
@@ -8727,6 +8792,8 @@
     "claude_codeText": "Memakai paket Claude milik orang yang menghubungkan komputer.",
     "codexText": "Memakai paket ChatGPT milik orang yang menghubungkan komputer.",
     "cursorText": "Memakai paket Cursor milik orang yang menghubungkan komputer.",
+    "grokText": "Memakai paket Grok milik orang yang menghubungkan komputer.",
+    "antigravityText": "Memakai paket Gemini milik orang yang menghubungkan komputer.",
     "opencodeText": "Model gratis OpenCode, atau kunci OpenCode milik orang yang menghubungkan komputer.",
     "cursorModel": {
       "inPlan": "Termasuk dalam paket Cursor-mu",
@@ -8771,6 +8838,8 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "grok": "Grok Build · {{model}}",
+      "antigravity": "Antigravity CLI · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, tanpa cadangan API"
     },
@@ -11101,6 +11170,8 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "grok": "Grok Build",
+        "antigravity": "Antigravity CLI",
         "opencode": "OpenCode",
         "commands": "Perintah",
         "browser": "Browser"
@@ -11109,6 +11180,8 @@
         "claude": "Menulis dan mengubah file, hanya di folder yang diizinkan.",
         "codex": "Seperti Claude Code, dengan akun ChatGPT. Hanya di folder yang diizinkan.",
         "cursor": "Seperti Claude Code, dengan akun Cursor. Hanya di folder yang diizinkan.",
+        "grok": "Seperti Claude Code, dengan akun Grok. Hanya di folder yang diizinkan.",
+        "antigravity": "Seperti Claude Code, dengan akun Gemini. Hanya di folder yang diizinkan.",
         "opencode": "Seperti Claude Code, dengan model gratis OpenCode atau kunci OpenCode. Hanya di folder yang diizinkan.",
         "commands": "Menjalankan perintah Terminal, seperti tes dan build."
       },
@@ -12606,6 +12679,8 @@
       "action_invite_people": "Undang orang",
       "action_install_skill": "Pasang skill",
       "action_update_skills": "Perbarui skill",
+      "action_approvals": "Persetujuan yang menunggumu",
+      "action_open_page": "Buka layar",
       "agent_proposal": "Mengusulkan agen baru: {{name}}",
       "settings_proposal": "Mengusulkan perubahan untuk {{names}}",
       "approval_request": "Permintaan persetujuan: {{title}}",
@@ -12632,9 +12707,7 @@
       "stuck": "Aku macet dan berhenti sebelum selesai.",
       "forum_suggestion": "Layak dibawa ke forum? \"{{title}}\"",
       "forum_concluded": "Forum \"{{title}}\" sudah selesai. Sintesisnya ada di file di bawah.",
-      "forum_concluded_issues": "Forum \"{{title}}\" sudah selesai. Sintesisnya ada di file di bawah, dengan {{count}} usulan tugas untuk disetujui.",
-      "action_approvals": "Persetujuan yang menunggumu",
-      "action_open_page": "Buka layar"
+      "forum_concluded_issues": "Forum \"{{title}}\" sudah selesai. Sintesisnya ada di file di bawah, dengan {{count}} usulan tugas untuk disetujui."
     }
   },
   "builtinTools": {

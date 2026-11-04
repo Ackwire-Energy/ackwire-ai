@@ -14,6 +14,7 @@ import type {
 import { ownSignInReady } from "./ai-accounts";
 import { answersOthers, audienceOf } from "./audience";
 import { type SetupView, setupPending } from "./computer";
+import { toolOffReason } from "./machines";
 import { CODING_PLANS, isPlanId, loginPerAgent, PLAN_IDS, type PlanId } from "./plans";
 
 /**
@@ -68,7 +69,13 @@ export function noAiCardOf(meta: Record<string, unknown> | null | undefined): No
   if (typeof o.agentId !== "string") return null;
   const signedOut = o.reason === "not_signed_in";
   const own =
-    signedOut && (o.own === "claude_code" || o.own === "codex" || o.own === "cursor" || o.own === "opencode")
+    signedOut &&
+    (o.own === "claude_code" ||
+      o.own === "codex" ||
+      o.own === "cursor" ||
+      o.own === "opencode" ||
+      o.own === "grok" ||
+      o.own === "antigravity")
       ? o.own
       : null;
   return {
@@ -93,17 +100,31 @@ export const opensByItself = (x: { intent?: string; autoOpen?: boolean }) =>
 
 /**
  * The brain a plan thinks with, on the agent's computer: a Claude plan through Claude Code, ChatGPT's through Codex,
- * OpenCode's (`zen`: its free tier or an OpenCode key, ADR 0132) through OpenCode's CLI.
+ * OpenCode's (`zen`: its free tier or an OpenCode key, ADR 0132) through OpenCode's CLI, a SuperGrok or X Premium+ plan
+ * through Grok Build (ADR 0142), a Google AI Pro or Ultra plan or Gemini Enterprise through the Antigravity CLI (ADR
+ * 0143).
  */
-export const PLAN_BRAIN: Record<"claude" | "chatgpt" | "cursor" | "zen", MachineAccountKind> = {
+export const PLAN_BRAIN: Record<"claude" | "chatgpt" | "cursor" | "zen" | "grok" | "gemini", MachineAccountKind> = {
   claude: "claude_code",
   chatgpt: "codex",
   cursor: "cursor",
   zen: "opencode",
+  grok: "grok",
+  gemini: "antigravity",
 };
 /** The plan a CLI signs in to by itself (`PLAN_BRAIN` the other way): ChatGPT's for Codex, Claude's for Claude Code. */
-export const planOfKind = (kind: MachineAccountKind): "claude" | "chatgpt" | "cursor" | "zen" =>
-  kind === "codex" ? "chatgpt" : kind === "cursor" ? "cursor" : kind === "opencode" ? "zen" : "claude";
+export const planOfKind = (kind: MachineAccountKind): "claude" | "chatgpt" | "cursor" | "zen" | "grok" | "gemini" =>
+  kind === "codex"
+    ? "chatgpt"
+    : kind === "cursor"
+      ? "cursor"
+      : kind === "opencode"
+        ? "zen"
+        : kind === "grok"
+          ? "grok"
+          : kind === "antigravity"
+            ? "gemini"
+            : "claude";
 
 type AiState = AiStatus["agents"][number]["state"];
 
@@ -115,14 +136,24 @@ export const aiStateOf = (status: AiStatus | undefined, agentId: string): AiStat
  * A plan a person signs in with, on the agent's computer: Claude's, ChatGPT's, Cursor's (a sign-in or its API key,
  * ADR 0114), OpenCode's (`zen`, its free tier or an OpenCode key, ADR 0132), or a coding plan's key.
  */
-export type PlanChoice = "claude" | "chatgpt" | "cursor" | "zen" | PlanId;
+export type PlanChoice = "claude" | "chatgpt" | "cursor" | "zen" | "grok" | "gemini" | PlanId;
 /** What the picker offers: a plan, or the workspace's API key. */
 export type AiChoice = PlanChoice | "key";
-/** Every picker's order: Claude (chosen first), ChatGPT, Cursor, OpenCode, then the coding plans. */
-export const PLAN_CHOICES: readonly PlanChoice[] = ["claude", "chatgpt", "cursor", "zen", ...PLAN_IDS];
+/** Every picker's order: Claude (chosen first), ChatGPT, Cursor, OpenCode, Grok, Gemini, then the coding plans. */
+export const PLAN_CHOICES: readonly PlanChoice[] = [
+  "claude",
+  "chatgpt",
+  "cursor",
+  "zen",
+  "grok",
+  "gemini",
+  ...PLAN_IDS,
+];
 /** The account a plan signs in as: ChatGPT's through Codex, Cursor's and OpenCode's through their CLIs; the rest through Claude Code. */
 export const kindOf = (choice: PlanChoice): MachineAccountKind =>
-  choice === "chatgpt" || choice === "cursor" || choice === "zen" ? PLAN_BRAIN[choice] : PLAN_BRAIN.claude;
+  choice === "chatgpt" || choice === "cursor" || choice === "zen" || choice === "grok" || choice === "gemini"
+    ? PLAN_BRAIN[choice]
+    : PLAN_BRAIN.claude;
 /** The plan an account signs in with: a coding plan's key, ChatGPT's through Codex, Cursor's, else Claude's. */
 export const planOfAccount = (a: Pick<MachineAccount, "kind" | "provider">): PlanChoice =>
   isPlanId(a.provider) ? a.provider : planOfKind(a.kind);
@@ -256,8 +287,8 @@ function brainOffReason(
   const tools = m?.access?.tools;
   const on = !tools
     ? undefined
-    : kind === "cursor"
-      ? (tools.cursor ?? tools.codex)
+    : kind === "cursor" || kind === "opencode" || kind === "grok" || kind === "antigravity"
+      ? (tools[kind] ?? tools.codex)
       : tools[kind === "codex" ? "codex" : "claude"];
   return on === false ? "tool_off" : "not_installed";
 }
@@ -286,6 +317,69 @@ export const ownSignInFor = (choice: PlanChoice, brain: AgentBrain | undefined, 
 
 /** A plan tile reads dimmed when its plan can't sign in there at all (it still opens its panel, which says why). */
 export const gateDims = (gate: PlanGate) => gate.state === "missing" || gate.state === "unsupported";
+
+/**
+ * The gate passes by itself, with nothing for the person to do: the computer reconnecting, or (the Cloud's, which is
+ * ours) its programs being installed or updated there. The panel asks again while it shows, as events may not say it.
+ * A program not allowed there waits for someone, as do all of self-host's (their computers are people's own).
+ */
+export const gateRechecks = (gate: PlanGate, edition: Edition | null) =>
+  gate.state === "offline" || (edition === "cloud" && gate.state === "unsupported" && gate.reason !== "tool_off");
+
+/** The Cloud's line per reason a plan can't sign in on the workspace's computer (`aiAccounts.connect.needsCloud.*`). */
+const CLOUD_REASON = {
+  no_computer: "preparing",
+  exec_off: "execOff",
+  runner_old: "runnerOld",
+  keys: "runnerOld",
+  tool_off: "toolOff",
+  not_installed: "installing",
+  outdated: "updating",
+} as const satisfies Record<BrainUnavailable | "keys", string>;
+
+/**
+ * Why a plan's panel can't sign in yet, in plain words, with what happens next: an offline computer, or a reason the
+ * plan can't sign in there (`unsupported`). On the Cloud the computer is ours, so the line says what it's doing (a
+ * program being installed or updated, a restart) and that it comes back by itself (`rechecks`), or who to ask. Null
+ * for any other gate. `computer`: its name as the panel says it; `machine`: its row, for the way to allow a program
+ * on a self-hosted one.
+ */
+export function gateLine(
+  t: TFunction,
+  {
+    gate,
+    edition,
+    kind,
+    computer,
+    machine,
+  }: {
+    gate: PlanGate;
+    edition: Edition | null;
+    kind: MachineAccountKind;
+    computer: string;
+    machine?: Pick<Machine, "os" | "mode"> | null;
+  },
+): { text: string; rechecks: boolean } | null {
+  const rechecks = gateRechecks(gate, edition);
+  const program = t(`brain.card.${kind}`);
+  if (gate.state === "offline")
+    return {
+      text:
+        edition === "cloud"
+          ? t("aiAccounts.connect.needsCloud.online", { computer })
+          : t("brain.offline", { computer }),
+      rechecks,
+    };
+  if (gate.state !== "unsupported") return null;
+  if (edition === "cloud")
+    return { text: t(`aiAccounts.connect.needsCloud.${CLOUD_REASON[gate.reason]}`, { computer, program }), rechecks };
+  if (gate.reason === "keys") return { text: t("aiAccounts.connect.needs.keys"), rechecks };
+  if (gate.reason === "tool_off") {
+    const off = toolOffReason(machine, kind);
+    return { text: t(off.key, { computer, command: off.command, program }), rechecks };
+  }
+  return { text: t(`brain.reasons.${gate.reason}`, { computer, program }), rechecks };
+}
 
 /** The longest a plan's panel shows its sign-in loading while the agent's view is asked again (`catchUp`). */
 export const CATCH_UP_MS = 8000;
@@ -363,6 +457,8 @@ export function agentAi(agent: Pick<Agent, "brain"> | undefined, state: AiState 
   if (brain?.kind === "codex") return "chatgpt";
   if (brain?.kind === "cursor") return "cursor";
   if (brain?.kind === "opencode") return "zen";
+  if (brain?.kind === "grok") return "grok";
+  if (brain?.kind === "antigravity") return "gemini";
   if (brain?.kind === "claude_code") return isPlanId(brain.provider) ? brain.provider : "claude";
   return state === undefined || state === "no_ai" ? null : "key";
 }

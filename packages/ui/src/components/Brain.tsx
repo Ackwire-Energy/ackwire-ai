@@ -66,13 +66,13 @@ export function BrainPortrait({ kind, state = "idle", size = 48, agent, label, c
 
 /**
  * A computer brain by its maker's official mark: Claude for Claude Code, OpenAI for Codex, Cursor's cube for Cursor,
- * OpenCode's for OpenCode.
+ * OpenCode's for OpenCode, Grok's for Grok Build, Gemini's for the Antigravity CLI.
  */
 export function BrainLogo({
   kind,
   ...rest
 }: {
-  kind: "claude_code" | "codex" | "cursor" | "opencode";
+  kind: "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
   size?: "tile" | "sm";
   off?: boolean;
   label?: string;

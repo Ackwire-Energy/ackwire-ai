@@ -1,7 +1,9 @@
 import {
+  ANTIGRAVITY_PROTOCOL,
   BRAIN_PROTOCOL,
   type BrainEffort,
   CURSOR_PROTOCOL,
+  GROK_PROTOCOL,
   isBrainEffort,
   OPENCODE_PROTOCOL,
   type PlanUsage,
@@ -20,7 +22,7 @@ import { accountUnavailable, brainSessionId, claudeCodeAvailability, toolOff } f
 import { codexVersionOk } from "./codex";
 import { BRAIN_NAMES, BRAIN_PLAN_NAMES, type BrainAccount, type BrainKind, type BrainSession } from "./types";
 
-const KINDS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor", "opencode"];
+const KINDS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor", "opencode", "grok", "antigravity"];
 const kindOf = (v: unknown): BrainKind => (KINDS.includes(v as BrainKind) ? (v as BrainKind) : "model");
 
 /** A mission's choice for a run in its thread (`missionTurnFor`). */
@@ -260,10 +262,18 @@ export function computerBrainUnavailable(
       ...pausedUntil,
     };
   }
-  if (kind === "cursor" || kind === "opencode") {
+  if (kind === "cursor" || kind === "opencode" || kind === "grok" || kind === "antigravity") {
     const off = toolOff(status, kind);
     if (off) return off;
-    if (status.protocol < (kind === "cursor" ? CURSOR_PROTOCOL : OPENCODE_PROTOCOL)) {
+    if (
+      status.protocol <
+      {
+        cursor: CURSOR_PROTOCOL,
+        opencode: OPENCODE_PROTOCOL,
+        grok: GROK_PROTOCOL,
+        antigravity: ANTIGRAVITY_PROTOCOL,
+      }[kind]
+    ) {
       return {
         code: "runner_outdated",
         message: `The runner on ${status.name} is too old for ${name} agents. Update it.`,
@@ -308,6 +318,8 @@ export const UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   "codex_too_old",
   "cursor_missing",
   "opencode_missing",
+  "grok_missing",
+  "antigravity_missing",
   "plan_limit",
   "plan_not_owner",
   "plan_not_shared",
@@ -325,6 +337,8 @@ export const NO_AI_CODES: ReadonlySet<string> = new Set([
   "codex_missing",
   "cursor_missing",
   "opencode_missing",
+  "grok_missing",
+  "antigravity_missing",
 ]);
 
 /** What the engine runs a turn with. */
@@ -408,16 +422,19 @@ export async function brainAccountFor(
 /**
  * A plan thinks only for its owner's agents (ADR 0059 §3): the account's
  * owner, or with the computer's own sign-in the person who connected that
- * computer, must be the agent's owner, still in the organization.
+ * computer, must be the agent's owner, still in the organization. The account
+ * someone who may use other people's plans gave it (`brainAccountLentBy`)
+ * needs only its own owner still there.
  */
 export async function planIsOwners(
   db: Executor,
-  agent: Pick<Agent, "orgId" | "ownerUserId">,
+  agent: Pick<Agent, "orgId" | "ownerUserId"> & Partial<Pick<Agent, "brainAccountId" | "brainAccountLentBy">>,
   machineId: string,
   account: Pick<BrainAccount, "id"> | undefined,
 ): Promise<boolean> {
   const owner = agent.ownerUserId;
   if (!owner) return false;
+  const lent = account !== undefined && !!agent.brainAccountLentBy && agent.brainAccountId === account.id;
   const { machineAccounts, machines, organizationMembers: members } = schema;
   const rows = account
     ? await db
@@ -431,7 +448,7 @@ export async function planIsOwners(
           and(
             eq(machineAccounts.orgId, agent.orgId),
             eq(machineAccounts.id, account.id),
-            eq(machineAccounts.createdBy, owner),
+            lent ? undefined : eq(machineAccounts.createdBy, owner),
           ),
         )
     : await db

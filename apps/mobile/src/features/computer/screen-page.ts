@@ -12,6 +12,8 @@ export type ScreenEvent =
   | { type: "view"; state: DesktopViewState }
   | { type: "size"; width: number; height: number }
   | { type: "changed" }
+  /** The stream's session took its mode (a page from before it never says). */
+  | { type: "session"; mode: DesktopMode }
   | { type: "refused"; why: "tooLong" };
 
 const VIEW_STATES: ReadonlySet<string> = new Set<DesktopViewState>([
@@ -62,6 +64,7 @@ export function screenEvent(server: string, from: { url: string; data: string })
   if (m.type === "size" && Number(m.width) > 0 && Number(m.height) > 0) {
     return { type: "size", width: Number(m.width), height: Number(m.height) };
   }
+  if (m.type === "session" && (m.mode === "watch" || m.mode === "control")) return { type: "session", mode: m.mode };
   if (m.type === "refused" && m.why === "tooLong") return { type: "refused", why: "tooLong" };
   return null;
 }

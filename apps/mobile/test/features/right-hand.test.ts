@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import type { DirectMessage } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
-import { firstVisitOf, introCards, presetsLeft, rightHandOf } from "@agenteschat/client/lib/right-hand";
+import { firstVisitOf, introCards, presetsLeft, rightHandOf, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import { STICKER_STILL_T, WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import { stickerFrame } from "../../src/agent/sticker";
 import { agentStarters, buildConversations, homeLayout, rightHandPin } from "../../src/features/chats/logic";
@@ -120,4 +120,11 @@ test("its wave moves, then ends on its still frame, so stopping shows no jump", 
   const still = JSON.stringify(stickerFrame(look, "wave", 110, STICKER_STILL_T));
   expect(JSON.stringify(stickerFrame(look, "wave", 110, 0.1))).not.toBe(still);
   expect(JSON.stringify(stickerFrame(look, "wave", 110, WAVE_SECONDS))).toBe(still);
+});
+
+test("its profile tells where its name comes from only while it keeps it, and only for the right hand", () => {
+  expect(tellsNameStory(lodi)).toBe(true);
+  expect(tellsNameStory({ ...lodi, name: "Tuca" })).toBe(false);
+  expect(tellsNameStory(agent({ id: "a-other", name: "Lodi" }))).toBe(false);
+  expect(tellsNameStory(undefined)).toBe(false);
 });

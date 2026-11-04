@@ -59,6 +59,10 @@ const Notification = z
         .optional()
         .openapi({ description: "`widget_alert`, `widget_failed`, `dashboard_proposal`: the board (ADR 0135)." }),
       widgetId: z.string().optional().openapi({ description: "`widget_alert`, `widget_failed`: the widget." }),
+      accountId: z
+        .string()
+        .optional()
+        .openapi({ description: "`plan_lent`: the plan's account (`POST …/ai-accounts/{id}/take-back`)." }),
       label: z.string().optional(),
     }),
     latest: z.object({
@@ -105,10 +109,9 @@ const Notification = z
         )
         .optional()
         .openapi({ description: "`run_failed`: every run the row stands for, failed for one cause close together." }),
-      plan: z
-        .string()
-        .optional()
-        .openapi({ description: "`run_failed` on a computer brain: the plan's name its cause names." }),
+      plan: z.string().optional().openapi({
+        description: "`run_failed` on a computer brain: the plan's name its cause names; `plan_lent`: the plan's.",
+      }),
       holdKind: z
         .string()
         .optional()

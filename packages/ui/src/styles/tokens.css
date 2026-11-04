@@ -119,6 +119,9 @@
   --space-4: 16px;
   --space-6: 24px;
   --space-8: 32px;
+  /* Above and below the words of a card's list row (a settings row, a role, a limit) and of the card's foot, so every
+     hairline between them sits as far from the words on each side. */
+  --row-py: var(--space-3);
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-item: 10px;
@@ -130,6 +133,11 @@
   --radius-cut: 2px;
   --radius-full: 999px;
   --radius-agent: 30% 30% 30% 9%;
+  /*
+   * Concentric corners: a rounded thing near the edge of a rounded box has the box's radius less the room between
+   * them, `calc(outer - gap)` (or the box `calc(inner + gap)`), never the same radius as the box. Each pair names its
+   * radius and its gap as properties (`--menu-pad`, `--bar-r`/`--bar-pad`, `--seg-r`/`--seg-in`, `--palette-pad`).
+   */
   /* The control ruler: everything you click or type in is one of three heights, radius
      30% of the height. sm 32 = toolbars, list filters, in-row actions, composer; md 40 = forms, page and dialog
      buttons, search, selects, sidebar items; lg 48 = only the main action of a full screen. Pills (radius-full)

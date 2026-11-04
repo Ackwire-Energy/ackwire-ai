@@ -4,10 +4,12 @@ import {
   cancelAccountLogin,
   getMachineAccounts,
   listAiAccounts,
+  publishMachineAgentsChanged,
   refreshAiAccounts,
   removeMachineAccount,
   renameMachineAccount,
   sendAccountLoginCode,
+  takeBackPlan,
   ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -31,6 +33,7 @@ const tags = ["Connected computers"];
 const MachineParams = OrgParams.extend({ machineId: z.uuid() });
 const LoginParams = MachineParams.extend({ loginId: z.uuid() });
 const AccountParams = MachineParams.extend({ accountId: z.uuid() });
+const PlanParams = OrgParams.extend({ accountId: z.uuid() });
 
 const AccountLogin = z
   .object({
@@ -144,7 +147,7 @@ export function machineAccountRoutes(deps: AppDeps) {
             }),
             provider: z.string().max(20).optional().openapi({
               description:
-                "A coding plan on Claude Code (`zai`, `kimi`, `minimax`, `opencode`), `cursor` for a Cursor API key or `zen` for an OpenCode key: a key account. The key is sent next like a code, sealed to the computer (`account.invalid_plan`; a runner without plans' keys: `account.runner_old`).",
+                "A coding plan on Claude Code (`zai`, `kimi`, `minimax`, `opencode`), `cursor` for a Cursor API key or `zen` for an OpenCode key: a key account. The key is sent next like a code, sealed to the computer. `enterprise` on `antigravity`: a Gemini Enterprise sign-in, not a key (`account.invalid_plan`; a runner without plans' keys: `account.runner_old`).",
             }),
           }),
         ),
@@ -256,6 +259,8 @@ export function machineAccountRoutes(deps: AppDeps) {
                       codex: z.boolean(),
                       cursor: z.boolean(),
                       opencode: z.boolean(),
+                      grok: z.boolean(),
+                      antigravity: z.boolean(),
                       key: z.boolean(),
                     })
                     .openapi({
@@ -268,10 +273,12 @@ export function machineAccountRoutes(deps: AppDeps) {
                       codex: z.boolean(),
                       cursor: z.boolean(),
                       opencode: z.boolean(),
+                      grok: z.boolean(),
+                      antigravity: z.boolean(),
                     })
                     .openapi({
                       description:
-                        "What it can think with now: Claude Code (Claude, the coding plans) and Codex (ChatGPT).",
+                        "What it can think with now: Claude Code (Claude, the coding plans), Codex (ChatGPT), Cursor, OpenCode, Grok Build and the Antigravity CLI (Gemini).",
                     }),
                   own: z
                     .object({
@@ -353,6 +360,35 @@ export function machineAccountRoutes(deps: AppDeps) {
       const { orgId, machineId, accountId } = c.req.valid("param");
       await removeMachineAccount(withHub(), c.get("user").id, orgId, machineId, accountId);
       return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/ai-accounts/{accountId}/take-back",
+      tags,
+      security,
+      summary: "Take a plan back from agents someone else gave it to (its owner)",
+      description:
+        "ADR 0059 §3: an agent that thinks with the caller's account because someone who may use other people's plans gave it (`use_others_plans`) loses it, as when an account goes. `agentId`: that agent only; omitted: every such agent. Audited as `account.taken_back`; the `plan_lent` notifications are done.",
+      request: {
+        params: PlanParams,
+        body: body(z.object({ agentId: z.uuid().optional() })),
+      },
+      responses: { 200: json(z.object({ agentIds: z.array(z.uuid()) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, accountId } = c.req.valid("param");
+      const result = await takeBackPlan(
+        { db, pubsub },
+        c.get("user").id,
+        orgId,
+        accountId,
+        c.req.valid("json").agentId,
+      );
+      if (result.agentIds.length) await publishMachineAgentsChanged(pubsub, orgId);
+      return c.json(result, 200);
     },
   );
 

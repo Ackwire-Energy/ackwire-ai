@@ -850,6 +850,10 @@ export const featureKeysPtBR = {
       desktop_taken_other: "{{names}} assumiram a tela do computador do\u00a0{{agent}}",
       desktop_taken_female_one: "{{names}} assumiu a tela do computador da\u00a0{{agent}}",
       desktop_taken_female_other: "{{names}} assumiram a tela do computador da\u00a0{{agent}}",
+      plan_lent_one: "{{names}} conectou o seu plano do {{plan}} ao\u00a0{{agent}}",
+      plan_lent_other: "{{names}} conectaram o seu plano do {{plan}} ao\u00a0{{agent}}",
+      plan_lent_female_one: "{{names}} conectou o seu plano do {{plan}} à\u00a0{{agent}}",
+      plan_lent_female_other: "{{names}} conectaram o seu plano do {{plan}} à\u00a0{{agent}}",
       connector_tool_changed_one: "Um servidor conectado mudou ferramentas que você aprovou",
       connector_tool_changed_other: "Um servidor conectado mudou ferramentas que você aprovou",
       computer_disk_full_one: "O disco de um computador está quase cheio",
@@ -1719,6 +1723,13 @@ export const featureKeysPtBR = {
     },
     machine: {
       toolsHow: "Toque numa ferramenta ligada para desligar. Para ligar de novo, só no próprio computador.",
+    },
+    roles: {
+      /** Under the roles and a role's name and color: what only the web changes. */
+      onComputer: "A ordem dos papéis e o ícone de cada um mudam no computador.",
+      /** Over an area's permissions, each with its own switch. */
+      items: "Item por item",
+      create: "Criar",
     },
     import: {
       preparing: "Preparando o arquivo…",

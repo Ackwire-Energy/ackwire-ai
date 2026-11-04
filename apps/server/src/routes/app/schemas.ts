@@ -292,7 +292,7 @@ export const Agent = z
     brakes: AgentBrakes,
     brain: z
       .object({
-        kind: z.enum(["model", "claude_code", "codex", "cursor", "opencode"]),
+        kind: z.enum(["model", "claude_code", "codex", "cursor", "opencode", "grok", "antigravity"]),
         model: z
           .string()
           .nullable()
@@ -639,7 +639,9 @@ export const Model = z
   .openapi("Model");
 
 /** ADR 0032: who thinks for an agent. */
-export const BrainKind = z.enum(["model", "claude_code", "codex", "cursor", "opencode"]).openapi("BrainKind");
+export const BrainKind = z
+  .enum(["model", "claude_code", "codex", "cursor", "opencode", "grok", "antigravity"])
+  .openapi("BrainKind");
 
 export const BrainOption = z
   .object({
@@ -762,7 +764,8 @@ export const AgentBrain = z
       description: "The most context it reads, any brain; null = its model's window (the smaller one wins).",
     }),
     accounts: z.array(MachineAccount).openapi({
-      description: "The agent's owner's accounts on its computer, both kinds, and the one it thinks with (ADR 0059).",
+      description:
+        "The agent's owner's accounts on its computer, both kinds, and the one it thinks with (ADR 0059); every one there for `canUseOthersPlans`.",
     }),
     canManageAccounts: z.boolean().openapi({
       description:
@@ -773,6 +776,10 @@ export const AgentBrain = z
     canUsePlans: z.boolean().openapi({
       description:
         "The caller owns the agent, so its plans are the caller's own: they sign one in for it. Admins choose among its owner's accounts and whom it answers too.",
+    }),
+    canUseOthersPlans: z.boolean().openapi({
+      description:
+        "The caller holds `use_others_plans` (ADR 0059 §3): `accounts` lists every plan on its computer, whoever connected it, and they may give it any. Its owner is told and may take it back.",
     }),
     ownSignIn: z.boolean().openapi({
       description: "The computer's own sign-in can think for it: the person who connected the computer owns the agent.",

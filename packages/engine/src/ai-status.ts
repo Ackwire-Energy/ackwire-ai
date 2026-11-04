@@ -45,7 +45,7 @@ export interface AgentAi {
    * With `not_signed_in`: the CLI whose own sign-in isn't there on the computer, the agent having no account of its
    * own (ADR 0041 §1).
    */
-  own?: "claude_code" | "codex" | "cursor" | "opencode";
+  own?: "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
 }
 
 export interface AiStatusDeps {

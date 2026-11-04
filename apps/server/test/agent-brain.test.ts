@@ -115,6 +115,8 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
     ["codex", false, "no_computer"],
     ["cursor", false, "no_computer"],
     ["opencode", false, "no_computer"],
+    ["grok", false, "no_computer"],
+    ["antigravity", false, "no_computer"],
   ]);
   expect(fresh.options.find((o) => o.kind === "claude_code")?.models.map((m) => m.value)).toEqual([
     "opus",
@@ -603,4 +605,49 @@ test("a new agent's canTalk reads the creator's roles: a role it answers that th
     ).json()) as { canTalk: boolean };
   expect((await create("eva", [board])).canTalk).toBe(true);
   expect((await create("ivo", [support])).canTalk).toBe(false);
+});
+
+test("someone else's plan (ADR 0059 §3): the workspace's owner gives Bia's to an agent, and only Bia takes it back", async () => {
+  const { api, asBia, agentId, orgId } = await workspace();
+  const mac = await pairMac(api);
+  await api(`/agents/${agentId}/computer/target`, { method: "PUT", json: { machineId: mac.machineId } });
+  const [bia] = await t.db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.email, "bia@example.com"));
+  const accountId = crypto.randomUUID();
+  await t.db.insert(schema.machineAccounts).values({
+    id: accountId,
+    orgId,
+    machineId: mac.machineId,
+    kind: "claude_code",
+    label: "Claude",
+    status: "active",
+    createdBy: bia?.id ?? null,
+  });
+  // The workspace's owner may use other people's plans: Bia's shows on the agent's page, with whose it is.
+  const seen = (await (await api(`/agents/${agentId}/brain`)).json()) as Brain & {
+    canUseOthersPlans: boolean;
+    accounts: { id: string; ownerId: string; email: string | null }[];
+  };
+  expect(seen.canUseOthersPlans).toBe(true);
+  expect(seen.accounts).toEqual([expect.objectContaining({ id: accountId, ownerId: bia?.id, email: null })]);
+  const put = await api(`/agents/${agentId}/brain`, {
+    method: "PUT",
+    json: { brain: "claude_code", account: accountId },
+  });
+  expect(put.status).toBe(200);
+  expect(((await put.json()) as { account: string }).account).toBe(accountId);
+
+  // Taking it back is the plan's owner's alone, not even the workspace's owner's.
+  const stranger = await api(`/ai-accounts/${accountId}/take-back`, { json: {} });
+  expect(stranger.status).toBe(403);
+  const back = await asBia(`/ai-accounts/${accountId}/take-back`, { json: { agentId } });
+  expect(back.status).toBe(200);
+  expect(await back.json()).toEqual({ agentIds: [agentId] });
+  const [row] = await t.db
+    .select({ account: schema.agents.brainAccountId, lentBy: schema.agents.brainAccountLentBy })
+    .from(schema.agents)
+    .where(eq(schema.agents.id, agentId));
+  expect(row).toEqual({ account: null, lentBy: null });
 });

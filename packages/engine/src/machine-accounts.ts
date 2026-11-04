@@ -4,9 +4,11 @@ import {
   ACCOUNTS_PROTOCOL,
   type AccountKind,
   type AccountLoginState,
+  ANTIGRAVITY_PROTOCOL,
   accountCodeAad,
   CURSOR_KEY_PROVIDER,
   CURSOR_PROTOCOL,
+  GROK_PROTOCOL,
   isAccountId,
   isAccountKind,
   isLoginEmail,
@@ -39,6 +41,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import {
+  GEMINI_ENTERPRISE_PROVIDER,
   isPlanId,
   loginPerAgent,
   type PlanId,
@@ -275,17 +278,36 @@ async function accountViewOf(db: Database, orgId: string, row: MachineAccountRow
  * sign-in when that is their owner's, else to the API (a plan thinks only for
  * its owner's agents, ADR 0059 §3). Their cache goes with `forgetAgents`.
  */
-export async function releaseAgents(db: Executor, orgId: string, accountIds: string[], now = new Date()) {
-  if (accountIds.length === 0) return [];
+export async function releaseAgents(
+  db: Executor,
+  orgId: string,
+  accountIds: string[],
+  now = new Date(),
+  /** Only these agents (a plan taken back from them); omitted = every agent on the accounts. */
+  only?: readonly string[],
+) {
+  if (accountIds.length === 0 || only?.length === 0) return [];
+  const ownSignIn = sql`exists (select 1 from ${machines} m where m.id = "agents"."machine_id"
+    and m.paired_by_user_id = "agents"."owner_user_id")`;
+  const lent = sql`"agents"."brain_account_lent_by" is not null`;
   const rows = await db
     .update(agents)
     .set({
       brainAccountId: null,
-      brain: sql`case when exists (select 1 from ${machines} m where m.id = "agents"."machine_id"
-        and m.paired_by_user_id = "agents"."owner_user_id") then "agents"."brain" else 'model' end`,
+      brainAccountLentBy: null,
+      brain: sql`case when ${ownSignIn} then "agents"."brain" else 'model' end`,
+      // Someone else's plan leaves with its switches: its owner's own sign-in neither pays extra nor answers others.
+      brainExtraUsage: sql`case when ${lent} then false else "agents"."brain_extra_usage" end`,
+      audienceMode: sql`case when ${lent} and ${ownSignIn} then 'owner' else "agents"."audience_mode" end`,
       updatedAt: now,
     })
-    .where(and(eq(agents.orgId, orgId), inArray(agents.brainAccountId, accountIds)))
+    .where(
+      and(
+        eq(agents.orgId, orgId),
+        inArray(agents.brainAccountId, accountIds),
+        only ? inArray(agents.id, [...only]) : undefined,
+      ),
+    )
     .returning({ id: agents.id });
   return rows.map((r) => r.id);
 }
@@ -751,11 +773,11 @@ export async function refreshAiAccounts(deps: MachineAccountHubDeps, userId: str
  */
 export function sharesSignIns(
   machine: Pick<MachineRow, "protocol" | "executors">,
-  which: "claude_code" | "codex" | "cursor" | "opencode" | "key",
+  which: "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity" | "key",
 ): boolean {
   if (machine.protocol < SHARED_ACCOUNTS_PROTOCOL) return false;
   if (machine.executors?.mode !== "system") return true;
-  if (which === "cursor" || which === "opencode") return false;
+  if (which === "cursor" || which === "opencode" || which === "grok" || which === "antigravity") return false;
   return (which !== "codex" || machine.protocol >= SHARED_CODEX_PROTOCOL) && SHARED_SIGN_INS[which];
 }
 
@@ -931,7 +953,10 @@ export async function beginAccountLogin(
   provider?: string,
 ): Promise<AccountLoginView> {
   if (!isAccountKind(kind)) {
-    throw new ValidationError("Choose claude_code, codex, cursor or opencode", "account.invalid_kind");
+    throw new ValidationError(
+      "Choose claude_code, codex, cursor, opencode, grok or antigravity",
+      "account.invalid_kind",
+    );
   }
   if (email !== undefined && (kind !== "claude_code" || provider !== undefined || !isLoginEmail(email))) {
     throw new ValidationError("Use a plain email address, like ana@example.com", "account.invalid_email");
@@ -940,7 +965,9 @@ export async function beginAccountLogin(
   const cliKey =
     (kind === "cursor" && provider === CURSOR_KEY_PROVIDER) ||
     (kind === "opencode" && provider === OPENCODE_KEY_PROVIDER);
-  if (provider !== undefined && !cliKey && (kind !== "claude_code" || !isPlanId(provider))) {
+  // Not a key: Gemini Enterprise's sign-in (ADR 0143), kept as the account's provider.
+  const enterprise = kind === "antigravity" && provider === GEMINI_ENTERPRISE_PROVIDER;
+  if (provider !== undefined && !cliKey && !enterprise && (kind !== "claude_code" || !isPlanId(provider))) {
     throw new ValidationError("Choose one of the coding plans", "account.invalid_plan");
   }
   if (kind === "opencode" && !cliKey) {
@@ -964,11 +991,15 @@ export async function beginAccountLogin(
     machine,
     kind === "cursor"
       ? CURSOR_PROTOCOL
-      : kind === "opencode"
-        ? OPENCODE_PROTOCOL
-        : plan
-          ? PLAN_KEYS_PROTOCOL
-          : ACCOUNTS_PROTOCOL,
+      : kind === "antigravity"
+        ? ANTIGRAVITY_PROTOCOL
+        : kind === "grok"
+          ? GROK_PROTOCOL
+          : kind === "opencode"
+            ? OPENCODE_PROTOCOL
+            : plan
+              ? PLAN_KEYS_PROTOCOL
+              : ACCOUNTS_PROTOCOL,
   );
   // Once for every agent of its owner there, where the runner can (protocol 29; ChatGPT's 38).
   const shared =
@@ -985,7 +1016,7 @@ export async function beginAccountLogin(
       label: defaultAccountLabel(kind, [], provider),
       status: "signing_in",
       createdBy: userId,
-      provider: plan || cliKey ? provider : null,
+      provider: plan || cliKey || enterprise ? provider : null,
     });
   }
   const fail = async () => {
@@ -1001,7 +1032,7 @@ export async function beginAccountLogin(
       loginId,
       ...(again ? { again: true } : {}),
       ...(email ? { email } : {}),
-      ...(plan || cliKey ? { provider } : {}),
+      ...(plan || cliKey || enterprise ? { provider } : {}),
       ...(shared ? { shared: true } : {}),
     });
   } catch (error) {
