@@ -924,6 +924,29 @@ html:not([data-pointer]) .thread-line:focus-visible {
     box-shadow: none;
   }
 }
+/* A thread beside its channel (`.thread-panel--docked`): in the members column's place under the channel's header,
+   wider than it, with no scrim, so the channel stays in use; closing it brings the members back. The chat keeps at
+   least 400px. A phone keeps the whole-screen sheet above. */
+@media (min-width: 861px) {
+  .thread-panel--docked {
+    position: relative;
+    z-index: auto;
+    inset: auto;
+    flex: none;
+    width: clamp(360px, calc(100% - 400px), 640px);
+    border-radius: 0;
+    box-shadow: inset 1px 0 0 var(--line);
+    animation: ac-fade-in 160ms ease-out;
+  }
+  [data-theme="dark"] .thread-panel--docked {
+    box-shadow: inset 1px 0 0 var(--line2);
+  }
+}
+@media (min-width: 861px) and (prefers-reduced-motion: reduce) {
+  .thread-panel--docked {
+    animation: none;
+  }
+}
 /* The agent's page in the same panel ("Ver perfil" in its DM): it scrolls inside, so its tabs and
    save bar stick to the panel. */
 .thread-panel__page {

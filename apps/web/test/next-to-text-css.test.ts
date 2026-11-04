@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { builtCss, declarations, topLevel } from "./built-css";
+import { atRule, builtCss, declarations, topLevel } from "./built-css";
 
 const sheets = () => builtCss("src/styles.css", "src/components/threads/threads.css");
 const last = (sheet: string, selector: string, property: string) =>
@@ -23,4 +23,16 @@ test("a row's minor action, its time and its stop sit right after its words, nev
   // The bar's step the same way.
   expect(last(shipped, ".ac-typing__step", "flex")).not.toContain("260px");
   expect(last(shipped, ".ac-typing__step", "max-width")).toBe("260px");
+});
+
+test("a thread opens in the members column's place, wider, with no scrim; a phone keeps the whole-screen sheet", async () => {
+  const css = await sheets();
+  const wide = atRule(css, "@media (min-width: 861px)");
+  const phone = atRule(css, "@media (max-width: 860px)");
+  expect(last(wide, ".thread-panel--docked", "position")).toBe("relative");
+  expect(last(wide, ".thread-panel--docked", "flex")).toBe("none");
+  // As wide as the floating panel was (640px), the chat keeping at least 400px.
+  expect(last(wide, ".thread-panel--docked", "width")).toBe("clamp(360px,100% - 400px,640px)");
+  expect(last(wide, ".thread-panel--docked", "border-radius")).toBe("0");
+  expect(last(phone, ".thread-panel", "position")).toBe("fixed");
 });

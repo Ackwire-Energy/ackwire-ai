@@ -2018,8 +2018,16 @@ function ChannelView({
                 queueMachine={queueMachine}
                 people={channelPeople}
                 agents={channelAgents}
-                membersOpen={membersColumn.open}
-                onMembers={membersColumn.toggle}
+                // A thread in the members' place: the toggle closes it and shows the members.
+                membersOpen={!panel && membersColumn.open}
+                onMembers={
+                  panel
+                    ? () => {
+                        setPanel(null);
+                        if (!membersColumn.open) membersColumn.toggle();
+                      }
+                    : membersColumn.toggle
+                }
                 onDetails={() => setDetailsOpen(true)}
                 onSearch={() => {
                   setPanel(null);
@@ -2427,13 +2435,34 @@ function ChannelView({
                   />
                 )}
               </div>
-              {!chrome && membersColumn.column && (
-                <MembersColumn
-                  channel={channel}
-                  people={channelPeople}
-                  agents={channelAgents}
-                  {...(addsMembers ? { onAdd: addMembers } : {})}
-                />
+              {/* A thread opens in the members' place, wider, and gives it back when it closes; the channel stays in use
+                  beside it (a phone: a sheet over it). */}
+              {panel ? (
+                <aside className="thread-panel thread-panel--docked" aria-label={t("threads.side.label")}>
+                  <ThreadPage
+                    key={`${panel.id}:${panel.focus ?? ""}`}
+                    threadId={panel.id}
+                    reply={panel.reply}
+                    focusMessageId={panel.focus}
+                    onClose={() => setPanel(null)}
+                    onSeeInChannel={(messageId, channelId) => {
+                      if (channelId !== channel.id) return false;
+                      setPanel(null);
+                      jumpTo(messageId);
+                      return true;
+                    }}
+                  />
+                </aside>
+              ) : (
+                !chrome &&
+                membersColumn.column && (
+                  <MembersColumn
+                    channel={channel}
+                    people={channelPeople}
+                    agents={channelAgents}
+                    {...(addsMembers ? { onAdd: addMembers } : {})}
+                  />
+                )
               )}
             </div>
           </Tag>
@@ -2457,32 +2486,6 @@ function ChannelView({
                 : {})}
               onClose={membersColumn.closeSheet}
             />
-          )}
-          {panel && (
-            <button
-              type="button"
-              className="thread-panel__scrim"
-              tabIndex={-1}
-              aria-label={t("common.close")}
-              onClick={() => setPanel(null)}
-            />
-          )}
-          {panel && (
-            <aside className="thread-panel" aria-label={t("threads.side.label")}>
-              <ThreadPage
-                key={`${panel.id}:${panel.focus ?? ""}`}
-                threadId={panel.id}
-                reply={panel.reply}
-                focusMessageId={panel.focus}
-                onClose={() => setPanel(null)}
-                onSeeInChannel={(messageId, channelId) => {
-                  if (channelId !== channel.id) return false;
-                  setPanel(null);
-                  jumpTo(messageId);
-                  return true;
-                }}
-              />
-            </aside>
           )}
           {searchOpen && <SearchResultsPanel channelId={channel.id} onClose={() => setSearchOpen(false)} />}
           {profile && (
