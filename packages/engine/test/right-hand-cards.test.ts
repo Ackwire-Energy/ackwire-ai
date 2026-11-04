@@ -148,6 +148,9 @@ describe("offer_approvals", () => {
     const { id, card } = await lastCard(f, "approvals");
     expect(card.forUserId).toBe(f.owner.id);
     expect((card.params.approvalIds as string[]).sort()).toEqual([merge.id, deploy.id].sort());
+    // Its body names no approval: a channel's readers (and its notifications) see the text, not each viewer's card.
+    const [posted] = await f.db.select().from(schema.messages).where(eq(schema.messages.id, id));
+    expect(posted?.body).not.toContain("Merge PR #42");
     // Nothing was decided by posting it.
     const still = await f.db.select().from(schema.approvals).where(eq(schema.approvals.id, merge.id));
     expect(still[0]?.status).toBe("pending");

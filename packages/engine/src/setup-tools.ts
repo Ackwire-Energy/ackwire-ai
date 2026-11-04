@@ -58,9 +58,9 @@ export const PROPOSE_MEMBER_CHANGES_TOOL = "propose_member_changes";
 export const OFFER_OPEN_PAGE_TOOL = "offer_open_page";
 /** At most this many approvals, or people's changes, on one card. */
 export const MAX_ROWS_PER_CARD = 20;
-/** The cards' `bodyCode`s (`chat.body.action_approvals`, `action_member_changes` with `names`, `action_open_page`). */
+/** The cards' `bodyCode`s (`chat.body.action_approvals`, `settings_proposal` with `names`, `action_open_page`). */
 export const APPROVALS_CARD = "action_approvals";
-export const MEMBER_CHANGES_CARD = "action_member_changes";
+export const MEMBER_CHANGES_CARD = "settings_proposal";
 export const OPEN_PAGE_CARD = "action_open_page";
 /**
  * The screens an "Abrir" card opens (`offer_open_page`), each with what it is for the model. The screen asks what
@@ -977,7 +977,9 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
             forUserId,
             params: { approvalIds: waiting.map((a) => a.id), why: str(input.why).trim() },
           };
-          const messageId = await postCard(deps, ctx, `Approvals waiting: ${waiting.map((a) => a.title).join("; ")}`, {
+          // No titles in the body: in a channel everyone reads it (and its notifications), while each viewer's card
+          // shows only the approvals they may see.
+          const messageId = await postCard(deps, ctx, `Approvals waiting: ${waiting.length}`, {
             ...bodyCode(APPROVALS_CARD),
             actionCard: card,
           });
@@ -1026,7 +1028,6 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
           if (!forUserId) return { content: "Only a person's request can propose changing people.", isError: true };
           const changes = (Array.isArray(input.changes) ? input.changes : []) as Record<string, unknown>[];
           const rows: MemberChangeRow[] = [];
-          const people: string[] = [];
           for (const change of changes) {
             const found = await findMember(ctx, str(change.person));
             if (found.length !== 1)
@@ -1038,7 +1039,6 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
               };
             const [person] = found;
             if (!person) continue;
-            const before = rows.length;
             const who = { userId: person.userId, name: person.name };
             if (change.remove === true) rows.push({ ...who, remove: true });
             else {
@@ -1049,24 +1049,24 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
               if (typeof take === "string") return { content: take, isError: true };
               if (add.length || take.length) rows.push({ ...who, addRoleIds: add, removeRoleIds: take });
             }
-            if (rows.length > before) people.push(person.name);
           }
           if (rows.length === 0)
             return { content: "Say what changes: owner, add_roles, remove_roles or remove.", isError: true };
           const full = await cardsLeft(ctx);
           if (full) return full;
+          const kept = rows.slice(0, MAX_ROWS_PER_CARD);
           const card: MemberChangesCard = {
             kind: "member_changes",
             forUserId,
-            params: { rows: rows.slice(0, MAX_ROWS_PER_CARD), why: str(input.why).trim() },
+            params: { rows: kept, why: str(input.why).trim() },
           };
-          const who = [...new Set(people)].join(", ");
+          const who = [...new Set(kept.map((r) => r.name))].join(", ");
           const messageId = await postCard(deps, ctx, `Proposed a change to ${who}: ${card.params.why}`, {
             ...bodyCode(MEMBER_CHANGES_CARD, { names: who }),
             actionCard: card,
           });
           const membership = await getMembership(ctx.db, forUserId, ctx.orgId);
-          const may = rows.every((r) =>
+          const may = kept.every((r) =>
             "role" in r ? membership?.role === "owner" : can(membership, "manage_members"),
           );
           return {

@@ -574,8 +574,9 @@ function MemberChanges({ message, card }: { message: Message; card: MemberChange
   const apply = (r: MemberChangeRow) => {
     if ("remove" in r) return setRemoving({ userId: r.userId, name: r.name });
     if ("role" in r) return change.mutate({ userId: r.userId, role: r.role }, { onError: failed });
+    // Roles are set whole: from their roles as listed now, never from a list not loaded yet (that would drop the rest).
     const now = people.find((p) => p.userId === r.userId)?.roleIds;
-    setRoles.mutate({ userId: r.userId, roleIds: rolesAfter(r, now) }, { onError: failed });
+    if (now) setRoles.mutate({ userId: r.userId, roleIds: rolesAfter(r, now) }, { onError: failed });
   };
   if (members.isSuccess && card.rows.every(done)) {
     return (
@@ -606,12 +607,16 @@ function MemberChanges({ message, card }: { message: Message; card: MemberChange
               <li key={`${r.userId}:${what(r)}`} className="proposal-row">
                 <PersonAvatar id={r.userId} name={r.name} size="sm" />
                 <span className="proposal-row__what">
-                  <span className="proposal-row__name">{r.name}</span>
+                  {/* Their email too: a display name alone can be anyone's (the card may follow what someone else wrote). */}
+                  <span className="proposal-row__name">
+                    {r.name} <span className="muted">{people.find((p) => p.userId === r.userId)?.email}</span>
+                  </span>
                   <span>{what(r)}</span>
                 </span>
                 {done(r) ? (
                   <span className="proposal-row__status">{t("rightHand.people.done")}</span>
                 ) : (
+                  members.isSuccess &&
                   may(r) && (
                     <Button
                       size="sm"
