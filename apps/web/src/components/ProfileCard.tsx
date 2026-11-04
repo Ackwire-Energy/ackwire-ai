@@ -632,7 +632,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
       {line && shown?.line && (
         <div className="profile-card__status">
           <span className="profile-card__status-emoji" aria-hidden="true">
-            {line.emoji}
+            {line.icon ? <Icon name={line.icon} size={16} /> : line.emoji}
           </span>
           <span>
             {line.text}

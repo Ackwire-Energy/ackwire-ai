@@ -42,6 +42,9 @@
   font-size: 13px;
   line-height: 1;
 }
+.status-line__icon {
+  flex: none;
+}
 .status-line__text {
   min-width: 0;
   overflow: hidden;
@@ -78,6 +81,11 @@
 .profile-card__status-emoji {
   flex: none;
   font-size: 15px;
+}
+/* A limit's icon, centered on the first of the text's 18px lines. */
+.profile-card__status-emoji .ac-icon {
+  display: block;
+  margin-top: 1px;
 }
 .profile-card__status small {
   display: block;

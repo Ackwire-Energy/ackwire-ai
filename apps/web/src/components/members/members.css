@@ -171,6 +171,10 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
 .members-side__work {
   color: var(--ink2);
 }
+/* Centered on the first of the wrapped 16px lines. */
+.members-side__line .status-line__icon {
+  margin-top: 1px;
+}
 .members-side__inner[data-presence="offline"] {
   opacity: 0.45;
 }

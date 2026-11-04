@@ -469,14 +469,16 @@ function top(a: JudgeAnswer | undefined): [string | null, number] {
 
 /**
  * The decision, by code (pure): each asker clears with a reason only from a source code checks: `solved` by that
- * asker, by someone who posted since the pause or by whoever moved the task to done; `withdrawn` by that asker only;
+ * asker, by someone who posted since the pause or by whoever moved the task to done; `withdrawn` by that asker only
+ * (from the asker, p(solved) + p(not_needed) counts as one: both mean "don't run");
  * `task_canceled` by whoever canceled the task. App posts are never a source. Closed when every asker clears and the
  * product of their p is at least `bar`; any asker likely still open runs with their name; anything else is unsure.
  */
 export function catchUpDecision(answers: Record<string, JudgeAnswer>, s: TriageSnapshot, bar: number): TriageVerdict {
   const posters = new Set(s.posts.flatMap((p) => (p.key ? [p.key] : [])));
   const changed = s.task && (s.task.changedAt?.getTime() ?? 0) > s.since ? s.task : null;
-  const askers = s.askers.map((a): TriageAskerVerdict => {
+  const certainty: number[] = [];
+  const askers = s.askers.map((a, i): TriageAskerVerdict => {
     const status = answers[`status_${a.key}`];
     const p = {
       needs_agent: prob(status, "needs_agent"),
@@ -494,18 +496,24 @@ export function catchUpDecision(answers: Record<string, JudgeAnswer>, s: TriageS
         a.asks.length > 1 ||
         a.asks.some((x) => x.editedSincePause) ||
         s.reactions.some((r) => r.key === who && r.at.getTime() > s.since));
-    // Each reason on its own: a split between solved and withdrawn is doubt, never added up.
-    if (p.solved >= bar && (self || posters.has(who) || (changed?.status === "done" && changed.changedBy === who)))
+    // From the asker themselves, solved and not needed both mean "don't run" ("olvídalo, ya lo hice" splits between
+    // them), so they add up. From anyone else each reason stands alone: a split there is doubt.
+    const either = Math.min(1, p.solved + p.not_needed);
+    if (self && either >= bar) {
+      certainty[i] = either;
+      return { ...out, reason: p.solved >= p.not_needed ? "solved" : "withdrawn", who };
+    }
+    if (p.solved >= bar && (posters.has(who) || (changed?.status === "done" && changed.changedBy === who))) {
+      certainty[i] = p.solved;
       return { ...out, reason: "solved", who };
-    if (p.not_needed >= bar && self) return { ...out, reason: "withdrawn", who };
-    if (p.not_needed >= bar && changed?.status === "canceled" && changed.changedBy === who)
+    }
+    if (p.not_needed >= bar && changed?.status === "canceled" && changed.changedBy === who) {
+      certainty[i] = p.not_needed;
       return { ...out, reason: "task_canceled", who };
+    }
     return out;
   });
-  const product = askers.reduce(
-    (n, a) => n * (a.reason ? (a.reason === "solved" ? a.p.solved : a.p.not_needed) : 0),
-    1,
-  );
+  const product = askers.reduce((n, a, i) => n * (a.reason ? (certainty[i] ?? 0) : 0), 1);
   if (askers.length > 0 && askers.every((a) => a.reason) && product >= bar)
     return { outcome: "closed", askers, p: product };
   return { outcome: askers.some((a) => !a.reason && a.p.needs_agent >= OPEN_AT) ? "run" : "unsure", askers };
