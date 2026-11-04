@@ -160,7 +160,7 @@ describe("one state for everyone (ADR 0113)", () => {
   test("the kit shares a value only after the person touched the page, and takes everyone's from the app", () => {
     expect(BLOCK_KIT_JS).toContain('post({type:"state",state:state,used:used})');
     expect(BLOCK_KIT_JS).toContain("draw:function(name,options)");
-    expect(BLOCK_KIT_JS).toContain("if(m.state&&typeof m.state===\"object\"){Object.assign(state,m.state)");
+    expect(BLOCK_KIT_JS).toContain('if(m.state&&typeof m.state==="object"){Object.assign(state,m.state)');
   });
 });
 

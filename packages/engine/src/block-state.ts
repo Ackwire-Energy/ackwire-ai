@@ -40,7 +40,7 @@ const SECRET_NAME =
  * refused, whether it looks like one or the page named it as one (a page can be made to ask for it). Secrets go
  * through `request_secret`, which keeps them off the conversation.
  */
-export const looksLikeSecret = (values: Record<string, unknown>) =>
+const holdsSecret = (values: Record<string, unknown>) =>
   Object.entries(values).some(
     ([name, value]) =>
       (SECRET_NAME.test(name) && textsOf(value).some((t) => t.trim() !== "")) ||
@@ -123,7 +123,7 @@ async function write(
   if (keys.length === 0) throw new ValidationError("Nothing to set");
   if (keys.length > BLOCK_STATE_KEYS) throw new ValidationError("Too many values at once");
   if (keys.some((k) => !KEY.test(k))) throw new ValidationError("A value has an invalid name");
-  if (looksLikeSecret(values)) {
+  if (holdsSecret(values)) {
     throw new ValidationError("That looks like a password or a key: everyone here would see it", "block.secret");
   }
   const at = new Date().toISOString();
@@ -180,7 +180,7 @@ export function fairIndex(n: number, random: (buf: Uint32Array) => Uint32Array =
  * A random pick for a block, made once on the server: the page asks, the server draws among `options` and everyone
  * sees the same one arrive. The agent reads that it was drawn, by whom, and among how many.
  */
-export function drawBlock(
+export async function drawBlock(
   deps: ArtifactDeps,
   userId: string,
   orgId: string,

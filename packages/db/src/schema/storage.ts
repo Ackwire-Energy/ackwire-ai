@@ -364,10 +364,7 @@ export const blockStates = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     state: jsonb().$type<Record<string, unknown>>().notNull().default({}),
-    changes: jsonb()
-      .$type<Record<string, { by: string; at: string; drawn?: number }>>()
-      .notNull()
-      .default({}),
+    changes: jsonb().$type<Record<string, { by: string; at: string; drawn?: number }>>().notNull().default({}),
     /** Goes up on every change: an app keeps the newest it heard (a reply and a socket event can cross). */
     rev: integer().notNull().default(0),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
