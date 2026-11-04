@@ -5,7 +5,7 @@ import { type AccessColumns, runAccess, viewerManages, viewerSees } from "../src
 import { routineRun, runAskedBy, unattendedRun, type VaultFixture, vaultSetup } from "./vault-fixtures";
 
 /**
- * Who sees, manages and uses a Vault item (ADR 0139): personal items are their owner's alone (admins included);
+ * Who sees, manages and uses a Vault item (ADR 0142): personal items are their owner's alone (admins included);
  * team items are seen by their audience and whoever manages credentials; agents use an item for the person behind
  * their run (who asked, else a routine's creator, else nobody) and only when it is shared with them.
  */

@@ -1,5 +1,5 @@
 /*
- * Settings › Vault (ADR 0139): the section, its rows, an item's dialog, the import and the connections, and the save
+ * Settings › Vault (ADR 0142): the section, its rows, an item's dialog, the import and the connections, and the save
  * block on a secret request's card. `vlt-` because `vault-*` belongs to the wiki's import.
  */
 
@@ -602,7 +602,7 @@ html:not([data-pointer]) .vlt-drop__area:focus-visible {
   font-weight: 600;
   color: var(--muted);
 }
-/* Under a closed request card: "Sent, but not saved to the Vault", with Retry while the value is kept (ADR 0139). */
+/* Under a closed request card: "Sent, but not saved to the Vault", with Retry while the value is kept (ADR 0142). */
 .vlt-save__failed {
   display: flex;
   align-items: center;

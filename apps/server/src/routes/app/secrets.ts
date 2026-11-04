@@ -68,10 +68,10 @@ const SecretRequest = z
     username: z
       .string()
       .nullable()
-      .openapi({ description: "For a site's password: the username the agent will type with it (ADR 0139)." }),
+      .openapi({ description: "For a site's password: the username the agent will type with it (ADR 0142)." }),
     codeDigits: z.number().int().nullable().openapi({
       description:
-        "A verification code (ADR 0139): how many digits, one box each on the card. Never saved to the Vault. Null otherwise.",
+        "A verification code (ADR 0142): how many digits, one box each on the card. Never saved to the Vault. Null otherwise.",
     }),
   })
   .openapi("SecretRequest");
@@ -105,7 +105,7 @@ const AgentParams = OrgParams.extend({ agentId: z.uuid() });
  * Secrets agents ask people for (ADR 0027). Only the person asked sees and
  * answers a request; the value travels sealed to the agent's computer and is
  * never stored or shown again, unless that person saves it to the Vault
- * (ADR 0139), sealed there like every Vault value.
+ * (ADR 0142), sealed there like every Vault value.
  */
 export function secretRoutes(deps: AppDeps) {
   const { db, adapters } = deps;
@@ -188,7 +188,7 @@ export function secretRoutes(deps: AppDeps) {
       security,
       summary: "Save to the Vault what you just sent: a site's password as a login, a variable as a key",
       description:
-        "Only the person the request was for (403), once it is delivered (409 `vault.request_not_delivered`). A file or a verification code is never saved (400 `vault.request_not_savable`). A team item takes `manage_credentials` (403 `vault.team_needs_permission`). Recorded in the audit log, never with the value (ADR 0139).",
+        "Only the person the request was for (403), once it is delivered (409 `vault.request_not_delivered`). A file or a verification code is never saved (400 `vault.request_not_savable`). A team item takes `manage_credentials` (403 `vault.team_needs_permission`). Recorded in the audit log, never with the value (ADR 0142).",
       request: { params: RequestParams, body: body(SecretToVaultInput) },
       responses: { 200: json(VaultItem), ...errors },
     }),

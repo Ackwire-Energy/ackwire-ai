@@ -169,11 +169,11 @@ async function missionGate(name: string, input: Record<string, unknown>, ctx: To
   return null;
 }
 
-/** Vault keys one `run_code` may take (ADR 0139). */
+/** Vault keys one `run_code` may take (ADR 0142). */
 export const MAX_RUN_KEYS = 10;
 
 /**
- * Why a run a routine feeds gets no Vault key in a command (ADR 0139 §2, ADR 0053 §3). A saved login it may still
+ * Why a run a routine feeds gets no Vault key in a command (ADR 0142 §2, ADR 0053 §3). A saved login it may still
  * type in the browser: that value never reaches the model or a command.
  */
 export const ROUTINE_KEYS_REFUSAL =
@@ -233,7 +233,7 @@ const REFUSED_BEFORE_KEYS = new Set([
 ]);
 
 /**
- * Whether a failed `exec` may have run its command with the Vault keys it carried (ADR 0139 §4), so their use is
+ * Whether a failed `exec` may have run its command with the Vault keys it carried (ADR 0142 §4), so their use is
  * recorded: yes when the link dropped mid-request or no answer came in time (it may be running), or for a failure we
  * can't place; no when it never reached the computer (offline, paused) or the runner refused it first. The machine
  * provider keeps the runner's error as the `cause` of the words it gives.
@@ -258,7 +258,7 @@ function runnerCode(error: unknown): string | null {
 
 /**
  * A command that carried Vault keys and came back `not_found`: the runner no longer had the one-use key (it lives two
- * minutes and opens once, ADR 0139 §4), not a missing file, so the agent reads what happened and runs it again.
+ * minutes and opens once, ADR 0142 §4), not a missing file, so the agent reads what happened and runs it again.
  */
 export const VAULT_KEY_EXPIRED =
   "The computer's one-use key for the Vault expired before the command ran. Nothing ran. Run it again.";
@@ -512,7 +512,7 @@ export function createSandboxToolSource(
     artifacts: ArtifactDeps;
     skills: Pick<SkillDeps, "blobs">;
     pubsub?: PubSub;
-    /** The Vault (ADR 0139): `run_code` takes saved keys (`keys`) for one command. Without it, no `keys`. */
+    /** The Vault (ADR 0142): `run_code` takes saved keys (`keys`) for one command. Without it, no `keys`. */
     vault?: VaultDeps;
   },
 ): ToolSource {
@@ -577,7 +577,7 @@ export function createSandboxToolSource(
   const pathProp = { type: "string", minLength: 1, maxLength: 300, description: "Path inside the workspace" };
 
   /**
-   * Vault keys for one command (ADR 0139): released for the person behind the run, then sealed, each bound to its
+   * Vault keys for one command (ADR 0142): released for the person behind the run, then sealed, each bound to its
    * variable, to a one-use key the computer just made. The values are in this process only while they are sealed;
    * the runner opens them into that one command's environment and redacts them from what it prints. A run a routine
    * feeds gets none (ADR 0053 §3: it never sends a credential, and a command holding a key could send it anywhere).
@@ -653,7 +653,7 @@ export function createSandboxToolSource(
         exitCode: r.exitCode,
         timedOut: r.timedOut,
         runId: ctx.runId ?? null,
-        // The Vault keys it was given, by name only (ADR 0139).
+        // The Vault keys it was given, by name only (ADR 0142).
         ...(vaultKeys.length > 0 ? { vaultKeys } : {}),
       },
     }).catch(() => undefined);
@@ -717,7 +717,7 @@ export function createSandboxToolSource(
           const started = Date.now();
           const result = await run(ctx, async (computer) => {
             await computer.provider.writeFile(computer.id, file, new TextEncoder().encode(str(input.code)));
-            // Sealed right before the command: the computer's one-use key lives two minutes (ADR 0139).
+            // Sealed right before the command: the computer's one-use key lives two minutes (ADR 0142).
             const keys = names.length > 0 ? await vaultKeysFor(ctx, computer, names) : null;
             let r: ExecResult;
             try {
@@ -730,7 +730,7 @@ export function createSandboxToolSource(
             } catch (error) {
               // The command may have run with the keys though no answer came back (the link dropped, no answer in
               // time): their use is recorded. Not when it never reached the computer or the runner refused it before
-              // opening them (ADR 0139 §4).
+              // opening them (ADR 0142 §4).
               if (keysMayHaveRun(error)) await keys?.used();
               if (keys && runnerCode(error) === "not_found") throw new Error(VAULT_KEY_EXPIRED, { cause: error });
               throw error;

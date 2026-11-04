@@ -146,7 +146,7 @@ export function actionCommands(
       if ("login" in action) throw new Error("a Vault login is typed through the Vault, not as a named secret");
       const site = secretSite(action.secret);
       if (!site) throw new Error(`no secret named ${action.secret} was delivered for a site`);
-      // A code split in one box per character: the runner types one character into each box, in order (protocol 41).
+      // A code split in one box per character: the runner types one character into each box, in order (protocol 43).
       return [c("agentes:type_secret", ref(action.at), action.secret, site, ...(action.more ?? []).map(ref))];
     }
     default:
@@ -163,11 +163,11 @@ export function observationOf(data: unknown): ScreenObservation | null {
   return observeSnapshot({ text: d.snapshot, url, refs: d.refs });
 }
 
-/** A Vault login made ready to type once (ADR 0139): the runner's command and what follows its answer. */
+/** A Vault login made ready to type once (ADR 0142): the runner's command and what follows its answer. */
 export interface VaultTyping {
   /** `agentes:type_vault [ref, rule, box]`: the password sealed to a one-use key of the agent's computer. */
   command: BrowserBatchCommand;
-  /** What the report names it by: the site of its rule (`github.com`), never its title (ADR 0139 §4) nor a value. */
+  /** What the report names it by: the site of its rule (`github.com`), never its title (ADR 0142 §4) nor a value. */
   label: string;
   /** The runner typed it: the use is recorded. */
   typed(): Promise<void>;
@@ -180,7 +180,7 @@ export interface BrowserSurfaceOptions {
   /** A `type_secret`'s site, from what `request_secret` delivered (never from the agent). */
   secretSite?: (name: string) => string | null;
   /**
-   * A Vault login (ADR 0139), released and sealed at the step that types it, for the field `ref` on the page at `url`
+   * A Vault login (ADR 0142), released and sealed at the step that types it, for the field `ref` on the page at `url`
    * (where it was found); or why it can't be typed. Without it a login step fails.
    */
   vaultLogin?: (login: string, ref: string, url: string | null) => Promise<VaultTyping | string>;

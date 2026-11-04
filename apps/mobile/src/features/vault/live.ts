@@ -4,7 +4,7 @@ import { useConnection, useOrgId } from "../shared/hooks";
 import { isVaultChanged, vaultQueryRoot } from "./logic";
 
 /**
- * Someone changed the Vault (ADR 0139: an item, its access, a connection or a sync): the org event carries nothing
+ * Someone changed the Vault (ADR 0142: an item, its access, a connection or a sync): the org event carries nothing
  * but its name, so every Vault screen refetches what this person may see. Mounted once with the app's stack; a
  * reconnect refetches everything already.
  */

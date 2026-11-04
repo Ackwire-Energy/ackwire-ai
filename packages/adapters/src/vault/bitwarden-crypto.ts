@@ -1,5 +1,5 @@
 /**
- * The part of Bitwarden's cryptography the Vault's Bitwarden source needs (ADR 0139), read-only: the master key from
+ * The part of Bitwarden's cryptography the Vault's Bitwarden source needs (ADR 0142), read-only: the master key from
  * the master password (PBKDF2-SHA256 or Argon2id, with the account's own settings), its HKDF stretch, the user key it
  * protects, per-cipher keys and EncStrings of type 2 (AES-256-CBC with an HMAC-SHA256 checked before decrypting).
  *
@@ -57,7 +57,7 @@ const ARGON2_MIN_MEMORY_MIB = 16;
  */
 export const ARGON2_MAX_MEMORY_MIB = 256;
 /**
- * The most work one derivation may take, as MiB of memory times iterations (ADR 0139): the account's server picks
+ * The most work one derivation may take, as MiB of memory times iterations (ADR 0142): the account's server picks
  * the settings, and the time Argon2id takes here grows with both, so their product is capped too. Bitwarden's
  * default (64 MiB, 3 iterations) is under it; 64 MiB with 4 iterations is the most at that memory.
  */

@@ -28,7 +28,7 @@ import { markName } from "./logic";
 
 type AgentPick = Pick<VaultAccess, "allAgents" | "agentIds">;
 
-/** How long a failed save keeps the typed value for "Try again" (ADR 0139), at most. */
+/** How long a failed save keeps the typed value for "Try again" (ADR 0142), at most. */
 const RETRY_MS = 2 * 60_000;
 
 /**
@@ -36,7 +36,7 @@ const RETRY_MS = 2 * 60_000;
  * person asked sees the field; the value is sealed here, on the phone, to the key the computer made, so it
  * never reaches our server, the chat or the agent. Everyone else sees who was asked. Once it ends, one line.
  *
- * ADR 0139 §6: a site's password or a key can also go to the Vault ("Save to the Vault", on by default), personal or
+ * ADR 0142 §6: a site's password or a key can also go to the Vault ("Save to the Vault", on by default), personal or
  * the team's, for the agents chosen (the one that asked first), with the username the agent filled in. Only then
  * does the value reach the server, once, after the box was delivered. A code asked by the site comes in one box per
  * digit and is never saved.

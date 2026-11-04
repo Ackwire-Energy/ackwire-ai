@@ -182,7 +182,7 @@ export function runCommand(opts: ExecOptions): Promise<ExecReply> {
       return;
     }
 
-    // Redacted before it is kept (ADR 0139): the cut of a long output (its head and tail) can't split a value in
+    // Redacted before it is kept (ADR 0142): the cut of a long output (its head and tail) can't split a value in
     // two and leave each half readable. The last `hold` characters wait for the next chunk, as live output does.
     const keptHeld = { stdout: "", stderr: "" };
     const keepDecoders = { stdout: new StringDecoder("utf8"), stderr: new StringDecoder("utf8") };

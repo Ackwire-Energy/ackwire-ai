@@ -9,7 +9,7 @@ import type {
 import type { IconName } from "@agenteschat/ui";
 
 /*
- * The Vault's words and rules as the web reads them (ADR 0139): what a row says, what a search finds, the access a new
+ * The Vault's words and rules as the web reads them (ADR 0142): what a row says, what a search finds, the access a new
  * item starts with, and the checks a form makes before the server makes them again.
  */
 
@@ -76,7 +76,7 @@ export const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").to
 
 /**
  * Whether an item has `query` in what a person would look it up by (never a value). A contact by its title and
- * description: the list carries no contact's fields (ADR 0139 §7).
+ * description: the list carries no contact's fields (ADR 0142 §7).
  */
 export function matchesQuery(item: VaultItem, query: string): boolean {
   const q = fold(query.trim());

@@ -269,7 +269,7 @@ function bodyBytes(body: RequestInit["body"]): Uint8Array | null {
 }
 
 /**
- * A `fetch` for hosts people type (a self-hosted password manager's server, ADR 0139), with `assertPublicHttpsUrl`'s
+ * A `fetch` for hosts people type (a self-hosted password manager's server, ADR 0142), with `assertPublicHttpsUrl`'s
  * checks made on every request, at connect time: https only, no user or password in the address, no internal name,
  * and every address the host resolves to public (not private, loopback, link-local, metadata, CGNAT or reserved). The
  * socket connects to one of those addresses (IPv4 first, `pinnedLookup`), never to the name resolved again, so a

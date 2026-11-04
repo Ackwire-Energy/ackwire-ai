@@ -190,7 +190,7 @@ export async function warmAgentBrowser(
 /**
  * A secret delivered to the computer the browser runs on, with the one site it may be typed on (`request_secret`
  * with `site`). Null when there is none. `gone`: a site's password past the minutes its runner keeps it in memory
- * (ADR 0139 §6), which the computer no longer has.
+ * (ADR 0142 §6), which the computer no longer has.
  */
 async function browserSecret(ctx: ToolContext, name: string, machineId: string) {
   const [held] = await ctx.db
@@ -273,7 +273,7 @@ export interface BrowserToolDeps {
   profilePollMs?: number;
   /** Error reports (ADR 0104): a computer's Google Chrome failing an agent goes there (`reportChromeFailure`). */
   errors?: ErrorReporter;
-  /** The Vault (ADR 0139): a `type_secret` with `login` types a saved login. Without it, logins are refused. */
+  /** The Vault (ADR 0142): a `type_secret` with `login` types a saved login. Without it, logins are refused. */
   vault?: VaultDeps;
 }
 
@@ -382,7 +382,7 @@ export function browserErrorText(error: string) {
 }
 
 /**
- * A runner's failed command as the agent reads it (protocol 41 adds a `code` to Vault and code refusals, ADR 0139):
+ * A runner's failed command as the agent reads it (protocol 43 adds a `code` to Vault and code refusals, ADR 0142):
  * a typed password the page tried to send in an address, a field that takes no code, a field inside an embedded
  * frame (a person types there, through the hand-off), or the refusal's code ahead of the runner's words, which
  * `vaultTypingRefusal` reads for a login.
@@ -428,16 +428,16 @@ function pageOrigin(url: string | null): string | null {
   }
 }
 
-/** A login id the run can't use: the same words whether it exists or not (ADR 0139). */
+/** A login id the run can't use: the same words whether it exists or not (ADR 0142). */
 const NO_SUCH_LOGIN =
   "No Vault login like that is shared with you for this request. Look with vault_list, or ask the person for the password with request_secret.";
 
-/** A Vault refusal (its own words, ADR 0139) or any other failure, as the agent reads it. Never a value. */
+/** A Vault refusal (its own words, ADR 0142) or any other failure, as the agent reads it. Never a value. */
 const vaultErrorText = (error: unknown) =>
   error instanceof VaultRefusal ? error.message : error instanceof Error ? error.message : String(error);
 
 /**
- * The runner's refusals of `agentes:type_vault` (ADR 0139), as the agent reads them; any other failure (a stale
+ * The runner's refusals of `agentes:type_vault` (ADR 0142), as the agent reads them; any other failure (a stale
  * number, a covered field) as the browser said it, so the plan finds the field again as for any step.
  */
 export function vaultTypingRefusal(text: string, site: string): string {
@@ -533,7 +533,7 @@ function trailOf(report: PlanReport) {
     .filter((s) => s.status !== "skipped")
     .map((s) => {
       const tool = TRAIL_TOOL[s.step.do];
-      // A Vault login's step says the site it was typed for (ADR 0139); an open says where. Never a value.
+      // A Vault login's step says the site it was typed for (ADR 0142); an open says where. Never a value.
       const detail =
         tool === "browser_open"
           ? toolDetail(tool, { url: s.step.url ?? s.step.target })
@@ -945,7 +945,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
 
   /**
    * The shared browser profile the run's commands go to, with every agent granted it (read now), as a Vault login
-   * typed there checks it (ADR 0139, ADR 0110); null in the agent's own browser.
+   * typed there checks it (ADR 0142, ADR 0110); null in the agent's own browser.
    */
   async function vaultProfile(
     ctx: ToolContext,
@@ -956,8 +956,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
   }
 
   /**
-   * Why a Vault login can't be typed in this run, checked before the plan starts (ADR 0139): the Vault on this
-   * server, "See the Vault" for the agent, a computer on protocol 41, the login shared with this agent for the
+   * Why a Vault login can't be typed in this run, checked before the plan starts (ADR 0142): the Vault on this
+   * server, "See the Vault" for the agent, a computer on protocol 43, the login shared with this agent for the
    * person behind the run, still in its source and with a value, and, in a shared browser profile, a login every
    * agent granted it may hold (never a personal one, nor one open only to some people). Null when it can be: its
    * value is released only at the step that types it (checked again there). An id the run doesn't know, or one not
@@ -987,7 +987,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
   }
 
   /**
-   * A Vault login made ready for one step (ADR 0139): released for the page the field is on (the Vault refuses
+   * A Vault login made ready for one step (ADR 0142): released for the page the field is on (the Vault refuses
    * another site), sealed to a one-use key the agent's computer just made, with the site rule in the box's
    * additional data, so the runner types it only into a password field of a frame on that site. The value is in
    * this process only while it is sealed; the use is recorded once the runner typed it.
@@ -1016,7 +1016,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         released.password,
         vaultAad({ keyId: key.keyId, agentId: ctx.agentId, use: { kind: "fill", rule } }),
       ).catch(() => {
-        // Never the sealing's own words (they could name the value's size), nor the login's title (ADR 0139 §4).
+        // Never the sealing's own words (they could name the value's size), nor the login's title (ADR 0142 §4).
         throw new Error(`The Vault login ${id} couldn't be prepared for your computer.`);
       });
       sealed = { box, keyId: key.keyId, rule, site: vaultRuleLabel(released.rule) };
@@ -1029,7 +1029,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         args: [field, sealed.rule, JSON.stringify({ keyId: sealed.keyId, box: sealed.box })],
         timeoutSeconds: COMMAND_SECONDS,
       },
-      // The site of its rule, which the engine read from the saved address: never its title (ADR 0139 §4).
+      // The site of its rule, which the engine read from the saved address: never its title (ADR 0142 §4).
       label: sealed.site,
       typed: () => recordVaultUse(vault, run, id, { action: "fill", ...(origin ? { origin } : {}) }),
       refused: (text) => vaultTypingRefusal(text, sealed.site),
@@ -1054,7 +1054,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     const logins = new Set<string>();
     for (const s of steps) {
       if (s.do !== "type_secret") continue;
-      // A code in one box per character: only a runner of protocol 41 types one character into each (ADR 0139).
+      // A code in one box per character: only a runner of protocol 43 types one character into each (ADR 0142).
       const boxes = (s.targets ?? []).filter((t) => t.trim()).length;
       if (boxes > 1 && linked.status.protocol < VAULT_PROTOCOL) {
         return {

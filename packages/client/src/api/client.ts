@@ -1002,7 +1002,7 @@ export interface ApiClient {
     list(orgId: string, agentId: string): Promise<AgentSecret[]>;
     remove(orgId: string, agentId: string, name: string, machineId: string | null): Promise<void>;
     /**
-     * "Save to the Vault" on the card (ADR 0139), after `deliver`: a site's password as a login, a variable as a
+     * "Save to the Vault" on the card (ADR 0142), after `deliver`: a site's password as a login, a variable as a
      * key. Only the person asked; 409 `vault.request_not_delivered`, 400 `vault.request_not_savable` (a file or a
      * code), 403 `vault.team_needs_permission`. Optional so older fakes type-check.
      */
@@ -1613,7 +1613,7 @@ export interface ApiClient {
     request(orgId: string, agentId: string): Promise<void>;
   };
   /**
-   * The Vault (ADR 0139): logins, keys and contacts agents use without seeing a password or a key. No answer carries
+   * The Vault (ADR 0142): logins, keys and contacts agents use without seeing a password or a key. No answer carries
    * a value but `reveal`'s, to who may edit the item, and that is recorded. Personal items are their owner's alone;
    * team items take `manage_credentials` to create, edit and reveal. Optional so older fakes type-check
    * (`createHttpApi` has it).

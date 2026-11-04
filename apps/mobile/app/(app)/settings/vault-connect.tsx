@@ -2,7 +2,7 @@ import { Redirect, useLocalSearchParams } from "expo-router";
 import { textParam, vaultHref } from "@/features/vault/logic";
 import { VaultConnectScreen } from "@/features/vault/VaultConnectScreen";
 
-/** Connecting a password manager (`?kind=`), or new sign-in details for one (`&connection=`; ADR 0139). */
+/** Connecting a password manager (`?kind=`), or new sign-in details for one (`&connection=`; ADR 0142). */
 export default function SettingsVaultConnectRoute() {
   const params = useLocalSearchParams<{ kind?: string; connection?: string }>();
   const kind = textParam(params.kind);

@@ -29,7 +29,7 @@ import {
 } from "./vault-fixtures";
 
 /**
- * The Vault for agents (ADR 0139): what a run may list (metadata, contacts' fields), the values it may release to be
+ * The Vault for agents (ADR 0142): what a run may list (metadata, contacts' fields), the values it may release to be
  * sealed for its computer, what it may change, and the words it gets when refused (never a hint of a hidden item).
  */
 
@@ -486,7 +486,7 @@ describe("recording a use", () => {
       v.events.filter((e) => (e as { event?: { type?: string } }).event?.type === "vault.changed").length;
     const before = changes();
     await recordVaultUse(v.deps, run, item.id, { action: "fill", origin: "https://github.com/login?token=abc123" });
-    // A use changes nothing people see in the list: no app reloads the Vault for it (ADR 0139 §7).
+    // A use changes nothing people see in the list: no app reloads the Vault for it (ADR 0142 §7).
     expect(changes()).toBe(before);
     const detail = await getVaultItem(v.deps, v.ana.id, v.f.org.id, item.id);
     expect(detail.lastUsedAt).not.toBeNull();

@@ -189,7 +189,7 @@ const INTERNAL_BY_SCOPE: Readonly<Record<string, InternalArea>> = {
   "sandbox:run": "code",
   "browser:use": "browser",
   "desktop:use": "desktop",
-  // Contacts and descriptions in the Vault (ADR 0139): never a value, and an agent deletes only what it saved.
+  // Contacts and descriptions in the Vault (ADR 0142): never a value, and an agent deletes only what it saved.
   "vault:write": "vault",
 };
 

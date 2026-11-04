@@ -1,5 +1,5 @@
 /**
- * Who may see, manage and use a Vault item (ADR 0139). One place for every check: the app's (people) and the
+ * Who may see, manage and use a Vault item (ADR 0142). One place for every check: the app's (people) and the
  * tools' (agents). Items are few per workspace, so callers load them (`VAULT_MAX_ITEMS`) and filter here in code.
  *
  * People:
@@ -97,7 +97,7 @@ export interface VaultRunPerson {
 }
 
 /**
- * The person a run uses the Vault for (ADR 0139): who asked (`authority.ts`), else the creator of the routine behind
+ * The person a run uses the Vault for (ADR 0142): who asked (`authority.ts`), else the creator of the routine behind
  * it (`routineCreatorOf`), else nobody. A person counts only while an active member (a blocked account or one who
  * left counts as nobody).
  */

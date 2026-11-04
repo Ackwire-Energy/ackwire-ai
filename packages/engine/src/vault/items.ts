@@ -1,5 +1,5 @@
 /**
- * The Vault for people (ADR 0139): what the app's Settings, Vault lists, saves, changes, shows and deletes. Every
+ * The Vault for people (ADR 0142): what the app's Settings, Vault lists, saves, changes, shows and deletes. Every
  * function checks the person itself (`access.ts`): an item they may not see is `NotFoundError`, the same as one that
  * doesn't exist, and what they see but don't manage is `ForbiddenError`. Values are sealed before any write
  * (`seal.ts`), and only `revealVaultItem` answers with one, recorded as a use and in the audit log.
@@ -274,7 +274,7 @@ function auditItem(
 
 /**
  * Everything the person sees in the Vault: their items, the connections they manage, the sources to connect. No
- * contact's fields (`contact: null`): opening every contact's seal for a list is work no row shows (ADR 0139 §7); an
+ * contact's fields (`contact: null`): opening every contact's seal for a list is work no row shows (ADR 0142 §7); an
  * item's page has them (`getVaultItem`).
  */
 export async function listVault(deps: VaultDeps, userId: string, orgId: string): Promise<VaultOverview> {
@@ -439,7 +439,7 @@ export async function updateVaultItem(
     changed.push("keyName");
   }
   if (patch.title !== undefined) {
-    // An emptied name falls back as on creation: a contact's goes by its (new or saved) fields (ADR 0139).
+    // An emptied name falls back as on creation: a contact's goes by its (new or saved) fields (ADR 0142).
     const contact =
       kind !== "contact" || patch.title.trim()
         ? null
@@ -526,7 +526,7 @@ export async function deleteVaultItem(deps: VaultDeps, userId: string, orgId: st
  * A login's password or a key's value, for the person who manages it to see or copy: recorded as a use and in the
  * audit log (`vault.item_shown`, `vault.item_copied`), never with the value. A source's refusal throws its
  * `VaultSourceError`. A use alone isn't a change to the Vault: no `vault.changed` goes to every open app for it
- * (ADR 0139 §7), and the person's own app refetches the item it shows.
+ * (ADR 0142 §7), and the person's own app refetches the item it shows.
  */
 export async function revealVaultItem(
   deps: VaultDeps,

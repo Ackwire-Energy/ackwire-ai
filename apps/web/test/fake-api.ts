@@ -3041,7 +3041,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
     },
     secrets: {
-      // "Save to the Vault" on the card (ADR 0139): logged, so a test can check it came after the delivery.
+      // "Save to the Vault" on the card (ADR 0142): logged, so a test can check it came after the delivery.
       saveToVault: async (orgId, requestId, input) => {
         log("secrets.saveToVault", orgId, requestId, input);
         return {} as never;

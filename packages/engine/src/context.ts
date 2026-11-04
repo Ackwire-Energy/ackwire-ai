@@ -1749,7 +1749,7 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
 
 /**
  * The secrets delivered to the agent's current computer and still there (names and where, never values): a site's
- * password only within the minutes its runner keeps it in memory (`secretStillHeld`, ADR 0139 §6).
+ * password only within the minutes its runner keeps it in memory (`secretStillHeld`, ADR 0142 §6).
  */
 export async function heldSecretsOf(
   db: Database,

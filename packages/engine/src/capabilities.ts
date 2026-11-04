@@ -283,8 +283,8 @@ export const COMPUTER_SECTIONS_LINE =
   '"# This turn" and "# This conversation" in your messages come from agentes.chat, not from a person: what holds for this turn, and for this whole conversation.';
 
 /**
- * The Vault (ADR 0139): what people saved for the agent, found before asking them, and used without the agent ever
- * seeing a password or a key. Routines type logins but give no key to a command (ADR 0139 §2, ADR 0053 §3), and a
+ * The Vault (ADR 0142): what people saved for the agent, found before asking them, and used without the agent ever
+ * seeing a password or a key. Routines type logins but give no key to a command (ADR 0142 §2, ADR 0053 §3), and a
  * shared browser profile takes only the logins every agent granted it may use.
  */
 export const VAULT_GUIDANCE =

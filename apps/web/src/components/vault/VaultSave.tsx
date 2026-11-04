@@ -10,7 +10,7 @@ import { AgentsAccessDialog } from "./VaultAccess";
 import "./vault.css";
 
 /*
- * "Save to the Vault" on a secret request's card (ADR 0139): a site's password becomes a login, a variable a key, after
+ * "Save to the Vault" on a secret request's card (ADR 0142): a site's password becomes a login, a variable a key, after
  * the value went to the computer. Checked by default; Personal or Team; the agents that may use it (the one asking
  * first); and, for a site, the username to keep with it. Never for a file or a verification code.
  */

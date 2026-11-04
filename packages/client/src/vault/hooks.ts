@@ -13,7 +13,7 @@ import type {
 } from "./types";
 
 /*
- * The Vault in the apps (ADR 0139). What a person types here (a password, a key, a passwords file, a password
+ * The Vault in the apps (ADR 0142). What a person types here (a password, a key, a passwords file, a password
  * manager's credentials) and what `reveal` answers never go into the query cache, and every mutation that carries
  * one is forgotten as soon as nothing watches it (`gcTime: 0`).
  */

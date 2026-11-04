@@ -60,7 +60,7 @@ import { RequestCard, RequestDone, RequestTile, useExpired } from "./RequestCard
 import { savesToVault, VaultSaveBlock, type VaultSaveChoice, vaultSaveDefaults } from "./vault/VaultSave";
 import "./proposals.css";
 
-/** How long a failed "Save to the Vault" keeps the typed value for Retry (ADR 0139), at most. */
+/** How long a failed "Save to the Vault" keeps the typed value for Retry (ADR 0142), at most. */
 const VAULT_RETRY_MS = 2 * 60_000;
 
 /** The host of a site the request names (`https://host`), or null. */
@@ -741,7 +741,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const current = useLive((s) => s.secrets[request.id]) ?? request;
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
-  // "Save to the Vault" (ADR 0139): a site's password or a variable, saved after it went to the computer.
+  // "Save to the Vault" (ADR 0142): a site's password or a variable, saved after it went to the computer.
   const [keep, setKeep] = useState<VaultSaveChoice>(() => vaultSaveDefaults(request));
   // How the save went: saved, failed (Retry while the value is kept), or dropped (failed, and the value is gone).
   const [vaultSave, setVaultSave] = useState<"saved" | "failed" | "dropped" | null>(null);
@@ -815,7 +815,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       if (choice)
         saveToVault({
           value: text,
-          // A site's username always goes: empty means none, even when the agent suggested one (ADR 0139 §6).
+          // A site's username always goes: empty means none, even when the agent suggested one (ADR 0142 §6).
           ...(current.target.kind === "site" ? { username: choice.username.trim() } : {}),
           scope: choice.scope,
           allAgents: choice.allAgents,
@@ -863,7 +863,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
             <>
               <div className="rq__field">
                 {codeDigits ? (
-                  // A verification code (ADR 0139): one box per digit, typed by the agent's browser, never saved.
+                  // A verification code (ADR 0142): one box per digit, typed by the agent's browser, never saved.
                   <CodeInput
                     length={codeDigits}
                     value={value}

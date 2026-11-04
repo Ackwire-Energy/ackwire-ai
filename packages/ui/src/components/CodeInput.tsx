@@ -24,7 +24,7 @@ export interface CodeInputProps {
 const keep = (text: string, numeric: boolean) => (numeric ? text.replace(/\D/g, "") : text.replace(/[^0-9a-z]/gi, ""));
 
 /**
- * A code typed one character per box (a sign-in's verification code an agent's browser types, ADR 0139). Typing moves
+ * A code typed one character per box (a sign-in's verification code an agent's browser types, ADR 0142). Typing moves
  * to the next box, Backspace on an empty box goes back and clears it, arrows move, and a paste or the system's
  * one-time-code suggestion fills every box from the one it lands in. Each box is a field of the ruler (`ac-input`), so
  * it looks and focuses like any field.

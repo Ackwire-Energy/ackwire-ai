@@ -86,7 +86,7 @@ function fakeHttps(reply: { status: number; headers?: Record<string, string>; bo
 
 const refusal = (work: Promise<unknown>) => work.then(() => null).catch((e: unknown) => e);
 
-test("publicHttpsFetch (ADR 0139): an address on our own network is refused before any connection", async () => {
+test("publicHttpsFetch (ADR 0142): an address on our own network is refused before any connection", async () => {
   const https = fakeHttps({ status: 200 });
   const resolved: Record<string, { address: string; family: number }[]> = {
     "vault.acme.example": [{ address: "10.0.0.5", family: 4 }],

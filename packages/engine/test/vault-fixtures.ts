@@ -19,7 +19,7 @@ import {
 import { addMember, type Fixture, setup } from "./fixtures";
 
 /**
- * The Vault's tests (ADR 0139): one workspace (Acme) with its owner Ana, Bruno (a member in "Support"), Carla (an
+ * The Vault's tests (ADR 0142): one workspace (Acme) with its owner Ana, Bruno (a member in "Support"), Carla (an
  * admin, so she manages credentials) and Dora (a member in no role); agents Dev and Infra; a fake password manager.
  */
 
@@ -34,7 +34,7 @@ export interface FakeSource extends VaultSource {
   listError: VaultSourceError | Error | null;
   /** The secrets `list` and `reveal` were handed (to prove they were unsealed). */
   seenTokens: string[];
-  /** Every call, with the signal the engine gave it and the workspace `connect` was told (ADR 0139). */
+  /** Every call, with the signal the engine gave it and the workspace `connect` was told (ADR 0142). */
   calls: { op: "connect" | "list" | "reveal"; signal: AbortSignal | undefined; orgId: string | undefined }[];
 }
 

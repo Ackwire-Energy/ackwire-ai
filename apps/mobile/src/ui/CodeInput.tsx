@@ -22,7 +22,7 @@ export interface CodeInputProps {
 }
 
 /**
- * A code of a few digits, one box per digit (ADR 0139 §6: a code a site sent by text or email, typed by the agent's
+ * A code of a few digits, one box per digit (ADR 0142 §6: a code a site sent by text or email, typed by the agent's
  * browser). One real field lies over the boxes, so the system's number pad, "paste" and the code it offers from a
  * message fill every box at once; typing moves to the next box and deleting goes back by itself. The boxes only draw
  * what the field holds, with the next one to fill outlined.

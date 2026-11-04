@@ -59,7 +59,7 @@ import {
   websiteOrigin,
 } from "../../src/features/vault/logic";
 
-/** A `t` that says which key and values it got, so the logic is tested apart from the words (ADR 0139). */
+/** A `t` that says which key and values it got, so the logic is tested apart from the words (ADR 0142). */
 const t = ((key: string, values?: Record<string, unknown>) =>
   values ? `${key}${JSON.stringify(values)}` : key) as unknown as TFunction;
 
@@ -135,7 +135,7 @@ const ITEMS: VaultItem[] = [
     id: "i3",
     title: "Acme billing",
     kind: "contact",
-    // The list carries no contact's fields (ADR 0139 §7): a contact goes by its title and description there.
+    // The list carries no contact's fields (ADR 0142 §7): a contact goes by its title and description there.
     description: "Invoices for the São Paulo office",
     website: null,
     username: null,

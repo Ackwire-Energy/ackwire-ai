@@ -193,7 +193,7 @@ test("headless as before: its own window size, none of the headed flags", () => 
   expect(args.at(-1)).toBe("about:blank");
 });
 
-/** Chrome's password manager, its sign-in with saved passwords, its leak check and its autofill: off (ADR 0139). */
+/** Chrome's password manager, its sign-in with saved passwords, its leak check and its autofill: off (ADR 0142). */
 const NO_SAVED_LOGINS = {
   credentials_enable_service: false,
   credentials_enable_autosignin: false,

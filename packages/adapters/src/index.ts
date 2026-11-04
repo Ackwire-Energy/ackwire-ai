@@ -90,7 +90,7 @@ export interface Adapters {
    */
   gifs?: GifProvider | null;
   /**
-   * The Vault's external sources by kind (ADR 0139): 1Password and Bitwarden by default, a module's merged by kind.
+   * The Vault's external sources by kind (ADR 0142): 1Password and Bitwarden by default, a module's merged by kind.
    * The built-in source is the engine's own. null/absent = only built-in items.
    */
   vaultSources?: VaultSources | null;

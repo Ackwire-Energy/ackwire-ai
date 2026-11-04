@@ -1,5 +1,5 @@
 /**
- * The Vault (ADR 0139): logins, keys and contacts a workspace keeps for its agents. This file holds what the rest of
+ * The Vault (ADR 0142): logins, keys and contacts a workspace keeps for its agents. This file holds what the rest of
  * the engine and the API see: the dependencies, the shapes people and agents get, and the inputs they send. The
  * shapes match `packages/client/src/vault/types.ts`, so a route hands them over as they are.
  *

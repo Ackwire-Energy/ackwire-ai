@@ -1,5 +1,5 @@
 /**
- * 1Password as a Vault source (ADR 0139): a service account the person creates with access to one vault only (the
+ * 1Password as a Vault source (ADR 0142): a service account the person creates with access to one vault only (the
  * connection refuses one that sees more), read through 1Password's own SDK.
  *
  * - The SDK is loaded when a 1Password connection is first used, never at boot: a server with no such connection
@@ -274,7 +274,7 @@ interface ReadCache {
   reads: Map<string, { username?: string }>;
 }
 
-/** 1Password through a service account (ADR 0139). One instance serves every connection of the server process. */
+/** 1Password through a service account (ADR 0142). One instance serves every connection of the server process. */
 export function createOnePasswordSource(options: OnePasswordSourceOptions = {}): VaultSource {
   const now = options.now ?? Date.now;
   const timeoutMs = options.timeoutMs ?? TIMEOUT_MS;

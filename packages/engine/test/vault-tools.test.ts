@@ -42,7 +42,7 @@ import { pairMachine } from "./machine-fixtures";
 import { agentRunRow, channelRoutine, fire } from "./routine-fixtures";
 
 /**
- * The Vault's tools (ADR 0139): what the Vault shares with an agent for the person behind its run, listed without a
+ * The Vault's tools (ADR 0142): what the Vault shares with an agent for the person behind its run, listed without a
  * value; a saved login typed by the browser and a saved key given to one command, each sealed to a one-use key of
  * the agent's own computer (a fake runner here, which opens the boxes the way the real one does); contacts the agent
  * keeps for people.
@@ -410,7 +410,7 @@ test("a saved login is typed by the browser, sealed to a one-use key of the agen
   // The value went only inside the box: never in a request, a result or a step.
   expect(JSON.stringify(v.computer.calls)).not.toContain(PASSWORD);
   expect(out.content).not.toContain(PASSWORD);
-  // The report names the site its rule allows, never the login's title (ADR 0139 §4).
+  // The report names the site its rule allows, never the login's title (ADR 0142 §4).
   expect(out.content).toContain("Typed the Vault login for acme.example into");
   expect(out.content).not.toContain("Acme admin");
   const fills = (await usesOf(v.items.login.id)).filter((u) => u.action === "fill");
@@ -457,7 +457,7 @@ test("a login is refused before its value goes out: not shared, another site, an
   expect(wrong.content).toContain("acme.example");
   expect(keysAsked()).toBe(0);
 
-  // A computer before protocol 41 never gets a Vault value.
+  // A computer before protocol 43 never gets a Vault value.
   v.computer.s.url = "https://acme.example/login";
   v.computer.s.protocol = VAULT_PROTOCOL - 1;
   const old = await v.call(ana, "browser_type_secret", { target: "e2", login: v.items.login.id });
@@ -470,7 +470,7 @@ test("a login is refused before its value goes out: not shared, another site, an
 test("the runner's refusals become clear errors, and nothing is recorded", async () => {
   const v = await vaultSetup();
   const ana = await v.runFor(f.owner.id);
-  // The runner names its refusal in `code` (protocol 41).
+  // The runner names its refusal in `code` (protocol 43).
   v.computer.s.typeVault = () => ({
     success: false,
     data: null,
@@ -504,7 +504,7 @@ test("the runner's refusals become clear errors, and nothing is recorded", async
   expect(vaultTypingRefusal("stale_ref: unknown ref e2", "acme.example")).toBe("stale_ref: unknown ref e2");
 });
 
-test("a code split in boxes is typed one character per box, only by a runner of protocol 41", async () => {
+test("a code split in boxes is typed one character per box, only by a runner of protocol 43", async () => {
   const v = await vaultSetup();
   const ana = await v.runFor(f.owner.id);
   const [machine] = await f.db.select({ id: schema.machines.id }).from(schema.machines);
@@ -669,7 +669,7 @@ test("vault_save keeps contacts for the person behind the run; vault_delete only
 
   const changed = await v.call(ana, "vault_save", { id, contact: { phone: "+55 19 0000-0000" } });
   expect(changed.isError).toBeFalsy();
-  // By its id: what was written on it reaches the model only inside vault_list's blocks (ADR 0139 §4).
+  // By its id: what was written on it reaches the model only inside vault_list's blocks (ADR 0142 §4).
   expect(changed.content).toBe(`Updated the contact ${id} in the Vault.`);
   expect(saved.content).not.toContain("Acme shipping");
   const listed = await v.call(ana, "vault_list", { kind: "contact" });

@@ -4,7 +4,7 @@ import { schema } from "@agenteschat/db";
 import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 /*
- * The Vault's routes (ADR 0139): who sees, edits and reveals what, and that no answer but `reveal` ever carries a
+ * The Vault's routes (ADR 0142): who sees, edits and reveals what, and that no answer but `reveal` ever carries a
  * password or a key.
  */
 
@@ -192,7 +192,7 @@ test("personal items are their owner's alone, the workspace's owner included", a
   const anaView = await overviewOf(w.ana, w.vault);
   expect(anaView.text).not.toContain(TOKEN_VALUE);
   expect(anaView.overview.items.map((i) => i.id).sort()).toEqual([id, contact.item?.id ?? ""].sort());
-  // The list carries no contact's fields; its page does (ADR 0139 §7).
+  // The list carries no contact's fields; its page does (ADR 0142 §7).
   expect(anaView.text).not.toContain("Ana Souza");
   const page = await (await w.ana(`${w.vault}/items/${contact.item?.id ?? ""}`)).json();
   expect(page).toMatchObject({ contact: { fullName: "Ana Souza", city: "Recife" }, unreadable: false });

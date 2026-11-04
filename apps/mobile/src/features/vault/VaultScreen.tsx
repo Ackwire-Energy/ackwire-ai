@@ -42,7 +42,7 @@ import { useVaultNames } from "./parts";
 const SEARCH_FROM = 6;
 
 /**
- * Settings › Vault (ADR 0139), as the web's: the team's items, the person's own and the password managers connected,
+ * Settings › Vault (ADR 0142), as the web's: the team's items, the person's own and the password managers connected,
  * one view at a time. Each row says what it is, which agents use it and when it was last used, and opens its page.
  * New items start here; importing a passwords file happens on a computer (the web), and a row says so.
  */

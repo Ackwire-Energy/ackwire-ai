@@ -1,5 +1,5 @@
 /**
- * The Vault as the apps see it (ADR 0139). Never a password or a key: only `reveal` answers with one, to a person
+ * The Vault as the apps see it (ADR 0142). Never a password or a key: only `reveal` answers with one, to a person
  * who manages the item, and that is recorded as a use.
  */
 

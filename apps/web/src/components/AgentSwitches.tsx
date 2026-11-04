@@ -5,7 +5,7 @@ import { AgentAvatar } from "./AgentAvatar";
 import { useOrg } from "./org-context";
 
 /**
- * Which agents may use something (a browser profile, a Vault item, ADR 0139): the workspace's agents, each on or off,
+ * Which agents may use something (a browser profile, a Vault item, ADR 0142): the workspace's agents, each on or off,
  * the main choice raised on top.
  *
  * Without `all`, that top row turns every agent on or off. With it, the top row is its own choice, every agent now

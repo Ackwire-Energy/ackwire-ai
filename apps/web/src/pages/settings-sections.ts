@@ -49,7 +49,7 @@ export const SETTINGS_SECTIONS: {
   { id: "right_hand", icon: "agent", group: "org", allowed: (o) => can(o, "manage_agents") },
   { id: "members", icon: "members", group: "org", allowed: () => true },
   { id: "roles", icon: "audiencePeople", group: "org", allowed: (o) => can(o, "manage_roles") },
-  // Every member keeps their own logins, keys and contacts there; team items show to who they're shared with (ADR 0139).
+  // Every member keeps their own logins, keys and contacts there; team items show to who they're shared with (ADR 0142).
   { id: "vault", icon: "lock", group: "org", allowed: () => true },
   // What agents did and people changed: only for who may see it (it shows everyone's work).
   { id: "audit", icon: "shield", group: "org", allowed: (o) => can(o, "view_audit") },

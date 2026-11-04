@@ -35,7 +35,7 @@ import { AgentRows, InputField, ScopeRows } from "./parts";
 import { contactKeyboard, MatchRows } from "./VaultItemScreen";
 
 /**
- * A new Vault item (ADR 0139), the web's dialog as a pushed screen: what it is (a login, a key or contact details),
+ * A new Vault item (ADR 0142), the web's dialog as a pushed screen: what it is (a login, a key or contact details),
  * its fields, personal or the team's (the team's only for who manages the workspace's keys), and the agents that may
  * use it. Saved, it opens its own page, where who sees it can be narrowed.
  */

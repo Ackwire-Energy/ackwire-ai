@@ -120,7 +120,7 @@ export const ICONS = {
   pause: [p("M9 6v12M15 6v12")],
   // The agent's browser card (Senha, the keys, Parar).
   lock: [r(5, 11, 14, 9.5, 2.5), p("M8.5 11V8a3.5 3.5 0 0 1 7 0v3")],
-  // The Vault's keys (ADR 0139): the web's key on this grid, a round bow and a shaft with two teeth.
+  // The Vault's keys (ADR 0142): the web's key on this grid, a round bow and a shaft with two teeth.
   key: [c(8.4, 15.6, 3.8), p("m11.1 12.9 8.4-8.4M16.8 7.2l2.6 2.6M14.6 9.4l2 2")],
   keyboard: [r(3, 6, 18, 12, 2.5), p("M7 10h.01M10.5 10h.01M14 10h.01M17 10h.01M7 14h.01M17 14h.01M10 14.5h4", 2)],
   stop: [r(7, 7, 10, 10, 2)],

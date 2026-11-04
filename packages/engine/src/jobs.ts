@@ -145,7 +145,7 @@ export interface JobDeps extends RunExecutorDeps {
   skills?: SkillDeps;
   /** Voice messages (job `voice.transcribe`, ADR 0100). */
   voice?: VoiceDeps;
-  /** The Vault's sources (job `vault.sync`, ADR 0139); absent: connections aren't read again. */
+  /** The Vault's sources (job `vault.sync`, ADR 0142); absent: connections aren't read again. */
   vault?: VaultDeps;
   /** Connectors: job `org.delete` revokes a workspace's GitHub OAuth grants at GitHub before its rows go. */
   connectors?: ConnectorDeps;
@@ -1001,7 +1001,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (!deps.skills) return;
       await runSkillUpdates(deps.skills, orgOf(job));
     },
-    // A Vault connection read again (ADR 0139); a source's refusal stays on the connection, never retried here.
+    // A Vault connection read again (ADR 0142); a source's refusal stays on the connection, never retried here.
     [VAULT_SYNC_JOB]: async (job) => {
       if (!deps.vault) return;
       await runVaultSync(deps.vault, orgOf(job), String(job.payload.connectionId));
