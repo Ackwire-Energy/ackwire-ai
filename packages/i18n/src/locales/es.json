@@ -1241,7 +1241,8 @@
     "budgetHelp": "Por encima de eso, el pedido va a ti.",
     "perMonth": "/mes",
     "guidanceLabel": "Cómo decide {{name}} por ti",
-    "guidancePlaceholder": "Cómo decide {{name}} por ti (opcional). Ej.: nada de agentes duplicados.",
+    "guidanceHelp": "{{name}} lo lee antes de decidir. Opcional.",
+    "guidancePlaceholder": "Ej.: nada de agentes duplicados\nSolo modelos baratos para agentes nuevos\nNunca en canales de clientes",
     "paused": "En pausa: deshiciste 3 de sus decisiones esta semana. Vuelve a activarlo cuando quieras.",
     "card": {
       "deciding": "{{name}} lo está analizando en nombre de {{for}}…",

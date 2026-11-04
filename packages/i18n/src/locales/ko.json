@@ -1169,7 +1169,8 @@
     "budgetHelp": "그 이상이면 요청이 나에게 와요.",
     "perMonth": "/월",
     "guidanceLabel": "{{name}}이(가) 나 대신 결정하는 방법",
-    "guidancePlaceholder": "{{name}}이(가) 나 대신 결정하는 방법 (선택). 예: 중복 에이전트는 안 돼요.",
+    "guidanceHelp": "{{name}}이(가) 결정하기 전에 이 내용을 읽어요. 선택 사항이에요.",
+    "guidancePlaceholder": "예: 중복 에이전트는 안 돼요\n새 에이전트에는 저렴한 모델만\n고객 채널에는 절대 안 돼요",
     "paused": "일시 중지됨: 이번 주에 결정을 3번 되돌렸어요. 원할 때 다시 켜세요.",
     "card": {
       "deciding": "{{name}}이(가) {{for}} 대신 검토하고 있어요…",

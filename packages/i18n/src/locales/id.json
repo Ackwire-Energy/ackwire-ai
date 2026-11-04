@@ -1169,7 +1169,8 @@
     "budgetHelp": "Di atas itu, permintaan diteruskan kepadamu.",
     "perMonth": "/bulan",
     "guidanceLabel": "Cara {{name}} memutuskan untukmu",
-    "guidancePlaceholder": "Cara {{name}} memutuskan untukmu (opsional). Mis.: jangan ada agen ganda.",
+    "guidanceHelp": "{{name}} membaca ini sebelum memutuskan. Opsional.",
+    "guidancePlaceholder": "Mis.: jangan ada agen ganda\nHanya model murah untuk agen baru\nJangan pernah di kanal pelanggan",
     "paused": "Dijeda: kamu membatalkan 3 keputusannya minggu ini. Nyalakan lagi kapan pun kamu mau.",
     "card": {
       "deciding": "{{name}} sedang meninjaunya atas nama {{for}}…",

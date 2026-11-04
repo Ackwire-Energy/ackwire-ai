@@ -1205,7 +1205,8 @@
     "budgetHelp": "Bunun üstünde istek size gelir.",
     "perMonth": "/ay",
     "guidanceLabel": "{{name}} sizin yerinize nasıl karar verir",
-    "guidancePlaceholder": "{{name}} sizin yerinize nasıl karar verir (isteğe bağlı). Ör.: aynı işi yapan ajan olmasın.",
+    "guidanceHelp": "{{name}} karar vermeden önce bunu okur. İsteğe bağlı.",
+    "guidancePlaceholder": "Ör.: aynı işi yapan ajan olmasın\nYeni ajanlara yalnızca ucuz modeller\nMüşteri kanallarına asla",
     "paused": "Duraklatıldı: bu hafta 3 kararını geri aldınız. İstediğinizde yeniden açın.",
     "card": {
       "deciding": "{{name}}, {{for}} adına inceliyor…",

@@ -34338,8 +34338,11 @@
   "rightHandApprovals.guidanceLabel": {
     "value": "How {{name}} decides for you"
   },
+  "rightHandApprovals.guidanceHelp": {
+    "value": "{{name}} reads this before deciding. Optional."
+  },
   "rightHandApprovals.guidancePlaceholder": {
-    "value": "How {{name}} decides for you (optional). E.g.: no duplicate agents."
+    "value": "E.g.: no duplicate agents\nOnly cheap models for new agents\nNever in customer channels"
   },
   "rightHandApprovals.paused": {
     "value": "Paused: you undid 3 of its decisions this week. Turn it back on when you want."

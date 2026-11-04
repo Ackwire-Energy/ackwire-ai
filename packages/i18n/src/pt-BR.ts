@@ -1215,7 +1215,9 @@ export const ptBR = {
     budgetHelp: "Acima disso, o pedido vai para você.",
     perMonth: "/mês",
     guidanceLabel: "Como {{name}} decide por você",
-    guidancePlaceholder: "Como {{name}} decide por você (opcional). Ex.: nada de agente duplicado.",
+    guidanceHelp: "{{name}} lê isto antes de decidir. Opcional.",
+    guidancePlaceholder:
+      "Ex.: nada de agente duplicado\nSó modelos baratos para agentes novos\nNunca em canais de clientes",
     paused: "Pausado: você desfez 3 decisões nesta semana. Ligue de novo quando quiser.",
     card: {
       deciding: "{{name}} está analisando em nome de {{for}}…",

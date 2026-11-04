@@ -220,9 +220,10 @@ function RightHandGroup({ view, name }: { view: RightHandApprovals; name: string
             }}
             maxLength={2000}
             minHeight={64}
-            placeholder={t("rightHandApprovals.guidancePlaceholder", { name })}
+            placeholder={t("rightHandApprovals.guidancePlaceholder")}
             accessibilityLabel={t("rightHandApprovals.guidanceLabel", { name })}
           />
+          <GroupedFooter>{t("rightHandApprovals.guidanceHelp", { name })}</GroupedFooter>
           <View style={styles.gap} />
         </>
       ) : null}

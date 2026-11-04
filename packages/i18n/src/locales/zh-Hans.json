@@ -1169,7 +1169,8 @@
     "budgetHelp": "超过这个金额，请求会交给你。",
     "perMonth": "/月",
     "guidanceLabel": "{{name}} 如何替你决定",
-    "guidancePlaceholder": "{{name}} 如何替你决定 (可选)。例如: 不要重复的智能体。",
+    "guidanceHelp": "{{name}} 决定前会先读这些。可选。",
+    "guidancePlaceholder": "例如: 不要重复的智能体\n新智能体只用便宜的模型\n绝不进客户频道",
     "paused": "已暂停: 你本周撤销了它的 3 个决定。随时可以重新打开。",
     "card": {
       "deciding": "{{name}} 正在代 {{for}} 审阅…",

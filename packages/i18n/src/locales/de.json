@@ -1205,7 +1205,8 @@
     "budgetHelp": "Darüber geht die Anfrage an dich.",
     "perMonth": "/Monat",
     "guidanceLabel": "Wie {{name}} für dich entscheidet",
-    "guidancePlaceholder": "Wie {{name}} für dich entscheidet (optional). Z. B.: keine doppelten Agenten.",
+    "guidanceHelp": "{{name}} liest das vor jeder Entscheidung. Optional.",
+    "guidancePlaceholder": "Z. B.: keine doppelten Agenten\nNur günstige Modelle für neue Agenten\nNie in Kundenkanälen",
     "paused": "Pausiert: Du hast diese Woche 3 Entscheidungen rückgängig gemacht. Schalte es wieder ein, wann du willst.",
     "card": {
       "deciding": "{{name}} prüft es im Namen von {{for}}…",

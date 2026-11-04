@@ -1277,7 +1277,8 @@
     "budgetHelp": "Powyżej tego prośba trafia do ciebie.",
     "perMonth": "/mies.",
     "guidanceLabel": "Jak {{name}} decyduje za ciebie",
-    "guidancePlaceholder": "Jak {{name}} decyduje za ciebie (opcjonalnie). Np.: bez zdublowanych agentów.",
+    "guidanceHelp": "{{name}} czyta to przed każdą decyzją. Opcjonalnie.",
+    "guidancePlaceholder": "Np.: bez zdublowanych agentów\nTylko tanie modele dla nowych agentów\nNigdy na kanałach klientów",
     "paused": "Wstrzymano: w tym tygodniu cofnięto 3 decyzje. Włącz ponownie, kiedy zechcesz.",
     "card": {
       "deciding": "{{name}} sprawdza to w imieniu: {{for}}…",

@@ -1218,7 +1218,8 @@ export const en = {
     budgetHelp: "Above that, the request goes to you.",
     perMonth: "/month",
     guidanceLabel: "How {{name}} decides for you",
-    guidancePlaceholder: "How {{name}} decides for you (optional). E.g.: no duplicate agents.",
+    guidanceHelp: "{{name}} reads this before deciding. Optional.",
+    guidancePlaceholder: "E.g.: no duplicate agents\nOnly cheap models for new agents\nNever in customer channels",
     paused: "Paused: you undid 3 of its decisions this week. Turn it back on when you want.",
     card: {
       deciding: "{{name}} is looking at it for {{for}}…",

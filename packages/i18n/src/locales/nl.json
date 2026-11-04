@@ -1205,7 +1205,8 @@
     "budgetHelp": "Daarboven gaat het verzoek naar jou.",
     "perMonth": "/maand",
     "guidanceLabel": "Hoe {{name}} voor je beslist",
-    "guidancePlaceholder": "Hoe {{name}} voor je beslist (optioneel). Bijv.: geen dubbele agents.",
+    "guidanceHelp": "{{name}} leest dit voor elke beslissing. Optioneel.",
+    "guidancePlaceholder": "Bijv.: geen dubbele agents\nAlleen goedkope modellen voor nieuwe agents\nNooit in klantkanalen",
     "paused": "Gepauzeerd: je hebt deze week 3 beslissingen ongedaan gemaakt. Zet het weer aan wanneer je wilt.",
     "card": {
       "deciding": "{{name}} bekijkt het namens {{for}}…",

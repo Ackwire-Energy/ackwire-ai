@@ -1241,7 +1241,8 @@
     "budgetHelp": "Au-delà, la demande vous revient.",
     "perMonth": "/mois",
     "guidanceLabel": "Comment {{name}} décide pour vous",
-    "guidancePlaceholder": "Comment {{name}} décide pour vous (facultatif). Ex. : pas d'agent en double.",
+    "guidanceHelp": "{{name}} le lit avant de décider. Facultatif.",
+    "guidancePlaceholder": "Ex. : pas d'agent en double\nDes modèles bon marché pour les nouveaux agents\nJamais dans les canaux clients",
     "paused": "En pause : vous avez annulé 3 de ses décisions cette semaine. Réactivez-le quand vous voulez.",
     "card": {
       "deciding": "{{name}} l'examine au nom de {{for}}…",

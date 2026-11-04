@@ -1241,7 +1241,8 @@
     "budgetHelp": "Oltre, la richiesta passa a te.",
     "perMonth": "/mese",
     "guidanceLabel": "Come {{name}} decide per te",
-    "guidancePlaceholder": "Come {{name}} decide per te (facoltativo). Es.: niente agenti duplicati.",
+    "guidanceHelp": "{{name}} lo legge prima di decidere. Facoltativo.",
+    "guidancePlaceholder": "Es.: niente agenti duplicati\nSolo modelli economici per i nuovi agenti\nMai nei canali dei clienti",
     "paused": "In pausa: hai annullato 3 sue decisioni questa settimana. Riattivalo quando vuoi.",
     "card": {
       "deciding": "{{name}} lo sta valutando per conto di {{for}}…",

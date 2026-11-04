@@ -93,6 +93,12 @@ describe("Configurações › Você › Aprovações: the right hand (ADR 0139 �
     expect(last(state, "approvals.setRightHand")).toEqual([ORG_ID, { budgetCapNanoUsd: 30_000_000_000 }]);
 
     const guidance = within(card).getByRole("textbox", { name: "Como Lodi decide por você" });
+    const guidanceRow = guidance.closest(".settings-row") as HTMLElement;
+    expect(guidanceRow).not.toBe(budget.closest(".settings-row"));
+    expect(within(guidanceRow).queryByRole("textbox", { name: "Orçamento a mais, por agente" })).toBeNull();
+    expect(guidance.getAttribute("aria-describedby")).toBe("rh-guidance-help");
+    expect(within(guidanceRow).getByText("Lodi lê isto antes de decidir. Opcional.")).toBeTruthy();
+    expect(guidance.getAttribute("placeholder")).toContain("Ex.: nada de agente duplicado\n");
     await act(async () => {
       fireEvent.change(guidance, { target: { value: "Nada de agente duplicado." } });
       fireEvent.blur(guidance);
