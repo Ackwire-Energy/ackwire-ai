@@ -15,7 +15,7 @@ export function useOpenBilling(orgId: string, from: BillingFrom) {
   const { t } = useTranslation();
   const api = useApi();
   const toast = useToast();
-  const here = useRouterState({ select: (s) => s.location.href });
+  const here = useRouterState({ select: (s) => s.location.pathname });
   return useMutation({
     mutationFn: () => api.orgs.billingLink(orgId, from, here),
     onSuccess: ({ url }) => navigateAway(url),

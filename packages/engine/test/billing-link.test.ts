@@ -161,8 +161,10 @@ describe("mintBillingLink", () => {
           })
         ).url,
       ).return;
-    // The upload that hit the limit, in a channel: back to that channel, its thread open.
-    expect(await back("upload_full", `${org}/c/abc?thread=m-1`)).toBe(`${org}/c/abc?thread=m-1`);
+    // The upload that hit the limit, in a channel: back to that channel. The billing service takes a bare path only
+    // (it adds `?paid=1`), so the page's search and hash stay behind.
+    const channel = `${org}/c/0b6f4c1e-8d2a-4f3b-9c7e-5a1d2e3f4a5b`;
+    expect(await back("upload_full", `${channel}?thread=m-1#x`)).toBe(channel);
     expect(await back("hold", `${org}/settings/members`)).toBe(`${org}/settings/members`);
     // Another workspace, another host, the onboarding outside any workspace, or a path that only starts like it.
     expect(await back("upload_full", "/org/someone-else/c/abc")).toBe(org);
@@ -171,6 +173,9 @@ describe("mintBillingLink", () => {
     expect(await back("onboarding", "/onboarding")).toBe(`${org}/onboarding`);
     expect(await back("settings", `${org}x/c/abc`)).toBe(`${org}/settings/billing`);
     expect(await back("settings", `${org}/c/a\\b`)).toBe(`${org}/settings/billing`);
+    // A shape the billing service would refuse the whole link over: the default instead.
+    expect(await back("settings", `${org}/wiki/Café`)).toBe(`${org}/settings/billing`);
+    expect(await back("settings", `${org}/c/a b`)).toBe(`${org}/settings/billing`);
   });
 
   test("usage counts the files on this server's storage; on the workspace's own bucket, none", async () => {

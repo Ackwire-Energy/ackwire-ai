@@ -75,10 +75,14 @@ const RETURN_TO: Partial<Record<BillingFrom, string>> = {
 
 /**
  * The page the person opened the link from (`returnTo`), when it is one of this workspace's: they land back there,
- * not on the entry point's default. Never another workspace or host.
+ * not on the entry point's default. Never another workspace or host. The billing service refuses the whole link
+ * unless `return` is `/org/<uuid>` plus lowercase path segments (no search, no hash; it adds `?paid=1` itself), so
+ * the page's search and hash are dropped and any other shape falls back to the default.
  */
-const placeIn = (orgId: string, path: string | undefined) =>
-  path !== undefined && path.length <= 500 && path.startsWith(`/org/${orgId}/`) && !/[\\\s]/.test(path) ? path : null;
+const placeIn = (orgId: string, returnTo: string | undefined) => {
+  const path = returnTo?.split(/[?#]/)[0];
+  return path?.startsWith(`/org/${orgId}/`) && /^\/org\/[0-9a-f-]{36}(\/[a-z0-9/-]*)?$/.test(path) ? path : null;
+};
 
 /**
  * What a workspace holds, for the billing service's pages (ADR 0079 §3): workspace-wide counts, never a name, a word of

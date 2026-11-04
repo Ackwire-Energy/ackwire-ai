@@ -32,7 +32,7 @@ export function billingRoutes(deps: AppDeps) {
               .openapi({ description: "Where in the app it was opened: the billing service opens on that." }),
             returnTo: z.string().max(500).optional().openapi({
               description:
-                "The page it was opened from (a path in this workspace, `/org/{orgId}/…`): the billing service sends the person back there instead of the entry point's default. Anything else is ignored.",
+                "The page it was opened from (a path in this workspace, `/org/{orgId}/…`): the billing service sends the person back there instead of the entry point's default, its search and hash dropped. Anything else is ignored.",
             }),
           }),
         ),
