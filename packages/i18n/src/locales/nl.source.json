@@ -31415,6 +31415,9 @@
   "desktop.ask.working": {
     "value": "{{name}} pauses while you’re in control."
   },
+  "desktop.ask.titleBrowser": {
+    "value": "Take over the browser?"
+  },
   "desktop.sub.control": {
     "value": "You're in control · {{name}} waits"
   },
@@ -31438,6 +31441,9 @@
   },
   "desktop.takeover": {
     "value": "Take control"
+  },
+  "desktop.takeBrowser": {
+    "value": "Take over the browser"
   },
   "desktop.taking": {
     "value": "Taking control…"
@@ -31580,6 +31586,15 @@
   "desktop.use.agent": {
     "value": "{{name}} can't use apps on his screen on {{computer}} yet.",
     "female": "{{name}} can't use apps on her screen on {{computer}} yet."
+  },
+  "desktop.browserOnly.title": {
+    "value": "You're in the browser, not the whole computer"
+  },
+  "desktop.browserOnly.plan": {
+    "value": "{{name}} thinks with the owner's plan, so only the owner controls the whole computer"
+  },
+  "desktop.browserOnly.other": {
+    "value": "You can control {{name}}'s browser, not the whole computer"
   },
   "agentComputer.title": {
     "value": "{{name}}'s computer"

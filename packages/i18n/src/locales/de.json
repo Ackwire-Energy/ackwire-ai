@@ -13158,7 +13158,8 @@
     "ask": {
       "watching": "Du schaust nur zu.",
       "title": "Steuerung übernehmen?",
-      "working": "{{name}} pausiert, solange du die Steuerung hast."
+      "working": "{{name}} pausiert, solange du die Steuerung hast.",
+      "titleBrowser": "Browser übernehmen?"
     },
     "sub": {
       "control": "Du hast die Steuerung · {{name}} wartet",
@@ -13172,6 +13173,7 @@
     },
     "retry": "Erneut versuchen",
     "takeover": "Steuerung übernehmen",
+    "takeBrowser": "Browser übernehmen",
     "taking": "Steuerung wird übernommen…",
     "clipboard": {
       "got": "Auf dem Computer von {{name}} kopiert:",
@@ -13239,6 +13241,11 @@
       "linuxOnly": "Agenten nutzen Apps auf eigenen Bildschirmen nur auf Linux-Computern.",
       "agent": "{{name}} kann auf {{computer}} noch keine Apps auf seinem Bildschirm nutzen.",
       "agent_female": "{{name}} kann auf {{computer}} noch keine Apps auf ihrem Bildschirm nutzen."
+    },
+    "browserOnly": {
+      "title": "Du bist im Browser, nicht auf dem ganzen Computer",
+      "plan": "{{name}} denkt mit dem Abo der Person, der der Agent gehört, deshalb steuert nur sie den ganzen Computer",
+      "other": "Du kannst den Browser von {{name}} steuern, nicht den ganzen Computer"
     }
   },
   "agentComputer": {

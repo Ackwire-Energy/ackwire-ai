@@ -13322,7 +13322,8 @@
     "ask": {
       "watching": "Je kijkt alleen mee.",
       "title": "Wil je de controle overnemen?",
-      "working": "{{name}} pauzeert zolang jij de controle hebt."
+      "working": "{{name}} pauzeert zolang jij de controle hebt.",
+      "titleBrowser": "Wil je de browser overnemen?"
     },
     "sub": {
       "control": "Jij hebt de controle · {{name}} wacht",
@@ -13338,6 +13339,7 @@
     },
     "retry": "Opnieuw proberen",
     "takeover": "Controle overnemen",
+    "takeBrowser": "Browser overnemen",
     "taking": "Controle overnemen…",
     "clipboard": {
       "got": "Gekopieerd op de computer van {{name}}:",
@@ -13417,6 +13419,11 @@
       "linuxOnly": "Agents gebruiken apps op hun eigen scherm alleen op Linux-computers.",
       "agent": "{{name}} kan nog geen apps op zijn scherm gebruiken op {{computer}}.",
       "agent_female": "{{name}} kan nog geen apps op haar scherm gebruiken op {{computer}}."
+    },
+    "browserOnly": {
+      "title": "Je zit in de browser, niet op de hele computer",
+      "plan": "{{name}} denkt met het abonnement van de eigenaar, dus alleen die bedient de hele computer",
+      "other": "Je kunt de browser van {{name}} bedienen, niet de hele computer"
     }
   },
   "agentComputer": {

@@ -299,7 +299,7 @@ export function AgentScreen({
     <Button
       variant="secondary"
       size="sm"
-      label={t("browser.watch.takeover")}
+      label={status?.canControl ? t("browser.watch.takeover") : t("desktop.takeBrowser")}
       loading={taking}
       onPress={() => void take()}
     />

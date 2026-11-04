@@ -1,6 +1,7 @@
 import type { DesktopMode, DesktopViewState, Edition, Machine } from "@agenteschat/client";
 import {
   ApiError,
+  browserOnlyWhy,
   DESKTOP_CLOSE,
   desktopCloseState,
   desktopMode,
@@ -384,6 +385,10 @@ export function DesktopView({
   const live = shown === "live";
   const offer = live && !inControl && !taking && !head?.full && !s?.controllerUserId && canTakeOver;
   const mayTake = Boolean(s?.canControl || onTakeBrowser);
+  // Only the browser is theirs to drive here: the button and the question say so, and why.
+  const browserOnly = !s?.canControl && Boolean(onTakeBrowser);
+  const takeLabel = t(browserOnly ? "desktop.takeBrowser" : "desktop.takeover");
+  const whyBrowser = browserOnly ? t(browserOnlyWhy(s), g) : undefined;
   useEffect(() => {
     if (!offer) setAsking(false);
   }, [offer]);
@@ -558,8 +563,9 @@ export function DesktopView({
           className="cmp-take"
           loading={actions.takeover.isPending}
           onClick={s?.canControl ? takeover : onTakeBrowser}
+          title={whyBrowser}
         >
-          <span className="cmp-act-label">{t("desktop.takeover")}</span>
+          <span className="cmp-act-label">{takeLabel}</span>
         </Button>
       )}
     </>
@@ -656,8 +662,8 @@ export function DesktopView({
             className="dsk-ask"
             color={color}
             icon={mayTake ? "person" : "eye"}
-            text={t(mayTake ? "desktop.ask.title" : "desktop.ask.watching")}
-            help={mayTake && working ? t("desktop.ask.working", g) : undefined}
+            text={t(!mayTake ? "desktop.ask.watching" : browserOnly ? "desktop.ask.titleBrowser" : "desktop.ask.title")}
+            help={whyBrowser ?? (mayTake && working ? t("desktop.ask.working", g) : undefined)}
             onDismiss={dismissAsk}
             action={
               mayTake ? (
@@ -672,7 +678,7 @@ export function DesktopView({
                     else onTakeBrowser?.();
                   }}
                 >
-                  {t("desktop.takeover")}
+                  {takeLabel}
                 </Button>
               ) : undefined
             }

@@ -13090,7 +13090,8 @@
     "ask": {
       "watching": "Yalnızca izliyorsunuz.",
       "title": "Kontrolü almak ister misiniz?",
-      "working": "Kontrol sizdeyken {{name}} duraklar."
+      "working": "Kontrol sizdeyken {{name}} duraklar.",
+      "titleBrowser": "Tarayıcıyı devralmak ister misiniz?"
     },
     "sub": {
       "control": "Kontrol sizde · {{name}} bekliyor",
@@ -13104,6 +13105,7 @@
     },
     "retry": "Tekrar dene",
     "takeover": "Kontrolü al",
+    "takeBrowser": "Tarayıcıyı devral",
     "taking": "Kontrol alınıyor…",
     "clipboard": {
       "got": "{{name}} bilgisayarında kopyalandı:",
@@ -13171,6 +13173,11 @@
       "linuxOnly": "Ajanlar kendi ekranlarında uygulamaları yalnızca Linux bilgisayarlarda kullanır.",
       "agent": "{{name}}, {{computer}} üzerinde kendi ekranındaki uygulamaları henüz kullanamıyor.",
       "agent_female": "{{name}}, {{computer}} üzerinde kendi ekranındaki uygulamaları henüz kullanamıyor."
+    },
+    "browserOnly": {
+      "title": "Tüm bilgisayarda değil, tarayıcıdasınız",
+      "plan": "{{name}} sahibinin planıyla düşünüyor, bu yüzden tüm bilgisayarı yalnızca sahibi kontrol eder",
+      "other": "{{name}} adlı ajanın tarayıcısını kontrol edebilirsiniz, tüm bilgisayarı değil"
     }
   },
   "agentComputer": {

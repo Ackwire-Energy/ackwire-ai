@@ -6470,6 +6470,11 @@ export interface DesktopStatus {
   viewers: number;
   /** This person may take control. */
   canControl: boolean;
+  /**
+   * Why not: `pairer` (only who connected the computer), `owner_plan` (only the agent's owner while it thinks with
+   * their plan), `not_allowed` (neither an admin nor its owner). Absent from older servers.
+   */
+  controlRefusal?: "pairer" | "owner_plan" | "not_allowed" | null;
   /** The agent is held, or the workspace is on hold: people watch, nobody takes control. */
   held: boolean;
 }

@@ -12871,7 +12871,8 @@
     "ask": {
       "watching": "你只是在观看。",
       "title": "要接管控制吗？",
-      "working": "你控制期间，{{name}} 会暂停。"
+      "working": "你控制期间，{{name}} 会暂停。",
+      "titleBrowser": "要接管浏览器吗？"
     },
     "sub": {
       "control": "由你控制 · {{name}} 等待中",
@@ -12887,6 +12888,7 @@
     },
     "retry": "重试",
     "takeover": "接管控制",
+    "takeBrowser": "接管浏览器",
     "taking": "正在接管控制…",
     "clipboard": {
       "got": "在 {{name}} 的电脑上复制了：",
@@ -12966,6 +12968,11 @@
       "linuxOnly": "智能体只能在 Linux 电脑上使用自己屏幕上的应用。",
       "agent": "{{name}} 还不能在 {{computer}} 上使用他屏幕上的应用。",
       "agent_female": "{{name}} 还不能在 {{computer}} 上使用她屏幕上的应用。"
+    },
+    "browserOnly": {
+      "title": "你控制的是浏览器，不是整台电脑",
+      "plan": "{{name}} 使用其所有者的套餐思考，因此只有所有者能控制整台电脑",
+      "other": "你可以控制 {{name}} 的浏览器，但不能控制整台电脑"
     }
   },
   "agentComputer": {

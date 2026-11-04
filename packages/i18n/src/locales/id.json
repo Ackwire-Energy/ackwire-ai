@@ -12807,7 +12807,8 @@
     "ask": {
       "watching": "Kamu hanya menonton.",
       "title": "Mau ambil kendali?",
-      "working": "{{name}} berhenti sejenak selama kamu yang mengendalikan."
+      "working": "{{name}} berhenti sejenak selama kamu yang mengendalikan.",
+      "titleBrowser": "Mau ambil alih browser?"
     },
     "sub": {
       "control": "Kamu yang mengendalikan · {{name}} menunggu",
@@ -12823,6 +12824,7 @@
     },
     "retry": "Coba lagi",
     "takeover": "Ambil kendali",
+    "takeBrowser": "Ambil alih browser",
     "taking": "Mengambil kendali…",
     "clipboard": {
       "got": "Disalin di komputer {{name}}:",
@@ -12902,6 +12904,11 @@
       "linuxOnly": "Agen hanya bisa memakai aplikasi di layarnya sendiri pada komputer Linux.",
       "agent": "{{name}} belum bisa memakai aplikasi di layarnya di {{computer}}.",
       "agent_female": "{{name}} belum bisa memakai aplikasi di layarnya di {{computer}}."
+    },
+    "browserOnly": {
+      "title": "Kamu di browser, bukan di seluruh komputer",
+      "plan": "{{name}} berpikir dengan paket pemiliknya, jadi hanya pemiliknya yang mengendalikan seluruh komputer",
+      "other": "Kamu bisa mengendalikan browser {{name}}, bukan seluruh komputer"
     }
   },
   "agentComputer": {

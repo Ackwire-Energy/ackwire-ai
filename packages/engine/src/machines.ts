@@ -226,8 +226,24 @@ export function drivesComputer(
   person: { userId: string; admin: boolean; owner: boolean },
   signIn = false,
 ) {
-  if (machine.executors?.mode === "system") return person.owner || (person.admin && !signIn);
-  return machine.pairedByUserId === person.userId;
+  return driveRefusal(machine, person, signIn) === null;
+}
+
+/**
+ * Why a person may not drive the computer (`drivesComputer`), null when they may: `pairer` (not the person who
+ * paired a computer outside system mode), `owner_plan` (an admin while the agent's user holds its owner's
+ * sign-in), `not_allowed` (neither an admin nor the agent's owner).
+ */
+export type DriveRefusal = "pairer" | "owner_plan" | "not_allowed";
+export function driveRefusal(
+  machine: Pick<MachineRow, "pairedByUserId" | "executors">,
+  person: { userId: string; admin: boolean; owner: boolean },
+  signIn = false,
+): DriveRefusal | null {
+  if (machine.executors?.mode !== "system") return machine.pairedByUserId === person.userId ? null : "pairer";
+  if (person.owner) return null;
+  if (!person.admin) return "not_allowed";
+  return signIn ? "owner_plan" : null;
 }
 
 /**
@@ -264,6 +280,21 @@ export async function requireComputerDriver(
   orgId: string,
   agentId: string,
 ): Promise<MachineRow> {
+  const { machine, refusal } = await computerDriving(db, userId, orgId, agentId);
+  if (refusal) {
+    throw new ForbiddenError(
+      refusal === "pairer"
+        ? "Only the person who connected this computer can use it as the agent"
+        : refusal === "owner_plan"
+          ? "Only the agent's owner can use its computer as the agent while it thinks with their plan"
+          : "Only admins and the agent's owner can use its computer as the agent",
+    );
+  }
+  return machine;
+}
+
+/** The agent's computer and why this person may not drive it (`driveRefusal`), null when they may. */
+export async function computerDriving(db: Database, userId: string, orgId: string, agentId: string) {
   const membership = await requireActiveMembership(db, userId, orgId);
   const [agent] = await db
     .select({
@@ -278,17 +309,7 @@ export async function requireComputerDriver(
   const machine = agent.machineId ? await getMachine(db, orgId, agent.machineId) : null;
   if (!machine) throw new NotFoundError("This agent has no computer");
   const person = { userId, admin: can(membership, "control_computers"), owner: agent.owner === userId };
-  const signIn = lentAccount(agent) !== null;
-  if (!drivesComputer(machine, person, signIn)) {
-    throw new ForbiddenError(
-      machine.executors?.mode !== "system"
-        ? "Only the person who connected this computer can use it as the agent"
-        : signIn
-          ? "Only the agent's owner can use its computer as the agent while it thinks with their plan"
-          : "Only admins and the agent's owner can use its computer as the agent",
-    );
-  }
-  return machine;
+  return { machine, refusal: driveRefusal(machine, person, lentAccount(agent) !== null) };
 }
 
 /**

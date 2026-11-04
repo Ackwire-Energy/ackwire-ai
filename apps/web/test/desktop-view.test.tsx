@@ -350,6 +350,31 @@ function screenPixels() {
 const waitLooks = () => act(async () => new Promise((r) => setTimeout(r, 260)));
 
 describe("the agent's screen in the computer dialog", () => {
+  test("an admin who may drive the browser but not the whole computer: the button and the page say browser, and why", async () => {
+    // The Cloud's computer in system mode, Ada on her owner's plan: only her owner drives the screen (ADR 0059 §8).
+    const b = await backend({ ...RUNNING, canControl: false, controlRefusal: "owner_plan" }, true);
+    b.state.scopes[ADA_ID] = [...(b.state.scopes[ADA_ID] ?? []), { connectionId: null, scope: "browser:use" }];
+    b.fake.settings.set(ADA_ID, { allowedDomains: null, available: true, reason: null, detail: null, machine: null });
+    const ada = b.state.agents.find((a) => a.id === ADA_ID) as Agent;
+    await renderPage(<ComputerDialog agent={ada} open onClose={() => {}} />, {
+      api: b.api,
+      org: true,
+      createSocket: b.sockets.factory,
+    });
+    await settle(8);
+    await connected();
+    const why = "A\u00a0Ada pensa com o plano de quem é dona dela, então só essa pessoa controla o computador inteiro";
+    expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
+    const take = view().getByRole("button", { name: "Assumir o navegador" });
+    expect(take.getAttribute("title")).toBe(why);
+    await click(take);
+    // The browser's take over, never the screen's: the screen's would be refused.
+    expect(calls(b, "browser.takeover")).toEqual([[ORG_ID, ADA_ID]]);
+    await settle(8);
+    const banner = document.querySelector(".cmp-banner[data-tone=info]") as HTMLElement;
+    expect(banner.textContent).toBe(`Você está no navegador, não no computador inteiro${why}`);
+  });
+
   test("watching: a socket of its own in binary, view-only at quality 3, scaled; live once noVNC connects", async () => {
     const t = await dialog();
     expect(t.sockets.desktops).toHaveLength(1);

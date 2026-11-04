@@ -13000,6 +13000,7 @@ export const ptBR = {
       title: "Quer assumir o controle?",
       working: "O\u00a0{{name}} pausa enquanto você está no controle.",
       working_female: "A\u00a0{{name}} pausa enquanto você está no controle.",
+      titleBrowser: "Quer assumir o navegador?",
     },
     sub: {
       control: "Você no controle · o\u00a0{{name}} espera",
@@ -13015,6 +13016,8 @@ export const ptBR = {
     },
     retry: "Tentar de novo",
     takeover: "Assumir o controle",
+    /** Where this person may drive the agent's browser but not its whole computer (`controlRefusal`). */
+    takeBrowser: "Assumir o navegador",
     /** Over the last picture while control opens. */
     taking: "Assumindo o controle…",
     clipboard: {
@@ -13101,6 +13104,15 @@ export const ptBR = {
       linuxOnly: "Os agentes só usam apps na própria tela em computadores Linux.",
       agent: "O {{name}} ainda não consegue usar apps na própria tela no {{computer}}.",
       agent_female: "A {{name}} ainda não consegue usar apps na própria tela no {{computer}}.",
+    },
+    /** In control of the browser alone on a computer with a screen, and why the whole computer isn't theirs. */
+    browserOnly: {
+      title: "Você está no navegador, não no computador inteiro",
+      plan: "O\u00a0{{name}} pensa com o plano de quem é dono dele, então só essa pessoa controla o computador inteiro",
+      plan_female:
+        "A\u00a0{{name}} pensa com o plano de quem é dona dela, então só essa pessoa controla o computador inteiro",
+      other: "Você controla o navegador do\u00a0{{name}}, não o computador inteiro",
+      other_female: "Você controla o navegador da\u00a0{{name}}, não o computador inteiro",
     },
   },
   agentComputer: {

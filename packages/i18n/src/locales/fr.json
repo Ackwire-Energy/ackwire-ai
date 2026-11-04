@@ -13725,7 +13725,8 @@
     "ask": {
       "watching": "Vous regardez seulement.",
       "title": "Prendre le contrôle ?",
-      "working": "{{name}} se met en pause pendant que vous avez le contrôle."
+      "working": "{{name}} se met en pause pendant que vous avez le contrôle.",
+      "titleBrowser": "Prendre le navigateur ?"
     },
     "sub": {
       "control": "Vous avez le contrôle · {{name}} attend",
@@ -13741,6 +13742,7 @@
     },
     "retry": "Réessayer",
     "takeover": "Prendre le contrôle",
+    "takeBrowser": "Prendre le navigateur",
     "taking": "Prise de contrôle…",
     "clipboard": {
       "got": "Copié sur l'ordinateur de {{name}} :",
@@ -13820,6 +13822,11 @@
       "linuxOnly": "Les agents n'utilisent des applications sur leurs propres écrans que sur les ordinateurs Linux.",
       "agent": "{{name}} ne peut pas encore utiliser d'applications sur son écran sur {{computer}}.",
       "agent_female": "{{name}} ne peut pas encore utiliser d'applications sur son écran sur {{computer}}."
+    },
+    "browserOnly": {
+      "title": "Vous êtes dans le navigateur, pas sur tout l'ordinateur",
+      "plan": "{{name}} réfléchit avec l'abonnement de son propriétaire, donc seule cette personne contrôle tout l'ordinateur",
+      "other": "Vous pouvez contrôler le navigateur de {{name}}, pas tout l'ordinateur"
     }
   },
   "agentComputer": {

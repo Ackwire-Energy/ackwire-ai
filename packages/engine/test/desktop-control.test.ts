@@ -288,6 +288,11 @@ describe("one person in control of the desktop", () => {
         .where(eq(schema.agents.id, f.agent.id));
     await onPlan(true);
     await expect(requireComputerDriver(f.db, bia.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+    // The apps say why, and offer the admin the agent's browser instead.
+    expect(await desktopStatus({ db: f.db }, bia.id, f.org.id, f.agent.id)).toMatchObject({
+      canControl: false,
+      controlRefusal: "owner_plan",
+    });
     await expect(startTakeover(deps(), bia.id, f.org.id, f.agent.id, null, "desktop")).rejects.toBeInstanceOf(
       ForbiddenError,
     );
@@ -615,9 +620,14 @@ describe("the desktop's REST and keep-alive", () => {
       handoff: null,
       viewers: 0,
       canControl: true,
+      controlRefusal: null,
       held: false,
     });
-    expect(await desktopStatus(rest, caio.id, f.org.id, f.agent.id)).toMatchObject({ canControl: false, held: false });
+    expect(await desktopStatus(rest, caio.id, f.org.id, f.agent.id)).toMatchObject({
+      canControl: false,
+      controlRefusal: "pairer",
+      held: false,
+    });
     expect(new Set(requests.map((r) => r.op))).toEqual(new Set(["desktop.session.status"]));
 
     // Held, the agent or its workspace: people still watch.

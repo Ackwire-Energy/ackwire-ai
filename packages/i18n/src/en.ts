@@ -12704,6 +12704,7 @@ export const en = {
       watching: "You're just watching.",
       title: "Want to take control?",
       working: "{{name}} pauses while you’re in control.",
+      titleBrowser: "Take over the browser?",
     },
     sub: {
       control: "You're in control · {{name}} waits",
@@ -12717,6 +12718,8 @@ export const en = {
     },
     retry: "Try again",
     takeover: "Take control",
+    /** Where this person may drive the agent's browser but not its whole computer (`controlRefusal`). */
+    takeBrowser: "Take over the browser",
     /** Over the last picture while control opens. */
     taking: "Taking control…",
     clipboard: {
@@ -12791,6 +12794,12 @@ export const en = {
       linuxOnly: "Agents use apps on their own screens only on Linux computers.",
       agent: "{{name}} can't use apps on his screen on {{computer}} yet.",
       agent_female: "{{name}} can't use apps on her screen on {{computer}} yet.",
+    },
+    /** In control of the browser alone on a computer with a screen, and why the whole computer isn't theirs. */
+    browserOnly: {
+      title: "You're in the browser, not the whole computer",
+      plan: "{{name}} thinks with the owner's plan, so only the owner controls the whole computer",
+      other: "You can control {{name}}'s browser, not the whole computer",
     },
   },
   agentComputer: {

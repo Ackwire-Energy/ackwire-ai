@@ -113,6 +113,12 @@ export function desktopMode(status: Pick<DesktopStatus, "handoff">, userId: stri
     : "watch";
 }
 
+/** Why this person drives only the agent's browser, not its whole computer (`controlRefusal`), as its words' key. */
+export const browserOnlyWhy = (status: Pick<DesktopStatus, "controlRefusal"> | null | undefined) =>
+  status?.controlRefusal === "owner_plan"
+    ? ("desktop.browserOnly.plan" as const)
+    : ("desktop.browserOnly.other" as const);
+
 /** Waits between tries to open the screen again: 1 s, then up to 10 s. */
 const RETRY_MS = [1000, 2000, 5000, 10_000];
 export const desktopRetryMs = (attempt: number) => RETRY_MS[Math.min(attempt, RETRY_MS.length - 1)] ?? 10_000;
