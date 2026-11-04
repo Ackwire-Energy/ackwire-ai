@@ -3578,6 +3578,7 @@
       "text": "Ce qui sera publié",
       "textDone": "Ce qui a été publié",
       "values": "Ce qui sera fait",
+      "valuesDone": "Ce qui a été fait",
       "more": "Tout afficher",
       "less": "Afficher moins",
       "trail": "Comment on en est arrivé là",

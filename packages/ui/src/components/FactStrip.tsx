@@ -24,7 +24,10 @@ export function FactStrip({ facts, className, ...rest }: { facts: Fact[] } & HTM
   return (
     <dl className={cx("ac-facts", className)} {...rest}>
       {facts.map((f) => (
-        <div key={f.key} className={cx("ac-facts__item", f.tone && f.tone !== "neutral" && `ac-facts__item--${f.tone}`)}>
+        <div
+          key={f.key}
+          className={cx("ac-facts__item", f.tone && f.tone !== "neutral" && `ac-facts__item--${f.tone}`)}
+        >
           <span className="ac-facts__icon" aria-hidden="true">
             {typeof f.icon === "string" ? <Icon name={f.icon as IconName} size={16} /> : f.icon}
           </span>

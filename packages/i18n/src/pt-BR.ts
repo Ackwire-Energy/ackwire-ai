@@ -3475,6 +3475,7 @@ export const ptBR = {
       text: "O que vai ser publicado",
       textDone: "O que foi publicado",
       values: "O que vai fazer",
+      valuesDone: "O que fez",
       more: "Ver inteiro",
       less: "Mostrar menos",
       trail: "Como chegou aqui",

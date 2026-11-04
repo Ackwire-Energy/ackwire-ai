@@ -34568,5 +34568,8 @@
   },
   "approvals.review.grants": {
     "value": "{{name}} will {{doing}}, this once, with these values."
+  },
+  "approvals.review.valuesDone": {
+    "value": "What it did"
   }
 }

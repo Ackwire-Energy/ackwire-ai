@@ -220,6 +220,13 @@ export function ApprovalsPage() {
   const selectedId = openId && order.includes(openId) ? openId : (order[0] ?? null);
   const selected = all.find((a) => a.id === selectedId) ?? null;
   const cardOf = new Map(approvalCards(shownOpen).flatMap((items) => items.map((a) => [a.id, items] as const)));
+  // A newly opened request starts at its top, not where the last one was scrolled to.
+  useEffect(() => {
+    if (!selectedId) return;
+    const pane = document.querySelector<HTMLElement>(".ap-review");
+    if (pane && pane.getBoundingClientRect().top < 0) pane.scrollIntoView?.({ block: "start" });
+  }, [selectedId]);
+  const selectedCard = selected ? cardOf.get(selected.id) : undefined;
   const select = (id: string) => {
     if (id !== selectedId) setRefusing(null);
     setOpenId(id);
@@ -239,7 +246,9 @@ export function ApprovalsPage() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const key = e.key.toLowerCase();
       const inList = Boolean(el?.closest(".ap-list"));
-      const step = key === "j" || (inList && e.key === "ArrowDown") ? 1 : key === "k" || (inList && e.key === "ArrowUp") ? -1 : 0;
+      const down = key === "j" || (inList && e.key === "ArrowDown");
+      const up = key === "k" || (inList && e.key === "ArrowUp");
+      const step = down ? 1 : up ? -1 : 0;
       if (e.key === "Escape") {
         if (refusing) setRefusing(null);
       } else if (e.key === "/") {
@@ -344,7 +353,8 @@ export function ApprovalsPage() {
           shownOpen.length === 0 &&
           !query &&
           commands === 0 &&
-          !missionWaiting && (
+          !missionWaiting &&
+          shownDecided.length === 0 && (
             <EmptyState sky title={t("approvals.emptyTitle")}>
               <HelpLink slug="approvals">{t("approvals.how")}</HelpLink>
             </EmptyState>
@@ -458,7 +468,7 @@ export function ApprovalsPage() {
                   refusing={refusing === selected.id}
                   onRefuse={() => setRefusing(selected.id)}
                   onCancelRefuse={() => setRefusing(null)}
-                  also={cardOf.get(selected.id) ? approveAlwaysAlso(cardOf.get(selected.id) ?? [], selected) : undefined}
+                  also={selectedCard ? approveAlwaysAlso(selectedCard, selected) : undefined}
                   floating
                 />
               </section>
@@ -563,7 +573,16 @@ export function ConnectorMark({ approval }: { approval: Approval }) {
  * with labels; a list shows a few as chips, the details every one, and the tool's own name and values
  * behind "Detalhes técnicos". An email shows as the email itself.
  */
-export function ExactAction({ approval, max }: { approval: Approval; max?: number }) {
+export function ExactAction({
+  approval,
+  max,
+  bare,
+}: {
+  approval: Approval;
+  max?: number;
+  /** Without the connector line and "Só lê" (the review's facts say both). */
+  bare?: boolean;
+}) {
   const { t } = useTranslation();
   // An email shows as the email itself (folded in lists, whole in the details).
   if (approval.email) return <EmailLetter email={approval.email} full={!max} />;
@@ -571,10 +590,12 @@ export function ExactAction({ approval, max }: { approval: Approval; max?: numbe
   const values = approvalValues(approval, full ? { long: true } : { max });
   return (
     <div className="ap-exact">
-      <div className="ap-exact__via">
-        <ConnectorLine approval={approval} />
-        {approvalReadsOnly(approval) && <Chip icon="eye">{t("approvals.readsOnly")}</Chip>}
-      </div>
+      {!bare && (
+        <div className="ap-exact__via">
+          <ConnectorLine approval={approval} />
+          {approvalReadsOnly(approval) && <Chip icon="eye">{t("approvals.readsOnly")}</Chip>}
+        </div>
+      )}
       {values.length > 0 &&
         (full ? (
           <dl className="ap-exact__rows">
@@ -1099,7 +1120,9 @@ function ReviewBody({ approval: a, channel }: { approval: Approval; channel: str
   const before = around ? toolItemsSaved(workFromSteps(around.before, run.data?.run)) : [];
   const after = around ? toolItemsSaved(workFromSteps(around.after, run.data?.run)) : [];
   const calls = (items: ToolItem[]) =>
-    items.flatMap((i) => (i.kind === "call" ? [i.line] : [])).filter((l, i, all) => !(i === all.length - 1 && l.state === "stop"));
+    items
+      .flatMap((i) => (i.kind === "call" ? [i.line] : []))
+      .filter((l, i, all) => !(i === all.length - 1 && l.state === "stop"));
   const lines = calls(before);
   const afterLines = after.flatMap((i) => (i.kind === "call" ? [i.line] : []));
   const at = (iso: string) => formatTime(i18n.language, iso);
@@ -1170,7 +1193,7 @@ function ReviewBody({ approval: a, channel }: { approval: Approval; channel: str
               ? t("approvals.review.email")
               : text
                 ? t(p === "done" ? "approvals.review.textDone" : "approvals.review.text")
-                : t("approvals.review.values")
+                : t(p === "waiting" ? "approvals.review.values" : "approvals.review.valuesDone")
           }
           subtitle={[via.name, target].filter(Boolean).join(" · ") || undefined}
           action={
@@ -1188,7 +1211,7 @@ function ReviewBody({ approval: a, channel }: { approval: Approval; channel: str
             <Markdown source={text.text} variant="message" />
           </div>
         ) : (
-          <ExactAction approval={a} />
+          <ExactAction approval={a} bare />
         )}
         {pr && (
           <a className="ap-link" href={pr} target="_blank" rel="noreferrer">
@@ -1239,23 +1262,25 @@ function ReviewBody({ approval: a, channel }: { approval: Approval; channel: str
             <code>{`${a.tool}\n${JSON.stringify(a.params ?? {}, null, 2)}`}</code>
           </pre>
         )}
-        <p className="ac-card__foot ap-review__foot">
-          {channel && (
-            <Link
-              className="ap-link"
-              to="/org/$orgId/c/$channelId"
-              params={{ orgId: org.id, channelId: a.channelId }}
-              search={{ m: a.messageId ?? a.threadId ?? undefined }}
-            >
-              {t("approvals.panel.viewChannel", { channel })}
-            </Link>
-          )}
-          {text && (
-            <button type="button" className="ap-link" aria-expanded={tech} onClick={() => setTech((o) => !o)}>
-              {t("approvals.technical")}
-            </button>
-          )}
-        </p>
+        {(channel || text) && (
+          <p className="ac-card__foot ap-review__foot">
+            {channel && (
+              <Link
+                className="ap-link"
+                to="/org/$orgId/c/$channelId"
+                params={{ orgId: org.id, channelId: a.channelId }}
+                search={{ m: a.messageId ?? a.threadId ?? undefined }}
+              >
+                {t("approvals.panel.viewChannel", { channel })}
+              </Link>
+            )}
+            {text && (
+              <button type="button" className="ap-link" aria-expanded={tech} onClick={() => setTech((o) => !o)}>
+                {t("approvals.technical")}
+              </button>
+            )}
+          </p>
+        )}
       </Card>
     </div>
   );
@@ -1537,7 +1562,9 @@ function Outcome({ approval: a, agent }: { approval: Approval; agent: Agent | un
   return (
     <Card className={cx("ap-review__card ap-outcome", `ap-outcome--${p}`)}>
       <CardHeader icon={icon} title={title} subtitle={subtitle} action={action} />
-      {p === "refused" && a.reason && <p className="ap-outcome__lesson">{t("approvals.lesson", { name, reason: a.reason })}</p>}
+      {p === "refused" && a.reason && (
+        <p className="ap-outcome__lesson">{t("approvals.lesson", { name, reason: a.reason })}</p>
+      )}
       {returned && a.result?.text && (
         <pre className="ap-code ap-review__tech">
           <code>{a.result.text}</code>

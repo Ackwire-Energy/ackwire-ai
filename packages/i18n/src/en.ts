@@ -3440,6 +3440,7 @@ export const en = {
       text: "What it will publish",
       textDone: "What it published",
       values: "What it will do",
+      valuesDone: "What it did",
       more: "Show all",
       less: "Show less",
       trail: "How it got here",

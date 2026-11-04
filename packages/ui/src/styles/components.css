@@ -9531,7 +9531,12 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   background: color-mix(in srgb, var(--success) 14%, transparent);
   color: var(--success);
 }
+/* A failed step keeps its app's logo; the ring and the label say it failed. */
 .ac-track__step.is-failed .ac-track__node {
+  color: var(--danger);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 60%, transparent);
+}
+.ac-track__step.is-failed .ac-track__label {
   color: var(--danger);
 }
 .ac-track__step.is-more .ac-track__node {
