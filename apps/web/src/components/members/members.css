@@ -163,10 +163,6 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
   display: flex;
   align-items: flex-start;
 }
-/* Centered on the first of the wrapped 16px lines. */
-.members-side__line .status-line__icon {
-  margin-top: 1px;
-}
 /* A written or automatic line too ("Sem limite no plano · volta às 15:00 · 4 conversas esperando"): wrapped, never cut. */
 .members-side__line .status-line__text {
   overflow: visible;
@@ -174,6 +170,10 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
 }
 .members-side__work {
   color: var(--ink2);
+}
+/* Centered on the first of the wrapped 16px lines. */
+.members-side__line .status-line__icon {
+  margin-top: 1px;
 }
 .members-side__inner[data-presence="offline"] {
   opacity: 0.45;

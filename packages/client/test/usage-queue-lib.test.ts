@@ -100,6 +100,12 @@ test("an agent out of office with conversations waiting says how many", () => {
   expect(agentStatusText(pt, { ...line, count: undefined }, "pt-BR", now)?.text).toBe("Sem limite no plano");
 });
 
+test("long work in the agent's line of work reads as in line, not as waiting for your answer", () => {
+  const view = receiptView({ routed: true, server: undefined, agents: [["ada", "line"]] } as never);
+  expect(view.status).toEqual({ kind: "line", agents: ["ada"] });
+  expect(pt("receipts.line", { count: 1, names: "Ada" })).toBe("Ada começa quando terminar outro trabalho");
+});
+
 test("a limit leads with our pause icon, never an emoji; any other line keeps its emoji", () => {
   const line = { by: "auto" as const, text: null, subject: null, emoji: null, until: null };
   for (const kind of ["out_of_plan", "out_of_budget", "waiting_plan", "waiting_budget"] as const)
@@ -110,10 +116,4 @@ test("a limit leads with our pause icon, never an emoji; any other line keeps it
   expect(agentStatusText(pt, { ...line, kind: "out_of_plan", emoji: "🌴" }, "pt-BR", now)).toMatchObject({
     emoji: "🌴",
   });
-});
-
-test("long work in the agent's line of work reads as in line, not as waiting for your answer", () => {
-  const view = receiptView({ routed: true, server: undefined, agents: [["ada", "line"]] } as never);
-  expect(view.status).toEqual({ kind: "line", agents: ["ada"] });
-  expect(pt("receipts.line", { count: 1, names: "Ada" })).toBe("Ada começa quando terminar outro trabalho");
 });
