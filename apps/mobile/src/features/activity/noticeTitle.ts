@@ -37,7 +37,9 @@ export function useNoticeTitle(n: AppNotification) {
         ? "catch_up_closed_asker_task"
         : n.kind === "usage_limit"
           ? `usage_limit_${n.latest.statusTo ?? "refused"}`
-          : n.kind;
+          : n.kind === "approval_cover" && (n.latest.statusTo === "declined" || n.latest.statusTo === "ended")
+            ? `approval_cover_${n.latest.statusTo}`
+            : n.kind;
   // A widget's alert or failure, an agent asking to publish a dashboard (ADR 0135): the dashboards' own words.
   const template = held
     ? t("standing.notification.agentHold", { name: NAMES })

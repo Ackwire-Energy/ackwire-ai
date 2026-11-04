@@ -112,6 +112,7 @@ describe("the setup group", () => {
       "offer_connect_app",
       "offer_invites",
       "propose_agent",
+      "propose_settings_change",
     ]);
     expect(deferrableGroups(granted).map((g) => [g.key, g.label])).toEqual([
       [
@@ -127,6 +128,7 @@ describe("the setup group", () => {
       "offer_connect_app",
       "offer_invites",
       "propose_agent",
+      "propose_settings_change",
     ]);
     const kind = (name: string) => toolKind({ name, scope: SETUP_SCOPE, connectionId: null }).kind;
     expect(kind("offer_connect_ai")).toBe("here");

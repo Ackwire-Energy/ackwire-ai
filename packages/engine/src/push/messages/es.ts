@@ -20,6 +20,8 @@ export const strings: Partial<PushStrings> = {
   routineFailedBody: "Toca para ver qué pasó.",
   routinePausedTitle: "Se pausó una rutina",
   routinePausedBody: "Toca para ver por qué.",
+  rightHandPausedTitle: (name) => `${name} dejó de aprobar por ti`,
+  rightHandPausedBody: "Deshiciste 3 de sus decisiones esta semana. Toca para revisar.",
   agentUnreachedTitle: (agent) => `Una rutina no pudo llamar a ${agent}`,
   agentUnreachedBody: "Solo las personas con las que trabaja el agente pueden hablarle. Toca para permitirlo.",
   routineStalledTitle: "Una rutina espera su computadora",

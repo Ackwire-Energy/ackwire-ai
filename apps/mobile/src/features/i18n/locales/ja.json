@@ -762,7 +762,12 @@
       "connector_tool_changed_other": "接続中のサーバーが、承認済みのツールを変更しました",
       "computer_disk_full_other": "コンピューターのディスクがほぼいっぱいです",
       "computer_no_chrome_other": "コンピューターにGoogle Chromeが必要です。google.com/chromeからダウンロードしてください",
-      "app_created_other": "AIアプリがあなたのために作成しました"
+      "app_created_other": "AIアプリがあなたのために作成しました",
+      "approval_cover_other": "{{names}}が「代わりに承認する人」にあなたを選びました",
+      "approval_cover_declined_other": "{{names}}はあなたの代わりに承認しなくなりました",
+      "approval_cover_ended_other": "{{names}}があなたの代わりに承認する人を解除しました",
+      "right_hand_decided_other": "{{names}}が今日あなたの代わりに依頼を承認しました",
+      "right_hand_paused_other": "{{names}}はあなたの代わりの承認を止めました"
     },
     "markRead": "既読にする",
     "markUnread": "未読にする",

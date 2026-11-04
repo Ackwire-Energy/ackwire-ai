@@ -28,6 +28,7 @@ import { can, getMembership } from "./organizations";
 import type { RolePermission } from "./permissions";
 import { personBehindCall } from "./requester";
 import { isRightHand } from "./right-hand";
+import { queueRightHandLook } from "./right-hand-approvals";
 import { bodyCode } from "./run-tools";
 import { replyThreadOf } from "./runs";
 import { REPORT_SCHEMA, SCHEDULE_INPUT } from "./schedule-tools";
@@ -535,6 +536,7 @@ export function createSetupToolSource(deps: {
           });
           if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(message));
           await supersedeOlderProposals({ db: ctx.db, pubsub: deps.pubsub }, message, draft.handle);
+          await queueRightHandLook(ctx.db, ctx.orgId, message.id, forUserId);
           const asks = rightHand
             ? " The person who asked can't create agents: the card lets them send it to an admin or owner, who creates it."
             : " The person who asked can't create agents: an admin or owner reviews it.";
@@ -713,13 +715,10 @@ export function createSetupToolSource(deps: {
       },
     },
   ];
-  const settings = settingsTool(deps);
-  return {
-    name: "setup",
-    // Only the right hand changes teammates' settings with cards (ADR 0137).
-    tools: async (ctx) =>
-      isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId)) ? [...tools, settings] : tools,
-  };
+  // Any agent that may set the team up proposes teammates' settings too: the right hand decides another agent's card
+  // for the person who asked (ADR 0139), never its own.
+  const all = [...tools, settingsTool(deps)];
+  return { name: "setup", tools: async () => all };
 }
 
 /** A setting's change as the tool takes it, for one agent. */
@@ -950,6 +949,7 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
           meta: { ...bodyCode(SETTINGS_PROPOSAL_CARD, { names: who }), actionCard: card },
         });
         if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(message));
+        await queueRightHandLook(ctx.db, ctx.orgId, message.id, forUserId);
         const decides = proposals.filter((p) => p.canDecide).length;
         const whoDecides =
           decides === proposals.length

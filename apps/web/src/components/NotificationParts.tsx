@@ -188,6 +188,11 @@ type WhatKey =
   | "usageLimitRequest"
   | "usageLimitRaised"
   | "usageLimitRefused"
+  | "approvalCover"
+  | "approvalCoverDeclined"
+  | "approvalCoverEnded"
+  | "rightHandDecided"
+  | "rightHandPaused"
   | "reaction";
 
 /** The line on top of a row: who did what, where. */
@@ -343,5 +348,18 @@ export function Headline({
           return k("usageLimitRefused", { name });
       }
     }
+    case "right_hand_decided":
+      return k("rightHandDecided", { name, count: n.count });
+    case "right_hand_paused":
+      return k("rightHandPaused", { name });
+    case "approval_cover":
+      return k(
+        n.latest.statusTo === "declined"
+          ? "approvalCoverDeclined"
+          : n.latest.statusTo === "ended"
+            ? "approvalCoverEnded"
+            : "approvalCover",
+        { name },
+      );
   }
 }

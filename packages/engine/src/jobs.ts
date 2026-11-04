@@ -79,6 +79,7 @@ import { notifyPersonLimit, PERSON_LIMIT_JOB } from "./person-usage";
 import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
 import { reachOf, settleReach } from "./reach";
 import { routineCreatorOf } from "./requester";
+import { considerCard, RIGHT_HAND_DECIDE_JOB } from "./right-hand-approvals";
 import {
   createLlmRouterStrategy,
   DEFAULT_ROUTER_POLICY,
@@ -1010,6 +1011,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "context.consolidate": async (job) => {
       if (!deps.context) return;
       await consolidateOrg(deps.context, orgOf(job));
+    },
+    // The right hand looks at a card for the person behind it (ADR 0139 §2).
+    [RIGHT_HAND_DECIDE_JOB]: async (job) => {
+      await considerCard(
+        { db: deps.db, pubsub: deps.pubsub, gateway: deps.gateway },
+        orgOf(job),
+        String(job.payload.messageId),
+      );
     },
     // Yesterday's stall-and-noise report, to the people who run the server (`OPS_REPORT_EMAIL`).
     [AUTONOMY_REPORT_JOB]: async (job) => {

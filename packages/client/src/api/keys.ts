@@ -60,6 +60,8 @@ export const keys = {
   toolChanges: (orgId: string) => ["org", orgId, "tool-changes"] as const,
   scopes: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "scopes"] as const,
   /** What the agent runs without asking ("Aprovar sempre"). */
+  approvalCovers: (orgId: string) => ["org", orgId, "approval-covers"] as const,
+  rightHandApprovals: (orgId: string) => ["org", orgId, "right-hand-approvals"] as const,
   approvalRules: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "approval-rules"] as const,
   runs: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "runs"] as const,
   /** Whether the agent has a run going now (its newest running run, if any). */

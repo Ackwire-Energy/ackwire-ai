@@ -34,7 +34,7 @@ import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } f
 import { type Agent, getAgentCached } from "./agents";
 import { agentsDmReads, readerOfRun } from "./agents-dm-reads";
 import { type AgentAi, agentAiState, type NoAiReason, noAiReasonOf, ownNotSignedIn } from "./ai-status";
-import { publishApproval } from "./approvals";
+import { deciderName, publishApproval } from "./approvals";
 import { accountablePerson, fedByRoutine, personOfMessage, runAuthority } from "./authority";
 import {
   type AutoChoice,
@@ -2102,8 +2102,10 @@ async function executeRunInner(
           if (ran) await publishApproval({ db, pubsub: deps.pubsub }, ran, "approval.decided").catch(() => {});
         } else {
           const by = approval?.status === "refused" ? approval.decidedByUserId : null;
-          const [person] = by ? await db.select({ name: users.name }).from(users).where(eq(users.id, by)) : [];
-          result = toolResultFor(approval, person?.name);
+          result = toolResultFor(
+            approval,
+            by ? await deciderName(db, by, approval?.decidedForUserId ?? null) : undefined,
+          );
         }
       }
       const line = `${call.name}${result?.isError ? " (not done)" : ""}: ${result?.content ?? ""}`;

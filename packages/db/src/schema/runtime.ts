@@ -575,6 +575,18 @@ export const approvals = pgTable(
      * and whoever may approve actions, as for any other approval.
      */
     approvers: jsonb().$type<ApprovalApprovers>(),
+    /**
+     * The person behind the run that asked (`accountablePerson`), when there was one: whoever covers someone never
+     * decides their own request (`approval_covers`).
+     */
+    requestedByUserId: text(),
+    /**
+     * Merge, deploy, rollback, sends, deletes and the like (`highRisk` in the Tool Gateway): a cover decides these only
+     * when the person turned that on. Rows from before the column count as high risk.
+     */
+    highRisk: boolean().notNull().default(true),
+    /** Decided by someone covering this person (`approval_covers`): "Aprovado por Bruno, cobrindo Ana". */
+    decidedForUserId: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -584,6 +596,101 @@ export const approvals = pgTable(
     index().on(t.expiresAt).where(sql`${t.status} = 'pending'`),
     index().on(t.routineId, t.runAt).where(sql`${t.runAt} is not null`),
   ],
+);
+
+/**
+ * "Quem aprova por mim" (ADR 0139): one person who decides, in this person's name, the approvals asked of them
+ * personally (as the agent's owner, or named by `request_approval`), always or only while their status says they are
+ * out of office, until `ends_at`. Never what the cover asked for, a mailbox's actions or access for good; merge,
+ * deploy and other high-risk actions only with `risky`. Gone when either person leaves the workspace.
+ */
+export const approvalCovers = pgTable(
+  "approval_covers",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid().notNull(),
+    fromUserId: text().notNull(),
+    toUserId: text().notNull(),
+    mode: text().$type<"always" | "while_out">().notNull().default("while_out"),
+    risky: boolean().notNull().default(false),
+    endsAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.orgId, t.fromUserId],
+      foreignColumns: [organizationMembers.orgId, organizationMembers.userId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.orgId, t.toUserId],
+      foreignColumns: [organizationMembers.orgId, organizationMembers.userId],
+    }).onDelete("cascade"),
+    unique().on(t.orgId, t.fromUserId),
+    index().on(t.orgId, t.toUserId),
+  ],
+);
+
+/**
+ * "O Gerente aprova por você" (ADR 0139 §2): whether the workspace's right hand decides, in this person's name, the
+ * cards other agents post from their own request, for which of the two kinds, up to which budget per agent. The day
+ * and month caps are code (`RIGHT_HAND_CAPS`). `paused_at`: three of its decisions undone in a week stopped it until
+ * the person turns it back on.
+ */
+export const rightHandApprovals = pgTable(
+  "right_hand_approvals",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid().notNull(),
+    userId: text().notNull(),
+    enabled: boolean().notNull().default(false),
+    newAgents: boolean().notNull().default(true),
+    agentChanges: boolean().notNull().default(true),
+    budgetCapNanoUsd: bigint({ mode: "number" }).notNull().default(20_000_000_000),
+    guidance: text().notNull().default(""),
+    pausedAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.orgId, t.userId],
+      foreignColumns: [organizationMembers.orgId, organizationMembers.userId],
+    }).onDelete("cascade"),
+    unique().on(t.orgId, t.userId),
+  ],
+);
+
+/**
+ * One per card the right hand looked at for someone (ADR 0139 §2): approved (applied as them) or passed to them, with
+ * its reason ("Por quê?"). The caps, Desfazer, the daily entry and the auto-pause read these rows. `budget_added`:
+ * what the decision added to the workspace's monthly budgets, counted against the month's cap.
+ */
+export const rightHandDecisions = pgTable(
+  "right_hand_decisions",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    forUserId: text().notNull(),
+    rightHandId: uuid().notNull(),
+    kind: text().$type<"agent_new" | "agent_settings">().notNull(),
+    /** The card's message (messages are partitioned: no foreign key). */
+    messageId: uuid().notNull(),
+    proposedByAgentId: uuid(),
+    /** `deciding` while its call runs (it holds its place under the caps). */
+    outcome: text().$type<"deciding" | "approved" | "passed">().notNull(),
+    reason: text().notNull().default(""),
+    /** A decision call was made (the day's cap counts these). */
+    called: boolean().notNull().default(false),
+    budgetAddedNanoUsd: bigint({ mode: "number" }).notNull().default(0),
+    /** The agent it created or changed. */
+    targetAgentId: uuid(),
+    undoneAt: timestamp({ withTimezone: true }),
+    undoneByUserId: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.orgId, t.messageId), index().on(t.orgId, t.forUserId, t.createdAt)],
 );
 
 /**

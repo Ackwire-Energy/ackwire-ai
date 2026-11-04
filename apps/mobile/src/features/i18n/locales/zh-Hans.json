@@ -762,7 +762,12 @@
       "connector_tool_changed_other": "一个已连接的服务器更改了你批准过的工具",
       "computer_disk_full_other": "一台电脑的磁盘快满了",
       "computer_no_chrome_other": "电脑需要 Google Chrome。请在 google.com/chrome 下载",
-      "app_created_other": "一个 AI 应用为你创建了内容"
+      "app_created_other": "一个 AI 应用为你创建了内容",
+      "approval_cover_other": "{{names}} 在“谁替我审批”中选了你",
+      "approval_cover_declined_other": "{{names}} 不再替你审批",
+      "approval_cover_ended_other": "{{names}} 取消了替你审批的人",
+      "right_hand_decided_other": "{{names}} 今天替你批准了请求",
+      "right_hand_paused_other": "{{names}} 已停止替你审批"
     },
     "markRead": "标为已读",
     "markUnread": "标为未读",

@@ -1,12 +1,20 @@
 import {
+  COVER_MODES,
   cancelAheadApproval,
   decideApproval,
   decideApprovals,
+  endCover,
   getApproval,
+  getMyCovers,
+  getRightHandApprovals,
   listApprovalRules,
   listApprovals,
   memoryJudging,
+  RIGHT_HAND_CAPS,
   removeApprovalRule,
+  setMyCover,
+  setRightHandApprovals,
+  undoRightHandDecision,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
@@ -66,6 +74,9 @@ export const Approval = z
     expiresAt: z.string(),
     createdAt: z.string(),
     decidedByUserId: z.string().nullable(),
+    decidedForUserId: z.string().nullable().openapi({
+      description: 'Decided by someone covering this person (ADR 0139): "Aprovado por Bruno, cobrindo Ana".',
+    }),
     decidedAt: z.string().nullable(),
     reason: z.string().nullable(),
     canDecide: z.boolean().openapi({ description: "You are the agent's owner or an admin, and it is pending." }),
@@ -123,6 +134,35 @@ export const Approval = z
       }),
   })
   .openapi("Approval");
+
+const CoverView = z.object({
+  userId: z.string().openapi({ description: "Who covers me (`cover`), or whom I cover (`covering`)." }),
+  mode: z.enum(COVER_MODES).openapi({ description: "`always`, or `while_out`: only while the status says out." }),
+  risky: z.boolean().openapi({ description: "Merge, deploy and other high-risk actions are in." }),
+  endsAt: z.string().nullable(),
+  active: z.boolean().openapi({ description: "Deciding now: not past its end, and `always` or the person is out." }),
+});
+
+export const ApprovalCovers = z
+  .object({ cover: CoverView.nullable(), covering: z.array(CoverView) })
+  .openapi("ApprovalCovers");
+
+export const RightHandApprovals = z
+  .object({
+    enabled: z.boolean(),
+    newAgents: z.boolean().openapi({ description: "Creating agents other agents propose (no apps, open channels)." }),
+    agentChanges: z
+      .boolean()
+      .openapi({ description: "Model on the same AI account, budget and open channels of an existing agent." }),
+    budgetCapNanoUsd: z.number().int().openapi({ description: "Budget it may add per agent in a month." }),
+    guidance: z.string(),
+    pausedAt: z.string().nullable().openapi({ description: "Three decisions undone in a week stopped it." }),
+    rightHand: z.object({ id: z.string(), name: z.string() }).nullable(),
+    mayDecide: z.object({ newAgents: z.boolean(), agentChanges: z.boolean() }),
+    caps: z.object({ decisionsPerDay: z.number(), newAgentsPerDay: z.number(), monthNanoUsd: z.number() }),
+    used: z.object({ decisionsToday: z.number(), newAgentsToday: z.number(), monthNanoUsd: z.number() }),
+  })
+  .openapi("RightHandApprovals");
 
 export const ApprovalRule = z
   .object({
@@ -302,6 +342,135 @@ export function approvalRoutes(deps: AppDeps) {
       const view = await cancelAheadApproval({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, approvalId);
       deps.wakeWorkers?.();
       return c.json(view, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/me/approval-cover",
+      tags,
+      security,
+      summary: "Who approves for me, and whom I approve for (ADR 0139)",
+      request: { params: OrgParams },
+      responses: { 200: json(ApprovalCovers), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await getMyCovers(db, c.get("user").id, orgId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/approval-cover",
+      tags,
+      security,
+      summary: "Choose who approves for me",
+      description:
+        "One person of the workspace, never you (400 `approval_cover.self`, `approval_cover.not_member`), until `endsAt` (in the future: 400 `approval_cover.ends_past`) or null. They decide in your name what is asked of you personally, never their own requests, a mailbox's actions or access for good; merge, deploy and the like only with `risky`. They hear it in their inbox.",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            userId: z.string().min(1),
+            mode: z.enum(COVER_MODES),
+            risky: z.boolean(),
+            endsAt: z.iso.datetime({ offset: true }).nullable(),
+          }),
+        ),
+      },
+      responses: { 200: json(ApprovalCovers), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const input = c.req.valid("json");
+      return c.json(await setMyCover({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, input), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/me/right-hand-approvals",
+      tags,
+      security,
+      summary: "Whether the right hand approves for me, and within what (ADR 0139)",
+      request: { params: OrgParams },
+      responses: { 200: json(RightHandApprovals), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await getRightHandApprovals(db, c.get("user").id, orgId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/right-hand-approvals",
+      tags,
+      security,
+      summary: "Let the right hand approve for me",
+      description:
+        "It decides only cards another agent posted from your own request, of the kinds turned on, and approves or passes them to you. The budget per agent is from 0 to US$ 50 (400 `right_hand_approvals.budget`); guidance at most 2,000 characters. Turning it on ends a pause.",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            enabled: z.boolean().optional(),
+            newAgents: z.boolean().optional(),
+            agentChanges: z.boolean().optional(),
+            budgetCapNanoUsd: z.number().int().min(0).max(RIGHT_HAND_CAPS.budgetCapMax).optional(),
+            guidance: z.string().max(RIGHT_HAND_CAPS.guidanceChars).optional(),
+          }),
+        ),
+      },
+      responses: { 200: json(RightHandApprovals), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const input = c.req.valid("json");
+      return c.json(await setRightHandApprovals({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, input), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/right-hand-decisions/{decisionId}/undo",
+      tags,
+      security,
+      summary: "Desfazer what the right hand approved for someone",
+      description:
+        "For 24 hours (409 `right_hand.undo_expired`), by the person it decided for or who manages agents: a new agent is archived, settings go back (409 `right_hand.changed_since` when they moved). Three undone in a week pause it.",
+      request: { params: OrgParams.extend({ decisionId: z.uuid() }) },
+      responses: { ...noContent, ...errors },
+    }),
+    async (c) => {
+      const { orgId, decisionId } = c.req.valid("param");
+      await undoRightHandDecision({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, decisionId);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/approval-covers/{userId}",
+      tags,
+      security,
+      summary: 'End someone\'s cover: theirs, the one you give them ("Não quero cobrir"), or any as an admin',
+      description:
+        "The covered person, the person covering them or who manages members (403 otherwise; 404 `approval_cover.not_found`). The covered person hears it when someone else ends it.",
+      request: { params: OrgParams.extend({ userId: z.string().min(1) }) },
+      responses: { ...noContent, ...errors },
+    }),
+    async (c) => {
+      const { orgId, userId } = c.req.valid("param");
+      await endCover({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, userId);
+      return c.body(null, 204);
     },
   );
 

@@ -36,6 +36,7 @@ import type {
   AppConsent,
   AppNotification,
   Approval,
+  ApprovalCovers,
   ApprovalRule,
   AppsList,
   Artifact,
@@ -162,6 +163,7 @@ import type {
   ReactionCount,
   Reminder,
   RemovalPreview,
+  RightHandApprovals,
   RosterMember,
   Routine,
   RoutineHook,
@@ -906,6 +908,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         (await request<{ rules: ApprovalRule[] }>(`${org(orgId)}/agents/${enc(agentId)}/approval-rules`)).rules,
       removeRule: (orgId, agentId, ruleId) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}/approval-rules/${enc(ruleId)}`, { method: "DELETE" }),
+      covers: (orgId) => request<ApprovalCovers>(`${org(orgId)}/me/approval-cover`),
+      setCover: (orgId, input) =>
+        request<ApprovalCovers>(`${org(orgId)}/me/approval-cover`, { method: "PUT", json: input }),
+      endCover: (orgId, userId) => request<void>(`${org(orgId)}/approval-covers/${enc(userId)}`, { method: "DELETE" }),
+      rightHand: (orgId) => request<RightHandApprovals>(`${org(orgId)}/me/right-hand-approvals`),
+      setRightHand: (orgId, input) =>
+        request<RightHandApprovals>(`${org(orgId)}/me/right-hand-approvals`, { method: "PUT", json: input }),
+      undoRightHand: (orgId, decisionId) =>
+        request<void>(`${org(orgId)}/right-hand-decisions/${enc(decisionId)}/undo`, { method: "POST", json: {} }),
     },
     connectors: {
       catalog: () => request<ConnectorCatalog>("/api/app/connectors/catalog"),

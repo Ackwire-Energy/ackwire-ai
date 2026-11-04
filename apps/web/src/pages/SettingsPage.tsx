@@ -63,6 +63,7 @@ import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AccountSection } from "@/components/AccountSettings";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AiAppsSection } from "@/components/AiApps";
+import { ApprovalsSection } from "@/components/ApprovalCover";
 import { AuditSection } from "@/components/Audit";
 import { AutoModelsRow } from "@/components/AutoModels";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
@@ -213,6 +214,7 @@ export function SettingsPage({
         )}
         {current === "account" && <AccountSection />}
         {current === "notifications" && <NoticePrefsSection />}
+        {current === "approvals" && <ApprovalsSection />}
         {current === "apps" && <AiAppsSection />}
         {current === "general" && <GeneralSection />}
         {current === "members" && <MembersPage embedded />}

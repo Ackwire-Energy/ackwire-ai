@@ -825,7 +825,17 @@
       "computer_no_chrome_one": "Ein Computer braucht Google Chrome. Lade es unter google.com/chrome herunter",
       "computer_no_chrome_other": "Computer brauchen Google Chrome. Lade es unter google.com/chrome herunter",
       "app_created_one": "Eine KI-App hat etwas für dich erstellt",
-      "app_created_other": "KI-Apps haben etwas für dich erstellt"
+      "app_created_other": "KI-Apps haben etwas für dich erstellt",
+      "approval_cover_one": "{{names}} hat dich bei Wer für mich freigibt gewählt",
+      "approval_cover_other": "{{names}} hat dich bei Wer für mich freigibt gewählt",
+      "approval_cover_declined_one": "{{names}} gibt nicht mehr für dich frei",
+      "approval_cover_declined_other": "{{names}} gibt nicht mehr für dich frei",
+      "approval_cover_ended_one": "{{names}} hat deine Vertretung für Freigaben beendet",
+      "approval_cover_ended_other": "{{names}} hat deine Vertretung für Freigaben beendet",
+      "right_hand_decided_one": "{{names}} hat heute Anfragen für dich freigegeben",
+      "right_hand_decided_other": "{{names}} hat heute Anfragen für dich freigegeben",
+      "right_hand_paused_one": "{{names}} gibt nicht mehr für dich frei",
+      "right_hand_paused_other": "{{names}} gibt nicht mehr für dich frei"
     },
     "markRead": "Als gelesen markieren",
     "markUnread": "Als ungelesen markieren",

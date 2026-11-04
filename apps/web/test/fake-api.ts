@@ -15,6 +15,7 @@ import type {
   ApiClient,
   AppNotification,
   Approval,
+  ApprovalCovers,
   ApprovalRule,
   AuditRow,
   AuthConfig,
@@ -70,6 +71,7 @@ import type {
   PlanAccountUsage,
   Proposal,
   ReactionCount,
+  RightHandApprovals,
   Role,
   Run,
   RunConsultation,
@@ -217,6 +219,10 @@ export interface FakeState {
   /** The code a new key is refused with, as a provider's own check refuses it (`provider_key_invalid`). */
   keyRefusal?: string;
   approvals: Approval[];
+  /** Who approves for me, and whom I approve for (ADR 0139). */
+  approvalCovers?: ApprovalCovers;
+  /** What the right hand approves for me (ADR 0139 §2); unset: off, as a new member has it. */
+  rightHandApprovals?: RightHandApprovals;
   /** How many of the newest the unfiltered list returns (the server's window); all when unset. */
   approvalsWindow?: number;
   /** What each agent runs without asking ("Aprovar sempre"), by agent id; unset = none. */
@@ -2908,6 +2914,37 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (!list.some((r) => r.id === ruleId)) throw new ApiError(404, "not_found", "Rule not found");
         if (state.approvalRules) state.approvalRules[agentId] = list.filter((r) => r.id !== ruleId);
       },
+      covers: async (orgId) => {
+        log("approvals.covers", orgId);
+        return structuredClone(state.approvalCovers ?? { cover: null, covering: [] });
+      },
+      setCover: async (orgId, input) => {
+        log("approvals.setCover", orgId, input);
+        const covers = state.approvalCovers ?? { cover: null, covering: [] };
+        state.approvalCovers = { ...covers, cover: { ...input, active: input.mode === "always" } };
+        return structuredClone(state.approvalCovers);
+      },
+      endCover: async (orgId, userId) => {
+        log("approvals.endCover", orgId, userId);
+        const covers = state.approvalCovers ?? { cover: null, covering: [] };
+        state.approvalCovers = {
+          cover: userId === state.me?.user.id ? null : covers.cover,
+          covering: covers.covering.filter((c) => c.userId !== userId),
+        };
+      },
+      rightHand: async (orgId) => {
+        log("approvals.rightHand", orgId);
+        return structuredClone(state.rightHandApprovals ?? rightHandOff(state));
+      },
+      setRightHand: async (orgId, input) => {
+        log("approvals.setRightHand", orgId, input);
+        const before = state.rightHandApprovals ?? rightHandOff(state);
+        state.rightHandApprovals = { ...before, ...input, ...(input.enabled ? { pausedAt: null } : {}) };
+        return structuredClone(state.rightHandApprovals);
+      },
+      undoRightHand: async (orgId, decisionId) => {
+        log("approvals.undoRightHand", orgId, decisionId);
+      },
     },
     connectors: {
       catalog: async () => CATALOG,
@@ -3667,4 +3704,21 @@ export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {})
   if (patch.machines) return brain;
   const computer = brain.computer ?? { machineId: "machine_1", name: "MacBook", online: true };
   return { ...brain, machines: [{ ...computer, options: brain.options }] };
+}
+
+/** The right hand's approvals as a member who never turned them on reads them. */
+export function rightHandOff(state: FakeState): RightHandApprovals {
+  const lodi = state.agents.find((a) => a.builtin === "right_hand");
+  return {
+    enabled: false,
+    newAgents: true,
+    agentChanges: true,
+    budgetCapNanoUsd: 20_000_000_000,
+    guidance: "",
+    pausedAt: null,
+    rightHand: lodi ? { id: lodi.id, name: lodi.name } : null,
+    mayDecide: { newAgents: true, agentChanges: true },
+    caps: { decisionsPerDay: 10, newAgentsPerDay: 2, monthNanoUsd: 50_000_000_000 },
+    used: { decisionsToday: 0, newAgentsToday: 0, monthNanoUsd: 0 },
+  };
 }

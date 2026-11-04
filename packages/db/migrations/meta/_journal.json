@@ -1443,6 +1443,20 @@
       "when": 1793823666011,
       "tag": "0207_usage_per_person",
       "breakpoints": true
+    },
+    {
+      "idx": 207,
+      "version": "7",
+      "when": 1793833666011,
+      "tag": "0208_approval_covers",
+      "breakpoints": true
+    },
+    {
+      "idx": 208,
+      "version": "7",
+      "when": 1793843666011,
+      "tag": "0209_right_hand_approvals",
+      "breakpoints": true
     }
   ]
 }

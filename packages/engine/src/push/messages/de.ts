@@ -20,6 +20,8 @@ export const strings: Partial<PushStrings> = {
   routineFailedBody: "Tippe, um zu sehen, was passiert ist.",
   routinePausedTitle: "Eine Routine wurde pausiert",
   routinePausedBody: "Tippe, um zu sehen, warum.",
+  rightHandPausedTitle: (name) => `${name} gibt nicht mehr für dich frei`,
+  rightHandPausedBody: "Du hast diese Woche 3 seiner Entscheidungen rückgängig gemacht. Tippe zum Prüfen.",
   agentUnreachedTitle: (agent) => `Eine Routine konnte ${agent} nicht aufrufen`,
   agentUnreachedBody:
     "Nur die Personen, mit denen der Agent arbeitet, können mit ihm sprechen. Tippe, um es zu erlauben.",

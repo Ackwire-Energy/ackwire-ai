@@ -19,6 +19,8 @@ export const ptBR: PushStrings = {
   routineFailedBody: "Toque para ver o que aconteceu.",
   routinePausedTitle: "Uma rotina foi pausada",
   routinePausedBody: "Toque para ver o motivo.",
+  rightHandPausedTitle: (name) => `${name} parou de aprovar por você`,
+  rightHandPausedBody: "Você desfez 3 decisões dele nesta semana. Toque para revisar.",
   agentUnreachedTitle: (agent) => `Uma rotina não conseguiu chamar ${agent}`,
   agentUnreachedBody: "Só quem cuida do agente pode falar com ele. Toque para deixar.",
   routineStalledTitle: "Uma rotina está esperando o computador",

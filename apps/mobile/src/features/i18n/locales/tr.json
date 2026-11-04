@@ -825,7 +825,17 @@
       "computer_no_chrome_one": "Bir bilgisayarın Google Chrome'a ihtiyacı var. google.com/chrome adresinden indirin",
       "computer_no_chrome_other": "Bilgisayarların Google Chrome'a ihtiyacı var. google.com/chrome adresinden indirin",
       "app_created_one": "Bir yapay zeka uygulaması sizin için bir şeyler oluşturdu",
-      "app_created_other": "Bir yapay zeka uygulaması sizin için bir şeyler oluşturdu"
+      "app_created_other": "Bir yapay zeka uygulaması sizin için bir şeyler oluşturdu",
+      "approval_cover_one": "{{names}} sizi Benim yerime kim onaylar bölümünde seçti",
+      "approval_cover_other": "{{names}} sizi Benim yerime kim onaylar bölümünde seçti",
+      "approval_cover_declined_one": "{{names}} artık sizin yerinize onaylamayacak",
+      "approval_cover_declined_other": "{{names}} artık sizin yerinize onaylamayacak",
+      "approval_cover_ended_one": "{{names}} sizin yerinize onaylayan kişiyi kaldırdı",
+      "approval_cover_ended_other": "{{names}} sizin yerinize onaylayan kişiyi kaldırdı",
+      "right_hand_decided_one": "{{names}} bugün sizin yerinize istekleri onayladı",
+      "right_hand_decided_other": "{{names}} bugün sizin yerinize istekleri onayladı",
+      "right_hand_paused_one": "{{names}} artık sizin yerinize onaylamıyor",
+      "right_hand_paused_other": "{{names}} artık sizin yerinize onaylamıyor"
     },
     "markRead": "Okundu olarak işaretle",
     "markUnread": "Okunmadı olarak işaretle",

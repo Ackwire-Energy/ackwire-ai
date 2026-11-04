@@ -4,6 +4,7 @@ import type {
   AgentDraft,
   AgentProposalCard,
   AiStatus,
+  CardDelegate,
   CostKind,
   CostlyDecision,
   PersonLimitCard,
@@ -152,6 +153,8 @@ export interface SettingsProposalCard {
   kind: "settings_proposal";
   forUserId: string | null;
   proposalIds: string[];
+  /** The right hand looked at it for the person it is for (ADR 0139 §2). */
+  delegate?: CardDelegate | null;
 }
 
 export type ActionCard =
@@ -348,12 +351,17 @@ export function actionCardOf(meta: Record<string, unknown> | null | undefined): 
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;
   if ((raw as { kind?: unknown }).kind === "settings_proposal") {
-    const r = raw as { forUserId?: unknown; proposalIds?: unknown };
+    const r = raw as { forUserId?: unknown; proposalIds?: unknown; delegate?: CardDelegate | null };
     const proposalIds = Array.isArray(r.proposalIds)
       ? r.proposalIds.filter((id): id is string => typeof id === "string")
       : [];
     return proposalIds.length > 0
-      ? { kind: "settings_proposal", forUserId: typeof r.forUserId === "string" ? r.forUserId : null, proposalIds }
+      ? {
+          kind: "settings_proposal",
+          forUserId: typeof r.forUserId === "string" ? r.forUserId : null,
+          proposalIds,
+          delegate: r.delegate ?? null,
+        }
       : null;
   }
   const card = raw as { kind?: unknown; forUserId?: unknown; params?: unknown };

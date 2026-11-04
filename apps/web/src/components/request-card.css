@@ -415,6 +415,14 @@ html:not([data-pointer]) .rq__more:focus-visible {
   color: var(--muted);
 }
 
+/* The right hand's line on a card it looked at for someone (ADR 0139): deciding, passed and why, out of its reach. */
+.rq__delegate {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+}
+
 /* A card a newer one replaced: still readable, plainly not the one to act on. */
 .rq--muted {
   opacity: 0.6;

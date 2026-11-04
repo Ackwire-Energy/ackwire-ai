@@ -772,6 +772,8 @@ export interface ProposalApplied {
 /** An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0081). A person creates it or says no. */
 export interface AgentProposalCard {
   kind: "agent_proposal";
+  /** The right hand looked at it for the person it is for (ADR 0139 §2). */
+  delegate?: CardDelegate | null;
   /** The person behind the run that proposed it. */
   forUserId: string | null;
   /** `firstTask`: what "Criar e testar" puts in the composer of the clicker's DM with the new agent (ADR 0137). */
@@ -1273,6 +1275,14 @@ export type ChannelEvent =
       threadId: string | null;
       messageId: string;
     } & AgentProposalDecision)
+  /** The right hand looked at a card for someone (ADR 0139): its `meta.actionCard.delegate` now. */
+  | {
+      type: "card.delegate";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      delegate: CardDelegate | null;
+    }
   // ── Chat latency batch (packages/engine/src/events.ts) ──────────────────────
   /** An agent will answer: show "thinking" at once. `runId` is null when announced at post time. */
   | {
@@ -1540,6 +1550,8 @@ export interface Approval {
   expiresAt: string;
   createdAt: string;
   decidedByUserId: string | null;
+  /** Decided by someone covering this person (ADR 0139): "Aprovado por Bruno, cobrindo Ana". */
+  decidedForUserId?: string | null;
   decidedAt: string | null;
   reason: string | null;
   /** You are the agent's owner or an admin, and it is pending. */
@@ -5821,7 +5833,84 @@ export type NotificationKind =
    * person), `reached` (who decides; `reached_notify` to the person when the limit only notifies), `request` (who
    * decides, waiting, with `raiseToUsd`), `raised` or `refused` (the person). The person's own carry a percent only.
    */
-  | "usage_limit";
+  | "usage_limit"
+  /**
+   * ADR 0139: someone chose this person to approve for them (`latest.statusTo` `always` or `while_out`,
+   * `latest.expiresAt` its end), or the covered person hears the cover said no (`declined`) or an admin ended it
+   * (`ended`). The other person is the actor. Inbox only. Opens Configurações › Aprovações.
+   */
+  | "approval_cover"
+  /**
+   * ADR 0139 §2: the right hand approved cards for this person today (`count` how many, `latest.title` the newest
+   * one's agent, `source.agentId` the right hand, its name in `label`). Inbox only.
+   */
+  | "right_hand_decided"
+  /** ADR 0139 §2: three of its decisions undone in a week stopped it. Waiting until it is turned back on. */
+  | "right_hand_paused";
+
+/** "O Gerente aprova por você" (ADR 0139 §2): what the person let the workspace's right hand approve. */
+export interface RightHandApprovals {
+  enabled: boolean;
+  /** Creating agents other agents propose (no apps, open channels). */
+  newAgents: boolean;
+  /** Model on the same AI account, budget and open channels of an existing agent. */
+  agentChanges: boolean;
+  /** What it may add to one agent's budget in a month. */
+  budgetCapNanoUsd: number;
+  guidance: string;
+  /** Three decisions undone in a week stopped it. */
+  pausedAt: string | null;
+  rightHand: { id: string; name: string } | null;
+  /** What the person may decide themselves now: a kind they can't is greyed. */
+  mayDecide: { newAgents: boolean; agentChanges: boolean };
+  caps: { decisionsPerDay: number; newAgentsPerDay: number; monthNanoUsd: number };
+  used: { decisionsToday: number; newAgentsToday: number; monthNanoUsd: number };
+}
+
+export type RightHandApprovalsInput = Partial<
+  Pick<RightHandApprovals, "enabled" | "newAgents" | "agentChanges" | "budgetCapNanoUsd" | "guidance">
+>;
+
+/**
+ * `meta.actionCard.delegate` (ADR 0139 §2): the right hand looked at the card for `forUserId`. Deciding, approved
+ * (Desfazer until `undoUntil`, "Por quê?" reads `reason`), passed with its reason, out of reach, its own chain, a cap
+ * reached, or undone.
+ */
+export interface CardDelegate {
+  agentId: string;
+  forUserId: string;
+  state: "deciding" | "approved" | "passed" | "outside" | "own" | "limit" | "undone";
+  reason?: string;
+  decisionId?: string;
+  at: string;
+  undoUntil?: string;
+  undoneByUserId?: string;
+}
+
+/** "Quem aprova por mim" (ADR 0139): how one cover reads, from either side. */
+export interface ApprovalCoverView {
+  /** Who covers me (`cover`), or whom I cover (`covering`). */
+  userId: string;
+  /** `while_out`: only while the covered person's status says out of office. */
+  mode: "always" | "while_out";
+  /** Merge, deploy and other high-risk actions are in. */
+  risky: boolean;
+  endsAt: string | null;
+  /** Deciding now. */
+  active: boolean;
+}
+
+export interface ApprovalCovers {
+  cover: ApprovalCoverView | null;
+  covering: ApprovalCoverView[];
+}
+
+export interface ApprovalCoverInput {
+  userId: string;
+  mode: "always" | "while_out";
+  risky: boolean;
+  endsAt: string | null;
+}
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {

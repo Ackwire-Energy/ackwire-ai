@@ -155,6 +155,7 @@ function AppStack() {
       <Stack.Screen name="invite-note" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="suggest-person" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/notifications" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/approvals" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/start" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/activity" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/sounds" options={{ ...pushed, ...scrollUnder }} />

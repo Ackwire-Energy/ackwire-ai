@@ -12708,6 +12708,24 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   display: flex;
   align-items: center;
 }
+/* Configurações › Aprovações (ADR 0139): a row whose box is the choice, the box on the label's first line. */
+.settings-row.rh-check {
+  align-items: flex-start;
+  gap: 12px;
+}
+.rh-check .ac-check {
+  flex: none;
+  margin-top: 2px;
+}
+.rh-check .ac-check[data-disabled] + .settings-row__text .settings-row__label {
+  color: var(--muted);
+}
+.rh-money {
+  gap: 10px;
+}
+.rh-money .ac-input-affix {
+  width: 120px;
+}
 /* Configurações › Sua conta: a line that opens something is a button, its chevron at the end. Its hover stays inside
    the card's corners. */
 .ac-card:has(> .settings-rows > .settings-row--open) {

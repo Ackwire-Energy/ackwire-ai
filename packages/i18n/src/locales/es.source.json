@@ -34049,5 +34049,194 @@
   },
   "chat.body.person_limit": {
     "value": "The person who asked reached their usage limit for this month. To keep going now, ask an admin."
+  },
+  "settings.section.approvals": {
+    "value": "Approvals"
+  },
+  "settings.sectionText.approvals": {
+    "value": "Who decides for you when an agent asks for something that waits for your approval."
+  },
+  "approval.outcomeApprovedCovering": {
+    "value": "Approved by {{name}}, covering {{for}}"
+  },
+  "approval.outcomeRefusedCovering": {
+    "value": "Refused by {{name}}, covering {{for}}"
+  },
+  "approval.outcomeApprovedByYouCovering": {
+    "value": "Approved by you, covering {{for}}"
+  },
+  "approval.outcomeRefusedByYouCovering": {
+    "value": "Refused by you, covering {{for}}"
+  },
+  "approval.outcomeApprovedCoveringYou": {
+    "value": "Approved by {{name}}, covering for you"
+  },
+  "approval.outcomeRefusedCoveringYou": {
+    "value": "Refused by {{name}}, covering for you"
+  },
+  "notifications.what.approvalCover": {
+    "value": "<b>{{name}}</b> picked you in Who approves for me"
+  },
+  "notifications.what.approvalCoverDeclined": {
+    "value": "<b>{{name}}</b> won't approve for you any more"
+  },
+  "notifications.what.approvalCoverEnded": {
+    "value": "<b>{{name}}</b> ended who approves for you"
+  },
+  "approvalCover.title": {
+    "value": "Who approves for me"
+  },
+  "approvalCover.subtitle": {
+    "value": "Decides in your name what is asked of you, and never what that person asked for."
+  },
+  "approvalCover.person": {
+    "value": "Person"
+  },
+  "approvalCover.nobody": {
+    "value": "No one"
+  },
+  "approvalCover.when": {
+    "value": "When"
+  },
+  "approvalCover.whenHelp": {
+    "value": "Out: when your status says you're out of office."
+  },
+  "approvalCover.whileOut": {
+    "value": "Only when I'm out"
+  },
+  "approvalCover.always": {
+    "value": "Always"
+  },
+  "approvalCover.until": {
+    "value": "Until"
+  },
+  "approvalCover.noDate": {
+    "value": "No end date"
+  },
+  "approvalCover.clearDate": {
+    "value": "Remove the date"
+  },
+  "approvalCover.risky": {
+    "value": "Merge, deploy and other risky actions"
+  },
+  "approvalCover.riskyOff": {
+    "value": "Off, these stay with you only."
+  },
+  "approvalCover.riskyOn": {
+    "value": "On, this person decides these too."
+  },
+  "approvalCover.lock": {
+    "value": "Always yours: money, people and roles, AI keys, your mailbox and deleting."
+  },
+  "approvalCover.coveringTitle": {
+    "value": "You approve for"
+  },
+  "approvalCover.coveringSubtitle": {
+    "value": "What is asked of these people reaches you too, and you decide in their name. Never what you asked for."
+  },
+  "approvalCover.coveringWhileOut": {
+    "value": "When they're out"
+  },
+  "approvalCover.coveringUntil": {
+    "value": "until {{date}}"
+  },
+  "approvalCover.coveringNow": {
+    "value": "Covering now"
+  },
+  "approvalCover.decline": {
+    "value": "Stop covering"
+  },
+  "approvalCover.failed": {
+    "value": "Couldn't save. Try again."
+  },
+  "rightHandApprovals.title": {
+    "value": "{{name}} approves for you"
+  },
+  "rightHandApprovals.subtitle": {
+    "value": "Only what came from a request of yours. What it wouldn't approve, it passes to you."
+  },
+  "rightHandApprovals.newAgents": {
+    "value": "Create agents other agents propose"
+  },
+  "rightHandApprovals.newAgentsHelp": {
+    "value": "No apps, open channels only. You can undo it for 24 h."
+  },
+  "rightHandApprovals.agentChanges": {
+    "value": "Change an agent's model, budget and channels"
+  },
+  "rightHandApprovals.agentChangesHelp": {
+    "value": "The model only on the same AI account."
+  },
+  "rightHandApprovals.cantDecide": {
+    "value": "You don't decide this today"
+  },
+  "rightHandApprovals.budget": {
+    "value": "Extra budget, per agent"
+  },
+  "rightHandApprovals.budgetHelp": {
+    "value": "Above that, the request goes to you."
+  },
+  "rightHandApprovals.perMonth": {
+    "value": "/month"
+  },
+  "rightHandApprovals.guidanceLabel": {
+    "value": "How {{name}} decides for you"
+  },
+  "rightHandApprovals.guidancePlaceholder": {
+    "value": "How {{name}} decides for you (optional). E.g.: no duplicate agents."
+  },
+  "rightHandApprovals.paused": {
+    "value": "Paused: you undid 3 of its decisions this week. Turn it back on when you want."
+  },
+  "rightHandApprovals.card.deciding": {
+    "value": "{{name}} is looking at it for {{for}}…"
+  },
+  "rightHandApprovals.card.approved": {
+    "value": "Approved by {{name}} for {{for}}"
+  },
+  "rightHandApprovals.card.passed": {
+    "value": "{{name}} passed it to you"
+  },
+  "rightHandApprovals.card.passedWhy": {
+    "value": "{{name}} passed it to you: {{reason}}"
+  },
+  "rightHandApprovals.card.outside": {
+    "value": "Outside what you let {{name}} approve"
+  },
+  "rightHandApprovals.card.own": {
+    "value": "{{name}} doesn't decide its own request"
+  },
+  "rightHandApprovals.card.limit": {
+    "value": "{{name}} reached today's limit: this one stays with you"
+  },
+  "rightHandApprovals.card.undoneByYou": {
+    "value": "Undone by you"
+  },
+  "rightHandApprovals.card.undoneBy": {
+    "value": "Undone by {{name}}"
+  },
+  "rightHandApprovals.card.why": {
+    "value": "Why?"
+  },
+  "rightHandApprovals.card.undo": {
+    "value": "Undo"
+  },
+  "rightHandApprovals.card.undoArchives": {
+    "value": "Undo archives {{name}}. It lasts until {{until}}."
+  },
+  "rightHandApprovals.card.undoSettings": {
+    "value": "Undo puts the settings back. It lasts until {{until}}."
+  },
+  "notifications.what.rightHandDecided": {
+    "value": "Requests <b>{{name}}</b> approved for you today: {{count}}"
+  },
+  "notifications.what.rightHandPaused": {
+    "value": "<b>{{name}}</b> stopped approving for you: you undid 3 of its decisions this week"
+  },
+  "rightHandApprovals.card.approvedForYou": {
+    "value": "Approved by {{name}} for you"
+  },
+  "rightHandApprovals.card.decidingForYou": {
+    "value": "{{name}} is looking at it for you…"
   }
 }

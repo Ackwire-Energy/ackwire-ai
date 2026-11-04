@@ -172,6 +172,8 @@ function SourceChip({
   let label = "";
   if (WIDGET_NOTICES.has(n.kind)) [icon, label] = ["grid", t("notifications.source.dashboard")];
   else if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];
+  else if (n.kind === "approval_cover" || n.kind === "right_hand_paused")
+    [icon, label] = ["approve", t("settings.section.approvals")];
   else if (n.kind === "join_request" || n.kind === "invitation_accepted")
     [icon, label] = ["members", t("notifications.source.members")];
   else if (n.kind === "composio_limit") [icon, label] = ["wallet", t("notifications.source.usage")];

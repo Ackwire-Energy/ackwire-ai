@@ -103,6 +103,9 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     case "routine_paused":
       // Its name only: the app says why, in the person's words.
       return out(s.routinePausedTitle, what || s.routinePausedBody);
+    case "right_hand_paused":
+      // The right hand's name (what the workspace calls it).
+      return out(s.rightHandPausedTitle(actor), s.rightHandPausedBody);
     case "agent_unreached":
       return out(s.agentUnreachedTitle(actor), what || s.agentUnreachedBody);
     case "routine_stalled":

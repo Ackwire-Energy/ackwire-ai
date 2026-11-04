@@ -29,6 +29,7 @@ export type AppHref =
   | "/issues"
   | "/connectors"
   | "/me/members"
+  | "/me/approvals"
   | "/settings/computers"
   | "/settings/skills"
   | "/activity"
@@ -235,6 +236,8 @@ export function notificationHref(
   if (n.kind === "join_request") return "/join-requests";
   // Someone who joined: Membros, where they now are (the app has no "say hi" of its own for them).
   if (n.kind === "invitation_accepted") return "/me/members";
+  // Who approves for whom (ADR 0139): Perfil › Aprovações, where it is set and declined.
+  if (n.kind === "approval_cover" || n.kind === "right_hand_paused") return "/me/approvals";
   // A server changed approved tools: accepted in Conectores.
   if (n.kind === "connector_tool_changed") return "/connectors";
   // An update of a skill from its link: the skill's page, where what waits is applied.

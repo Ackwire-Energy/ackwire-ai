@@ -335,7 +335,14 @@ export async function decideProposal(
   orgId: string,
   proposalId: string,
   decision: "accept" | "reject",
-  options: { finalText?: string; judge?: Judge; pubsub?: PubSub; blobs?: BlobStoreResolver } = {},
+  options: {
+    finalText?: string;
+    judge?: Judge;
+    pubsub?: PubSub;
+    blobs?: BlobStoreResolver;
+    /** The right hand's name when it accepted for `actorId` (ADR 0139): the proposer reads it decided for them. */
+    via?: string;
+  } = {},
 ): Promise<Proposal> {
   const [p] = await db
     .select()
@@ -432,7 +439,7 @@ export async function decideProposal(
   if (decided.status === "rejected" && !isRightHand(await proposerOf(db, decided)))
     await recordRefusal(db, actorId, decided);
   // Also for a row gone stale: it may be the card's last open one.
-  await tellProposer({ db, pubsub: options.pubsub }, decided).catch(() => {});
+  await tellProposer({ db, pubsub: options.pubsub }, decided, options.via).catch(() => {});
   await settled({ db, pubsub: options.pubsub }, decided).catch(() => {});
   if (decided.status === "stale")
     throw new ConflictError("What this was proposed against changed since, so it can't be applied.");
@@ -660,7 +667,7 @@ async function recordRefusal(db: Database, actorId: string, p: Proposal) {
 const NOTICE_ROW_CHARS = 300;
 
 /** What the agent that proposed a card reads about its decided rows, by what became of them. */
-async function cardResult(db: Executor, proposerId: string, rows: Proposal[]) {
+async function cardResult(db: Executor, proposerId: string, rows: Proposal[], via?: string) {
   const ids = (list: (string | null)[]) => [...new Set(list.flatMap((id) => (id ? [id] : [])))];
   const team = await db
     .select({ id: agents.id, handle: agents.handle })
@@ -687,7 +694,8 @@ async function cardResult(db: Executor, proposerId: string, rows: Proposal[]) {
   const decided = (status: Proposal["status"]) => {
     const those = rows.filter((r) => r.status === status);
     const who = ids(those.map((r) => r.decidedByUserId)).map((id) => names.get(id) ?? "A person");
-    return { who: who.join(" and ") || "A person", lines: those.map(line).join("; ") };
+    const people = who.join(" and ") || "A person";
+    return { who: via ? `${via}, on behalf of ${people},` : people, lines: those.map(line).join("; ") };
   };
   const accepted = decided("accepted");
   const refused = decided("rejected");
@@ -740,7 +748,7 @@ async function cardOf(db: Executor, p: Proposal) {
  * it (ADR 0092 §6). One notice per card, when its last open row is decided, in the conversation it proposed in.
  * A card that only went stale changed nothing to tell. After the commit.
  */
-async function tellProposer(deps: { db: Database; pubsub?: PubSub }, p: Proposal) {
+async function tellProposer(deps: { db: Database; pubsub?: PubSub }, p: Proposal, via?: string) {
   const card = await cardOf(deps.db, p);
   if (!card) return;
   // The card's own key: a message may show several.
@@ -775,7 +783,7 @@ async function tellProposer(deps: { db: Database; pubsub?: PubSub }, p: Proposal
     return deliverNoticeToRun(tx, run, {
       kind: "proposal_result",
       from: "Your proposed change",
-      text: await cardResult(tx, run.agentId, rows),
+      text: await cardResult(tx, run.agentId, rows, via),
       refs: { proposalCardId: key },
     });
   });

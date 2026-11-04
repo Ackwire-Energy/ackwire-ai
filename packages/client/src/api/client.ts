@@ -41,6 +41,8 @@ import type {
   AppConsentDecision,
   AppNotification,
   Approval,
+  ApprovalCoverInput,
+  ApprovalCovers,
   ApprovalRule,
   AppsList,
   Artifact,
@@ -209,6 +211,8 @@ import type {
   Reminder,
   ReminderInput,
   RemovalPreview,
+  RightHandApprovals,
+  RightHandApprovalsInput,
   Role,
   RoleInput,
   RosterMember,
@@ -772,6 +776,16 @@ export interface ApiClient {
     rules(orgId: string, agentId: string): Promise<ApprovalRule[]>;
     /** The agent asks again for that kind (admins and the agent's owner). */
     removeRule(orgId: string, agentId: string, ruleId: string): Promise<void>;
+    /** Who approves for me, and whom I approve for (ADR 0139). */
+    covers(orgId: string): Promise<ApprovalCovers>;
+    setCover(orgId: string, input: ApprovalCoverInput): Promise<ApprovalCovers>;
+    /** Ends `userId`'s cover: mine, the one I give them ("Não quero cobrir"), or any as an admin. */
+    endCover(orgId: string, userId: string): Promise<void>;
+    /** What the right hand may approve for me (ADR 0139 §2). */
+    rightHand(orgId: string): Promise<RightHandApprovals>;
+    setRightHand(orgId: string, input: RightHandApprovalsInput): Promise<RightHandApprovals>;
+    /** Desfazer, for 24 hours: a new agent is archived, settings go back. */
+    undoRightHand(orgId: string, decisionId: string): Promise<void>;
   };
   connectors: {
     /** Connectors agentes.chat knows, with their scopes, plus the built-in scopes. */

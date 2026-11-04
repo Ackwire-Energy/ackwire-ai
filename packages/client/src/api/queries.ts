@@ -64,6 +64,7 @@ import type {
   AppConsentDecision,
   AppNotification,
   Approval,
+  ApprovalCoverInput,
   ArtifactContent,
   ArtifactDetail,
   ArtifactFilters,
@@ -73,6 +74,7 @@ import type {
   BlockState,
   CalendarEventInput,
   CalendarEventPatch,
+  CardDelegate,
   Channel,
   ChannelInput,
   ChannelOverride,
@@ -122,6 +124,8 @@ import type {
   Proposal,
   ReactionCount,
   ReminderInput,
+  RightHandApprovals,
+  RightHandApprovalsInput,
   Role,
   RoleInput,
   Routine,
@@ -1666,6 +1670,88 @@ export function useRemoveApprovalRule(orgId: string, agentId: string) {
     mutationFn: (ruleId: string) => api.approvals.removeRule(orgId, agentId, ruleId),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, agentId) }),
   });
+}
+
+/** "Quem aprova por mim" (ADR 0139): who covers me, and whom I cover. */
+export const useApprovalCovers = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.approvalCovers(orgId), queryFn: () => api.approvals.covers(orgId) });
+};
+
+/** Chooses who covers me (`input`), or with null ends it. */
+export function useSetApprovalCover(orgId: string, meId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ApprovalCoverInput | null) => {
+      if (input) return api.approvals.setCover(orgId, input);
+      await api.approvals.endCover(orgId, meId);
+      return null;
+    },
+    onSuccess: (covers) =>
+      covers
+        ? qc.setQueryData(keys.approvalCovers(orgId), covers)
+        : qc.invalidateQueries({ queryKey: keys.approvalCovers(orgId) }),
+  });
+}
+
+/** "Não quero cobrir": I stop covering `userId`. */
+export function useDeclineApprovalCover(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => api.approvals.endCover(orgId, userId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.approvalCovers(orgId) }),
+  });
+}
+
+/** "O Gerente aprova por você" (ADR 0139 §2). */
+export const useRightHandApprovals = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.rightHandApprovals(orgId), queryFn: () => api.approvals.rightHand(orgId) });
+};
+
+/** Saves a change at once, shown before the answer (a switch, a box, the budget, the guidance). */
+export function useSetRightHandApprovals(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const key = keys.rightHandApprovals(orgId);
+  return useMutation({
+    mutationFn: (input: RightHandApprovalsInput) => api.approvals.setRightHand(orgId, input),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: key });
+      const before = qc.getQueryData<RightHandApprovals>(key);
+      if (before) qc.setQueryData<RightHandApprovals>(key, { ...before, ...input });
+      return { before };
+    },
+    onError: (_e, _input, ctx) => ctx?.before && qc.setQueryData(key, ctx.before),
+    onSuccess: (next) => qc.setQueryData(key, next),
+  });
+}
+
+/** Desfazer on a card the right hand approved: the card says "Desfeito por …" when its event arrives. */
+export function useUndoRightHand(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (decisionId: string) => api.approvals.undoRightHand(orgId, decisionId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.rightHandApprovals(orgId) });
+    },
+  });
+}
+
+/** `card.delegate`: what the right hand did with a card, on the message in the cache. */
+export function cacheCardDelegate(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  where: { channelId: string; messageId: string },
+  delegate: CardDelegate | null,
+) {
+  cacheMessageMeta(qc, orgId, where.channelId, where.messageId, (meta) => ({
+    actionCard: { ...(meta.actionCard as Record<string, unknown> | undefined), delegate },
+  }));
 }
 
 // ── Connectors and agent scopes ─────────────────────────────────────────────
