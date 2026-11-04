@@ -2983,7 +2983,23 @@
       "invitationAccepted": "<b>{{name}}</b> davetinizi kabul etti ve {{org}} çalışma alanına katıldı",
       "invitationAcceptedAny": "<b>{{name}}</b> davetinizi kabul etti",
       "reaction_one": "<b>{{names}}</b> mesajınıza tepki verdi",
-      "reaction_other": "<b>{{names}}</b> mesajınıza tepki verdi"
+      "reaction_other": "<b>{{names}}</b> mesajınıza tepki verdi",
+      "usageLimitWarning": "Bu ayki limitinin %{{percent}} kadarını kullandın",
+      "usageLimitReachedSelf": "Bu ayki kullanım limitine ulaştın",
+      "usageLimitReached": "<b>{{name}}</b> {{amount}} limitine ulaştı",
+      "usageLimitRequest": "<b>{{name}}</b> {{amount}} limitine ulaştı ve daha fazlasını istiyor",
+      "usageLimitRaised": "<b>{{name}}</b> bu ayki limitini artırdı",
+      "usageLimitRefused": "<b>{{name}}</b> daha fazla kullanım isteğini reddetti"
+    },
+    "usageLimit": {
+      "runs_one": "Bu ay {{count}} istek",
+      "runs_other": "Bu ay {{count}} istek",
+      "top": "{{agent}} ile %{{share}}",
+      "fromRole": "{{role}} rolünün limiti.",
+      "fromRaised": "Limit bu ay artırıldı.",
+      "fromPerson": "Bu kişiye özel bir limit.",
+      "fromDefault": "Çalışma alanının varsayılan limiti.",
+      "line": "{{runs}}. {{from}}"
     },
     "source": {
       "channel": "#{{name}}",
@@ -3792,6 +3808,7 @@
         "credential_wrong_provider": "Model {{modelProvider}} sağlayıcısına ait, ama anahtar {{keyProvider}} sağlayıcısına ait.",
         "model_unlisted": "OpenRouter artık {{model}} sunmuyor. Ajanın ayarlarından başka bir model seçin.",
         "no_ai": "Ajana bağlı bir yapay zeka yok.",
+        "person_limit": "İsteyen kişi bu ayki kullanım limitine ulaştı.",
         "org_paused": "Çalışma alanının ajanları duraklatıldı.",
         "org_suspended": "Çalışma alanı kullanılamıyor.",
         "org_deleting": "Çalışma alanı siliniyor.",
@@ -5499,6 +5516,7 @@
       "agent_archived": "Ajan arşivlendi",
       "interrupted": "Sunucu yeniden başlatıldığı için kesildi",
       "no_ai": "Ajanın bağlı yapay zekası yok",
+      "person_limit": "Çalışmadı: oluşturan kişi bu ayki kullanım limitine ulaştı",
       "org_paused": "Çalışmadı: çalışma alanının ajanları duraklatılmıştı",
       "org_suspended": "Çalışmadı: çalışma alanı kullanılamıyordu",
       "org_deleting": "Çalışmadı: çalışma alanı siliniyordu",
@@ -9898,6 +9916,13 @@
     "urlHelp": "postgres:// ile başlar. Sondaki veritabanı adı isteğe bağlıdır. Sunucuda şifreli saklanır. Ajanlar dahil kimse bir daha göremez.",
     "urlPlaceholder": "postgres://user:password@host/db",
     "urlInvalid": "postgres:// ile başlayan bir adres yapıştırın ya da Gelişmiş altındaki alanları doldurun.",
+    "scope": "Hangi veritabanları",
+    "scopeOne": "Yalnızca bu veritabanı",
+    "scopeAll": "Bu sunucudaki tüm veritabanları",
+    "scopeAllHelp": "Her müşteri için ayrı veritabanı olanlar için. Ajanlar listeyi görür ve her sorguda veritabanını seçer.",
+    "prefix": "Yalnızca adı şununla başlayanlar",
+    "prefixPlaceholder": "Örn. musteri_",
+    "prefixHelp": "Hepsi için boş bırakın. Bu şekilde başlayan yeni veritabanları kendiliğinden görünür.",
     "howTitle": "Salt okunur kullanıcıyı nasıl oluştururum?",
     "howText": "Ajanlar yalnızca sorgu çalıştırır ama yalnızca okuyabilen bir kullanıcı bunu veritabanının kendisinde garanti eder.",
     "how": {
@@ -9932,11 +9957,13 @@
         "3": "postgres://agentes_leitura:şifre@sunucu:5432/veritabanı adresini oluşturup buraya yapıştırın."
       }
     },
+    "howAll": "Tüm veritabanlarını okumak için (Postgres 14 veya daha yeni).",
     "openPage": "{{name}} aç",
     "dedicated": "İpucu: Veritabanının salt okunur bir kopyası (replika) varsa onu bağlayın.",
     "advancedText": "Adres yerine ya da içindeki bir şeyi değiştirmek için.",
     "host": "Sunucu",
     "database": "Veritabanı",
+    "databaseOptional": "Tüm veritabanlarında isteğe bağlıdır.",
     "password": "Şifre",
     "passwordInvalid": "Veritabanı şifresini yazın.",
     "ssl": "Güvenli bağlantı",
@@ -9953,10 +9980,26 @@
     },
     "connect": "Bağla",
     "connectedToast": "{{name}} bağlandı.",
+    "connectedToastAll_one": "{{name}} {{count}} veritabanıyla bağlandı.",
+    "connectedToastAll_other": "{{name}} {{count}} veritabanıyla bağlandı.",
+    "count_one": "{{count}} veritabanı",
+    "count_other": "{{count}} veritabanı",
+    "prefixRow": "{{prefix}} ile başlayan veritabanları",
+    "refresh": "Listeyi yenile",
+    "refreshName": "{{name}} veritabanı listesini yenile",
+    "scopeEdit": "Veritabanları",
+    "scopeEditName": "{{name}} veritabanları",
+    "scopeSaved": "{{name}} kaydedildi.",
+    "widenTitle": "Sunucunun tamamı açılsın mı?",
+    "widenTitlePrefix": "Daha fazla veritabanı açılsın mı?",
+    "widenText_one": "Erişimi olan ajan bu sunucudaki tüm veritabanlarını okuyabilecek. Ajan başına sınırı Kurallar bölümünden koyabilirsiniz.",
+    "widenText_other": "Erişimi olan {{count}} ajan bu sunucudaki tüm veritabanlarını okuyabilecek. Ajan başına sınırı Kurallar bölümünden koyabilirsiniz.",
+    "widenTextPrefix_one": "Erişimi olan ajan {{prefix}} ile başlayan tüm veritabanlarını okuyabilecek. Ajan başına sınırı Kurallar bölümünden koyabilirsiniz.",
+    "widenTextPrefix_other": "Erişimi olan {{count}} ajan {{prefix}} ile başlayan tüm veritabanlarını okuyabilecek. Ajan başına sınırı Kurallar bölümünden koyabilirsiniz.",
     "testing": {
       "reach": "Veritabanına ulaşılıyor…",
-      "tables": "Tablolara bakılıyor…",
-      "databases": "Veritabanlarına bakılıyor…"
+      "databases": "Veritabanlarına bakılıyor…",
+      "tables": "Tablolara bakılıyor…"
     },
     "canWrite": "Bu kullanıcı verileri değiştirebilir. Ajanlar zaten yalnızca okur ama en güvenlisi salt okunur bir kullanıcıdır (nasıl oluşturulacağını 1. adımda görün).",
     "toolsLead": "Ajanların {{name}} içinde yapabilecekleri. Şimdilik yalnızca okurlar: veritabanında hiçbir şey değişmez.",
@@ -9995,23 +10038,23 @@
       "tablesLoading": "Tablolar yükleniyor…",
       "tablesError": "Tablolar şu anda okunamadı.",
       "tablesHelp": "Hiçbiri işaretli değilse = tüm tablolar.",
+      "tablesIn": "Tablolar ({{database}} içinde görülen)",
+      "databases": "Veritabanları",
+      "databasesAll": "Tümü",
+      "databasesSome": "Yalnızca bunlar",
+      "databasePlaceholder": "Veritabanı adı",
+      "databasesHelp": "Aşağıdaki kurallar bu ajanın okuduğu her veritabanı için geçerlidir.",
       "hidden": "Asla görmediği sütunlar",
       "hiddenHelp": "tablo.sütun biçiminde. Büyük harf, boşluk veya simge içeren adları çift tırnak içine alın (customers.\"Tax ID\"). Kişisel veri veya şifre gibi görünenleri zaten gizledik.",
       "hiddenPlaceholder": "customers.cpf",
       "hiddenInvalid": "tablo.sütun (veya şema.tablo.sütun) yazın. Büyük harf, boşluk veya simge içeren adları \"çift tırnak\" içine alın.",
       "cap": "Günlük sorgu sayısı",
       "capHelp": "Boş = limit yok.",
+      "capHelpAll": "Boş = sınır yok. Tüm veritabanları toplanır.",
       "timeout": "Sorgu başına süre limiti",
       "timeoutHelp": "Daha uzun süren bir sorgu, veritabanını yormasın diye iptal edilir.",
       "seconds_one": "{{count}} saniye",
-      "seconds_other": "{{count}} saniye",
-      "databases": "Veritabanları",
-      "databasesAll": "Tümü",
-      "databasesSome": "Yalnızca bunlar",
-      "databasePlaceholder": "Veritabanı adı",
-      "databasesHelp": "Aşağıdaki kurallar bu ajanın okuduğu her veritabanı için geçerlidir.",
-      "tablesIn": "Tablolar ({{database}} içinde görülen)",
-      "capHelpAll": "Boş = sınır yok. Tüm veritabanları toplanır."
+      "seconds_other": "{{count}} saniye"
     },
     "agent": {
       "title": "Veritabanları",
@@ -10022,32 +10065,7 @@
       "allDatabases": "{{name}} içindeki tüm veritabanları",
       "someDatabases_one": "{{name}} içinde {{count}} veritabanı",
       "someDatabases_other": "{{name}} içinde {{count}} veritabanı"
-    },
-    "scope": "Hangi veritabanları",
-    "scopeOne": "Yalnızca bu veritabanı",
-    "scopeAll": "Bu sunucudaki tüm veritabanları",
-    "scopeAllHelp": "Her müşteri için ayrı veritabanı olanlar için. Ajanlar listeyi görür ve her sorguda veritabanını seçer.",
-    "prefix": "Yalnızca adı şununla başlayanlar",
-    "prefixPlaceholder": "Örn. musteri_",
-    "prefixHelp": "Hepsi için boş bırakın. Bu şekilde başlayan yeni veritabanları kendiliğinden görünür.",
-    "databaseOptional": "Tüm veritabanlarında isteğe bağlıdır.",
-    "connectedToastAll_one": "{{name}} {{count}} veritabanıyla bağlandı.",
-    "connectedToastAll_other": "{{name}} {{count}} veritabanıyla bağlandı.",
-    "howAll": "Tüm veritabanlarını okumak için (Postgres 14 veya daha yeni).",
-    "count_one": "{{count}} veritabanı",
-    "count_other": "{{count}} veritabanı",
-    "prefixRow": "{{prefix}} ile başlayan veritabanları",
-    "refresh": "Listeyi yenile",
-    "refreshName": "{{name}} veritabanı listesini yenile",
-    "scopeEdit": "Veritabanları",
-    "scopeEditName": "{{name}} veritabanları",
-    "scopeSaved": "{{name}} kaydedildi.",
-    "widenTitle": "Sunucunun tamamı açılsın mı?",
-    "widenTitlePrefix": "Daha fazla veritabanı açılsın mı?",
-    "widenText_one": "Erişimi olan ajan bu sunucudaki tüm veritabanlarını okuyabilecek. Ajan başına sınırı Kurallar bölümünden koyabilirsiniz.",
-    "widenText_other": "Erişimi olan {{count}} ajan bu sunucudaki tüm veritabanlarını okuyabilecek. Ajan başına sınırı Kurallar bölümünden koyabilirsiniz.",
-    "widenTextPrefix_one": "Erişimi olan ajan {{prefix}} ile başlayan tüm veritabanlarını okuyabilecek. Ajan başına sınırı Kurallar bölümünden koyabilirsiniz.",
-    "widenTextPrefix_other": "Erişimi olan {{count}} ajan {{prefix}} ile başlayan tüm veritabanlarını okuyabilecek. Ajan başına sınırı Kurallar bölümünden koyabilirsiniz."
+    }
   },
   "mail": {
     "choice": {
@@ -11394,7 +11412,7 @@
       "skills": "Ajanların ihtiyaç duyduklarında açtıkları Markdown talimatları.",
       "keys": "Planlarınız ve çalışma alanının API anahtarları.",
       "storage": "Çalışma alanının dosyalarının durduğu yer.",
-      "usage": "Bütçeler ve her ajanın bu ay harcadıkları.",
+      "usage": "Her kişinin ve her ajanın ne kadar yapay zekâ kullandığı ve ayın limitleri.",
       "audit": "Ajanların konuşma dışında yaptıkları ve kişilerin değiştirdikleri. Yalnızca yöneticiler görür.",
       "import": "Başka bir uygulamadan ya da çalışma alanından ajan getirin ve bu çalışma alanını istediğiniz yere götürün.",
       "billing": "Bu çalışma alanının agentes.chat planı, kartı ve faturaları uygulamanın dışında, bize ait bir sayfada.",
@@ -11584,6 +11602,149 @@
         "jev": "Ajanlar kendiliğinden çıkartmayı yalnızca Jev ile gönderir.",
         "jevLink": "Jev'i kur"
       }
+    }
+  },
+  "peopleUsage": {
+    "tabs": {
+      "summary": "Özet",
+      "people": "Kişiler",
+      "mine": "Kullanımın"
+    },
+    "view": {
+      "usage": "Kullanım",
+      "limits": "Limitler"
+    },
+    "title": "Kişi başına kullanım",
+    "about": "Her kişinin ne kadar ve hangi ajanlarla kullandığını görürsün. Özel konuşmaların içeriği burada asla görünmez.",
+    "plansAbout": "Plan zaten ödendi. Bu tutar yalnızca kişiler arasındaki kullanımı karşılaştırır.",
+    "sub_one": "{{month}} · {{count}} kişi · {{amount}} yapay zekâ",
+    "sub_other": "{{month}} · {{count}} kişi · {{amount}} yapay zekâ",
+    "periodLabel": "Dönem",
+    "period": {
+      "month": "Bu ay",
+      "last7": "Son 7 gün",
+      "last30": "Son 30 gün",
+      "lastMonth": "Geçen ay"
+    },
+    "role": "Rol",
+    "roleAll": "Rol: tümü",
+    "agent": "Ajan",
+    "agentAll": "Ajan: tümü",
+    "chips": {
+      "near": "Limite yakın",
+      "at": "Limitte",
+      "idle": "Kullanım yok"
+    },
+    "summary": {
+      "near": "Limite yakın: {{n}}",
+      "at": "Limitte: {{n}}",
+      "idle": "Dönemde kullanım yok: {{n}}"
+    },
+    "export": "CSV dışa aktar",
+    "limitsHint": "Limitler bölümünde kişi başına limit belirle",
+    "empty": "Bu ay henüz kimse ajan kullanmadı.",
+    "owner": "Sahip",
+    "member": "Üye",
+    "columns": {
+      "person": "Kişi",
+      "now": "Şimdi",
+      "runs": "İstekler",
+      "agents": "En çok kullanılan",
+      "usage": "Bu ay",
+      "caresFor": "İlgilendiği",
+      "created": "Oluşturdu"
+    },
+    "now": {
+      "channel": "#{{channel}} içinde {{agent}} ile",
+      "private": "{{agent}} ile özel bir konuşmada",
+      "hidden": "Özel bir kanalda {{agent}} ile",
+      "routine": "Rutin {{name}}",
+      "last": "Son kullanım {{when}}",
+      "never": "Kullanım yok"
+    },
+    "meter": {
+      "of": "/ {{limit}}",
+      "noLimit": "· limitsiz",
+      "estimate": "API üzerinden ≈ {{amount}}"
+    },
+    "live": {
+      "title": "Şimdi",
+      "routineOf": "{{name}} rutini"
+    },
+    "from": {
+      "raised": "bu ay artırıldı",
+      "person": "bu kişi için belirlendi",
+      "role": "{{role}} rolünden",
+      "default": "çalışma alanı varsayılanı"
+    },
+    "drawer": {
+      "limit": "Bu ayın limiti: {{amount}}",
+      "noLimit": "Bu ay kullanım limiti yok.",
+      "reached": "{{date}} tarihinde limite ulaştı · {{used}} kullanıldı",
+      "used": "{{used}} kullanıldı · %{{percent}}",
+      "raise": "Limiti artır",
+      "raiseTo": "Bu ay için yeni limit (US$)",
+      "raiseSave": "Artır",
+      "raised": "Limit bu ay için artırıldı",
+      "asked": "Daha fazla istedi",
+      "days": "Günlük kullanım",
+      "agents": "Hangi ajanlarla",
+      "runs_one": "{{count}} istek",
+      "runs_other": "{{count}} istek",
+      "recent": "Son yaptıkları",
+      "untitled": "Başlıksız",
+      "with": "{{agent}} ile",
+      "minutes": "{{n}} dk",
+      "private": "{{agent}} ile özel konuşma",
+      "hidden": "Özel bir kanalda {{agent}} ile",
+      "routine": "Rutin {{name}}",
+      "created": "Oluşturduğu ajanlar",
+      "createdAt": "{{date}} tarihinde oluşturuldu",
+      "audit": "Ajanların eylemlerini Denetim'de gör",
+      "noUse": "Bu dönemde kullanım yok."
+    },
+    "limits": {
+      "title": "Kişi başına kullanım limiti",
+      "lead": "Her kişinin ayda tüm ajanlarda toplam ne kadar yapay zekâ kullanabileceği. İstedikleri ve oluşturdukları rutinler sayılır.",
+      "default": "Çalışma alanı varsayılanı",
+      "defaultHint": "Rolden ya da istisnadan limiti olmayan herkes için geçerli.",
+      "byRole": "Role göre",
+      "people": "İstisnalar",
+      "addPerson": "Kişi ekle",
+      "useDefault": "Varsayılanı kullan",
+      "none": "Limitsiz",
+      "amount": "Aylık limit",
+      "rule": "Kişinin kendi limiti geçerlidir. Yoksa rollerinin en yükseği. Hiçbiri yoksa varsayılan. Sahiplerin limiti yoktur.",
+      "whenTitle": "Biri limite ulaştığında",
+      "block": "Ajanlar o kişi için yeni iş başlatmayı bırakır",
+      "notify": "Yalnızca yöneticilere haber ver",
+      "warn": "%80'de uyar",
+      "warnHint": "Kişi bir bildirim alır, yöneticiler de %100'de bir tane daha alır.",
+      "saved": "Limitler kaydedildi"
+    },
+    "mine": {
+      "title": "Bu ayki limitinin %{{percent}} kadarını kullandın",
+      "noLimit": "Bu ay kullanım limitin yok",
+      "renews": "{{date}} tarihinde yenilenir.",
+      "near": "Limite yakınsın, bir yöneticiden daha fazlasını iste.",
+      "recent": "Son yaptıkların",
+      "ofLimit": "Limitin %{{percent}} kadarı"
+    },
+    "card": {
+      "title": "Bu ayki kullanım limitine ulaştın",
+      "text": "{{date}} tarihinde yenilenir. Şimdi devam etmek için bir yöneticiye sor.",
+      "ask": "Daha fazla iste",
+      "asked": "İstek gönderildi",
+      "see": "Kullanımımı gör",
+      "other": "{{name}} bu ayki kullanım limitine ulaştı",
+      "raised": "{{name}} bu ayki limitini artırdı. Devam edebilirsin.",
+      "raisedOther": "{{name}} bu ayın limitini artırdı",
+      "refused": "{{name}} isteği reddetti. Limit {{date}} tarihinde yenilenir."
+    },
+    "actions": {
+      "raise": "Bu ay {{amount}} olarak artır",
+      "refuse": "Reddet",
+      "see": "Kullanımı gör"
     }
   },
   "usageViews": {
@@ -12132,6 +12293,7 @@
       "work_end_canceled": "{{minutes}} dk sonra durduruldu.",
       "work_end_canceledBy": "{{minutes}} dk sonra {{name}} durdurdu.",
       "no_ai": "Henüz yanıt veremiyorum: bağlı bir yapay zekam yok.",
+      "person_limit": "Bu ayki kullanım limitine ulaştın. Şimdi devam etmek için bir yöneticiye sor.",
       "no_ai_signed_out": "Henüz yanıt veremiyorum: yapay zekamın oturumu kapalı.",
       "no_ai_not_signed_in": "Henüz yanıt veremiyorum: bilgisayarımda {{brain}} oturumu açık değil.",
       "action_connect_ai": "Yapay zeka bağla",

@@ -2996,7 +2996,23 @@
       "invitationAccepted": "<b>{{name}}</b> hat deine Einladung angenommen und ist {{org}} beigetreten",
       "invitationAcceptedAny": "<b>{{name}}</b> hat deine Einladung angenommen",
       "reaction_one": "<b>{{names}}</b> hat auf deine Nachricht reagiert",
-      "reaction_other": "<b>{{names}}</b> haben auf deine Nachricht reagiert"
+      "reaction_other": "<b>{{names}}</b> haben auf deine Nachricht reagiert",
+      "usageLimitWarning": "Du hast {{percent}} % deines Limits in diesem Monat verbraucht",
+      "usageLimitReachedSelf": "Du hast dein Nutzungslimit für diesen Monat erreicht",
+      "usageLimitReached": "<b>{{name}}</b> hat das Limit von {{amount}} erreicht",
+      "usageLimitRequest": "<b>{{name}}</b> hat das Limit von {{amount}} erreicht und bittet um mehr",
+      "usageLimitRaised": "<b>{{name}}</b> hat dein Limit für diesen Monat erhöht",
+      "usageLimitRefused": "<b>{{name}}</b> hat deine Bitte um mehr Nutzung abgelehnt"
+    },
+    "usageLimit": {
+      "runs_one": "{{count}} Anfrage diesen Monat",
+      "runs_other": "{{count}} Anfragen diesen Monat",
+      "top": "{{share}} % mit {{agent}}",
+      "fromRole": "Limit der Rolle {{role}}.",
+      "fromRaised": "Limit in diesem Monat erhöht.",
+      "fromPerson": "Ein Limit für diese Person.",
+      "fromDefault": "Das Standardlimit des Workspace.",
+      "line": "{{runs}}. {{from}}"
     },
     "source": {
       "channel": "#{{name}}",
@@ -3806,6 +3822,7 @@
         "credential_wrong_provider": "Das Modell ist von {{modelProvider}}, der Schlüssel aber von {{keyProvider}}.",
         "model_unlisted": "OpenRouter bietet {{model}} nicht mehr an. Wähle in den Einstellungen des Agenten ein anderes Modell.",
         "no_ai": "Der Agent hat keine KI verbunden.",
+        "person_limit": "Die anfragende Person hat ihr Nutzungslimit für diesen Monat erreicht.",
         "org_paused": "Die Agenten des Workspace sind pausiert.",
         "org_suspended": "Der Workspace ist nicht verfügbar.",
         "org_deleting": "Der Workspace wird gelöscht.",
@@ -5539,6 +5556,7 @@
       "agent_archived": "Der Agent wurde archiviert",
       "interrupted": "Durch einen Serverneustart unterbrochen",
       "no_ai": "Der Agent hat keine KI verbunden",
+      "person_limit": "Nicht gelaufen: Die erstellende Person hat ihr Nutzungslimit für diesen Monat erreicht",
       "org_paused": "Nicht gelaufen: Die Agenten des Workspace waren pausiert",
       "org_suspended": "Nicht gelaufen: Der Workspace war nicht verfügbar",
       "org_deleting": "Nicht gelaufen: Der Workspace wurde gerade gelöscht",
@@ -9960,6 +9978,13 @@
     "urlHelp": "Beginnt mit postgres://. Der Datenbankname am Ende ist optional. Verschlüsselt auf dem Server gespeichert. Niemand sieht sie wieder, nicht einmal die Agenten.",
     "urlPlaceholder": "postgres://benutzer:passwort@host/db",
     "urlInvalid": "Füg eine Adresse ein, die mit postgres:// beginnt, oder füll die Felder unter Erweitert aus.",
+    "scope": "Welche Datenbanken",
+    "scopeOne": "Nur diese Datenbank",
+    "scopeAll": "Alle Datenbanken dieses Servers",
+    "scopeAllHelp": "Für eine Datenbank pro Kunde. Agenten sehen die Liste und wählen bei jeder Abfrage die Datenbank.",
+    "prefix": "Nur Namen, die beginnen mit",
+    "prefixPlaceholder": "Z. B. kunde_",
+    "prefixHelp": "Leer lassen für alle. Neue Datenbanken mit diesem Anfang erscheinen von selbst.",
     "howTitle": "Wie erstelle ich einen Benutzer mit reinem Lesezugriff?",
     "howText": "Agenten führen nur Abfragen aus, aber ein Benutzer, der nur lesen darf, stellt das in der Datenbank selbst sicher.",
     "how": {
@@ -9994,11 +10019,13 @@
         "3": "Bau die Adresse postgres://agentes_leitura:passwort@server:5432/datenbank und füg sie hier ein."
       }
     },
+    "howAll": "Um alle Datenbanken zu lesen (Postgres 14 oder neuer).",
     "openPage": "{{name}} öffnen",
     "dedicated": "Tipp: Wenn du eine Kopie der Datenbank nur zum Lesen hast (Replica), verbinde diese.",
     "advancedText": "Statt der Adresse, oder um etwas daran zu ändern.",
     "host": "Server",
     "database": "Datenbank",
+    "databaseOptional": "Optional bei allen Datenbanken.",
     "password": "Passwort",
     "passwordInvalid": "Gib das Passwort der Datenbank ein.",
     "ssl": "Sichere Verbindung",
@@ -10015,10 +10042,26 @@
     },
     "connect": "Verbinden",
     "connectedToast": "{{name}} verbunden.",
+    "connectedToastAll_one": "{{name}} mit {{count}} Datenbank verbunden.",
+    "connectedToastAll_other": "{{name}} mit {{count}} Datenbanken verbunden.",
+    "count_one": "{{count}} Datenbank",
+    "count_other": "{{count}} Datenbanken",
+    "prefixRow": "Datenbanken, die mit {{prefix}} beginnen",
+    "refresh": "Liste aktualisieren",
+    "refreshName": "Liste der Datenbanken von {{name}} aktualisieren",
+    "scopeEdit": "Datenbanken",
+    "scopeEditName": "Datenbanken von {{name}}",
+    "scopeSaved": "{{name}} gespeichert.",
+    "widenTitle": "Den ganzen Server öffnen?",
+    "widenTitlePrefix": "Mehr Datenbanken öffnen?",
+    "widenText_one": "Der Agent mit Zugriff liest dann alle Datenbanken dieses Servers. Unter Regeln lässt sich das pro Agent begrenzen.",
+    "widenText_other": "Die {{count}} Agenten mit Zugriff lesen dann alle Datenbanken dieses Servers. Unter Regeln lässt sich das pro Agent begrenzen.",
+    "widenTextPrefix_one": "Der Agent mit Zugriff liest dann alle Datenbanken, die mit {{prefix}} beginnen. Unter Regeln lässt sich das pro Agent begrenzen.",
+    "widenTextPrefix_other": "Die {{count}} Agenten mit Zugriff lesen dann alle Datenbanken, die mit {{prefix}} beginnen. Unter Regeln lässt sich das pro Agent begrenzen.",
     "testing": {
       "reach": "Datenbank wird erreicht…",
-      "tables": "Tabellen werden angesehen…",
-      "databases": "Datenbanken werden angesehen…"
+      "databases": "Datenbanken werden angesehen…",
+      "tables": "Tabellen werden angesehen…"
     },
     "canWrite": "Dieser Benutzer kann Daten ändern. Agenten lesen sowieso nur, aber am sichersten ist ein Benutzer mit reinem Lesezugriff (wie du einen erstellst, steht in Schritt 1).",
     "toolsLead": "Was Agenten in {{name}} tun können. Vorerst lesen sie nur: In der Datenbank wird nichts geändert.",
@@ -10057,23 +10100,23 @@
       "tablesLoading": "Tabellen werden geladen…",
       "tablesError": "Die Tabellen konnten gerade nicht gelesen werden.",
       "tablesHelp": "Keine ausgewählt = alle Tabellen.",
+      "tablesIn": "Tabellen (gesehen in {{database}})",
+      "databases": "Datenbanken",
+      "databasesAll": "Alle",
+      "databasesSome": "Nur diese",
+      "databasePlaceholder": "Name der Datenbank",
+      "databasesHelp": "Die Regeln unten gelten für jede Datenbank, die dieser Agent liest.",
       "hidden": "Spalten, die er nie sieht",
       "hiddenHelp": "tabelle.spalte, Namen mit Großbuchstaben, Leerzeichen oder Symbolen in doppelten Anführungszeichen (kunden.\"Steuer-ID\"). Spalten, die nach persönlichen Daten oder Passwörtern aussehen, haben wir schon versteckt.",
       "hiddenPlaceholder": "kunden.steuer_id",
       "hiddenInvalid": "Gib tabelle.spalte (oder schema.tabelle.spalte) ein, mit \"doppelten Anführungszeichen\" um Namen mit Großbuchstaben, Leerzeichen oder Symbolen.",
       "cap": "Abfragen pro Tag",
       "capHelp": "Leer = kein Limit.",
+      "capHelpAll": "Leer = kein Limit. Über alle Datenbanken gezählt.",
       "timeout": "Zeitlimit pro Abfrage",
       "timeoutHelp": "Eine Abfrage, die länger dauert, wird abgebrochen, damit sie die Datenbank nicht belastet.",
       "seconds_one": "{{count}} Sekunde",
-      "seconds_other": "{{count}} Sekunden",
-      "databases": "Datenbanken",
-      "databasesAll": "Alle",
-      "databasesSome": "Nur diese",
-      "databasePlaceholder": "Name der Datenbank",
-      "databasesHelp": "Die Regeln unten gelten für jede Datenbank, die dieser Agent liest.",
-      "tablesIn": "Tabellen (gesehen in {{database}})",
-      "capHelpAll": "Leer = kein Limit. Über alle Datenbanken gezählt."
+      "seconds_other": "{{count}} Sekunden"
     },
     "agent": {
       "title": "Datenbanken",
@@ -10084,32 +10127,7 @@
       "allDatabases": "Alle Datenbanken von {{name}}",
       "someDatabases_one": "{{count}} Datenbank von {{name}}",
       "someDatabases_other": "{{count}} Datenbanken von {{name}}"
-    },
-    "scope": "Welche Datenbanken",
-    "scopeOne": "Nur diese Datenbank",
-    "scopeAll": "Alle Datenbanken dieses Servers",
-    "scopeAllHelp": "Für eine Datenbank pro Kunde. Agenten sehen die Liste und wählen bei jeder Abfrage die Datenbank.",
-    "prefix": "Nur Namen, die beginnen mit",
-    "prefixPlaceholder": "Z. B. kunde_",
-    "prefixHelp": "Leer lassen für alle. Neue Datenbanken mit diesem Anfang erscheinen von selbst.",
-    "databaseOptional": "Optional bei allen Datenbanken.",
-    "connectedToastAll_one": "{{name}} mit {{count}} Datenbank verbunden.",
-    "connectedToastAll_other": "{{name}} mit {{count}} Datenbanken verbunden.",
-    "howAll": "Um alle Datenbanken zu lesen (Postgres 14 oder neuer).",
-    "count_one": "{{count}} Datenbank",
-    "count_other": "{{count}} Datenbanken",
-    "prefixRow": "Datenbanken, die mit {{prefix}} beginnen",
-    "refresh": "Liste aktualisieren",
-    "refreshName": "Liste der Datenbanken von {{name}} aktualisieren",
-    "scopeEdit": "Datenbanken",
-    "scopeEditName": "Datenbanken von {{name}}",
-    "scopeSaved": "{{name}} gespeichert.",
-    "widenTitle": "Den ganzen Server öffnen?",
-    "widenTitlePrefix": "Mehr Datenbanken öffnen?",
-    "widenText_one": "Der Agent mit Zugriff liest dann alle Datenbanken dieses Servers. Unter Regeln lässt sich das pro Agent begrenzen.",
-    "widenText_other": "Die {{count}} Agenten mit Zugriff lesen dann alle Datenbanken dieses Servers. Unter Regeln lässt sich das pro Agent begrenzen.",
-    "widenTextPrefix_one": "Der Agent mit Zugriff liest dann alle Datenbanken, die mit {{prefix}} beginnen. Unter Regeln lässt sich das pro Agent begrenzen.",
-    "widenTextPrefix_other": "Die {{count}} Agenten mit Zugriff lesen dann alle Datenbanken, die mit {{prefix}} beginnen. Unter Regeln lässt sich das pro Agent begrenzen."
+    }
   },
   "mail": {
     "choice": {
@@ -11456,7 +11474,7 @@
       "skills": "Markdown-Anweisungen, die Agenten öffnen, wenn sie sie brauchen.",
       "keys": "Deine Abos und die API-Schlüssel des Workspace.",
       "storage": "Wo die Dateien des Workspace liegen.",
-      "usage": "Budgets und was jeder Agent diesen Monat ausgegeben hat.",
+      "usage": "Wie viel KI jede Person und jeder Agent nutzt, und die Limits des Monats.",
       "audit": "Was die Agenten außerhalb der Unterhaltung getan und was Personen geändert haben. Nur Admins sehen es.",
       "import": "Hol Agenten aus einer anderen App oder einem anderen Workspace und nimm diesen mit, wohin du willst.",
       "billing": "Der agentes.chat-Tarif, die Karte und die Rechnungen dieses Workspace liegen auf einer eigenen Seite von uns, außerhalb der App.",
@@ -11646,6 +11664,149 @@
         "jev": "Agenten senden nur mit Jev von selbst Sticker.",
         "jevLink": "Jev einrichten"
       }
+    }
+  },
+  "peopleUsage": {
+    "tabs": {
+      "summary": "Übersicht",
+      "people": "Personen",
+      "mine": "Deine Nutzung"
+    },
+    "view": {
+      "usage": "Nutzung",
+      "limits": "Limits"
+    },
+    "title": "Nutzung pro Person",
+    "about": "Du siehst, wie viel jede Person nutzt und mit welchen Agenten. Was in privaten Unterhaltungen steht, erscheint hier nie.",
+    "plansAbout": "Der Plan ist schon bezahlt. Dieser Betrag vergleicht nur die Nutzung zwischen Personen.",
+    "sub_one": "{{month}} · {{count}} Person · {{amount}} für KI",
+    "sub_other": "{{month}} · {{count}} Personen · {{amount}} für KI",
+    "periodLabel": "Zeitraum",
+    "period": {
+      "month": "Dieser Monat",
+      "last7": "Letzte 7 Tage",
+      "last30": "Letzte 30 Tage",
+      "lastMonth": "Letzter Monat"
+    },
+    "role": "Rolle",
+    "roleAll": "Rolle: alle",
+    "agent": "Agent",
+    "agentAll": "Agent: alle",
+    "chips": {
+      "near": "Nah am Limit",
+      "at": "Am Limit",
+      "idle": "Keine Nutzung"
+    },
+    "summary": {
+      "near": "{{n}} nah am Limit",
+      "at": "{{n}} am Limit",
+      "idle": "{{n}} ohne Nutzung im Zeitraum"
+    },
+    "export": "CSV exportieren",
+    "limitsHint": "Lege unter Limits ein Limit pro Person fest",
+    "empty": "Diesen Monat hat noch niemand Agenten genutzt.",
+    "owner": "Inhaber",
+    "member": "Mitglied",
+    "columns": {
+      "person": "Person",
+      "now": "Jetzt",
+      "runs": "Anfragen",
+      "agents": "Am meisten genutzt",
+      "usage": "Diesen Monat",
+      "caresFor": "Betreut",
+      "created": "Erstellt"
+    },
+    "now": {
+      "channel": "Mit {{agent}} in #{{channel}}",
+      "private": "In einer privaten Unterhaltung mit {{agent}}",
+      "hidden": "Mit {{agent}} in einem privaten Kanal",
+      "routine": "Routine {{name}}",
+      "last": "Zuletzt genutzt {{when}}",
+      "never": "Keine Nutzung"
+    },
+    "meter": {
+      "of": "von {{limit}}",
+      "noLimit": "· ohne Limit",
+      "estimate": "≈ {{amount}} über die API"
+    },
+    "live": {
+      "title": "Jetzt",
+      "routineOf": "Routine von {{name}}"
+    },
+    "from": {
+      "raised": "in diesem Monat erhöht",
+      "person": "für diese Person festgelegt",
+      "role": "aus der Rolle {{role}}",
+      "default": "Standard des Workspace"
+    },
+    "drawer": {
+      "limit": "Limit dieses Monats: {{amount}}",
+      "noLimit": "Kein Nutzungslimit in diesem Monat.",
+      "reached": "Limit erreicht am {{date}} · {{used}} genutzt",
+      "used": "{{used}} genutzt · {{percent}} %",
+      "raise": "Limit erhöhen",
+      "raiseTo": "Neues Limit für diesen Monat in US$",
+      "raiseSave": "Erhöhen",
+      "raised": "Limit für diesen Monat erhöht",
+      "asked": "Hat um mehr gebeten",
+      "days": "Nutzung pro Tag",
+      "agents": "Mit welchen Agenten",
+      "runs_one": "{{count}} Anfrage",
+      "runs_other": "{{count}} Anfragen",
+      "recent": "Was die Person zuletzt gemacht hat",
+      "untitled": "Ohne Titel",
+      "with": "mit {{agent}}",
+      "minutes": "{{n}} Min.",
+      "private": "Private Unterhaltung mit {{agent}}",
+      "hidden": "In einem privaten Kanal mit {{agent}}",
+      "routine": "Routine {{name}}",
+      "created": "Erstellte Agenten",
+      "createdAt": "erstellt am {{date}}",
+      "audit": "Aktionen der Agenten im Audit ansehen",
+      "noUse": "Keine Nutzung in diesem Zeitraum."
+    },
+    "limits": {
+      "title": "Nutzungslimit pro Person",
+      "lead": "Wie viel KI jede Person pro Monat nutzen darf, über alle Agenten hinweg. Es zählt, was sie anfragt, und die Routinen, die sie erstellt hat.",
+      "default": "Standard des Workspace",
+      "defaultHint": "Gilt für alle ohne Limit aus einer Rolle oder einer Ausnahme.",
+      "byRole": "Nach Rolle",
+      "people": "Ausnahmen",
+      "addPerson": "Person hinzufügen",
+      "useDefault": "Standard verwenden",
+      "none": "Kein Limit",
+      "amount": "Monatslimit",
+      "rule": "Es gilt das eigene Limit der Person. Ohne eines das höchste ihrer Rollen. Ohne jedes der Standard. Inhaber haben kein Limit.",
+      "whenTitle": "Wenn jemand das Limit erreicht",
+      "block": "Agenten beginnen keine neue Arbeit mehr für diese Person",
+      "notify": "Nur die Admins benachrichtigen",
+      "warn": "Bei 80 % warnen",
+      "warnHint": "Die Person bekommt einen Hinweis, und die Admins bekommen einen weiteren bei 100 %.",
+      "saved": "Limits gespeichert"
+    },
+    "mine": {
+      "title": "Du hast {{percent}} % deines Limits in diesem Monat verbraucht",
+      "noLimit": "Du hast in diesem Monat kein Nutzungslimit",
+      "renews": "Es erneuert sich am {{date}}.",
+      "near": "Nah am Limit, bitte einen Admin um mehr.",
+      "recent": "Was du zuletzt gemacht hast",
+      "ofLimit": "{{percent}} % des Limits"
+    },
+    "card": {
+      "title": "Du hast dein Nutzungslimit für diesen Monat erreicht",
+      "text": "Es erneuert sich am {{date}}. Um jetzt weiterzumachen, frag einen Admin.",
+      "ask": "Um mehr bitten",
+      "asked": "Anfrage gesendet",
+      "see": "Meine Nutzung ansehen",
+      "other": "{{name}} hat das Nutzungslimit für diesen Monat erreicht",
+      "raised": "{{name}} hat dein Limit für diesen Monat erhöht. Du kannst weitermachen.",
+      "raisedOther": "{{name}} hat das Limit für diesen Monat erhöht",
+      "refused": "{{name}} hat die Anfrage abgelehnt. Das Limit erneuert sich am {{date}}."
+    },
+    "actions": {
+      "raise": "Auf {{amount}} für diesen Monat erhöhen",
+      "refuse": "Ablehnen",
+      "see": "Nutzung ansehen"
     }
   },
   "usageViews": {
@@ -12200,6 +12361,7 @@
       "work_end_canceled": "Nach {{minutes}} Min. gestoppt.",
       "work_end_canceledBy": "Von {{name}} nach {{minutes}} Min. gestoppt.",
       "no_ai": "Ich kann noch nicht antworten: Ich habe keine KI verbunden.",
+      "person_limit": "Du hast dein Nutzungslimit für diesen Monat erreicht. Um jetzt weiterzumachen, frag einen Admin.",
       "no_ai_signed_out": "Ich kann noch nicht antworten: Meine KI ist abgemeldet.",
       "no_ai_not_signed_in": "Ich kann noch nicht antworten: {{brain}} ist auf meinem Computer nicht angemeldet.",
       "action_connect_ai": "KI verbinden",

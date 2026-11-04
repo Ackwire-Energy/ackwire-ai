@@ -2891,7 +2891,22 @@
       "changeRequestAgent": "<b>{{name}}</b> 请求新的智能体：<b>{{agent}}</b>",
       "invitationAccepted": "<b>{{name}}</b> 接受了你的邀请并加入了 {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> 接受了你的邀请",
-      "reaction_other": "<b>{{names}}</b> 对你的消息发了表情回应"
+      "reaction_other": "<b>{{names}}</b> 对你的消息发了表情回应",
+      "usageLimitWarning": "本月你已用掉额度的 {{percent}}%",
+      "usageLimitReachedSelf": "你已达到本月的使用额度",
+      "usageLimitReached": "<b>{{name}}</b> 已达到 {{amount}} 的额度",
+      "usageLimitRequest": "<b>{{name}}</b> 已达到 {{amount}} 的额度并申请增加",
+      "usageLimitRaised": "<b>{{name}}</b> 提高了你本月的额度",
+      "usageLimitRefused": "<b>{{name}}</b> 拒绝了你增加使用的申请"
+    },
+    "usageLimit": {
+      "runs_other": "本月 {{count}} 次请求",
+      "top": "{{share}}% 用 {{agent}}",
+      "fromRole": "角色 {{role}} 的额度。",
+      "fromRaised": "本月已提高额度。",
+      "fromPerson": "为此人单独设定的额度。",
+      "fromDefault": "工作区的默认额度。",
+      "line": "{{runs}}。{{from}}"
     },
     "source": {
       "channel": "#{{name}}",
@@ -3702,6 +3717,7 @@
         "credential_wrong_provider": "模型来自 {{modelProvider}}，但密钥来自 {{keyProvider}}。",
         "model_unlisted": "OpenRouter 不再提供 {{model}}。请在智能体设置中选择其他模型。",
         "no_ai": "该智能体没有连接 AI。",
+        "person_limit": "提出请求的人已达到本月的使用额度。",
         "org_paused": "工作区的智能体已暂停。",
         "org_suspended": "工作区不可用。",
         "org_deleting": "工作区正在删除中。",
@@ -5393,6 +5409,7 @@
       "agent_archived": "智能体已归档",
       "interrupted": "因服务器重启而中断",
       "no_ai": "智能体未连接 AI",
+      "person_limit": "未运行:创建者已达到本月的使用额度",
       "org_paused": "未运行：工作区的智能体已暂停",
       "org_suspended": "未运行：工作区不可用",
       "org_deleting": "未运行：工作区正在被删除",
@@ -9644,6 +9661,13 @@
     "urlHelp": "以 postgres:// 开头。末尾的数据库名可以省略。加密保存在服务器上，之后没人能再看到，智能体也不能。",
     "urlPlaceholder": "postgres://user:password@host/db",
     "urlInvalid": "请粘贴以 postgres:// 开头的地址，或填写“高级”下的各项。",
+    "scope": "哪些数据库",
+    "scopeOne": "仅此数据库",
+    "scopeAll": "此服务器上的所有数据库",
+    "scopeAllHelp": "适合每个客户一个数据库的情况。智能体会看到列表，每次查询时选择一个数据库。",
+    "prefix": "仅名称以此开头的",
+    "prefixPlaceholder": "例如 customer_",
+    "prefixHelp": "留空表示全部。以此开头的新数据库会自动出现。",
     "howTitle": "如何创建只读用户？",
     "howText": "智能体只会执行查询，但只读用户能在数据库层面确保这一点。",
     "how": {
@@ -9678,11 +9702,13 @@
         "3": "拼出地址 postgres://agentes_leitura:password@server:5432/database，然后粘贴到这里。"
       }
     },
+    "howAll": "用于读取所有数据库（Postgres 14 或更新版本）。",
     "openPage": "打开 {{name}}",
     "dedicated": "提示：如果你有数据库的只读副本（replica），请连接那个副本。",
     "advancedText": "代替地址，或修改地址中的某项。",
     "host": "服务器",
     "database": "数据库",
+    "databaseOptional": "选择全部数据库时可不填。",
     "password": "密码",
     "passwordInvalid": "请输入数据库密码。",
     "ssl": "安全连接",
@@ -9699,10 +9725,22 @@
     },
     "connect": "连接",
     "connectedToast": "{{name}} 已连接。",
+    "connectedToastAll_other": "{{name}} 已连接，共 {{count}} 个数据库。",
+    "count_other": "{{count}} 个数据库",
+    "prefixRow": "以 {{prefix}} 开头的数据库",
+    "refresh": "刷新列表",
+    "refreshName": "刷新 {{name}} 的数据库列表",
+    "scopeEdit": "数据库",
+    "scopeEditName": "{{name}} 的数据库",
+    "scopeSaved": "{{name}} 已保存。",
+    "widenTitle": "开放整个服务器？",
+    "widenTitlePrefix": "开放更多数据库？",
+    "widenText_other": "有访问权限的 {{count}} 个智能体将可以读取此服务器上的所有数据库。可以在规则中按智能体限制。",
+    "widenTextPrefix_other": "有访问权限的 {{count}} 个智能体将可以读取所有以 {{prefix}} 开头的数据库。可以在规则中按智能体限制。",
     "testing": {
       "reach": "正在连接数据库…",
-      "tables": "正在查看数据表…",
-      "databases": "正在查看数据库…"
+      "databases": "正在查看数据库…",
+      "tables": "正在查看数据表…"
     },
     "canWrite": "这个用户可以更改数据。智能体本身只会读取，但最安全的做法是使用只读用户（创建方法见第 1 步）。",
     "toolsLead": "智能体在 {{name}} 中可以做什么。目前它们只读取，不会更改数据库中的任何内容。",
@@ -9741,22 +9779,22 @@
       "tablesLoading": "正在加载数据表…",
       "tablesError": "暂时无法读取数据表。",
       "tablesHelp": "不勾选 = 所有数据表。",
+      "tablesIn": "表（取自 {{database}}）",
+      "databases": "数据库",
+      "databasesAll": "全部",
+      "databasesSome": "仅这些",
+      "databasePlaceholder": "数据库名称",
+      "databasesHelp": "以下规则适用于此智能体读取的每个数据库。",
       "hidden": "永远看不到的列",
       "hiddenHelp": "格式为“表.列”，名称含大写字母、空格或符号时用双引号括起来（customers.\"Tax ID\"）。看起来像个人数据或密码的列，我们已经隐藏了。",
       "hiddenPlaceholder": "customers.cpf",
       "hiddenInvalid": "请输入 table.column（或 schema.table.column），名称含大写字母、空格或符号时用\"双引号\"括起来。",
       "cap": "每天查询次数",
       "capHelp": "留空 = 不限制。",
+      "capHelpAll": "留空 = 不限。按所有数据库合计。",
       "timeout": "每次查询的时间上限",
       "timeoutHelp": "超时的查询会被取消，以免给数据库造成负担。",
-      "seconds_other": "{{count}} 秒",
-      "databases": "数据库",
-      "databasesAll": "全部",
-      "databasesSome": "仅这些",
-      "databasePlaceholder": "数据库名称",
-      "databasesHelp": "以下规则适用于此智能体读取的每个数据库。",
-      "tablesIn": "表（取自 {{database}}）",
-      "capHelpAll": "留空 = 不限。按所有数据库合计。"
+      "seconds_other": "{{count}} 秒"
     },
     "agent": {
       "title": "数据库",
@@ -9766,28 +9804,7 @@
       "saved": "已保存 {{name}} 的数据库访问权限。",
       "allDatabases": "{{name}} 的所有数据库",
       "someDatabases_other": "{{name}} 的 {{count}} 个数据库"
-    },
-    "scope": "哪些数据库",
-    "scopeOne": "仅此数据库",
-    "scopeAll": "此服务器上的所有数据库",
-    "scopeAllHelp": "适合每个客户一个数据库的情况。智能体会看到列表，每次查询时选择一个数据库。",
-    "prefix": "仅名称以此开头的",
-    "prefixPlaceholder": "例如 customer_",
-    "prefixHelp": "留空表示全部。以此开头的新数据库会自动出现。",
-    "databaseOptional": "选择全部数据库时可不填。",
-    "connectedToastAll_other": "{{name}} 已连接，共 {{count}} 个数据库。",
-    "howAll": "用于读取所有数据库（Postgres 14 或更新版本）。",
-    "count_other": "{{count}} 个数据库",
-    "prefixRow": "以 {{prefix}} 开头的数据库",
-    "refresh": "刷新列表",
-    "refreshName": "刷新 {{name}} 的数据库列表",
-    "scopeEdit": "数据库",
-    "scopeEditName": "{{name}} 的数据库",
-    "scopeSaved": "{{name}} 已保存。",
-    "widenTitle": "开放整个服务器？",
-    "widenTitlePrefix": "开放更多数据库？",
-    "widenText_other": "有访问权限的 {{count}} 个智能体将可以读取此服务器上的所有数据库。可以在规则中按智能体限制。",
-    "widenTextPrefix_other": "有访问权限的 {{count}} 个智能体将可以读取所有以 {{prefix}} 开头的数据库。可以在规则中按智能体限制。"
+    }
   },
   "mail": {
     "choice": {
@@ -11112,7 +11129,7 @@
       "skills": "智能体在需要时打开的 Markdown 指令。",
       "keys": "你的套餐和工作区的 API 密钥。",
       "storage": "工作区文件的存放位置。",
-      "usage": "预算以及每个智能体本月的花费。",
+      "usage": "每个人和每个智能体的 AI 用量,以及本月的额度。",
       "audit": "智能体在对话之外做了什么，以及成员改了什么。仅管理员可见。",
       "import": "从其他应用或工作区导入智能体，也可以把这个工作区带到任何地方。",
       "billing": "此工作区的 agentes.chat 套餐、银行卡和发票在我们的一个独立页面上，不在应用内。",
@@ -11293,6 +11310,147 @@
         "jev": "只有使用 Jev 时，智能体才会主动发送贴纸。",
         "jevLink": "设置 Jev"
       }
+    }
+  },
+  "peopleUsage": {
+    "tabs": {
+      "summary": "概览",
+      "people": "成员",
+      "mine": "你的用量"
+    },
+    "view": {
+      "usage": "用量",
+      "limits": "额度"
+    },
+    "title": "按成员查看用量",
+    "about": "你可以看到每个人用了多少、用了哪些智能体。私聊的内容永远不会出现在这里。",
+    "plansAbout": "套餐已付费。这个金额只用于比较成员之间的用量。",
+    "sub_other": "{{month}} · {{count}} 人 · AI 用量 {{amount}}",
+    "periodLabel": "时间段",
+    "period": {
+      "month": "本月",
+      "last7": "最近 7 天",
+      "last30": "最近 30 天",
+      "lastMonth": "上个月"
+    },
+    "role": "角色",
+    "roleAll": "角色:全部",
+    "agent": "智能体",
+    "agentAll": "智能体:全部",
+    "chips": {
+      "near": "接近额度",
+      "at": "已达额度",
+      "idle": "未使用"
+    },
+    "summary": {
+      "near": "{{n}} 人接近额度",
+      "at": "{{n}} 人已达额度",
+      "idle": "{{n}} 人在此期间未使用"
+    },
+    "export": "导出 CSV",
+    "limitsHint": "在额度中为每个人设定额度",
+    "empty": "本月还没有人使用智能体。",
+    "owner": "所有者",
+    "member": "成员",
+    "columns": {
+      "person": "成员",
+      "now": "现在",
+      "runs": "请求",
+      "agents": "最常用",
+      "usage": "本月",
+      "caresFor": "负责",
+      "created": "创建"
+    },
+    "now": {
+      "channel": "在 #{{channel}} 与 {{agent}}",
+      "private": "正在与 {{agent}} 私聊",
+      "hidden": "在私密频道与 {{agent}}",
+      "routine": "例行任务 {{name}}",
+      "last": "上次使用 {{when}}",
+      "never": "未使用"
+    },
+    "meter": {
+      "of": "/ {{limit}}",
+      "noLimit": "· 无额度",
+      "estimate": "按 API 计 ≈ {{amount}}"
+    },
+    "live": {
+      "title": "现在",
+      "routineOf": "{{name}} 的例行任务"
+    },
+    "from": {
+      "raised": "本月已提高",
+      "person": "为此人设定",
+      "role": "来自角色 {{role}}",
+      "default": "工作区默认"
+    },
+    "drawer": {
+      "limit": "本月额度:{{amount}}",
+      "noLimit": "本月没有使用额度。",
+      "reached": "{{date}} 达到额度 · 已用 {{used}}",
+      "used": "已用 {{used}} · {{percent}}%",
+      "raise": "提高额度",
+      "raiseTo": "本月新额度(US$)",
+      "raiseSave": "提高",
+      "raised": "已提高本月额度",
+      "asked": "已申请增加",
+      "days": "每日用量",
+      "agents": "用了哪些智能体",
+      "runs_other": "{{count}} 次请求",
+      "recent": "最近做了什么",
+      "untitled": "无标题",
+      "with": "与 {{agent}}",
+      "minutes": "{{n}} 分钟",
+      "private": "与 {{agent}} 的私聊",
+      "hidden": "在私密频道与 {{agent}}",
+      "routine": "例行任务 {{name}}",
+      "created": "创建的智能体",
+      "createdAt": "创建于 {{date}}",
+      "audit": "在审计中查看智能体的操作",
+      "noUse": "此期间没有用量。"
+    },
+    "limits": {
+      "title": "每人使用额度",
+      "lead": "每个人每月可使用的 AI 量,合计所有智能体。包括本人提出的请求和本人创建的例行任务。",
+      "default": "工作区默认",
+      "defaultHint": "适用于没有角色额度或例外的人。",
+      "byRole": "按角色",
+      "people": "例外",
+      "addPerson": "添加成员",
+      "useDefault": "使用默认",
+      "none": "无额度",
+      "amount": "每月额度",
+      "rule": "优先使用本人的额度。没有时取其角色中最高的额度。都没有时使用默认值。所有者没有额度。",
+      "whenTitle": "有人达到额度时",
+      "block": "智能体不再为此人开始新工作",
+      "notify": "只通知管理员",
+      "warn": "达到 80% 时提醒",
+      "warnHint": "本人会收到提醒,管理员会在 100% 时再收到一条。",
+      "saved": "额度已保存"
+    },
+    "mine": {
+      "title": "本月你已用掉额度的 {{percent}}%",
+      "noLimit": "你本月没有使用额度",
+      "renews": "将于 {{date}} 重置。",
+      "near": "接近额度,请向管理员申请增加。",
+      "recent": "你最近做了什么",
+      "ofLimit": "额度的 {{percent}}%"
+    },
+    "card": {
+      "title": "你已达到本月的使用额度",
+      "text": "将于 {{date}} 重置。如需现在继续,请联系管理员。",
+      "ask": "申请增加",
+      "asked": "已发送申请",
+      "see": "查看我的用量",
+      "other": "{{name}} 已达到本月的使用额度",
+      "raised": "{{name}} 提高了你本月的额度。可以继续了。",
+      "raisedOther": "{{name}} 提高了本月的额度",
+      "refused": "{{name}} 拒绝了申请。额度将于 {{date}} 重置。"
+    },
+    "actions": {
+      "raise": "本月提高到 {{amount}}",
+      "refuse": "拒绝",
+      "see": "查看用量"
     }
   },
   "usageViews": {
@@ -11842,6 +12000,7 @@
       "work_end_canceled": "{{minutes}} 分钟后停止。",
       "work_end_canceledBy": "{{minutes}} 分钟后由 {{name}} 停止。",
       "no_ai": "我暂时无法回答：我还没有连接 AI。",
+      "person_limit": "你已达到本月的使用额度。如需现在继续,请联系管理员。",
       "no_ai_signed_out": "我暂时无法回答：我的 AI 已退出登录。",
       "no_ai_not_signed_in": "我暂时无法回答：{{brain}} 还没有在我的电脑上登录。",
       "action_connect_ai": "连接 AI",
