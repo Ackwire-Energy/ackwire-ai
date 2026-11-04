@@ -1017,7 +1017,7 @@ textarea.ac-input {
 .ac-msg__author {
   font-weight: 650;
 }
-/* The receipt beside the name never raises its line. */
+/* The receipt right after the time never raises its line. */
 .ac-msg__head > .ac-msg__aside {
   align-self: center;
 }
@@ -1156,7 +1156,7 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   margin: 2px 0 0;
 }
 .ac-msg__error-row > .ac-msg__error {
-  flex: 1;
+  min-width: 0;
   margin: 0;
 }
 .ac-mention {
@@ -3334,11 +3334,11 @@ html:not([data-pointer]) .ac-color__hue:focus-visible {
     opacity: 0.6;
   }
 }
-/* One width whatever it says (a narrow row gives way), cut with "…": the time and the stop after it never move under
-   the pointer as the step turns. */
+/* At most one width (a narrow row gives way), cut with "…"; the time and the stop follow its words. */
 .ac-wait__step {
   display: flex;
-  flex: 0 1 340px;
+  flex: 0 1 auto;
+  max-width: 340px;
   min-width: 0;
   color: var(--muted);
   font-size: 14px;
@@ -3456,7 +3456,6 @@ html:not([data-pointer]) .ac-receipt__check:focus-visible {
 
 /* Right edge of the header line (receipts): muted */
 .ac-msg__aside {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -5147,8 +5146,8 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 .ac-msg--grouped > .ac-msg__body > .ac-msg__actions {
   top: 0;
 }
-/* Left of the check (20px wide), 8px from it, past the row's side padding. */
-.ac-msg:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
+/* Left of a grouped message's check (20px wide, at the row's end), 8px from it, past the row's side padding. */
+.ac-msg:has(> .ac-msg__body > .ac-msg__aside--floating:not(:empty)) > .ac-msg__body > .ac-msg__actions {
   right: calc(var(--msg-inline) + 28px);
 }
 .ac-msg__actions .ac-btn--sm {
