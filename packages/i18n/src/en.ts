@@ -8212,6 +8212,8 @@ export const en = {
     recommended: "Recommended",
     /** A model that costs nothing on its plan or key; search finds it by "free" too. */
     free: "Free",
+    /** Under OpenCode Go's models: OpenCode's free tier answers only its own CLI (ADR 0132 §7). */
+    opencodeFreeHint: "Other free models run through OpenCode on the agent's computer.",
     modelHelp: "Bigger models think more and use up the plan faster.",
     hidden: "{{owner}} or an admin chooses who thinks.",
     hiddenAdmins: "Only admins choose who thinks.",

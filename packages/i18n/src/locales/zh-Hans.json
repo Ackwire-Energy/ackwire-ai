@@ -8221,6 +8221,7 @@
     },
     "recommended": "推荐",
     "free": "免费",
+    "opencodeFreeHint": "其他免费模型通过智能体电脑上的 OpenCode 运行。",
     "modelHelp": "模型越大，思考越多，套餐额度消耗也越快。",
     "hidden": "由 {{owner}} 或管理员选择思考方式。",
     "hiddenAdmins": "只有管理员可以选择思考方式。",

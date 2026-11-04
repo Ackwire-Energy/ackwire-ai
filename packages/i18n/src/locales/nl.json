@@ -8565,6 +8565,7 @@
     },
     "recommended": "Aanbevolen",
     "free": "Gratis",
+    "opencodeFreeHint": "Andere gratis modellen draaien via OpenCode op de computer van de agent.",
     "modelHelp": "Grotere modellen denken meer na en verbruiken het abonnement sneller.",
     "hidden": "{{owner}} of een beheerder kiest wie denkt.",
     "hiddenAdmins": "Alleen beheerders kiezen wie denkt.",

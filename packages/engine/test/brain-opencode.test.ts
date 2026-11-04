@@ -160,7 +160,7 @@ test("which brain a run thinks with, and why OpenCode can't now", () => {
   );
 });
 
-test("Quem pensa lists OpenCode with the models its CLI listed, free ones first, else OpenCode's free tier", () => {
+test("Quem pensa lists OpenCode with the models its CLI listed, free ones first or beside their paid model, else OpenCode's free tier", () => {
   const machine = (over: Record<string, unknown> = {}) => ({
     id: "m1",
     name: "box",
@@ -184,6 +184,36 @@ test("Quem pensa lists OpenCode with the models its CLI listed, free ones first,
     { value: "opencode/big-pickle", label: "Big Pickle", free: true },
     { value: "opencode/glm-5.3", label: "glm-5.3" },
   ]);
+  // With a key the CLI lists the paid models too: each free variant sits right after its paid model, with no price.
+  const keyed = opencode(
+    machine({
+      executors: {
+        opencode: {
+          version: "1.19.5",
+          models: [
+            { id: "opencode/deepseek-v4-pro" },
+            { id: "opencode/deepseek-v4.1-flash" },
+            { id: "opencode/deepseek-v4.1-flash-free", label: "DeepSeek V4.1 Flash Free", free: true },
+            { id: "opencode/glm-5.3" },
+            { id: "opencode/glm-5.3-flash" },
+            { id: "opencode/glm-5.3-flash-free", label: "GLM-5.3 Flash Free", free: true },
+            { id: "opencode/big-pickle", label: "Big Pickle", free: true },
+          ],
+        },
+        detectedAt: "x",
+      },
+    }),
+  )?.models;
+  expect(keyed?.map((m) => [m.value, m.free === true])).toEqual([
+    ["opencode/big-pickle", true],
+    ["opencode/deepseek-v4-pro", false],
+    ["opencode/deepseek-v4.1-flash", false],
+    ["opencode/deepseek-v4.1-flash-free", true],
+    ["opencode/glm-5.3", false],
+    ["opencode/glm-5.3-flash", false],
+    ["opencode/glm-5.3-flash-free", true],
+  ]);
+  expect(keyed?.find((m) => m.value === "opencode/glm-5.3-flash-free")?.label).toBe("GLM-5.3 Flash Free");
   // A CLI that listed nothing (offline at detection): OpenCode's free tier, all marked free.
   const fallback = opencode(machine({ executors: { opencode: { version: "1.19.5" }, detectedAt: "x" } }))?.models;
   expect(fallback?.map((m) => m.value)).toEqual(OPENCODE_FREE_MODELS.map((m) => m.id));

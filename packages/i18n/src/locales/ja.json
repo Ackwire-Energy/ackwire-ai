@@ -8141,6 +8141,7 @@
     },
     "recommended": "おすすめ",
     "free": "無料",
+    "opencodeFreeHint": "ほかの無料モデルは、エージェントのコンピューターの OpenCode で動きます。",
     "modelHelp": "大きいモデルほど深く考え、プランの消費が早くなります。",
     "hidden": "考えるAIを選ぶのは{{owner}}または管理者です。",
     "hiddenAdmins": "考えるAIを選べるのは管理者だけです。",
