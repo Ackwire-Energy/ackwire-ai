@@ -107,7 +107,7 @@ export function UsageQueueSheet({ agentId, tab: initialTab = "queued" }: { agent
         // Asleep while it waits on the limit, at work once it picks up.
         leading={<AgentFace agentId={agentId} size={32} mode={resuming ? "run" : queue.reason ? "sleep" : "idle"} />}
         title={usageQueueTitle(t, i18n.language, agent, queue, new Date(now))}
-        hint={shared ? { name: t("usageQueue.about"), text: shared } : undefined}
+        hint={shared || undefined}
       />
       {waiting > 0 && skipped > 0 ? (
         <Segmented

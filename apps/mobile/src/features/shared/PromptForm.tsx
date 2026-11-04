@@ -1,9 +1,13 @@
 import { type ReactNode, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, type IconName, InfoHint, Text } from "@/ui";
 import { TextArea } from "./TextArea";
 
-/** A sheet's title row: an optional face or tile, the title (with an ⓘ when `hint` says why) and a line under it. */
+/**
+ * A sheet's title row: an optional face or tile, the title (with an ⓘ, "About <title>", when `hint` says why) and a
+ * line under it.
+ */
 export function SheetTitle({
   leading,
   title,
@@ -13,15 +17,16 @@ export function SheetTitle({
   leading?: ReactNode;
   title: string;
   subtitle?: string;
-  hint?: { name: string; text: string };
+  hint?: string;
 }) {
+  const { t } = useTranslation();
   const text = <Text variant="title">{title}</Text>;
   return (
     <View style={[styles.title, hint ? styles.top : null]}>
       {leading}
       <View style={styles.grow}>
         {hint ? (
-          <InfoHint name={hint.name} text={hint.text} variant="title">
+          <InfoHint name={t("common.about", { label: title })} text={hint} variant="title">
             {text}
           </InfoHint>
         ) : (

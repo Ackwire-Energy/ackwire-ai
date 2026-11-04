@@ -31,12 +31,20 @@ import { decryptCredential, usableCredentialRow } from "./credentials";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
 import { maySql, type RolePermission } from "./permissions";
-import { addPersonSpend, assertPersonUnderLimit } from "./person-usage";
+import { addPersonSpend, assertPersonUnderLimit, personSpendAdded } from "./person-usage";
 import { assertCanWork } from "./standing";
 import { redactCredentials } from "./tool-detail";
 import { budgetPercent, monthStartUtc, withEffectiveBudget } from "./usage";
 
-const { usageRecords, agentBudgetPeriods, budgetReservations, providerCredentials, organizationSettings } = schema;
+const {
+  usageRecords,
+  agentBudgetPeriods,
+  budgetReservations,
+  providerCredentials,
+  organizationSettings,
+  organizationMembers,
+  personUsageMonths,
+} = schema;
 
 export interface ModelGatewayDeps {
   db: Database;
@@ -485,8 +493,9 @@ export function createModelGateway(deps: ModelGatewayDeps) {
 
   /**
    * After a successful agent call, one statement: the usage record, the
-   * reservation released and the spend counter updated (no transaction
-   * round trips; a remote database costs one round trip here).
+   * reservation released, the spend counter updated and the person's month
+   * added to (no transaction round trips; a remote database costs one round
+   * trip here).
    */
   async function settleCall(input: {
     agent: Agent;
@@ -507,7 +516,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     const id = Bun.randomUUIDv7();
     const period = input.reservation?.periodStart ?? periodOf(now());
     const at = now().toISOString();
-    const rows = rowsOf<{ spent: string | number }>(
+    const rows = rowsOf<{ spent: string | number; person_spent: string | number | null }>(
       await db.execute(sql`with d as (
           delete from ${budgetReservations} where id = ${input.reservation?.id ?? null}::uuid returning amount_nano_usd
         ), u as (
@@ -526,10 +535,25 @@ export function createModelGateway(deps: ModelGatewayDeps) {
             reserved_nano_usd = greatest(0, ${agentBudgetPeriods}.reserved_nano_usd - coalesce((select amount_nano_usd from d), 0)),
             updated_at = now()
           returning spent_nano_usd
+        ), m as (
+          -- Read from the membership so a person who left mid-run adds nothing instead of failing the foreign key.
+          insert into ${personUsageMonths} (org_id, person_id, period_start, spent_nano_usd, updated_at)
+          select org_id, user_id, ${periodOf(now())}::date, ${cost}::bigint, ${at}::timestamptz from ${organizationMembers}
+          where org_id = ${agent.orgId}::uuid and user_id = ${input.personId ?? null}::text and ${cost}::bigint > 0
+          on conflict (org_id, person_id, period_start) do update set
+            spent_nano_usd = ${personUsageMonths}.spent_nano_usd + excluded.spent_nano_usd,
+            updated_at = excluded.updated_at
+          returning spent_nano_usd
         )
-        select (select spent_nano_usd from p) as spent, (select count(*) from u) as inserted`),
+        select (select spent_nano_usd from p) as spent, (select count(*) from u) as inserted,
+          (select spent_nano_usd from m) as person_spent`),
     );
-    return { record: { id, cost }, spent: Number(rows[0]?.spent ?? cost) };
+    const personSpent = rows[0]?.person_spent;
+    return {
+      record: { id, cost },
+      spent: Number(rows[0]?.spent ?? cost),
+      personSpent: personSpent === null || personSpent === undefined ? null : Number(personSpent),
+    };
   }
 
   /** Tells the agent's owner when spend crosses 80% and 100% of the budget (once each per month). */
@@ -679,7 +703,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         throw masked(error);
       }
 
-      const { record, spent } = await settleCall({
+      const { record, spent, personSpent } = await settleCall({
         agent,
         reservation,
         runId: call.runId,
@@ -691,7 +715,12 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         reportedCost: result.costNanoUsd,
       });
       await checkThresholds(agent, spent, record.cost);
-      if (personId) await addPersonSpend(db, { orgId: agent.orgId, personId, amountNanoUsd: record.cost, at: now() });
+      if (personId && personSpent !== null)
+        await personSpendAdded(
+          db,
+          { orgId: agent.orgId, personId, amountNanoUsd: record.cost, at: now() },
+          personSpent,
+        );
       const refused = result.thinking?.refused;
       return {
         ...result,

@@ -44,7 +44,7 @@ export function StatusLine({
   className?: string;
 }) {
   return (
-    <span className={cx("status-line", empty && "status-line--empty", className)}>
+    <span className={cx("status-line", empty && "status-line--empty", icon && "ac-iconline", className)}>
       {icon ? (
         <Icon name={icon} size={14} className="status-line__icon" />
       ) : (

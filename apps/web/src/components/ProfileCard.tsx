@@ -631,7 +631,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
       </div>
       <NoAiChip agentId={agent.id} />
       {line && shown?.line && (
-        <div className="profile-card__status">
+        <div className={line.icon ? "profile-card__status ac-iconline" : "profile-card__status"}>
           <span className="profile-card__status-emoji" aria-hidden="true">
             {line.icon ? <Icon name={line.icon} size={16} /> : line.emoji}
           </span>

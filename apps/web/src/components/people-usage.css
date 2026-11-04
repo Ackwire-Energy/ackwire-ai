@@ -199,9 +199,8 @@ th.pu-num .pu-sort {
   color: var(--ink);
   font-weight: 600;
 }
-.pu-now > svg {
-  margin-right: 6px;
-  vertical-align: -2px;
+.pu-now > .ac-iconline {
+  gap: 6px;
 }
 .pu-faces .ac-avatar {
   outline: 2px solid var(--surface-raised);
@@ -381,7 +380,10 @@ th.pu-num .pu-sort {
   margin-left: auto;
   white-space: nowrap;
 }
+/* One short line, as the other links led by an icon (.mail-howto__link). */
 .pu-audit {
+  display: inline-flex;
+  align-items: center;
   align-self: flex-start;
   gap: 6px;
 }

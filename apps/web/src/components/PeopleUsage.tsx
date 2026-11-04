@@ -369,8 +369,10 @@ function PeopleView({ switcher, person, onLimits }: { switcher: ReactNode; perso
                       </button>
                     </td>
                     <td className={p.now ? "pu-now pu-now--live" : "pu-now"}>
-                      {p.now && p.now.place.kind === "private" && <Icon name="lock" size={14} />}
-                      <span>{nowLine(t, i18n.language, dir, p)}</span>
+                      <span className={p.now?.place.kind === "private" ? "ac-iconline" : undefined}>
+                        {p.now?.place.kind === "private" && <Icon name="lock" size={14} />}
+                        <span>{nowLine(t, i18n.language, dir, p)}</span>
+                      </span>
                     </td>
                     <td className="pu-num tabular">{formatInt(i18n.language, p.runs)}</td>
                     <td>
@@ -733,7 +735,7 @@ function PersonDrawer({ userId, onClose }: { userId: string | null; onClose: () 
           <Link
             to="/org/$orgId/settings/$section"
             params={{ orgId: org.id, section: "audit" }}
-            className="pu-audit ac-link ac-iconline"
+            className="pu-audit ac-link"
           >
             <Icon name="shield" size={16} />
             {t("peopleUsage.drawer.audit")}

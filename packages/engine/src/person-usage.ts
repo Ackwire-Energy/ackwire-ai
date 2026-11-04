@@ -205,13 +205,29 @@ export async function addPersonSpend(
         set: { spentNanoUsd: sql`${personUsageMonths.spentNanoUsd} + ${amount}`, updatedAt: at },
       })
       .returning({ spent: personUsageMonths.spentNanoUsd });
-    if (!row) return;
+    if (row) await personSpendAdded(db, { ...input, amountNanoUsd: amount, at }, row.spent);
+  } catch {
+    // A member who left mid-run has no month to add to (its foreign key): nothing to count.
+  }
+}
+
+/**
+ * After `amountNanoUsd` was added to a person's month (now `after`): queues their 80% and the admins' 100% notices
+ * when it crossed one. Nothing is read past the cached settings while no limit is set anywhere.
+ */
+export async function personSpendAdded(
+  db: Executor,
+  input: { orgId: string; personId: string; amountNanoUsd: number; at?: Date },
+  after: number,
+) {
+  const at = input.at ?? new Date();
+  const amount = input.amountNanoUsd;
+  try {
     const limits = await orgPersonLimits(db, input.orgId);
     if (!anyPersonLimit(limits)) return;
     const state = await personLimitState(db, input.orgId, input.personId, at);
     const limit = state?.limitNanoUsd ?? null;
     if (!state || limit === null || limit <= 0) return;
-    const after = row.spent;
     const before = after - amount;
     const period = periodOf(at);
     const queue = (level: "warning" | "reached") =>
@@ -237,7 +253,7 @@ export async function addPersonSpend(
       await queue("warning");
     }
   } catch {
-    // A member who left mid-run has no month to add to (its foreign key): nothing to count.
+    // The call already happened: a notice that fails to queue never fails it.
   }
 }
 
