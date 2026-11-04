@@ -415,6 +415,22 @@ describe("Bancos of a connected database: ask before more databases open", () =>
     expect(screen().queryByText("Abrir o servidor inteiro?")).toBeNull();
   });
 
+  test("Desconectar counts only the agents that aren't archived", async () => {
+    const ARCHIVED_ID = "00000000-0000-4000-8000-0000000000a9";
+    await connected({}, [ADA_ID, ARCHIVED_ID]);
+    await click(within(flow()).getByRole("button", { name: "Cancelar" }));
+    const row = (await screen().findByText("Clientes")).closest(".connected-row") as HTMLElement;
+    await click(within(row).getByRole("button", { name: "Desconectar Clientes" }));
+    expect(flow().textContent).toContain("1 agente perde o acesso na hora.");
+    cleanup();
+
+    await connected({}, [ARCHIVED_ID]);
+    await click(within(flow()).getByRole("button", { name: "Cancelar" }));
+    const only = (await screen().findByText("Clientes")).closest(".connected-row") as HTMLElement;
+    await click(within(only).getByRole("button", { name: "Desconectar Clientes" }));
+    expect(flow().textContent).toContain("Nenhum agente usa agora.");
+  });
+
   test("no question with no agent reading it", async () => {
     const { updates } = await connected({}, []);
     await pickAll();

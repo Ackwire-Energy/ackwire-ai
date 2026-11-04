@@ -86,6 +86,15 @@ export function widensDatabaseScope(
   return !current.wholeServer || !next.databasePrefix.trim().startsWith(current.databasePrefix ?? "");
 }
 
+/**
+ * How many agents with a grant on a connection can use it: an archived agent keeps its grant but reads nothing. `team`
+ * is the workspace's active agents; until it loads every grant counts, so a question about them is never skipped.
+ */
+export const activeGrantCount = (
+  connection: Pick<DatabaseConnection, "agents"> | null | undefined,
+  team: { id: string }[] | undefined,
+) => connection?.agents.filter((x) => !team || team.some((a) => a.id === x.agentId)).length ?? 0;
+
 /** A new agent's rules for a database: every table, the sensitive columns found when connecting hidden. */
 export const defaultDatabasePolicy = (connection?: Pick<DatabaseConnection, "suggestedHidden">): DatabasePolicy => ({
   tables: [],

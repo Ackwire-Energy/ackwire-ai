@@ -8,6 +8,7 @@ import type {
 import { keys, useAgentDatabases, useAgents, useDatabaseAction, useServerDatabases } from "@agenteschat/client";
 import type { Level } from "@agenteschat/client/lib/access-levels";
 import {
+  activeGrantCount,
   DATABASE_PROVIDER_URLS,
   DATABASE_PROVIDERS,
   databaseErrorOf,
@@ -885,10 +886,7 @@ export function DatabaseScopeDialog({
   const whole = (scope ?? (connection?.wholeServer ? "all" : "one")) === "all";
   const nextPrefix = (prefix ?? connection?.databasePrefix ?? "").trim();
   const name = connection?.label ?? "";
-  const team = useAgents(org.id).data;
-  // An archived agent keeps its grant but reads nothing; until the team loads, every grant counts so the question
-  // is never skipped.
-  const using = connection?.agents.filter((x) => !team || team.some((a) => a.id === x.agentId)).length ?? 0;
+  const using = activeGrantCount(connection, useAgents(org.id).data);
   const close = () => {
     setScope(null);
     setPrefix(null);
@@ -1077,7 +1075,7 @@ export function DatabaseDisconnectDialog({
   const toast = useToast();
   const { disconnect } = useDatabaseAction(org.id);
   const name = connection?.label ?? "";
-  const using = connection?.agents.length ?? 0;
+  const using = activeGrantCount(connection, useAgents(org.id).data);
   return (
     <Dialog
       open={connection !== null}
