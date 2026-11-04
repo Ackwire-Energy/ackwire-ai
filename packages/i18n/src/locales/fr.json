@@ -88,6 +88,24 @@
     "fromAdmin": "D'Administrateur",
     "viaAdmin": "Tout, en tant qu'Administrateur",
     "nothing": "Rien",
+    "computer": {
+      "title": "Ordinateurs des agents",
+      "levels": {
+        "none": "Aucun",
+        "browser": "Navigateur seulement",
+        "full": "Ordinateur entier"
+      },
+      "every": {
+        "none": "Seulement ce que Tout le monde peut déjà faire",
+        "browser": "Le navigateur de n'importe quel agent et les demandes de connexion, jamais l'écran entier ni le terminal",
+        "full": "L'écran entier, la prise de contrôle et le terminal de n'importe quel agent"
+      },
+      "own": {
+        "none": "Personne ne voit ni n'utilise les ordinateurs ou navigateurs des agents, ni les demandes de connexion",
+        "browser": "Le navigateur de ses propres agents et les demandes de connexion qui lui sont faites, jamais l'écran entier",
+        "full": "L'écran entier et le terminal de ses propres agents et des ordinateurs que la personne a connectés"
+      }
+    },
     "everyoneNote": "S'applique à chaque personne de l'espace de travail. Les autres rôles ne font qu'ajouter.",
     "summary": {
       "owner": "Peut tout faire, toujours. Chaque espace de travail a au moins un propriétaire.",
@@ -254,6 +272,24 @@
       "desc": "Contrôler leur bureau et leur navigateur.",
       "short": "prendre la main sur les écrans",
       "say": "prend la main sur l'écran des agents"
+    },
+    "control_browsers": {
+      "title": "Utiliser le navigateur des agents",
+      "desc": "Voir et contrôler le navigateur de n'importe quel agent et répondre aux demandes de connexion.",
+      "short": "utiliser le navigateur des agents",
+      "say": "utilise le navigateur des agents"
+    },
+    "own_computers": {
+      "title": "Utiliser l'ordinateur de ses propres agents",
+      "desc": "L'écran entier et le terminal des agents dont la personne est responsable et des ordinateurs qu'elle a connectés.",
+      "short": "utiliser l'ordinateur de ses propres agents",
+      "say": "utilise l'ordinateur de ses propres agents"
+    },
+    "own_browsers": {
+      "title": "Utiliser le navigateur de ses propres agents",
+      "desc": "Le navigateur des agents dont la personne est responsable et les demandes de connexion qui lui sont faites.",
+      "short": "utiliser le navigateur de ses propres agents",
+      "say": "utilise le navigateur de ses propres agents"
     },
     "manage_connectors": {
       "title": "Connecter des applications",
@@ -13321,6 +13357,7 @@
       "noComputerCloud": "L'ordinateur de {{name}} est en préparation.",
       "noComputerCloud_female": "L'ordinateur de {{name}} est en préparation.",
       "forbidden": "Vous ne pouvez pas voir ce navigateur.",
+      "noRole": "Votre rôle ne vous donne pas accès aux navigateurs des agents.",
       "tooMany": "Trop de navigateurs ouverts en même temps. Celui-ci s'affichera quand un autre se fermera.",
       "unavailable": "Le navigateur ne peut pas être affiché pour le moment. Nouvelle tentative…",
       "closed": "Le navigateur de {{name}} est fermé.",
@@ -13832,7 +13869,8 @@
     "browserOnly": {
       "title": "Vous êtes dans le navigateur, pas sur tout l'ordinateur",
       "plan": "{{name}} réfléchit avec l'abonnement de son propriétaire, donc seuls cette personne et les admins qui gèrent les agents contrôlent tout l'ordinateur",
-      "other": "Vous pouvez contrôler le navigateur de {{name}}, pas tout l'ordinateur"
+      "other": "Vous pouvez contrôler le navigateur de {{name}}, pas tout l'ordinateur",
+      "role": "Votre rôle vous donne le navigateur de {{name}}, pas tout l'ordinateur"
     }
   },
   "agentComputer": {
@@ -13906,7 +13944,8 @@
       "noComputer_female": "Choisissez un ordinateur pour {{name}}.",
       "browserOff": "Le navigateur de {{name}} est désactivé sur {{computer}}",
       "browserOff_female": "Le navigateur de {{name}} est désactivé sur {{computer}}",
-      "forbidden": "Vous ne pouvez pas voir cet ordinateur."
+      "forbidden": "Vous ne pouvez pas voir cet ordinateur.",
+      "noRole": "Votre rôle ne vous donne pas accès aux ordinateurs des agents."
     },
     "closeAsk": "{{name}} vous attend 2 min.",
     "closeAsk_female": "{{name}} vous attend 2 min.",

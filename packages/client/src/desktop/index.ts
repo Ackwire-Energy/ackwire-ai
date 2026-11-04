@@ -131,7 +131,9 @@ export function desktopMode(
 export const browserOnlyWhy = (status: Pick<DesktopStatus, "controlRefusal"> | null | undefined) =>
   status?.controlRefusal === "owner_plan"
     ? ("desktop.browserOnly.plan" as const)
-    : ("desktop.browserOnly.other" as const);
+    : status?.controlRefusal === "role"
+      ? ("desktop.browserOnly.role" as const)
+      : ("desktop.browserOnly.other" as const);
 
 /** Waits between tries to open the screen again: 1 s, then up to 10 s. */
 const RETRY_MS = [1000, 2000, 5000, 10_000];

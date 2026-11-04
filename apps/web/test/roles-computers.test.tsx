@@ -1,0 +1,94 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { setupDom } from "@agenteschat/ui/testing/dom";
+
+setupDom();
+
+import type { OrgRole } from "@agenteschat/client";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { createFakeApi, ORG_ID, seedRoles, seedState } from "./fake-api";
+import { renderApp, screen, settle } from "./render";
+
+afterEach(() => cleanup());
+
+const click = (el: Element) => act(async () => fireEvent.click(el));
+
+/** A workspace with a third role, "Suporte", holding nothing of the computers. */
+async function openRole(name: string) {
+  const state = seedState();
+  const [admin, everyone] = seedRoles() as [OrgRole, OrgRole];
+  state.roles = [
+    admin,
+    { ...admin, id: "role-support", name: "Suporte", position: 1, permissions: [], hoist: false },
+    everyone,
+  ];
+  await renderApp(`/org/${ORG_ID}/settings/roles`, { api: createFakeApi(state) });
+  await settle(6);
+  const row = screen()
+    .getAllByRole("button")
+    .find((b) => b.className.includes("roles-row") && b.querySelector("b")?.textContent === name);
+  if (!row) throw new Error(`no row for ${name}`);
+  await click(row);
+  await settle(4);
+  const saved = () =>
+    state.calls
+      .filter((c) => c.method === "roles.update")
+      .map((c) => (c.args.at(-1) as { permissions: string[] }).permissions);
+  return { choice: () => screen().getByRole("radiogroup", { name: "Computadores dos agentes" }), saved };
+}
+
+const checked = (group: HTMLElement) =>
+  within(group)
+    .getAllByRole("radio")
+    .find((r) => r.getAttribute("aria-checked") === "true")?.textContent;
+
+describe("the agents' computers on a role's page: one choice of three", () => {
+  test("Todos: the whole computer of their own agents by default; Só o navegador and Nenhum save one key or none", async () => {
+    const { choice, saved } = await openRole("Todos");
+    expect(
+      within(choice())
+        .getAllByRole("radio")
+        .map((r) => r.textContent),
+    ).toEqual(["Nenhum", "Só o navegador", "Computador inteiro"]);
+    expect(checked(choice())).toBe("Computador inteiro");
+    expect(
+      screen().getByText("A tela inteira e o terminal dos próprios agentes e dos computadores que a pessoa conectou"),
+    ).toBeTruthy();
+    await click(within(choice()).getByRole("radio", { name: "Só o navegador" }));
+    await settle(4);
+    expect(saved().at(-1)).toContain("own_browsers");
+    expect(saved().at(-1)).not.toContain("own_computers");
+    expect(checked(choice())).toBe("Só o navegador");
+    await click(within(choice()).getByRole("radio", { name: "Nenhum" }));
+    await settle(4);
+    expect(
+      saved()
+        .at(-1)
+        ?.filter((k) => k.includes("browsers") || k.includes("computers")),
+    ).toEqual(["pair_computers"]);
+    expect(
+      screen().getByText("Ninguém vê nem usa os computadores ou navegadores dos agentes, nem os pedidos de login"),
+    ).toBeTruthy();
+  });
+
+  test("another role chooses for every agent: Só o navegador is control_browsers, never the key one by one", async () => {
+    const { choice, saved } = await openRole("Suporte");
+    expect(checked(choice())).toBe("Nenhum");
+    await click(within(choice()).getByRole("radio", { name: "Só o navegador" }));
+    await settle(4);
+    expect(saved().at(-1)).toEqual(["control_browsers"]);
+    await click(within(choice()).getByRole("radio", { name: "Computador inteiro" }));
+    await settle(4);
+    expect(saved().at(-1)).toEqual(["control_computers"]);
+    expect(screen().getByText("A tela inteira, o controle e o terminal de qualquer agente")).toBeTruthy();
+    // Item by item, the tools show no separate switch for the computers.
+    await click(screen().getByRole("button", { name: /Ajustar Apps e computadores/ }));
+    await settle(2);
+    expect(screen().queryByText("Usar o navegador dos agentes")).toBeNull();
+  });
+
+  test("Admin: the whole computer, shown and not changed there", async () => {
+    const { choice } = await openRole("Admin");
+    expect(checked(choice())).toBe("Computador inteiro");
+    expect(choice().getAttribute("aria-disabled")).toBe("true");
+  });
+});

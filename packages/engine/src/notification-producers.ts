@@ -1355,14 +1355,41 @@ export const resolveAgentHold = (deps: NotificationDeps, orgId: string, agentId:
 
 // ── Agent browser (ADR 0040) ──────────────────────────────────────────────────
 
-/** Who an agent's browser handoff is asked of: the person behind the run, else the agent's owner. */
+/**
+ * Who an agent's browser handoff is asked of: the person behind the run, else the agent's owner, the first whose
+ * roles give them the agents' browsers (`own_browsers`); null: nobody in particular.
+ */
 export async function browserHandoffRecipient(
   deps: Pick<NotificationDeps, "db">,
   orgId: string,
   runId: string | null,
   agentId: string,
 ) {
-  return (await requesterOfRun(deps, orgId, runId)) ?? (await agentOwner(deps, agentId));
+  const asked = [await requesterOfRun(deps, orgId, runId), await agentOwner(deps, agentId)];
+  const may = await mayOf(deps, orgId, asked, "own_browsers");
+  return asked.find((id) => id && may.includes(id)) ?? null;
+}
+
+/** Those of `userIds` who may `permission` in the organization (ADR 0085). */
+async function mayOf(
+  deps: Pick<NotificationDeps, "db">,
+  orgId: string,
+  userIds: (string | null)[],
+  permission: RolePermission,
+) {
+  const ids = userIds.filter((id): id is string => !!id);
+  if (ids.length === 0) return [];
+  const rows = await deps.db
+    .select({ userId: organizationMembers.userId })
+    .from(organizationMembers)
+    .where(
+      and(
+        eq(organizationMembers.orgId, orgId),
+        inArray(organizationMembers.userId, ids),
+        maySql(orgId, organizationMembers.userId, permission),
+      ),
+    );
+  return rows.map((r) => r.userId);
 }
 
 /**
@@ -1378,10 +1405,13 @@ export async function notifyBrowserHandoff(
   where: { channelId: string; threadId: string | null },
   to?: string[],
 ) {
-  // Who asked for the work and the agent's responsible person (once when it's the same person).
-  const userIds = [...new Set(to ?? [h.requestedForUserId, await agentOwner(deps, h.agentId)])].filter(
-    (id): id is string => !!id,
-  );
+  // Who asked for the work and the agent's responsible person (once when it's the same person), if their roles
+  // give them the agents' browsers.
+  const userIds = [
+    ...new Set(
+      to ?? (await mayOf(deps, h.orgId, [h.requestedForUserId, await agentOwner(deps, h.agentId)], "own_browsers")),
+    ),
+  ];
   if (userIds.length === 0) return;
   const [channel] = await deps.db
     .select({ kind: channels.kind, name: channels.name })

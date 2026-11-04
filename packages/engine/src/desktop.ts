@@ -19,6 +19,7 @@ import {
   noteComputerTaken,
   openHandoffOn,
   requireBrowserAccess,
+  screenAccess,
   setControlDeadline,
   touchControl,
 } from "./browser/handoff";
@@ -263,7 +264,10 @@ export interface DesktopStatus {
   held: boolean;
 }
 
-/** `GET …/agents/{agentId}/desktop`: for whoever may watch it. */
+/**
+ * `GET …/agents/{agentId}/desktop`: for whoever may watch it. Who may see the agent's browser but whose roles don't
+ * give them its whole computer gets a screen that can't be shown (`browser_only`), so the apps show the browser.
+ */
 export async function desktopStatus(
   deps: DesktopDeps,
   userId: string,
@@ -271,6 +275,22 @@ export async function desktopStatus(
   agentId: string,
 ): Promise<DesktopStatus> {
   const { db } = deps;
+  if ((await screenAccess(db, userId, orgId, agentId, undefined, "desktop")).refusal === "level") {
+    await requireBrowserAccess(db, userId, orgId, agentId);
+    return {
+      available: false,
+      reason: "browser_only",
+      detail: null,
+      running: false,
+      startedAt: null,
+      controllerUserId: null,
+      handoff: null,
+      viewers: 0,
+      canControl: false,
+      controlRefusal: "role",
+      held: await standingRefusal(db, orgId, agentId).then((refusal) => refusal !== null),
+    };
+  }
   await requireDesktopAccess(db, userId, orgId, agentId);
   const [served, open, controlRefusal, held] = await Promise.all([
     desktopTarget(db, ANYWHERE, orgId, agentId, "desktop"),

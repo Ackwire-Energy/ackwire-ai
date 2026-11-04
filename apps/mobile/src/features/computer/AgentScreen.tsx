@@ -259,7 +259,10 @@ export function AgentScreen({
   const waiting = handoff && isWaitingHandoff(handoff, now) ? handoff : null;
   const asked = waiting !== null && asksMe(waiting, userId);
   // Whose it is goes by ids, the same rule as the request's card: its owner and who controls computers may help too.
-  const mine = waiting !== null && handoffIsMine(waiting, userId, agent?.ownerUserId, can(org, "control_computers"));
+  const mine =
+    waiting !== null &&
+    can(org, "own_browsers") &&
+    handoffIsMine(waiting, userId, agent?.ownerUserId, can(org, "control_browsers"));
   const ask = inControl && handoff?.kind === "ask";
   const doneLabel = ask ? t("mobile.browser.live.done") : t("mobile.browser.live.handBack");
   const { handBack, couldnt } = useFinishHandoff(inControl ? handoff : null, name, doneLabel);

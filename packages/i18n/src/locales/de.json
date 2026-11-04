@@ -87,6 +87,24 @@
     "fromAdmin": "Von Administrator",
     "viaAdmin": "Alles, als Administrator",
     "nothing": "Nichts",
+    "computer": {
+      "title": "Computer der Agenten",
+      "levels": {
+        "none": "Keiner",
+        "browser": "Nur der Browser",
+        "full": "Ganzer Computer"
+      },
+      "every": {
+        "none": "Nur, was Alle schon dürfen",
+        "browser": "Der Browser jedes Agenten und die Anmeldeanfragen, nie der ganze Bildschirm oder das Terminal",
+        "full": "Der ganze Bildschirm, die Steuerung und das Terminal jedes Agenten"
+      },
+      "own": {
+        "none": "Niemand sieht oder nutzt die Computer oder Browser der Agenten, auch keine Anmeldeanfragen",
+        "browser": "Der Browser der eigenen Agenten und die Anmeldeanfragen an die Person, nie der ganze Bildschirm",
+        "full": "Der ganze Bildschirm und das Terminal der eigenen Agenten und der Computer, die die Person verbunden hat"
+      }
+    },
     "everyoneNote": "Gilt für jede Person im Workspace. Andere Rollen fügen nur etwas hinzu.",
     "summary": {
       "owner": "Darf immer alles. Jeder Workspace hat mindestens einen Inhaber.",
@@ -249,6 +267,24 @@
       "desc": "Ihren Desktop und ihren Browser steuern.",
       "short": "Bildschirme übernehmen",
       "say": "übernimmt die Bildschirme der Agenten"
+    },
+    "control_browsers": {
+      "title": "Browser der Agenten nutzen",
+      "desc": "Den Browser jedes Agenten sehen und steuern und Anmeldeanfragen beantworten.",
+      "short": "Browser der Agenten nutzen",
+      "say": "nutzt die Browser der Agenten"
+    },
+    "own_computers": {
+      "title": "Computer der eigenen Agenten nutzen",
+      "desc": "Der ganze Bildschirm und das Terminal der Agenten, für die die Person verantwortlich ist, und der Computer, die sie verbunden hat.",
+      "short": "Computer der eigenen Agenten nutzen",
+      "say": "nutzt die Computer der eigenen Agenten"
+    },
+    "own_browsers": {
+      "title": "Browser der eigenen Agenten nutzen",
+      "desc": "Der Browser der Agenten, für die die Person verantwortlich ist, und die Anmeldeanfragen an sie.",
+      "short": "Browser der eigenen Agenten nutzen",
+      "say": "nutzt die Browser der eigenen Agenten"
     },
     "manage_connectors": {
       "title": "Apps verbinden",
@@ -12801,6 +12837,7 @@
       "noComputer": "{{name}} hat keinen verbundenen Computer.",
       "noComputerCloud": "Der Computer von {{name}} wird vorbereitet.",
       "forbidden": "Du kannst diesen Browser nicht sehen.",
+      "noRole": "Deine Rolle gibt dir keinen Zugang zu den Browsern der Agenten.",
       "tooMany": "Zu viele Browser gleichzeitig offen. Dieser erscheint, sobald ein anderer geschlossen wird.",
       "unavailable": "Der Browser kann gerade nicht angezeigt werden. Neuer Versuch…",
       "closed": "Der Browser von {{name}} ist geschlossen.",
@@ -13251,7 +13288,8 @@
     "browserOnly": {
       "title": "Du bist im Browser, nicht auf dem ganzen Computer",
       "plan": "{{name}} denkt mit dem Abo der Person, der der Agent gehört, deshalb steuern nur sie und Admins, die Agenten verwalten, den ganzen Computer",
-      "other": "Du kannst den Browser von {{name}} steuern, nicht den ganzen Computer"
+      "other": "Du kannst den Browser von {{name}} steuern, nicht den ganzen Computer",
+      "role": "Deine Rolle gibt dir den Browser von {{name}}, nicht den ganzen Computer"
     }
   },
   "agentComputer": {
@@ -13312,7 +13350,8 @@
       "noScreenHelp": "Erlaube den Bildschirm oder den Browser unter Tools und Zugriff.",
       "noComputer": "Wähle einen Computer für {{name}}.",
       "browserOff": "Der Browser von {{name}} ist auf {{computer}} aus",
-      "forbidden": "Du kannst diesen Computer nicht sehen."
+      "forbidden": "Du kannst diesen Computer nicht sehen.",
+      "noRole": "Deine Rolle gibt dir keinen Zugang zu den Computern der Agenten."
     },
     "closeAsk": "{{name}} wartet 2 Min., bis du zurückkommst.",
     "openAccess": "Tools und Zugriff öffnen",

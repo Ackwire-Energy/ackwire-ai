@@ -55,8 +55,9 @@ export function isWaitingHandoff(h: Pick<BrowserHandoff, "status" | "expiresAt">
  * Whether a waiting request is this person's to answer (its card says it waits for you, the bar above the
  * composer brings it back, its buttons show): the person it was asked of and the agent's responsible person,
  * who are both notified. Asked of no one in particular (no one behind the run and no responsible person, or a
- * desktop several people may drive), it is for whoever may control computers. The server checks again when
- * they open it (ADR 0040 §6, ADR 0058 §4).
+ * desktop several people may drive), it is for whoever may control the agents' browsers (`control_browsers`). The
+ * server checks again when they open it (ADR 0040 §6, ADR 0058 §4); whose roles give them no browser at all
+ * (`own_browsers`) answers none, which the callers check first.
  */
 export function handoffIsMine(
   h: Pick<BrowserHandoff, "requestedForUserId">,

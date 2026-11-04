@@ -217,10 +217,10 @@ const lentAccount = (a: { brain: string; account: string | null }) => (a.brain !
 /**
  * Whether a person may run commands as the OS user an agent's desktop and terminal run as (ADR 0058 §4): what
  * controlling the desktop or opening the terminal gives. In system mode each agent is its own user: the org's
- * admins (`control_computers`) and the agent's owner; while that user holds the owner's sign-in (`signIn`, ADR
- * 0059 §8), only those admins who also manage agents (`manages`), who could read that sign-in there. Otherwise
- * every agent is the runner's own user, which holds every agent's folder, the computer's sign-ins and its token:
- * only the person who paired the computer, and nobody on one nobody paired.
+ * admins (`control_computers`) and the agent's owner (with `own_computers`); while that user holds the owner's
+ * sign-in (`signIn`, ADR 0059 §8), only those admins who also manage agents (`manages`), who could read that sign-in
+ * there. Otherwise every agent is the runner's own user, which holds every agent's folder, the computer's sign-ins
+ * and its token: only the person who paired the computer (with `own_computers`), and nobody on one nobody paired.
  */
 export function drivesComputer(
   machine: Pick<MachineRow, "pairedByUserId" | "executors">,
@@ -233,25 +233,33 @@ export function drivesComputer(
 /**
  * Why a person may not drive the computer (`drivesComputer`), null when they may: `pairer` (not the person who
  * paired a computer outside system mode), `owner_plan` (an admin who doesn't manage agents while the agent's user
- * holds its owner's sign-in), `not_allowed` (neither an admin nor the agent's owner).
+ * holds its owner's sign-in), `role` (their roles give them the agents' browsers but not the whole computer here),
+ * `not_allowed` (neither an admin nor the agent's owner).
  */
-export type DriveRefusal = "pairer" | "owner_plan" | "not_allowed";
+export type DriveRefusal = "pairer" | "owner_plan" | "role" | "not_allowed";
 export interface DrivingPerson {
   userId: string;
   /** `control_computers`. */
   admin: boolean;
+  /** `own_computers`: the whole computer of an agent they own, or of one they paired. */
+  own: boolean;
   owner: boolean;
   /** `manage_agents`: drives it on its owner's plan too. */
   manages?: boolean;
+  /** `control_browsers`: told `role` rather than `not_allowed`. */
+  browsers?: boolean;
 }
 export function driveRefusal(
   machine: Pick<MachineRow, "pairedByUserId" | "executors">,
   person: DrivingPerson,
   signIn = false,
 ): DriveRefusal | null {
-  if (machine.executors?.mode !== "system") return machine.pairedByUserId === person.userId ? null : "pairer";
-  if (person.owner) return null;
-  if (!person.admin) return "not_allowed";
+  if (machine.executors?.mode !== "system") {
+    if (machine.pairedByUserId !== person.userId) return "pairer";
+    return person.own ? null : "role";
+  }
+  if (person.owner && person.own) return null;
+  if (!person.admin) return person.owner || person.browsers ? "role" : "not_allowed";
   return signIn && !person.manages ? "owner_plan" : null;
 }
 
@@ -296,7 +304,9 @@ export async function requireComputerDriver(
         ? "Only the person who connected this computer can use it as the agent"
         : refusal === "owner_plan"
           ? "Only the agent's owner and admins who manage agents can use its computer as the agent while it thinks with the owner's plan"
-          : "Only admins and the agent's owner can use its computer as the agent",
+          : refusal === "role"
+            ? "Your roles give you the agents' browsers, not their whole computer"
+            : "Only admins and the agent's owner can use its computer as the agent",
     );
   }
   return machine;
@@ -320,8 +330,10 @@ export async function computerDriving(db: Database, userId: string, orgId: strin
   const person = {
     userId,
     admin: can(membership, "control_computers"),
+    own: can(membership, "own_computers"),
     owner: agent.owner === userId,
     manages: can(membership, "manage_agents"),
+    browsers: can(membership, "control_browsers"),
   };
   return { machine, refusal: driveRefusal(machine, person, lentAccount(agent) !== null) };
 }
@@ -351,11 +363,12 @@ export async function computerDrivers(db: Database, orgId: string, agentId: stri
   if (!agent || !machine) return [];
   const signIn = lentAccount(agent) !== null;
   const named = [agent.owner, machine.pairedByUserId].filter((id): id is string => !!id);
-  // Who may drive it (`control_computers`, ADR 0085), read once per member, and the people named above.
+  // Who may drive it (`control_computers`, `own_computers`, ADR 0085), read once per member, and the people named above.
   const everyone = await db
     .select({
       userId: organizationMembers.userId,
       admin: maySql(orgId, organizationMembers.userId, "control_computers"),
+      own: maySql(orgId, organizationMembers.userId, "own_computers"),
       manages: maySql(orgId, organizationMembers.userId, "manage_agents"),
     })
     .from(organizationMembers)

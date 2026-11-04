@@ -87,6 +87,24 @@
     "fromAdmin": "Yönetici'den gelir",
     "viaAdmin": "Her şey, Yönetici olduğu için",
     "nothing": "Hiçbir şey",
+    "computer": {
+      "title": "Ajanların bilgisayarları",
+      "levels": {
+        "none": "Hiçbiri",
+        "browser": "Yalnızca tarayıcı",
+        "full": "Bilgisayarın tamamı"
+      },
+      "every": {
+        "none": "Yalnızca Herkes'in zaten yapabildikleri",
+        "browser": "Herhangi bir ajanın tarayıcısı ve oturum açma istekleri, asla tam ekran veya terminal değil",
+        "full": "Herhangi bir ajanın tam ekranı, kontrolü ve terminali"
+      },
+      "own": {
+        "none": "Kimse ajanların bilgisayarlarını, tarayıcılarını veya oturum açma isteklerini göremez ve kullanamaz",
+        "browser": "Kendi ajanlarının tarayıcısı ve kişiye gelen oturum açma istekleri, asla tam ekran değil",
+        "full": "Kendi ajanlarının ve kişinin bağladığı bilgisayarların tam ekranı ve terminali"
+      }
+    },
     "everyoneNote": "Çalışma alanındaki herkese uygulanır. Diğer roller yalnızca buna ekleme yapar.",
     "summary": {
       "owner": "Her zaman her şeyi yapabilir. Her çalışma alanının en az bir sahibi vardır.",
@@ -249,6 +267,24 @@
       "desc": "Masaüstlerini ve tarayıcılarını kontrol etme.",
       "short": "ekranları devralma",
       "say": "ajanların ekranlarını devralır"
+    },
+    "control_browsers": {
+      "title": "Ajanların tarayıcılarını kullanma",
+      "desc": "Herhangi bir ajanın tarayıcısını görme, kontrol etme ve oturum açma isteklerini yanıtlama.",
+      "short": "ajanların tarayıcılarını kullanma",
+      "say": "ajanların tarayıcılarını kullanır"
+    },
+    "own_computers": {
+      "title": "Kendi ajanlarının bilgisayarını kullanma",
+      "desc": "Sorumlu olduğu ajanların ve bağladığı bilgisayarların tam ekranı ve terminali.",
+      "short": "kendi ajanlarının bilgisayarını kullanma",
+      "say": "kendi ajanlarının bilgisayarını kullanır"
+    },
+    "own_browsers": {
+      "title": "Kendi ajanlarının tarayıcısını kullanma",
+      "desc": "Sorumlu olduğu ajanların tarayıcısı ve kendisine gelen oturum açma istekleri.",
+      "short": "kendi ajanlarının tarayıcısını kullanma",
+      "say": "kendi ajanlarının tarayıcısını kullanır"
     },
     "manage_connectors": {
       "title": "Uygulama bağlama",
@@ -12733,6 +12769,7 @@
       "noComputer": "{{name}} ajanının bağlı bir bilgisayarı yok.",
       "noComputerCloud": "{{name}} ajanının bilgisayarı hazırlanıyor.",
       "forbidden": "Bu tarayıcıyı göremezsiniz.",
+      "noRole": "Rolünüz ajanların tarayıcılarına erişim vermiyor.",
       "tooMany": "Aynı anda çok fazla tarayıcı açık. Bu, başka biri kapanınca görünür.",
       "unavailable": "Tarayıcı şu anda gösterilemiyor. Yeniden deneniyor…",
       "closed": "{{name}} ajanının tarayıcısı kapalı.",
@@ -13183,7 +13220,8 @@
     "browserOnly": {
       "title": "Tüm bilgisayarda değil, tarayıcıdasınız",
       "plan": "{{name}} sahibinin planıyla düşünüyor, bu yüzden tüm bilgisayarı yalnızca sahibi ve ajanları yöneten yöneticiler kontrol eder",
-      "other": "{{name}} adlı ajanın tarayıcısını kontrol edebilirsiniz, tüm bilgisayarı değil"
+      "other": "{{name}} adlı ajanın tarayıcısını kontrol edebilirsiniz, tüm bilgisayarı değil",
+      "role": "Rolünüz size {{name}} adlı ajanın tarayıcısını verir, tüm bilgisayarı değil"
     }
   },
   "agentComputer": {
@@ -13244,7 +13282,8 @@
       "noScreenHelp": "Araçlar ve erişim bölümünden ekrana veya tarayıcıya izin verin.",
       "noComputer": "{{name}} için bir bilgisayar seçin.",
       "browserOff": "{{name}} ajanının tarayıcısı {{computer}} üzerinde kapalı",
-      "forbidden": "Bu bilgisayarı göremezsiniz."
+      "forbidden": "Bu bilgisayarı göremezsiniz.",
+      "noRole": "Rolünüz ajanların bilgisayarlarına erişim vermiyor."
     },
     "closeAsk": "{{name}}, geri dönmeniz için 2 dakika bekler.",
     "openAccess": "Araçlar ve erişimi aç",

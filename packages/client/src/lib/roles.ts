@@ -14,11 +14,52 @@ export type PermissionAreaId = "chat" | "agents" | "tools" | "knowledge" | "org"
 /** An area's level: nothing past `everyone` ("Como Todos"), its "use" keys, all of them, or a mix. */
 export type AreaLevel = "none" | "use" | "manage" | "custom";
 
-/** Every key with `administrator` spread out. */
+/** Every key with `administrator` spread out, and what each computer key gives (`IMPLIED` on the server). */
 export function grants(keys: readonly string[]): Set<string> {
   const out = new Set(keys);
   if (out.has("administrator")) for (const k of ALL_KEYS) out.add(k);
+  for (const k of [...out]) for (const i of IMPLIED[k] ?? []) out.add(i);
   return out;
+}
+
+const IMPLIED: Record<string, readonly string[]> = {
+  control_computers: ["control_browsers", "own_computers", "own_browsers"],
+  control_browsers: ["own_browsers"],
+  own_computers: ["own_browsers"],
+};
+
+/**
+ * The agents' computers on the roles screen: one choice per role, not keys one by one. `everyone` chooses for what
+ * is a person's own (their agents, the computers they connected, what they're asked or asked for: `own_*`), any
+ * other role for every agent (`control_*`).
+ */
+export type ComputerLevel = "none" | "browser" | "full";
+export const COMPUTER_KEYS: readonly string[] = [
+  "own_browsers",
+  "own_computers",
+  "control_browsers",
+  "control_computers",
+];
+const computerKeysOf = (role: Pick<OrgRole, "kind">) =>
+  isEveryone(role)
+    ? ({ browser: "own_browsers", full: "own_computers" } as const)
+    : ({ browser: "control_browsers", full: "control_computers" } as const);
+
+/** The level a set of keys gives on `role`'s reach. */
+const levelIn = (keys: Set<string>, role: Pick<OrgRole, "kind">): ComputerLevel => {
+  const k = computerKeysOf(role);
+  return keys.has(k.full) ? "full" : keys.has(k.browser) ? "browser" : "none";
+};
+
+/** The role's computer level (`administrator` and its own keys), and what `everyone` already gives it (`base`). */
+export function computerLevelOf(role: OrgRole, everyone: OrgRole | undefined) {
+  return { level: levelIn(grants(role.permissions), role), base: levelIn(baseOf(role, everyone), role) };
+}
+
+/** The role's keys with its computer level set (the rest untouched). */
+export function withComputerLevel(role: OrgRole, level: ComputerLevel): string[] {
+  const keep = role.permissions.filter((k) => !COMPUTER_KEYS.includes(k));
+  return level === "none" ? keep : [...keep, computerKeysOf(role)[level]];
 }
 
 /** The keys the summary names first: what tells roles apart. */
@@ -27,6 +68,7 @@ export const SUMMARY_ORDER: readonly RolePermission[] = [
   "approve_actions",
   "manage_agents",
   "control_computers",
+  "control_browsers",
   "manage_connectors",
   "manage_credentials",
   "manage_members",
@@ -41,6 +83,8 @@ export const SUMMARY_ORDER: readonly RolePermission[] = [
   "review_memory",
   "invite_people",
   "pair_computers",
+  "own_computers",
+  "own_browsers",
   "talk_to_agents",
   "assign_work",
   "post",
@@ -64,21 +108,24 @@ export const sortRoles = (roles: readonly OrgRole[]) =>
 const baseOf = (role: OrgRole, everyone: OrgRole | undefined) =>
   isEveryone(role) || !everyone ? new Set<string>() : grants(everyone.permissions);
 
+/** An area's keys but the computers' (their own choice, `computerLevelOf`). */
+const areaKeys = (area: PermissionArea) => area.keys.filter((k) => !COMPUTER_KEYS.includes(k));
+
 /** The area's keys this role reaches, `everyone`'s included. */
 export function areaReach(role: OrgRole, area: PermissionArea, everyone: OrgRole | undefined) {
   const own = grants(role.permissions);
   const base = baseOf(role, everyone);
-  return area.keys.filter((k) => own.has(k) || base.has(k));
+  return areaKeys(area).filter((k) => own.has(k) || base.has(k));
 }
 
 const same = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
 
 export function levelOf(role: OrgRole, area: PermissionArea, everyone: OrgRole | undefined): AreaLevel {
-  const base = new Set(area.keys.filter((k) => baseOf(role, everyone).has(k)));
+  const base = new Set(areaKeys(area).filter((k) => baseOf(role, everyone).has(k)));
   const reach = new Set(areaReach(role, area, everyone));
   if (same(reach, base)) return "none";
   if (same(reach, new Set([...base, ...area.use]))) return "use";
-  if (same(reach, new Set(area.keys))) return "manage";
+  if (same(reach, new Set(areaKeys(area)))) return "manage";
   return "custom";
 }
 
@@ -91,8 +138,9 @@ export function levelOptions(role: OrgRole, area: PermissionArea, everyone: OrgR
 /** The role's keys with the area set to `level` (the rest untouched). */
 export function withLevel(role: OrgRole, area: PermissionArea, level: AreaLevel): string[] {
   if (level === "custom") return role.permissions;
-  const keep = role.permissions.filter((k) => !area.keys.includes(k));
-  const add = level === "use" ? area.use : level === "manage" ? area.keys : [];
+  const keys = areaKeys(area);
+  const keep = role.permissions.filter((k) => !keys.includes(k));
+  const add = level === "use" ? area.use : level === "manage" ? keys : [];
   return [...keep, ...add];
 }
 

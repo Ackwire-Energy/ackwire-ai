@@ -236,6 +236,36 @@
   "rolesPage.nothing": {
     "value": "Nothing"
   },
+  "rolesPage.computer.title": {
+    "value": "Agents' computers"
+  },
+  "rolesPage.computer.levels.none": {
+    "value": "None"
+  },
+  "rolesPage.computer.levels.browser": {
+    "value": "Browser only"
+  },
+  "rolesPage.computer.levels.full": {
+    "value": "Whole computer"
+  },
+  "rolesPage.computer.every.none": {
+    "value": "Only what Everyone can already do"
+  },
+  "rolesPage.computer.every.browser": {
+    "value": "Any agent's browser and sign-in requests, never the full screen or the terminal"
+  },
+  "rolesPage.computer.every.full": {
+    "value": "Any agent's full screen, control and terminal"
+  },
+  "rolesPage.computer.own.none": {
+    "value": "Nobody sees or uses the agents' computers or browsers, sign-in requests included"
+  },
+  "rolesPage.computer.own.browser": {
+    "value": "Their own agents' browser and sign-in requests made to them, never the full screen"
+  },
+  "rolesPage.computer.own.full": {
+    "value": "The full screen and terminal of their own agents and of the computers they connected"
+  },
   "rolesPage.everyoneNote": {
     "value": "Applies to every person in the workspace. Other roles only add to it."
   },
@@ -616,6 +646,42 @@
   },
   "permissions.control_computers.say": {
     "value": "takes over the agents' screens"
+  },
+  "permissions.control_browsers.title": {
+    "value": "Use the agents' browsers"
+  },
+  "permissions.control_browsers.desc": {
+    "value": "See and control any agent's browser and answer sign-in requests."
+  },
+  "permissions.control_browsers.short": {
+    "value": "use the agents' browsers"
+  },
+  "permissions.control_browsers.say": {
+    "value": "uses the agents' browsers"
+  },
+  "permissions.own_computers.title": {
+    "value": "Use their own agents' computers"
+  },
+  "permissions.own_computers.desc": {
+    "value": "The full screen and terminal of the agents they're responsible for and of the computers they connected."
+  },
+  "permissions.own_computers.short": {
+    "value": "use their own agents' computers"
+  },
+  "permissions.own_computers.say": {
+    "value": "uses their own agents' computers"
+  },
+  "permissions.own_browsers.title": {
+    "value": "Use their own agents' browsers"
+  },
+  "permissions.own_browsers.desc": {
+    "value": "The browser of the agents they're responsible for and sign-in requests made to them."
+  },
+  "permissions.own_browsers.short": {
+    "value": "use their own agents' browsers"
+  },
+  "permissions.own_browsers.say": {
+    "value": "uses their own agents' browsers"
   },
   "permissions.manage_connectors.title": {
     "value": "Connect apps"
@@ -30617,6 +30683,9 @@
   "browser.inCard.forbidden": {
     "value": "You can't see this browser."
   },
+  "browser.inCard.noRole": {
+    "value": "Your role doesn't give you the agents' browsers."
+  },
   "browser.inCard.tooMany": {
     "value": "Too many browsers open at once. This one shows when another one closes."
   },
@@ -31614,6 +31683,9 @@
   "desktop.browserOnly.other": {
     "value": "You can control {{name}}'s browser, not the whole computer"
   },
+  "desktop.browserOnly.role": {
+    "value": "Your role gives you {{name}}'s browser, not the whole computer"
+  },
   "agentComputer.title": {
     "value": "{{name}}'s computer"
   },
@@ -31766,6 +31838,9 @@
   },
   "agentComputer.state.forbidden": {
     "value": "You can't see this computer."
+  },
+  "agentComputer.state.noRole": {
+    "value": "Your role doesn't give you the agents' computers."
   },
   "agentComputer.closeAsk": {
     "value": "{{name}} waits 2 min for you to come back."

@@ -108,7 +108,8 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   if (waiting) {
     const asked = current.requestedForUserId;
     // Its buttons only for whom it waits on (the server checks again when they open it).
-    const mine = handoffIsMine(current, me.user.id, agent?.ownerUserId, can(org, "control_computers"));
+    const mine =
+      can(org, "own_browsers") && handoffIsMine(current, me.user.id, agent?.ownerUserId, can(org, "control_browsers"));
     const askedName = asked ? dir.memberById.get(asked)?.name : undefined;
     return (
       <>

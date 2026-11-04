@@ -1422,6 +1422,13 @@
       "when": 1793749430769,
       "tag": "0204_right_hand_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 204,
+      "version": "7",
+      "when": 1793750030769,
+      "tag": "0205_own_computers",
+      "breakpoints": true
     }
   ]
 }

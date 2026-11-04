@@ -12,7 +12,7 @@ const DesktopStatus = z
     available: z.boolean(),
     reason: z.string().nullable().openapi({
       description:
-        "Why it can't be shown now: `no_desktop`, `no_computer`, `offline`, `runner_outdated`, `not_allowed` (its switch is off), `desktop_unavailable`.",
+        "Why it can't be shown now: `no_desktop`, `no_computer`, `offline`, `runner_outdated`, `not_allowed` (its switch is off), `desktop_unavailable`, `browser_only` (this person's roles give them its browser, not its whole computer).",
     }),
     detail: z.string().nullable().openapi({ description: "What the computer says it lacks (what to install)." }),
     running: z.boolean().openapi({
@@ -26,9 +26,9 @@ const DesktopStatus = z
     }),
     viewers: z.number().int(),
     canControl: z.boolean().openapi({ description: "This person may take control of the desktop." }),
-    controlRefusal: z.enum(["pairer", "owner_plan", "not_allowed"]).nullable().openapi({
+    controlRefusal: z.enum(["pairer", "owner_plan", "role", "not_allowed"]).nullable().openapi({
       description:
-        "Why not: `pairer` (only the person who connected the computer), `owner_plan` (only the agent's owner and admins who manage agents while it thinks with the owner's plan), `not_allowed` (neither an admin nor its owner).",
+        "Why not: `pairer` (only the person who connected the computer), `owner_plan` (only the agent's owner and admins who manage agents while it thinks with the owner's plan), `role` (their roles give them the agents' browsers, not the whole computer), `not_allowed` (neither an admin nor its owner).",
     }),
     held: z.boolean().openapi({
       description: "The agent is held, or its workspace is on hold: people may watch, nobody takes control.",

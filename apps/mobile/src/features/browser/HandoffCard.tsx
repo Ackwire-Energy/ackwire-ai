@@ -125,7 +125,10 @@ function HandoffAsk({
   const g = genderOf(name);
   // Whose it is goes by ids (the same rule as the line above the composer); a name only says who, once it loads.
   // Someone else's: who it waits for in the header when known, no buttons here.
-  const mine = meId !== null && handoffIsMine(h, meId, agent?.ownerUserId, can(org, "control_computers"));
+  const mine =
+    meId !== null &&
+    can(org, "own_browsers") &&
+    handoffIsMine(h, meId, agent?.ownerUserId, can(org, "control_browsers"));
   const asked = h.requestedForUserId ? dir.memberById.get(h.requestedForUserId)?.name : undefined;
   const failed = () => toast({ title: t("mobile.app.failed"), icon: "x" });
 

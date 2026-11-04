@@ -95,6 +95,22 @@ export const ptBR = {
     fromAdmin: "Vem de Administrador",
     viaAdmin: "Tudo, por ser Administrador",
     nothing: "Nada",
+    computer: {
+      title: "Computadores dos agentes",
+      levels: { none: "Nenhum", browser: "Só o navegador", full: "Computador inteiro" },
+      /** A role but Todos: on every agent of the workspace. */
+      every: {
+        none: "Só o que Todos já podem",
+        browser: "O navegador de qualquer agente e os pedidos de login, nunca a tela inteira nem o terminal",
+        full: "A tela inteira, o controle e o terminal de qualquer agente",
+      },
+      /** Todos: on the agents each person is responsible for, the computers they connected and when asked. */
+      own: {
+        none: "Ninguém vê nem usa os computadores ou navegadores dos agentes, nem os pedidos de login",
+        browser: "O navegador dos próprios agentes e os pedidos de login feitos à pessoa, nunca a tela inteira",
+        full: "A tela inteira e o terminal dos próprios agentes e dos computadores que a pessoa conectou",
+      },
+    },
     everyoneNote: "Vale para toda pessoa do workspace. Os outros papéis só somam a isto.",
     summary: {
       owner: "Pode tudo, sempre. Todo workspace tem pelo menos um dono.",
@@ -252,6 +268,24 @@ export const ptBR = {
       desc: "Controlar a área de trabalho e o navegador deles.",
       short: "assumir a tela",
       say: "assume a tela dos agentes",
+    },
+    control_browsers: {
+      title: "Usar o navegador dos agentes",
+      desc: "Ver e controlar o navegador de qualquer agente e atender os pedidos de login.",
+      short: "usar o navegador dos agentes",
+      say: "usa o navegador dos agentes",
+    },
+    own_computers: {
+      title: "Usar o computador dos próprios agentes",
+      desc: "A tela inteira e o terminal dos agentes pelos quais responde e dos computadores que conectou.",
+      short: "usar o computador dos próprios agentes",
+      say: "usa o computador dos próprios agentes",
+    },
+    own_browsers: {
+      title: "Usar o navegador dos próprios agentes",
+      desc: "O navegador dos agentes pelos quais responde e os pedidos de login feitos à pessoa.",
+      short: "usar o navegador dos próprios agentes",
+      say: "usa o navegador dos próprios agentes",
     },
     manage_connectors: {
       title: "Conectar apps",
@@ -12554,6 +12588,7 @@ export const ptBR = {
       noComputerCloud: "O computador do {{name}} está sendo preparado.",
       noComputerCloud_female: "O computador da {{name}} está sendo preparado.",
       forbidden: "Você não pode ver este navegador.",
+      noRole: "Seu papel não dá acesso aos navegadores dos agentes.",
       tooMany: "Muitos navegadores abertos ao mesmo tempo. Este aparece quando outro fechar.",
       unavailable: "O navegador não pode ser mostrado agora. Tentando de novo…",
       closed: "O navegador do {{name}} está fechado.",
@@ -13121,6 +13156,8 @@ export const ptBR = {
         "A\u00a0{{name}} pensa com o plano de quem é dona dela, então só essa pessoa e os admins que gerenciam agentes controlam o computador inteiro",
       other: "Você controla o navegador do\u00a0{{name}}, não o computador inteiro",
       other_female: "Você controla o navegador da\u00a0{{name}}, não o computador inteiro",
+      role: "Seu papel dá acesso ao navegador do\u00a0{{name}}, não ao computador inteiro",
+      role_female: "Seu papel dá acesso ao navegador da\u00a0{{name}}, não ao computador inteiro",
     },
   },
   agentComputer: {
@@ -13195,6 +13232,7 @@ export const ptBR = {
       browserOff: "O navegador do {{name}} está desligado no {{computer}}",
       browserOff_female: "O navegador da {{name}} está desligado no {{computer}}",
       forbidden: "Você não pode ver este computador.",
+      noRole: "Seu papel não dá acesso aos computadores dos agentes.",
     },
     closeAsk: "O {{name}} espera 2 min você voltar.",
     closeAsk_female: "A {{name}} espera 2 min você voltar.",

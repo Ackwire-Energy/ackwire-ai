@@ -461,7 +461,7 @@ function ProfilesSection({ machine: m }: { machine: Machine }) {
   const actions = useBrowserProfileMutations(orgId);
   const mine = machineProfiles(profiles.data, m);
   if (mine.length === 0) return null;
-  const drive = can(org, "manage_connectors") && can(org, "control_computers");
+  const drive = can(org, "manage_connectors") && can(org, "control_browsers");
   const login = (profileId: string) =>
     actions.takeover.mutate(profileId, {
       onSuccess: () => router.push(`/browser-profile/${profileId}`),

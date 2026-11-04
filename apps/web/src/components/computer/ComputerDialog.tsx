@@ -337,7 +337,11 @@ function ComputerStage({
       <>
         <DialogHead sub="" />
         <Stage>
-          <Cover color={color} icon="lock" text={t("agentComputer.state.forbidden")} />
+          <Cover
+            color={color}
+            icon="lock"
+            text={t(can(org, "own_browsers") ? "agentComputer.state.forbidden" : "agentComputer.state.noRole")}
+          />
         </Stage>
       </>
     );
@@ -436,7 +440,8 @@ function ComputerStage({
           />
         ) : (
           <>
-            {mine && view.desktop?.available && !view.desktop.canControl && (
+            {((mine && view.desktop?.available && !view.desktop.canControl) ||
+              view.desktop?.reason === "browser_only") && (
               // A computer with a screen whose browser alone this person drives: the page, labeled, not the screen.
               <Banner tone="info" text={t("desktop.browserOnly.title")} help={t(browserOnlyWhy(view.desktop), g)} />
             )}

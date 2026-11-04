@@ -43,7 +43,7 @@ const AgentParams = OrgParams.extend({ agentId: z.uuid() });
 /**
  * Browser profiles (ADR 0110): named, shared logins on one computer that the agents granted them use, one at a
  * time. Anyone in the workspace sees the list; creating, granting and deleting take `manage_connectors`; logging in
- * ("Fazer login", a person's control on the live view `profile:<id>`) also takes `control_computers`. An agent's
+ * ("Fazer login", a person's control on the live view `profile:<id>`) also takes `control_browsers`. An agent's
  * owner chooses its default among the profiles it has and can ask for another, never grant one.
  */
 export function browserProfileRoutes(deps: AppDeps) {
@@ -149,7 +149,7 @@ export function browserProfileRoutes(deps: AppDeps) {
       security,
       summary: "Fazer login: take control of the profile (agents wait) and open its live view",
       description:
-        '`manage_connectors` with `control_computers`. The live view is `browser.watch` with `agentId: "profile:<id>"` on `/api/ws`. 409 `browser_profile.busy` while another person has it.',
+        '`manage_connectors` with `control_browsers`. The live view is `browser.watch` with `agentId: "profile:<id>"` on `/api/ws`. 409 `browser_profile.busy` while another person has it.',
       request: { params: ProfileParams },
       responses: { 200: json(BrowserProfile), ...errors },
     }),

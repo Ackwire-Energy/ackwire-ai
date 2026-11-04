@@ -411,14 +411,38 @@ async function handoffFacts(
 // ── Access ────────────────────────────────────────────────────────────────────
 
 /**
- * Who may watch an agent's screen, and see its handoffs (driving it: `requireBrowserControl`): org admins,
- * the agent's responsible person, the person a handoff was asked of, and the
- * person behind the work (who asked for the run waiting on it, or for one of
- * the agent's runs going on now). Not everyone who can read a channel: the
- * screen shows all of the agent's work, DMs included. A desktop also to whoever
- * may drive its computer (`drivesComputer`): they can see all of it anyway.
+ * Who may watch an agent's screen, and see its handoffs (driving it: `requireBrowserControl`): org admins of that
+ * screen (`control_browsers`; the desktop `control_computers`), and, with the same screen's `own_*` key, the agent's
+ * responsible person, the person a handoff was asked of, and the person behind the work (who asked for the run
+ * waiting on it, or for one of the agent's runs going on now). Not everyone who can read a channel: the screen shows
+ * all of the agent's work, DMs included. A desktop also to whoever may drive its computer (`drivesComputer`): they
+ * can see all of it anyway. `level`: refused only for the key (`screenAccess`).
  */
 export async function requireBrowserAccess(
+  db: Database,
+  userId: string,
+  orgId: string,
+  agentId: string,
+  handoff?: BrowserHandoffRow | null,
+  screen: ScreenKind = "browser",
+) {
+  const { access, refusal } = await screenAccess(db, userId, orgId, agentId, handoff, screen);
+  if (refusal === "level") {
+    throw new ForbiddenError(
+      screen === "desktop"
+        ? "Your roles give you the agents' browsers, not their whole computer"
+        : "Your roles don't give you the agents' computers",
+    );
+  }
+  if (refusal) throw new ForbiddenError(`You can't use this agent's ${SCREENS[screen].what}`);
+  return access;
+}
+
+/**
+ * `requireBrowserAccess` without throwing on a refusal: `level` when the person would see this screen but their
+ * roles don't give them it (no `own_*` key; an admin of browsers on a desktop), `none` otherwise.
+ */
+export async function screenAccess(
   db: Database,
   userId: string,
   orgId: string,
@@ -435,11 +459,28 @@ export async function requireBrowserAccess(
     .from(agents)
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
   if (!agent) throw new NotFoundError("Agent not found");
-  const admin = can(membership, "control_computers");
+  const full = screen === "desktop";
+  const admin = can(membership, full ? "control_computers" : "control_browsers");
   const access = { ...agent, admin };
-  if (admin || agent.owner === userId) return access;
+  if (admin) return { access, refusal: null };
+  const theirs = await seesScreenAsTheirs(db, userId, orgId, agentId, agent, handoff, screen);
+  if (theirs && can(membership, full ? "own_computers" : "own_browsers")) return { access, refusal: null };
+  return { access, refusal: theirs || (full && can(membership, "control_browsers")) ? "level" : "none" } as const;
+}
+
+/** Whether the agent's screen is this person's to see, keys aside (`requireBrowserAccess`). */
+async function seesScreenAsTheirs(
+  db: Database,
+  userId: string,
+  orgId: string,
+  agentId: string,
+  agent: { owner: string | null; machineId: string | null },
+  handoff: BrowserHandoffRow | null | undefined,
+  screen: ScreenKind,
+) {
+  if (agent.owner === userId) return true;
   const open = handoff === undefined ? await openHandoffOf(db, orgId, agentId, screen) : handoff;
-  if (open?.requestedForUserId === userId) return access;
+  if (open?.requestedForUserId === userId) return true;
   const runs = open?.runId
     ? [open.runId]
     : (
@@ -459,14 +500,14 @@ export async function requireBrowserAccess(
   for (const runId of runs) {
     // A run consulted for someone outside the agent's audience has nobody behind it for its screen.
     if ((await humanBehindRun({ db }, orgId, runId)) === userId && !(await answersAgentsOnly(db, orgId, runId))) {
-      return access;
+      return true;
     }
   }
   if (screen === "desktop" && agent.machineId) {
     const machine = await getMachine(db, orgId, agent.machineId);
-    if (machine && drivesComputer(machine, { userId, admin, owner: false })) return access;
+    if (machine && drivesComputer(machine, { userId, admin: false, own: true, owner: false })) return true;
   }
-  throw new ForbiddenError(`You can't use this agent's ${SCREENS[screen].what}`);
+  return false;
 }
 
 /**
@@ -490,7 +531,8 @@ export async function requireBrowserControl(
   if (open && OPEN.includes(open.status) && open.requestedForUserId === userId) return access;
   if (screen === "desktop" && access.machineId) {
     const machine = await getMachine(db, orgId, access.machineId);
-    if (machine && drivesComputer(machine, { userId, admin: false, owner: false })) return access;
+    // `requireBrowserAccess` checked the desktop's key.
+    if (machine && drivesComputer(machine, { userId, admin: false, own: true, owner: false })) return access;
   }
   throw new ForbiddenError(
     `Only an admin, the agent's owner or the person it asked can control its ${SCREENS[screen].what}`,
