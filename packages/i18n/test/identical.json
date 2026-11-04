@@ -2684,55 +2684,18 @@
     ]
   },
   "mobile-base": {
-    "pt-BR": [
-      "push.ask.minutes"
-    ],
-    "es": [
-      "push.ask.minutes"
-    ],
-    "fr": [
-      "a11y.agent",
-      "a11y.agentPlain",
-      "push.ask.minutes"
-    ],
-    "de": [
-      "a11y.agentPlain",
-      "auth.connect.on",
-      "auth.server.line"
-    ],
-    "it": [
-      "auth.connect.on",
-      "auth.server.line",
-      "push.ask.minutes"
-    ],
-    "nl": [
-      "a11y.agent",
-      "a11y.agentPlain",
-      "auth.connect.on",
-      "auth.server.line",
-      "push.ask.minutes"
-    ],
-    "ja": [
-      "auth.server.placeholder"
-    ],
-    "ko": [
-      "auth.server.placeholder"
-    ],
-    "zh-Hans": [
-      "auth.server.placeholder"
-    ],
-    "id": [
-      "auth.connect.on",
-      "auth.server.line"
-    ],
-    "pl": [
-      "a11y.agent",
-      "a11y.agentPlain",
-      "push.ask.minutes"
-    ],
-    "ru": [
-      "auth.server.placeholder"
-    ]
+    "pt-BR": ["push.ask.minutes"],
+    "es": ["push.ask.minutes"],
+    "fr": ["a11y.agent", "a11y.agentPlain", "push.ask.minutes"],
+    "de": ["a11y.agentPlain", "auth.connect.on", "auth.server.line"],
+    "it": ["auth.connect.on", "auth.server.line", "push.ask.minutes"],
+    "nl": ["a11y.agent", "a11y.agentPlain", "auth.connect.on", "auth.server.line", "push.ask.minutes"],
+    "ja": ["auth.server.placeholder"],
+    "ko": ["auth.server.placeholder"],
+    "zh-Hans": ["auth.server.placeholder"],
+    "id": ["auth.connect.on", "auth.server.line"],
+    "pl": ["a11y.agent", "a11y.agentPlain", "push.ask.minutes"],
+    "ru": ["auth.server.placeholder"]
   },
   "mobile-features": {
     "pt-BR": [
