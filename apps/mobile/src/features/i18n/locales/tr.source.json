@@ -1967,6 +1967,24 @@
       "other": "{{names}} ask for a change to the team"
     }
   },
+  "activity.kind.usage_limit_warning": {
+    "value": "You've used {{percent}}% of your limit this month"
+  },
+  "activity.kind.usage_limit_reached_notify": {
+    "value": "You've reached your usage limit for this month"
+  },
+  "activity.kind.usage_limit_reached": {
+    "value": "{{names}} reached their {{amount}} limit"
+  },
+  "activity.kind.usage_limit_request": {
+    "value": "{{names}} reached their {{amount}} limit and asks for more"
+  },
+  "activity.kind.usage_limit_raised": {
+    "value": "{{names}} raised your limit for this month"
+  },
+  "activity.kind.usage_limit_refused": {
+    "value": "{{names}} turned down your request for more"
+  },
   "activity.kind.browser_profile_request": {
     "value": {
       "one": "{{names}} asks for one more browser profile",
@@ -2971,6 +2989,9 @@
   },
   "activityNow.kind.tools": {
     "value": "Tools"
+  },
+  "activityNow.kind.limit": {
+    "value": "Limit"
   },
   "activityNow.review": {
     "value": "Review"

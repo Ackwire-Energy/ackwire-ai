@@ -39,6 +39,7 @@ import {
   stepCells,
   workspaceHeadline,
 } from "@agenteschat/client/lib/notifications";
+import { usageLimitLine } from "@agenteschat/client/lib/person-usage";
 import { routineNotificationWords } from "@agenteschat/client/lib/routine-view";
 import { secretNoticeLine } from "@agenteschat/client/lib/secret-requests";
 import {
@@ -78,16 +79,7 @@ import { approvalDoing, approvalReadsOnly, approvalValues } from "@/components/A
 import { useConnectAi } from "@/components/ConnectAi";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useNotificationHref, useNotificationOpener } from "@/components/NotificationOpen";
-import {
-  type Dir,
-  Face,
-  Headline,
-  joinerOf,
-  nameOf,
-  SystemFace,
-  sayWords,
-  usageLimitLine,
-} from "@/components/NotificationParts";
+import { type Dir, Face, Headline, joinerOf, nameOf, SystemFace, sayWords } from "@/components/NotificationParts";
 import { useOrg } from "@/components/org-context";
 import { UsageLimitActions } from "@/components/PeopleUsage";
 import { AllowTalkButton } from "@/components/ReachLines";

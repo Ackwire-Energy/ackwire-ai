@@ -921,6 +921,12 @@
       "change_request_few": "{{names}} proszą o zmianę w zespole",
       "change_request_many": "{{names}} proszą o zmianę w zespole",
       "change_request_other": "{{names}} proszą o zmianę w zespole",
+      "usage_limit_warning": "Wykorzystano {{percent}}% Twojego limitu w tym miesiącu",
+      "usage_limit_reached_notify": "Osiągnięto Twój limit użycia w tym miesiącu",
+      "usage_limit_reached": "{{names}} osiąga limit {{amount}}",
+      "usage_limit_request": "{{names}} osiąga limit {{amount}} i prosi o więcej",
+      "usage_limit_raised": "{{names}} podnosi Twój limit na ten miesiąc",
+      "usage_limit_refused": "{{names}} odrzuca Twoją prośbę o więcej użycia",
       "browser_profile_request_one": "{{names}} prosi o jeszcze jeden profil przeglądarki",
       "browser_profile_request_few": "{{names}} proszą o jeszcze jeden profil przeglądarki",
       "browser_profile_request_many": "{{names}} proszą o jeszcze jeden profil przeglądarki",
@@ -1351,7 +1357,8 @@
       "browser": "Przeglądarka",
       "secret": "Sekret",
       "join": "Członkowie",
-      "tools": "Narzędzia"
+      "tools": "Narzędzia",
+      "limit": "Limit"
     },
     "review": "Sprawdź",
     "answer": "Odpowiedz",

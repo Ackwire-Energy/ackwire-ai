@@ -316,20 +316,3 @@ export function Headline({
     }
   }
 }
-
-/** Under a limit's notice to who decides: this month's requests, the agent most used and where the limit comes from. */
-export function usageLimitLine(t: TFunction, n: AppNotification) {
-  const l = n.latest;
-  if (l.statusTo !== "reached" && l.statusTo !== "request") return "";
-  const runs = t("notifications.usageLimit.runs", { count: l.runs ?? 0 });
-  const top = l.title ? t("notifications.usageLimit.top", { share: l.share ?? 0, agent: l.title }) : "";
-  const from =
-    l.limitFrom === "role"
-      ? t("notifications.usageLimit.fromRole", { role: n.source.label ?? "" })
-      : l.limitFrom === "raised"
-        ? t("notifications.usageLimit.fromRaised")
-        : l.limitFrom === "person"
-          ? t("notifications.usageLimit.fromPerson")
-          : t("notifications.usageLimit.fromDefault");
-  return t("notifications.usageLimit.line", { runs: top ? `${runs}, ${top}` : runs, from });
-}

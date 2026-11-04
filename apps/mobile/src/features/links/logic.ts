@@ -224,6 +224,8 @@ export function notificationHref(
   if (n.kind === "org_standing") return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return "/usage";
+  // A person's monthly limit (ADR 0141): Uso, where the people's months and one's own are.
+  if (n.kind === "usage_limit") return "/usage";
   // A computer's disk is almost full (ADR 0115): that computer, where its shared folder's size shows.
   if (n.kind === "computer_disk_full" || n.kind === "computer_no_chrome")
     return isSafeId(s.machineId) ? `/settings/computers/${s.machineId}` : null;

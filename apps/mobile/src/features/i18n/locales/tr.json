@@ -807,6 +807,12 @@
       "composio_limit_other": "Bu çalışma alanı bu ayki Composio çağrılarını kullandı",
       "change_request_one": "{{names}} ekipte bir değişiklik istiyor",
       "change_request_other": "{{names}} ekipte bir değişiklik istiyor",
+      "usage_limit_warning": "Bu ayki limitinin %{{percent}} kadarını kullandın",
+      "usage_limit_reached_notify": "Bu ayki kullanım limitine ulaştın",
+      "usage_limit_reached": "{{names}} {{amount}} limitine ulaştı",
+      "usage_limit_request": "{{names}} {{amount}} limitine ulaştı ve daha fazlasını istiyor",
+      "usage_limit_raised": "{{names}} bu ayki limitini artırdı",
+      "usage_limit_refused": "{{names}} daha fazla kullanım isteğini reddetti",
       "browser_profile_request_one": "{{names}} bir tarayıcı profili daha istiyor",
       "browser_profile_request_other": "{{names}} bir tarayıcı profili daha istiyor",
       "connector_tool_changed_one": "Bağlı bir sunucu, onayladığınız araçları değiştirdi",
@@ -1209,7 +1215,8 @@
       "browser": "Tarayıcı",
       "secret": "Gizli bilgi",
       "join": "Üyeler",
-      "tools": "Araçlar"
+      "tools": "Araçlar",
+      "limit": "Limit"
     },
     "review": "İncele",
     "answer": "Yanıtla",

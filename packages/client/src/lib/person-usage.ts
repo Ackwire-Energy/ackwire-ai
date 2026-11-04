@@ -1,4 +1,5 @@
-import type { PeopleUsage } from "../api/types";
+import type { TFunction } from "i18next";
+import type { AppNotification, PeopleUsage } from "../api/types";
 
 /** Uso › Pessoas (ADR 0141): what the web and the phone share. */
 
@@ -70,4 +71,24 @@ export function sortPeople(people: PersonRow[], by: PeopleSort, desc: boolean, l
     const c = typeof x === "string" ? x.localeCompare(String(y), locale) : x - (y as number);
     return (desc ? -c : c) || a.name.localeCompare(b.name, locale);
   });
+}
+
+/**
+ * Under a person's limit notice to who decides (ADR 0141): this month's requests, the agent most used and where the
+ * limit comes from ("64 pedidos este mês, 80% com Zara. Limite do papel Vendas."). Empty for the person's own.
+ */
+export function usageLimitLine(t: TFunction, n: Pick<AppNotification, "latest" | "source">) {
+  const l = n.latest;
+  if (l.statusTo !== "reached" && l.statusTo !== "request") return "";
+  const runs = t("notifications.usageLimit.runs", { count: l.runs ?? 0 });
+  const top = l.title ? t("notifications.usageLimit.top", { share: l.share ?? 0, agent: l.title }) : "";
+  const from =
+    l.limitFrom === "role"
+      ? t("notifications.usageLimit.fromRole", { role: n.source.label ?? "" })
+      : l.limitFrom === "raised"
+        ? t("notifications.usageLimit.fromRaised")
+        : l.limitFrom === "person"
+          ? t("notifications.usageLimit.fromPerson")
+          : t("notifications.usageLimit.fromDefault");
+  return t("notifications.usageLimit.line", { runs: top ? `${runs}, ${top}` : runs, from });
 }

@@ -1,5 +1,6 @@
 import type { AppNotification } from "@agenteschat/client";
 import { appCreatedLine } from "@agenteschat/client/lib/apps";
+import { formatUsd } from "@agenteschat/client/lib/format";
 import { restrictionOf, workspaceHeadline } from "@agenteschat/client/lib/notifications";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "../shared/hooks";
@@ -14,7 +15,7 @@ const NAMES = "⁣names⁣";
  * or several agents' failures of one cause, what goes under it too.
  */
 export function useNoticeTitle(n: AppNotification) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const dir = useDirectory();
   // A restriction on agentes.chat Cloud: its whole line under the headline, and a held agent's name heads it.
   const restriction = restrictionOf(n);
@@ -32,7 +33,9 @@ export function useNoticeTitle(n: AppNotification) {
       ? "desktop_handoff"
       : n.kind === "catch_up_closed_asker" && n.latest.reason === "task_canceled"
         ? "catch_up_closed_asker_task"
-        : n.kind;
+        : n.kind === "usage_limit"
+          ? `usage_limit_${n.latest.statusTo ?? "refused"}`
+          : n.kind;
   const template = held
     ? t("standing.notification.agentHold", { name: NAMES })
     : n.kind === "app_created"
@@ -47,6 +50,9 @@ export function useNoticeTitle(n: AppNotification) {
             plan: n.latest.title ?? "",
             // `catch_up_closed_asker`: who was credited.
             who: n.latest.title ?? "",
+            // `usage_limit`: the limit (who decides only) and the share used.
+            amount: n.latest.limitUsd !== undefined ? formatUsd(i18n.language, n.latest.limitUsd) : "",
+            percent: Math.round(n.latest.percent ?? 0),
             defaultValue: NAMES,
           });
   // Agents that failed for one cause close together: one line for all, who they are under it.

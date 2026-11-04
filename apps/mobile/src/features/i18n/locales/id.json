@@ -750,6 +750,12 @@
       "invitation_accepted_other": "{{names}} menerima undanganmu",
       "composio_limit_other": "Ruang kerja ini sudah memakai jatah panggilan Composio bulan ini",
       "change_request_other": "{{names}} meminta perubahan di tim",
+      "usage_limit_warning": "Kamu sudah memakai {{percent}}% dari batasmu bulan ini",
+      "usage_limit_reached_notify": "Kamu sudah mencapai batas pemakaianmu bulan ini",
+      "usage_limit_reached": "{{names}} mencapai batas {{amount}}",
+      "usage_limit_request": "{{names}} mencapai batas {{amount}} dan meminta tambahan",
+      "usage_limit_raised": "{{names}} menaikkan batasmu bulan ini",
+      "usage_limit_refused": "{{names}} menolak permintaan tambahan pemakaianmu",
       "browser_profile_request_other": "{{names}} meminta satu profil browser lagi",
       "connector_tool_changed_other": "Server yang terhubung mengubah alat yang kamu setujui",
       "computer_disk_full_other": "Disk komputer hampir penuh",
@@ -1138,7 +1144,8 @@
       "browser": "Browser",
       "secret": "Rahasia",
       "join": "Anggota",
-      "tools": "Alat"
+      "tools": "Alat",
+      "limit": "Batas"
     },
     "review": "Tinjau",
     "answer": "Balas",
