@@ -1394,6 +1394,7 @@
       "approval.originShort.routine",
       "approvals.details",
       "approvals.filters",
+      "approvals.review.effect",
       "approvals.review.state",
       "apps.created.agent",
       "apps.created.routine",
