@@ -1,5 +1,4 @@
 import { and, type Database, type Executor, eq, inArray, isNull, rowsOf, schema, sql } from "@agenteschat/db";
-import { insertMessage } from "./messages";
 import { quietNoticeSql } from "./notices";
 import { admitTaskAgents } from "./task-access";
 
@@ -42,6 +41,8 @@ export async function ensureTaskConversation(db: Database, issueId: string): Pro
     if (issue.conversationChannelId && issue.conversationRootId) {
       return { channelId: issue.conversationChannelId, rootId: issue.conversationRootId };
     }
+    // The creator's account may be gone (deleted): the root and the channel then have no author.
+    const creator = issue.createdByType === "person" ? await liveUser(tx, issue.createdById) : null;
     const [channel] = await tx
       .insert(channels)
       .values({
@@ -50,22 +51,26 @@ export async function ensureTaskConversation(db: Database, issueId: string): Pro
         name: `task-${issue.number}-${issue.id.slice(-6)}`,
         kind: "task",
         visibility: "private",
-        createdByUserId: issue.createdByType === "person" ? await liveUser(tx, issue.createdById) : null,
+        createdByUserId: creator,
       })
       .returning({ id: channels.id });
     if (!channel) throw new Error("channel insert returned nothing");
-    const author =
-      issue.createdByType === "agent"
-        ? ({ type: "agent", agentId: issue.createdById, runId: null, hop: 0, stretchId: null } as const)
-        : ({ type: "person", userId: issue.createdById } as const);
-    const root = await insertMessage(tx, {
-      orgId: issue.orgId,
-      channelId: channel.id,
-      author,
-      body: `Task #${issue.number}: ${issue.title}`.slice(0, 2_000),
-      meta: { taskConversation: { issueId: issue.id, number: issue.number, title: issue.title } },
-      createdAt: issue.createdAt,
-    });
+    // Written directly: the root is never shown, indexed, routed or notified (a title's "@ana" mentions nobody).
+    const agentAuthor = issue.createdByType === "agent";
+    const [root] = await tx
+      .insert(messages)
+      .values({
+        createdAt: issue.createdAt,
+        orgId: issue.orgId,
+        channelId: channel.id,
+        authorType: agentAuthor ? "agent" : "person",
+        authorUserId: creator,
+        authorAgentId: agentAuthor ? await liveAgent(tx, issue.createdById) : null,
+        body: `Task #${issue.number}: ${issue.title}`.slice(0, 2_000),
+        meta: { taskConversation: { issueId: issue.id, number: issue.number, title: issue.title } },
+      })
+      .returning({ id: messages.id });
+    if (!root) throw new Error("root insert returned nothing");
     await moveComments(tx, issue, channel.id, root.id);
     await tx
       .update(issues)
@@ -81,6 +86,12 @@ export async function ensureTaskConversation(db: Database, issueId: string): Pro
 async function liveUser(tx: Executor, userId: string) {
   const [u] = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId));
   return u?.id ?? null;
+}
+
+async function liveAgent(tx: Executor, agentId: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(agentId)) return null;
+  const [a] = await tx.select({ id: agents.id }).from(agents).where(eq(agents.id, agentId));
+  return a?.id ?? null;
 }
 
 /** The old comments, as replies of the root: same id and time, the author when still there, their files. */
@@ -108,28 +119,28 @@ async function moveComments(tx: Executor, issue: IssueRow, channelId: string, ro
   const livePeople = new Set(people.map((p) => p.id));
   const liveAgents = new Set(bots.map((b) => b.id));
   const fileById = new Map(files.map((f) => [f.id, f]));
-  await tx.insert(messages).values(
-    comments.map((c) => {
-      const attached = ((c.data.attachments as { id: string }[] | undefined) ?? []).flatMap((f) => {
-        const file = fileById.get(f.id);
-        return file ? [file] : [];
-      });
-      const agent = c.authorType === "agent";
-      return {
-        id: c.id,
-        createdAt: c.createdAt,
-        orgId: issue.orgId,
-        channelId,
-        threadId: rootId,
-        authorType: agent ? ("agent" as const) : ("person" as const),
-        authorUserId: !agent && livePeople.has(c.authorId) ? c.authorId : null,
-        authorAgentId: agent && liveAgents.has(c.authorId) ? c.authorId : null,
-        body: c.text,
-        hop: agent ? 1 : 0,
-        meta: { movedFromIssue: true, ...(attached.length ? { artifacts: attached } : {}) },
-      };
-    }),
-  );
+  const rows = comments.map((c) => {
+    const attached = ((c.data.attachments as { id: string }[] | undefined) ?? []).flatMap((f) => {
+      const file = fileById.get(f.id);
+      return file ? [file] : [];
+    });
+    const agent = c.authorType === "agent";
+    return {
+      id: c.id,
+      createdAt: c.createdAt,
+      orgId: issue.orgId,
+      channelId,
+      threadId: rootId,
+      authorType: agent ? ("agent" as const) : ("person" as const),
+      authorUserId: !agent && livePeople.has(c.authorId) ? c.authorId : null,
+      authorAgentId: agent && liveAgents.has(c.authorId) ? c.authorId : null,
+      body: c.text,
+      hop: agent ? 1 : 0,
+      meta: { movedFromIssue: true, ...(attached.length ? { artifacts: attached } : {}) },
+    };
+  });
+  // In slices: a statement takes at most 65,535 parameters.
+  for (let i = 0; i < rows.length; i += 1_000) await tx.insert(messages).values(rows.slice(i, i + 1_000));
   await tx.delete(issueActivity).where(
     inArray(
       issueActivity.id,
@@ -149,8 +160,19 @@ export async function moveIssueComments(db: Database): Promise<number> {
       where i.conversation_channel_id is null
         and exists (select 1 from ${issueActivity} a where a.issue_id = i.id and a.kind = 'comment')`),
   );
-  for (const p of pending) await ensureTaskConversation(db, p.id);
-  return pending.length;
+  let moved = 0;
+  let failed: unknown = null;
+  // One task that fails keeps its comments where they are (tried again next boot); the others still move.
+  for (const p of pending) {
+    try {
+      await ensureTaskConversation(db, p.id);
+      moved++;
+    } catch (error) {
+      failed ??= error;
+    }
+  }
+  if (failed) throw failed;
+  return moved;
 }
 
 /** What a task's card and dialog show of its conversation: its replies, who took part, an agent at work now. */

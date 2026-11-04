@@ -10,6 +10,7 @@ import {
   ForbiddenError,
   getIssue,
   issueFromMessage,
+  listApprovals,
   listIssueActivity,
   listIssues,
   moveIssueComments,
@@ -18,6 +19,7 @@ import {
   openTaskConversation,
   postPersonMessage,
   requireChannelAccess,
+  updateIssue,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -96,7 +98,23 @@ describe("a task's conversation (ADR 0144)", () => {
     const issue = await issueFromMessage(deps, f.owner.id, f.org.id, said.id);
     const at = await openTaskConversation(f.db, person(f.owner.id), f.org.id, issue.id);
 
+    // An approval card the agent asked for there (a merge): read like the conversation.
+    await f.db.insert(schema.approvals).values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: at.channelId,
+      threadRootId: at.rootId,
+      toolUseId: "toolu_1",
+      tool: "github.merge_pull_request",
+      scope: "github:merge",
+      params: { pr: 42 },
+      actionHash: "hash",
+      title: "Merge PR #42",
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
+
     // Bia isn't in #secreto: no task, no conversation, by any way in.
+    expect(await listApprovals(f.db, bia.id, f.org.id)).toEqual([]);
     await expect(openTaskConversation(f.db, person(bia.id), f.org.id, issue.id)).rejects.toBeInstanceOf(NotFoundError);
     await expect(requireChannelAccess(f.db, bia.id, f.org.id, at.channelId)).rejects.toBeInstanceOf(ForbiddenError);
     await expect(
@@ -105,6 +123,7 @@ describe("a task's conversation (ADR 0144)", () => {
     // In #secreto now: she reads it, without being a member of the conversation itself.
     await addChannelMember(f.db, f.owner.id, f.org.id, secret.id, { userId: bia.id });
     expect((await requireChannelAccess(f.db, bia.id, f.org.id, at.channelId)).channel.id).toBe(at.channelId);
+    expect((await listApprovals(f.db, bia.id, f.org.id)).map((a) => a.title)).toEqual(["Merge PR #42"]);
     const members = await f.db
       .select()
       .from(schema.channelMembers)
@@ -198,5 +217,27 @@ describe("a task's conversation (ADR 0144)", () => {
     const [n] = await f.db.select().from(schema.notifications).where(eq(schema.notifications.userId, bia.id));
     expect(n).toMatchObject({ kind: "issue_comment" });
     expect(n?.source).toMatchObject({ issueId: issue.id, issueNumber: issue.number, messageId: reply.id });
+
+    // Who wrote there follows the task, as a commenter did: Bia hears its status change.
+    const caio = await addMember(f.db, f.org.id, "member", "Caio");
+    await postPersonMessage(deps, caio.id, f.org.id, at.channelId, { body: "Testei aqui", threadId: at.rootId });
+    await drainOutbox(f.db, f.handlers);
+    await updateIssue(deps, person(bia.id), f.org.id, issue.id, { status: "done" });
+    const told = await f.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "issue_status"));
+    expect(told.map((x) => x.userId).sort()).toEqual([caio.id, f.owner.id].sort());
+  });
+
+  test("a task whose creator's account is gone still gets its conversation", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Sem dono" });
+    await f.db.update(schema.issues).set({ createdById: "gone-account" }).where(eq(schema.issues.id, issue.id));
+    const at = await openTaskConversation(f.db, person(f.owner.id), f.org.id, issue.id);
+    const [root] = await f.db.select().from(schema.messages).where(eq(schema.messages.id, at.rootId));
+    expect(root).toMatchObject({ authorType: "person", authorUserId: null });
+    // The root routes to nobody and is never indexed.
+    expect(
+      (await f.db.select().from(schema.outbox)).filter((o) => JSON.stringify(o.payload).includes(at.rootId)),
+    ).toEqual([]);
   });
 });

@@ -567,13 +567,27 @@ export async function rerouteApprovals(deps: NotificationDeps, orgId: string, us
 
 // ── Issues ────────────────────────────────────────────────────────────────────
 
-/** Who follows an issue: its author, its assignee, and the people who commented or acted on it. */
+/** Who follows an issue: its author, its assignee, and the people who acted on it or wrote in its conversation. */
 async function issueFollowers(deps: NotificationDeps, issue: IssueRow) {
-  const acted = await deps.db
-    .selectDistinct({ userId: issueActivity.authorId })
-    .from(issueActivity)
-    .where(and(eq(issueActivity.issueId, issue.id), eq(issueActivity.authorType, "person")));
-  const ids = new Set<string>(acted.map((a) => a.userId));
+  const [acted, wrote] = await Promise.all([
+    deps.db
+      .selectDistinct({ userId: issueActivity.authorId })
+      .from(issueActivity)
+      .where(and(eq(issueActivity.issueId, issue.id), eq(issueActivity.authorType, "person"))),
+    issue.conversationChannelId
+      ? deps.db
+          .selectDistinct({ userId: messages.authorUserId })
+          .from(messages)
+          .where(
+            and(
+              eq(messages.orgId, issue.orgId),
+              eq(messages.channelId, issue.conversationChannelId),
+              isNotNull(messages.authorUserId),
+            ),
+          )
+      : [],
+  ]);
+  const ids = new Set<string>([...acted.map((a) => a.userId), ...wrote.flatMap((w) => (w.userId ? [w.userId] : []))]);
   if (issue.createdByType === "person") ids.add(issue.createdById);
   if (issue.assigneeType === "person" && issue.assigneeId) ids.add(issue.assigneeId);
   return visibleOnIssue(deps, issue, [...ids]);
@@ -648,8 +662,8 @@ export async function notifyIssueComment(
   issueId: string,
   activityId: string,
   text: string,
-  /** The reply in the task's conversation (ADR 0144): the apps open the task at it; who wrote there follow it. */
-  options: { messageId?: string; writers?: string[] } = {},
+  /** The reply in the task's conversation (ADR 0144): the apps open the task at it. */
+  options: { messageId?: string } = {},
 ) {
   const [issue] = await deps.db.select().from(issues).where(eq(issues.id, issueId));
   if (!issue) return;
@@ -681,9 +695,7 @@ export async function notifyIssueComment(
     });
     for (const u of mentioned) told.add(u);
   }
-  const followers = [
-    ...new Set([...(await issueFollowers(deps, issue)), ...(await visibleOnIssue(deps, issue, options.writers ?? []))]),
-  ].filter((u) => !told.has(u));
+  const followers = (await issueFollowers(deps, issue)).filter((u) => !told.has(u));
   await notify(deps, {
     orgId: issue.orgId,
     userIds: followers,
@@ -708,22 +720,10 @@ async function notifyTaskMessage(deps: NotificationDeps, message: typeof message
   const author =
     message.authorType === "person" ? message.authorUserId : message.authorAgentId ? message.authorAgentId : null;
   if (!issue || !author) return;
-  const writers = await deps.db
-    .selectDistinct({ userId: messages.authorUserId })
-    .from(messages)
-    .where(
-      and(
-        eq(messages.orgId, message.orgId),
-        eq(messages.channelId, message.channelId),
-        eq(messages.authorType, "person"),
-        isNotNull(messages.authorUserId),
-      ),
-    );
   const text = readableBody(message.body, message.meta);
   if (!text.trim()) return;
   await notifyIssueComment(deps, { type: message.authorType, id: author }, issue.id, message.id, text, {
     messageId: message.id,
-    writers: writers.flatMap((w) => (w.userId && w.userId !== author ? [w.userId] : [])),
   });
 }
 

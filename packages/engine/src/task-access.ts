@@ -45,5 +45,7 @@ export async function admitTaskAgents(
       returning agent_id`),
   );
   if (rows.length > 0) caches.channelMembers.delete(`${orgId}:${channelId}`);
+  // Its search reaches the conversation it's in now (`agentSearchChannels`).
+  for (const r of rows) caches.scopes.deletePrefix(`${orgId}:${r.agent_id}:visible`);
   return rows.map((r) => r.agent_id);
 }
