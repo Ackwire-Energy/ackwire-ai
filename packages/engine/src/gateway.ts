@@ -535,11 +535,16 @@ export function createModelGateway(deps: ModelGatewayDeps) {
             reserved_nano_usd = greatest(0, ${agentBudgetPeriods}.reserved_nano_usd - coalesce((select amount_nano_usd from d), 0)),
             updated_at = now()
           returning spent_nano_usd
-        ), m as (
-          -- Read from the membership so a person who left mid-run adds nothing instead of failing the foreign key.
-          insert into ${personUsageMonths} (org_id, person_id, period_start, spent_nano_usd, updated_at)
-          select org_id, user_id, ${periodOf(now())}::date, ${cost}::bigint, ${at}::timestamptz from ${organizationMembers}
+        ), member as (
+          -- The person's month must never fail this statement and lose the call's usage record. The key-share lock
+          -- makes a removal racing this statement wait for it, and skips a membership already removed (even one the
+          -- snapshot still shows), so the foreign key below always holds.
+          select org_id, user_id from ${organizationMembers}
           where org_id = ${agent.orgId}::uuid and user_id = ${input.personId ?? null}::text and ${cost}::bigint > 0
+          for key share
+        ), m as (
+          insert into ${personUsageMonths} (org_id, person_id, period_start, spent_nano_usd, updated_at)
+          select org_id, user_id, ${periodOf(now())}::date, ${cost}::bigint, ${at}::timestamptz from member
           on conflict (org_id, person_id, period_start) do update set
             spent_nano_usd = ${personUsageMonths}.spent_nano_usd + excluded.spent_nano_usd,
             updated_at = excluded.updated_at
