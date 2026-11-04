@@ -34,7 +34,7 @@ beforeAll(() => {
     media: query,
     addEventListener() {},
     removeEventListener() {},
-  })) as unknown as typeof matchMedia;
+  })) as unknown as typeof realMatch;
 });
 let touch = false;
 afterAll(() => {
