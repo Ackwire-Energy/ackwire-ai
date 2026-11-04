@@ -13639,6 +13639,8 @@
       "open": "Buka"
     },
     "home": "Berandaku",
+    "seeMore": "Lihat lainnya",
+    "seeMoreHidden_other": "{{count}} lagi",
     "untitled": "Widget baru",
     "updatedAgo": "diperbarui {{when}}",
     "removed": {

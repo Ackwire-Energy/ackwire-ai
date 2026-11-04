@@ -9359,3 +9359,50 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 .ac-access__start {
   margin-right: auto;
 }
+
+/*
+ * A card's horizon (`CardHorizon`): the sky's light tones in a low dither at the foot of a card with room to spare.
+ * Under the card's text (the card is its stacking context), clipped to the card's bottom corners.
+ */
+.ac-card-horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  width: 100%;
+  border-radius: 0 0 var(--radius-section) 4px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.ac-card-horizon[hidden] {
+  display: none;
+}
+/* A cut card's foot (`CardMore`): the content fades into `--card-more-bg` and "See more" sits on the fade. */
+.ac-card-more {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 88px;
+  padding-bottom: 10px;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--card-more-bg, var(--surface-raised)) 0%, transparent),
+    var(--card-more-bg, var(--surface-raised)) 70%
+  );
+  pointer-events: none;
+}
+.ac-card-more > .ac-btn {
+  pointer-events: auto;
+  box-shadow: var(--e1);
+}
+.ac-card-more__n {
+  margin-inline-start: 4px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

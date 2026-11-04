@@ -14462,6 +14462,10 @@
       "open": "Abrir"
     },
     "home": "Mi inicio",
+    "seeMore": "Ver más",
+    "seeMoreHidden_one": "{{count}} más",
+    "seeMoreHidden_many": "{{count}} más",
+    "seeMoreHidden_other": "{{count}} más",
     "untitled": "Nuevo widget",
     "updatedAgo": "actualizado {{when}}",
     "removed": {

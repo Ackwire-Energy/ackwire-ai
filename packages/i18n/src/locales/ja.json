@@ -13525,6 +13525,8 @@
       "open": "開く"
     },
     "home": "マイホーム",
+    "seeMore": "もっと見る",
+    "seeMoreHidden_other": "ほか{{count}}件",
     "untitled": "新しいウィジェット",
     "updatedAgo": "{{when}}に更新",
     "removed": {

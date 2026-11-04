@@ -742,6 +742,41 @@ html:not([data-pointer]) :is(.wg__size, .wg__grip):focus-visible {
   color: var(--muted);
 }
 
+/*
+ * On a board a card's height is capped (S and M one row, L two, the gap between): past it the body cuts, fades out
+ * and "See more" opens it whole (`CardMore`). The horizon (`CardHorizon`) sits under the text, so the card is its
+ * own stacking context.
+ */
+.wg {
+  --wg-max: 320px;
+  --card-more-bg: var(--wg-bg);
+  isolation: isolate;
+}
+.wg[data-capped] {
+  max-height: var(--wg-max);
+}
+.wg[data-capped][data-h="2"] {
+  max-height: calc(var(--wg-max) * 2 + 12px);
+}
+.wg[data-capped] > .wg__head,
+.wg[data-capped] > .wg__foot {
+  flex: none;
+}
+.wg[data-capped] > .wg__body {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+/* The tile whole, in its dialog: its rows reach the dialog's edges, as they reach the card's. */
+.wg-whole__title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.wg-whole__body > :is(ul, ol) {
+  margin-inline: calc(-1 * var(--dialog-pad));
+}
+
 /* ── A preview (New widget, Pin): the card alone, at the size chosen ───── */
 .wg--preview {
   width: 100%;

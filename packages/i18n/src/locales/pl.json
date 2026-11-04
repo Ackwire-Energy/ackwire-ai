@@ -14940,6 +14940,11 @@
       "open": "Otwórz"
     },
     "home": "Mój Start",
+    "seeMore": "Pokaż więcej",
+    "seeMoreHidden_one": "jeszcze {{count}}",
+    "seeMoreHidden_few": "jeszcze {{count}}",
+    "seeMoreHidden_many": "jeszcze {{count}}",
+    "seeMoreHidden_other": "jeszcze {{count}}",
     "untitled": "Nowy widżet",
     "updatedAgo": "zaktualizowano {{when}}",
     "removed": {
