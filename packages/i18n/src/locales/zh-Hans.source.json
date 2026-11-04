@@ -32588,5 +32588,92 @@
   },
   "approvalCover.failed": {
     "value": "Couldn't save. Try again."
+  },
+  "rightHandApprovals.title": {
+    "value": "{{name}} approves for you"
+  },
+  "rightHandApprovals.subtitle": {
+    "value": "Only what came from a request of yours. What it wouldn't approve, it passes to you."
+  },
+  "rightHandApprovals.newAgents": {
+    "value": "Create agents other agents propose"
+  },
+  "rightHandApprovals.newAgentsHelp": {
+    "value": "No apps, open channels only. You can undo it for 24 h."
+  },
+  "rightHandApprovals.agentChanges": {
+    "value": "Change an agent's model, budget and channels"
+  },
+  "rightHandApprovals.agentChangesHelp": {
+    "value": "The model only on the same AI account."
+  },
+  "rightHandApprovals.cantDecide": {
+    "value": "You don't decide this today"
+  },
+  "rightHandApprovals.budget": {
+    "value": "Extra budget, per agent"
+  },
+  "rightHandApprovals.budgetHelp": {
+    "value": "Above that, the request goes to you."
+  },
+  "rightHandApprovals.perMonth": {
+    "value": "/month"
+  },
+  "rightHandApprovals.guidanceLabel": {
+    "value": "How {{name}} decides for you"
+  },
+  "rightHandApprovals.guidancePlaceholder": {
+    "value": "How {{name}} decides for you (optional). E.g.: no duplicate agents."
+  },
+  "rightHandApprovals.paused": {
+    "value": "Paused: you undid 3 of its decisions this week. Turn it back on when you want."
+  },
+  "rightHandApprovals.you": {
+    "value": "you"
+  },
+  "rightHandApprovals.card.deciding": {
+    "value": "{{name}} is looking at it for {{for}}…"
+  },
+  "rightHandApprovals.card.approved": {
+    "value": "Approved by {{name}} for {{for}}"
+  },
+  "rightHandApprovals.card.passed": {
+    "value": "{{name}} passed it to you"
+  },
+  "rightHandApprovals.card.passedWhy": {
+    "value": "{{name}} passed it to you: {{reason}}"
+  },
+  "rightHandApprovals.card.outside": {
+    "value": "Outside what you let {{name}} approve"
+  },
+  "rightHandApprovals.card.own": {
+    "value": "{{name}} doesn't decide its own request"
+  },
+  "rightHandApprovals.card.limit": {
+    "value": "{{name}} reached today's limit: this one stays with you"
+  },
+  "rightHandApprovals.card.undoneByYou": {
+    "value": "Undone by you"
+  },
+  "rightHandApprovals.card.undoneBy": {
+    "value": "Undone by {{name}}"
+  },
+  "rightHandApprovals.card.why": {
+    "value": "Why?"
+  },
+  "rightHandApprovals.card.undo": {
+    "value": "Undo"
+  },
+  "rightHandApprovals.card.undoArchives": {
+    "value": "Undo archives {{name}}. It lasts until {{until}}."
+  },
+  "rightHandApprovals.card.undoSettings": {
+    "value": "Undo puts the settings back. It lasts until {{until}}."
+  },
+  "notifications.what.rightHandDecided": {
+    "value": "Requests <b>{{name}}</b> approved for you today: {{count}}"
+  },
+  "notifications.what.rightHandPaused": {
+    "value": "<b>{{name}}</b> stopped approving for you: you undid 3 of its decisions this week"
   }
 }

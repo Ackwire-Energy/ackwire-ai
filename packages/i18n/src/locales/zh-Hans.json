@@ -1120,6 +1120,37 @@
     "decline": "不再代审",
     "failed": "无法保存，请重试。"
   },
+  "rightHandApprovals": {
+    "title": "{{name}} 替你审批",
+    "subtitle": "只处理来自你自己请求的事项。不会批准的，转交给你。",
+    "newAgents": "创建其他智能体提议的智能体",
+    "newAgentsHelp": "不含应用，只在公开频道。24 小时内可撤销。",
+    "agentChanges": "更改智能体的模型、预算和频道",
+    "agentChangesHelp": "模型只能在同一个 AI 账号内更换。",
+    "cantDecide": "你目前不能决定这个",
+    "budget": "每个智能体的额外预算",
+    "budgetHelp": "超过这个金额，请求会交给你。",
+    "perMonth": "/月",
+    "guidanceLabel": "{{name}} 如何替你决定",
+    "guidancePlaceholder": "{{name}} 如何替你决定 (可选)。例如: 不要重复的智能体。",
+    "paused": "已暂停: 你本周撤销了它的 3 个决定。随时可以重新打开。",
+    "you": "你",
+    "card": {
+      "deciding": "{{name}} 正在代 {{for}} 审阅…",
+      "approved": "由 {{name}} 代 {{for}} 批准",
+      "passed": "{{name}} 已转交给你",
+      "passedWhy": "{{name}} 已转交给你：{{reason}}",
+      "outside": "超出你允许 {{name}} 批准的范围",
+      "own": "{{name}} 不决定自己的请求",
+      "limit": "{{name}} 已达今日上限：这个由你决定",
+      "undoneByYou": "已由你撤销",
+      "undoneBy": "已由 {{name}} 撤销",
+      "why": "为什么？",
+      "undo": "撤销",
+      "undoArchives": "撤销会归档 {{name}}。有效期至 {{until}}。",
+      "undoSettings": "撤销会恢复设置。有效期至 {{until}}。"
+    }
+  },
   "noticePrefs": {
     "whereTitle": "通知去向",
     "whatTitle": "哪些事通知你",
@@ -2922,6 +2953,8 @@
       "approvalCover": "<b>{{name}}</b> 在“谁替我审批”中选了你",
       "approvalCoverDeclined": "<b>{{name}}</b> 不再替你审批",
       "approvalCoverEnded": "<b>{{name}}</b> 取消了替你审批的人",
+      "rightHandDecided": "<b>{{name}}</b> 今天替你批准的请求：{{count}}",
+      "rightHandPaused": "<b>{{name}}</b> 已停止替你审批：你本周撤销了它的 3 个决定",
       "invitationAccepted": "<b>{{name}}</b> 接受了你的邀请并加入了 {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> 接受了你的邀请",
       "reaction_other": "<b>{{names}}</b> 对你的消息发了表情回应"

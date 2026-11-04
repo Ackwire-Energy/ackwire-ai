@@ -1120,6 +1120,37 @@
     "decline": "대신하지 않기",
     "failed": "저장하지 못했어요. 다시 시도해 주세요."
   },
+  "rightHandApprovals": {
+    "title": "{{name}}이(가) 나 대신 승인",
+    "subtitle": "내 요청에서 시작된 것만이에요. 승인하지 않을 건 나에게 넘겨요.",
+    "newAgents": "다른 에이전트가 제안한 에이전트 만들기",
+    "newAgentsHelp": "앱 없이 공개 채널에서만요. 24시간 동안 되돌릴 수 있어요.",
+    "agentChanges": "에이전트의 모델, 예산, 채널 바꾸기",
+    "agentChangesHelp": "모델은 같은 AI 계정 안에서만요.",
+    "cantDecide": "지금은 내가 결정할 수 없어요",
+    "budget": "에이전트당 추가 예산",
+    "budgetHelp": "그 이상이면 요청이 나에게 와요.",
+    "perMonth": "/월",
+    "guidanceLabel": "{{name}}이(가) 나 대신 결정하는 방법",
+    "guidancePlaceholder": "{{name}}이(가) 나 대신 결정하는 방법 (선택). 예: 중복 에이전트는 안 돼요.",
+    "paused": "일시 중지됨: 이번 주에 결정을 3번 되돌렸어요. 원할 때 다시 켜세요.",
+    "you": "나",
+    "card": {
+      "deciding": "{{name}}이(가) {{for}} 대신 검토하고 있어요…",
+      "approved": "{{name}}이(가) {{for}} 대신 승인함",
+      "passed": "{{name}}이(가) 나에게 넘겼어요",
+      "passedWhy": "{{name}}이(가) 나에게 넘겼어요: {{reason}}",
+      "outside": "{{name}}에게 맡긴 범위 밖이에요",
+      "own": "{{name}}은(는) 자기 요청은 결정하지 않아요",
+      "limit": "{{name}}이(가) 오늘 한도에 닿았어요. 이건 내가 결정해요",
+      "undoneByYou": "내가 되돌렸어요",
+      "undoneBy": "{{name}}이(가) 되돌렸어요",
+      "why": "이유",
+      "undo": "되돌리기",
+      "undoArchives": "되돌리면 {{name}}이(가) 보관돼요. {{until}}까지 가능해요.",
+      "undoSettings": "되돌리면 설정이 원래대로 돌아가요. {{until}}까지 가능해요."
+    }
+  },
   "noticePrefs": {
     "whereTitle": "받을 곳",
     "whatTitle": "알림 받을 항목",
@@ -2917,6 +2948,8 @@
       "approvalCover": "<b>{{name}}</b>님이 '나 대신 승인할 사람'으로 나를 골랐어요",
       "approvalCoverDeclined": "<b>{{name}}</b>님이 더 이상 나 대신 승인하지 않아요",
       "approvalCoverEnded": "<b>{{name}}</b>님이 나 대신 승인할 사람을 해제했어요",
+      "rightHandDecided": "<b>{{name}}</b>이(가) 오늘 나 대신 승인한 요청: {{count}}",
+      "rightHandPaused": "<b>{{name}}</b>이(가) 나 대신 승인하는 걸 멈췄어요. 이번 주에 결정을 3번 되돌렸어요",
       "invitationAccepted": "<b>{{name}}</b> 님이 내 초대를 수락하고 {{org}}에 참여했어요",
       "invitationAcceptedAny": "<b>{{name}}</b> 님이 내 초대를 수락했어요",
       "reaction_other": "<b>{{names}}</b>이(가) 내 메시지에 반응했어요"

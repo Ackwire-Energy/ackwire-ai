@@ -168,6 +168,8 @@ type WhatKey =
   | "approvalCover"
   | "approvalCoverDeclined"
   | "approvalCoverEnded"
+  | "rightHandDecided"
+  | "rightHandPaused"
   | "reaction";
 
 /** The line on top of a row: who did what, where. */
@@ -285,6 +287,10 @@ export function Headline({
       return k("reaction", { names, count });
     case "change_request":
       return k(n.source.proposalId ? "changeRequest" : "changeRequestAgent", { name, agent: n.source.label ?? "" });
+    case "right_hand_decided":
+      return k("rightHandDecided", { name, count: n.count });
+    case "right_hand_paused":
+      return k("rightHandPaused", { name });
     case "approval_cover":
       return k(
         n.latest.statusTo === "declined"

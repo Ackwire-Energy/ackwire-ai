@@ -1120,6 +1120,37 @@
     "decline": "代理をやめる",
     "failed": "保存できませんでした。もう一度お試しください。"
   },
+  "rightHandApprovals": {
+    "title": "{{name}}があなたの代わりに承認",
+    "subtitle": "あなた自身の依頼から来たものだけ。承認しないものはあなたに回します。",
+    "newAgents": "他のエージェントが提案したエージェントを作成",
+    "newAgentsHelp": "アプリなし、公開チャンネルのみ。24時間は取り消せます。",
+    "agentChanges": "エージェントのモデル、予算、チャンネルを変更",
+    "agentChangesHelp": "モデルは同じ AI アカウント内のみ。",
+    "cantDecide": "現在あなたはこれを決められません",
+    "budget": "エージェントごとの追加予算",
+    "budgetHelp": "それを超えると依頼はあなたに届きます。",
+    "perMonth": "/月",
+    "guidanceLabel": "{{name}}があなたの代わりにどう決めるか",
+    "guidancePlaceholder": "{{name}}があなたの代わりにどう決めるか (任意)。例: 重複するエージェントは作らない。",
+    "paused": "一時停止中: 今週その決定を3回取り消しました。いつでもオンに戻せます。",
+    "you": "あなた",
+    "card": {
+      "deciding": "{{name}}が{{for}}の代わりに確認しています…",
+      "approved": "{{name}}が{{for}}の代わりに承認",
+      "passed": "{{name}}があなたに回しました",
+      "passedWhy": "{{name}}があなたに回しました: {{reason}}",
+      "outside": "{{name}}に任せた範囲の外です",
+      "own": "{{name}}は自分の依頼は決めません",
+      "limit": "{{name}}は今日の上限に達しました。これはあなたが決めます",
+      "undoneByYou": "あなたが取り消しました",
+      "undoneBy": "{{name}}が取り消しました",
+      "why": "理由",
+      "undo": "取り消す",
+      "undoArchives": "取り消すと{{name}}をアーカイブします。{{until}}まで有効です。",
+      "undoSettings": "取り消すと設定が元に戻ります。{{until}}まで有効です。"
+    }
+  },
   "noticePrefs": {
     "whereTitle": "届く場所",
     "whatTitle": "通知する内容",
@@ -2919,6 +2950,8 @@
       "approvalCover": "<b>{{name}}</b>が「代わりに承認する人」にあなたを選びました",
       "approvalCoverDeclined": "<b>{{name}}</b>はあなたの代わりに承認しなくなりました",
       "approvalCoverEnded": "<b>{{name}}</b>があなたの代わりに承認する人を解除しました",
+      "rightHandDecided": "<b>{{name}}</b>が今日あなたの代わりに承認した依頼: {{count}}",
+      "rightHandPaused": "<b>{{name}}</b>はあなたの代わりの承認を止めました。今週その決定を3回取り消しました",
       "invitationAccepted": "<b>{{name}}</b>があなたの招待を受けて{{org}}に参加しました",
       "invitationAcceptedAny": "<b>{{name}}</b>があなたの招待を受けました",
       "reaction_other": "<b>{{names}}</b>があなたのメッセージにリアクションしました"

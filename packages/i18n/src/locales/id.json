@@ -1120,6 +1120,37 @@
     "decline": "Berhenti menggantikan",
     "failed": "Tidak bisa menyimpan. Coba lagi."
   },
+  "rightHandApprovals": {
+    "title": "{{name}} menyetujui untukmu",
+    "subtitle": "Hanya yang berasal dari permintaanmu. Yang tidak akan disetujui, diteruskan kepadamu.",
+    "newAgents": "Membuat agen yang diusulkan agen lain",
+    "newAgentsHelp": "Tanpa aplikasi, hanya di kanal terbuka. Kamu bisa membatalkannya selama 24 jam.",
+    "agentChanges": "Mengubah model, anggaran, dan kanal agen",
+    "agentChangesHelp": "Model hanya di akun AI yang sama.",
+    "cantDecide": "Saat ini kamu tidak memutuskan ini",
+    "budget": "Anggaran tambahan, per agen",
+    "budgetHelp": "Di atas itu, permintaan diteruskan kepadamu.",
+    "perMonth": "/bulan",
+    "guidanceLabel": "Cara {{name}} memutuskan untukmu",
+    "guidancePlaceholder": "Cara {{name}} memutuskan untukmu (opsional). Mis.: jangan ada agen ganda.",
+    "paused": "Dijeda: kamu membatalkan 3 keputusannya minggu ini. Nyalakan lagi kapan pun kamu mau.",
+    "you": "kamu",
+    "card": {
+      "deciding": "{{name}} sedang meninjaunya atas nama {{for}}…",
+      "approved": "Disetujui oleh {{name}} atas nama {{for}}",
+      "passed": "{{name}} meneruskannya kepadamu",
+      "passedWhy": "{{name}} meneruskannya kepadamu: {{reason}}",
+      "outside": "Di luar yang kamu izinkan {{name}} setujui",
+      "own": "{{name}} tidak memutuskan permintaannya sendiri",
+      "limit": "{{name}} sudah mencapai batas hari ini: yang ini tetap padamu",
+      "undoneByYou": "Dibatalkan olehmu",
+      "undoneBy": "Dibatalkan oleh {{name}}",
+      "why": "Kenapa?",
+      "undo": "Batalkan",
+      "undoArchives": "Membatalkan akan mengarsipkan {{name}}. Berlaku hingga {{until}}.",
+      "undoSettings": "Membatalkan akan mengembalikan pengaturan. Berlaku hingga {{until}}."
+    }
+  },
   "noticePrefs": {
     "whereTitle": "Ke mana notifikasi dikirim",
     "whatTitle": "Apa yang memberimu notifikasi",
@@ -2931,6 +2962,8 @@
       "approvalCover": "<b>{{name}}</b> memilihmu di Siapa yang menyetujui untukku",
       "approvalCoverDeclined": "<b>{{name}}</b> tidak lagi menyetujui untukmu",
       "approvalCoverEnded": "<b>{{name}}</b> mengakhiri siapa yang menyetujui untukmu",
+      "rightHandDecided": "Permintaan yang disetujui <b>{{name}}</b> untukmu hari ini: {{count}}",
+      "rightHandPaused": "<b>{{name}}</b> berhenti menyetujui untukmu: kamu membatalkan 3 keputusannya minggu ini",
       "invitationAccepted": "<b>{{name}}</b> menerima undanganmu dan bergabung ke {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> menerima undanganmu",
       "reaction_other": "<b>{{names}}</b> bereaksi pada pesanmu"

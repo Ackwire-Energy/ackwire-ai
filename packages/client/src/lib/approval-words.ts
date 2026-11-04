@@ -1,8 +1,8 @@
 import type { TFunction } from "i18next";
-import type { Approval, ApprovalCoverView, ApprovalRule } from "../api/types";
+import type { Approval, ApprovalCoverView, ApprovalRule, CardDelegate } from "../api/types";
 import { aheadPhase, approvalAction, emailTitleWords, sqlReadsTarget } from "./approval-kind";
 import { humanize } from "./custom-tools";
-import { formatShortDate, lowerFirst } from "./format";
+import { formatShortDate, formatTime, lowerFirst } from "./format";
 import { agentGrammar } from "./grammar";
 import { partsOf, toolName } from "./tool-review";
 
@@ -333,4 +333,52 @@ export function coveringLine(t: TFunction, locale: string, c: Pick<ApprovalCover
   ]
     .filter(Boolean)
     .join(" · ");
+}
+
+/**
+ * What the right hand did with a card (ADR 0138 §2), in a line: "Aprovado pelo Gerente em nome de Ana", "O Gerente
+ * passou para você: …". What is only about the person it decided for (passed, out of reach, its own, a cap) is said
+ * to them alone: null for anyone else.
+ */
+export function delegateLine(
+  t: TFunction,
+  d: CardDelegate,
+  meId: string | null,
+  nameOf: (userId: string) => string | undefined,
+  rightHandName: string,
+): string | null {
+  const mine = d.forUserId === meId;
+  const name = rightHandName;
+  const forName = mine ? t("rightHandApprovals.you") : (nameOf(d.forUserId) ?? "");
+  switch (d.state) {
+    case "deciding":
+      return t("rightHandApprovals.card.deciding", { name, for: forName });
+    case "approved":
+      return t("rightHandApprovals.card.approved", { name, for: forName });
+    case "undone":
+      return d.undoneByUserId === meId
+        ? t("rightHandApprovals.card.undoneByYou")
+        : t("rightHandApprovals.card.undoneBy", { name: nameOf(d.undoneByUserId ?? "") ?? "" });
+    default:
+      if (!mine) return null;
+      if (d.state === "passed")
+        return d.reason
+          ? t("rightHandApprovals.card.passedWhy", { name, reason: d.reason })
+          : t("rightHandApprovals.card.passed", { name });
+      return t(`rightHandApprovals.card.${d.state}`, { name });
+  }
+}
+
+/** "Desfazer arquiva a Triagem. Vale até 09:42.": what Desfazer does, and until when. */
+export function delegateUndoLine(t: TFunction, locale: string, d: CardDelegate, agentName: string | null) {
+  const end = d.undoUntil ? new Date(d.undoUntil) : null;
+  // It lasts a day: tomorrow's word (Intl's own, "amanhã", "tomorrow") before the hour when it ends then.
+  const tomorrow =
+    end && end.toDateString() !== new Date().toDateString()
+      ? `${new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(1, "day")}, `
+      : "";
+  const until = end ? `${tomorrow}${formatTime(locale, end.toISOString())}` : "";
+  return agentName
+    ? t("rightHandApprovals.card.undoArchives", { name: agentName, until })
+    : t("rightHandApprovals.card.undoSettings", { until });
 }

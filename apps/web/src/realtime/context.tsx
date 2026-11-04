@@ -36,6 +36,7 @@ import {
   type ConsultsState,
   cacheAgentProposal,
   cacheApproval,
+  cacheCardDelegate,
   cacheDmRead,
   cacheForumSuggestion,
   cacheMessage,
@@ -820,6 +821,7 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "machine.task") applyTaskEvent(qc, orgId, event.task);
       // An agent's proposal of a new agent was created or denied (by anyone): its card.
       if (event.type === "agent.proposal.updated") cacheAgentProposal(qc, orgId, event, event);
+      if (event.type === "card.delegate") cacheCardDelegate(qc, orgId, event, event.delegate);
       // An agent's "Vale um fórum?" card was accepted or dismissed (by anyone).
       if (event.type === "forum.suggestion.updated") {
         cacheForumSuggestion(qc, orgId, channelId, event.messageId, event.suggestion);

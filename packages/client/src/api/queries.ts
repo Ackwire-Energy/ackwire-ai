@@ -71,6 +71,7 @@ import type {
   AuditRow,
   CalendarEventInput,
   CalendarEventPatch,
+  CardDelegate,
   Channel,
   ChannelInput,
   ChannelOverride,
@@ -119,6 +120,8 @@ import type {
   Proposal,
   ReactionCount,
   ReminderInput,
+  RightHandApprovals,
+  RightHandApprovalsInput,
   Role,
   RoleInput,
   Routine,
@@ -1695,6 +1698,55 @@ export function useDeclineApprovalCover(orgId: string) {
     mutationFn: (userId: string) => api.approvals.endCover(orgId, userId),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.approvalCovers(orgId) }),
   });
+}
+
+/** "O Gerente aprova por você" (ADR 0138 §2). */
+export const useRightHandApprovals = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.rightHandApprovals(orgId), queryFn: () => api.approvals.rightHand(orgId) });
+};
+
+/** Saves a change at once, shown before the answer (a switch, a box, the budget, the guidance). */
+export function useSetRightHandApprovals(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const key = keys.rightHandApprovals(orgId);
+  return useMutation({
+    mutationFn: (input: RightHandApprovalsInput) => api.approvals.setRightHand(orgId, input),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: key });
+      const before = qc.getQueryData<RightHandApprovals>(key);
+      if (before) qc.setQueryData<RightHandApprovals>(key, { ...before, ...input });
+      return { before };
+    },
+    onError: (_e, _input, ctx) => ctx?.before && qc.setQueryData(key, ctx.before),
+    onSuccess: (next) => qc.setQueryData(key, next),
+  });
+}
+
+/** Desfazer on a card the right hand approved: the card says "Desfeito por …" when its event arrives. */
+export function useUndoRightHand(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (decisionId: string) => api.approvals.undoRightHand(orgId, decisionId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.rightHandApprovals(orgId) });
+    },
+  });
+}
+
+/** `card.delegate`: what the right hand did with a card, on the message in the cache. */
+export function cacheCardDelegate(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  where: { channelId: string; messageId: string },
+  delegate: CardDelegate | null,
+) {
+  cacheMessageMeta(qc, orgId, where.channelId, where.messageId, (meta) => ({
+    actionCard: { ...(meta.actionCard as Record<string, unknown> | undefined), delegate },
+  }));
 }
 
 // ── Connectors and agent scopes ─────────────────────────────────────────────
