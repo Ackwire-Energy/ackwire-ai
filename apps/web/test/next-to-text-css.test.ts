@@ -27,7 +27,8 @@ test("a row's minor action, its time and its stop sit right after its words, nev
 
 test("a thread opens in the members column's place, wider, with no scrim; a phone keeps the whole-screen sheet", async () => {
   const css = await sheets();
-  const wide = atRule(css, "@media (min-width: 861px)");
+  const block = atRule(css, "@media (min-width: 861px)");
+  const wide = topLevel(block);
   const phone = atRule(css, "@media (max-width: 860px)");
   expect(last(wide, ".thread-panel--docked", "position")).toBe("relative");
   expect(last(wide, ".thread-panel--docked", "flex")).toBe("none");
@@ -38,4 +39,12 @@ test("a thread opens in the members column's place, wider, with no scrim; a phon
   expect(last(wide, ".thread-panel--docked", "border-left")).toBe("1px solid var(--line)");
   expect(last(wide, ".thread-panel--docked", "box-shadow")).toBe("none");
   expect(last(phone, ".thread-panel", "position")).toBe("fixed");
+  // A body too narrow for both (a tablet with the sidebar open): the thread takes the conversation's place.
+  const narrow = atRule(block, "@container channel-body (max-width: 719px)");
+  expect(last(narrow, ".thread-panel--docked", "position")).toBe("absolute");
+  expect(last(narrow, ".thread-panel--docked", "inset")).toBe("0");
+  expect(last(wide, ".channel__body:has(>.thread-panel--docked)", "position")).toBe("relative");
+  // A narrow docked thread drops the channel's name and its "·", never leaving a lone "· 2 respostas".
+  const slim = atRule(block, "@container thread-dock (max-width: 479px)");
+  expect(last(slim, ".thread-head__meta>.thread-head__where", "display")).toBe("none");
 });
