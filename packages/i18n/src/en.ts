@@ -1125,6 +1125,8 @@ export const en = {
     otherAnswer: "Another answer",
     review: "Review",
     open: "Open",
+    /** On the closed island, at its end: opens where the notice happened. */
+    see: "View",
     dismiss: "Dismiss",
     send: "Send",
     placeholder: "Write your answer…",

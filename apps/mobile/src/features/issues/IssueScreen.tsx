@@ -12,7 +12,7 @@ import {
   useIssueAction,
   useIssueColumns,
 } from "@agenteschat/client";
-import { relativeTime } from "@agenteschat/client/lib/format";
+import { capitalize, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { webUrl } from "@agenteschat/client/lib/guards";
 import { conversationLine, isOpen, PRIORITIES, STATUSES } from "@agenteschat/client/lib/issues";
@@ -224,9 +224,9 @@ function ConversationRow({ issue, onOpen }: { issue: Issue; onOpen: () => void }
   );
 }
 
-/** "#134 · criada pelo Atlas a partir do Sentry · #tech", the title, the chips. */
+/** "#134" and the title on one row, "Criada pelo Atlas a partir do Sentry · #tech" under it, the chips. */
 function Head({ issue: i }: { issue: Issue }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const dir = useDirectory();
   const orgId = useOrgId();
   const channels = useChannels(orgId);
@@ -242,22 +242,30 @@ function Head({ issue: i }: { issue: Issue }) {
             ? t("mobile.issues.fromWebhook", { provider: i.source.provider })
             : null;
   const creator = dir.nameOf(i.createdBy);
-  const line = [
-    `#${i.number}`,
-    [creator ? t("mobile.issues.createdBy", { name: creator }) : null, from].filter(Boolean).join(" "),
-    channel ? `#${channel.name}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // It starts the line now, under the title.
+  const line = capitalize(
+    [
+      [creator ? t("mobile.issues.createdBy", { name: creator }) : null, from].filter(Boolean).join(" "),
+      channel ? `#${channel.name}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    i18n.language,
+  );
   const assignee = i.assignee;
   return (
     <View style={styles.head}>
-      <Text variant="small" tone="faint">
-        {line}
-      </Text>
       <Text variant="display2" accessibilityRole="header" style={styles.bigTitle} maxFontSizeMultiplier={1.4}>
+        <Text variant="display2" tone="faint" style={styles.number} maxFontSizeMultiplier={1.4}>
+          #{i.number}
+        </Text>{" "}
         {i.title}
       </Text>
+      {line ? (
+        <Text variant="small" tone="faint">
+          {line}
+        </Text>
+      ) : null}
       <View style={styles.chips}>
         <StateChip issue={i} />
         {i.priority === "high" ? <Chip icon="flag" label={t("issues.priority.high")} /> : null}
@@ -804,6 +812,7 @@ const styles = StyleSheet.create({
   centerText: { textAlign: "center" },
   head: { paddingHorizontal: 20, paddingTop: 6, gap: 6, marginBottom: 14 },
   bigTitle: { marginVertical: 4 },
+  number: { fontWeight: "500" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   work: { marginHorizontal: 16, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
   workHead: { flexDirection: "row", alignItems: "center", gap: 8 },

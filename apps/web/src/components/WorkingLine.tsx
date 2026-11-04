@@ -1,4 +1,4 @@
-import { elapsedClock, type LiveWork } from "@agenteschat/client";
+import { elapsedClock } from "@agenteschat/client";
 import {
   type ActivityEntry,
   activitySentence,
@@ -10,9 +10,8 @@ import {
   markedPieces,
   markInk,
 } from "@agenteschat/client/lib/activity";
-import { waitStep } from "@agenteschat/client/lib/work";
-import { type AgentColor, Avatar, agentGradient, Icon } from "@agenteschat/ui";
-import { type CSSProperties, Fragment, type ReactNode, useState } from "react";
+import { Avatar, Icon } from "@agenteschat/ui";
+import { Fragment, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentWho } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
@@ -131,39 +130,6 @@ function TurnText({ text }: { text: string }) {
         {boldNames(shown.now)}
       </span>
     </span>
-  );
-}
-
-/**
- * The waiting row's body, beside the agent's face until its first words arrive: three pixels in its color lighting up
- * in turn, then a muted line saying what it does now (`waitStep`), turning like the bar's phrase, in one width (cut
- * with "…", the whole step as the tip), and `tail` after it (its time and its stop). In the dark theme the pixels
- * take the color's light tone.
- */
-export function WaitLine({
-  work,
-  color,
-  tail,
-}: {
-  work: LiveWork[] | undefined;
-  color?: AgentColor;
-  tail?: ReactNode;
-}) {
-  const { t } = useTranslation();
-  const [light, deep] = agentGradient(color);
-  const step = waitStep(t, work);
-  return (
-    <div className="ac-wait" style={{ "--wait-deep": deep, "--wait-light": light } as CSSProperties}>
-      <span className="ac-wait__dots" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-      </span>
-      <span className="ac-wait__step" title={step}>
-        <TurnText text={step} />
-      </span>
-      {tail}
-    </div>
   );
 }
 

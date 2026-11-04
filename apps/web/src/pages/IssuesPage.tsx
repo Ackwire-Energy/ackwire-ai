@@ -668,14 +668,19 @@ function IssueCard({
       data-status={i.status}
       data-card={i.number}
     >
-      <span className="issue-card__top tabular">
-        <span>#{i.number}</span>
-        {fields.label && i.labels[0] && <span>· {i.labels[0]}</span>}
-        <span className="issue-card__grow" />
-        {fields.priority && <PriorityChip issue={i} />}
-        {fields.due && <DueChip issue={i} />}
+      <span className="issue-card__title">
+        <span className="issue-card__number tabular">#{i.number}</span> {i.title}
       </span>
-      <span className="issue-card__title">{i.title}</span>
+      {((fields.label && i.labels[0]) ||
+        (fields.priority && i.priority !== "normal") ||
+        (fields.due && i.dueDate && isOpen(i))) && (
+        <span className="issue-card__top tabular">
+          {fields.label && i.labels[0] && <span>{i.labels[0]}</span>}
+          <span className="issue-card__grow" />
+          {fields.priority && <PriorityChip issue={i} />}
+          {fields.due && <DueChip issue={i} />}
+        </span>
+      )}
       {fields.criteria && <Criteria issue={i} />}
       <IssueCardWork issue={i} />
       {(fields.assignee || pr) && (

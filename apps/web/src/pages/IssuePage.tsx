@@ -119,8 +119,9 @@ function useIssueSource(i: Issue) {
 }
 
 /**
- * An issue opened from the board or the list: the task's own page inside the shared details dialog ("#131" on its
- * bar, "abrir em página própria"), wide and always full height so changing tabs never makes it jump.
+ * An issue opened from the board or the list: the task's own page inside the shared details dialog ("#131" and its
+ * title on its bar, which never scrolls away; "abrir em página própria"), wide and always full height so changing
+ * tabs never makes it jump.
  */
 export function IssueDialog({
   issue: i,
@@ -149,7 +150,7 @@ export function IssueDialog({
       size="lg"
       fill
       titleHidden
-      eyebrow={<span className="tabular">#{i.number}</span>}
+      eyebrow={<IssueBarTitle issue={i} />}
       title={i.title}
       // Esc in a text being edited in place saves it and stays: the dialog closes on the next Esc.
       onEscapeKeyDown={(e) => {
@@ -171,8 +172,21 @@ export function IssueDialog({
   );
 }
 
+/** "#131 Confirmação do agendamento por WhatsApp" on the dialog's bar, the title edited in place there. */
+function IssueBarTitle({ issue: i }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const [saved, flashSaved] = useSavedFlash();
+  return (
+    <div className="issue-bartitle">
+      <span className="issue-bartitle__number tabular">#{i.number}</span>
+      <IssueTitle issue={i} onSaved={flashSaved} />
+      <SavedNote shown={saved} label={t("common.saved")} className="issue-bartitle__saved" />
+    </div>
+  );
+}
+
 /**
- * An issue's details, the same on its page and in the dialog: who made it and from where, the title, then tabs
+ * An issue's details, the same on its page and in the dialog (whose bar has the title): who made it and from where, the title, then tabs
  * (the agent's work, live steps or "stalled" with "Pedir para continuar"; "Pedir a um agente"; description,
  * criteria and who checked them; forum; discussion), and the aside with its fields and links. The title, the
  * description and the criteria are edited where they are, saved on leaving the field ("Salvo" by the source line).
@@ -211,7 +225,7 @@ export function IssueDetails({
             {from && <> {from}</>}
             <SavedNote shown={saved} label={t("common.saved")} className="issue-details__saved" />
           </span>
-          <IssueTitle issue={i} onSaved={flashSaved} />
+          {variant === "page" && <IssueTitle issue={i} onSaved={flashSaved} />}
         </header>
         <Tabs
           value={tab}

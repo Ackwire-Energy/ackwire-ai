@@ -1,4 +1,5 @@
-import type { LiveRun } from "@agenteschat/client";
+import { browserSteps, isQuiet, type LiveRun } from "@agenteschat/client";
+import { waitsForWords } from "@agenteschat/client/lib/activity";
 import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 
 /**
@@ -118,28 +119,12 @@ export function waitingLast<S extends Pick<RunSlot, "runId">>(
 }
 
 /**
- * How long after it starts the block waits before its waiting row shows (1.2–2 s, one per run): the bar above the
- * composer says it works at once, and a row in the same instant reads as a machine.
+ * Its block is in the conversation: words of its own, or something to show while it waits for them (its browser
+ * card, "sem notícias · Atualizar" on a run gone quiet). Until then the bar above the composer speaks for it: its
+ * face, what it does now, for how long, and its stop.
  */
-export function openerDelayMs(runId: string) {
-  return 1200 + (hashOf(runId) % 800);
-}
-
-/** Nothing of its own yet: no words, no steps, still at work (the block waits for its opener's delay). */
-export const saysNothingYet = (r: Pick<LiveRun, "status" | "text" | "work">) =>
-  r.text.length === 0 &&
-  (r.work ?? []).length === 0 &&
-  (r.status === "thinking" || r.status === "queued" || r.status === "running");
-
-/** Its block is in the conversation: it has something of its own, or the moment before its waiting row passed. */
-export const rowShows = (r: Pick<LiveRun, "runId" | "status" | "text" | "work" | "startedAt">, now: number) =>
-  !saysNothingYet(r) || now >= (r.startedAt ?? 0) + openerDelayMs(r.runId);
-
-function hashOf(s: string) {
-  let h = 0;
-  for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return h;
-}
+export const rowShows = (r: LiveRun, now: number) =>
+  !waitsForWords(r) || browserSteps(r.work).length > 0 || isQuiet(r, now);
 
 /** The first thing it said, out of its work list (the line its block opens with, above its tools). */
 export function openerOf(r: Pick<LiveRun, "work">): { said: string | null; work: NonNullable<LiveRun["work"]> } {

@@ -35,6 +35,7 @@ import {
   type LiveRun,
   MESSAGES_PAGE,
   OPEN_THREAD,
+  QUIET_AFTER_MS,
   runsInChannel,
   type StreamsState,
   sendHelpers,
@@ -217,13 +218,11 @@ import { readingLanding } from "@/chat/reading";
 import {
   blockRowByRun,
   nextSlots,
-  openerDelayMs,
   openerOf,
   type RunSlot,
   rowShows,
   SLOT_HOLD_MS,
   sameSlots,
-  saysNothingYet,
   waitingLast,
 } from "@/chat/run-slots";
 import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
@@ -337,7 +336,7 @@ import {
 } from "@/components/threads/ThreadLines";
 import { UsageWaitCancel, UsageWaitClosed } from "@/components/UsagePauseCard";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
-import { BarAlsoTyping, BarPhrase, BarStep, ConsultClock, WaitLine, WorkingStack } from "@/components/WorkingLine";
+import { BarAlsoTyping, BarPhrase, BarStep, ConsultClock, WorkingStack } from "@/components/WorkingLine";
 import { useChannelSearch } from "@/hooks/useChannelSearch";
 import { useComposerDraft } from "@/hooks/useComposerDraft";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -1414,7 +1413,7 @@ function ChannelView({
 
   // Which agents' blocks are on screen: the line above the composer speaks only for those out of view.
   // By run: a "pensando…" hands its block (same key) to the real run, and that run must count as in view.
-  // A block's row draws only after its opener's delay (`RunBlock`): then it is measured again.
+  // A block's row draws only once it has something to show (`RunBlock`, `rowShows`): then it is measured again.
   const [rowsDrawn, setRowsDrawn] = useState(0);
   const rowDrawn = useCallback(() => setRowsDrawn((n) => n + 1), []);
   const inView = useBlocksInView(scroller, `${slots.map((x) => x.runId).join(" ")} ${rowsDrawn}`);
@@ -2897,18 +2896,19 @@ function RunBlock({
     () => (live ? liveMessageOf(live) : null),
     [liveId, liveAgent, liveChannel, liveThread, liveStart],
   );
-  // Just started and nothing of its own yet: its waiting row comes after a moment (the bar says it works at once).
-  const quiet = Boolean(live && saysNothingYet(live));
-  const due = useDue(liveStart ?? null, live ? openerDelayMs(live.runId) : 0, quiet);
+  // No words of its own yet: the bar above the composer speaks for it, and the block draws only for something to
+  // show (`rowShows`). A run gone quiet meanwhile draws for "sem notícias · Atualizar": wake when that moment comes.
+  const waits = Boolean(live && !message && waitsForWords(live));
+  useDue(live?.lastEventAt ?? liveStart ?? null, QUIET_AFTER_MS, waits);
+  const hidden = Boolean(live && !message && !rowShows(live, Date.now()));
   const shown = message ?? placeholder;
   // Its live row on the page: the view measures which blocks are in view again (the bar speaks for those out of it).
   const rowDrawn = useContext(RowDrawnContext);
-  const drawnRun = live && !message && !(quiet && !due) ? live.runId : null;
+  const drawnRun = live && !message && !hidden ? live.runId : null;
   useLayoutEffect(() => {
     if (drawnRun) rowDrawn?.();
   }, [drawnRun, rowDrawn]);
-  if (!shown) return null;
-  if (live && !message && quiet && !due) return null;
+  if (!shown || hidden) return null;
   // At work it never groups under the agent's own message: it starts as the waiting row with its face, and taking the
   // face away when the words arrive would move the row. Its saved message groups as any other.
   const together = message ? grouped : false;
@@ -3042,7 +3042,7 @@ function LiveRunStatus({
   run,
   quietOnly = false,
 }: {
-  run: LiveRun /** The waiting row's step line says what it does. */;
+  run: LiveRun /** Waiting for its words, the bar says what it does: only "sem notícias" here. */;
   quietOnly?: boolean;
 }) {
   const { t, i18n } = useTranslation();
@@ -3345,8 +3345,8 @@ function useAsksOutOfView(scroller: { current: HTMLElement | null }, registry: A
  * The bar right above the composer, one for everyone at work here and always one width: a glass pill (in
  * the first agent's color while agents work), their small faces (the typing dots first when only people type)
  * and one line that says it all. An agent whose live row is on screen is left out: the row says its step, its
- * time and its stop. Its row out of view, the bar speaks for it: its face, the row's step, its time, "Ver" and
- * its stop.
+ * time and its stop. Its row out of view, or no words of its own yet (there is no thinking row in the conversation),
+ * the bar speaks for it: its face, its step, its time, "Ver" once its row is there, and its stop.
  */
 function ActivityBar({
   channelId,
@@ -3396,8 +3396,8 @@ function ActivityBar({
   asking.current = consults.length > 0;
   const ids = typingIn({ [channelId]: typing ?? {} }, channelId, now, me.user.id, threadId);
   // Its row on screen says what it does, for how long and how to stop it: the bar leaves that agent out (a row not
-  // drawn yet is out of view).
-  const rowInView = (r: LiveRun) => !outOfView(r.runId);
+  // drawn yet is out of view). Still waiting for its words, its row says none of that: the bar keeps it.
+  const rowInView = (r: LiveRun) => !waitsForWords(r) && !outOfView(r.runId);
   const entries = entriesOffScreen(
     barEntries(
       runs,
@@ -3425,7 +3425,7 @@ function ActivityBar({
   const typers = entries.some((e) => e.type === "person");
   // Agents running code: "Ver código" with the live code and output.
   const coding = runs.filter(
-    (r) => outOfView(r.runId) && r.code && (r.work ?? []).some((w) => w.kind === "call" && w.running),
+    (r) => !rowInView(r) && r.code && (r.work ?? []).some((w) => w.kind === "call" && w.running),
   );
   // An agent working in its browser: the bar says so, and a click opens its browser card in the conversation.
   // Its row in view draws its browser card itself.
@@ -3613,7 +3613,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   // Nothing said and no steps yet: its words stream at the top, so the line it opens with stays put when a tool
   // call turns it into narration (and the answer, with no tools, starts there too).
   const wordsOnTop = !opening.said && opening.work.length === 0;
-  // At work with no words shown yet: the waiting row (its face, the pixels and what it does now), no name or time.
+  // At work with no words shown yet: its face and what it has to show (its browser card, a quiet run's notice), no
+  // name or time; the bar above the composer says what it does, for how long, and stops it.
   const waiting = Boolean(live && waitsForWords({ ...live, text: revealed }));
   // A sent message that waits for the connection: not "Não enviada", it goes out on its own.
   const queued = useWaiting(m.local === "failed" ? m.clientId : undefined);
@@ -3995,7 +3996,6 @@ export const TimelineMessage = memo(function TimelineMessage({
       >
         {live && waiting ? (
           <Parts resetKey={m}>
-            <WaitLine work={live.work} color={colorOf(agent)} tail={<RunTail run={live} />} />
             <LiveRunStatus run={live} quietOnly />
             <RunBrowserCard run={live} name={name} />
             <span className="ac-visually-hidden">{t("channel.writing")}</span>

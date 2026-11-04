@@ -21,7 +21,9 @@ const go = async (state = seedState()) => {
   return { ...r, api, state };
 };
 const column = (name: string) => screen().getByRole("region", { name });
-const cardTitles = (el: HTMLElement) => Array.from(el.querySelectorAll(".issue-card__title")).map((x) => x.textContent);
+// The title after its number ("#131 Confirmação…" on one row).
+const cardTitles = (el: HTMLElement) =>
+  Array.from(el.querySelectorAll(".issue-card__title")).map((x) => x.textContent?.replace(/^#\d+ /, ""));
 const cardOf = (number: number) => document.querySelector<HTMLElement>(`[data-card="${number}"]`) as HTMLElement;
 const toast = () => document.querySelector(".ac-toast")?.textContent ?? "";
 const live = () => document.querySelector(".issues-body [aria-live]")?.textContent ?? "";
@@ -112,6 +114,19 @@ describe("Tarefas: how I left it", () => {
     cleanup();
     await go();
     expect(screen().getByRole("button", { name: "Mais opções" })).toBeTruthy();
+  });
+});
+
+describe("Tarefas: a card", () => {
+  test("'#N' and the title on one row, its fields under it", async () => {
+    await go();
+    const card = cardOf(128);
+    const title = card.querySelector(".issue-card__title") as HTMLElement;
+    expect(title.querySelector(".issue-card__number")?.textContent).toBe("#128");
+    expect(title.textContent).toBe("#128 Login devolve 401 depois do deploy das 9h");
+    // The fields after the title, the label without its old dot.
+    expect(title.nextElementSibling?.classList.contains("issue-card__top")).toBe(true);
+    expect(card.querySelector(".issue-card__top")?.textContent).toMatch(/^bug/);
   });
 });
 

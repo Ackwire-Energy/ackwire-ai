@@ -68,9 +68,16 @@ const open = async () => {
     act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
   return { state, ev, scroll: rows.scroll };
 };
-/** At work for a while already, on a step: its row shows at once. */
+/** At work for a while already, on a step with no words yet: no row, the bar alone says it. */
+const thinking = async (ev: (event: Record<string, unknown>) => Promise<void>) => {
+  await ev({ type: "agent.run", ...ids, status: "running", startedAt: new Date(Date.now() - 13_000).toISOString() });
+  await ev({ type: "agent.tool", ...ids, tool: "read_file", toolUseId: "t1", detail: "apps/api/auth/refresh.ts" });
+  await settle(3);
+};
+/** The same, after its first words: its row is in the conversation. */
 const working = async (ev: (event: Record<string, unknown>) => Promise<void>) => {
   await ev({ type: "agent.run", ...ids, status: "running", startedAt: new Date(Date.now() - 13_000).toISOString() });
+  await ev({ type: "agent.delta", ...ids, seq: 0, text: "Olhando o refresh." });
   await ev({ type: "agent.tool", ...ids, tool: "read_file", toolUseId: "t1", detail: "apps/api/auth/refresh.ts" });
   await settle(3);
 };
@@ -81,32 +88,45 @@ const typing = (ev: (event: Record<string, unknown>) => Promise<void>) =>
 const cancels = (state: ReturnType<typeof seedState>) => state.calls.filter((c) => c.method === "agents.cancelRun");
 
 describe("the live row says it, the bar only for what is out of view", () => {
-  test("its row on screen: the bar says nothing of it; the row's step ends in its time and its stop", async () => {
+  test("its row on screen: the bar says nothing of it; the row's header ends in its time and its stop", async () => {
     const { state, ev } = await open();
     await working(ev);
-    expect(row().classList.contains("ac-msg--waiting")).toBe(true);
     expect(bar().dataset.active).toBe("false");
     expect(bar().textContent).toBe("");
-    const step = row().querySelector(".ac-wait__step") as HTMLElement;
-    expect(step.getAttribute("title")).toBe("Mexendo nos arquivos do PC · refresh.ts…");
-    const tail = step.nextElementSibling as HTMLElement;
-    expect(tail.classList.contains("run-tail")).toBe(true);
+    const tail = row().querySelector(".ac-msg__head .run-tail") as HTMLElement;
     expect(tail.querySelector(".run-tail__clock")?.textContent).toMatch(/^1\d s$/);
     await act(async () => fireEvent.click(within(tail).getByRole("button", { name: "Parar" })));
     await settle(2);
     expect(cancels(state)).toHaveLength(1);
   });
 
-  test("its row drawn a moment after it starts: the bar speaks meanwhile, then goes quiet once the row is on screen", async () => {
-    const { ev } = await open();
-    await ev({ type: "agent.run", ...ids, status: "running" });
-    await settle(2);
-    expect(row()).toBeNull();
-    expect(bar().dataset.active).toBe("true");
-    expect(bar().querySelector(".ac-typing__text")?.textContent).toBe("Ada pensando…");
+  test("no words yet: no thinking row; the bar alone says what it does, its time and its stop, then its words bring the row", async () => {
+    const { state, ev } = await open();
+    await thinking(ev);
     await act(() => new Promise((r) => setTimeout(r, 2100)));
     await settle(2);
+    expect(row()).toBeNull();
+    expect(document.querySelector(".ac-msg--waiting")).toBeNull();
+    expect(bar().dataset.active).toBe("true");
+    expect(bar().querySelector(".ac-typing__avatars .ac-avatar--agent")).not.toBeNull();
+    expect(bar().querySelector(".ac-typing__text")?.textContent).toBe("Ada mexendo nos arquivos do PC · refresh.ts…");
+    expect(bar().querySelector(".ac-typing__elapsed")?.textContent).toMatch(/^1\d s$/);
+    // Nothing to go back to yet.
+    expect(within(bar()).queryByRole("button", { name: "Ver" })).toBeNull();
+    await act(async () => fireEvent.click(within(bar()).getByRole("button", { name: "Parar" })));
+    await settle(2);
+    expect(cancels(state)).toHaveLength(1);
+  });
+
+  test("its first words bring its row, and the bar, its row on screen, goes quiet", async () => {
+    const { ev } = await open();
+    await thinking(ev);
+    expect(row()).toBeNull();
+    expect(bar().dataset.active).toBe("true");
+    await ev({ type: "agent.delta", ...ids, seq: 0, text: "O refresh expira cedo." });
+    await settle(3);
     expect(row()).not.toBeNull();
+    expect(row().classList.contains("ac-msg--waiting")).toBe(false);
     expect(bar().dataset.active).toBe("false");
   });
 

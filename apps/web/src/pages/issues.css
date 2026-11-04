@@ -477,6 +477,10 @@ html:not([data-pointer]) .issue-card:focus-visible {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.issue-card__number {
+  color: var(--faint);
+  font-weight: 500;
+}
 .issue-card[data-status="done"] .issue-card__title,
 .issue-card[data-status="canceled"] .issue-card__title {
   color: var(--muted);
@@ -969,6 +973,39 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   margin: -4px 0 0;
   font-size: 12px;
   color: var(--faint);
+}
+/* The dialog's bar: "#131" and the title on one row, the buttons on its first line; a long title wraps, never cut. */
+.ac-details__bar:has(.issue-bartitle) {
+  align-items: flex-start;
+}
+.issue-bartitle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--ink);
+}
+.issue-bartitle__number {
+  flex: none;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+  color: var(--faint);
+}
+.issue-bartitle > .issue-inplace {
+  flex: 1;
+  min-width: 0;
+}
+.issue-bartitle .issue-details__title,
+.issue-bartitle .issue-inplace__title {
+  font-size: 20px;
+  line-height: 28px;
+  letter-spacing: -0.01em;
+}
+.issue-bartitle__saved {
+  flex: none;
+  align-self: center;
 }
 /* "✓ Salvo" (SavedNote) at the end of the source line. */
 .issue-details__saved {

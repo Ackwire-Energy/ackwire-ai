@@ -29,23 +29,10 @@ export function turnItems(r: Pick<LiveRun, "work" | "status">): ToolItem[] {
 }
 
 /**
- * How long after it starts the block waits before its waiting row shows (1.2–2 s, one per run): the line above the
- * box says it works at once, and a row in the same instant reads as a machine.
+ * Its block is in the conversation (as `TurnRow` draws it): words of its own. Until then there is no row, and the
+ * line above the box speaks for it (its face, what it does now, its time and its stop).
  */
-export function openerDelayMs(runId: string) {
-  let h = 0;
-  for (const ch of runId) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return 1200 + (h % 800);
-}
-
-/**
- * Its block is in the conversation (as `TurnRow` draws it): it has something of its own, or the moment before its
- * waiting row passed. Until then the line above the box keeps its face.
- */
-export const turnShows = (
-  r: Pick<LiveRun, "runId" | "status" | "text" | "work" | "startedAt" | "since">,
-  now: number,
-) => turnItems(r).length > 0 || r.text.length > 0 || now >= (r.startedAt ?? r.since ?? 0) + openerDelayMs(r.runId);
+export const turnShows = (r: Pick<LiveRun, "status" | "text" | "work">) => !waitsForWords(r);
 
 /** The first thing it said, out of the lines below (the line its block opens with, above its tools). */
 export function turnOpener(items: readonly ToolItem[], posted = ""): { said: string | null; lines: ToolItem[] } {
@@ -65,21 +52,6 @@ export function turnOpener(items: readonly ToolItem[], posted = ""): { said: str
  */
 export function turnOrder<R extends Pick<LiveRun, "status" | "text" | "work">>(runs: readonly R[]): R[] {
   return [...runs.filter((r) => !waitsForWords(r)), ...runs.filter((r) => waitsForWords(r))];
-}
-
-/** One turn of the waiting row's pixels (as the web's `ac-wait-dot`): each lights up in turn, 0.2 s apart. */
-export const WAIT_DOT_PERIOD = 1.2;
-
-/**
- * Pixel `i` (0–2) of the waiting row at `t` seconds: lit and 2px up for the first 18% of its turn, then 60%, then
- * 30%, stepped (no easing). Reduce Motion: still, at 60%.
- */
-export function waitDot(t: number, i: number, reduced = false): { opacity: number; lift: number } {
-  if (reduced) return { opacity: 0.6, lift: 0 };
-  const p = ((((t - i * 0.2) % WAIT_DOT_PERIOD) + WAIT_DOT_PERIOD) % WAIT_DOT_PERIOD) / WAIT_DOT_PERIOD;
-  if (p < 0.18) return { opacity: 1, lift: -2 };
-  if (p < 0.36) return { opacity: 0.6, lift: 0 };
-  return { opacity: 0.3, lift: 0 };
 }
 
 const TURN_STATUSES: ReadonlySet<string> = new Set(["thinking", "queued", "running", "canceled"]);
