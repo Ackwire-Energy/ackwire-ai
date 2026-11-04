@@ -1,4 +1,10 @@
-import { type Dashboard, useDeleteDashboard, useUpdateDashboard } from "@agenteschat/client";
+import {
+  type Dashboard,
+  useDashboards,
+  useDeleteDashboard,
+  useSetHomeDashboard,
+  useUpdateDashboard,
+} from "@agenteschat/client";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,9 +25,10 @@ interface MenuItem {
 }
 
 /**
- * A board's "…" (ADR 0135): Organize, Share, Rename, Pin to the top or Unpin, and Delete (with a confirmation), only
- * what the viewer may do. As the routines' menu: the system's action sheet on iOS, the app's own list in a sheet on
- * Android (the screen hosts it: `SheetHostProvider`). Called before the board loads: it offers nothing until then.
+ * A board's "…" (ADR 0135): Use on Home or Remove from Home (§18), Organize, Share, Rename, Pin to the top or Unpin,
+ * and Delete (with a confirmation), only what the viewer may do. As the routines' menu: the system's action sheet on
+ * iOS, the app's own list in a sheet on Android (the screen hosts it: `SheetHostProvider`). Called before the board
+ * loads: it offers nothing until then.
  */
 export function useBoardMenu(board: Dashboard | undefined) {
   const { t } = useTranslation();
@@ -31,8 +38,20 @@ export function useBoardMenu(board: Dashboard | undefined) {
   const sheet = useSheet();
   const update = useUpdateDashboard(orgId);
   const remove = useDeleteDashboard(orgId);
+  const list = useDashboards(orgId);
+  const setHome = useSetHomeDashboard(orgId);
   if (!board) return { any: false, open: () => {}, label: t("widgets.menu.label") };
   const home = board.kind === "home";
+  const chosen = list.data?.homeDashboardId ?? null;
+  const onHome = home ? !chosen : chosen === board.id;
+  const showOnHome = (id: string | null) =>
+    setHome.mutate(id, {
+      onSuccess: () => {
+        successHaptic();
+        if (id) toast({ title: t("dashboards.onHomeDone") });
+      },
+      onError: failed,
+    });
   const title = home ? t("dashboards.home") : board.title;
   const setPinned = (pinned: boolean) =>
     update.mutate(
@@ -62,6 +81,8 @@ export function useBoardMenu(board: Dashboard | undefined) {
       },
     ]);
   const all: Record<BoardMenuKey, Omit<MenuItem, "key">> = {
+    home: { icon: "home", label: t("dashboards.useOnHome"), run: () => showOnHome(home ? null : board.id) },
+    unhome: { icon: "home", label: t("dashboards.stopOnHome"), run: () => showOnHome(null) },
     organize: {
       icon: "list",
       label: t("widgets.organize.start"),
@@ -73,7 +94,7 @@ export function useBoardMenu(board: Dashboard | undefined) {
     unpin: { icon: "pin", label: t("dashboards.unpin"), run: () => setPinned(false) },
     delete: { icon: "trash", label: t("dashboards.delete.action"), danger: true, run: confirmDelete },
   };
-  const items: MenuItem[] = boardMenuKeys(board).map((key) => ({ key, ...all[key] }));
+  const items: MenuItem[] = boardMenuKeys(board, onHome).map((key) => ({ key, ...all[key] }));
   const open = () => {
     if (items.length === 0) return;
     if (Platform.OS === "ios") {

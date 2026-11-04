@@ -13666,6 +13666,11 @@
     "new": "Neues Dashboard",
     "back": "Dashboards",
     "home": "Mein Start",
+    "seeAll": "Alle ansehen",
+    "useOnHome": "Auf Start zeigen",
+    "stopOnHome": "Von Start entfernen",
+    "onHome": "Auf Start",
+    "onHomeDone": "Start zeigt jetzt dieses Dashboard",
     "groups": {
       "workspace": "Workspace",
       "workspaceHint": "alle sehen es",

@@ -157,6 +157,11 @@ export const organizationMembers = pgTable(
      * live step line while they work and the cards that carry content or wait for a person.
      */
     showActivity: boolean().notNull().default(false),
+    /**
+     * The dashboard Início shows instead of the person's own home board (ADR 0135 §18); null = their own. No foreign
+     * key: read against the boards they see, so one deleted or no longer shown to them falls back to their own.
+     */
+    homeDashboardId: uuid(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

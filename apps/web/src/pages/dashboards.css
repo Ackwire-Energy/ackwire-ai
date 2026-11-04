@@ -98,6 +98,10 @@ html:not([data-pointer]) .db-card:focus-visible {
   flex: none;
   color: var(--muted);
 }
+/* The board on Início: a chip under its title. */
+.db-card__home {
+  align-self: flex-start;
+}
 .db-card__name {
   min-width: 0;
   white-space: nowrap;

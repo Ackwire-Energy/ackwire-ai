@@ -136,7 +136,8 @@ export function BoardActionsPill({
   arranging: boolean;
   /** Absent: no Organize (an empty board has nothing to move). */
   onArrange?: () => void;
-  onAdd: () => void;
+  /** Absent: no "+" (Home showing a board the person only sees). */
+  onAdd?: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -148,10 +149,12 @@ export function BoardActionsPill({
           {arranging ? t("widgets.organize.done") : t("widgets.organize.start")}
         </button>
       )}
-      <button type="button" aria-label={t("widgets.add.label")} title={t("widgets.add.label")} onClick={onAdd}>
-        <Icon name="plus" size={16} />
-        {t("widgets.add.short")}
-      </button>
+      {onAdd && (
+        <button type="button" aria-label={t("widgets.add.label")} title={t("widgets.add.label")} onClick={onAdd}>
+          <Icon name="plus" size={16} />
+          {t("widgets.add.short")}
+        </button>
+      )}
     </span>
   );
 }

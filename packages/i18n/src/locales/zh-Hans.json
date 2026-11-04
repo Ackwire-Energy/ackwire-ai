@@ -13398,6 +13398,11 @@
     "new": "新建仪表盘",
     "back": "仪表盘",
     "home": "我的首页",
+    "seeAll": "查看全部",
+    "useOnHome": "在首页显示",
+    "stopOnHome": "从首页移除",
+    "onHome": "首页显示中",
+    "onHomeDone": "首页现在显示此仪表板",
     "groups": {
       "workspace": "工作区",
       "workspaceHint": "所有人可见",

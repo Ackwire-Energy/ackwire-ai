@@ -13185,6 +13185,11 @@ export const en = {
     new: "New dashboard",
     back: "Dashboards",
     home: "My Home",
+    seeAll: "See all",
+    useOnHome: "Use on Home",
+    stopOnHome: "Remove from Home",
+    onHome: "On Home",
+    onHomeDone: "Home now shows this dashboard",
     groups: {
       workspace: "Workspace",
       workspaceHint: "everyone sees",

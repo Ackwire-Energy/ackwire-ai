@@ -1,5 +1,6 @@
 import type { Dashboard, HomeTile } from "@agenteschat/client";
-import { useHomeDashboard } from "@agenteschat/client";
+import { useHomeBoard } from "@agenteschat/client";
+import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NewWidgetDialog } from "@/components/dashboards/NewWidgetDialog";
@@ -26,47 +27,75 @@ const DEFAULT_TILES: HomeTile[] = [
 /**
  * Home as a mural (ADR 0135, on ADR 0108): "Waiting on you" and "Working now" are fixed tiles of the person's home
  * board, among their widgets, in its 4 columns. "Organize" drags and resizes; the header's "+" asks an agent for a
- * widget or pins a chart from the chat; a widget opens in its side panel (`?widget=<id>`).
+ * widget or pins a chart from the chat; a widget opens in its side panel (`?widget=<id>`). "See all" opens Dashboards.
+ * With a board chosen for Início ("Use on Home", ADR 0135 §18) the head takes its title and its widgets follow the
+ * fixed tiles; "+" and Organize change that board, when the person edits it.
  */
 export function HomeMural({ orgId, waiting, working }: { orgId: string; waiting: MuralTile; working: MuralTile }) {
   const { t } = useTranslation();
-  const home = useHomeDashboard(orgId);
+  const home = useHomeBoard(orgId);
   const [arranging, setArranging] = useState(false);
   const [adding, setAdding] = useState(false);
   const [widgetId, setWidgetId] = useOpenParam("widget");
-  const board = withTiles(home.data ?? placeholder(orgId));
-  const editable = Boolean(home.data?.canEdit);
+  const own = withTiles(home.own ?? placeholder(orgId));
+  const chosen = home.chosen;
+  // With a chosen board (even before it came), the own home keeps only its fixed tiles here; its widgets stay in
+  // "My Home".
+  const tilesBoard = home.chosenId ? { ...own, widgets: [] } : own;
+  const ownEditable = Boolean(home.own?.canEdit);
+  const editable = chosen ? chosen.canEdit || ownEditable : ownEditable;
+  const title = home.chosenId ? (chosen?.title ?? home.chosenTitle ?? "") : t("widgets.home");
+  const count = home.chosenId ? (chosen?.widgets.length ?? 0) : own.widgets.length;
   const tile = (it: MuralTile) => (organize: TileOrganize | null) => (
     <BoardTile title={it.title} count={it.count} action={it.action} organize={organize}>
       {it.body}
     </BoardTile>
   );
+  const fixed = {
+    tiles: { waiting: tile(waiting), working: tile(working) },
+    tileNames: { waiting: waiting.title, working: working.title },
+  };
   return (
-    <section className="home-sec home-mural" aria-label={t("widgets.home")}>
+    <section className="home-sec home-mural" aria-label={title}>
       <div className="list-group-head">
-        <h2>{t("widgets.home")}</h2>
-        {board.widgets.length > 0 && <span className="list-group-head__count">{board.widgets.length}</span>}
-        {editable && (
-          <span className="home-sec__acts">
+        <h2>{title}</h2>
+        {count > 0 && <span className="list-group-head__count">{count}</span>}
+        <span className="home-sec__acts">
+          <Link className="home-sec__more" to="/org/$orgId/dashboards" params={{ orgId }}>
+            {t("dashboards.seeAll")}
+          </Link>
+          {editable && (
             <BoardActionsPill
-              label={t("widgets.home")}
+              label={title}
               arranging={arranging}
               onArrange={() => setArranging((v) => !v)}
-              onAdd={() => setAdding(true)}
+              onAdd={!chosen || chosen.canEdit ? () => setAdding(true) : undefined}
             />
-          </span>
-        )}
+          )}
+        </span>
       </div>
       <WidgetBoard
         orgId={orgId}
-        board={board}
-        arranging={arranging && editable}
-        tiles={{ waiting: tile(waiting), working: tile(working) }}
-        tileNames={{ waiting: waiting.title, working: working.title }}
+        board={tilesBoard}
+        arranging={arranging && ownEditable}
+        {...fixed}
         onOpen={(id) => setWidgetId(id)}
       />
+      {chosen && chosen.widgets.length > 0 && (
+        <WidgetBoard
+          orgId={orgId}
+          board={chosen}
+          arranging={arranging && chosen.canEdit}
+          onOpen={(id) => setWidgetId(id)}
+        />
+      )}
       <WidgetPanel orgId={orgId} widgetId={widgetId} onClose={() => setWidgetId(null)} />
-      <NewWidgetDialog orgId={orgId} open={adding} onClose={() => setAdding(false)} dashboardId={null} />
+      <NewWidgetDialog
+        orgId={orgId}
+        open={adding}
+        onClose={() => setAdding(false)}
+        dashboardId={chosen ? chosen.id : null}
+      />
     </section>
   );
 }

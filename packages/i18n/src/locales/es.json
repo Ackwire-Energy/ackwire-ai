@@ -14127,6 +14127,11 @@
     "new": "Nuevo panel",
     "back": "Paneles",
     "home": "Mi inicio",
+    "seeAll": "Ver todos",
+    "useOnHome": "Usar en Inicio",
+    "stopOnHome": "Quitar de Inicio",
+    "onHome": "En Inicio",
+    "onHomeDone": "Inicio ahora muestra este panel",
     "groups": {
       "workspace": "Espacio de trabajo",
       "workspaceHint": "todos lo ven",

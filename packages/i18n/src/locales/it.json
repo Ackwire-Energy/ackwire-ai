@@ -14272,6 +14272,11 @@
     "new": "Nuova dashboard",
     "back": "Dashboard",
     "home": "La mia Home",
+    "seeAll": "Vedi tutti",
+    "useOnHome": "Usa nella Home",
+    "stopOnHome": "Togli dalla Home",
+    "onHome": "Nella Home",
+    "onHomeDone": "La Home ora mostra questa dashboard",
     "groups": {
       "workspace": "Spazio di lavoro",
       "workspaceHint": "la vedono tutti",

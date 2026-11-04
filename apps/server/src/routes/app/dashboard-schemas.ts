@@ -127,8 +127,21 @@ export const DashboardList = z
   .object({
     home: DashboardSummary.nullable().openapi({ description: "The caller's home board; null until first opened." }),
     dashboards: z.array(DashboardSummary),
+    homeDashboardId: z
+      .string()
+      .nullable()
+      .openapi({ description: "The board Início shows instead of the caller's own home; null = their own." }),
   })
   .openapi("DashboardList");
+
+export const HomeChoice = z
+  .object({
+    homeDashboardId: z
+      .uuid()
+      .nullable()
+      .openapi({ description: "A board the caller sees, shown on their Início; null = their own home board." }),
+  })
+  .openapi("HomeChoice");
 
 export const Widget = z
   .object({

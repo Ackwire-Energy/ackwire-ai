@@ -14597,6 +14597,11 @@
     "new": "Nowy dashboard",
     "back": "Dashboardy",
     "home": "Mój Start",
+    "seeAll": "Zobacz wszystkie",
+    "useOnHome": "Pokaż na Starcie",
+    "stopOnHome": "Usuń ze Startu",
+    "onHome": "Na Starcie",
+    "onHomeDone": "Start pokazuje teraz ten pulpit",
     "groups": {
       "workspace": "Przestrzeń robocza",
       "workspaceHint": "widzą wszyscy",

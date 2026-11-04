@@ -13858,6 +13858,11 @@
     "new": "Nieuw dashboard",
     "back": "Dashboards",
     "home": "Mijn start",
+    "seeAll": "Alles bekijken",
+    "useOnHome": "Op Start tonen",
+    "stopOnHome": "Van Start halen",
+    "onHome": "Op Start",
+    "onHomeDone": "Start toont nu dit dashboard",
     "groups": {
       "workspace": "Werkruimte",
       "workspaceHint": "iedereen ziet het",

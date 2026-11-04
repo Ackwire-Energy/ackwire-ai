@@ -1793,9 +1793,6 @@
   },
   "dashboards": {
     "homeRow": "Solo tu · i tuoi widget",
-    "count_one": "{{count}} dashboard",
-    "count_many": "{{count}} dashboard",
-    "count_other": "{{count}} dashboard",
     "loadFailed": "Impossibile caricare le dashboard.",
     "onlyHome": "Le dashboard dello spazio di lavoro o dei tuoi ruoli compaiono qui.",
     "create": "Crea",

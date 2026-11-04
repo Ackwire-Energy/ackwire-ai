@@ -75,7 +75,8 @@ import {
   type WidgetView,
 } from "./types";
 
-const { dashboards, dashboardWidgets, dashboardWidgetUpdates, agents, users, routines, orgRoles } = schema;
+const { dashboards, dashboardWidgets, dashboardWidgetUpdates, agents, users, routines, orgRoles, organizationMembers } =
+  schema;
 
 /**
  * Boards and widgets for people (ADR 0135): the HTTP layer's calls, each checking who may (`access.ts`), and the
@@ -525,7 +526,41 @@ export async function listDashboards(deps: DashboardDeps, actorId: string, orgId
   );
   const views = await summarize(deps.db, rows, viewer, widgets);
   const home = views.find((v) => v.kind === "home" && v.ownerUserId === actorId) ?? null;
-  return { home, dashboards: views.filter((v) => v.kind === "board").sort(byListOrder) };
+  const boards = views.filter((v) => v.kind === "board").sort(byListOrder);
+  // The board chosen for Início counts only while the person still sees it; else Início shows their own.
+  const chosen = await homeChoiceOf(deps.db, orgId, actorId);
+  return { home, dashboards: boards, homeDashboardId: boards.some((b) => b.id === chosen) ? chosen : null };
+}
+
+async function homeChoiceOf(db: Executor, orgId: string, userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ id: organizationMembers.homeDashboardId })
+    .from(organizationMembers)
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+  return row?.id ?? null;
+}
+
+/**
+ * "Use on Home" (ADR 0135 §18): Início shows this board's widgets instead of the person's own home board, for them
+ * only; null goes back to their own. Any board they see may be chosen (seeing is enough: Início only shows it).
+ */
+export async function setHomeDashboard(
+  deps: DashboardDeps,
+  actorId: string,
+  orgId: string,
+  dashboardId: string | null,
+): Promise<{ homeDashboardId: string | null }> {
+  if (dashboardId !== null) {
+    const { board } = await requireDashboard(deps.db, actorId, orgId, dashboardId, "see");
+    if (board.kind !== "board") throw new ValidationError("Your home is already Início", DASHBOARD_ERRORS.homeFixed);
+  } else {
+    await requireActiveMembership(deps.db, actorId, orgId);
+  }
+  await deps.db
+    .update(organizationMembers)
+    .set({ homeDashboardId: dashboardId })
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, actorId)));
+  return { homeDashboardId: dashboardId };
 }
 
 export async function getDashboard(

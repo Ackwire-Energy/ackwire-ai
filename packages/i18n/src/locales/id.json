@@ -13320,6 +13320,11 @@
     "new": "Dasbor baru",
     "back": "Dasbor",
     "home": "Berandaku",
+    "seeAll": "Lihat semua",
+    "useOnHome": "Pakai di Beranda",
+    "stopOnHome": "Hapus dari Beranda",
+    "onHome": "Di Beranda",
+    "onHomeDone": "Beranda kini menampilkan dasbor ini",
     "groups": {
       "workspace": "Ruang kerja",
       "workspaceHint": "semua orang melihat",

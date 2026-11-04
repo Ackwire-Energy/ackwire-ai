@@ -32583,6 +32583,21 @@
   "dashboards.home": {
     "value": "My Home"
   },
+  "dashboards.seeAll": {
+    "value": "See all"
+  },
+  "dashboards.useOnHome": {
+    "value": "Use on Home"
+  },
+  "dashboards.stopOnHome": {
+    "value": "Remove from Home"
+  },
+  "dashboards.onHome": {
+    "value": "On Home"
+  },
+  "dashboards.onHomeDone": {
+    "value": "Home now shows this dashboard"
+  },
   "dashboards.groups.workspace": {
     "value": "Workspace"
   },

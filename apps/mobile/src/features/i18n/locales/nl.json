@@ -1707,8 +1707,6 @@
   },
   "dashboards": {
     "homeRow": "Alleen jij · je eigen widgets",
-    "count_one": "{{count}} dashboard",
-    "count_other": "{{count}} dashboards",
     "loadFailed": "De dashboards konden niet worden geladen.",
     "onlyHome": "Dashboards van de werkruimte of jouw rollen verschijnen hier.",
     "create": "Maken",
