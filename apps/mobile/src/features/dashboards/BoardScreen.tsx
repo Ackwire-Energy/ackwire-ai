@@ -1,10 +1,9 @@
-import { busyWidgets, type Widget } from "@agenteschat/client";
+import { busyWidgets } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, RefreshControl, StyleSheet, View } from "react-native";
 import { Button, IconButton, Text, useTheme } from "@/ui";
-import { widgetHref } from "../links/logic";
 import { usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { PushedHeader } from "../shared/parts";
@@ -13,7 +12,7 @@ import { useBoard } from "./hooks";
 import { HOME, phoneRows, widgetsInOrder } from "./logic";
 import { useBoardMenu } from "./menu";
 import { AudienceLine, ProposalBanner, useBoardByline } from "./parts";
-import { WidgetCard } from "./WidgetView";
+import { WidgetPeek } from "./WidgetPeek";
 
 /** While a widget is being built or updated, the board is asked again this often (events usually come first). */
 const BUSY_POLL_MS = 15_000;
@@ -75,7 +74,6 @@ function Board({ id }: { id: string }) {
   const share = () => router.push(`/board-share/${board.id}`);
   const widgets = widgetsInOrder(board.widgets);
   const rows = phoneRows(widgets.map((w) => ({ w: w.layout.w, widget: w })));
-  const open = (w: Widget) => router.push(widgetHref(w.id));
   return (
     <PushedLargeTitle
       title={title}
@@ -123,20 +121,7 @@ function Board({ id }: { id: string }) {
               <View key={items.map((x) => x.widget.id).join("+")} style={styles.row}>
                 {items.map(({ widget: w }) => (
                   <View key={w.id} style={items.length === 1 && w.layout.w < 2 ? styles.half : styles.cell}>
-                    <WidgetCard
-                      widget={{
-                        title: w.title,
-                        kind: w.kind,
-                        spec: w.spec,
-                        status: w.status,
-                        agentId: w.agentId,
-                        refreshedAt: w.refreshedAt,
-                        schedule: w.schedule,
-                        w: w.layout.w,
-                        h: w.layout.h,
-                      }}
-                      onPress={() => open(w)}
-                    />
+                    <WidgetPeek widget={w} canEdit={board.canEdit} board={{ id: home ? HOME : board.id, home }} />
                   </View>
                 ))}
               </View>
