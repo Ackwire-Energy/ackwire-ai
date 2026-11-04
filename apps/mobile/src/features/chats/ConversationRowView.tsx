@@ -234,8 +234,10 @@ export const ConversationRowView = memo(function ConversationRowView({
   };
   const holds = Boolean(onHold && r.kind === "channel");
   // iOS's own long press: the conversation itself in the system preview (tapping it opens it), and the row's menu
-  // ("Move to…") under it. An agent with no conversation yet, and Android, keep the plain press.
-  const peeks = Platform.OS === "ios" && href !== null && !starts;
+  // ("Move to…") under it. An agent with no conversation yet peeks at its profile instead, with "Talk" in the menu;
+  // a tap on its row still starts the conversation. Android keeps the plain press.
+  const peekHref = starts && r.kind === "dm" ? (`/agent/${r.with.id}` as const) : href;
+  const peeks = Platform.OS === "ios" && peekHref !== null;
   const a11y = [
     name,
     meta ?? null,
@@ -284,13 +286,21 @@ export const ConversationRowView = memo(function ConversationRowView({
       trailing={badge > 0 ? <Count value={badge} max={99} inverted /> : null}
     />
   );
-  if (!peeks || !href) return row(open);
+  if (!peeks || !peekHref) return row(open);
   return (
-    <Link href={href} asChild>
+    <Link href={peekHref} asChild>
       <Link.Trigger>
-        <RowTrigger row={row} onOpen={onOpen} />
+        {/* A row that starts a conversation keeps its own press; the link only serves its preview. */}
+        <RowTrigger row={row} onOpen={onOpen} own={starts ? open : undefined} />
       </Link.Trigger>
       <Link.Preview />
+      {starts ? (
+        <Link.Menu>
+          <Link.MenuAction icon="bubble.left" onPress={open}>
+            {t("mobile.agent.talk")}
+          </Link.MenuAction>
+        </Link.Menu>
+      ) : null}
       {holds && onHold ? (
         <Link.Menu>
           <Link.MenuAction icon="folder" onPress={() => onHold(r.channelId)}>
@@ -302,20 +312,28 @@ export const ConversationRowView = memo(function ConversationRowView({
   );
 });
 
-/** The row under the link's trigger: the link's press opens the conversation, after the row's own `onOpen`. */
+/**
+ * The row under the link's trigger: the link's press opens the conversation, after the row's own `onOpen`; `own`
+ * replaces it (a row that starts a conversation, whose link is only its preview).
+ */
 function RowTrigger({
   row,
   onOpen,
+  own,
   onPress,
 }: {
   row: (press: () => void) => ReactNode;
   onOpen?: (() => void) | undefined;
+  own?: (() => void) | undefined;
   onPress?: () => void;
 }) {
-  return row(() => {
-    onOpen?.();
-    onPress?.();
-  });
+  return row(
+    own ??
+      (() => {
+        onOpen?.();
+        onPress?.();
+      }),
+  );
 }
 
 const styles = StyleSheet.create({

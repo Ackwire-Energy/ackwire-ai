@@ -1660,7 +1660,9 @@ function Chat({
   const bottomPad = Math.max(insets.bottom, 10);
   // The header floats over the conversation (glass on iOS 26, a blur before; round plates on Android), which
   // fades under it.
-  const headerHeight = useHeaderHeight();
+  // Peeked at from the list (iOS's long press): no bar over it and no composer, so no room for either.
+  const barHeight = useHeaderHeight();
+  const headerHeight = peeking ? 0 : barHeight;
   const lift = Math.max(0, bottomPad - KEYBOARD_GAP);
   const showList = !loading && !(rows.length === 0 && runs.length === 0);
   // The conversation starts below the clear bar by our own padding, on both platforms (the pinned card, when there
@@ -1936,91 +1938,93 @@ function Chat({
               style={[styles.topFade, { height: headerHeight + 28 }]}
             />
           ) : null}
-          <KeyboardStickyView offset={{ opened: lift }} style={styles.composerDock}>
-            <View
-              ref={composerRef}
-              onLayout={onComposerBoxLayout}
-              style={[styles.composer, { paddingBottom: bottomPad }]}
-            >
-              {/* The conversation fades under the box: no hard edge above it. */}
-              <LinearGradient
-                pointerEvents="none"
-                colors={[withOpacity(c.bg, 0), withOpacity(c.bg, 0.9), c.bg]}
-                locations={[0, 0.3, 1]}
-                style={StyleSheet.absoluteFill}
-              />
-              <Connection status={realtime} />
-              {banner ? <NoAiBanner banner={banner} /> : null}
-              {/* Who is working, right above the composer (as on the web), while they work; a request waiting out
-                  of view takes the line, with "Ver" (and the working line's stop while one agent works). */}
-              {member && awayAsk ? (
-                <AskBar
-                  away={awayAsk}
-                  onSee={seeAsk}
-                  runs={runs}
-                  consults={lineConsults}
-                  canStop={canStop}
-                  onStop={stopRun}
-                  sight={sight}
+          {peeking ? null : (
+            <KeyboardStickyView offset={{ opened: lift }} style={styles.composerDock}>
+              <View
+                ref={composerRef}
+                onLayout={onComposerBoxLayout}
+                style={[styles.composer, { paddingBottom: bottomPad }]}
+              >
+                {/* The conversation fades under the box: no hard edge above it. */}
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={[withOpacity(c.bg, 0), withOpacity(c.bg, 0.9), c.bg]}
+                  locations={[0, 0.3, 1]}
+                  style={StyleSheet.absoluteFill}
                 />
-              ) : null}
-              {member && !awayAsk ? (
-                <WorkingLine
-                  runs={runs}
-                  consults={lineConsults}
-                  typing={typing}
-                  canStop={canStop}
-                  onStop={stopRun}
-                  onOpenBrowser={(agentId) => {
-                    // The agent's browser card opens in the conversation (at the end), not another screen.
-                    toggleBrowser(agentId, true);
-                    toEnd();
-                  }}
-                  sight={sight}
-                  onSee={seeRun}
-                />
-              ) : null}
-              {member && dmAgent && !canTalk(dmAgent) ? (
-                <AgentLocked agent={dmAgent} />
-              ) : member && channel?.can?.post === false ? (
-                // The channel's exceptions keep me from sending here (ADR 0134): reading stays open.
-                <Text variant="footnote" tone="muted" style={styles.readOnly}>
-                  {t("channel.perms.readOnlyComposer")}
-                </Text>
-              ) : member ? (
-                <Composer
-                  placeholder={placeholder}
-                  onSend={onSend}
-                  working={working}
-                  onPlus={() => sheet.open(<PlusActions onPick={(p) => void onPlus(p)} />)}
-                  media={mediaTabs.length > 0 ? { label: t("media.picker.send"), onPress: openMedia } : null}
-                  inputNativeID={COMPOSER_INPUT_ID}
-                  {...(suggestions.length > 0 ? { suggestions } : {})}
-                  {...(dmAgentId && !isThread ? { face: <AgentFace agentId={dmAgentId} size={22} /> } : {})}
-                  mentionAt={refQuery}
-                  insertMention={insertRef}
-                  prefill={prefill}
-                  mention={({ query, sigil, pick }) =>
-                    sigil === "#" ? (
-                      <ChannelPicker query={query} pick={pick} />
-                    ) : (
-                      <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
-                    )
-                  }
-                  onType={(text) => sendTyping(threadId, text)}
-                  voice={voice}
-                />
-              ) : (
-                <Button
-                  variant="primary"
-                  wide
-                  label={t("mobile.chat.join")}
-                  disabled={join.isPending}
-                  onPress={() => join.mutate()}
-                />
-              )}
-            </View>
-          </KeyboardStickyView>
+                <Connection status={realtime} />
+                {banner ? <NoAiBanner banner={banner} /> : null}
+                {/* Who is working, right above the composer (as on the web), while they work; a request waiting out
+                    of view takes the line, with "Ver" (and the working line's stop while one agent works). */}
+                {member && awayAsk ? (
+                  <AskBar
+                    away={awayAsk}
+                    onSee={seeAsk}
+                    runs={runs}
+                    consults={lineConsults}
+                    canStop={canStop}
+                    onStop={stopRun}
+                    sight={sight}
+                  />
+                ) : null}
+                {member && !awayAsk ? (
+                  <WorkingLine
+                    runs={runs}
+                    consults={lineConsults}
+                    typing={typing}
+                    canStop={canStop}
+                    onStop={stopRun}
+                    onOpenBrowser={(agentId) => {
+                      // The agent's browser card opens in the conversation (at the end), not another screen.
+                      toggleBrowser(agentId, true);
+                      toEnd();
+                    }}
+                    sight={sight}
+                    onSee={seeRun}
+                  />
+                ) : null}
+                {member && dmAgent && !canTalk(dmAgent) ? (
+                  <AgentLocked agent={dmAgent} />
+                ) : member && channel?.can?.post === false ? (
+                  // The channel's exceptions keep me from sending here (ADR 0134): reading stays open.
+                  <Text variant="footnote" tone="muted" style={styles.readOnly}>
+                    {t("channel.perms.readOnlyComposer")}
+                  </Text>
+                ) : member ? (
+                  <Composer
+                    placeholder={placeholder}
+                    onSend={onSend}
+                    working={working}
+                    onPlus={() => sheet.open(<PlusActions onPick={(p) => void onPlus(p)} />)}
+                    media={mediaTabs.length > 0 ? { label: t("media.picker.send"), onPress: openMedia } : null}
+                    inputNativeID={COMPOSER_INPUT_ID}
+                    {...(suggestions.length > 0 ? { suggestions } : {})}
+                    {...(dmAgentId && !isThread ? { face: <AgentFace agentId={dmAgentId} size={22} /> } : {})}
+                    mentionAt={refQuery}
+                    insertMention={insertRef}
+                    prefill={prefill}
+                    mention={({ query, sigil, pick }) =>
+                      sigil === "#" ? (
+                        <ChannelPicker query={query} pick={pick} />
+                      ) : (
+                        <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
+                      )
+                    }
+                    onType={(text) => sendTyping(threadId, text)}
+                    voice={voice}
+                  />
+                ) : (
+                  <Button
+                    variant="primary"
+                    wide
+                    label={t("mobile.chat.join")}
+                    disabled={join.isPending}
+                    onPress={() => join.mutate()}
+                  />
+                )}
+              </View>
+            </KeyboardStickyView>
+          )}
         </KeyboardGestureArea>
       </View>
     </AskStoreProvider>
