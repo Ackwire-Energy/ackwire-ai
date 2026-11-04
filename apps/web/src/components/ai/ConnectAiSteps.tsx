@@ -163,12 +163,15 @@ export function AiPicker({
   dims,
   panel,
   have,
+  choices = PLAN_CHOICES,
 }: {
   choice: AiChoice | null;
   onPick: (choice: AiChoice) => void;
   dims?: (choice: PlanChoice) => boolean;
   panel: ReactNode;
   have?: (panel: ReactNode) => ReactNode;
+  /** The plans offered (the team's right hand: `RIGHT_HAND_PLAN_CHOICES`). */
+  choices?: readonly PlanChoice[];
 }) {
   const { t } = useTranslation();
   return (
@@ -176,7 +179,7 @@ export function AiPicker({
       {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
       <div className="grid-options grid-options--plans" role="group" aria-label={t("onboarding.keyStep.title")}>
         {have?.(choice === null && panel)}
-        {PLAN_CHOICES.map((c) => (
+        {choices.map((c) => (
           <OptionCard key={c} pressed={choice === c} onClick={() => onPick(c)}>
             <ProviderLogo id={planMark(c)} size="sm" off={dims?.(c)} />
             <span className="ac-option__title">{planLabel(t, c)}</span>

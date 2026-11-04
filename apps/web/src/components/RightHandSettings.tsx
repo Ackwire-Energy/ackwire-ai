@@ -1,5 +1,13 @@
 import type { Agent } from "@agenteschat/client";
-import { useCredentials, useModels, usePlatformKey, useUpdateAgent } from "@agenteschat/client";
+import {
+  keys,
+  useAgentBrain,
+  useApi,
+  useCredentials,
+  useModels,
+  usePlatformKey,
+  useUpdateAgent,
+} from "@agenteschat/client";
 import { audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -8,12 +16,15 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { AUTO, modelChoices } from "@agenteschat/client/lib/providers";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { AffixInput, Button, Card, CardFooter, CardHeader, Dialog, Input } from "@agenteschat/ui";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { LookRows, ModelSelect, modelOptions } from "@/components/AgentFields";
+import { PlanReplies } from "@/components/ai/PlanReplies";
+import { useConnectAi } from "@/components/ConnectAi";
 import { PrefRow } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -45,6 +56,16 @@ function RightHandForm({ agent }: { agent: Agent }) {
   const [look, setLook] = useState(() => fullLook(lookOf(agent)));
   const g = agentGrammar(agent.name);
   const label = t("rightHand.label");
+  const api = useApi();
+  const qc = useQueryClient();
+  const connect = useConnectAi();
+  const dir = useDirectory(org.id);
+  // On a plan (ADR 0137 §1): whose, and whether other people's DMs think with it.
+  const onPlan = agent.brain?.kind === "claude_code";
+  const view = useAgentBrain(org.id, agent.id, onPlan).data;
+  const planAccount = view?.accounts.find((a) => a.id === view.account)?.label;
+  const ownerId = view?.accounts.find((a) => a.id === view.account)?.ownerId;
+  const planOwner = ownerId ? dir.memberById.get(ownerId)?.name.split(" ")[0] : undefined;
   const save = (patch: Parameters<typeof update.mutate>[0], onSuccess?: () => void) =>
     update.mutate(patch, { onSuccess, onError: (e) => toast.show(errorText(t, e), "error") });
   const rename = () => {
@@ -94,23 +115,61 @@ function RightHandForm({ agent }: { agent: Agent }) {
             id="rh-ai"
             icon="bulb"
             label={t("rightHand.settings.ai")}
-            help={t("rightHand.settings.aiHelp")}
+            help={t(onPlan ? "rightHand.settings.planHelp" : "rightHand.settings.aiHelp")}
             control={
-              <ModelSelect
-                className="rh-set__model"
-                aria-label={t("rightHand.settings.ai")}
-                value={agent.model}
-                onChange={(model) => model !== agent.model && save({ model })}
-                options={[
-                  { value: AUTO, label: t("brain.auto.label"), description: t("brain.auto.hint") },
-                  ...(agent.model === AUTO || list.some((o) => o.value === agent.model)
-                    ? []
-                    : [{ value: agent.model, label: agent.model }]),
-                  ...list,
-                ]}
-              />
+              onPlan ? (
+                <span className="rh-set__plan">
+                  <span>{t("rightHand.settings.onPlan", { account: planAccount ?? "Claude" })}</span>
+                  <Button size="sm" onClick={() => connect?.open({ agentId: agent.id })}>
+                    {t("rightHand.settings.change")}
+                  </Button>
+                </span>
+              ) : (
+                <ModelSelect
+                  className="rh-set__model"
+                  aria-label={t("rightHand.settings.ai")}
+                  value={agent.model}
+                  onChange={(model) => model !== agent.model && save({ model })}
+                  options={[
+                    { value: AUTO, label: t("brain.auto.label"), description: t("brain.auto.hint") },
+                    ...(agent.model === AUTO || list.some((o) => o.value === agent.model)
+                      ? []
+                      : [{ value: agent.model, label: agent.model }]),
+                    ...list,
+                  ]}
+                />
+              )
             }
           />
+          {!onPlan && connect && (
+            <PrefRow
+              id="rh-plan"
+              icon="plug"
+              label={t("rightHand.settings.plan")}
+              help={t("rightHand.settings.planOffer", g)}
+              control={
+                <Button size="sm" onClick={() => connect.open({ agentId: agent.id, plan: "claude" })}>
+                  {t("rightHand.settings.usePlan")}
+                </Button>
+              }
+            />
+          )}
+          {onPlan && view && (
+            <PlanReplies
+              agent={agent.name}
+              owner={view.canUsePlans ? undefined : (planOwner ?? undefined)}
+              on={!view.onlyOwner}
+              onChange={(on) =>
+                void api.agents
+                  .setBrain(org.id, agent.id, { onlyOwner: !on })
+                  .then(() => qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, agent.id) }))
+                  .catch((e) => toast.show(errorText(t, e), "error"))
+              }
+              // Only the plan's owner lets other people's DMs think with it.
+              disabled={!view.canUsePlans}
+              brain="claude_code"
+            />
+          )}
           <PrefRow
             id="rh-budget"
             icon="wallet"

@@ -8,6 +8,7 @@ import {
   brainTopic,
   CONTEXT_LIMIT_PROTOCOL,
   CONVERSATION_PROTOCOL,
+  LOCKED_BRAIN_PROTOCOL,
   type PubSub,
   parseBrainEvent,
   STEER_PROTOCOL,
@@ -373,6 +374,17 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           Promise.resolve(deps.personalMcp?.(turn) ?? false),
         ]);
         const permissions = await deps.permissions?.(turn);
+        // The team's right hand on a plan (ADR 0137 §4): only a runner that locks the CLI down to our tools gets it,
+        // in its own empty folder, with no checkout and none of the owner's servers.
+        const chat = permissions?.mode === "chat";
+        if (chat && (status?.protocol ?? 0) < LOCKED_BRAIN_PROTOCOL) {
+          yield err(
+            "runner_outdated",
+            "The runner on the computer is too old to keep Claude Code to the right hand's tools. Update it.",
+            true,
+          );
+          return;
+        }
         // An older runner's `plan` lets the CLI read secrets and loads the project's settings files: the
         // turn waits for an updated runner instead of reading with more power than asked for (§3).
         if (permissions?.mode === "plan" && (status?.protocol ?? 0) < BRAIN_PROFILES_PROTOCOL) {
@@ -383,7 +395,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           );
           return;
         }
-        const code = await (turn.code ?? deps.prepare?.(turn, io.signal))?.catch(() => null);
+        const code = chat ? null : await (turn.code ?? deps.prepare?.(turn, io.signal))?.catch(() => null);
         // A runner that takes the conversation apart reads it at the start of the session: the system text stays the
         // agent's, the same in each of its conversations (and its cached prefix with it).
         const apart = (status?.protocol ?? 0) >= CONVERSATION_PROTOCOL;
@@ -398,7 +410,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           prompt: computerPrompt(turn, code?.start),
           mcp: { token: deps.mcpToken?.(turn) ?? randomBytes(24).toString("base64url") },
           keepAlive: deps.keepAlive !== false,
-          personalMcp,
+          personalMcp: personalMcp && !chat,
           ...(permissions ? { permissions } : {}),
           ...accountFields(status?.protocol, turn),
           ...contextFields(status?.protocol, turn),

@@ -1124,6 +1124,32 @@ export function missionFolderRules(missionFolder: string | undefined, tools: rea
 }
 
 /**
+ * A `chat` turn's deny list (protocol 41): every tool of Claude Code's own that reaches the computer, the web or other
+ * agents, on top of `--tools ""` that lists none of them. Names a version doesn't know are ignored by it.
+ */
+export const CHAT_DENIED_TOOLS = [
+  "Bash",
+  "PowerShell",
+  "BashOutput",
+  "KillShell",
+  "Monitor",
+  "Read",
+  "Edit",
+  "MultiEdit",
+  "Write",
+  "NotebookEdit",
+  "Glob",
+  "Grep",
+  "LS",
+  "WebFetch",
+  "WebSearch",
+  "Task",
+  "Agent",
+  "Skill",
+  "SlashCommand",
+] as const;
+
+/**
  * Denied in every profile (Claude Code checks deny rules before allow rules):
  * the deny list, credential stores (shell and read tools) and code given
  * inline to an interpreter, which `Bash(node *)`, `Bash(python3 *)` would
@@ -1151,7 +1177,7 @@ const PLAN_DENY = ["Edit", "Write", "NotebookEdit"];
  * rules), so the prompt tool reads where it goes.
  */
 export function claudePermissionSettings(
-  mode: "plan" | "work",
+  mode: "plan" | "work" | "chat",
   missionAllow: string[] = [],
   /** An item's mission folder when it runs elsewhere (its worktree or subfolder). */
   missionFolder?: string,
@@ -1168,6 +1194,12 @@ export function claudePermissionSettings(
   const shellReads = opts.promptReads ? [] : readOnlyShell();
   const home = opts.runnerHome?.startsWith("/") && !opts.runnerHome.includes("*") ? opts.runnerHome : null;
   const homeDeny = home ? [`Read(/${home}/**)`, `Bash(*${home}/*)`] : [];
+  // The team's right hand on a person's plan (protocol 41): our tools only, every tool of Claude Code's own refused.
+  if (mode === "chat") {
+    return {
+      permissions: { allow: ["mcp__agentes"], deny: [...CHAT_DENIED_TOOLS, ...ALWAYS_DENY_RULES, ...homeDeny] },
+    };
+  }
   if (mode === "plan") {
     return {
       permissions: {

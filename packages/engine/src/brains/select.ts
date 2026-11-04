@@ -14,6 +14,7 @@ import type { Agent } from "../agents";
 import type { MachineStatus } from "../machine-hub";
 import { pausedMessage } from "../machines";
 import { missionTurnFor } from "../missions-engine";
+import { isRightHand, rightHandPlanRefusal, thinkingAgent } from "../right-hand";
 import type { AgentRun } from "../runs";
 import { accountUnavailable, brainSessionId, claudeCodeAvailability, toolOff } from "./claude-code";
 import { codexVersionOk } from "./codex";
@@ -60,12 +61,13 @@ export async function recordRunBrain(db: Executor, runId: string, kind: BrainKin
 /**
  * Whether a run whose computer brain can't answer may hand the turn to the model brain (ADR 0032 §5).
  * Never a background run (ADR 0053 §6.4): a routine thinks with its agent's own brain and waits quietly
- * for its computer instead; the agent's owner may also turn the fallback off.
+ * for its computer instead; the agent's owner may also turn the fallback off. Never the team's right hand on a
+ * plan (ADR 0137 §7): its DM says why it can't think, with the way to an API key, and nothing runs on a key unasked.
  */
 export const mayFallBack = (
-  agent: Pick<Agent, "brainFallback">,
+  agent: Pick<Agent, "brainFallback"> & { builtin?: string | null },
   run: Pick<AgentRun, "background"> & { workId?: string | null },
-) => !run.background && !run.workId && agent.brainFallback !== false;
+) => !run.background && !run.workId && agent.brainFallback !== false && !isRightHand(agent);
 
 /**
  * Plan limits seen on this process (`limit` events), by machine, brain and account: a cache in front of the
@@ -308,6 +310,7 @@ export const UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   "opencode_missing",
   "plan_limit",
   "plan_not_owner",
+  "plan_not_shared",
 ]);
 
 /**
@@ -561,7 +564,7 @@ export async function resolveBrain(
     db: Executor;
     machines?: { status(machineId: string): Promise<MachineStatus | null> };
   },
-  agent: Agent,
+  given: Agent,
   run: AgentRun,
   conversation: string,
   /**
@@ -571,6 +574,8 @@ export async function resolveBrain(
   options: { fresh?: boolean; now?: Date; promptKey?: string } = {},
 ): Promise<BrainPlan> {
   const mission: MissionTurn | null = await missionTurnFor(deps.db, run).catch(() => null);
+  // The right hand on a plan: that plan's computer and owner (`thinkingAgent`).
+  const agent = await thinkingAgent(deps.db, given);
   const kind = brainFor(agent, run, mission);
   const base = mission ? { missionId: mission.missionId } : {};
   if (kind === "model") return { kind, ...base };
@@ -590,7 +595,8 @@ export async function resolveBrain(
     kind === "claude_code" && model && !isAutoModel(model) ? claudeCodeModel(planOf(account?.provider), model) : model;
   const effort = brainEffortFor(agent, kind);
   const unavailable =
-    machineId && !deps.machines
+    (isRightHand(agent) ? await rightHandPlanRefusal(deps.db, agent, run, status) : null) ??
+    (machineId && !deps.machines
       ? null
       : computerBrainUnavailable(
           kind,
@@ -600,7 +606,7 @@ export async function resolveBrain(
           account,
           machineId ? await planIsOwners(deps.db, agent, machineId, account) : true,
           usage,
-        );
+        ));
   // A mission's main session stays (its decisions, inbox and items point at it): `settingsChanged` brings the edit.
   const settingsChanged =
     mission?.session?.resume && options.promptKey !== undefined

@@ -1666,7 +1666,13 @@
       "audience": "사용할 수 있는 사람",
       "audienceHelp": "대상이 아닌 사람에게는 사이드바에 {{name}}이(가) 보이지 않아요.",
       "lock": "{{name}}은(는) 보관하거나 삭제할 수 없어요. 누군가 말을 걸기 전에는 아무것도 올리지 않아요.",
-      "audit": "{{name}}이(가) 한 일 보기"
+      "audit": "{{name}}이(가) 한 일 보기",
+      "onPlan": "Claude 요금제 · {{account}}",
+      "change": "바꾸기",
+      "planHelp": "비용은 요금제 주인이 내요. 그 컴퓨터를 쓸 수 없으면 대화에서 알려 주고 API 키를 제안해요.",
+      "plan": "요금제",
+      "planOffer": "{{name}}은(는) API 키 대신 내 Claude 요금제로 생각할 수 있어요. 요금제가 로그인된 컴퓨터에서 돌아가고 이 워크스페이스 밖에는 닿지 않아요.",
+      "usePlan": "요금제 쓰기"
     },
     "card": {
       "settings": "{{name}} · 설정",
@@ -1760,6 +1766,12 @@
     "action": "연결",
     "locked": "{{name}}의 AI를 연결할 수 있는 사람: API 키로는 관리자, 자기 요금제로는 {{owner}} 님.",
     "lockedAdmins": "관리자만 AI를 연결할 수 있어요.",
+    "rightHand": {
+      "computer_away": "{{name}}은(는) 지금 답할 수 없어요: 요금제가 로그인된 컴퓨터를 쓸 수 없어요.",
+      "plan_limit": "{{name}}은(는) 지금 답할 수 없어요: 요금제가 한도에 도달했어요.",
+      "plan_not_shared": "{{name}}은(는) 주인에게만 답하는 요금제로 생각해요.",
+      "useKey": "API 키 쓰기"
+    },
     "receipt": "아무도 답하지 않아요: 연결된 AI 없음",
     "chip": "AI 없음"
   },
@@ -11760,6 +11772,9 @@
       "no_ai": "아직 답할 수 없어요: 연결된 AI가 없어요.",
       "no_ai_signed_out": "아직 답할 수 없어요: AI가 로그아웃됐어요.",
       "no_ai_not_signed_in": "아직 답할 수 없어요: 제 컴퓨터에서 {{brain}}에 로그인되어 있지 않아요.",
+      "no_ai_computer_away": "지금은 답할 수 없어요: 내 요금제의 컴퓨터를 쓸 수 없어요.",
+      "no_ai_plan_limit": "지금은 답할 수 없어요: 내가 쓰는 요금제가 한도에 도달했어요.",
+      "no_ai_plan_not_shared": "이 요금제로는 답할 수 없어요: 주인에게만 답해요.",
       "action_connect_ai": "AI 연결",
       "action_connect_app": "{{name}} 연결",
       "action_add_mcp": "MCP 서버 추가",

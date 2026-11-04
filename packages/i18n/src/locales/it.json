@@ -1797,7 +1797,13 @@
       "audience": "Chi può usarlo",
       "audienceHelp": "Fuori dal pubblico, la persona non vede {{name}} nella barra laterale.",
       "lock": "{{name}} non si può archiviare né eliminare. Non pubblica nulla finché nessuno gli parla.",
-      "audit": "Vedi cosa ha fatto {{name}}"
+      "audit": "Vedi cosa ha fatto {{name}}",
+      "onPlan": "Piano Claude · {{account}}",
+      "change": "Cambia",
+      "planHelp": "Paga chi è titolare del piano. Se il suo computer non è disponibile, la conversazione lo dice e propone una chiave API.",
+      "plan": "Un piano",
+      "planOffer": "{{name}} può pensare con il tuo piano Claude invece che con una chiave API, sul computer dove il piano ha l'accesso, senza raggiungere nulla fuori da questo workspace.",
+      "usePlan": "Usa un piano"
     },
     "card": {
       "settings": "{{name}} · Impostazioni",
@@ -1897,6 +1903,12 @@
     "action": "Collega",
     "locked": "Chi collega l'IA di {{name}}: un admin, con una chiave API, oppure {{owner}}, con il proprio piano.",
     "lockedAdmins": "Solo un admin può collegare un'IA.",
+    "rightHand": {
+      "computer_away": "{{name}} non può rispondere ora: il computer del piano non è disponibile.",
+      "plan_limit": "{{name}} non può rispondere ora: il piano ha raggiunto il limite.",
+      "plan_not_shared": "{{name}} pensa con un piano che risponde solo al suo titolare.",
+      "useKey": "Usa una chiave API"
+    },
     "receipt": "Nessuno risponderà: nessuna IA collegata",
     "chip": "Nessuna IA"
   },
@@ -12688,6 +12700,9 @@
       "no_ai": "Non posso ancora rispondere: non ho un'IA collegata.",
       "no_ai_signed_out": "Non posso ancora rispondere: la mia IA è disconnessa.",
       "no_ai_not_signed_in": "Non posso ancora rispondere: {{brain}} non ha effettuato l'accesso sul mio computer.",
+      "no_ai_computer_away": "Ora non posso rispondere: il computer del mio piano non è disponibile.",
+      "no_ai_plan_limit": "Ora non posso rispondere: il piano con cui penso ha raggiunto il limite.",
+      "no_ai_plan_not_shared": "Non posso risponderti con questo piano: risponde solo al suo titolare.",
       "action_connect_ai": "Collega un'IA",
       "action_connect_app": "Collega {{name}}",
       "action_add_mcp": "Aggiungi un server MCP",

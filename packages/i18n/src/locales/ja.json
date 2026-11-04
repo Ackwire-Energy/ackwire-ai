@@ -1666,7 +1666,13 @@
       "audience": "使える人",
       "audienceHelp": "対象外の人には、サイドバーに{{name}}が表示されません。",
       "lock": "{{name}}はアーカイブも削除もできません。誰かが話しかけない限り、何も投稿しません。",
-      "audit": "{{name}}がしたことを見る"
+      "audit": "{{name}}がしたことを見る",
+      "onPlan": "Claudeのプラン · {{account}}",
+      "change": "変更",
+      "planHelp": "料金はプランの持ち主が払います。そのコンピューターが使えないときは、会話でそう伝え、APIキーを提案します。",
+      "plan": "プラン",
+      "planOffer": "{{name}}はAPIキーの代わりにあなたのClaudeのプランで考えられます。プランがログインしているコンピューターで動き、このワークスペースの外には届きません。",
+      "usePlan": "プランを使う"
     },
     "card": {
       "settings": "{{name}} · 設定",
@@ -1762,6 +1768,12 @@
     "action": "接続",
     "locked": "{{name}}のAIを接続できるのは、APIキーを使う管理者か、自分のプランを使う{{owner}}です。",
     "lockedAdmins": "AIを接続できるのは管理者だけです。",
+    "rightHand": {
+      "computer_away": "{{name}}は今は返信できません。プランのコンピューターが使えません。",
+      "plan_limit": "{{name}}は今は返信できません。プランが上限に達しました。",
+      "plan_not_shared": "{{name}}は持ち主にだけ返信するプランで考えています。",
+      "useKey": "APIキーを使う"
+    },
     "receipt": "誰も返信しません: AIが接続されていません",
     "chip": "AIなし"
   },
@@ -11769,6 +11781,9 @@
       "no_ai": "まだ返信できません。AIが接続されていません。",
       "no_ai_signed_out": "まだ返信できません。AIがログアウトされています。",
       "no_ai_not_signed_in": "まだ返信できません。私のコンピューターで{{brain}}にログインしていません。",
+      "no_ai_computer_away": "今は返信できません。私のプランのコンピューターが使えません。",
+      "no_ai_plan_limit": "今は返信できません。私が使っているプランが上限に達しました。",
+      "no_ai_plan_not_shared": "このプランではあなたに返信できません。持ち主にだけ返信するプランです。",
       "action_connect_ai": "AIを接続",
       "action_connect_app": "{{name}}を接続",
       "action_add_mcp": "MCPサーバーを追加",

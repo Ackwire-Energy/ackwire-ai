@@ -1801,7 +1801,13 @@
       "audience": "Qui peut l’utiliser",
       "audienceHelp": "Hors de ce public, la personne ne voit pas {{name}} dans la barre latérale.",
       "lock": "{{name}} ne peut être ni archivé ni supprimé. Il ne publie rien tant que personne ne lui parle.",
-      "audit": "Voir ce que {{name}} a fait"
+      "audit": "Voir ce que {{name}} a fait",
+      "onPlan": "Abonnement Claude · {{account}}",
+      "change": "Changer",
+      "planHelp": "C'est le titulaire de l'abonnement qui paie. Si son ordinateur n'est pas disponible, la conversation le signale et propose une clé API.",
+      "plan": "Un abonnement",
+      "planOffer": "{{name}} peut réfléchir avec votre abonnement Claude au lieu d'une clé API, sur l'ordinateur où l'abonnement est connecté, sans rien atteindre hors de ce workspace.",
+      "usePlan": "Utiliser un abonnement"
     },
     "card": {
       "settings": "{{name}} · Réglages",
@@ -1897,6 +1903,12 @@
     "action": "Connecter",
     "locked": "Qui connecte l'IA de {{name}} : un admin, avec une clé API, ou {{owner}}, avec son propre abonnement.",
     "lockedAdmins": "Seul un admin peut connecter une IA.",
+    "rightHand": {
+      "computer_away": "{{name}} ne peut pas répondre maintenant : l'ordinateur de l'abonnement n'est pas disponible.",
+      "plan_limit": "{{name}} ne peut pas répondre maintenant : l'abonnement a atteint sa limite.",
+      "plan_not_shared": "{{name}} réfléchit avec un abonnement qui ne répond qu'à son titulaire.",
+      "useKey": "Utiliser une clé API"
+    },
     "receipt": "Personne ne répondra : aucune IA connectée",
     "chip": "Sans IA"
   },
@@ -12686,6 +12698,9 @@
       "no_ai": "Je ne peux pas encore répondre : je n'ai aucune IA connectée.",
       "no_ai_signed_out": "Je ne peux pas encore répondre : mon IA est déconnectée.",
       "no_ai_not_signed_in": "Je ne peux pas encore répondre : {{brain}} n'est pas connecté sur mon ordinateur.",
+      "no_ai_computer_away": "Je ne peux pas répondre maintenant : l'ordinateur de mon abonnement n'est pas disponible.",
+      "no_ai_plan_limit": "Je ne peux pas répondre maintenant : l'abonnement avec lequel je réfléchis a atteint sa limite.",
+      "no_ai_plan_not_shared": "Je ne peux pas vous répondre avec cet abonnement : il ne répond qu'à son titulaire.",
       "action_connect_ai": "Connecter une IA",
       "action_connect_app": "Connecter {{name}}",
       "action_add_mcp": "Ajouter un serveur MCP",

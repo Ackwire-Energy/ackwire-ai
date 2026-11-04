@@ -1436,6 +1436,13 @@
       "when": 1793813666011,
       "tag": "0206_right_hand_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 206,
+      "version": "7",
+      "when": 1793823666011,
+      "tag": "0207_right_hand_plans",
+      "breakpoints": true
     }
   ]
 }

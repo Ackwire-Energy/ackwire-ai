@@ -50,6 +50,7 @@ import { ownBranches } from "./command-gate";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import {
+  CHAT_DENIED_TOOLS,
   claudeMcpConfig,
   claudePermissionSettings,
   type McpTaskInfo,
@@ -580,6 +581,8 @@ export interface ClaudeLaunch {
   disallowedTools?: readonly string[];
   /** No `--fallback-model` (a plan's aliases may all be one model). */
   noFallback?: boolean;
+  /** `--disable-slash-commands`: no skills or commands, the computer owner's or the CLI's own. */
+  noSlashCommands?: boolean;
 }
 
 /**
@@ -626,14 +629,34 @@ export function repoInstructions(cwd: string): string {
  * no settings files of the folder or the owner, no edits (the web stays), and every
  * command answered on the computer by `localVerdict` (reads only, never secrets);
  * nothing is ever asked of a person.
+ * `chat` (protocol 41, the team's right hand on a person's plan, ADR 0137 §4): our MCP tools and nothing else. None
+ * of Claude Code's own tools (`--tools ""`, each one denied too), no settings files, skills or slash commands, no
+ * permission prompt (`dontAsk`: whatever isn't allowed is refused), whatever `personalMcp` says.
  */
 export function brainProfileLaunch(
-  mode: "plan" | "work",
+  mode: "plan" | "work" | "chat",
   personalMcp: boolean,
 ): Pick<
   ClaudeLaunch,
-  "strictMcp" | "promptTool" | "permissionMode" | "settingSources" | "builtinTools" | "disallowedTools"
+  | "strictMcp"
+  | "promptTool"
+  | "permissionMode"
+  | "settingSources"
+  | "builtinTools"
+  | "disallowedTools"
+  | "noSlashCommands"
 > {
+  if (mode === "chat") {
+    return {
+      strictMcp: true,
+      promptTool: false,
+      permissionMode: "dontAsk",
+      settingSources: "",
+      builtinTools: [],
+      disallowedTools: CHAT_DENIED_TOOLS,
+      noSlashCommands: true,
+    };
+  }
   if (mode === "plan") {
     return {
       strictMcp: true,
@@ -684,6 +707,7 @@ export function claudeBrainArgs(l: ClaudeLaunch): string[] {
     ...(l.settingSources !== undefined ? ["--setting-sources", l.settingSources] : []),
     ...(l.builtinTools ? ["--tools", l.builtinTools.join(",")] : []),
     ...(l.disallowedTools?.length ? ["--disallowedTools", l.disallowedTools.join(",")] : []),
+    ...(l.noSlashCommands ? ["--disable-slash-commands"] : []),
     l.resume ? "--resume" : "--session-id",
     l.session,
   ];
@@ -1407,7 +1431,8 @@ export class BrainManager {
     if (!SESSION_ID.test(session)) throw new RunnerError("bad_request", "The session must be a UUID");
     if (typeof req.prompt !== "string" || !req.prompt.trim()) throw new RunnerError("bad_request", "Empty prompt");
     let cwd = ctx.folder;
-    if (typeof req.cwd === "string" && req.cwd.trim() !== "") {
+    // A `chat` turn starts in the agent's own folder, whatever the request names.
+    if (req.permissions?.mode !== "chat" && typeof req.cwd === "string" && req.cwd.trim() !== "") {
       const resolved = await resolveForAgent(ctx.folder, ctx.grants, req.cwd);
       if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
       if (!statSync(resolved.abs).isDirectory()) throw new RunnerError("bad_request", `${req.cwd} is not a folder`);
@@ -1659,11 +1684,12 @@ export class BrainManager {
     const dir = path.join(this.opts.root, id);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const systemFile = path.join(dir, "system.txt");
-    const mode = req.permissions?.mode === "plan" ? "plan" : "work";
+    const mode = req.permissions?.mode === "plan" || req.permissions?.mode === "chat" ? req.permissions.mode : "work";
     const launch = brainProfileLaunch(mode, req.personalMcp === true);
     const system = typeof req.system === "string" ? req.system : "";
     const ranKey = ranKeyOf(req, session);
-    const withRepo = launch.settingSources === "";
+    // A `chat` turn reads nothing of the folder, its CLAUDE.md included.
+    const withRepo = launch.settingSources === "" && mode !== "chat";
     const keptSystem = this.keptSystemFile(ctx.agent.id, ranKey, cwd, withRepo);
     // Protocol 40: what holds for the conversation opens the session's first message instead (`turnPrompt`). The
     // checkout's instructions stay at the end of this text, under Claude Code's last cache breakpoint that sessions
@@ -1671,7 +1697,8 @@ export class BrainManager {
     const started = this.sessionSystem(keptSystem, resume, () => (withRepo ? system + repoInstructions(cwd) : system));
     writeFileSync(systemFile, started.text, { mode: 0o600 });
     let mcpConfigFile: string | undefined;
-    const base: NodeJS.ProcessEnv = { ...process.env, ...(ctx.secrets?.env ?? {}) };
+    // A `chat` turn never holds the agent's secrets.
+    const base: NodeJS.ProcessEnv = { ...process.env, ...(mode === "chat" ? {} : (ctx.secrets?.env ?? {})) };
     // ADR 0041: the account's folder is this process's Claude Code home, and nothing else signs it in.
     const env = ctx.accountHome ? accountEnv("claude_code", ctx.accountHome, base) : base;
     const plan = ctx.planKey ? planOf(ctx.planKey.provider) : undefined;
@@ -1695,7 +1722,7 @@ export class BrainManager {
             // Our tools behind Claude Code's ToolSearch, but those it reaches for on its own (`ALWAYS_LOADED`).
             alwaysLoad: false,
             // A plan turn's prompts are answered on the computer (reads only), never asked of anyone.
-            profile: mode,
+            profile: mode === "work" ? "work" : "plan",
             ...(this.opts.runnerHome ? { runnerHome: this.opts.runnerHome } : {}),
             // Its own branches: a push there needs nobody (ADR 0053 §3).
             branches: ownBranches(ctx.agent, missionBranchPrefix(ctx.agent.id, req.permissions?.branchPrefix)),
@@ -1731,17 +1758,17 @@ export class BrainManager {
         // With the owner's own settings loaded (`personalMcp`), theirs decide the computer's own sign-in.
         ...(ctx.accountHome
           ? { env: accountSettingsEnv(plan, model) }
-          : req.personalMcp === true
+          : req.personalMcp === true && mode !== "chat"
             ? {}
             : { env: accountSettingsEnv(undefined, model, process.env, true) }),
       }),
       { mode: 0o600 },
     );
     // Starting in one of its checkouts (`repos/owner/name`), the agent keeps its whole folder (its other checkouts).
-    const addDirs = [
-      ...(cwd !== ctx.folder ? [ctx.folder] : []),
-      ...(ctx.grants ?? []).filter((g) => !isInside(g, cwd)),
-    ];
+    const addDirs =
+      mode === "chat"
+        ? []
+        : [...(cwd !== ctx.folder ? [ctx.folder] : []), ...(ctx.grants ?? []).filter((g) => !isInside(g, cwd))];
     const args = claudeBrainArgs({
       session,
       resume,

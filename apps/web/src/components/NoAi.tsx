@@ -1,6 +1,7 @@
 import type { Message } from "@agenteschat/client";
-import { useAiStatus } from "@agenteschat/client";
+import { useAiStatus, useAuthConfig } from "@agenteschat/client";
 import { withoutApiKeys } from "@agenteschat/client/lib/api-key-text";
+import { billingHoldOf } from "@agenteschat/client/lib/billing";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   aiStateOf,
@@ -8,12 +9,14 @@ import {
   noAiCardOf,
   opensByItself,
   planOfKind,
+  type RightHandPlanLine,
   signInAgainPlan,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Chip, Dialog, DialogFooter, Icon, InfoHint } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { type ConnectAiRequest, useConnectAi } from "@/components/ConnectAi";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -88,6 +91,7 @@ export function NoAiCard({ message }: { message: Message }) {
   const connect = useConnectAi();
   const card = noAiCardOf(message.meta);
   if (!card) return null;
+  if (card.planLine) return <PlanLineCard message={message} agentId={card.agentId} line={card.planLine} />;
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const again = signInAgainPlan(card, agent);
@@ -138,6 +142,51 @@ export function NoAiCard({ message }: { message: Message }) {
         <span>{title}</span>
       </span>
       {action && <span className="waitcard__acts">{action}</span>}
+    </div>
+  );
+}
+
+/**
+ * The team's right hand on a plan that can't think now (ADR 0137 §7): one plain line saying why, with the way to an API
+ * key, and before the workspace's plan is paid, the way to pay. Once it can think again: "Responder agora".
+ */
+function PlanLineCard({ message, agentId, line }: { message: Message; agentId: string; line: RightHandPlanLine }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const status = useAiStatus(org.id);
+  const connect = useConnectAi();
+  const name = dir.agentById.get(agentId)?.name ?? t("channel.unknownAgent");
+  const ready = aiStateOf(status.data, agentId) === "ready" && line === "computer_away";
+  // Before the workspace's plan is paid it has no computer: whoever pays sees the way to.
+  const billingUrl = useAuthConfig().data?.billingUrl;
+  const hold = can(org, "manage_billing") && billingUrl ? billingHoldOf(org.standing) : null;
+  return (
+    <div className="waitcard" data-done={ready || undefined}>
+      <span className="waitcard__top ac-iconline">
+        <Icon name={ready ? "check" : "plug"} size={16} />
+        <span>{ready ? t("noAi.card.connected", { name }) : t(`noAi.rightHand.${line}`, { name })}</span>
+      </span>
+      {connect && (
+        <span className="waitcard__acts">
+          {ready ? (
+            <Button size="sm" variant="primary" onClick={() => connect.answer(message.id)}>
+              {t("noAi.card.answerNow")}
+            </Button>
+          ) : (
+            <>
+              {hold && (
+                <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
+                  {t(`standing.billing.cta.${hold}`)}
+                </BillingLinkButton>
+              )}
+              <Button size="sm" onClick={() => connect.open({ agentId, intent: "api_key", from: message.id })}>
+                {t("noAi.rightHand.useKey")}
+              </Button>
+            </>
+          )}
+        </span>
+      )}
     </div>
   );
 }

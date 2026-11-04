@@ -457,7 +457,17 @@ export function agentRoutes(deps: AppDeps) {
               z.object({
                 agentId: z.uuid(),
                 state: z.enum(["ready", "no_ai", "waiting"]),
-                reason: z.enum(["no_key", "not_signed_in", "no_computer", "cli_missing"]).optional(),
+                reason: z
+                  .enum([
+                    "no_key",
+                    "not_signed_in",
+                    "no_computer",
+                    "cli_missing",
+                    "computer_away",
+                    "plan_limit",
+                    "plan_not_shared",
+                  ])
+                  .optional(),
                 own: z.enum(["claude_code", "codex", "cursor", "opencode"]).optional(),
               }),
             ),

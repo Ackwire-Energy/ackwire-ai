@@ -880,15 +880,18 @@ async function doBrainTurn(
   requireTool(ctx, cli ?? "claude");
   if (!req.agent) throw new RunnerError("bad_request", "A brain turn belongs to an agent");
   const runId = requireString(req.runId, "runId");
+  // A locked-down turn (protocol 41) is Claude Code's alone, and gets neither the agent's secrets nor its folders.
+  const chat = req.permissions?.mode === "chat";
+  if (chat && cli) throw new RunnerError("bad_request", "Only Claude Code takes a chat turn");
   if (cli) return doCodexTurn(ctx, req, scope, runId);
   if (!ctx.brains) throw new RunnerError("bad_request", "This runner runs no brain turns");
   const final = await ctx.brains.turn(req, {
     agent: req.agent,
     folder: ctx.workspaceReal,
-    secrets: secrets ? { env: secrets.env, redact: secrets.redact, hold: secrets.hold } : null,
+    secrets: secrets && !chat ? { env: secrets.env, redact: secrets.redact, hold: secrets.hold } : null,
     signal: scope.signal,
     emit: (event) => scope.emit?.({ type: "brain.event", runId, event }),
-    ...(ctx.grants ? { grants: ctx.grants } : {}),
+    ...(ctx.grants && !chat ? { grants: ctx.grants } : {}),
     ...(ctx.grant ? { grant: ctx.grant } : {}),
   });
   signedOut(ctx, req, final);

@@ -66,6 +66,11 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   const busy = waitNote?.code === "busy";
   const noAi = code === "no_ai" ? (m.noAi as { reason?: unknown; own?: unknown } | undefined) : undefined;
   const signedOut = noAi?.reason === "not_signed_in";
+  // The team's right hand on a plan (ADR 0137 §7): its plan's computer away, its limit, or a plan for its owner only.
+  const planLine =
+    noAi?.reason === "computer_away" || noAi?.reason === "plan_limit" || noAi?.reason === "plan_not_shared"
+      ? `no_ai_${noAi.reason}`
+      : null;
   const own =
     signedOut &&
     (noAi?.own === "codex" || noAi?.own === "claude_code" || noAi?.own === "cursor" || noAi?.own === "opencode")
@@ -131,9 +136,11 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
       : "brain_busy"
     : signedOut
       ? "no_ai_signed_out"
-      : anon
-        ? "secret_requestAnon"
-        : code;
+      : planLine
+        ? planLine
+        : anon
+          ? "secret_requestAnon"
+          : code;
   const key = `chat.body.${shown}`;
   // i18next takes the first key that exists: a body with no `…NoComputer` words keeps its own.
   return t(params.computer && !namesComputer ? [`${key}NoComputer`, key] : key, { ...params, defaultValue: body });

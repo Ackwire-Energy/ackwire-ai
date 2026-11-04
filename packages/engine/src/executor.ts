@@ -199,7 +199,7 @@ import {
   visibleText,
 } from "./reply-policy";
 import { routineCreatorOf, wikiPersonOf } from "./requester";
-import { isRightHand, RIGHT_HAND_AUTO } from "./right-hand";
+import { isRightHand, RIGHT_HAND_AUTO, rightHandNoAiReason } from "./right-hand";
 import { routineBriefOf } from "./routine-brief";
 import { missStaleRoutineRun, routineRunWaitingForComputer, routineRunWaitingForPlan } from "./routine-firing";
 import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
@@ -2593,6 +2593,12 @@ async function executeRunInner(
       });
       if (back === null) return "canceled";
       if (back) return "back";
+    }
+    // The team's right hand on a plan (ADR 0137 §7): one line says why, with the way to an API key; it never stands
+    // in on a key nor waits for the computer. Only waiting its turn for room stays a wait.
+    if (isRightHand(agent) && u.code !== "busy" && !u.queued) {
+      await failNoAi(rightHandNoAiReason(u.code));
+      return "failed";
     }
     // Tools already ran in a turn cut off by its computer: only that computer may finish it (the model
     // brain would redo them), so the run waits for it. A turn the plan cut after it worked parks with no

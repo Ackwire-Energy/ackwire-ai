@@ -1666,7 +1666,13 @@
       "audience": "Siapa yang bisa memakai",
       "audienceHelp": "Di luar itu, orang tidak melihat {{name}} di bilah samping.",
       "lock": "{{name}} tidak bisa diarsipkan atau dihapus. Ia tidak memposting apa pun kalau tak ada yang mengajaknya bicara.",
-      "audit": "Lihat apa yang dilakukan {{name}}"
+      "audit": "Lihat apa yang dilakukan {{name}}",
+      "onPlan": "Paket Claude · {{account}}",
+      "change": "Ubah",
+      "planHelp": "Yang membayar adalah pemilik paket. Saat komputernya tidak tersedia, percakapan memberi tahu dan menawarkan kunci API.",
+      "plan": "Paket",
+      "planOffer": "{{name}} bisa berpikir dengan paket Claude kamu sebagai pengganti kunci API, di komputer tempat paket itu masuk, dan hanya menjangkau workspace ini.",
+      "usePlan": "Pakai paket"
     },
     "card": {
       "settings": "{{name}} · Pengaturan",
@@ -1766,6 +1772,12 @@
     "action": "Hubungkan",
     "locked": "Siapa yang menghubungkan AI {{name}}: admin, dengan kunci API, atau {{owner}}, dengan paketnya sendiri.",
     "lockedAdmins": "Hanya admin yang bisa menghubungkan AI.",
+    "rightHand": {
+      "computer_away": "{{name}} tidak bisa menjawab sekarang: komputer paketnya sedang tidak tersedia.",
+      "plan_limit": "{{name}} tidak bisa menjawab sekarang: paketnya sudah mencapai batas.",
+      "plan_not_shared": "{{name}} berpikir dengan paket yang hanya menjawab pemiliknya.",
+      "useKey": "Pakai kunci API"
+    },
     "receipt": "Tidak ada yang akan menjawab: belum ada AI yang terhubung",
     "chip": "Tanpa AI"
   },
@@ -11835,6 +11847,9 @@
       "no_ai": "Aku belum bisa menjawab: aku belum punya AI yang terhubung.",
       "no_ai_signed_out": "Aku belum bisa menjawab: AI-ku sudah keluar.",
       "no_ai_not_signed_in": "Aku belum bisa menjawab: {{brain}} belum masuk di komputerku.",
+      "no_ai_computer_away": "Aku tidak bisa menjawab sekarang: komputer paketku sedang tidak tersedia.",
+      "no_ai_plan_limit": "Aku tidak bisa menjawab sekarang: paket yang kupakai untuk berpikir sudah mencapai batas.",
+      "no_ai_plan_not_shared": "Aku tidak bisa menjawabmu lewat paket ini: paket ini hanya menjawab pemiliknya.",
       "action_connect_ai": "Hubungkan AI",
       "action_connect_app": "Hubungkan {{name}}",
       "action_add_mcp": "Tambah server MCP",

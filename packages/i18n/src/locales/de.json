@@ -1733,7 +1733,13 @@
       "audience": "Wer es nutzen darf",
       "audienceHelp": "Wer nicht dazugehört, sieht {{name}} nicht in der Seitenleiste.",
       "lock": "{{name}} kann weder archiviert noch gelöscht werden. Er postet nichts, solange niemand mit ihm spricht.",
-      "audit": "Ansehen, was {{name}} getan hat"
+      "audit": "Ansehen, was {{name}} getan hat",
+      "onPlan": "Claude-Abo · {{account}}",
+      "change": "Ändern",
+      "planHelp": "Es zahlt, wem das Abo gehört. Ist sein Computer nicht erreichbar, sagt die Unterhaltung das und bietet einen API-Schlüssel an.",
+      "plan": "Ein Abo",
+      "planOffer": "{{name}} kann statt mit einem API-Schlüssel mit deinem Claude-Abo denken, auf dem Computer, auf dem das Abo angemeldet ist, und erreicht dabei nur diesen Workspace.",
+      "usePlan": "Abo verwenden"
     },
     "card": {
       "settings": "{{name}} · Einstellungen",
@@ -1833,6 +1839,12 @@
     "action": "Verbinden",
     "locked": "Wer die KI von {{name}} verbindet: ein Admin, mit einem API-Schlüssel, oder {{owner}}, mit dem eigenen Abo.",
     "lockedAdmins": "Nur ein Admin kann eine KI verbinden.",
+    "rightHand": {
+      "computer_away": "{{name}} kann gerade nicht antworten: Der Computer, auf dem das Abo angemeldet ist, ist nicht erreichbar.",
+      "plan_limit": "{{name}} kann gerade nicht antworten: Das Abo hat sein Limit erreicht.",
+      "plan_not_shared": "{{name}} denkt mit einem Abo, das nur der Person antwortet, der es gehört.",
+      "useKey": "API-Schlüssel verwenden"
+    },
     "receipt": "Niemand wird antworten: keine KI verbunden",
     "chip": "Keine KI"
   },
@@ -12210,6 +12222,9 @@
       "no_ai": "Ich kann noch nicht antworten: Ich habe keine KI verbunden.",
       "no_ai_signed_out": "Ich kann noch nicht antworten: Meine KI ist abgemeldet.",
       "no_ai_not_signed_in": "Ich kann noch nicht antworten: {{brain}} ist auf meinem Computer nicht angemeldet.",
+      "no_ai_computer_away": "Ich kann gerade nicht antworten: Der Computer, auf dem mein Abo angemeldet ist, ist nicht erreichbar.",
+      "no_ai_plan_limit": "Ich kann gerade nicht antworten: Das Abo, mit dem ich denke, hat sein Limit erreicht.",
+      "no_ai_plan_not_shared": "Über dieses Abo kann ich dir nicht antworten: Es antwortet nur der Person, der es gehört.",
       "action_connect_ai": "KI verbinden",
       "action_connect_app": "{{name}} verbinden",
       "action_add_mcp": "Einen MCP-Server hinzufügen",

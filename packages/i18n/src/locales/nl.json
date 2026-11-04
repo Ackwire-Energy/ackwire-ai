@@ -1732,7 +1732,13 @@
       "audience": "Wie het mag gebruiken",
       "audienceHelp": "Wie erbuiten valt, ziet {{name}} niet in de zijbalk.",
       "lock": "{{name}} kan niet gearchiveerd of verwijderd worden. Hij plaatst niets zolang niemand met hem praat.",
-      "audit": "Bekijk wat {{name}} deed"
+      "audit": "Bekijk wat {{name}} deed",
+      "onPlan": "Claude-abonnement · {{account}}",
+      "change": "Wijzigen",
+      "planHelp": "De eigenaar van het abonnement betaalt. Is de computer ervan niet bereikbaar, dan zegt het gesprek dat en biedt het een API-sleutel aan.",
+      "plan": "Een abonnement",
+      "planOffer": "{{name}} kan met je Claude-abonnement denken in plaats van met een API-sleutel, op de computer waar het abonnement is ingelogd, zonder iets buiten deze workspace te bereiken.",
+      "usePlan": "Abonnement gebruiken"
     },
     "card": {
       "settings": "{{name}} · Instellingen",
@@ -1832,6 +1838,12 @@
     "action": "Koppelen",
     "locked": "Wie de AI van {{name}} koppelt: een beheerder, met een API-sleutel, of {{owner}}, met een eigen abonnement.",
     "lockedAdmins": "Alleen een beheerder kan een AI koppelen.",
+    "rightHand": {
+      "computer_away": "{{name}} kan nu niet antwoorden: de computer van het abonnement is niet bereikbaar.",
+      "plan_limit": "{{name}} kan nu niet antwoorden: het abonnement heeft zijn limiet bereikt.",
+      "plan_not_shared": "{{name}} denkt met een abonnement dat alleen de eigenaar antwoordt.",
+      "useKey": "API-sleutel gebruiken"
+    },
     "receipt": "Niemand antwoordt: geen AI gekoppeld",
     "chip": "Geen AI"
   },
@@ -12293,6 +12305,9 @@
       "no_ai": "Ik kan nog niet antwoorden: ik heb geen AI gekoppeld.",
       "no_ai_signed_out": "Ik kan nog niet antwoorden: mijn AI is uitgelogd.",
       "no_ai_not_signed_in": "Ik kan nog niet antwoorden: {{brain}} is niet ingelogd op mijn computer.",
+      "no_ai_computer_away": "Ik kan nu niet antwoorden: de computer van mijn abonnement is niet bereikbaar.",
+      "no_ai_plan_limit": "Ik kan nu niet antwoorden: het abonnement waarmee ik denk heeft zijn limiet bereikt.",
+      "no_ai_plan_not_shared": "Ik kan je via dit abonnement niet antwoorden: het antwoordt alleen de eigenaar.",
       "action_connect_ai": "AI koppelen",
       "action_connect_app": "{{name}} koppelen",
       "action_add_mcp": "Een MCP-server toevoegen",

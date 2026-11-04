@@ -12903,7 +12903,8 @@ html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
   width: 280px;
   max-width: 100%;
 }
-.rh-set__budget {
+.rh-set__budget,
+.rh-set__plan {
   display: inline-flex;
   align-items: center;
   gap: 8px;

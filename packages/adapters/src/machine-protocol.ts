@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 40;
+export const MACHINE_PROTOCOL_VERSION = 41;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -465,6 +465,14 @@ export const OPENCODE_PROTOCOL = 39;
  * put those in the first message too). An older runner gets both in `system`, as before.
  */
 export const CONVERSATION_PROTOCOL = 40;
+/**
+ * From this protocol on (ADR 0137 §4, amended 2026-11-04): a Claude Code `brain.turn` takes `permissions.mode: "chat"`,
+ * the team's right hand thinking on a person's plan. The CLI gets none of its own tools (`--tools ""`, and every one of
+ * them denied too), only our MCP bridge (`--strict-mcp-config`), no settings files, skills or slash commands, no
+ * folder but the agent's own, no checkout's instructions and no permission prompt (`dontAsk`: what isn't allowed is
+ * refused). An older runner reads any mode but `plan` as `work`: the server never sends it a `chat` turn.
+ */
+export const LOCKED_BRAIN_PROTOCOL = 41;
 /** `account` `begin`'s `provider` for an OpenCode account: an OpenCode (Zen / Go) API key, its only sign-in. */
 export const OPENCODE_KEY_PROVIDER = "zen";
 
@@ -1248,7 +1256,7 @@ export interface BrainTurnRequest {
    * The turn's permission profile (ADR 0053 §3): `work` (default) edits and asks a person (or the server's
    * rules) for the rest; `plan` reads only. Codex honours it from `BRAIN_PROFILES_PROTOCOL` on.
    */
-  permissions?: { mode?: "plan" | "work"; branchPrefix?: string; allow?: string[] };
+  permissions?: { mode?: "plan" | "work" | "chat"; branchPrefix?: string; allow?: string[] };
   /** Protocol 13: the account folder to run in (`accounts/<kind>/<id>`); absent: the machine's own sign-in. */
   account?: string;
   /** Protocol 13: how hard it thinks; absent: the CLI's default. */
