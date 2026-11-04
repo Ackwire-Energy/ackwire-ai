@@ -4149,5 +4149,23 @@
   },
   "status.bySelfUntil": {
     "value": "Written by {{name}} · {{when}}"
+  },
+  "activity.kind.approval_cover": {
+    "value": {
+      "one": "{{names}} picked you in Who approves for me",
+      "other": "{{names}} picked you in Who approves for me"
+    }
+  },
+  "activity.kind.approval_cover_declined": {
+    "value": {
+      "one": "{{names}} won't approve for you any more",
+      "other": "{{names}} won't approve for you any more"
+    }
+  },
+  "activity.kind.approval_cover_ended": {
+    "value": {
+      "one": "{{names}} ended who approves for you",
+      "other": "{{names}} ended who approves for you"
+    }
   }
 }

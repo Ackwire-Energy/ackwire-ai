@@ -1,8 +1,8 @@
 import type { TFunction } from "i18next";
-import type { Approval, ApprovalRule } from "../api/types";
+import type { Approval, ApprovalCoverView, ApprovalRule } from "../api/types";
 import { aheadPhase, approvalAction, emailTitleWords, sqlReadsTarget } from "./approval-kind";
 import { humanize } from "./custom-tools";
-import { lowerFirst } from "./format";
+import { formatShortDate, lowerFirst } from "./format";
 import { agentGrammar } from "./grammar";
 import { partsOf, toolName } from "./tool-review";
 
@@ -322,4 +322,15 @@ export function requesterDecidesLine(t: TFunction, a: Pick<Approval, "approvers"
   if (!asked?.requesterDecides || !asked.requestedByUserId) return null;
   if (a.status !== "pending" && a.decidedByUserId !== asked.requestedByUserId) return null;
   return t("approval.requesterDecides");
+}
+
+/** Whom I cover, in a line (ADR 0138): "Quando a pessoa estiver fora · até 10 de nov. · Cobrindo agora". */
+export function coveringLine(t: TFunction, locale: string, c: Pick<ApprovalCoverView, "mode" | "endsAt" | "active">) {
+  return [
+    t(c.mode === "always" ? "approvalCover.always" : "approvalCover.coveringWhileOut"),
+    c.endsAt ? t("approvalCover.coveringUntil", { date: formatShortDate(locale, c.endsAt) }) : null,
+    c.active ? t("approvalCover.coveringNow") : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }

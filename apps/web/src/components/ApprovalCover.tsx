@@ -1,8 +1,8 @@
-import type { ApprovalCoverInput, ApprovalCoverView } from "@agenteschat/client";
+import type { ApprovalCoverInput } from "@agenteschat/client";
 import { useApprovalCovers, useDeclineApprovalCover, useMe, useSetApprovalCover } from "@agenteschat/client";
-import { endOfDay, formatShortDate, toYmd } from "@agenteschat/client/lib/format";
+import { coveringLine } from "@agenteschat/client/lib/approval-words";
+import { endOfDay, toYmd } from "@agenteschat/client/lib/format";
 import { Avatar, Button, Card, CardFooter, CardHeader, DatePicker, Select, Switch } from "@agenteschat/ui";
-import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { LoadingLine } from "@/components/Loading";
 import { PrefRow } from "@/components/NoticePrefs";
@@ -166,15 +166,4 @@ export function ApprovalsSection() {
       )}
     </>
   );
-}
-
-/** "Quando a pessoa estiver fora · até 10 de nov. · Cobrindo agora". */
-function coveringLine(t: TFunction, locale: string, c: ApprovalCoverView) {
-  return [
-    t(c.mode === "always" ? "approvalCover.always" : "approvalCover.coveringWhileOut"),
-    c.endsAt ? t("approvalCover.coveringUntil", { date: formatShortDate(locale, c.endsAt) }) : null,
-    c.active ? t("approvalCover.coveringNow") : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
 }

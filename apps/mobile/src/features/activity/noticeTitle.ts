@@ -32,7 +32,9 @@ export function useNoticeTitle(n: AppNotification) {
       ? "desktop_handoff"
       : n.kind === "catch_up_closed_asker" && n.latest.reason === "task_canceled"
         ? "catch_up_closed_asker_task"
-        : n.kind;
+        : n.kind === "approval_cover" && (n.latest.statusTo === "declined" || n.latest.statusTo === "ended")
+          ? `approval_cover_${n.latest.statusTo}`
+          : n.kind;
   const template = held
     ? t("standing.notification.agentHold", { name: NAMES })
     : n.kind === "app_created"

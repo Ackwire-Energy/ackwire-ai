@@ -121,6 +121,8 @@ export function MeScreen() {
       ...(push === null ? {} : { value: push ? t("mobile.me.on") : t("mobile.me.off") }),
       href: "/me/notifications",
     },
+    // Who approves for me, and whom I approve for (ADR 0138).
+    { icon: "shield", label: t("settings.section.approvals"), href: "/me/approvals" },
     // A server from before the choice sends none and can't keep one (`PUT …/me/start` answers 404).
     ...(org.org?.start !== undefined
       ? [{ icon: "home" as const, label: t("mobile.me.start"), value: startLabel, href: "/me/start" }]
