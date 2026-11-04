@@ -6,11 +6,15 @@ import {
   endCover,
   getApproval,
   getMyCovers,
+  getRightHandApprovals,
   listApprovalRules,
   listApprovals,
   memoryJudging,
+  RIGHT_HAND_CAPS,
   removeApprovalRule,
   setMyCover,
+  setRightHandApprovals,
+  undoRightHandDecision,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
@@ -142,6 +146,23 @@ const CoverView = z.object({
 export const ApprovalCovers = z
   .object({ cover: CoverView.nullable(), covering: z.array(CoverView) })
   .openapi("ApprovalCovers");
+
+export const RightHandApprovals = z
+  .object({
+    enabled: z.boolean(),
+    newAgents: z.boolean().openapi({ description: "Creating agents other agents propose (no apps, open channels)." }),
+    agentChanges: z
+      .boolean()
+      .openapi({ description: "Model on the same AI account, budget and open channels of an existing agent." }),
+    budgetCapNanoUsd: z.number().int().openapi({ description: "Budget it may add per agent in a month." }),
+    guidance: z.string(),
+    pausedAt: z.string().nullable().openapi({ description: "Three decisions undone in a week stopped it." }),
+    rightHand: z.object({ id: z.string(), name: z.string() }).nullable(),
+    mayDecide: z.object({ newAgents: z.boolean(), agentChanges: z.boolean() }),
+    caps: z.object({ decisionsPerDay: z.number(), newAgentsPerDay: z.number(), monthNanoUsd: z.number() }),
+    used: z.object({ decisionsToday: z.number(), newAgentsToday: z.number(), monthNanoUsd: z.number() }),
+  })
+  .openapi("RightHandApprovals");
 
 export const ApprovalRule = z
   .object({
@@ -366,6 +387,71 @@ export function approvalRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const input = c.req.valid("json");
       return c.json(await setMyCover({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, input), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/me/right-hand-approvals",
+      tags,
+      security,
+      summary: "Whether the right hand approves for me, and within what (ADR 0138)",
+      request: { params: OrgParams },
+      responses: { 200: json(RightHandApprovals), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await getRightHandApprovals(db, c.get("user").id, orgId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/right-hand-approvals",
+      tags,
+      security,
+      summary: "Let the right hand approve for me",
+      description:
+        "It decides only cards another agent posted from your own request, of the kinds turned on, and approves or passes them to you. The budget per agent is from 0 to US$ 50 (400 `right_hand_approvals.budget`); guidance at most 2,000 characters. Turning it on ends a pause.",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            enabled: z.boolean().optional(),
+            newAgents: z.boolean().optional(),
+            agentChanges: z.boolean().optional(),
+            budgetCapNanoUsd: z.number().int().min(0).max(RIGHT_HAND_CAPS.budgetCapMax).optional(),
+            guidance: z.string().max(RIGHT_HAND_CAPS.guidanceChars).optional(),
+          }),
+        ),
+      },
+      responses: { 200: json(RightHandApprovals), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const input = c.req.valid("json");
+      return c.json(await setRightHandApprovals({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, input), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/right-hand-decisions/{decisionId}/undo",
+      tags,
+      security,
+      summary: "Desfazer what the right hand approved for someone",
+      description:
+        "For 24 hours (409 `right_hand.undo_expired`), by the person it decided for or who manages agents: a new agent is archived, settings go back (409 `right_hand.changed_since` when they moved). Three undone in a week pause it.",
+      request: { params: OrgParams.extend({ decisionId: z.uuid() }) },
+      responses: { ...noContent, ...errors },
+    }),
+    async (c) => {
+      const { orgId, decisionId } = c.req.valid("param");
+      await undoRightHandDecision({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, decisionId);
+      return c.body(null, 204);
     },
   );
 

@@ -20,6 +20,8 @@ export const strings: Partial<PushStrings> = {
   routineFailedBody: "タップして何が起きたかを確認",
   routinePausedTitle: "ルーティンが一時停止されました",
   routinePausedBody: "タップして理由を確認",
+  rightHandPausedTitle: (name) => `${name}はあなたの代わりの承認を止めました`,
+  rightHandPausedBody: "今週その決定を3回取り消しました。タップして確認してください。",
   agentUnreachedTitle: (agent) => `ルーティンが ${agent} を呼び出せませんでした`,
   agentUnreachedBody: "このエージェントと話せるのは、一緒に働く人だけです。タップして許可できます。",
   routineStalledTitle: "ルーティンがコンピューターを待っています",

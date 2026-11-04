@@ -20,6 +20,8 @@ export const strings: Partial<PushStrings> = {
   routineFailedBody: "点按查看发生了什么。",
   routinePausedTitle: "一项例行工作已暂停",
   routinePausedBody: "点按查看原因。",
+  rightHandPausedTitle: (name) => `${name} 已停止替你审批`,
+  rightHandPausedBody: "你本周撤销了它的 3 个决定。点按查看。",
   agentUnreachedTitle: (agent) => `例行工作无法呼叫 ${agent}`,
   agentUnreachedBody: "只有和这个智能体一起工作的成员才能和它对话。点按授权。",
   routineStalledTitle: "一项例行工作在等它的电脑",

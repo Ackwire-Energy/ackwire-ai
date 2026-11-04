@@ -196,6 +196,7 @@ export * from "./questions";
 export * from "./recovery";
 export * from "./reply-policy";
 export * from "./right-hand";
+export * from "./right-hand-approvals";
 export * from "./right-hand-prompt";
 export * from "./roles";
 export * from "./router";

@@ -20,6 +20,8 @@ export const strings: Partial<PushStrings> = {
   routineFailedBody: "Нажмите, чтобы узнать, что случилось.",
   routinePausedTitle: "Регулярная задача на паузе",
   routinePausedBody: "Нажмите, чтобы узнать почему.",
+  rightHandPausedTitle: (name) => `${name} больше не одобряет за вас`,
+  rightHandPausedBody: "На этой неделе вы отменили 3 его решения. Нажмите, чтобы проверить.",
   agentUnreachedTitle: (agent) => `Регулярная задача не смогла обратиться к агенту ${agent}`,
   agentUnreachedBody: "С агентом могут говорить только те, с кем он работает. Нажмите, чтобы разрешить.",
   routineStalledTitle: "Регулярная задача ждёт свой компьютер",

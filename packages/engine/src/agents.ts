@@ -435,8 +435,16 @@ export async function updateAgent(
   return agent;
 }
 
-export async function archiveAgent(db: Database, actorId: string, orgId: string, agentId: string, pubsub?: PubSub) {
-  await requirePermission(db, actorId, orgId, "manage_agents");
+export async function archiveAgent(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  agentId: string,
+  pubsub?: PubSub,
+  /** The caller already checked who may (the right hand's Desfazer, ADR 0138: the person it created it for). */
+  checked = false,
+) {
+  if (!checked) await requirePermission(db, actorId, orgId, "manage_agents");
   await refuseRightHand(db, orgId, agentId, "archived");
   const [gone] = await db
     .update(agents)

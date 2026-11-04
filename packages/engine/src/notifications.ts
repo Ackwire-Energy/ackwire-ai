@@ -175,6 +175,16 @@ export const NOTIFICATION_KINDS = [
    * (`declined`) or an admin ended it (`ended`). The covered person or who ended it is the actor. Inbox only.
    */
   "approval_cover",
+  /**
+   * The right hand approved a card for this person (ADR 0138 §2): one row a day while unread, `count` how many,
+   * `latest.title` the newest one's agent, `source.agentId` the right hand (its name in `label`). Inbox only.
+   */
+  "right_hand_decided",
+  /**
+   * The right hand stopped deciding for this person: three of its decisions undone in a week (ADR 0138 §2). Waiting
+   * until they turn it back on, so it reaches their devices.
+   */
+  "right_hand_paused",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -323,6 +333,8 @@ const MERGING: ReadonlySet<NotificationKind> = new Set([
   "skill_update",
   // An agent's skipped catch-ups of one line gather in one row while unread, counting them.
   "catch_up_closed",
+  // The day's decisions the right hand made for the person, one row while unread.
+  "right_hand_decided",
 ]);
 /** "Menções" in the inbox: what was said to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_reply", "agent_question"];

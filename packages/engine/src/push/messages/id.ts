@@ -20,6 +20,8 @@ export const strings: Partial<PushStrings> = {
   routineFailedBody: "Ketuk untuk melihat apa yang terjadi.",
   routinePausedTitle: "Sebuah rutinitas dijeda",
   routinePausedBody: "Ketuk untuk melihat alasannya.",
+  rightHandPausedTitle: (name) => `${name} berhenti menyetujui untukmu`,
+  rightHandPausedBody: "Kamu membatalkan 3 keputusannya minggu ini. Ketuk untuk meninjau.",
   agentUnreachedTitle: (agent) => `Sebuah rutinitas tidak bisa memanggil ${agent}`,
   agentUnreachedBody: "Hanya orang yang bekerja dengan agen ini yang bisa bicara dengannya. Ketuk untuk mengizinkan.",
   routineStalledTitle: "Sebuah rutinitas menunggu komputernya",

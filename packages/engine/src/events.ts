@@ -593,6 +593,14 @@ export type ChannelEvent =
       applied?: { channelIds: string[]; connectionIds: string[]; mailAccountIds: string[] };
       /** The routine made with it. */
       routineId?: string | null;
+    }
+  /** The right hand looked at a card for someone (ADR 0138): its `meta.actionCard.delegate` now (null: nothing to say). */
+  | {
+      type: "card.delegate";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      delegate: Record<string, unknown> | null;
     };
 
 const INLINE_LIMIT = 6000;

@@ -78,6 +78,7 @@ import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./
 import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
 import { reachOf, settleReach } from "./reach";
 import { routineCreatorOf } from "./requester";
+import { considerCard, RIGHT_HAND_DECIDE_JOB } from "./right-hand-approvals";
 import {
   createLlmRouterStrategy,
   DEFAULT_ROUTER_POLICY,
@@ -1003,6 +1004,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       await consolidateOrg(deps.context, orgOf(job));
     },
     // Yesterday's stall-and-noise report, to the people who run the server (`OPS_REPORT_EMAIL`).
+    // The right hand looks at a card for the person behind it (ADR 0138 §2).
+    [RIGHT_HAND_DECIDE_JOB]: async (job) => {
+      await considerCard(
+        { db: deps.db, pubsub: deps.pubsub, gateway: deps.gateway },
+        orgOf(job),
+        String(job.payload.messageId),
+      );
+    },
     [AUTONOMY_REPORT_JOB]: async (job) => {
       await queueAutonomyEmail(deps.db, job.payload, { router: deps.router?.enabled ?? false });
     },

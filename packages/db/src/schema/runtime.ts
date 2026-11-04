@@ -595,6 +595,69 @@ export const approvalCovers = pgTable(
 );
 
 /**
+ * "O Gerente aprova por você" (ADR 0138 §2): whether the workspace's right hand decides, in this person's name, the
+ * cards other agents post from their own request, for which of the two kinds, up to which budget per agent. The day
+ * and month caps are code (`RIGHT_HAND_CAPS`). `paused_at`: three of its decisions undone in a week stopped it until
+ * the person turns it back on.
+ */
+export const rightHandApprovals = pgTable(
+  "right_hand_approvals",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid().notNull(),
+    userId: text().notNull(),
+    enabled: boolean().notNull().default(false),
+    newAgents: boolean().notNull().default(true),
+    agentChanges: boolean().notNull().default(true),
+    budgetCapNanoUsd: bigint({ mode: "number" }).notNull().default(20_000_000_000),
+    guidance: text().notNull().default(""),
+    pausedAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.orgId, t.userId],
+      foreignColumns: [organizationMembers.orgId, organizationMembers.userId],
+    }).onDelete("cascade"),
+    unique().on(t.orgId, t.userId),
+  ],
+);
+
+/**
+ * One per card the right hand looked at for someone (ADR 0138 §2): approved (applied as them) or passed to them, with
+ * its reason ("Por quê?"). The caps, Desfazer, the daily entry and the auto-pause read these rows. `budget_added`:
+ * what the decision added to the workspace's monthly budgets, counted against the month's cap.
+ */
+export const rightHandDecisions = pgTable(
+  "right_hand_decisions",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    forUserId: text().notNull(),
+    rightHandId: uuid().notNull(),
+    kind: text().$type<"agent_new" | "agent_settings">().notNull(),
+    /** The card's message (messages are partitioned: no foreign key). */
+    messageId: uuid().notNull(),
+    proposedByAgentId: uuid(),
+    /** `deciding` while its call runs (it holds its place under the caps). */
+    outcome: text().$type<"deciding" | "approved" | "passed">().notNull(),
+    reason: text().notNull().default(""),
+    /** A decision call was made (the day's cap counts these). */
+    called: boolean().notNull().default(false),
+    budgetAddedNanoUsd: bigint({ mode: "number" }).notNull().default(0),
+    /** The agent it created or changed. */
+    targetAgentId: uuid(),
+    undoneAt: timestamp({ withTimezone: true }),
+    undoneByUserId: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.orgId, t.messageId), index().on(t.orgId, t.forUserId, t.createdAt)],
+);
+
+/**
  * "Aprovar sempre" (docs/adr/0015): a kind of call one agent makes without asking again, approved for good by
  * someone who decides its approvals. The kind is the connection, the server's own tool name and, for a tool that
  * runs other actions (Composio's executor), one wrapped action (`''`: the tool itself). Params are never part of

@@ -20,6 +20,8 @@ export const strings: Partial<PushStrings> = {
   routineFailedBody: "Ne olduğunu görmek için dokunun.",
   routinePausedTitle: "Bir rutin duraklatıldı",
   routinePausedBody: "Nedenini görmek için dokunun.",
+  rightHandPausedTitle: (name) => `${name} artık sizin yerinize onaylamıyor`,
+  rightHandPausedBody: "Bu hafta 3 kararını geri aldınız. İncelemek için dokunun.",
   agentUnreachedTitle: (agent) => `Bir rutin ${agent} ajanına ulaşamadı`,
   agentUnreachedBody: "Ajanla yalnızca birlikte çalıştığı kişiler konuşabilir. İzin vermek için dokunun.",
   routineStalledTitle: "Bir rutin bilgisayarını bekliyor",

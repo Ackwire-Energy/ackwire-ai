@@ -20,6 +20,8 @@ export const strings: Partial<PushStrings> = {
   routineFailedBody: "탭해서 무슨 일인지 확인하세요.",
   routinePausedTitle: "루틴이 일시 중지됐어요",
   routinePausedBody: "탭해서 이유를 확인하세요.",
+  rightHandPausedTitle: (name) => `${name}이(가) 나 대신 승인하는 걸 멈췄어요`,
+  rightHandPausedBody: "이번 주에 결정을 3번 되돌렸어요. 탭해서 확인하세요.",
   agentUnreachedTitle: (agent) => `루틴이 ${agent} 님을 부르지 못했어요`,
   agentUnreachedBody: "에이전트와 함께 일하는 사람만 말을 걸 수 있어요. 탭해서 허용하세요.",
   routineStalledTitle: "루틴이 컴퓨터를 기다리고 있어요",

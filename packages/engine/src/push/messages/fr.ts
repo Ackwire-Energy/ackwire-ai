@@ -20,6 +20,8 @@ export const strings: Partial<PushStrings> = {
   routineFailedBody: "Touchez pour voir ce qui s’est passé.",
   routinePausedTitle: "Une routine a été mise en pause",
   routinePausedBody: "Touchez pour savoir pourquoi.",
+  rightHandPausedTitle: (name) => `${name} n'approuve plus pour vous`,
+  rightHandPausedBody: "Vous avez annulé 3 de ses décisions cette semaine. Touchez pour vérifier.",
   agentUnreachedTitle: (agent) => `Une routine n’a pas pu appeler ${agent}`,
   agentUnreachedBody: "Seules les personnes avec qui l’agent travaille peuvent lui parler. Touchez pour l’autoriser.",
   routineStalledTitle: "Une routine attend son ordinateur",

@@ -241,3 +241,29 @@ test("approvals API: who approves for me decides my approvals in my name while I
   );
   expect(await (await ana(cover)).json()).toMatchObject({ cover: null });
 });
+
+test("approvals API: the right hand approves for me, within what I set (ADR 0138 §2)", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const ana = await joinByInvitation(t, owner, orgId, "ana@example.com");
+  const path = `/api/app/organizations/${orgId}/me/right-hand-approvals`;
+
+  expect(await (await ana(path)).json()).toMatchObject({
+    enabled: false,
+    newAgents: true,
+    agentChanges: true,
+    budgetCapNanoUsd: 20_000_000_000,
+    mayDecide: { newAgents: false },
+    caps: { decisionsPerDay: 10, newAgentsPerDay: 2, monthNanoUsd: 50_000_000_000 },
+  });
+  expect((await ana(path, { method: "PUT", json: { budgetCapNanoUsd: 60_000_000_000 } })).status).toBe(400);
+  const set = await ana(path, {
+    method: "PUT",
+    json: { enabled: true, newAgents: false, budgetCapNanoUsd: 10_000_000_000, guidance: "Nada duplicado." },
+  });
+  expect(set.status).toBe(200);
+  expect(await set.json()).toMatchObject({ enabled: true, newAgents: false, guidance: "Nada duplicado." });
+  const undo = `/api/app/organizations/${orgId}/right-hand-decisions/${crypto.randomUUID()}/undo`;
+  expect((await ana(undo, { json: {} })).status).toBe(404);
+});

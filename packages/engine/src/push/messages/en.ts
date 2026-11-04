@@ -18,6 +18,8 @@ export interface PushStrings {
   routineFailedBody: string;
   routinePausedTitle: string;
   routinePausedBody: string;
+  rightHandPausedTitle: (name: string) => string;
+  rightHandPausedBody: string;
   agentUnreachedTitle: (agent: string) => string;
   agentUnreachedBody: string;
   routineStalledTitle: string;
@@ -66,6 +68,8 @@ export const en: PushStrings = {
   routineFailedBody: "Tap to see what happened.",
   routinePausedTitle: "A routine was paused",
   routinePausedBody: "Tap to see why.",
+  rightHandPausedTitle: (name) => `${name} stopped approving for you`,
+  rightHandPausedBody: "You undid 3 of its decisions this week. Tap to review.",
   agentUnreachedTitle: (agent) => `A routine couldn't call ${agent}`,
   agentUnreachedBody: "Only the people the agent works with can talk to it. Tap to let it.",
   routineStalledTitle: "A routine is waiting for its computer",
