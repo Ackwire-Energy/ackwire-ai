@@ -63,7 +63,10 @@ import type {
   NewAgentSetup,
   OrgRole,
   OrgSettings,
+  PeopleUsage,
   Person,
+  PersonLimits,
+  PersonUsage,
   PlanAccountUsage,
   Proposal,
   ReactionCount,
@@ -247,6 +250,11 @@ export interface FakeState {
   agentStatuses?: AgentStatus[];
   /** Per agent: what it picks up when its plan or budget is back (`agents.usageQueue`). */
   usageQueues?: Record<string, UsageQueue>;
+  /** Uso › Pessoas (ADR 0141); unset: nobody used agents yet. */
+  peopleUsage?: PeopleUsage;
+  /** A person's month by id; unset: an empty month. */
+  personUsage?: Record<string, PersonUsage>;
+  personLimits?: PersonLimits;
   memories: Memory[];
   proposals: Proposal[];
   reactions: Record<string, ReactionCount[]>;
@@ -1760,6 +1768,53 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const inv = state.invitations.find((i) => i.id === invitationId);
         if (inv) inv.roleIds = roleIds;
         return { roleIds };
+      },
+      peopleUsage: async () =>
+        state.peopleUsage ?? {
+          month: new Date().toISOString().slice(0, 7),
+          since: new Date().toISOString(),
+          until: new Date().toISOString(),
+          totalUsd: 0,
+          plansOnly: false,
+          limitsOn: false,
+          people: [],
+          live: [],
+        },
+      peopleUsageCsvUrl: (orgId) => `/api/app/organizations/${orgId}/usage/people.csv`,
+      personUsage: async (_orgId, userId) =>
+        state.personUsage?.[userId] ?? {
+          userId,
+          name: state.members.find((m) => m.userId === userId)?.name ?? "",
+          image: null,
+          roleIds: [],
+          owner: false,
+          money: seesCost(),
+          renewsAt: new Date().toISOString(),
+          since: new Date().toISOString(),
+          until: new Date().toISOString(),
+          limit: { percent: null, state: "none", requested: false, reachedAt: null },
+          total: 0,
+          days: [],
+          agents: [],
+          recent: [],
+          created: [],
+        },
+      personLimits: async () =>
+        state.personLimits ?? { defaultUsd: null, roles: {}, people: {}, onLimit: "block", warn: true },
+      setPersonLimits: async (orgId, limits) => {
+        log("orgs.setPersonLimits", orgId, limits);
+        state.personLimits = limits;
+        return limits;
+      },
+      requestMoreUsage: async (orgId) => {
+        log("orgs.requestMoreUsage", orgId);
+        return { requestedAt: new Date().toISOString() };
+      },
+      raisePersonLimit: async (orgId, userId, limitUsd) => {
+        log("orgs.raisePersonLimit", orgId, userId, limitUsd);
+      },
+      refuseMoreUsage: async (orgId, userId) => {
+        log("orgs.refuseMoreUsage", orgId, userId);
       },
       planUsage: async () => ({
         month: new Date().toISOString().slice(0, 7),

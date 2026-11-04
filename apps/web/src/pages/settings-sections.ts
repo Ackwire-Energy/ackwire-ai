@@ -100,6 +100,8 @@ export const settingsSearch = (
   install?: string;
   skill?: string;
   agent?: string;
+  /** Uso › Pessoas: the person whose month opens (ADR 0141). */
+  person?: string;
 } => ({
   connected: typeof search.connected === "string" ? search.connected : undefined,
   outcome: typeof search.outcome === "string" ? search.outcome : undefined,
@@ -112,4 +114,5 @@ export const settingsSearch = (
   install: typeof search.install === "string" ? search.install : undefined,
   skill: typeof search.skill === "string" ? search.skill : undefined,
   agent: typeof search.agent === "string" ? search.agent : undefined,
+  person: typeof search.person === "string" ? search.person : undefined,
 });

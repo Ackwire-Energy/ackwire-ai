@@ -386,6 +386,15 @@ export function openTarget(n: AppNotification): OpenTarget | null {
         : null;
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return { to: "/org/$orgId/settings/$section", params: { section: "usage" } };
+  // A person's limit (ADR 0141): who decides opens that person's month in Uso › Pessoas; the person, Seu uso.
+  if (n.kind === "usage_limit") {
+    const theirs = n.latest.statusTo === "reached" || n.latest.statusTo === "request";
+    return {
+      to: "/org/$orgId/settings/$section",
+      params: { section: "usage" },
+      ...(theirs && s.userId ? { search: { person: s.userId } } : {}),
+    };
+  }
   // A server changed approved tools: accepted in Conectores.
   if (n.kind === "connector_tool_changed")
     return { to: "/org/$orgId/settings/$section", params: { section: "connectors" } };

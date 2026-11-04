@@ -2,6 +2,9 @@ import type { ActiveRun, BrowserProfileWait, ChannelEvent, Message, RunStatus } 
 import { isMediaAfterReply } from "../lib/media";
 import { NO_AI } from "../lib/no-ai";
 
+/** Failures whose card in the conversation is all there is to say: no AI, or the person at their limit (ADR 0141). */
+const carded = (error: string | undefined) => error === NO_AI || error === "person_limit";
+
 /**
  * Live agent runs per channel, from `agent.run`, `agent.delta` and (expected
  * from the backend) `agent.thinking` / `agent.typing` / `agent.idle` /
@@ -641,8 +644,8 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         const settled = settleProvisional(s, event.agentId, event.threadId);
         return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
       }
-      // No AI to think with: nothing ran, and its card (or the receipt under the message) says why.
-      if (event.status === "failed" && event.error === NO_AI) return finish(settleAfterRun(s, event), event.runId);
+      // No AI to think with, or its person at their limit: nothing ran, and its card says why.
+      if (event.status === "failed" && carded(event.error)) return finish(settleAfterRun(s, event), event.runId);
       // Started but nothing written yet: thinking.
       const current = s.runs[event.runId];
       const status: LiveStatus =
@@ -680,7 +683,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       return finish(settleAfterRun(state, event), event.runId);
     case "run.finished": {
       const settled = settleAfterRun(state, event);
-      if (event.status === "failed" && event.error === NO_AI) return finish(settled, event.runId);
+      if (event.status === "failed" && carded(event.error)) return finish(settled, event.runId);
       if (event.status === "failed") {
         const { error, errorCode, errorParams } = event;
         return upsert(settled, event, { status: "failed", error, errorCode, errorParams });

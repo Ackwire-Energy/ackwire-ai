@@ -93,6 +93,10 @@ export const keys = {
   /** The usage views; an agent's sits under it, so one invalidation refreshes both. */
   planUsage: (orgId: string) => ["org", orgId, "plan-usage"] as const,
   agentPlanUsage: (orgId: string, agentId: string) => ["org", orgId, "plan-usage", "agent", agentId] as const,
+  /** Uso › Pessoas and a person's month (ADR 0141); one invalidation refreshes both. */
+  peopleUsage: (orgId: string, period: object = {}) => ["org", orgId, "people-usage", period] as const,
+  personUsage: (orgId: string, userId: string) => ["org", orgId, "people-usage", "person", userId] as const,
+  personLimits: (orgId: string) => ["org", orgId, "people-usage", "limits"] as const,
   platformKey: (orgId: string) => ["org", orgId, "platform-key"] as const,
   roster: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "roster"] as const,
   /** All the agents' memories, for the workspace's map. */

@@ -6,6 +6,7 @@ import type {
   AiStatus,
   CostKind,
   CostlyDecision,
+  PersonLimitCard,
   ProposedRoutine,
   Skill,
   SuggestedAi,
@@ -163,7 +164,16 @@ export type ActionCard =
   | AgentProposalCard
   | StretchCard
   | UsagePauseCard
-  | CostlyProposalCard;
+  | CostlyProposalCard
+  | PersonLimitCard;
+
+/** The card an agent posts when the person behind its run is at their monthly limit (ADR 0141). */
+export const personLimitCardOf = (meta: Record<string, unknown> | null | undefined): PersonLimitCard | null => {
+  const c = meta?.actionCard as Partial<PersonLimitCard> | undefined;
+  return c?.kind === "person_limit" && typeof c.agentId === "string" && typeof c.state === "string"
+    ? (c as PersonLimitCard)
+    : null;
+};
 
 /**
  * An agent asks before costly work nobody asked for directly (ADR 0131 §3): opening a PR, installing packages, a long
@@ -328,7 +338,12 @@ function routineLine(
 }
 
 export function actionCardOf(meta: Record<string, unknown> | null | undefined): ActionCard | null {
-  const proposal = agentProposalOf(meta) ?? stretchCardOf(meta) ?? usagePauseCardOf(meta) ?? costlyProposalOf(meta);
+  const proposal =
+    agentProposalOf(meta) ??
+    stretchCardOf(meta) ??
+    usagePauseCardOf(meta) ??
+    costlyProposalOf(meta) ??
+    personLimitCardOf(meta);
   if (proposal) return proposal;
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;

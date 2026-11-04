@@ -1,0 +1,496 @@
+/* Usage per person (PeopleUsage.tsx): Orçamento e uso › Pessoas, the person drawer, Limites and Seu uso. */
+
+.ac-tabpanel:has(.pu-head),
+.ac-tabpanel:has(.pu-mine) {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pu-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.pu-head__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pu-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 26px;
+}
+.pu-h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.pu-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.pu-toolbar__end {
+  margin-left: auto;
+}
+.pu-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pu-chip[aria-pressed="true"] {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+.pu-chip__n {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: var(--plate);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.pu-summary {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--muted);
+}
+.pu-summary [data-tone="near"] {
+  color: var(--warn);
+  font-weight: 600;
+}
+.pu-summary [data-tone="at"] {
+  color: var(--danger);
+  font-weight: 600;
+}
+.pu-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* The table: a hairline per row, the person's face top-aligned with their name. */
+.pu-table-card {
+  padding: 0;
+  overflow-x: auto;
+}
+.pu-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+}
+.pu-table th {
+  padding: 12px 12px;
+  text-align: left;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+.pu-table td {
+  padding: 10px 12px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line);
+}
+.pu-table tr:last-child td {
+  border-bottom: 0;
+}
+.pu-row {
+  cursor: pointer;
+}
+.pu-row:hover td {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+.pu-num {
+  text-align: right;
+}
+th.pu-num .pu-sort {
+  margin-left: auto;
+}
+.pu-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.pu-person {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pu-person__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 20px;
+}
+.pu-person__name {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pu-person__role {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pu-now {
+  color: var(--muted);
+  max-width: 260px;
+}
+.pu-now--live {
+  color: var(--ink);
+  font-weight: 600;
+}
+.pu-now > svg {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+.pu-faces .ac-avatar {
+  outline: 2px solid var(--surface-raised);
+}
+
+/* A month's use against its limit: the words, then the bar; amber from 80%, red at it. */
+.pu-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+}
+.pu-meter__line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+.pu-meter__at {
+  color: var(--danger);
+  font-weight: 650;
+}
+.pu-meter[data-state="near"] {
+  --meter-fill: var(--warn);
+}
+.pu-meter[data-state="at"] {
+  --meter-fill: var(--danger);
+}
+
+.pu-live {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pu-live__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+.pu-live__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--online, #2f8f4e);
+}
+.pu-live__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pu-live__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.pu-live__text {
+  min-width: 0;
+}
+
+/* The person's month, at the side: the dialog becomes a sheet on the right edge, the page dimmed behind it. */
+.ac-dialog.pu-drawer {
+  left: auto;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  transform: none;
+  width: min(480px, 100%);
+  max-height: none;
+  height: 100dvh;
+  border-radius: 0;
+  animation: none;
+}
+.pu-drawer__body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0 var(--dialog-pad) var(--dialog-pad);
+  overflow-y: auto;
+}
+.pu-limit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--plate);
+}
+.pu-limit[data-state="near"] {
+  --meter-fill: var(--warn);
+}
+.pu-limit[data-state="at"] {
+  --meter-fill: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface-raised));
+}
+.pu-limit__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pu-limit__line {
+  font-size: 14px;
+  color: var(--muted);
+}
+.pu-limit[data-state="at"] .pu-limit__line {
+  color: var(--danger);
+  font-weight: 600;
+}
+.pu-limit__acts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pu-limit__asked {
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.pu-amount {
+  width: 110px;
+}
+.pu-days .ac-usage-days {
+  height: 110px;
+}
+.pu-axis {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 0 8px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+.pu-agents,
+.pu-recent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pu-agents li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pu-recent__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.pu-recent__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 20px;
+}
+.pu-recent__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pu-recent__text .muted {
+  font-size: 13.5px;
+}
+.pu-recent__amount {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.pu-audit {
+  align-self: flex-start;
+  gap: 6px;
+}
+
+/* Limites. */
+.pu-limits {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.pu-lead {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+.pu-limits__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.pu-limits__label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pu-limits__label .muted {
+  font-size: 13.5px;
+}
+.pu-limits__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pu-limits__list li {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.pu-limits__who {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 160px;
+}
+.pu-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pu-usd {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+.pu-rule {
+  margin: 4px 0 12px;
+  font-size: 14px;
+}
+.pu-when {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.pu-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pu-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.pu-radio .muted {
+  font-size: 13.5px;
+}
+.pu-save {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+}
+
+/* Seu uso. */
+.pu-mine {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pu-mine__line {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .pu-head {
+    flex-direction: column;
+  }
+  .pu-toolbar__end {
+    margin-left: 0;
+  }
+  .pu-limits__row {
+    flex-direction: column;
+  }
+  .pu-limits__list li {
+    justify-content: space-between;
+  }
+}
+
+/* A request for more in the inbox: its two answers and the person's month. */
+.pu-asks {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.pu-asks__see {
+  margin-left: 4px;
+  font-size: 14px;
+}
