@@ -1,6 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import { Text as RNText, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { ScrollView as GestureScrollView } from "react-native-gesture-handler";
 import { Text } from "@/ui";
 import { withAlpha } from "@/ui/palette";
 import { openPage } from "../ai/parts";
@@ -91,7 +92,7 @@ export function Table({
   const [drawn, setDrawn] = useState<Record<number, number>>({});
   const [frame, setFrame] = useState(0);
   const [x, setX] = useState(0);
-  const scroller = useRef<ScrollView>(null);
+  const scroller = useRef<GestureScrollView>(null);
   const flashed = useRef(false);
   const widths = tableColumnWidths(header, rows, drawn, fontScale);
   // The content's width said outright (not left to layout), so the box always knows it has more to scroll.
@@ -147,8 +148,15 @@ export function Table({
           ))}
         </ScrollView>
       </View>
-      <View style={[styles.table, { borderColor: c.line2 ?? c.line }]}>
-        <ScrollView
+      {/* The message's long-press (select) is a Pressable around the whole row: the table takes its own touches so a
+          sideways drag scrolls it instead of starting the press, and its scroller is the gesture handler's (native
+          gesture first, ahead of the row's JS responder). Long-press elsewhere on the message still selects it. */}
+      <View
+        style={[styles.table, { borderColor: c.line2 ?? c.line }]}
+        onStartShouldSetResponder={() => true}
+        onResponderTerminationRequest={() => true}
+      >
+        <GestureScrollView
           ref={scroller}
           horizontal
           directionalLockEnabled
@@ -169,7 +177,7 @@ export function Table({
               </View>
             ))}
           </View>
-        </ScrollView>
+        </GestureScrollView>
         {hidden.left ? (
           <LinearGradient
             pointerEvents="none"
