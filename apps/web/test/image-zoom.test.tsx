@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
-import { setupDom } from "@agenteschat/ui/testing/dom";
+import { domWindow, setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
@@ -9,10 +9,18 @@ import { ImageZoom } from "@/components/artifacts/ImageZoom";
 import { createI18n } from "@/i18n";
 
 const STAGE = { w: 1200, h: 700 };
-const realRect = HTMLElement.prototype.getBoundingClientRect;
-let realMatch: typeof matchMedia;
+/**
+ * Patched where happy-dom defines them (getBoundingClientRect on Element, clientWidth/Height on HTMLElement) and put
+ * back as they were: a copy left on HTMLElement.prototype, or a deleted getter, breaks later test files' layout.
+ */
+const realRect = Element.prototype.getBoundingClientRect;
+const realSize = ["clientWidth", "clientHeight"].map(
+  (k) => [k, Object.getOwnPropertyDescriptor(HTMLElement.prototype, k)] as const,
+);
+// On happy-dom's window itself: `setupDom`'s afterAll may detach the global `window` before this file's runs.
+const realMatch = domWindow().matchMedia;
 beforeAll(() => {
-  HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+  Element.prototype.getBoundingClientRect = function (this: Element) {
     // Mid open animation (the dialog scales in from 0.97): the fit must come from the layout size, not this one.
     const [w, h] = [STAGE.w * 0.97, STAGE.h * 0.97];
     const r = { x: 0, y: 0, left: 0, top: 0, width: w, height: h, right: w, bottom: h };
@@ -20,9 +28,8 @@ beforeAll(() => {
   };
   Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => STAGE.w });
   Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => STAGE.h });
-  realMatch = window.matchMedia;
   // A mouse (the hover lens is offered), or a finger when `touch` is set.
-  window.matchMedia = ((query: string) => ({
+  domWindow().matchMedia = ((query: string) => ({
     matches: !touch && query.includes("hover: hover"),
     media: query,
     addEventListener() {},
@@ -31,10 +38,9 @@ beforeAll(() => {
 });
 let touch = false;
 afterAll(() => {
-  HTMLElement.prototype.getBoundingClientRect = realRect;
-  Reflect.deleteProperty(HTMLElement.prototype, "clientWidth");
-  Reflect.deleteProperty(HTMLElement.prototype, "clientHeight");
-  if (typeof window !== "undefined") window.matchMedia = realMatch;
+  Element.prototype.getBoundingClientRect = realRect;
+  for (const [k, d] of realSize) if (d) Object.defineProperty(HTMLElement.prototype, k, d);
+  domWindow().matchMedia = realMatch;
 });
 afterEach(() => {
   cleanup();
