@@ -209,6 +209,49 @@ test.skipIf(!posix)(
 );
 
 test.skipIf(!posix)(
+  "speed: every turn says its tier, since a thread keeps one until told; the process turns the feature on",
+  async () => {
+    const t = await setup();
+    await start(t.ctx, request(1, "Say pong", { speed: "fast" })).done;
+    await start(t.ctx, request(2, "Say pong")).done;
+    await start(t.ctx, request(3, "Say pong", { speed: "turbo" })).done;
+    expect(t.rpcs("turn/start").map((p) => p.serviceTier)).toEqual(["fast", null, null]);
+    expect(t.starts()).toHaveLength(1);
+    expect(String(t.starts()[0]?.args)).toContain("features.fast_mode=true");
+  },
+  20_000,
+);
+
+test.skipIf(!posix)(
+  "Fast refused on an app-server: the same turn again at standard speed, once, and the reply still comes",
+  async () => {
+    const t = await setup();
+    const turn = start(t.ctx, request(1, "FAST_REFUSED then pong", { speed: "fast" }));
+    await turn.done;
+    expect(t.rpcs("turn/start").map((p) => p.serviceTier)).toEqual(["fast", null]);
+    expect(turn.events.filter((e) => e.type === "error")).toEqual([]);
+    expect(turn.events.find((e) => e.type === "speed_fallback")).toMatchObject({
+      message: expect.stringContaining("Fast mode is not available"),
+    });
+    expect(turn.events.at(-1)).toMatchObject({ type: "done", text: "pong" });
+  },
+  20_000,
+);
+
+test.skipIf(!posix)(
+  "another failure of a Fast turn is that failure: no second try, no note",
+  async () => {
+    const t = await setup();
+    const turn = start(t.ctx, request(1, "LIMIT", { speed: "fast" }));
+    await turn.done;
+    expect(t.rpcs("turn/start")).toHaveLength(1);
+    expect(turn.events.some((e) => e.type === "speed_fallback")).toBe(false);
+    expect(turn.events.at(-1)).toMatchObject({ type: "error", code: "plan_limit" });
+  },
+  20_000,
+);
+
+test.skipIf(!posix)(
   "a secret quoted across two streamed batches leaves redacted, never in halves",
   async () => {
     const t = await setup();

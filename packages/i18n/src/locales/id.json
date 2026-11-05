@@ -4031,6 +4031,12 @@
           "high": "Berpikir lebih banyak untuk tugas sulit. Lebih lambat dan lebih mahal.",
           "max": "Berpikir semaksimal mungkin. Jauh lebih lambat dan lebih mahal."
         },
+        "speed": "Kecepatan",
+        "speeds": {
+          "standard": "Standar",
+          "fast": "Cepat"
+        },
+        "speedText": "Menjawab lebih cepat dalam percakapan dan menghabiskan paket 2,5× lebih cepat. Rutinitas dan tugas panjang tetap standar.",
         "modelLine": {
           "opus": "Paling mampu. Menghabiskan paket lebih cepat.",
           "sonnet": "Seimbang. Cocok untuk hampir semua hal.",
@@ -4053,10 +4059,13 @@
           "contents": {
             "model": "Jendela konteks",
             "auto": "Jendela konteks dan siapa yang dijawabnya",
-            "fixed": "Upaya, jendela konteks, dan siapa yang dijawabnya"
+            "fixed": "Upaya, jendela konteks, dan siapa yang dijawabnya",
+            "autoSpeed": "Kecepatan, jendela konteks, dan siapa yang dijawabnya",
+            "fixedSpeed": "Upaya, kecepatan, jendela konteks, dan siapa yang dijawabnya"
           },
           "allDefault": "Semua default",
           "effort": "Upaya: {{level}}",
+          "speed": "Kecepatan: cepat",
           "context": "Konteks: {{size}}",
           "sharing": "Menjawab orang lain",
           "waits": "Menunggu komputer"
@@ -12109,6 +12118,10 @@
     "working": "Di latar belakang"
   },
   "chat": {
+    "speedFallback": {
+      "text": "ChatGPT menolak kecepatan Cepat untuk akun atau model ini, jadi jawaban ini memakai kecepatan standar.",
+      "action": "Buka agen"
+    },
     "usageWhen": {
       "at": "pukul {{time}}",
       "on": "{{day}} pukul {{time}}",

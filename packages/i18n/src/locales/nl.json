@@ -4196,6 +4196,12 @@
           "high": "Denkt meer na bij moeilijke taken. Trager en duurder.",
           "max": "Denkt zoveel mogelijk na. Veel trager en duurder."
         },
+        "speed": "Snelheid",
+        "speeds": {
+          "standard": "Standaard",
+          "fast": "Snel"
+        },
+        "speedText": "Antwoordt sneller in gesprekken en verbruikt het abonnement 2,5× zo snel. Routines en lange taken blijven op standaard.",
         "modelLine": {
           "opus": "De krachtigste. Verbruikt het abonnement sneller.",
           "sonnet": "Gebalanceerd. Goed voor bijna alles.",
@@ -4218,10 +4224,13 @@
           "contents": {
             "model": "Contextvenster",
             "auto": "Contextvenster en wie het antwoordt",
-            "fixed": "Inspanning, contextvenster en wie het antwoordt"
+            "fixed": "Inspanning, contextvenster en wie het antwoordt",
+            "autoSpeed": "Snelheid, contextvenster en wie het antwoordt",
+            "fixedSpeed": "Inspanning, snelheid, contextvenster en wie het antwoordt"
           },
           "allDefault": "Alles standaard",
           "effort": "Inspanning: {{level}}",
+          "speed": "Snelheid: snel",
           "context": "Context: {{size}}",
           "sharing": "Antwoordt andere mensen",
           "waits": "Wacht op de computer"
@@ -12578,6 +12587,10 @@
     "working": "Op de achtergrond"
   },
   "chat": {
+    "speedFallback": {
+      "text": "ChatGPT weigerde de snelheid Snel voor dit account of model, dus dit antwoord kwam op standaardsnelheid.",
+      "action": "Agent openen"
+    },
     "usageWhen": {
       "at": "om {{time}}",
       "on": "{{day}} om {{time}}",

@@ -11,7 +11,8 @@
 // (exits mid-turn), "APPROVE <command>" (asks the runner to approve the
 // command, answers with the decision), "APPROVE_FILE <path>" (the same for a
 // change of that file), "RATE" (the plan's windows moved:
-// `account/rateLimits/updated`), "LEAK" (quotes $FAKE_SECRET in two deltas apart); anything else answers "pong".
+// `account/rateLimits/updated`), "LEAK" (quotes $FAKE_SECRET in two deltas apart), "FAST_REFUSED" (a turn with
+// `serviceTier: "fast"` fails as the provider's refusal comes back); anything else answers "pong".
 // `account/rateLimits/read` answers the 5 hours at 12% and the week at 55%.
 import { appendFileSync } from "node:fs";
 import { createInterface } from "node:readline";
@@ -252,6 +253,13 @@ function appServer() {
               primary: { usedPercent: 91, windowDurationMins: 300, resetsAt: 1900000000 },
               secondary: null,
             },
+          });
+        }
+        if (/\bFAST_REFUSED\b/.test(prompt) && params.serviceTier === "fast") {
+          return complete("failed", {
+            message: '{"error":{"message":"Fast mode is not available for this account.","param":"service_tier"}}',
+            codexErrorInfo: "other",
+            additionalDetails: null,
           });
         }
         if (/\bLIMIT\b/.test(prompt)) {

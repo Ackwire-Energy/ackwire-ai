@@ -81,6 +81,7 @@ const option = (kind: "claude_code" | "codex", over: Partial<AgentBrain["options
 /** Ada on the MacBook, hers: every plan can sign in there. */
 const brain = (over: Partial<AgentBrain> = {}): AgentBrain => ({
   agentId: "ada",
+  speed: "standard",
   brain: "model",
   model: null,
   effectiveModel: null,

@@ -7,6 +7,7 @@ import type { CommandProfile } from "@agenteschat/adapters/command-policy";
 import {
   type AgentScope,
   type BrainEffort,
+  type BrainSpeed,
   isAccountId,
   isBrainEffort,
   isContextTokens,
@@ -97,7 +98,8 @@ export type CodexBrainEvent =
   | { type: "done"; text: string; session?: { id: string } }
   | { type: "error"; code: string; message: string; retryable?: boolean; worked?: boolean }
   /** Protocol 15 (app-server only): messages handed with `brain.steer` that the turn read. */
-  | { type: "steer_read"; uuids: string[] };
+  | { type: "steer_read"; uuids: string[] }
+  | { type: "speed_fallback"; message: string };
 
 /** `brain.turn` with `kind: "codex"` (contract: "Runner"). */
 export interface CodexBrainTurnRequest {
@@ -115,6 +117,8 @@ export interface CodexBrainTurnRequest {
   account?: string;
   /** Protocol 13: how hard it thinks. */
   effort?: BrainEffort;
+  /** Protocol 46: Fast mode on this turn. */
+  speed?: BrainSpeed;
   /** Protocol 28: the agent's context limit in tokens. */
   contextTokens?: number;
   /** Protocol 16: the turn's permission profile (absent: `work`); protocol 41: `chat`, the team's right hand. */
@@ -200,6 +204,16 @@ export const codexProfileOf = (req: { permissions?: { mode?: unknown } }): Comma
 
 /** The Codex sandbox of a profile (`--sandbox`, the app-server's `sandbox`): never with the network. */
 export const codexSandbox = (profile: CommandProfile) => (profile === "plan" ? "read-only" : "workspace-write");
+
+/**
+ * Fast mode on a `codex exec` turn. `fast` reaches the provider as `service_tier: "priority"` (codex-cli 0.166.0), and
+ * a model that doesn't list the tier goes out without one. `features.` rather than `--enable`: the flag fails the turn
+ * on a Codex that doesn't know the feature, the key doesn't.
+ */
+export const CODEX_FAST_CONFIG = ['service_tier="fast"', "features.fast_mode=true"];
+
+/** The account or model refused the tier: Codex hands on the provider's words, naming it or Fast mode. */
+const CODEX_FAST_REFUSED = /service[_ ]tier|fast[_ ]mode/i;
 
 /** The agent's context limit as Codex's own: it compacts the conversation there instead of at its window. */
 export const codexContextOverride = (tokens: unknown): string[] =>
@@ -330,6 +344,8 @@ export function codexTurnArgs(input: {
   writableRoots?: string[];
   /** Protocol 13: `-c model_reasoning_effort` (anything else is left out). */
   effort?: BrainEffort;
+  /** Protocol 46: `fast`, `CODEX_FAST_CONFIG`. */
+  speed?: BrainSpeed;
   /** Protocol 28: `-c model_auto_compact_token_limit` (anything else is left out). */
   contextTokens?: number;
   /** Protocol 16: the sandbox (default `work`: workspace-write; `plan`: read-only). Never the network. */
@@ -363,6 +379,7 @@ export function codexTurnArgs(input: {
     ...(isBrainEffort(input.effort)
       ? ["-c", `model_reasoning_effort=${JSON.stringify(codexEffort(input.effort))}`]
       : []),
+    ...(input.speed === "fast" ? CODEX_FAST_CONFIG.flatMap((c) => ["-c", c]) : []),
     ...codexContextOverride(input.contextTokens),
     ...(input.model ? ["-m", input.model] : []),
     "-o",
@@ -615,6 +632,8 @@ export interface CodexTurnInput {
   /** Protocol 13: the account (its threads are its own) and its folder (`CODEX_HOME`). */
   account?: { id: string; home: string };
   effort?: BrainEffort;
+  /** Protocol 46: Fast mode on this turn. */
+  speed?: BrainSpeed;
   /** Protocol 28: the agent's context limit in tokens. */
   contextTokens?: number;
   /** App-server mode: the agent (one process per agent and session) and its folder (the MCP bridge's). */
@@ -652,8 +671,28 @@ export async function runCodexTurn(input: CodexTurnInput, opts: CodexTurnOptions
   }
   // A long-lived app-server takes messages mid-turn; exec runs the turns it can't (an older CLI, a failed handshake…).
   // A `chat` turn's flags exist only for `exec`.
-  if (opts.app && !input.chat) return opts.app.turn({ ...input, version }, opts, () => runCodexExec(input, opts));
-  return runCodexExec(input, opts);
+  const run = (turn: CodexTurnInput, turnOpts: CodexTurnOptions) =>
+    turnOpts.app && !turn.chat
+      ? turnOpts.app.turn({ ...turn, version }, turnOpts, () => runCodexExec(turn, turnOpts))
+      : runCodexExec(turn, turnOpts);
+  if (input.speed !== "fast") return run(input, opts);
+  // Fast never costs a reply: refused before anything happened, the same turn goes again at standard speed.
+  const first: { started?: boolean; refused?: string } = {};
+  await run(input, {
+    ...opts,
+    emit: (event) => {
+      const fast = event.type === "error" && event.code === "codex_failed" && CODEX_FAST_REFUSED.test(event.message);
+      if (fast && !first.started) first.refused = event.message;
+      else {
+        first.started = true;
+        opts.emit(event);
+      }
+    },
+  });
+  if (first.refused === undefined) return;
+  opts.emit({ type: "speed_fallback", message: first.refused });
+  const { speed: _speed, ...standard } = input;
+  return run(standard, opts);
 }
 
 /** One turn as `codex exec --json` (the version already checked). */
@@ -675,6 +714,7 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
     mcp: input.mcp.url ? { url: input.mcp.url } : { ...(opts.mcpCommand ? { command: opts.mcpCommand } : {}) },
     ...(input.writableRoots?.length ? { writableRoots: input.writableRoots } : {}),
     ...(input.effort ? { effort: input.effort } : {}),
+    ...(input.speed ? { speed: input.speed } : {}),
     ...(input.contextTokens ? { contextTokens: input.contextTokens } : {}),
     profile: input.profile ?? "work",
     ...(input.chat ? { chat: true } : {}),
@@ -893,6 +933,7 @@ export async function handleCodexBrainTurn(
         ...(writableRoots.length ? { writableRoots } : {}),
         ...(account ? { account } : {}),
         ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
+        ...(req.speed === "fast" && !chat ? { speed: "fast" as const } : {}),
         ...(isContextTokens(req.contextTokens) ? { contextTokens: req.contextTokens } : {}),
         agentId: String(req.agent.id),
         folder,

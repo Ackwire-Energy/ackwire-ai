@@ -1,4 +1,4 @@
-import { keys, useApi } from "@agenteschat/client";
+import { type AgentBrainInput, keys, useApi } from "@agenteschat/client";
 import { EFFORT_LEVELS, type EffortLevel } from "@agenteschat/client/lib/brain-advanced";
 import { bodyTones } from "@agenteschat/ui/agent/engine";
 import { Canvas, Fill, Shader, Skia, useClock } from "@shopify/react-native-skia";
@@ -215,36 +215,43 @@ export function EffortRamp({
  * The ramp's choice, saved when let go: it stays on the ramp while the server answers, and a change made in the
  * meantime goes next, so the last one wins. Only a failure speaks.
  */
-export function useEffortChoice(agentId: string, saved: EffortLevel | undefined) {
+export const useEffortChoice = (agentId: string, saved: EffortLevel | undefined) =>
+  useBrainChoice<EffortLevel>(agentId, saved ?? "medium", (effort) => ({ effort }));
+
+/**
+ * One choice of the agent's brain that shows at once and saves in the background: the last one wins, and a save that
+ * fails goes back to what is saved and says so.
+ */
+export function useBrainChoice<V>(agentId: string, saved: V, input: (value: V) => AgentBrainInput) {
   const { t } = useTranslation();
   const { orgId } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
-  const [draft, setDraft] = useState<EffortLevel | null>(null);
+  const [draft, setDraft] = useState<V | null>(null);
   const sending = useRef(false);
-  const next = useRef<EffortLevel | null>(null);
-  const send = async (level: EffortLevel) => {
+  const next = useRef<V | null>(null);
+  const send = async (value: V) => {
     sending.current = true;
     try {
-      qc.setQueryData(keys.agentBrain(orgId, agentId), await api.agents.setBrain(orgId, agentId, { effort: level }));
+      qc.setQueryData(keys.agentBrain(orgId, agentId), await api.agents.setBrain(orgId, agentId, input(value)));
     } catch {
       toast({ title: t("agentPage.work.failed"), icon: "x" });
     }
     sending.current = false;
     const queued = next.current;
     next.current = null;
-    if (queued) return void send(queued);
+    if (queued !== null) return void send(queued);
     setDraft(null);
     for (const key of [keys.agentBrain(orgId, agentId), keys.agents(orgId)])
       void qc.invalidateQueries({ queryKey: key });
   };
-  const change = (level: EffortLevel) => {
-    setDraft(level);
-    if (sending.current) next.current = level;
-    else void send(level);
+  const change = (value: V) => {
+    setDraft(value);
+    if (sending.current) next.current = value;
+    else void send(value);
   };
-  return { value: draft ?? saved ?? "medium", change };
+  return { value: draft ?? saved, change };
 }
 
 const styles = StyleSheet.create({

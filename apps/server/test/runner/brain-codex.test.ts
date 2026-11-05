@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { MachineRequest } from "@agenteschat/adapters";
+import { type MachineRequest, parseBrainEvent } from "@agenteschat/adapters";
 import {
   CODEX_CHAT_CONFIG,
   CODEX_CHAT_OFF,
@@ -375,6 +375,129 @@ test("effort: model_reasoning_effort, with xhigh and max as high; nothing for an
   expect(args().some((a) => a.startsWith("model_reasoning_effort"))).toBe(false);
   // Before resume and the stdin dash, like every option.
   expect(args("medium").slice(-1)).toEqual(["-"]);
+});
+
+test("speed: fast is the tier and its feature, on a work turn or any other; nothing otherwise", () => {
+  const args = (speed?: string) =>
+    codexTurnArgs({ cwd: "/w", lastFile: "/l.txt", runId: RUN, model: "gpt-6.1-sol", speed: speed as never });
+  const fast = args("fast");
+  expect(fast[fast.indexOf('service_tier="fast"') - 1]).toBe("-c");
+  expect(fast[fast.indexOf("features.fast_mode=true") - 1]).toBe("-c");
+  for (const other of [args("standard"), args("turbo"), args()]) {
+    expect(other.some((a) => a.includes("service_tier") || a.includes("fast_mode"))).toBe(false);
+  }
+});
+
+/** A `codex` refusing `service_tier="fast"` as the provider's 400 comes back (exit 1), answering any other turn. */
+function fastRefusingCodex(dir: string, refusal: string) {
+  const bin = path.join(dir, "codex");
+  writeFileSync(
+    bin,
+    [
+      "#!/bin/sh",
+      'n=$(ls "$FAKE_DIR" | grep -c "^args-")',
+      'for a in "$@"; do printf "%s\\n" "$a"; done > "$FAKE_DIR/args-$n"',
+      "cat > /dev/null",
+      'case " $* " in',
+      `  *service_tier*) cat <<'EOF'\n${JSON.stringify({ type: "thread.started", thread_id: THREAD })}\n${JSON.stringify({ type: "turn.failed", error: { message: refusal } })}\nEOF\nexit 1;;`,
+      "esac",
+      `cat <<'EOF'\n${JSON.stringify({ type: "item.completed", item: { id: "m", type: "agent_message", text: "pong" } })}\n${JSON.stringify({ type: "turn.completed", usage: { input_tokens: 1, cached_input_tokens: 0, output_tokens: 1 } })}\nEOF`,
+    ].join("\n"),
+  );
+  chmodSync(bin, 0o755);
+  return bin;
+}
+
+async function fastTurn(refusal: string) {
+  const root = tempDir("brain-codex-");
+  dirs.push(root);
+  const fake = path.join(root, "fake");
+  mkdirSync(fake, { recursive: true });
+  process.env.FAKE_DIR = fake;
+  const events: CodexBrainEvent[] = [];
+  await runCodexTurn(
+    {
+      runId: RUN,
+      sessionId: SESSION,
+      cwd: root,
+      system: "",
+      prompt: "hi",
+      mcp: { token: "t" },
+      speed: "fast",
+    },
+    {
+      threads: new CodexThreads(path.join(root, "threads.json")),
+      workDir: path.join(root, "turn"),
+      emit: (e) => events.push(e),
+      signal: new AbortController().signal,
+      bin: fastRefusingCodex(fake, refusal),
+      codexVersion: () => "codex-cli 0.166.0",
+    },
+  );
+  delete process.env.FAKE_DIR;
+  const argv = (n: number) =>
+    existsSync(path.join(fake, `args-${n}`)) ? readFileSync(path.join(fake, `args-${n}`), "utf8").split("\n") : null;
+  return { events, argv };
+}
+
+test.skipIf(!posix)(
+  "Fast refused on exec: the same turn again at standard speed, once, and the reply still comes",
+  async () => {
+    const refusal = '{"error":{"message":"Fast mode is not available for this account.","param":"service_tier"}}';
+    const { events, argv } = await fastTurn(refusal);
+    expect(argv(0)).toContain('service_tier="fast"');
+    expect(argv(1)).not.toContain('service_tier="fast"');
+    expect(argv(1)).toContain("resume");
+    expect(argv(2)).toBeNull();
+    expect(events.filter((e) => e.type === "error")).toEqual([]);
+    const note = events.find((e) => e.type === "speed_fallback");
+    expect(note).toEqual({ type: "speed_fallback", message: refusal });
+    expect(parseBrainEvent(note)).toEqual(note as never);
+    expect(events.at(-1)).toMatchObject({ type: "done", text: "pong" });
+  },
+);
+
+test.skipIf(!posix)("another failure of a Fast turn on exec stays that failure: no second try, no note", async () => {
+  const { events, argv } = await fastTurn("The model is overloaded.");
+  expect(argv(1)).toBeNull();
+  expect(events.some((e) => e.type === "speed_fallback")).toBe(false);
+  expect(events.at(-1)).toMatchObject({ type: "error", code: "codex_failed" });
+});
+
+test.skipIf(!posix)("a chat turn (the right hand) never carries the tier, whatever the request says", async () => {
+  const root = tempDir("brain-codex-");
+  dirs.push(root);
+  const fake = path.join(root, "fake");
+  const ws = path.join(root, "ws");
+  const home = path.join(root, "home");
+  for (const d of [fake, ws, home]) mkdirSync(d, { recursive: true });
+  process.env.FAKE_DIR = fake;
+  try {
+    const ctx = {
+      folder: await agentWorkspace(ws, AGENT),
+      exec: true,
+      runnerHome: home,
+      codexVersion: () => "codex-cli 0.166.0",
+      bin: fakeCodex(fake),
+    };
+    const req = {
+      runId: RUN,
+      kind: "codex" as const,
+      session: { id: SESSION, resume: false },
+      system: "",
+      prompt: "hi",
+      mcp: { token: "t" },
+      agent: AGENT,
+      speed: "fast" as const,
+      permissions: { mode: "chat" as const },
+    };
+    await handleCodexBrainTurn(ctx, req, { signal: new AbortController().signal, emit: () => {} });
+    const args = readFileSync(path.join(fake, "args-0"), "utf8");
+    expect(args).toContain("--ignore-user-config");
+    expect(args).not.toContain("service_tier");
+  } finally {
+    delete process.env.FAKE_DIR;
+  }
 });
 
 test("context limit (protocol 28): model_auto_compact_token_limit, nothing for a value out of range", () => {

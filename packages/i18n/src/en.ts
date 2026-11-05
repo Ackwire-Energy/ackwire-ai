@@ -4207,6 +4207,10 @@ export const en = {
           high: "Thinks more on hard tasks. Slower and costs more.",
           max: "Thinks as much as possible. Much slower and pricier.",
         },
+        speed: "Speed",
+        speeds: { standard: "Standard", fast: "Fast" },
+        speedText:
+          "Answers faster in conversations and uses the plan 2.5× as fast. Routines and long tasks stay at standard speed.",
         modelLine: {
           opus: "The most capable. Uses up the plan faster.",
           sonnet: "Balanced. Good for almost everything.",
@@ -4230,9 +4234,12 @@ export const en = {
             model: "Context window",
             auto: "Context window and who it answers",
             fixed: "Effort, context window and who it answers",
+            autoSpeed: "Speed, context window and who it answers",
+            fixedSpeed: "Effort, speed, context window and who it answers",
           },
           allDefault: "All defaults",
           effort: "Effort: {{level}}",
+          speed: "Fast speed",
           context: "Context: {{size}}",
           sharing: "Answers other people",
           waits: "Waits for the computer",
@@ -12093,6 +12100,10 @@ export const en = {
     working: "In the background",
   },
   chat: {
+    speedFallback: {
+      text: "ChatGPT refused Fast speed on this account or model, so this reply came at standard speed.",
+      action: "Open agent",
+    },
     /** When a waiting agent goes on (`usageWhen`). */
     usageWhen: { at: "at {{time}}", on: "{{day}} at {{time}}", date: "on {{date}}" },
     doing_one: "{{names}} is {{doing}}",

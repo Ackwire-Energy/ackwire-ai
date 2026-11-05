@@ -250,7 +250,14 @@ import { ChannelHeader } from "@/components/ChannelHeader";
 import { ChannelPermissions } from "@/components/ChannelPermissions";
 import { ChannelPinnedBar } from "@/components/ChannelPins";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
-import { AppViaTag, NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
+import {
+  AppViaTag,
+  NoticeLine,
+  RoutineReport,
+  RoutineTag,
+  SpeedFallbackLine,
+  UnshownLine,
+} from "@/components/ChatNotices";
 import { QueueWaitTurns, useAgentsMachineId } from "@/components/ComputerQueue";
 import { ConsultationPanel } from "@/components/ConsultationPanel";
 import {
@@ -2160,7 +2167,9 @@ function ChannelView({
               {chrome?.header ? (
                 <AgentTasksContext.Provider value={tasksControl}>
                   <AgentPanelShownContext.Provider value={profile?.agentId ?? null}>
-                    {typeof chrome.header === "function" ? chrome.header({ onSearch: openSearch, side }) : chrome.header}
+                    {typeof chrome.header === "function"
+                      ? chrome.header({ onSearch: openSearch, side })
+                      : chrome.header}
                   </AgentPanelShownContext.Provider>
                 </AgentTasksContext.Provider>
               ) : (
@@ -4278,6 +4287,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             )}
             {media && <ChatMedia media={media} />}
             {voice && <ChatVoice message={m} voice={voice} />}
+            {m.author.type === "agent" && meta.speedFallback === true && <SpeedFallbackLine agent={agent} />}
             {(stopped.canceled || atLimit || providerCut) && (
               <StoppedLine
                 runId={m.agentRunId}

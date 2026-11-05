@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
+import type { AgentBrain } from "../src/api/types";
 import { brainLine, engineOfBrain, engineOfExecutor, engineStateOfOption, thinksWith } from "../src/lib/brain";
+import {
+  ADVANCED_DEFAULTS,
+  advancedContents,
+  advancedParts,
+  isAdvancedDefault,
+  viewSpeedFits,
+} from "../src/lib/brain-advanced";
 
 describe("the engine an agent thinks with", () => {
   test("agents.brain maps to its engine; the API and anything unknown is the agent itself", () => {
@@ -82,5 +90,53 @@ describe("what thinks, in one sentence", () => {
       kind: "agent",
       mark: null,
     });
+  });
+});
+
+describe("Velocidade (ADR 0149)", () => {
+  const t = ((key: string) => key) as unknown as TFunction;
+  type Fits = Parameters<typeof viewSpeedFits>[0];
+  const view = (over: Partial<Fits> = {}): Fits => ({
+    brain: "codex",
+    effectiveModel: "gpt-6.1-sol",
+    account: null,
+    accounts: [],
+    ...over,
+  });
+
+  test("shows on a ChatGPT sign-in with a model that has it, Automático included", () => {
+    expect(viewSpeedFits(view())).toBe(true);
+    expect(viewSpeedFits(view({ effectiveModel: "auto" }))).toBe(true);
+    expect(
+      viewSpeedFits(view({ account: "a", accounts: [{ id: "a", provider: null } as AgentBrain["accounts"][number]] })),
+    ).toBe(true);
+  });
+
+  test("hides on any other model, brain or sign-in, and on the right hand", () => {
+    expect(viewSpeedFits(view({ effectiveModel: "gpt-5.5" }))).toBe(false);
+    expect(viewSpeedFits(view({ brain: "claude_code", effectiveModel: "sonnet" }))).toBe(false);
+    expect(viewSpeedFits(view({ brain: "model", effectiveModel: null }))).toBe(false);
+    expect(viewSpeedFits(view({ scope: "workspace" }))).toBe(false);
+    expect(viewSpeedFits(view({ scope: "mine" }))).toBe(false);
+  });
+
+  test("Rápida counts as a change from the defaults and is named wherever they are", () => {
+    const now = { ...ADVANCED_DEFAULTS, speed: "fast" as const };
+    expect(isAdvancedDefault("codex", now)).toBe(false);
+    expect(advancedParts(t, "pt-BR", { kind: "codex", autoModel: false, apiKey: false, now })).toEqual([
+      "agentPage.work.brain.advanced.speed",
+    ]);
+    expect(
+      advancedParts(t, "pt-BR", { kind: "codex", autoModel: false, apiKey: false, now: ADVANCED_DEFAULTS }),
+    ).toEqual([]);
+    expect(advancedContents(t, { kind: "codex", autoModel: false, speed: true })).toBe(
+      "agentPage.work.brain.advanced.contents.fixedSpeed",
+    );
+    expect(advancedContents(t, { kind: "codex", autoModel: true, speed: true })).toBe(
+      "agentPage.work.brain.advanced.contents.autoSpeed",
+    );
+    expect(advancedContents(t, { kind: "codex", autoModel: false })).toBe(
+      "agentPage.work.brain.advanced.contents.fixed",
+    );
   });
 });

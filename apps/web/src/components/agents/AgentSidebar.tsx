@@ -391,6 +391,7 @@ function ThinksSection({ agent }: { agent: Agent }) {
             <dd className="ac-iconline">
               {thinks.mark ? <ProviderLogo id={thinks.mark} size="xs" /> : <BrainIcon kind={thinks.kind} size={14} />}
               {thinks.text}
+              {agent.brain?.speed && ` · ${t("agentPage.work.brain.speeds.fast")}`}
             </dd>
           </div>
         )}

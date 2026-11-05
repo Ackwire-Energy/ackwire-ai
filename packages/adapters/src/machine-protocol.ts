@@ -7,7 +7,7 @@ import type { MergeDone } from "./command-policy";
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 45;
+export const MACHINE_PROTOCOL_VERSION = 46;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -514,6 +514,11 @@ export const ANTIGRAVITY_PROTOCOL = 44;
  */
 export const VAULT_PROTOCOL = 45;
 /**
+ * From this protocol on (ADR 0149): `brain.turn` carries `speed`, and a Codex turn the account or model refused at
+ * that speed goes again at standard speed, with a `speed_fallback` event before it. An older runner never sees it.
+ */
+export const SPEED_PROTOCOL = 46;
+/**
  * Protocol 45 (ADR 0144 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
  * only, from the moment it got it (never across its own restart). The server counts a `site` delivery older than this
  * as gone too: it doesn't tell the agent it holds it, nor list it on the agent's page.
@@ -581,6 +586,12 @@ export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
 export const BRAIN_EFFORTS: readonly BrainEffort[] = ["low", "medium", "high", "xhigh", "max"];
 export const isBrainEffort = (v: unknown): v is BrainEffort =>
   typeof v === "string" && (BRAIN_EFFORTS as readonly string[]).includes(v);
+
+/** How fast an agent answers in conversations (ADR 0149): `fast` is the provider's Fast mode. */
+export type BrainSpeed = "standard" | "fast";
+export const BRAIN_SPEEDS: readonly BrainSpeed[] = ["standard", "fast"];
+export const isBrainSpeed = (v: unknown): v is BrainSpeed =>
+  typeof v === "string" && (BRAIN_SPEEDS as readonly string[]).includes(v);
 
 /** A `brain.turn`'s `contextTokens` the runner applies (protocol 28): a whole number of tokens in a sane range. */
 export const isContextTokens = (v: unknown): v is number =>
@@ -1296,7 +1307,9 @@ export type WireBrainEvent =
    */
   | { type: "error"; code: string; message: string; retryable?: boolean; worked?: boolean }
   /** Protocol 15: messages handed with `brain.steer` that the turn read (their `uuid`s). */
-  | { type: "steer_read"; uuids: string[] };
+  | { type: "steer_read"; uuids: string[] }
+  /** Protocol 46: Fast was refused (`message`: the provider's words); the turn goes on at standard speed. */
+  | { type: "speed_fallback"; message: string };
 
 /**
  * `brain.steer` (protocol 15): messages for the turn of `runId` in progress.
@@ -1370,6 +1383,8 @@ export interface BrainTurnRequest {
   account?: string;
   /** Protocol 13: how hard it thinks; absent: the CLI's default. */
   effort?: BrainEffort;
+  /** Protocol 46: `fast` asks for the provider's Fast mode on this turn; absent: standard speed. */
+  speed?: BrainSpeed;
   /**
    * `opencode`: no account on a computer nobody connected, so OpenCode's own free tier alone (`opencode/*` models,
    * no key from the runner's env); ADR 0132.
@@ -2399,6 +2414,8 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
         .map((u) => u.slice(0, 64));
       return uuids.length ? { type: "steer_read", uuids } : null;
     }
+    case "speed_fallback":
+      return { type: "speed_fallback", message: (isString(v.message) ? v.message : "").slice(0, BRAIN_LIMITS.message) };
     default:
       return null;
   }

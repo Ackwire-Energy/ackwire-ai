@@ -247,6 +247,23 @@ describe("what the viewer sees", () => {
   });
 });
 
+describe("Como pensa", () => {
+  const thinks = async (speed?: "fast") => {
+    widthIs(DM_SIDE_WIDE_QUERY);
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.brain = { kind: "codex", model: "GPT-6.1 Sol", ...(speed ? { speed } : {}) };
+    await openDm({ state });
+    return (section("Como pensa") as HTMLElement).textContent;
+  };
+
+  test("says Rápida next to the model when that is its speed, and nothing at the standard one", async () => {
+    expect(await thinks("fast")).toMatch(/GPT-6\.1 Sol pelo plano do ChatGPT.* · Rápida/);
+    cleanup();
+    expect(await thinks()).not.toContain("Rápida");
+  });
+});
+
 describe("the picture's refresh", () => {
   test("only while the sidebar shows in a focused window, of a screen that runs", () => {
     const on = { available: true, running: true };

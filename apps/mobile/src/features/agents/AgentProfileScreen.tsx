@@ -200,7 +200,8 @@ function Profile({ id }: { id: string }) {
           level: t(`agentPage.work.brain.effortsLower.${effortLevel(effortView.effort)}`),
         })
       : null;
-  const thinksUnder = [thinksModel, thinksEffort].filter(Boolean).join(" · ");
+  const thinksSpeed = agent?.brain?.speed ? t("agentPage.work.brain.speeds.fast") : null;
+  const thinksUnder = [thinksModel, thinksEffort, thinksSpeed].filter(Boolean).join(" · ");
   const spend = detail.data
     ? spendOf({
         budgetUsedPercent: detail.data.budgetUsedPercent,

@@ -4,9 +4,11 @@ import {
   ANTIGRAVITY_PROTOCOL,
   BRAIN_PROTOCOL,
   type BrainEffort,
+  type BrainSpeed,
   CURSOR_PROTOCOL,
   GROK_PROTOCOL,
   isBrainEffort,
+  isBrainSpeed,
   OPENCODE_PROTOCOL,
   type OwnPlanUsage,
   PLAN_KEYS_PROTOCOL,
@@ -32,6 +34,7 @@ import {
   OPENCODE_FREE_MODELS,
   planModel,
   planOf,
+  speedFits,
 } from "@agenteschat/providers/plans";
 import { type Agent, getAgent, rememberAgentSetup, setupOfAgent } from "./agents";
 import {
@@ -411,6 +414,8 @@ export interface AgentBrainView {
   account: string | null;
   /** How hard its computer brain thinks; `auto` = picked per run; null = the CLI's default. */
   effort: BrainEffortSetting | null;
+  /** How fast it answers in conversations (ADR 0149): kept whatever it thinks with, applied only where it fits. */
+  speed: BrainSpeed;
   /** The most context it reads, in tokens (`CONTEXT_LIMITS`, any brain); null = its model's window. */
   contextTokens: ContextLimit | null;
   /**
@@ -575,6 +580,7 @@ function view(
     canEdit: true,
     account: agent.brainAccountId,
     effort: isBrainEffortSetting(agent.brainEffort) ? agent.brainEffort : null,
+    speed: isBrainSpeed(agent.brainSpeed) ? agent.brainSpeed : "standard",
     contextTokens: isContextLimit(agent.contextTokens) ? agent.contextTokens : null,
     ...accounts,
     // The right hand keeps its audience: the switch says whether other people's DMs think with the plan.
@@ -886,6 +892,8 @@ export interface AgentBrainInput {
   moveAccount?: unknown;
   /** `low`…`max`, `auto` (picked per run), or null for the CLI's default. Omitted = keep it. */
   effort?: unknown;
+  /** `standard` or `fast`, kept through any change of brain, account or model. Omitted = keep it. */
+  speed?: unknown;
   /** One of `CONTEXT_LIMITS`, or null for the model's window; kept through brain switches. Omitted = keep it. */
   contextTokens?: unknown;
 }
@@ -1016,6 +1024,11 @@ export async function setAgentBrain(
     throw new ValidationError("Choose auto, low, medium, high, xhigh or max", "brain.invalid_effort");
   }
   const effort = input.effort === undefined ? agent.brainEffort : (input.effort as BrainEffortSetting | null);
+  if (input.speed !== undefined && !isBrainSpeed(input.speed)) {
+    throw new ValidationError("Choose standard or fast", "brain.invalid_speed");
+  }
+  // The right hand has no speed of its own: each person's DM thinks with their plan.
+  const speed = rightHand || input.speed === undefined ? agent.brainSpeed : input.speed;
   if (input.contextTokens !== undefined && input.contextTokens !== null && !isContextLimit(input.contextTokens)) {
     throw new ValidationError("Choose 200000, 400000 or 1000000 tokens", "brain.invalid_context");
   }
@@ -1042,6 +1055,7 @@ export async function setAgentBrain(
     extraUsage !== agent.brainExtraUsage ||
     account !== agent.brainAccountId ||
     effort !== agent.brainEffort ||
+    speed !== agent.brainSpeed ||
     contextTokens !== agent.contextTokens ||
     planForOthers !== agent.planForOthers;
   if (!thinks && !audience) return view(agent, machine, machines, accounts, userId, others);
@@ -1088,6 +1102,7 @@ export async function setAgentBrain(
         brainAccountId: account,
         brainAccountLentBy: lentBy,
         brainEffort: effort,
+        brainSpeed: speed,
         contextTokens,
         planForOthers,
         // The people and roles lists stay while it is its owner's only, for when it is let out again.
@@ -1150,9 +1165,10 @@ export async function setAgentBrain(
           extraUsage: agent.brainExtraUsage,
           account: agent.brainAccountId,
           effort: agent.brainEffort,
+          speed: agent.brainSpeed,
           contextTokens: agent.contextTokens,
         },
-        to: { brain, model, fallback, extraUsage, account, effort, contextTokens },
+        to: { brain, model, fallback, extraUsage, account, effort, speed, contextTokens },
         ...(rightHand ? { planForOthers: { from: agent.planForOthers, to: planForOthers } } : {}),
         ...options.audit,
       },
@@ -1185,6 +1201,7 @@ export async function setAgentBrain(
     brainAccountId: account,
     brainAccountLentBy: lentBy,
     brainEffort: effort,
+    brainSpeed: speed,
     contextTokens,
     planForOthers,
     ...(audience ? { audienceMode: audience.mode } : {}),
@@ -1520,6 +1537,8 @@ export interface AgentBrainSummary {
   account?: string;
   /** That account's limits as the runner last reported them; absent: not known yet. */
   usage?: PlanUsage;
+  /** Set to Rápida where that applies to what it thinks with (ADR 0149); absent: standard speed. */
+  speed?: "fast";
 }
 
 /**
@@ -1552,6 +1571,8 @@ export async function agentBrainSummaries(
     machineId: string | null;
     ownerUserId: string | null;
     brainAccountId?: string | null;
+    brainSpeed?: string;
+    builtin?: string | null;
   }[],
 ): Promise<Map<string, AgentBrainSummary>> {
   const out = new Map<string, AgentBrainSummary>();
@@ -1617,6 +1638,11 @@ export async function agentBrainSummaries(
       ...(provider ? { provider } : {}),
       ...(plan ? { account: plan.account } : {}),
       ...(plan?.usage ? { usage: plan.usage } : {}),
+      ...(a.brainSpeed === "fast" &&
+      !isRightHand(a) &&
+      speedFits({ kind, provider: row?.provider, model: a.brainModel })
+        ? { speed: "fast" as const }
+        : {}),
     });
   }
   return out;

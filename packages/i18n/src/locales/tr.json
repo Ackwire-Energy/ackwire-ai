@@ -4156,6 +4156,12 @@
           "high": "Zor görevlerde daha çok düşünür. Daha yavaş ve daha pahalıdır.",
           "max": "Olabildiğince çok düşünür. Çok daha yavaş ve daha pahalıdır."
         },
+        "speed": "Hız",
+        "speeds": {
+          "standard": "Standart",
+          "fast": "Hızlı"
+        },
+        "speedText": "Sohbetlerde daha hızlı yanıt verir ve planı 2,5× daha hızlı tüketir. Rutinler ve uzun görevler standart hızda kalır.",
         "modelLine": {
           "opus": "En yetenekli olanı. Planı daha hızlı tüketir.",
           "sonnet": "Dengeli. Neredeyse her şey için iyi.",
@@ -4178,10 +4184,13 @@
           "contents": {
             "model": "Bağlam penceresi",
             "auto": "Bağlam penceresi ve kime yanıt verdiği",
-            "fixed": "Çaba, bağlam penceresi ve kime yanıt verdiği"
+            "fixed": "Çaba, bağlam penceresi ve kime yanıt verdiği",
+            "autoSpeed": "Hız, bağlam penceresi ve kime yanıt verdiği",
+            "fixedSpeed": "Çaba, hız, bağlam penceresi ve kime yanıt verdiği"
           },
           "allDefault": "Tümü varsayılan",
           "effort": "Çaba: {{level}}",
+          "speed": "Hız: hızlı",
           "context": "Bağlam: {{size}}",
           "sharing": "Başka kişilere de yanıt verir",
           "waits": "Bilgisayarı bekler"
@@ -12451,6 +12460,10 @@
     "working": "Arka planda"
   },
   "chat": {
+    "speedFallback": {
+      "text": "ChatGPT bu hesap veya model için Hızlı hızı reddetti, bu yüzden bu yanıt standart hızda geldi.",
+      "action": "Ajanı aç"
+    },
     "usageWhen": {
       "at": "saat {{time}}",
       "on": "{{day}}, saat {{time}}",

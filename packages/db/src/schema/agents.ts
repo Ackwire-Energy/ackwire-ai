@@ -208,6 +208,11 @@ export const agents = pgTable(
     /** How hard its computer brain thinks (`low`…`max`, ADR 0041); null = the CLI's default. */
     brainEffort: text(),
     /**
+     * How fast it answers in conversations (`standard`, `fast`, ADR 0149). Kept when its model or sign-in stops
+     * supporting it, where it just doesn't apply. The right hand has none.
+     */
+    brainSpeed: text().notNull().default("standard"),
+    /**
      * It may follow a light reply with a sticker or a GIF of its own (ADR 0091), as often as the workspace's
      * `organization_settings.agent_media` allows. Off: never.
      */

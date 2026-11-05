@@ -971,6 +971,44 @@ test("a plan limit falls back to the model brain; the reply carries a quiet note
   expect(computerBrainUnavailable("claude_code", machineId, statusOf(machineId))?.code).toBe("plan_limit");
 });
 
+test("Fast: the turn of a conversation asks for it; refused, the reply says it came at standard speed", async () => {
+  f = await setup({});
+  await computerAgent(f, { brain: "codex", brainModel: "gpt-6.1-sol", brainSpeed: "fast" });
+  const { brain, seen } = scriptedComputerBrain((n) =>
+    n === 0
+      ? [
+          { type: "speed_fallback", message: "Fast mode is not available for this account." },
+          { type: "done", text: "Respondi." },
+        ]
+      : [{ type: "done", text: "De novo." }],
+  );
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { codex: () => ({ ...brain, kind: "codex" }) },
+    machines: {
+      status: async (id) =>
+        statusOf(id, {
+          protocol: MACHINE_PROTOCOL_VERSION,
+          executors: { codex: { version: "codex-cli 0.166.0" }, detectedAt: new Date().toISOString() },
+        }),
+    },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  expect(seen[0]).toMatchObject({ speed: "fast", model: "gpt-6.1-sol" });
+  const reply = (await timeline(f)).at(-1);
+  expect(reply).toMatchObject({ body: "Respondi.", meta: { speedFallback: true } });
+  const steps = await f.db.select().from(schema.agentRunSteps);
+  expect(steps.some((s) => (s.data as { speedFallback?: string }).speedFallback?.includes("not available"))).toBe(true);
+
+  // The agent moves to a model without it: the value stays, nothing goes out.
+  await f.db.update(schema.agents).set({ brainModel: "gpt-5.5" }).where(eq(schema.agents.id, f.agent.id));
+  await post(f, "@dev e agora?");
+  await drainOutbox(f.db, handlers);
+  expect(seen[1]?.speed).toBeUndefined();
+  expect((await timeline(f)).at(-1)?.meta.speedFallback).toBeUndefined();
+});
+
 test("Claude Code lists every tool; the model brain standing in lists the core ones and finds the rest", async () => {
   f = await setup({ toolsOnDemand: true, issueTools: true, reply: () => ({ chunks: ["Respondi pela API."] }) });
   await computerAgent(f);
