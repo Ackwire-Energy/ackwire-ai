@@ -2819,9 +2819,13 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   overflow-y: auto;
   border-bottom: 1px solid var(--line);
 }
-/* Last in a dialog's body, the footer's line closes the list: one line there, not two. */
+/* Last in a dialog's body, the footer's line closes the list: one line there, not two, and the list meets it (the kit's
+   room over a footer's line is for a body that ends in words or fields). */
 .ac-dialog__body > .people-picker:last-child .people-picker__results {
   border-bottom: 0;
+}
+.ac-dialog__body:has(> .people-picker:last-child):has(+ .ac-dialog__foot--bar) {
+  padding-bottom: 4px;
 }
 
 /*
@@ -11767,9 +11771,11 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
 .sidebar__more-item[data-status="active"] {
   background: var(--surface-sunken);
 }
+/* Its count on the name's 20px line, not the middle of the name and the line under it. */
 .sidebar__more-item > :is(.ac-count, .ac-countchip) {
   margin-left: auto;
-  align-self: center;
+  align-self: flex-start;
+  margin-top: calc((20px - var(--count-h, 20px)) / 2);
 }
 /* The tool opened from More stays in sight under it. */
 .sidebar__more-active {

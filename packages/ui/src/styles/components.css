@@ -2230,6 +2230,9 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-dialog__title {
   margin: 0;
   flex: 1;
+  /* A long word (an address, a file's name) wraps inside the head instead of pushing the close out. */
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 18px;
   line-height: 24px;
   font-weight: 650;
@@ -2301,6 +2304,11 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-dialog__foot--bar {
   padding: 12px var(--dialog-pad) var(--dialog-pad);
   border-top: 1px solid var(--line);
+}
+/* Over that line, the body ends as far above it as the buttons start under it (it kept only its 4px of room for focus
+   rings). */
+.ac-dialog__body:has(+ .ac-dialog__foot--bar) {
+  padding-bottom: 12px;
 }
 .ac-dialog__foot-note {
   flex: 1;
