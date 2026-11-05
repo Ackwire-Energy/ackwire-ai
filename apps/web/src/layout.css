@@ -9562,6 +9562,10 @@ html:not([data-pointer]) .agp-cell:focus-visible {
 .agp-tabs .ac-tab[data-state="active"]::after {
   bottom: 0;
 }
+/* The strip scrolls sideways with its tabs at its top and its ends, where it clips their rings: drawn inside. */
+html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
+  box-shadow: var(--focus-ring-inset);
+}
 .agp-badge {
   display: inline-flex;
   align-items: center;
