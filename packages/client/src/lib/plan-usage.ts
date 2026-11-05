@@ -70,6 +70,12 @@ export function usageWhen(t: TFunction, locale: string | undefined, iso: string,
   return t("chat.usageWhen.date", { date: loc.startsWith("pt") ? date.replace(/^1 /, "1º ") : date });
 }
 
+/** `usageWhen` where room is short: "às 18:00", "sáb às 18:00", "3 de dez. às 18:00". */
+export function usageWhenShort(t: TFunction, locale: string | undefined, iso: string, now = new Date()): string {
+  const { day, time } = resetWhen(locale ?? "en", iso, now);
+  return day ? t("chat.usageWhen.on", { day, time }) : t("chat.usageWhen.at", { time });
+}
+
 /**
  * The brain card's line when the agent's model is at a limit of its own on its plan (`PlanUsage.models`), so the
  * account's meters don't read as room for it: when it resets, or the region it needs. Null: none now.

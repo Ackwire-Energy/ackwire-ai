@@ -3829,6 +3829,12 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
               const createdAt = state.taskManager?.tasks.find((x) => x.runId === runId)?.createdAt ?? NOW.toISOString();
               return structuredClone(state.taskSteps?.[runId] ?? { run: { createdAt, finishedAt: null }, steps: [] });
             },
+            continueTasks: async (orgId: string, runIds: string[]) => {
+              state.calls.push({ method: "working.continueTasks", args: [orgId, runIds] });
+              for (const task of state.taskManager?.tasks ?? [])
+                if (runIds.includes(task.runId)) Object.assign(task, { status: "running", held: null, wait: null });
+              return { continued: runIds.length };
+            },
           },
         }
       : {}),

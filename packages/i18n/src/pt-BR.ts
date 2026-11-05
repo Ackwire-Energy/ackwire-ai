@@ -13997,6 +13997,40 @@ export const ptBR = {
       stopping: "Parando…",
       stopped: "Parada",
     },
+    /** Por que uma tarefa espera, na linha dela: o que a segura, depois o que vem a seguir. */
+    wait: {
+      pausedPlan: "Pausada: plano a {{percent}}% {{window}}",
+      pausedBudget: "Pausada: orçamento a {{percent}}% do mês",
+      planLimit: "Plano do {{plan}} no limite",
+      modelLimit: "{{model}} no limite",
+      modelRegion: "{{model}} precisa da região Global",
+      modelRegionNext: "Ligue no OpenCode (Settings\u00a0›\u00a0Privacy)",
+      budgetOut: "Orçamento do mês acabou",
+      workLine: "Na fila de trabalhos do agente",
+      workLineNext: "Começa quando outro trabalho terminar",
+      computerWait: "Esperando o computador",
+      computerWaitNext: "Volta quando ele estiver pronto",
+      computerOfflineNext: "Volta quando ele ligar",
+      computerBusyNext: "Começa quando tiver espaço",
+      okNext: "Segue quando alguém aprovar",
+      answerNext: "Segue quando alguém responder",
+      back: "Volta {{when}}",
+      whenRenews: "quando renovar",
+      whenSoon: "em instantes",
+    },
+    /** Uma linha sobre várias tarefas esperando o mesmo limite. */
+    waitGroup: {
+      routines_one: "{{count}} rotina",
+      routines_other: "{{count}} rotinas",
+      pausedPlan:
+        "{{what}} pausadas: o plano do {{plan}} está em {{percent}}% {{window}} e volta {{when}}. O restante fica para as conversas.",
+      pausedBudget:
+        "{{what}} pausadas: o orçamento do mês está em {{percent}}% e volta {{when}}. O restante fica para as conversas.",
+      planLimit: "{{what}} esperando: o plano do {{plan}} chegou ao limite e volta {{when}}.",
+      modelLimit:
+        "{{what}} esperando: {{model}} chegou ao limite e volta {{when}}. Os outros modelos do plano seguem funcionando.",
+      budgetOut: "{{what}} esperando: o orçamento do mês acabou e volta {{when}}.",
+    },
     where: { dm: "Conversa direta", routine: "Rotina «{{name}}»", background: "Em segundo plano" },
     askedBy: "{{name}} pediu",
     askedByYou: "Você pediu",

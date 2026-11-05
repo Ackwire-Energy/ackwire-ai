@@ -14053,6 +14053,35 @@
       "stopping": "Wird gestoppt…",
       "stopped": "Gestoppt"
     },
+    "wait": {
+      "pausedPlan": "Pausiert: Abo bei {{percent}} % {{window}}",
+      "pausedBudget": "Pausiert: Budget bei {{percent}} % des Monats",
+      "planLimit": "{{plan}}-Abo am Limit",
+      "modelLimit": "{{model}} am Limit",
+      "modelRegion": "{{model}} braucht die Global-Region",
+      "modelRegionNext": "Schalte sie in OpenCode ein (Settings › Privacy)",
+      "budgetOut": "Monatsbudget aufgebraucht",
+      "workLine": "In der Arbeitsreihe des Agenten",
+      "workLineNext": "Startet, wenn andere Arbeit endet",
+      "computerWait": "Wartet auf den Computer",
+      "computerWaitNext": "Geht weiter, wenn er bereit ist",
+      "computerOfflineNext": "Geht weiter, wenn er an ist",
+      "computerBusyNext": "Startet, wenn Platz frei ist",
+      "okNext": "Geht weiter, sobald jemand freigibt",
+      "answerNext": "Geht weiter, sobald jemand antwortet",
+      "back": "Geht {{when}} weiter",
+      "whenRenews": "nach der Erneuerung",
+      "whenSoon": "gleich"
+    },
+    "waitGroup": {
+      "routines_one": "{{count}} Routine",
+      "routines_other": "{{count}} Routinen",
+      "pausedPlan": "{{what}} pausiert: Das {{plan}}-Abo steht bei {{percent}} % {{window}} und geht {{when}} weiter. Der Rest bleibt für die Unterhaltungen.",
+      "pausedBudget": "{{what}} pausiert: Das Monatsbudget steht bei {{percent}} % und geht {{when}} weiter. Der Rest bleibt für die Unterhaltungen.",
+      "planLimit": "{{what}} warten: Das {{plan}}-Abo hat sein Limit erreicht und geht {{when}} weiter.",
+      "modelLimit": "{{what}} warten: {{model}} hat sein Limit erreicht und geht {{when}} weiter. Die anderen Modelle des Abos funktionieren weiter.",
+      "budgetOut": "{{what}} warten: Das Monatsbudget ist aufgebraucht und geht {{when}} weiter."
+    },
     "where": {
       "dm": "Direkte Unterhaltung",
       "routine": "Routine „{{name}}“",

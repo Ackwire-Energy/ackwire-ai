@@ -1,6 +1,9 @@
 import type { TFunction } from "i18next";
-import type { EndedTask, ManagedTask, TaskNow } from "../api/types";
+import type { EndedTask, ManagedTask, TaskNow, TaskWait } from "../api/types";
 import { type Activity, toolActivity } from "./activity";
+import { etaMinutes } from "./computer-queue";
+import { usageWhenShort } from "./plan-usage";
+import { usageWindowText } from "./usage-pause";
 
 /**
  * The task manager, the same on every app (ADR 0128): the web's page, the phone's list and the chat's strip read
@@ -49,6 +52,145 @@ export const waitKey = (w: WaitReason) =>
           : w === "plan"
             ? "taskManager.state.plan"
             : "taskManager.state.budget";
+
+const say = (t: TFunction) => t as unknown as (key: string, o?: Record<string, unknown>) => string;
+
+/** A sentence with a window that may have no words of its own: no gap where it was. */
+const closeGap = (text: string) => text.replace(/\s+/g, " ").trim();
+
+/** When a limit gives way: its reset in the reader's zone, "quando renovar" unknown, "em instantes" once past it. */
+function backWhen(t: TFunction, locale: string, resetsAt: string | null, now: number) {
+  if (!resetsAt) return say(t)("taskManager.wait.whenRenews");
+  if (Date.parse(resetsAt) <= now) return say(t)("taskManager.wait.whenSoon");
+  return usageWhenShort(t, locale, resetsAt, new Date(now));
+}
+
+/** A computer's waits that mean it's gone; any other (signed out, paused, a program to update) isn't "desligado". */
+const COMPUTER_GONE = new Set(["machine_offline", "machine_dropped", "no_computer"]);
+
+/**
+ * What a waiting task says on its row, whole: what holds it and why ("Pausada: plano a 95% da semana"), and what comes
+ * next ("Volta sáb às 18:00"). Null when it isn't waiting.
+ */
+export function taskWaitWords(
+  t: TFunction,
+  locale: string,
+  task: Pick<ManagedTask, "status" | "held" | "line" | "wait">,
+  now = Date.now(),
+): { state: string; next: string | null } | null {
+  const reason = waitsFor(task);
+  if (!reason) return null;
+  const s = say(t);
+  const w = task.wait ?? null;
+  const back = () => s("taskManager.wait.back", { when: backWhen(t, locale, w?.resetsAt ?? null, now) });
+  const paused = w?.code === "usage_pause" && w.percent !== null;
+  switch (reason) {
+    case "ok":
+      return { state: s(waitKey(reason)), next: s("taskManager.wait.okNext") };
+    case "answer":
+      return { state: s(waitKey(reason)), next: s("taskManager.wait.answerNext") };
+    case "computer_busy": {
+      const place = linePlace(task);
+      return {
+        state: place ? s("taskManager.state.inLine", { position: place.position }) : s(waitKey(reason)),
+        next: place?.estimatedStartAt
+          ? s("queue.startsIn", { n: etaMinutes(place.estimatedStartAt, now) })
+          : s("taskManager.wait.computerBusyNext"),
+      };
+    }
+    case "computer_offline":
+      if (w?.code === "work_queue")
+        return { state: s("taskManager.wait.workLine"), next: s("taskManager.wait.workLineNext") };
+      if (w && !COMPUTER_GONE.has(w.code))
+        return { state: s("taskManager.wait.computerWait"), next: s("taskManager.wait.computerWaitNext") };
+      return { state: s(waitKey(reason)), next: s("taskManager.wait.computerOfflineNext") };
+    case "budget":
+      if (paused) return { state: s("taskManager.wait.pausedBudget", { percent: w.percent }), next: back() };
+      // With no reset it's other runs' reservations filling the budget, not the month: a moment, not a renewal.
+      if (w?.code === "budget")
+        return {
+          state: s("taskManager.wait.budgetOut"),
+          next: w.resetsAt ? back() : s("taskManager.wait.back", { when: s("taskManager.wait.whenSoon") }),
+        };
+      return { state: s(waitKey(reason)), next: null };
+    case "plan":
+      if (paused) {
+        const window = w.window ? usageWindowText(t, w.window) : "";
+        return { state: closeGap(s("taskManager.wait.pausedPlan", { percent: w.percent, window })), next: back() };
+      }
+      if (w?.scope === "region")
+        return {
+          state: s("taskManager.wait.modelRegion", { model: w.model ?? "" }),
+          next: s("taskManager.wait.modelRegionNext"),
+        };
+      if (w?.scope === "model")
+        return { state: s("taskManager.wait.modelLimit", { model: w.model ?? "" }), next: back() };
+      if (w?.code === "plan_limit")
+        return { state: s("taskManager.wait.planLimit", { plan: w.plan ?? "" }), next: back() };
+      return { state: s(waitKey(reason)), next: null };
+  }
+}
+
+/** Tasks waiting on the same limit: the line over them says it once, with Continuar agora for a pause. */
+export interface TaskWaitGroup {
+  key: string;
+  tasks: ManagedTask[];
+  /** The first task's wait, at the furthest any of them got. */
+  wait: TaskWait;
+  /** The ones the viewer may press Continuar agora on. */
+  continuable: string[];
+}
+
+const USAGE_LIMITS = new Set(["plan_limit", "budget"]);
+
+/** What makes two waits the same limit; null for a wait whose rows say it all (a computer, a person, a region). */
+function limitKey(w: TaskWait | null | undefined) {
+  if (!w?.key || w.scope === "region") return null;
+  const near = w.code === "usage_pause" && w.percent !== null;
+  return near || USAGE_LIMITS.has(w.code) ? `${w.code}:${w.key}:${w.model ?? ""}:${w.window ?? ""}` : null;
+}
+
+/** The groups among `tasks`: two or more waiting on the same limit, in order of first appearance. */
+export function taskWaitGroups(tasks: ManagedTask[]): TaskWaitGroup[] {
+  const byLimit = new Map<string, ManagedTask[]>();
+  for (const task of tasks) {
+    const key = taskState(task) === "waiting" ? limitKey(task.wait) : null;
+    if (key) byLimit.set(key, [...(byLimit.get(key) ?? []), task]);
+  }
+  return [...byLimit]
+    .filter(([, list]) => list.length > 1)
+    .map(([key, list]) => {
+      const waits = list.map((task) => task.wait as TaskWait);
+      const percents = waits.flatMap((w) => (w.percent === null ? [] : [w.percent]));
+      return {
+        key,
+        tasks: list,
+        wait: { ...(waits[0] as TaskWait), percent: percents.length ? Math.max(...percents) : null },
+        continuable: list.filter((task) => task.wait?.canContinue).map((task) => task.runId),
+      };
+    });
+}
+
+/** The line over a group: "9 rotinas pausadas: o plano do Claude está em 95% da semana e volta sáb às 18:00. …". */
+export function taskWaitGroupText(t: TFunction, locale: string, group: TaskWaitGroup, now = Date.now()) {
+  const s = say(t);
+  const { wait: w, tasks } = group;
+  const count = tasks.length;
+  const what = s(tasks.every((task) => task.background) ? "taskManager.waitGroup.routines" : "taskManager.tasks", {
+    count,
+  });
+  const values = { what, plan: w.plan ?? "", model: w.model ?? "", percent: w.percent };
+  const when = backWhen(t, locale, w.resetsAt, now);
+  if (w.code === "usage_pause" && tasks[0]?.held === "budget")
+    return s("taskManager.waitGroup.pausedBudget", { ...values, when });
+  if (w.code === "usage_pause") {
+    const window = w.window ? usageWindowText(t, w.window) : "";
+    return closeGap(s("taskManager.waitGroup.pausedPlan", { ...values, when, window }));
+  }
+  if (w.code === "budget") return s("taskManager.waitGroup.budgetOut", { ...values, when });
+  if (w.scope === "model") return s("taskManager.waitGroup.modelLimit", { ...values, when });
+  return s("taskManager.waitGroup.planLimit", { ...values, when });
+}
 
 /** Since when it counts (a long work's start, else the run's), in ms. */
 export const taskSince = (t: Pick<ManagedTask, "startedAt" | "createdAt">) => Date.parse(t.startedAt ?? t.createdAt);

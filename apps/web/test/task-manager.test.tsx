@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -11,9 +13,11 @@ import type {
   RunStep,
   TaskManagerView,
   TaskSteps,
+  TaskWait,
   WorkingRun,
 } from "@agenteschat/client";
 import { keys, TASK_MANAGER_POLL_MS } from "@agenteschat/client";
+import { usageWhenShort } from "@agenteschat/client/lib/plan-usage";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -270,6 +274,9 @@ function cardOf(name: string) {
   const cards = [...document.querySelectorAll<HTMLElement>(".tm-card")];
   return cards.find((c) => c.querySelector(".tm-card__text b")?.textContent === name) as HTMLElement;
 }
+/** A waiting row's state cell: what holds it, then what comes next. */
+const stateOf = (row: HTMLElement) =>
+  [...row.querySelectorAll(".tm-cell--state .tm-state__text > *")].map((el) => el.textContent);
 const stopCalls = (state: FakeState) =>
   state.calls.filter((c) => c.method === "agents.cancelRun").map((c) => c.args.slice(1));
 
@@ -564,7 +571,9 @@ describe("an agent's tasks beside its DM", () => {
       "Corrigir o link de cancelar",
       "Backups",
     ]);
-    expect(cards[0]?.querySelector(".tm-taskcard__label small")?.textContent).toBe("Espera seu ok · #eng");
+    expect(cards[0]?.querySelector(".tm-taskcard__label small")?.textContent).toBe(
+      "Espera seu ok · Segue quando alguém aprovar · #eng",
+    );
     expect(cards[1]?.querySelector(".tm-here")?.textContent).toBe("aqui");
     expect(cards[2]?.querySelector(".tm-taskcard__label small")?.textContent).toMatch(/^Rotina «Backups» · /);
     // Esc closes it, and stops nothing.
@@ -634,12 +643,12 @@ describe("a computer's line", () => {
     const { view } = withLine();
     await open(seedState({ taskManager: view }), "task-manager");
     const checkout = rowOf("Ajustar o texto do checkout");
-    expect(checkout.querySelector(".tm-cell--state")?.textContent).toBe("Na fila · 1º");
+    expect(stateOf(checkout)).toEqual(["Na fila · 1º", "começa em ~3 min"]);
     // Grey with the clock: it waits on its computer, not on me.
-    expect(checkout.querySelector(".tm-cell--state .ac-chip--waiting")).toBeNull();
-    expect(checkout.querySelector(".tm-cell--use")?.textContent).toBe("começa em ~3 min");
+    expect(checkout.querySelector(".tm-state[data-wait]")).toBeNull();
+    expect(checkout.querySelector(".tm-cell--use")?.textContent).toBe("—");
     const report = rowOf("Gerar o relatório");
-    expect(report.querySelector(".tm-cell--state")?.textContent).toBe("Computador cheio");
+    expect(stateOf(report)).toEqual(["Computador cheio", "Começa quando tiver espaço"]);
     expect(report.querySelector(".tm-cell--use")?.textContent).toBe("—");
     expect(document.querySelector(".tm-sum")?.textContent).toBe("3 trabalhando1 espera você");
   });
@@ -650,7 +659,7 @@ describe("a computer's line", () => {
     if (checkout?.line) checkout.line.estimatedStartAt = null;
     await open(seedState({ taskManager: view }), "task-manager");
     const row = rowOf("Ajustar o texto do checkout");
-    expect(row.querySelector(".tm-cell--state")?.textContent).toBe("Na fila · 1º");
+    expect(stateOf(row)).toEqual(["Na fila · 1º", "Começa quando tiver espaço"]);
     expect(row.querySelector(".tm-cell--use")?.textContent).toBe("—");
   });
 
@@ -696,7 +705,7 @@ describe("a computer's line", () => {
       return cards.find((c) => c.textContent?.includes("Ajustar o texto do checkout")) as HTMLElement;
     };
     const sub = checkout().querySelector(".tm-taskcard__label small");
-    expect(sub?.textContent).toBe("Na fila · 1º · #eng");
+    expect(sub?.textContent).toBe("Na fila · 1º · começa em ~3 min · #eng");
     expect(sub?.hasAttribute("data-wait")).toBe(false);
     await click(within(checkout()).getByRole("button", { name: "Ver fila" }));
     await settle(4);
@@ -704,6 +713,166 @@ describe("a computer's line", () => {
     expect(dialog.textContent).toContain("respondendo você · sua DM");
     // The tasks stay beside the conversation, under the dialog.
     expect(document.querySelectorAll(".tm-agentpanel .tm-taskcard")).toHaveLength(4);
+  });
+});
+
+describe("why a task waits", () => {
+  const SATURDAY = new Date(Date.now() + 2.5 * 24 * 3600_000).toISOString();
+  const wait = (over: Partial<TaskWait> = {}): TaskWait => ({
+    code: "usage_pause",
+    key: "plan:m1:claude_code:a1",
+    plan: "Claude",
+    model: null,
+    scope: null,
+    percent: 95,
+    window: "seven_day",
+    resetsAt: SATURDAY,
+    canContinue: true,
+    ...over,
+  });
+  const waiting = (runId: string, label: string, held: ManagedTask["held"], w: TaskWait | null, over = {}) =>
+    task({
+      runId,
+      agentId: ADA_ID,
+      label,
+      status: "waiting_input",
+      held,
+      wait: w,
+      background: true,
+      requester: null,
+      startedAt: ago(90),
+      createdAt: ago(90),
+      machine: { id: "machine_1", name: "Computador da Ada" },
+      ...over,
+    });
+  const view = (tasks: ManagedTask[]): TaskManagerView => ({ tasks, ended: [], computers: [], activity: {} });
+  const heat = (row: HTMLElement) => (row.querySelector(".tm-cell--time") as HTMLElement).style.getPropertyValue("--h");
+
+  test("each wait says what holds it and what comes next, whole", async () => {
+    const when = usageWhenShort(
+      ((_key: string, v: Record<string, string>) => `${v.day} às ${v.time}`) as never,
+      "pt-BR",
+      SATURDAY,
+    );
+    await open(
+      seedState({
+        taskManager: view([
+          waiting("r1", "Pausa do plano", "plan", wait()),
+          waiting(
+            "r2",
+            "Pausa do orçamento",
+            "budget",
+            wait({ plan: null, window: null, percent: 96, key: "budget:a" }),
+          ),
+          waiting(
+            "r3",
+            "Limite do plano",
+            "plan",
+            wait({ code: "plan_limit", percent: null, window: null, key: "k3" }),
+          ),
+          waiting(
+            "r4",
+            "Limite do modelo",
+            "plan",
+            wait({ code: "plan_limit", scope: "model", model: "GLM-5.3", percent: null, resetsAt: null, key: "k4" }),
+          ),
+          waiting(
+            "r5",
+            "Região",
+            "plan",
+            wait({ code: "plan_limit", scope: "region", model: "DeepSeek V4 Pro", key: "k5" }),
+          ),
+          waiting("r6", "Orçamento no fim", "budget", wait({ code: "budget", percent: null, key: "k6" })),
+          waiting("r7", "Fila de trabalhos", "computer_offline", wait({ code: "work_queue", key: null })),
+          waiting("r8", "Computador longe", "computer_offline", wait({ code: "machine_offline", key: null })),
+          waiting("r9", "Sem login", "computer_offline", wait({ code: "not_logged_in", key: null })),
+          waiting("r10", "Falta o ok", null, null, { status: "waiting_approval" }),
+          waiting("r11", "Falta a resposta", null, null),
+        ]),
+      }),
+      "task-manager",
+    );
+    const back = `Volta ${when}`;
+    expect(stateOf(rowOf("Pausa do plano"))).toEqual(["Pausada: plano a 95% da semana", back]);
+    expect(stateOf(rowOf("Pausa do orçamento"))).toEqual(["Pausada: orçamento a 96% do mês", back]);
+    expect(stateOf(rowOf("Limite do plano"))).toEqual(["Plano do Claude no limite", back]);
+    expect(stateOf(rowOf("Limite do modelo"))).toEqual(["GLM-5.3 no limite", "Volta quando renovar"]);
+    expect(stateOf(rowOf("Região"))).toEqual([
+      "DeepSeek V4 Pro precisa da região Global",
+      "Ligue no OpenCode (Settings\u00a0›\u00a0Privacy)",
+    ]);
+    expect(stateOf(rowOf("Orçamento no fim"))).toEqual(["Orçamento do mês acabou", back]);
+    expect(stateOf(rowOf("Fila de trabalhos"))).toEqual([
+      "Na fila de trabalhos do agente",
+      "Começa quando outro trabalho terminar",
+    ]);
+    expect(stateOf(rowOf("Computador longe"))).toEqual(["Computador desligado", "Volta quando ele ligar"]);
+    expect(stateOf(rowOf("Sem login"))).toEqual(["Esperando o computador", "Volta quando ele estiver pronto"]);
+    expect(stateOf(rowOf("Falta o ok"))).toEqual(["Espera seu ok", "Segue quando alguém aprovar"]);
+    expect(stateOf(rowOf("Falta a resposta"))).toEqual(["Espera resposta", "Segue quando alguém responder"]);
+  });
+
+  test("Estado and Onde roda are never cut: no chip, no ellipsis class", async () => {
+    await open(seedState({ taskManager: view([waiting("r1", "Pausa do plano", "plan", wait())]) }), "task-manager");
+    const row = rowOf("Pausa do plano");
+    const state = row.querySelector(".tm-cell--state") as HTMLElement;
+    const where = row.querySelector(".tm-cell--where") as HTMLElement;
+    expect(where.textContent).toBe("Computador da Ada");
+    expect(state.querySelector(".ac-chip")).toBeNull();
+    expect(row.querySelector(".tm-ellipsis")).toBeNull();
+    const css = readFileSync(join(import.meta.dir, "../src/pages/task-manager.css"), "utf8");
+    expect(css).not.toContain(".tm-ellipsis");
+    expect(css).not.toMatch(/\.tm-cell--(state|where)[^{]*\{[^}]*(nowrap|text-overflow)/);
+  });
+
+  test("Tempo warms for work taking long, not for a wait", async () => {
+    const running = task({
+      runId: "r2",
+      agentId: ADA_ID,
+      label: "Trabalho longo",
+      background: true,
+      startedAt: ago(40),
+    });
+    await open(
+      seedState({ taskManager: view([waiting("r1", "Pausa do plano", "plan", wait()), running]) }),
+      "task-manager",
+    );
+    expect(heat(rowOf("Pausa do plano"))).toBe("0");
+    expect(heat(rowOf("Trabalho longo"))).toBe("1");
+  });
+
+  test("an agent whose tasks are all paused says why, not Na fila", async () => {
+    const asked = waiting("r1", "Pedido longo", "plan", wait(), { background: false });
+    await open(seedState({ taskManager: view([asked]) }), "task-manager");
+    const row = document.querySelector(".tm-row--agent") as HTMLElement;
+    expect(stateOf(row)[0]).toBe("Pausada: plano a 95% da semana");
+  });
+
+  const paused = (canContinue: boolean) =>
+    view([
+      waiting("r1", "Resumo diário", "plan", wait({ canContinue })),
+      waiting("r2", "Backups", "plan", wait({ canContinue, percent: 96 })),
+      waiting("r3", "Fora do grupo", "budget", wait({ plan: null, key: "budget:b", window: null })),
+    ]);
+
+  test("rows on the same limit: one line says why; Continuar agora goes on with them", async () => {
+    const state = seedState({ taskManager: paused(true) });
+    await open(state, "task-manager");
+    const lines = [...document.querySelectorAll(".tm-waitline")];
+    expect(lines).toHaveLength(1);
+    const line = lines[0] as HTMLElement;
+    expect(line.textContent).toContain("2 rotinas pausadas: o plano do Claude está em 96% da semana e volta ");
+    expect(line.textContent).toContain("O restante fica para as conversas.");
+    await click(within(line).getByRole("button", { name: "Continuar agora" }));
+    expect(state.calls.find((c) => c.method === "working.continueTasks")?.args).toEqual([ORG_ID, ["r1", "r2"]]);
+    expect(document.querySelector(".tm-waitline")).toBeNull();
+  });
+
+  test("who may not continue reads the line, with no button", async () => {
+    await open(seedState({ taskManager: paused(false) }), "task-manager");
+    const line = document.querySelector(".tm-waitline") as HTMLElement;
+    expect(line.textContent).toContain("2 rotinas pausadas");
+    expect(within(line).queryByRole("button")).toBeNull();
   });
 });
 

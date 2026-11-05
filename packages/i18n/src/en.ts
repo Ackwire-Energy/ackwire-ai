@@ -13721,6 +13721,40 @@ export const en = {
       stopping: "Stopping…",
       stopped: "Stopped",
     },
+    /** Why a task waits, on its row: what holds it, then what comes next. */
+    wait: {
+      pausedPlan: "Paused: plan at {{percent}}% {{window}}",
+      pausedBudget: "Paused: budget at {{percent}}% of the month",
+      planLimit: "{{plan}} plan at its limit",
+      modelLimit: "{{model}} at its limit",
+      modelRegion: "{{model}} needs the Global region",
+      modelRegionNext: "Turn it on in OpenCode (Settings\u00a0›\u00a0Privacy)",
+      budgetOut: "This month's budget ran out",
+      workLine: "In the agent's line of work",
+      workLineNext: "Starts when other work ends",
+      computerWait: "Waiting for the computer",
+      computerWaitNext: "Back when it's ready",
+      computerOfflineNext: "Back when it's on",
+      computerBusyNext: "Starts when there's room",
+      okNext: "Goes on once someone approves",
+      answerNext: "Goes on once someone answers",
+      back: "Back {{when}}",
+      whenRenews: "when it renews",
+      whenSoon: "in a moment",
+    },
+    /** One line over several tasks waiting on the same limit. */
+    waitGroup: {
+      routines_one: "{{count}} routine",
+      routines_other: "{{count}} routines",
+      pausedPlan:
+        "{{what}} paused: the {{plan}} plan is at {{percent}}% {{window}} and comes back {{when}}. What's left stays for conversations.",
+      pausedBudget:
+        "{{what}} paused: the month's budget is at {{percent}}% and comes back {{when}}. What's left stays for conversations.",
+      planLimit: "{{what}} waiting: the {{plan}} plan hit its limit and comes back {{when}}.",
+      modelLimit:
+        "{{what}} waiting: {{model}} hit its limit and comes back {{when}}. The plan's other models keep working.",
+      budgetOut: "{{what}} waiting: this month's budget ran out and comes back {{when}}.",
+    },
     where: { dm: "Direct conversation", routine: "Routine «{{name}}»", background: "In the background" },
     askedBy: "{{name}} asked",
     askedByYou: "You asked",

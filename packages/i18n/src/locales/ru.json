@@ -14943,6 +14943,37 @@
       "stopping": "Останавливается…",
       "stopped": "Остановлена"
     },
+    "wait": {
+      "pausedPlan": "На паузе: тариф на {{percent}}% {{window}}",
+      "pausedBudget": "На паузе: бюджет на {{percent}}% месяца",
+      "planLimit": "Тариф {{plan}} на лимите",
+      "modelLimit": "{{model}} на лимите",
+      "modelRegion": "{{model}} нужен регион Global",
+      "modelRegionNext": "Включите его в OpenCode (Settings › Privacy)",
+      "budgetOut": "Бюджет на месяц закончился",
+      "workLine": "В очереди работ агента",
+      "workLineNext": "Начнётся, когда закончится другая работа",
+      "computerWait": "Ждёт компьютер",
+      "computerWaitNext": "Продолжит, когда он будет готов",
+      "computerOfflineNext": "Продолжит, когда он включится",
+      "computerBusyNext": "Начнётся, когда появится место",
+      "okNext": "Продолжит, когда кто-то одобрит",
+      "answerNext": "Продолжит, когда кто-то ответит",
+      "back": "Продолжит {{when}}",
+      "whenRenews": "после обновления",
+      "whenSoon": "через мгновение"
+    },
+    "waitGroup": {
+      "routines_one": "{{count}} регулярная задача",
+      "routines_few": "{{count}} регулярные задачи",
+      "routines_many": "{{count}} регулярных задач",
+      "routines_other": "{{count}} регулярные задачи",
+      "pausedPlan": "На паузе ({{what}}): тариф {{plan}} израсходован на {{percent}}% {{window}} и продолжит {{when}}. Остаток идёт на разговоры.",
+      "pausedBudget": "На паузе ({{what}}): бюджет месяца израсходован на {{percent}}% и продолжит {{when}}. Остаток идёт на разговоры.",
+      "planLimit": "Ждут ({{what}}): тариф {{plan}} упёрся в лимит и продолжит {{when}}.",
+      "modelLimit": "Ждут ({{what}}): {{model}} упёрлась в лимит и продолжит {{when}}. Остальные модели тарифа продолжают работать.",
+      "budgetOut": "Ждут ({{what}}): бюджет на месяц закончился и продолжит {{when}}."
+    },
     "where": {
       "dm": "Личные сообщения",
       "routine": "Регулярная задача «{{name}}»",

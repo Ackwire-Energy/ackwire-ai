@@ -1573,6 +1573,8 @@ export interface ApiClient {
     taskManager?(orgId: string, since?: string): Promise<TaskManagerView>;
     /** A task's steps for "Ver passos", to whoever sees it in the task manager (no inputs, no outputs). */
     taskSteps?(orgId: string, runId: string): Promise<TaskSteps>;
+    /** Continuar agora on runs paused near a limit (`wait.canContinue`). */
+    continueTasks?(orgId: string, runIds: string[]): Promise<{ continued: number }>;
   };
   /** People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio, the rest by IMAP/SMTP. */
   mail: {

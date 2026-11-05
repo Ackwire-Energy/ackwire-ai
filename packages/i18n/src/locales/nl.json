@@ -14231,6 +14231,35 @@
       "stopping": "Stoppen…",
       "stopped": "Gestopt"
     },
+    "wait": {
+      "pausedPlan": "Gepauzeerd: abonnement op {{percent}}% {{window}}",
+      "pausedBudget": "Gepauzeerd: budget op {{percent}}% van de maand",
+      "planLimit": "{{plan}}-abonnement op de limiet",
+      "modelLimit": "{{model}} op de limiet",
+      "modelRegion": "{{model}} heeft de regio Global nodig",
+      "modelRegionNext": "Zet die aan in OpenCode (Settings › Privacy)",
+      "budgetOut": "Budget van deze maand is op",
+      "workLine": "In de werkrij van de agent",
+      "workLineNext": "Begint als ander werk klaar is",
+      "computerWait": "Wacht op de computer",
+      "computerWaitNext": "Gaat verder als hij klaar is",
+      "computerOfflineNext": "Gaat verder als hij aanstaat",
+      "computerBusyNext": "Begint als er ruimte is",
+      "okNext": "Gaat verder zodra iemand goedkeurt",
+      "answerNext": "Gaat verder zodra iemand antwoordt",
+      "back": "Gaat {{when}} verder",
+      "whenRenews": "na de vernieuwing",
+      "whenSoon": "zo meteen"
+    },
+    "waitGroup": {
+      "routines_one": "{{count}} routine",
+      "routines_other": "{{count}} routines",
+      "pausedPlan": "{{what}} gepauzeerd: het {{plan}}-abonnement staat op {{percent}}% {{window}} en gaat {{when}} verder. De rest blijft voor de gesprekken.",
+      "pausedBudget": "{{what}} gepauzeerd: het maandbudget staat op {{percent}}% en gaat {{when}} verder. De rest blijft voor de gesprekken.",
+      "planLimit": "{{what}} wachten: het {{plan}}-abonnement heeft de limiet bereikt en gaat {{when}} verder.",
+      "modelLimit": "{{what}} wachten: {{model}} heeft de limiet bereikt en gaat {{when}} verder. De andere modellen van het abonnement blijven werken.",
+      "budgetOut": "{{what}} wachten: het budget van deze maand is op en gaat {{when}} verder."
+    },
     "where": {
       "dm": "Direct bericht",
       "routine": "Routine «{{name}}»",

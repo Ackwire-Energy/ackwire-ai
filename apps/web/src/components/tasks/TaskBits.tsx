@@ -1,7 +1,6 @@
 import type { ManagedTask } from "@agenteschat/client";
-import { useCatalog, useStopReason, useStopTasks } from "@agenteschat/client";
+import { useCatalog, useContinueTasks, useStopReason, useStopTasks } from "@agenteschat/client";
 import { activityVerb, appLabel } from "@agenteschat/client/lib/activity";
-import { etaMinutes } from "@agenteschat/client/lib/computer-queue";
 import { capitalize, joinNames } from "@agenteschat/client/lib/format";
 import { brainName } from "@agenteschat/client/lib/outages";
 import { playSound } from "@agenteschat/client/lib/sounds";
@@ -9,11 +8,13 @@ import {
   linePlace,
   programKey,
   type TaskProgram,
+  type TaskWaitGroup,
   taskProgram,
   taskSince,
   taskState,
-  waitKey,
-  waitsFor,
+  taskWaitGroups,
+  taskWaitGroupText,
+  taskWaitWords,
   waitsOnPerson,
 } from "@agenteschat/client/lib/task-manager";
 import { callLogo } from "@agenteschat/client/lib/work";
@@ -136,35 +137,70 @@ export function SayWhy({
 }
 
 /**
- * What a task waits for, in words: "Espera seu ok", "Na fila · 2º" with its place in its computer's line (ADR 0128),
- * "Computador cheio" when the line isn't known, "Esperando o plano"…; null when it waits for nothing.
+ * A wait: what holds the task and what comes next, in as many lines as they take ("Pausada: plano a 95% da semana",
+ * "Volta sáb às 18:00"). Amber only for what waits on a person; a computer, a plan or a budget stay grey.
  */
-export function waitWords(t: TFunction, task: Pick<ManagedTask, "status" | "held" | "line">): string | null {
-  const place = linePlace(task);
-  if (place) return t("taskManager.state.inLine", { position: place.position });
-  const wait = waitsFor(task);
-  return wait ? t(waitKey(wait)) : null;
+function WaitState({ task }: { task: ManagedTask }) {
+  const { t, i18n } = useTranslation();
+  const now = useNow(30_000);
+  const words = taskWaitWords(t, i18n.language, task, now);
+  if (!words) return null;
+  const person = waitsOnPerson(task);
+  return (
+    <span className="tm-state ac-iconline" data-wait={person || undefined}>
+      {person ? <WaitMark /> : <Icon name={task.wait?.code === "usage_pause" ? "pause" : "clock"} size={14} />}
+      <span className="tm-state__text">
+        <b>{words.state}</b>
+        {words.next && <small>{words.next}</small>}
+      </span>
+    </span>
+  );
 }
 
-/** "Trabalhando" (the orbit in the agent's color), "Espera seu ok" / "Espera resposta", "Na fila", "Parando…". */
+/** "Trabalhando" (the orbit in the agent's color), a wait in its words (`WaitState`), "Na fila", "Parando…". */
 export function TaskStateChip({ task, stopping = false }: { task: ManagedTask; stopping?: boolean }) {
   const { t } = useTranslation();
   if (stopping) return <Chip lead={<Spinner size={14} />}>{t("taskManager.state.stopping")}</Chip>;
   const state = taskState(task);
   if (state === "working")
     return <Chip lead={<AgentSpinner agentId={task.agentId} size={14} />}>{t("taskManager.state.working")}</Chip>;
-  if (state === "waiting") {
-    const words = waitWords(t, task) ?? t(waitKey("answer"));
-    // A wait on a computer (its place in its line), a plan or a budget isn't "espera você": grey, with the clock.
-    return waitsOnPerson(task) ? (
-      <Chip tone="waiting" lead={<WaitMark />}>
-        {words}
-      </Chip>
-    ) : (
-      <Chip icon="clock">{words}</Chip>
-    );
-  }
+  if (state === "waiting") return <WaitState task={task} />;
   return <Chip icon="clock">{t("taskManager.state.queued")}</Chip>;
+}
+
+/** The lines over several tasks waiting on the same limit. */
+export function TaskWaitLines({ tasks }: { tasks: ManagedTask[] }) {
+  return taskWaitGroups(tasks).map((group) => <TaskWaitLine key={group.key} group={group} />);
+}
+
+/**
+ * Why they wait, once, and Continuar agora on a pause for who may press it (the pause card's rule and hint): nobody
+ * else sees the button. What the server refuses comes back as the app's own toast.
+ */
+function TaskWaitLine({ group }: { group: TaskWaitGroup }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const go = useContinueTasks(org.id);
+  const now = useNow(30_000);
+  return (
+    <p className="tm-waitline">
+      <span className="tm-waitline__text ac-iconline">
+        <Icon name={group.wait.code === "usage_pause" ? "pause" : "clock"} size={14} />
+        <span>{taskWaitGroupText(t, i18n.language, group, now)}</span>
+      </span>
+      {group.continuable.length > 0 && (
+        <Button
+          size="sm"
+          variant="primary"
+          loading={go.isPending}
+          title={t(group.tasks[0]?.held === "budget" ? "usageCard.hintBudget" : "usageCard.hint")}
+          onClick={() => go.mutate(group.continuable)}
+        >
+          {t("usageCard.continue")}
+        </Button>
+      )}
+    </p>
+  );
 }
 
 /** The small mark before a task's title: the orbit while it works, the waiting square, the clock in the queue. */
@@ -243,18 +279,10 @@ export function ProgramLogo({ program }: { program: TaskProgram }) {
   return <span className="tm-logo">{logo(program.activity)}</span>;
 }
 
-/** "Usando agora": the logo, the program and what it does in it; a dash queued, when it starts in a computer's line. */
+/** "Usando agora": the logo, the program and what it does in it; a dash queued or in a computer's line. */
 export function UsingNow({ task }: { task: ManagedTask }) {
-  const { t } = useTranslation();
   const text = useProgramText()(task);
-  const place = linePlace(task);
-  const now = useNow(place?.estimatedStartAt ? 30_000 : false);
-  if (place) {
-    // In its computer's line it uses nothing yet: when it should start, exactly as the line's own dialog writes it.
-    const starts = place.estimatedStartAt ? t("queue.startsIn", { n: etaMinutes(place.estimatedStartAt, now) }) : "—";
-    return <span className="tm-use tm-use--none">{starts}</span>;
-  }
-  if (!text) return <span className="tm-use tm-use--none">—</span>;
+  if (!text || linePlace(task)) return <span className="tm-use tm-use--none">—</span>;
   return (
     <span className="tm-use">
       <ProgramLogo program={taskProgram(task)} />

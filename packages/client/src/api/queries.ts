@@ -5408,6 +5408,22 @@ export function useStopTasks(orgId: string) {
   });
 }
 
+/** Continuar agora on runs paused near a limit (the task manager's line over them). */
+export function useContinueTasks(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runIds: string[]) => {
+      if (!api.working?.continueTasks) throw new Error("This server can't continue tasks yet");
+      return api.working.continueTasks(orgId, runIds);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.taskManager(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.working(orgId) });
+    },
+  });
+}
+
 /** "Dizer por quê" after stopping a task: the agent reads it (only who stopped it, once). */
 export function useStopReason(orgId: string) {
   const api = useApi();

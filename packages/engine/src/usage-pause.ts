@@ -8,7 +8,7 @@ import { mayStopRun, runRequester } from "./cancel";
 import { ConflictError, ForbiddenError } from "./errors";
 import { publishMessageCreated } from "./events";
 import { type Message, messageView } from "./messages";
-import type { Membership } from "./organizations";
+import { can, type Membership, requireActiveMembership } from "./organizations";
 import { enqueue } from "./outbox";
 import { isTerminal } from "./runs";
 import { effectiveAgentBudget, monthStartUtc } from "./usage";
@@ -801,6 +801,86 @@ export async function overrideUsagePause(
     ...(p.channelId ? { channelId: p.channelId } : {}),
   });
   return true;
+}
+
+/**
+ * Who may press Continuar agora on a paused run: the card's people (`mayStopRun`) and, for a routine's run, Rotinas'
+ * (its creator, whoever manages routines).
+ */
+export async function mayContinuePause(
+  db: Executor,
+  userId: string,
+  membership: Membership,
+  row: Parameters<typeof mayStopRun>[3] & { routineCreatorId: string | null },
+) {
+  if (row.routineCreatorId === userId || can(membership, "manage_routines")) return true;
+  return mayStopRun(db, userId, membership, row);
+}
+
+/**
+ * Continuar agora on several paused runs at once (the task manager's line over them): each goes on as from its card or
+ * Rotinas, so a run's pause may be refused alone (`assertMayContinuePause`) while the others go on. Refused for all of
+ * them, the first refusal is thrown. Runs that moved on meanwhile are skipped.
+ */
+export async function continuePausedRuns(
+  deps: { db: Database },
+  userId: string,
+  orgId: string,
+  runIds: string[],
+): Promise<{ continued: number }> {
+  const { db } = deps;
+  const { agentRuns, agents, messages, routineRuns, routines } = schema;
+  const membership = await requireActiveMembership(db, userId, orgId);
+  const rows = await db
+    .select({
+      run: { id: agentRuns.id, orgId: agentRuns.orgId, triggerMessageId: agentRuns.triggerMessageId },
+      ownerUserId: agents.ownerUserId,
+      requester: runRequester,
+      routineCreatorId: routines.createdByUserId,
+      waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+      source: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'source'`,
+      resetsAt: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'resetsAt'`,
+    })
+    .from(agentRuns)
+    .innerJoin(agents, eq(agents.id, agentRuns.agentId))
+    .leftJoin(messages, and(eq(messages.id, agentRuns.triggerMessageId), eq(messages.orgId, agentRuns.orgId)))
+    .leftJoin(routineRuns, and(eq(routineRuns.agentRunId, agentRuns.id), eq(routineRuns.orgId, agentRuns.orgId)))
+    .leftJoin(routines, eq(routines.id, routineRuns.routineId))
+    .where(
+      and(
+        eq(agentRuns.orgId, orgId),
+        inArray(agentRuns.id, runIds),
+        eq(agentRuns.status, "waiting_input"),
+        sql`${agentRuns.transcript}->'waitingForBrain'->>'code' = 'usage_pause'`,
+      ),
+    );
+  let continued = 0;
+  let refused: unknown = null;
+  for (const row of rows) {
+    if (!row.waitId) continue;
+    try {
+      if (!(await mayContinuePause(db, userId, membership, row)))
+        throw new ForbiddenError("Only who asked, the agent's owner or an admin can do this", "run.answer_forbidden");
+      await assertMayContinuePause(db, orgId, row.run.id, "run");
+    } catch (error) {
+      refused ??= error;
+      continue;
+    }
+    const { waitId, resetsAt, source } = row;
+    const moved = await db.transaction((tx) =>
+      overrideUsagePause(tx, {
+        orgId,
+        runId: row.run.id,
+        waitId: waitId as string,
+        until: resetsAt,
+        userId,
+        details: { source: source ?? "plan" },
+      }),
+    );
+    if (moved) continued++;
+  }
+  if (continued === 0 && refused) throw refused;
+  return { continued };
 }
 
 /**

@@ -1,15 +1,14 @@
 import type { ComputerSummary, EndedTask, ManagedTask } from "@agenteschat/client";
 import { type Activity, activityVerb } from "@agenteschat/client/lib/activity";
-import { etaMinutes } from "@agenteschat/client/lib/computer-queue";
 import { capitalize } from "@agenteschat/client/lib/format";
 import { brainName } from "@agenteschat/client/lib/outages";
 import {
   type AgentTasks,
   endedState,
-  linePlace,
   type TaskProgram,
   taskState,
   tasksOf,
+  taskWaitWords,
   taskWhere,
   waitsFor,
   waitsOnPerson,
@@ -59,42 +58,21 @@ export function rowState(
 export const isHeld = (state: RowState): state is HeldState =>
   state === "computerBusy" || state === "computerOffline" || state === "plan" || state === "budget";
 
-export function stateText(t: TFunction, state: RowState): string {
-  switch (state) {
-    case "working":
-      return t("taskManager.state.working");
-    case "ok":
-      return t("taskManager.state.ok");
-    case "answer":
-      return t("taskManager.state.answer");
-    case "queued":
-      return t("taskManager.state.queued");
-    case "stopping":
-      return t("taskManager.state.stopping");
-    case "computerBusy":
-      return t("taskManager.state.computerBusy");
-    case "computerOffline":
-      return t("taskManager.state.computerOffline");
-    case "plan":
-      return t("taskManager.state.plan");
-    case "budget":
-      return t("taskManager.state.budget");
-  }
-}
-
-/** A task's state in words; one waiting for room on a full computer says its place in line ("Na fila · 2º"). */
-export function taskStateText(t: TFunction, task: Pick<ManagedTask, "held" | "line">, state: RowState): string {
-  const line = state === "computerBusy" ? linePlace(task) : null;
-  return line ? t("taskManager.state.inLine", { position: line.position }) : stateText(t, state);
-}
-
 /**
- * When a task waiting for room on its computer should start, in the computer line's own words ("começa em ~3 min");
- * null with no estimate, or when it isn't in a line.
+ * A task's state on its row: a wait says what holds it and what comes next ("Pausada: plano a 95% da semana", "Volta
+ * sáb às 18:00"; "Na fila · 2º", "começa em ~3 min").
  */
-export function lineStartText(t: TFunction, task: Pick<ManagedTask, "held" | "line">, now: number): string | null {
-  const at = linePlace(task)?.estimatedStartAt;
-  return at ? t("queue.startsIn", { n: etaMinutes(at, now) }) : null;
+export function taskStateWords(
+  t: TFunction,
+  locale: string,
+  task: Pick<ManagedTask, "status" | "held" | "line" | "wait">,
+  state: RowState,
+  now: number,
+): { state: string; next: string | null } {
+  if (state === "working") return { state: t("taskManager.state.working"), next: null };
+  if (state === "queued") return { state: t("taskManager.state.queued"), next: null };
+  if (state === "stopping") return { state: t("taskManager.state.stopping"), next: null };
+  return taskWaitWords(t, locale, task, now) ?? { state: t("taskManager.state.answer"), next: null };
 }
 
 /** A computer on the task manager: "Cheio · 2 na fila · 3 trabalhando", "Tem espaço · 1 trabalhando". */
@@ -104,15 +82,18 @@ export function computerLine(t: TFunction, computer: Pick<ComputerSummary, "work
   return computer.working > 0 ? `${room} · ${t("taskManager.working", { count: computer.working })}` : room;
 }
 
-/** An agent's row: "1 trabalhando · 1 espera você", or "Na fila" while its tasks only wait their turn. */
-export function groupLine(t: TFunction, group: Pick<AgentTasks, "working" | "waiting">) {
+/**
+ * An agent's row: "1 trabalhando · 1 espera você"; with nothing of that, `held`, what holds its tasks ("Pausada: plano
+ * a 95% da semana"), or "Na fila" while they only wait their turn.
+ */
+export function groupLine(t: TFunction, group: Pick<AgentTasks, "working" | "waiting">, held?: string | null) {
   const parts = [
     group.working > 0 ? t("taskManager.working", { count: group.working }) : null,
     group.waiting > 0 ? t("taskManager.waiting", { count: group.waiting }) : null,
   ].filter((p): p is string => Boolean(p));
   const mark: "working" | "waiting" | "queued" =
     group.working > 0 ? "working" : group.waiting > 0 ? "waiting" : "queued";
-  return { mark, text: parts.length > 0 ? parts.join(" · ") : t("taskManager.state.queued") };
+  return { mark, text: parts.length > 0 ? parts.join(" · ") : (held ?? t("taskManager.state.queued")) };
 }
 
 /**

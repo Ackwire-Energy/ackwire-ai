@@ -13671,6 +13671,34 @@
       "stopping": "Menghentikan…",
       "stopped": "Dihentikan"
     },
+    "wait": {
+      "pausedPlan": "Dijeda: paket di {{percent}}% {{window}}",
+      "pausedBudget": "Dijeda: anggaran di {{percent}}% bulan ini",
+      "planLimit": "Paket {{plan}} mencapai batas",
+      "modelLimit": "{{model}} mencapai batas",
+      "modelRegion": "{{model}} butuh region Global",
+      "modelRegionNext": "Nyalakan di OpenCode (Settings › Privacy)",
+      "budgetOut": "Anggaran bulan ini habis",
+      "workLine": "Dalam antrean kerja agen",
+      "workLineNext": "Mulai saat pekerjaan lain selesai",
+      "computerWait": "Menunggu komputer",
+      "computerWaitNext": "Lanjut saat komputer siap",
+      "computerOfflineNext": "Lanjut saat komputer menyala",
+      "computerBusyNext": "Mulai saat ada tempat",
+      "okNext": "Lanjut saat ada yang menyetujui",
+      "answerNext": "Lanjut saat ada yang menjawab",
+      "back": "Lanjut {{when}}",
+      "whenRenews": "saat diperbarui",
+      "whenSoon": "sebentar lagi"
+    },
+    "waitGroup": {
+      "routines_other": "{{count}} rutinitas",
+      "pausedPlan": "{{what}} dijeda: paket {{plan}} di {{percent}}% {{window}} dan lanjut {{when}}. Sisanya untuk percakapan.",
+      "pausedBudget": "{{what}} dijeda: anggaran bulan ini di {{percent}}% dan lanjut {{when}}. Sisanya untuk percakapan.",
+      "planLimit": "{{what}} menunggu: paket {{plan}} mencapai batas dan lanjut {{when}}.",
+      "modelLimit": "{{what}} menunggu: {{model}} mencapai batas dan lanjut {{when}}. Model lain di paket tetap berfungsi.",
+      "budgetOut": "{{what}} menunggu: anggaran bulan ini habis dan lanjut {{when}}."
+    },
     "where": {
       "dm": "Pesan langsung",
       "routine": "Rutinitas «{{name}}»",

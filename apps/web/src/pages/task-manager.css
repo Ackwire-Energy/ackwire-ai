@@ -100,6 +100,10 @@ html:not([data-pointer]) .tm-card:focus-visible {
 }
 
 /* The tasks now: its toolbar ("Ver passos", "Parar tarefa"), then the table. */
+.tm-now,
+.tm-ended {
+  container: tm / inline-size;
+}
 .tm-now {
   display: flex;
   flex-direction: column;
@@ -139,7 +143,8 @@ html:not([data-pointer]) .tm-card:focus-visible {
   --tm-lead: 24px;
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 160px minmax(0, 240px) 84px minmax(0, 150px) 128px;
+  /* Estado and Onde roda keep the room their words need and Tarefa gives way first; short of that, they wrap. */
+  grid-template-columns: minmax(160px, 1fr) minmax(136px, 256px) minmax(0, 200px) 84px minmax(100px, 184px) 128px;
   align-items: stretch;
   min-height: 52px;
   border-top: 1px solid var(--line);
@@ -195,18 +200,13 @@ html:not([data-pointer]) .tm-row:has(.tm-hit:focus-visible) {
   background: color-mix(in srgb, var(--tm-heat) calc(var(--h, 0) * 100%), transparent);
 }
 .tm-cell--where {
+  overflow-wrap: anywhere;
   color: var(--muted);
 }
 .tm-cell--act {
   justify-content: flex-end;
   gap: 4px;
   padding-right: 12px;
-}
-.tm-ellipsis {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* A row's name: the whole row picks it (its button reaches every edge); the buttons on it stay on top. */
@@ -216,14 +216,21 @@ html:not([data-pointer]) .tm-row:has(.tm-hit:focus-visible) {
   min-width: 0;
   line-height: 1.35;
 }
-.tm-hit,
 .tm-name__title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A long prompt takes two lines at most: the row's state and place say what matters. */
+.tm-hit__text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
 .tm-hit {
+  min-width: 0;
   padding: 0;
   border: 0;
   background: none;
@@ -291,6 +298,29 @@ html:not([data-pointer]) .tm-twist:focus-visible {
   .tm-row:not(.tm-row--agent, :hover, [data-selected], :focus-within) .tm-cell--act > :not(:disabled) {
     opacity: 0;
   }
+}
+
+/* Over rows waiting on the same limit: why, once, and Continuar agora for who may press it. */
+.tm-waitline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--plate-soft);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink2);
+}
+.tm-waitline__text {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.tm-waitline__text > .ac-icon {
+  color: var(--faint);
 }
 
 /* "Pedidas por pessoas 6": a section's line inside the table. */
@@ -366,7 +396,6 @@ html:not([data-pointer]) .tm-more:focus-visible {
   color: var(--ink2);
 }
 
-/* A phone: no column names; each row stacks its name, state and what it uses, Parar at its side. */
 @media (max-width: 760px) {
   .tm-search {
     flex-basis: 100%;
@@ -377,6 +406,11 @@ html:not([data-pointer]) .tm-more:focus-visible {
   .tm-cards .ac-carousel__arrow {
     display: none;
   }
+}
+
+/* No room for the columns (a phone, a small window beside the sidebar): no column names; each row stacks its name,
+   state and what it uses, Parar at its side. */
+@container tm (max-width: 640px) {
   .tm-row--head {
     display: none;
   }
@@ -486,14 +520,15 @@ html:not([data-pointer]) .tm-more:focus-visible {
   gap: 6px;
   min-width: 0;
   max-width: 100%;
-  height: 28px;
+  min-height: 28px;
   margin-left: -6px;
-  padding: 0 6px;
+  padding: 4px 6px;
   border: 0;
   border-radius: var(--control-r-sm);
   background: none;
   font: inherit;
   color: inherit;
+  text-align: left;
   cursor: pointer;
 }
 .tm-where:hover {

@@ -12,6 +12,7 @@ import {
   cancelRun,
   canTalkTo,
   canViewCost,
+  continuePausedRuns,
   continueRun,
   GIF_RATINGS,
   getMembership,
@@ -403,6 +404,23 @@ const ManagedTask = z
       .nullable()
       .openapi({
         description: "Its place in its computer's line for room: people's turns first, then the longest wait.",
+      }),
+    wait: z
+      .object({
+        code: z.string(),
+        key: z.string().nullable(),
+        plan: z.string().nullable(),
+        model: z.string().nullable(),
+        scope: z.enum(["model", "region"]).nullable(),
+        percent: z.number().int().nullable(),
+        window: z.string().nullable(),
+        resetsAt: z.string().nullable(),
+        canContinue: z.boolean(),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "Why a `waiting_input` run waits: its code, the plan or budget (`key` groups the runs on the same one), how far a pause got, when the limit resets, and whether you may press Continuar agora.",
       }),
   })
   .openapi("ManagedTask");
@@ -1584,6 +1602,33 @@ export function managementRoutes(deps: AppDeps) {
         ...(since ? { since: new Date(since) } : {}),
       });
       return c.json(view, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/task-manager/continue",
+      tags: ["Usage"],
+      security,
+      summary: "Continuar agora on several runs paused near a limit (ADR 0118): each goes on until that window resets",
+      description:
+        "For who may press it on each run's card or routine (`wait.canContinue`). Runs that moved on are skipped. Refused for every run, the first refusal comes back: 403 `run.answer_forbidden`, or 409 `run.continue_extra_off` / `run.continue_extra_used_up` when going on would pass the plan without paid extra usage.",
+      request: {
+        params: OrgParams,
+        body: {
+          required: true,
+          content: { "application/json": { schema: z.object({ runIds: z.array(z.uuid()).min(1).max(100) }) } },
+        },
+      },
+      responses: { 200: json(z.object({ continued: z.number().int() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const { runIds } = c.req.valid("json");
+      const out = await continuePausedRuns({ db }, c.get("user").id, orgId, runIds);
+      if (out.continued > 0) deps.wakeWorkers?.();
+      return c.json(out, 200);
     },
   );
 

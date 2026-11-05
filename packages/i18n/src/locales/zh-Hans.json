@@ -13747,6 +13747,34 @@
       "stopping": "正在停止…",
       "stopped": "已停止"
     },
+    "wait": {
+      "pausedPlan": "已暂停：套餐已用 {{percent}}% {{window}}",
+      "pausedBudget": "已暂停：本月预算已用 {{percent}}%",
+      "planLimit": "{{plan}} 套餐已达限额",
+      "modelLimit": "{{model}} 已达限额",
+      "modelRegion": "{{model}} 需要 Global 区域",
+      "modelRegionNext": "请在 OpenCode 中开启（Settings › Privacy）",
+      "budgetOut": "本月预算已用完",
+      "workLine": "在智能体的工作队列中",
+      "workLineNext": "其他工作结束后开始",
+      "computerWait": "等待电脑",
+      "computerWaitNext": "准备好后继续",
+      "computerOfflineNext": "开机后继续",
+      "computerBusyNext": "有空位时开始",
+      "okNext": "有人审批后继续",
+      "answerNext": "有人回答后继续",
+      "back": "{{when}}继续",
+      "whenRenews": "重置后",
+      "whenSoon": "马上"
+    },
+    "waitGroup": {
+      "routines_other": "{{count}} 项例行工作",
+      "pausedPlan": "{{what}}已暂停：{{plan}} 套餐已用 {{percent}}% {{window}}，{{when}}继续。剩余额度留给对话。",
+      "pausedBudget": "{{what}}已暂停：本月预算已用 {{percent}}%，{{when}}继续。剩余额度留给对话。",
+      "planLimit": "{{what}}在等待：{{plan}} 套餐已达限额，{{when}}继续。",
+      "modelLimit": "{{what}}在等待：{{model}} 已达限额，{{when}}继续。套餐里的其他模型仍可正常使用。",
+      "budgetOut": "{{what}}在等待：本月预算已用完，{{when}}继续。"
+    },
     "where": {
       "dm": "私信",
       "routine": "例行工作“{{name}}”",
