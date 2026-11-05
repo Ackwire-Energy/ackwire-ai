@@ -22,6 +22,7 @@ import { UUID } from "../authority";
 import { SealedValueError } from "../crypto";
 import { ConflictError, ValidationError } from "../errors";
 import { publishVaultChanged } from "../events";
+import { secretLabelOf } from "../secrets";
 import {
   type ConnectionRow,
   effectiveColumns,
@@ -60,8 +61,23 @@ import {
 
 const { vaultConnections, vaultItems } = schema;
 
-/** Values a made password keeps behind it (`previousSecrets`): a few retries with other shapes never drop a good one. */
+/** Values a made password keeps behind it (`previousSecrets`). */
 export const VAULT_PREVIOUS_KEPT = 5;
+
+/**
+ * One more value kept behind an item. Past the limit the oldest stays and the one after it goes: the oldest is what the
+ * site had before any of these tries, so however many a loop or a page's words make, the one that works isn't dropped.
+ */
+const keptBehind = (kept: ItemRow["previousSecrets"]) =>
+  kept.length > VAULT_PREVIOUS_KEPT ? [kept[0] as (typeof kept)[number], ...kept.slice(2)] : kept;
+
+/** An item's value as it goes behind another. */
+function sealedValueOf(item: ItemRow): ItemRow["previousSecrets"] {
+  const { secretCiphertext, wrappedDataKey, kekId, secretVersion } = item;
+  return secretCiphertext && wrappedDataKey && kekId
+    ? [{ secretCiphertext, wrappedDataKey, kekId, secretVersion }]
+    : [];
+}
 
 /** Most keys one command gets at once. */
 export const VAULT_MAX_KEYS = 10;
@@ -512,7 +528,8 @@ export async function saveMadePassword(
   const fields = await asRefusal(() => {
     if ("keyName" in target) {
       const keyName = cleanKeyName(target.keyName);
-      const title = cleanText(target.title, VAULT_LIMITS.title, "title") || keyName;
+      const plain = secretLabelOf({ label: null, site: null, name: keyName });
+      const title = cleanText(target.title, VAULT_LIMITS.title, "title") || plain;
       return { kind: "key" as const, title, website: null, username: null, keyName };
     }
     const website = cleanWebsite(target.website);
@@ -533,12 +550,8 @@ export async function saveMadePassword(
   if (existing) {
     assertMayReplace(existing, run, person);
     const sealed = await sealItemValue(deps, existing, existing.secretVersion + 1, value);
-    const { secretCiphertext, wrappedDataKey, kekId, secretVersion } = existing;
-    const kept =
-      secretCiphertext && wrappedDataKey && kekId
-        ? [...existing.previousSecrets, { secretCiphertext, wrappedDataKey, kekId, secretVersion }]
-        : existing.previousSecrets;
-    const row = await replaceValue(deps, run, person, existing, sealed, kept.slice(-VAULT_PREVIOUS_KEPT));
+    const kept = keptBehind([...existing.previousSecrets, ...sealedValueOf(existing)]);
+    const row = await replaceValue(deps, run, person, existing, sealed, kept);
     return { outcome: "updated", item: agentView(row, null) };
   }
   await asRefusal(() => assertRoom(db, run.orgId));
@@ -581,7 +594,8 @@ async function replaceValue(
   const row = await deps.db.transaction(async (tx) => {
     const [updated] = await tx
       .update(vaultItems)
-      .set({ ...sealed, previousSecrets, updatedAt: vaultNow(deps) })
+      // A key's hint names the value it replaces.
+      .set({ ...sealed, previousSecrets, keyHint: null, updatedAt: vaultNow(deps) })
       .where(and(eq(vaultItems.id, item.id), eq(vaultItems.secretVersion, item.secretVersion)))
       .returning();
     if (!updated) throw refuse.notAllowed("It changed meanwhile. Nothing was replaced. Try again.");
@@ -593,8 +607,21 @@ async function replaceValue(
   return row;
 }
 
-/** The value before the last made password comes back in its place, as a new version. */
-export async function restoreMadePassword(deps: VaultDeps, run: VaultRun, itemId: string): Promise<VaultAgentResult> {
+/** What `undo` answers: which value the site takes is the agent's to find out, and none was lost. */
+export const undoneText = (item: string, kept: number) =>
+  `${item} has its earlier value back. The Vault keeps ${kept} more: if this one is not it, \`undo\` again steps to the next.`;
+
+/**
+ * The value kept last comes back in its place, as a new version. What it replaces goes to the far end of what is kept,
+ * so more `undo`s step through them all and none is lost: only the agent's words say which one the site takes, and a
+ * page's words can reach those. `discard`: it was never typed anywhere, so it goes.
+ */
+export async function restoreMadePassword(
+  deps: VaultDeps,
+  run: VaultRun,
+  itemId: string,
+  { discard = false }: { discard?: boolean } = {},
+): Promise<VaultAgentResult & { kept: number }> {
   const person = await vaultPersonOfRun(deps.db, run);
   const { item } = await itemForRun(deps, run, person, itemId, "item");
   assertMayReplace(item, run, person);
@@ -603,8 +630,9 @@ export async function restoreMadePassword(deps: VaultDeps, run: VaultRun, itemId
   const value = await openItemValue(deps, { ...item, ...last }).catch(() => null);
   if (value === null) throw refuse.noValue(item);
   const sealed = await sealItemValue(deps, item, item.secretVersion + 1, value);
-  const row = await replaceValue(deps, run, person, item, sealed, item.previousSecrets.slice(0, -1));
-  return { outcome: "updated", item: agentView(row, null) };
+  const kept = [...(discard ? [] : sealedValueOf(item)), ...item.previousSecrets.slice(0, -1)];
+  const row = await replaceValue(deps, run, person, item, sealed, kept);
+  return { outcome: "updated", item: agentView(row, null), kept: kept.length };
 }
 
 /**

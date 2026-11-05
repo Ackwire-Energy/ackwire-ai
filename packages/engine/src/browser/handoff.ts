@@ -577,10 +577,10 @@ async function claimScreens(tx: Executor, orgId: string, agentId: string, screen
   if (open) throw new SameWindowError(open);
 }
 
-/** The screen showing the same window has an open handoff: this one can't start. */
 /** It ended meanwhile: the apps read it again, and its card settles. Someone else in control has no code. */
 const handoffOver = () => new ConflictError("This is already over", "browser.handoff_over");
 
+/** The screen showing the same window has an open handoff: this one can't start. */
 class SameWindowError extends ConflictError {
   constructor(readonly open: BrowserHandoffRow) {
     super(

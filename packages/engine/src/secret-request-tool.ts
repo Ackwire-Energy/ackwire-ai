@@ -23,10 +23,10 @@ export const MAX_SECRET_USERNAME = 200;
 /** Longest label a card shows. */
 export const MAX_SECRET_LABEL = 80;
 
-/** The agent's label as people read it; a variable-style one (`LIA_GOOGLE_PASSWORD`) is no label at all. */
+/** The agent's label as people read it; a variable-style one (`LIA_GOOGLE_PASSWORD`, `lia_google_pw`) is no label at all. */
 export function friendlyLabel(raw: unknown): string | null {
   const label = str(raw).trim().slice(0, MAX_SECRET_LABEL);
-  return label && !/^[A-Z0-9_]+$/.test(label) ? label : null;
+  return label && !/^[A-Z0-9_-]+$/.test(label) && !/^\S*_\S*$/.test(label) ? label : null;
 }
 
 /** A `request_secret` site as its origin (`https://host[:port]`), or null when it isn't a web address. */
@@ -271,6 +271,11 @@ export function requestSecretTool(opts: {
           if (!publicKey) throw new Error("the computer made no key");
           // A site's password is for the browser alone where the runner keeps it so; an older one gets a variable.
           const kind = file ? "file" : origin && sites === true ? "site" : "env";
+          const label = friendlyLabel(input.label);
+          // Its reason is read as written: the agent's own name for it stays out of it.
+          const said = str(input.purpose)
+            .trim()
+            .replaceAll(name, secretLabelOf({ label, site: origin, name }));
           const [inserted] = await ctx.db
             .insert(schema.secretRequests)
             .values({
@@ -282,9 +287,9 @@ export function requestSecretTool(opts: {
               toolUseId: ctx.toolUseId ?? id,
               requestedForUserId: requester,
               name,
-              label: friendlyLabel(input.label),
+              label,
               // The person sees the one site a browser password may be typed on.
-              purpose: origin ? `${str(input.purpose).trim()} (${new URL(origin).host})` : str(input.purpose).trim(),
+              purpose: origin ? `${said} (${new URL(origin).host})` : said,
               site: origin,
               username: user || null,
               codeDigits: digits,

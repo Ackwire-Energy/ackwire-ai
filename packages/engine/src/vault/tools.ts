@@ -85,7 +85,12 @@ const itemBlock = (lines: string[]) => untrustedBlock("vault item", lines.join("
 
 function itemLine(item: VaultItemForAgent, owner: string): string {
   const scope = item.scope === "team" ? "team" : `personal, ${owner}`;
-  const about = item.description ? [`about: ${line(item.description)}`] : [];
+  const about = [
+    ...(item.description ? [`about: ${line(item.description)}`] : []),
+    ...(item.earlier
+      ? [`earlier values kept: ${item.earlier}, if this one fails: \`undo\` of the make password tool`]
+      : []),
+  ];
   switch (item.kind) {
     case "login":
       return `- ${item.id} (${scope}), ${siteText(item)}:\n${itemBlock([

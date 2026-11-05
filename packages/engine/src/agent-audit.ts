@@ -3,7 +3,7 @@ import { recordAudit } from "./audit";
 import type { RunAuthority } from "./authority";
 import { cutText } from "./format";
 import { requirePermission } from "./organizations";
-import { REQUEST_SECRET_TOOL } from "./secrets";
+import { MAKE_KEY_TOOL, REQUEST_SECRET_TOOL } from "./secrets";
 import { redactCredentials as masked } from "./tool-detail";
 
 const { auditLog, agents, approvals, channels, secretRequests, users } = schema;
@@ -111,11 +111,13 @@ export async function recordToolCall(
     approvalRules?: string[] | null;
   },
 ) {
-  // A request's variable-style name is the agent's own: people read its label (the call's title), never this.
+  // A secret's variable-style name is the agent's own: people read its label (the call's title), never this.
   const { name: secretName, ...rest } = call.input;
-  const asked = call.tool === REQUEST_SECRET_TOOL && typeof secretName === "string" ? secretName : null;
-  const input = asked === null ? call.input : rest;
-  const reason = asked ? call.reason?.replaceAll(asked, "the secret") : call.reason;
+  const named = call.tool === REQUEST_SECRET_TOOL || call.tool === MAKE_KEY_TOOL;
+  const asked = named && typeof secretName === "string" && secretName ? secretName : null;
+  const unnamed = (text: string) => (asked ? text.replaceAll(asked, "the secret") : text);
+  const input = asked === null ? call.input : (JSON.parse(unnamed(JSON.stringify(rest))) as Record<string, unknown>);
+  const reason = call.reason && unnamed(call.reason);
   await recordAudit(db, {
     orgId: call.orgId,
     actor: { type: "agent", id: call.agentId },

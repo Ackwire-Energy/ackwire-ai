@@ -78,8 +78,8 @@ import {
   truncateOutput,
   withSandbox,
 } from "./sandbox";
-import { requestSecretTool } from "./secret-request-tool";
-import { REQUEST_SECRET_TOOL, secretFilePaths } from "./secrets";
+import { friendlyLabel, requestSecretTool } from "./secret-request-tool";
+import { MAKE_KEY_TOOL, REQUEST_SECRET_TOOL, secretFilePaths } from "./secrets";
 import { agentSkillByName, type SkillDeps, skillFilesOf, skillFolderFiles } from "./skills";
 import { maskSecrets } from "./tool-detail";
 import { MAX_RESULT_CHARS } from "./tools/gateway";
@@ -103,6 +103,7 @@ import {
   releaseVaultKeys,
   restoreMadePassword,
   saveMadePassword,
+  undoneText,
   type VaultDeps,
   VaultRefusal,
   vaultItemName,
@@ -110,10 +111,17 @@ import {
 } from "./vault";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
-const MAKE_KEY_TOOL = "vault_make_password";
 
 /** Tools that change the computer (or start work on it); the rest only read. */
-const WRITE_TOOLS = new Set(["run_code", "write_file", "start_task", "run_skill_script", "import_file", "cancel_task"]);
+const WRITE_TOOLS = new Set([
+  "run_code",
+  "write_file",
+  "start_task",
+  "run_skill_script",
+  "import_file",
+  "cancel_task",
+  MAKE_KEY_TOOL,
+]);
 
 const READ_ONLY_COMMANDS = new Set([
   "ls",
@@ -696,8 +704,8 @@ export function createSandboxToolSource(
       try {
         const undo = str(input.undo).trim();
         if (undo) {
-          const { item } = await restoreMadePassword(vault, runIds, undo);
-          return { content: `The earlier value of ${vaultItemName(item)} is back in the Vault.` };
+          const { item, kept } = await restoreMadePassword(vault, runIds, undo);
+          return { content: undoneText(vaultItemName(item), kept) };
         }
         const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
         const scope = {
@@ -711,7 +719,7 @@ export function createSandboxToolSource(
         const saved = await saveMadePassword(
           vault,
           runIds,
-          { keyName: str(input.name), title: str(input.label) },
+          { keyName: str(input.name), title: friendlyLabel(input.label) ?? "" },
           value,
         );
         return {

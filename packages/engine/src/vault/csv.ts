@@ -288,7 +288,7 @@ export async function importVaultCsv(
     for (const { item, sealed } of replaced) {
       const [done] = await tx
         .update(vaultItems)
-        .set({ ...sealed, updatedAt: now })
+        .set({ ...sealed, previousSecrets: [], updatedAt: now })
         .where(and(eq(vaultItems.id, item.id), eq(vaultItems.secretVersion, item.secretVersion)))
         .returning({ id: vaultItems.id });
       if (!done) throw new ConflictError("Some logins changed meanwhile. Import again.", "vault.changed_meanwhile");

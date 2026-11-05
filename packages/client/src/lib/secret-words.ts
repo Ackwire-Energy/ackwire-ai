@@ -7,7 +7,7 @@ import type { SecretRequest } from "../api/types";
  */
 export function secretOutcome(
   t: TFunction,
-  r: Pick<SecretRequest, "status" | "withdrawn" | "endReason">,
+  r: Pick<SecretRequest, "status" | "withdrawn" | "endReason" | "supersededBy">,
   mine: boolean,
   person: string,
   agent: string,
@@ -16,8 +16,8 @@ export function secretOutcome(
   if (r.status === "declined") return t("secret.endedDeclined", { agent });
   // Past its deadline before the server's event said so.
   if (r.status === "expired" || r.status === "pending") return t("secret.endedExpired", { agent });
+  if (r.endReason === "superseded" || r.supersededBy) return t("secret.endedSuperseded", { agent });
   if (r.withdrawn || r.endReason === "withdrawn") return t("secret.outcomeWithdrawn", { agent });
-  if (r.endReason === "superseded") return t("secret.endedSuperseded", { agent });
   if (r.endReason === "run_stopped") return t("secret.endedRunStopped", { agent });
   if (r.endReason === "computer_changed") return t("secret.endedComputer", { agent });
   if (r.endReason === "person_left") return t("secret.endedPersonLeft", { person });

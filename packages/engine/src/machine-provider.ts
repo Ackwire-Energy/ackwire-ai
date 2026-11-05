@@ -211,7 +211,7 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
       } catch (error) {
         // The runner's own words ("This request's key is gone…"), not the file-tool wording.
         if (error instanceof MachineRequestError && error.code !== "timeout" && error.code !== "canceled") {
-          throw new Error(error.message);
+          throw new Error(error.message, { cause: error });
         }
         throw error;
       }

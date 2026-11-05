@@ -68,6 +68,7 @@ import {
   releaseVaultLogin,
   restoreMadePassword,
   saveMadePassword,
+  undoneText,
   type VaultBrowserProfile,
   type VaultDeps,
   VaultRefusal,
@@ -1060,7 +1061,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
   async function plan(
     ctx: ToolContext,
     steps: ScreenStep[],
-    options: { trail?: boolean; made?: boolean } = {},
+    options: { trail?: boolean; made?: boolean; onReport?: (report: PlanReport) => void } = {},
   ): Promise<ToolOutput> {
     for (const s of steps) {
       const refused = s.do === "open" && s.url ? await outboundRefusal(ctx, s.url) : null;
@@ -1135,6 +1136,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       },
       steps,
     );
+    options.onReport?.(report);
     // The agent has seen the page (the report shows it), or opened one of its own; not when a person
     // changed it meanwhile (the read-first guard stays for the next call).
     if (!handedBack && (report.after || report.steps.some((s) => s.status === "done" && s.step.do === "open"))) {
@@ -1170,7 +1172,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
   /**
    * `browser_make_password` (ADR 0144 §8): the computer makes the password, the Vault keeps it for this page's site,
    * and only then is it typed, as any Vault login is, into each field. A form can't be sent with a password the Vault
-   * doesn't have. Typed nowhere (a wrong field, a page that moved on): what was saved goes back, so a good password
+   * doesn't have. A field left empty (a wrong field, a page that moved on): what was saved goes back, so a good password
    * isn't left behind one no site ever saw. The value is in this process only while it is sealed.
    */
   async function makePassword(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
@@ -1186,12 +1188,12 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     }
     const run = ids(ctx);
     const undo = str(input.undo).trim();
+    const username = str(input.username).trim();
+    if (!undo && !username) return { content: "Say whose account it is (`username`).", isError: true };
     try {
       if (undo) {
-        const { item } = await restoreMadePassword(vault, run, undo);
-        return {
-          content: `The earlier password of ${vaultItemName(item)} is back in the Vault, and the last one is gone.`,
-        };
+        const { item, kept } = await restoreMadePassword(vault, run, undo);
+        return { content: undoneText(vaultItemName(item), kept) };
       }
       const linked = await linkFor(ctx);
       if (!linked.ok) return { content: linked.text, isError: true };
@@ -1203,19 +1205,28 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       const agent = scopeOf(ctx.agentId, await getAgentCached(ctx.db, ctx.orgId, ctx.agentId));
       const value = await requestMadePassword(hub, linked.status.machineId, agent, input, ctx.signal);
       const profile = await vaultProfile(ctx, linked.profile);
-      const username = str(input.username).trim() || null;
       const saved = await saveMadePassword(vault, run, { website, username }, value, profile);
       const fields = [str(input.target), str(input.confirm)].map((t) => t.trim()).filter(Boolean);
+      let filled = false;
       const typed = await plan(
         ctx,
         fields.map((target) => ({ do: "type_secret", target, login: saved.item.id })),
-        { made: true },
+        {
+          made: true,
+          onReport: (report) => {
+            filled = report.steps.every((s) => s.status === "done" || s.ran);
+          },
+        },
       );
-      if (typed.isError) {
+      // A form with one field filled, or none (a person took the browser, the field moved), isn't sent.
+      if (!filled) {
         await (saved.outcome === "created"
           ? deleteVaultItemByAgent(vault, run, saved.item.id)
-          : restoreMadePassword(vault, run, saved.item.id));
-        return { ...typed, content: `${typed.content}\nNothing was typed, and the Vault is as it was.` };
+          : restoreMadePassword(vault, run, saved.item.id, { discard: true }));
+        return {
+          ...typed,
+          content: `${typed.content}\nNot every field took the password, and the Vault is as it was. Don't send the form: call this again.`,
+        };
       }
       return {
         ...typed,
@@ -1886,10 +1897,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       const profiles = await agentBrowserProfiles(ctx.db, ctx.orgId, ctx.agentId);
       const status = await machineOf(ctx);
       if (!status.available && profiles.length === 0) return [];
-      // A password made here goes to the Vault: without keeping one there, it would be typed and lost.
-      const mayKeep = deps.vault && isAllowed(toolAccess(granted, { name: VAULT_SAVE_TOOL, scope: VAULT_WRITE_SCOPE }));
-      const usable = mayKeep ? definitions : definitions.filter((t) => t.name !== "browser_make_password");
-      const offered = profiles.length > 0 ? [...usable, profileTool(profiles)] : usable;
+      const offered = profiles.length > 0 ? [...definitions, profileTool(profiles)] : definitions;
       // A browser password needs `request_secret`: the computer's tools offer it when the agent may run code
       // there; otherwise this source does, bound to one site (one tool by that name either way).
       const sandboxOffers =

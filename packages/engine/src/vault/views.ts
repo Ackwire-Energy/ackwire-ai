@@ -176,6 +176,7 @@ export function agentView(item: ItemRow, contact: VaultContactFields | null): Va
     username: item.username,
     keyName: item.keyName,
     contact: item.kind === "contact" ? (contact ?? {}) : null,
+    ...(item.previousSecrets.length > 0 ? { earlier: item.previousSecrets.length } : {}),
   };
 }
 

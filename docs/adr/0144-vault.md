@@ -212,12 +212,15 @@ scopes) and, for what a command uses, `vault_make_password` (a key, through `run
    origin, frame and field checks, guard, redaction and use record.
 
 Saving comes first so no form can go out with a value the Vault doesn't hold. A save that fails types nothing. A fill
-that types nothing puts the Vault back as it was. A password that replaces another keeps the old one sealed behind it
-(`previous_secrets`, its own version in its own seal, the last 5): the site may have turned the new one down, or a
-retry may have run after an accepted change, so `undo` brings the old one back. A person's new value clears them.
+that leaves a field empty puts the Vault back as it was and says not to send the form. A password that replaces another
+keeps the old one sealed behind it (`previous_secrets`, its own version in its own seal, 5 at most): the site may have
+turned the new one down, or a retry may have run after an accepted change, so `undo` brings the old one back. Past 5,
+the oldest stays: it is what the site had before any of these tries, and a page's words reach the agent. `undo` puts
+what it replaces at the far end, so more of them step through every value and none is lost, and `vault_list` says when
+an item has some. A person's new value clears them.
 
 What it makes: for a login, the page's own origin with `match: site`, since sign-up and sign-in are often on different
-hosts of one site, and the `username` given. The same login again (the person's own first, then the team's) takes the
+hosts of one site, and the `username` it must give. The same login again (the person's own first, then the team's) takes the
 new value, on the terms of §2, and an agent may always change what it made. A new one is the team's, open to everyone,
 for this agent, or for every agent of the shared browser profile it is made in: the session it opens stays in the
 agent's browser for all its work (§5), so the agent's next run needs it whoever asked. It shows in Settings, Vault with

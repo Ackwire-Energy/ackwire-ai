@@ -22,6 +22,7 @@ import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { MachineRequestError } from "./machine-hub";
+import { REMOVED_COMPUTER_MESSAGE } from "./machines";
 import { notifySecretRequest, resolveSecretRequestNotifications } from "./notification-producers";
 import { requireActiveMembership } from "./organizations";
 import { enqueue } from "./outbox";
@@ -40,6 +41,7 @@ const { secretRequests, agentRuns } = schema;
 export type SecretRequestRow = typeof secretRequests.$inferSelect;
 
 export const REQUEST_SECRET_TOOL = "request_secret";
+export const MAKE_KEY_TOOL = "vault_make_password";
 /** How long a request waits for the person before the run goes on without it. */
 export const SECRET_TTL_MS = 15 * 60_000;
 /** Pending requests one run may have at a time. */
@@ -262,9 +264,10 @@ const deliveryOrder = (row: SecretRequestRow) => {
 /** A request that ended (`secret.closed`): a computer that can't take it now answers its own code, and it stays open. */
 const closedRequest = () => new ConflictError("This request was already answered or expired", "secret.closed");
 
-/** The computer that made the request's key is no longer the agent's, or it no longer has the key. */
+/** The computer that made the request's key is no longer the agent's, was removed, or no longer has the key. */
 const keyIsGone = (error: unknown) =>
   (error instanceof ConflictError && error.code === "secret.computer_changed") ||
+  (error instanceof Error && error.message === REMOVED_COMPUTER_MESSAGE) ||
   (error instanceof Error && error.cause instanceof MachineRequestError && error.cause.code === "not_found");
 
 /** Closes a waiting request nobody answered: its card says why, its run goes on, the computer drops its key. */
@@ -291,8 +294,10 @@ async function closeRequest(
 }
 
 /**
- * A newer request for the same thing takes the place of what is still open (asked by another run: the same run waits
- * on its own): two live cards for one password would each take a value, and the first answer would go for nothing.
+ * A newer request for the same thing, of the same person and account, takes the place of what is still open (asked by
+ * another run: the same run waits on its own): two live cards for one password would each take a value, and the first
+ * answer would go for nothing. One that closed unanswered within its time (its run stopped) points to the newer one
+ * too. Another person's request is their own: they couldn't open this one, and it isn't their account.
  */
 export async function supersedeOlderSecretRequests(deps: { db: Database; pubsub?: PubSub }, newer: SecretRequestRow) {
   const older = await deps.db
@@ -303,16 +308,27 @@ export async function supersedeOlderSecretRequests(deps: { db: Database; pubsub?
         eq(secretRequests.orgId, newer.orgId),
         eq(secretRequests.agentId, newer.agentId),
         eq(secretRequests.name, newer.name),
-        eq(secretRequests.status, "pending"),
+        eq(secretRequests.requestedForUserId, newer.requestedForUserId),
         ne(secretRequests.id, newer.id),
+        isNull(secretRequests.supersededBy),
+        gt(secretRequests.expiresAt, sql`now()`),
+        or(eq(secretRequests.status, "pending"), eq(secretRequests.status, "canceled")),
         sql`${secretRequests.site} is not distinct from ${newer.site}`,
         sql`${secretRequests.targetPath} is not distinct from ${newer.targetPath}`,
+        sql`${secretRequests.username} is not distinct from ${newer.username}`,
       ),
     );
   for (const row of older) {
-    const closed = await deps.db.transaction((tx) =>
-      closeInTx(tx, row, { endReason: "superseded", supersededBy: newer.id }),
-    );
+    const closed = await deps.db.transaction(async (tx) => {
+      if (row.status === "pending") return closeInTx(tx, row, { endReason: "superseded", supersededBy: newer.id });
+      const [pointed] = await tx
+        .update(secretRequests)
+        .set({ supersededBy: newer.id })
+        .where(eq(secretRequests.id, row.id))
+        .returning();
+      if (pointed) await syncSecretMessage(tx, pointed);
+      return pointed ?? null;
+    });
     if (closed) await publishSecret(deps, closed, "secret.updated");
   }
 }
@@ -491,8 +507,9 @@ export async function deliverSecret(
     secretOnComputer(computer, { action: "deliver", requestId: row.id, name: row.name, target, aad, box }),
   ).catch(async (error: unknown) => {
     // No computer can open this box anymore: the request ends here, or its card would go on taking values for nothing.
-    if (keyIsGone(error)) await closeRequest(deps, row, "computer_changed");
-    throw error;
+    if (!keyIsGone(error)) throw error;
+    await closeRequest(deps, row, "computer_changed");
+    throw closedRequest();
   });
   let delivered: SecretRequestRow | null;
   try {

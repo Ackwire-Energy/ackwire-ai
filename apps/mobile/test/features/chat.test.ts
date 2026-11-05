@@ -1374,6 +1374,10 @@ describe("an agent's secret request (ADR 0027), as its card reads it", () => {
     expect(said({ status: "pending" })).toContain("Ninguém respondeu a tempo.");
     expect(said({ status: "canceled", endReason: "run_stopped" })).toContain("A tarefa de Theo parou");
     expect(said({ status: "canceled", endReason: "superseded" })).toContain("num pedido mais novo");
+    // Its run stopped and the agent asked again: the newer one is what's next.
+    expect(said({ status: "canceled", endReason: "run_stopped", supersededBy: "r2" })).toContain(
+      "num pedido mais novo",
+    );
     expect(said({ status: "canceled", endReason: "computer_changed" })).toContain("o computador que pediu mudou");
     expect(said({ status: "canceled", endReason: "person_left" })).toContain("Ana saiu do workspace");
     expect(said({ status: "canceled", withdrawn: true })).toBe("Theo não precisa mais disso.");

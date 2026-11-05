@@ -12,6 +12,7 @@ export {
   restoreMadePassword,
   saveMadePassword,
   saveVaultItemByAgent,
+  undoneText,
   VAULT_MAX_KEYS,
   type VaultBrowserProfile,
   type VaultMadeTarget,
