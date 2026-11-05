@@ -511,12 +511,14 @@ async function setUsageCardState(
   deps: { db: Database; pubsub?: PubSub },
   orgId: string,
   messageId: string,
-  state: "resumed" | "ended",
+  state: "resumed" | "ended" | "continued",
+  fields: Partial<UsagePauseCard> = {},
 ) {
   const { messages } = schema;
+  const next = JSON.stringify({ ...fields, state });
   const [row] = await deps.db
     .update(messages)
-    .set({ meta: sql`jsonb_set(${messages.meta}, '{actionCard,state}', ${JSON.stringify(state)}::jsonb)` })
+    .set({ meta: sql`jsonb_set(${messages.meta}, '{actionCard}', (${messages.meta}->'actionCard') || ${next}::jsonb)` })
     .where(
       and(
         eq(messages.orgId, orgId),
@@ -811,19 +813,19 @@ export async function mayContinuePause(
   db: Executor,
   userId: string,
   membership: Membership,
-  row: Parameters<typeof mayStopRun>[3] & { routineCreatorId: string | null },
+  row: Parameters<typeof mayStopRun>[3] & { routineId: string | null; routineCreatorId: string | null },
 ) {
-  if (row.routineCreatorId === userId || can(membership, "manage_routines")) return true;
+  if (row.routineId && (row.routineCreatorId === userId || can(membership, "manage_routines"))) return true;
   return mayStopRun(db, userId, membership, row);
 }
 
 /**
  * Continuar agora on several paused runs at once (the task manager's line over them): each goes on as from its card or
- * Rotinas, so a run's pause may be refused alone (`assertMayContinuePause`) while the others go on. Refused for all of
- * them, the first refusal is thrown. Runs that moved on meanwhile are skipped.
+ * Rotinas, so a run's pause may be refused alone (`assertMayContinuePause`) while the others go on, and a run's card
+ * says who let it go on. Refused for all of them, the first refusal is thrown. Runs that moved on meanwhile are skipped.
  */
 export async function continuePausedRuns(
-  deps: { db: Database },
+  deps: { db: Database; pubsub?: PubSub },
   userId: string,
   orgId: string,
   runIds: string[],
@@ -836,7 +838,9 @@ export async function continuePausedRuns(
       run: { id: agentRuns.id, orgId: agentRuns.orgId, triggerMessageId: agentRuns.triggerMessageId },
       ownerUserId: agents.ownerUserId,
       requester: runRequester,
+      routineId: routines.id,
       routineCreatorId: routines.createdByUserId,
+      cardId: sql<string | null>`${agentRuns.transcript}->'usagePause'->>'cardId'`,
       waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
       source: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'source'`,
       resetsAt: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'resetsAt'`,
@@ -877,7 +881,13 @@ export async function continuePausedRuns(
         details: { source: source ?? "plan" },
       }),
     );
-    if (moved) continued++;
+    if (!moved) continue;
+    continued++;
+    if (row.cardId)
+      await setUsageCardState(deps, orgId, row.cardId, "continued", {
+        continuedByUserId: userId,
+        continuedAt: new Date().toISOString(),
+      });
   }
   if (continued === 0 && refused) throw refused;
   return { continued };

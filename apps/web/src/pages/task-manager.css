@@ -143,8 +143,9 @@ html:not([data-pointer]) .tm-card:focus-visible {
   --tm-lead: 24px;
   position: relative;
   display: grid;
-  /* Estado and Onde roda keep the room their words need and Tarefa gives way first; short of that, they wrap. */
-  grid-template-columns: minmax(160px, 1fr) minmax(136px, 256px) minmax(0, 200px) 84px minmax(100px, 184px) 128px;
+  /* Estado and Onde roda get the room their words need first (whole on one line from 950px), then Tarefa and Usando
+     agora share what's left. Short of that the words wrap; under the sum of the minimums the rows stack (below). */
+  grid-template-columns: minmax(200px, 2fr) minmax(136px, 256px) minmax(96px, 1fr) 84px minmax(100px, 184px) 128px;
   align-items: stretch;
   min-height: 52px;
   border-top: 1px solid var(--line);
@@ -199,9 +200,21 @@ html:not([data-pointer]) .tm-row:has(.tm-hit:focus-visible) {
   white-space: nowrap;
   background: color-mix(in srgb, var(--tm-heat) calc(var(--h, 0) * 100%), transparent);
 }
+.tm-cell--state,
 .tm-cell--where {
   overflow-wrap: anywhere;
+}
+.tm-cell--where {
   color: var(--muted);
+}
+/* A chip here wraps like the waits beside it, never cut. */
+.tm-cell--state .ac-chip {
+  height: auto;
+  min-height: 22px;
+  white-space: normal;
+}
+.tm-cell--state .ac-chip__text {
+  overflow: visible;
 }
 .tm-cell--act {
   justify-content: flex-end;
@@ -215,6 +228,7 @@ html:not([data-pointer]) .tm-row:has(.tm-hit:focus-visible) {
   flex-direction: column;
   min-width: 0;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 .tm-name__title {
   min-width: 0;
@@ -252,9 +266,6 @@ html:not([data-pointer]) .tm-hit:focus-visible {
   font-weight: 650;
 }
 .tm-name small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 12px;
   color: var(--faint);
 }
@@ -298,29 +309,6 @@ html:not([data-pointer]) .tm-twist:focus-visible {
   .tm-row:not(.tm-row--agent, :hover, [data-selected], :focus-within) .tm-cell--act > :not(:disabled) {
     opacity: 0;
   }
-}
-
-/* Over rows waiting on the same limit: why, once, and Continuar agora for who may press it. */
-.tm-waitline {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
-  margin: 0;
-  padding: 10px 14px;
-  border-top: 1px solid var(--line);
-  background: var(--plate-soft);
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--ink2);
-}
-.tm-waitline__text {
-  flex: 1 1 280px;
-  min-width: 0;
-}
-.tm-waitline__text > .ac-icon {
-  color: var(--faint);
 }
 
 /* "Pedidas por pessoas 6": a section's line inside the table. */
@@ -409,8 +397,8 @@ html:not([data-pointer]) .tm-more:focus-visible {
 }
 
 /* No room for the columns (a phone, a small window beside the sidebar): no column names; each row stacks its name,
-   state and what it uses, Parar at its side. */
-@container tm (max-width: 640px) {
+   state, what it uses and where it runs, Parar at its side. */
+@container tm (max-width: 760px) {
   .tm-row--head {
     display: none;
   }
@@ -435,16 +423,21 @@ html:not([data-pointer]) .tm-more:focus-visible {
     grid-row: 3;
     grid-column: 1;
   }
+  .tm-cell--where {
+    grid-row: 4;
+    grid-column: 1;
+  }
   .tm-cell--state,
-  .tm-cell--use {
+  .tm-cell--use,
+  .tm-cell--where {
     padding-left: calc(var(--tm-indent) + var(--tm-lead));
   }
   .tm-cell--act {
-    grid-row: 1 / span 3;
+    grid-row: 1 / span 4;
     grid-column: 2;
   }
   .tm-row:not(.tm-row--ended) > .tm-cell--time,
-  .tm-cell--where,
+  .tm-cell--where:empty,
   .tm-cell--use:empty {
     display: none;
   }

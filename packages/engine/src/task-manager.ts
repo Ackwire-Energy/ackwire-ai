@@ -389,6 +389,7 @@ export async function taskManager(
         run: { orgId, triggerMessageId: r.trigger_message_id },
         requester: r.requester_id,
         ownerUserId: r.owner_user_id,
+        routineId: r.routine_id,
         routineCreatorId: r.routine_creator,
       });
     }),

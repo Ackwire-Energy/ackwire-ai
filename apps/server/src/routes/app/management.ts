@@ -1626,7 +1626,7 @@ export function managementRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       const { runIds } = c.req.valid("json");
-      const out = await continuePausedRuns({ db }, c.get("user").id, orgId, runIds);
+      const out = await continuePausedRuns({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, runIds);
       if (out.continued > 0) deps.wakeWorkers?.();
       return c.json(out, 200);
     },

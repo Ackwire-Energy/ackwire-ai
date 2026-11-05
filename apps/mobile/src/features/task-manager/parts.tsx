@@ -264,7 +264,15 @@ const styles = StyleSheet.create({
   stack: { gap: 1, minWidth: 0 },
   // Under the state's words, past its mark (16 + 6).
   starts: { marginLeft: 22 },
-  waitLine: { gap: 8, alignItems: "flex-start", marginTop: 4, marginBottom: 8, padding: 12, borderRadius: 14 },
+  waitLine: {
+    gap: 8,
+    alignItems: "flex-start",
+    marginTop: 4,
+    marginBottom: 8,
+    marginHorizontal: 16,
+    padding: 12,
+    borderRadius: 14,
+  },
   // As tall as the button it stands in for, so the row doesn't move.
   stopping: { minWidth: 36, height: 36, alignItems: "center", justifyContent: "center" },
   field: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, minHeight: 36 },

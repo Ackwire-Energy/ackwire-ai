@@ -13984,7 +13984,7 @@
       "stopped": "Durduruldu"
     },
     "wait": {
-      "pausedPlan": "Duraklatıldı: plan %{{percent}} {{window}}",
+      "pausedPlan": "Duraklatıldı: plan {{window}} %{{percent}} seviyesinde",
       "pausedBudget": "Duraklatıldı: bütçe ayın %{{percent}} kadarında",
       "planLimit": "{{plan}} planı sınırda",
       "modelLimit": "{{model}} sınırda",
@@ -14006,7 +14006,7 @@
     "waitGroup": {
       "routines_one": "{{count}} rutin",
       "routines_other": "{{count}} rutin",
-      "pausedPlan": "{{what}} duraklatıldı: {{plan}} planı %{{percent}} {{window}} ve {{when}} devam eder. Kalan kısım konuşmalara ayrılır.",
+      "pausedPlan": "{{what}} duraklatıldı: {{plan}} planı {{window}} %{{percent}} seviyesinde ve {{when}} devam eder. Kalan kısım konuşmalara ayrılır.",
       "pausedBudget": "{{what}} duraklatıldı: aylık bütçe %{{percent}} seviyesinde ve {{when}} devam eder. Kalan kısım konuşmalara ayrılır.",
       "planLimit": "{{what}} bekliyor: {{plan}} planı sınırına ulaştı ve {{when}} devam eder.",
       "modelLimit": "{{what}} bekliyor: {{model}} sınırına ulaştı ve {{when}} devam eder. Planın diğer modelleri çalışmaya devam ediyor.",

@@ -25,7 +25,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useEscClose } from "@/hooks/useEscClose";
 import { useNow } from "@/hooks/useNow";
 import { useAgentTasks } from "./agent-tasks-context";
-import { StopAllInline, StopTaskButton, TaskMark, taskAge, useTaskStop } from "./TaskBits";
+import { StopAllInline, StopTaskButton, TaskMark, TaskWaitLines, taskAge, useTaskStop } from "./TaskBits";
 import "@/components/threads/threads.css";
 
 /**
@@ -136,18 +136,21 @@ export function AgentTasksPanel({
           {tasks.length === 0 ? (
             <p className="tm-panel__none">{t("taskManager.agentPanel.none", { name })}</p>
           ) : (
-            <ul className="tm-agentpanel__list">
-              {tasks.map((task) => (
-                <TaskCard
-                  key={task.runId}
-                  task={task}
-                  here={task.channelId === channelId}
-                  now={now}
-                  stopping={stopping.has(task.runId)}
-                  onStop={() => stop([task.runId])}
-                />
-              ))}
-            </ul>
+            <>
+              <TaskWaitLines tasks={tasks} />
+              <ul className="tm-agentpanel__list">
+                {tasks.map((task) => (
+                  <TaskCard
+                    key={task.runId}
+                    task={task}
+                    here={task.channelId === channelId}
+                    now={now}
+                    stopping={stopping.has(task.runId)}
+                    onStop={() => stop([task.runId])}
+                  />
+                ))}
+              </ul>
+            </>
           )}
         </div>
 

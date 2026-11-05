@@ -496,9 +496,9 @@ function TaskSection({
 }
 
 /**
- * One task: what it is (the whole row picks it), its state, what it uses now, its time (shaded as work at it grows: a
- * wait for a known reason isn't stuck), where it runs and Parar. `grouped` sits under its agent's row; `flat` (a routine's background run) shows its agent's face;
- * `agent` is the list of one agent's tasks (its card chosen).
+ * One task: what it is (the whole row picks it), its state, what it uses now, its time (shaded as it grows, but not on
+ * a wait with a known reason: that isn't stuck), where it runs and Parar. `grouped` sits under its agent's row; `flat`
+ * (a routine's background run) shows its agent's face; `agent` is the list of one agent's tasks (its card chosen).
  */
 function TaskRow({
   task,
@@ -562,7 +562,7 @@ function TaskRow({
       </span>
       <span
         className="tm-cell tm-cell--time ac-num"
-        style={{ "--h": taskState(task) === "working" ? heatOf(age) : 0 } as CSSProperties}
+        style={{ "--h": taskState(task) === "waiting" ? 0 : heatOf(age) } as CSSProperties}
       >
         {taskClock(age)}
       </span>

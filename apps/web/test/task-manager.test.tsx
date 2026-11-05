@@ -833,12 +833,22 @@ describe("why a task waits", () => {
       background: true,
       startedAt: ago(40),
     });
+    const stuck = task({
+      runId: "r3",
+      agentId: ADA_ID,
+      label: "Nunca começou",
+      background: true,
+      status: "queued",
+      startedAt: null,
+      createdAt: ago(40),
+    });
     await open(
-      seedState({ taskManager: view([waiting("r1", "Pausa do plano", "plan", wait()), running]) }),
+      seedState({ taskManager: view([waiting("r1", "Pausa do plano", "plan", wait()), running, stuck]) }),
       "task-manager",
     );
     expect(heat(rowOf("Pausa do plano"))).toBe("0");
     expect(heat(rowOf("Trabalho longo"))).toBe("1");
+    expect(heat(rowOf("Nunca começou"))).toBe("1");
   });
 
   test("an agent whose tasks are all paused says why, not Na fila", async () => {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
+import { eq, schema, sql } from "@agenteschat/db";
 import {
   addRunStep,
   cancelRun,
@@ -7,6 +7,8 @@ import {
   drainOutbox,
   ForbiddenError,
   listMessages,
+  type Membership,
+  mayContinuePause,
   NotFoundError,
   postPersonMessage,
   setStopReason,
@@ -165,6 +167,52 @@ describe("why a task waits", () => {
       by: f.owner.id,
     });
     expect(await continuePausedRuns({ db: f.db }, f.owner.id, f.org.id, [runId])).toEqual({ continued: 0 });
+  });
+
+  test("managing routines is no way past the rule for a run that isn't a routine's", async () => {
+    f = await setup();
+    await ask("@dev resume a semana");
+    const [run] = await runs();
+    const membership = { permissions: new Set(["manage_routines"]) } as unknown as Membership;
+    const row = {
+      run: { orgId: f.org.id, triggerMessageId: run?.triggerMessageId ?? "" },
+      requester: null,
+      ownerUserId: null,
+      routineCreatorId: null,
+    };
+    const other = await addMember(f.db, f.org.id, "member", "caio");
+    expect(await mayContinuePause(f.db, other.id, membership, { ...row, routineId: null })).toBe(false);
+    expect(await mayContinuePause(f.db, other.id, membership, { ...row, routineId: "a-routine" })).toBe(true);
+  });
+
+  test("Continuar agora on several says so on a run's card, as pressing the card does", async () => {
+    f = await setup();
+    await ask("@dev resume a semana");
+    const [run] = await runs();
+    const runId = run?.id ?? "";
+    await park(runId, pauseWait, { source: "plan", used: 95, window: "seven_day" });
+    const card = { kind: "usage_paused", state: "paused", runId, waitId: "w1", continuedByUserId: null };
+    const [trigger] = await f.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.id, run?.triggerMessageId ?? ""));
+    await f.db
+      .update(schema.messages)
+      .set({ meta: { ...trigger?.meta, actionCard: card } })
+      .where(eq(schema.messages.id, trigger?.id ?? ""));
+    await f.db
+      .update(schema.agentRuns)
+      .set({
+        transcript: sql`${schema.agentRuns.transcript} || jsonb_build_object('usagePause', jsonb_build_object('cardId', ${trigger?.id}::text))`,
+      })
+      .where(eq(schema.agentRuns.id, runId));
+
+    expect(await continuePausedRuns(deps(), f.owner.id, f.org.id, [runId])).toEqual({ continued: 1 });
+    const [after] = await f.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.id, trigger?.id ?? ""));
+    expect(after?.meta.actionCard).toMatchObject({ state: "continued", continuedByUserId: f.owner.id, waitId: "w1" });
   });
 });
 

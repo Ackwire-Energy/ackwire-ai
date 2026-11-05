@@ -51,7 +51,12 @@ test("a limit: the plan's, a model's own, the region it needs, the budget", () =
   expect(region?.next).toBe("taskManager.wait.modelRegionNext");
   const budget = wait({ code: "budget", percent: null, plan: null });
   expect(words(task("budget", budget))?.state).toBe("taskManager.wait.budgetOut");
-  expect(words(task("budget", { ...budget, resetsAt: null }))?.next).toContain("taskManager.wait.whenSoon");
+  const reserved = words(task("budget", { ...budget, resetsAt: null }));
+  expect(reserved?.state).toBe("taskManager.state.budget");
+  expect(reserved?.next).toContain("taskManager.wait.whenSoon");
+  const pausedReserved = words(task("budget", wait({ resetsAt: null, plan: null })));
+  expect(pausedReserved?.state).toContain("taskManager.wait.pausedBudget");
+  expect(pausedReserved?.next).toContain("taskManager.wait.whenSoon");
 });
 
 test("a wait on no limit: the agent's line of work, a computer gone, one not ready, a person", () => {
@@ -60,6 +65,7 @@ test("a wait on no limit: the agent's line of work, a computer gone, one not rea
   expect(on("machine_offline")?.state).toBe("taskManager.state.computerOffline");
   expect(on("machine_dropped")?.next).toBe("taskManager.wait.computerOfflineNext");
   expect(on("not_logged_in")?.state).toBe("taskManager.wait.computerWait");
+  expect(on("no_computer")?.state).toBe("taskManager.wait.computerWait");
   expect(words(task(null, null))?.next).toBe("taskManager.wait.answerNext");
   expect(words(task(null, null, { status: "waiting_approval" }))?.next).toBe("taskManager.wait.okNext");
 });
@@ -81,6 +87,8 @@ test("a group needs two rows on the same limit; a computer, a person or a region
   ).toEqual([]);
   const region = wait({ code: "plan_limit", scope: "region" });
   expect(taskWaitGroups([task("plan", region), task("plan", region)])).toEqual([]);
+  const reserved = wait({ code: "budget", key: "budget:a", percent: null, resetsAt: null });
+  expect(taskWaitGroups([task("budget", reserved), task("budget", reserved)])).toEqual([]);
   const away = wait({ code: "machine_offline", key: null });
   expect(taskWaitGroups([task("computer_offline", away), task("computer_offline", away)])).toEqual([]);
 });
