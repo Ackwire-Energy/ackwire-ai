@@ -6,6 +6,7 @@ import { useToast } from "@/ui";
 import { widgetHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { useOrgId } from "../shared/hooks";
+import { successHaptic } from "../shared/parts";
 import { useAgentLook } from "./hooks";
 import { shownWidgetTitle } from "./logic";
 import { useWidgetSurface, WidgetCard, type WidgetCardData } from "./WidgetView";
@@ -75,7 +76,10 @@ export function WidgetPeek({
           style: "destructive",
           onPress: () =>
             remove.mutate(w.id, {
-              onSuccess: () => toast({ title: t("mobile.dashboards.widget.removed") }),
+              onSuccess: () => {
+                successHaptic();
+                toast({ title: t("mobile.dashboards.widget.removed") });
+              },
               onError: failed,
             }),
         },

@@ -3,8 +3,9 @@ import { router } from "expo-router";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Text as RNText, ScrollView, StyleSheet, View } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Icon, IconButton, PressScale, Text, useTheme } from "@/ui";
+import { Icon, IconButton, PressScale, Text, useReducedMotion, useTheme } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { copyText, MONO } from "../shared/parts";
 
@@ -52,7 +53,7 @@ export const CodeCard = memo(function CodeCard({ lang, text }: { lang: string; t
           style={styles.tool}
           contentStyle={styles.toolIn}
         >
-          <Icon name="expand" size={17} color={c.muted} />
+          <Icon name="expand" size={18} color={c.muted} />
         </PressScale>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.body}>
@@ -126,6 +127,7 @@ function CodeText({
 function CopyButton({ text, plate = false }: { text: string; plate?: boolean }) {
   const { t } = useTranslation();
   const c = useColors();
+  const reduced = useReducedMotion();
   const [done, setDone] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -147,11 +149,13 @@ function CopyButton({ text, plate = false }: { text: string; plate?: boolean }) 
       style={[styles.tool, done ? styles.toolDone : null, plate ? { backgroundColor: c.plate } : null]}
       contentStyle={styles.toolIn}
     >
-      <Icon name={done ? "check" : "copy"} size={17} color={done ? c.ok : c.muted} />
+      <Icon name={done ? "check" : "copy"} size={18} color={done ? c.ok : c.muted} />
       {done ? (
-        <Text variant="label" style={{ color: c.ok }}>
-          {t("mobile.code.copied")}
-        </Text>
+        <Animated.View entering={reduced ? undefined : FadeIn.duration(160)}>
+          <Text variant="label" style={{ color: c.ok }}>
+            {t("mobile.code.copied")}
+          </Text>
+        </Animated.View>
       ) : null}
     </PressScale>
   );
@@ -215,13 +219,14 @@ const styles = StyleSheet.create({
   card: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
   top: { flexDirection: "row", alignItems: "center", gap: 2, height: 38, paddingLeft: 12, paddingRight: 4 },
   lang: { flex: 1 },
+  // Round while it holds the icon alone (its least width centers it), a pill once "Copied" shows.
   tool: {
     height: 32,
     minWidth: 32,
-    paddingHorizontal: 7,
+    paddingHorizontal: 6,
     borderRadius: 16,
   },
-  toolIn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
+  toolIn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   center: { alignItems: "center", justifyContent: "center" },
   toolDone: { paddingHorizontal: 10 },
   body: { paddingHorizontal: 14, paddingBottom: 12 },
@@ -234,7 +239,7 @@ const styles = StyleSheet.create({
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14 },
   sheetTitle: { flex: 1, textAlign: "center" },
   sheetTools: { flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-  pill: { height: 32, paddingHorizontal: 13, borderRadius: 16 },
+  pill: { height: 32, paddingHorizontal: 14, borderRadius: 16 },
   fill: { flex: 1 },
   sheetBody: { paddingHorizontal: 16, paddingTop: 4 },
 });

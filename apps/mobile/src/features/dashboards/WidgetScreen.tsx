@@ -168,6 +168,7 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
           onPress: () =>
             remove.mutate(w.id, {
               onSuccess: () => {
+                successHaptic();
                 toast({ title: t("mobile.dashboards.widget.removed") });
                 goBack();
               },
@@ -230,7 +231,7 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
         {w.status === "failed" && w.failure ? (
           <View style={styles.failure}>
             <View style={styles.failureLine}>
-              <LineIcon name="info" size={16} color={c.warn} variant="footnote" />
+              <LineIcon name="info" size={13} color={c.warn} variant="footnote" />
               <Text variant="footnote" style={[styles.grow, { color: c.warn }]}>
                 {words.failure(w)}
               </Text>

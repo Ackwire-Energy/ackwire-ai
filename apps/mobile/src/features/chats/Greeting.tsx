@@ -95,7 +95,7 @@ export function Greeting({
               onPress={() => openFinished(line.finished)}
               accessibilityRole="button"
               accessibilityLabel={`${finishedName} ${finishedText}`}
-              hitSlop={8}
+              hitSlop={13}
               style={({ pressed }) => [styles.part, styles.shrink, pressed && styles.pressed]}
             >
               <AgentFace agentId={line.finished.agentId} size={FACE} framed />
@@ -113,7 +113,7 @@ export function Greeting({
               onPress={openAgents}
               accessibilityRole="button"
               accessibilityLabel={workingText}
-              hitSlop={8}
+              hitSlop={13}
               style={({ pressed }) => [styles.shrink, pressed && styles.pressed]}
             >
               {workingPart}
@@ -186,7 +186,7 @@ export function FirstAgentEmpty() {
               style={({ pressed }) => [styles.idea, pressed && { backgroundColor: c.sunken }]}
             >
               {i > 0 ? <View style={[styles.sep, { backgroundColor: c.line2 }]} /> : null}
-              <Tile icon={ex.icon} />
+              <Tile icon={ex.icon} size={IDEA_TILE} />
               <View style={styles.grow}>
                 <Text variant="callout" style={styles.bold}>
                   {t(`mobile.chats.first.example.${ex.key}.title`)}
@@ -204,33 +204,59 @@ export function FirstAgentEmpty() {
   );
 }
 
+/** The empty state's card: its padding, which the sky runs past to the card's edges. */
+const EMPTY_PAD = 20;
+/** An example's row: its inset, the tile and the gap to the words (the hairline starts at the words). */
+const IDEA_INSET = 14;
+const IDEA_TILE = 36;
+const IDEA_GAP = 12;
+
 const styles = StyleSheet.create({
   sky: { opacity: 0.5 },
-  mini: { paddingHorizontal: 20, paddingBottom: 18 },
-  line: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
+  mini: { paddingHorizontal: 20, paddingBottom: 16 },
+  line: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
   after: { marginTop: 14, marginHorizontal: -4 },
   part: { flexDirection: "row", alignItems: "center", gap: 6 },
   shrink: { flexShrink: 1 },
   pressed: { opacity: 0.6 },
   faces: { flexDirection: "row" },
-  overlap: { marginLeft: -5 },
-  empty: { marginHorizontal: 16, marginTop: 6, borderRadius: 28, overflow: "hidden", padding: 22, paddingTop: 0 },
-  emptySky: { height: 150, marginHorizontal: -22, alignItems: "center", justifyContent: "center", marginBottom: 6 },
+  overlap: { marginLeft: -6 },
+  empty: {
+    marginHorizontal: 16,
+    marginTop: 6,
+    borderRadius: 20,
+    overflow: "hidden",
+    padding: EMPTY_PAD,
+    paddingTop: 0,
+  },
+  emptySky: {
+    height: 150,
+    marginHorizontal: -EMPTY_PAD,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
   center: { textAlign: "center" },
-  emptyText: { marginTop: 6, marginBottom: 18 },
+  emptyText: { marginTop: 6, marginBottom: 20 },
   acts: { gap: 8 },
-  ideas: { paddingHorizontal: 16, paddingTop: 18 },
+  ideas: { paddingHorizontal: 16, paddingTop: 20 },
   ideasTitle: { paddingHorizontal: 4, paddingBottom: 8 },
   idea: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
+    gap: IDEA_GAP,
+    paddingHorizontal: IDEA_INSET,
     paddingVertical: 12,
     minHeight: 56,
   },
-  // Between rows, inset to the text (14 + the 36 tile + 12), as every list's hairline.
-  sep: { position: "absolute", top: 0, left: 62, right: 0, height: StyleSheet.hairlineWidth },
+  // Between rows, inset to the text, as every list's hairline.
+  sep: {
+    position: "absolute",
+    top: 0,
+    left: IDEA_INSET + IDEA_TILE + IDEA_GAP,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+  },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
 });

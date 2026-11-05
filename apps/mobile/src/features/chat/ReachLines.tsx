@@ -69,19 +69,13 @@ function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: 
   return (
     <View style={[styles.one, { backgroundColor: colors.sunken }]}>
       <View style={styles.tx}>
-        <LineIcon
-          name={handed ? "chat" : "info"}
-          size={16}
-          color={colors.muted}
-          variant="small"
-          text={styles.oneText}
-        />
+        <LineIcon name={handed ? "chat" : "info"} size={15} color={colors.muted} variant="small" />
       </View>
       <View style={[styles.grow, styles.tx]}>
-        <Text variant="small" tone="ink2" numberOfLines={3} style={styles.oneText}>
+        <Text variant="small" tone="ink2" numberOfLines={3}>
           {runs.map((r, i) =>
             r.bold ? (
-              <Text key={String(i)} variant="small" tone="ink" style={[styles.oneText, styles.bold]}>
+              <Text key={String(i)} variant="small" tone="ink" style={styles.bold}>
                 {r.text}
               </Text>
             ) : (
@@ -223,19 +217,19 @@ const styles = StyleSheet.create({
   lockedText: { textAlign: "center" },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  // As the team checks' line (TeamChecks): the 16-point icon, the first line and the pill share one middle, also when
-  // the words take three lines.
+  // As the team checks' line (TeamChecks): the icon, the first line and the pill (32, in a 50 row) share one middle,
+  // also when the words take three lines.
   one: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
     minHeight: 50,
-    paddingVertical: 9,
+    paddingVertical: (50 - 32) / 2,
     paddingLeft: 12,
     paddingRight: 10,
-    borderRadius: 16,
+    borderRadius: 14,
   },
-  tx: { paddingTop: 6 },
-  oneText: { fontSize: 14.5, lineHeight: 19 },
+  // The "small" line (20) on the pill's middle.
+  tx: { paddingTop: (32 - 20) / 2 },
   detail: { marginTop: 2 },
 });

@@ -15,7 +15,19 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { sealSecret } from "@/lib/secret-box";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, CodeInput, haptics, Icon, LineIcon, Segmented, Text, ToggleSwitch, useToast } from "@/ui";
+import {
+  Button,
+  Chip,
+  CodeInput,
+  fieldText,
+  haptics,
+  Icon,
+  LineIcon,
+  Segmented,
+  Text,
+  ToggleSwitch,
+  useToast,
+} from "@/ui";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -279,9 +291,9 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                   accessibilityState={{ checked: save }}
                   accessibilityLabel={t("mobile.vault.card.save")}
                   accessibilityHint={t("mobile.vault.card.saveText")}
-                  style={styles.saveRow}
+                  style={({ pressed }) => [styles.saveRow, pressed && styles.pressed]}
                 >
-                  <Icon name={site ? "globe" : "key"} size={16} color={c.muted} />
+                  <Icon name={site ? "globe" : "key"} size={15} color={c.muted} />
                   <View style={styles.grow}>
                     <Text variant="subhead" style={styles.semibold}>
                       {t("mobile.vault.card.save")}
@@ -325,7 +337,12 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                         ))
                       )}
                       {sheet ? (
-                        <Pressable onPress={chooseAgents} accessibilityRole="button" hitSlop={8}>
+                        <Pressable
+                          onPress={chooseAgents}
+                          accessibilityRole="button"
+                          hitSlop={12}
+                          style={({ pressed }) => pressed && styles.pressed}
+                        >
                           <Text variant="subhead" tone="ink2" style={styles.semibold}>
                             {t("mobile.vault.card.choose")}
                           </Text>
@@ -400,16 +417,17 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   semibold: { fontWeight: "600" },
   field: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     minHeight: 44,
     justifyContent: "center",
   },
-  input: { fontSize: 17, paddingVertical: 10 },
+  input: { ...fieldText("body"), paddingVertical: 10 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   save: { gap: 10, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   saveRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   agents: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },
   retry: { flexDirection: "row", alignItems: "center", gap: 6 },
+  pressed: { opacity: 0.6 },
 });

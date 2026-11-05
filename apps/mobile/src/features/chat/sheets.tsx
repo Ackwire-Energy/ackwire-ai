@@ -34,7 +34,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
-import { Button, CHROME_MAX_SCALE, Count, Icon, Text, useToast } from "@/ui";
+import { Button, CHROME_MAX_SCALE, Count, Icon, PressScale, Text, useToast } from "@/ui";
 import { useMovesChannel } from "../categories/CategoryScreens";
 import { categoryHrefs } from "../categories/logic";
 import { setPinDraft } from "../dashboards/logic";
@@ -257,20 +257,21 @@ export function PlusActions({ onPick }: { onPick: (pick: PlusPick) => void }) {
     <>
       <View style={styles.tiles}>
         {tiles.map((x) => (
-          <Pressable
+          <PressScale
             key={x.key}
             onPress={() => onPick(x.key)}
             accessibilityRole="button"
             accessibilityLabel={x.label}
-            style={({ pressed }) => [styles.tileBtn, pressed && styles.emoPressed]}
+            style={styles.tileBtn}
+            contentStyle={styles.tileIn}
           >
             <View style={[styles.bigTile, surface]}>
-              <Icon name={x.icon} size={22} />
+              <Icon name={x.icon} size={24} />
             </View>
             <Text variant="caption" tone="ink2" style={styles.bold}>
               {x.label}
             </Text>
-          </Pressable>
+          </PressScale>
         ))}
       </View>
       <ActionList
@@ -771,7 +772,7 @@ export function MissionSummaryView({ missionId }: { missionId: string }) {
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   bold: { fontWeight: "600" },
-  preview: { flexDirection: "row", gap: 10, padding: 12, borderRadius: 18 },
+  preview: { flexDirection: "row", gap: 10, padding: 12, borderRadius: 14 },
   emorow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -783,6 +784,7 @@ const styles = StyleSheet.create({
   emoPressed: { transform: [{ scale: 1.15 }] },
   emoText: { fontSize: 26, lineHeight: 34 },
   tiles: { flexDirection: "row", justifyContent: "space-between" },
-  tileBtn: { flex: 1, alignItems: "center", gap: 7, paddingVertical: 6 },
+  tileBtn: { flex: 1 },
+  tileIn: { alignItems: "center", gap: 8, paddingVertical: 6 },
   bigTile: { width: 54, height: 54, borderRadius: 18, alignItems: "center", justifyContent: "center" },
 });

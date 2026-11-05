@@ -133,7 +133,7 @@ function Form({ board }: { board: Dashboard }) {
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[styles.in, { paddingBottom: 28 + insets.bottom }]}
+        contentContainerStyle={[styles.in, { paddingBottom: 24 + insets.bottom }]}
       >
         {board.kind === "home" ? (
           <Text variant="footnote" tone="muted" style={styles.note}>

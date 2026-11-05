@@ -149,6 +149,7 @@ import {
   buildRows,
   type ChatRow,
   dayInView,
+  MSG_TEXT,
   mayStopRun,
   mergeTimeline,
   parseSlash,
@@ -2084,7 +2085,7 @@ function Chat({
 function ToLatest({ unseen, onPress }: { unseen: Unseen; onPress: () => void }) {
   const { t } = useTranslation();
   const dir = useDirectory();
-  const { colors, shadows } = useTheme();
+  const { colors, shadows, reducedMotion } = useTheme();
   const nameOf = (who: string) => {
     const at = who.indexOf(":");
     return dir.nameOf({ type: who.slice(0, at), id: who.slice(at + 1) });
@@ -2098,7 +2099,11 @@ function ToLatest({ unseen, onPress }: { unseen: Unseen; onPress: () => void }) 
     unseen.mentionsMe ? t("mobile.chat.unseen.mentionsYou") : "",
   ].filter(Boolean);
   return (
-    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)} pointerEvents="box-none">
+    <Animated.View
+      entering={reducedMotion ? undefined : FadeIn.duration(160)}
+      exiting={reducedMotion ? undefined : FadeOut.duration(120)}
+      pointerEvents="box-none"
+    >
       <PressScale
         to={0.92}
         onPress={onPress}
@@ -2188,8 +2193,8 @@ function Connection({ status }: { status: ConnectionStatus }) {
 
 const styles = StyleSheet.create({
   topFade: { position: "absolute", top: 0, left: 0, right: 0 },
-  // Under the agent's words, like a card on its message (MessageRow: 14 + 34 avatar + 11 gap).
-  browserRow: { paddingLeft: 59, paddingRight: 16, paddingBottom: 6 },
+  // Under the agent's words, like a card on its message.
+  browserRow: { paddingLeft: MSG_TEXT, paddingRight: 16, paddingBottom: 6 },
   screen: { flex: 1 },
   grow: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
@@ -2216,7 +2221,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginHorizontal: 4,
     marginBottom: 6,
-    paddingVertical: 7,
+    paddingVertical: 8,
     paddingHorizontal: 10,
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,

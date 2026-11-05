@@ -29,8 +29,9 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { Button, LineIcon, Text } from "@/ui";
+import { Button, LineIcon, Text, useReducedMotion } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
@@ -45,7 +46,12 @@ const NANO = 1_000_000_000;
  */
 export function TeamWeek({ message: m }: { message: Message }) {
   const card = m.author.type === "agent" ? teamWeekCardOf(m.meta) : null;
-  return card ? <WeekCard message={m} card={card} /> : null;
+  // A fix done while the card shows fades into its done line; one done before it mounts just shows.
+  return card ? (
+    <LayoutAnimationConfig skipEntering>
+      <WeekCard message={m} card={card} />
+    </LayoutAnimationConfig>
+  ) : null;
 }
 
 function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
@@ -138,7 +144,7 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
             </Text>
             {card.worked.map((w) => (
               <View key={`${w.kind}:${w.agentId}`} style={styles.line}>
-                <LineIcon name="check" size={16} color={c.ok} variant="footnote" />
+                <LineIcon name="check" size={13} color={c.ok} variant="footnote" />
                 <Text variant="footnote" tone="ink" style={styles.fill}>
                   {w.kind === "runs"
                     ? t("teamWeek.workedRuns", {
@@ -199,7 +205,12 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
             />
           ) : null}
           {prefs ? (
-            <Pressable accessibilityRole="button" onPress={openRightHandSettings} hitSlop={6} style={styles.when}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={openRightHandSettings}
+              hitSlop={8}
+              style={({ pressed }) => [styles.when, pressed && styles.pressed]}
+            >
               <Text variant="footnote" tone="muted">
                 {prefs.off ? t("teamWeek.off") : teamWeekWhen(t, locale, prefs)}
                 {" · "}
@@ -244,6 +255,7 @@ function Fix({
   const { t } = useTranslation();
   const { orgId } = useOrg();
   const c = useColors();
+  const reduced = useReducedMotion();
   const qc = useQueryClient();
   const failed = useFailed();
   const actions = useAgentActions(orgId, message.channelId);
@@ -263,7 +275,7 @@ function Fix({
           ) : (
             <LineIcon
               name={row.kind === "unanswered" ? "help" : row.kind === "stalled" ? "issue" : "clock"}
-              size={16}
+              size={15}
               color={c.muted}
               variant="small"
             />
@@ -279,9 +291,9 @@ function Fix({
         </View>
       </View>
       {state === "done" ? (
-        <View style={styles.doneRow}>
+        <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={styles.doneRow}>
           <View style={[styles.line, styles.fill]}>
-            <LineIcon name="check" size={16} color={c.ok} variant="footnote" />
+            <LineIcon name="check" size={13} color={c.ok} variant="footnote" />
             <Text variant="footnote" tone="ok" style={[styles.semibold, styles.fill]}>
               {receipt?.undoneAt ? t("rightHand.card.undone") : doneText}
             </Text>
@@ -300,7 +312,7 @@ function Fix({
               }
             />
           ) : null}
-        </View>
+        </Animated.View>
       ) : state === "gone" ? (
         <Text variant="footnote" tone="muted">
           {t("teamWeek.gone")}
@@ -328,8 +340,8 @@ const styles = StyleSheet.create({
   card: {
     paddingTop: 12,
     paddingHorizontal: 14,
-    borderRadius: 16,
-    borderBottomLeftRadius: 4,
+    borderRadius: 14,
+    borderBottomLeftRadius: 6,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
@@ -359,4 +371,5 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   when: { alignSelf: "flex-start", minHeight: 28, justifyContent: "center" },
+  pressed: { opacity: 0.6 },
 });

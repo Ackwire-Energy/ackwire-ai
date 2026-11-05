@@ -98,7 +98,7 @@ export function MentionPicker({
               style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
             >
               {i > 0 && !heading ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
-              <Face who={{ type: o.type, id: o.id }} size={30} />
+              <Face who={{ type: o.type, id: o.id }} size={FACE} />
               <View style={styles.tx}>
                 <Text variant="body" numberOfLines={1} style={styles.name}>
                   {nb}
@@ -118,7 +118,7 @@ export function MentionPicker({
                   disabled={add.isPending}
                   accessibilityRole="button"
                   accessibilityLabel={t("mobile.mention.addA11y", { name: o.name })}
-                  hitSlop={6}
+                  hitSlop={9}
                   style={[styles.add, { backgroundColor: c.sunken }]}
                   contentStyle={styles.addIn}
                 >
@@ -135,18 +135,23 @@ export function MentionPicker({
   );
 }
 
+/** A row's inset, its face and the gap to the name: the hairline above starts where the name does. */
+const INSET = 14;
+const FACE = 30;
+const GAP = 10;
+
 const styles = StyleSheet.create({
   card: { marginHorizontal: 2, marginBottom: 8, borderRadius: 20, overflow: "hidden", paddingBottom: 4 },
-  heading: { paddingTop: 10, paddingHorizontal: 14, paddingBottom: 4, fontWeight: "600" },
+  heading: { paddingTop: 10, paddingHorizontal: INSET, paddingBottom: 4, fontWeight: "600" },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: GAP,
     paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingHorizontal: INSET,
     minHeight: 48,
   },
-  divider: { position: "absolute", top: 0, left: 54, right: 0, height: StyleSheet.hairlineWidth },
+  divider: { position: "absolute", top: 0, left: INSET + FACE + GAP, right: 0, height: StyleSheet.hairlineWidth },
   tx: { flex: 1, minWidth: 0 },
   name: { fontWeight: "600" },
   mark: { textDecorationLine: "underline" },

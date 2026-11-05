@@ -75,7 +75,7 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
         ) : null}
         {q ? (
           <View style={[styles.line, styles.pad]}>
-            <LineIcon name="agent" size={14} color={c.faint} variant="caption" />
+            <LineIcon name="agent" size={12} color={c.faint} variant="caption" />
             <Text variant="caption" tone="faint" style={styles.grow}>
               {t(consultOriginKey(q, Boolean(channelName)), {
                 from: from.name,
@@ -112,7 +112,7 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
             ) : (
               <LineIcon
                 name={state === "waiting" || state === "offline" || state === "handedOn" ? "wait" : "clock"}
-                size={14}
+                size={12}
                 color={c.faint}
                 variant="caption"
               />
@@ -125,7 +125,7 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
       </ScrollView>
       <View style={[styles.foot, { paddingBottom: insets.bottom + 8 }]}>
         <View style={[styles.note, { backgroundColor: c.sunken }]}>
-          <LineIcon name="lock" size={16} color={c.muted} variant="footnote" />
+          <LineIcon name="lock" size={13} color={c.muted} variant="footnote" />
           <Text variant="footnote" tone="muted" style={styles.grow}>
             <Text variant="footnote" tone="ink2" style={styles.bold}>
               {t("chat.consultPanel.readOnly")}
@@ -158,5 +158,5 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   answer: { gap: 4, paddingVertical: 8 },
   foot: { paddingHorizontal: 12, paddingTop: 8, gap: 8 },
-  note: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderRadius: 16 },
+  note: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderRadius: 14 },
 });

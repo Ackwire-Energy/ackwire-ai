@@ -249,7 +249,7 @@ function SettingsRow({
     />
   ) : asked ? (
     <View style={styles.sent}>
-      <LineIcon name="send" size={14} color={c.muted} variant="small" />
+      <LineIcon name="send" size={15} color={c.muted} variant="small" />
       <Text variant="small" tone="muted" style={styles.fill}>
         {asked}
       </Text>

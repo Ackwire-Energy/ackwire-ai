@@ -19,6 +19,7 @@ import type { TFunction } from "i18next";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import {
@@ -36,6 +37,7 @@ import {
   Sky,
   SwipeRow,
   Text,
+  useReducedMotion,
 } from "@/ui";
 import { openPage } from "../ai/parts";
 import { approvalAction } from "../approvals/logic";
@@ -105,6 +107,9 @@ export function ActivityScreen() {
   const waitingCount = Math.max(waiting.length, (counts?.waiting ?? waiting.length) - merged - settled);
   const pull = usePullRefresh(list.refetch);
   const header = useTabHeader();
+  const reduced = useReducedMotion();
+  // A card decided while the page shows fades out and the rest close up; a new one fades in.
+  const cardMotion = reduced ? {} : { entering: CARD_IN, exiting: CARD_OUT, layout: LinearTransition };
   return (
     <LargeTitleScreen
       title={t("mobile.activity.title")}
@@ -124,11 +129,15 @@ export function ActivityScreen() {
       {waiting.length > 0 ? (
         <>
           <SectionHeader title={t("mobile.home.waiting")} count={waitingCount} />
-          <View style={styles.cards}>
-            {waiting.map((n) => (
-              <WaitingCardView key={n.id} item={n} />
-            ))}
-          </View>
+          <LayoutAnimationConfig skipEntering skipExiting>
+            <View style={styles.cards}>
+              {waiting.map((n) => (
+                <Animated.View key={n.id} {...cardMotion}>
+                  <WaitingCardView item={n} />
+                </Animated.View>
+              ))}
+            </View>
+          </LayoutAnimationConfig>
         </>
       ) : list.isLoading ? null : filter !== "done" ? (
         <AllClear />
@@ -147,7 +156,11 @@ export function ActivityScreen() {
         </View>
       ))}
       {list.hasNextPage ? (
-        <Pressable onPress={() => void list.fetchNextPage()} accessibilityRole="button" style={styles.more}>
+        <Pressable
+          onPress={() => void list.fetchNextPage()}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.more, pressed && styles.morePressed]}
+        >
           <Text variant="small" tone="muted">
             {t("mobile.activity.more")}
           </Text>
@@ -383,8 +396,10 @@ function AllClear() {
   const nextAgent = next ? dir.agentById.get(next.agentId) : undefined;
   const when = useWhen();
   const date = next?.nextRunAt ? nextRunWords(t, when, next.nextRunAt) : null;
+  const reduced = useReducedMotion();
+  // The last card decided: the clear page fades in where the cards were.
   return (
-    <>
+    <Animated.View entering={reduced ? undefined : FadeIn.duration(160)}>
       <View style={styles.clear}>
         <View style={styles.clearSky}>
           <Sky color={agentLook(crew[0]).color} depth={0.8} style={[StyleSheet.absoluteFill, styles.clearSkyTint]} />
@@ -427,7 +442,7 @@ function AllClear() {
           />
         </>
       ) : null}
-    </>
+    </Animated.View>
   );
 }
 
@@ -603,4 +618,8 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   divider: { position: "absolute", top: 0, left: LIST_INSET, right: 0, height: StyleSheet.hairlineWidth },
   more: { alignItems: "center", paddingVertical: 16 },
+  morePressed: { opacity: 0.6 },
 });
+
+const CARD_IN = FadeIn.duration(160);
+const CARD_OUT = FadeOut.duration(120);

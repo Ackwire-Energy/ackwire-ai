@@ -84,7 +84,7 @@ export function ConversationSwitcher({
                   {...(sub ? { subtitle: sub } : {})}
                   meta={
                     current ? (
-                      <Icon name="check" size={17} color={c.muted} />
+                      <Icon name="check" size={18} color={c.muted} />
                     ) : r.unread > 0 ? (
                       <Count value={r.unread} max={99} inverted />
                     ) : undefined

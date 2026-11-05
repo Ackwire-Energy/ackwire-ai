@@ -148,7 +148,7 @@ export const ConversationRowView = memo(function ConversationRowView({
       <View style={styles.work}>
         {lines.state === "working" ? <PixelOrbit color={orbitColor} size={13} /> : null}
         {lines.state === "waiting" ? (
-          <LineIcon name="wait" size={14} color={c.amber} variant="small" text={LIST_PREVIEW} />
+          <LineIcon name="wait" size={15} color={c.amber} variant="small" text={LIST_PREVIEW} />
         ) : null}
         <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           <Text
@@ -167,7 +167,7 @@ export const ConversationRowView = memo(function ConversationRowView({
     label = [verb, agentState.title].filter(Boolean).join(" · ");
     line = (
       <View style={styles.work}>
-        <LineIcon name="wait" size={14} color={c.amber} variant="small" text={LIST_PREVIEW} />
+        <LineIcon name="wait" size={15} color={c.amber} variant="small" text={LIST_PREVIEW} />
         <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           <Text variant="small" style={[LIST_PREVIEW, styles.em, { color: c.amber }]}>
             {verb}
@@ -180,7 +180,7 @@ export const ConversationRowView = memo(function ConversationRowView({
     label = t("mobile.outage.rowWaiting", { computer: agentState.computer });
     line = (
       <View style={styles.work}>
-        <LineIcon name="clock" size={14} color={c.muted} variant="small" text={LIST_PREVIEW} />
+        <LineIcon name="clock" size={15} color={c.muted} variant="small" text={LIST_PREVIEW} />
         <Text variant="small" tone="muted" numberOfLines={1} style={[LIST_PREVIEW, styles.shrink]}>
           {label}
         </Text>
@@ -347,6 +347,6 @@ function RowTrigger({
 
 const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
-  work: { flexDirection: "row", alignItems: "center", gap: 7, minWidth: 0 },
+  work: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
   em: { fontWeight: "500" },
 });

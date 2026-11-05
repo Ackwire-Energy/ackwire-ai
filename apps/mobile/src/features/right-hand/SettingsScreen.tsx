@@ -20,9 +20,19 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import { StyleSheet, TextInput, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { EmptyState, fieldText, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import {
+  EmptyState,
+  fieldText,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  PressScale,
+  Text,
+  useToast,
+} from "@/ui";
 import { openAgentEdit } from "../agents/AgentEditScreen";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
@@ -305,17 +315,19 @@ function Pills({
         {options.map((o) => {
           const on = o.value === value;
           return (
-            <Pressable
+            <PressScale
               key={o.value}
+              to={0.95}
               accessibilityRole="radio"
               accessibilityState={{ checked: on }}
               onPress={() => !on && onPick(o.value)}
               style={[styles.pill, { backgroundColor: on ? c.ink : c.sunken }]}
+              contentStyle={styles.pillIn}
             >
               <Text variant="footnote" style={{ color: on ? c.bg : c.ink }}>
                 {o.label}
               </Text>
-            </Pressable>
+            </PressScale>
           );
         })}
       </View>
@@ -328,7 +340,9 @@ const styles = StyleSheet.create({
   pills: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
   pillsLabel: { fontWeight: "600" },
   pillRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  pill: { minHeight: 32, paddingHorizontal: 12, borderRadius: 12, borderBottomLeftRadius: 4, justifyContent: "center" },
+  pill: { minHeight: 32, borderRadius: 10, borderBottomLeftRadius: 3 },
+  // The whole pill presses: its padding is the press area's.
+  pillIn: { paddingHorizontal: 12, justifyContent: "center" },
   // One row of a group: GroupedRow's 50 high and 14 sides.
   budget: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, minHeight: 50 },
   amount: { flex: 1, paddingVertical: 12 },

@@ -22,8 +22,9 @@ import { router } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { LineIcon, PillButton, Text, useLivePaused, useToast } from "@/ui";
+import { LineIcon, PillButton, Text, useLivePaused, useReducedMotion, useToast } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -54,7 +55,12 @@ export function Receipts({ message: m }: { message: Message }) {
   const layout = receiptLayout(list);
   const now = useTick(layout !== "none" && anyLive(list));
   if (layout === "none") return null;
-  return <ReceiptList message={m} list={list} now={now} group={layout === "group"} />;
+  // What changes while it shows (undone, Redo) fades in; what is there when it mounts just shows.
+  return (
+    <LayoutAnimationConfig skipEntering>
+      <ReceiptList message={m} list={list} now={now} group={layout === "group"} />
+    </LayoutAnimationConfig>
+  );
 }
 
 /** Now, every second while something counts down and the screen is showing (LivePause); else frozen. */
@@ -128,7 +134,7 @@ function ReceiptList({
     return (
       <View style={[styles.one, styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
         <View style={styles.oneTx}>
-          <LineIcon name={receiptIcon(a.kind)} size={16} color={c.muted} variant="small" text={styles.oneText} />
+          <LineIcon name={receiptIcon(a.kind)} size={15} color={c.muted} variant="small" />
         </View>
         <View style={[styles.grow, styles.oneTx]}>
           <Sentence action={a} channelId={m.channelId} struck={v.struck} size="one" />
@@ -152,7 +158,12 @@ function ReceiptList({
           {start ? ` · ${agoText(t, agoOf(start, now))}` : ""}
         </Text>
         {live.length > 1 ? (
-          <Pressable onPress={() => undoAll(live)} accessibilityRole="button" hitSlop={8}>
+          <Pressable
+            onPress={() => undoAll(live)}
+            accessibilityRole="button"
+            hitSlop={12}
+            style={({ pressed }) => pressed && styles.pressed}
+          >
             <Text variant="small" tone="ink" style={styles.bold}>
               {t("agentActions.undoAll")}
             </Text>
@@ -161,7 +172,7 @@ function ReceiptList({
       </View>
       {rows.map(({ a, v }) => (
         <View key={a.id} style={[styles.it, { borderTopColor: c.line2 }]}>
-          <LineIcon name={receiptIcon(a.kind)} size={16} color={c.muted} variant="footnote" />
+          <LineIcon name={receiptIcon(a.kind)} size={13} color={c.muted} variant="footnote" />
           <View style={styles.grow}>
             <Sentence action={a} channelId={m.channelId} struck={v.struck} size="item" />
             <OwnActions action={a} />
@@ -191,17 +202,12 @@ function Sentence({
   const meId = useMeId();
   const values = actionTextValues(a, t, meId ?? undefined);
   const runs = boldRuns(t(actionTextKey(a), values) as string);
-  const open = href
-    ? () => {
-        tapHaptic();
-        router.push(href);
-      }
-    : undefined;
+  const open = href ? () => router.push(href) : undefined;
   return (
     <Text
       variant={size === "one" ? "small" : "footnote"}
       tone={struck ? "faint" : "ink2"}
-      style={[size === "one" && styles.oneText, struck && styles.struck]}
+      style={struck && styles.struck}
       onPress={open}
       accessibilityRole={open ? "link" : undefined}
       suppressHighlighting
@@ -212,7 +218,7 @@ function Sentence({
             key={String(i)}
             variant={size === "one" ? "small" : "footnote"}
             tone={struck ? "faint" : "ink"}
-            style={[size === "one" && styles.oneText, styles.bold]}
+            style={styles.bold}
           >
             {r.text}
           </Text>
@@ -256,8 +262,8 @@ function CopyHook({ action: a }: { action: AgentAction }) {
       onPress={() => void copy()}
       disabled={busy}
       accessibilityRole="button"
-      hitSlop={8}
-      style={styles.copyHook}
+      hitSlop={12}
+      style={({ pressed }) => [styles.copyHook, pressed && styles.pressed]}
     >
       <Text variant="footnote" tone="ink" style={styles.bold}>
         {t("agentActions.copyWebhook")}
@@ -292,10 +298,13 @@ function UndoneBy({ action: a }: { action: AgentAction }) {
     a.undoneByUserId && a.undoneByUserId === meId
       ? t("agentActions.you")
       : dir.nameOf({ type: "user", id: a.undoneByUserId }) || t("mobile.chat.someone");
+  const reduced = useReducedMotion();
   return (
-    <Text variant="caption" tone="faint" style={styles.undoneBy}>
-      {t("agentActions.undoneBy", { name })}
-    </Text>
+    <Animated.View entering={reduced ? undefined : FadeIn.duration(160)}>
+      <Text variant="caption" tone="faint" style={styles.undoneBy}>
+        {t("agentActions.undoneBy", { name })}
+      </Text>
+    </Animated.View>
   );
 }
 
@@ -316,6 +325,7 @@ function RowButton({
   onRedo: () => void;
 }) {
   const { t } = useTranslation();
+  const reduced = useReducedMotion();
   const had = useRef<ReceiptView["button"]>(null);
   if (v.button) had.current = v.button;
   const shown = v.button ?? had.current;
@@ -330,13 +340,25 @@ function RowButton({
       accessibilityLabel={!redo && v.timeLeft ? `${label}, ${v.timeLeft}` : label}
     />
   ) : (
-    <Pressable onPress={redo ? onRedo : onUndo} accessibilityRole="button" hitSlop={8}>
+    // 8 to the finger, not more: the rows above and below have their own.
+    <Pressable
+      onPress={redo ? onRedo : onUndo}
+      accessibilityRole="button"
+      hitSlop={8}
+      style={({ pressed }) => pressed && styles.pressed}
+    >
       <Text variant="footnote" tone="muted" style={styles.bold}>
         {label}
       </Text>
     </Pressable>
   );
-  return v.button ? button : <Room>{button}</Room>;
+  // Undo turning into Redo fades in.
+  const swapped = (
+    <Animated.View key={shown} entering={reduced ? undefined : FadeIn.duration(160)}>
+      {button}
+    </Animated.View>
+  );
+  return v.button ? swapped : <Room>{button}</Room>;
 }
 
 /** A button gone, its room kept: not seen, not read, not tapped. */
@@ -353,6 +375,10 @@ function Room({ children }: { children: ReactNode }) {
   );
 }
 
+/** One change's row: a list row's height, and the raised pill (PillButton) in its middle. */
+const ONE_ROW = 50;
+const PILL = 32;
+
 const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
@@ -360,30 +386,31 @@ const styles = StyleSheet.create({
   // The tool block's card (ToolCalls.tsx): a hairline and the cut corner, bottom left.
   card: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    borderBottomRightRadius: 16,
-    borderBottomLeftRadius: 4,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
+    borderBottomLeftRadius: 6,
   },
-  // The 16-point icon (as the conversation's event lines), the sentence's first line and the 32px pill share one
-  // middle; the sentence wraps under it.
+  // The icon (as the conversation's event lines), the sentence's first line and the pill share one middle; the
+  // sentence wraps under it.
   one: {
     marginTop: 12,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
-    minHeight: 50,
-    paddingVertical: 9,
+    minHeight: ONE_ROW,
+    paddingVertical: (ONE_ROW - PILL) / 2,
     paddingLeft: 12,
     paddingRight: 10,
   },
-  oneTx: { paddingTop: 6 },
-  oneText: { fontSize: 14.5, lineHeight: 19 },
+  // The "small" line (20) on the pill's middle.
+  oneTx: { paddingTop: (PILL - 20) / 2 },
+  pressed: { opacity: 0.6 },
   undoneBy: { marginTop: 2 },
   copyHook: { alignSelf: "flex-start", marginTop: 6, paddingVertical: 2 },
   room: { opacity: 0 },
   group: { marginTop: 12, overflow: "hidden" },
-  hd: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 9, paddingHorizontal: 12 },
+  hd: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 12 },
   it: {
     flexDirection: "row",
     alignItems: "flex-start",

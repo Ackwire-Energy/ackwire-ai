@@ -209,7 +209,7 @@ export function Table({
 }
 
 const styles = StyleSheet.create({
-  table: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  table: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
   fade: { position: "absolute", top: 0, bottom: 0, width: 28 },
   fadeLeft: { left: 0 },
   fadeRight: { right: 0 },

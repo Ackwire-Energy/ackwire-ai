@@ -6,6 +6,7 @@ import { StyleSheet, View } from "react-native";
 import { Button, LineIcon, Text, useToast } from "@/ui";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { ReasonField } from "../task-manager/parts";
+import { LINE_GAP, LINE_MARK, MSG_TEXT } from "./logic";
 
 /**
  * A person stopped one of the agent's tasks (ADR 0128): one calm line where the task was, "Você parou esta tarefa ·
@@ -47,7 +48,7 @@ export function StoppedLine({ message, notice }: { message: Message; notice: Sto
   return (
     <View style={styles.line}>
       <View style={styles.head}>
-        <LineIcon name="stop" size={16} color={c.faint} variant="small" />
+        <LineIcon name="stop" size={LINE_MARK} color={c.faint} variant="small" />
         <Text variant="small" tone="faint" style={styles.grow}>
           <Text variant="small" tone="muted" style={styles.bold}>
             {who}
@@ -98,9 +99,10 @@ export function StoppedLine({ message, notice }: { message: Message; notice: Sto
 
 const styles = StyleSheet.create({
   // Aligned with the messages' words, as the other automatic lines (`EventLine`).
-  line: { marginVertical: 4, paddingLeft: 59, paddingRight: 16 },
-  head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  line: { marginVertical: 4, paddingLeft: MSG_TEXT, paddingRight: 16 },
+  head: { flexDirection: "row", alignItems: "flex-start", gap: LINE_GAP },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  form: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8, marginLeft: 24 },
+  // Under the words, not the mark.
+  form: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8, marginLeft: LINE_MARK + LINE_GAP },
 });

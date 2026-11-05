@@ -188,7 +188,7 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
                       {t(`onboarding.presets.${p}.role`)}
                     </Text>
                   </View>
-                  <Icon name="plus" size={16} color={c.faint} />
+                  <Icon name="plus" size={15} color={c.faint} />
                 </Pressable>
               );
             })}
@@ -325,7 +325,7 @@ function IntroCard({
   return (
     <View style={[styles.card, surface]}>
       <View style={styles.cardHead}>
-        <LineIcon name={icon} size={16} color={c.ink2} variant="subhead" />
+        <LineIcon name={icon} size={15} color={c.ink2} variant="subhead" />
         <Text variant="subhead" style={[styles.bold, styles.fill]}>
           {title}
         </Text>
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   sticker: { width: MESSAGE_STICKER, height: MESSAGE_STICKER, marginTop: 4 },
   fill: { flex: 1, minWidth: 0 },
-  card: { marginTop: 6, borderRadius: 16, padding: 14, gap: 10 },
+  card: { marginTop: 6, borderRadius: 20, padding: 14, gap: 10 },
   // A question that wraps keeps its icon on its first line.
   cardHead: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   // A ready-made agent to make: at least 44 points to tap.

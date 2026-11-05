@@ -101,7 +101,7 @@ export function HomeServerNotice({ retry }: { retry: () => Promise<unknown> }) {
       <View style={[styles.card, surface]} accessibilityLiveRegion="polite">
         <View style={styles.line} accessible accessibilityRole="summary">
           {/* Not something that waits on the person: muted, never the waiting amber. */}
-          <LineIcon name="wifi" variant="callout" size={22} color={c.muted} />
+          <LineIcon name="wifi" variant="callout" size={16} color={c.muted} />
           <View style={styles.tx}>
             <Text variant="callout" tone="ink" style={styles.bold} numberOfLines={3}>
               {trouble.title}

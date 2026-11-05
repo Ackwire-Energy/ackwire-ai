@@ -8,7 +8,7 @@ import { StyleSheet, View } from "react-native";
 import { LineIcon, Text } from "@/ui";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { ConsultPairRow } from "./ConsultGroup";
-import { eventLineOf } from "./logic";
+import { eventLineOf, LINE_GAP, LINE_MARK, MSG_TEXT } from "./logic";
 import { MessageText } from "./MessageText";
 import { StoppedLine } from "./StoppedLine";
 
@@ -59,7 +59,7 @@ export function EventLine({ message, fold }: { message: Message; fold?: ConsultN
   return (
     <View style={styles.line}>
       <View style={styles.head}>
-        <LineIcon name={line.icon} size={16} color={c.faint} variant="small" />
+        <LineIcon name={line.icon} size={LINE_MARK} color={c.faint} variant="small" />
         <Text variant="small" tone="faint" style={styles.grow}>
           {t(line.key, line.values)} · {when.time(message.createdAt)}
           {line.text ? (
@@ -90,12 +90,12 @@ export function EventLine({ message, fold }: { message: Message; fold?: ConsultN
 }
 
 const styles = StyleSheet.create({
-  // Aligned with the messages' words (MessageRow: 14 + 34 avatar + 11 gap = 59), like `IssueTakenLine`; an event line
-  // as a decided request's (`AskDone`): the 16-point mark on the first line, the words in 15/20.
-  line: { marginVertical: 4, paddingLeft: 59, paddingRight: 16 },
-  head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  // Aligned with the messages' words, like `IssueTakenLine`; an event line as a decided request's (`AskDone`): the
+  // mark on the first line, the words in 15/20.
+  line: { marginVertical: 4, paddingLeft: MSG_TEXT, paddingRight: 16 },
+  head: { flexDirection: "row", alignItems: "flex-start", gap: LINE_GAP },
   grow: { flex: 1, flexShrink: 1 },
   toggle: { fontWeight: "600" },
   // The text itself, under the line, aligned with the words (not the icon).
-  body: { marginTop: 4, marginLeft: 24, paddingLeft: 10, borderLeftWidth: 2 },
+  body: { marginTop: 4, marginLeft: LINE_MARK + LINE_GAP, paddingLeft: 10, borderLeftWidth: 2 },
 });

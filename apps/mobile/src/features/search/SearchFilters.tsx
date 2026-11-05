@@ -21,7 +21,8 @@ import {
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Button, Filters, Icon, SectionHeader, Text } from "@/ui";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
+import { Button, Filters, Icon, PressScale, SectionHeader, Text, useReducedMotion } from "@/ui";
 import { Note } from "../ai/parts";
 import { Face } from "../shared/Face";
 import { useColors, useOrgId, useWhen } from "../shared/hooks";
@@ -32,33 +33,43 @@ import { hitHref } from "./logic";
 /** One size for every result's face or tile, in the search tab and in a conversation's search. */
 export const RESULT_LEAD = 32;
 
+const CHIP_IN = FadeIn.duration(160);
+const CHIP_OUT = FadeOut.duration(120);
+
 /** The filters on the box (ADR 0123): each a pill with its ×. */
 export function FilterChips({ chips, onRemove }: { chips: SearchChip[]; onRemove: (chip: SearchChip) => void }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
+  const reduced = useReducedMotion();
+  // A filter added or taken off while the box shows fades and the others slide; those there when it mounts just show.
+  const motion = reduced ? {} : { entering: CHIP_IN, exiting: CHIP_OUT, layout: LinearTransition };
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={styles.chips}
-    >
-      {chips.map((chip) => {
-        const label = searchChipLabel(t, i18n.language, chip);
-        return (
-          <Pressable
-            key={searchChipKey(chip)}
-            onPress={() => onRemove(chip)}
-            accessibilityRole="button"
-            accessibilityLabel={t("searchPage.removeFilter", { filter: label })}
-            style={[styles.chip, { backgroundColor: c.sunken }]}
-          >
-            <Text variant="subhead">{label}</Text>
-            <Icon name="x" size={14} color={c.muted} />
-          </Pressable>
-        );
-      })}
-    </ScrollView>
+    <LayoutAnimationConfig skipEntering skipExiting>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.chips}
+      >
+        {chips.map((chip) => {
+          const label = searchChipLabel(t, i18n.language, chip);
+          return (
+            <Animated.View key={searchChipKey(chip)} {...motion}>
+              <PressScale
+                onPress={() => onRemove(chip)}
+                accessibilityRole="button"
+                accessibilityLabel={t("searchPage.removeFilter", { filter: label })}
+                fill={false}
+                contentStyle={[styles.chip, { backgroundColor: c.sunken }]}
+              >
+                <Text variant="subhead">{label}</Text>
+                <Icon name="x" size={15} color={c.muted} />
+              </PressScale>
+            </Animated.View>
+          );
+        })}
+      </ScrollView>
+    </LayoutAnimationConfig>
   );
 }
 
@@ -244,9 +255,14 @@ export function FilteredResults({
                 : ""}
           </Text>
           {onClear && chips.length > 0 ? (
-            <Pressable onPress={onClear} accessibilityRole="button" hitSlop={8} style={styles.clear}>
+            <Pressable
+              onPress={onClear}
+              accessibilityRole="button"
+              hitSlop={11}
+              style={({ pressed }) => [styles.clear, pressed && styles.pressed]}
+            >
               <Text tone="faint">{t("searchPage.filtersApplied", { count: chips.length })}</Text>
-              <Icon name="x" size={14} color={c.muted} />
+              <Icon name="x" size={17} color={c.muted} />
             </Pressable>
           ) : null}
         </View>
@@ -312,5 +328,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   clear: { flexDirection: "row", alignItems: "center", gap: 4 },
+  pressed: { opacity: 0.6 },
   empty: { textAlign: "center", paddingVertical: 40, paddingHorizontal: 16 },
 });

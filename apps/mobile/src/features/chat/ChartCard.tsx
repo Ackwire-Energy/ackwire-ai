@@ -19,7 +19,7 @@ import { router } from "expo-router";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type LayoutChangeEvent, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { Easing, FadeIn, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon, IconButton, PixelOrbit, PressScale, Text, useReducedMotion, useTheme } from "@/ui";
 import { useColors } from "../shared/hooks";
@@ -78,6 +78,8 @@ export const ChartCard = memo(function ChartCard({
           onPress={() => setTable((v) => !v)}
           accessibilityRole="switch"
           accessibilityState={{ checked: table }}
+          // 44 tall to the finger; across, the expand button beside it has its own.
+          hitSlop={{ top: 7, bottom: 7 }}
           style={[styles.pill, table ? { backgroundColor: c.plate } : null]}
           contentStyle={styles.center}
         >
@@ -93,11 +95,11 @@ export const ChartCard = memo(function ChartCard({
           }}
           accessibilityRole="button"
           accessibilityLabel={t("mobile.code.fullScreen")}
-          hitSlop={6}
+          hitSlop={7}
           style={styles.tool}
           contentStyle={styles.center}
         >
-          <Icon name="expand" size={17} color={c.muted} />
+          <Icon name="expand" size={18} color={c.muted} />
         </PressScale>
       </View>
       <View style={styles.body}>
@@ -232,10 +234,14 @@ function Cells({ paths, tone }: { paths: Map<number, string>; tone: (v: number) 
 
 /** What was tapped, under the chart ("first_trip_soft · 15%"). */
 function Picked({ text }: { text: string | null }) {
+  const reduced = useReducedMotion();
+  // Each pick's words fade in over the last one's place.
   return (
-    <Text variant="footnote" tone="muted" style={styles.picked} numberOfLines={1}>
-      {text ?? " "}
-    </Text>
+    <Animated.View key={text ?? ""} entering={reduced || !text ? undefined : FadeIn.duration(160)}>
+      <Text variant="footnote" tone="muted" style={styles.picked} numberOfLines={1}>
+        {text ?? " "}
+      </Text>
+    </Animated.View>
   );
 }
 
@@ -548,21 +554,21 @@ function BigNumber({
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  card: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
   pending: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 14 },
   top: { flexDirection: "row", alignItems: "flex-start", gap: 4, paddingLeft: 14, paddingRight: 4, paddingTop: 10 },
-  titles: { flex: 1, gap: 1, paddingTop: 4 },
+  titles: { flex: 1, gap: 2, paddingTop: 4 },
   pill: { height: 30, paddingHorizontal: 10, borderRadius: 15 },
   tool: { height: 30, width: 32, borderRadius: 15 },
   center: { alignItems: "center", justifyContent: "center" },
   body: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 12 },
-  bars: { gap: 9 },
+  bars: { gap: 8 },
   barRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   dim: { opacity: 0.5 },
   barLabel: { width: "34%" },
   rail: { flex: 1 },
-  railTrack: { borderRadius: 5, overflow: "hidden" },
-  fill: { height: "100%", borderRadius: 5, overflow: "hidden" },
+  railTrack: { borderRadius: 6, overflow: "hidden" },
+  fill: { height: "100%", borderRadius: 6, overflow: "hidden" },
   barValue: { minWidth: 44, textAlign: "right", fontWeight: "600", fontVariant: ["tabular-nums"] },
   xLabels: { flexDirection: "row", justifyContent: "space-between", paddingTop: 6, paddingHorizontal: 2 },
   picked: { paddingTop: 8, fontVariant: ["tabular-nums"] },
@@ -580,5 +586,5 @@ const styles = StyleSheet.create({
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14 },
   sheetTitle: { flex: 1, textAlign: "center" },
   sheetSpacer: { width: 40 },
-  sheetBody: { paddingHorizontal: 16, paddingTop: 14, gap: 18 },
+  sheetBody: { paddingHorizontal: 16, paddingTop: 14, gap: 20 },
 });

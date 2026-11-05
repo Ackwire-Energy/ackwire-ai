@@ -35,7 +35,8 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Count, HoldButton, Icon, LineIcon, Text, useToast } from "@/ui";
+import Animated, { FadeIn } from "react-native-reanimated";
+import { Button, Count, HoldButton, Icon, LineIcon, Text, useReducedMotion, useToast } from "@/ui";
 import { approvalAction, approvalRisk, approveAlwaysToast } from "../approvals/logic";
 import {
   ApprovalAheadLine,
@@ -346,7 +347,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
                         }}
                         accessibilityRole="button"
                         accessibilityState={{ expanded: open }}
-                        hitSlop={6}
+                        hitSlop={12}
                         style={({ pressed }) => [styles.runMore, pressed && styles.pressed]}
                       >
                         <Text variant="footnote" tone="ink2" style={styles.bold}>
@@ -406,6 +407,7 @@ function ApprovalGroupItem({
   const meId = useMeId();
   const dir = useDirectory();
   const c = useColors();
+  const reduced = useReducedMotion();
   const cancelAhead = useCancelAhead();
   const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   const pending = a.status === "pending";
@@ -478,7 +480,8 @@ function ApprovalGroupItem({
           </>
         ) : null
       ) : (
-        <>
+        // Decided while the card shows: how it ended fades in where its buttons were.
+        <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={styles.item}>
           <Text variant="footnote" tone="muted">
             {[
               decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name),
@@ -498,7 +501,7 @@ function ApprovalGroupItem({
               />
             </View>
           ) : null}
-        </>
+        </Animated.View>
       )}
     </View>
   );
@@ -805,7 +808,7 @@ export function ThreadLink({ thread }: { thread: ThreadInfo }) {
       </View>
       {thread.replyCount > 0 ? (
         <>
-          <Count value={thread.replyCount} size={13} />
+          <Count value={thread.replyCount} size={15} />
           <Text variant="small" tone="ink2" style={styles.bold}>
             {t("mobile.chat.repliesWord", { count: thread.replyCount })}
           </Text>
@@ -869,7 +872,7 @@ const styles = StyleSheet.create({
     minHeight: 36,
     paddingLeft: 8,
     paddingRight: 12,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   faces: { flexDirection: "row", marginRight: 2 },
   overlap: { marginLeft: -6 },

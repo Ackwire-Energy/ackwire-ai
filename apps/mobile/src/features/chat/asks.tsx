@@ -62,7 +62,16 @@ import {
   timerDelay,
 } from "./ask-store";
 import { LineStop, useRowsInView } from "./LiveRows";
-import { approvalIdOf, lineStops, markedParts, markName, questionOf, workingEntries } from "./logic";
+import {
+  approvalIdOf,
+  LINE_GAP,
+  LINE_MARK,
+  lineStops,
+  markedParts,
+  markName,
+  questionOf,
+  workingEntries,
+} from "./logic";
 import type { RowSight } from "./row-sight";
 
 /**
@@ -494,7 +503,7 @@ export function AskCard({
                 accessibilityRole="button"
                 accessibilityHint={well.more.label}
                 accessibilityState={{ expanded: open }}
-                hitSlop={6}
+                hitSlop={10}
                 style={({ pressed }) => [styles.source, open && styles.sourceOpen, pressed && styles.pressed]}
               >
                 {source}
@@ -570,7 +579,7 @@ export function ExpiryLine({ createdAt, expiresAt }: { createdAt?: string | null
 
 /**
  * A decided request: no card, one line in the conversation where the message's text starts, as every event in a
- * message is drawn: a 16-point mark on its first line (a check in green when it went through, an × when it didn't)
+ * message is drawn: a mark on its first line (a check in green when it went through, an × when it didn't)
  * and its words (what `markName` wraps in bold) on one line. With `more`, the line opens the rest under it (and
  * the words in full); the line has no room for `label`, so it reaches screen readers as the hint.
  */
@@ -589,7 +598,7 @@ export function AskDone({
   const line = (
     <>
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.doneMark}>
-        <Icon name={done ? "check" : "x"} size={16} color={done ? c.ok : c.faint} />
+        <Icon name={done ? "check" : "x"} size={LINE_MARK} color={done ? c.ok : c.faint} />
       </View>
       <Text
         variant="small"
@@ -611,9 +620,16 @@ export function AskDone({
       </Text>
     </>
   );
-  if (!more) return <View style={styles.done}>{line}</View>;
+  // A card turning into this line fades into it (an old one fades as it scrolls in, as the cards do).
+  const enter = reduced ? undefined : FadeIn.duration(160);
+  if (!more)
+    return (
+      <Animated.View entering={enter} style={styles.done}>
+        {line}
+      </Animated.View>
+    );
   return (
-    <>
+    <Animated.View entering={enter}>
       <Pressable
         onPress={() => {
           tapHaptic();
@@ -622,7 +638,7 @@ export function AskDone({
         accessibilityRole="button"
         accessibilityHint={more.label}
         accessibilityState={{ expanded: open }}
-        hitSlop={8}
+        hitSlop={12}
         style={({ pressed }) => [styles.done, pressed && styles.pressed]}
       >
         {line}
@@ -635,7 +651,7 @@ export function AskDone({
           {more.content}
         </Animated.View>
       ) : null}
-    </>
+    </Animated.View>
   );
 }
 
@@ -695,10 +711,8 @@ export function AskBar({
     canStop,
     rowInView,
   );
-  const see = () => {
-    tapHaptic();
-    onSee();
-  };
+  // "See" scrolls to the card: no haptic.
+  const see = onSee;
   return (
     <View style={styles.dock}>
       <Animated.View
@@ -714,7 +728,7 @@ export function AskBar({
           onPress={see}
           accessibilityRole="button"
           accessibilityLabel={`${plain}. ${t("ask.bar.see")}`}
-          style={styles.words}
+          style={({ pressed }) => [styles.words, pressed && styles.pressed]}
         >
           <Text variant="caption" tone="muted" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
             {parts.map((p, i) =>
@@ -735,7 +749,13 @@ export function AskBar({
           </Text>
         ) : null}
         <View style={[styles.sep, { backgroundColor: c.line }]} />
-        <Pressable onPress={see} accessibilityElementsHidden importantForAccessibility="no" hitSlop={8}>
+        <Pressable
+          onPress={see}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+          hitSlop={8}
+          style={({ pressed }) => pressed && styles.pressed}
+        >
           <Text
             variant="caption"
             tone="ink"
@@ -787,10 +807,11 @@ const styles = StyleSheet.create({
   expiryText: { flexShrink: 1, fontWeight: "500", fontVariant: ["tabular-nums"] },
   // A decided request: an event line on the conversation itself, nothing around it; the mark on the first line's
   // reading middle (a 20-point line), the words to the end of the column.
-  done: { flexDirection: "row", alignItems: "flex-start", gap: 8, alignSelf: "stretch", marginTop: 8 },
+  done: { flexDirection: "row", alignItems: "flex-start", gap: LINE_GAP, alignSelf: "stretch", marginTop: 8 },
   doneMark: { height: 20, justifyContent: "center" },
   doneWords: { flex: 1, minWidth: 0 },
-  doneMore: { marginTop: 6, marginLeft: 24, gap: 4 },
+  // Under the words, not the mark.
+  doneMore: { marginTop: 6, marginLeft: LINE_MARK + LINE_GAP, gap: 4 },
   // The bar: the working line's shape (WorkingLine), so one replaces the other without moving.
   dock: { paddingHorizontal: 4, paddingBottom: 6 },
   pill: {

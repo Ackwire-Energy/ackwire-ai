@@ -609,7 +609,7 @@ export function WidgetCard({
       {head === undefined ? (
         <View style={[styles.head, large ? styles.headTop : null]}>
           <AgentFace agentId={w.agentId} size={16} live={false} />
-          <Text variant="footnote" tone="muted" numberOfLines={large ? 2 : 1} style={[styles.title, styles.grow]}>
+          <Text variant="caption" tone="muted" numberOfLines={large ? 2 : 1} style={[styles.title, styles.grow]}>
             {title}
           </Text>
           {/* The strip has no footer: updating is its orbit, a failure its mark, on the title line. */}
@@ -717,7 +717,7 @@ const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
   // A big card's title may take two lines: the 16 face on the first (its line is 16 tall).
   headTop: { alignItems: "flex-start" },
-  title: { fontSize: 12.5, lineHeight: 16, fontWeight: "600", letterSpacing: 0.1 },
+  title: { fontWeight: "600", letterSpacing: 0.1 },
   body: { flexGrow: 1, minWidth: 0 },
   num: { fontSize: 30, lineHeight: 34, fontWeight: "700", letterSpacing: -0.9, fontVariant: ["tabular-nums"] },
   numBig: { fontSize: 40, lineHeight: 44, letterSpacing: -1.2 },

@@ -54,7 +54,6 @@ import { CHROME_MAX_SCALE, haptics, Icon, PixelStop, Text, useReducedMotion, use
 import { AgentFace, AgentWho, Face } from "../shared/Face";
 import { useDirectory, useNow, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { tapHaptic } from "../shared/parts";
 import type { Measurable } from "./ask-store";
 import { ConsultPairRow, useRunConsults } from "./ConsultGroup";
 import {
@@ -64,6 +63,9 @@ import {
   leavingWords,
   lineFit,
   lineStops,
+  MSG_AVATAR,
+  MSG_GAP,
+  MSG_INSET,
   markedParts,
   markName,
   narrowDrawn,
@@ -485,10 +487,9 @@ export function WorkingLine({
   const openBrowser = browsing && onOpenBrowser ? () => onOpenBrowser(browsing.agentId) : undefined;
   // "Ver" once its row is in the conversation (before that, there is nothing to go back to).
   const seeable = away && turnShows(away) ? away : undefined;
+  // Back to the row is a scroll, so no haptic.
   const see = () => {
-    if (!seeable) return;
-    tapHaptic();
-    onSee(seeable);
+    if (seeable) onSee(seeable);
   };
   return (
     <View style={styles.dock}>
@@ -516,7 +517,7 @@ export function WorkingLine({
                   <View style={plate}>
                     <AgentFace agentId={e.id} size={18} mode="idle" />
                   </View>
-                  <Icon name="right" size={14} color={c.faint} />
+                  <Icon name="right" size={12} color={c.faint} />
                   <View style={plate}>
                     <AgentFace agentId={asking.to} size={18} mode="think" />
                   </View>
@@ -537,7 +538,7 @@ export function WorkingLine({
           accessible
           accessibilityRole={browsing ? "button" : "text"}
           accessibilityLabel={browsing ? `${label}. ${t("browser.watch.open")}` : label}
-          style={styles.wordsTap}
+          style={({ pressed }) => [styles.wordsTap, pressed && styles.pressed]}
         >
           {step !== null && lead ? (
             <AwayStep name={lead.name} step={step} reduced={reduced} />
@@ -557,18 +558,19 @@ export function WorkingLine({
           ) : null}
           {browsing ? (
             <View style={[styles.browser, { backgroundColor: c.raised }]}>
-              <Icon name="globe" size={14} color={c.ink2} />
+              <Icon name="globe" size={12} color={c.ink2} />
             </View>
           ) : null}
         </Pressable>
         {clock ? (
-          <RNText
+          <Text
+            variant="caption"
+            tone="muted"
             accessibilityLabel={t("chat.consult.clock", { time: clock })}
-            maxFontSizeMultiplier={CHROME_MAX_SCALE}
-            style={[styles.clock, { color: c.muted }]}
+            style={styles.clock}
           >
             {clock}
-          </RNText>
+          </Text>
         ) : null}
         {seeable ? (
           <>
@@ -578,6 +580,7 @@ export function WorkingLine({
               accessibilityRole="button"
               accessibilityLabel={`${t("run.strip.see")} · ${lead?.name ?? ""}`}
               hitSlop={8}
+              style={({ pressed }) => pressed && styles.pressed}
             >
               <Text variant="caption" tone="ink" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.ink}>
                 {t("run.strip.see")}
@@ -792,8 +795,15 @@ function TypingDots({ color }: { color: string }) {
 
 const styles = StyleSheet.create({
   // Same turn as a saved message (MessageRow): the reply replaces it in place.
-  msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
-  avslot: { width: 34, alignItems: "center", paddingTop: 2 },
+  msg: {
+    flexDirection: "row",
+    gap: MSG_GAP,
+    paddingLeft: MSG_INSET,
+    paddingRight: 16,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  avslot: { width: MSG_AVATAR, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
   // The row's end: "· 12 s" and the stop. The clock keeps room for its seconds, and the stop never raises the line it
   // ends (24 points drawn in a 16-point line).
@@ -807,9 +817,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  who: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 3, minHeight: 19 },
+  who: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4, minHeight: 19 },
   name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
-  state: { flexDirection: "row", alignItems: "center", gap: 5, flexShrink: 0 },
+  state: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
   say: { marginVertical: 2 },
   // As wide as the box, whatever it says: a turning phrase or a face coming and going never moves its edge.
   dock: { paddingHorizontal: 4, paddingBottom: 6 },
@@ -825,8 +835,8 @@ const styles = StyleSheet.create({
   stack: { flexDirection: "row", alignItems: "center", flexShrink: 0 },
   tok: { padding: 1.5, borderRadius: 7 },
   pair: { flexDirection: "row", alignItems: "center", gap: 1 },
-  overlap: { marginLeft: -5 },
-  dots: { flexDirection: "row", alignItems: "center", gap: 3, flexShrink: 0 },
+  overlap: { marginLeft: -6 },
+  dots: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
   dot: { width: 4, height: 4, borderRadius: 2 },
   // The words take what the marks and the stop leave, so the globe after them stays put while they turn. Who is
   // typing keeps its width: the agents' words before it end in "…" first (the " · " after them goes with their
@@ -853,7 +863,8 @@ const styles = StyleSheet.create({
   },
   ink: { fontWeight: "600" },
   took: { fontVariant: ["tabular-nums"] },
-  clock: { fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] },
+  clock: { fontWeight: "600", fontVariant: ["tabular-nums"] },
+  pressed: { opacity: 0.6 },
   sep: { width: StyleSheet.hairlineWidth * 2, height: 16, marginLeft: 4, marginRight: 2 },
   // Last in the pill, in its round end: 2px from the edge all around.
   stop: { width: 24, height: 24, marginRight: -6, borderRadius: 999, alignItems: "center", justifyContent: "center" },

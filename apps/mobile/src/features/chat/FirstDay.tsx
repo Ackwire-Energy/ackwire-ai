@@ -59,7 +59,7 @@ export function FirstDay({
         <View style={[styles.welc, surface]}>
           <Sky color={agentLook(agent).color} depth={0.8} surface="raised" style={styles.sky} />
           <View style={styles.born}>
-            <AgentFace agentId={agent.id} size={78} />
+            <AgentFace agentId={agent.id} size={BORN} />
           </View>
           <Text variant="display" style={styles.h2} accessibilityRole="header">
             {title}
@@ -105,35 +105,44 @@ export function FirstDay({
   );
 }
 
+/** The agent's face on the welcome's sky, and where it stands: the title starts under it. */
+const BORN = 78;
+const BORN_TOP = 32;
+/** A suggestion's row: its inset, the 28 mark, the gap to the words, and the words' first line (callout). */
+const INSET = 14;
+const MARK = 28;
+const GAP = 12;
+const LINE = 21;
+
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   content: { flexGrow: 1, justifyContent: "flex-end", paddingHorizontal: 16, paddingTop: 8 },
   welc: {
     alignItems: "center",
-    paddingTop: 134,
+    paddingTop: BORN_TOP + BORN + 24,
     paddingHorizontal: 20,
-    paddingBottom: 18,
+    paddingBottom: 20,
     borderRadius: 20,
     overflow: "hidden",
   },
   sky: { position: "absolute", top: 0, left: 0, right: 0, height: 150 },
-  born: { position: "absolute", top: 34, alignSelf: "center" },
+  born: { position: "absolute", top: BORN_TOP, alignSelf: "center" },
   h2: { textAlign: "center" },
   p: { marginTop: 6, textAlign: "center", lineHeight: 21 },
-  h3: { fontWeight: "600", paddingHorizontal: 4, paddingTop: 18, paddingBottom: 8 },
+  h3: { fontWeight: "600", paddingHorizontal: 4, paddingTop: 20, paddingBottom: 8 },
   card: { borderRadius: 20, overflow: "hidden" },
   // The channel's suggestions' rows (ChannelHello): a 28 mark (no tile inside the card), the first line's middle on
-  // its middle when a suggestion wraps (28 against a 21 line), the send icon there too.
+  // its middle when a suggestion wraps, the send icon there too.
   row: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 12,
+    gap: GAP,
     minHeight: 52,
-    paddingHorizontal: 14,
+    paddingHorizontal: INSET,
     paddingVertical: 12,
   },
-  sep: { position: "absolute", top: 0, left: 54, right: 0, height: StyleSheet.hairlineWidth },
-  mark: { width: 28, height: 28, alignItems: "center", justifyContent: "center" },
-  ask: { fontWeight: "500", marginTop: 3 },
-  send: { marginTop: 6 },
+  sep: { position: "absolute", top: 0, left: INSET + MARK + GAP, right: 0, height: StyleSheet.hairlineWidth },
+  mark: { width: MARK, height: MARK, alignItems: "center", justifyContent: "center" },
+  ask: { fontWeight: "500", marginTop: (MARK - LINE) / 2 },
+  send: { marginTop: (MARK - 16) / 2 },
 });

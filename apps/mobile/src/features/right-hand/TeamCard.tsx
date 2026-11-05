@@ -94,7 +94,7 @@ export function AnswerChips({
                 { backgroundColor: on ? c.ink : pressed ? c.sunken : c.raised, borderColor: c.line2 },
               ]}
             >
-              {on ? <Icon name="check" size={14} color={c.bg} /> : null}
+              {on ? <Icon name="check" size={15} color={c.bg} /> : null}
               <Text variant="small" style={on ? { color: c.bg } : undefined}>
                 {choice}
               </Text>
@@ -200,7 +200,7 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
           </Text>
           {teamRoutines(plan).map(({ agent, routine }) => (
             <View key={`${agent?.handle ?? "weekly"}-${routine.name}`} style={styles.line}>
-              <LineIcon name="clock" size={16} color={c.muted} variant="small" />
+              <LineIcon name="clock" size={15} color={c.muted} variant="small" />
               <Text variant="small" style={styles.fill}>
                 <Text variant="small" style={styles.bold}>
                   {proposedRoutineWhen(t, i18n.language, routine)}
@@ -221,7 +221,7 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
           </Text>
           {plan.skills.map((s) => (
             <View key={s.name} style={styles.line}>
-              <LineIcon name="doc" size={16} color={c.muted} variant="small" />
+              <LineIcon name="doc" size={15} color={c.muted} variant="small" />
               <Text variant="small" style={styles.fill}>
                 <Text variant="small" style={styles.bold}>
                   {s.title}
@@ -234,7 +234,7 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
       ) : null}
       {plan.approvals ? (
         <View style={[styles.line, styles.note]}>
-          <LineIcon name="shield" size={16} color={c.muted} variant="small" />
+          <LineIcon name="shield" size={15} color={c.muted} variant="small" />
           <Text variant="small" style={styles.fill}>
             {plan.approvals}
           </Text>
@@ -601,7 +601,7 @@ export function TeamMapSheet({ plan, open, onClose }: { plan: TeamPlan; open: bo
         {teamColumns(plan).map((col) => (
           <View key={col.channel} style={[styles.mapCol, { borderColor: c.line2 }]}>
             <View style={styles.line}>
-              <LineIcon name="hash" size={14} color={c.muted} />
+              <LineIcon name="hash" size={17} color={c.muted} />
               {/* "Novo" inside the name's line, on its baseline. */}
               <Text variant="body" style={[styles.bold, styles.fill]}>
                 {col.channel}
@@ -728,7 +728,10 @@ export function TeamTemplatesSheet({
             <Pressable
               accessibilityRole="button"
               onPress={onNone}
-              style={[styles.template, { borderColor: c.line2, backgroundColor: c.raised }]}
+              style={({ pressed }) => [
+                styles.template,
+                { borderColor: c.line2, backgroundColor: pressed ? c.sunken : c.raised },
+              ]}
             >
               <View style={styles.faces}>
                 <Icon name="pen" size={16} color={c.muted} />
@@ -759,8 +762,8 @@ const styles = StyleSheet.create({
     gap: 6,
     minHeight: 36,
     paddingHorizontal: 14,
-    borderRadius: 12,
-    borderBottomLeftRadius: 4,
+    borderRadius: 10,
+    borderBottomLeftRadius: 3,
     borderWidth: StyleSheet.hairlineWidth,
   },
   rows: { gap: 8 },
@@ -770,15 +773,15 @@ const styles = StyleSheet.create({
   // Under the agent's words, in their column.
   agentFoot: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 4 },
   section: { gap: 6, marginTop: 4 },
-  // A 16-point icon on the first line of its words, as the conversation's event lines.
+  // An icon on the first line of its words, as the conversation's event lines.
   line: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   note: { marginTop: 4 },
   fill: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   form: { gap: 12, padding: 16, paddingBottom: 32 },
   formRow: { gap: 4 },
-  field: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
-  mapCol: { gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderStyle: "dashed" },
+  field: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 },
+  mapCol: { gap: 8, padding: 12, borderRadius: 14, borderWidth: 1, borderStyle: "dashed" },
   template: {
     flexDirection: "row",
     alignItems: "center",

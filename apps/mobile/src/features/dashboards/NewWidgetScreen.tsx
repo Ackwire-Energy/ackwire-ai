@@ -33,6 +33,7 @@ import {
   GroupedRow,
   Icon,
   LineIcon,
+  PressScale,
   systemText,
   Text,
   useTheme,
@@ -42,7 +43,7 @@ import { boardHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";
 import { useDirectory, useOrgId } from "../shared/hooks";
-import { goBack, PushedHeader, successHaptic } from "../shared/parts";
+import { goBack, PushedHeader, successHaptic, tapHaptic } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { closeAgentPick, openAgentPick } from "./agent-pick";
 import { useAgentLook, useWidgetWords } from "./hooks";
@@ -298,13 +299,14 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
       disabled={phase === "testing"}
       accessibilityRole="button"
       accessibilityLabel={`${t("dashboards.newWidget.format")}: ${formatWord}`}
-      style={[styles.pickBox, { borderColor: c.line2 }]}
+      hitSlop={8}
+      style={({ pressed }) => [styles.pickBox, { borderColor: c.line2 }, pressed && styles.pressed]}
     >
-      <KindGlyph kind={format} size={15} color={c.muted} />
+      <KindGlyph kind={format} size={13} color={c.muted} />
       <Text variant="footnote" numberOfLines={1} style={[styles.semibold, { color: c.ink2 }]}>
         {formatWord}
       </Text>
-      <Icon name="down" size={12} color={c.muted} />
+      <Icon name="down" size={13} color={c.muted} />
     </Pressable>
   );
 
@@ -337,12 +339,15 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
         </View>
       ) : null}
       <Pressable
-        onPress={() => setAlert((v) => !v)}
+        onPress={() => {
+          tapHaptic();
+          setAlert((v) => !v);
+        }}
         accessibilityRole="switch"
         accessibilityLabel={t("widgets.alert.label")}
         accessibilityState={{ checked: alert }}
-        hitSlop={6}
-        style={[styles.bell, alert ? { backgroundColor: c.plate } : null]}
+        hitSlop={8}
+        style={({ pressed }) => [styles.bell, alert ? { backgroundColor: c.plate } : null, pressed && styles.pressed]}
       >
         <Icon name="bell" size={16} color={alert ? c.ink : c.muted} />
         {alert ? (
@@ -362,8 +367,13 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
               accessibilityLabel={`${t("widgets.sizes.label")}: ${t(`widgets.sizes.${s}`)}`}
               accessibilityHint={t(`mobile.dashboards.sizeHint.${s}`)}
               accessibilityState={{ selected: on }}
-              hitSlop={4}
-              style={[styles.size, on ? { backgroundColor: c.raised } : null]}
+              // 44 tall to the finger; across, the segments touch.
+              hitSlop={{ top: 10, bottom: 10 }}
+              style={({ pressed }) => [
+                styles.size,
+                on ? { backgroundColor: c.raised } : null,
+                pressed && styles.pressed,
+              ]}
             >
               <Text variant="caption" style={[styles.semibold, { color: on ? c.ink : c.muted }]}>
                 {t(`widgets.sizes.${s}`)}
@@ -385,7 +395,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
           accessibilityLabel={t("mobile.dashboards.newWidget.editAsk")}
           accessibilityHint={text.trim()}
           disabled={phase === "testing"}
-          style={styles.asked}
+          style={({ pressed }) => [styles.asked, pressed && styles.pressed]}
         >
           <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
             {t("mobile.dashboards.newWidget.asked", { ask: text.trim() })}
@@ -423,17 +433,19 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
         {!text.trim() && phase === "untested" && suggestionList.length > 0 ? (
           <View style={styles.suggestions}>
             {suggestionList.map((s) => (
-              <Pressable
+              <PressScale
                 key={s.title}
                 onPress={() => suggest(s)}
                 accessibilityRole="button"
-                style={[styles.suggestion, { backgroundColor: c.chip }]}
+                fill={false}
+                style={styles.suggestionWrap}
+                contentStyle={[styles.suggestion, { backgroundColor: c.chip }]}
               >
-                <KindGlyph kind={s.kind} size={14} color={c.muted} />
+                <KindGlyph kind={s.kind} size={13} color={c.muted} />
                 <Text variant="footnote" numberOfLines={1} style={[styles.semibold, { color: c.ink2 }]}>
                   {s.title}
                 </Text>
-              </Pressable>
+              </PressScale>
             ))}
           </View>
         ) : null}
@@ -453,7 +465,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
     body = (
       <View style={styles.failed}>
         <View style={styles.failedLine}>
-          <LineIcon name="info" size={16} color={c.warn} variant="footnote" />
+          <LineIcon name="info" size={13} color={c.warn} variant="footnote" />
           <Text variant="footnote" style={[styles.grow, { color: c.warn }]}>
             {t("dashboards.newWidget.testFailed", { reason: widgetWords.failure(draft) })}
           </Text>
@@ -475,7 +487,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
     <View style={styles.gap10}>
       {alert ? (
         <View style={[styles.condition, { backgroundColor: c.sunken }]}>
-          <Icon name="bell" size={14} color={c.muted} />
+          <Icon name="bell" size={13} color={c.muted} />
           <Text variant="footnote" tone="muted" style={styles.semibold}>
             {t("widgets.alert.condition")}
           </Text>
@@ -498,13 +510,13 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
           disabled={agents.length === 0 || phase === "testing"}
           accessibilityRole="button"
           accessibilityLabel={`${t("dashboards.newWidget.who")}: ${look.name}`}
-          hitSlop={6}
-          style={styles.footPick}
+          hitSlop={FOOT_SLOP}
+          style={({ pressed }) => [styles.footPick, pressed && styles.pressed]}
         >
           <Text variant="footnote" numberOfLines={1} style={[styles.semibold, { color: c.ink2 }]}>
             {look.name || t("dashboards.newWidget.theAgent")}
           </Text>
-          <Icon name="down" size={12} color={c.muted} />
+          <Icon name="down" size={13} color={c.muted} />
         </Pressable>
         <Text variant="footnote" tone="faint">
           {"·"}
@@ -513,14 +525,14 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
           onPress={openSchedules}
           accessibilityRole="button"
           accessibilityLabel={`${t("dashboards.newWidget.updates")}: ${t(`widgets.schedules.${schedule}`)}`}
-          hitSlop={6}
-          style={[styles.footPick, styles.shrink]}
+          hitSlop={FOOT_SLOP}
+          style={({ pressed }) => [styles.footPick, styles.shrink, pressed && styles.pressed]}
         >
           <Icon name="clock" size={13} color={c.muted} />
           <Text variant="footnote" numberOfLines={1} style={[styles.shrink, { color: c.ink2 }]}>
             {t(`widgets.schedulesInline.${schedule}`)}
           </Text>
-          <Icon name="down" size={12} color={c.muted} />
+          <Icon name="down" size={13} color={c.muted} />
         </Pressable>
       </View>
     </View>
@@ -542,7 +554,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
-        contentContainerStyle={[styles.in, { paddingBottom: 28 + insets.bottom }]}
+        contentContainerStyle={[styles.in, { paddingBottom: 24 + insets.bottom }]}
       >
         <WidgetCard
           big={sized === "l"}
@@ -606,24 +618,31 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
   );
 }
 
+/** The footer's two picks: 44 tall to the finger, across only as far as the dot between them. */
+const FOOT_SLOP = { top: 9, bottom: 9, left: 4, right: 4 };
+/** The size switch: its corner, and its segments' inside it (concentric, 2 in from its edge). */
+const SIZES_R = 10;
+const SIZES_PAD = 2;
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   in: { paddingHorizontal: 16, paddingTop: 8 },
   head: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
   titleInput: { flex: 1, minWidth: 0, paddingVertical: 4, ...fieldText("footnote", "600") },
-  okBadge: { width: 22, height: 22, borderRadius: 7, alignItems: "center", justifyContent: "center" },
+  okBadge: { width: 22, height: 22, borderRadius: 6, alignItems: "center", justifyContent: "center" },
   bell: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     height: 28,
     paddingHorizontal: 6,
-    borderRadius: 8,
+    borderRadius: 10,
   },
-  sizes: { flexDirection: "row", padding: 2, borderRadius: 9 },
-  size: { minWidth: 26, height: 24, borderRadius: 7, alignItems: "center", justifyContent: "center" },
+  sizes: { flexDirection: "row", padding: SIZES_PAD, borderRadius: SIZES_R },
+  size: { minWidth: 26, height: 24, borderRadius: SIZES_R - SIZES_PAD, alignItems: "center", justifyContent: "center" },
   ask: { minHeight: 56, paddingTop: 4, paddingBottom: 2, ...systemText("body", "500") },
   suggestions: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  suggestionWrap: { maxWidth: "100%" },
   suggestion: {
     flexDirection: "row",
     alignItems: "center",
@@ -637,10 +656,10 @@ const styles = StyleSheet.create({
   pickBox: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 4,
     height: 28,
     paddingHorizontal: 8,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
     flexShrink: 0,
   },
@@ -664,7 +683,8 @@ const styles = StyleSheet.create({
   semibold: { fontWeight: "600", flexShrink: 1 },
   shrink: { flexShrink: 1, minWidth: 0 },
   grow: { flex: 1, minWidth: 0 },
-  gap: { height: 18 },
+  gap: { height: 20 },
+  pressed: { opacity: 0.6 },
   gap8: { gap: 8 },
   gap10: { gap: 10 },
 });

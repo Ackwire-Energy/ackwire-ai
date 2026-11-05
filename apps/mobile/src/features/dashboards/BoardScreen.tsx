@@ -133,6 +133,9 @@ function Board({ id }: { id: string }) {
   );
 }
 
+/** Between the widgets, across and down. */
+const GAP = 10;
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   in: { paddingHorizontal: 16, gap: 10 },
@@ -140,17 +143,18 @@ const styles = StyleSheet.create({
   centerText: { textAlign: "center" },
   barRight: { flexDirection: "row", alignItems: "center" },
   meta: { paddingHorizontal: 4 },
-  grid: { gap: 10 },
-  row: { flexDirection: "row", gap: 10 },
+  grid: { gap: GAP },
+  row: { flexDirection: "row", gap: GAP },
   cell: { flex: 1, minWidth: 0 },
-  half: { width: "50%", paddingRight: 5 },
+  // A lone half widget as wide as one in a row of two: half the row, less half the gap between them.
+  half: { width: "50%", paddingRight: GAP / 2 },
   empty: {
     alignItems: "center",
     gap: 6,
     marginTop: 14,
     paddingVertical: 32,
     paddingHorizontal: 16,
-    borderRadius: 22,
+    borderRadius: 20,
     borderWidth: 1.5,
   },
   emptyAction: { alignSelf: "center", marginTop: 10 },

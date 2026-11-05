@@ -42,6 +42,7 @@ import { router } from "expo-router";
 import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import {
   CHROME_MAX_SCALE,
@@ -90,6 +91,9 @@ import {
   consultationsOf,
   hangsUnder,
   hidesBody,
+  MSG_AVATAR,
+  MSG_GAP,
+  MSG_INSET,
   mayStopRun,
   missionCardRef,
   missionLinkOf,
@@ -348,7 +352,12 @@ export const MessageRow = memo(function MessageRow({
       {m.local === "pending" || (m.local === "failed" && offline) ? (
         <Sending offline={offline} end={mine} />
       ) : m.local === "failed" ? (
-        <Pressable onPress={() => onRetry?.(m)} accessibilityRole="button" hitSlop={8}>
+        <Pressable
+          onPress={() => onRetry?.(m)}
+          accessibilityRole="button"
+          hitSlop={14}
+          style={({ pressed }) => pressed && styles.pressedDim}
+        >
           <Text variant="caption" tone="danger" style={mine ? styles.meStatus : undefined}>
             {t("mobile.chat.failed")}
           </Text>
@@ -445,7 +454,7 @@ export const MessageRow = memo(function MessageRow({
         style={({ pressed }) => [
           styles.msg,
           grouped && styles.cont,
-          mentionsMe && { backgroundColor: `${c.amber}17`, borderLeftWidth: 2, borderLeftColor: c.amber },
+          mentionsMe && [styles.mention, { backgroundColor: `${c.amber}17`, borderLeftColor: c.amber }],
           pressed && press && { backgroundColor: c.sunken },
         ]}
       >
@@ -479,8 +488,8 @@ export const MessageRow = memo(function MessageRow({
                   onPress={() => setReportOpen((o) => !o)}
                   accessibilityRole="button"
                   accessibilityState={{ expanded: reportOpen }}
-                  hitSlop={6}
-                  style={styles.shrink}
+                  hitSlop={14}
+                  style={({ pressed }) => [styles.shrink, pressed && styles.pressedDim]}
                 >
                   <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
                     {reportOpen ? t("channel.routineReportHide") : t("channel.routineReport")}
@@ -558,10 +567,7 @@ export const MessageRow = memo(function MessageRow({
           ) : null}
           {talk && !brainWait ? (
             <Pressable
-              onPress={() => {
-                tapHaptic();
-                router.push(chatHref(m.channelId, m.threadId ?? m.id));
-              }}
+              onPress={() => router.push(chatHref(m.channelId, m.threadId ?? m.id))}
               accessibilityRole="button"
               hitSlop={8}
               style={({ pressed }) => [styles.talkMore, pressed && styles.pressedDim]}
@@ -572,7 +578,7 @@ export const MessageRow = memo(function MessageRow({
               <Text variant="footnote" tone="faint">
                 · {t("chat.talk.more", { count: talk.more })}
               </Text>
-              <Icon name="right" size={14} color={c.faint} />
+              <Icon name="right" size={13} color={c.faint} />
             </Pressable>
           ) : null}
           {media ? <ChatMedia media={media} liveId={m.id} /> : null}
@@ -816,7 +822,7 @@ function Tag({
   const c = useColors();
   const chip = (
     <View style={[styles.tag, { backgroundColor: c.sunken }]} accessibilityHint={onPress ? undefined : hint}>
-      {lead ?? <Icon name={icon} size={11} color={c.muted} />}
+      {lead ?? <Icon name={icon} size={12} color={c.muted} />}
       <Text variant="caption" tone="muted" numberOfLines={1} style={styles.shrink}>
         {label}
       </Text>
@@ -828,8 +834,8 @@ function Tag({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityHint={hint}
-      hitSlop={6}
-      style={styles.tagPress}
+      hitSlop={12}
+      style={({ pressed }) => [styles.tagPress, pressed && styles.pressedDim]}
     >
       {chip}
     </Pressable>
@@ -853,8 +859,8 @@ function HelpingTag({ consultation: c, channelId }: { consultation: RunConsultat
       <Pressable
         onPress={() => router.push(consultationHref(c.id, channelId))}
         accessibilityRole="button"
-        hitSlop={6}
-        style={styles.shrink}
+        hitSlop={14}
+        style={({ pressed }) => [styles.shrink, pressed && styles.pressedDim]}
       >
         <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
           {t("chat.consultPanel.see")}
@@ -879,61 +885,72 @@ function PinMark() {
 function Reactions({ message: m, meId }: { message: Message; meId: string | null }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const c = useColors();
+  const { colors: c, reducedMotion: reduced } = useTheme();
   const cached = useReactions(orgId, m.id, false);
   const toggle = useToggleReaction(orgId, m.id);
   const pills = reactionPills(cached.data ?? m.reactions, meId);
   // What an agent saved to memory from this message comes last in the row (the web's memory mark).
   const remembered = (m.memories?.length ?? 0) > 0;
-  if ((pills.length === 0 && !remembered) || m.local) return null;
+  const shown = (pills.length > 0 || remembered) && !m.local;
+  // A pill someone adds or takes back while the row shows fades and the others slide aside; those there when the row
+  // mounts (scrolling to it) just show, and none lingers when the row goes.
+  const motion = reduced ? {} : { entering: PILL_IN, exiting: PILL_OUT, layout: PILL_MOVE };
   return (
-    <View style={styles.reacts}>
-      {pills.flatMap((p) => [
-        ...(p.people > 0
-          ? [
-              <Pressable
-                key={`p:${p.reaction}`}
-                onPress={() => {
-                  tapHaptic();
-                  toggle.mutate({ reaction: p.reaction, on: !p.mine });
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={t("mobile.chat.reactionLabel", { emoji: p.emoji, count: p.people })}
-                accessibilityState={{ selected: p.mine }}
-                style={[
-                  styles.react,
-                  { backgroundColor: c.sunken },
-                  p.mine && { borderWidth: 1.5, borderColor: c.ink2 },
-                ]}
+    <LayoutAnimationConfig skipEntering skipExiting>
+      {shown ? (
+        <View style={styles.reacts}>
+          {pills.flatMap((p) => [
+            ...(p.people > 0
+              ? [
+                  <Animated.View key={`p:${p.reaction}`} {...motion}>
+                    {/* The press's own light tap is the toggle's haptic. */}
+                    <PressScale
+                      onPress={() => toggle.mutate({ reaction: p.reaction, on: !p.mine })}
+                      fill={false}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("mobile.chat.reactionLabel", { emoji: p.emoji, count: p.people })}
+                      accessibilityState={{ selected: p.mine }}
+                      contentStyle={[styles.react, { backgroundColor: c.sunken }, p.mine && { borderColor: c.ink2 }]}
+                    >
+                      <Text variant="subhead" maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+                        {p.emoji}
+                      </Text>
+                      <Count value={p.people} size={14} />
+                    </PressScale>
+                  </Animated.View>,
+                ]
+              : []),
+            ...p.agentIds.map((agentId) => (
+              <Animated.View
+                key={`a:${p.reaction}:${agentId}`}
+                {...motion}
+                accessible
+                accessibilityLabel={t("mobile.chat.agentReacted", { emoji: p.emoji })}
+                style={[styles.react, { backgroundColor: c.sunken }]}
               >
-                <Text maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.emoji}>
+                <Text variant="subhead" maxFontSizeMultiplier={CHROME_MAX_SCALE}>
                   {p.emoji}
                 </Text>
-                <Count value={p.people} size={14} />
-              </Pressable>,
-            ]
-          : []),
-        ...p.agentIds.map((agentId) => (
-          <View
-            key={`a:${p.reaction}:${agentId}`}
-            accessible
-            accessibilityLabel={t("mobile.chat.agentReacted", { emoji: p.emoji })}
-            style={[styles.react, { backgroundColor: c.sunken }]}
-          >
-            <Text maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.emoji}>
-              {p.emoji}
-            </Text>
-            <AgentFace agentId={agentId} size={16} live={false} />
-          </View>
-        )),
-      ])}
-      {remembered ? <MemoryMarks message={m} divided={pills.length > 0} /> : null}
-    </View>
+                <AgentFace agentId={agentId} size={16} live={false} />
+              </Animated.View>
+            )),
+          ])}
+          {remembered ? <MemoryMarks message={m} divided={pills.length > 0} /> : null}
+        </View>
+      ) : null}
+    </LayoutAnimationConfig>
   );
 }
 
+const PILL_IN = FadeIn.duration(160);
+const PILL_OUT = FadeOut.duration(120);
+const PILL_MOVE = LinearTransition;
+
 /** The turn's last corner, cut as a card's is, on the side my bubble stands. */
-const BUBBLE_CUT = 5;
+const BUBBLE_CUT = 6;
+
+/** Between the rows of a run of mine: one bubble under the other, close. */
+const RUN_GAP = 2;
 
 /** The bubble's corners by its place in a run of my rows: the sides it shares with its neighbours square off. */
 const BUBBLE_RUN: Record<RunPosition, { borderTopRightRadius?: number; borderBottomRightRadius?: number }> = {
@@ -945,46 +962,55 @@ const BUBBLE_RUN: Record<RunPosition, { borderTopRightRadius?: number; borderBot
 
 const styles = StyleSheet.create({
   // Readable turns: more room between turns, a quieter name and time.
-  msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
+  msg: {
+    flexDirection: "row",
+    gap: MSG_GAP,
+    paddingLeft: MSG_INSET,
+    paddingRight: 16,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  // The amber rule takes its width from the inset: the face and the words stay in their columns.
+  mention: { borderLeftWidth: 2, paddingLeft: MSG_INSET - 2 },
   cont: { paddingTop: 0, marginTop: 0 },
-  avslot: { width: 34, alignItems: "center", paddingTop: 2 },
+  avslot: { width: MSG_AVATAR, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
   // A long pick wraps: the check stays on its first line.
   choiceReply: { flexDirection: "row", alignItems: "flex-start", gap: 6, paddingVertical: 2 },
   // Wraps on a narrow phone: a routine's tag and "Ver relatório" go to the next line instead of off the edge.
-  who: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 8, rowGap: 3, marginBottom: 3 },
+  who: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 8, rowGap: 4, marginBottom: 4 },
   // A person's name line keeps room at its end for the receipt's mark, with or without one, so a mark that comes
   // never wraps the line.
   whoRoom: { paddingRight: 40 },
   whoMark: { position: "absolute", top: 0, right: 0, height: 19, justifyContent: "center" },
   name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
   me: { paddingLeft: 64, paddingRight: 16, paddingVertical: 10, marginTop: 4, alignItems: "flex-end" },
-  meCont: { paddingTop: 1, marginTop: 0 },
-  // A run of my rows sits 2px apart (1 under this one, 1 over the next).
-  meRunOn: { paddingBottom: 1 },
+  meCont: { paddingTop: RUN_GAP / 2, marginTop: 0 },
+  // A run of my rows sits RUN_GAP apart (half under this one, half over the next).
+  meRunOn: { paddingBottom: RUN_GAP / 2 },
   meTime: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4, marginTop: 4, height: 16 },
   mePressed: { opacity: 0.7 },
   meEnd: { alignSelf: "flex-end" },
   bubble: {
     maxWidth: "100%",
     paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 18,
+    paddingHorizontal: 14,
+    borderRadius: 20,
   },
   meFiles: { alignSelf: "stretch" },
   meCards: { alignSelf: "stretch" },
   meStatus: { marginTop: 4, textAlign: "right" },
-  status: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4, minHeight: 18 },
+  status: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, minHeight: 18 },
   statusEnd: { alignSelf: "flex-end" },
   stopped: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 6 },
   continue: {
     minHeight: 26,
-    borderTopLeftRadius: 9,
-    borderTopRightRadius: 9,
-    borderBottomRightRadius: 9,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
     borderBottomLeftRadius: 3,
   },
-  continueIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 5, paddingLeft: 8, paddingRight: 10 },
+  continueIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 4, paddingLeft: 8, paddingRight: 10 },
   medium: { fontWeight: "600" },
   talkMore: {
     flexDirection: "row",
@@ -1007,19 +1033,21 @@ const styles = StyleSheet.create({
     gap: 4,
     alignSelf: "center",
     flexShrink: 1,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 999,
   },
   pinLine: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 2 },
   reacts: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
+  // The outline is always there (clear unless it is mine), so a pill keeps its size when I add or take mine.
   react: {
     minHeight: 30,
     paddingHorizontal: 10,
     borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: "transparent",
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-  emoji: { fontSize: 15 },
 });
