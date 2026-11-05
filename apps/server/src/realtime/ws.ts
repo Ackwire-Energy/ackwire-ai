@@ -7,6 +7,7 @@ import {
   type Presence,
   type PubSub,
   type RateLimiter,
+  STREAM_LIMITS,
   typingTopic,
   type Unsubscribe,
   userTopic,
@@ -122,6 +123,8 @@ export interface FrameSocketData {
   kind: "browser.frames";
   owner: Bun.ServerWebSocket<BrowserSocketData>;
   agentId: string;
+  /** An idle page sends nothing: pings keep proxies from dropping the socket. */
+  pinger?: ReturnType<typeof setInterval>;
 }
 
 /** Every socket of the server: browsers (`/api/ws`), runners (`/api/machines/connect`) and streams (ADR 0058). */
@@ -397,6 +400,7 @@ export function createRealtime(deps: RealtimeDeps) {
       const old = owner.data.frameSockets.get(agentId);
       owner.data.frameSockets.set(agentId, socket);
       old?.close(1000, "replaced");
+      socket.data.pinger = setInterval(() => socket.ping(), STREAM_LIMITS.pingMs);
     },
     message(socket: Bun.ServerWebSocket<FrameSocketData>, raw: string | Buffer) {
       const { owner, agentId } = socket.data;
@@ -404,6 +408,7 @@ export function createRealtime(deps: RealtimeDeps) {
       if (parseFrameSocketMessage(raw)?.type === "ack") owner.data.browserPacers.get(agentId)?.ack();
     },
     close(socket: Bun.ServerWebSocket<FrameSocketData>) {
+      clearInterval(socket.data.pinger);
       const { owner, agentId } = socket.data;
       // Its pictures go on the realtime socket again, in the same window.
       if (owner.data.frameSockets.get(agentId) === socket) owner.data.frameSockets.delete(agentId);
