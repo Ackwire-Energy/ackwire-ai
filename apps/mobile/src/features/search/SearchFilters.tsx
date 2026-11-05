@@ -22,7 +22,7 @@ import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
-import { Button, Filters, Icon, PressScale, SectionHeader, Text, useReducedMotion } from "@/ui";
+import { Button, EmptyState, Filters, Icon, PressScale, SectionHeader, Text, useReducedMotion } from "@/ui";
 import { Note } from "../ai/parts";
 import { Face } from "../shared/Face";
 import { useColors, useOrgId, useWhen } from "../shared/hooks";
@@ -299,11 +299,12 @@ export function FilteredResults({
           </View>
         ))}
         {hits.isSuccess && list.length === 0 ? (
-          <Text tone="faint" style={styles.empty}>
-            {t("mobile.find.nothing", {
+          <EmptyState
+            icon="search"
+            title={t("mobile.find.nothing", {
               q: text.trim() || chips.map((c) => searchChipLabel(t, i18n.language, c)).join(" "),
             })}
-          </Text>
+          />
         ) : null}
       </View>
     </View>

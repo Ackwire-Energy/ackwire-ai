@@ -7,7 +7,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Filters, SectionHeader, Text, useToast } from "@/ui";
+import { EmptyState, Filters, SectionHeader, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useDirectory, useOrgId, useWhen } from "../shared/hooks";
@@ -205,9 +205,8 @@ export function SearchResults({ q }: { q: string }) {
           </Group>
         ) : null}
         {words && isEmpty(r) && !hits.isFetching ? (
-          <Text tone="faint" style={styles.empty}>
-            {t("mobile.find.nothing", { q: q.trim() })}
-          </Text>
+          // As every search's "nothing found" in the app (Drive, Routines): a quiet magnifier over the words.
+          <EmptyState icon="search" title={t("mobile.find.nothing", { q: q.trim() })} />
         ) : null}
       </View>
     </View>
@@ -230,5 +229,4 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 const styles = StyleSheet.create({
   res: { paddingTop: 2 },
   list: { paddingHorizontal: 16 },
-  empty: { textAlign: "center", paddingVertical: 40, paddingHorizontal: 16 },
 });

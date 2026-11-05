@@ -6,6 +6,7 @@ import { BackHandler, Keyboard, StyleSheet, type TextInputInstance, View } from 
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import {
+  EmptyState,
   GroupedHeader,
   GroupedList,
   GroupedRow,
@@ -13,7 +14,6 @@ import {
   type IconName,
   PixelOrbit,
   SearchField,
-  Text,
   useReducedMotion,
   useTheme,
 } from "@/ui";
@@ -157,9 +157,7 @@ export function NewScreen() {
             </Animated.View>
           ) : null}
           {typed && agents.length + people.length === 0 && !dir.loading ? (
-            <Text tone="faint" style={styles.empty}>
-              {t("mobile.find.nothing", { q: typed })}
-            </Text>
+            <EmptyState icon="search" title={t("mobile.find.nothing", { q: typed })} />
           ) : null}
         </View>
       </Animated.View>
@@ -240,5 +238,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  empty: { textAlign: "center", paddingVertical: 32 },
 });

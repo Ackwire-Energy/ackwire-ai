@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native";
-import { Icon, Text } from "@/ui";
+import { EmptyState, Icon, Text } from "@/ui";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { ActionList } from "../shared/parts";
@@ -66,9 +66,10 @@ export function ChatTargets({
         </>
       ) : null}
       {found.agents.length + found.people.length === 0 && !dir.loading ? (
-        <Text tone="faint" style={styles.empty}>
-          {q.trim() ? t("mobile.find.nothing", { q: q.trim() }) : t("mobile.new.nobody")}
-        </Text>
+        <EmptyState
+          icon={q.trim() ? "search" : "members"}
+          title={q.trim() ? t("mobile.find.nothing", { q: q.trim() }) : t("mobile.new.nobody")}
+        />
       ) : null}
     </>
   );
@@ -76,5 +77,4 @@ export function ChatTargets({
 
 const styles = StyleSheet.create({
   sec: { paddingHorizontal: 4, paddingTop: 10 },
-  empty: { textAlign: "center", paddingVertical: 30 },
 });
