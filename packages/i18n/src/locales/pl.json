@@ -9191,7 +9191,7 @@
     "noAccessText": "Jest tylko dla niektórych osób. Jeśli jej potrzebujesz, poproś osobę, która opiekuje się wiki.",
     "delete": "Przenieś do kosza",
     "deleteTitle": "Przenieść {{title}} do kosza?",
-    "deleteText": "Linki do niej staną się „stroną do utworzenia”. Możesz ją później przywrócić.",
+    "deleteText": "Linki do niej staną się „stroną do utworzenia”. Na razie nie można jej przywrócić w aplikacji.",
     "deleted": "{{title}} przeniesiono do kosza.",
     "noBacklinksHint": "Żadna strona jeszcze tu nie linkuje. Wpisz [[{{title}}]] w innej.",
     "allVersions": "Zobacz wszystkie wersje ({{count}})",
@@ -14626,7 +14626,8 @@
     "card": {
       "text": "Opuszczasz wszystkie przestrzenie robocze, a twoje konto zostaje trwale usunięte.",
       "button": "Usuń konto…",
-      "oneWorkspace": "Chcesz usunąć tylko tę przestrzeń roboczą? To jest w sekcji Ogólne."
+      "oneWorkspace": "Chcesz usunąć tylko tę przestrzeń roboczą? To jest w sekcji Ogólne.",
+      "leaveWorkspace": "Chcesz opuścić tylko tę przestrzeń roboczą? To jest w sekcji Członkowie."
     },
     "title": "Usunąć całe twoje konto?",
     "intro": "To usuwa całe twoje konto, a nie tylko jedną przestrzeń roboczą. Tego nie da się cofnąć.",

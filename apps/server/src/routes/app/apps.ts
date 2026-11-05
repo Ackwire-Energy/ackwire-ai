@@ -61,6 +61,7 @@ const ConsentView = z.object({
       logo: z.string().nullable(),
       paused: z.boolean(),
       createdAt: z.string().optional(),
+      deletion: z.object({ dueAt: z.string() }).optional(),
       current: z.boolean(),
     }),
   ),

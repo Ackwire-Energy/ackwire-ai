@@ -8396,7 +8396,7 @@ export const en = {
     noAccessText: "It's for some people only. If you need it, ask whoever looks after the wiki.",
     delete: "Move to trash",
     deleteTitle: "Move {{title}} to the trash?",
-    deleteText: "Links to it become “page to create”. You can restore it later.",
+    deleteText: "Links to it become “page to create”. You can't restore it from the app yet.",
     deleted: "{{title}} moved to the trash.",
     noBacklinksHint: "No page links here yet. Write [[{{title}}]] in another one.",
     allVersions: "See all {{count}} versions",
@@ -13337,6 +13337,8 @@ export const en = {
       button: "Delete account…",
       /** The link to Settings › General, for someone who only meant this workspace. */
       oneWorkspace: "Want to delete just this workspace? It's in General.",
+      /** The link to Members, for someone who can't delete this workspace and only meant to leave it. */
+      leaveWorkspace: "Want to leave just this workspace? It's in Members.",
     },
     title: "Delete your whole account?",
     intro: "This deletes your whole account, not just one workspace. It can't be undone.",

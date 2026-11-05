@@ -30,6 +30,7 @@ async function open(
     name = "Acme",
     deletion,
     standing,
+    createdAt,
     beta = { id: BETA_ID, name: "Beta", role: "member" },
     state = seedState(),
   }: {
@@ -37,13 +38,21 @@ async function open(
     name?: string;
     deletion?: OrgDeletion;
     standing?: OrgSummary["standing"];
+    createdAt?: string;
     beta?: OrgSummary;
     state?: ReturnType<typeof seedState>;
   } = {},
 ) {
   if (!state.me) throw new Error("signed in");
   state.me.organizations = [
-    { id: ORG_ID, name, role, ...(deletion ? { deletion } : {}), ...(standing ? { standing } : {}) },
+    {
+      id: ORG_ID,
+      name,
+      role,
+      ...(deletion ? { deletion } : {}),
+      ...(standing ? { standing } : {}),
+      ...(createdAt ? { createdAt } : {}),
+    },
     beta,
   ];
   const r = await renderApp(path, { api: createFakeApi(state) });
@@ -439,6 +448,40 @@ describe("deleting your account (Configurações › Sua conta)", () => {
     cleanup();
     await open(`/org/${ORG_ID}/settings/account`, { role: "member" });
     expect(screen().queryByRole("link", { name: /Quer apagar só este workspace/ })).toBeNull();
+    expect(
+      screen().getByRole("link", { name: "Quer sair só deste workspace? Fica em Membros." }).getAttribute("href"),
+    ).toBe(`/org/${ORG_ID}/settings/members`);
+  });
+
+  test("two with the same name in the dialog: told apart in what it says and in its links", async () => {
+    const made = (days: number) => new Date(Date.now() - days * DAY).toISOString();
+    const state = seedState({
+      deletionPlan: {
+        closes: [],
+        leaves: [
+          { id: ORG_ID, name: "Acme", role: "owner" },
+          { id: BETA_ID, name: "Acme", role: "owner" },
+        ],
+        soleOwner: [
+          { id: ORG_ID, name: "Acme" },
+          { id: BETA_ID, name: "Acme" },
+        ],
+        computers: [],
+        staysBehind: [],
+        serverOwner: false,
+      },
+    });
+    await open(`/org/${ORG_ID}/issues?account=delete`, {
+      state,
+      createdAt: made(90),
+      beta: { id: BETA_ID, name: "Acme", role: "owner", createdAt: made(30) },
+    });
+    const dialog = screen().getByRole("dialog", { name: "Apagar a sua conta inteira?" });
+    const links = within(dialog)
+      .getAllByRole("link", { name: /^Apagar Acme/ })
+      .map((l) => l.textContent);
+    expect(new Set(links).size).toBe(2);
+    expect(links.every((l) => l?.includes("Criado em"))).toBe(true);
   });
 
   test("what closes, what you leave, what stays; the code from the email, then out to the sign-in", async () => {

@@ -8495,7 +8495,7 @@
     "noAccessText": "Yalnızca bazı kişiler için. Gerekiyorsa wiki ile ilgilenen kişiye sorun.",
     "delete": "Çöp kutusuna taşı",
     "deleteTitle": "{{title}} çöp kutusuna taşınsın mı?",
-    "deleteText": "Ona verilen bağlantılar “oluşturulacak sayfa” olur. Daha sonra geri yükleyebilirsiniz.",
+    "deleteText": "Ona verilen bağlantılar “oluşturulacak sayfa” olur. Şimdilik uygulamadan geri yüklenemez.",
     "deleted": "{{title}} çöp kutusuna taşındı.",
     "noBacklinksHint": "Henüz hiçbir sayfa buraya bağlantı vermiyor. Başka bir sayfaya [[{{title}}]] yazın.",
     "allVersions": "{{count}} sürümün tümünü gör",
@@ -13616,7 +13616,8 @@
     "card": {
       "text": "Tüm çalışma alanlarından ayrılırsınız ve hesabınız kalıcı olarak silinir.",
       "button": "Hesabı sil…",
-      "oneWorkspace": "Yalnızca bu çalışma alanını mı silmek istiyorsunuz? Genel bölümünde."
+      "oneWorkspace": "Yalnızca bu çalışma alanını mı silmek istiyorsunuz? Genel bölümünde.",
+      "leaveWorkspace": "Yalnızca bu çalışma alanından mı ayrılmak istiyorsunuz? Üyeler bölümünde."
     },
     "title": "Hesabınızın tamamı silinsin mi?",
     "intro": "Bu, tek bir çalışma alanını değil hesabınızın tamamını siler. Bu işlem geri alınamaz.",

@@ -8252,7 +8252,7 @@
     "noAccessText": "Halaman ini hanya untuk orang tertentu. Kalau kamu butuh, tanyakan ke pengurus wiki.",
     "delete": "Pindahkan ke sampah",
     "deleteTitle": "Pindahkan {{title}} ke sampah?",
-    "deleteText": "Tautan ke halaman ini menjadi “halaman untuk dibuat”. Kamu bisa memulihkannya nanti.",
+    "deleteText": "Tautan ke halaman ini menjadi “halaman untuk dibuat”. Untuk saat ini halaman tidak bisa dipulihkan dari aplikasi.",
     "deleted": "{{title}} dipindahkan ke sampah.",
     "noBacklinksHint": "Belum ada halaman yang menautkan ke sini. Tulis [[{{title}}]] di halaman lain.",
     "allVersions": "Lihat semua {{count}} versi",
@@ -13262,7 +13262,8 @@
     "card": {
       "text": "Kamu keluar dari semua ruang kerja dan akunmu dihapus selamanya.",
       "button": "Hapus akun…",
-      "oneWorkspace": "Mau menghapus ruang kerja ini saja? Ada di Umum."
+      "oneWorkspace": "Mau menghapus ruang kerja ini saja? Ada di Umum.",
+      "leaveWorkspace": "Mau keluar dari ruang kerja ini saja? Ada di Anggota."
     },
     "title": "Hapus seluruh akunmu?",
     "intro": "Ini menghapus seluruh akunmu, bukan hanya satu ruang kerja. Ini tidak bisa diurungkan.",

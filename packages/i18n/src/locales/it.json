@@ -8911,7 +8911,7 @@
     "noAccessText": "È riservata ad alcune persone. Se ti serve, chiedi a chi si occupa del wiki.",
     "delete": "Sposta nel cestino",
     "deleteTitle": "Spostare {{title}} nel cestino?",
-    "deleteText": "I link che puntano qui diventano “pagina da creare”. Potrai ripristinarla in seguito.",
+    "deleteText": "I link che puntano qui diventano “pagina da creare”. Per ora non puoi ripristinarla dall'app.",
     "deleted": "{{title}} spostata nel cestino.",
     "noBacklinksHint": "Ancora nessuna pagina punta qui. Scrivi [[{{title}}]] in un'altra.",
     "allVersions": "Vedi tutte le {{count}} versioni",
@@ -14214,7 +14214,8 @@
     "card": {
       "text": "Esci da tutti gli spazi di lavoro e il tuo account viene eliminato per sempre.",
       "button": "Elimina account…",
-      "oneWorkspace": "Vuoi eliminare solo questo spazio di lavoro? Lo trovi in Generali."
+      "oneWorkspace": "Vuoi eliminare solo questo spazio di lavoro? Lo trovi in Generali.",
+      "leaveWorkspace": "Vuoi uscire solo da questo spazio di lavoro? Lo trovi in Membri."
     },
     "title": "Eliminare tutto il tuo account?",
     "intro": "Elimina tutto il tuo account, non solo uno spazio di lavoro. Non si può annullare.",

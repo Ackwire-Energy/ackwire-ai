@@ -80,17 +80,19 @@ export function DeleteAccountScreen() {
   const toSend = proof ? proofToSend(proof, { sent: sent !== null, code, password }) : null;
   const ready = toSend === null || toSend.ready;
   const web = (path: string) => openPage(`${serverUrl()}${path}`);
+  const notes = workspaceNotes(t, i18n.language, me?.organizations ?? []);
+  const named = (o: { id: string; name: string }) => workspaceLabel(o.name, notes.get(o.id));
   const lines = plan.data
     ? accountDeletionLines(t, i18n.language, plan.data, {
         cloud: config?.workspaceComputer === true,
         billing: Boolean(config?.billingUrl),
+        notes,
       })
     : [];
   const inSetup = (id: string) => me?.organizations.some((o) => o.id === id && settingUp(o)) === true;
   // Where the website's account menu adds a password: a workspace of theirs that is open.
   const shell = me?.organizations.find(workspaceOpens);
   const own = deletableWorkspaces(me?.organizations ?? []);
-  const notes = workspaceNotes(t, i18n.language, me?.organizations ?? []);
 
   const codeOut = (email: string, resendIn: number) => setSent({ email, resendAt: Date.now() + resendIn * 1000 });
   const sendCode = async () => {
@@ -201,7 +203,7 @@ export function DeleteAccountScreen() {
                     key={o.id}
                     variant="secondary"
                     size="sm"
-                    label={t("deleteAccount.deleteOrg", { name: workspaceLabel(o.name, notes.get(o.id)) })}
+                    label={t("deleteAccount.deleteOrg", { name: named(o) })}
                     onPress={() => web(soleOwnerWaysOut(o.id, settingUp(o)).delete)}
                   />
                 ))}
@@ -223,7 +225,7 @@ export function DeleteAccountScreen() {
                 return (
                   <View key={o.id} style={styles.line}>
                     <Text variant="small" tone="ink2">
-                      {t(setup ? "deleteAccount.soleOwnerSettingUp" : "deleteAccount.soleOwner", { name: o.name })}
+                      {t(setup ? "deleteAccount.soleOwnerSettingUp" : "deleteAccount.soleOwner", { name: named(o) })}
                     </Text>
                     <View style={styles.acts}>
                       <Button
@@ -235,7 +237,7 @@ export function DeleteAccountScreen() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        label={t("deleteAccount.deleteOrg", { name: o.name })}
+                        label={t("deleteAccount.deleteOrg", { name: named(o) })}
                         onPress={() => web(out.delete)}
                       />
                     </View>

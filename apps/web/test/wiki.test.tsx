@@ -225,6 +225,21 @@ describe("the wiki", () => {
     expect(screen().getByRole("region", { name: "Sobre a página" })).toBeTruthy();
   });
 
+  test("moving a page to the trash promises no restore a person can't do", async () => {
+    await go("wiki/deploy");
+    const more = screen().getByRole("button", { name: "Mais ações" });
+    more.focus();
+    await act(async () => {
+      fireEvent.keyDown(more, { key: "Enter" });
+      fireEvent.keyUp(more, { key: "Enter" });
+    });
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Mover para a lixeira" }));
+    expect(screen().getByRole("dialog", { name: "Mover Deploy para a lixeira?" }).textContent).toContain(
+      "Ainda não dá para restaurar pelo app.",
+    );
+  });
+
   test("the visual editor: the page edits as it reads; a changed paragraph saves, the rest as written", async () => {
     const { state } = await go("wiki/onboarding");
     await click(screen().getByRole("button", { name: /^Editar/ }));

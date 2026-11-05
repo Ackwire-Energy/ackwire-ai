@@ -86,16 +86,18 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
   }, [open, reset]);
   const data = plan.data;
   const blockers = data?.soleOwner ?? [];
+  const notes = workspaceNotes(t, i18n.language, me?.organizations ?? []);
+  const named = (o: { id: string; name: string }) => workspaceLabel(o.name, notes.get(o.id));
   const lines = data
     ? accountDeletionLines(t, i18n.language, data, {
         cloud: config?.workspaceComputer === true,
         billing: Boolean(config?.billingUrl),
+        notes,
       })
     : [];
   const ready = data !== undefined && blockers.length === 0;
   const inSetup = (orgId: string) => me?.organizations.some((o) => o.id === orgId && settingUp(o)) === true;
   const own = deletableWorkspaces(me?.organizations ?? []);
-  const notes = workspaceNotes(t, i18n.language, me?.organizations ?? []);
 
   return (
     <Dialog
@@ -125,17 +127,17 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
                 {blockers.map((o) =>
                   inSetup(o.id) ? (
                     <DeletionLine key={o.id} icon="stageTodo">
-                      {t("deleteAccount.soleOwnerSettingUp", { name: o.name })}
+                      {t("deleteAccount.soleOwnerSettingUp", { name: named(o) })}
                       <span className="deletion-acts">
                         <Link className="ac-link" to="/onboarding">
                           {t("deleteAccount.finishSetup")}
                         </Link>
-                        <DeleteOrgLink orgId={o.id} name={o.name} setup />
+                        <DeleteOrgLink orgId={o.id} name={named(o)} setup />
                       </span>
                     </DeletionLine>
                   ) : (
                     <DeletionLine key={o.id} icon="stageTodo">
-                      {t("deleteAccount.soleOwner", { name: o.name })}
+                      {t("deleteAccount.soleOwner", { name: named(o) })}
                       <span className="deletion-acts">
                         <Link
                           className="ac-link"
@@ -144,7 +146,7 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
                         >
                           {t("deleteAccount.openPeople")}
                         </Link>
-                        <DeleteOrgLink orgId={o.id} name={o.name} setup={false} />
+                        <DeleteOrgLink orgId={o.id} name={named(o)} setup={false} />
                       </span>
                     </DeletionLine>
                   ),
@@ -181,12 +183,7 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
                     {t("deleteAccount.oneWorkspace")}
                     <span className="deletion-acts">
                       {own.map((o) => (
-                        <DeleteOrgLink
-                          key={o.id}
-                          orgId={o.id}
-                          name={workspaceLabel(o.name, notes.get(o.id))}
-                          setup={settingUp(o)}
-                        />
+                        <DeleteOrgLink key={o.id} orgId={o.id} name={named(o)} setup={settingUp(o)} />
                       ))}
                     </span>
                   </span>
@@ -214,8 +211,8 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
 
 /**
  * "Apagar conta" where Sua conta is out of reach (`accountOutOfReach`): a closed workspace's screen and the onboarding,
- * for someone with no workspace that opens. `trigger` draws the button; the dialog is kept in the address (`?account=delete`), so a sign-in again (adding a password may ask for
- * one) comes back to it.
+ * for someone with no workspace that opens. `trigger` draws the button; the dialog is kept in the address
+ * (`?account=delete`), so a sign-in again (adding a password may ask for one) comes back to it.
  */
 export function DeleteAccountEntry({ trigger }: { trigger: (open: () => void) => ReactNode }) {
   const [account, setAccount] = useOpenParam("account");

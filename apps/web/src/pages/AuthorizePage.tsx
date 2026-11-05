@@ -231,6 +231,9 @@ function ConsentForm({
   // Every workspace paused (on hold until billing is paid, say): Permitir can't be pressed, so the page says why.
   const nonePickable = !defaultWorkspace(consent);
   const notes = workspaceNotes(t, i18n.language, consent.workspaces);
+  // One being deleted is paused too, and its note says the rest.
+  const named = (w: AppConsent["workspaces"][number]) =>
+    workspaceLabel(w.paused && !w.deletion ? t("apps.consent.paused", { name: w.name }) : w.name, notes.get(w.id));
   return (
     <Card padded as="div" className="consent">
       <form
@@ -287,7 +290,7 @@ function ConsentForm({
         {only ? (
           <div className="apps-field" style={{ gap: 2 }}>
             <span className="newag__label">{t("apps.consent.workspace")}</span>
-            <span>{only.paused ? t("apps.consent.paused", { name: only.name }) : only.name}</span>
+            <span>{named(only)}</span>
           </div>
         ) : (
           <Field label={t("apps.consent.workspace")} id="consent-org">
@@ -299,7 +302,7 @@ function ConsentForm({
               }}
               options={consent.workspaces.map((w) => ({
                 value: w.id,
-                label: workspaceLabel(w.paused ? t("apps.consent.paused", { name: w.name }) : w.name, notes.get(w.id)),
+                label: named(w),
                 disabled: w.paused,
               }))}
             />

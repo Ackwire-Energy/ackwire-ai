@@ -102,6 +102,12 @@ describe("deleting an account", () => {
     });
   });
 
+  test("the preflight counts agents as the workspace does: an unused one holds none, its right hand aside", async () => {
+    f = await setup({ rightHand: true });
+    await archiveAgent(f.db, f.owner.id, f.org.id, f.agent.id);
+    expect((await workspaceContents(f.db, [f.org.id])).get(f.org.id)?.agents).toBe(0);
+  });
+
   test("refused for the only owner of a workspace with others in it, with its name and id; nothing changes", async () => {
     f = await setup();
     enableOperatorEvents();

@@ -139,12 +139,21 @@ html:not([data-pointer]) .onb__signout:focus-visible {
   font-size: 12px;
 }
 @media (max-width: 760px) {
+  .onb__rail {
+    flex-wrap: wrap;
+  }
   .onb__signout {
     align-self: center;
   }
+  /* A row of its own: the rail is a row here, and beside Sair it would read as one of its actions. */
   .onb__account {
+    flex-basis: 100%;
+    flex-direction: row;
     align-items: center;
+    justify-content: space-between;
     margin-top: 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
   }
 }
 /* The host's face and its bubble start at one top, the bubble's small corner pointing at the face. */

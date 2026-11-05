@@ -904,8 +904,9 @@ export async function workspaceDeletions(db: Executor, orgIds: string[]) {
 // ── Deleting an account ─────────────────────────────────────────────────────
 
 /**
- * How many agents and messages each workspace holds, for the preflight to say what closes. Kept out of
- * `accountDeletionPlan`, which `deleteAccount` runs under its locks.
+ * How many agents and messages each workspace holds, for the preflight to say what closes: agents as the workspace
+ * counts them, without the right hand every workspace has. Kept out of `accountDeletionPlan`, which `deleteAccount`
+ * runs under its locks.
  */
 export async function workspaceContents(db: Executor, orgIds: string[]) {
   const counted = await Promise.all(
@@ -913,7 +914,8 @@ export async function workspaceContents(db: Executor, orgIds: string[]) {
       const [row] = await db
         .select({
           agents: sql<number>`(select count(*) from ${agents} where ${agents.orgId} = ${id}
-            and ${agents.archivedAt} is null and ${agents.deletedAt} is null)`.mapWith(Number),
+            and ${agents.archivedAt} is null and ${agents.deletedAt} is null
+            and ${agents.builtin} is null)`.mapWith(Number),
           messages: orgMessageCount(id),
         })
         .from(organizations)

@@ -8551,7 +8551,7 @@
     "noAccessText": "Sie ist nur für bestimmte Personen. Wenn du sie brauchst, frag die Person, die sich um das Wiki kümmert.",
     "delete": "In den Papierkorb",
     "deleteTitle": "{{title}} in den Papierkorb verschieben?",
-    "deleteText": "Links darauf werden zu „Seite erstellen“. Du kannst sie später wiederherstellen.",
+    "deleteText": "Links darauf werden zu „Seite erstellen“. In der App lässt sie sich noch nicht wiederherstellen.",
     "deleted": "{{title}} in den Papierkorb verschoben.",
     "noBacklinksHint": "Noch verlinkt keine Seite hierher. Schreib [[{{title}}]] in eine andere.",
     "allVersions": "Alle {{count}} Versionen ansehen",
@@ -13686,7 +13686,8 @@
     "card": {
       "text": "Du verlässt jeden Workspace und dein Konto wird endgültig gelöscht.",
       "button": "Konto löschen…",
-      "oneWorkspace": "Möchtest du nur diesen Workspace löschen? Das geht unter Allgemein."
+      "oneWorkspace": "Möchtest du nur diesen Workspace löschen? Das geht unter Allgemein.",
+      "leaveWorkspace": "Möchtest du nur diesen Workspace verlassen? Das geht unter Mitglieder."
     },
     "title": "Dein ganzes Konto löschen?",
     "intro": "Damit löschst du dein ganzes Konto, nicht nur einen Workspace. Das lässt sich nicht rückgängig machen.",

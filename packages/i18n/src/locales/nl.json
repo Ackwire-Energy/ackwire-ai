@@ -8619,7 +8619,7 @@
     "noAccessText": "Hij is alleen voor bepaalde mensen. Heb je hem nodig, vraag het dan aan wie voor de wiki zorgt.",
     "delete": "Naar de prullenbak",
     "deleteTitle": "{{title}} naar de prullenbak verplaatsen?",
-    "deleteText": "Links ernaartoe worden “te maken pagina”. Je kunt hem later terugzetten.",
+    "deleteText": "Links ernaartoe worden “te maken pagina”. Je kunt hem nog niet terugzetten vanuit de app.",
     "deleted": "{{title}} is naar de prullenbak verplaatst.",
     "noBacklinksHint": "Nog geen pagina linkt hiernaartoe. Schrijf [[{{title}}]] in een andere.",
     "allVersions": "Alle {{count}} versies bekijken",
@@ -13802,7 +13802,8 @@
     "card": {
       "text": "Je verlaat elke werkruimte en je account wordt definitief verwijderd.",
       "button": "Account verwijderen…",
-      "oneWorkspace": "Wil je alleen deze werkruimte verwijderen? Dat kan bij Algemeen."
+      "oneWorkspace": "Wil je alleen deze werkruimte verwijderen? Dat kan bij Algemeen.",
+      "leaveWorkspace": "Wil je alleen deze werkruimte verlaten? Dat kan bij Leden."
     },
     "title": "Je hele account verwijderen?",
     "intro": "Dit verwijdert je hele account, niet alleen één werkruimte. Dit kan niet ongedaan worden gemaakt.",

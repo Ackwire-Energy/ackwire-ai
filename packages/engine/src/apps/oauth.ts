@@ -127,6 +127,7 @@ export interface ConsentView {
     paused: boolean;
     current: boolean;
     createdAt?: string;
+    deletion?: { dueAt: string };
   }[];
 }
 
@@ -155,6 +156,7 @@ export async function consentView(deps: OauthDeps, userId: string, requestId: st
       paused: !!workRefusal(m.standing),
       current: i === 0,
       createdAt: m.orgCreatedAt?.toISOString(),
+      ...(m.standing?.deletionDueAt ? { deletion: { dueAt: m.standing.deletionDueAt.toISOString() } } : {}),
     })),
   };
 }

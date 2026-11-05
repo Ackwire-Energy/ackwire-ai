@@ -64,7 +64,9 @@ export function otherWorkspaces<O extends WorkspaceState>(orgs: readonly O[], or
 export const deletableWorkspaces = <O extends WorkspaceState>(orgs: readonly O[]) =>
   orgs.filter((o) => o.role === "owner" && !o.deletion && o.standing?.state !== "suspended");
 
-type ListedWorkspace = Pick<OrgSummary, "id" | "name" | "createdAt" | "deletion" | "standing">;
+type ListedWorkspace = Pick<OrgSummary, "id" | "name" | "createdAt" | "standing"> & {
+  deletion?: Pick<OrgDeletion, "dueAt">;
+};
 
 /**
  * What a list says beside a workspace's name, by id: a closed one says so wherever it is, with its date when it's being
@@ -162,20 +164,29 @@ function contentsText(t: TFunction, locale: string, org: AccountDeletionPlan["cl
  * what it holds (one being deleted already on its own date) and those they leave, per workspace the computers removed
  * and what stays behind with where to disconnect each, where plans are billed (`billing`) that those they pay for stop
  * renewing with nothing refunded, that their messages stay, and, on a self-hosted server they set up, that its settings
- * lose their owner here.
+ * lose their owner here. `notes` (`workspaceNotes`) tells apart those with the same name.
  */
 export function accountDeletionLines(
   t: TFunction,
   locale: string,
   plan: AccountDeletionPlan,
-  { cloud, billing = false, now = new Date() }: { cloud: boolean; billing?: boolean; now?: Date },
+  {
+    cloud,
+    billing = false,
+    now = new Date(),
+    notes,
+  }: { cloud: boolean; billing?: boolean; now?: Date; notes?: ReadonlyMap<string, string> },
 ): AccountDeletionLine[] {
+  const label = (org: { id: string; name: string }) => workspaceLabel(org.name, notes?.get(org.id));
   const names = (items: { name: string }[]) =>
     joinNames(
       items.map((i) => i.name),
       t,
     );
-  const orgName = (orgId: string) => plan.leaves.find((o) => o.id === orgId)?.name ?? "";
+  const orgName = (orgId: string) => {
+    const org = plan.leaves.find((o) => o.id === orgId);
+    return org ? label(org) : "";
+  };
   const byOrg = <T extends { orgId: string }>(items: T[]) => {
     const groups = new Map<string, T[]>();
     for (const item of items) groups.set(item.orgId, [...(groups.get(item.orgId) ?? []), item]);
@@ -186,12 +197,13 @@ export function accountDeletionLines(
   for (const org of plan.closes) {
     if (org.deletion) continue;
     const what = contentsText(t, locale, org);
+    const name = label(org);
     const text =
       what === undefined
-        ? t("deleteAccount.closes", { name: org.name, date })
+        ? t("deleteAccount.closes", { name, date })
         : what === null
-          ? t("deleteAccount.closesEmpty", { name: org.name, date })
-          : t("deleteAccount.closesWith", { name: org.name, what, date });
+          ? t("deleteAccount.closesEmpty", { name, date })
+          : t("deleteAccount.closesWith", { name, what, date });
     lines.push({ kind: "closes", text });
   }
   for (const { name, deletion } of plan.closes) {
@@ -202,7 +214,7 @@ export function accountDeletionLines(
     lines.push({ kind: "closes", text });
   }
   if (plan.leaves.length > 0)
-    lines.push({ kind: "leaves", text: t("deleteAccount.leaves", { names: names(plan.leaves) }) });
+    lines.push({ kind: "leaves", text: t("deleteAccount.leaves", { names: joinNames(plan.leaves.map(label), t) }) });
   for (const [orgId, computers] of byOrg(plan.computers)) {
     const text = t("deleteAccount.computers", {
       count: computers.length,

@@ -20849,7 +20849,7 @@
     "value": "Move {{title}} to the trash?"
   },
   "wiki.deleteText": {
-    "value": "Links to it become “page to create”. You can restore it later."
+    "value": "Links to it become “page to create”. You can't restore it from the app yet."
   },
   "wiki.deleted": {
     "value": "{{title}} moved to the trash."
@@ -33120,6 +33120,9 @@
   },
   "deleteAccount.card.oneWorkspace": {
     "value": "Want to delete just this workspace? It's in General."
+  },
+  "deleteAccount.card.leaveWorkspace": {
+    "value": "Want to leave just this workspace? It's in Members."
   },
   "deleteAccount.title": {
     "value": "Delete your whole account?"

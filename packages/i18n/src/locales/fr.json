@@ -8893,7 +8893,7 @@
     "noAccessText": "Elle est réservée à certaines personnes. Si vous en avez besoin, demandez à la personne qui s'occupe du wiki.",
     "delete": "Mettre à la corbeille",
     "deleteTitle": "Mettre {{title}} à la corbeille ?",
-    "deleteText": "Les liens vers elle deviennent « page à créer ». Vous pourrez la restaurer plus tard.",
+    "deleteText": "Les liens vers elle deviennent « page à créer ». Vous ne pouvez pas encore la restaurer depuis l'app.",
     "deleted": "{{title}} mise à la corbeille.",
     "noBacklinksHint": "Aucune page ne pointe encore ici. Écrivez [[{{title}}]] dans une autre.",
     "allVersions": "Voir les {{count}} versions",
@@ -14210,7 +14210,8 @@
     "card": {
       "text": "Vous quittez tous les espaces de travail et votre compte est supprimé définitivement.",
       "button": "Supprimer le compte…",
-      "oneWorkspace": "Vous voulez supprimer seulement cet espace de travail ? C'est dans Général."
+      "oneWorkspace": "Vous voulez supprimer seulement cet espace de travail ? C'est dans Général.",
+      "leaveWorkspace": "Vous voulez quitter seulement cet espace de travail ? C'est dans Membres."
     },
     "title": "Supprimer tout votre compte ?",
     "intro": "Cela supprime tout votre compte, pas seulement un espace de travail. Cette action est définitive.",

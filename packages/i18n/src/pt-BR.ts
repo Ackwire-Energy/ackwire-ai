@@ -8542,7 +8542,7 @@ export const ptBR = {
     noAccessText: "Ela é só para algumas pessoas. Se precisar, peça a quem cuida da wiki.",
     delete: "Mover para a lixeira",
     deleteTitle: "Mover {{title}} para a lixeira?",
-    deleteText: "Os links para ela viram “página para criar”. Dá para restaurar depois.",
+    deleteText: "Os links para ela viram “página para criar”. Ainda não dá para restaurar pelo app.",
     deleted: "{{title}} foi para a lixeira.",
     noBacklinksHint: "Nenhuma página aponta para esta ainda. Escreva [[{{title}}]] em outra.",
     allVersions: "Ver as {{count}} versões",
@@ -13547,6 +13547,8 @@ export const ptBR = {
       button: "Apagar conta…",
       /** The link to Configurações › Geral, for someone who only meant this workspace. */
       oneWorkspace: "Quer apagar só este workspace? Fica em Geral.",
+      /** The link to Membros, for someone who can't delete this workspace and only meant to leave it. */
+      leaveWorkspace: "Quer sair só deste workspace? Fica em Membros.",
     },
     title: "Apagar a sua conta inteira?",
     intro: "Isto apaga a sua conta inteira, não só um workspace. Não tem volta.",

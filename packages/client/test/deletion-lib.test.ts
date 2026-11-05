@@ -63,6 +63,35 @@ describe("what deleting an account does, line by line", () => {
     ]);
   });
 
+  test("two with the same name differ by their notes wherever a line names them", () => {
+    const notes = new Map([
+      ["a", "made in June"],
+      ["b", "made in July"],
+      ["c", "made in May"],
+      ["d", "made in April"],
+    ]);
+    const lines = accountDeletionLines(
+      t,
+      "en",
+      plan({
+        closes: [
+          { id: "a", name: "Acme", agents: 0, messages: 0 },
+          { id: "b", name: "Acme", agents: 0, messages: 0 },
+        ],
+        leaves: [
+          { id: "c", name: "Beta", role: "member" },
+          { id: "d", name: "Beta", role: "member" },
+        ],
+        computers: [{ orgId: "d", id: "m", name: "Laptop" }],
+      }),
+      { cloud: true, now, notes },
+    );
+    const text = lines.map((l) => l.text).join("\n");
+    expect(new Set(lines.map((l) => l.text)).size).toBe(lines.length);
+    for (const name of ["Acme (made in June)", "Acme (made in July)", "Beta (made in May)", "Beta (made in April)"])
+      expect(text).toContain(name);
+  });
+
   test("what stays behind links to where each is disconnected: keys to Keys, the rest to Connectors", () => {
     const lines = accountDeletionLines(
       t,
@@ -228,6 +257,11 @@ describe("a workspace beside its name in a list", () => {
         { id: "b", name: "Sol" },
       ]).size,
     ).toBe(0);
+  });
+
+  test("the consent view's deletion, with only its date, reads the same", () => {
+    const listed = notes([{ id: "a", name: "Acme", deletion: { dueAt: "2026-11-10T12:00:00Z" } }]);
+    expect(listed.get("a")).toContain("deleting.row");
   });
 
   test("in a flat list the note follows the name", () => {

@@ -74,7 +74,7 @@ export const OPEN_PAGE_CARD = "action_open_page";
 export const APP_PAGES = {
   billing: "Billing: the plan, payment method and invoices (Stripe's checkout and portal open from there)",
   delete_workspace: "Deleting this workspace (owners): its email code, typed name and grace period",
-  delete_account: "Deleting their own account: its confirmation and grace period",
+  delete_account: "Deleting their whole account, not one workspace: it goes at once and for good after its email code",
   account: "Their profile, password and sign-in methods",
   ai_accounts: "AI accounts and API keys (Settings › Keys), typed only in our dialogs",
   workspace: "Workspace settings: name, logo, time zone and the context every agent reads",

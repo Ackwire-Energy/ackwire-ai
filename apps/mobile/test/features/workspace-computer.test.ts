@@ -115,6 +115,9 @@ describe("Apagar conta on the phone's closed screens and first run", () => {
     expect(screen).toContain('t("deleteAccount.title")');
     expect(screen).toContain('t("deleteAccount.intro")');
     expect(screen).toContain('t("deleteAccount.oneWorkspace")');
+    expect(screen).toContain("notes,\n");
+    expect(screen).toContain('t("deleteAccount.deleteOrg", { name: named(o) })');
+    expect(read("features/me/AccountPage.tsx")).toContain('"deleteAccount.card.leaveWorkspace"');
   });
 });
 

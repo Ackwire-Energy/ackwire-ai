@@ -6748,6 +6748,8 @@ export interface AppConsent {
     current: boolean;
     /** Tells apart two with the same name. Absent from older servers. */
     createdAt?: string;
+    /** While it's being deleted, when it goes. Absent from older servers. */
+    deletion?: { dueAt: string };
   }[];
 }
 

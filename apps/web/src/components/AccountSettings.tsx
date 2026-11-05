@@ -250,19 +250,14 @@ export function AccountSection() {
           title={t("deleteAccount.menu")}
           subtitle={
             <>
-              {t("deleteAccount.card.text")}
-              {org.role === "owner" && (
-                <>
-                  {" "}
-                  <Link
-                    className="ac-link"
-                    to="/org/$orgId/settings/$section"
-                    params={{ orgId: org.id, section: "general" }}
-                  >
-                    {t("deleteAccount.card.oneWorkspace")}
-                  </Link>
-                </>
-              )}
+              {t("deleteAccount.card.text")}{" "}
+              <Link
+                className="ac-link"
+                to="/org/$orgId/settings/$section"
+                params={{ orgId: org.id, section: org.role === "owner" ? "general" : "members" }}
+              >
+                {t(org.role === "owner" ? "deleteAccount.card.oneWorkspace" : "deleteAccount.card.leaveWorkspace")}
+              </Link>
             </>
           }
           action={
