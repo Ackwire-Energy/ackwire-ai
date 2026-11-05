@@ -163,6 +163,24 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
   display: flex;
   align-items: flex-start;
 }
+/* The emoji on the first of the line's 16px lines, beside its words: not above them, nor between two wrapped lines
+   (`.status-line` centres a one-line status). */
+.members-side__line .status-line__emoji {
+  align-self: flex-start;
+  line-height: inherit;
+}
+/*
+ * With a line under the name, the face's top is on the name's capitals (an `.ac-faceline` picture's place) however
+ * far that line wraps: the name rises by the air above its capitals (9.5px is half its 19px line). A name alone stays
+ * on the face's middle. The face stays where a centred row puts it (7px into the 46px row).
+ */
+.members-side__inner:has(.members-side__line) {
+  align-items: flex-start;
+  padding-block: 7px;
+}
+.members-side__inner:has(.members-side__line) .members-side__name {
+  margin-block-start: calc(var(--cap-top) - 9.5px);
+}
 /* A written or automatic line too: wrapped, never cut. */
 .members-side__line .status-line__text {
   overflow: visible;

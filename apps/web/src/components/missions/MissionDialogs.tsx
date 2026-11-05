@@ -233,7 +233,7 @@ export function NewMissionDialog({
                       : cloud && (a.reason ?? "no_computer") === "no_computer"
                         ? waitWords
                         : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" }),
-                  leading: <AgentAvatar agentId={a.id} name={a.name} size="xs" />,
+                  leading: <AgentAvatar agentId={a.id} name={a.name} size="sm" />,
                 }))}
               />
             </div>
