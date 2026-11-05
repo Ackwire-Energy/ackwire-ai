@@ -1043,11 +1043,11 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 }
 /* Turns are told apart by space: ~10px between messages; the same author
    within 5 minutes continues the row above. */
-/* A message that @mentions the viewer: a tinted row with an accent bar on its left edge. */
+/* A message that @mentions the viewer: a tinted row, its corners all round. No accent bar on its left edge: the tint
+   and the name in the words say it. */
 .channel__messages .ac-msg--mentions-me {
   background: color-mix(in srgb, var(--attention) 9%, transparent);
-  box-shadow: inset 2px 0 0 var(--attention);
-  border-radius: 0 14px 14px 0;
+  border-radius: 14px;
 }
 .channel__messages .ac-msg--mentions-me:hover {
   background: color-mix(in srgb, var(--attention) 13%, transparent);
@@ -10663,12 +10663,19 @@ html:not([data-pointer]) .agp-changes__jump:focus-visible {
 }
 
 /* Agents that reacted instead of replying: mini avatars inside the reaction pill */
+/* Agents that reacted: their faces at the emoji's own size (15px type draws a ~16px glyph), on its middle; the 18px
+   tiny avatar stood taller than the emoji beside it and read as a sticker. */
 .msg-react__agents {
   display: inline-flex;
   align-items: center;
+  height: 16px;
+}
+.msg-react__agents > .ac-avatar {
+  width: 16px;
+  height: 16px;
 }
 .msg-react__agents > * + * {
-  margin-left: -5px;
+  margin-left: -4px;
 }
 
 /* After my 👎 on an agent's reply: a private "redo or explain?" under it */
@@ -13280,10 +13287,10 @@ html:not([data-pointer]) .rh-set__face-edit:focus-visible {
     justify-content: flex-start;
   }
 }
-/* A plan on a line of its own under the row's text: its maker's mark, then its account. */
+/* A plan on a line of its own under the row's text: its maker's mark (an icon on the first line, `.ac-iconline`, not a
+   30px tile beside 13px words), then its account. */
 .rh-set__planline {
   display: flex;
-  align-items: center;
   gap: 6px;
   margin-top: 4px;
   color: var(--ink);

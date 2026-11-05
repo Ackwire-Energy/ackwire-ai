@@ -632,7 +632,8 @@ export const MessageRow = memo(function MessageRow({
           bubbled && lookRows.bubblesRow,
           compact && lookRows.compactRow,
           grouped && styles.cont,
-          mentionsMe && [styles.mention, { backgroundColor: `${c.amber}17`, borderLeftColor: c.amber }],
+          // A mention of me: the row's tint says it, with round corners; no accent bar on its left edge.
+          mentionsMe && { backgroundColor: `${c.amber}17`, borderRadius: 14 },
           pressed && press && { backgroundColor: c.sunken },
         ]}
       >
@@ -1105,8 +1106,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginTop: 4,
   },
-  // The amber rule takes its width from the inset: the face and the words stay in their columns.
-  mention: { borderLeftWidth: 2, paddingLeft: MSG_INSET - 2 },
   cont: { paddingTop: 0, marginTop: 0 },
   avslot: { width: MSG_AVATAR, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
