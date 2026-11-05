@@ -80,6 +80,7 @@ describe("sign-up policy (self-host)", () => {
         showActivity: false,
         agentStyle: null,
         chatPrefs: {},
+        createdAt: expect.any(String),
       },
     ] as never);
   });

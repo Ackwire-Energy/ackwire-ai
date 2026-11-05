@@ -167,6 +167,9 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
   display: flex;
   align-items: center;
 }
+.members-side__line.status-line > :first-child {
+  translate: none;
+}
 .members-side__work {
   color: var(--ink2);
 }

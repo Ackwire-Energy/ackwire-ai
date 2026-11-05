@@ -69,7 +69,7 @@ describe("dialog padding", () => {
       const pad = padding(body);
       for (const [part, sides, token] of EDGES) {
         // The part is what the rule styles (its last compound), not an ancestor of it.
-        const last = selector.split(/[\s>+~]+/).pop() ?? "";
+        const last = selector.replace(/:(?:has|not)\([^)]*\)/g, "").split(/[\s>+~]+/).pop() ?? "";
         if (!part.test(last)) continue;
         for (const side of sides) {
           const value = pad[side];
