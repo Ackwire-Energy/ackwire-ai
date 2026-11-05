@@ -1,6 +1,7 @@
 import { isReservedSecretName } from "@agenteschat/adapters";
 import { and, eq, gt, isNull, ne, or, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
+import { isAbsoluteMachinePath, pathInOwnFolder } from "./machine-access";
 import { type ComputerHandle, requireComputerManager } from "./sandbox";
 import {
   MAX_PENDING_SECRETS,
@@ -137,8 +138,8 @@ export function requestSecretTool(opts: {
           };
         }
         const file = !opts.browserOnly && input.target === "file";
-        const path = file ? (opts.toolPath?.(str(input.path)) ?? "") : "";
-        if (file && (!path || path === ".agentes" || path.startsWith(".agentes/"))) {
+        const path = file ? pathInOwnFolder(opts.toolPath?.(str(input.path)) ?? "", ctx.agentId) : "";
+        if (file && (!path || path === ".agentes" || path.startsWith(".agentes/") || isAbsoluteMachinePath(path))) {
           return { content: "With target file, give a path inside your workspace (e.g. .npmrc).", isError: true };
         }
         const rawSite = str(input.site).trim();

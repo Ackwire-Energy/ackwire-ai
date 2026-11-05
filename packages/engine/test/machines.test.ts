@@ -1156,6 +1156,17 @@ describe("secrets for a connected machine (ADR 0027)", () => {
       secretAad({ requestId: view.id, orgId: f.org.id, name: view.name, target: view.target }),
     );
 
+  test("a secret's file written in full in the agent's folder is kept as the path it is there", async () => {
+    const id8 = () => f.agent.id.replace(/-/g, "").slice(0, 8);
+    const { row } = await asking({
+      target: "file",
+      get path() {
+        return `/home/ag-${id8()}/dev-${id8()}/.npmrc`;
+      },
+    });
+    expect(row.targetPath).toBe(".npmrc");
+  });
+
   test("the run waits on a card; only the person asked delivers; the value reaches the machine and nothing else", async () => {
     const { runner, row, paired } = await asking();
     const [run] = await f.db.select().from(schema.agentRuns);

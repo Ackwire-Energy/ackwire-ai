@@ -350,6 +350,9 @@ const SECRET_PATH = new RegExp(
   "i",
 );
 
+/** Whether a path, as written or relative to a folder, is one of those. */
+export const isSecretRead = (p: string) => SECRET_PATH.test(p);
+
 function secretPath(scope: CommandScope, p: string) {
   const r = resolveIn(scope, p);
   const home = scope.home;

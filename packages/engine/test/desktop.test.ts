@@ -18,6 +18,7 @@ import {
   drainOutbox,
   ForbiddenError,
   formatUserCode,
+  fullMachinePath,
   getDeviceCode,
   grantScopes,
   listMachines,
@@ -28,6 +29,7 @@ import {
   machineAccessText,
   machinePause,
   NotFoundError,
+  notAllowedMessage,
   pathInOwnFolder,
   pausedMessage,
   pollDeviceToken,
@@ -758,9 +760,27 @@ describe("folders and tools on the machine (protocol 10)", () => {
     expect(pathInOwnFolder("/home/ag-0193aaaa/dev-0193aaaa/.env", id)).toBe(".env");
     expect(pathInOwnFolder("~/dev-0193aaaa/./keys/a.pem", id)).toBe("keys/a.pem");
     expect(pathInOwnFolder("/home/ag-0193aaaa/dev-0193aaaa", id)).toBe("");
-    expect(pathInOwnFolder("/home/ag-0193aaaa", id)).toBe("");
     expect(pathInOwnFolder("keys/a.pem", id)).toBe("keys/a.pem");
     expect(pathInOwnFolder("/srv/site/.env", id)).toBe("/srv/site/.env");
+    // The home is named like the folder, and its files are not the folder's.
+    expect(pathInOwnFolder("/home/ag-0193aaaa/notes.txt", id)).toBe("/home/ag-0193aaaa/notes.txt");
+    expect(pathInOwnFolder("/home/ag-0193aaaa/ag-0193aaaa/notes.txt", id)).toBe("notes.txt");
+  });
+
+  test("a path written in full goes to the runner; /workspace and anything relative don't", () => {
+    expect(fullMachinePath(" /home/ag-x/a.png ")).toBe("/home/ag-x/a.png");
+    expect(fullMachinePath("~/a.png")).toBe("~/a.png");
+    expect(fullMachinePath("/workspace/a.png")).toBeNull();
+    expect(fullMachinePath("a.png")).toBeNull();
+    expect(() => fullMachinePath("/home/ag-x/../ag-y/a.png")).toThrow("invalid path");
+  });
+
+  test("the workspace's own computer: a folder refusal with no path at hand still says what the agent can do", () => {
+    const detail = "/srv is outside your folder (ask for it with request_folder_access)";
+    expect(notAllowedMessage("Box", detail, undefined, true)).toBe(
+      "/srv is outside your folder. Nobody can allow folders on Box, the workspace's own computer: work in your folder, read from your home, or copy what you need into your folder with a command.",
+    );
+    expect(notAllowedMessage("Box", "Grok is turned off", "/srv", true)).toBe("Grok is turned off. Tell the people.");
   });
 
   test("what the agent reads: its folders, the tools that are off, and the outcome of a request", () => {

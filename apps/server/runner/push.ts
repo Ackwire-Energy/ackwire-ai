@@ -3,7 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import type { MachineReplies } from "@agenteschat/adapters/machine-protocol";
 import { RunnerError } from "./errors";
-import { type Resolved, resolveInWorkspace } from "./paths";
+import { hiddenIn, type Resolved, resolveInWorkspace } from "./paths";
 import { zipFolder } from "./zip";
 
 export const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
@@ -106,11 +106,12 @@ export async function pushPath(opts: PushOptions): Promise<MachineReplies["push"
   if (st.isDirectory()) {
     const folder = target.rel === "" ? path.basename(opts.workspaceReal) : (target.rel.split("/").pop() as string);
     name = `${folder || "workspace"}.zip`;
+    const root = target.root ?? opts.workspaceReal;
     bytes = await zipFolder(target.abs, {
       prefix: folder || "workspace",
       maxBytes,
-      workspaceReal: target.root ?? opts.workspaceReal,
-      skipHidden: target.inHome === true,
+      workspaceReal: root,
+      ...(target.inHome ? { skip: (abs: string) => hiddenIn(root, abs) } : {}),
     });
   } else if (st.isFile()) {
     if (st.size > maxBytes) throw new RunnerError("too_large", `The file has ${st.size} bytes (max ${maxBytes})`);

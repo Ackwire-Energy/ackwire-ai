@@ -179,6 +179,24 @@ test("the agent's home reads, lists and goes to the Drive with no grant; what is
   expect(uploads).toHaveLength(2);
 });
 
+test("in the home, a key or sign-in by its name stays closed too, as Claude Code's own reads", async () => {
+  const { home, ctx, uploads } = worker();
+  mkdirSync(path.join(home, "proj"));
+  writeFileSync(path.join(home, "proj", "ok.txt"), "ok");
+  const closed = ["id_ed25519", "credentials.json", "deploy.key", "proj/server.pem", "proj/mcp-token"];
+  for (const name of closed) writeFileSync(path.join(home, name), "KEY");
+  for (const name of closed) {
+    for (const req of [read(path.join(home, name)), push(path.join(home, name))]) {
+      expect((await refusal(ctx, req)).code).toBe("outside_workspace");
+    }
+  }
+  const listed = entries(await handleRequest(ctx, list(home), scope()));
+  expect(listed.filter((p) => closed.some((name) => p.endsWith(name)))).toEqual([]);
+  await handleRequest(ctx, push(path.join(home, "proj")), scope());
+  const zipped = readZip(uploads[0]?.body as Uint8Array, { maxFiles: 100, maxBytes: 1e6 }).map((e) => e.path);
+  expect(zipped.filter((p) => !p.endsWith("/"))).toEqual(["proj/ok.txt"]);
+});
+
 test("hidden files of the agent's own folder stay its own, written in full or not", async () => {
   const { folder, ctx } = worker();
   expect(text(await handleRequest(ctx, read(path.join(folder, ".hidden-note")), scope()))).toBe("mine");

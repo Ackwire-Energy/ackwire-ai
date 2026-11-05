@@ -31,9 +31,10 @@ export const foldersFixedMessage = (name: string) =>
 export function notAllowedMessage(name: string, detail: string, path?: string, managed = false) {
   if (policyRefusal(detail)) return detail;
   if (managed) {
-    return `${detail.replace(" (ask for it with request_folder_access)", ".") || "Not allowed on this computer."}${
-      path && /^(\/|~|[A-Za-z]:)/.test(path) ? ` ${foldersFixedMessage(name)}` : " Tell the people."
-    }`;
+    const pointer = " (ask for it with request_folder_access)";
+    return detail.includes(pointer)
+      ? `${detail.replace(pointer, ".")} ${foldersFixedMessage(name)}`
+      : `${(detail || "Not allowed on this computer").replace(/\.$/, "")}. Tell the people.`;
   }
   return `${detail || "Not allowed on this computer."} ${
     path && /^(\/|~|[A-Za-z]:)/.test(path)

@@ -179,8 +179,21 @@ export function pathInOwnFolder(path: string, agentId: string) {
     .replace(/\\/g, "/")
     .split("/")
     .filter((p) => p !== "" && p !== ".");
-  const at = parts.map((p) => p.endsWith(`-${id8}`)).lastIndexOf(true);
-  return at < 0 ? path : parts.slice(at + 1).join("/");
+  // `/home/ag-<id8>` ends the same way and is the agent's home, not its folder.
+  const at = parts.map((p, i) => p.endsWith(`-${id8}`) && !(i === 1 && parts[0] === "home" && p === `ag-${id8}`));
+  const last = at.lastIndexOf(true);
+  return last < 0 ? path : parts.slice(last + 1).join("/");
+}
+
+/**
+ * A path written in full, for the runner to check against the agent's folder, allowed folders and home; null for any
+ * other (`/workspace/…` is the agent's folder under another name).
+ */
+export function fullMachinePath(raw: string) {
+  const path = raw.trim();
+  if (!isAbsoluteMachinePath(path) || /^\/workspace(\/|$)/.test(path)) return null;
+  if (path.replace(/\\/g, "/").split("/").includes("..")) throw new Error(`invalid path: ${raw}`);
+  return path;
 }
 
 export type FolderRequestResult =

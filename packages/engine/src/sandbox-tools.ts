@@ -36,7 +36,7 @@ import { sniffModelImage } from "./avatars";
 import { publishChannelEvent } from "./events";
 import { cutText, formatBytes, textOfBytes } from "./format";
 import { mergeReposOfCall } from "./git/repos";
-import { isAbsoluteMachinePath, pathInOwnFolder, requestFolderAccess } from "./machine-access";
+import { fullMachinePath, pathInOwnFolder, requestFolderAccess } from "./machine-access";
 import { MachineRequestError } from "./machine-hub";
 import { foldersFixedMessage, notAllowedMessage, requestVaultKey, vaultUpdateText } from "./machine-provider";
 import {
@@ -379,13 +379,7 @@ export function computerSentence(info: ComputerInfo) {
  * checks it against the folders allowed for this agent (`not_allowed`).
  */
 export function toolPath(raw: string, info: ComputerInfo): string {
-  const path = raw.trim();
-  const own = /^\/workspace(\/|$)/.test(path);
-  if (info.kind === "machine" && info.protocol >= ACCESS_PROTOCOL && isAbsoluteMachinePath(path) && !own) {
-    if (path.replace(/\\/g, "/").split("/").includes("..")) throw new Error(`invalid path: ${raw}`);
-    return path;
-  }
-  return workspacePath(raw);
+  return (info.kind === "machine" && info.protocol >= ACCESS_PROTOCOL && fullMachinePath(raw)) || workspacePath(raw);
 }
 
 /** What the model sees from a command: exit code first (it is the line kept in "Recent actions"). */

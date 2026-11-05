@@ -468,8 +468,8 @@ async function doList(
     items.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     for (const item of items) {
       if (entries.length >= MAX_LIST_ENTRIES) return;
-      if (target.inHome && item.name.startsWith(".")) continue;
       const childAbs = path.join(abs, item.name);
+      if (target.inHome && hiddenIn(root, childAbs)) continue;
       const childRel = rel ? `${rel.replace(/\/+$/, "")}/${item.name}` : item.name;
       let isDir = item.isDirectory();
       let size = 0;

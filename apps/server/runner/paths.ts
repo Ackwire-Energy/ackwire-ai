@@ -1,6 +1,7 @@
 import { lstatSync } from "node:fs";
 import { lstat, mkdir, readdir, realpath, rename } from "node:fs/promises";
 import path from "node:path";
+import { isSecretRead } from "@agenteschat/adapters/command-policy";
 import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
 import { expandHome } from "./config";
 import { errnoCode, RunnerError } from "./errors";
@@ -184,12 +185,14 @@ export async function resolveInRoots(rootsReal: string[], input: string): Promis
   return resolveWithin(rootsReal, abs, shown, notAllowed, true);
 }
 
-/** Whether `abs`, inside `home`, is a hidden file or folder there or below one: where keys and sign-ins live. */
-export const hiddenIn = (home: string, abs: string) =>
-  path
-    .relative(home, abs)
-    .split(path.sep)
-    .some((part) => part.startsWith("."));
+/**
+ * Whether `abs`, inside `home`, stays closed there: a hidden file or folder or something below one, where keys and
+ * sign-ins live, or a name Claude Code's own reads are denied (`id_ed25519`, `credentials.json`, `*.pem`).
+ */
+export function hiddenIn(home: string, abs: string) {
+  const rel = path.relative(home, abs);
+  return isSecretRead(rel) || rel.split(path.sep).some((part) => part.startsWith("."));
+}
 
 /**
  * The same path in the agent's folder, for a request that names a place it isn't: a path relative to the folder with
@@ -261,7 +264,7 @@ export async function resolveForAgent(
   if (hiddenIn(home.path, found.abs) || (isInside(home.path, abs) && hiddenIn(home.path, abs))) {
     throw new RunnerError(
       "outside_workspace",
-      `${input} is hidden in your home, and the file tools stay out of what is hidden there (keys and sign-ins live there). To send a file of your own from there, copy it into your folder first.`,
+      `${input} stays closed in your home: the file tools leave out hidden files and anything named like a key or a sign-in. To send a file of your own from there, copy it into your folder first.`,
     );
   }
   if (!found.exists) {
