@@ -5177,6 +5177,24 @@ html:not([data-pointer]) .tr-ok:focus-visible {
     gap: 5px;
   }
 }
+/* The agent's tools (read only, `ToolLevelsView`) also show in the panel beside its DM (`agp-side`): there the pixel
+   strip goes under the subject's name too, or its 196px leave the name a sliver. */
+@container agp-side (max-width: 640px) {
+  .tr-subj__h {
+    grid-template-columns: minmax(0, 1fr) 16px;
+    row-gap: 10px;
+    padding: 14px;
+  }
+  .tr-subj__strip {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-self: start;
+    width: 100%;
+  }
+  .tr-subj__b {
+    padding: 2px 4px 8px;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .tr-subj__b,
   .tr-done {

@@ -203,9 +203,6 @@
   .tabs-bar .ac-toolbar {
     flex: 1 1 100%;
   }
-  .proposals__list {
-    max-width: none;
-  }
 }
 
 /* Centered card pages on a phone (invite, onboarding) */
@@ -375,6 +372,11 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 14px;
   }
+  /* Activity's month: the numbers under the chart (layout.css), not a 260px column beside a sliver of it. */
+  .agp-month {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
   .agp-subnav {
     position: static;
     flex-direction: row;
@@ -474,8 +476,17 @@
   .level-row__below {
     padding-left: 0;
   }
+  /* The tile above its card, the role's field the rest of its line and its list as wide as it (layout.css). */
   .agp-id {
     flex-direction: column;
+  }
+  .agp-roleedit {
+    flex: 1 1 auto;
+  }
+  .agp-roles {
+    right: 0;
+    width: auto;
+    max-width: none;
   }
 }
 

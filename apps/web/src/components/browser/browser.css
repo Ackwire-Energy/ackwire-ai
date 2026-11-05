@@ -1199,6 +1199,12 @@ html:not([data-pointer]) .brw-kc:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* The agent's Work tab in the panel beside its DM: three steps across 420px would be three slivers. */
+@container agp-side (max-width: 760px) {
+  .brw-steps__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .brw-step__shot,
   .brw-mwin__row i[data-flip],
