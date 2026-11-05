@@ -15,7 +15,7 @@ import {
 } from "@agenteschat/client/lib/tool-review";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import {
   Button,
   GroupedFooter,
@@ -28,7 +28,7 @@ import {
 } from "@/ui";
 import { chooseAction } from "../settings/parts";
 import { useColors, useOrgId } from "../shared/hooks";
-import { errorHaptic, successHaptic, Tile } from "../shared/parts";
+import { errorHaptic, successHaptic } from "../shared/parts";
 import { Problem } from "./Problem";
 import {
   acceptAll,
@@ -236,37 +236,6 @@ export function MailReview({
   );
 }
 
-/** "Ferramentas" on a connection or a mailbox: how many tools, how many wait for a decision ("Revisar"). */
-export function ToolsRow({ count, waiting = 0, onPress }: { count: number; waiting?: number; onPress: () => void }) {
-  const { t } = useTranslation();
-  const c = useColors();
-  const line = waiting > 0 ? t("toolReview.decideTitle", { count: waiting }) : t("toolReview.subjectCount", { count });
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${t("connectors.tools")}, ${line}`}
-      style={({ pressed }) => [styles.row, { borderColor: c.line }, pressed && { backgroundColor: c.sunken }]}
-    >
-      <Tile icon="list" size={36} />
-      <View style={styles.grow}>
-        <Text variant="body" style={styles.bold}>
-          {t("connectors.tools")}
-        </Text>
-        <Text variant="small" tone="muted" numberOfLines={1} style={waiting > 0 && { color: c.warn }}>
-          {line}
-        </Text>
-      </View>
-      {waiting > 0 ? (
-        <Text variant="small" style={[styles.bold, { color: c.warn }]}>
-          {t("connectors.review")}
-        </Text>
-      ) : null}
-      <Icon name="right" size={15} color={c.faint} />
-    </Pressable>
-  );
-}
-
 /** The levels' groups, in the order that matters most: what asks first, what is off last. */
 const LEVEL_ORDER: ToolDecision[] = ["approval", "write", "read", "off"];
 
@@ -389,14 +358,4 @@ function ToolList({
 const styles = StyleSheet.create({
   accept: { paddingTop: 12 },
   again: { paddingTop: 18 },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  grow: { flex: 1, minWidth: 0 },
-  bold: { fontWeight: "600" },
 });

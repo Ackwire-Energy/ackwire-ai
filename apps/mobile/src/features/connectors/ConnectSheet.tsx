@@ -662,20 +662,6 @@ function ConnectStep({
   );
 }
 
-/** What always asks, whatever the level (deleting, publishing, answering customers). */
-export function SafeNote() {
-  const { t } = useTranslation();
-  const c = useColors();
-  return (
-    <View style={styles.note}>
-      <LineIcon name="shield" size={14} color={c.faint} variant="small" />
-      <Text variant="small" tone="muted" style={styles.grow}>
-        {t("mobile.connectors.safe")}
-      </Text>
-    </View>
-  );
-}
-
 /** One dash per step, the ones done and the current in ink, and the step said under them ("Passo 2 de 2: …"). */
 export function Progress({ steps, step }: { steps: Step[]; step: Step }) {
   const { t } = useTranslation();
