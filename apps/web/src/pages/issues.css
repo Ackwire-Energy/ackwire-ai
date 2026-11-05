@@ -662,7 +662,7 @@ html:not([data-pointer]) .issue-card:focus-visible {
 }
 html:not([data-pointer]) .issue-list__row:focus-visible {
   outline: none;
-  box-shadow: inset var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .issue-list__num {
   font-size: 12.5px;

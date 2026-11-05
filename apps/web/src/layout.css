@@ -5966,9 +5966,10 @@ html:not([data-pointer]) .wiki-link:focus-visible {
 .save-wiki__page:hover {
   background: var(--plate);
 }
+/* The list scrolls with its rows at its edges: the ring goes inside, where the list can't clip it. */
 html:not([data-pointer]) .save-wiki__page:focus-visible {
   outline: none;
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .save-wiki__page--new {
   color: var(--ink2);
@@ -12942,7 +12943,7 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 }
 html:not([data-pointer]) .settings-row--open:focus-visible {
   outline: none;
-  box-shadow: inset var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .settings-row__chevron {
   flex: none;

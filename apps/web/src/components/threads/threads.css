@@ -367,7 +367,7 @@ html:not([data-pointer]) .thread-title__button:focus-visible {
 }
 html:not([data-pointer]) .thread-context__head:focus-visible {
   outline: none;
-  box-shadow: inset var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .thread-context__icon {
   width: 30px;
