@@ -1800,6 +1800,7 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
   const [m] = await db
     .select({
       name: schema.machines.name,
+      kind: schema.machines.kind,
       os: schema.machines.os,
       access: schema.machines.access,
       executors: schema.machines.executors,
@@ -1813,6 +1814,7 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
   const system = m.executors?.mode === "system";
   return {
     name: m.name,
+    managed: m.kind === "managed",
     folders: m.access.folders.filter((f) => f.path !== shared && grantedTo(f, agentId)).map((f) => f.path),
     tools: m.access.tools,
     shared: shared ? { dir: shared, system, os: m.os } : null,
@@ -1873,6 +1875,8 @@ export function heldSecretsText(rows: { name: string; kind: string; path: string
 /** The block about the agent's connected computer: the folders the machine allows it and the tools that are off. */
 export function machineAccessText(a: {
   name: string;
+  /** The workspace's own computer: nobody there can allow a folder. */
+  managed?: boolean;
   folders: string[];
   tools: { claude: boolean; codex: boolean; commands: boolean };
 }) {
@@ -1890,7 +1894,9 @@ export function machineAccessText(a: {
           .join("\n")}`
       : "Only your own folder there; no other folders are allowed for you.",
     off.length > 0 ? `Turned off on that computer: ${off.join(", ")}.` : "",
-    "Anything else is refused. For another folder, ask its owner with request_folder_access (they decide on that computer); never ask people to change settings by hand.",
+    a.managed
+      ? `${a.tools.commands ? "You can also read and upload from your home, but not its hidden files and folders. " : ""}Anything else is refused, and nobody can allow more here.`
+      : "Anything else is refused. For another folder, ask its owner with request_folder_access (they decide on that computer); never ask people to change settings by hand.",
   ]
     .filter(Boolean)
     .join("\n");

@@ -17,14 +17,24 @@ export const MACHINE_PROVIDER_ID = "machine";
 
 const MB = (n: number) => `${Math.round(n / 1024 / 1024)} MB`;
 
+/** The workspace's own computer has no owner to ask: what the agent can do instead of `request_folder_access`. */
+export const foldersFixedMessage = (name: string) =>
+  `Nobody can allow folders on ${name}, the workspace's own computer: work in your folder, read from your home, or copy what you need into your folder with a command.`;
+
 /**
  * A runner's `not_allowed` (protocol 10): the path is outside every folder
  * this agent may use on the machine, or the tool is off there. Points the
- * agent at `request_folder_access` for a folder. The command policy's own
- * (`policyRefusal`) already says where to go and stays as it is.
+ * agent at `request_folder_access` for a folder, where someone can answer it
+ * (`managed`: nobody can). The command policy's own (`policyRefusal`) already
+ * says where to go and stays as it is.
  */
-export function notAllowedMessage(name: string, detail: string, path?: string) {
+export function notAllowedMessage(name: string, detail: string, path?: string, managed = false) {
   if (policyRefusal(detail)) return detail;
+  if (managed) {
+    return `${detail.replace(" (ask for it with request_folder_access)", ".") || "Not allowed on this computer."}${
+      path && /^(\/|~|[A-Za-z]:)/.test(path) ? ` ${foldersFixedMessage(name)}` : " Tell the people."
+    }`;
+  }
   return `${detail || "Not allowed on this computer."} ${
     path && /^(\/|~|[A-Za-z]:)/.test(path)
       ? `${path} is outside the folders you may use on ${name}: ask its owner for it with request_folder_access (path and a short reason), or work inside your own folder.`
@@ -36,7 +46,7 @@ export function notAllowedMessage(name: string, detail: string, path?: string) {
  * Runner error codes → what the agent reads (and tells the people). The runner's error stays as the `cause` of the
  * words given, so a caller can still tell where it failed (a Vault key's use, ADR 0144 §4).
  */
-function explain(error: unknown, name: string, path?: string): Error {
+function explain(error: unknown, name: string, path?: string, managed = false): Error {
   if (!(error instanceof MachineRequestError)) return error instanceof Error ? error : new Error(String(error));
   const said = (message: string) => new Error(message, { cause: error });
   switch (error.code) {
@@ -44,19 +54,19 @@ function explain(error: unknown, name: string, path?: string): Error {
       return said(
         `Commands are turned off on the computer ${name} (its runner was started with --no-exec): you can only read, write, list and upload files there. Tell the person; its owner can restart the runner without --no-exec.`,
       );
+    // The runner names what is wrong with the path and what to use instead.
     case "outside_workspace":
-      return said(
-        `${path ?? "That path"} is outside the computer's workspace folder (or a link that leaves it); use paths inside the workspace.`,
-      );
+    case "not_found":
+      return said(error.message);
     case "too_large":
       return said(
         `${path ?? "The file"} is too large to move this way (max ${MB(MAX_INLINE_FILE_BYTES)}); use upload_file to send big files to the Drive.`,
       );
-    case "not_found":
-      return said(`No file or folder ${path ?? ""} on ${name}.`.replace("  ", " "));
+    case "upload_failed":
+      return said(`${path ?? "The file"} didn't reach the Drive. ${error.message}`);
     case "not_allowed":
       // The command policy's `never` (a push our git proxy refuses): callers read its code, as below.
-      return policyRefusal(error.message) ? error : said(notAllowedMessage(name, error.message, path));
+      return policyRefusal(error.message) ? error : said(notAllowedMessage(name, error.message, path, managed));
     case "paused":
       return said(
         `The owner paused the computer ${name}: nothing new can start there until they resume it. Tell the people.`,
@@ -79,13 +89,13 @@ function explain(error: unknown, name: string, path?: string): Error {
  * in its own folder of the workspace.
  */
 export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentScope): SandboxProvider {
-  const nameOf = async (id: string) => (await hub.status(id))?.name ?? "computer";
   const guard = async <T>(id: string, fn: () => Promise<T>, path?: string): Promise<T> => {
     try {
       return await fn();
     } catch (error) {
       if (error instanceof MachineOfflineError || error instanceof MachinePausedError) throw error;
-      throw explain(error, await nameOf(id), path);
+      const status = await hub.status(id);
+      throw explain(error, status?.name ?? "computer", path, status?.kind === "managed");
     }
   };
   const execOn = async (
@@ -173,14 +183,22 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
       return guard(
         id,
         () =>
-          hub.call(id, {
-            agent,
-            op: "push",
-            path,
-            url: target.url,
-            uploadId: target.uploadId,
-            maxBytes: target.maxBytes,
-          }),
+          hub
+            .call(id, {
+              agent,
+              op: "push",
+              path,
+              url: target.url,
+              uploadId: target.uploadId,
+              maxBytes: target.maxBytes,
+            })
+            .catch((error: unknown) => {
+              if (!(error instanceof MachineRequestError) || error.code !== "too_large") throw error;
+              throw new Error(
+                `${path} is over the ${MB(target.maxBytes)} the Drive takes per file, so it stayed on the computer. Make it smaller (a video: re-encode it at a lower resolution or bitrate) or send it in parts under ${MB(target.maxBytes)}, then upload again.`,
+                { cause: error },
+              );
+            }),
         path,
       );
     },

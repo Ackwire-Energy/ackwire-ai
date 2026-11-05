@@ -110,6 +110,7 @@ export async function pushPath(opts: PushOptions): Promise<MachineReplies["push"
       prefix: folder || "workspace",
       maxBytes,
       workspaceReal: target.root ?? opts.workspaceReal,
+      skipHidden: target.inHome === true,
     });
   } else if (st.isFile()) {
     if (st.size > maxBytes) throw new RunnerError("too_large", `The file has ${st.size} bytes (max ${maxBytes})`);

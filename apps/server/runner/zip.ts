@@ -192,13 +192,14 @@ export class ZipWriter {
 
 /**
  * Zips a folder (its contents under `<prefix>/`). Symlinks are skipped, and so
- * is an agent browser's profile (its logins never leave the computer).
+ * is an agent browser's profile (its logins never leave the computer), and with
+ * `skipHidden` every hidden file and folder.
  * Stops with `too_large` once the archive passes `maxBytes`, and refuses to
  * read more than `maxReadBytes` of uncompressed data.
  */
 export async function zipFolder(
   dir: string,
-  opts: { prefix: string; maxBytes: number; maxReadBytes?: number; workspaceReal?: string },
+  opts: { prefix: string; maxBytes: number; maxReadBytes?: number; workspaceReal?: string; skipHidden?: boolean },
 ): Promise<Uint8Array> {
   const zip = new ZipWriter(opts.maxBytes);
   const maxRead = Math.min(opts.maxReadBytes ?? Math.max(opts.maxBytes * 20, 64 * 1024 * 1024), ZIP_MAX_BYTES - 1);
@@ -208,7 +209,7 @@ export async function zipFolder(
     const items = await readdir(abs, { withFileTypes: true });
     items.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     for (const item of items) {
-      if (item.isSymbolicLink()) continue;
+      if (item.isSymbolicLink() || (opts.skipHidden && item.name.startsWith("."))) continue;
       const childAbs = path.join(abs, item.name);
       if (opts.workspaceReal && !isInside(opts.workspaceReal, childAbs)) continue;
       const childRel = rel ? `${rel}/${item.name}` : item.name;

@@ -2,6 +2,7 @@ import { lstatSync } from "node:fs";
 import { lstat, mkdir, readdir, realpath, rename } from "node:fs/promises";
 import path from "node:path";
 import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
+import { expandHome } from "./config";
 import { errnoCode, RunnerError } from "./errors";
 
 /** Agents see their computer's root as `/workspace`; on the machine it is the workspace folder. */
@@ -70,6 +71,15 @@ export interface Resolved {
   exists: boolean;
   /** Protocol 10, absolute requests only: the allowed folder (real path) it was found in. */
   root?: string;
+  /** In the agent's own home (`root`): listings and zips leave out what is hidden there. */
+  inHome?: boolean;
+}
+
+/** System mode, in a worker: the agent's own home, and whether this request may read there. */
+export interface OwnHome {
+  /** Real path. */
+  path: string;
+  reads: boolean;
 }
 
 /**
@@ -154,6 +164,9 @@ export async function resolveInWorkspace(workspaceReal: string, input: string): 
   );
 }
 
+const outsideEveryFolder = (input: string) =>
+  `${input} is outside your folder and outside every folder allowed for you on this computer (ask for it with request_folder_access)`;
+
 /**
  * Protocol 10: an absolute request path inside one of the folders allowed
  * for the agent (`rootsReal`: real paths). Symlinks are resolved before the
@@ -165,24 +178,97 @@ export async function resolveInRoots(rootsReal: string[], input: string): Promis
   if (typeof input !== "string") throw new RunnerError("bad_request", "The path must be a string");
   if (input.includes("\0")) throw new RunnerError("bad_request", "The path has a null byte");
   const abs = path.resolve(input.trim());
-  const notAllowed = () =>
-    new RunnerError(
-      "not_allowed",
-      `${input} is outside your folder and outside every folder allowed for you on this computer (ask for it with request_folder_access)`,
-    );
+  const notAllowed = () => new RunnerError("not_allowed", outsideEveryFolder(input));
   if (rootsReal.length === 0) throw notAllowed();
   const shown = process.platform === "win32" ? abs : abs.split(path.sep).join("/");
   return resolveWithin(rootsReal, abs, shown, notAllowed, true);
 }
 
+/** Whether `abs`, inside `home`, is a hidden file or folder there or below one: where keys and sign-ins live. */
+export const hiddenIn = (home: string, abs: string) =>
+  path
+    .relative(home, abs)
+    .split(path.sep)
+    .some((part) => part.startsWith("."));
+
 /**
- * A request path for an agent: relative to its folder (`workspaceReal`), or
- * absolute inside one of its allowed folders when `grants` is given
- * (protocol 10). Without `grants` an absolute path is refused as before.
+ * The same path in the agent's folder, for a request that names a place it isn't: a path relative to the folder with
+ * the folder's parent (its home, where agents have users) or `/` written in front. Null when it isn't there either.
  */
-export function resolveForAgent(workspaceReal: string, grants: string[] | undefined, input: string) {
-  if (grants && isAbsoluteRequest(input)) return resolveInRoots(grants, input);
-  return resolveInWorkspace(workspaceReal, input);
+async function sameInFolder(workspaceReal: string, abs: string) {
+  const parent = path.dirname(workspaceReal);
+  const rel = isInside(parent, abs) ? path.relative(parent, abs) : abs.slice(path.parse(abs).root.length);
+  if (!rel) return null;
+  const real = await realpath(path.join(workspaceReal, rel)).catch(() => null);
+  return real && isInside(workspaceReal, real) ? rel.split(path.sep).join("/") : null;
+}
+
+const useInFolder = (rel: string) => `Your folder has ${rel}: use that path.`;
+
+/** Why an absolute path was refused. A place of the agent's own is never one to ask anybody for. */
+async function refusal(workspaceReal: string, abs: string, input: string, home: OwnHome | undefined) {
+  const rel = await sameInFolder(workspaceReal, abs);
+  const hint = rel ? ` ${useInFolder(rel)}` : "";
+  const inHome = home && isInside(home.path, abs);
+  if (isInside(workspaceReal, abs) || (inHome && home.reads)) {
+    const own = inHome ? "home" : "folder";
+    return new RunnerError(
+      "outside_workspace",
+      `${input} is a link that leaves your ${own}, so the file tools can't follow it: copy the file into your folder first.${hint}`,
+    );
+  }
+  if (inHome) {
+    return new RunnerError(
+      "outside_workspace",
+      `${input} isn't in your folder, the only place this works here: use a path relative to it.${hint}`,
+    );
+  }
+  return new RunnerError("not_allowed", `${outsideEveryFolder(input)}${hint}`);
+}
+
+/**
+ * A request path for an agent: relative to its folder (`workspaceReal`), or, when `grants` is given (protocol 10),
+ * absolute (`~/…` too). Written in full it works like the relative path inside the agent's folder, then inside its
+ * allowed folders, then, with `home.reads`, inside its home but for what is hidden there. Without `grants` an
+ * absolute path is refused as before: a locked-down turn has none, nor any of these.
+ */
+export async function resolveForAgent(
+  workspaceReal: string,
+  grants: string[] | undefined,
+  input: string,
+  home?: OwnHome,
+): Promise<Resolved> {
+  const tilde = typeof input === "string" && /^~([/\\]|$)/.test(input.trim());
+  if (!grants || !(tilde || isAbsoluteRequest(input))) return resolveInWorkspace(workspaceReal, input);
+  if (input.includes("\0")) throw new RunnerError("bad_request", "The path has a null byte");
+  const abs = tilde && home ? path.join(home.path, input.trim().slice(1)) : expandHome(input.trim());
+  let found: Resolved;
+  try {
+    found = await resolveInRoots([workspaceReal, ...grants, ...(home?.reads ? [home.path] : [])], abs);
+  } catch (err) {
+    // A folder this user can't enter, another agent's home among them, is refused like any other.
+    const denied = errnoCode(err) === "EACCES" || errnoCode(err) === "EPERM";
+    if (denied || (err instanceof RunnerError && err.code === "not_allowed")) {
+      throw await refusal(workspaceReal, abs, input, home);
+    }
+    throw err;
+  }
+  if (found.root === workspaceReal) {
+    const rel = path.relative(workspaceReal, found.abs).split(path.sep).join("/");
+    return { rel, abs: found.abs, exists: found.exists };
+  }
+  if (!home || found.root !== home.path) return found;
+  if (hiddenIn(home.path, found.abs) || (isInside(home.path, abs) && hiddenIn(home.path, abs))) {
+    throw new RunnerError(
+      "outside_workspace",
+      `${input} is hidden in your home, and the file tools stay out of what is hidden there (keys and sign-ins live there). To send a file of your own from there, copy it into your folder first.`,
+    );
+  }
+  if (!found.exists) {
+    const rel = await sameInFolder(workspaceReal, abs);
+    if (rel) throw new RunnerError("not_found", `${input} doesn't exist. ${useInFolder(rel)}`);
+  }
+  return { ...found, inHome: true };
 }
 
 /** The first 8 letters and digits of an agent's id, lower case: what names on the machine keep across renames. */

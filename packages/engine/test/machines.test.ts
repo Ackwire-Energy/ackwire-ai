@@ -1067,8 +1067,7 @@ describe("tools on a connected machine", () => {
     );
     expect(away.content).not.toContain("runner");
     const folder = await call(ctx, "request_folder_access", { path: "/srv/site", reason: "the site" });
-    expect(folder).toMatchObject({ isError: true });
-    expect(folder.content).toContain("isn't answering right now. It usually comes back within minutes.");
+    expect(folder.content).toContain("Nobody can allow folders on Build box");
     expect(folder.content).not.toContain("runner");
   });
 

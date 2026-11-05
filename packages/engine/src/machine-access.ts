@@ -165,6 +165,24 @@ export async function reduceMachineAccess(
 /** An absolute path on macOS, Linux or Windows (`~/…` too: the runner expands it). */
 export const isAbsoluteMachinePath = (path: string) => /^(\/|~\/|~$|[A-Za-z]:[\\/])/.test(path);
 
+/**
+ * A path written in full inside the agent's own folder (`<handle>-<first 8 of its id>`, wherever it sits) as the
+ * relative path it is there, which is how a secret's file is kept. Any other path stays as it is.
+ */
+export function pathInOwnFolder(path: string, agentId: string) {
+  if (!isAbsoluteMachinePath(path)) return path;
+  const id8 = agentId
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 8);
+  const parts = path
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter((p) => p !== "" && p !== ".");
+  const at = parts.map((p) => p.endsWith(`-${id8}`)).lastIndexOf(true);
+  return at < 0 ? path : parts.slice(at + 1).join("/");
+}
+
 export type FolderRequestResult =
   | { status: "granted"; requestId: string; path: string }
   | { status: "pending"; requestId: string; path: string };
