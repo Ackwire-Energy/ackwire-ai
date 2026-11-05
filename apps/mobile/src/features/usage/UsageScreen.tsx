@@ -17,13 +17,14 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, fieldText, Icon, Segmented, Text, useTheme, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { PushedHeader } from "../shared/parts";
+import { Loaded, PushedHeader } from "../shared/parts";
 import { AccountHead, PlanMeter, UsageCard } from "./parts";
 import { MyUsageCard, PeopleList } from "./people";
 
@@ -70,82 +71,87 @@ export function UsageScreen() {
             { key: "people", label: allowed ? t("peopleUsage.tabs.people") : t("peopleUsage.tabs.mine") },
           ]}
         />
-        {view === "people" ? allowed ? <PeopleList /> : <MyUsageCard /> : null}
-        {view === "people" ? null : usage.isLoading ? <ActivityIndicator color={c.muted} /> : null}
-        {view === "people" ? null : !usage.isLoading && !data ? (
-          <Text variant="small" tone="muted">
-            {t("common.loadFailed")}
-          </Text>
-        ) : null}
-        {data && view === "summary" ? (
-          <>
-            <UsageCard
-              icon="laptop"
-              title={t("usageViews.accounts.title")}
-              footer={data.accounts.length > 0 ? t("usageViews.estimate") : undefined}
-            >
-              {data.accounts.length === 0 ? (
-                <Text variant="small" tone="muted">
-                  {t("usageViews.accounts.empty")}
-                </Text>
-              ) : (
-                [...machines].map(([machineId, list]) => (
-                  <View key={machineId} style={styles.machine}>
-                    <View style={styles.machineName}>
-                      <Icon name="laptop" size={12} color={c.faint} />
-                      <Text variant="caption" tone="faint" style={styles.caps}>
-                        {list[0]?.machineName.toLocaleUpperCase()}
-                      </Text>
-                    </View>
-                    {list.map((a, i) => (
-                      <View
-                        key={a.key}
-                        style={i > 0 ? [styles.block, styles.divided, { borderTopColor: c.line }] : styles.block}
-                      >
-                        <AccountBlock account={a} money={data.money} />
-                      </View>
-                    ))}
-                  </View>
-                ))
-              )}
-            </UsageCard>
-            <ApiCard data={data} />
-          </>
-        ) : null}
-        {view === "summary" && composio.data && showsComposioUsage(composio.data) ? (
-          <UsageCard icon="chart" title={composioUsageText(t, i18n.language, composio.data)}>
-            {null}
-          </UsageCard>
-        ) : null}
-        {view === "summary" && allowed && report.data ? (
-          <UsageCard icon="chart" title={t("settings.usageTitle")}>
+        {/* A view switched to, or numbers that came in, fade in; what is here when the screen opens just shows. */}
+        <LayoutAnimationConfig skipEntering>
+          {view === "people" ? <Loaded>{allowed ? <PeopleList /> : <MyUsageCard />}</Loaded> : null}
+          {view === "people" ? null : usage.isLoading ? <ActivityIndicator color={c.muted} /> : null}
+          {view === "people" ? null : !usage.isLoading && !data ? (
             <Text variant="small" tone="muted">
-              {t("settings.usageTotal", {
-                amount: formatUsd(i18n.language, report.data.totalUsd),
-                since: formatShortDate(i18n.language, report.data.since),
-              })}
+              {t("common.loadFailed")}
             </Text>
-            <View>
-              {report.data.byKind.map((k, i) => (
-                <View
-                  key={k.kind}
-                  style={[styles.kind, i > 0 && { borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth }]}
+          ) : null}
+          {data && view === "summary" ? (
+            <Loaded>
+              <View style={styles.stack}>
+                <UsageCard
+                  icon="laptop"
+                  title={t("usageViews.accounts.title")}
+                  footer={data.accounts.length > 0 ? t("usageViews.estimate") : undefined}
                 >
-                  <Text variant="subhead" tone="ink" style={styles.grow}>
-                    {t(`settings.kinds.${k.kind}`)}
-                  </Text>
-                  <Text variant="small" tone="muted" style={styles.tabular}>
-                    {t("settings.usageCalls", { count: k.calls })}
-                  </Text>
-                  <Text variant="subhead" tone="ink2" style={[styles.tabular, styles.amount]}>
-                    {formatUsd(i18n.language, k.costUsd)}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </UsageCard>
-        ) : null}
-        {view === "summary" && allowed ? <DefaultBudgetCard /> : null}
+                  {data.accounts.length === 0 ? (
+                    <Text variant="small" tone="muted">
+                      {t("usageViews.accounts.empty")}
+                    </Text>
+                  ) : (
+                    [...machines].map(([machineId, list]) => (
+                      <View key={machineId} style={styles.machine}>
+                        <View style={styles.machineName}>
+                          <Icon name="laptop" size={12} color={c.faint} />
+                          <Text variant="caption" tone="faint" style={styles.caps}>
+                            {list[0]?.machineName.toLocaleUpperCase()}
+                          </Text>
+                        </View>
+                        {list.map((a, i) => (
+                          <View
+                            key={a.key}
+                            style={i > 0 ? [styles.block, styles.divided, { borderTopColor: c.line }] : styles.block}
+                          >
+                            <AccountBlock account={a} money={data.money} />
+                          </View>
+                        ))}
+                      </View>
+                    ))
+                  )}
+                </UsageCard>
+                <ApiCard data={data} />
+              </View>
+            </Loaded>
+          ) : null}
+          {view === "summary" && composio.data && showsComposioUsage(composio.data) ? (
+            <UsageCard icon="chart" title={composioUsageText(t, i18n.language, composio.data)}>
+              {null}
+            </UsageCard>
+          ) : null}
+          {view === "summary" && allowed && report.data ? (
+            <UsageCard icon="chart" title={t("settings.usageTitle")}>
+              <Text variant="small" tone="muted">
+                {t("settings.usageTotal", {
+                  amount: formatUsd(i18n.language, report.data.totalUsd),
+                  since: formatShortDate(i18n.language, report.data.since),
+                })}
+              </Text>
+              <View>
+                {report.data.byKind.map((k, i) => (
+                  <View
+                    key={k.kind}
+                    style={[styles.kind, i > 0 && { borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth }]}
+                  >
+                    <Text variant="subhead" tone="ink" style={styles.grow}>
+                      {t(`settings.kinds.${k.kind}`)}
+                    </Text>
+                    <Text variant="small" tone="muted" style={styles.tabular}>
+                      {t("settings.usageCalls", { count: k.calls })}
+                    </Text>
+                    <Text variant="subhead" tone="ink2" style={[styles.tabular, styles.amount]}>
+                      {formatUsd(i18n.language, k.costUsd)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </UsageCard>
+          ) : null}
+          {view === "summary" && allowed ? <DefaultBudgetCard /> : null}
+        </LayoutAnimationConfig>
       </ScrollView>
     </View>
   );
@@ -363,6 +369,8 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.6 },
   screen: { flex: 1 },
   in: { paddingHorizontal: 16, paddingTop: 8, gap: 14 },
+  // The page's own gap, for the cards that fade in together.
+  stack: { gap: 14 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   caps: { fontWeight: "700", letterSpacing: 0.5 },

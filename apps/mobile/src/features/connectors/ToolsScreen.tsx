@@ -4,10 +4,11 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
-import { goBack, PushedHeader } from "../shared/parts";
+import { goBack, Loaded, PushedHeader } from "../shared/parts";
 import { BottomBar, ChangedTools } from "./ToolChanges";
 import { ReviewStep, type SaveBar } from "./ToolReview";
 
@@ -46,21 +47,26 @@ export function ToolsScreen({ connectionId }: { connectionId: string }) {
         automaticallyAdjustKeyboardInsets
         contentContainerStyle={[styles.page, { paddingBottom: save ? 24 : insets.bottom + 24 }]}
       >
-        {loading ? (
-          <ActivityIndicator color={c.muted} />
-        ) : (
-          <>
-            <ChangedTools connectionId={connectionId} name={name} />
-            <ReviewStep
-              connectionId={connectionId}
-              def={item?.def ?? null}
-              name={name}
-              onNext={goBack}
-              onScreen
-              onSaveBar={setSave}
-            />
-          </>
-        )}
+        {/* The tools fade in over the spinner; tools already here when the screen opens just show. */}
+        <LayoutAnimationConfig skipEntering>
+          {loading ? (
+            <ActivityIndicator color={c.muted} />
+          ) : (
+            <Loaded>
+              <View style={styles.stack}>
+                <ChangedTools connectionId={connectionId} name={name} />
+                <ReviewStep
+                  connectionId={connectionId}
+                  def={item?.def ?? null}
+                  name={name}
+                  onNext={goBack}
+                  onScreen
+                  onSaveBar={setSave}
+                />
+              </View>
+            </Loaded>
+          )}
+        </LayoutAnimationConfig>
       </ScrollView>
       {save ? (
         <BottomBar bottom={insets.bottom}>
@@ -75,4 +81,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   // The phone's settings: groups on the grouped gray.
   page: { paddingHorizontal: 16, paddingTop: 8, gap: 14 },
+  // The page's own gap, for what fades in together.
+  stack: { gap: 14 },
 });
