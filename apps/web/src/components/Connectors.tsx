@@ -380,7 +380,7 @@ function ConnectedRow({
     <div className="ac-list__row connected-row">
       <ConnectorIcon def={item.def} image={item.image} label={itemName(t, item)} size="lg" />
       <span className="list-col connected-row__text">
-        <span className="list-title">
+        <span className="list-title ac-captop">
           <span>{itemName(t, item)}</span>
           {item.needsReconnect ? (
             <Chip icon="alert" tone="waiting">

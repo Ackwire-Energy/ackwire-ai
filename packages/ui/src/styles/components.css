@@ -2542,8 +2542,10 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-list__row + .ac-list__row {
   border-top: 1px solid var(--line);
 }
-/* A ghost icon that ends a row (its actions' menu): its icon on the row's padding line, as far in as the row's lead. */
-.ac-list__row > .ac-btn--ghost.ac-btn--icon:last-child {
+/* A ghost icon that ends a row (its actions' menu): its icon on the row's padding line, as far in as the row's lead,
+   in the row's first-line box (`.ac-captail`) too. */
+.ac-list__row > .ac-btn--ghost.ac-btn--icon:last-child,
+.ac-list__row > .ac-captail:last-child > .ac-btn--ghost.ac-btn--icon:last-child {
   margin-right: calc(-1 * var(--ghost-plate));
 }
 a.ac-list__row:hover {

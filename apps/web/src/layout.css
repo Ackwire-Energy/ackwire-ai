@@ -4344,8 +4344,8 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
 /* Settings → Conectores: one row per connected service. */
 /*
  * One grid for every connected row (service, email box, database): the icon beside the name and details, its top on
- * the name's line however far the details wrap, then who uses it and the actions under them, one gap apart, the same
- * way on every row. The details wrap whole, never cut.
+ * the name's capitals however far the details wrap (the name rises, `.ac-captop`), then who uses it and the actions
+ * under them, one gap apart, the same way on every row. The details wrap whole, never cut.
  * A row with no actions (someone who can't manage connectors) has room for who uses it beside the text when the
  * list is wide; the actions never do: four or five buttons would leave the name a sliver.
  */
@@ -4383,6 +4383,11 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   }
   .connected-row:not(:has(> .connected-row__actions)) > .connected-row__who {
     grid-column: auto;
+    /* On the name's line: a box as tall as it (as `.ac-captail`), risen with a name that rises. */
+    height: 22px;
+  }
+  .connected-row:not(:has(> .connected-row__actions)):has(> .connected-row__text > .ac-captop) > .connected-row__who {
+    margin-block-start: calc(var(--cap-top) - 11px);
   }
 }
 
@@ -7694,10 +7699,6 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
 }
 .machine-folder__tail {
   gap: var(--space-3);
-}
-/* The menu's ghost reaches out to the row's padding line, as a row's last ghost does (`.ac-list__row`). */
-.machine-folder__tail > .ac-btn--ghost.ac-btn--icon:last-child {
-  margin-right: calc(-1 * var(--ghost-plate));
 }
 /* A tool: a name alone centres on its tile with its state; with a line under it (Commands, on) it is an
    `.ac-faceline`, the name and the state on the tile's top line (`.ac-captop`, `.ac-captail`). */
