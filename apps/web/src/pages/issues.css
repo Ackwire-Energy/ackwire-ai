@@ -1063,13 +1063,26 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   top: 0;
 }
 .issue-layout {
+  container: issue-layout / inline-size;
   display: flex;
   flex-wrap: wrap;
   gap: 24px;
   align-items: flex-start;
 }
+/* Never wider than its column: a long line inside (tabs, a link) wraps or ends in "…" instead of scrolling the task
+   sideways. */
 .issue-layout__main {
   flex: 999 1 520px;
+  min-width: 0;
+}
+/* Too narrow for the fields beside the task (the conversation open beside it, a small window): they go under it,
+   as wide as it, instead of a 320px card left alone on the left. */
+@container issue-layout (max-width: 803px) {
+  .issue-layout > .issue-aside {
+    flex-basis: 100%;
+    max-width: none;
+    position: static;
+  }
 }
 .issue-aside {
   flex: 1 1 260px;
@@ -1882,6 +1895,7 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
 /* Room for the cards' shadows and focus rings at the scrolling column's edges. */
 .issue-page--talk > .issue-page__main {
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   margin: -4px;
   padding: 4px;
