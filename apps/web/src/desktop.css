@@ -146,18 +146,21 @@ html[data-desktop="mac"]:not([data-fullscreen]) .onb__rail {
   }
 }
 
-/* Drawers from the window's left edge cover the title bar, and the window's buttons stay on top of them: the
-   sidebar's and the wiki's pages, which a window zoomed in with ⌘+ narrows to, start under the buttons as the
-   onboarding's rail does, instead of their first row sitting behind them. */
+/* The sidebar's drawer (a window zoomed in with ⌘+ narrows to it) hangs from the window's top-left corner, over the
+   title bar, and the window's buttons stay drawn on top of it: it starts under them, as the onboarding's rail does,
+   instead of the workspace card sitting behind them. */
 @media (max-width: 760px) {
   html[data-desktop="mac"]:not([data-fullscreen]) .shell .sidebar {
     padding-top: calc(var(--titlebar-h) + 8px);
   }
 }
-@media (max-width: 900px) {
-  html[data-desktop="mac"]:not([data-fullscreen]) .wiki-nav {
-    padding-top: calc(var(--titlebar-h) + 8px);
-  }
+
+/* The agent's computer at full size fills the window, title bar included, with the window's buttons drawn over its
+   head. Unless the page really went full screen (the engine's, or the system's), it fills the room under the bar,
+   as the computer's window already centres in it. */
+html[data-desktop="mac"]:not([data-fullscreen], :fullscreen) .ac-dialog.cmp-dialog.is-full {
+  top: var(--titlebar-h);
+  height: auto;
 }
 
 /*
