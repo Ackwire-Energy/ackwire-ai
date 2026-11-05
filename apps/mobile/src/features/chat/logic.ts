@@ -528,23 +528,6 @@ export const hangsUnder = (
   Boolean(messageMediaOf(m.meta)) ||
   Boolean(issueWorkOf(m.meta));
 
-/** Toggle my reaction: the new list as the server will see it (optimistic). */
-export function toggleReaction(
-  reactions: ReactionCount[] | undefined,
-  reaction: string,
-  meId: string,
-): ReactionCount[] {
-  const list = reactions ?? [];
-  const hit = list.find((r) => r.reaction === reaction);
-  if (!hit) return [...list, { reaction, count: 1, userIds: [meId], agentIds: [] }];
-  const mine = hit.userIds.includes(meId);
-  const userIds = mine ? hit.userIds.filter((u) => u !== meId) : [...hit.userIds, meId];
-  const next = { ...hit, userIds, count: Math.max(0, hit.count + (mine ? -1 : 1)) };
-  return next.count === 0 && (next.agentIds?.length ?? 0) === 0
-    ? list.filter((r) => r.reaction !== reaction)
-    : list.map((r) => (r.reaction === reaction ? next : r));
-}
-
 // ── Pins ─────────────────────────────────────────────────────────────────────
 
 /** "Fixadas": one entry per message, the latest pin first (the server's order, kept even if events raced). */

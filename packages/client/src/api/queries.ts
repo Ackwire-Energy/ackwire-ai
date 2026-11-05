@@ -29,6 +29,7 @@ import {
   upsertInPages,
   withServerCounts,
 } from "../lib/notifications";
+import { setMyReaction } from "../lib/reactions";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
 import { firstVisitOf } from "../lib/right-hand";
@@ -2848,10 +2849,28 @@ export function useToggleReaction(orgId: string, messageId: string) {
   const api = useApi();
   const onAgentReaction = useAgentReaction();
   const qc = useQueryClient();
+  const meId = useMe().data?.user.id;
+  const mutationKey = ["reaction", orgId, messageId];
+  const queryKey = keys.reactions(orgId, messageId);
   return useMutation({
+    mutationKey,
     mutationFn: ({ reaction, on }: { reaction: string; on: boolean }) =>
       on ? api.chat.react(orgId, messageId, reaction) : api.chat.unreact(orgId, messageId, reaction),
-    onSuccess: (reactions) => applyReactions(qc, orgId, messageId, reactions, onAgentReaction),
+    // The pill shows at once; a refused reaction goes back to what was there.
+    onMutate: ({ reaction, on }) => {
+      if (!meId) return undefined;
+      void qc.cancelQueries({ queryKey });
+      const before = knownReactions(qc, orgId, messageId);
+      applyReactions(qc, orgId, messageId, setMyReaction(before, reaction, meId, on), onAgentReaction);
+      return { before };
+    },
+    onError: (_error, _input, context) => {
+      if (context) qc.setQueryData(queryKey, context.before);
+    },
+    // An earlier answer mustn't undo a later tap (👍 then 👎 is two calls): only the last one in flight is the truth.
+    onSuccess: (reactions) => {
+      if (qc.isMutating({ mutationKey }) <= 1) applyReactions(qc, orgId, messageId, reactions, onAgentReaction);
+    },
   });
 }
 
