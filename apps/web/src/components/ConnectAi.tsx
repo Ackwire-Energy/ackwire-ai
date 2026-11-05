@@ -8,6 +8,7 @@ import {
   useCredentials,
   useMachines,
 } from "@agenteschat/client";
+import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -46,6 +47,7 @@ import {
   useGatesWithoutAgent,
   usePlanGates,
 } from "@/components/ai/ConnectAiSteps";
+import { EndpointForm } from "@/components/ai/EndpointForm";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
@@ -252,7 +254,7 @@ function ConnectAiDialog({
   const all = setOf(choice).map((a) => ({ ...a, done: aiOf(a.id) === choice }));
   const target = defaultTarget({ ...aimed, set: all });
   const [draft, setDraft] = useState<KeyDraft>(() => ({
-    provider: providerGuess(request.apiKey, request.provider),
+    provider: request.provider === CUSTOM_PROVIDER ? CUSTOM_PROVIDER : providerGuess(request.apiKey, request.provider),
     apiKey: request.apiKey ?? "",
   }));
   // Anything connected shows Done; only a saved key closes the key's field (after a plan, it's for the other agents).
@@ -266,7 +268,7 @@ function ConnectAiDialog({
     onConnected();
   };
   const saveKey = () => {
-    if (draft.provider === "platform") return;
+    if (draft.provider === "platform" || draft.provider === CUSTOM_PROVIDER) return;
     add.mutate(
       { provider: draft.provider, label: providerLabel(draft.provider), apiKey: draft.apiKey.trim() },
       {
@@ -371,6 +373,15 @@ function ConnectAiDialog({
                   saved={keySaved}
                   saving={add.isPending}
                   onSave={saveKey}
+                  endpoint={
+                    <EndpointForm
+                      orgId={org.id}
+                      onDone={() => {
+                        setKeySaved(true);
+                        done();
+                      }}
+                    />
+                  }
                 />
               ) : bare ? (
                 <PlanWithoutAgent

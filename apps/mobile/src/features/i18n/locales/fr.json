@@ -693,7 +693,7 @@
     "noneForYou": "Aucun agent ne travaille encore avec vous.",
     "noneForYouHint": "Demandez l'accès à un admin.",
     "freeSection": "Libres",
-    "noGroupSection": "Sans groupe"
+    "noGroupSection": "Sans service"
   },
   "agentEdit": {
     "missing": "Cet agent n'existe plus.",
@@ -791,12 +791,6 @@
       "issue_status_one": "{{names}} a modifié une tâche",
       "issue_status_many": "{{names}} ont modifié une tâche",
       "issue_status_other": "{{names}} ont modifié une tâche",
-      "forum_turn_one": "À vous de jouer dans le forum",
-      "forum_turn_many": "À vous de jouer dans le forum",
-      "forum_turn_other": "À vous de jouer dans le forum",
-      "forum_synthesis_one": "Synthèse du forum prête",
-      "forum_synthesis_many": "Synthèse du forum prête",
-      "forum_synthesis_other": "Synthèse du forum prête",
       "approval_one": "{{names}} demande une approbation",
       "approval_many": "{{names}} demandent une approbation",
       "approval_other": "{{names}} demandent une approbation",
@@ -1078,6 +1072,7 @@
   "files": {
     "type": {
       "image": "Image",
+      "video": "Vidéo",
       "pdf": "PDF",
       "document": "Document",
       "table": "Tableau",
@@ -1102,7 +1097,17 @@
     "openImage": "Ouvrir l'image",
     "imageOf": "Image {{index}} sur {{count}}",
     "place": "{{index}} sur {{count}}",
-    "noPreview": "Ce fichier ne s'ouvre pas dans l'app. Partagez-le pour l'ouvrir dans une autre app."
+    "noPreview": "Ce fichier ne s'ouvre pas dans l'app. Partagez-le pour l'ouvrir dans une autre app.",
+    "video": {
+      "play": "Lire",
+      "pause": "Pause",
+      "replay": "Revoir",
+      "seek": "Position dans la vidéo",
+      "mute": "Couper le son",
+      "unmute": "Activer le son",
+      "fullscreen": "Plein écran",
+      "open": "Ouvrir"
+    }
   },
   "issues": {
     "title": "Tâches",
@@ -1134,7 +1139,6 @@
     "loadFailed": "Impossible de charger les tâches.",
     "createdBy": "créée par {{name}}",
     "fromMessage": "depuis un message",
-    "fromForum": "depuis le forum",
     "fromAgent": "depuis une demande à un agent",
     "fromWebhook": "depuis {{provider}}",
     "workingFor_one": "au travail depuis {{count}} min",
@@ -1311,7 +1315,6 @@
     "kind": {
       "approval": "Approuver",
       "question": "Question",
-      "forum": "À vous",
       "browser": "Navigateur",
       "secret": "Secret",
       "join": "Membres",
@@ -1427,7 +1430,6 @@
         "wiki": "Wiki",
         "skills": "Compétences",
         "schedule": "Routines",
-        "forum": "Forum",
         "sandbox": "Son propre ordinateur",
         "browser": "Navigateur",
         "setup": "Configuration de l'espace de travail",
@@ -2138,5 +2140,9 @@
         "proposal": "Tableau de bord"
       }
     }
+  },
+  "team": {
+    "entry": "Liste, organigramme et carte",
+    "mapHint": "Pour changer un agent de canal, utilisez la carte sur le web ou parlez à {{name}}."
   }
 }

@@ -32,6 +32,7 @@ export const keys = {
   formerAgents: (orgId: string) => ["org", orgId, "agents", "former"] as const,
   /** An agent's proposal of a new agent, by its card's message (ADR 0081). */
   agentProposal: (orgId: string, messageId: string) => ["org", orgId, "agent-proposal", messageId] as const,
+  teamTemplates: (orgId: string, locale: string) => ["org", orgId, "team-templates", locale] as const,
   team: (orgId: string) => ["org", orgId, "team"] as const,
   credentials: (orgId: string) => ["org", orgId, "credentials"] as const,
   /** Under `credentials`: a key added, rotated or removed refreshes it too. */
@@ -99,6 +100,7 @@ export const keys = {
   peopleUsage: (orgId: string, period: object = {}) => ["org", orgId, "people-usage", period] as const,
   personUsage: (orgId: string, userId: string) => ["org", orgId, "people-usage", "person", userId] as const,
   personLimits: (orgId: string) => ["org", orgId, "people-usage", "limits"] as const,
+  teamWeek: (orgId: string) => ["org", orgId, "team-week"] as const,
   platformKey: (orgId: string) => ["org", orgId, "platform-key"] as const,
   roster: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "roster"] as const,
   /** All the agents' memories, for the workspace's map. */
@@ -200,8 +202,6 @@ export const keys = {
   issuesView: (orgId: string) => ["org", orgId, "issues-view"] as const,
   sidebarToolOrder: (orgId: string) => ["org", orgId, "sidebar-tool-order"] as const,
   sidebarView: (orgId: string) => ["org", orgId, "sidebar-view"] as const,
-  forum: (orgId: string) => ["org", orgId, "forum"] as const,
-  forumTopic: (orgId: string, topicId: string) => ["org", orgId, "forum", topicId] as const,
   wiki: (orgId: string) => ["org", orgId, "wiki"] as const,
   wikiTree: (orgId: string) => ["org", orgId, "wiki", "tree"] as const,
   wikiPage: (orgId: string, slug: string) => ["org", orgId, "wiki", "page", slug] as const,

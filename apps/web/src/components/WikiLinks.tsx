@@ -89,7 +89,7 @@ export function WikiLinkChip({ title, label, pages }: { title: string; label: st
   );
 }
 
-/** The renderer to pass to `<Markdown wikiLink>` in chat, forum, issues and the wiki itself. */
+/** The renderer to pass to `<Markdown wikiLink>` in chat, issues and the wiki itself. */
 export function useWikiLinkRenderer(): WikiLinkRenderer {
   const { org } = useOrg();
   const tree = useWikiTree(org.id);

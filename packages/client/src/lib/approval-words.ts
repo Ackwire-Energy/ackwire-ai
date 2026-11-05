@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import type { Approval, ApprovalCoverView, ApprovalRule, CardDelegate } from "../api/types";
 import { aheadPhase, approvalAction, emailTitleWords, sqlReadsTarget } from "./approval-kind";
 import { humanize } from "./custom-tools";
-import { formatShortDate, formatTime, lowerFirst } from "./format";
+import { formatShortDate, formatTime, lowerFirst, relativeDay } from "./format";
 import { agentGrammar } from "./grammar";
 import { partsOf, toolName } from "./tool-review";
 
@@ -42,7 +42,9 @@ export function approvalTitle(
   }
   const inner = innerTool(approval);
   if (inner) return toolName(t, partsOf(inner), inner);
-  if (!OWN_TITLES.has(approval.tool)) return approval.title;
+  // A server title that is only the tool's own name ("GitHub: add_issue_comment") reads as the tool in words.
+  if (!OWN_TITLES.has(approval.tool))
+    return rawToolTitle(approval) ? toolName(t, partsOf(approval.tool), approval.tool) : approval.title;
   const p = approval.params ?? {};
   const s = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v) : "");
   return t(`approval.titles.${approval.tool}`, {
@@ -83,6 +85,12 @@ const READ_VERBS = new Set([
   "preview",
   "lookup",
 ]);
+
+/** The title is the tool's identifier, bare or after the connector's name ("GitHub: add_issue_comment"). */
+function rawToolTitle(approval: Pick<Approval, "tool" | "title">) {
+  const title = approval.title.trim();
+  return /^[a-z][a-z0-9_]*$/i.test(approval.tool) && (title === approval.tool || title.endsWith(`: ${approval.tool}`));
+}
 
 /** A connector tool that runs another one by name (`{ name, arguments }`): that tool's name, when it reads as one. */
 function innerTool(approval: Pick<Approval, "params"> & Partial<Pick<Approval, "connector">>): string | null {
@@ -376,11 +384,8 @@ export function delegateLine(
 /** "Desfazer arquiva a Triagem. Vale até 09:42.": what Desfazer does, and until when. */
 export function delegateUndoLine(t: TFunction, locale: string, d: CardDelegate, agentName: string | null) {
   const end = d.undoUntil ? new Date(d.undoUntil) : null;
-  // It lasts a day: tomorrow's word (Intl's own, "amanhã", "tomorrow") before the hour when it ends then.
-  const tomorrow =
-    end && end.toDateString() !== new Date().toDateString()
-      ? `${new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(1, "day")}, `
-      : "";
+  // It lasts a day: tomorrow's word ("amanhã", "tomorrow") before the hour when it ends then.
+  const tomorrow = end && end.toDateString() !== new Date().toDateString() ? `${relativeDay(locale, 1)}, ` : "";
   const until = end ? `${tomorrow}${formatTime(locale, end.toISOString())}` : "";
   return agentName
     ? t("rightHandApprovals.card.undoArchives", { name: agentName, until })

@@ -8,7 +8,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
       "agentes.chat'in kullanımına ilişkin sözleşme: çalışma alanınız, ajanlarınız ve her bir tarafın neden sorumlu olduğu.",
     courtesy:
       "Bu metin bir nezaket çevirisidir. İngilizce sürümden farklılık göstermesi hâlinde İngilizce sürüm esas alınır.",
-    updated: "2026-11-03",
+    updated: "2026-11-04",
     sections: [
       {
         id: "agreement",
@@ -22,7 +22,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "service",
         heading: "2. Hizmet",
         blocks: [
-          "Hizmet, insanların ve yapay zekâ ajanlarının birlikte çalıştığı bir çalışma alanıdır. Kanalları, ileti dizilerini ve doğrudan mesajları, ayrıca kendi rolleri, talimatları, hafızaları ve bütçeleri olan ajanları içerir. Bunların yanında görevleri, wiki, Drive, forum, takvim ve rutinleri, onayları, diğer hizmetlere bağlayıcıları ve ajanların üzerinde çalışabileceği bilgisayarları bağlama imkânını da içerir.",
+          "Hizmet, insanların ve yapay zekâ ajanlarının birlikte çalıştığı bir çalışma alanıdır. Kanalları, ileti dizilerini ve doğrudan mesajları, ayrıca kendi rolleri, talimatları, hafızaları ve bütçeleri olan ajanları içerir. Bunların yanında görevleri, wiki, Drive, takvim ve rutinleri, onayları, diğer hizmetlere bağlayıcıları ve ajanların üzerinde çalışabileceği bilgisayarları bağlama imkânını da içerir.",
           "Hizmet yenidir ve gelişmeye devam etmektedir: özellikler değişebilir, sınırlandırılabilir veya kaldırılabilir. Yeni hesapları bir süre yalnızca davetle ya da kaydolan herkese açabiliriz. Dayandığınız bir özelliği kaldırmadan önce, makul ölçüde mümkün olduğu hâllerde, sizi önceden bilgilendiririz.",
         ],
       },
@@ -175,7 +175,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
       "Neleri topladığımız, ajanların neyi nereye gönderdiği, çalışma alanınızı kimlerin görebildiği ve sahip olduğunuz haklar.",
     courtesy:
       "Bu metin bir nezaket çevirisidir. İngilizce sürümden farklılık göstermesi hâlinde İngilizce sürüm esas alınır.",
-    updated: "2026-11-03",
+    updated: "2026-11-04",
     sections: [
       {
         id: "overview",
@@ -219,7 +219,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "workspace-content",
         heading: "4. Çalışma alanları adına işlenen Çalışma Alanı İçeriği",
         blocks: [
-          "Çalışma Alanı İçeriği, kanallardaki, ileti dizilerindeki ve doğrudan mesajlardaki mesajları, Drive'daki dosyaları ve wiki sayfalarını kapsar. Ayrıca görevleri, forum konularını, rutinleri, takvim etkinliklerini ve onayları, ajanların talimatlarını, ayarlarını ve hafızasını, ajanların yazdıklarını ve yaptıklarını ve ajanların çalışma alanının bağladığı bağlayıcılar, veritabanları ve bilgisayarlar aracılığıyla okuduğu verileri de kapsar. Bunları yalnızca çalışma alanını ve ajanlarını çalışma alanının yapılandırdığı şekilde çalıştırmak, çalışma alanının üyelerine göstermek, talep ettikleri bildirimleri göndermek ve destek sağlamak amacıyla işleriz.",
+          "Çalışma Alanı İçeriği, kanallardaki, ileti dizilerindeki ve doğrudan mesajlardaki mesajları, Drive'daki dosyaları ve wiki sayfalarını kapsar. Ayrıca görevleri, rutinleri, takvim etkinliklerini ve onayları, ajanların talimatlarını, ayarlarını ve hafızasını, ajanların yazdıklarını ve yaptıklarını ve ajanların çalışma alanının bağladığı bağlayıcılar, veritabanları ve bilgisayarlar aracılığıyla okuduğu verileri de kapsar. Bunları yalnızca çalışma alanını ve ajanlarını çalışma alanının yapılandırdığı şekilde çalıştırmak, çalışma alanının üyelerine göstermek, talep ettikleri bildirimleri göndermek ve destek sağlamak amacıyla işleriz.",
           "Çalışma Alanı İçeriği çalışma alanına aittir: üyeler, kanalların ve izinlerin izin verdiği kadarını görür. Sahipleri ve yöneticileri ise içeriği yönetir. Paylaştığınız mesajlar, çalışma alanı bunları silmedikçe, çalışma alanından ayrılmanızdan veya hesabınızı silmenizden sonra da çalışma alanında kalır.",
         ],
       },

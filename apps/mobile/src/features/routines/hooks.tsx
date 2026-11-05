@@ -179,7 +179,6 @@ export function useTargetLabel() {
           ? t("routines.inThread", { channel: c.name })
           : t("routines.inChannel", { channel: c.name });
       }
-      if (target.type === "forum") return t("routines.target.forumShort");
       // A widget's own routine (ADR 0135): it redoes its widget, with no message.
       if (target.type === "widget") return t("mobile.dashboards.routineTarget");
       return target.type === "dm" ? t("routines.target.dmShort") : t("routines.target.artifactShort");

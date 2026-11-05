@@ -342,7 +342,6 @@ describe("humanized activity", () => {
       hand_off: "Entregou um relatório",
       record_findings: "Anotou o que encontrou",
       complete_mission: "Entregou a missão",
-      suggest_forum_topic: "Sugeriu um tópico no fórum",
       request_permission: "Pediu acesso",
       request_folder_access: "Pediu acesso",
       request_secret: "Pediu um segredo",

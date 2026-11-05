@@ -11,7 +11,7 @@ import {
   userTopic,
 } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
-import { and, type Database, eq, inArray, isNotNull, isNull, or, schema } from "@agenteschat/db";
+import { and, type Database, eq, inArray, isNotNull, isNull, or, schema, sql } from "@agenteschat/db";
 import {
   activityAudience,
   announcePresence,
@@ -27,6 +27,7 @@ import {
   requireBrowserAccess,
   requireChannelAccess,
   requireProfileWatcher,
+  taskReaderSql,
   touchLastSeen,
 } from "@agenteschat/engine";
 import type { Auth, SessionUser } from "../auth";
@@ -221,7 +222,11 @@ export async function currentSubscriptions(
         eq(schema.channels.orgId, orgId),
         inArray(schema.channels.id, channelIds),
         isNull(schema.channels.archivedAt),
-        or(eq(schema.channels.kind, "forum"), isNotNull(schema.channelMembers.id)),
+        or(
+          isNotNull(schema.channelMembers.id),
+          // A task's conversation: whoever sees the task (ADR 0145).
+          and(eq(schema.channels.kind, "task"), taskReaderSql(sql`${schema.channels.id}`, sql`${userId}::text`)),
+        ),
       ),
     );
   return new Set(rows.map((row) => row.id));

@@ -32,7 +32,9 @@ const openDm = async (state: FakeState) => {
   await settle(10);
   return r;
 };
-const startCard = () => screen().queryByRole("group", { name: "Como você quer começar?" });
+const startCard = () => screen().queryByRole("group", { name: /^O que a .+ faz\?|^Como você quer começar\?$/ });
+/** The ready-made agents sit behind the start card's footer button. */
+const openPresets = async () => click(button("Agentes prontos"), 4);
 
 describe("after the workspace's name", () => {
   test("the workspace is set up at once and opens in Lodi's DM, its greeting at the top", async () => {
@@ -108,28 +110,43 @@ describe("the top of Lodi's DM", () => {
     expect(calls(state, "chat.post")).toEqual([]);
   });
 
-  test("with an AI: how to start, the four ready-made agents and the other ways in", async () => {
+  test("with an AI: what the workspace does, the business types to tap and the other ways in under it", async () => {
     await openDm(fresh());
     const card = startCard();
     expect(card).toBeTruthy();
     expect(card?.textContent).toContain("esperando você");
-    const tiles = within(card as HTMLElement)
+    expect(card?.textContent).toContain("Com isso eu monto um time pronto, e você só confere.");
+    for (const name of ["Agência", "Loja online", "Software e apps", "Outra coisa"])
+      expect(within(card as HTMLElement).getByRole("button", { name })).toBeTruthy();
+    expect(card?.textContent).toContain("Ou escreva do seu jeito aqui embaixo, numa frase.");
+    for (const name of ["Ver modelos de time", "Agentes prontos", "Importar meus agentes", "Preencher o formulário"])
+      expect(within(card as HTMLElement).getByRole("button", { name })).toBeTruthy();
+    // The ready-made agents wait behind their button.
+    expect(within(card as HTMLElement).queryByRole("button", { name: /^Criar / })).toBeNull();
+    await openPresets();
+    const tiles = within(startCard() as HTMLElement)
       .getAllByRole("button", { name: /^Criar / })
       .map((b) => b.textContent);
     expect(tiles).toEqual(["TheoPM", "AdaDev", "LiaPesquisa", "AtlasOps"]);
-    for (const name of [
-      "Montar um time pra começar",
-      "Descrever o que preciso",
-      "Importar meus agentes",
-      "Preencher o formulário",
-    ])
-      expect(within(card as HTMLElement).getByRole("button", { name })).toBeTruthy();
     expect(screen().queryByText("Conectar uma IA para o time")).toBeNull();
+  });
+
+  test("a business type is my own message to Lodi, and the card reads answered with it checked", async () => {
+    const state = fresh();
+    await openDm(state);
+    await click(button("Software e apps"), 10);
+    expect(calls(state, "chat.post").map((c) => (c.args[2] as { body: string }).body)).toEqual(["Software e apps"]);
+    const card = startCard() as HTMLElement;
+    expect(card.textContent).toContain("respondida");
+    const picked = within(card).getByRole("button", { name: "Software e apps" });
+    expect(picked.getAttribute("aria-pressed")).toBe("true");
+    expect((picked as HTMLButtonElement).disabled).toBe(true);
   });
 
   test("a tile's Criar makes that agent alone, in #general; the other tiles stay, the next card comes under", async () => {
     const state = fresh();
     await openDm(state);
+    await openPresets();
     await click(button("Criar Lia"), 12);
     const made = calls(state, "agents.create").map((c) => c.args[1] as { name: string; appearance: unknown });
     expect(made.map((a) => a.name)).toEqual(["Lia"]);
@@ -154,6 +171,7 @@ describe("the top of Lodi's DM", () => {
   test("Montar um time pra começar makes the four, each with its own look, on Automático", async () => {
     const state = fresh();
     await openDm(state);
+    await openPresets();
     await click(button("Montar um time pra começar"), 16);
     const made = calls(state, "agents.create").map(
       (c) => c.args[1] as { name: string; handle: string; model: string; appearance: unknown },
@@ -178,15 +196,18 @@ describe("the top of Lodi's DM", () => {
     expect(again.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/import`);
   });
 
-  test("Descrever o que preciso puts the cursor in Lodi's composer", async () => {
-    await openDm(fresh());
-    await click(button("Descrever o que preciso"), 4);
+  test("Outra coisa puts the cursor in Lodi's composer instead of sending", async () => {
+    const state = fresh();
+    await openDm(state);
+    await click(button("Outra coisa"), 4);
+    expect(calls(state, "chat.post")).toEqual([]);
     expect(document.activeElement?.getAttribute("aria-label")).toBe("Mensagem para Lodi · nada muda sem você");
   });
 
   test("Dar a primeira tarefa opens the first agent's DM with its task written in the composer", async () => {
     const state = fresh();
     const { router } = await openDm(state);
+    await openPresets();
     await click(button("Criar Theo"), 12);
     const theo = state.agents.find((a) => a.name === "Theo");
     await click(button("Dar a primeira tarefa para o Theo"), 12);

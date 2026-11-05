@@ -25,6 +25,7 @@ import {
   setupView,
   statusRestatesChip,
 } from "@agenteschat/client/lib/computer";
+import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { holdText } from "@agenteschat/client/lib/errors";
 import { NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -1267,7 +1268,8 @@ function GateWait({
 
 /** The API key being added: its maker (or the agentes.chat key, where the server offers one) and the key. */
 export interface KeyDraft {
-  provider: ProviderId | "platform";
+  /** `custom`: a workspace's own endpoint (ADR 0146), which has a form of its own (`endpoint`). */
+  provider: ProviderId | "platform" | typeof CUSTOM_PROVIDER;
   apiKey: string;
 }
 
@@ -1284,9 +1286,12 @@ export function KeyPanel({
   saved,
   saving,
   onSave,
+  endpoint,
 }: {
   draft: KeyDraft;
   onDraft: (draft: KeyDraft) => void;
+  /** The "Outro provedor" form, shown when it is chosen. */
+  endpoint?: ReactNode;
   /** The server has a key of its own to offer. */
   platform?: boolean;
   /** Only an admin adds an API key. */
@@ -1299,13 +1304,13 @@ export function KeyPanel({
   const fieldId = useId();
   const [touched, setTouched] = useState(false);
   const { provider, apiKey } = draft;
-  const keyOf = provider === "platform" ? null : provider;
+  const keyOf = provider === "platform" || provider === CUSTOM_PROVIDER ? null : provider;
   const maker = keyOf ? providerOf(keyOf) : undefined;
   const hint = maker && keyStepHint(maker);
   const valid = keyOf === null || keyLooksValid(keyOf, apiKey);
   const wrong = touched && apiKey.trim().length > 0 && !valid;
   const site = maker ? new URL(`https://${maker.site}`) : null;
-  const pick = (next: ProviderId | "platform") => onDraft({ provider: next, apiKey });
+  const pick = (next: KeyDraft["provider"]) => onDraft({ provider: next, apiKey });
   return (
     <Card as="section" className="ai-panel" aria-label={t("connectAi.key.title")}>
       {keyOf && (
@@ -1329,6 +1334,12 @@ export function KeyPanel({
                 <span className="ac-option__title">{p.label}</span>
               </OptionCard>
             ))}
+            {endpoint && (
+              <OptionCard pressed={provider === CUSTOM_PROVIDER} onClick={() => pick(CUSTOM_PROVIDER)}>
+                <ProviderLogo id={CUSTOM_PROVIDER} size="sm" />
+                <span className="ac-option__title">{t("endpoint.option")}</span>
+              </OptionCard>
+            )}
             {platform && (
               <OptionCard pressed={provider === "platform"} onClick={() => pick("platform")} className="ai-key__ours">
                 <span className="ac-brand ac-brand--sm ac-brand--mono" aria-hidden="true">
@@ -1338,7 +1349,14 @@ export function KeyPanel({
               </OptionCard>
             )}
           </div>
-          {keyOf && maker && site ? (
+          {provider === CUSTOM_PROVIDER ? (
+            <>
+              <p className="small muted" style={{ margin: 0 }}>
+                {t("endpoint.optionSub")}
+              </p>
+              {endpoint}
+            </>
+          ) : keyOf && maker && site ? (
             <>
               <Step
                 n={1}

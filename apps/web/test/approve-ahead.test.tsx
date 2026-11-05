@@ -124,24 +124,27 @@ describe("actions approved ahead, on one shared card", () => {
 });
 
 describe("an action approved ahead, on Aprovações", () => {
-  const details = async (state: ReturnType<typeof seedState>) => {
+  /** The request, open beside the list. */
+  const review = async (state: ReturnType<typeof seedState>) => {
     await renderApp(`/org/${ORG_ID}/approvals?open=ap-merge`, { api: createFakeApi(state) });
     await settle(8);
-    return screen().getByRole("dialog");
+    const pane = screen().getByRole("region", { name: TITLE });
+    expect(pane.classList.contains("ap-review")).toBe(true);
+    return pane;
   };
 
-  test("its request's details say it approves a future action, and what approving now covers", async () => {
-    const dialog = await details(withAhead("pending"));
-    expect(dialog.querySelector(".ap-card__ahead")?.textContent).toBe(
+  test("the open request says it approves a future action, and what approving now covers", async () => {
+    const pane = await review(withAhead("pending"));
+    expect(pane.querySelector(".ap-card__ahead")?.textContent).toBe(
       `Aprova uma ação futura: roda sozinha ${WHEN}, sem pedir de novo`,
     );
-    expect(dialog.textContent).toContain(`Aprovar agora vale para ${WHEN}.`);
-    expect(dialog.textContent).not.toContain("Aprovar roda a ação na hora.");
+    expect(pane.querySelector(".ap-bar__text")?.textContent).toBe(`Aprovar agora vale para ${WHEN}.`);
+    expect(pane.textContent).not.toContain("Aprovar roda a ação na hora.");
   });
 
-  test("approved, its details say when it runs, and Cancelar withdraws it", async () => {
+  test("approved, the open request says when it runs, and Cancel withdraws it", async () => {
     const state = withAhead("approved");
-    const outcome = (await details(state)).querySelector(".ap-outcome") as HTMLElement;
+    const outcome = (await review(state)).querySelector(".ap-outcome") as HTMLElement;
     expect(outcome.textContent).toContain(`Agendado para ${WHEN}`);
     await click(within(outcome).getByRole("button", { name: "Cancelar" }));
     expect(state.calls.filter((c) => c.method === "approvals.cancel").map((c) => c.args)).toEqual([
@@ -150,12 +153,12 @@ describe("an action approved ahead, on Aprovações", () => {
   });
 
   test("approved but not done by its run in time, it says so, not that nobody decided", async () => {
-    const dialog = await details(withAhead("lapsed"));
-    expect(dialog.querySelector(".ap-outcome")?.textContent).toContain(
+    const pane = await review(withAhead("lapsed"));
+    expect(pane.querySelector(".ap-outcome")?.textContent).toContain(
       "Aprovada, mas não rodou a tempo. Nada foi feito.",
     );
     expect(document.body.textContent).not.toContain("Ninguém decidiu em 24 h");
-    expect(within(dialog).queryByRole("button", { name: "Pedir de novo" })).toBeNull();
+    expect(within(pane).queryByRole("button", { name: "Pedir de novo" })).toBeNull();
   });
 });
 

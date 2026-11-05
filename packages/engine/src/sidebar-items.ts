@@ -18,7 +18,6 @@ export const SIDEBAR_ITEMS = [
   "drive",
   "routines",
   "calendar",
-  "forum",
   "team",
 ] as const;
 export type SidebarItem = (typeof SIDEBAR_ITEMS)[number];

@@ -51,7 +51,7 @@ export function settledBy(event: NotificationEvent, now = Date.now()): string | 
 }
 
 /** Kinds whose `latest.title` says it better than its text (an approval's action, a routine's name). */
-const TITLED = new Set(["approval", "forum_turn", "mission_stopped", "routine_failed", "routine_paused"]);
+const TITLED = new Set(["approval", "mission_stopped", "routine_failed", "routine_paused"]);
 
 /**
  * The line under a notice's headline: the message's snippet, an approval's action, the word for a GIF, a sticker

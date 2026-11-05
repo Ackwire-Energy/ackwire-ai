@@ -9,8 +9,17 @@ import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
+const click = async (el: Element) => {
+  await act(async () => fireEvent.click(el));
+  await settle(4);
+};
+const row = (id: string) => document.querySelector(`.ap-li[data-id="${id}"]`) as HTMLElement;
+const review = () => document.querySelector(".ap-review") as HTMLElement;
+const title = () => review().querySelector(".ap-review__title")?.textContent;
+const ids = (el: Element) => [...el.querySelectorAll(".ap-li")].map((li) => li.getAttribute("data-id"));
+
 describe("Aprovações: requests sharing a card", () => {
-  test("come together under one head with 'Aprovar tudo', which decides exactly them", async () => {
+  test("come together under one head with 'Approve all', which decides exactly them", async () => {
     const state = seedState();
     const [merge] = state.approvals;
     if (!merge) throw new Error("no approval");
@@ -28,11 +37,10 @@ describe("Aprovações: requests sharing a card", () => {
     await settle(4);
     const group = document.querySelector(".ap-group") as HTMLElement;
     expect(group.textContent).toContain("Ada pediu 2 coisas de uma vez");
-    expect(within(group).getAllByRole("article")).toHaveLength(2);
+    expect(ids(group)).toEqual(["ap-g1", "ap-g2"]);
     // The request without a card stands alone.
-    expect(screen().getByRole("article", { name: "Run deploy workflow" }).closest(".ap-group")).toBeNull();
-    await act(async () => fireEvent.click(within(group).getByRole("button", { name: "Aprovar tudo" })));
-    await settle(4);
+    expect(row("ap-deploy").closest(".ap-group")).toBeNull();
+    await click(within(group).getByRole("button", { name: "Aprovar tudo" }));
     expect(state.calls.find((c) => c.method === "approvals.decideMany")?.args).toEqual([
       ORG_ID,
       ["ap-g1", "ap-g2"],
@@ -44,7 +52,7 @@ describe("Aprovações: requests sharing a card", () => {
     ]);
   });
 
-  test("waiting requests of one kind in a row: one card, 'Aprovar todos', unfolding into each", async () => {
+  test("waiting requests of one kind in a row: one row, 'Approve all', unfolding into each", async () => {
     const state = seedState();
     const [merge] = state.approvals;
     if (!merge) throw new Error("no approval");
@@ -62,30 +70,104 @@ describe("Aprovações: requests sharing a card", () => {
     await settle(4);
     const run = document.querySelector(".ap-run") as HTMLElement;
     expect(run.getAttribute("aria-label")).toMatch(/^3 pedidos de Ada para /);
-    // The card is the run: no group head over it, and its requests folded.
+    // The row is the run: no group head over it, and its requests folded.
     expect(run.closest(".ap-group")).toBeNull();
-    expect(within(run).queryAllByRole("article")).toHaveLength(0);
-    // The keyboard: the run is no one request (no `data-id`), Enter unfolds it.
+    expect(ids(run)).toEqual([]);
+    // The run is no one request (no `data-id`); "See each one" unfolds it.
     expect(run.dataset.id).toBeUndefined();
-    run.focus();
-    await act(async () => fireEvent.keyDown(run, { key: "Enter" }));
-    expect(within(run).getAllByRole("article")).toHaveLength(3);
-    // Deciding its first request keeps the rest unfolded.
-    const [one] = within(run).getAllByRole("article");
-    await act(async () =>
-      fireEvent.click(within(one as HTMLElement).getAllByRole("button", { name: /^Aprovar/ })[0] as HTMLElement),
-    );
-    await settle(4);
+    await click(within(run).getByRole("button", { name: "Ver cada um" }));
+    expect(within(run).getByRole("button", { name: "Ver cada um" }).getAttribute("aria-expanded")).toBe("true");
+    expect(ids(run)).toEqual(["ap-s1", "ap-s2", "ap-s3"]);
+    // Deciding its first request beside the list keeps the rest unfolded.
+    await click(row("ap-s1"));
+    expect(review().getAttribute("aria-label")).toBe("Supabase: Execute sql");
+    await click(review().querySelector('[data-approve="ap-s1"]') as HTMLElement);
+    expect(state.calls.find((c) => c.method === "approvals.approve")?.args.slice(0, 2)).toEqual([ORG_ID, "ap-s1"]);
     const rest = document.querySelector(".ap-run") as HTMLElement;
-    expect(within(rest).getAllByRole("article")).toHaveLength(2);
-    await act(async () =>
-      fireEvent.click(within(rest).getAllByRole("button", { name: "Aprovar todos" })[0] as HTMLElement),
-    );
-    await settle(4);
+    expect(ids(rest)).toEqual(["ap-s2", "ap-s3"]);
+    await click(within(rest).getAllByRole("button", { name: "Aprovar todos" })[0] as HTMLElement);
     expect(state.calls.find((c) => c.method === "approvals.decideMany")?.args).toEqual([
       ORG_ID,
       ["ap-s2", "ap-s3"],
       "approve",
     ]);
+  });
+});
+
+describe("Approvals: the request beside the list", () => {
+  /** The seed's first request as a GitHub comment whose server title is only the tool's name. */
+  function withComment() {
+    const state = seedState();
+    const merge = state.approvals.find((a) => a.id === "ap-merge");
+    if (!merge) throw new Error("no approval");
+    Object.assign(merge, {
+      tool: "add_issue_comment",
+      scope: "github:issues.write",
+      title: "GitHub: add_issue_comment",
+      detail: "add_issue_comment · acme/loja · issue 45",
+      connector: "github",
+      params: { owner: "acme", repo: "loja", issue_number: 45, body: "Os testes passaram. Pode revisar?" },
+    });
+    return state;
+  }
+
+  test("one row per request; the selected one opens beside it with its facts, its text and the decision bar", async () => {
+    const state = withComment();
+    await renderApp(`/org/${ORG_ID}/approvals`, { api: createFakeApi(state) });
+    await settle(6);
+    const list = screen().getByRole("navigation", { name: "Pedidos" });
+    expect(list.contains(row("ap-merge"))).toBe(true);
+    expect(row("ap-merge").querySelector(".ap-li__line")?.textContent).toBe("Ada quer adicionar comentários da issue");
+    expect(row("ap-merge").querySelector(".ap-li__where")?.textContent).toBe("acme/loja #45");
+    // Nothing chosen: the first row (closest to expiring) is open.
+    expect(row("ap-deploy").getAttribute("aria-current")).toBe("true");
+    expect(title()).toBe("Run deploy workflow");
+
+    await click(row("ap-merge"));
+    expect(row("ap-merge").getAttribute("aria-current")).toBe("true");
+    expect(row("ap-deploy").getAttribute("aria-current")).toBeNull();
+    // The server's title was only the tool's name: the tool in words.
+    expect(title()).toBe("Adicionar comentários da issue");
+    const facts = review().querySelector(".ac-facts") as HTMLElement;
+    expect([...facts.querySelectorAll(".ac-facts__label")].map((d) => d.textContent)).toEqual([
+      "Onde",
+      "Efeito",
+      "Prazo",
+    ]);
+    const values = [...facts.querySelectorAll(".ac-facts__value")].map((d) => d.textContent ?? "");
+    expect(values[0]).toContain("acme/loja #45");
+    expect(values[1]).toBe("Sai da empresa");
+    // The comment it will publish, as it will read.
+    expect(review().textContent).toContain("O que vai ser publicado");
+    expect(review().querySelector(".ap-review__text")?.textContent).toContain("Os testes passaram. Pode revisar?");
+    const bar = review().querySelector(".ap-bar") as HTMLElement;
+    expect(bar.querySelector(".ap-bar__text")?.textContent).toBe(
+      "Ada vai adicionar comentários da issue, só desta vez e com estes valores.",
+    );
+    await click(bar.querySelector('[data-approve="ap-merge"]') as HTMLElement);
+    expect(state.calls.find((c) => c.method === "approvals.approve")?.args).toEqual([ORG_ID, "ap-merge", undefined]);
+  });
+
+  test("J and K walk the requests; R opens the reason and Escape backs out of it", async () => {
+    const { router } = await renderApp(`/org/${ORG_ID}/approvals`, { api: createFakeApi(withComment()) });
+    await settle(6);
+    const key = async (target: Element, k: string) => {
+      await act(async () => fireEvent.keyDown(target, { key: k }));
+      await settle(4);
+    };
+    expect(title()).toBe("Run deploy workflow");
+    await key(document.body, "j");
+    expect(title()).toBe("Adicionar comentários da issue");
+    expect(router.state.location.search).toMatchObject({ open: "ap-merge" });
+    expect(document.activeElement).toBe(row("ap-merge"));
+    await key(document.body, "k");
+    expect(title()).toBe("Run deploy workflow");
+    await key(document.body, "j");
+    await key(document.body, "r");
+    const reason = within(review()).getByLabelText("Por que não?");
+    // Escape inside the reason backs out of refusing.
+    await key(reason, "Escape");
+    expect(within(review()).queryByLabelText("Por que não?")).toBeNull();
+    expect(review().querySelector('[data-approve="ap-merge"]')).not.toBeNull();
   });
 });

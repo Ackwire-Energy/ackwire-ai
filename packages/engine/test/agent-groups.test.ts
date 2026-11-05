@@ -114,7 +114,17 @@ describe("agent groups", () => {
     await createAgentGroup(w.deps, w.owner.id, w.org.id, { name: "Integrations", agentIds: [w.ada.id, w.bia.id] });
     const groups = await createAgentGroup(w.deps, w.owner.id, w.org.id, { name: "Produto", agentIds: [w.caio.id] });
     const left = await deleteAgentGroup(w.deps, w.owner.id, w.org.id, groups[0]?.id ?? "");
-    expect(left).toEqual([{ id: groups[1]?.id ?? "", name: "Produto", agentIds: [w.caio.id] }]);
+    expect(left).toEqual([
+      {
+        id: groups[1]?.id ?? "",
+        name: "Produto",
+        agentIds: [w.caio.id],
+        color: "graphite",
+        icon: "person",
+        leadUserId: null,
+        backupUserId: null,
+      },
+    ]);
     const rows = await w.db.select().from(schema.agents).where(eq(schema.agents.orgId, w.org.id));
     expect(rows.filter((a) => a.groupId === null).map((a) => a.name)).toEqual(expect.arrayContaining(["Ada", "Bia"]));
     await expect(deleteAgentGroup(w.deps, w.owner.id, w.org.id, groups[0]?.id ?? "")).rejects.toMatchObject(GONE);

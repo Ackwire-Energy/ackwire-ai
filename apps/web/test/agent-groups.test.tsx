@@ -35,17 +35,17 @@ const go = async (state = seedState(), path = `c/${GENERAL_ID}`) => {
   await settle(8);
   return { ...r, state };
 };
-const card = () => screen().getByText("Grupos de agentes").closest(".team-groups") as HTMLElement;
-/** A group on Equipe by its title, and the agents listed in it. */
+/** Equipe › Setores (ADR 0148): a card per group, the agents in none last. */
+const view = () => screen().getByRole("region", { name: "Setores" });
 const group = (title: string) => {
-  const root = within(card()).getByRole("region", { name: title });
-  const agents = () => [...root.querySelectorAll("[data-agent-row] b")].map((b) => b.textContent);
+  const root = within(view()).getByRole("region", { name: title });
+  const agents = () => [...root.querySelectorAll("[data-agent-row]")].map((el) => el.textContent);
   return { root, agents };
 };
-const groupTitles = () => [...card().querySelectorAll(".team-groups__head h3")].map((h) => h.textContent);
+const groupTitles = () => [...view().querySelectorAll(".team-sector-card h3")].map((h) => h.textContent);
 /** Opens a "…" menu (Radix: keyboard) and gives the menu. */
-const openMenu = async (name: string) => {
-  const button = within(card()).getByRole("button", { name });
+const openMenu = async (name: string, within$ = view()) => {
+  const button = within(within$).getByRole("button", { name });
   button.focus();
   await act(async () => {
     fireEvent.keyDown(button, { key: "Enter" });
@@ -56,111 +56,127 @@ const openMenu = async (name: string) => {
 };
 const calls = (state: ReturnType<typeof seedState>, method: string) =>
   state.calls.filter((c) => c.method === method).map((c) => c.args.slice(1));
-const team = (state = seedState()) => go(state, "team");
+/** Equipe on one of its views (remembered in this browser). */
+const team = (state = seedState(), shown: "sectors" | "list" = "sectors") => {
+  localStorage.setItem("agentes.team.view", shown);
+  return go(state, "team");
+};
+const pick = async (label: string, option: string) => {
+  const field = screen().getByRole("combobox", { name: label });
+  field.focus();
+  await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
+  await click(screen().getByRole("option", { name: option }));
+};
 
-describe("groups of agents on Equipe (ADR 0083)", () => {
-  test("no groups: Agentes with everyone and nothing else to read", async () => {
+describe("setores on Equipe (ADR 0083, ADR 0148)", () => {
+  test("no groups: an empty state that says what setores are, and a way to create one", async () => {
     await team();
-    expect(groupTitles()).toEqual(["Agentes"]);
-    expect(group("Agentes").agents()).toEqual(["Ada", "Atlas"]);
-    expect(card().textContent).not.toContain("Arraste agentes para cá");
+    expect(view().textContent).toContain("Nenhum setor ainda");
+    expect(within(view()).getByRole("button", { name: "Criar setor" })).toBeTruthy();
   });
 
-  test("each group has its title; the agents in none stay under Agentes", async () => {
+  test("each setor is a card; the agents in none are under Sem setor", async () => {
     await team(
       withGroups([
         { id: INTEGRATIONS, name: "Integrations", agentIds: [ATLAS_ID] },
         { id: "00000000-0000-4000-8000-0000000000e2", name: "Lumen | Gestão e Financeiro", agentIds: [] },
       ]),
     );
-    expect(groupTitles()).toEqual(["Agentes", "Integrations", "Lumen | Gestão e Financeiro"]);
-    expect(group("Agentes").agents()).toEqual(["Ada"]);
+    expect(groupTitles()).toEqual(["Integrations", "Lumen | Gestão e Financeiro", "Sem setor"]);
+    expect(group("Sem setor").agents()).toEqual(["Ada"]);
     expect(group("Integrations").agents()).toEqual(["Atlas"]);
-    // An empty group says where its agents go, to whoever organizes them.
+    // An empty setor says where its agents go, to whoever organizes them; one with no lead says so.
     expect(group("Lumen | Gestão e Financeiro").root.textContent).toContain("Arraste agentes para cá");
+    expect(group("Integrations").root.textContent).toContain("Sem responsável. Escolha quem cuida deste setor.");
   });
 
-  test("owners and admins create, rename, reorder and delete groups; deleting puts its agents back", async () => {
+  test("owners and admins create, edit, reorder and delete setores; deleting puts its agents back", async () => {
     const { state } = await team(withGroups());
-    await click(within(card()).getByRole("button", { name: "Novo grupo" }));
-    const dialog = screen().getByRole("dialog", { name: "Novo grupo" });
+    await click(within(view()).getByRole("button", { name: "Novo setor" }));
+    const dialog = screen().getByRole("dialog", { name: "Novo setor" });
     await type(within(dialog).getByLabelText("Nome"), "  Produto ");
-    await click(within(dialog).getByRole("button", { name: "Criar grupo" }));
-    expect(calls(state, "agentGroups.create")).toEqual([[{ name: "Produto" }]]);
-    expect(groupTitles()).toEqual(["Agentes", "Integrations", "Produto"]);
+    await click(within(dialog).getByRole("radio", { name: /green/ }));
+    await click(within(dialog).getByRole("button", { name: "Criar setor" }));
+    expect(calls(state, "agentGroups.create")).toEqual([[{ name: "Produto", color: "green", icon: "person" }]]);
+    expect(groupTitles()).toEqual(["Integrations", "Produto", "Sem setor"]);
 
     await click(within(await openMenu("Opções de Produto")).getByRole("menuitem", { name: "Mover para cima" }));
-    expect(groupTitles()).toEqual(["Agentes", "Produto", "Integrations"]);
+    expect(groupTitles()).toEqual(["Produto", "Integrations", "Sem setor"]);
 
-    await click(within(await openMenu("Opções de Integrations")).getByRole("menuitem", { name: "Renomear" }));
-    const rename = screen().getByRole("dialog", { name: "Renomear grupo" });
-    const name = within(rename).getByLabelText("Nome") as HTMLInputElement;
+    await click(within(await openMenu("Opções de Integrations")).getByRole("menuitem", { name: "Editar" }));
+    const edit = screen().getByRole("dialog", { name: "Editar setor" });
+    const name = within(edit).getByLabelText("Nome") as HTMLInputElement;
     expect(name.value).toBe("Integrations");
     await type(name, "APIs");
-    await click(within(rename).getByRole("button", { name: "Salvar" }));
-    expect(calls(state, "agentGroups.update").at(-1)).toEqual([INTEGRATIONS, { name: "APIs" }]);
+    await click(within(edit).getByRole("button", { name: "Salvar" }));
+    expect(calls(state, "agentGroups.update").at(-1)).toEqual([
+      INTEGRATIONS,
+      { name: "APIs", color: "graphite", icon: "person" },
+    ]);
 
-    await click(within(await openMenu("Opções de APIs")).getByRole("menuitem", { name: "Excluir grupo" }));
-    const sure = screen().getByRole("dialog", { name: "Excluir o grupo APIs?" });
+    await click(within(await openMenu("Opções de APIs")).getByRole("menuitem", { name: "Excluir setor" }));
+    const sure = screen().getByRole("dialog", { name: "Excluir o setor APIs?" });
     expect(sure.textContent).toContain("Os agentes dele voltam para Agentes.");
-    await click(within(sure).getByRole("button", { name: "Excluir grupo" }));
+    await click(within(sure).getByRole("button", { name: "Excluir setor" }));
     expect(calls(state, "agentGroups.remove")).toEqual([[INTEGRATIONS]]);
-    expect(groupTitles()).toEqual(["Agentes", "Produto"]);
-    expect(group("Agentes").agents()).toEqual(["Ada", "Atlas"]);
+    expect(groupTitles()).toEqual(["Produto", "Sem setor"]);
+    expect(group("Sem setor").agents()).toEqual(["Ada", "Atlas"]);
   });
 
-  test("an agent moves from its row's menu, into a new group from there, and by dragging", async () => {
+  test("the lead and the substitute are picked on the card", async () => {
     const { state } = await team(withGroups());
-    const menu = await openMenu("Opções de Ada");
-    expect(
-      within(menu)
-        .getAllByRole("menuitemradio")
-        .map((o) => o.textContent),
-    ).toEqual(["Sem grupo", "Integrations"]);
-    await click(within(menu).getByRole("menuitemradio", { name: "Integrations" }));
-    expect(calls(state, "agentGroups.move")).toEqual([[ADA_ID, { groupId: INTEGRATIONS }]]);
-    expect(group("Integrations").agents()).toEqual(["Atlas", "Ada"]);
+    await pick("Responsável por Integrations", "João");
+    expect(calls(state, "agentGroups.update").at(-1)).toEqual([INTEGRATIONS, { leadUserId: "u-joao" }]);
+    expect(group("Integrations").root.textContent).toContain("Sem substituto.");
+    await pick("Substituto em Integrations", "Walter");
+    expect(calls(state, "agentGroups.update").at(-1)).toEqual([INTEGRATIONS, { backupUserId: "u-walter" }]);
+    expect(group("Integrations").root.querySelector(".team-sector-card__gap")).toBeNull();
+  });
 
-    // Inside its group: up one place.
-    await click(within(await openMenu("Opções de Ada")).getByRole("menuitem", { name: "Mover para cima" }));
-    expect(calls(state, "agentGroups.move").at(-1)).toEqual([ADA_ID, { groupId: INTEGRATIONS, index: 0 }]);
-    expect(group("Integrations").agents()).toEqual(["Ada", "Atlas"]);
-
-    // Dragged onto Agentes: out of any group.
+  test("an agent moves by dragging between cards, and from its row's menu in Lista", async () => {
+    const { state } = await team(withGroups());
+    // Dragged onto Sem setor: out of any setor.
     const atlas = within(group("Integrations").root).getByRole("link", { name: /Atlas/ });
     expect(atlas.getAttribute("draggable")).toBe("true");
     const dataTransfer = { setData: () => {}, getData: () => "" };
     await act(async () => fireEvent.dragStart(atlas, { dataTransfer }));
-    const agents = group("Agentes").root;
-    await act(async () => fireEvent.dragOver(agents, { dataTransfer }));
-    expect(agents.getAttribute("data-drop")).toBe("true");
-    await act(async () => fireEvent.drop(agents, { dataTransfer }));
+    const none = group("Sem setor").root;
+    await act(async () => fireEvent.dragOver(none, { dataTransfer }));
+    expect(none.getAttribute("data-drop")).toBe("true");
+    await act(async () => fireEvent.drop(none, { dataTransfer }));
     await settle(3);
     expect(calls(state, "agentGroups.move").at(-1)).toEqual([ATLAS_ID, { groupId: null }]);
-    expect(group("Agentes").agents()).toEqual(["Atlas"]);
+    expect(group("Sem setor").agents()).toEqual(["Ada", "Atlas"]);
+    cleanup();
 
-    // A new group made from a row takes that agent.
-    await click(within(await openMenu("Opções de Atlas")).getByRole("menuitem", { name: "Novo grupo…" }));
-    const dialog = screen().getByRole("dialog", { name: "Novo grupo" });
+    const list = await team(withGroups(), "list");
+    const table = screen().getByRole("table");
+    const menu = await openMenu("Opções de Ada", table);
+    expect(
+      within(menu)
+        .getAllByRole("menuitemradio")
+        .map((o) => o.textContent),
+    ).toEqual(["Sem setor", "Integrations"]);
+    await click(within(menu).getByRole("menuitemradio", { name: "Integrations" }));
+    expect(calls(list.state, "agentGroups.move")).toEqual([[ADA_ID, { groupId: INTEGRATIONS }]]);
+    // A new setor made from a row takes that agent.
+    await click(within(await openMenu("Opções de Atlas", table)).getByRole("menuitem", { name: "Novo setor…" }));
+    const dialog = screen().getByRole("dialog", { name: "Novo setor" });
     await type(within(dialog).getByLabelText("Nome"), "Ops");
-    await click(within(dialog).getByRole("button", { name: "Criar grupo" }));
-    expect(calls(state, "agentGroups.create")).toEqual([[{ name: "Ops", agentIds: [ATLAS_ID] }]]);
-    expect(group("Ops").agents()).toEqual(["Atlas"]);
+    await click(within(dialog).getByRole("button", { name: "Criar setor" }));
+    expect(calls(list.state, "agentGroups.create")).toEqual([
+      [{ name: "Ops", agentIds: [ATLAS_ID], color: "graphite", icon: "person" }],
+    ]);
   });
 
-  test("members see the groups and nothing to change them", async () => {
+  test("members read the setores and have nothing to change them", async () => {
     await team(asMember(withGroups()));
-    expect(groupTitles()).toEqual(["Integrations"]);
+    expect(groupTitles()).toEqual(["Integrations", "Sem setor"]);
     expect(group("Integrations").agents()).toEqual(["Atlas"]);
-    expect(within(card()).queryByRole("button", { name: "Novo grupo" })).toBeNull();
-    expect(within(card()).queryByRole("button", { name: "Opções de Integrations" })).toBeNull();
-    expect(within(card()).queryByRole("button", { name: "Opções de Atlas" })).toBeNull();
-    expect(within(card()).getByRole("link", { name: /Atlas/ }).getAttribute("draggable")).toBeNull();
-  });
-
-  test("members with no group holding an agent they see get no groups card", async () => {
-    await team(asMember());
-    expect(screen().queryByText("Grupos de agentes")).toBeNull();
+    expect(within(view()).queryByRole("button", { name: "Novo setor" })).toBeNull();
+    expect(within(view()).queryByRole("button", { name: "Opções de Integrations" })).toBeNull();
+    expect(within(view()).queryByRole("combobox")).toBeNull();
+    expect(within(view()).getByRole("link", { name: /Atlas/ }).getAttribute("draggable")).toBeNull();
   });
 
   test("a change made elsewhere shows at once (the workspace's realtime)", async () => {
@@ -173,32 +189,32 @@ describe("groups of agents on Equipe (ADR 0083)", () => {
     await act(async () => socket.push({ type: "event", scope: "org", event: { type: "agent.groups" } }));
     await settle(3);
     expect(group("Integrations").agents()).toEqual(["Ada", "Atlas"]);
-    expect(group("Agentes").agents()).toEqual([]);
+    expect(group("Sem setor").agents()).toEqual([]);
   });
 });
 
 describe("the Group field on the agent's page", () => {
   test("owners and admins pick it in Configurações and it saves with the page", async () => {
     const { state } = await go(withGroups(), `agents/${ADA_ID}?tab=settings&sec=identity`);
-    const field = screen().getByRole("combobox", { name: "Grupo" });
-    expect(field.textContent).toBe("Sem grupo");
+    const field = screen().getByRole("combobox", { name: "Setor" });
+    expect(field.textContent).toBe("Sem setor");
     field.focus();
     await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
     await click(screen().getByRole("option", { name: "Integrations" }));
     const bar = screen().getByRole("region", { name: "Alterações não salvas" });
-    expect(bar.textContent).toContain("Grupo");
+    expect(bar.textContent).toContain("Setor");
     await click(within(bar).getByRole("button", { name: /^Salvar/ }));
     await settle(4);
     expect(calls(state, "agentGroups.move")).toEqual([[ADA_ID, { groupId: INTEGRATIONS }]]);
-    expect(screen().getByRole("combobox", { name: "Grupo" }).textContent).toBe("Integrations");
+    expect(screen().getByRole("combobox", { name: "Setor" }).textContent).toBe("Integrations");
   });
 
   test("with no groups there is no field; a member reads the agent's group", async () => {
     await go(seedState(), `agents/${ADA_ID}?tab=settings&sec=identity`);
-    expect(screen().queryByRole("combobox", { name: "Grupo" })).toBeNull();
+    expect(screen().queryByRole("combobox", { name: "Setor" })).toBeNull();
     cleanup();
     await go(asMember(withGroups()), `agents/${ATLAS_ID}?tab=settings&sec=identity`);
-    expect(screen().queryByRole("combobox", { name: "Grupo" })).toBeNull();
+    expect(screen().queryByRole("combobox", { name: "Setor" })).toBeNull();
     expect(document.querySelector(".agp-id")?.textContent).toContain("Integrations");
   });
 });

@@ -12,6 +12,7 @@ import {
 } from "@agenteschat/client";
 import { accountTitle, type ExistingAi, groupPlans, planWordOf, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
+import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -77,6 +78,7 @@ import { SheetHeader } from "../new/parts";
 import { AgentFace } from "../shared/Face";
 import { AddAccount } from "./AddAccount";
 import type { ConnectKey } from "./ConnectAi";
+import { EndpointForm } from "./EndpointForm";
 import { existingRows, offersKeyNow, PLAN_POLL_MS, pollsPlan, takenFrom } from "./logic";
 import { useAiOrg } from "./org";
 import { AiRow, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from "./parts";
@@ -1074,8 +1076,12 @@ function GateWait({
 function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveKey }: ConnectAiFlowProps) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
+  const { orgId } = useAiOrg();
   const [touched, setTouched] = useState(false);
   const [opened, setOpened] = useState(false);
+  // "Outro provedor" (ADR 0146): its own form, saved by its own button (a sheet only: the first run saves a key).
+  const [custom, setCustom] = useState(form.asked === CUSTOM_PROVIDER);
+  const [endpointSaved, setEndpointSaved] = useState(false);
   const maker = providerOf(form.provider);
   const hint = maker && keyStepHint(maker);
   const clean = form.key.trim();
@@ -1083,10 +1089,10 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
   const wrong = touched && clean.length > 0 && !valid;
   const others = wrong ? providersForKey(clean) : [];
   if (!mayAddKey) return <InfoCard icon="lock">{t("connectAi.keyLocked")}</InfoCard>;
-  if (keySaved) {
+  if (keySaved || endpointSaved) {
     return (
       <View style={styles.done}>
-        <ProviderLogo id={form.provider} size="hero" />
+        <ProviderLogo id={endpointSaved ? CUSTOM_PROVIDER : form.provider} size="hero" />
         <Text variant="title2" tone="ink" style={styles.center}>
           {t("connectAi.key.saved")}
         </Text>
@@ -1103,13 +1109,29 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
             key={p.id}
             leading={<ProviderLogo id={p.id} size="sm" />}
             label={p.label}
-            checked={form.provider === p.id}
-            onPress={() => form.setProvider(p.id)}
+            checked={!custom && form.provider === p.id}
+            onPress={() => {
+              setCustom(false);
+              form.setProvider(p.id);
+            }}
           />
         ))}
+        {keyButton ? (
+          <GroupedRow
+            leading={<ProviderLogo id={CUSTOM_PROVIDER} size="sm" />}
+            label={t("endpoint.option")}
+            sub={t("endpoint.optionSub")}
+            checked={custom}
+            onPress={() => setCustom(true)}
+          />
+        ) : null}
       </GroupedList>
       <GroupedFooter>{t("connectAi.key.sub")}</GroupedFooter>
-      {maker && site ? (
+      {custom ? (
+        <View style={styles.keySteps}>
+          <EndpointForm orgId={orgId} onDone={() => setEndpointSaved(true)} />
+        </View>
+      ) : maker && site ? (
         <View style={styles.keySteps}>
           <StepsCard>
             <Step

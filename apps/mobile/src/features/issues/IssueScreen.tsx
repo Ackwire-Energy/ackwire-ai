@@ -12,14 +12,14 @@ import {
   useIssueAction,
   useIssueColumns,
 } from "@agenteschat/client";
-import { relativeTime } from "@agenteschat/client/lib/format";
+import { capitalize, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { webUrl } from "@agenteschat/client/lib/guards";
-import { isOpen, PRIORITIES, STATUSES } from "@agenteschat/client/lib/issues";
+import { conversationLine, isOpen, PRIORITIES, STATUSES } from "@agenteschat/client/lib/issues";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
@@ -36,7 +36,6 @@ import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
 import { IssueWorkLine } from "../chat/WorkLine";
 import { chatHref } from "../links/logic";
-import { useOpenDm } from "../new/useOpenDm";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -50,15 +49,15 @@ import {
   useSurface,
 } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
-import { IssueActivityFeed, IssueComposer } from "./IssueActivity";
+import { IssueActivityFeed } from "./IssueActivity";
 import {
   columnChoices,
   columnOfIssue,
-  conversationOf,
   criteriaProgress,
   issueState,
   minutesSince,
   stageCustomized,
+  taskConversationHref,
   workLines,
 } from "./logic";
 import { StateChip, useColumnLabel, useStepText } from "./parts";
@@ -69,15 +68,15 @@ import { StateChip, useColumnLabel, useStepText } from "./parts";
  * here too), what is linked (the source message, Drive files, PRs) and its sub-issues. Conversar and Concluir
  * at the bottom; "…" moves it to another board column, changes priority and who does it, as the web allows.
  */
-export function IssueScreen({ number }: { number: number }) {
+export function IssueScreen({ number, focusId = null }: { number: number; focusId?: string | null }) {
   return (
     <SheetHostProvider>
-      <IssueView number={number} />
+      <IssueView number={number} focusId={focusId} />
     </SheetHostProvider>
   );
 }
 
-function IssueView({ number }: { number: number }) {
+function IssueView({ number, focusId }: { number: number; focusId: string | null }) {
   const { t } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
@@ -93,6 +92,14 @@ function IssueView({ number }: { number: number }) {
   );
   const sheet = useSheet();
   const i = issue.data;
+  const openConversation = useOpenConversation();
+  // A notice or a link named a message of its conversation: straight there, once.
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!i || !focusId || focused.current) return;
+    focused.current = true;
+    openConversation(i, focusId);
+  }, [i, focusId, openConversation]);
   if (!i) {
     return (
       <View style={[styles.screen, { backgroundColor: c.bg }]}>
@@ -138,6 +145,7 @@ function IssueView({ number }: { number: number }) {
           <Head issue={i} />
           <WorkCard issue={i} />
           <IssueWorkLine issue={i} />
+          <ConversationRow issue={i} onOpen={() => openConversation(i)} />
           <Description issue={i} />
           <Criteria issue={i} />
           <Linked issue={i} />
@@ -145,14 +153,80 @@ function IssueView({ number }: { number: number }) {
           <IssueActivityFeed issue={i} />
         </ScrollView>
       </FocusLive>
-      <IssueComposer issue={i} onSent={() => scroll.current?.scrollToEnd({ animated: true })} />
     </View>
   );
 }
 
-/** "#134 · criada pelo Atlas a partir do Sentry · #tech", the title, the chips. */
-function Head({ issue: i }: { issue: Issue }) {
+/** Opens the task's conversation (ADR 0145), made on first use, at `messageId` when one is named. */
+function useOpenConversation() {
   const { t } = useTranslation();
+  const orgId = useOrgId();
+  const api = useApi();
+  const toast = useToast();
+  return useCallback(
+    (i: Issue, messageId?: string | null) => {
+      void (async () => {
+        try {
+          const at = i.conversation ?? (await api.issues.conversation(orgId, i.id));
+          router.push(taskConversationHref(at, messageId));
+        } catch {
+          toast({ title: t("mobile.app.failed"), icon: "x" });
+        }
+      })();
+    },
+    [api, orgId, toast, t],
+  );
+}
+
+/**
+ * The task's conversation, one row: who took part, "6 mensagens", "Trabalhando" while an agent is at it, else when
+ * it last moved; nobody yet: "Conversar sobre a tarefa". Opens the thread screen.
+ */
+function ConversationRow({ issue, onOpen }: { issue: Issue; onOpen: () => void }) {
+  const { t, i18n } = useTranslation();
+  const c = useColors();
+  const surface = useSurface();
+  const line = conversationLine(issue);
+  const label = line ? t("issues.conversation.messages", { count: line.count }) : t("issues.conversation.start");
+  const state = line?.working
+    ? t("threads.status.working")
+    : line?.lastAt
+      ? relativeTime(t, i18n.language, line.lastAt)
+      : null;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={[t("issues.conversation.title"), label, state].filter(Boolean).join(", ")}
+      onPress={() => {
+        tapHaptic();
+        onOpen();
+      }}
+      style={[styles.talk, surface]}
+    >
+      <Icon name="chat" size={18} color={c.muted} />
+      {line ? (
+        <View style={styles.faces}>
+          {line.people.map((p) => (
+            <Face key={`${p.type}:${p.id}`} who={p} size={20} live={false} />
+          ))}
+        </View>
+      ) : null}
+      <Text variant="body" style={[styles.bold, styles.grow]} numberOfLines={1}>
+        {label}
+      </Text>
+      {state ? (
+        <Text variant="small" tone="muted">
+          {state}
+        </Text>
+      ) : null}
+      <Icon name="right" size={16} color={c.faint} />
+    </Pressable>
+  );
+}
+
+/** "#134" and the title on one row, "Criada pelo Atlas a partir do Sentry · #tech" under it, the chips. */
+function Head({ issue: i }: { issue: Issue }) {
+  const { t, i18n } = useTranslation();
   const dir = useDirectory();
   const orgId = useOrgId();
   const channels = useChannels(orgId);
@@ -160,30 +234,36 @@ function Head({ issue: i }: { issue: Issue }) {
   const from =
     i.source.type === "message"
       ? t("mobile.issues.fromMessage")
-      : i.source.type === "forum"
-        ? t("mobile.issues.fromForum")
-        : i.source.type === "agent"
-          ? t("mobile.issues.fromAgent")
-          : i.source.type === "webhook"
-            ? t("mobile.issues.fromWebhook", { provider: i.source.provider })
-            : null;
+      : i.source.type === "agent"
+        ? t("mobile.issues.fromAgent")
+        : i.source.type === "webhook"
+          ? t("mobile.issues.fromWebhook", { provider: i.source.provider })
+          : null;
   const creator = dir.nameOf(i.createdBy);
-  const line = [
-    `#${i.number}`,
-    [creator ? t("mobile.issues.createdBy", { name: creator }) : null, from].filter(Boolean).join(" "),
-    channel ? `#${channel.name}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // It starts the line now, under the title.
+  const line = capitalize(
+    [
+      [creator ? t("mobile.issues.createdBy", { name: creator }) : null, from].filter(Boolean).join(" "),
+      channel ? `#${channel.name}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    i18n.language,
+  );
   const assignee = i.assignee;
   return (
     <View style={styles.head}>
-      <Text variant="small" tone="faint">
-        {line}
-      </Text>
       <Text variant="display2" accessibilityRole="header" style={styles.bigTitle} maxFontSizeMultiplier={1.4}>
+        <Text variant="display2" tone="faint" style={styles.number} maxFontSizeMultiplier={1.4}>
+          #{i.number}
+        </Text>{" "}
         {i.title}
       </Text>
+      {line ? (
+        <Text variant="small" tone="faint">
+          {line}
+        </Text>
+      ) : null}
       <View style={styles.chips}>
         <StateChip issue={i} />
         {i.priority === "high" ? <Chip icon="flag" label={t("issues.priority.high")} /> : null}
@@ -584,7 +664,7 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
   const columns = useIssueColumns(orgId);
   const columnLabel = useColumnLabel();
   const toast = useToast();
-  const openDm = useOpenDm();
+  const openConversation = useOpenConversation();
   const stop = useMutation({
     mutationFn: (runId: string) => api.agents.cancelRun(orgId, runId),
     onSettled: () => void qc.invalidateQueries({ queryKey: keys.issues(orgId) }),
@@ -665,22 +745,16 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
         )
       : pick(statusItems());
   const w = i.work;
-  const target = conversationOf(i);
   const items: ActionItem[] = [
-    ...(target
-      ? [
-          {
-            key: "talk",
-            icon: "chat" as const,
-            label: t("mobile.issues.talk"),
-            onPress: () => {
-              sheet.close();
-              if ("channelId" in target) router.push(chatHref(target.channelId));
-              else void openDm({ agentId: target.agentId });
-            },
-          },
-        ]
-      : []),
+    {
+      key: "talk",
+      icon: "chat" as const,
+      label: t("mobile.issues.talk"),
+      onPress: () => {
+        sheet.close();
+        openConversation(i);
+      },
+    },
     {
       key: "column",
       icon: "circle",
@@ -736,6 +810,7 @@ const styles = StyleSheet.create({
   centerText: { textAlign: "center" },
   head: { paddingHorizontal: 20, paddingTop: 6, gap: 6, marginBottom: 14 },
   bigTitle: { marginVertical: 4 },
+  number: { fontWeight: "500" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   work: { marginHorizontal: 16, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
   workHead: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -754,8 +829,18 @@ const styles = StyleSheet.create({
   pickerStage: { gap: 6 },
   pickerTitle: { paddingHorizontal: 4 },
   tile: { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  /** Room for the comment box floating at the bottom. */
-  scroll: { paddingBottom: 130 },
+  scroll: { paddingBottom: 40 },
+  talk: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  faces: { flexDirection: "row", gap: 2 },
   barRight: { flexDirection: "row", alignItems: "center", gap: 2 },
   barWord: { paddingHorizontal: 10, height: 36, justifyContent: "center" },
 });

@@ -25,7 +25,7 @@ Going to the background starts no child run: the run already working keeps going
 
 ### 1. When work becomes background work
 
-- **The agent decides**: `work_in_background({ title, say, next_update_minutes?, plan?, card?, card_issue?, description? })`, through the tool gateway and so the MCP bridge on every brain. Listed only for a run a person is behind (`runAuthority` → `person`), in a channel or DM people read, never in a mission's thread, a forum turn, an agents' DM, a routine's run or a run that already is a work (`workEligible`). The prompt line (`WORK_IN_BACKGROUND_LINE`) goes in "How you work" when the tool is there.
+- **The agent decides**: `work_in_background({ title, say, next_update_minutes?, plan?, card?, card_issue?, description? })`, through the tool gateway and so the MCP bridge on every brain. Listed only for a run a person is behind (`runAuthority` → `person`), in a channel or DM people read, never in a mission's thread, an agents' DM, a routine's run or a run that already is a work (`workEligible`). The prompt line (`WORK_IN_BACKGROUND_LINE`) goes in "How you work" when the tool is there.
 - **The safety net is deterministic**: a timer per execution attempt (`autoMove` in the executor) counts active time (`transcript.activeMs` across parks, waits excluded) and model calls, and moves an eligible run at `WORK_AUTO_AFTER_MS` (4 min) or `WORK_AUTO_AFTER_CALLS` (20), concurrently with a long computer turn. Its title is the thread's, else the excerpt of the ask. The note reaches the brain like a check-in (an agent-only `work_check_in` notice, live on a steerable turn).
 
 ### 2. Every brain, one surface

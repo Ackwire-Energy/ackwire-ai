@@ -8,7 +8,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
       "L'accordo per l'utilizzo di agentes.chat: il tuo workspace, i tuoi agenti e ciò di cui ciascuna parte è responsabile.",
     courtesy:
       "La presente è una traduzione di cortesia. In caso di divergenza rispetto alla versione inglese, prevale la versione inglese.",
-    updated: "2026-11-03",
+    updated: "2026-11-04",
     sections: [
       {
         id: "agreement",
@@ -22,7 +22,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
         id: "service",
         heading: "2. Il Servizio",
         blocks: [
-          "Il Servizio è un workspace in cui persone e agenti di IA lavorano insieme. Comprende canali, thread e messaggi diretti, e agenti con ruoli, istruzioni, memoria e budget propri. Comprende inoltre attività, wiki, Drive, forum, calendario e routine, approvazioni, connettori verso altri servizi e la possibilità di collegare computer sui quali gli agenti possono lavorare.",
+          "Il Servizio è un workspace in cui persone e agenti di IA lavorano insieme. Comprende canali, thread e messaggi diretti, e agenti con ruoli, istruzioni, memoria e budget propri. Comprende inoltre attività, wiki, Drive, calendario e routine, approvazioni, connettori verso altri servizi e la possibilità di collegare computer sui quali gli agenti possono lavorare.",
           "Il Servizio è nuovo e ancora in evoluzione: le funzionalità possono essere modificate, limitate o rimosse. Per un certo periodo potremmo aprire nuovi account solo su invito, oppure a chiunque si registri. Ove possibile, ti avviseremo in anticipo prima di rimuovere qualcosa su cui fai affidamento.",
         ],
       },
@@ -175,7 +175,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
       "Quali dati raccogliamo, che cosa gli agenti inviano e dove, chi può vedere il tuo workspace e quali diritti hai.",
     courtesy:
       "La presente è una traduzione di cortesia. In caso di divergenza rispetto alla versione inglese, prevale la versione inglese.",
-    updated: "2026-11-03",
+    updated: "2026-11-04",
     sections: [
       {
         id: "overview",
@@ -219,7 +219,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
         id: "workspace-content",
         heading: "4. Il Contenuto del Workspace, trattato per conto dei workspace",
         blocks: [
-          "Il Contenuto del Workspace comprende i messaggi nei canali, nei thread e nei messaggi diretti, i file nel Drive e le pagine wiki. Comprende inoltre le attività, gli argomenti del forum, le routine, gli eventi del calendario e le approvazioni, le istruzioni, le impostazioni e la memoria degli agenti, ciò che gli agenti scrivono e fanno, e i dati che gli agenti leggono tramite i connettori, i database e i computer collegati dal workspace. Lo trattiamo esclusivamente per far funzionare il workspace e i suoi agenti secondo la configurazione stabilita dal workspace, per mostrarlo ai membri del workspace, per inviare le notifiche da loro richieste e per fornire assistenza.",
+          "Il Contenuto del Workspace comprende i messaggi nei canali, nei thread e nei messaggi diretti, i file nel Drive e le pagine wiki. Comprende inoltre le attività, le routine, gli eventi del calendario e le approvazioni, le istruzioni, le impostazioni e la memoria degli agenti, ciò che gli agenti scrivono e fanno, e i dati che gli agenti leggono tramite i connettori, i database e i computer collegati dal workspace. Lo trattiamo esclusivamente per far funzionare il workspace e i suoi agenti secondo la configurazione stabilita dal workspace, per mostrarlo ai membri del workspace, per inviare le notifiche da loro richieste e per fornire assistenza.",
           "Il Contenuto del Workspace appartiene al workspace: i membri vedono ciò che i suoi canali e le sue autorizzazioni consentono, e i suoi proprietari e amministratori lo gestiscono. I messaggi che hai pubblicato restano nel workspace dopo che lo hai lasciato o hai eliminato il tuo account, a meno che il workspace non li elimini.",
         ],
       },

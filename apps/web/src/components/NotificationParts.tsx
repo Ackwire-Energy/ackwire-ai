@@ -148,8 +148,6 @@ type WhatKey =
   | "issueComment"
   | "issueStatus"
   | "issueDone"
-  | "forumTurn"
-  | "forumSynthesis"
   | "approval"
   | "missionFinished"
   | "missionStopped"
@@ -256,10 +254,6 @@ export function Headline({
       return k("issueComment", { names, count });
     case "issue_status":
       return n.latest.statusTo === "done" ? k("issueDone", { name }) : k("issueStatus", { name });
-    case "forum_turn":
-      return k("forumTurn", { name });
-    case "forum_synthesis":
-      return k("forumSynthesis", { name });
     case "approval":
       return k("approval", { name });
     case "mission_finished":

@@ -647,7 +647,7 @@
     "noneForYou": "Belum ada agen yang bekerja denganmu.",
     "noneForYouHint": "Minta akses ke admin.",
     "freeSection": "Senggang",
-    "noGroupSection": "Tanpa grup"
+    "noGroupSection": "Tanpa departemen"
   },
   "agentEdit": {
     "missing": "Agen ini sudah tidak ada.",
@@ -727,8 +727,6 @@
       "issue_assigned_other": "Tugas untukmu",
       "issue_comment_other": "{{names}} mengomentari tugas",
       "issue_status_other": "{{names}} mengubah tugas",
-      "forum_turn_other": "Giliranmu di forum",
-      "forum_synthesis_other": "Ringkasan forum siap",
       "approval_other": "{{names}} meminta persetujuan",
       "mission_finished_other": "Misi selesai",
       "mission_stopped_other": "Misi dihentikan",
@@ -932,6 +930,7 @@
   "files": {
     "type": {
       "image": "Gambar",
+      "video": "Video",
       "pdf": "PDF",
       "document": "Dokumen",
       "table": "Tabel",
@@ -956,7 +955,17 @@
     "openImage": "Buka gambar",
     "imageOf": "Gambar {{index}} dari {{count}}",
     "place": "{{index}} dari {{count}}",
-    "noPreview": "File ini tidak bisa dibuka di aplikasi. Bagikan untuk membukanya di aplikasi lain."
+    "noPreview": "File ini tidak bisa dibuka di aplikasi. Bagikan untuk membukanya di aplikasi lain.",
+    "video": {
+      "play": "Putar",
+      "pause": "Jeda",
+      "replay": "Putar lagi",
+      "seek": "Posisi dalam video",
+      "mute": "Bisukan",
+      "unmute": "Nyalakan suara",
+      "fullscreen": "Layar penuh",
+      "open": "Buka"
+    }
   },
   "issues": {
     "title": "Tugas",
@@ -988,7 +997,6 @@
     "loadFailed": "Tidak bisa memuat tugas.",
     "createdBy": "dibuat oleh {{name}}",
     "fromMessage": "dari pesan",
-    "fromForum": "dari forum",
     "fromAgent": "dari permintaan ke agen",
     "fromWebhook": "dari {{provider}}",
     "workingFor_other": "bekerja selama {{count}} mnt",
@@ -1151,7 +1159,6 @@
     "kind": {
       "approval": "Setujui",
       "question": "Pertanyaan",
-      "forum": "Giliranmu",
       "browser": "Browser",
       "secret": "Rahasia",
       "join": "Anggota",
@@ -1263,7 +1270,6 @@
         "wiki": "Wiki",
         "skills": "Skill",
         "schedule": "Rutinitas",
-        "forum": "Forum",
         "sandbox": "Komputer sendiri",
         "browser": "Browser",
         "setup": "Pengaturan ruang kerja",
@@ -1936,5 +1942,9 @@
         "proposal": "Dasbor"
       }
     }
+  },
+  "team": {
+    "entry": "Daftar, bagan organisasi, dan peta",
+    "mapHint": "Untuk memindahkan agen ke kanal lain, pakai peta di web atau bicara dengan {{name}}."
   }
 }

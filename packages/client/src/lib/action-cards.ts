@@ -13,6 +13,7 @@ import type {
   Role,
   Skill,
   SuggestedAi,
+  TeamProposalCard,
 } from "../api/types";
 import type { Level } from "./access-levels";
 import { type AppPage, isAppPage } from "./app-pages";
@@ -20,6 +21,7 @@ import type { ConnectedItem } from "./connected";
 import { isHttpsUrl, sameServer } from "./custom-tools";
 import { joinNames } from "./format";
 import { aiStateOf, PLAN_BRAIN } from "./no-ai";
+import { type TeamWeekCard, teamWeekCardOf } from "./team-week";
 import { type UsagePauseCard, usagePauseCardOf } from "./usage-pause";
 
 /**
@@ -204,10 +206,12 @@ export type ActionCard =
   | UpdateSkillsCard
   | SettingsProposalCard
   | AgentProposalCard
+  | TeamProposalCard
   | StretchCard
   | UsagePauseCard
   | CostlyProposalCard
-  | PersonLimitCard;
+  | PersonLimitCard
+  | TeamWeekCard;
 
 /** The card an agent posts when the person behind its run is at their monthly limit (ADR 0141). */
 export const personLimitCardOf = (meta: Record<string, unknown> | null | undefined): PersonLimitCard | null => {
@@ -274,6 +278,14 @@ export function agentProposalOf(meta: Record<string, unknown> | null | undefined
   const raw = meta?.actionCard as Partial<AgentProposalCard> | undefined;
   return raw?.kind === "agent_proposal" && raw.params?.draft && typeof raw.expiresAt === "string"
     ? (raw as AgentProposalCard)
+    : null;
+}
+
+/** The right hand's team card (ADR 0137 §10), or null. */
+export function teamProposalOf(meta: Record<string, unknown> | null | undefined): TeamProposalCard | null {
+  const raw = meta?.actionCard as Partial<TeamProposalCard> | undefined;
+  return raw?.kind === "team_proposal" && Array.isArray(raw.params?.agents) && typeof raw.expiresAt === "string"
+    ? (raw as TeamProposalCard)
     : null;
 }
 
@@ -382,10 +394,12 @@ function routineLine(
 export function actionCardOf(meta: Record<string, unknown> | null | undefined): ActionCard | null {
   const proposal =
     agentProposalOf(meta) ??
+    teamProposalOf(meta) ??
     stretchCardOf(meta) ??
     usagePauseCardOf(meta) ??
     costlyProposalOf(meta) ??
-    personLimitCardOf(meta);
+    personLimitCardOf(meta) ??
+    teamWeekCardOf(meta);
   if (proposal) return proposal;
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;

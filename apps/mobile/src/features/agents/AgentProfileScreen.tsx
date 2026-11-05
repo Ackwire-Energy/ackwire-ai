@@ -11,6 +11,7 @@ import {
   useMemoryAboutMe,
   useMemoryAction,
   useModelLabel,
+  useModels,
   useRemoveApprovalRule,
   useUsage,
 } from "@agenteschat/client";
@@ -18,6 +19,7 @@ import { approvalRuleServer, approvalRuleWords, approvalTitle } from "@agentesch
 import { listsAgent, seesDetails } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { effortLevel } from "@agenteschat/client/lib/brain-advanced";
+import { modelUnpriced } from "@agenteschat/client/lib/endpoints";
 import { formatPercent, lowerFirst, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentPlan, aiStateOf, planLabel, planOfAccount } from "@agenteschat/client/lib/no-ai";
@@ -105,7 +107,6 @@ const AREA_ICON: Record<string, IconName> = {
   wiki: "doc",
   skills: "sparkle",
   schedule: "clock",
-  forum: "chat",
   sandbox: "laptop",
   browser: "globe",
   setup: "pen",
@@ -162,6 +163,7 @@ function Profile({ id }: { id: string }) {
   const underBar = AVATAR_TOP - (insets.top + BAR_HEIGHT);
   const avatarFade = useScrollFade(y, underBar - 30, underBar + 70);
   const agent = dir.agentById.get(id);
+  const models = useModels();
   // Someone it doesn't answer (not its owner, not an admin) sees only its public card: no tools, memory or month.
   const details = seesDetails(agent);
   // The team's right hand (ADR 0137): what it is and how it works, its model, Configurar for who manages agents.
@@ -343,6 +345,8 @@ function Profile({ id }: { id: string }) {
     planNow?.alert ?? null,
     budgetUnder ? budgetLine : null,
     !budgetUnder && budgetLine && spend && spend.fraction >= 1 ? t(`mobile.agent.exhausted${g}`, { name }) : null,
+    // A model with no price can't count against the budget: said where the budget is.
+    budgetLine && agent && modelUnpriced(models.data?.models, agent.model) ? t("endpoint.budgetUnpriced") : null,
   ]
     .filter(Boolean)
     .join(" · ");

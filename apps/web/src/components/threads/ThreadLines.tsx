@@ -1,12 +1,13 @@
-import type { Message, ThreadInfo, ThreadStartMeta } from "@agenteschat/client";
+import type { Actor, Message, ThreadInfo, ThreadStartMeta } from "@agenteschat/client";
 import { runsInChannel, useChannelThreads } from "@agenteschat/client";
 import { formatTime, relativeTime } from "@agenteschat/client/lib/format";
-import { threadMessageCount, threadStatus, threadTitle } from "@agenteschat/client/lib/threads";
+import { type ThreadStatus, threadMessageCount, threadStatus, threadTitle } from "@agenteschat/client/lib/threads";
 import { AvatarStack, Button, CountBadge, Icon, Popover } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { createContext, type ReactNode, useContext, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useActors } from "@/components/actors";
+import { ActorAvatar } from "@/components/AgentAvatar";
+import { actorKey, useActors } from "@/components/actors";
 import { useChannelActions } from "@/components/channel-actions";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -79,8 +80,7 @@ function OpenThread({
  * time. Opens the thread in the panel beside the channel; pressed while open there.
  */
 export function ThreadReplyLine({ thread, count }: { thread: ThreadInfo; count: number }) {
-  const { t, i18n } = useTranslation();
-  const actors = useActors();
+  const { t } = useTranslation();
   const view = useChannelThreadsView();
   // A run in the thread right now (the list's `working` lags until it refetches).
   const live = useStreams((s) => runsInChannel(s, thread.channelId).some((r) => r.threadId === thread.id));
@@ -91,21 +91,53 @@ export function ThreadReplyLine({ thread, count }: { thread: ThreadInfo; count: 
   const open = view?.open === thread.id;
   return (
     <OpenThread threadId={thread.id} className="thread-line" pressed={open}>
+      <ThreadLineBody people={people} label={replies} status={status} at={at} />
+    </OpenThread>
+  );
+}
+
+/**
+ * The words of a thread line (inside `.thread-line`), for a "Responder" thread and a task's conversation alike: who
+ * is in it (three framed faces, agents and people one size), the count, what it needs, when it last moved.
+ */
+export function ThreadLineBody({
+  people,
+  label,
+  status,
+  at,
+}: {
+  people: Actor[];
+  label: string;
+  status?: ThreadStatus;
+  at?: string | null;
+}) {
+  const { t, i18n } = useTranslation();
+  const actors = useActors();
+  return (
+    <>
       <span className="thread-line__who" aria-hidden="true">
-        <AvatarStack>{people.slice(0, 3).map((p) => actors.avatar(p))}</AvatarStack>
+        <AvatarStack>
+          {people.slice(0, 3).map((p) => (
+            <ActorAvatar key={actorKey(p)} actor={p} name={actors.name(p)} size="xs" framed />
+          ))}
+        </AvatarStack>
       </span>
-      <b>{replies}</b>
+      <b>{label}</b>
       {(status === "needsYou" || status === "working") && (
         <span className={`thread-line__state thread-line__state--${status}`}>
           <Icon name={status === "needsYou" ? "waiting" : "bolt"} size={14} />
           {t(`threads.status.${status}`)}
         </span>
       )}
-      <span className="thread-line__dot" aria-hidden="true">
-        ·
-      </span>
-      <time dateTime={at}>{relativeTime(t, i18n.language, at)}</time>
-    </OpenThread>
+      {at && (
+        <span className="thread-line__when">
+          <span className="thread-line__dot" aria-hidden="true">
+            ·
+          </span>
+          <time dateTime={at}>{relativeTime(t, i18n.language, at)}</time>
+        </span>
+      )}
+    </>
   );
 }
 

@@ -79,6 +79,7 @@ export const agentRunStatusEnum = pgEnum("agent_run_status", [
   /** Stopped by a person (`POST …/runs/{id}/cancel`). */
   "canceled",
 ]);
+/** `forum` is unused since the forum was removed (migration 0216); dropping it would rewrite `agent_runs`. */
 export const agentRunTriggerEnum = pgEnum("agent_run_trigger", ["mention", "router", "dm", "forum"]);
 
 export const agentRuns = pgTable(

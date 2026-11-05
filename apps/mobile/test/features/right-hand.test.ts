@@ -68,6 +68,17 @@ test("its greeting's cards: Connect AI, then how to start, then what next, then 
   expect(introCards({ ...base, teamHandles: ["ada"], alone: false })).toEqual([]);
 });
 
+test("it asks once how the person wants agents to talk to them, last, while they never picked (ADR 0147)", () => {
+  const base = { noAi: false, aiKnown: true, teamHandles: ["ada"], createsAgents: true, alone: false };
+  expect(introCards({ ...base, askStyle: true })).toEqual(["style"]);
+  expect(introCards({ ...base, teamHandles: [], alone: true, askStyle: true })).toEqual(["start", "style"]);
+  // Picked (or an older server that sends no choice): never again.
+  expect(introCards({ ...base, askStyle: false })).toEqual([]);
+  // Nothing to talk with yet: Connect AI alone, the question comes with the AI.
+  expect(introCards({ ...base, noAi: true, askStyle: true })).toEqual(["connect"]);
+  expect(introCards({ ...base, aiKnown: false, askStyle: true })).toEqual([]);
+});
+
 test("Configurações has its section for who manages agents, at its own screen", () => {
   const ids = (permissions: string[]) =>
     visibleSections({ id: "o", name: "Acme", role: "member", permissions }).map((s) => s.id);

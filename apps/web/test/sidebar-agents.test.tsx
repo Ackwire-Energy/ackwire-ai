@@ -97,7 +97,7 @@ describe("Agentes and its groups", () => {
     await go(asMember(withGroups()));
     expect(within(nav()).queryByRole("button", { name: "Diretoria" })).toBeNull();
     expect(nav().querySelector("[draggable='true'][data-agent-row], [data-agent-row] [draggable='true']")).toBeNull();
-    expect(within(nav()).queryByRole("button", { name: "Novo agente ou grupo" })).toBeNull();
+    expect(within(nav()).queryByRole("button", { name: "Novo agente ou setor" })).toBeNull();
   });
 
   test("closed, a group still shows the agent that wrote to me, and the working count while one works", async () => {
@@ -174,15 +174,15 @@ describe("Agentes and its groups", () => {
   });
 });
 
-describe("Mudar de grupo", () => {
+describe("Mudar de setor", () => {
   test("the row's right click moves the agent, and the toast's Desfazer puts it back", async () => {
     const { state } = await go(withGroups());
     await rightClick(within(nav()).getByRole("link", { name: /^Ada/ }));
-    expect(items()).toEqual(expect.arrayContaining(["Sem grupo", "Integrations", "Diretoria", "Novo grupo com Ada"]));
+    expect(items()).toEqual(expect.arrayContaining(["Sem setor", "Integrations", "Diretoria", "Novo setor com Ada"]));
     await pick("Integrations");
     expect(rowsIn(section("Integrations"))).toEqual(["Atlas", "Ada"]);
     const toast = screen()
-      .getByText("Ada foi para o grupo Integrations")
+      .getByText("Ada foi para o setor Integrations")
       .closest("[role='status'], li, div") as HTMLElement;
     await click(within(toast.parentElement as HTMLElement).getByRole("button", { name: "Desfazer" }));
     expect(rowsIn(section("Agentes"))).toEqual(["Ada"]);
@@ -209,6 +209,20 @@ describe("Fixar no topo", () => {
     await click(within(hint).getByRole("button", { name: "Fechar" }));
     expect(section("Agentes").querySelector(".sidebar__pins-hint")).toBeNull();
     expect(views(state).at(-1)).toMatchObject({ pins: { agents: [ATLAS_ID], channels: [], people: [] } });
+  });
+
+  test("day one leaves my agents in their groups: an agent writing in its DM keeps its group", async () => {
+    const state = withGroups();
+    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
+    if (atlas) atlas.ownerUserId = "u-walter";
+    state.agentGroups?.[1]?.agentIds.push(ADA_ID);
+    seedDm(state, { type: "agent", id: ATLAS_ID }, { ago: 1 });
+    seedDm(state, { type: "agent", id: ADA_ID }, { ago: 2 });
+    await go(state);
+    expect(rowsIn(section("Integrations"))).toEqual(["Atlas"]);
+    expect(rowsIn(section("Diretoria"))).toEqual(["Ada"]);
+    expect(within(nav()).queryByRole("img", { name: "Fixado no topo" })).toBeNull();
+    expect(section("Agentes").querySelector(".sidebar__pins-hint")).toBeNull();
   });
 
   test("a channel pinned from its right click goes on top of Canais; Tirar do topo puts it back", async () => {

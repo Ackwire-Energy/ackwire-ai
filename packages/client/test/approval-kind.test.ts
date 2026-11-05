@@ -14,6 +14,7 @@ import {
   approvalRuleServer,
   approvalRuleWords,
   approvalSummary,
+  approvalTitle,
   approvalValues,
   approvalWaitsFor,
   approveAlwaysHint,
@@ -180,6 +181,33 @@ describe("an approval's values", () => {
     ]);
     // A list of objects still says nothing.
     expect(approvalValues({ params: { tools: [{ slug: "X" }] }, connector: "x" })).toEqual([]);
+  });
+});
+
+describe("an approval's title", () => {
+  const lang = (lng: string) => {
+    const instance = i18next.createInstance();
+    void instance.init({ lng, fallbackLng: "en", resources, initAsync: false });
+    return instance.t;
+  };
+  const pt = lang("pt-BR");
+  const en = lang("en");
+  const comment = { tool: "add_issue_comment", params: {}, email: null, connector: "github" };
+
+  test("a server title that is only the tool's name reads as the tool in words, bare or after the connector", () => {
+    expect(approvalTitle(pt, { ...comment, title: "GitHub: add_issue_comment" })).toBe(
+      "Adicionar comentários da issue",
+    );
+    expect(approvalTitle(pt, { ...comment, title: "add_issue_comment" })).toBe("Adicionar comentários da issue");
+    expect(approvalTitle(en, { ...comment, title: "GitHub: add_issue_comment" })).toBe("Add issue comments");
+  });
+
+  test("a real title stays as the server wrote it", () => {
+    expect(
+      approvalTitle(pt, { tool: "merge_pull_request", title: "Merge PR #42 into main", params: {}, email: null }),
+    ).toBe("Merge PR #42 into main");
+    // Another tool's name after the connector isn't this tool's identifier.
+    expect(approvalTitle(pt, { ...comment, title: "GitHub: comment" })).toBe("GitHub: comment");
   });
 });
 

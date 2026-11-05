@@ -30,6 +30,7 @@ import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
 import { usePresenceOf } from "../status/hooks";
 import { useTasksToday } from "../task-manager/hooks";
+import { TeamEntry } from "../team/TeamEntry";
 import { openAgentDelete } from "./DeleteAgentScreen";
 import { agoOf, freeSections, plainRole, type TeamLine, teamLines } from "./logic";
 import { agoText, workTitle } from "./work";
@@ -90,6 +91,8 @@ export function AgentsScreen() {
       ) : total === 0 ? (
         <EmptyState title={t("mobile.agents.noneForYou")} subtitle={t("mobile.agents.noneForYouHint")} sky />
       ) : null}
+      {/* Equipe's lists, org chart and map (ADR 0148). */}
+      {total > 0 ? <TeamEntry /> : null}
       {waiting.length > 0 ? (
         <>
           <SectionHeader title={t("mobile.intentAgents.waitingSection")} count={waiting.length} />

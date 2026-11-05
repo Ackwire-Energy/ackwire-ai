@@ -28,12 +28,7 @@ export const HOME_ROWS = 5;
 /** How long something an agent finished stays news on Início. */
 export const DONE_MS = 7 * 86_400_000;
 
-const DONE_KINDS: ReadonlySet<string> = new Set([
-  "mission_finished",
-  "routine_finished",
-  "agent_reply",
-  "forum_synthesis",
-]);
+const DONE_KINDS: ReadonlySet<string> = new Set(["mission_finished", "routine_finished", "agent_reply"]);
 
 const isDone = (n: AppNotification) =>
   DONE_KINDS.has(n.kind) || (n.kind === "issue_status" && n.latest.statusTo === "done");

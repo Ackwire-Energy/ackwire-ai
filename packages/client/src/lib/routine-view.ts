@@ -168,7 +168,7 @@ export function routineNotificationWords(n: Pick<AppNotification, "kind" | "late
 /** The one-tap fix for a paused routine. */
 export type RoutineFix = "add_agent" | "take_over" | "resume";
 
-/** The conversation a routine reports to, when it is a channel or a thread (a DM, the Drive, the forum: none). */
+/** The conversation a routine reports to, when it is a channel or a thread (a DM, the Drive: none). */
 export function routineChannelOf(target: RoutineTarget): string | null {
   return target.type === "channel" || target.type === "conversation" ? target.channelId : null;
 }

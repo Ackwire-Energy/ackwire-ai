@@ -12,7 +12,7 @@ import { agentProposalOf, costlyProposalOf, stretchCardOf } from "@agenteschat/c
 import { type ActivityEntry, barEntries, type barWords, markedPieces, markInk } from "@agenteschat/client/lib/activity";
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
-import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
+import { detailsAt, type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import { messageMediaOf } from "@agenteschat/client/lib/media";
 import {
   answeredNotices,
@@ -622,7 +622,9 @@ export type Block =
   | { kind: "bullet"; inline: Inline[]; ordinal: string | null }
   | { kind: "quote"; inline: Inline[] }
   | { kind: "code"; lang: string; text: string; open?: boolean }
-  | { kind: "table"; header: Inline[][]; rows: Inline[][][]; align: TableAlign[] };
+  | { kind: "table"; header: Inline[][]; rows: Inline[][][]; align: TableAlign[] }
+  /** Closed until tapped (the shared `detailsAt`, ADR 0147): `body` is Markdown of its own. */
+  | { kind: "details"; summary: Inline[]; body: string };
 
 /** Widest a table's column gets at the default text size: a longer cell wraps inside it, at its words. */
 export const TABLE_COL_MAX = 280;
@@ -732,11 +734,30 @@ export function parseInline(text: string): Inline[] {
 }
 
 /**
- * Blocks: fenced code (with its language), tables (the web's rule: `tableAt` from the shared parser, so a
- * table right under a sentence is still a table), headings, lists, quotes and paragraphs (lines of a
- * paragraph keep their breaks).
+ * Blocks: collapsed `<details>` (outside fenced code), then in the text around them fenced code (with its language),
+ * tables (the web's rule: `tableAt` from the shared parser, so a table right under a sentence is still a table),
+ * headings, lists, quotes and paragraphs (lines of a paragraph keep their breaks).
  */
 export function parseBlocks(body: string): Block[] {
+  const lines = body.split("\n");
+  const out: Block[] = [];
+  let from = 0;
+  let fence = false;
+  for (let n = 0; n < lines.length; n++) {
+    if (/^\s*```/.test(lines[n] ?? "")) fence = !fence;
+    const found = fence ? null : detailsAt(lines, n);
+    if (!found) continue;
+    out.push(...plainBlocks(lines.slice(from, n).join("\n")));
+    out.push({ kind: "details", summary: parseInline(found.details.summary), body: found.details.body });
+    from = found.next;
+    n = found.next - 1;
+  }
+  if (from === 0) return plainBlocks(body);
+  out.push(...plainBlocks(lines.slice(from).join("\n")));
+  return out;
+}
+
+function plainBlocks(body: string): Block[] {
   const out: Block[] = [];
   const parts = body.split(/```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/g);
   for (let i = 0; i < parts.length; i += 3) {

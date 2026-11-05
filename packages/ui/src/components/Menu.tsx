@@ -1,6 +1,7 @@
 import { DropdownMenu } from "radix-ui";
 import { type ReactNode, useEffect, useState } from "react";
 import { cx } from "../cx";
+import { EDGE_ROOM } from "../floating";
 import { Icon, type IconName } from "../icons/Icon";
 
 /** Dropdown menu (Radix DropdownMenu: arrow keys, typeahead, Esc, focus return). */
@@ -32,6 +33,7 @@ export function Menu({
           align={align}
           side={side}
           sideOffset={4}
+          collisionPadding={EDGE_ROOM}
           aria-label={label}
           onCloseAutoFocus={(e) => {
             onClosed?.();
@@ -137,7 +139,7 @@ export function MenuSub({ icon, label, children }: { icon?: IconName; label: Rea
           className="ac-menu ac-menu--dropdown"
           sideOffset={12}
           alignOffset={-6}
-          collisionPadding={8}
+          collisionPadding={EDGE_ROOM}
         >
           {children}
         </DropdownMenu.SubContent>
@@ -313,7 +315,7 @@ export function MenuAt({
           align={align}
           side="bottom"
           sideOffset={2}
-          collisionPadding={8}
+          collisionPadding={EDGE_ROOM}
           // Following, placed again each frame: Radix can't see a point (0 by 0) move.
           updatePositionStrategy={follows ? "always" : "optimized"}
           aria-label={label}

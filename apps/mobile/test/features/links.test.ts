@@ -63,7 +63,7 @@ describe("push payloads", () => {
     expect(hrefForPush({ kind: "join_request", orgId: "o1", notificationId: "n1" })).toBe("/join-requests");
   });
   test("anything else opens Atividade", () => {
-    expect(hrefForPush({ kind: "forum_turn" })).toBe("/activity");
+    expect(hrefForPush({ kind: "nope" })).toBe("/activity");
     expect(hrefForPush({ channelId: 5 })).toBe("/activity");
   });
   test("each kind opens where its row in Atividade opens, at the message itself", () => {
@@ -83,10 +83,6 @@ describe("push payloads", () => {
       "/chat/c1?handoff=h1",
     );
     expect(hrefForPush({ ...at, kind: "mission_finished", missionId: "x1", channelId: "c1" })).toBe("/mission/x1");
-    // The forum has no screen in the app: null, its web page opens in the browser.
-    const forum = { ...at, kind: "forum_turn", topicId: "f1" };
-    expect(hrefForPush(forum)).toBeNull();
-    expect(notificationWebPath(pushAsNotification(forum), "o1")).toBe("/org/o1/forum/f1");
   });
   test("a push's ids are read checked: anything else is dropped", () => {
     expect(pushAsNotification({ kind: "mention", channelId: "../x", messageId: "m1", issueNumber: "x" })).toEqual({
@@ -115,16 +111,24 @@ describe("inbox items", () => {
     const n = notification({ id: "n", kind: "join_request", actors: [], count: 3, source: { label: "Alves Studio" } });
     expect(notificationHref({ ...n, latest: { title: "Ana Souza" } })).toBe("/join-requests");
   });
-  test("a task opens its screen; the forum has none in the app, its web page opens in the browser", () => {
+  test("a task opens its screen", () => {
     expect(
       notificationHref(notification({ id: "n", kind: "issue_comment", source: { issueId: "i1", issueNumber: 7 } })),
     ).toBe("/issues/7");
+    // A reply in its conversation (ADR 0145): the task, which opens its conversation at that message.
+    const messageId = "0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
+    expect(
+      notificationHref(
+        notification({ id: "n", kind: "issue_comment", source: { issueId: "i1", issueNumber: 7, messageId } }),
+      ),
+    ).toBe(`/issues/7?m=${messageId}`);
     expect(
       notificationHref(notification({ id: "n", kind: "issue_comment", source: { issueId: "i1", channelId: "c1" } })),
     ).toBe("/issues");
-    const forum = notification({ id: "n", kind: "forum_turn", source: { topicId: "f1" } });
-    expect(notificationHref(forum)).toBeNull();
-    expect(notificationWebPath(forum, "o1")).toBe("/org/o1/forum/f1");
+    // The workspace's billing hold has no screen in the app: its web page opens in the browser.
+    const hold = notification({ id: "n", kind: "org_standing", latest: { billingHold: "past_due" } });
+    expect(notificationHref(hold)).toBeNull();
+    expect(notificationWebPath(hold, "o1")).toBe("/org/o1/settings/billing");
   });
 
   test("people, connectors, computers and an agent's hold open their screens", () => {

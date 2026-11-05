@@ -27,16 +27,10 @@ export const NOTIFICATION_FILTERS = ["all", "mentions", "waiting", "unread", "re
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_question"];
 
 /**
- * Waiting ones in this order: an agent's secret request (it expires in minutes), an agent's question, my turn at the
- * table, an approval, then someone asking to join (nobody's work waits on it).
+ * Waiting ones in this order: an agent's secret request (it expires in minutes), an agent's question, an
+ * approval, then someone asking to join (nobody's work waits on it).
  */
-const WAITING_ORDER: NotificationKind[] = [
-  "secret_request",
-  "agent_question",
-  "forum_turn",
-  "approval",
-  "join_request",
-];
+const WAITING_ORDER: NotificationKind[] = ["secret_request", "agent_question", "approval", "join_request"];
 
 export const isSnoozed = (n: Pick<AppNotification, "snoozedUntil">, now = Date.now()) =>
   !!n.snoozedUntil && new Date(n.snoozedUntil).getTime() > now;
@@ -71,7 +65,7 @@ export function compareNotifications(a: AppNotification, b: AppNotification) {
 /** "Concluídas": the latest marked done first. */
 const compareDone = (a: AppNotification, b: AppNotification) => (b.doneAt ?? "").localeCompare(a.doneAt ?? "");
 
-/** The waiting section's order (question, forum, approval), the newest first within a kind. */
+/** The waiting section's order (question, approval), the newest first within a kind. */
 export function sortWaiting(list: AppNotification[]) {
   return [...list].sort(
     (a, b) => WAITING_ORDER.indexOf(a.kind) - WAITING_ORDER.indexOf(b.kind) || b.updatedAt.localeCompare(a.updatedAt),
@@ -300,16 +294,13 @@ export function runFailedGroupOf(n: Pick<AppNotification, "kind" | "latest">) {
 export type ReplyTarget =
   | { kind: "message"; channelId: string; threadId: string | null }
   | { kind: "issue"; issueId: string }
-  | { kind: "question"; questionId: string }
-  | { kind: "forum"; topicId: string };
+  | { kind: "question"; questionId: string };
 
 export function replyTarget(n: AppNotification): ReplyTarget | null {
   const s = n.source;
   switch (n.kind) {
     case "agent_question":
       return s.questionId ? { kind: "question", questionId: s.questionId } : null;
-    case "forum_turn":
-      return s.topicId ? { kind: "forum", topicId: s.topicId } : null;
     case "issue_assigned":
     case "issue_comment":
       return s.issueId ? { kind: "issue", issueId: s.issueId } : null;
@@ -334,8 +325,7 @@ export type OpenTarget =
   | { to: "/org/$orgId/dm/agent/$agentId"; params: { agentId: string }; search?: { m: string } }
   | { to: "/org/$orgId/agents/$agentId"; params: { agentId: string } }
   | { to: "/org/$orgId/dm/person/$userId"; params: { userId: string }; search?: { m: string } }
-  | { to: "/org/$orgId/issues/$number"; params: { number: string } }
-  | { to: "/org/$orgId/forum/$topicId"; params: { topicId: string } }
+  | { to: "/org/$orgId/issues/$number"; params: { number: string }; search?: { m: string } }
   | { to: "/org/$orgId/approvals"; search?: { open: string } }
   | { to: "/org/$orgId/routines"; search?: { open: string } }
   | { to: "/org/$orgId/threads"; search: { tab: "missions" } }
@@ -449,8 +439,9 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   // The workspace held for its payment: Cobrança, where it is paid.
   if (n.kind === "org_standing" && n.latest.billingHold)
     return { to: "/org/$orgId/settings/$section", params: { section: "billing" } };
-  if (s.topicId) return { to: "/org/$orgId/forum/$topicId", params: { topicId: s.topicId } };
-  if (s.issueNumber != null) return { to: "/org/$orgId/issues/$number", params: { number: String(s.issueNumber) } };
+  // A reply in a task's conversation (ADR 0145) opens the task at that message.
+  if (s.issueNumber != null)
+    return { to: "/org/$orgId/issues/$number", params: { number: String(s.issueNumber) }, ...at };
   // A routine that failed, paused or waits for its computer: the routine in Rotinas (its state and fix).
   // What a routine found opens the agent's message in its conversation (below); without one, the routine.
   if (ROUTINE_TROUBLE.has(n.kind) || (n.kind === "routine_finished" && !s.messageId && !s.threadId))
@@ -551,15 +542,15 @@ export function snoozeTimes(now = new Date()) {
 }
 
 /**
- * What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser, give
+ * What a waiting item asks of you: approve, answer an agent, help in a browser, give
  * a secret, let someone in, or review tools a connected server changed.
  */
-export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "secret" | "join" | "tools" | "limit";
+export type WaitingCardKind = "approval" | "question" | "browser" | "secret" | "join" | "tools" | "limit";
 
 export interface WaitingCard {
   kind: WaitingCardKind;
   /**
-   * The exact request: the action to approve, the question, the topic, what to do in the browser, who asks to join,
+   * The exact request: the action to approve, the question, what to do in the browser, who asks to join,
    * the tools that changed.
    */
   title: string;
@@ -579,8 +570,6 @@ export function waitingCardOf(n: Pick<AppNotification, "kind" | "count" | "lates
     return { kind: "secret", title: secretNoticeLine(n), expiresAt: l.expiresAt ?? null, action: "open" };
   if (n.kind === "approval")
     return { kind: "approval", title: l.title ?? l.text ?? "", expiresAt: l.expiresAt ?? null, action: "review" };
-  if (n.kind === "forum_turn")
-    return { kind: "forum", title: l.title ?? l.text ?? "", expiresAt: null, action: "answer" };
   // No actor (they aren't a member yet): the first who asked is the title; `joinRequestLine` says them all.
   if (n.kind === "join_request")
     return { kind: "join", title: askersOf(n).names[0] ?? "", expiresAt: null, action: "review" };

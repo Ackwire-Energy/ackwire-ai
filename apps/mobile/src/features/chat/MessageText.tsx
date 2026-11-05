@@ -1,12 +1,13 @@
 import { parseChart } from "@agenteschat/client/lib/chart";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
-import { Text as RNText, StyleSheet, View } from "react-native";
-import { Text, useReducedMotion } from "@/ui";
+import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
+import { Icon, Text, useReducedMotion } from "@/ui";
 import { useColors } from "../shared/hooks";
+import { tapHaptic } from "../shared/parts";
 import { ChartCard, ChartPending } from "./ChartCard";
 import { CodeCard } from "./CodeCard";
-import { parseBlocks } from "./logic";
+import { type Inline, parseBlocks } from "./logic";
 import { Spans, Table } from "./MessageSpans";
 
 /**
@@ -92,6 +93,14 @@ export const MessageText = memo(function MessageText({
                 </Text>
               </View>
             );
+          case "details":
+            return (
+              // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
+              <View key={i}>
+                <Details summary={b.summary} body={b.body} muted={muted} accent={accent} channelRefs={channelRefs} />
+                {end ? <Text variant="body">{end}</Text> : null}
+              </View>
+            );
           case "quote":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
@@ -129,6 +138,52 @@ function Fenced({ lang, text, accent, open }: { lang: string; text: string; acce
   return <CodeCard lang={isChart ? "json" : lang} text={text} />;
 }
 
+/** A collapsed block (`<details>`, ADR 0147): its summary opens what only some want to read. */
+function Details({
+  summary,
+  body,
+  muted,
+  accent,
+  channelRefs,
+}: {
+  summary: Inline[];
+  body: string;
+  muted: boolean;
+  accent?: AgentColorName;
+  channelRefs?: Record<string, string>;
+}) {
+  const c = useColors();
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={[styles.details, { borderColor: c.line }]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        onPress={() => {
+          tapHaptic();
+          setOpen((v) => !v);
+        }}
+        style={styles.summary}
+      >
+        <Text variant="body" tone="muted" style={[styles.line, styles.flex, styles.heading]}>
+          {summary.length > 0 ? <Spans inline={summary} channelRefs={channelRefs} /> : "…"}
+        </Text>
+        <View style={open ? styles.flip : undefined}>
+          <Icon name="chev" size={13} color={c.muted} />
+        </View>
+      </Pressable>
+      {open ? (
+        <MessageText
+          body={body}
+          muted={muted}
+          {...(accent ? { accent } : {})}
+          {...(channelRefs ? { channelRefs } : {})}
+        />
+      ) : null}
+    </View>
+  );
+}
+
 /** The agent's thin caret while it writes (agent blue: the agent's identity); still with reduce motion. */
 function Caret() {
   const c = useColors();
@@ -154,4 +209,13 @@ const styles = StyleSheet.create({
   bullet: { flexDirection: "row", gap: 8, paddingLeft: 2 },
   mark: { minWidth: 14 },
   quote: { borderLeftWidth: 3, paddingLeft: 10 },
+  details: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  summary: { flexDirection: "row", alignItems: "center", gap: 8 },
+  flip: { transform: [{ rotate: "180deg" }] },
 });

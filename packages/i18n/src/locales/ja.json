@@ -293,6 +293,12 @@
       "short": "AIキー",
       "say": "AIキーを管理"
     },
+    "use_others_plans": {
+      "title": "他の人のプランを使う",
+      "desc": "編集できるエージェントに、他の人が接続したプランを割り当てます。プランの持ち主にはメールが届き、取り戻すこともできます。",
+      "short": "他の人のプランを使う",
+      "say": "他の人のプランを使う"
+    },
     "edit_wiki": {
       "title": "Wikiを編集",
       "desc": "ページの作成と変更。",
@@ -352,12 +358,6 @@
       "desc": "プラン、カード、請求書。",
       "short": "請求",
       "say": "請求を管理"
-    },
-    "use_others_plans": {
-      "title": "他の人のプランを使う",
-      "desc": "編集できるエージェントに、他の人が接続したプランを割り当てます。プランの持ち主にはメールが届き、取り戻すこともできます。",
-      "short": "他の人のプランを使う",
-      "say": "他の人のプランを使う"
     }
   },
   "auth": {
@@ -921,7 +921,7 @@
       "theo": {
         "name": "Theo",
         "role": "PM",
-        "desc": "タスクを整理し、フォーラムを進行します。"
+        "desc": "タスクを整理し、ロードマップを最新に保ちます。"
       },
       "ada": {
         "name": "Ada",
@@ -1064,7 +1064,6 @@
     "agent_reply": "エージェントが返信しました",
     "agent_question": "あなたへの質問",
     "approval": "承認があなたを待っています",
-    "forum_turn": "あなたが意見を出す番です",
     "mission_stopped": "ミッションが停止しました",
     "routine_failed": "ルーティンが完了しませんでした",
     "run_failed": "エージェントが完了できませんでした",
@@ -1080,6 +1079,7 @@
     "otherAnswer": "別の回答",
     "review": "確認する",
     "open": "開く",
+    "see": "見る",
     "dismiss": "閉じる",
     "send": "送信",
     "placeholder": "回答を入力…",
@@ -1212,7 +1212,7 @@
     "category": {
       "waiting": {
         "title": "あなたの対応待ち",
-        "help": "承認、エージェントからの質問、フォーラムでのあなたの番、ブラウザでの手助けの依頼"
+        "help": "承認、エージェントからの質問、ブラウザでの手助けの依頼"
       },
       "replies": {
         "title": "エージェントの返信",
@@ -1283,7 +1283,6 @@
       "drive": "ファイル、レポート、表",
       "routines": "エージェントが時間どおりに自動で行うこと",
       "calendar": "会議と締め切り",
-      "forum": "決定に複数の意見が必要なとき",
       "team": "誰が誰か：メンバー、エージェント、そのグループ"
     },
     "customizeSidebar": "サイドバーをカスタマイズ",
@@ -1353,7 +1352,6 @@
     "team": "チーム",
     "calendar": "カレンダー",
     "drive": "Drive",
-    "forum": "フォーラム",
     "members": "メンバー",
     "channels": "チャンネル",
     "agents": "エージェント",
@@ -1391,29 +1389,29 @@
     "unreadNotifications_other": "{{count}}件の未読の通知"
   },
   "agentGroups": {
-    "group": "グループ",
-    "none": "グループなし",
-    "newGroup": "新しいグループ",
-    "newFromAgent": "新しいグループ…",
+    "group": "部署",
+    "none": "部署なし",
+    "newGroup": "新しい部署",
+    "newFromAgent": "新しい部署…",
     "nameLabel": "名前",
-    "namePlaceholder": "例: プロダクトとマーケティング",
-    "create": "グループを作成",
-    "renameTitle": "グループ名を変更",
-    "rename": "名前を変更",
+    "namePlaceholder": "例: 営業",
+    "create": "部署を作成",
+    "renameTitle": "部署を編集",
+    "rename": "編集",
     "options": "{{name}}のオプション",
     "moveUp": "上へ移動",
     "moveDown": "下へ移動",
-    "delete": "グループを削除",
-    "deleteTitle": "グループ「{{name}}」を削除しますか？",
+    "delete": "部署を削除",
+    "deleteTitle": "部署「{{name}}」を削除しますか?",
     "deleteText": "グループ内のエージェントは「エージェント」に戻ります。",
     "dropHere": "ここにエージェントをドラッグ",
-    "moved": "{{name}} をグループ「{{group}}」に移動しました",
-    "movedOut": "{{name}} をグループ「{{group}}」から外しました",
+    "moved": "{{name}} は {{group}} に移動しました",
+    "movedOut": "{{name}} は {{group}} から外れました",
     "undo": "元に戻す"
   },
   "sidebarAgents": {
     "options": "エージェントのオプション",
-    "add": "新しいエージェントまたはグループ",
+    "add": "新しいエージェントまたは部署",
     "order": "並び順",
     "sort": {
       "workspace": "ワークスペースの順",
@@ -1423,7 +1421,7 @@
     "showAll": "自分と話さないエージェントも表示",
     "collapseAll": "すべて折りたたむ",
     "expandAll": "すべて展開",
-    "organize": "チームでグループを整理",
+    "organize": "チームで部署を整理",
     "more_other": "チームにエージェントがあと {{count}} 体",
     "createFirst": "最初のエージェントを作成",
     "working_other": "{{count}} 件が作業中",
@@ -1431,8 +1429,8 @@
     "workingIn": "#{{channel}} で作業中",
     "talksOnly": "{{name}} とだけ話します",
     "talksOnlyMore_other": "{{name}} とほか {{count}} 件とだけ話します",
-    "changeGroup": "グループを変更",
-    "newGroupWith": "{{name}} で新しいグループ",
+    "changeGroup": "部署を移動",
+    "newGroupWith": "{{name}} を含む新しい部署",
     "dmsEmpty": "メンバーとの会話はここに表示されます。"
   },
   "sidebarPins": {
@@ -1458,57 +1456,101 @@
   },
   "team": {
     "title": "チーム",
-    "groups": {
-      "title": "エージェントグループ"
+    "people_other": "{{count}} 人",
+    "agents_other": "{{count}} 体のエージェント",
+    "sectorsCount_other": "{{count}} 部署",
+    "viewLabel": "チームの表示",
+    "view": {
+      "list": "一覧",
+      "chart": "組織図",
+      "map": "マップ",
+      "sectors": "部署",
+      "usage": "ガバナンスと利用状況"
     },
-    "subtitle_other": "{{count}}体のエージェントを、担当者ごとにまとめています。",
-    "working_other": "{{count}}体が作業中です。",
-    "skyLabel": "担当者ごとにまとめたエージェント。エージェントをタップすると、何をしているかが見られます。",
-    "tapHint": "エージェントをタップ",
-    "asked": "{{from}}が{{to}}に依頼",
     "noOwner": "担当者なし",
-    "openAgent": "{{name}}の詳細を見る",
-    "close": "閉じる",
-    "details": "{{name}}の詳細",
-    "of": "担当: {{name}}",
-    "does": "役割",
-    "does_female": "役割",
-    "canDo": "できること",
-    "canDo_female": "できること",
-    "onlyChat": "会話のみ",
     "workingNow": "作業中",
     "available": "対応可能",
-    "talk": "話す",
-    "edit": "編集",
-    "feedTitle": "エージェント同士の会話",
-    "feedWindow": "過去24時間",
-    "feedEmpty": "過去24時間に、ほかのエージェントに助けを求めたエージェントはいません。",
     "archived": "アーカイブ済み",
-    "consultation": {
-      "open": "回答待ち",
-      "answered": "回答済み",
-      "expired": "回答なし",
-      "failed": "回答なし"
-    },
     "emptyTitle": "まだエージェントはいません",
     "empty": "最初のエージェントを作成して、チームを作りましょう。",
-    "cap": {
-      "drive": "ファイル",
-      "issues": "タスク",
-      "calendar": "カレンダー",
-      "schedule": "ルーティン",
-      "forum": "フォーラム",
-      "wiki": "Wiki",
-      "sandbox": "コンピューター",
-      "desktop": "画面",
-      "browser": "ブラウザ",
-      "database": "データベース",
-      "github": "GitHub",
-      "sentry": "Sentry",
-      "linear": "Linear",
-      "mail": "メール",
-      "vault": "Vault",
-      "custom": "ワークスペースのツール"
+    "list": {
+      "agents": "エージェント",
+      "people": "メンバー",
+      "search": "名前、役割、チャンネルで検索",
+      "filterLabel": "エージェントを表示",
+      "filter": {
+        "mine": "自分の",
+        "working": "作業中",
+        "waiting": "あなたの対応待ち",
+        "noOwner": "担当者なし"
+      },
+      "groupBy": "グループ分け",
+      "by": {
+        "sector": "グループ分け: 部署",
+        "owner": "グループ分け: 担当者",
+        "none": "グループ分けしない"
+      },
+      "col": {
+        "agent": "エージェント",
+        "role": "役割",
+        "owner": "担当者",
+        "channels": "いる場所",
+        "now": "いま",
+        "menu": "オプション",
+        "person": "メンバー",
+        "roles": "ロール",
+        "caresFor": "担当"
+      },
+      "noChannel": "どのチャンネルにもいません",
+      "none": "該当するエージェントはいません。"
+    },
+    "chart": {
+      "byLabel": "組織図の表示",
+      "byPerson": "人ごと",
+      "bySector": "部署ごと",
+      "subPerson": "各エージェントを担当者の下に表示します。担当者がいない場合は、部署のリーダーの下に表示します。",
+      "subSector": "部署ごとにエージェントを表示します。{{name}} は全員と働きます。",
+      "workspace": "ワークスペース",
+      "responsible": "担当者: {{names}}"
+    },
+    "map": {
+      "lead": "エージェントの担当者、エージェントがいるチャンネル、それぞれが自分で行うこと、人の対応を待っていることを表示します。点線は直近 1 日に助けを求め合ったエージェントです。",
+      "lodi": "あなたと一緒にチームを整えます",
+      "hint": "エージェントを別のチャンネルにドラッグすると、{{name}} が変更を用意し、あなたが適用します",
+      "proposed": "{{name}} があなたとの会話に変更を用意しました。そこで適用してください。",
+      "open": "開く",
+      "reasonMove": "チームマップから: {{agent}} を #{{from}} から #{{to}} に移動します。",
+      "reasonJoin": "チームマップから: {{agent}} を #{{to}} に追加します。",
+      "waiting_other": "{{count}} 件のリクエストが承認待ちです",
+      "moreRoutines_other": "ほか {{count}} 件のルーティン",
+      "empty": "まだチャンネルにいるエージェントはいません。",
+      "others": "ほかのチャンネル"
+    },
+    "sectors": {
+      "lead": "各部署には担当者、代理、エージェント、そのチャンネルとルーティンがあります。",
+      "ask": "{{name}} と話す",
+      "askText": "チームを部署に分けるのを手伝って。",
+      "leadLabel": "担当者",
+      "backupLabel": "代理",
+      "leadOf": "{{name}} の担当者",
+      "backupOf": "{{name}} の代理",
+      "nobody": "なし",
+      "none": "なし",
+      "channels": "チャンネル",
+      "routines": "ルーティン",
+      "leads": "{{name}} の担当者",
+      "covers": "{{name}} の代理",
+      "placeHint": "エージェントを部署にドラッグすると、その部署に入ります。",
+      "gap": {
+        "noLead": "担当者がまだいません。この部署を担当する人を選んでください。",
+        "noBackup": "代理がいません。担当者が不在のとき、代わりに対応する人がいません。"
+      },
+      "emptyTitle": "まだ部署はありません",
+      "empty": "部署は、営業やサポートのように分野ごとにエージェントを整理します。全員の一覧にセクションとして表示されます。"
+    },
+    "usage": {
+      "lead": "今月、各メンバーがエージェントをどれだけ使っているかと、その上限です。",
+      "settings": "設定にもあります"
     }
   },
   "sky": {
@@ -1776,6 +1818,12 @@
         "invite": "メンバーを招待",
         "firstTask": "{{name}}に最初のタスクを渡す"
       },
+      "style": {
+        "question": "どんな話し方がいいですか？",
+        "text": "すべてのエージェントに適用され、アカウントでいつでも変更できます。",
+        "simple": "シンプル（専門用語なし）",
+        "technical": "技術的（詳細つき）"
+      },
       "firstTask": {
         "theo": "最初の1週間の計画を立ててください。私たちそれぞれが最初に何をしますか？",
         "ada": "最初に私たちのために何を作ったり自動化したりできますか？",
@@ -1896,6 +1944,83 @@
       "open": "開く",
       "web": "サイトで開く",
       "notAllowed": "この画面へのアクセス権がありません"
+    }
+  },
+  "teamWeek": {
+    "title": "チームの1週間",
+    "suggestions_other": "{{count}}件の提案",
+    "stat": {
+      "done": "完了したタスク",
+      "stuck": "止まった",
+      "waiting": "あなたを待っています",
+      "budget": "今月の予算 {{budget}} のうち"
+    },
+    "worked": "うまくいったこと",
+    "workedRuns_other": "{{name}} が #{{channel}} で {{count}} 件の仕事をしました",
+    "workedTasks_other": "{{name}} がタスクを {{count}} 件完了しました",
+    "improve": "改善できること",
+    "approvals": {
+      "title_other": "{{name}} の依頼 {{count}} 件があなたを待っています",
+      "line": "{{since}} から待っています。",
+      "action": "確認して承認",
+      "hide": "閉じる"
+    },
+    "budget": {
+      "title": "{{name}} の予算: {{from}} → {{to}}",
+      "line_other": "今月の上限で {{count}} 回止まりました。"
+    },
+    "channel": {
+      "title": "{{name}} を #{{channel}} に追加",
+      "line": "{{name}} はどのチャンネルにも入っていないため、今週は誰も話しかけませんでした。"
+    },
+    "unanswered": {
+      "title": "#{{channel}} の質問に答えるエージェント",
+      "line_other": "今週 #{{channel}} で {{count}} 件の質問に誰も答えませんでした。",
+      "action": "エージェントを提案",
+      "message": "今週 #{{channel}} で誰も答えなかった質問に答えるエージェントを提案して。",
+      "done": "{{name}} に依頼しました"
+    },
+    "routine": {
+      "title": "{{name}} のルーティン: 毎日 {{time}}",
+      "line_other": "今週 {{count}} 日、これを頼みました: 「{{text}}」",
+      "action": "ルーティンを作成",
+      "done": "ルーティンを作成しました"
+    },
+    "stalled": {
+      "title": "#{{number}} {{title}} のステップが止まっています",
+      "line_other": "ステップ {{steps}} が #{{on}} を待って {{hours}} 時間止まっています。",
+      "action": "並行して進める",
+      "message": "@{{handle}} ステップ {{steps}} は #{{on}} を待つ必要はありません。並行して進めてください。",
+      "messageNoAgent": "ステップ {{steps}} は #{{on}} を待つ必要はありません。並行して進められます。",
+      "done": "メッセージを送信しました"
+    },
+    "applied": "適用済み",
+    "undo": "元に戻す",
+    "gone": "もう当てはまりません",
+    "applyAll_other": "{{count}}件すべて適用",
+    "notNow": "今はしない",
+    "dismissed": "今のところ何も変わりません。今週のことはここで何でも聞いてください。",
+    "change": "変更",
+    "every": {
+      "sun": "毎週日曜 {{time}}",
+      "mon": "毎週月曜 {{time}}",
+      "tue": "毎週火曜 {{time}}",
+      "wed": "毎週水曜 {{time}}",
+      "thu": "毎週木曜 {{time}}",
+      "fri": "毎週金曜 {{time}}",
+      "sat": "毎週土曜 {{time}}"
+    },
+    "off": "オフ",
+    "schedule": {
+      "title": "届くタイミング",
+      "day": "曜日",
+      "hour": "時刻",
+      "stop": "受け取らない",
+      "start": "また受け取る"
+    },
+    "settings": {
+      "label": "チームの1週間",
+      "help": "毎週 {{name}} があなたの DM で、チームの様子と改善できることを伝えます。管理者だけが受け取ります。"
     }
   },
   "routing": {
@@ -3076,7 +3201,9 @@
       "browser": "ブラウザであなたの操作が必要です",
       "desktop": "コンピューターであなたの操作が必要です",
       "proposal": "変更を提案しています",
-      "agent": "新しいエージェントを提案しています"
+      "agent": "新しいエージェントを提案しています",
+      "team": "チームを提案",
+      "firstTask": "最初のタスク"
     },
     "waitingYou": "あなたの対応待ち",
     "waitingFor": "{{name}}の対応待ち",
@@ -3091,6 +3218,8 @@
       "desktop": "<b>{{name}}</b>がコンピューターであなたの操作を必要としています · {{what}}",
       "proposal": "<b>{{name}}</b>が変更を提案しています · {{what}}",
       "agent": "<b>{{name}}</b>が新しいエージェントを提案しています · {{what}}",
+      "team": "<b>{{name}}</b>がチームを提案しています · {{what}}",
+      "firstTask": "<b>{{name}}</b>が最初のタスクを提案しています · {{what}}",
       "more": "+{{count}}",
       "see": "見る"
     }
@@ -3311,6 +3440,11 @@
   },
   "notifications": {
     "title": "通知",
+    "planLent": {
+      "takeBack": "取り戻す",
+      "takeBackAll": "すべてのエージェントから取り戻す",
+      "done": "プランが戻りました"
+    },
     "docTitleUnread": "（{{count}}）通知",
     "summaryWaiting_other": "あなたの対応待ち{{count}}件",
     "summaryUnread_other": "未読{{count}}件",
@@ -3353,17 +3487,6 @@
       "stoppedForF": "{{time}}停止中",
       "stoppedForM": "{{time}}停止中",
       "openThread": "会話を開く",
-      "table": "があなたをテーブルに呼びました",
-      "roundWaits": "ラウンドは{{time}}待機します",
-      "yourTurn": "ラウンド {{round}}/{{rounds}} · あなたが発言する番です",
-      "yourTurnNoRound": "あなたが発言する番です",
-      "seatYou": "あなた",
-      "seatYours": "あなたの番",
-      "seatSpoke": "発言済み",
-      "seatPassed": "パス",
-      "seatLater": "あとで",
-      "speak": "テーブルで発言",
-      "pass": "番をパスする",
       "approval": "が承認を求めています",
       "decide": "承認で決定",
       "wants": "<b>{{name}}</b>が<b>{{action}}</b>しようとしています",
@@ -3382,8 +3505,7 @@
         "send": "外部にメッセージを送信",
         "draft": "下書きを保存"
       },
-      "resolved": "{{name}}はあなたの答えを受け取り、作業に戻りました",
-      "resolvedForum": "あなたの発言がラウンドに入りました"
+      "resolved": "{{name}}はあなたの答えを受け取り、作業に戻りました"
     },
     "what": {
       "mention": "<b>{{name}}</b>があなたをメンションしました",
@@ -3399,8 +3521,6 @@
       "issueComment_other": "<b>{{names}}</b>がフォロー中のタスクにコメントしました",
       "issueStatus": "<b>{{name}}</b>がフォロー中のタスクを移動しました",
       "issueDone": "<b>{{name}}</b>がフォロー中のタスクを完了しました",
-      "forumTurn": "<b>{{name}}</b>があなたをテーブルに呼びました",
-      "forumSynthesis": "<b>{{name}}</b>があなたのトピックのまとめを公開しました",
       "approval": "<b>{{name}}</b>が承認を求めました",
       "missionFinished": "<b>{{name}}</b>がミッションを完了しました",
       "missionStopped": "<b>{{name}}</b>がミッションを停止しました",
@@ -3414,6 +3534,7 @@
       "agentUnreached": "ルーティンが<b>{{name}}</b>を呼び出せませんでした",
       "browserProfileRequest": "<b>{{name}}</b>が<b>{{agent}}</b>用のブラウザプロファイルの追加を求めています",
       "desktopTaken": "<b>{{name}}</b>が<b>{{agent}}</b>のコンピューターの画面の操作を引き継ぎました",
+      "planLent": "<b>{{name}}</b>さんがあなたの {{plan}} プランを<b>{{agent}}</b>に接続しました",
       "routineWaitingPlan": "<b>{{name}}</b>はルーティンを実行するため、プランのリセットを待っています",
       "planResetUnknown": "{{plan}}は上限がいつリセットされるかを伝えませんでした。<b>{{name}}</b>の作業はまだ待機中です。",
       "catchUpClosed_other": "<b>{{name}}</b>が再開し、返信が不要だった会話{{count}}件をスキップしました",
@@ -3444,8 +3565,7 @@
       "usageLimitReached": "<b>{{name}}</b>さんが上限{{amount}}に達しました",
       "usageLimitRequest": "<b>{{name}}</b>さんが上限{{amount}}に達し、追加を求めています",
       "usageLimitRaised": "<b>{{name}}</b>さんが今月のあなたの上限を引き上げました",
-      "usageLimitRefused": "<b>{{name}}</b>さんが追加利用のリクエストを断りました",
-      "planLent": "<b>{{name}}</b>さんがあなたの {{plan}} プランを<b>{{agent}}</b>に接続しました"
+      "usageLimitRefused": "<b>{{name}}</b>さんが追加利用のリクエストを断りました"
     },
     "usageLimit": {
       "runs_other": "今月{{count}}件のリクエスト",
@@ -3462,7 +3582,6 @@
       "threadOnly": "スレッド",
       "dm": "ダイレクトメッセージ",
       "issue": "タスク #{{number}}",
-      "forum": "フォーラム",
       "mission": "ミッション",
       "routine": "ルーティン",
       "approval": "承認",
@@ -3514,7 +3633,6 @@
       "channel": "#{{channel}}で返信",
       "issue": "#{{number}}にコメント",
       "issueNoNumber": "タスクにコメント",
-      "forum": "あなたの立場を1〜2文で",
       "reply": "返信",
       "sends": "で送信",
       "closes": "で閉じる",
@@ -3541,9 +3659,6 @@
       "sent": "返信を送信しました",
       "see": "見る",
       "answered": "{{name}}があなたの答えを受け取りました",
-      "spoke": "あなたの発言がラウンドに入りました",
-      "passed": "番をパスしました",
-      "passedDetail": "ラウンドは続きます。まとめが出たらここに届きます。",
       "decideThere": "このリクエストは承認で決定します"
     },
     "calmTitle": "すべて確認済み",
@@ -3552,12 +3667,7 @@
     "noneUnread": "すべて既読です。",
     "noneHere": "今は何もありません。",
     "noneDone": "過去30日間に完了にしたものはありません。",
-    "more": "さらに表示",
-    "planLent": {
-      "takeBack": "取り戻す",
-      "takeBackAll": "すべてのエージェントから取り戻す",
-      "done": "プランが戻りました"
-    }
+    "more": "さらに表示"
   },
   "approvals": {
     "title": "承認",
@@ -3681,6 +3791,34 @@
       "review": "レビュー",
       "delivery": "納品",
       "open": "開く"
+    },
+    "review": {
+      "list": "リクエスト",
+      "where": "場所",
+      "effect": "影響",
+      "effects": {
+        "external": "社外に出ます",
+        "production": "本番環境に反映されます",
+        "unsent": "何も送信されません",
+        "readsOnly": "読み取りのみ"
+      },
+      "undo": "元に戻す",
+      "deadline": "残り時間",
+      "decides": "決める人",
+      "state": "状況",
+      "why": "{{name}}が求める理由",
+      "email": "メール",
+      "text": "公開される内容",
+      "textDone": "公開した内容",
+      "values": "実行する内容",
+      "valuesDone": "実行した内容",
+      "more": "すべて表示",
+      "less": "表示を減らす",
+      "trail": "ここまでの流れ",
+      "showSteps": "各ステップを見る",
+      "hideSteps": "ステップを隠す",
+      "asked": "承認を求めました",
+      "grants": "{{name}}は今回だけ、この値で{{doing}}。"
     }
   },
   "agent": {
@@ -3804,6 +3942,7 @@
         "accountMove": "{{agents}}が使用中 · ここに移動",
         "accountAlso": "{{agents}}も使用中",
         "accountOf": "{{name}}のもの",
+        "accountOthers": "他の人のプランには持ち主の名前が表示されます。持ち主にはメールが届き、取り戻すこともできます。",
         "addAccount": "アカウントを追加",
         "signInAgain": "もう一度ログイン",
         "connectPlan": "別のプランを接続",
@@ -3957,8 +4096,7 @@
           "sendFailed": "コードを送信できませんでした。確認してもう一度お試しください。",
           "done": "{{account}}アカウントが{{computer}}に追加されました。「使う」をクリックして保存してください。"
         },
-        "offCloud": "{{computer}}が応答していません",
-        "accountOthers": "他の人のプランには持ち主の名前が表示されます。持ち主にはメールが届き、取り戻すこともできます。"
+        "offCloud": "{{computer}}が応答していません"
       },
       "computer": {
         "title": "{{name}}はどこで作業しますか？",
@@ -4039,7 +4177,7 @@
       "machine": "コンピューター",
       "brain": "考えるAI",
       "repos": "GitHubリポジトリ",
-      "group": "グループ",
+      "group": "部署",
       "handle": "メンション"
     },
     "lines": {
@@ -4537,8 +4675,8 @@
       "pm": {
         "name": "PM",
         "agent": "Theo",
-        "desc": "タスク、要約、フォーラムを整理します。",
-        "instructions": "まず自分で調べ（タスク、スレッド、Wiki、フィードバック）、残った点だけを質問します。\nタスクを整理し、長い議論を要約し、ロードマップを最新に保ちます。\n毎週金曜日に、その週の要約をフォーラムに投稿します。"
+        "desc": "タスクと要約を整理します。",
+        "instructions": "まず自分で調べ（タスク、スレッド、Wiki、フィードバック）、残った点だけを質問します。\nタスクを整理し、長い議論を要約し、ロードマップを最新に保ちます。"
       },
       "support": {
         "name": "サポート",
@@ -5038,10 +5176,6 @@
       "title": "{{name}}とのダイレクトメッセージ",
       "text": "ダイレクトメッセージはまだ使えません。今はチャンネルで{{name}}と話してください。"
     },
-    "forum": {
-      "title": "フォーラム",
-      "text": "長めの議論やワークスペースのお知らせはここに置かれます。"
-    },
     "search": {
       "title": "ワークスペースを検索",
       "text": "メッセージ、タスク、ファイルの検索結果はここに表示されます。",
@@ -5170,10 +5304,6 @@
     "wiki_write": {
       "label": "Wikiに書く",
       "description": "人から頼まれたときだけ、Wikiページを作成・編集します。"
-    },
-    "forum_write": {
-      "label": "フォーラム",
-      "description": "フォーラムのトピックを作成して読み、自分の番以外でも投稿します。"
     },
     "schedule_write": {
       "label": "スケジュール",
@@ -5445,8 +5575,8 @@
     "createdBy": "#{{number}} · 作成者: {{name}}",
     "createdByShort": "作成者: {{name}}",
     "fromMessage": "<0>#{{channel}}のメッセージ</0>から",
-    "fromForum": "フォーラムのトピックから",
     "fromAgent": "エージェントへの依頼から",
+    "subIssues_other": "サブタスク · {{count}}",
     "fromWebhook": "{{provider}}のイベントから",
     "description": "説明",
     "noDescription": "説明はありません。",
@@ -5465,13 +5595,22 @@
     "askText_female": "{{name}}は必要な情報を読み、ここに計画をコメントしてから実行します。公開など重要な操作は、あなたの承認を求めます。",
     "askButton": "{{name}}に頼む",
     "askSection": "エージェントに頼む",
-    "asked": "依頼を送りました。{{name}}がここに進捗を投稿します。あなたとのやり取りはDMに残ります。",
+    "asked": "依頼を送りました。{{name}} はタスクの会話で作業します。タスクを見られる人は全員その会話を追えます。",
     "activity": "アクティビティ",
     "noActivity": "まだ何もありません。",
     "discussion": "ディスカッション",
+    "conversation": {
+      "button": "会話",
+      "toggle_other": "会話、{{count}} 件のメッセージ",
+      "title": "タスクの会話",
+      "messages_other": "{{count}} 件のメッセージ",
+      "open": "開く",
+      "start": "タスクについて話す",
+      "close": "会話を閉じる"
+    },
     "noComments": "まだコメントはありません。",
     "comment": "タスクにコメント",
-    "commentPlaceholder": "コメント · @でエージェントを呼べます",
+    "commentPlaceholder": "タスクにコメント · @でエージェントを呼べます",
     "send": "コメント",
     "details": "タスクの詳細",
     "statusLabel": "ステータス",
@@ -5523,9 +5662,7 @@
       "artifact_linked": "ファイルを添付しました",
       "criterion_checked": "条件「{{text}}」にチェックを入れました",
       "criterion_unchecked": "条件「{{text}}」のチェックを外しました",
-      "agent_asked": "{{name}}に作業を頼みました",
-      "forum_opened": "フォーラムに持ち込みました: {{title}}",
-      "forum_evaluated": "フォーラムの結果を戻しました: {{title}}"
+      "agent_asked": "{{name}}に作業を頼みました"
     }
   },
   "routines": {
@@ -5612,8 +5749,6 @@
     "widgetChip": "ダッシュボードのウィジェット",
     "widgetFixed": "表示内容、更新のタイミング、担当者はウィジェットから変更します。",
     "target": {
-      "forum": "フォーラムのトピック",
-      "forumShort": "フォーラム",
       "dm": "エージェントとの自分のDM",
       "artifact": "Driveのドキュメント",
       "dmShort": "DM",
@@ -5713,7 +5848,6 @@
         "thread": "毎回同じスレッドで回答します",
         "channel": "チャンネルの全員に表示されます",
         "dm": "あなただけに表示されます",
-        "forum": "エージェントがフォーラムのトピックで話し合います",
         "artifact": "Driveのドキュメントになります",
         "widget": "ウィジェットを更新します（メッセージなし）"
       },
@@ -5800,7 +5934,6 @@
       "keepUtc": "UTCのままにする",
       "adjust": "調整",
       "next": "次回",
-      "forumAgents": "話し合うエージェント",
       "agent": "エージェント",
       "target": "送信先",
       "what": "やること",
@@ -6819,6 +6952,49 @@
     "list": "モデル",
     "picks": "{{provider}} · おすすめ"
   },
+  "endpoint": {
+    "option": "その他のプロバイダー",
+    "optionSub": "OpenAI または Claude 互換: ゲートウェイ、Ollama、vLLM、LM Studio、LiteLLM",
+    "name": "名前",
+    "namePlaceholder": "自分のゲートウェイ",
+    "style": "API",
+    "styles": {
+      "openai": "OpenAI (Chat Completions)",
+      "anthropic": "Claude (Messages)"
+    },
+    "address": "アドレス",
+    "addressHelp": "API のベースアドレス (例: {{example}})",
+    "key": "API キー",
+    "keyHelp": "サーバーがキーを求めない場合は空欄のままにします。",
+    "fetch": "モデルを取得",
+    "listFailed": "サーバーはモデルを一覧にしませんでした ({{error}})。下に各モデルの ID を入力してください。",
+    "choose": "エージェントが使えるモデルを選びます",
+    "addModel": "モデルを追加",
+    "add": "追加",
+    "modelPlaceholder": "モデル ID (例: llama-4)",
+    "modelInvalid": "モデル ID ではないようです。",
+    "priceIn": "{{model}}: 入力の料金",
+    "priceOut": "{{model}}: 出力の料金",
+    "priceInShort": "入力",
+    "priceOutShort": "出力",
+    "priceUnit": "100 万トークンあたりの US$",
+    "priceBoth": "入力と出力の両方を入力するか、どちらも空欄にします。",
+    "priceInvalid": "0.50 のような数値を使ってください",
+    "unpriced": "料金のないモデルは予算上の費用がかかりません。トークン数だけが数えられます。",
+    "save": "保存してテスト",
+    "saveModels": "保存してもう一度テスト",
+    "testing": "各モデルをテスト中…",
+    "results": "各モデルのテスト",
+    "check": {
+      "ok": "動作します (ツールあり)",
+      "noTools": "応答しますが、ツールを使いませんでした。エージェントが働くにはツールが必要です。",
+      "failed": "失敗: {{error}}"
+    },
+    "done": "完了",
+    "models": "モデル",
+    "modelsTitle": "{{name}} のモデル",
+    "budgetUnpriced": "このエージェントのモデルには料金がないため、予算で使った金額を数えられません。トークン数は数えられます。"
+  },
   "timezone": {
     "search": "タイムゾーンを検索",
     "searchPlaceholder": "都市、国、UTC−3…",
@@ -7674,7 +7850,6 @@
     "inviteKeywords": "invite 招待 しょうたい メンバー 人 チーム 参加",
     "wikiPage": "Wikiページ",
     "wikiNew": "新しいWikiページ",
-    "forum": "フォーラムのトピック",
     "jump": "移動…",
     "open": "移動、またはエージェントに質問",
     "placeholder": "移動、またはエージェントに質問…",
@@ -7690,484 +7865,6 @@
     "newConversation": "新しい会話",
     "askLabel": "{{name}}、{{text}}",
     "empty": "「{{q}}」に一致するものはありません。"
-  },
-  "forum": {
-    "title": "フォーラム",
-    "subtitle": "目標のある問い。エージェントが1体ずつ順番に何ラウンドか議論し、最後にまとめを出します。",
-    "guard": "ワークスペースの全員が読めます。各発言は通常の実行なので、ツールと承認のルールが適用されます。",
-    "new": "新しいトピック",
-    "filters": "トピックを絞り込む",
-    "filter": {
-      "open": "議論中",
-      "done": "結論済み",
-      "mine": "自分のもの"
-    },
-    "listTitle": {
-      "open": "議論中",
-      "done": "結論済み",
-      "mine": "自分のトピック"
-    },
-    "agentFilter": "エージェント",
-    "agentCount_other": "{{count}}体のエージェント",
-    "search": "フォーラムを検索",
-    "clearFilters": "フィルターをクリア",
-    "emptyFilter": "このフィルターに一致するトピックはありません。",
-    "liveNow": "議論中",
-    "needsYou": "あなたの対応が必要",
-    "status": {
-      "open": "議論中",
-      "stalled": "停滞中",
-      "reopened": "再開済み",
-      "done": "結論済み",
-      "canceled": "キャンセル済み"
-    },
-    "reopenedBy": "{{name}}が再開",
-    "roundOf": "ラウンド {{round}}/{{rounds}}",
-    "rounds_other": "{{count}}ラウンド",
-    "until": "{{when}}まで",
-    "noDeadline": "期限なし",
-    "deadlineToday": "今日 {{time}}",
-    "deadlineTomorrow": "明日 {{time}}",
-    "you": "{{name}}（あなた）",
-    "empty": {
-      "title": "トピックはまだありません",
-      "text": "難しい問いを持ち込んで、エージェントに何ラウンドか議論してもらいましょう。チャットからも依頼できます:「@エージェント これをフォーラムで話し合って」。"
-    },
-    "live": {
-      "writing": "{{name}}が書いています",
-      "reading": "{{name}}が議論を読んでいます",
-      "yourTurn": "あなたの番です",
-      "waiting": "{{name}}を待っています",
-      "synthesis": "{{name}}がまとめを書いています",
-      "stalled": "{{name}}の番で停滞中",
-      "stalledSynthesis": "まとめで停滞中",
-      "next": "次: {{name}}",
-      "thenSynthesis": "その後: まとめ"
-    },
-    "need": {
-      "turnTitle": "「{{title}}」であなたの番です",
-      "turn": "ラウンド{{round}}であなたの番です。ラウンドはあなたを待っています。",
-      "turnDeadline": "ラウンド{{round}}であなたの番です。{{when}}までに発言しないと、あなた抜きで議論が進みます。",
-      "speak": "今すぐ発言",
-      "issues_other": "まとめでは{{count}}件のタスクが提案されています。誰かが承認したときだけ作成されます。",
-      "planIssues_other": "計画では{{count}}件のタスクが提案されています。誰かが承認したときだけ作成されます。",
-      "subIssues_other": "計画では#{{number}}に{{count}}件のサブタスクが提案されています。誰かが承認したときだけ作成されます。",
-      "review": "タスクを確認",
-      "budget": "{{name}}は予算を使い切ったため、次の番からスキップされます。",
-      "budget_female": "{{name}}は予算を使い切ったため、次の番からスキップされます。",
-      "seeBudget": "予算を見る",
-      "stalled": "停滞中: 誰かが再開するまで、誰も発言しません。",
-      "resume": "再開"
-    },
-    "row": {
-      "canceled": "まとめなしでキャンセルされました。"
-    },
-    "origin": {
-      "direct": "フォーラムで直接作成",
-      "agent": "{{name}}、#{{channel}}",
-      "agentNoChannel": "{{name}}が作成",
-      "suggestion": "{{name}}が提案",
-      "suggestionIn": "{{name}}が#{{channel}}で提案",
-      "issue": "タスク #{{number}}",
-      "issueBy": "タスク #{{number}} · 依頼者: {{name}}",
-      "routine": "ルーティン",
-      "conversation": "ある会話"
-    },
-    "track": {
-      "label_other": "エージェントの発言{{count}}回、{{rounds}}",
-      "spoke": "ラウンド{{round}} · {{name}} · {{stance}}",
-      "spokeNoStance": "ラウンド{{round}} · {{name}}",
-      "person": "ラウンド{{round}} · {{name}}が参加",
-      "seat": "ラウンド{{round}} · {{name}}が順番に発言",
-      "passed": "ラウンド{{round}} · {{name}}がパス",
-      "waiting": "ラウンドは{{name}}を待っています",
-      "waitingMe": "ラウンドはあなたを待っています",
-      "seatPending": "ラウンド{{round}} · {{name}}の番",
-      "live": "{{name}}が書いています",
-      "sleep": "{{name}}の番で停滞中",
-      "synthesis": "{{name}}のまとめ",
-      "synthesisLive": "{{name}}がまとめを書いています",
-      "skipped": "ラウンド{{round}} · {{name}}は発言しませんでした",
-      "budget": "ラウンド{{round}} · {{name}}はスキップ: エージェントの予算切れ",
-      "pending": "ラウンド{{round}} · {{name}}の番",
-      "round": "ラウンド{{n}}",
-      "roundShort": "R{{n}}",
-      "key": "各列は1回の発言で、発言者の色で表示されます。高さは発言の長さです。",
-      "keyLive": "人型のアイコンは今話している人です。点は残りの発言です。",
-      "keyDone": "最後の幅の広いブロックがまとめです。",
-      "keyClick": "クリックするとその発言に移動します。"
-    },
-    "stance": {
-      "propose": "提案",
-      "agree": "{{name}}に賛成",
-      "agreeAny": "賛成",
-      "disagree": "{{name}}に反対",
-      "disagreeAny": "反対",
-      "shift": "立場を変更",
-      "ask": "質問",
-      "askPeople": "人に質問",
-      "reply": "{{name}}に返答",
-      "replyAny": "返答",
-      "people": "人"
-    },
-    "topic": {
-      "back": "フォーラム",
-      "goal": "目標",
-      "responsible": "担当",
-      "requestedBy": "依頼者",
-      "reopenedFor": "{{name}}がラウンド{{round}}のために再開",
-      "conclude": "結論を出す",
-      "concluding": "結論をまとめています…",
-      "more": "その他の操作",
-      "copyLink": "リンクをコピー",
-      "linkCopied": "リンクをコピーしました。開いた人はトピック全体を読めます。",
-      "editParticipants": "参加者を編集",
-      "cancel": "トピックをキャンセル",
-      "notFound": "トピックが見つかりません。"
-    },
-    "table": {
-      "title": "テーブル",
-      "order": "この順番で、ラウンドごとに1回発言",
-      "orderDone": "この順番で発言しました",
-      "writes": "まとめを書く",
-      "writesPlan": "計画を書く",
-      "seatedPerson": "人 · テーブルに参加",
-      "next": "次",
-      "yourTurn": "あなたの番です",
-      "waits": "ラウンドは待機中",
-      "writing": "書いています",
-      "reading": "議論を読んでいます…",
-      "rereading": "ラウンドを読み返しています…",
-      "writingSynthesis": "まとめを書いています",
-      "stopped": "ここで停止",
-      "broke": "予算切れのため、番をスキップ",
-      "wroteSynthesis": "まとめを書きました",
-      "spokeAt": "{{time}}に発言",
-      "passed": "パス",
-      "notYet": "まだ発言していません",
-      "readsCanEnter": "読むことができ、参加も可能",
-      "entered": "ラウンド{{round}}で参加",
-      "sits": "テーブルに参加",
-      "orgReads": "ワークスペース全体が読めます"
-    },
-    "posts": {
-      "round": "ラウンド{{n}}",
-      "startedWith": "{{name}}から開始",
-      "spokeCount": "{{total}}人中{{said}}人が発言",
-      "none": "{{name}}が最初に発言します。最初のラウンドが始まりました。",
-      "person": "人",
-      "starts": "ラウンド{{round}}はここから始まります",
-      "started": "ラウンド{{round}}はここから始まりました",
-      "last": "これが最後のラウンドでした。この投稿はまとめに反映されます",
-      "askedRound": "新しいラウンドを依頼",
-      "inTurn": "自分の番で発言",
-      "reroundFrom": "ここからラウンドを依頼",
-      "replyTo": "{{name}}の投稿へ移動",
-      "budgetSkip": "{{name}}は番をスキップしました: エージェントの予算切れです。",
-      "passedTurn": "{{name}}はパスしました。",
-      "didntSpeak_other": "{{names}}はこのラウンドで発言しませんでした。",
-      "stopped": "発言の途中で停止しました。",
-      "comments": "コメント",
-      "afterSynthesis": "まとめの後"
-    },
-    "liveTurn": {
-      "writing": "書いています · ラウンド{{round}}",
-      "reading": "議論を読んでいます · ラウンド{{round}}",
-      "synthesis": "まとめを書いています",
-      "rereading": "ラウンドを読み返しています",
-      "readingLine": "議論を読んでいます…",
-      "waitsFor": "ラウンドは、テーブルに参加している{{name}}を待っています。",
-      "yourTurn": "あなたの番です",
-      "yourTurnSub": "ラウンド{{round}} · ラウンドはあなたを待っています",
-      "yourTurnPlaceholder": "どう思いますか？エージェントは次の番の前にこれを読みます。",
-      "pass": "パス",
-      "send": "送信",
-      "deadline": "{{when}}までに発言しないと、あなた抜きで議論が進みます。",
-      "passed": "パスしました。今回はあなた抜きでラウンドが進みます。",
-      "spoke": "自分の番で発言しました。ラウンドはテーブルの順番で進みます。"
-    },
-    "stalled": {
-      "title": "{{name}}の番で停滞中",
-      "titleSynthesis": "まとめで停滞中",
-      "stopped": "{{name}}が番を止めました。誰かが再開するまで、誰も発言しません。",
-      "stoppedAnon": "番が止められました。誰かが再開するまで、誰も発言しません。",
-      "failed": "番が失敗しました。もう一度試すか、ここまでの内容で結論を出してください。",
-      "resume": "再開",
-      "retry": "もう一度試す",
-      "concludeNow": "今すぐ結論を出す",
-      "resumed": "トピックを再開しました。"
-    },
-    "closed": {
-      "canceled": "まとめなしでキャンセルされました。投稿はここに残り、誰でも読めます。",
-      "synthesizing": "{{name}}がまとめを書いています。このトピックでは、ほかの誰も発言しません。"
-    },
-    "composer": {
-      "label": "議論に参加",
-      "placeholder": "議論に参加…",
-      "hint": "いつでも参加できます。今の番が終わると、あなたの投稿から次のラウンドが始まります。",
-      "hintLast": "いつでも参加できます。今の番が終わると、この最後のラウンドでは、あなたの投稿がそのまままとめに反映されます。",
-      "moreRound": "あなたの投稿からもう1ラウンド",
-      "send": "送信",
-      "sent": "投稿しました。次のラウンドはここから始まります。",
-      "sentLast": "あなたの投稿はまとめに反映されます。",
-      "commentLabel": "コメント",
-      "commentPlaceholder": "コメント…",
-      "comment": "コメント",
-      "commentAndRound": "コメントしてラウンドを依頼",
-      "commented": "コメントを投稿しました。トピックは結論済みのままです。",
-      "reround": "このコメントから新しいラウンドを依頼",
-      "doneHint": "このトピックは結論済みです。コメントしても再開されません（ラウンドを依頼した場合を除く）。",
-      "reroundHint": "テーブルのエージェントが新しいラウンドであなたのコメントに答え、{{name}}がまとめを書き直します。"
-    },
-    "newRound": {
-      "title": "新しいラウンドを依頼",
-      "text": "あなたのコメントからラウンド{{round}}が始まり、トピックはあなたの名前で再開されます。",
-      "textFrom": "このコメントからラウンド{{round}}が始まり、トピックはあなたの名前で再開されます。",
-      "note": "追加したいこと",
-      "notePlaceholder": "任意: エージェントに見直してほしい点",
-      "defaultBody": "このコメントから新しいラウンドを依頼しました。",
-      "who": "答える人",
-      "whoHint": "テーブルの順番で",
-      "speaksAt": "{{n}}番目に発言",
-      "broke": "予算切れ: 番をスキップします",
-      "ok": "ラウンドを依頼",
-      "done": "トピックを再開しました: ラウンド{{round}}。"
-    },
-    "conclude": {
-      "title": "トピックの結論を出しますか？",
-      "text": "新しい番は始まりません。ここまでの内容がまとめになります。",
-      "finishes": "{{name}}が自分の番を終えます",
-      "finishes_female": "{{name}}が自分の番を終えます",
-      "finishesSub": "今はこのエージェントの番です。その後は、誰も発言しません。",
-      "nobody": "今は誰も書いていません",
-      "nobodySub": "まとめがすぐに始まります。",
-      "writes": "{{name}}がまとめを書きます",
-      "writesSub": "結論、それぞれの賛否、未解決の問い、次のステップ、提案タスク。",
-      "writesSubPlan": "目標、範囲内と範囲外、ステップ、リスク、測り方、ステップごとのタスク。",
-      "goes": "Driveにドキュメントとして保存され、元の場所に戻ります",
-      "goesSub": "提案タスクは、誰かが承認したときだけ作成されます。",
-      "keep": "議論を続ける",
-      "ok": "結論を出す",
-      "done": "結論をまとめています。まとめはこことDriveに表示されます。"
-    },
-    "cancel": {
-      "title": "まとめなしでキャンセルしますか？",
-      "text": "これ以降誰も発言せず、Driveにも何も保存されません。投稿はここに残り、誰でも読めます。",
-      "keep": "トピックを残す",
-      "ok": "トピックをキャンセル",
-      "done": "トピックをキャンセルしました。投稿はフォーラムに残ります。"
-    },
-    "side": {
-      "title": "それぞれの立場",
-      "titleDone": "最終的な立場",
-      "agree_other": "{{total}}体中{{count}}体が賛成",
-      "withProposal": "テーブル上の提案に",
-      "withDecision": "結論に",
-      "askers_other": "{{names}}には疑問が残りました",
-      "agents": "各エージェント",
-      "notYet": "まだ発言していません",
-      "firstWriting": "最初の発言を書いています…",
-      "writingNow": "書いています…",
-      "broke": "予算切れ: 番をスキップします",
-      "spoke": "発言済み",
-      "laneKey": "1ラウンドにつき1マス。上: テーブル上の提案に賛成。下: 反対。中央: 質問。",
-      "laneLabel": "{{name}}: {{list}}",
-      "laneEmpty": "{{name}}: 発言なし",
-      "laneRound": "ラウンド{{round}}: {{stance}}",
-      "laneLive": "ラウンド{{round}}: 書いています",
-      "details": "詳細",
-      "rounds": "ラウンド",
-      "roundsDone": "{{round}}/{{rounds}}",
-      "format": "形式",
-      "deadline": "期限",
-      "origin": "出どころ",
-      "openedBy": "作成者",
-      "participants": "参加者"
-    },
-    "format": {
-      "decision": "結論",
-      "plan": "計画",
-      "decisionHint": "結論と、それぞれの賛否、未解決の問い、次のステップ。",
-      "planHint": "計画: 範囲内と範囲外、担当者つきの順序立てたステップ、リスク、測り方。ステップはタスクになります。"
-    },
-    "formatLower": {
-      "decision": "結論",
-      "plan": "計画"
-    },
-    "synthesis": {
-      "eyebrow": "まとめ",
-      "eyebrowPlan": "計画",
-      "closed": "{{name}}がトピックを締めくくりました",
-      "closedPlan": "{{name}}が計画を締めくくりました",
-      "rewrote": "{{name}}がまとめを書き直しました",
-      "meta": "{{agents}}体のエージェントによる{{posts}}回の発言",
-      "metaPeople": "{{agents}}体のエージェントと人による{{posts}}回の発言",
-      "version": "バージョン{{n}}",
-      "versionN": "バージョン{{n}}",
-      "decision": "結論",
-      "objective": "目標",
-      "prosCons": "それぞれの賛否",
-      "why": "理由",
-      "openQuestions": "未解決の問い",
-      "nextSteps": "次のステップ",
-      "forRequester": "{{name}}へ:",
-      "inScope": "範囲内",
-      "outOfScope": "範囲外",
-      "steps": "ステップ（順番どおり）",
-      "after": "{{n}}の後",
-      "startNow": "すぐに開始できます",
-      "risks": "リスク",
-      "metrics": "測り方",
-      "changes": "バージョン{{n}} · 変更点",
-      "showV": "バージョン{{n}}を見る",
-      "hideV": "バージョン{{n}}を隠す",
-      "replaced": "ラウンド{{round}}の後に置き換え",
-      "none": "なし",
-      "issues": "提案タスク",
-      "subIssues": "#{{number}}の提案サブタスク",
-      "marked": "{{total}}件中{{on}}件をチェック",
-      "allCreated": "すべて作成済み",
-      "goesTo": "担当: {{name}}",
-      "with": "{{name}}と一緒に",
-      "step": "ステップ{{n}}",
-      "approveTitle": "{{name}}が提案し、人が承認します",
-      "approveText": "あなたなしでは何も作成されません。各タスクは名前の挙がった人に割り当てられます。",
-      "approveTextPlan": "各ステップは担当者つきのサブタスクになります。あなたなしでは何も作成されません。",
-      "create_other": "{{count}}件のタスクを作成",
-      "createSub_other": "#{{number}}に{{count}}件のサブタスクを作成",
-      "created_other": "{{count}}件のタスクを作成しました。",
-      "createdSub_other": "#{{number}}に{{count}}件のサブタスクを作成しました。",
-      "wentTo": "送り先",
-      "backIssue": "タスク #{{number}}に戻ります",
-      "backIssueDone": "タスク #{{number}}に戻りました: 計画 + サブタスク{{count}}件",
-      "backChannel": "元の会話に戻りました",
-      "backNone": "フォーラムに残ります",
-      "saveWiki": "Wikiに保存"
-    },
-    "form": {
-      "title": "新しいトピック",
-      "fromIssue": "フォーラムで検討",
-      "editSuggestion": "提案を編集",
-      "subtitle": "エージェントはテーブルの順番で1体ずつ発言し、最初のエージェントがまとめを書きます。",
-      "templatesText": "テンプレートから、またはゼロから始めます。開く前にすべて変更できます。",
-      "tip": "ヒント: チャットで「@エージェント これをフォーラムで話し合って」と書いてもトピックを開けます。",
-      "templateMeta": "{{rounds}} · {{format}}",
-      "templates": {
-        "tech": {
-          "title": "技術的な判断",
-          "text": "リスクと計画を添えて、選択肢を1つ選びます。",
-          "goal": "選択肢を1つ選んで理由を示し、リスクと次のステップも挙げてください。"
-        },
-        "review": {
-          "title": "提案をレビュー",
-          "text": "穴を見つけ、変えるべき点を持ち帰ります。",
-          "goal": "提案を読み、穴を指摘し、変えるべき点のリストを持ち帰ってください。"
-        },
-        "brain": {
-          "title": "ブレインストーミング",
-          "text": "アイデアを集め、試す3つを選びます。",
-          "goal": "アイデアを集めてグループ分けし、試すべきベスト3を選んでください。"
-        },
-        "postmortem": {
-          "title": "ポストモーテム",
-          "text": "何が起きたか、なぜか、何を変えるか。",
-          "goal": "何が起きたかを説明し、原因を見つけ、再発しないために何を変えるかを示してください。"
-        },
-        "blank": {
-          "title": "ゼロから",
-          "text": "問いを書いて、議論するメンバーを選びます。"
-        }
-      },
-      "question": "問い",
-      "questionPlaceholder": "例: outboxのキューをLISTEN/NOTIFYに移行する？",
-      "origin": "{{origin}}から。結果はそこに戻ります。",
-      "format": "出力の形式",
-      "goal": "目標",
-      "goalPlaceholder": "例: リスクと展開計画を含む結論。",
-      "table": "テーブル",
-      "tableHint": "発言順 · ドラッグか矢印で並べ替え",
-      "personSeat": "人 · この番でラウンドが待機します",
-      "addAgents": "テーブルにエージェントを追加",
-      "add": "{{name}}をテーブルに追加",
-      "up": "{{name}}を上へ移動",
-      "down": "{{name}}を下へ移動",
-      "remove": "{{name}}を削除",
-      "unseat": "{{name}}をテーブルから外す",
-      "noTalk": "あなたには返信しません",
-      "noTalkTitle": "{{name}}はあなたに返信しません",
-      "oneAgent": "エージェントが1体だけなら、スレッドかタスクの「{{name}}に聞く」を使ってください。フォーラムは意見が分かれうる議論のためのものです。",
-      "minAgents": "議論にはエージェントを2体以上選んでください。",
-      "people": "通知する人",
-      "peopleHint": "ワークスペースの全員が読めます",
-      "meAlways": "あなた（常に通知されます）",
-      "seatMe": "自分もテーブルに参加する",
-      "seatMeHint": "ラウンドで自分を待つ",
-      "seatOther": "{{name}}がテーブルに参加",
-      "seatOtherHint": "この番でラウンドが待機します",
-      "rounds": "ラウンド",
-      "deadline": "期限",
-      "deadlines": {
-        "none": "期限なし",
-        "today": "今日の18時",
-        "tomorrow": "明日",
-        "friday": "金曜日"
-      },
-      "approvals": "各発言は通常の実行なので、承認のルールが適用されます。",
-      "create": "トピックを開く",
-      "open": "フォーラムを開く",
-      "created": "トピックを開きました。{{name}}が最初に発言します。ワークスペースの全員が読めます。"
-    },
-    "participantsDialog": {
-      "title": "参加者",
-      "text": "テーブルにエージェント{{agents}}体と{{people}}。",
-      "people_other": "通知する人{{count}}人",
-      "search": "参加者を検索",
-      "speaksAt": "{{n}}番目に発言",
-      "entered": "議論に参加しました",
-      "notified": "通知を受け、参加できます",
-      "org": "ワークスペース全体",
-      "orgReads": "トピックを読めます",
-      "note": "テーブルの変更は次のラウンドから反映されます。",
-      "edit": "編集",
-      "saved": "参加者を更新しました。"
-    },
-    "suggestion": {
-      "label": "フォーラムの提案",
-      "title": "フォーラムで話し合いますか？",
-      "by": "{{name}}からの提案",
-      "edit": "編集",
-      "table": "テーブル",
-      "open": "フォーラムを開く",
-      "notNow": "今はしない",
-      "note": "開けるのは人だけです。あなたの名前で開かれます。",
-      "opened": "フォーラムを開きました",
-      "openedBy": "{{name}}がこの会話から作成",
-      "openedToast": "フォーラムを開きました。あなたの名前で開かれています。",
-      "dismissed": "{{name}}が提案を見送りました。",
-      "dismissedMe": "提案を見送りました。",
-      "undo": "元に戻す"
-    },
-    "card": {
-      "label": "フォーラムのトピック",
-      "see": "議論を見る"
-    },
-    "issue": {
-      "section": "フォーラム",
-      "evaluate": "フォーラムで検討",
-      "evaluateTitle": "複数の視点が必要です",
-      "evaluateText": "フォーラムは、判断する側の意見が分かれうるときに使います。結果はこのタスクに戻ります。",
-      "inForum": "フォーラムで検討中",
-      "evaluated": "フォーラムで検討済み",
-      "outPlan": "計画が出ます",
-      "outDecision": "結論が出ます",
-      "subIssues_other": "サブタスク · {{count}}"
-    },
-    "notify": {
-      "your_turn": "「{{title}}」であなたの番です。",
-      "requested": "あなたの依頼でフォーラムが開かれました:「{{title}}」。",
-      "concluded": "フォーラム「{{title}}」が終了しました。",
-      "open": "開く"
-    }
   },
   "code": {
     "ranSummary_other": "{{language}}を{{count}}行実行 · 出力 {{size}}",
@@ -8586,7 +8283,6 @@
     "saveNew": "ページ{{title}}を作成",
     "savedTo": "{{title}}に保存しました。",
     "fromMessage": "#{{channel}}のメッセージから",
-    "fromForum": "フォーラムのまとめから",
     "note": {
       "created": "ページを作成",
       "edited": "編集",
@@ -8597,9 +8293,7 @@
       "moved": "「{{folder}}」に移動",
       "moved_root": "ルートに移動",
       "saved_message": "メッセージを保存",
-      "saved_synthesis": "フォーラムのまとめを保存",
       "created_from_message": "メッセージから作成",
-      "created_from_synthesis": "フォーラムのまとめから作成",
       "imported": "「{{source}}」からインポート"
     }
   },
@@ -8891,7 +8585,6 @@
       "wiki": "Wiki",
       "skills": "スキル",
       "schedule": "リマインダーとルーティン",
-      "forum": "フォーラム",
       "sandbox": "コードの実行",
       "browser": "ブラウザ",
       "setup": "ワークスペースの設定",
@@ -8925,9 +8618,6 @@
       },
       "schedule": {
         "write": "依頼した人のためにリマインダーとルーティンを作成します。"
-      },
-      "forum": {
-        "write": "フォーラムでトピックを立て、読んだり投稿したりします。"
       },
       "sandbox": {
         "write": "エージェントのコンピューターでコードを実行します。"
@@ -10701,6 +10391,19 @@
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "大きすぎてプレビューできません。ダウンロードして開いてください。",
     "downloadOnly": "この種類のファイルはプレビューできません。ダウンロードして開いてください。",
+    "video": {
+      "play": "再生",
+      "pause": "一時停止",
+      "replay": "もう一度再生",
+      "seek": "動画の再生位置",
+      "volume": "音量",
+      "mute": "ミュート",
+      "unmute": "ミュート解除",
+      "speed": "速度 {{speed}}×",
+      "fullscreen": "全画面表示",
+      "exitFullscreen": "全画面表示を終了",
+      "open": "開く"
+    },
     "zoom": {
       "toolbar": "ズーム",
       "in": "拡大",
@@ -10751,6 +10454,9 @@
       "base": "どのワークスペースにも「全員」ロールは必ずあります。",
       "unknown": "そのロールはもうありません。",
       "orderIncomplete": "ロールが変更されました。再読み込みしてもう一度お試しください。"
+    },
+    "teamProposal": {
+      "undoExpired": "このチームの作成から1日以上たったため、ここでは取り消せません。各エージェントのページでアーカイブしてください。"
     },
     "agentProposal": {
       "decided": "この提案はすでに誰かが判断しました。",
@@ -10847,8 +10553,7 @@
       "rangeTooLong": "スレッドのコンテキストに含められるのは最大{{max}}件のメッセージです。",
       "titleTooLong": "タイトルは最大{{max}}文字です。",
       "noContext": "このスレッドは会話の範囲から作られたものではありません。",
-      "notUndoable": "元に戻せるのは、範囲から作られたスレッドだけです。",
-      "forum": "フォーラムのトピックにはスレッドがありません。"
+      "notUndoable": "元に戻せるのは、範囲から作られたスレッドだけです。"
     },
     "routine": {
       "tooFrequent": "ルーティンの実行間隔は最短15分です。もっと長い間隔を選んでください。",
@@ -10905,8 +10610,8 @@
       "noPendingUpdate": "このスキルの更新待ちはありません。"
     },
     "agentGroup": {
-      "notFound": "このグループはもう存在しません。",
-      "tooMany": "このワークスペースにはすでに{{max}}個のグループがあります。先にどれかを削除してください。"
+      "notFound": "この部署はもうありません。",
+      "tooMany": "このワークスペースにはすでに {{max}} 個の部署があります。先に 1 つ削除してください。"
     },
     "handle": {
       "invalid": "@は小文字、数字、-、_ で{{min}}〜{{max}}文字にしてください。",
@@ -11539,8 +11244,7 @@
       "unattended": "自発的に"
     },
     "where": {
-      "dm": "非公開の会話",
-      "forum": "フォーラム: {{name}}"
+      "dm": "非公開の会話"
     },
     "system": "システム",
     "removed": "削除済み",
@@ -11617,7 +11321,6 @@
         "mission": "ミッション",
         "thread": "スレッド",
         "channel": "チャンネル",
-        "forum": "フォーラムのトピック",
         "artifact": "Driveのファイル",
         "agent": "エージェント",
         "machine": "コンピューター",
@@ -11745,7 +11448,11 @@
       "device": "このデバイス",
       "activity": "各回答の下にエージェントの作業内容を表示",
       "activityHelp": "使ったツールとかかった時間。作業中は、何をしているかが引き続き表示されます。",
-      "activityFailed": "保存できませんでした。もう一度お試しください。"
+      "activityFailed": "保存できませんでした。もう一度お試しください。",
+      "agentStyle": "エージェントの話し方",
+      "agentStyleHelp": "シンプル：何が起きて何をすればいいかを短く。技術的：パス、コード、詳細つき。",
+      "agentStyleSimple": "シンプル",
+      "agentStyleTechnical": "技術的"
     },
     "orgTitle": "ワークスペース",
     "name": "名前",
@@ -12342,8 +12049,6 @@
       "seconds": "{{n}}秒",
       "minutes": "{{n}}分",
       "step": {
-        "openingForumTopic": "フォーラムのトピックを開きました",
-        "postingInForum": "フォーラムに書き込みました",
         "schedulingReminder": "リマインダーを設定しました",
         "creatingRoutine": "ルーティンを作成しました",
         "updatingRoutine": "ルーティンを変更しました",
@@ -12395,7 +12100,6 @@
         "writingWiki": "Wikiに書き込みました",
         "readingWiki": "Wikiを読みました",
         "linkingWiki": "Wikiページをリンクしました",
-        "readingForum": "フォーラムを読みました",
         "creatingChannel": "チャンネルを作成しました",
         "offeringConnectAi": "AIの接続を提案しました",
         "offeringConnectApp": "アプリの接続を提案しました",
@@ -12414,7 +12118,6 @@
         "handingOff": "レポートを届けました",
         "recordingFindings": "調査結果を記録しました",
         "deliveringMission": "ミッションを納品しました",
-        "suggestingForumTopic": "フォーラムのトピックを提案しました",
         "requestingAccess": "アクセスを求めました",
         "requestingSecret": "シークレットを求めました",
         "queryingDatabase": "データベースを照会しました",
@@ -12425,8 +12128,6 @@
       }
     },
     "activity": {
-      "openingForumTopic": "フォーラムのトピックを作成中",
-      "postingInForum": "フォーラムに書き込み中",
       "schedulingReminder": "リマインダーを設定中",
       "creatingRoutine": "ルーティンを作成中",
       "updatingRoutine": "ルーティンを変更中",
@@ -12481,7 +12182,6 @@
       "writingWiki": "Wikiに書き込み中",
       "readingWiki": "Wikiを読み込み中",
       "linkingWiki": "Wikiページをリンク中",
-      "readingForum": "フォーラムを読み込み中",
       "creatingChannel": "チャンネルを作成中",
       "offeringConnectAi": "AIの接続を準備中",
       "offeringConnectApp": "アプリの接続を準備中",
@@ -12500,7 +12200,6 @@
       "handingOff": "レポートを届けています",
       "recordingFindings": "調査結果を記録中",
       "deliveringMission": "ミッションを納品中",
-      "suggestingForumTopic": "フォーラムのトピックを提案中",
       "requestingAccess": "アクセスを求めています",
       "requestingSecret": "シークレットを求めています",
       "queryingDatabase": "データベースを照会中",
@@ -12546,6 +12245,7 @@
         "long": "多くのステップがかかっていて、誰も直接頼んでいません。続けてもいいですか?"
       },
       "autonomy_digest_other": "{{count}}件のアラートは既知か無害に見えたので、作業しませんでした:",
+      "team_week": "チームの1週間、{{from}}〜{{to}}",
       "autonomy_loop": "この件は自分の判断で作業をやめました。1日に{{count}}回繰り返されました({{title}})。どう扱うか教えてください。",
       "mission_plan": "{{computer}}での「{{title}}」の計画",
       "mission_planNoComputer": "「{{title}}」の計画",
@@ -12614,6 +12314,7 @@
       "action_approvals": "あなたの承認待ち",
       "action_open_page": "画面を開く",
       "agent_proposal": "新しいエージェントを提案しました: {{name}}",
+      "team_proposal": "チームを提案しました：{{names}}",
       "settings_proposal": "{{names}}への変更を提案しました",
       "approval_request": "承認リクエスト: {{title}}",
       "secret_request": "{{agent}}がキーを求めました: {{name}}",
@@ -12636,10 +12337,7 @@
       },
       "interrupted": "サーバーの再起動で中断されました。続けるにはもう一度依頼してください。",
       "step_limit": "完了する前にステップを使い切りました。",
-      "stuck": "行き詰まったため、完了前に停止しました。",
-      "forum_suggestion": "フォーラムで話し合いますか？「{{title}}」",
-      "forum_concluded": "フォーラム「{{title}}」は終了しました。まとめは下のファイルにあります。",
-      "forum_concluded_issues": "フォーラム「{{title}}」は終了しました。まとめは下のファイルにあり、承認待ちの提案タスクが{{count}}件あります。"
+      "stuck": "行き詰まったため、完了前に停止しました。"
     }
   },
   "builtinTools": {
@@ -12782,22 +12480,6 @@
     "schedule_action": {
       "label": "操作を予約",
       "description": "接続済みアプリの操作を指定した時刻に向けて準備します。承認は今、人が行います。"
-    },
-    "suggest_forum_topic": {
-      "label": "フォーラムのトピックを提案",
-      "description": "エージェント同士の議論を提案します。開くのは人です。"
-    },
-    "open_forum_topic": {
-      "label": "フォーラムのトピックを開く",
-      "description": "テーマをエージェント同士の議論に持ち込みます。"
-    },
-    "post_in_forum": {
-      "label": "フォーラムに投稿",
-      "description": "自分の番以外のときにトピックに投稿します。"
-    },
-    "read_forum_topic": {
-      "label": "フォーラムのトピックを読む",
-      "description": "トピックの目的と返信を読みます。"
     },
     "search_wiki": {
       "label": "Wikiを検索",
@@ -14294,5 +13976,202 @@
       "promptRequired": "ウィジェットに表示する内容を書いてください。",
       "notTested": "先にテストしてください。テストが成功するとウィジェットが作成されます。"
     }
+  },
+  "teamPlan": {
+    "start": {
+      "question": "{{org}}はどんなことをしていますか？それをもとにすぐ使えるチームを組みます。あなたは確認するだけです。",
+      "orWrite": "または、下に自分の言葉で一文で書いてください。",
+      "footer": "もう決まっていますか？",
+      "templates": "チームのテンプレートを見る",
+      "presets": "用意されたエージェント"
+    },
+    "business": {
+      "agency": "代理店",
+      "store": "オンラインショップ",
+      "clinic": "クリニック・診療所",
+      "software": "ソフトウェア・アプリ",
+      "support": "カスタマーサポート",
+      "services": "サービス事務所",
+      "other": "その他"
+    },
+    "answered": "回答済み",
+    "step": "質問 {{step}}/{{of}}",
+    "send": "{{count}}件を送信",
+    "card": {
+      "new": "新規",
+      "routines": "ルーティン",
+      "skills": "スキル",
+      "create": "チームを作成",
+      "adjust": "調整",
+      "adjustName": "{{name}}を調整",
+      "map": "マップで見る",
+      "agents_other": "エージェント{{count}}体",
+      "newChannels_other": "新しいチャンネル{{count}}件",
+      "routineCount_other": "ルーティン{{count}}件",
+      "weekly": "チームの1週間をここで報告します",
+      "failed": "チームは作成されませんでした。{{step}}で失敗しました（{{reason}}）。何も作成されていないので、もう一度試せます。",
+      "retry": "もう一度試す",
+      "onlyCreators": "チームを作成できるのはエージェントを作成できる人だけです。",
+      "created": "{{name}}がチームを作成",
+      "createdYou": "あなたがチームを作成",
+      "skillsWait": "スキルは管理者を待っています。",
+      "weeklyWait": "私の週次レビューは、私のルーティンを管理する人を待っています。",
+      "undone": "チームを取り消しました",
+      "dismissed": "チームを破棄しました"
+    },
+    "firstTask": {
+      "suggestion": "提案",
+      "lead": "エージェントごとに短いタスクを1つ。今日それぞれの働きを見られます。",
+      "open": "タスク付きで開く",
+      "invite": "{{names}}を招待",
+      "later": "あとで"
+    },
+    "adjust": {
+      "title": "{{name}}を調整",
+      "name": "名前",
+      "role": "役割",
+      "line": "していること",
+      "instructions": "指示",
+      "channel": "チャンネル",
+      "firstTask": "最初のタスク"
+    },
+    "map": {
+      "title": "マップで見るチーム",
+      "people": "メンバー",
+      "reviewer": "{{name}}がチームの1週間を振り返ります",
+      "waits": "あなたの承認待ち"
+    },
+    "templates": {
+      "title": "チームのテンプレート",
+      "lead": "あなたの業種向けのすぐ使えるチーム。そのあと{{name}}が一緒に調整します。",
+      "use": "このテンプレートを使う",
+      "none": "どれも違う",
+      "noneSub": "していることを伝えれば{{name}}が組みます",
+      "tailor": "そのあと、あなたの事業に合わせるために2つ質問します。"
+    },
+    "weekly": {
+      "name": "チームの1週間"
+    }
+  },
+  "teamTemplates": {
+    "lead": "{{org}}のチーム。エージェントはそれぞれ自分のチャンネルにいます。作成前に調整できます。",
+    "agency": {
+      "name": "マーケティング代理店",
+      "sub": "コンテンツ、広告、サポート",
+      "desc": "顧客のコンテンツやキャンペーンを運営する代理店向け。"
+    },
+    "store": {
+      "name": "オンラインショップ",
+      "sub": "注文、在庫、SNS",
+      "desc": "オンラインで販売し、購入者に対応するショップ向け。"
+    },
+    "clinic": {
+      "name": "クリニック・診療所",
+      "sub": "WhatsAppでの予約、請求、フォローアップ",
+      "desc": "患者の予約とフォローアップを行うクリニックや診療所向け。"
+    },
+    "software": {
+      "name": "ソフトウェア・アプリ",
+      "sub": "サポート、請求、コード",
+      "desc": "ソフトウェアを販売し、自社の顧客を支える会社向け。"
+    },
+    "support": {
+      "name": "カスタマーサポート",
+      "sub": "顧客の対応待ちと回答集",
+      "desc": "毎日多くの顧客に対応するチーム向け。"
+    },
+    "services": {
+      "name": "サービス事務所",
+      "sub": "会計、法務、コンサルティング",
+      "desc": "顧客の予約、提案書の送付、請求を行う事務所向け。"
+    },
+    "agents": {
+      "iara": {
+        "role": "サポート",
+        "line": "WhatsAppとメールで顧客に返信します。わからないときはあなたを呼びます。",
+        "routine": "未返信のものをまとめる",
+        "task": "待っている最新の顧客メッセージに返信する"
+      },
+      "caio": {
+        "role": "請求",
+        "line": "支払いが遅れている人に連絡し、あなたの承認後に督促を送ります。",
+        "routine": "支払いが遅れている人を一覧にする",
+        "task": "今月遅れている人を一覧にする"
+      },
+      "ada": {
+        "role": "開発",
+        "line": "顧客から報告されたバグを直してPRを作ります。",
+        "routine": "新しいバグを一覧にする",
+        "task": "顧客が報告した最新のバグを見る"
+      },
+      "lia": {
+        "role": "コンテンツ",
+        "line": "会社のトーンで投稿や台本を書き、あなたの承認後に予約します。",
+        "routine": "今週の投稿を提案する",
+        "task": "今週の投稿を3つ提案する"
+      },
+      "theo": {
+        "role": "営業",
+        "line": "見積もりを依頼した人をフォローし、提案書を書きます。",
+        "routine": "見積もりを依頼して返事がない人を一覧にする",
+        "task": "今週見積もりを依頼した人を一覧にする"
+      },
+      "nina": {
+        "role": "予約",
+        "line": "予約の受付、確認、変更を行い、前日に顧客へリマインドします。",
+        "routine": "明日の予約を確認する",
+        "task": "明日の予約を見せて"
+      },
+      "otto": {
+        "role": "注文",
+        "line": "注文と在庫を追い、なくなりそうなものを知らせます。",
+        "routine": "在庫切れが近いものを知らせる",
+        "task": "まだ発送待ちの注文を一覧にする"
+      },
+      "bia": {
+        "role": "回答集",
+        "line": "チームの回答をもとに回答集を最新に保ちます。",
+        "routine": "今週の回答で回答集を更新する",
+        "task": "顧客がいちばんよく聞く5つの質問を一覧にする"
+      }
+    },
+    "channels": {
+      "iara": "support",
+      "caio": "billing",
+      "ada": "eng",
+      "lia": "content",
+      "theo": "sales",
+      "nina": "schedule",
+      "otto": "orders",
+      "bia": "support"
+    },
+    "skills": {
+      "voice": {
+        "name": "トーン&ボイス",
+        "line": "会社が顧客とどう話すか"
+      },
+      "dunning": {
+        "name": "督促ルール",
+        "line": "期日当日、そして遅延3日目と7日目にリマインド"
+      },
+      "answers": {
+        "name": "回答集",
+        "line": "よくある質問へのチームの承認済み回答"
+      },
+      "proposal": {
+        "name": "提案書の構成",
+        "line": "提案書に何をどの順番で書くか"
+      },
+      "schedule": {
+        "name": "予約ルール",
+        "line": "時間帯、間隔、何日前から予約できるか"
+      },
+      "review": {
+        "name": "コードレビュー",
+        "line": "PRを作る前に確認すること"
+      }
+    },
+    "approvals": "顧客に送るものはあなたの承認を待ちます。信頼できるようになったら、あとで任せられます。",
+    "ask": "{{name}}のテンプレートを使いました。あなたの事業に合わせるために：**{{org}}の違いは何ですか？**"
   }
 }

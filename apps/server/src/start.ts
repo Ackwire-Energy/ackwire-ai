@@ -47,6 +47,7 @@ import {
 } from "@agenteschat/db";
 import {
   adoptRestoredOperatorEvents,
+  allowsPrivateEndpoints,
   composioUsageHook,
   createGifKey,
   createLocalKeyWrapper,
@@ -61,6 +62,7 @@ import {
   isAgentesCloud,
   isBlockedAddress,
   meterComposio,
+  moveIssueComments,
   publicHttpsFetch,
   resolveHostDns,
   retireHostTokens,
@@ -255,7 +257,8 @@ async function boot(
     modules,
     base,
     defaults,
-    createModelProviders(),
+    // A workspace's own model endpoint (ADR 0146): on agentes.chat Cloud every call connects only to public addresses.
+    createModelProviders({ endpointFetch: allowsPrivateEndpoints(config) ? undefined : publicHttpsFetch() }),
   );
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
   resolved = adapters;
@@ -338,6 +341,12 @@ async function boot(
       if (made > 0) log.info("right hands created", { made });
     })
     .catch((error: unknown) => log.warn("right hands backfill failed", { error: String(error) }));
+  // Off the boot path: tasks' comments from before their conversations move into them once (ADR 0145).
+  void moveIssueComments(database.db)
+    .then((moved) => {
+      if (moved > 0) log.info("task comments moved to conversations", { moved });
+    })
+    .catch((error: unknown) => log.warn("task comments move failed", { error: String(error) }));
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,

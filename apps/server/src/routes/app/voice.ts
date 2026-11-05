@@ -16,6 +16,7 @@ import {
 import { createRoute, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
+import { rangedResponse } from "../../http/byte-range";
 import { apiError, errorResponse } from "../../http/errors";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
 
@@ -30,38 +31,11 @@ const KEY_WRITES = { limit: 10, windowMs: 60_000 };
 const ChannelParams = OrgParams.extend({ channelId: z.uuid() });
 const ClipParams = OrgParams.extend({ clipId: z.uuid() });
 
-/** `bytes=a-b` of an object of `size`: where it starts and ends; null when absent; "bad" when it can't be served. */
-function rangeOf(header: string | undefined, size: number): { start: number; end: number } | "bad" | null {
-  if (!header) return null;
-  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
-  if (!match || (!match[1] && !match[2])) return "bad";
-  const start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2]));
-  const end = match[1] && match[2] ? Math.min(Number(match[2]), size - 1) : size - 1;
-  return start > end || start >= size ? "bad" : { start, end };
-}
-
 function audioResponse(c: Context, audio: Uint8Array, contentType: string) {
-  const size = audio.length;
-  const headers: Record<string, string> = {
+  return rangedResponse(audio, c.req.header("range"), {
     "content-type": contentType,
-    "accept-ranges": "bytes",
     "cache-control": "private, max-age=300",
     "x-content-type-options": "nosniff",
-  };
-  const range = rangeOf(c.req.header("range"), size);
-  if (range === "bad") {
-    return new Response(null, { status: 416, headers: { ...headers, "content-range": `bytes */${size}` } });
-  }
-  if (!range)
-    return new Response(audio as Uint8Array<ArrayBuffer>, { headers: { ...headers, "content-length": String(size) } });
-  const part = audio.subarray(range.start, range.end + 1);
-  return new Response(part as Uint8Array<ArrayBuffer>, {
-    status: 206,
-    headers: {
-      ...headers,
-      "content-length": String(part.length),
-      "content-range": `bytes ${range.start}-${range.end}/${size}`,
-    },
   });
 }
 

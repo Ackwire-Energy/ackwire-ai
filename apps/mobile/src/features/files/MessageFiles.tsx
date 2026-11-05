@@ -2,7 +2,7 @@ import type { ArtifactDetail } from "@agenteschat/client";
 import { formatBytes } from "@agenteschat/client/lib/files";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon, Text } from "@/ui";
@@ -12,12 +12,14 @@ import { PollCard } from "../blocks/PollCard";
 import { useColors, useOrgId } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
 import { ImageStack } from "./ImageStack";
-import { encodeFileList, extensionOf, type FileInfo, fileInfo, singleImageHeight } from "./logic";
+import { encodeFileList, extensionOf, type FileInfo, fileInfo, singleImageHeight, VIDEO_EXT } from "./logic";
 import { useArtifacts, useRemoteFile } from "./source";
+import { VideoPlayer } from "./VideoPlayer";
 
 /**
  * A message's files: a picture inline at its own shape, or several as a deck to swipe through (`ImageStack`),
- * tapping opens the viewer at that picture; other files as a card with the type's tile, the real name and
+ * tapping opens the viewer at that picture; a video plays right there (its corner button opens the file screen);
+ * other files as a card with the type's tile, the real name and
  * "Documento · 4 KB", tapping opens the document screen. `align="end"`: the viewer's own message, its files sit
  * on the right.
  */
@@ -45,6 +47,7 @@ export function MessageFiles({ files, align = "start" }: { files: MessageFile[];
   const images: { file: MessageFile; detail: ArtifactDetail | undefined }[] = [];
   // What lives in the conversation isn't a file: the thing itself (ADR 0113).
   const blocks: ArtifactDetail[] = [];
+  const videos: { file: MessageFile; detail: ArtifactDetail | undefined }[] = [];
   const others: { file: MessageFile; detail: ArtifactDetail | undefined; failed: boolean }[] = [];
   live.forEach((file, i) => {
     const q = queries[i];
@@ -55,7 +58,9 @@ export function MessageFiles({ files, align = "start" }: { files: MessageFile[];
     }
     // Until it loads, a name like "print.png" already says it's a picture (no jump into the grid).
     const isImage = detail ? fileInfo(detail).view === "image" : !q?.isError && IMAGE_EXT.has(extensionOf(file.title));
+    const isVideo = detail ? fileInfo(detail).view === "video" : !q?.isError && VIDEO_EXT.has(extensionOf(file.title));
     if (isImage) images.push({ file, detail });
+    else if (isVideo) videos.push({ file, detail });
     else others.push({ file, detail, failed: Boolean(q?.isError) });
   });
   const removed = files.filter((f) => f.deleted);
@@ -88,6 +93,9 @@ export function MessageFiles({ files, align = "start" }: { files: MessageFile[];
           />
         </View>
       ) : null}
+      {videos.map(({ file, detail }) => (
+        <InlineVideo key={file.id} file={file} detail={detail} width={blockWidth} />
+      ))}
       {blocks.map((b) =>
         b.kind === "poll" ? (
           <PollCard key={b.id} id={b.id} version={b.shownVersion} />
@@ -158,6 +166,60 @@ function InlineImage({
         </View>
       ) : null}
     </Pressable>
+  );
+}
+
+/** A video on a message: it plays in place; one this phone can't play becomes the file's card. */
+function InlineVideo({
+  file,
+  detail,
+  width,
+}: {
+  file: MessageFile;
+  detail: ArtifactDetail | undefined;
+  width: number;
+}) {
+  const { i18n } = useTranslation();
+  const orgId = useOrgId();
+  const c = useColors();
+  const version = detail?.shownVersion ?? file.version;
+  const link = useRemoteFile(orgId, file.id, version);
+  const [failed, setFailed] = useState(false);
+  const source = useMemo(
+    () => (link.data ? { uri: link.data.uri, ...(link.data.headers ? { headers: link.data.headers } : {}) } : null),
+    [link.data],
+  );
+  if (failed || link.isError) return <FileCard file={file} detail={detail} failed={false} />;
+  const info = detail ? fileInfo(detail) : null;
+  const open = () => {
+    if (!detail) return;
+    tapHaptic();
+    router.push({
+      pathname: "/file/[id]",
+      params: { id: file.id, ...(detail.shownVersion < detail.version ? { v: String(detail.shownVersion) } : {}) },
+    });
+  };
+  return (
+    <View style={styles.images}>
+      {source ? (
+        <VideoPlayer
+          key={source.uri}
+          source={source}
+          name={info?.name || file.title}
+          size={info?.size != null ? formatBytes(i18n.language || "en", info.size) : undefined}
+          width={width}
+          onOpen={detail ? open : undefined}
+          onFailed={() => setFailed(true)}
+        />
+      ) : (
+        <View
+          style={[
+            styles.shot,
+            { width, height: Math.round((width * 9) / 16), backgroundColor: c.sunken, borderColor: c.line2 },
+          ]}
+        />
+      )}
+    </View>
   );
 }
 

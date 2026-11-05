@@ -13,7 +13,7 @@ Código aberto: AGPL-3.0-only em tudo o que é público, contribuições sob a m
 - Roteador: modelo barato e fixo decide quem responde (0 a 2 agentes). Nunca concede permissão.
 - Conectores em 2 camadas: org conecta o MCP uma vez; cada agente recebe subconjunto de escopos.
 - Ações sensíveis (merge, deploy, rollback) sempre viram pedido de aprovação humana no chat.
-- Issues, fórum, Drive (relatório, organograma, tabela, diff) e rotinas via jobs agendados.
+- Issues, Drive (relatório, organograma, tabela, diff) e rotinas via jobs agendados.
 
 ## Ambiente e testes
 - Os testes não precisam de Docker nem de Postgres local; credenciais reais só no `.env`.

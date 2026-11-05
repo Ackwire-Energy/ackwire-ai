@@ -60,8 +60,8 @@ export interface WikiRun {
 /**
  * Whether a run may read a wiki page, as a condition over `wiki_pages` (ADR 0023 addendum): only when the agent, the
  * person behind the run and everyone who reads its conversation all see it. An agent's output reaches them, so this is
- * checked before the text ever reaches the agent, and a page that fails is simply not there. A public channel and a
- * forum are read by the whole workspace, members of them or not.
+ * checked before the text ever reaches the agent, and a page that fails is simply not there. A public channel is
+ * read by the whole workspace, members of it or not.
  */
 export function wikiPageRunVisibleSql(run: WikiRun) {
   const parts = [
@@ -78,7 +78,7 @@ export function wikiPageRunVisibleSql(run: WikiRun) {
       sql`not exists (select 1 from ${channels}
         join ${organizationMembers} on ${organizationMembers.orgId} = ${channels.orgId}
         where ${channels.id} = ${run.channelId}
-        and (${channels.kind} = 'forum' or (${channels.kind} = 'channel' and ${channels.visibility} = 'public'))
+        and ${channels.kind} = 'channel' and ${channels.visibility} = 'public'
         and not ${wikiPageVisibleSql(sql`${organizationMembers.userId}`)})`,
     );
   }

@@ -6,12 +6,13 @@ import { fileIcon, previewType } from "@agenteschat/client/lib/files";
  * line ("MD", "Documento · 4 KB"), how a viewer shows each, and the name a shared copy gets.
  */
 
-/** How the app shows a file: inline picture, the document screen (Markdown, text, PDF), or only its card. */
-export type FileView = "image" | "markdown" | "text" | "pdf" | "other";
+/** How the app shows a file: inline picture or video, the document screen (Markdown, text, PDF), or only its card. */
+export type FileView = "image" | "video" | "markdown" | "text" | "pdf" | "other";
 
 /** The word under the name ("Imagem", "PDF", "Documento"…): `mobile.files.type.<key>`. */
 export type FileTypeKey =
   | "image"
+  | "video"
   | "pdf"
   | "document"
   | "table"
@@ -38,6 +39,10 @@ export interface FileInfo {
 
 /** Raster types the app draws (expo-image); SVG and the rest open as a card. */
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/heic", "image/heif"]);
+/** Video types the phones play (expo-video); WebM only plays on Android, so iPhone falls back to the card. */
+const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime", "video/x-m4v", "video/webm"]);
+/** Names that already say "video" while the file's details load (no jump from card to player). */
+export const VIDEO_EXT = new Set(["mp4", "mov", "m4v", "webm"]);
 const MARKDOWN_EXT = new Set(["md", "markdown", "mdx"]);
 const TEXT_EXT = new Set(["txt", "log", "csv", "tsv", "json", "yml", "yaml", "toml", "xml", "ini", "env"]);
 
@@ -103,6 +108,7 @@ export function fileInfo(a: Pick<ArtifactDetail, "kind" | "title" | "content">):
     const mime = previewType(c.contentType);
     let view: FileView = "other";
     if (IMAGE_TYPES.has(mime)) view = "image";
+    else if (VIDEO_TYPES.has(mime)) view = "video";
     else if (mime === "application/pdf" || ext === "pdf") view = "pdf";
     else if (MARKDOWN_EXT.has(ext) || mime === "text/markdown") view = "markdown";
     else if (TEXT_EXT.has(ext) || mime.startsWith("text/")) view = "text";
@@ -117,6 +123,7 @@ export function fileInfo(a: Pick<ArtifactDetail, "kind" | "title" | "content">):
 
 function fileType(name: string, mime: string, view: FileView): FileTypeKey {
   if (view === "image") return "image";
+  if (view === "video") return "video";
   if (view === "pdf") return "pdf";
   if (view === "markdown") return "document";
   const icon = fileIcon(name, mime);
@@ -127,6 +134,22 @@ function fileType(name: string, mime: string, view: FileView): FileTypeKey {
   if (icon === "page") return "page";
   if (icon === "document") return view === "text" ? "text" : "document";
   return view === "text" ? "text" : "file";
+}
+
+/** A video's height for `width`: its own shape once known (16:9 before), kept between tall (9:16) and wide (2:1). */
+export function videoHeight(width: number, size: { width: number; height: number } | null): number {
+  if (!size || size.width <= 0 || size.height <= 0) return Math.round((width * 9) / 16);
+  const ratio = Math.min(Math.max(size.width / size.height, 9 / 16), 2);
+  return Math.round(width / ratio);
+}
+
+/** "0:07", "12:05", "1:02:09": a video's time. */
+export function videoClock(seconds: number): string {
+  const s = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
 
 /** A lone picture's height for `width`: its own aspect ratio, kept between tall (3:4… 9:16) and wide (2:1). */

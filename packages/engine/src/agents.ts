@@ -13,7 +13,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
-import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
+import { AUTO_MODEL, isAutoModel, MODEL_CATALOG, parseCustomModel } from "@agenteschat/providers";
 import { isIdHandle } from "@agenteschat/ui/names";
 import type { AgentAppearance } from "./appearance";
 import { dropAgentRules } from "./approval-rules";
@@ -98,7 +98,7 @@ export async function validateAgentFields(db: Database, orgId: string, input: Pa
     throw new ValidationError("handle can't look like an id. Pick one from the agent's name");
   }
   // "auto": each run picks the model from the line of the agent's key (any provider).
-  const model = input.model && !isAutoModel(input.model) ? await modelInfoFor(db, input.model) : undefined;
+  const model = input.model && !isAutoModel(input.model) ? await modelInfoFor(db, input.model, orgId) : undefined;
   if (input.model !== undefined && !isAutoModel(input.model) && !model) {
     throw new ValidationError(
       `model must be ${AUTO_MODEL}, one of: ${Object.keys(MODEL_CATALOG).join(", ")}, or one OpenRouter lists`,
@@ -119,6 +119,8 @@ export async function validateAgentFields(db: Database, orgId: string, input: Pa
         ),
       );
     if (!cred) throw new ValidationError("credentialId does not belong to this organization");
+    const pinned = input.model ? parseCustomModel(input.model)?.credentialId : undefined;
+    if (pinned && pinned !== cred.id) throw new ValidationError("An endpoint's model runs only on its own endpoint");
     if (model && model.provider !== cred.provider) {
       throw new ValidationError(
         `The model ${input.model} is from ${model.provider}, but this key is from ${cred.provider}`,

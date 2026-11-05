@@ -108,6 +108,13 @@ export function AgentPage(props: AgentPageProps) {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const agent = dir.agentById.get(props.agentId);
+  // Only the full profile edits, so only it asks before closing; every other view here closes on the request.
+  const full = Boolean(agent && !dir.loading && seesDetails(agent) && !isRightHand(agent));
+  const closeRef = useRef(props.onClose);
+  closeRef.current = full ? undefined : props.onClose;
+  useEffect(() => {
+    if (props.closeRequest) closeRef.current?.();
+  }, [props.closeRequest]);
   if (dir.loading) {
     return (
       <div className="page page--full">
@@ -135,7 +142,7 @@ export function AgentPage(props: AgentPageProps) {
       </div>
     );
   }
-  if (!seesDetails(agent) || isRightHand(agent)) return <AgentPublicCard agent={agent} onClose={props.onClose} />;
+  if (!seesDetails(agent) || isRightHand(agent)) return <AgentPublicCard agent={agent} />;
   return <AgentProfile key={agent.id} agent={agent} {...props} />;
 }
 
@@ -667,7 +674,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
       <div className={cx("page page--full agp", onClose && "agp--panel")} data-dirty={dirty || undefined}>
         <AgentHero
           onArchive={() => setArchiving(true)}
-          onClose={close}
+          panel={Boolean(onClose)}
           onExpand={
             onClose &&
             (() =>

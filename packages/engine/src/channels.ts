@@ -43,6 +43,7 @@ import {
 } from "./permissions";
 import { refuseRightHand } from "./right-hand";
 import { closedRefusal, STANDING_COLUMNS } from "./standing";
+import { taskReaderSql } from "./task-access";
 
 const { channels, channelMembers, agents, organizationMembers, organizations, users } = schema;
 
@@ -135,19 +136,17 @@ export async function dropRoleLeavers(
 
 /**
  * Tells everyone that people left channels (after the transaction that took them out): their live subscriptions end
- * first, then their sidebars and the channels hear it. Their notifications from those channels go with them, unless
- * the channel stays readable to them (a forum).
+ * first, then their sidebars and the channels hear it. Their notifications from those channels go with them.
  */
 export async function announceChannelLeavers(
   deps: { db: Database; pubsub?: PubSub },
   orgId: string,
   leavers: ChannelLeaver[],
-  options: { clearNotifications?: boolean } = {},
 ) {
   const { pubsub } = deps;
   for (const { channelId, userId } of leavers) {
     caches.channelMembers.delete(`${orgId}:${channelId}`);
-    if (options.clearNotifications !== false) await clearChannelNotifications(deps, orgId, userId, channelId);
+    await clearChannelNotifications(deps, orgId, userId, channelId);
     const removed = {
       type: "channel.member_removed" as const,
       channelId,
@@ -478,8 +477,8 @@ export async function peopleAllIn(db: Executor, orgId: string, hereId: string, t
 }
 
 /**
- * Which of `channelIds` a person reads, by the rule of `requireChannelAccess`: a member, or a forum (open to the
- * organization); archived channels left out. For screens that quote a conversation outside it (run history).
+ * Which of `channelIds` a person reads, by the rule of `requireChannelAccess`: a member, or a task's reader;
+ * archived channels left out. For screens that quote a conversation outside it (run history).
  */
 export async function readableChannelIds(
   db: Database,
@@ -505,7 +504,10 @@ export async function readableChannelIds(
         eq(channels.orgId, orgId),
         inArray(channels.id, ids),
         isNull(channels.archivedAt),
-        or(isNotNull(channelMembers.id), eq(channels.kind, "forum")),
+        or(
+          isNotNull(channelMembers.id),
+          and(eq(channels.kind, "task"), taskReaderSql(sql`${channels.id}`, sql`${userId}::text`)),
+        ),
       ),
     );
   return new Set(rows.map((r) => r.id));
@@ -530,6 +532,7 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
       channel: channels,
       memberId: channelMembers.id,
       overrides: channelOverridesSql(organizationMembers.orgId, sql`${channelId}::uuid`, organizationMembers.userId),
+      taskReader: sql<boolean>`${channels.kind} = 'task' and ${taskReaderSql(sql`${channelId}::uuid`, sql`${userId}::text`)}`,
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
@@ -545,8 +548,9 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
   if (closed) throw closed;
   const channel = row.channel;
   if (!channel || channel.archivedAt) throw new NotFoundError("Channel not found");
-  // Forum topics are readable by the whole organization (ADR 0022); writing goes through the forum.
-  if (!row.memberId && channel.kind !== "forum") throw new ForbiddenError("Join this channel first");
+  // A task's conversation is read by whoever sees the task (ADR 0145), always checked again: people are never its members.
+  if (channel.kind === "task" ? !(row.taskReader === true || String(row.taskReader) === "t") : !row.memberId)
+    throw new ForbiddenError("Join this channel first");
   const workspace: Membership = {
     orgId,
     orgName: row.orgName,
@@ -840,11 +844,8 @@ export async function removeChannelMember(
       ),
     );
   caches.channelMembers.delete(`${orgId}:${channelId}`);
-  // A forum stays readable to the whole organization (ADR 0022): only a channel or a DM takes its snippets along.
   if ("userId" in member) {
-    await announceChannelLeavers({ db, pubsub: options.pubsub }, orgId, [{ channelId, userId: member.userId }], {
-      clearNotifications: channel.kind !== "forum",
-    });
+    await announceChannelLeavers({ db, pubsub: options.pubsub }, orgId, [{ channelId, userId: member.userId }]);
     return;
   }
   caches.scopes.deletePrefix(`${orgId}:${member.agentId}:visible`);

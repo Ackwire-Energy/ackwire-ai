@@ -1492,6 +1492,41 @@
       "when": 1793883667011,
       "tag": "0214_vault",
       "breakpoints": true
+    },
+    {
+      "idx": 215,
+      "version": "7",
+      "when": 1793893667011,
+      "tag": "0215_task_conversations",
+      "breakpoints": true
+    },
+    {
+      "idx": 216,
+      "version": "7",
+      "when": 1793903667011,
+      "tag": "0216_remove_forum",
+      "breakpoints": true
+    },
+    {
+      "idx": 217,
+      "version": "7",
+      "when": 1793913667011,
+      "tag": "0217_agent_style",
+      "breakpoints": true
+    },
+    {
+      "idx": 218,
+      "version": "7",
+      "when": 1793923667011,
+      "tag": "0218_team_week",
+      "breakpoints": true
+    },
+    {
+      "idx": 219,
+      "version": "7",
+      "when": 1793933667011,
+      "tag": "0219_sectors",
+      "breakpoints": true
     }
   ]
 }

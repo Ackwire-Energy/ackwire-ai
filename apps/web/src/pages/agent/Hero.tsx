@@ -109,14 +109,14 @@ export function Numbers() {
   );
 }
 
-/** `onClose` / `onExpand`: in the panel beside its DM, where "Conversar" is the conversation next to it. */
+/** `panel` / `onExpand`: in the panel beside its DM, where "Conversar" is the conversation next to it (its × is the panel's). */
 export function AgentHero({
   onArchive,
-  onClose,
+  panel,
   onExpand,
 }: {
   onArchive: () => void;
-  onClose?: () => void;
+  panel?: boolean;
   onExpand?: () => void;
 }) {
   const { t } = useTranslation();
@@ -140,7 +140,7 @@ export function AgentHero({
         <div className="agp-cover" data-busy={busy || undefined}>
           <AgentCover color={draft.look.color as AgentColor} busy={busy} clear={() => [face.current, acts.current]} />
           <div className="agp-cover__acts" ref={acts}>
-            {!onClose && (
+            {!panel && (
               <Button asChild variant="primary" size="sm" className="agp-chat">
                 <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId: org.id, agentId: agent.id }}>
                   <Icon name="message" size={14} />
@@ -210,17 +210,6 @@ export function AgentHero({
                 onClick={onExpand}
               />
             )}
-            {onClose && (
-              <Button
-                size="sm"
-                iconOnly
-                icon="close"
-                className="agp-glass"
-                aria-label={t("common.close")}
-                title={t("common.close")}
-                onClick={onClose}
-              />
-            )}
           </div>
         </div>
         {/* Over the cover's left edge, cut out by a ring of the page. */}
@@ -240,7 +229,7 @@ export function AgentHero({
             is the overview's side column (OverviewTab). In the panel the numbers stay on the full page. */}
         {!workInAside && (
           <div className="agp-hero__work">
-            <WorkCard onOpen={openWork} footer={onClose ? null : <Numbers />} />
+            <WorkCard onOpen={openWork} footer={panel ? null : <Numbers />} />
           </div>
         )}
       </section>

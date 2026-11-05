@@ -683,7 +683,11 @@ export const featureKeysPtBR = {
     noneForYou: "Nenhum agente atende você ainda.",
     noneForYouHint: "Peça acesso a um admin.",
     freeSection: "Livres",
-    noGroupSection: "Sem grupo",
+    noGroupSection: "Sem setor",
+  },
+  team: {
+    entry: "Lista, organograma e mapa",
+    mapHint: "Para mudar um agente de canal, use o mapa na web ou fale com {{name}}.",
   },
   agentEdit: {
     missing: "Este agente não existe mais.",
@@ -778,10 +782,6 @@ export const featureKeysPtBR = {
       issue_comment_other: "{{names}} comentaram numa tarefa",
       issue_status_one: "{{names}} mudou uma tarefa",
       issue_status_other: "{{names}} mudaram uma tarefa",
-      forum_turn_one: "Sua vez no fórum",
-      forum_turn_other: "Sua vez no fórum",
-      forum_synthesis_one: "Síntese pronta no fórum",
-      forum_synthesis_other: "Síntese pronta no fórum",
       approval_one: "{{names}} pede aprovação",
       approval_other: "{{names}} pedem aprovação",
       mission_finished_one: "Missão terminou",
@@ -1026,6 +1026,7 @@ export const featureKeysPtBR = {
   files: {
     type: {
       image: "Imagem",
+      video: "Vídeo",
       pdf: "PDF",
       document: "Documento",
       table: "Tabela",
@@ -1051,6 +1052,16 @@ export const featureKeysPtBR = {
     imageOf: "Imagem {{index}} de {{count}}",
     place: "{{index}} de {{count}}",
     noPreview: "Este arquivo não abre no app. Compartilhe para abrir em outro app.",
+    video: {
+      play: "Tocar",
+      pause: "Pausar",
+      replay: "Ver de novo",
+      seek: "Posição no vídeo",
+      mute: "Tirar o som",
+      unmute: "Ligar o som",
+      fullscreen: "Tela cheia",
+      open: "Abrir",
+    },
   },
   issues: {
     title: "Tarefas",
@@ -1082,7 +1093,6 @@ export const featureKeysPtBR = {
     loadFailed: "Não deu para carregar as tarefas.",
     createdBy: "criada por {{name}}",
     fromMessage: "a partir de uma mensagem",
-    fromForum: "a partir do fórum",
     fromAgent: "a partir de um pedido a um agente",
     fromWebhook: "a partir do {{provider}}",
     workingFor_one: "trabalhando há {{count}} min",
@@ -1236,7 +1246,6 @@ export const featureKeysPtBR = {
     kind: {
       approval: "Aprovar",
       question: "Pergunta",
-      forum: "Sua vez",
       browser: "Navegador",
       secret: "Segredo",
       join: "Membros",
@@ -1344,7 +1353,6 @@ export const featureKeysPtBR = {
         wiki: "Wiki",
         skills: "Habilidades",
         schedule: "Rotinas",
-        forum: "Fórum",
         sandbox: "Computador próprio",
         browser: "Navegador",
         setup: "Configurar o workspace",

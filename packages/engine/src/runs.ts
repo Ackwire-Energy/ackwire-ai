@@ -42,8 +42,8 @@ export const usageWaitSql = sql<"plan" | "budget" | null>`(case when ${agentRuns
   when 'usage_pause' then coalesce(${agentRuns.transcript}->'waitingForBrain'->>'source', 'plan') end) end)`;
 
 /**
- * Where a run's replies go: asked in the main timeline (a channel, a DM
- * or a forum post), it answers in the main timeline; asked in a thread, in
+ * Where a run's replies go: asked in the main timeline (a channel or a
+ * DM), it answers in the main timeline; asked in a thread, in
  * that thread. The run keeps `threadRootId` (its trigger, when top-level) as
  * the conversation it belongs to. The one rule for the engine, its tools and
  * the bridge: cards and events of a run always land where its replies do.
@@ -76,7 +76,7 @@ export const NO_AI = "no_ai" as const;
 export const PERSON_LIMIT = "person_limit" as const;
 /** An older run's error from when a run waited at most 30 minutes for room on its computer (still worded). */
 export const COMPUTER_BUSY = "computer_busy" as const;
-/** A run's error when it went in circles and its kind of run can't end with Continuar (a routine's, a forum's). */
+/** A run's error when it went in circles and its kind of run can't end with Continuar (a routine's). */
 export const STUCK_ERROR = "stuck" as const;
 
 /** A run's error when its server stopped in the middle of a tool call (a deploy, a crash, a reboot). */

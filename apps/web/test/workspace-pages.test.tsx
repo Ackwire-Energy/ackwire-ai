@@ -29,29 +29,44 @@ describe("Aprovações", () => {
     within(screen().getByRole("radiogroup", { name: "Filtro" }))
       .getAllByRole("radio")
       .map((b) => b.textContent);
+  /** A request's row in the list. */
+  const row = (id: string) => document.querySelector(`.ap-li[data-id="${id}"]`) as HTMLElement;
+  /** The request open beside the list, by its title. */
+  const pane = (name: string) => {
+    const el = screen().getByRole("region", { name });
+    expect(el.classList.contains("ap-review")).toBe(true);
+    return el;
+  };
+  const refuse = async (open: HTMLElement) => {
+    await click(within(open).getByRole("button", { name: /^Recusar/ }));
+    await click(within(open).getByRole("button", { name: "Falta teste" }));
+    await click(within(open).getByRole("button", { name: /Recusar e avisar/ }));
+    await settle(4);
+  };
 
-  test("waiting cards with the exact action; refusing sends the reason and moves it to the history", async () => {
+  test("waiting rows, the first open beside them; refusing sends the reason and moves it to the history", async () => {
     const { state } = await go("approvals");
     // A zero count isn't shown.
     expect(pills()).toEqual(["Esperando você2", "Aprovados1", "Recusados", "Expirados", "Todos3"]);
-    const merge = screen().getByRole("article", { name: "Merge PR #42 into main" });
+    const merge = row("ap-merge");
     expect(merge.textContent).toContain("Ada");
-    expect(merge.textContent).toContain("#eng");
-    expect(merge.querySelector(".ac-chip")?.textContent).toMatch(/\d+ h para decidir$/);
-    expect(within(merge).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
-    // Deploy is high risk: the button asks for a hold.
-    const deploy = screen().getByRole("article", { name: "Run deploy workflow" });
+    expect(merge.querySelector(".ap-li__left")?.textContent).toMatch(/^\d+ h$/);
+    // Deploy, closest to expiring, opens first. It is high risk: the button asks for a hold.
+    const deploy = pane("Run deploy workflow");
     expect(within(deploy).getByRole("button", { name: "Aprovar deploy: segure para confirmar" })).toBeTruthy();
-    expect(deploy.textContent).toContain("Produção");
+    expect(deploy.querySelector(".ac-facts")?.textContent).toContain("Vai para produção");
 
-    await click(within(merge).getByRole("button", { name: "Recusar" }));
-    await click(within(merge).getByRole("button", { name: "Falta teste" }));
-    await click(within(merge).getByRole("button", { name: /Recusar e avisar/ }));
-    await settle(4);
+    await click(merge);
+    await settle(2);
+    const open = pane("Merge PR #42 into main");
+    expect(open.querySelector(".ap-review__by")?.textContent).toContain("#eng");
+    expect(within(open).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
+    await refuse(open);
     expect(state.calls.find((c) => c.method === "approvals.refuse")?.args).toEqual([ORG_ID, "ap-merge", "Falta teste"]);
     expect(pills()).toEqual(["Esperando você1", "Aprovados1", "Recusados1", "Expirados", "Todos3"]);
-    expect(screen().queryByRole("article", { name: "Merge PR #42 into main" })).toBeNull();
-    expect(screen().getByText("Decididos há pouco")).toBeTruthy();
+    // Under Recent now, refused.
+    expect(row("ap-merge").closest(".ap-list__section")?.querySelector("h2")?.textContent).toBe("Decididos há pouco");
+    expect(row("ap-merge").textContent).toContain("Recusado");
   });
 
   test("nothing waiting: All decided and one link to how approvals work; the header says no more", async () => {
@@ -66,54 +81,45 @@ describe("Aprovações", () => {
     expect(document.querySelector(".list-head")?.querySelectorAll("p")).toHaveLength(1);
   });
 
-  test("refusing asks why, optional; the exact action is approved only for its values", async () => {
+  test("refusing asks why, optional; approving covers this once, with these values", async () => {
     await go("approvals?open=ap-merge");
-    const dialog = screen().getByRole("dialog", { name: "Merge PR #42 into main" });
-    expect(within(dialog).getByRole("region", { name: "A ação exata" }).textContent).toContain(
-      "Só para estes valores: qualquer mudança precisa de nova aprovação.",
+    const open = pane("Merge PR #42 into main");
+    expect(open.querySelector(".ap-bar__text")?.textContent).toBe(
+      "Ada vai fazer um merge, só desta vez e com estes valores.",
     );
-    await click(within(dialog).getByRole("button", { name: /^Recusar/ }));
-    const why = within(dialog).getByLabelText("Por que não?");
+    await click(within(open).getByRole("button", { name: /^Recusar/ }));
+    await settle(2);
+    const why = within(open).getByLabelText("Por que não?");
     expect(why.getAttribute("placeholder")).toBe("Opcional");
-    expect(dialog.textContent).toContain("Vira uma lição na memória da Ada");
+    expect(open.textContent).toContain("Vira uma lição na memória da Ada");
   });
 
   test("a normal-risk approval goes with one click", async () => {
-    const { state } = await go("approvals");
-    const merge = screen().getByRole("article", { name: "Merge PR #42 into main" });
-    await click(within(merge).getByRole("button", { name: "Aprovar merge" }));
+    const { state } = await go("approvals?open=ap-merge");
+    await click(within(pane("Merge PR #42 into main")).getByRole("button", { name: "Aprovar merge" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "approvals.approve")?.args[1]).toBe("ap-merge");
   });
 
-  test("the details dialog shows the exact action and who may decide, kept in ?open=", async () => {
+  test("a row opens its request beside the list, kept in ?open=, with no dialog", async () => {
     const { router } = await go("approvals");
-    const merge = screen().getByRole("article", { name: "Merge PR #42 into main" });
-    await click(within(merge).getByRole("button", { name: "Detalhes" }));
+    await click(row("ap-merge"));
     await settle(2);
-    const dialog = screen().getByRole("dialog", { name: "Merge PR #42 into main" });
-    expect(dialog.textContent).toContain("Pedido de aprovação");
-    expect(within(dialog).getByRole("region", { name: "A ação exata" })).toBeTruthy();
-    expect(within(dialog).getByRole("region", { name: "Quem pode decidir" })).toBeTruthy();
-    expect(within(dialog).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
     expect(router.state.location.search).toMatchObject({ open: "ap-merge" });
-    await click(within(dialog).getByRole("button", { name: "Fechar" }));
-    await settle(2);
+    const open = pane("Merge PR #42 into main");
+    expect(open.textContent).toContain("O que vai fazer");
+    expect(open.textContent).toContain("Como chegou aqui");
+    expect(within(open).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
     expect(screen().queryByRole("dialog")).toBeNull();
-    expect(router.state.location.search).toEqual({});
   });
 
-  test("a link with ?open= reopens the request's details; refusing works from the dialog", async () => {
+  test("a link with ?open= opens that request; refusing works from its decision bar", async () => {
     const { state } = await go("approvals?open=ap-merge");
-    const dialog = screen().getByRole("dialog", { name: "Merge PR #42 into main" });
-    await click(within(dialog).getByRole("button", { name: /^Recusar/ }));
-    await click(within(dialog).getByRole("button", { name: "Falta teste" }));
-    await click(within(dialog).getByRole("button", { name: /Recusar e avisar/ }));
-    await settle(4);
+    await refuse(pane("Merge PR #42 into main"));
     expect(state.calls.find((c) => c.method === "approvals.refuse")?.args).toEqual([ORG_ID, "ap-merge", "Falta teste"]);
   });
 
-  test("a connector tool that runs another by name reads as that action, in words, with the tool behind Detalhes técnicos", async () => {
+  test("a connector tool that runs another by name reads as that action, in words, with the tool behind Technical details", async () => {
     const state = seedState();
     const merge = state.approvals[0];
     if (!merge) throw new Error("no approval");
@@ -129,24 +135,33 @@ describe("Aprovações", () => {
       },
     ];
     await go("approvals", state);
-    const card = screen().getByRole("article", { name: "Ver stack trace do evento" });
-    expect(card.textContent).toContain("Só lê");
-    expect(card.textContent).toContain("Issue: ACME-177");
-    expect(card.textContent).not.toContain("custom:");
-    expect(card.textContent).not.toContain("get_event_stacktrace");
-    await click(within(card).getByRole("button", { name: "Detalhes" }));
-    await settle(2);
-    const dialog = screen().getByRole("dialog", { name: "Ver stack trace do evento" });
-    expect(dialog.querySelector(".ap-exact__tech pre")?.textContent).toContain("get_event_stacktrace");
+    const line = row("ap-trace");
+    expect(line.querySelector(".ap-li__line")?.textContent).toBe("Ada quer ver stack trace do evento");
+    expect(line.textContent).not.toContain("custom:");
+    expect(line.textContent).not.toContain("get_event_stacktrace");
+    const open = pane("Ver stack trace do evento");
+    const facts = open.querySelector(".ac-facts") as HTMLElement;
+    expect(facts.textContent).toContain("Só lê");
+    expect(facts.textContent).not.toContain("custom:");
+    const values = [...open.querySelectorAll(".ap-exact__rows > div")].map((d) => [
+      d.querySelector("dt")?.textContent,
+      d.querySelector("dd")?.textContent,
+    ]);
+    expect(values).toContainEqual(["Issue", "ACME-177"]);
+    expect(open.querySelector(".ap-review__title")?.textContent).not.toContain("get_event_stacktrace");
+    expect(open.querySelector(".ap-exact__tech pre")?.textContent).toContain("get_event_stacktrace");
   });
 
   test("approvals you can't decide show who they wait for, without buttons", async () => {
     const state = seedState();
     for (const a of state.approvals) a.canDecide = false;
     await go("approvals", state);
-    const merge = screen().getByRole("article", { name: "Merge PR #42 into main" });
-    expect(merge.querySelector(".ac-chip")?.textContent).toBe("Aguardando João");
-    expect(within(merge).queryByRole("button", { name: "Recusar" })).toBeNull();
+    expect(row("ap-merge").querySelector(".ap-li__left")?.textContent).toBe("Aguardando João");
+    await click(row("ap-merge"));
+    await settle(2);
+    const open = pane("Merge PR #42 into main");
+    expect(within(open).queryByRole("button", { name: /^Recusar/ })).toBeNull();
+    expect(open.querySelector("[data-approve]")).toBeNull();
   });
 });
 
@@ -409,24 +424,18 @@ describe("Criar agente", () => {
   });
 });
 
-describe("Equipe", () => {
-  test("agents in the sky grouped by their person; a tap opens what it does and how to reach it", async () => {
-    await go("team");
-    expect(screen().getByRole("heading", { name: "Equipe" })).toBeTruthy();
-    expect(screen().getByText(/2 agentes, agrupados por quem cuida de cada um\./)).toBeTruthy();
-    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
-    expect(sky.textContent).toContain("João");
-    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
-    const card = screen().getByRole("dialog", { name: "Detalhes de Ada" });
-    expect(card.textContent).toContain("O que faz");
-    expect(card.textContent).toContain("Arquivos");
-    expect(within(card).getByRole("link", { name: "Conversar" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/dm/agent/${ADA_ID}`,
+describe("Equipe (ADR 0148)", () => {
+  afterEach(() => localStorage.removeItem("agentes.team.view"));
+  const view = async (name: string) => {
+    await click(screen().getByRole("radio", { name }));
+    await settle(3);
+  };
+  const rows = () =>
+    [...document.querySelectorAll(".team-table tbody tr.team-table__row")].map(
+      (r) => r.querySelector(".team-who b")?.textContent,
     );
-    expect(screen().getByText("Nenhum agente pediu ajuda a outro nas últimas 24 h.")).toBeTruthy();
-  });
 
-  test("the card: what it does, available or with no AI, each ability named and drawn its own way", async () => {
+  test("Lista: each agent with its role, who looks after it, where it is and what it does now", async () => {
     const state = seedState({
       aiStatus: {
         any: true,
@@ -436,83 +445,112 @@ describe("Equipe", () => {
         ],
       },
     });
-    const imported = state.agents.find((a) => a.id === ADA_ID);
-    if (imported)
-      imported.instructions =
-        "# SOUL.md - Quem você é\n\n_Você não é um chatbot. Você está se tornando alguém._\n\n## Verdades\n\n- **Ajude de verdade.**";
-    const api = createFakeApi(state);
-    const team = api.agents.team;
-    api.agents.team = async (orgId) => {
-      const t = await team(orgId);
-      return {
-        ...t,
-        agents: t.agents.map((a) => ({ ...a, capabilities: ["sandbox", "desktop", "browser", "drive"] })),
-      };
-    };
-    await renderApp(`/org/${ORG_ID}/team`, { api });
-    await settle(4);
+    state.approvals = state.approvals.filter((a) => a.agentId !== ATLAS_ID);
+    await go("team", state);
+    expect(screen().getByRole("heading", { name: "Equipe" })).toBeTruthy();
+    expect(document.querySelector(".team-head__sub")?.textContent).toBe("2 pessoas · 2 agentes · 0 setores");
     // The same action as the sidebar's, in the same words.
     const head = document.querySelector(".team-head") as HTMLElement;
     expect(within(head).getByRole("link", { name: "Criar agente" })).toBeTruthy();
-    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
-    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
-    const ada = screen().getByRole("dialog", { name: "Detalhes de Ada" });
-    // Its role is beside its name; what it does comes from its instructions, in plain words: their first line,
-    // as its page starts.
-    expect(ada.querySelector(".team-card__meta")?.textContent).toContain("Dev");
-    expect(ada.querySelector(".team-card__call")?.textContent).toBe(
-      "Você não é um chatbot. Você está se tornando alguém.",
-    );
-    expect(ada.querySelector(".team-card__status")?.textContent).toBe("Disponível");
-    expect(ada.textContent).not.toContain("Livre");
-    const chip = (name: string) =>
-      Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === name) as HTMLElement;
-    for (const name of ["Computador", "Tela", "Navegador", "Arquivos"]) expect(chip(name)).toBeTruthy();
-    const drawn = new Set(["Computador", "Tela", "Navegador"].map((n) => chip(n).querySelector("svg")?.innerHTML));
-    expect(drawn.size).toBe(3);
-    await click(within(sky).getByRole("button", { name: "Atlas, ver detalhes" }));
-    const atlas = screen().getByRole("dialog", { name: "Detalhes de Atlas" });
+    const table = screen().getByRole("table");
+    const ada = within(table).getByRole("link", { name: /Ada/ }).closest("tr") as HTMLElement;
+    expect(ada.textContent).toContain("Dev");
+    expect(ada.textContent).toContain("João");
+    expect(ada.textContent).toContain("eng");
+    // The fixture's request waits for Walter: that is what Ada is on now.
+    expect(ada.textContent).toContain("Esperando você");
+    const atlas = within(table).getByRole("link", { name: /Atlas/ }).closest("tr") as HTMLElement;
     expect(within(atlas).getByRole("button", { name: "Sem IA" })).toBeTruthy();
     expect(atlas.textContent).not.toContain("Disponível");
   });
 
-  test("the card names another company's service by its own mark, from the connector catalog", async () => {
-    const api = createFakeApi(seedState());
-    const team = api.agents.team;
-    api.agents.team = async (orgId) => {
-      const t = await team(orgId);
-      return {
-        ...t,
-        agents: t.agents.map((a) => ({ ...a, capabilities: ["github", "linear", "sentry", "browser"] })),
-      };
-    };
-    await renderApp(`/org/${ORG_ID}/team`, { api });
-    await settle(4);
-    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
-    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
-    const ada = screen().getByRole("dialog", { name: "Detalhes de Ada" });
-    const mark = (name: string) => {
-      const chip = Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === name);
-      const el = chip?.querySelector<HTMLElement>(".connector-icon__mark");
-      return el && [el.style.getPropertyValue("--connector-icon"), el.style.getPropertyValue("--connector-color")];
-    };
-    expect(mark("GitHub")).toEqual(['url("/connectors/github.svg")', ""]);
-    expect(mark("Linear")).toEqual(['url("/connectors/linear.svg")', "#5E6AD2"]);
-    // A service's mark sits beside the service's own name.
-    expect(mark("Sentry")).toEqual(['url("/connectors/sentry.svg")', ""]);
-    // Our own abilities keep their icons.
-    expect(mark("Navegador")).toBeNull();
-    const browser = Array.from(ada.querySelectorAll(".ac-chip")).find((c) => c.textContent === "Navegador");
-    expect(browser?.querySelector("svg.ac-icon")).not.toBeNull();
+  test("Lista: search by name, role or channel, filter, and sort by a column", async () => {
+    await go("team");
+    expect(rows()).toEqual(["Ada", "Atlas"]);
+    await act(async () =>
+      fireEvent.change(screen().getByRole("searchbox", { name: "Buscar por nome, função ou canal" }), {
+        target: { value: "ops" },
+      }),
+    );
+    expect(rows()).toEqual(["Atlas"]);
+    await act(async () =>
+      fireEvent.change(screen().getByRole("searchbox", { name: "Buscar por nome, função ou canal" }), {
+        target: { value: "" },
+      }),
+    );
+    // Walter looks after none of them.
+    await click(screen().getByRole("button", { name: /^Meus/ }));
+    expect(rows()).toEqual([]);
+    expect(screen().getByText("Nenhum agente encontrado.")).toBeTruthy();
+    await click(screen().getByRole("button", { name: /^Meus/ }));
+    await click(screen().getByRole("button", { name: "Agente" }));
+    expect(rows()).toEqual(["Atlas", "Ada"]);
   });
 
-  test("the card of an agent waiting for its computer says neither Available nor No AI", async () => {
+  test("the agent waiting for its computer reads neither Available nor No AI", async () => {
     await go("team", seedState({ aiStatus: { any: true, agents: [{ agentId: ADA_ID, state: "waiting" }] } }));
-    const sky = screen().getByRole("region", { name: /Agentes agrupados por pessoa responsável/ });
-    await click(within(sky).getByRole("button", { name: "Ada, ver detalhes" }));
-    const ada = screen().getByRole("dialog", { name: "Detalhes de Ada" });
-    expect(ada.querySelector(".team-card__status")).toBeNull();
+    const ada = within(screen().getByRole("table")).getByRole("link", { name: /Ada/ }).closest("tr") as HTMLElement;
+    expect(ada.textContent).not.toContain("Disponível");
     expect(within(ada).queryByRole("button", { name: "Sem IA" })).toBeNull();
-    expect(ada.textContent).toContain("Instruções de Ada.");
+  });
+
+  test("Organograma: the workspace on top, each person with the agents that report to them", async () => {
+    await go("team");
+    await view("Organograma");
+    const chart = screen().getByRole("region", { name: "Organograma" });
+    expect(chart.querySelector(".team-node--org")?.textContent).toContain("Acme");
+    const joao = [...chart.querySelectorAll(".team-tree__col")].find((c) => c.textContent?.includes("João"));
+    expect([...(joao?.querySelectorAll(".team-node--agent b") ?? [])].map((b) => b.textContent)).toEqual([
+      "Ada",
+      "Atlas",
+    ]);
+  });
+
+  test("Mapa: a column per channel; dropping an agent on another channel asks the right hand for a card", async () => {
+    const { state } = await go("team");
+    await view("Mapa");
+    const map = screen().getByRole("region", { name: "Mapa" });
+    const eng = within(map).getByRole("region", { name: "#eng" });
+    expect([...eng.querySelectorAll(".team-map__card b")].map((b) => b.textContent)).toEqual(["Ada", "Atlas"]);
+    expect(map.querySelector(".team-map__people")?.textContent).toContain("João");
+    const ada = eng.querySelector(".team-map__card") as HTMLElement;
+    const general = map.querySelector('[data-map-col="00000000-0000-4000-8000-0000000000c1"]') as HTMLElement;
+    const dataTransfer = { setData: () => {}, getData: () => "", effectAllowed: "", dropEffect: "" };
+    await act(async () => fireEvent.dragStart(ada, { dataTransfer }));
+    await act(async () => fireEvent.dragOver(general, { dataTransfer }));
+    expect(general.getAttribute("data-drop")).toBe("true");
+    await act(async () => fireEvent.drop(general, { dataTransfer }));
+    await settle(3);
+    expect(state.calls.filter((c) => c.method === "agents.proposeChannelMove").map((c) => c.args[1])).toEqual([
+      {
+        agentId: ADA_ID,
+        fromChannelId: ENG_ID,
+        toChannelId: "00000000-0000-4000-8000-0000000000c1",
+        reason: "Levar Ada de #eng para #general, pelo mapa da equipe.",
+      },
+    ]);
+    // Nothing moved: the change waits on the card.
+    expect(state.calls.some((c) => c.method === "agentGroups.move")).toBe(false);
+  });
+
+  test("Governança e uso: Settings' use per person, with the way to Settings", async () => {
+    await go("team");
+    await view("Governança e uso");
+    const usage = screen().getByRole("region", { name: "Governança e uso" });
+    expect(
+      within(usage)
+        .getByRole("link", { name: /Também nas Configurações/ })
+        .getAttribute("href"),
+    ).toBe(`/org/${ORG_ID}/settings/usage`);
+    await settle(4);
+    expect(usage.textContent).toContain("Uso por pessoa");
+  });
+
+  test("the view chosen stays for the next visit", async () => {
+    await go("team");
+    await view("Setores");
+    cleanup();
+    await go("team");
+    expect(screen().getByRole("radio", { name: "Setores" }).getAttribute("aria-checked")).toBe("true");
   });
 });

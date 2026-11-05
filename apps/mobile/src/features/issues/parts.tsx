@@ -1,5 +1,6 @@
 import type { Issue, IssueColumn } from "@agenteschat/client";
 import { dueLabel } from "@agenteschat/client/lib/format";
+import { conversationLine, isWorking } from "@agenteschat/client/lib/issues";
 import { blockedText, workPlanProgress } from "@agenteschat/client/lib/long-work";
 import { stepPhrase } from "@agenteschat/client/lib/work";
 import { type AgentColorName, gradientOf } from "@agenteschat/ui/agent/engine";
@@ -9,7 +10,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Chip, Icon, type IconName, PixelOrbit, Text } from "@/ui";
 import { Face } from "../shared/Face";
-import { useColors, useDirectory } from "../shared/hooks";
+import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { Tile, useSurface } from "../shared/parts";
 import { criteriaProgress, currentStep, type IssueState, isLate, issueState, latestPr, listState } from "./logic";
@@ -163,8 +164,8 @@ function StateLine({ issue }: { issue: Issue }) {
 }
 
 /**
- * One task on the board: why it stands out, the title, the agent's current step while it works, its criteria, then
- * the number, priority and date with who has it on the far side.
+ * One task on the board: why it stands out, "#N" and the title on one row, the agent's current step while it works,
+ * its criteria, then priority and date with who has it on the far side, and last its conversation (as the web's).
  */
 export const BoardCard = memo(function BoardCard({ issue: i, live }: { issue: Issue; live: boolean }) {
   const { t, i18n } = useTranslation();
@@ -187,6 +188,9 @@ export const BoardCard = memo(function BoardCard({ issue: i, live }: { issue: Is
     >
       <StateLine issue={i} />
       <Text variant="callout" numberOfLines={3} style={styles.title}>
+        <Text variant="callout" tone="faint" style={styles.number}>
+          #{i.number}
+        </Text>{" "}
         {i.title}
       </Text>
       {state === "running" ? (
@@ -200,9 +204,6 @@ export const BoardCard = memo(function BoardCard({ issue: i, live }: { issue: Is
       <CriteriaTrack issue={i} color={color} going={state === "running"} />
       <BoardWork issue={i} />
       <View style={styles.meta}>
-        <Text variant="caption" tone="faint">
-          #{i.number}
-        </Text>
         <PriorityMark issue={i} />
         {due ? (
           <Text variant="caption" style={{ color: late ? c.warn : c.faint }}>
@@ -212,9 +213,49 @@ export const BoardCard = memo(function BoardCard({ issue: i, live }: { issue: Is
         <View style={styles.step} />
         <AssigneeFace issue={i} size={26} live={live} />
       </View>
+      <CardConversation issue={i} />
     </Pressable>
   );
 });
+
+/**
+ * Under a card's fields, its conversation as the web's thread line: faces, "N mensagens", then "Trabalhando" while an
+ * agent works on it, else when the last one came. Part of the card's press (it opens the task).
+ */
+function CardConversation({ issue }: { issue: Issue }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const when = useWhen();
+  const line = conversationLine(issue);
+  if (!line) return null;
+  const working = line.working || isWorking(issue);
+  return (
+    <View style={styles.talk}>
+      <View style={styles.inline}>
+        {line.people.map((p, k) => (
+          <View key={`${p.type}:${p.id}`} style={k > 0 ? styles.overlap : undefined}>
+            <Face who={p} size={18} live={false} />
+          </View>
+        ))}
+      </View>
+      <Text variant="small" tone="ink2" style={styles.bold}>
+        {t("threads.messages", { count: line.count })}
+      </Text>
+      {working ? (
+        <View style={styles.inline}>
+          <Icon name="bolt" size={12} color={c.agent} />
+          <Text variant="small" style={[styles.bold, { color: c.agent }]}>
+            {t("threads.status.working")}
+          </Text>
+        </View>
+      ) : line.lastAt ? (
+        <Text variant="small" tone="faint" numberOfLines={1}>
+          · {when.short(line.lastAt)}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   card: { borderRadius: 16, paddingHorizontal: 13, paddingVertical: 12, gap: 8 },
@@ -222,6 +263,10 @@ const styles = StyleSheet.create({
   inline: { flexDirection: "row", alignItems: "center", gap: 6 },
   bold: { fontWeight: "600" },
   title: { fontWeight: "600" },
+  number: { fontWeight: "500" },
+  // A narrow card wraps between the parts, never inside one.
+  talk: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 },
+  overlap: { marginLeft: -4 },
   step: { flex: 1, minWidth: 0 },
   meta: { flexDirection: "row", alignItems: "center", columnGap: 8 },
   track: { flexDirection: "row", alignItems: "center", gap: 8 },

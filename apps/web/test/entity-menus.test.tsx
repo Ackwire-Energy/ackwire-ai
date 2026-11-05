@@ -107,7 +107,7 @@ describe("an agent", () => {
       "Ver perfil",
       "Fixar no topo",
       "Copiar @ada",
-      "Novo grupo com Ada",
+      "Novo setor com Ada",
       "Editar agente",
       "Copiar link",
       "Copiar ID",

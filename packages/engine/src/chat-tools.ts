@@ -1,13 +1,14 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, count, eq, isNull, schema, sql } from "@agenteschat/db";
+import { and, count, desc, eq, isNull, or, schema, sql } from "@agenteschat/db";
 import { type ArtifactDeps, shareArtifact } from "./artifacts";
 import { recordAudit } from "./audit";
 import { answersAgentsOnly } from "./consultations";
 import { addAgentReaction, isValidReaction, normalizeReaction } from "./context/feedback";
 import { openPersonAgentDm } from "./dms";
 import { publishMessageCreated } from "./events";
+import { cutText } from "./format";
 import { messageLink } from "./message-links";
-import { getMessage, insertMessage, MAX_MESSAGE_LENGTH, messageView, unreachedAgents, unreachedNote } from "./messages";
+import { insertMessage, MAX_MESSAGE_LENGTH, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { enqueue } from "./outbox";
 import { runReadOutsideById } from "./outside";
 import { actingRoutineOfCall, personBehindCall } from "./requester";
@@ -354,45 +355,148 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
   return { name: "chat", tools: async () => tools };
 }
 
+/** How many of the conversation's latest messages `to` looks through for its author's. */
+const REACT_LOOKBACK = 50;
+
+/**
+ * The run's conversation, newest first, with who wrote each message as the agent sees them: its thread when the run
+ * is in one (`threadRootId` is the root), else the channel's main timeline. `id`: that one message only.
+ */
+function conversationMessages(ctx: ToolContext, id?: string) {
+  const m = schema.messages;
+  const inThread = ctx.threadRootId !== ctx.triggerMessageId;
+  return ctx.db
+    .select({
+      id: m.id,
+      body: m.body,
+      meta: m.meta,
+      authorAgentId: m.authorAgentId,
+      authorUserId: m.authorUserId,
+      userName: schema.users.name,
+      userHandle: schema.organizationMembers.handle,
+      agentName: schema.agents.name,
+      agentHandle: schema.agents.handle,
+    })
+    .from(m)
+    .leftJoin(schema.users, eq(schema.users.id, m.authorUserId))
+    .leftJoin(
+      schema.organizationMembers,
+      and(eq(schema.organizationMembers.orgId, m.orgId), eq(schema.organizationMembers.userId, m.authorUserId)),
+    )
+    .leftJoin(schema.agents, eq(schema.agents.id, m.authorAgentId))
+    .where(
+      and(
+        eq(m.orgId, ctx.orgId),
+        eq(m.channelId, ctx.channelId),
+        isNull(m.deletedAt),
+        id
+          ? eq(m.id, id)
+          : inThread
+            ? or(eq(m.threadId, ctx.threadRootId), eq(m.id, ctx.threadRootId))
+            : isNull(m.threadId),
+      ),
+    )
+    .orderBy(desc(m.createdAt), desc(m.id))
+    .limit(id ? 1 : REACT_LOOKBACK);
+}
+type ConversationMessage = Awaited<ReturnType<typeof conversationMessages>>[number];
+
+/**
+ * The messages whose author `who` names, as the agent wrote it ("@caio", "Caio", "Ana", "Ana Souza"). A handle is
+ * one author, a name may be several: handle matches win.
+ */
+function writtenBy(messages: ConversationMessage[], who: string) {
+  const q = plainName(who);
+  const is = (n: string | null) => Boolean(n) && plainName(n as string) === q;
+  const byHandle = messages.filter((m) => is(m.agentHandle ?? m.userHandle));
+  if (byHandle.length) return byHandle;
+  return messages.filter((m) =>
+    m.agentHandle ? is(m.agentName) : is(m.userName) || is((m.userName ?? "").trim().split(/\s+/)[0] ?? ""),
+  );
+}
+
+/** "Caio (@caio)", "Bia Lima": a message's author as the tool's results name them. */
+function authorOf(m: ConversationMessage) {
+  const handle = m.agentHandle ?? m.userHandle;
+  const name = (m.agentHandle ? m.agentName : m.userName) ?? "someone";
+  return handle ? `${name} (@${handle})` : name;
+}
+
+/** 'Caio (@caio): "Fechei o relatório de…"', for the tool's result. */
+function quoteOf(m: ConversationMessage) {
+  const text = m.body.replace(/\s+/g, " ").trim();
+  return `${authorOf(m)}: "${text.length > 80 ? `${cutText(text, 80)}…` : text || "(no text)"}"`;
+}
+
 /**
  * The built-in `react` tool: no scope needed (every agent may react, like
  * `ask_user`). Adds a reaction by the agent to the message that started the
- * run (or another message of this conversation) instead of replying to a
- * plain "thanks" / "ok". The executor ends such a run without posting text
+ * run, another author's latest message here (`to`) or one by id, instead of
+ * replying to a plain "thanks" / "ok" or when asked to react to someone's
+ * message. The executor ends such a run without posting text
  * (`data.reacted`). Never feedback: only people's 👍/👎 teach agents.
  */
 export function createReactToolSource(deps: { pubsub?: PubSub }): ToolSource {
   const tool: ToolDefinition = {
     name: REACT_TOOL,
     description:
-      'React with one emoji instead of replying, when the message only acknowledges or thanks ("valeu", "perfeito", "ok, pode seguir") and needs no answer. Reacts to the message you are answering unless you give `message_id` (a message of this conversation). After reacting, end your turn without any text: nothing else is posted. Never react and also reply.',
+      'React with one emoji instead of replying, when a message only acknowledges or thanks ("valeu", "ok, pode seguir"), or when asked to react. Reacts to the message you answer; for another one, `to` its author ("@caio", "Ana"), plus `quote` (a few of its words) if not their latest. Then end with no text. Never react and also reply.',
     scope: "",
     inputSchema: {
       type: "object",
       properties: {
         emoji: { type: "string", minLength: 1, maxLength: 16 },
+        to: { type: "string", maxLength: 100 },
+        quote: { type: "string", maxLength: 200 },
         message_id: { type: "string", minLength: 36, maxLength: 36 },
       },
       required: ["emoji"],
       additionalProperties: false,
     },
-    describe: (input) => ({ title: `React with ${str(input.emoji)}` }),
+    describe: (input) => ({ title: `React with ${str(input.emoji)}${str(input.to) ? ` to ${str(input.to)}` : ""}` }),
     async execute(input, ctx) {
       try {
         const reaction = normalizeReaction(str(input.emoji));
         if (!isValidReaction(reaction)) return { content: "Give exactly one emoji, e.g. 🙌.", isError: true };
-        const messageId = str(input.message_id) || ctx.triggerMessageId;
-        const target = await getMessage(ctx.db, ctx.orgId, messageId);
-        if (!target || target.deletedAt || target.channelId !== ctx.channelId) {
-          return { content: "No such message in this conversation.", isError: true };
+        const to = str(input.to).trim();
+        const quote = plainName(str(input.quote)).replace(/\s+/g, " ");
+        const byId = str(input.message_id);
+        let target: ConversationMessage | undefined;
+        if ((to || quote) && !byId) {
+          const recent = (await conversationMessages(ctx)).filter(
+            (m) => m.authorAgentId !== ctx.agentId && !m.meta.notice,
+          );
+          const quoted = quote ? recent.filter((m) => plainName(m.body).replace(/\s+/g, " ").includes(quote)) : recent;
+          if (quote && !quoted.length)
+            return {
+              content: `No message here has "${str(input.quote).trim()}": nothing was reacted to. Quote a few words exactly as the message has them.`,
+              isError: true,
+            };
+          const theirs = to ? writtenBy(quoted, to) : quoted.slice(0, 1);
+          const authors = new Map(theirs.map((m) => [m.authorAgentId ?? m.authorUserId, m]));
+          if (authors.size > 1)
+            return {
+              content: `${to} names more than one author here: ${[...authors.values()].map(authorOf).join(", ")}. Nothing was reacted to: give the @handle.`,
+              isError: true,
+            };
+          target = theirs[0];
+          if (!target)
+            return {
+              content: `No message from ${to}${quote ? " with those words" : ""} in this conversation: nothing was reacted to. Give their @handle or name as the conversation shows it, or message_id.`,
+              isError: true,
+            };
+        } else {
+          [target] = await conversationMessages(ctx, byId || ctx.triggerMessageId);
+          if (!target) return { content: "No such message in this conversation.", isError: true };
         }
         await addAgentReaction(
           ctx.db,
           { orgId: ctx.orgId, agentId: ctx.agentId, messageId: target.id, reaction },
           deps.pubsub,
         );
+        const which = target.id === ctx.triggerMessageId ? "the message you are answering, " : "";
         return {
-          content: "Reaction added. End your turn now without any text.",
+          content: `Reacted ${str(input.emoji).trim()} to ${which}${quoteOf(target)}. End your turn now without any text.`,
           data: { reacted: { messageId: target.id, reaction } },
         };
       } catch (error) {

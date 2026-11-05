@@ -9,6 +9,7 @@ import type { TFunction } from "i18next";
 import { HOVER_OPEN_MS } from "@/components/ProfileCard";
 import { runContext } from "@/components/StopRun";
 import { createI18n } from "@/i18n";
+import { requestAgentPanel } from "@/lib/agent-panel-ask";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -32,7 +33,7 @@ const cancels = (state: ReturnType<typeof seedState>) => state.calls.filter((c) 
 const esc = () => act(async () => fireEvent.keyDown(window, { key: "Escape" }));
 
 describe("Parar is immediate", () => {
-  test("the card above the box, its row out of view: its face, its name and step, 'Ver' once the row shows, its stop", async () => {
+  test("the card above the box, no row yet or its row out of view: its face, name, step and stop, 'Ver' once the row shows", async () => {
     const { state, ev } = await open((s) => {
       const ada = s.agents.find((a) => a.id === ADA_ID);
       if (ada) (ada as { appearance?: unknown }).appearance = { color: "amber", accessory: "hat" };
@@ -45,10 +46,15 @@ describe("Parar is immediate", () => {
     expect(bar.querySelector(".ac-avatar--agent")).not.toBeNull();
     expect(bar.querySelector(".ac-typing__text")?.textContent).toBe("Ada pensando…");
     expect(within(bar).queryByRole("button", { name: "Ver" })).toBeNull();
+    // No thinking row comes later either: still no "Ver" while it has no words.
     await act(() => new Promise((r) => setTimeout(r, 2100)));
-    // The row shows, out of view: the bar still speaks for it, with "Ver".
+    expect(within(bar).queryByRole("button", { name: "Ver" })).toBeNull();
+    expect(within(bar).getByRole("button", { name: "Parar" })).toBeTruthy();
+    // Its words bring its row, out of view: the bar still speaks for it, with "Ver".
+    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Olhando o login." });
+    await settle(3);
     expect(bar.querySelector(".ac-avatar--agent")).not.toBeNull();
-    expect(bar.querySelector(".ac-typing__text")?.textContent).toBe("Ada pensando…");
+    expect(bar.querySelector(".ac-typing__text")?.textContent).toBe("Ada escrevendo…");
     expect(within(bar).getByRole("button", { name: "Ver" })).toBeTruthy();
     // Its stop, one click, nothing asked.
     await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Parar" })));
@@ -109,6 +115,20 @@ describe("Parar is immediate", () => {
     await act(async () => fireEvent.keyDown(box, { key: "Escape" }));
     await settle(2);
     expect(cancels(state)).toHaveLength(1);
+  });
+
+  test("Esc in a field of the agent's page in the panel stops nothing under it", async () => {
+    const { state, ev } = await open();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await act(async () => requestAgentPanel(ADA_ID, "settings"));
+    await settle(6);
+    const panel = screen().getByRole("complementary", { name: "Perfil da Ada" });
+    const field = panel.querySelector("input, textarea") as HTMLElement;
+    field.focus();
+    await act(async () => fireEvent.keyDown(field, { key: "Escape" }));
+    await settle(2);
+    expect(cancels(state)).toHaveLength(0);
+    expect(screen().getByRole("complementary", { name: "Perfil da Ada" })).toBeTruthy();
   });
 
   test("typing while it works: 'Juntar' (↵) joins; ⌘↵ / Ctrl↵ sends with 'Parar e mandar'", async () => {

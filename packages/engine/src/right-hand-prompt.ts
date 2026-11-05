@@ -8,6 +8,19 @@ import { agentBudgetsThisMonth } from "./usage";
 
 const { agents, channelMembers, connectorConnections, machines, organizationMembers, organizations, users } = schema;
 
+/**
+ * How it builds the first team (ADR 0137 §10): the start card the app draws asks question 1, then two more with
+ * answers to tap, then one team card. A template's card asks its own two questions.
+ */
+export const TEAM_INTERVIEW = [
+  "# Starting the team",
+  "The app's start card at the top of this conversation asked them 'What does the workspace do?' (question 1 of 3), with business types to tap or a sentence to write. When they answer it, run a short interview, one question per turn, each with offer_answers:",
+  "- Question 2 of 3: what takes most of their time today (multiple: true; 5 to 7 answers fitting their business, the last one 'Outra coisa' in their language). Start by saying back in a few words what they do.",
+  "- Question 3 of 3: who else works there (no answers to tap, or a couple like 'Só eu').",
+  "Then propose the team with ONE propose_team card: 2 to 4 agents for what takes their time, each in its own channel (new ones are created with the team), 1 or 2 routines each, 1 or 2 skills, the line on what waits for their approval, a first_task each, the people they named in `invite`, and weekly_check: true. Skip a question they already answered; never ask more than three.",
+  "When a team card came from a template ('Usar este modelo'), its first question to fit it is already asked (1 of 2): take the answer, ask the second with offer_answers (step 2, of 2: who else works there and who approves what goes out to clients), then propose_team again fitted to both answers (it replaces the template's card).",
+].join("\n");
+
 /** What the person behind the run may do here, as its prompt names it. */
 const POWERS: [RolePermission, string][] = [
   ["create_agents", "create agents"],
@@ -149,7 +162,7 @@ export async function rightHandPrompt(
     aiStates && seen.some((a) => aiStates.get(a.id)?.state === "no_ai")
       ? "An agent has no AI: point to it and offer the Connect AI card."
       : "",
-    team.length === 0 ? "There is no agent besides you: offer to create the first ones (propose_agent)." : "",
+    team.length === 0 ? "There is no agent besides you: build the first team with them (# Starting the team)." : "",
     people.length <= 1 ? "Only one person is here: offer to invite the team (offer_invites)." : "",
     apps.length === 0 ? "No app is connected: offer one the team needs (offer_connect_app)." : "",
     !workspace[0]?.context.trim()
@@ -197,16 +210,19 @@ export async function rightHandPrompt(
       .filter(Boolean)
       .join("\n"),
     checklist.length ? `# Not set up yet\n${checklist.map((l) => `- ${l}`).join("\n")}` : "",
+    team.length === 0 && input.inDm ? TEAM_INTERVIEW : "",
     [
       "# Your cards",
       "- Every change is a card the person clicks, applied as whoever clicks it. Never say it is done before the click.",
       "- When this person can't make a change, make the same card: it is sent to whoever may decide it.",
-      "- A new agent: propose_agent, with first_task when there is something to try it on (the card offers 'Criar e testar').",
+      "- A whole team (a new workspace, 'start over', several agents at once): ONE propose_team card, never one propose_agent card per agent.",
+      "- One new agent: propose_agent, with first_task when there is something to try it on (the card offers 'Criar e testar').",
       "- A teammate's model, AI account, budget, owner, who talks to it, channels or reply mode: propose_settings_change. Its instructions, role or apps: propose_instruction_change. Archiving or deleting agents, several at once ('start over'): propose_remove_agents, then propose the new team.",
       "- At most 5 agent proposals in a row; ask one short question first when what they need is unclear.",
       "- Approvals waiting for them: offer_approvals (they decide each on the card; you never decide). People's ownership, roles or removal: propose_member_changes.",
       "- Anything else the app does (billing, deleting the workspace or their account, a password, API keys, roles, routines, Drive, wiki, issues, an agent's page, a channel's settings): offer_open_page, whose screen asks what it always asks.",
       "- Never ask for a key, password or token in the chat: offer_connect_ai, offer_connect_app or offer_open_page open our dialog for it.",
+      "- Admins get your weekly 'Semana da equipe' card in this DM (Fridays at 17h by default). When they ask you to stop it, send it again or move it, use set_team_week; never say it stopped before the tool did.",
     ].join("\n"),
     RIGHT_HAND_TOOLS,
     input.inDm

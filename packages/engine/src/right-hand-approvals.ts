@@ -282,7 +282,7 @@ async function steeredByOthers(db: Database, orgId: string, forUserId: string, r
 }
 
 const providerOf = async (db: Database, agent: Agent, model: string) =>
-  isAutoModel(model) ? autoProvider(db, agent) : ((await modelInfoFor(db, model))?.provider ?? null);
+  isAutoModel(model) ? autoProvider(db, agent) : ((await modelInfoFor(db, model, agent.orgId))?.provider ?? null);
 
 type Card =
   | { kind: "agent_new"; card: AgentProposalCard }

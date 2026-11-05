@@ -50,7 +50,7 @@ export function brainFor(
 /**
  * The brain a run thinks with (ADR 0053 §10): its own (`agent_runs.brain`, stored when the engine resolves
  * it and when a conversation run falls back), else the agent's until its first turn. Shared code (steering,
- * the talker, "Continuar", the forum budget) reads this, never the agent's stored brain alone.
+ * the talker, "Continuar") reads this, never the agent's stored brain alone.
  */
 export const runBrainOf = (run: { brain?: string | null }, agent?: { brain?: string | null } | null): BrainKind =>
   kindOf(run.brain ?? agent?.brain);

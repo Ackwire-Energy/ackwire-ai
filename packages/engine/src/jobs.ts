@@ -51,8 +51,8 @@ import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { FOLLOW_UP_JOB, wakeFollowUp } from "./follow-through";
 import { cutText } from "./format";
-import { advanceForumTopic } from "./forum";
 import { FILE_JOIN_REQUEST_JOB, fileJoinRequest } from "./invite-requests";
+import { announceTaskConversation } from "./issues";
 import type { JevKey, JevKeySource } from "./jev-key";
 import { DEEP_MENTION_THRESHOLD, DEEP_WAKE_HOP, MENTION_WAKE_THRESHOLD, mentionNeedsNothing } from "./judge";
 import { platformCapReached } from "./limits";
@@ -101,6 +101,7 @@ import { runSkillUpdates, SKILL_UPDATES_JOB } from "./skill-updates";
 import type { SkillDeps } from "./skills";
 import { purgeOrgFiles, purgeUserFiles, runMigration, type StorageDeps } from "./storage";
 import { postStretchCard, STRETCH_JOB, type StretchHold } from "./stretch";
+import { postTeamWeek, TEAM_WEEK_JOB } from "./team-week";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
 import { runVaultSync, VAULT_SYNC_JOB, type VaultDeps } from "./vault";
@@ -159,7 +160,7 @@ export interface JobDeps extends RunExecutorDeps {
     info(message: string, data?: Record<string, unknown>): void;
     warn(message: string, data?: Record<string, unknown>): void;
   };
-  /** Drive (job `forum.advance` saves the forum synthesis). */
+  /** Drive (routines' reports, polls). */
   artifacts?: ArtifactDeps;
   /** Agents' computers: the hub and public URL missions use. */
   sandbox?: SandboxDeps | null;
@@ -541,7 +542,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (!message) return;
       if (deps.context && message.threadId) await maybeEnqueueReflection(deps, message.orgId, message.threadId);
       // An issue's work card, its start (the run is already started) and the "took issue #N" line route to nobody.
+      // A task conversation's root (ADR 0145) stands for the task: nobody is routed either.
       if (message.meta.issueWork || message.meta.issueWorkStart || message.meta.issueTaken) return;
+      if (message.meta.taskConversation) return;
       // A fast reply while the task works (talker.ts): its task reads it; it starts nobody, not even by mention.
       if (message.meta.talker) return;
       // A GIF or a sticker alone (ADR 0091), an agent's silent one after its reply too: it starts nobody, routes
@@ -567,8 +570,6 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           ...intent,
         });
       const where = await getChannelCached(deps.db, message.orgId, message.channelId);
-      // The forum moves by its own turns (ADR 0022): no mentions, router or DMs there.
-      if (where?.kind === "forum") return;
       // Addressed a mission's agent without the right to act there (ADR 0029): a suggestion, no run.
       if (message.meta.missionSuggestion) return routed("none", message.mentionedAgentIds, [], "mission_suggestion");
       // Someone who acts in a mission waiting to be concluded wrote in its thread: new work, active again.
@@ -846,14 +847,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     "routine.run": async (job) => {
       await executeRoutineRun(
-        { db: deps.db, pubsub: deps.pubsub, context: deps.context, artifacts: deps.artifacts },
+        { db: deps.db, pubsub: deps.pubsub, context: deps.context },
         String(job.payload.routineRunId),
-      );
-    },
-    "forum.advance": async (job) => {
-      await advanceForumTopic(
-        { db: deps.db, pubsub: deps.pubsub, artifacts: deps.artifacts },
-        String(job.payload.topicId),
       );
     },
     [VOICE_JOB]: async (job, ctx) => {
@@ -990,6 +985,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       );
     },
     // A person's monthly AI limit neared or reached (ADR 0141): the person hears 80%, who decides hears 100%.
+    [TEAM_WEEK_JOB]: async (job) => {
+      await postTeamWeek({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), job.payload);
+    },
     [PERSON_LIMIT_JOB]: async (job) => {
       await notifyPersonLimit({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), {
         personId: String(job.payload.personId),
@@ -1000,6 +998,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // In-app notifications of a message: mentions, thread replies, DMs.
     "notifications.message": async (job) => {
       await notifyMessage({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.messageId));
+      // A reply in a task's conversation (ADR 0145): the board's card counts it.
+      await announceTaskConversation({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.messageId));
     },
     // A request for help in an agent's browser nobody answered within the hour: the people asked hear it again, once.
     [HANDOFF_REMIND_JOB]: async (job) => {

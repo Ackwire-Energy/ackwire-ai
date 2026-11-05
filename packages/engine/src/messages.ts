@@ -44,6 +44,7 @@ import { inChannelRun, waitsOnUsage, workKeepsThread } from "./run-scope";
 import { computerWaitSql, NO_AI, outageParkedSql, passedSql, usageWaitSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
+import { admitTaskAgents } from "./task-access";
 import { WEB_USAGE_PROVIDER } from "./web-tools";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
 import { type WorkView, workViews } from "./works";
@@ -374,7 +375,8 @@ function channelRefsSql(orgId: string, channelId: string, names: string[]) {
 /**
  * The org's agents an agent's text @mentions that aren't members of `channelId`: a mention reaches only members
  * (`insertMessageWithRuns`), so for them it is plain text that wakes nobody. Handles, lower case; never the author,
- * an archived agent or a handle a person holds (the @ is theirs).
+ * an archived agent or a handle a person holds (the @ is theirs). In a task's conversation (ADR 0145) the ones that see
+ * the task join it first, as `insertMessageWithRuns` does, so they are reached.
  */
 export async function unreachedAgents(
   db: Executor,
@@ -382,6 +384,9 @@ export async function unreachedAgents(
 ): Promise<string[]> {
   const handles = parseMentionHandles(input.body);
   if (handles.length === 0) return [];
+  await admitTaskAgents(db, input.orgId, input.channelId, {
+    handles: await currentHandles(db, input.orgId, handles),
+  });
   const rows = await db
     .select({ handle: agents.handle })
     .from(agents)
@@ -569,10 +574,14 @@ export async function insertMessageWithRuns(
   const silent = isMediaAfterReply(input.meta);
   if (body.length > MAX_MESSAGE_LENGTH)
     throw new ValidationError(`Message is longer than ${MAX_MESSAGE_LENGTH} characters`);
-  // Handles match [a-z0-9_-]: safe as an array literal.
-  const handles = `{${(await currentHandles(tx, input.orgId, parseMentionHandles(body))).join(",")}}`;
-  const id = Bun.randomUUIDv7();
+  const mentions = await currentHandles(tx, input.orgId, parseMentionHandles(body));
   const person = input.author.type === "person";
+  // A task's conversation (ADR 0145): an agent another agent mentions there joins it when it sees the task, as with a
+  // person's mention (`postPersonMessage`), so the mention wakes it (hop limits as anywhere). Elsewhere it adds no one.
+  if (!person && mentions.length > 0) await admitTaskAgents(tx, input.orgId, input.channelId, { handles: mentions });
+  // Handles match [a-z0-9_-]: safe as an array literal.
+  const handles = `{${mentions.join(",")}}`;
+  const id = Bun.randomUUIDv7();
   const userId = input.author.type === "person" ? input.author.userId : null;
   const agentId = input.author.type === "agent" ? input.author.agentId : null;
   const runId = input.author.type === "agent" ? input.author.runId : null;
@@ -839,7 +848,7 @@ export async function insertMessageWithRuns(
         returning id
       ), assess as (
         -- A reply: the thread's title and "resolved?" are assessed a while later (threads.assess);
-        -- a newer reply's job takes over. Forum replies are skipped by the handler. An agent's silent sticker or GIF
+        -- a newer reply's job takes over. An agent's silent sticker or GIF
         -- after its reply leaves it to the reply's own job (the assessment doesn't count it as newer).
         insert into ${outbox} (id, org_id, kind, payload, dedupe_key, max_attempts, next_attempt_at)
         select gen_random_uuid(), ${input.orgId}::uuid, 'threads.assess',
@@ -1006,9 +1015,12 @@ export async function postPersonMessage(
   // One access check (membership + channel) instead of two round trips.
   const { channel, membership, workspace } = await requireChannelAccess(deps.db, userId, orgId, channelId);
   if (!can(membership, "post")) throw postRefusal(workspace);
-  // A forum topic is written through the forum (its turns), never as a plain chat (ADR 0022).
-  if (channel.kind === "forum")
-    throw new ValidationError("Post in the forum from the topic's page", "forum.post_from_topic");
+  // A task's conversation (ADR 0145): an agent mentioned there that sees the task joins it, so the mention wakes it.
+  if (channel.kind === "task") {
+    await admitTaskAgents(deps.db, orgId, channelId, {
+      handles: await currentHandles(deps.db, orgId, parseMentionHandles(input.body)),
+    });
+  }
   const clientId = normalizeClientId(input.clientId);
   // A resend found before the judge call (no cost again); a resend racing the first send is caught by the insert.
   const resent = clientId ? await sentWithClientId(deps.db, orgId, userId, clientId) : null;

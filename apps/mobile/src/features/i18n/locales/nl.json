@@ -670,7 +670,7 @@
     "noneForYou": "Er werkt nog geen agent met jou.",
     "noneForYouHint": "Vraag een beheerder om toegang.",
     "freeSection": "Vrij",
-    "noGroupSection": "Geen groep"
+    "noGroupSection": "Geen afdeling"
   },
   "agentEdit": {
     "missing": "Deze agent bestaat niet meer.",
@@ -759,10 +759,6 @@
       "issue_comment_other": "{{names}} reageerden op een taak",
       "issue_status_one": "{{names}} heeft een taak gewijzigd",
       "issue_status_other": "{{names}} hebben een taak gewijzigd",
-      "forum_turn_one": "Jouw beurt in het forum",
-      "forum_turn_other": "Jouw beurt in het forum",
-      "forum_synthesis_one": "Samenvatting van het forum klaar",
-      "forum_synthesis_other": "Samenvatting van het forum klaar",
       "approval_one": "{{names}} vraagt om goedkeuring",
       "approval_other": "{{names}} vragen om goedkeuring",
       "mission_finished_one": "Missie afgerond",
@@ -1005,6 +1001,7 @@
   "files": {
     "type": {
       "image": "Afbeelding",
+      "video": "Video",
       "pdf": "Pdf",
       "document": "Document",
       "table": "Tabel",
@@ -1029,7 +1026,17 @@
     "openImage": "Afbeelding openen",
     "imageOf": "Afbeelding {{index}} van {{count}}",
     "place": "{{index}} van {{count}}",
-    "noPreview": "Dit bestand opent niet in de app. Deel het om het in een andere app te openen."
+    "noPreview": "Dit bestand opent niet in de app. Deel het om het in een andere app te openen.",
+    "video": {
+      "play": "Afspelen",
+      "pause": "Pauzeren",
+      "replay": "Opnieuw afspelen",
+      "seek": "Positie in de video",
+      "mute": "Geluid uit",
+      "unmute": "Geluid aan",
+      "fullscreen": "Volledig scherm",
+      "open": "Openen"
+    }
   },
   "issues": {
     "title": "Taken",
@@ -1061,7 +1068,6 @@
     "loadFailed": "De taken konden niet worden geladen.",
     "createdBy": "aangemaakt door {{name}}",
     "fromMessage": "vanuit een bericht",
-    "fromForum": "vanuit het forum",
     "fromAgent": "vanuit een verzoek aan een agent",
     "fromWebhook": "vanuit {{provider}}",
     "workingFor_one": "al {{count}} min aan het werk",
@@ -1231,7 +1237,6 @@
     "kind": {
       "approval": "Goedkeuren",
       "question": "Vraag",
-      "forum": "Jouw beurt",
       "browser": "Browser",
       "secret": "Geheim",
       "join": "Leden",
@@ -1345,7 +1350,6 @@
         "wiki": "Wiki",
         "skills": "Skills",
         "schedule": "Routines",
-        "forum": "Forum",
         "sandbox": "Eigen computer",
         "browser": "Browser",
         "setup": "Werkruimte instellen",
@@ -2040,5 +2044,9 @@
         "proposal": "Dashboard"
       }
     }
+  },
+  "team": {
+    "entry": "Lijst, organogram en kaart",
+    "mapHint": "Om een agent naar een ander kanaal te verplaatsen, gebruik je de kaart op het web of praat je met {{name}}."
   }
 }

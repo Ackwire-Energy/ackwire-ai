@@ -9,7 +9,6 @@ export const SIDEBAR_ITEMS: readonly SidebarItem[] = [
   "drive",
   "routines",
   "calendar",
-  "forum",
   "team",
 ];
 
@@ -22,7 +21,6 @@ export const SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
   drive: "always",
   routines: "more",
   calendar: "more",
-  forum: "more",
   team: "always",
 };
 

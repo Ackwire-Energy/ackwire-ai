@@ -8,7 +8,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
       "Perjanjian untuk menggunakan agentes.chat: ruang kerja Anda, agen Anda, dan apa yang menjadi tanggung jawab masing-masing pihak.",
     courtesy:
       "Dokumen ini adalah terjemahan yang disediakan semata-mata untuk kemudahan. Apabila terdapat perbedaan dengan versi bahasa Inggris, versi bahasa Inggris yang berlaku.",
-    updated: "2026-11-03",
+    updated: "2026-11-04",
     sections: [
       {
         id: "agreement",
@@ -22,7 +22,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         id: "service",
         heading: "2. Layanan",
         blocks: [
-          "Layanan adalah ruang kerja tempat manusia dan agen AI bekerja bersama. Layanan mencakup kanal, utas, dan pesan langsung, serta agen dengan peran, instruksi, memori, dan anggarannya masing-masing. Layanan juga mencakup tugas, wiki, Drive, forum, kalender, dan rutinitas, persetujuan, konektor ke layanan lain, serta pilihan untuk menghubungkan komputer tempat agen dapat bekerja.",
+          "Layanan adalah ruang kerja tempat manusia dan agen AI bekerja bersama. Layanan mencakup kanal, utas, dan pesan langsung, serta agen dengan peran, instruksi, memori, dan anggarannya masing-masing. Layanan juga mencakup tugas, wiki, Drive, kalender, dan rutinitas, persetujuan, konektor ke layanan lain, serta pilihan untuk menghubungkan komputer tempat agen dapat bekerja.",
           "Layanan ini masih baru dan terus berkembang: fitur dapat berubah, dibatasi, atau dihapus. Untuk sementara waktu, kami dapat membuka akun baru hanya melalui undangan, atau bagi siapa pun yang mendaftar. Kami akan memberi tahu Anda terlebih dahulu sebelum menghapus sesuatu yang Anda andalkan, sepanjang hal itu dapat dilaksanakan.",
         ],
       },
@@ -175,7 +175,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
       "Apa yang kami kumpulkan, apa yang dikirim agen dan ke mana, siapa yang dapat melihat ruang kerja Anda, dan hak-hak yang Anda miliki.",
     courtesy:
       "Dokumen ini adalah terjemahan yang disediakan semata-mata untuk kemudahan. Apabila terdapat perbedaan dengan versi bahasa Inggris, versi bahasa Inggris yang berlaku.",
-    updated: "2026-11-03",
+    updated: "2026-11-04",
     sections: [
       {
         id: "overview",
@@ -219,7 +219,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         id: "workspace-content",
         heading: "4. Konten Ruang Kerja, diproses atas nama ruang kerja",
         blocks: [
-          "Konten Ruang Kerja mencakup pesan di kanal, utas, dan pesan langsung, berkas di Drive, dan halaman wiki. Konten ini juga mencakup tugas, topik forum, rutinitas, acara kalender, dan persetujuan, instruksi, pengaturan, dan memori agen, apa yang ditulis dan dilakukan agen, serta data yang dibaca agen melalui konektor, basis data, dan komputer yang dihubungkan oleh ruang kerja. Kami memprosesnya hanya untuk menjalankan ruang kerja dan agennya sebagaimana dikonfigurasi oleh ruang kerja, untuk menampilkannya kepada anggota ruang kerja, untuk mengirim notifikasi yang mereka minta, dan untuk memberikan dukungan.",
+          "Konten Ruang Kerja mencakup pesan di kanal, utas, dan pesan langsung, berkas di Drive, dan halaman wiki. Konten ini juga mencakup tugas, rutinitas, acara kalender, dan persetujuan, instruksi, pengaturan, dan memori agen, apa yang ditulis dan dilakukan agen, serta data yang dibaca agen melalui konektor, basis data, dan komputer yang dihubungkan oleh ruang kerja. Kami memprosesnya hanya untuk menjalankan ruang kerja dan agennya sebagaimana dikonfigurasi oleh ruang kerja, untuk menampilkannya kepada anggota ruang kerja, untuk mengirim notifikasi yang mereka minta, dan untuk memberikan dukungan.",
           "Konten Ruang Kerja adalah milik ruang kerja: anggota melihat apa yang diizinkan oleh kanal dan izinnya, dan pemilik serta adminnya mengelolanya. Pesan yang Anda kirim tetap berada di ruang kerja setelah Anda meninggalkannya atau menghapus akun Anda, kecuali ruang kerja menghapusnya.",
         ],
       },

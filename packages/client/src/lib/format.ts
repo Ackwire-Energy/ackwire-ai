@@ -1,4 +1,5 @@
 import { dayMonthOrder, formatMoneyUsd } from "@agenteschat/i18n/format";
+import { type AppLocale, appLocale } from "@agenteschat/i18n/locale";
 import type { TFunction } from "i18next";
 
 /**
@@ -112,6 +113,40 @@ export function dayLabel(t: TFunction, locale: string, iso: string, now = new Da
   return formatShortDate(locale, iso, new Date(iso).getFullYear() !== now.getFullYear());
 }
 
+/** Intl.RelativeTimeFormat's own words, for engines without it (the phone's Hermes has only Collator, DateTimeFormat and NumberFormat). */
+const RELATIVE_DAYS: Record<AppLocale, readonly [string, string, string]> = {
+  en: ["yesterday", "today", "tomorrow"],
+  "pt-BR": ["ontem", "hoje", "amanhã"],
+  es: ["ayer", "hoy", "mañana"],
+  fr: ["hier", "aujourd’hui", "demain"],
+  de: ["gestern", "heute", "morgen"],
+  it: ["ieri", "oggi", "domani"],
+  nl: ["gisteren", "vandaag", "morgen"],
+  ja: ["昨日", "今日", "明日"],
+  ko: ["어제", "오늘", "내일"],
+  "zh-Hans": ["昨天", "今天", "明天"],
+  id: ["kemarin", "hari ini", "besok"],
+  tr: ["dün", "bugün", "yarın"],
+  pl: ["wczoraj", "dzisiaj", "jutro"],
+  ru: ["вчера", "сегодня", "завтра"],
+};
+
+/** "ontem", "today", "明日": the language's word for the day `offset` (-1, 0, 1) away, lowercase where it writes it so. */
+export function relativeDay(locale: string, offset: -1 | 0 | 1): string {
+  if (typeof Intl.RelativeTimeFormat === "function")
+    return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(offset, "day");
+  return RELATIVE_DAYS[appLocale([locale], true) ?? "en"][offset + 1] as string;
+}
+
+/** The ordinal plural form of `n` ("one" for 1st, "few" for 3rd), with English's and French's rules where Intl.PluralRules is missing (Hermes). */
+export function ordinalForm(locale: string, n: number): Intl.LDMLPluralRule {
+  if (typeof Intl.PluralRules === "function") return new Intl.PluralRules(locale, { type: "ordinal" }).select(n);
+  const code = appLocale([locale], true);
+  if (code === "fr") return n === 1 ? "one" : "other";
+  if (code !== "en" || (n % 100 >= 11 && n % 100 <= 13)) return "other";
+  return (["other", "one", "two", "few"] as const)[n % 10] ?? "other";
+}
+
 /** "terça-feira, 14 de outubro de 2026 às 21:10" (tooltip on a message's time). */
 export const formatFullDate = (locale: string, iso: string) =>
   new Intl.DateTimeFormat(locale, { dateStyle: "full", timeStyle: "short" }).format(new Date(iso));
@@ -123,8 +158,7 @@ export function relativeTime(t: TFunction, locale: string, iso: string, now = ne
   if (diff < 3_600_000) return t("format.minutesAgo", { count: Math.floor(diff / 60_000) });
   const days = daysBetween(iso, now);
   if (days === 0) return t("format.hoursAgo", { count: Math.floor(diff / 3_600_000) });
-  // "ontem", "yesterday", "昨日": Intl's own word, lowercase where the language writes it so.
-  if (days === 1) return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(-1, "day");
+  if (days === 1) return relativeDay(locale, -1);
   return formatShortDate(locale, iso);
 }
 
@@ -207,9 +241,7 @@ export const toYmd = (d: Date) =>
 /** Due date: "hoje", "24 out". */
 export function dueLabel(_t: TFunction, locale: string, ymd: string, now = new Date()) {
   const iso = dateOnly(ymd).toISOString();
-  return daysBetween(iso, now) === 0
-    ? new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(0, "day")
-    : formatShortDate(locale, iso);
+  return daysBetween(iso, now) === 0 ? relativeDay(locale, 0) : formatShortDate(locale, iso);
 }
 
 /**

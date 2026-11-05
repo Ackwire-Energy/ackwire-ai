@@ -1,8 +1,8 @@
 # 0083. Groups of agents
 
-- Status: Accepted. Amended 2026-10-30: §4 and §5 (a person's lists show only the agents that answer them, unless they manage agents). Amended 2026-11-03: §4 and §5 (the sidebar's AGENTES part comes back with the groups, "Fixar no topo" in every section, §7)
+- Status: Accepted. Amended 2026-10-30: §4 and §5 (a person's lists show only the agents that answer them, unless they manage agents). Amended 2026-11-03: §4 and §5 (the sidebar's AGENTES part comes back with the groups, "Fixar no topo" in every section, §7). Amended 2026-11-04: groups are shown as setores with a color, an icon, a lead and a substitute, managed on Equipe › Setores (ADR 0148)
 - Date: 2026-10-30
-- Code: `packages/db/src/schema/agents.ts` (`agent_groups`, `agents.group_id`, `agents.group_position`), `packages/engine/src/agent-groups.ts`, `apps/server/src/routes/app/agents.ts`, `packages/client/src/lib/agent-groups.ts`, `apps/web/src/components/AgentGroups.tsx`, `apps/web/src/components/TeamGroups.tsx`, `apps/mobile/src/features/agents/AgentsScreen.tsx`; sidebar view and pins: `packages/engine/src/sidebar-items.ts` (`SidebarView`), `packages/client/src/lib/sidebar-view.ts`, `apps/web/src/components/Sidebar.tsx`, `apps/web/src/hooks/useSidebarPins.ts`, `apps/mobile/src/features/chats/pins.ts`
+- Code: `packages/db/src/schema/agents.ts` (`agent_groups`, `agents.group_id`, `agents.group_position`), `packages/engine/src/agent-groups.ts`, `apps/server/src/routes/app/agents.ts`, `packages/client/src/lib/agent-groups.ts`, `apps/web/src/components/AgentGroups.tsx`, `apps/web/src/components/team/TeamSectors.tsx`, `apps/mobile/src/features/agents/AgentsScreen.tsx`; sidebar view and pins: `packages/engine/src/sidebar-items.ts` (`SidebarView`), `packages/client/src/lib/sidebar-view.ts`, `apps/web/src/components/Sidebar.tsx`, `apps/web/src/hooks/useSidebarPins.ts`, `apps/mobile/src/features/chats/pins.ts`
 
 ## Context
 
@@ -23,7 +23,7 @@ A workspace with many agents (an import brings twenty or more, for several compa
    - **Mensagens diretas** lists people only: an agent's row in AGENTES is its DM. With no conversation with a person yet it says so, with Nova mensagem.
    - **Order, per person:** do workspace, Meus primeiro (the agents I'm responsible for lead each group) or Trabalhando primeiro.
    - **Arranging (managers):** drag a row to another group or place, or the row's right click "Mudar de grupo" (the keyboard's way) and "Novo grupo com …"; either says so in a toast with Desfazer. The part's + has Criar agente and Novo grupo; renaming, ordering and deleting groups stay on Equipe ("Organizar grupos na Equipe").
-   - **Fixar no topo:** any row's right click (an agent, a channel I'm in, a person), the cards' ⋯ and the channel header's menu pin it on top of its own section (AGENTES, CANAIS, MENSAGENS DIRETAS) above a thin line, five per section; the sixth says to unpin one. There is no Favoritos section, so kinds never mix. Until the person first pins, unpins or closes the one-time line, their own agents (up to five, the most recently active first) are pinned (`pins: null` → `dayOnePins`).
+   - **Fixar no topo:** any row's right click (an agent, a channel I'm in, a person), the cards' ⋯ and the channel header's menu pin it on top of its own section (AGENTES, CANAIS, MENSAGENS DIRETAS) above a thin line, five per section; the sixth says to unpin one. There is no Favoritos section, so kinds never mix. Until the person first pins, unpins or closes the one-time line, their own agents in no group (up to five, the most recently active first) are pinned (`pins: null` → `dayOnePins`). A grouped agent stays in its group: a pin takes an agent out of it, and these pins follow the DMs' activity, so grouped agents pinned this way jumped out of their groups whenever agents talked.
    - **Equipe** is one of the tools on top (`team` in `SIDEBAR_ITEMS`, shown by default), no longer an icon on a header.
    - **Saved per person and workspace, on every device:** `GET`/`PUT …/me/sidebar/view` (`{ agentSort, showAllAgents, pins }`), kept as `view` in `organization_members.sidebar_items` beside the tools' places and both orders, so no migration. A stored view is cleaned on read (`sidebarViewOf`: known orders, each pin once, five at most); a pin of something gone or no longer visible simply doesn't show.
 
@@ -36,3 +36,7 @@ A workspace with many agents (an import brings twenty or more, for several compa
 - Pins are ids the server doesn't check against channels, agents or people: the apps show only the ones the person still sees, and a stale one costs one of the five places until it is unpinned. Checking them would mean reading three tables on every save for no visible gain.
 - "Trabalhando primeiro" reorders as agents start and stop; a drop while it is on lands by what the person sees, which can differ from the workspace's order inside the group.
 - An import run twice makes its groups twice unless the importer looks for a group of the same name first (`listAgentGroups`).
+
+## Amendment (2026-11-04): groups are setores (ADR 0148)
+
+The groups are shown as setores ("departments" in English): the same rows, the same moves and the same permissions. Each one gains a color and an icon (the roles' sets, never sky), a lead and a substitute (`agent_groups.color`, `icon`, `lead_user_id`, `backup_user_id`, migration 0219, set with `PATCH …/agent-groups/{groupId}`). Equipe's "Grupos de agentes" card became Equipe › Setores, one card per setor. The sidebar's headers carry the setor's mark.

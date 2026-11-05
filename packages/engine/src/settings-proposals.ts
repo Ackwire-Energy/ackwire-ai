@@ -345,7 +345,7 @@ export async function recordSettingsReceipt(
   db: Executor,
   p: Proposal,
   actorId: string,
-  card: { runId: string; messageId: string; channelId: string },
+  card: { runId: string | null; messageId: string; channelId: string },
   agentName: string,
   undoWindowMs: number,
 ) {

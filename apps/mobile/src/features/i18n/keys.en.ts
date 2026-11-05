@@ -675,7 +675,12 @@ export const featureKeysEn = {
     noneForYou: "No agent works with you yet.",
     noneForYouHint: "Ask an admin for access.",
     freeSection: "Free",
-    noGroupSection: "No group",
+    noGroupSection: "No department",
+  },
+  /** Equipe (ADR 0148): its row on Agentes and the map's line. */
+  team: {
+    entry: "List, org chart and map",
+    mapHint: "To move an agent to another channel, use the map on the web or talk to {{name}}.",
   },
   agentEdit: {
     missing: "This agent no longer exists.",
@@ -770,10 +775,6 @@ export const featureKeysEn = {
       issue_comment_other: "{{names}} commented on a task",
       issue_status_one: "{{names}} changed a task",
       issue_status_other: "{{names}} changed a task",
-      forum_turn_one: "Your turn in the forum",
-      forum_turn_other: "Your turn in the forum",
-      forum_synthesis_one: "Forum summary ready",
-      forum_synthesis_other: "Forum summary ready",
       approval_one: "{{names}} asks for approval",
       approval_other: "{{names}} ask for approval",
       mission_finished_one: "Mission finished",
@@ -1021,6 +1022,7 @@ export const featureKeysEn = {
   files: {
     type: {
       image: "Image",
+      video: "Video",
       pdf: "PDF",
       document: "Document",
       table: "Table",
@@ -1046,6 +1048,17 @@ export const featureKeysEn = {
     imageOf: "Picture {{index}} of {{count}}",
     place: "{{index}} of {{count}}",
     noPreview: "This file doesn't open in the app. Share it to open it in another app.",
+    /** The video player's controls (a message's video and the file screen). */
+    video: {
+      play: "Play",
+      pause: "Pause",
+      replay: "Play again",
+      seek: "Position in the video",
+      mute: "Mute",
+      unmute: "Unmute",
+      fullscreen: "Full screen",
+      open: "Open",
+    },
   },
   issues: {
     title: "Tasks",
@@ -1077,7 +1090,6 @@ export const featureKeysEn = {
     loadFailed: "Couldn't load the tasks.",
     createdBy: "created by {{name}}",
     fromMessage: "from a message",
-    fromForum: "from the forum",
     fromAgent: "from a request to an agent",
     fromWebhook: "from {{provider}}",
     workingFor_one: "working for {{count}} min",
@@ -1231,7 +1243,6 @@ export const featureKeysEn = {
     kind: {
       approval: "Approve",
       question: "Question",
-      forum: "Your turn",
       browser: "Browser",
       secret: "Secret",
       join: "Members",
@@ -1339,7 +1350,6 @@ export const featureKeysEn = {
         wiki: "Wiki",
         skills: "Skills",
         schedule: "Routines",
-        forum: "Forum",
         sandbox: "Own computer",
         browser: "Browser",
         setup: "Workspace setup",

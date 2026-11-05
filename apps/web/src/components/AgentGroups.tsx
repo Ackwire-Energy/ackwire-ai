@@ -1,5 +1,5 @@
 import type { Agent, AgentGroup } from "@agenteschat/client";
-import { useAgentGroupAction } from "@agenteschat/client";
+import { useAgentGroupAction, useRoles } from "@agenteschat/client";
 import { groupOf, NO_GROUP } from "@agenteschat/client/lib/agent-groups";
 import { errorText } from "@agenteschat/client/lib/errors";
 import {
@@ -7,7 +7,10 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
+  ditherUrl,
   Field,
+  Icon,
+  type IconName,
   Input,
   Menu,
   MenuItem,
@@ -19,25 +22,35 @@ import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useOrg } from "./org-context";
+import "./roles/roles.css";
 
 /** What Equipe's group dialog is for: a new group (with these agents in it), or renaming one. */
 export type GroupDialogFor = { mode: "create"; agentIds?: string[] } | { mode: "rename"; group: AgentGroup };
 
-/** "Novo grupo" and "Renomear grupo": a name, nothing else. Mounted while open. */
+/** "Novo setor" and "Editar setor" (ADR 0148): its name, color and icon. Mounted while open. */
 export function GroupNameDialog({ purpose, onClose }: { purpose: GroupDialogFor; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const action = useAgentGroupAction(org.id);
+  const looks = useRoles(org.id).data;
   const renaming = purpose.mode === "rename" ? purpose.group : null;
   const [name, setName] = useState(renaming?.name ?? "");
+  const [color, setColor] = useState(renaming?.color ?? "graphite");
+  const [icon, setIcon] = useState(renaming?.icon ?? "person");
   const save = () => {
     const value = name.trim();
     if (!value) return;
-    if (renaming && value === renaming.name) return onClose();
+    if (renaming && value === renaming.name && color === renaming.color && icon === renaming.icon) return onClose();
     action.mutate(
       renaming
-        ? { type: "update", groupId: renaming.id, name: value }
-        : { type: "create", name: value, agentIds: purpose.mode === "create" ? purpose.agentIds : undefined },
+        ? { type: "update", groupId: renaming.id, name: value, color, icon }
+        : {
+            type: "create",
+            name: value,
+            color,
+            icon,
+            agentIds: purpose.mode === "create" ? purpose.agentIds : undefined,
+          },
       { onSuccess: onClose },
     );
   };
@@ -67,6 +80,41 @@ export function GroupNameDialog({ purpose, onClose }: { purpose: GroupDialogFor;
               placeholder={t("agentGroups.namePlaceholder")}
             />
           </Field>
+          {looks && (
+            <div className="agent-group-look">
+              <div className="roles-colors" role="radiogroup" aria-label={t("rolesPage.color")}>
+                {looks.colors.map((c) => (
+                  // biome-ignore lint/a11y/useSemanticElements: a swatch button in a radio group
+                  <button
+                    key={c}
+                    type="button"
+                    role="radio"
+                    aria-checked={color === c}
+                    aria-label={t("rolesPage.colorOf", { color: c })}
+                    className="roles-color"
+                    style={{ backgroundImage: `url("${ditherUrl(c as "graphite", 8)}")` }}
+                    onClick={() => setColor(c)}
+                  />
+                ))}
+              </div>
+              <div className="roles-icons" role="radiogroup" aria-label={t("rolesPage.icon")}>
+                {looks.icons.map((n) => (
+                  // biome-ignore lint/a11y/useSemanticElements: an icon button in a radio group
+                  <button
+                    key={n}
+                    type="button"
+                    role="radio"
+                    aria-checked={icon === n}
+                    aria-label={n}
+                    className="roles-iconpick"
+                    onClick={() => setIcon(n)}
+                  >
+                    <Icon name={n as IconName} size={18} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </DialogBody>
         <DialogFooter>
           <Button type="button" onClick={onClose}>

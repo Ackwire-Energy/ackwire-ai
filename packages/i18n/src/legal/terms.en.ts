@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const termsEn: LegalDocument = {
   title: "Terms of Use",
   summary: "The agreement for using agentes.chat: your workspace, your agents, and what each side is responsible for.",
-  updated: "2026-11-03",
+  updated: "2026-11-04",
   sections: [
     {
       id: "agreement",
@@ -17,7 +17,7 @@ export const termsEn: LegalDocument = {
       id: "service",
       heading: "2. The Service",
       blocks: [
-        "The Service is a workspace where people and AI agents work together. It includes channels, threads and direct messages, and agents with their own roles, instructions, memory and budgets. It also includes tasks, wiki, Drive, forum, calendar and routines, approvals, connectors to other services, and the option to connect computers on which agents can work.",
+        "The Service is a workspace where people and AI agents work together. It includes channels, threads and direct messages, and agents with their own roles, instructions, memory and budgets. It also includes tasks, wiki, Drive, calendar and routines, approvals, connectors to other services, and the option to connect computers on which agents can work.",
         "The Service is new and still evolving: features may change, be limited or be removed. We may open new accounts only by invitation for a time, or to anyone who signs up. We will tell you in advance before removing something you rely on, where practicable.",
       ],
     },

@@ -18,7 +18,6 @@ import {
 import { getAgent } from "./agents";
 import { decidesAgentApprovals } from "./approval-rules";
 import { cancelRoutineAhead, type RoutineAheadView, routinesAhead } from "./approvals";
-import type { ArtifactDeps } from "./artifacts";
 import { audienceError, audienceSql, canTalkTo, speakerFor, speakerOf } from "./audience";
 import { recordAudit } from "./audit";
 import { UUID } from "./authority";
@@ -44,7 +43,6 @@ import { widgetRoutineGone, widgetRoutineHeld } from "./dashboards/refresh-ledge
 import { openDm } from "./dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated, publishRoutineRuns, publishUserEvent } from "./events";
-import { createForumTopic } from "./forum";
 import { releaseRoutineEmails } from "./mail/inbound";
 import {
   checkWatchable,
@@ -85,7 +83,6 @@ import { pauseRoutine, personCanPost, type RoutinePausedReason } from "./routine
 import {
   cronToRule,
   describeRule,
-  localDate,
   nextOccurrence,
   normalizeRule,
   ruleOccurrences,
@@ -133,8 +130,6 @@ export type RoutineTarget =
    * `forUserId` (no run); otherwise the agent is asked, as in any routine.
    */
   | { type: "conversation"; channelId: string; threadId: string | null; reminder?: boolean; forUserId?: string }
-  /** Opens a forum topic each time (ADR 0022): the prompt is its goal, these agents discuss it. */
-  | { type: "forum"; agentIds: string[]; rounds?: number }
   /**
    * Redoes a widget in place (ADR 0135 §4): its runs speak only through `update_widget`. Its schedule, instructions
    * and name follow the widget (`syncWidgetRoutine`); people change them from the widget, never here.
@@ -396,8 +391,6 @@ export type RoutineTriggerInput =
 export interface RoutineDeps {
   db: Database;
   pubsub: PubSub;
-  /** Forum routines save their synthesis in the Drive. */
-  artifacts?: ArtifactDeps;
   /** Reads schedule phrases (`schedulesOf`: the org's cheap model, `kind=summary`). */
   context?: ContextDeps;
   /** Mail adapters: email routines on Gmail/Outlook create and delete Composio triggers. */
@@ -542,7 +535,7 @@ const usageWaiting = (a: AgentRunInfo | undefined) =>
  */
 const NOT_HELD = sql`not (${routineRuns.status} = 'queued' and coalesce(${routineRuns.event}->>'held', '') = 'true')`;
 
-/** How a stored end reads; anything else that ended (`ok`: a forum topic or a reminder) was delivered. */
+/** How a stored end reads; anything else that ended (`ok`: a reminder) was delivered. */
 const endedAs = (status: string): RoutineRunStatus | null =>
   OPEN_RUN.includes(status) ? null : ENDED_RUN.has(status) ? (status as RoutineRunStatus) : "reported";
 
@@ -698,7 +691,7 @@ function recentViews(runs: RunRow[], details: RunDetails, detailed: boolean): Ro
   }));
 }
 
-/** The conversation a routine reports to (a channel, a thread's, a DM); null for DM, Drive and forum routines. */
+/** The conversation a routine reports to (a channel, a thread's, a DM); null for DM and Drive routines. */
 const conversationOf = (t: RoutineTarget) => (t.type === "channel" || t.type === "conversation" ? t.channelId : null);
 
 /** What a viewer may see of each routine (ADR 0053 §9). */
@@ -707,7 +700,7 @@ interface ViewerRights {
   reads: boolean;
   /** Changes, pauses, stops or deletes it: its creator, admins, the agent's owner. */
   manages: boolean;
-  /** Its prompt is shown even to who doesn't read it (a public channel's or a forum routine). */
+  /** Its prompt is shown even to who doesn't read it (a public channel's). */
   publicPrompt: boolean;
   /** Withdraws what was approved ahead for its runs: who manages it, and who may approve the agent's actions. */
   cancelsAhead: boolean;
@@ -772,8 +765,8 @@ async function viewerRights(
     const manages = !!viewerId && (admin || r.createdByUserId === viewerId || ownerOf.get(r.agentId) === viewerId);
     out.set(r.id, {
       manages,
-      reads: !viewerId || manages || target.type === "forum" || (!!channelId && inChannel.has(channelId)),
-      publicPrompt: target.type === "forum" || (!!channelId && publicChannels.has(channelId)),
+      reads: !viewerId || manages || (!!channelId && inChannel.has(channelId)),
+      publicPrompt: !!channelId && publicChannels.has(channelId),
       cancelsAhead: manages || me?.approves === true,
     });
   }
@@ -1220,12 +1213,6 @@ async function checkTarget(
   target: RoutineTarget,
   creatorId: string | null,
 ) {
-  if (target.type === "forum") {
-    if (target.agentIds.length === 0 || target.agentIds.length > 8) {
-      throw new ValidationError("Pick 1 to 8 agents for the forum", "routine.forum_agents", { min: 1, max: 8 });
-    }
-    return;
-  }
   if (target.type !== "channel" && target.type !== "conversation") return;
   const [row] = await db
     .select({ id: channelMembers.id })
@@ -2097,7 +2084,7 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
  * run is a person's ask, a one-off fires while active); structural checks pause the routine with
  * their coded reason and one notification (creator gone or unable to post where it reports, agent
  * archived, out of the agent's audience, agent not in the conversation); one run at a time
- * (`makeWayForRun`); then the work: a forum topic, a reminder (no run), or the background run in the
+ * (`makeWayForRun`); then the work: a reminder (no run), or the background run in the
  * routine's room, which posts through `hand_off` in the conversation it reports to (`deliverTo`).
  */
 async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
@@ -2143,32 +2130,6 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   };
   const target = targetOf(routine);
   const ref = { orgId: routine.orgId, routineId: routine.id, routineRunId: run.id };
-
-  if (target.type === "forum") {
-    // A topic on a schedule ("toda sexta, retrospectiva"), opened for the routine's creator.
-    // The date as YYYY-MM-DD in the routine's zone: the same in every language.
-    const when = localDate(new Date(), routine.timezone ?? "UTC");
-    const topic = await createForumTopic(
-      { db, pubsub: deps.pubsub, artifacts: deps.artifacts },
-      { type: "person", userId: creator },
-      routine.orgId,
-      {
-        title: `${routine.name} · ${when}`,
-        goal: routine.prompt,
-        agentIds: [...new Set([agent.id, ...target.agentIds])],
-        rounds: target.rounds,
-        ownerAgentId: agent.id,
-        origin: { kind: "routine", routineId: routine.id },
-      },
-    );
-    await db
-      .update(routineRuns)
-      .set({ status: "reported", code: "forum_opened", summary: topic.title, finishedAt: new Date() })
-      .where(eq(routineRuns.id, run.id));
-    await ran();
-    await afterRoutineRunEnded(deps, { ...ref, status: "reported", code: "forum_opened", event: null });
-    return;
-  }
 
   if (target.type === "conversation" && target.reminder) {
     // A plain reminder: the agent's own message, mentioning the person; no run.
@@ -2597,7 +2558,6 @@ export async function createReminderFromApp(
 ): Promise<ReminderView> {
   const { db } = deps;
   const { channel, membership } = await requireChannelAccess(db, requesterId, orgId, input.channelId);
-  if (channel.kind === "forum") throw new NotFoundError("Channel not found");
   if (!can(membership, "post")) throw new ForbiddenError();
   if (Number.isNaN(input.at.getTime()) || input.at.getTime() <= now.getTime()) {
     throw new ValidationError("That time has already passed.", "when.past");

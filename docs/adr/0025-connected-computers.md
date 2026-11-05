@@ -40,7 +40,7 @@ Channels without `pushFile` (Daytona) fall back on the server: a folder is zippe
 A new artifact kind `file` (migration adds the enum value): any bytes, with the original name, MIME type, size and SHA-256 in the version row.
 
 - Limit: 50 MB per file version (`ARTIFACT_LIMITS.fileBytes`).
-- Always `untrusted`: downloaded as an attachment with `nosniff`, never rendered on the app's origin. The app previews only raster images (`png`, `jpeg`, `gif`, `webp`) and PDF from a download URL; `svg` and everything else is download-only.
+- Always `untrusted`: downloaded as an attachment with `nosniff`, never rendered on the app's origin. The app previews only raster images (`png`, `jpeg`, `gif`, `webp`) and PDF from a download URL, and plays videos (`mp4`, `webm`, `mov`) in its own player straight from the download, which answers `Range` requests (a media element never runs the file as a page); `svg` and everything else is download-only.
 - Search indexes the title and file name only.
 - `read_artifact` returns the metadata (and the text of small UTF-8 text files); `import_file` copies the bytes back into a computer.
 - Versions work like other kinds (`upload_file` with `artifact_id`).

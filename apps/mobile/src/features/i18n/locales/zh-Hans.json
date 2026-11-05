@@ -647,7 +647,7 @@
     "noneForYou": "还没有和你一起工作的智能体。",
     "noneForYouHint": "请向管理员申请访问权限。",
     "freeSection": "空闲",
-    "noGroupSection": "未分组"
+    "noGroupSection": "无部门"
   },
   "agentEdit": {
     "missing": "此智能体已不存在。",
@@ -727,8 +727,6 @@
       "issue_assigned_other": "给你的任务",
       "issue_comment_other": "{{names}} 评论了一个任务",
       "issue_status_other": "{{names}} 更改了一个任务",
-      "forum_turn_other": "轮到你在论坛发言了",
-      "forum_synthesis_other": "论坛总结已就绪",
       "approval_other": "{{names}} 请求审批",
       "mission_finished_other": "专项任务已结束",
       "mission_stopped_other": "专项任务已停止",
@@ -932,6 +930,7 @@
   "files": {
     "type": {
       "image": "图片",
+      "video": "视频",
       "pdf": "PDF",
       "document": "文档",
       "table": "表格",
@@ -956,7 +955,17 @@
     "openImage": "打开图片",
     "imageOf": "第 {{index}} 张图片，共 {{count}} 张",
     "place": "{{index}}/{{count}}",
-    "noPreview": "此文件无法在应用中打开。请分享到其他应用打开。"
+    "noPreview": "此文件无法在应用中打开。请分享到其他应用打开。",
+    "video": {
+      "play": "播放",
+      "pause": "暂停",
+      "replay": "重新播放",
+      "seek": "视频中的位置",
+      "mute": "静音",
+      "unmute": "取消静音",
+      "fullscreen": "全屏",
+      "open": "打开"
+    }
   },
   "issues": {
     "title": "任务",
@@ -988,7 +997,6 @@
     "loadFailed": "无法加载任务。",
     "createdBy": "由 {{name}} 创建",
     "fromMessage": "来自一条消息",
-    "fromForum": "来自论坛",
     "fromAgent": "来自对智能体的请求",
     "fromWebhook": "来自 {{provider}}",
     "workingFor_other": "已工作 {{count}} 分钟",
@@ -1151,7 +1159,6 @@
     "kind": {
       "approval": "审批",
       "question": "问题",
-      "forum": "轮到你了",
       "browser": "浏览器",
       "secret": "密钥",
       "join": "成员",
@@ -1263,7 +1270,6 @@
         "wiki": "Wiki",
         "skills": "技能",
         "schedule": "例行工作",
-        "forum": "论坛",
         "sandbox": "自己的电脑",
         "browser": "浏览器",
         "setup": "工作区设置",
@@ -1936,5 +1942,9 @@
         "proposal": "仪表盘"
       }
     }
+  },
+  "team": {
+    "entry": "列表、组织架构图和地图",
+    "mapHint": "要把智能体移到另一个频道，请使用网页版的地图，或和 {{name}} 对话。"
   }
 }

@@ -72,6 +72,8 @@ import {
 import { DelegateNote, DelegateUndo, useDelegateLine } from "@/components/RightHandDelegate";
 import { InstallSkillDialog, SkillSheet } from "@/components/Skills";
 import { StretchCardView } from "@/components/StretchCard";
+import { TeamPlanCardView } from "@/components/TeamPlan";
+import { TeamWeekCardView } from "@/components/TeamWeekCard";
 import { UsagePauseCardView } from "@/components/UsagePauseCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
@@ -110,6 +112,7 @@ export function ActionCard({ message }: { message: Message }) {
         card={card}
       />
     );
+  if (card.kind === "team_proposal") return <TeamPlanCardView message={message} card={card} />;
   if (card.kind === "settings_proposal") return <SettingsProposalCardView message={message} card={card} />;
   if (card.kind === "approvals") return <ApprovalsCardView message={message} card={card} />;
   if (card.kind === "member_changes") return <MemberChangesCardView message={message} card={card} />;
@@ -122,6 +125,7 @@ export function ActionCard({ message }: { message: Message }) {
   if (card.kind === "install_skill") return <InstallSkillCardView card={card} />;
   if (card.kind === "update_skills") return <UpdateSkillsCardView message={message} card={card} />;
   if (card.kind === "autonomy_proposal") return <CostlyProposalCardView message={message} card={card} />;
+  if (card.kind === "team_week") return <TeamWeekCardView message={message} card={card} />;
   const done = connectAiDone(card, status.data, dir.agentById);
   const agents = joinNames(
     card.agentIds.map((id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent")),

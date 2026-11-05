@@ -181,7 +181,7 @@ export interface AuditRow {
   runId: string | null;
   channelId: string | null;
   /** Where it happened; null when there is no conversation or it was deleted. */
-  channel: { id: string; name: string; kind: "channel" | "dm" | "forum" } | null;
+  channel: { id: string; name: string; kind: schema.ChannelKind } | null;
   onBehalfOf: { id: string; name: string | null } | null;
   outcome: schema.AuditOutcome | null;
   /** The approval a call waited for (or ran after), as it stands now: a `pending` row may be decided since. */
@@ -315,7 +315,7 @@ export async function listAudit(
       details: r.action === TOOL_CALL ? r.details : auditInput(r.details),
       runId: r.runId,
       channelId: r.channelId,
-      channel: (r.channelId && channelById.get(r.channelId)) || null,
+      channel: (r.channelId && (channelById.get(r.channelId) as AuditRow["channel"])) || null,
       onBehalfOf: r.onBehalfOfUserId
         ? { id: r.onBehalfOfUserId, name: userName.get(r.onBehalfOfUserId) ?? null }
         : null,

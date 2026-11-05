@@ -693,7 +693,7 @@
     "noneForYou": "Nessun agente lavora ancora con te.",
     "noneForYouHint": "Chiedi l'accesso a un admin.",
     "freeSection": "Liberi",
-    "noGroupSection": "Nessun gruppo"
+    "noGroupSection": "Nessun reparto"
   },
   "agentEdit": {
     "missing": "Questo agente non esiste più.",
@@ -791,12 +791,6 @@
       "issue_status_one": "{{names}} ha modificato un'attività",
       "issue_status_many": "{{names}} hanno modificato un'attività",
       "issue_status_other": "{{names}} hanno modificato un'attività",
-      "forum_turn_one": "Tocca a te nel forum",
-      "forum_turn_many": "Tocca a te nel forum",
-      "forum_turn_other": "Tocca a te nel forum",
-      "forum_synthesis_one": "Riepilogo del forum pronto",
-      "forum_synthesis_many": "Riepiloghi del forum pronti",
-      "forum_synthesis_other": "Riepiloghi del forum pronti",
       "approval_one": "{{names}} chiede un'approvazione",
       "approval_many": "{{names}} chiedono un'approvazione",
       "approval_other": "{{names}} chiedono un'approvazione",
@@ -1078,6 +1072,7 @@
   "files": {
     "type": {
       "image": "Immagine",
+      "video": "Video",
       "pdf": "PDF",
       "document": "Documento",
       "table": "Tabella",
@@ -1102,7 +1097,17 @@
     "openImage": "Apri immagine",
     "imageOf": "Immagine {{index}} di {{count}}",
     "place": "{{index}} di {{count}}",
-    "noPreview": "Questo file non si apre nell'app. Condividilo per aprirlo in un'altra app."
+    "noPreview": "Questo file non si apre nell'app. Condividilo per aprirlo in un'altra app.",
+    "video": {
+      "play": "Riproduci",
+      "pause": "Pausa",
+      "replay": "Riguarda",
+      "seek": "Posizione nel video",
+      "mute": "Disattiva audio",
+      "unmute": "Attiva audio",
+      "fullscreen": "Schermo intero",
+      "open": "Apri"
+    }
   },
   "issues": {
     "title": "Attività",
@@ -1134,7 +1139,6 @@
     "loadFailed": "Non è stato possibile caricare le attività.",
     "createdBy": "creata da {{name}}",
     "fromMessage": "da un messaggio",
-    "fromForum": "dal forum",
     "fromAgent": "da una richiesta a un agente",
     "fromWebhook": "da {{provider}}",
     "workingFor_one": "al lavoro da {{count}} min",
@@ -1311,7 +1315,6 @@
     "kind": {
       "approval": "Approva",
       "question": "Domanda",
-      "forum": "Tocca a te",
       "browser": "Browser",
       "secret": "Segreto",
       "join": "Membri",
@@ -1427,7 +1430,6 @@
         "wiki": "Wiki",
         "skills": "Skill",
         "schedule": "Routine",
-        "forum": "Forum",
         "sandbox": "Computer proprio",
         "browser": "Browser",
         "setup": "Configurazione dello spazio di lavoro",
@@ -2138,5 +2140,9 @@
         "proposal": "Dashboard"
       }
     }
+  },
+  "team": {
+    "entry": "Elenco, organigramma e mappa",
+    "mapHint": "Per spostare un agente in un altro canale, usa la mappa sul web o parla con {{name}}."
   }
 }

@@ -37,16 +37,38 @@ test("issues API: create, by number, patch, criteria, comments, activity, ask ag
   const activity = (await (await api(`/issues/${issue.id}/activity`)).json()) as {
     activity: { kind: string; event?: string; author: { type: string }; text: string }[];
   };
+  // Comments are the task's conversation now (ADR 0145): the activity keeps its events.
   expect(activity.activity.map((a) => a.event ?? a.kind)).toEqual([
     "created",
     "status_changed",
     "criterion_checked",
-    "comment",
     "assigned",
     "agent_asked",
-    "comment",
   ]);
-  expect(activity.activity.at(-1)).toMatchObject({ author: { type: "agent" }, text: "Feito." });
+
+  // The conversation: opened once (the same thread again), read and written through the chat's own routes.
+  const at = (await (await api(`/issues/${issue.id}/conversation`, { json: {} })).json()) as {
+    channelId: string;
+    rootId: string;
+  };
+  expect(await (await api(`/issues/${issue.id}/conversation`, { json: {} })).json()).toEqual(at);
+  const read = await api(`/channels/${at.channelId}/messages?threadId=${at.rootId}`);
+  const thread = (await read.json()) as {
+    messages: { author: { type: string }; body: string; meta: Record<string, unknown> }[];
+  };
+  // The root stands for the task (never drawn); the replies are the conversation.
+  expect(thread.messages.filter((m) => !m.meta.taskConversation).map((m) => [m.author.type, m.body])).toEqual([
+    ["person", "Olhando"],
+    ["person", "Please implement issue #1."],
+    ["agent", "Feito."],
+  ]);
+  const posted = await api(`/channels/${at.channelId}/messages`, { json: { body: "Valeu", threadId: at.rootId } });
+  expect(posted.status).toBe(201);
+  const card = (await (await api(`/issues/${issue.id}`)).json()) as {
+    conversation: { channelId: string; count: number; participants: { type: string }[]; working: boolean };
+  };
+  expect(card.conversation).toMatchObject({ channelId: at.channelId, count: 4, working: false });
+  expect(card.conversation.participants.map((p) => p.type)).toEqual(["person", "agent"]);
 
   const message = (await (
     await api(`/channels/${channelId}/messages`, { json: { body: "Bug no checkout" } })

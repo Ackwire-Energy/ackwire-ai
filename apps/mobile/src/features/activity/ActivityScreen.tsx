@@ -171,7 +171,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
   const href = notificationHref(n, ai);
-  // No screen of its own in the app (a forum topic): its page on the web, so a tap is never a dead end.
+  // No screen of its own in the app (the workspace's billing hold): its page on the web, so a tap is never a dead end.
   const web = href ? null : notificationWebPath(n, orgId);
   const actor = n.actors[0];
   const who = actor ? { type: actor.type === "agent" ? "agent" : "person", id: actor.id } : null;
@@ -244,7 +244,6 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
 const KIND_ICON = {
   approval: "wait",
   question: "help",
-  forum: "chat",
   browser: "globe",
   secret: "lock",
   join: "members",
@@ -351,7 +350,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
   const href = notificationHref(n, ai);
-  // No screen of its own in the app (a forum topic): its page on the web, so a tap is never a dead end.
+  // No screen of its own in the app (the workspace's billing hold): its page on the web, so a tap is never a dead end.
   const web = href ? null : notificationWebPath(n, orgId);
   const unread = n.readAt === null;
 

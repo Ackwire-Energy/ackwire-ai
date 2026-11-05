@@ -716,7 +716,7 @@
     "noneForYou": "Żaden agent jeszcze z tobą nie pracuje.",
     "noneForYouHint": "Poproś administratora o dostęp.",
     "freeSection": "Wolni",
-    "noGroupSection": "Bez grupy"
+    "noGroupSection": "Bez działu"
   },
   "agentEdit": {
     "missing": "Ten agent już nie istnieje.",
@@ -823,14 +823,6 @@
       "issue_status_few": "{{names}} zmieniają zadanie",
       "issue_status_many": "{{names}} zmieniają zadanie",
       "issue_status_other": "{{names}} zmieniają zadanie",
-      "forum_turn_one": "Twoja kolej na forum",
-      "forum_turn_few": "Twoja kolej na forum",
-      "forum_turn_many": "Twoja kolej na forum",
-      "forum_turn_other": "Twoja kolej na forum",
-      "forum_synthesis_one": "Podsumowanie forum gotowe",
-      "forum_synthesis_few": "Podsumowanie forum gotowe",
-      "forum_synthesis_many": "Podsumowanie forum gotowe",
-      "forum_synthesis_other": "Podsumowanie forum gotowe",
       "approval_one": "{{names}} prosi o zatwierdzenie",
       "approval_few": "{{names}} proszą o zatwierdzenie",
       "approval_many": "{{names}} proszą o zatwierdzenie",
@@ -1151,6 +1143,7 @@
   "files": {
     "type": {
       "image": "Obraz",
+      "video": "Wideo",
       "pdf": "PDF",
       "document": "Dokument",
       "table": "Tabela",
@@ -1175,7 +1168,17 @@
     "openImage": "Otwórz zdjęcie",
     "imageOf": "Zdjęcie {{index}} z {{count}}",
     "place": "{{index}} z {{count}}",
-    "noPreview": "Ten plik nie otwiera się w aplikacji. Udostępnij go, żeby otworzyć go w innej aplikacji."
+    "noPreview": "Ten plik nie otwiera się w aplikacji. Udostępnij go, żeby otworzyć go w innej aplikacji.",
+    "video": {
+      "play": "Odtwórz",
+      "pause": "Wstrzymaj",
+      "replay": "Odtwórz ponownie",
+      "seek": "Pozycja w filmie",
+      "mute": "Wycisz",
+      "unmute": "Włącz dźwięk",
+      "fullscreen": "Pełny ekran",
+      "open": "Otwórz"
+    }
   },
   "issues": {
     "title": "Zadania",
@@ -1207,7 +1210,6 @@
     "loadFailed": "Nie udało się wczytać zadań.",
     "createdBy": "utworzone przez: {{name}}",
     "fromMessage": "z wiadomości",
-    "fromForum": "z forum",
     "fromAgent": "z prośby do agenta",
     "fromWebhook": "z {{provider}}",
     "workingFor_one": "pracuje od {{count}} min",
@@ -1391,7 +1393,6 @@
     "kind": {
       "approval": "Zatwierdź",
       "question": "Pytanie",
-      "forum": "Twoja kolej",
       "browser": "Przeglądarka",
       "secret": "Sekret",
       "join": "Członkowie",
@@ -1509,7 +1510,6 @@
         "wiki": "Wiki",
         "skills": "Umiejętności",
         "schedule": "Rutyny",
-        "forum": "Forum",
         "sandbox": "Własny komputer",
         "browser": "Przeglądarka",
         "setup": "Konfiguracja przestrzeni roboczej",
@@ -2248,5 +2248,9 @@
         "proposal": "Dashboard"
       }
     }
+  },
+  "team": {
+    "entry": "Lista, schemat organizacyjny i mapa",
+    "mapHint": "Aby przenieść agenta do innego kanału, użyj mapy w wersji webowej albo porozmawiaj z {{name}}."
   }
 }
