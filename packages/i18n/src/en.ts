@@ -11640,7 +11640,7 @@ export const en = {
         toneDms: "My messages in DMs",
         toneDmsHelp: "In the color of the agent you're talking to",
         toneChannels: "My messages in channels",
-        toneChannelsHelp: "In the workspace's color",
+        toneChannelsHelp: "In blue",
         toneLight: "Light",
         toneStrong: "Strong",
         openAt: "When I open a conversation, take me to",

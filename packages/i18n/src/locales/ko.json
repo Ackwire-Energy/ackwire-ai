@@ -11566,7 +11566,7 @@
         "toneDms": "다이렉트 메시지의 내 메시지",
         "toneDmsHelp": "대화 중인 에이전트의 색",
         "toneChannels": "채널의 내 메시지",
-        "toneChannelsHelp": "워크스페이스의 색",
+        "toneChannelsHelp": "파란색으로",
         "toneLight": "연하게",
         "toneStrong": "진하게",
         "openAt": "대화를 열면 이동할 위치",

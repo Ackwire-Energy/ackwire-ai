@@ -5,6 +5,7 @@ setupDom();
 
 import type { Agent, ComputerQueue, Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { STORAGE_KEYS } from "@/lib/storage";
 import { atRule, builtCss, declarations, topLevel } from "./built-css";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -276,6 +277,7 @@ describe("a computer's line", () => {
 
   test("in an agent's DM one Computer button says who waits, and the line goes on to the computer", async () => {
     const { api, machines, queue } = setup();
+    localStorage.setItem(`${STORAGE_KEYS.dmSidebar}.u-walter.${ORG_ID}`, "0");
     const r = await renderApp(`/org/${ORG_ID}/dm/agent/${ATLAS_ID}`, { api });
     const socket = r.sockets.last();
     await act(async () => socket.open());

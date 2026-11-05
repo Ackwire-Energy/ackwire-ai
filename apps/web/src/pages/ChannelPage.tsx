@@ -2160,7 +2160,9 @@ function ChannelView({
               {chrome?.header ? (
                 <AgentTasksContext.Provider value={tasksControl}>
                   <AgentPanelShownContext.Provider value={profile?.agentId ?? null}>
-                    {typeof chrome.header === "function" ? chrome.header({ onSearch: openSearch, side }) : chrome.header}
+                    {typeof chrome.header === "function"
+                      ? chrome.header({ onSearch: openSearch, side })
+                      : chrome.header}
                   </AgentPanelShownContext.Provider>
                 </AgentTasksContext.Provider>
               ) : (

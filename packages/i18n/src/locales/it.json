@@ -12472,7 +12472,7 @@
         "toneDms": "I miei messaggi nei messaggi diretti",
         "toneDmsHelp": "Nel colore dell'agente con cui parli",
         "toneChannels": "I miei messaggi nei canali",
-        "toneChannelsHelp": "Nel colore del workspace",
+        "toneChannelsHelp": "In blu",
         "toneLight": "Chiara",
         "toneStrong": "Intensa",
         "openAt": "Quando apro una conversazione, portami a",

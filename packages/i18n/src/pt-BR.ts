@@ -11769,7 +11769,7 @@ export const ptBR = {
         toneDms: "Minhas mensagens nas DMs",
         toneDmsHelp: "Na cor do agente com quem você fala",
         toneChannels: "Minhas mensagens nos canais",
-        toneChannelsHelp: "Na cor do workspace",
+        toneChannelsHelp: "Em azul",
         toneLight: "Clara",
         toneStrong: "Forte",
         openAt: "Ao abrir uma conversa, me leve para",

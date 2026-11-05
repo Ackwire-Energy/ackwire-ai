@@ -11575,7 +11575,7 @@
         "toneDms": "ダイレクトメッセージの自分のメッセージ",
         "toneDmsHelp": "話しているエージェントの色",
         "toneChannels": "チャンネルの自分のメッセージ",
-        "toneChannelsHelp": "ワークスペースの色",
+        "toneChannelsHelp": "青色で",
         "toneLight": "淡い",
         "toneStrong": "濃い",
         "openAt": "会話を開いたときの移動先",
