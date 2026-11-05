@@ -203,7 +203,7 @@ function Picker({ imp }: { imp: AgentImport }) {
                 <Text variant="body" style={styles.fill}>
                   {name}
                 </Text>
-                {on ? <Icon name="checkc" size={22} color={c.ink} /> : null}
+                {on ? <Icon name="checkc" size={24} color={c.ink} /> : null}
               </Pressable>
               {on && !isRequestCard(card) ? (
                 <View style={styles.where}>
@@ -424,7 +424,7 @@ function Preview({ imp, orgId }: { imp: AgentImport; orgId: string }) {
                   </Text>
                 ) : null}
               </View>
-              {a.free ? <Icon name={a.on ? "checkc" : "circle"} size={22} color={a.on ? c.ink : c.faint} /> : null}
+              {a.free ? <Icon name={a.on ? "checkc" : "circle"} size={24} color={a.on ? c.ink : c.faint} /> : null}
             </Pressable>
           );
         })}

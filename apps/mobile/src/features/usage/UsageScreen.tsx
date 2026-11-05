@@ -92,7 +92,7 @@ export function UsageScreen() {
                 [...machines].map(([machineId, list]) => (
                   <View key={machineId} style={styles.machine}>
                     <View style={styles.machineName}>
-                      <Icon name="laptop" size={14} color={c.faint} />
+                      <Icon name="laptop" size={12} color={c.faint} />
                       <Text variant="caption" tone="faint" style={styles.caps}>
                         {list[0]?.machineName.toLocaleUpperCase()}
                       </Text>
@@ -220,7 +220,7 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
           key={a.agentId}
           onPress={() => openAgentUsage(a.agentId)}
           accessibilityRole="button"
-          style={[styles.share, i > 0 && divided]}
+          style={({ pressed }) => [styles.share, i > 0 && divided, pressed && styles.pressed]}
         >
           <AgentFace agentId={a.agentId} size={18} live={false} />
           <Text variant="small" tone="ink" style={[styles.grow, styles.bold]}>
@@ -239,7 +239,7 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
           onPress={() => setOpen(true)}
           accessibilityRole="button"
           accessibilityState={{ expanded: false }}
-          style={[styles.share, divided]}
+          style={({ pressed }) => [styles.share, divided, pressed && styles.pressed]}
         >
           <View style={styles.face} />
           <Text variant="small" tone="ink" style={[styles.grow, styles.bold]}>
@@ -273,7 +273,11 @@ function ApiCard({ data }: { data: OrgPlanUsage }) {
               key={a.agentId}
               onPress={() => openAgentUsage(a.agentId)}
               accessibilityRole="button"
-              style={[styles.api, i > 0 && { borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth }]}
+              style={({ pressed }) => [
+                styles.api,
+                i > 0 && { borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth },
+                pressed && styles.pressed,
+              ]}
             >
               <AgentFace agentId={a.agentId} size={28} live={false} />
               <View style={styles.grow}>
@@ -356,6 +360,7 @@ function DefaultBudgetCard() {
 }
 
 const styles = StyleSheet.create({
+  pressed: { opacity: 0.6 },
   screen: { flex: 1 },
   in: { paddingHorizontal: 16, paddingTop: 8, gap: 14 },
   grow: { flex: 1, minWidth: 0 },
