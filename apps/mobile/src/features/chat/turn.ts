@@ -21,12 +21,25 @@ export function turnPhase(r: Pick<LiveRun, "status" | "text" | "tool" | "work">)
 
 /**
  * The run's work in order, as the tool block's items (the shared model): its calls, repeats folded (five
- * browser steps are one line), what it said between them and the messages it read. A stopped run's call
- * that was running shows as stopped.
+ * browser steps are one line), what it said between them and the messages it read. `over`: nothing more comes, so a
+ * call that was running shows as stopped.
  */
-export function turnItems(r: Pick<LiveRun, "work" | "status">): ToolItem[] {
-  return toolItemsLive(r.work ?? [], r.status === "canceled");
+export function turnItems(
+  r: Pick<LiveRun, "work" | "status">,
+  over = r.status === "canceled" || r.status === "failed",
+): ToolItem[] {
+  return toolItemsLive(r.work ?? [], over);
 }
+
+/** What a saved reply's kept work depends on: a line's state and count, and how much of a line said has arrived. */
+export const turnSignature = (items: readonly ToolItem[]) =>
+  items
+    .map((x) =>
+      x.kind === "call"
+        ? `${x.key}:${x.line.state}${x.line.count}`
+        : `${x.key}:${x.kind === "say" ? x.text.length : ""}`,
+    )
+    .join("|");
 
 /**
  * Its block is in the conversation (as `TurnRow` draws it): words of its own. Until then there is no row, and the

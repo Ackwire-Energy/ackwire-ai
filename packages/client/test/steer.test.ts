@@ -241,18 +241,15 @@ describe("the live work: what it read, when it read it", () => {
   const delta = (seq: number, turn: number, text: string) =>
     ({ type: "agent.delta", ...base, seq, turn, text }) as ChannelEvent;
 
-  test("steered only notes it; read moves the text so far to narration and adds the step once", () => {
+  test("steered only notes it; read adds the step once and leaves the text where it is", () => {
     let s = run([delta(0, 1, "Olhando os logs."), steered("m2")]);
     expect(s.runs.r1?.text).toBe("Olhando os logs.");
     expect(s.runs.r1?.work ?? []).toEqual([]);
     s = applyChannelEvent(s, read("m2"));
-    expect(s.runs.r1?.text).toBe("");
-    expect(s.runs.r1?.work).toEqual([
-      { kind: "say", text: "Olhando os logs.", turn: 1 },
-      { kind: "steer", messageId: "m2" },
-    ]);
+    expect(s.runs.r1?.text).toBe("Olhando os logs.");
+    expect(s.runs.r1?.work).toEqual([{ kind: "steer", messageId: "m2" }]);
     s = applyChannelEvent(s, read("m2"));
-    expect(s.runs.r1?.work).toHaveLength(2);
+    expect(s.runs.r1?.work).toHaveLength(1);
   });
 
   test("stop and send: the step says it stopped to read; the cut text of the turn is narration", () => {

@@ -172,6 +172,8 @@ export interface LiveRun {
   steerNow?: string[];
   /** How much of the current turn's text arrived (`agent.delta.at`), moved to the narration or not. */
   turnChars?: number;
+  /** Where `text` starts in the current turn's text: the start of its stretch (`agent.delta.from`). */
+  textFrom?: number;
   /** A piece of the current turn's text never arrived (a lost socket, a conversation opened mid-answer). */
   gap?: boolean;
   /** The current turn's pieces heard past that hole, kept for the server's copy of the text before them. */
@@ -179,7 +181,8 @@ export interface LiveRun {
 }
 
 export type LiveWork =
-  | { kind: "say"; text: string; turn?: number }
+  /** `from`: where this stretch starts in the turn's text, so what still arrives of it joins this line. */
+  | { kind: "say"; text: string; turn?: number; from?: number }
   /**
    * The running task read a message sent while it worked ("Leu seu recado"); `now`: it stopped
    * to read it ("Parou para ler seu recado").
@@ -202,6 +205,8 @@ export type LiveWork =
       ms?: number;
       /** The tool answered with an error (`agent.tool` end with `failed`). */
       failed?: boolean;
+      /** That error was its arguments refused: a later call may make it right (`toolItemsLive`). */
+      slip?: boolean;
       /** It didn't run: it waits on a person (an approval, a question, a secret). */
       held?: boolean;
       /** A permission check: the whole command it checked (its line opens on it). */
@@ -291,6 +296,8 @@ export interface AgentToolEvent {
   toolUseId?: string;
   /** On the end (`tool: null`): the tool answered with an error. */
   failed?: boolean;
+  /** On a failed end: its arguments were refused, the tool never ran. */
+  slip?: boolean;
   /** On the end: it didn't run, it waits on a person. */
   held?: boolean;
   /** On the end: a rule ("Aprovar sempre") let it run without asking. */
@@ -428,7 +435,16 @@ type StreamEvent =
   | RunContinuedEvent
   | AgentNarrationEvent;
 
-/** Adds what the agent said (or replaces the line of the same turn: `agent.narration` is the final word). */
+/** The body so far as a line of what it said (its end may still come: its spaces stay). */
+const spoken = (r: LiveRun): LiveWork => ({
+  kind: "say",
+  text: r.text.trimStart(),
+  ...(r.turn !== undefined ? { turn: r.turn } : {}),
+  // Past a hole, what still comes of this stretch wouldn't continue what it holds.
+  ...(r.textFrom !== undefined && !r.gap ? { from: r.textFrom } : {}),
+});
+
+/** `agent.narration`, the turn's final word: adds what the agent said, or replaces the line of the same turn. */
 function say(work: LiveWork[], text: string, turn: number | undefined): LiveWork[] {
   if (turn !== undefined) {
     const at = work.findIndex((w) => w.kind === "say" && w.turn === turn);
@@ -485,10 +501,9 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       const seen = new Set((r.work ?? []).flatMap((w) => (w.kind === "steer" ? [w.messageId] : [])));
       const fresh = event.messageIds.filter((id) => !seen.has(id));
       if (fresh.length === 0) return state;
-      // Text so far is narration: the answer continues after the message it read.
-      const said = r.text.trim();
+      // What it wrote stays where it is: the reply goes on from it, and the saved message holds both.
       const work: LiveWork[] = [
-        ...(said ? say(r.work ?? [], said, r.turn) : (r.work ?? [])),
+        ...(r.work ?? []),
         ...fresh.map((messageId) => ({
           kind: "steer" as const,
           messageId,
@@ -496,18 +511,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         })),
       ];
       const steerNow = (r.steerNow ?? []).filter((id) => !fresh.includes(id));
-      return {
-        ...state,
-        runs: {
-          ...state.runs,
-          [event.runId]: {
-            ...r,
-            work,
-            steerNow,
-            ...(said ? { text: "", status: "thinking" as const } : {}),
-          },
-        },
-      };
+      return { ...state, runs: { ...state.runs, [event.runId]: { ...r, work, steerNow } } };
     }
     case "run.continued": {
       // The stopped row (if still here) gives way to the run that picks up, a normal live run.
@@ -540,15 +544,16 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       const said = newCall ? (current?.text ?? "").trim() : "";
       const status: LiveStatus = said ? "thinking" : current?.text ? current.status : "thinking";
       let work = current?.work ?? [];
-      if (said) work = say(work, said, current?.turn);
+      if (said && current) work = [...work, spoken(current)];
       const end = (
         w: Extract<LiveWork, { kind: "call" }>,
-        how: Pick<AgentToolEvent, "failed" | "held" | "why" | "refusal" | "requestId" | "autoApproved"> = {},
+        how: Pick<AgentToolEvent, "failed" | "slip" | "held" | "why" | "refusal" | "requestId" | "autoApproved"> = {},
       ) => ({
         ...w,
         running: false,
         ...(w.since !== undefined ? { ms: Math.max(0, Date.now() - w.since) } : {}),
         ...(how.failed ? { failed: true } : {}),
+        ...(how.slip ? { slip: true } : {}),
         ...(how.held ? { held: true } : {}),
         ...(how.why ? { why: how.why } : {}),
         ...(how.refusal ? { refusal: how.refusal } : {}),
@@ -739,12 +744,29 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
             : undefined,
         ...(event.at !== undefined ? { turnChars: Math.max(heard ?? 0, event.at + event.text.length) } : {}),
         ...(event.turn !== undefined ? { turn: event.turn } : {}),
+        ...(event.from !== undefined ? { textFrom: event.from } : {}),
       };
       // Sent before the server's copy of the turn was read, it arrived after it (`caughtUp`): only its tail is new.
       const fresh =
         event.at !== undefined && heard !== undefined && event.at < heard
           ? event.text.slice(heard - event.at)
           : event.text;
+      const { from } = event;
+      if (from !== undefined && !gap) {
+        // The end of text that left the body already: a call's start overtakes what a brain still keeps back
+        // (`redactHold`), and the call's end brings it. It finishes its line; alone in the body it would start mid-word.
+        const line =
+          current?.work?.findIndex((w) => w.kind === "say" && w.turn === event.turn && w.from === from) ?? -1;
+        if (current?.work && line >= 0) {
+          const work = current.work.map((w, i) =>
+            i === line && w.kind === "say" ? { ...w, text: w.text + fresh } : w,
+          );
+          return upsert(state, event, { work, lastSeq: event.seq, ...turnPatch });
+        }
+        // Opened during a call: the end of a text whose start this app never had. It doesn't show at all.
+        if (current && !current.text && event.at !== undefined && event.at > from)
+          return upsert(state, event, { lastSeq: event.seq, ...turnPatch });
+      }
       // A new model call. Narration (text before tool calls) already left the body with `agent.narration` or the
       // call; what is still here is a whole reply the server held and sent back for another try (a give-up, a
       // question it shouldn't ask), never posted: the next turn's text replaces it.
@@ -756,9 +778,19 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
           ...turnPatch,
         });
       }
+      // The next stretch with the last one still here: a call that shows no line of its own (the brain's own tools) or
+      // text that came whole after its call. A line here would land below the body, and stay after the reply.
+      const said = current?.text.trimEnd();
+      const next = !gap && sameTurn && from !== undefined && from > (current?.textFrom ?? from) && said;
       return upsert(state, event, {
         status: "running",
-        text: gap ? (sameTurn ? (current?.text ?? "") : "") : (current?.text ?? "") + fresh,
+        text: gap
+          ? sameTurn
+            ? (current?.text ?? "")
+            : ""
+          : next
+            ? `${said}\n\n${fresh.trimStart()}`
+            : (current?.text ?? "") + fresh,
         lastSeq: event.seq,
         ...turnPatch,
       });
@@ -895,6 +927,7 @@ function caughtUp(r: LiveRun, live: NonNullable<ActiveRun["live"]>): LiveRun {
     ...r,
     status: "running",
     text,
+    textFrom: live.at,
     turn: live.turn,
     turnChars: Math.max(heard, end),
     gap,

@@ -4237,7 +4237,7 @@ export const TimelineMessage = memo(function TimelineMessage({
               agentName={name}
               color={colorOf(agent)}
               steerNote={steerNote}
-              stopped={liveStopped}
+              stopped={liveStopped || liveFailed}
             />
             {/* Last, after its tools; also on a failed or stopped run, for the person still in control (they hand back from it). */}
             <RunBrowserCard run={live} name={name} />

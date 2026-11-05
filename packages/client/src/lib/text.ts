@@ -259,13 +259,17 @@ export const visibleText = (text: string) =>
 
 const oneSpaced = (text: string) => text.replace(/\s+/g, " ").trim();
 
+/** From this length a text found word for word is the same text, wherever it was cut. */
+const SURE_PIECE_CHARS = 40;
+
 /**
  * Whether `whole` already holds `part` word for word (line breaks and extra spaces aside), as whole words: "Ok" is
- * not in "Okay", "Vou ver." is not in "Vou verificar".
+ * not in "Okay", "Vou ver." is not in "Vou verificar". A long piece counts even cut mid-word: a stream's cuts fall there.
  */
 export function holdsText(whole: string, part: string) {
   const w = oneSpaced(whole);
   const p = oneSpaced(part);
+  if (p.length >= SURE_PIECE_CHARS && w.includes(p)) return true;
   for (let at = w.indexOf(p); at >= 0; at = w.indexOf(p, at + 1)) {
     if (!WORD_CHAR.test(w[at - 1] ?? "") && !WORD_CHAR.test(w[at + p.length] ?? "")) return true;
   }
