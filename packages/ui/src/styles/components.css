@@ -952,6 +952,18 @@ textarea.ac-input {
 .ac-avatar-stack > .ac-avatar {
   box-shadow: 0 0 0 2px var(--stack-ring, var(--surface));
 }
+/*
+ * A raised container names its own face as that surface, resolved on the container itself (its children's `--raised`
+ * is a step up), so faces and makers' tiles stacked on a card, a list, a dialog or a menu are cut out of that face. The
+ * page's color drew rings around them there: darker on a dialog in dark (outside the work area `--surface` is the
+ * darkest ground), lighter on a menu. A row with a plate of its own sets the ring again.
+ */
+:where(.ac-dialog, .ac-details, .ac-card, .ac-list, .ac-composer, .ac-approval, .ac-alert) {
+  --stack-ring: var(--surface-raised);
+}
+:where(.ac-menu, .ac-toast, .ac-glass) {
+  --stack-ring: var(--glass-solid);
+}
 .ac-avatar-stack > .ac-avatar + .ac-avatar {
   margin-left: -6px;
 }
@@ -1997,6 +2009,8 @@ html:not([data-pointer]) .ac-radio:focus-visible {
   border-radius: var(--radius-lg);
   border: 0;
   background: var(--raised);
+  /* Faces or makers' tiles stacked on it are cut out of its own face (`--stack-ring`), chosen or not. */
+  --stack-ring: var(--raised);
   /* A visible outline in both themes (the e1 hairline alone disappears on dark surfaces). */
   box-shadow:
     0 0 0 1px var(--line2),
@@ -2025,6 +2039,7 @@ html:not([data-pointer]) .ac-radio:focus-visible {
 .ac-option[aria-pressed="true"],
 .ac-option[data-state="checked"] {
   --pressed: 0 0 0 1px var(--line2), 0 0 0 1px var(--line), var(--chosen-press);
+  --stack-ring: var(--chosen-bg);
   background: var(--chosen-bg);
   box-shadow: var(--pressed);
 }
