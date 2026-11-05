@@ -2020,7 +2020,7 @@
     "rightHand": {
       "computer_away": "{{name}} kan nu niet antwoorden: de computer van het abonnement is niet bereikbaar.",
       "plan_limit": "{{name}} kan nu niet antwoorden: het abonnement heeft zijn limiet bereikt.",
-      "plan_not_shared": "{{name}} denkt met een abonnement dat alleen de eigenaar antwoordt.",
+      "plan_not_shared": "{{name}} denkt met een abonnement dat alleen de eigenaar antwoordt. De eigenaar van het abonnement kan Antwoordt andere mensen aanzetten.",
       "runner_outdated": "{{name}} kan nu niet antwoorden: het programma op de computer van het abonnement heeft een update nodig.",
       "plan_tools": "{{name}} stopte voordat het antwoordde: de AI van het abonnement op die computer biedt eigen tools aan.",
       "useKey": "API-sleutel gebruiken"
@@ -3967,6 +3967,7 @@
         "account": "Account",
         "accountWho": "Alleen accounts van {{owner}}, verantwoordelijk voor {{name}}: een abonnement denkt alleen voor de agents van de eigenaar.",
         "accountSignedOut": "Uitgelogd, log opnieuw in",
+        "accountUnknown": "Login niet bevestigd, wordt binnenkort opnieuw gecontroleerd",
         "thisComputer": "Account van {{computer}}",
         "accountMove": "In gebruik door {{agents}} · Hierheen verplaatsen",
         "accountAlso": "Ook gebruikt door {{agents}}",
@@ -7747,6 +7748,8 @@
       "signedOutFor_one": "{{agents}} is uitgelogd.",
       "signedOutFor_other": "{{agents}} zijn uitgelogd.",
       "keyRefused": "De sleutel is geweigerd: vervang hem door een nieuwe.",
+      "statusUnknown": "De computer kon de login deze keer niet bevestigen. Hij controleert het vanzelf opnieuw.",
+      "identityUnknown": "account niet herkend",
       "rename": "Hernoemen",
       "signInAgain": "Opnieuw inloggen",
       "newKey": "Sleutel vervangen",
@@ -7793,6 +7796,8 @@
       "limited": "Limiet bereikt",
       "limitedUntil": "Limiet bereikt tot {{when}}",
       "updated": "{{ago}} bijgewerkt",
+      "ago": "{{ago}} bijgewerkt",
+      "stale": "oude cijfers, {{ago}} bijgewerkt",
       "notShared": "{{maker}} deelt het gebruik hier niet.",
       "offer": {
         "use": "{{label}} gebruiken ({{pct}}%)",

@@ -5,6 +5,7 @@ import {
   agentsToGive,
   endsOnClaude,
   groupPlans,
+  identityUnknown,
   onSeveralComputers,
   ownSignIns,
   ownSignInTitle,
@@ -174,7 +175,7 @@ export function AiAccountsSection() {
       {accounts.length > 0 && (
         <List>
           {accounts.map((account) => {
-            const { logins, usedBy, usage, signedOut } = account;
+            const { logins, usedBy, usage, signedOut, unknown } = account;
             const a = logins.find((l) => l.shared === true) ?? logins[0];
             if (!a) return null;
             const give = toGive(a);
@@ -183,8 +184,14 @@ export function AiAccountsSection() {
             const allOut = signedOut.length === logins.length;
             // Of an account with a login per agent, the agents whose login is out.
             const outFor = allOut ? [] : signedOut.flatMap((l) => l.usedBy);
+            const machine = machines.data?.find((m) => m.id === a.machineId);
             const facts = [
-              a.email ?? (a.keyHint ? t("aiAccounts.page.keyEnds", { hint: a.keyHint }) : null),
+              a.email ??
+                (a.keyHint
+                  ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
+                  : identityUnknown(a, machine)
+                    ? t("aiAccounts.page.identityUnknown")
+                    : null),
               several ? t("aiAccounts.page.on", { computer: a.computer }) : null,
               usedBy.length > 0
                 ? t("aiAccounts.page.usedBy", { count: usedBy.length, agents: names(usedBy) })
@@ -204,6 +211,9 @@ export function AiAccountsSection() {
                           ? t("aiAccounts.page.keyRefused")
                           : t("aiAccounts.page.signedOut")}
                     </SettingNote>
+                  )}
+                  {signedOut.length === 0 && unknown.length > 0 && (
+                    <SettingNote icon="info">{t("aiAccounts.page.statusUnknown")}</SettingNote>
                   )}
                   {copies.length > 0 && (
                     <span className="ai-panel__row">

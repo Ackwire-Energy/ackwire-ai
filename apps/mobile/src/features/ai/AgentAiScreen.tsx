@@ -1,6 +1,6 @@
 import type { AgentBrain, AgentBrainInput, MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi, useMachines, useModels } from "@agenteschat/client";
-import { accountChoices, ownSignInListed, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
+import { accountChoices, ownSignInListed, ownSignInName, signInOf } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
 import { advancedContents } from "@agenteschat/client/lib/brain-advanced";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -159,18 +159,20 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const usage = view && kind ? thinkingUsage(view, kind) : undefined;
   const limited = usage ? planState(usage).state === "limited" : false;
   const offers = limited && kind && view ? limitOffers(accounts, kind, view.account).slice(0, 2) : [];
-  const signedOut = current?.status === "signed_out" && current.mine;
+  const signedOut = current != null && signInOf(current) === "signed_out" && current.mine;
   // A coding plan's key that its endpoint refused: a new key, on that plan's page.
   const refused = signedOut && current && isPlanId(current.provider) ? current.provider : null;
   // Someone else's plans listed for whoever may use them: whose they are, and that their owner hears it.
   const lends = view?.canUseOthersPlans === true && accounts.some((a) => !a.mine && a.ownerId !== agent?.ownerUserId);
   const accountNote = signedOut
     ? t(refused ? "aiAccounts.page.keyRefused" : "agentPage.work.brain.accountSignedOut")
-    : lends
-      ? t("agentPage.work.brain.accountOthers")
-      : view && !view.canUsePlans && ownerFirst
-        ? t("agentPage.work.brain.accountWho", { ...g, owner: ownerFirst })
-        : null;
+    : current != null && signInOf(current) === "unknown"
+      ? t("aiAccounts.page.statusUnknown")
+      : lends
+        ? t("agentPage.work.brain.accountOthers")
+        : view && !view.canUsePlans && ownerFirst
+          ? t("agentPage.work.brain.accountWho", { ...g, owner: ownerFirst })
+          : null;
   const ownRow = view !== undefined && kind !== null && ownSignInListed(view, row, kind);
   const choices = view ? accountChoices(accounts, [view.account]) : [];
   const adds = view?.canUsePlans === true && view.canManageAccounts;

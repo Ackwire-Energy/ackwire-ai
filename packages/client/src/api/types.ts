@@ -5279,6 +5279,8 @@ export interface MachineAccount {
   keyHint: string | null;
   /** It thinks for every agent its owner gives it on that computer, with no new sign-in (absent: an older server). */
   shared?: boolean;
+  /** Claude's organization it is signed in to (opaque), its owner's eyes only; null or absent: not known. */
+  providerOrgId?: string | null;
 }
 
 /** `GET …/ai-accounts`: the viewer's AI accounts on the organization's computers, and where they can add one. */

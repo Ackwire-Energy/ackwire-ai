@@ -1,6 +1,6 @@
 import type { AccountLoginStart, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAccountLogin, useAiAccounts, useApi } from "@agenteschat/client";
-import { accountTitle, reusableAccount } from "@agenteschat/client/lib/ai-accounts";
+import { accountTitle, reusableAccount, signInOf } from "@agenteschat/client/lib/ai-accounts";
 import {
   beginLogin,
   freeDuplicate,
@@ -95,7 +95,7 @@ export function AddAccount(props: AddAccountProps) {
     setReuse(found ?? null);
   }, [reuse, offers, ai.isPending, ai.data, props.machineId, props.kind, props.provider]);
   if (reuse === undefined) return <ActivityIndicator color={c.muted} />;
-  const chosen = reuse ? (pick ?? (reuse.status === "signed_out" ? "again" : undefined)) : "new";
+  const chosen = reuse ? (pick ?? (signInOf(reuse) === "signed_out" ? "again" : undefined)) : "new";
   const label = reuse ? accountTitle(reuse) : "";
   const another = (
     <Button size="sm" variant="secondary" label={t("connectAi.another")} onPress={() => setPick("new")} />

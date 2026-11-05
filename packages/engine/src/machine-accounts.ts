@@ -43,6 +43,7 @@ import {
   isNotNull,
   isNull,
   ne,
+  or,
   schema,
   sql,
 } from "@agenteschat/db";
@@ -140,6 +141,8 @@ export interface MachineAccountView {
   keyHint: string | null;
   /** It thinks for every agent its owner gives it on that computer (protocol 29); else for one. */
   shared: boolean;
+  /** Claude's organization it is signed in to (opaque, protocol 46), for its owner's eyes only; null: not known. */
+  providerOrgId: string | null;
 }
 
 /** An account on a computer, by what the runner needs to remove it. */
@@ -219,6 +222,7 @@ function accountView(
     provider: row.provider,
     keyHint: mine ? row.keyHint : null,
     shared: row.shared,
+    providerOrgId: mine ? row.providerOrgId : null,
   };
 }
 
@@ -383,11 +387,12 @@ async function removeOnComputer(
 }
 
 type AccountKey = Pick<MachineAccountRow, "orgId" | "machineId" | "kind" | "createdBy" | "provider">;
-type AccountIdentity = { email?: string | null; keyHint?: string | null };
+type AccountIdentity = { email?: string | null; keyHint?: string | null; providerOrgId?: string | null };
 
 /**
  * The logins of one account on this computer, its owner's: the same CLI, plan and email, or for a key account
  * the same key's last 4 (the key never leaves the computer). Never the label, which any rename can repeat.
+ * One email may be in several of Claude's organizations: where both logins know theirs, it must be the same one.
  * Undefined while neither is known.
  */
 function sameAccountWhere(row: AccountKey, same: AccountIdentity) {
@@ -397,7 +402,12 @@ function sameAccountWhere(row: AccountKey, same: AccountIdentity) {
       ? eq(machineAccounts.keyHint, same.keyHint)
       : null
     : same.email
-      ? sql`lower(${machineAccounts.email}) = ${same.email.toLowerCase()}`
+      ? and(
+          sql`lower(${machineAccounts.email}) = ${same.email.toLowerCase()}`,
+          same.providerOrgId
+            ? or(isNull(machineAccounts.providerOrgId), eq(machineAccounts.providerOrgId, same.providerOrgId))
+            : undefined,
+        )
       : null;
   if (!match) return undefined;
   return and(
@@ -528,7 +538,7 @@ async function settleAccount(
   // thinks with a signed-out account); a runner sign-out that keeps the folder, if a stray login there ever matters.
   if (!signingIn && info.loggedIn && (email !== row.email || keyHint !== row.keyHint)) {
     const otherEmail = Boolean(row.email && info.email && row.email.toLowerCase() !== info.email.toLowerCase());
-    const duplicate = await sameAccount(db, row, { email, keyHint });
+    const duplicate = await sameAccount(db, row, { email, keyHint, providerOrgId: state.providerOrgId });
     if (otherEmail || (duplicate && !loginPerAgent(row.kind, row.provider))) {
       const [kept] =
         row.status === "signed_out" && row.shared === shared
@@ -548,7 +558,8 @@ async function settleAccount(
     }
   }
   // Signed in again, a login is never the duplicate of one for all agents: it keeps its agents.
-  const duplicate = dedupe ? await duplicateOf(db, row, { email, keyHint }, shared && signingIn) : null;
+  const identity = { email, keyHint, providerOrgId: state.providerOrgId };
+  const duplicate = dedupe ? await duplicateOf(db, row, identity, shared && signingIn) : null;
   if (duplicate) {
     const [gone] = await db
       .update(machineAccounts)
@@ -563,7 +574,7 @@ async function settleAccount(
   if (signingIn) {
     // A login of an account its owner already has here (one per agent) takes that account's name.
     const label =
-      (await sameAccount(db, row, { email, keyHint }))?.label ??
+      (await sameAccount(db, row, identity))?.label ??
       defaultAccountLabel(kindOf(row), await takenLabels(db, orgId, row.createdBy, row.id), row.provider);
     const [done] = await db
       .update(machineAccounts)

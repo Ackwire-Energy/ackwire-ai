@@ -382,6 +382,7 @@ test("signing in: the person who connected the computer; the code is sealed to i
       provider: null,
       keyHint: null,
       shared: false,
+      providerOrgId: null,
     },
   });
   // Polled again: the same account, added once.
@@ -1934,6 +1935,33 @@ test("reports: the method and Claude's organization stay when not said; an incon
   });
   await sync([{ ...base, loggedIn: false }]);
   expect(await accountRow(CLAUDE_ID)).toMatchObject({ status: "signed_out", authMethod: "setup_token" });
+});
+
+test("one email in two of Claude's organizations is two accounts; a login that doesn't say its organization is either", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(CLAUDE_AUTH_PROTOCOL);
+  await addAccount(machineId, CLAUDE_ID, "claude_code", { label: "Pessoal", providerOrgId: "org-ana-personal" });
+  const labelOf = async (providerOrgId?: string) => {
+    const runner = signingRunner(machineId, () => ({
+      loggedIn: true,
+      email: "ana@example.com",
+      plan: "team",
+      ...(providerOrgId ? { providerOrgId } : {}),
+    }));
+    return (await signIn(runner, f.owner.id, machineId)).status.account;
+  };
+  // Another organization: a new account, under a name of its own; its owner sees which organization.
+  expect(await labelOf("org-ana-team")).toMatchObject({ label: "Claude", providerOrgId: "org-ana-team" });
+  // The same organization, or one not said: a login of the account it is, under its name.
+  expect((await labelOf("org-ana-personal"))?.label).toBe("Pessoal");
+  expect((await labelOf())?.label).toBe("Pessoal");
+  // A rename renames that account's logins only.
+  await renameMachineAccount({ db: f.db }, f.owner.id, f.org.id, machineId, CLAUDE_ID, "Casa");
+  expect((await accountRows(machineId)).map((r) => r.label).sort()).toEqual(["Casa", "Casa", "Casa", "Claude"]);
+  // Only its owner sees the organization.
+  const bia = await addMember(f.db, f.org.id, "admin", "bia");
+  const asBia = await getMachineAccounts({ db: f.db }, bia.id, f.org.id, machineId);
+  expect(asBia.accounts.map((a) => a.providerOrgId)).toEqual([null, null, null, null]);
 });
 
 test("hello keeps what a new Claude sign-in for all agents can use on the computer (protocol 46)", async () => {

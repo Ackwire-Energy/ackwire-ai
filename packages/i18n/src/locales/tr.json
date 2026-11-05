@@ -2011,7 +2011,7 @@
     "rightHand": {
       "computer_away": "{{name}} şu an yanıt veremiyor: planın bilgisayarına ulaşılamıyor.",
       "plan_limit": "{{name}} şu an yanıt veremiyor: plan sınırına ulaştı.",
-      "plan_not_shared": "{{name}}, yalnızca sahibine yanıt veren bir planla düşünüyor.",
+      "plan_not_shared": "{{name}}, yalnızca sahibine yanıt veren bir planla düşünüyor. Planın sahibi Başka kişilere de yanıt verir seçeneğini açabilir.",
       "runner_outdated": "{{name}} şu an yanıt veremiyor: planın bilgisayarındaki programın güncellenmesi gerekiyor.",
       "plan_tools": "{{name}} yanıt vermeden durdu: o bilgisayardaki planın yapay zekâsı kendi araçlarını sunuyor.",
       "useKey": "API anahtarı kullan"
@@ -3928,6 +3928,7 @@
         "account": "Hesap",
         "accountWho": "Yalnızca {{name}} sorumlusu {{owner}} hesapları: bir plan yalnızca sahibinin ajanları için düşünür.",
         "accountSignedOut": "Oturum kapandı, yeniden giriş yapın",
+        "accountUnknown": "Giriş doğrulanmadı, yakında yeniden kontrol edilecek",
         "thisComputer": "{{computer}} hesabı",
         "accountMove": "{{agents}} kullanıyor · Buraya taşı",
         "accountAlso": "{{agents}} da kullanıyor",
@@ -7636,6 +7637,8 @@
       "signedOutFor_one": "{{agents}} oturumu kapalı.",
       "signedOutFor_other": "{{agents}} oturumu kapalı.",
       "keyRefused": "Anahtar reddedildi: yenisiyle değiştirin.",
+      "statusUnknown": "Bilgisayar bu sefer girişi doğrulayamadı. Kendiliğinden yeniden kontrol edecek.",
+      "identityUnknown": "hesap belirlenemedi",
       "rename": "Yeniden adlandır",
       "signInAgain": "Yeniden giriş yap",
       "newKey": "Anahtarı değiştir",
@@ -7681,6 +7684,8 @@
       "limited": "Sınırda",
       "limitedUntil": "Sınırda · bitiş: {{when}}",
       "updated": "Güncellendi: {{ago}}",
+      "ago": "güncellendi: {{ago}}",
+      "stale": "eski veriler, güncellendi: {{ago}}",
       "notShared": "{{maker}} kullanımı burada paylaşmıyor.",
       "offer": {
         "use": "{{label}} kullan (%{{pct}})",

@@ -1,6 +1,6 @@
 import type { AccountLoginStart, AccountLoginStatus, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAccountLogin, useAiAccounts, useApi } from "@agenteschat/client";
-import { accountTitle, reusableAccount } from "@agenteschat/client/lib/ai-accounts";
+import { accountTitle, reusableAccount, signInOf } from "@agenteschat/client/lib/ai-accounts";
 import {
   beginLogin,
   freeDuplicate,
@@ -119,7 +119,7 @@ export function AddAccount(props: AddAccountProps) {
     setReuse(found ?? null);
   }, [reuse, offers, ai.isPending, ai.data, props.machineId, props.kind, props.provider]);
   if (reuse === undefined) return <Icon name="spinner" size={14} />;
-  const chosen = reuse ? (pick ?? (reuse.status === "signed_out" ? "again" : undefined)) : "new";
+  const chosen = reuse ? (pick ?? (signInOf(reuse) === "signed_out" ? "again" : undefined)) : "new";
   const label = reuse ? accountTitle(reuse) : "";
   const another = (
     <Button size="sm" onClick={() => setPick("new")}>

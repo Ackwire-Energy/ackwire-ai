@@ -13,9 +13,11 @@ import {
   accountTitle,
   agentsToGive,
   endsOnClaude,
+  identityUnknown,
   onSeveralComputers,
   ownSignIns,
   ownSignInTitle,
+  signInOf,
 } from "@agenteschat/client/lib/ai-accounts";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -163,7 +165,7 @@ export function AiAccountsScreen() {
     );
   const actions = (a: Account) => {
     const plan = planOf(a.provider);
-    const out = a.status === "signed_out";
+    const out = signInOf(a) === "signed_out";
     const toGive = meId
       ? agentsToGive({
           account: a,
@@ -243,9 +245,15 @@ export function AiAccountsScreen() {
           <Card>
             {rows.map((a) => {
               const plan = planOf(a.provider);
-              const out = a.status === "signed_out";
+              const out = signInOf(a) === "signed_out";
+              const unknown = signInOf(a) === "unknown";
               const facts = [
-                a.email ?? (a.keyHint ? t("aiAccounts.page.keyEnds", { hint: a.keyHint }) : null),
+                a.email ??
+                  (a.keyHint
+                    ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
+                    : identityUnknown(a, machineOf(a))
+                      ? t("aiAccounts.page.identityUnknown")
+                      : null),
                 several ? t("aiAccounts.page.on", { computer: a.computer }) : null,
                 a.usedBy.length > 0
                   ? t("aiAccounts.page.usedBy", { count: a.usedBy.length, agents: names(a.usedBy) })
@@ -260,13 +268,14 @@ export function AiAccountsScreen() {
                   chevron
                   onPress={() => actions(a)}
                   below={
-                    out || a.usage || (plan && !plan.usage) ? (
+                    out || unknown || a.usage || (plan && !plan.usage) ? (
                       <View style={styles.below}>
                         {out ? (
                           <Note icon="x">
                             {plan ? t("aiAccounts.page.keyRefused") : t("aiAccounts.page.signedOut")}
                           </Note>
                         ) : null}
+                        {unknown ? <Note icon="info">{t("aiAccounts.page.statusUnknown")}</Note> : null}
                         {a.usage ? (
                           <PlanMeter usage={a.usage} compact />
                         ) : plan && !plan.usage ? (

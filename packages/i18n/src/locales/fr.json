@@ -2091,7 +2091,7 @@
     "rightHand": {
       "computer_away": "{{name}} ne peut pas répondre maintenant : l'ordinateur de l'abonnement n'est pas disponible.",
       "plan_limit": "{{name}} ne peut pas répondre maintenant : l'abonnement a atteint sa limite.",
-      "plan_not_shared": "{{name}} réfléchit avec un abonnement qui ne répond qu'à son titulaire.",
+      "plan_not_shared": "{{name}} réfléchit avec un abonnement qui ne répond qu'à son titulaire. Le titulaire de l'abonnement peut activer Répond aux autres personnes.",
       "runner_outdated": "{{name}} ne peut pas répondre pour l'instant : le programme sur l'ordinateur de l'abonnement doit être mis à jour.",
       "plan_tools": "{{name}} s'est arrêté avant de répondre : l'IA de l'abonnement sur cet ordinateur propose ses propres outils.",
       "useKey": "Utiliser une clé API"
@@ -4080,6 +4080,7 @@
         "account": "Compte",
         "accountWho": "Seulement les comptes de {{owner}}, responsable de {{name}} : un plan ne pense que pour les agents de son propriétaire.",
         "accountSignedOut": "Déconnecté, reconnectez-vous",
+        "accountUnknown": "Connexion non confirmée, vérifiée de nouveau bientôt",
         "thisComputer": "Compte de {{computer}}",
         "accountMove": "Utilisé par {{agents}} · Le déplacer ici",
         "accountAlso": "Aussi utilisé par {{agents}}",
@@ -7996,6 +7997,8 @@
       "signedOutFor_many": "{{agents}} sont déconnectés.",
       "signedOutFor_other": "{{agents}} sont déconnectés.",
       "keyRefused": "La clé a été refusée : remplacez-la par une nouvelle.",
+      "statusUnknown": "L'ordinateur n'a pas pu confirmer la connexion cette fois. Il vérifie de nouveau tout seul.",
+      "identityUnknown": "compte non identifié",
       "rename": "Renommer",
       "signInAgain": "Se reconnecter",
       "newKey": "Remplacer la clé",
@@ -8045,6 +8048,8 @@
       "limited": "Limite atteinte",
       "limitedUntil": "Limite atteinte jusqu'à {{when}}",
       "updated": "Mis à jour {{ago}}",
+      "ago": "mis à jour {{ago}}",
+      "stale": "chiffres anciens, mis à jour {{ago}}",
       "notShared": "{{maker}} ne partage pas l'utilisation ici.",
       "offer": {
         "use": "Utiliser {{label}} ({{pct}} %)",

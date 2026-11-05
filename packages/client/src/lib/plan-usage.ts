@@ -87,6 +87,8 @@ export function planMeterText(
   almost: string;
   limited(until: string | null): string;
   updated(iso: string): string;
+  ago(iso: string): string;
+  stale(iso: string): string;
 } {
   const named = (w: Pick<MeterWindow, "kind" | "label">, words: "window" | "short") => {
     const kind = WINDOW_NAMES.find((k) => k === w.kind);
@@ -106,6 +108,8 @@ export function planMeterText(
       return t("aiAccounts.usage.limitedUntil", { when: day ? `${day} ${time}` : time });
     },
     updated: (iso) => t("aiAccounts.usage.updated", { ago: relativeTime(t, locale, iso, now) }),
+    ago: (iso) => t("aiAccounts.usage.ago", { ago: relativeTime(t, locale, iso, now) }),
+    stale: (iso) => t("aiAccounts.usage.stale", { ago: relativeTime(t, locale, iso, now) }),
   };
 }
 

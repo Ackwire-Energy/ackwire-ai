@@ -1939,7 +1939,7 @@
     "rightHand": {
       "computer_away": "{{name}} 现在无法回答：套餐所在的电脑不可用。",
       "plan_limit": "{{name}} 现在无法回答：套餐已达到上限。",
-      "plan_not_shared": "{{name}} 用的套餐只回复它的所有者。",
+      "plan_not_shared": "{{name}} 用的套餐只回复它的所有者。套餐的所有者可以打开“回复其他成员”。",
       "runner_outdated": "{{name}} 现在无法回复：套餐所在电脑上的程序需要更新。",
       "plan_tools": "{{name}} 在回复前停下了：那台电脑上套餐的 AI 提供了它自己的工具。",
       "useKey": "使用 API 密钥"
@@ -3823,6 +3823,7 @@
         "account": "账号",
         "accountWho": "只有 {{name}} 的负责人 {{owner}} 的账号：套餐只为其所有者的智能体思考。",
         "accountSignedOut": "已退出登录，请重新登录",
+        "accountUnknown": "登录未确认，稍后会再次检查",
         "thisComputer": "{{computer}} 的账号",
         "accountMove": "{{agents}} 正在使用 · 移到这里",
         "accountAlso": "{{agents}} 也在使用",
@@ -7422,6 +7423,8 @@
       "signedOut": "已退出登录。请重新登录，让你的智能体可以使用它。",
       "signedOutFor_other": "{{agents}} 已退出登录。",
       "keyRefused": "密钥被拒绝：请换一个新的。",
+      "statusUnknown": "这次电脑没能确认登录状态。它会自动再检查一次。",
+      "identityUnknown": "未识别的账号",
       "rename": "重命名",
       "signInAgain": "重新登录",
       "newKey": "更换密钥",
@@ -7465,6 +7468,8 @@
       "limited": "已达限额",
       "limitedUntil": "已达限额，直到 {{when}}",
       "updated": "{{ago}}更新",
+      "ago": "{{ago}}更新",
+      "stale": "数据较旧，{{ago}}更新",
       "notShared": "{{maker}} 不在这里提供用量数据。",
       "offer": {
         "use": "使用 {{label}}（{{pct}}%）",

@@ -728,6 +728,10 @@ export const MachineAccount = z
       description:
         "It thinks for every agent its owner gives it on that computer, with no new sign-in (runner protocol 29); else for one.",
     }),
+    providerOrgId: z.string().nullable().openapi({
+      description:
+        "Claude's organization it is signed in to (opaque, runner protocol 46); only for its owner. Logins of one email in two organizations are two accounts.",
+    }),
   })
   .openapi("MachineAccount", {
     description:

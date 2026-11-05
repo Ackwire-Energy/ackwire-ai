@@ -2164,7 +2164,7 @@
     "rightHand": {
       "computer_away": "{{name}} nie może teraz odpowiedzieć: komputer planu jest niedostępny.",
       "plan_limit": "{{name}} nie może teraz odpowiedzieć: plan osiągnął limit.",
-      "plan_not_shared": "{{name}} myśli z planem, który odpowiada tylko swojemu właścicielowi.",
+      "plan_not_shared": "{{name}} myśli z planem, który odpowiada tylko swojemu właścicielowi. Właściciel planu może włączyć Odpowiada innym osobom.",
       "runner_outdated": "{{name}} nie może teraz odpowiedzieć: program na komputerze planu wymaga aktualizacji.",
       "plan_tools": "{{name}} zatrzymał się przed odpowiedzią: AI planu na tym komputerze oferuje własne narzędzia.",
       "useKey": "Użyj klucza API"
@@ -4222,6 +4222,7 @@
         "account": "Konto",
         "accountWho": "Tylko konta {{owner}}, osoby odpowiedzialnej za {{name}}: plan myśli tylko dla agentów swojego właściciela.",
         "accountSignedOut": "Wylogowano, zaloguj się ponownie",
+        "accountUnknown": "Logowanie niepotwierdzone, wkrótce sprawdzimy ponownie",
         "thisComputer": "Konto komputera {{computer}}",
         "accountMove": "Używane przez: {{agents}} · Przenieś tutaj",
         "accountAlso": "Używane też przez: {{agents}}",
@@ -8270,6 +8271,8 @@
       "signedOutFor_many": "{{agents}} są wylogowani.",
       "signedOutFor_other": "{{agents}} są wylogowani.",
       "keyRefused": "Klucz został odrzucony: zastąp go nowym.",
+      "statusUnknown": "Komputer nie zdołał tym razem potwierdzić logowania. Sprawdzi je ponownie sam.",
+      "identityUnknown": "konto nierozpoznane",
       "rename": "Zmień nazwę",
       "signInAgain": "Zaloguj się ponownie",
       "newKey": "Zastąp klucz",
@@ -8322,6 +8325,8 @@
       "limited": "Limit osiągnięty",
       "limitedUntil": "Limit osiągnięty do {{when}}",
       "updated": "Zaktualizowano {{ago}}",
+      "ago": "zaktualizowano {{ago}}",
+      "stale": "stare dane, zaktualizowano {{ago}}",
       "notShared": "{{maker}} nie udostępnia tutaj danych o użyciu.",
       "offer": {
         "use": "Użyj {{label}} ({{pct}}%)",

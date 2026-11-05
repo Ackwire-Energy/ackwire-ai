@@ -89,8 +89,9 @@ export function Meter({
  * bars are ink until a window nears its limit (`planLevel`, `PLAN_TONE`): amber from 80%, red from 90% and at the
  * limit, each window by its own level and the words above by the plan's.
  * `compact` (an agent's month, Contas de IA, Você): one line with the tightest windows ("semana 40% · 5h 12%",
- * after `label`), one bar for the fullest, and only near the limit when it renews; nothing while no window is known,
- * unless the plan already refused a request ("No limite").
+ * after `label`), one bar for the fullest, only near the limit when it renews, then how old the numbers are from 10
+ * minutes (out of date past 6 hours); nothing while no window is known, unless the plan already refused a request
+ * ("No limite").
  */
 export function PlanMeter({
   usage,
@@ -111,7 +112,7 @@ export function PlanMeter({
   if (compact) {
     const shown = planLine(usage, text, now);
     if (!shown) return null;
-    const line = [label, shown.line].filter(Boolean).join(" · ");
+    const line = [label, shown.line, shown.age].filter(Boolean).join(" · ");
     const tone = c[PLAN_TONE[planLevel(shown.top?.used ?? 0, shown.state === "limited")]];
     return (
       <View style={styles.meterCompact}>

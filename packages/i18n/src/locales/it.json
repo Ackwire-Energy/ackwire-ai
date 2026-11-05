@@ -2093,7 +2093,7 @@
     "rightHand": {
       "computer_away": "{{name}} non può rispondere ora: il computer del piano non è disponibile.",
       "plan_limit": "{{name}} non può rispondere ora: il piano ha raggiunto il limite.",
-      "plan_not_shared": "{{name}} pensa con un piano che risponde solo al suo titolare.",
+      "plan_not_shared": "{{name}} pensa con un piano che risponde solo al suo titolare. Il titolare del piano può attivare Risponde ad altre persone.",
       "runner_outdated": "{{name}} non può rispondere ora: il programma sul computer del piano va aggiornato.",
       "plan_tools": "{{name}} si è fermato prima di rispondere: l'IA del piano su quel computer offre strumenti propri.",
       "useKey": "Usa una chiave API"
@@ -4082,6 +4082,7 @@
         "account": "Account",
         "accountWho": "Solo account di {{owner}}, responsabile di {{name}}: un piano pensa solo per gli agenti del suo proprietario.",
         "accountSignedOut": "Disconnesso, accedi di nuovo",
+        "accountUnknown": "Accesso non confermato, ricontrollato a breve",
         "thisComputer": "Account di {{computer}}",
         "accountMove": "In uso da {{agents}} · Spostalo qui",
         "accountAlso": "Usato anche da {{agents}}",
@@ -8013,6 +8014,8 @@
       "signedOutFor_many": "{{agents}} sono disconnessi.",
       "signedOutFor_other": "{{agents}} sono disconnessi.",
       "keyRefused": "La chiave è stata rifiutata: sostituiscila con una nuova.",
+      "statusUnknown": "Il computer non è riuscito a confermare l'accesso questa volta. Lo ricontrolla da solo.",
+      "identityUnknown": "account non identificato",
       "rename": "Rinomina",
       "signInAgain": "Accedi di nuovo",
       "newKey": "Sostituisci la chiave",
@@ -8062,6 +8065,8 @@
       "limited": "Al limite",
       "limitedUntil": "Al limite fino a {{when}}",
       "updated": "Aggiornato {{ago}}",
+      "ago": "aggiornato {{ago}}",
+      "stale": "dati vecchi, aggiornati {{ago}}",
       "notShared": "{{maker}} non condivide qui l'utilizzo.",
       "offer": {
         "use": "Usa {{label}} ({{pct}}%)",

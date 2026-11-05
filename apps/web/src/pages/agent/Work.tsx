@@ -52,6 +52,7 @@ import {
   ownSignInName,
   ownSignInReady,
   ownSignInTitle,
+  signInOf,
   signInPlan,
 } from "@agenteschat/client/lib/ai-accounts";
 import { EVERYONE_AUDIENCE, setupPlanOpens, setupPlanQuestion } from "@agenteschat/client/lib/audience";
@@ -861,7 +862,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const limited = usage ? planState(usage).state === "limited" : false;
   const offers = limited && accountKind ? limitOffers(accounts, accountKind, account).slice(0, 2) : [];
   // Signing in to it again is its owner's.
-  const signedOut = current?.status === "signed_out" && current.mine;
+  const signedOut = current != null && signInOf(current) === "signed_out" && current.mine;
+  const unknown = current != null && signInOf(current) === "unknown";
   const accountChanged = accountsOn && account !== view.account;
   // A login made for one agent thinks for one: picking another agent's takes it from that one ("Mover para cá"). One
   // made for all of its owner's agents there thinks for this one too.
@@ -1200,13 +1202,15 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const lends = view.canUseOthersPlans === true && accounts.some((a) => !a.mine && a.ownerId !== agent.ownerUserId);
   const accountNote = signedOut
     ? t(isPlanId(card) ? "aiAccounts.page.keyRefused" : "agentPage.work.brain.accountSignedOut")
-    : lends
-      ? t("agentPage.work.brain.accountOthers")
-      : !view.canUsePlans && ownerFirst
-        ? t("agentPage.work.brain.accountWho", { ...g, owner: ownerFirst })
-        : lockedHere
-          ? t("connectAi.accountsLocked", { name: pairer ?? "", computer: computerName })
-          : null;
+    : unknown
+      ? t("aiAccounts.page.statusUnknown")
+      : lends
+        ? t("agentPage.work.brain.accountOthers")
+        : !view.canUsePlans && ownerFirst
+          ? t("agentPage.work.brain.accountWho", { ...g, owner: ownerFirst })
+          : lockedHere
+            ? t("connectAi.accountsLocked", { name: pairer ?? "", computer: computerName })
+            : null;
   const accountField = accountsOn && accountKind && (
     <BrainField label={t("agentPage.work.brain.account")}>
       {/* The account and its plan's usage in one outline: the meters hang under its picker, they are that account's. */}
@@ -1234,7 +1238,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         </div>
       )}
       {accountNote && (
-        <SettingNote icon={signedOut ? "alert" : view.canUsePlans && !lends ? "lock" : "info"}>
+        <SettingNote icon={signedOut ? "alert" : !unknown && view.canUsePlans && !lends ? "lock" : "info"}>
           {accountNote}
         </SettingNote>
       )}

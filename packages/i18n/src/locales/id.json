@@ -1946,7 +1946,7 @@
     "rightHand": {
       "computer_away": "{{name}} tidak bisa menjawab sekarang: komputer paketnya sedang tidak tersedia.",
       "plan_limit": "{{name}} tidak bisa menjawab sekarang: paketnya sudah mencapai batas.",
-      "plan_not_shared": "{{name}} berpikir dengan paket yang hanya menjawab pemiliknya.",
+      "plan_not_shared": "{{name}} berpikir dengan paket yang hanya menjawab pemiliknya. Pemilik paket bisa menyalakan Menjawab orang lain.",
       "runner_outdated": "{{name}} belum bisa menjawab sekarang: program di komputer paket perlu diperbarui.",
       "plan_tools": "{{name}} berhenti sebelum menjawab: AI paket di komputer itu menawarkan alatnya sendiri.",
       "useKey": "Pakai kunci API"
@@ -3815,6 +3815,7 @@
         "account": "Akun",
         "accountWho": "Hanya akun {{owner}}, penanggung jawab {{name}}: paket hanya berpikir untuk agen milik pemiliknya.",
         "accountSignedOut": "Keluar, masuk lagi",
+        "accountUnknown": "Login belum dipastikan, segera dicek lagi",
         "thisComputer": "Akun {{computer}}",
         "accountMove": "Dipakai oleh {{agents}} · Pindahkan ke sini",
         "accountAlso": "Juga dipakai oleh {{agents}}",
@@ -7415,6 +7416,8 @@
       "signedOut": "Sudah keluar. Masuk lagi agar agenmu bisa memakainya.",
       "signedOutFor_other": "{{agents}} sudah keluar.",
       "keyRefused": "Kunci ditolak: ganti dengan yang baru.",
+      "statusUnknown": "Komputer tidak bisa memastikan login kali ini. Komputer akan mengeceknya lagi sendiri.",
+      "identityUnknown": "akun tidak dikenali",
       "rename": "Ganti nama",
       "signInAgain": "Masuk lagi",
       "newKey": "Ganti kunci",
@@ -7457,6 +7460,8 @@
       "limited": "Mencapai batas",
       "limitedUntil": "Mencapai batas sampai {{when}}",
       "updated": "Diperbarui {{ago}}",
+      "ago": "diperbarui {{ago}}",
+      "stale": "angka lama, diperbarui {{ago}}",
       "notShared": "{{maker}} tidak membagikan pemakaian di sini.",
       "offer": {
         "use": "Pakai {{label}} ({{pct}}%)",

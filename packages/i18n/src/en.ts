@@ -2013,7 +2013,8 @@ export const en = {
     rightHand: {
       computer_away: "{{name}} can't answer now: the computer the plan is signed in on is away.",
       plan_limit: "{{name}} can't answer now: the plan reached its limit.",
-      plan_not_shared: "{{name}} thinks with a plan that answers only its owner.",
+      plan_not_shared:
+        "{{name}} thinks with a plan that answers only its owner. The plan's owner can turn on Answers other people.",
       runner_outdated: "{{name}} can't answer now: the program on the plan's computer needs an update.",
       plan_tools: "{{name}} stopped before answering: the plan's AI on that computer offers tools of its own.",
       useKey: "Use an API key",
@@ -3950,6 +3951,8 @@ export const en = {
         accountWho:
           "Only accounts of {{owner}}, who is responsible for {{name}}: a plan thinks only for its owner's agents.",
         accountSignedOut: "Signed out, sign in again",
+        /** The computer's last look at the sign-in said nothing for sure, and the last it knew was signed out. */
+        accountUnknown: "Sign-in not confirmed, checked again soon",
         thisComputer: "{{computer}}'s account",
         accountMove: "In use by {{agents}} · Move it here",
         accountAlso: "Also used by {{agents}}",
@@ -7498,6 +7501,9 @@ export const en = {
       signedOutFor_one: "{{agents}} is signed out.",
       signedOutFor_other: "{{agents}} are signed out.",
       keyRefused: "The key was refused: replace it with a new one.",
+      statusUnknown: "The computer couldn't confirm the sign-in this time. It checks again on its own.",
+      /** Where an account's email would be: a Claude token made for all agents doesn't say which account it is. */
+      identityUnknown: "account not identified",
       rename: "Rename",
       signInAgain: "Sign in again",
       newKey: "Replace the key",
@@ -7544,6 +7550,10 @@ export const en = {
       limited: "At the limit",
       limitedUntil: "At the limit until {{when}}",
       updated: "Updated {{ago}}",
+      /** Mid-line, after the windows: "week 40% · 5h 12% · updated 51 min ago". */
+      ago: "updated {{ago}}",
+      /** The same once the numbers are over 6 hours old. */
+      stale: "old numbers, updated {{ago}}",
       notShared: "{{maker}} doesn't share usage here.",
       offer: {
         use: "Use {{label}} ({{pct}}%)",

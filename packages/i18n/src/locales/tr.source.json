@@ -4300,7 +4300,7 @@
     "value": "{{name}} can't answer now: the plan reached its limit."
   },
   "noAi.rightHand.plan_not_shared": {
-    "value": "{{name}} thinks with a plan that answers only its owner."
+    "value": "{{name}} thinks with a plan that answers only its owner. The plan's owner can turn on Answers other people."
   },
   "noAi.rightHand.runner_outdated": {
     "value": "{{name}} can't answer now: the program on the plan's computer needs an update."
@@ -8893,6 +8893,9 @@
   },
   "agentPage.work.brain.accountSignedOut": {
     "value": "Signed out, sign in again"
+  },
+  "agentPage.work.brain.accountUnknown": {
+    "value": "Sign-in not confirmed, checked again soon"
   },
   "agentPage.work.brain.thisComputer": {
     "value": "{{computer}}'s account"
@@ -17888,6 +17891,12 @@
   "aiAccounts.page.keyRefused": {
     "value": "The key was refused: replace it with a new one."
   },
+  "aiAccounts.page.statusUnknown": {
+    "value": "The computer couldn't confirm the sign-in this time. It checks again on its own."
+  },
+  "aiAccounts.page.identityUnknown": {
+    "value": "account not identified"
+  },
   "aiAccounts.page.rename": {
     "value": "Rename"
   },
@@ -18004,6 +18013,12 @@
   },
   "aiAccounts.usage.updated": {
     "value": "Updated {{ago}}"
+  },
+  "aiAccounts.usage.ago": {
+    "value": "updated {{ago}}"
+  },
+  "aiAccounts.usage.stale": {
+    "value": "old numbers, updated {{ago}}"
   },
   "aiAccounts.usage.notShared": {
     "value": "{{maker}} doesn't share usage here."
