@@ -417,8 +417,8 @@ export function AuthFlow({
             <Pressable
               onPress={() => setEmail(fix)}
               accessibilityRole="button"
-              hitSlop={6}
-              style={{ alignSelf: "center" }}
+              hitSlop={12}
+              style={({ pressed }) => ({ alignSelf: "center", opacity: pressed ? 0.6 : 1 })}
             >
               <Text variant="subhead" style={{ fontWeight: "600" }}>
                 {t("auth.flow.didYouMean", { email: fix })}
@@ -541,12 +541,17 @@ function Who({ email, onChange }: { email: string; onChange?: () => void }) {
         boxShadow: shadows.e1,
       }}
     >
-      <Icon name="mail" size={16} color={colors.muted} />
+      <Icon name="mail" size={15} color={colors.muted} />
       <Text variant="subhead" numberOfLines={1} style={{ flexShrink: 1 }}>
         {email}
       </Text>
       {onChange ? (
-        <Pressable onPress={onChange} accessibilityRole="button" hitSlop={8} style={{ paddingHorizontal: 8 }}>
+        <Pressable
+          onPress={onChange}
+          accessibilityRole="button"
+          hitSlop={12}
+          style={({ pressed }) => ({ paddingHorizontal: 8, opacity: pressed ? 0.6 : 1 })}
+        >
           <Text variant="subhead" style={{ fontWeight: "600" }}>
             {t("auth.flow.change")}
           </Text>

@@ -33,7 +33,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, fieldText, Icon, Sheet, Text } from "@/ui";
+import { AgentAvatar, Button, fieldText, Icon, LineIcon, Sheet, Text } from "@/ui";
 import { fullLook } from "../agents/edit";
 import { openConnectAi } from "../ai/NoAiCard";
 import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
@@ -94,7 +94,7 @@ export function AnswerChips({
                 { backgroundColor: on ? c.ink : pressed ? c.sunken : c.raised, borderColor: c.line2 },
               ]}
             >
-              {on ? <Icon name="check" size={14} color={c.bg} /> : null}
+              {on ? <Icon name="check" size={15} color={c.bg} /> : null}
               <Text variant="small" style={on ? { color: c.bg } : undefined}>
                 {choice}
               </Text>
@@ -147,7 +147,10 @@ export function ReplyChips({ message: m }: { message: Message }) {
   );
 }
 
-/** The team: a row per agent, its routines, its skills and what waits for approval. */
+/**
+ * The team: a row per agent, its routines, its skills and what waits for approval. Flat on the card that holds it
+ * (rows divided by hairlines, icons on the first line), never a plate or a box in a card.
+ */
 function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgentDraft) => void }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
@@ -155,42 +158,38 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
   const lodi = dir.agents.find(isRightHand);
   return (
     <View style={styles.rows}>
-      {plan.agents.map((a) => (
-        <View key={a.handle} style={[styles.agent, { backgroundColor: c.sunken }]}>
-          <View style={styles.agentHead}>
-            <AgentAvatar agent={fullLook(a.appearance)} size={32} name={a.name} live={false} />
-            <View style={styles.fill}>
-              <Text variant="body" style={styles.bold}>
-                {a.name}{" "}
-                <Text variant="small" tone="muted">
-                  {a.role}
-                </Text>
+      {plan.agents.map((a, i) => (
+        <View key={a.handle} style={[styles.agentHead, i > 0 && [styles.divided, { borderTopColor: c.line2 }]]}>
+          <AgentAvatar agent={fullLook(a.appearance)} size={32} name={a.name} live={false} />
+          <View style={styles.fill}>
+            <Text variant="body" style={styles.bold}>
+              {a.name}{" "}
+              <Text variant="small" tone="muted">
+                {a.role}
               </Text>
-              <Text variant="small" tone="ink2">
-                {a.line}
+            </Text>
+            <Text variant="small" tone="ink2">
+              {a.line}
+            </Text>
+            {/* Its channel under its words, "new" on its line; "Adjust" at the right. */}
+            <View style={styles.agentFoot}>
+              <Text variant="footnote" tone="muted" style={styles.fill}>
+                #{a.channel}
+                {plan.newChannels.includes(a.channel) ? (
+                  <Text variant="footnote" style={[styles.bold, { color: c.info }]}>
+                    {` ${t("teamPlan.card.new")}`}
+                  </Text>
+                ) : null}
               </Text>
-            </View>
-          </View>
-          <View style={styles.agentFoot}>
-            <View style={[styles.pill, { backgroundColor: c.raised }]}>
-              <Icon name="hash" size={12} color={c.muted} />
-              <Text variant="caption" numberOfLines={1} style={styles.shrink}>
-                {a.channel}
-              </Text>
-              {plan.newChannels.includes(a.channel) ? (
-                <Text variant="caption" style={[styles.bold, { color: c.info }]}>
-                  {t("teamPlan.card.new")}
-                </Text>
+              {onAdjust ? (
+                <Button
+                  variant="text"
+                  size="sm"
+                  label={t("teamPlan.card.adjustName", { name: a.name })}
+                  onPress={() => onAdjust(a)}
+                />
               ) : null}
             </View>
-            {onAdjust ? (
-              <Button
-                variant="text"
-                size="sm"
-                label={t("teamPlan.card.adjustName", { name: a.name })}
-                onPress={() => onAdjust(a)}
-              />
-            ) : null}
           </View>
         </View>
       ))}
@@ -201,7 +200,7 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
           </Text>
           {teamRoutines(plan).map(({ agent, routine }) => (
             <View key={`${agent?.handle ?? "weekly"}-${routine.name}`} style={styles.line}>
-              <Icon name="clock" size={14} color={c.muted} />
+              <LineIcon name="clock" size={15} color={c.muted} variant="small" />
               <Text variant="small" style={styles.fill}>
                 <Text variant="small" style={styles.bold}>
                   {proposedRoutineWhen(t, i18n.language, routine)}
@@ -222,7 +221,7 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
           </Text>
           {plan.skills.map((s) => (
             <View key={s.name} style={styles.line}>
-              <Icon name="doc" size={14} color={c.muted} />
+              <LineIcon name="doc" size={15} color={c.muted} variant="small" />
               <Text variant="small" style={styles.fill}>
                 <Text variant="small" style={styles.bold}>
                   {s.title}
@@ -234,8 +233,8 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
         </View>
       ) : null}
       {plan.approvals ? (
-        <View style={[styles.note, { backgroundColor: c.sunken }]}>
-          <Icon name="shield" size={14} color={c.muted} />
+        <View style={[styles.line, styles.note]}>
+          <LineIcon name="shield" size={15} color={c.muted} variant="small" />
           <Text variant="small" style={styles.fill}>
             {plan.approvals}
           </Text>
@@ -300,13 +299,10 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
             </>
           }
           foot={
-            <AskFoot
-              expiry={
-                <Text variant="caption" tone="muted">
-                  {countsText(t, plan)}
-                </Text>
-              }
-            >
+            <AskFoot>
+              <Text variant="caption" tone="muted">
+                {countsText(t, plan)}
+              </Text>
               {decides ? (
                 <Button
                   variant="primary"
@@ -375,7 +371,6 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
         <AskDone
           done
           words={`${by ? t("teamPlan.card.created", { name: by }) : t("teamPlan.card.createdYou")}: ${names}`}
-          at={card.decidedAt}
           more={
             undoable
               ? {
@@ -414,7 +409,6 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
               ? "teamPlan.card.dismissed"
               : "approval.expired",
       )}: ${names}`}
-      at={card.undoneAt ?? card.decidedAt}
     />
   );
 }
@@ -439,25 +433,25 @@ function FirstTasks({ message: m, card }: { message: Message; card: TeamProposal
       lead={t("teamPlan.firstTask.lead")}
       body={
         <View style={styles.rows}>
-          {tasks.map((f) => (
-            <View key={f.agentId} style={[styles.agent, { backgroundColor: c.sunken }]}>
-              <View style={styles.agentHead}>
-                <AgentAvatar agent={fullLook(f.appearance)} size={32} name={f.name} live={false} />
-                <View style={styles.fill}>
-                  <Text variant="body" style={styles.bold}>
-                    {f.name}
-                  </Text>
-                  <Text variant="small" tone="ink2">
-                    {f.task}
-                  </Text>
+          {tasks.map((f, i) => (
+            <View key={f.agentId} style={[styles.agentHead, i > 0 && [styles.divided, { borderTopColor: c.line2 }]]}>
+              <AgentAvatar agent={fullLook(f.appearance)} size={32} name={f.name} live={false} />
+              <View style={styles.fill}>
+                <Text variant="body" style={styles.bold}>
+                  {f.name}
+                </Text>
+                <Text variant="small" tone="ink2">
+                  {f.task}
+                </Text>
+                <View style={styles.agentFoot}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    label={t("teamPlan.firstTask.open")}
+                    onPress={() => void openDm({ agentId: f.agentId }, { compose: true, text: f.task })}
+                  />
                 </View>
               </View>
-              <Button
-                variant="secondary"
-                size="sm"
-                label={t("teamPlan.firstTask.open")}
-                onPress={() => void openDm({ agentId: f.agentId }, { compose: true, text: f.task })}
-              />
             </View>
           ))}
         </View>
@@ -607,15 +601,16 @@ export function TeamMapSheet({ plan, open, onClose }: { plan: TeamPlan; open: bo
         {teamColumns(plan).map((col) => (
           <View key={col.channel} style={[styles.mapCol, { borderColor: c.line2 }]}>
             <View style={styles.line}>
-              <Icon name="hash" size={14} color={c.muted} />
-              <Text variant="body" style={[styles.bold, styles.shrink]}>
+              <LineIcon name="hash" size={17} color={c.muted} />
+              {/* "Novo" inside the name's line, on its baseline. */}
+              <Text variant="body" style={[styles.bold, styles.fill]}>
                 {col.channel}
+                {col.fresh ? (
+                  <Text variant="caption" style={[styles.bold, { color: c.info }]}>
+                    {` ${t("teamPlan.card.new")}`}
+                  </Text>
+                ) : null}
               </Text>
-              {col.fresh ? (
-                <Text variant="caption" style={[styles.bold, { color: c.info }]}>
-                  {t("teamPlan.card.new")}
-                </Text>
-              ) : null}
             </View>
             {col.agents.map((a) => (
               <View key={a.handle} style={styles.agentHead}>
@@ -733,7 +728,10 @@ export function TeamTemplatesSheet({
             <Pressable
               accessibilityRole="button"
               onPress={onNone}
-              style={[styles.template, { borderColor: c.line2, backgroundColor: c.raised }]}
+              style={({ pressed }) => [
+                styles.template,
+                { borderColor: c.line2, backgroundColor: pressed ? c.sunken : c.raised },
+              ]}
             >
               <View style={styles.faces}>
                 <Icon name="pen" size={16} color={c.muted} />
@@ -755,7 +753,6 @@ export function TeamTemplatesSheet({
 }
 
 const styles = StyleSheet.create({
-  shrink: { flexShrink: 1 },
   chips: { gap: 8, marginTop: 6 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chipFoot: { flexDirection: "row", alignItems: "center", gap: 12 },
@@ -765,33 +762,26 @@ const styles = StyleSheet.create({
     gap: 6,
     minHeight: 36,
     paddingHorizontal: 14,
-    borderRadius: 12,
-    borderBottomLeftRadius: 4,
+    borderRadius: 10,
+    borderBottomLeftRadius: 3,
     borderWidth: StyleSheet.hairlineWidth,
   },
   rows: { gap: 8 },
-  agent: { borderRadius: 12, padding: 10, gap: 8 },
   agentHead: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  agentFoot: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  pill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 999,
-    // A long channel name ends in an ellipsis inside the pill, leaving room for "Adjust" beside it.
-    flexShrink: 1,
-  },
+  // 12 above the hairline (with the rows' gap) and 12 under it.
+  divided: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  // Under the agent's words, in their column.
+  agentFoot: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 4 },
   section: { gap: 6, marginTop: 4 },
-  line: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
-  note: { flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 10, borderRadius: 12 },
+  // An icon on the first line of its words, as the conversation's event lines.
+  line: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  note: { marginTop: 4 },
   fill: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   form: { gap: 12, padding: 16, paddingBottom: 32 },
   formRow: { gap: 4 },
-  field: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
-  mapCol: { gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderStyle: "dashed" },
+  field: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 },
+  mapCol: { gap: 8, padding: 12, borderRadius: 14, borderWidth: 1, borderStyle: "dashed" },
   template: {
     flexDirection: "row",
     alignItems: "center",

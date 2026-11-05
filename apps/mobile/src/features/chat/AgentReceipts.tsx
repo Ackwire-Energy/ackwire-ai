@@ -47,6 +47,7 @@ import {
   receiptShows,
 } from "./agent-receipts";
 import { requestComposerText } from "./composer-request";
+import { MSG_TEXT } from "./logic";
 
 /**
  * Under a person's latest message, for what asks something of you (./agent-receipts.ts says what): the agents'
@@ -140,7 +141,7 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
         accessibilityLabel={label}
         // A 20-point line: 12 above and below gives it the 44-point target.
         hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
-        style={styles.row}
+        style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       >
         {line.faces.length > 0 ? (
           <View style={styles.faces}>
@@ -243,18 +244,24 @@ export const ReceiptMark = memo(function ReceiptMark({
       entering={reduced ? undefined : FadeIn.duration(200)}
       accessibilityLiveRegion="polite"
     >
-      <Pressable onPress={say} accessibilityRole="button" accessibilityLabel={label} hitSlop={14} style={styles.mark}>
+      <Pressable
+        onPress={say}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        hitSlop={14}
+        style={({ pressed }) => [styles.mark, pressed && styles.pressed]}
+      >
         {view.kind === "seen" ? (
           <Face who={{ type: "person", id: view.personId }} size={16} live={false} />
         ) : view.kind === "steer" ? (
           view.state === "read" || view.state === "resolved" ? (
             <AgentFace agentId={view.agentId} size={16} live={false} framed={false} />
           ) : view.state === "now" ? (
-            <Icon name="bolt" size={14} color={tint} />
+            <Icon name="bolt" size={12} color={tint} />
           ) : view.state === "delivered" ? (
-            <Icon name="check" size={14} color={tint} />
+            <Icon name="check" size={12} color={tint} />
           ) : view.state === "held" ? (
-            <Icon name="pause" size={14} color={tint} />
+            <Icon name="pause" size={12} color={tint} />
           ) : (
             <InkOrbit size={10} color={tint} />
           )
@@ -271,7 +278,7 @@ export const ReceiptMark = memo(function ReceiptMark({
 
 function Mark({ mark, color }: { mark: ReceiptLine["mark"]; color: string }) {
   if (mark === "none") return null;
-  return <Icon name={mark} size={14} color={color} />;
+  return <Icon name={mark} size={12} color={color} />;
 }
 
 /** The web's icon for what a rule follows: the reply, the one person with the agent, the thread. */
@@ -378,14 +385,15 @@ function ReceiptsSheet({
 }
 
 const styles = StyleSheet.create({
-  // Right under the message, on its side: mine at the right edge (as "Visto"), anyone else's under the text
-  // (MessageRow: 14 + 34 avatar + 11 gap).
+  // Right under the message, on its side: mine at the right edge (as "Visto"), anyone else's under the text.
   line: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: -4, marginBottom: 4, minHeight: 20 },
   end: { alignSelf: "flex-end", paddingRight: 16, paddingLeft: 64 },
-  start: { alignSelf: "flex-start", paddingLeft: 59, paddingRight: 16 },
-  row: { flexDirection: "row", alignItems: "center", gap: 5, flexShrink: 1 },
+  start: { alignSelf: "flex-start", paddingLeft: MSG_TEXT, paddingRight: 16 },
+  row: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
   faces: { flexDirection: "row", alignItems: "center", gap: 2 },
   words: { flexShrink: 1 },
-  // A face (16) and a mark (14) at most: the time's line under my turn and a name line's end hold it.
+  // A face (16) and a mark (12, the caption's size) at most: the time's line under my turn and a name line's end
+  // hold it.
   mark: { flexDirection: "row", alignItems: "center", gap: 4, height: 16 },
+  pressed: { opacity: 0.6 },
 });

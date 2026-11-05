@@ -3,13 +3,14 @@ import * as Clipboard from "expo-clipboard";
 import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-router";
 import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { needsHeaderBlur } from "@/lib/nav";
 import {
   BarPressable,
   Button,
-  Card,
   coverBarOptions,
   fonts,
+  GroupedList,
   HeaderCapsule,
   HeaderSlot,
   type HeaderSlotStore,
@@ -41,7 +42,7 @@ export function Tile({ icon, size = 36, children }: { icon?: IconName; size?: nu
     <View
       style={[
         styles.tile,
-        { width: size, height: size, borderRadius: Math.round(size / 3), backgroundColor: c.sunken },
+        { width: size, height: size, borderRadius: Math.round(size * 0.3), backgroundColor: c.sunken },
       ]}
     >
       {children ?? (icon ? <Icon name={icon} size={Math.round(size / 2)} color={c.muted} /> : null)}
@@ -69,77 +70,99 @@ export interface ActionItem {
   onPress?: () => void;
 }
 
-/** The list of actions in a sheet: icon, label, a hint under it. */
+/**
+ * The list of actions in a sheet, a GroupedList (sheets sit on the grouped gray): an icon or a face in GroupedRow's
+ * 32 pt column, the label, a hint under it; the text and the hairline above start together at 58.
+ */
 export function ActionList({ items }: { items: ActionItem[] }) {
+  const c = useColors();
+  return (
+    <GroupedList>
+      {items.map((it) => (
+        <ActionRow
+          key={it.key}
+          item={it}
+          // `leading`, as a GroupedRow's: GroupedList starts the hairline after its column.
+          leading={
+            it.leading ?? (it.icon ? <Icon name={it.icon} size={20} color={it.danger ? c.danger : c.muted} /> : null)
+          }
+        />
+      ))}
+    </GroupedList>
+  );
+}
+
+/** One action, on a GroupedRow's numbers: 14 pt sides, the 32 pt leading column, 12 apart, 50 tall at least. */
+function ActionRow({ item: it, leading }: { item: ActionItem; leading: ReactNode }) {
   const c = useColors();
   const { fontScale } = useWindowDimensions();
   const line = textLineOf("body", fontScale);
+  // A hint that may wrap: the icon and what is on the right stay on the label's line, not the row's middle.
+  const tall = Boolean(it.hint) && !it.oneLine;
+  const onLine = (size: number) => (tall ? leadBox(line, size) : null);
+  const press = it.onPress;
   return (
-    <Card>
-      {items.map((it, i) => {
-        // A hint that may wrap: the icon and what is on the right stay on the label's line, not the row's middle.
-        const tall = Boolean(it.hint) && !it.oneLine;
-        const onLine = (size: number) => (tall ? leadBox(line, size) : null);
-        return (
-          <Pressable
-            key={it.key}
-            onPress={it.onPress}
-            disabled={it.disabled || !it.onPress}
-            accessibilityRole={it.checked === undefined ? "button" : "switch"}
-            {...(it.checked === undefined ? {} : { accessibilityState: { checked: it.checked } })}
-            accessibilityLabel={it.hint ? `${it.label}. ${it.hint}` : it.label}
-            style={({ pressed }) => [
-              styles.action,
-              tall && styles.actionTall,
-              i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
-              pressed && { backgroundColor: c.sunken },
-              it.disabled && { opacity: 0.5 },
-            ]}
-          >
-            {it.leading ??
-              (it.icon ? (
-                <View style={onLine(20)}>
-                  <Icon name={it.icon} size={20} color={it.danger ? c.danger : c.muted} />
-                </View>
-              ) : null)}
-            <View style={styles.actionText}>
-              <Text variant="body" tone={it.danger ? "danger" : "ink"} {...(it.oneLine ? { numberOfLines: 1 } : {})}>
-                {it.marks
-                  ? markTerms(it.label, it.marks).map((part, k) =>
-                      part.mark ? (
-                        // biome-ignore lint/suspicious/noArrayIndexKey: segments of one fixed text
-                        <Text key={k} variant="body" style={{ backgroundColor: withAlpha(c.info, 0.22) }}>
-                          {part.text}
-                        </Text>
-                      ) : (
-                        part.text
-                      ),
-                    )
-                  : it.label}
-              </Text>
-              {it.hint ? (
-                <Text variant="small" tone="faint" {...(it.oneLine ? { numberOfLines: 1 } : {})}>
-                  {it.hint}
-                </Text>
-              ) : null}
-            </View>
-            {it.code ? (
-              <View style={tall ? [styles.onLine, { minHeight: line.height }] : null}>
-                <Text style={[styles.mono, { color: c.faint }]}>{it.code}</Text>
-              </View>
-            ) : null}
-            {it.trailing ? (
-              <View style={tall ? [styles.onLine, { minHeight: line.height }] : null}>{it.trailing}</View>
-            ) : null}
-            {it.checked === undefined ? null : (
-              <View style={onLine(28)}>
-                <ToggleSwitch value={it.checked} />
-              </View>
-            )}
-          </Pressable>
-        );
-      })}
-    </Card>
+    <Pressable
+      // A switch answers the finger as it flips, as `GroupedRow`'s does.
+      onPress={
+        it.checked !== undefined && press
+          ? () => {
+              haptics.selection();
+              press();
+            }
+          : press
+      }
+      disabled={it.disabled || !it.onPress}
+      accessibilityRole={it.checked === undefined ? "button" : "switch"}
+      {...(it.checked === undefined ? {} : { accessibilityState: { checked: it.checked } })}
+      accessibilityLabel={it.hint ? `${it.label}. ${it.hint}` : it.label}
+      style={({ pressed }) => [
+        styles.action,
+        tall && styles.actionTall,
+        pressed && { backgroundColor: c.sunken },
+        it.disabled && { opacity: 0.5 },
+      ]}
+    >
+      {leading ? (
+        <View style={styles.actionLead}>
+          {tall && !it.leading ? <View style={onLine(20)}>{leading}</View> : leading}
+        </View>
+      ) : null}
+      <View style={styles.actionText}>
+        <Text variant="body" tone={it.danger ? "danger" : "ink"} {...(it.oneLine ? { numberOfLines: 1 } : {})}>
+          {it.marks
+            ? markTerms(it.label, it.marks).map((part, k) =>
+                part.mark ? (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: segments of one fixed text
+                  <Text key={k} variant="body" style={{ backgroundColor: withAlpha(c.info, 0.22) }}>
+                    {part.text}
+                  </Text>
+                ) : (
+                  part.text
+                ),
+              )
+            : it.label}
+        </Text>
+        {it.hint ? (
+          <Text variant="footnote" tone="faint" {...(it.oneLine ? { numberOfLines: 1 } : {})}>
+            {it.hint}
+          </Text>
+        ) : null}
+      </View>
+      {it.code ? (
+        <View style={tall ? [styles.onLine, { minHeight: line.height }] : null}>
+          <Text style={[styles.mono, { color: c.faint }]}>{it.code}</Text>
+        </View>
+      ) : null}
+      {it.trailing ? (
+        <View style={tall ? [styles.onLine, { minHeight: line.height }] : null}>{it.trailing}</View>
+      ) : null}
+      {it.checked === undefined ? null : (
+        <View style={onLine(28)}>
+          <ToggleSwitch value={it.checked} />
+        </View>
+      )}
+    </Pressable>
   );
 }
 
@@ -291,11 +314,32 @@ export function copyText(text: string): Promise<boolean> {
 /** Code only (branches, commands). */
 export const MONO = fonts.mono;
 
+const LOADED_IN = FadeIn.duration(200);
+
+/**
+ * What comes in while the screen is watched (what it waited for, in its spinner's place; another tab's rows): it fades
+ * in. The page holds it in a `LayoutAnimationConfig skipEntering` (`SettingsPage`, the account pages' `Page`), so what
+ * had loaded before the screen opened is simply there; so is everything with reduced motion.
+ */
+export function Loaded({ children }: { children: ReactNode }) {
+  const { reducedMotion } = useTheme();
+  return <Animated.View entering={reducedMotion ? undefined : LOADED_IN}>{children}</Animated.View>;
+}
+
 const styles = StyleSheet.create({
   tile: { alignItems: "center", justifyContent: "center" },
-  action: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
-  actionTall: { alignItems: "flex-start" },
+  action: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minHeight: 50,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  // A wrapping hint: the label starts where a one-line row's does (its 22 points centred in 50), as GroupedRow's.
+  actionTall: { alignItems: "flex-start", paddingVertical: 14 },
   onLine: { justifyContent: "center" },
+  actionLead: { width: 32, alignItems: "center", justifyContent: "center" },
   actionText: { flex: 1, minWidth: 0 },
   mono: { fontFamily: MONO, fontSize: 13 },
   headerTitle: { alignItems: Platform.OS === "ios" ? "center" : "flex-start", minWidth: 0 },

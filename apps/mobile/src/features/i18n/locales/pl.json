@@ -1402,6 +1402,9 @@
     "review": "Sprawdź",
     "answer": "Odpowiedz",
     "open": "Otwórz",
+    "toolsTitle": "Zmienił narzędzia, które zatwierdziłeś",
+    "toolsWhy": "Agenci używają zatwierdzonej wersji, dopóki nie zaakceptujesz nowej.",
+    "reviewChanges": "Przejrzyj zmiany",
     "clear": {
       "title": "Nic na ciebie nie czeka",
       "text": "Gdy agent będzie cię potrzebował, najpierw zobaczysz to tutaj."

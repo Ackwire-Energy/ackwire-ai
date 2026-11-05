@@ -3057,6 +3057,15 @@
   "activityNow.open": {
     "value": "Open"
   },
+  "activityNow.toolsTitle": {
+    "value": "Changed tools you approved"
+  },
+  "activityNow.toolsWhy": {
+    "value": "Agents keep the version you approved until you accept the new one."
+  },
+  "activityNow.reviewChanges": {
+    "value": "Review the changes"
+  },
   "activityNow.clear.title": {
     "value": "Nothing waiting on you"
   },

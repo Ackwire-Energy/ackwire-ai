@@ -25,7 +25,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import { setIslandLive } from "@/lib/push";
 import { serverUrl } from "@/lib/server";
 import { useRealtime } from "@/providers/realtime";
-import { haptics, Icon, type IconName, Text, useTheme } from "@/ui";
+import { haptics, Icon, type IconName, LineIcon, Text, useTheme } from "@/ui";
 import { variantStyle } from "@/ui/Text";
 import { useNoticeTitle } from "../activity/noticeTitle";
 import { openPage } from "../ai/parts";
@@ -40,6 +40,8 @@ const CAMERA = { width: 126, height: 37, top: 11 };
 /** From this top inset an iPhone has the camera's island (14 Pro and later); below it, a notch or nothing. */
 const CAMERA_INSET = 59;
 const PILL_HEIGHT = 72;
+/** The face on the small island, beside the camera. */
+const SMALL_FACE = 27;
 /** Open: until its height is measured. */
 const OPEN_GUESS = 260;
 const TICK_MS = 250;
@@ -208,7 +210,7 @@ export function NoticeIsland() {
                           setOpen(false);
                           router.push("/activity");
                         }}
-                        style={styles.all}
+                        style={({ pressed }) => [styles.all, pressed && styles.pressed]}
                         accessibilityRole="link"
                       >
                         <Text variant="footnote" style={{ color: MUTED }}>
@@ -245,7 +247,12 @@ function Title({ n, lines }: { n: AppNotification; lines: number }) {
       {parts.map((part, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one fixed sentence
         <Fragment key={i}>
-          {i > 0 ? <Text style={styles.names}>{names}</Text> : null}
+          {/* The sentence's own size: a bare Text is body (17) inside this 15. */}
+          {i > 0 ? (
+            <Text variant="subhead" style={styles.names}>
+              {names}
+            </Text>
+          ) : null}
           {part}
         </Fragment>
       ))}
@@ -284,7 +291,7 @@ function Pill({
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.pill, { paddingTop: clear }]}
+      style={({ pressed }) => [styles.pill, { paddingTop: clear }, pressed && styles.pressed]}
       accessibilityRole="button"
       accessibilityLabel={[title, line].filter(Boolean).join(", ")}
       accessibilityHint={t("island.expand")}
@@ -347,12 +354,16 @@ function SmallIsland({
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.small, camera ? styles.smallSplit : styles.smallTogether]}
+      style={({ pressed }) => [
+        styles.small,
+        camera ? styles.smallSplit : styles.smallTogether,
+        pressed && styles.pressed,
+      ]}
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityHint={t("island.expand")}
     >
-      <IslandFace n={item.n} size={27} />
+      <IslandFace n={item.n} size={SMALL_FACE} />
       <Text variant="footnote" numberOfLines={1} style={styles.smallLabel}>
         {others > 0 ? `${label} +${others}` : label}
       </Text>
@@ -419,8 +430,8 @@ function IslandRow({ n, onOpened }: { n: AppNotification; onOpened: () => void }
         ) : null}
         {done ? (
           <View style={styles.done} accessibilityLiveRegion="polite">
-            <Icon name="check" size={16} color="#7ee2a8" />
-            <Text variant="footnote" style={styles.doneText}>
+            <LineIcon name="check" size={13} color="#7ee2a8" variant="footnote" />
+            <Text variant="footnote" style={[styles.doneText, styles.grow]}>
               {done}
             </Text>
           </View>
@@ -479,7 +490,7 @@ function IslandRow({ n, onOpened }: { n: AppNotification; onOpened: () => void }
       <Pressable
         onPress={() => island.dismiss(n.id)}
         hitSlop={10}
-        style={styles.x}
+        style={({ pressed }) => [styles.x, pressed && styles.pressed]}
         accessibilityRole="button"
         accessibilityLabel={t("island.dismiss")}
       >
@@ -571,19 +582,21 @@ const styles = StyleSheet.create({
   count: {
     minWidth: 26,
     height: 22,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     borderRadius: 11,
     backgroundColor: "rgba(255,255,255,0.16)",
     alignItems: "center",
     justifyContent: "center",
   },
   countText: { color: WHITE, fontWeight: "700" },
-  small: { flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 5 },
+  // The face as far from the island's edge as from its top and bottom.
+  small: { flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: (CAMERA.height - SMALL_FACE) / 2 },
   // Beside the camera: the face on its left, the ask on its right.
   smallSplit: { justifyContent: "space-between", paddingRight: 14 },
   smallTogether: { gap: 10, paddingRight: 14 },
   smallLabel: { color: WHITE, fontWeight: "600" },
-  row: { flexDirection: "row", gap: 12, paddingTop: 18, paddingBottom: 16, paddingLeft: 16, paddingRight: 40 },
+  // The × (its icon at `x`'s top and padding) level with the row's first line.
+  row: { flexDirection: "row", gap: 12, paddingTop: 16, paddingBottom: 16, paddingLeft: 16, paddingRight: 40 },
   rule: { height: StyleSheet.hairlineWidth, backgroundColor: LINE, marginHorizontal: 16 },
   text: { color: WHITE, marginTop: 2 },
   acts: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
@@ -617,9 +630,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.1)",
   },
   input: { flex: 1, minWidth: 0, color: WHITE, paddingVertical: 6 },
-  done: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
+  // The check on the first line when an answer's words wrap.
+  done: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 10 },
   doneText: { color: "#7ee2a8", fontWeight: "600" },
   failed: { color: "#ff8a80", marginTop: 6 },
-  x: { position: "absolute", top: 14, right: 12, padding: 4 },
+  x: { position: "absolute", top: 12, right: 12, padding: 4 },
+  pressed: { opacity: 0.7 },
   all: { alignItems: "center", paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: LINE },
 });

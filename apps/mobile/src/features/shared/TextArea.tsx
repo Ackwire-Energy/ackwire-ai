@@ -30,7 +30,7 @@ export function TextArea({
 
 const styles = StyleSheet.create({
   field: {
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14,
     paddingTop: 12,

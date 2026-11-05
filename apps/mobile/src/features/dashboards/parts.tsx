@@ -24,6 +24,7 @@ import {
   Icon,
   type IconName,
   LineIcon,
+  PressScale,
   Segmented,
   Text,
   useTheme,
@@ -133,7 +134,7 @@ export function BoardRow({
           <Text variant="body" numberOfLines={1} style={[styles.semibold, styles.shrink]}>
             {title}
           </Text>
-          {locked ? <Icon name="lock" size={13} color={c.faint} /> : null}
+          {locked ? <Icon name="lock" size={17} color={c.faint} /> : null}
         </View>
         <Text variant="footnote" tone="faint" numberOfLines={1}>
           {sub}
@@ -170,7 +171,7 @@ export function AudienceLine({ board, after }: { board: Pick<Dashboard, "audienc
   const picked = roles.filter((r) => board.roleIds.includes(r.id));
   return (
     <View style={styles.audience}>
-      <Icon name={board.audience === "workspace" ? "globe" : "lock"} size={14} color={c.muted} />
+      <Icon name={board.audience === "workspace" ? "globe" : "lock"} size={13} color={c.muted} />
       {board.audience === "roles" ? (
         picked.map((r) => (
           <View key={r.id} style={styles.role}>
@@ -319,20 +320,21 @@ export function ChoiceChips<K extends string>({
         const on = item.key === value;
         const ink = on ? c.bg : c.ink2;
         return (
-          <Pressable
+          <PressScale
             key={item.key}
             onPress={() => onChange(item.key)}
             accessibilityRole="radio"
             accessibilityState={{ selected: on }}
+            fill={false}
             // 34 tall: the slop gives it a finger's 44 without spacing the row out.
             hitSlop={{ top: 5, bottom: 5 }}
-            style={[styles.chip, { backgroundColor: on ? c.ink : c.chip }]}
+            contentStyle={[styles.chip, { backgroundColor: on ? c.ink : c.chip }]}
           >
             {item.icon ? item.icon(ink) : null}
             <Text variant="subhead" numberOfLines={1} style={[styles.semibold, { color: ink }]}>
               {item.label}
             </Text>
-          </Pressable>
+          </PressScale>
         );
       })}
     </ScrollView>
@@ -456,12 +458,13 @@ export function AudienceFields({
               roles.map((r) => {
                 const on = draft.roleIds.includes(r.id);
                 return (
-                  <Pressable
+                  <PressScale
                     key={r.id}
                     onPress={() => onChange(toggleRole(draft, r.id))}
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: on }}
-                    style={[styles.roleChip, { backgroundColor: on ? c.ink : c.chip }]}
+                    fill={false}
+                    contentStyle={[styles.roleChip, { backgroundColor: on ? c.ink : c.chip }]}
                   >
                     <View style={on ? null : styles.faded}>
                       <RoleMark color={r.color} />
@@ -469,7 +472,7 @@ export function AudienceFields({
                     <Text variant="subhead" style={[styles.semibold, { color: on ? c.bg : c.ink2 }]}>
                       {r.name}
                     </Text>
-                  </Pressable>
+                  </PressScale>
                 );
               })
             )}
@@ -515,14 +518,15 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   semibold: { fontWeight: "600" },
   thumb: { width: THUMB_W, height: THUMB_H, borderRadius: 10, overflow: "hidden" },
-  boardRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, paddingVertical: 10 },
-  titleLine: { flexDirection: "row", alignItems: "center", gap: 5 },
+  // GroupedRow's 14 sides and 12 gap.
+  boardRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
+  titleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
   audience: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 },
   role: { flexDirection: "row", alignItems: "center", gap: 4 },
   proposal: {
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    borderBottomRightRadius: 18,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
     borderBottomLeftRadius: 6,
     padding: 12,
     gap: 10,
@@ -533,7 +537,15 @@ const styles = StyleSheet.create({
   // Min heights: with a large text size the label grows past them instead of being clipped.
   chip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 34, paddingHorizontal: 12, borderRadius: 17 },
   segments: { paddingHorizontal: 16 },
-  roles: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingLeft: 54, paddingRight: 14, paddingBottom: 12 },
+  // In GroupedRow's text column: its 14 side, the 32 leading column and the 12 gap.
+  roles: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    paddingLeft: 14 + 32 + 12,
+    paddingRight: 14,
+    paddingBottom: 12,
+  },
   roleChip: {
     flexDirection: "row",
     alignItems: "center",

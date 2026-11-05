@@ -196,7 +196,9 @@ export function EffortRamp({
               if (i !== shown) stepped(i);
               choose(i);
             }}
-            style={styles.name}
+            // 44 pt to the finger: the room under the name, never over the ramp's own drag.
+            hitSlop={{ bottom: 16 }}
+            style={({ pressed }) => [styles.name, pressed && i !== shown ? styles.pressed : null]}
           >
             <Text variant="caption" tone={i === shown ? "ink" : "faint"} style={i === shown && styles.bold}>
               {t(`agentPage.work.brain.efforts.${e}`)}
@@ -248,13 +250,14 @@ export function useEffortChoice(agentId: string, saved: EffortLevel | undefined)
 }
 
 const styles = StyleSheet.create({
-  ramp: { gap: 9 },
+  ramp: { gap: 8 },
   off: { opacity: 0.55 },
   head: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: 12 },
   bold: { fontWeight: "600" },
   track: { height: HEIGHT },
   names: { flexDirection: "row", marginTop: -2 },
-  name: { flex: 1, alignItems: "center", paddingVertical: 5 },
+  name: { flex: 1, alignItems: "center", paddingVertical: 6 },
+  pressed: { opacity: 0.6 },
   // Two lines' room: the words change under the finger and nothing around them moves.
   hint: { minHeight: 36 },
 });

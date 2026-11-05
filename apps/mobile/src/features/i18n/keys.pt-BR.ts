@@ -1255,6 +1255,9 @@ export const featureKeysPtBR = {
     review: "Revisar",
     answer: "Responder",
     open: "Abrir",
+    toolsTitle: "Mudou ferramentas que você aprovou",
+    toolsWhy: "Os agentes seguem com a versão aprovada até você aceitar a nova.",
+    reviewChanges: "Rever as mudanças",
     clear: {
       title: "Nada esperando você",
       text: "Quando um agente precisar de você, aparece aqui primeiro.",

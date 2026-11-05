@@ -21,7 +21,6 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, Chip, DiffView, haptics, Icon, LineIcon, Text, ToggleSwitch, useTheme, useToast } from "@/ui";
 import { boldRuns } from "../chat/actions";
-import { lastDecidedAt } from "../chat/ask-store";
 import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
 import { markName } from "../chat/logic";
 import { IconTile } from "../connectors/ConnectorIcon";
@@ -156,7 +155,7 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
         well={
           only
             ? {
-                tile: <IconTile name={only.target.type === "agent_access" ? "bolt" : "file"} size={32} />,
+                tile: <IconTile name={only.target.type === "agent_access" ? "bolt" : "file"} size={20} />,
                 title: proposalTarget(t, only, agentName, orgName),
                 detail:
                   only.target.type === "agent_role"
@@ -165,7 +164,7 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
                 more: change,
               }
             : firstLine
-              ? { tile: <IconTile name="file" size={32} />, title: firstLine.text, more: change }
+              ? { tile: <IconTile name="file" size={20} />, title: firstLine.text, more: change }
               : null
         }
         body={
@@ -244,8 +243,7 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
   return (
     <AskDone
       done={outcome.accepted}
-      words={`${outcome.label}: ${what}`}
-      at={lastDecidedAt(rows)}
+      words={`${outcome.label} · ${what}`}
       more={{ label: t("ask.seeChange"), content: card }}
     />
   );

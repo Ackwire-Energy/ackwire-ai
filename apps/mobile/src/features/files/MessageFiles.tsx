@@ -10,7 +10,7 @@ import { ChoicesCard } from "../blocks/ChoicesCard";
 import { LiveBlockCard } from "../blocks/LiveBlock";
 import { PollCard } from "../blocks/PollCard";
 import { useColors, useOrgId } from "../shared/hooks";
-import { tapHaptic, useSurface } from "../shared/parts";
+import { useSurface } from "../shared/parts";
 import { ImageStack } from "./ImageStack";
 import { encodeFileList, extensionOf, type FileInfo, fileInfo, singleImageHeight, VIDEO_EXT } from "./logic";
 import { useArtifacts, useRemoteFile } from "./source";
@@ -67,9 +67,9 @@ export function MessageFiles({ files, align = "start" }: { files: MessageFile[];
   const blockWidth = Math.min(width || MAX_WIDTH, MAX_WIDTH);
 
   const [only] = images;
+  // Opening a file or a picture is plain navigation: the press shows it, with no haptic.
   const openOnly = () => {
     if (!only) return;
-    tapHaptic();
     router.push({
       pathname: "/images",
       params: {
@@ -193,7 +193,6 @@ function InlineVideo({
   const info = detail ? fileInfo(detail) : null;
   const open = () => {
     if (!detail) return;
-    tapHaptic();
     router.push({
       pathname: "/file/[id]",
       params: { id: file.id, ...(detail.shownVersion < detail.version ? { v: String(detail.shownVersion) } : {}) },
@@ -272,7 +271,6 @@ function FileCard({
   const name = info?.name || file.title || t("mobile.chat.file");
   const open = () => {
     if (!detail) return;
-    tapHaptic();
     router.push({
       pathname: "/file/[id]",
       params: { id: file.id, ...(detail.shownVersion < detail.version ? { v: String(detail.shownVersion) } : {}) },
@@ -306,7 +304,7 @@ function RemovedCard() {
   return (
     <View style={[styles.card, surface]}>
       <View style={[styles.tile, { backgroundColor: c.sunken }]}>
-        <Icon name="file" size={19} color={c.faint} />
+        <Icon name="file" size={20} color={c.faint} />
       </View>
       <Text variant="body" tone="faint" style={styles.grow}>
         {t("mobile.chat.fileDeleted")}
@@ -338,7 +336,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 16,
+    // As the pictures' beside it.
+    borderRadius: 14,
   },
   tile: { width: 40, height: 48, borderRadius: 8, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   tileLg: { width: 84, height: 100, borderRadius: 14 },

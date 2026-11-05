@@ -9,6 +9,7 @@ import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from 
 import { Note } from "../ai/parts";
 import { AgentFace } from "../shared/Face";
 import { useColors } from "../shared/hooks";
+import { Loaded } from "../shared/parts";
 import { SettingsPage } from "./parts";
 
 const RATINGS: GifRating[] = ["g", "pg"];
@@ -62,68 +63,70 @@ export function MediaSettingsScreen() {
 
   return (
     <SettingsPage title={title}>
-      <GroupedFooter>{t("settings.sectionText.media")}</GroupedFooter>
-      {!editable ? (
-        <View style={styles.note}>
-          <Note icon="lock">{t("settings.readOnly")}</Note>
-        </View>
-      ) : null}
-      <GroupedHeader>{t("settings.media.chatTitle")}</GroupedHeader>
-      <GroupedList>
-        <GroupedRow
-          icon="image"
-          label={t("settings.media.gifs")}
-          sub={shown.gifsAvailable ? t("settings.media.gifsHelp") : t("settings.media.gifsUnavailable")}
-          subLines={3}
-          toggle={gifsOn}
-          disabled={!editable || !shown.gifsAvailable}
-          onPress={() => save({ gifs: !gifsOn })}
-        />
-        <GroupedRow
-          icon="smile"
-          label={t("settings.media.stickers")}
-          sub={t("settings.media.stickersHelp")}
-          subLines={2}
-          toggle={shown.agentStickers}
-          disabled={!editable}
-          onPress={() => save({ agentStickers: !shown.agentStickers })}
-        />
-      </GroupedList>
-      <GroupedHeader>{t("settings.media.rating")}</GroupedHeader>
-      <GroupedList>
-        {RATINGS.map((rating) => (
+      <Loaded>
+        <GroupedFooter>{t("settings.sectionText.media")}</GroupedFooter>
+        {!editable ? (
+          <View style={styles.note}>
+            <Note icon="lock">{t("settings.readOnly")}</Note>
+          </View>
+        ) : null}
+        <GroupedHeader>{t("settings.media.chatTitle")}</GroupedHeader>
+        <GroupedList>
           <GroupedRow
-            key={rating}
-            label={t(`settings.media.ratings.${rating}`)}
-            checked={shown.gifRating === rating}
-            disabled={!editable || !gifsOn}
-            onPress={() => save({ gifRating: rating })}
+            icon="image"
+            label={t("settings.media.gifs")}
+            sub={shown.gifsAvailable ? t("settings.media.gifsHelp") : t("settings.media.gifsUnavailable")}
+            subLines={3}
+            toggle={gifsOn}
+            disabled={!editable || !shown.gifsAvailable}
+            onPress={() => save({ gifs: !gifsOn })}
           />
-        ))}
-      </GroupedList>
-      <GroupedFooter>{t("settings.media.ratingHelp")}</GroupedFooter>
-      <GroupedHeader>{t("settings.media.level")}</GroupedHeader>
-      <GroupedList>
-        {LEVELS.map((option) => (
           <GroupedRow
-            key={option}
-            label={t(`settings.media.levels.${option}`)}
-            checked={level === option}
-            disabled={!editable || !shown.agentMediaAvailable}
-            onPress={() => save({ agentMedia: option })}
+            icon="smile"
+            label={t("settings.media.stickers")}
+            sub={t("settings.media.stickersHelp")}
+            subLines={2}
+            toggle={shown.agentStickers}
+            disabled={!editable}
+            onPress={() => save({ agentStickers: !shown.agentStickers })}
           />
-        ))}
-      </GroupedList>
-      <GroupedFooter>
-        {shown.agentMediaAvailable ? t("settings.media.levelHelp") : t("settings.media.levelUnavailable")}
-      </GroupedFooter>
-      <GroupedHeader>{t("settings.media.agentsTitle")}</GroupedHeader>
-      <GroupedList>
-        {team.map((agent) => (
-          <AgentMediaRow key={agent.id} agent={agent} />
-        ))}
-      </GroupedList>
-      {agentsNote ? <GroupedFooter>{agentsNote}</GroupedFooter> : null}
+        </GroupedList>
+        <GroupedHeader>{t("settings.media.rating")}</GroupedHeader>
+        <GroupedList>
+          {RATINGS.map((rating) => (
+            <GroupedRow
+              key={rating}
+              label={t(`settings.media.ratings.${rating}`)}
+              checked={shown.gifRating === rating}
+              disabled={!editable || !gifsOn}
+              onPress={() => save({ gifRating: rating })}
+            />
+          ))}
+        </GroupedList>
+        <GroupedFooter>{t("settings.media.ratingHelp")}</GroupedFooter>
+        <GroupedHeader>{t("settings.media.level")}</GroupedHeader>
+        <GroupedList>
+          {LEVELS.map((option) => (
+            <GroupedRow
+              key={option}
+              label={t(`settings.media.levels.${option}`)}
+              checked={level === option}
+              disabled={!editable || !shown.agentMediaAvailable}
+              onPress={() => save({ agentMedia: option })}
+            />
+          ))}
+        </GroupedList>
+        <GroupedFooter>
+          {shown.agentMediaAvailable ? t("settings.media.levelHelp") : t("settings.media.levelUnavailable")}
+        </GroupedFooter>
+        <GroupedHeader>{t("settings.media.agentsTitle")}</GroupedHeader>
+        <GroupedList>
+          {team.map((agent) => (
+            <AgentMediaRow key={agent.id} agent={agent} />
+          ))}
+        </GroupedList>
+        {agentsNote ? <GroupedFooter>{agentsNote}</GroupedFooter> : null}
+      </Loaded>
     </SettingsPage>
   );
 }

@@ -17,7 +17,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { deleteAccount } from "@/features/account";
 import { serverUrl } from "@/lib/server";
-import { Button, Card, HoldButton, Icon, type IconName, Text, useToast } from "@/ui";
+import { Button, Card, HoldButton, type IconName, LineIcon, Text, useToast } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { PasswordField } from "@/ui/auth/PasswordField";
 import { openPage } from "../ai/parts";
@@ -135,7 +135,7 @@ export function DeleteAccountScreen() {
   const line = (key: string, icon: IconName, text: string, links?: AccountDeletionLine["links"]) => (
     <View key={key} style={styles.line}>
       <View style={styles.item}>
-        <Icon name={icon} size={16} color={c.muted} />
+        <LineIcon name={icon} variant="small" size={16} color={c.muted} />
         <Text variant="small" tone="ink2" style={styles.grow}>
           {text}
         </Text>
@@ -299,7 +299,8 @@ const styles = StyleSheet.create({
   in: { paddingHorizontal: 20, paddingTop: 8, gap: 16 },
   list: { padding: 14, gap: 10 },
   line: { gap: 8 },
-  item: { flexDirection: "row", alignItems: "center", gap: 10 },
+  // A line that wraps keeps its icon on the first.
+  item: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   grow: { flex: 1 },
   acts: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   proof: { gap: 10 },

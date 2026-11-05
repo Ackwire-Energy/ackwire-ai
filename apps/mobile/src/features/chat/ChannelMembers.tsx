@@ -24,7 +24,7 @@ import { Button, Card, Count, Icon, Row, SearchField, Text, useToast, weights } 
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
-import { ActionList, Tile, tapHaptic } from "../shared/parts";
+import { ActionList, successHaptic, Tile, tapHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 
 /** Above this many members the list gets a search field (as the web's channel details). */
@@ -95,10 +95,8 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
   const people = shown.filter((w) => w.kind === "person");
   const agentCount = all.filter((w) => w.kind === "agent").length;
 
-  const open = (w: Who) => {
-    tapHaptic();
+  const open = (w: Who) =>
     sheet.open(<MemberOptions channelId={channelId} channelName={channelName} who={w} removable={editable} />);
-  };
   const group = (label: string, count: number, list: Who[]) =>
     list.length > 0 ? (
       <View>
@@ -219,6 +217,7 @@ function MemberOptions({
     mutationFn: () =>
       api.chat.removeMember(orgId, channelId, who.kind === "agent" ? { agentId: who.id } : { userId: who.id }),
     onSuccess: () => {
+      successHaptic();
       refresh();
       back();
     },

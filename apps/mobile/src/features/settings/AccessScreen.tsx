@@ -152,6 +152,6 @@ export function AccessScreen() {
 
 const styles = StyleSheet.create({
   note: { paddingHorizontal: 4, paddingTop: 10 },
-  head: { gap: 12, paddingHorizontal: 4, paddingTop: 18, paddingBottom: 4 },
+  head: { gap: 12, paddingHorizontal: 4, paddingTop: 20, paddingBottom: 4 },
   loading: { marginVertical: 16 },
 });

@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,
     borderBottomRightRadius: 14,
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: 6,
     overflow: "hidden",
   },
   offTitle: {
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   center: { textAlign: "center" },
-  mark: { position: "absolute", left: 8, bottom: 8, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 5 },
+  mark: { position: "absolute", left: 8, bottom: 8, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 },
   markOn: { backgroundColor: "rgba(0, 0, 0, 0.55)" },
   markOff: { borderWidth: 1.5 },
   markText: { fontSize: 10.5, lineHeight: 14, fontWeight: "700", letterSpacing: 0.5 },

@@ -88,7 +88,12 @@ function Pane({
   return (
     <>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: action.color }, shown]} />
-      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={action.label} style={styles.pane}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={action.label}
+        style={({ pressed }) => [styles.pane, pressed ? { opacity: 0.6 } : null]}
+      >
         <Animated.View style={[styles.in, grow]}>
           <Icon name={action.icon} size={20} color={action.ink} />
           <Text variant="caption" numberOfLines={1} style={[styles.word, { color: action.ink }]}>

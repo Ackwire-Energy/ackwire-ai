@@ -209,8 +209,8 @@ const styles = StyleSheet.create({
   in: { paddingHorizontal: 16, paddingTop: 8 },
   loading: { marginTop: 16 },
   lead: { paddingHorizontal: 4, paddingBottom: 14 },
-  autonomy: { marginBottom: 18 },
+  autonomy: { marginBottom: 20 },
   // A list without a header keeps a header's room above it.
-  gap: { marginTop: 18 },
+  gap: { marginTop: 20 },
   footer: { paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
 });

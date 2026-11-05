@@ -73,6 +73,7 @@ export function useBoardMenu(board: Dashboard | undefined) {
         onPress: () =>
           remove.mutate(board.id, {
             onSuccess: () => {
+              successHaptic();
               toast({ title: t("dashboards.delete.done", { title }) });
               goBack();
             },

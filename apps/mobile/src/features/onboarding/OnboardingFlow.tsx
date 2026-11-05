@@ -243,7 +243,7 @@ function ConfirmationNote({ email }: { email: string }) {
   };
   return (
     <View style={styles.note} accessibilityLiveRegion="polite">
-      <LineIcon name="mail" size={14} color={c.faint} variant="small" />
+      <LineIcon name="mail" size={15} color={c.faint} variant="small" />
       <View style={styles.grow}>
         <Text variant="small" tone="muted">
           {sent === "sent" ? t("auth.newLinkSent", { email }) : t("onboarding.confirmation.sent", { email })}
@@ -255,7 +255,7 @@ function ConfirmationNote({ email }: { email: string }) {
             accessibilityRole="button"
             // A 20-point line: 12 of slop around it reaches the 44-point target.
             hitSlop={12}
-            style={styles.linkButton}
+            style={({ pressed }) => [styles.linkButton, pressed ? styles.pressed : null]}
           >
             <Text variant="small" style={styles.bold}>
               {t("auth.sendNewLink")}
@@ -341,7 +341,7 @@ function Note({ icon, text }: { icon: IconName; text: string }) {
   const { colors: c } = useTheme();
   return (
     <View style={styles.note}>
-      <LineIcon name={icon} size={14} color={c.faint} variant="small" />
+      <LineIcon name={icon} size={15} color={c.faint} variant="small" />
       <Text variant="small" tone="muted" style={styles.grow}>
         {text}
       </Text>
@@ -379,4 +379,5 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   linkButton: { alignSelf: "flex-start", marginTop: 2 },
+  pressed: { opacity: 0.6 },
 });

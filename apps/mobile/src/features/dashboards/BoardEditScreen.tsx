@@ -78,7 +78,7 @@ function Form({ board }: { board: Dashboard }) {
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
-        contentContainerStyle={[styles.in, { paddingBottom: 28 + insets.bottom }]}
+        contentContainerStyle={[styles.in, { paddingBottom: 24 + insets.bottom }]}
       >
         <GroupedHeader>{t("dashboards.create.name")}</GroupedHeader>
         <TextArea

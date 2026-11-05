@@ -7,7 +7,7 @@ import { Button, useToast } from "@/ui";
 import { useOrgId } from "../shared/hooks";
 import { genderOf } from "../shared/logic";
 import { PromptForm, SheetTitle } from "../shared/PromptForm";
-import { successHaptic, tapHaptic } from "../shared/parts";
+import { successHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { FAILED_REASONS, NOTE_MAX } from "./logic";
 
@@ -46,8 +46,8 @@ export function useFinishHandoff(
       setFinishing(false);
     }
   };
+  // Both open a sheet from a button that gives the press's own haptic (`Button`, the dock's `PressScale`).
   const handBack = () => {
-    tapHaptic();
     sheet.open(
       <HandBackSheet
         title={t(handoff?.kind === "ask" ? "browser.inCard.doneTitle" : "browser.inCard.backTitle", agentGrammar(name))}
@@ -62,7 +62,6 @@ export function useFinishHandoff(
     );
   };
   const couldnt = () => {
-    tapHaptic();
     sheet.open(
       <PromptForm
         title={t("mobile.browser.failed.title")}

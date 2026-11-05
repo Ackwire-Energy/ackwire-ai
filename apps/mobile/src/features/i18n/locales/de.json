@@ -1246,6 +1246,9 @@
     "review": "Prüfen",
     "answer": "Antworten",
     "open": "Öffnen",
+    "toolsTitle": "Hat Tools geändert, die du freigegeben hast",
+    "toolsWhy": "Die Agenten nutzen die freigegebene Version, bis du die neue annimmst.",
+    "reviewChanges": "Änderungen prüfen",
     "clear": {
       "title": "Nichts wartet auf dich",
       "text": "Wenn ein Agent dich braucht, erscheint es zuerst hier."

@@ -172,16 +172,15 @@ export function SetupFailedCard({
           {t("mobile.mission.setup.lostText", { branch: lostBranch ?? m?.branch ?? "" })}
         </Text>
       ) : null}
+      {/* The log flat in the card (never a plate in a card), in mono: it is the command's own output. */}
       {tail ? (
-        <View style={[styles.log, { backgroundColor: colors.sunken }]}>
-          <RNText
-            numberOfLines={8}
-            maxFontSizeMultiplier={CHROME_MAX_SCALE}
-            style={{ fontFamily: fonts.mono, fontSize: 12, lineHeight: 17, color: colors.ink2 }}
-          >
-            {tail}
-          </RNText>
-        </View>
+        <RNText
+          numberOfLines={8}
+          maxFontSizeMultiplier={CHROME_MAX_SCALE}
+          style={[styles.log, { fontFamily: fonts.mono, color: colors.ink2 }]}
+        >
+          {tail}
+        </RNText>
       ) : null}
       {state === "preparing" ? (
         <View style={styles.row}>
@@ -257,10 +256,10 @@ export function ReviewCardView({ review: r, mission }: { review: MissionReview; 
     return (
       <View style={[styles.done, surface]}>
         <LineIcon
-          variant="small"
           name={r.status === "approved" ? "check" : "reply"}
-          size={16}
+          size={15}
           color={r.status === "approved" ? c.ok : c.muted}
+          variant="small"
         />
         <Text variant="small" tone="muted" style={styles.grow}>
           {r.status === "approved"
@@ -468,13 +467,13 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
       <Pressable
         onPress={() => router.push(`/mission/${m.id}`)}
         accessibilityRole="button"
-        style={[styles.done, surface]}
+        style={({ pressed }) => [styles.done, surface, pressed && styles.pressed]}
       >
-        <LineIcon variant="small" name="check" size={16} color={c.ok} />
+        <LineIcon name="check" size={15} color={c.ok} variant="small" />
         <Text variant="small" tone="muted" style={styles.grow} numberOfLines={2}>
           {t("mobile.mission.plan.started", { title: m.title || goal })}
         </Text>
-        <LineIcon variant="small" name="right" size={16} color={c.faint} />
+        <LineIcon name="right" size={15} color={c.faint} variant="small" />
       </Pressable>
     );
   }
@@ -493,7 +492,7 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
               : t("mobile.mission.plan.title")}
         </Text>
       </View>
-      <Text variant="body" style={[styles.bold, investigated ? styles.invTitle : styles.title]}>
+      <Text variant="body" style={[styles.bold, styles.title]}>
         {m.title || goal}
       </Text>
       {investigated ? <Findings findings={findings} /> : null}
@@ -600,7 +599,8 @@ const FINDING_ICON = { read: "search", data: "chart", decision: "help" } as cons
 
 /**
  * What the agent found before proposing: what it read (search), numbers
- * it saw (chart) and the one decision left for the person (help), highlighted. Refs are mono chips.
+ * it saw (chart) and the one decision left for the person (help), in ink and bold: no band behind it, the card
+ * holds no plate of its own. Refs are mono chips.
  */
 function Findings({ findings }: { findings: MissionFinding[] }) {
   const { t } = useTranslation();
@@ -612,7 +612,7 @@ function Findings({ findings }: { findings: MissionFinding[] }) {
         return (
           <View
             key={`${f.kind}:${String(i)}`}
-            style={[styles.fdRow, open && [styles.fdOpen, { backgroundColor: colors.sunken }]]}
+            style={styles.fdRow}
             accessible
             accessibilityLabel={`${t(`missions.findings.${f.kind}`)}: ${f.text}`}
           >
@@ -644,6 +644,9 @@ function Findings({ findings }: { findings: MissionFinding[] }) {
   );
 }
 
+/** A plan step's number column. */
+const STEP_N = 16;
+
 const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   mcard: { marginTop: 8, padding: 14, borderRadius: 20, gap: 0 },
@@ -651,12 +654,12 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  title: { marginTop: 5, marginBottom: 10 },
+  title: { marginTop: 6, marginBottom: 10 },
   titlePinned: { marginTop: 4, marginBottom: 8 },
   ft: { marginTop: 8, gap: 6 },
-  askcard: { marginTop: 8, padding: 12, borderRadius: 16 },
+  askcard: { marginTop: 8, padding: 12, borderRadius: 20 },
   summary: { marginBottom: 10 },
-  log: { padding: 10, borderRadius: 12, marginBottom: 10 },
+  log: { fontSize: 12, lineHeight: 17, marginBottom: 10 },
   acts: { flexDirection: "row", gap: 8, marginTop: 4 },
   // Its words wrap to two lines: the icons stay on the first.
   done: {
@@ -666,23 +669,22 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 16,
+    borderRadius: 20,
   },
   opts: { gap: 6 },
   // A long option wraps: its check and "Recommended" stay on its first line.
-  opt: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderRadius: 13 },
+  opt: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderRadius: 14 },
   optText: { flex: 1, fontWeight: "500" },
   // A step's title wraps: its number stays on the first line.
   planRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 4 },
-  n: { width: 16, alignItems: "flex-end" },
-  more: { paddingLeft: 26, paddingBottom: 8 },
+  n: { width: STEP_N, alignItems: "flex-end" },
+  // Under the steps' words: past the number's column and the row's gap.
+  more: { paddingLeft: STEP_N + 10, paddingBottom: 8 },
   inv: { marginTop: 8, padding: 14, borderRadius: 20 },
-  invTitle: { marginTop: 5, marginBottom: 10, fontSize: 17, lineHeight: 22 },
-  fd: { gap: 7, marginBottom: 12 },
+  fd: { gap: 8, marginBottom: 12 },
   fdRow: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
-  fdOpen: { padding: 8, marginHorizontal: -8, borderRadius: 12 },
   refs: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4 },
-  ref: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, maxWidth: "100%" },
+  ref: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, maxWidth: "100%" },
   plHead: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, marginBottom: 4 },
   note: { marginTop: 8, textAlign: "center" },
 });

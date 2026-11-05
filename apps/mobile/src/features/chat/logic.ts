@@ -42,6 +42,18 @@ import { continuesReply } from "./media";
  * reactions, pins, the slash commands and a small Markdown reader.
  */
 
+// ── Layout ───────────────────────────────────────────────────────────────────
+
+/** A message row's side inset, its avatar column and the gap to the words (MessageRow, LiveRows, the queue's turn). */
+export const MSG_INSET = 14;
+export const MSG_AVATAR = 34;
+export const MSG_GAP = 12;
+/** Where a message's words start: event lines, receipts and what hangs under a message line up there. */
+export const MSG_TEXT = MSG_INSET + MSG_AVATAR + MSG_GAP;
+/** An event line's mark (its "small" words' size) and the gap to them: what unfolds under it starts there. */
+export const LINE_MARK = 15;
+export const LINE_GAP = 8;
+
 // ── Timeline ─────────────────────────────────────────────────────────────────
 
 const byTime = (a: Pick<Message, "createdAt" | "id">, b: Pick<Message, "createdAt" | "id">) =>

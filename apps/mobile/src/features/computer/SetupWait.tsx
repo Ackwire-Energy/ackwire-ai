@@ -20,7 +20,7 @@ import { ComputerIcon, ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg, useOrgMaybe } from "@/providers/org";
 import { Button, type IconName, InfoHint, LineIcon, SheetScreen, Text } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
-import { tapHaptic, useSurface } from "../shared/parts";
+import { useSurface } from "../shared/parts";
 import { setupNoticeLine } from "./logic";
 
 /** This workspace's computer on its way, or null where people connect their own (`pair`). */
@@ -181,14 +181,12 @@ export function SetupNotice() {
   const line = setupNoticeLine(t, view, wait.eta, wait.emailed);
   return (
     <View style={styles.list}>
+      {/* It opens a screen: the press shows, with no haptic (plain navigation). */}
       <Pressable
-        onPress={() => {
-          tapHaptic();
-          router.push("/computer-setup");
-        }}
+        onPress={() => router.push("/computer-setup")}
         accessibilityRole="button"
         accessibilityLabel={`${title}. ${line}`}
-        style={[styles.card, surface]}
+        style={({ pressed }) => [styles.card, surface, pressed && styles.pressed]}
       >
         <LineIcon variant="callout" size={22}>
           <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={22} color={c.muted} />
@@ -214,7 +212,7 @@ const styles = StyleSheet.create({
   center: { textAlign: "center" },
   bold: { fontWeight: "600" },
   steps: { flexDirection: "row", gap: 6, alignSelf: "stretch", paddingHorizontal: 24, paddingTop: 4 },
-  bar: { flex: 1, height: 4, borderRadius: 2 },
+  bar: { flex: 1, height: 4, borderRadius: 999 },
   line: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   grow: { flex: 1, minWidth: 0 },
   list: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
@@ -226,4 +224,5 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 10,
   },
+  pressed: { opacity: 0.85 },
 });

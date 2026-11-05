@@ -26,6 +26,11 @@ export interface SearchFieldProps extends Omit<TextInputProps, "style"> {
   onCancel?: () => void;
   /** Forces the cancel button on or off; by default it shows while the field is focused or has words. */
   showCancel?: boolean;
+  /**
+   * On the grouped gray, the field is white with a hairline (the system's search over grouped lists): the default
+   * gray fill would sink into the gray around it.
+   */
+  raised?: boolean;
 }
 
 /** The search box: sunken, a magnifier, a clear button when there is text, and "Cancelar" with `onCancel`. */
@@ -36,11 +41,12 @@ export function SearchField({
   ref,
   onCancel,
   showCancel,
+  raised = false,
   onFocus,
   onBlur,
   ...rest
 }: SearchFieldProps) {
-  const { colors } = useTheme();
+  const { colors, reducedMotion } = useTheme();
   const { t } = useTranslation();
   const input = useRef<TextInputInstance | null>(null);
   useImperativeHandle(ref, () => input.current as TextInputInstance, []);
@@ -56,7 +62,7 @@ export function SearchField({
   return (
     <View style={{ flexDirection: "row", alignItems: "center" }}>
       <Animated.View
-        layout={LinearTransition.duration(220)}
+        layout={reducedMotion ? undefined : LinearTransition.duration(220)}
         style={{
           flex: 1,
           flexDirection: "row",
@@ -65,7 +71,9 @@ export function SearchField({
           minHeight: 42,
           paddingHorizontal: 12,
           borderRadius: 14,
-          backgroundColor: colors.sunken,
+          // The system's fill (a gray at 10%) on white; white with a hairline on the grouped gray.
+          backgroundColor: raised ? colors.raised : colors.plate,
+          ...(raised ? { boxShadow: `0px 0px 0px 0.5px ${colors.line2}` } : {}),
         }}
       >
         <Icon name="search" size={18} color={colors.faint} />
@@ -95,13 +103,17 @@ export function SearchField({
             accessibilityLabel={t("mobile.a11y.clearSearch")}
             // A 16-point glyph: 14 of slop around it gives the 44-point target.
             hitSlop={14}
+            style={({ pressed }) => (pressed ? { opacity: 0.4 } : null)}
           >
             <Icon name="x" size={16} color={colors.faint} />
           </Pressable>
         ) : null}
       </Animated.View>
       {cancelShown ? (
-        <Animated.View entering={FadeInRight.duration(220)} exiting={FadeOutRight.duration(180)}>
+        <Animated.View
+          entering={reducedMotion ? undefined : FadeInRight.duration(220)}
+          exiting={reducedMotion ? undefined : FadeOutRight.duration(180)}
+        >
           <Pressable
             onPress={cancel}
             accessibilityRole="button"

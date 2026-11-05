@@ -1324,6 +1324,9 @@
     "review": "Revisar",
     "answer": "Responder",
     "open": "Abrir",
+    "toolsTitle": "Cambió herramientas que aprobaste",
+    "toolsWhy": "Los agentes siguen con la versión aprobada hasta que aceptes la nueva.",
+    "reviewChanges": "Revisar los cambios",
     "clear": {
       "title": "Nada te espera",
       "text": "Cuando un agente te necesite, aparece aquí primero."

@@ -13,6 +13,7 @@ import {
   listToolChanges,
   type McpConnect,
   mcpSessionOver,
+  notifyToolChanged,
   refreshCustomServer,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
@@ -107,6 +108,20 @@ test("a changed description keeps the approved one, one notice; accepted, agents
   expect((await w.seen()).description).toContain("other_tool");
   expect(await listToolChanges(f.db, f.owner.id, f.org.id)).toEqual([]);
   expect((await w.notices())[0]?.doneAt).not.toBeNull();
+});
+
+test("another tool changing on the same server replaces the waiting notice instead of adding a twin", async () => {
+  const w = await connected();
+  const connection = { id: w.id, orgId: f.org.id, label: "Notes" };
+  await notifyToolChanged({ db: f.db }, connection, [{ name: "search_articles", fingerprint: "a" }]);
+  await notifyToolChanged({ db: f.db }, connection, [{ name: "list_articles", fingerprint: "b" }]);
+  // The same change again (a retried job) keeps the newer row open.
+  await notifyToolChanged({ db: f.db }, connection, [{ name: "list_articles", fingerprint: "b" }]);
+  const open = (await w.notices()).filter((n) => n.doneAt === null);
+  expect(open.map((n) => n.latest)).toEqual([{ title: "list_articles" }]);
+  // It names the server, so the apps open that server's tools.
+  expect(open[0]?.source).toEqual({ label: "Notes", connectionId: w.id });
+  expect(await w.notices()).toHaveLength(2);
 });
 
 test("Aceitar todas: every change waiting on a connection accepted at once, the notice resolved", async () => {

@@ -266,6 +266,8 @@ export interface NotificationSource {
   skillId?: string;
   /** A plan's account (`plan_lent`). */
   accountId?: string;
+  /** The connected MCP server whose approved tools changed (`connector_tool_changed`, ADR 0117). */
+  connectionId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name, widget or board title. */
   label?: string;
 }

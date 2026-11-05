@@ -6,24 +6,12 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
-import {
-  Button,
-  CHROME_MAX_SCALE,
-  Chip,
-  Count,
-  Fuse,
-  Icon,
-  PressScale,
-  systemText,
-  Text,
-  useTheme,
-  weights,
-} from "@/ui";
+import { CHROME_MAX_SCALE, Count, Icon, PressScale, systemText, Text, useTheme, weights } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
-import { fuseRemaining } from "../shared/logic";
 import { useSurface } from "../shared/parts";
 import { useWaitingApprovals } from "../shared/queries";
+import { WaitingCard } from "../shared/WaitingCard";
 import { missionsWaiting, openQuestions } from "./logic";
 import {
   stackLayers,
@@ -99,7 +87,7 @@ export function WaitingStrip({
       >
         {open ? (
           <Animated.View key="card" {...fade}>
-            <WaitingCard item={first} rest={stack.rest} faces={stack.faces} stacked={stack.stacked} />
+            <WaitingOpenCard item={first} rest={stack.rest} faces={stack.faces} stacked={stack.stacked} />
           </Animated.View>
         ) : (
           <Animated.View key="pill" {...fade}>
@@ -182,7 +170,7 @@ function WaitingPill({
 /** The count's chip on the strip: the background at 18% over ink. */
 const mixOnInk = (ink: string, bg: string) => mixHex(ink, bg, 0.18);
 
-function WaitingCard({
+function WaitingOpenCard({
   item,
   rest,
   faces,
@@ -197,7 +185,7 @@ function WaitingCard({
   const c = useColors();
   const surface = useSurface();
   const now = useNow();
-  const { name, verb, line } = useLine(item);
+  const { name, line } = useLine(item);
   const minutes = waitingMinutes(item, now);
   const review = () => {
     if (item.href) router.push(item.href);
@@ -211,70 +199,42 @@ function WaitingCard({
           <View style={[styles.back, styles.back1, surface, { opacity: 0.9 }]} />
         </>
       ) : null}
-      <View style={[styles.card, surface]}>
-        <Pressable
-          onPress={review}
-          accessibilityRole="button"
-          accessibilityLabel={line}
-          style={({ pressed }) => [styles.cardTap, pressed && styles.pressed]}
-        >
-          <View style={styles.hd}>
-            <AgentFace agentId={item.agentId} size={22} />
-            {name ? (
-              <Text variant="small" tone="ink" style={[styles.semibold, styles.shrink]} numberOfLines={1}>
-                {name}
+      <WaitingCard
+        agentId={item.agentId}
+        name={name || t("mobile.home.waiting")}
+        kind={{ icon: WAITING_ICON[item.kind], label: t(waitingChipKey(item.kind)) }}
+        title={item.title || undefined}
+        onPress={review}
+        accessibilityLabel={line}
+        expires={minutes !== null && item.expiresAt ? { createdAt: item.createdAt, expiresAt: item.expiresAt } : null}
+        action={{ label: t("mobile.chats.wait.review"), onPress: review }}
+        footer={
+          rest > 0 ? (
+            <Pressable
+              onPress={openWaitingActivity}
+              accessibilityRole="button"
+              // The slop reaches over the footer's 10 points above and the card's 14 below, toward a 44-point target.
+              hitSlop={{ top: 10, bottom: 14 }}
+              style={({ pressed }) => [styles.more, pressed && styles.pressed]}
+            >
+              {faces.length > 0 ? (
+                <View style={styles.faces}>
+                  {faces.map((id, i) => (
+                    <View key={id} style={i > 0 ? styles.overlap : undefined}>
+                      <AgentFace agentId={id} size={18} live={false} />
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+              <Text variant="small" tone="muted" numberOfLines={1} style={styles.shrink}>
+                {t("mobile.chats.wait.more", { count: rest })}
               </Text>
-            ) : null}
-            <Text variant="small" tone="muted" numberOfLines={1} style={styles.shrink}>
-              {name ? verb : t("mobile.home.waiting")}
-            </Text>
-            <View style={styles.grow} />
-            <Chip icon={WAITING_ICON[item.kind]} label={t(waitingChipKey(item.kind))} />
-          </View>
-          {item.title ? (
-            <Text variant="callout" tone="ink" numberOfLines={2} style={styles.title}>
-              {item.title}
-            </Text>
-          ) : null}
-        </Pressable>
-        <View style={styles.ft}>
-          {minutes !== null && item.expiresAt && item.createdAt ? (
-            <>
-              <Fuse color="amber" remaining={fuseRemaining(item.createdAt, item.expiresAt, now)} />
-              <Text variant="caption" numberOfLines={1} style={[styles.expiry, { color: c.amber }, styles.shrink]}>
-                {t("mobile.approval.expiresIn", { count: minutes })}
-              </Text>
-            </>
-          ) : (
-            <View style={styles.grow} />
-          )}
-          <Button variant="primary" size="sm" label={t("mobile.chats.wait.review")} onPress={review} />
-        </View>
-        {rest > 0 ? (
-          <Pressable
-            onPress={openWaitingActivity}
-            accessibilityRole="button"
-            // The line is 28 tall: the slop reaches over the card's bottom padding to a 44-point target.
-            hitSlop={{ top: 4, bottom: 12 }}
-            style={({ pressed }) => [styles.more, { borderTopColor: c.line2 }, pressed && styles.pressed]}
-          >
-            {faces.length > 0 ? (
-              <View style={styles.faces}>
-                {faces.map((id, i) => (
-                  <View key={id} style={i > 0 ? styles.overlap : undefined}>
-                    <AgentFace agentId={id} size={18} live={false} />
-                  </View>
-                ))}
-              </View>
-            ) : null}
-            <Text variant="small" tone="muted" numberOfLines={1} style={styles.shrink}>
-              {t("mobile.chats.wait.more", { count: rest })}
-            </Text>
-            <View style={styles.grow} />
-            <Icon name="right" size={15} color={c.faint} />
-          </Pressable>
-        ) : null}
-      </View>
+              <View style={styles.grow} />
+              <Icon name="right" size={15} color={c.faint} />
+            </Pressable>
+          ) : null
+        }
+      />
     </View>
   );
 }
@@ -312,23 +272,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  back: { position: "absolute", height: 30, borderRadius: 18 },
+  back: { position: "absolute", height: 30, borderRadius: 20 },
   back1: { bottom: 6, left: 8, right: 8 },
-  back2: { bottom: 0, left: 18, right: 18 },
-  card: { borderRadius: 22, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12, gap: 9 },
-  cardTap: { gap: 9 },
-  hd: { flexDirection: "row", alignItems: "center", gap: 8 },
-  title: { fontWeight: weights.semibold },
-  expiry: { fontWeight: weights.medium, fontVariant: ["tabular-nums"] },
-  ft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  more: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    // As much under the hairline as the card's 9-point gap above it.
-    paddingTop: 9,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
+  back2: { bottom: 0, left: 16, right: 16 },
+  more: { flexDirection: "row", alignItems: "center", gap: 8 },
   faces: { flexDirection: "row" },
   overlap: { marginLeft: -6 },
   pressed: { opacity: 0.6 },

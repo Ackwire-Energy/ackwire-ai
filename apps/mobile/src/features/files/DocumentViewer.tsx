@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 6 },
   page: { flex: 1, marginTop: 4, marginHorizontal: 16, borderTopLeftRadius: 14, borderTopRightRadius: 14 },
   clip: { overflow: "hidden" },
-  pageInner: { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 28 },
+  pageInner: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 32 },
   mono: { fontFamily: MONO, fontSize: 13, lineHeight: 19 },
   web: { flex: 1, backgroundColor: "transparent" },
   video: { backgroundColor: "#000", borderBottomLeftRadius: 14, borderBottomRightRadius: 14, marginBottom: 12 },

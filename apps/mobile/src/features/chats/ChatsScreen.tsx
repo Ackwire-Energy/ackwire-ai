@@ -17,7 +17,7 @@ import { useOpenStart } from "../me/useStart";
 import { useOpenDm } from "../new/useOpenDm";
 import { OutageNotices } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
-import { RightHandPin } from "../right-hand/Pin";
+import { RightHandAsk } from "../right-hand/Pin";
 import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { useActiveWork, useConversations, useHiddenAgents, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider } from "../shared/SheetHost";
@@ -108,7 +108,7 @@ function Home() {
   const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waiting.refetch(), outages.refetch()]));
   const openDm = useOpenDm();
   const startDm = useCallback((agentId: string) => void openDm({ agentId }), [openDm]);
-  // The right hand (ADR 0137): the first row of Agentes, not one of its sorted rows; outside its audience, none.
+  // The right hand (ADR 0137): its own field under the greeting, not one of Agentes' rows; outside its audience, none.
   const rightHand = rightHandOf(dir.agents);
   const pinned = rightHandPin(list.rows, rightHand && canTalk(rightHand) ? rightHand : undefined);
   const starters = useMemo(
@@ -143,10 +143,7 @@ function Home() {
   }, [offerPush, markOffered]);
   const strip = <WaitingStrip items={waiting.items} open={waitOpen} onOpenChange={setWaitOpen} />;
 
-  const pin =
-    pinned.pin && !failed && !list.loading ? (
-      <RightHandPin row={pinned.pin} agent={agentStates.get(pinned.pin.key)} onStart={startDm} />
-    ) : null;
+  const ask = pinned.pin && !failed && !list.loading ? <RightHandAsk row={pinned.pin} onStart={startDm} /> : null;
 
   let live = 0;
   return (
@@ -156,7 +153,12 @@ function Home() {
       backdrop={empty || failed ? undefined : <GreetingSky />}
       below={
         empty || failed ? undefined : (
-          <Greeting working={working} finished={finished.finished} onFinishedPress={(f) => finished.dismiss(f.key)} />
+          <Greeting
+            working={working}
+            finished={finished.finished}
+            onFinishedPress={(f) => finished.dismiss(f.key)}
+            after={ask}
+          />
         )
       }
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
@@ -166,12 +168,10 @@ function Home() {
       <OutageNotices />
       {list.stale && !failed ? <HomeServerNotice retry={list.refetch} /> : null}
       {strip}
-      {/* No Agentes section yet (no other agent): it stands on its own on top. */}
-      {pin && !sections.some((b) => b.key === "agents") ? pin : null}
       {failed || empty || list.loading ? null : (
         <>
           {/* Início's widgets, and the way to Dashboards ("See all"), not a tab (ADR 0135 §15). */}
-          <HomeWidgets />
+          <HomeWidgets collapsed={collapsed.includes("widgets")} onToggle={() => toggle("widgets")} />
           <FirstSteps collapsed={collapsed} onToggle={toggle} />
         </>
       )}
@@ -186,13 +186,11 @@ function Home() {
       ) : (
         sections.map((s) => {
           const off = collapsed.includes(s.key);
-          // Agentes opens with the right hand, kept in sight while it is closed.
-          const lead = s.key === "agents" ? pin : null;
           const row = (r: ConversationRow, i: number, shown: boolean) => (
             <ConversationRowView
               key={r.key}
               row={r}
-              divider={i > 0 || Boolean(lead)}
+              divider={i > 0}
               live={shown && live++ < LIVE_ROWS}
               agent={agentStates.get(r.key)}
               pinned={i < (s.pinned ?? 0)}
@@ -212,10 +210,8 @@ function Home() {
               onToggle={() => toggle(s.key)}
               // A closed category keeps its unread channels in sight, as on the web.
               {...(s.categoryId && s.unread.length > 0 ? { kept: s.unread.map((r, i) => row(r, i, true)) } : {})}
-              {...(lead ? { kept: lead } : {})}
               {...(hold ? { onLongPress: hold, holdLabel: t("mobile.categories.title") } : {})}
             >
-              {lead}
               {s.rows.map((r, i) => row(r, i, !off))}
               {s.more ? (
                 <SeeAllRow

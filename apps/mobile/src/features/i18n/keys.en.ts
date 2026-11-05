@@ -1252,6 +1252,9 @@ export const featureKeysEn = {
     review: "Review",
     answer: "Reply",
     open: "Open",
+    toolsTitle: "Changed tools you approved",
+    toolsWhy: "Agents keep the version you approved until you accept the new one.",
+    reviewChanges: "Review the changes",
     clear: {
       title: "Nothing waiting on you",
       text: "When an agent needs you, it shows up here first.",

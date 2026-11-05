@@ -1,6 +1,19 @@
-import type { ToolChange } from "@agenteschat/client";
-import { inputFields } from "@agenteschat/client/lib/custom-tools";
-import { type DiffLine, diffLines } from "@agenteschat/ui";
+import type { TFunction } from "i18next";
+import type { ToolChange } from "../api/types";
+import { inputFields } from "./custom-tools";
+
+/** A line of a before/after diff, as the design system's `diffLines` gives it (each app passes that in). */
+export interface DiffLine {
+  kind: "same" | "add" | "del";
+  text: string;
+}
+/** Two lists of lines diffed line by line: this package stays platform-neutral, so the app hands it its differ. */
+export type LineDiff = (before: string[], after: string[]) => DiffLine[];
+
+/*
+ * What a connected server changed in an approved tool (ADR 0117), cut down to the changes: shared by the web's
+ * Conectores and the phone's Ferramentas, so both say the same thing about the same change.
+ */
 
 /** Marks the unchanged lines left out between two changes (ADR 0117 review: only what changed, briefly framed). */
 export const ELIDED = "…";
@@ -31,8 +44,6 @@ export function changedOnly(lines: DiffLine[], context = 1): DiffLine[] {
   });
   return out;
 }
-
-const diffText = (before: string, after: string) => changedOnly(diffLines(textUnits(before), textUnits(after)));
 
 /** A schema with its keys sorted, as lines: two versions differ here only when their content does. */
 function schemaLines(value: unknown): string[] {
@@ -73,8 +84,9 @@ export interface ToolChangeDiff {
 }
 
 /** What a server changed in an approved tool, cut down to the changes (ADR 0117). */
-export function toolChangeDiff(change: Pick<ToolChange, "before" | "after">): ToolChangeDiff {
+export function toolChangeDiff(change: Pick<ToolChange, "before" | "after">, diffLines: LineDiff): ToolChangeDiff {
   const { before, after } = change;
+  const diffText = (was: string, now: string) => changedOnly(diffLines(textUnits(was), textUnits(now)));
   const description = before.description === after.description ? null : diffText(before.description, after.description);
   const oldFields = new Map(inputFields(before.inputSchema).map((f) => [f.name, f]));
   const newFields = new Map(inputFields(after.inputSchema).map((f) => [f.name, f]));
@@ -97,4 +109,13 @@ export function toolChangeDiff(change: Pick<ToolChange, "before" | "after">): To
   const newTop = schemaLines(without(after.inputSchema, "properties"));
   const schema = oldTop.join("\n") === newTop.join("\n") ? null : changedOnly(diffLines(oldTop, newTop));
   return { description, fields, schema };
+}
+
+/** "O texto mudou · 2 campos mudaram": what changed, in a few words (the list's line under each tool's name). */
+export function toolChangeSummary(t: TFunction, diff: ToolChangeDiff): string {
+  const parts: string[] = [];
+  if (diff.description) parts.push(t("connectors.toolChanges.textChanged"));
+  if (diff.fields.length > 0) parts.push(t("connectors.toolChanges.fieldsChanged", { count: diff.fields.length }));
+  if (parts.length === 0) parts.push(t("connectors.toolChanges.inputChanged"));
+  return parts.join(" · ");
 }
