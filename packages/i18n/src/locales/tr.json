@@ -3809,6 +3809,34 @@
       "review": "İnceleme",
       "delivery": "Teslim",
       "open": "Aç"
+    },
+    "review": {
+      "list": "İstekler",
+      "where": "Nerede",
+      "effect": "Etkisi",
+      "effects": {
+        "external": "Şirket dışına çıkar",
+        "production": "Canlı ortama gider",
+        "unsent": "Hiçbir şey gönderilmez",
+        "readsOnly": "Yalnızca okur"
+      },
+      "undo": "Geri alma",
+      "deadline": "Kalan süre",
+      "decides": "Kim karar verir",
+      "state": "Durum",
+      "why": "{{name}} neden istiyor",
+      "email": "E-posta",
+      "text": "Yayımlanacak olan",
+      "textDone": "Yayımlanan",
+      "values": "Yapacağı şey",
+      "valuesDone": "Yaptığı şey",
+      "more": "Tümünü göster",
+      "less": "Daha az göster",
+      "trail": "Buraya nasıl gelindi",
+      "showSteps": "Her adımı gör",
+      "hideSteps": "Adımları gizle",
+      "asked": "Onay istedi",
+      "grants": "{{name}} yalnızca bu seferlik ve bu değerlerle şunu yapacak: {{doing}}."
     }
   },
   "agent": {

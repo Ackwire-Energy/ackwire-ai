@@ -42,7 +42,9 @@ export function approvalTitle(
   }
   const inner = innerTool(approval);
   if (inner) return toolName(t, partsOf(inner), inner);
-  if (!OWN_TITLES.has(approval.tool)) return approval.title;
+  // A server title that is only the tool's own name ("GitHub: add_issue_comment") reads as the tool in words.
+  if (!OWN_TITLES.has(approval.tool))
+    return rawToolTitle(approval) ? toolName(t, partsOf(approval.tool), approval.tool) : approval.title;
   const p = approval.params ?? {};
   const s = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v) : "");
   return t(`approval.titles.${approval.tool}`, {
@@ -83,6 +85,12 @@ const READ_VERBS = new Set([
   "preview",
   "lookup",
 ]);
+
+/** The title is the tool's identifier, bare or after the connector's name ("GitHub: add_issue_comment"). */
+function rawToolTitle(approval: Pick<Approval, "tool" | "title">) {
+  const title = approval.title.trim();
+  return /^[a-z][a-z0-9_]*$/i.test(approval.tool) && (title === approval.tool || title.endsWith(`: ${approval.tool}`));
+}
 
 /** A connector tool that runs another one by name (`{ name, arguments }`): that tool's name, when it reads as one. */
 function innerTool(approval: Pick<Approval, "params"> & Partial<Pick<Approval, "connector">>): string | null {

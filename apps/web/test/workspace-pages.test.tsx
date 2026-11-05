@@ -29,29 +29,44 @@ describe("Aprovações", () => {
     within(screen().getByRole("radiogroup", { name: "Filtro" }))
       .getAllByRole("radio")
       .map((b) => b.textContent);
+  /** A request's row in the list. */
+  const row = (id: string) => document.querySelector(`.ap-li[data-id="${id}"]`) as HTMLElement;
+  /** The request open beside the list, by its title. */
+  const pane = (name: string) => {
+    const el = screen().getByRole("region", { name });
+    expect(el.classList.contains("ap-review")).toBe(true);
+    return el;
+  };
+  const refuse = async (open: HTMLElement) => {
+    await click(within(open).getByRole("button", { name: /^Recusar/ }));
+    await click(within(open).getByRole("button", { name: "Falta teste" }));
+    await click(within(open).getByRole("button", { name: /Recusar e avisar/ }));
+    await settle(4);
+  };
 
-  test("waiting cards with the exact action; refusing sends the reason and moves it to the history", async () => {
+  test("waiting rows, the first open beside them; refusing sends the reason and moves it to the history", async () => {
     const { state } = await go("approvals");
     // A zero count isn't shown.
     expect(pills()).toEqual(["Esperando você2", "Aprovados1", "Recusados", "Expirados", "Todos3"]);
-    const merge = screen().getByRole("article", { name: "Merge PR #42 into main" });
+    const merge = row("ap-merge");
     expect(merge.textContent).toContain("Ada");
-    expect(merge.textContent).toContain("#eng");
-    expect(merge.querySelector(".ac-chip")?.textContent).toMatch(/\d+ h para decidir$/);
-    expect(within(merge).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
-    // Deploy is high risk: the button asks for a hold.
-    const deploy = screen().getByRole("article", { name: "Run deploy workflow" });
+    expect(merge.querySelector(".ap-li__left")?.textContent).toMatch(/^\d+ h$/);
+    // Deploy, closest to expiring, opens first. It is high risk: the button asks for a hold.
+    const deploy = pane("Run deploy workflow");
     expect(within(deploy).getByRole("button", { name: "Aprovar deploy: segure para confirmar" })).toBeTruthy();
-    expect(deploy.textContent).toContain("Produção");
+    expect(deploy.querySelector(".ac-facts")?.textContent).toContain("Vai para produção");
 
-    await click(within(merge).getByRole("button", { name: "Recusar" }));
-    await click(within(merge).getByRole("button", { name: "Falta teste" }));
-    await click(within(merge).getByRole("button", { name: /Recusar e avisar/ }));
-    await settle(4);
+    await click(merge);
+    await settle(2);
+    const open = pane("Merge PR #42 into main");
+    expect(open.querySelector(".ap-review__by")?.textContent).toContain("#eng");
+    expect(within(open).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
+    await refuse(open);
     expect(state.calls.find((c) => c.method === "approvals.refuse")?.args).toEqual([ORG_ID, "ap-merge", "Falta teste"]);
     expect(pills()).toEqual(["Esperando você1", "Aprovados1", "Recusados1", "Expirados", "Todos3"]);
-    expect(screen().queryByRole("article", { name: "Merge PR #42 into main" })).toBeNull();
-    expect(screen().getByText("Decididos há pouco")).toBeTruthy();
+    // Under Recent now, refused.
+    expect(row("ap-merge").closest(".ap-list__section")?.querySelector("h2")?.textContent).toBe("Decididos há pouco");
+    expect(row("ap-merge").textContent).toContain("Recusado");
   });
 
   test("nothing waiting: All decided and one link to how approvals work; the header says no more", async () => {
@@ -66,54 +81,45 @@ describe("Aprovações", () => {
     expect(document.querySelector(".list-head")?.querySelectorAll("p")).toHaveLength(1);
   });
 
-  test("refusing asks why, optional; the exact action is approved only for its values", async () => {
+  test("refusing asks why, optional; approving covers this once, with these values", async () => {
     await go("approvals?open=ap-merge");
-    const dialog = screen().getByRole("dialog", { name: "Merge PR #42 into main" });
-    expect(within(dialog).getByRole("region", { name: "A ação exata" }).textContent).toContain(
-      "Só para estes valores: qualquer mudança precisa de nova aprovação.",
+    const open = pane("Merge PR #42 into main");
+    expect(open.querySelector(".ap-bar__text")?.textContent).toBe(
+      "Ada vai fazer um merge, só desta vez e com estes valores.",
     );
-    await click(within(dialog).getByRole("button", { name: /^Recusar/ }));
-    const why = within(dialog).getByLabelText("Por que não?");
+    await click(within(open).getByRole("button", { name: /^Recusar/ }));
+    await settle(2);
+    const why = within(open).getByLabelText("Por que não?");
     expect(why.getAttribute("placeholder")).toBe("Opcional");
-    expect(dialog.textContent).toContain("Vira uma lição na memória da Ada");
+    expect(open.textContent).toContain("Vira uma lição na memória da Ada");
   });
 
   test("a normal-risk approval goes with one click", async () => {
-    const { state } = await go("approvals");
-    const merge = screen().getByRole("article", { name: "Merge PR #42 into main" });
-    await click(within(merge).getByRole("button", { name: "Aprovar merge" }));
+    const { state } = await go("approvals?open=ap-merge");
+    await click(within(pane("Merge PR #42 into main")).getByRole("button", { name: "Aprovar merge" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "approvals.approve")?.args[1]).toBe("ap-merge");
   });
 
-  test("the details dialog shows the exact action and who may decide, kept in ?open=", async () => {
+  test("a row opens its request beside the list, kept in ?open=, with no dialog", async () => {
     const { router } = await go("approvals");
-    const merge = screen().getByRole("article", { name: "Merge PR #42 into main" });
-    await click(within(merge).getByRole("button", { name: "Detalhes" }));
+    await click(row("ap-merge"));
     await settle(2);
-    const dialog = screen().getByRole("dialog", { name: "Merge PR #42 into main" });
-    expect(dialog.textContent).toContain("Pedido de aprovação");
-    expect(within(dialog).getByRole("region", { name: "A ação exata" })).toBeTruthy();
-    expect(within(dialog).getByRole("region", { name: "Quem pode decidir" })).toBeTruthy();
-    expect(within(dialog).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
     expect(router.state.location.search).toMatchObject({ open: "ap-merge" });
-    await click(within(dialog).getByRole("button", { name: "Fechar" }));
-    await settle(2);
+    const open = pane("Merge PR #42 into main");
+    expect(open.textContent).toContain("O que vai fazer");
+    expect(open.textContent).toContain("Como chegou aqui");
+    expect(within(open).getByRole("button", { name: "Aprovar merge" })).toBeTruthy();
     expect(screen().queryByRole("dialog")).toBeNull();
-    expect(router.state.location.search).toEqual({});
   });
 
-  test("a link with ?open= reopens the request's details; refusing works from the dialog", async () => {
+  test("a link with ?open= opens that request; refusing works from its decision bar", async () => {
     const { state } = await go("approvals?open=ap-merge");
-    const dialog = screen().getByRole("dialog", { name: "Merge PR #42 into main" });
-    await click(within(dialog).getByRole("button", { name: /^Recusar/ }));
-    await click(within(dialog).getByRole("button", { name: "Falta teste" }));
-    await click(within(dialog).getByRole("button", { name: /Recusar e avisar/ }));
-    await settle(4);
+    await refuse(pane("Merge PR #42 into main"));
     expect(state.calls.find((c) => c.method === "approvals.refuse")?.args).toEqual([ORG_ID, "ap-merge", "Falta teste"]);
   });
 
-  test("a connector tool that runs another by name reads as that action, in words, with the tool behind Detalhes técnicos", async () => {
+  test("a connector tool that runs another by name reads as that action, in words, with the tool behind Technical details", async () => {
     const state = seedState();
     const merge = state.approvals[0];
     if (!merge) throw new Error("no approval");
@@ -129,24 +135,33 @@ describe("Aprovações", () => {
       },
     ];
     await go("approvals", state);
-    const card = screen().getByRole("article", { name: "Ver stack trace do evento" });
-    expect(card.textContent).toContain("Só lê");
-    expect(card.textContent).toContain("Issue: ACME-177");
-    expect(card.textContent).not.toContain("custom:");
-    expect(card.textContent).not.toContain("get_event_stacktrace");
-    await click(within(card).getByRole("button", { name: "Detalhes" }));
-    await settle(2);
-    const dialog = screen().getByRole("dialog", { name: "Ver stack trace do evento" });
-    expect(dialog.querySelector(".ap-exact__tech pre")?.textContent).toContain("get_event_stacktrace");
+    const line = row("ap-trace");
+    expect(line.querySelector(".ap-li__line")?.textContent).toBe("Ada quer ver stack trace do evento");
+    expect(line.textContent).not.toContain("custom:");
+    expect(line.textContent).not.toContain("get_event_stacktrace");
+    const open = pane("Ver stack trace do evento");
+    const facts = open.querySelector(".ac-facts") as HTMLElement;
+    expect(facts.textContent).toContain("Só lê");
+    expect(facts.textContent).not.toContain("custom:");
+    const values = [...open.querySelectorAll(".ap-exact__rows > div")].map((d) => [
+      d.querySelector("dt")?.textContent,
+      d.querySelector("dd")?.textContent,
+    ]);
+    expect(values).toContainEqual(["Issue", "ACME-177"]);
+    expect(open.querySelector(".ap-review__title")?.textContent).not.toContain("get_event_stacktrace");
+    expect(open.querySelector(".ap-exact__tech pre")?.textContent).toContain("get_event_stacktrace");
   });
 
   test("approvals you can't decide show who they wait for, without buttons", async () => {
     const state = seedState();
     for (const a of state.approvals) a.canDecide = false;
     await go("approvals", state);
-    const merge = screen().getByRole("article", { name: "Merge PR #42 into main" });
-    expect(merge.querySelector(".ac-chip")?.textContent).toBe("Aguardando João");
-    expect(within(merge).queryByRole("button", { name: "Recusar" })).toBeNull();
+    expect(row("ap-merge").querySelector(".ap-li__left")?.textContent).toBe("Aguardando João");
+    await click(row("ap-merge"));
+    await settle(2);
+    const open = pane("Merge PR #42 into main");
+    expect(within(open).queryByRole("button", { name: /^Recusar/ })).toBeNull();
+    expect(open.querySelector("[data-approve]")).toBeNull();
   });
 });
 

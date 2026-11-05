@@ -35804,5 +35804,101 @@
   },
   "agentPage.work.brain.accountOthers": {
     "value": "Other people's plans show whose they are. Their owner gets an email and can take it back."
+  },
+  "dm.profile": {
+    "value": "View profile"
+  },
+  "aiAccounts.connect.needsCloud.claude_code": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "aiAccounts.connect.needsCloud.codex": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "aiAccounts.connect.needsCloud.cursor": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "aiAccounts.connect.needsCloud.opencode": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "rightHand.callWith": {
+    "value": "call with @{{handle}}"
+  },
+  "sidebarAgents.seeAll": {
+    "value": {
+      "one": "See the {{count}} agent",
+      "other": "See all {{count}} agents"
+    }
+  },
+  "approvals.review.list": {
+    "value": "Requests"
+  },
+  "approvals.review.where": {
+    "value": "Where"
+  },
+  "approvals.review.effect": {
+    "value": "Effect"
+  },
+  "approvals.review.effects.external": {
+    "value": "Leaves the company"
+  },
+  "approvals.review.effects.production": {
+    "value": "Goes to production"
+  },
+  "approvals.review.effects.unsent": {
+    "value": "Nothing is sent"
+  },
+  "approvals.review.effects.readsOnly": {
+    "value": "Only reads"
+  },
+  "approvals.review.undo": {
+    "value": "Undo"
+  },
+  "approvals.review.deadline": {
+    "value": "Time left"
+  },
+  "approvals.review.decides": {
+    "value": "Who decides"
+  },
+  "approvals.review.state": {
+    "value": "Status"
+  },
+  "approvals.review.why": {
+    "value": "Why {{name}} asks"
+  },
+  "approvals.review.email": {
+    "value": "The email"
+  },
+  "approvals.review.text": {
+    "value": "What it will publish"
+  },
+  "approvals.review.textDone": {
+    "value": "What it published"
+  },
+  "approvals.review.values": {
+    "value": "What it will do"
+  },
+  "approvals.review.more": {
+    "value": "Show all"
+  },
+  "approvals.review.less": {
+    "value": "Show less"
+  },
+  "approvals.review.trail": {
+    "value": "How it got here"
+  },
+  "approvals.review.showSteps": {
+    "value": "See each step"
+  },
+  "approvals.review.hideSteps": {
+    "value": "Hide the steps"
+  },
+  "approvals.review.asked": {
+    "value": "Asked for approval"
+  },
+  "approvals.review.grants": {
+    "value": "{{name}} will {{doing}}, this once, with these values."
+  },
+  "approvals.review.valuesDone": {
+    "value": "What it did"
   }
 }

@@ -3682,6 +3682,34 @@
       "review": "レビュー",
       "delivery": "納品",
       "open": "開く"
+    },
+    "review": {
+      "list": "リクエスト",
+      "where": "場所",
+      "effect": "影響",
+      "effects": {
+        "external": "社外に出ます",
+        "production": "本番環境に反映されます",
+        "unsent": "何も送信されません",
+        "readsOnly": "読み取りのみ"
+      },
+      "undo": "元に戻す",
+      "deadline": "残り時間",
+      "decides": "決める人",
+      "state": "状況",
+      "why": "{{name}}が求める理由",
+      "email": "メール",
+      "text": "公開される内容",
+      "textDone": "公開した内容",
+      "values": "実行する内容",
+      "valuesDone": "実行した内容",
+      "more": "すべて表示",
+      "less": "表示を減らす",
+      "trail": "ここまでの流れ",
+      "showSteps": "各ステップを見る",
+      "hideSteps": "ステップを隠す",
+      "asked": "承認を求めました",
+      "grants": "{{name}}は今回だけ、この値で{{doing}}。"
     }
   },
   "agent": {

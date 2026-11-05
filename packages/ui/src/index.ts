@@ -160,6 +160,7 @@ export {
   readRecentEmoji,
   rememberEmoji,
 } from "./components/EmojiPicker";
+export { type Fact, FactStrip, type FactTone } from "./components/FactStrip";
 export {
   AffixInput,
   Field,
@@ -322,6 +323,7 @@ export {
   TopProgress,
   useDelayed,
 } from "./components/Skeleton";
+export { StepTrack, type StepTrackState, type StepTrackStep } from "./components/StepTrack";
 export {
   Alert,
   Card,
