@@ -986,7 +986,11 @@ function Chat({
     }
   };
   const onPlus = async (pick: PlusPick) => {
-    sheet.close();
+    // The library, the camera and the files picker open once the sheet is gone: presented over it while it slid out,
+    // iOS took them away with it and the app waited for an answer that never came.
+    const system = pick === "camera" || pick === "photos" || pick === "file";
+    if (system) await new Promise<void>((done) => sheet.close(done));
+    else sheet.close();
     switch (pick) {
       case "camera": {
         const perm = await ImagePicker.requestCameraPermissionsAsync();
