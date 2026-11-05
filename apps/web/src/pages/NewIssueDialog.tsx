@@ -388,7 +388,7 @@ export function NewIssueDialog({
                 <DueDate value={due} onChange={setDue} />
               </Field>
               {agent && (
-                <div className="issue-new__who">
+                <div className="issue-new__who ac-iconline">
                   <ActorAvatar actor={{ type: "agent", id: agent.id }} name={agent.name} size="sm" />
                   <span>{t("issues.form.agentStartsAll", agentGrammar(agent.name))}</span>
                 </div>

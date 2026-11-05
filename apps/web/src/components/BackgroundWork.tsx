@@ -1,7 +1,7 @@
 import { type Issue, type Message, useChannels, type WorkView } from "@agenteschat/client";
 import { blockedText, workLine, workPlanProgress } from "@agenteschat/client/lib/long-work";
 import { can } from "@agenteschat/client/lib/permissions";
-import { WorkLine, WorkLineAction, WorkPlan } from "@agenteschat/ui";
+import { Icon, WorkLine, WorkLineAction, WorkPlan } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -184,7 +184,12 @@ export function IssueCardWork({ issue }: { issue: Issue }) {
   const step = live ? (work.plan.find((p) => p.state === "doing") ?? work.plan.find((p) => p.state === "todo")) : null;
   return (
     <span className="issue-card__work">
-      {blocked && <span className="issue-card__blocked">{blocked}</span>}
+      {blocked && (
+        <span className="ac-iconline issue-card__blocked">
+          <Icon name={issue.blocked?.reason === "failed" ? "alert" : "waiting"} size={14} />
+          <span>{blocked}</span>
+        </span>
+      )}
       {live && progress && (
         <span className="issue-card__plan">
           <span className="issue-card__plan-head">

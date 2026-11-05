@@ -1355,7 +1355,7 @@ function RoutineDetails({ routine: r, now, onClose }: { routine: Routine; now: D
                             to="/org/$orgId/approvals"
                             params={{ orgId: org.id }}
                             search={{ open: a.id }}
-                            className="routine-ahead__title"
+                            className="routine-ahead__title ac-captop"
                           >
                             {approvalTitle(t, { ...a, email: null })}
                           </Link>
@@ -1366,7 +1366,7 @@ function RoutineDetails({ routine: r, now, onClose }: { routine: Routine; now: D
                           </small>
                         </span>
                         {a.canCancel && (
-                          <span className="ac-acts">
+                          <span className="ac-acts ac-captop">
                             <CancelAhead id={a.id} />
                           </span>
                         )}
@@ -2482,7 +2482,7 @@ function RoutineDialog({
                       <Icon name={p.icon} size={16} />
                     </span>
                     <span>
-                      <b>{t(`routines.presets.${p.key}.name`)}</b>
+                      <b className="ac-captop">{t(`routines.presets.${p.key}.name`)}</b>
                       <small>{t(`routines.presets.${p.key}.text`)}</small>
                     </span>
                   </button>

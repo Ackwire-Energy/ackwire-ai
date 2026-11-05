@@ -542,11 +542,14 @@ html:not([data-pointer]) .cal-band:focus-visible {
   font-weight: 600;
   color: var(--ink);
 }
+/* An icon and a value that may wrap (a long link): the icon stays on the first line (`.ac-iconline`). */
 .cal-details__row {
-  display: inline-flex;
-  align-items: center;
   gap: 6px;
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+.cal-details__row > :last-child {
+  min-width: 0;
 }
 .cal-details__people {
   list-style: none;
