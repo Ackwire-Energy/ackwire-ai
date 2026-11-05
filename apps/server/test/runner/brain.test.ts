@@ -417,6 +417,10 @@ test("parser: a failed turn says why the provider failed it, from Claude Code's 
   expect(fail(retry("overloaded", 529), failed)).toMatchObject({ cause: "provider_transient", httpStatus: 529 });
   expect(fail(retry("server_error", 500), failed)).toMatchObject({ cause: "provider_transient", httpStatus: 500 });
   expect(fail(retry("unknown", null), failed)).toMatchObject({ code: "claude_failed", cause: "network" });
+  // A retry that came through is not why the turn failed later.
+  const reply = { type: "assistant", parent_tool_use_id: null, message: { id: "m3", content: [] } };
+  expect(fail(retry("overloaded", 529), reply, failed)).toMatchObject({ code: "claude_failed", cause: "unknown" });
+  expect(fail(retry("overloaded", 529), reply, failed)).not.toHaveProperty("httpStatus");
   expect(fail({ ...failed, errors: ["API Error: Connection error. (ECONNRESET)"] })).toMatchObject({
     cause: "network",
   });

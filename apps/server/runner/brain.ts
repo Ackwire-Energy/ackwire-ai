@@ -440,6 +440,9 @@ export class ClaudeStreamParser {
           const said = content.map((b) => (isObj(b) && b.type === "text" ? str(b.text) : "")).join("\n");
           const failure = providerFailure({ error: ev.error, text: said });
           if (failure.cause || failure.httpStatus) this.failure = failure;
+        } else {
+          // A reply came through: an earlier retry's cause is not why the turn may fail later.
+          this.failure = {};
         }
         const messageId = isObj(ev.message) ? str(ev.message.id) : "";
         if (messageId && isObj(ev.message) && isObj(ev.message.usage))
