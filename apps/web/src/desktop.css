@@ -146,6 +146,20 @@ html[data-desktop="mac"]:not([data-fullscreen]) .onb__rail {
   }
 }
 
+/* Drawers from the window's left edge cover the title bar, and the window's buttons stay on top of them: the
+   sidebar's and the wiki's pages, which a window zoomed in with ⌘+ narrows to, start under the buttons as the
+   onboarding's rail does, instead of their first row sitting behind them. */
+@media (max-width: 760px) {
+  html[data-desktop="mac"]:not([data-fullscreen]) .shell .sidebar {
+    padding-top: calc(var(--titlebar-h) + 8px);
+  }
+}
+@media (max-width: 900px) {
+  html[data-desktop="mac"]:not([data-fullscreen]) .wiki-nav {
+    padding-top: calc(var(--titlebar-h) + 8px);
+  }
+}
+
 /*
  * An app, not a page: the interface's own words don't select (messages, pages and
  * fields still do), buttons keep the Mac's arrow (links keep the hand), nothing of the interface drags out
