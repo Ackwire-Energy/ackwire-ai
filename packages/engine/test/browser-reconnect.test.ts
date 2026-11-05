@@ -35,10 +35,12 @@ const PAGE = { snapshot: '- heading "agentes.chat" [ref=e1]', origin: "https://a
  */
 function browserRunner(hub: MachineHub, opts: { dead?: boolean; closedBrowser?: boolean } = {}) {
   const got: Request[] = [];
+  const acks: number[] = [];
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
   const socket = {
     send(text: string) {
       const frame = JSON.parse(text) as ServerFrame;
+      if (frame.type === "browser.ack") acks.push(frame.seq);
       if (frame.type !== "request") return;
       got.push(frame);
       setTimeout(() => {
@@ -68,6 +70,7 @@ function browserRunner(hub: MachineHub, opts: { dead?: boolean; closedBrowser?: 
   const conn = hub.open(socket);
   return {
     conn,
+    acks,
     starts: () => got.filter((r) => r.op === "browser.stream.start"),
     batches: () => got.filter((r) => r.op === "browser.batch"),
     hello: (token: string) =>
@@ -112,6 +115,20 @@ const kinds = (got: BrowserLiveMessage[]) =>
 const until = async (done: () => boolean) => {
   for (let i = 0; i < 100 && !done(); i++) await Bun.sleep(5);
 };
+
+test("the stream starts with a frame window, and each frame the server gets is acknowledged to the runner", async () => {
+  const { hub, paired, live, got, viewer } = await liveSetup();
+  const runner = browserRunner(hub);
+  await runner.hello(paired.token);
+  await live.watch(viewer, f.org.id, f.agent.id);
+  await until(() => runner.starts().length === 1);
+  expect(runner.starts()[0]).toMatchObject({ op: "browser.stream.start", mode: "watch", window: 2 });
+  await runner.frame(1);
+  await runner.frame(2);
+  expect(runner.acks).toEqual([1, 2]);
+  expect(got.flatMap((m) => (m.type === "browser.frame" ? [m.seq] : []))).toEqual([1, 2]);
+  live.close();
+});
 
 test("a runner that restarts and says hello before its old socket's close is asked for the stream: the page comes back", async () => {
   const { hub, paired, live, got, viewer } = await liveSetup();

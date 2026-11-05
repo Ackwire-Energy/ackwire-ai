@@ -30,7 +30,7 @@ export interface BrowserFrame {
 /** Who is in control and the open request, on watch and whenever it changes. */
 export interface BrowserLiveStatus {
   agentId: string;
-  /** `watch`: about one frame a second; `control`: smooth while a person drives. */
+  /** `watch`: a few frames a second; `control`: smooth while a person drives. */
   mode: "watch" | "control";
   controllerUserId: string | null;
   handoff: BrowserHandoff | null;

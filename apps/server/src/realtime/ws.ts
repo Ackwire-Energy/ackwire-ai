@@ -36,8 +36,10 @@ import { allowedOrigins, requestOriginAllowed } from "../routes/app/context";
 import {
   BROWSER_INPUT_PER_SECOND,
   type BrowserClientFrame,
+  createViewerPacer,
   MAX_WATCHED_BROWSERS,
   parseBrowserClientFrame,
+  type ViewerPacer,
 } from "./browser";
 import type { MachineSocketData, MachineSockets } from "./machines";
 import type { StreamSocketData, StreamSockets } from "./streams";
@@ -100,6 +102,8 @@ export interface BrowserSocketData {
   pending: Map<string, { revoked: boolean }>;
   /** Agents' browsers this socket watches (ADR 0040), by agent id: the stop function. */
   browsers: Map<string, () => void>;
+  /** Their frame windows, for clients that answer each frame (`browser.ack`, ADR 0040 §7.1). */
+  browserPacers: Map<string, ViewerPacer>;
 }
 
 /** Every socket of the server: browsers (`/api/ws`), runners (`/api/machines/connect`) and streams (ADR 0058). */
@@ -373,6 +377,18 @@ export function createRealtime(deps: RealtimeDeps) {
     startingBrowsers.add(starting);
     ws.data.browsers.set(agentId, starting);
     let stop: () => void;
+    // Before the watch: it sends the status and the newest frame at once.
+    ws.data.browserPacers.get(agentId)?.close();
+    const deliver = (message: { type: string }) => {
+      if (ws.readyState === 1) send(ws, message);
+    };
+    const pacer = frame.acks ? createViewerPacer(deliver) : null;
+    if (pacer) ws.data.browserPacers.set(agentId, pacer);
+    else ws.data.browserPacers.delete(agentId);
+    const ended = () => {
+      pacer?.close();
+      if (ws.data.browserPacers.get(agentId) === pacer) ws.data.browserPacers.delete(agentId);
+    };
     try {
       const profileId = profileIdOfKey(agentId);
       if (profileId) await requireProfileWatcher(deps.db, user.id, orgId, profileId);
@@ -380,9 +396,7 @@ export function createRealtime(deps: RealtimeDeps) {
       stop = await live.watch(
         {
           userId: user.id,
-          send: (message) => {
-            if (ws.readyState === 1) send(ws, message);
-          },
+          send: pacer ? (message) => pacer.send(message) : deliver,
           // Backed up (a slow phone link): skip frames, the next one sent is the newest.
           busy: () => ws.getBufferedAmount() > 1024 * 1024,
         },
@@ -390,6 +404,7 @@ export function createRealtime(deps: RealtimeDeps) {
         agentId,
       );
     } catch (error) {
+      ended();
       startingBrowsers.delete(starting);
       // Whatever failed, the placeholder goes: a later `browser.watch` tries again.
       if (ws.data.browsers.get(agentId) === starting) ws.data.browsers.delete(agentId);
@@ -398,6 +413,11 @@ export function createRealtime(deps: RealtimeDeps) {
       return send(ws, { type: "browser.unavailable", agentId, reason: "unavailable", message: "try again" });
     }
     startingBrowsers.delete(starting);
+    const watched = stop;
+    stop = () => {
+      watched();
+      ended();
+    };
     // Closed or unwatched while it was starting: stop at once.
     if (ws.readyState !== 1 || ws.data.browsers.get(agentId) !== starting) return stop();
     ws.data.browsers.set(agentId, stop);
@@ -445,6 +465,7 @@ export function createRealtime(deps: RealtimeDeps) {
         system: [],
         pending: new Map(),
         browsers: new Map(),
+        browserPacers: new Map(),
       };
       return server.upgrade(req, { data }) ? undefined : new Response("WebSocket upgrade failed", { status: 400 });
     },
@@ -542,6 +563,8 @@ export function createRealtime(deps: RealtimeDeps) {
         const ws = socket as BrowserSocket;
         const browserFrame = deps.browserLive ? parseBrowserClientFrame(raw) : null;
         if (browserFrame?.type === "browser.input") return browserInput(ws, browserFrame);
+        // A frame drawn: nothing to check, it only lets the next frame of a view this socket already has go.
+        if (browserFrame?.type === "browser.ack") return void ws.data.browserPacers.get(browserFrame.agentId)?.ack();
         if (!(await liveSession(ws))) return;
         if (browserFrame) {
           return browserMessage(ws, browserFrame).catch(() => {

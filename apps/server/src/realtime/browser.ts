@@ -1,10 +1,19 @@
-import { BROWSER_LIMITS, type BrowserInputEvent, parseBrowserInputEvent } from "@agenteschat/adapters";
+import {
+  BROWSER_FRAME_WINDOW,
+  BROWSER_LIMITS,
+  type BrowserInputEvent,
+  parseBrowserInputEvent,
+} from "@agenteschat/adapters";
 
 /**
  * The agent browser's live view on `/api/ws` (ADR 0040 §7). Client frames:
  *
- * - `{"type":"browser.watch","agentId"}`: start getting that agent's browser
- *   (checked like the HTTP routes: `requireBrowserAccess`).
+ * - `{"type":"browser.watch","agentId","acks"?:true}`: start getting that
+ *   agent's browser (checked like the HTTP routes: `requireBrowserAccess`).
+ *   `acks`: this client answers each `browser.frame` it drew with
+ *   `{"type":"browser.ack","agentId","seq"}`, and gets frames in a window
+ *   (`createViewerPacer`, ADR 0040 §7.1). Without it (older apps), frames are
+ *   only skipped while its socket is backed up.
  * - `{"type":"browser.unwatch","agentId"}`.
  * - `{"type":"browser.input","agentId","events":[…]}`: only from the person
  *   in control of the open handoff; events as `BrowserInputEvent` (mouse,
@@ -28,7 +37,9 @@ import { BROWSER_LIMITS, type BrowserInputEvent, parseBrowserInputEvent } from "
  * `not_in_control`, `rate_limited`).
  */
 export type BrowserClientFrame =
-  | { type: "browser.watch" | "browser.unwatch"; agentId: string }
+  | { type: "browser.watch"; agentId: string; acks?: true }
+  | { type: "browser.unwatch"; agentId: string }
+  | { type: "browser.ack"; agentId: string }
   | { type: "browser.input"; agentId: string; events: BrowserInputEvent[] };
 
 /** Largest browser client frame: a batch of input events with a pasted text. */
@@ -48,9 +59,12 @@ export function parseBrowserClientFrame(raw: string | Buffer): BrowserClientFram
   // Cheap test before parsing: every other client frame is small and never says "browser.".
   if (!text.includes('"browser.')) return null;
   try {
-    const frame = JSON.parse(text) as { type?: unknown; agentId?: unknown; events?: unknown };
+    const frame = JSON.parse(text) as { type?: unknown; agentId?: unknown; events?: unknown; acks?: unknown };
     if (typeof frame.agentId !== "string" || !UUID.test(frame.agentId)) return null;
-    if (frame.type === "browser.watch" || frame.type === "browser.unwatch") {
+    if (frame.type === "browser.watch") {
+      return { type: frame.type, agentId: frame.agentId, ...(frame.acks === true ? { acks: true as const } : {}) };
+    }
+    if (frame.type === "browser.unwatch" || frame.type === "browser.ack") {
       return { type: frame.type, agentId: frame.agentId };
     }
     if (frame.type === "browser.input" && Array.isArray(frame.events)) {
@@ -65,4 +79,88 @@ export function parseBrowserClientFrame(raw: string | Buffer): BrowserClientFram
     }
   } catch {}
   return null;
+}
+
+/** A full window with no `browser.ack` for this long sends the newest frame anyway (a hidden tab draws nothing). */
+export const VIEWER_ACK_STALL_MS = 5000;
+
+export interface ViewerPacer<M extends { type: string } = { type: string }> {
+  /** A live-view message to the viewer: frames in the window, everything else at once. */
+  send(message: M): void;
+  /** The viewer drew a frame (`browser.ack`). */
+  ack(): void;
+  /** The view ended: nothing held goes out any more. */
+  close(): void;
+}
+
+/**
+ * Live-view frames to one viewer in a window (ADR 0040 §7.1): at most `window` frames it hasn't drawn yet are on
+ * their way; a frame that finds the window full waits in place of the one waiting before it, so a slow link (a
+ * phone on mobile data) shows the page as it is now rather than the seconds it fell behind. Other messages go at
+ * once; one that ends or hides the view drops the frame waiting, which would show a page it no longer may.
+ */
+export function createViewerPacer<M extends { type: string }>(
+  deliver: (message: M) => void,
+  opts: {
+    window?: number;
+    stallMs?: number;
+    timers?: { setTimeout(fn: () => void, ms: number): unknown; clearTimeout(id: unknown): void };
+  } = {},
+): ViewerPacer<M> {
+  const window = opts.window ?? BROWSER_FRAME_WINDOW;
+  const timers = opts.timers ?? {
+    setTimeout: (fn: () => void, ms: number) => setTimeout(fn, ms),
+    clearTimeout: (id: unknown) => clearTimeout(id as ReturnType<typeof setTimeout>),
+  };
+  let inflight = 0;
+  let held: M | null = null;
+  let stall: unknown = null;
+  let closed = false;
+  const unstall = () => {
+    if (stall !== null) timers.clearTimeout(stall);
+    stall = null;
+  };
+  const release = () => {
+    const next = held;
+    held = null;
+    if (next) pacer.send(next);
+  };
+  const pacer: ViewerPacer<M> = {
+    send(message) {
+      if (closed) return;
+      if (message.type !== "browser.frame") {
+        const hides =
+          message.type === "browser.ended" ||
+          message.type === "browser.unavailable" ||
+          (message.type === "browser.status" && (message as { hidden?: unknown }).hidden === true);
+        if (hides) held = null;
+        deliver(message);
+        return;
+      }
+      if (inflight >= window) {
+        held = message;
+        stall ??= timers.setTimeout(() => {
+          stall = null;
+          // Nothing drawn in all this time: start the window again, from the newest frame.
+          inflight = 0;
+          release();
+        }, opts.stallMs ?? VIEWER_ACK_STALL_MS);
+        return;
+      }
+      inflight++;
+      deliver(message);
+    },
+    ack() {
+      if (closed) return;
+      inflight = Math.max(0, inflight - 1);
+      unstall();
+      release();
+    },
+    close() {
+      closed = true;
+      held = null;
+      unstall();
+    },
+  };
+  return pacer;
 }

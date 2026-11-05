@@ -2,11 +2,84 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { MachineRequest } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import { BROWSER_SCOPE, grantScopes, MachineRequestError } from "@agenteschat/engine";
-import { parseBrowserClientFrame } from "../src/realtime/browser";
+import { createViewerPacer, parseBrowserClientFrame } from "../src/realtime/browser";
 import { parseClientFrame } from "../src/realtime/ws";
 import { browser, createTestServer, listen, ORIGIN, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 const AGENT = "0193a2b4-0000-7000-8000-000000000000";
+
+describe("parseBrowserClientFrame: frame windows", () => {
+  test("a watch says whether the client answers frames; an ack names the agent", () => {
+    expect(parseBrowserClientFrame(JSON.stringify({ type: "browser.watch", agentId: AGENT, acks: true }))).toEqual({
+      type: "browser.watch",
+      agentId: AGENT,
+      acks: true,
+    });
+    // Only `true` asks for a window: an older client's watch gets frames as before.
+    expect(parseBrowserClientFrame(JSON.stringify({ type: "browser.watch", agentId: AGENT, acks: "yes" }))).toEqual({
+      type: "browser.watch",
+      agentId: AGENT,
+    });
+    expect(parseBrowserClientFrame(JSON.stringify({ type: "browser.ack", agentId: AGENT, seq: 4 }))).toEqual({
+      type: "browser.ack",
+      agentId: AGENT,
+    });
+    expect(parseBrowserClientFrame(JSON.stringify({ type: "browser.ack", agentId: "dev" }))).toBeNull();
+  });
+});
+
+describe("createViewerPacer", () => {
+  type Message = { type: string; [key: string]: unknown };
+  const frame = (seq: number): Message => ({ type: "browser.frame", agentId: AGENT, seq });
+  const seqs = (got: Message[]) => got.flatMap((m) => (m.type === "browser.frame" ? [m.seq] : []));
+
+  test("at most the window's frames go undrawn; only the newest waits, and goes at the next ack", () => {
+    const got: Message[] = [];
+    const pacer = createViewerPacer<Message>((m) => got.push(m), { window: 2 });
+    for (const seq of [1, 2, 3, 4]) pacer.send(frame(seq));
+    expect(seqs(got)).toEqual([1, 2]);
+    // Other messages never wait behind frames.
+    pacer.send({ type: "browser.status", agentId: AGENT, mode: "watch" });
+    expect(got.at(-1)?.type).toBe("browser.status");
+    pacer.ack();
+    expect(seqs(got)).toEqual([1, 2, 4]);
+    pacer.ack();
+    pacer.ack();
+    pacer.send(frame(5));
+    expect(seqs(got)).toEqual([1, 2, 4, 5]);
+    pacer.close();
+  });
+
+  test("a view that ends or hides drops the frame waiting; a closed pacer sends nothing", () => {
+    const got: Message[] = [];
+    const pacer = createViewerPacer<Message>((m) => got.push(m), { window: 1 });
+    pacer.send(frame(1));
+    pacer.send(frame(2));
+    pacer.send({ type: "browser.status", agentId: AGENT, hidden: true });
+    pacer.ack();
+    expect(seqs(got)).toEqual([1]);
+    pacer.send(frame(3));
+    pacer.send(frame(4));
+    pacer.send({ type: "browser.ended", agentId: AGENT, reason: "stopped" });
+    pacer.ack();
+    expect(seqs(got)).toEqual([1, 3]);
+    pacer.close();
+    pacer.send(frame(5));
+    pacer.send({ type: "browser.status", agentId: AGENT });
+    expect(seqs(got)).toEqual([1, 3]);
+    expect(got.at(-1)?.type).toBe("browser.ended");
+  });
+
+  test("a viewer that draws nothing for a while (a hidden tab) gets the newest frame anyway", async () => {
+    const got: Message[] = [];
+    const pacer = createViewerPacer<Message>((m) => got.push(m), { window: 1, stallMs: 5 });
+    for (const seq of [1, 2, 3]) pacer.send(frame(seq));
+    expect(seqs(got)).toEqual([1]);
+    await Bun.sleep(20);
+    expect(seqs(got)).toEqual([1, 3]);
+    pacer.close();
+  });
+});
 
 describe("parseBrowserClientFrame", () => {
   test("watch, unwatch and input with checked events; the rest is not a browser frame", () => {

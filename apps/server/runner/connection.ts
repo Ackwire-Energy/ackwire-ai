@@ -124,6 +124,8 @@ export interface ConnectionOptions {
   onAgents?: (agents: unknown) => void;
   /** Protocol 12: a person's turn in an agent's browser started, changed or ended (`browser.handoff`). */
   onBrowserHandoff?: (frame: Extract<ServerFrame, { type: "browser.handoff" }>) => void;
+  /** Protocol 46: the server got one of an agent's `browser.frame`s (`browser.ack`), so the next may go. */
+  onBrowserAck?: (frame: Extract<ServerFrame, { type: "browser.ack" }>) => void;
   /** The socket's state: dialing, welcomed, or down (reconnecting). */
   onState?: (state: "connecting" | "online" | "offline") => void;
   /** Sees every request start and end (the desktop app's jobs, the activity log). */
@@ -318,6 +320,9 @@ export class RunnerConnection {
             return;
           case "browser.handoff":
             opts.onBrowserHandoff?.(frame);
+            return;
+          case "browser.ack":
+            opts.onBrowserAck?.(frame);
             return;
           case "mcp.result":
             opts.mcp?.result(frame);

@@ -811,7 +811,7 @@ async function handleBrowser(
       return browser.warm(req.agent, ctx.workspaceReal, onDesktop(ctx, req));
     case "browser.stream.start":
       requireTool(ctx, "browser");
-      return browser.streamStart(req.agent, req.mode);
+      return browser.streamStart(req.agent, req.mode, req.window);
     case "browser.input":
       requireTool(ctx, "browser");
       return browser.input(req.agent, Array.isArray(req.events) ? req.events : []);
@@ -896,7 +896,7 @@ async function handleProfileBrowser(ctx: HandlerContext, req: MachineRequest, sc
       return browser.warm(agent, folder, false);
     case "browser.stream.start":
       requireTool(ctx, "browser");
-      return browser.streamStart(agent, req.mode);
+      return browser.streamStart(agent, req.mode, req.window);
     case "browser.input":
       requireTool(ctx, "browser");
       return browser.input(agent, Array.isArray(req.events) ? req.events : []);

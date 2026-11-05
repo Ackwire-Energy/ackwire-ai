@@ -619,6 +619,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
       return handleRequest(grant ? { ...ctx, grant } : ctx, req, scope);
     },
     onBrowserHandoff: (frame) => browser.setHandoff(frame.agentId, frame.handoff),
+    onBrowserAck: (frame) => browser.frameAck(frame.agentId),
     onState: (s) => {
       if (s === "online") return;
       browser.stopStreams();

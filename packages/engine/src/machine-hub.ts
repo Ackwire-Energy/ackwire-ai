@@ -2,6 +2,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import {
   ACCOUNTS_PROTOCOL,
   BROWSER_PROTOCOL,
+  BROWSER_WINDOW_PROTOCOL,
   type BrowserHandoffInfo,
   brainTopic,
   type ErrorReporter,
@@ -1270,9 +1271,14 @@ export function createMachineHub(deps: MachineHubDeps) {
       }
       if (frame.type === "output") conn.pending.get(frame.id)?.onOutput?.(frame.stream, frame.chunk);
       else if (frame.type === "result") conn.pending.get(frame.id)?.settle(frame);
-      // The agent browser's live view (ADR 0040): straight to the viewers in memory.
-      else if (frame.type === "browser.frame") browserHooks.frame?.(conn.machineId, frame);
-      else if (frame.type === "browser.stream.ended") browserHooks.streamEnded?.(conn.machineId, frame);
+      // The agent browser's live view (ADR 0040): straight to the viewers in memory. Acknowledged on arrival, so the
+      // runner's window (§7.1) measures its own link: each viewer's link has a window of its own.
+      else if (frame.type === "browser.frame") {
+        if (conn.protocol >= BROWSER_WINDOW_PROTOCOL) {
+          send(conn, { type: "browser.ack", agentId: frame.agentId, seq: frame.seq });
+        }
+        browserHooks.frame?.(conn.machineId, frame);
+      } else if (frame.type === "browser.stream.ended") browserHooks.streamEnded?.(conn.machineId, frame);
       else if (frame.type === "pong") await touch(conn, frame);
       else if (frame.type === "task.event") {
         await applyTaskEvent({ db, pubsub }, conn.machineId, frame).catch(() => undefined);

@@ -630,6 +630,12 @@ export class Supervisor {
     this.disown(taskId);
   }
 
+  /** `browser.ack` (protocol 46): to the worker whose agent's frame it was; a worker that went sends no more frames. */
+  browserAck(frame: Extract<ServerFrame, { type: "browser.ack" }>) {
+    const w = this.workers.get(frame.agentId);
+    if (w?.ready) this.send(w, frame);
+  }
+
   /** `browser.handoff`: to the agent's worker, and kept for a session that says hello later. */
   handoff(frame: Handoff) {
     if (frame.handoff) this.handoffs.set(frame.agentId, frame);

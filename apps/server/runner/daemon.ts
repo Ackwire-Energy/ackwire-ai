@@ -1207,6 +1207,7 @@ export class RunnerDaemon implements RequestObserver {
       onAgents: (raw) => this.setAgents(raw),
       onBrowserHandoff: (frame) =>
         supervisor ? supervisor.handoff(frame) : browser.setHandoff(frame.agentId, frame.handoff),
+      onBrowserAck: (frame) => (supervisor ? supervisor.browserAck(frame) : browser.frameAck(frame.agentId)),
       onState: (state) => {
         // Offline: frames have nowhere to go; the server starts the live view again when it is back.
         if (state !== "online") {

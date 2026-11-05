@@ -7,7 +7,7 @@ import type { MergeDone } from "./command-policy";
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 45;
+export const MACHINE_PROTOCOL_VERSION = 46;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -519,6 +519,16 @@ export const VAULT_PROTOCOL = 45;
  * as gone too: it doesn't tell the agent it holds it, nor list it on the agent's page.
  */
 export const SITE_SECRET_TTL_MS = 15 * 60_000;
+/**
+ * From this protocol on (ADR 0040 §7.1): the live view's frames go out in a window. `browser.stream.start` carries
+ * `window`, how many `browser.frame`s may be on their way at once; the server answers each frame it gets with
+ * `browser.ack`, and the runner holds only the newest frame while the window is full. A slow link then shows the page
+ * as it is now instead of replaying the seconds it fell behind. The server sends `browser.ack` to no older runner,
+ * and a runner told no `window` sends every frame as before.
+ */
+export const BROWSER_WINDOW_PROTOCOL = 46;
+/** `browser.frame`s on their way at once, per agent: two keep a slow link busy without a backlog (ADR 0040 §7.1). */
+export const BROWSER_FRAME_WINDOW = 2;
 /** What `agentes:type_vault` (and a code typed into several fields) answers in `code` when it types nothing. */
 export const VAULT_TYPE_REFUSALS = [
   /** The frame that owns the field (or one around it, or the page) is on no site the login's rule allows. */
@@ -943,7 +953,7 @@ export interface BrowserHandoffInfo {
   link?: string;
 }
 
-/** `watch`: about 1 frame a second for viewers; `control`: 10–15 while a person drives. */
+/** `watch`: a few frames a second for viewers; `control`: 10–15 while a person drives. */
 export type BrowserStreamMode = "watch" | "control";
 
 /** Bits of CDP's modifier mask: Alt 1, Control 2, Meta 4, Shift 8. */
@@ -1735,8 +1745,11 @@ export type MachineRequest = (
     }
   /** Protocol 12: close the agent's browser session (Stop, idle). */
   | { op: "browser.stop" }
-  /** Protocol 12: start (or change the mode of) the agent's stream: `browser.frame` frames until `browser.stream.stop`. */
-  | { op: "browser.stream.start"; mode: BrowserStreamMode }
+  /**
+   * Protocol 12: start (or change the mode of) the agent's stream: `browser.frame` frames until `browser.stream.stop`.
+   * Protocol 46: `window`, the frames that may be on their way unacknowledged (`BROWSER_WINDOW_PROTOCOL`).
+   */
+  | { op: "browser.stream.start"; mode: BrowserStreamMode; window?: number }
   | { op: "browser.stream.stop" }
   /** Protocol 12: a person's input during a take over, in order. */
   | { op: "browser.input"; events: BrowserInputEvent[] }
@@ -2067,6 +2080,8 @@ export type ServerFrame =
    * runners ignore it.
    */
   | { type: "browser.handoff"; agentId: string; handoff: BrowserHandoffInfo | null }
+  /** Protocol 46: the server got this `browser.frame`: one more may go (`BROWSER_WINDOW_PROTOCOL`). */
+  | { type: "browser.ack"; agentId: string; seq: number }
   /** The server closes after sending this (bad token, revoked, outdated runner). */
   | { type: "refused"; reason: "invalid_token" | "revoked" | "outdated" | "replaced"; message: string };
 
@@ -2672,6 +2687,7 @@ const SERVER_FRAME_TYPES = [
   "mcp.tools",
   "agents",
   "browser.handoff",
+  "browser.ack",
 ];
 
 /** Parses a server frame (runner side); null when it isn't one. */
@@ -2696,6 +2712,7 @@ export function parseServerFrame(raw: string): ServerFrame | null {
   if (f.type === "browser.handoff" && (!isString(f.agentId) || (f.handoff !== null && !isObject(f.handoff)))) {
     return null;
   }
+  if (f.type === "browser.ack" && (!isString(f.agentId) || typeof f.seq !== "number")) return null;
   if (!SERVER_FRAME_TYPES.includes(f.type)) return null;
   return f as ServerFrame;
 }

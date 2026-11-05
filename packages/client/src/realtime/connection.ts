@@ -19,6 +19,9 @@ import { steerStore } from "./steer";
  * - when a notification names a message in a channel listened to here whose `message.created` never came
  *   (`MISSED_MESSAGE_GRACE_MS` later), subscribes that channel anew: the server's `subscribed` has every screen
  *   catch up (`onSubscribed`), and a subscription the server lost without a word is made again.
+ * - watches agents' browsers with `acks` and answers each `browser.frame` once it could be drawn (`browser.ack`,
+ *   after the next animation frame): the server keeps only a couple of frames on their way to this socket, so a slow
+ *   link or a busy page shows the newest picture instead of a backlog (ADR 0040 §7.1).
  */
 
 export type ServerFrame =
@@ -118,7 +121,7 @@ export class RealtimeConnection {
   private readonly userListeners = new Set<(event: UserEvent) => void>();
   private readonly browserListeners = new Set<(frame: Record<string, unknown>) => void>();
   private readonly browserWatches = createBrowserWatches({
-    send: (frame) => this.send(frame),
+    send: (frame) => this.sendBrowserFrame(frame),
     timers: {
       setTimeout: (fn, ms) => this.timers.setTimeout(fn, ms),
       clearTimeout: (id) => this.timers.clearTimeout(id),
@@ -257,7 +260,16 @@ export class RealtimeConnection {
 
   /** Sends a live-view frame (`browser.watch`, `browser.unwatch`, `browser.input`); dropped while not connected. */
   sendBrowserFrame(frame: { type: `browser.${string}`; agentId: string; [key: string]: unknown }) {
-    this.send(frame);
+    // Every watch from this socket says it answers frames: `handle` does, for every view of that agent at once.
+    this.send(frame.type === "browser.watch" ? { ...frame, acks: true } : frame);
+  }
+
+  /** A frame went to the views: answered once they could draw it (a hidden tab draws nothing, so it answers late). */
+  private ackBrowserFrame(agentId: string, seq: unknown) {
+    const ack = () => this.send({ type: "browser.ack", agentId, ...(typeof seq === "number" ? { seq } : {}) });
+    const nextFrame = (globalThis as { requestAnimationFrame?: (fn: () => void) => unknown }).requestAnimationFrame;
+    if (typeof nextFrame === "function") nextFrame(ack);
+    else ack();
   }
 
   /**
@@ -338,6 +350,9 @@ export class RealtimeConnection {
     if (!frame) return;
     if (frame.type.startsWith("browser.") || (frame.type === "error" && typeof frame.agentId === "string")) {
       for (const l of this.browserListeners) l(frame as Record<string, unknown>);
+      if (frame.type === "browser.frame" && typeof frame.agentId === "string") {
+        this.ackBrowserFrame(frame.agentId, (frame as { seq?: unknown }).seq);
+      }
       return;
     }
     if (frame.type === "event" && "scope" in frame) {

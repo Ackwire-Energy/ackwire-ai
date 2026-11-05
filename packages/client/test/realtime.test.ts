@@ -51,6 +51,27 @@ describe("RealtimeConnection", () => {
     expect(() => realtimeUrl("agentes.chat", "o1")).toThrow();
   });
 
+  test("watches agents' browsers saying it answers frames, and answers each frame once, after the views got it", async () => {
+    const { factory, last } = fakeSockets();
+    const conn = new RealtimeConnection({ url: "ws://x/api/ws?orgId=o", createSocket: factory, pingMs: 0 });
+    const views: unknown[] = [];
+    conn.onBrowserFrame((frame) => views.push(frame));
+    conn.onBrowserFrame(() => {});
+    conn.start();
+    const socket = last();
+    socket.open();
+    const release = conn.browserWatcher.acquire("a1");
+    expect(socket.sent).toEqual([{ type: "browser.watch", agentId: "a1", acks: true }]);
+    socket.push({ type: "browser.frame", agentId: "a1", seq: 9, data: "/9j/", metadata: {} });
+    socket.push({ type: "browser.status", agentId: "a1", mode: "watch" });
+    // After the next animation frame where there is one (a browser), at once otherwise.
+    for (let i = 0; i < 20 && socket.sent.length < 2; i++) await Bun.sleep(5);
+    expect(views).toHaveLength(2);
+    expect(socket.sent.slice(1)).toEqual([{ type: "browser.ack", agentId: "a1", seq: 9 }]);
+    release();
+    conn.stop();
+  });
+
   test("subscribes once per channel after open, routes events, unsubscribes when the last listener leaves", () => {
     const { factory, last } = fakeSockets();
     const conn = new RealtimeConnection({ url: "ws://x/api/ws?orgId=o", createSocket: factory, pingMs: 0 });

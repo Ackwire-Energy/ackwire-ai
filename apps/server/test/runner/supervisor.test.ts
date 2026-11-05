@@ -1183,6 +1183,10 @@ test("worker sessions follow the server's: they end when it drops and are welcom
   };
   t.sup.handoff(handoff);
   await waitFor(() => ana.of("browser.handoff").length === 1);
+  // The server got one of her browser's frames: her worker may send the next.
+  t.sup.browserAck({ type: "browser.ack", agentId: ANA.id, seq: 3 });
+  await waitFor(() => ana.of("browser.ack").length === 1);
+  expect(ana.of("browser.ack")[0]).toMatchObject({ agentId: ANA.id, seq: 3 });
   // Root sees a person take the desktop; the agent's keys are its worker's.
   t.sup.desktopTaken(ANA.id);
   await waitFor(() => ana.of("desktop.taken").length === 1);

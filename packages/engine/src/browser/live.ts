@@ -1,5 +1,6 @@
 import {
   type AgentScope,
+  BROWSER_FRAME_WINDOW,
   BROWSER_LIMITS,
   type BrowserInputEvent,
   type BrowserStreamMode,
@@ -236,7 +237,7 @@ export interface BrowserLiveDeps extends Omit<HandoffDeps, "live"> {
 /**
  * The live view of agents' browsers on this process (ADR 0040 §7): viewers
  * per agent, the runner's stream started with the first viewer (`watch`,
- * about 1 fps), switched to `control` while the person in control watches,
+ * a few frames a second), switched to `control` while the person in control watches,
  * and stopped with the last; a person's input forwarded only for whoever is
  * in control, and while someone is in control only they get frames (the
  * others' status says `hidden`). The machine hub hands it the runner's
@@ -334,7 +335,14 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       if (mode === null)
         await deps.hub.call(state.machineId, { op: "browser.stream.stop", agent, ...profileOp(agentId) });
       else {
-        await deps.hub.call(state.machineId, { op: "browser.stream.start", mode, agent, ...profileOp(agentId) });
+        // `window` (protocol 46, ADR 0040 §7.1): an older runner ignores it and sends every frame.
+        await deps.hub.call(state.machineId, {
+          op: "browser.stream.start",
+          mode,
+          window: BROWSER_FRAME_WINDOW,
+          agent,
+          ...profileOp(agentId),
+        });
         broadcastStatus(agentId, state);
       }
     } catch (error) {
