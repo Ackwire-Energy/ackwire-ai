@@ -5,6 +5,7 @@ import { mediaKindOf, mediaWord } from "./media";
 import { RIGHT_HAND_PLAN_LINES } from "./no-ai";
 import { brainName } from "./outages";
 import { usageWhen } from "./plan-usage";
+import { weekDay } from "./team-week";
 import { closedNoteText, usageWaitOf, usageWindowText } from "./usage-pause";
 import { isVoiceMeta, voiceLength, voiceWord } from "./voice";
 
@@ -111,6 +112,16 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
     const window = typeof params.window === "string" && params.window ? usageWindowText(t, params.window) : "";
     return t(`chat.body.${code}`, { ...params, window, defaultValue: body });
   }
+  // Lodi's weekly card (ADR 0137 §9): its week in the reader's words; a list without the locale keeps the body, which
+  // the server wrote in the person's language.
+  if (code === "team_week")
+    return locale && typeof params.from === "string" && typeof params.to === "string"
+      ? t("chat.body.team_week", {
+          from: weekDay(locale, params.from),
+          to: weekDay(locale, params.to),
+          defaultValue: body,
+        })
+      : body;
   // Long work's own update of a silent work (ADR 0121): what it does now, in the reader's words.
   if (code === "work_auto_update") return autoUpdateText(t, params);
   // The autonomy brakes (ADR 0131): a working agent's status line, a proposal of costly work, the noise digest.

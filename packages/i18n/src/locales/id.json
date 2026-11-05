@@ -293,6 +293,12 @@
       "short": "kunci AI",
       "say": "mengurus kunci AI"
     },
+    "use_others_plans": {
+      "title": "Pakai paket orang lain",
+      "desc": "Memberi agen yang bisa diedit paket yang dihubungkan orang lain. Pemiliknya menerima email dan bisa menariknya kembali.",
+      "short": "pakai paket orang lain",
+      "say": "memakai paket orang lain"
+    },
     "edit_wiki": {
       "title": "Ubah wiki",
       "desc": "Buat dan ubah halaman.",
@@ -352,12 +358,6 @@
       "desc": "Paket, kartu, dan faktur.",
       "short": "tagihan",
       "say": "mengurus tagihan"
-    },
-    "use_others_plans": {
-      "title": "Pakai paket orang lain",
-      "desc": "Memberi agen yang bisa diedit paket yang dihubungkan orang lain. Pemiliknya menerima email dan bisa menariknya kembali.",
-      "short": "pakai paket orang lain",
-      "say": "memakai paket orang lain"
     }
   },
   "auth": {
@@ -921,7 +921,7 @@
       "theo": {
         "name": "Theo",
         "role": "PM",
-        "desc": "Mengatur tugas dan menjalankan forum."
+        "desc": "Mengatur tugas dan menjaga roadmap tetap terkini."
       },
       "ada": {
         "name": "Ada",
@@ -1064,7 +1064,6 @@
     "agent_reply": "Agen membalas",
     "agent_question": "Ada pertanyaan untukmu",
     "approval": "Ada persetujuan yang menunggumu",
-    "forum_turn": "Giliranmu memberi pendapat",
     "mission_stopped": "Sebuah misi berhenti",
     "routine_failed": "Sebuah rutinitas tidak selesai",
     "run_failed": "Agen tidak bisa menyelesaikan",
@@ -1213,7 +1212,7 @@
     "category": {
       "waiting": {
         "title": "Menunggumu",
-        "help": "Persetujuan, pertanyaan agen, giliranmu di forum, permintaan bantuan di browser"
+        "help": "Persetujuan, pertanyaan agen, permintaan bantuan di browser"
       },
       "replies": {
         "title": "Balasan agen",
@@ -1284,7 +1283,6 @@
       "drive": "File, laporan, dan tabel",
       "routines": "Yang dikerjakan agen sendiri, tepat waktu",
       "calendar": "Rapat dan tenggat",
-      "forum": "Saat keputusan butuh beberapa sudut pandang",
       "team": "Siapa siapa: orang, agen, dan grupnya"
     },
     "customizeSidebar": "Sesuaikan sidebar",
@@ -1354,7 +1352,6 @@
     "team": "Tim",
     "calendar": "Kalender",
     "drive": "Drive",
-    "forum": "Forum",
     "members": "Anggota",
     "channels": "Kanal",
     "agents": "Agen",
@@ -1392,29 +1389,29 @@
     "unreadNotifications_other": "{{count}} notifikasi belum dibaca"
   },
   "agentGroups": {
-    "group": "Grup",
-    "none": "Tanpa grup",
-    "newGroup": "Grup baru",
-    "newFromAgent": "Grup baru…",
+    "group": "Departemen",
+    "none": "Tanpa departemen",
+    "newGroup": "Departemen baru",
+    "newFromAgent": "Departemen baru…",
     "nameLabel": "Nama",
-    "namePlaceholder": "Misalnya Produk dan pemasaran",
-    "create": "Buat grup",
-    "renameTitle": "Ganti nama grup",
-    "rename": "Ganti nama",
+    "namePlaceholder": "Mis.: Penjualan",
+    "create": "Buat departemen",
+    "renameTitle": "Edit departemen",
+    "rename": "Edit",
     "options": "Opsi {{name}}",
     "moveUp": "Pindah ke atas",
     "moveDown": "Pindah ke bawah",
-    "delete": "Hapus grup",
-    "deleteTitle": "Hapus grup {{name}}?",
+    "delete": "Hapus departemen",
+    "deleteTitle": "Hapus departemen {{name}}?",
     "deleteText": "Agen di dalamnya kembali ke Agen.",
     "dropHere": "Seret agen ke sini",
-    "moved": "{{name}} pindah ke grup {{group}}",
-    "movedOut": "{{name}} keluar dari grup {{group}}",
+    "moved": "{{name}} pindah ke {{group}}",
+    "movedOut": "{{name}} keluar dari {{group}}",
     "undo": "Urungkan"
   },
   "sidebarAgents": {
     "options": "Opsi agen",
-    "add": "Agen atau grup baru",
+    "add": "Agen atau departemen baru",
     "order": "Urutan",
     "sort": {
       "workspace": "Urutan ruang kerja",
@@ -1424,7 +1421,7 @@
     "showAll": "Tampilkan agen yang tidak berbicara dengan saya",
     "collapseAll": "Ciutkan semua",
     "expandAll": "Bentangkan semua",
-    "organize": "Atur grup di Tim",
+    "organize": "Tata departemen di Tim",
     "more_other": "{{count}} agen lagi di Tim",
     "createFirst": "Buat agen pertama",
     "working_other": "{{count}} sedang bekerja",
@@ -1432,8 +1429,8 @@
     "workingIn": "bekerja di #{{channel}}",
     "talksOnly": "hanya berbicara dengan {{name}}",
     "talksOnlyMore_other": "hanya berbicara dengan {{name}} dan {{count}} lainnya",
-    "changeGroup": "Pindah grup",
-    "newGroupWith": "Grup baru dengan {{name}}",
+    "changeGroup": "Pindahkan ke departemen",
+    "newGroupWith": "Departemen baru dengan {{name}}",
     "dmsEmpty": "Percakapanmu dengan orang muncul di sini."
   },
   "sidebarPins": {
@@ -1459,57 +1456,101 @@
   },
   "team": {
     "title": "Tim",
-    "groups": {
-      "title": "Grup agen"
+    "people_other": "{{count}} orang",
+    "agents_other": "{{count}} agen",
+    "sectorsCount_other": "{{count}} departemen",
+    "viewLabel": "Tampilan tim",
+    "view": {
+      "list": "Daftar",
+      "chart": "Bagan organisasi",
+      "map": "Peta",
+      "sectors": "Departemen",
+      "usage": "Tata kelola dan penggunaan"
     },
-    "subtitle_other": "{{count}} agen, dikelompokkan berdasarkan siapa yang mengurusnya.",
-    "working_other": "{{count}} sedang bekerja.",
-    "skyLabel": "Agen dikelompokkan berdasarkan penanggung jawabnya. Ketuk agen untuk melihat apa yang dikerjakannya.",
-    "tapHint": "Ketuk agen",
-    "asked": "{{from}} bertanya ke {{to}}",
     "noOwner": "Tanpa penanggung jawab",
-    "openAgent": "{{name}}, lihat detail",
-    "close": "Tutup",
-    "details": "Detail {{name}}",
-    "of": "oleh {{name}}",
-    "does": "Yang dikerjakannya",
-    "does_female": "Yang dikerjakannya",
-    "canDo": "Yang bisa dilakukannya",
-    "canDo_female": "Yang bisa dilakukannya",
-    "onlyChat": "Hanya percakapan",
     "workingNow": "Sedang bekerja",
     "available": "Tersedia",
-    "talk": "Bicara",
-    "edit": "Ubah",
-    "feedTitle": "Percakapan antaragen",
-    "feedWindow": "24 jam terakhir",
-    "feedEmpty": "Tidak ada agen yang minta bantuan agen lain dalam 24 jam terakhir.",
     "archived": "Diarsipkan",
-    "consultation": {
-      "open": "Menunggu jawaban",
-      "answered": "Sudah dijawab",
-      "expired": "Tidak mendapat jawaban",
-      "failed": "Tidak mendapat jawaban"
-    },
     "emptyTitle": "Belum ada agen",
     "empty": "Buat agen pertama untuk membentuk tim.",
-    "cap": {
-      "drive": "File",
-      "issues": "Tugas",
-      "calendar": "Kalender",
-      "schedule": "Rutinitas",
-      "forum": "Forum",
-      "wiki": "Wiki",
-      "sandbox": "Komputer",
-      "desktop": "Layar",
-      "browser": "Browser",
-      "database": "Database",
-      "github": "GitHub",
-      "sentry": "Sentry",
-      "linear": "Linear",
-      "mail": "Email",
-      "vault": "Vault",
-      "custom": "Alat ruang kerja"
+    "list": {
+      "agents": "Agen",
+      "people": "Orang",
+      "search": "Cari menurut nama, peran, atau kanal",
+      "filterLabel": "Tampilkan agen",
+      "filter": {
+        "mine": "Milikku",
+        "working": "Sedang bekerja",
+        "waiting": "Menunggumu",
+        "noOwner": "Tanpa penanggung jawab"
+      },
+      "groupBy": "Kelompokkan menurut",
+      "by": {
+        "sector": "Kelompokkan menurut: departemen",
+        "owner": "Kelompokkan menurut: penanggung jawab",
+        "none": "Jangan dikelompokkan"
+      },
+      "col": {
+        "agent": "Agen",
+        "role": "Peran",
+        "owner": "Penanggung jawab",
+        "channels": "Lokasinya",
+        "now": "Sekarang",
+        "menu": "Opsi",
+        "person": "Orang",
+        "roles": "Peran",
+        "caresFor": "Mengurus"
+      },
+      "noChannel": "Tidak di kanal mana pun",
+      "none": "Tidak ada agen yang cocok."
+    },
+    "chart": {
+      "byLabel": "Bagan organisasi menurut",
+      "byPerson": "Per orang",
+      "bySector": "Per departemen",
+      "subPerson": "Setiap agen di bawah orang yang bertanggung jawab atasnya, atau di bawah pemimpin departemennya bila tidak ada.",
+      "subSector": "Setiap departemen dengan agennya. {{name}} bekerja dengan semua orang.",
+      "workspace": "Ruang kerja",
+      "responsible": "Penanggung jawab: {{names}}"
+    },
+    "map": {
+      "lead": "Siapa yang mengurus agen, kanal tempat mereka berada, apa yang dikerjakan masing-masing sendiri, dan apa yang menunggu seseorang. Garis putus-putus adalah agen yang saling minta bantuan dalam sehari terakhir.",
+      "lodi": "Menata tim bersamamu",
+      "hint": "Seret agen ke kanal lain dan {{name}} menyiapkan perubahan untuk kamu terapkan",
+      "proposed": "{{name}} menyiapkan perubahan di percakapanmu. Terapkan di sana.",
+      "open": "Buka",
+      "reasonMove": "Pindahkan {{agent}} dari #{{from}} ke #{{to}}, dari peta tim.",
+      "reasonJoin": "Tambahkan {{agent}} ke #{{to}}, dari peta tim.",
+      "waiting_other": "{{count}} permintaan menunggu persetujuan",
+      "moreRoutines_other": "dan {{count}} rutinitas lagi",
+      "empty": "Belum ada agen di kanal mana pun.",
+      "others": "Kanal lain"
+    },
+    "sectors": {
+      "lead": "Setiap departemen punya penanggung jawab, pengganti, agen, serta kanal dan rutinitas mereka.",
+      "ask": "Bicara dengan {{name}}",
+      "askText": "Bantu aku menata tim ke dalam departemen.",
+      "leadLabel": "Penanggung jawab",
+      "backupLabel": "Pengganti",
+      "leadOf": "Penanggung jawab {{name}}",
+      "backupOf": "Pengganti di {{name}}",
+      "nobody": "Tidak ada",
+      "none": "Tidak ada",
+      "channels": "Kanal",
+      "routines": "Rutinitas",
+      "leads": "Memimpin {{name}}",
+      "covers": "Menggantikan di {{name}}",
+      "placeHint": "Seret agen ke sebuah departemen untuk menaruhnya di sana.",
+      "gap": {
+        "noLead": "Belum ada penanggung jawab. Pilih siapa yang mengurus departemen ini.",
+        "noBackup": "Tidak ada pengganti. Kalau penanggung jawab pergi, tidak ada yang menggantikan."
+      },
+      "emptyTitle": "Belum ada departemen",
+      "empty": "Departemen menata agen menurut bidang, seperti Penjualan atau Dukungan. Departemen muncul sebagai bagian di daftar semua orang."
+    },
+    "usage": {
+      "lead": "Penggunaan agen oleh setiap orang bulan ini, dan batasnya.",
+      "settings": "Juga di Pengaturan"
     }
   },
   "sky": {
@@ -1777,6 +1818,12 @@
         "invite": "Undang orang",
         "firstTask": "Beri {{name}} tugas pertama"
       },
+      "style": {
+        "question": "Bagaimana sebaiknya saya bicara dengan kamu?",
+        "text": "Berlaku untuk semua agen, dan bisa kamu ubah kapan saja di akunmu.",
+        "simple": "Sederhana, tanpa istilah teknis",
+        "technical": "Teknis, lengkap dengan detailnya"
+      },
       "firstTask": {
         "theo": "Susun rencana minggu pertama kita: apa yang dikerjakan masing-masing dari kita lebih dulu?",
         "ada": "Apa yang bisa kamu bangun atau otomatiskan untuk kami lebih dulu?",
@@ -1897,6 +1944,83 @@
       "open": "Buka",
       "web": "Buka di situs",
       "notAllowed": "Kamu tidak punya akses ke layar ini"
+    }
+  },
+  "teamWeek": {
+    "title": "Minggu tim",
+    "suggestions_other": "{{count}} saran",
+    "stat": {
+      "done": "tugas selesai",
+      "stuck": "macet",
+      "waiting": "menunggumu",
+      "budget": "dari {{budget}} bulan ini"
+    },
+    "worked": "Berhasil",
+    "workedRuns_other": "{{name}} mengerjakan {{count}} pekerjaan di #{{channel}}",
+    "workedTasks_other": "{{name}} menutup {{count}} tugas",
+    "improve": "Untuk diperbaiki",
+    "approvals": {
+      "title_other": "{{count}} permintaan dari {{name}} menunggumu",
+      "line": "Menunggu sejak {{since}}.",
+      "action": "Lihat dan setujui",
+      "hide": "Tutup"
+    },
+    "budget": {
+      "title": "Anggaran {{name}}: {{from}} → {{to}}",
+      "line_other": "Berhenti {{count}} kali di batas bulanan."
+    },
+    "channel": {
+      "title": "Masukkan {{name}} ke #{{channel}}",
+      "line": "{{name}} tidak ada di kanal mana pun, jadi tidak ada yang mengajaknya bicara sepanjang minggu."
+    },
+    "unanswered": {
+      "title": "Agen untuk pertanyaan di #{{channel}}",
+      "line_other": "{{count}} pertanyaan tidak terjawab di #{{channel}} minggu ini.",
+      "action": "Usulkan agen",
+      "message": "Usulkan agen untuk menjawab pertanyaan yang tidak terjawab di #{{channel}} minggu ini.",
+      "done": "Sudah diminta ke {{name}}"
+    },
+    "routine": {
+      "title": "Rutinitas {{name}} setiap hari pukul {{time}}",
+      "line_other": "Kamu meminta ini pada {{count}} hari minggu ini: “{{text}}”",
+      "action": "Buat rutinitas",
+      "done": "Rutinitas dibuat"
+    },
+    "stalled": {
+      "title": "Langkah berhenti di #{{number}} {{title}}",
+      "line_other": "Langkah {{steps}} sudah berhenti {{hours}} jam menunggu #{{on}}.",
+      "action": "Jalankan paralel",
+      "message": "@{{handle}} langkah {{steps}} tidak perlu menunggu #{{on}}. Lanjutkan secara paralel.",
+      "messageNoAgent": "Langkah {{steps}} tidak perlu menunggu #{{on}}. Bisa berjalan paralel.",
+      "done": "Pesan terkirim"
+    },
+    "applied": "Diterapkan",
+    "undo": "Urungkan",
+    "gone": "Tidak berlaku lagi",
+    "applyAll_other": "Terapkan semua {{count}}",
+    "notNow": "Nanti saja",
+    "dismissed": "Belum ada yang berubah. Tanyakan apa saja tentang minggu ini di sini.",
+    "change": "Ubah",
+    "every": {
+      "sun": "Setiap Minggu pukul {{time}}",
+      "mon": "Setiap Senin pukul {{time}}",
+      "tue": "Setiap Selasa pukul {{time}}",
+      "wed": "Setiap Rabu pukul {{time}}",
+      "thu": "Setiap Kamis pukul {{time}}",
+      "fri": "Setiap Jumat pukul {{time}}",
+      "sat": "Setiap Sabtu pukul {{time}}"
+    },
+    "off": "Mati",
+    "schedule": {
+      "title": "Kapan datangnya",
+      "day": "Hari",
+      "hour": "Jam",
+      "stop": "Berhenti menerima",
+      "start": "Terima lagi"
+    },
+    "settings": {
+      "label": "Minggu tim",
+      "help": "Setiap minggu {{name}} menceritakan di DM-mu bagaimana tim bekerja dan apa yang bisa diperbaiki. Hanya admin yang menerimanya."
     }
   },
   "routing": {
@@ -3088,7 +3212,9 @@
       "browser": "Butuh kamu di browser",
       "desktop": "Butuh kamu di komputer",
       "proposal": "Mengusulkan perubahan",
-      "agent": "Mengusulkan agen baru"
+      "agent": "Mengusulkan agen baru",
+      "team": "Mengusulkan tim",
+      "firstTask": "Tugas pertama"
     },
     "waitingYou": "menunggumu",
     "waitingFor": "menunggu {{name}}",
@@ -3103,6 +3229,8 @@
       "desktop": "<b>{{name}}</b> butuh kamu di komputer · {{what}}",
       "proposal": "<b>{{name}}</b> mengusulkan perubahan · {{what}}",
       "agent": "<b>{{name}}</b> mengusulkan agen baru · {{what}}",
+      "team": "<b>{{name}}</b> mengusulkan tim · {{what}}",
+      "firstTask": "<b>{{name}}</b> menyarankan tugas pertama · {{what}}",
       "more": "+{{count}}",
       "see": "Lihat"
     }
@@ -3325,6 +3453,11 @@
   },
   "notifications": {
     "title": "Notifikasi",
+    "planLent": {
+      "takeBack": "Tarik kembali",
+      "takeBackAll": "Tarik kembali dari semua agen",
+      "done": "Paketmu sudah kembali"
+    },
     "docTitleUnread": "({{count}}) Notifikasi",
     "summaryWaiting_other": "{{count}} hal menunggumu",
     "summaryUnread_other": "{{count}} belum dibaca",
@@ -3367,17 +3500,6 @@
       "stoppedForF": "Berhenti selama {{time}}",
       "stoppedForM": "Berhenti selama {{time}}",
       "openThread": "Buka percakapan",
-      "table": "memanggilmu ke meja",
-      "roundWaits": "Ronde menunggu {{time}}",
-      "yourTurn": "Ronde {{round}} dari {{rounds}} · giliranmu bicara",
-      "yourTurnNoRound": "Giliranmu bicara",
-      "seatYou": "Kamu",
-      "seatYours": "giliranmu",
-      "seatSpoke": "sudah bicara",
-      "seatPassed": "melewatkan",
-      "seatLater": "nanti",
-      "speak": "Bicara di meja",
-      "pass": "Lewati giliranmu",
       "approval": "meminta persetujuan",
       "decide": "Putuskan di Persetujuan",
       "wants": "<b>{{name}}</b> ingin <b>{{action}}</b>",
@@ -3397,8 +3519,7 @@
         "draft": "menyimpan draf"
       },
       "resolved": "{{name}} menerima jawabanmu dan kembali bekerja",
-      "resolved_female": "{{name}} menerima jawabanmu dan kembali bekerja",
-      "resolvedForum": "Giliranmu sudah masuk ke ronde"
+      "resolved_female": "{{name}} menerima jawabanmu dan kembali bekerja"
     },
     "what": {
       "mention": "<b>{{name}}</b> menyebutmu",
@@ -3414,8 +3535,6 @@
       "issueComment_other": "<b>{{names}}</b> berkomentar di tugas yang kamu ikuti",
       "issueStatus": "<b>{{name}}</b> memindahkan tugas yang kamu ikuti",
       "issueDone": "<b>{{name}}</b> menyelesaikan tugas yang kamu ikuti",
-      "forumTurn": "<b>{{name}}</b> memanggilmu ke meja",
-      "forumSynthesis": "<b>{{name}}</b> menerbitkan sintesis topikmu",
       "approval": "<b>{{name}}</b> meminta persetujuan",
       "missionFinished": "<b>{{name}}</b> menyelesaikan misi",
       "missionStopped": "<b>{{name}}</b> menghentikan misi",
@@ -3429,6 +3548,7 @@
       "agentUnreached": "Rutinitas tidak bisa memanggil <b>{{name}}</b>",
       "browserProfileRequest": "<b>{{name}}</b> meminta satu profil browser lagi untuk <b>{{agent}}</b>",
       "desktopTaken": "<b>{{name}}</b> mengambil alih layar komputer <b>{{agent}}</b>",
+      "planLent": "<b>{{name}}</b> menghubungkan paket {{plan}} kamu ke <b>{{agent}}</b>",
       "routineWaitingPlan": "<b>{{name}}</b> menunggu paketnya direset untuk menjalankan rutinitas",
       "planResetUnknown": "{{plan}} tidak memberi tahu kapan batasnya direset. Pekerjaan <b>{{name}}</b> masih menunggu.",
       "catchUpClosed_other": "<b>{{name}}</b> kembali dan melewati {{count}} percakapan yang tidak perlu dijawab",
@@ -3459,8 +3579,7 @@
       "usageLimitReached": "<b>{{name}}</b> mencapai batas {{amount}}",
       "usageLimitRequest": "<b>{{name}}</b> mencapai batas {{amount}} dan meminta tambahan",
       "usageLimitRaised": "<b>{{name}}</b> menaikkan batasmu bulan ini",
-      "usageLimitRefused": "<b>{{name}}</b> menolak permintaan tambahan pemakaianmu",
-      "planLent": "<b>{{name}}</b> menghubungkan paket {{plan}} kamu ke <b>{{agent}}</b>"
+      "usageLimitRefused": "<b>{{name}}</b> menolak permintaan tambahan pemakaianmu"
     },
     "usageLimit": {
       "runs_other": "{{count}} permintaan bulan ini",
@@ -3477,7 +3596,6 @@
       "threadOnly": "Utas",
       "dm": "Pesan langsung",
       "issue": "Tugas #{{number}}",
-      "forum": "Forum",
       "mission": "Misi",
       "routine": "Rutinitas",
       "approval": "Persetujuan",
@@ -3530,7 +3648,6 @@
       "channel": "Balas di #{{channel}}",
       "issue": "Komentari #{{number}}",
       "issueNoNumber": "Komentari tugas",
-      "forum": "Posisimu dalam satu atau dua kalimat",
       "reply": "Balas",
       "sends": "kirim",
       "closes": "tutup",
@@ -3557,9 +3674,6 @@
       "sent": "Balasan terkirim",
       "see": "Lihat",
       "answered": "{{name}} menerima jawabanmu",
-      "spoke": "Giliranmu sudah masuk ke ronde",
-      "passed": "Kamu melewatkan giliranmu",
-      "passedDetail": "Ronde berlanjut. Sintesisnya akan muncul di sini saat sudah keluar.",
       "decideThere": "Permintaan ini diputuskan di Persetujuan"
     },
     "calmTitle": "Semua sudah beres",
@@ -3568,12 +3682,7 @@
     "noneUnread": "Semua sudah dibaca.",
     "noneHere": "Belum ada apa-apa di sini.",
     "noneDone": "Tidak ada yang ditandai selesai dalam 30 hari terakhir.",
-    "more": "Tampilkan lebih banyak",
-    "planLent": {
-      "takeBack": "Tarik kembali",
-      "takeBackAll": "Tarik kembali dari semua agen",
-      "done": "Paketmu sudah kembali"
-    }
+    "more": "Tampilkan lebih banyak"
   },
   "approvals": {
     "title": "Persetujuan",
@@ -3848,6 +3957,7 @@
         "accountMove": "Dipakai oleh {{agents}} · Pindahkan ke sini",
         "accountAlso": "Juga dipakai oleh {{agents}}",
         "accountOf": "Milik {{name}}",
+        "accountOthers": "Paket orang lain menunjukkan milik siapa. Pemiliknya menerima email dan bisa menariknya kembali.",
         "addAccount": "Tambah akun",
         "signInAgain": "Masuk lagi",
         "connectPlan": "Hubungkan paket lain",
@@ -4001,8 +4111,7 @@
           "sendFailed": "Tidak bisa mengirim kode. Periksa lalu coba lagi.",
           "done": "Akun {{account}} sudah ada di {{computer}}. Klik Pakai untuk menyimpan."
         },
-        "offCloud": "{{computer}} tidak merespons",
-        "accountOthers": "Paket orang lain menunjukkan milik siapa. Pemiliknya menerima email dan bisa menariknya kembali."
+        "offCloud": "{{computer}} tidak merespons"
       },
       "computer": {
         "title": "Di mana {{name}} bekerja?",
@@ -4083,7 +4192,7 @@
       "machine": "Komputer",
       "brain": "Siapa yang berpikir",
       "repos": "Repositori GitHub",
-      "group": "Grup",
+      "group": "Departemen",
       "handle": "Sebutan"
     },
     "lines": {
@@ -4589,8 +4698,8 @@
       "pm": {
         "name": "PM",
         "agent": "Theo",
-        "desc": "Mengatur tugas, ringkasan, dan forum.",
-        "instructions": "Mencari dulu (tugas, utas, wiki, masukan) dan hanya menanyakan yang tersisa.\nMengatur tugas, merangkum diskusi panjang, dan menjaga roadmap tetap terkini.\nSetiap Jumat, memposting ringkasan minggu itu di forum."
+        "desc": "Mengatur tugas dan ringkasan.",
+        "instructions": "Mencari dulu (tugas, utas, wiki, masukan) dan hanya menanyakan yang tersisa.\nMengatur tugas, merangkum diskusi panjang, dan menjaga roadmap tetap terkini."
       },
       "support": {
         "name": "Dukungan",
@@ -5095,10 +5204,6 @@
       "title": "Pesan langsung dengan {{name}}",
       "text": "Pesan langsung belum tersedia. Untuk sekarang, bicaralah dengan {{name}} di kanal."
     },
-    "forum": {
-      "title": "Forum",
-      "text": "Diskusi panjang dan pengumuman ruang kerja akan ada di sini."
-    },
     "search": {
       "title": "Cari di ruang kerja",
       "text": "Pencarian di pesan, tugas, dan file akan muncul di sini.",
@@ -5227,10 +5332,6 @@
     "wiki_write": {
       "label": "Tulis ke wiki",
       "description": "Buat dan edit halaman wiki, hanya saat diminta seseorang."
-    },
-    "forum_write": {
-      "label": "Forum",
-      "description": "Buka topik forum, membacanya, dan memposting di luar gilirannya sendiri."
     },
     "schedule_write": {
       "label": "Jadwal",
@@ -5508,8 +5609,8 @@
     "createdBy": "#{{number}} · dibuat oleh {{name}}",
     "createdByShort": "Dibuat oleh {{name}}",
     "fromMessage": "dari <0>pesan di #{{channel}}</0>",
-    "fromForum": "dari topik forum",
     "fromAgent": "dari permintaan ke agen",
+    "subIssues_other": "Subtugas · {{count}}",
     "fromWebhook": "dari event {{provider}}",
     "description": "Deskripsi",
     "noDescription": "Tanpa deskripsi.",
@@ -5598,9 +5699,7 @@
       "artifact_linked": "melampirkan file",
       "criterion_checked": "mencentang kriteria \"{{text}}\"",
       "criterion_unchecked": "menghapus centang kriteria \"{{text}}\"",
-      "agent_asked": "meminta {{name}} mengerjakannya",
-      "forum_opened": "membawanya ke forum: {{title}}",
-      "forum_evaluated": "membawa kembali hasil forum: {{title}}"
+      "agent_asked": "meminta {{name}} mengerjakannya"
     }
   },
   "routines": {
@@ -5687,8 +5786,6 @@
     "widgetChip": "Widget dasbor",
     "widgetFixed": "Apa yang ditampilkan, kapan diperbarui, dan siapa yang mengurusnya diubah dari widget-nya.",
     "target": {
-      "forum": "Topik forum",
-      "forumShort": "Forum",
       "dm": "DM-ku dengan agen",
       "artifact": "Dokumen di Drive",
       "dmShort": "DM",
@@ -5788,7 +5885,6 @@
         "thread": "Setiap kali berjalan, dia menjawab di utas yang sama",
         "channel": "Semua orang di kanal melihatnya",
         "dm": "Hanya kamu yang melihatnya",
-        "forum": "Agen berdiskusi di topik forum",
         "artifact": "Menjadi dokumen di Drive",
         "widget": "Memperbarui widget-nya, tanpa pesan"
       },
@@ -5875,7 +5971,6 @@
       "keepUtc": "Tetap UTC",
       "adjust": "Sesuaikan",
       "next": "Berikutnya",
-      "forumAgents": "Agen yang berdiskusi",
       "agent": "Agen",
       "target": "Kirim ke mana",
       "what": "Apa yang dikerjakan",
@@ -6906,6 +7001,49 @@
     "list": "Model",
     "picks": "{{provider}} · Pilihan bagus"
   },
+  "endpoint": {
+    "option": "Penyedia lain",
+    "optionSub": "Kompatibel dengan OpenAI atau Anthropic: gateway, Ollama, vLLM, LM Studio, LiteLLM",
+    "name": "Nama",
+    "namePlaceholder": "Gateway saya",
+    "style": "API",
+    "styles": {
+      "openai": "OpenAI (Chat Completions)",
+      "anthropic": "Anthropic (Messages)"
+    },
+    "address": "Alamat",
+    "addressHelp": "Alamat dasar API, seperti {{example}}",
+    "key": "Kunci API",
+    "keyHelp": "Kosongkan jika server tidak meminta kunci.",
+    "fetch": "Ambil model",
+    "listFailed": "Server tidak mencantumkan model ({{error}}). Ketik id setiap model di bawah.",
+    "choose": "Pilih model yang boleh dipakai agen",
+    "addModel": "Tambahkan model",
+    "add": "Tambah",
+    "modelPlaceholder": "Id model, seperti llama-4",
+    "modelInvalid": "Itu tidak terlihat seperti id model.",
+    "priceIn": "{{model}}: harga input",
+    "priceOut": "{{model}}: harga output",
+    "priceInShort": "Input",
+    "priceOutShort": "Output",
+    "priceUnit": "US$ per juta token",
+    "priceBoth": "Isi input dan output, atau tidak keduanya.",
+    "priceInvalid": "Gunakan angka, seperti 0.50",
+    "unpriced": "Model tanpa harga tidak menghabiskan anggaran: hanya tokennya yang dihitung.",
+    "save": "Simpan dan uji",
+    "saveModels": "Simpan dan uji lagi",
+    "testing": "Menguji setiap model…",
+    "results": "Uji setiap model",
+    "check": {
+      "ok": "Berfungsi, dengan alat",
+      "noTools": "Menjawab, tetapi tidak memakai alat. Agen butuh alat untuk bekerja.",
+      "failed": "Gagal: {{error}}"
+    },
+    "done": "Selesai",
+    "models": "Model",
+    "modelsTitle": "Model {{name}}",
+    "budgetUnpriced": "Model agen ini tidak punya harga, jadi anggarannya tidak bisa menghitung pengeluarannya. Tokennya tetap dihitung."
+  },
   "timezone": {
     "search": "Cari zona waktu",
     "searchPlaceholder": "Kota, negara, UTC+7…",
@@ -7764,7 +7902,6 @@
     "inviteKeywords": "undang undangan anggota orang tim invite invitation member people team",
     "wikiPage": "halaman wiki",
     "wikiNew": "Halaman wiki baru",
-    "forum": "topik forum",
     "jump": "Buka…",
     "open": "Buka, atau tanya agen",
     "placeholder": "Buka, atau tanya agen…",
@@ -7780,498 +7917,6 @@
     "newConversation": "percakapan baru",
     "askLabel": "{{name}}, {{text}}",
     "empty": "Tidak ada hasil untuk “{{q}}”."
-  },
-  "forum": {
-    "title": "Forum",
-    "subtitle": "Pertanyaan dengan tujuan. Para agen membahasnya dalam beberapa ronde, bergiliran, lalu menutup dengan sintesis.",
-    "guard": "Semua orang di ruang kerja bisa membacanya. Tiap giliran adalah proses biasa: alat dan persetujuan tetap berlaku.",
-    "new": "Topik baru",
-    "filters": "Filter topik",
-    "filter": {
-      "open": "Sedang dibahas",
-      "done": "Selesai",
-      "mine": "Milikku"
-    },
-    "listTitle": {
-      "open": "Sedang dibahas",
-      "done": "Selesai",
-      "mine": "Topikku"
-    },
-    "agentFilter": "Agen",
-    "agentCount_other": "{{count}} agen",
-    "search": "Cari di forum",
-    "clearFilters": "Hapus filter",
-    "emptyFilter": "Tidak ada topik yang cocok dengan filter ini.",
-    "liveNow": "Sedang dibahas sekarang",
-    "needsYou": "Butuh kamu",
-    "status": {
-      "open": "Sedang dibahas",
-      "stalled": "Macet",
-      "reopened": "Dibuka lagi",
-      "done": "Selesai",
-      "canceled": "Dibatalkan"
-    },
-    "reopenedBy": "Dibuka lagi oleh {{name}}",
-    "roundOf": "ronde {{round}} dari {{rounds}}",
-    "rounds_other": "{{count}} ronde",
-    "until": "sampai {{when}}",
-    "noDeadline": "tanpa tenggat",
-    "deadlineToday": "hari ini, {{time}}",
-    "deadlineTomorrow": "besok, {{time}}",
-    "you": "{{name}} (kamu)",
-    "empty": {
-      "title": "Belum ada topik",
-      "text": "Bawa pertanyaan sulit untuk dibahas para agen dalam beberapa ronde. Kamu juga bisa melakukannya dari chat: “@agen bawa ini ke forum”."
-    },
-    "live": {
-      "writing": "{{name}} sedang menulis",
-      "reading": "{{name}} sedang membaca diskusi",
-      "yourTurn": "Giliranmu",
-      "waiting": "Menunggu {{name}}",
-      "synthesis": "{{name}} sedang menulis sintesis",
-      "stalled": "Macet di giliran {{name}}",
-      "stalled_female": "Macet di giliran {{name}}",
-      "stalledSynthesis": "Macet di sintesis",
-      "next": "berikutnya: {{name}}",
-      "thenSynthesis": "lalu: sintesis"
-    },
-    "need": {
-      "turnTitle": "Giliranmu di “{{title}}”",
-      "turn": "Giliranmu di ronde {{round}}. Ronde ini menunggumu.",
-      "turnDeadline": "Giliranmu di ronde {{round}}. Kalau kamu tidak bicara sebelum {{when}}, diskusi berlanjut tanpamu.",
-      "speak": "Bicara sekarang",
-      "issues_other": "Sintesis menyarankan {{count}} tugas. Tugas baru dibuat setelah seseorang menyetujuinya.",
-      "planIssues_other": "Rencana menyarankan {{count}} tugas. Tugas baru dibuat setelah seseorang menyetujuinya.",
-      "subIssues_other": "Rencana menyarankan {{count}} subtugas di #{{number}}. Subtugas baru dibuat setelah seseorang menyetujuinya.",
-      "review": "Tinjau tugas",
-      "budget": "Anggaran {{name}} habis dan dia akan melewatkan giliran berikutnya.",
-      "budget_female": "Anggaran {{name}} habis dan dia akan melewatkan giliran berikutnya.",
-      "seeBudget": "Lihat anggaran",
-      "stalled": "Macet: tidak ada yang bicara sampai seseorang melanjutkannya.",
-      "resume": "Lanjutkan"
-    },
-    "row": {
-      "canceled": "Dibatalkan, tanpa sintesis."
-    },
-    "origin": {
-      "direct": "Langsung di forum",
-      "agent": "{{name}}, #{{channel}}",
-      "agentNoChannel": "Dibuka oleh {{name}}",
-      "suggestion": "disarankan oleh {{name}}",
-      "suggestionIn": "disarankan oleh {{name}} di #{{channel}}",
-      "issue": "Tugas #{{number}}",
-      "issueBy": "Tugas #{{number}} · diminta oleh {{name}}",
-      "issueBy_female": "Tugas #{{number}} · diminta oleh {{name}}",
-      "routine": "Rutinitas",
-      "conversation": "Sebuah percakapan"
-    },
-    "track": {
-      "label_other": "{{count}} giliran agen, {{rounds}}",
-      "spoke": "Ronde {{round}} · {{name}} · {{stance}}",
-      "spokeNoStance": "Ronde {{round}} · {{name}}",
-      "person": "Ronde {{round}} · {{name}} ikut bicara",
-      "seat": "Ronde {{round}} · {{name}} bicara sesuai giliran",
-      "passed": "Ronde {{round}} · {{name}} melewatkan giliran",
-      "waiting": "Ronde ini menunggu {{name}}",
-      "waitingMe": "Ronde ini menunggumu",
-      "seatPending": "Ronde {{round}} · giliran {{name}}",
-      "live": "{{name}} sedang menulis",
-      "sleep": "Macet di giliran {{name}}",
-      "sleep_female": "Macet di giliran {{name}}",
-      "synthesis": "Sintesis {{name}}",
-      "synthesis_female": "Sintesis {{name}}",
-      "synthesisLive": "{{name}} sedang menulis sintesis",
-      "skipped": "Ronde {{round}} · {{name}} tidak bicara",
-      "budget": "Ronde {{round}} · {{name}} dilewati: anggaran agen habis",
-      "pending": "Ronde {{round}} · giliran {{name}}",
-      "pending_female": "Ronde {{round}} · giliran {{name}}",
-      "round": "Ronde {{n}}",
-      "roundShort": "R{{n}}",
-      "key": "Tiap kolom adalah satu giliran, dengan warna orang yang bicara. Tingginya menunjukkan panjang giliran.",
-      "keyLive": "Figur itu adalah yang sedang bicara. Titik-titiknya adalah giliran yang tersisa.",
-      "keyDone": "Blok lebar di akhir adalah sintesisnya.",
-      "keyClick": "Klik untuk ke giliran itu."
-    },
-    "stance": {
-      "propose": "Mengusulkan",
-      "agree": "Setuju dengan {{name}}",
-      "agreeAny": "Setuju",
-      "disagree": "Tidak setuju dengan {{name}}",
-      "disagreeAny": "Tidak setuju",
-      "shift": "Mengubah posisi",
-      "ask": "Bertanya",
-      "askPeople": "Bertanya ke orang-orang",
-      "reply": "Membalas {{name}}",
-      "replyAny": "Membalas",
-      "people": "orang-orang"
-    },
-    "topic": {
-      "back": "Forum",
-      "goal": "Tujuan",
-      "responsible": "Penanggung jawab",
-      "requestedBy": "Diminta oleh",
-      "reopenedFor": "dibuka lagi oleh {{name}} untuk ronde {{round}}",
-      "conclude": "Selesaikan",
-      "concluding": "Menyelesaikan…",
-      "more": "Tindakan lainnya",
-      "copyLink": "Salin tautan",
-      "linkCopied": "Tautan disalin. Siapa pun yang membukanya bisa membaca seluruh topik.",
-      "editParticipants": "Ubah peserta",
-      "cancel": "Batalkan topik",
-      "notFound": "Topik tidak ditemukan."
-    },
-    "table": {
-      "title": "Meja diskusi",
-      "order": "bicara dengan urutan ini, sekali per ronde",
-      "orderDone": "bicara dengan urutan ini",
-      "writes": "menulis sintesis",
-      "writesPlan": "menulis rencana",
-      "seatedPerson": "orang · di meja",
-      "next": "berikutnya",
-      "yourTurn": "Giliranmu",
-      "waits": "ronde menunggu",
-      "writing": "menulis",
-      "reading": "membaca diskusi…",
-      "rereading": "membaca ulang ronde…",
-      "writingSynthesis": "menulis sintesis",
-      "stopped": "berhenti di sini",
-      "broke": "anggaran habis, melewatkan giliran",
-      "wroteSynthesis": "menulis sintesis",
-      "spokeAt": "bicara pukul {{time}}",
-      "passed": "melewatkan giliran",
-      "notYet": "belum bicara",
-      "readsCanEnter": "membaca dan bisa ikut",
-      "entered": "ikut di ronde {{round}}",
-      "sits": "di meja",
-      "orgReads": "seluruh ruang kerja membaca"
-    },
-    "posts": {
-      "round": "Ronde {{n}}",
-      "startedWith": "dimulai oleh {{name}}",
-      "spokeCount": "{{said}} dari {{total}} sudah bicara",
-      "none": "{{name}} bicara pertama. Ronde pertama sudah dimulai.",
-      "person": "orang",
-      "starts": "Ronde {{round}} dimulai di sini",
-      "started": "Ronde {{round}} dimulai di sini",
-      "last": "Ini ronde terakhir: posting ini masuk ke sintesis",
-      "askedRound": "Meminta ronde baru",
-      "inTurn": "Di gilirannya",
-      "reroundFrom": "Minta ronde dari sini",
-      "replyTo": "Ke posting {{name}}",
-      "budgetSkip": "{{name}} melewatkan giliran: anggaran agen habis.",
-      "passedTurn": "{{name}} melewatkan giliran.",
-      "didntSpeak_other": "{{names}} tidak bicara di ronde ini.",
-      "stopped": "Berhenti di tengah giliran.",
-      "comments": "Komentar",
-      "afterSynthesis": "setelah sintesis"
-    },
-    "liveTurn": {
-      "writing": "menulis · ronde {{round}}",
-      "reading": "membaca diskusi · ronde {{round}}",
-      "synthesis": "menulis sintesis",
-      "rereading": "membaca ulang ronde",
-      "readingLine": "Membaca diskusi…",
-      "waitsFor": "Ronde ini menunggu {{name}}, yang duduk di meja.",
-      "yourTurn": "Giliranmu",
-      "yourTurnSub": "ronde {{round}} · ronde ini menunggumu",
-      "yourTurnPlaceholder": "Apa pendapatmu? Para agen membacanya sebelum giliran berikutnya.",
-      "pass": "Lewati",
-      "send": "Kirim",
-      "deadline": "Kalau kamu tidak bicara sebelum {{when}}, diskusi berlanjut tanpamu.",
-      "passed": "Kamu melewatkan giliran. Kali ini ronde berlanjut tanpamu.",
-      "spoke": "Kamu sudah bicara di giliranmu. Ronde berlanjut sesuai urutan meja."
-    },
-    "stalled": {
-      "title": "Macet di giliran {{name}}",
-      "title_female": "Macet di giliran {{name}}",
-      "titleSynthesis": "Macet di sintesis",
-      "stopped": "{{name}} menghentikan giliran. Tidak ada yang bicara sampai seseorang melanjutkannya.",
-      "stoppedAnon": "Giliran dihentikan. Tidak ada yang bicara sampai seseorang melanjutkannya.",
-      "failed": "Giliran gagal. Coba lagi, atau selesaikan dengan apa yang sudah dibahas.",
-      "resume": "Lanjutkan",
-      "retry": "Coba lagi",
-      "concludeNow": "Selesaikan sekarang",
-      "resumed": "Topik dilanjutkan."
-    },
-    "closed": {
-      "canceled": "Dibatalkan, tanpa sintesis. Posting tetap di sini untuk dibaca siapa saja.",
-      "synthesizing": "{{name}} sedang menulis sintesis. Tidak ada orang lain yang bicara di topik ini.",
-      "synthesizing_female": "{{name}} sedang menulis sintesis. Tidak ada orang lain yang bicara di topik ini."
-    },
-    "composer": {
-      "label": "Ikut diskusi",
-      "placeholder": "Ikut diskusi…",
-      "hint": "Kamu bisa ikut kapan saja: giliran saat ini selesai dan ronde berikutnya dimulai dari postinganmu.",
-      "hintLast": "Kamu bisa ikut kapan saja: giliran saat ini selesai dan, di ronde terakhir ini, postinganmu langsung masuk ke sintesis.",
-      "moreRound": "Satu ronde lagi dari postinganmu",
-      "send": "Kirim",
-      "sent": "Postinganmu sudah masuk: ronde berikutnya dimulai dari situ.",
-      "sentLast": "Postinganmu masuk ke sintesis.",
-      "commentLabel": "Komentar",
-      "commentPlaceholder": "Komentar…",
-      "comment": "Kirim komentar",
-      "commentAndRound": "Komentar dan minta ronde",
-      "commented": "Komentar diposting. Topik tetap selesai.",
-      "reround": "Minta ronde baru dari komentar ini",
-      "doneHint": "Topik sudah selesai: berkomentar tidak membukanya lagi, kecuali kamu meminta ronde.",
-      "reroundHint": "Agen di meja menjawab komentarmu di ronde baru dan {{name}} menulis ulang sintesisnya.",
-      "reroundHint_female": "Agen di meja menjawab komentarmu di ronde baru dan {{name}} menulis ulang sintesisnya."
-    },
-    "newRound": {
-      "title": "Minta ronde baru",
-      "text": "Ronde {{round}} dimulai dari komentarmu dan topik dibuka lagi atas namamu.",
-      "textFrom": "Ronde {{round}} dimulai dari komentar ini dan topik dibuka lagi atas namamu.",
-      "note": "Apa yang ingin kamu tambahkan",
-      "notePlaceholder": "Opsional: apa yang perlu dilihat lagi oleh agen",
-      "defaultBody": "Saya meminta ronde baru dari komentar ini.",
-      "who": "Siapa yang menjawab",
-      "whoHint": "sesuai urutan meja",
-      "speaksAt": "bicara ke-{{n}}",
-      "broke": "anggaran habis: akan melewatkan giliran",
-      "ok": "Minta ronde",
-      "done": "Topik dibuka lagi: ronde {{round}}."
-    },
-    "conclude": {
-      "title": "Selesaikan topik?",
-      "text": "Tidak ada yang memulai giliran baru. Apa yang sudah dibahas menjadi sintesis.",
-      "finishes": "{{name}} menyelesaikan gilirannya",
-      "finishes_female": "{{name}} menyelesaikan gilirannya",
-      "finishesSub": "Sekarang gilirannya. Setelah itu, tidak ada lagi yang bicara.",
-      "nobody": "Tidak ada yang sedang menulis",
-      "nobodySub": "Sintesis langsung dimulai.",
-      "writes": "{{name}} menulis sintesis",
-      "writes_female": "{{name}} menulis sintesis",
-      "writesSub": "Keputusan, pro dan kontra tiap pihak, pertanyaan terbuka, langkah berikutnya, dan tugas yang disarankan.",
-      "writesSubPlan": "Tujuan, apa yang termasuk dan tidak, langkah, risiko, cara mengukur, dan tugas per langkah.",
-      "goes": "Menjadi dokumen di Drive dan kembali ke asalnya",
-      "goesSub": "Tugas yang disarankan baru dibuat setelah seseorang menyetujuinya.",
-      "keep": "Lanjut diskusi",
-      "ok": "Selesaikan",
-      "done": "Menyelesaikan: sintesis akan muncul di sini dan di Drive."
-    },
-    "cancel": {
-      "title": "Batalkan tanpa sintesis?",
-      "text": "Tidak ada lagi yang bicara dan tidak ada yang masuk ke Drive. Posting tetap di sini untuk dibaca siapa saja.",
-      "keep": "Pertahankan topik",
-      "ok": "Batalkan topik",
-      "done": "Topik dibatalkan. Posting tetap ada di forum."
-    },
-    "side": {
-      "title": "Posisi tiap pihak",
-      "titleDone": "Posisi akhir tiap pihak",
-      "agree_other": "{{count}} dari {{total}} setuju",
-      "withProposal": "dengan usulan di meja",
-      "withDecision": "dengan keputusannya",
-      "askers_other": "{{names}} masih punya pertanyaan",
-      "agents": "Tiap agen",
-      "notYet": "Belum bicara",
-      "firstWriting": "Menulis giliran pertama…",
-      "writingNow": "sedang menulis…",
-      "broke": "anggaran habis: melewatkan giliran",
-      "spoke": "sudah bicara",
-      "laneKey": "Satu kotak per ronde. Atas: mendukung usulan di meja. Bawah: menentang. Tengah: pertanyaan.",
-      "laneLabel": "{{name}}: {{list}}",
-      "laneEmpty": "{{name}}: tanpa giliran",
-      "laneRound": "ronde {{round}}: {{stance}}",
-      "laneLive": "ronde {{round}}: menulis",
-      "details": "Detail",
-      "rounds": "Ronde",
-      "roundsDone": "{{round}} dari {{rounds}}",
-      "format": "Format",
-      "deadline": "Tenggat",
-      "origin": "Asal",
-      "openedBy": "Dibuka oleh",
-      "participants": "Peserta"
-    },
-    "format": {
-      "decision": "Keputusan",
-      "plan": "Rencana",
-      "decisionHint": "Keputusan, dengan pro dan kontra tiap pihak, pertanyaan terbuka, dan langkah berikutnya.",
-      "planHint": "Rencana: apa yang termasuk dan tidak, langkah berurutan beserta pelaksananya, risiko, dan cara mengukur. Langkah-langkahnya menjadi tugas."
-    },
-    "formatLower": {
-      "decision": "keputusan",
-      "plan": "rencana"
-    },
-    "synthesis": {
-      "eyebrow": "Sintesis",
-      "eyebrowPlan": "Rencana",
-      "closed": "{{name}} menutup topik",
-      "closed_female": "{{name}} menutup topik",
-      "closedPlan": "{{name}} menutup rencana",
-      "closedPlan_female": "{{name}} menutup rencana",
-      "rewrote": "{{name}} menulis ulang sintesis",
-      "rewrote_female": "{{name}} menulis ulang sintesis",
-      "meta": "{{posts}} giliran dari {{agents}} agen",
-      "metaPeople": "{{posts}} giliran dari {{agents}} agen dan dari orang",
-      "version": "versi {{n}}",
-      "versionN": "Versi {{n}}",
-      "decision": "Keputusan",
-      "objective": "Tujuan",
-      "prosCons": "Pro dan kontra tiap pihak",
-      "why": "Alasannya",
-      "openQuestions": "Pertanyaan terbuka",
-      "nextSteps": "Langkah berikutnya",
-      "forRequester": "Untuk {{name}}:",
-      "forRequester_female": "Untuk {{name}}:",
-      "inScope": "Yang termasuk",
-      "outOfScope": "Yang tidak termasuk",
-      "steps": "Langkah, berurutan",
-      "after": "setelah {{n}}",
-      "startNow": "bisa dimulai sekarang",
-      "risks": "Risiko",
-      "metrics": "Cara mengukur",
-      "changes": "Versi {{n}} · apa yang berubah",
-      "showV": "Lihat versi {{n}}",
-      "hideV": "Sembunyikan versi {{n}}",
-      "replaced": "diganti setelah ronde {{round}}",
-      "none": "tidak ada",
-      "issues": "Tugas yang disarankan",
-      "subIssues": "Subtugas yang disarankan di #{{number}}",
-      "marked": "{{on}} dari {{total}} dicentang",
-      "allCreated": "semua sudah dibuat",
-      "goesTo": "untuk {{name}}",
-      "with": "dengan {{name}}",
-      "step": "langkah {{n}}",
-      "approveTitle": "{{name}} menyarankan, orang yang menyetujui",
-      "approveTitle_female": "{{name}} menyarankan, orang yang menyetujui",
-      "approveText": "Tidak ada yang dibuat tanpamu. Tiap tugas langsung ditujukan ke orang yang disebut.",
-      "approveTextPlan": "Tiap langkah menjadi subtugas, lengkap dengan pelaksananya. Tidak ada yang dibuat tanpamu.",
-      "create_other": "Buat {{count}} tugas",
-      "createSub_other": "Buat {{count}} subtugas di #{{number}}",
-      "created_other": "{{count}} tugas dibuat.",
-      "createdSub_other": "{{count}} subtugas dibuat di #{{number}}.",
-      "wentTo": "Ke mana hasilnya",
-      "backIssue": "Kembali ke tugas #{{number}}",
-      "backIssueDone": "Sudah kembali ke tugas #{{number}}: rencana + {{count}} subtugas",
-      "backChannel": "Sudah kembali ke percakapan asalnya",
-      "backNone": "Tetap di forum",
-      "saveWiki": "Simpan ke Wiki"
-    },
-    "form": {
-      "title": "Topik baru",
-      "fromIssue": "Evaluasi di forum",
-      "editSuggestion": "Ubah saran",
-      "subtitle": "Para agen bicara bergiliran, sesuai urutan meja, dan yang pertama menulis sintesisnya.",
-      "templatesText": "Mulai dari template atau dari nol. Kamu bisa mengubah semuanya sebelum membukanya.",
-      "tip": "Tips: di chat, “@agen bawa ini ke forum” juga membuka topik.",
-      "templateMeta": "{{rounds}} · {{format}}",
-      "templates": {
-        "tech": {
-          "title": "Keputusan teknis",
-          "text": "Pilih satu opsi, lengkap dengan risiko dan rencana.",
-          "goal": "Pilih satu opsi dan jelaskan alasannya, beserta risiko dan langkah berikutnya."
-        },
-        "review": {
-          "title": "Tinjau usulan",
-          "text": "Temukan celahnya dan pulang dengan daftar perubahan.",
-          "goal": "Baca usulannya, tunjukkan celahnya, dan hasilkan daftar apa yang perlu diubah."
-        },
-        "brain": {
-          "title": "Curah gagasan",
-          "text": "Kumpulkan ide dan pilih 3 untuk diuji.",
-          "goal": "Kumpulkan ide, kelompokkan, dan pilih 3 terbaik untuk diuji."
-        },
-        "postmortem": {
-          "title": "Postmortem",
-          "text": "Apa yang terjadi, kenapa, dan apa yang berubah.",
-          "goal": "Ceritakan apa yang terjadi, temukan penyebabnya, dan sebutkan apa yang berubah supaya tidak terulang."
-        },
-        "blank": {
-          "title": "Dari nol",
-          "text": "Tulis pertanyaannya dan pilih siapa yang membahasnya."
-        }
-      },
-      "question": "Pertanyaan",
-      "questionPlaceholder": "Mis.: Pindahkan antrean outbox ke LISTEN/NOTIFY?",
-      "origin": "Dari {{origin}}. Hasilnya kembali ke sana.",
-      "format": "Hasilnya",
-      "goal": "Tujuan",
-      "goalPlaceholder": "Mis.: keputusan beserta risiko dan rencana peluncurannya.",
-      "table": "Meja diskusi",
-      "tableHint": "sesuai urutan bicara · seret atau pakai panah",
-      "personSeat": "orang · ronde menunggu giliran ini",
-      "addAgents": "Tambahkan agen ke meja",
-      "add": "Tambahkan {{name}} ke meja",
-      "up": "Pindahkan {{name}} ke atas",
-      "down": "Pindahkan {{name}} ke bawah",
-      "remove": "Hapus {{name}}",
-      "unseat": "Keluarkan {{name}} dari meja",
-      "noTalk": "tidak menjawabmu",
-      "noTalkTitle": "{{name}} tidak menjawabmu",
-      "oneAgent": "Dengan satu agen saja, pakai utas atau “Tanya {{name}}” di tugas. Forum untuk pandangan yang bisa berbeda.",
-      "minAgents": "Pilih minimal 2 agen untuk diskusi.",
-      "people": "Orang yang diberi tahu",
-      "peopleHint": "semua orang di ruang kerja bisa membacanya",
-      "meAlways": "kamu, selalu diberi tahu",
-      "seatMe": "Saya duduk di meja",
-      "seatMeHint": "tunggu saya di setiap ronde",
-      "seatOther": "{{name}} duduk di meja",
-      "seatOtherHint": "ronde menunggu giliran ini",
-      "rounds": "Ronde",
-      "deadline": "Tenggat",
-      "deadlines": {
-        "none": "Tanpa tenggat",
-        "today": "Hari ini, 18.00",
-        "tomorrow": "Besok",
-        "friday": "Jumat"
-      },
-      "approvals": "Tiap giliran adalah proses biasa: persetujuan tetap berlaku.",
-      "create": "Buka topik",
-      "open": "Buka forum",
-      "created": "Topik dibuka. {{name}} bicara pertama. Semua orang di ruang kerja bisa membacanya."
-    },
-    "participantsDialog": {
-      "title": "Peserta",
-      "text": "{{agents}} agen di meja dan {{people}}.",
-      "people_other": "{{count}} orang diberi tahu",
-      "search": "Cari peserta",
-      "speaksAt": "bicara ke-{{n}}",
-      "entered": "ikut dalam diskusi",
-      "notified": "sudah diberi tahu dan bisa ikut",
-      "org": "Seluruh ruang kerja",
-      "orgReads": "membaca topik",
-      "note": "Perubahan di meja berlaku mulai ronde berikutnya.",
-      "edit": "Ubah",
-      "saved": "Peserta diperbarui."
-    },
-    "suggestion": {
-      "label": "Saran forum",
-      "title": "Perlu dibawa ke forum?",
-      "by": "{{name}} menyarankan",
-      "edit": "Ubah",
-      "table": "Meja diskusi",
-      "open": "Buka forum",
-      "notNow": "Nanti saja",
-      "note": "Hanya orang yang bisa membukanya. Forum ini atas namamu.",
-      "opened": "Forum dibuka",
-      "openedBy": "oleh {{name}}, dari percakapan ini",
-      "openedToast": "Forum dibuka. Forum ini atas namamu.",
-      "dismissed": "{{name}} mengabaikan saran ini.",
-      "dismissedMe": "Kamu mengabaikan saran ini.",
-      "undo": "Urungkan"
-    },
-    "card": {
-      "label": "Topik forum",
-      "see": "Lihat diskusi"
-    },
-    "issue": {
-      "section": "Forum",
-      "evaluate": "Evaluasi di forum",
-      "evaluateTitle": "Butuh lebih dari satu sudut pandang",
-      "evaluateText": "Forum untuk saat pihak yang memutuskan bisa berbeda pendapat. Hasilnya kembali ke tugas ini.",
-      "inForum": "Sedang dievaluasi di forum",
-      "evaluated": "Sudah dievaluasi di forum",
-      "outPlan": "menghasilkan rencana",
-      "outDecision": "menghasilkan keputusan",
-      "subIssues_other": "Subtugas · {{count}}"
-    },
-    "notify": {
-      "your_turn": "Giliranmu di “{{title}}”.",
-      "requested": "Forum dibuka atas permintaanmu: “{{title}}”.",
-      "concluded": "Forum “{{title}}” sudah selesai.",
-      "open": "Buka"
-    }
   },
   "code": {
     "ranSummary_other": "Menjalankan {{count}} baris {{language}} · output {{size}}",
@@ -8691,7 +8336,6 @@
     "saveNew": "Buat halaman {{title}}",
     "savedTo": "Disimpan ke {{title}}.",
     "fromMessage": "dari pesan di #{{channel}}",
-    "fromForum": "dari sintesis forum",
     "note": {
       "created": "membuat halaman",
       "edited": "mengedit",
@@ -8702,9 +8346,7 @@
       "moved": "dipindahkan ke \"{{folder}}\"",
       "moved_root": "dipindahkan ke akar",
       "saved_message": "menyimpan pesan",
-      "saved_synthesis": "menyimpan sintesis forum",
       "created_from_message": "dibuat dari pesan",
-      "created_from_synthesis": "dibuat dari sintesis forum",
       "imported": "diimpor dari \"{{source}}\""
     }
   },
@@ -8997,7 +8639,6 @@
       "wiki": "Wiki",
       "skills": "Skill",
       "schedule": "Pengingat dan rutinitas",
-      "forum": "Forum",
       "sandbox": "Jalankan kode",
       "browser": "Browser",
       "setup": "Pengaturan ruang kerja",
@@ -9031,9 +8672,6 @@
       },
       "schedule": {
         "write": "Membuat pengingat dan rutinitas untuk siapa pun yang meminta."
-      },
-      "forum": {
-        "write": "Membuka topik, membaca, dan memposting di forum."
       },
       "sandbox": {
         "write": "Menjalankan kode di komputer agen."
@@ -10871,6 +10509,9 @@
       "unknown": "Peran itu sudah tidak ada.",
       "orderIncomplete": "Peran sudah berubah. Muat ulang dan coba lagi."
     },
+    "teamProposal": {
+      "undoExpired": "Sudah lebih dari sehari sejak tim ini dibuat, jadi tidak bisa dibatalkan di sini. Arsipkan agennya di halaman masing-masing."
+    },
     "agentProposal": {
       "decided": "Seseorang sudah memutuskan usulan ini.",
       "expired": "Usulan ini kedaluwarsa: tidak ada yang memutuskannya dalam sehari.",
@@ -10966,8 +10607,7 @@
       "rangeTooLong": "Konteks utas memuat maksimal {{max}} pesan.",
       "titleTooLong": "Judul maksimal {{max}} karakter.",
       "noContext": "Utas ini tidak berasal dari rentang percakapan.",
-      "notUndoable": "Hanya utas yang dibuat dari rentang yang bisa dibatalkan.",
-      "forum": "Topik forum tidak punya utas."
+      "notUndoable": "Hanya utas yang dibuat dari rentang yang bisa dibatalkan."
     },
     "routine": {
       "tooFrequent": "Rutinitas berjalan paling sering setiap 15 menit. Pilih interval yang lebih panjang.",
@@ -11024,8 +10664,8 @@
       "noPendingUpdate": "Tidak ada pembaruan skill ini yang menunggu."
     },
     "agentGroup": {
-      "notFound": "Grup ini sudah tidak ada.",
-      "tooMany": "Ruang kerja ini sudah punya {{max}} grup. Hapus salah satunya dulu."
+      "notFound": "Departemen ini sudah tidak ada.",
+      "tooMany": "Ruang kerja ini sudah punya {{max}} departemen. Hapus satu dulu."
     },
     "handle": {
       "invalid": "@ terdiri dari {{min}} sampai {{max}} huruf kecil, angka, - atau _.",
@@ -11658,8 +11298,7 @@
       "unattended": "atas inisiatif sendiri"
     },
     "where": {
-      "dm": "percakapan pribadi",
-      "forum": "forum: {{name}}"
+      "dm": "percakapan pribadi"
     },
     "system": "Sistem",
     "removed": "Dihapus",
@@ -11736,7 +11375,6 @@
         "mission": "misi",
         "thread": "utas",
         "channel": "kanal",
-        "forum": "topik forum",
         "artifact": "file Drive",
         "agent": "agen",
         "machine": "komputer",
@@ -11864,7 +11502,11 @@
       "device": "Di perangkat ini",
       "activity": "Tampilkan yang dilakukan agen di bawah tiap balasan",
       "activityHelp": "Alat yang mereka pakai dan berapa lama prosesnya. Saat mereka bekerja, kamu tetap melihat apa yang sedang mereka lakukan.",
-      "activityFailed": "Tidak bisa menyimpan. Coba lagi."
+      "activityFailed": "Tidak bisa menyimpan. Coba lagi.",
+      "agentStyle": "Cara agen berbicara denganmu",
+      "agentStyleHelp": "Sederhana: apa yang terjadi dan apa yang harus dilakukan, dalam beberapa kata. Teknis: dengan path, kode, dan detail.",
+      "agentStyleSimple": "Sederhana",
+      "agentStyleTechnical": "Teknis"
     },
     "orgTitle": "Ruang kerja",
     "name": "Nama",
@@ -12461,8 +12103,6 @@
       "seconds": "{{n}} dtk",
       "minutes": "{{n}} mnt",
       "step": {
-        "openingForumTopic": "Membuka topik forum",
-        "postingInForum": "Menulis di forum",
         "schedulingReminder": "Menjadwalkan pengingat",
         "creatingRoutine": "Membuat rutinitas",
         "updatingRoutine": "Mengubah rutinitas",
@@ -12514,7 +12154,6 @@
         "writingWiki": "Menulis di wiki",
         "readingWiki": "Membaca wiki",
         "linkingWiki": "Menautkan halaman wiki",
-        "readingForum": "Membaca forum",
         "creatingChannel": "Membuat kanal",
         "offeringConnectAi": "Menawarkan menghubungkan AI",
         "offeringConnectApp": "Menawarkan menghubungkan aplikasi",
@@ -12533,7 +12172,6 @@
         "handingOff": "Mengirim laporan",
         "recordingFindings": "Mencatat temuan",
         "deliveringMission": "Menyerahkan hasil misi",
-        "suggestingForumTopic": "Menyarankan topik forum",
         "requestingAccess": "Meminta akses",
         "requestingSecret": "Meminta rahasia",
         "queryingDatabase": "Mengkueri database",
@@ -12544,8 +12182,6 @@
       }
     },
     "activity": {
-      "openingForumTopic": "membuka topik forum",
-      "postingInForum": "menulis di forum",
       "schedulingReminder": "menjadwalkan pengingat",
       "creatingRoutine": "membuat rutinitas",
       "updatingRoutine": "mengubah rutinitas",
@@ -12600,7 +12236,6 @@
       "writingWiki": "menulis di wiki",
       "readingWiki": "membaca wiki",
       "linkingWiki": "menautkan halaman wiki",
-      "readingForum": "membaca forum",
       "creatingChannel": "membuat kanal",
       "offeringConnectAi": "menyiapkan AI untuk dihubungkan",
       "offeringConnectApp": "menyiapkan aplikasi untuk dihubungkan",
@@ -12619,7 +12254,6 @@
       "handingOff": "mengirim laporan",
       "recordingFindings": "mencatat temuan",
       "deliveringMission": "menyerahkan hasil misi",
-      "suggestingForumTopic": "menyarankan topik forum",
       "requestingAccess": "meminta akses",
       "requestingSecret": "meminta rahasia",
       "queryingDatabase": "mengkueri database",
@@ -12665,6 +12299,7 @@
         "long": "Ini butuh banyak langkah, dan tidak ada yang memintanya langsung. Boleh saya lanjutkan?"
       },
       "autonomy_digest_other": "{{count}} peringatan tampak sudah dikenal atau tidak berbahaya, jadi tidak saya kerjakan:",
+      "team_week": "Bagaimana minggu tim berjalan, {{from}} sampai {{to}}",
       "autonomy_loop": "Saya berhenti mengerjakan ini atas inisiatif sendiri. Ini muncul lagi {{count}} kali dalam sehari ({{title}}). Beri tahu saya bagaimana Anda ingin menanganinya.",
       "mission_plan": "Rencana untuk “{{title}}” di {{computer}}",
       "mission_planNoComputer": "Rencana untuk “{{title}}”",
@@ -12733,6 +12368,7 @@
       "action_approvals": "Persetujuan yang menunggumu",
       "action_open_page": "Buka layar",
       "agent_proposal": "Mengusulkan agen baru: {{name}}",
+      "team_proposal": "Mengusulkan tim: {{names}}",
       "settings_proposal": "Mengusulkan perubahan untuk {{names}}",
       "approval_request": "Permintaan persetujuan: {{title}}",
       "secret_request": "{{agent}} meminta kunci: {{name}}",
@@ -12755,10 +12391,7 @@
       },
       "interrupted": "Terputus karena server dimulai ulang. Minta lagi untuk melanjutkan.",
       "step_limit": "Langkahku habis sebelum selesai.",
-      "stuck": "Aku macet dan berhenti sebelum selesai.",
-      "forum_suggestion": "Layak dibawa ke forum? \"{{title}}\"",
-      "forum_concluded": "Forum \"{{title}}\" sudah selesai. Sintesisnya ada di file di bawah.",
-      "forum_concluded_issues": "Forum \"{{title}}\" sudah selesai. Sintesisnya ada di file di bawah, dengan {{count}} usulan tugas untuk disetujui."
+      "stuck": "Aku macet dan berhenti sebelum selesai."
     }
   },
   "builtinTools": {
@@ -12901,22 +12534,6 @@
     "schedule_action": {
       "label": "Jadwalkan tindakan",
       "description": "Menyiapkan tindakan aplikasi yang terhubung untuk waktu tertentu. Seseorang menyetujuinya sekarang."
-    },
-    "suggest_forum_topic": {
-      "label": "Sarankan topik forum",
-      "description": "Menyarankan diskusi antar-agen. Seseorang yang membukanya."
-    },
-    "open_forum_topic": {
-      "label": "Buka topik forum",
-      "description": "Membawa sebuah pokok bahasan ke diskusi antar-agen."
-    },
-    "post_in_forum": {
-      "label": "Posting di forum",
-      "description": "Memposting di sebuah topik di luar gilirannya."
-    },
-    "read_forum_topic": {
-      "label": "Baca topik forum",
-      "description": "Membaca tujuan dan balasan sebuah topik."
     },
     "search_wiki": {
       "label": "Cari wiki",
@@ -14461,5 +14078,202 @@
       "promptRequired": "Sebutkan apa yang harus ditampilkan widget.",
       "notTested": "Uji dulu: widget dibuat setelah ujinya berhasil."
     }
+  },
+  "teamPlan": {
+    "start": {
+      "question": "Apa yang dikerjakan {{org}}? Dengan itu saya susun tim yang siap, dan kamu tinggal mengecek.",
+      "orWrite": "Atau tulis dengan caramu di bawah, dalam satu kalimat.",
+      "footer": "Sudah tahu yang kamu mau?",
+      "templates": "Lihat template tim",
+      "presets": "Agen siap pakai"
+    },
+    "business": {
+      "agency": "Agensi",
+      "store": "Toko online",
+      "clinic": "Klinik atau praktik",
+      "software": "Software dan aplikasi",
+      "support": "Layanan pelanggan",
+      "services": "Kantor jasa",
+      "other": "Lainnya"
+    },
+    "answered": "terjawab",
+    "step": "Pertanyaan {{step}} dari {{of}}",
+    "send": "Kirim {{count}}",
+    "card": {
+      "new": "baru",
+      "routines": "Rutinitas",
+      "skills": "Skill",
+      "create": "Buat tim",
+      "adjust": "Sesuaikan",
+      "adjustName": "Sesuaikan {{name}}",
+      "map": "Lihat sebagai peta",
+      "agents_other": "{{count}} agen",
+      "newChannels_other": "{{count}} kanal baru",
+      "routineCount_other": "{{count}} rutinitas",
+      "weekly": "saya ceritakan di sini bagaimana minggu tim berjalan",
+      "failed": "Tim tidak dibuat: {{step}} gagal ({{reason}}). Tidak ada yang dibuat, jadi kamu bisa mencoba lagi.",
+      "retry": "Coba lagi",
+      "onlyCreators": "Hanya yang membuat agen yang membuat tim.",
+      "created": "Tim dibuat oleh {{name}}",
+      "createdYou": "Tim dibuat olehmu",
+      "skillsWait": "Skill menunggu admin.",
+      "weeklyWait": "Tinjauan mingguan saya menunggu orang yang mengelola rutinitas saya.",
+      "undone": "Tim dibatalkan",
+      "dismissed": "Tim dibuang"
+    },
+    "firstTask": {
+      "suggestion": "saran",
+      "lead": "Satu tugas singkat per agen, supaya kamu melihat masing-masing bekerja hari ini.",
+      "open": "Buka dengan tugasnya",
+      "invite": "Undang {{names}}",
+      "later": "Nanti"
+    },
+    "adjust": {
+      "title": "Sesuaikan {{name}}",
+      "name": "Nama",
+      "role": "Peran",
+      "line": "Apa yang dikerjakan",
+      "instructions": "Instruksi",
+      "channel": "Kanal",
+      "firstTask": "Tugas pertama"
+    },
+    "map": {
+      "title": "Tim sebagai peta",
+      "people": "Orang",
+      "reviewer": "{{name}} meninjau minggu tim",
+      "waits": "Menunggu persetujuanmu"
+    },
+    "templates": {
+      "title": "Template tim",
+      "lead": "Tim siap untuk jenis usahamu. Lalu {{name}} menyesuaikannya bersamamu.",
+      "use": "Pakai template ini",
+      "none": "Tidak ada yang cocok",
+      "noneSub": "Ceritakan apa yang kamu kerjakan dan {{name}} menyusunnya",
+      "tailor": "Lalu saya ajukan 2 pertanyaan untuk menyesuaikannya dengan usahamu."
+    },
+    "weekly": {
+      "name": "Minggu tim"
+    }
+  },
+  "teamTemplates": {
+    "lead": "Tim untuk {{org}}, tiap agen di kanalnya sendiri. Kamu bisa menyesuaikannya sebelum membuat.",
+    "agency": {
+      "name": "Agensi pemasaran",
+      "sub": "Konten, iklan, dan layanan pelanggan",
+      "desc": "Untuk agensi yang mengelola konten dan kampanye kliennya."
+    },
+    "store": {
+      "name": "Toko online",
+      "sub": "Pesanan, stok, dan media sosial",
+      "desc": "Untuk toko yang berjualan online dan melayani pembelinya."
+    },
+    "clinic": {
+      "name": "Klinik atau praktik",
+      "sub": "Janji temu lewat WhatsApp, tagihan, dan kontrol",
+      "desc": "Untuk klinik atau praktik yang menjadwalkan pasien dan menindaklanjutinya."
+    },
+    "software": {
+      "name": "Software dan aplikasi",
+      "sub": "Dukungan, tagihan, dan kode",
+      "desc": "Untuk perusahaan yang menjual software dan mengurus pelanggannya sendiri."
+    },
+    "support": {
+      "name": "Layanan dan dukungan",
+      "sub": "Antrean pelanggan dan basis jawaban",
+      "desc": "Untuk tim yang menjawab banyak pelanggan setiap hari."
+    },
+    "services": {
+      "name": "Kantor jasa",
+      "sub": "Akuntansi, hukum, konsultasi",
+      "desc": "Untuk kantor yang menjadwalkan klien, mengirim proposal, dan menagih."
+    },
+    "agents": {
+      "iara": {
+        "role": "Layanan pelanggan",
+        "line": "Menjawab pelanggan di WhatsApp dan email. Memanggilmu saat tidak tahu.",
+        "routine": "Merangkum yang belum dijawab",
+        "task": "Menjawab pesan pelanggan terakhir yang menunggu"
+      },
+      "caio": {
+        "role": "Penagihan",
+        "line": "Mengingatkan yang terlambat bayar dan mengirim tagihan setelah kamu setuju.",
+        "routine": "Mendaftar siapa yang terlambat bayar",
+        "task": "Mendaftar siapa yang terlambat bulan ini"
+      },
+      "ada": {
+        "role": "Dev",
+        "line": "Memperbaiki bug yang dilaporkan pelanggan dan membuka PR.",
+        "routine": "Mendaftar bug baru",
+        "task": "Melihat bug terakhir yang dilaporkan pelanggan"
+      },
+      "lia": {
+        "role": "Konten",
+        "line": "Menulis posting dan naskah dengan gaya perusahaan dan menjadwalkannya setelah kamu setuju.",
+        "routine": "Mengusulkan posting minggu ini",
+        "task": "Mengusulkan tiga posting untuk minggu ini"
+      },
+      "theo": {
+        "role": "Penjualan",
+        "line": "Menindaklanjuti semua yang meminta penawaran dan menulis proposalnya.",
+        "routine": "Mendaftar siapa yang meminta penawaran dan belum dijawab",
+        "task": "Mendaftar siapa yang meminta penawaran minggu ini"
+      },
+      "nina": {
+        "role": "Jadwal",
+        "line": "Membuat, mengonfirmasi, dan memindahkan janji, dan mengingatkan klien sehari sebelumnya.",
+        "routine": "Mengonfirmasi janji besok",
+        "task": "Tunjukkan janji besok"
+      },
+      "otto": {
+        "role": "Pesanan",
+        "line": "Memantau pesanan dan stok dan memberi tahu yang hampir habis.",
+        "routine": "Memberi tahu stok yang hampir habis",
+        "task": "Mendaftar pesanan yang masih menunggu dikirim"
+      },
+      "bia": {
+        "role": "Basis jawaban",
+        "line": "Menjaga basis jawaban tetap sesuai dengan jawaban tim.",
+        "routine": "Memperbarui basis dengan jawaban minggu ini",
+        "task": "Mendaftar 5 pertanyaan yang paling sering ditanyakan pelanggan"
+      }
+    },
+    "channels": {
+      "iara": "layanan",
+      "caio": "keuangan",
+      "ada": "eng",
+      "lia": "konten",
+      "theo": "penjualan",
+      "nina": "jadwal",
+      "otto": "pesanan",
+      "bia": "layanan"
+    },
+    "skills": {
+      "voice": {
+        "name": "Gaya bahasa",
+        "line": "cara perusahaan berbicara dengan pelanggan"
+      },
+      "dunning": {
+        "name": "Jadwal penagihan",
+        "line": "pengingat pada hari jatuh tempo, lalu hari ke-3 dan ke-7 keterlambatan"
+      },
+      "answers": {
+        "name": "Basis jawaban",
+        "line": "jawaban tim yang disetujui untuk pertanyaan umum"
+      },
+      "proposal": {
+        "name": "Kerangka proposal",
+        "line": "apa isi setiap proposal, dan dalam urutan apa"
+      },
+      "schedule": {
+        "name": "Aturan jadwal",
+        "line": "jam, jeda, dan seberapa jauh sebelumnya orang bisa memesan"
+      },
+      "review": {
+        "name": "Tinjauan kode",
+        "line": "apa yang dicek sebelum membuka PR"
+      }
+    },
+    "approvals": "Yang dikirim ke pelanggan menunggu persetujuanmu. Kamu bisa melepasnya nanti, saat sudah percaya pada mereka.",
+    "ask": "Saya pakai template {{name}}. Untuk menyesuaikannya dengan usahamu: **apa yang membuat {{org}} berbeda?**"
   }
 }

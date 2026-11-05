@@ -33,7 +33,7 @@ export type DocumentBuilder = (db: Database, orgId: string, sourceId: string) =>
 
 const builders = new Map<SearchKind, DocumentBuilder>();
 
-/** Registers how a kind of source becomes a search document (messages, context items, issues, forum, files). */
+/** Registers how a kind of source becomes a search document (messages, context items, issues, files). */
 export function registerDocumentBuilder(kind: SearchKind, builder: DocumentBuilder) {
   builders.set(kind, builder);
 }

@@ -406,7 +406,7 @@ describe("agents", () => {
     expect(later).toContain("Rode os testes");
   });
 
-  test("no request, no write: agents' own messages and forum turns are refused; the scope can be turned off", async () => {
+  test("no request, no write: agents' own messages are refused; the scope can be turned off", async () => {
     f = await setup({ wikiTools: true });
     const source = createWikiToolSource({ pubsub: f.pubsub, search: f.context });
     const tools = await source.tools({} as ToolContext);
@@ -431,14 +431,6 @@ describe("agents", () => {
       content: WIKI_WRITE_REFUSAL,
       isError: true,
     });
-    const kickoff = await insertMessage(f.db, {
-      orgId: f.org.id,
-      channelId: f.general.id,
-      author: { type: "person", userId: f.owner.id },
-      body: "@dev sua vez",
-      meta: { forum: { topicId: crypto.randomUUID(), round: 1, kickoff: true } },
-    });
-    expect((await create.execute({ title: "Nota", body: "x" }, ctx(kickoff.id))).isError).toBe(true);
     expect(await f.db.select().from(schema.wikiPages)).toEqual([]);
 
     // Without wiki:write the write tools are gone; reading stays.

@@ -45,16 +45,7 @@ const KINDS = [
   "note",
   "lesson",
 ] as const;
-const SEARCH_KINDS = [
-  "message",
-  "context_item",
-  "issue",
-  "forum_topic",
-  "forum_reply",
-  "file",
-  "wiki",
-  "action",
-] as const;
+const SEARCH_KINDS = ["message", "context_item", "issue", "file", "wiki", "action"] as const;
 
 /** A comma-separated list of ids in a query string (at most 50). */
 const ids = (description: string, id: z.ZodType<string, string>) =>
@@ -196,8 +187,7 @@ export function knowledgeRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/search",
       tags,
       security,
-      summary:
-        "Search what you can read (messages, summaries, facts, issues, forum, files, the team's outside actions)",
+      summary: "Search what you can read (messages, summaries, facts, issues, files, the team's outside actions)",
       request: {
         params: OrgParams,
         query: z.object({

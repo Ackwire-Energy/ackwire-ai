@@ -32,6 +32,7 @@ import type {
   ConsultationConversation,
   Credential,
   Edition,
+  EndpointCheck,
   ForeignMailbox,
   FormerAgent,
   Gif,
@@ -90,6 +91,8 @@ import type {
   StorageUsage,
   TaskManagerView,
   TaskSteps,
+  TeamProposalCard,
+  TeamTemplate,
   UsageQueue,
   WorkspaceLimits,
 } from "@agenteschat/client";
@@ -101,6 +104,7 @@ import { freeHandle, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
 import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
 import { SIDEBAR_ITEMS } from "@agenteschat/client/lib/sidebar-items";
+import type { TeamWeekPrefs } from "@agenteschat/client/lib/team-week";
 import { driveFolder, isSecretFile } from "@agenteschat/ui/names";
 import { createFakeAccess } from "./fakes/access";
 import { createFakeApps, type FakeApps } from "./fakes/apps";
@@ -110,7 +114,6 @@ import type { MockContext } from "./fakes/context";
 import { createMockCustomConnectors } from "./fakes/custom-connectors";
 import { createFakeDashboards, type FakeDashboards } from "./fakes/dashboards";
 import { createFakeDatabases, type FakeDatabases } from "./fakes/databases";
-import { createFakeForum } from "./fakes/forum";
 import { createFakeMachines, type FakeMachines } from "./fakes/machines";
 import { createFakeMail, type FakeMail } from "./fakes/mail";
 import { createFakeMissions } from "./fakes/missions";
@@ -182,6 +185,8 @@ function fakePlanAccount(money: boolean): PlanAccountUsage {
 
 export interface FakeState {
   me: Me | null;
+  /** "Ver modelos de time" (`agents.teamTemplates`; default none). */
+  teamTemplates?: TeamTemplate[];
   /** What a one-click proposed agent thinks with (default: what its draft suggested). */
   proposalAi?: "account" | "model" | "none";
   /** By agent: the mailboxes others gave it, which a wider audience would take (`agents.mailLoss`; default none). */
@@ -219,6 +224,10 @@ export interface FakeState {
   extraModels?: Model[];
   /** The code a new key is refused with, as a provider's own check refuses it (`provider_key_invalid`). */
   keyRefusal?: string;
+  /** What an endpoint lists (ADR 0146); absent: nothing. */
+  endpointList?: { baseURL: string; models: { id: string }[]; error?: string };
+  /** Each model's test result when an endpoint is saved; absent: `ok`. */
+  endpointChecks?: Record<string, EndpointCheck>;
   approvals: Approval[];
   /** Who approves for me, and whom I approve for (ADR 0139). */
   approvalCovers?: ApprovalCovers;
@@ -266,6 +275,8 @@ export interface FakeState {
   /** A person's month by id; unset: an empty month. */
   personUsage?: Record<string, PersonUsage>;
   personLimits?: PersonLimits;
+  /** Lodi's weekly card for the signed-in person. */
+  teamWeek?: TeamWeekPrefs;
   memories: Memory[];
   proposals: Proposal[];
   reactions: Record<string, ReactionCount[]>;
@@ -1156,7 +1167,6 @@ const id = (prefix: string) => `${prefix}-${++n}`;
 type FakedParts =
   | "apps"
   | "wiki"
-  | "forum"
   | "notifications"
   | "sandbox"
   | "machines"
@@ -1583,6 +1593,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         org.showActivity = show;
         return show;
       },
+      setAgentStyle: async (orgId, style) => {
+        log("orgs.setAgentStyle", orgId, style);
+        const org = state.me?.organizations.find((o) => o.id === orgId);
+        if (!org) throw new ApiError(404, "not_found", "Organization not found");
+        org.agentStyle = style;
+        return style;
+      },
       sidebarItems: async () => structuredClone(state.sidebarItems ?? {}),
       setSidebarItem: async (orgId, item, place) => {
         log("orgs.setSidebarItem", orgId, item, place);
@@ -1854,6 +1871,18 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       refuseMoreUsage: async (orgId, userId) => {
         log("orgs.refuseMoreUsage", orgId, userId);
       },
+      teamWeek: async () => state.teamWeek ?? { off: false, day: 5, hour: 17, timezone: "America/Sao_Paulo" },
+      setTeamWeek: async (orgId, patch) => {
+        log("orgs.setTeamWeek", orgId, patch);
+        state.teamWeek = {
+          ...(state.teamWeek ?? { off: false, day: 5, hour: 17, timezone: "America/Sao_Paulo" }),
+          ...patch,
+        };
+        return state.teamWeek;
+      },
+      actOnTeamWeek: async (orgId, messageId, act) => {
+        log("orgs.actOnTeamWeek", orgId, messageId, act);
+      },
       planUsage: async () => ({
         month: new Date().toISOString().slice(0, 7),
         money: seesCost(),
@@ -1920,8 +1949,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       update: async (orgId, groupId, patch) => {
         state.calls.push({ method: "agentGroups.update", args: [orgId, groupId, patch] });
+        const { index: _, ...look } = patch;
         const groups = (state.agentGroups ?? []).map((g) =>
-          g.id === groupId && patch.name ? { ...g, name: patch.name } : g,
+          g.id === groupId ? { ...g, ...look, name: patch.name || g.name } : g,
         );
         const group = groups.find((g) => g.id === groupId);
         const others = groups.filter((g) => g.id !== groupId);
@@ -1988,6 +2018,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           current: agentId === ADA_ID ? account : null,
         };
       },
+      proposeChannelMove: async (orgId, input) => {
+        state.calls.push({ method: "agents.proposeChannelMove", args: [orgId, input] });
+        return { channelId: crypto.randomUUID(), messageId: crypto.randomUUID(), rightHandId: crypto.randomUUID() };
+      },
       team: async () => ({
         agents: state.agents.map((a) => ({
           id: a.id,
@@ -1998,6 +2032,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           ownerUserId: a.ownerUserId,
           capabilities: ["drive", "issues"],
           busy: false,
+          channelIds: state.channels
+            .filter((c) => (state.channelMembers[c.id] ?? []).some((m) => m.type === "agent" && m.id === a.id))
+            .map((c) => c.id),
           canTalk: true,
           ...(a.seesDetails === false ? { capabilities: [], canTalk: false, seesDetails: false } : {}),
         })),
@@ -2053,6 +2090,81 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return agent;
       },
       proposal: async (_orgId, messageId) => proposalView(messageId),
+      // The right hand's team card (ADR 0137 §10): the card in its message changes as the server's does.
+      createTeam: async (orgId, messageId) => {
+        log("agents.createTeam", orgId, messageId);
+        const m = state.messages.find((x) => x.id === messageId);
+        const card = m?.meta?.actionCard as TeamProposalCard | undefined;
+        if (!m || !card) throw new ApiError(404, "team_proposal.not_found", "Not found");
+        if (card.state !== "pending") throw new ApiError(409, "team_proposal.decided", "Already decided");
+        const me = state.me?.user.id ?? null;
+        const made = card.params.agents.map((d) => {
+          const agent: Agent = {
+            id: id("agent"),
+            name: d.name,
+            handle: d.handle,
+            role: d.role,
+            instructions: d.instructions,
+            model: "auto",
+            ownerUserId: me,
+            hasCredential: false,
+            monthlyBudgetUsd: null,
+            createdAt: NOW.toISOString(),
+            audience: { mode: "everyone", userIds: [] },
+            ...(d.appearance ? { appearance: d.appearance } : {}),
+          };
+          state.agents.push(agent);
+          return agent.id;
+        });
+        const next: TeamProposalCard = {
+          ...card,
+          state: "created",
+          decidedByUserId: me,
+          decidedAt: new Date().toISOString(),
+          error: null,
+          created: { agentIds: made, channelIds: [], routineIds: [], skillIds: [], skipped: [], noAi: [] },
+        };
+        m.meta = { ...m.meta, actionCard: next };
+        return { card: next, noAi: [] };
+      },
+      denyTeam: async (orgId, messageId) => {
+        log("agents.denyTeam", orgId, messageId);
+        const m = state.messages.find((x) => x.id === messageId);
+        const next = { ...(m?.meta?.actionCard as TeamProposalCard), state: "denied" as const };
+        if (m) m.meta = { ...m.meta, actionCard: next };
+        return { card: next };
+      },
+      undoTeam: async (orgId, messageId) => {
+        log("agents.undoTeam", orgId, messageId);
+        const m = state.messages.find((x) => x.id === messageId);
+        const next = { ...(m?.meta?.actionCard as TeamProposalCard), state: "undone" as const };
+        if (m) m.meta = { ...m.meta, actionCard: next };
+        return { card: next };
+      },
+      adjustTeamAgent: async (orgId, messageId, handle, patch) => {
+        log("agents.adjustTeamAgent", orgId, messageId, handle, patch);
+        const m = state.messages.find((x) => x.id === messageId);
+        const card = m?.meta?.actionCard as TeamProposalCard;
+        const next: TeamProposalCard = {
+          ...card,
+          params: {
+            ...card.params,
+            agents: card.params.agents.map((a) =>
+              a.handle === handle ? { ...a, ...patch, firstTask: patch.firstTask ?? a.firstTask } : a,
+            ),
+          },
+        };
+        if (m) m.meta = { ...m.meta, actionCard: next };
+        return { card: next };
+      },
+      teamTemplates: async (orgId, locale) => {
+        log("agents.teamTemplates", orgId, locale);
+        return state.teamTemplates ?? [];
+      },
+      applyTeamTemplate: async (orgId, templateId, locale) => {
+        log("agents.applyTeamTemplate", orgId, templateId, locale);
+        return { channelId: `dm-${LODI_ID}`, messageId: id("message") };
+      },
       decideCostly: async (orgId, signalId, decision) => {
         log("agents.decideCostly", orgId, signalId, decision);
         return { state: decision };
@@ -2190,11 +2302,23 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           provider: input.provider,
           label: input.label,
           keyHint: input.apiKey.slice(-4),
+          ...(input.endpoint ? { endpoint: input.endpoint } : {}),
           createdAt: NOW.toISOString(),
           revokedAt: null,
         };
         state.credentials.push(cred);
-        return cred;
+        const checks = input.endpoint?.models.map(
+          (m) => state.endpointChecks?.[m.id] ?? { model: m.id, check: "ok" as const },
+        );
+        return { ...cred, ...(checks ? { checks } : {}) };
+      },
+      endpointModels: async (orgId, input) => {
+        log("agents.endpointModels", orgId, { ...input, apiKey: "[redacted]" });
+        return state.endpointList ?? { baseURL: input.baseURL, models: [] };
+      },
+      setEndpointModels: async (orgId, credentialId, models) => {
+        log("agents.setEndpointModels", orgId, credentialId, models);
+        return { models, checks: models.map((m) => ({ model: m.id, check: "ok" as const })) };
       },
       rotateCredential: async (orgId, credentialId, input) => {
         log("agents.rotateCredential", orgId, credentialId, { apiKey: "[redacted]" });
@@ -3491,7 +3615,6 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     apps: apps.client,
     sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args }), machines),
     machines: machines.client,
-    forum: createFakeForum(ctx, (method, ...args) => state.calls.push({ method, args })),
     notifications: createFakeNotifications(
       {
         get items() {

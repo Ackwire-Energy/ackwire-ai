@@ -2,15 +2,33 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNotNull, isNull, schema } from "@agenteschat/db";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
-import { requirePermission } from "./organizations";
+import { getMembership, requirePermission } from "./organizations";
+import { ROLE_COLORS, ROLE_ICONS } from "./permissions";
 
 const { agentGroups, agents } = schema;
 
-/** A group of agents as every app reads it (ADR 0083): the groups in the workspace's order, each with its agents in theirs. */
+/**
+ * A group of agents as every app reads it (ADR 0083): the groups in the workspace's order, each with its agents in
+ * theirs. Shown as a setor (ADR 0148): its mark, who leads it and who covers for them.
+ */
 export interface AgentGroupView {
   id: string;
   name: string;
   agentIds: string[];
+  color: string;
+  icon: string;
+  leadUserId: string | null;
+  backupUserId: string | null;
+}
+
+/** What a group's look and people may change to; null clears a person. */
+export interface AgentGroupPatch {
+  name?: string;
+  index?: number;
+  color?: string;
+  icon?: string;
+  leadUserId?: string | null;
+  backupUserId?: string | null;
 }
 
 export interface AgentGroupDeps {
@@ -53,6 +71,10 @@ export async function agentGroupViews(db: Executor, orgId: string): Promise<Agen
     id: g.id,
     name: g.name,
     agentIds: members.filter((m) => m.groupId === g.id).map((m) => m.id),
+    color: g.color,
+    icon: g.icon,
+    leadUserId: g.leadUserId,
+    backupUserId: g.backupUserId,
   }));
 }
 
@@ -71,6 +93,26 @@ async function requireAgents(db: Executor, orgId: string, ids: string[]) {
     .from(agents)
     .where(and(eq(agents.orgId, orgId), inArray(agents.id, ids), isNull(agents.archivedAt)));
   if (found.length !== ids.length) throw new NotFoundError("Agent not found");
+}
+
+const oneOf = (list: readonly string[], value: string, what: string) => {
+  if (!list.includes(value)) throw new ValidationError(`Unknown ${what}`, `agent_group.bad_${what}`);
+  return value;
+};
+
+/** The color, icon and people a patch sets, checked: a person must be in the workspace. */
+async function lookOf(db: Executor, orgId: string, patch: AgentGroupPatch) {
+  const set: Partial<typeof agentGroups.$inferInsert> = {};
+  if (patch.color !== undefined) set.color = oneOf(ROLE_COLORS, patch.color, "color");
+  if (patch.icon !== undefined) set.icon = oneOf(ROLE_ICONS, patch.icon, "icon");
+  for (const key of ["leadUserId", "backupUserId"] as const) {
+    const id = patch[key];
+    if (id === undefined) continue;
+    if (id !== null && !(await getMembership(db, id, orgId)))
+      throw new ValidationError("That person isn't in the workspace", "agent_group.not_member");
+    set[key] = id;
+  }
+  return set;
 }
 
 /** `ids` in this order inside `groupId` (null: in no group). */
@@ -97,11 +139,12 @@ export async function createAgentGroup(
   deps: AgentGroupDeps,
   userId: string,
   orgId: string,
-  input: { name: string; agentIds?: string[] },
+  input: { name: string; agentIds?: string[]; color?: string; icon?: string },
 ): Promise<AgentGroupView[]> {
   await requirePermission(deps.db, userId, orgId, "manage_agents");
   const name = cleanName(input.name);
   const ids = [...new Set(input.agentIds ?? [])];
+  const look = await lookOf(deps.db, orgId, { color: input.color, icon: input.icon });
   await deps.db.transaction(async (tx) => {
     const groups = await groupRows(tx, orgId);
     if (groups.length >= MAX_GROUPS) {
@@ -112,29 +155,33 @@ export async function createAgentGroup(
     if (ids.length) await requireAgents(tx, orgId, ids);
     const [group] = await tx
       .insert(agentGroups)
-      .values({ orgId, name, position: (groups.at(-1)?.position ?? -1) + 1 })
+      .values({ orgId, name, position: (groups.at(-1)?.position ?? -1) + 1, ...look })
       .returning({ id: agentGroups.id });
     if (group) await placeAgents(tx, orgId, group.id, ids);
   });
   return announce(deps, orgId);
 }
 
-/** Renames a group, or moves it among the groups (`index`: its place among the others). Owners and admins. */
+/**
+ * Renames a group, moves it among the groups (`index`: its place among the others), or changes its color, icon, lead
+ * or substitute. Owners and admins.
+ */
 export async function updateAgentGroup(
   deps: AgentGroupDeps,
   userId: string,
   orgId: string,
   groupId: string,
-  patch: { name?: string; index?: number },
+  patch: AgentGroupPatch,
 ): Promise<AgentGroupView[]> {
   await requirePermission(deps.db, userId, orgId, "manage_agents");
   const groups = await groupRows(deps.db, orgId);
   const group = groups.find((g) => g.id === groupId);
   if (!group) throw groupNotFound();
   const name = patch.name === undefined ? undefined : cleanName(patch.name);
+  const set = { ...(await lookOf(deps.db, orgId, patch)), ...(name === undefined ? {} : { name }) };
   const index = patch.index;
   await deps.db.transaction(async (tx) => {
-    if (name !== undefined) await tx.update(agentGroups).set({ name }).where(eq(agentGroups.id, group.id));
+    if (Object.keys(set).length > 0) await tx.update(agentGroups).set(set).where(eq(agentGroups.id, group.id));
     if (index === undefined) return;
     const order = placeAt(
       groups.filter((g) => g.id !== group.id),

@@ -113,7 +113,7 @@ async function whereOf(ctx: ToolContext, r: RoutineView) {
     const channel = await getChannelCached(ctx.db, ctx.orgId, t.channelId);
     return channel?.kind === "channel" ? `#${channel.name}` : "a direct message";
   }
-  return t.type === "forum" ? "a forum topic" : t.type === "artifact" ? "a file in the Drive" : "a direct message";
+  return t.type === "artifact" ? "a file in the Drive" : "a direct message";
 }
 
 const sameText = (a: string, b: string) =>
@@ -783,8 +783,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
               // view only when nobody is.
               const visible = person
                 ? r.prompt !== null
-                : r.agentId === ctx.agentId ||
-                  (channelId ? readable.has(channelId) : r.target.type === "forum" || r.target.type === "artifact");
+                : r.agentId === ctx.agentId || (channelId ? readable.has(channelId) : r.target.type === "artifact");
               return routineLine(
                 r,
                 await whereOf(ctx, r),
@@ -1078,8 +1077,8 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             const own = await ownRoutine(ctx, routineId);
             if (!own.row) return { content: own.error, isError: true };
             const target = own.row.target as RoutineTarget;
-            if (target.type === "forum" || (target.type === "conversation" && target.reminder)) {
-              return { content: `Routine ${routineId} doesn't run you (a reminder or a forum topic).`, isError: true };
+            if (target.type === "conversation" && target.reminder) {
+              return { content: `Routine ${routineId} doesn't run you (a reminder).`, isError: true };
             }
             const runAt = str(input.routine) ? own.row.nextRunAt : replaced?.runAt;
             if (!own.row.active || !runAt || runAt.getTime() <= Date.now()) {

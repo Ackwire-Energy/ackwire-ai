@@ -7,7 +7,16 @@ import type { Message } from "@agenteschat/client";
  */
 
 /** What a request asks (`proposal`: a change to the context or to an agent's instructions; `agent`: a new agent). */
-export type AskKind = "approval" | "secret" | "question" | "browser" | "desktop" | "proposal" | "agent";
+export type AskKind =
+  | "approval"
+  | "secret"
+  | "question"
+  | "browser"
+  | "desktop"
+  | "proposal"
+  | "agent"
+  | "team"
+  | "firstTask";
 
 /** A request the person can answer now, in this conversation. `order`: where its message sits in the list. */
 export interface PendingAsk {

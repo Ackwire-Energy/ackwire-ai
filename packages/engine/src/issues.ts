@@ -51,7 +51,6 @@ export interface WorkActor {
 export type IssueSource =
   | { type: "manual" }
   | { type: "message"; channelId: string; messageId: string }
-  | { type: "forum"; threadId: string }
   | { type: "agent"; agentId: string; workId?: string; channelId?: string; messageId?: string }
   | { type: "webhook"; provider: string };
 
@@ -75,7 +74,7 @@ export interface IssueView {
   createdBy: WorkActor;
   source: IssueSource;
   channelId: string | null;
-  /** The issue this one is a sub-issue of (e.g. a plan step from the forum). */
+  /** The issue this one is a sub-issue of. */
   parentIssueId: string | null;
   pullRequests: { number: number; url: string; openedBy: WorkActor | null }[];
   artifacts: { id: string; title: string; createdBy: WorkActor }[];
@@ -112,10 +111,9 @@ export interface IssueWork {
   reason?: "failed" | "canceled" | "budget";
 }
 
-/** One issue with what hangs from it: its sub-issues and the forum topics that evaluate it. */
+/** One issue with its sub-issues. */
 export interface IssueDetailView extends IssueView {
   subIssues: { id: string; number: number; title: string; status: IssueStatus; assignee: WorkActor | null }[];
-  forumTopics: { id: string; title: string; status: string; format: string }[];
 }
 
 export interface IssueActivityView {
@@ -526,9 +524,6 @@ function eventDetail(event: string | null, data: Record<string, unknown>) {
       return out(event, s(data.byUserId) ? { byUserId: s(data.byUserId) as string } : {});
     case "shared_everyone":
       return out(event, {});
-    case "forum_opened":
-    case "forum_evaluated":
-      return s(data.title) ? out(event, { title: s(data.title) as string, topicId: s(data.topicId) ?? "" }) : {};
     default:
       return {};
   }
@@ -686,7 +681,7 @@ export async function getIssue(db: Database, actor: IssueActor, orgId: string, r
   return one(db, await findVisible(db, actor, orgId, ref));
 }
 
-/** An issue with its sub-issues (the ones the actor can see) and the forum topics that evaluate it. */
+/** An issue with its sub-issues (the ones the actor can see). */
 export async function getIssueDetail(
   db: Database,
   actor: IssueActor,
@@ -694,23 +689,13 @@ export async function getIssueDetail(
   ref: { id?: string; number?: number },
 ): Promise<IssueDetailView> {
   const row = await findVisible(db, actor, orgId, ref);
-  const [view, children, topics] = await Promise.all([
+  const [view, children] = await Promise.all([
     one(db, row),
     db
       .select()
       .from(issues)
       .where(and(eq(issues.orgId, orgId), eq(issues.parentIssueId, row.id)))
       .orderBy(asc(issues.number)),
-    db
-      .select({
-        id: schema.forumTopics.id,
-        title: schema.forumTopics.title,
-        status: schema.forumTopics.status,
-        format: schema.forumTopics.format,
-      })
-      .from(schema.forumTopics)
-      .where(and(eq(schema.forumTopics.orgId, orgId), eq(schema.forumTopics.originIssueId, row.id)))
-      .orderBy(asc(schema.forumTopics.createdAt)),
   ]);
   const subIssues: IssueDetailView["subIssues"] = [];
   for (const c of children) {
@@ -723,62 +708,7 @@ export async function getIssueDetail(
       assignee: c.assigneeType && c.assigneeId ? { type: c.assigneeType as WorkActor["type"], id: c.assigneeId } : null,
     });
   }
-  return { ...view, subIssues, forumTopics: topics };
-}
-
-/**
- * The forum's mark on an issue's activity: `forum_opened` ("in
- * evaluation in the forum") when a topic opens from it, `forum_evaluated`
- * when its synthesis is written (with `comment`: the summary and the link,
- * and the synthesis file linked to the issue). No visibility check: the
- * forum calls it for the topic it opened from this issue.
- */
-export async function recordIssueForumEvent(
-  deps: IssueDeps,
-  orgId: string,
-  issueId: string,
-  author: WorkActor,
-  event: "forum_opened" | "forum_evaluated",
-  data: { topicId: string; title: string; artifactId?: string | null; version?: number | null },
-  options: { comment?: string } = {},
-) {
-  const [issue] = await deps.db
-    .select()
-    .from(issues)
-    .where(and(eq(issues.id, issueId), eq(issues.orgId, orgId)));
-  if (!issue) return null;
-  const row = await deps.db.transaction(async (tx) => {
-    const a = await addActivity(tx, issue, {
-      kind: "event",
-      author,
-      text:
-        event === "forum_opened" ? `took it to the forum: "${data.title}"` : `the forum evaluated it: "${data.title}"`,
-      event,
-      data,
-    });
-    const file = data.artifactId && !issue.artifactIds.includes(data.artifactId) ? data.artifactId : null;
-    await tx
-      .update(issues)
-      .set({ updatedAt: new Date(), ...(file ? { artifactIds: [...issue.artifactIds, file] } : {}) })
-      .where(eq(issues.id, issue.id));
-    return [a];
-  });
-  const activities = row.map(activityView);
-  for (const activity of activities) {
-    const e = { type: "issue.comment" as const, issueId: issue.id, activity };
-    if (issue.channelId) await publishChannelEvent(deps.pubsub, { ...e, channelId: issue.channelId });
-    else await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event: e });
-  }
-  // The summary and its link: a reply in the task's conversation (ADR 0145).
-  const comment = options.comment?.trim();
-  if (comment && deps.pubsub) {
-    const at = await ensureTaskConversation(deps.db, issue.id);
-    const who: IssueActor | { type: "agent"; agentId: string } =
-      author.type === "agent" ? { type: "agent", agentId: author.id } : { type: "person", userId: author.id };
-    const message = await postInConversation(deps, who, orgId, at, comment.slice(0, 20_000));
-    activities.push({ id: message.id, kind: "comment", author, text: message.body, createdAt: message.createdAt });
-  }
-  return activities;
+  return { ...view, subIssues };
 }
 
 /** Issues the actor can see, open first then by most recent update. */
@@ -1327,7 +1257,7 @@ async function announceTaken(deps: IssueDeps, issue: IssueRow, card: IssueWorkMe
     .select({ kind: channels.kind, archivedAt: channels.archivedAt })
     .from(channels)
     .where(eq(channels.id, origin.channelId));
-  if (!channel || channel.archivedAt || channel.kind === "forum") return;
+  if (!channel || channel.archivedAt) return;
   const line = await insertMessage(deps.db, {
     orgId: issue.orgId,
     channelId: origin.channelId,

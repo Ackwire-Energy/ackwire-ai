@@ -12,7 +12,7 @@ import { clone, type MockContext, MockNotFoundError, minutesAgo, mockId, perOrg 
 interface Stored {
   page: Omit<WikiPage, "backlinks">;
   versions: (WikiVersion & { body: string })[];
-  /** Mentions outside the wiki (messages, forum, issues). */
+  /** Mentions outside the wiki (messages, issues). */
   outside: WikiBacklink[];
 }
 

@@ -1,6 +1,10 @@
 # 0022. Forum: rounds driven by a job, posts as messages of the topic's channel
 
-- Status: Accepted
+- Status: Removed (2026-11-04). The owner removed the forum entirely, its data included (product decision). Migration 0216 deletes every topic, its channel and everything in or
+  pointing at it; the `forum_*` tables stay, empty and unused, for one release (the previous version still reads them
+  during a deploy or a rollback) and a later migration drops them; agents no longer suggest or open topics. The enum values
+  `channel_kind.forum` and `agent_run_trigger.forum` stay, unused (dropping one recreates the type and rewrites its
+  tables). Kept as the record of what the forum was.
 - Date: 2026-10-15
 
 ## Decision

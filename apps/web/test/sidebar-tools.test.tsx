@@ -90,7 +90,7 @@ describe("the tools on top", () => {
     expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive", "Equipe"]);
     const more = await openMore();
     // Dashboards (ADR 0135) and the task manager (ADR 0128) are always there, after the tools a person places.
-    expect(inMore(more)).toEqual(["Wiki", "Rotinas", "Calendário", "Fórum", "Painéis", "Gerenciador de tarefas"]);
+    expect(inMore(more)).toEqual(["Wiki", "Rotinas", "Calendário", "Painéis", "Gerenciador de tarefas"]);
     expect(
       within(more)
         .getByRole("link", { name: /Painéis/ })
@@ -110,7 +110,6 @@ describe("the tools on top", () => {
       "Wiki",
       "Rotinas",
       "Calendário",
-      "Fórum",
       "Painéis",
       "Gerenciador de tarefas",
     ]);
@@ -194,7 +193,6 @@ describe("the tools on top", () => {
       "Wiki",
       "Drive",
       "Calendário",
-      "Fórum",
       "Painéis",
       "Gerenciador de tarefas",
     ]);
@@ -251,7 +249,7 @@ describe("the tools on top", () => {
     test("the server's order: the same list on every device", async () => {
       await go(
         seedState({
-          sidebarToolOrder: ["drive", "issues", "approvals", "threads", "wiki", "routines", "calendar", "forum"],
+          sidebarToolOrder: ["drive", "issues", "approvals", "threads", "wiki", "routines", "calendar"],
         }),
       );
       expect(listed()).toEqual(["Drive", "Tarefas", "Aprovações", "Threads", "Equipe"]);
@@ -265,7 +263,7 @@ describe("the tools on top", () => {
       // Wiki waits in More between Tarefas and Drive: one press is one step in the list.
       expect(listed()).toEqual(["Aprovações", "Threads", "Drive", "Tarefas", "Equipe"]);
       expect(toolOrder(state)).toEqual([
-        ["approvals", "threads", "drive", "issues", "wiki", "routines", "calendar", "forum", "team"],
+        ["approvals", "threads", "drive", "issues", "wiki", "routines", "calendar", "team"],
       ]);
       expect(tool("Drive").getAttribute("aria-keyshortcuts")).toBe("Alt+Shift+ArrowUp Alt+Shift+ArrowDown");
       // At the top, up does nothing; an arrow alone is the page's.
@@ -304,7 +302,6 @@ describe("the tools on top", () => {
         "wiki",
         "routines",
         "calendar",
-        "forum",
         "team",
       ]);
     });

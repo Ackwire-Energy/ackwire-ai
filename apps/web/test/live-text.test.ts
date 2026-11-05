@@ -41,4 +41,14 @@ describe("splitSettled: done blocks vs the one still growing", () => {
   test("a list keeps growing in the tail", () => {
     expect(splitSettled("Passos:\n\n- um\n- dois")).toEqual({ settled: "Passos:", tail: "- um\n- dois" });
   });
+
+  test("a <details> block is one block: no split inside it, open or closed (ADR 0147)", () => {
+    const open = "Feito.\n\n<details><summary>Detalhes</summary>\n\nO app recebeu 403.\n\n- um";
+    expect(splitSettled(open)).toEqual({ settled: "Feito.", tail: open.slice("Feito.\n\n".length) });
+    expect(splitSettled(`${open}\n</details>\n\nPronto.`).tail).toBe("Pronto.");
+    expect(splitSettled("Feito.\n\n<details><summary>Detalhes</summary> 403 </details>\n\nPronto.").tail).toBe(
+      "Pronto.",
+    );
+    expect(splitSettled(`${open} fim</details>\n\nPronto.`).tail).toBe("Pronto.");
+  });
 });

@@ -25,6 +25,19 @@ import { organizations } from "./tenancy";
  * (self-host: derived from AGENTES_SECRET; Cloud: a KMS key, via the
  * `KeyWrapper` adapter). Both ciphertexts are bound to (org_id, id).
  */
+/** A workspace's own model endpoint as its credential keeps it (ADR 0146). Prices in nano-USD per token. */
+export interface StoredEndpoint {
+  style: "openai" | "anthropic";
+  baseURL: string;
+  models: {
+    id: string;
+    label?: string;
+    prices?: { input: number; output: number; cacheRead: number; cacheWrite: number };
+    /** The last test call: answered and called a tool, answered without calling it, or failed. */
+    check?: "ok" | "no_tools" | "failed";
+  }[];
+}
+
 export const providerCredentials = pgTable(
   "provider_credentials",
   {
@@ -46,8 +59,14 @@ export const providerCredentials = pgTable(
      * `anthropic-workspace-id` for keys not scoped to a workspace. Not secret.
      */
     workspaceId: text(),
-    /** Other provider options sent with calls, e.g. OpenAI `{ organization, project }`. Not secret. */
-    options: jsonb().$type<{ organization?: string; project?: string }>().notNull().default({}),
+    /**
+     * Other provider options sent with calls, e.g. OpenAI `{ organization, project }`, or a workspace endpoint's
+     * address, API style and models (`custom`, ADR 0146). Not secret.
+     */
+    options: jsonb()
+      .$type<{ organization?: string; project?: string; endpoint?: StoredEndpoint }>()
+      .notNull()
+      .default({}),
     /** Last 4 characters of the key, so people can tell keys apart. */
     keyHint: text().notNull(),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
@@ -58,7 +77,8 @@ export const providerCredentials = pgTable(
 );
 
 /**
- * A named group of the workspace's agents, shared by everyone in it (ADR 0083): the sidebar's sections.
+ * A named group of the workspace's agents, shared by everyone in it (ADR 0083): the sidebar's sections. Shown as a
+ * setor (department, ADR 0148) with its color, icon, the person who leads it and their substitute.
  * An agent is in at most one (`agents.group_id`).
  */
 export const agentGroups = pgTable(
@@ -71,6 +91,14 @@ export const agentGroups = pgTable(
     name: text().notNull(),
     /** Order among the workspace's groups. */
     position: integer().notNull().default(0),
+    /** One of the roles' colors (`ROLE_COLORS`: the agents' colors but sky). */
+    color: text().notNull().default("graphite"),
+    /** One of the roles' icons (`ROLE_ICONS`). */
+    icon: text().notNull().default("person"),
+    /** Who leads the setor: its agents with no owner of their own report to them on the org chart. */
+    leadUserId: text().references(() => users.id, { onDelete: "set null" }),
+    /** Who covers for the lead. */
+    backupUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.orgId, t.position)],

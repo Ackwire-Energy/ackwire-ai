@@ -471,7 +471,7 @@ export const extraIcons = {
   move: [["path", { d: "M3.5 10h9M9 6l4 4-4 4M16.5 4v12" }]],
   /** Two agents talking to each other ("Theo ⇄ Iris"): one arrow each way. */
   swap: [["path", { d: "M4 7h11.5M13 4.5 15.5 7 13 9.5M16 13H4.5M7 10.5 4.5 13 7 15.5" }]],
-  /** Threads: the drag handle on a range's start and end caps; forum: drag to reorder the table. */
+  /** Threads: the drag handle on a range's start and end caps. */
   grip: [
     ["circle", { cx: "7.5", cy: "5", r: "0.6" }],
     ["circle", { cx: "12.5", cy: "5", r: "0.6" }],
@@ -492,22 +492,18 @@ export const extraIcons = {
     ["rect", { x: "3", y: "3.75", width: "14", height: "3.3", rx: "1" }],
     ["path", { d: "M4.2 7v8.2a.8.8 0 0 0 .8.8h10a.8.8 0 0 0 .8-.8V7M10 14v-4.2M7.9 11.9 10 9.8l2.1 2.1" }],
   ],
-  /** Threads: Missões (a flag on a pole); forum: conclude, a turn, where a round starts. */
+  /** Threads: Missões (a flag on a pole). */
   flag: [["path", { d: "M5 17V3.5M5 3.5h9l-1.7 3.3L14 10H5" }]],
   /** Numbers a mission's investigation found (analytics, logs, errors). */
   chart: [["path", { d: "M3.5 16.5h13M6.5 13.5v-3M10 13.5v-7.5M13.5 13.5v-5" }]],
-  /** Forum: a stance that proposes. */
+  /** An idea: memory and context. */
   bulb: [["path", { d: "M7.5 15h5M8.3 17.5h3.4M10 2.5a5 5 0 0 0-2.9 9.1v1.7h5.8v-1.7A5 5 0 0 0 10 2.5z" }]],
-  /** Forum: a stance that disagrees. */
-  disagree: [["path", { d: "M4 7.5h12M4 12.5h12M12.5 3.5l-5 13" }]],
-  /** Forum: a stance that changes position. */
-  shift: [["path", { d: "M3.5 6.5h11L12 4M16.5 13.5h-11L8 16" }]],
-  /** Forum: a stance that asks. */
+  /** A question: an agent asks, a decision to make. */
   question: [
     ["circle", { cx: "10", cy: "10", r: "7" }],
     ["path", { d: "M8 7.9a2.1 2.1 0 1 1 2.8 1.9c-.5.3-.8.7-.8 1.3v.3M10 14v.01" }],
   ],
-  /** Forum: an agent's budget ("Ver orçamento"). */
+  /** Money: a plan, a budget, sales. */
   coin: [
     ["circle", { cx: "10", cy: "10", r: "7" }],
     [
@@ -517,7 +513,7 @@ export const extraIcons = {
       },
     ],
   ],
-  /** Forum: move up in the table. */
+  /** Move up in a list. */
   chevronUp: [["path", { d: "m6 12 4-4 4 4" }]],
   /** Repositories: a GitHub repository. */
   repo: [

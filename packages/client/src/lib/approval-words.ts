@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import type { Approval, ApprovalCoverView, ApprovalRule, CardDelegate } from "../api/types";
 import { aheadPhase, approvalAction, emailTitleWords, sqlReadsTarget } from "./approval-kind";
 import { humanize } from "./custom-tools";
-import { formatShortDate, formatTime, lowerFirst } from "./format";
+import { formatShortDate, formatTime, lowerFirst, relativeDay } from "./format";
 import { agentGrammar } from "./grammar";
 import { partsOf, toolName } from "./tool-review";
 
@@ -384,11 +384,8 @@ export function delegateLine(
 /** "Desfazer arquiva a Triagem. Vale até 09:42.": what Desfazer does, and until when. */
 export function delegateUndoLine(t: TFunction, locale: string, d: CardDelegate, agentName: string | null) {
   const end = d.undoUntil ? new Date(d.undoUntil) : null;
-  // It lasts a day: tomorrow's word (Intl's own, "amanhã", "tomorrow") before the hour when it ends then.
-  const tomorrow =
-    end && end.toDateString() !== new Date().toDateString()
-      ? `${new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(1, "day")}, `
-      : "";
+  // It lasts a day: tomorrow's word ("amanhã", "tomorrow") before the hour when it ends then.
+  const tomorrow = end && end.toDateString() !== new Date().toDateString() ? `${relativeDay(locale, 1)}, ` : "";
   const until = end ? `${tomorrow}${formatTime(locale, end.toISOString())}` : "";
   return agentName
     ? t("rightHandApprovals.card.undoArchives", { name: agentName, until })

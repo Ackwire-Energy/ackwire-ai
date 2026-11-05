@@ -101,7 +101,7 @@ export type AgentMediaSkip =
   | "not_person"
   /** A mission's or an issue's work. */
   | "work"
-  /** Not a chat channel or a DM with a person (a forum, an agents-only DM, an archived place). */
+  /** Not a chat channel or a DM with a person (an agents-only DM, an archived place). */
   | "channel"
   /** Something newer was posted in the conversation. */
   | "newer"
@@ -153,7 +153,6 @@ const NOT_A_LIGHT_REPLY = [
   "issueTaken",
   "missionLink",
   "missionSuggestion",
-  "forum",
   "background",
   "routine",
   "viaRoutine",
@@ -203,7 +202,7 @@ export function replySkip(message: ReplyFields): AgentMediaSkip | null {
   return replyTextSkip(message.body);
 }
 
-/** Where a reaction may go: a chat channel or a DM with a person in it; never a forum or an agents-only DM. */
+/** Where a reaction may go: a chat channel or a DM with a person in it; never an agents-only DM. */
 export function channelSkip(channel: ChannelFields | null | undefined): AgentMediaSkip | null {
   if (!channel || channel.archivedAt) return "channel";
   if (channel.kind === "channel") return null;
@@ -407,8 +406,8 @@ async function runSkip(db: Executor, reply: Message): Promise<AgentMediaSkip | n
   if (!run || run.agentId !== reply.authorAgentId) return "not_reply";
   // Its final reply (`replyMessageId`, set as the run ends), not text posted on the way or a card.
   if (run.status !== "done" || run.replyMessageId !== reply.id) return "not_final";
-  // A routine's background work or a forum turn: nobody asked for this reply.
-  if (run.background || run.trigger === "forum") return "not_person";
+  // A routine's background work: nobody asked for this reply.
+  if (run.background) return "not_person";
   if (run.issueId) return "work";
   const trigger = await getMessage(db, reply.orgId, run.triggerMessageId);
   // A person's own message. Another agent's, a notice (a consultation's answer, a routine's report, an email

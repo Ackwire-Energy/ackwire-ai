@@ -1,6 +1,7 @@
 import {
   AGENT_MEDIA_LEVELS,
   AGENT_SORTS,
+  AGENT_STYLES,
   agentDetail,
   agentView,
   announceMembers,
@@ -37,6 +38,7 @@ import {
   mySidebarToolOrder,
   mySidebarView,
   orgOverview,
+  pickerEndpoint,
   pickerModels,
   queueInvitationEmail,
   requirePermission,
@@ -54,6 +56,7 @@ import {
   STOP_REASON_MAX,
   seesAgentDetails,
   setAgentChannels,
+  setAgentStyle,
   setInvitationRoles,
   setMyIssuesView,
   setMySidebarItem,
@@ -76,7 +79,8 @@ import {
 import { contextWindowOf, nanoUsdToUsd, PROVIDERS, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
-import { AgentAppearance, AgentAudience, Credential, ModelTier, ProviderId, Role, StartChoice } from "./schemas";
+import { credentialOut } from "./credential-view";
+import { AgentAppearance, AgentAudience, Credential, Model, ModelTier, ProviderId, Role, StartChoice } from "./schemas";
 
 const usd = (nano: number | null) => (nano === null ? null : nanoUsdToUsd(nano));
 const ModelId = z.string().max(100);
@@ -682,6 +686,25 @@ export function managementRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/agent-style",
+      tags: ["Members"],
+      security,
+      summary: "Choose how agents talk to you in this organization",
+      description:
+        "Yours, for every agent here (ADR 0147): `simple` (plain words, what to do first) or `technical` (paths, codes and ids welcome). Until you pick, agents talk simply. `GET /me` sends it with each organization (`agentStyle`).",
+      request: { params: OrgParams, body: body(z.object({ style: z.enum(AGENT_STYLES) })) },
+      responses: { 200: json(z.object({ style: z.enum(AGENT_STYLES) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const style = await setAgentStyle(db, c.get("user").id, orgId, c.req.valid("json").style);
+      return c.json({ style }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "get",
       path: "/organizations/{orgId}/me/sidebar",
       tags: ["Members"],
@@ -1140,7 +1163,7 @@ export function managementRoutes(deps: AppDeps) {
         c.req.valid("json"),
         { fetch: deps.extras?.http },
       );
-      return c.json({ ...row, createdAt: row.createdAt.toISOString(), revokedAt: iso(row.revokedAt) }, 200);
+      return c.json(credentialOut(row), 200);
     },
   );
 
@@ -1157,7 +1180,7 @@ export function managementRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, credentialId } = c.req.valid("param");
       const row = await makeDefaultCredential(db, c.get("user").id, orgId, credentialId);
-      return c.json({ ...row, createdAt: row.createdAt.toISOString(), revokedAt: iso(row.revokedAt) }, 200);
+      return c.json(credentialOut(row), 200);
     },
   );
 
@@ -1212,6 +1235,8 @@ export function managementRoutes(deps: AppDeps) {
                 tier: ModelTier.optional().openapi({
                   description: "The size Automático uses it for on its provider's key, by default.",
                 }),
+                endpoint: Model.shape.endpoint,
+                unpriced: Model.shape.unpriced,
               }),
             ),
             providers: z.array(
@@ -1230,7 +1255,7 @@ export function managementRoutes(deps: AppDeps) {
       const usable = (p: string) => Boolean(access.get(p)?.own || access.get(p)?.platform);
       return c.json(
         {
-          models: (await pickerModels(db)).map(([id, m]) => ({
+          models: (await pickerModels(db, [orgId])).map(([id, m]) => ({
             id,
             label: m.label,
             provider: m.provider,
@@ -1242,6 +1267,7 @@ export function managementRoutes(deps: AppDeps) {
             outputUsdPerMTok: pricesAt(m).output / 1000,
             ...(m.pick !== undefined ? { pick: m.pick } : {}),
             ...(m.tier ? { tier: m.tier } : {}),
+            ...pickerEndpoint(id, m),
           })),
           providers: providerIds.map((id) => ({
             id,

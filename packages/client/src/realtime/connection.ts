@@ -28,7 +28,7 @@ export type ServerFrame =
   | { type: "error"; code: string; channelId?: string; agentId?: string }
   | { type: "pong" }
   | { type: "event"; channelId: string; event: ChannelEvent }
-  /** `user`: for me only; `org`: broadcasts to the whole organization (the forum). */
+  /** `user`: for me only; `org`: broadcasts to the whole organization. */
   | { type: "event"; scope: "user" | "org"; event: UserEvent }
   /** The agent browser's live view (ADR 0040): `browser.frame`, `browser.status`, … (see `browser/live.ts`). */
   | { type: `browser.${string}`; agentId: string; [key: string]: unknown };

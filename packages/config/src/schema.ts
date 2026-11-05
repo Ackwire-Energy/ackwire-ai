@@ -379,6 +379,12 @@ export const envVars = {
       "Workspace id for the platform key, when the key is not scoped to a workspace (sent as `anthropic-workspace-id`).",
     section: "Agents",
   },
+  MODEL_ENDPOINTS_PRIVATE: {
+    schema: z.stringbool().optional(),
+    description:
+      "Whether a workspace's own model endpoint (Settings › AI keys › Other provider) may be on this server's network or over http: an Ollama, vLLM, LM Studio or LiteLLM next to it. Unset: allowed, except on agentes.chat Cloud (https://app.agentes.chat) and with `ALLOW_SIGNUP=true`, where only public https addresses are, checked again at every connection.",
+    section: "Agents",
+  },
   SUMMARY_MODEL: {
     schema: modelId.default("claude-haiku-5-5"),
     description:

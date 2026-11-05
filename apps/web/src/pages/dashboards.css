@@ -841,7 +841,7 @@ html:not([data-pointer]) .nwc-bell:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: min(320px, calc(100vw - 16px));
+  width: min(320px, calc(100vw - 24px));
   max-width: none;
   padding: var(--menu-pad);
 }

@@ -128,7 +128,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
           : Promise.resolve(undefined);
       void ai.then((status) => {
         const href = hrefForPush(data, status);
-        // No screen of its own in the app (a forum topic): its page on the web, in the in-app browser.
+        // No screen of its own in the app (the workspace's billing hold): its page on the web, in the in-app browser.
         const web = href || !orgId ? null : notificationWebPath(pushAsNotification(data), orgId);
         setTimeout(() => (web ? openPage(`${serverUrl()}${web}`) : router.push(href ?? "/activity")), 0);
       });

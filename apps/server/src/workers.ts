@@ -12,6 +12,7 @@ import {
   enqueueIdleReflections,
   enqueueOverdueDeletions,
   enqueueSkillUpdates,
+  enqueueTeamWeeks,
   enqueueVaultSyncs,
   enqueueWaitlistContacts,
   expireAgentProposalAsks,
@@ -138,6 +139,8 @@ export const WORKER_INTERVALS_MS = {
   skillUpdates: 3600_000,
   /** Vault connections last read over 10 minutes ago, queued once per 10-minute window (ADR 0144). */
   vaultSyncs: 5 * 60_000,
+  /** Lodi's weekly card of admins whose slot just passed (ADR 0137 §9; one per person and week: its dedupe key). */
+  teamWeek: 10 * 60_000,
 };
 
 /**
@@ -301,6 +304,10 @@ export function startWorkers(deps: WorkerDeps) {
   every("notifications", WORKER_INTERVALS_MS.notifications, async () => {
     const woke = await wakeSnoozedNotifications({ db, pubsub: deps.pubsub });
     if (woke > 0) log.info("snoozed notifications back", { woke });
+  });
+
+  every("teamWeek", WORKER_INTERVALS_MS.teamWeek, async () => {
+    if ((await enqueueTeamWeeks(db)) > 0) void ticks.get("outbox")?.();
   });
 
   every("routines", WORKER_INTERVALS_MS.routines, async () => {

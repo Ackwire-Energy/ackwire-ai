@@ -52,6 +52,8 @@ export const STORAGE_KEYS = {
   imageLens: "agentes.image.lens",
   /** The Drive's view: "grid" (default) or "list". */
   driveView: "agentes.drive.view",
+  /** Equipe's view (ADR 0148): "list" (default), "chart", "map", "sectors" or "usage". */
+  teamView: "agentes.team.view",
   /** "1" when the person shrank the sidebar to its icon rail (desktop). */
   sidebarCollapsed: "agentes.sidebar.collapsed",
   /** Prefix (`.<user id>.<org id>`): the sidebar categories that person closed in that workspace (JSON array of ids). */

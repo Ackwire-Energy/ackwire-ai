@@ -15,14 +15,12 @@ import {
   sql,
 } from "@agenteschat/db";
 import { getAgent } from "./agents";
-import { type ArtifactDeps, getArtifact } from "./artifacts";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { cutText } from "./format";
-import { getForumTopic } from "./forum";
 import { getMessage } from "./messages";
 import { can, type Membership, requireActiveMembership } from "./organizations";
 import { enqueueIndex, registerDocumentBuilder, registerReindexSource, type SearchDeps, searchVisible } from "./search";
@@ -51,7 +49,6 @@ const {
   channels,
   channelMembers,
   issues,
-  forumTopics,
 } = schema;
 
 type PageRow = typeof wikiPages.$inferSelect;
@@ -70,8 +67,6 @@ export interface WikiDeps {
   pubsub?: PubSub;
   /** Search over the wiki (else a title/body match). */
   search?: SearchDeps;
-  /** For "Save to wiki" from a forum synthesis (a Drive document). */
-  artifacts?: ArtifactDeps;
 }
 
 export interface WikiAuthor {
@@ -122,7 +117,7 @@ export interface WikiPageSummary {
   audienceFolder: string | null;
   /** The start of the text, plain (no markdown), for cards. */
   excerpt: string;
-  /** Where it came from: `obsidian` for an imported page, `message`/`forum_topic` for "Save to wiki". */
+  /** Where it came from: `obsidian` for an imported page, `message` for "Save to wiki". */
   sourceType: string | null;
   updatedAt: string;
   updatedBy: WikiAuthor;
@@ -149,7 +144,6 @@ export type WikiBacklink =
       excerpt: string;
       at: string;
     }
-  | { kind: "forum"; topicId: string; title: string }
   | { kind: "issue"; number: number; title: string };
 
 export interface WikiPageView extends WikiPageSummary {
@@ -670,13 +664,10 @@ async function backlinksOf(db: Database, actor: WikiActor, page: PageRow): Promi
         dmKey: channels.dmKey,
         visibility: channels.visibility,
         memberId: channelMembers.id,
-        topicId: forumTopics.id,
-        topicTitle: forumTopics.title,
       })
       .from(messages)
       .innerJoin(channels, eq(channels.id, messages.channelId))
       .leftJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, viewer)))
-      .leftJoin(forumTopics, eq(forumTopics.channelId, channels.id))
       .where(
         and(
           eq(messages.orgId, page.orgId),
@@ -686,14 +677,7 @@ async function backlinksOf(db: Database, actor: WikiActor, page: PageRow): Promi
         ),
       )
       .orderBy(desc(messages.createdAt));
-    const topics = new Set<string>();
     for (const m of found) {
-      if (m.kind === "forum" && m.topicId) {
-        if (topics.has(m.topicId)) continue;
-        topics.add(m.topicId);
-        out.push({ kind: "forum", topicId: m.topicId, title: m.topicTitle ?? "" });
-        continue;
-      }
       if (!(m.memberId || (m.visibility === "public" && m.kind === "channel"))) continue;
       out.push({
         kind: "message",
@@ -1261,9 +1245,7 @@ const NOTE_PATTERNS: [RegExp, string, string[]][] = [
   [/^moved to the root$/, "moved_root", []],
   [/^moved to "(.*)"$/, "moved", ["folder"]],
   [/^saved a message$/, "saved_message", []],
-  [/^saved the forum synthesis$/, "saved_synthesis", []],
   [/^created from a message$/, "created_from_message", []],
-  [/^created from the forum synthesis$/, "created_from_synthesis", []],
   [/^imported from "(.*)"$/, "imported", ["source"]],
 ];
 
@@ -2351,64 +2333,40 @@ async function searchPages(
 
 // ── "Save to wiki" ─────────────────────────────────────────────────────────────
 
-export type WikiSaveSource =
-  | { kind: "message"; channelId: string; messageId: string }
-  | { kind: "forum"; topicId: string };
+export type WikiSaveSource = { kind: "message"; channelId: string; messageId: string };
 
-/** The text of a message or a forum synthesis, with a line saying where it came from. */
+/** The text of a message, with a line saying where it came from. */
 async function sourceBlock(deps: WikiDeps, userId: string, orgId: string, source: WikiSaveSource) {
   const { db } = deps;
-  if (source.kind === "message") {
-    await requireChannelAccess(db, userId, orgId, source.channelId);
-    const m = await getMessage(db, orgId, source.messageId);
-    if (!m || m.deletedAt || m.channelId !== source.channelId)
-      throw new NotFoundError("Message not found", "message.not_found");
-    const [channel] = await db
-      .select({ name: channels.name, kind: channels.kind })
-      .from(channels)
-      .where(eq(channels.id, m.channelId));
-    const [author] =
-      m.authorType === "agent" && m.authorAgentId
-        ? await db.select({ name: agents.name }).from(agents).where(eq(agents.id, m.authorAgentId))
-        : m.authorUserId
-          ? await db.select({ name: users.name }).from(users).where(eq(users.id, m.authorUserId))
-          : [];
-    const where = channel?.kind === "dm" ? "a DM" : `#${channel?.name ?? "channel"}`;
-    const date = m.createdAt.toISOString().slice(0, 10);
-    return {
-      text: `${m.body.trim()}\n\n_Saved from a message by ${author?.name ?? "someone"} in ${where} (${date})._`,
-      source: { type: "message", id: m.id, channelId: m.channelId },
-      title:
-        m.body
-          .split("\n")[0]
-          ?.replace(/[#*_`[\]|]/g, "")
-          .trim()
-          .slice(0, 80) || "Note",
-    };
-  }
-  const topic = await getForumTopic(db, userId, orgId, source.topicId);
-  if (!topic.synthesis?.artifactId) throw new ValidationError("This topic has no synthesis yet", "forum.no_synthesis");
-  if (!deps.artifacts) throw new ValidationError("Files aren't available on this server", "drive.unavailable");
-  if (topic.synthesis.deleted) {
-    throw new ValidationError("The synthesis file was deleted", "forum.synthesis_deleted");
-  }
-  const doc = await getArtifact(deps.artifacts, { type: "person", userId }, orgId, topic.synthesis.artifactId).catch(
-    (error: unknown) => {
-      if (error instanceof NotFoundError) {
-        throw new ValidationError("The synthesis file was deleted", "forum.synthesis_deleted");
-      }
-      throw error;
-    },
-  );
-  const markdown = doc.content.kind === "document" ? doc.content.markdown : "";
+  await requireChannelAccess(db, userId, orgId, source.channelId);
+  const m = await getMessage(db, orgId, source.messageId);
+  if (!m || m.deletedAt || m.channelId !== source.channelId)
+    throw new NotFoundError("Message not found", "message.not_found");
+  const [channel] = await db
+    .select({ name: channels.name, kind: channels.kind })
+    .from(channels)
+    .where(eq(channels.id, m.channelId));
+  const [author] =
+    m.authorType === "agent" && m.authorAgentId
+      ? await db.select({ name: agents.name }).from(agents).where(eq(agents.id, m.authorAgentId))
+      : m.authorUserId
+        ? await db.select({ name: users.name }).from(users).where(eq(users.id, m.authorUserId))
+        : [];
+  const where = channel?.kind === "dm" ? "a DM" : `#${channel?.name ?? "channel"}`;
+  const date = m.createdAt.toISOString().slice(0, 10);
   return {
-    text: `${markdown.trim()}\n\n_Forum synthesis "${topic.title}" (${topic.lastActivityAt.slice(0, 10)})._`,
-    source: { type: "forum_topic", id: topic.id, channelId: topic.channelId },
-    title: topic.title.replace(/[#[\]|]/g, "").slice(0, 120),
+    text: `${m.body.trim()}\n\n_Saved from a message by ${author?.name ?? "someone"} in ${where} (${date})._`,
+    source: { type: "message", id: m.id, channelId: m.channelId },
+    title:
+      m.body
+        .split("\n")[0]
+        ?.replace(/[#*_`[\]|]/g, "")
+        .trim()
+        .slice(0, 80) || "Note",
   };
 }
 
-/** "Save to wiki": appends the message or synthesis to a page, with where it came from. */
+/** "Save to wiki": appends the message to a page, with where it came from. */
 export async function appendSourceToWiki(
   deps: WikiDeps,
   userId: string,
@@ -2421,11 +2379,11 @@ export async function appendSourceToWiki(
   return appendToWikiPage(deps, { type: "person", userId }, orgId, ref, {
     text,
     section: input.section,
-    note: input.source.kind === "message" ? "saved a message" : "saved the forum synthesis",
+    note: "saved a message",
   });
 }
 
-/** "Save to wiki" on a new page: the message or synthesis becomes the page, with its source. */
+/** "Save to wiki" on a new page: the message becomes the page, with its source. */
 export async function createPageFromSource(
   deps: WikiDeps,
   userId: string,
@@ -2443,7 +2401,7 @@ export async function createPageFromSource(
       folder: input.folder,
       tags: input.tags,
       source: block.source,
-      note: input.source.kind === "message" ? "created from a message" : "created from the forum synthesis",
+      note: "created from a message",
     },
     { allowDuplicate: true },
   );

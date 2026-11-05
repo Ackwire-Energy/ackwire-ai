@@ -5,6 +5,7 @@ import {
   useChannels,
   useDms,
   useNoticePrefs,
+  useSetAgentStyle,
   useSetNoticePref,
   useSetShowActivity,
   useSetStart,
@@ -247,6 +248,35 @@ export function ActivityPage() {
         />
       </GroupedList>
       <GroupedFooter>{t("mobile.me.activityHint")}</GroupedFooter>
+    </Page>
+  );
+}
+
+/** Como os agentes falam com você (ADR 0147): Simples or Técnico, for every agent in this workspace. */
+export function AgentStylePage() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const { orgId, org } = useOrg();
+  const set = useSetAgentStyle(orgId);
+  const style = org?.agentStyle ?? "simple";
+  const pick = (next: "simple" | "technical") =>
+    set.mutate(next, { onError: () => toast({ title: t("settings.account.activityFailed"), icon: "x" }) });
+  return (
+    <Page title={t("settings.account.agentStyle")}>
+      <View style={styles.gap} />
+      <GroupedList>
+        <GroupedRow
+          label={t("settings.account.agentStyleSimple")}
+          checked={style === "simple"}
+          onPress={() => pick("simple")}
+        />
+        <GroupedRow
+          label={t("settings.account.agentStyleTechnical")}
+          checked={style === "technical"}
+          onPress={() => pick("technical")}
+        />
+      </GroupedList>
+      <GroupedFooter>{t("settings.account.agentStyleHelp")}</GroupedFooter>
     </Page>
   );
 }

@@ -43,7 +43,6 @@ export const SIDEBAR_TOOLS = {
   drive: { to: "/org/$orgId/drive", icon: "drive" },
   routines: { to: "/org/$orgId/routines", icon: "routines" },
   calendar: { to: "/org/$orgId/calendar", icon: "calendar" },
-  forum: { to: "/org/$orgId/forum", icon: "message" },
   team: { to: "/org/$orgId/team", icon: "agent" },
 } as const satisfies Record<SidebarItem, { to: string; icon: IconName }>;
 

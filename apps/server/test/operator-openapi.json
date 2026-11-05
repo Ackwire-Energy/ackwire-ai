@@ -203,7 +203,7 @@
               },
               "channels": {
                 "type": "integer",
-                "description": "Channels and forums, not archived; no direct messages."
+                "description": "Channels, not archived; no direct messages."
               },
               "machines": {
                 "type": "integer",

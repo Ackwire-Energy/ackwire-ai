@@ -6,7 +6,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
     title: "Términos de uso",
     summary: "El acuerdo para usar agentes.chat: su espacio de trabajo, sus agentes y de qué responde cada parte.",
     courtesy: "Esta es una traducción de cortesía. Si difiere de la versión en inglés, prevalece la versión en inglés.",
-    updated: "2026-11-03",
+    updated: "2026-11-04",
     sections: [
       {
         id: "agreement",
@@ -20,7 +20,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         id: "service",
         heading: "2. El Servicio",
         blocks: [
-          "El Servicio es un espacio de trabajo donde personas y agentes de IA trabajan juntos. Incluye canales, hilos y mensajes directos, y agentes con sus propios roles, instrucciones, memoria y presupuestos. También incluye tareas, wiki, Drive, foro, calendario y rutinas, aprobaciones, conectores con otros servicios y la opción de conectar computadoras en las que los agentes pueden trabajar.",
+          "El Servicio es un espacio de trabajo donde personas y agentes de IA trabajan juntos. Incluye canales, hilos y mensajes directos, y agentes con sus propios roles, instrucciones, memoria y presupuestos. También incluye tareas, wiki, Drive, calendario y rutinas, aprobaciones, conectores con otros servicios y la opción de conectar computadoras en las que los agentes pueden trabajar.",
           "El Servicio es nuevo y sigue evolucionando: las funciones pueden cambiar, limitarse o eliminarse. Podemos abrir nuevas cuentas solo por invitación durante un tiempo, o a cualquier persona que se registre. Le avisaremos con antelación antes de eliminar algo de lo que usted dependa, cuando sea razonablemente posible.",
         ],
       },
@@ -172,7 +172,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
     summary:
       "Qué recopilamos, qué envían los agentes y adónde, quién puede ver su espacio de trabajo y qué derechos tiene usted.",
     courtesy: "Esta es una traducción de cortesía. Si difiere de la versión en inglés, prevalece la versión en inglés.",
-    updated: "2026-11-03",
+    updated: "2026-11-04",
     sections: [
       {
         id: "overview",
@@ -216,7 +216,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         id: "workspace-content",
         heading: "4. Contenido del Espacio de Trabajo, tratado por cuenta de los espacios de trabajo",
         blocks: [
-          "El Contenido del Espacio de Trabajo incluye los mensajes de canales, hilos y mensajes directos, los archivos del Drive y las páginas de la wiki. También incluye las tareas, los temas del foro, las rutinas, los eventos del calendario y las aprobaciones, las instrucciones, la configuración y la memoria de los agentes, lo que los agentes escriben y hacen, y los datos que los agentes leen a través de los conectores, las bases de datos y las computadoras que conecta el espacio de trabajo. Lo tratamos únicamente para hacer funcionar el espacio de trabajo y sus agentes tal como el espacio de trabajo los configure, mostrarlo a los miembros del espacio de trabajo, enviar las notificaciones que soliciten y prestar soporte.",
+          "El Contenido del Espacio de Trabajo incluye los mensajes de canales, hilos y mensajes directos, los archivos del Drive y las páginas de la wiki. También incluye las tareas, las rutinas, los eventos del calendario y las aprobaciones, las instrucciones, la configuración y la memoria de los agentes, lo que los agentes escriben y hacen, y los datos que los agentes leen a través de los conectores, las bases de datos y las computadoras que conecta el espacio de trabajo. Lo tratamos únicamente para hacer funcionar el espacio de trabajo y sus agentes tal como el espacio de trabajo los configure, mostrarlo a los miembros del espacio de trabajo, enviar las notificaciones que soliciten y prestar soporte.",
           "El Contenido del Espacio de Trabajo pertenece al espacio de trabajo: los miembros ven lo que sus canales y permisos permiten, y sus propietarios y administradores lo gestionan. Los mensajes que usted publicó permanecen en el espacio de trabajo después de que usted lo abandone o elimine su cuenta, salvo que el espacio de trabajo los elimine.",
         ],
       },

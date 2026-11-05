@@ -21,7 +21,6 @@ const GROUPS: Record<string, string> = {
   calendar: "Calendar",
   skills: "Skills",
   schedule: "Schedule and reminders",
-  forum: "Forum",
   wiki: "Organization wiki",
   sandbox: "Code",
   browser: "Browser",

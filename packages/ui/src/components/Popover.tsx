@@ -1,6 +1,7 @@
 import { Popover as RPopover } from "radix-ui";
 import type { ReactNode } from "react";
 import { cx } from "../cx";
+import { EDGE_ROOM } from "../floating";
 import type { HoverCard } from "../hooks/useHoverCard";
 
 /** Contents that opened without taking the focus: closing gives none back. */
@@ -61,7 +62,7 @@ export function Popover({
           side={side}
           align={align}
           sideOffset={6}
-          collisionPadding={8}
+          collisionPadding={EDGE_ROOM}
           aria-label={label}
           role="dialog"
           {...hover?.content}

@@ -1897,6 +1897,23 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   border: 0;
   border-top: 1px solid var(--line);
 }
+/* A collapsed block (`<details>` in Markdown, ADR 0147): a quiet box, its summary the line to open it. */
+.md__details {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.md__details > summary {
+  cursor: pointer;
+  color: var(--ink-muted);
+  font-weight: 550;
+}
+.md__details[open] > summary {
+  margin-bottom: 8px;
+}
+.md__details > :not(summary) + * {
+  margin-top: 10px;
+}
 .md code {
   font-family: var(--font-mono);
   font-size: 0.9em;
@@ -5603,15 +5620,6 @@ html:not([data-pointer]) .sidebar__jump:focus-visible {
   color: var(--ink);
 }
 
-/* ── Forum: pages/forum.css ── */
-.routine-forum {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.routine-forum .ac-seg {
-  align-self: flex-start;
-}
 .sandbox-warning {
   margin: 0;
   color: var(--ink);

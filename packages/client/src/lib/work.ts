@@ -713,7 +713,6 @@ const QUIET_READS: ReadonlySet<ActivityKind> = new Set([
   "listingReminders",
   "listingRoutines",
   "readingWiki",
-  "readingForum",
   "consultingSkill",
   "openingSkill",
 ]);

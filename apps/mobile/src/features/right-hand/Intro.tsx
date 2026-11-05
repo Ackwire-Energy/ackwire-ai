@@ -1,13 +1,23 @@
-import { type Agent, keys, useAiStatus, useApi, useChannels, useMembers } from "@agenteschat/client";
+import {
+  type Agent,
+  keys,
+  useAiStatus,
+  useApi,
+  useChannels,
+  useMembers,
+  useMessages,
+  useSetAgentStyle,
+} from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import { introCards, isRightHand, presetsLeft } from "@agenteschat/client/lib/right-hand";
+import { answerAfter, BUSINESS_TYPES } from "@agenteschat/client/lib/team-plan";
 import { WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { StickerCanvas } from "@/agent/StickerCanvas";
@@ -23,12 +33,14 @@ import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic, useSurface } from "../shared/parts";
+import { AnswerChips, TeamTemplatesSheet, useSendAnswer } from "./TeamCard";
 
 /**
  * The top of the right hand's DM (ADR 0137), drawn by the app and never stored, so it costs nothing and works before
  * any AI is connected: its greeting, then the first card the workspace needs, as on the web. No AI yet: Connect AI.
  * An AI and no agent besides it: how to start (the ready-made agents, describing the need, an import or the form). A
- * team and nobody else here yet: inviting people and the first task, written in that agent's composer. On the
+ * team and nobody else here yet: inviting people and the first task, written in that agent's composer. Last, until the
+ * person picks, how agents talk to them (ADR 0147). On the
  * person's first visit (`waveFrom`, when its wave started), its waving sticker under the greeting, drawn as a sticker
  * message is and decorative.
  */
@@ -47,6 +59,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
     teamHandles,
     createsAgents: can(org, "create_agents"),
     alone: (members.data?.length ?? 0) <= 1,
+    askStyle: org?.agentStyle === null,
   });
   return (
     <View style={styles.intro}>
@@ -87,22 +100,35 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
             />
           </IntroCard>
         )}
-        {cards.includes("start") && <StartCard channelId={channelId} left={presetsLeft(teamHandles)} />}
+        {cards.includes("start") && (
+          <StartCard channelId={channelId} left={presetsLeft(teamHandles)} first={team.length === 0} />
+        )}
         {cards.includes("next") && first && <NextCard first={first} />}
+        {cards.includes("style") && <StyleCard />}
       </View>
     </View>
   );
 }
 
-/** "Como você quer começar?": the ready-made agents not created yet, each its own Criar, or all of them, or another way in. */
-function StartCard({ channelId, left }: { channelId: string; left: readonly Preset[] }) {
+/**
+ * How to start (ADR 0137 §10), as on the web. No agent yet: "O que a Acme faz?" with business types as chips (each tap
+ * the person's own message) or a sentence typed, then the other ways in: the templates (a sheet), the ready-made
+ * agents, an import or the form. With ready-made agents already made, the tiles of the ones left.
+ */
+function StartCard({ channelId, left, first }: { channelId: string; left: readonly Preset[]; first: boolean }) {
   const { t } = useTranslation();
-  const { orgId } = useOrg();
+  const { orgId, org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
   const c = useColors();
   const failed = useFailed();
   const channels = useChannels(orgId);
+  const messages = useMessages(orgId, channelId).data;
+  const send = useSendAnswer(channelId);
+  // With ready-made agents already made, their tiles show from the start.
+  const [opened, setPresetsOpen] = useState(false);
+  const presetsOpen = opened || !first;
+  const [templates, setTemplates] = useState(false);
   const general = channels.data?.find((ch) => ch.name === "general");
   const create = useMutation({
     mutationFn: async (presets: readonly Preset[]) => {
@@ -115,57 +141,87 @@ function StartCard({ channelId, left }: { channelId: string; left: readonly Pres
     onError: failed,
     onSettled: () => qc.invalidateQueries({ queryKey: keys.agents(orgId) }),
   });
+  const answer = first ? answerAfter(messages, null) : null;
+  const other = t("teamPlan.business.other");
   return (
-    <IntroCard icon="agent" title={t("rightHand.intro.start.question")}>
-      <View style={styles.presets}>
-        {left.map((p) => {
-          const name = t(`onboarding.presets.${p}.name`);
-          return (
-            <Pressable
-              key={p}
-              disabled={create.isPending}
-              onPress={() => {
-                tapHaptic();
-                create.mutate([p]);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={t("rightHand.intro.start.createOne", { name })}
-              style={({ pressed }) => [
-                styles.preset,
-                { borderColor: c.line2 },
-                pressed && { backgroundColor: c.sunken },
-              ]}
-            >
-              <AgentAvatar agent={fullLook(PRESET_LOOK[p])} size={28} name={name} live={false} />
-              <View style={styles.fill}>
-                <Text variant="small" style={styles.bold} numberOfLines={1}>
-                  {name}
-                </Text>
-                <Text variant="caption" tone="muted" numberOfLines={1}>
-                  {t(`onboarding.presets.${p}.role`)}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-      <Button
-        variant="primary"
-        size="card"
-        wide
-        label={t("rightHand.intro.start.team")}
-        loading={create.isPending}
-        onPress={() => create.mutate(left)}
-      />
+    <IntroCard
+      icon="agent"
+      title={first ? t("teamPlan.start.question", { org: org?.name ?? "" }) : t("rightHand.intro.start.question")}
+      text={first && answer === null ? t("teamPlan.start.orWrite") : first ? t("teamPlan.answered") : undefined}
+    >
+      {first ? (
+        <AnswerChips
+          choices={BUSINESS_TYPES.map((b) => t(`teamPlan.business.${b}`))}
+          multiple={false}
+          answer={answer}
+          onSend={(text) => (text === other ? requestComposerText(channelId, "") : send(text))}
+        />
+      ) : null}
+      {presetsOpen ? (
+        <>
+          <View style={styles.presets}>
+            {left.map((p) => {
+              const name = t(`onboarding.presets.${p}.name`);
+              return (
+                <Pressable
+                  key={p}
+                  disabled={create.isPending}
+                  onPress={() => {
+                    tapHaptic();
+                    create.mutate([p]);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("rightHand.intro.start.createOne", { name })}
+                  style={({ pressed }) => [
+                    styles.preset,
+                    { borderColor: c.line2 },
+                    pressed && { backgroundColor: c.sunken },
+                  ]}
+                >
+                  <AgentAvatar agent={fullLook(PRESET_LOOK[p])} size={28} name={name} live={false} />
+                  <View style={styles.fill}>
+                    <Text variant="small" style={styles.bold} numberOfLines={1}>
+                      {name}
+                    </Text>
+                    <Text variant="caption" tone="muted" numberOfLines={1}>
+                      {t(`onboarding.presets.${p}.role`)}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Button
+            variant="secondary"
+            size="card"
+            wide
+            label={t("rightHand.intro.start.team")}
+            loading={create.isPending}
+            onPress={() => create.mutate(left)}
+          />
+        </>
+      ) : null}
+      <Text variant="caption" tone="muted">
+        {t("teamPlan.start.footer")}
+      </Text>
       <Button
         variant="secondary"
         size="card"
         wide
-        label={t("rightHand.intro.start.describe")}
-        onPress={() => requestComposerText(channelId, "")}
+        label={t("teamPlan.start.templates")}
+        onPress={() => setTemplates(true)}
       />
+      {presetsOpen ? null : (
+        <Button
+          variant="ghost"
+          size="card"
+          wide
+          label={t("teamPlan.start.presets")}
+          onPress={() => setPresetsOpen(true)}
+        />
+      )}
       <Button
-        variant="secondary"
+        variant="ghost"
         size="card"
         wide
         label={t("rightHand.intro.start.import")}
@@ -177,6 +233,14 @@ function StartCard({ channelId, left }: { channelId: string; left: readonly Pres
         wide
         label={t("rightHand.intro.start.form")}
         onPress={() => router.push("/new-agent")}
+      />
+      <TeamTemplatesSheet
+        open={templates}
+        onClose={() => setTemplates(false)}
+        onNone={() => {
+          setTemplates(false);
+          requestComposerText(channelId, "");
+        }}
       />
     </IntroCard>
   );
@@ -210,6 +274,34 @@ function NextCard({ first }: { first: Agent }) {
             { compose: true, text: preset ? t(`rightHand.intro.firstTask.${preset}`) : "" },
           )
         }
+      />
+    </IntroCard>
+  );
+}
+
+/** "Como prefere que eu fale com você?": two answers, saved for every agent here; gone once the person picks. */
+function StyleCard() {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const failed = useFailed();
+  const save = useSetAgentStyle(orgId);
+  return (
+    <IntroCard icon="chat" title={t("rightHand.intro.style.question")} text={t("rightHand.intro.style.text")}>
+      <Button
+        variant="primary"
+        size="card"
+        wide
+        label={t("rightHand.intro.style.simple")}
+        disabled={save.isPending}
+        onPress={() => save.mutate("simple", { onError: failed })}
+      />
+      <Button
+        variant="secondary"
+        size="card"
+        wide
+        label={t("rightHand.intro.style.technical")}
+        disabled={save.isPending}
+        onPress={() => save.mutate("technical", { onError: failed })}
       />
     </IntroCard>
   );

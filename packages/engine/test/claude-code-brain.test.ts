@@ -602,10 +602,36 @@ test("live text end to end: the runner's partial deltas reach the channel as age
 });
 
 // A pure check (no fixture): what counts as restating a reaction after `react`.
-test("restatesReaction: empty, NO_REPLY or only emoji and punctuation; any letter or digit is a reply", () => {
-  for (const t of ["", "  ", "👍", "👍🏽", "🙌!", "✅ ✅", "❤️", "NO_REPLY", "👍👍👍👍👍👍👍👍"])
+test("restatesReaction: empty, NO_REPLY, only emoji and punctuation, or one short line saying it reacted; anything else is a reply", () => {
+  for (const t of [
+    "",
+    "  ",
+    "👍",
+    "👍🏽",
+    "🙌!",
+    "✅ ✅",
+    "❤️",
+    "NO_REPLY",
+    "👍👍👍👍👍👍👍👍",
+    "Reagi com 👍 à mensagem do Caio.",
+    "Pronto, reagi!",
+    "Reacted with 👍 to Caio's message.",
+    "J'ai réagi avec 👍",
+    "Caioのメッセージにリアクションしました",
+  ])
     expect(restatesReaction(t)).toBe(true);
-  for (const t of ["ok", "👍 feito", "Pronto!", "42", "valeu"]) expect(restatesReaction(t)).toBe(false);
+  for (const t of [
+    "ok",
+    "👍 feito",
+    "Pronto!",
+    "42",
+    "valeu",
+    "Reagi com 👍.\nE o PR está pronto para revisão.",
+    "Reagi com 👍. A entrega é sexta.",
+    "Reacted 👍! The deadline is Friday.",
+    "リアクションしました。締め切りは金曜です。",
+  ])
+    expect(restatesReaction(t)).toBe(false);
 });
 
 test("plan usage is stored like API usage: uncached input apart from cache reads and writes, same total", async () => {

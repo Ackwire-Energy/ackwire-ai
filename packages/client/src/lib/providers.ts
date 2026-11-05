@@ -147,11 +147,18 @@ export interface ModelChoice {
  */
 export function modelChoices(models: Model[], credentials: Credential[], platform: boolean) {
   const withKey = providersWithKeys(credentials);
+  const live = new Set(credentials.filter((c) => !c.revokedAt).map((c) => c.id));
   const groups = new Map<string, ModelChoice[]>();
   for (const model of models) {
-    const available = model.available ?? (withKey.has(model.provider) || (platform && model.provider === "anthropic"));
-    if (model.pick === false && !available) continue;
-    groups.set(model.provider, [...(groups.get(model.provider) ?? []), { model, available }]);
+    // A workspace endpoint's models (ADR 0146), under its name: only this workspace's, only while its key lives.
+    const group = model.endpoint?.name ?? model.provider;
+    const available =
+      model.available ??
+      (model.endpoint
+        ? live.has(model.endpoint.credentialId)
+        : withKey.has(model.provider) || (platform && model.provider === "anthropic"));
+    if ((model.pick === false || model.endpoint) && !available) continue;
+    groups.set(group, [...(groups.get(group) ?? []), { model, available }]);
   }
   return [...groups.entries()];
 }
@@ -168,8 +175,15 @@ export const AUTO = "auto";
 export const isAuto = (value: string | null | undefined) => value === AUTO;
 
 /** A workspace key runs this agent model: Automático (it follows the key), or one of the key's provider's. */
-export const keyRuns = (key: Pick<Credential, "provider">, model: string | undefined, models: readonly Model[]) =>
-  isAuto(model) || models.some((m) => m.id === model && m.provider === key.provider);
+export const keyRuns = (
+  key: Pick<Credential, "id" | "provider">,
+  model: string | undefined,
+  models: readonly Model[],
+) =>
+  isAuto(model) ||
+  models.some(
+    (m) => m.id === model && m.provider === key.provider && (!m.endpoint || m.endpoint.credentialId === key.id),
+  );
 
 /**
  * Whose API an agent's model runs on: the model's provider; for Automático, the one provider the workspace can use

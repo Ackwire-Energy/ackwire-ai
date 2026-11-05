@@ -7,7 +7,7 @@ import { useOrg } from "./org-context";
 
 /**
  * Designed empty state for screens the design only links to (thread, DMs,
- * issues, forum, Drive, search, settings): page title, a dashed box with the
+ * issues, Drive, search, settings): page title, a dashed box with the
  * icon and a short explanation, and a way back to the conversation.
  */
 export function EmptyPage({

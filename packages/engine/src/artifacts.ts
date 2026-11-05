@@ -511,13 +511,13 @@ async function personCanRead(db: Database, userId: string, orgId: string, a: Pic
     .where(and(eq(channels.id, a.channelId), eq(channels.orgId, orgId)));
   if (!row) return false;
   if (row.kind === "task") return row.taskReader === true || String(row.taskReader) === "t";
-  return row.memberId !== null || (row.visibility === "public" && (row.kind === "channel" || row.kind === "forum"));
+  return row.memberId !== null || (row.visibility === "public" && row.kind === "channel");
 }
 
-/** The channels whose files this person may read: those they belong to, public channels and forums, tasks they see. */
+/** The channels whose files this person may read: those they belong to, public channels, tasks they see. */
 async function personReadableChannels(db: Database, userId: string, orgId: string): Promise<string[]> {
   const member = and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, userId));
-  const open = and(eq(channels.visibility, "public"), inArray(channels.kind, ["channel", "forum"]));
+  const open = and(eq(channels.visibility, "public"), eq(channels.kind, "channel"));
   const rows = await db
     .select({ id: channels.id })
     .from(channels)

@@ -7,7 +7,6 @@ import {
   draftOf,
   draftTrigger,
   everyMinutes,
-  forumRoundsOf,
   futureRuns,
   hasFired,
   horizonLanes,
@@ -134,7 +133,6 @@ describe("what a routine is", () => {
     expect(targetIcon({ type: "dm" })).toBe("chat");
     expect(targetIcon({ type: "conversation", channelId: "c1", threadId: "t1" })).toBe("reply");
     expect(targetIcon({ type: "conversation", channelId: "c1", threadId: null })).toBe("hash");
-    expect(targetIcon({ type: "forum", agentIds: ["dev"] })).toBe("members");
     expect(targetIcon({ type: "artifact" })).toBe("doc");
     expect(whenIcon(routine({ id: "a", trigger: event }))).toBe("bolt");
     expect(whenIcon(routine({ id: "a", trigger: email }))).toBe("mail");
@@ -259,13 +257,8 @@ describe("the form", () => {
     expect(targetChoice({ type: "channel", channelId: "c9" })).toBe("c9");
     expect(targetChoice({ type: "dm" })).toBe("dm");
     expect(targetChoice({ type: "artifact" })).toBe("artifact");
-    expect(targetChoice({ type: "forum", agentIds: ["dev"] })).toBe("forum");
     expect(targetChoice({ type: "conversation", channelId: "c1", threadId: "t1" })).toBe("keep");
     expect(targetChoice(undefined)).toBe("");
-    expect(forumRoundsOf({ type: "forum", agentIds: ["dev"], rounds: 5 })).toBe("5");
-    expect(forumRoundsOf({ type: "forum", agentIds: ["dev"], rounds: 4 })).toBe("3");
-    expect(forumRoundsOf({ type: "forum", agentIds: ["dev"] })).toBe("3");
-    expect(forumRoundsOf(undefined)).toBe("3");
   });
 
   test("a new routine: weekly on today's weekday at 09:00, in my zone, read only, speaking when there is news", () => {
@@ -278,13 +271,7 @@ describe("the form", () => {
       timezone: SP,
       start: "2026-10-28",
     });
-    expect([d.kind, d.event, d.active, d.report, d.forumRounds]).toEqual([
-      "schedule",
-      "sentry.issue_created",
-      true,
-      "when_new",
-      "3",
-    ]);
+    expect([d.kind, d.event, d.active, d.report]).toEqual(["schedule", "sentry.issue_created", true, "when_new"]);
     const input = draftInput({ ...d, agentId: "dev", target: "c1", prompt: "  Resuma o dia  ", name: " " });
     expect(input).toEqual({
       agentId: "dev",
@@ -340,15 +327,9 @@ describe("the form", () => {
     expect(draftChanges(hidden, draftOf(hidden, SP, today), saved)).toEqual({});
   });
 
-  test("a forum topic: its agents in any order and its rounds; a chat-made routine keeps its conversation", () => {
-    const r = routine({ id: "f", target: { type: "forum", agentIds: ["dev", "infra"], rounds: 3 } });
-    const saved = JSON.stringify(toApiRule(ruleOf(r, SP, today)));
-    const d = draftOf(r, SP, today);
-    expect(draftChanges(r, { ...d, forumAgents: ["infra", "dev"] }, saved)).toEqual({});
-    expect(draftChanges(r, { ...d, forumRounds: "5" }, saved)).toEqual({
-      target: { type: "forum", agentIds: ["dev", "infra"], rounds: 5 },
-    });
+  test("a chat-made routine keeps its conversation", () => {
     const chat = routine({ id: "k", target: { type: "conversation", channelId: "c1", threadId: "t1" } });
+    const saved = JSON.stringify(toApiRule(ruleOf(chat, SP, today)));
     expect(draftOf(chat, SP, today).target).toBe("keep");
     expect(draftChanges(chat, draftOf(chat, SP, today), saved)).toEqual({});
   });

@@ -9,9 +9,7 @@ import {
   WHY_YOU_WERE_CALLED,
 } from "../src/reply-policy";
 
-const run = (
-  over: Partial<{ trigger: "mention" | "router" | "dm" | "forum"; background: boolean; hop: number }> = {},
-) => ({
+const run = (over: Partial<{ trigger: "mention" | "router" | "dm"; background: boolean; hop: number }> = {}) => ({
   agentId: "a1",
   trigger: "router" as const,
   background: false,
@@ -25,7 +23,7 @@ describe("replyPolicyFor", () => {
     expect(replyPolicyFor(run(), person())).toEqual({ mayPass: true, background: false });
     // Brought in after another agent spoke (`meta.joined`).
     expect(replyPolicyFor(run(), { authorType: "agent", meta: {} }).mayPass).toBe(true);
-    for (const trigger of ["mention", "dm", "forum"] as const)
+    for (const trigger of ["mention", "dm"] as const)
       expect(replyPolicyFor(run({ trigger }), person()).mayPass).toBe(false);
   });
 

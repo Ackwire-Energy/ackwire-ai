@@ -14,7 +14,7 @@ function skillMarkdown(s: { name: string; description: string; body: string; met
 
 type RoutineRow = typeof routines.$inferSelect;
 
-/** A routine as the bundle carries it; null when its trigger or target can't move (events, mail, forums). */
+/** A routine as the bundle carries it; null when its trigger or target can't move (events, mail). */
 function bundleRoutine(r: RoutineRow, channelIds: Set<string>): BundleRoutine | null {
   const target = r.target as unknown as RoutineTarget;
   const channel =

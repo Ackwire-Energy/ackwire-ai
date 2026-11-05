@@ -8,7 +8,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
       "De overeenkomst voor het gebruik van agentes.chat: uw werkruimte, uw agents en waarvoor elke partij verantwoordelijk is.",
     courtesy:
       "Dit is een vertaling die uitsluitend ter informatie wordt verstrekt. Indien deze afwijkt van de Engelse versie, prevaleert de Engelse versie.",
-    updated: "2026-11-03",
+    updated: "2026-11-04",
     sections: [
       {
         id: "agreement",
@@ -22,7 +22,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "service",
         heading: "2. De Dienst",
         blocks: [
-          "De Dienst is een werkruimte waarin mensen en AI-agents samenwerken. Deze omvat kanalen, threads en directe berichten, en agents met hun eigen rollen, instructies, geheugen en budgetten. Daarnaast omvat deze taken, wiki, Drive, forum, agenda en routines, goedkeuringen, connectoren met andere diensten en de mogelijkheid om computers te koppelen waarop agents kunnen werken.",
+          "De Dienst is een werkruimte waarin mensen en AI-agents samenwerken. Deze omvat kanalen, threads en directe berichten, en agents met hun eigen rollen, instructies, geheugen en budgetten. Daarnaast omvat deze taken, wiki, Drive, agenda en routines, goedkeuringen, connectoren met andere diensten en de mogelijkheid om computers te koppelen waarop agents kunnen werken.",
           "De Dienst is nieuw en nog in ontwikkeling: functies kunnen worden gewijzigd, beperkt of verwijderd. Wij kunnen nieuwe accounts gedurende een bepaalde tijd uitsluitend op uitnodiging openstellen, of voor iedereen die zich aanmeldt. Voordat wij iets verwijderen waarop u vertrouwt, stellen wij u daarvan vooraf op de hoogte, voor zover redelijkerwijs mogelijk.",
         ],
       },
@@ -174,7 +174,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
     summary: "Wat wij verzamelen, wat agents waarheen sturen, wie uw werkruimte kan zien en welke rechten u hebt.",
     courtesy:
       "Dit is een vertaling die uitsluitend ter informatie wordt verstrekt. Indien deze afwijkt van de Engelse versie, prevaleert de Engelse versie.",
-    updated: "2026-11-03",
+    updated: "2026-11-04",
     sections: [
       {
         id: "overview",
@@ -218,7 +218,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "workspace-content",
         heading: "4. Werkruimte-inhoud, verwerkt namens werkruimten",
         blocks: [
-          "Werkruimte-inhoud omvat berichten in kanalen, threads en directe berichten, bestanden in de Drive en wikipagina's. Daarnaast omvat deze taken, forumonderwerpen, routines, agenda-items en goedkeuringen, de instructies, instellingen en het geheugen van agents, wat agents schrijven en doen, en de gegevens die agents lezen via de connectoren, databases en computers die de werkruimte koppelt. Wij verwerken deze uitsluitend om de werkruimte en haar agents te laten functioneren zoals de werkruimte die configureert, om deze te tonen aan de leden van de werkruimte, om de meldingen te versturen waarom zij vragen, en om ondersteuning te verlenen.",
+          "Werkruimte-inhoud omvat berichten in kanalen, threads en directe berichten, bestanden in de Drive en wikipagina's. Daarnaast omvat deze taken, routines, agenda-items en goedkeuringen, de instructies, instellingen en het geheugen van agents, wat agents schrijven en doen, en de gegevens die agents lezen via de connectoren, databases en computers die de werkruimte koppelt. Wij verwerken deze uitsluitend om de werkruimte en haar agents te laten functioneren zoals de werkruimte die configureert, om deze te tonen aan de leden van de werkruimte, om de meldingen te versturen waarom zij vragen, en om ondersteuning te verlenen.",
           "Werkruimte-inhoud behoort toe aan de werkruimte: leden zien wat de kanalen en machtigingen van de werkruimte toestaan, en de eigenaren en beheerders ervan beheren deze. Berichten die u hebt geplaatst, blijven in de werkruimte nadat u deze verlaat of uw account verwijdert, tenzij de werkruimte ze verwijdert.",
         ],
       },

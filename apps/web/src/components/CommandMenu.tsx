@@ -1,4 +1,4 @@
-import { useAuthConfig, useChannels, useForumTopics, useWikiTree } from "@agenteschat/client";
+import { useAuthConfig, useChannels, useWikiTree } from "@agenteschat/client";
 import { canTalk, listsAgent } from "@agenteschat/client/lib/audience";
 import { joinable } from "@agenteschat/client/lib/channel-access";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
@@ -34,8 +34,7 @@ export function CommandMenu() {
   const navigate = useNavigate();
   const invite = useInviteDialog();
   const [open, setOpen] = useState(false);
-  // Topics only when the palette is open (no request on every page).
-  const topics = useForumTopics(org.id, open);
+  // The wiki only when the palette is open (no request on every page).
   const wiki = useWikiTree(org.id, open);
 
   useEffect(() => {
@@ -116,17 +115,6 @@ export function CommandMenu() {
         onSelect: () => void navigate({ to: p.to as "/org/$orgId/issues", params: { orgId } }),
       });
     }
-    for (const tp of topics.data ?? []) {
-      list.push({
-        key: `f:${tp.id}`,
-        group: goTo,
-        label: tp.title,
-        sub: t("palette.forum"),
-        keywords: tp.goal,
-        mark: <Icon name="message" size={16} />,
-        onSelect: () => void navigate({ to: "/org/$orgId/forum/$topicId", params: { orgId, topicId: tp.id } }),
-      });
-    }
     for (const p of wiki.data ?? []) {
       list.push({
         key: `w:${p.slug}`,
@@ -172,20 +160,7 @@ export function CommandMenu() {
         onSelect: () => invite.open(),
       });
     return list;
-  }, [
-    channels.data,
-    topics.data,
-    wiki.data,
-    dir.agents,
-    dir.members,
-    me.user.id,
-    org,
-    server,
-    navigate,
-    t,
-    goTo,
-    invite,
-  ]);
+  }, [channels.data, wiki.data, dir.agents, dir.members, me.user.id, org, server, navigate, t, goTo, invite]);
 
   // "Pedir a um agente": the agents I can talk to, with what was typed.
   const askable = useMemo(() => dir.agents.filter((a) => canTalk(a)), [dir.agents]);

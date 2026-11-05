@@ -670,7 +670,7 @@
     "noneForYou": "Noch arbeitet kein Agent mit dir.",
     "noneForYouHint": "Bitte einen Admin um Zugriff.",
     "freeSection": "Frei",
-    "noGroupSection": "Ohne Gruppe"
+    "noGroupSection": "Keine Abteilung"
   },
   "agentEdit": {
     "missing": "Diesen Agenten gibt es nicht mehr.",
@@ -759,10 +759,6 @@
       "issue_comment_other": "{{names}} haben eine Aufgabe kommentiert",
       "issue_status_one": "{{names}} hat eine Aufgabe geändert",
       "issue_status_other": "{{names}} haben eine Aufgabe geändert",
-      "forum_turn_one": "Du bist im Forum dran",
-      "forum_turn_other": "Du bist im Forum dran",
-      "forum_synthesis_one": "Forumszusammenfassung fertig",
-      "forum_synthesis_other": "Forumszusammenfassungen fertig",
       "approval_one": "{{names}} bittet um Freigabe",
       "approval_other": "{{names}} bitten um Freigabe",
       "mission_finished_one": "Mission abgeschlossen",
@@ -1072,7 +1068,6 @@
     "loadFailed": "Die Aufgaben ließen sich nicht laden.",
     "createdBy": "erstellt von {{name}}",
     "fromMessage": "aus einer Nachricht",
-    "fromForum": "aus dem Forum",
     "fromAgent": "aus einer Anfrage an einen Agenten",
     "fromWebhook": "von {{provider}}",
     "workingFor_one": "arbeitet seit {{count}} Min.",
@@ -1242,7 +1237,6 @@
     "kind": {
       "approval": "Freigeben",
       "question": "Frage",
-      "forum": "Du bist dran",
       "browser": "Browser",
       "secret": "Secret",
       "join": "Mitglieder",
@@ -1356,7 +1350,6 @@
         "wiki": "Wiki",
         "skills": "Skills",
         "schedule": "Routinen",
-        "forum": "Forum",
         "sandbox": "Eigener Computer",
         "browser": "Browser",
         "setup": "Workspace-Einrichtung",
@@ -2051,5 +2044,9 @@
         "proposal": "Dashboard"
       }
     }
+  },
+  "team": {
+    "entry": "Liste, Organigramm und Karte",
+    "mapHint": "Um einen Agenten in einen anderen Kanal zu verschieben, nutze die Karte im Web oder sprich mit {{name}}."
   }
 }

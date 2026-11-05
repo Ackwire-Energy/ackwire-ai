@@ -65,7 +65,7 @@ export async function takeInbox(db: Executor, runId: string): Promise<string[]> 
  * A run ended without reading some messages: they get a run of their own (the last person's
  * message is its trigger; it reads the conversation, so the earlier ones too), or join the agent's run already
  * active there. `exclude`: messages that need no answer (the one that asked it to stop). The app
- * hears `agent.run.redispatched`. Forum turns are driven by the topic, never redispatched.
+ * hears `agent.run.redispatched`.
  * Returns the run that took them, or null when there was nothing to hand on.
  */
 export async function releaseInbox(
@@ -90,8 +90,7 @@ export async function handOnMessages(
   run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "trigger">,
   messageIds: string[],
 ): Promise<{ runId: string; messageIds: string[] } | null> {
-  // Forum turns are driven by the topic: nothing is handed on from them.
-  if (messageIds.length === 0 || run.trigger === "forum") return null;
+  if (messageIds.length === 0) return null;
   const taken = await takeToHandOn(db, run, messageIds);
   return handOn(db, pubsub, run, taken, { reason: "held" });
 }
@@ -259,7 +258,7 @@ async function handOn(
   options: { reason: ReleaseReason; exclude?: string[] },
 ): Promise<{ runId: string; messageIds: string[] } | null> {
   const ids = taken.filter((id) => !options.exclude?.includes(id));
-  if (ids.length === 0 || run.trigger === "forum") return null;
+  if (ids.length === 0) return null;
   // An archived (or deleted) agent answers nobody: a run of its own would only fail, so what it was sent is dropped.
   const [agent] = await db.select({ archivedAt: agents.archivedAt }).from(agents).where(eq(agents.id, run.agentId));
   if (!agent || agent.archivedAt) return null;

@@ -8,7 +8,7 @@ export const legalFr: Partial<Record<LegalKind, LegalDocument>> = {
       "Le contrat d'utilisation d'agentes.chat : votre espace de travail, vos agents et les responsabilités de chaque partie.",
     courtesy:
       "Ceci est une traduction de courtoisie. En cas de divergence avec la version anglaise, la version anglaise prévaut.",
-    updated: "2026-11-03",
+    updated: "2026-11-04",
     sections: [
       {
         id: "agreement",
@@ -22,7 +22,7 @@ export const legalFr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "service",
         heading: "2. Le Service",
         blocks: [
-          "Le Service est un espace de travail où des personnes et des agents d'IA travaillent ensemble. Il comprend des canaux, des fils de discussion et des messages directs, ainsi que des agents dotés de leurs propres rôles, instructions, mémoire et budgets. Il comprend aussi des tâches, un wiki, un Drive, un forum, un agenda et des routines, des approbations, des connecteurs vers d'autres services et la possibilité de connecter des ordinateurs sur lesquels les agents peuvent travailler.",
+          "Le Service est un espace de travail où des personnes et des agents d'IA travaillent ensemble. Il comprend des canaux, des fils de discussion et des messages directs, ainsi que des agents dotés de leurs propres rôles, instructions, mémoire et budgets. Il comprend aussi des tâches, un wiki, un Drive, un agenda et des routines, des approbations, des connecteurs vers d'autres services et la possibilité de connecter des ordinateurs sur lesquels les agents peuvent travailler.",
           "Le Service est nouveau et continue d'évoluer : des fonctionnalités peuvent être modifiées, limitées ou supprimées. Nous pouvons, pendant un certain temps, n'ouvrir de nouveaux comptes que sur invitation, ou les ouvrir à toute personne qui s'inscrit. Dans la mesure du possible, nous vous informerons à l'avance avant de supprimer un élément dont vous dépendez.",
         ],
       },
@@ -175,7 +175,7 @@ export const legalFr: Partial<Record<LegalKind, LegalDocument>> = {
       "Ce que nous collectons, ce que les agents envoient et à qui, qui peut voir votre espace de travail, et les droits dont vous disposez.",
     courtesy:
       "Ceci est une traduction de courtoisie. En cas de divergence avec la version anglaise, la version anglaise prévaut.",
-    updated: "2026-11-03",
+    updated: "2026-11-04",
     sections: [
       {
         id: "overview",
@@ -219,7 +219,7 @@ export const legalFr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "workspace-content",
         heading: "4. Contenu de l'Espace de travail, traité pour le compte des espaces de travail",
         blocks: [
-          "Le Contenu de l'Espace de travail comprend les messages des canaux, fils de discussion et messages directs, les fichiers du Drive et les pages du wiki. Il comprend aussi les tâches, sujets du forum, routines, événements d'agenda et approbations, les instructions, paramètres et la mémoire des agents, ce que les agents écrivent et font, et les données que les agents lisent par l'intermédiaire des connecteurs, bases de données et ordinateurs que l'espace de travail connecte. Nous le traitons uniquement pour faire fonctionner l'espace de travail et ses agents tels que l'espace de travail les configure, pour le présenter aux membres de l'espace de travail, pour envoyer les notifications qu'ils demandent et pour fournir une assistance.",
+          "Le Contenu de l'Espace de travail comprend les messages des canaux, fils de discussion et messages directs, les fichiers du Drive et les pages du wiki. Il comprend aussi les tâches, routines, événements d'agenda et approbations, les instructions, paramètres et la mémoire des agents, ce que les agents écrivent et font, et les données que les agents lisent par l'intermédiaire des connecteurs, bases de données et ordinateurs que l'espace de travail connecte. Nous le traitons uniquement pour faire fonctionner l'espace de travail et ses agents tels que l'espace de travail les configure, pour le présenter aux membres de l'espace de travail, pour envoyer les notifications qu'ils demandent et pour fournir une assistance.",
           "Le Contenu de l'Espace de travail appartient à l'espace de travail : les membres voient ce que ses canaux et autorisations permettent, et ses propriétaires et administrateurs le gèrent. Les messages que vous avez publiés restent dans l'espace de travail après que vous l'avez quitté ou que vous avez supprimé votre compte, sauf si l'espace de travail les supprime.",
         ],
       },

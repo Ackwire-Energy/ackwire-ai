@@ -35,6 +35,8 @@ import { replyThreadOf } from "./runs";
 import { REPORT_SCHEMA, SCHEDULE_INPUT } from "./schedule-tools";
 import type { WantedLine } from "./settings-proposals";
 import { noAgentText } from "./team";
+import { teamTools } from "./team-proposals";
+import { SET_TEAM_WEEK_TOOL, setTeamWeekPrefs } from "./team-week";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
@@ -92,7 +94,6 @@ export const APP_PAGES = {
   drive: "Drive (files)",
   wiki: "Wiki",
   issues: "Issues",
-  forum: "Forum",
   calendar: "Calendar",
   agent: "An agent's page (instructions, memory, access, its own delete): needs `agent`",
   channel: "A channel (its settings, members, archiving): needs `channel`",
@@ -897,7 +898,7 @@ export function createSetupToolSource(deps: {
   // Any agent that may set the team up proposes teammates' settings too: the right hand decides another agent's card
   // for the person who asked (ADR 0139), never its own.
   const all = [...tools, settingsTool(deps)];
-  const rightHand = [...all, ...rightHandCards(deps)];
+  const rightHand = [...all, ...rightHandCards(deps), ...teamTools({ ...deps, cardsLeft, hopOf })];
   return {
     name: "setup",
     // Only the right hand starts the rest of the app with cards (ADR 0137).
@@ -1142,8 +1143,44 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
         }
       },
     },
+    {
+      name: SET_TEAM_WEEK_TOOL,
+      description:
+        "Stop, start again or move the weekly 'Semana da equipe' card you post in this person's DM (only admins get it; by default on Fridays at 17h in the workspace's time zone). Use it when they ask you to stop it ('para de mandar o resumo da semana'), to send it again, or on another day or hour. It changes only their card.",
+      scope: SETUP_SCOPE,
+      inputSchema: {
+        type: "object",
+        properties: {
+          off: { type: "boolean", description: "True stops it; false starts it again." },
+          day: { type: "string", enum: [...WEEK_DAYS] },
+          hour: { type: "integer", minimum: 0, maximum: 23, description: "In the workspace's time zone." },
+        },
+        additionalProperties: false,
+      },
+      async execute(input, ctx) {
+        try {
+          const forUserId = await personBehindCall(ctx);
+          if (!forUserId) return { content: "Only a person's request changes their weekly card.", isError: true };
+          const day = WEEK_DAYS.indexOf(str(input.day) as (typeof WEEK_DAYS)[number]);
+          const next = await setTeamWeekPrefs(ctx.db, ctx.orgId, forUserId, {
+            ...(typeof input.off === "boolean" ? { off: input.off } : {}),
+            ...(day >= 0 ? { day } : {}),
+            ...(typeof input.hour === "number" ? { hour: input.hour } : {}),
+          });
+          return {
+            content: next.off
+              ? "Stopped: no weekly card for them until they ask again or turn it on in Settings › Lodi."
+              : `Their weekly card now comes every ${WEEK_DAYS[next.day]} at ${next.hour}:00 (${next.timezone}), when there is something to say.`,
+          };
+        } catch (error) {
+          return failed(error);
+        }
+      },
+    },
   ];
 }
+
+const WEEK_DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
 
 /** A setting's change as the tool takes it, for one agent. */
 interface SettingsChangeInput {

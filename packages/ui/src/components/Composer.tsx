@@ -13,6 +13,7 @@ import {
 import { channelQuery, insertChannelRef } from "../channel-refs";
 import { cx } from "../cx";
 import { onScreenKeyboard } from "../device";
+import { EDGE_ROOM } from "../floating";
 import {
   applyFormat,
   FORMAT_KINDS,
@@ -958,6 +959,7 @@ export function Composer({
               side="top"
               align="start"
               sideOffset={6}
+              collisionPadding={EDGE_ROOM}
               // Focus stays in the text box (combobox).
               onOpenAutoFocus={(e) => e.preventDefault()}
               onCloseAutoFocus={(e) => e.preventDefault()}

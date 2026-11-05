@@ -96,7 +96,10 @@ const size = (r: ModelRequest) =>
  * with `ask_choices`, `request_approval` and the plain-words line that came next, 44,076 with the rule that a step
  * needing the person is handed over, never a blocker (ADR 0097 addendum), 44,466 with skills that update from their
  * links (`offer_install_skill` and `update_skill_from_source` load on demand), 44,789 with the right hand's cards named in
- * the setup group's label (ADR 0137 §4); the ceiling leaves a little room.
+ * the setup group's label (ADR 0137 §4), 44,982 with the plain-words rule that leads with what the person must do and
+ * `set_reply_style` named in the rarer tools' label (ADR 0147), 44,969 with `react` reaching an older message by its
+ * author and a key used before an app connection, once two rules stopped repeating each other; the ceiling leaves a
+ * little room.
  */
 const OI_CEILING_CHARS = 45_000;
 

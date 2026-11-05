@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 
-export type WikiSource = { kind: "message"; channelId: string; messageId: string } | { kind: "forum"; topicId: string };
+export type WikiSource = { kind: "message"; channelId: string; messageId: string };
 
 /** The block appended to the page: the text as a quote, then where it came from. */
 export const wikiBlock = (text: string, from: string) =>

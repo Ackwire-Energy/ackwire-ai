@@ -223,7 +223,6 @@ export async function currentSubscriptions(
         inArray(schema.channels.id, channelIds),
         isNull(schema.channels.archivedAt),
         or(
-          eq(schema.channels.kind, "forum"),
           isNotNull(schema.channelMembers.id),
           // A task's conversation: whoever sees the task (ADR 0145).
           and(eq(schema.channels.kind, "task"), taskReaderSql(sql`${schema.channels.id}`, sql`${userId}::text`)),

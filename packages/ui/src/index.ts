@@ -178,20 +178,6 @@ export {
   type FilterChipProps,
   type FilterOption,
 } from "./components/FilterChip";
-export {
-  Convergence,
-  type ForumTrackItem,
-  type ForumTrackKind,
-  layoutTrack,
-  RoundTrack,
-  roundLabelBoxes,
-  StanceLane,
-  TRACK_SIZES,
-  type TrackLayout,
-  type TrackLayoutItem,
-  type TrackSize,
-  trackItemAt,
-} from "./components/ForumPixels";
 export { InfoHint, type InfoHintProps } from "./components/InfoHint";
 export { isApple, Kbd, modKey, shortcut } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";

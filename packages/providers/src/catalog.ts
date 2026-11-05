@@ -19,7 +19,7 @@ export interface TokenPrices {
 export interface ProviderInfo {
   label: string;
   /** The API it speaks, which picks its adapter (`createModelProviders`). */
-  protocol: "anthropic" | "openai" | "gemini" | "openrouter";
+  protocol: "anthropic" | "openai" | "gemini" | "openrouter" | "custom";
   /** Replaces the SDK's default host. */
   baseURL?: string;
   /**
@@ -66,6 +66,8 @@ export const PROVIDERS = {
   },
   // Its models come from its public list at run time (`openrouter.ts`), never from this catalog.
   openrouter: { label: "OpenRouter", protocol: "openrouter" },
+  // A workspace's own endpoint (ADR 0146): its address, API style and models live on its credential (`custom.ts`).
+  custom: { label: "Other provider", protocol: "custom" },
 } as const satisfies Record<string, ProviderInfo>;
 
 export type ProviderId = keyof typeof PROVIDERS;
@@ -111,6 +113,10 @@ export interface ModelInfo {
   structuredOutput?: false;
   /** In a long list (OpenRouter's): `true` is a good pick, shown first. Absent: a catalog model. */
   pick?: boolean;
+  /** No prices known (a workspace's own endpoint, ADR 0146): its calls cost 0 and count tokens only. */
+  unpriced?: true;
+  /** A workspace endpoint's name (ADR 0146), which the pickers group its models under. */
+  endpoint?: string;
 }
 
 /** The sizes "Automático" chooses between: a fast cheap model, the everyday one, the strongest. */
@@ -339,9 +345,50 @@ export function setListedModels(models: Record<string, ModelInfo>) {
   listed = new Map(Object.entries(models).filter(([id]) => !Object.hasOwn(MODEL_CATALOG, id)));
 }
 
-/** A model of the catalog or of a list read at run time; undefined for any other id. */
-export const modelInfo = (model: string): ModelInfo | undefined =>
-  Object.hasOwn(MODEL_CATALOG, model) ? MODEL_CATALOG[model] : listed.get(model);
+/**
+ * A workspace's own endpoint's models (ADR 0146), by organization, under ids `custom:<credentialId>:<model>`: the
+ * credential in the id keeps two workspaces' models (and the catalog's ids) apart. Never in `listedModels`.
+ */
+let custom = new Map<string, Map<string, ModelInfo>>();
+/**
+ * Every endpoint model this process has loaded, kept after it is removed or its key revoked: a call already running
+ * still settles its cost by it. Only `modelInfo` reads it; who may call a model is `customModelOf`.
+ */
+const lastKnown = new Map<string, ModelInfo>();
+const CUSTOM_ID = /^custom:([0-9a-f-]{36}):(.+)$/;
+
+export const customModelId = (credentialId: string, model: string) => `custom:${credentialId}:${model}`;
+
+/** The credential and the endpoint's own model id of a `custom:` id; null for any other id. */
+export function parseCustomModel(id: string): { credentialId: string; model: string } | null {
+  const m = CUSTOM_ID.exec(id);
+  return m?.[1] && m[2] ? { credentialId: m[1], model: m[2] } : null;
+}
+
+export const isCustomModel = (id: string) => CUSTOM_ID.test(id);
+
+/** Replaces an organization's endpoint models (full ids); an empty record forgets them. */
+export function setCustomModels(orgId: string, models: Record<string, ModelInfo>) {
+  custom = new Map(custom);
+  for (const [id, info] of Object.entries(models)) lastKnown.set(id, info);
+  if (Object.keys(models).length === 0) custom.delete(orgId);
+  else custom.set(orgId, new Map(Object.entries(models)));
+}
+
+/** An organization's endpoint models, in the order they were set. */
+export const customModelsOf = (orgId: string): [string, ModelInfo][] => [...(custom.get(orgId) ?? [])];
+
+/** One endpoint model of this organization; undefined for another workspace's. */
+export const customModelOf = (orgId: string, id: string) => custom.get(orgId)?.get(id);
+
+/**
+ * A model of the catalog, of a list read at run time or of an endpoint loaded in this process (also one removed
+ * since, for the cost of a call still running); undefined for any other id.
+ */
+export function modelInfo(model: string): ModelInfo | undefined {
+  if (Object.hasOwn(MODEL_CATALOG, model)) return MODEL_CATALOG[model];
+  return isCustomModel(model) ? lastKnown.get(model) : listed.get(model);
+}
 
 /** Every model: the catalog's, then the listed ones in their list's order. */
 export const listedModels = (): [string, ModelInfo][] => [...Object.entries(MODEL_CATALOG), ...listed];

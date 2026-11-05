@@ -1,6 +1,7 @@
 import type { AppLocale } from "@agenteschat/i18n/locale";
 import type { DashboardsApi } from "../dashboards/api";
 import type { OnboardingStepId } from "../lib/onboarding";
+import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
 import type { WikiAccess } from "../lib/wiki";
 import type {
   SecretToVaultInput,
@@ -35,6 +36,7 @@ import type {
   AgentDetail,
   AgentForYou,
   AgentGroup,
+  AgentGroupPatch,
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
@@ -46,6 +48,7 @@ import type {
   AgentSetupResult,
   AgentSkill,
   AgentStatus,
+  AgentStyle,
   AgentUsage,
   AiAccounts,
   AiStatus,
@@ -111,17 +114,11 @@ import type {
   DirectMessage,
   DmRead,
   DmTarget,
+  EndpointCheck,
+  EndpointModel,
+  EndpointStyle,
   ForeignMailbox,
   FormerAgent,
-  ForumParticipantsInput,
-  ForumPost,
-  ForumPostInput,
-  ForumSuggestedIssue,
-  ForumSuggestion,
-  ForumSuggestionOverrides,
-  ForumTopic,
-  ForumTopicDetail,
-  ForumTopicInput,
   GifKey,
   GifPage,
   GifQuery,
@@ -278,6 +275,9 @@ import type {
   TaskOutput,
   TaskSteps,
   Team,
+  TeamAgentDraft,
+  TeamProposalCard,
+  TeamTemplate,
   ThreadAction,
   ThreadCreateInput,
   ThreadFilters,
@@ -434,6 +434,8 @@ export interface ApiClient {
     setStart(orgId: string, input: { page: StartPage; channelId?: string | null }): Promise<StartChoice>;
     /** Whether I see what agents did under each reply here, on every device. */
     setShowActivity(orgId: string, show: boolean): Promise<boolean>;
+    /** How agents talk to me here (ADR 0147), for every agent. */
+    setAgentStyle(orgId: string, style: AgentStyle): Promise<AgentStyle>;
     /** Where I put the tools at the top of my sidebar here (only the ones I moved). */
     sidebarItems(orgId: string): Promise<SidebarItems>;
     /** Moves one tool (`null`: back on its default), my others as the server has them. Answers with every choice. */
@@ -524,6 +526,11 @@ export interface ApiClient {
     requestMoreUsage(orgId: string): Promise<{ requestedAt: string }>;
     raisePersonLimit(orgId: string, userId: string, limitUsd: number): Promise<void>;
     refuseMoreUsage(orgId: string, userId: string): Promise<void>;
+    /** Lodi's weekly card (ADR 0137 §9): when mine comes, or that it is off. */
+    teamWeek(orgId: string): Promise<TeamWeekPrefs>;
+    setTeamWeek(orgId: string, patch: Partial<Omit<TeamWeekPrefs, "timezone">>): Promise<TeamWeekPrefs>;
+    /** A row of my weekly card applied as me (a routine, a message), or "Agora não". */
+    actOnTeamWeek(orgId: string, messageId: string, act: TeamWeekAct): Promise<void>;
     /** The audit log, newest first (admins): agents' tool calls and people's changes. `before`: `next`. */
     audit(orgId: string, query?: AuditQuery & { before?: string; limit?: number }): Promise<AuditPage>;
   };
@@ -542,9 +549,12 @@ export interface ApiClient {
   agentGroups: {
     list(orgId: string): Promise<AgentGroup[]>;
     /** After the other groups, with `agentIds` in it in that order (out of any group they were in). */
-    create(orgId: string, input: { name: string; agentIds?: string[] }): Promise<AgentGroup[]>;
+    create(
+      orgId: string,
+      input: { name: string; agentIds?: string[]; color?: string; icon?: string },
+    ): Promise<AgentGroup[]>;
     /** Renames it, or moves it among the groups (`index`). */
-    update(orgId: string, groupId: string, patch: { name?: string; index?: number }): Promise<AgentGroup[]>;
+    update(orgId: string, groupId: string, patch: AgentGroupPatch): Promise<AgentGroup[]>;
     /** Its agents go back to no group. */
     remove(orgId: string, groupId: string): Promise<AgentGroup[]>;
     /** Into a group at `index` among its agents (the end without one), or out of any (`groupId` null). */
@@ -556,6 +566,11 @@ export interface ApiClient {
     planUsage(orgId: string, agentId: string): Promise<AgentPlanUsage>;
     /** The agents as a team: grouped by person, with who consulted whom in the last day. */
     team(orgId: string): Promise<Team>;
+    /** The team map's drag (ADR 0148): the right hand's settings card in my DM with it; nothing changes yet. */
+    proposeChannelMove(
+      orgId: string,
+      input: { agentId: string; fromChannelId: string | null; toChannelId: string; reason: string },
+    ): Promise<{ channelId: string; messageId: string; rightHandId: string }>;
     create(orgId: string, input: AgentInput): Promise<Agent>;
     /** An agent's proposal of a new agent, by its card's message (ADR 0081). */
     proposal(orgId: string, messageId: string): Promise<AgentProposal>;
@@ -574,6 +589,28 @@ export interface ApiClient {
     proposalRoutine(orgId: string, messageId: string): Promise<AgentProposal>;
     /** Says no to it (who may create agents): the card stays, marked denied. */
     denyProposal(orgId: string, messageId: string): Promise<AgentProposal>;
+    /** "Criar o time" on the right hand's team card: everything at once, or nothing and the card's `error`. */
+    createTeam(orgId: string, messageId: string): Promise<{ card: TeamProposalCard; noAi?: string[] }>;
+    denyTeam(orgId: string, messageId: string): Promise<{ card: TeamProposalCard }>;
+    /** "Desfazer" on the team's receipt, within a day. */
+    undoTeam(orgId: string, messageId: string): Promise<{ card: TeamProposalCard }>;
+    /** "Ajustar": one agent's draft on the open card. */
+    adjustTeamAgent(
+      orgId: string,
+      messageId: string,
+      handle: string,
+      patch: Partial<Pick<TeamAgentDraft, "name" | "role" | "line" | "instructions" | "channel">> & {
+        firstTask?: string;
+      },
+    ): Promise<{ card: TeamProposalCard }>;
+    /** "Ver modelos de time": the templates in `locale`. */
+    teamTemplates(orgId: string, locale?: string): Promise<TeamTemplate[]>;
+    /** "Usar este modelo": its card, then the right hand's first question, in the person's DM with it. */
+    applyTeamTemplate(
+      orgId: string,
+      templateId: string,
+      locale?: string,
+    ): Promise<{ channelId: string; messageId: string }>;
     /** Decides an agent's proposal of costly work nobody asked for (ADR 0131): its card's `signalId`. */
     decideCostly(orgId: string, signalId: string, decision: CostlyDecision): Promise<{ state: CostlyDecision }>;
     update(orgId: string, agentId: string, input: Partial<AgentInput>): Promise<Agent>;
@@ -597,8 +634,21 @@ export interface ApiClient {
         /** OpenAI: organization and project (expected; the backend is adding OpenAI). */
         organizationId?: string | null;
         projectId?: string | null;
+        /** `custom` only: the endpoint's address, API and models (ADR 0146). */
+        endpoint?: { style: EndpointStyle; baseURL: string; models: EndpointModel[] };
       },
-    ): Promise<Credential>;
+    ): Promise<Credential & { checks?: EndpointCheck[] }>;
+    /** What an endpoint lists before it is saved (admins): its address as stored, its models, or why none. */
+    endpointModels(
+      orgId: string,
+      input: { style: EndpointStyle; baseURL: string; apiKey?: string },
+    ): Promise<{ baseURL: string; models: { id: string; label?: string }[]; error?: string }>;
+    /** Changes an endpoint's models and prices, then tests each again. */
+    setEndpointModels(
+      orgId: string,
+      credentialId: string,
+      models: EndpointModel[],
+    ): Promise<{ models: EndpointModel[]; checks: EndpointCheck[] }>;
     /** Replaces the key, keeping the id (agents keep using it). */
     rotateCredential(
       orgId: string,
@@ -1309,39 +1359,9 @@ export interface ApiClient {
       slug: string,
       input: {
         text: string;
-        source: { kind: "message"; channelId: string; messageId: string } | { kind: "forum"; topicId: string };
+        source: { kind: "message"; channelId: string; messageId: string };
       },
     ): Promise<WikiPage>;
-  };
-  /** The forum: agents (and seated people) discuss a question in rounds and end with a synthesis. */
-  forum: {
-    list(orgId: string): Promise<ForumTopic[]>;
-    get(orgId: string, topicId: string): Promise<ForumTopicDetail>;
-    create(orgId: string, input: ForumTopicInput): Promise<ForumTopicDetail>;
-    /** A person's post: their seated turn, or it leads the next round; `requestRound` asks for one more. */
-    post(orgId: string, topicId: string, input: ForumPostInput): Promise<ForumPost>;
-    /** No more turns; the synthesis is written next. */
-    conclude(orgId: string, topicId: string): Promise<ForumTopicDetail>;
-    cancel(orgId: string, topicId: string): Promise<ForumTopicDetail>;
-    /** "Passar a vez": my seated turn goes by. */
-    pass(orgId: string, topicId: string): Promise<ForumTopicDetail>;
-    /** "Retomar": a stalled topic starts the stopped turn again. */
-    resume(orgId: string, topicId: string): Promise<ForumTopicDetail>;
-    participants(orgId: string, topicId: string, input: ForumParticipantsInput): Promise<ForumTopicDetail>;
-    /** Creates the approved suggested issues (sub-issues of the origin issue, when there is one). */
-    createIssues(
-      orgId: string,
-      topicId: string,
-      items: ForumSuggestedIssue[],
-    ): Promise<{ numbers: number[]; issues: { id: string; number: number; title: string }[] }>;
-    /** "Abrir fórum" on an agent's suggestion (the card's message); it is mine. */
-    acceptSuggestion(
-      orgId: string,
-      messageId: string,
-      overrides?: ForumSuggestionOverrides,
-    ): Promise<{ topic: ForumTopicDetail; suggestion: ForumSuggestion }>;
-    /** "Agora não": the card stays, marked dismissed. */
-    dismissSuggestion(orgId: string, messageId: string): Promise<{ suggestion: ForumSuggestion }>;
   };
   /** My inbox in this organization: mentions, replies, what waits on me. */
   notifications: {

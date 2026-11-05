@@ -454,7 +454,7 @@ export async function reportRunFailure(
   if (run.background || UNREPORTED.has(reason)) return;
   try {
     const channel = await getChannelCached(deps.db, run.orgId, run.channelId);
-    if (!channel || channel.kind === "forum") return;
+    if (!channel) return;
     // A hand-off's run in the agents' DM: no person can open that DM, and its failure already reaches the asker
     // and the hand-off's line where the work came from (`onConsultedRunFinished`).
     if (isAgentOnlyDm(channel) && (await handedOffRun(deps.db, run))) return;

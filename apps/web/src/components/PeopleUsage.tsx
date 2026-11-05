@@ -117,7 +117,8 @@ export function UsageTabs({ summary, person }: { summary: ReactNode; person?: st
   );
 }
 
-function PeopleTab({ person }: { person?: string }) {
+/** Uso › Pessoas for who sees money (ADR 0141): each person's use, or the limits. Equipe's Governança e uso shows it too. */
+export function PeopleTab({ person }: { person?: string }) {
   const { t } = useTranslation();
   const [view, setView] = useState<"usage" | "limits">("usage");
   const segmented = (

@@ -647,7 +647,7 @@
     "noneForYou": "あなたと一緒に作業するエージェントはまだいません。",
     "noneForYouHint": "管理者にアクセスを依頼してください。",
     "freeSection": "空き",
-    "noGroupSection": "グループなし"
+    "noGroupSection": "部署なし"
   },
   "agentEdit": {
     "missing": "このエージェントはもう存在しません。",
@@ -727,8 +727,6 @@
       "issue_assigned_other": "あなたへのタスク",
       "issue_comment_other": "{{names}}がタスクにコメントしました",
       "issue_status_other": "{{names}}がタスクを変更しました",
-      "forum_turn_other": "フォーラムであなたの番です",
-      "forum_synthesis_other": "フォーラムのまとめができました",
       "approval_other": "{{names}}が承認を求めています",
       "mission_finished_other": "ミッションが完了しました",
       "mission_stopped_other": "ミッションが停止しました",
@@ -999,7 +997,6 @@
     "loadFailed": "タスクを読み込めませんでした。",
     "createdBy": "作成者: {{name}}",
     "fromMessage": "メッセージから",
-    "fromForum": "フォーラムから",
     "fromAgent": "エージェントへの依頼から",
     "fromWebhook": "{{provider}}から",
     "workingFor_other": "{{count}}分間作業中",
@@ -1162,7 +1159,6 @@
     "kind": {
       "approval": "承認",
       "question": "質問",
-      "forum": "あなたの番",
       "browser": "ブラウザ",
       "secret": "シークレット",
       "join": "メンバー",
@@ -1274,7 +1270,6 @@
         "wiki": "Wiki",
         "skills": "スキル",
         "schedule": "ルーティン",
-        "forum": "フォーラム",
         "sandbox": "専用コンピューター",
         "browser": "ブラウザ",
         "setup": "ワークスペースの設定",
@@ -1947,5 +1942,9 @@
         "proposal": "ダッシュボード"
       }
     }
+  },
+  "team": {
+    "entry": "一覧、組織図、マップ",
+    "mapHint": "エージェントを別のチャンネルに移すには、Web のマップを使うか {{name}} に話しかけてください。"
   }
 }

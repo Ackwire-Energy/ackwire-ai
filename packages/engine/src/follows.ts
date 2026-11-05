@@ -6,7 +6,7 @@ const { threadFollows, messages } = schema;
  * Who follows a thread (the inbox and the phone app's "Seguir"). A person's
  * explicit choice (`thread_follows`) wins: following adds them, unfollowing
  * mutes them even where they wrote. Without one, they follow the threads
- * they started (not a routine's or the forum's root) or wrote in.
+ * they started (not a routine's root) or wrote in.
  *
  * Following means: notified of replies (`thread_reply`), and replies count
  * as unread in the channel list.
@@ -16,7 +16,7 @@ export function followsThreadSql(orgId: string | SQL, userId: string | SQL, root
     (select tf.following from ${threadFollows} tf
       where tf.org_id = ${orgId}::uuid and tf.root_message_id = ${root} and tf.user_id = ${userId}),
     exists (select 1 from ${messages} fr where fr.org_id = ${orgId}::uuid and fr.id = ${root}
-      and fr.author_user_id = ${userId} and fr.meta->'routine' is null and fr.meta->'forum' is null)
+      and fr.author_user_id = ${userId} and fr.meta->'routine' is null)
     or exists (select 1 from ${messages} fp where fp.org_id = ${orgId}::uuid and fp.thread_id = ${root}
       and fp.author_user_id = ${userId} and fp.deleted_at is null)
   )`;

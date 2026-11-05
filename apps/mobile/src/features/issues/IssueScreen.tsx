@@ -234,13 +234,11 @@ function Head({ issue: i }: { issue: Issue }) {
   const from =
     i.source.type === "message"
       ? t("mobile.issues.fromMessage")
-      : i.source.type === "forum"
-        ? t("mobile.issues.fromForum")
-        : i.source.type === "agent"
-          ? t("mobile.issues.fromAgent")
-          : i.source.type === "webhook"
-            ? t("mobile.issues.fromWebhook", { provider: i.source.provider })
-            : null;
+      : i.source.type === "agent"
+        ? t("mobile.issues.fromAgent")
+        : i.source.type === "webhook"
+          ? t("mobile.issues.fromWebhook", { provider: i.source.provider })
+          : null;
   const creator = dir.nameOf(i.createdBy);
   // It starts the line now, under the title.
   const line = capitalize(

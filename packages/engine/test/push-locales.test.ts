@@ -7,7 +7,6 @@ import { PUSH_BODY_MAX, PUSH_TITLE_MAX, pushStrings, renderPush } from "../src/p
 const KINDS = [
   "approval",
   "agent_question",
-  "forum_turn",
   "mention",
   "dm",
   "agent_reply",
@@ -48,10 +47,10 @@ test("every push kind in every language: words, within the phone's limits (ADR 0
 test("a language without a word says it in English", () => {
   PUSH.ru = {};
   try {
-    expect(pushStrings("ru").forumTitle).toBe(pushStrings("en").forumTitle);
+    expect(pushStrings("ru").questionBody).toBe(pushStrings("en").questionBody);
   } finally {
     PUSH.ru = ru;
   }
-  expect(pushStrings("ru").forumTitle).not.toBe(pushStrings("en").forumTitle);
-  expect(pushStrings("pt-BR").forumTitle).not.toBe(pushStrings("en").forumTitle);
+  expect(pushStrings("ru").questionBody).not.toBe(pushStrings("en").questionBody);
+  expect(pushStrings("pt-BR").questionBody).not.toBe(pushStrings("en").questionBody);
 });

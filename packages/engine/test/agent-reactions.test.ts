@@ -5,12 +5,16 @@ import { systemText } from "@agenteschat/providers";
 import {
   addAgentReaction,
   addReaction,
+  createAgent,
+  createChannel,
   drainOutbox,
   ForbiddenError,
   grantScopes,
+  insertMessage,
   listMessageReactions,
   listMessages,
   listReactions,
+  NEW_AGENT_DEFAULTS,
   normalizeReaction,
   postPersonMessage,
   removeReaction,
@@ -154,6 +158,170 @@ describe("react (reaction instead of reply)", () => {
       .from(r)
       .where(and(eq(r.orgId, f.org.id), eq(r.messageId, m.id)));
     expect(rows).toHaveLength(2);
+  });
+});
+
+describe("react to someone else's message (`to`)", () => {
+  /** "reaja ao Caio" reacts with 👍 `to` whoever follows "ao", then says so in words, as models do. */
+  const askedTo = (req: ModelRequest) => {
+    const last = lastText(req);
+    if (last.includes("tool_result")) return { chunks: ["Reagi com 👍 à mensagem do Caio."] };
+    // The latest ask: the turn's text also carries the earlier ones.
+    const to = [...last.matchAll(/reaja ao (\S+?)["\\]/g)].at(-1)?.[1];
+    if (to) return { chunks: [], toolUses: [{ name: "react", input: { emoji: "👍", to } }] };
+    return { chunks: [], toolUses: [{ name: "react", input: { emoji: "🙌" } }] };
+  };
+  const toolResult = () =>
+    f.provider.calls.map((c) => lastText(c.request as ModelRequest)).find((t) => t.includes("tool_result")) ?? "";
+  const byAgent = (agentId: string, body: string, threadId: string | null = null) =>
+    insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      threadId,
+      author: { type: "agent", agentId, runId: null, hop: 1, stretchId: null },
+      body,
+    });
+  const caio = () => createAgent(f.db, f.owner.id, f.org.id, { name: "Caio", handle: "caio" }, NEW_AGENT_DEFAULTS);
+
+  test("reacts to the named agent's latest message, not the request, says which, and posts no text", async () => {
+    f = await setup({ react: true, reply: askedTo });
+    const p = await caio();
+    await byAgent(p.id, "Primeiro rascunho");
+    const latest = await byAgent(p.id, "Fechei o relatório de vendas de outubro com os números finais");
+    const ask = await post("@dev reaja ao @Caio");
+    await drainOutbox(f.db, f.handlers);
+
+    // 👍 is stored as "+1".
+    expect(await listReactions(f.db, f.org.id, latest.id)).toEqual([
+      { reaction: "+1", count: 1, userIds: [], agentIds: [f.agent.id] },
+    ]);
+    expect(await listReactions(f.db, f.org.id, ask.id)).toEqual([]);
+    expect(toolResult()).toContain('Reacted 👍 to Caio (@caio): \\"Fechei o relatório de vendas de outubro');
+    expect((await agentMessages()).filter((m) => m.authorAgentId === f.agent.id)).toEqual([]);
+  });
+
+  test("in a thread, the author's latest message in that thread, even when the channel has a newer one", async () => {
+    f = await setup({ react: true, reply: askedTo });
+    const p = await caio();
+    const root = await post("Plano da semana");
+    const inThread = await byAgent(p.id, "Topo, sigo com o plano", root.id);
+    const outside = await byAgent(p.id, "Outra coisa no canal");
+    await post("@dev reaja ao caio", { threadId: root.id });
+    await drainOutbox(f.db, f.handlers);
+
+    expect((await listReactions(f.db, f.org.id, inThread.id)).map((r) => r.reaction)).toEqual(["+1"]);
+    expect(await listReactions(f.db, f.org.id, outside.id)).toEqual([]);
+  });
+
+  test("a person by first name; nobody by that name reacts to nothing and says so", async () => {
+    f = await setup({ react: true, reply: askedTo });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia Lima");
+    const theirs = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: bia.id },
+      body: "Subi a versão nova",
+    });
+    await post("@dev reaja ao Bia");
+    await drainOutbox(f.db, f.handlers);
+    expect((await listReactions(f.db, f.org.id, theirs.id)).map((r) => r.reaction)).toEqual(["+1"]);
+    expect(toolResult()).toContain('to Bia Lima: \\"Subi a versão nova\\"');
+
+    const before = f.provider.calls.length;
+    const ask = await post("@dev reaja ao Ninguém");
+    await drainOutbox(f.db, f.handlers);
+    expect(await listReactions(f.db, f.org.id, ask.id)).toEqual([]);
+    const result = f.provider.calls
+      .slice(before)
+      .map((c) => lastText(c.request as ModelRequest))
+      .find((t) => t.includes("tool_result"));
+    expect(result).toContain("No message from Ninguém in this conversation: nothing was reacted to.");
+  });
+
+  test("`quote` picks an older message of that author; words nobody wrote react to nothing", async () => {
+    const quoting = (req: ModelRequest) => {
+      const last = lastText(req);
+      if (last.includes("tool_result")) return { chunks: [""] };
+      const q = [...last.matchAll(/reaja ao bom (\S+?)["\\]/g)].at(-1)?.[1];
+      return q
+        ? { chunks: [], toolUses: [{ name: "react", input: { emoji: "👍", to: "@caio", quote: `Bom ${q}` } }] }
+        : { chunks: [], toolUses: [{ name: "react", input: { emoji: "🙌" } }] };
+    };
+    f = await setup({ react: true, reply: quoting });
+    const p = await caio();
+    const morning = await byAgent(p.id, "Bom dia, pessoal! ☀️ Bom dia a todos.");
+    const relay = await byAgent(p.id, "@dev a Ana pediu para reagirem à minha mensagem");
+    await post("@dev reaja ao bom dia");
+    await drainOutbox(f.db, f.handlers);
+    expect((await listReactions(f.db, f.org.id, morning.id)).map((r) => r.reaction)).toEqual(["+1"]);
+    expect(await listReactions(f.db, f.org.id, relay.id)).toEqual([]);
+    expect(toolResult()).toContain('Caio (@caio): \\"Bom dia, pessoal!');
+
+    const before = f.provider.calls.length;
+    await post("@dev reaja ao bom almoço");
+    await drainOutbox(f.db, f.handlers);
+    const result = f.provider.calls
+      .slice(before)
+      .map((c) => lastText(c.request as ModelRequest))
+      .find((t) => t.includes("tool_result"));
+    expect(result).toContain("nothing was reacted to");
+  });
+
+  test("without `to`, the result names the message being answered", async () => {
+    f = await setup({ react: true, reply: askedTo });
+    await post("@dev valeu pela ajuda");
+    await drainOutbox(f.db, f.handlers);
+    expect(toolResult()).toContain("Reacted 🙌 to the message you are answering,");
+    expect(toolResult()).toContain("valeu pela ajuda");
+  });
+
+  test("a first name two authors share reacts to nothing and lists them; a handle picks one", async () => {
+    f = await setup({ react: true, reply: askedTo });
+    const lima = await addMember(f.db, f.org.id, "member", "Bia Lima");
+    const souza = await addMember(f.db, f.org.id, "member", "Bia Souza");
+    const byPerson = (userId: string, body: string) =>
+      insertMessage(f.db, { orgId: f.org.id, channelId: f.general.id, author: { type: "person", userId }, body });
+    const limas = await byPerson(lima.id, "Subi a versão nova");
+    const souzas = await byPerson(souza.id, "Revisei o contrato");
+
+    const ask = await post("@dev reaja ao Bia");
+    await drainOutbox(f.db, f.handlers);
+    for (const id of [limas.id, souzas.id, ask.id]) expect(await listReactions(f.db, f.org.id, id)).toEqual([]);
+    expect(toolResult()).toContain("Bia names more than one author here: ");
+    expect(toolResult()).toContain("Bia Lima");
+    expect(toolResult()).toContain("Bia Souza");
+
+    await f.db
+      .update(schema.organizationMembers)
+      .set({ handle: "bia" })
+      .where(eq(schema.organizationMembers.userId, lima.id));
+    await post("@dev reaja ao @bia");
+    await drainOutbox(f.db, f.handlers);
+    expect((await listReactions(f.db, f.org.id, limas.id)).map((r) => r.reaction)).toEqual(["+1"]);
+    expect(await listReactions(f.db, f.org.id, souzas.id)).toEqual([]);
+  });
+
+  test("a message_id outside this conversation is refused", async () => {
+    let elsewhereId = "";
+    f = await setup({
+      react: true,
+      reply: (req) =>
+        lastText(req).includes("tool_result")
+          ? { chunks: [] }
+          : { chunks: [], toolUses: [{ name: "react", input: { emoji: "👍", message_id: elsewhereId } }] },
+    });
+    const eng = await createChannel(f.db, f.owner.id, f.org.id, { name: "eng" });
+    const elsewhere = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: eng.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "Em outro canal",
+    });
+    elsewhereId = elsewhere.id;
+    await post("@dev reaja àquela mensagem");
+    await drainOutbox(f.db, f.handlers);
+    expect(await listReactions(f.db, f.org.id, elsewhere.id)).toEqual([]);
+    expect(toolResult()).toContain("No such message in this conversation.");
   });
 });
 

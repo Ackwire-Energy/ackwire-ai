@@ -1608,7 +1608,7 @@
     "value": "Free"
   },
   "agents.noGroupSection": {
-    "value": "No group"
+    "value": "No department"
   },
   "agentEdit.missing": {
     "value": "This agent no longer exists."
@@ -1821,18 +1821,6 @@
     "value": {
       "one": "{{names}} changed a task",
       "other": "{{names}} changed a task"
-    }
-  },
-  "activity.kind.forum_turn": {
-    "value": {
-      "one": "Your turn in the forum",
-      "other": "Your turn in the forum"
-    }
-  },
-  "activity.kind.forum_synthesis": {
-    "value": {
-      "one": "Forum summary ready",
-      "other": "Forum summary ready"
     }
   },
   "activity.kind.approval": {
@@ -2643,9 +2631,6 @@
   "issues.fromMessage": {
     "value": "from a message"
   },
-  "issues.fromForum": {
-    "value": "from the forum"
-  },
   "issues.fromAgent": {
     "value": "from a request to an agent"
   },
@@ -3048,9 +3033,6 @@
   "activityNow.kind.question": {
     "value": "Question"
   },
-  "activityNow.kind.forum": {
-    "value": "Your turn"
-  },
   "activityNow.kind.browser": {
     "value": "Browser"
   },
@@ -3314,9 +3296,6 @@
   },
   "intentAgents.uses.area.schedule": {
     "value": "Routines"
-  },
-  "intentAgents.uses.area.forum": {
-    "value": "Forum"
   },
   "intentAgents.uses.area.sandbox": {
     "value": "Own computer"
@@ -4982,5 +4961,11 @@
       "one": "{{names}} connected your {{plan}} plan to {{agent}}",
       "other": "{{names}} connected your {{plan}} plan to {{agent}}"
     }
+  },
+  "team.entry": {
+    "value": "List, org chart and map"
+  },
+  "team.mapHint": {
+    "value": "To move an agent to another channel, use the map on the web or talk to {{name}}."
   }
 }

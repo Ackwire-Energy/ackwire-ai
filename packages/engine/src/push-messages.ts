@@ -84,8 +84,6 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     }
     case "agent_question":
       return out(s.questionTitle(actor), text || s.questionBody);
-    case "forum_turn":
-      return out(s.forumTitle, what || s.forumBody);
     case "mention":
       return out(s.mentionTitle(actor), text || s.openBody);
     case "dm":

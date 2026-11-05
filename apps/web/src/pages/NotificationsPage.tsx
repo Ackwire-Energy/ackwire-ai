@@ -7,8 +7,6 @@ import {
   useApproval,
   useApprovals,
   useChannels,
-  useForumAction,
-  useForumTopic,
   useNotificationAction,
   useNotificationCount,
   useNotificationReply,
@@ -192,7 +190,6 @@ function SourceChip({
     [icon, label] = ["computer", t("notifications.source.machine")];
   else if (n.kind === "plan_lent") [icon, label] = ["bulb", t("settings.section.keys")];
   else if (n.kind === "browser_handoff") [icon, label] = ["globe", t("notifications.source.browser")];
-  else if (s.topicId) [icon, label] = ["message", t("notifications.source.forum")];
   else if (s.issueNumber != null)
     [icon, label] = ["issues", t("notifications.source.issue", { number: s.issueNumber })];
   else if (n.kind === "mission_finished" || n.kind === "mission_stopped")
@@ -243,7 +240,6 @@ function statusName(t: TFunction, value: string | undefined) {
 function placeholderFor(t: TFunction, n: AppNotification, dir: Dir, channelName: (id: string) => string) {
   const target = replyTarget(n);
   if (!target) return t("notifications.composer.reply");
-  if (target.kind === "forum") return t("notifications.composer.forum");
   if (target.kind === "issue")
     return n.source.issueNumber != null
       ? t("notifications.composer.issue", { number: n.source.issueNumber })
@@ -644,8 +640,7 @@ function Row({
       : (n.kind === "mission_finished" ||
             n.kind === "mission_stopped" ||
             n.kind.startsWith("routine_") ||
-            n.kind === "agent_unreached" ||
-            n.kind === "forum_synthesis") &&
+            n.kind === "agent_unreached") &&
           n.source.label
         ? n.source.label
         : origin
@@ -837,72 +832,6 @@ function Row({
   );
 }
 
-/** The seats at the table this round: who spoke, me (my turn), who comes later. */
-function Seats({ topicId, dir }: { topicId: string; dir: Dir }) {
-  const { t } = useTranslation();
-  const { org, me } = useOrg();
-  const topic = useForumTopic(org.id, topicId);
-  const data = topic.data;
-  if (!data) return null;
-  const entries = data.track.rounds.find((r) => r.round === data.round)?.entries ?? [];
-  const lastTurn = [...data.posts].reverse().find((p) => p.kind === "turn" || p.kind === "seat");
-  return (
-    <>
-      {entries.length > 0 && (
-        <div className="nt-seats">
-          {entries.map((e) => {
-            const mine = e.seat.type === "person" && e.seat.id === me.user.id;
-            const actor: NotificationActor = { type: e.seat.type === "agent" ? "agent" : "user", id: e.seat.id };
-            return (
-              <span key={`${e.seat.type}:${e.seat.id}`} className={cx("nt-seat", mine && "nt-seat--me")}>
-                <Face actor={actor} dir={dir} size="sm" className="nt-av20" />
-                <b>{mine ? t("notifications.wait.seatYou") : nameOf(t, dir, actor)}</b>
-                {mine && e.status === "waiting" ? (
-                  t("notifications.wait.seatYours")
-                ) : e.status === "spoke" ? (
-                  <>
-                    <Icon name="check" size={14} className="nt-ok" />
-                    {t("notifications.wait.seatSpoke")}
-                  </>
-                ) : e.status === "passed" || e.status === "skipped" || e.status === "skipped_budget" ? (
-                  t("notifications.wait.seatPassed")
-                ) : (
-                  t("notifications.wait.seatLater")
-                )}
-              </span>
-            );
-          })}
-        </div>
-      )}
-      {lastTurn && (
-        <div className="nt-quote">
-          <span>
-            <b>
-              {t("notifications.speaker", {
-                name: nameOf(t, dir, {
-                  type: lastTurn.author.type === "agent" ? "agent" : "user",
-                  id: lastTurn.author.id,
-                }),
-              })}
-            </b>{" "}
-            {lastTurn.body}
-          </span>
-        </div>
-      )}
-    </>
-  );
-}
-
-/** The topic's deadline chip ("A rodada espera 1 h 50 min"), when it has one. */
-function RoundWaits({ topicId }: { topicId: string }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const topic = useForumTopic(org.id, topicId);
-  const left = topic.data?.deadline ? timeLeft(t, topic.data.deadline) : null;
-  if (!left) return null;
-  return <Chip icon="clock">{t("notifications.wait.roundWaits", { time: left })}</Chip>;
-}
-
 /**
  * An approval in one sentence (AprovacaoConector B): "Ada quer ver stack trace do evento", then the
  * connector's logo (its name in a tooltip), "Só lê", its values in words and the agent's why behind "Por quê?".
@@ -1059,7 +988,7 @@ function ApprovalActs({
   );
 }
 
-/** An item in "Esperando você": a card for an agent's question, my turn at the table or an approval, else a row. */
+/** An item in "Esperando você": a card for an agent's question or an approval, else a row. */
 function WaitCard({
   n,
   s,
@@ -1067,8 +996,6 @@ function WaitCard({
   dir,
   mine,
   resolving,
-  onPass,
-  passing,
   channelName,
 }: {
   n: AppNotification;
@@ -1077,8 +1004,6 @@ function WaitCard({
   dir: Dir;
   mine: string | null;
   resolving: boolean;
-  onPass: (n: AppNotification, el: HTMLElement) => void;
-  passing: boolean;
   channelName: (id: string) => string;
 }) {
   const { t, i18n } = useTranslation();
@@ -1135,7 +1060,7 @@ function WaitCard({
   );
   const approvalId = n.kind === "approval" ? n.source.approvalId : undefined;
   // What only points somewhere (a request to join, an agent's hand, an approval without its id) is one row.
-  if (n.kind !== "agent_question" && n.kind !== "forum_turn" && !approvalId)
+  if (n.kind !== "agent_question" && !approvalId)
     return (
       <WaitRow n={n} s={s} h={h} dir={dir} channelName={channelName} label={label} face={face} tail={tail}>
         {fuse}
@@ -1234,75 +1159,6 @@ function WaitCard({
           </Button>
           {tail}
         </div>
-      </>
-    );
-  } else if (n.kind === "forum_turn") {
-    meta = (
-      <>
-        <b>{name}</b>
-        <span>{t("notifications.wait.table")}</span>
-        <SourceChip n={n} channelName={channelName} />
-        <span>{whenText(t, i18n.language, n.createdAt)}</span>
-        <span className="nt-grow" />
-        {n.source.topicId && <RoundWaits topicId={n.source.topicId} />}
-      </>
-    );
-    head = (
-      <>
-        <h3>{l.title ?? n.source.label ?? l.text ?? ""}</h3>
-        <p className="nt-ctx">
-          {l.round && l.rounds
-            ? t("notifications.wait.yourTurn", { round: l.round, rounds: l.rounds })
-            : t("notifications.wait.yourTurnNoRound")}
-        </p>
-      </>
-    );
-    body = resolving ? (
-      <div className="nt-resolved">
-        <Spinner size={14} />
-        {t("notifications.wait.resolvedForum")}
-      </div>
-    ) : (
-      <>
-        {n.source.topicId ? <Seats topicId={n.source.topicId} dir={dir} /> : null}
-        {s.replying ? (
-          <Composer
-            id={n.id}
-            placeholder={placeholderFor(t, n, dir, channelName)}
-            draft={s.draft}
-            sending={s.sending}
-            onDraft={(text) => h.onDraft(n, text)}
-            onSend={() => h.onSend(n, s.draft)}
-            onCancel={h.onCancel}
-          />
-        ) : (
-          <div className="nt-wacts ac-acts">
-            <Button
-              variant="primary"
-              size="sm"
-              icon="message"
-              onClick={(e) => {
-                e.stopPropagation();
-                h.onReply(n);
-              }}
-            >
-              {t("notifications.wait.speak")}
-            </Button>
-            <Button
-              size="sm"
-              icon="arrowRight"
-              loading={passing}
-              disabled={passing}
-              onClick={(e) => {
-                e.stopPropagation();
-                onPass(n, e.currentTarget);
-              }}
-            >
-              {t("notifications.wait.pass")}
-            </Button>
-            {tail}
-          </div>
-        )}
       </>
     );
   } else if (approvalId) {
@@ -1499,7 +1355,6 @@ export function NotificationsPage() {
   const badge = useNotificationCount(org.id);
   const action = useNotificationAction(org.id);
   const reply = useNotificationReply(org.id);
-  const forum = useForumAction(org.id);
   const [cur, setCur] = useState<string | null>(null);
   const [replying, setReplying] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -1508,7 +1363,6 @@ export function NotificationsPage() {
   const [replied, setReplied] = useState<Record<string, string>>({});
   const [resolving, setResolving] = useState<string | null>(null);
   const [sending, setSending] = useState<string | null>(null);
-  const [passing, setPassing] = useState<string | null>(null);
   const later = useLater();
 
   const items = allItems(list.data);
@@ -1671,9 +1525,6 @@ export function NotificationsPage() {
             live.answered({ ...res.question, answer: res.question.answer ?? body });
             toast.show(t("notifications.toast.answered", { name }), "info", undefined, body);
             resolve(n);
-          } else if (res.kind === "forum") {
-            toast.show(t("notifications.toast.spoke"), "info", undefined, body);
-            resolve(n);
           } else {
             setReplied((r) => ({ ...r, [n.id]: body }));
             toast.show(
@@ -1685,21 +1536,6 @@ export function NotificationsPage() {
           }
         },
         onSettled: () => setSending(null),
-      },
-    );
-  };
-
-  const pass = (n: AppNotification) => {
-    if (!n.source.topicId) return;
-    setPassing(n.id);
-    forum.mutate(
-      { type: "pass", topicId: n.source.topicId },
-      {
-        onSuccess: () => {
-          leave(n, () => dropNotification(qc, org.id, n.id));
-          toast.show(t("notifications.toast.passed"), "info", undefined, t("notifications.toast.passedDetail"));
-        },
-        onSettled: () => setPassing(null),
       },
     );
   };
@@ -1962,8 +1798,6 @@ export function NotificationsPage() {
               dir={dir}
               mine={mine}
               resolving={resolving === n.id}
-              onPass={pass}
-              passing={passing === n.id}
               channelName={channelName}
             />
           ))}

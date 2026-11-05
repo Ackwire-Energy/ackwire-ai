@@ -100,7 +100,7 @@ const Org = z
     counts: z.object({
       members: z.number().int(),
       agents: z.number().int().openapi({ description: "Not archived." }),
-      channels: z.number().int().openapi({ description: "Channels and forums, not archived; no direct messages." }),
+      channels: z.number().int().openapi({ description: "Channels, not archived; no direct messages." }),
       machines: z.number().int().openapi({ description: "Connected computers." }),
       invitations: z.number().int().openapi({ description: "Pending: neither accepted nor expired." }),
     }),

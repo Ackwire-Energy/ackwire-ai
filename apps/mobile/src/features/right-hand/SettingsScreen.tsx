@@ -1,14 +1,26 @@
-import { type Agent, keys, useAgentBrain, useApi, useModelLabel, useRoles, useUpdateAgent } from "@agenteschat/client";
+import {
+  type Agent,
+  keys,
+  useAgentBrain,
+  useApi,
+  useModelLabel,
+  useRoles,
+  useSetTeamWeekPrefs,
+  useTeamWeekPrefs,
+  useUpdateAgent,
+} from "@agenteschat/client";
 import { audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { can } from "@agenteschat/client/lib/permissions";
 import { accountPlan } from "@agenteschat/client/lib/plans";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { rightHandOf } from "@agenteschat/client/lib/right-hand";
+import { dayText, hourText } from "@agenteschat/client/lib/team-week";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { EmptyState, fieldText, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
 import { openAgentEdit } from "../agents/AgentEditScreen";
@@ -193,6 +205,8 @@ function Form({ agent }: { agent: Agent }) {
       </View>
       <GroupedFooter>{t("rightHand.settings.budgetHelp", g)}</GroupedFooter>
 
+      <TeamWeekRows name={agent.name} />
+
       <GroupedHeader>{t("rightHand.settings.audience")}</GroupedHeader>
       <GroupedList>
         <GroupedRow
@@ -223,7 +237,98 @@ function Form({ agent }: { agent: Agent }) {
   );
 }
 
+/** "Semana da equipe" (ADR 0137 §9): the admin's own day and hour of Lodi's weekly card, or off, as on the web. */
+function TeamWeekRows({ name }: { name: string }) {
+  const { t, i18n } = useTranslation();
+  const { orgId, org } = useOrg();
+  const failed = useFailed();
+  const admin = can(org, "administrator");
+  const prefs = useTeamWeekPrefs(orgId, admin).data;
+  const set = useSetTeamWeekPrefs(orgId);
+  if (!admin || !prefs) return null;
+  const save = (patch: Parameters<typeof set.mutate>[0]) => set.mutate(patch, { onError: failed });
+  const locale = i18n.language;
+  return (
+    <>
+      <GroupedHeader>{t("teamWeek.settings.label")}</GroupedHeader>
+      <GroupedList>
+        <GroupedRow
+          icon="clock"
+          label={t("teamWeek.settings.label")}
+          toggle={!prefs.off}
+          onPress={() => save({ off: !prefs.off })}
+        />
+      </GroupedList>
+      {prefs.off ? null : (
+        <>
+          <Pills
+            label={t("teamWeek.schedule.day")}
+            value={prefs.day}
+            options={[1, 2, 3, 4, 5, 6, 0].map((d) => ({ value: d, label: dayText(locale, d) }))}
+            onPick={(day) => save({ day })}
+          />
+          <Pills
+            label={t("teamWeek.schedule.hour")}
+            value={prefs.hour}
+            options={Array.from({ length: 24 }, (_, h) => ({ value: h, label: hourText(locale, h) }))}
+            onPick={(hour) => save({ hour })}
+          />
+        </>
+      )}
+      <GroupedFooter>{t("teamWeek.settings.help", agentGrammar(name))}</GroupedFooter>
+    </>
+  );
+}
+
+/** A choice of a few short values as pills that wrap (the days, the hours), the picked one filled. */
+function Pills({
+  label,
+  value,
+  options,
+  onPick,
+}: {
+  label: string;
+  value: number;
+  options: { value: number; label: string }[];
+  onPick: (value: number) => void;
+}) {
+  const c = useColors();
+  return (
+    <View
+      accessibilityRole="radiogroup"
+      accessibilityLabel={label}
+      style={[styles.pills, { backgroundColor: c.raised }]}
+    >
+      <Text variant="footnote" tone="muted" style={styles.pillsLabel}>
+        {label}
+      </Text>
+      <View style={styles.pillRow}>
+        {options.map((o) => {
+          const on = o.value === value;
+          return (
+            <Pressable
+              key={o.value}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: on }}
+              onPress={() => !on && onPick(o.value)}
+              style={[styles.pill, { backgroundColor: on ? c.ink : c.sunken }]}
+            >
+              <Text variant="footnote" style={{ color: on ? c.bg : c.ink }}>
+                {o.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  pills: { borderRadius: 14, padding: 12, marginTop: 8, gap: 8 },
+  pillsLabel: { fontWeight: "600" },
+  pillRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  pill: { minHeight: 32, paddingHorizontal: 12, borderRadius: 12, borderBottomLeftRadius: 4, justifyContent: "center" },
   budget: {
     flexDirection: "row",
     alignItems: "center",

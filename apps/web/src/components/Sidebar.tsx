@@ -71,6 +71,7 @@ import {
   Popover,
   PresenceBadge,
   ProviderLogo,
+  RoleMark,
   Skeleton,
   SkeletonGroup,
   selectionSkyUrl,
@@ -627,6 +628,7 @@ export function Sidebar() {
               key={group.id}
               id={`group:${group.id}`}
               label={group.name}
+              mark={<RoleMark color={group.color ?? "graphite"} icon={group.icon ?? "person"} size={16} />}
               sections={sections}
               defaultOpen={groupsOpen}
               className="sidebar__section--category sidebar__section--group"
@@ -884,10 +886,13 @@ function SidebarSection({
   drop,
   className,
   headProps,
+  mark,
   children,
 }: {
   id: SectionId;
   label: string;
+  /** Before the label: a setor's color and icon. */
+  mark?: ReactNode;
   sections: ReturnType<typeof useSidebarSections>;
   /** Open until the person closes it (a long team's groups start closed). */
   defaultOpen?: boolean;
@@ -913,6 +918,7 @@ function SidebarSection({
           onClick={() => sections.toggle(id, defaultOpen)}
         >
           <Icon name="chevronDown" size={14} className="sidebar__section-chevron" />
+          {mark}
           <span className="sidebar__label">{label}</span>
         </button>
         {!open && summary}

@@ -771,7 +771,7 @@ function finish(state: StreamsState, runId: string): StreamsState {
 /**
  * A message its run posts while it goes on working, never its reply: a fast reply (`meta.talker`), and anything posted
  * while one of its calls runs, since a tool posts inside its call (`invokeWithChip` sends the call's start before the
- * tool runs, on every brain): a card (an agent's proposal, Connect, a forum topic, an event), a DM, a post in another
+ * tool runs, on every brain): a card (an agent's proposal, Connect, an event), a DM, a post in another
  * channel. Taken for the run's end, it froze the row with that call still running, and dropped every later event of the
  * run. A pause (an approval, a question) ends the row with its own event.
  */

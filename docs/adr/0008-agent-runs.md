@@ -51,8 +51,8 @@ free again.
   has that handle as their own now (it is theirs). It is kept per process (`caches.agents`), dropped by a rename, an
   archive or a deletion here and seen by another replica within the cache's TTL. `currentHandles` maps written
   handles through it, and every reader of a handle someone wrote asks it: a message's mentions (before the insert's
-  one statement) and the addressee check, `ask_agent`, `tell_agent`, `add_agent_to_channel`, `list_routines`, the forum
-  and setup tools (`agentsByHandle`), an issue's assignee, calendar participants and reflected lessons about an agent.
+  one statement) and the addressee check, `ask_agent`, `tell_agent`, `add_agent_to_channel`, `list_routines`, the setup
+  tools (`agentsByHandle`), an issue's assignee, calendar participants and reflected lessons about an agent.
   The agent list gives the apps each agent's (`previousHandles`, from `oldHandlesByAgent`), so an old message's "@ada"
   shows the agent now called Claudio (`agentsByAnyHandle` in `@agenteschat/client`, where an agent's own handle wins).
 - **What a run reads.** Text that names an old handle (a routine's brief, memory, instructions, the conversation) gets

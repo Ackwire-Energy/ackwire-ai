@@ -737,6 +737,22 @@ describe("markdown", () => {
     expect(blocks[3]).toMatchObject({ kind: "bullet", ordinal: "2" });
     expect(blocks[5]).toEqual({ kind: "code", lang: "ts", text: "const a = 1;" });
   });
+  test("blocks: <details> is one collapsed block whose body stays Markdown; a fenced one is code (ADR 0147)", () => {
+    const blocks = parseBlocks(
+      "Falta dar acesso.\n<details>\n<summary>Detalhes</summary>\n\nO app recebeu `403`.\n```\n</details>\n```\n</details>\nPronto.",
+    );
+    expect(blocks.map((b) => b.kind)).toEqual(["paragraph", "details", "paragraph"]);
+    expect(blocks[1]).toEqual({
+      kind: "details",
+      summary: [{ kind: "text", text: "Detalhes" }],
+      body: "O app recebeu `403`.\n```\n</details>\n```",
+    });
+    expect(parseBlocks("```\n<details>\n```").map((b) => b.kind)).toEqual(["code"]);
+    // Still being written: it runs to the end.
+    expect(parseBlocks("<details><summary>Mais</summary>\nlinha")).toEqual([
+      { kind: "details", summary: [{ kind: "text", text: "Mais" }], body: "linha" },
+    ]);
+  });
   test("blocks: a fence still being written is an open code block; a fence still opening is hidden", () => {
     expect(parseBlocks('Aqui:\n```chart\n{"type":"bar","ti')).toEqual([
       { kind: "paragraph", inline: [{ kind: "text", text: "Aqui:" }] },

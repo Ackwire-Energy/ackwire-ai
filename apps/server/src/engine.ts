@@ -19,6 +19,7 @@ import {
   CursorBrain,
   composioConnectorsOf,
   connectOverHttp,
+  createAgentStyleToolSource,
   createApprovalRequestToolSource,
   createArtifactToolSource,
   createAskAgentToolSource,
@@ -39,7 +40,6 @@ import {
   createDesktopToolSource,
   createFindAgentToolSource,
   createFollowUpToolSource,
-  createForumToolSource,
   createGitToolSource,
   createHandOffToolSource,
   createIssueToolSource,
@@ -363,6 +363,8 @@ export function buildEngine(o: EngineOptions) {
       createVaultToolSource(vault),
       // What the agent says it is doing, next to its name (ADR 0084).
       createSetStatusToolSource({ pubsub: adapters.pubsub }),
+      // How the person asked agents to talk to them (ADR 0147).
+      createAgentStyleToolSource(),
       createReactToolSource({ pubsub: adapters.pubsub }),
       // A GIF or the agent's sticker when asked (ADR 0091): listed by the workspace's switches and the agent's.
       createMediaToolSource({ pubsub: adapters.pubsub, gifs: adapters.gifs ?? null }),
@@ -402,8 +404,7 @@ export function buildEngine(o: EngineOptions) {
         hooks: hookConfig(config),
         connectors: connectorDeps,
       }),
-      createForumToolSource({ pubsub: adapters.pubsub, artifacts }),
-      createWikiToolSource({ pubsub: adapters.pubsub, search: context, artifacts }),
+      createWikiToolSource({ pubsub: adapters.pubsub, search: context }),
       createContextToolSource(context),
       createConnectorToolSource({ ...connectorDeps, artifacts, log: o.log, pubsub: adapters.pubsub }),
       // People's mailboxes (ADR 0038): only when the server has a mail path (Composio, IMAP).
