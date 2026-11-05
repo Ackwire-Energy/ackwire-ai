@@ -28,6 +28,7 @@ import { routineCreatorOf } from "../requester";
 import type { RoutineBrief } from "../routine-brief";
 import { addRunStep } from "../runs";
 import { describeWhen } from "../schedule";
+import { REQUEST_SECRET_TOOL } from "../secrets";
 import {
   callTargets,
   checkTeamAction,
@@ -41,6 +42,7 @@ import {
 import { carriesCredential, promptAnswer, toolCommand, toolDetail } from "../tool-detail";
 import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
+import { connectorFirst } from "./connector-first";
 import { type BlockedTool, compactSchema, presentTools, resolveCall } from "./directory";
 import { canonicalJson, validateJson } from "./json-schema";
 import { missingPermissions, REQUEST_PERMISSION_TOOL } from "./permission";
@@ -1012,6 +1014,17 @@ export function createToolGateway(deps: {
         const { why: given, ...rest } = call.input;
         repeatWhy = typeof given === "string" ? given : null;
         call = { ...call, input: rest };
+      }
+      // A key for a service we connect natively opens no card: the agent gets the way in. `person_said` is only ever
+      // offered by that answer, so the tool's schema doesn't carry it.
+      if (tool.name === REQUEST_SECRET_TOOL && !tool.connectionId) {
+        const { person_said: said, ...asked } = call.input;
+        call = { ...call, input: asked };
+        if (deps.catalog) {
+          const tools = { usable: await grantedFor(ctx, authority, all), all: [...all.values()] };
+          const way = await connectorFirst(ctx, deps.catalog, asked, String(said ?? ""), tools).catch(() => null);
+          if (way) return finish({ content: way, data: { code: "secret.connector_first" } });
+        }
       }
       const problems = validateJson(tool.inputSchema, call.input);
       if (problems.length > 0) {

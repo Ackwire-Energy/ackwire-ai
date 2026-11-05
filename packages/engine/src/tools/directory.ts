@@ -618,7 +618,7 @@ export function compactSchema(schema: JsonSchema) {
 }
 
 /** How a person gets a connector the agent lacks, in the app's words (and the Portuguese the app shows). */
-const HOW_TO_GET: Record<MissingConnector["state"], (label: string) => string> = {
+export const HOW_TO_GET: Record<MissingConnector["state"], (label: string) => string> = {
   not_connected: (label) =>
     `Not connected in this workspace: an admin connects it in Settings › Connectors and MCPs › Add connector › ${label} (in Portuguese, Configurações › Conectores e MCPs › Adicionar conector › ${label}).`,
   not_given: () =>
