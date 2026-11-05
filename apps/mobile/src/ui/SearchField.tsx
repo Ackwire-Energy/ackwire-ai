@@ -65,7 +65,8 @@ export function SearchField({
           minHeight: 42,
           paddingHorizontal: 12,
           borderRadius: 14,
-          backgroundColor: colors.sunken,
+          // The system's fill (a gray at 10%), so the field shows on white and on the grouped gray alike.
+          backgroundColor: colors.plate,
         }}
       >
         <Icon name="search" size={18} color={colors.faint} />

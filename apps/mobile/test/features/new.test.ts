@@ -66,14 +66,13 @@ describe("New: the search for a person or an agent", () => {
   });
 });
 
-describe("New: what the grid offers", () => {
+describe("New: what its Create list offers", () => {
   const all = ["create_agents", "create_channels", "post", "manage_routines", "edit_wiki", "invite_people"] as const;
 
   test("everything, in order, for who may do it all", () => {
     expect(createItems({ permissions: all }, { ownsAgent: false })).toEqual([
       "agent",
       "channel",
-      "chat",
       "task",
       "routine",
       "wiki",
@@ -81,13 +80,13 @@ describe("New: what the grid offers", () => {
     ]);
   });
 
-  test("a conversation for anyone; nothing else without its permission", () => {
-    expect(createItems({ permissions: [] }, { ownsAgent: false })).toEqual(["chat"]);
-    expect(createItems(null, { ownsAgent: false })).toEqual(["chat"]);
+  test("nothing without its permission (a conversation starts from the search, not from this list)", () => {
+    expect(createItems({ permissions: [] }, { ownsAgent: false })).toEqual([]);
+    expect(createItems(null, { ownsAgent: false })).toEqual([]);
   });
 
   test("a routine also for the owner of an agent", () => {
-    expect(createItems({ permissions: ["post"] }, { ownsAgent: true })).toEqual(["chat", "task", "routine"]);
+    expect(createItems({ permissions: ["post"] }, { ownsAgent: true })).toEqual(["task", "routine"]);
   });
 });
 

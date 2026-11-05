@@ -4,8 +4,8 @@ import type { ConversationRow } from "../chats/logic";
 import { matches } from "../search/logic";
 
 /**
- * The pure part of "New" (the "+" of the tabs): the agents in its row, who its search finds, what its grid offers
- * to create, and the name suggested for a new agent.
+ * The pure part of "New" (the "+" of the tabs): the agents in its row, who its search finds, what its "Create" list
+ * offers, and the name suggested for a new agent.
  */
 
 /**
@@ -31,7 +31,7 @@ export function askTargets(agents: readonly Agent[], rows: readonly Conversation
 }
 
 /**
- * Who a conversation can start with, for the words typed ("Person or agent" in "New", and "Chat with…"): the agents
+ * Who a conversation can start with, for the words typed ("Chat with…", in "New" and in its own sheet): the agents
  * that talk to you (by name, role or handle) and the other people (by name), each by name. No words: everyone.
  */
 export function chatMatches<P extends { userId: string; name: string }>(
@@ -50,15 +50,18 @@ export function chatMatches<P extends { userId: string; name: string }>(
   };
 }
 
-/** What "New"'s grid offers, in its order; `invite` is the wide row at its end. */
-export type CreateItem = "agent" | "channel" | "chat" | "task" | "routine" | "wiki" | "invite";
+/**
+ * What "New" offers to start, in its order; `invite` is a list of its own at the end. A conversation is not here:
+ * the search on top already starts one.
+ */
+export type CreateItem = "agent" | "channel" | "task" | "routine" | "wiki" | "invite";
 
-const CREATE_ORDER: readonly CreateItem[] = ["agent", "channel", "chat", "task", "routine", "wiki", "invite"];
+const CREATE_ORDER: readonly CreateItem[] = ["agent", "channel", "task", "routine", "wiki", "invite"];
 
 /**
  * What this person may start from "New", each as the server checks it (ADR 0085): an agent (`create_agents`), a
- * channel (`create_channels`), a conversation (anyone), a task (`post`), a routine (`manage_routines`, or the owner of
- * an agent), a wiki page (`edit_wiki`) and invitations (`invite_people`).
+ * channel (`create_channels`), a task (`post`), a routine (`manage_routines`, or the owner of an agent), a wiki page
+ * (`edit_wiki`) and invitations (`invite_people`).
  */
 export function createItems(
   org: { permissions?: readonly string[] } | null | undefined,
@@ -67,7 +70,6 @@ export function createItems(
   const allowed: Record<CreateItem, boolean> = {
     agent: can(org, "create_agents"),
     channel: can(org, "create_channels"),
-    chat: true,
     task: can(org, "post"),
     routine: can(org, "manage_routines") || ownsAgent,
     wiki: can(org, "edit_wiki"),
