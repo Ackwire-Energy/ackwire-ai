@@ -14566,6 +14566,22 @@
       "role": "Il tuo ruolo ti dà il browser di {{name}}, non tutto il computer"
     }
   },
+  "agentSide": {
+    "label": "Dettagli",
+    "show": "Mostra dettagli",
+    "hide": "Nascondi dettagli",
+    "seeAll": "Vedi tutte",
+    "thinks": "Come ragiona",
+    "thinksWith": "Ragiona con",
+    "owner": "Responsabile",
+    "usage": "Questo mese",
+    "spentOf": "{{spent}} su {{limit}}",
+    "tasks": "Attività recenti",
+    "usingBrowser": "Sta usando Chrome",
+    "usingScreen": "Sta usando il computer",
+    "screenOff": "Lo schermo è spento",
+    "screenOffHelp": "Si accende quando qualcuno guarda."
+  },
   "agentComputer": {
     "title": "Il computer di {{name}}",
     "title_female": "Il computer di {{name}}",
@@ -14573,6 +14589,7 @@
     "openOf": "Apri il computer di {{name}}",
     "help": "Aiuto",
     "button": "Computer",
+    "pictureNow": "Poco fa",
     "choose": "Scegli un computer",
     "status": {
       "available": "Disponibile · nessuno lo sta usando",

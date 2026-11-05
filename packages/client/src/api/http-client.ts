@@ -79,6 +79,7 @@ import type {
   CustomServer,
   DatabaseConnection,
   DatabaseTable,
+  DesktopPictureView,
   DesktopRelease,
   DesktopStatus,
   DeviceRequest,
@@ -437,6 +438,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     desktop: {
       status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),
+      picture: (orgId, agentId) => request<DesktopPictureView>(`${org(orgId)}/agents/${enc(agentId)}/desktop/picture`),
     },
     vault: {
       overview: (orgId) => request<VaultOverview>(`${org(orgId)}/vault`),

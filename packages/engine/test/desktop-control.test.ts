@@ -21,6 +21,7 @@ import {
   createStreamBroker,
   DESKTOP_SCOPE,
   type DesktopControl,
+  desktopPicture,
   desktopStatus,
   drainOutbox,
   ForbiddenError,
@@ -944,5 +945,91 @@ test("a stream whose session ended is refused on the recheck, before anything el
   expect(await recheckStream(f.db, stream as unknown as Parameters<typeof recheckStream>[1])).toEqual({
     refused: STREAM_CLOSE.forbidden,
     reason: "signed_out",
+  });
+});
+
+describe("a picture of an agent's screen", () => {
+  /** The computer as a picture sees it: `running` says whether its screen runs. */
+  const pictureHub = (running: boolean, fails = false) => {
+    const ops: string[] = [];
+    const hub: MachineCaller = {
+      status: toolHub.status,
+      call: (async (_id: string, request: MachineRequest) => {
+        ops.push(request.op);
+        if (request.op === "desktop.session.status") return { running, streams: 0 };
+        if (fails) throw new Error("no capture");
+        return {
+          data: "anBlZw==",
+          width: 1280,
+          height: 800,
+          screen: { width: 1280, height: 800 },
+          region: null,
+          marks: [],
+        };
+      }) as MachineCaller["call"],
+    };
+    return { hub, ops };
+  };
+  const ask = (hub: MachineCaller, userId: string) => desktopPicture({ db: f.db, hub }, userId, f.org.id, f.agent.id);
+
+  test("whoever may watch gets a recent JPEG; others asking soon after share it, and it counts as watching once", async () => {
+    await start();
+    const { hub, ops } = pictureHub(true);
+    expect(await ask(hub, f.owner.id)).toMatchObject({
+      picture: { data: "anBlZw==", width: 1280, height: 800 },
+      reason: null,
+    });
+    await ask(hub, f.owner.id);
+    expect(ops).toEqual(["desktop.session.status", "desktop.capture"]);
+    const audits = await f.db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.targetId, f.agent.id), eq(schema.auditLog.action, "desktop.watched")));
+    expect(audits).toHaveLength(1);
+    expect(audits[0]?.details).toMatchObject({ picture: true, seconds: 0 });
+  });
+
+  test("everyone asking at once shares one capture, and each of them counts as watching", async () => {
+    await start();
+    const admin = await addMember(f.db, f.org.id, "admin", "bia");
+    const { hub, ops } = pictureHub(true);
+    const [mine, theirs] = await Promise.all([ask(hub, f.owner.id), ask(hub, admin.id)]);
+    expect(theirs).toEqual(mine);
+    expect(ops).toEqual(["desktop.session.status", "desktop.capture"]);
+    const audits = await f.db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.targetId, f.agent.id), eq(schema.auditLog.action, "desktop.watched")));
+    expect(audits.map((a) => a.actorId).sort()).toEqual([f.owner.id, admin.id].sort());
+  });
+
+  test("a screen that isn't running stays off: no capture is asked of the computer", async () => {
+    await start();
+    const { hub, ops } = pictureHub(false);
+    expect(await ask(hub, f.owner.id)).toEqual({ picture: null, reason: "stopped" });
+    expect(ops).toEqual(["desktop.session.status"]);
+  });
+
+  test("a person who can't watch gets no picture", async () => {
+    await start();
+    const member = await addMember(f.db, f.org.id, "member", "dani");
+    const { hub, ops } = pictureHub(true);
+    await expect(ask(hub, member.id)).rejects.toBeInstanceOf(ForbiddenError);
+    expect(ops).toEqual([]);
+  });
+
+  test("while someone is in control, nobody else sees it, a kept picture included", async () => {
+    await start();
+    const admin = await addMember(f.db, f.org.id, "admin", "bia");
+    const { hub, ops } = pictureHub(true);
+    await ask(hub, admin.id);
+    await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id, null, "desktop");
+    expect(await ask(hub, admin.id)).toEqual({ picture: null, reason: "hidden" });
+    expect(ops).toEqual(["desktop.session.status", "desktop.capture"]);
+  });
+
+  test("a capture that fails is no picture, not an error", async () => {
+    await start();
+    expect(await ask(pictureHub(true, true).hub, f.owner.id)).toEqual({ picture: null, reason: "unavailable" });
   });
 });

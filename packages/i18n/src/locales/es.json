@@ -14433,12 +14433,29 @@
       "role": "Tu rol te da el navegador de {{name}}, no la computadora entera"
     }
   },
+  "agentSide": {
+    "label": "Detalles",
+    "show": "Mostrar detalles",
+    "hide": "Ocultar detalles",
+    "seeAll": "Ver todas",
+    "thinks": "Cómo piensa",
+    "thinksWith": "Piensa con",
+    "owner": "Responsable",
+    "usage": "Este mes",
+    "spentOf": "{{spent}} de {{limit}}",
+    "tasks": "Tareas recientes",
+    "usingBrowser": "Usando Chrome",
+    "usingScreen": "Usando el ordenador",
+    "screenOff": "La pantalla está apagada",
+    "screenOffHelp": "Se enciende cuando alguien la mira."
+  },
   "agentComputer": {
     "title": "Computadora de {{name}}",
     "open": "Abrir",
     "openOf": "Abrir la computadora de {{name}}",
     "help": "Ayuda",
     "button": "Computadora",
+    "pictureNow": "Hace un momento",
     "choose": "Elige una computadora",
     "status": {
       "available": "Disponible · nadie la está usando",

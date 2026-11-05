@@ -6610,6 +6610,19 @@ export interface DesktopStatus {
   held: boolean;
 }
 
+/** `GET …/desktop/picture`: a recent picture of the agent's screen, or why there is none. */
+export interface DesktopPictureView {
+  picture: {
+    /** A JPEG, base64. */
+    data: string;
+    width: number;
+    height: number;
+    capturedAt: string;
+  } | null;
+  /** `stopped`: its screen isn't running. `hidden`: someone else is in control. */
+  reason: "stopped" | "hidden" | "unavailable" | null;
+}
+
 /** A plan window with each agent's estimated part of it (the usage views, ADR 0063). */
 export interface PlanWindowParts extends PlanWindow {
   /**

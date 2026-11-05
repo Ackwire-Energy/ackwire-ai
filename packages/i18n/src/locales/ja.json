@@ -13504,12 +13504,29 @@
       "role": "あなたのロールで使えるのは{{name}}のブラウザで、コンピューター全体ではありません"
     }
   },
+  "agentSide": {
+    "label": "詳細",
+    "show": "詳細を表示",
+    "hide": "詳細を非表示",
+    "seeAll": "すべて見る",
+    "thinks": "考え方",
+    "thinksWith": "使用モデル",
+    "owner": "担当者",
+    "usage": "今月",
+    "spentOf": "{{spent}} / {{limit}}",
+    "tasks": "最近のタスク",
+    "usingBrowser": "Chrome を使用中",
+    "usingScreen": "コンピューターを使用中",
+    "screenOff": "画面はオフです",
+    "screenOffHelp": "誰かが見ると画面がオンになります。"
+  },
   "agentComputer": {
     "title": "{{name}}のコンピューター",
     "open": "開く",
     "openOf": "{{name}}のコンピューターを開く",
     "help": "ヘルプ",
     "button": "コンピューター",
+    "pictureNow": "たった今",
     "choose": "コンピューターを選択",
     "status": {
       "available": "利用可能 · 誰も使っていません",

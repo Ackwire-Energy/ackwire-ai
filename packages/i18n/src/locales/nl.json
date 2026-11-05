@@ -14150,6 +14150,22 @@
       "role": "Je rol geeft je de browser van {{name}}, niet de hele computer"
     }
   },
+  "agentSide": {
+    "label": "Details",
+    "show": "Details tonen",
+    "hide": "Details verbergen",
+    "seeAll": "Alles bekijken",
+    "thinks": "Hoe het denkt",
+    "thinksWith": "Denkt met",
+    "owner": "Verantwoordelijke",
+    "usage": "Deze maand",
+    "spentOf": "{{spent}} van {{limit}}",
+    "tasks": "Recente taken",
+    "usingBrowser": "Gebruikt Chrome",
+    "usingScreen": "Gebruikt de computer",
+    "screenOff": "Het scherm staat uit",
+    "screenOffHelp": "Het gaat aan zodra iemand kijkt."
+  },
   "agentComputer": {
     "title": "Computer van {{name}}",
     "title_female": "Computer van {{name}}",
@@ -14157,6 +14173,7 @@
     "openOf": "Computer van {{name}} openen",
     "help": "Hulp",
     "button": "Computer",
+    "pictureNow": "Zojuist",
     "choose": "Kies een computer",
     "status": {
       "available": "Beschikbaar · niemand gebruikt hem",

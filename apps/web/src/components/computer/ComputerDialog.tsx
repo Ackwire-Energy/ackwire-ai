@@ -631,9 +631,9 @@ function Banner({
 /**
  * "Computador" in the agent's DM header: while turns wait for its computer, "Computador · 4 aguardando" opening the
  * line (with a way on to the computer for whoever may watch it), else, for whoever may watch it, the same dialog in
- * place, with a dot while the agent needs someone (amber) or works on it (its color).
+ * place, with a dot while the agent needs someone (amber) or works on it (its color). `queueOnly`: just that line.
  */
-export function ComputerButton({ agent }: { agent: Agent }) {
+export function ComputerButton({ agent, queueOnly }: { agent: Agent; queueOnly?: boolean }) {
   const view = useAgentComputer(agent);
   const openComputer = useOpenComputer();
   const signal = useEntrySignal(agent, view);
@@ -642,7 +642,7 @@ export function ComputerButton({ agent }: { agent: Agent }) {
     <QueueButton
       machineId={useAgentMachineId(agent.id)}
       signal={watch ? signal : undefined}
-      idle={watch ? <WatchButton agent={agent} signal={signal} /> : null}
+      idle={watch && !queueOnly ? <WatchButton agent={agent} signal={signal} /> : null}
       onOpenComputer={watch ? () => openComputer(agent.id) : undefined}
     />
   );

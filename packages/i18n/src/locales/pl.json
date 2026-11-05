@@ -14941,6 +14941,22 @@
       "role": "Twoja rola daje ci przeglądarkę agenta {{name}}, a nie cały komputer"
     }
   },
+  "agentSide": {
+    "label": "Szczegóły",
+    "show": "Pokaż szczegóły",
+    "hide": "Ukryj szczegóły",
+    "seeAll": "Zobacz wszystkie",
+    "thinks": "Jak myśli",
+    "thinksWith": "Myśli z",
+    "owner": "Osoba odpowiedzialna",
+    "usage": "W tym miesiącu",
+    "spentOf": "{{spent}} z {{limit}}",
+    "tasks": "Ostatnie zadania",
+    "usingBrowser": "Używa Chrome",
+    "usingScreen": "Używa komputera",
+    "screenOff": "Ekran jest wyłączony",
+    "screenOffHelp": "Włącza się, gdy ktoś ogląda."
+  },
   "agentComputer": {
     "title": "Komputer agenta {{name}}",
     "title_female": "Komputer agenta {{name}}",
@@ -14948,6 +14964,7 @@
     "openOf": "Otwórz komputer agenta {{name}}",
     "help": "Pomóż",
     "button": "Komputer",
+    "pictureNow": "Przed chwilą",
     "choose": "Wybierz komputer",
     "status": {
       "available": "Dostępny · nikt go nie używa",

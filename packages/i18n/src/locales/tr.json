@@ -13916,12 +13916,29 @@
       "role": "Rolünüz size {{name}} adlı ajanın tarayıcısını verir, tüm bilgisayarı değil"
     }
   },
+  "agentSide": {
+    "label": "Ayrıntılar",
+    "show": "Ayrıntıları göster",
+    "hide": "Ayrıntıları gizle",
+    "seeAll": "Tümünü gör",
+    "thinks": "Nasıl düşünür",
+    "thinksWith": "Düşündüğü model",
+    "owner": "Sorumlu",
+    "usage": "Bu ay",
+    "spentOf": "{{spent}} / {{limit}}",
+    "tasks": "Son görevler",
+    "usingBrowser": "Chrome kullanıyor",
+    "usingScreen": "Bilgisayarı kullanıyor",
+    "screenOff": "Ekran kapalı",
+    "screenOffHelp": "Biri izleyince açılır."
+  },
   "agentComputer": {
     "title": "{{name}} ajanının bilgisayarı",
     "open": "Aç",
     "openOf": "{{name}} ajanının bilgisayarını aç",
     "help": "Yardım",
     "button": "Bilgisayar",
+    "pictureNow": "Az önce",
     "choose": "Bir bilgisayar seçin",
     "status": {
       "available": "Müsait · kimse kullanmıyor",

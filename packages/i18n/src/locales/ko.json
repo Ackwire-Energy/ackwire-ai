@@ -13495,12 +13495,29 @@
       "role": "내 역할로는 {{name}}의 브라우저만 쓸 수 있고 컴퓨터 전체는 안 돼요"
     }
   },
+  "agentSide": {
+    "label": "세부 정보",
+    "show": "세부 정보 표시",
+    "hide": "세부 정보 숨기기",
+    "seeAll": "모두 보기",
+    "thinks": "생각하는 방식",
+    "thinksWith": "사용 모델",
+    "owner": "담당자",
+    "usage": "이번 달",
+    "spentOf": "{{spent}} / {{limit}}",
+    "tasks": "최근 작업",
+    "usingBrowser": "Chrome 사용 중",
+    "usingScreen": "컴퓨터 사용 중",
+    "screenOff": "화면이 꺼져 있습니다",
+    "screenOffHelp": "누군가 보면 화면이 켜집니다."
+  },
   "agentComputer": {
     "title": "{{name}}의 컴퓨터",
     "open": "열기",
     "openOf": "{{name}}의 컴퓨터 열기",
     "help": "도움말",
     "button": "컴퓨터",
+    "pictureNow": "방금 전",
     "choose": "컴퓨터 선택",
     "status": {
       "available": "사용 가능 · 아무도 사용하지 않음",

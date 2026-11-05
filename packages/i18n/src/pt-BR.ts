@@ -13925,6 +13925,22 @@ export const ptBR = {
       role_female: "Seu papel dá acesso ao navegador da\u00a0{{name}}, não ao computador inteiro",
     },
   },
+  agentSide: {
+    label: "Detalhes",
+    show: "Mostrar detalhes",
+    hide: "Esconder detalhes",
+    seeAll: "Ver todas",
+    thinks: "Como pensa",
+    thinksWith: "Pensa com",
+    owner: "Responsável",
+    usage: "Uso no mês",
+    spentOf: "{{spent}} de {{limit}}",
+    tasks: "Tarefas recentes",
+    usingBrowser: "Usando o Chrome",
+    usingScreen: "Usando o computador",
+    screenOff: "A tela está desligada",
+    screenOffHelp: "Ela liga quando alguém assiste.",
+  },
   agentComputer: {
     title: "Computador do {{name}}",
     title_female: "Computador da {{name}}",
@@ -13933,6 +13949,8 @@ export const ptBR = {
     openOf_female: "Abrir o computador da {{name}}",
     help: "Ajudar",
     button: "Computador",
+    /** A picture of its screen is never live: how fresh it is, not "Ao vivo". */
+    pictureNow: "Agora há pouco",
     choose: "Escolher um computador",
     status: {
       available: "Disponível · ninguém usando agora",

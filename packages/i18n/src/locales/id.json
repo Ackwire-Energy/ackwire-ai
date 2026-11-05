@@ -13606,12 +13606,29 @@
       "role": "Peranmu memberimu browser {{name}}, bukan seluruh komputer"
     }
   },
+  "agentSide": {
+    "label": "Detail",
+    "show": "Tampilkan detail",
+    "hide": "Sembunyikan detail",
+    "seeAll": "Lihat semua",
+    "thinks": "Cara berpikir",
+    "thinksWith": "Berpikir dengan",
+    "owner": "Penanggung jawab",
+    "usage": "Bulan ini",
+    "spentOf": "{{spent}} dari {{limit}}",
+    "tasks": "Tugas terbaru",
+    "usingBrowser": "Menggunakan Chrome",
+    "usingScreen": "Menggunakan komputer",
+    "screenOff": "Layar mati",
+    "screenOffHelp": "Layar menyala saat ada yang menonton."
+  },
   "agentComputer": {
     "title": "Komputer {{name}}",
     "open": "Buka",
     "openOf": "Buka komputer {{name}}",
     "help": "Bantuan",
     "button": "Komputer",
+    "pictureNow": "Baru saja",
     "choose": "Pilih komputer",
     "status": {
       "available": "Tersedia · tidak ada yang memakai",

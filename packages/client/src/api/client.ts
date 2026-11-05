@@ -110,6 +110,7 @@ import type {
   DatabaseConnectionInput,
   DatabaseTable,
   DeletionProofInput,
+  DesktopPictureView,
   DesktopRelease,
   DesktopStatus,
   DeviceRequest,
@@ -1712,6 +1713,8 @@ export interface ApiClient {
    */
   desktop: {
     status(orgId: string, agentId: string): Promise<DesktopStatus>;
+    /** A recent picture of the agent's screen; never starts a stopped one. 403 for who may not watch it. */
+    picture(orgId: string, agentId: string): Promise<DesktopPictureView>;
   };
   /**
    * GIF search (ADR 0091), through our server: the browser and the phone never talk to the provider. Every member;
