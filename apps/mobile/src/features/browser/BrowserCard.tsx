@@ -164,8 +164,8 @@ export function BrowserCard({
   }, [claim, handoff, actions, onToggle]);
 
   const failedToast = () => toast({ title: t("mobile.app.failed"), icon: "x" });
+  // Its buttons give the press's own haptic (`Button`): none more here, or a press taps twice.
   const answer = async () => {
-    tapHaptic();
     setOpen(true);
     if (handoff?.status !== "pending") return;
     try {
@@ -175,7 +175,6 @@ export function BrowserCard({
     }
   };
   const takeover = async () => {
-    tapHaptic();
     setOpen(true);
     try {
       if (profile) {
@@ -197,7 +196,6 @@ export function BrowserCard({
   // A profile's control has no task to report on: Devolver just hands it back.
   const handBack = () => {
     if (!profile) return finishing.handBack();
-    tapHaptic();
     void profileActions.handback.mutateAsync(profile.id).then(successHaptic, failedToast);
   };
   const stop = () => {
@@ -214,7 +212,6 @@ export function BrowserCard({
   // Who may drive it restarts the browser, then watches again (this card's own watch may be what was refused);
   // someone who only watches watches again.
   const retry = () => {
-    tapHaptic();
     setAttempt((n) => n + 1);
     if (mayDrive && !profile) void actions.restart(agentId).catch(failedToast).finally(live.retry);
     else live.retry();
@@ -263,7 +260,7 @@ export function BrowserCard({
           accessibilityRole={surface ? undefined : "button"}
           accessibilityState={surface ? undefined : { expanded: open }}
           accessibilityLabel={surface ? title : `${title}. ${subtitle}`}
-          style={styles.head}
+          style={({ pressed }) => [styles.head, pressed && !surface && styles.pressed]}
         >
           {!open ? (
             // Closed: the page's small live picture.
@@ -322,7 +319,7 @@ export function BrowserCard({
                       accessibilityRole="button"
                       accessibilityLabel={t("mobile.browser.card.stop")}
                       hitSlop={8}
-                      style={styles.icon}
+                      style={({ pressed }) => [styles.icon, pressed && { backgroundColor: c.sunken }]}
                     >
                       <Icon name="stop" size={16} color={c.muted} />
                     </Pressable>
@@ -331,7 +328,7 @@ export function BrowserCard({
               ) : null}
               {surface ? null : (
                 <View style={open ? styles.flip : undefined}>
-                  <Icon name="chev" size={14} color={c.faint} />
+                  <Icon name="chev" size={13} color={c.faint} />
                 </View>
               )}
             </View>
@@ -398,7 +395,12 @@ export function BrowserCard({
               />
               {/* A take over asked for nothing: it only hands back. */}
               {handoff?.kind === "ask" ? (
-                <Pressable onPress={couldnt} accessibilityRole="button" hitSlop={6} style={styles.couldnt}>
+                <Pressable
+                  onPress={couldnt}
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.couldnt, pressed && styles.pressedWord]}
+                >
                   <Text variant="small" tone="muted" style={styles.medium}>
                     {t("mobile.browser.live.couldnt")}
                   </Text>
@@ -459,14 +461,18 @@ export function BrowserRunCard({
   return <BrowserCard agentId={run.agentId} run={run} open={open} onToggle={onToggle} />;
 }
 
+/** The card's corners, and the page inside it 8 pt in, concentric with them. */
+const CARD = 20;
+const PAGE_INSET = 8;
+
 const styles = StyleSheet.create({
-  card: { marginTop: 12, borderRadius: 18, overflow: "hidden" },
+  card: { marginTop: 12, borderRadius: CARD, overflow: "hidden" },
   sky: { height: 6 },
   head: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  tile: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  tile: { width: 28, height: 28, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
-  subRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 1 },
+  subRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
   semibold: { fontWeight: "600" },
   medium: { fontWeight: "500" },
   acts: { flexDirection: "row", alignItems: "center", gap: 4 },
@@ -474,7 +480,7 @@ const styles = StyleSheet.create({
   thumb: {
     width: 96,
     height: 60,
-    borderRadius: 9,
+    borderRadius: 10,
     overflow: "hidden",
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
@@ -482,8 +488,8 @@ const styles = StyleSheet.create({
   },
   hint: { marginTop: 2 },
   flip: { transform: [{ rotate: "180deg" }] },
-  page: { aspectRatio: 16 / 10, marginHorizontal: 8, borderRadius: 12, overflow: "hidden" },
-  pageLast: { marginBottom: 8 },
+  page: { aspectRatio: 16 / 10, marginHorizontal: PAGE_INSET, borderRadius: CARD - PAGE_INSET, overflow: "hidden" },
+  pageLast: { marginBottom: PAGE_INSET },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 16 },
   lines: { alignItems: "center", gap: 8 },
   onSky: { alignItems: "center", gap: 4, maxWidth: 420, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14 },
@@ -495,4 +501,6 @@ const styles = StyleSheet.create({
   log: { paddingHorizontal: 12, paddingVertical: 6 },
   step: { flexDirection: "row", alignItems: "center", paddingVertical: 6 },
   fuse: { marginTop: 0 },
+  pressed: { opacity: 0.7 },
+  pressedWord: { opacity: 0.6 },
 });

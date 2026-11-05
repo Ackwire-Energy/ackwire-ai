@@ -27,15 +27,13 @@ export function LookPicker({ look, onChange }: { look: FullLook; onChange: (next
     <View style={styles.wrap}>
       <View style={styles.head}>
         <Label text={t("look.color")} value={t(`look.colors.${colorKey(look.color)}`)} />
+        {/* `Button` gives the press's haptic. */}
         <Button
           variant="secondary"
           size="sm"
           icon="sparkle"
           label={t("newAgent.shuffle")}
-          onPress={() => {
-            tapHaptic();
-            onChange(shuffleLook(look));
-          }}
+          onPress={() => onChange(shuffleLook(look))}
         />
       </View>
       <Swatches look={look} onPick={(next) => set({ color: next })} onCustom={color.open} ring />
@@ -176,6 +174,8 @@ function Swatches({
   const custom = isHexColor(look.color);
   const frame = (on: boolean) => (ring ? [styles.swatchRing, { borderColor: on ? c.ink : "transparent" }] : null);
   const swatch = ring ? styles.swatch : styles.swatchFlat;
+  // A flat swatch is 30 pt: 7 more around it reach the 44 pt a finger needs.
+  const slop = ring ? 4 : 7;
   return (
     <View
       style={ring ? styles.swatches : styles.swatchRow}
@@ -192,8 +192,8 @@ function Swatches({
             accessibilityRole="radio"
             accessibilityLabel={t(`look.colors.${color}`)}
             accessibilityState={{ selected: on }}
-            hitSlop={4}
-            style={frame(on)}
+            hitSlop={slop}
+            style={({ pressed }) => [frame(on), pressed && styles.pressed]}
           >
             <LinearGradient colors={[top, bottom]} style={swatch}>
               {on ? <Icon name="check" size={16} color="#fff" /> : null}
@@ -206,8 +206,8 @@ function Swatches({
         accessibilityRole="radio"
         accessibilityLabel={t("look.customColor")}
         accessibilityState={{ selected: custom }}
-        hitSlop={4}
-        style={frame(custom)}
+        hitSlop={slop}
+        style={({ pressed }) => [frame(custom), pressed && styles.pressed]}
       >
         <LinearGradient
           colors={custom ? gradientOf(look.color) : RAINBOW}

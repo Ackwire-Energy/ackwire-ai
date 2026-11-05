@@ -96,18 +96,19 @@ export function DockRule() {
 const styles = StyleSheet.create({
   dock: { position: "absolute", left: 0, right: 0, bottom: -DOCK_HANG, alignItems: "center" },
   inside: { bottom: 12 },
-  lift: { borderRadius: 26, maxWidth: "94%" },
+  // A pill around its 40 pt pills, 4 pt out: concentric with them.
+  lift: { borderRadius: 999, maxWidth: "94%" },
   glass: {
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
     padding: 4,
-    borderRadius: 26,
+    borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
   pill: { borderRadius: 20, flexShrink: 1, overflow: "hidden" },
-  pillIn: { height: 40, flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 14 },
+  pillIn: { height: 40, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
   label: { fontWeight: "600", flexShrink: 1 },
   rule: { width: StyleSheet.hairlineWidth, height: 22, marginHorizontal: 4 },
 });

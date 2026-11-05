@@ -20,6 +20,7 @@ import { router } from "expo-router";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import {
@@ -30,10 +31,12 @@ import {
   Icon,
   IconButton,
   LineIcon,
+  PressScale,
   Row,
   SearchField,
   SectionHeader,
   Text,
+  useReducedMotion,
   useToast,
 } from "@/ui";
 import { Note } from "../ai/parts";
@@ -99,6 +102,9 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
     map?.stars.find((s) => s.kind === "page");
   const when = (iso: string) => relativeTime(t, i18n.language, iso);
   const title = folder ? (folder.split("/").pop() ?? folder) : t("wiki.title");
+  // The home and the search's results cross-fade as a search starts and ends, and fade in when they load.
+  const reduced = useReducedMotion();
+  const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
   const pageRow = (p: WikiPageSummary, i: number, sub?: string) => (
     <Row
       key={p.id}
@@ -158,13 +164,13 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
               <EmptyState icon="search" title={t("wiki.noMatch")} />
             ) : null
           ) : (
-            <>
+            <Animated.View key="found" {...fade}>
               <SectionHeader title={t("wiki.results", { count: found.length })} />
               {found.map((p, i) => pageRow(p, i, p.folder || undefined))}
-            </>
+            </Animated.View>
           )
         ) : home ? (
-          <>
+          <Animated.View key="home" {...fade}>
             {map && star && !folder && map.stars.length > 1 ? (
               <StarCard
                 label={t("mobile.wiki.map")}
@@ -253,26 +259,25 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
                 ))}
               </>
             ) : null}
-          </>
+          </Animated.View>
         ) : tree.isSuccess && pages.length > 0 ? (
           <EmptyState icon="archive" title={t("mobile.wiki.folderGone")} />
         ) : null}
       </PushedLargeTitle>
       {writes ? (
-        <Pressable
+        <PressScale
           accessibilityRole="button"
           accessibilityLabel={t("wiki.newPage")}
           onPress={() => newWikiPage(folder ? { folder } : {})}
-          style={({ pressed }) => [
-            styles.fab,
-            { backgroundColor: c.ink, bottom: insets.bottom + 18, opacity: pressed ? 0.85 : 1 },
-          ]}
+          sink
+          style={[styles.fab, { backgroundColor: c.ink, bottom: insets.bottom + 16 }]}
+          contentStyle={styles.fabIn}
         >
           <Icon name="plus" size={18} color={c.bg} />
           <Text variant="callout" style={[styles.fabText, { color: c.bg }]}>
             {t("wiki.newPage")}
           </Text>
-        </Pressable>
+        </PressScale>
       ) : null}
     </View>
   );
@@ -404,6 +409,7 @@ function WikiPage({ slug }: { slug: string }) {
           void api.wiki
             .remove(orgId, p.slug)
             .then(() => {
+              successHaptic();
               void qc.invalidateQueries({ queryKey: keys.wiki(orgId) });
               toast({ title: t("wiki.deleted", { title: p.title }) });
               goBack();
@@ -510,7 +516,7 @@ function WikiPage({ slug }: { slug: string }) {
                       accessibilityLabel={t("wiki.edit")}
                       onPress={() => writeWikiPage({ slug: p.slug })}
                       hitSlop={6}
-                      style={styles.barWord}
+                      style={({ pressed }) => [styles.barWord, pressed && styles.pressedWord]}
                     >
                       <Text variant="callout" style={[styles.barWordText, { color: c.agent }]}>
                         {t("wiki.edit")}
@@ -693,6 +699,7 @@ export function WikiHistoryScreen({ slug }: { slug: string }) {
       failed(e);
     }
   };
+  const reduced = useReducedMotion();
   const noteOf = (v: WikiVersion) =>
     v.noteCode ? t(`wiki.note.${v.noteCode}`, v.noteParams ?? {}) : (v.note ?? undefined);
   return (
@@ -720,12 +727,12 @@ export function WikiHistoryScreen({ slug }: { slug: string }) {
               onPress={() => void show(v.version)}
             />
             {open?.version === v.version ? (
-              <View style={styles.diffWrap}>
+              <Animated.View entering={reduced ? undefined : FadeIn.duration(160)} style={styles.diffWrap}>
                 <Text variant="footnote" tone="faint">
                   {t("wiki.versionDiff", { version: v.version })}
                 </Text>
                 <DiffView lines={open.lines} />
-              </View>
+              </Animated.View>
             ) : null}
           </View>
         );
@@ -847,7 +854,12 @@ export function FolderChips({
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
             onPress={() => onPick(f)}
-            style={[styles.chip, { backgroundColor: on ? c.ink : c.sunken }]}
+            hitSlop={4}
+            style={({ pressed }) => [
+              styles.chip,
+              { backgroundColor: on ? c.ink : c.sunken },
+              pressed && styles.pressedWord,
+            ]}
           >
             <Text variant="subhead" style={{ color: on ? c.bg : c.ink2 }}>
               {f || t("wiki.root")}
@@ -868,22 +880,18 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
   pins: { gap: 10, paddingHorizontal: 16, paddingBottom: 4 },
-  pin: { width: 210, borderRadius: 16, padding: 14, gap: 5 },
+  pin: { width: 210, borderRadius: 20, padding: 14, gap: 4 },
   pressed: { opacity: 0.85 },
+  pressedWord: { opacity: 0.6 },
   byline: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
   // The page's line can wrap: the face sits on its first line.
   pageByline: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 2 },
-  // On the buttons' ruler (48, `Button` md), its icon as theirs (18).
+  // On the buttons' ruler (48, `Button` md), its icon as theirs (18); 16 in from the edge, as the page's sides.
   fab: {
     position: "absolute",
-    right: 18,
+    right: 16,
     height: 48,
     borderRadius: 24,
-    paddingLeft: 16,
-    paddingRight: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
     shadowColor: "#000",
     shadowOpacity: 0.25,
     shadowRadius: 14,
@@ -893,6 +901,7 @@ const styles = StyleSheet.create({
   barRight: { flexDirection: "row", alignItems: "center", gap: 2 },
   barWord: { paddingHorizontal: 10, height: 36, justifyContent: "center" },
   barWordText: { fontWeight: "600" },
+  fabIn: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 16, paddingRight: 20 },
   fabText: { fontWeight: "600" },
   page: { paddingHorizontal: 20, paddingTop: 8, gap: 4 },
   note: { paddingTop: 10 },
@@ -901,6 +910,6 @@ const styles = StyleSheet.create({
   form: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 40, gap: 8 },
   field: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
   gapTop: { marginTop: 12 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 7, paddingVertical: 4 },
-  chip: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingVertical: 4 },
+  chip: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
 });

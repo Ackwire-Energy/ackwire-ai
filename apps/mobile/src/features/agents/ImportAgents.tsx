@@ -120,8 +120,11 @@ export function AiAppImport({ orgId }: { orgId: string }) {
   );
 }
 
+/** A source's mark in its row. */
+const MARK = 34;
+
 /** A source's logo on a neutral tile: our own mark for our export, an icon for any other app. */
-function SourceMark({ card, size = 34 }: { card: ImportCard; size?: number }) {
+function SourceMark({ card, size = MARK }: { card: ImportCard; size?: number }) {
   const { colors: c, scheme } = useTheme();
   const logo = card === "other" || card === "agenteschat" ? null : IMPORT_LOGO[card];
   return (
@@ -401,7 +404,11 @@ function Preview({ imp, orgId }: { imp: AgentImport; orgId: string }) {
               ]
                 .filter(Boolean)
                 .join(". ")}
-              style={[styles.agent, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }]}
+              style={({ pressed }) => [
+                styles.agent,
+                i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
+                pressed && { backgroundColor: c.sunken },
+              ]}
             >
               <AgentAvatar agent={fullLook(a.appearance)} size={40} name={a.name} live={false} />
               <View style={styles.fill}>
@@ -517,7 +524,7 @@ const styles = StyleSheet.create({
   paste: { maxHeight: 320 },
   bold: { fontWeight: "600" },
   gapTop: { marginTop: 14 },
-  tile: { borderRadius: 11, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
+  tile: { borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
   source: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 14 },
   reading: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 },
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: 10 },
@@ -526,7 +533,8 @@ const styles = StyleSheet.create({
   previewHead: { flexDirection: "row", alignItems: "center", gap: 12 },
   agent: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 12, paddingHorizontal: 14 },
   kindRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 14 },
-  where: { paddingLeft: 60, paddingRight: 14, paddingBottom: 12 },
+  // Under the source's name: the row's side, its mark and the gap.
+  where: { paddingLeft: 14 + MARK + 12, paddingRight: 14, paddingBottom: 12 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 6 },
   todos: { gap: 10, marginTop: 14 },
   todo: { flexDirection: "row", alignItems: "center", gap: 12 },

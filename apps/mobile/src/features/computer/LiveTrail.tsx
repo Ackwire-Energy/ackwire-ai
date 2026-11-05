@@ -74,7 +74,7 @@ export function LiveTrail({ steps, color, now }: { steps: ScreenStep[]; color: A
           // biome-ignore lint/suspicious/noArrayIndexKey: the pages of one run, in order
           <View key={i}>
             <View style={styles.site}>
-              <Icon name={screen === "desktop" ? "laptop" : "globe"} size={14} color={c.muted} />
+              <Icon name={screen === "desktop" ? "laptop" : "globe"} size={SITE_ICON} color={c.muted} />
               <Text variant="footnote" tone="ink2" numberOfLines={1} style={[styles.grow, styles.semibold]}>
                 {p.host ?? tt("after.noSite")}
                 {p.path ? (
@@ -129,16 +129,20 @@ export function LiveTrail({ steps, color, now }: { steps: ScreenStep[]; color: A
   );
 }
 
+/** A page's site mark, beside its footnote name. */
+const SITE_ICON = 13;
+
 const styles = StyleSheet.create({
   trail: { paddingHorizontal: 16, paddingTop: 8 },
   head: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 28 },
   summary: { marginLeft: "auto", flexShrink: 1, fontVariant: ["tabular-nums"] },
   site: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 30 },
-  line: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 28, paddingLeft: 22 },
+  // A line's mark starts where its page's name does: past the site's mark and the gap.
+  line: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 28, paddingLeft: SITE_ICON + 8 },
   mark: { width: 18, alignItems: "center" },
   grow: { flex: 1, minWidth: 0 },
   semibold: { fontWeight: "600" },
   medium: { fontWeight: "500" },
-  times: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
+  times: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   timesText: { fontWeight: "600", fontVariant: ["tabular-nums"] },
 });

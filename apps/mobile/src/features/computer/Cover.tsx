@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { ComputerSky, Glass, Icon, type IconName, PixelOrbit, Text, useTheme } from "@/ui";
 import { withAlpha } from "@/ui/palette";
-import { EdgeDock } from "./EdgeDock";
+import { DOCK_HANG, EdgeDock } from "./EdgeDock";
 import { DEFAULT_DESKTOP } from "./screen-view";
 
 /** The agent's screen switched off: a device's dark glass, whatever the app's theme. */
@@ -114,14 +114,15 @@ export function Cover({
 const styles = StyleSheet.create({
   center: { textAlign: "center" },
   cover: {
-    borderRadius: 18,
+    borderRadius: 20,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
   },
   stage: { aspectRatio: DEFAULT_DESKTOP.width / DEFAULT_DESKTOP.height },
-  docked: { marginBottom: 36 },
+  // The capsule's hang and a little air, as the live screen's.
+  docked: { marginBottom: DOCK_HANG + 12 },
   say: { alignItems: "center", gap: 8, maxWidth: 300 },
   lift: { maxWidth: "100%", borderRadius: 14 },
   card: { alignItems: "center", gap: 10, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10 },

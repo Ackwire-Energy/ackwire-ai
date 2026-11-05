@@ -303,8 +303,8 @@ export function AgentScreen({
     if (!offer) setAsking(false);
   }, [offer]);
 
+  // Pressed through a `Button` or the dock's `PressScale`, which give the press's haptic.
   const take = async () => {
-    tapHaptic();
     setTaking(true);
     try {
       if (waiting) await actions.takeControl(waiting.id);
@@ -1298,7 +1298,7 @@ const styles = StyleSheet.create({
   notice: { paddingHorizontal: 14 },
   stage: { flexShrink: 1 },
   docked: { marginBottom: DOCK_HANG + 12 },
-  box: { marginHorizontal: 12, borderRadius: 18, overflow: "hidden", backgroundColor: "#101010" },
+  box: { marginHorizontal: 12, borderRadius: 20, overflow: "hidden", backgroundColor: "#101010" },
   boxWide: { marginHorizontal: 0, borderRadius: 0 },
   frame: { position: "absolute", left: 0, top: 0, transformOrigin: "left top" },
   web: { flex: 1, backgroundColor: "transparent" },
@@ -1317,7 +1317,7 @@ const styles = StyleSheet.create({
   control: { paddingHorizontal: 12, paddingTop: 10, gap: 8 },
   pad: {
     height: PAD_HEIGHT,
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
@@ -1343,13 +1343,14 @@ const styles = StyleSheet.create({
     opacity: 0,
   },
   wideBanner: { position: "absolute", top: 12, maxWidth: 320 },
-  dock: { position: "absolute", top: 12, borderRadius: 26 },
+  // A pill around its 40 pt buttons, 4 pt out: concentric with them.
+  dock: { position: "absolute", top: 12, borderRadius: 999 },
   dockGlass: {
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
     padding: 4,
-    borderRadius: 26,
+    borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
@@ -1357,7 +1358,7 @@ const styles = StyleSheet.create({
   dockDone: { width: 40, height: 40, borderRadius: 20 },
   dockDoneIn: { alignItems: "center", justifyContent: "center" },
   dockNotice: { position: "absolute", top: 70 },
-  dockNoticeOpen: { width: 300, paddingHorizontal: 14, paddingBottom: 12, paddingTop: 8, borderRadius: 16 },
+  dockNoticeOpen: { width: 300, paddingHorizontal: 14, paddingBottom: 12, paddingTop: 8, borderRadius: 14 },
   typing: { flexDirection: "row", alignItems: "flex-end", gap: 8, paddingTop: 8 },
   under: { flex: 1, paddingTop: 4 },
   request: { marginHorizontal: 12, marginBottom: 4 },

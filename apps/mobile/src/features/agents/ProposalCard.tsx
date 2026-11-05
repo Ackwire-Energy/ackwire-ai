@@ -259,7 +259,7 @@ export function AgentProposalView({
               </>
             ) : sent ? (
               <View style={styles.sent}>
-                <Icon name="send" size={14} color={colors.muted} />
+                <Icon name="send" size={15} color={colors.muted} />
                 <Text variant="small" tone="muted" style={styles.fill}>
                   {sent}
                 </Text>
@@ -365,7 +365,7 @@ function Lines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
     if (l.kind === "channel") {
       const name = channels.data?.find((c) => c.id === l.id)?.name;
       return {
-        icon: <Icon name="hash" size={14} color={colors.muted} />,
+        icon: <Icon name="hash" size={13} color={colors.muted} />,
         text: name ?? t("actionCard.agentProposal.aChannel"),
       };
     }
@@ -379,11 +379,11 @@ function Lines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
     }
     if (l.kind === "mail") {
       const box = draft.mail?.find((b) => b.accountId === l.id);
-      return { icon: <Icon name="mail" size={14} color={colors.muted} />, text: says(l.level, box?.address ?? "") };
+      return { icon: <Icon name="mail" size={13} color={colors.muted} />, text: says(l.level, box?.address ?? "") };
     }
     const routine = draft.routine;
     return {
-      icon: <Icon name="clock" size={14} color={colors.muted} />,
+      icon: <Icon name="clock" size={13} color={colors.muted} />,
       text: routine ? [routine.name, proposedRoutineWhen(t, i18n.language, routine)].join(" · ") : l.id,
     };
   };
@@ -407,7 +407,7 @@ function Lines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
           .join(" · ");
         return (
           <View key={l.key} style={styles.line}>
-            <View style={styles.mark}>{l.given ? <Icon name="check" size={14} color={colors.success} /> : icon}</View>
+            <View style={styles.mark}>{l.given ? <Icon name="check" size={13} color={colors.success} /> : icon}</View>
             <View style={styles.fill}>
               <Text variant="footnote" tone="ink2">
                 {text}

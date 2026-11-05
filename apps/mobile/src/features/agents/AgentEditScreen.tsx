@@ -301,5 +301,5 @@ const styles = StyleSheet.create({
   field: { minHeight: 50, paddingHorizontal: 14, paddingVertical: 12 },
   bare: { borderWidth: 0, borderRadius: 0, backgroundColor: "transparent" },
   foot: { paddingTop: 7, paddingHorizontal: 16 },
-  gap: { height: 22 },
+  gap: { height: 24 },
 });

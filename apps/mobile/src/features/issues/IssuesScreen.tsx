@@ -13,8 +13,9 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, EmptyState, Filters, IconButton, Text } from "@/ui";
+import { Button, EmptyState, Filters, IconButton, Text, useReducedMotion } from "@/ui";
 import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { FocusLive, PushedHeader } from "../shared/parts";
@@ -142,6 +143,11 @@ function Column({
   const c = useColors();
   const insets = useSafeAreaInsets();
   const columnLabel = useColumnLabel();
+  // A task that moves to another stage while the person watches leaves this column and fades into its new one;
+  // the rest slide into place. The cards there when the board loads don't each fade.
+  const reduced = useReducedMotion();
+  const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
+  const layout = reduced ? undefined : LinearTransition.duration(220);
   let card = 0;
   return (
     <ScrollView
@@ -150,20 +156,28 @@ function Column({
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
-      {b.count === 0 ? (
-        <Text variant="subhead" tone="faint" style={styles.none}>
-          {t("mobile.issues.columnEmpty")}
-        </Text>
-      ) : null}
-      {b.groups.map((g) => (
-        <Fragment key={g.key}>
-          {b.showColumns && g.column ? <ColumnHeader label={columnLabel(g.column)} count={g.items.length} /> : null}
-          {g.items.map((i) => {
-            card += 1;
-            return <BoardCard key={i.id} issue={i} live={card <= LIVE_CARDS} />;
-          })}
-        </Fragment>
-      ))}
+      <LayoutAnimationConfig skipEntering>
+        {b.count === 0 ? (
+          <Animated.View {...fade}>
+            <Text variant="subhead" tone="faint" style={styles.none}>
+              {t("mobile.issues.columnEmpty")}
+            </Text>
+          </Animated.View>
+        ) : null}
+        {b.groups.map((g) => (
+          <Fragment key={g.key}>
+            {b.showColumns && g.column ? <ColumnHeader label={columnLabel(g.column)} count={g.items.length} /> : null}
+            {g.items.map((i) => {
+              card += 1;
+              return (
+                <Animated.View key={i.id} {...fade} layout={layout}>
+                  <BoardCard issue={i} live={card <= LIVE_CARDS} />
+                </Animated.View>
+              );
+            })}
+          </Fragment>
+        ))}
+      </LayoutAnimationConfig>
     </ScrollView>
   );
 }
@@ -174,7 +188,7 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
   pager: { paddingLeft: 16, paddingRight: PEEK - COLUMN_GAP, paddingTop: 8, gap: COLUMN_GAP },
-  column: { borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  columnBody: { padding: 10, gap: 9 },
+  column: { borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  columnBody: { padding: 10, gap: 10 },
   none: { padding: 10, textAlign: "center" },
 });

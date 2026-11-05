@@ -18,7 +18,7 @@ import { IconTile } from "../connectors/ConnectorIcon";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
-import { tapHaptic, useSurface } from "../shared/parts";
+import { useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { BrowserCard } from "./BrowserCard";
 import { cardStateOf, NOTE_MAX } from "./logic";
@@ -82,9 +82,9 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
       <Pressable
         onPress={() => router.push(`/computer/${h.agentId}`)}
         accessibilityRole="button"
-        style={[styles.done, surface]}
+        style={({ pressed }) => [styles.done, surface, pressed && styles.pressed]}
       >
-        <LineIcon name="laptop" variant="small" size={16} color={c.muted} />
+        <LineIcon name="laptop" variant="small" size={15} color={c.muted} />
         <Text variant="small" tone="muted" style={styles.grow}>
           {state === "mine"
             ? t("mobile.browser.live.inControl")
@@ -131,8 +131,8 @@ function HandoffAsk({
   const asked = h.requestedForUserId ? dir.memberById.get(h.requestedForUserId)?.name : undefined;
   const failed = () => toast({ title: t("mobile.app.failed"), icon: "x" });
 
+  // `Button` gives the press's haptic: none more here, or a press taps twice.
   const take = async () => {
-    tapHaptic();
     onOpened(true);
     try {
       await actions.takeControl(h.id);
@@ -220,6 +220,7 @@ const styles = StyleSheet.create({
   },
   peek: { aspectRatio: 16 / 10, borderRadius: 12, overflow: "hidden" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  pressed: { opacity: 0.85 },
 });
 
 /**
@@ -235,9 +236,9 @@ export function useNotNow(h: BrowserHandoff | null, onDone?: () => void) {
   const actions = useBrowserHandoffActions(orgId);
   const name = (h && dir.agentById.get(h.agentId)?.name) ?? "";
   const g = genderOf(name);
+  // Pressed through a `Button`, which gives the press's haptic.
   return () => {
     if (!h) return;
-    tapHaptic();
     sheet.open(
       <PromptForm
         title={t("mobile.browser.failed.title")}

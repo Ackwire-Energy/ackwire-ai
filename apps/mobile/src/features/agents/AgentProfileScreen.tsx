@@ -920,12 +920,17 @@ export function MemoryFix({
       <SheetTitle title={t(`mobile.intentAgents.fix.title${g}`, { name: agentName })} />
       <TextArea value={text} onChangeText={setText} autoFocus maxLength={8000} />
       <View style={styles.src}>
-        <Icon name="chat" size={14} color={c.muted} />
+        <Icon name="chat" size={15} color={c.muted} />
         <Text variant="small" tone="muted" numberOfLines={1} style={styles.grow}>
           {source}
         </Text>
         {onSee ? (
-          <Pressable onPress={onSee} accessibilityRole="link" hitSlop={8}>
+          <Pressable
+            onPress={onSee}
+            accessibilityRole="link"
+            hitSlop={12}
+            style={({ pressed }) => (pressed ? styles.pressed : null)}
+          >
             <Text variant="small" tone="ink2" style={styles.bold}>
               {t("mobile.intentAgents.fix.see")}
             </Text>
@@ -965,12 +970,13 @@ const styles = StyleSheet.create({
   bar: { position: "absolute", top: 0, left: 0, right: 0 },
   // Not clipped: on a pull the sky grows up into the gap above the content.
   cover: { height: COVER_HEIGHT, alignItems: "center", justifyContent: "flex-end", paddingBottom: COVER_FOOT },
-  prof: { paddingHorizontal: 24, gap: 3 },
+  prof: { paddingHorizontal: 24, gap: 4 },
   center: { textAlign: "center" },
   // Chat takes the row; the computer's square sits beside it.
   acts: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
+  pressed: { opacity: 0.6 },
   // `Segmented` sizes to its labels: a row centers it under the centered head.
   tabs: { paddingHorizontal: 16, paddingTop: 20 },
   page: { paddingHorizontal: 16 },

@@ -310,7 +310,7 @@ function AgentRow({
 }
 
 const styles = StyleSheet.create({
-  work: { flexDirection: "row", alignItems: "center", gap: 7, minWidth: 0, marginTop: 2 },
+  work: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0, marginTop: 2 },
   medium: { fontWeight: "500" },
   shrink: { flexShrink: 1 },
 });

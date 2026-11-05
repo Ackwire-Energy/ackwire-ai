@@ -9,7 +9,6 @@ import { useOrg } from "@/providers/org";
 import { Icon, PressScale, useTheme, useToast } from "@/ui";
 import { BUTTON_SIZES } from "@/ui/Button";
 import { useDirectory, useNow } from "../shared/hooks";
-import { tapHaptic } from "../shared/parts";
 import { phoneEntryButton } from "./logic";
 import { useSetupWait } from "./SetupWait";
 import { useAgentComputer } from "./useAgentComputer";
@@ -59,13 +58,10 @@ export function AgentComputerButton({ agentId }: { agentId: string }) {
   const what = helps ? t("agentComputer.help") : t("agentComputer.openOf", g);
   // The secondary button's lit top edge (`Button`).
   const edge = scheme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.9)";
-  const open = () => {
-    tapHaptic();
-    openComputer(agentId);
-  };
+  // The press gives its own haptic (`PressScale`).
+  const open = () => openComputer(agentId);
   const help = async () => {
     if (state.kind !== "needsYou") return;
-    tapHaptic();
     try {
       await actions.takeControl(state.handoff.id);
       openComputer(agentId);

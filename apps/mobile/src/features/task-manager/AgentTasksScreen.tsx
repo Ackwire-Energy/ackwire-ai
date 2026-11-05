@@ -5,7 +5,8 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
-import { Button, Chip, Count, Icon, PixelStop, Text, weights } from "@/ui";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
+import { Button, Chip, Count, Icon, PixelStop, Text, useReducedMotion, weights } from "@/ui";
 import { useOpenQueue } from "../queue/QueueSheet";
 import { useColors, useDirectory, useNow, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
@@ -38,6 +39,11 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
   const { view, doneToday, query } = useAgentTasks(agentId, { here: from, stopping });
   const pull = usePullRefresh(query.refetch);
   const [asking, setAsking] = useState(false);
+  // Tasks that start or end while the person watches fade, and the rest slide into place; nothing moves with reduced
+  // motion.
+  const reduced = useReducedMotion();
+  const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
+  const layout = reduced ? undefined : LinearTransition.duration(220);
   const name = dir.nameOf({ type: "agent", id: agentId }) || t("channel.unknownAgent");
   const count = view?.rows.length ?? 0;
   const waiting = view?.waiting ?? 0;
@@ -59,67 +65,73 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
           <Button variant="secondary" size="sm" label={t("mobile.common.retry")} onPress={() => void query.refetch()} />
         </View>
       ) : (
-        <>
-          {/* The three numbers are said once, here (no line above repeating them). */}
-          <View style={styles.wells}>
-            <Well label={t("taskManager.agentPanel.wells.now")} value={count} />
-            <Well label={t("taskManager.agentPanel.wells.waiting")} value={waiting} />
-            <Well label={t("taskManager.agentPanel.wells.done")} value={doneToday} />
-          </View>
-          {view ? (
-            view.rows.map(({ task, here }, i) => (
-              <TaskRow
-                key={task.runId}
-                task={task}
-                here={here}
-                stopping={stopping}
-                now={now}
-                divider={i > 0}
-                onStop={() => stop([task.runId])}
-              />
-            ))
-          ) : (
-            <Text variant="footnote" tone="faint" style={styles.free}>
-              {t("taskManager.agentPanel.none", { name })}
-            </Text>
-          )}
-          {asking && stoppable.length > 1 ? (
-            <View style={styles.confirm}>
-              <StopConfirm
-                agentId={agentId}
-                count={stoppable.length}
-                onCancel={() => setAsking(false)}
-                onStop={(reason) => {
-                  setAsking(false);
-                  stop(stoppable, reason);
-                }}
-              />
+        // Loaded, the list fades in over the spinner; the rows it starts with don't each fade again.
+        <Animated.View {...fade}>
+          <LayoutAnimationConfig skipEntering>
+            {/* The three numbers are said once, here (no line above repeating them). */}
+            <View style={styles.wells}>
+              <Well label={t("taskManager.agentPanel.wells.now")} value={count} />
+              <Well label={t("taskManager.agentPanel.wells.waiting")} value={waiting} />
+              <Well label={t("taskManager.agentPanel.wells.done")} value={doneToday} />
             </View>
-          ) : (
-            <View style={styles.foot}>
-              <Pressable
-                onPress={() => router.push("/task-manager")}
-                accessibilityRole="button"
-                hitSlop={6}
-                style={({ pressed }) => [styles.manager, pressed && styles.pressed]}
-              >
-                <Text variant="small" tone="muted" style={styles.semibold}>
-                  {t("taskManager.actions.openManager")}
+            {view ? (
+              view.rows.map(({ task, here }, i) => (
+                <Animated.View key={task.runId} {...fade} layout={layout}>
+                  <TaskRow
+                    task={task}
+                    here={here}
+                    stopping={stopping}
+                    now={now}
+                    divider={i > 0}
+                    onStop={() => stop([task.runId])}
+                  />
+                </Animated.View>
+              ))
+            ) : (
+              <Animated.View {...fade}>
+                <Text variant="footnote" tone="faint" style={styles.free}>
+                  {t("taskManager.agentPanel.none", { name })}
                 </Text>
-                <Icon name="right" size={14} color={c.muted} />
-              </Pressable>
-              {stoppable.length > 1 ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  label={t("taskManager.actions.stopAll")}
-                  leading={(ink) => <PixelStop size={10} color={ink} moving={false} />}
-                  onPress={() => setAsking(true)}
+              </Animated.View>
+            )}
+            {asking && stoppable.length > 1 ? (
+              <Animated.View key="confirm" {...fade} layout={layout} style={styles.confirm}>
+                <StopConfirm
+                  agentId={agentId}
+                  count={stoppable.length}
+                  onCancel={() => setAsking(false)}
+                  onStop={(reason) => {
+                    setAsking(false);
+                    stop(stoppable, reason);
+                  }}
                 />
-              ) : null}
-            </View>
-          )}
-        </>
+              </Animated.View>
+            ) : (
+              <Animated.View key="foot" {...fade} layout={layout} style={styles.foot}>
+                <Pressable
+                  onPress={() => router.push("/task-manager")}
+                  accessibilityRole="button"
+                  hitSlop={6}
+                  style={({ pressed }) => [styles.manager, pressed && styles.pressed]}
+                >
+                  <Text variant="small" tone="muted" style={styles.semibold}>
+                    {t("taskManager.actions.openManager")}
+                  </Text>
+                  <Icon name="right" size={15} color={c.muted} />
+                </Pressable>
+                {stoppable.length > 1 ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    label={t("taskManager.actions.stopAll")}
+                    leading={(ink) => <PixelStop size={10} color={ink} moving={false} />}
+                    onPress={() => setAsking(true)}
+                  />
+                ) : null}
+              </Animated.View>
+            )}
+          </LayoutAnimationConfig>
+        </Animated.View>
       )}
     </PushedLargeTitle>
   );
@@ -212,7 +224,7 @@ function TaskRow({
           <Pressable
             onPress={() => openQueue(inLine.machineId)}
             accessibilityRole="button"
-            hitSlop={6}
+            hitSlop={12}
             style={({ pressed }) => [styles.see, pressed && styles.pressed]}
           >
             <Text variant="footnote" tone="muted" style={styles.semibold}>
@@ -245,12 +257,12 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,
     borderBottomRightRadius: 14,
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: 6,
   },
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 11, paddingHorizontal: 16 },
+  row: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 12, paddingHorizontal: 16 },
   divider: { position: "absolute", top: 0, left: TEXT_INSET, right: 0, height: StyleSheet.hairlineWidth },
   mark: { paddingTop: 2 },
-  text: { flex: 1, minWidth: 0, gap: 3 },
+  text: { flex: 1, minWidth: 0, gap: 4 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
   shrink: { flexShrink: 1 },
   medium: { fontWeight: weights.medium },

@@ -2,9 +2,23 @@ import { useMission, useMissionDecisions, useMissionReviews, useThreadInfo, useT
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ComputerIcon, ComputerPortrait, useComputerKind } from "@/computer/ComputerPortrait";
-import { Button, Card, Chip, Count, Icon, IconButton, LineIcon, PixelOrbit, PlanTrack, Section, Text } from "@/ui";
+import {
+  Button,
+  Card,
+  Chip,
+  Count,
+  Icon,
+  IconButton,
+  LineIcon,
+  PixelOrbit,
+  PlanTrack,
+  Section,
+  Text,
+  useReducedMotion,
+} from "@/ui";
 import { ThreadOptions } from "../chat/sheets";
 import { chatHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
@@ -56,6 +70,11 @@ function Mission({ id }: { id: string }) {
   const computer = useComputerKind(orgId, m?.machine?.id);
   const cloud = useEdition() === "cloud";
   const names = useNamesComputers();
+  // What waits on you leaves as it is decided, a step's mark changes as it moves on, and the sections under them
+  // slide into place; nothing moves with reduced motion.
+  const reduced = useReducedMotion();
+  const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
+  const layout = reduced ? undefined : LinearTransition.duration(220);
 
   if (!m) {
     return (
@@ -194,18 +213,26 @@ function Mission({ id }: { id: string }) {
           </View>
         ) : null}
 
-        {waitingN > 0 ? (
-          <Section title={t("mobile.home.waiting")} count={waitingN}>
-            <View style={styles.stack}>
-              {waiting.reviews.map((r) => (
-                <ReviewCardView key={r.id} review={r} mission={m} />
-              ))}
-              {waiting.decisions.map((d) => (
-                <DecisionCardView key={d.id} decision={d} mission={m} />
-              ))}
-            </View>
-          </Section>
-        ) : null}
+        <LayoutAnimationConfig skipEntering>
+          {waitingN > 0 ? (
+            <Animated.View {...fade} layout={layout}>
+              <Section title={t("mobile.home.waiting")} count={waitingN}>
+                <View style={styles.stack}>
+                  {waiting.reviews.map((r) => (
+                    <Animated.View key={r.id} {...fade} layout={layout}>
+                      <ReviewCardView review={r} mission={m} />
+                    </Animated.View>
+                  ))}
+                  {waiting.decisions.map((d) => (
+                    <Animated.View key={d.id} {...fade} layout={layout}>
+                      <DecisionCardView decision={d} mission={m} />
+                    </Animated.View>
+                  ))}
+                </View>
+              </Section>
+            </Animated.View>
+          ) : null}
+        </LayoutAnimationConfig>
 
         {sessions.length > 0 ? (
           <Section title={t("mobile.mission.onComputer")}>
@@ -257,44 +284,48 @@ function Mission({ id }: { id: string }) {
         {rows.length > 0 ? (
           <Section title={t("mobile.mission.plan.section")} count={rows.length}>
             <Card>
-              {rows.map((it, i) => (
-                <View
-                  key={it.id}
-                  style={[
-                    styles.planRow,
-                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
-                  ]}
-                >
-                  {/* On the item's first line, however many lines it takes. */}
-                  <LineIcon variant="body" size={18}>
-                    <View style={styles.st}>
-                      {it.status === "done" ? (
-                        <Icon name="check" size={18} color={c.ok} />
-                      ) : it.status === "doing" ? (
-                        <PixelOrbit color={color} size={14} />
-                      ) : it.status === "waiting_you" ? (
-                        <Icon name="clock" size={18} color={c.muted} />
-                      ) : (
-                        <Icon name="circle" size={18} color={c.faint} />
-                      )}
-                    </View>
-                  </LineIcon>
-                  <View style={styles.grow}>
-                    <Text
-                      variant="body"
-                      tone={it.status === "done" ? "muted" : it.status === "todo" ? "ink2" : "ink"}
-                      style={it.status === "doing" || it.status === "waiting_you" ? styles.bold : undefined}
-                    >
-                      {it.title}
-                    </Text>
-                    {it.status === "doing" || it.status === "waiting_you" ? (
-                      <Text variant="small" tone="muted">
-                        {t(it.status === "doing" ? "mobile.mission.plan.doing" : "mobile.mission.plan.waiting")}
+              {/* The marks there when the plan shows don't fade in; only a step that moves on does. */}
+              <LayoutAnimationConfig skipEntering>
+                {rows.map((it, i) => (
+                  <View
+                    key={it.id}
+                    style={[
+                      styles.planRow,
+                      i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
+                    ]}
+                  >
+                    {/* On the item's first line, however many lines it takes. */}
+                    <LineIcon variant="body" size={18}>
+                      {/* Keyed by the step's state: a step moving on cross-fades its mark. */}
+                      <Animated.View key={it.status} {...fade} style={styles.st}>
+                        {it.status === "done" ? (
+                          <Icon name="check" size={18} color={c.ok} />
+                        ) : it.status === "doing" ? (
+                          <PixelOrbit color={color} size={14} />
+                        ) : it.status === "waiting_you" ? (
+                          <Icon name="clock" size={18} color={c.muted} />
+                        ) : (
+                          <Icon name="circle" size={18} color={c.faint} />
+                        )}
+                      </Animated.View>
+                    </LineIcon>
+                    <View style={styles.grow}>
+                      <Text
+                        variant="body"
+                        tone={it.status === "done" ? "muted" : it.status === "todo" ? "ink2" : "ink"}
+                        style={it.status === "doing" || it.status === "waiting_you" ? styles.bold : undefined}
+                      >
+                        {it.title}
                       </Text>
-                    ) : null}
+                      {it.status === "doing" || it.status === "waiting_you" ? (
+                        <Text variant="small" tone="muted">
+                          {t(it.status === "doing" ? "mobile.mission.plan.doing" : "mobile.mission.plan.waiting")}
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
-                </View>
-              ))}
+                ))}
+              </LayoutAnimationConfig>
             </Card>
           </Section>
         ) : null}

@@ -30,6 +30,7 @@ import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import {
@@ -44,6 +45,7 @@ import {
   InfoHint,
   LineIcon,
   Text,
+  useReducedMotion,
 } from "@/ui";
 import { approvalTitleText, useCancelAhead } from "../approvals/parts";
 import { chatHref, widgetHref } from "../links/logic";
@@ -80,6 +82,9 @@ import { WebhookCard } from "./WebhookCard";
 
 /** At most this many runs on the screen (the web's details show as many). */
 const RUNS_SHOWN = 30;
+/** A run's mark on the timeline, and the height of the outcome's line beside it. */
+const NODE = 18;
+const SUBHEAD_LINE = 20;
 
 /**
  * One routine (`/routines/<id>`), the web's details on a screen of its own: the agent, the title and its state;
@@ -212,6 +217,10 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
       : null;
   const list = runs.data ?? r.recentRuns;
   const next = done ? "" : nextText(r, at);
+  // A run that starts, or a prepared action withdrawn, while the person watches fades; the rest slide into place.
+  const reduced = useReducedMotion();
+  const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
+  const layout = reduced ? undefined : LinearTransition.duration(220);
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader
@@ -224,7 +233,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
         <ScrollView
           contentInsetAdjustmentBehavior="automatic"
           refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
-          contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 28 }]}
+          contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 32 }]}
         >
           <View style={styles.head}>
             <AgentFace agentId={r.agentId} size={56} mode={running ? "run" : isPaused(r) ? "rest" : "idle"} />
@@ -385,7 +394,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
               ) : null}
               {busy ? (
                 <View style={styles.note}>
-                  <LineIcon name="laptop" size={14} color={c.muted} variant="footnote" />
+                  <LineIcon name="laptop" size={13} color={c.muted} variant="footnote" />
                   <Text variant="footnote" tone="muted" style={styles.shrink}>
                     {say(busy)}
                   </Text>
@@ -411,7 +420,9 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
           {r.ahead && r.ahead.length > 0 ? (
             <Section title={t("routines.panel.ahead")}>
               {r.ahead.map((a) => (
-                <AheadItem key={a.id} action={a} />
+                <Animated.View key={a.id} {...fade} layout={layout}>
+                  <AheadItem action={a} />
+                </Animated.View>
               ))}
               <Block>
                 <Text variant="footnote" tone="muted">
@@ -471,11 +482,16 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
                 <ActivityIndicator color={c.muted} />
               </Block>
             ) : list.length > 0 ? (
-              <View style={styles.runs}>
-                {list.slice(0, RUNS_SHOWN).map((x, i, shown) => (
-                  <RunItem key={x.id} run={x} routine={r} last={i === shown.length - 1} />
-                ))}
-              </View>
+              // The runs fade in over the spinner; the ones there when they load don't each fade again.
+              <Animated.View {...fade} style={styles.runs}>
+                <LayoutAnimationConfig skipEntering>
+                  {list.slice(0, RUNS_SHOWN).map((x, i, shown) => (
+                    <Animated.View key={x.id} {...fade} layout={layout}>
+                      <RunItem run={x} routine={r} last={i === shown.length - 1} />
+                    </Animated.View>
+                  ))}
+                </LayoutAnimationConfig>
+              </Animated.View>
             ) : (
               <Block>
                 <Text variant="footnote" tone="muted">
@@ -634,13 +650,21 @@ const styles = StyleSheet.create({
   block: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
   strip: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
   nexts: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  next: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
+  next: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   runs: { paddingVertical: 6 },
   run: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  rail: { alignSelf: "stretch", alignItems: "center", width: 18 },
-  node: { width: 18, height: 18, borderRadius: 6, marginTop: 1, alignItems: "center", justifyContent: "center" },
-  dash: { width: 8, height: 1.7, borderRadius: 1 },
+  rail: { alignSelf: "stretch", alignItems: "center", width: NODE },
+  // Centered on the outcome's first line (subhead, 20 tall).
+  node: {
+    width: NODE,
+    height: NODE,
+    borderRadius: 6,
+    marginTop: (SUBHEAD_LINE - NODE) / 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dash: { width: 8, height: 1.7, borderRadius: 999 },
   stem: { flex: 1, width: 1.5, marginTop: 4, marginBottom: -12 },
   underline: { textDecorationLine: "underline" },
   open: { marginTop: 2 },

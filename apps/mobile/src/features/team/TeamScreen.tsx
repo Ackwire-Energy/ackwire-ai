@@ -20,6 +20,8 @@ const AGENT = 30;
 const COLUMN_GAP = 14;
 const SCROLL_COLUMN = 168;
 const PAGE = 16;
+/** The line from an agent's trunk to its face. */
+const ELBOW = 18;
 /** Faces on a channel's card before "+N". */
 const CHANNEL_FACES = 4;
 
@@ -283,7 +285,8 @@ function ChannelCard({ channelId, name, agents }: { channelId: string; name: str
 }
 
 const styles = StyleSheet.create({
-  summary: { paddingHorizontal: PAGE, marginTop: -2 },
+  // Under the large title's words (20 in, not the page's 16), tucked to it as Memória's and Wiki's lines are.
+  summary: { paddingHorizontal: 20, marginTop: -4 },
   page: { paddingHorizontal: PAGE },
   lead: { flexDirection: "row", alignItems: "center", gap: 10 },
   // From the right hand's face center down to the people's bar.
@@ -296,12 +299,13 @@ const styles = StyleSheet.create({
   person: { flexDirection: "row", alignItems: "center", gap: 10 },
   // The agents hang from a line under the person's face center.
   branch: { marginLeft: LEAD / 2 - 0.5 },
-  node: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 46, paddingLeft: 26 },
+  // Past the elbow and 8 more: the agent's face hangs off its line.
+  node: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 46, paddingLeft: ELBOW + 8 },
   trunk: { position: "absolute", left: 0, top: 0, bottom: 0, width: 1 },
   trunkEnd: { bottom: "50%" },
-  elbow: { position: "absolute", left: 0, top: "50%", width: 18, height: 1 },
+  elbow: { position: "absolute", left: 0, top: "50%", width: ELBOW, height: 1 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, paddingHorizontal: PAGE },
-  card: { padding: 12, gap: 8, borderRadius: 18, borderBottomLeftRadius: 6 },
+  card: { padding: 12, gap: 8, borderRadius: 20, borderBottomLeftRadius: 6 },
   faces: { flexDirection: "row", alignItems: "center" },
   overlap: { marginLeft: -8 },
   more: { marginLeft: 6 },

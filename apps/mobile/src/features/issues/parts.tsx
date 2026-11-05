@@ -243,7 +243,7 @@ function CardConversation({ issue }: { issue: Issue }) {
       </Text>
       {working ? (
         <View style={styles.inline}>
-          <Icon name="bolt" size={12} color={c.agent} />
+          <Icon name="bolt" size={15} color={c.agent} />
           <Text variant="small" style={[styles.bold, { color: c.agent }]}>
             {t("threads.status.working")}
           </Text>
@@ -258,7 +258,7 @@ function CardConversation({ issue }: { issue: Issue }) {
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 16, paddingHorizontal: 13, paddingVertical: 12, gap: 8 },
+  card: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 12, gap: 8 },
   pressed: { opacity: 0.85 },
   inline: { flexDirection: "row", alignItems: "center", gap: 6 },
   bold: { fontWeight: "600" },
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   step: { flex: 1, minWidth: 0 },
   meta: { flexDirection: "row", alignItems: "center", columnGap: 8 },
   track: { flexDirection: "row", alignItems: "center", gap: 8 },
-  cells: { flex: 1, flexDirection: "row", gap: 3 },
+  cells: { flex: 1, flexDirection: "row", gap: 2 },
   cell: { flex: 1, height: 7 },
   column: {
     flexDirection: "row",
@@ -319,8 +319,8 @@ const boardWork = StyleSheet.create({
   box: { gap: 4 },
   badge: {
     alignSelf: "flex-start",
-    paddingHorizontal: 7,
-    paddingVertical: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: 6,
     overflow: "hidden",
     fontWeight: "600",

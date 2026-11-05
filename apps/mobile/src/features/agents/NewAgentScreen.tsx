@@ -60,7 +60,6 @@ import {
   GroupedHeader,
   GroupedList,
   GroupedRow,
-  Icon,
   type IconName,
   ProviderLogo,
   Sky,
@@ -76,7 +75,7 @@ import { useFailed } from "../routines/hooks";
 import { proposedRoutineWhen } from "../routines/rule";
 import { chooseAction } from "../settings/parts";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
-import { goBack, PushedHeader, successHaptic, tapHaptic, useSurface } from "../shared/parts";
+import { goBack, PushedHeader, successHaptic, Tile, tapHaptic, useSurface } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { BrainPickSheet } from "./BrainPickSheet";
 import { type FullLook, fullLook } from "./edit";
@@ -958,14 +957,12 @@ function StepBar({ index, total, name }: { index: number; total: number; name: s
   );
 }
 
-/** A row's tile as big as the roles' faces, so the text of every list on the step starts at the same place. */
+/**
+ * A row's tile as big as the roles' faces, so the text of every list on the step starts at the same place: the app's
+ * own `Tile` (its corners a third of its side).
+ */
 function RowTile({ icon }: { icon: IconName }) {
-  const c = useColors();
-  return (
-    <View style={[styles.tile, { backgroundColor: c.sunken }]}>
-      <Icon name={icon} size={18} color={c.muted} />
-    </View>
-  );
+  return <Tile icon={icon} size={36} />;
 }
 
 const styles = StyleSheet.create({
@@ -974,13 +971,12 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: 16, paddingBottom: 32 },
   steps: { paddingTop: 4 },
   bars: { flexDirection: "row", gap: 6 },
-  bar: { flex: 1, height: 3, borderRadius: 2 },
+  bar: { flex: 1, height: 3, borderRadius: 999 },
   stepName: { paddingTop: 8, paddingHorizontal: 4 },
   head: { gap: 2, paddingHorizontal: 4, paddingTop: 10, paddingBottom: 16 },
   stack: { gap: 8 },
-  gap: { height: 22 },
+  gap: { height: 24 },
   foot: { paddingTop: 7, paddingHorizontal: 16 },
-  tile: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   stage: {
     height: 150,
     marginTop: 14,
@@ -996,6 +992,6 @@ const styles = StyleSheet.create({
   restore: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 7, paddingLeft: 16 },
   who: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 4, paddingTop: 16, paddingBottom: 4 },
   pressed: { opacity: 0.6 },
-  refuse: { marginTop: 22 },
+  refuse: { marginTop: 24 },
   footer: { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 12 },
 });

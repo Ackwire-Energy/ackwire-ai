@@ -5,7 +5,19 @@ import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, TextInput, View } from "react-native";
-import { Button, fieldText, Icon, PixelOrbit, PixelStop, PixelStopped, ProviderLogo, Text, weights } from "@/ui";
+import Animated, { FadeIn } from "react-native-reanimated";
+import {
+  Button,
+  fieldText,
+  Icon,
+  PixelOrbit,
+  PixelStop,
+  PixelStopped,
+  ProviderLogo,
+  Text,
+  useReducedMotion,
+  weights,
+} from "@/ui";
 import { useCallLogo } from "../chat/ToolCalls";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
@@ -20,8 +32,11 @@ import { isHeld, lineStartText, type RowState, taskStateText, usingNow } from ".
 /** A reason's length at most: the server's (ADR 0128). */
 const REASON_MAX = 500;
 
+/** A task mark's glyph; its box is 4 pt wider, so a clock's corners aren't cut. */
+const MARK = 12;
+
 /** A task's mark: the agent's orbit while it works, the waiting clock (amber: it waits on you), queued, stopping. */
-export function TaskMark({ state, color, size = 12 }: { state: RowState; color: AgentColorName; size?: number }) {
+export function TaskMark({ state, color, size = MARK }: { state: RowState; color: AgentColorName; size?: number }) {
   const c = useColors();
   return (
     <View style={[styles.mark, { width: size + 4, height: size + 4 }]}>
@@ -122,11 +137,18 @@ export function UsingLine({ task }: { task: ManagedTask }) {
 export function StopButton({ label, stopping, onPress }: { label: string; stopping: boolean; onPress: () => void }) {
   const { t } = useTranslation();
   const c = useColors();
+  const reduced = useReducedMotion();
+  // The spinner fades in over the button it stands in for, rather than popping.
   if (stopping)
     return (
-      <View style={styles.stopping} accessible accessibilityLabel={t("taskManager.state.stopping")}>
+      <Animated.View
+        entering={reduced ? undefined : FadeIn.duration(160)}
+        style={styles.stopping}
+        accessible
+        accessibilityLabel={t("taskManager.state.stopping")}
+      >
         <ActivityIndicator size="small" color={c.muted} />
-      </View>
+      </Animated.View>
     );
   return (
     <Button
@@ -223,9 +245,9 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   grow: { flex: 1, minWidth: 0 },
   num: { fontVariant: ["tabular-nums"], flexShrink: 0 },
-  stack: { gap: 1, minWidth: 0 },
-  // Under the state's words, past its mark (16 + 6).
-  starts: { marginLeft: 22 },
+  stack: { gap: 2, minWidth: 0 },
+  // Under the state's words: past its mark's box and the row's gap.
+  starts: { marginLeft: MARK + 4 + 6 },
   // As tall as the button it stands in for, so the row doesn't move.
   stopping: { minWidth: 36, height: 36, alignItems: "center", justifyContent: "center" },
   field: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, minHeight: 36 },
