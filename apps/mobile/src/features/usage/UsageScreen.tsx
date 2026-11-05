@@ -93,7 +93,7 @@ export function UsageScreen() {
                   <View key={machineId} style={styles.machine}>
                     <View style={styles.machineName}>
                       <Icon name="laptop" size={14} color={c.faint} />
-                      <Text variant="caption" tone="faint" style={styles.caps}>
+                      <Text variant="caption" tone="faint" style={[styles.caps, styles.shrink]}>
                         {list[0]?.machineName.toLocaleUpperCase()}
                       </Text>
                     </View>
@@ -356,6 +356,7 @@ function DefaultBudgetCard() {
 }
 
 const styles = StyleSheet.create({
+  shrink: { flexShrink: 1 },
   screen: { flex: 1 },
   in: { paddingHorizontal: 16, paddingTop: 8, gap: 14 },
   grow: { flex: 1, minWidth: 0 },

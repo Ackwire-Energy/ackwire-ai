@@ -241,7 +241,7 @@ function WaitingCard({
           {minutes !== null && item.expiresAt && item.createdAt ? (
             <>
               <Fuse color="amber" remaining={fuseRemaining(item.createdAt, item.expiresAt, now)} />
-              <Text variant="caption" numberOfLines={1} style={[styles.expiry, { color: c.amber }]}>
+              <Text variant="caption" numberOfLines={1} style={[styles.expiry, { color: c.amber }, styles.shrink]}>
                 {t("mobile.approval.expiresIn", { count: minutes })}
               </Text>
             </>

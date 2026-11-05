@@ -50,7 +50,7 @@ export function Row({
         gap: 12,
         padding: 14,
         minHeight: 60,
-        backgroundColor: pressed ? "rgba(127, 127, 127, 0.08)" : "transparent",
+        backgroundColor: pressed ? colors.plate : "transparent",
       }}
     >
       {divider ? (

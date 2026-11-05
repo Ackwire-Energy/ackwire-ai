@@ -485,7 +485,7 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
     <View style={[investigated ? styles.inv : styles.askcard, surface]}>
       <View style={styles.row}>
         <Icon name="target" size={15} color={c.muted} />
-        <Text variant="caption" tone="muted" style={styles.bold}>
+        <Text variant="caption" tone="muted" style={[styles.bold, styles.shrink]}>
           {investigated
             ? t("missions.findings.proposed")
             : items.length > 0
@@ -645,6 +645,7 @@ function Findings({ findings }: { findings: MissionFinding[] }) {
 }
 
 const styles = StyleSheet.create({
+  shrink: { flexShrink: 1 },
   mcard: { marginTop: 8, padding: 14, borderRadius: 20, gap: 0 },
   pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },

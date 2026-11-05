@@ -133,7 +133,7 @@ export function TrailCard({
           </Text>
           <View style={styles.sum}>
             <TrailStrip kinds={steps.map(browserTrailKind)} color={color} />
-            <Text variant="caption" tone="muted" numberOfLines={1}>
+            <Text variant="caption" tone="muted" numberOfLines={1} style={styles.shrink}>
               {summary}
             </Text>
           </View>
