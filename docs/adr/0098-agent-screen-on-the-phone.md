@@ -21,7 +21,7 @@ Nothing on the server needs to change for a first version:
 - A socket changes mode in place (ADR 0058 §17), and `@agenteschat/client` already has the close codes, states, retries and `desktopMode`.
 - `CONTROL_GRACE_MS` gives a person who drops 2 minutes to come back.
 - The web's `DesktopLink` hands noVNC a channel of its own, so noVNC doesn't care what carries its bytes.
-- The phone has the entry (`AgentComputerRow`), the full-screen view (`/computer/<agentId>`), the request card, the push that opens it, the live steps of the run, and `TypeBar` (whole text into the focused field, with a password mode, key row and the system's autofill).
+- The phone has the entry (`AgentComputerButton`, beside Conversar on the agent's profile), the full-screen view (`/computer/<agentId>`), the request card, the push that opens it, the live steps of the run, and `TypeBar` (whole text into the focused field, with a password mode, key row and the system's autofill).
 
 ### Why the phone is not a small laptop
 

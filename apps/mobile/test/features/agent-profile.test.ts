@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentAccess, AgentForYouItem, Memory, OrgSummary, PlanUsage } from "@agenteschat/client";
+import type { AgentAccess, AgentForYouItem, AgentStatusLine, Memory, OrgSummary, PlanUsage } from "@agenteschat/client";
 import { listsAgent, mailLossText, widenQuestion } from "@agenteschat/client/lib/audience";
 import { planMeterText } from "@agenteschat/client/lib/plan-usage";
 import { planLine } from "@agenteschat/ui/plan-state";
@@ -12,6 +12,7 @@ import {
   knownAboutMe,
   memoryOrigin,
   plainRole,
+  statusCardShown,
   teamLines,
   usesOf,
   type WorkItem,
@@ -350,6 +351,9 @@ describe("Perfil: o mês, com os limites do plano (ADR 0063 §5)", () => {
     expect(planLine(both, pt, NOW.getTime())?.line).toBe("semana 40% · 5h 12%");
     expect(planLine(both, en, NOW.getTime())?.line).toBe("week 40% · 5h 12%");
     expect(planLine(both, pt, NOW.getTime())?.alert).toBeNull();
+    // The profile's month row keeps the tightest window alone as its value.
+    const top = planLine(both, pt, NOW.getTime())?.top;
+    expect(top ? `${pt.short(top)} ${top.used}%` : null).toBe("semana 40%");
     const soon = new Date(NOW.getTime() + 90 * 60_000).toISOString();
     expect(planLine(usage([{ kind: "five_hour", usedPercent: 92, resetsAt: soon }]), pt, NOW.getTime())?.alert).toBe(
       "Quase no limite · renova às 16:30",
@@ -362,31 +366,36 @@ describe("Perfil: o mês, com os limites do plano (ADR 0063 §5)", () => {
     });
   });
 
-  test("the screen: the plan's card with its account's name first, the budget only once it spent through the API", async () => {
+  test("the screen: one row for the month, the plan's account named first, the budget only once it spent through the API", async () => {
     // The screens are components the tests can't render: what they wire in, as text.
     const read = (file: string) => Bun.file(new URL(`../../src/features/${file}`, import.meta.url).pathname).text();
     const [screen, parts] = await Promise.all([read("agents/AgentProfileScreen.tsx"), read("usage/parts.tsx")]);
     expect(screen).toContain("const shown = usageShown(agent?.brain, detail.data?.budgetUsedPercent ?? 0);");
-    const plan = screen.indexOf("<PlanMeter compact usage={shown.plan.usage} label={shown.plan.account} />");
-    const budget = screen.indexOf(") : spend && shown.budget ? (");
-    expect(plan).toBeGreaterThan(0);
-    expect(budget).toBeGreaterThan(plan);
-    // The budget's share as the web says it ("<1%" for a little spent), in the plan's card and the budget's.
-    expect(screen.match(/formatPercent\(i18n\.language, spend\.percent\)/g)).toHaveLength(2);
+    // Its name: the plan's account, else the plan, else its model; its value: the plan's tightest window.
+    expect(screen).toContain("shown.plan?.account ?? thinksPlan ?? thinks?.text ?? apiModel");
+    expect(screen).toContain("const planNow = shown.plan ? planLine(shown.plan.usage, meter, now) : null;");
+    expect(screen).toContain("meter.short(planNow.top)");
+    // The budget only where it shows, its share as the web says it ("<1%" for a little spent).
+    expect(screen).toContain("if (!spend || !shown.budget) return null;");
+    expect(screen.match(/formatPercent\(i18n\.language, spend\.percent\)/g)).toHaveLength(1);
+    // No meter card and no separate usage card: the row itself opens the usage page.
+    expect(screen).not.toContain("<PlanMeter");
+    expect(screen).toContain("onPress={() => openAgentUsage(id)}");
     // The phone's meter draws the same line as the web's (`planLine`).
     expect(parts).toContain("const shown = planLine(usage, text, now);");
     // The budget is never called a limit next to a plan's limits.
     const t = await translator("pt-BR");
     expect(t("mobile.agent.ofMonthBudget")).toBe("do orçamento do mês");
     expect(t("mobile.agent.exhaustedF", { name: "Ada" })).toBe("A Ada usou todo o orçamento do mês.");
+    expect(t("settings.usageAgentLine", { spent: "US$ 3,20", budget: "US$ 50,00" })).toBe("US$ 3,20 de US$ 50,00");
   });
 
   test("Pensa com: the plan as the row's name, the model and a fixed model's effort under it, on two lines", async () => {
     const screen = await Bun.file(
       new URL("../../src/features/agents/AgentProfileScreen.tsx", import.meta.url).pathname,
     ).text();
-    expect(screen).toContain("title={thinksPlan ?? thinks.text}");
-    expect(screen).toContain("{...(thinksUnder ? { subtitle: thinksUnder, subtitleLines: 2 } : {})}");
+    expect(screen).toContain("label={thinksPlan ?? thinks.text}");
+    expect(screen).toContain("{...(thinksUnder ? { sub: thinksUnder, subLines: 2 } : {})}");
     expect(screen).toContain("!isAuto(effortView.effectiveModel)");
     const t = await translator("pt-BR");
     expect(t("agentPage.work.cell.effort", { level: "médio" })).toBe("esforço médio");
@@ -398,6 +407,51 @@ describe("Perfil: o mês, com os limites do plano (ADR 0063 §5)", () => {
     expect(parts).toContain('{ color: c[PLAN_TONE[planLevel(used, state === "limited")]] }');
     expect(parts).toContain("const level = planLevel(w.used);");
     expect(parts.match(/color=\{tone\}/g)).toHaveLength(2);
+  });
+});
+
+describe("Perfil: agora, cada coisa uma vez", () => {
+  const line = (by: AgentStatusLine["by"], kind: AgentStatusLine["kind"] = null) => ({ by, kind });
+  const idle = { working: false, asking: false };
+
+  test("its own words and out of office always; the server's work line only with no job row; a wait unless it is the request shown", () => {
+    expect(statusCardShown(null, idle)).toBe(false);
+    expect(statusCardShown(line("self"), { working: true, asking: true })).toBe(true);
+    expect(statusCardShown(line("auto", "out_of_plan"), { working: true, asking: false })).toBe(true);
+    expect(statusCardShown(line("auto", "coding"), { working: true, asking: false })).toBe(false);
+    expect(statusCardShown(line("auto", "coding"), idle)).toBe(true);
+    expect(statusCardShown(line("wait", "waiting_approval"), { working: false, asking: true })).toBe(false);
+    expect(statusCardShown(line("wait", "waiting_approval"), idle)).toBe(true);
+    expect(statusCardShown(line("wait", "waiting_plan"), { working: false, asking: true })).toBe(true);
+  });
+
+  test("the screen: three views, the request as the shared card and out of the list, the jobs as rows, no pills", async () => {
+    // The screens are components the tests can't render: what they wire in, as text.
+    const read = (file: string) => Bun.file(new URL(`../../src/features/${file}`, import.meta.url).pathname).text();
+    const [screen, mail, computer] = await Promise.all([
+      read("agents/AgentProfileScreen.tsx"),
+      read("agents/AgentMailSection.tsx"),
+      read("computer/AgentComputerRow.tsx"),
+    ]);
+    expect(screen).toContain('{ key: "today", label: t("common.today") }');
+    expect(screen).toContain('{ key: "access", label: t("agentPage.fields.levels") }');
+    expect(screen).toContain('{ key: "memory", label: t("agentPage.tabs.memory") }');
+    expect(screen).toContain('kind={{ icon: "shield", label: t("ask.kind.approval") }}');
+    expect(screen).toContain('!(waitingNow && l.href?.kind === "approval" && l.href.id === waitingNow.id)');
+    expect(screen).toContain("statusCardShown(statusLine, { working: busy, asking: asking.length > 0 })");
+    expect(screen).toContain("<PixelOrbit color={look.color} size={14} />");
+    // One surface level: grouped lists on the gray, no pills, sections or cards of its own.
+    expect(screen).not.toContain("NowPill");
+    expect(screen).not.toMatch(/<(Section|Card|Row)\b/);
+    // Mailboxes are rows of "Can use"; the computer is a square beside Chat.
+    expect(mail).toContain("export function useAgentMailboxes(agentId: string, enabled = true): MailboxLine[]");
+    expect(screen).toContain("{details && !rightHand ? <AgentComputerButton agentId={id} /> : null}");
+    expect(computer).toContain("const SIZE = BUTTON_SIZES.md.height;");
+    const t = await translator("pt-BR");
+    const tabs = [t("common.today"), t("agentPage.fields.levels"), t("agentPage.tabs.memory")];
+    expect(tabs).toEqual(["Hoje", "Acesso", "Memória"]);
+    expect(t("ask.kind.approval")).toBe("Pede sua aprovação");
+    expect(t("mobile.agent.canUse")).toBe("Pode usar");
   });
 });
 
