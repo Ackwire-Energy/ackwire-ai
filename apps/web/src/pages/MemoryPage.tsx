@@ -13,6 +13,7 @@ import {
   Icon,
   type IconName,
   List,
+  PageHeader,
   SearchField,
   Tabs,
   Textarea,
@@ -118,22 +119,20 @@ function MemoryView({ agent }: { agent: Agent }) {
         <Icon name="chevronLeft" />
         {t("memory.back", g)}
       </Link>
-      <header className="page__header page__header--row" style={{ alignItems: "flex-end" }}>
-        <div className="stack-4" style={{ flex: "1 1 320px" }}>
-          <h1 className="page-title">{t("memory.title", g)}</h1>
-          <p className="page-sub" style={{ maxWidth: "60ch" }}>
-            {t("memory.subtitle", g)}
-          </p>
-        </div>
-        {pendingProposals.length > 0 && (
-          <Button asChild>
-            <Link to="/org/$orgId/proposals" params={{ orgId: org.id }} search={{ agent: agent.id }}>
-              <Icon name="waiting" />
-              {t("memory.proposals", { count: pendingProposals.length })}
-            </Link>
-          </Button>
-        )}
-      </header>
+      <PageHeader
+        title={t("memory.title", g)}
+        meta={t("memory.subtitle", g)}
+        actions={
+          pendingProposals.length > 0 && (
+            <Button asChild>
+              <Link to="/org/$orgId/proposals" params={{ orgId: org.id }} search={{ agent: agent.id }}>
+                <Icon name="waiting" />
+                {t("memory.proposals", { count: pendingProposals.length })}
+              </Link>
+            </Button>
+          )
+        }
+      />
 
       <div className="tabs-bar">
         <Tabs

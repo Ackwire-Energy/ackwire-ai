@@ -336,6 +336,7 @@ export {
   type ToolBlockLine,
   type ToolBlockState,
 } from "./components/ToolBlock";
+export { PageHeader, type PageHeaderProps } from "./components/PageHeader";
 export {
   FilterToggle,
   type FilterToggleProps,

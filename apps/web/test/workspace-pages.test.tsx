@@ -78,7 +78,7 @@ describe("Aprovações", () => {
     const link = within(empty).getByRole("link", { name: "Como as aprovações funcionam" });
     expectHelpLink(link, "approvals");
     expect(empty.querySelector(".ac-empty__text")?.textContent).toBe("Como as aprovações funcionam");
-    expect(document.querySelector(".list-head")?.querySelectorAll("p")).toHaveLength(1);
+    expect(document.querySelector(".ac-pagehead")?.querySelectorAll("p")).toHaveLength(1);
   });
 
   test("refusing asks why, optional; approving covers this once, with these values", async () => {
@@ -169,7 +169,7 @@ describe("Memória e propostas", () => {
   test("tabs, search, pin, archive and edit with history", async () => {
     await go(`agents/${ADA_ID}/memory`);
     expect(screen().getByRole("heading", { level: 1, name: "O que a Ada sabe" })).toBeTruthy();
-    expect(document.querySelector(".page-sub")?.textContent).toBe(
+    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe(
       "O que a Ada aprendeu com as conversas e as correções do time.",
     );
     // How memory works is a page on the site, linked once under the list.
@@ -448,9 +448,9 @@ describe("Equipe (ADR 0148)", () => {
     state.approvals = state.approvals.filter((a) => a.agentId !== ATLAS_ID);
     await go("team", state);
     expect(screen().getByRole("heading", { name: "Equipe" })).toBeTruthy();
-    expect(document.querySelector(".team-head__sub")?.textContent).toBe("2 pessoas · 2 agentes · 0 setores");
+    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe("2 pessoas · 2 agentes · 0 setores");
     // The same action as the sidebar's, in the same words.
-    const head = document.querySelector(".team-head") as HTMLElement;
+    const head = document.querySelector(".ac-pagehead") as HTMLElement;
     expect(within(head).getByRole("link", { name: "Criar agente" })).toBeTruthy();
     const table = screen().getByRole("table");
     const ada = within(table).getByRole("link", { name: /Ada/ }).closest("tr") as HTMLElement;

@@ -1,5 +1,5 @@
 import { useChannels } from "@agenteschat/client";
-import { Button, EmptyState, type IconName } from "@agenteschat/ui";
+import { Button, EmptyState, type IconName, PageHeader } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -27,9 +27,7 @@ export function EmptyPage({
   const home = channels.data?.find((c) => c.name === "general" && c.isMember) ?? channels.data?.find((c) => c.isMember);
   return (
     <div className="page page--mid">
-      <header className="page__header">
-        <h1 className="page-title">{title}</h1>
-      </header>
+      <PageHeader title={title} />
       {children}
       <EmptyState
         sky

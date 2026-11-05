@@ -208,7 +208,7 @@ describe("Início", () => {
     const { router, services } = await renderApp(`/org/${ORG_ID}/home`, { api });
     await settle(4);
     expect(screen().getByRole("heading", { level: 1 }).textContent).toMatch(/^(Bom dia|Boa tarde|Boa noite), Walter$/);
-    expect(document.querySelector(".list-head__sub")?.textContent).toBe(
+    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe(
       "4 coisas esperando você · 1 agente trabalhando",
     );
     expect(screen().getByRole("navigation", { name: "Navegação do workspace" }).textContent).toContain("Início");
@@ -283,7 +283,7 @@ describe("Início", () => {
     state.members = state.members.filter((m) => m.userId === "u-walter");
     await renderApp(`/org/${ORG_ID}/home`, { api: backend(state) });
     await settle(4);
-    expect(document.querySelector(".list-head__sub")?.textContent).toBe("Seu workspace está pronto. Comece por aqui.");
+    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe("Seu workspace está pronto. Comece por aqui.");
     const steps = section("Primeiros passos");
     expect(steps.textContent).toContain("1 de 5");
     const items = within(steps).getAllByRole("listitem");
@@ -332,7 +332,7 @@ describe("Início", () => {
     await renderApp(`/org/${ORG_ID}/home`, { api: backend(state) });
     await settle(4);
     expect(section("Primeiros passos").textContent).toContain("3 de 5");
-    expect(document.querySelector(".list-head__sub")?.textContent).toBe("Nada esperando você agora.");
+    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe("Nada esperando você agora.");
   });
 
   test("a member is offered only the steps they can finish: no AI to connect for agents they don't own", async () => {

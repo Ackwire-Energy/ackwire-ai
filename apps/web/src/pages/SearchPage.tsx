@@ -2,7 +2,7 @@ import type { SearchHit } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { hitText } from "@agenteschat/client/lib/media";
 import { formatSearch, groupByChannel, SEARCH_SORTS } from "@agenteschat/client/lib/search-filters";
-import { Button, EmptyState, List, Select, TabPanel, Tabs } from "@agenteschat/ui";
+import { Button, EmptyState, List, PageHeader, Select, TabPanel, Tabs } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -123,9 +123,7 @@ export function SearchPage({ scope }: { scope?: string }) {
 
   return (
     <div className="page page--full">
-      <header className="page__header">
-        <h1 className="page-title">{t("searchPage.title")}</h1>
-      </header>
+      <PageHeader title={t("searchPage.title")} />
       <SearchBox
         chips={chips}
         onChipsChange={setChips}

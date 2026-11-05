@@ -7889,6 +7889,88 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 }
 
 /*
+ * Every inner page's header (PageHeader): the title, 28px on a 40px line (the height of the page's buttons, so they
+ * centre on it), the page's line under it, the buttons at the end of the title's line, then the page's bar. One shape
+ * on every page, so a title starts at the same place wherever you go.
+ */
+.ac-pagehead {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.ac-pagehead__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+.ac-pagehead__text {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.ac-pagehead__titleline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ac-pagehead__title {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.ac-pagehead__meta {
+  margin: -2px 0 0;
+  max-width: 72ch;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.ac-pagehead__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-left: auto;
+}
+.ac-pagehead__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  min-width: 0;
+}
+/* A phone: the buttons take their own row under the title, as wide as it, without their keys. */
+@media (max-width: 760px) {
+  .ac-pagehead__title {
+    font-size: 24px;
+    line-height: 36px;
+  }
+  .ac-pagehead__actions {
+    flex-basis: 100%;
+    min-height: 0;
+  }
+  .ac-pagehead__actions > .ac-btn:not(.ac-btn--icon) {
+    flex: 1 1 auto;
+  }
+  .ac-pagehead__actions .ac-btn__kbd {
+    display: none;
+  }
+}
+
+/*
  * List toolbars: Toolbar + SearchField + FilterChip / FilterToggle. One
  * shape from the control ruler: a list's row is compact (`--tool-h` 32, r10;
  * 40 r12 on touch), the field background and hairline; pressed or set =

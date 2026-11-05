@@ -108,7 +108,7 @@ describe("Calendário: views, moves and series", () => {
 
   test("views: Mês and Agenda; T goes back to today; arrows move the day", async () => {
     await go();
-    const range = () => document.querySelector(".cal-page__range")?.textContent ?? "";
+    const range = () => document.querySelector(".ac-pagehead__meta")?.textContent ?? "";
     const thisWeek = range();
     await act(async () => fireEvent.keyDown(document.body, { key: "ArrowRight" }));
     for (let i = 0; i < 7; i++) await act(async () => fireEvent.keyDown(document.body, { key: "ArrowRight" }));
