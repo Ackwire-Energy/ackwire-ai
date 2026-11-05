@@ -183,7 +183,7 @@ describe("connectors gallery", () => {
     expect(capabilityLines(tr, exists, def("github"), () => "")).toEqual([
       { text: "Ler código", asks: false },
       { text: "Abrir PRs", asks: false },
-      { text: "Fazer merge", asks: true },
+      { text: "Fazer merge", asks: true, said: true },
     ]);
     const sentry = def("sentry", {
       scopes: [

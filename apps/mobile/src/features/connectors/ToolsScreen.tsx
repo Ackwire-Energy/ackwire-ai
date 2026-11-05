@@ -13,7 +13,7 @@ export const openTools = (id: string) => router.push({ pathname: "/connectors/to
 
 /**
  * Ferramentas, a screen pushed over Conectores (the web's "Ferramentas", "Revisar" while some wait): what each of a
- * connection's tools may do on its own, by subject, under the native bar with its back button. A server's are
+ * connection's tools may do on its own, grouped by level, under the native bar with its back button. A server's are
  * changed here and saved with Salvar, which goes back; our catalog services' are shown as they are.
  */
 export function ToolsScreen({ connectionId }: { connectionId: string }) {
@@ -31,7 +31,7 @@ export function ToolsScreen({ connectionId }: { connectionId: string }) {
   // Until the connection is known, a catalog one can't tell its tools yet (it would read as none).
   const loading = !item && (catalog.isPending || connections.isPending || servers.isPending);
   return (
-    <View style={[styles.screen, { backgroundColor: c.bg }]}>
+    <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader title={t("connectors.tools")} {...(name ? { subtitle: name } : {})} solid={false} />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
@@ -51,5 +51,6 @@ export function ToolsScreen({ connectionId }: { connectionId: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  page: { paddingHorizontal: 20, paddingTop: 8, gap: 14 },
+  // The phone's settings: groups on the grouped gray, the save button after them.
+  page: { paddingHorizontal: 16, paddingTop: 8, gap: 14 },
 });

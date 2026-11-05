@@ -5,26 +5,14 @@ import {
   type ConnectorDef,
   type CustomServer,
   keys,
-  useAgentAccess,
-  useApi,
   useCatalog,
   useCompleteOAuth,
   useConnections,
   useConnectWithKey,
   useCustomServerAction,
   useCustomServers,
-  useDisconnect,
   useStartOAuth,
 } from "@agenteschat/client";
-import {
-  LEVELS,
-  type Level,
-  levelIn,
-  levelOf,
-  resourcesOf,
-  saveLevels,
-  sharedLevel,
-} from "@agenteschat/client/lib/access-levels";
 import { composioConnectText } from "@agenteschat/client/lib/composio";
 import { type ConnectedItem, connectedItems, itemName, outcomeText } from "@agenteschat/client/lib/connected";
 import { sameServer } from "@agenteschat/client/lib/custom-tools";
@@ -35,17 +23,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { Button, fieldText, Icon, InfoHint, LineIcon, Segmented, Text, useTheme, useToast } from "@/ui";
-import { useAgentsAccess, useSetLevels } from "../settings/hooks";
-import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useOrgId } from "../shared/hooks";
-import { errorHaptic, successHaptic, Tile } from "../shared/parts";
+import { Button, fieldText, GroupedList, GroupedRow, Icon, InfoHint, LineIcon, Text, useTheme, useToast } from "@/ui";
+import { useColors, useOrgId } from "../shared/hooks";
+import { errorHaptic, successHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
+import { AgentLevelList, WaitTile } from "./Access";
 import { ConnectorIcon } from "./ConnectorIcon";
 import {
   type AuthAnswer,
@@ -143,7 +130,7 @@ export function ConnectSheet({
               <View key={l.text} style={styles.cap}>
                 <LineIcon name={l.asks ? "shield" : "eye"} size={18} color={l.asks ? c.warn : c.muted} />
                 <Text variant="body" style={styles.grow}>
-                  {l.asks ? t("mobile.connectors.asks", { text: l.text }) : l.text}
+                  {l.asks && !l.said ? t("mobile.connectors.asks", { text: l.text }) : l.text}
                 </Text>
               </View>
             ))}
@@ -245,7 +232,8 @@ export function AddressSheet({
           reconnect={mode === "reconnect"}
           onConnected={(id, name) => {
             setConnected({ id, name });
-            setStep("review");
+            // Its tools don't hold the flow: what needs a decision waits on the connection's screen.
+            setStep("who");
           }}
           onDone={sheet.close}
         />
@@ -262,7 +250,8 @@ export function ServerSheet({ item, start, fresh = false }: { item: ConnectedIte
   const { t } = useTranslation();
   const { org } = useOrg();
   const admin = can(org, "manage_connectors");
-  const [step, setStep] = useState<Step>(() => firstStep(item, admin, start));
+  // Back from a sign-in it opens on who uses it: its tools wait on the connection's screen.
+  const [step, setStep] = useState<Step>(() => firstStep(item, admin, start === "review" ? "who" : start));
   const name = itemName(t, item);
   return (
     <View style={styles.body}>
@@ -294,9 +283,9 @@ export function ServerSheet({ item, start, fresh = false }: { item: ConnectedIte
 }
 
 /**
- * After connecting, the web's last two steps: its tools ("O que faz", then Continuar) and who uses it (one level
- * per agent). From who uses it admins open the tools on their own screen, as the web's "Ferramentas" (or
- * "Revisar" while they wait); anyone else is told when they still wait for an admin.
+ * After connecting: a catalog service's tools ("O que faz", then Continuar), then who uses it (one row per agent,
+ * the level as its value). What a server's tools need from an admin is one row there (it opens Ferramentas); anyone
+ * else is told when they still wait for an admin. Ferramentas, the account and Desconectar live on its screen.
  */
 function ConnectedSteps({
   step,
@@ -336,72 +325,32 @@ function ConnectedSteps({
       </>
     );
   }
+  const waiting = admin && live ? live.pending : 0;
   return (
     <>
-      <Text variant="body" style={styles.bold}>
-        {t("mobile.connectors.whoTitle")}
-      </Text>
-      <AgentLevels connectionId={connectionId} />
+      {/* A server comes straight here from connecting; a service said it on its tools' step. */}
+      {justConnected && !def ? <ConnectedNote name={name} /> : null}
+      <AgentLevelList connectionId={connectionId} />
+      {waiting > 0 ? (
+        // What the server's tools need from the person, one tap away, never in the way of finishing.
+        <GroupedList>
+          <GroupedRow
+            leading={<WaitTile />}
+            label={t("toolReview.decideTitle", { count: waiting })}
+            chevron
+            onPress={() => {
+              sheet.close();
+              openTools(connectionId);
+            }}
+          />
+        </GroupedList>
+      ) : null}
       {live?.needsReview && !admin ? (
         <Text variant="small" tone="muted">
           {t("mobile.connectors.review.waiting")}
         </Text>
       ) : null}
-      <SafeNote />
       <Button variant="primary" wide label={t("mobile.connectors.done")} onPress={sheet.close} />
-      {admin ? (
-        <Button
-          variant="ghost"
-          wide
-          label={live?.needsReview ? t("connectors.review") : t("connectors.tools")}
-          onPress={() => {
-            sheet.close();
-            openTools(connectionId);
-          }}
-        />
-      ) : null}
-      {admin && live ? <DisconnectButton item={live} name={name} onDone={sheet.close} /> : null}
-    </>
-  );
-}
-
-/**
- * Disconnecting: `onDone` leaves (the sheet closes, the screen goes back) with a note on the screen behind it, or
- * it says in place that it failed.
- */
-export function DisconnectButton({ item, name, onDone }: { item: ConnectedItem; name: string; onDone: () => void }) {
-  const { t } = useTranslation();
-  const orgId = useOrgId();
-  const toast = useToast();
-  const disconnect = useDisconnect(orgId);
-  const { disconnect: disconnectServer } = useCustomServerAction(orgId);
-  const [failed, setFailed] = useState(false);
-  return (
-    <>
-      <Button
-        variant="ghost"
-        wide
-        label={t("mobile.connectors.disconnect")}
-        disabled={disconnect.isPending || disconnectServer.isPending}
-        onPress={() => {
-          setFailed(false);
-          const done = {
-            onSuccess: () => {
-              successHaptic();
-              onDone();
-              toast({ title: t("mobile.connectors.disconnected", { name }) });
-            },
-            onError: () => {
-              errorHaptic();
-              setFailed(true);
-            },
-          };
-          // A server connected by address is removed through its own endpoint (as on the web).
-          if (item.custom) disconnectServer.mutate(item.id, done);
-          else disconnect.mutate(item.id, done);
-        }}
-      />
-      {failed ? <Problem text={t("mobile.connectors.disconnectFailed", { name })} /> : null}
     </>
   );
 }
@@ -479,6 +428,10 @@ function ConnectStep({
   const how = def ? connectHow(def) : "either";
   const [mode, setMode] = useState<"signIn" | "key">(how === "key" ? "key" : "signIn");
   const [url, setUrl] = useState(initialUrl ?? "");
+  // By address: the address first (Continuar checks it), then how to get in, once the host is known.
+  const [phase, setPhase] = useState<"address" | "enter">(() =>
+    askUrl && !isHttpsUrl(initialUrl ?? "") ? "address" : "enter",
+  );
   const [key, setKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const busy = start.isPending || complete.isPending || withKey.isPending || connect.isPending;
@@ -586,6 +539,11 @@ function ConnectStep({
   };
 
   const field = [styles.field, { backgroundColor: c.raised, color: c.ink, borderColor: c.line }];
+  const toEnter = () => {
+    if (!isHttpsUrl(url.trim())) return oops(t("mobile.connectors.addressInvalid"));
+    setError(null);
+    setPhase("enter");
+  };
   return (
     <>
       {viaComposio && def ? (
@@ -593,34 +551,44 @@ function ConnectStep({
           {composioConnectText(t, def)}
         </Text>
       ) : null}
-      {askUrl ? (
-        <View style={styles.fieldBox}>
-          <Text variant="footnote" tone="faint">
-            {t("mobile.connectors.addressLabel")}
-          </Text>
-          <TextInput
-            value={url}
-            onChangeText={setUrl}
-            placeholder="https://"
-            placeholderTextColor={c.faint}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            accessibilityLabel={t("mobile.connectors.addressLabel")}
-            style={field}
-          />
-        </View>
-      ) : null}
-      {!viaComposio && (how === "either" || (byAddress && mode === "key")) ? (
-        <Segmented
-          items={[
-            { key: "signIn", label: t("mobile.connectors.useSignIn") },
-            { key: "key", label: t("mobile.connectors.useKey") },
-          ]}
-          value={mode}
-          onChange={(k) => setMode(k as "signIn" | "key")}
-        />
-      ) : null}
+      {askUrl && phase === "address" ? (
+        <>
+          <View style={styles.fieldBox}>
+            <Text variant="footnote" tone="faint">
+              {t("mobile.connectors.addressLabel")}
+            </Text>
+            <TextInput
+              value={url}
+              onChangeText={(v) => {
+                setUrl(v);
+                setError(null);
+              }}
+              placeholder="https://"
+              placeholderTextColor={c.faint}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+              keyboardType="url"
+              returnKeyType="next"
+              onSubmitEditing={toEnter}
+              accessibilityLabel={t("mobile.connectors.addressLabel")}
+              style={field}
+            />
+          </View>
+          <Button variant="primary" wide label={t("connectFlow.next")} onPress={toEnter} />
+          {error ? <Problem key={error} text={error} /> : null}
+        </>
+      ) : (
+        <>
+          {askUrl ? (
+            // The address it will enter, and a way back to change it.
+            <View style={styles.keyRow}>
+              <Text variant="footnote" tone="faint" numberOfLines={1} style={styles.grow}>
+                {serverUrl}
+              </Text>
+              <Button variant="text" size="sm" label={t("common.back")} onPress={() => setPhase("address")} />
+            </View>
+          ) : null}
       {mode === "signIn" ? (
         <Button
           variant="primary"
@@ -678,141 +646,19 @@ function ConnectStep({
           />
         </>
       )}
-      {busy ? <ActivityIndicator color={c.muted} /> : null}
-      {error ? <Problem key={error} text={error} /> : null}
-    </>
-  );
-}
-
-/**
- * Who uses this connection and how far: "Todos os agentes" first (admins: it sets every agent), then one choice per
- * agent (admins and each agent's owner change it).
- */
-export function AgentLevels({ connectionId }: { connectionId: string }) {
-  const dir = useDirectory();
-  const qc = useQueryClient();
-  const orgId = useOrgId();
-  const { org } = useOrg();
-  // A new connection: every agent's tree must be read again to show it.
-  useEffect(() => {
-    void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "org" && q.queryKey[2] === "access" });
-  }, [qc]);
-  return (
-    <View style={styles.agents}>
-      {dir.agents.length > 1 && can(org, "manage_agents") ? <EveryoneLevel connectionId={connectionId} /> : null}
-      {dir.agents.map((a) => (
-        <AgentLevel key={a.id} orgId={orgId} agentId={a.id} connectionId={connectionId} />
-      ))}
-    </View>
-  );
-}
-
-/** "Todos os agentes": the main choice, as an agent's row; picking a level saves it for every agent, one by one. */
-function EveryoneLevel({ connectionId }: { connectionId: string }) {
-  const { t } = useTranslation();
-  const c = useColors();
-  const dir = useDirectory();
-  const access = useAgentsAccess(dir.agents);
-  const set = useSetLevels();
-  const [saving, setSaving] = useState<Level | null>(null);
-  const [failed, setFailed] = useState(false);
-  const resourceId = `connector:${connectionId}`;
-  const levels = dir.agents.map((a) => levelIn(access.byAgent.get(a.id), resourceId));
-  const current = saving ?? (access.loading ? null : sharedLevel(levels));
-  const choose = async (level: Level) => {
-    if (saving || access.loading || level === current) return;
-    setSaving(level);
-    setFailed(false);
-    try {
-      for (const [i, a] of dir.agents.entries()) {
-        if (levels[i] !== level) await set.mutateAsync({ agentId: a.id, changes: { [resourceId]: level } });
-      }
-    } catch {
-      errorHaptic();
-      setFailed(true);
-    } finally {
-      setSaving(null);
-    }
-  };
-  return (
-    <View style={[styles.agent, styles.everyone, { borderColor: c.line2, backgroundColor: c.raised }]}>
-      <View style={styles.agentHead}>
-        <Tile icon="members" size={30} />
-        <View style={styles.grow}>
-          <Text variant="body" numberOfLines={1} style={styles.bold}>
-            {t("connectFlow.everyone")}
-          </Text>
-          <Text variant="small" tone="muted" numberOfLines={1}>
-            {t("connectFlow.everyoneCount", { count: dir.agents.length })}
-          </Text>
-        </View>
-      </View>
-      <Segmented
-        items={LEVELS.map((l) => ({ key: l, label: t(`mobile.connectors.level.${l}`) }))}
-        value={current === "custom" || current === null ? "" : current}
-        onChange={(k) => void choose(k as Level)}
-      />
-      {failed ? <Problem text={t("mobile.connectors.everyoneFailed")} /> : null}
-    </View>
-  );
-}
-
-function AgentLevel({ orgId, agentId, connectionId }: { orgId: string; agentId: string; connectionId: string }) {
-  const { t } = useTranslation();
-  const c = useColors();
-  const api = useApi();
-  const qc = useQueryClient();
-  const dir = useDirectory();
-  const { org } = useOrg();
-  const agent = dir.agentById.get(agentId);
-  const access = useAgentAccess(orgId, agentId);
-  const [saving, setSaving] = useState<Level | null>(null);
-  const [failed, setFailed] = useState(false);
-  const resource = access.data ? resourcesOf(access.data).find((r) => r.id === `connector:${connectionId}`) : undefined;
-  const current = saving ?? (resource ? levelOf(resource) : "none");
-  // Giving an agent a connector is an admin's call, like its scopes (the server checks it again).
-  const mayChange = can(org, "manage_agents");
-  const choose = (level: Level) => {
-    if (!resource || level === current) return;
-    setSaving(level);
-    setFailed(false);
-    void saveLevels(api, orgId, agentId, { [resource.id]: level })
-      .then((next) => qc.setQueryData(keys.agentAccess(orgId, agentId), next))
-      .catch(() => {
-        errorHaptic();
-        setFailed(true);
-      })
-      .finally(() => setSaving(null));
-  };
-  return (
-    <View style={[styles.agent, { borderColor: c.line }]}>
-      <View style={styles.agentHead}>
-        <AgentFace agentId={agentId} size={30} live={false} />
-        <View style={styles.grow}>
-          <Text variant="body" numberOfLines={1} style={styles.bold}>
-            {agent?.name ?? ""}
-          </Text>
-          {agent?.role ? (
-            <Text variant="small" tone="muted" numberOfLines={1}>
-              {agent.role}
-            </Text>
+          {/* The other way in, as words under the button, only where both exist (a server asked for a key). */}
+          {!viaComposio && (how === "either" || (byAddress && mode === "key")) ? (
+            <Button
+              variant="text"
+              size="sm"
+              label={mode === "signIn" ? t("mobile.connectors.useKey") : t("mobile.connectors.useSignIn")}
+              onPress={() => setMode(mode === "signIn" ? "key" : "signIn")}
+            />
           ) : null}
-        </View>
-        {!mayChange || !resource ? (
-          <Text variant="small" tone="muted">
-            {t(`mobile.connectors.level.${current}`)}
-          </Text>
-        ) : null}
-      </View>
-      {mayChange && resource ? (
-        <Segmented
-          items={resource.levels.map((l) => ({ key: l, label: t(`mobile.connectors.level.${l}`) }))}
-          value={current === "custom" ? "" : current}
-          onChange={(k) => choose(k as Level)}
-        />
-      ) : null}
-      {failed ? <Problem text={t("mobile.connectors.levelFailed", { name: agent?.name ?? "" })} /> : null}
-    </View>
+          {error ? <Problem key={error} text={error} /> : null}
+        </>
+      )}
+    </>
   );
 }
 
@@ -830,24 +676,22 @@ export function SafeNote() {
   );
 }
 
-/** One dash per step, the ones done and the current in ink (`step`: "Passo 3 de 4: O que faz"). */
+/** One dash per step, the ones done and the current in ink, and the step said under them ("Passo 2 de 2: …"). */
 export function Progress({ steps, step }: { steps: Step[]; step: Step }) {
   const { t } = useTranslation();
   const c = useColors();
   const index = steps.indexOf(step);
+  const said = t("mobile.connectors.step", { n: index + 1, total: steps.length, label: t(STEP_KEYS[step]) });
   return (
-    <View
-      style={styles.progress}
-      accessible
-      accessibilityLabel={t("mobile.connectors.step", {
-        n: index + 1,
-        total: steps.length,
-        label: t(STEP_KEYS[step]),
-      })}
-    >
-      {steps.map((s, i) => (
-        <View key={s} style={[styles.dash, { backgroundColor: i <= index ? c.ink : c.line2 }]} />
-      ))}
+    <View accessible accessibilityLabel={said} style={styles.steps}>
+      <View style={styles.progress}>
+        {steps.map((s, i) => (
+          <View key={s} style={[styles.dash, { backgroundColor: i <= index ? c.ink : c.line2 }]} />
+        ))}
+      </View>
+      <Text variant="footnote" tone="faint" style={styles.bold}>
+        {said}
+      </Text>
     </View>
   );
 }
@@ -860,6 +704,7 @@ const styles = StyleSheet.create({
   label: { letterSpacing: 0.3 },
   caps: { gap: 10 },
   cap: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  steps: { gap: 8 },
   progress: { flexDirection: "row", gap: 6 },
   dash: { flex: 1, height: 3, borderRadius: 2 },
   fieldBox: { gap: 6 },
@@ -887,8 +732,4 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   badge: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  agents: { gap: 10 },
-  agent: { gap: 10, padding: 12, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
-  everyone: { borderWidth: 1 },
-  agentHead: { flexDirection: "row", alignItems: "center", gap: 10 },
 });

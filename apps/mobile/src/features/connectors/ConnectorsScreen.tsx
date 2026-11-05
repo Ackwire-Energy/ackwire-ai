@@ -20,6 +20,7 @@ import { Dither } from "@/sky/Dither";
 import { Button, EmptyState, Filters, Icon, SearchField, SectionHeader, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
+import { useSurface } from "../shared/parts";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { openConnection } from "./ConnectionScreen";
@@ -31,6 +32,7 @@ import {
   CATEGORIES,
   connectionOf,
   galleryTiles,
+  isHttpsUrl,
   SUGGESTED,
   searchConnectors,
   shownMailboxes,
@@ -82,6 +84,7 @@ function Gallery() {
   );
   const apps = items.filter((i) => !isMcpItem(i));
   const mcps = items.filter(isMcpItem);
+  const connectedCount = items.length + mailboxes.length;
   const name = (d: ConnectorDef) => connectorName(t, d);
   const suggestions = useMemo(() => suggestionsOf(list, items), [list, items]);
   const searching = q.trim().length > 0;
@@ -91,6 +94,8 @@ function Gallery() {
     return searchConnectors(inCat, q, (d) => `${connectorName(t, d)} ${connectorDescription(t, d)}`);
   }, [list, suggestions, cat, q, searching, t]);
   const cats = CATEGORIES.filter((k) => list.some((d) => d.category === k));
+  // What is already connected is in the row above; the grid shows it only to a search.
+  const tiles = galleryTiles(rest, items).filter((x) => searching || !x.connected);
   // Without Composio here, the services that connect only through it are left out: admins read why.
   const composioOff = admin ? composioOffText(t, list, SUGGESTED) : null;
   const open = (def: ConnectorDef) => {
@@ -98,6 +103,8 @@ function Gallery() {
     if (existing) openConnection(existing.id);
     else sheet.open(<ConnectSheet def={def} />);
   };
+  // Connecting by an address: the one typed in the search when it is one.
+  const openAddress = () => sheet.open(<AddressSheet {...(isHttpsUrl(q.trim()) ? { url: q.trim() } : {})} />);
   // A connection opens its own screen (a server connected by an address we don't know included).
   const openItem = (item: ConnectedItem) => openConnection(item.id);
   // From an agent's card in the chat (`?connect=<catalog id>` or `?mcp=<address>`, `?mcp=` alone: any address): the
@@ -165,72 +172,47 @@ function Gallery() {
         </View>
       ) : (
         <>
-          {searching ? null : apps.length + mailboxes.length > 0 ? (
-            <>
-              <SectionHeader title={t("mobile.connectors.connected")} />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-                {/* Mailboxes first, as on the web, by their name ("Suporte"). */}
-                {mailboxes.map((a) => (
-                  <Pressable
-                    key={a.id}
-                    onPress={() => sheet.open(<MailboxSheet accountId={a.id} />)}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("mobile.connectors.connectedCheck", { name: a.label })}
-                    style={styles.mini}
-                  >
-                    <ConnectorIcon def={MAIL_BRANDS[choiceOf(a)] ?? null} label={a.label} size={48} check />
-                    <Text variant="caption" tone="muted" numberOfLines={1}>
-                      {a.label}
-                    </Text>
-                  </Pressable>
-                ))}
-                {/* Every connection but the MCPs below (oldest first, as on the web). */}
-                {apps.map((item) => (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => openItem(item)}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("mobile.connectors.connectedCheck", { name: itemName(t, item) })}
-                    style={styles.mini}
-                  >
-                    <ConnectorIcon def={item.def} image={item.image} label={itemName(t, item)} size={48} check />
-                    <Text variant="caption" tone="muted" numberOfLines={1}>
-                      {itemName(t, item)}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </>
-          ) : items.length === 0 ? (
-            <EmptyHint />
-          ) : null}
+          {/* A pasted address connects a server by it, from the search itself. */}
+          {searching && admin && isHttpsUrl(q.trim()) ? <AddressRow url={q.trim()} onPress={openAddress} /> : null}
           {searching ? null : (
             <>
-              <SectionHeader title={t("mobile.connectors.mcps")} />
-              {mcps.length === 0 ? (
-                <Text variant="small" tone="muted" style={styles.mcpNone}>
-                  {t("mobile.connectors.mcpsNone")}
-                </Text>
+              {admin || connectedCount > 0 ? (
+                <>
+                  <SectionHeader
+                    title={t("mobile.connectors.connected")}
+                    {...(connectedCount > 0 ? { count: connectedCount } : {})}
+                  />
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+                    {/* Adding one opens the row: always in sight, never at the end of a sideways scroll. */}
+                    {admin ? <AddressTile onPress={() => sheet.open(<AddressSheet />)} /> : null}
+                    {/* Mailboxes first, as on the web, by their name ("Suporte"). */}
+                    {mailboxes.map((a) => (
+                      <Pressable
+                        key={a.id}
+                        onPress={() => sheet.open(<MailboxSheet accountId={a.id} />)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t("mobile.connectors.connectedCheck", { name: a.label })}
+                        style={styles.mini}
+                      >
+                        <ConnectorIcon def={MAIL_BRANDS[choiceOf(a)] ?? null} label={a.label} size={48} check />
+                        <Text variant="caption" tone="muted" numberOfLines={1}>
+                          {a.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                    {/* Services, then servers connected by address (oldest first, as on the web). */}
+                    {[...apps, ...mcps].map((item) => (
+                      <ConnectedTile
+                        key={item.id}
+                        item={item}
+                        waiting={admin && item.pending > 0}
+                        onPress={() => openItem(item)}
+                      />
+                    ))}
+                  </ScrollView>
+                </>
               ) : null}
-              {mcps.length > 0 || admin ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-                  {mcps.map((item) => (
-                    <Pressable
-                      key={item.id}
-                      onPress={() => openItem(item)}
-                      accessibilityRole="button"
-                      accessibilityLabel={t("mobile.connectors.connectedCheck", { name: itemName(t, item) })}
-                      style={styles.mini}
-                    >
-                      <ConnectorIcon def={item.def} image={item.image} label={itemName(t, item)} size={48} check />
-                      <Text variant="caption" tone="muted" numberOfLines={1}>
-                        {itemName(t, item)}
-                      </Text>
-                    </Pressable>
-                  ))}
-                  {admin ? <AddressTile onPress={() => sheet.open(<AddressSheet />)} /> : null}
-                </ScrollView>
-              ) : null}
+              {connectedCount === 0 ? <EmptyHint /> : null}
             </>
           )}
           {!searching && suggestions.length > 0 ? (
@@ -249,9 +231,9 @@ function Gallery() {
               </View>
             </>
           ) : null}
+          {searching ? null : <SectionHeader title={t("connectors.more")} count={tiles.length} />}
           {cats.length > 1 ? (
-            // Under the search it sits close; after the sections above it starts a new one (their spacing).
-            <View style={searching ? undefined : styles.filters}>
+            <View style={styles.filters}>
               <Filters
                 items={[
                   { key: "all", label: t("mobile.connectors.all") },
@@ -262,11 +244,19 @@ function Gallery() {
               />
             </View>
           ) : null}
-          {rest.length === 0 ? (
-            <EmptyState icon="search" title={t("mobile.connectors.noResults")} />
+          {tiles.length === 0 ? (
+            <EmptyState
+              icon="search"
+              title={t("mobile.connectors.noResults")}
+              action={
+                admin ? (
+                  <Button variant="secondary" size="sm" label={t("connectors.otherConnect")} onPress={openAddress} />
+                ) : null
+              }
+            />
           ) : (
             <View style={styles.grid}>
-              {galleryTiles(rest, items).map(({ def: d, connected: isConnected, opens, locked }) => (
+              {tiles.map(({ def: d, connected: isConnected, opens, locked }) => (
                 <Tile
                   key={d.id}
                   def={d}
@@ -317,6 +307,67 @@ function EmptyHint() {
   );
 }
 
+/**
+ * A connection in the row: its mark with the check, its name; when its tools wait on you (a server's new or unclear
+ * tools), the amber wait mark and its name in amber instead (its screen lists them first).
+ */
+function ConnectedTile({ item, waiting, onPress }: { item: ConnectedItem; waiting: boolean; onPress: () => void }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const name = itemName(t, item);
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={
+        waiting
+          ? `${name}, ${t("toolReview.decideTitle", { count: item.pending })}`
+          : t("mobile.connectors.connectedCheck", { name })
+      }
+      style={styles.mini}
+    >
+      <View>
+        <ConnectorIcon def={item.def} image={item.image} label={name} size={48} check={!waiting} />
+        {waiting ? (
+          <View style={[styles.waitBadge, { backgroundColor: c.amber, borderColor: c.bg }]}>
+            <Icon name="wait" size={11} color={c.bg} />
+          </View>
+        ) : null}
+      </View>
+      <Text
+        variant="caption"
+        tone="muted"
+        numberOfLines={1}
+        style={waiting ? [styles.bold, { color: c.amber }] : undefined}
+      >
+        {name}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** Searching with an address: connecting a server by it, one tap. */
+function AddressRow({ url, onPress }: { url: string; onPress: () => void }) {
+  const { t } = useTranslation();
+  const surface = useSurface();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.card, styles.address, surface, pressed && styles.pressed]}
+    >
+      <View style={[styles.cardText, styles.addressText]}>
+        <Text variant="body" numberOfLines={1} style={styles.bold}>
+          {t("connectors.otherConnect")}
+        </Text>
+        <Text variant="small" tone="muted" numberOfLines={1}>
+          {url}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 function AddressTile({ onPress }: { onPress: () => void }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -350,16 +401,23 @@ function Suggestion({
   onPress: () => void;
 }) {
   const c = useColors();
+  const surface = useSurface();
   const brand = brandOf(mark?.brandColor ?? null) ?? c.ink2;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${name}. ${text}`}
-      style={({ pressed }) => [styles.card, { borderColor: c.line }, pressed && { backgroundColor: c.sunken }]}
+      style={({ pressed }) => [styles.card, surface, pressed && styles.pressed]}
     >
       <View style={styles.band}>
-        <Dither kind="sky" tones={brandTones(c.bg, brand)} pixel={3} animated={false} style={StyleSheet.absoluteFill} />
+        <Dither
+          kind="sky"
+          tones={brandTones(c.raised, brand)}
+          pixel={3}
+          animated={false}
+          style={StyleSheet.absoluteFill}
+        />
         <ConnectorIcon def={mark} label={name} size={44} />
       </View>
       <View style={styles.cardText}>
@@ -390,6 +448,7 @@ function Tile({
   onPress?: ((def: ConnectorDef) => void) | undefined;
 }) {
   const c = useColors();
+  const surface = useSurface();
   return (
     <Pressable
       onPress={onPress ? () => onPress(def) : undefined}
@@ -398,9 +457,9 @@ function Tile({
       accessibilityLabel={`${name}. ${text}`}
       style={({ pressed }) => [
         styles.tile,
-        { borderColor: c.line },
-        pressed && { backgroundColor: c.sunken },
-        !onPress && { opacity: 0.55 },
+        // Coming soon sits sunk in the page, not raised like what opens.
+        onPress ? surface : [styles.soon, { backgroundColor: c.sunken }],
+        pressed && styles.pressed,
       ]}
     >
       <ConnectorIcon def={def} label={name} size={40} check={connected} />
@@ -421,7 +480,6 @@ const styles = StyleSheet.create({
   search: { paddingHorizontal: 16, paddingBottom: 6 },
   note: { paddingHorizontal: 16, paddingTop: 16 },
   usage: { paddingHorizontal: 16, paddingBottom: 8 },
-  mcpNone: { paddingHorizontal: 16, paddingBottom: 8 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
   row: { gap: 14, paddingHorizontal: 16, paddingBottom: 6 },
@@ -451,15 +509,18 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   hintText: { gap: 2 },
   suggestions: { gap: 10, paddingHorizontal: 16 },
-  filters: { paddingTop: 20 },
+  filters: { paddingBottom: 2 },
+  // The app's card with its cut corner (no hairline box), as every card standing on the page.
   card: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 20,
+    borderBottomLeftRadius: 6,
     overflow: "hidden",
   },
+  pressed: { opacity: 0.85 },
+  soon: { opacity: 0.55 },
   band: { width: 88, alignSelf: "stretch", minHeight: 72, alignItems: "center", justifyContent: "center" },
   cardText: { flex: 1, minWidth: 0, paddingVertical: 12, paddingRight: 14 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, paddingHorizontal: 16, paddingTop: 10 },
@@ -469,7 +530,20 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     gap: 6,
     padding: 14,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 20,
+    borderBottomLeftRadius: 6,
   },
+  waitBadge: {
+    position: "absolute",
+    right: -4,
+    bottom: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  address: { marginHorizontal: 16, marginTop: 8 },
+  addressText: { paddingLeft: 16 },
 });
