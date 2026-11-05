@@ -1145,7 +1145,12 @@ describe("stopping a chain, at its edges (ADR 0128)", () => {
     await f.db
       .insert(schema.agentRuns)
       .values({ ...asker, id: other, triggerMessageId: ask.messageId, status: "running" });
-    const row = (over: Partial<typeof ask>) => ({ ...ask, id: Bun.randomUUIDv7(), ...over });
+    const row = (over: Partial<typeof ask>) => ({
+      ...ask,
+      id: Bun.randomUUIDv7(),
+      messageId: Bun.randomUUIDv7(),
+      ...over,
+    });
     await f.db
       .insert(schema.agentConsultations)
       .values([
@@ -1213,9 +1218,14 @@ describe("a hand-off held for room (ADR 0131 §7)", () => {
     const { infra, asker } = await deferred();
     const [held] = await consultations();
     if (!held) throw new Error("no row");
-    await f.db
-      .insert(schema.agentConsultations)
-      .values({ ...held, id: Bun.randomUUIDv7(), status: "answered", answer: "Feito.", answeredAt: new Date() });
+    await f.db.insert(schema.agentConsultations).values({
+      ...held,
+      id: Bun.randomUUIDv7(),
+      messageId: Bun.randomUUIDv7(),
+      status: "answered",
+      answer: "Feito.",
+      answeredAt: new Date(),
+    });
 
     const reported = await reportHandOffs({ db: f.db, pubsub: f.pubsub }, asker);
 

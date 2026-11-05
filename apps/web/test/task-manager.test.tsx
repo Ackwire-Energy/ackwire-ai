@@ -767,7 +767,8 @@ describe("work agents asked of each other", () => {
     view.tasks.push(task({ runId: "r-boss2", agentId: ATLAS_ID, label: "Ver o deploy", requester: null }));
     const state = seedState({ taskManager: view });
     await open(state, "task-manager");
-    const row = screen().getByRole("button", { name: "Atlas" }).closest(".tm-row") as HTMLElement;
+    const asked = screen().getByRole("region", { name: "Pedidas por pessoas" });
+    const row = within(asked).getByRole("button", { name: "Atlas" }).closest(".tm-row") as HTMLElement;
     await click(within(row).getByRole("button", { name: "Parar 2" }));
     const ask = screen().getByRole("dialog", { name: "Parar Atlas e 1 ajudante?" });
     await click(within(ask).getByRole("button", { name: "Parar 3" }));
