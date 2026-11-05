@@ -13273,6 +13273,7 @@
       "usage_paused_budget": "{{agent}} pausó este trabajo · presupuesto mensual al {{percent}}%",
       "work_auto_moved": "Esto va a tardar, así que sigo en segundo plano. Publicaré novedades aquí, la próxima en unos {{minutes}} min.",
       "work_auto_movedOver": "Esto va a tardar, así que sigo en segundo plano. Publicaré novedades aquí.",
+      "moved_on": "Continúa en {{link}}",
       "work_end_done": "Listo ({{minutes}} min).",
       "work_end_failed": "Este trabajo en segundo plano no terminó ({{minutes}} min).",
       "work_end_failedWhy": "Este trabajo en segundo plano no terminó ({{minutes}} min): {{why}}.",

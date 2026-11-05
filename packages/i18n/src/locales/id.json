@@ -12466,6 +12466,7 @@
       "usage_paused_budget": "{{agent}} menjeda pekerjaan ini · anggaran bulanan di {{percent}}%",
       "work_auto_moved": "Ini akan makan waktu, jadi aku lanjutkan di latar belakang. Aku akan memposting kabar di sini, berikutnya sekitar {{minutes}} menit lagi.",
       "work_auto_movedOver": "Ini akan makan waktu, jadi aku lanjutkan di latar belakang. Aku akan memposting kabar di sini.",
+      "moved_on": "Berlanjut di {{link}}",
       "work_end_done": "Selesai ({{minutes}} menit).",
       "work_end_failed": "Pekerjaan latar belakang ini tidak selesai ({{minutes}} menit).",
       "work_end_failedWhy": "Pekerjaan latar belakang ini tidak selesai ({{minutes}} menit): {{why}}.",

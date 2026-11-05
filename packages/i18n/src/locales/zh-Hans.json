@@ -12481,6 +12481,7 @@
       "usage_paused_budget": "{{agent}} 暂停了这项工作 · 每月预算已用 {{percent}}%",
       "work_auto_moved": "这需要一些时间，所以我会在后台继续。我会在这里发布进展，下一次大约在 {{minutes}} 分钟后。",
       "work_auto_movedOver": "这需要一些时间，所以我会在后台继续。我会在这里发布进展。",
+      "moved_on": "继续在 {{link}}",
       "work_end_done": "完成（{{minutes}} 分钟）。",
       "work_end_failed": "这项后台工作没有完成（{{minutes}} 分钟）。",
       "work_end_failedWhy": "这项后台工作没有完成（{{minutes}} 分钟）：{{why}}。",

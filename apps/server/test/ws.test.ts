@@ -290,8 +290,6 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
     "agent.run",
     "agent.typing",
     "agent.delta",
-    "agent.delta",
-    "agent.delta",
     "message.created",
     "agent.run",
     "agent.idle",
@@ -307,7 +305,7 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
       .map((e) => e.text)
       .join(""),
   ).toBe("Hello there");
-  const reply = events[10] as {
+  const reply = events[8] as {
     message: { body: string; threadId: string | null; author: { type: string; id: string } };
   };
   // Asked in the channel, answered in the channel.

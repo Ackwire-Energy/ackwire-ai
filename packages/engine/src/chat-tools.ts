@@ -15,8 +15,10 @@ import { actingRoutineOfCall, personBehindCall } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
 import { personCanPost } from "./routine-state";
 import type { ArtifactLink } from "./run-tools";
+import { replyThreadOf } from "./runs";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
+import { movableRun, moveRun } from "./works";
 
 export const POST_MESSAGE_TOOL = "post_message";
 export const SEND_DM_TOOL = "send_dm";
@@ -97,13 +99,14 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
     {
       name: POST_MESSAGE_TOOL,
       description:
-        'Post a new message in another channel, e.g. when someone in a DM says "manda no #geral". `channel` is its name (with or without #). Attach files with `artifact_ids` (from list_artifacts or files you made); a file from a DM goes as a copy. Only channels the person who asked is in (when nobody asked, channels you are in). Then reply here saying where you posted. For this conversation, just reply.',
+        'Post a new message in another channel, e.g. "manda no #geral". `channel`: its name. `move_here`: asked to continue in a channel or out of a thread (its own channel too): your replies and background work go on at its top level, and a line here links there. Files: `artifact_ids`; one from a DM goes as a copy. Only channels the person who asked is in (when nobody asked, yours). Then say where you posted. For this conversation, just reply.',
       scope: "",
       inputSchema: {
         type: "object",
         properties: {
           channel: { type: "string", minLength: 1, maxLength: 100 },
           text: { type: "string", maxLength: MAX_MESSAGE_LENGTH },
+          move_here: { type: "boolean" },
           artifact_ids: {
             type: "array",
             items: { type: "string", minLength: 36, maxLength: 36 },
@@ -161,7 +164,16 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
                 : "you are";
             return { content: `No channel #${name} that ${who} in.`, isError: true };
           }
-          if (channel.id === ctx.channelId) return { content: SAME_CONVERSATION, isError: true };
+          const moving = input.move_here === true;
+          const [run] = await ctx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, ctx.runId));
+          const inThread = replyThreadOf(ctx) !== null;
+          if (channel.id === ctx.channelId && !(moving && inThread)) {
+            const out = inThread ? " To continue at this channel's top level instead, set `move_here`." : "";
+            return { content: `${SAME_CONVERSATION}${out}`, isError: true };
+          }
+          if (moving && !(run && (await movableRun(ctx.db, run)))) {
+            return { content: "This work stays where it is: post without `move_here`.", isError: true };
+          }
           if (channel.visibility !== "public" && !members.some((m) => m.agentId === ctx.agentId)) {
             return {
               content: `You are not in #${channel.name} (private). Ask someone to add you to it, then try again.`,
@@ -189,10 +201,6 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             });
             files.push({ id: shared.artifact.id, version: shared.artifact.version, title: shared.artifact.title });
           }
-          const [run] = await ctx.db
-            .select({ hop: schema.agentRuns.hop })
-            .from(schema.agentRuns)
-            .where(eq(schema.agentRuns.id, ctx.runId));
           // A mention reaches only that channel's members: the result names the agents it missed.
           const unreached = await unreachedAgents(ctx.db, {
             orgId: ctx.orgId,
@@ -230,9 +238,13 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             const [view] = await withWikiLinks(ctx.db, ctx.orgId, [messageView(message)]);
             if (view) await publishMessageCreated(deps.pubsub, view);
           }
+          if (moving && run) await moveRun({ db: ctx.db, pubsub: deps.pubsub }, run, message);
           const note = unreachedNote(unreached, `#${channel.name}`, true);
+          const next = moving
+            ? `Your replies land there from now on, at its top level, your background work's updates and report too; the people where you were see a line linking to it. Go on with the work.`
+            : "Tell the person it's there.";
           return {
-            content: `Posted in #${channel.name}${files.length > 0 ? ` with ${files.length} file(s)` : ""}: ${messageLink(ctx.orgId, message)}. Tell the person it's there.${note ? ` ${note}` : ""}`,
+            content: `Posted in #${channel.name}${files.length > 0 ? ` with ${files.length} file(s)` : ""}: ${messageLink(ctx.orgId, message)}. ${next}${note ? ` ${note}` : ""}`,
             data: { message: { id: message.id, channelId: channel.id } },
           };
         } catch (error) {

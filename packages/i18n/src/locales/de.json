@@ -12884,6 +12884,7 @@
       "usage_paused_budget": "{{agent}} hat diese Arbeit pausiert · Monatsbudget bei {{percent}} %",
       "work_auto_moved": "Das dauert eine Weile, also mache ich im Hintergrund weiter. Ich poste hier Updates, das nächste in etwa {{minutes}} Min.",
       "work_auto_movedOver": "Das dauert eine Weile, also mache ich im Hintergrund weiter. Ich poste hier Updates.",
+      "moved_on": "Geht weiter in {{link}}",
       "work_end_done": "Fertig ({{minutes}} Min.).",
       "work_end_failed": "Diese Arbeit im Hintergrund wurde nicht abgeschlossen ({{minutes}} Min.).",
       "work_end_failedWhy": "Diese Arbeit im Hintergrund wurde nicht abgeschlossen ({{minutes}} Min.): {{why}}.",

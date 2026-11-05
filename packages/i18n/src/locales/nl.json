@@ -12953,6 +12953,7 @@
       "usage_paused_budget": "{{agent}} heeft dit werk gepauzeerd · maandbudget op {{percent}}%",
       "work_auto_moved": "Dit duurt even, dus ik ga op de achtergrond verder. Ik post hier updates, de volgende over ongeveer {{minutes}} min.",
       "work_auto_movedOver": "Dit duurt even, dus ik ga op de achtergrond verder. Ik post hier updates.",
+      "moved_on": "Gaat verder in {{link}}",
       "work_end_done": "Klaar ({{minutes}} min).",
       "work_end_failed": "Dit werk op de achtergrond is niet afgerond ({{minutes}} min).",
       "work_end_failedWhy": "Dit werk op de achtergrond is niet afgerond ({{minutes}} min): {{why}}.",

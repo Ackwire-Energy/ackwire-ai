@@ -429,8 +429,8 @@ export async function startNoteRun(db: Database, message: Message, targetAgentId
 }
 
 /**
- * A note from a run to another agent (`tell_agent`'s delivery, also an @mention of an agent outside the
- * conversation, `reach.ts`): into the two agents' private DM, taken by the other agent's run at work there for the
+ * A note from a run to another agent (`tell_agent`'s delivery, also an @mention of a member that takes consultations
+ * for people outside its audience, `reach.ts`): into the two agents' private DM, taken by the other agent's run at work there for the
  * same person or starting one, tracked as a `note` row whose result comes back to the sending run's conversation
  * (`reportHandOffs`). The caller checked who may be reached. Null: the same note went out within the hour.
  */
@@ -444,7 +444,7 @@ export async function sendNote(
     targetAgentId: string;
     body: string;
     chain: string[];
-    /** An @mention of an agent outside the conversation (`settleReach`), not a tell_agent call. */
+    /** An @mention (`settleReach`), not a tell_agent call. */
     fromMention?: boolean;
     /** Wakes nobody yet: the caller starts it (`startNoteRun`) once the brakes let it through. */
     deferStart?: boolean;

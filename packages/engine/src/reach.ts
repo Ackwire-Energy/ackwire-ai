@@ -4,7 +4,6 @@ import { type AiStatusDeps, agentAiState } from "./ai-status";
 import { canTalkTo, speakerFor, viaAgent } from "./audience";
 import { fedByRoutine, personOfMessage, routinePostRun, runAuthorityById } from "./authority";
 import { chainOfRun, sendNote } from "./consultations";
-import { isAgentOnlyDm } from "./dms";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { getMessage, type Message, messageView } from "./messages";
 import { notifyAgentUnreached } from "./notification-producers";
@@ -15,7 +14,7 @@ const { agents, agentConsultations, channels, messages, routingDecisions } = sch
 
 /**
  * Why an agent's mention didn't wake the agent it names, the one vocabulary every skip uses (`routing_decisions.reason`,
- * `meta.reach`): `not_in_channel`, it isn't a member there (delivered as a note instead, when it may be reached);
+ * `meta.reach`): `not_in_channel`, on messages from before an agent's @ stopped reaching outsiders (a passing name woke them);
  * `audience`, the person behind the message can't talk to it (consulted as a note instead, when it takes consultations);
  * `routine_creator_reach`, a routine is behind it and
  * its creator's reach (a routine's) doesn't take it there.
@@ -24,9 +23,8 @@ export type ReachReason = "not_in_channel" | "audience" | "routine_creator_reach
 
 /**
  * One agent a message named and didn't wake as a mention (`meta.reach`), what the people there read under it.
- * `consultationId`: delivered as a hand-off note to its private DM (`not_in_channel`, or `audience` when it takes
- * consultations for people outside its audience: it answers the agent, never them). `outside`: also not a
- * member there. `userId`: whose reach fell short (the person behind it, or the routine's creator), so the agent's owner
+ * `consultationId`: delivered as a hand-off note to its private DM (`audience`, when it takes consultations for people
+ * outside its audience: it answers the agent, never them). `outside`: old messages, also not a member there. `userId`: whose reach fell short (the person behind it, or the routine's creator), so the agent's owner
  * can let them in. A routine behind it: its id, name, creator and access.
  */
 export interface ReachEntry {
@@ -95,45 +93,19 @@ export async function reachOfMessage(db: Database, message: Pick<Message, "orgId
 }
 
 /**
- * Of the agents outside a conversation a run's reply @names (handles), the ones `settleReach` will hand it to as a
- * note: those whoever is behind the run may talk to and that aren't in its chain, from any conversation but the
- * agents' DM. For them the mention is no unkept hand-off.
- */
-export async function reachWillHand(
-  db: Database,
-  run: { orgId: string; id: string; triggerMessageId: string },
-  channel: { kind: string; dmKey: string | null },
-  handles: string[],
-): Promise<string[]> {
-  if (handles.length === 0 || isAgentOnlyDm(channel)) return [];
-  const behind = { orgId: run.orgId, id: run.triggerMessageId, agentRunId: run.id, meta: {} };
-  const { person } = await reachOfMessage(db, behind);
-  const [rows, talks, chain] = await Promise.all([
-    db
-      .select()
-      .from(agents)
-      .where(and(eq(agents.orgId, run.orgId), inArray(agents.handle, handles), isNull(agents.archivedAt))),
-    speakerFor(db, run.orgId, person),
-    chainOfRun(db, run.orgId, run.id),
-  ]);
-  return rows.filter((a) => !chain.includes(a.id) && canTalkTo(a, person, viaAgent(talks))).map((a) => a.handle);
-}
-
-/**
- * Never silent (owner direction: a message meant for an agent reaches it, or someone is told why not). For an agent's
- * message once its mentions were dispatched: `outside`, agents of the workspace it @named that aren't members here
- * and that the judge read as needed, go as a hand-off note (`sendNote`, as `tell_agent`) when the person behind it
- * (or the routine's creator) may talk to them, from any conversation; `blocked`, members its mention didn't wake for
- * who is behind it. Each one is written on the message (`meta.reach`, the line under it, and the author's next context), in
- * `routing_decisions`, and, when a routine's creator couldn't reach an agent, told to that agent's owner.
+ * For an agent's message once its mentions were dispatched: `blocked`, members its mention didn't wake for who is
+ * behind it, are told under it, or go as a hand-off note (`sendNote`, as `tell_agent`) when they take consultations.
+ * Each one is written on the message (`meta.reach`, the line under it, and the author's next context), in
+ * `routing_decisions`, and, when a routine's creator couldn't reach an agent, told to that agent's owner. An agent @named
+ * outside the conversation isn't here: that @ reaches nobody, and `unreachedNote` tells the author so.
  */
 export async function settleReach(
   deps: { db: Database; pubsub?: PubSub } & Partial<Pick<AiStatusDeps, "gateway" | "machines">>,
   message: Message,
-  input: { outside: string[]; blocked: string[] },
+  input: { blocked: string[] },
 ): Promise<ReachEntry[]> {
   const { db } = deps;
-  const ids = [...new Set([...input.outside, ...input.blocked])];
+  const ids = [...new Set(input.blocked)];
   if (ids.length === 0) return [];
   const rows = await db
     .select()
@@ -145,11 +117,10 @@ export async function settleReach(
   const routineRef = routine
     ? { id: routine.routineId, name: routine.name, creatorUserId: routine.creatorUserId, access: routine.access }
     : undefined;
-  const blockedOf = (a: { id: string; handle: string }, outside: boolean): ReachEntry => ({
+  const blockedOf = (a: { id: string; handle: string }): ReachEntry => ({
     agentId: a.id,
     handle: a.handle,
     reason: blockedReason,
-    ...(outside ? { outside: true as const } : {}),
     ...(person ? { userId: person } : {}),
     ...(routineRef ? { routine: routineRef } : {}),
   });
@@ -158,10 +129,9 @@ export async function settleReach(
   const consulted = viaAgent(talks);
   const consultedOnly = (r: (typeof rows)[number]) =>
     !!person && !canTalkTo(r, person, talks) && canTalkTo(r, person, consulted);
-  for (const a of rows.filter((r) => input.blocked.includes(r.id) && !consultedOnly(r)))
-    entries.push(blockedOf(a, false));
-  const outside = rows.filter((r) => (input.blocked.includes(r.id) ? consultedOnly(r) : input.outside.includes(r.id)));
-  if (outside.length > 0) {
+  for (const a of rows.filter((r) => !consultedOnly(r))) entries.push(blockedOf(a));
+  const asked = rows.filter(consultedOnly);
+  if (asked.length > 0) {
     const [where] = await db
       .select({ name: channels.name, kind: channels.kind })
       .from(channels)
@@ -173,12 +143,11 @@ export async function settleReach(
     const runId = message.agentRunId ?? (await routinePostRun(db, message));
     const chain = runId ? [...(await chainOfRun(db, message.orgId, runId)), message.authorAgentId as string] : [];
     const place = where?.kind === "channel" ? `#${where.name}` : "a conversation";
-    for (const a of outside) {
-      const member = input.blocked.includes(a.id);
+    for (const a of asked) {
       // A routine reaches only its creator's agents.
       const may = !!runId && !!message.authorAgentId && !chain.includes(a.id) && canTalkTo(a, person, consulted);
       if (!may) {
-        entries.push(blockedOf(a, !member));
+        entries.push(blockedOf(a));
         continue;
       }
       if (
@@ -186,7 +155,7 @@ export async function settleReach(
         (await agentAiState({ db, gateway: deps.gateway, machines: deps.machines }, a, undefined, person ?? undefined))
           .state === "no_ai"
       ) {
-        entries.push({ agentId: a.id, handle: a.handle, reason: "not_in_channel", noAi: true });
+        entries.push(blockedOf(a));
         continue;
       }
       // Already handed to it by this run (its own tell_agent): that note is the delivery.
@@ -209,9 +178,7 @@ export async function settleReach(
             runId: runId as string,
             hop: message.hop,
             targetAgentId: a.id,
-            body: member
-              ? `[@${author?.handle ?? "an agent"} mentioned you in ${place} for someone you answer only through other agents, so it reaches you here: answer it, not them]\n\n${message.body}`
-              : `[@${author?.handle ?? "an agent"} mentioned you in ${place}, where you aren't a member, so it reaches you here]\n\n${message.body}`,
+            body: `[@${author?.handle ?? "an agent"} mentioned you in ${place} for someone you answer only through other agents, so it reaches you here: answer it, not them]\n\n${message.body}`,
             chain,
             fromMention: true,
           });
@@ -219,7 +186,7 @@ export async function settleReach(
       entries.push({
         agentId: a.id,
         handle: a.handle,
-        reason: member ? blockedReason : "not_in_channel",
+        reason: blockedReason,
         consultationId: sent.consultationId,
       });
       if (!handed && deps.pubsub && runId) {

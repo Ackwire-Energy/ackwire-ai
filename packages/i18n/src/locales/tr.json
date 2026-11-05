@@ -12814,6 +12814,7 @@
       "usage_paused_budget": "{{agent}} bu işi duraklattı · aylık bütçe %{{percent}}",
       "work_auto_moved": "Bu biraz sürecek, o yüzden arka planda devam ediyorum. Güncellemeleri buraya yazacağım, bir sonraki yaklaşık {{minutes}} dk içinde.",
       "work_auto_movedOver": "Bu biraz sürecek, o yüzden arka planda devam ediyorum. Güncellemeleri buraya yazacağım.",
+      "moved_on": "{{link}} içinde devam ediyor",
       "work_end_done": "Bitti ({{minutes}} dk).",
       "work_end_failed": "Bu arka plan işi tamamlanmadı ({{minutes}} dk).",
       "work_end_failedWhy": "Bu arka plan işi tamamlanmadı ({{minutes}} dk): {{why}}.",

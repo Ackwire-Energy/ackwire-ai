@@ -13355,6 +13355,7 @@
       "usage_paused_budget": "{{agent}} a mis ce travail en pause · budget mensuel à {{percent}} %",
       "work_auto_moved": "Cela va prendre un moment, je continue donc en arrière-plan. Je publierai des nouvelles ici, la prochaine dans environ {{minutes}} min.",
       "work_auto_movedOver": "Cela va prendre un moment, je continue donc en arrière-plan. Je publierai des nouvelles ici.",
+      "moved_on": "La suite dans {{link}}",
       "work_end_done": "Terminé ({{minutes}} min).",
       "work_end_failed": "Ce travail en arrière-plan n'a pas abouti ({{minutes}} min).",
       "work_end_failedWhy": "Ce travail en arrière-plan n'a pas abouti ({{minutes}} min) : {{why}}.",

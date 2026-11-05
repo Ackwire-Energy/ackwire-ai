@@ -52,7 +52,7 @@ describe("canceling a run", () => {
     });
     const events = f.listen(f.general.id);
     await ask("@dev analisa os logs");
-    onFirst("agent.delta", (e) => {
+    onFirst("agent.typing", (e) => {
       void cancelRun(deps(), f.owner.id, f.org.id, String(e.runId)).finally(release);
     });
     await drainOutbox(f.db, f.handlers);

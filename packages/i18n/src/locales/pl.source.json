@@ -31374,6 +31374,9 @@
   "chat.body.work_auto_movedOver": {
     "value": "This will take a while, so I'll keep going in the background. I'll post updates here."
   },
+  "chat.body.moved_on": {
+    "value": "Continues in {{link}}"
+  },
   "chat.body.work_end_done": {
     "value": "Done ({{minutes}} min)."
   },

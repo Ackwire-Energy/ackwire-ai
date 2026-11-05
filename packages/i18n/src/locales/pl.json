@@ -13765,6 +13765,7 @@
       "usage_paused_budget": "{{agent}}: praca wstrzymana · budżet miesięczny na {{percent}}%",
       "work_auto_moved": "To trochę potrwa, więc będę kontynuować w tle. Będę tu wrzucać aktualizacje, następną za około {{minutes}} min.",
       "work_auto_movedOver": "To trochę potrwa, więc będę kontynuować w tle. Będę tu wrzucać aktualizacje.",
+      "moved_on": "Ciąg dalszy w {{link}}",
       "work_end_done": "Gotowe ({{minutes}} min).",
       "work_end_failed": "Ta praca w tle się nie zakończyła ({{minutes}} min).",
       "work_end_failedWhy": "Ta praca w tle się nie zakończyła ({{minutes}} min): {{why}}.",

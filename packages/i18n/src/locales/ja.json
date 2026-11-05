@@ -12412,6 +12412,7 @@
       "usage_paused_budget": "{{agent}}がこの作業を一時停止しました · 月間予算 {{percent}}%",
       "work_auto_moved": "時間がかかりそうなので、バックグラウンドで続けます。ここに進捗を投稿します。次回は約{{minutes}}分後です。",
       "work_auto_movedOver": "時間がかかりそうなので、バックグラウンドで続けます。ここに進捗を投稿します。",
+      "moved_on": "続きは {{link}}",
       "work_end_done": "完了しました（{{minutes}}分）。",
       "work_end_failed": "このバックグラウンド作業は完了しませんでした（{{minutes}}分）。",
       "work_end_failedWhy": "このバックグラウンド作業は完了しませんでした（{{minutes}}分）: {{why}}。",

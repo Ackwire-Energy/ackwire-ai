@@ -12493,6 +12493,7 @@ export const en = {
         "This will take a while, so I'll keep going in the background. I'll post updates here, the next one in about {{minutes}} min.",
       /** The same once the work is over: its line says how it ended, so no promise is left (ADR 0121). */
       work_auto_movedOver: "This will take a while, so I'll keep going in the background. I'll post updates here.",
+      moved_on: "Continues in {{link}}",
       work_end_done: "Done ({{minutes}} min).",
       work_end_failed: "This background work didn't finish ({{minutes}} min).",
       work_end_failedWhy: "This background work didn't finish ({{minutes}} min): {{why}}.",

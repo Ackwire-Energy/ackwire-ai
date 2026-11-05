@@ -12403,6 +12403,7 @@
       "usage_paused_budget": "{{agent}}이(가) 이 작업을 일시 중지했어요 · 월 예산 {{percent}}%",
       "work_auto_moved": "시간이 좀 걸릴 것 같아 백그라운드에서 계속할게요. 여기에 진행 상황을 올릴게요. 다음 소식은 약 {{minutes}}분 후예요.",
       "work_auto_movedOver": "시간이 좀 걸릴 것 같아 백그라운드에서 계속할게요. 여기에 진행 상황을 올릴게요.",
+      "moved_on": "{{link}} 에서 계속됩니다",
       "work_end_done": "완료했어요({{minutes}}분).",
       "work_end_failed": "이 백그라운드 작업을 끝내지 못했어요({{minutes}}분).",
       "work_end_failedWhy": "이 백그라운드 작업을 끝내지 못했어요({{minutes}}분): {{why}}.",
