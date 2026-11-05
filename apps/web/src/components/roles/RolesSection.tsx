@@ -424,7 +424,7 @@ function RolePage({
         open={deleting}
         onOpenChange={setDeleting}
         title={t("rolesPage.deleteTitle", { name })}
-        description={t("rolesPage.deleteText")}
+        description={t("common.joinSentences", { a: t("rolesPage.deleteText"), b: t("common.cantUndo") })}
         closeLabel={t("common.close")}
         width={440}
       >

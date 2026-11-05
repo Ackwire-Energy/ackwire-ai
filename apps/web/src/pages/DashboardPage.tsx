@@ -328,7 +328,7 @@ function DeleteDialog({ board, open, onClose }: { board: Dashboard; open: boolea
       open={open}
       onOpenChange={(o) => !o && onClose()}
       title={t("dashboards.delete.title", { title: board.title })}
-      description={t("dashboards.delete.text")}
+      description={t("common.joinSentences", { a: t("dashboards.delete.text"), b: t("common.cantUndo") })}
       closeLabel={t("common.close")}
       width={440}
     >

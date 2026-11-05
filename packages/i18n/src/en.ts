@@ -11,6 +11,7 @@ export const en = {
   common: {
     close: "Close",
     joinSentences: "{{a}} {{b}}",
+    cantUndo: "This can't be undone.",
     removeName: "Remove {{name}}",
     about: "About {{label}}",
     previousMonth: "Previous month",
@@ -1348,6 +1349,8 @@ export const en = {
     addPasswordReauth: "Sign in again to add a password.",
     yourWorkspaces: "Your workspaces",
     youAreHere: "You are here",
+    /** Beside a workspace's name, only when another of the person's has the same name. */
+    createdOn: "Created on {{date}}",
     newWorkspace: "New workspace",
     wiki: "Wiki",
     settings: "Settings",
@@ -4703,7 +4706,7 @@ export const en = {
       audience: "Who can talk",
       channels: "Channels",
       computer: "Computer",
-      danger: "Archive",
+      danger: "Archive or delete",
       keySafe: "The key stays encrypted on the server. Nobody sees it.",
       spentOf: "spent in {{month}}, of {{amount}}",
       spentOfDefault: "spent in {{month}}, of {{amount}} (workspace default)",
@@ -7660,6 +7663,7 @@ export const en = {
     removeAgents_one: "{{names}} uses this skill and loses access to it.",
     removeAgents_other: "{{names}} use this skill and lose access to it.",
     removeNone: "No agent uses this skill.",
+    removeGone: "It leaves the workspace and this can't be undone.",
     removed: "{{name}} removed.",
     agentTitle: "Skills",
     agentSubtitle: "What {{name}} can open when needed.",
@@ -8399,7 +8403,7 @@ export const en = {
     noAccessText: "It's for some people only. If you need it, ask whoever looks after the wiki.",
     delete: "Move to trash",
     deleteTitle: "Move {{title}} to the trash?",
-    deleteText: "Links to it become “page to create”. You can restore it later.",
+    deleteText: "Links to it become “page to create”. You can't restore it from the app yet.",
     deleted: "{{title}} moved to the trash.",
     noBacklinksHint: "No page links here yet. Write [[{{title}}]] in another one.",
     allVersions: "See all {{count}} versions",
@@ -13246,6 +13250,8 @@ export const en = {
     suspendedFor: "This workspace is suspended: {{reason}}",
     bannerSub: "You can still read and write here. Agents don't answer or work while it's on hold.",
     label: "Workspace status",
+    /** Beside a suspended workspace's name in a list of workspaces. */
+    row: "Unavailable",
     screen: {
       title: "This workspace is unavailable",
       text: "Its conversations and agents are closed for now.",
@@ -13356,8 +13362,12 @@ export const en = {
   /** A workspace being deleted: the screen in its place until it goes. */
   deleting: {
     title: "{{name}} is being deleted",
-    text: "{{by}} deleted it on {{date}}. It goes for good on {{due}}.",
-    textLate: "{{by}} deleted it on {{date}}.",
+    text: "This workspace is already being deleted. There's nothing you need to do, it goes on {{date}}.",
+    textLate: "This workspace is already being deleted. There's nothing you need to do.",
+    by: "{{by}} deleted it on {{date}}.",
+    /** Beside its name in a list of workspaces. */
+    row: "Being deleted, goes on {{date}}",
+    rowLate: "Being deleted",
     /** `{{by}}` once the account that deleted it is gone. */
     someone: "Someone",
     restore: "Restore workspace",
@@ -13371,10 +13381,26 @@ export const en = {
     card: {
       text: "You leave every workspace and your account is deleted for good.",
       button: "Delete account…",
+      /** The link to Settings › General, for someone who only meant this workspace. */
+      oneWorkspace: "Want to delete just this workspace? It's in General.",
+      /** The link to Members, for someone who can't delete this workspace and only meant to leave it. */
+      leaveWorkspace: "Want to leave just this workspace? It's in Members.",
     },
-    title: "Delete your account?",
-    closes_one: "{{names}} closes now and is deleted for good on {{date}}. You're the only one there.",
-    closes_other: "{{names}} close now and are deleted for good on {{date}}. You're the only one there.",
+    title: "Delete your whole account?",
+    intro: "This deletes your whole account, not just one workspace. It can't be undone.",
+    /** The heading over deleting the account on a closed workspace's screen and on the onboarding. */
+    whole: "Your whole account",
+    /** Over links to delete a workspace instead. */
+    oneWorkspace: "Want to delete just one workspace? Your account stays.",
+    closes: "{{name}} closes now. You're the only one there, so it's deleted for good on {{date}}.",
+    /** `{{what}}`: "3 agents and 40 messages", from `agentCount` and `messageCount`. */
+    closesWith: "{{name}} closes now, with {{what}}. You're the only one there, so it's deleted for good on {{date}}.",
+    closesEmpty:
+      "{{name}} closes now, with no agents or messages. You're the only one there, so it's deleted for good on {{date}}.",
+    agentCount_one: "{{value}} agent",
+    agentCount_other: "{{value}} agents",
+    messageCount_one: "{{value}} message",
+    messageCount_other: "{{value}} messages",
     leaves: "You leave {{names}}.",
     messages: "Your messages stay in the workspaces without your name.",
     computers_one: "Your computer connected to {{name}} is removed from it: {{computers}}.",

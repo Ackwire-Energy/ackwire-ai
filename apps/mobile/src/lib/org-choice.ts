@@ -1,4 +1,5 @@
 import type { OrgSummary } from "@agenteschat/client";
+import { otherWorkspaces } from "@agenteschat/client/lib/deletion";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import type { ServerProblem } from "@agenteschat/client/lib/server";
 
@@ -41,7 +42,7 @@ export function suspendedOf<
   return {
     reason: org.standing.reason,
     cloud: org.standing.cloud === true,
-    others: orgs.filter((o) => o.id !== org.id && o.standing?.state !== "suspended"),
+    others: otherWorkspaces(orgs, org.id),
   };
 }
 
@@ -55,7 +56,7 @@ export function deletingOf<O extends Pick<OrgSummary, "id" | "deletion" | "stand
 ): { org: O; others: O[] } | null {
   const org = orgs.find((o) => o.id === orgId);
   if (!org?.deletion) return null;
-  return { org, others: orgs.filter((o) => o.id !== org.id && o.standing?.state !== "suspended") };
+  return { org, others: otherWorkspaces(orgs, org.id) };
 }
 
 /**

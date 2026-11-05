@@ -983,8 +983,6 @@
     }
   },
   "delete": {
-    "title": "Dein Konto löschen",
-    "intro": "Das lässt sich nicht rückgängig machen.",
     "goes": {
       "account": "Dein Konto, dein Zugriff und deine Sitzungen sind weg.",
       "orgs": "Workspaces, in denen du das einzige Mitglied bist, werden gelöscht.",

@@ -1000,8 +1000,6 @@ export const featureKeysEn = {
     },
   },
   delete: {
-    title: "Delete your account",
-    intro: "There's no undo.",
     goes: {
       account: "Your account, your access and your sessions are gone.",
       /** A server from before the preflight, which says what it closes. */

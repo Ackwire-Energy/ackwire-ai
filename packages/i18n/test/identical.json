@@ -419,6 +419,8 @@
       "team.list.col.roles"
     ],
     "fr": [
+      "deleteAccount.agentCount",
+      "deleteAccount.messageCount",
       "access.agentCol",
       "agent.builtinName",
       "agent.handleLabel",
@@ -1417,6 +1419,7 @@
       "agentPage.work.brain.speeds.standard"
     ],
     "nl": [
+      "deleteAccount.agentCount",
       "access.agentCol",
       "access.area.browser",
       "access.area.skills",
@@ -2617,6 +2620,7 @@
       "teamTemplates.channels.ada"
     ],
     "pl": [
+      "deleteAccount.agentCount",
       "access.agentCol",
       "agent.builtinName",
       "agentPage.fields.model",

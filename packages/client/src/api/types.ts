@@ -227,6 +227,8 @@ export interface OrgSummary {
   rank?: number | null;
   /** The workspace logo (`/api/app/org-logos/…`); null or absent = the agent mark. */
   logo?: string | null;
+  /** From `GET /me`: when it was made. Absent from older servers. */
+  createdAt?: string;
   /** From `GET /me`; absent from older servers (active). Changes come as `org.standing` events. */
   standing?: OrgStanding;
   /**
@@ -280,7 +282,14 @@ export interface AccountDeletionPlan {
    * Only I am in them: they close now and are deleted for good 7 days later. One being deleted already keeps its date
    * (`deletion.dueAt`, null once it passed).
    */
-  closes: { id: string; name: string; deletion?: { dueAt: string | null } }[];
+  closes: {
+    id: string;
+    name: string;
+    /** What it holds, unless it's being deleted already. Absent from older servers. */
+    agents?: number;
+    messages?: number;
+    deletion?: { dueAt: string | null };
+  }[];
   /** Others are in them: I leave. */
   leaves: { id: string; name: string; role: Role }[];
   /** I'm their only owner, others are in them and they aren't being deleted: the account can't go yet (`sole_owner`). */
@@ -6760,7 +6769,17 @@ export interface AppConsent {
     };
   };
   account: { name: string; email: string };
-  workspaces: { id: string; name: string; logo: string | null; paused: boolean; current: boolean }[];
+  workspaces: {
+    id: string;
+    name: string;
+    logo: string | null;
+    paused: boolean;
+    current: boolean;
+    /** Tells apart two with the same name. Absent from older servers. */
+    createdAt?: string;
+    /** While it's being deleted, when it goes. Absent from older servers. */
+    deletion?: { dueAt: string };
+  }[];
 }
 
 export interface AppConsentDecision {

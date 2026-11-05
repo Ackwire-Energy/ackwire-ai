@@ -983,8 +983,6 @@
     }
   },
   "delete": {
-    "title": "Hesabınızı silin",
-    "intro": "Bunun geri dönüşü yok.",
     "goes": {
       "account": "Hesabınız, erişimleriniz ve oturumlarınız silinir.",
       "orgs": "Tek üyesi olduğunuz çalışma alanları silinir.",

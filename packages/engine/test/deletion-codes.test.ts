@@ -170,9 +170,9 @@ describe("the code that proves it's you before deleting (ADR 0088 §2)", () => {
       support: null,
       url: "https://chat.example.com",
     });
-    expect(account.subject).toBe("482913 é seu código para apagar sua conta");
+    expect(account.subject).toBe("482913 é seu código para apagar sua conta inteira");
     // The address is inert, as every name in an email is (ADR 0069).
-    expect(account.text).toContain("Digite este código para apagar a conta ana@");
+    expect(account.text).toContain("Digite este código para apagar a conta inteira ana@");
     expect(account.text).toContain("Ela some na hora, e os workspaces em que só você está fecham com ela.");
     expect(account.text).toContain("Se não foi você, não passe para ninguém e avise quem cuida deste servidor.");
   });

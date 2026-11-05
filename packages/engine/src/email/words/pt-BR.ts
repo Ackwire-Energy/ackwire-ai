@@ -215,7 +215,7 @@ export const ptBR: Words = {
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} é seu código para apagar um workspace`,
-    subjectAccount: (code) => `${code} é seu código para apagar sua conta`,
+    subjectAccount: (code) => `${code} é seu código para apagar sua conta inteira`,
     preheader: "Digite no agentes.chat para confirmar. Vale por 10 minutos.",
     headline: "Seu código",
     workspace: (org) => [
@@ -224,9 +224,9 @@ export const ptBR: Words = {
       ". Ele fecha para todos na hora e é apagado de vez 7 dias depois.",
     ],
     account: (email) => [
-      "Digite este código para apagar a conta ",
+      "Digite este código para apagar a conta inteira ",
       { b: email },
-      ". Ela some na hora, e os workspaces em que só você está fecham com ela.",
+      ", não só um workspace. Ela some na hora, e os workspaces em que só você está fecham com ela.",
     ],
     support: (address) => [
       "Vale por 10 minutos, e nada é apagado sem ele. Se não foi você, não passe para ninguém e escreva para ",

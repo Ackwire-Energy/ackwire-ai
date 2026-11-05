@@ -1054,8 +1054,6 @@
     }
   },
   "delete": {
-    "title": "Supprimer votre compte",
-    "intro": "C'est irréversible.",
     "goes": {
       "account": "Votre compte, vos accès et vos sessions disparaissent.",
       "orgs": "Les espaces de travail dont vous êtes le seul membre sont supprimés.",

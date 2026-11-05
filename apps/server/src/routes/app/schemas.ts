@@ -79,6 +79,10 @@ export const Organization = z
       .nullable()
       .optional()
       .openapi({ description: "The workspace logo (`/api/app/org-logos/…`); null = the agent mark." }),
+    createdAt: z
+      .string()
+      .optional()
+      .openapi({ description: "In `GET /me`: when it was made, which tells apart two workspaces with the same name." }),
     standing: z
       .object({
         state: z.enum(STANDING_STATES),

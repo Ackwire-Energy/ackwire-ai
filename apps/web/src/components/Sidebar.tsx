@@ -36,6 +36,7 @@ import {
 } from "@agenteschat/client";
 import { agentSections, groupOf } from "@agenteschat/client/lib/agent-groups";
 import { audienceChip, audienceNames, audienceNotice, canTalk, hiddenAgentIds } from "@agenteschat/client/lib/audience";
+import { workspaceNotes } from "@agenteschat/client/lib/deletion";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
@@ -2046,8 +2047,9 @@ function WorkspaceMenu({ summary }: { summary: string | null }) {
 
 /** The workspace menu's options (mounted only while open: the counts load then). */
 function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
+  const notes = workspaceNotes(t, i18n.language, me.organizations);
   const navigate = useNavigate();
   const overview = useOverview(org.id);
   const managesAgents = can(org, "manage_agents");
@@ -2112,7 +2114,7 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
           <MenuOverlayItem
             key={o.id}
             leading={<OrgMark logo={o.logo} size={32} />}
-            description={t(`roles.${o.role}`)}
+            description={[t(`roles.${o.role}`), notes.get(o.id)].filter(Boolean).join(" · ")}
             current={o.id === org.id}
             hint={o.id === org.id ? t("shell.youAreHere") : undefined}
             onSelect={() => {

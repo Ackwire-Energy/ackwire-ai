@@ -286,6 +286,16 @@ export function AccountPage() {
           onPress={() => router.push("/account-delete")}
         />
       </GroupedList>
+      <GroupedFooter>{t("deleteAccount.card.text")}</GroupedFooter>
+      <GroupedList>
+        <GroupedRow
+          icon="home"
+          label={t(org.org?.role === "owner" ? "deleteAccount.card.oneWorkspace" : "deleteAccount.card.leaveWorkspace")}
+          labelLines={2}
+          chevron
+          onPress={() => router.push(org.org?.role === "owner" ? "/settings/general" : "/me/members")}
+        />
+      </GroupedList>
     </Page>
   );
 }

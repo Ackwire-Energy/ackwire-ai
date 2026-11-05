@@ -222,7 +222,7 @@ export const words: EmailWords = {
   },
   deletionCode: {
     subjectWorkspace: (code) => `ワークスペース削除の確認コード: ${code}`,
-    subjectAccount: (code) => `アカウント削除の確認コード: ${code}`,
+    subjectAccount: (code) => `アカウント全体の削除の確認コード: ${code}`,
     preheader: "agentes.chat に入力して確定してください。有効期限は10分です。",
     headline: "確認コード",
     workspace: (org) => [
@@ -233,7 +233,7 @@ export const words: EmailWords = {
     account: (email) => [
       "このコードを入力すると、アカウント ",
       { b: email },
-      " が削除されます。すぐに削除され、あなただけが参加しているワークスペースも一緒に閉じられます。",
+      " 全体が削除されます。ワークスペース1つだけではありません。すぐに削除され、あなただけが参加しているワークスペースも一緒に閉じられます。",
     ],
     support: (address) => [
       "有効期限は10分で、このコードがなければ何も削除されません。心当たりがない場合は、コードを誰にも教えず、",

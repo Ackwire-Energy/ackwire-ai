@@ -1125,8 +1125,6 @@
     }
   },
   "delete": {
-    "title": "Usuń konto",
-    "intro": "Tego nie da się cofnąć.",
     "goes": {
       "account": "Twoje konto, dostęp i sesje znikną.",
       "orgs": "Przestrzenie robocze, w których jesteś jedynym członkiem, zostaną usunięte.",

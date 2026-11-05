@@ -203,14 +203,14 @@ export const words: EmailWords = {
   },
   deletionCode: {
     subjectWorkspace: (code) => `删除工作区的验证码：${code}`,
-    subjectAccount: (code) => `删除账号的验证码：${code}`,
+    subjectAccount: (code) => `删除整个账号的验证码：${code}`,
     preheader: "在 agentes.chat 中输入它来确认。10 分钟内有效。",
     headline: "你的验证码",
     workspace: (org) => ["输入这个验证码即可删除工作区 ", { b: org }, "。它会立即对所有人关闭，7 天后被永久删除。"],
     account: (email) => [
-      "输入这个验证码即可删除账号 ",
+      "输入这个验证码即可删除整个账号 ",
       { b: email },
-      "。账号会立即删除，只有你一人的工作区也会随之关闭。",
+      "，而不只是一个工作区。账号会立即删除，只有你一人的工作区也会随之关闭。",
     ],
     support: (address) => [
       "验证码 10 分钟内有效，没有它什么都不会被删除。如果不是你本人操作，请不要告诉任何人，并写信至 ",
