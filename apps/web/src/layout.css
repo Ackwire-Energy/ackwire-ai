@@ -10666,9 +10666,10 @@ html:not([data-pointer]) .agp-changes__jump:focus-visible {
   border: 0;
   border-radius: 9px;
   background: var(--raised);
+  /* The theme's top light (`--top`): a fixed 60% white drew a bright line across its top in dark. */
   box-shadow:
     inset 0 0 0 1px var(--line),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    var(--top);
   display: inline-flex;
   align-items: center;
   cursor: pointer;

@@ -199,7 +199,8 @@ html:not([data-pointer]) .status-field__emoji:focus-visible {
   cursor: pointer;
 }
 .status-avail__opt:hover {
-  background: var(--surface);
+  /* The kit's row hover: in the dialog the page's color was a near-black plate in dark. */
+  background: var(--plate-soft);
 }
 .status-avail__text {
   display: flex;

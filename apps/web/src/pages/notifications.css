@@ -87,6 +87,8 @@
 .nt-wait > * {
   --raised: var(--raised-2);
   --surface-raised: var(--raised-2);
+  --card-face-top: var(--raised-2);
+  --card-key-bottom: var(--raised-2);
 }
 .nt-wh {
   display: flex;
