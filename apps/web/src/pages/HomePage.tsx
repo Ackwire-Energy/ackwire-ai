@@ -30,6 +30,7 @@ import {
 } from "@agenteschat/client/lib/home";
 import { waitingParts, waitingText } from "@agenteschat/client/lib/missions";
 import { allItems, waitingCardOf, widgetNoticeOf } from "@agenteschat/client/lib/notifications";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { dayPart } from "@agenteschat/client/lib/welcome";
 import { WORKING_POLL_MS, type WorkItem, workByAgent, workingNow } from "@agenteschat/client/lib/working";
 import { Button, Composer, cx, Icon, PageHeader, Select, SkyGlow } from "@agenteschat/ui";
@@ -104,6 +105,7 @@ export function HomePage() {
     ? []
     : firstSteps({
         agents: dir.agents.length,
+        made: dir.agents.filter((a) => !isRightHand(a)).length,
         hasAi: ai.data?.any ?? true,
         asked: (statuses.data ?? []).some((s) => s.activeAt !== null),
         people: overview.data?.people ?? 1,
