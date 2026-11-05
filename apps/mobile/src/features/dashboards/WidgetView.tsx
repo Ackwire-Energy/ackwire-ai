@@ -22,7 +22,7 @@ import {
   smoothPath,
 } from "@agenteschat/ui/sky/chart";
 import { Canvas, Path, Rect, Skia } from "@shopify/react-native-skia";
-import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
+import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type LayoutChangeEvent, StyleSheet, View } from "react-native";
 import Animated, {
@@ -33,7 +33,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
-import { CHROME_MAX_SCALE, Icon, PixelOrbit, PressScale, Text, useReducedMotion, useTheme } from "@/ui";
+import { CardHorizon, CHROME_MAX_SCALE, Icon, PixelOrbit, PressScale, Text, useReducedMotion, useTheme } from "@/ui";
 import { Line } from "../chat/ChartCard";
 import { AgentFace } from "../shared/Face";
 import { useSurface } from "../shared/parts";
@@ -86,6 +86,8 @@ const lineSpec = (labels: string[], values: number[], unit?: string): ChartSpec 
 export const COMPACT_HEIGHT = 152;
 /** The rows a list shows on the home's strip. */
 const COMPACT_ROWS = 3;
+/** A strip card is short: a number and its line leave less room than a board's card, and that room still earns it. */
+const COMPACT_HORIZON_ROOM = 56;
 
 /** What a widget shows: its data by kind, the building sweep, or a quiet line when it has nothing yet. */
 export const WidgetBody = memo(function WidgetBody({
@@ -95,6 +97,7 @@ export const WidgetBody = memo(function WidgetBody({
   big = false,
   bleed = false,
   compact = false,
+  onLayout,
 }: {
   spec: WidgetSpec | null;
   status: WidgetStatus;
@@ -105,6 +108,8 @@ export const WidgetBody = memo(function WidgetBody({
   bleed?: boolean;
   /** The home's strip: a smaller number, one line of note, the first rows only. */
   compact?: boolean;
+  /** Where the data ends: the card measures the room left under it (its horizon). */
+  onLayout?: (e: LayoutChangeEvent) => void;
 }) {
   const { t } = useTranslation();
   const look = useAgentLook(agentId);
@@ -123,7 +128,8 @@ export const WidgetBody = memo(function WidgetBody({
   // On a board the data dims while it updates or failed; the home's strip says so on its title line instead.
   const dim = compact ? 1 : status === "updating" ? 0.45 : status === "failed" ? 0.5 : 1;
   return (
-    <View style={[{ opacity: dim }, compact && styles.fill]}>
+    // On the strip the columns take the card's room; anything else ends where its data does.
+    <View onLayout={onLayout} style={[{ opacity: dim }, compact && spec.kind === "bars" && styles.fill]}>
       <SpecBody spec={spec} color={look.color} big={big} bleed={bleed} compact={compact} />
     </View>
   );
@@ -658,8 +664,43 @@ export function WidgetCard({
   const bleed = drawn ? bleedSeries(w.spec, large) : null;
   const bleedHeight = compact ? 34 : w.spec?.kind === "line" ? (large ? 120 : 76) : large ? 72 : 48;
   const foot = footer !== undefined ? footer : compact ? null : <WidgetFoot widget={w} />;
+  // A card with room to spare under its data gets the agents' horizon at its foot, as on the web: not under a trend
+  // (it already runs along the foot), not on the big preview, not while it builds.
+  const horizon = Boolean(onPress) && !big && drawn && !bleed;
+  const [frame, setFrame] = useState({ width: 0, height: 0 });
+  const frameRef = useRef<View>(null);
+  // Where the card stands on the screen: cards side by side continue one wave, as on the web.
+  const [waveX, setWaveX] = useState(0);
+  const [bodyTop, setBodyTop] = useState(0);
+  const [dataHeight, setDataHeight] = useState(0);
+  // From where the data ends to the card's bottom edge, its padding included (as the web measures it).
+  const room = frame.height + PAD_Y - (bodyTop + dataHeight);
   const content = (
     <>
+      {horizon ? (
+        <>
+          <View
+            ref={frameRef}
+            pointerEvents="none"
+            style={StyleSheet.absoluteFill}
+            onLayout={(e) => {
+              const { width, height } = e.nativeEvent.layout;
+              setFrame((f) => (f.width === width && f.height === height ? f : { width, height }));
+              frameRef.current?.measureInWindow((x) => setWaveX(Math.round(x - PAD_X)));
+            }}
+          />
+          {dataHeight > 0 && frame.width > 0 ? (
+            <CardHorizon
+              width={frame.width + 2 * PAD_X}
+              room={room}
+              surface={compact ? c.raised : soft.backgroundColor}
+              x={waveX}
+              {...(compact ? { minRoom: COMPACT_HORIZON_ROOM } : {})}
+              style={styles.horizon}
+            />
+          ) : null}
+        </>
+      ) : null}
       {head === undefined ? (
         <View style={[styles.head, large ? styles.headTop : null]}>
           <AgentFace agentId={w.agentId} size={16} live={false} />
@@ -674,7 +715,10 @@ export function WidgetCard({
         head
       )}
       {above}
-      <View style={compact ? styles.bodyCompact : styles.body}>
+      <View
+        style={compact ? styles.bodyCompact : styles.body}
+        onLayout={horizon ? (e) => setBodyTop(e.nativeEvent.layout.y) : undefined}
+      >
         {body === undefined ? (
           <WidgetBody
             spec={w.spec}
@@ -683,6 +727,7 @@ export function WidgetCard({
             big={large}
             bleed={Boolean(bleed)}
             compact={compact}
+            {...(horizon ? { onLayout: (e: LayoutChangeEvent) => setDataHeight(e.nativeEvent.layout.height) } : {})}
           />
         ) : (
           body
@@ -815,6 +860,8 @@ const styles = StyleSheet.create({
   bleedBox: { marginHorizontal: -PAD_X, marginBottom: -PAD_Y, marginTop: -4 },
   bleed: { width: "100%" },
   dim: { opacity: 0.45 },
+  // Out to the card's sides and bottom edge, under its text: the card's corners clip it.
+  horizon: { left: -PAD_X, bottom: -PAD_Y },
   compact: { height: COMPACT_HEIGHT, flexGrow: 0, gap: 6 },
   fill: { flex: 1, minHeight: 0 },
   compactBars: { gap: 6 },
