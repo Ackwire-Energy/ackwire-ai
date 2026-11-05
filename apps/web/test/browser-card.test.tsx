@@ -373,7 +373,7 @@ describe("the card in the message", () => {
     /** The input frames sent since, each as its events. */
     const frames = () =>
       (socket.sent.slice(before) as Sent[]).filter((f) => f.type === "browser.input").map((f) => f.events ?? []);
-    return { card, page, img, sentToPage, flushed, frames };
+    return { card, page, img, socket, sentToPage, flushed, frames };
   }
   const pointer = (pointerId: number, x: number, y: number, pointerType = "mouse") => ({
     pointerId,
@@ -549,6 +549,27 @@ describe("the card in the message", () => {
         void fireEvent.paste(el, { clipboardData: { getData: (type: string) => (type === "text/plain" ? text : "") } }),
     );
   const toast = () => [...document.querySelectorAll(".ac-toast")].at(-1)?.textContent ?? null;
+
+  test("in control with the focus nowhere, keys go to the page without a click first", async () => {
+    const { page } = await inControlOfPage();
+    expect(document.activeElement).toBe(page);
+  });
+
+  test("what the person does that can't reach the page: the card says so, again when a try fails again", async () => {
+    const { socket } = await inControlOfPage();
+    expect(toast()).toBeNull();
+    const refused = async (code: string) => {
+      await act(async () => socket.push({ type: "error", agentId: ADA_ID, code }));
+      await settle(2);
+      return [...document.querySelectorAll(".ac-toast")].at(-1);
+    };
+    const first = await refused("input_failed");
+    expect(toast()).toContain("não chegou à página");
+    // Nothing repaints after a try that failed, so no picture clears the first refusal.
+    expect(await refused("input_failed")).not.toBe(first);
+    await refused("no_field");
+    expect(toast()).toContain("Nenhum campo está selecionado");
+  });
 
   test("the person's paste keys paste their text into the page's field as text, in pieces a frame carries", async () => {
     const { page, frames } = await inControlOfPage("dialog");

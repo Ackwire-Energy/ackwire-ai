@@ -146,6 +146,10 @@ export function BrowserCard({
     watching && live.online && !live.hidden && waitsForPage(live.unavailable) && !(live.frame && !live.unavailable);
   const stuck = useBrowserStuck(waitingForPage, attempt);
   const note = pageNoteOf(live.unavailable, live.hidden, mine, stuck);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: said each time, also when a try that failed fails again
+  useEffect(() => {
+    if (mine && live.lost) toast({ title: t(live.lost.words), icon: "x" });
+  }, [live.lost]);
   // Full screen its header says who is in control, so the page says only why it hides, as the web's does.
   const hiddenNote = surface
     ? t("browser.inCard.hiddenHelp", agentGrammar(name))

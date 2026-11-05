@@ -13497,6 +13497,8 @@
       "paste": "Yapıştır",
       "pasteHint": "Kopyaladığını sayfaya yapıştır",
       "pasteBlocked": "Tarayıcın kopyaladığını okumaya izin vermedi. Sayfada {{keys}} kullan.",
+      "inputLost": "Bu sayfaya ulaşmadı, bu yüzden hiçbir şey tıklanmadı veya yazılmadı. Tekrar dene.",
+      "noField": "Sayfada seçili bir alan yok, bu yüzden yazılmadı. Alanı seç ve tekrar yaz.",
       "goLabel": "Site adresi",
       "goPlaceholder": "ornek.com gibi bir adres yazın",
       "go": "Aç",

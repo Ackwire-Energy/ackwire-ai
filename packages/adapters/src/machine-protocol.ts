@@ -1922,8 +1922,11 @@ export interface MachineReplies {
   "browser.stream.start": { mode: BrowserStreamMode };
   "browser.stream.stop": { stopped: boolean };
   /** Events sent to the page. */
-  /** `failed`: events the browser didn't confirm (absent when all went through). */
-  "browser.input": { accepted: number; failed?: number };
+  /**
+   * `failed`: events the browser didn't confirm (absent when all went through). `nowhere`: text went to a page with
+   * nothing focused that takes it.
+   */
+  "browser.input": { accepted: number; failed?: number; nowhere?: boolean };
   /** One answer per command run, in order: fewer than asked when one failed without `tolerate`. */
   "browser.batch": {
     answers: { success: boolean; data: unknown; error?: string; code?: string }[];
