@@ -52,7 +52,7 @@ import { Alert, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, Text
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, Card, fieldText, Icon, InfoHint, Row, Text, Toggle, useToast } from "@/ui";
+import { AgentAvatar, Button, Card, fieldText, Icon, InfoHint, Locked, Row, Text, Toggle, useToast } from "@/ui";
 import { newAgentAi, pickedAi } from "../ai/logic";
 import { openConnectAi } from "../ai/NoAiCard";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
@@ -868,7 +868,9 @@ function NewAgentForm({
           ) : (
             <>
               <Steps index={index} total={total} />
-              {views[step]()}
+              <Locked when={busy} style={styles.step}>
+                {views[step]()}
+              </Locked>
             </>
           )}
         </ScrollView>
@@ -891,7 +893,7 @@ function NewAgentForm({
             </>
           ) : null}
           {!importing && index > 0 ? (
-            <Button variant="secondary" label={t("common.back")} onPress={() => goTo(index - 1)} />
+            <Button variant="secondary" label={t("common.back")} disabled={busy} onPress={() => goTo(index - 1)} />
           ) : null}
           {!importing && (step !== "role" || role) ? (
             <View style={styles.fill}>
@@ -901,7 +903,7 @@ function NewAgentForm({
                 label={
                   index === total - 1 ? t("newAgent.create", { name: name.trim() || shownName }) : t("common.continue")
                 }
-                disabled={busy}
+                loading={busy}
                 onPress={next}
               />
             </View>
@@ -980,6 +982,7 @@ function RoleCard({
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   body: { paddingHorizontal: 18, paddingBottom: 32, gap: 8 },
+  step: { gap: 8 },
   head: { gap: 6, marginBottom: 10 },
   group: { gap: 8, marginTop: 8 },
   groupTitle: { marginTop: 6 },

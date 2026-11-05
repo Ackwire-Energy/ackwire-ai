@@ -33,7 +33,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, fieldText, Icon, Sheet, Text } from "@/ui";
+import { AgentAvatar, Button, fieldText, Icon, Locked, Sheet, Text } from "@/ui";
 import { fullLook } from "../agents/edit";
 import { openConnectAi } from "../ai/NoAiCard";
 import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
@@ -567,21 +567,23 @@ function AdjustForm({
   return (
     <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
       <Text variant="title2">{t("teamPlan.adjust.title", { name: agent.name })}</Text>
-      {input("name", t("teamPlan.adjust.name"), 80)}
-      {input("role", t("teamPlan.adjust.role"), 200)}
-      {input("line", t("teamPlan.adjust.line"), 300)}
-      {input("channel", t("teamPlan.adjust.channel"), 80)}
-      <View style={styles.formRow}>
-        <Text variant="footnote" tone="muted">
-          {t("teamPlan.adjust.instructions")}
-        </Text>
-        <TextArea
-          value={v.instructions}
-          accessibilityLabel={t("teamPlan.adjust.instructions")}
-          onChangeText={(text) => setV((p) => ({ ...p, instructions: text }))}
-        />
-      </View>
-      {input("firstTask", t("teamPlan.adjust.firstTask"), 500)}
+      <Locked when={saving} style={styles.fields}>
+        {input("name", t("teamPlan.adjust.name"), 80)}
+        {input("role", t("teamPlan.adjust.role"), 200)}
+        {input("line", t("teamPlan.adjust.line"), 300)}
+        {input("channel", t("teamPlan.adjust.channel"), 80)}
+        <View style={styles.formRow}>
+          <Text variant="footnote" tone="muted">
+            {t("teamPlan.adjust.instructions")}
+          </Text>
+          <TextArea
+            value={v.instructions}
+            accessibilityLabel={t("teamPlan.adjust.instructions")}
+            onChangeText={(text) => setV((p) => ({ ...p, instructions: text }))}
+          />
+        </View>
+        {input("firstTask", t("teamPlan.adjust.firstTask"), 500)}
+      </Locked>
       <Button variant="primary" wide label={t("common.save")} loading={saving} onPress={() => onSave(v)} />
       <Button variant="ghost" wide label={t("common.cancel")} onPress={onClose} />
     </ScrollView>
@@ -699,7 +701,13 @@ export function TeamTemplatesSheet({
                 use.mutate({ templateId: chosen.id, locale: i18n.language }, { onSuccess: onClose, onError: failed })
               }
             />
-            <Button variant="ghost" wide label={t("common.back")} onPress={() => setPicked(null)} />
+            <Button
+              variant="ghost"
+              wide
+              label={t("common.back")}
+              disabled={use.isPending}
+              onPress={() => setPicked(null)}
+            />
           </>
         ) : (
           <>
@@ -784,6 +792,7 @@ const styles = StyleSheet.create({
   fill: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   form: { gap: 12, padding: 16, paddingBottom: 32 },
+  fields: { gap: 12 },
   formRow: { gap: 4 },
   field: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
   mapCol: { gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderStyle: "dashed" },

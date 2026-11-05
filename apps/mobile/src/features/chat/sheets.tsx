@@ -34,7 +34,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
-import { Button, CHROME_MAX_SCALE, Count, Icon, Text, useToast } from "@/ui";
+import { Button, CHROME_MAX_SCALE, Count, Icon, Locked, Text, useToast } from "@/ui";
 import { useMovesChannel } from "../categories/CategoryScreens";
 import { categoryHrefs } from "../categories/logic";
 import { setPinDraft } from "../dashboards/logic";
@@ -673,28 +673,32 @@ export function NewMissionForm({
       <Text variant="body" tone="muted">
         {t("mobile.newMission.intro")}
       </Text>
-      <TextArea
-        value={goal}
-        onChangeText={setGoal}
-        placeholder={t("mobile.newMission.placeholder")}
-        accessibilityLabel={t("mobile.newMission.placeholder")}
-        autoFocus={!initialGoal}
-      />
+      <Locked when={create.isPending}>
+        <TextArea
+          value={goal}
+          onChangeText={setGoal}
+          placeholder={t("mobile.newMission.placeholder")}
+          accessibilityLabel={t("mobile.newMission.placeholder")}
+          autoFocus={!initialGoal}
+        />
+      </Locked>
       {eligible.isLoading ? <ActivityIndicator color={c.muted} /> : null}
       {list.length > 0 ? (
-        <ActionList
-          items={[
-            ...list.map((a) => ({
-              key: a.agentId,
-              leading: <AgentFace agentId={a.agentId} size={26} live={false} />,
-              label: a.name,
-              hint: (waitCloud && !a.machine ? waitCloud : whereText(t, a, { cloud, names })) ?? undefined,
-              disabled: a.eligible === false,
-              trailing: a.agentId === agentId ? <Icon name="check" size={18} color={c.ink} /> : undefined,
-              onPress: a.eligible === false ? undefined : () => setPicked(a.agentId),
-            })),
-          ]}
-        />
+        <Locked when={create.isPending}>
+          <ActionList
+            items={[
+              ...list.map((a) => ({
+                key: a.agentId,
+                leading: <AgentFace agentId={a.agentId} size={26} live={false} />,
+                label: a.name,
+                hint: (waitCloud && !a.machine ? waitCloud : whereText(t, a, { cloud, names })) ?? undefined,
+                disabled: a.eligible === false,
+                trailing: a.agentId === agentId ? <Icon name="check" size={18} color={c.ink} /> : undefined,
+                onPress: a.eligible === false ? undefined : () => setPicked(a.agentId),
+              })),
+            ]}
+          />
+        </Locked>
       ) : eligible.isSuccess ? (
         <Text variant="small" tone="muted">
           {waitCloud ?? t("mobile.newMission.noAgents")}
@@ -705,7 +709,8 @@ export function NewMissionForm({
         wide
         icon="sparkle"
         label={t("mobile.newMission.submit")}
-        disabled={!agentId || !goal.trim() || create.isPending}
+        loading={create.isPending}
+        disabled={!agentId || !goal.trim()}
         onPress={submit}
       />
     </>

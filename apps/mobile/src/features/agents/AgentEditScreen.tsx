@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, EmptyState, fieldText, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { AgentAvatar, EmptyState, fieldText, GroupedList, GroupedRow, Locked, Text, useToast } from "@/ui";
 import { useWidenAsk } from "../chat/ReachLines";
 import { useFailed } from "../routines/hooks";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -139,138 +139,140 @@ export function AgentEditScreen({ id }: { id: string }) {
         bottomOffset={24}
         contentContainerStyle={styles.form}
       >
-        <View style={styles.hero}>
-          <AgentAvatar agent={{ ...draft.look, id }} size={96} name={draft.name} />
-          <Text variant="footnote" tone="muted">
-            @{draft.handle}
-          </Text>
-        </View>
-
-        {fields.has("name") ? (
-          <>
-            <Text variant="footnote" tone="faint">
-              {t("agent.nameLabel")}
+        <Locked when={update.isPending} style={styles.fields}>
+          <View style={styles.hero}>
+            <AgentAvatar agent={{ ...draft.look, id }} size={96} name={draft.name} />
+            <Text variant="footnote" tone="muted">
+              @{draft.handle}
             </Text>
-            <TextInput
-              value={draft.name}
-              onChangeText={(v) => set("name", v)}
-              maxLength={32}
-              autoCorrect={false}
-              placeholder={t("newAgent.namePlaceholder")}
-              placeholderTextColor={c.faint}
-              accessibilityLabel={t("agent.nameLabel")}
-              style={field}
-            />
-            <Text variant="footnote" tone="faint">
-              {nameMissing
-                ? t("newAgent.errors.nameRequired")
-                : moved && !handleIssue
-                  ? t("agent.handleMoves", { handle: draft.handle, old: agent.handle })
-                  : t("agent.identityHelp")}
-            </Text>
-            <Text variant="footnote" tone="faint" style={styles.gapTop}>
-              {t("agent.handleLabel")}
-            </Text>
-            <HandleInput
-              value={draft.handle}
-              onChangeText={(v) => set("handle", cleanHandle(v))}
-              label={t("agent.handleLabel")}
-            />
-            {handleIssue ? <ErrorLine text={handleIssue} /> : null}
-          </>
-        ) : (
-          readOnly(t("agent.nameLabel"), agent.name)
-        )}
-
-        {rightHand ? null : fields.has("role") ? (
-          <RoleInput value={draft.role} onChangeText={(v) => set("role", v)} placeholder={t("agent.roleHelp")} />
-        ) : (
-          <View style={styles.gapTop}>{readOnly(t("agent.roleLabel"), agent.role)}</View>
-        )}
-
-        {fields.has("look") ? (
-          <View style={styles.section}>
-            <Text variant="title" accessibilityRole="header">
-              {t("newAgent.look")}
-            </Text>
-            <LookPicker look={draft.look} onChange={(look) => set("look", look)} />
           </View>
-        ) : null}
 
-        {/* Only an audience that leaves someone out has anyone to be consulted for. */}
-        {!rightHand && offersConsultable(draft.audience, onPlan) ? (
-          <View style={styles.section}>
-            <GroupedList>
-              <GroupedRow
-                icon="agent"
-                label={t("audience.consultable", agentGrammar(agent.name))}
-                labelLines={2}
-                sub={t("audience.consultableHint", agentGrammar(agent.name))}
-                subLines={4}
-                toggle={draft.audience.consultable !== false}
-                disabled={
-                  !fields.has("consultable") || (!!saved && consultableLocked(saved.audience, { owner, onPlan }))
-                }
-                onPress={() =>
-                  set("audience", { ...draft.audience, consultable: draft.audience.consultable === false })
-                }
+          {fields.has("name") ? (
+            <>
+              <Text variant="footnote" tone="faint">
+                {t("agent.nameLabel")}
+              </Text>
+              <TextInput
+                value={draft.name}
+                onChangeText={(v) => set("name", v)}
+                maxLength={32}
+                autoCorrect={false}
+                placeholder={t("newAgent.namePlaceholder")}
+                placeholderTextColor={c.faint}
+                accessibilityLabel={t("agent.nameLabel")}
+                style={field}
               />
-            </GroupedList>
-          </View>
-        ) : null}
+              <Text variant="footnote" tone="faint">
+                {nameMissing
+                  ? t("newAgent.errors.nameRequired")
+                  : moved && !handleIssue
+                    ? t("agent.handleMoves", { handle: draft.handle, old: agent.handle })
+                    : t("agent.identityHelp")}
+              </Text>
+              <Text variant="footnote" tone="faint" style={styles.gapTop}>
+                {t("agent.handleLabel")}
+              </Text>
+              <HandleInput
+                value={draft.handle}
+                onChangeText={(v) => set("handle", cleanHandle(v))}
+                label={t("agent.handleLabel")}
+              />
+              {handleIssue ? <ErrorLine text={handleIssue} /> : null}
+            </>
+          ) : (
+            readOnly(t("agent.nameLabel"), agent.name)
+          )}
 
-        {rightHand ? (
-          <Text variant="footnote" tone="faint" style={styles.section}>
-            {t("rightHand.settings.lock", agentGrammar(agent.name))}
-          </Text>
-        ) : (
-          <>
-            {admin ? <BudgetSection agent={agent} /> : null}
-            <BrakesSection agent={agent} />
+          {rightHand ? null : fields.has("role") ? (
+            <RoleInput value={draft.role} onChangeText={(v) => set("role", v)} placeholder={t("agent.roleHelp")} />
+          ) : (
+            <View style={styles.gapTop}>{readOnly(t("agent.roleLabel"), agent.role)}</View>
+          )}
 
+          {fields.has("look") ? (
             <View style={styles.section}>
               <Text variant="title" accessibilityRole="header">
-                {t("agent.instructions")}
+                {t("newAgent.look")}
               </Text>
-              {fields.has("instructions") ? (
-                <TextArea
-                  value={draft.instructions}
-                  onChangeText={(v) => set("instructions", v)}
-                  placeholder={t("newAgent.instructionsPlaceholder")}
-                  accessibilityLabel={t("agent.instructions")}
-                  minHeight={180}
-                  scrollEnabled={false}
-                />
-              ) : (
-                <Text variant="body" tone="ink2" selectable>
-                  {agent.instructions || t("agentPage.none")}
-                </Text>
-              )}
-              {!fields.has("name") ? (
-                <Text variant="footnote" tone="faint">
-                  {t("mobile.agentEdit.adminsOnly")}
-                </Text>
-              ) : null}
+              <LookPicker look={draft.look} onChange={(look) => set("look", look)} />
             </View>
-          </>
-        )}
+          ) : null}
 
-        {/* Deleting for good asks for its name on a screen of its own (ADR 0082). */}
-        {admin && !rightHand ? (
-          <View style={styles.section}>
-            <GroupedList>
-              <GroupedRow
-                icon="x"
-                label={t("agentPage.delete.action", agentGrammar(agent.name))}
-                sub={t("agentPage.delete.help")}
-                subLines={2}
-                danger
-                chevron
-                onPress={() => openAgentDelete(id)}
-              />
-            </GroupedList>
-          </View>
-        ) : null}
+          {/* Only an audience that leaves someone out has anyone to be consulted for. */}
+          {!rightHand && offersConsultable(draft.audience, onPlan) ? (
+            <View style={styles.section}>
+              <GroupedList>
+                <GroupedRow
+                  icon="agent"
+                  label={t("audience.consultable", agentGrammar(agent.name))}
+                  labelLines={2}
+                  sub={t("audience.consultableHint", agentGrammar(agent.name))}
+                  subLines={4}
+                  toggle={draft.audience.consultable !== false}
+                  disabled={
+                    !fields.has("consultable") || (!!saved && consultableLocked(saved.audience, { owner, onPlan }))
+                  }
+                  onPress={() =>
+                    set("audience", { ...draft.audience, consultable: draft.audience.consultable === false })
+                  }
+                />
+              </GroupedList>
+            </View>
+          ) : null}
+
+          {rightHand ? (
+            <Text variant="footnote" tone="faint" style={styles.section}>
+              {t("rightHand.settings.lock", agentGrammar(agent.name))}
+            </Text>
+          ) : (
+            <>
+              {admin ? <BudgetSection agent={agent} /> : null}
+              <BrakesSection agent={agent} />
+
+              <View style={styles.section}>
+                <Text variant="title" accessibilityRole="header">
+                  {t("agent.instructions")}
+                </Text>
+                {fields.has("instructions") ? (
+                  <TextArea
+                    value={draft.instructions}
+                    onChangeText={(v) => set("instructions", v)}
+                    placeholder={t("newAgent.instructionsPlaceholder")}
+                    accessibilityLabel={t("agent.instructions")}
+                    minHeight={180}
+                    scrollEnabled={false}
+                  />
+                ) : (
+                  <Text variant="body" tone="ink2" selectable>
+                    {agent.instructions || t("agentPage.none")}
+                  </Text>
+                )}
+                {!fields.has("name") ? (
+                  <Text variant="footnote" tone="faint">
+                    {t("mobile.agentEdit.adminsOnly")}
+                  </Text>
+                ) : null}
+              </View>
+            </>
+          )}
+
+          {/* Deleting for good asks for its name on a screen of its own (ADR 0082). */}
+          {admin && !rightHand ? (
+            <View style={styles.section}>
+              <GroupedList>
+                <GroupedRow
+                  icon="x"
+                  label={t("agentPage.delete.action", agentGrammar(agent.name))}
+                  sub={t("agentPage.delete.help")}
+                  subLines={2}
+                  danger
+                  chevron
+                  onPress={() => openAgentDelete(id)}
+                />
+              </GroupedList>
+            </View>
+          ) : null}
+        </Locked>
       </KeyboardAwareScrollView>
     </View>
   );
@@ -279,6 +281,7 @@ export function AgentEditScreen({ id }: { id: string }) {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   form: { paddingHorizontal: 18, paddingBottom: 48, gap: 8 },
+  fields: { gap: 8 },
   hero: { alignItems: "center", gap: 6, paddingVertical: 12 },
   field: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 12 },
   gapTop: { marginTop: 10, gap: 8 },

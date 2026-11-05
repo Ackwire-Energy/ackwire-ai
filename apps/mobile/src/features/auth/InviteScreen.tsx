@@ -30,7 +30,7 @@ import { signOut } from "@/features/account";
 import { useNow } from "@/features/shared/hooks";
 import { useOrgGate } from "@/providers/org";
 import { useSession } from "@/providers/session";
-import { Button, haptics, Icon, InfoHint, Text, useTheme } from "@/ui";
+import { Button, haptics, Icon, InfoHint, Locked, Text, useTheme } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
@@ -366,18 +366,20 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
             </View>
           ) : null}
           {user ? null : (
-            <AuthField
-              value={name}
-              onChangeText={setName}
-              placeholder={t("invite.ask.name")}
-              accessibilityLabel={t("invite.ask.name")}
-              maxLength={JOIN_NAME_MAX}
-              autoCapitalize="words"
-              autoComplete="name"
-              textContentType="name"
-              returnKeyType="next"
-              onSubmitEditing={() => emailField.current?.focus()}
-            />
+            <Locked when={asking}>
+              <AuthField
+                value={name}
+                onChangeText={setName}
+                placeholder={t("invite.ask.name")}
+                accessibilityLabel={t("invite.ask.name")}
+                maxLength={JOIN_NAME_MAX}
+                autoCapitalize="words"
+                autoComplete="name"
+                textContentType="name"
+                returnKeyType="next"
+                onSubmitEditing={() => emailField.current?.focus()}
+              />
+            </Locked>
           )}
           {user && proofNeeded ? (
             // The account's own address, read-only, takes the place of "You'll ask as".
@@ -387,7 +389,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
               </View>
             </EmailProof>
           ) : user ? null : (
-            <View style={styles.field}>
+            <Locked when={asking} style={styles.field}>
               <AuthField
                 ref={emailField}
                 value={email}
@@ -402,9 +404,9 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
                 returnKeyType="done"
               />
               {fix ? <DidYouMean fix={fix} onFix={setEmail} /> : null}
-            </View>
+            </Locked>
           )}
-          <View style={styles.field}>
+          <Locked when={asking} style={styles.field}>
             <Text variant="subhead" tone="muted">
               {t("invite.ask.note")}
             </Text>
@@ -419,7 +421,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
               textAlignVertical="top"
               minHeight={84}
             />
-          </View>
+          </Locked>
           {error ? (
             <Text variant="small" tone="danger" accessibilityLiveRegion="polite" style={CENTER}>
               {error}
@@ -429,7 +431,8 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
             variant="primary"
             wide
             label={t("invite.ask.send")}
-            disabled={!ready || asking}
+            loading={asking}
+            disabled={!ready}
             onPress={() => void ask()}
           />
           {user ? null : (
@@ -646,7 +649,7 @@ function EmailProof({
         {children}
       </View>
       {showCode ? (
-        <View style={styles.field}>
+        <Locked when={checking} style={styles.field}>
           <AuthField
             ref={codeField}
             code
@@ -664,7 +667,7 @@ function EmailProof({
             }}
           />
           {said ? errorLine(said) : null}
-        </View>
+        </Locked>
       ) : null}
     </>
   );

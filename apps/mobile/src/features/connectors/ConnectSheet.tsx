@@ -40,7 +40,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
 import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { Button, fieldText, Icon, InfoHint, LineIcon, Segmented, Text, useTheme, useToast } from "@/ui";
+import { Button, fieldText, Icon, InfoHint, LineIcon, Locked, Segmented, Text, useTheme, useToast } from "@/ui";
 import { useAgentsAccess, useSetLevels } from "../settings/hooks";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
@@ -594,7 +594,7 @@ function ConnectStep({
         </Text>
       ) : null}
       {askUrl ? (
-        <View style={styles.fieldBox}>
+        <Locked when={busy} style={styles.fieldBox}>
           <Text variant="footnote" tone="faint">
             {t("mobile.connectors.addressLabel")}
           </Text>
@@ -609,17 +609,19 @@ function ConnectStep({
             accessibilityLabel={t("mobile.connectors.addressLabel")}
             style={field}
           />
-        </View>
+        </Locked>
       ) : null}
       {!viaComposio && (how === "either" || (byAddress && mode === "key")) ? (
-        <Segmented
-          items={[
-            { key: "signIn", label: t("mobile.connectors.useSignIn") },
-            { key: "key", label: t("mobile.connectors.useKey") },
-          ]}
-          value={mode}
-          onChange={(k) => setMode(k as "signIn" | "key")}
-        />
+        <Locked when={busy}>
+          <Segmented
+            items={[
+              { key: "signIn", label: t("mobile.connectors.useSignIn") },
+              { key: "key", label: t("mobile.connectors.useKey") },
+            ]}
+            value={mode}
+            onChange={(k) => setMode(k as "signIn" | "key")}
+          />
+        </Locked>
       ) : null}
       {mode === "signIn" ? (
         <Button
@@ -637,7 +639,7 @@ function ConnectStep({
         />
       ) : (
         <>
-          <View style={styles.fieldBox}>
+          <Locked when={busy} style={styles.fieldBox}>
             <InfoHint
               name={t("common.about", { label: keyLabel })}
               text={t("mobile.connectors.keyHelp")}
@@ -668,7 +670,7 @@ function ConnectStep({
                 </Text>
               </Pressable>
             </View>
-          </View>
+          </Locked>
           <Button
             variant="primary"
             wide
@@ -747,11 +749,13 @@ function EveryoneLevel({ connectionId }: { connectionId: string }) {
           </Text>
         </View>
       </View>
-      <Segmented
-        items={LEVELS.map((l) => ({ key: l, label: t(`mobile.connectors.level.${l}`) }))}
-        value={current === "custom" || current === null ? "" : current}
-        onChange={(k) => void choose(k as Level)}
-      />
+      <Locked when={saving !== null}>
+        <Segmented
+          items={LEVELS.map((l) => ({ key: l, label: t(`mobile.connectors.level.${l}`) }))}
+          value={current === "custom" || current === null ? "" : current}
+          onChange={(k) => void choose(k as Level)}
+        />
+      </Locked>
       {failed ? <Problem text={t("mobile.connectors.everyoneFailed")} /> : null}
     </View>
   );

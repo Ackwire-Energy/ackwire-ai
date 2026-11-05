@@ -32,6 +32,7 @@ import {
   GroupedList,
   GroupedRow,
   Icon,
+  Locked,
   systemText,
   Text,
   useTheme,
@@ -310,7 +311,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
   // ── The card's header: the agent's face, the title, the check of a good test, the bell and the size.
   const titleValue = title ?? draft?.title ?? "";
   const head = (
-    <View style={styles.head}>
+    <Locked when={busy} style={styles.head}>
       {agentId ? <AgentFace agentId={agentId} size={16} live={false} /> : null}
       <TextInput
         value={titleValue}
@@ -371,12 +372,12 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
           );
         })}
       </View>
-    </View>
+    </Locked>
   );
 
   // ── Between the header and the data, after a test: the ask folded into a line, and the format.
   const above = asking ? null : (
-    <View style={styles.gap8}>
+    <Locked when={busy} style={styles.gap8}>
       <View style={styles.askedRow}>
         <Pressable
           onPress={() => setEditing(true)}
@@ -398,14 +399,14 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
           {t("dashboards.newWidget.stale")}
         </Text>
       ) : null}
-    </View>
+    </Locked>
   );
 
   // ── The data's place: the ask while typing it, the build, the failure, or the draft (the card's own drawing).
   let body: ReactNode;
   if (asking) {
     body = (
-      <View style={styles.gap10}>
+      <Locked when={busy} style={styles.gap10}>
         <TextInput
           value={text}
           onChangeText={type}
@@ -442,7 +443,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
             <WidgetBody spec={draft.spec} status={draft.status} agentId={draft.agentId} big={sized === "l"} />
           </View>
         ) : null}
-      </View>
+      </Locked>
     );
   } else if (phase === "testing") {
     body = (
@@ -471,7 +472,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
 
   // ── The footer: the alert's condition when the bell is on, then who looks after it and how often.
   const footer = (
-    <View style={styles.gap10}>
+    <Locked when={busy} style={styles.gap10}>
       {alert ? (
         <View style={[styles.condition, { backgroundColor: c.sunken }]}>
           <Icon name="bell" size={14} color={c.muted} />
@@ -522,7 +523,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
           <Icon name="down" size={12} color={c.muted} />
         </Pressable>
       </View>
-    </View>
+    </Locked>
   );
 
   return (

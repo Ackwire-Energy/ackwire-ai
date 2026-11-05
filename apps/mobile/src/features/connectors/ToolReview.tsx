@@ -18,7 +18,7 @@ import {
 import { useDeferredValue, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Button, Icon, SearchField, Segmented, Text } from "@/ui";
+import { Button, Icon, Locked, SearchField, Segmented, Text } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
 import { errorHaptic, MONO, successHaptic, Tile } from "../shared/parts";
 import { Problem } from "./Problem";
@@ -168,7 +168,9 @@ function ServerReview({
           </Text>
         )
       ) : (
-        <ToolList tools={tools} levelOf={(x) => chosenLevel(state, x)} review={{ state, onChange: setState }} />
+        <Locked when={busy}>
+          <ToolList tools={tools} levelOf={(x) => chosenLevel(state, x)} review={{ state, onChange: setState }} />
+        </Locked>
       )}
       {failed ? <Problem key={failed} text={failed} /> : null}
       <Text variant="small" tone="muted">
@@ -229,7 +231,9 @@ export function MailReview({
       <Text variant="body" tone="muted">
         {t("mail.toolsLead", { name: account.address })}
       </Text>
-      <ToolList tools={tools} levelOf={(x) => chosenLevel(state, x)} review={{ state, onChange: setState }} />
+      <Locked when={update.isPending}>
+        <ToolList tools={tools} levelOf={(x) => chosenLevel(state, x)} review={{ state, onChange: setState }} />
+      </Locked>
       {failed ? <Problem text={t("mail.actionsError")} /> : null}
       <Button
         variant="primary"

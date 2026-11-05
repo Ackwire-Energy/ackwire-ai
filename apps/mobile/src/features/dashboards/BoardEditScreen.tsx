@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GroupedHeader, Text, useTheme, useToast } from "@/ui";
+import { GroupedHeader, Locked, Text, useTheme, useToast } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
@@ -80,26 +80,28 @@ function Form({ board }: { board: Dashboard }) {
         automaticallyAdjustKeyboardInsets
         contentContainerStyle={[styles.in, { paddingBottom: 28 + insets.bottom }]}
       >
-        <GroupedHeader>{t("dashboards.create.name")}</GroupedHeader>
-        <TextArea
-          value={title}
-          onChangeText={setTitle}
-          placeholder={t("dashboards.create.namePlaceholder")}
-          accessibilityLabel={t("dashboards.create.name")}
-          multiline={false}
-          minHeight={50}
-          maxLength={TITLE_MAX}
-          returnKeyType="done"
-        />
-        <GroupedHeader>{t("dashboards.about")}</GroupedHeader>
-        <TextArea
-          value={about}
-          onChangeText={setAbout}
-          placeholder={t("dashboards.aboutPlaceholder")}
-          accessibilityLabel={t("dashboards.about")}
-          maxLength={ABOUT_MAX}
-          minHeight={96}
-        />
+        <Locked when={update.isPending}>
+          <GroupedHeader>{t("dashboards.create.name")}</GroupedHeader>
+          <TextArea
+            value={title}
+            onChangeText={setTitle}
+            placeholder={t("dashboards.create.namePlaceholder")}
+            accessibilityLabel={t("dashboards.create.name")}
+            multiline={false}
+            minHeight={50}
+            maxLength={TITLE_MAX}
+            returnKeyType="done"
+          />
+          <GroupedHeader>{t("dashboards.about")}</GroupedHeader>
+          <TextArea
+            value={about}
+            onChangeText={setAbout}
+            placeholder={t("dashboards.aboutPlaceholder")}
+            accessibilityLabel={t("dashboards.about")}
+            maxLength={ABOUT_MAX}
+            minHeight={96}
+          />
+        </Locked>
       </ScrollView>
     </View>
   );

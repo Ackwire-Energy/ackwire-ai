@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AgentReadingBook } from "@/agent/ReadingBook";
 import { useOrg } from "@/providers/org";
-import { Button, Card, Text, useToast } from "@/ui";
+import { Button, Card, Locked, Text, useToast } from "@/ui";
 import { canEditMemories } from "../agents/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
@@ -148,13 +148,15 @@ function MemorySheet({ message, memory, onClose }: { message: Message; memory: M
           </View>
         </Card>
       ) : mode === "edit" ? (
-        <TextArea
-          value={draft}
-          onChangeText={setDraft}
-          accessibilityLabel={t("memoryMark.fixLabel")}
-          maxLength={2000}
-          autoFocus
-        />
+        <Locked when={fix.isPending}>
+          <TextArea
+            value={draft}
+            onChangeText={setDraft}
+            accessibilityLabel={t("memoryMark.fixLabel")}
+            maxLength={2000}
+            autoFocus
+          />
+        </Locked>
       ) : (
         <Card>
           <View style={styles.fact}>
@@ -179,7 +181,13 @@ function MemorySheet({ message, memory, onClose }: { message: Message; memory: M
       ) : mode === "edit" ? (
         <View style={styles.row}>
           <View style={styles.grow}>
-            <Button variant="secondary" wide label={t("mobile.common.cancel")} onPress={() => setMode("card")} />
+            <Button
+              variant="secondary"
+              wide
+              label={t("mobile.common.cancel")}
+              disabled={fix.isPending}
+              onPress={() => setMode("card")}
+            />
           </View>
           <View style={styles.grow}>
             <Button
@@ -205,6 +213,7 @@ function MemorySheet({ message, memory, onClose }: { message: Message; memory: M
                   wide
                   icon="pen"
                   label={t("memoryMark.fix")}
+                  disabled={forget.isPending}
                   onPress={() => {
                     setDraft(text);
                     setMode("edit");

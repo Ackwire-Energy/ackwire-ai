@@ -13,7 +13,7 @@ import { signOut } from "@/features/account";
 import { authClient } from "@/lib/auth";
 import { serverUrl } from "@/lib/server";
 import { useOrgGate } from "@/providers/org";
-import { AgentAvatar, Button, fieldText, Icon, type IconName, LineIcon, Text, useTheme } from "@/ui";
+import { AgentAvatar, Button, fieldText, Icon, type IconName, LineIcon, Locked, Text, useTheme } from "@/ui";
 import { fullLook } from "../agents/edit";
 import { openPage } from "../ai/parts";
 import { confirmationSentTo, forgetConfirmationSent } from "../auth/confirmation";
@@ -159,7 +159,7 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
         <Text variant="callout" tone="muted">
           {t("onboarding.workspace.lead")}
         </Text>
-        <View style={styles.answer}>
+        <Locked when={pending} style={styles.answer}>
           <Field
             value={name}
             onChangeText={setName}
@@ -177,7 +177,7 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
           />
           {zone ? <Note icon="clock" text={t("mobile.onb.zone", { zone: zoneLabel(zone, i18n.language) })} /> : null}
           {unconfirmed ? <ConfirmationNote email={email} /> : null}
-        </View>
+        </Locked>
       </ScrollView>
       <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         {error ? (
@@ -189,7 +189,8 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
           variant="primary"
           wide
           label={t("onboarding.actions.continue")}
-          disabled={orgName.length === 0 || pending}
+          loading={pending}
+          disabled={orgName.length === 0}
           onPress={() => void save()}
         />
         {/* Until a workspace is set up this is the only screen: the ways out of the account, and of a workspace made

@@ -16,7 +16,18 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Share, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, GroupedList, GroupedRow, InfoHint, PersonAvatar, SheetScreen, Text, useToast } from "@/ui";
+import {
+  Button,
+  Chip,
+  GroupedList,
+  GroupedRow,
+  InfoHint,
+  Locked,
+  PersonAvatar,
+  SheetScreen,
+  Text,
+  useToast,
+} from "@/ui";
 import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { successHaptic, useSurface } from "../shared/parts";
@@ -171,7 +182,7 @@ function RequestCard({
       ) : null}
       {denying ? (
         <>
-          <View style={styles.field}>
+          <Locked when={busy} style={styles.field}>
             <TextArea
               value={reason}
               onChangeText={setReason}
@@ -183,19 +194,26 @@ function RequestCard({
             <Text variant="caption" tone="faint">
               {t("members.requests.reasonHelp")}
             </Text>
-          </View>
+          </Locked>
           <View style={styles.acts}>
             <View style={styles.grow}>
               <Button
                 variant="primary"
                 wide
                 label={t("members.requests.deny")}
+                loading={deny.isPending}
                 disabled={busy}
                 onPress={() => void denyIt()}
               />
             </View>
             <View style={styles.grow}>
-              <Button variant="ghost" wide label={t("mobile.common.back")} onPress={() => setDenying(false)} />
+              <Button
+                variant="ghost"
+                wide
+                label={t("mobile.common.back")}
+                disabled={busy}
+                onPress={() => setDenying(false)}
+              />
             </View>
           </View>
         </>
@@ -232,6 +250,7 @@ function RequestCard({
                 wide
                 icon="check"
                 label={t("members.requests.approve")}
+                loading={approve.isPending}
                 disabled={busy || full}
                 onPress={() => void approveIt()}
               />

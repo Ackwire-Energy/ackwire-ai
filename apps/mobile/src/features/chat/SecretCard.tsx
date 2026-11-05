@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { sealSecret } from "@/lib/secret-box";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, CodeInput, haptics, Icon, Segmented, Text, ToggleSwitch, useToast } from "@/ui";
+import { Button, Chip, CodeInput, haptics, Icon, Locked, Segmented, Text, ToggleSwitch, useToast } from "@/ui";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -221,7 +221,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       well={{ tile: <IconTile name="lock" size={32} />, title: r.name, detail: where }}
       body={
         mine ? (
-          <>
+          <Locked when={busy !== null} style={styles.body}>
             {code ? (
               <CodeInput
                 length={code}
@@ -354,7 +354,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                 ) : null}
               </View>
             ) : null}
-          </>
+          </Locked>
         ) : null
       }
       foot={
@@ -397,6 +397,8 @@ export function SecretCard({ request }: { request: SecretRequest }) {
 }
 
 const styles = StyleSheet.create({
+  // The card's body gives its children this gap: the lock takes their place in it.
+  body: { gap: 8 },
   grow: { flex: 1, minWidth: 0 },
   semibold: { fontWeight: "600" },
   field: {

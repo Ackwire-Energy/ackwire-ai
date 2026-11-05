@@ -22,7 +22,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { StickerCanvas } from "@/agent/StickerCanvas";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, Icon, type IconName, Text } from "@/ui";
+import { AgentAvatar, Button, Icon, type IconName, Locked, Text } from "@/ui";
 import { fullLook } from "../agents/edit";
 import { openConnectAi } from "../ai/NoAiCard";
 import { requestComposerText } from "../chat/composer-request";
@@ -177,7 +177,7 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
       ) : null}
       {presetsOpen ? (
         <>
-          <View style={styles.presets}>
+          <Locked when={create.isPending} style={styles.presets}>
             {left.map((p) => {
               const name = t(`onboarding.presets.${p}.name`);
               return (
@@ -208,7 +208,7 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
                 </Pressable>
               );
             })}
-          </View>
+          </Locked>
           <Button
             variant="secondary"
             size="card"

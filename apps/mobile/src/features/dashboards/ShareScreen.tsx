@@ -10,7 +10,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GroupedHeader, GroupedList, GroupedRow, Text, useTheme, useToast } from "@/ui";
+import { GroupedHeader, GroupedList, GroupedRow, Locked, Text, useTheme, useToast } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
 import { useMeId, useOrgId } from "../shared/hooks";
@@ -141,7 +141,9 @@ function Form({ board }: { board: Dashboard }) {
           </Text>
         ) : (
           <>
-            <AudienceFields draft={draft} onChange={setDraft} members={members.data?.length ?? 0} />
+            <Locked when={share.isPending}>
+              <AudienceFields draft={draft} onChange={setDraft} members={members.data?.length ?? 0} />
+            </Locked>
             <GroupedHeader>{t("dashboards.share.access")}</GroupedHeader>
             <GroupedList>
               {people.map(({ member: m, access }) => (

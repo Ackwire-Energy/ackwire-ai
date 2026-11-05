@@ -27,6 +27,7 @@ import { rememberSignIn, SocialButtons, useSocialProviders } from "@/ui/auth/Soc
 import { Button } from "@/ui/Button";
 import { haptics } from "@/ui/haptics";
 import { Icon } from "@/ui/Icon";
+import { Locked } from "@/ui/Locked";
 import { Text } from "@/ui/Text";
 import { useTheme } from "@/ui/theme";
 import { rememberConfirmationSent } from "./confirmation";
@@ -387,14 +388,16 @@ export function AuthFlow({
     >
       {step !== "email" && step !== "forgot" && step !== "sent" ? (
         // Where the e-mail can't sign up, "Usar outro e-mail" below already changes it: the chip only says which.
-        <Who
-          email={email.trim()}
-          onChange={step === "closed" || step === "expired" || step === "noPassword" ? undefined : () => go("email")}
-        />
+        <Locked when={pending}>
+          <Who
+            email={email.trim()}
+            onChange={step === "closed" || step === "expired" || step === "noPassword" ? undefined : () => go("email")}
+          />
+        </Locked>
       ) : null}
 
       {step === "email" || step === "forgot" ? (
-        <>
+        <Locked when={pending} style={{ gap: 10 }}>
           <AuthField
             value={email}
             onChangeText={(value) => {
@@ -425,36 +428,40 @@ export function AuthFlow({
               </Text>
             </Pressable>
           ) : null}
-        </>
+        </Locked>
       ) : null}
 
       {step === "password" || step === "newPassword" ? (
-        <PasswordField
-          value={password}
-          onChangeText={(value) => {
-            setPassword(value);
-            setWrong(false);
-          }}
-          fresh={step === "newPassword"}
-          onSecretChange={setSecret}
-          onShow={showWink}
-          onSubmitEditing={submit}
-          label={step === "newPassword" ? t("invite.createPassword") : t("auth.password")}
-        />
+        <Locked when={pending}>
+          <PasswordField
+            value={password}
+            onChangeText={(value) => {
+              setPassword(value);
+              setWrong(false);
+            }}
+            fresh={step === "newPassword"}
+            onSecretChange={setSecret}
+            onShow={showWink}
+            onSubmitEditing={submit}
+            label={step === "newPassword" ? t("invite.createPassword") : t("auth.password")}
+          />
+        </Locked>
       ) : null}
 
       {step === "name" ? (
-        <AuthField
-          value={name}
-          onChangeText={setName}
-          placeholder={t("auth.flow.namePlaceholder")}
-          autoComplete="name"
-          textContentType="name"
-          returnKeyType="next"
-          onSubmitEditing={submit}
-          accessibilityLabel={t("auth.yourName")}
-          autoFocus
-        />
+        <Locked when={pending}>
+          <AuthField
+            value={name}
+            onChangeText={setName}
+            placeholder={t("auth.flow.namePlaceholder")}
+            autoComplete="name"
+            textContentType="name"
+            returnKeyType="next"
+            onSubmitEditing={submit}
+            accessibilityLabel={t("auth.yourName")}
+            autoFocus
+          />
+        </Locked>
       ) : null}
       {step === "name" && !error ? <NameHint name={name} /> : null}
 
@@ -470,14 +477,20 @@ export function AuthFlow({
       ) : null}
 
       {submitLabel[step] ? (
-        <Button variant="primary" wide label={submitLabel[step]} disabled={!ready || pending} onPress={submit} />
+        <Button variant="primary" wide label={submitLabel[step]} loading={pending} disabled={!ready} onPress={submit} />
       ) : null}
 
       {step === "email" ? (
-        <SocialButtons providers={allProviders} onError={socialRefused} earlyAccess={access} />
+        <Locked when={pending}>
+          <SocialButtons providers={allProviders} onError={socialRefused} earlyAccess={access} />
+        </Locked>
       ) : null}
 
-      {step === "password" && canReset ? <Quiet label={t("auth.forgotPassword")} onPress={() => go("forgot")} /> : null}
+      {step === "password" && canReset ? (
+        <Locked when={pending}>
+          <Quiet label={t("auth.forgotPassword")} onPress={() => go("forgot")} />
+        </Locked>
+      ) : null}
 
       {step === "social" ? (
         <>

@@ -11,7 +11,7 @@ import {
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Icon, Sky, Text, useToast } from "@/ui";
+import { Icon, Locked, Sky, Text, useToast } from "@/ui";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
@@ -147,7 +147,7 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
       <Text variant="body" style={styles.question}>
         {q.question}
       </Text>
-      <View style={styles.options}>
+      <Locked when={answer.isPending} style={styles.options}>
         {q.options.map((o, i) => {
           const on = d.picks[d.step] === i;
           return (
@@ -184,7 +184,7 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
             </Pressable>
           );
         })}
-      </View>
+      </Locked>
       {questions.length > 1 ? (
         <View style={[styles.foot, { borderTopColor: c.line2 }]}>
           <Pressable

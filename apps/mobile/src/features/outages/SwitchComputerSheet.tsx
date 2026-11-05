@@ -7,7 +7,7 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Button, Card, Chip, Icon, ProviderLogo, SheetScreen, Text, useToast } from "@/ui";
+import { Button, Card, Chip, Icon, Locked, ProviderLogo, SheetScreen, Text, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
@@ -120,22 +120,24 @@ function SwitchForm({
 
       <SectionLabel label={t("mobile.outage.sheet.where")} />
       {options.length > 0 ? (
-        <Card>
-          <View accessibilityRole="radiogroup" accessibilityLabel={t("mobile.outage.sheet.where")}>
-            {options.map((x, i) => (
-              <TargetRow
-                key={x.key}
-                option={x}
-                selected={x.key === targetKey}
-                divider={i > 0}
-                onPress={() => {
-                  tapHaptic();
-                  setPicked(x.key);
-                }}
-              />
-            ))}
-          </View>
-        </Card>
+        <Locked when={move.isPending}>
+          <Card>
+            <View accessibilityRole="radiogroup" accessibilityLabel={t("mobile.outage.sheet.where")}>
+              {options.map((x, i) => (
+                <TargetRow
+                  key={x.key}
+                  option={x}
+                  selected={x.key === targetKey}
+                  divider={i > 0}
+                  onPress={() => {
+                    tapHaptic();
+                    setPicked(x.key);
+                  }}
+                />
+              ))}
+            </View>
+          </Card>
+        </Locked>
       ) : null}
       {!options.some((x) => x.enabled) ? (
         <Text variant="small" tone="muted">
@@ -144,35 +146,37 @@ function SwitchForm({
       ) : null}
 
       <SectionLabel label={t("mobile.outage.sheet.who")} />
-      <Card>
-        {o.agents.map((a, i) => {
-          const on = chosen.has(a.agentId);
-          const waiting = waitingText(t, a);
-          return (
-            <Pressable
-              key={a.agentId}
-              onPress={() => toggle(a.agentId)}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: on }}
-              accessibilityLabel={`${a.name}, ${waiting}`}
-              style={({ pressed }) => [
-                styles.row,
-                i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
-                pressed && { backgroundColor: c.sunken },
-              ]}
-            >
-              <Icon name={on ? "checkc" : "circle"} size={22} color={on ? c.ink : c.faint} />
-              <AgentFace agentId={a.agentId} size={28} mode="rest" live={false} />
-              <Text variant="body" tone="ink" numberOfLines={1} style={styles.grow}>
-                {a.name}
-              </Text>
-              <Text variant="small" tone="muted" numberOfLines={1} style={styles.shrink}>
-                {waiting}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </Card>
+      <Locked when={move.isPending}>
+        <Card>
+          {o.agents.map((a, i) => {
+            const on = chosen.has(a.agentId);
+            const waiting = waitingText(t, a);
+            return (
+              <Pressable
+                key={a.agentId}
+                onPress={() => toggle(a.agentId)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: on }}
+                accessibilityLabel={`${a.name}, ${waiting}`}
+                style={({ pressed }) => [
+                  styles.row,
+                  i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
+                  pressed && { backgroundColor: c.sunken },
+                ]}
+              >
+                <Icon name={on ? "checkc" : "circle"} size={22} color={on ? c.ink : c.faint} />
+                <AgentFace agentId={a.agentId} size={28} mode="rest" live={false} />
+                <Text variant="body" tone="ink" numberOfLines={1} style={styles.grow}>
+                  {a.name}
+                </Text>
+                <Text variant="small" tone="muted" numberOfLines={1} style={styles.shrink}>
+                  {waiting}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </Card>
+      </Locked>
 
       <View style={[styles.hint, { backgroundColor: c.sunken }]}>
         <Icon name="help" size={16} color={c.muted} />
@@ -186,7 +190,8 @@ function SwitchForm({
           variant="primary"
           wide
           label={t("mobile.outage.sheet.submit", { count })}
-          disabled={!target || count === 0 || move.isPending}
+          loading={move.isPending}
+          disabled={!target || count === 0}
           onPress={submit}
         />
         <Button variant="ghost" wide label={t("mobile.outage.sheet.later")} onPress={onClose} />

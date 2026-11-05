@@ -28,6 +28,7 @@ import {
   EmptyState,
   fieldText,
   IconButton,
+  Locked,
   Row,
   SearchField,
   SectionHeader,
@@ -787,34 +788,36 @@ export function WikiMoveScreen({ slug }: { slug: string }) {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.form}
       >
-        <Text variant="footnote" tone="faint">
-          {t("wiki.form.title")}
-        </Text>
-        <TextInput
-          value={title ?? p?.title ?? ""}
-          onChangeText={setTitle}
-          placeholder={t("wiki.form.titlePlaceholder")}
-          placeholderTextColor={c.faint}
-          style={field}
-        />
-        <Text variant="footnote" tone="faint">
-          {t("wiki.renameHelp")}
-        </Text>
-        <Text variant="footnote" tone="faint" style={styles.gapTop}>
-          {t("wiki.form.folder")}
-        </Text>
-        <TextInput
-          value={folder ?? p?.folder ?? ""}
-          onChangeText={setFolder}
-          placeholder={t("wiki.form.folderPlaceholder")}
-          placeholderTextColor={c.faint}
-          autoCapitalize="words"
-          style={field}
-        />
-        <FolderChips folders={folders} value={nextFolder} onPick={setFolder} />
-        <Text variant="footnote" tone="faint">
-          {t("wiki.form.folderHelp")}
-        </Text>
+        <Locked when={saving} style={styles.formFields}>
+          <Text variant="footnote" tone="faint">
+            {t("wiki.form.title")}
+          </Text>
+          <TextInput
+            value={title ?? p?.title ?? ""}
+            onChangeText={setTitle}
+            placeholder={t("wiki.form.titlePlaceholder")}
+            placeholderTextColor={c.faint}
+            style={field}
+          />
+          <Text variant="footnote" tone="faint">
+            {t("wiki.renameHelp")}
+          </Text>
+          <Text variant="footnote" tone="faint" style={styles.gapTop}>
+            {t("wiki.form.folder")}
+          </Text>
+          <TextInput
+            value={folder ?? p?.folder ?? ""}
+            onChangeText={setFolder}
+            placeholder={t("wiki.form.folderPlaceholder")}
+            placeholderTextColor={c.faint}
+            autoCapitalize="words"
+            style={field}
+          />
+          <FolderChips folders={folders} value={nextFolder} onPick={setFolder} />
+          <Text variant="footnote" tone="faint">
+            {t("wiki.form.folderHelp")}
+          </Text>
+        </Locked>
       </ScrollView>
     </View>
   );
@@ -895,6 +898,7 @@ const styles = StyleSheet.create({
   body: { paddingTop: 14 },
   diffWrap: { paddingHorizontal: 20, paddingBottom: 12, gap: 6 },
   form: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 40, gap: 8 },
+  formFields: { gap: 8 },
   field: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
   gapTop: { marginTop: 12 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 7, paddingVertical: 4 },

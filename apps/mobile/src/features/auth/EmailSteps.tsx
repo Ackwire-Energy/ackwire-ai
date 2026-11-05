@@ -9,7 +9,7 @@ import { firstName } from "@/features/shared/logic";
 import { authClient } from "@/lib/auth";
 import { writeValue } from "@/lib/storage";
 import { useSession } from "@/providers/session";
-import { Button, haptics } from "@/ui";
+import { Button, haptics, Locked } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthScaffold } from "@/ui/auth/AuthScaffold";
 import { PasswordField } from "@/ui/auth/PasswordField";
@@ -246,21 +246,23 @@ export function EmailSteps({
   const expression = wrong ? "cross" : wink ? "wink" : secret ? "closed" : step === "sent" ? "happy" : undefined;
   const enterLabel = t("invite.enter", { org });
   const passwordField = (fresh: boolean) => (
-    <PasswordField
-      value={password}
-      onChangeText={(value) => {
-        setPassword(value);
-        setWrong(false);
-      }}
-      fresh={fresh}
-      onSecretChange={setSecret}
-      onShow={() => {
-        setWink(true);
-        setTimeout(() => setWink(false), 900);
-      }}
-      onSubmitEditing={submit}
-      label={fresh ? t("invite.createPassword") : t("auth.password")}
-    />
+    <Locked when={pending}>
+      <PasswordField
+        value={password}
+        onChangeText={(value) => {
+          setPassword(value);
+          setWrong(false);
+        }}
+        fresh={fresh}
+        onSecretChange={setSecret}
+        onShow={() => {
+          setWink(true);
+          setTimeout(() => setWink(false), 900);
+        }}
+        onSubmitEditing={submit}
+        label={fresh ? t("invite.createPassword") : t("auth.password")}
+      />
+    </Locked>
   );
   const enterButton = (
     <Button variant="primary" wide label={enterLabel} loading={pending} disabled={!ready || pending} onPress={submit} />
@@ -316,7 +318,11 @@ export function EmailSteps({
           {passwordField(false)}
           <ErrorLine error={error} />
           {enterButton}
-          {canReset ? <Quiet label={t("auth.forgotPassword")} onPress={() => go("forgot")} /> : null}
+          {canReset ? (
+            <Locked when={pending}>
+              <Quiet label={t("auth.forgotPassword")} onPress={() => go("forgot")} />
+            </Locked>
+          ) : null}
         </>
       );
       break;

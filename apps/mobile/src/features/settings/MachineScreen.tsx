@@ -839,6 +839,7 @@ export function RenameMachineScreen({ machineId }: { machineId: string }) {
     <SettingsPage
       title={t("machines.renameTitle")}
       action={{ label: t("common.save"), disabled: !ready, onPress: save }}
+      locked={action.isPending}
     >
       <GroupedHeader>{t("machines.name")}</GroupedHeader>
       <TextArea

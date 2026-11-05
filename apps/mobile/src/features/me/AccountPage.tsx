@@ -208,6 +208,7 @@ export function AccountPage() {
         disabled: saving,
         onPress: () => void save(),
       }}
+      locked={saving}
     >
       <View style={styles.photo}>
         <PersonAvatar name={draft.name || "?"} size={92} photo={photo} />
