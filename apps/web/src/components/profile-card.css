@@ -156,6 +156,17 @@ html:not([data-pointer]) .mcard__edit:focus-visible {
   border-top: 1px solid var(--line);
   padding-top: 12px;
 }
+/* A card taller than the room scrolls: its message field stays at its foot, 16px from the edge as at rest, on the
+   card's own face that fades in over the 12px above it, so what scrolls passes under it instead of the edge cutting
+   the field. At rest it sits where it did (the fade takes the body's gap back). */
+.mcard__foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: -12px -16px -16px;
+  padding: 12px 16px 16px;
+  background: linear-gradient(to bottom, transparent, var(--glass-solid) 12px);
+}
 .mcard__dm.ac-input-affix {
   gap: 2px;
   padding-right: 4px;
