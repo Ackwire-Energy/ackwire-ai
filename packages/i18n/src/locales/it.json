@@ -14649,6 +14649,36 @@
       "stopping": "Arresto in corso…",
       "stopped": "Fermata"
     },
+    "wait": {
+      "pausedPlan": "In pausa: piano al {{percent}}% {{window}}",
+      "pausedBudget": "In pausa: budget al {{percent}}% del mese",
+      "planLimit": "Piano {{plan}} al limite",
+      "modelLimit": "{{model}} al limite",
+      "modelRegion": "{{model}} ha bisogno della regione Global",
+      "modelRegionNext": "Attivala in OpenCode (Settings › Privacy)",
+      "budgetOut": "Budget del mese esaurito",
+      "workLine": "Nella coda di lavoro dell'agente",
+      "workLineNext": "Inizia quando finisce un altro lavoro",
+      "computerWait": "Aspetta il computer",
+      "computerWaitNext": "Riprende quando è pronto",
+      "computerOfflineNext": "Riprende quando si accende",
+      "computerBusyNext": "Inizia quando c'è spazio",
+      "okNext": "Continua quando qualcuno approva",
+      "answerNext": "Continua quando qualcuno risponde",
+      "back": "Riprende {{when}}",
+      "whenRenews": "quando si rinnova",
+      "whenSoon": "tra un attimo"
+    },
+    "waitGroup": {
+      "routines_one": "{{count}} routine",
+      "routines_many": "{{count}} routine",
+      "routines_other": "{{count}} routine",
+      "pausedPlan": "{{what}} in pausa: il piano {{plan}} è al {{percent}}% {{window}} e riprende {{when}}. Il resto rimane per le conversazioni.",
+      "pausedBudget": "{{what}} in pausa: il budget del mese è al {{percent}}% e riprende {{when}}. Il resto rimane per le conversazioni.",
+      "planLimit": "{{what}} in attesa: il piano {{plan}} ha raggiunto il limite e riprende {{when}}.",
+      "modelLimit": "{{what}} in attesa: {{model}} ha raggiunto il limite e riprende {{when}}. Gli altri modelli del piano continuano a funzionare.",
+      "budgetOut": "{{what}} in attesa: il budget del mese è esaurito e riprende {{when}}."
+    },
     "where": {
       "dm": "Conversazione diretta",
       "routine": "Routine «{{name}}»",

@@ -13560,6 +13560,34 @@
       "stopping": "중지하는 중…",
       "stopped": "중지됨"
     },
+    "wait": {
+      "pausedPlan": "일시 중지: 요금제 {{percent}}% {{window}}",
+      "pausedBudget": "일시 중지: 이번 달 예산 {{percent}}%",
+      "planLimit": "{{plan}} 요금제 한도 도달",
+      "modelLimit": "{{model}} 한도 도달",
+      "modelRegion": "{{model}}에 Global 리전이 필요해요",
+      "modelRegionNext": "OpenCode에서 켜세요(Settings › Privacy)",
+      "budgetOut": "이번 달 예산 소진",
+      "workLine": "에이전트 작업 대기열에 있어요",
+      "workLineNext": "다른 작업이 끝나면 시작해요",
+      "computerWait": "컴퓨터 대기 중",
+      "computerWaitNext": "준비되면 다시 시작해요",
+      "computerOfflineNext": "켜지면 다시 시작해요",
+      "computerBusyNext": "자리가 나면 시작해요",
+      "okNext": "누군가 승인하면 이어서 해요",
+      "answerNext": "누군가 답하면 이어서 해요",
+      "back": "다시 시작: {{when}}",
+      "whenRenews": "초기화 후",
+      "whenSoon": "곧"
+    },
+    "waitGroup": {
+      "routines_other": "루틴 {{count}}개",
+      "pausedPlan": "{{what}} 일시 중지: {{plan}} 요금제가 {{percent}}% {{window}}이고 {{when}} 다시 시작해요. 남은 양은 대화에 써요.",
+      "pausedBudget": "{{what}} 일시 중지: 이번 달 예산이 {{percent}}%이고 {{when}} 다시 시작해요. 남은 양은 대화에 써요.",
+      "planLimit": "{{what}} 대기 중: {{plan}} 요금제가 한도에 도달했고 {{when}} 다시 시작해요.",
+      "modelLimit": "{{what}} 대기 중: {{model}}이(가) 한도에 도달했고 {{when}} 다시 시작해요. 요금제의 다른 모델은 계속 쓸 수 있어요.",
+      "budgetOut": "{{what}} 대기 중: 이번 달 예산을 다 썼고 {{when}} 다시 시작해요."
+    },
     "where": {
       "dm": "다이렉트 메시지",
       "routine": "루틴 «{{name}}»",

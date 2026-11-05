@@ -5,6 +5,7 @@ import {
   linePlace,
   taskState,
   taskTitle,
+  taskWaitWords,
   taskWhere,
   waitsOnPerson,
 } from "@agenteschat/client/lib/task-manager";
@@ -24,7 +25,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useEscClose } from "@/hooks/useEscClose";
 import { useNow } from "@/hooks/useNow";
 import { useAgentTasks } from "./agent-tasks-context";
-import { StopAllInline, StopTaskButton, TaskMark, taskAge, useTaskStop, waitWords } from "./TaskBits";
+import { StopAllInline, StopTaskButton, TaskMark, TaskWaitLines, taskAge, useTaskStop } from "./TaskBits";
 import "@/components/threads/threads.css";
 
 /**
@@ -135,18 +136,21 @@ export function AgentTasksPanel({
           {tasks.length === 0 ? (
             <p className="tm-panel__none">{t("taskManager.agentPanel.none", { name })}</p>
           ) : (
-            <ul className="tm-agentpanel__list">
-              {tasks.map((task) => (
-                <TaskCard
-                  key={task.runId}
-                  task={task}
-                  here={task.channelId === channelId}
-                  now={now}
-                  stopping={stopping.has(task.runId)}
-                  onStop={() => stop([task.runId])}
-                />
-              ))}
-            </ul>
+            <>
+              <TaskWaitLines tasks={tasks} />
+              <ul className="tm-agentpanel__list">
+                {tasks.map((task) => (
+                  <TaskCard
+                    key={task.runId}
+                    task={task}
+                    here={task.channelId === channelId}
+                    now={now}
+                    stopping={stopping.has(task.runId)}
+                    onStop={() => stop([task.runId])}
+                  />
+                ))}
+              </ul>
+            </>
           )}
         </div>
 
@@ -198,7 +202,7 @@ function TaskCard({
   stopping: boolean;
   onStop: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const [open, setOpen] = useState(false);
@@ -208,10 +212,10 @@ function TaskCard({
   const steps = useTaskSteps(org.id, open ? task.runId : null, open && working ? TASK_MANAGER_POLL_MS : false);
   const title = taskTitle(t, task);
   const where = taskWhere(t, task);
-  const wait = waitWords(t, task);
+  const wait = taskWaitWords(t, i18n.language, task, now);
   const place = linePlace(task);
   const sub = wait
-    ? `${wait} · ${where}`
+    ? [wait.state, wait.next, where].filter(Boolean).join(" · ")
     : taskState(task) === "queued"
       ? `${t("taskManager.state.queued")} · ${where}`
       : `${where} · ${formatDuration(t, taskAge(task, now))}`;

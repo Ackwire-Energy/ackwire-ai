@@ -33755,6 +33755,81 @@
   "taskManager.state.stopped": {
     "value": "Stopped"
   },
+  "taskManager.wait.pausedPlan": {
+    "value": "Paused: plan at {{percent}}% {{window}}"
+  },
+  "taskManager.wait.pausedBudget": {
+    "value": "Paused: budget at {{percent}}% of the month"
+  },
+  "taskManager.wait.planLimit": {
+    "value": "{{plan}} plan at its limit"
+  },
+  "taskManager.wait.modelLimit": {
+    "value": "{{model}} at its limit"
+  },
+  "taskManager.wait.modelRegion": {
+    "value": "{{model}} needs the Global region"
+  },
+  "taskManager.wait.modelRegionNext": {
+    "value": "Turn it on in OpenCode (Settings › Privacy)"
+  },
+  "taskManager.wait.budgetOut": {
+    "value": "This month's budget ran out"
+  },
+  "taskManager.wait.workLine": {
+    "value": "In the agent's line of work"
+  },
+  "taskManager.wait.workLineNext": {
+    "value": "Starts when other work ends"
+  },
+  "taskManager.wait.computerWait": {
+    "value": "Waiting for the computer"
+  },
+  "taskManager.wait.computerWaitNext": {
+    "value": "Back when it's ready"
+  },
+  "taskManager.wait.computerOfflineNext": {
+    "value": "Back when it's on"
+  },
+  "taskManager.wait.computerBusyNext": {
+    "value": "Starts when there's room"
+  },
+  "taskManager.wait.okNext": {
+    "value": "Goes on once someone approves"
+  },
+  "taskManager.wait.answerNext": {
+    "value": "Goes on once someone answers"
+  },
+  "taskManager.wait.back": {
+    "value": "Back {{when}}"
+  },
+  "taskManager.wait.whenRenews": {
+    "value": "when it renews"
+  },
+  "taskManager.wait.whenSoon": {
+    "value": "in a moment"
+  },
+  "taskManager.waitGroup.routines": {
+    "value": {
+      "one": "{{count}} routine",
+      "other": "{{count}} routines"
+    }
+  },
+  "taskManager.waitGroup.pausedPlan": {
+    "value": "{{what}} paused: the {{plan}} plan is at {{percent}}% {{window}} and comes back {{when}}. What's left stays for conversations."
+  },
+  "taskManager.waitGroup.pausedBudget": {
+    "value": "{{what}} paused: the month's budget is at {{percent}}% and comes back {{when}}. What's left stays for conversations."
+  },
+  "taskManager.waitGroup.planLimit": {
+    "value": "{{what}} waiting: the {{plan}} plan hit its limit and comes back {{when}}."
+  },
+  "taskManager.waitGroup.modelLimit": {
+    "value": "{{what}} waiting: {{model}} hit its limit and comes back {{when}}. The plan's other models keep working."
+  },
+  "taskManager.waitGroup.budgetOut": {
+    "value": "{{what}} waiting: this month's budget ran out and comes back {{when}}."
+  },
   "taskManager.where.dm": {
     "value": "Direct conversation"
   },

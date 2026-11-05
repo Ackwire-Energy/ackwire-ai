@@ -15026,6 +15026,37 @@
       "stopping": "Zatrzymywanie…",
       "stopped": "Zatrzymane"
     },
+    "wait": {
+      "pausedPlan": "Wstrzymane: plan na {{percent}}% {{window}}",
+      "pausedBudget": "Wstrzymane: budżet na {{percent}}% miesiąca",
+      "planLimit": "Plan {{plan}} na limicie",
+      "modelLimit": "{{model}} na limicie",
+      "modelRegion": "{{model}} wymaga regionu Global",
+      "modelRegionNext": "Włącz go w OpenCode (Settings › Privacy)",
+      "budgetOut": "Budżet na ten miesiąc się skończył",
+      "workLine": "W kolejce prac agenta",
+      "workLineNext": "Zacznie się, gdy skończy się inna praca",
+      "computerWait": "Czeka na komputer",
+      "computerWaitNext": "Wznowi, gdy będzie gotowy",
+      "computerOfflineNext": "Wznowi, gdy się włączy",
+      "computerBusyNext": "Zacznie się, gdy będzie miejsce",
+      "okNext": "Wznowi, gdy ktoś zatwierdzi",
+      "answerNext": "Wznowi, gdy ktoś odpowie",
+      "back": "Wznowi {{when}}",
+      "whenRenews": "po odnowieniu",
+      "whenSoon": "za chwilę"
+    },
+    "waitGroup": {
+      "routines_one": "{{count}} rutyna",
+      "routines_few": "{{count}} rutyny",
+      "routines_many": "{{count}} rutyn",
+      "routines_other": "{{count}} rutyny",
+      "pausedPlan": "Wstrzymane ({{what}}): plan {{plan}} jest na {{percent}}% {{window}} i wznowi {{when}}. Reszta zostaje na rozmowy.",
+      "pausedBudget": "Wstrzymane ({{what}}): budżet miesiąca jest na {{percent}}% i wznowi {{when}}. Reszta zostaje na rozmowy.",
+      "planLimit": "Czekają ({{what}}): plan {{plan}} osiągnął limit i wznowi {{when}}.",
+      "modelLimit": "Czekają ({{what}}): {{model}} osiągnął limit i wznowi {{when}}. Pozostałe modele planu działają dalej.",
+      "budgetOut": "Czekają ({{what}}): budżet na ten miesiąc się skończył i wznowi {{when}}."
+    },
     "where": {
       "dm": "Wiadomość bezpośrednia",
       "routine": "Rutyna «{{name}}»",

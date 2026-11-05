@@ -13569,6 +13569,34 @@
       "stopping": "停止しています…",
       "stopped": "停止"
     },
+    "wait": {
+      "pausedPlan": "一時停止: プラン {{window}} {{percent}}%",
+      "pausedBudget": "一時停止: 今月の予算 {{percent}}%",
+      "planLimit": "{{plan}}プランが上限です",
+      "modelLimit": "{{model}}が上限です",
+      "modelRegion": "{{model}}にはGlobalリージョンが必要です",
+      "modelRegionNext": "OpenCodeでオンにしてください（Settings › Privacy）",
+      "budgetOut": "今月の予算を使い切りました",
+      "workLine": "エージェントの作業待ちの列にあります",
+      "workLineNext": "ほかの作業が終わると始まります",
+      "computerWait": "コンピューター待ち",
+      "computerWaitNext": "準備ができたら再開します",
+      "computerOfflineNext": "電源が入ったら再開します",
+      "computerBusyNext": "空きができたら始まります",
+      "okNext": "誰かが承認すると続きます",
+      "answerNext": "誰かが回答すると続きます",
+      "back": "再開: {{when}}",
+      "whenRenews": "リセット後",
+      "whenSoon": "まもなく"
+    },
+    "waitGroup": {
+      "routines_other": "{{count}}件のルーティン",
+      "pausedPlan": "{{what}}を一時停止中: {{plan}}プランは{{window}} {{percent}}%で、再開は{{when}}です。残りは会話に使います。",
+      "pausedBudget": "{{what}}を一時停止中: 今月の予算は{{percent}}%で、再開は{{when}}です。残りは会話に使います。",
+      "planLimit": "{{what}}が待機中: {{plan}}プランが上限に達しました。再開は{{when}}です。",
+      "modelLimit": "{{what}}が待機中: {{model}}が上限に達しました。再開は{{when}}です。プランのほかのモデルはそのまま使えます。",
+      "budgetOut": "{{what}}が待機中: 今月の予算を使い切りました。再開は{{when}}です。"
+    },
     "where": {
       "dm": "ダイレクトメッセージ",
       "routine": "ルーティン「{{name}}」",

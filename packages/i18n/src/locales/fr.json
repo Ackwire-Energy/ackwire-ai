@@ -14645,6 +14645,36 @@
       "stopping": "Arrêt en cours…",
       "stopped": "Arrêtée"
     },
+    "wait": {
+      "pausedPlan": "En pause : abonnement à {{percent}} % {{window}}",
+      "pausedBudget": "En pause : budget à {{percent}} % du mois",
+      "planLimit": "Abonnement {{plan}} à sa limite",
+      "modelLimit": "{{model}} à sa limite",
+      "modelRegion": "{{model}} a besoin de la région Global",
+      "modelRegionNext": "Activez-la dans OpenCode (Settings › Privacy)",
+      "budgetOut": "Budget du mois épuisé",
+      "workLine": "Dans la file de travail de l'agent",
+      "workLineNext": "Commence quand un autre travail se termine",
+      "computerWait": "Attend l'ordinateur",
+      "computerWaitNext": "Reprend quand il est prêt",
+      "computerOfflineNext": "Reprend quand il est allumé",
+      "computerBusyNext": "Commence quand il y a de la place",
+      "okNext": "Continue dès que quelqu'un approuve",
+      "answerNext": "Continue dès que quelqu'un répond",
+      "back": "Reprend {{when}}",
+      "whenRenews": "au renouvellement",
+      "whenSoon": "dans un instant"
+    },
+    "waitGroup": {
+      "routines_one": "{{count}} routine",
+      "routines_many": "{{count}} routines",
+      "routines_other": "{{count}} routines",
+      "pausedPlan": "{{what}} en pause : l'abonnement {{plan}} est à {{percent}} % {{window}} et revient {{when}}. Le reste est gardé pour les conversations.",
+      "pausedBudget": "{{what}} en pause : le budget du mois est à {{percent}} % et revient {{when}}. Le reste est gardé pour les conversations.",
+      "planLimit": "{{what}} en attente : l'abonnement {{plan}} a atteint sa limite et revient {{when}}.",
+      "modelLimit": "{{what}} en attente : {{model}} a atteint sa limite et revient {{when}}. Les autres modèles de l'abonnement fonctionnent toujours.",
+      "budgetOut": "{{what}} en attente : le budget du mois est épuisé et revient {{when}}."
+    },
     "where": {
       "dm": "Conversation directe",
       "routine": "Routine « {{name}} »",
