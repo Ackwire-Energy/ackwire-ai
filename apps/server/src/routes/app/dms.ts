@@ -5,6 +5,7 @@ import {
   body,
   createAppRouter,
   errors,
+  iso,
   json,
   noContent,
   OrgParams,
@@ -41,6 +42,9 @@ const Dm = z
     unread: z.number().openapi({
       description: "Messages since you last read it, not yours; an agent's sticker or GIF after its reply never.",
     }),
+    lastReadAt: z.string().nullable().openapi({
+      description: "Where the unread starts: when you last read it; null when you never did.",
+    }),
     everRead: z.boolean().openapi({
       description:
         "False until you first read it (`POST …/channels/{channelId}/read`): the right hand waves on that first visit.",
@@ -70,6 +74,7 @@ export function dmRoutes(deps: AppDeps) {
         {
           dms: dms.map((d) => ({
             ...d,
+            lastReadAt: iso(d.lastReadAt),
             lastMessage: d.lastMessage ? { ...d.lastMessage, createdAt: d.lastMessage.createdAt.toISOString() } : null,
           })),
         },

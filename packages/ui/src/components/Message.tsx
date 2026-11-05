@@ -1,8 +1,38 @@
-import { type HTMLAttributes, type MouseEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  createContext,
+  type HTMLAttributes,
+  type MouseEvent,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
 import { MenuAt } from "./Menu";
+
+/**
+ * How the rows under it are drawn. Every row reads it, so a view sets it once: `comfortable` keeps my rows on the right
+ * in a gray bubble, `left` draws them as anyone's, `bubbles` puts everyone's words in a bubble, `compact` is one line a
+ * row. No provider: `comfortable`.
+ */
+export interface MessageLook {
+  style: "comfortable" | "left" | "bubbles" | "compact";
+  /** My bubbles in `bubbles`: a tint of `mine`, or `mine` itself. */
+  tone: "light" | "strong";
+  /** The color of my bubbles in `bubbles`. */
+  mine: string;
+  /** False where the name says nothing (a DM's two speakers): `bubbles` leaves it to screen readers. */
+  names: boolean;
+}
+export const MessageLookContext = createContext<MessageLook | null>(null);
+
+/** What a row's `MessageText` holds besides its words in `bubbles`: the name on top, the time at the end. */
+const BubbleContext = createContext<{ head: ReactNode; tail: ReactNode } | null>(null);
 
 export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "children"> {
   /** The avatar element. Omitted for grouped (continuation) messages. */
@@ -43,6 +73,10 @@ export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "childre
   run?: "solo" | "start" | "mid" | "end";
   /** The message text (use `MessageText`), plus attachments or cards. */
   children: ReactNode;
+  /** Nothing in a `MessageText` (a card, a picture): in `bubbles` its name and time stay above it, with no bubble. */
+  bare?: boolean;
+  /** The name's color in `bubbles`, on a light and on a dark surface. */
+  nameColor?: readonly [string, string];
   /** Wraps the body in a column with gaps (approval cards). */
   stacked?: boolean;
   /** Muted, at the end of the first line, the header's or a grouped message's text's (e.g. the receipt check). */
@@ -102,21 +136,29 @@ export function Message({
   own,
   run = "solo",
   children,
+  bare,
+  nameColor,
   stacked,
   aside,
   foot,
   menu,
   className,
   onClick,
+  style,
   ...rest
 }: MessageProps) {
+  const look = useContext(MessageLookContext);
+  const drawn = look?.style ?? "comfortable";
+  // In `left` and `compact` a row of mine is a row like anyone's.
+  const mine = own && (drawn === "comfortable" || drawn === "bubbles");
+  const inBubble = drawn === "bubbles" && !bare;
   const tipId = useId();
   const noteId = useId();
   const row = useRef<HTMLElement>(null);
   const tap = useRef({ x: 0, y: 0 });
   const [menuAt, setMenuAt] = useState<ReturnType<typeof menuPlace>>(null);
   const menuOpen = Boolean(menu) && menuAt !== null;
-  const footed = own && (run === "end" || run === "solo");
+  const footed = mine && !inBubble && (run === "end" || run === "solo");
   useEffect(() => {
     if (!menuOpen) return;
     // The menu follows its row and closes when the row leaves the screen: a phone's keyboard going down resizes the
@@ -137,6 +179,67 @@ export function Message({
       {meta}
     </span>
   ) : null;
+  const clock = meta ? (
+    // Focusable so the details are reachable without a mouse.
+    <span className="ac-msg__time ac-msg__time--details" tabIndex={grouped || mine ? -1 : 0} aria-describedby={tipId}>
+      {time}
+      {tip}
+    </span>
+  ) : (
+    <span className="ac-msg__time">{time}</span>
+  );
+  const statusNode = status && (
+    <span className="ac-msg__status">
+      {status.mark ?? (status.icon ? <Icon name={status.icon} size={14} /> : null)}
+      {status.label}
+    </span>
+  );
+  const head = (
+    <div
+      className={grouped || waiting || mine ? "ac-visually-hidden" : inBubble ? "ac-msg__bubble-head" : "ac-msg__head"}
+    >
+      <span className="ac-msg__author">{author}</span>
+      {/* In a bubble the time is its last thing; my row's hidden head still reads it. */}
+      {(!inBubble || mine) && clock}
+      {note && (
+        // Focusable so the reason is reachable without a mouse.
+        <span className="ac-msg__note" tabIndex={grouped ? -1 : 0} aria-describedby={noteId}>
+          {note.label}
+          <span className="ac-msg__note-tip ac-glass" role="tooltip" id={noteId}>
+            {note.tip}
+          </span>
+        </span>
+      )}
+      {/* A run's earlier row of mine has no line under it once sent, so none while it sends: its hidden head
+          reads the state out. */}
+      {!footed && !inBubble && statusNode}
+      {aside && !grouped && !mine && !inBubble && <span className="ac-msg__aside">{aside}</span>}
+    </div>
+  );
+  // What a bubble ends with: the time, what the row is doing (a send in flight stands in the time's place, as under
+  // a bubble of mine), and the receipt's mark.
+  const stamp = inBubble ? (
+    <span className="ac-msg__stamp">
+      {mine ? (
+        (statusNode ?? (
+          <span className="ac-msg__time ac-msg__time--details" aria-hidden="true">
+            {time}
+            {meta && <span className="ac-msg__tip">{meta}</span>}
+          </span>
+        ))
+      ) : (
+        <>
+          {clock}
+          {statusNode}
+        </>
+      )}
+      {aside && <span className="ac-msg__aside">{aside}</span>}
+    </span>
+  ) : null;
+  const rowVars = {
+    ...(mine && drawn === "bubbles" ? { "--msg-mine": look?.mine } : {}),
+    ...(nameColor && drawn === "bubbles" ? { "--msg-name": nameColor[0], "--msg-name-dark": nameColor[1] } : {}),
+  };
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: the tap opens on touch what the row's bar has for a keyboard
     <article
@@ -144,7 +247,7 @@ export function Message({
       className={cx(
         "ac-msg",
         agent && "ac-msg--agent",
-        own && "ac-msg--own",
+        mine && "ac-msg--own",
         grouped && "ac-msg--grouped",
         streaming && "ac-msg--streaming",
         waiting && "ac-msg--waiting",
@@ -152,7 +255,11 @@ export function Message({
         className,
       )}
       aria-busy={streaming || undefined}
-      data-run={own ? run : undefined}
+      style={{ ...rowVars, ...style } as CSSProperties}
+      data-look={look ? drawn : undefined}
+      data-tone={mine && drawn === "bubbles" ? look?.tone : undefined}
+      data-names={drawn === "bubbles" && look?.names === false ? "false" : undefined}
+      data-run={mine || drawn === "bubbles" ? run : undefined}
       data-menu-open={menuOpen ? "true" : undefined}
       onClick={(e) => {
         onClick?.(e);
@@ -163,7 +270,12 @@ export function Message({
       }}
       {...rest}
     >
-      {own ? null : grouped ? (
+      {drawn === "compact" && (
+        <span className="ac-msg__clock" aria-hidden="true">
+          {time}
+        </span>
+      )}
+      {mine ? null : grouped ? (
         // Same width as the avatar column; the time shows here on hover (it's also in the hidden header).
         <span className="ac-msg__gutter" aria-hidden="true">
           <span className="ac-msg__gutter-time">
@@ -175,42 +287,13 @@ export function Message({
         <span className="ac-msg__avatar">{avatar}</span>
       )}
       <div className="ac-msg__body" style={stacked ? { display: "flex", flexDirection: "column", gap: 8 } : undefined}>
-        <div className={grouped || waiting || own ? "ac-visually-hidden" : "ac-msg__head"}>
-          <span className="ac-msg__author">{author}</span>
-          {meta ? (
-            // Focusable so the details are reachable without a mouse.
-            <span
-              className="ac-msg__time ac-msg__time--details"
-              tabIndex={grouped || own ? -1 : 0}
-              aria-describedby={tipId}
-            >
-              {time}
-              {tip}
-            </span>
-          ) : (
-            <span className="ac-msg__time">{time}</span>
-          )}
-          {note && (
-            // Focusable so the reason is reachable without a mouse.
-            <span className="ac-msg__note" tabIndex={grouped ? -1 : 0} aria-describedby={noteId}>
-              {note.label}
-              <span className="ac-msg__note-tip ac-glass" role="tooltip" id={noteId}>
-                {note.tip}
-              </span>
-            </span>
-          )}
-          {/* A run's earlier row of mine has no line under it once sent, so none while it sends: its hidden head
-              reads the state out. */}
-          {status && !footed && (
-            <span className="ac-msg__status">
-              {status.mark ?? (status.icon ? <Icon name={status.icon} size={14} /> : null)}
-              {status.label}
-            </span>
-          )}
-          {aside && !grouped && !own && <span className="ac-msg__aside">{aside}</span>}
-        </div>
-        {aside && grouped && !own && <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>}
-        {children}
+        {(!inBubble || mine) && head}
+        {aside && grouped && !mine && !inBubble && (
+          <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>
+        )}
+        <BubbleContext.Provider value={inBubble ? { head: mine ? null : head, tail: stamp } : null}>
+          {children}
+        </BubbleContext.Provider>
         {footed && (
           // The head (hidden) reads the time; here it is for the eye, its details on hover. One per run: its rows
           // are minutes apart at most (they group). The receipt's mark ends this line, so it never adds one. A
@@ -247,8 +330,22 @@ export function Message({
   );
 }
 
-export function MessageText({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cx("ac-msg__text", className)} {...rest} />;
+export interface MessageTextProps extends HTMLAttributes<HTMLDivElement> {
+  /** False on a second text in a row: in `bubbles` the name opens the first one only. */
+  opens?: boolean;
+  /** False on a first text with another under it: in `bubbles` the time ends the last one only. */
+  closes?: boolean;
+}
+
+export function MessageText({ className, opens = true, closes = true, children, ...rest }: MessageTextProps) {
+  const bubble = useContext(BubbleContext);
+  return (
+    <div className={cx("ac-msg__text", className)} {...rest}>
+      {opens && bubble?.head}
+      {children}
+      {closes && bubble?.tail}
+    </div>
+  );
 }
 
 /** "Hoje", "Ontem", a date. */

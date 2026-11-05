@@ -1,5 +1,6 @@
 /** Types of the private web-app API (`/api/app/*`, apps/server/src/routes/app). */
 
+import type { ChatPrefs } from "../lib/chat-look";
 import type { OnboardingStepId } from "../lib/onboarding";
 
 /** Whether a person owns the workspace (ADR 0085); what anyone may do comes from their roles (`OrgRole`). */
@@ -241,6 +242,8 @@ export interface OrgSummary {
   showActivity?: boolean;
   /** How agents talk to me here (ADR 0147): null until I pick (they talk simply); absent from an older server. */
   agentStyle?: AgentStyle | null;
+  /** How conversations look to me here: only what I chose (`chatLookOf`); absent from an older server. */
+  chatPrefs?: ChatPrefs;
 }
 
 /** How agents talk to a person (ADR 0147): the server's `AGENT_STYLES`. */
@@ -995,6 +998,8 @@ export interface Channel {
   unreadCount?: number;
   /** Channel list only: of `unreadCount`, the messages that mention you (counted even while muted). */
   mentionCount?: number;
+  /** Channel list only: where the unread starts (when you last read it, or joined); null when not a member. */
+  lastReadAt?: string | null;
   /** Channel list only: you muted it, so it never looks unread. */
   muted?: boolean;
   /** Channel list only: the latest top-level message; null when empty or not a member. */
@@ -2814,6 +2819,8 @@ export interface DirectMessage {
     authorType: string;
   } | null;
   unread: number;
+  /** Where the unread starts: when I last read it; null when I never did. Absent from an older server. */
+  lastReadAt?: string | null;
   /** False until this person first reads it (server side, so on every device): the right hand waves then. */
   everRead?: boolean;
 }

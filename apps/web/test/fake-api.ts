@@ -99,6 +99,7 @@ import type {
 import { ApiError } from "@agenteschat/client";
 import { moveInGroups } from "@agenteschat/client/lib/agent-groups";
 import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
+import type { ChatPrefs } from "@agenteschat/client/lib/chat-look";
 import { ISSUES_VIEW_DEFAULT } from "@agenteschat/client/lib/issues-view";
 import { freeHandle, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
@@ -664,6 +665,17 @@ export function withRightHand(state: FakeState, extra: Partial<Agent> = {}) {
   });
   return state;
 }
+
+/** Sets how conversations look to me (`chatPrefs`). */
+export function withChatPrefs(state: FakeState, chatPrefs: ChatPrefs = {}) {
+  const org = state.me?.organizations[0];
+  if (org) org.chatPrefs = chatPrefs;
+  return state;
+}
+
+/** The original layout everywhere: what pins the parts of my own bubble, under the time on the right. */
+export const comfortable = (state: FakeState) =>
+  withChatPrefs(state, { channelStyle: "comfortable", dmStyle: "comfortable" });
 
 export function seedDm(
   state: FakeState,
@@ -1604,6 +1616,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (!org) throw new ApiError(404, "not_found", "Organization not found");
         org.agentStyle = style;
         return style;
+      },
+      setChatPrefs: async (orgId, patch) => {
+        log("orgs.setChatPrefs", orgId, patch);
+        const org = state.me?.organizations.find((o) => o.id === orgId);
+        if (!org) throw new ApiError(404, "not_found", "Organization not found");
+        org.chatPrefs = { ...org.chatPrefs, ...patch };
+        return org.chatPrefs;
       },
       sidebarItems: async () => structuredClone(state.sidebarItems ?? {}),
       setSidebarItem: async (orgId, item, place) => {

@@ -89,6 +89,7 @@ describe("permissions", () => {
         start: { page: "home", channelId: null },
         showActivity: false,
         agentStyle: null,
+        chatPrefs: {},
       },
     ]);
     const members = await f.db

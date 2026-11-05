@@ -203,6 +203,7 @@ export const ReceiptMark = memo(function ReceiptMark({
   mine,
   receipt,
   seenBy,
+  ink,
 }: {
   message: Message;
   /** My own message: it also wears what became of it in a task at work. */
@@ -211,11 +212,14 @@ export const ReceiptMark = memo(function ReceiptMark({
   receipt?: MessageReceipt;
   /** A DM between people: who read this message, my latest. */
   seenBy?: string;
+  /** Over a solid bubble: the mark's color in place of the page's. */
+  ink?: string;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const dir = useDirectory();
   const c = useColors();
+  const tint = ink ?? c.muted;
   const reduced = useReducedMotion();
   const sheet = useSheet();
   const toast = useToast();
@@ -245,18 +249,18 @@ export const ReceiptMark = memo(function ReceiptMark({
           view.state === "read" || view.state === "resolved" ? (
             <AgentFace agentId={view.agentId} size={16} live={false} framed={false} />
           ) : view.state === "now" ? (
-            <Icon name="bolt" size={14} color={c.muted} />
+            <Icon name="bolt" size={14} color={tint} />
           ) : view.state === "delivered" ? (
-            <Icon name="check" size={14} color={c.muted} />
+            <Icon name="check" size={14} color={tint} />
           ) : view.state === "held" ? (
-            <Icon name="pause" size={14} color={c.muted} />
+            <Icon name="pause" size={14} color={tint} />
           ) : (
-            <InkOrbit size={10} color={c.muted} />
+            <InkOrbit size={10} color={tint} />
           )
         ) : (
           <>
             {view.agentId ? <AgentFace agentId={view.agentId} size={16} live={false} framed={false} /> : null}
-            <Mark mark={view.mark} color={c.muted} />
+            <Mark mark={view.mark} color={tint} />
           </>
         )}
       </Pressable>

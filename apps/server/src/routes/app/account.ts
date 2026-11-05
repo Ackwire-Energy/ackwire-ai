@@ -525,6 +525,7 @@ export function accountRoutes(deps: AppDeps) {
               ...(m.start ? { start: m.start } : {}),
               showActivity: m.showActivity ?? false,
               agentStyle: m.agentStyle ?? null,
+              chatPrefs: m.chatPrefs ?? {},
               ...(m.standing
                 ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
                 : {}),
