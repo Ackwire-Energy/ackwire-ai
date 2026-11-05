@@ -110,9 +110,12 @@
   min-width: 0;
 }
 /* A person: the name beside the face, when they were last here on the right, their roles under the name, on its edge. */
+/* A face line (`.ac-faceline`): the face at the row's top, the name's capitals on its top edge (`.ac-captop`), when they
+   were last here and the DM button on the name's line (`.ac-captail`) however the @handle and email wrap. */
 .ac-list__row.members-person {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
   gap: 6px var(--space-3);
 }
 .members-person__name {
@@ -127,11 +130,8 @@
   gap: 0 var(--space-2);
   overflow-wrap: anywhere;
 }
-/* When they were last here, and the DM button right beside it at the row's top right. */
+/* When they were last here, and the DM button right beside it, on the name's line at the row's right. */
 .members-person__end {
-  display: flex;
-  align-items: center;
-  align-self: start;
   gap: var(--space-1);
 }
 .members-person__seen {
