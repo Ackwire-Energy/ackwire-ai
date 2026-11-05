@@ -119,7 +119,6 @@
 }
 .ac-msg--mentions-me[data-look="bubbles"] .ac-msg__text {
   background: color-mix(in srgb, var(--attention) 13%, var(--msg-bubble));
-  box-shadow: inset 2px 0 0 var(--attention);
 }
 /* Mine: on the right in the tint or the solid color, its width the same as anyone's. */
 .ac-msg--own[data-look="bubbles"] {
