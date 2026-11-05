@@ -361,6 +361,88 @@ test("parser: a plan limit is a limit event with its reset time, then plan_limit
   ).toMatchObject({ code: "claude_failed", message: "boom", retryable: false });
 });
 
+test("parser: a failed turn says why the provider failed it, from Claude Code's own error frames only", () => {
+  const p = new ClaudeStreamParser();
+  const fail = (...lines: Record<string, unknown>[]) => {
+    p.beginTurn();
+    for (const l of lines.slice(0, -1)) p.push(line(l));
+    return p.push(line(lines.at(-1) as Record<string, unknown>)).final;
+  };
+  const retry = (error: string, status: number | null) => ({
+    type: "system",
+    subtype: "api_retry",
+    attempt: 1,
+    max_retries: 10,
+    error_status: status,
+    error,
+  });
+  const errorFrame = (error: string, text: string) => ({
+    type: "assistant",
+    parent_tool_use_id: null,
+    error,
+    message: { id: "m1", content: [{ type: "text", text }] },
+  });
+  const failed = { type: "result", subtype: "error_during_execution", is_error: true, errors: ["boom"] };
+
+  expect(fail(retry("authentication_failed", 401), { type: "result", is_error: true, result: "x" })).toMatchObject({
+    code: "not_logged_in",
+    cause: "auth_rejected",
+    httpStatus: 401,
+  });
+  // A 403 alone is a refused sign-in, not a disabled account.
+  expect(fail(retry("authentication_failed", 403), failed)).toMatchObject({ cause: "auth_rejected", httpStatus: 403 });
+  expect(
+    fail(errorFrame("unknown", 'API Error: 403 {"error":{"message":"Request not allowed"}}'), {
+      type: "result",
+      is_error: true,
+      result: 'API Error: 403 {"error":{"message":"Request not allowed"}}',
+    }),
+  ).toMatchObject({ code: "claude_failed", cause: "auth_rejected", httpStatus: 403 });
+  // Only the provider's own words say an account is disabled.
+  const disabled = 'API Error: 400 {"error":{"message":"This organization has been disabled."}}';
+  expect(
+    fail(errorFrame("invalid_request", disabled), { type: "result", is_error: true, result: disabled }),
+  ).toMatchObject({ code: "claude_failed", cause: "account_disabled", httpStatus: 400 });
+  expect(
+    fail(errorFrame("billing_error", "Credit balance is too low"), {
+      type: "result",
+      is_error: true,
+      result: "Credit balance is too low",
+    }),
+  ).toMatchObject({ cause: "billing" });
+  expect(fail({ type: "rate_limit_event", rate_limit_info: { status: "rejected" } }, failed)).toMatchObject({
+    code: "plan_limit",
+    cause: "quota",
+  });
+  expect(fail(retry("overloaded", 529), failed)).toMatchObject({ cause: "provider_transient", httpStatus: 529 });
+  expect(fail(retry("server_error", 500), failed)).toMatchObject({ cause: "provider_transient", httpStatus: 500 });
+  expect(fail(retry("unknown", null), failed)).toMatchObject({ code: "claude_failed", cause: "network" });
+  expect(fail({ ...failed, errors: ["API Error: Connection error. (ECONNRESET)"] })).toMatchObject({
+    cause: "network",
+  });
+  expect(fail(failed)).toMatchObject({ code: "claude_failed", cause: "unknown" });
+  expect(fail({ ...failed, api_error_status: 502 })).toMatchObject({ cause: "provider_transient", httpStatus: 502 });
+
+  // The model's own prose quoting an error never fails a turn, nor says a cause.
+  const prose = "The log says: Invalid API key, credentials, and this organization has been disabled.";
+  const ok = fail(
+    { type: "assistant", parent_tool_use_id: null, message: { id: "m2", content: [{ type: "text", text: prose }] } },
+    { type: "result", subtype: "success", is_error: false, result: prose },
+  );
+  expect(ok).toMatchObject({ type: "done", text: prose });
+  // Nor does a failure that only mentions credentials in passing read as signed out.
+  expect(fail({ ...failed, errors: ["Could not read the credentials helper's config"] })).toMatchObject({
+    code: "claude_failed",
+  });
+  expect(fail({ ...failed, errors: ["Invalid credentials"] })).toMatchObject({ code: "not_logged_in" });
+  // A success result marked as an error is an error.
+  expect(fail({ type: "result", subtype: "success", is_error: true, result: "boom" })).toMatchObject({
+    type: "error",
+    code: "claude_failed",
+    cause: "unknown",
+  });
+});
+
 test("command line: stream-json both ways, opus falls back to sonnet, strict MCP unless opted out, our prompt tool", () => {
   const base = {
     session: SESSION(1),
@@ -1604,7 +1686,14 @@ test.if(posix)(
       // Its endpoint refuses it: the turn ends at once, as signed out (the CLI would retry for minutes).
       const started = Date.now();
       const refused = await turn(4, "KEY401", { account: ACCOUNT }, undefined, grant);
-      expect(refused.final).toEqual({ type: "error", code: "not_logged_in", message: TOKEN_REFUSED, retryable: true });
+      expect(refused.final).toEqual({
+        type: "error",
+        code: "not_logged_in",
+        message: TOKEN_REFUSED,
+        retryable: true,
+        cause: "auth_rejected",
+        httpStatus: 401,
+      });
       expect(Date.now() - started).toBeLessThan(10_000);
       // Nothing to sign in with on the computer: signed out, no CLI started.
       const before = runs().length;

@@ -30,6 +30,7 @@ import {
   OWN_USAGE_ID,
   PERMISSION_PROMPT_TOOL,
   PERMISSION_WAIT_MS,
+  type ProviderFailureCause,
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
 import { claudeCodeModel, type PlanId, planOf } from "@agenteschat/providers/plans";
@@ -218,7 +219,49 @@ export const LIMIT_TEXT =
 /** The server throttling everyone, which it says is no plan limit. */
 export const NOT_LIMIT_TEXT = /not your usage limit/i;
 /** Claude Code can't authenticate (not logged in, a revoked token, a bad key). */
-export const AUTH_TEXT = /not logged in|\/login|invalid api key|authentication[_ ]failed|oauth token|credentials/i;
+export const AUTH_TEXT =
+  /not logged in|\/login|invalid api key|authentication[_ ]failed|oauth token|(?:invalid|expired|revoked|missing) credentials|credentials (?:are |were |have )?(?:invalid|expired|revoked|missing)/i;
+
+/** The provider's own words that the account or its organization is shut off: never read in the model's prose. */
+const DISABLED_TEXT = /\b(?:organization|account) (?:has been|is|was) (?:disabled|suspended|banned)\b/i;
+const BILLING_TEXT = /credit balance/i;
+const NETWORK_TEXT =
+  /\bE(?:CONNRESET|CONNREFUSED|CONNABORTED|TIMEDOUT|NOTFOUND|AI_AGAIN|HOSTUNREACH|NETUNREACH|PIPE)\b|socket hang up|proxy|connection error|fetch failed/i;
+/** How Claude Code words a provider's answer in an error text: "API Error: 403 {…}". */
+const API_ERROR_STATUS = /\bAPI Error: (\d{3})\b/;
+
+/** Why the provider refused or failed a call (protocol 46), and its HTTP status when the CLI said one. */
+export interface ProviderFailure {
+  cause?: ProviderFailureCause;
+  httpStatus?: number;
+}
+
+/**
+ * A provider failure from what Claude Code said of it: its `error` word (`api_retry`, an `assistant` error frame),
+ * the HTTP status, and the error's own text (never the model's prose). A 403 alone is a refused sign-in: only the
+ * provider's words say an account is disabled. `noResponse`: no HTTP answer came at all.
+ */
+export function providerFailure(f: {
+  error?: unknown;
+  status?: unknown;
+  text?: string;
+  noResponse?: boolean;
+}): ProviderFailure {
+  const text = f.text ?? "";
+  const status = typeof f.status === "number" ? f.status : Number(API_ERROR_STATUS.exec(text)?.[1]);
+  const httpStatus = Number.isInteger(status) && status >= 100 && status <= 599 ? status : undefined;
+  const http = httpStatus ? { httpStatus } : {};
+  const error = typeof f.error === "string" ? f.error : "";
+  if (DISABLED_TEXT.test(text)) return { cause: "account_disabled", ...http };
+  if (error === "authentication_failed" || error === "oauth_org_not_allowed" || status === 401 || status === 403)
+    return { cause: "auth_rejected", ...http };
+  if (error === "billing_error" || BILLING_TEXT.test(text)) return { cause: "billing", ...http };
+  if (error === "rate_limit" || status === 429) return { cause: "quota", ...http };
+  if (error === "server_error" || error === "overloaded" || (httpStatus ?? 0) >= 500)
+    return { cause: "provider_transient", ...http };
+  if (NETWORK_TEXT.test(text) || (f.noResponse && !httpStatus)) return { cause: "network", ...http };
+  return http;
+}
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -317,6 +360,8 @@ export class ClaudeStreamParser {
   private worked = false;
   private resetsAt?: string;
   private authFailed = false;
+  /** What the turn's provider errors said last (`api_retry`, an error frame, a refused plan): `cause` on its error. */
+  failure: ProviderFailure = {};
   /** Uncached input of each API call of the turn, by message id (Claude Code repeats a message per content block). */
   private uncached = new Map<string, number>();
 
@@ -331,6 +376,7 @@ export class ClaudeStreamParser {
     this.worked = false;
     this.resetsAt = undefined;
     this.authFailed = false;
+    this.failure = {};
   }
 
   push(raw: string): ParsedBrainLine {
@@ -346,6 +392,14 @@ export class ClaudeStreamParser {
     const main = ev.parent_tool_use_id === null || ev.parent_tool_use_id === undefined;
     switch (ev.type) {
       case "system": {
+        if (ev.subtype === "api_retry") {
+          const failure = providerFailure({
+            error: ev.error,
+            status: ev.error_status,
+            noResponse: ev.error_status === null || isObj(ev.no_response),
+          });
+          if (failure.cause || failure.httpStatus) this.failure = failure;
+        }
         if (ev.subtype === "api_retry" && (ev.error === "authentication_failed" || ev.error_status === 401)) {
           this.authFailed = true;
           return { events: [], authRetry: true };
@@ -381,6 +435,12 @@ export class ClaudeStreamParser {
         if (ev.error === "authentication_failed") this.authFailed = true;
         if (ev.error === "rate_limit") this.limited = true;
         const content = isObj(ev.message) && Array.isArray(ev.message.content) ? ev.message.content : [];
+        // Claude Code's own frame for a provider's error (its `error` word set): its text is the provider's answer.
+        if (typeof ev.error === "string") {
+          const said = content.map((b) => (isObj(b) && b.type === "text" ? str(b.text) : "")).join("\n");
+          const failure = providerFailure({ error: ev.error, text: said });
+          if (failure.cause || failure.httpStatus) this.failure = failure;
+        }
         const messageId = isObj(ev.message) ? str(ev.message.id) : "";
         if (messageId && isObj(ev.message) && isObj(ev.message.usage))
           this.uncached.set(messageId, num(ev.message.usage.input_tokens));
@@ -433,6 +493,7 @@ export class ClaudeStreamParser {
         if (info.status !== "rejected") return { events: [], rateLimit: info };
         this.limited = true;
         this.rejected = true;
+        this.failure = { cause: "quota" };
         this.resetsAt = resetIso(info.resetsAt);
         if (this.limitSent) return { events: [], rateLimit: info };
         this.limitSent = true;
@@ -482,6 +543,9 @@ export class ClaudeStreamParser {
     const session = str(ev.session_id) || this.session;
     const text = str(ev.result) || (Array.isArray(ev.errors) ? ev.errors.map(str).join("\n") : "");
     if (ev.is_error === true || (typeof ev.subtype === "string" && ev.subtype !== "success")) {
+      const said = providerFailure({ status: ev.api_error_status, text });
+      const httpStatus = said.httpStatus ?? this.failure.httpStatus;
+      const http = httpStatus ? { httpStatus } : {};
       if (this.rejected || ((this.limited || LIMIT_TEXT.test(text)) && !NOT_LIMIT_TEXT.test(text))) {
         const legacy = /\|(\d{10})\b/.exec(text)?.[1];
         const resetsAt = this.resetsAt ?? (legacy ? resetIso(Number(legacy)) : undefined);
@@ -495,6 +559,8 @@ export class ClaudeStreamParser {
             message: (text || "The plan's usage limit was reached.").slice(0, BRAIN_LIMITS.message),
             retryable: true,
             worked: this.worked,
+            cause: "quota",
+            ...http,
           },
           // Known only from its words (no `rate_limit_event` said so): the stored usage says limited too.
           ...(this.rejected ? {} : { rateLimit: { status: "rejected" } }),
@@ -508,6 +574,8 @@ export class ClaudeStreamParser {
             code: "not_logged_in",
             message: (text || "Claude Code is not logged in on this computer.").slice(0, BRAIN_LIMITS.message),
             retryable: true,
+            cause: (said.cause ?? this.failure.cause) === "account_disabled" ? "account_disabled" : "auth_rejected",
+            ...http,
           },
         };
       }
@@ -518,6 +586,8 @@ export class ClaudeStreamParser {
           code: "claude_failed",
           message: (text || `Claude Code ended with ${str(ev.subtype) || "an error"}`).slice(0, BRAIN_LIMITS.message),
           retryable: false,
+          cause: said.cause ?? this.failure.cause ?? "unknown",
+          ...http,
         },
       };
     }
@@ -1132,7 +1202,16 @@ export function runTurnOnProcess(
       const parsed = proc.parser.push(line);
       if (parsed.authRetry && opts.refused) {
         proc.kill();
-        finish({ final: { type: "error", code: "not_logged_in", message: opts.refused, retryable: true } });
+        finish({
+          final: {
+            type: "error",
+            code: "not_logged_in",
+            message: opts.refused,
+            retryable: true,
+            cause: "auth_rejected",
+            ...proc.parser.failure,
+          },
+        });
         return;
       }
       // The next turn began: it reads the notices that came before it.
