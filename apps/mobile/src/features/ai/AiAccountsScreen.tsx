@@ -14,6 +14,7 @@ import {
   agentsToGive,
   endsOnClaude,
   identityUnknown,
+  offersSignInAgain,
   onSeveralComputers,
   ownSignIns,
   ownSignInTitle,
@@ -165,7 +166,7 @@ export function AiAccountsScreen() {
     );
   const actions = (a: Account) => {
     const plan = planOf(a.provider);
-    const out = signInOf(a) === "signed_out";
+    const out = offersSignInAgain(a);
     const toGive = meId
       ? agentsToGive({
           account: a,

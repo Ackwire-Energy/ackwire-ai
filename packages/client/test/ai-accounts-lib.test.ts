@@ -11,6 +11,7 @@ import {
   groupPlans,
   identityUnknown,
   lendable,
+  offersSignInAgain,
   ownSignInListed,
   ownSignInName,
   ownSignInReady,
@@ -121,6 +122,8 @@ describe("groupPlans: one row per account, its logins together", () => {
     expect(plan?.signedOut.map((l) => l.id)).toEqual(["b"]);
     expect(plan?.unknown.map((l) => l.id)).toEqual(["c"]);
     expect(plan?.logins.map(signInOf)).toEqual(["active", "signed_out", "unknown", "active"]);
+    // Still refused by the server, so signing in again stays offered; only the words change.
+    expect(plan?.logins.map(offersSignInAgain)).toEqual([false, true, true, false]);
   });
 
   test("logins whose email or key the viewer can't see stay apart", () => {

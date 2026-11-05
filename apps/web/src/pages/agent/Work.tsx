@@ -48,6 +48,7 @@ import {
 import {
   accountChoices,
   lendable,
+  offersSignInAgain,
   ownSignInListed,
   ownSignInName,
   ownSignInReady,
@@ -864,6 +865,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // Signing in to it again is its owner's.
   const signedOut = current != null && signInOf(current) === "signed_out" && current.mine;
   const unknown = current != null && signInOf(current) === "unknown";
+  const signInAgain = current != null && offersSignInAgain(current) && current.mine;
   const accountChanged = accountsOn && account !== view.account;
   // A login made for one agent thinks for one: picking another agent's takes it from that one ("Mover para cá"). One
   // made for all of its owner's agents there thinks for this one too.
@@ -1181,7 +1183,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       value: ADD,
       action: true,
       // A coding plan's key that was refused gets a new key; a sign-in that ended signs in again.
-      label: signedOut
+      label: signInAgain
         ? t(isPlanId(card) ? "aiAccounts.page.newKey" : "agentPage.work.brain.signInAgain")
         : t("agentPage.work.brain.addAccount"),
       leading: (
@@ -1287,7 +1289,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   );
   const also = typeof adding === "object" ? adding : undefined;
   // A sign-in for one more login of the account picked (`also`), else for this agent's own signed-out one again.
-  const again = !also && signedOut ? current : null;
+  const again = !also && signInAgain ? current : null;
   const signingIn = also ?? again;
   // The model as a picker like the account's: Automático first, each model with its line. Claude's own models say what
   // each is for ("O mais capaz…"), a plan's what it's sold as, and what it needs from the plan's account behind its ⓘ;

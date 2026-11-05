@@ -118,6 +118,14 @@ describe("Contas de IA", () => {
     expect(screen().getByRole("region", { name: "Chaves de provedor" })).toBeTruthy();
   });
 
+  test("a signed-out account its computer couldn't check says so, and still signs in again", async () => {
+    const { rows } = await page([{ ...WORK, status: "signed_out" as const, statusKnown: false }]);
+    const row = rows()[0] as HTMLElement;
+    expect(row.textContent).toContain("O computador não conseguiu confirmar o login desta vez.");
+    expect(row.textContent).not.toContain("Saiu da conta.");
+    expect(within(row).getByRole("button", { name: "Entrar de novo" })).toBeTruthy();
+  });
+
   test("Sign in again: the account's own email goes to Claude's sign-in unseen; another account coming back is said, with Try again only", async () => {
     const out = { ...WORK, status: "signed_out" as const };
     const free = { ...WORK, id: "acct_pessoal", label: "Pessoal", email: "walt@gmail.com", usedBy: [], usage: null };

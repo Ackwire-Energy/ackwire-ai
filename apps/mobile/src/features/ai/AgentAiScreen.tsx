@@ -1,6 +1,12 @@
 import type { AgentBrain, AgentBrainInput, MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi, useMachines, useModels } from "@agenteschat/client";
-import { accountChoices, ownSignInListed, ownSignInName, signInOf } from "@agenteschat/client/lib/ai-accounts";
+import {
+  accountChoices,
+  offersSignInAgain,
+  ownSignInListed,
+  ownSignInName,
+  signInOf,
+} from "@agenteschat/client/lib/ai-accounts";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
 import { advancedContents } from "@agenteschat/client/lib/brain-advanced";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -160,8 +166,9 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const limited = usage ? planState(usage).state === "limited" : false;
   const offers = limited && kind && view ? limitOffers(accounts, kind, view.account).slice(0, 2) : [];
   const signedOut = current != null && signInOf(current) === "signed_out" && current.mine;
+  const signInAgain = current != null && offersSignInAgain(current) && current.mine;
   // A coding plan's key that its endpoint refused: a new key, on that plan's page.
-  const refused = signedOut && current && isPlanId(current.provider) ? current.provider : null;
+  const refused = signInAgain && current && isPlanId(current.provider) ? current.provider : null;
   // Someone else's plans listed for whoever may use them: whose they are, and that their owner hears it.
   const lends = view?.canUseOthersPlans === true && accounts.some((a) => !a.mine && a.ownerId !== agent?.ownerUserId);
   const accountNote = signedOut
@@ -231,7 +238,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                       label={
                         refused
                           ? t("aiAccounts.page.newKey")
-                          : signedOut
+                          : signInAgain
                             ? t("agentPage.work.brain.signInAgain")
                             : t("agentPage.work.brain.addAccount")
                       }

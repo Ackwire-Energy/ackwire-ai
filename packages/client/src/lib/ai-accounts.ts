@@ -36,6 +36,12 @@ export interface PlanAccount<A extends MachineAccount> {
 export const signInOf = (a: Pick<MachineAccount, "status" | "statusKnown">): "active" | "signed_out" | "unknown" =>
   a.status === "active" ? "active" : a.statusKnown === false ? "unknown" : "signed_out";
 
+/**
+ * Whether a login offers signing in to it again: whenever the server keeps it signed out, also while its last look
+ * was unclear (`signInOf` unknown only changes the words), since its turns are refused until then.
+ */
+export const offersSignInAgain = (a: Pick<MachineAccount, "status">) => a.status === "signed_out";
+
 const newest = (usages: (PlanUsage | null)[]) =>
   usages.reduce<PlanUsage | null>(
     (best, u) => (u && (!best || Date.parse(u.at) > Date.parse(best.at)) ? u : best),

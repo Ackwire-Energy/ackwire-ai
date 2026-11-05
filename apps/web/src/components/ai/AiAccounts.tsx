@@ -6,6 +6,7 @@ import {
   endsOnClaude,
   groupPlans,
   identityUnknown,
+  offersSignInAgain,
   onSeveralComputers,
   ownSignIns,
   ownSignInTitle,
@@ -264,7 +265,7 @@ export function AiAccountsSection() {
                   <Button variant="ghost" size="sm" onClick={() => setOpen({ type: "rename", account })}>
                     {t("aiAccounts.page.rename")}
                   </Button>
-                  {(signedOut.length > 0 || plan) && (
+                  {(logins.some(offersSignInAgain) || plan) && (
                     <Button variant="ghost" size="sm" onClick={() => setOpen({ type: "again", account })}>
                       {plan ? t("aiAccounts.page.newKey") : t("aiAccounts.page.signInAgain")}
                     </Button>
@@ -345,7 +346,7 @@ export function AiAccountsSection() {
 
 /**
  * Signing in again: a coding plan's new key goes to every login of the account, a sign-in to its first login out
- * (else its first). Closes once each login took it.
+ * (else one unchecked, else its first). Closes once each login took it.
  */
 function AgainDialog({
   account,
@@ -360,7 +361,7 @@ function AgainDialog({
 }) {
   const { t } = useTranslation();
   const added = useRef(new Set<string>());
-  const a = account.signedOut[0] ?? account.logins[0];
+  const a = account.signedOut[0] ?? account.unknown[0] ?? account.logins[0];
   if (!a) return null;
   const key = isPlanId(a.provider);
   const fanOut = key ? account.logins.map((l) => ({ id: l.id, again: l.id })) : undefined;
