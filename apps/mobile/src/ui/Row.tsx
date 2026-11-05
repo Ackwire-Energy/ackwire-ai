@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import { Icon } from "./Icon";
 import { Text, textLineOf } from "./Text";
@@ -39,6 +39,9 @@ export function Row({
   // title's line (centred on the whole row they floated between lines). Short rows keep everything centred.
   const tall = subtitleLines > 1 || Boolean(below);
   const line = tall ? textLineOf("title", fontScale) : null;
+  // The hairline starts where the text does: the leading's own width (a 30-point face, a 34-point tile), not a
+  // fixed 32 that left it a couple of points off the title.
+  const [leadWidth, setLeadWidth] = useState(32);
   const body = (pressed: boolean) => (
     <View
       style={{
@@ -55,14 +58,14 @@ export function Row({
           style={{
             position: "absolute",
             top: 0,
-            left: leading ? 58 : 14,
+            left: leading ? 14 + leadWidth + 12 : 14,
             right: 0,
             height: 1,
             backgroundColor: colors.line,
           }}
         />
       ) : null}
-      {leading}
+      {leading ? <View onLayout={(e) => setLeadWidth(e.nativeEvent.layout.width)}>{leading}</View> : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="title" numberOfLines={1}>
           {title}
