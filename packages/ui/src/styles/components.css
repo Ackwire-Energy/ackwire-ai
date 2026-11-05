@@ -134,7 +134,10 @@ html[data-pointer] :focus-visible {
  * mode. Set on the children (custom properties inherit), so the container
  * keeps its own level and a card inside a dialog lifts once. Light mode is
  * unchanged (`--raised-2` is white there). App containers that hold raised
- * pieces add the same pair of declarations to their children.
+ * pieces add the same pair of declarations to their children. A card's top
+ * (`--card-face-top`, `--card-key-bottom`) steps up with them: set on the
+ * root, it stayed the container's color, and a card there faded from the
+ * container's face into its own in dark.
  */
 :where(
   .ac-dialog,
@@ -150,6 +153,8 @@ html[data-pointer] :focus-visible {
 ) > * {
   --raised: var(--raised-2);
   --surface-raised: var(--raised-2);
+  --card-face-top: var(--raised-2);
+  --card-key-bottom: var(--raised-2);
 }
 .ac-visually-hidden {
   position: absolute;
@@ -1013,6 +1018,8 @@ textarea.ac-input {
 .ac-msg > * {
   --raised: var(--raised-2);
   --surface-raised: var(--raised-2);
+  --card-face-top: var(--raised-2);
+  --card-key-bottom: var(--raised-2);
   --sunken: var(--msg-well);
   --surface-sunken: var(--msg-well);
   --card-well: var(--msg-well);
@@ -2571,8 +2578,10 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-list__row > .ac-captail:last-child > .ac-btn--ghost.ac-btn--icon:last-child {
   margin-right: calc(-1 * var(--ghost-plate));
 }
+/* The soft plate, as a message row's hover: the page's color was no change on a list on the page in light, and a
+   near-black hole on a list in a dialog in dark (outside the work area `--surface` is the darkest ground). */
 a.ac-list__row:hover {
-  background: var(--surface);
+  background: var(--plate-soft);
 }
 html:not([data-pointer]) a.ac-list__row:focus-visible {
   outline: none;
