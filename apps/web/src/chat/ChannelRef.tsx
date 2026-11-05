@@ -1,7 +1,7 @@
 import { useChannelCard, useChannels, useJoinChannel } from "@agenteschat/client";
 import { joinable } from "@agenteschat/client/lib/channel-access";
 import { channelCardFacts, resolveChannelRef } from "@agenteschat/client/lib/channel-refs";
-import { Button, Chip, Icon, Popover, useHoverCard } from "@agenteschat/ui";
+import { Button, Chip, Icon, movesByKeys, Popover, useHoverCard } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type FocusEvent, type KeyboardEvent, type MouseEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -38,8 +38,8 @@ export function ChannelRef({ name, text, refs }: { name: string; text: string; r
   const archived = !ref.known && lookup.data?.archived === true;
   const label = archived ? t("channelRefs.archivedLabel", { name: shown }) : t("channelRefs.label", { name: shown });
   const focus = {
-    onFocus: (e: FocusEvent<HTMLElement>) => {
-      if (!open && e.currentTarget.matches(":focus-visible")) setFocused(true);
+    onFocus: () => {
+      if (!open && movesByKeys()) setFocused(true);
     },
     onBlur: (e: FocusEvent<HTMLElement>) => {
       if (!(e.relatedTarget instanceof Node && body.current?.contains(e.relatedTarget))) setFocused(false);

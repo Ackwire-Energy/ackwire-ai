@@ -1654,6 +1654,8 @@
     "reply": "返信",
     "quoteOf": "{{name}}への返信: {{excerpt}}。メッセージを見る",
     "quoteGone": "元のメッセージは削除されました",
+    "jumpTooFar": "このメッセージは古すぎるため、ここからは開けません。",
+    "quoteNoWords": "テキストなしのメッセージ",
     "replyingTo": "{{name}} に返信中",
     "cancelReply": "返信をキャンセル",
     "emoji": "絵文字",

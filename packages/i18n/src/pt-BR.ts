@@ -1692,6 +1692,8 @@ export const ptBR = {
     reply: "Responder",
     quoteOf: "Resposta a {{name}}: {{excerpt}}. Ver a mensagem",
     quoteGone: "Mensagem original apagada",
+    jumpTooFar: "Essa mensagem está longe demais para abrir daqui.",
+    quoteNoWords: "Mensagem sem texto",
     replyingTo: "Respondendo a {{name}}",
     cancelReply: "Cancelar resposta",
     emoji: "Emoji",

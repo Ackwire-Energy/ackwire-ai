@@ -1700,6 +1700,8 @@ export const en = {
     reply: "Reply",
     quoteOf: "Reply to {{name}}: {{excerpt}}. See the message",
     quoteGone: "Original message deleted",
+    jumpTooFar: "That message is too far back to open from here.",
+    quoteNoWords: "Message with no text",
     replyingTo: "Replying to {{name}}",
     cancelReply: "Cancel reply",
     emoji: "Emoji",

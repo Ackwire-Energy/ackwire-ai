@@ -104,6 +104,20 @@ test("a quote of a message deleted since keeps only that: its words and author g
   expect(listed.find((m) => m.id === kept.id)?.meta.replyTo).not.toHaveProperty("deleted");
 });
 
+test("a quote of a file with no words names the file; one with nothing to say still says who it answers", async () => {
+  f = await setup();
+  const file = await createFileArtifact(f.artifactDeps, { type: "person", userId: f.owner.id }, f.org.id, {
+    title: "relatorio.pdf",
+    name: "relatorio.pdf",
+    bytes: new TextEncoder().encode("%PDF"),
+  });
+  const only = await post("", { attachments: [file.id] });
+  const reply = await post("li", { replyTo: only.id });
+  expect(reply.meta.replyTo).toMatchObject({ excerpt: file.title });
+  expect(quotedLine(reply.meta)).toBe(`(replying to ${f.owner.name}: "${file.title}")\n`);
+  expect(quotedLine({ replyTo: { authorName: "Ana", excerpt: "" } })).toBe("(replying to Ana)\n");
+});
+
 test("an agent reading a thread sees which message each reply answers", async () => {
   f = await setup();
   const root = await post("o deploy falhou");

@@ -1828,6 +1828,8 @@
     "reply": "Odpowiedz",
     "quoteOf": "Odpowiedź do {{name}}: {{excerpt}}. Zobacz wiadomość",
     "quoteGone": "Pierwotna wiadomość została usunięta",
+    "jumpTooFar": "Ta wiadomość jest zbyt daleko wstecz, żeby otworzyć ją stąd.",
+    "quoteNoWords": "Wiadomość bez tekstu",
     "replyingTo": "Odpowiadasz: {{name}}",
     "cancelReply": "Anuluj odpowiedź",
     "emoji": "Emoji",

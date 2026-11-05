@@ -1389,10 +1389,16 @@ async function replyRefFor(
     threadId: row.threadId,
     author: { type: row.authorType, id: person ? row.authorUserId : row.authorAgentId },
     authorName: (person ? row.userName : row.agentName) ?? "",
-    excerpt: replyExcerpt(readableBody(row.body, row.meta)),
+    // A file with no words is quoted by its name, so people and agents still see what is answered.
+    excerpt: replyExcerpt(readableBody(row.body, row.meta) || fileNameOf(row.meta)),
     ...(voiceOf(row.meta) ? { mediaKind: "voice" as const } : media ? { mediaKind: media.kind } : {}),
   };
 }
+
+const fileNameOf = (meta: Record<string, unknown>) => {
+  const title = (meta.artifacts as { title?: unknown }[] | undefined)?.[0]?.title;
+  return typeof title === "string" ? title : "";
+};
 
 /** Files for a message: the person's own uploads or files of this channel, not deleted. */
 async function attachmentRefsFor(db: Database, userId: string, orgId: string, channelId: string, ids: string[]) {

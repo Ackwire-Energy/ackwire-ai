@@ -1712,6 +1712,8 @@
     "reply": "Yanıtla",
     "quoteOf": "{{name}} kişisine yanıt: {{excerpt}}. Mesajı gör",
     "quoteGone": "Orijinal mesaj silindi",
+    "jumpTooFar": "Bu mesaj buradan açmak için fazla geride.",
+    "quoteNoWords": "Metinsiz mesaj",
     "replyingTo": "{{name}} yanıtlanıyor",
     "cancelReply": "Yanıtı iptal et",
     "emoji": "Emoji",

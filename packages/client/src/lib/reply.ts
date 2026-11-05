@@ -1,4 +1,5 @@
 import type { ArtifactRef, Message, ReplyRef } from "../api/types";
+import { artifactRefs } from "./artifacts";
 import { mediaKindOf, messageMediaOf } from "./media";
 import { voiceOf } from "./voice";
 
@@ -47,7 +48,7 @@ export function localMeta(quote: Message | null, authorName: string, files: Arti
       author: quote.author,
       authorName,
       // A quote of a voice message names it: its words never travel.
-      excerpt: voice ? "" : quoteExcerpt(quote.body),
+      excerpt: voice ? "" : quoteExcerpt(quote.body || (artifactRefs(quote.meta)[0]?.title ?? "")),
       ...(media ? { media } : {}),
     } satisfies ReplyRef;
   }

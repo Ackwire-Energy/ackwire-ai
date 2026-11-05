@@ -1770,6 +1770,8 @@
     "reply": "Répondre",
     "quoteOf": "Réponse à {{name}} : {{excerpt}}. Voir le message",
     "quoteGone": "Message d'origine supprimé",
+    "jumpTooFar": "Ce message est trop ancien pour être ouvert d'ici.",
+    "quoteNoWords": "Message sans texte",
     "replyingTo": "Réponse à {{name}}",
     "cancelReply": "Annuler la réponse",
     "emoji": "Emoji",

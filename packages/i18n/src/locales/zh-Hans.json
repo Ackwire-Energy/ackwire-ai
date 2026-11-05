@@ -1654,6 +1654,8 @@
     "reply": "回复",
     "quoteOf": "回复 {{name}}：{{excerpt}}。查看消息",
     "quoteGone": "原消息已删除",
+    "jumpTooFar": "这条消息太久远,无法从这里打开。",
+    "quoteNoWords": "无文字消息",
     "replyingTo": "正在回复 {{name}}",
     "cancelReply": "取消回复",
     "emoji": "表情",

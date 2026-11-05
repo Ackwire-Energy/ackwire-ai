@@ -160,6 +160,18 @@ describe("the word for a GIF or a sticker where text shows", () => {
     expect(quoteText(t, { excerpt: "oi", media: "gif" })).toBe("oi");
   });
 
+  test("a quote's line reads as words: no Markdown's marks, and something where the original has none", () => {
+    expect(quoteText(t, { excerpt: "## Resumo **do deploy** em [produção](https://x.test)" })).toBe(
+      "Resumo do deploy em produção",
+    );
+    expect(quoteText(t, { excerpt: "- primeiro item" })).toBe("primeiro item");
+    expect(quoteText(t, { excerpt: "" })).toBe("channel.quoteNoWords");
+    const file = { id: "a-1", version: 1, title: "relatorio.pdf" };
+    expect(replyOf(localMeta(message({ id: "m-file", meta: { artifacts: [file] } }), "Ana", []))?.excerpt).toBe(
+      "relatorio.pdf",
+    );
+  });
+
   test("a reply shown away from its root quotes it: a sticker root says Figurinha", () => {
     const root = message({ id: "root", meta: { media: STICKER }, createdAt: "2026-10-31T12:00:00.000Z" });
     const other = message({ id: "other", body: "outra coisa", createdAt: "2026-10-31T12:01:00.000Z" });

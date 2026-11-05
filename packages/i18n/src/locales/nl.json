@@ -1712,6 +1712,8 @@
     "reply": "Beantwoorden",
     "quoteOf": "Antwoord op {{name}}: {{excerpt}}. Bekijk het bericht",
     "quoteGone": "Oorspronkelijk bericht verwijderd",
+    "jumpTooFar": "Dit bericht ligt te ver terug om hier te openen.",
+    "quoteNoWords": "Bericht zonder tekst",
     "replyingTo": "Antwoord aan {{name}}",
     "cancelReply": "Antwoord annuleren",
     "emoji": "Emoji",

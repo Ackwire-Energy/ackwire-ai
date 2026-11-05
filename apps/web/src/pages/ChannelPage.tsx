@@ -193,7 +193,7 @@ import {
   type VoiceNotice,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link, Navigate, useNavigate } from "@tanstack/react-router";
+import { Link, Navigate, useNavigate, useRouter } from "@tanstack/react-router";
 import {
   Children,
   createContext,
@@ -354,7 +354,7 @@ import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { selectingIn } from "@/lib/context-menu";
 import { desktopPlatform, useDocumentTitle } from "@/lib/desktop";
 import { holdOnScreen } from "@/lib/island";
-import { useThreadPanel } from "@/lib/open-param";
+import { threadSearch, useThreadPanel } from "@/lib/open-param";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
 import {
@@ -534,7 +534,11 @@ function QuotedMessage({ reply }: { reply: ReplyRef }) {
       type="button"
       className="msg-quote"
       aria-label={t("channel.quoteOf", { name, excerpt })}
-      onClick={() => actions?.jumpTo?.(reply.messageId)}
+      onClick={() => {
+        // In the channel's timeline a thread's reply isn't a row: it is in its thread. A thread view has no panel.
+        if (reply.threadId && actions?.openThread) actions.openThread(reply.threadId, reply.messageId);
+        else actions?.jumpTo?.(reply.messageId);
+      }}
     >
       {reply.author.id ? (
         <ActorAvatar actor={{ type: reply.author.type, id: reply.author.id }} name={name} size="xs" />
@@ -571,6 +575,7 @@ export function ChannelPage({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const router = useRouter();
   const channels = useChannels(org.id);
   const channel = channels.data?.find((c) => c.id === channelId) ?? fallback;
   // A DM's link (a message link copied there) names its channel: the DM's own page opens it, at the message.
@@ -581,7 +586,10 @@ export function ChannelPage({
 
   if (channels.isPending && !fallback) return <ChannelSkeleton />;
   if (dm) {
-    const search = focusMessageId ? { m: focusMessageId } : {};
+    const search = {
+      ...threadSearch(router.state.location.search as Record<string, unknown>),
+      ...(focusMessageId ? { m: focusMessageId } : {}),
+    };
     return dm.with.type === "agent" ? (
       <Navigate
         to="/org/$orgId/dm/agent/$agentId"
@@ -851,6 +859,16 @@ function ChannelView({
     setProfile((open) => open && { ...open, close: (open.close ?? 0) + 1 });
     return true;
   }, []);
+  // A thread the URL brings back (Back, Forward) takes the panel's place like one opened from here, unless unsaved
+  // edits hold it.
+  const panelId = panel?.id;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a new thread; the rest close around it
+  useEffect(() => {
+    if (!panelId || profileKeeps()) return;
+    setProfile(null);
+    setConsultId(null);
+    setSearchOpen(false);
+  }, [panelId]);
   // A question an agent asked another from here, opened from its line in the reply ("Theo ⇄ Iris"): one panel too.
   const [consultId, setConsultId] = useState<string | null>(null);
   // A DM with an agent: its tasks (ADR 0128), from the pill in the header; one panel too, any other one closes it.
@@ -1721,19 +1739,28 @@ function ChannelView({
   const [focusTarget, setFocusTarget] = useState(focusMessageId);
   const [focusDone, setFocusDone] = useState(!focusMessageId);
   const focusPages = useRef(0);
+  const jumping = useRef(false);
   const found = focusTarget ? timeline.some((i) => i.kind === "message" && i.message.id === focusTarget) : false;
   // biome-ignore lint/correctness/useExhaustiveDependencies: steps while the timeline grows
   useEffect(() => {
     if (focusDone || !focusTarget || !serverRead) return;
     if (found) {
       setFocusDone(true);
+      jumping.current = false;
       stick.current = false;
       highlightMessage(scroller.current, focusTarget);
       return;
     }
-    if (olderState === "done" || focusPages.current >= FOCUS_MAX_PAGES) {
-      // Not here (or too far back): stay at the bottom as usual.
+    // A thread view holds all it can show: nothing to page in.
+    if (thread || olderState === "done" || focusPages.current >= FOCUS_MAX_PAGES) {
       setFocusDone(true);
+      // Pressed from here: the person stays where they were.
+      if (jumping.current) {
+        jumping.current = false;
+        toast.show(t("channel.jumpTooFar"));
+        return;
+      }
+      // Not here (or too far back): stay at the bottom as usual.
       stick.current = true;
       toBottom();
       return;
@@ -1750,6 +1777,7 @@ function ChannelView({
       return;
     }
     focusPages.current = 0;
+    jumping.current = true;
     setFocusTarget(messageId);
     setFocusDone(false);
   };
@@ -2091,6 +2119,7 @@ function ChannelView({
     // channel, the message's thread opens in the panel (a reply there starts it).
     reply: thread
       ? (message) => {
+          setMissionReply(null);
           setQuote(message);
           composer.current?.focus();
         }
@@ -2126,6 +2155,7 @@ function ChannelView({
     },
     jumpTo,
     replyToMission: (missionId, label) => {
+      setQuote(null);
       setMissionReply({ missionId, label });
       composer.current?.focus();
     },

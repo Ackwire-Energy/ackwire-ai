@@ -1770,6 +1770,8 @@
     "reply": "Responder",
     "quoteOf": "Respuesta a {{name}}: {{excerpt}}. Ver el mensaje",
     "quoteGone": "Mensaje original eliminado",
+    "jumpTooFar": "Ese mensaje está demasiado atrás para abrirlo desde aquí.",
+    "quoteNoWords": "Mensaje sin texto",
     "replyingTo": "Respondiendo a {{name}}",
     "cancelReply": "Cancelar respuesta",
     "emoji": "Emoji",

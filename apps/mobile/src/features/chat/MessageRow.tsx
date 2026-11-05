@@ -5,6 +5,7 @@ import {
   keys,
   type Message,
   type MessageReceipt,
+  type ReplyRef,
   type RunConsultation,
   type ScreenKind,
   type ThreadInfo,
@@ -157,8 +158,8 @@ export const MessageRow = memo(function MessageRow({
   /** Absent where it is read only. */
   onLongPress?: (m: Message) => void;
   onRetry?: (m: Message) => void;
-  /** A tap on what it answers: the original, in this conversation. */
-  onQuote?: (messageId: string) => void;
+  /** A tap on what it answers. */
+  onQuote?: (reply: ReplyRef) => void;
   /** The agents' receipt its mark shows: the latest person's message's, on it or on its turn's first row. */
   receipt?: MessageReceipt;
   /** A DM between people: who read this message, my latest. */
@@ -457,7 +458,11 @@ export const MessageRow = memo(function MessageRow({
           </View>
         ) : null}
         {/* With no words there is no bubble to hold it. */}
-        {quote && (!body || voiceOf(meta) || choiceReply) ? <QuotePlate reply={quote} onJump={onQuote} /> : null}
+        {quote && (!body || voiceOf(meta) || choiceReply) ? (
+          <View style={styles.meEnd}>
+            <QuotePlate reply={quote} onJump={onQuote} />
+          </View>
+        ) : null}
         {lead}
         {body && media ? (
           <View style={styles.meFiles}>

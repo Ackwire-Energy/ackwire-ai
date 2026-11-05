@@ -14,7 +14,7 @@ export function QuoteLine({
   ink,
 }: {
   reply: ReplyRef;
-  onJump?: (messageId: string) => void;
+  onJump?: (reply: ReplyRef) => void;
   /** On my solid bubble. */
   ink?: string;
 }) {
@@ -32,7 +32,7 @@ export function QuoteLine({
   const excerpt = quoteText(t, reply);
   return (
     <Pressable
-      onPress={() => onJump?.(reply.messageId)}
+      onPress={() => onJump?.(reply)}
       accessibilityRole="button"
       accessibilityLabel={t("channel.quoteOf", { name, excerpt })}
       style={({ pressed }) => [styles.line, pressed && styles.pressed]}
@@ -60,7 +60,7 @@ export function QuoteAbove({
 }: {
   look: RowLook;
   reply: ReplyRef;
-  onJump?: (messageId: string) => void;
+  onJump?: (reply: ReplyRef) => void;
 }) {
   const c = useColors();
   const middle = FACE_MIDDLE[look.style];
@@ -80,7 +80,7 @@ export function QuotePlate({
   ink,
 }: {
   reply: ReplyRef;
-  onJump?: (messageId: string) => void;
+  onJump?: (reply: ReplyRef) => void;
   ink?: string;
 }) {
   const c = useColors();

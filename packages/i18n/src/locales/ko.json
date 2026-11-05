@@ -1654,6 +1654,8 @@
     "reply": "답장",
     "quoteOf": "{{name}}에게 답장: {{excerpt}}. 메시지 보기",
     "quoteGone": "원본 메시지가 삭제되었습니다",
+    "jumpTooFar": "이 메시지는 너무 오래되어 여기서 열 수 없어요.",
+    "quoteNoWords": "텍스트 없는 메시지",
     "replyingTo": "{{name}}님에게 답장 중",
     "cancelReply": "답장 취소",
     "emoji": "이모지",

@@ -1654,6 +1654,8 @@
     "reply": "Balas",
     "quoteOf": "Balasan untuk {{name}}: {{excerpt}}. Lihat pesannya",
     "quoteGone": "Pesan asli dihapus",
+    "jumpTooFar": "Pesan itu terlalu jauh ke belakang untuk dibuka dari sini.",
+    "quoteNoWords": "Pesan tanpa teks",
     "replyingTo": "Membalas {{name}}",
     "cancelReply": "Batalkan balasan",
     "emoji": "Emoji",

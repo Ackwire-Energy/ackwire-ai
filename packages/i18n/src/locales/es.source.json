@@ -4157,6 +4157,12 @@
   "channel.quoteGone": {
     "value": "Original message deleted"
   },
+  "channel.jumpTooFar": {
+    "value": "That message is too far back to open from here."
+  },
+  "channel.quoteNoWords": {
+    "value": "Message with no text"
+  },
   "channel.replyingTo": {
     "value": "Replying to {{name}}"
   },

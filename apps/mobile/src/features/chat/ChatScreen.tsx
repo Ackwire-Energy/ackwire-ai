@@ -12,6 +12,7 @@ import {
   type MessageMedia,
   type MessagePin,
   type ReceiptsState,
+  type ReplyRef,
   type RunConsultation,
   type SearchHit,
   sendHelpers,
@@ -46,7 +47,7 @@ import { canTalk } from "@agenteschat/client/lib/audience";
 import { runPosition, screenAboveEnd } from "@agenteschat/client/lib/chat";
 import { firstUnreadId, opensAtLastRead } from "@agenteschat/client/lib/chat-look";
 import { consultBlocksNearEnd, consultNoticeFolds, consultsForLine } from "@agenteschat/client/lib/consult-group";
-import { errorText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { mentionsReader, offersEveryone } from "@agenteschat/client/lib/everyone";
 import { capitalize } from "@agenteschat/client/lib/format";
 import { issueTakenOf, issueWorkOf, taskConversationOf } from "@agenteschat/client/lib/issues";
@@ -835,8 +836,10 @@ function Chat({
       // A GIF or a sticker alone routes to nobody, so it gets no clock to keep.
       if (channel && channelAgents.length > 0 && !isMediaAlone(message)) live.picking(message.id);
     },
-    onFailed: (_error, { waits }) => {
-      if (!waits) toast({ title: t("mobile.chat.notSent"), icon: "x" });
+    onFailed: (error, { waits }) => {
+      if (waits) return;
+      const gone = errorCode(error) === "message.reply_not_found";
+      toast({ title: gone ? errorText(t, error) : t("mobile.chat.notSent"), icon: "x" });
     },
   });
   const { send, retry } = sendHelpers(post);
@@ -1085,12 +1088,14 @@ function Chat({
   const [seek, setSeek] = useState<string | null>(focusId);
   const [flashId, setFlashId] = useState<string | null>(null);
   const seekPages = useRef(0);
+  const seekPressed = useRef(false);
   const seekReady = isThread ? threadMessages.isSuccess && !threadMessages.isPlaceholderData : top.isSuccess;
   useEffect(() => {
     if (!seek || !seekReady) return;
     const index = shownRows.findIndex((r) => r.kind === "message" && r.message.id === seek);
     if (index >= 0) {
       setSeek(null);
+      seekPressed.current = false;
       letGo();
       void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
       setFlashId(seek);
@@ -1098,22 +1103,33 @@ function Chat({
     }
     if (isThread || olderDone || seekPages.current >= SEEK_MAX_PAGES) {
       setSeek(null);
+      if (seekPressed.current) toast({ title: t("channel.jumpTooFar") });
+      seekPressed.current = false;
       return;
     }
     if (!loadingOlder) {
       seekPages.current += 1;
       loadOlder();
     }
-  }, [seek, seekReady, shownRows, isThread, olderDone, loadingOlder, loadOlder, letGo]);
+  }, [seek, seekReady, shownRows, isThread, olderDone, loadingOlder, loadOlder, letGo, t, toast]);
   useEffect(() => {
     if (!flashId) return;
     const timer = setTimeout(() => setFlashId(null), FLASH_MS);
     return () => clearTimeout(timer);
   }, [flashId]);
-  const onQuote = useCallback((messageId: string) => {
-    seekPages.current = 0;
-    setSeek(messageId);
-  }, []);
+  const onQuote = useCallback(
+    (reply: ReplyRef) => {
+      // A thread's reply isn't a row of the conversation: it is on the thread's screen.
+      if (!isThread && reply.threadId) {
+        router.push(chatHref(channelId, reply.threadId, reply.messageId));
+        return;
+      }
+      seekPages.current = 0;
+      seekPressed.current = true;
+      setSeek(reply.messageId);
+    },
+    [isThread, channelId],
+  );
   const goToPin = (pin: MessagePin) => {
     sheet.close();
     const target = pinTarget(pin, threadId);

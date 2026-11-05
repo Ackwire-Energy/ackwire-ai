@@ -1712,6 +1712,8 @@
     "reply": "Antworten",
     "quoteOf": "Antwort an {{name}}: {{excerpt}}. Nachricht ansehen",
     "quoteGone": "Ursprüngliche Nachricht gelöscht",
+    "jumpTooFar": "Diese Nachricht liegt zu weit zurück, um sie von hier zu öffnen.",
+    "quoteNoWords": "Nachricht ohne Text",
     "replyingTo": "Antwort an {{name}}",
     "cancelReply": "Antwort abbrechen",
     "emoji": "Emoji",

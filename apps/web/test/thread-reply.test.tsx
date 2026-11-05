@@ -5,7 +5,7 @@ setupDom();
 
 import type { Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -83,6 +83,37 @@ describe("the thread in the URL", () => {
     expect(r.router.history.length).toBe(1);
   });
 
+  test("Back to a thread takes the panel from what replaced it: one panel at a time", async () => {
+    const state = seeded();
+    const r = await renderApp(URL_OF("?thread=m-1"), { api: createFakeApi(state) });
+    await settle(10);
+    const search = within(document.querySelector(".channel__header") as HTMLElement).getByRole("combobox", {
+      name: "Buscar",
+    });
+    await act(async () => fireEvent.change(search, { target: { value: "token" } }));
+    await act(() => new Promise((done) => setTimeout(done, 300)));
+    await act(async () => fireEvent.keyDown(search, { key: "Enter" }));
+    await act(() => new Promise((done) => setTimeout(done, 300)));
+    await settle(6);
+    const results = () => screen().queryByRole("complementary", { name: "Resultados da busca" });
+    expect(results()).toBeTruthy();
+    expect(searchOf(r).thread).toBeUndefined();
+    await act(async () => r.router.history.back());
+    await settle(8);
+    expect(panel()).toBeTruthy();
+    expect(results()).toBeNull();
+  });
+
+  test("a DM's link by its channel keeps the thread on the way to the DM's page", async () => {
+    const state = seedState();
+    const dm = seedDm(state, { type: "agent", id: ADA_ID });
+    const r = await renderApp(`/org/${ORG_ID}/c/${dm}?thread=m-${dm}&tm=m-${dm}`, { api: createFakeApi(state) });
+    await settle(12);
+    expect(r.router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
+    expect(searchOf(r)).toMatchObject({ thread: `m-${dm}`, tm: `m-${dm}` });
+    expect(panel()).toBeTruthy();
+  });
+
   test("the conversation's thread view doesn't take the page's `?thread=` for a panel of its own", async () => {
     await renderApp(URL_OF("?thread=m-1"), { api: createFakeApi(seeded()) });
     await settle(10);
@@ -157,6 +188,55 @@ describe("Responder inside a thread", () => {
     expect(row("t-1").className).toContain("ac-msg--focus");
   });
 
+  test("an original this view can't reach says so, and the person stays where they were", async () => {
+    const far = {
+      replyTo: {
+        messageId: "t-far",
+        threadId: "m-1",
+        author: { type: "agent", id: ADA_ID },
+        authorName: "Ada",
+        excerpt: "lá atrás",
+      },
+    };
+    await open(seeded([inThread("t-3", "sobre aquilo", 20, { type: "person", id: "u-walter" }, far)]));
+    const scroller = panel().querySelector(".channel__messages") as HTMLElement;
+    Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 900 });
+    scroller.scrollTop = 40;
+    await click(within(row("t-3")).getByRole("button", { name: /Resposta a Ada/ }));
+    await settle(6);
+    expect(document.body.textContent).toContain("Essa mensagem está longe demais para abrir daqui.");
+    expect(scroller.scrollTop).toBe(40);
+  });
+
+  test("in the channel, a quote of a thread's reply opens that thread at it", async () => {
+    const state = seeded([
+      {
+        ...inThread(
+          "c-1",
+          "sobre o token",
+          20,
+          { type: "person", id: "u-walter" },
+          {
+            replyTo: {
+              messageId: "t-1",
+              threadId: "m-1",
+              author: { type: "agent", id: ADA_ID },
+              authorName: "Ada",
+              excerpt: "o token expira em 15 minutos",
+            },
+          },
+        ),
+        threadId: null,
+      },
+    ]);
+    const r = await renderApp(URL_OF(), { api: createFakeApi(state) });
+    await settle(10);
+    await click(screen().getByRole("button", { name: /Resposta a Ada/ }));
+    await settle(8);
+    expect(searchOf(r)).toMatchObject({ thread: "m-1", tm: "t-1" });
+    expect(row("t-1").className).toContain("ac-msg--focus");
+  });
+
   test("a reply never groups under the row before it: its face stands under the quote", async () => {
     const quoted = {
       replyTo: {
@@ -197,6 +277,41 @@ describe("Responder inside a thread", () => {
     await click(within(panel()).getByRole("button", { name: "Enviar" }));
     await settle(8);
     expect(document.body.textContent).toContain("A mensagem que você estava respondendo não está mais aqui.");
+  });
+
+  test("answering a mission's plan and a message are one at a time: the words go to the one on the composer", async () => {
+    const state = seeded();
+    const api = createFakeApi(state);
+    const mission = await api.missions.create(ORG_ID, {
+      agentId: ADA_ID,
+      goal: "Fotos",
+      title: "Fotos",
+      channelId: ENG_ID,
+    });
+    api.missions.get = async () => ({ ...mission, status: "proposed", canAct: true });
+    state.messages.push(
+      inThread(
+        "t-3",
+        "o plano",
+        25,
+        { type: "agent", id: ADA_ID },
+        {
+          missionPlan: { missionId: mission.id, title: "Fotos", goal: "Fotos", computer: "mac", executor: "claude" },
+        },
+      ),
+    );
+    await renderApp(URL_OF("?thread=m-1"), { api });
+    await settle(10);
+    const pill = () => panel().querySelector(".composer-reply");
+    const change = () => within(panel()).getByRole("button", { name: "Mudar algo" });
+    await replyTo("t-1");
+    await click(change());
+    await settle(2);
+    expect(panel().querySelector(".composer-quote")).toBeNull();
+    expect(pill()).toBeTruthy();
+    await replyTo("t-1");
+    expect(panel().querySelector(".composer-quote")).toBeTruthy();
+    expect(pill()).toBeNull();
   });
 
   test("an archived thread has no composer, so no Responder", async () => {

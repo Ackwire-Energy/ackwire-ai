@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { channelQuery } from "@agenteschat/ui";
+import { channelQuery, trackInput } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -132,7 +132,17 @@ describe("#channel links in messages", () => {
   test("from the keyboard: focus shows the card, ArrowDown moves into it and Tab reaches Open", async () => {
     await go(`c/${GENERAL_ID}`, withMessage("veja #eng"));
     const link = screen().getByRole("link", { name: "Canal #eng" });
+    // Focus a script hands back (a panel closing) opens nothing; the keys' does.
+    trackInput();
     await act(async () => link.focus());
+    await settle(4);
+    expect(screen().queryByRole("dialog", { name: "Sobre #eng" })).toBeNull();
+    await act(async () => link.blur());
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: "Tab" });
+      link.focus();
+      fireEvent.keyUp(document.body, { key: "Tab" });
+    });
     await keyDown(link, "ArrowDown");
     await settle(4);
     const card = screen().getByRole("dialog", { name: "Sobre #eng" });
@@ -140,5 +150,6 @@ describe("#channel links in messages", () => {
     await wait(250);
     expect(screen().getByRole("dialog", { name: "Sobre #eng" })).toBeTruthy();
     expect(document.activeElement?.textContent).toBe("Abrir");
+    await act(async () => fireEvent.pointerDown(document.body));
   });
 });
