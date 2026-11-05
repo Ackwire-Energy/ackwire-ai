@@ -4152,7 +4152,8 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   display: grid;
   place-items: center;
   background: var(--ok);
-  color: #fff;
+  /* The card's color, as a count on red is: dark's green is light, and white on it didn't read. */
+  color: var(--raised);
   box-shadow: 0 0 0 2px var(--raised);
 }
 .catalog-icon__check .ac-icon {

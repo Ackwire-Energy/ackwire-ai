@@ -701,17 +701,18 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   background: var(--ink);
   color: var(--bg);
 }
+/* Dark's red, amber and blue are light: each takes its ink (the card's color on red, as a count does), not white. */
 .routine-runs__node--failed {
   background: var(--danger);
-  color: #fff;
+  color: var(--raised);
 }
 .routine-runs__node--skipped {
   background: var(--warn);
-  color: #fff;
+  color: var(--on-warn);
 }
 .routine-runs__node--running {
   background: var(--agent);
-  color: #fff;
+  color: var(--on-agent);
 }
 /* "Esperando sua aprovação" opens the request; "Abrir na conversa", the agent's message. */
 .routine-runs__link {
