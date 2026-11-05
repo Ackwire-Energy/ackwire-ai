@@ -266,11 +266,83 @@ html:not([data-pointer]) .issues-layout:focus-visible {
 
 /* ── Board ──────────────────────────────────────────────────────────────── */
 /* The board scrolls sideways inside its own box; the page never does. */
+/*
+ * A board wider than the page slides sideways with no scrollbar: the side with more columns fades out and an arrow
+ * floats there (`data-more` on the frame, kept by the board as it scrolls), as the kit's carousel does. On a touch
+ * screen a finger drags it and the arrows stay away. The card drag still scrolls `.issues-boardwrap` near its edges.
+ */
+.issues-boardframe {
+  position: relative;
+  min-width: 0;
+}
 .issues-boardwrap {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   margin: 0 -6px;
   padding: 2px 6px 10px;
+  scrollbar-width: none;
+}
+.issues-boardwrap::-webkit-scrollbar {
+  display: none;
+}
+.issues-boardframe[data-more="end"] > .issues-boardwrap {
+  mask-image: linear-gradient(to right, #000 calc(100% - 72px), transparent);
+}
+.issues-boardframe[data-more="start"] > .issues-boardwrap {
+  mask-image: linear-gradient(to right, transparent, #000 72px);
+}
+.issues-boardframe[data-more="both"] > .issues-boardwrap {
+  mask-image: linear-gradient(to right, transparent, #000 72px, #000 calc(100% - 72px), transparent);
+}
+/* Beside the first cards, clear of the column heads and their menus. */
+.issues-boardframe__arrow {
+  position: absolute;
+  top: 56px;
+  z-index: var(--z-raised);
+  display: grid;
+  place-items: center;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--raised);
+  box-shadow: var(--e2), var(--top);
+  color: var(--ink2);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    transform 0.2s var(--spring);
+}
+/* Only where there is more: its own `display` would otherwise win over `hidden`. */
+.issues-boardframe__arrow[hidden] {
+  display: none;
+}
+.issues-boardframe__arrow--start {
+  left: -4px;
+}
+.issues-boardframe__arrow--end {
+  right: -4px;
+}
+.issues-boardframe__arrow:hover {
+  color: var(--ink);
+}
+.issues-boardframe__arrow:active {
+  transform: scale(0.94);
+}
+html:not([data-pointer]) .issues-boardframe__arrow:focus-visible {
+  outline: none;
+  box-shadow: var(--e2), var(--focus-ring);
+}
+@media (hover: none) {
+  .issues-boardframe__arrow {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .issues-boardframe__arrow {
+    transition: none;
+  }
 }
 .issues-board {
   --cw: 248px;
