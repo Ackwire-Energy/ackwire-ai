@@ -133,7 +133,7 @@ import {
   taskNoticeOf,
 } from "@agenteschat/client/lib/missions";
 import { noAiCardOf } from "@agenteschat/client/lib/no-ai";
-import { isTalkerReply, noticeOf, routineReportText } from "@agenteschat/client/lib/notices";
+import { isTalkerReply, noticeOf, routineReportText, talkerWaited } from "@agenteschat/client/lib/notices";
 import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/outages";
 import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
 import { reachHandoffs } from "@agenteschat/client/lib/reach";
@@ -2758,6 +2758,7 @@ const Timeline = memo(function Timeline({
       }),
     [heldPlaces, channelId, runVisible, slots, lastByRun],
   );
+  const shownMessages = useMemo(() => items.flatMap((i) => (i.kind === "message" ? [i.message] : [])), [items]);
   const rows: ReactElement<{ message?: MessageType }>[] = [];
   const afterUnshown = () => unshown.has(rows.at(-1)?.key ?? "");
   for (const [at, item] of items.entries()) {
@@ -2821,10 +2822,8 @@ const Timeline = memo(function Timeline({
         />
       ),
     );
-    // Its agents in line for their computer: each one's turn right after it, where "thinking" shows otherwise.
-    if ((m.author.type === "person" || m.mentionedAgentIds.length > 0) && !m.local)
-      rows.push(<QueueWaitTurns key={`queue-${item.key}`} message={m} />);
   }
+  rows.push(<QueueWaitTurns key="queue-waits" channelId={channelId} messages={shownMessages} />);
   drawn.forEach((slot) => {
     if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);
     rows.push(
@@ -3988,8 +3987,11 @@ export const TimelineMessage = memo(function TimelineMessage({
               )}
               {via && <AppViaTag via={via} person={name} />}
               {talker && (
-                <span className="msg-reminder msg-talker" title={t("chat.notice.talkerTip")}>
-                  {t("chat.notice.talker")}
+                <span
+                  className="msg-reminder msg-talker"
+                  title={t(talkerWaited(m.meta) ? "chat.notice.talkerWaitingTip" : "chat.notice.talkerTip")}
+                >
+                  {t(talkerWaited(m.meta) ? "chat.notice.talkerWaiting" : "chat.notice.talker")}
                 </span>
               )}
               {helping && <ConsultHelpingTag consultation={helping} />}

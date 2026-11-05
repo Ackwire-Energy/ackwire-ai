@@ -8468,6 +8468,7 @@
     "stuck": "因卡住而停止",
     "steer": {
       "waiting": "{{name}} 会在下次暂停时阅读",
+      "computer": "{{name}} 拿到电脑后会阅读",
       "now": "{{name}} 停下来阅读了",
       "delivered": "{{name}} 已收到",
       "held": "{{name}} 会在你做出决定后阅读",
@@ -8662,6 +8663,7 @@
       "nextEta": "正在等待电脑。下一个就是它，约 {{n}} 分钟后",
       "nextAfter": "正在等待电脑。{{after}} 完成后就轮到它",
       "next": "正在等待电脑。下一个就是它",
+      "waiting": "正在等待电脑",
       "behind": "排队中，第 {{nth}}。在 {{names}} 之后",
       "position": "排队中，第 {{nth}}"
     },
@@ -12052,6 +12054,8 @@
     "autoUpdate": "仍在进行中（{{duration}}）。",
     "autoUpdateNow": "当前：{{now}}。",
     "statusReply": "仍在处理中（{{duration}}）。完成这一步后我会读你的消息。",
+    "statusReplyQueued": "正在等待电脑（{{duration}}）。轮到我时我会读你的消息。",
+    "statusReplyAway": "正在等我的电脑恢复。电脑一恢复我就读你的消息。",
     "status": {
       "one": "正在处理：{{subject}}",
       "oneUntitled": "正在后台工作",
@@ -12186,7 +12190,9 @@
       "show": "显示",
       "hide": "隐藏",
       "talker": "工作间隙",
-      "talkerTip": "在不中断进行中任务的情况下作了回复。"
+      "talkerTip": "在不中断进行中任务的情况下作了回复。",
+      "talkerWaiting": "等待期间",
+      "talkerWaitingTip": "在任务等待期间作了回复。"
     },
     "joined": {
       "label": "主动加入",

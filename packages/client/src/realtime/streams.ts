@@ -466,13 +466,18 @@ export function applyChannelEvent(state: StreamsState, event: StreamEvent, now =
 function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
   switch (event.type) {
     case "agent.run.steered": {
+      // It joined a run under way, one that may be waiting with no row of its own: no new reply comes, so no
+      // "pensando…" for it. By channel: the guess may still hang off the optimistic message.
+      const s = event.agentId
+        ? settleAfterRun(state, { agentId: event.agentId, channelId: event.channelId, threadId: null })
+        : state;
       // Only noted here: it shows in the work once read (`agent.run.read`), under the message until then.
-      const r = state.runs[event.runId];
-      if (!r) return state;
-      if (event.stop) return { ...state, runs: { ...state.runs, [event.runId]: { ...r, stopping: true } } };
-      if (!event.now || r.steerNow?.includes(event.messageId)) return state;
+      const r = s.runs[event.runId];
+      if (!r) return s;
+      if (event.stop) return { ...s, runs: { ...s.runs, [event.runId]: { ...r, stopping: true } } };
+      if (!event.now || r.steerNow?.includes(event.messageId)) return s;
       const steerNow = [...(r.steerNow ?? []), event.messageId];
-      return { ...state, runs: { ...state.runs, [event.runId]: { ...r, steerNow } } };
+      return { ...s, runs: { ...s.runs, [event.runId]: { ...r, steerNow } } };
     }
     case "agent.run.read": {
       const r = state.runs[event.runId];

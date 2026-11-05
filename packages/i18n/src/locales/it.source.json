@@ -21433,6 +21433,9 @@
   "run.steer.waiting": {
     "value": "{{name}} reads it at the next pause"
   },
+  "run.steer.computer": {
+    "value": "{{name}} reads it when it gets the computer"
+  },
   "run.steer.now": {
     "value": "{{name}} stopped to read it"
   },
@@ -21882,6 +21885,9 @@
   },
   "queue.live.next": {
     "value": "Waiting for the computer. Next up"
+  },
+  "queue.live.waiting": {
+    "value": "Waiting for the computer"
   },
   "queue.live.behind": {
     "value": "In line, {{nth}}. After {{names}}"
@@ -30238,6 +30244,12 @@
   "work.statusReply": {
     "value": "Still on it ({{duration}}). I'll read your message after this step."
   },
+  "work.statusReplyQueued": {
+    "value": "Waiting for the computer ({{duration}}). I'll read your message when my turn comes."
+  },
+  "work.statusReplyAway": {
+    "value": "Waiting for my computer to come back. I'll read your message as soon as it's back."
+  },
   "work.status.one": {
     "value": "Working on: {{subject}}"
   },
@@ -30543,6 +30555,12 @@
   },
   "chat.notice.talkerTip": {
     "value": "Answered without stopping the task in progress."
+  },
+  "chat.notice.talkerWaiting": {
+    "value": "while waiting"
+  },
+  "chat.notice.talkerWaitingTip": {
+    "value": "Answered while its task waits."
   },
   "chat.joined.label": {
     "value": "joined in"

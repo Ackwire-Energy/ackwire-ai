@@ -1,6 +1,8 @@
-import type { Message, ComputerQueue as Queue, QueueWaiting, QueueWhere } from "@agenteschat/client";
+import type { Message, ComputerQueue as Queue, QueueWhere } from "@agenteschat/client";
 import { receiptView, useChannels, useDms, useMachineQueue, useMachines } from "@agenteschat/client";
 import {
+  type ConversationWait,
+  conversationWaits,
   durationText,
   fanChipText,
   fanOutOf,
@@ -230,7 +232,7 @@ function useQueueWaits(message: Message) {
   const rows = agents.flatMap((id) => waitingFor(q.data, receipt, id, message.channelId) ?? []);
   // The fan-out strip says where each stands instead.
   const fanned = fanShows(message, fanOutOf(receipt, q.data), receipt);
-  return { agents, machineId, queue: q.data, rows: fanned ? [] : rows };
+  return { agents, rows: fanned ? [] : rows };
 }
 
 /**
@@ -246,47 +248,48 @@ export function QueuedWords({ message, fallback }: { message: Message; fallback:
   return <span>{next ? queuedNextText(t, next) : fallback}</span>;
 }
 
+const sameWaits = (a: ConversationWait[], b: ConversationWait[]) =>
+  a.length === b.length && a.every((w, i) => w.agentId === b[i]?.agentId && w.runId === b[i]?.runId);
+
 /**
- * Where "thinking" shows otherwise, for each agent of a message that waits in line for its computer: the agent's turn
- * (its face, its name), "Waiting for the computer. Next up, in about 1 min" or "In line, 4th. After Ada, Kai and
- * Ravi", "You go first" on the viewer's own request, and "See queue". Nothing while the line doesn't know the turn
- * (the receipt says it) or while the fan-out strip shows.
+ * Where "thinking" shows, at the end of the conversation, for each run of these messages that waits in line for its
+ * computer: one turn per run, whatever number of messages went into it. It lives as long as the receipts say the run
+ * waits, and its computer's line only adds to it.
  */
-export function QueueWaitTurns({ message }: { message: Message }) {
-  const { machineId, queue, rows } = useQueueWaits(message);
-  if (!machineId || rows.length === 0) return null;
+export function QueueWaitTurns({ channelId, messages }: { channelId: string; messages: readonly Message[] }) {
+  const waits = useLive((s) => conversationWaits(messages, s.receipts), sameWaits);
   return (
     <>
-      {rows.map((w) => (
-        <QueueWaitTurn key={w.runId} waiting={w} queue={queue} machineId={machineId} />
+      {waits.map((w) => (
+        <QueueWaitTurn key={w.runId ?? w.agentId} wait={w} channelId={channelId} />
       ))}
     </>
   );
 }
 
-function QueueWaitTurn({
-  waiting: w,
-  queue,
-  machineId,
-}: {
-  waiting: QueueWaiting;
-  queue: Queue | undefined;
-  machineId: string;
-}) {
+/**
+ * The agent's turn (its face, its name): "Waiting for the computer. Next up, in about 1 min" or "In line, 4th. After
+ * Ada, Kai and Ravi", "You go first" on the viewer's own request, and "See queue"; "Waiting for the computer" until
+ * the line knows the turn.
+ */
+function QueueWaitTurn({ wait: { agentId, runId }, channelId }: { wait: ConversationWait; channelId: string }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const now = useNow(30_000);
+  const machineId = useAgentMachineId(agentId);
+  const queue = useMachineQueue(org.id, machineId).data;
+  const w = waitingFor(queue, runId ? { runOf: { [agentId]: runId } } : undefined, agentId, channelId);
   const agentName = (id: string) => dir.agentById.get(id)?.name;
-  const name = agentName(w.agentId) ?? t("channel.unknownAgent");
-  const text = queueLiveText(t, i18n.language, queue, w.runId, agentName, now);
-  const first = w.people && w.purpose.kind === "person" && w.purpose.userId === me.user.id;
+  const name = agentName(agentId) ?? t("channel.unknownAgent");
+  const text = w ? queueLiveText(t, i18n.language, queue, w.runId, agentName, now) : t("queue.live.waiting");
+  const first = w?.people && w.purpose.kind === "person" && w.purpose.userId === me.user.id;
   return (
     <MessageRow
       agent
       stacked
       className="cq-turn"
-      avatar={<AgentAvatar agentId={w.agentId} name={name} state="idle" />}
+      avatar={<AgentAvatar agentId={agentId} name={name} state="idle" />}
       author={name}
       time={null}
     >
@@ -296,7 +299,7 @@ function QueueWaitTurn({
       </p>
       <span className="cq-turn__acts">
         {first && <Chip className="cq-first">{t("queue.youFirst")}</Chip>}
-        <SeeQueue machineId={machineId} />
+        {machineId && <SeeQueue machineId={machineId} />}
       </span>
     </MessageRow>
   );

@@ -892,6 +892,8 @@ async function executeRunInner(
   // A job for one wait for the computer (back, grace, plan reset, room): only while the run still waits on it.
   // Another job may have resumed it already; running it again would run the run twice.
   let askingForRoom = false;
+  /** The computer whose line it asks from: the run stays in that line until a turn is taken (`leaveLine`). */
+  let lineMachine: string | null = null;
   if (options.wait) {
     const [row] = await db
       .select({
@@ -955,9 +957,10 @@ async function executeRunInner(
       const late = row.code === "budget" || row.source === "budget" ? "waiting_budget_late" : "waiting_plan_late";
       if (await missStaleRoutineRun({ db, pubsub: deps.pubsub }, runId, new Date(), late)) return;
     }
-    // Asking a busy computer again: nothing says it works until a turn starts (its first words do), or the
-    // conversation would flash "thinking" every few seconds while it waits.
+    // Asking a busy computer again: nothing says it works until a turn starts (`leaveLine`), or the conversation would
+    // flash "thinking" every few seconds while it waits.
     askingForRoom = row.code === "busy";
+    lineMachine = askingForRoom ? row.machineId : null;
     // Only the head of the computer's line asks it (`computer-queue.ts`); the others look again later, without
     // claiming.
     if (askingForRoom && row.machineId) {
@@ -1019,7 +1022,13 @@ async function executeRunInner(
       // Decided while the computer turn that asked still runs: its job resumes the run when that turn ends
       // (`suspendedByBridge`), so the brain's session never takes two turns at once.
       if (stored?.pending?.calls.some((c) => c.inTurn) && (await runJobElsewhere(db, run.id, options.jobId))) return;
-      const resumed = await transitionRun(db, run.id, run.status, "running");
+      const resumed = await transitionRun(
+        db,
+        run.id,
+        run.status,
+        "running",
+        lineMachine ? { waitingMachineId: lineMachine } : {},
+      );
       if (!resumed) return;
       run = resumed;
       backFromWait = true;
@@ -1230,6 +1239,29 @@ async function executeRunInner(
     ...(usage ? { usage } : {}),
     ...(error ? { error, ...runErrorDetail(error) } : {}),
   });
+  /**
+   * The ask from the line worked (a computer took the turn, or the model stands in): the run leaves the line, and the
+   * conversation hears now what `askingForRoom` held back. A turn can open with a tool, so no word of it may come.
+   */
+  const leaveLine = async () => {
+    const machineId = lineMachine;
+    if (!machineId) return;
+    lineMachine = null;
+    await db
+      .update(agentRuns)
+      .set({ waitingMachineId: null })
+      .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "running")));
+    await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, ...bg });
+    await publishChannelEvent(deps.pubsub, {
+      type: "message.claimed",
+      channelId: run.channelId,
+      messageId: run.triggerMessageId,
+      agentId: run.agentId,
+      runId: run.id,
+    });
+    await publishChannelEvent(deps.pubsub, event("running"));
+    await publishQueueChanged(deps.pubsub, run.orgId, machineId);
+  };
   /** Writes that don't need to finish before the model call (steps, usage log); flushed after it. */
   let deferred: Promise<unknown> = Promise.resolve();
   const later = (write: () => Promise<unknown>) => {
@@ -2678,6 +2710,7 @@ async function executeRunInner(
       mayFallBack(agent, run) &&
       (await deps.gateway.hasModelCredential(thinker).catch(() => false))
     ) {
+      await leaveLine();
       t.fallback = { from, code: u.code, message: u.message, ...(u.resetsAt ? { resetsAt: u.resetsAt } : {}) };
       // On "Automático" the API answers with the model and effort chosen for this run.
       const autoEffort = isAutoModel(agent.model) ? t.autoModel?.effort : undefined;
@@ -3632,9 +3665,10 @@ async function executeRunInner(
 
       // A shared computer's line (`roomGate`): its first turn waits behind the runs ahead, and agents' turns are spaced.
       const roomMachine = plan.kind !== "model" ? (plan.session?.machineId ?? agent.machineId ?? null) : null;
+      if (!roomMachine) await leaveLine();
       /**
        * Where its admission is told: at once for a run that never waited (after the transcript holding `roomAsk` is
-       * saved), at its first delta for the head of the line, which the runner may still refuse (no flicker per ask).
+       * saved), when a computer takes the turn for the head of the line (`leaveLine`), which it may still refuse.
        */
       let admitted: { machineId: string; fromLine: boolean } | null = null;
       if (roomMachine && computerTurns === 0) {
@@ -3672,7 +3706,7 @@ async function executeRunInner(
           event: { type: "agent.typing", ...where },
           onFirst: () => {
             deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id });
-            if (admitted?.fromLine)
+            if (admitted?.fromLine && !askingForRoom)
               void publishQueueChanged(deps.pubsub, run.orgId, admitted.machineId).catch(() => {});
           },
           quiet: run.background,
@@ -3822,9 +3856,10 @@ async function executeRunInner(
             onSteerRead: (uuids) => live.read(uuids),
             // The end of a wait for room, for the operator's analytics (`work-analytics.ts`): the turn's own first
             // step can come minutes later.
-            onTaken: () => {
+            onTaken: async () => {
               if (transcript.roomWaitSince !== undefined)
                 later(() => addRunStep(db, run, "context", { roomFound: true }));
+              await leaveLine().catch(() => {});
             },
           },
           // Before anything reads the inbox again (the next step, a failure's redispatch): what the turn
@@ -4822,8 +4857,8 @@ async function thinkOnce(
     onExecuted?(call: { id: string; name: string; input: unknown; result?: ToolResult }): void;
     /** Messages handed to the turn mid-turn that it read (live steering). */
     onSteerRead?(uuids: string[]): void;
-    /** The brain's first event that isn't an error: a computer had room for the turn. */
-    onTaken?(): void;
+    /** The brain's first event that isn't an error: a computer had room for the turn. Done before that event is read. */
+    onTaken?(): void | Promise<void>;
   } = {},
 ): Promise<BrainStep> {
   let text: string | null = null;
@@ -4861,7 +4896,7 @@ async function thinkOnce(
     const event: BrainEvent = next.value;
     if (!taken && event.type !== "error") {
       taken = true;
-      hooks.onTaken?.();
+      await hooks.onTaken?.();
     }
     if (event.type === "text_delta") onDelta(event.text);
     else if (event.type === "tool_call") {

@@ -8717,6 +8717,7 @@
     "stuck": "Takıldığı için durdu",
     "steer": {
       "waiting": "{{name}} bir sonraki arada okuyacak",
+      "computer": "{{name}} bilgisayarı alınca okuyacak",
       "now": "{{name}} okumak için durdu",
       "delivered": "{{name}} aldı",
       "held": "{{name}} kararınızdan sonra okuyacak",
@@ -8909,6 +8910,7 @@
       "nextEta": "Bilgisayarı bekliyor. Sıradaki o, yaklaşık {{n}} dk sonra",
       "nextAfter": "Bilgisayarı bekliyor. {{after}} bitince sıradaki o",
       "next": "Bilgisayarı bekliyor. Sıradaki o",
+      "waiting": "Bilgisayarı bekliyor",
       "behind": "Sırada, {{nth}}. {{names}} sonrasında",
       "position": "Sırada, {{nth}}"
     },
@@ -12391,6 +12393,8 @@
     "autoUpdate": "Hâlâ üzerinde çalışıyor ({{duration}}).",
     "autoUpdateNow": "Şimdi: {{now}}.",
     "statusReply": "Hâlâ üzerinde çalışıyorum ({{duration}}). Mesajını bu adımdan sonra okuyacağım.",
+    "statusReplyQueued": "Bilgisayarı bekliyorum ({{duration}}). Sıram gelince mesajını okuyacağım.",
+    "statusReplyAway": "Bilgisayarımın geri gelmesini bekliyorum. Geri gelir gelmez mesajını okuyacağım.",
     "status": {
       "one": "Üzerinde çalışıyor: {{subject}}",
       "oneUntitled": "Arka planda çalışıyor",
@@ -12517,7 +12521,9 @@
       "show": "Göster",
       "hide": "Gizle",
       "talker": "çalışırken",
-      "talkerTip": "Süren görevi durdurmadan yanıt verdi."
+      "talkerTip": "Süren görevi durdurmadan yanıt verdi.",
+      "talkerWaiting": "beklerken",
+      "talkerWaitingTip": "Görev beklerken yanıt verdi."
     },
     "joined": {
       "label": "katıldı",

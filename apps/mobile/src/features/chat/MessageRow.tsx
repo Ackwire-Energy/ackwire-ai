@@ -30,7 +30,7 @@ import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
 import { isMediaAfterReply, messageMediaOf } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { missionSetupOf } from "@agenteschat/client/lib/missions";
-import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notices";
+import { isTalkerReply, routineReportText, talkerWaited } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { reachHandoffs } from "@agenteschat/client/lib/reach";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
@@ -493,9 +493,9 @@ export const MessageRow = memo(function MessageRow({
                   tone="faint"
                   numberOfLines={1}
                   style={styles.shrink}
-                  accessibilityHint={t("chat.notice.talkerTip")}
+                  accessibilityHint={t(talkerWaited(meta) ? "chat.notice.talkerWaitingTip" : "chat.notice.talkerTip")}
                 >
-                  {t("chat.notice.talker")}
+                  {t(talkerWaited(meta) ? "chat.notice.talkerWaiting" : "chat.notice.talker")}
                 </Text>
               ) : null}
               {helping ? <HelpingTag consultation={helping} channelId={m.channelId} /> : null}

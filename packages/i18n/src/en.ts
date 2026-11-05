@@ -8618,6 +8618,8 @@ export const en = {
     stuck: "Stopped because it got stuck",
     steer: {
       waiting: "{{name}} reads it at the next pause",
+      /** Sent to an agent waiting for its computer: it has no pause, it reads it once it gets the computer. */
+      computer: "{{name}} reads it when it gets the computer",
       now: "{{name}} stopped to read it",
       delivered: "{{name}} got it",
       held: "{{name}} reads it after your decision",
@@ -8827,6 +8829,8 @@ export const en = {
       nextEta: "Waiting for the computer. Next up, in about {{n}} min",
       nextAfter: "Waiting for the computer. Next up, once {{after}} finishes",
       next: "Waiting for the computer. Next up",
+      /** Before the line knows its turn, or while it can't say where it is. */
+      waiting: "Waiting for the computer",
       /** {{nth}} is the place in line (`queue.nth`), {{names}} the agents ahead. */
       behind: "In line, {{nth}}. After {{names}}",
       position: "In line, {{nth}}",
@@ -12030,6 +12034,10 @@ export const en = {
     autoUpdateNow: "Now: {{now}}.",
     /** The server's own line when a person writes to a working agent and the quick reply can't be written (ADR 0131). */
     statusReply: "Still on it ({{duration}}). I'll read your message after this step.",
+    /** The same line for an agent waiting in line for its computer: {{duration}} is how long it has waited. */
+    statusReplyQueued: "Waiting for the computer ({{duration}}). I'll read your message when my turn comes.",
+    /** The same line for an agent whose computer is away. */
+    statusReplyAway: "Waiting for my computer to come back. I'll read your message as soon as it's back.",
     status: {
       one: "Working on: {{subject}}",
       oneUntitled: "Working in the background",
@@ -12176,6 +12184,9 @@ export const en = {
       hide: "Hide",
       talker: "while working",
       talkerTip: "Answered without stopping the task in progress.",
+      /** Beside the name of a reply given while its task waits (its computer, a person), not while it works. */
+      talkerWaiting: "while waiting",
+      talkerWaitingTip: "Answered while its task waits.",
     },
     /** Next to the time on a reply of an agent nobody called. */
     joined: {

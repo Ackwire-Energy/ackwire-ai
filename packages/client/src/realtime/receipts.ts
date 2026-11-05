@@ -2,6 +2,7 @@ import type { ChannelEvent, ConnectIntent, DecidedBy, Message, MessageReceipts, 
 import { PLATFORM_CAP } from "../lib/limits";
 import { isMediaAfterReply } from "../lib/media";
 import { NO_AI } from "../lib/no-ai";
+import type { SteerPhase, SteerState } from "./steer";
 import type { RunSteeredEvent } from "./streams";
 
 /**
@@ -468,6 +469,12 @@ export interface ReceiptView {
   decidedBy?: DecidedBy;
   /** The author's own plan is picking who answers: "Picking who answers" until the decision. */
   picking?: true;
+}
+
+/** Which words a message's steer state reads in: an agent waiting for its computer has no next pause to read it at. */
+export function steerWords(steer: SteerState, receipt: MessageReceipt | undefined): SteerPhase | "computer" {
+  const computer = receipt?.agents.some(([id, p]) => id === steer.agentId && (p === "queued" || p === "away"));
+  return steer.state === "waiting" && computer ? "computer" : steer.state;
 }
 
 export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {

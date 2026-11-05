@@ -43,6 +43,7 @@ import {
 import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { runPosition, screenAboveEnd } from "@agenteschat/client/lib/chat";
+import { type ConversationWait, conversationWaits } from "@agenteschat/client/lib/computer-queue";
 import { consultBlocksNearEnd, consultNoticeFolds, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { mentionsReader, offersEveryone } from "@agenteschat/client/lib/everyone";
@@ -111,7 +112,7 @@ import { threadTitle } from "../chats/logic";
 import { chatHref } from "../links/logic";
 import { MissionCardView } from "../missions/cards";
 import { isOpenMission } from "../missions/logic";
-import { FanStrip } from "../queue/parts";
+import { FanStrip, QueueWaitRow } from "../queue/parts";
 import { DmQueueButton, QueueButton, useAgentsQueue, useOpenQueue } from "../queue/QueueSheet";
 import { RemindSheet } from "../reminders/RemindSheet";
 import { RightHandIntro } from "../right-hand/Intro";
@@ -203,6 +204,8 @@ type Row =
   | ChatRow
   | { kind: "marker"; key: string; text: string }
   | { kind: "run"; key: string; run: LiveRun }
+  /** A run in line for its computer (`conversationWaits`): no live row of its own, this one for all its messages. */
+  | { kind: "wait"; key: string; wait: ConversationWait }
   /** An agent's browser card: its live run in the browser, or (no run row) a take over held here. */
   | { kind: "browser"; key: string; run: LiveRun; handoff?: undefined }
   | { kind: "browser"; key: string; run: null; handoff: BrowserHandoff }
@@ -543,7 +546,16 @@ function Chat({
   // ── Rows ──
   // One waiting card per agent and computer: an older "my computer is away" gives way to the newer one.
   const superseded = useMemo(() => supersededBrainNotices(list), [list]);
+  const waitsNow = conversationWaits(isThread ? list : list.filter((m) => !m.threadId), live.receipts);
+  const waitsKey = waitsNow.map((w) => `${w.agentId}:${w.runId}`).join(" ");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: new only when the waits change, not on every receipt
+  const waits = useMemo(() => waitsNow, [waitsKey]);
   const rows = useMemo<Row[]>(() => {
+    const waitRows = waits.map((wait) => ({
+      kind: "wait" as const,
+      key: `wait-${wait.runId ?? wait.agentId}`,
+      wait,
+    }));
     // A saved reply that was live here keeps its block's key (only the run's last message: keys stay unique).
     const drawn = new Set(shownRuns.map((r) => r.runId));
     const asTurns = (chatRows: ChatRow[]): Row[] => {
@@ -592,6 +604,7 @@ function Chat({
         ...asTurns(buildRows(replies, (m) => superseded.has(m.id))),
         ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
         ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
+        ...waitRows,
         ...runRowsOf(turnOrder(shownRuns)),
       ];
     }
@@ -601,9 +614,24 @@ function Chat({
       ...asTurns(buildRows(list, hidden)),
       ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
       ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
+      ...waitRows,
       ...runRowsOf(turnOrder(shownRuns)),
     ];
-  }, [isThread, threadId, list, thread.data, channel?.name, dm, shownRuns, turnKeyOf, browsing, held, superseded, t]);
+  }, [
+    isThread,
+    threadId,
+    list,
+    thread.data,
+    channel?.name,
+    dm,
+    shownRuns,
+    turnKeyOf,
+    browsing,
+    held,
+    superseded,
+    t,
+    waits,
+  ]);
   const shownMessages = useMemo(() => rows.flatMap((r) => (r.kind === "message" ? [r.message] : [])), [rows]);
   // Questions agents asked other agents, in the pair row before the replies that asked (`ConsultGroup`): how each
   // answer's notice draws (hidden under a reply close by, one line to one farther up), and the working line without
@@ -1572,6 +1600,8 @@ function Chat({
               <TurnRow run={item.run} bodyOf={bodyOf} />
             </Animated.View>
           );
+        case "wait":
+          return <QueueWaitRow channelId={channelId} wait={item.wait} />;
         case "unseen":
           return <UnseenLine fading={item.fading} />;
         case "browser": {
@@ -1646,6 +1676,7 @@ function Chat({
     [
       when,
       meId,
+      channelId,
       isThread,
       linkThreads,
       onLongPress,

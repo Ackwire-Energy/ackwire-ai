@@ -738,6 +738,19 @@ describe("a run waiting for its computer", () => {
     expect(receiptView(s.m1).status).toEqual({ kind: "queued", agents: ["nova"] });
   });
 
+  test('a message that joins a run in line has no "pensando…" of its own, even on the optimistic id', () => {
+    let s = expectReply(emptyStreams, { channelId: "c1", threadId: "local-1", agentId: "nova" });
+    s = applyChannelEvent(s, {
+      type: "agent.run.steered",
+      channelId: "c1",
+      runId: "r1",
+      agentId: "nova",
+      messageId: "m2",
+      computer: "queued",
+    } as unknown as ChannelEvent);
+    expect(Object.values(s.runs)).toEqual([]);
+  });
+
   test("a message that went into a run in line says so live, as a reload would", () => {
     let s = seedReceipt({}, person);
     s = applyReceiptEvent(s, {

@@ -321,6 +321,7 @@
     },
     "steer": {
       "waiting": "{{name}} liest es bei der nächsten Pause",
+      "computer": "{{name}} liest es, sobald der Computer frei ist",
       "now": "{{name}} hat angehalten, um es zu lesen",
       "delivered": "{{name}} hat es erhalten",
       "held": "{{name}} liest es nach deiner Entscheidung",

@@ -3,6 +3,7 @@ import { ACCOUNTS_PROTOCOL, channelTopic, MACHINE_PROTOCOL_VERSION, orgTopic } f
 import { and, eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
+  activeRunsIn,
   addChannelMember,
   addRunStep,
   type Brain,
@@ -47,6 +48,7 @@ import {
   notePlanLimit,
   openDm,
   postPersonMessage,
+  queueOnRun,
   recoverStaleRuns,
   resolveBrain,
   resumeRunsWaitingForMachine,
@@ -58,6 +60,7 @@ import {
   type ToolSource,
 } from "../src";
 import { computerPrompt } from "../src/brains/prompt";
+import { afterSteered } from "../src/steering";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
@@ -2742,6 +2745,113 @@ test("the line is told only when it changes: admitted once its ask is saved, a r
   const all = await Promise.all(reads);
   expect(all[2]?.working.map((w) => w.runId)).toEqual([id]);
   expect(all.at(-1)).toMatchObject({ machineId, working: [], waiting: [] });
+});
+
+test("a run asking again from the line stays in it for everyone reading, until the computer takes its turn", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  let room = false;
+  const reads: { waiting: string[]; working: string[]; handled: unknown; active: string[] }[] = [];
+  let asked = "";
+  const look = async () => {
+    const line = await computerQueue(f.db, f.owner.id, f.org.id, machineId);
+    const listed = (await timeline(f)).find((m) => m.id === asked);
+    reads.push({
+      waiting: line.waiting.map((w) => w.runId),
+      working: line.working.map((w) => w.runId),
+      handled: listed?.receipts?.handled.map((h) => [h.status, h.computer]),
+      active: (await activeRunsIn(f.db, f.org.id, f.general.id)).map((r) => r.status),
+    });
+  };
+  const { brain } = scriptedComputerBrain(async function* (n): AsyncGenerator<BrainEvent> {
+    if (n > 0) await look();
+    if (!room) {
+      yield { type: "error", code: "busy", message: "The computer is busy.", retryable: true };
+      return;
+    }
+    yield { type: "text_delta", text: "Pronto." };
+    await Bun.sleep(0);
+    await Bun.sleep(0);
+    await look();
+    yield { type: "done", text: "Pronto." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const events: { type: string; status?: string }[] = [];
+  f.pubsub.subscribe(channelTopic(f.general.id), (e) => events.push(e as { type: string; status?: string }));
+  asked = (await post(f, "@dev oi")).id;
+  await drainOutbox(f.db, handlers);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  const id = run?.id ?? "";
+
+  // The head asks again: every read made during the ask finds it where it was, waiting in line.
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS + 1_000), maxBatches: 1 });
+  expect(reads).toEqual([
+    { waiting: [id], working: [], handled: [["waiting_input", "queued"]], active: ["waiting_input"] },
+  ]);
+  const [after] = await f.db.select().from(schema.agentRuns);
+  expect(after?.waitingMachineId).toBe(machineId);
+
+  // The computer takes the turn: it left the line, and the conversation hears it works before any word of it.
+  room = true;
+  reads.length = 0;
+  events.length = 0;
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + 2 * COMPUTER_BUSY_RETRY_MS + 2_000) });
+  // The ask itself, then the read inside the turn.
+  expect(reads).toEqual([
+    { waiting: [id], working: [], handled: [["waiting_input", "queued"]], active: ["waiting_input"] },
+    { waiting: [], working: [id], handled: [["running", undefined]], active: ["running"] },
+  ]);
+  const seenTypes = events.map((e) => e.type);
+  expect(seenTypes.indexOf("agent.thinking")).toBeGreaterThanOrEqual(0);
+  expect(seenTypes.indexOf("agent.thinking")).toBeLessThan(seenTypes.indexOf("agent.typing"));
+  expect(seenTypes).toContain("message.claimed");
+});
+
+test("a person's message during the ask joins the wait: its receipt says the line, as a reload would", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const busy: BrainEvent = { type: "error", code: "busy", message: "The computer is busy.", retryable: true };
+  const events: { type: string; computer?: string; messageId?: string }[] = [];
+  f.pubsub.subscribe(channelTopic(f.general.id), (e) => events.push(e as (typeof events)[number]));
+  let second = "";
+  const { brain } = scriptedComputerBrain(async function* (n): AsyncGenerator<BrainEvent> {
+    if (n === 1) {
+      const [run] = await f.db.select().from(schema.agentRuns);
+      const message = await personMessage(f, "?");
+      second = message.id;
+      await queueOnRun(f.db, run?.id ?? "", message.id);
+      await afterSteered(
+        { db: f.db, pubsub: f.pubsub },
+        {
+          orgId: f.org.id,
+          userId: f.owner.id,
+          channelId: f.general.id,
+          message,
+          runIds: [run?.id ?? ""],
+          now: false,
+        },
+      );
+    }
+    yield busy;
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS + 1_000), maxBatches: 1 });
+  expect(second).not.toBe("");
+  expect(events.find((e) => e.type === "agent.run.steered" && e.messageId === second)?.computer).toBe("queued");
+  const [after] = await f.db.select().from(schema.agentRuns);
+  expect(after?.waitingMachineId).toBe(machineId);
 });
 
 test("still in line after ten minutes: one note in the agent's words, and no other from it there", async () => {

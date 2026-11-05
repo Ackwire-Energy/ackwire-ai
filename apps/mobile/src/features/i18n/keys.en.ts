@@ -324,6 +324,8 @@ export const featureKeysEn = {
     },
     steer: {
       waiting: "{{name}} reads it at the next pause",
+      /** Sent to an agent waiting for its computer: it has no pause, it reads it once it gets the computer. */
+      computer: "{{name}} reads it when it gets the computer",
       now: "{{name}} stopped to read it",
       delivered: "{{name}} got it",
       held: "{{name}} reads it after your decision",

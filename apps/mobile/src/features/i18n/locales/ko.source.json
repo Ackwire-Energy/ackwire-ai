@@ -773,6 +773,9 @@
   "chat.steer.waiting": {
     "value": "{{name}} reads it at the next pause"
   },
+  "chat.steer.computer": {
+    "value": "{{name}} reads it when it gets the computer"
+  },
   "chat.steer.now": {
     "value": "{{name}} stopped to read it"
   },

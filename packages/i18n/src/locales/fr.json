@@ -9138,6 +9138,7 @@
     "stuck": "Arrêté car il était bloqué",
     "steer": {
       "waiting": "{{name}} le lira à la prochaine pause",
+      "computer": "{{name}} le lira dès qu'il aura l'ordinateur",
       "now": "{{name}} s'est arrêté pour le lire",
       "delivered": "{{name}} l'a reçu",
       "held": "{{name}} le lira après votre décision",
@@ -9335,6 +9336,7 @@
       "nextEta": "En attente de l'ordinateur. Passe ensuite, dans environ {{n}} min",
       "nextAfter": "En attente de l'ordinateur. Passe ensuite, quand {{after}} aura fini",
       "next": "En attente de l'ordinateur. Passe ensuite",
+      "waiting": "En attente de l'ordinateur",
       "behind": "Dans la file, {{nth}}. Après {{names}}",
       "position": "Dans la file, {{nth}}"
     },
@@ -12914,6 +12916,8 @@
     "autoUpdate": "Toujours dessus ({{duration}}).",
     "autoUpdateNow": "En ce moment : {{now}}.",
     "statusReply": "Je suis toujours dessus ({{duration}}). Je lis votre message après cette étape.",
+    "statusReplyQueued": "J'attends l'ordinateur ({{duration}}). Je lis votre message dès que c'est mon tour.",
+    "statusReplyAway": "J'attends que mon ordinateur revienne. Je lis votre message dès son retour.",
     "status": {
       "one": "Travaille sur : {{subject}}",
       "oneUntitled": "Travaille en arrière-plan",
@@ -13054,7 +13058,9 @@
       "show": "Afficher",
       "hide": "Masquer",
       "talker": "en travaillant",
-      "talkerTip": "A répondu sans interrompre la tâche en cours."
+      "talkerTip": "A répondu sans interrompre la tâche en cours.",
+      "talkerWaiting": "en attendant",
+      "talkerWaitingTip": "A répondu pendant que la tâche attend."
     },
     "joined": {
       "label": "s'est joint",

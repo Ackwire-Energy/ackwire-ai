@@ -307,6 +307,7 @@
     },
     "steer": {
       "waiting": "{{name}} membacanya di jeda berikutnya",
+      "computer": "{{name}} membacanya saat mendapat komputer",
       "now": "{{name}} berhenti untuk membacanya",
       "delivered": "{{name}} sudah menerimanya",
       "held": "{{name}} membacanya setelah kamu memutuskan",

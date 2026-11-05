@@ -8775,6 +8775,7 @@
     "stuck": "Gestoppt, weil er feststeckte",
     "steer": {
       "waiting": "{{name}} liest es bei der nächsten Pause",
+      "computer": "{{name}} liest es, sobald der Computer frei ist",
       "now": "{{name}} hat angehalten, um es zu lesen",
       "delivered": "{{name}} hat es bekommen",
       "held": "{{name}} liest es nach deiner Entscheidung",
@@ -8969,6 +8970,7 @@
       "nextEta": "Wartet auf den Computer. Als Nächstes dran, in etwa {{n}} Min.",
       "nextAfter": "Wartet auf den Computer. Als Nächstes dran, sobald {{after}} fertig ist",
       "next": "Wartet auf den Computer. Als Nächstes dran",
+      "waiting": "Wartet auf den Computer",
       "behind": "In der Warteschlange, {{nth}}. Nach {{names}}",
       "position": "In der Warteschlange, {{nth}}"
     },
@@ -12461,6 +12463,8 @@
     "autoUpdate": "Noch dran ({{duration}}).",
     "autoUpdateNow": "Gerade: {{now}}.",
     "statusReply": "Ich arbeite noch daran ({{duration}}). Ich lese deine Nachricht nach diesem Schritt.",
+    "statusReplyQueued": "Ich warte auf den Computer ({{duration}}). Ich lese deine Nachricht, sobald ich dran bin.",
+    "statusReplyAway": "Ich warte darauf, dass mein Computer zurückkommt. Ich lese deine Nachricht, sobald er wieder da ist.",
     "status": {
       "one": "Arbeitet an: {{subject}}",
       "oneUntitled": "Arbeitet im Hintergrund",
@@ -12587,7 +12591,9 @@
       "show": "Anzeigen",
       "hide": "Ausblenden",
       "talker": "während der Arbeit",
-      "talkerTip": "Hat geantwortet, ohne die laufende Aufgabe zu unterbrechen."
+      "talkerTip": "Hat geantwortet, ohne die laufende Aufgabe zu unterbrechen.",
+      "talkerWaiting": "beim Warten",
+      "talkerWaitingTip": "Hat geantwortet, während die Aufgabe wartet."
     },
     "joined": {
       "label": "hat sich eingeschaltet",
