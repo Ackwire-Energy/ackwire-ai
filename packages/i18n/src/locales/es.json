@@ -11514,6 +11514,19 @@
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "Demasiado grande para la vista previa. Descárgalo para abrirlo.",
     "downloadOnly": "No hay vista previa para este tipo de archivo. Descárgalo para abrirlo.",
+    "video": {
+      "play": "Reproducir",
+      "pause": "Pausar",
+      "replay": "Ver de nuevo",
+      "seek": "Posición en el video",
+      "volume": "Volumen",
+      "mute": "Silenciar",
+      "unmute": "Activar sonido",
+      "speed": "Velocidad {{speed}}×",
+      "fullscreen": "Pantalla completa",
+      "exitFullscreen": "Salir de pantalla completa",
+      "open": "Abrir"
+    },
     "zoom": {
       "toolbar": "Zoom",
       "in": "Ampliar",

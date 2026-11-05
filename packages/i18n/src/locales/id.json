@@ -10779,6 +10779,19 @@
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "Terlalu besar untuk dipratinjau. Unduh untuk membukanya.",
     "downloadOnly": "Tidak ada pratinjau untuk jenis file ini. Unduh untuk membukanya.",
+    "video": {
+      "play": "Putar",
+      "pause": "Jeda",
+      "replay": "Putar lagi",
+      "seek": "Posisi dalam video",
+      "volume": "Volume",
+      "mute": "Bisukan",
+      "unmute": "Nyalakan suara",
+      "speed": "Kecepatan {{speed}}×",
+      "fullscreen": "Layar penuh",
+      "exitFullscreen": "Keluar dari layar penuh",
+      "open": "Buka"
+    },
     "zoom": {
       "toolbar": "Zoom",
       "in": "Perbesar",

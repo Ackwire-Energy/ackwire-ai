@@ -1151,6 +1151,7 @@
   "files": {
     "type": {
       "image": "Obraz",
+      "video": "Wideo",
       "pdf": "PDF",
       "document": "Dokument",
       "table": "Tabela",
@@ -1175,7 +1176,17 @@
     "openImage": "Otwórz zdjęcie",
     "imageOf": "Zdjęcie {{index}} z {{count}}",
     "place": "{{index}} z {{count}}",
-    "noPreview": "Ten plik nie otwiera się w aplikacji. Udostępnij go, żeby otworzyć go w innej aplikacji."
+    "noPreview": "Ten plik nie otwiera się w aplikacji. Udostępnij go, żeby otworzyć go w innej aplikacji.",
+    "video": {
+      "play": "Odtwórz",
+      "pause": "Wstrzymaj",
+      "replay": "Odtwórz ponownie",
+      "seek": "Pozycja w filmie",
+      "mute": "Wycisz",
+      "unmute": "Włącz dźwięk",
+      "fullscreen": "Pełny ekran",
+      "open": "Otwórz"
+    }
   },
   "issues": {
     "title": "Zadania",

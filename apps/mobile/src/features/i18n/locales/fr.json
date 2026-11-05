@@ -1078,6 +1078,7 @@
   "files": {
     "type": {
       "image": "Image",
+      "video": "Vidéo",
       "pdf": "PDF",
       "document": "Document",
       "table": "Tableau",
@@ -1102,7 +1103,17 @@
     "openImage": "Ouvrir l'image",
     "imageOf": "Image {{index}} sur {{count}}",
     "place": "{{index}} sur {{count}}",
-    "noPreview": "Ce fichier ne s'ouvre pas dans l'app. Partagez-le pour l'ouvrir dans une autre app."
+    "noPreview": "Ce fichier ne s'ouvre pas dans l'app. Partagez-le pour l'ouvrir dans une autre app.",
+    "video": {
+      "play": "Lire",
+      "pause": "Pause",
+      "replay": "Revoir",
+      "seek": "Position dans la vidéo",
+      "mute": "Couper le son",
+      "unmute": "Activer le son",
+      "fullscreen": "Plein écran",
+      "open": "Ouvrir"
+    }
   },
   "issues": {
     "title": "Tâches",

@@ -1005,6 +1005,7 @@
   "files": {
     "type": {
       "image": "Afbeelding",
+      "video": "Video",
       "pdf": "Pdf",
       "document": "Document",
       "table": "Tabel",
@@ -1029,7 +1030,17 @@
     "openImage": "Afbeelding openen",
     "imageOf": "Afbeelding {{index}} van {{count}}",
     "place": "{{index}} van {{count}}",
-    "noPreview": "Dit bestand opent niet in de app. Deel het om het in een andere app te openen."
+    "noPreview": "Dit bestand opent niet in de app. Deel het om het in een andere app te openen.",
+    "video": {
+      "play": "Afspelen",
+      "pause": "Pauzeren",
+      "replay": "Opnieuw afspelen",
+      "seek": "Positie in de video",
+      "mute": "Geluid uit",
+      "unmute": "Geluid aan",
+      "fullscreen": "Volledig scherm",
+      "open": "Openen"
+    }
   },
   "issues": {
     "title": "Taken",

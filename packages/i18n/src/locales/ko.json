@@ -10704,6 +10704,19 @@
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "너무 커서 미리 볼 수 없어요. 다운로드해서 여세요.",
     "downloadOnly": "이 유형의 파일은 미리보기가 없어요. 다운로드해서 여세요.",
+    "video": {
+      "play": "재생",
+      "pause": "일시정지",
+      "replay": "다시 보기",
+      "seek": "동영상 재생 위치",
+      "volume": "볼륨",
+      "mute": "음소거",
+      "unmute": "음소거 해제",
+      "speed": "속도 {{speed}}×",
+      "fullscreen": "전체 화면",
+      "exitFullscreen": "전체 화면 종료",
+      "open": "열기"
+    },
     "zoom": {
       "toolbar": "확대/축소",
       "in": "확대",

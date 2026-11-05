@@ -10652,6 +10652,23 @@ export const en = {
     pdfFrame: "PDF: {{title}}",
     tooBigToPreview: "Too large to preview. Download it to open.",
     downloadOnly: "No preview for this type of file. Download it to open.",
+    /** The video player's controls (chat tile and viewer). */
+    video: {
+      play: "Play",
+      pause: "Pause",
+      /** The video ended: plays it again from the start. */
+      replay: "Play again",
+      /** The timeline, as a slider. */
+      seek: "Position in the video",
+      volume: "Volume",
+      mute: "Mute",
+      unmute: "Unmute",
+      speed: "Speed {{speed}}×",
+      fullscreen: "Full screen",
+      exitFullscreen: "Exit full screen",
+      /** The corner button on a chat tile: opens the file viewer. */
+      open: "Open",
+    },
     /** The picture viewer's zoom bar. */
     zoom: {
       toolbar: "Zoom",

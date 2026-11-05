@@ -11224,6 +11224,19 @@
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "Te groot voor een voorbeeld. Download het om het te openen.",
     "downloadOnly": "Geen voorbeeld voor dit soort bestand. Download het om het te openen.",
+    "video": {
+      "play": "Afspelen",
+      "pause": "Pauzeren",
+      "replay": "Opnieuw afspelen",
+      "seek": "Positie in de video",
+      "volume": "Volume",
+      "mute": "Geluid uit",
+      "unmute": "Geluid aan",
+      "speed": "Snelheid {{speed}}×",
+      "fullscreen": "Volledig scherm",
+      "exitFullscreen": "Volledig scherm sluiten",
+      "open": "Openen"
+    },
     "zoom": {
       "toolbar": "Zoom",
       "in": "Inzoomen",
