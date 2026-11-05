@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerBlockState, stateChanges, stateForPage } from "../lib/blocks";
+import type { ChatPrefs } from "../lib/chat-look";
 import { newerSetup } from "../lib/computer";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { forPeople } from "../lib/consultations";
@@ -2249,6 +2250,36 @@ export function useSetAgentStyle(orgId: string) {
       return { before };
     },
     onError: (_e, _style, ctx) => {
+      if (ctx?.before !== undefined) qc.setQueryData(keys.me, ctx.before);
+    },
+    onSuccess: put,
+  });
+}
+
+/** How conversations look to me in this workspace, on every device: the choice shows at once. */
+export function useSetChatPrefs(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const put = (patch: ChatPrefs) =>
+    qc.setQueryData<Me | null>(keys.me, (me) =>
+      me
+        ? {
+            ...me,
+            organizations: me.organizations.map((o) =>
+              o.id === orgId ? { ...o, chatPrefs: { ...o.chatPrefs, ...patch } } : o,
+            ),
+          }
+        : me,
+    );
+  return useMutation({
+    mutationFn: (patch: ChatPrefs) => api.orgs.setChatPrefs(orgId, patch),
+    onMutate: async (patch) => {
+      await qc.cancelQueries({ queryKey: keys.me });
+      const before = qc.getQueryData<Me | null>(keys.me);
+      put(patch);
+      return { before };
+    },
+    onError: (_e, _patch, ctx) => {
       if (ctx?.before !== undefined) qc.setQueryData(keys.me, ctx.before);
     },
     onSuccess: put,

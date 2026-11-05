@@ -152,6 +152,10 @@ export function MeScreen() {
           },
         ]
       : []),
+    // Likewise: a server from before the choice sends no `chatPrefs`.
+    ...(org.org?.chatPrefs !== undefined
+      ? [{ icon: "chat" as const, label: t("settings.account.chat.title"), href: "/me/chat-look" }]
+      : []),
     {
       icon: "sound",
       label: t("mobile.me.sounds"),

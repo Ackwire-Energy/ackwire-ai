@@ -58,6 +58,7 @@ import {
   seesAgentDetails,
   setAgentChannels,
   setAgentStyle,
+  setChatPrefs,
   setInvitationRoles,
   setMyIssuesView,
   setMySidebarItem,
@@ -81,7 +82,17 @@ import { contextWindowOf, nanoUsdToUsd, PROVIDERS, pricesAt, usdToNanoUsd } from
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
 import { credentialOut } from "./credential-view";
-import { AgentAppearance, AgentAudience, Credential, Model, ModelTier, ProviderId, Role, StartChoice } from "./schemas";
+import {
+  AgentAppearance,
+  AgentAudience,
+  ChatPrefs,
+  Credential,
+  Model,
+  ModelTier,
+  ProviderId,
+  Role,
+  StartChoice,
+} from "./schemas";
 
 const usd = (nano: number | null) => (nano === null ? null : nanoUsdToUsd(nano));
 const ModelId = z.string().max(100);
@@ -718,6 +729,24 @@ export function managementRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const style = await setAgentStyle(db, c.get("user").id, orgId, c.req.valid("json").style);
       return c.json({ style }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/chat",
+      tags: ["Members"],
+      security,
+      summary: "Choose how conversations look to you in this organization",
+      description:
+        "Yours, on every device. Only the keys you send change. `GET /me` sends what you chose with each organization (`chatPrefs`); a key not there keeps the app's default.",
+      request: { params: OrgParams, body: body(ChatPrefs) },
+      responses: { 200: json(ChatPrefs), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await setChatPrefs(db, c.get("user").id, orgId, c.req.valid("json")), 200);
     },
   );
 

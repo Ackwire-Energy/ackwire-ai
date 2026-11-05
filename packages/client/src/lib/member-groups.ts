@@ -24,6 +24,15 @@ export interface MemberGroup<P, A> {
   rows: MemberRow<P, A>[];
 }
 
+/** The color of a person's name in a conversation: the mark of their highest role; an owner's is the owners' mark. */
+export function memberRoleColor(person: Pick<GroupPerson, "role" | "roleIds">, roles: OrgRole[]) {
+  if (person.role === "owner") return "violet";
+  const top = roles
+    .filter((r) => r.kind !== "everyone" && person.roleIds?.includes(r.id))
+    .sort((a, b) => a.position - b.position)[0];
+  return top?.color;
+}
+
 const connected = (p: MemberPresence | undefined) => p === "online" || p === "away" || p === "busy";
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
 

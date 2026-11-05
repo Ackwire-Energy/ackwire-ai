@@ -1,5 +1,6 @@
 import type { AppLocale } from "@agenteschat/i18n/locale";
 import type { DashboardsApi } from "../dashboards/api";
+import type { ChatPrefs } from "../lib/chat-look";
 import type { OnboardingStepId } from "../lib/onboarding";
 import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
 import type { WikiAccess } from "../lib/wiki";
@@ -437,6 +438,7 @@ export interface ApiClient {
     setShowActivity(orgId: string, show: boolean): Promise<boolean>;
     /** How agents talk to me here (ADR 0147), for every agent. */
     setAgentStyle(orgId: string, style: AgentStyle): Promise<AgentStyle>;
+    setChatPrefs(orgId: string, patch: ChatPrefs): Promise<ChatPrefs>;
     /** Where I put the tools at the top of my sidebar here (only the ones I moved). */
     sidebarItems(orgId: string): Promise<SidebarItems>;
     /** Moves one tool (`null`: back on its default), my others as the server has them. Answers with every choice. */

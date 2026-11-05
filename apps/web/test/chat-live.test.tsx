@@ -5,7 +5,7 @@ setupDom();
 
 import { ApiError } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, comfortable, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -972,7 +972,7 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
 describe("regression: the router picks nobody (production #general, 'oi' after 'oi @Theo')", () => {
   test("a mention answered, then a no-mention message: no thinking shown, receipt says nobody", async () => {
     // #general with exactly one person and one agent: it is NOT a DM.
-    const state = seedState();
+    const state = comfortable(seedState());
     state.channelMembers[GENERAL_ID] = [
       { type: "person", id: "u-walter" },
       { type: "agent", id: ADA_ID },

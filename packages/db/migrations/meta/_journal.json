@@ -1548,6 +1548,13 @@
       "when": 1793963667011,
       "tag": "0222_agent_merge_repos",
       "breakpoints": true
+    },
+    {
+      "idx": 223,
+      "version": "7",
+      "when": 1793973667011,
+      "tag": "0223_chat_prefs",
+      "breakpoints": true
     }
   ]
 }

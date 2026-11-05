@@ -24,6 +24,7 @@ export const MessageText = memo(function MessageText({
   accent,
   channelRefs,
   everyone = false,
+  ink,
 }: {
   body: string;
   streaming?: boolean;
@@ -41,9 +42,12 @@ export const MessageText = memo(function MessageText({
   channelRefs?: Record<string, string>;
   /** The message's `meta.mentionsEveryone`: its `@todos` shows in the reader's language, like a mention of them. */
   everyone?: boolean;
+  /** Over a solid bubble: the words' color in place of the page's. */
+  ink?: string;
 }) {
   const c = useColors();
   const blocks = useMemo(() => parseBlocks(body), [body]);
+  const inked = ink ? { color: ink } : undefined;
   const tone = muted ? "muted" : "ink";
   const last = blocks.length - 1;
   const caret =
@@ -78,7 +82,7 @@ export const MessageText = memo(function MessageText({
           case "heading":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <Text key={i} variant="body" tone="ink" style={[styles.line, styles.heading]}>
+              <Text key={i} variant="body" tone="ink" style={[styles.line, styles.heading, inked]}>
                 <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} />
                 {end}
               </Text>
@@ -90,7 +94,7 @@ export const MessageText = memo(function MessageText({
                 <Text variant="body" tone="faint" style={[styles.line, styles.mark]}>
                   {b.ordinal ? `${b.ordinal}.` : "•"}
                 </Text>
-                <Text variant="body" tone={tone} style={[styles.line, styles.flex]}>
+                <Text variant="body" tone={tone} style={[styles.line, styles.flex, inked]}>
                   <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} />
                   {end}
                 </Text>
@@ -117,7 +121,7 @@ export const MessageText = memo(function MessageText({
           default:
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <Text key={i} variant="body" tone={tone} style={styles.line} selectable={selectable}>
+              <Text key={i} variant="body" tone={tone} style={[styles.line, inked]} selectable={selectable}>
                 <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} />
                 {end}
               </Text>

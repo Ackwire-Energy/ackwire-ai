@@ -19,8 +19,7 @@ describe("a reply's tools sit last, live and saved", () => {
     expect(
       ascending(
         at(row, [
-          // A long message to another agent shows its first paragraph (`talk.lead`), the rest behind "Ler tudo".
-          ") : body ? (\n            <MessageText\n              body={talk ? talk.lead : body}",
+          "{opener}\n              {words}\n            </>\n          )}",
           "<Receipts message={m} />",
           "{cards}\n          {/* Its tools after",
           "<TurnTools",
@@ -31,7 +30,7 @@ describe("a reply's tools sit last, live and saved", () => {
       ),
     ).toBe(true);
     // The cards above the tools are an issue's and a mission's; the thread, the reactions and the send state go under.
-    const [cardsAt, footAt, endAt] = at(row, ["const cards = (", "const foot = (", "\n  if (mine) {"]);
+    const [cardsAt, footAt, endAt] = at(row, ["const cards = (", "const foot = (", "\n  if (onRight) {"]);
     const cards = row.slice(cardsAt, footAt);
     const foot = row.slice(footAt, endAt);
     for (const card of ["<IssueWorkCard", "<MissionCard", "<PlanCard", "<ReviewCard", "<SetupFailedCard"])
@@ -65,7 +64,10 @@ describe("a reply's tools sit last, live and saved", () => {
     const live = source("LiveRows.tsx");
     expect(
       ascending(
-        at(live, ["{run.text && !wordsOnTop ? <RevealText", '<TurnTools items={lines} agentName={agent?.name ?? ""}']),
+        at(live, [
+          "{run.text && !wordsOnTop ? (\n                <RevealText",
+          '<TurnTools items={lines} agentName={agent?.name ?? ""}',
+        ]),
       ),
     ).toBe(true);
   });
@@ -84,7 +86,7 @@ describe("agents it asked first: one pair row right before the reply, never insi
     expect(live).toContain("const consults = useRunConsults(run.runId, run, null);");
     // Before its words only the row stands (no thinking row); after them, right above the measured row.
     expect(live).toContain("if (waiting) return pair;");
-    expect(live).toContain("{pair}\n      <View ref={seen} collapsable={false} style={styles.msg}>");
+    expect(live).toContain("{pair}\n      <View\n        ref={seen}\n        collapsable={false}");
   });
 
   test("the row says no answer: only faces, names, a short word and the time", () => {

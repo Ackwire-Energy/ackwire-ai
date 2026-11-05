@@ -31,7 +31,7 @@ import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines"
 import { secretRequestOf } from "@agenteschat/client/lib/secret-requests";
 import { usagePauseCardOf } from "@agenteschat/client/lib/usage-pause";
 import { voiceOf } from "@agenteschat/client/lib/voice";
-import { mentionTone } from "@agenteschat/ui/agent/engine";
+import { type AgentColorName, gradientOf, mentionTone, mixHex } from "@agenteschat/ui/agent/engine";
 import type { TFunction } from "i18next";
 import { agentLook, previewOf } from "../shared/logic";
 import { continuesReply } from "./media";
@@ -511,6 +511,15 @@ export function reactionPills(reactions: ReactionCount[] | undefined, meId: stri
     }))
     .filter((p) => p.people > 0 || p.agentIds.length > 0);
 }
+
+/** My bubble: a tint of the deep end of the color on the page (stronger on a dark page), or the color a step darker. */
+export function bubbleFill(color: AgentColorName, tone: "light" | "strong", page: string, dark: boolean) {
+  const deep = gradientOf(color)[1];
+  return tone === "strong" ? mixHex(deep, "#000000", 0.18) : mixHex(page, deep, dark ? 0.3 : 0.2);
+}
+
+/** A name's color in the bubbles: the deep end on a light page, the bright end on a dark one. */
+export const nameInk = (color: AgentColorName, dark: boolean) => gradientOf(color)[dark ? 0 : 1];
 
 /** What my row shows under its bubble (`MessageRow`'s foot, files and cards): it ends a run's look (`runAround`). */
 export const hangsUnder = (

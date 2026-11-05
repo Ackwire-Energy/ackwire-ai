@@ -26,6 +26,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import type { AuthResult } from "@/auth/client";
 import { useAuth } from "@/auth/context";
+import { ChatLookSettings } from "@/components/ChatLookSettings";
 import { PrefRow } from "@/components/NoticePrefs";
 import { OpenOnPhoneDialog } from "@/components/OpenOnPhone";
 import { useOrg } from "@/components/org-context";
@@ -45,7 +46,7 @@ import { LanguageSelect } from "./LanguageSelect";
 /**
  * Configurações › Sua conta: your profile in this workspace, your time zone, whether agents' work shows under their replies,
  * how agents talk to you (ADR 0147), opening the phone app and a password
- * for an account without one, your plans' limits (ADR 0063 §5), then what this device keeps for itself (theme,
+ * for an account without one, your plans' limits (ADR 0063 §5), how conversations look to you, then what this device keeps for itself (theme,
  * language, sounds, the desktop app's menus), and last, deleting the account.
  */
 export function AccountSection() {
@@ -168,6 +169,8 @@ export function AccountSection() {
           </div>
         </Card>
       )}
+      {/* A server from before the choice sends no `chatPrefs` and can't keep one. */}
+      {org.chatPrefs !== undefined && <ChatLookSettings />}
       <Card aria-labelledby="account-device">
         <CardHeader id="account-device" title={t("settings.account.device")} />
         <div className="settings-rows">
