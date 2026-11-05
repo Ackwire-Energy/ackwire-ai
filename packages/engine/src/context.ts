@@ -658,6 +658,7 @@ export async function buildRunContext(
         .select({
           userId: channelMembers.userId,
           userName: users.name,
+          userHandle: schema.organizationMembers.handle,
           agentId: agents.id,
           agentName: agents.name,
           agentHandle: agents.handle,
@@ -665,6 +666,13 @@ export async function buildRunContext(
         })
         .from(channelMembers)
         .leftJoin(users, eq(users.id, channelMembers.userId))
+        .leftJoin(
+          schema.organizationMembers,
+          and(
+            eq(schema.organizationMembers.userId, channelMembers.userId),
+            eq(schema.organizationMembers.orgId, run.orgId),
+          ),
+        )
         .leftJoin(agents, eq(agents.id, channelMembers.agentId))
         // An archived agent keeps its memberships, but nothing reaches it: never named as here.
         .where(
@@ -678,6 +686,7 @@ export async function buildRunContext(
       {
         userId: string | null;
         userName: string | null;
+        userHandle: string | null;
         agentId: string | null;
         agentName: string | null;
         agentHandle: string | null;
@@ -832,7 +841,11 @@ export async function buildRunContext(
   // The rest of the org's agents: channel members are described in "Where you are".
   const team = options.team ? teamPrompt(teamRows, agent.id, requester, here, talks) : "";
   const memberList = members
-    .map((m) => (m.agentHandle ? `${m.agentName} (@${m.agentHandle}, agent)` : `${m.userName ?? "unknown"} (person)`))
+    .map((m) =>
+      m.agentHandle
+        ? `${m.agentName} (@${m.agentHandle}, agent)`
+        : `${m.userName ?? "unknown"} (${m.userHandle && channel.kind !== "dm" ? `@${m.userHandle}, ` : ""}person)`,
+    )
     .join(", ");
 
   // A task's conversation (ADR 0145), or an older work thread in a DM (asked to implement it): the task, read from

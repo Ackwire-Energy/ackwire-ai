@@ -348,6 +348,78 @@ export function parseMentionHandles(body: string): string[] {
   return [...found];
 }
 
+/** Code and links, as the apps show them (a fence nobody closed runs to the end): what stands there stays as written. */
+const CODE_OR_LINK = /```[\s\S]*?(?:```|$)|`[^`\n]+`|\[[^\]]*\]\([^)\s]*\)|https?:\/\/\S+/;
+
+/**
+ * An agent's text with each `@Full Name` of a person among `members` as their `@handle`, its real mention: agents write
+ * the names they read, and a mention is one word. Only the whole name, the longest one first, ignoring case. A name two
+ * members share, or the full name of someone outside the conversation (`outsiders`), mentions nobody: it loses its @, or
+ * `@Ana` of `@Ana Souza` would reach whoever holds that handle. A name that is also a member's handle already mentions
+ * them, and code, links and package scopes (`@ana/kit`) stay as written.
+ */
+export function mentionsByName(
+  body: string,
+  members: { name: string | null; handle: string | null; person: boolean }[],
+  outsiders: (string | null)[] = [],
+): string {
+  const key = (name: string) => name.trim().normalize("NFC").toLowerCase();
+  const named = new Map<string, typeof members>();
+  for (const m of members) {
+    const name = key(m.name ?? "");
+    if (name) named.set(name, [...(named.get(name) ?? []), m]);
+  }
+  // One word is a handle's business, whoever holds it.
+  const elsewhere = outsiders.map((n) => key(n ?? "")).filter((n) => n.includes(" "));
+  if (named.size === 0 && elsewhere.length === 0) return body;
+  const handles = new Set(members.map((m) => m.handle));
+  const names = [...new Set([...named.keys(), ...elsewhere].flatMap((n) => [n, n.normalize("NFD")]))]
+    .sort((a, b) => b.length - a.length)
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  const mention = new RegExp(
+    `${CODE_OR_LINK.source}|(^|[^\\p{L}\\p{N}_@./])@(${names})(?![\\p{L}\\p{N}_@/-]|\\.[\\p{L}\\p{N}])`,
+    "giu",
+  );
+  return body.replace(mention, (whole, before: string | undefined, written: string | undefined) => {
+    if (written === undefined) return whole;
+    const name = key(written);
+    if (handles.has(name)) return whole;
+    const [one, other] = named.get(name) ?? [];
+    if (!one || other) return `${before}${written}`;
+    return one.person && one.handle ? `${before}@${one.handle}` : whole;
+  });
+}
+
+/** `mentionsByName` for a message going to `channelId`: its people and agents, an agent's message only. */
+async function withNamedMentions(tx: Executor, input: NewMessage, body: string) {
+  if (input.author.type !== "agent" || !/@\p{L}/u.test(body)) return body;
+  const { organizationMembers, users } = schema;
+  // ponytail: reads every member's name for such a message; filter by the text in SQL if a workspace's size calls for it.
+  const people = await tx
+    .select({ name: users.name, handle: organizationMembers.handle, here: channelMembers.userId })
+    .from(organizationMembers)
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .leftJoin(
+      channelMembers,
+      and(eq(channelMembers.channelId, input.channelId), eq(channelMembers.userId, organizationMembers.userId)),
+    )
+    .where(eq(organizationMembers.orgId, input.orgId));
+  const teammates = await tx
+    .select({ name: agents.name, handle: agents.handle })
+    .from(channelMembers)
+    .innerJoin(agents, eq(agents.id, channelMembers.agentId))
+    .where(and(eq(channelMembers.channelId, input.channelId), isNull(agents.archivedAt)));
+  return mentionsByName(
+    body,
+    [
+      ...people.filter((p) => p.here).map((p) => ({ ...p, person: true })),
+      ...teammates.map((a) => ({ ...a, person: false })),
+    ],
+    people.filter((p) => !p.here).map((p) => p.name),
+  );
+}
+
 /**
  * `#name` channel references in a message, lower-cased and de-duplicated, outside code and links (they stay as
  * typed), by the rule the apps share (`CHANNEL_REF`).
@@ -564,7 +636,7 @@ export async function insertMessageWithRuns(
   /** A resend (same person and `clientId`): `message` is the one already written; nothing was written now. */
   duplicate: boolean;
 }> {
-  const body = input.body.trim();
+  const body = await withNamedMentions(tx, input, input.body.trim());
   // Files alone are a message (`meta.artifacts`), and so is a GIF or a sticker (`meta.media`, ADR 0091): the
   // text may be empty then.
   const attached = input.meta?.artifacts;
