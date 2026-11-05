@@ -1,4 +1,5 @@
 import { createDashboardsApi } from "../dashboards/api";
+import type { ChatPrefs } from "../lib/chat-look";
 import { humanCheckHeaders } from "../lib/human-check";
 import type { OnboardingStepId } from "../lib/onboarding";
 import { CLOUD_SERVER } from "../lib/server";
@@ -78,6 +79,7 @@ import type {
   CustomServer,
   DatabaseConnection,
   DatabaseTable,
+  DesktopPictureView,
   DesktopRelease,
   DesktopStatus,
   DeviceRequest,
@@ -436,6 +438,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     desktop: {
       status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),
+      picture: (orgId, agentId) => request<DesktopPictureView>(`${org(orgId)}/agents/${enc(agentId)}/desktop/picture`),
     },
     vault: {
       overview: (orgId) => request<VaultOverview>(`${org(orgId)}/vault`),
@@ -548,6 +551,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       setAgentStyle: async (orgId, style) =>
         (await request<{ style: AgentStyle }>(`${org(orgId)}/me/agent-style`, { method: "PUT", json: { style } }))
           .style,
+      setChatPrefs: (orgId, patch) => request<ChatPrefs>(`${org(orgId)}/me/chat`, { method: "PUT", json: patch }),
       sidebarItems: async (orgId) => (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`)).items,
       setSidebarItem: async (orgId, item, place) =>
         (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`, { method: "PATCH", json: { item, place } }))

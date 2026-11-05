@@ -1,5 +1,6 @@
 import type { AppLocale } from "@agenteschat/i18n/locale";
 import type { DashboardsApi } from "../dashboards/api";
+import type { ChatPrefs } from "../lib/chat-look";
 import type { OnboardingStepId } from "../lib/onboarding";
 import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
 import type { WikiAccess } from "../lib/wiki";
@@ -109,6 +110,7 @@ import type {
   DatabaseConnectionInput,
   DatabaseTable,
   DeletionProofInput,
+  DesktopPictureView,
   DesktopRelease,
   DesktopStatus,
   DeviceRequest,
@@ -437,6 +439,7 @@ export interface ApiClient {
     setShowActivity(orgId: string, show: boolean): Promise<boolean>;
     /** How agents talk to me here (ADR 0147), for every agent. */
     setAgentStyle(orgId: string, style: AgentStyle): Promise<AgentStyle>;
+    setChatPrefs(orgId: string, patch: ChatPrefs): Promise<ChatPrefs>;
     /** Where I put the tools at the top of my sidebar here (only the ones I moved). */
     sidebarItems(orgId: string): Promise<SidebarItems>;
     /** Moves one tool (`null`: back on its default), my others as the server has them. Answers with every choice. */
@@ -1710,6 +1713,8 @@ export interface ApiClient {
    */
   desktop: {
     status(orgId: string, agentId: string): Promise<DesktopStatus>;
+    /** A recent picture of the agent's screen; never starts a stopped one. 403 for who may not watch it. */
+    picture(orgId: string, agentId: string): Promise<DesktopPictureView>;
   };
   /**
    * GIF search (ADR 0091), through our server: the browser and the phone never talk to the provider. Every member;

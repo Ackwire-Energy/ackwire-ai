@@ -552,7 +552,7 @@ describe("a receipt never adds a line to its row", () => {
     expect(row).toContain("solo: { borderBottomRightRadius: BUBBLE_CUT }");
     expect(row).toContain("end: { borderTopRightRadius: 6, borderBottomRightRadius: BUBBLE_CUT }");
     // Someone else's: absolutely placed in room their name line always keeps, so a mark that comes wraps nothing.
-    expect(row).toContain('<View style={[styles.who, m.author.type === "person" && styles.whoRoom]}>');
+    expect(row).toContain('m.author.type === "person" && !inBubble && !compact && styles.whoRoom');
     expect(row).toMatch(/whoMark: \{ position: "absolute"/);
     expect(num(row, /whoRoom: \{ paddingRight: (\d+) \}/)).toBeGreaterThanOrEqual(16 + 4 + 12);
     // No line of its own: neither the steer line under my bubble nor "Visto" under the list's row.
