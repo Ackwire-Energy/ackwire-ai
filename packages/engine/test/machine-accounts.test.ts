@@ -1961,6 +1961,29 @@ test("reports: the method and Claude's organization stay when not said; an incon
   expect(await accountRow(CLAUDE_ID)).toMatchObject({ status: "signed_out", authMethod: "setup_token" });
 });
 
+test("a finished sign-in's account is checked like a hello's: unknown method, bad org id and long names left out", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(CLAUDE_AUTH_PROTOCOL);
+  const runner = signingRunner(
+    machineId,
+    () =>
+      ({
+        loggedIn: true,
+        email: "ana@example.com",
+        authMethod: "oauth",
+        providerOrgId: "not an id!",
+        orgName: `Ada${"\u0007".repeat(3)} ${"x".repeat(5000)}`,
+        statusUnknown: "yes",
+      }) as unknown as Omit<RunnerAccountInfo, "id" | "kind">,
+    { protocol: CLAUDE_AUTH_PROTOCOL },
+  );
+  const { login, status } = await signIn(runner, f.owner.id, machineId);
+  expect(status).toMatchObject({ state: "done" });
+  const row = await accountRow(login.loginId);
+  expect(row).toMatchObject({ status: "active", authMethod: "cli_login", providerOrgId: null, statusUnknown: false });
+  expect(row?.orgName?.length).toBe(120);
+});
+
 test("one email in two of Claude's organizations is two accounts; a login that doesn't say its organization is either", async () => {
   f = await setup();
   const { machineId } = await ownedMachine(CLAUDE_AUTH_PROTOCOL);

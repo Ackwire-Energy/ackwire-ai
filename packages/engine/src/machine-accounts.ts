@@ -28,6 +28,7 @@ import {
   type PlanUsage,
   type ProviderFailureCause,
   type PubSub,
+  parseAccounts,
   parseSecretBox,
   type RunnerAccountInfo,
   SHARED_ACCOUNTS_PROTOCOL,
@@ -1261,8 +1262,8 @@ export async function accountLoginStatus(
     if (state !== "waiting") await dropSignIn(deps.db, orgId, row.id);
     return { state, ...(state === "failed" && error ? { error } : {}) };
   }
-  const info = reply.account;
-  if (!info || !isAccountId(info.id) || !isAccountKind(info.kind)) {
+  const [info] = parseAccounts(reply.account ? [reply.account] : []);
+  if (!info) {
     return { state: "failed", error: "The computer didn't say which account signed in." };
   }
   if (info.id !== row.id) return { state: "failed", error: "The computer reported another account." };
