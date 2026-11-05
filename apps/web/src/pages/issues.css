@@ -271,8 +271,11 @@ html:not([data-pointer]) .issues-layout:focus-visible {
  * floats there (`data-more` on the frame, kept by the board as it scrolls), as the kit's carousel does. On a touch
  * screen a finger drags it and the arrows stay away. The card drag still scrolls `.issues-boardwrap` near its edges.
  */
+/* A column of flex items, so the arrows' rail keeps both of its margins (an empty block's would fold into one). */
 .issues-boardframe {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
 .issues-boardwrap {
@@ -294,10 +297,23 @@ html:not([data-pointer]) .issues-layout:focus-visible {
 .issues-boardframe[data-more="both"] > .issues-boardwrap {
   mask-image: linear-gradient(to right, transparent, #000 72px, #000 calc(100% - 72px), transparent);
 }
-/* Beside the first cards, clear of the column heads and their menus. */
+/* A rail of no height that sticks a little above the middle of the view while the board is on screen: on a long
+   board the arrows follow the page's scroll instead of staying by the column heads. */
+.issues-boardframe__rail {
+  position: sticky;
+  top: 45vh;
+  z-index: var(--z-raised);
+  height: 0;
+  /* Never by the stage and column heads (72px in at the top) nor past the cards (64px short of the bottom), even on a
+     short board; the board under it takes back that room, so nothing moves. */
+  margin: 72px 0 64px;
+}
+.issues-boardframe__rail + .issues-boardwrap {
+  margin-top: -136px;
+}
 .issues-boardframe__arrow {
   position: absolute;
-  top: 56px;
+  top: calc(var(--control-h-md) / -2);
   z-index: var(--z-raised);
   display: grid;
   place-items: center;

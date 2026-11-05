@@ -226,26 +226,29 @@ export function Board({
     <>
       {/* More columns than the width: the board fades at that side and an arrow there slides it (no scrollbar). */}
       <div className="issues-boardframe" data-more={more}>
-        <button
-          type="button"
-          className="issues-boardframe__arrow issues-boardframe__arrow--start"
-          aria-label={t("look.previous")}
-          title={t("look.previous")}
-          hidden={more !== "start" && more !== "both"}
-          onClick={() => slide(-1)}
-        >
-          <Icon name="chevronLeft" size={18} />
-        </button>
-        <button
-          type="button"
-          className="issues-boardframe__arrow issues-boardframe__arrow--end"
-          aria-label={t("look.next")}
-          title={t("look.next")}
-          hidden={more !== "end" && more !== "both"}
-          onClick={() => slide(1)}
-        >
-          <Icon name="chevronRight" size={18} />
-        </button>
+        {/* A rail of no height that sticks as the page scrolls: the arrows stay in view on a long board. */}
+        <div className="issues-boardframe__rail">
+          <button
+            type="button"
+            className="issues-boardframe__arrow issues-boardframe__arrow--start"
+            aria-label={t("look.previous")}
+            title={t("look.previous")}
+            hidden={more !== "start" && more !== "both"}
+            onClick={() => slide(-1)}
+          >
+            <Icon name="chevronLeft" size={18} />
+          </button>
+          <button
+            type="button"
+            className="issues-boardframe__arrow issues-boardframe__arrow--end"
+            aria-label={t("look.next")}
+            title={t("look.next")}
+            hidden={more !== "end" && more !== "both"}
+            onClick={() => slide(1)}
+          >
+            <Icon name="chevronRight" size={18} />
+          </button>
+        </div>
         <div ref={wrap} className="issues-boardwrap">
           <div className={cx("issues-board", grouped && "is-grouped")}>
             {stages ? (
