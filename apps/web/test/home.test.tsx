@@ -283,7 +283,9 @@ describe("Início", () => {
     state.members = state.members.filter((m) => m.userId === "u-walter");
     await renderApp(`/org/${ORG_ID}/home`, { api: backend(state) });
     await settle(4);
-    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe("Seu workspace está pronto. Comece por aqui.");
+    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe(
+      "Seu workspace está pronto. Comece por aqui.",
+    );
     const steps = section("Primeiros passos");
     expect(steps.textContent).toContain("1 de 5");
     const items = within(steps).getAllByRole("listitem");

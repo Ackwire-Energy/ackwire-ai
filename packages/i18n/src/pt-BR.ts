@@ -4796,8 +4796,7 @@ export const ptBR = {
   },
   proposals: {
     title: "Propostas de melhoria",
-    subtitle:
-      "O que os agentes propõem mudar no time. Nada muda sem alguém aceitar.",
+    subtitle: "O que os agentes propõem mudar no time. Nada muda sem alguém aceitar.",
     list: "Propostas",
     proposes: "<b>{{agent}}</b> propõe · {{target}}",
     proposesMany: "<b>{{agent}}</b> propõe · instruções de {{count}} agentes",
@@ -11587,8 +11586,7 @@ export const ptBR = {
       right_hand: "O assistente que monta o time com cada pessoa, na DM dela.",
       members: "Quem está no workspace e os convites.",
       roles: "O que cada pessoa pode fazer. Papéis se somam.",
-      vault:
-        "Senhas, chaves e contatos dos agentes. Senhas eles nunca veem.",
+      vault: "Senhas, chaves e contatos dos agentes. Senhas eles nunca veem.",
       access: "O que cada agente pode usar: um nível por conector.",
       connectors: "Serviços e servidores MCP conectados uma vez para o workspace inteiro.",
       skills: "Instruções em Markdown que os agentes abrem quando precisam.",

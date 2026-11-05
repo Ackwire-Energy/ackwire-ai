@@ -4722,8 +4722,7 @@ export const en = {
   },
   proposals: {
     title: "Improvement proposals",
-    subtitle:
-      "Changes the agents propose. Nothing changes until someone accepts.",
+    subtitle: "Changes the agents propose. Nothing changes until someone accepts.",
     list: "Proposals",
     proposes: "<b>{{agent}}</b> proposes · {{target}}",
     proposesMany: "<b>{{agent}}</b> proposes · {{count}} agents' instructions",
@@ -11441,14 +11440,12 @@ export const en = {
     },
     sectionText: {
       account: "Your profile and how the app looks for you.",
-      notifications:
-        "What reaches you as an alert here. The inbox keeps everything.",
+      notifications: "What reaches you as an alert here. The inbox keeps everything.",
       general: "Name, time zone and what every agent knows about the workspace.",
       right_hand: "The assistant that builds the team with each person, in their DM.",
       members: "Who is in the workspace, and invitations.",
       roles: "What each person can do. Roles add up.",
-      vault:
-        "Your agents' passwords, keys and contacts. They never see a password.",
+      vault: "Your agents' passwords, keys and contacts. They never see a password.",
       access: "What each agent can use: one level per connector.",
       connectors: "Services and MCP servers connected once for the whole workspace.",
       skills: "Markdown instructions agents open when they need them.",
