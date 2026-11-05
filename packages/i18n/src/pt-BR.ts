@@ -9178,6 +9178,8 @@ export const ptBR = {
     thousand: "mil",
     building: "Montando…",
     openBig: "Abrir grande",
+    showAll: "Mostrar tudo",
+    showLess: "Mostrar menos",
     keep: "Guardar no Drive",
     kept: "Guardado no Drive",
     inDrive: "No Drive",

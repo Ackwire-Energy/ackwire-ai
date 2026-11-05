@@ -58,6 +58,26 @@
 .live-block__room {
   width: 100%;
 }
+/* The block's one height in the conversation (`INLINE_HEIGHT`): the frame inside is as tall as its page, the rest is
+   cut with a fade at the foot until "Show all" opens it in place. */
+.live-block__view {
+  overflow: hidden;
+  transition: height 0.22s var(--ease-out, ease-out);
+}
+.live-block__view[data-cut] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), transparent);
+}
+.live-block__more {
+  display: flex;
+  justify-content: center;
+  padding: 0 8px 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-block__view {
+    transition: none;
+  }
+}
 .live-block__foot {
   display: flex;
   align-items: center;
