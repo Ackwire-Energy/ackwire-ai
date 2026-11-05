@@ -1819,6 +1819,11 @@
         "import": "导入我的智能体",
         "form": "填写表单"
       },
+      "again": {
+        "question": "要和我一起组建团队吗？",
+        "action": "组建团队",
+        "message": "帮我组建团队。"
+      },
       "next": {
         "question": "团队到齐了。接下来呢？",
         "invite": "邀请成员",
@@ -7421,6 +7426,7 @@
     "files": "文件",
     "needsSandbox": "未保存",
     "assetLimit": "一个技能最多保存 {{max}} MB 的图片和其他文件。",
+    "moreFiles_other": "还有 {{count}} 个文件",
     "runsOnPc": "在智能体的电脑上运行",
     "reinstall": "重新安装该技能，智能体才能使用这个文件。",
     "edit": "编辑",
@@ -10748,8 +10754,14 @@
       "tooManySkills": "这个链接包含超过 {{max}} 个技能，请链接到其中一个文件夹。",
       "invalidName": "名称只能使用小写字母、数字和连字符，最多 {{max}} 个字符。",
       "invalidDescription": "描述需为 1 到 {{max}} 个字符。",
-      "tooLarge": "技能太大（最大 {{max}} MB）。",
-      "tooManyFiles": "技能的文件太多（最多 {{max}} 个）。",
+      "tooLarge": "这个技能有 {{size}} MB 的文本和脚本，上限是 {{max}} MB。",
+      "tooManyFiles": "这个技能有 {{files}} 个文件，上限是 {{max}} 个。",
+      "repoTooLarge": "仓库太大，无法下载（最大 {{max}} MB）。请改为上传技能文件夹的 .zip。",
+      "noFrontmatter": "SKILL.md 顶部需要一个写有名称和描述的区块，放在两行 --- 之间。",
+      "bodyTooLong": "SKILL.md 太长（最多 {{max}} 个字符）。",
+      "noSkillMdZip": "zip 文件夹顶层没有 SKILL.md。",
+      "notGithubLink": "无法读取这个 GitHub 链接。请粘贴仓库或其中某个文件夹的链接。",
+      "badZip": "无法读取这个 zip。请不设密码，重新压缩技能文件夹。",
       "connectionGone": "读取 {{repo}} 的 GitHub 连接已失效。请重新连接 GitHub 以更新这个技能。",
       "linkHoldsSeveral": "链接里现在有多个技能。请从这个技能自己的文件夹重新安装。",
       "linkRenamed": "链接里现在是技能 {{name}}。",

@@ -45,6 +45,14 @@ export function answerAfter(
   return sorted.slice(from).find((m) => m.author.type === "person" && m.local !== "failed")?.body ?? null;
 }
 
+/**
+ * The start card took a message as its answer and no interview followed: it was something else (often written before
+ * an AI was connected), so the card stopped asking with nothing started.
+ */
+export const startCardPassed = (
+  messages: readonly Pick<Message, "id" | "createdAt" | "author" | "body" | "local" | "meta">[] | undefined,
+) => answerAfter(messages, null) !== null && !messages?.some((m) => replyChipsOf(m.meta));
+
 /** The answers of `choices` an answer holds: what the card shows checked once it was answered. */
 export const answerPicks = (choices: readonly string[], answer: string | null) => {
   if (answer === null) return [];

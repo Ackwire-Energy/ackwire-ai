@@ -1965,6 +1965,11 @@
         "import": "Importa i miei agenti",
         "form": "Compila il modulo"
       },
+      "again": {
+        "question": "Vuoi costruire il team con me?",
+        "action": "Costruisci il team",
+        "message": "Aiutami a costruire il team."
+      },
       "next": {
         "question": "Il team è arrivato. E adesso?",
         "invite": "Invita persone",
@@ -8033,6 +8038,9 @@
     "files": "File",
     "needsSandbox": "non conservato",
     "assetLimit": "Una skill conserva fino a {{max}} MB di immagini e altri file.",
+    "moreFiles_one": "E altro {{count}} file",
+    "moreFiles_many": "E altri {{count}} file",
+    "moreFiles_other": "E altri {{count}} file",
     "runsOnPc": "gira sul PC dell'agente",
     "reinstall": "Reinstalla la skill perché gli agenti possano usare questo file.",
     "edit": "Modifica",
@@ -11552,8 +11560,14 @@
       "tooManySkills": "Questo link contiene più di {{max}} skill. Collega una delle sue cartelle.",
       "invalidName": "Il nome deve usare lettere minuscole, numeri e trattini, fino a {{max}} caratteri.",
       "invalidDescription": "La descrizione deve avere da 1 a {{max}} caratteri.",
-      "tooLarge": "La skill è troppo grande (massimo {{max}} MB).",
-      "tooManyFiles": "La skill ha troppi file (massimo {{max}}).",
+      "tooLarge": "Questa skill ha {{size}} MB di testo e script, e il limite è {{max}} MB.",
+      "tooManyFiles": "Questa skill ha {{files}} file, e il limite è {{max}}.",
+      "repoTooLarge": "Il repository è troppo grande da scaricare (massimo {{max}} MB). Carica invece la cartella della skill come .zip.",
+      "noFrontmatter": "Il SKILL.md deve avere in alto un blocco con nome e descrizione, tra due righe ---.",
+      "bodyTooLong": "Il SKILL.md è troppo lungo (massimo {{max}} caratteri).",
+      "noSkillMdZip": "Nessun SKILL.md in cima alla cartella dello zip.",
+      "notGithubLink": "Non riusciamo a leggere questo link GitHub. Incolla il link di un repository o di una sua cartella.",
+      "badZip": "Non siamo riusciti a leggere questo zip. Comprimi di nuovo la cartella della skill, senza password.",
       "connectionGone": "Il collegamento GitHub che ha letto {{repo}} non c'è più. Ricollega GitHub per aggiornare questa skill.",
       "linkHoldsSeveral": "Il suo link ora contiene più skill. Installa di nuovo questa dalla sua cartella.",
       "linkRenamed": "Il suo link ora contiene la skill {{name}}.",

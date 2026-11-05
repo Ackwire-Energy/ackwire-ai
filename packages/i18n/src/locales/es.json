@@ -1966,6 +1966,11 @@
         "import": "Importar mis agentes",
         "form": "Llenar el formulario"
       },
+      "again": {
+        "question": "¿Quieres armar el equipo conmigo?",
+        "action": "Armar el equipo",
+        "message": "Ayúdame a armar el equipo."
+      },
       "next": {
         "question": "El equipo ya llegó. ¿Y ahora?",
         "invite": "Invitar personas",
@@ -7964,6 +7969,9 @@
     "files": "Archivos",
     "needsSandbox": "no guardado",
     "assetLimit": "Una habilidad guarda hasta {{max}} MB de imágenes y otros archivos.",
+    "moreFiles_one": "Y {{count}} archivo más",
+    "moreFiles_many": "Y {{count}} archivos más",
+    "moreFiles_other": "Y {{count}} archivos más",
     "runsOnPc": "se ejecuta en la PC del agente",
     "reinstall": "Reinstala la habilidad para que los agentes usen este archivo.",
     "edit": "Editar",
@@ -11472,8 +11480,14 @@
       "tooManySkills": "Este enlace tiene más de {{max}} habilidades. Enlaza una de sus carpetas.",
       "invalidName": "El nombre debe usar minúsculas, números y guiones, hasta {{max}} caracteres.",
       "invalidDescription": "La descripción debe tener de 1 a {{max}} caracteres.",
-      "tooLarge": "La habilidad es demasiado grande (máx. {{max}} MB).",
-      "tooManyFiles": "La habilidad tiene demasiados archivos (máx. {{max}}).",
+      "tooLarge": "Esta habilidad tiene {{size}} MB de texto y scripts, y el límite es {{max}} MB.",
+      "tooManyFiles": "Esta habilidad tiene {{files}} archivos, y el límite es {{max}}.",
+      "repoTooLarge": "El repositorio es demasiado grande para descargarlo (máx. {{max}} MB). Sube la carpeta de la habilidad en un .zip.",
+      "noFrontmatter": "El SKILL.md necesita arriba un bloque con el nombre y la descripción, entre dos líneas ---.",
+      "bodyTooLong": "El SKILL.md es demasiado largo (máx. {{max}} caracteres).",
+      "noSkillMdZip": "No hay SKILL.md en la parte superior de la carpeta del zip.",
+      "notGithubLink": "No es un enlace de GitHub que podamos leer. Pega el enlace de un repositorio o de una carpeta suya.",
+      "badZip": "No pudimos leer este zip. Comprime de nuevo la carpeta de la habilidad, sin contraseña.",
       "connectionGone": "La conexión de GitHub que leyó {{repo}} ya no existe. Conecta GitHub de nuevo para actualizar esta habilidad.",
       "linkHoldsSeveral": "Su enlace ahora tiene varias habilidades. Instala esta de nuevo desde su propia carpeta.",
       "linkRenamed": "Su enlace ahora tiene la habilidad {{name}}.",

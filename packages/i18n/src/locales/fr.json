@@ -1969,6 +1969,11 @@
         "import": "Importer mes agents",
         "form": "Remplir le formulaire"
       },
+      "again": {
+        "question": "Vous voulez monter l'équipe avec moi ?",
+        "action": "Monter l'équipe",
+        "message": "Aidez-moi à monter l'équipe."
+      },
       "next": {
         "question": "L’équipe est là. Et maintenant ?",
         "invite": "Inviter des personnes",
@@ -8017,6 +8022,9 @@
     "files": "Fichiers",
     "needsSandbox": "non conservé",
     "assetLimit": "Une compétence conserve jusqu'à {{max}} Mo d'images et d'autres fichiers.",
+    "moreFiles_one": "Et {{count}} fichier de plus",
+    "moreFiles_many": "Et {{count}} fichiers de plus",
+    "moreFiles_other": "Et {{count}} fichiers de plus",
     "runsOnPc": "tourne sur l'ordinateur de l'agent",
     "reinstall": "Réinstallez la compétence pour que les agents utilisent ce fichier.",
     "edit": "Modifier",
@@ -11542,8 +11550,14 @@
       "tooManySkills": "Ce lien contient plus de {{max}} compétences. Liez l'un de ses dossiers.",
       "invalidName": "Le nom doit utiliser des lettres minuscules, des chiffres et des tirets, jusqu'à {{max}} caractères.",
       "invalidDescription": "La description doit compter de 1 à {{max}} caractères.",
-      "tooLarge": "La compétence est trop volumineuse ({{max}} Mo maximum).",
-      "tooManyFiles": "La compétence contient trop de fichiers ({{max}} maximum).",
+      "tooLarge": "Cette compétence contient {{size}} Mo de texte et de scripts, et la limite est de {{max}} Mo.",
+      "tooManyFiles": "Cette compétence contient {{files}} fichiers, et la limite est de {{max}}.",
+      "repoTooLarge": "Le dépôt est trop volumineux à télécharger ({{max}} Mo maximum). Envoyez plutôt le dossier de la compétence en .zip.",
+      "noFrontmatter": "Le SKILL.md doit commencer par un bloc avec son nom et sa description, entre deux lignes ---.",
+      "bodyTooLong": "Le SKILL.md est trop long ({{max}} caractères maximum).",
+      "noSkillMdZip": "Aucun SKILL.md à la racine du dossier du zip.",
+      "notGithubLink": "Nous ne pouvons pas lire ce lien GitHub. Collez le lien d'un dépôt ou d'un de ses dossiers.",
+      "badZip": "Nous n'avons pas pu lire ce zip. Compressez à nouveau le dossier de la compétence, sans mot de passe.",
       "connectionGone": "La connexion GitHub qui a lu {{repo}} n'existe plus. Reconnectez GitHub pour mettre à jour cette compétence.",
       "linkHoldsSeveral": "Son lien contient maintenant plusieurs compétences. Installez celle-ci à nouveau depuis son propre dossier.",
       "linkRenamed": "Son lien contient maintenant la compétence {{name}}.",

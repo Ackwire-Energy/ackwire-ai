@@ -1820,6 +1820,11 @@
         "import": "Impor agen saya",
         "form": "Isi formulir"
       },
+      "again": {
+        "question": "Mau menyusun tim bersama saya?",
+        "action": "Susun tim",
+        "message": "Bantu saya menyusun tim."
+      },
       "next": {
         "question": "Timnya sudah datang. Lalu apa?",
         "invite": "Undang orang",
@@ -7422,6 +7427,7 @@
     "files": "File",
     "needsSandbox": "tidak disimpan",
     "assetLimit": "Satu skill menyimpan hingga {{max}} MB gambar dan file lain.",
+    "moreFiles_other": "Dan {{count}} file lagi",
     "runsOnPc": "berjalan di PC agen",
     "reinstall": "Pasang ulang skill agar agen bisa memakai file ini.",
     "edit": "Ubah",
@@ -10739,8 +10745,14 @@
       "tooManySkills": "Tautan ini memuat lebih dari {{max}} skill. Tautkan salah satu foldernya.",
       "invalidName": "Nama harus memakai huruf kecil, angka, dan tanda hubung, maksimal {{max}} karakter.",
       "invalidDescription": "Deskripsi harus terdiri dari 1 sampai {{max}} karakter.",
-      "tooLarge": "Skill terlalu besar (maks {{max}} MB).",
-      "tooManyFiles": "Skill punya terlalu banyak file (maks {{max}}).",
+      "tooLarge": "Skill ini punya {{size}} MB teks dan skrip, dan batasnya {{max}} MB.",
+      "tooManyFiles": "Skill ini punya {{files}} file, dan batasnya {{max}}.",
+      "repoTooLarge": "Repositori terlalu besar untuk diunduh (maks {{max}} MB). Unggah folder skill sebagai .zip saja.",
+      "noFrontmatter": "SKILL.md perlu blok di bagian atas berisi nama dan deskripsi, di antara dua baris ---.",
+      "bodyTooLong": "SKILL.md terlalu panjang (maks {{max}} karakter).",
+      "noSkillMdZip": "Tidak ada SKILL.md di bagian atas folder zip.",
+      "notGithubLink": "Tautan GitHub itu tidak bisa kami baca. Tempel tautan repositori atau salah satu foldernya.",
+      "badZip": "Zip ini tidak bisa kami baca. Kompres lagi folder skill, tanpa kata sandi.",
       "connectionGone": "Koneksi GitHub yang membaca {{repo}} sudah tidak ada. Hubungkan GitHub lagi untuk memperbarui skill ini.",
       "linkHoldsSeveral": "Tautannya sekarang berisi beberapa skill. Pasang skill ini lagi dari foldernya sendiri.",
       "linkRenamed": "Tautannya sekarang berisi skill {{name}}.",

@@ -5,7 +5,7 @@ setupDom();
 
 import type { Message, RunConsultation } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, LODI_ID, ORG_ID, seedState, withRightHand } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -360,6 +360,23 @@ describe("the pair row before the reply that asked (ConsultPairRow)", () => {
     await settle(3);
     expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
     expect(panel()?.textContent).not.toContain("mentioned you");
+  });
+
+  test("the row offers Adicionar ao canal for a teammate, as a text action; never for the right hand, which joins no channel", async () => {
+    const reachOf = (agentId: string, handle: string) => {
+      const c = consultation({ kind: "note", consultedAgentId: agentId });
+      const state = withRightHand(withTalk(withAsk([c]), c));
+      const ask = state.messages.find((m) => m.id === "msg-asked");
+      if (ask) ask.meta = { reach: [{ agentId, handle, reason: "not_in_channel", consultationId: "q1" }] };
+      return state;
+    };
+    await open(reachOf(ATLAS_ID, "atlas"));
+    const reach = () => screen().getByRole("group", { name: "Quem a mensagem não chamou direto" });
+    expect(within(reach()).getByRole("button", { name: "Adicionar ao canal" }).className).toBe("ag-rc__btn");
+    cleanup();
+    await open(reachOf(LODI_ID, "lodi"));
+    expect(reach().querySelector(".consult-pair")).toBeTruthy();
+    expect(within(reach()).queryByRole("button", { name: "Adicionar ao canal" })).toBeNull();
   });
 
   test("a hand-off older than the conversation's list goes back is still the pair row, never 'Entregue ao'", async () => {

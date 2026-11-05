@@ -1890,6 +1890,12 @@ export const ptBR = {
         import: "Importar meus agentes",
         form: "Preencher o formulário",
       },
+      /** Under its greeting once the start card stopped asking; `message`: what the button sends, as the person. */
+      again: {
+        question: "Quer montar o time comigo?",
+        action: "Montar o time",
+        message: "Me ajuda a montar o time.",
+      },
       next: {
         question: "O time chegou. E agora?",
         invite: "Convidar pessoas",
@@ -7664,6 +7670,8 @@ export const ptBR = {
     files: "Arquivos",
     needsSandbox: "não guardado",
     assetLimit: "Uma skill guarda até {{max}} MB de imagens e outros arquivos.",
+    moreFiles_one: "E mais {{count}} arquivo",
+    moreFiles_other: "E mais {{count}} arquivos",
     runsOnPc: "roda no PC do agente",
     reinstall: "Reinstale a skill para os agentes usarem este arquivo.",
     edit: "Editar",
@@ -10851,8 +10859,14 @@ export const ptBR = {
       tooManySkills: "Este link tem mais de {{max}} skills. Use o link de uma das pastas dele.",
       invalidName: "O nome precisa ter só letras minúsculas, números e hífens, até {{max}} caracteres.",
       invalidDescription: "A descrição precisa ter de 1 a {{max}} caracteres.",
-      tooLarge: "A skill é grande demais (máximo de {{max}} MB).",
-      tooManyFiles: "A skill tem arquivos demais (máximo de {{max}}).",
+      tooLarge: "Esta skill tem {{size}} MB de texto e scripts, e o limite é {{max}} MB.",
+      tooManyFiles: "Esta skill tem {{files}} arquivos, e o limite é {{max}}.",
+      repoTooLarge: "O repositório é grande demais para baixar (máximo de {{max}} MB). Envie a pasta da skill em .zip.",
+      noFrontmatter: "O SKILL.md precisa de um bloco no topo com nome e descrição, entre duas linhas ---.",
+      bodyTooLong: "O SKILL.md é longo demais (máximo de {{max}} caracteres).",
+      noSkillMdZip: "Nenhum SKILL.md no topo da pasta do zip.",
+      notGithubLink: "Não é um link do GitHub que dá para ler. Cole o link de um repositório ou de uma pasta dele.",
+      badZip: "Não deu para ler este zip. Compacte a pasta da skill de novo, sem senha.",
       connectionGone:
         "A conexão do GitHub que lia {{repo}} não existe mais. Conecte o GitHub de novo para atualizar esta skill.",
       linkHoldsSeveral: "O link agora tem várias skills. Instale esta de novo pela pasta dela.",
