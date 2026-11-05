@@ -18,7 +18,7 @@ import {
   usePlatformKey,
   useSkills,
 } from "@agenteschat/client";
-import { LEVELS, type Level, nextLevel, saveLevels } from "@agenteschat/client/lib/access-levels";
+import { LEVELS, type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { draftLevels, draftMailLevels, suggestedAiText } from "@agenteschat/client/lib/action-cards";
 import { newAgentStart, newAgentStartText } from "@agenteschat/client/lib/agent-setup";
 import {
@@ -46,13 +46,27 @@ import {
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { AUTO, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { router, usePreventRemove } from "expo-router";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, Card, fieldText, Icon, InfoHint, Row, Text, Toggle, useToast } from "@/ui";
+import {
+  AgentAvatar,
+  Button,
+  fieldText,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  Icon,
+  type IconName,
+  ProviderLogo,
+  Sky,
+  Text,
+  useToast,
+} from "@/ui";
 import { newAgentAi, pickedAi } from "../ai/logic";
 import { openConnectAi } from "../ai/NoAiCard";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
@@ -69,8 +83,8 @@ import { type FullLook, fullLook } from "./edit";
 import { ErrorLine, HandleInput } from "./HandleInput";
 import { ImportAgents } from "./ImportAgents";
 import { arrivedAgents, landingOf, reportCounts } from "./import";
-import { LookPicker } from "./LookPicker";
-import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, type PhoneStep, stepBlocked } from "./new-agent";
+import { LookList } from "./LookPicker";
+import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, type PhoneStep, roleLine, stepBlocked } from "./new-agent";
 import { RoleInput } from "./RoleInput";
 import { useAgentImport } from "./useAgentImport";
 
@@ -105,9 +119,9 @@ export function NewAgentScreen({
   if (proposal.data?.canDecide && opened.current?.messageId !== proposal.data.messageId) opened.current = proposal.data;
   if (proposalId && !opened.current) {
     return (
-      <View style={[styles.fill, { backgroundColor: c.bg }]}>
-        <PushedHeader title={t("newAgent.title")} solid={false} />
-        <View style={styles.body}>
+      <View style={[styles.fill, { backgroundColor: c.grouped }]}>
+        <PushedHeader title={t("newAgent.title")} solid={false} grouped />
+        <View style={styles.closed}>
           {proposal.isPending ? null : (
             <>
               <Text variant="body" tone="muted">
@@ -149,6 +163,7 @@ function NewAgentForm({
   const failed = useFailed();
   const api = useApi();
   const insets = useSafeAreaInsets();
+  const surface = useSurface();
   const orgId = useOrgId();
   const { org } = useOrg();
   const mayImport = can(org, "create_agents");
@@ -473,134 +488,165 @@ function NewAgentForm({
 
   const head = (title: string, lead?: string) => (
     <View style={styles.head}>
-      <Text variant="display2" accessibilityRole="header">
+      <Text variant="title2" accessibilityRole="header">
         {title}
       </Text>
       {lead ? (
-        <Text variant="body" tone="muted">
+        <Text variant="small" tone="muted">
           {lead}
         </Text>
       ) : null}
     </View>
   );
-  const input = [styles.input, fieldText("body"), { backgroundColor: c.raised, color: c.ink, borderColor: c.line }];
-  const usesTitle = (
-    <Text variant="title" accessibilityRole="header">
-      {t("newAgent.preview.uses")}
-    </Text>
-  );
+  const field = [styles.field, fieldText("body"), { color: c.ink }];
+  // The step, said once under the bar ("2 of 4 · Who it is").
+  const stepNames: Record<PhoneStep, string> = {
+    role: t("newAgent.steps.role.name"),
+    identity: t("newAgent.steps.identity.title"),
+    instructions: t("mobile.agent.does"),
+    review: t("actionCard.agentProposal.review"),
+  };
+  const roleName = role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : roleText.trim();
+  // A level is chosen among the three, as everywhere else on the phone (the system's list), never cycled by taps.
+  const pickLevel = (title: string, choose: (level: Level) => void) =>
+    chooseAction(
+      title,
+      LEVELS.map((l) => ({ label: t(`access.level.${l}`), onPress: () => choose(l) })),
+      t("common.cancel"),
+    );
 
   const views: Record<PhoneStep, () => ReactNode> = {
     role: () => (
       <>
         {head(t("newAgent.steps.role.title"), t("newAgent.steps.role.lead"))}
-        {mayImport && !proposed ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            icon="archive"
-            label={t("shell.importAgents")}
-            onPress={() => {
-              setImporting(true);
-              scroll.current?.scrollTo({ y: 0, animated: false });
-            }}
-          />
-        ) : null}
-        <View style={styles.group}>
-          <RoleCard
-            on={role === "custom"}
+        <GroupedList>
+          <GroupedRow
+            leading={<RowTile icon="plus" />}
+            label={t("newAgent.roles.custom.name")}
+            sub={t("newAgent.roles.custom.desc")}
+            subLines={2}
+            checked={role === "custom"}
             onPress={() => pickRole("custom")}
-            leading={
-              <View style={[styles.blank, { borderColor: c.line2 }]}>
-                <Icon name="plus" size={20} color={c.muted} />
-              </View>
-            }
-            title={t("newAgent.roles.custom.name")}
-            desc={t("newAgent.roles.custom.desc")}
           />
-          {role === "custom" ? (
-            <RoleInput value={roleText} onChangeText={setRoleText} placeholder={t("agent.roleHelp")} />
-          ) : null}
-        </View>
+        </GroupedList>
+        {role === "custom" ? (
+          <RoleInput value={roleText} onChangeText={setRoleText} placeholder={t("agent.roleHelp")} grouped />
+        ) : null}
         {ROLE_GROUPS.map((group) => (
-          <View key={group.id} style={styles.group}>
-            <Text variant="footnote" tone="faint" style={styles.groupTitle}>
-              {t(`newAgent.roleGroups.${group.id}`)}
-            </Text>
-            {group.roles.map((id) => (
-              <RoleCard
-                key={id}
-                on={role === id}
-                onPress={() => pickRole(id)}
-                leading={<AgentAvatar agent={fullLook(ROLE_DEFAULTS[id].look)} size={44} live={false} />}
-                title={t(`newAgent.roles.${id}.name`)}
-                caption={t("newAgent.startsAs", { name: t(`newAgent.roles.${id}.agent`) })}
-                desc={t(`newAgent.roles.${id}.desc`)}
-              />
-            ))}
-          </View>
+          <Fragment key={group.id}>
+            <GroupedHeader>{t(`newAgent.roleGroups.${group.id}`)}</GroupedHeader>
+            <GroupedList>
+              {group.roles.map((id) => {
+                const agent = t(`newAgent.roles.${id}.agent`);
+                return (
+                  <GroupedRow
+                    key={id}
+                    leading={<AgentAvatar agent={fullLook(ROLE_DEFAULTS[id].look)} size={36} live={false} />}
+                    label={t(`newAgent.roles.${id}.name`)}
+                    sub={roleLine(
+                      t(`newAgent.roles.${id}.desc`),
+                      t("newAgent.startsAs", { name: agent }),
+                      agent,
+                      i18n.language,
+                    )}
+                    subLines={2}
+                    checked={role === id}
+                    onPress={() => pickRole(id)}
+                  />
+                );
+              })}
+            </GroupedList>
+          </Fragment>
         ))}
-        {tried && !role ? <ErrorLine text={t("newAgent.errors.roleRequired")} /> : null}
+        {tried && !role ? (
+          <View style={styles.foot}>
+            <ErrorLine text={t("newAgent.errors.roleRequired")} />
+          </View>
+        ) : null}
+        {mayImport && !proposed ? (
+          <>
+            <View style={styles.gap} />
+            <GroupedList>
+              <GroupedRow
+                leading={<RowTile icon="archive" />}
+                label={t("shell.importAgents")}
+                sub={t("onboarding.import.lead")}
+                subLines={2}
+                chevron
+                onPress={() => {
+                  setImporting(true);
+                  scroll.current?.scrollTo({ y: 0, animated: false });
+                }}
+              />
+            </GroupedList>
+          </>
+        ) : null}
       </>
     ),
     identity: () => (
       <>
-        {head(t("newAgent.steps.identity.title"), t("newAgent.steps.identity.lead"))}
-        <View style={styles.hero}>
-          <AgentAvatar agent={look} size={104} name={shownName} />
+        {/* The agent standing in its own sky, as on its page: what the fields below change. */}
+        <View style={[styles.stage, surface]}>
+          <Sky color={look.color} surface="raised" style={StyleSheet.absoluteFill} />
+          <AgentAvatar agent={look} size={92} name={shownName} framed={false} />
         </View>
-        <Text variant="footnote" tone="faint">
-          {t("newAgent.name")}
-        </Text>
-        <TextInput
-          value={name}
-          onChangeText={changeName}
-          maxLength={32}
-          autoCorrect={false}
-          placeholder={t("newAgent.namePlaceholder")}
-          placeholderTextColor={c.faint}
-          accessibilityLabel={t("newAgent.name")}
-          style={input}
-        />
-        {tried && !name.trim() ? <ErrorLine text={t("newAgent.errors.nameRequired")} /> : null}
-        <Text variant="footnote" tone="faint" style={styles.gapTop}>
-          {t("newAgent.handle")}
-        </Text>
-        <HandleInput
-          value={handle}
-          onChangeText={(v) => {
-            setHandleTouched(true);
-            setHandle(cleanHandle(v));
-          }}
-          label={t("newAgent.handle")}
-          placeholder={t("newAgent.handlePlaceholder")}
-        />
+        <GroupedHeader>{t("newAgent.name")}</GroupedHeader>
+        <GroupedList>
+          <TextInput
+            value={name}
+            onChangeText={changeName}
+            maxLength={32}
+            autoCorrect={false}
+            placeholder={t("newAgent.namePlaceholder")}
+            placeholderTextColor={c.faint}
+            accessibilityLabel={t("newAgent.name")}
+            style={field}
+          />
+        </GroupedList>
+        {tried && !name.trim() ? (
+          <View style={styles.foot}>
+            <ErrorLine text={t("newAgent.errors.nameRequired")} />
+          </View>
+        ) : null}
+        <GroupedHeader>{t("newAgent.handle")}</GroupedHeader>
+        <GroupedList>
+          <HandleInput
+            value={handle}
+            onChangeText={(v) => {
+              setHandleTouched(true);
+              setHandle(cleanHandle(v));
+            }}
+            label={t("newAgent.handle")}
+            placeholder={t("newAgent.handlePlaceholder")}
+            grouped
+            ok={Boolean(handle) && !handleIssue}
+          />
+        </GroupedList>
         {handleIssue ? (
-          <ErrorLine text={handleText} />
+          <View style={styles.foot}>
+            <ErrorLine text={handleText} />
+          </View>
         ) : (
-          <Text variant="footnote" tone="faint">
-            {handleText}
-          </Text>
+          <GroupedFooter>{handleText}</GroupedFooter>
         )}
-        <View style={styles.section}>
-          <Text variant="title" accessibilityRole="header">
-            {t("newAgent.look")}
-          </Text>
-          <LookPicker look={look} onChange={setLook} />
-        </View>
+        <LookList look={look} onChange={setLook} />
       </>
     ),
     instructions: () => (
       <>
         {head(t("newAgent.steps.instructions.title", g), t("newAgent.steps.instructions.lead"))}
-        <TextArea
-          value={instructions}
-          onChangeText={setInstructions}
-          placeholder={t("newAgent.instructionsPlaceholder")}
-          accessibilityLabel={t("newAgent.instructions")}
-          minHeight={220}
-          scrollEnabled={false}
-        />
+        {/* The list draws the field's surface (radius 14, raised), like the fields around it. */}
+        <GroupedList>
+          <TextArea
+            value={instructions}
+            onChangeText={setInstructions}
+            placeholder={t("newAgent.instructionsPlaceholder")}
+            accessibilityLabel={t("newAgent.instructions")}
+            minHeight={220}
+            scrollEnabled={false}
+            style={styles.bare}
+          />
+        </GroupedList>
         {role && role !== "custom" && instructions !== t(`newAgent.roles.${role}.instructions`) ? (
           <View style={styles.restore}>
             <Text variant="footnote" tone="faint" style={styles.fill}>
@@ -614,87 +660,96 @@ function NewAgentForm({
             />
           </View>
         ) : null}
-        {!instructions.trim() ? (
-          <Text variant="footnote" tone="faint">
-            {t("newAgent.noInstructions", g)}
-          </Text>
-        ) : null}
+        {!instructions.trim() ? <GroupedFooter>{t("newAgent.noInstructions", g)}</GroupedFooter> : null}
       </>
     ),
     review: () => (
       <>
-        {head(t("newAgent.steps.review.title", g), t("newAgent.hints.review"))}
-        <Card>
-          <Row
-            leading={<AgentAvatar agent={look} size={44} name={shownName} />}
-            title={shownName}
-            subtitle={`@${handle}`}
-            chevron
-            onPress={() => goTo(1)}
-          />
-          <Row
-            title={t("newAgent.steps.role.name")}
-            meta={
-              <Text variant="small" tone="muted">
-                {role && role !== "custom"
-                  ? t(`newAgent.roles.${role}.name`)
-                  : roleText || t("newAgent.roles.custom.name")}
-              </Text>
-            }
-            chevron
-            onPress={() => goTo(0)}
-          />
-          <Row
-            title={t("newAgent.instructions")}
-            subtitle={instructions.trim().split("\n")[0] || t("newAgent.onlyContext")}
+        {/* Who it is, as its head: a tap goes back to its name, @ and look. */}
+        <Pressable
+          onPress={() => goTo(1)}
+          accessibilityRole="button"
+          accessibilityLabel={[shownName, `@${handle}`, roleName].filter(Boolean).join(", ")}
+          style={({ pressed }) => [styles.who, pressed && styles.pressed]}
+        >
+          <AgentAvatar agent={look} size={52} name={shownName} />
+          <View style={styles.fill}>
+            <Text variant="title2" numberOfLines={1}>
+              {shownName}
+            </Text>
+            <Text variant="small" tone="muted" numberOfLines={1}>
+              {[`@${handle}`, roleName].filter(Boolean).join(" · ")}
+            </Text>
+          </View>
+        </Pressable>
+
+        <GroupedHeader>{t("mobile.agent.does")}</GroupedHeader>
+        <GroupedList>
+          <GroupedRow
+            label={instructions.trim().split("\n")[0] || t("newAgent.onlyContext")}
             chevron
             onPress={() => goTo(2)}
           />
-        </Card>
+        </GroupedList>
+
+        {/* A proposal's AI reads "Thinks with …" itself: no header over it. */}
         {proposed ? (
-          <Text variant="footnote" tone="muted">
-            {suggestedAiText(t, proposed.ai)}
-          </Text>
-        ) : null}
-        {proposed ? null : (
-          <Card>
-            <Row
-              title={t("brain.title")}
-              subtitle={
-                chosen
-                  ? chosen.title
-                  : start && useLast
-                    ? t("newAgent.lastSetup", { setup: startText })
-                    : t("brain.auto.label")
-              }
-              subtitleLines={2}
-              chevron
-              onPress={() =>
-                start
-                  ? chooseAction(
-                      t("brain.title"),
-                      [
-                        {
-                          label: startText,
-                          onPress: () => {
-                            setPicked(null);
-                            setUseLast(true);
+          <>
+            <View style={styles.gap} />
+            <GroupedList>
+              <GroupedRow icon="brain" label={suggestedAiText(t, proposed.ai)} labelLines={2} />
+            </GroupedList>
+          </>
+        ) : (
+          <>
+            <GroupedHeader>{t("mobile.intentAgents.thinks")}</GroupedHeader>
+            <GroupedList>
+              <GroupedRow
+                {...(chosen?.mark
+                  ? { leading: <ProviderLogo id={chosen.mark} size="sm" /> }
+                  : { icon: "brain" as const })}
+                label={
+                  chosen
+                    ? chosen.title
+                    : start && useLast
+                      ? t("newAgent.lastSetup", { setup: startText })
+                      : t("brain.auto.label")
+                }
+                labelLines={2}
+                chevron
+                onPress={() =>
+                  start
+                    ? chooseAction(
+                        t("brain.title"),
+                        [
+                          {
+                            label: startText,
+                            onPress: () => {
+                              setPicked(null);
+                              setUseLast(true);
+                            },
                           },
-                        },
-                        { label: t("newAgent.brainPick.other"), onPress: () => setPicking(true) },
-                      ],
-                      t("common.cancel"),
-                    )
-                  : setPicking(true)
-              }
-            />
-          </Card>
+                          { label: t("newAgent.brainPick.other"), onPress: () => setPicking(true) },
+                        ],
+                        t("common.cancel"),
+                      )
+                    : setPicking(true)
+                }
+              />
+              <GroupedRow
+                icon="plus"
+                label={t("aiAccounts.page.connect")}
+                onPress={() => {
+                  setOptionsBefore(new Set(brainOptions.map((o) => o.value)));
+                  openConnectAi({ forNew: "1" });
+                }}
+              />
+            </GroupedList>
+            {picked?.pick.kind === "connect" && picked.description ? (
+              <GroupedFooter>{picked.description}</GroupedFooter>
+            ) : null}
+          </>
         )}
-        {picked?.pick.kind === "connect" && picked.description ? (
-          <Text variant="footnote" tone="muted">
-            {picked.description}
-          </Text>
-        ) : null}
         <BrainPickSheet
           open={picking}
           onClose={() => setPicking(false)}
@@ -706,316 +761,241 @@ function NewAgentForm({
             setOptionsBefore(null);
           }}
         />
-        {proposed ? null : (
-          <Button
-            variant="secondary"
-            size="sm"
-            icon="plus"
-            label={t("aiAccounts.page.connect")}
-            onPress={() => {
-              setOptionsBefore(new Set(brainOptions.map((o) => o.value)));
-              openConnectAi({ forNew: "1" });
-            }}
-          />
-        )}
 
-        <View style={styles.section}>
-          {managesAgents ? (
-            usesTitle
-          ) : (
-            <InfoHint
-              name={t("common.about", { label: t("newAgent.preview.uses") })}
-              text={t("newAgent.accessAdmins")}
-              variant="title"
-            >
-              {usesTitle}
-            </InfoHint>
-          )}
-          {listedApps.length > 0 ? (
-            <Card>
-              {listedApps.map((i) => {
-                const level = levels[i.id] ?? "none";
-                return (
-                  <Row
-                    key={i.id}
-                    leading={<ConnectorIcon def={i.def} image={i.image} label={itemName(t, i)} size={32} />}
-                    title={itemName(t, i)}
-                    meta={
-                      <Text variant="small" tone="muted">
-                        {proposed
-                          ? t(`access.level.${level}`)
-                          : t(`mobile.intentAgents.uses.level.${level === "write" ? "write" : "read"}`)}
-                      </Text>
+        <GroupedHeader>{t("newAgent.preview.uses")}</GroupedHeader>
+        <GroupedList>
+          {listedApps.map((i) => {
+            const level = levels[i.id] ?? "none";
+            const app = itemName(t, i);
+            return (
+              <GroupedRow
+                key={i.id}
+                leading={<ConnectorIcon def={i.def} image={i.image} label={app} size={32} />}
+                label={app}
+                value={
+                  proposed
+                    ? t(`access.level.${level}`)
+                    : t(`mobile.intentAgents.uses.level.${level === "write" ? "write" : "read"}`)
+                }
+                {...(proposed
+                  ? {
+                      chevron: true,
+                      onPress: () => pickLevel(app, (l) => setProposedLevels((p) => ({ ...p, [i.id]: l }))),
                     }
-                    {...(proposed
-                      ? {
-                          onPress: () => {
-                            tapHaptic();
-                            setProposedLevels((p) => ({ ...p, [i.id]: nextLevel({ levels: LEVELS }, level) }));
-                          },
-                        }
-                      : {})}
-                  />
-                );
-              })}
-            </Card>
-          ) : myMail.length === 0 ? (
-            <Text variant="footnote" tone="faint">
-              {t("newAgent.preview.onlyTalks")}
-            </Text>
+                  : {})}
+              />
+            );
+          })}
+          {myMail.map((box) => (
+            <GroupedRow
+              key={box.accountId}
+              icon="mail"
+              label={box.address}
+              value={t(`access.level.${mailLevels[box.accountId] ?? "none"}`)}
+              chevron
+              onPress={() => pickLevel(box.address, (l) => setMailLevels((p) => ({ ...p, [box.accountId]: l })))}
+            />
+          ))}
+          {listedApps.length + myMail.length === 0 ? (
+            <GroupedRow
+              label={t("newAgent.preview.onlyTalks")}
+              faint
+              {...(managesAgents
+                ? {}
+                : {
+                    hint: {
+                      name: t("common.about", { label: t("newAgent.preview.uses") }),
+                      text: t("newAgent.accessAdmins"),
+                    },
+                  })}
+            />
           ) : null}
-          {myMail.length > 0 ? (
-            <Card>
-              {myMail.map((box) => {
-                const level = mailLevels[box.accountId] ?? "none";
-                return (
-                  <Row
-                    key={box.accountId}
-                    leading={<Icon name="mail" size={20} color={c.muted} />}
-                    title={box.address}
-                    meta={
-                      <Text variant="small" tone="muted">
-                        {t(`access.level.${level}`)}
-                      </Text>
-                    }
-                    onPress={() => {
-                      tapHaptic();
-                      setMailLevels((p) => ({ ...p, [box.accountId]: nextLevel({ levels: LEVELS }, level) }));
-                    }}
-                  />
-                );
-              })}
-            </Card>
-          ) : null}
-          <Text variant="footnote" tone="faint">
-            {proposed && listedApps.length + myMail.length > 0
-              ? t("common.joinSentences", { a: t("mobile.settings.access.how"), b: t("newAgent.approvalsNote") })
-              : t("newAgent.approvalsNote")}
-          </Text>
-        </View>
+        </GroupedList>
+        <GroupedFooter>
+          {proposed && listedApps.length + myMail.length > 0
+            ? t("common.joinSentences", { a: t("mobile.settings.access.how"), b: t("newAgent.approvalsNote") })
+            : t("newAgent.approvalsNote")}
+        </GroupedFooter>
 
         {proposed?.routine ? (
-          <View style={styles.section}>
-            <Text variant="title" accessibilityRole="header">
-              {t("newAgent.routine")}
-            </Text>
-            <Card>
-              <Toggle
+          <>
+            <GroupedHeader>{t("newAgent.routine")}</GroupedHeader>
+            <GroupedList>
+              <GroupedRow
                 label={`${proposed.routine.name} · ${proposedRoutineWhen(t, i18n.language, proposed.routine)}`}
-                value={withRoutine}
-                onChange={setWithRoutine}
+                labelLines={2}
+                toggle={withRoutine}
+                onPress={() => setWithRoutine((on) => !on)}
               />
-            </Card>
-            <Text variant="footnote" tone="faint">
-              {proposed.routine.prompt}
-            </Text>
-          </View>
+            </GroupedList>
+            <GroupedFooter>{proposed.routine.prompt}</GroupedFooter>
+          </>
         ) : null}
 
-        <View style={styles.section}>
-          <Text variant="title" accessibilityRole="header">
-            {t("newAgent.channels")}
-          </Text>
-          {myChannels.length > 0 ? (
-            <Card>
-              {myChannels.map((ch) => (
-                <Toggle
-                  key={ch.id}
-                  label={`#${ch.name}`}
-                  value={channelIds.has(ch.id)}
-                  onChange={(on) =>
-                    setChannelIds((prev) => {
-                      const nextSet = new Set(prev);
-                      if (on) nextSet.add(ch.id);
-                      else nextSet.delete(ch.id);
-                      return nextSet;
-                    })
-                  }
-                />
-              ))}
-            </Card>
-          ) : null}
-          <Text variant="footnote" tone="faint">
-            {myChannels.length > 0 ? t("newAgent.channelsHelp") : t("newAgent.noChannels")}
-          </Text>
-        </View>
+        <GroupedHeader>{t("newAgent.channels")}</GroupedHeader>
+        <GroupedList>
+          {myChannels.map((ch) => (
+            <GroupedRow
+              key={ch.id}
+              label={`#${ch.name}`}
+              toggle={channelIds.has(ch.id)}
+              onPress={() =>
+                setChannelIds((prev) => {
+                  const nextSet = new Set(prev);
+                  if (nextSet.has(ch.id)) nextSet.delete(ch.id);
+                  else nextSet.add(ch.id);
+                  return nextSet;
+                })
+              }
+            />
+          ))}
+        </GroupedList>
+        <GroupedFooter>{myChannels.length > 0 ? t("newAgent.channelsHelp") : t("newAgent.noChannels")}</GroupedFooter>
         {from ? (
-          <Button variant="secondary" label={t("approval.refuse")} disabled={busy || deny.isPending} onPress={refuse} />
+          <View style={styles.refuse}>
+            <Button
+              variant="secondary"
+              label={t("approval.refuse")}
+              disabled={busy || deny.isPending}
+              onPress={refuse}
+            />
+          </View>
         ) : null}
       </>
     ),
   };
 
+  const backs = !importing && index > 0;
+  const goes = !importing && (step !== "role" || role !== null);
+  // Nothing to press yet on the first step (a tap on a role goes on by itself): no bar at all.
+  const footer = importing || backs || goes;
+
   return (
-    <View style={[styles.fill, { backgroundColor: c.bg }]}>
-      <PushedHeader
-        title={t("newAgent.title")}
-        subtitle={importing ? undefined : t("newAgent.stepOf", { n: index + 1, total })}
-        solid={false}
-      />
+    <View style={[styles.fill, { backgroundColor: c.grouped }]}>
+      <PushedHeader title={t("newAgent.title")} solid={false} grouped />
       <KeyboardAvoidingView behavior="padding" style={styles.fill}>
         <ScrollView
           ref={scroll}
           contentInsetAdjustmentBehavior="automatic"
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.body}
+          contentContainerStyle={[styles.body, footer ? null : { paddingBottom: 32 + insets.bottom }]}
         >
           {importing ? (
             <>
               {head(t("shell.importAgents"), t("onboarding.import.lead"))}
-              <ImportAgents imp={imp} orgId={orgId} />
+              <View style={styles.stack}>
+                <ImportAgents imp={imp} orgId={orgId} />
+              </View>
             </>
           ) : (
             <>
-              <Steps index={index} total={total} />
+              <StepBar index={index} total={total} name={stepNames[step]} />
               {views[step]()}
             </>
           )}
         </ScrollView>
-        <View style={[styles.footer, { borderTopColor: c.line, paddingBottom: Math.max(insets.bottom, 12) }]}>
-          {importing ? (
-            <>
-              <Button variant="secondary" label={t("common.back")} disabled={busy} onPress={closeImport} />
-              {imp.planned && imp.picks.length > 0 ? (
-                <View style={styles.fill}>
-                  <Button
-                    variant="primary"
-                    wide
-                    label={t("onboarding.import.go", { count: imp.picks.length })}
-                    loading={busy}
-                    disabled={busy}
-                    onPress={() => void runImport()}
-                  />
-                </View>
-              ) : null}
-            </>
-          ) : null}
-          {!importing && index > 0 ? (
-            <Button variant="secondary" label={t("common.back")} onPress={() => goTo(index - 1)} />
-          ) : null}
-          {!importing && (step !== "role" || role) ? (
-            <View style={styles.fill}>
-              <Button
-                variant="primary"
-                wide
-                label={
-                  index === total - 1 ? t("newAgent.create", { name: name.trim() || shownName }) : t("common.continue")
-                }
-                disabled={busy}
-                onPress={next}
-              />
-            </View>
-          ) : null}
-        </View>
+        {footer ? (
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            {importing ? (
+              <>
+                <Button variant="secondary" label={t("common.back")} disabled={busy} onPress={closeImport} />
+                {imp.planned && imp.picks.length > 0 ? (
+                  <View style={styles.fill}>
+                    <Button
+                      variant="primary"
+                      wide
+                      label={t("onboarding.import.go", { count: imp.picks.length })}
+                      loading={busy}
+                      disabled={busy}
+                      onPress={() => void runImport()}
+                    />
+                  </View>
+                ) : null}
+              </>
+            ) : null}
+            {backs ? <Button variant="secondary" label={t("common.back")} onPress={() => goTo(index - 1)} /> : null}
+            {goes ? (
+              <View style={styles.fill}>
+                <Button
+                  variant="primary"
+                  wide
+                  label={
+                    index === total - 1
+                      ? t("newAgent.create", { name: name.trim() || shownName })
+                      : t("common.continue")
+                  }
+                  disabled={busy}
+                  onPress={next}
+                />
+              </View>
+            ) : null}
+          </View>
+        ) : null}
       </KeyboardAvoidingView>
     </View>
   );
 }
 
-/** Where the person is, as dots (the web's step rail, small). */
-function Steps({ index, total }: { index: number; total: number }) {
+/** Where the person is, said once under the bar: a thin bar per step, then "2 of 4 · Who it is". */
+function StepBar({ index, total, name }: { index: number; total: number; name: string }) {
+  const { t } = useTranslation();
   const c = useColors();
   return (
-    <View style={styles.dots} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      {Array.from({ length: total }, (_, i) => (
-        <View
-          // biome-ignore lint/suspicious/noArrayIndexKey: one dot per step, in order
-          key={i}
-          style={[styles.dot, { backgroundColor: i <= index ? c.ink : c.line2 }, i === index && styles.dotOn]}
-        />
-      ))}
+    <View style={styles.steps}>
+      <View style={styles.bars} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        {Array.from({ length: total }, (_, i) => (
+          <View
+            // biome-ignore lint/suspicious/noArrayIndexKey: one bar per step, in order
+            key={i}
+            style={[styles.bar, { backgroundColor: i <= index ? c.ink : c.line2 }]}
+          />
+        ))}
+      </View>
+      <Text variant="label" style={styles.stepName}>
+        {`${t("mobile.choices.step", { step: index + 1, total })} · ${name}`}
+      </Text>
     </View>
   );
 }
 
-function RoleCard({
-  on,
-  onPress,
-  leading,
-  title,
-  caption,
-  desc,
-}: {
-  on: boolean;
-  onPress: () => void;
-  leading: ReactNode;
-  title: string;
-  caption?: string;
-  desc: string;
-}) {
+/** A row's tile as big as the roles' faces, so the text of every list on the step starts at the same place. */
+function RowTile({ icon }: { icon: IconName }) {
   const c = useColors();
-  const surface = useSurface();
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected: on }}
-      accessibilityLabel={[title, caption, desc].filter(Boolean).join(". ")}
-      style={({ pressed }) => [
-        styles.role,
-        surface,
-        { borderColor: on ? c.ink : "transparent" },
-        pressed && styles.pressed,
-      ]}
-    >
-      {leading}
-      <View style={styles.fill}>
-        <Text variant="body" style={styles.bold}>
-          {title}
-        </Text>
-        {caption ? (
-          <Text variant="footnote" tone="muted">
-            {caption}
-          </Text>
-        ) : null}
-        <Text variant="footnote" tone="ink2" style={styles.desc}>
-          {desc}
-        </Text>
-      </View>
-      {on ? <Icon name="checkc" size={22} color={c.ink} /> : null}
-    </Pressable>
+    <View style={[styles.tile, { backgroundColor: c.sunken }]}>
+      <Icon name={icon} size={18} color={c.muted} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  body: { paddingHorizontal: 18, paddingBottom: 32, gap: 8 },
-  head: { gap: 6, marginBottom: 10 },
-  group: { gap: 8, marginTop: 8 },
-  groupTitle: { marginTop: 6 },
-  role: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
+  closed: { paddingHorizontal: 16, gap: 8 },
+  body: { paddingHorizontal: 16, paddingBottom: 32 },
+  steps: { paddingTop: 4 },
+  bars: { flexDirection: "row", gap: 6 },
+  bar: { flex: 1, height: 3, borderRadius: 2 },
+  stepName: { paddingTop: 8, paddingHorizontal: 4 },
+  head: { gap: 2, paddingHorizontal: 4, paddingTop: 10, paddingBottom: 16 },
+  stack: { gap: 8 },
+  gap: { height: 22 },
+  foot: { paddingTop: 7, paddingHorizontal: 16 },
+  tile: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  stage: {
+    height: 150,
+    marginTop: 14,
     borderRadius: 20,
-    borderWidth: 2,
-  },
-  blank: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    borderWidth: 1.5,
-    borderStyle: "dashed",
+    borderBottomLeftRadius: 6,
+    overflow: "hidden",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-end",
+    paddingBottom: 12,
   },
-  bold: { fontWeight: "600" },
-  desc: { marginTop: 2 },
-  pressed: { transform: [{ scale: 0.98 }] },
-  hero: { alignItems: "center", paddingVertical: 8 },
-  input: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 12 },
-  gapTop: { marginTop: 10 },
-  section: { marginTop: 22, gap: 10 },
-  restore: { flexDirection: "row", alignItems: "center", gap: 10 },
-  footer: {
-    flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  dots: { flexDirection: "row", gap: 6, marginBottom: 14, marginTop: 4 },
-  dot: { width: 6, height: 6, borderRadius: 3 },
-  dotOn: { width: 18 },
+  field: { minHeight: 50, paddingHorizontal: 14, paddingVertical: 12 },
+  bare: { borderWidth: 0, borderRadius: 0, backgroundColor: "transparent" },
+  restore: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 7, paddingLeft: 16 },
+  who: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 4, paddingTop: 16, paddingBottom: 4 },
+  pressed: { opacity: 0.6 },
+  refuse: { marginTop: 22 },
+  footer: { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 12 },
 });
