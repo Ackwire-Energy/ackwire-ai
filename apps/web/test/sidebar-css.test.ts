@@ -31,10 +31,15 @@ test("space, not lines, sets the sidebar's parts apart: 14px over each one with 
   expect(value('.sidebar:not([data-rail="true"]) .sidebar__scroll', "gap")).toBe("4px");
 });
 
-test("an agent's role sits under its name, up to two lines, beside a face as tall as both, and gone in the rail", () => {
+test("an agent's role sits under its name, one line, beside a face as tall as both, and gone in the rail", () => {
   const role = ".sidebar__item-role";
-  expect([value(role, "-webkit-line-clamp"), value(role, "font-size"), value(role, "color")]).toEqual([
-    "2",
+  // One line ending in "…", what it is on too: the row stays two lines and everything in it shares its middle.
+  expect([value(role, "white-space"), value(role, "text-overflow"), value(".sidebar__item-work", "white-space")]).toEqual([
+    "nowrap",
+    "ellipsis",
+    undefined,
+  ]);
+  expect([value(role, "font-size"), value(role, "color")]).toEqual([
     "12px",
     "var(--ink-muted)",
   ]);

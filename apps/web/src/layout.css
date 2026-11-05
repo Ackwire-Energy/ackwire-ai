@@ -1129,7 +1129,7 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   align-items: center;
 }
 /* An agent's name over its role, like a two-line list item: the name has the row less the lock or count, the role
-   the line under it, up to two lines (the row's title has it whole). */
+   the line under it, one line ending in "…" (the row's title has it whole). */
 .sidebar__item-text {
   display: flex;
   flex: 1;
@@ -1137,12 +1137,10 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   min-width: 0;
 }
 .sidebar__item-role {
-  display: -webkit-box;
+  display: block;
   overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-size: 12px;
   font-weight: 400;
   line-height: 16px;
@@ -1151,11 +1149,8 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .sidebar__item[data-status="active"] .sidebar__item-role {
   color: var(--ink2);
 }
-/* What the agent is on wraps in full: a title cut short would hide the work and its minutes. */
+/* What the agent is on: one line like the role, in a stronger ink; the row's title has it whole. */
 .sidebar__item-work {
-  display: block;
-  -webkit-line-clamp: unset;
-  line-clamp: unset;
   color: var(--ink2);
 }
 .sidebar__lock {
@@ -11286,46 +11281,9 @@ html[data-menu-overlay] .shell {
 .sidebar:not([data-rail="true"]) .sidebar__item-text > .sidebar__item-label {
   line-height: 20px;
 }
-/*
- * A face beside a name over a role (an agent, the right hand): the role wraps to two lines and what an agent is on
- * wraps in full, so the row is a face line (`.ac-faceline`). The face keeps the row's top, the name's capitals rise to
- * its top edge (the kit's `.ac-captop` rise), and what ends the row (the count, the pin, the lock, "waiting", "New")
- * stays on the name's line instead of the middle of two or three lines. `--name-rise` is that rise worked out in the
- * row's own type, so the smaller pieces at its end rise by the same pixels.
- */
-@property --name-rise {
-  syntax: "<length>";
-  inherits: true;
-  initial-value: 0px;
-}
-.sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) {
-  --name-rise: calc(var(--cap-top) - 10px);
-  align-items: flex-start;
-}
-.sidebar:not([data-rail="true"])
-  .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role)
-  > .sidebar__item-text
-  > .sidebar__item-label {
-  margin-top: var(--name-rise);
-}
-/* Each end piece in a box of the name's 20px line, centred in it. */
-.sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) > .sidebar__item-meta {
-  display: inline-flex;
-  align-items: center;
-  height: 20px;
-  margin-top: var(--name-rise);
-}
-.sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) > .sidebar__unread {
-  margin-top: calc(var(--name-rise) + (20px - 18px) / 2);
-}
-/* Its hover buttons on the name's line too (3px of padding, then the line's middle, which the rise puts at the
-   capitals' top), measured in the row's 14px type. */
-.sidebar:not([data-rail="true"])
-  .sidebar__row:has(> .sidebar__item > .sidebar__item-text > .sidebar__item-role)
-  > .sidebar__row-acts {
-  top: calc(3px + var(--cap-top));
-  font-size: 14px;
-}
+/* A face beside a name over one line (its role, or what it is on): the line never wraps, so the row is two lines at
+   most and the face, the words and what ends the row (the count, the pin, the lock, the hover buttons) share its
+   middle, never the row's top edge. */
 .sidebar:not([data-rail="true"]) .sidebar__item > .sidebar__more-chevron {
   width: 16px;
   height: 16px;
@@ -11524,21 +11482,25 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 .channel-details__archive {
   color: var(--danger);
 }
-/* Channel settings (ADR 0134): a nav on the left as in Settings, one section in the pane; stacked on a phone. */
+/* Channel settings (ADR 0134): a nav on the left as in Settings, one section in the pane; stacked on a phone. The
+   nav is a column of its own (a soft ground and a hairline to the pane, down to the dialog's cut corner): without it
+   the sections floated in the dialog's empty left side and the current one read as a stray key. */
 .channel-settings {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
-  gap: 4px;
   border-top: 1px solid var(--line);
 }
 .channel-settings__nav {
-  flex: 0 0 184px;
+  flex: 0 0 200px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 0 var(--dialog-pad) var(--dialog-pad);
+  padding: 12px;
+  border-right: 1px solid var(--line);
+  border-bottom-left-radius: 4px;
+  background: var(--plate-soft);
 }
 .channel-settings__nav ul {
   list-style: none;
@@ -11581,7 +11543,10 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
     flex: none;
     flex-direction: row;
     overflow-x: auto;
-    padding: 8px var(--dialog-pad) 0;
+    padding: 8px var(--dialog-pad);
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
     scrollbar-width: none;
   }
   .channel-settings__nav::-webkit-scrollbar {
@@ -11597,7 +11562,7 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
   }
   .channel-settings__pane {
     min-height: 0;
-    padding-top: 4px;
+    padding-top: 12px;
   }
 }
 /* A channel's exceptions: who on the left, their keys on the right. */
