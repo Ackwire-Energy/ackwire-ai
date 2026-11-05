@@ -176,7 +176,6 @@
   .channel__composer {
     padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
   }
-  .channel__status,
   .channel__notice {
     margin-right: 12px;
     margin-left: 12px;
@@ -462,15 +461,6 @@
   }
 }
 @container agp-side (max-width: 640px) {
-  .agp-brainrows > .ac-setrow {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-  .agp-brainrows .ac-setrow__end,
-  .agp-brainrows__sel {
-    width: 100%;
-  }
   .level-row__below {
     padding-left: 0;
   }
