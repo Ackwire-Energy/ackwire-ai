@@ -29,7 +29,7 @@
 }
 .ac-msg[data-look="bubbles"][data-tone="strong"] {
   --own-bubble: color-mix(in oklab, var(--msg-mine) 82%, black);
-  --stamp-ink: var(--on-dark-soft);
+  --stamp-ink: var(--on-dark);
 }
 .ac-msg[data-look="bubbles"]:has(.ac-msg__stamp .ac-msg__aside:not(:empty)) {
   --stamp-room: 62px;
@@ -133,11 +133,30 @@
 .ac-msg--own[data-look="bubbles"][data-tone="strong"].ac-msg--pending .ac-msg__text {
   color: var(--on-dark);
 }
-.ac-msg--own[data-look="bubbles"][data-tone="strong"] .ac-msg__text :is(a, .ac-mention, code:not(pre code)) {
+.ac-msg--own[data-look="bubbles"][data-tone="strong"]
+  .ac-msg__text
+  :is(a, .ac-mention, code:not(pre code)):not(.md__table *) {
   color: var(--on-dark);
 }
-.ac-msg--own[data-look="bubbles"][data-tone="strong"] .ac-msg__text .ac-mention {
-  background: var(--on-dark-plate);
+/* A plate darker than the bubble: a lighter one takes the words under AA on the brightest colors. */
+.ac-msg--own[data-look="bubbles"][data-tone="strong"] .ac-msg__text .ac-mention:not(.md__table *) {
+  background: rgb(0 0 0 / 0.16);
+}
+/* The page's tones don't read on a color: a quote, a list's marks, a rule take the bubble's ink. */
+.ac-msg--own[data-look="bubbles"][data-tone="strong"] .ac-msg__text .md > :not(.md__table, .code-card) {
+  --ink: var(--on-dark);
+  --ink-muted: var(--on-dark);
+  --muted: var(--on-dark);
+  --faint: var(--on-dark);
+  --line: var(--on-dark-plate);
+  --line2: var(--on-dark-plate-strong);
+}
+/* A table and a block of code stay cut from the page's color, so they keep its ink. */
+.ac-msg--own[data-look="bubbles"][data-tone="strong"] .ac-msg__text :is(.md__table, .code-card) {
+  color: var(--ink);
+}
+.ac-msg--own[data-look="bubbles"][data-tone="strong"] .ac-msg__stamp .ac-receipt__check {
+  color: var(--stamp-ink);
 }
 /* Name inside the bubble, in its color; a DM's two speakers leave it to screen readers. */
 .ac-msg__bubble-head {
@@ -149,11 +168,12 @@
   line-height: 18px;
   user-select: none;
 }
+/* A step toward the ink: amber, teal and lighter colors of an agent's own are under AA on the bubble. */
 .ac-msg__bubble-head .ac-msg__author {
-  color: var(--msg-name, var(--ink));
+  color: color-mix(in oklab, var(--msg-name, var(--ink)) 70%, black);
 }
 [data-theme="dark"] .ac-msg__bubble-head .ac-msg__author {
-  color: var(--msg-name-dark, var(--ink));
+  color: color-mix(in oklab, var(--msg-name-dark, var(--ink)) 85%, white);
 }
 .ac-msg[data-names="false"] .ac-msg__author .msg-status {
   display: none;
@@ -184,7 +204,7 @@
   gap: 4px;
   font-size: 11px;
   line-height: 14px;
-  color: var(--stamp-ink, var(--faint));
+  color: var(--stamp-ink, var(--muted));
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   user-select: none;
@@ -218,8 +238,8 @@
 .ac-msg--streaming[data-look="bubbles"] .ac-msg__text:has(> .ac-msg__stamp) {
   padding-bottom: 22px;
 }
-/* What it is doing stands in the time's place, a stop button and all: a line of its own. */
-.ac-msg--streaming[data-look="bubbles"] .ac-msg__text:has(> .ac-msg__stamp .ac-msg__status) {
+/* What it is doing follows the time, a stop button and all: a line of its own. */
+.ac-msg[data-look="bubbles"]:not(.ac-msg--own) .ac-msg__text:has(> .ac-msg__stamp .ac-msg__status:not(:empty)) {
   padding-bottom: 30px;
 }
 /* A send that takes long says so there too; most sends never show these words. */
@@ -340,7 +360,7 @@
   margin: 2px 0 0;
 }
 .ac-msg[data-look="compact"] .ac-msg__text .md > :is(.md__table, .code-card) {
-  max-width: var(--msg-card-w);
+  max-width: min(100%, var(--msg-card-w));
   margin-block: 4px;
 }
 .ac-msg[data-look="compact"] .ac-msg__body > :is(.ac-tools, .brw-ac, .rq-done, .ac-reacts, .thread-line) {

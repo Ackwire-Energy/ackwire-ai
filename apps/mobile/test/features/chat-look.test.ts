@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { chatLookOf, mineOnRight } from "@agenteschat/client/lib/chat-look";
-import { gradientOf, mixHex } from "@agenteschat/ui/agent/engine";
+import { AGENT_GRADIENTS, type AgentColorName, contrastOf, gradientOf, mixHex } from "@agenteschat/ui/agent/engine";
 import { bubbleFill, nameInk } from "../../src/features/chat/logic";
+import { appColors } from "../../src/ui/palette";
 
 const read = (rel: string) => Bun.file(new URL(`../../src/features/${rel}`, import.meta.url).pathname).text();
 
@@ -13,10 +14,19 @@ describe("the bubbles' colors", () => {
     expect(bubbleFill("green", "strong", "#ffffff", false)).toBe(mixHex(deep, "#000000", 0.18));
   });
 
-  test("a name reads on both pages", () => {
-    const [top, deep] = gradientOf("violet");
-    expect(nameInk("violet", false)).toBe(deep);
-    expect(nameInk("violet", true)).toBe(top);
+  const colors = [...Object.keys(AGENT_GRADIENTS), "#ffff00", "#00ffff", "#ffffff"] as AgentColorName[];
+
+  test("every color: white on the strong bubble is AA", () => {
+    for (const color of colors) {
+      expect(contrastOf("#ffffff", bubbleFill(color, "strong", "#ffffff", false))).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  test("every color: a name is AA on the bubble of both themes", () => {
+    for (const color of colors) {
+      expect(contrastOf(nameInk(color, false), appColors("light").bubble)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastOf(nameInk(color, true), appColors("dark").bubble)).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });
 
@@ -39,7 +49,7 @@ describe("the rows follow the same choice as the web", () => {
 
   test("opening at the last read message goes to the line, once, with no glide", async () => {
     const chat = await read("chat/ChatScreen.tsx");
-    expect(chat).toContain("firstUnreadId(list, readFrom?.at, meId)");
+    expect(chat).toContain("firstUnreadId(list, from.at, meId)");
     expect(chat).toContain("holdAt(id ?? undefined, 0, false);");
   });
 

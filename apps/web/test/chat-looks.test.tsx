@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { Message } from "@agenteschat/client";
+import { keys, type Message } from "@agenteschat/client";
 import type { ChatPrefs } from "@agenteschat/client/lib/chat-look";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import {
@@ -11,6 +11,7 @@ import {
   createFakeApi,
   ENG_ID,
   type FakeState,
+  GENERAL_ID,
   NOW,
   ORG_ID,
   seedDm,
@@ -127,6 +128,28 @@ describe("each style in a channel and in a DM", () => {
   });
 });
 
+describe("a reply being written in Bolhas", () => {
+  test("its time stays in the bubble, ahead of how long it has been at work", async () => {
+    const state = seedState();
+    const channelId = seedDm(state, { type: "agent", id: ADA_ID }, { body: "x" });
+    const r = await renderApp(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, { api: createFakeApi(withChatPrefs(state)) });
+    await settle(10);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    await settle(2);
+    const run = { threadId: null, runId: "r-live", agentId: ADA_ID, channelId };
+    const push = (event: Record<string, unknown>) =>
+      act(async () => socket.push({ type: "event", channelId, event: { ...run, ...event } }));
+    await push({ type: "agent.run", status: "running", startedAt: ago(1) });
+    await push({ type: "agent.typing" });
+    await push({ type: "agent.delta", seq: 1, text: "Escrevendo" });
+    await settle(4);
+    const stamp = document.querySelector('article[data-run-id="r-live"] .ac-msg__text > .ac-msg__stamp');
+    expect(stamp?.querySelector(".ac-msg__time")?.textContent).toContain(":");
+    expect(stamp?.querySelector(".run-tail__clock")).not.toBeNull();
+  });
+});
+
 describe("Sua conta › Conversa", () => {
   const openSettings = async (state: FakeState) => {
     await renderApp(`/org/${ORG_ID}/settings/account`, { api: createFakeApi(state) });
@@ -191,6 +214,42 @@ describe("opening at the last read message", () => {
     const line = document.querySelector(".channel__unread");
     expect(line).not.toBeNull();
     expect(line?.nextElementSibling).toBe(row("a1"));
+  });
+
+  test("a page kept from an earlier visit: the line still lands, once the fresh page brings the unread", async () => {
+    const state = withChatPrefs(seedState({ messages: [said(ENG_ID, "a0", ADA_ID, "Lida.", 60)] }), {
+      openAt: "read",
+    });
+    const api = createFakeApi(state);
+    const { router, services } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(10);
+    const go = (channelId: string) =>
+      act(async () => router.navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: ORG_ID, channelId } }));
+    await go(GENERAL_ID);
+    await settle(10);
+    state.messages.push(said(ENG_ID, "a1", ADA_ID, "Nova um.", 10), said(ENG_ID, "a2", ADA_ID, "Nova dois.", 5));
+    const eng = state.channels.find((c) => c.id === ENG_ID);
+    if (eng) Object.assign(eng, { unreadCount: 2, lastReadAt: ago(30) });
+    await act(async () => {
+      await services.queryClient.invalidateQueries({ queryKey: keys.channels(ORG_ID) });
+      await services.queryClient.invalidateQueries({ queryKey: keys.messages(ORG_ID, ENG_ID), refetchType: "none" });
+    });
+    // The fresh page lands after the conversation is on screen with the old one, as over a network.
+    let land = () => {};
+    const landed = new Promise<void>((resolve) => {
+      land = resolve;
+    });
+    const read = api.chat.messages;
+    api.chat.messages = async (...args) => {
+      await landed;
+      return read(...args);
+    };
+    await go(ENG_ID);
+    await settle(10);
+    expect(document.querySelector(".channel__unread")).toBeNull();
+    await act(async () => land());
+    await settle(10);
+    expect(document.querySelector(".channel__unread")?.nextElementSibling).toBe(row("a1"));
   });
 
   test("by default it opens at the end, with no line", async () => {

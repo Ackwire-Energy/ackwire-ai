@@ -75,7 +75,9 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i}>
-                <Table header={b.header} rows={b.rows} align={b.align} />
+                <View style={ink ? [styles.cut, { backgroundColor: c.bg }] : undefined}>
+                  <Table header={b.header} rows={b.rows} align={b.align} />
+                </View>
                 {end ? <Text variant="body">{end}</Text> : null}
               </View>
             );
@@ -83,7 +85,7 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <Text key={i} variant="body" tone="ink" style={[styles.line, styles.heading, inked]}>
-                <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} />
+                <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} ink={ink} />
                 {end}
               </Text>
             );
@@ -91,11 +93,11 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i} style={styles.bullet}>
-                <Text variant="body" tone="faint" style={[styles.line, styles.mark]}>
+                <Text variant="body" tone="faint" style={[styles.line, styles.mark, inked]}>
                   {b.ordinal ? `${b.ordinal}.` : "•"}
                 </Text>
                 <Text variant="body" tone={tone} style={[styles.line, styles.flex, inked]}>
-                  <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} />
+                  <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} ink={ink} />
                   {end}
                 </Text>
               </View>
@@ -103,7 +105,7 @@ export const MessageText = memo(function MessageText({
           case "details":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <View key={i}>
+              <View key={i} style={ink ? [styles.cut, { backgroundColor: c.bg }] : undefined}>
                 <Details summary={b.summary} body={b.body} muted={muted} accent={accent} channelRefs={channelRefs} />
                 {end ? <Text variant="body">{end}</Text> : null}
               </View>
@@ -111,9 +113,9 @@ export const MessageText = memo(function MessageText({
           case "quote":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <View key={i} style={[styles.quote, { borderLeftColor: c.line2 ?? c.line }]}>
-                <Text variant="body" tone="muted" style={styles.line}>
-                  <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} />
+              <View key={i} style={[styles.quote, { borderLeftColor: ink ?? c.line2 ?? c.line }]}>
+                <Text variant="body" tone="muted" style={[styles.line, inked]}>
+                  <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} ink={ink} />
                   {end}
                 </Text>
               </View>
@@ -122,7 +124,7 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <Text key={i} variant="body" tone={tone} style={[styles.line, inked]} selectable={selectable}>
-                <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} />
+                <Spans inline={b.inline} channelRefs={channelRefs} everyone={everyone} ink={ink} />
                 {end}
               </Text>
             );
@@ -216,6 +218,8 @@ const styles = StyleSheet.create({
   bullet: { flexDirection: "row", gap: 8, paddingLeft: 2 },
   mark: { minWidth: 14 },
   quote: { borderLeftWidth: 3, paddingLeft: 10 },
+  /** On a solid bubble: a table or a collapsed block stays on the page's color, in the page's ink. */
+  cut: { borderRadius: 10, overflow: "hidden" },
   details: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 12,

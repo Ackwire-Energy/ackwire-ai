@@ -1778,22 +1778,26 @@ function Chat({
 
   // "Última mensagem lida" with something unread: it opens at the "Novas" line, kept as it was on opening because
   // reading moves it. Threads open at their end.
-  const [readFrom] = useState(() =>
-    !isThread && opensAtLastRead(org?.chatPrefs, channel?.unreadCount ?? dm?.unread ?? 0)
-      ? { at: channel?.lastReadAt ?? dm?.lastReadAt }
-      : null,
-  );
-  const atReadDone = useRef(!readFrom);
+  // Read as the lists arrive: a notification can open it before them.
+  const readFrom = useRef<{ at: string | null | undefined } | null | undefined>(undefined);
+  if (readFrom.current === undefined && (channel || dm))
+    readFrom.current =
+      !isThread && opensAtLastRead(org?.chatPrefs, channel?.unreadCount ?? dm?.unread ?? 0)
+        ? { at: channel?.lastReadAt ?? dm?.lastReadAt }
+        : null;
+  const atReadDone = useRef(false);
   useEffect(() => {
-    if (atReadDone.current || !showList || !top.data || rows.length === 0) return;
-    atReadDone.current = true;
-    const id = firstUnreadId(list, readFrom?.at, meId);
+    const from = readFrom.current;
+    if (atReadDone.current || !from || !showList || !top.data || rows.length === 0) return;
+    const id = firstUnreadId(list, from.at, meId);
     const key = rows.find((r) => r.kind === "message" && r.message.id === id)?.key;
+    // A page kept from an earlier visit has none of them: wait for the fresh one.
+    atReadDone.current = Boolean(key) || !top.isFetching;
     if (!key) return;
     setDivider({ beforeKey: key, fading: false });
     setReached(false);
     holdAt(id ?? undefined, 0, false);
-  }, [showList, top.data, rows, list, readFrom, meId, holdAt]);
+  }, [showList, top.data, top.isFetching, rows, list, meId, holdAt]);
 
   // ── Reading from the top ──
   // A message someone else wrote (an agent's reply, also while it streams, or a teammate's) taller than the room

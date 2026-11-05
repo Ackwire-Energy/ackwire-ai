@@ -216,18 +216,23 @@ export function Message({
       {aside && !grouped && !mine && !inBubble && <span className="ac-msg__aside">{aside}</span>}
     </div>
   );
-  // What a bubble ends with: the time, or what the row is doing in its place, and the receipt's mark.
+  // What a bubble ends with: the time, what the row is doing (a send in flight stands in the time's place, as under
+  // a bubble of mine), and the receipt's mark.
   const stamp = inBubble ? (
     <span className="ac-msg__stamp">
-      {statusNode ??
-        (mine ? (
+      {mine ? (
+        (statusNode ?? (
           <span className="ac-msg__time ac-msg__time--details" aria-hidden="true">
             {time}
             {meta && <span className="ac-msg__tip">{meta}</span>}
           </span>
-        ) : (
-          clock
-        ))}
+        ))
+      ) : (
+        <>
+          {clock}
+          {statusNode}
+        </>
+      )}
       {aside && <span className="ac-msg__aside">{aside}</span>}
     </span>
   ) : null;

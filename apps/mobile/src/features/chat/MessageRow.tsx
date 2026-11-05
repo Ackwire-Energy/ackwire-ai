@@ -382,12 +382,14 @@ export const MessageRow = memo(function MessageRow({
   if (onRight) {
     const stamp = (
       <View style={styles.stamp}>
-        <Text variant="caption" tone="faint" style={solidInk ? { color: ON_SOLID_SOFT } : undefined}>
+        <Text variant="caption" tone="muted" style={solidInk ? { color: solidInk } : undefined}>
           {when.time(m.createdAt)}
         </Text>
-        <ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />
+        <ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} {...(solidInk ? { ink: solidInk } : {})} />
       </View>
     );
+    // A voice message and a choice's answer lead with their own player or line, so their time stays under them.
+    const myBubble = bubbled && Boolean(body) && !voiceOf(meta) && !choiceReply;
     // A voice message's player, a choice's answer, the bubble, or the GIF or sticker or the files of a message
     // with no words, leads.
     const lead = voiceOf(meta) ? (
@@ -465,7 +467,7 @@ export const MessageRow = memo(function MessageRow({
         </View>
         {/* One time per run of my rows (they group a few minutes apart), under its last, the receipt's mark ending
             its line; a send in flight says so. */}
-        {!m.local && (run === "end" || run === "solo") && !(bubbled && body) ? (
+        {!m.local && (run === "end" || run === "solo") && !myBubble ? (
           <View style={styles.meTime}>
             <Text variant="caption" tone="faint">
               {when.time(m.createdAt)}
@@ -642,7 +644,7 @@ export const MessageRow = memo(function MessageRow({
                 <View style={styles.bubbleLine}>
                   {words}
                   <View style={styles.stamp}>
-                    <Text variant="caption" tone="faint">
+                    <Text variant="caption" tone="muted">
                       {when.time(m.createdAt)}
                     </Text>
                     {receipt || seenBy ? (
@@ -1068,7 +1070,6 @@ const OTHER_RUN: Record<RunPosition, { borderTopLeftRadius?: number; borderBotto
 
 /** Words and time on my solid bubble. */
 const ON_SOLID = "#ffffff";
-const ON_SOLID_SOFT = "rgba(255,255,255,0.78)";
 
 const styles = StyleSheet.create({
   // Readable turns: more room between turns, a quieter name and time.

@@ -1945,10 +1945,9 @@ function ChannelView({
   }, [unseenFrom]);
   // Opening at the last read message: the line goes before the first unread one, once the messages are in.
   const atReadDone = useRef(!readFrom);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the first page arrives
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the page with them arrives
   useLayoutEffect(() => {
     if (atReadDone.current || !serverRead) return;
-    atReadDone.current = true;
     const items = timeline.flatMap((i) => (i.kind === "message" ? [i] : []));
     const id = firstUnreadId(
       items.map((i) => i.message),
@@ -1957,14 +1956,18 @@ function ChannelView({
     );
     const key = items.find((i) => i.message.id === id)?.key;
     if (!key) {
+      // A page kept from an earlier visit has none of them: the end, until the fresh one lands.
+      atReadDone.current = !messages.isFetching;
       stick.current = true;
       followRef.current();
       return;
     }
+    atReadDone.current = true;
+    stick.current = false;
     landingAtRead.current = true;
     catchUp.current = true;
     markUnseen(key);
-  }, [serverRead]);
+  }, [serverRead, messages.isFetching]);
   const emptySuggestions = useMemo(() => {
     if (chrome?.suggestions) return chrome.suggestions.map((text) => ({ label: text, text }));
     const a = suggestedAgent;

@@ -518,8 +518,14 @@ export function bubbleFill(color: AgentColorName, tone: "light" | "strong", page
   return tone === "strong" ? mixHex(deep, "#000000", 0.18) : mixHex(page, deep, dark ? 0.3 : 0.2);
 }
 
-/** A name's color in the bubbles: the deep end on a light page, the bright end on a dark one. */
-export const nameInk = (color: AgentColorName, dark: boolean) => gradientOf(color)[dark ? 0 : 1];
+/**
+ * A name's color in the bubbles: the deep end on a light page, the bright end on a dark one, each a step toward the
+ * ink because amber, teal and an agent's own lighter colors are under AA on the bubble.
+ */
+export const nameInk = (color: AgentColorName, dark: boolean) => {
+  const [top, deep] = gradientOf(color);
+  return dark ? mixHex(top, "#ffffff", 0.15) : mixHex(deep, "#000000", 0.35);
+};
 
 /** What my row shows under its bubble (`MessageRow`'s foot, files and cards): it ends a run's look (`runAround`). */
 export const hangsUnder = (

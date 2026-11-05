@@ -66,6 +66,7 @@ import {
   lineStops,
   markedParts,
   markName,
+  nameInk,
   narrowDrawn,
   PHRASE_FADE_MS,
   type PhraseTurn,
@@ -190,6 +191,7 @@ export const TurnRow = memo(function TurnRow({
   const when = useWhen();
   const look = useRowLook();
   const c = useColors();
+  const { scheme } = useTheme();
   const bubbled = look.style === "bubbles";
   const compact = look.style === "compact";
   const agent = dir.agentById.get(run.agentId);
@@ -249,7 +251,12 @@ export const TurnRow = memo(function TurnRow({
         <View style={styles.body}>
           <View style={styles.who}>
             {!bubbled || look.names ? (
-              <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
+              <Text
+                variant="footnote"
+                tone="ink2"
+                style={[styles.name, bubbled ? { color: nameInk(color, scheme === "dark") } : undefined]}
+                numberOfLines={1}
+              >
                 {agent?.name ?? ""}
               </Text>
             ) : null}
