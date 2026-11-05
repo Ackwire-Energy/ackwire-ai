@@ -505,10 +505,7 @@ export function chatRoutes(deps: AppDeps) {
         params: ChannelParams,
         query: z.object({
           threadId: z.uuid().optional(),
-          before: z.iso
-            .datetime()
-            .optional()
-            .openapi({ description: "Page backwards from this time (top-level messages)." }),
+          before: z.iso.datetime().optional().openapi({ description: "Page backwards from this time." }),
           limit: z.coerce.number().int().min(1).max(200).optional(),
           include: z
             .string()

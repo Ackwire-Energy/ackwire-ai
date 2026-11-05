@@ -20,7 +20,7 @@ import { forPeople } from "../lib/consultations";
 import { answerWithin, noAnswer, sendWaits } from "../lib/errors";
 import { ISSUES_VIEW_DEFAULT, type IssuesViewChange, withIssuesView } from "../lib/issues-view";
 import { LoginReadError, loginReadPasses } from "../lib/machines";
-import { GIF_PAGE, messageMediaOf, postedMedia } from "../lib/media";
+import { GIF_PAGE, isMediaAfterReply, messageMediaOf, postedMedia } from "../lib/media";
 import {
   allItems,
   matchesFilter,
@@ -83,6 +83,7 @@ import type {
   CalendarEventPatch,
   CardDelegate,
   Channel,
+  ChannelEvent,
   ChannelInput,
   ChannelOverride,
   ComputerSetup,
@@ -1151,10 +1152,23 @@ export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: strin
   // A thread no one read yet stays unread: a list started by one reply would pass for the whole thread, and open
   // without the replies before it. A read on its way may have missed this one, which it keeps (`withLocalCopies`).
   const query = qc.getQueryCache().find({ queryKey: key, exact: true });
-  if (message.threadId && query?.state.data === undefined && query?.state.fetchStatus !== "fetching") return;
+  if (message.threadId && query?.state.data === undefined && query?.state.fetchStatus !== "fetching") {
+    // Open on a read that failed: this one mustn't be lost with the rest of the thread.
+    void qc.refetchQueries({ queryKey: key, exact: true, type: "active" });
+    return;
+  }
   // While that read is on its way, the root stands in as `useThreadMessages` shows it.
   const root = message.threadId ? cachedTopLevel(qc, orgId, message.threadId, message.channelId) : undefined;
   qc.setQueryData<Message[]>(key, (list) => upsertMessage(withoutLocal(list) ?? (root && [root]), message));
+}
+
+/**
+ * The thread whose count a `message.created` moves. One too big for its event still says it; an agent's sticker or
+ * GIF after its reply (ADR 0091) moves none.
+ */
+export function repliedThread(event: Extract<ChannelEvent, { type: "message.created" }>) {
+  const threadId = event.message ? event.message.threadId : event.threadId;
+  return threadId && !isMediaAfterReply(event.message?.meta) ? threadId : null;
 }
 
 /** A reply landed: the lists behind the thread lines, and that thread's header (count, last reply, who is in it). */
@@ -1228,9 +1242,10 @@ export async function catchUpChannel(
       .getQueriesData<Message[]>({ queryKey: prefix, predicate: (q) => isMessageList(q.queryKey) })
       .flatMap(([, data]) => (Array.isArray(data) ? data.map((m) => m.id) : [])),
   );
-  for (const m of read) if (!known.has(m.id)) cacheMessage(qc, orgId, m);
-  // The thread lines and the open thread's header count replies this read may have just added.
-  void qc.invalidateQueries({ queryKey: keys.threads(orgId) });
+  const added = read.filter((m) => !known.has(m.id));
+  for (const m of added) cacheMessage(qc, orgId, m);
+  // Only what it added: this runs on every channel opened, and a reconnect reads the thread lists on its own.
+  for (const threadId of new Set(added.flatMap((m) => m.threadId ?? []))) refreshRepliedThread(qc, orgId, threadId);
   return read;
 }
 
@@ -3667,7 +3682,10 @@ export function useIssueLive(
   const channelId = issue?.channelId ?? null;
   useEffect(() => {
     if (!connection || !issueId) return;
-    const take = (event: { type: string }) => void applyIssueActivityEvent(qc, orgId, issueId, event);
+    const take = (event: { type: string }) => {
+      applyIssueEvent(qc, orgId, event);
+      applyIssueActivityEvent(qc, orgId, issueId, event);
+    };
     const offOrg = connection.onUserEvent(take);
     const offChannel = channelId ? connection.subscribe(channelId, take) : undefined;
     const offReconnect = connection.onReconnect(() => {
@@ -4673,7 +4691,12 @@ export async function loadThreadRange(api: ApiClient, orgId: string, thread: Thr
   const ctx = thread.context;
   if (!ctx) return [];
   if (ctx.moved) {
-    const all = await api.chat.messages(orgId, thread.channelId, { threadId: thread.id, limit: 200 });
+    // Only those before the root: a thread's read holds its latest replies, and these are its oldest.
+    const all = await api.chat.messages(orgId, thread.channelId, {
+      threadId: thread.id,
+      before: thread.createdAt,
+      limit: 200,
+    });
     return all.filter((m) => m.id !== thread.id && m.createdAt < thread.createdAt);
   }
   let list = await api.chat.messages(orgId, ctx.channelId, { limit: 200 });
@@ -5317,6 +5340,12 @@ function readOncePerBurst(key: string, read: () => void) {
       read();
     }, UNREAD_REFRESH_MS),
   );
+}
+
+/** A task changed, a reply in its conversation too (ADR 0145): the boards on screen read again, once per burst. */
+export function applyIssueEvent(qc: QueryClient, orgId: string, event: { type: string }) {
+  if (event.type === "issue.created" || event.type === "issue.updated")
+    readOncePerBurst(`${orgId}:issues`, () => void qc.invalidateQueries({ queryKey: keys.issues(orgId) }));
 }
 
 /**

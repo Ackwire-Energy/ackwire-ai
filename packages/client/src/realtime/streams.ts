@@ -319,10 +319,16 @@ export const emptyStreams: StreamsState = { runs: {}, finished: {} };
 
 const provisionalId = (agentId: string, threadId: string) => `pending:${agentId}:${threadId}`;
 
-/** Shows "Ada está pensando…" right away for an agent that was mentioned or picked. */
+/** The message a "pensando…" answers: the one that asked in a thread, or the top-level one it hangs off. */
+export const guessedFrom = (r: Pick<LiveRun, "threadId" | "triggerMessageId">) => r.triggerMessageId ?? r.threadId;
+
+/**
+ * Shows "Ada está pensando…" right away for an agent that was mentioned or picked. `messageId`: a reply, whose row
+ * lives in its thread (`threadId`) and hangs off the message that asked.
+ */
 export function expectReply(
   state: StreamsState,
-  event: { channelId: string; threadId: string; agentId: string },
+  event: { channelId: string; threadId: string; agentId: string; messageId?: string },
   now = Date.now(),
 ) {
   const input = { channelId: event.channelId, threadId: event.threadId, agentId: event.agentId };
@@ -340,6 +346,7 @@ export function expectReply(
     provisional: true,
     since: now,
     startedAt: now,
+    ...(event.messageId && event.messageId !== input.threadId ? { triggerMessageId: event.messageId } : {}),
   };
   return { ...state, runs: { ...state.runs, [runId]: run } };
 }
@@ -404,7 +411,7 @@ function upsert(
     lastSeq: -1,
     startedAt: provisional?.startedAt ?? Date.now(),
     // A "pensando…" row hangs off the message I sent: that message started the run.
-    ...(provisional ? { triggerMessageId: provisional.threadId } : {}),
+    ...(provisional ? { triggerMessageId: guessedFrom(provisional) } : {}),
     ...current,
     ...patch,
   };
@@ -710,7 +717,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       const picked = new Set(event.pickedBy);
       const runs = Object.fromEntries(
         Object.entries(state.runs).filter(
-          ([, r]) => !(r.provisional && r.threadId === event.messageId && !picked.has(r.agentId)),
+          ([, r]) => !(r.provisional && guessedFrom(r) === event.messageId && !picked.has(r.agentId)),
         ),
       );
       return Object.keys(runs).length === Object.keys(state.runs).length ? state : { ...state, runs };
@@ -902,9 +909,9 @@ export function dismissRun(state: StreamsState, runId: string): StreamsState {
  * for a message sent there (`topLevelIds`: the channel's own messages).
  */
 export const inMainTimeline = (
-  r: { threadId: string | null; provisional?: boolean },
+  r: { threadId: string | null; provisional?: boolean; triggerMessageId?: string | null },
   topLevelIds: ReadonlySet<string>,
-) => r.threadId === null || Boolean(r.provisional && topLevelIds.has(r.threadId));
+) => r.threadId === null || Boolean(r.provisional && topLevelIds.has(r.triggerMessageId ?? r.threadId));
 
 /** Runs to show in a channel, oldest first. */
 export const runsInChannel = (state: StreamsState, channelId: string) =>
@@ -939,8 +946,12 @@ export function dropProvisional(state: StreamsState, threadIds: Set<string>): St
 export function retargetProvisional(state: StreamsState, fromId: string, toId: string): StreamsState {
   const runs: Record<string, LiveRun> = {};
   for (const [id, r] of Object.entries(state.runs)) {
-    if (!(r.provisional && r.threadId === fromId)) {
+    if (!(r.provisional && guessedFrom(r) === fromId)) {
       runs[id] = r;
+      continue;
+    }
+    if (r.threadId !== fromId) {
+      runs[id] = { ...r, triggerMessageId: toId };
       continue;
     }
     const answered = Object.values(state.runs).some(

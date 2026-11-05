@@ -1458,7 +1458,13 @@ export async function listMessages(
     const replies = await db
       .select()
       .from(messages)
-      .where(and(scope, eq(messages.threadId, options.threadId)))
+      .where(
+        and(
+          scope,
+          eq(messages.threadId, options.threadId),
+          options.before ? lt(messages.createdAt, options.before) : undefined,
+        ),
+      )
       .orderBy(desc(messages.createdAt), desc(messages.id))
       .limit(limit);
     return withReceipts(db, orgId, [root, ...replies.reverse()]);

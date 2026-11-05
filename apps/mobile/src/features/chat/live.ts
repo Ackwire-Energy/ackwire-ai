@@ -29,6 +29,7 @@ import {
   emptyStreams,
   expectReply,
   expireTyping,
+  guessedFrom,
   guessReceipt,
   keys,
   type LiveConsult,
@@ -41,6 +42,7 @@ import {
   reconcileConsults,
   reconcileRuns,
   refreshRepliedThread,
+  repliedThread,
   runsInChannel,
   type SecretRequest,
   type StreamsState,
@@ -54,7 +56,6 @@ import {
   useApi,
 } from "@agenteschat/client";
 import { newerBlockState } from "@agenteschat/client/lib/blocks";
-import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 import { playSound } from "@agenteschat/client/lib/sounds";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
@@ -139,7 +140,11 @@ function reduce(state: LiveState, action: Action): LiveState {
     case "expect": {
       let streams = state.streams;
       for (const agentId of action.agentIds)
-        streams = expectReply(streams, { channelId: action.channelId, threadId: action.threadId, agentId }, action.at);
+        streams = expectReply(
+          streams,
+          { channelId: action.channelId, threadId: action.threadId, agentId, messageId: action.messageId },
+          action.at,
+        );
       // The message's receipt guesses the same agents until the server says (unconfirmed; the sweep drops it).
       return { ...state, streams, receipts: guessReceipt(state.receipts, action.messageId, action.agentIds) };
     }
@@ -152,12 +157,12 @@ function reduce(state: LiveState, action: Action): LiveState {
     case "sweep": {
       const stale = staleProvisional(state.streams, action.at, PROVISIONAL_TTL_MS);
       if (stale.length === 0) return state;
-      const threads = new Set(stale.map((r) => r.threadId));
+      const asked = new Set(stale.map(guessedFrom));
       // A guess the server never confirmed goes with its "pensando…" (the conversation resyncs right after).
       const receipts = Object.fromEntries(
-        Object.entries(state.receipts).filter(([id, r]) => !(threads.has(id) && !r.confirmed)),
+        Object.entries(state.receipts).filter(([id, r]) => !(asked.has(id) && !r.confirmed)),
       );
-      return { ...state, streams: dropProvisional(state.streams, threads), receipts };
+      return { ...state, streams: dropProvisional(state.streams, new Set(stale.map((r) => r.threadId))), receipts };
     }
   }
 }
@@ -227,10 +232,9 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
       // A new top-level message may get agent replies in its thread: start that list.
       if (event.message) startThreadCache(qc, orgId, event.message);
-      // A reply: its root's "2 respostas" link and the thread's header. An agent's sticker or GIF after its reply
-      // (ADR 0091) changes neither. Too big for its event, it still says its thread.
-      const threadId = event.message ? event.message.threadId : event.threadId;
-      if (threadId && !isMediaAfterReply(event.message?.meta)) refreshRepliedThread(qc, orgId, threadId);
+      // A reply: its root's "2 respostas" link and the thread's header.
+      const threadId = repliedThread(event);
+      if (threadId) refreshRepliedThread(qc, orgId, threadId);
       // The conversation list's last line and unread.
       void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
       void qc.invalidateQueries({ queryKey: keys.channels(orgId) });

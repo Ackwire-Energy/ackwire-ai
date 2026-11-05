@@ -21,6 +21,7 @@ import {
   applyComputerEvent,
   applyConsultEvent,
   applyDashboardEvent,
+  applyIssueEvent,
   applyMachineEvent,
   applyMembershipEvent,
   applyNotificationEvent,
@@ -55,6 +56,7 @@ import {
   dropProvisional,
   emptyStreams,
   expectReply,
+  guessedFrom,
   guessReceipt,
   isActiveStatus,
   isNotificationEvent,
@@ -68,6 +70,7 @@ import {
   reconcileRuns,
   refreshMission,
   refreshRepliedThread,
+  repliedThread,
   retargetProvisional,
   runsInChannel,
   type SocketFactory,
@@ -86,7 +89,6 @@ import {
 import { newerBlockState } from "@agenteschat/client/lib/blocks";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatPercent } from "@agenteschat/client/lib/format";
-import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 import { nextMonthIso, usageWhen } from "@agenteschat/client/lib/plan-usage";
 import { playSound, soundForNotification } from "@agenteschat/client/lib/sounds";
 import { playAgentReaction } from "@agenteschat/ui";
@@ -315,11 +317,11 @@ export function createStreamsStore(
       set({ ...state, receipts, memory });
     },
     /** Right after sending: provisional "pensando…" rows and receipts for the agents we mentioned. */
-    expect: (channelId: string, messageId: string, agentIds: string[]) => {
+    expect: (channelId: string, messageId: string, agentIds: string[], threadId = messageId) => {
       let streams = state.streams;
       let receipts = state.receipts;
       for (const agentId of agentIds)
-        streams = expectReply(streams, { channelId, threadId: messageId, agentId }, now());
+        streams = expectReply(streams, { channelId, threadId, agentId, messageId }, now());
       receipts = guessReceipt(receipts, messageId, agentIds);
       set({ ...state, streams, receipts });
     },
@@ -340,11 +342,11 @@ export function createStreamsStore(
     sweep: (at = now()): string[] => {
       const stale = staleProvisional(state.streams, at, provisionalTtlMs);
       if (stale.length === 0) return [];
-      const threads = new Set(stale.map((r) => r.threadId));
+      const asked = new Set(stale.map(guessedFrom));
       const receipts = Object.fromEntries(
-        Object.entries(state.receipts).filter(([id, r]) => !(threads.has(id) && !r.confirmed)),
+        Object.entries(state.receipts).filter(([id, r]) => !(asked.has(id) && !r.confirmed)),
       );
-      set({ ...state, streams: dropProvisional(state.streams, threads), receipts });
+      set({ ...state, streams: dropProvisional(state.streams, new Set(stale.map((r) => r.threadId))), receipts });
       return [...new Set(stale.map((r) => r.channelId))];
     },
     /** The agent won't answer me: show the notice and drop its "pensando…" on that message. */
@@ -361,7 +363,7 @@ export function createStreamsStore(
       };
       set({
         ...state,
-        streams: dismissRun(state.streams, `pending:${e.agentId}:${e.messageId}`),
+        streams: dismissRun(state.streams, `pending:${e.agentId}:${e.threadId ?? e.messageId}`),
         notices: { ...state.notices, [e.channelId]: [...list, notice] },
       });
     },
@@ -462,6 +464,7 @@ export function RealtimeProvider({
       void qc.invalidateQueries({ queryKey: keys.me });
       void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
+      void qc.invalidateQueries({ queryKey: keys.threads(orgId) });
       // The groups of agents someone changed meanwhile.
       void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
       // The Vault, whose `vault.changed` may have come while offline (ADR 0144).
@@ -541,6 +544,7 @@ export function RealtimeProvider({
         qc.setQueryData(keys.issueColumns(orgId), event.columns as IssueColumn[]);
         void qc.invalidateQueries({ queryKey: keys.issues(orgId), predicate: (q) => q.queryKey[3] === "list" });
       }
+      applyIssueEvent(qc, orgId, event);
       // An agent switched computers, or its computer was removed: the cached view takes the new target.
       applyComputerEvent(qc, orgId, event);
       // Connected computers: online/offline, paired, renamed, removed.
@@ -594,7 +598,7 @@ export function RealtimeProvider({
   useEffect(() => {
     const timer = setInterval(() => {
       for (const channelId of streams.sweep()) {
-        void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
+        void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
       }
     }, 5000);
     return () => clearInterval(timer);
@@ -779,7 +783,9 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       }
       const away = hiddenAt === null ? 0 : Date.now() - hiddenAt;
       hiddenAt = null;
-      if (away >= RESYNC_AFTER_HIDDEN_MS) resync();
+      if (away < RESYNC_AFTER_HIDDEN_MS) return;
+      resync();
+      void qc.invalidateQueries({ queryKey: keys.threads(orgId) });
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
@@ -862,9 +868,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         }
         // A new top-level message may get agent replies in its thread: start watching it.
         if (event.message) startThreadCache(qc, orgId, event.message);
-        // A reply: its thread line and header. An agent's sticker after its reply (ADR 0091) changes neither.
-        const threadId = event.message ? event.message.threadId : event.threadId;
-        if (threadId && !isMediaAfterReply(event.message?.meta)) refreshRepliedThread(qc, orgId, threadId);
+        const threadId = repliedThread(event);
+        if (threadId) refreshRepliedThread(qc, orgId, threadId);
       }
     });
   }, [connection, enabled, orgId, channelId, qc, streams, api]);

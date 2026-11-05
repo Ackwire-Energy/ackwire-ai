@@ -58,6 +58,17 @@ test("a thread past its limit reads its latest replies: the one just said is nev
   expect(ids(read)).toEqual([root.id, second.id, third.id]);
 });
 
+test("a thread pages back from a time: its root, then the replies before it", async () => {
+  const root = await post(f.owner.id, f.general.id, "raiz");
+  const first = await post(f.owner.id, f.general.id, "primeira", root.id);
+  const second = await post(f.owner.id, f.general.id, "segunda", root.id);
+  const read = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, {
+    threadId: root.id,
+    before: new Date(second.createdAt),
+  });
+  expect(ids(read)).toEqual([root.id, first.id]);
+});
+
 test("a thread from a range: auto title, a root in the channel, exclusions; nothing moves, nobody runs", async () => {
   const a = await post(f.owner.id, f.general.id, "Onboarding is too long for new teams");
   const b = await post(f.owner.id, f.general.id, "Agree, step 3 is confusing");
