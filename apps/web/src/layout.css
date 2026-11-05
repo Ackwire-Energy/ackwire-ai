@@ -13287,10 +13287,10 @@ html:not([data-pointer]) .rh-set__face-edit:focus-visible {
     justify-content: flex-start;
   }
 }
-/* A plan on a line of its own under the row's text: its maker's mark, then its account. */
+/* A plan on a line of its own under the row's text: its maker's mark (an icon on the first line, `.ac-iconline`, not a
+   30px tile beside 13px words), then its account. */
 .rh-set__planline {
   display: flex;
-  align-items: center;
   gap: 6px;
   margin-top: 4px;
   color: var(--ink);
