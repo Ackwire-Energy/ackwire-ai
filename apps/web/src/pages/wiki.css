@@ -487,9 +487,17 @@ html:not([data-pointer]) .wiki-read:focus-visible {
   box-shadow: var(--e1);
   color: var(--ink2);
 }
+/* Two folders across the home's narrower column leave a name ~60px: it ends in "…" inside its card instead of
+   running over the next one. */
+.wiki-folder > :last-child {
+  min-width: 0;
+}
 .wiki-folder b {
   display: block;
+  overflow: hidden;
   font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .wiki-folder small {
   color: var(--faint);
@@ -875,7 +883,8 @@ html:not([data-pointer]) button.wiki-chip:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  max-width: 420px;
+  max-width: min(420px, 100%);
+  box-sizing: border-box;
   padding: 8px 12px 8px 8px;
   border-radius: 14px;
   background: var(--raised);
@@ -909,9 +918,14 @@ a.wiki-embed:hover {
   height: 100%;
   object-fit: cover;
 }
+/* A file's name with no spaces (a screenshot's) breaks where it must: never wider than the page on a phone. */
+.wiki-embed__text {
+  min-width: 0;
+}
 .wiki-embed__text b {
   display: block;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .wiki-embed__text small {
   display: block;
