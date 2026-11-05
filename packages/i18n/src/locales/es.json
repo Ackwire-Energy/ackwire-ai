@@ -11742,7 +11742,8 @@
       "targetOffline": "Esa computadora se desconectó. Elige otra.",
       "targetNotFound": "Esa computadora ya no existe. Elige otra.",
       "targetSame": "Los agentes ya están en esa computadora.",
-      "targetPaused": "Esa computadora está en pausa. Elige otra."
+      "targetPaused": "Esa computadora está en pausa. Elige otra.",
+      "accountMethodUnsupported": "Esta computadora todavía no puede conectar Claude de esta forma. Actualiza el programa de agentes.chat en ella o usa una clave de API."
     },
     "github": {
       "repoMissing": "El repositorio {{repo}} es privado o no existe en GitHub.",

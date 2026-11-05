@@ -10900,6 +10900,8 @@ export const en = {
       targetNotFound: "That computer no longer exists. Choose another one.",
       targetSame: "The agents are already on that computer.",
       targetPaused: "That computer is paused. Choose another one.",
+      accountMethodUnsupported:
+        "This computer can't connect Claude this way yet. Update the agentes.chat program on it, or use an API key.",
     },
     github: {
       repoMissing: "The repository {{repo}} is private or doesn't exist on GitHub.",

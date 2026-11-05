@@ -10939,7 +10939,8 @@
       "targetOffline": "そのコンピューターはオフラインになりました。別のものを選んでください。",
       "targetNotFound": "そのコンピューターはもう存在しません。別のものを選んでください。",
       "targetSame": "エージェントはすでにそのコンピューターにいます。",
-      "targetPaused": "そのコンピューターは一時停止中です。別のものを選んでください。"
+      "targetPaused": "そのコンピューターは一時停止中です。別のものを選んでください。",
+      "accountMethodUnsupported": "このコンピューターでは、まだこの方法でClaudeを接続できません。コンピューターのagentes.chatプログラムを更新するか、APIキーを使ってください。"
     },
     "github": {
       "repoMissing": "リポジトリ{{repo}}は非公開か、GitHubに存在しません。",

@@ -12177,7 +12177,8 @@
       "targetOffline": "Ten komputer przeszedł w tryb offline. Wybierz inny.",
       "targetNotFound": "Ten komputer już nie istnieje. Wybierz inny.",
       "targetSame": "Agenci są już na tym komputerze.",
-      "targetPaused": "Ten komputer jest wstrzymany. Wybierz inny."
+      "targetPaused": "Ten komputer jest wstrzymany. Wybierz inny.",
+      "accountMethodUnsupported": "Ten komputer nie może jeszcze połączyć Claude w ten sposób. Zaktualizuj na nim program agentes.chat albo użyj klucza API."
     },
     "github": {
       "repoMissing": "Repozytorium {{repo}} jest prywatne albo nie istnieje na GitHub.",

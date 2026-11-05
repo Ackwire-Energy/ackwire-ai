@@ -11822,7 +11822,8 @@
       "targetOffline": "Quel computer è andato offline. Scegline un altro.",
       "targetNotFound": "Quel computer non esiste più. Scegline un altro.",
       "targetSame": "Gli agenti sono già su quel computer.",
-      "targetPaused": "Quel computer è in pausa. Scegline un altro."
+      "targetPaused": "Quel computer è in pausa. Scegline un altro.",
+      "accountMethodUnsupported": "Questo computer non può ancora collegare Claude in questo modo. Aggiorna il programma agentes.chat che ha installato, oppure usa una chiave API."
     },
     "github": {
       "repoMissing": "Il repository {{repo}} è privato o non esiste su GitHub.",

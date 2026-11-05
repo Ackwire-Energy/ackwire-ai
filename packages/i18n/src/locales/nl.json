@@ -11452,7 +11452,8 @@
       "targetOffline": "Die computer is offline gegaan. Kies een andere.",
       "targetNotFound": "Die computer bestaat niet meer. Kies een andere.",
       "targetSame": "De agents staan al op die computer.",
-      "targetPaused": "Die computer is gepauzeerd. Kies een andere."
+      "targetPaused": "Die computer is gepauzeerd. Kies een andere.",
+      "accountMethodUnsupported": "Deze computer kan Claude nog niet op deze manier koppelen. Werk het agentes.chat-programma erop bij, of gebruik een API-sleutel."
     },
     "github": {
       "repoMissing": "De repository {{repo}} is privé of bestaat niet op GitHub.",

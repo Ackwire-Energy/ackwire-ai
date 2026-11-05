@@ -11059,6 +11059,8 @@ export const ptBR = {
       targetNotFound: "Esse computador não existe mais. Escolha outro.",
       targetSame: "Os agentes já estão nesse computador.",
       targetPaused: "Esse computador está pausado. Escolha outro.",
+      accountMethodUnsupported:
+        "Este computador ainda não conecta o Claude desse jeito. Atualize o programa do agentes.chat nele, ou use uma chave de API.",
     },
     github: {
       repoMissing: "O repositório {{repo}} é privado ou não existe no GitHub.",

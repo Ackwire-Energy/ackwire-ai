@@ -10932,7 +10932,8 @@
       "targetOffline": "그 컴퓨터가 오프라인이 됐어요. 다른 컴퓨터를 고르세요.",
       "targetNotFound": "그 컴퓨터는 더 이상 없어요. 다른 컴퓨터를 고르세요.",
       "targetSame": "에이전트가 이미 그 컴퓨터에 있어요.",
-      "targetPaused": "그 컴퓨터는 일시 중지됐어요. 다른 컴퓨터를 고르세요."
+      "targetPaused": "그 컴퓨터는 일시 중지됐어요. 다른 컴퓨터를 고르세요.",
+      "accountMethodUnsupported": "이 컴퓨터에서는 아직 이 방식으로 Claude를 연결할 수 없어요. 컴퓨터의 agentes.chat 프로그램을 업데이트하거나 API 키를 쓰세요."
     },
     "github": {
       "repoMissing": "{{repo}} 저장소는 비공개이거나 GitHub에 없어요.",

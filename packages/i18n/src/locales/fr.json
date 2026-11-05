@@ -11812,7 +11812,8 @@
       "targetOffline": "Cet ordinateur est passé hors ligne. Choisissez-en un autre.",
       "targetNotFound": "Cet ordinateur n'existe plus. Choisissez-en un autre.",
       "targetSame": "Les agents sont déjà sur cet ordinateur.",
-      "targetPaused": "Cet ordinateur est en pause. Choisissez-en un autre."
+      "targetPaused": "Cet ordinateur est en pause. Choisissez-en un autre.",
+      "accountMethodUnsupported": "Cet ordinateur ne peut pas encore connecter Claude de cette façon. Mettez à jour le programme agentes.chat dessus ou utilisez une clé API."
     },
     "github": {
       "repoMissing": "Le dépôt {{repo}} est privé ou n'existe pas sur GitHub.",

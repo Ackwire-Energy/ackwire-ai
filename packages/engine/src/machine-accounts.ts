@@ -1112,7 +1112,7 @@ export async function beginAccountLogin(
       : claudeAuthMethodFor(await claudeAuthPolicy(deps.db), orgId, system);
     if (!again && method === "cli_login" && !claudeLoginMethodsOf(said, system).includes("cli_login")) {
       throw new ConflictError(
-        "This computer's runner can't use Claude's own login for all agents yet. Update its runner, or ask support.",
+        "This computer can't connect Claude this way yet. Update the agentes.chat program on it, or use an API key.",
         "account.method_unsupported",
         { name: machine.name },
       );

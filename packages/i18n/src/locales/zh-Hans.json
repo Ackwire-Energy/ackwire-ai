@@ -11016,7 +11016,8 @@
       "targetOffline": "那台电脑已离线，请选择另一台。",
       "targetNotFound": "那台电脑已不存在，请选择另一台。",
       "targetSame": "智能体已经在那台电脑上了。",
-      "targetPaused": "那台电脑已暂停，请选择另一台。"
+      "targetPaused": "那台电脑已暂停，请选择另一台。",
+      "accountMethodUnsupported": "这台电脑暂时无法用这种方式连接 Claude。请更新电脑上的 agentes.chat 程序，或使用 API 密钥。"
     },
     "github": {
       "repoMissing": "仓库 {{repo}} 在 GitHub 上是私有的或不存在。",

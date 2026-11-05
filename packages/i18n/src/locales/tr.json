@@ -11311,7 +11311,8 @@
       "targetOffline": "O bilgisayar çevrimdışı oldu. Başka birini seçin.",
       "targetNotFound": "O bilgisayar artık yok. Başka birini seçin.",
       "targetSame": "Ajanlar zaten o bilgisayarda.",
-      "targetPaused": "O bilgisayar duraklatıldı. Başka birini seçin."
+      "targetPaused": "O bilgisayar duraklatıldı. Başka birini seçin.",
+      "accountMethodUnsupported": "Bu bilgisayar Claude'u henüz bu şekilde bağlayamıyor. Üzerindeki agentes.chat programını güncelleyin ya da bir API anahtarı kullanın."
     },
     "github": {
       "repoMissing": "{{repo}} deposu gizli ya da GitHub'da yok.",

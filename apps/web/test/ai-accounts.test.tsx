@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { AiAccounts, AiComputer } from "@agenteschat/client";
+import { ApiError } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -154,6 +155,37 @@ describe("Contas de IA", () => {
     // No agent here to think with the one that came back: nothing to use it for.
     expect(within(dialog).queryByRole("button", { name: /^Usar / })).toBeNull();
     expect(within(dialog).getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
+  });
+
+  test("a sign-in the server refuses says why, not that the computer didn't answer; one it can't explain still does", async () => {
+    const out = { ...WORK, status: "signed_out" as const };
+    const { api, rows } = await page([out]);
+    api.machines.beginAccountLogin = async () => {
+      throw new ApiError(409, "account.method_unsupported", "This computer can't connect Claude this way yet.");
+    };
+    await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Entrar de novo" }));
+    const dialog = screen().getByRole("dialog", { name: "Trabalho" });
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    const signIn = async () => {
+      await click(within(dialog).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(8);
+    };
+    try {
+      await signIn();
+      expect(shownText(dialog)).toContain(
+        "Este computador ainda não conecta o Claude desse jeito. Atualize o programa do agentes.chat nele, ou use uma chave de API.",
+      );
+      expect(shownText(dialog)).not.toContain("não respondeu");
+      api.machines.beginAccountLogin = async () => {
+        throw new ApiError(409, "machine.offline", "The computer MacBook is offline.");
+      };
+      await click(within(dialog).getByRole("button", { name: "Tentar de novo" }));
+      await signIn();
+      expect(shownText(dialog)).toContain("O MacBook não respondeu. Tente de novo em instantes.");
+    } finally {
+      window.open = realOpen;
+    }
   });
 
   test("disconnecting names the agent that thinks with it; renaming saves the new name", async () => {

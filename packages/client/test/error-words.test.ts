@@ -160,3 +160,9 @@ test("a provider's sign-in that didn't finish, by Better Auth's code: what the p
   // The codes the app says itself never read Object's own names either.
   expect(errorText(pt, new ApiError(403, "toString", ""))).toBe("common.notAllowed");
 });
+
+test("a computer that can't connect Claude this way is said in the person's language, not the server's English", () => {
+  const said = ((key: string) => key) as unknown as TFunction;
+  const refusal = new ApiError(409, "account.method_unsupported", "This computer can't connect Claude this way yet.");
+  expect(errorText(said, refusal)).toBe("errors.machine.accountMethodUnsupported");
+});

@@ -26640,6 +26640,9 @@
   "errors.machine.targetPaused": {
     "value": "That computer is paused. Choose another one."
   },
+  "errors.machine.accountMethodUnsupported": {
+    "value": "This computer can't connect Claude this way yet. Update the agentes.chat program on it, or use an API key."
+  },
   "errors.github.repoMissing": {
     "value": "The repository {{repo}} is private or doesn't exist on GitHub."
   },
