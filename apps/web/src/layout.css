@@ -3212,7 +3212,7 @@ html:not([data-pointer]) .level-pill:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.level-pill[disabled] {
+.level-pill:disabled {
   cursor: progress;
   opacity: 0.6;
 }
@@ -7132,7 +7132,7 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
   align-items: center;
 }
 /* The ghost's own off state is only a lighter ink: here it fades, so − and Ajustar read as off at a glance. */
-.izoom__tools .ac-btn[disabled] {
+.izoom__tools .ac-btn:disabled {
   opacity: 0.35;
 }
 .izoom__level {
@@ -12764,7 +12764,7 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   flex: none;
   margin-top: 2px;
 }
-.rh-check .ac-check[data-disabled] + .settings-row__text .settings-row__label {
+.rh-check .ac-check:disabled + .settings-row__text .settings-row__label {
   color: var(--muted);
 }
 .rh-money {

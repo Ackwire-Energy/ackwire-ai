@@ -124,7 +124,7 @@ describe("Button loading", () => {
     expect(hides.flatMap((r) => r.selectors)).toEqual(
       expect.arrayContaining([
         ".ac-btn.ac-btn--loading",
-        ".ac-btn.ac-btn--loading[disabled]",
+        ".ac-btn.ac-btn--loading:disabled",
         '.ac-btn.ac-btn--loading[aria-disabled="true"]',
       ]),
     );
@@ -132,7 +132,7 @@ describe("Button loading", () => {
     // covers heavier ones (a ghost on a dark surface, the composer's send button).
     const disabledColors = rules.filter(
       (r) =>
-        r.selectors.some((s) => /^\.ac-btn\[(?:disabled|aria-disabled="true")\]$/.test(s)) && sets(r.body, "color"),
+        r.selectors.some((s) => /^\.ac-btn(?::disabled|\[aria-disabled="true"\])$/.test(s)) && sets(r.body, "color"),
     );
     expect(disabledColors.length).toBeGreaterThan(0);
     expect(Math.min(...hides.map((r) => r.i))).toBeGreaterThan(Math.max(...disabledColors.map((r) => r.i)));

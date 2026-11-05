@@ -26,7 +26,7 @@ import {
 import { Icon, type IconName } from "../icons/Icon";
 import { Button } from "./Button";
 import { type EmojiPickerLabels, EmojiPickerPopover, type PickerTab } from "./EmojiPicker";
-import { useAutoGrow } from "./Field";
+import { useAutoGrow, useLocked } from "./Field";
 import { modKey } from "./Kbd";
 import { PixelStop } from "./PixelMarks";
 import { Spinner } from "./Skeleton";
@@ -377,7 +377,7 @@ export function Composer({
   sendLabel,
   attachLabel,
   onAttach,
-  disabled,
+  disabled: off,
   id,
   className,
   textareaRef,
@@ -402,6 +402,8 @@ export function Composer({
   choice,
   voice,
 }: ComposerProps) {
+  const locked = useLocked();
+  const disabled = off || locked;
   const ref = useRef<HTMLTextAreaElement>(null);
   const wave = useRef<HTMLCanvasElement>(null);
   const rec = useVoiceRecorder(voice, wave);

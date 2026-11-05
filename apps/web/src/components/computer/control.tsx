@@ -1,4 +1,4 @@
-import { Button, isApple, onScreenKeyboard, Textarea } from "@agenteschat/ui";
+import { Button, isApple, Locked, onScreenKeyboard, Textarea } from "@agenteschat/ui";
 import { type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { aimsAtScreen } from "@/lib/keys";
@@ -130,7 +130,7 @@ export function AskActions({ take, onCancel }: { take?: ReactNode; onCancel: () 
  * asked the person something (`handoffWantsWords`). Open, it is one line that grows as it wraps (`.brw-ac__note`);
  * Enter hands back as in the chat, while Shift+Enter, an input method's Enter and a phone's return key add a line.
  */
-export function HandBackFoot({
+function HandBackRow({
   title,
   label,
   grammar,
@@ -205,5 +205,14 @@ export function HandBackFoot({
         </Button>
       </div>
     </div>
+  );
+}
+
+/** All of it while the hand back is on its way, Voltar too: it can't be recalled, so leaving would only hide it. */
+export function HandBackFoot(props: Parameters<typeof HandBackRow>[0]) {
+  return (
+    <Locked when={props.pending}>
+      <HandBackRow {...props} />
+    </Locked>
   );
 }

@@ -18,7 +18,7 @@ import { useTranslation } from "react-i18next";
 import { Image, type LayoutChangeEvent, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { GestureDetector, GestureStateManager, type TouchData, useManualGesture } from "react-native-gesture-handler";
 import { scheduleOnRN } from "react-native-worklets";
-import { Icon, Text } from "@/ui";
+import { Icon, Locked, Text } from "@/ui";
 import { useColors, useConnection } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
 import { keyPastDraft, LIVE_KEYS, type LiveKey, type PageGap, touchOnPage } from "./logic";
@@ -301,36 +301,41 @@ export function AddressBar({
   const ready = url.trim().length > 0 && !busy;
   return (
     <View style={styles.typeWrap}>
-      <View style={[styles.field, { backgroundColor: c.raised, borderColor: c.line }]}>
-        <Icon name="globe" size={16} color={c.muted} />
-        <TextInput
-          value={url}
-          onChangeText={(v) => {
-            setUrl(v);
-            setError(null);
-          }}
-          placeholder={t("browser.inCard.goPlaceholder")}
-          placeholderTextColor={c.faint}
-          accessibilityLabel={t("browser.inCard.goLabel")}
-          style={[styles.input, { color: c.ink }]}
-          keyboardType="url"
-          textContentType="URL"
-          autoCapitalize="none"
-          autoCorrect={false}
-          maxLength={2048}
-          returnKeyType="go"
-          onSubmitEditing={() => void go()}
-        />
-        <Pressable
-          onPress={() => void go()}
-          disabled={!ready}
-          accessibilityRole="button"
-          accessibilityLabel={t("browser.inCard.go")}
-          style={({ pressed }) => [styles.send, { backgroundColor: c.ink, opacity: !ready ? 0.35 : pressed ? 0.8 : 1 }]}
-        >
-          <Icon name="right" size={16} color={c.bg} />
-        </Pressable>
-      </View>
+      <Locked when={busy}>
+        <View style={[styles.field, { backgroundColor: c.raised, borderColor: c.line }]}>
+          <Icon name="globe" size={16} color={c.muted} />
+          <TextInput
+            value={url}
+            onChangeText={(v) => {
+              setUrl(v);
+              setError(null);
+            }}
+            placeholder={t("browser.inCard.goPlaceholder")}
+            placeholderTextColor={c.faint}
+            accessibilityLabel={t("browser.inCard.goLabel")}
+            style={[styles.input, { color: c.ink }]}
+            keyboardType="url"
+            textContentType="URL"
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={2048}
+            returnKeyType="go"
+            onSubmitEditing={() => void go()}
+          />
+          <Pressable
+            onPress={() => void go()}
+            disabled={!ready}
+            accessibilityRole="button"
+            accessibilityLabel={t("browser.inCard.go")}
+            style={({ pressed }) => [
+              styles.send,
+              { backgroundColor: c.ink, opacity: !ready ? 0.35 : pressed ? 0.8 : 1 },
+            ]}
+          >
+            <Icon name="right" size={16} color={c.bg} />
+          </Pressable>
+        </View>
+      </Locked>
       {error ? (
         <Text variant="caption" tone="danger" accessibilityRole="alert">
           {error}

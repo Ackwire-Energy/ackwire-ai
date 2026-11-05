@@ -166,10 +166,12 @@ export {
   Field,
   type FieldProps,
   Input,
+  Locked,
   PickerHeading,
   SearchInput,
   Textarea,
   useFieldControl,
+  useLocked,
 } from "./components/Field";
 export {
   FILTER_SEARCH_AFTER,

@@ -1830,7 +1830,7 @@ describe("the dialog's size (computer.css)", () => {
     const body = () => document.querySelector(".ac-dialog.cmp-dialog > .cmp-body");
     expect(body()?.querySelector(":scope > .dsk")).toBeTruthy();
     await click(view().getByRole("button", { name: "Devolver" }));
-    expect(body()?.querySelector(":scope > .dsk > .brw-ac__fail")).toBeTruthy();
+    expect(body()?.querySelector(":scope > .dsk > .ac-locked > .brw-ac__fail")).toBeTruthy();
     expect(t.sockets.desktops.length).toBeGreaterThan(0);
   });
 

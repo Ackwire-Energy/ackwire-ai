@@ -511,10 +511,10 @@ describe("ghost buttons on a dark or agent-colored surface", () => {
     expect(value(css, ".ac-on-dark .ac-btn--ghost:hover", "color")).toBe("var(--on-dark)");
     expect(value(css, ".ac-on-dark .ac-btn--ghost:hover", "background")).toBe("var(--on-dark-plate)");
     expect(value(css, '.ac-on-dark .ac-btn--ghost[aria-pressed="true"]', "color")).toBe("var(--on-dark)");
-    expect(value(css, ".ac-on-dark .ac-btn--ghost:active:not([disabled])", "background")).toBe(
+    expect(value(css, ".ac-on-dark .ac-btn--ghost:active:not(:disabled)", "background")).toBe(
       "var(--on-dark-plate-strong)",
     );
-    expect(value(css, ".ac-on-dark .ac-btn--ghost[disabled]", "color")).toBe("var(--on-dark-faint)");
+    expect(value(css, ".ac-on-dark .ac-btn--ghost:disabled", "color")).toBe("var(--on-dark-faint)");
     expect(value(css, ".ac-on-dark .ac-btn--ghost.ac-btn--glyph:hover::before", "background")).toBe(
       "var(--on-dark-plate)",
     );
