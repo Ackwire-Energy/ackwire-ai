@@ -30,7 +30,7 @@ import { ActionList, Tile } from "../shared/parts";
 import { hitHref } from "./logic";
 
 /** One size for every result's face or tile, in the search tab and in a conversation's search. */
-export const RESULT_LEAD = 34;
+export const RESULT_LEAD = 32;
 
 /** The filters on the box (ADR 0123): each a pill with its ×. */
 export function FilterChips({ chips, onRemove }: { chips: SearchChip[]; onRemove: (chip: SearchChip) => void }) {
