@@ -558,17 +558,17 @@ export function brainEffortFor(agent: Pick<Agent, "brain" | "brainEffort">, kind
 
 /**
  * Fast mode for this turn (ADR 0149): an agent set to it, thinking with its own brain on a sign-in and model that
- * support it, answering in a conversation. A routine, long work or a mission spends the plan with nobody waiting, so
- * they stay at standard speed, and the right hand has no such setting.
+ * support it, answering in a conversation. A routine, long work, an issue or a mission spends the plan with nobody
+ * waiting (`unattended`), so they stay at standard speed, and the right hand has no such setting.
  */
 export function brainSpeedFor(
   agent: Pick<Agent, "brain" | "brainSpeed"> & { builtin?: string | null },
   plan: Pick<BrainPlan, "kind" | "model" | "account" | "missionId">,
   run: Pick<AgentRun, "background" | "workId">,
-  routine: boolean,
+  unattended: boolean,
 ): "fast" | undefined {
   if (agent.brainSpeed !== "fast" || isRightHand(agent) || kindOf(agent.brain) !== plan.kind) return undefined;
-  if (routine || run.background || run.workId || plan.missionId) return undefined;
+  if (unattended || run.background || run.workId || plan.missionId) return undefined;
   return speedFits({ kind: plan.kind, provider: plan.account?.provider, model: plan.model }) ? "fast" : undefined;
 }
 

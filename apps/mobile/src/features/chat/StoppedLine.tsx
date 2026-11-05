@@ -1,11 +1,11 @@
 import { type Message, useStopReason } from "@agenteschat/client";
 import { seesDetails } from "@agenteschat/client/lib/audience";
 import type { StoppedNotice } from "@agenteschat/client/lib/notices";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, LineIcon, Text, useToast } from "@/ui";
+import { openAgentAi } from "../ai/AgentAiScreen";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { ReasonField } from "../task-manager/parts";
 
@@ -117,7 +117,7 @@ export function SpeedFallbackLine({ message }: { message: Message }) {
                 variant="caption"
                 tone="muted"
                 style={styles.bold}
-                onPress={() => router.push(`/agent-ai/${agent.id}` as never)}
+                onPress={() => openAgentAi(agent.id)}
                 accessibilityRole="link"
                 suppressHighlighting
               >

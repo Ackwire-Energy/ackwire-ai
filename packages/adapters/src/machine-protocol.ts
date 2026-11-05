@@ -514,8 +514,9 @@ export const ANTIGRAVITY_PROTOCOL = 44;
  */
 export const VAULT_PROTOCOL = 45;
 /**
- * From this protocol on (ADR 0149): `brain.turn` carries `speed`, and a Codex turn the account or model refused at
- * that speed goes again at standard speed, with a `speed_fallback` event before it. An older runner never sees it.
+ * From this protocol on (ADR 0149): `brain.turn` carries `speed`, and a Codex turn that failed at that speed before
+ * anything happened goes again at standard speed, with a `speed_fallback` event right before its `done`. An older
+ * runner never sees it.
  */
 export const SPEED_PROTOCOL = 46;
 /**
@@ -1308,7 +1309,7 @@ export type WireBrainEvent =
   | { type: "error"; code: string; message: string; retryable?: boolean; worked?: boolean }
   /** Protocol 15: messages handed with `brain.steer` that the turn read (their `uuid`s). */
   | { type: "steer_read"; uuids: string[] }
-  /** Protocol 46: Fast was refused (`message`: the provider's words); the turn goes on at standard speed. */
+  /** Protocol 46: Fast failed (`message`: the provider's words) and this turn answered at standard speed. */
   | { type: "speed_fallback"; message: string };
 
 /**

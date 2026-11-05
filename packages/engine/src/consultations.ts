@@ -1913,6 +1913,24 @@ export async function consultationOrigin(
   return origin;
 }
 
+/** This run answers a question that began in a routine's or long work's run, through any chain of agents. */
+export async function consultedInBackground(db: Executor, orgId: string, runId: string): Promise<boolean> {
+  let current = runId;
+  for (let depth = 0; depth < MAX_HANDOFF_LINKS; depth++) {
+    const [asker] = await db
+      .select({ id: agentRuns.id, background: agentRuns.background, workId: agentRuns.workId })
+      .from(agentConsultations)
+      .innerJoin(agentRuns, eq(agentRuns.id, agentConsultations.askerRunId))
+      .where(and(eq(agentConsultations.orgId, orgId), eq(agentConsultations.targetRunId, current)))
+      .orderBy(desc(agentConsultations.createdAt))
+      .limit(1);
+    if (!asker) return false;
+    if (asker.background || asker.workId) return true;
+    current = asker.id;
+  }
+  return false;
+}
+
 /**
  * The run was consulted for someone outside its agent's audience (`viaAgent`, ADR 0085 addendum): it answers the
  * agent that asked and nothing of it reaches that person: no card where they asked (its approvals and questions

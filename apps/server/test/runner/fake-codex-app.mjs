@@ -19,6 +19,10 @@ import { createInterface } from "node:readline";
 
 const THREAD = "01a1463b-6712-7b53-9f12-2499fb614d2d";
 const args = process.argv.slice(2);
+if (args[0] === "login") {
+  console.log("Logged in using ChatGPT");
+  process.exit(0);
+}
 const log = (o) => {
   if (process.env.FAKE_CODEX_LOG) appendFileSync(process.env.FAKE_CODEX_LOG, `${JSON.stringify(o)}\n`);
 };

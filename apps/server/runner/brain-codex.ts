@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, execFile, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -73,6 +73,7 @@ export const CODEX_TOOL_OUTPUT_MAX = 4000;
 /** Sessions remembered (oldest forgotten first). */
 export const CODEX_THREADS_MAX = 2000;
 const KILL_GRACE_MS = 5000;
+const CODEX_LOGIN_STATUS_MS = 5000;
 
 /** The engine's `BrainEvent` (ADR 0032 contract), as the runner sends it in `brain.event`. */
 export type CodexBrainEvent =
@@ -212,8 +213,38 @@ export const codexSandbox = (profile: CommandProfile) => (profile === "plan" ? "
  */
 export const CODEX_FAST_CONFIG = ['service_tier="fast"', "features.fast_mode=true"];
 
-/** The account or model refused the tier: Codex hands on the provider's words, naming it or Fast mode. */
-const CODEX_FAST_REFUSED = /service[_ ]tier|fast[_ ]mode/i;
+/**
+ * Every other `codex exec` turn. `exec resume` goes on with the tier the thread last ran with, and leaving
+ * `service_tier` out doesn't clear it: only the feature off does (codex-cli 0.165.0 and 0.166.0). It also holds against
+ * a `service_tier` in the config of the person's own computer.
+ */
+export const CODEX_STANDARD_CONFIG = ["features.fast_mode=false"];
+
+/**
+ * A provider's words we know for a refused tier, or a Codex that can't read the setting. On the wire the tier is
+ * `priority`.
+ */
+const CODEX_FAST_REFUSED = /service[_ ]tier|fast[_ ]mode|priority/i;
+
+/**
+ * This failure may be Fast's. No real refusal has been seen yet, so anything the provider failed comes in, not only
+ * the words above: going again costs one try on a turn that was lost anyway. A dropped connection is the engine's
+ * retry, and a plan's limit or a lost sign-in aren't about speed.
+ */
+const fastMayHaveFailed = (error: Extract<CodexBrainEvent, { type: "error" }>) =>
+  error.code === "codex_failed" && (!error.retryable || CODEX_FAST_REFUSED.test(error.message));
+
+/** The computer's own Codex is on a ChatGPT sign-in, not an API key, where Fast bills the key at a higher rate. */
+const ownChatGptSignIn = (opts: Pick<CodexTurnOptions, "bin" | "env">) =>
+  new Promise<boolean>((resolve) => {
+    const env = { ...process.env, ...opts.env };
+    execFile(
+      resolveCommand(opts.bin ?? "codex", env.PATH),
+      ["login", "status"],
+      { env, timeout: CODEX_LOGIN_STATUS_MS },
+      (err, stdout, stderr) => resolve(!err && /logged in using chatgpt/i.test(`${stdout}${stderr}`)),
+    );
+  });
 
 /** The agent's context limit as Codex's own: it compacts the conversation there instead of at its window. */
 export const codexContextOverride = (tokens: unknown): string[] =>
@@ -344,7 +375,7 @@ export function codexTurnArgs(input: {
   writableRoots?: string[];
   /** Protocol 13: `-c model_reasoning_effort` (anything else is left out). */
   effort?: BrainEffort;
-  /** Protocol 46: `fast`, `CODEX_FAST_CONFIG`. */
+  /** Protocol 46: `fast`, `CODEX_FAST_CONFIG`; anything else, `CODEX_STANDARD_CONFIG`. */
   speed?: BrainSpeed;
   /** Protocol 28: `-c model_auto_compact_token_limit` (anything else is left out). */
   contextTokens?: number;
@@ -379,7 +410,7 @@ export function codexTurnArgs(input: {
     ...(isBrainEffort(input.effort)
       ? ["-c", `model_reasoning_effort=${JSON.stringify(codexEffort(input.effort))}`]
       : []),
-    ...(input.speed === "fast" ? CODEX_FAST_CONFIG.flatMap((c) => ["-c", c]) : []),
+    ...(input.speed === "fast" ? CODEX_FAST_CONFIG : CODEX_STANDARD_CONFIG).flatMap((c) => ["-c", c]),
     ...codexContextOverride(input.contextTokens),
     ...(input.model ? ["-m", input.model] : []),
     "-o",
@@ -675,24 +706,29 @@ export async function runCodexTurn(input: CodexTurnInput, opts: CodexTurnOptions
     turnOpts.app && !turn.chat
       ? turnOpts.app.turn({ ...turn, version }, turnOpts, () => runCodexExec(turn, turnOpts))
       : runCodexExec(turn, turnOpts);
-  if (input.speed !== "fast") return run(input, opts);
-  // Fast never costs a reply: refused before anything happened, the same turn goes again at standard speed.
+  const { speed: _speed, ...standard } = input;
+  if (input.speed !== "fast" || (!input.account && !(await ownChatGptSignIn(opts)))) return run(standard, opts);
+  // Fast never costs a reply: failed before anything happened, the same turn goes again at standard speed.
   const first: { started?: boolean; refused?: string } = {};
   await run(input, {
     ...opts,
     emit: (event) => {
-      const fast = event.type === "error" && event.code === "codex_failed" && CODEX_FAST_REFUSED.test(event.message);
-      if (fast && !first.started) first.refused = event.message;
+      if (event.type === "error" && !first.started && fastMayHaveFailed(event)) first.refused = event.message;
       else {
         first.started = true;
         opts.emit(event);
       }
     },
   });
-  if (first.refused === undefined) return;
-  opts.emit({ type: "speed_fallback", message: first.refused });
-  const { speed: _speed, ...standard } = input;
-  return run(standard, opts);
+  const { refused } = first;
+  if (refused === undefined) return;
+  return run(standard, {
+    ...opts,
+    emit: (event) => {
+      if (event.type === "done") opts.emit({ type: "speed_fallback", message: refused });
+      opts.emit(event);
+    },
+  });
 }
 
 /** One turn as `codex exec --json` (the version already checked). */

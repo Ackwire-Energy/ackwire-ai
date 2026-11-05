@@ -120,7 +120,12 @@ import {
 } from "./catch-up-triage";
 import { REACT_TOOL } from "./chat-tools";
 import { kickRoomQueue, publishQueueChanged, roomGate, roomHead } from "./computer-queue";
-import { announceConsultationChange, answersOpen, onConsultedRunFinished } from "./consultations";
+import {
+  announceConsultationChange,
+  answersOpen,
+  consultedInBackground,
+  onConsultedRunFinished,
+} from "./consultations";
 import {
   buildRunContext,
   type ContextBlock,
@@ -1535,7 +1540,13 @@ async function executeRunInner(
   // Asked to implement an issue: each answer it posts is also a comment on it (a resumed run's too).
   const issueId = triggerMessage?.meta.issueId;
   const viaRoutine = (runMeta.viaRoutine as { id: string; name: string } | undefined) ?? null;
-  const routine = viaRoutine !== null || Boolean(triggerMessage?.meta?.routine);
+  // Nobody is waiting on this run: Fast would spend the plan for no one (`brainSpeedFor`).
+  const unattended =
+    viaRoutine !== null ||
+    Boolean(triggerMessage?.meta?.routine ?? triggerMessage?.meta?.viaRoutine ?? issueId ?? run.issueId) ||
+    (agent.brainSpeed === "fast" &&
+      triggerMessage?.authorType === "agent" &&
+      (await consultedInBackground(db, run.orgId, run.id)));
   // Woken by a routine's report (ADR 0053 §7): its message carries the routine, and the routine run links to it.
   const report = routineReportTagOf(triggerMessage);
   // Who must answer (reply-policy.ts): a run nobody called by name may pass; a background run never posts.
@@ -3540,7 +3551,7 @@ async function executeRunInner(
     ) {
       // Meanwhile a computer brain's checkouts get synced for its first turn (used only if that turn is the same).
       if (plan.kind !== "model" && plan.session && deps.prepareCode && computerTurns === 0 && !nextPrompt) {
-        const early = brainTurnOf(run, thinker, transcript, tools, triggerText, plan, { routine });
+        const early = brainTurnOf(run, thinker, transcript, tools, triggerText, plan, { unattended });
         const prepare = deps.prepareCode;
         const machineId = plan.session.machineId;
         // Not for Codex on a runner that never uses its checkouts (`CodexBrain`): a sync nobody reads.
@@ -3564,7 +3575,7 @@ async function executeRunInner(
       const over = await Promise.race([waiting.then(() => true), Bun.sleep(PREWARM_PROBE_MS).then(() => false)]);
       const warming =
         !over && deps.prewarm && brain instanceof ModelBrain
-          ? brain.prewarm(brainTurnOf(run, thinker, transcript, tools, triggerText, plan, { routine }))
+          ? brain.prewarm(brainTurnOf(run, thinker, transcript, tools, triggerText, plan, { unattended }))
           : null;
       const warmedAt = Date.now();
       await waiting;
@@ -3765,7 +3776,7 @@ async function executeRunInner(
           brain,
           // Memory and wiki once per run: its first turn, or a session started afresh.
           brainTurnOf(run, thinker, transcript, turnTools, prompt, turnPlan, {
-            routine,
+            unattended,
             found: computerTurns === 0 || !turnPlan.session?.resume,
             personId,
             // Synced during the quiet window for this very turn; where it starts is picked again from its words now
@@ -4690,10 +4701,11 @@ function brainTurnOf(
   tools: ToolDefinition[],
   trigger: string,
   plan: BrainPlan,
-  options: { found?: boolean; code?: Promise<CodeSetup | null>; personId?: string | null; routine?: boolean } = {},
+  options: { found?: boolean; code?: Promise<CodeSetup | null>; personId?: string | null; unattended?: boolean } = {},
 ): ComputerTurn {
   const model = plan.kind === "model" ? agent.model : plan.model;
-  const speed = brainSpeedFor(agent, plan, run, options.routine === true);
+  // Refused once in this run, its other turns don't ask again.
+  const speed = t.speedFallback ? undefined : brainSpeedFor(agent, plan, run, options.unattended === true);
   const turnParts = () => {
     if (plan.kind === "model") return undefined;
     // The turn that starts the session taking over from a lost one reads why, whole; its later turns don't.
@@ -4827,7 +4839,7 @@ async function thinkOnce(
     onSteerRead?(uuids: string[]): void;
     /** The brain's first event that isn't an error: a computer had room for the turn. */
     onTaken?(): void;
-    /** Fast was refused and the turn goes on at standard speed. */
+    /** Fast failed and the turn answered at standard speed. */
     onSpeedFallback?(message: string): void;
   } = {},
 ): Promise<BrainStep> {

@@ -180,7 +180,7 @@ export type BrainEvent =
     }
   /** Messages handed mid-turn (`BrainIO.steerable`) that the turn read, by their `uuid`. */
   | { type: "steer_read"; uuids: string[] }
-  /** Fast was refused (`message`: the provider's words); the turn goes on at standard speed. */
+  /** Fast failed (`message`: the provider's words) and this turn answered at standard speed. */
   | { type: "speed_fallback"; message: string };
 
 export interface Brain {
