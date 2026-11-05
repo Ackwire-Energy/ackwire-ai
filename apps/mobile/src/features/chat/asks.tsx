@@ -473,7 +473,8 @@ export function AskCard({
                   }}
                   accessibilityRole="button"
                   accessibilityState={{ expanded: open }}
-                  hitSlop={6}
+                  // 28 tall: the slop makes it the 44-point target without spacing the well out.
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                   style={({ pressed }) => [styles.more, pressed && styles.pressed]}
                 >
                   <Text variant="footnote" tone="ink2" style={styles.semibold}>
@@ -565,10 +566,17 @@ export function AskDone({
   const c = useColors();
   const when = useWhen();
   const reduced = useReducedMotion();
+  const { fontScale } = useWindowDimensions();
   const [open, setOpen] = useState(false);
+  // The words wrap: the mark and the chevron sit on their first line (the words' 19 points, grown as far as they grow).
+  const first = { height: DONE_LINE * Math.min(fontScale, CHROME_MAX_SCALE) };
   const line = (
     <>
-      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.doneMark}>
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[styles.doneMark, first]}
+      >
         <View style={[done ? styles.donePixel : styles.doneBar, { backgroundColor: done ? c.ok : c.faint }]} />
       </View>
       <Text variant="small" tone="muted" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.doneWords}>
@@ -601,8 +609,10 @@ export function AskDone({
         style={({ pressed }) => [styles.done, pressed && styles.pressed]}
       >
         {line}
-        <View style={open ? styles.flip : undefined}>
-          <Icon name="chev" size={13} color={c.muted} />
+        <View style={[styles.doneChev, first]}>
+          <View style={open ? styles.flip : undefined}>
+            <Icon name="chev" size={13} color={c.muted} />
+          </View>
         </View>
       </Pressable>
       {open ? (
@@ -724,6 +734,9 @@ export function AskBar({
   );
 }
 
+/** A decided request's line height (its words are 14/19). */
+const DONE_LINE = 19;
+
 const styles = StyleSheet.create({
   slot: { marginTop: 12 },
   // Flat on the conversation (a hairline, no heavy shadow), with the app's cut corner at the bottom left.
@@ -793,16 +806,17 @@ const styles = StyleSheet.create({
   // A decided request: a line on the conversation itself, nothing around it.
   done: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 8,
     alignSelf: "flex-start",
     maxWidth: "100%",
     marginTop: 6,
   },
-  doneMark: { width: 14, height: 14, alignItems: "center", justifyContent: "center" },
+  doneMark: { width: 14, alignItems: "center", justifyContent: "center" },
+  doneChev: { justifyContent: "center" },
   donePixel: { width: 5, height: 5 },
   doneBar: { width: 8, height: 2 },
-  doneWords: { flexShrink: 1, fontSize: 14, lineHeight: 19 },
+  doneWords: { flexShrink: 1, fontSize: 14, lineHeight: DONE_LINE },
   // The bar: the working line's shape (WorkingLine), so one replaces the other without moving.
   dock: { paddingHorizontal: 4, paddingBottom: 6 },
   pill: {

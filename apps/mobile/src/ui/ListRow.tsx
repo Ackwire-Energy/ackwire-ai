@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
-import { Platform, Pressable, type PressableProps, StyleSheet, type TextStyle, View } from "react-native";
-import { Text } from "./Text";
+import {
+  Platform,
+  Pressable,
+  type PressableProps,
+  StyleSheet,
+  type TextStyle,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { Text, textLineOf } from "./Text";
 import { useTheme } from "./theme";
 import { weights } from "./type-scale";
 
@@ -70,6 +78,11 @@ export function ListRow({
   ...press
 }: ListRowProps) {
   const { colors: c } = useTheme();
+  const { fontScale } = useWindowDimensions();
+  // The badge or state stays on the preview's first line: centred on a two-line preview it sat between lines.
+  const previewLine = textLineOf("small", fontScale, LIST_PREVIEW).height;
+  // The time likewise stays on the title's first line when the title takes two (Activity's sentences).
+  const titleLine = textLineOf("title", fontScale).height;
   return (
     <Pressable
       {...press}
@@ -92,13 +105,11 @@ export function ListRow({
           )}
           <View style={styles.grow} />
           {time ? (
-            <Text
-              variant="small"
-              tone={unread ? "ink2" : "faint"}
-              style={[styles.time, LIST_TIME, unread && styles.unreadTime]}
-            >
-              {time}
-            </Text>
+            <View style={[styles.time, { minHeight: titleLine }]}>
+              <Text variant="small" tone={unread ? "ink2" : "faint"} style={[LIST_TIME, unread && styles.unreadTime]}>
+                {time}
+              </Text>
+            </View>
           ) : null}
         </View>
         {over}
@@ -113,7 +124,7 @@ export function ListRow({
                 sub
               )}
             </View>
-            {trailing}
+            {trailing ? <View style={[styles.trailing, { minHeight: previewLine }]}>{trailing}</View> : null}
           </View>
         ) : null}
       </View>
@@ -136,11 +147,12 @@ const styles = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5, marginLeft: -3 },
   avatar: { width: LIST_AVATAR, height: LIST_AVATAR, alignItems: "center", justifyContent: "center" },
   tx: { flex: 1, minWidth: 0, gap: 2 },
-  l1: { flexDirection: "row", alignItems: "center", gap: 6 },
-  l2: { flexDirection: "row", alignItems: "center", gap: 10 },
+  l1: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  l2: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  trailing: { justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
   unreadName: { fontWeight: weights.bold },
-  time: { flexShrink: 0 },
+  time: { flexShrink: 0, justifyContent: "center" },
   unreadTime: { fontWeight: weights.medium },
 });

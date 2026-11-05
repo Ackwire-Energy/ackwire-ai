@@ -21,7 +21,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
-import { AgentAvatar, Button, Card, Icon, LogoMark, Text, Toggle, useTheme } from "@/ui";
+import { AgentAvatar, Button, Card, Icon, LineIcon, LogoMark, Text, Toggle, useTheme } from "@/ui";
 import { openPage } from "../ai/parts";
 import { tapHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
@@ -496,7 +496,8 @@ function Note({ icon, children }: { icon: "info" | "lock" | "check"; children: s
   const { colors: c } = useTheme();
   return (
     <View style={styles.note}>
-      <Icon name={icon} size={16} color={c.faint} />
+      {/* On the note's first line (at the row's top it sat above the letters). */}
+      <LineIcon variant="footnote" name={icon} size={16} color={c.faint} />
       <Text variant="footnote" tone="muted" style={styles.fill}>
         {children}
       </Text>

@@ -78,6 +78,8 @@ export const ChartCard = memo(function ChartCard({
           onPress={() => setTable((v) => !v)}
           accessibilityRole="switch"
           accessibilityState={{ checked: table }}
+          // 30 tall in the card's head: the slop gives it the 44-point target.
+          hitSlop={7}
           style={[styles.pill, table ? { backgroundColor: c.plate } : null]}
           contentStyle={styles.center}
         >
@@ -93,7 +95,7 @@ export const ChartCard = memo(function ChartCard({
           }}
           accessibilityRole="button"
           accessibilityLabel={t("mobile.code.fullScreen")}
-          hitSlop={6}
+          hitSlop={7}
           style={styles.tool}
           contentStyle={styles.center}
         >

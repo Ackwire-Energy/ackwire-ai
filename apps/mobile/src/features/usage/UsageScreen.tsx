@@ -131,7 +131,7 @@ export function UsageScreen() {
                   key={k.kind}
                   style={[styles.kind, i > 0 && { borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth }]}
                 >
-                  <Text variant="subhead" tone="ink" style={styles.grow}>
+                  <Text variant="subhead" tone="ink" numberOfLines={1} style={styles.grow}>
                     {t(`settings.kinds.${k.kind}`)}
                   </Text>
                   <Text variant="small" tone="muted" style={styles.tabular}>
@@ -220,10 +220,10 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
           key={a.agentId}
           onPress={() => openAgentUsage(a.agentId)}
           accessibilityRole="button"
-          style={[styles.share, i > 0 && divided]}
+          style={[styles.share, styles.shareRow, i > 0 && divided]}
         >
           <AgentFace agentId={a.agentId} size={18} live={false} />
-          <Text variant="small" tone="ink" style={[styles.grow, styles.bold]}>
+          <Text variant="small" tone="ink" numberOfLines={1} style={[styles.grow, styles.bold]}>
             {dir.agentById.get(a.agentId)?.name ?? a.name}
           </Text>
           <Text variant="small" tone="ink2" style={styles.shareNum}>
@@ -239,10 +239,10 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
           onPress={() => setOpen(true)}
           accessibilityRole="button"
           accessibilityState={{ expanded: false }}
-          style={[styles.share, divided]}
+          style={[styles.share, styles.shareRow, divided]}
         >
           <View style={styles.face} />
-          <Text variant="small" tone="ink" style={[styles.grow, styles.bold]}>
+          <Text variant="small" tone="ink" numberOfLines={1} style={[styles.grow, styles.bold]}>
             {t("usageViews.moreAgents", { count: shares.rest.length })}
           </Text>
           <Text variant="small" tone="ink2" style={styles.shareNum}>
@@ -368,6 +368,8 @@ const styles = StyleSheet.create({
   divided: { borderTopWidth: StyleSheet.hairlineWidth },
   // An account's agents: face, name, share, tokens, the numbers in right-aligned columns that fit 390 pt.
   share: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 32 },
+  // The rows that open an agent: a finger's 44 points (the column titles above them stay at 32).
+  shareRow: { minHeight: 44 },
   face: { width: 18 },
   shareNum: { minWidth: 44, textAlign: "right", fontVariant: ["tabular-nums"] },
   shareTokens: { minWidth: 68, textAlign: "right", fontVariant: ["tabular-nums"] },

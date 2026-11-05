@@ -44,6 +44,7 @@ import {
   Icon,
   IconButton,
   type IconName,
+  LineIcon,
   PixelOrbit,
   ProviderLogo,
   Row,
@@ -646,8 +647,8 @@ function Profile({ id }: { id: string }) {
                       ) : null}
                       {spend.fraction >= 1 ? (
                         <View style={styles.warn}>
-                          <Icon name="clock" size={14} color={c.muted} />
-                          <Text variant="caption" tone="muted">
+                          <LineIcon variant="caption" name="clock" size={14} color={c.muted} />
+                          <Text variant="caption" tone="muted" style={styles.shrink}>
                             {t(`mobile.agent.exhausted${g}`, { name })}
                           </Text>
                         </View>
@@ -934,7 +935,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 9,
     paddingHorizontal: 14,
-    borderRadius: 999,
+    // It opens what the agent is on: a button, so the buttons' corner (pills are for labels only).
+    borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
     maxWidth: "100%",
   },
@@ -947,5 +949,7 @@ const styles = StyleSheet.create({
   src: { flexDirection: "row", alignItems: "center", gap: 6 },
   spend: { padding: 14, gap: 10 },
   spendHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
-  warn: { flexDirection: "row", alignItems: "center", gap: 6 },
+  // The sentence wraps inside the card (it ran past its edge): the clock stays on its first line.
+  warn: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  shrink: { flexShrink: 1, minWidth: 0 },
 });

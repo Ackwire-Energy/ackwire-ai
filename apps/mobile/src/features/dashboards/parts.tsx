@@ -23,6 +23,7 @@ import {
   GroupedRow,
   Icon,
   type IconName,
+  LineIcon,
   Segmented,
   Text,
   useTheme,
@@ -323,6 +324,8 @@ export function ChoiceChips<K extends string>({
             onPress={() => onChange(item.key)}
             accessibilityRole="radio"
             accessibilityState={{ selected: on }}
+            // 34 tall: the slop gives it a finger's 44 without spacing the row out.
+            hitSlop={{ top: 5, bottom: 5 }}
             style={[styles.chip, { backgroundColor: on ? c.ink : c.chip }]}
           >
             {item.icon ? item.icon(ink) : null}
@@ -495,7 +498,10 @@ export function AudienceFields({
         </>
       )}
       <View style={styles.exposure}>
-        <Icon name="shield" size={14} color={c.faint} />
+        {/* Down by the footer's own top padding, onto its first line (at the row's top it sat above the text). */}
+        <View style={styles.exposureIcon}>
+          <LineIcon variant="footnote" name="shield" size={14} color={c.faint} />
+        </View>
         <View style={styles.grow}>
           <GroupedFooter>{t("widgets.exposure")}</GroupedFooter>
         </View>
@@ -530,4 +536,6 @@ const styles = StyleSheet.create({
   roleChip: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 12, borderRadius: 16 },
   faded: { opacity: 0.35 },
   exposure: { flexDirection: "row", alignItems: "flex-start", gap: 6, paddingLeft: 16, paddingTop: 10 },
+  // GroupedFooter's paddingTop.
+  exposureIcon: { paddingTop: 7 },
 });

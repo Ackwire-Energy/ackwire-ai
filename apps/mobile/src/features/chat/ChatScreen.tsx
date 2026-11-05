@@ -98,6 +98,7 @@ import {
   Count,
   Icon,
   IconButton,
+  LineIcon,
   PressScale,
   type SendHow,
   Text,
@@ -2104,6 +2105,8 @@ function ToLatest({ unseen, onPress }: { unseen: Unseen; onPress: () => void }) 
         to={0.92}
         onPress={onPress}
         accessibilityRole="button"
+        // A 40-point circle: 4 around it gives the 48 a thumb needs.
+        hitSlop={4}
         accessibilityLabel={
           said.length > 0 ? t("mobile.chat.toLatestNew", { text: said.join(" · ") }) : t("mobile.chat.toLatest")
         }
@@ -2179,7 +2182,8 @@ function Connection({ status }: { status: ConnectionStatus }) {
       accessibilityLiveRegion="polite"
       style={[styles.conn, { backgroundColor: back ? withOpacity(c.ok, 0.14) : c.warnSoft }]}
     >
-      <Icon name={back ? "check" : "wifi"} size={15} color={back ? c.ok : c.warn} />
+      {/* On the first line: the offline sentence wraps, and centred on both lines the icon floated between them. */}
+      <LineIcon variant="small" name={back ? "check" : "wifi"} size={15} color={back ? c.ok : c.warn} />
       <Text variant="small" style={[styles.connText, { color: back ? c.ok : c.warn }]}>
         {back ? t("mobile.chat.connection.back") : t("mobile.chat.connection.down")}
       </Text>
@@ -2213,7 +2217,7 @@ const styles = StyleSheet.create({
   unseenRule: { flex: 1, height: StyleSheet.hairlineWidth * 2, opacity: 0.45 },
   conn: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 8,
     marginHorizontal: 4,
     marginBottom: 6,

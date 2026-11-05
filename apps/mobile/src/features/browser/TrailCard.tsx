@@ -177,7 +177,7 @@ export function TrailCard({
                       onPress={() => void Linking.openURL(href).catch(() => undefined)}
                       accessibilityRole="link"
                       accessibilityLabel={tt("after.openSite", { site: p.site })}
-                      hitSlop={6}
+                      hitSlop={8}
                       style={({ pressed }) => [styles.ext, pressed && { backgroundColor: c.plate }]}
                     >
                       <Icon name="out" size={14} color={c.faint} />

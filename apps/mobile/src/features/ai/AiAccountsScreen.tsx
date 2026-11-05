@@ -435,7 +435,8 @@ function KeysSection({ locale }: { locale: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  in: { paddingHorizontal: 18, paddingTop: 8, gap: 12 },
+  // The 16-point margin of the other AI and usage screens it sits beside.
+  in: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   sectionHead: { gap: 4, paddingHorizontal: 2 },
   keysHead: { marginTop: 18 },
   below: { gap: 8, marginTop: 6 },

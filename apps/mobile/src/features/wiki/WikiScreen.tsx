@@ -27,7 +27,9 @@ import {
   DiffView,
   EmptyState,
   fieldText,
+  Icon,
   IconButton,
+  LineIcon,
   Row,
   SearchField,
   SectionHeader,
@@ -266,9 +268,8 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
             { backgroundColor: c.ink, bottom: insets.bottom + 18, opacity: pressed ? 0.85 : 1 },
           ]}
         >
-          <Text variant="title2" style={[styles.fabPlus, { color: c.bg }]}>
-            +
-          </Text>
+          {/* The kit's plus, centred on the label: a "+" typed in title2 sat off its middle. */}
+          <Icon name="plus" size={20} color={c.bg} />
           <Text variant="callout" style={[styles.fabText, { color: c.bg }]}>
             {t("wiki.newPage")}
           </Text>
@@ -547,8 +548,11 @@ function WikiPage({ slug }: { slug: string }) {
               <Text variant="display2" accessibilityRole="header">
                 {p.title}
               </Text>
-              <View style={styles.byline}>
-                <Face who={p.updatedBy} size={18} />
+              {/* Top-aligned, the face on the first line: a long "by … for …" line wraps under it. */}
+              <View style={[styles.byline, styles.top]}>
+                <LineIcon variant="footnote" size={18}>
+                  <Face who={p.updatedBy} size={18} />
+                </LineIcon>
                 <Text variant="footnote" tone="faint" style={styles.grow}>
                   {by} · {relativeTime(t, i18n.language, p.updatedAt)} · v{p.version}
                 </Text>
@@ -869,6 +873,7 @@ const styles = StyleSheet.create({
   pin: { width: 210, borderRadius: 16, padding: 14, gap: 5 },
   pressed: { opacity: 0.85 },
   byline: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  top: { alignItems: "flex-start" },
   fab: {
     position: "absolute",
     right: 18,
@@ -885,7 +890,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
-  fabPlus: { lineHeight: 26 },
   barRight: { flexDirection: "row", alignItems: "center", gap: 2 },
   barWord: { paddingHorizontal: 10, height: 36, justifyContent: "center" },
   barWordText: { fontWeight: "600" },
