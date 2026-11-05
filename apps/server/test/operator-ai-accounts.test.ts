@@ -98,18 +98,16 @@ beforeAll(async () => {
     }),
   ]);
   // Three agents on one shared account: still one connection. An archived fourth thinks with nothing.
-  await t.db
-    .insert(schema.agents)
-    .values(
-      [1, 2, 3, 4].map((n) => ({
-        orgId: ada,
-        name: `Agent ${n}`,
-        handle: `agent${n}`,
-        model: "x",
-        brainAccountId: id(1),
-        ...(n === 4 ? { archivedAt: new Date() } : {}),
-      })),
-    );
+  await t.db.insert(schema.agents).values(
+    [1, 2, 3, 4].map((n) => ({
+      orgId: ada,
+      name: `Agent ${n}`,
+      handle: `agent${n}`,
+      model: "x",
+      brainAccountId: id(1),
+      ...(n === 4 ? { archivedAt: new Date() } : {}),
+    })),
+  );
   const credential = (orgId: string, provider: string, revokedAt: Date | null = null) => ({
     orgId,
     provider,

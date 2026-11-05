@@ -63,8 +63,7 @@ export function groupPlans<A extends MachineAccount & { machineId?: string }>(
     const org = a.providerOrgId ?? null;
     // Like the server's, an organization not said matches any: only two known ones tell logins apart.
     const same = groups.filter((g) => g.key === key);
-    const group =
-      org === null ? same[0] : (same.find((g) => g.org === org) ?? same.find((g) => g.org === null));
+    const group = org === null ? same[0] : (same.find((g) => g.org === org) ?? same.find((g) => g.org === null));
     if (!group) groups.push({ key, org, logins: [a] });
     else {
       group.logins.push(a);

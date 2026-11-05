@@ -67,9 +67,9 @@ export async function setClaudeAuthPolicy(db: Database, input: unknown, now = ne
   const asked = [...new Set(parsed.data.orgIds.map((id) => id.toLowerCase()))];
   const found = new Set(
     asked.length > 0
-      ? (
-          await db.select({ id: organizations.id }).from(organizations).where(inArray(organizations.id, asked))
-        ).map((o) => o.id)
+      ? (await db.select({ id: organizations.id }).from(organizations).where(inArray(organizations.id, asked))).map(
+          (o) => o.id,
+        )
       : [],
   );
   // A listed workspace deleted since (no foreign key on the array) drops out; only a new id must exist.
