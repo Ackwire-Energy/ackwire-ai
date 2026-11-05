@@ -17,9 +17,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
 import {
-  Button,
   Filters,
-  Fuse,
   Icon,
   LargeTitleScreen,
   LIST_AVATAR,
@@ -30,10 +28,10 @@ import {
   Sky,
   SwipeRow,
   Text,
-  weights,
 } from "@/ui";
 import { openPage } from "../ai/parts";
 import { ApprovalWhy } from "../approvals/parts";
+import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { dashboardWaitingCard } from "../dashboards/logic";
 import { notificationHref, notificationWebPath, routineHref } from "../links/logic";
 import { ChangeRequestCard } from "../right-hand/SettingsCard";
@@ -43,6 +41,7 @@ import { agentLook, fuseRemaining } from "../shared/logic";
 import { Tile, useSurface } from "../shared/parts";
 import { useWaitingApprovals } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
+import { WaitingCard } from "../shared/WaitingCard";
 import { UsageLimitActions } from "../usage/people";
 import {
   type ActivityFilter,
@@ -134,18 +133,16 @@ export function ActivityScreen() {
 }
 
 /**
- * One thing waiting on you (`.wyA`): who asks and the kind (amber, the waiting color), the exact request in
+ * One thing waiting on you (`WaitingCard`): who asks and the kind (amber, the waiting color), the exact request in
  * words, the fuse and "expira em" (requests) or where and when, and one button: Revisar or Responder. The
  * whole card opens it too.
  */
 function WaitingCardView({ item: n }: { item: AppNotification }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const c = useColors();
   const dir = useDirectory();
   const when = useWhen();
   const now = useNow();
-  const surface = useSurface();
   const act = useNotificationAction(orgId);
   const card = waitingCardOf(n);
   // A widget's alert, or an agent asking to publish a dashboard (ADR 0135): its own word, line and "Open".
@@ -192,45 +189,42 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
     if (href) router.push(href);
     else if (web) openPage(`${serverUrl()}${web}`);
   };
-  return (
-    <Pressable
-      onPress={href || web ? open : undefined}
-      disabled={!href && !web}
-      style={({ pressed }) => [styles.wcard, surface, pressed && styles.wpressed]}
-      accessibilityRole={href || web ? "button" : undefined}
-      accessibilityLabel={[name, kind, title].filter(Boolean).join(", ")}
-    >
-      <View style={styles.hd}>
-        {who ? <Face who={who} size={22} live={false} /> : null}
-        {join ? (
-          <View style={styles.faces}>
-            {join.faces.map((face, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: two names at most, and two people can share one
-              <View key={`${i}-${face}`} style={i > 0 ? styles.overlap : undefined}>
-                <PersonAvatar name={face} size={22} />
-              </View>
-            ))}
+  // Whoever asks leads the card: an agent (with its sky), a person, the people asking to join, or the server.
+  const leading =
+    who && who.type !== "agent" ? (
+      <Face who={who} size={36} live={false} />
+    ) : join ? (
+      <View style={styles.faces}>
+        {join.faces.map((face, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: two names at most, and two people can share one
+          <View key={`${i}-${face}`} style={i > 0 ? styles.overlap : undefined}>
+            <PersonAvatar name={face} size={30} />
           </View>
-        ) : null}
-        {name ? (
-          <Text variant="footnote" tone="ink" numberOfLines={1} style={[styles.semibold, styles.shrink]}>
-            {name}
-          </Text>
-        ) : null}
-        {/* With nobody to lead it (a server changed tools), the kind leads the card instead of hanging right. */}
-        {who || join || name ? <View style={styles.grow} /> : null}
-        <View style={styles.kind}>
-          <Icon name={dash ? "chart" : KIND_ICON[card.kind]} size={13} color={c.amber} />
-          <Text variant="footnote" style={[styles.semibold, { color: c.amber }]}>
-            {kind}
-          </Text>
-        </View>
+        ))}
       </View>
-      {title ? (
-        <Text variant="callout" tone="ink" numberOfLines={3} style={styles.semibold}>
-          {title}
-        </Text>
-      ) : null}
+    ) : card.kind === "tools" ? (
+      <ConnectorIcon def={null} label={n.source.label ?? ""} size={36} />
+    ) : null;
+  return (
+    <WaitingCard
+      agentId={who?.type === "agent" ? who.id : null}
+      leading={leading}
+      name={name || (card.kind === "tools" ? (n.source.label ?? "") : "")}
+      kind={{ icon: dash ? "chart" : KIND_ICON[card.kind], label: kind }}
+      title={title}
+      onPress={href || web ? open : undefined}
+      accessibilityLabel={[name, kind, title].filter(Boolean).join(", ")}
+      expires={
+        left !== null && card.expiresAt
+          ? {
+              remaining: fuseRemaining(n.createdAt, card.expiresAt, now),
+              label: t("approval.expiresDetail", { time: left }),
+            }
+          : null
+      }
+      where={where}
+      action={(href || web) && card.kind !== "limit" ? { label: button, onPress: open } : null}
+    >
       {/* Who asked while nobody watched, then why (ADR 0053 §8), as on the request itself. */}
       {card.kind === "approval" ? (
         <ApprovalWhy approval={{ origin: n.latest.origin ?? null, why: n.latest.text ?? null }} name={name} />
@@ -243,25 +237,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
           <UsageLimitActions n={n} />
         </>
       ) : null}
-      <View style={styles.ft}>
-        {left !== null && card.expiresAt ? (
-          <>
-            <Fuse color="amber" remaining={fuseRemaining(n.createdAt, card.expiresAt, now)} style={styles.fuse} />
-            <Text variant="caption" numberOfLines={1} style={[styles.when, { color: c.amber }]}>
-              {t("approval.expiresDetail", { time: left })}
-            </Text>
-          </>
-        ) : (
-          <Text variant="caption" tone="faint" numberOfLines={1} style={[styles.when, styles.shrink]}>
-            {where}
-          </Text>
-        )}
-        <View style={styles.grow} />
-        {(href || web) && card.kind !== "limit" ? (
-          <Button variant="primary" size="sm" label={button} onPress={open} />
-        ) : null}
-      </View>
-    </Pressable>
+    </WaitingCard>
   );
 }
 
@@ -500,16 +476,9 @@ const styles = StyleSheet.create({
   cards: { gap: 10, paddingHorizontal: 16 },
   change: { paddingHorizontal: 16, paddingBottom: 12 },
   noneDone: { paddingHorizontal: 16, paddingVertical: 24, textAlign: "center" },
-  wcard: { borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, gap: 9 },
   wpressed: { opacity: 0.85 },
-  hd: { flexDirection: "row", alignItems: "center", gap: 8 },
   faces: { flexDirection: "row" },
   overlap: { marginLeft: -6 },
-  kind: { flexDirection: "row", alignItems: "center", gap: 4 },
-  ft: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 36 },
-  fuse: { flex: 0, width: 90 },
-  when: { fontWeight: weights.medium, fontVariant: ["tabular-nums"] },
-  semibold: { fontWeight: weights.semibold },
   grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
   clear: { marginHorizontal: 16, marginTop: 4, borderRadius: 26, overflow: "hidden", padding: 20, paddingTop: 0 },
