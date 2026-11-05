@@ -14,6 +14,7 @@ import { routingLineOf } from "@agenteschat/client/lib/routing";
 import {
   Button,
   Card,
+  CardHeader,
   Chip,
   type ChipTone,
   Dialog,
@@ -199,13 +200,13 @@ export function WhoPicksSection() {
   const line = admin ? routingLineOf(status.data, modelLabel) : null;
   if (!line && !jev.data) return null;
   return (
-    <Card aria-labelledby="sec-routing">
-      <div className="who-head">
-        <h2 id="sec-routing" className="ac-card__title">
-          {t("routing.title")}
-        </h2>
-        <HelpLink slug="who-answers">{t("routing.how")}</HelpLink>
-      </div>
+    <Card aria-labelledby="sec-routing" className="who-card">
+      <CardHeader
+        id="sec-routing"
+        icon="agent"
+        title={t("routing.title")}
+        action={<HelpLink slug="who-answers">{t("routing.how")}</HelpLink>}
+      />
       {line && <p className="who-line">{t(line.key, line.params)}</p>}
       {jev.data && <JevCard routing={status.data?.routing?.by} />}
     </Card>
@@ -344,9 +345,11 @@ function JevCard({ routing }: { routing?: AiRouting["by"] }) {
             </span>
             <span className="small muted">{t("jev.lead")}</span>
           </span>
-          <Chip icon={chip.icon} tone={chip.tone}>
-            {t(`jev.state.${chip.word}`)}
-          </Chip>
+          <span className="ac-captail ac-captop">
+            <Chip icon={chip.icon} tone={chip.tone}>
+              {t(`jev.state.${chip.word}`)}
+            </Chip>
+          </span>
         </div>
         {view.source === null ? (
           <div className="ac-list__row jev__body">
@@ -374,7 +377,7 @@ function JevCard({ routing }: { routing?: AiRouting["by"] }) {
                 </span>
                 {note && <SettingNote icon={view.state === "ok" ? "info" : "alert"}>{note}</SettingNote>}
               </span>
-              {actions && <span className="ac-acts">{actions}</span>}
+              {actions && <span className="ac-acts ac-captail">{actions}</span>}
             </div>
             {steps === "replace" && <div className="ac-list__row jev__body">{stepsOf(true)}</div>}
           </>

@@ -7676,9 +7676,41 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
 .machine-page__agent-name .muted {
   font-weight: 400;
 }
-.machine-folder,
+/*
+ * A folder: its icon on the name's line (an `.ac-iconline` lead), who uses it and its menu on that line too
+ * (`.ac-captail`), however many lines its path and notes take under the name.
+ */
+.machine-folder {
+  align-items: flex-start;
+}
+.machine-folder > .machine-row__icon {
+  display: flex;
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .machine-folder > .machine-row__icon {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+}
+.machine-folder__tail {
+  gap: var(--space-3);
+}
+/* The menu's ghost reaches out to the row's padding line, as a row's last ghost does (`.ac-list__row`). */
+.machine-folder__tail > .ac-btn--ghost.ac-btn--icon:last-child {
+  margin-right: calc(-1 * var(--ghost-plate));
+}
+/* A tool: a name alone centres on its tile with its state; with a line under it (Commands, on) it is an
+   `.ac-faceline`, the name and the state on the tile's top line (`.ac-captop`, `.ac-captail`). */
 .machine-tool {
   align-items: center;
+}
+.machine-tool:has(> .list-col > .ac-captop) {
+  align-items: flex-start;
+}
+.machine-tool__tail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 .machine-folder__name {
   font-weight: 600;
@@ -12511,15 +12543,15 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   color: var(--ink-muted);
 }
 /* A plan's or a key's mark beside its name and facts: the name's capitals at the mark's top, what follows them (a
-   chip, the actions) in the row's middle. As deep as it is wide at its ends: a plan's meter makes it a block. */
+   chip, the actions) on the name's line (`.ac-captail`), however far the facts, notes and meter run under it. As
+   deep as it is wide at its ends: a plan's meter makes it a block. */
 .ai-accounts__row,
 .key-row {
   align-items: flex-start;
   padding: var(--space-4);
 }
-.ai-accounts__row > .ac-acts,
-.key-row > :not(.ac-brand, .list-col) {
-  align-self: center;
+.key-row__tail {
+  gap: var(--space-3);
 }
 .ai-accounts__name {
   font-weight: 600;
@@ -12530,14 +12562,7 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 }
 /* Who picks the agents (Settings › AI accounts): the title with how they are picked beside it, one line on who picks
    now, and Jev's key under it for the installation's owner. */
-.who-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 12px;
-}
-.who-head > .ac-link,
+.who-card .ac-card__action > .ac-link,
 .jev__foot {
   font-size: 13px;
   line-height: 18px;
@@ -12559,17 +12584,11 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .jev:focus {
   outline: none;
 }
-/* TypeSafe's tile beside Jev's name and line: the name's capitals at the tile's top, the state on the tile's middle. */
+/* TypeSafe's tile beside Jev's name and line: the name's capitals at the tile's top, the state and the key's actions
+   on the name's line (`.ac-captail`). */
 .jev__head,
 .jev__key {
   align-items: flex-start;
-}
-/* The tile is 30px, at the row's top. */
-.jev__head > .ac-chip {
-  translate: 0 calc(15px - 50%);
-}
-.jev__key > .ac-acts {
-  align-self: center;
 }
 /* On a phone the name and its line wrap, so the state stays on their row. */
 .jev__head > .list-col {
@@ -12830,6 +12849,34 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
     flex-basis: 100%;
     box-sizing: border-box;
     padding-left: 44px;
+  }
+}
+/*
+ * With a line under its name, what ends a row (a switch, a choice, the chevron) belongs to the name's line, never to
+ * the row's middle however far that line wraps: a box as tall as the name's 22px line, centred on it (as
+ * `.ac-captail`). A choice that goes under the words on a phone keeps its own height there.
+ */
+.settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__end {
+  align-self: flex-start;
+  height: 22px;
+}
+.settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__chevron {
+  align-self: flex-start;
+  margin-block: 3px;
+}
+@media (max-width: 760px) {
+  .settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__end:has(> .ac-seg) {
+    height: auto;
+  }
+}
+/* A plain row (its label beside its control, the help under the label) does the same where the two sit side by
+   side; on a phone the control goes under the words. */
+@media (min-width: 761px) {
+  .settings-row:has(> .settings-row__text > .settings-row__help):has(> .settings-row__control, > .settings-row__end) {
+    align-items: flex-start;
+  }
+  .settings-row:has(> .settings-row__text > .settings-row__help) > :is(.settings-row__control, .settings-row__end) {
+    height: 22px;
   }
 }
 

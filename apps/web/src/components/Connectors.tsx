@@ -35,6 +35,7 @@ import {
   AvatarStack,
   Button,
   Card,
+  CardHeader,
   Chip,
   Dialog,
   DialogBody,
@@ -215,16 +216,18 @@ export function ConnectorsSection({
   return (
     <>
       <Card aria-labelledby="sec-conn">
-        <div className="row" style={{ gap: 12 }}>
-          <h2 id="sec-conn" className="ac-card__title" style={{ flex: "1 1 280px" }}>
-            {t("connectors.title")}
-          </h2>
-          {admin && (
-            <Button size="sm" variant="primary" icon="plus" onClick={() => setAdding(true)}>
-              {t("connectors.add")}
-            </Button>
-          )}
-        </div>
+        <CardHeader
+          id="sec-conn"
+          icon="plug"
+          title={t("connectors.title")}
+          action={
+            admin && (
+              <Button size="sm" variant="primary" icon="plus" onClick={() => setAdding(true)}>
+                {t("connectors.add")}
+              </Button>
+            )
+          }
+        />
         {composio.data && nearComposioLimit(composio.data) && (
           <p className="small muted">{composioUsageText(t, i18n.language, composio.data)}</p>
         )}
@@ -267,16 +270,19 @@ export function ConnectorsSection({
         <GitHubAppPanel />
       </Card>
       <Card aria-labelledby="sec-mcp">
-        <div className="row" style={{ gap: 12 }}>
-          <h2 id="sec-mcp" className="ac-card__title" style={{ flex: "1 1 280px" }}>
-            {t("connectors.mcp.title")}
-          </h2>
-          {admin && (
-            <Button size="sm" variant="primary" icon="plus" onClick={() => setFlow({ step: 0, def: null })}>
-              {t("connectors.mcp.add")}
-            </Button>
-          )}
-        </div>
+        <CardHeader
+          id="sec-mcp"
+          icon="code"
+          title={t("connectors.mcp.title")}
+          action={
+            // The page's one primary is Add connector above; a server by address is the second way in.
+            admin && (
+              <Button size="sm" icon="plus" onClick={() => setFlow({ step: 0, def: null })}>
+                {t("connectors.mcp.add")}
+              </Button>
+            )
+          }
+        />
         {loaded && mcps.length === 0 && <p className="small muted">{t("connectors.mcp.none")}</p>}
         {mcps.length > 0 && (
           <List className="connected-list" aria-label={t("connectors.mcp.list")}>

@@ -27,16 +27,7 @@ test("the built stylesheet keeps what places the Settings header, the bucket's h
   expect(declarations(phoneRules(await Bun.file(LAYOUT).text()), ".settings__head")).toContainEqual(["padding", "0"]);
   // Every declaration the source writes for these ships as written.
   const sources: [string, string[]][] = [
-    [
-      LAYOUT,
-      [
-        ".grid-fields--wide",
-        ".page__header > p",
-        ".page__header-text > p",
-        ".key-row",
-        ".key-row > :not(.ac-brand, .list-col)",
-      ],
-    ],
+    [LAYOUT, [".grid-fields--wide", ".page__header > p", ".page__header-text > p", ".key-row", ".key-row__tail"]],
     [
       KIT,
       [
@@ -44,6 +35,7 @@ test("the built stylesheet keeps what places the Settings header, the bucket's h
         ".ac-card__key",
         ".ac-card__head:not(:has(.ac-card__sub)) .ac-card__key",
         ".ac-card__head:not(:has(.ac-card__sub)) .ac-card__key + .ac-card__heading",
+        ".ac-captail",
         ".ac-optrow__desc",
         ".ac-card__sub",
         ".ac-field__help",

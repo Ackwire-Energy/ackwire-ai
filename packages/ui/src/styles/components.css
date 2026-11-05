@@ -229,6 +229,24 @@ html[data-pointer] :focus-visible {
     margin-block-start: calc(var(--cap-top) - 0.5lh);
   }
 }
+/*
+ * What ends a row whose words can wrap (a chip, its buttons, a switch) belongs to the first line, never to the row's
+ * middle: `.ac-captail` is a box as tall as that line (in the row's font size and line height), whatever it holds
+ * centred on it, so a 32px button reaches as far above the line as below. Beside a first line that rises
+ * (`.ac-captop`, in an `.ac-faceline`) it takes `.ac-captop` too and rises with it.
+ */
+.ac-captail {
+  display: flex;
+  flex: none;
+  align-self: flex-start;
+  align-items: center;
+  height: 22px;
+}
+@supports (top: 1lh) {
+  .ac-captail {
+    height: 1lh;
+  }
+}
 
 /*
  * The plate around a small ghost button's icon (32px around 16px, 40px on touch): what shows only on hover. A ghost
