@@ -65,7 +65,8 @@
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: -0.01em;
-  text-wrap: pretty;
+  /* Two short lines of a length: "pretty" still ended a line on "e-" and began the next with "mail". */
+  text-wrap: balance;
 }
 .auth__lead {
   margin: 4px 0 0;

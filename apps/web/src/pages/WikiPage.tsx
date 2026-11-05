@@ -379,18 +379,22 @@ function WikiNav({
           <div className="wiki-nav__list">{pinned.map((p) => pageRow(p, false))}</div>
         </section>
       )}
-      <nav className="wiki-nav__section" aria-label={t("wiki.tree")}>
-        <span className="wiki-label">{filtering ? t("wiki.results", { count: shown.length }) : t("wiki.tree")}</span>
-        {loading ? (
-          <LoadingList count={5} avatar={false} />
-        ) : (
-          <div className="wiki-nav__list">
-            {root.folders.map((f) => folderRows(f))}
-            {root.pages.map((p) => pageRow(p))}
-            {shown.length === 0 && <p className="small muted wiki-nav__empty">{t("wiki.noMatch")}</p>}
-          </div>
-        )}
-      </nav>
+      {/* An empty wiki has no tree to show (its page says so and how to start): no "Pages" over nothing, and "none
+          with that name" only after a search. */}
+      {(loading || filtering || pages.length > 0) && (
+        <nav className="wiki-nav__section" aria-label={t("wiki.tree")}>
+          <span className="wiki-label">{filtering ? t("wiki.results", { count: shown.length }) : t("wiki.tree")}</span>
+          {loading ? (
+            <LoadingList count={5} avatar={false} />
+          ) : (
+            <div className="wiki-nav__list">
+              {root.folders.map((f) => folderRows(f))}
+              {root.pages.map((p) => pageRow(p))}
+              {filtering && shown.length === 0 && <p className="small muted wiki-nav__empty">{t("wiki.noMatch")}</p>}
+            </div>
+          )}
+        </nav>
+      )}
       {tags.length > 0 && (
         <section className="wiki-nav__section" aria-label={t("wiki.tags")}>
           <span className="wiki-label">{t("wiki.tags")}</span>

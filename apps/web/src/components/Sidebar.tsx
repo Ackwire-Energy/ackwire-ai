@@ -733,12 +733,11 @@ export function Sidebar() {
         <div className="sidebar__org">
           <WorkspaceMenu
             summary={
+              // Each count with its own plural: one summary string followed the people's, so "1 agentes".
               overview.data
-                ? t("shell.summary", {
-                    count: overview.data.people,
-                    people: overview.data.people,
-                    agents: overview.data.agents,
-                  })
+                ? `${t("settings.tileState.members", { count: overview.data.people })} · ${t("sidebarAgents.count", {
+                    count: overview.data.agents,
+                  })}`
                 : null
             }
           />

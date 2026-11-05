@@ -659,7 +659,10 @@ html:not([data-pointer]) .cal-band:focus-visible {
 .cal-more__title {
   margin: 0 0 6px;
   font-weight: 600;
-  text-transform: capitalize;
+}
+/* Only the first letter: `capitalize` raised every word ("Novembro De 2026"). */
+.cal-more__title::first-letter {
+  text-transform: uppercase;
 }
 .cal-more__list {
   display: flex;
@@ -742,7 +745,10 @@ html:not([data-pointer]) .cal-band:focus-visible {
 .cal-mini__title {
   flex: 1;
   font-weight: 600;
-  text-transform: capitalize;
+}
+/* Only the first letter: `capitalize` raised every word ("Novembro De 2026"). */
+.cal-mini__title::first-letter {
+  text-transform: uppercase;
 }
 .cal-mini__grid {
   display: grid;

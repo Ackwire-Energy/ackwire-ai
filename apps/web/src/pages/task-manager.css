@@ -4,9 +4,13 @@
   /* "Tempo" warms as a task goes on (full at 40 min), like an operating system's task manager. */
   --tm-heat: color-mix(in srgb, var(--warn) 22%, var(--warn-soft));
 }
+/* A width of its own: in the page head's actions, which size to what they hold, a flex basis counted for nothing and
+   the field fell to its 220px minimum, cutting its placeholder mid-word. */
 .tm-search {
-  flex: 0 1 360px;
+  flex: 0 1 auto;
+  width: 360px;
   min-width: 220px;
+  max-width: 100%;
 }
 .tm-search > .ac-searchfield {
   width: 100%;
@@ -409,6 +413,7 @@ html:not([data-pointer]) .tm-more:focus-visible {
 @media (max-width: 760px) {
   .tm-search {
     flex-basis: 100%;
+    width: 100%;
   }
   .tm-card.ac-card {
     width: 156px;

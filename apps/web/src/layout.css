@@ -736,6 +736,18 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   color: var(--ink);
   font-weight: 400;
 }
+/* A row that acts in place ("Create your first agent" opening its dialog) is a button: none of the browser's own
+   button look (outset border, gray face, Arial, centred words), a row like its links. */
+button.sidebar__item {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 .sidebar__item:hover {
   background: var(--surface);
 }
@@ -3784,8 +3796,9 @@ html:not([data-pointer]) .settings__link:focus-visible {
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: var(--space-4);
 }
+/* As tall as its title and its one state line (a blank one keeps the row even): a 128px floor left most tiles,
+   which have no state yet, as tall boxes holding only a title. */
 .settings-tile {
-  min-height: 128px;
   color: inherit;
   text-decoration: none;
 }
