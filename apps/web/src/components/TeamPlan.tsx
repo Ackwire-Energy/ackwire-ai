@@ -136,27 +136,30 @@ export function TeamPlanBody({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a
         {plan.agents.map((a) => (
           <li key={a.handle} className="tp-agent">
             <AgentAvatar name={a.name} appearance={lookOf(a)} size="md" />
-            <span className="tp-agent__text">
+            <span className="tp-agent__text ac-captop">
               <span>
                 <b>{a.name}</b> <span className="muted">{a.role}</span>
               </span>
               <span className="tp-agent__line">{a.line}</span>
             </span>
-            <span className="tp-pill">
-              <Icon name="channel" size={14} />
-              <span>{a.channel}</span>
-              {plan.newChannels.includes(a.channel) && <b className="tp-pill__new">{t("teamPlan.card.new")}</b>}
+            {/* On the name's line, whatever the description's length. */}
+            <span className="tp-agent__tail ac-captop">
+              <span className="tp-pill">
+                <Icon name="channel" size={14} />
+                <span>{a.channel}</span>
+                {plan.newChannels.includes(a.channel) && <b className="tp-pill__new">{t("teamPlan.card.new")}</b>}
+              </span>
+              {onAdjust && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t("teamPlan.card.adjustName", { name: a.name })}
+                  onClick={() => onAdjust(a)}
+                >
+                  {t("teamPlan.card.adjust")}
+                </Button>
+              )}
             </span>
-            {onAdjust && (
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label={t("teamPlan.card.adjustName", { name: a.name })}
-                onClick={() => onAdjust(a)}
-              >
-                {t("teamPlan.card.adjust")}
-              </Button>
-            )}
           </li>
         ))}
       </ul>
@@ -568,7 +571,7 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
                 <div key={a.handle} className="tp-map__agent">
                   <span className="ac-faceline">
                     <AgentAvatar name={a.name} appearance={lookOf(a)} size="sm" />
-                    <span className="ac-captop">
+                    <span>
                       <b>{a.name}</b> <span className="small muted">{a.role}</span>
                     </span>
                   </span>
@@ -586,7 +589,7 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
         {plan.weekly && lodi && (
           <p className="tp-map__lodi ac-faceline">
             <AgentAvatar agentId={lodi.id} name={lodi.name} size="sm" />
-            <span className="ac-captop">{t("teamPlan.map.reviewer", { name: lodi.name })}</span>
+            <span>{t("teamPlan.map.reviewer", { name: lodi.name })}</span>
           </p>
         )}
         {plan.approvals && (

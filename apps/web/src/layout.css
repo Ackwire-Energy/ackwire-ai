@@ -1058,8 +1058,11 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .ac-msg--own .ac-msg__text .md__table {
   background: var(--bg);
 }
+/* Its line is never capped by a short bubble's width (a narrow panel): it grows to the left, into the row's room,
+   instead of its words running out of its plate. */
 .ac-msg--own .thread-line {
   align-self: flex-end;
+  max-width: none;
   margin: 4px -6px 0 0;
   border-radius: 10px 10px 3px 10px;
 }
@@ -6871,8 +6874,10 @@ html:not([data-pointer]) .sky-welcome__close:focus-visible {
   height: auto;
   max-width: 420px;
 }
+/* A wide, short picture (a strip of a screen) still shows above its caption: at least 140px tall, cropped to fit. */
 .artifact-tile:only-child .file-thumb img {
   height: auto;
+  min-height: 140px;
   max-height: 320px;
 }
 /* Also when alone on the message (its `height: auto` would otherwise collapse the tile until the image decodes). */
