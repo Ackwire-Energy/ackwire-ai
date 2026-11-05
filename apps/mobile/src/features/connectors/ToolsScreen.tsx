@@ -51,5 +51,6 @@ export function ToolsScreen({ connectionId }: { connectionId: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  page: { paddingHorizontal: 20, paddingTop: 8, gap: 14 },
+  // The pushed screens' 16-point margin, as the connection screen it opens from.
+  page: { paddingHorizontal: 16, paddingTop: 8, gap: 14 },
 });

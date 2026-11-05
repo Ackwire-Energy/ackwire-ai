@@ -385,7 +385,8 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
               ) : null}
               {busy ? (
                 <View style={styles.note}>
-                  <Icon name="laptop" size={14} color={c.muted} />
+                  {/* On the note's first line, not above its letters at the row's top. */}
+                  <LineIcon variant="footnote" name="laptop" size={14} color={c.muted} />
                   <Text variant="footnote" tone="muted" style={styles.shrink}>
                     {say(busy)}
                   </Text>

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, Text, useTheme } from "@/ui";
+import { Button, LineIcon, Text, useTheme } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
 
@@ -44,7 +44,7 @@ export function CostlyProposalCard({ message: m }: { message: Message }) {
   return (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.row}>
-        <Icon name={decided ? "check" : "shield"} size={16} color={colors.ink2} />
+        <LineIcon name={decided ? "check" : "shield"} variant="subhead" size={16} color={colors.ink2} />
         <Text variant="subhead" style={styles.title}>
           {t(`chat.body.autonomy_proposal.${card.cost}`)}
         </Text>

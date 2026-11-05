@@ -251,6 +251,7 @@ const styles = StyleSheet.create({
   band: { alignItems: "center", gap: 8, paddingHorizontal: 24, paddingBottom: 22 },
   center: { textAlign: "center" },
   loading: { marginTop: 24 },
-  body: { paddingHorizontal: 20, gap: 12 },
+  // The pushed screens' 16-point margin (the connectors list and the settings screens use it too).
+  body: { paddingHorizontal: 16, gap: 12 },
   section: { fontWeight: "600", paddingTop: 6 },
 });

@@ -32,6 +32,7 @@ import {
   GroupedList,
   GroupedRow,
   Icon,
+  LineIcon,
   systemText,
   Text,
   useTheme,
@@ -452,7 +453,8 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
     body = (
       <View style={styles.failed}>
         <View style={styles.failedLine}>
-          <Icon name="info" size={16} color={c.warn} />
+          {/* On the reason's first line (at the row's top it sat above the letters). */}
+          <LineIcon variant="footnote" name="info" size={16} color={c.warn} />
           <Text variant="footnote" style={[styles.grow, { color: c.warn }]}>
             {t("dashboards.newWidget.testFailed", { reason: widgetWords.failure(draft) })}
           </Text>

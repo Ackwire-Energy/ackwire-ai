@@ -289,8 +289,9 @@ const styles = StyleSheet.create({
   sentence: { fontWeight: "500", lineHeight: 26 },
   legend: { flexDirection: "row", flexWrap: "wrap", rowGap: 4, columnGap: 14 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  source: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 12 },
-  acct: { flexDirection: "row", alignItems: "center", gap: 12 },
+  // The line under the name wraps: the mark and the numbers stay on the name's line instead of the block's middle.
+  source: { flexDirection: "row", alignItems: "flex-start", gap: 14, paddingVertical: 12 },
+  acct: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   key: {
     width: 30,
     height: 30,

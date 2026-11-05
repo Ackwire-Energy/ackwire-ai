@@ -17,7 +17,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Dither } from "@/sky/Dither";
-import { Button, EmptyState, Filters, Icon, SearchField, SectionHeader, Text } from "@/ui";
+import { Button, EmptyState, Filters, Icon, LineIcon, SearchField, SectionHeader, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
@@ -408,7 +408,7 @@ function Tile({
         {name}
       </Text>
       <View style={styles.tileText}>
-        {locked ? <Icon name="lock" size={13} color={c.muted} /> : null}
+        {locked ? <LineIcon variant="small" name="lock" size={13} color={c.muted} /> : null}
         <Text variant="small" tone="muted" numberOfLines={2} style={styles.grow}>
           {text}
         </Text>
@@ -463,7 +463,8 @@ const styles = StyleSheet.create({
   band: { width: 88, alignSelf: "stretch", minHeight: 72, alignItems: "center", justifyContent: "center" },
   cardText: { flex: 1, minWidth: 0, paddingVertical: 12, paddingRight: 14 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, paddingHorizontal: 16, paddingTop: 10 },
-  tileText: { flexDirection: "row", alignItems: "center", gap: 4 },
+  // The lock stays on the first line of a two-line description, not between its lines.
+  tileText: { flexDirection: "row", alignItems: "flex-start", gap: 4 },
   tile: {
     width: "48%",
     flexGrow: 1,
