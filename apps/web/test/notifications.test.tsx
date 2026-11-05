@@ -278,6 +278,47 @@ describe("Notificações", () => {
     expect(row.textContent).toContain("Você respondeu: Sobe sim, às 17h.");
   });
 
+  test("grouped task comments expand from the task's conversation (ADR 0145)", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const issue = await api.issues.get(ORG_ID, 131);
+    const at = await api.issues.conversation(ORG_ID, issue.id);
+    for (const [id, body, m] of [
+      ["m-task-1", "Comecei pelo template.", 8],
+      ["m-task-2", "Mandei o lembrete pelo WhatsApp.", 5],
+    ] as const) {
+      state.messages.push({
+        id,
+        channelId: at.channelId,
+        threadId: at.rootId,
+        author: { type: "agent", id: ADA_ID },
+        body,
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: ago(m),
+      });
+    }
+    state.notifications = [
+      notification({
+        id: "n-task",
+        kind: "issue_comment",
+        actors: [{ type: "agent", id: ADA_ID }],
+        count: 2,
+        source: { issueId: issue.id, issueNumber: 131, label: issue.title },
+        latest: { text: "Mandei o lembrete pelo WhatsApp.", title: issue.title },
+        updatedAt: ago(5),
+      }),
+    ];
+    await renderApp(`/org/${ORG_ID}/notifications`, { api });
+    await settle(8);
+    const row = document.querySelector('[data-n="n-task"]') as HTMLElement;
+    await click(within(row).getByRole("button", { name: "Ver 2 comentários" }));
+    await settle(6);
+    const shown = row.querySelector(".nt-reps")?.textContent;
+    expect(shown).toContain("Comecei pelo template.");
+    expect(shown).toContain("Mandei o lembrete pelo WhatsApp.");
+  });
+
   test("an agent's question: a suggestion fills the answer, Enviar answers through the question", async () => {
     const { state } = await go();
     const waiting = screen().getByRole("region", { name: "Esperando você" });

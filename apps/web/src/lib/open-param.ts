@@ -48,3 +48,9 @@ export function openSearch(search: Record<string, unknown>): { open?: string | n
   if (typeof v !== "string" || !v) return {};
   return /^\d{1,15}$/.test(v) ? { open: Number(v) } : { open: v };
 }
+
+/** `validateSearch` for the tasks' pages: the open task, and `m`, a message of its conversation to open at. */
+export function taskSearch(search: Record<string, unknown>): { open?: string | number; m?: string } {
+  const m = typeof search.m === "string" && search.m ? { m: search.m } : {};
+  return { ...openSearch(search), ...m };
+}

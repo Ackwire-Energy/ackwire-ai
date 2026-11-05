@@ -242,7 +242,6 @@ p {
  * then the page, laid out as before (a row: the page's main column and anything beside it).
  */
 .shell__work {
-  /* The island's place (components/notice-island.css): centered over the work area. */
   position: relative;
   flex: 1 1 560px;
   min-width: 0;
@@ -1077,7 +1076,7 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   margin-top: 6px;
 }
 /* A tile wider than its thumbnail (or a file's row): the thumbnail keeps to its right edge, under the bubble. */
-.ac-msg--own .artifact-tile > :is(.file-thumb, .file-row) {
+.ac-msg--own .artifact-tile > :is(.file-thumb, .file-row, .ac-video) {
   margin-left: auto;
 }
 /* A table on my bubble is cut from the page's color, as its code blocks are (the kit's `--surface-sunken` there). */
@@ -7031,6 +7030,11 @@ html:not([data-pointer]) .file-row__open:focus-visible {
   min-height: 0;
   overflow-y: auto;
 }
+/* A video fills the viewer the same way, its glass bar over its foot. */
+.file-view--image > .ac-video--viewer {
+  flex: 1 1 auto;
+  min-height: 240px;
+}
 .file-view--image .file-view__preview {
   flex: 1 1 auto;
   align-items: center;
@@ -11997,8 +12001,9 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   opacity: 0;
 }
 
-/* Back to the latest messages: a round button at the top right of the list (below the header and the pinned bar,
-   clear of the scrollbar), with what arrived below as a count, red when it mentions me. */
+/* Back to the latest messages: a round button at the bottom right of the list, right above the composer and its
+   working bar (clear of the scrollbar), with what arrived below as a count, red when it mentions me. Placed after the
+   list, so the button rises from the list's bottom edge. */
 .channel__latest {
   position: relative;
   height: 0;
@@ -12011,7 +12016,7 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
 }
 .channel__latest-at {
   position: absolute;
-  top: 12px;
+  bottom: 12px;
   right: 24px;
 }
 .channel__latest[data-shown] .channel__latest-at {
@@ -12047,7 +12052,7 @@ html:not([data-pointer]) .channel__latest-btn.ac-btn:focus-visible {
   }
   .channel__latest-at {
     transition: transform 0.22s cubic-bezier(0.34, 1.5, 0.5, 1);
-    transform: translateY(-6px) scale(0.92);
+    transform: translateY(6px) scale(0.92);
   }
   .channel__latest[data-shown] .channel__latest-at {
     transform: none;
@@ -12090,18 +12095,22 @@ html:not([data-pointer]) .channel__latest-btn.ac-btn:focus-visible {
 .ac-typing__text + .ac-typing__elapsed::before {
   content: "· ";
 }
-/* One agent out of view: its row's step after its name, at most one width (cut with "…"), its time, "Ver" and the
-   stop right after it; a narrow bar still fits it. */
+/* One agent out of view: its row's step after its name, as wide as its words while the bar has room (cut with "…"
+   only when it runs out), its time, "Ver" and the stop right after it. */
 .ac-typing__step {
   display: flex;
   flex: 0 1 auto;
-  max-width: 260px;
   min-width: 0;
   margin-left: 0.3em;
 }
 /* Its step and someone typing beside it ("· Marina digitando…", after its time): the pill widens for both. */
 .ac-typing[data-active="true"][data-wide] {
   max-width: 640px;
+}
+/* A task's conversation column is a little wider than the bar's one width: there the bar spans its composer, as it
+   does in a thread beside a channel. */
+:is(.ac-details__side, .issue-page__talk) .channel__composer > .ac-typing[data-active="true"] {
+  max-width: none;
 }
 .ac-typing__also {
   display: flex;
@@ -12142,11 +12151,6 @@ html:not([data-pointer]) .channel__latest-btn.ac-btn:focus-visible {
   width: 24px;
   height: 24px;
   margin-block: -4px;
-}
-.ac-wait > .run-tail {
-  font-size: 14px;
-  line-height: 20px;
-  color: var(--muted);
 }
 .ac-typing__see {
   flex: none;

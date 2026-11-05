@@ -2,7 +2,7 @@ import { badgeCount } from "@agenteschat/client/lib/unread";
 import { Button, CountBadge } from "@agenteschat/ui";
 
 /**
- * Back to the latest messages: a round button at the top right of the message list, while the person reads more
+ * Back to the latest messages: a round button at the bottom right of the message list, while the person reads more
  * than a screen above the end or something new arrived below. It counts what arrived, in red when one mentions the
  * person (as the sidebar's mention count). Always mounted, so it fades in and out; hidden, it is out of the tab order
  * and of the accessibility tree.

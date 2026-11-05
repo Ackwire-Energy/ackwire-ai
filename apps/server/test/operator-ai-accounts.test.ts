@@ -4,7 +4,7 @@ import { createLogger } from "../src/logger";
 import { createOperatorApp } from "../src/operator/app";
 import { createTestServer, type TestServer } from "./harness";
 
-/** ADR 0145: the operator's reads of the AI accounts people connected. */
+/** ADR 0146: the operator's reads of the AI accounts people connected. */
 
 const TOKEN = "operator-test-token-".padEnd(48, "x");
 const RANGE = "from=2026-10-01&to=2026-10-31";

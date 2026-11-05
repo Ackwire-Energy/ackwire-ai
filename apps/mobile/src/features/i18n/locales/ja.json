@@ -932,6 +932,7 @@
   "files": {
     "type": {
       "image": "画像",
+      "video": "動画",
       "pdf": "PDF",
       "document": "ドキュメント",
       "table": "表",
@@ -956,7 +957,17 @@
     "openImage": "画像を開く",
     "imageOf": "画像 {{index}}/{{count}}",
     "place": "{{index}}/{{count}}",
-    "noPreview": "このファイルはアプリでは開けません。共有して別のアプリで開いてください。"
+    "noPreview": "このファイルはアプリでは開けません。共有して別のアプリで開いてください。",
+    "video": {
+      "play": "再生",
+      "pause": "一時停止",
+      "replay": "もう一度再生",
+      "seek": "動画の再生位置",
+      "mute": "ミュート",
+      "unmute": "ミュート解除",
+      "fullscreen": "全画面表示",
+      "open": "開く"
+    }
   },
   "issues": {
     "title": "タスク",

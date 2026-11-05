@@ -16,13 +16,13 @@ test("a row's minor action, its time and its stop sit right after its words, nev
   expect(last(shipped, ".ac-msg__error-row>.ac-msg__error", "flex")).toBeUndefined();
   // The receipt's mark right after the time in the name's line.
   expect(last(shipped, ".ac-msg__aside", "margin-left")).toBeUndefined();
-  // "Pensando… · 2 s ■": the step as wide as its words (at most 340px), the clock with no room kept for its seconds.
-  expect(last(shipped, ".ac-wait__step", "flex")).not.toContain("340px");
-  expect(last(shipped, ".ac-wait__step", "max-width")).toBe("340px");
+  // The header's "· 2 s ■": the clock with no room kept for its seconds.
   expect(last(shipped, ".run-tail__clock", "min-width")).toBeUndefined();
+  // No thinking row in the conversation any more: the bar above the composer says it.
+  expect(shipped).not.toContain(".ac-wait");
   // The bar's step the same way.
   expect(last(shipped, ".ac-typing__step", "flex")).not.toContain("260px");
-  expect(last(shipped, ".ac-typing__step", "max-width")).toBe("260px");
+  expect(last(shipped, ".ac-typing__step", "max-width")).toBeUndefined();
 });
 
 test("a thread opens in the members column's place, wider, with no scrim; a phone keeps the whole-screen sheet", async () => {

@@ -1,15 +1,12 @@
-import { and, desc, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
-import { cutText } from "./format";
+import { and, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
 
-const { issues, issueActivity, users, agents, artifacts } = schema;
+const { issues, artifacts } = schema;
 
 /**
- * "Ask Ada to implement": the work conversation lives in the
- * requester's DM with the agent, as a thread whose root is a compact card
- * (`meta.issueWork`). The agent's instructions never show in the chat: they
- * are built from the issue at run time (`issueWorkBrief`) for every run in
- * that thread. Where the issue came from a channel message, that conversation
- * gets one discreet line (`meta.issueTaken`).
+ * "Ask Ada to implement" works in the task's own conversation (ADR 0145). Work asked before that lives in the
+ * requester's DM with the agent, as a thread whose root is a compact card (`meta.issueWork`). The agent's
+ * instructions never show in the chat: they are built from the issue at run time (`issueWorkBrief`). Where the
+ * issue came from a channel message, that conversation gets one discreet line (`meta.issueTaken`).
  */
 export interface IssueWorkMeta {
   issueId: string;
@@ -34,40 +31,24 @@ export function issueWorkOf(
   };
 }
 
-/** Comments read back to the agent at most (newest; older ones are on the issue). */
-const COMMENTS_SHOWN = 10;
-const COMMENT_CHARS = 1_500;
-
 /**
- * The task block of a run in an issue's work thread, read from the issue now
- * (description, criteria and their state, PRs, the latest comments), so each
- * turn sees what the team wrote on the issue since the last one.
+ * The task block of a run in a task's conversation (ADR 0145), or in an older work thread of a DM, read from the
+ * issue now (description, criteria and their state, PRs, files), so each turn sees what the team changed since
+ * the last one. The conversation itself is the thread the run reads. `asked`: the agent was asked to implement it
+ * (the assignee working on it); else it was called into the task's conversation.
  */
-export async function issueWorkBrief(db: Executor, orgId: string, issueId: string): Promise<string | null> {
+export async function issueWorkBrief(
+  db: Executor,
+  orgId: string,
+  issueId: string,
+  options: { asked?: boolean; inConversation?: boolean } = {},
+): Promise<string | null> {
+  const asked = options.asked ?? true;
   const [issue] = await db
     .select()
     .from(issues)
     .where(and(eq(issues.id, issueId), eq(issues.orgId, orgId)));
   if (!issue) return null;
-  const comments = (
-    await db
-      .select()
-      .from(issueActivity)
-      .where(and(eq(issueActivity.issueId, issue.id), eq(issueActivity.kind, "comment")))
-      .orderBy(desc(issueActivity.createdAt))
-      .limit(COMMENTS_SHOWN)
-  ).reverse();
-  const personIds = [...new Set(comments.filter((c) => c.authorType === "person").map((c) => c.authorId))];
-  const agentIds = [...new Set(comments.filter((c) => c.authorType === "agent").map((c) => c.authorId))];
-  const [people, bots] = await Promise.all([
-    personIds.length
-      ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, personIds))
-      : [],
-    agentIds.length
-      ? db.select({ id: agents.id, name: agents.name }).from(agents).where(inArray(agents.id, agentIds))
-      : [],
-  ]);
-  const names = new Map([...people, ...bots].map((r) => [r.id, r.name]));
   // Files attached when it was created, on comments or linked later: the agent opens them with `read_artifact`.
   const files = issue.artifactIds.length
     ? await db
@@ -77,27 +58,26 @@ export async function issueWorkBrief(db: Executor, orgId: string, issueId: strin
     : [];
   const criteria = issue.criteria.map((c, i) => `${i + 1}. [${c.done ? "x" : " "}] ${c.text}`).join("\n");
   const prs = issue.pullRequests.map((p) => `- #${p.number} ${p.url}`).join("\n");
-  const lines = comments
-    .filter((c) => c.text.trim())
-    .map(
-      (c) =>
-        `- ${names.get(c.authorId) ?? (c.authorType === "agent" ? "an agent" : "someone")} (${c.createdAt.toISOString().slice(0, 16).replace("T", " ")}): ${cutText(c.text.trim(), COMMENT_CHARS)}`,
-    );
+  const here = options.inConversation ?? true;
   return [
-    `# Your task: issue #${issue.number}`,
-    `The person in this conversation asked you to implement issue #${issue.number} "${issue.title}" (status: ${issue.status}).`,
+    asked ? `# Your task: issue #${issue.number}` : `# This conversation: task #${issue.number}`,
+    asked
+      ? `You were asked to implement issue #${issue.number} "${issue.title}" (status: ${issue.status}).`
+      : `This is the conversation of task #${issue.number} "${issue.title}" (status: ${issue.status}). Someone called you into it: answer what they ask about the task.`,
     issue.description.trim() ? `## Description\n${issue.description.trim()}` : "",
     criteria ? `## Acceptance criteria\n${criteria}` : "",
     prs ? `## Pull requests linked\n${prs}` : "",
     files.length
       ? `## Files attached to the issue\n${files.map((f) => `- ${f.title} (artifact ${f.id})`).join("\n")}\nOpen one with \`read_artifact\` when it helps.`
       : "",
-    lines.length ? `## Latest comments on the issue\n${lines.join("\n")}` : "",
     [
       "## How to work on it",
-      "- This conversation is private between you and the person who asked. The rest of the team follows the work on the issue itself, so post progress there: a short comment with `comment_issue` when you start, at each real step and when you finish.",
-      `- Refer to the issue as #${issue.number} in your tools. Check each criterion you meet with \`update_issue\` (\`done_criteria\`), and link the pull request with \`update_issue\`. The issue's status follows your work on its own: don't set it yourself.`,
-      "- Comments people leave on the issue show above on your next turns: take them into account.",
+      here
+        ? "- This is the task's own conversation: everyone who sees the task reads it and writes here, and your replies land here. Say when you start, at each real step and when you finish, in your replies."
+        : "- This conversation is private between you and the person who asked. The rest of the team follows the task's own conversation: post progress there with `comment_issue` when you start, at each real step and when you finish.",
+      asked
+        ? `- Refer to the issue as #${issue.number} in your tools. Check each criterion you meet with \`update_issue\` (\`done_criteria\`), and link the pull request with \`update_issue\`. The issue's status follows your work on its own: don't set it yourself.`
+        : `- Refer to the task as #${issue.number} in your tools. Change it only when someone asks you to.`,
       "- Sensitive actions (merge, deploy, rollback) still need a person's approval.",
     ].join("\n"),
   ]

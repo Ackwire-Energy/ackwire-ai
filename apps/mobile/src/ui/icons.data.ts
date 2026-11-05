@@ -153,6 +153,10 @@ export const ICONS = {
   bolt: [p("M13 3 5 13.5h6L10 21l8-10.5h-6Z")],
   join: [p("M5 12h11M12 7l5 5-5 5"), p("M19 5v14")],
   play: [p("M8 5.5v13l10.5-6.5Z")],
+  // The video player: a video that ended, the sound off, full screen.
+  replay: [p("M5.5 12a6.5 6.5 0 1 0 2-4.7M6.5 3.5v4.5H11")],
+  mute: [p("M4 9.5v5h3.5l5 4.5V5L7.5 9.5Z"), p("M16 9.5l5 5M21 9.5l-5 5")],
+  fullscreen: [p("M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5")],
   trash: [p("M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v5.5M14 11v5.5")],
   text: [p("M5 7h14M5 12h14M5 17h9")],
   eye: [p("M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z"), c(12, 12, 2.6)],

@@ -11,6 +11,7 @@ import { assertStorageRoom } from "./limits";
 import { can, requireActiveMembership } from "./organizations";
 import { markdownToPdf } from "./pdf";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
+import { taskReaderSql } from "./task-access";
 
 const { artifacts, artifactVersions, channels, channelMembers } = schema;
 
@@ -498,15 +499,22 @@ export function diffToPatch(files: { path: string; patch: string }[]): string {
 async function personCanRead(db: Database, userId: string, orgId: string, a: Pick<ArtifactRow, "channelId">) {
   if (!a.channelId) return true;
   const [row] = await db
-    .select({ visibility: channels.visibility, kind: channels.kind, memberId: channelMembers.id })
+    .select({
+      visibility: channels.visibility,
+      kind: channels.kind,
+      memberId: channelMembers.id,
+      // A task's conversation: whoever sees the task (ADR 0145).
+      taskReader: taskReaderSql(sql`${channels.id}`, sql`${userId}::text`),
+    })
     .from(channels)
     .leftJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, userId)))
     .where(and(eq(channels.id, a.channelId), eq(channels.orgId, orgId)));
   if (!row) return false;
+  if (row.kind === "task") return row.taskReader === true || String(row.taskReader) === "t";
   return row.memberId !== null || (row.visibility === "public" && (row.kind === "channel" || row.kind === "forum"));
 }
 
-/** The channels whose files this person may read: those they belong to, and public channels and forums. */
+/** The channels whose files this person may read: those they belong to, public channels and forums, tasks they see. */
 async function personReadableChannels(db: Database, userId: string, orgId: string): Promise<string[]> {
   const member = and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, userId));
   const open = and(eq(channels.visibility, "public"), inArray(channels.kind, ["channel", "forum"]));
@@ -514,7 +522,16 @@ async function personReadableChannels(db: Database, userId: string, orgId: strin
     .select({ id: channels.id })
     .from(channels)
     .leftJoin(channelMembers, member)
-    .where(and(eq(channels.orgId, orgId), or(sql`${channelMembers.id} is not null`, open)));
+    .where(
+      and(
+        eq(channels.orgId, orgId),
+        or(
+          sql`${channelMembers.id} is not null`,
+          open,
+          and(eq(channels.kind, "task"), taskReaderSql(sql`${channels.id}`, sql`${userId}::text`)),
+        ),
+      ),
+    );
   return rows.map((r) => r.id);
 }
 

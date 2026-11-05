@@ -280,6 +280,21 @@ export const extraIcons = {
   ],
   /** A voice message's words, opened on demand. */
   note: [["path", { d: "M4.5 6h11M4.5 10h11M4.5 14h6.5" }]],
+  /** "Ver de novo": a video that ended. */
+  replay: [["path", { d: "M4.5 10a5.5 5.5 0 1 0 1.7-4M5.5 3v3.5H9" }]],
+  /** "Tirar o som": a speaker with its sound. */
+  volume: [["path", { d: "M3.5 8v4h3l4 3.5v-11l-4 3.5zM13.5 7.5a3.5 3.5 0 0 1 0 5M15.5 5.5a6.3 6.3 0 0 1 0 9" }]],
+  /** "Ligar o som": the speaker crossed. */
+  mute: [["path", { d: "M3.5 8v4h3l4 3.5v-11l-4 3.5zM13.5 8l4 4M17.5 8l-4 4" }]],
+  /** "Tela cheia": four corners pointing out. */
+  fullscreen: [["path", { d: "M3.5 7.5v-4h4M12.5 3.5h4v4M16.5 12.5v4h-4M7.5 16.5h-4v-4" }]],
+  /** "Sair da tela cheia": four corners pointing in. */
+  fullscreenExit: [["path", { d: "M7.5 3.5v4h-4M16.5 7.5h-4v-4M12.5 16.5v-4h4M3.5 12.5h4v4" }]],
+  /** A video file: a frame with a play mark. */
+  video: [
+    ["rect", { x: "3", y: "4.5", width: "14", height: "11", rx: "2.5" }],
+    ["path", { d: "m8.5 7.8 3.7 2.2-3.7 2.2z" }],
+  ],
   /** An uploaded file of any type (Drive). */
   file: [["path", { d: "M6 3h6l3.5 3.5V17H6zM12 3v3.5h3.5" }]],
   /** An image file. */

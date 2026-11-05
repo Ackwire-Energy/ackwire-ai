@@ -1,10 +1,10 @@
-# 0145. How each Claude connection signs in: kept per connection, chosen by the operator for new ones
+# 0146. How each Claude connection signs in: kept per connection, chosen by the operator for new ones
 
 - Status: Accepted (2026-11-05; built: the runner, the engine, the operator API, the shared client, the web and the phone app)
 - Date: 2026-11-05
 - Extends: ADR 0041 (accounts per agent), ADR 0056 (operator API), ADR 0059 (AI accounts belong to people)
 - Amends: ADR 0059 §2 (the method a Claude sign-in for all agents uses is per connection and chosen by the operator for new ones; an unchecked status is not signed out), ADR 0056 §4 (the Claude sign-in policy and the AI-accounts reads) and §5 (`account.failure`, a failed `run.finished`'s `failure`)
-- Code: runner protocol 46 (`CLAUDE_AUTH_PROTOCOL`, `AuthMethod`, `ProviderFailureCause`, `claudeLoginMethodsOf` in `packages/adapters/src/machine-protocol.ts`); runner `apps/server/runner/accounts.ts` (the `<id>.method` marker, `authMethod`, `statusUnknown`, `begin`'s `method`), `brain.ts` (`cause`, `httpStatus`), `agent-users.ts` (`authEgressPrefix`); migration `0215_claude_auth` (`machine_accounts.auth_method`, `status_unknown`, `provider_org_id`, `last_failure_cause`, `last_failure_at`, `last_success_at`; `claude_auth_settings`); engine `packages/engine/src/claude-auth-policy.ts`, `machine-accounts.ts`, `operator-events.ts`, `ai-accounts-analytics.ts`; operator routes `apps/server/src/operator/claude-auth.ts`, `analytics.ts`; client `packages/client/src/lib/ai-accounts.ts`
+- Code: runner protocol 46 (`CLAUDE_AUTH_PROTOCOL`, `AuthMethod`, `ProviderFailureCause`, `claudeLoginMethodsOf` in `packages/adapters/src/machine-protocol.ts`); runner `apps/server/runner/accounts.ts` (the `<id>.method` marker, `authMethod`, `statusUnknown`, `begin`'s `method`), `brain.ts` (`cause`, `httpStatus`), `agent-users.ts` (`authEgressPrefix`); migration `0216_claude_auth` (`machine_accounts.auth_method`, `status_unknown`, `provider_org_id`, `last_failure_cause`, `last_failure_at`, `last_success_at`; `claude_auth_settings`); engine `packages/engine/src/claude-auth-policy.ts`, `machine-accounts.ts`, `operator-events.ts`, `ai-accounts-analytics.ts`; operator routes `apps/server/src/operator/claude-auth.ts`, `analytics.ts`; client `packages/client/src/lib/ai-accounts.ts`
 
 ## Context
 

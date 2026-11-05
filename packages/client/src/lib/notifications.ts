@@ -334,7 +334,7 @@ export type OpenTarget =
   | { to: "/org/$orgId/dm/agent/$agentId"; params: { agentId: string }; search?: { m: string } }
   | { to: "/org/$orgId/agents/$agentId"; params: { agentId: string } }
   | { to: "/org/$orgId/dm/person/$userId"; params: { userId: string }; search?: { m: string } }
-  | { to: "/org/$orgId/issues/$number"; params: { number: string } }
+  | { to: "/org/$orgId/issues/$number"; params: { number: string }; search?: { m: string } }
   | { to: "/org/$orgId/forum/$topicId"; params: { topicId: string } }
   | { to: "/org/$orgId/approvals"; search?: { open: string } }
   | { to: "/org/$orgId/routines"; search?: { open: string } }
@@ -450,7 +450,9 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   if (n.kind === "org_standing" && n.latest.billingHold)
     return { to: "/org/$orgId/settings/$section", params: { section: "billing" } };
   if (s.topicId) return { to: "/org/$orgId/forum/$topicId", params: { topicId: s.topicId } };
-  if (s.issueNumber != null) return { to: "/org/$orgId/issues/$number", params: { number: String(s.issueNumber) } };
+  // A reply in a task's conversation (ADR 0145) opens the task at that message.
+  if (s.issueNumber != null)
+    return { to: "/org/$orgId/issues/$number", params: { number: String(s.issueNumber) }, ...at };
   // A routine that failed, paused or waits for its computer: the routine in Rotinas (its state and fix).
   // What a routine found opens the agent's message in its conversation (below); without one, the routine.
   if (ROUTINE_TROUBLE.has(n.kind) || (n.kind === "routine_finished" && !s.messageId && !s.threadId))

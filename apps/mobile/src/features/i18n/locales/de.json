@@ -1005,6 +1005,7 @@
   "files": {
     "type": {
       "image": "Bild",
+      "video": "Video",
       "pdf": "PDF",
       "document": "Dokument",
       "table": "Tabelle",
@@ -1029,7 +1030,17 @@
     "openImage": "Bild öffnen",
     "imageOf": "Bild {{index}} von {{count}}",
     "place": "{{index}} von {{count}}",
-    "noPreview": "Diese Datei öffnet sich nicht in der App. Teile sie, um sie in einer anderen App zu öffnen."
+    "noPreview": "Diese Datei öffnet sich nicht in der App. Teile sie, um sie in einer anderen App zu öffnen.",
+    "video": {
+      "play": "Abspielen",
+      "pause": "Pausieren",
+      "replay": "Erneut abspielen",
+      "seek": "Position im Video",
+      "mute": "Ton aus",
+      "unmute": "Ton an",
+      "fullscreen": "Vollbild",
+      "open": "Öffnen"
+    }
   },
   "issues": {
     "title": "Aufgaben",

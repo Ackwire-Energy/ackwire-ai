@@ -1091,7 +1091,7 @@ export async function beginAccountLogin(
   const shared =
     protocol >= (kind === "codex" ? SHARED_CODEX_PROTOCOL : SHARED_ACCOUNTS_PROTOCOL) && sharedSignIn(kind, provider);
   const again = accountId !== undefined;
-  // A Claude subscription sign-in for all agents (ADR 0145): a new one takes the policy's method once, kept on its
+  // A Claude subscription sign-in for all agents (ADR 0146): a new one takes the policy's method once, kept on its
   // row; signing in again keeps the row's, whatever the policy says now (none known: the runner does as before).
   let method: ClaudeLoginMethod | undefined;
   if (kind === "claude_code" && provider === undefined && (again || shared)) {

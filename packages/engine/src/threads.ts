@@ -92,7 +92,7 @@ export interface ThreadInfo {
   id: string;
   channelId: string;
   channelName: string;
-  channelKind: "channel" | "dm" | "forum";
+  channelKind: "channel" | "dm" | "forum" | "task";
   /** Null: no title of its own (show `rootText`). Written by a person, or by a model (`threads.assess`). */
   title: string | null;
   /** The root message's text, on one line (≤ 200 chars). */
@@ -923,7 +923,7 @@ interface ThreadSqlRow {
   id: string;
   channel_id: string;
   channel_name: string;
-  channel_kind: "channel" | "dm" | "forum";
+  channel_kind: "channel" | "dm" | "forum" | "task";
   created_at: Date | string;
   body: string;
   root_meta: Record<string, unknown> | null;

@@ -108,25 +108,23 @@ describe("Aprovar sempre on a request", () => {
     expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined]]);
   });
 
-  test("on Aprovações: on the card and in its details, never on a high-risk one", async () => {
+  test("on Aprovações: in the open request's decision bar, never on a high-risk one", async () => {
     const state = withComposio();
     const deploy = state.approvals[1];
     if (deploy) deploy.approveAlways = { tool: "run_workflow", actions: [] };
     await renderApp(`/org/${ORG_ID}/approvals`, { api: createFakeApi(state) });
     await settle(4);
-    const card = screen().getByRole("article", { name: TITLE });
-    expect(card.textContent).toContain(HINT);
-    expect(
-      [...(card.querySelector(".ap-card__actions")?.querySelectorAll(":scope > button") ?? [])]
-        .map((b) => b.textContent)
-        .slice(1),
-    ).toEqual(["Aprovar sempre", "Recusar", "Detalhes"]);
-    const risky = screen().getByRole("article", { name: "Run deploy workflow" });
+    // The deploy, closest to expiring, opens first: high risk, so no "Always approve".
+    const risky = screen().getByRole("region", { name: "Run deploy workflow" });
     expect(within(risky).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
-    await click(within(card).getByRole("button", { name: "Detalhes" }));
-    const dialog = screen().getByRole("dialog", { name: TITLE });
-    expect(dialog.textContent).toContain(HINT);
-    await click(within(dialog).getByRole("button", { name: "Aprovar sempre" }));
+    await click(document.querySelector('.ap-li[data-id="ap-merge"]') as HTMLElement);
+    const pane = screen().getByRole("region", { name: TITLE });
+    expect(pane.textContent).toContain(HINT);
+    // Beside Refuse and Approve, first in the bar.
+    const buttons = [...(pane.querySelector(".ap-bar__acts")?.querySelectorAll(":scope > button") ?? [])];
+    expect(buttons.map((b) => b.textContent?.replace(/R$/, ""))).toEqual(["Aprovar sempre", "Recusar", "Aprovar"]);
+    expect(buttons.at(-1)?.getAttribute("data-approve")).toBe("ap-merge");
+    await click(within(pane).getByRole("button", { name: "Aprovar sempre" }));
     expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined, true]]);
   });
 
@@ -269,10 +267,10 @@ describe("git requests", () => {
     expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined, true]]);
   });
 
-  test("deleting branches: the batch on one card, held to approve, never Aprovar sempre", async () => {
-    await renderApp(`/org/${ORG_ID}/approvals`, { api: createFakeApi(withGit(remove)) });
+  test("deleting branches: the batch in the open request, held to approve, never Always approve", async () => {
+    await renderApp(`/org/${ORG_ID}/approvals?open=ap-merge`, { api: createFakeApi(withGit(remove)) });
     await settle(4);
-    const card = screen().getByRole("article", { name: "Apagar 7 branches em acme/app" });
+    const card = screen().getByRole("region", { name: "Apagar 7 branches em acme/app" });
     expect(card.textContent).toContain("old-1, old-2, old-3");
     expect(within(card).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
     expect(within(card).getByRole("button", { name: "Aprovar exclusão: segure para confirmar" })).toBeTruthy();

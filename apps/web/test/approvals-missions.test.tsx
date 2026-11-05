@@ -99,24 +99,43 @@ describe("Aprovações: missions", () => {
   });
 });
 
-describe("Aprovações: a request's details", () => {
-  test("how it got here: each step's dot leads its text's first line", async () => {
+describe("Approvals: the open request", () => {
+  test("how it got here: the run's steps before the ask, then the ask itself, on one track", async () => {
     const state = seedState();
-    const at = new Date().toISOString();
     const merge = state.approvals.find((a) => a.id === "ap-merge");
-    if (merge)
-      merge.trail = [
-        { text: "O João pediu a correção do login", at },
-        { text: "A Ada abriu o PR #42 com a correção", at },
-      ];
+    if (!merge?.runId) throw new Error("no approval");
+    const asked = Date.parse(merge.createdAt);
+    const at = (seconds: number) => new Date(asked + seconds * 1000).toISOString();
+    state.runSteps = {
+      [merge.runId]: [
+        { seq: 1, kind: "tool_call", data: { toolUseId: "c1", name: "search_context", input: {} }, createdAt: at(-60) },
+        { seq: 2, kind: "tool_result", data: { toolUseId: "c1", content: "ok" }, createdAt: at(-59) },
+        { seq: 3, kind: "tool_call", data: { toolUseId: "c2", name: "read_wiki_page", input: {} }, createdAt: at(-30) },
+        { seq: 4, kind: "tool_result", data: { toolUseId: "c2", content: "ok" }, createdAt: at(-29) },
+        // The call that waits on the decision: the ask stands for it.
+        {
+          seq: 5,
+          kind: "tool_call",
+          data: { toolUseId: "c3", name: "github_merge_pull_request", connector: "github", input: {} },
+          createdAt: at(0),
+        },
+      ],
+    };
     await renderApp(`/org/${ORG_ID}/approvals?open=ap-merge`, { api: createFakeApi(state) });
     await settle(8);
-    const steps = [...document.querySelectorAll(".ap-trail li")];
-    expect(steps.length).toBe(3);
-    for (const step of steps) {
-      expect(step.classList.contains("ac-iconline")).toBe(true);
-      expect(step.firstElementChild?.classList.contains("ap-trail__dot")).toBe(true);
-    }
+    const pane = screen().getByRole("region", { name: "Merge PR #42 into main" });
+    const track = within(pane).getByRole("list", { name: "Como chegou aqui" });
+    const steps = [...track.querySelectorAll(".ac-track__step")];
+    expect(steps.map((li) => [...li.classList].find((c) => c.startsWith("is-")))).toEqual([
+      "is-done",
+      "is-done",
+      "is-now",
+    ]);
+    expect(steps.at(-1)?.querySelector(".ac-track__label")?.textContent).toBe("Pediu aprovação");
+    // "See each step" unfolds them as the reply's tool block.
+    await act(async () => fireEvent.click(within(pane).getByRole("button", { name: "Ver cada passo" })));
+    await settle(4);
+    expect(within(pane).getByRole("button", { name: "Esconder os passos" }).getAttribute("aria-expanded")).toBe("true");
   });
 });
 
@@ -132,10 +151,16 @@ describe("Aprovações: asked of a role (request_approval)", () => {
     });
     await renderApp(`/org/${ORG_ID}/approvals?open=ap-merge`, { api: createFakeApi(state) });
     await settle(8);
-    const card = document.querySelector('.ap-card[data-id="ap-merge"]');
-    expect(card?.textContent).toContain("Aguardando Diretoria");
-    const deciders = [...document.querySelectorAll(".ap-deciders li")].map((li) => li.textContent);
-    expect(deciders).toEqual(["DDiretoria"]);
-    expect(document.body.textContent).toContain("Pedido por quem também aprova pela função");
+    const row = document.querySelector('.ap-li[data-id="ap-merge"]');
+    expect(row?.querySelector(".ap-li__left")?.textContent).toBe("Aguardando Diretoria");
+    // Beside the list: who decides is the role, and the bar says the requester may decide too, without buttons.
+    const pane = document.querySelector(".ap-review") as HTMLElement;
+    const facts = [...pane.querySelectorAll(".ac-facts__item")].map((f) => [
+      f.querySelector(".ac-facts__label")?.textContent,
+      f.querySelector(".ac-facts__value")?.textContent,
+    ]);
+    expect(facts).toContainEqual(["Quem decide", "Aguardando Diretoria"]);
+    expect(pane.querySelector(".ap-bar__text")?.textContent).toContain("Pedido por quem também aprova pela função");
+    expect(pane.querySelector("[data-approve]")).toBeNull();
   });
 });

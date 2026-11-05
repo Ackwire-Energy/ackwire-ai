@@ -12,9 +12,11 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
+import { channels } from "./chat";
 import { organizations } from "./tenancy";
 
 export const issueStatusEnum = pgEnum("issue_status", ["todo", "in_progress", "in_review", "done", "canceled"]);
@@ -98,6 +100,12 @@ export const issues = pgTable(
     artifactIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     /** Long work stopped on something (ADR 0121 §4): a badge on the card, the card stays in its stage. */
     blocked: jsonb().$type<{ reason: string; since: string; text?: string }>(),
+    /**
+     * Its conversation (ADR 0145): a channel of kind `task` and the thread root in it, made on first use. No
+     * foreign key to the root (`messages` is partitioned).
+     */
+    conversationChannelId: uuid().references((): AnyPgColumn => channels.id, { onDelete: "set null" }),
+    conversationRootId: uuid(),
     createdByType: text().notNull(),
     createdById: text().notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -108,6 +116,7 @@ export const issues = pgTable(
     index().on(t.orgId, t.status),
     index().on(t.orgId, t.dueDate),
     index().on(t.parentIssueId),
+    uniqueIndex().on(t.conversationChannelId),
     // Every run reads its agent's open tasks, latest activity first (`openTasksBrief`).
     index().on(t.orgId, t.assigneeType, t.assigneeId, t.updatedAt),
   ],

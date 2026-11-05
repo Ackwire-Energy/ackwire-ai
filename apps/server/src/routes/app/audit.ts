@@ -27,7 +27,7 @@ const AuditRow = z
     runId: z.string().nullable(),
     channelId: z.string().nullable(),
     channel: z
-      .object({ id: z.string(), name: z.string(), kind: z.enum(["channel", "dm", "forum"]) })
+      .object({ id: z.string(), name: z.string(), kind: z.enum(["channel", "dm", "forum", "task"]) })
       .nullable()
       .openapi({ description: "Where it happened; null without a conversation or when it was deleted." }),
     onBehalfOf: z

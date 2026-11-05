@@ -1,9 +1,10 @@
 /*
- * The island (ADR 0071 §9): a dark pill at the top of the work area, in both themes (the dark tokens inside it,
- * `data-theme="dark"`). The face sits 8px from the top, the bottom and the left, concentric with the pill's curve.
+ * The island (ADR 0071 §9): a dark pill at the top, centered on the window (not the work area beside the sidebar,
+ * open or collapsed), in both themes (the dark tokens inside it, `data-theme="dark"`). The face sits 8px from the
+ * top, the bottom and the left, concentric with the pill's curve.
  */
 .ni-wrap {
-  position: absolute;
+  position: fixed;
   top: 10px;
   left: 0;
   right: 0;
@@ -67,6 +68,32 @@
   padding: 0 18px 0 8px;
   white-space: nowrap;
   border-radius: inherit;
+}
+/* Closed: the pill, then "Ver" at its end (a button of its own beside it, never inside it). */
+.ni__bar {
+  display: flex;
+  align-items: center;
+  max-width: 100%;
+}
+.ni__bar > .ni__pill {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.ni__bar:has(.ni__see) > .ni__pill {
+  padding-right: 12px;
+}
+.ni__see.ac-btn {
+  flex: none;
+  margin-right: 8px;
+  border: 0;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+  font-weight: 650;
+  animation: ni-fade 0.3s 0.18s both;
+}
+.ni__see.ac-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 html:not([data-pointer]) .ni__pill:focus-visible {
   outline: none;

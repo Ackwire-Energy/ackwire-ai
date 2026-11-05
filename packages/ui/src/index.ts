@@ -160,6 +160,7 @@ export {
   readRecentEmoji,
   rememberEmoji,
 } from "./components/EmojiPicker";
+export { type Fact, FactStrip, type FactTone } from "./components/FactStrip";
 export {
   AffixInput,
   Field,
@@ -225,6 +226,7 @@ export {
   MenuOverlaySeparator,
 } from "./components/MenuOverlay";
 export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";
+export { stopPlayback } from "./components/media-playback";
 export { OptionList, type OptionListItem, type OptionListProps } from "./components/OptionList";
 export {
   PixelDone,
@@ -321,6 +323,7 @@ export {
   TopProgress,
   useDelayed,
 } from "./components/Skeleton";
+export { StepTrack, type StepTrackState, type StepTrackStep } from "./components/StepTrack";
 export {
   Alert,
   Card,
@@ -366,6 +369,7 @@ export {
   toolLevelTones,
 } from "./components/ToolPixels";
 export { type UsageDay, type UsageDayPart, UsageDays, UsageSwatch } from "./components/UsageDays";
+export { VideoPlayer, type VideoPlayerLabels, type VideoPlayerProps } from "./components/VideoPlayer";
 export {
   stopVoicePlayback,
   VoicePlayer,

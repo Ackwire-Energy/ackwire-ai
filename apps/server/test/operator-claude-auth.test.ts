@@ -5,7 +5,7 @@ import { createLogger } from "../src/logger";
 import { createOperatorApp } from "../src/operator/app";
 import { createTestServer, type TestServer } from "./harness";
 
-/** ADR 0145: how new Claude sign-ins for all agents are made, through the operator API. */
+/** ADR 0146: how new Claude sign-ins for all agents are made, through the operator API. */
 
 const TOKEN = "operator-test-token-".padEnd(48, "x");
 

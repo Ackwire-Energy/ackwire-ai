@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -34,7 +34,9 @@ const go = async (path: string, api = createFakeApi(seedState())) => {
   return { ...r, api };
 };
 const column = (name: string) => screen().getByRole("region", { name });
-const cardTitles = (el: HTMLElement) => Array.from(el.querySelectorAll(".issue-card__title")).map((x) => x.textContent);
+// The title after its number ("#131 Confirmação…" on one row).
+const cardTitles = (el: HTMLElement) =>
+  Array.from(el.querySelectorAll(".issue-card__title")).map((x) => x.textContent?.replace(/^#\d+ /, ""));
 /** Radix tabs switch on mouse down. */
 const tab = async (name: string | RegExp) => {
   await act(async () => fireEvent.mouseDown(screen().getByRole("tab", { name }), { button: 0 }));
@@ -365,6 +367,13 @@ describe("Issue detail", () => {
       within(dialog).getByRole("heading", { level: 1, name: "Confirmação do agendamento por WhatsApp" }),
     ).toBeTruthy();
     expect(within(dialog).getByText(/^Criada por João/)).toBeTruthy();
+    // "#131" and the title on one row, on the bar that never scrolls; "Criada por…" under it, in the body.
+    const bar = dialog.querySelector(".ac-details__bar") as HTMLElement;
+    const row = bar.querySelector(".issue-bartitle") as HTMLElement;
+    expect(row.firstElementChild?.textContent).toBe("#131");
+    expect(within(row).getByRole("heading", { level: 1 }).textContent).toBe("Confirmação do agendamento por WhatsApp");
+    expect(dialog.querySelectorAll(".issue-details__title")).toHaveLength(1);
+    expect(bar.textContent).not.toContain("Criada por");
     await click(within(dialog).getByRole("button", { name: "Editar o título" }));
     const title = within(dialog).getByRole("textbox", { name: "Título" });
     await type(title, "Confirmação por WhatsApp");
@@ -389,37 +398,91 @@ describe("Issue detail", () => {
     expect(screen().getByRole("region", { name: "Histórico" }).textContent).toContain("Walter pediu a Ada para fazer");
   });
 
-  test("comment and change the status", async () => {
+  test("change the status: the history says it", async () => {
     await go("issues/131");
-    await type(screen().getByRole("combobox", { name: "Comentar na tarefa" }), "Começo amanhã.");
-    await act(async () =>
-      fireEvent.keyDown(screen().getByRole("combobox", { name: "Comentar na tarefa" }), { key: "Enter" }),
-    );
-    await settle(5);
-    expect(screen().getByRole("region", { name: "Discussão" }).textContent).toContain("Começo amanhã.");
     const aside = screen().getByRole("complementary", { name: "Detalhes da tarefa" });
     await pick(within(aside).getByRole("combobox", { name: "Coluna" }), "Em revisão");
     await settle(4);
     await tab("Histórico");
-    const history = screen().getByRole("region", { name: "Histórico" });
-    expect(history.textContent).toContain("Walter comentou");
-    expect(history.textContent).toContain("mudou o status para Em revisão");
+    expect(screen().getByRole("region", { name: "Histórico" }).textContent).toContain("mudou o status para Em revisão");
   });
 
-  test("a print pasted in a comment shows as a picture, and the Anexos tab lists it", async () => {
-    await go("issues/131");
-    const box = screen().getByRole("combobox", { name: "Comentar na tarefa" });
-    const print = new File(["png"], "image.png", { type: "image/png" });
-    await act(async () => fireEvent.paste(box, { clipboardData: { files: [print] } }));
-    await settle(4);
+  test("the conversation (variant B): Conversa on the bar opens the thread panel beside the details, chat's own box", async () => {
+    const { api } = await go("issues?open=131");
+    const dialog = screen().getByRole("dialog", { name: "Confirmação do agendamento por WhatsApp" });
+    // Where Discussão was: one line that opens it.
+    const summary = within(dialog).getByRole("button", { name: /Conversar sobre a tarefa/ });
+    expect(summary).toBeTruthy();
+    const toggle = within(dialog).getByRole("button", { name: "Conversa" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    await click(toggle);
+    await settle(6);
+    expect(dialog.className).toContain("ac-details--side");
+    expect(within(dialog).getByRole("heading", { name: "Conversa da tarefa" })).toBeTruthy();
+    // The chat's composer, never locked while sending; the message shows in the panel, oldest first.
+    const box = within(dialog).getByRole("combobox", { name: "Comentar na tarefa · use @ para chamar um agente" });
+    await type(box, "Começo amanhã.");
     await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
     await settle(5);
-    // Like a chat message: the file as a tile, not a bare link with its name.
-    expect(screen().getByRole("region", { name: "Discussão" }).querySelector(".artifact-tile")).toBeTruthy();
-    await tab(/^Anexos/);
-    const files = screen().getByRole("region", { name: "Anexos" });
-    expect(files.querySelectorAll(".issue-file")).toHaveLength(1);
-    expect(files.textContent).toContain("Comentário de Walter");
+    expect((box as HTMLTextAreaElement).disabled).toBe(false);
+    const at = (await api.issues.get(ORG_ID, 131)).conversation;
+    expect(at).toBeTruthy();
+    const posted = (await api.chat.messages(ORG_ID, at?.channelId ?? "", { threadId: at?.rootId })).map((m) => m.body);
+    expect(posted.at(-1)).toBe("Começo amanhã.");
+    expect(within(dialog).getByText("Começo amanhã.")).toBeTruthy();
+    // Its root stands for the task: never drawn in the panel.
+    expect(within(dialog).queryByText(/^Task #131/)).toBeNull();
+    // Closing the panel gives the details their width back.
+    await click(within(dialog).getByRole("button", { name: "Fechar a conversa" }));
+    expect(dialog.className).not.toContain("ac-details--side");
+  });
+
+  test("a card with a conversation ends with the chat's thread line; one with none stays as it is", async () => {
+    const api = createFakeApi(seedState());
+    const list = api.issues.list;
+    const conversation = {
+      channelId: "task_c",
+      rootId: "root_r",
+      count: 6,
+      lastAt: new Date().toISOString(),
+      participants: [
+        { type: "person" as const, id: "u-joao" },
+        { type: "agent" as const, id: ADA_ID },
+      ],
+      working: true,
+    };
+    api.issues.list = async (orgId, filters) =>
+      (await list(orgId, filters)).map((i) => (i.number === 131 ? { ...i, conversation } : i));
+    const logged = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await go("issues", api);
+      // Each face of the stack has its key: React warns of none.
+      expect(logged.mock.calls.some((c) => String(c[0]).includes('unique "key"'))).toBe(false);
+    } finally {
+      logged.mockRestore();
+    }
+    const talking = document.querySelector('[data-card="131"] .issue-card__talk');
+    expect(talking?.classList.contains("thread-line")).toBe(true);
+    expect(talking?.textContent).toContain("6 mensagens");
+    expect(talking?.textContent).toContain("Trabalhando");
+    // The chat's faces: one size, framed, agents and people alike (an unframed agent stands taller than the letters).
+    const faces = [...(talking?.querySelectorAll(".thread-line__who .ac-avatar") ?? [])];
+    expect(
+      faces.map((a) => [a.getAttribute("data-kind"), a.className.includes("ac-avatar--xs ac-avatar--framed")]),
+    ).toEqual([
+      ["person", true],
+      ["agent", true],
+    ]);
+    expect(document.querySelector('[data-card="132"] .issue-card__talk')).toBeNull();
+  });
+
+  test("a link with a message opens the task's conversation at it", async () => {
+    const api = createFakeApi(seedState());
+    const at = await api.issues.conversation(ORG_ID, (await api.issues.get(ORG_ID, 131)).id);
+    const said = await api.chat.post(ORG_ID, at.channelId, { body: "Olhem isto", threadId: at.rootId });
+    await go(`issues/131?m=${said.id}`, api);
+    expect(screen().getByRole("complementary", { name: "Conversa da tarefa" })).toBeTruthy();
+    expect(screen().getByText("Olhem isto")).toBeTruthy();
   });
 
   test("a missing issue says so", async () => {

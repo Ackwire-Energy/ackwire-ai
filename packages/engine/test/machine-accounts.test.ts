@@ -1753,7 +1753,7 @@ test("where each agent is its own OS user, a key's login made for one agent leav
   });
 });
 
-// ── How each connection signs in (protocol 46, ADR 0145) ────────────────────
+// ── How each connection signs in (protocol 46, ADR 0146) ────────────────────
 
 /** A computer where each agent is its own OS user, on `protocol`, its runner saying `methods` (protocol 46). */
 async function systemMachine(protocol = CLAUDE_AUTH_PROTOCOL, methods?: ("cli_login" | "setup_token")[]) {

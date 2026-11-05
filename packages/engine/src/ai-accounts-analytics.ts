@@ -6,7 +6,7 @@ import { ANALYTICS_ROWS_MAX, analyticsRange, howMany } from "./connector-usage";
 import { decodeCursor, encodeCursor } from "./cursor";
 
 /**
- * The operator's reads of the AI accounts people connected (ADR 0145): counts over `machine_accounts` (the
+ * The operator's reads of the AI accounts people connected (ADR 0146): counts over `machine_accounts` (the
  * computers' sign-ins and plan keys) and `provider_credentials` (API keys), and a keyset-paged list. Counts, ids
  * and stable codes only: never an email, a key hint, a token or the provider's organization id.
  */

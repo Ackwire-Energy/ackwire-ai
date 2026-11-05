@@ -2705,6 +2705,9 @@
   "island.open": {
     "value": "Open"
   },
+  "island.see": {
+    "value": "View"
+  },
   "island.dismiss": {
     "value": "Dismiss"
   },
@@ -12941,7 +12944,7 @@
     "value": "Ask an agent"
   },
   "issues.asked": {
-    "value": "Request sent. {{name}} posts progress here. Your conversation stays in your DM."
+    "value": "Request sent. {{name}} works in the task's conversation, where everyone who sees the task follows along."
   },
   "issues.activity": {
     "value": "Activity"
@@ -12952,6 +12955,33 @@
   "issues.discussion": {
     "value": "Discussion"
   },
+  "issues.conversation.button": {
+    "value": "Conversation"
+  },
+  "issues.conversation.toggle": {
+    "value": {
+      "one": "Conversation, {{count}} message",
+      "other": "Conversation, {{count}} messages"
+    }
+  },
+  "issues.conversation.title": {
+    "value": "Task conversation"
+  },
+  "issues.conversation.messages": {
+    "value": {
+      "one": "{{count}} message",
+      "other": "{{count}} messages"
+    }
+  },
+  "issues.conversation.open": {
+    "value": "Open"
+  },
+  "issues.conversation.start": {
+    "value": "Talk about the task"
+  },
+  "issues.conversation.close": {
+    "value": "Close the conversation"
+  },
   "issues.noComments": {
     "value": "No comments yet."
   },
@@ -12959,7 +12989,7 @@
     "value": "Comment on the task"
   },
   "issues.commentPlaceholder": {
-    "value": "Comment · use @ to call an agent"
+    "value": "Comment on the task · use @ to call an agent"
   },
   "issues.send": {
     "value": "Comment"
@@ -26145,6 +26175,39 @@
   "files.downloadOnly": {
     "value": "No preview for this type of file. Download it to open."
   },
+  "files.video.play": {
+    "value": "Play"
+  },
+  "files.video.pause": {
+    "value": "Pause"
+  },
+  "files.video.replay": {
+    "value": "Play again"
+  },
+  "files.video.seek": {
+    "value": "Position in the video"
+  },
+  "files.video.volume": {
+    "value": "Volume"
+  },
+  "files.video.mute": {
+    "value": "Mute"
+  },
+  "files.video.unmute": {
+    "value": "Unmute"
+  },
+  "files.video.speed": {
+    "value": "Speed {{speed}}×"
+  },
+  "files.video.fullscreen": {
+    "value": "Full screen"
+  },
+  "files.video.exitFullscreen": {
+    "value": "Exit full screen"
+  },
+  "files.video.open": {
+    "value": "Open"
+  },
   "files.zoom.toolbar": {
     "value": "Zoom"
   },
@@ -35756,5 +35819,101 @@
   },
   "agentPage.work.brain.accountOthers": {
     "value": "Other people's plans show whose they are. Their owner gets an email and can take it back."
+  },
+  "dm.profile": {
+    "value": "View profile"
+  },
+  "aiAccounts.connect.needsCloud.claude_code": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "aiAccounts.connect.needsCloud.codex": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "aiAccounts.connect.needsCloud.cursor": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "aiAccounts.connect.needsCloud.opencode": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "rightHand.callWith": {
+    "value": "call with @{{handle}}"
+  },
+  "sidebarAgents.seeAll": {
+    "value": {
+      "one": "See the {{count}} agent",
+      "other": "See all {{count}} agents"
+    }
+  },
+  "approvals.review.list": {
+    "value": "Requests"
+  },
+  "approvals.review.where": {
+    "value": "Where"
+  },
+  "approvals.review.effect": {
+    "value": "Effect"
+  },
+  "approvals.review.effects.external": {
+    "value": "Leaves the company"
+  },
+  "approvals.review.effects.production": {
+    "value": "Goes to production"
+  },
+  "approvals.review.effects.unsent": {
+    "value": "Nothing is sent"
+  },
+  "approvals.review.effects.readsOnly": {
+    "value": "Only reads"
+  },
+  "approvals.review.undo": {
+    "value": "Undo"
+  },
+  "approvals.review.deadline": {
+    "value": "Time left"
+  },
+  "approvals.review.decides": {
+    "value": "Who decides"
+  },
+  "approvals.review.state": {
+    "value": "Status"
+  },
+  "approvals.review.why": {
+    "value": "Why {{name}} asks"
+  },
+  "approvals.review.email": {
+    "value": "The email"
+  },
+  "approvals.review.text": {
+    "value": "What it will publish"
+  },
+  "approvals.review.textDone": {
+    "value": "What it published"
+  },
+  "approvals.review.values": {
+    "value": "What it will do"
+  },
+  "approvals.review.more": {
+    "value": "Show all"
+  },
+  "approvals.review.less": {
+    "value": "Show less"
+  },
+  "approvals.review.trail": {
+    "value": "How it got here"
+  },
+  "approvals.review.showSteps": {
+    "value": "See each step"
+  },
+  "approvals.review.hideSteps": {
+    "value": "Hide the steps"
+  },
+  "approvals.review.asked": {
+    "value": "Asked for approval"
+  },
+  "approvals.review.grants": {
+    "value": "{{name}} will {{doing}}, this once, with these values."
+  },
+  "approvals.review.valuesDone": {
+    "value": "What it did"
   }
 }

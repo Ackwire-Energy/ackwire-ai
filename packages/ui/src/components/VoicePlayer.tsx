@@ -10,6 +10,7 @@ import {
 } from "react";
 import { cx } from "../cx";
 import { Icon } from "../icons/Icon";
+import { claimPlayback, releasePlayback, stopPlayback } from "./media-playback";
 import { drawVoiceWave, useWaveRepaint } from "./voice-wave";
 
 export interface VoicePlayerLabels {
@@ -48,10 +49,8 @@ const clock = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
 
-/** Only one recording plays at a time: starting one stops the others. */
-let playing: { stop: () => void } | null = null;
-/** Called by anything else about to make sound (listening back to a recording). */
-export const stopVoicePlayback = () => playing?.stop();
+/** Called by anything else about to make sound (listening back to a recording): stops a voice message or a video. */
+export const stopVoicePlayback = stopPlayback;
 
 /**
  * A voice message: play, wave, time and speed, a click or a drag on the wave moves through it. The words stay closed on
@@ -96,8 +95,9 @@ export function VoicePlayer({
       cancelAnimationFrame(frame.current);
       audio.current?.pause();
       audio.current = null;
+      releasePlayback(halt);
     },
-    [],
+    [halt],
   );
   const to = useCallback(
     (next: number) => {
@@ -130,8 +130,7 @@ export function VoicePlayer({
       audio.current = a;
     }
     const a = audio.current;
-    playing?.stop();
-    playing = { stop: halt };
+    claimPlayback(halt);
     a.playbackRate = speed;
     if (pos.current > 0) a.currentTime = (pos.current * durationMs) / 1000;
     a.play().catch(failed);

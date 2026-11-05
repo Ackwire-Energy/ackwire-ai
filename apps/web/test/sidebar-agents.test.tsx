@@ -211,6 +211,20 @@ describe("Fixar no topo", () => {
     expect(views(state).at(-1)).toMatchObject({ pins: { agents: [ATLAS_ID], channels: [], people: [] } });
   });
 
+  test("day one leaves my agents in their groups: an agent writing in its DM keeps its group", async () => {
+    const state = withGroups();
+    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
+    if (atlas) atlas.ownerUserId = "u-walter";
+    state.agentGroups?.[1]?.agentIds.push(ADA_ID);
+    seedDm(state, { type: "agent", id: ATLAS_ID }, { ago: 1 });
+    seedDm(state, { type: "agent", id: ADA_ID }, { ago: 2 });
+    await go(state);
+    expect(rowsIn(section("Integrations"))).toEqual(["Atlas"]);
+    expect(rowsIn(section("Diretoria"))).toEqual(["Ada"]);
+    expect(within(nav()).queryByRole("img", { name: "Fixado no topo" })).toBeNull();
+    expect(section("Agentes").querySelector(".sidebar__pins-hint")).toBeNull();
+  });
+
   test("a channel pinned from its right click goes on top of Canais; Tirar do topo puts it back", async () => {
     const { state } = await go();
     const eng = () => nav().querySelector(`a.sidebar__item[title="#eng"]`) as HTMLElement;

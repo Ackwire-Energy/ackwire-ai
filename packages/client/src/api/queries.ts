@@ -97,6 +97,7 @@ import type {
   GifCategory,
   GifKey,
   InviteBatch,
+  Issue,
   IssueActivity,
   IssueActivityEvent,
   IssueColumn,
@@ -3391,6 +3392,21 @@ export const useIssue = (orgId: string, number: number) => {
     refetchInterval: (query) => (query.state.data?.work && query.state.data.work.state !== "stalled" ? 10_000 : false),
   });
 };
+
+/**
+ * Where a task's conversation lives (ADR 0145): the one the task already carries, or, once `open`, the one the
+ * server makes on first use. Null until then.
+ */
+export function useTaskConversation(orgId: string, issue: Pick<Issue, "id" | "conversation">, open: boolean) {
+  const api = useApi();
+  const made = useQuery({
+    queryKey: [...keys.issueActivity(orgId, issue.id), "conversation"],
+    queryFn: () => api.issues.conversation(orgId, issue.id),
+    enabled: open && !issue.conversation,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  return issue.conversation ?? made.data ?? null;
+}
 
 export const useIssueActivity = (orgId: string, id: string | undefined) => {
   const api = useApi();

@@ -15,7 +15,6 @@ import {
   insertMessage,
   invokeToolForRun,
   joinChannel,
-  listIssueActivity,
   openAgentDm,
   postPersonMessage,
   removeChannelMember,
@@ -506,7 +505,7 @@ test("a reminder it set to do the work itself keeps the promise: no judgment, no
   expect(f.provider.calls.length).toBe(2);
 });
 
-test("asked to implement an issue: an answer posted before a nudge is a comment there too", async () => {
+test("asked to implement an issue: an answer posted before a nudge lands in the task's conversation too", async () => {
   const first = "Fixed in PR #7. CI is running: I'll check it once it finishes.";
   const second = "CI passed: PR #7 is ready to merge.";
   f = await setup({
@@ -516,10 +515,13 @@ test("asked to implement an issue: an answer posted before a nudge is a comment 
   const deps = { db: f.db, pubsub: f.pubsub };
   const person = { type: "person" as const, userId: f.owner.id };
   const issue = await createIssue(deps, person, f.org.id, { title: "Login breaks on Safari" });
-  await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
+  const at = (await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id)).conversation;
   await drainOutbox(f.db, f.handlers);
-  const comments = (await listIssueActivity(f.db, person, f.org.id, issue.id)).filter((a) => a.kind === "comment");
-  expect(comments.map((a) => a.text)).toEqual([first, second]);
+  // Written there once each (ADR 0145: the conversation is where it works, nothing mirrored).
+  const said = (await f.db.select().from(schema.messages))
+    .filter((m) => m.authorType === "agent" && m.channelId === at?.channelId && !m.meta.questionId)
+    .map((m) => m.body);
+  expect(said).toEqual([first, second]);
 });
 
 test("a promise is kept by work handed off from this conversation still out, by any run; not another conversation's or a closed one", async () => {

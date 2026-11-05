@@ -46,7 +46,7 @@ import { runPosition, screenAboveEnd } from "@agenteschat/client/lib/chat";
 import { consultBlocksNearEnd, consultNoticeFolds, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { capitalize } from "@agenteschat/client/lib/format";
-import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
+import { issueTakenOf, issueWorkOf, taskConversationOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import {
@@ -559,31 +559,33 @@ function Chat({
       const root = list.find((m) => m.id === threadId);
       const replies = list.filter((m) => m.id !== threadId);
       const info = thread.data;
-      const head: Row[] = root
-        ? [
-            {
-              kind: "marker",
-              key: "started",
-              // In a DM, with whom (its channel name is internal, "dm-…"); in a channel, where.
-              text:
-                info?.channelKind === "dm" || dm
-                  ? t("mobile.chat.startedWith", { name: dm?.with.name ?? "" })
-                  : t("mobile.chat.startedIn", { channel: info?.channelName ?? channel?.name ?? "" }),
-            },
-            // The root as it started the thread (its mission card is pinned above already).
-            {
-              kind: "message",
-              key: root.id,
-              message: { ...root, meta: { ...root.meta, missionStart: undefined, missionLink: undefined } },
-              grouped: false,
-            },
-            {
-              kind: "marker",
-              key: "replies",
-              text: t("mobile.chat.replies", { count: info?.replyCount ?? replies.length }),
-            },
-          ]
-        : [];
+      // A task's conversation (ADR 0145): its root stands for the task, one screen back; only the replies show.
+      const head: Row[] =
+        root && !taskConversationOf(root.meta)
+          ? [
+              {
+                kind: "marker",
+                key: "started",
+                // In a DM, with whom (its channel name is internal, "dm-…"); in a channel, where.
+                text:
+                  info?.channelKind === "dm" || dm
+                    ? t("mobile.chat.startedWith", { name: dm?.with.name ?? "" })
+                    : t("mobile.chat.startedIn", { channel: info?.channelName ?? channel?.name ?? "" }),
+              },
+              // The root as it started the thread (its mission card is pinned above already).
+              {
+                kind: "message",
+                key: root.id,
+                message: { ...root, meta: { ...root.meta, missionStart: undefined, missionLink: undefined } },
+                grouped: false,
+              },
+              {
+                kind: "marker",
+                key: "replies",
+                text: t("mobile.chat.replies", { count: info?.replyCount ?? replies.length }),
+              },
+            ]
+          : [];
       return [
         ...head,
         ...asTurns(buildRows(replies, (m) => superseded.has(m.id))),
@@ -1127,13 +1129,17 @@ function Chat({
   // number and title, in the reader's.
   const root = isThread ? list.find((m) => m.id === threadId) : undefined;
   const rootWork = issueWorkOf(root?.meta);
+  // A task's conversation (ADR 0145): "Conversa da tarefa", the task under it.
+  const rootTask = taskConversationOf(root?.meta);
   const title = isThread
-    ? rootWork
-      ? t("issues.open", { number: rootWork.number, title: rootWork.title })
-      : info
-        ? // A thread on a GIF or a sticker has no words of its own to title it (ADR 0091).
-          threadTitle(info) || previewOf(root ? textOrMedia(t, root.body, root.meta) : "") || t("mobile.chat.thread")
-        : ""
+    ? rootTask
+      ? t("issues.conversation.title")
+      : rootWork
+        ? t("issues.open", { number: rootWork.number, title: rootWork.title })
+        : info
+          ? // A thread on a GIF or a sticker has no words of its own to title it (ADR 0091).
+            threadTitle(info) || previewOf(root ? textOrMedia(t, root.body, root.meta) : "") || t("mobile.chat.thread")
+          : ""
     : dm
       ? dm.with.name
       : channel
@@ -1141,28 +1147,30 @@ function Chat({
         : "";
   const agentsHere = (roster.data ?? []).filter((r) => r.type === "agent").length;
   const subtitle = isThread
-    ? info
-      ? info.channelKind === "dm"
-        ? // A DM's channel name is internal ("dm-…"): the thread says who it is with.
-          t(
-            mission
-              ? "mobile.chat.missionWith"
-              : info.state === "closed"
-                ? "mobile.chat.closedThreadWith"
-                : "mobile.chat.threadWith",
-            { name: dm?.with.name ?? "" },
-          )
-        : t(
-            mission
-              ? "mobile.chat.missionIn"
-              : info.state === "closed"
-                ? "mobile.chat.closedThreadIn"
-                : "mobile.chat.threadIn",
-            {
-              channel: info.channelName,
-            },
-          )
-      : undefined
+    ? rootTask
+      ? `#${rootTask.number} · ${rootTask.title}`
+      : info
+        ? info.channelKind === "dm"
+          ? // A DM's channel name is internal ("dm-…"): the thread says who it is with.
+            t(
+              mission
+                ? "mobile.chat.missionWith"
+                : info.state === "closed"
+                  ? "mobile.chat.closedThreadWith"
+                  : "mobile.chat.threadWith",
+              { name: dm?.with.name ?? "" },
+            )
+          : t(
+              mission
+                ? "mobile.chat.missionIn"
+                : info.state === "closed"
+                  ? "mobile.chat.closedThreadIn"
+                  : "mobile.chat.threadIn",
+              {
+                channel: info.channelName,
+              },
+            )
+        : undefined
     : dmAgentId
       ? rightHand
         ? `${t("rightHand.label")} · ${t("rightHand.actsAsYou")}`
@@ -1466,7 +1474,9 @@ function Chat({
     ) : null;
 
   const placeholder = isThread
-    ? t("mobile.chat.reply")
+    ? rootTask
+      ? t("issues.commentPlaceholder")
+      : t("mobile.chat.reply")
     : dm
       ? rightHand
         ? `${t("mobile.chat.messageTo", { name: dm.with.name })} · ${t("rightHand.composerHint")}`
@@ -1921,9 +1931,6 @@ function Chat({
                     </JumpToMessageContext.Provider>
                   </StickerStageContext.Provider>
                   <DatePill day={topDay} shown={dayShown} top={hasPin ? 8 : headerHeight + 8} />
-                  {showList && (readHold || (!atEnd && (far || unseen.messages > 0 || unseen.working.length > 0))) ? (
-                    <ToLatest top={hasPin ? 8 : headerHeight + 8} unseen={unseen} onPress={toEnd} />
-                  ) : null}
                 </View>
               </Animated.View>
               {showList ? null : (
@@ -1965,6 +1972,16 @@ function Chat({
               style={[styles.topFade, { height: headerHeight + 28 }]}
             />
           ) : null}
+          {/* Above the composer and its working line, riding the keyboard with them. */}
+          <KeyboardStickyView
+            offset={{ opened: lift }}
+            style={[styles.jumpAt, { bottom: composerHeight + 10 }]}
+            pointerEvents="box-none"
+          >
+            {showList && (readHold || (!atEnd && (far || unseen.messages > 0 || unseen.working.length > 0))) ? (
+              <ToLatest unseen={unseen} onPress={toEnd} />
+            ) : null}
+          </KeyboardStickyView>
           {peeking ? null : (
             <KeyboardStickyView offset={{ opened: lift }} style={styles.composerDock}>
               <View
@@ -2059,10 +2076,10 @@ function Chat({
 }
 
 /**
- * Back to the latest messages: a round button at the top right, under the bar (and the pinned card), as on the web.
+ * Back to the latest messages: a round button at the bottom right, right above the composer, as on the web.
  * It counts what arrived below, in red when one mentions me; its label says who spoke and who is writing.
  */
-function ToLatest({ top, unseen, onPress }: { top: number; unseen: Unseen; onPress: () => void }) {
+function ToLatest({ unseen, onPress }: { unseen: Unseen; onPress: () => void }) {
   const { t } = useTranslation();
   const dir = useDirectory();
   const { colors, shadows } = useTheme();
@@ -2079,12 +2096,7 @@ function ToLatest({ top, unseen, onPress }: { top: number; unseen: Unseen; onPre
     unseen.mentionsMe ? t("mobile.chat.unseen.mentionsYou") : "",
   ].filter(Boolean);
   return (
-    <Animated.View
-      entering={FadeIn.duration(160)}
-      exiting={FadeOut.duration(120)}
-      style={[styles.jumpAt, { top }]}
-      pointerEvents="box-none"
-    >
+    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)} pointerEvents="box-none">
       <PressScale
         to={0.92}
         onPress={onPress}

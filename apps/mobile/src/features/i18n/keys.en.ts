@@ -1021,6 +1021,7 @@ export const featureKeysEn = {
   files: {
     type: {
       image: "Image",
+      video: "Video",
       pdf: "PDF",
       document: "Document",
       table: "Table",
@@ -1046,6 +1047,17 @@ export const featureKeysEn = {
     imageOf: "Picture {{index}} of {{count}}",
     place: "{{index}} of {{count}}",
     noPreview: "This file doesn't open in the app. Share it to open it in another app.",
+    /** The video player's controls (a message's video and the file screen). */
+    video: {
+      play: "Play",
+      pause: "Pause",
+      replay: "Play again",
+      seek: "Position in the video",
+      mute: "Mute",
+      unmute: "Unmute",
+      fullscreen: "Full screen",
+      open: "Open",
+    },
   },
   issues: {
     title: "Tasks",

@@ -1125,6 +1125,8 @@ export const en = {
     otherAnswer: "Another answer",
     review: "Review",
     open: "Open",
+    /** On the closed island, at its end: opens where the notice happened. */
+    see: "View",
     dismiss: "Dismiss",
     send: "Send",
     placeholder: "Write your answer…",
@@ -3822,6 +3824,35 @@ export const en = {
       delivery: "Delivery",
       open: "Open",
     },
+    /** The open request on the Approvals page: its facts, its cards and the decision bar. */
+    review: {
+      list: "Requests",
+      where: "Where",
+      effect: "Effect",
+      effects: {
+        external: "Leaves the company",
+        production: "Goes to production",
+        unsent: "Nothing is sent",
+        readsOnly: "Only reads",
+      },
+      undo: "Undo",
+      deadline: "Time left",
+      decides: "Who decides",
+      state: "Status",
+      why: "Why {{name}} asks",
+      email: "The email",
+      text: "What it will publish",
+      textDone: "What it published",
+      values: "What it will do",
+      valuesDone: "What it did",
+      more: "Show all",
+      less: "Show less",
+      trail: "How it got here",
+      showSteps: "See each step",
+      hideSteps: "Hide the steps",
+      asked: "Asked for approval",
+      grants: "{{name}} will {{doing}}, this once, with these values.",
+    },
   },
   agent: {
     editIdentity: "Edit name and role",
@@ -5611,13 +5642,28 @@ export const en = {
       "{{name}} reads what she needs, comments the plan here and does it. Anything sensitive, like publishing, asks for your approval.",
     askButton: "Ask {{name}}",
     askSection: "Ask an agent",
-    asked: "Request sent. {{name}} posts progress here. Your conversation stays in your DM.",
+    asked: "Request sent. {{name}} works in the task's conversation, where everyone who sees the task follows along.",
     activity: "Activity",
     noActivity: "Nothing yet.",
     discussion: "Discussion",
+    /** A task's conversation (ADR 0145): a chat thread of its own, beside the task's details. */
+    conversation: {
+      /** The dialog's top bar button and the section's title. */
+      button: "Conversation",
+      toggle_one: "Conversation, {{count}} message",
+      toggle_other: "Conversation, {{count}} messages",
+      /** The panel's title. */
+      title: "Task conversation",
+      messages_one: "{{count}} message",
+      messages_other: "{{count}} messages",
+      open: "Open",
+      /** The summary line of a task nobody wrote in yet. */
+      start: "Talk about the task",
+      close: "Close the conversation",
+    },
     noComments: "No comments yet.",
     comment: "Comment on the task",
-    commentPlaceholder: "Comment · use @ to call an agent",
+    commentPlaceholder: "Comment on the task · use @ to call an agent",
     send: "Comment",
     details: "Task details",
     statusLabel: "Status",
@@ -10645,6 +10691,23 @@ export const en = {
     pdfFrame: "PDF: {{title}}",
     tooBigToPreview: "Too large to preview. Download it to open.",
     downloadOnly: "No preview for this type of file. Download it to open.",
+    /** The video player's controls (chat tile and viewer). */
+    video: {
+      play: "Play",
+      pause: "Pause",
+      /** The video ended: plays it again from the start. */
+      replay: "Play again",
+      /** The timeline, as a slider. */
+      seek: "Position in the video",
+      volume: "Volume",
+      mute: "Mute",
+      unmute: "Unmute",
+      speed: "Speed {{speed}}×",
+      fullscreen: "Full screen",
+      exitFullscreen: "Exit full screen",
+      /** The corner button on a chat tile: opens the file viewer. */
+      open: "Open",
+    },
     /** The picture viewer's zoom bar. */
     zoom: {
       toolbar: "Zoom",

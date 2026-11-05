@@ -2469,6 +2469,9 @@
   "files.type.image": {
     "value": "Image"
   },
+  "files.type.video": {
+    "value": "Video"
+  },
   "files.type.pdf": {
     "value": "PDF"
   },
@@ -2540,6 +2543,30 @@
   },
   "files.noPreview": {
     "value": "This file doesn't open in the app. Share it to open it in another app."
+  },
+  "files.video.play": {
+    "value": "Play"
+  },
+  "files.video.pause": {
+    "value": "Pause"
+  },
+  "files.video.replay": {
+    "value": "Play again"
+  },
+  "files.video.seek": {
+    "value": "Position in the video"
+  },
+  "files.video.mute": {
+    "value": "Mute"
+  },
+  "files.video.unmute": {
+    "value": "Unmute"
+  },
+  "files.video.fullscreen": {
+    "value": "Full screen"
+  },
+  "files.video.open": {
+    "value": "Open"
   },
   "issues.title": {
     "value": "Tasks"
