@@ -136,7 +136,8 @@ export function requestSecretTool(opts: {
             isError: true,
           };
         }
-        const file = !opts.browserOnly && input.target === "file";
+        const file =
+          !opts.browserOnly && (input.target === "file" || (input.target === undefined && Boolean(str(input.path))));
         const path = file ? (opts.toolPath?.(str(input.path)) ?? "") : "";
         if (file && (!path || path === ".agentes" || path.startsWith(".agentes/"))) {
           return { content: "With target file, give a path inside your workspace (e.g. .npmrc).", isError: true };

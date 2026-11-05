@@ -1390,6 +1390,11 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     expect(everything).not.toContain(NEW);
   });
 
+  test("a `path` with no `target` is a file, so what a person types lands where it was asked for", async () => {
+    const { row } = await asking({ path: ".npmrc" } as never);
+    expect(row).toMatchObject({ name: "NPM_TOKEN", targetKind: "file", targetPath: ".npmrc" });
+  });
+
   test("`target` is env unless it says file; anything else is refused with the values", async () => {
     const { row } = await asking({});
     expect(row).toMatchObject({ name: "NPM_TOKEN", targetPath: null });
