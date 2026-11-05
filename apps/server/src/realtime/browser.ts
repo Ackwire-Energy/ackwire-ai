@@ -25,7 +25,8 @@ import { BROWSER_LIMITS, type BrowserInputEvent, parseBrowserInputEvent } from "
  * stream or `forbidden`),
  * `browser.ended` (`{agentId, reason, message?}`), and `error` with
  * `code` and `agentId` (`forbidden`, `not_found`, `too_many_browsers`,
- * `not_in_control`, `input_failed` (the computer couldn't put a person's input on the page), `rate_limited`).
+ * `not_in_control`, `input_failed` (the computer couldn't put a person's input on the page), `no_field` (their text
+ * reached a page with nothing focused to take it), `rate_limited`).
  */
 export type BrowserClientFrame =
   | { type: "browser.watch" | "browser.unwatch"; agentId: string }

@@ -32731,6 +32731,9 @@
   "browser.inCard.inputLost": {
     "value": "That didn't reach the page, so nothing was clicked or typed. Try again."
   },
+  "browser.inCard.noField": {
+    "value": "No field is selected on the page, so that wasn't typed. Select the field and type again."
+  },
   "browser.inCard.goLabel": {
     "value": "Site address"
   },

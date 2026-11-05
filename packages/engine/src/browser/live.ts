@@ -586,11 +586,15 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     }, graceMs);
   }
 
-  /** `failed`: events that didn't reach the page, though the person was in control (the view says so). */
+  /**
+   * `failed`: events that didn't reach the page, though the person was in control; `nowhere`: text reached a page with
+   * nothing focused to take it (the view says so).
+   */
   interface InputAnswer {
     accepted: number;
     refused: boolean;
     failed?: number;
+    nowhere?: boolean;
   }
   interface InputBatch {
     userId: string;
@@ -845,7 +849,12 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         agent: scope,
         ...profileOp(agentId),
       });
-      return { accepted: reply.accepted, refused: false, ...(reply.failed ? { failed: reply.failed } : {}) };
+      return {
+        accepted: reply.accepted,
+        refused: false,
+        ...(reply.failed ? { failed: reply.failed } : {}),
+        ...(reply.nowhere ? { nowhere: true } : {}),
+      };
     },
 
     /**

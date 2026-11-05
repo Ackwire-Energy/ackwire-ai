@@ -1700,6 +1700,19 @@ describe("live view", () => {
     live.close();
   });
 
+  test("text that reached a page with nothing to take it comes back as nowhere: the view says so", async () => {
+    await start();
+    const { hub } = fakeHub((r) => (r.op === "browser.input" ? { accepted: 1, nowhere: true } : undefined));
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    await startTakeover({ db: f.db }, f.owner.id, f.org.id, f.agent.id);
+    expect(await live.sendInput(f.owner.id, f.org.id, f.agent.id, [{ kind: "text", text: "a" }])).toEqual({
+      accepted: 1,
+      refused: false,
+      nowhere: true,
+    });
+    live.close();
+  });
+
   test("while a person is in control only they see the page; the others are told it's hidden, and see it again on hand back", async () => {
     const machine = await start();
     const { hub, calls } = fakeHub();

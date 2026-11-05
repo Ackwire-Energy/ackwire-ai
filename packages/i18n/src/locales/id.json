@@ -13095,6 +13095,7 @@
       "pasteHint": "Tempel yang kamu salin ke halaman",
       "pasteBlocked": "Browsermu tidak mengizinkan membaca yang kamu salin. Gunakan {{keys}} di halaman.",
       "inputLost": "Itu tidak sampai ke halaman, jadi tidak ada yang diklik atau diketik. Coba lagi.",
+      "noField": "Tidak ada kolom yang dipilih di halaman, jadi itu tidak diketik. Pilih kolomnya lalu ketik lagi.",
       "goLabel": "Alamat situs",
       "goPlaceholder": "Ketik alamat, misalnya example.com",
       "go": "Buka",

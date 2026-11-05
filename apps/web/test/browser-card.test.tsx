@@ -550,12 +550,25 @@ describe("the card in the message", () => {
     );
   const toast = () => [...document.querySelectorAll(".ac-toast")].at(-1)?.textContent ?? null;
 
-  test("what the person does that can't reach the page: the card says so, once until the next picture", async () => {
+  test("in control with the focus nowhere, keys go to the page without a click first", async () => {
+    const { page } = await inControlOfPage();
+    expect(document.activeElement).toBe(page);
+  });
+
+  test("what the person does that can't reach the page: the card says so, again when a try fails again", async () => {
     const { socket } = await inControlOfPage();
     expect(toast()).toBeNull();
-    await act(async () => socket.push({ type: "error", agentId: ADA_ID, code: "input_failed" }));
-    await settle(2);
+    const refused = async (code: string) => {
+      await act(async () => socket.push({ type: "error", agentId: ADA_ID, code }));
+      await settle(2);
+      return [...document.querySelectorAll(".ac-toast")].at(-1);
+    };
+    const first = await refused("input_failed");
     expect(toast()).toContain("não chegou à página");
+    // Nothing repaints after a try that failed, so no picture clears the first refusal.
+    expect(await refused("input_failed")).not.toBe(first);
+    await refused("no_field");
+    expect(toast()).toContain("Nenhum campo está selecionado");
   });
 
   test("the person's paste keys paste their text into the page's field as text, in pieces a frame carries", async () => {

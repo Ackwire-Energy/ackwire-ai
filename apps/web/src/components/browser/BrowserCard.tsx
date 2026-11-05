@@ -17,7 +17,7 @@ import {
   frameMetadata,
   HELD_STALE_MS,
   handoffWantsWords,
-  inputLost,
+  inputProblem,
   isHeldTakeover,
   isOpenHandoff,
   keyboardEvents,
@@ -436,11 +436,11 @@ export function BrowserCard({
   const inControl = controller === me.user.id;
   const otherInControl = Boolean(controller) && !inControl;
   useEffect(() => setHolding(inControl), [inControl]);
-  const lost = inControl && inputLost(live.error);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: said once each time it starts
+  const problem = inControl ? inputProblem(live.error) : null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: said each time, also when a try that failed fails again
   useEffect(() => {
-    if (lost) sayFailed(t("browser.inCard.inputLost"));
-  }, [lost]);
+    if (problem) sayFailed(t(problem));
+  }, [live.errors]);
   // A chat card's Hand back keeps its check and words: only the dialog's head folds it.
   const back = useHandBack(surface && handoff?.kind === "takeover");
   const controllerName = controller ? (dir.memberById.get(controller)?.name ?? t("channel.unknownPerson")) : "";
@@ -699,6 +699,10 @@ export function BrowserCard({
     fingers.cancel();
     setSliding(false);
   }, [pointing, fingers]);
+  // The button that opened the page leaves with the focus: keys typed at once, at a field the page shows, go there.
+  useEffect(() => {
+    if (pointing && document.activeElement === document.body) pageRef.current?.focus({ preventScroll: true });
+  }, [pointing]);
   // The screen's last picture, when the dialog switches from it to this page (or back), shows dimmed until the page's
   // first frame: the layout effects of the view going and of the one coming run before anything paints
   // (`DialogHeadSlots.picture`).

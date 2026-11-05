@@ -5,7 +5,7 @@ import {
   createBrowserLiveConnection,
   createTouchInput,
   frameMetadata,
-  inputLost,
+  inputProblem,
   keyEvents,
   PASTE_MAX_BYTES,
   pasteBytes,
@@ -354,8 +354,8 @@ export interface LiveState {
   retry: () => void;
   /** The app's own socket is open: only then can a page come (its "reconnecting" isn't the computer's). */
   online: boolean;
-  /** A person's clicks or keys didn't reach the page, since the last picture. */
-  lost: boolean;
+  /** The last of a person's clicks or keys that didn't reach the page: a new object each time. */
+  lost: { words: NonNullable<ReturnType<typeof inputProblem>> } | null;
 }
 
 /**
@@ -371,7 +371,7 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
   const [handoff, setHandoff] = useState<{ controllerUserId: string | null } | null | undefined>(undefined);
   const [hidden, setHidden] = useState(false);
   const [online, setOnline] = useState(false);
-  const [lost, setLost] = useState(false);
+  const [lost, setLost] = useState<LiveState["lost"]>(null);
   const liveRef = useRef<ReturnType<typeof createBrowserLiveConnection> | null>(null);
 
   useEffect(() => {
@@ -384,7 +384,6 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
       agentId,
       onFrame: (f) => {
         setUnavailable(null);
-        setLost(false);
         setFrame(f);
       },
       onStatus: (st) => {
@@ -401,7 +400,10 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
       onError: (code) => {
         if (code === "forbidden" || code === "not_found") setUnavailable("forbidden");
         else if (code === "too_many_browsers") setUnavailable("tooMany");
-        else if (inputLost(code)) setLost(true);
+        else {
+          const words = inputProblem(code);
+          if (words) setLost({ words });
+        }
       },
     });
     liveRef.current = live;

@@ -299,6 +299,9 @@ describe("live view socket", () => {
       await until((f) => f.type === "browser.unavailable");
       ws.send(JSON.stringify({ type: "browser.input", agentId: org.agentId, events: [{ kind: "text", text: "a" }] }));
       expect(await until((f) => f.code === "input_failed")).toMatchObject({ agentId: org.agentId });
+      t.engine.browserLive.input = async () => ({ accepted: 1, refused: false, nowhere: true });
+      ws.send(JSON.stringify({ type: "browser.input", agentId: org.agentId, events: [{ kind: "text", text: "a" }] }));
+      expect(await until((f) => f.code === "no_field")).toMatchObject({ agentId: org.agentId });
       t.engine.browserLive.input = realInput;
       ws.close();
     } finally {

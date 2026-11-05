@@ -14036,6 +14036,7 @@
       "pasteHint": "Coller dans la page ce que vous avez copié",
       "pasteBlocked": "Votre navigateur n’a pas laissé lire ce que vous avez copié. Utilisez {{keys}} sur la page.",
       "inputLost": "Cela n'a pas atteint la page : rien n'a été cliqué ni saisi. Réessaie.",
+      "noField": "Aucun champ n'est sélectionné sur la page : rien n'a été saisi. Sélectionne le champ et saisis à nouveau.",
       "goLabel": "Adresse du site",
       "goPlaceholder": "Saisissez une adresse, comme exemple.com",
       "go": "Ouvrir",

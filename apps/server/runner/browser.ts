@@ -995,6 +995,13 @@ export function hitCheckScript(at: Point, box: Box, typing: boolean): string {
   return `(() => { if (window !== top) throw new Error("agentes:frame"); const own = (n) => ${OWN_CONTROL}; const near = (a, b) => Math.abs(a - b) <= 1; const e = document.elementFromPoint(${at.x}, ${at.y}); let n = e; while (n) { const r = n.getBoundingClientRect(); if (near(r.left, ${left}) && near(r.top, ${top}) && near(r.right, ${right}) && near(r.bottom, ${bottom})) break; n = n.parentElement; } if (!n || /^I?FRAME$/.test(e.tagName) || own(e) !== own(document.elementFromPoint(${cx}, ${cy}))) throw new Error("agentes:covered"); ${typing ? `if (!${TEXT_FIELD}) throw new Error("agentes:not_text");` : ""} return true; })()`;
 }
 
+/**
+ * Whether the text just put in landed: `Input.insertText` answers the same when it didn't. Asked after it, since text
+ * goes into a field that lost the focus but kept its selection (a button was clicked), and the focus comes back with
+ * it. A frame's focus is the frame's own, so it counts.
+ */
+const TAKES_TEXT = `(() => { let e = document.activeElement; while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement; return !!e && (document.designMode === "on" || /^(I?FRAME|OBJECT|EMBED)$/.test(e.tagName) || ${TEXT_FIELD}); })()`;
+
 /** Whether the focus is on a field, before keys go out: anywhere else they would be the page's shortcuts. */
 const FOCUSED_FIELD = `(() => { const e = document.activeElement; if (!e || !${TEXT_FIELD}) throw new Error("agentes:not_text"); return true; })()`;
 
@@ -3740,7 +3747,8 @@ export class BrowserManager {
    * `browser.input`: a person's input during a take over, in order, through
    * the daemon's command relay (the active tab, each one confirmed before the
    * next), a drag with the gaps the person made (`dragDelay`), never more
-   * than `DRAG_LAG_MAX_MS` behind. The stream socket only carries frames.
+   * than `DRAG_LAG_MAX_MS` behind. The stream socket only carries frames. Text with nothing on the page to take it
+   * is said (`nowhere`), and the picture taken again: an idle page may be showing what was there before.
    */
   async input(agent: AgentScope, events: unknown[]): Promise<MachineReplies["browser.input"]> {
     const session = this.sessions.get(String(agent.id ?? ""));
@@ -3758,6 +3766,8 @@ export class BrowserManager {
     const run = stream.inputQueue.then(async () => {
       let accepted = 0;
       let failed = 0;
+      let asked = false;
+      let nowhere = false;
       for (const e of parsed) {
         const wait = driving() ? dragDelay(e, stream.input, this.now(), until) : 0;
         if (wait > 0) await new Promise((r) => setTimeout(r, wait));
@@ -3769,11 +3779,20 @@ export class BrowserManager {
         for (const command of relayCommands(e, stream.input)) {
           if (!(await this.relay(stream.port, command))) ok = false;
         }
+        if (e.kind === "text" && !asked) {
+          asked = true;
+          const seen = await this.relayAnswer(stream.port, { action: "evaluate", script: TAKES_TEXT });
+          nowhere = isRecord(seen?.data) && seen.data.result === false;
+        }
         if (stream.input.pointer) session.pointer = stream.input.pointer;
         if (ok) accepted += 1;
         else failed += 1;
       }
-      return failed > 0 ? { accepted, failed } : { accepted };
+      if (nowhere && stream.framed) {
+        stream.framed = false;
+        void this.firstFrame(session, stream);
+      }
+      return { accepted, ...(failed > 0 ? { failed } : {}), ...(nowhere ? { nowhere } : {}) };
     });
     stream.inputQueue = run.catch(() => undefined);
     return run;
@@ -3789,8 +3808,13 @@ export class BrowserManager {
     });
   }
 
-  /** One command on the daemon's relay (`POST /api/command` on the stream port); true when it ran. */
+  /** One command on the daemon's relay; true when it ran. */
   private async relay(port: number, command: Record<string, unknown>): Promise<boolean> {
+    return (await this.relayAnswer(port, command)) !== null;
+  }
+
+  /** One command on the daemon's relay (`POST /api/command` on the stream port): its answer, null if it didn't run. */
+  private async relayAnswer(port: number, command: Record<string, unknown>): Promise<Record<string, unknown> | null> {
     const origin = `http://127.0.0.1:${port}`;
     try {
       const res = await (this.opts.fetch ?? fetch)(`${origin}/api/command`, {
@@ -3802,10 +3826,10 @@ export class BrowserManager {
         body: JSON.stringify({ id: randomUUID(), ...command }),
       });
       const body = (await res.json().catch(() => null)) as unknown;
-      return res.ok && isRecord(body) && body.success !== false && !body.error;
+      return res.ok && isRecord(body) && body.success !== false && !body.error ? body : null;
     } catch {
       // Timed out (the command may still be queued in the daemon) or the port closed.
-      return false;
+      return null;
     }
   }
 
