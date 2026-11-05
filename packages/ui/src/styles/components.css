@@ -6239,7 +6239,7 @@ button.ac-voice__play:active {
 }
 .ac-video--tile .ac-video__media {
   width: auto;
-  min-width: 220px;
+  min-width: min(220px, 100%);
   max-width: 100%;
   max-height: 320px;
 }
@@ -6545,6 +6545,27 @@ button.ac-voice__play:active {
 /* A small tile, or a phone (the device's buttons set the volume): only the total time and the mute button go. */
 .ac-video--tile .ac-video__total {
   display: none;
+}
+/* The bar fits the player's width, wherever it is (a chat column, a dialog, a phone): the timeline keeps its room and
+   the extras leave from the least needed, the total time, then the speed and the sound, then the clock. */
+.ac-video__bar {
+  container: ac-video-bar / inline-size;
+}
+@container ac-video-bar (max-width: 360px) {
+  .ac-video__total {
+    display: none;
+  }
+}
+@container ac-video-bar (max-width: 280px) {
+  .ac-video__speed,
+  .ac-video__sound {
+    display: none;
+  }
+}
+@container ac-video-bar (max-width: 200px) {
+  .ac-video__time {
+    display: none;
+  }
 }
 @media (hover: none) {
   .ac-video__volume {
