@@ -13135,6 +13135,7 @@ export const en = {
       pasteHint: "Paste what you copied into the page",
       /** `keys`: the paste shortcut, "⌘V" or "Ctrl+V". */
       pasteBlocked: "Your browser didn't let the page read what you copied. Use {{keys}} on the page.",
+      inputLost: "That didn't reach the page, so nothing was clicked or typed. Try again.",
       goLabel: "Site address",
       goPlaceholder: "Type an address, like example.com",
       go: "Open",

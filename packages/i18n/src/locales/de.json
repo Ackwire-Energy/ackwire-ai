@@ -13518,6 +13518,7 @@
       "paste": "Einfügen",
       "pasteHint": "Das Kopierte in die Seite einfügen",
       "pasteBlocked": "Dein Browser hat die Seite nicht lesen lassen, was du kopiert hast. Nutze {{keys}} auf der Seite.",
+      "inputLost": "Das ist nicht auf der Seite angekommen, es wurde also nichts geklickt oder getippt. Versuch es noch einmal.",
       "goLabel": "Adresse der Website",
       "goPlaceholder": "Gib eine Adresse ein, z. B. example.com",
       "go": "Öffnen",

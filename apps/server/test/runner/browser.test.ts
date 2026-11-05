@@ -3111,7 +3111,7 @@ test.if(posix)("a code goes one character per field, each field checked where it
   // As many fields as characters, each one once.
   expect(await typeCode(refs.slice(0, 4))).toMatchObject({
     success: false,
-    error: expect.stringContaining("one character for each"),
+    error: expect.stringContaining("A password goes in one field at a time"),
   });
   expect(await errorCode(() => typeCode(["@e1", "@e1", "@e2", "@e3", "@e4", "@e5"]))).toBe("bad_request");
   // A field that isn't a code's stops it there.

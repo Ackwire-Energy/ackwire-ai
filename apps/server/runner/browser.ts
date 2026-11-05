@@ -3025,7 +3025,7 @@ export class BrowserManager {
       return {
         success: false,
         data: null,
-        error: `${name} doesn't have one character for each of the ${refs.length} fields given; it wasn't typed`,
+        error: `${name} doesn't have one character for each of the ${refs.length} fields given, so it wasn't typed: several fields at once are for a code split in boxes. A password goes in one field at a time, one type_secret for each`,
       };
     }
     // Redacted from what the browser answers from before it is typed (a code isn't guarded from addresses).

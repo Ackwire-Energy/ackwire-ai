@@ -13627,6 +13627,7 @@
       "paste": "Plakken",
       "pasteHint": "Plak wat je hebt gekopieerd in de pagina",
       "pasteBlocked": "Je browser liet niet lezen wat je hebt gekopieerd. Gebruik {{keys}} op de pagina.",
+      "inputLost": "Dat is niet bij de pagina aangekomen, dus er is niets geklikt of getypt. Probeer het opnieuw.",
       "goLabel": "Adres van de site",
       "goPlaceholder": "Typ een adres, zoals example.com",
       "go": "Openen",

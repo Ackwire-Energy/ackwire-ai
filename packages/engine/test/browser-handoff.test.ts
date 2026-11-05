@@ -1687,6 +1687,19 @@ describe("live view", () => {
     live.close();
   });
 
+  test("input the computer couldn't put on the page comes back as failed: the view says so", async () => {
+    await start();
+    const { hub } = fakeHub((r) => (r.op === "browser.input" ? { accepted: 0, failed: 1 } : undefined));
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    await startTakeover({ db: f.db }, f.owner.id, f.org.id, f.agent.id);
+    expect(await live.sendInput(f.owner.id, f.org.id, f.agent.id, [{ kind: "text", text: "a" }])).toEqual({
+      accepted: 0,
+      refused: false,
+      failed: 1,
+    });
+    live.close();
+  });
+
   test("while a person is in control only they see the page; the others are told it's hidden, and see it again on hand back", async () => {
     const machine = await start();
     const { hub, calls } = fakeHub();

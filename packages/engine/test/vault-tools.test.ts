@@ -9,6 +9,7 @@ import {
 } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
+  ASK_PERSON_TOOL,
   createAgent,
   createAgentRuns,
   createBrowserProfile,
@@ -484,7 +485,10 @@ test("the runner's refusals become clear errors, and nothing is recorded", async
   expect(runnerFailureText("typed nothing", "get_blocked")).toContain("stopped that request");
   expect(runnerFailureText("typed nothing", "not_code_field")).toContain("aren't fields for a code");
   // Chrome didn't confirm the guard against a password in an address before the fill: nothing was typed.
-  expect(runnerFailureText("typed nothing", "unguarded")).toContain("nothing was typed");
+  const unguarded = runnerFailureText("typed nothing", "unguarded");
+  expect(unguarded).toContain("nothing was typed");
+  expect(unguarded).toContain("won't change that");
+  expect(unguarded).toContain(ASK_PERSON_TOOL);
   expect(runnerFailureText("no such ref", undefined)).toBe("The browser said: no such ref");
   expect(vaultTypingRefusal("The browser said: not_password_field", "acme.example")).toContain(
     "isn't a password field",

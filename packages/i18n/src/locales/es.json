@@ -13913,6 +13913,7 @@
       "paste": "Pegar",
       "pasteHint": "Pegar en la página lo que copiaste",
       "pasteBlocked": "Tu navegador no dejó leer lo que copiaste. Usa {{keys}} en la página.",
+      "inputLost": "Eso no llegó a la página, así que no se hizo clic ni se escribió nada. Inténtalo de nuevo.",
       "goLabel": "Dirección del sitio",
       "goPlaceholder": "Escribe una dirección, como ejemplo.com",
       "go": "Abrir",

@@ -13337,6 +13337,7 @@ export const ptBR = {
       paste: "Colar",
       pasteHint: "Colar na página o que você copiou",
       pasteBlocked: "O navegador não deixou ler o que você copiou. Use {{keys}} na página.",
+      inputLost: "Isso não chegou à página, então nada foi clicado nem digitado. Tente de novo.",
       goLabel: "Endereço do site",
       goPlaceholder: "Digite um endereço, como loja.com.br",
       go: "Abrir",

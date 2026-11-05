@@ -14039,6 +14039,7 @@
       "paste": "Incolla",
       "pasteHint": "Incolla nella pagina ciò che hai copiato",
       "pasteBlocked": "Il browser non ha lasciato leggere ciò che hai copiato. Usa {{keys}} sulla pagina.",
+      "inputLost": "Non è arrivato alla pagina, quindi non è stato cliccato né digitato nulla. Riprova.",
       "goLabel": "Indirizzo del sito",
       "goPlaceholder": "Scrivi un indirizzo, come example.com",
       "go": "Apri",

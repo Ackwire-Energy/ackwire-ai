@@ -332,6 +332,7 @@ export function createRealtime(deps: RealtimeDeps) {
       try {
         const sent = await step.sent;
         if (sent.refused) send(ws, { type: "error", code: "not_in_control", agentId });
+        else if (sent.failed) send(ws, { type: "error", code: "input_failed", agentId });
       } catch (error) {
         if (ws.readyState === 1) {
           send(ws, { type: "browser.unavailable", agentId, reason: "unavailable", message: String(error) });

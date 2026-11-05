@@ -373,7 +373,7 @@ describe("the card in the message", () => {
     /** The input frames sent since, each as its events. */
     const frames = () =>
       (socket.sent.slice(before) as Sent[]).filter((f) => f.type === "browser.input").map((f) => f.events ?? []);
-    return { card, page, img, sentToPage, flushed, frames };
+    return { card, page, img, socket, sentToPage, flushed, frames };
   }
   const pointer = (pointerId: number, x: number, y: number, pointerType = "mouse") => ({
     pointerId,
@@ -549,6 +549,14 @@ describe("the card in the message", () => {
         void fireEvent.paste(el, { clipboardData: { getData: (type: string) => (type === "text/plain" ? text : "") } }),
     );
   const toast = () => [...document.querySelectorAll(".ac-toast")].at(-1)?.textContent ?? null;
+
+  test("what the person does that can't reach the page: the card says so, once until the next picture", async () => {
+    const { socket } = await inControlOfPage();
+    expect(toast()).toBeNull();
+    await act(async () => socket.push({ type: "error", agentId: ADA_ID, code: "input_failed" }));
+    await settle(2);
+    expect(toast()).toContain("não chegou à página");
+  });
 
   test("the person's paste keys paste their text into the page's field as text, in pieces a frame carries", async () => {
     const { page, frames } = await inControlOfPage("dialog");

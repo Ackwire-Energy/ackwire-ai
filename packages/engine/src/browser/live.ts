@@ -286,7 +286,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
   /** The mode the stream should run in now: control while the person in control watches. */
   const wanted = (state: AgentLive): BrowserStreamMode | null => {
     if (state.viewers.size === 0) return null;
-    const driving = state.controllerUserId && [...state.viewers].some((v) => v.userId === state.controllerUserId);
+    const controller = controllerOf(state);
+    const driving = controller && [...state.viewers].some((v) => v.userId === controller);
     return driving ? "control" : "watch";
   };
 
@@ -429,6 +430,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     announce(agentId, state, () => {
       state.shared = row ? handoffView(row) : null;
     });
+    void sync(agentId, state);
   };
   const reloadShared = (agentId: string, state: AgentLive) =>
     void sharedChanged(agentId, state).catch((error) =>
@@ -584,12 +586,18 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     }, graceMs);
   }
 
+  /** `failed`: events that didn't reach the page, though the person was in control (the view says so). */
+  interface InputAnswer {
+    accepted: number;
+    refused: boolean;
+    failed?: number;
+  }
   interface InputBatch {
     userId: string;
     orgId: string;
     agentId: string;
     events: BrowserInputEvent[];
-    waiters: { resolve(r: { accepted: number; refused: boolean }): void; reject(e: unknown): void }[];
+    waiters: { resolve(r: InputAnswer): void; reject(e: unknown): void }[];
     timer: ReturnType<typeof setTimeout> | null;
   }
   /** Input being gathered, per person and agent. */
@@ -779,7 +787,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       }
       batch.events.push(...events);
       const current = batch;
-      return new Promise<{ accepted: number; refused: boolean }>((resolve, reject) => {
+      return new Promise<InputAnswer>((resolve, reject) => {
         current.waiters.push({ resolve, reject });
       });
     },
@@ -792,16 +800,21 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
 
     /**
      * Forwarded to the runner only when the person is in control of the open
-     * handoff (checked against the database).
+     * handoff (checked against the database), or of the desktop showing this same window, which the view shows them
+     * in control of too.
      */
-    async sendInput(userId: string, orgId: string, agentId: string, events: BrowserInputEvent[]) {
+    async sendInput(userId: string, orgId: string, agentId: string, events: BrowserInputEvent[]): Promise<InputAnswer> {
       const profileId = profileIdOfKey(agentId);
-      const open = await controlRow(orgId, agentId);
+      const open =
+        (await controlRow(orgId, agentId)) ??
+        (profileId ? null : await openElsewhere(deps.db, orgId, agentId, "browser"));
       if (open?.status !== "active" || open.controllerUserId !== userId) return { accepted: 0, refused: true };
       // Control changed where this process didn't hear it (another replica, a lost event): the others'
       // view is hidden here before any of the person's typing reaches the page.
       const state = live.get(agentId);
-      if (state && state.controllerUserId !== open.controllerUserId) handoffChanged(agentId, state, open);
+      if (state && ofBrowser(open.screen) && state.controllerUserId !== open.controllerUserId) {
+        handoffChanged(agentId, state, open);
+      }
       // Its own key: watching's recheck says only that they may see it, not drive it.
       const key = `control:${userId}:${agentId}`;
       if (Date.now() - (checked.get(key) ?? 0) > recheckMs) {
@@ -832,7 +845,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         agent: scope,
         ...profileOp(agentId),
       });
-      return { accepted: reply.accepted, refused: false };
+      return { accepted: reply.accepted, refused: false, ...(reply.failed ? { failed: reply.failed } : {}) };
     },
 
     /**

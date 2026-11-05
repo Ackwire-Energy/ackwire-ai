@@ -17,6 +17,7 @@ import {
   frameMetadata,
   HELD_STALE_MS,
   handoffWantsWords,
+  inputLost,
   isHeldTakeover,
   isOpenHandoff,
   keyboardEvents,
@@ -435,6 +436,11 @@ export function BrowserCard({
   const inControl = controller === me.user.id;
   const otherInControl = Boolean(controller) && !inControl;
   useEffect(() => setHolding(inControl), [inControl]);
+  const lost = inControl && inputLost(live.error);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: said once each time it starts
+  useEffect(() => {
+    if (lost) sayFailed(t("browser.inCard.inputLost"));
+  }, [lost]);
   // A chat card's Hand back keeps its check and words: only the dialog's head folds it.
   const back = useHandBack(surface && handoff?.kind === "takeover");
   const controllerName = controller ? (dir.memberById.get(controller)?.name ?? t("channel.unknownPerson")) : "";

@@ -396,7 +396,7 @@ export function runnerFailureText(error: string | undefined, code?: string): str
     return "Those aren't fields for a code (text, number or one-time-code boxes), so nothing was typed. Read the page and give the code's boxes, in order.";
   }
   if (code === "unguarded") {
-    return "The browser couldn't get ready to keep the password out of the page's addresses, so nothing was typed. Run that step again; if it keeps failing, tell the person.";
+    return `The browser didn't confirm in time that it can keep the password out of the page's addresses, so nothing was typed. Running it again won't change that on this page: ask the person to type it themselves with ${ASK_PERSON_TOOL}.`;
   }
   // Its code stays ahead of the words: `vaultTypingRefusal` reads it for a login and words it its own way.
   if (code === "in_frame") {

@@ -32728,6 +32728,9 @@
   "browser.inCard.pasteBlocked": {
     "value": "Your browser didn't let the page read what you copied. Use {{keys}} on the page."
   },
+  "browser.inCard.inputLost": {
+    "value": "That didn't reach the page, so nothing was clicked or typed. Try again."
+  },
   "browser.inCard.goLabel": {
     "value": "Site address"
   },

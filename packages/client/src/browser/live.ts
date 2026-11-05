@@ -101,6 +101,9 @@ export type BrowserLiveMessage =
     }
   | { type: "error"; agentId: string; code: string };
 
+/** An `error` code saying a person's clicks or keys didn't reach the page: the view says so, or they vanish. */
+export const inputLost = (code: string | null) => code === "input_failed" || code === "not_in_control";
+
 /** The most text one `text` event carries (mirror of `BROWSER_LIMITS.inputText` in `@agenteschat/adapters`). */
 export const TEXT_EVENT_MAX = 10_000;
 /** Most events in one `browser.input` frame (the server's limit). */
@@ -187,7 +190,7 @@ export interface BrowserLiveOptions {
   onUnavailable?(reason: BrowserLiveUnavailable, message?: string): void;
   /** The stream ended: the browser closed, an error, or someone pressed Parar (`by`: who and when). */
   onEnded?(reason: "stopped" | "closed" | "error", message?: string, by?: { userId?: string; at?: string }): void;
-  /** `forbidden`, `not_found`, `not_in_control`, `too_many_browsers`, `rate_limited`. */
+  /** `forbidden`, `not_found`, `not_in_control`, `input_failed`, `too_many_browsers`, `rate_limited`. */
   onError?(code: string): void;
   timers?: Pick<Timers, "setTimeout" | "clearTimeout">;
   backoffMs?: number[];

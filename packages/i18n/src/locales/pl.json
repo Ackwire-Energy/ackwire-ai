@@ -14451,6 +14451,7 @@
       "paste": "Wklej",
       "pasteHint": "Wklej na stronę to, co skopiowano",
       "pasteBlocked": "Przeglądarka nie pozwoliła odczytać tego, co skopiowano. Użyj {{keys}} na stronie.",
+      "inputLost": "To nie dotarło do strony, więc nic nie zostało kliknięte ani wpisane. Spróbuj ponownie.",
       "goLabel": "Adres strony",
       "goPlaceholder": "Wpisz adres, np. example.com",
       "go": "Otwórz",
