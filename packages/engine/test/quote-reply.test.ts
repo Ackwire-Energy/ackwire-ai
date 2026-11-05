@@ -8,6 +8,7 @@ import {
   createFileArtifact,
   listMessages,
   type Message,
+  ownFilesNote,
   postPersonMessage,
   quotedLine,
   removeReaction,
@@ -119,6 +120,53 @@ test("quotedLine / attachedLine render the meta for toTurns", () => {
       content: '[Bia]: (replying to Ana: "manda o relatório")\nsegue\n(attached files: "r.pdf" (artifact a1))',
     },
   ]);
+});
+
+test("toTurns: files on an agent's message are read too, its own ones as a note on the people's side", () => {
+  const msg = (id: string, author: { userId?: string; agentId?: string }, body: string, files?: unknown[]) =>
+    ({
+      id,
+      authorUserId: author.userId ?? null,
+      authorAgentId: author.agentId ?? null,
+      authorType: author.userId ? "person" : "agent",
+      body,
+      meta: files ? { artifacts: files } : {},
+    }) as unknown as Message;
+  const names = new Map([
+    ["u1", "Bia"],
+    ["a2", "Ada"],
+  ]);
+  const turns = toTurns(
+    [
+      msg("m1", { userId: "u1" }, "@dev faz o vídeo"),
+      // Its own reply with a video and a text file, written at post time with their titles.
+      msg("m2", { agentId: "me" }, "Pronto", [
+        { id: "v1", version: 1, title: "teaser.mp4" },
+        { id: "t1", version: 2, title: 'notes "final"\nv2.txt' },
+      ]),
+      // Another agent's message with a file reads like a person's.
+      msg("m3", { agentId: "a2" }, "fiz a capa", [{ id: "c1", version: 1, title: "capa.png" }]),
+      msg("m4", { userId: "u1" }, "manda o vídeo pra Ana"),
+    ],
+    "me",
+    names,
+  );
+  expect(turns).toEqual([
+    { role: "user", content: "[Bia]: @dev faz o vídeo" },
+    // Never in its own words: it would learn to write the line in a reply.
+    { role: "assistant", content: "Pronto" },
+    {
+      role: "user",
+      content: [
+        // A title's quotes and line breaks never break the line (some titles come from outside, e.g. an email).
+        '[Files you attached to your message above: "teaser.mp4" (artifact v1), "notes final v2.txt" (artifact t1)]',
+        '[Ada]: fiz a capa\n(attached files: "capa.png" (artifact c1))',
+        "[Bia]: manda o vídeo pra Ana",
+      ].join("\n\n"),
+    },
+  ]);
+  expect(ownFilesNote({})).toBe("");
+  expect(attachedLine({ meta: { artifacts: [{ id: "x1" }] } })).toBe('\n(attached files: "file" (artifact x1))');
 });
 
 test("reactions: listed with the messages and published live to the channel", async () => {

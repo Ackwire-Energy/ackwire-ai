@@ -144,7 +144,7 @@ export function createArtifactToolSource(deps: ArtifactDeps): ToolSource {
           });
           return {
             content: `Saved "${a.title}" (${a.kind}) as artifact ${a.id}, version 1.`,
-            data: { artifact: { id: a.id, version: a.version } },
+            data: { artifact: { id: a.id, version: a.version, title: a.title } },
           };
         } catch (error) {
           return failed(error);
@@ -178,7 +178,7 @@ export function createArtifactToolSource(deps: ArtifactDeps): ToolSource {
           });
           return {
             content: `Saved version ${a.version} of "${a.title}".`,
-            data: { artifact: { id: a.id, version: a.version } },
+            data: { artifact: { id: a.id, version: a.version, title: a.title } },
           };
         } catch (error) {
           return failed(error);
@@ -293,7 +293,7 @@ export function createArtifactToolSource(deps: ArtifactDeps): ToolSource {
           } else if (result.copied) from = "It came from another conversation: a copy was saved here.";
           return {
             content: `Shared "${a.title}" (${a.kind}) in this conversation as artifact ${a.id}; its card goes with your reply. ${from}`,
-            data: { artifact: { id: a.id, version: a.version } },
+            data: { artifact: { id: a.id, version: a.version, title: a.title } },
           };
         } catch (error) {
           return failed(error);

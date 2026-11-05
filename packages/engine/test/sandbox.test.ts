@@ -298,7 +298,7 @@ describe("Drive and skills", () => {
     expect(saved.isError).toBeFalsy();
     const [table] = await f.db.select().from(schema.artifacts);
     expect(table).toMatchObject({ kind: "table", title: "Vendas", channelId: f.general.id });
-    expect(saved.data).toEqual({ artifact: { id: table?.id, version: 1 } });
+    expect(saved.data).toEqual({ artifact: { id: table?.id, version: 1, title: "Vendas" } });
     await call(ctx, "write_file", { path: "out/vendas.csv", content: "mês,total\nfev,2\n" });
     const v2 = await call(ctx, "export_file", { path: "out/vendas.csv", artifact_id: table?.id });
     expect(v2.content).toContain("version 2");

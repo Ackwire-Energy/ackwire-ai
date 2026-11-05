@@ -96,7 +96,7 @@ describe("artifacts made by agents", () => {
     // Asked in the channel: the file and the reply are in the channel itself.
     expect(created).toMatchObject({ channelId: f.general.id, threadId: null, createdByType: "agent" });
     const reply = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).at(-1);
-    expect(reply?.meta.artifacts).toEqual([{ id: created?.id, version: 1 }]);
+    expect(reply?.meta.artifacts).toEqual([{ id: created?.id, version: 1, title: "Relatório de março" }]);
     await Bun.sleep(5);
     expect(events.some((e) => e.type === "artifact.created")).toBe(true);
 
@@ -131,6 +131,50 @@ describe("artifacts made by agents", () => {
       kinds: ["file"],
     });
     expect(hits.map((h) => h.sourceId)).toContain(id);
+  });
+
+  test("a reply in the thread of the agent's message reads that message's files by title and id", async () => {
+    // "Send it to Ana" under a reply with a file must name that file, not whatever the Drive has newest.
+    const requests: ModelRequest[] = [];
+    const contentOf = (m: ModelRequest["messages"][number]) =>
+      typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+    f = await setup({
+      artifactTools: true,
+      reply: (req: ModelRequest) => {
+        requests.push(req);
+        const text = last(req);
+        if (text.includes("tool_result")) return { chunks: ["Pronto, está no Drive."] };
+        if (text.includes("monta o roteiro"))
+          return {
+            chunks: [],
+            toolUses: [
+              { name: "create_artifact", input: { title: "Roteiro do vídeo", kind: "document", markdown: "# Cena 1" } },
+            ],
+          };
+        return { chunks: ["ok"] };
+      },
+    });
+    await grantScopes(f.db, f.org.id, f.agent.id, DRIVE);
+    await post("@dev monta o roteiro");
+    await drainOutbox(f.db, f.handlers);
+    const [file] = await f.db.select().from(schema.artifacts);
+    const reply = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).at(-1);
+    // Written at post time with the title, so the context reads it with no query.
+    expect(reply?.meta.artifacts).toEqual([{ id: file?.id, version: 1, title: "Roteiro do vídeo" }]);
+
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev manda isso pra Ana",
+      threadId: reply?.id ?? null,
+    });
+    await drainOutbox(f.db, f.handlers);
+    const asked = requests.find((r) => r.messages.some((m) => contentOf(m).includes("manda isso pra Ana")));
+    if (!asked) throw new Error("no run for the thread reply");
+    // On the people's side (a note, like its own GIF's), never in its own words: it would learn to write the line.
+    const note = `[Files you attached to your message above: "Roteiro do vídeo" (artifact ${file?.id})]`;
+    const noteAt = asked.messages.findIndex((m) => m.role === "user" && contentOf(m).includes(note));
+    expect(noteAt).toBeGreaterThan(0);
+    expect(asked.messages[noteAt - 1]).toMatchObject({ role: "assistant", content: "Pronto, está no Drive." });
+    expect(asked.messages.filter((m) => m.role === "assistant" && contentOf(m).includes("attached"))).toEqual([]);
   });
 
   test("html is stored as is and flagged untrusted", async () => {

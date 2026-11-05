@@ -390,7 +390,7 @@ export async function shareSavedFile(
     if (!done) throw new Error(row.error ?? "the upload did not finish");
     return {
       content: `${saved.content} It is shown in this conversation: its card goes with your reply ("${done.title}" in the Drive, ${formatBytes(done.size)}, artifact ${done.id}).`,
-      data: { ...saved.data, artifact: { id: done.id, version: done.version } },
+      data: { ...saved.data, artifact: { id: done.id, version: done.version, title: done.title } },
     };
   } catch (error) {
     return {

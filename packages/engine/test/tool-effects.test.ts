@@ -21,13 +21,14 @@ afterEach(async () => {
 describe("files a run's tools leave for its reply", () => {
   test("the same file twice (kept by the bridge and taken again, or saved again) is one card, newest version", () => {
     const t: ToolSideEffects = {};
-    absorbToolData(t, { artifact: { id: "a", version: 1 } });
-    mergeToolEffects(t, { artifacts: [{ id: "a", version: 1 }] });
-    mergeToolEffects(t, { artifacts: [{ id: "b", version: 1 }] });
-    absorbToolData(t, { artifact: { id: "a", version: 2 } });
+    absorbToolData(t, { artifact: { id: "a", version: 1, title: "plan.md" } });
+    mergeToolEffects(t, { artifacts: [{ id: "a", version: 1, title: "plan.md" }] });
+    mergeToolEffects(t, { artifacts: [{ id: "b", version: 1, title: "chart.png" }] });
+    // Renamed with its new version: the card and the agent's context read the newest title.
+    absorbToolData(t, { artifact: { id: "a", version: 2, title: "launch plan.md" } });
     expect(t.artifacts).toEqual([
-      { id: "a", version: 2 },
-      { id: "b", version: 1 },
+      { id: "a", version: 2, title: "launch plan.md" },
+      { id: "b", version: 1, title: "chart.png" },
     ]);
   });
 
@@ -37,7 +38,7 @@ describe("files a run's tools leave for its reply", () => {
     const trigger = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, {
       body: "make the QR screenshot",
     });
-    const kept = { artifacts: [{ id: "file-1", version: 1 }] };
+    const kept = { artifacts: [{ id: "file-1", version: 1, title: "qr.png" }] };
     const [run] = await fx.db
       .insert(schema.agentRuns)
       .values({
