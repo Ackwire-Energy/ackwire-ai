@@ -258,7 +258,7 @@ export function AgentFaces({ access }: { access: VaultAccess }) {
 }
 
 /**
- * One line of the access block: its icon, then what it is (Edit at its end) over who, across the whole width (after
+ * One line of the access block: its icon on the top row with what it is (Edit at its end), then who under it (after
  * the agents' faces, for the agents). Every line's icon, the scope's too, keeps one width, so the words line up.
  */
 function AccessLine({
