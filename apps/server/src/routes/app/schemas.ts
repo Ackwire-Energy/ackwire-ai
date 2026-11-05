@@ -1,5 +1,14 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
-import { AGENT_ACTION_KINDS, AGENT_STYLES, ONBOARDING_STEPS, STANDING_STATES, START_PAGES } from "@agenteschat/engine";
+import {
+  AGENT_ACTION_KINDS,
+  AGENT_STYLES,
+  CHAT_OPEN_AT,
+  CHAT_STYLES,
+  CHAT_TONES,
+  ONBOARDING_STEPS,
+  STANDING_STATES,
+  START_PAGES,
+} from "@agenteschat/engine";
 import { CONTEXT_LIMITS, ENDPOINT_STYLES, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
@@ -43,6 +52,16 @@ export const StartChoice = z
     description:
       "What opens when the app starts here (ADR 0108): `home` (Início, Conversas on the phone), `last` (where the person was, kept on each device) or `channel` (open the home when they are no longer in it).",
   });
+
+export const ChatPrefs = z
+  .object({
+    channelStyle: z.enum(CHAT_STYLES).optional(),
+    dmStyle: z.enum(CHAT_STYLES).optional(),
+    channelTone: z.enum(CHAT_TONES).optional(),
+    dmTone: z.enum(CHAT_TONES).optional(),
+    openAt: z.enum(CHAT_OPEN_AT).optional(),
+  })
+  .openapi("ChatPrefs");
 
 export const Organization = z
   .object({
@@ -109,6 +128,10 @@ export const Organization = z
     agentStyle: z.enum(AGENT_STYLES).nullable().optional().openapi({
       description:
         "In `GET /me`: how agents talk to you here (`PUT …/me/agent-style`, ADR 0147): `simple` or `technical`; null until you pick, and agents talk simply. Absent elsewhere.",
+    }),
+    chatPrefs: ChatPrefs.optional().openapi({
+      description:
+        "In `GET /me`: how conversations look to you here (`PUT …/me/chat`). Only what you chose: a key not here keeps the app's default. Absent elsewhere.",
     }),
   })
   .openapi("Organization");
@@ -277,6 +300,16 @@ export const PlanUsage = z
     limited: z.boolean().optional().openapi({ description: "The plan refused a request for its limit." }),
     source: z.enum(["turn", "probe"]),
     at: z.string().openapi({ description: "When the computer learned it." }),
+    models: z
+      .record(
+        z.string(),
+        z.object({ at: z.string(), until: z.string().optional(), region: z.literal(true).optional() }),
+      )
+      .optional()
+      .openapi({
+        description:
+          "Models at a limit of their own, by model id: until `until` (absent: unknown), or `region`: the model needs a region the account doesn't allow.",
+      }),
   })
   .openapi("PlanUsage", {
     description: "A plan's usage limits, as the CLI on the computer said them (no token is ever read).",
@@ -396,6 +429,10 @@ export const Channel = z
     mentionCount: z.number().int().optional().openapi({
       description: "Channel list only: of `unreadCount`, the messages that mention you (counted even while muted).",
     }),
+    lastReadAt: z.string().nullable().optional().openapi({
+      description:
+        "Channel list only: where the unread starts (when you last read it, or joined); null when not a member.",
+    }),
     can: z.object({ post: z.boolean(), callAgents: z.boolean(), manage: z.boolean() }).optional().openapi({
       description:
         "Channel list only: what you may do here with its exceptions (ADR 0134): send messages, wake its agents, manage it.",
@@ -440,7 +477,7 @@ export const AgentAction = z
       .nullable()
       .openapi({ description: "The person the agent worked for: they, admins and the agent's owner may undo." }),
     target: z.object({
-      type: z.enum(["issue", "memory", "routine", "channel", "wiki_page", "thread", "skill", "agent"]),
+      type: z.enum(["issue", "memory", "routine", "channel", "wiki_page", "thread", "skill", "agent", "repository"]),
       id: z.string(),
       number: z.number().optional().openapi({ description: "Issues." }),
       title: z.string().optional().openapi({ description: "Issue, routine, page or thread title; channel name." }),
@@ -790,6 +827,21 @@ export const BrainMachine = z
 export const AgentBrain = z
   .object({
     agentId: z.uuid(),
+    scope: z.enum(["mine", "workspace"]).optional().openapi({
+      description:
+        "The team's right hand only (ADR 0137 §11): `mine`, the caller's own AI for their DM with it (`brain` `model` = none, their DM thinks with the workspace's); `workspace`, the one every DM thinks with while its person has none.",
+    }),
+    workspaceAi: z
+      .object({
+        brain: BrainKind,
+        ownerId: z.string().nullable(),
+        servesYou: z.boolean(),
+      })
+      .optional()
+      .openapi({
+        description:
+          "With `mine`: the workspace's AI, `model` for an API key, else the plan's brain and owner; `servesYou`, it thinks for the caller (a key, a plan whose owner lets it serve everyone, or theirs).",
+      }),
     brain: BrainKind,
     model: z.string().nullable().openapi({ description: "As stored; null = the brain's default." }),
     effectiveModel: z.string().nullable(),

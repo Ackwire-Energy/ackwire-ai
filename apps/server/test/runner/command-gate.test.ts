@@ -2,7 +2,14 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { ASK_AGAIN, DELETE_BRANCHES_POINTER } from "@agenteschat/adapters/command-policy";
-import { commandApproval, lonePush, pushesOwnBranches, pushThroughProxy, repoFacts } from "../../runner/command-gate";
+import {
+  allowedMerge,
+  commandApproval,
+  lonePush,
+  pushesOwnBranches,
+  pushThroughProxy,
+  repoFacts,
+} from "../../runner/command-gate";
 import { gitRepo, hasGit, removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
@@ -212,4 +219,56 @@ test.skipIf(!hasGit)(
     expect(await hold("git push origin --delete cursor/pap-582-fix", work)).toMatchObject({ never: false });
     expect(await pushThroughProxy(push, work)).toBe(false);
   },
+);
+
+test.skipIf(!hasGit)(
+  "allowedMerge: the repository as the command names it, else every remote of the folder; anything unknown stays held",
+  async () => {
+    const { work, git } = gitRepo(dirs);
+    const repos = ["acme/app"];
+    const merge = (command: string, cwd = work) => allowedMerge(command, { cwd, repos });
+    // Named: the folder doesn't matter, and case doesn't either.
+    expect(await merge("gh pr merge 12 -R ACME/App")).toEqual({ repo: "ACME/App", pr: 12, ref: null });
+    expect(await merge("gh pr merge 12 -R acme/api")).toBeNull();
+    // Not named: the remote here isn't GitHub, so nobody can tell.
+    expect(await merge("gh pr merge 12")).toBeNull();
+    git("remote", "set-url", "origin", "https://github.com/acme/app.git");
+    expect(await merge("gh pr merge 12")).toEqual({ repo: "acme/app", pr: 12, ref: null });
+    expect(await merge("git merge feature/x")).toEqual({ repo: "acme/app", pr: null, ref: "feature/x" });
+    git("remote", "set-url", "origin", PROXY);
+    expect(await merge("gh pr merge 12")).toEqual({ repo: "acme/app", pr: 12, ref: null });
+    // A fork's upstream: gh may pick either, so it stays held.
+    git("remote", "add", "upstream", "https://github.com/beta/app.git");
+    expect(await merge("gh pr merge 12")).toBeNull();
+    git("remote", "set-url", "upstream", "git@github.com:acme/app.git");
+    expect(await merge("gh pr merge 12")).toEqual({ repo: "acme/app", pr: 12, ref: null });
+    // gh goes by gh-resolved, whatever the remotes say.
+    git("config", "remote.origin.gh-resolved", "base");
+    expect(await merge("gh pr merge 12")).toEqual({ repo: "acme/app", pr: 12, ref: null });
+    git("config", "remote.origin.gh-resolved", "beta/secret");
+    expect(await merge("gh pr merge 12")).toBeNull();
+    expect(await merge("gh pr merge 12 -R acme/app")).toEqual({ repo: "acme/app", pr: 12, ref: null });
+    git("config", "--unset", "remote.origin.gh-resolved");
+    // In another folder: that folder's remotes.
+    const other = gitRepo(dirs);
+    other.git("remote", "set-url", "origin", "https://github.com/beta/app.git");
+    expect(await merge(`cd ${other.work} && gh pr merge 12`)).toBeNull();
+    // The script a run_code writes is read like the command, and any other language stays held.
+    mkdirSync(path.join(work, ".agentes"));
+    writeFileSync(path.join(work, ".agentes", "run-1.sh"), "#!/bin/bash\nset -e\ngh pr merge 12 --squash\n");
+    writeFileSync(path.join(work, ".agentes", "run-2.py"), "gh pr merge 12\n");
+    writeFileSync(path.join(work, ".agentes", "run-3.sh"), "gh pr merge 12 && vercel deploy --prod\n");
+    expect(await merge("bash .agentes/run-1.sh")).toEqual({ repo: "acme/app", pr: 12, ref: null });
+    expect(await merge("python3 .agentes/run-2.py")).toBeNull();
+    expect(await merge("bash .agentes/run-3.sh")).toBeNull();
+    // Past what is read of a script, anything could follow.
+    writeFileSync(
+      path.join(work, ".agentes", "run-4.sh"),
+      `gh pr merge 12\n#${"x".repeat(1024 * 1024)}\nvercel deploy --prod\n`,
+    );
+    expect(await merge("bash .agentes/run-4.sh")).toBeNull();
+    // No list, no merge.
+    expect(await allowedMerge("gh pr merge 12 -R acme/app", { cwd: work, repos: [] })).toBeNull();
+  },
+  30_000,
 );

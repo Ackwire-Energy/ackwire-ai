@@ -19,8 +19,10 @@ user.
 import base64
 import itertools
 import json
+import math
 import os
 import platform
+import random
 import re
 import select
 import shutil
@@ -54,6 +56,8 @@ TILE = 32
 BUSY_S = 0.15
 # Below about 12 ms between keys xdotool drops letters and capitals of accented text.
 KEY_DELAY_MS = 12
+# Long text goes to xdotool this many characters at a time: a person taking control stops it between two.
+EVEN_CHUNK = 16
 # Keys sent right after a click can reach the window that had the focus before it.
 STEP_GAP_S = 0.05
 # A paste is answered by the app that has the focus; nothing asking for it this long means nothing took it.
@@ -69,14 +73,38 @@ POINTER_STEPS = ("move", "click", "drag", "scroll")
 KEY_STEPS = ("key", "type")
 STEPS = ("move", "click", "drag", "key", "type", "fill", "scroll", "activate", "launch", "open", "pause")
 TEXT_TARGETS = ("UTF8_STRING", "text/plain;charset=utf-8", "TEXT", "STRING")
+# How the agent's pointer and keys move, so apps and pages see a person's rhythm (apps/server/runner/human-input.ts
+# has the same model and numbers for the agent browser: keep the two in step). Times in ms, ranges [low, high].
+HUMAN = {
+    "fittsA": 50, "fittsB": 100, "minMs": 150, "maxMs": 450,
+    "stepMs": 16, "stepJitterMs": 4,
+    "bend": 0.2, "bendMaxPx": 120, "jitterPx": 0.7,
+    "overshootOverPx": 300, "overshootChance": 0.3, "overshootShare": (0.03, 0.07), "overshootMaxPx": 28,
+    "correctShare": 0.2, "correctMinMs": 60,
+    "dragSlowdown": 1.4, "dragHoldMs": (60, 140),
+    "holdMs": (40, 120), "clickGapMs": (70, 150),
+    "wheelGapMs": (30, 110), "wheelPauseChance": 0.15, "wheelPauseMs": (150, 300),
+    "firstKeyMs": (120, 260), "keyMs": (38, 100), "afterSpaceMs": (10, 40), "afterPunctuationMs": (40, 120),
+    "pauseChance": 0.02, "pauseMs": (200, 450),
+    # How long a key stays down: xdotool's `type --delay` holds it a quarter of the delay, then waits as long (measured).
+    "keyHoldMs": (25, 45),
+    "typeMaxChars": 200,
+}
 
 
 class HelperError(Exception):
-    """A request that fails with a code for the runner: bad_request, unavailable, stale, failed, mismatch."""
+    """A request that fails with a code for the runner: bad_request, unavailable, stale, failed, mismatch, stopped."""
 
     def __init__(self, code, message):
         super().__init__(message)
         self.code = code
+
+
+class Stopped(HelperError):
+    """A person took control: an `input` ends at its next key or step, and the runner tells the agent."""
+
+    def __init__(self):
+        super().__init__("stopped", "a person took control")
 
 
 def bad(message):
@@ -341,6 +369,135 @@ def is_key(ch):
 def text_runs(text):
     """Text cut for typing: runs that go as keys, and runs of anything else, which are pasted."""
     return [(keys, "".join(chars)) for keys, chars in itertools.groupby(text, key=is_key)]
+
+
+def between(rng, span):
+    return span[0] + rng.random() * (span[1] - span[0])
+
+
+def move_ms(distance, size, rng):
+    """How long a pointer move of `distance` to a target `size` wide takes (Fitts), +-10%."""
+    fitts = HUMAN["fittsA"] + HUMAN["fittsB"] * math.log2(distance / max(size, 1) + 1)
+    return min(max(fitts, HUMAN["minMs"]), HUMAN["maxMs"]) * (0.9 + 0.2 * rng.random())
+
+
+def segment(a, b, ms, rng, screen, straight=False):
+    """One curved stretch from a to b: a cubic Bezier walked at minimum-jerk speed, [(x, y, wait ms)]."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    d = math.hypot(dx, dy)
+    nx, ny = (-dy / d, dx / d) if d else (0.0, 0.0)
+    side = -1 if rng.random() < 0.5 else 1
+    reach = 0 if straight else min(d * HUMAN["bend"], HUMAN["bendMaxPx"])
+    o1 = side * reach * (0.3 + 0.7 * rng.random())
+    o2 = side * reach * (0.1 + 0.6 * rng.random())
+    c1 = (a[0] + dx * 0.3 + nx * o1, a[1] + dy * 0.3 + ny * o1)
+    c2 = (a[0] + dx * 0.7 + nx * o2, a[1] + dy * 0.7 + ny * o2)
+    steps = max(2, round(ms / HUMAN["stepMs"]))
+    out = []
+    for i in range(1, steps + 1):
+        t = i / steps
+        s = t * t * t * (10 - 15 * t + 6 * t * t)
+        u = 1 - s
+        x = u * u * u * a[0] + 3 * u * u * s * c1[0] + 3 * u * s * s * c2[0] + s * s * s * b[0]
+        y = u * u * u * a[1] + 3 * u * u * s * c1[1] + 3 * u * s * s * c2[1] + s * s * s * b[1]
+        if i < steps:
+            x += (rng.random() * 2 - 1) * HUMAN["jitterPx"]
+            y += (rng.random() * 2 - 1) * HUMAN["jitterPx"]
+        else:
+            x, y = b
+        p = [min(max(round(x), 0), screen[0] - 1), min(max(round(y), 0), screen[1] - 1)]
+        gap = max(1, round(ms / steps + (rng.random() * 2 - 1) * HUMAN["stepJitterMs"]))
+        if out and out[-1][0] == p[0] and out[-1][1] == p[1]:
+            out[-1][2] += gap
+        else:
+            out.append(p + [gap])
+    return out
+
+
+def pointer_path(a, b, rng, screen, size=24, held=False, straight=False):
+    """
+    The pointer events from a to b, ending exactly on b, each [x, y, wait ms after it], on the screen. A long
+    move sometimes ends a little past b and comes back; `held` (a drag) goes slower and never overshoots;
+    `straight` (inside a menu a hover opened) neither curves nor overshoots: a line into a box stays in it.
+    """
+    d = math.hypot(b[0] - a[0], b[1] - a[1])
+    if d < 1:
+        return [[b[0], b[1], HUMAN["stepMs"]]]
+    ms = move_ms(d, size, rng)
+    if held:
+        ms = max(ms * HUMAN["dragSlowdown"], HUMAN["minMs"] * 2)
+    elif not straight and d > HUMAN["overshootOverPx"] and rng.random() < HUMAN["overshootChance"]:
+        past = min(d * between(rng, HUMAN["overshootShare"]), HUMAN["overshootMaxPx"])
+        ux, uy = (b[0] - a[0]) / d, (b[1] - a[1]) / d
+        wobble = (rng.random() * 2 - 1) * 3
+        over = (b[0] + ux * past - uy * wobble, b[1] + uy * past + ux * wobble)
+        over = (min(max(over[0], 0), screen[0] - 1), min(max(over[1], 0), screen[1] - 1))
+        back = max(ms * HUMAN["correctShare"], HUMAN["correctMinMs"])
+        return segment(a, over, ms - back, rng, screen) + segment(over, b, back, rng, screen)
+    return segment(a, b, ms, rng, screen, straight)
+
+
+def typing_delays(text, rng):
+    """The wait (ms) before each character of `text` is typed."""
+    out = []
+    for i, ch in enumerate(text):
+        if i == 0:
+            out.append(round(between(rng, HUMAN["firstKeyMs"])))
+            continue
+        prev = text[i - 1]
+        ms = between(rng, HUMAN["keyMs"])
+        if prev == " ":
+            ms += between(rng, HUMAN["afterSpaceMs"])
+        if prev in ".,;:!?":
+            ms += between(rng, HUMAN["afterPunctuationMs"])
+        if rng.random() < HUMAN["pauseChance"]:
+            ms += between(rng, HUMAN["pauseMs"])
+        out.append(round(ms))
+    return out
+
+
+def sleep_arg(ms):
+    return "%.3f" % (ms / 1000)
+
+
+def path_args(path):
+    """A path as xdotool commands: each move, then its wait."""
+    out = []
+    for x, y, ms in path:
+        out += ["mousemove", str(x), str(y), "sleep", sleep_arg(ms)]
+    return out
+
+
+def press_args(button, count, rng):
+    """A button held a moment, `count` times with a person's gap between."""
+    out = []
+    for i in range(count):
+        if i:
+            out += ["sleep", sleep_arg(between(rng, HUMAN["clickGapMs"]))]
+        out += ["mousedown", button, "sleep", sleep_arg(between(rng, HUMAN["holdMs"])), "mouseup", button]
+    return out
+
+
+def pointer_args(kind, step, start, screen, rng, straight=False):
+    """A pointer step (move, click, drag, scroll) from `start` as one xdotool command line, and its total wait (ms)."""
+    v = step[kind]
+    args = path_args(pointer_path(start, v[:2], rng, screen, straight=straight))
+    if kind == "click":
+        args += press_args(str(step.get("button", 1)), step.get("count", 1), rng)
+    elif kind == "drag":
+        args += ["mousedown", "1", "sleep", sleep_arg(between(rng, HUMAN["dragHoldMs"]))]
+        # Toolkits start a drag only after the pointer moves past a threshold while the button is down: a path does.
+        args += path_args(pointer_path(v[:2], v[2:], rng, screen, held=True))
+        args += ["sleep", sleep_arg(between(rng, HUMAN["dragHoldMs"])), "mouseup", "1"]
+    elif kind == "scroll":
+        for amount, back, forth in ((step.get("dy", 0), "4", "5"), (step.get("dx", 0), "6", "7")):
+            for _ in range(abs(amount)):
+                gap = between(rng, HUMAN["wheelGapMs"])
+                if rng.random() < HUMAN["wheelPauseChance"]:
+                    gap += between(rng, HUMAN["wheelPauseMs"])
+                args += ["click", forth if amount > 0 else back, "sleep", sleep_arg(gap)]
+    waited = sum(float(args[i + 1]) for i, a in enumerate(args) if a == "sleep") * 1000
+    return args, waited
 
 
 def clamp_region(region, screen):
@@ -610,6 +767,11 @@ class XDisplay:
             v = v.decode("utf-8", "replace")
         return (v or "")[:NAME_MAX]
 
+    def pointer(self):
+        """Where the pointer is now (a person in control moves it too)."""
+        at = self.root.query_pointer()
+        return [at.root_x, at.root_y]
+
     def a11y_address(self):
         v = self.prop(self.root, "AT_SPI_BUS")
         return v.decode("utf-8", "replace") if isinstance(v, bytes) and v else None
@@ -854,6 +1016,10 @@ class Desktop:
         self.tools = {t: shutil.which(t) for t in TOOLS}
         self.session_env = None
         self.shots = None
+        self.rng = random.Random()
+        self.stopping = False
+        self.on_path = False
+        self.hovered = None
 
     def close(self):
         if self.shots:
@@ -982,6 +1148,7 @@ class Desktop:
             for i, (kind, step) in enumerate(zip(kinds, steps)):
                 if i and kinds[i - 1] in POINTER_STEPS and kind in KEY_STEPS:
                     time.sleep(STEP_GAP_S)
+                self.check_stopped()
                 self.step(kind, step)
             if settle is not None:
                 settle.start(time.monotonic())
@@ -989,36 +1156,44 @@ class Desktop:
                 out["changed"] = settle.changed
         finally:
             x.watch = None
+            self.stopping = False
         out["ms"] = ms_since(t0)
         return out
 
+    def stop_input(self, *_):
+        """SIGUSR1: the runner's word that a person took control. A pointer's xdotool line dies now (`step`)."""
+        self.stopping = True
+        if self.on_path:
+            self.on_path = False
+            raise Stopped()
+
+    def check_stopped(self):
+        if self.stopping:
+            raise Stopped()
+
     def step(self, kind, s):
         v = s[kind]
-        if kind == "move":
-            self.xdotool("mousemove", str(v[0]), str(v[1]))
-        elif kind == "click":
-            count, button = str(s.get("count", 1)), str(s.get("button", 1))
-            self.xdotool("mousemove", str(v[0]), str(v[1]), "click", "--repeat", count, button)
-        elif kind == "drag":
-            x1, y1, x2, y2 = v
-            mx, my = str((x1 + x2) // 2), str((y1 + y2) // 2)
-            # Toolkits start a drag only after the pointer moves past a threshold while the button is down.
-            self.xdotool(
-                *("mousemove", str(x1), str(y1), "mousedown", "1", "sleep", "0.05", "mousemove", mx, my),
-                *("sleep", "0.05", "mousemove", str(x2), str(y2), "sleep", "0.05", "mouseup", "1"),
-            )
+        if kind in POINTER_STEPS:
+            x = self.display()
+            start = x.pointer()
+            # ponytail: a hover stands for "a menu is open": the accessibility tree could tell for sure.
+            args, waited = pointer_args(kind, s, start, x.screen, self.rng, straight=start == self.hovered)
+            self.hovered = v if kind == "move" else None
+            self.on_path = True
+            try:
+                self.xdotool(*args, timeout=10 + waited / 1000)
+            except Stopped:
+                # Killed between its press and release, the button would stay down under the person's pointer.
+                self.xdotool("mouseup", str(s.get("button", 1)))
+                raise
+            finally:
+                self.on_path = False
         elif kind == "key":
             self.xdotool("key", "--delay", str(KEY_DELAY_MS), "--", v)
         elif kind == "type":
             self.type_text(v)
         elif kind == "fill":
             self.bus().set_text(v[0], v[1], s["text"])
-        elif kind == "scroll":
-            args = ["mousemove", str(v[0]), str(v[1])]
-            for amount, back, forth in ((s.get("dy", 0), "4", "5"), (s.get("dx", 0), "6", "7")):
-                if amount:
-                    args += ["click", "--repeat", str(abs(amount)), "--delay", "20", forth if amount > 0 else back]
-            self.xdotool(*args)
         elif kind == "activate":
             self.xdotool("windowactivate", "--sync", str(v), timeout=3)
         elif kind in ("launch", "open"):
@@ -1038,11 +1213,31 @@ class Desktop:
             raise HelperError("failed", "xdotool: %s" % first_line(r.stderr))
 
     def type_text(self, text):
-        """Keys for what a keyboard types exactly (text on stdin, never in an argument); the rest is pasted."""
+        """
+        Keys for what a keyboard types exactly (text on stdin, never in an argument), one by one at a person's
+        pace up to typeMaxChars and evenly past it; the rest is pasted.
+        """
+        if len(text) <= HUMAN["typeMaxChars"]:
+            waits = iter(typing_delays(text, self.rng))
+            due = time.monotonic()
+            for keys, run in text_runs(text):
+                for ch in run if keys else [run]:
+                    due += next(waits) / 1000
+                    time.sleep(max(0.0, due - time.monotonic()))
+                    self.check_stopped()
+                    if keys:
+                        hold = round(between(self.rng, HUMAN["keyHoldMs"]))
+                        self.xdotool("type", "--delay", str(4 * hold), "--file", "-", stdin=ch.encode("utf-8"))
+                    else:
+                        self.paste(run)
+                        due = time.monotonic()
+            return
         for keys, run in text_runs(text):
+            self.check_stopped()
             if keys:
-                timeout = 10 + len(run) * KEY_DELAY_MS * 3 / 1000
-                self.xdotool("type", "--delay", str(KEY_DELAY_MS), "--file", "-", stdin=run.encode("utf-8"), timeout=timeout)
+                for i in range(0, len(run), EVEN_CHUNK):
+                    self.check_stopped()
+                    self.xdotool("type", "--delay", str(KEY_DELAY_MS), "--file", "-", stdin=run[i : i + EVEN_CHUNK].encode("utf-8"))
             else:
                 self.paste(run)
 
@@ -1350,6 +1545,7 @@ def main(argv):
         return self_check()
     desktop = Desktop()
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    signal.signal(signal.SIGUSR1, desktop.stop_input)
     try:
         serve(desktop)
     except BrokenPipeError:

@@ -32,7 +32,7 @@ import { waitingParts, waitingText } from "@agenteschat/client/lib/missions";
 import { allItems, waitingCardOf, widgetNoticeOf } from "@agenteschat/client/lib/notifications";
 import { dayPart } from "@agenteschat/client/lib/welcome";
 import { WORKING_POLL_MS, type WorkItem, workByAgent, workingNow } from "@agenteschat/client/lib/working";
-import { Button, Composer, Icon, Select, SkyGlow } from "@agenteschat/ui";
+import { Button, Composer, Icon, PageHeader, Select, SkyGlow } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
@@ -132,13 +132,11 @@ export function HomePage() {
 
   return (
     <div className="page page--list home">
-      <header className="list-head">
-        <div>
-          <h1>{t(`home.greeting.${dayPart(new Date(now).getHours())}`, { name: firstName(me.user.name) })}</h1>
-          {loaded && <p className="list-head__sub">{summary}</p>}
-        </div>
-        <StartChoice />
-      </header>
+      <PageHeader
+        title={t(`home.greeting.${dayPart(new Date(now).getHours())}`, { name: firstName(me.user.name) })}
+        meta={loaded && summary}
+        actions={<StartChoice />}
+      />
 
       {showSteps && <FirstSteps steps={steps} onAsk={() => composer.current?.focus()} onHide={hideSteps} />}
 
@@ -307,7 +305,7 @@ function AskAgent({ agents, composer }: { agents: Agent[]; composer: RefObject<H
             options={agents.map((a) => ({
               value: a.id,
               label: a.name,
-              leading: <AgentAvatar agentId={a.id} name={a.name} size="xs" />,
+              leading: <AgentAvatar agentId={a.id} name={a.name} size="sm" />,
             }))}
             renderValue={(o) => (
               <span className="home-ask__agent">

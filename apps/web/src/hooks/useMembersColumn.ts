@@ -3,15 +3,20 @@ import { COMPACT_QUERY, DESKTOP_QUERY, useMediaQuery } from "@/components/NavDra
 import { useOrg } from "@/components/org-context";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 
+/** Under this, a DM's sidebar leaves the chat too little room beside it: it floats over the chat, closed at first. */
+export const DM_SIDE_NARROW_QUERY = "(max-width: 1099px)";
+export const DM_SIDE_WIDE_QUERY = "(min-width: 1100px)";
+
 /**
- * A channel's members, as the header's toggle shows them: a column on the right (open by default on a desktop,
- * closed on a tablet; the person's last choice in this workspace wins), or on a phone a sheet over the channel.
+ * A column on the right of a conversation: open by default at `openQuery`, closed below it, the person's last choice
+ * in this workspace wins. At `sheetQuery` it isn't a column: it opens over the conversation, and stays only until it
+ * closes.
  */
-export function useMembersColumn() {
+function useSideColumn(prefix: string, sheetQuery: string, openQuery: string) {
   const { org, me } = useOrg();
-  const compact = useMediaQuery(COMPACT_QUERY);
-  const desktop = useMediaQuery(DESKTOP_QUERY);
-  const key = `${STORAGE_KEYS.membersColumn}.${me.user.id}.${org.id}`;
+  const compact = useMediaQuery(sheetQuery);
+  const desktop = useMediaQuery(openQuery);
+  const key = `${prefix}.${me.user.id}.${org.id}`;
   // The key in the state: another workspace or person reads its own choice.
   const [saved, setSaved] = useState(() => ({ key, value: storage.get(key) }));
   const value = saved.key === key ? saved.value : storage.get(key);
@@ -26,3 +31,9 @@ export function useMembersColumn() {
   const closeSheet = useCallback(() => setSheet(false), []);
   return { open: compact ? sheet : column, column, sheet: compact && sheet, toggle, closeSheet };
 }
+
+/** A channel's members, as the header's toggle shows them: a column, or on a phone a sheet over the channel. */
+export const useMembersColumn = () => useSideColumn(STORAGE_KEYS.membersColumn, COMPACT_QUERY, DESKTOP_QUERY);
+
+/** The sidebar of a DM with an agent: a column on a wide window, else floating over the chat. */
+export const useDmSidebar = () => useSideColumn(STORAGE_KEYS.dmSidebar, DM_SIDE_NARROW_QUERY, DM_SIDE_WIDE_QUERY);

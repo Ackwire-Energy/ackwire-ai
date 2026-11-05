@@ -435,7 +435,22 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
           {r.canSeeDetails ? (
             <Section title={t("routines.panel.ownActions")}>
               {(r.ownActions ?? []).map((name) => (
-                <GroupedRow key={name} label={ownActionName(t, name)} />
+                <GroupedRow
+                  key={name}
+                  label={ownActionName(t, name)}
+                  {...(r.canManage
+                    ? {
+                        toggle: true,
+                        disabled: controls.action.isPending,
+                        onPress: () =>
+                          controls.action.mutate({
+                            type: "update",
+                            id: r.id,
+                            patch: { ownActions: (r.ownActions ?? []).filter((a) => a !== name) },
+                          }),
+                      }
+                    : {})}
+                />
               ))}
               <Block>
                 <Text variant="footnote" tone="muted">

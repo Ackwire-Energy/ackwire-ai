@@ -250,6 +250,8 @@ export interface ChannelListItem {
   unreadCount: number;
   /** Of those, the ones that mention me (the sidebar's number, even while muted). */
   mentionCount: number;
+  /** Where the unread starts: when I last read it (or joined); null when I'm not a member. */
+  lastReadAt: Date | null;
   /** I muted it: it never looks unread to me. */
   muted: boolean;
   /**
@@ -278,6 +280,7 @@ interface ChannelListRow {
   is_member: boolean;
   unread_count: number | string | null;
   mention_count: number | string | null;
+  last_read_at: Date | string | null;
   muted: boolean | null;
   last_id: string | null;
   last_body: string | null;
@@ -319,7 +322,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
     await db.execute(sql`select c.id, c.org_id, c.name, c.topic, c.visibility, c.audience_role_ids, c.created_by_user_id, c.created_at,
         c.category_id, c.position,
         (cm.id is not null) as is_member, coalesce(un.n, 0) as unread_count, coalesce(un.m, 0) as mention_count,
-        coalesce(cr.muted, false) as muted,
+        coalesce(cr.muted, false) as muted, coalesce(cr.last_read_at, cm.created_at) as last_read_at,
         lm.id as last_id, lm.body as last_body, lm.meta as last_meta, lm.created_at as last_at, lm.author_type as last_author_type,
         lm.author_user_id as last_user_id, lm.author_agent_id as last_agent_id,
         coalesce(lu.name, la.name) as last_author_name,
@@ -372,6 +375,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
       isMember: r.is_member === true,
       unreadCount: Number(r.unread_count ?? 0),
       mentionCount: Number(r.mention_count ?? 0),
+      lastReadAt: r.last_read_at ? asDate(r.last_read_at) : null,
       muted: r.muted === true,
       can: { post: r.can_post === true, callAgents: r.can_call === true, manage: r.can_manage === true },
       lastMessage:
@@ -720,7 +724,7 @@ export async function addChannelMember(
   if (channel.kind === "dm") throw new ValidationError("A direct conversation keeps its participants");
   if ("userId" in member) {
     if (!(await managesChannel(db, membership, actorId, channel))) {
-      throw new ForbiddenError("Only the channel's creator or an admin can add members");
+      throw new ForbiddenError("Only the channel's creator or an admin can add members", "channel.members_forbidden");
     }
     if (!(await getMembership(db, member.userId, orgId))) {
       throw new ValidationError("That person is not a member of this organization");
@@ -831,7 +835,11 @@ export async function removeChannelMember(
   if (!channel) throw new NotFoundError("Channel not found");
   const self = "userId" in member && member.userId === actorId;
   if (!self && !(await managesChannel(db, membership, actorId, channel))) {
-    if ("userId" in member) throw new ForbiddenError("Only the channel's creator or an admin can remove members");
+    if ("userId" in member)
+      throw new ForbiddenError(
+        "Only the channel's creator or an admin can remove members",
+        "channel.members_forbidden",
+      );
     await requirePlacesAgent(db, membership, actorId, channel, member.agentId);
   }
   await db

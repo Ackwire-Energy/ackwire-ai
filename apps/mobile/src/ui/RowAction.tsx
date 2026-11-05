@@ -5,11 +5,11 @@ import { useTheme } from "./theme";
 import { CHROME_MAX_SCALE, weights } from "./type-scale";
 
 /**
- * A small raised pill beside a line (Desfazer under an agent's change, Abrir on a team check): the whole pill
- * presses, its word centered in it, quiet figures after it when it has a `detail` (the time left to undo).
- * `onPress` brings its own haptic, if any.
+ * A row's action beside a line (Desfazer under an agent's change, Abrir on a team check): words only, as the web's
+ * `.ag-rc__btn`, as tall as the line's first row so they share a middle, quiet figures after them when it has a
+ * `detail` (the time left to undo). `onPress` brings its own haptic, if any.
  */
-export function PillButton({
+export function RowAction({
   label,
   detail,
   onPress,
@@ -24,7 +24,7 @@ export function PillButton({
   accessibilityLabel?: string;
   accessibilityRole?: AccessibilityRole;
 }) {
-  const { colors, shadows } = useTheme();
+  const { colors } = useTheme();
   return (
     <PressScale
       to={0.95}
@@ -33,13 +33,13 @@ export function PillButton({
       accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel ?? label}
       hitSlop={6}
-      style={[styles.pill, { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
+      style={styles.row}
     >
-      {/* The press area fills the pill; the word alone in it sat at its top. */}
+      {/* The press area fills the row; the word alone in it sat at its top. */}
       <View style={styles.face}>
         <RNText
           maxFontSizeMultiplier={CHROME_MAX_SCALE}
-          style={[systemText("footnote", weights.semibold), { color: colors.ink }]}
+          style={[systemText("footnote", weights.semibold), styles.word, { color: colors.muted }]}
         >
           {label}
           {detail ? (
@@ -52,7 +52,8 @@ export function PillButton({
 }
 
 const styles = StyleSheet.create({
-  pill: { height: 32, borderRadius: 16 },
-  face: { flexGrow: 1, paddingHorizontal: 14, alignItems: "center", justifyContent: "center" },
+  row: { height: 32 },
+  face: { flexGrow: 1, paddingHorizontal: 4, alignItems: "center", justifyContent: "center" },
+  word: { fontSize: 14 },
   detail: { fontVariant: ["tabular-nums"] },
 });

@@ -24,7 +24,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { LineIcon, PillButton, Text, useLivePaused, useReducedMotion, useToast } from "@/ui";
+import { LineIcon, RowAction, Text, useLivePaused, useReducedMotion, useToast } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -309,7 +309,7 @@ function UndoneBy({ action: a }: { action: AgentAction }) {
 }
 
 /**
- * Desfazer or Refazer: a raised pill next to one change, Desfazer with the time left in it; a quiet word in a group.
+ * Desfazer or Refazer: a row action next to one change, Desfazer with the time left in it; a quiet word in a group.
  * None for who may not use it. Once it had one, its room stays when its time is up, empty: the sentence never
  * rewraps.
  */
@@ -333,7 +333,7 @@ function RowButton({
   const redo = shown === "redo";
   const label = redo ? t("agentActions.redo") : t("agentActions.undo");
   const button = big ? (
-    <PillButton
+    <RowAction
       label={label}
       detail={redo ? undefined : v.timeLeft || formatTimeLeft(0)}
       onPress={redo ? onRedo : onUndo}
@@ -375,9 +375,9 @@ function Room({ children }: { children: ReactNode }) {
   );
 }
 
-/** One change's row: a list row's height, and the raised pill (PillButton) in its middle. */
+/** One change's row: a list row's height, and its action (RowAction, 32) in its middle. */
 const ONE_ROW = 50;
-const PILL = 32;
+const ACTION = 32;
 
 const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 14,
     borderBottomLeftRadius: 6,
   },
-  // The icon (as the conversation's event lines), the sentence's first line and the pill share one middle; the
+  // The icon (as the conversation's event lines), the sentence's first line and the action share one middle; the
   // sentence wraps under it.
   one: {
     marginTop: 12,
@@ -399,12 +399,12 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 8,
     minHeight: ONE_ROW,
-    paddingVertical: (ONE_ROW - PILL) / 2,
+    paddingVertical: (ONE_ROW - ACTION) / 2,
     paddingLeft: 12,
     paddingRight: 10,
   },
-  // The "small" line (20) on the pill's middle.
-  oneTx: { paddingTop: (PILL - 20) / 2 },
+  // The "small" line (20) on the action's middle.
+  oneTx: { paddingTop: (ACTION - 20) / 2 },
   pressed: { opacity: 0.6 },
   undoneBy: { marginTop: 2 },
   copyHook: { alignSelf: "flex-start", marginTop: 6, paddingVertical: 2 },

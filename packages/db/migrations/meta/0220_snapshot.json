@@ -1,5 +1,5 @@
 {
-  "id": "f4167104-7d00-4f8f-a828-39729820ef95",
+  "id": "e3cf658e-e121-4f16-91e5-4348cac69993",
   "prevId": "93091af7-7677-4dd0-bdae-fe47acfadb4b",
   "version": "7",
   "dialect": "postgresql",
@@ -25002,7 +25002,8 @@
         "open_question",
         "entity_profile",
         "note",
-        "lesson"
+        "lesson",
+        "rule"
       ]
     },
     "public.context_status": {

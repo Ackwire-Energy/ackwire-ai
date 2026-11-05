@@ -466,6 +466,10 @@ html:not([data-pointer]) .rq__more:focus-visible {
   color: var(--muted);
 }
 
+/* Under the right hand's greeting and cards: the line to build the team with it. */
+.rh-intro__again {
+  margin: 8px 0 0;
+}
 /* The right hand's first card (ADR 0137): the ready-made agents, four in a row (two on a phone), each a Criar. */
 .rh-intro__presets {
   display: grid;

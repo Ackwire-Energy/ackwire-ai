@@ -57,6 +57,7 @@ export const keys = {
   githubApp: (orgId: string) => ["org", orgId, "github-app"] as const,
   githubRepos: (orgId: string) => ["org", orgId, "github-repositories"] as const,
   agentRepos: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "repositories"] as const,
+  agentMergeRepos: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "merge-repositories"] as const,
   customServers: (orgId: string) => ["org", orgId, "custom-servers"] as const,
   toolChanges: (orgId: string) => ["org", orgId, "tool-changes"] as const,
   scopes: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "scopes"] as const,
@@ -251,6 +252,7 @@ export const keys = {
   browserHandoff: (orgId: string, handoffId: string) => ["org", orgId, "browser", "handoff", handoffId] as const,
   /** The agent's desktop (ADR 0058): its state as this person sees it. */
   agentDesktop: (orgId: string, agentId: string) => ["org", orgId, "desktop", agentId] as const,
+  agentDesktopPicture: (orgId: string, agentId: string) => ["org", orgId, "desktop", agentId, "picture"] as const,
   /** Every agent's screen (`agentDesktop`'s prefix). */
   agentDesktops: (orgId: string) => ["org", orgId, "desktop"] as const,
   /** Boards and widgets (ADR 0135): everything below (prefix); `dashboard.*` events refresh it. */

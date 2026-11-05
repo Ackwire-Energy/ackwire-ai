@@ -9,15 +9,16 @@ import { agentBudgetsThisMonth } from "./usage";
 const { agents, channelMembers, connectorConnections, machines, organizationMembers, organizations, users } = schema;
 
 /**
- * How it builds the first team (ADR 0137 §10): the start card the app draws asks question 1, then two more with
- * answers to tap, then one team card. A template's card asks its own two questions.
+ * How it builds a team (ADR 0137 §10), the first one or later on: the start card the app draws asks question 1, then
+ * two more with answers to tap, then one team card. A template's card asks its own two questions.
  */
 export const TEAM_INTERVIEW = [
   "# Starting the team",
-  "The app's start card at the top of this conversation asked them 'What does the workspace do?' (question 1 of 3), with business types to tap or a sentence to write. When they answer it, run a short interview, one question per turn, each with offer_answers:",
+  "The app's start card at the top of this conversation asks 'What does the workspace do?' (question 1 of 3), with business types to tap or a sentence to write. When they answer it, or ask at any time to build, set up or redo the team (in their words, or the app's 'Build the team' line), run a short interview, one question per turn, each with offer_answers:",
+  "- Question 1 of 3, when they didn't answer it yet: what the workspace does.",
   "- Question 2 of 3: what takes most of their time today (multiple: true; 5 to 7 answers fitting their business, the last one 'Outra coisa' in their language). Start by saying back in a few words what they do.",
   "- Question 3 of 3: who else works there (no answers to tap, or a couple like 'Só eu').",
-  "Then propose the team with ONE propose_team card: 2 to 4 agents for what takes their time, each in its own channel (new ones are created with the team), 1 or 2 routines each, 1 or 2 skills, the line on what waits for their approval, a first_task each, the people they named in `invite`, and weekly_check: true. Skip a question they already answered; never ask more than three.",
+  "Then propose the team with ONE propose_team card: 2 to 4 agents for what takes their time, each in its own channel (new ones are created with the team), 1 or 2 routines each, 1 or 2 skills, the line on what waits for their approval, a first_task each, the people they named in `invite`, and weekly_check: true. Skip a question they already answered; never ask more than three. Agents already here stay: propose what is missing around them.",
   "When a team card came from a template ('Usar este modelo'), its first question to fit it is already asked (1 of 2): take the answer, ask the second with offer_answers (step 2, of 2: who else works there and who approves what goes out to clients), then propose_team again fitted to both answers (it replaces the template's card).",
 ].join("\n");
 
@@ -210,7 +211,7 @@ export async function rightHandPrompt(
       .filter(Boolean)
       .join("\n"),
     checklist.length ? `# Not set up yet\n${checklist.map((l) => `- ${l}`).join("\n")}` : "",
-    team.length === 0 && input.inDm ? TEAM_INTERVIEW : "",
+    input.inDm ? TEAM_INTERVIEW : "",
     [
       "# Your cards",
       "- Every change is a card the person clicks, applied as whoever clicks it. Never say it is done before the click.",

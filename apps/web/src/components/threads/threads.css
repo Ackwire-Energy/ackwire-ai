@@ -988,10 +988,26 @@ html:not([data-pointer]) .thread-line:focus-visible {
   min-height: 0;
   overflow-y: auto;
 }
-/* The agent's page needs more room than a thread: wider, and its narrow rules follow this width. */
+/* The agent's page needs more room than a thread: wider, and its narrow rules follow this width. Beside the
+   conversation it never squeezes it: the chat keeps 520px and the page takes the rest, from 420px to 760px; a body
+   too narrow for both gives the page the conversation's place until it closes, as a thread does. */
 .thread-panel--wide {
   width: min(900px, calc(100% - 20px));
   container: agp-side / inline-size;
+}
+@media (min-width: 861px) {
+  .thread-panel--docked.thread-panel--wide {
+    width: clamp(420px, calc(100% - 520px), 760px);
+  }
+  @container channel-body (max-width: 939px) {
+    .thread-panel--docked.thread-panel--wide {
+      position: absolute;
+      z-index: 30;
+      inset: 0;
+      width: auto;
+      border-left: 0;
+    }
+  }
 }
 @media (max-width: 860px) {
   .thread-panel--wide {
@@ -1015,6 +1031,18 @@ html:not([data-pointer]) .thread-line:focus-visible {
 .thread-panel--wide .page__header,
 .thread-panel--wide .agp-tabs .ac-tabs {
   padding-right: 48px;
+}
+/* The agent's page docked beside its conversation: as wide as the conversation lets it, up to the page's own 900px,
+   the conversation keeping its 400px like beside a thread. */
+@media (min-width: 861px) {
+  .thread-panel--docked.thread-panel--wide {
+    width: clamp(360px, calc(100% - 400px), 900px);
+  }
+  @container channel-body (max-width: 719px) {
+    .thread-panel--docked.thread-panel--wide {
+      width: auto;
+    }
+  }
 }
 /* Under a panel: the conversation dims like under a dialog (.ac-dialog__scrim, e.g. a routine's details),
    and a click there closes the panel. */

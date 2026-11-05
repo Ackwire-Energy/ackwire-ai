@@ -54,6 +54,7 @@ import {
   Menu,
   MenuItem,
   MenuNote,
+  PageHeader,
   PlanMeter,
   Textarea,
 } from "@agenteschat/ui";
@@ -146,24 +147,17 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
 
   return (
     <div className={`${embedded ? "settings__section" : "page"} members-page`} style={{ gap: 28 }}>
-      <header className="page__header page__header--row">
-        <div className="page__header-text">
-          {embedded ? (
-            <h2 className="page-title">{t("settings.section.members")}</h2>
-          ) : (
-            <h1 className="page-title">{t("settings.section.members")}</h1>
-          )}
-          <p className="page-sub">
-            {t("members.subtitle", {
-              count: people.length,
-              people: people.length,
-              agents: dir.agents.length,
-              org: org.name,
-            })}
-          </p>
-        </div>
-        {invites && <InviteActions />}
-      </header>
+      <PageHeader
+        level={embedded ? 2 : 1}
+        title={t("settings.section.members")}
+        meta={t("members.subtitle", {
+          count: people.length,
+          people: people.length,
+          agents: dir.agents.length,
+          org: org.name,
+        })}
+        actions={invites && <InviteActions />}
+      />
 
       {invites && <WaitingRequests focus={search.request} action={search.do} />}
       {invites && <SentInvitations />}

@@ -57,6 +57,7 @@ import {
   MenuHeading,
   MenuItem,
   modKey,
+  PageHeader,
   PlanStrip,
   prefersReducedMotion,
   Segmented,
@@ -1670,42 +1671,41 @@ export function NotificationsPage() {
 
   return (
     <div className="page page--list nt">
-      <header className="list-head">
-        {/* How many are unread sits on the title's row, on its right. */}
-        <div className="nt-title">
-          <h1>{t("notifications.title")}</h1>
-          {/* The counts the sidebar already has show at once; the list's own replace them when it arrives. */}
-          {(list.isSuccess || badge.isSuccess) && <p className="nt-title__count">{summary}</p>}
-        </div>
-        <div className="list-head__acts">
-          <Menu
-            align="end"
-            label={t("notifications.keys.title")}
-            trigger={
-              <Button size="sm" variant="ghost" className="nt-keys-btn">
-                {t("notifications.keys.title")}
-              </Button>
-            }
-          >
-            <MenuHeading>{t("notifications.keys.title")}</MenuHeading>
-            <MenuItem hint="J · K" onSelect={() => {}}>
-              {t("notifications.keys.move")}
-            </MenuItem>
-            <MenuItem hint="E" onSelect={() => {}}>
-              {t("notifications.keys.done")}
-            </MenuItem>
-            <MenuItem hint="R" onSelect={() => {}}>
-              {t("notifications.keys.reply")}
-            </MenuItem>
-            <MenuItem hint="↵" onSelect={() => {}}>
-              {t("notifications.keys.open")}
-            </MenuItem>
-          </Menu>
-          <Button size="sm" disabled={doneView || !counts?.unread || action.isPending} onClick={readAll}>
-            {t("notifications.readAll")}
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title={t("notifications.title")}
+        // The counts the sidebar already has show at once; the list's own replace them when it arrives.
+        meta={(list.isSuccess || badge.isSuccess) && summary}
+        actions={
+          <>
+            <Menu
+              align="end"
+              label={t("notifications.keys.title")}
+              trigger={
+                <Button variant="ghost" className="nt-keys-btn">
+                  {t("notifications.keys.title")}
+                </Button>
+              }
+            >
+              <MenuHeading>{t("notifications.keys.title")}</MenuHeading>
+              <MenuItem hint="J · K" onSelect={() => {}}>
+                {t("notifications.keys.move")}
+              </MenuItem>
+              <MenuItem hint="E" onSelect={() => {}}>
+                {t("notifications.keys.done")}
+              </MenuItem>
+              <MenuItem hint="R" onSelect={() => {}}>
+                {t("notifications.keys.reply")}
+              </MenuItem>
+              <MenuItem hint="↵" onSelect={() => {}}>
+                {t("notifications.keys.open")}
+              </MenuItem>
+            </Menu>
+            <Button disabled={doneView || !counts?.unread || action.isPending} onClick={readAll}>
+              {t("notifications.readAll")}
+            </Button>
+          </>
+        }
+      />
 
       <div className="nt-tb">
         <div className="nt-segwrap">

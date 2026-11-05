@@ -888,7 +888,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(panel.textContent).not.toContain("sendo instalado");
   });
 
-  test("on the Cloud, the program not allowed there: who to ask, never a wait", async () => {
+  test("on the Cloud, the program not allowed there: it's on our side, never a wait", async () => {
     const options = fakeAgentBrain(ADA_ID).options.map((o) =>
       o.kind === "codex" ? { ...o, available: false, reason: "tool_off" as const } : o,
     );
@@ -899,7 +899,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     });
     await click(tile("ChatGPT"));
     expect(dialog.textContent).toContain(
-      "O Codex não está liberado no Computador da Acme. Peça ao suporte para liberar.",
+      "O Codex ainda não está liberado no Computador da Acme. Isso é do nosso lado: tente de novo mais tarde.",
     );
     expect(within(dialog).getByRole("button", { name: "Usar uma chave de API agora" })).toBeTruthy();
   });

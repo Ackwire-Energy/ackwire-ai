@@ -9,6 +9,7 @@ import {
   useSkillAction,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { formatShortDate } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { proposalTitle } from "@agenteschat/client/lib/proposals";
 import {
@@ -315,6 +316,57 @@ function LearnedSkillRow({ s }: { s: LearnedSkill }) {
   );
 }
 
+/** Rules people gave it (who, when, the text), each with Remover for its giver, the agent's owner and admins. */
+function RulesCard({ rules }: { rules: Memory[] }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const { agent } = useAgentEdit();
+  const toast = useToast();
+  const act = useMemoryAction(org.id, agent.id);
+  return (
+    <Card as="section" className="agp-card" aria-labelledby="mem-rules">
+      <CardHead
+        id="mem-rules"
+        icon="flag"
+        title={t("agentPage.memory.rules")}
+        subtitle={t("agentPage.memory.rulesNote")}
+      />
+      <ul className="agp-list agp-mems">
+        {rules.map((m) => (
+          <li key={m.id} className="agp-mem">
+            <span>{m.text}</span>
+            <span className="agp-chips">
+              <span className="small muted">
+                {t("agentPage.memory.ruleBy", {
+                  name: m.origin?.name ?? t("memory.origin.someone"),
+                  date: formatShortDate(i18n.language, m.origin?.at ?? m.updatedAt),
+                })}
+              </span>
+            </span>
+            {m.removable && (
+              <span className="agp-row">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={act.isPending}
+                  onClick={() =>
+                    act.mutate(
+                      { type: "archive", id: m.id, archived: true },
+                      { onSuccess: () => toast.show(t("agentPage.memory.ruleRemoved")) },
+                    )
+                  }
+                >
+                  {t("agentPage.memory.removeRule")}
+                </Button>
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 /**
  * What the agent learned on its own, newest first: what matters to people (preferences, facts, decisions), then how
  * it works (its playbook: how-tos, lessons and notes it keeps for itself, none of them in the chat) and the skills it
@@ -393,6 +445,7 @@ export function MemoryTab() {
   const count = (k: Kind | "learned") =>
     k === "learned" ? list.filter((m) => m.learned && !m.archived).length : filterMemories(list, k, "").length;
   const shown = kind === "learned" ? [] : filterMemories(list, kind, q);
+  const rules = list.filter((m) => m.kind === "rule" && !m.archived);
   return (
     <>
       <section className="agp-workcard" aria-label={t("agentPage.memory.counts")}>
@@ -422,6 +475,7 @@ export function MemoryTab() {
           {pending.map((p) => (
             <ProposalCard key={p.id} proposal={p} />
           ))}
+          {rules.length > 0 && <RulesCard rules={rules} />}
           <Card as="section" className="agp-card" aria-labelledby="mem-known">
             <CardHead
               id="mem-known"

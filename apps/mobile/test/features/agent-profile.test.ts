@@ -447,6 +447,17 @@ describe("Perfil: agora, cada coisa uma vez", () => {
     expect(mail).toContain("export function useAgentMailboxes(agentId: string, enabled = true): MailboxLine[]");
     expect(screen).toContain("{details && !rightHand ? <AgentComputerButton agentId={id} /> : null}");
     expect(computer).toContain("const SIZE = BUTTON_SIZES.md.height;");
+    // The screen's recent picture on Today; the rules people gave on Memory; where it merges on Access; the right
+    // hand's own AI above how it works: each in the grouped lists, none a section of its own.
+    expect(screen).toContain("      {nowBlock}\n      <AgentComputerPicture agentId={id} />");
+    expect(computer).toContain("asksPicture(focused, view.desktopQ.data ?? null)");
+    expect(screen).toContain("      <GivenRules agentId={id} />\n      {knows.data ? memoryKnows : null}");
+    expect(screen).toContain(
+      '<MergeReposSection agentId={id} name={name} mayEdit={mine || can(org, "manage_agents")} />',
+    );
+    expect(screen).toContain(
+      '<GroupedHeader>{t("rightHand.settings.mine")}</GroupedHeader>\n            <RightHandMine',
+    );
     const t = await translator("pt-BR");
     const tabs = [t("common.today"), t("agentPage.fields.levels"), t("agentPage.tabs.memory")];
     expect(tabs).toEqual(["Hoje", "Acesso", "Memória"]);

@@ -1,5 +1,6 @@
 import {
   type Agent,
+  type AgentBrainInput,
   keys,
   useAgentBrain,
   useApi,
@@ -12,9 +13,8 @@ import {
 import { audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
-import { accountPlan } from "@agenteschat/client/lib/plans";
 import { AUTO } from "@agenteschat/client/lib/providers";
-import { rightHandOf } from "@agenteschat/client/lib/right-hand";
+import { rightHandFallback, rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { dayText, hourText } from "@agenteschat/client/lib/team-week";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -30,17 +30,17 @@ import {
   GroupedList,
   GroupedRow,
   PressScale,
+  ProviderLogo,
   Text,
   useToast,
 } from "@/ui";
 import { openAgentEdit } from "../agents/AgentEditScreen";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
-import { PlanReplies } from "../ai/parts";
 import { useFailed } from "../routines/hooks";
 import { Gap, SettingsPage } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
-import { type Directory, useColors, useDirectory } from "../shared/hooks";
+import { type Directory, useColors, useDirectory, useMeId } from "../shared/hooks";
 
 /** Opens Configurações › the right hand (ADR 0137). */
 export const openRightHandSettings = () => router.push("/settings/right-hand" as never);
@@ -64,8 +64,58 @@ export function RightHandSettingsScreen() {
 }
 
 /**
- * Its AI on a plan (ADR 0137 §1): the plan's account, a tap from Connect, and "Atende outras pessoas" as for any agent
- * on its owner's plan (the plan's owner chooses, an admin may override, the plan's owner hears it by email).
+ * "Sua IA" (ADR 0137 §11): the plan the person's own DM with the right hand thinks with, theirs or one shared with them,
+ * and, without one, what the workspace's does for them. Everyone has it: here and on its profile.
+ */
+export function RightHandMine({ agent }: { agent: Agent }) {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const failed = useFailed();
+  const dir = useDirectory();
+  const meId = useMeId();
+  const view = useAgentBrain(orgId, agent.id).data;
+  const g = agentGrammar(agent.name);
+  const kind = view && view.brain !== "model" ? view.brain : null;
+  const signIn = view?.accounts.find((a) => a.id === view.account);
+  const first = (id: string) => dir.memberById.get(id)?.name.split(" ")[0];
+  const fallback = view?.workspaceAi ? rightHandFallback(t, view.workspaceAi, meId ?? undefined, g, first) : "";
+  const shared = signIn?.ownerId && signIn.ownerId !== meId ? first(signIn.ownerId) : undefined;
+  const back = () =>
+    void api.agents
+      .setBrain(orgId, agent.id, { scope: "mine", brain: "model" })
+      .then(() => {
+        void qc.invalidateQueries({ queryKey: keys.agentBrain(orgId, agent.id) });
+        void qc.invalidateQueries({ queryKey: keys.aiStatus(orgId) });
+      })
+      .catch(failed);
+  return (
+    <>
+      <GroupedList>
+        <GroupedRow
+          {...(kind ? { leading: <ProviderLogo id={kind} size="sm" /> } : { icon: "bolt" as const })}
+          label={kind ? (signIn?.label ?? t(`aiAccounts.connect.${kind}`)) : t("rightHand.settings.connectMine")}
+          {...(shared ? { sub: t("rightHand.settings.planOwner", { owner: shared }) } : {})}
+          {...(kind ? { value: t("rightHand.settings.change") } : {})}
+          chevron
+          onPress={() => openConnectAi({ agentId: agent.id })}
+        />
+        {kind ? <GroupedRow icon="members" label={t("rightHand.settings.useWorkspace")} onPress={back} /> : null}
+      </GroupedList>
+      <GroupedFooter>
+        {kind
+          ? t("rightHand.settings.mineHelp", g)
+          : t("common.joinSentences", { a: t("rightHand.settings.mineHelp", g), b: fallback })}
+      </GroupedFooter>
+    </>
+  );
+}
+
+/**
+ * The workspace's AI on a plan (ADR 0137 §11): what every DM thinks with while its person has none. The plan's account,
+ * and "Atende outras pessoas" as for any agent on its owner's plan (the plan's owner chooses, an admin may override,
+ * the plan's owner hears it by email): on, whoever has no plan of their own talks to it on this one.
  */
 function PlanRows({
   agent,
@@ -81,41 +131,100 @@ function PlanRows({
   const api = useApi();
   const qc = useQueryClient();
   const failed = useFailed();
-  const view = useAgentBrain(orgId, agent.id).data;
+  const meId = useMeId();
+  const view = useAgentBrain(orgId, agent.id, true, false, "workspace").data;
   const signIn = view?.accounts.find((a) => a.id === view.account);
   const owner = signIn?.ownerId ? dir.memberById.get(signIn.ownerId)?.name.split(" ")[0] : undefined;
+  const set = (input: AgentBrainInput) =>
+    void api.agents
+      .setBrain(orgId, agent.id, { scope: "workspace", ...input })
+      .then(() => {
+        for (const key of [keys.agentBrain(orgId, agent.id), keys.agents(orgId), keys.aiStatus(orgId)])
+          void qc.invalidateQueries({ queryKey: key });
+      })
+      .catch(failed);
+  const on = view ? !view.onlyOwner : false;
+  const g = agentGrammar(agent.name);
   return (
     <>
       <GroupedList>
         <GroupedRow
-          icon="bolt"
-          label={
-            kind === "claude_code"
-              ? t("rightHand.settings.onPlan", { account: signIn?.label ?? "Claude" })
-              : `${t(`aiAccounts.connect.${kind}`)} · ${signIn?.label ?? ""}`
-          }
-          value={t("rightHand.settings.change")}
-          chevron
-          onPress={() => openConnectAi({ agentId: agent.id })}
+          leading={<ProviderLogo id={kind} size="sm" />}
+          label={signIn?.label ?? t(`aiAccounts.connect.${kind}`)}
+          {...(owner && signIn?.ownerId !== meId ? { sub: t("rightHand.settings.planOwner", { owner }) } : {})}
         />
+        <GroupedRow icon="brain" label={t("noAi.rightHand.useKey")} onPress={() => set({ brain: "model" })} />
       </GroupedList>
       <GroupedFooter>{t("rightHand.settings.planHelp")}</GroupedFooter>
       {view ? (
-        <PlanReplies
-          agent={agent.name}
-          owner={view.canUsePlans ? undefined : owner}
-          on={!view.onlyOwner}
-          onChange={(on) =>
-            void api.agents
-              .setBrain(orgId, agent.id, { onlyOwner: !on })
-              .then(() => qc.invalidateQueries({ queryKey: keys.agentBrain(orgId, agent.id) }))
-              .catch(failed)
-          }
-          brain={kind}
-          coding={accountPlan(signIn)}
-          disabled={!view.canEdit}
-        />
+        <>
+          <GroupedList>
+            <GroupedRow
+              icon="members"
+              label={t("aiAccounts.share.switch")}
+              toggle={on}
+              disabled={!view.canEdit}
+              onPress={() => set({ onlyOwner: on })}
+            />
+          </GroupedList>
+          <GroupedFooter>
+            {t(
+              on
+                ? "rightHand.settings.sharesOn"
+                : signIn?.ownerId === meId
+                  ? "rightHand.settings.sharesOffYou"
+                  : "rightHand.settings.sharesOff",
+              { ...g, owner: owner ?? "" },
+            )}
+          </GroupedFooter>
+        </>
       ) : null}
+    </>
+  );
+}
+
+/** The plans the workspace's AI may move onto (the admin's own, everyone's with `use_others_plans`), a tap each. */
+function WorkspacePlanRows({ agent, dir }: { agent: Agent; dir: Directory }) {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const failed = useFailed();
+  const meId = useMeId();
+  const view = useAgentBrain(orgId, agent.id, true, false, "workspace").data;
+  const g = agentGrammar(agent.name);
+  const plans = (view?.accounts ?? []).filter((a) => a.status === "active");
+  const pick = (a: (typeof plans)[number]) =>
+    void api.agents
+      .setBrain(orgId, agent.id, { scope: "workspace", brain: a.kind, account: a.id })
+      .then(() => {
+        for (const key of [keys.agentBrain(orgId, agent.id), keys.agents(orgId), keys.aiStatus(orgId)])
+          void qc.invalidateQueries({ queryKey: key });
+      })
+      .catch(failed);
+  return (
+    <>
+      {plans.length > 0 ? (
+        <GroupedList>
+          {plans.map((a) => {
+            const owner =
+              a.ownerId && a.ownerId !== meId ? dir.memberById.get(a.ownerId)?.name.split(" ")[0] : undefined;
+            return (
+              <GroupedRow
+                key={a.id}
+                leading={<ProviderLogo id={a.kind} size="sm" />}
+                label={a.label}
+                {...(owner ? { sub: t("rightHand.settings.planOwner", { owner }) } : {})}
+                chevron
+                onPress={() => pick(a)}
+              />
+            );
+          })}
+        </GroupedList>
+      ) : null}
+      <GroupedFooter>
+        {t(plans.length > 0 ? "rightHand.settings.workspacePlanHelp" : "rightHand.settings.noPlans", g)}
+      </GroupedFooter>
     </>
   );
 }
@@ -162,14 +271,16 @@ function Form({ agent }: { agent: Agent }) {
           leading={<AgentFace agentId={agent.id} size={36} live={false} />}
           label={agent.name}
           sub={`@${agent.handle}`}
-          value={t("rightHand.settings.changeLook")}
           chevron
           onPress={() => openAgentEdit(agent.id)}
         />
       </GroupedList>
       <GroupedFooter>{t("rightHand.settings.nameHelp", { ...g, label: t("rightHand.label") })}</GroupedFooter>
 
-      <GroupedHeader>{t("rightHand.settings.ai")}</GroupedHeader>
+      <GroupedHeader>{t("rightHand.settings.mine")}</GroupedHeader>
+      <RightHandMine agent={agent} />
+
+      <GroupedHeader>{t("rightHand.settings.workspace")}</GroupedHeader>
       {planKind ? (
         <PlanRows agent={agent} kind={planKind} dir={dir} />
       ) : (
@@ -181,16 +292,10 @@ function Form({ agent }: { agent: Agent }) {
               chevron
               onPress={() => openAgentAi(agent.id)}
             />
-            <GroupedRow
-              icon="bolt"
-              label={t("rightHand.settings.usePlan")}
-              chevron
-              onPress={() => openConnectAi({ agentId: agent.id })}
-            />
           </GroupedList>
-          <GroupedFooter>
-            {t("common.joinSentences", { a: t("rightHand.settings.aiHelp"), b: t("rightHand.settings.planOffer", g) })}
-          </GroupedFooter>
+          <GroupedFooter>{t("rightHand.settings.workspaceHelp", g)}</GroupedFooter>
+          <GroupedHeader>{t("rightHand.settings.workspacePlan")}</GroupedHeader>
+          <WorkspacePlanRows agent={agent} dir={dir} />
         </>
       )}
 

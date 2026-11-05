@@ -110,6 +110,10 @@ export const RUN_CODES = [
   "org_deleting",
   "agent_paused",
   "computer_busy",
+  "computer_failed",
+  "computer_timeout",
+  "account_missing",
+  "our_error",
 ] as const;
 
 /**

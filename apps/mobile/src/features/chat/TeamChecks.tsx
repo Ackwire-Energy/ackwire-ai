@@ -3,7 +3,7 @@ import { targetKind, teamChecksOf } from "@agenteschat/client/lib/team-checks";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { type IconName, LineIcon, PillButton, Text, useTheme } from "@/ui";
+import { type IconName, LineIcon, RowAction, Text, useTheme } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { chatHref } from "../links/logic";
@@ -75,7 +75,7 @@ function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
         ) : null}
       </View>
       {channelId ? (
-        <PillButton
+        <RowAction
           label={t("teamChecks.open")}
           accessibilityRole="link"
           onPress={() => router.push(chatHref(channelId))}
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   // The receipts' card: a hairline, the cut corner; the icon (as the conversation's event lines), the first line and
-  // the pill (32, in a 50 row) share one middle.
+  // the action (32, in a 50 row) share one middle.
   one: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 14,
     borderBottomLeftRadius: 6,
   },
-  // The "small" line (20) on the pill's middle.
+  // The "small" line (20) on the action's middle.
   tx: { paddingTop: (32 - 20) / 2 },
   detail: { marginTop: 2 },
 });

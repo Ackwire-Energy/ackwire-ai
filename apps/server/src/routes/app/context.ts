@@ -155,6 +155,7 @@ const AGENT_DETAIL_READS = new Set([
   "learned-skills",
   "mail",
   "memories",
+  "merge-repositories",
   "repositories",
   "scopes",
   "skills",

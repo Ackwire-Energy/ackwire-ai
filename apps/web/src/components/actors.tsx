@@ -23,15 +23,19 @@ export function useActors() {
   const avatar = (a: Actor, size: "xs" | "sm" = "xs") => (
     <ActorAvatar key={actorKey(a)} size={size} actor={a} name={name(a)} />
   );
-  // The empty choice leads with a glyph as wide as the 18px faces, so every name starts on one edge.
+  // The empty choice leads with a glyph as wide as a small menu's 18px faces (a Select's list centres it in its 32px
+  // column), so every name starts on one edge.
   const none = <Icon name="person" size={18} className="muted" />;
-  /** `current` (the value picked now) stays an option even when my lists leave that agent out. */
-  const options = (withNone: boolean, current?: string): SelectOption[] => [
+  /**
+   * `current` (the value picked now) stays an option even when my lists leave that agent out. Faces are tiles (`sm`,
+   * drawn at 32px by a Select's list); a small dropdown menu takes the 18px ones (`xs`).
+   */
+  const options = (withNone: boolean, current?: string, faces: "xs" | "sm" = "sm"): SelectOption[] => [
     ...(withNone ? [{ value: NO_ACTOR, label: t("issues.noAssignee"), leading: none }] : []),
     ...dir.members.map((m) => ({
       value: `person:${m.userId}`,
       label: m.name,
-      leading: avatar({ type: "person", id: m.userId }),
+      leading: avatar({ type: "person", id: m.userId }, faces),
     })),
     ...dir.agents
       .filter((a) => listsAgent(org, a) || `agent:${a.id}` === current)
@@ -39,7 +43,7 @@ export function useActors() {
         value: `agent:${a.id}`,
         label: a.name,
         description: a.role ? t("issues.agentRole", { role: a.role }) : undefined,
-        leading: avatar({ type: "agent", id: a.id }),
+        leading: avatar({ type: "agent", id: a.id }, faces),
       })),
   ];
   return { dir, name, options, avatar, meId: me.user.id };

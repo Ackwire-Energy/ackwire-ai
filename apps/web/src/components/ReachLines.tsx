@@ -18,6 +18,7 @@ import {
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
+import { joinsChannels } from "@agenteschat/client/lib/right-hand";
 import { Button, Dialog, DialogFooter, Icon } from "@agenteschat/ui";
 import { type SyntheticEvent, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
@@ -88,8 +89,10 @@ function ReachRow({
   ]
     .filter(Boolean)
     .join(" · ");
+  // The right hand joins no channel, and an @mention reaches it in any of them.
   const addButton = ((handed && e.reason === "not_in_channel") || e.private) &&
     addable &&
+    (!agent || joinsChannels(agent)) &&
     can(org, "manage_channels") && (
       <button
         type="button"
@@ -116,7 +119,7 @@ function ReachRow({
   return (
     <div className="ag-rc">
       <span className="ag-rc__ic" aria-hidden="true">
-        <Icon name={handed ? "agent" : "info"} size={14} />
+        <Icon name={handed ? "agent" : "info"} size={16} />
       </span>
       <span className="ag-rc__tx">
         <span className="ag-rc__sentence">

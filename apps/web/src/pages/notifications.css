@@ -41,19 +41,7 @@
   font-size: 8px;
 }
 
-/* The title, with how many are unread on its right (baseline to baseline). */
-.nt-title {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-}
-.nt-title__count {
-  margin: 0;
-  color: var(--muted);
-}
-
-/* ── Toolbar (the header is the shared .list-head) ──────────────────────── */
+/* ── Toolbar (the header is the shared PageHeader) ──────────────────────── */
 .nt-tb {
   display: flex;
   flex-wrap: wrap;
@@ -983,7 +971,7 @@ html:not([data-pointer]) .nt-nb:focus-visible {
 
 /* ── Phones ─────────────────────────────────────────────────────────────── */
 @media (max-width: 720px) {
-  .nt .list-head__acts {
+  .nt .ac-pagehead__actions {
     width: 100%;
   }
   .nt-tb {

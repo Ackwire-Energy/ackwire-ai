@@ -1,12 +1,19 @@
-import { isWaitingHandoff, useBrowserHandoffActions } from "@agenteschat/client";
-import { entryLine, entryState } from "@agenteschat/client/lib/agent-computer";
+import {
+  asksPicture,
+  isWaitingHandoff,
+  PICTURE_IDLE_MS,
+  useBrowserHandoffActions,
+  useDesktopPicture,
+} from "@agenteschat/client";
+import { entryLine, entryState, pictureWhen } from "@agenteschat/client/lib/agent-computer";
 import { computerName } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { router } from "expo-router";
+import { Image } from "expo-image";
+import { router, useIsFocused } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Icon, PressScale, useTheme, useToast } from "@/ui";
+import { GroupedFooter, GroupedHeader, Icon, PressScale, useTheme, useToast } from "@/ui";
 import { BUTTON_SIZES } from "@/ui/Button";
 import { useDirectory, useNow } from "../shared/hooks";
 import { phoneEntryButton } from "./logic";
@@ -89,7 +96,47 @@ export function AgentComputerButton({ agentId }: { agentId: string }) {
   );
 }
 
+/**
+ * A recent picture of the agent's screen on its profile's Today, as the web's entry shows one: only while its
+ * computer runs and the profile is on screen, for whoever may watch it, never a stream. A tap opens the computer;
+ * under it, how old the picture is. Nothing otherwise (the button beside Chat stays the way in).
+ */
+export function AgentComputerPicture({ agentId }: { agentId: string }) {
+  const { t, i18n } = useTranslation();
+  const { orgId } = useOrg();
+  const dir = useDirectory();
+  const focused = useIsFocused();
+  const view = useAgentComputer(agentId, focused ? PICTURE_IDLE_MS : false);
+  const asks = !view.forbidden && asksPicture(focused, view.desktopQ.data ?? null);
+  const shot = useDesktopPicture(orgId, agentId, { enabled: asks, working: Boolean(view.facts?.working) });
+  const now = useNow(60_000);
+  const picture = asks ? shot.data?.picture : null;
+  if (!picture) return null;
+  const g = agentGrammar(dir.agentById.get(agentId)?.name ?? "");
+  return (
+    <>
+      <GroupedHeader>{t("agentComputer.button")}</GroupedHeader>
+      {/* The press gives its own haptic (`PressScale`). */}
+      <PressScale
+        onPress={() => openComputer(agentId)}
+        accessibilityRole="button"
+        accessibilityLabel={t("agentComputer.openOf", g)}
+      >
+        <Image
+          source={{ uri: `data:image/jpeg;base64,${picture.data}` }}
+          contentFit="cover"
+          contentPosition="left top"
+          style={styles.picture}
+          accessible={false}
+        />
+      </PressScale>
+      <GroupedFooter>{pictureWhen(t, i18n.language, picture.capturedAt, new Date(now))}</GroupedFooter>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
+  picture: { width: "100%", aspectRatio: 16 / 10, borderRadius: 14 },
   button: { width: SIZE, height: SIZE, borderRadius: BUTTON_SIZES.md.radius },
   face: {
     flexGrow: 1,

@@ -10,7 +10,14 @@ import {
   useMachines,
   useModels,
 } from "@agenteschat/client";
-import { accountTitle, type ExistingAi, groupPlans, planWordOf, signInPlan } from "@agenteschat/client/lib/ai-accounts";
+import {
+  accountTitle,
+  type ExistingAi,
+  groupPlans,
+  listsExisting,
+  planWordOf,
+  signInPlan,
+} from "@agenteschat/client/lib/ai-accounts";
 import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { holdText } from "@agenteschat/client/lib/errors";
@@ -255,7 +262,12 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
   const [login, setLogin] = useState<ExistingSignIn | null>(null);
   const [busy, setBusy] = useState(false);
   const have =
-    forAgent && gates.view?.agentId === forAgent.id && !hasAi(forAgent.id)
+    forAgent &&
+    gates.view?.agentId === forAgent.id &&
+    listsExisting(
+      agentRows.data?.find((a) => a.id === forAgent.id),
+      !hasAi(forAgent.id),
+    )
       ? existingRows(t, gates.view, credentials.data ?? [], forAgent.name)
       : [];
   const shownGate = gates.gateOf(view.page === "plan" ? view.choice : "claude");
@@ -304,6 +316,10 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
       const fits = keyRuns(k, model, models.data?.models ?? []);
       return void save(forAgent, k.label, async () => {
         if (brain !== "model") await api.agents.setBrain(orgId, forAgent.id, { brain: "model" });
+        // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
+        if (gates.view?.scope === "mine") {
+          await api.agents.setBrain(orgId, forAgent.id, { scope: "workspace", brain: "model" });
+        }
         await api.agents.update(orgId, forAgent.id, { credentialId: k.id, ...(fits ? {} : { model: AUTO }) });
       });
     }
@@ -591,17 +607,19 @@ function PlanPage(
   const [done, setDone] = useState<{ agentId: string; agent: string; label: string } | null>(null);
   const kind = kindOf(choice);
   const replies = useReplies(gates, agentId, kind);
-  const repliesRow = (
-    <PlanReplies
-      agent={done?.agent ?? agent?.name ?? ""}
-      on={replies.on}
-      onChange={(on) => void replies.change(on)}
-      brain={kind}
-      plan={replies.plan}
-      coding={planOf(choice)}
-      disabled={replies.busy}
-    />
-  );
+  // The team's right hand's own AI for the person serves them alone: no switch.
+  const repliesRow =
+    gates.view?.scope === "mine" ? null : (
+      <PlanReplies
+        agent={done?.agent ?? agent?.name ?? ""}
+        on={replies.on}
+        onChange={(on) => void replies.change(on)}
+        brain={kind}
+        plan={replies.plan}
+        coding={planOf(choice)}
+        disabled={replies.busy}
+      />
+    );
   const pick = () => {
     const names = agents.map((a) => a.name);
     const choose = (i: number) => {
@@ -1066,7 +1084,7 @@ function GateWait({
       <InfoCard icon="lock">
         {gate.who === "computer"
           ? t("connectAi.accountsLocked", { name: pairer ?? "", computer })
-          : t("noAi.lockedAdmins")}
+          : t("noAi.lockedOwner")}
       </InfoCard>
     );
   }

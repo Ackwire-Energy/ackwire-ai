@@ -128,6 +128,21 @@ test("it is in no channel and on no computer, whoever asks", async () => {
   await expect(addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: lodi.id })).rejects.toMatchObject(
     permanent,
   );
+  // Its owner, alone in the workspace, still adds any other agent.
+  const ada = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Ada", handle: "ada" },
+    { model: "claude-sonnet-5-5" },
+  );
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: ada.id });
+  const inGeneral = await f.db
+    .select({ agentId: schema.channelMembers.agentId })
+    .from(schema.channelMembers)
+    .where(eq(schema.channelMembers.channelId, f.general.id));
+  expect(inGeneral.map((m) => m.agentId)).toContain(ada.id);
+  expect(inGeneral.map((m) => m.agentId)).not.toContain(lodi.id);
   await expect(
     setAgentChannels(f.db, f.owner.id, f.org.id, lodi.id, [{ channelId: f.general.id }]),
   ).rejects.toMatchObject(permanent);

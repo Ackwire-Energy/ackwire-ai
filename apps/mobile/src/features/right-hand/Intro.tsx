@@ -12,8 +12,8 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
-import { introCards, isRightHand, presetsLeft } from "@agenteschat/client/lib/right-hand";
-import { answerAfter, BUSINESS_TYPES } from "@agenteschat/client/lib/team-plan";
+import { introCards, isRightHand, offersTeamSetup, presetsLeft } from "@agenteschat/client/lib/right-hand";
+import { answerAfter, BUSINESS_TYPES, startCardPassed } from "@agenteschat/client/lib/team-plan";
 import { WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -40,9 +40,9 @@ import { AnswerChips, TeamTemplatesSheet, useSendAnswer } from "./TeamCard";
  * any AI is connected: its greeting, then the first card the workspace needs, as on the web. No AI yet: Connect AI.
  * An AI and no agent besides it: how to start (the ready-made agents, describing the need, an import or the form). A
  * team and nobody else here yet: inviting people and the first task, written in that agent's composer. Last, until the
- * person picks, how agents talk to them (ADR 0147). On the
- * person's first visit (`waveFrom`, when its wave started), its waving sticker under the greeting, drawn as a sticker
- * message is and decorative.
+ * person picks, how agents talk to them (ADR 0147). Once the start card has stopped asking, a line to build the team
+ * with it, at any time. On the person's first visit (`waveFrom`, when its wave started), its waving sticker under the
+ * greeting, drawn as a sticker message is and decorative.
  */
 export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; channelId: string; waveFrom?: number }) {
   const { t } = useTranslation();
@@ -53,14 +53,19 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
   const team = dir.agents.filter((a) => !isRightHand(a));
   const first = team[0];
   const teamHandles = team.map((a) => a.handle);
+  const noAi = aiStateOf(status.data, agent.id) === "no_ai";
+  const aiKnown = Boolean(status.data);
+  const createsAgents = can(org, "create_agents");
   const cards = introCards({
-    noAi: aiStateOf(status.data, agent.id) === "no_ai",
-    aiKnown: Boolean(status.data),
+    noAi,
+    aiKnown,
     teamHandles,
-    createsAgents: can(org, "create_agents"),
+    createsAgents,
     alone: (members.data?.length ?? 0) <= 1,
     askStyle: org?.agentStyle === null,
   });
+  const cardPassed = startCardPassed(useMessages(orgId, channelId).data);
+  const send = useSendAnswer(channelId);
   return (
     <View style={styles.intro}>
       <View style={styles.head}>
@@ -105,6 +110,19 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
         )}
         {cards.includes("next") && first && <NextCard first={first} />}
         {cards.includes("style") && <StyleCard />}
+        {offersTeamSetup({ noAi, aiKnown, createsAgents, hasTeam: team.length > 0, cardPassed }) ? (
+          <View>
+            <Text variant="small" tone="muted">
+              {t("rightHand.intro.again.question")}
+            </Text>
+            <Button
+              variant="text"
+              size="sm"
+              label={t("rightHand.intro.again.action")}
+              onPress={() => send(t("rightHand.intro.again.message"))}
+            />
+          </View>
+        ) : null}
       </View>
     </View>
   );

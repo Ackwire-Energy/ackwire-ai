@@ -756,6 +756,9 @@ test.skipIf(!posix)(
     await tasks.start(AGENT, { taskId: id(49), executor: "shell", command: "sleep 30" });
     tasks.keepAccount(FOLDER_ACCOUNT);
     expect(tasks.list().map((t) => t.status)).toEqual(["running", "running"]);
+    // One of the several accounts the agent thinks with (the team's right hand): it goes on too.
+    tasks.keepAccount(null, [FOLDER_ACCOUNT]);
+    expect(tasks.list().map((t) => t.status)).toEqual(["running", "running"]);
     // Root says the agent thinks with nothing now: the task on its old account stops, the shell task goes on.
     tasks.keepAccount(null);
     await waitFor(() => Boolean(done(id(48))), 8000);

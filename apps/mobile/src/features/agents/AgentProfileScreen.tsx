@@ -8,6 +8,7 @@ import {
   useAiStatus,
   useApi,
   useApprovalRules,
+  useMemory,
   useMemoryAboutMe,
   useMemoryAction,
   useModelLabel,
@@ -59,12 +60,12 @@ import {
 import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
-import { LetMeTalkPill } from "../chat/ReachLines";
-import { AgentComputerButton } from "../computer/AgentComputerRow";
+import { LetMeTalkButton } from "../chat/ReachLines";
+import { AgentComputerButton, AgentComputerPicture } from "../computer/AgentComputerRow";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
 import { UsageQueueSheet } from "../queue/UsageQueueSheet";
-import { openRightHandSettings } from "../right-hand/SettingsScreen";
+import { openRightHandSettings, RightHandMine } from "../right-hand/SettingsScreen";
 import { useConnectedById } from "../settings/hooks";
 import { agentBadgeInset } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId, useWhen } from "../shared/hooks";
@@ -92,6 +93,7 @@ import {
   statusCardShown,
   usesOf,
 } from "./logic";
+import { MergeReposSection } from "./MergeReposSection";
 import { MonthPixels } from "./MonthPixels";
 import { useMemoryOriginText } from "./useMemoryOriginText";
 import { agoText, workTitle, workWhere } from "./work";
@@ -439,6 +441,7 @@ function Profile({ id }: { id: string }) {
   const todayView = (
     <>
       {nowBlock}
+      <AgentComputerPicture agentId={id} />
       {forYou.data || forYou.isError ? (
         <>
           <GroupedHeader>{didHead}</GroupedHeader>
@@ -594,6 +597,7 @@ function Profile({ id }: { id: string }) {
         </>
       ) : null}
       <AlwaysApproved agentId={id} name={name} mayRemove={mine || can(org, "approve_actions")} />
+      <MergeReposSection agentId={id} name={name} mayEdit={mine || can(org, "manage_agents")} />
       {ownerLine ? (
         <View style={styles.apart}>
           <GroupedList>
@@ -610,7 +614,7 @@ function Profile({ id }: { id: string }) {
     : owner
       ? t("mobile.intentAgents.knows.footOwner", { name: owner })
       : t("mobile.intentAgents.knows.footAdmins");
-  const memoryView = knows.data ? (
+  const memoryKnows = (
     <>
       <GroupedHeader>{t("mobile.intentAgents.knows.title", agentGrammar(name))}</GroupedHeader>
       <GroupedList>{learned.people.map(memoryRow)}</GroupedList>
@@ -626,7 +630,14 @@ function Profile({ id }: { id: string }) {
         </>
       ) : null}
     </>
-  ) : null;
+  );
+  const memoryView = (
+    <>
+      {/* What people told it to always do first, as the web's Memória. */}
+      <GivenRules agentId={id} />
+      {knows.data ? memoryKnows : null}
+    </>
+  );
 
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
@@ -691,12 +702,14 @@ function Profile({ id }: { id: string }) {
               {details ? t("mobile.agent.cantTalk") : t("profile.detailsHidden", agentGrammar(name))}
             </Text>
           ) : null}
-          {agent ? <LetMeTalkPill agent={agent} /> : null}
+          {agent ? <LetMeTalkButton agent={agent} /> : null}
         </View>
 
         {rightHand && agent ? (
           <View style={styles.page}>
             {nowBlock}
+            <GroupedHeader>{t("rightHand.settings.mine")}</GroupedHeader>
+            <RightHandMine agent={agent} />
             <GroupedHeader>{t("rightHand.profile.how")}</GroupedHeader>
             <GroupedList>
               <GroupedRow icon="shield" label={t("rightHand.profile.permissions")} labelLines={2} />
@@ -873,6 +886,59 @@ function ButtonRow({
       ) : null}
       {trailing}
     </View>
+  );
+}
+
+/**
+ * "Regras que as pessoas deram", as on the web's Memória: what people told it to always do, by whom and when. Its
+ * giver, the agent's owner and admins take one back with its ×. Shown only when there is something.
+ */
+function GivenRules({ agentId }: { agentId: string }) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const toast = useToast();
+  const when = useWhen();
+  const memory = useMemory(orgId, agentId);
+  const remove = useMemoryAction(orgId, agentId);
+  const list = (memory.data ?? []).filter((m) => m.kind === "rule" && !m.archived);
+  if (list.length === 0) return null;
+  return (
+    <>
+      <GroupedHeader>{t("agentPage.memory.rules")}</GroupedHeader>
+      <GroupedList>
+        {list.map((m) => (
+          <ButtonRow
+            key={m.id}
+            icon="flag"
+            label={m.text}
+            labelLines={3}
+            sub={t("agentPage.memory.ruleBy", {
+              name: m.origin?.name ?? t("memory.origin.someone"),
+              date: when.short(m.origin?.at ?? m.updatedAt),
+            })}
+            trailing={
+              m.removable ? (
+                <IconButton
+                  icon="x"
+                  label={t("agentPage.memory.removeRule")}
+                  disabled={remove.isPending}
+                  onPress={() =>
+                    remove.mutate(
+                      { type: "archive", id: m.id, archived: true },
+                      {
+                        onSuccess: () => toast({ title: t("agentPage.memory.ruleRemoved"), agentId }),
+                        onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+                      },
+                    )
+                  }
+                />
+              ) : undefined
+            }
+          />
+        ))}
+      </GroupedList>
+      <GroupedFooter>{t("agentPage.memory.rulesNote")}</GroupedFooter>
+    </>
   );
 }
 

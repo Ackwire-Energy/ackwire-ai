@@ -42,8 +42,7 @@ export function Row({
         flexDirection: "row",
         alignItems: "center",
         gap: 12,
-        paddingVertical: 12,
-        paddingHorizontal: 14,
+        padding: 14,
         minHeight: 60,
         backgroundColor: pressed ? colors.sunken : "transparent",
       }}

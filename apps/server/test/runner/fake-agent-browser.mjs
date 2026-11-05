@@ -7,6 +7,10 @@
 // (`setAttribute`, kept in `marks` for this page only) and `fill [attr="value"]` finds it by that mark, or nothing
 // (`navigateAfterCheck`: the page goes there right after a check marks a field, as a page that moved on would);
 // `filled` keeps what each fill typed into. With `--bail` the batch stops at the first failure (ADR 0144).
+// `get box <sel>` answers `boxes[sel]`; a script sees `viewport` as `window.innerWidth`/`innerHeight` and
+// `hit` (`{ tag, type, box: [left, top, right, bottom], ref }`) at any `document.elementFromPoint`; a
+// `mouse down` focuses that `ref`; `frames` (`[[width, height]]`) are the page's iframes.
+// `typingMs`: a batch that presses keys or moves the pointer takes that long (a person can step in meanwhile).
 import { appendFileSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 const argv = process.argv.slice(2);
@@ -73,6 +77,7 @@ const pageEval = (script, focused) => {
     ? {
         tagName: field.tag ?? "INPUT",
         type: field.type ?? "text",
+        select: () => {},
         getAttribute: (name) => (name === "autocomplete" ? (field.autocomplete ?? null) : null),
         setAttribute: (name, value) => {
           state.marks = { ...(state.marks ?? {}), [name]: { value: String(value), ref: focused, url: state.url } };
@@ -88,14 +93,27 @@ const pageEval = (script, focused) => {
     const mark = m ? state.marks?.[m[1]] : undefined;
     return m && mark && mark.value === m[2] && mark.url === state.url ? { name: m[1], mark } : null;
   };
+  const hit = state.hit
+    ? {
+        tagName: state.hit.tag ?? "BUTTON",
+        type: state.hit.type ?? "",
+        isContentEditable: false,
+        closest: () => null,
+        getBoundingClientRect: () => {
+          const [left, top, right, bottom] = state.hit.box;
+          return { left, top, right, bottom };
+        },
+      }
+    : null;
   const document = {
     activeElement: el,
+    elementFromPoint: () => (state.hit?.ref && state.hit.ref === focused ? el : hit),
     querySelector: (selector) => {
       const found = marked(selector);
       return found ? { removeAttribute: (name) => delete state.marks[name] } : null;
     },
   };
-  const win = {};
+  const win = state.viewport ? { innerWidth: state.viewport[0], innerHeight: state.viewport[1] } : {};
   const ancestors = frame.ancestors ?? [];
   const location = { origin: frame.origin ?? origin, ancestorOrigins: ancestors };
   const run = new Function("document", "location", "window", "top", `return ${script}`);
@@ -152,12 +170,22 @@ switch (command) {
     break;
   case "batch": {
     const list = JSON.parse(stdin || "[]");
+    if (state.typingMs && list.some((c) => c[0] === "press" || c[1] === "move")) {
+      await new Promise((resolve) => setTimeout(resolve, state.typingMs));
+    }
     const bail = argv.includes("--bail");
     const results = [];
-    let focused = null;
+    let focused = state.focusedRef ?? null;
     for (const cmd of list) {
       let result = { command: cmd[0], success: true, result: {}, error: null };
       if (cmd[0] === "focus") focused = cmd[1];
+      if (cmd[0] === "mouse" && cmd[1] === "down") focused = state.hit?.ref ?? null;
+      if (cmd[0] === "get" && cmd[1] === "box") {
+        const box = state.boxes?.[cmd[2]];
+        result = box
+          ? { command: cmd, success: true, result: box, error: null }
+          : { command: cmd, success: false, result: null, error: `Element not found: ${cmd[2]}` };
+      }
       if (cmd[0] === "eval") {
         const before = JSON.stringify(state.marks ?? {});
         try {

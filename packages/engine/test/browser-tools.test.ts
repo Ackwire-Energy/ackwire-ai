@@ -15,6 +15,7 @@ import {
   absorbToolData,
   agentBrowserStatus,
   agentFolderPath,
+  BROWSER_GUIDANCE,
   BROWSER_SCOPE,
   BROWSER_TOOLS,
   browserErrorText,
@@ -855,6 +856,22 @@ test("an agent with only the browser asks for a password bound to one site, made
   expect(row?.purpose).toContain("dashboard.stripe.com");
 });
 
+test("a password step: the Vault, else the private card for that site; the person's own hands only where they must", async () => {
+  expect(BROWSER_GUIDANCE).toContain(
+    "A password or code step: a Vault login, else `request_secret` (`site`: the login page; `code` for a one-time code), then `browser_type_secret`",
+  );
+  expect(BROWSER_GUIDANCE).toContain("never type one you got any other way");
+  expect(BROWSER_GUIDANCE).toContain(
+    "with `browser_ask_person` only when it needs their own hands (a QR code, a captcha, a passkey, a site refusing automated sign-in) or they'd rather do it",
+  );
+  expect(BROWSER_GUIDANCE).toContain("Use the way they ask for.");
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  const tools = f.tools as NonNullable<Fixture["tools"]>;
+  const [secret] = (await tools.list(b.ctx)).filter((t) => t.name === "request_secret");
+  expect(secret?.description).toContain("and whenever they ask to send one privately");
+});
+
 test("with the computer and the browser, there is exactly one request_secret (the computer's)", async () => {
   const holder: { hub?: MachineCaller } = {};
   f = await setup({
@@ -918,10 +935,10 @@ test("browser_screenshot with share: sent to the Drive and attached to the reply
   expect(path).toMatch(/^screenshots\/.+\.png$/);
   const [a] = await f.db.select().from(schema.artifacts);
   expect(a).toMatchObject({ kind: "file", title: path.slice("screenshots/".length), channelId: f.general.id });
-  expect(out.data).toEqual({ path, artifact: { id: a?.id, version: 1 } });
+  expect(out.data).toEqual({ path, artifact: { id: a?.id, version: 1, title: a?.title } });
   const reply: ToolSideEffects = {};
   absorbToolData(reply, out.data);
-  expect(reply.artifacts).toEqual([{ id: a?.id as string, version: 1 }]);
+  expect(reply.artifacts).toEqual([{ id: a?.id as string, version: 1, title: a?.title as string }]);
   expect(out.content).toBe(
     `Saved ${path} in your folder. It is shown in this conversation: its card goes with your reply ("${a?.title}" in the Drive, 8 bytes, artifact ${a?.id}).`,
   );

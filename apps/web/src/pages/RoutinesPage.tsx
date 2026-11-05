@@ -92,6 +92,7 @@ import {
   InfoHint,
   Input,
   Menu,
+  PageHeader,
   RecurrencePicker,
   type RecurrenceRule,
   RunKey,
@@ -166,7 +167,7 @@ const isRunning = (r: Routine) => r.state === "running";
 const isAtWork = (r: Routine) =>
   isRunning(r) || r.state === "waiting_person" || r.state === "waiting_computer" || r.state === "usage_paused";
 /** A one-off that already fired (or was cancelled): no switch, no "Rodar agora", nothing left to run. */
-const hasFired = (r: Routine) => r.trigger.type === "once" && !r.active;
+export const hasFired = (r: Routine) => r.trigger.type === "once" && !r.active;
 /** A one-off that fired and whose run ended: shown muted, under "Concluídos" (while its run works, it is live). */
 export const isDoneOnce = (r: Routine) => hasFired(r) && !isAtWork(r);
 /** Paused: inactive and not a one-off (a fired one-off is done, or live while its run works). */
@@ -354,15 +355,15 @@ export function RoutinesPage() {
   return (
     <div className="page routines">
       <div className="routines__main">
-        <header className="routines-head">
-          <div>
-            <h1>{t("routines.title")}</h1>
-            <p className="routines-head__sub">{t("routines.subtitle")}</p>
-          </div>
-          <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-            {t("routines.new")}
-          </Button>
-        </header>
+        <PageHeader
+          title={t("routines.title")}
+          meta={t("routines.subtitle")}
+          actions={
+            <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+              {t("routines.new")}
+            </Button>
+          }
+        />
         {routines.isLoading && <LoadingCards count={3} />}
         {routines.isError && !routines.data && (
           <ErrorState error={routines.error} onRetry={() => void routines.refetch()} />
@@ -562,7 +563,7 @@ function useNextText() {
 }
 
 /** Pause, resume, run, stop, the one-tap fixes and delete: one place for the toasts they say. */
-function useRoutineControls(r: Routine) {
+export function useRoutineControls(r: Routine) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const actors = useActors();
@@ -1643,11 +1644,11 @@ function RoutineAside({
       value: a.id,
       label: a.name,
       description: a.role || undefined,
-      leading: actors.avatar({ type: "agent", id: a.id }),
+      leading: actors.avatar({ type: "agent", id: a.id }, "sm"),
     })),
     ...(actors.dir.agentById.has(r.agentId)
       ? []
-      : [{ value: r.agentId, label: actors.name(agent), description: undefined, leading: actors.avatar(agent) }]),
+      : [{ value: r.agentId, label: actors.name(agent), description: undefined, leading: actors.avatar(agent, "sm") }]),
   ];
   const choice = targetChoice(r.target);
   const channelList = channels.data ?? [];
@@ -2499,7 +2500,7 @@ function RoutineDialog({
                     value: a.id,
                     label: a.name,
                     description: a.role || undefined,
-                    leading: actors.avatar({ type: "agent", id: a.id }),
+                    leading: actors.avatar({ type: "agent", id: a.id }, "sm"),
                   }))}
                 />
               </Field>
@@ -2694,14 +2695,33 @@ function RoutineDialog({
 /** What a routine does in connected apps without asking (the job its creator set it up for), or that it asks for each. */
 function OwnActions({ routine }: { routine: Routine | undefined }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const action = useRoutineAction(org.id);
   const own = routine?.ownActions ?? [];
   if (own.length === 0) return <p className="small muted">{t("routines.ownActions.none")}</p>;
   return (
     <>
       <ul className="routine-own" aria-label={t("routines.panel.ownActions")}>
-        {own.map((action) => (
-          <li key={action} title={action}>
-            {ownActionName(t, action)}
+        {own.map((name) => (
+          <li key={name} title={name}>
+            {ownActionName(t, name)}
+            {routine?.canManage && (
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                icon="close"
+                aria-label={t("routines.ownActions.remove", { action: ownActionName(t, name) })}
+                disabled={action.isPending}
+                onClick={() =>
+                  action.mutate({
+                    type: "update",
+                    id: routine.id,
+                    patch: { ownActions: own.filter((a) => a !== name) },
+                  })
+                }
+              />
+            )}
           </li>
         ))}
       </ul>

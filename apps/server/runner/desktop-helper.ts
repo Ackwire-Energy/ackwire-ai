@@ -193,8 +193,9 @@ export type HelperRequest = { [K in HelperOp]: { id: number; op: K } & HelperReq
  * - `stale`: the element is gone.
  * - `failed`: the action didn't happen (the tool failed, nothing took a paste, the app didn't start).
  * - `mismatch`: a field's text didn't come out as written.
+ * - `stopped`: SIGUSR1 (a person took control) ended an `input` at its next key or step.
  */
-export type HelperErrorCode = "bad_request" | "unavailable" | "stale" | "failed" | "mismatch" | "internal";
+export type HelperErrorCode = "bad_request" | "unavailable" | "stale" | "failed" | "mismatch" | "stopped" | "internal";
 
 export type HelperReply<K extends HelperOp = HelperOp> =
   | { id: number; ok: true; data: HelperReplies[K] }

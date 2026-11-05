@@ -27,6 +27,8 @@ export const en = {
     refreshing: "Refreshing",
     retry: "Try again",
     unknownError: "Something went wrong. Try again.",
+    /** A server error (a 5xx of its own): nothing the person did, and nothing they can fix. */
+    ourSide: "Something went wrong on our side. Try again in a little while.",
     signedOut: "Your session ended. Sign in again to continue.",
     newVersion: "A new version of agentes.chat is out.",
     reload: "Reload",
@@ -47,7 +49,7 @@ export const en = {
     today: "Today",
     yesterday: "Yesterday",
     loadFailed: "Couldn't load this. Check your connection and try again.",
-    notAllowed: "You don't have permission for this. Ask a workspace admin.",
+    notAllowed: "You don't have permission for this.",
     tooMany: "Too many tries. Try again later.",
     offline: "You're offline. Check your connection and try again.",
     unreachable: "Can't reach agentes.chat right now. Try again in a moment.",
@@ -217,6 +219,13 @@ export const en = {
       desc: "Open or private.",
       short: "create channels",
       say: "creates channels",
+    },
+    /** `@everyone` is this language's word for the mention of everyone (packages/i18n/src/everyone.ts). */
+    mention_everyone: {
+      title: "Mention everyone",
+      desc: "Use @everyone to notify everyone in a channel, people and agents.",
+      short: "mention everyone",
+      say: "mentions everyone",
     },
     manage_channels: {
       title: "Arrange channels",
@@ -1808,8 +1817,8 @@ export const en = {
     away_one: "{{names}} is waiting for the computer",
     away_other: "{{names}} are waiting for the computer",
     /** Its plan's limit or its budget holds its answer (`receipts.ts` `plan` / `budget`). */
-    plan_one: "{{names}} answers when the plan resets",
-    plan_other: "{{names}} answer when the plan resets",
+    plan_one: "{{names}} is waiting on the plan",
+    plan_other: "{{names}} are waiting on the plan",
     budget_one: "{{names}} answers when the budget renews",
     budget_other: "{{names}} answer when the budget renews",
     line_one: "{{names}} starts when another work ends",
@@ -1829,7 +1838,7 @@ export const en = {
       outage: "The AI provider is down · retries by itself",
       queued: "In line for the computer",
       away: "Waiting for the computer",
-      plan: "Answers when the plan resets",
+      plan: "Waiting on the plan",
       budget: "Answers when the budget renews",
       line: "Starts when another work ends",
       canceled: "Canceled",
@@ -1887,6 +1896,12 @@ export const en = {
         import: "Import my agents",
         form: "Fill in the form",
       },
+      /** Under its greeting once the start card stopped asking; `message`: what the button sends, as the person. */
+      again: {
+        question: "Want to build the team with me?",
+        action: "Build the team",
+        message: "Help me build the team.",
+      },
       next: {
         question: "The team is here. What next?",
         invite: "Invite people",
@@ -1922,8 +1937,6 @@ export const en = {
       name: "Name and look",
       nameHelp: "In the sidebar it always shows as “{{label}}”.",
       changeLook: "Change look",
-      ai: "AI and model",
-      aiHelp: "Automatic picks the cheapest model that does the job.",
       budget: "Monthly budget",
       perMonth: "/month",
       budgetHelp: "When it reaches the limit, it stops and tells you, like any agent.",
@@ -1931,14 +1944,33 @@ export const en = {
       audienceHelp: "Outside it, a person doesn't see {{name}} in the sidebar.",
       lock: "{{name}} can't be archived or deleted. It posts nothing unless someone talks to it.",
       audit: "See what {{name}} did",
-      /** On a person's plan (ADR 0137 §1): the AI row names the plan's account, with Change. */
-      onPlan: "Claude plan · {{account}}",
       change: "Change",
       planHelp: "The plan's owner pays. When its computer is away, the conversation says so and offers an API key.",
-      plan: "A plan",
-      planOffer:
-        "{{name}} can think with your plan instead of an API key. It runs on the computer where the plan is signed in and reaches only this workspace.",
-      usePlan: "Use a plan",
+      /** The face that opens the look's dialog, read aloud and on hover. */
+      lookEdit: "Change {{name}}'s look",
+      /** After a plan's name when it is someone else's. */
+      planOwner: "from {{owner}}",
+      /** Each person's own AI for their conversation with the right hand (ADR 0137 §11). */
+      mine: "Your AI",
+      mineHelp: "Your conversation with {{name}} thinks with your plan or one shared with you, and only yours does.",
+      connectMine: "Connect my plan",
+      useWorkspace: "Use the workspace's",
+      /** Without a plan of their own: what their conversation thinks with. */
+      fallbackKey: "Without your own plan, it uses the workspace's API key.",
+      fallbackPlan: "Without your own plan, it uses {{owner}}'s plan, which serves everyone.",
+      fallbackYours: "Without another plan, it uses the workspace's, which is yours.",
+      fallbackNone: "Without your own plan, {{name}} can't answer you: the workspace's plan serves only {{owner}}.",
+      /** What admins set for people with no plan of their own. */
+      workspace: "Workspace AI",
+      workspaceHelp: "People without their own plan talk to {{name}} through this AI.",
+      workspacePlan: "Workspace plan",
+      workspacePlanHelp: "A plan in place of the key. It serves other people only when its owner lets it.",
+      noPlans: "Connect a plan under Your AI to use it here.",
+      pickPlan: "Choose a plan",
+      /** "Atende outras pessoas" on the workspace's plan. */
+      sharesOn: "On: people without their own plan talk to {{name}} through this plan.",
+      sharesOff: "Off: only {{owner}} talks through it. People without their own plan get no answer.",
+      sharesOffYou: "Off: only you talk through it. People without their own plan get no answer.",
     },
     card: {
       settings: "{{name}} · Settings",
@@ -2140,6 +2172,10 @@ export const en = {
       orgAction: "Connect an AI",
     },
     agent: "{{name}} won't reply because he has no AI\u00a0connected.",
+    /** Its computer has no such CLI installed (`reason: cli_missing`). */
+    cliMissing: "{{name}} won't reply: the AI's program isn't installed on the computer.",
+    /** Its AI thinks on a computer and it has none (`reason: no_computer`). */
+    noComputer: "{{name}} won't reply: the AI needs a computer and there is none.",
     agent_female: "{{name}} won't reply because she has no AI\u00a0connected.",
     signedOut: "{{name}} won't reply because his AI is signed\u00a0out.",
     signedOut_female: "{{name}} won't reply because her AI is signed\u00a0out.",
@@ -2160,13 +2196,25 @@ export const en = {
     action: "Connect",
     locked: "Who connects {{name}}'s AI: an admin, with an API key, or {{owner}}, with their own plan.",
     lockedAdmins: "Only an admin can connect an AI.",
+    /** A plan signs in only for its own agents: whoever opened this isn't the agent's owner. */
+    lockedOwner: "Only the agent's owner connects a plan for it.",
     /** The team's right hand on a plan that can't think now (ADR 0137 §7): one line, and the way to an API key. */
     rightHand: {
       computer_away: "{{name}} can't answer now: the computer the plan is signed in on is away.",
+      computer_failed: "{{name}} can't answer now: the computer the plan is signed in on had a problem.",
       plan_limit: "{{name}} can't answer now: the plan reached its limit.",
-      plan_not_shared: "{{name}} thinks with a plan that answers only its owner.",
+      plan_not_shared: "Connect your own plan to talk to {{name}}: the workspace's plan serves only its owner.",
       runner_outdated: "{{name}} can't answer now: the program on the plan's computer needs an update.",
-      plan_tools: "{{name}} stopped before answering: the plan's AI on that computer offers tools of its own.",
+      plan_tools:
+        "{{name}} stopped before answering: the plan's AI on that computer didn't stay within agentes.chat's tools.",
+      /** `model`: the model whose own limit it is (not the plan's); the plan's other models still work. */
+      model_limit:
+        "{{name}} can't answer now: {{model}} reached its own limit on the plan. The plan's other models still work.",
+      /** `model`: a model that needs a region setting on the plan's account; it doesn't come back by itself. */
+      model_region:
+        "{{name}} can't answer: {{model}} needs the Global region on in OpenCode (Settings\u00a0›\u00a0Privacy).",
+      commands_off:
+        "{{name}} can't answer now: commands are turned off on the plan's computer, and whoever looks after it needs to turn them on.",
       useKey: "Use an API key",
     },
     receipt: "Nobody will answer: no\u00a0AI connected",
@@ -2352,6 +2400,9 @@ export const en = {
       monthly: "of its month",
     },
     line: "Picks up {{when}}, when the plan resets. Quick replies keep going.",
+    /** Buttons under a wait's note, to the agent's page. */
+    changeModel: "Change model",
+    raiseBudget: "Raise the budget",
     lineUnknown: "Picks up as soon as the plan resets. Quick replies keep going.",
     lineBudget: "Picks up {{when}}, or sooner if the budget goes up. Quick replies keep going.",
     continue: "Continue now",
@@ -2548,6 +2599,8 @@ export const en = {
     },
     memory: {
       saved: "Saved to <b>memory</b>: {{text}}",
+      /** A lasting rule a person gave the agent (a permission, a destination), kept for all its work for them. */
+      saved_rule: "Saved to <b>my rules</b>: {{text}}",
       updated: "Updated <b>memory</b>: {{text}}",
       forgotten: "Removed from <b>memory</b>: {{text}}",
     },
@@ -2581,6 +2634,11 @@ export const en = {
     /** A teammate's settings changed from the right hand's card, by the person who clicked Aplicar (ADR 0137). */
     agent: {
       settings_changed: "Changed the settings of <b>{{agentName}}</b>",
+    },
+    /** A merge the agent did without asking, in a repository its owner or an admin chose. Nothing undoes it. */
+    pr: {
+      merged: "Merged PR <b>#{{number}}</b> in <b>{{repo}}</b>",
+      merged_branch: "Merged <b>{{ref}}</b> in <b>{{repo}}</b>",
     },
     other: "Made a change",
     /** On the line of a webhook routine the agent created: copies its secret address (only for who manages it). */
@@ -2865,7 +2923,7 @@ export const en = {
       waiting_answer: "Waiting for an answer",
       waiting_computer: "Waiting for the computer",
       queued_computer: "In line for the computer",
-      waiting_plan: "Waiting for the plan to reset",
+      waiting_plan: "Waiting on the plan",
       waiting_budget: "Waiting for the budget to reset",
       provider_down: "The AI provider is down · retries by itself",
       out_of_plan: "Out of plan limit",
@@ -2893,6 +2951,8 @@ export const en = {
     inChannel: "In this channel",
     inWorkspace: "In the workspace",
     notInChannel: "not in the channel",
+    /** Under `@everyone` (this language's word) in the "@" list. */
+    everyone: "Everyone in this conversation, people and agents",
     offer: "{{name}} isn't in the channel and won't see the mention.",
     add: "Add to channel",
     dismiss: "Not now",
@@ -3437,6 +3497,15 @@ export const en = {
       done: "Approved. {{name}} won't ask for this again.",
       undoHere: "To undo it, go to Tools and access, on {{name}}'s page.",
       open: "Open",
+      /** On a routine's card: lets that kind of action run in this routine from now on, and nowhere else. */
+      routine: "Always in this routine",
+      /** The routine in `noteRoutine`, when its name isn't known. */
+      thisRoutine: "this routine",
+      /** `routine`: its name. `actions`: what it will do. */
+      noteRoutine:
+        "{{routine}} does {{actions}} on its own from now on, with any values. Outside this routine it still asks. To undo: the routine's settings.",
+      doneRoutine: "Approved. {{routine}} won't ask for this again.",
+      undoRoutine: "To undo it, go to the routine's settings.",
     },
     email: {
       from: "From",
@@ -4513,6 +4582,14 @@ export const en = {
       cancel: "Cancel",
       forgotten: "Forgotten. It's in Archived if you want it back.",
       saved: "Saved. It counts as verified now.",
+      /** Lasting rules people gave the agent in the chat (a permission, where to send things), with who and when. */
+      rules: "Rules people gave",
+      rulesNote:
+        "Followed in all its work for whoever gave each one, wherever the work comes from. Rules from its owner or an admin hold for everyone.",
+      /** Who gave the rule and when ("From Ana · Nov 4"). */
+      ruleBy: "From {{name}} · {{date}}",
+      removeRule: "Remove",
+      ruleRemoved: "Rule removed. It's in Archived if you want it back.",
       /** The agent's own how-tos, lessons and notes, apart from what it learned about people. */
       playbook: "How {{name}} works",
       playbookNote:
@@ -4573,6 +4650,8 @@ export const en = {
         model_refused: "The model refused to answer.",
         agent_archived: "The agent was archived.",
         provider_error: "The model provider returned an error: {{detail}}",
+        /** Its 401, 402, 403 or 429: the provider's own words (`detail`) show only on hover. */
+        provider_account: "The provider refused the key: it may be invalid, out of credit or over its quota.",
         provider_unavailable: "The model provider didn't answer: {{detail}}",
         canceled: "Someone stopped the task.",
         interrupted: "Interrupted by a server restart.",
@@ -4580,7 +4659,7 @@ export const en = {
         credential_revoked: "This agent's key was revoked.",
         credential_wrong_provider: "The model is from {{modelProvider}}, but the key is from {{keyProvider}}.",
         model_unlisted: "OpenRouter no longer offers {{model}}. Pick another model in the agent's settings.",
-        no_ai: "The agent has no AI connected.",
+        no_ai: "The agent had no AI available.",
         person_limit: "The person who asked reached their usage limit for this month.",
         org_paused: "The workspace's agents are paused.",
         org_suspended: "The workspace is unavailable.",
@@ -4590,6 +4669,9 @@ export const en = {
         /** A computer brain (Claude Code, Codex) stopped with an error code; the code shows only on hover. */
         computer_failed: "The computer ran into a problem and stopped.",
         computer_timeout: "The computer took too long to answer.",
+        account_missing:
+          "The account chosen for this agent isn't on its computer anymore. Choose another one in the agent's settings, or add it again.",
+        our_error: "Something went wrong on our side and it stopped. Ask again in a little while.",
         unknown: "Failed.",
       },
     },
@@ -4684,8 +4766,8 @@ export const en = {
     tabs: { known: "Facts and decisions", lessons: "Lessons and preferences", archived: "Archived" },
     search: "Search",
     searchPlaceholder: "Search what {{name}} knows",
-    kinds: { decision: "Decision", fact: "Fact", preference: "Preference", lesson: "Lesson" },
-    kindsLower: { decision: "decision", fact: "fact", preference: "preference", lesson: "lesson" },
+    kinds: { decision: "Decision", fact: "Fact", preference: "Preference", lesson: "Lesson", rule: "Rule" },
+    kindsLower: { decision: "decision", fact: "fact", preference: "preference", lesson: "lesson", rule: "rule" },
     verified: "Verified",
     unverified: "Not verified",
     verifiedTitle: "Confirmed by a person or a real outcome.",
@@ -4722,8 +4804,7 @@ export const en = {
   },
   proposals: {
     title: "Improvement proposals",
-    subtitle:
-      "Agents propose changes to the team's instructions, roles and access, or to the {{org}} context, when someone asks or a lesson repeats. Nothing changes until someone accepts.",
+    subtitle: "Changes the agents propose. Nothing changes until someone accepts.",
     list: "Proposals",
     proposes: "<b>{{agent}}</b> proposes · {{target}}",
     proposesMany: "<b>{{agent}}</b> proposes · {{count}} agents' instructions",
@@ -5430,7 +5511,10 @@ export const en = {
     },
     github_pr_read: { label: "Read pull requests", description: "List and read pull requests and their checks." },
     github_pr_write: { label: "Open pull requests", description: "Open pull requests and comment on them." },
-    github_pr_merge: { label: "Merge pull requests", description: "Merge a pull request. Always asks for approval." },
+    github_pr_merge: {
+      label: "Merge pull requests",
+      description: "Merge a pull request. Asks for approval, except in the repositories chosen on the agent's page.",
+    },
     github_issues_read: { label: "Read issues", description: "List and read GitHub issues." },
     github_issues_write: { label: "Write issues", description: "Create issues and comment." },
     github_actions_read: {
@@ -6034,6 +6118,8 @@ export const en = {
     ownActions: {
       hint: "Every run does these in your connected apps without asking. Any other action there asks a person first, and merge, deploy and rollback always ask.",
       none: "In connected apps it asks a person before each action. To let it do its job on its own, tell the agent in the chat which actions it may do.",
+      /** Screen reader name of the button that takes one action out of the routine's list. */
+      remove: "Ask again before: {{action}}",
     },
     ahead: {
       approved: "Approved · runs {{when}}",
@@ -6186,7 +6272,7 @@ export const en = {
       waiting: "Waiting for someone to answer",
       waitingApproval: "Waiting for your approval",
       waitingComputer: "Waiting for the computer",
-      waitingPlan: "Waiting for the plan to reset",
+      waitingPlan: "Waiting on the plan",
       waitingBudget: "Waiting for the budget to renew",
       reported: "Told what it found",
       silent: "Nothing new, stayed quiet",
@@ -6200,7 +6286,7 @@ export const en = {
       previous_running: "Skipped: the previous one was still running",
       previous_waiting: "Skipped: the previous one was still waiting for someone",
       waiting_computer: "Skipped: waiting for the agent's computer",
-      waiting_plan: "Skipped: waiting for the plan to reset",
+      waiting_plan: "Skipped: waiting on the plan",
       waiting_budget: "Skipped: waiting for the budget to reset",
       superseded: "Gave way to the next run",
       stale: "Missed its time: the computer came back too late",
@@ -6232,13 +6318,17 @@ export const en = {
       model_unlisted: "OpenRouter no longer offers the model",
       agent_archived: "The agent was archived",
       interrupted: "Interrupted by a server restart",
-      no_ai: "The agent has no AI connected",
+      no_ai: "The agent had no AI available",
       person_limit: "Didn't run: its creator reached their usage limit for this month",
       org_paused: "Didn't run: the workspace's agents were paused",
       org_suspended: "Didn't run: the workspace was unavailable",
       org_deleting: "Didn't run: the workspace was being deleted",
       agent_paused: "Didn't run: the agent was paused",
       computer_busy: "The computer stayed busy with other tasks",
+      computer_failed: "The computer had a problem and stopped",
+      computer_timeout: "The computer took too long to answer",
+      account_missing: "The agent's account isn't on its computer anymore",
+      our_error: "Something went wrong on our side",
     },
     openInChat: "Open in the conversation",
     stop: "Stop",
@@ -7311,7 +7401,13 @@ export const en = {
     hidePanel: "Hide panel",
     panel: "Calendar panel",
     filters: "Filters",
-    filter: { person: "People", agent: "Agents", routine: "Routines", deadline: "Task due dates" },
+    filter: {
+      person: "People",
+      agent: "Agents",
+      routine: "Routines",
+      reminder: "Reminders",
+      deadline: "Task due dates",
+    },
     upcoming: "Upcoming",
     upcomingEmpty: "Nothing coming up.",
     viewZone: "Calendar time zone",
@@ -7326,13 +7422,17 @@ export const en = {
     confirm: "Confirm and invite",
     otherTime: "Another time",
     confirmed: "Event created and invitations sent.",
-    kind: { event: "Event", routine: "Routine", deadline: "Task due date" },
+    kind: { event: "Event", routine: "Routine", reminder: "Reminder", deadline: "Task due date" },
     every: { hour: "every hour", hours: "every {{count}} h", minutes: "every {{count}} min" },
     perDay: "{{count}}× a day",
     runs_one: "{{count}} run in these days.",
     runs_other: "{{count}} runs in these days.",
     routineDetail: "{{agent}}'s routine · delivers to {{target}}.",
     deadlineDetail: "The task is due.",
+    reminderBy: "Set by {{name}}",
+    reminderPosted: "Posted by {{agent}} · {{target}}",
+    cancelReminder: "Cancel reminder",
+    reminderCancelled: "Reminder cancelled",
     openIssue: "Open task",
     openRoutines: "See in Routines",
     openRoutine: "Open routine",
@@ -7464,6 +7564,8 @@ export const en = {
     files: "Files",
     needsSandbox: "not kept",
     assetLimit: "A skill keeps up to {{max}} MB of images and other files.",
+    moreFiles_one: "And {{count}} more file",
+    moreFiles_other: "And {{count}} more files",
     runsOnPc: "runs on the agent's PC",
     reinstall: "Reinstall the skill so agents can use this file.",
     edit: "Edit",
@@ -7688,7 +7790,7 @@ export const en = {
         runnerOld:
           "The agentes.chat program on {{computer}} is out of date and an update is on its way. This changes by itself when it's done.",
         execOff: "{{computer}} can't run {{program}} yet. We're on it, and this changes by itself.",
-        toolOff: "{{program}} isn't allowed on {{computer}}. Ask support to allow it.",
+        toolOff: "{{program}} isn't allowed on {{computer}} yet. That's on our side: try again later.",
         preparing: "{{computer}} is getting ready. This changes by itself when it's done.",
       },
     },
@@ -8628,6 +8730,11 @@ export const en = {
       paidTraining: "The provider may use requests to train the model. Turn on the permission in OpenCode.",
       freeTraining: "Free. The provider may use requests to train the model. Turn on the permission in OpenCode.",
     },
+    /** Under the plan's usage: the agent's model is at a limit of its own, which the account's meters don't show. */
+    modelLimit: "{{model}} hit its own limit on this plan and resets {{when}}. The plan's other models keep working.",
+    modelLimitUnknown: "{{model}} hit its own limit on this plan. The plan's other models keep working.",
+    modelRegion:
+      "{{model}} needs the Global region turned on in OpenCode (Settings\u00a0›\u00a0Privacy). The plan's other models keep working.",
     /** Under the model chosen that needs it: how to give it. */
     modelHow: {
       globalRegion:
@@ -8931,6 +9038,8 @@ export const en = {
     thousand: "k",
     building: "Putting it together…",
     openBig: "Open large",
+    showAll: "Show all",
+    showLess: "Show less",
     keep: "Keep in Drive",
     kept: "Kept in Drive",
     inDrive: "In Drive",
@@ -9179,6 +9288,14 @@ export const en = {
     failed: "Couldn't connect. Try again in a moment.",
   },
   repos: {
+    /** A per-agent permission: in the chosen repositories its merges need no approval card. */
+    merge: {
+      label: "Can merge without asking",
+      none: "No repositories chosen. Every merge asks for approval.",
+      help: "In these repositories a merge runs with no approval card, goes in the audit and leaves a receipt in the conversation. Everything else that's sensitive still asks.",
+      dialogTitle: "Where {{name}} merges without asking",
+      dialogDesc: "Only repositories it already uses. A merge anywhere else asks for approval.",
+    },
     label: "Which repositories",
     all: "All repositories",
     allLower: "all repositories",
@@ -10284,6 +10401,7 @@ export const en = {
   },
   searchPage: {
     title: "Search the workspace",
+    subtitle: "Messages, context and team actions in the channels you're in.",
     label: "Search",
     placeholder: "Messages, decisions, summaries…",
     filter: "Type",
@@ -10426,6 +10544,7 @@ export const en = {
       titleTaken: "There's already a page called “{{title}}”.",
       titleCharacters: "A title can't have [ ] | or #.",
       titleNoLetters: "A title needs letters or numbers.",
+      lockAdminsOnly: "Only admins lock pages.",
     },
     media: {
       off: "GIFs and stickers are off in this workspace.",
@@ -10452,6 +10571,7 @@ export const en = {
       expired: "This proposal expired: nobody decided it in a day.",
       routineMade: "This agent's routine was already created.",
       noRoutine: "This proposal has no routine to create.",
+      notRequester: "Only the person who asked for it can send it.",
     },
     approval: {
       alwaysUnavailable: "This request can't be approved for good. Approve just this one.",
@@ -10558,12 +10678,19 @@ export const en = {
         "This plan's window is used up and this agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now, or it picks up after the reset.",
       continueExtraUsedUp:
         "This plan's window is used up and its paid extra usage is used up or unavailable. It picks up after the reset.",
+      actionsNeedApprover:
+        "Only the agent's owner or someone who approves its actions can let a routine act on its own.",
+      editorOnly: "Only who created the routine, the agent's owner or an admin can change it.",
+      widgetFixed: "This routine keeps a widget up to date. Change it from its widget.",
     },
     run: {
       notContinuable: "This answer can't be continued anymore.",
       agentBusy: "The agent is already working in this conversation. Wait for it to finish to continue.",
       continueForbidden: "Only who asked, the agent's owner or an admin can continue it.",
       notRestartable: "This answer had already started, so it can't start over. Send your message again.",
+      cancelForbidden: "Only who asked, the agent's owner or an admin can stop it.",
+      answerForbidden: "Only who asked, the agent's owner or an admin can do this.",
+      stopReasonForbidden: "Only who stopped it can say why.",
     },
     artifact: {
       fileTooLarge: "The file is over {{max}} MB, the limit per file.",
@@ -10571,6 +10698,8 @@ export const en = {
       fileRequired: "Choose a file to upload.",
       fileNameRequired: "The file needs a name.",
       notFound: "This file no longer exists or you don't have access.",
+      deleteForbidden: "Only who created it, who asked the agent, the agent's owner or an admin can delete this.",
+      restoreForbidden: "Only who could delete it can restore it.",
     },
     machine: {
       forbidden: "Only an admin, or whoever connected the computer, can do that.",
@@ -10582,6 +10711,9 @@ export const en = {
       targetNotFound: "That computer no longer exists. Choose another one.",
       targetSame: "The agents are already on that computer.",
       targetPaused: "That computer is paused. Choose another one.",
+      offline: "{{name}} is offline right now. Try again once it's back.",
+      paused: "{{name}} is paused: nothing new starts on it until it's resumed.",
+      timeout: "The computer didn't answer in time. Try again.",
     },
     github: {
       repoMissing: "The repository {{repo}} is private or doesn't exist on GitHub.",
@@ -10595,8 +10727,15 @@ export const en = {
       tooManySkills: "This link holds more than {{max}} skills. Link one of its folders.",
       invalidName: "The name must use lowercase letters, numbers and hyphens, up to {{max}} characters.",
       invalidDescription: "The description must have 1 to {{max}} characters.",
-      tooLarge: "The skill is too large (max {{max}} MB).",
-      tooManyFiles: "The skill has too many files (max {{max}}).",
+      tooLarge: "This skill has {{size}} MB of text and scripts, and the limit is {{max}} MB.",
+      tooManyFiles: "This skill has {{files}} files, and the limit is {{max}}.",
+      repoTooLarge:
+        "The repository is too large to download (max {{max}} MB). Upload the skill's folder as a .zip instead.",
+      noFrontmatter: "The SKILL.md needs a block at the top with its name and description, between two --- lines.",
+      bodyTooLong: "The SKILL.md is too long (max {{max}} characters).",
+      noSkillMdZip: "No SKILL.md at the top of the zip's folder.",
+      notGithubLink: "That isn't a GitHub link we can read. Paste the link of a repository or of a folder in it.",
+      badZip: "We couldn't read this zip. Zip the skill's folder again, with no password.",
       connectionGone: "The GitHub connection that read {{repo}} is gone. Connect GitHub again to update this skill.",
       linkHoldsSeveral: "Its link holds several skills now. Install this one again from its own folder.",
       linkRenamed: "Its link holds the skill {{name}} now.",
@@ -10606,6 +10745,23 @@ export const en = {
     agentGroup: {
       notFound: "This department no longer exists.",
       tooMany: "This workspace already has {{max}} departments. Delete one first.",
+    },
+    /** `agent.right_hand_permanent`: archiving, deleting or adding the right hand to a channel (ADR 0137). */
+    rightHand: {
+      permanent:
+        "The right hand is part of the workspace and stays out of channels. An @mention reaches it in any of them.",
+    },
+    agent: {
+      ownerOrAdmin: "Only the agent's owner or an admin can do this.",
+      detailsHidden: "Only who talks to {{agentName}} sees how it works.",
+      extraOwnerOnly: "Only the agent's owner turns its plan's paid extra usage on or off.",
+      undoForbidden: "Only the person the agent worked for, its owner or an admin can undo this.",
+    },
+    account: {
+      notOwner: "Only the person who connected this account or plan can do this.",
+    },
+    channel: {
+      membersForbidden: "Only the channel's creator or an admin can add or remove people.",
     },
     handle: {
       invalid: "An @ has {{min}} to {{max}} lowercase letters, numbers, - or _.",
@@ -10839,7 +10995,7 @@ export const en = {
       state: { online: "online", paused: "paused", offline: "offline" },
       saved: "{{name}} now uses {{computer}}.",
     },
-    lead: "Where your agents work: this server's computer and any other computer you connect.",
+    lead: "Where your agents work: this server and any computer you connect.",
     leadCloud: "Where your agents work: a computer just for this workspace, always on.",
     about: "About this computer",
     how: "How computers work",
@@ -11266,6 +11422,7 @@ export const en = {
     system: "System",
     removed: "Removed",
     change: {
+      mergedWithoutAsking: "Merged in {{repo}} without asking",
       pattern: "{{verb}} {{area}}",
       approval: {
         approved: "Approved a request",
@@ -11440,27 +11597,25 @@ export const en = {
     },
     sectionText: {
       account: "Your profile and how the app looks for you.",
-      notifications:
-        "The inbox keeps everything. Here you choose what reaches you as a notification, in this workspace.",
+      notifications: "What reaches you as an alert here. The inbox keeps everything.",
       general: "Name, time zone and what every agent knows about the workspace.",
-      right_hand: "The assistant that builds the team with each person, in their DM and with their permissions.",
+      right_hand: "The assistant that builds the team with each person, in their DM.",
       members: "Who is in the workspace, and invitations.",
       roles: "What each person can do. Roles add up.",
-      vault:
-        "Passwords, keys and contact details your agents use. They type passwords and use keys without ever seeing them.",
+      vault: "Your agents' passwords, keys and contacts. They never see a password.",
       access: "What each agent can use: one level per connector.",
       connectors: "Services and MCP servers connected once for the whole workspace.",
       skills: "Markdown instructions agents open when they need them.",
       keys: "Your plans and the workspace's API keys.",
       storage: "Where the workspace's files live.",
       usage: "How much AI each person and each agent uses, and the month's limits.",
-      audit: "What the agents did outside the conversation and what people changed. Only admins see it.",
-      import: "Bring agents from another app or workspace, and take this one wherever you want.",
-      billing: "This workspace's agentes.chat plan, card and invoices are on a page of ours, outside the app.",
-      media: "What people can send in a conversation, and when agents send a GIF or a sticker.",
+      audit: "What agents did outside the conversation and what people changed.",
+      import: "Bring agents from another app or workspace, or take this one along.",
+      billing: "The plan, card and invoices, on a page of ours outside the app.",
+      media: "What can be sent in a conversation, and the agents' GIFs and stickers.",
       voice: "Voice messages in conversations, and who turns voice into text.",
-      apps: "Ask this workspace's agents for tasks from Claude, Cursor and other apps.",
-      approvals: "Who decides for you when an agent asks for something that waits for your approval.",
+      apps: "Ask the agents for tasks from Claude, Cursor and other apps.",
+      approvals: "Who decides for you when an agent asks for your approval.",
     },
     title: "Settings",
     account: {
@@ -11471,6 +11626,39 @@ export const en = {
       activityHelp: "The tools they used and how long it took. While they work, you still see what they're doing.",
       activityFailed: "Couldn't save that. Try again.",
       /** Yours in this workspace, for every agent (ADR 0147). */
+      chat: {
+        title: "Conversations",
+        density: "Conversation density",
+        densityHelp: "Changes only for you, on all your devices",
+        where: "Where it applies",
+        channels: "Channels",
+        dms: "DMs",
+        comfortable: "Comfortable",
+        left: "All on the left",
+        bubbles: "Bubbles",
+        compact: "Compact",
+        toneDms: "My messages in DMs",
+        toneDmsHelp: "In the color of the agent you're talking to",
+        toneChannels: "My messages in channels",
+        toneChannelsHelp: "In blue",
+        toneLight: "Light",
+        toneStrong: "Strong",
+        openAt: "When I open a conversation, take me to",
+        openRead: "Last message read",
+        openLatest: "Latest message",
+        sample: {
+          ask: "How many are left?",
+          answer: "14 left. Shall I tell them?",
+          go: "Go ahead.",
+          send: "Send it to the 14 clinics.",
+          sent: "Sent to all 14.",
+          new1: "9 have confirmed already.",
+          new2: "3 more just now.",
+          new3: "2 left, I'll call tomorrow.",
+          new4: "Report updated in the Drive.",
+          newCount: "4 new",
+        },
+      },
       agentStyle: "How agents talk to you",
       agentStyleHelp: "Simple: what happened and what to do, in a few words. Technical: with paths, codes and details.",
       agentStyleSimple: "Simple",
@@ -11741,7 +11929,7 @@ export const en = {
     },
     card: {
       title: "You've reached your usage limit for this month",
-      text: "It renews on {{date}}. To keep going now, ask an admin.",
+      text: "It renews on {{date}}. To keep going now, ask for more.",
       ask: "Ask for more",
       asked: "Request sent",
       see: "See my usage",
@@ -11814,7 +12002,7 @@ export const en = {
   },
   gallery: {
     title: "Component gallery",
-    subtitle: "Development only. The @agenteschat/ui components with the states of the approved screens.",
+    subtitle: "Development only: the @agenteschat/ui components.",
   },
   format: {
     // i18next's `list` format: Intl.ListFormat in the language ("Ada, Atlas, and Theo", "Ada、Atlas、Theo"). Keep as is.
@@ -12299,6 +12487,14 @@ export const en = {
         "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready.",
       machine_offline: "{{computer}} went offline.",
       brain_unavailable: "{{brain}} can't answer right now. I'll answer when it's back.",
+      /** Waits that don't pass by themselves (`meta.brainUnavailable.code`): the cause and who fixes it. */
+      brain_unavailable_paused: "The computer {{brain}} runs on is paused. I'll answer once it's resumed.",
+      brain_unavailable_commands_off:
+        "{{brain}} is turned off on my computer. I'll answer once whoever looks after it turns it on.",
+      brain_unavailable_outdated:
+        "The program on my computer needs an update before {{brain}} can answer. I'll answer once it's updated.",
+      brain_unavailable_plan_owner:
+        "{{brain}} would think with a plan that isn't my owner's, so I won't use it. Connect my owner's account on my page.",
       provider_unavailable: "My AI provider isn't answering right now. I'll answer as soon as it's back.",
       brain_busy: "My computer is busy with other tasks right now. I'll answer as soon as it's free.",
       brain_queued: "Still in line for the computer. I'll answer as soon as it has room.",
@@ -12308,6 +12504,14 @@ export const en = {
         "I stopped at the {{plan}} plan's limit. I'll pick up where I left off as soon as it resets.",
       plan_limit_wait: "The {{plan}} plan hit its limit. I'll answer {{when}}, when it resets.",
       plan_limit_wait_unknown: "The {{plan}} plan hit its limit. I'll answer as soon as it resets.",
+      /** A model's own limit on a plan whose models each have one (OpenCode Go): the others still answer. */
+      plan_model_limit_wait:
+        "{{model}} hit its own limit on {{plan}}. The plan's other models keep working: change {{agent}}'s model or wait for it to reset {{when}}.",
+      plan_model_limit_wait_unknown:
+        "{{model}} hit its own limit on {{plan}}. The plan's other models keep working: change {{agent}}'s model or wait for it to reset.",
+      /** The model answers only once the OpenCode account allows its Global region: no reset to wait for. */
+      plan_model_region_wait:
+        "This model ({{model}}) needs the Global region turned on in OpenCode (Settings\u00a0›\u00a0Privacy).",
       budget_wait: "My budget for the month ran out. I'll go on {{when}}, or sooner if an admin raises it.",
       usage_wait_canceled: "Canceled. It won't run when the limit is back.",
       usage_wait_archived: "It won't run: the agent was archived.",
@@ -12328,14 +12532,23 @@ export const en = {
       work_end_canceled: "Stopped after {{minutes}} min.",
       work_end_canceledBy: "Stopped by {{name}} after {{minutes}} min.",
       no_ai: "I can't answer yet: I have no AI connected.",
-      person_limit: "The person who asked reached their usage limit for this month. To keep going now, ask an admin.",
+      person_limit: "The person who asked reached their usage limit for this month.",
       no_ai_signed_out: "I can't answer yet: my AI is signed out.",
       no_ai_not_signed_in: "I can't answer yet: {{brain}} isn't signed in on my computer.",
       no_ai_computer_away: "I can't answer now: the computer my plan is signed in on is away.",
+      no_ai_computer_failed: "I can't answer now: the computer my plan is signed in on had a problem.",
       no_ai_plan_limit: "I can't answer now: the plan I think with reached its limit.",
-      no_ai_plan_not_shared: "I can't answer you on this plan: it answers only its owner.",
+      no_ai_plan_not_shared:
+        "I can't answer you on the workspace's plan: it serves only its owner. Connect your own plan and I will.",
       no_ai_runner_outdated: "I can't answer now: the program on my plan's computer needs an update.",
-      no_ai_plan_tools: "I stopped before answering: my plan's AI on that computer offers tools of its own.",
+      no_ai_plan_tools:
+        "I stopped before answering: my plan's AI on that computer didn't stay within agentes.chat's tools.",
+      no_ai_model_limit: "I can't answer now: {{model}} reached its own limit on my plan.",
+      no_ai_model_region:
+        "I can't answer: {{model}} needs the Global region on in OpenCode (Settings\u00a0›\u00a0Privacy).",
+      no_ai_commands_off: "I can't answer now: commands are turned off on my plan's computer.",
+      no_ai_cli_missing: "I can't answer yet: my AI's program isn't installed on my computer.",
+      no_ai_no_computer: "I can't answer yet: my AI needs a computer and I have none.",
       /** Where the server took a sign-in or a key out of the team's right hand's reply, in place of it. */
       redacted: "[removed: it looked like a sign-in or a key]",
       action_connect_ai: "Connect an AI",
@@ -13452,12 +13665,30 @@ export const en = {
       role: "Your role gives you {{name}}'s browser, not the whole computer",
     },
   },
+  agentSide: {
+    label: "Details",
+    show: "Show details",
+    hide: "Hide details",
+    seeAll: "See all",
+    thinks: "How it thinks",
+    thinksWith: "Thinks with",
+    owner: "Owner",
+    usage: "This month",
+    spentOf: "{{spent}} of {{limit}}",
+    tasks: "Recent tasks",
+    usingBrowser: "Using Chrome",
+    usingScreen: "Using the computer",
+    screenOff: "The screen is off",
+    screenOffHelp: "It turns on when someone watches.",
+  },
   agentComputer: {
     title: "{{name}}'s computer",
     open: "Open",
     openOf: "Open {{name}}'s computer",
     help: "Help",
     button: "Computer",
+    /** A picture of its screen is never live: how fresh it is, not "Ao vivo". */
+    pictureNow: "A moment ago",
     choose: "Choose a computer",
     status: {
       available: "Available · nobody's using it",
@@ -13529,6 +13760,8 @@ export const en = {
   },
   taskManager: {
     title: "Task manager",
+    /** Under the title when no agent is working or waiting on you. */
+    subtitle: "What the agents are doing now and what ended today.",
     nav: "Task manager",
     search: "Search a task, agent or app",
     working_one: "{{count}} working",
@@ -13555,6 +13788,40 @@ export const en = {
       queued: "Queued",
       stopping: "Stopping…",
       stopped: "Stopped",
+    },
+    /** Why a task waits, on its row: what holds it, then what comes next. */
+    wait: {
+      pausedPlan: "Paused: plan at {{percent}}% {{window}}",
+      pausedBudget: "Paused: budget at {{percent}}% of the month",
+      planLimit: "{{plan}} plan at its limit",
+      modelLimit: "{{model}} at its limit",
+      modelRegion: "{{model}} needs the Global region",
+      modelRegionNext: "Turn it on in OpenCode (Settings\u00a0›\u00a0Privacy)",
+      budgetOut: "This month's budget ran out",
+      workLine: "In the agent's line of work",
+      workLineNext: "Starts when other work ends",
+      computerWait: "Waiting for the computer",
+      computerWaitNext: "Back when it's ready",
+      computerOfflineNext: "Back when it's on",
+      computerBusyNext: "Starts when there's room",
+      okNext: "Goes on once someone approves",
+      answerNext: "Goes on once someone answers",
+      back: "Back {{when}}",
+      whenRenews: "when it renews",
+      whenSoon: "in a moment",
+    },
+    /** One line over several tasks waiting on the same limit. */
+    waitGroup: {
+      routines_one: "{{count}} routine",
+      routines_other: "{{count}} routines",
+      pausedPlan:
+        "{{what}} paused: the {{plan}} plan is at {{percent}}% {{window}} and comes back {{when}}. What's left stays for conversations.",
+      pausedBudget:
+        "{{what}} paused: the month's budget is at {{percent}}% and comes back {{when}}. What's left stays for conversations.",
+      planLimit: "{{what}} waiting: the {{plan}} plan hit its limit and comes back {{when}}.",
+      modelLimit:
+        "{{what}} waiting: {{model}} hit its limit and comes back {{when}}. The plan's other models keep working.",
+      budgetOut: "{{what}} waiting: this month's budget ran out and comes back {{when}}.",
     },
     where: { dm: "Direct conversation", routine: "Routine «{{name}}»", background: "In the background" },
     askedBy: "{{name}} asked",
@@ -13837,7 +14104,7 @@ export const en = {
   // Dashboards (ADR 0135): the boards' page, a board, its dialogs. The web and the phone add their own keys here.
   dashboards: {
     title: "Dashboards",
-    subtitle: "Numbers and charts the agents keep up to date, for the workspace or only some roles.",
+    subtitle: "Numbers and charts the agents keep up to date.",
     sidebar: "Dashboards",
     /** Its line in the sidebar's More menu. */
     navWhat: "Numbers and charts the agents keep up to date",

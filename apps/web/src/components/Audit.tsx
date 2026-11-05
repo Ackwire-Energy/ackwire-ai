@@ -25,7 +25,7 @@ import {
 import { dayLabel, formatTime, whenAt } from "@agenteschat/client/lib/format";
 import { Button, Chip, type ChipProps, Icon, Menu, MenuItem, Segmented, Select, Toolbar } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
@@ -33,6 +33,7 @@ import { DetailsLink } from "@/components/details-link";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useEscClose } from "@/hooks/useEscClose";
 import { useToast } from "@/lib/toast";
 import "@/components/threads/threads.css";
 import "./audit.css";
@@ -56,25 +57,13 @@ export function AuditSection({ agent }: { agent?: string }) {
   const rows = useMemo(() => audit.data?.pages.flatMap((p) => p.rows) ?? [], [audit.data]);
   const open = rows.find((r) => r.id === openId) ?? null;
 
-  // Esc closes the panel, like a thread's.
-  useEffect(() => {
-    if (!openId) return;
-    // An Escape a dialog over the panel took (the request's, from "Ver o pedido") is the dialog's alone.
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[role="dialog"]')) return;
-      setOpenId(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [openId]);
-
   const agentOptions = [
-    // A glyph as wide as the 18px faces, so every name starts on one edge.
+    // A glyph the list centres in the faces' 32px column, so every name starts on one edge.
     { value: ANY, label: t("audit.anyAgent"), leading: <Icon name="members" size={18} className="muted" /> },
     ...dir.agents.map((a) => ({
       value: a.id,
       label: a.name,
-      leading: <AgentAvatar agentId={a.id} name={a.name} size="xs" />,
+      leading: <AgentAvatar agentId={a.id} name={a.name} size="sm" />,
     })),
   ];
 
@@ -217,6 +206,7 @@ function AuditPanel({ row, onClose }: { row: AuditRow; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
+  useEscClose(onClose);
   const name = auditActorName(t, row) ?? t("audit.system");
   const reason = auditReason(t, row);
   const isCall = row.action === TOOL_CALL;

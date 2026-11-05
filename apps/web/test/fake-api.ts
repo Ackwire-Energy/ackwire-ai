@@ -99,6 +99,7 @@ import type {
 import { ApiError } from "@agenteschat/client";
 import { moveInGroups } from "@agenteschat/client/lib/agent-groups";
 import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
+import type { ChatPrefs } from "@agenteschat/client/lib/chat-look";
 import { ISSUES_VIEW_DEFAULT } from "@agenteschat/client/lib/issues-view";
 import { freeHandle, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
@@ -248,6 +249,7 @@ export interface FakeState {
   refusedGithub?: string;
   /** Agents' GitHub repositories, in order (`repositories.get`); unset = every repository. */
   agentRepos?: Record<string, string[]>;
+  agentMergeRepos?: Record<string, string[]>;
   scopes: Record<string, ScopeGrant[]>;
   runs: Run[];
   /** A run's steps by id (`GET …/runs/{id}`, what an approval's review reads); unset = none. */
@@ -497,7 +499,11 @@ export function meWithRole(state: FakeState, permissions: string[]) {
 
 /** The permission areas `roles.list` sends (the server's `PERMISSION_AREAS`). */
 const PERMISSION_AREAS = [
-  { id: "chat", use: ["post", "create_channels"], keys: ["post", "create_channels", "manage_channels"] },
+  {
+    id: "chat",
+    use: ["post", "create_channels"],
+    keys: ["post", "create_channels", "mention_everyone", "manage_channels"],
+  },
   {
     id: "agents",
     use: ["talk_to_agents", "assign_work", "manage_routines"],
@@ -659,6 +665,17 @@ export function withRightHand(state: FakeState, extra: Partial<Agent> = {}) {
   });
   return state;
 }
+
+/** Sets how conversations look to me (`chatPrefs`). */
+export function withChatPrefs(state: FakeState, chatPrefs: ChatPrefs = {}) {
+  const org = state.me?.organizations[0];
+  if (org) org.chatPrefs = chatPrefs;
+  return state;
+}
+
+/** The original layout everywhere: what pins the parts of my own bubble, under the time on the right. */
+export const comfortable = (state: FakeState) =>
+  withChatPrefs(state, { channelStyle: "comfortable", dmStyle: "comfortable" });
 
 export function seedDm(
   state: FakeState,
@@ -1600,6 +1617,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         org.agentStyle = style;
         return style;
       },
+      setChatPrefs: async (orgId, patch) => {
+        log("orgs.setChatPrefs", orgId, patch);
+        const org = state.me?.organizations.find((o) => o.id === orgId);
+        if (!org) throw new ApiError(404, "not_found", "Organization not found");
+        org.chatPrefs = { ...org.chatPrefs, ...patch };
+        return org.chatPrefs;
+      },
       sidebarItems: async () => structuredClone(state.sidebarItems ?? {}),
       setSidebarItem: async (orgId, item, place) => {
         log("orgs.setSidebarItem", orgId, item, place);
@@ -2430,7 +2454,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       brain: async (_orgId, agentId) => {
         const me = requireMe();
         const agent = state.agents.find((a) => a.id === agentId);
-        if (me.organizations[0]?.role === "member" && agent?.ownerUserId !== me.user.id)
+        if (me.organizations[0]?.role === "member" && agent?.ownerUserId !== me.user.id && !agent?.builtin)
           throw new ApiError(403, "agent.not_owner", "Only an admin or the agent's owner");
         return structuredClone(brainOf(agentId));
       },
@@ -3441,6 +3465,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.agentRepos = { ...(state.agentRepos ?? {}), [agentId]: [...repositories] };
         return structuredClone(repositories);
       },
+      merge: async (_orgId, agentId) => structuredClone(state.agentMergeRepos?.[agentId] ?? []),
+      setMerge: async (orgId, agentId, repositories) => {
+        log("repositories.setMerge", orgId, agentId, repositories);
+        state.agentMergeRepos = { ...(state.agentMergeRepos ?? {}), [agentId]: [...repositories] };
+        return structuredClone(repositories);
+      },
     },
     scopes: {
       get: async (_orgId, agentId) => structuredClone(state.scopes[agentId] ?? []),
@@ -3817,6 +3847,12 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
               state.calls.push({ method: "working.taskSteps", args: [orgId, runId] });
               const createdAt = state.taskManager?.tasks.find((x) => x.runId === runId)?.createdAt ?? NOW.toISOString();
               return structuredClone(state.taskSteps?.[runId] ?? { run: { createdAt, finishedAt: null }, steps: [] });
+            },
+            continueTasks: async (orgId: string, runIds: string[]) => {
+              state.calls.push({ method: "working.continueTasks", args: [orgId, runIds] });
+              for (const task of state.taskManager?.tasks ?? [])
+                if (runIds.includes(task.runId)) Object.assign(task, { status: "running", held: null, wait: null });
+              return { continued: runIds.length };
             },
           },
         }

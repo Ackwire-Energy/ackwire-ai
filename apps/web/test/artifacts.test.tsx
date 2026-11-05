@@ -521,7 +521,7 @@ describe("Drive", () => {
     expect(screen().getByText("Nenhum arquivo ainda")).toBeTruthy();
     // The one line that fills it, under a subtitle that already says what the Drive holds.
     expect(document.querySelector(".ac-empty__text")?.textContent).toBe("Arraste arquivos para cá para enviar.");
-    expect(document.querySelector(".drive-head__sub")?.textContent).toBe(
+    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe(
       "Tudo o que pessoas e agentes criaram ou enviaram.",
     );
   });

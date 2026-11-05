@@ -71,6 +71,7 @@ export const RECEIPT_ICONS: Record<AgentAction["kind"], IconName> = {
   "skill.created": "book",
   "skill.updated": "book",
   "agent.settings_changed": "settings",
+  "pr.merged": "repo",
 };
 
 /** A kind a newer server sends that this build doesn't know yet gets the plain check. */
@@ -260,7 +261,7 @@ function Receipt({
     <div className={cx(single ? "ag-rc" : "ag-rcg__it", struck && "is-undone")} data-phase={phase}>
       {single ? (
         <span className="ag-rc__ic" aria-hidden="true">
-          <Icon name={iconOf(a)} size={14} />
+          <Icon name={iconOf(a)} size={16} />
         </span>
       ) : (
         <Icon name={iconOf(a)} size={14} className="ag-rcg__ic" />

@@ -438,7 +438,7 @@ export function NewIssueDialog({
                   </Button>
                 }
               >
-                {actors.options(true).map((o) => (
+                {actors.options(true, undefined, "xs").map((o) => (
                   <MenuItem key={o.value} leading={o.leading} onSelect={() => setAssignee(o.value)}>
                     {o.label}
                   </MenuItem>

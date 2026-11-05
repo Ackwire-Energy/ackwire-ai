@@ -9,6 +9,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lt,
   lte,
   ne,
   rowsOf,
@@ -16,7 +17,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { getAgent } from "./agents";
-import { decidesAgentApprovals } from "./approval-rules";
+import { decidesAgentApprovals, MAX_OWN_ACTIONS, OWN_ACTION_NAME } from "./approval-rules";
 import { cancelRoutineAhead, type RoutineAheadView, routinesAhead } from "./approvals";
 import { audienceError, audienceSql, canTalkTo, speakerFor, speakerOf } from "./audience";
 import { recordAudit } from "./audit";
@@ -1292,10 +1293,6 @@ async function checkRoutineCap(db: Database, orgId: string, agentId: string, exc
   }
 }
 
-/** How many connected-app actions a routine may do on its own. */
-export const MAX_OWN_ACTIONS = 20;
-const ACTION_NAME = /^[A-Za-z0-9_.:-]{1,128}$/;
-
 /**
  * A routine's own actions as sent: trimmed and unique, each a tool name (or a Composio action's slug). Merge, deploy,
  * rollback and the rest that always ask a person at the time are refused (`alwaysAsks`), so nobody thinks they're on.
@@ -1308,7 +1305,7 @@ export function ownActionsOf(list: readonly string[]): string[] {
     });
   }
   for (const action of out) {
-    if (!ACTION_NAME.test(action)) {
+    if (!OWN_ACTION_NAME.test(action)) {
       throw new ValidationError(`Not a tool name: ${action}`, "routine.action_invalid", { action });
     }
     if (alwaysAsks(action)) {
@@ -2468,6 +2465,47 @@ export async function createReminder(
     details: { agentId: agent.id, trigger: "once", via: "agent" },
   });
   return reminderView(row);
+}
+
+/**
+ * The pending reminders in a range that this person may see: the ones they set or that remind them, and the plain
+ * ones of conversations they are in, with an agent they may see (`sees`): those get posted there word for word, while
+ * what an agent is asked to do later (`ask_agent`, `schedule_action`) never is. Only who set one can cancel it
+ * (`cancelReminder`).
+ */
+export async function calendarReminders(
+  db: Database,
+  userId: string,
+  orgId: string,
+  from: Date,
+  to: Date,
+  channelIds: ReadonlySet<string>,
+  sees: (r: RoutineRow) => boolean,
+) {
+  const rows = await db
+    .select()
+    .from(routines)
+    .where(
+      and(
+        eq(routines.orgId, orgId),
+        eq(routines.triggerType, "once"),
+        eq(routines.active, true),
+        isNull(routines.deletedAt),
+        gte(routines.nextRunAt, from),
+        lt(routines.nextRunAt, to),
+        sql`${routines.target}->>'type' = 'conversation'`,
+      ),
+    )
+    .orderBy(routines.nextRunAt);
+  return rows.flatMap((r) => {
+    const { id, message, at, forUserId, channelId, threadId } = reminderView(r);
+    const canCancel = r.createdByUserId === userId;
+    const posted = (targetOf(r) as Extract<RoutineTarget, { type: "conversation" }>).reminder;
+    if (!at || !(canCancel || forUserId === userId || (posted && channelIds.has(channelId) && sees(r)))) return [];
+    return [
+      { id, message, at, forUserId, channelId, threadId, agentId: r.agentId, createdBy: r.createdByUserId, canCancel },
+    ];
+  });
 }
 
 /** The person's pending reminders (created by them), soonest first. */

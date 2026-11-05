@@ -42,6 +42,12 @@ describe("@ picker", () => {
     expect(all.some((x) => x.id === "me" || x.id === "a3")).toBe(false);
   });
 
+  test("the right hand is in every channel: an @mention reaches it there, with nothing to add", () => {
+    const lodi = { id: "rh", name: "Lodi", handle: "lodi", role: null, builtin: "right_hand" as const };
+    const [o] = mentionOptions({ query: "lo", agents: [...agents, lodi], people, meId: "me", members: new Set() });
+    expect(o).toMatchObject({ id: "rh", inChannel: true });
+  });
+
   test("filters by name, handle or e-mail, accents folded; starts-with ranks first", () => {
     expect(mentionOptions({ query: "jo", agents, people, meId: "me", members: null }).map((x) => x.id)).toEqual(["u2"]);
     expect(mentionOptions({ query: "joã", agents, people, meId: null, members: null })[0]?.id).toBe("u2");

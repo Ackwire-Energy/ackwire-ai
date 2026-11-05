@@ -18,28 +18,6 @@
   gap: 18px;
 }
 
-/* ── Header ─────────────────────────────────────────────────────────────── */
-.routines-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: flex-end;
-  justify-content: space-between;
-}
-.routines-head h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: var(--font-display-weight, 300);
-  font-size: clamp(30px, 4vw, 40px);
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-}
-.routines-head__sub {
-  margin: 6px 0 0;
-  max-width: 58ch;
-  color: var(--muted);
-}
-
 /* ── Horizon ────────────────────────────────────────────────────────────── */
 .routines-horizon {
   --lab: 168px;
@@ -586,6 +564,7 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 .routine-own li {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   min-height: 26px;
   padding: 0 10px;
   border-radius: 8px;
@@ -593,6 +572,11 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   font-size: 12.5px;
   color: var(--ink2);
   overflow-wrap: anywhere;
+}
+.routine-own li .ac-btn {
+  width: 20px;
+  height: 20px;
+  margin-right: -6px;
 }
 .routine-details__where {
   display: flex;
@@ -835,9 +819,6 @@ html:not([data-pointer]) .routine-preset:focus-visible {
   }
 }
 @media (max-width: 720px) {
-  .routines-head > .ac-btn {
-    width: 100%;
-  }
   .routine-row {
     grid-template-columns: 36px minmax(0, 1fr) auto;
     gap: 10px 12px;

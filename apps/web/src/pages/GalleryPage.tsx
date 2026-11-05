@@ -31,6 +31,7 @@ import {
   MessageText,
   Meter,
   OptionCard,
+  PageHeader,
   RadioCard,
   RadioGroup,
   SearchField,
@@ -84,15 +85,15 @@ export function GalleryPage() {
 
   return (
     <main className="page page--wide" style={{ minHeight: "100vh" }}>
-      <header className="page__header page__header--row">
-        <div className="page__header-text">
-          <h1 className="page-title">{t("gallery.title")}</h1>
-          <p className="page-sub">{t("gallery.subtitle")}</p>
-        </div>
-        <Button onClick={() => theme.setPreference(theme.resolved === "dark" ? "light" : "dark")}>
-          {theme.resolved === "dark" ? t("shell.themeLight") : t("shell.themeDark")}
-        </Button>
-      </header>
+      <PageHeader
+        title={t("gallery.title")}
+        meta={t("gallery.subtitle")}
+        actions={
+          <Button onClick={() => theme.setPreference(theme.resolved === "dark" ? "light" : "dark")}>
+            {theme.resolved === "dark" ? t("shell.themeLight") : t("shell.themeDark")}
+          </Button>
+        }
+      />
 
       <Section title="Logo">
         <div className="row" style={{ gap: 32 }}>

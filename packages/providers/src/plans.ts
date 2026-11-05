@@ -83,6 +83,11 @@ export interface CodingPlan {
   };
   /** The maker's usage endpoint for the key (`apps/server/runner/plan-usage.ts` reads its answer). */
   usage?: { url: string; auth: "bearer" | "raw" };
+  /**
+   * Each model has limits of its own: a refusal with no window of the account full is that model's, and the plan's
+   * other models go on answering.
+   */
+  limitsPerModel?: true;
 }
 
 export const CODING_PLANS = {
@@ -216,6 +221,8 @@ export const CODING_PLANS = {
       env: { CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS: "1", OPENCODE_DISABLE_PROJECT_CONFIG: "1" },
     },
     usage: { url: "https://opencode.ai/zen/go/v1/usage", auth: "bearer" },
+    // "Each model has the following usage limits: 5-hour, weekly, monthly" (opencode.ai/docs/go, read 2026-11-05).
+    limitsPerModel: true,
   },
 } as const satisfies Record<string, CodingPlan>;
 
@@ -243,6 +250,34 @@ export function planModel(plan: CodingPlan, value: string | null | undefined): P
 
 /** What a plan's model is stored and chosen as: its alias where it has one (portable to Claude), else its id. */
 export const planModelValue = (m: PlanModel): string => m.alias ?? m.id;
+
+/**
+ * On a plan whose models have limits of their own (`limitsPerModel`), the model a stored value runs (`planModel`), by
+ * whose id its limit is kept; null on any other plan.
+ */
+export function ownLimitsModel(provider: unknown, value: string | null | undefined): PlanModel | null {
+  const plan = planOf(provider);
+  return plan?.limitsPerModel && value ? planModel(plan, value) : null;
+}
+
+/** How long a model's own limit with no known reset (or the region it needs) holds once seen: then a turn asks again. */
+export const MODEL_LIMIT_HOLD_MS = 30 * 60_000;
+
+/**
+ * The model's own limit in `models` (`PlanUsage.models`, kept by the server) that still holds: until its reset, else
+ * `MODEL_LIMIT_HOLD_MS` after it was seen.
+ */
+export function modelLimitOf(
+  models: Readonly<Record<string, { at: string; until?: string; region?: true }>> | undefined,
+  id: string | null | undefined,
+  now = Date.now(),
+): { until: number | null; region: boolean } | null {
+  const l = id ? models?.[id] : undefined;
+  if (!l) return null;
+  const until = l.until ? Date.parse(l.until) : Number.NaN;
+  if (until > now) return { until, region: false };
+  return !l.until && now - Date.parse(l.at) < MODEL_LIMIT_HOLD_MS ? { until: null, region: l.region === true } : null;
+}
 
 /** A coding plan's model by its id, whichever plan has it. */
 export const planModelById = (id: string): PlanModel | undefined =>

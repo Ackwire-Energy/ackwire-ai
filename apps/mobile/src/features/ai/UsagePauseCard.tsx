@@ -7,6 +7,7 @@ import {
   mayContinueUsage,
   usagePauseCardOf,
   usagePauseText,
+  usageWaitFix,
   usageWaitOf,
 } from "@agenteschat/client/lib/usage-pause";
 import { useQueryClient } from "@tanstack/react-query";
@@ -15,10 +16,12 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, LineIcon, Text, useTheme } from "@/ui";
+import { openAgentEdit } from "../agents/AgentEditScreen";
 import { UsageQueueSheet } from "../queue/UsageQueueSheet";
 import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
 import { useSheetIfAny } from "../shared/SheetHost";
+import { openAgentAi } from "./AgentAiScreen";
 
 /**
  * "Don't run it" on what waits for a plan's or budget's limit (the web's): cancels the run, so nothing runs when the
@@ -125,9 +128,18 @@ export function UsageWaitCancel({ message: m }: { message: Message }) {
     : wait.runId && !mayStop
       ? "usageCard.dontRunForbidden"
       : null;
+  const fix = !skipped && m.author.id ? usageWaitFix(m.meta, { admin, owner: owner === meId }) : null;
   return (
     <View style={styles.acts}>
       <View style={styles.textActs}>
+        {fix ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            label={t(`usageCard.${fix}`)}
+            onPress={() => (fix === "raiseBudget" ? openAgentEdit : openAgentAi)(m.author.id ?? "")}
+          />
+        ) : null}
         {skipped ? (
           <AnswerAnywayButton runId={wait.runId} agentId={m.author.id ?? null} closed={skipped} />
         ) : (

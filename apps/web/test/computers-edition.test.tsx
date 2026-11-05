@@ -125,9 +125,7 @@ describe("Configurações → Computadores on the Cloud: one computer, nothing t
 describe("Configurações → Computadores on self-host", () => {
   test("this server's computer first, then the other computers and how to connect one, then each agent's", async () => {
     await computers(`/org/${ORG_ID}/settings/computers`, { host: true });
-    expect(body()).toContain(
-      "Onde os agentes trabalham: o computador deste servidor e qualquer outro computador que você conectar.",
-    );
+    expect(body()).toContain("Onde os agentes trabalham: este servidor e outros que você conectar.");
     const order = [...document.querySelectorAll(".settings__body section[aria-labelledby]")].map((el) =>
       el.getAttribute("aria-labelledby"),
     );

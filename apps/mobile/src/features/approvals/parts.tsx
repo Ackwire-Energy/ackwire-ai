@@ -8,7 +8,7 @@ import {
 } from "@agenteschat/client";
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
-import { approvalDoing, approvalTitle } from "@agenteschat/client/lib/approval-words";
+import { alwaysRoutineName, approvalDoing, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { fromServer, itemName } from "@agenteschat/client/lib/connected";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { connectorName } from "@agenteschat/client/lib/scopes";
@@ -128,7 +128,7 @@ export function useApproveNow(a: Approval, onApproved?: () => void) {
           onApproved?.();
           toast({
             ...(always
-              ? approveAlwaysToast(t, name)
+              ? approveAlwaysToast(t, name, alwaysRoutineName(t, a))
               : {
                   title: t("mobile.approval.approved"),
                   subtitle: a.runAt

@@ -1,5 +1,6 @@
 import type { AppLocale } from "@agenteschat/i18n/locale";
 import type { DashboardsApi } from "../dashboards/api";
+import type { ChatPrefs } from "../lib/chat-look";
 import type { OnboardingStepId } from "../lib/onboarding";
 import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
 import type { WikiAccess } from "../lib/wiki";
@@ -75,6 +76,7 @@ import type {
   BlockState,
   BrainKind,
   BrainMachine,
+  BrainScope,
   BrowserHandoff,
   BrowserProfile,
   CalendarEvent,
@@ -108,6 +110,7 @@ import type {
   DatabaseConnectionInput,
   DatabaseTable,
   DeletionProofInput,
+  DesktopPictureView,
   DesktopRelease,
   DesktopStatus,
   DeviceRequest,
@@ -436,6 +439,7 @@ export interface ApiClient {
     setShowActivity(orgId: string, show: boolean): Promise<boolean>;
     /** How agents talk to me here (ADR 0147), for every agent. */
     setAgentStyle(orgId: string, style: AgentStyle): Promise<AgentStyle>;
+    setChatPrefs(orgId: string, patch: ChatPrefs): Promise<ChatPrefs>;
     /** Where I put the tools at the top of my sidebar here (only the ones I moved). */
     sidebarItems(orgId: string): Promise<SidebarItems>;
     /** Moves one tool (`null`: back on its default), my others as the server has them. Answers with every choice. */
@@ -684,7 +688,7 @@ export interface ApiClient {
       channels: { channelId: string; autoReply?: boolean }[],
     ): Promise<AgentChannel[]>;
     /** "Quem pensa": the API, Claude Code or Codex on its computer (its owner or an admin). */
-    brain(orgId: string, agentId: string): Promise<AgentBrain>;
+    brain(orgId: string, agentId: string, scope?: BrainScope): Promise<AgentBrain>;
     setBrain(orgId: string, agentId: string, input: AgentBrainInput): Promise<AgentBrain>;
     /** "Quem pensa" for an agent still being created: the workspace's computers and what each offers (admins). */
     brainMachines(orgId: string): Promise<BrainMachine[]>;
@@ -1020,6 +1024,9 @@ export interface ApiClient {
   repositories: {
     get(orgId: string, agentId: string): Promise<string[]>;
     set(orgId: string, agentId: string, repositories: string[]): Promise<string[]>;
+    /** Where it merges with no approval card (`owner/name`). */
+    merge(orgId: string, agentId: string): Promise<string[]>;
+    setMerge(orgId: string, agentId: string, repositories: string[]): Promise<string[]>;
   };
   scopes: {
     get(orgId: string, agentId: string): Promise<ScopeGrant[]>;
@@ -1385,7 +1392,7 @@ export interface ApiClient {
     setPref(orgId: string, category: NoticeCategory, on: boolean): Promise<NoticePrefs>;
   };
   calendar: {
-    /** Events, routine runs, issue deadlines and proposals between `from` and `to` (ISO). */
+    /** Events, routine runs, reminders, issue deadlines and proposals between `from` and `to` (ISO). */
     range(orgId: string, from: string, to: string): Promise<CalendarRange>;
     create(orgId: string, input: CalendarEventInput): Promise<CalendarEvent>;
     /** Confirms an agent's proposal: creates the event and invites the people. */
@@ -1569,6 +1576,8 @@ export interface ApiClient {
     taskManager?(orgId: string, since?: string): Promise<TaskManagerView>;
     /** A task's steps for "Ver passos", to whoever sees it in the task manager (no inputs, no outputs). */
     taskSteps?(orgId: string, runId: string): Promise<TaskSteps>;
+    /** Continuar agora on runs paused near a limit (`wait.canContinue`). */
+    continueTasks?(orgId: string, runIds: string[]): Promise<{ continued: number }>;
   };
   /** People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio, the rest by IMAP/SMTP. */
   mail: {
@@ -1704,6 +1713,8 @@ export interface ApiClient {
    */
   desktop: {
     status(orgId: string, agentId: string): Promise<DesktopStatus>;
+    /** A recent picture of the agent's screen; never starts a stopped one. 403 for who may not watch it. */
+    picture(orgId: string, agentId: string): Promise<DesktopPictureView>;
   };
   /**
    * GIF search (ADR 0091), through our server: the browser and the phone never talk to the provider. Every member;

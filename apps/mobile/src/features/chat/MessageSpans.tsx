@@ -1,25 +1,42 @@
+import { everyoneWord, isEveryoneWord } from "@agenteschat/client/lib/everyone";
 import { parseMessageLink } from "@agenteschat/client/lib/message-links";
 import { LinearGradient } from "expo-linear-gradient";
 import { type ComponentRef, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Text as RNText, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { ScrollView as GestureScrollView } from "react-native-gesture-handler";
 import { serverUrl } from "@/lib/server";
-import { Text } from "@/ui";
+import { Text, useTheme } from "@/ui";
 import { withAlpha } from "@/ui/palette";
 import { openPage } from "../ai/parts";
-import { useColors, useMyHandle } from "../shared/hooks";
+import { useColors, useDirectory, useMyHandle } from "../shared/hooks";
 import { MONO } from "../shared/parts";
 import { ChannelRefText } from "./ChannelRefText";
-import { type Block, type Inline, tableColumnWidths, tableHidden } from "./logic";
+import { type Block, type Inline, mentionTint, tableColumnWidths, tableHidden } from "./logic";
 import { MessageRefText } from "./MessageRefText";
 
 /**
  * Inline marks of a message (bold, italic, `code`, links, a message's link as its pill, @mentions, #channels), inside a Text. `channelRefs`: the
  * message's `meta.channelRefs` (a renamed channel still links).
  */
-export function Spans({ inline, channelRefs }: { inline: Inline[]; channelRefs?: Record<string, string> }) {
+export function Spans({
+  inline,
+  channelRefs,
+  everyone = false,
+  ink,
+}: {
+  inline: Inline[];
+  channelRefs?: Record<string, string>;
+  /** The message mentions everyone (`meta.mentionsEveryone`): its word shows in the reader's language. */
+  everyone?: boolean;
+  /** Over a solid bubble: a mention's color and plate in place of its own. */
+  ink?: string | undefined;
+}) {
   const c = useColors();
   const myHandle = useMyHandle();
+  const { i18n } = useTranslation();
+  const { agents } = useDirectory();
+  const { scheme } = useTheme();
   return (
     <>
       {inline.map((s, i) => {
@@ -56,20 +73,24 @@ export function Spans({ inline, channelRefs }: { inline: Inline[]; channelRefs?:
           }
           case "channel":
             return <ChannelRefText key={key} name={s.name} text={s.text} refs={channelRefs} />;
-          case "mention":
+          case "mention": {
+            const all = everyone && isEveryoneWord(s.text.slice(1));
             return (
               <RNText
                 key={key}
                 style={[
                   styles.bold,
-                  s.text.slice(1).toLowerCase() === myHandle
-                    ? { color: c.amber, backgroundColor: `${c.amber}2e` }
-                    : { color: c.ink },
+                  ink
+                    ? { color: ink, backgroundColor: "rgba(0,0,0,0.16)" }
+                    : all || s.text.slice(1).toLowerCase() === myHandle
+                      ? { color: c.amber, backgroundColor: `${c.amber}2e` }
+                      : (mentionTint(s.text.slice(1), agents, scheme) ?? { color: c.ink }),
                 ]}
               >
-                {s.text}
+                {all ? `@${everyoneWord(i18n.language)}` : s.text}
               </RNText>
             );
+          }
           default:
             return <RNText key={key}>{s.text}</RNText>;
         }

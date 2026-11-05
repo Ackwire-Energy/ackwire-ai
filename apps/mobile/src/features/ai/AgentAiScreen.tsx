@@ -6,6 +6,7 @@ import { advancedContents } from "@agenteschat/client/lib/brain-advanced";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
+import { modelLimitText } from "@agenteschat/client/lib/plan-usage";
 import { brainPlan, geminiPersonal, isPlanId, planFreeHint, planOf } from "@agenteschat/client/lib/plans";
 import { apiProviderOf, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import { extraUsageOn, limitOffers, planState } from "@agenteschat/ui/plan-state";
@@ -158,6 +159,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
 
   const usage = view && kind ? thinkingUsage(view, kind) : undefined;
   const limited = usage ? planState(usage).state === "limited" : false;
+  const modelLimit = modelLimitText(t, i18n.language, usage, current?.provider, model?.value);
   const offers = limited && kind && view ? limitOffers(accounts, kind, view.account).slice(0, 2) : [];
   const signedOut = current?.status === "signed_out" && current.mine;
   // A coding plan's key that its endpoint refused: a new key, on that plan's page.
@@ -299,6 +301,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                     />
                   ) : null}
                 </GroupedList>
+                {modelLimit ? <GroupedFooter>{modelLimit}</GroupedFooter> : null}
               </>
             ) : null}
             <View style={styles.advanced}>

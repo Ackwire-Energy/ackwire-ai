@@ -5,13 +5,14 @@ import {
   linePlace,
   taskState,
   taskTitle,
+  taskWaitWords,
   taskWhere,
   waitsOnPerson,
 } from "@agenteschat/client/lib/task-manager";
 import { formatDuration } from "@agenteschat/client/lib/work";
 import { Button, Chip, Icon, PixelStop } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { QueueDialog } from "@/components/ComputerQueue";
@@ -21,9 +22,10 @@ import { WaitMark } from "@/components/RequestCard";
 import { colorOf } from "@/components/Sky";
 import { TaskStepsBlock } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useEscClose } from "@/hooks/useEscClose";
 import { useNow } from "@/hooks/useNow";
 import { useAgentTasks } from "./agent-tasks-context";
-import { StopAllInline, StopTaskButton, TaskMark, taskAge, useTaskStop, waitWords } from "./TaskBits";
+import { StopAllInline, StopTaskButton, TaskMark, TaskWaitLines, taskAge, useTaskStop } from "./TaskBits";
 import "@/components/threads/threads.css";
 
 /**
@@ -78,18 +80,7 @@ export function AgentTasksPanel({
   const now = useNow(30_000);
   const { stop, stopping } = useTaskStop();
   const [confirming, setConfirming] = useState(false);
-  // Esc closes it, before the conversation's own Esc (which would stop the agent's work there). In a field (the
-  // reason of "Parar todas") Esc is the field's: it leaves the confirmation.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[role="dialog"]')) return;
-      if (e.target instanceof Element && e.target.closest("input, textarea")) return;
-      e.preventDefault();
-      onClose();
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
+  useEscClose(onClose);
   const name = dir.anyAgent(agentId)?.name ?? t("channel.unknownAgent");
   const title = t("taskManager.agentTasks", { name });
   const { waiting } = agentSummary(tasks);
@@ -145,18 +136,21 @@ export function AgentTasksPanel({
           {tasks.length === 0 ? (
             <p className="tm-panel__none">{t("taskManager.agentPanel.none", { name })}</p>
           ) : (
-            <ul className="tm-agentpanel__list">
-              {tasks.map((task) => (
-                <TaskCard
-                  key={task.runId}
-                  task={task}
-                  here={task.channelId === channelId}
-                  now={now}
-                  stopping={stopping.has(task.runId)}
-                  onStop={() => stop([task.runId])}
-                />
-              ))}
-            </ul>
+            <>
+              <TaskWaitLines tasks={tasks} />
+              <ul className="tm-agentpanel__list">
+                {tasks.map((task) => (
+                  <TaskCard
+                    key={task.runId}
+                    task={task}
+                    here={task.channelId === channelId}
+                    now={now}
+                    stopping={stopping.has(task.runId)}
+                    onStop={() => stop([task.runId])}
+                  />
+                ))}
+              </ul>
+            </>
           )}
         </div>
 
@@ -208,7 +202,7 @@ function TaskCard({
   stopping: boolean;
   onStop: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const [open, setOpen] = useState(false);
@@ -218,10 +212,10 @@ function TaskCard({
   const steps = useTaskSteps(org.id, open ? task.runId : null, open && working ? TASK_MANAGER_POLL_MS : false);
   const title = taskTitle(t, task);
   const where = taskWhere(t, task);
-  const wait = waitWords(t, task);
+  const wait = taskWaitWords(t, i18n.language, task, now);
   const place = linePlace(task);
   const sub = wait
-    ? `${wait} · ${where}`
+    ? [wait.state, wait.next, where].filter(Boolean).join(" · ")
     : taskState(task) === "queued"
       ? `${t("taskManager.state.queued")} · ${where}`
       : `${where} · ${formatDuration(t, taskAge(task, now))}`;

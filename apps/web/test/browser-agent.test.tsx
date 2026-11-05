@@ -7,10 +7,14 @@ import type { AgentBrowserSettings, BrowserHandoff } from "@agenteschat/client";
 import { isBlankPage, openRefusalKey } from "@agenteschat/client/lib/sites";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { agentSearch } from "@/lib/agent-edit";
+import { STORAGE_KEYS } from "@/lib/storage";
 import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 const READY: AgentBrowserSettings = {
   allowedDomains: null,
@@ -52,6 +56,8 @@ const ask = (over: Partial<BrowserHandoff> = {}): BrowserHandoff => ({
  */
 async function setup(options: { as?: "admin" | "owner" | "member"; sites?: string[] | null } = {}) {
   const state = seedState();
+  // The header's Computador, the way in with the DM's sidebar closed.
+  localStorage.setItem(`${STORAGE_KEYS.dmSidebar}.u-walter.${ORG_ID}`, "0");
   if (options.as === "owner" || options.as === "member") {
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
   }

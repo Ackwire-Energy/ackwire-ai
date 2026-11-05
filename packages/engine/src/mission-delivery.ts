@@ -17,6 +17,7 @@ import {
   type MissionDeps,
   type MissionRow,
   missionAnswerers,
+  missionFileRefs,
   missionPersonName,
   noMentions,
   oneLineText,
@@ -178,7 +179,7 @@ async function createDelivery(
             ? { branch: mission.branch, baseBranch: mission.baseBranch, baseSha: mission.baseSha }
             : {}),
         },
-        ...(input.artifactIds.length ? { artifacts: input.artifactIds.map((id) => ({ id })) } : {}),
+        ...(input.artifactIds.length ? { artifacts: await missionFileRefs(tx, mission.orgId, input.artifactIds) } : {}),
         bodyCode: input.auto ? "mission_all_done" : "mission_delivery",
         bodyParams: input.auto ? {} : { summary: cutText(input.summary.split("\n")[0] ?? "", 300) },
       },

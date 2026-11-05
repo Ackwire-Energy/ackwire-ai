@@ -34,7 +34,7 @@ import {
   useToast,
 } from "@/ui";
 import { boldRuns } from "../chat/actions";
-import { AllowTalkPill } from "../chat/ReachLines";
+import { AllowTalkAction } from "../chat/ReachLines";
 import { routineHref } from "../links/logic";
 import { ZoneList } from "../me/AccountPage";
 import { AgentFace } from "../shared/Face";
@@ -754,7 +754,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
                 ),
               )}
             </Text>
-            {creator ? <AllowTalkPill agent={w.agent} userId={creator} /> : null}
+            {creator ? <AllowTalkAction agent={w.agent} userId={creator} /> : null}
           </View>
         ))}
         {routine && !isDoneOnce(routine) ? (

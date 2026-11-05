@@ -9,6 +9,7 @@ import { MissionJoinNote, MissionThreadHeader } from "@/components/missions/Miss
 import { useOrg } from "@/components/org-context";
 import { TaskConversationHeader } from "@/components/TaskConversationHeader";
 import { ArchivedNote, ContextBlock, ThreadHeader, ThreadOrigin } from "@/components/threads/ThreadView";
+import { useEscClose } from "@/hooks/useEscClose";
 import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
 /**
@@ -36,6 +37,7 @@ export function ThreadPage({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  useEscClose(onClose);
   const info = useThreadInfo(org.id, threadId);
   const thread = info.data;
   // A thread with a mission (ADR 0029): the mission header; who only reads gets a note.

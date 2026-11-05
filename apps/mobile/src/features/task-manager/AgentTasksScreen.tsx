@@ -12,8 +12,8 @@ import { useColors, useDirectory, useNow, usePullRefresh } from "../shared/hooks
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useAgentTasks, useStopper } from "./hooks";
-import { lineStartText, type Place, rowState, taskStateText } from "./logic";
-import { StopButton, StopConfirm, TaskMark, UsingLine, useAgentColor } from "./parts";
+import { type Place, rowState, taskStateWords } from "./logic";
+import { StopButton, StopConfirm, TaskMark, UsingLine, useAgentColor, WaitLines } from "./parts";
 
 /**
  * An agent's tasks (ADR 0128), pushed from its DM's header the way a thread opens: three wells (Agora, Esperam você,
@@ -75,18 +75,21 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
               <Well label={t("taskManager.agentPanel.wells.done")} value={doneToday} />
             </View>
             {view ? (
-              view.rows.map(({ task, here }, i) => (
-                <Animated.View key={task.runId} {...fade} layout={layout}>
-                  <TaskRow
-                    task={task}
-                    here={here}
-                    stopping={stopping}
-                    now={now}
-                    divider={i > 0}
-                    onStop={() => stop([task.runId])}
-                  />
-                </Animated.View>
-              ))
+              <>
+                <WaitLines tasks={view.rows.map((r) => r.task)} now={now} />
+                {view.rows.map(({ task, here }, i) => (
+                  <Animated.View key={task.runId} {...fade} layout={layout}>
+                    <TaskRow
+                      task={task}
+                      here={here}
+                      stopping={stopping}
+                      now={now}
+                      divider={i > 0}
+                      onStop={() => stop([task.runId])}
+                    />
+                  </Animated.View>
+                ))}
+              </>
             ) : (
               <Animated.View {...fade}>
                 <Text variant="footnote" tone="faint" style={styles.free}>
@@ -170,11 +173,12 @@ function TaskRow({
   divider: boolean;
   onStop: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const c = useColors();
   const color = useAgentColor(task.agentId);
   const openQueue = useOpenQueue();
   const state = rowState(task, stopping);
+  const words = taskStateWords(t, i18n.language, task, state, now);
   const title = taskTitle(t, task);
   const where = taskWhere(t, task);
   const place = where === title ? null : where;
@@ -182,13 +186,11 @@ function TaskRow({
   const sub =
     state === "working"
       ? [place, formatDuration(t, now - taskSince(task))]
-      : [taskStateText(t, task, state), state === "stopping" ? null : place];
+      : [words.state, state === "stopping" ? null : place];
   const line = sub.filter(Boolean).join(" · ");
-  const label = [title, here ? t("taskManager.strip.here") : null, line].filter(Boolean).join(", ");
-  // Waiting for room on its computer: its place shows in the line above, when it should start under it, and "Ver
-  // fila" opens the computer's line.
+  const label = [title, here ? t("taskManager.strip.here") : null, line, words.next].filter(Boolean).join(", ");
+  // What comes next shows under it; waiting for room on its computer, "Ver fila" opens the computer's line.
   const inLine = state === "stopping" ? null : linePlace(task);
-  const starts = inLine ? lineStartText(t, task, now) : null;
   return (
     <Pressable
       onPress={() => router.push(`/task-manager/${task.runId}`)}
@@ -207,16 +209,12 @@ function TaskRow({
           </Text>
           {here ? <Chip icon="chat" label={t("taskManager.strip.here")} /> : null}
         </View>
-        <Text
-          variant="footnote"
-          numberOfLines={1}
-          style={[waits && styles.semibold, { color: waits ? c.amber : c.muted }]}
-        >
+        <Text variant="footnote" style={[waits && styles.semibold, { color: waits ? c.amber : c.muted }]}>
           {line}
         </Text>
-        {starts ? (
-          <Text variant="caption" tone="faint" numberOfLines={1}>
-            {starts}
+        {words.next ? (
+          <Text variant="caption" tone="faint">
+            {words.next}
           </Text>
         ) : null}
         {state === "stopping" ? null : <UsingLine task={task} />}

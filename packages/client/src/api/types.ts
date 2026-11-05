@@ -1,5 +1,6 @@
 /** Types of the private web-app API (`/api/app/*`, apps/server/src/routes/app). */
 
+import type { ChatPrefs } from "../lib/chat-look";
 import type { OnboardingStepId } from "../lib/onboarding";
 
 /** Whether a person owns the workspace (ADR 0085); what anyone may do comes from their roles (`OrgRole`). */
@@ -241,6 +242,8 @@ export interface OrgSummary {
   showActivity?: boolean;
   /** How agents talk to me here (ADR 0147): null until I pick (they talk simply); absent from an older server. */
   agentStyle?: AgentStyle | null;
+  /** How conversations look to me here: only what I chose (`chatLookOf`); absent from an older server. */
+  chatPrefs?: ChatPrefs;
 }
 
 /** How agents talk to a person (ADR 0147): the server's `AGENT_STYLES`. */
@@ -995,6 +998,8 @@ export interface Channel {
   unreadCount?: number;
   /** Channel list only: of `unreadCount`, the messages that mention you (counted even while muted). */
   mentionCount?: number;
+  /** Channel list only: where the unread starts (when you last read it, or joined); null when not a member. */
+  lastReadAt?: string | null;
   /** Channel list only: you muted it, so it never looks unread. */
   muted?: boolean;
   /** Channel list only: the latest top-level message; null when empty or not a member. */
@@ -1150,6 +1155,9 @@ export interface MessageReceipts {
     status: RunStatus | "waiting_input" | "canceled";
     /** `no_ai`: it couldn't answer, it has no AI connected. */
     reason?: string;
+    /** `failed` for another reason: why, as a run's error is worded (`runErrorText`). */
+    errorCode?: string;
+    errorParams?: Record<string, string>;
     /** `waiting_input` because its AI provider is down: it retries by itself. */
     outage?: true;
     /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
@@ -1217,7 +1225,11 @@ export interface AiStatus {
       | "no_computer"
       | "cli_missing"
       | "computer_away"
+      | "computer_failed"
       | "plan_limit"
+      | "model_limit"
+      | "model_region"
+      | "commands_off"
       | "plan_not_shared"
       | "runner_outdated"
       | "plan_tools";
@@ -1590,6 +1602,9 @@ export type ChannelEvent =
       status?: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
       /** `no_ai`: the agent has no AI to think with. */
       reason?: string;
+      /** `failed`: why, as a run's error is worded (`runErrorText`). */
+      errorCode?: string;
+      errorParams?: Record<string, string>;
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
@@ -1725,7 +1740,7 @@ export interface Approval {
    * "Aprovar sempre" is offered: approving with `always` lets the agent run this server tool (each of these wrapped
    * actions; none: the tool itself) without asking again, with any values. Null or absent: not offered.
    */
-  approveAlways?: { tool: string; actions: string[] } | null;
+  approveAlways?: { tool: string; actions: string[]; routineId?: string } | null;
   /** Approved ahead (`schedule_action`): when the routine's run does it by itself; null: it runs once approved. */
   runAt?: string | null;
   /** The routine whose run at `runAt` it is for. */
@@ -1883,7 +1898,8 @@ export interface ScopeGrant {
   scope: string;
 }
 
-export type MemoryKind = "fact" | "decision" | "lesson" | "preference";
+/** `rule`: a lasting rule a person gave the agent (a permission, where to send things); `origin` says who and when. */
+export type MemoryKind = "fact" | "decision" | "lesson" | "preference" | "rule";
 
 export interface Memory {
   id: string;
@@ -1922,6 +1938,8 @@ export interface Memory {
   disputed?: boolean;
   /** Where it was learned. */
   channelId?: string | null;
+  /** A `rule` the viewer may remove: its giver, the agent's owner or an admin. */
+  removable?: boolean;
   updatedAt: string;
   /** `about: "me"` only: the viewer's message it came from ("Você disse hoje, nesta conversa"). */
   from?: { messageId: string; channelId: string; threadId: string | null; dm: boolean; at: string } | null;
@@ -2648,12 +2666,13 @@ export const AGENT_ACTION_KINDS = [
   "skill.created",
   "skill.updated",
   "agent.settings_changed",
+  "pr.merged",
 ] as const;
 export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
 /** What the change was made to (link it: issue → Issues, wiki_page → Wiki, routine → Rotinas…). */
 export interface AgentActionTarget {
-  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill" | "agent";
+  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill" | "agent" | "repository";
   id: string;
   /** Issues. */
   number?: number;
@@ -2677,6 +2696,7 @@ export interface AgentActionTarget {
  *   `fields` (name, prompt, target, schedule, active), `active`, `schedule`
  * - `channel.agent_added`: `agentId`, `agentName`, `agentHandle`, `channel`
  * - `channel.created`: `name` (undo archives it)
+ * - `pr.merged`: `repo`, and `number` (a pull request) or `ref` (a branch); nothing undoes it
  * - `wiki.page_created` / `wiki.page_edited`: `title`, `slug`
  * - `thread.renamed`: `from`, `to`; `thread.closed`: `title`
  * - `agent.settings_changed` (ADR 0137): `agentName`, `fields`, `proposalId` (the right hand's card, applied by the
@@ -2799,6 +2819,8 @@ export interface DirectMessage {
     authorType: string;
   } | null;
   unread: number;
+  /** Where the unread starts: when I last read it; null when I never did. Absent from an older server. */
+  lastReadAt?: string | null;
   /** False until this person first reads it (server side, so on every device): the right hand waves then. */
   everRead?: boolean;
 }
@@ -3552,7 +3574,12 @@ export interface RoutineInput {
 }
 
 /** `PATCH …/routines/{id}`: only what changed (`active: true` also clears a pause reason and a failure streak). */
-export type RoutinePatch = Partial<Omit<RoutineInput, "name">> & { name?: string; active?: boolean };
+export type RoutinePatch = Partial<Omit<RoutineInput, "name">> & {
+  name?: string;
+  active?: boolean;
+  /** Replaces its own actions: taking one away is what undoes "Sempre nesta rotina". */
+  ownActions?: string[];
+};
 
 /** Natural language → cron, in the workspace time zone (the backend decides). */
 export type ScheduleParse =
@@ -3622,10 +3649,26 @@ export interface CalendarProposal {
   status: "pending" | "confirmed" | "dismissed";
 }
 
+export interface CalendarReminder {
+  id: string;
+  message: string;
+  at: string;
+  forUserId: string;
+  channelId: string;
+  threadId: string | null;
+  /** The agent that posts it. */
+  agentId: string;
+  /** The person who set it. */
+  createdBy: string | null;
+  canCancel: boolean;
+}
+
 export interface CalendarRange {
   events: CalendarEvent[];
   /** Scheduled routine runs in the range. */
   routines: { routineId: string; name: string; agentId: string; at: string; target: RoutineTarget }[];
+  /** Pending reminders the viewer may see (absent on an older server). */
+  reminders?: CalendarReminder[];
   /** Issues due in the range (all-day). */
   deadlines: { issueId: string; number: number; title: string; date: string }[];
   proposals: CalendarProposal[];
@@ -5011,9 +5054,16 @@ export interface BrainMachine {
   options: BrainOption[];
 }
 
-/** `GET …/agents/{id}/brain` (its owner or an admin). */
+/** `GET …/agents/{id}/brain` (its owner or an admin; the team's right hand's `mine`, anyone). */
 export interface AgentBrain {
   agentId: string;
+  /**
+   * The team's right hand only (ADR 0137 §11): `mine`, the viewer's own AI for their DM with it (`brain` `model`: none,
+   * it thinks with the workspace's); `workspace`, what every DM thinks with while its person has none.
+   */
+  scope?: BrainScope;
+  /** With `mine`: the workspace's AI (`model`: an API key), and whether it thinks for the viewer. */
+  workspaceAi?: { brain: BrainKind; ownerId: string | null; servesYou: boolean };
   brain: BrainKind;
   /** As stored; null = the brain's default. */
   model: string | null;
@@ -5058,6 +5108,9 @@ export interface AgentBrain {
   /** Its Autonomia (its new missions' autonomy), copied with its setup (ADR 0094); absent on older servers. */
   autonomy?: CommandApproval;
 }
+
+/** The team's right hand's AIs: the viewer's own, or the workspace's (admins). */
+export type BrainScope = "mine" | "workspace";
 
 /** ADR 0041 §5: `xhigh` may be stored; the page offers low, medium, high and max. */
 export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
@@ -5153,9 +5206,13 @@ export interface PlanUsage {
   limited?: boolean;
   source: "turn" | "probe";
   at: string;
+  /** Models at a limit of their own, by model id: until `until` (absent: unknown), or `region` the model needs. */
+  models?: Record<string, { at: string; until?: string; region?: true }>;
 }
 
 export interface AgentBrainInput {
+  /** The team's right hand: the viewer's own AI (`mine`, the server's default) or the workspace's (admins). */
+  scope?: BrainScope;
   brain?: BrainKind;
   model?: string | null;
   fallback?: boolean;
@@ -6153,6 +6210,28 @@ export interface ManagedTask {
     /** When it should start (the line's estimate); null with no basis. */
     estimatedStartAt: string | null;
   } | null;
+  /** Why a `waiting_input` run waits (absent on an older server). */
+  wait?: TaskWait | null;
+}
+
+/** What a task waits on, in the words the apps need to say why. */
+export interface TaskWait {
+  /** `usage_pause`, `plan_limit`, `budget`, `busy`, `work_queue`, or what keeps its computer away. */
+  code: string;
+  /** Runs with the same key wait on the same plan or budget. */
+  key: string | null;
+  /** The plan in words ("Claude"); null for a budget. */
+  plan: string | null;
+  /** A wait on a model's own limit or the region it needs: the model's name, and which. */
+  model: string | null;
+  scope: "model" | "region" | null;
+  /** Paused near a limit: how far along, and the plan's window. */
+  percent: number | null;
+  window: string | null;
+  /** When the limit resets; null when unknown. */
+  resetsAt: string | null;
+  /** You may press Continuar agora. */
+  canContinue: boolean;
 }
 
 /** A computer with turns running or waiting for room (counts only). */
@@ -6531,6 +6610,19 @@ export interface DesktopStatus {
   controlRefusal?: "pairer" | "owner_plan" | "role" | "not_allowed" | null;
   /** The agent is held, or the workspace is on hold: people watch, nobody takes control. */
   held: boolean;
+}
+
+/** `GET …/desktop/picture`: a recent picture of the agent's screen, or why there is none. */
+export interface DesktopPictureView {
+  picture: {
+    /** A JPEG, base64. */
+    data: string;
+    width: number;
+    height: number;
+    capturedAt: string;
+  } | null;
+  /** `stopped`: its screen isn't running. `hidden`: someone else is in control. */
+  reason: "stopped" | "hidden" | "unavailable" | null;
 }
 
 /** A plan window with each agent's estimated part of it (the usage views, ADR 0063). */

@@ -1,10 +1,11 @@
 import { keys, useAddChannelMember, useRoster } from "@agenteschat/client";
+import { everyoneSuggestion } from "@agenteschat/client/lib/everyone";
 import { useQueryClient } from "@tanstack/react-query";
 import { Fragment, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import Animated, { FadeInDown, FadeOut } from "react-native-reanimated";
-import { PressScale, Text, useTheme, useToast } from "@/ui";
+import { Icon, PressScale, Text, useTheme, useToast } from "@/ui";
 import { Face } from "../shared/Face";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { type MentionOption, mentionOptions, splitMatch } from "./mentions";
@@ -31,14 +32,17 @@ export function MentionPicker({
   pick,
   channelId,
   members,
+  everyone = false,
 }: {
   query: string;
   pick: (handle: string) => void;
   channelId: string;
   /** The channel's members; null = no sections and no "Adicionar" (a DM). */
   members: ReadonlySet<string> | null;
+  /** The person may mention everyone here (`offersEveryone`): `@todos`, in their language, comes first. */
+  everyone?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { colors: c, reducedMotion } = useTheme();
   const orgId = useOrgId();
   const meId = useMeId();
@@ -48,7 +52,8 @@ export function MentionPicker({
   const add = useAddChannelMember(orgId);
   const people = useMemo(() => [...dir.memberById.values()], [dir.memberById]);
   const options = mentionOptions({ query, agents: dir.agents, people, meId, members });
-  if (options.length === 0) return null;
+  const all = everyone ? everyoneSuggestion(query, i18n.language) : null;
+  if (options.length === 0 && !all) return null;
 
   const addAndPick = (o: MentionOption) =>
     add.mutate(
@@ -77,6 +82,26 @@ export function MentionPicker({
         },
       ]}
     >
+      {all ? (
+        <Pressable
+          onPress={() => pick(all)}
+          accessibilityRole="button"
+          accessibilityLabel={`@${all}, ${t("mentions.everyone")}`}
+          style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
+        >
+          <View style={[styles.everyone, { backgroundColor: c.sunken }]}>
+            <Icon name="members" size={18} color={c.ink2} />
+          </View>
+          <View style={styles.tx}>
+            <Text variant="body" numberOfLines={1} style={styles.name}>
+              @{all}
+            </Text>
+            <Text variant="footnote" tone="muted" numberOfLines={1}>
+              {t("mentions.everyone")}
+            </Text>
+          </View>
+        </Pressable>
+      ) : null}
       {options.map((o, i) => {
         const prev = options[i - 1];
         const heading = members && (!prev || prev.inChannel !== o.inChannel);
@@ -153,6 +178,7 @@ const styles = StyleSheet.create({
   },
   divider: { position: "absolute", top: 0, left: INSET + FACE + GAP, right: 0, height: StyleSheet.hairlineWidth },
   tx: { flex: 1, minWidth: 0 },
+  everyone: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
   name: { fontWeight: "600" },
   mark: { textDecorationLine: "underline" },
   add: { height: 26, paddingHorizontal: 10, borderRadius: 13 },

@@ -1,0 +1,109 @@
+import { expect, test } from "bun:test";
+import type { TFunction } from "i18next";
+import type { ManagedTask, TaskWait } from "../src/api/types";
+import { taskWaitGroups, taskWaitGroupText, taskWaitWords } from "../src/lib/task-manager";
+
+/** Says the key and its values, so a test reads which words were picked. */
+const t = ((key: string, values: Record<string, unknown> = {}) => {
+  const { defaultValue: _, ...rest } = values;
+  return Object.keys(rest).length ? `${key} ${JSON.stringify(rest)}` : key;
+}) as unknown as TFunction;
+
+const now = new Date(2026, 10, 5, 10, 0).getTime();
+const resetsAt = new Date(2026, 10, 7, 18, 0).toISOString();
+const wait = (over: Partial<TaskWait> = {}): TaskWait => ({
+  code: "usage_pause",
+  key: "plan:m1:claude_code:a1",
+  plan: "Claude",
+  model: null,
+  scope: null,
+  percent: 95,
+  window: "seven_day",
+  resetsAt,
+  canContinue: true,
+  ...over,
+});
+const task = (held: ManagedTask["held"], w: TaskWait | null, over: Partial<ManagedTask> = {}) =>
+  ({ runId: "r1", status: "waiting_input", held, line: null, wait: w, background: true, ...over }) as ManagedTask;
+const words = (x: ManagedTask, at = now) => taskWaitWords(t, "en", x, at);
+
+test("not waiting: nothing to say", () => {
+  expect(words(task(null, null, { status: "running" }))).toBeNull();
+});
+
+test("a pause says how far along and when it's back; past the reset, a moment; unknown, when it renews", () => {
+  const paused = words(task("plan", wait()));
+  expect(paused?.state).toContain("taskManager.wait.pausedPlan");
+  expect(paused?.state).toContain('"percent":95');
+  expect(paused?.next).toContain("taskManager.wait.back");
+  expect(paused?.next).toContain("chat.usageWhen.on");
+  expect(words(task("plan", wait()), Date.parse(resetsAt) + 1000)?.next).toContain("taskManager.wait.whenSoon");
+  expect(words(task("plan", wait({ resetsAt: null })))?.next).toContain("taskManager.wait.whenRenews");
+});
+
+test("a limit: the plan's, a model's own, the region it needs, the budget", () => {
+  const limit = { code: "plan_limit", percent: null, window: null };
+  expect(words(task("plan", wait(limit)))?.state).toContain("taskManager.wait.planLimit");
+  const own = wait({ ...limit, scope: "model", model: "GLM-5.3" });
+  expect(words(task("plan", own))?.state).toContain("taskManager.wait.modelLimit");
+  const region = words(task("plan", wait({ ...limit, scope: "region", model: "GLM-5.3" })));
+  expect(region?.state).toContain("taskManager.wait.modelRegion");
+  expect(region?.next).toBe("taskManager.wait.modelRegionNext");
+  const budget = wait({ code: "budget", percent: null, plan: null });
+  expect(words(task("budget", budget))?.state).toBe("taskManager.wait.budgetOut");
+  const reserved = words(task("budget", { ...budget, resetsAt: null }));
+  expect(reserved?.state).toBe("taskManager.state.budget");
+  expect(reserved?.next).toContain("taskManager.wait.whenSoon");
+  const pausedReserved = words(task("budget", wait({ resetsAt: null, plan: null })));
+  expect(pausedReserved?.state).toContain("taskManager.wait.pausedBudget");
+  expect(pausedReserved?.next).toContain("taskManager.wait.whenSoon");
+});
+
+test("a wait on no limit: the agent's line of work, a computer gone, one not ready, a person", () => {
+  const on = (code: string) => words(task("computer_offline", wait({ code, key: null })));
+  expect(on("work_queue")?.state).toBe("taskManager.wait.workLine");
+  expect(on("machine_offline")?.state).toBe("taskManager.state.computerOffline");
+  expect(on("machine_dropped")?.next).toBe("taskManager.wait.computerOfflineNext");
+  expect(on("not_logged_in")?.state).toBe("taskManager.wait.computerWait");
+  expect(on("no_computer")?.state).toBe("taskManager.wait.computerWait");
+  expect(words(task(null, null))?.next).toBe("taskManager.wait.answerNext");
+  expect(words(task(null, null, { status: "waiting_approval" }))?.next).toBe("taskManager.wait.okNext");
+});
+
+test("an older server sends no wait: the plain words, no second line", () => {
+  expect(words(task("plan", null))).toEqual({ state: "taskManager.state.plan", next: null });
+  expect(words(task("budget", null))).toEqual({ state: "taskManager.state.budget", next: null });
+  expect(words(task("computer_offline", null))?.state).toBe("taskManager.state.computerOffline");
+});
+
+test("a group needs two rows on the same limit; a computer, a person or a region isn't one", () => {
+  const two = [task("plan", wait(), { runId: "a" }), task("plan", wait({ percent: 97 }), { runId: "b" })];
+  const [group] = taskWaitGroups(two);
+  expect(group?.wait.percent).toBe(97);
+  expect(group?.continuable).toEqual(["a", "b"]);
+  expect(taskWaitGroups(two.slice(0, 1))).toEqual([]);
+  expect(
+    taskWaitGroups([task("plan", wait(), { runId: "a" }), task("plan", wait({ key: "other" }), { runId: "b" })]),
+  ).toEqual([]);
+  const region = wait({ code: "plan_limit", scope: "region" });
+  expect(taskWaitGroups([task("plan", region), task("plan", region)])).toEqual([]);
+  const reserved = wait({ code: "budget", key: "budget:a", percent: null, resetsAt: null });
+  expect(taskWaitGroups([task("budget", reserved), task("budget", reserved)])).toEqual([]);
+  const away = wait({ code: "machine_offline", key: null });
+  expect(taskWaitGroups([task("computer_offline", away), task("computer_offline", away)])).toEqual([]);
+});
+
+test("the group's words: routines or tasks, by what holds them", () => {
+  const group = (x: ManagedTask) => {
+    const [g] = taskWaitGroups([x, { ...x, runId: "b" }]);
+    return g ? taskWaitGroupText(t, "en", g, now) : "";
+  };
+  expect(group(task("plan", wait()))).toContain("taskManager.waitGroup.pausedPlan");
+  expect(group(task("plan", wait()))).toContain("taskManager.waitGroup.routines");
+  expect(group(task("plan", wait(), { background: false }))).toContain("taskManager.tasks");
+  expect(group(task("budget", wait({ plan: null })))).toContain("taskManager.waitGroup.pausedBudget");
+  expect(group(task("plan", wait({ code: "plan_limit", percent: null })))).toContain("taskManager.waitGroup.planLimit");
+  const own = wait({ code: "plan_limit", percent: null, scope: "model", model: "GLM-5.3" });
+  expect(group(task("plan", own))).toContain("taskManager.waitGroup.modelLimit");
+  expect(group(task("budget", wait({ code: "budget", percent: null })))).toContain("taskManager.waitGroup.budgetOut");
+});

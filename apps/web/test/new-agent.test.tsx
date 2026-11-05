@@ -1504,7 +1504,7 @@ describe("Criar agente: what gets created", () => {
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
     expect(document.querySelector(".ac-toasts")?.textContent).toContain(
-      "A Iris já existe, mas parte do que você escolheu não foi salva. Você não tem permissão para isso. Peça a um admin do workspace.",
+      "A Iris já existe, mas parte do que você escolheu não foi salva. Você não tem permissão para isso.",
     );
     expect(screen().getByRole("heading", { name: "Iris entrou no time" })).toBeTruthy();
     expect(document.body.textContent).toContain(

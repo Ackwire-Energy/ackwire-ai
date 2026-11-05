@@ -72,6 +72,8 @@ export const contextKindEnum = pgEnum("context_kind", [
   "entity_profile",
   "note",
   "lesson",
+  /** A lasting rule a person gave an agent (a permission, a destination): in every run it acts for them (ADR 0120). */
+  "rule",
 ]);
 export const trustEnum = pgEnum("context_trust", ["high", "low"]);
 export const contextStatusEnum = pgEnum("context_status", ["active", "archived"]);

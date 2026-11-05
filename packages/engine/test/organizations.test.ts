@@ -47,6 +47,8 @@ describe("permissions", () => {
       "manage_credentials",
       // Using other people's plans (ADR 0059 §3): owners and admins, never "Todos".
       "use_others_plans",
+      // Mentioning everyone (`@todos`): owners and admins, never "Todos".
+      "mention_everyone",
       "view_usage",
       "manage_members",
       "manage_billing",
@@ -87,6 +89,7 @@ describe("permissions", () => {
         start: { page: "home", channelId: null },
         showActivity: false,
         agentStyle: null,
+        chatPrefs: {},
       },
     ]);
     const members = await f.db
