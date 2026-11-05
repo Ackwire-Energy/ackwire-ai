@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingTop: 22,
     paddingHorizontal: 20,
-    // 8 under the title, as Conversas' section heads.
+    // 8 under the title, as the Chats list's section heads (the kit's SectionHeader).
     paddingBottom: 8,
   },
   sectionTitle: { fontWeight: "600", flexShrink: 1 },
