@@ -93,7 +93,9 @@ export function FirstDay({
                 <Text variant="callout" tone="ink" style={[styles.grow, styles.ask]}>
                   {text}
                 </Text>
-                <Icon name="send" size={16} color={c.faint} />
+                <View style={styles.send}>
+                  <Icon name="send" size={16} color={c.faint} />
+                </View>
               </Pressable>
             );
           })}
@@ -120,15 +122,19 @@ const styles = StyleSheet.create({
   p: { marginTop: 6, textAlign: "center", lineHeight: 21 },
   h3: { fontWeight: "600", paddingHorizontal: 4, paddingTop: 18, paddingBottom: 8 },
   card: { borderRadius: 20, overflow: "hidden" },
+  // A suggestion that wraps keeps its tile and its send mark on the first line (as ChannelHello's rows): centred on
+  // the whole row they floated between its lines. 11 + 36 + 11: one line still sits in the middle of the 58.
   row: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 12,
     minHeight: 58,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 11,
   },
   sep: { position: "absolute", top: 0, left: 62, right: 0, height: StyleSheet.hairlineWidth },
   tile: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
-  ask: { fontWeight: "500" },
+  // The first line's middle on the tile's (a 21 line against 36).
+  ask: { fontWeight: "500", marginTop: 7 },
+  send: { marginTop: 10 },
 });

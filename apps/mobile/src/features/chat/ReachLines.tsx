@@ -31,7 +31,8 @@ import { ConsultPairRow, useConsultById } from "./ConsultGroup";
 /**
  * On the phone, under an agent's message, every agent it @named that its mention didn't wake (`meta.reach`): one
  * outside the conversation got it by direct message (the two agents' pair row, opening their conversation), one it couldn't call
- * says why, and the agent's owner can let that person talk to it. The team actions' sunken row (TeamChecks.tsx).
+ * says why, and the agent's owner can let that person talk to it. The receipts' card, as the team actions' rows
+ * beside it (TeamChecks.tsx): a sunken fill here stood apart from the raised cards under the same reply.
  */
 export function ReachLines({ message: m }: { message: Message }) {
   const list = reachOf(m.meta);
@@ -47,7 +48,7 @@ export function ReachLines({ message: m }: { message: Message }) {
 
 function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: string; authorId: string }) {
   const { t } = useTranslation();
-  const { colors } = useTheme();
+  const { colors, shadows } = useTheme();
   const orgId = useOrgId();
   const dir = useDirectory();
   const channel = useChannels(orgId).data?.find((c) => c.id === channelId);
@@ -67,8 +68,8 @@ function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: 
   // Handed to it by direct message: the two agents talking, as the pair row that opens their conversation.
   if (talk) return <ConsultPairRow askerId={authorId} channelId={channelId} items={[talk]} inline />;
   return (
-    <View style={[styles.one, { backgroundColor: colors.sunken }]}>
-      <View style={[styles.tile, { backgroundColor: colors.raised }]}>
+    <View style={[styles.one, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
+      <View style={[styles.tile, { backgroundColor: colors.raised, boxShadow: shadows.e1 }]}>
         <Icon name={handed ? "chat" : "info"} size={16} color={colors.ink2} />
       </View>
       <View style={[styles.grow, styles.tx]}>
@@ -228,7 +229,11 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingLeft: 12,
     paddingRight: 10,
-    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+    borderBottomLeftRadius: 4,
   },
   oneText: { fontSize: 14.5, lineHeight: 19 },
   detail: { marginTop: 2 },

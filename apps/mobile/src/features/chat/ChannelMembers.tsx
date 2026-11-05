@@ -20,7 +20,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Card, Icon, Row, SearchField, Text, useToast } from "@/ui";
+import { Button, Card, Count, Icon, Row, SearchField, Text, useToast, weights } from "@/ui";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
@@ -106,9 +106,8 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
           <Text variant="footnote" tone="faint" style={styles.bold}>
             {label}
           </Text>
-          <Text variant="footnote" tone="faint">
-            {count}
-          </Text>
+          {/* Tabular figures, as every count in the app (`Count`). */}
+          <Count value={count} size={13} weight={weights.medium} color={c.faint} />
         </View>
         <Card>
           {list.map((w) => {

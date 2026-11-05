@@ -143,7 +143,7 @@ export function MentionPicker({
                   disabled={add.isPending}
                   accessibilityRole="button"
                   accessibilityLabel={t("mobile.mention.addA11y", { name: o.name })}
-                  hitSlop={6}
+                  hitSlop={9}
                   style={[styles.add, { backgroundColor: c.sunken }]}
                   contentStyle={styles.addIn}
                 >
@@ -176,7 +176,8 @@ const styles = StyleSheet.create({
   everyone: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
   name: { fontWeight: "600" },
   mark: { textDecorationLine: "underline" },
-  add: { height: 26, paddingHorizontal: 10, borderRadius: 13 },
+  // A button, so a rounded rectangle rather than a pill; 26 tall with 9 of slop: the 44-point target.
+  add: { height: 26, paddingHorizontal: 10, borderRadius: 8 },
   addIn: { alignItems: "center", justifyContent: "center" },
   addText: { fontWeight: "600" },
 });

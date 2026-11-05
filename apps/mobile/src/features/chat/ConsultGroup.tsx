@@ -145,6 +145,8 @@ export function ConsultPairRow({
         }}
         disabled={!opens}
         accessibilityRole="button"
+        // A 28-point row: 8 above and below gives it the 44-point target.
+        hitSlop={{ top: 8, bottom: 8 }}
         style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.plate }]}
       >
         <AgentFace agentId={askerId} size={18} live={false} />
