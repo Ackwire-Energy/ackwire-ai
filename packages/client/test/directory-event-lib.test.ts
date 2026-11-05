@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import { keys } from "../src/api/keys";
 import { applyMembershipEvent, applyWorkspaceEvent, readUnknownMembers } from "../src/realtime/machines";
 
@@ -36,6 +36,26 @@ test("channels.changed: the channels, the DMs, and each channel's members and ro
   expect(applyWorkspaceEvent(qc, "o1", { type: "channels.changed" })).toBe(true);
   for (const key of lists) expect(stale(qc, key)).toBe(true);
   expect(stale(qc, keys.messages("o1", "c1"))).toBe(false);
+});
+
+test("the same event again before the gap ends is one read when it ends, not one each", async () => {
+  const qc = new QueryClient();
+  let reads = 0;
+  qc.setQueryDefaults(keys.agents("o1"), { queryFn: () => ++reads });
+  const unwatch = new QueryObserver(qc, { queryKey: keys.agents("o1") }).subscribe(() => {});
+  await Bun.sleep(5);
+  expect(reads).toBe(1);
+  for (let i = 0; i < 10; i++) applyWorkspaceEvent(qc, "o1", { type: "agents.changed" });
+  await Bun.sleep(5);
+  expect(reads).toBe(2);
+  await Bun.sleep(600);
+  expect(reads).toBe(3);
+  await Bun.sleep(600);
+  expect(reads).toBe(3);
+  applyWorkspaceEvent(qc, "o1", { type: "agents.changed" });
+  await Bun.sleep(5);
+  expect(reads).toBe(4);
+  unwatch();
 });
 
 test("an id the directory lacks reads it again, once; one it knows, or a list not loaded yet, doesn't", () => {

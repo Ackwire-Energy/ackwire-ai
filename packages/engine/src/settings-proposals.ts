@@ -7,6 +7,7 @@ import { isComputerBrain } from "./brains/types";
 import { addChannelMember, removeChannelMember, setChannelAgentAutoReply } from "./channels";
 import { sha256 } from "./crypto";
 import { NotFoundError } from "./errors";
+import { publishAgentsChanged } from "./events";
 import { setAgentComputerTarget } from "./machines";
 import { can, getMembership } from "./organizations";
 import { maySql } from "./permissions";
@@ -398,4 +399,6 @@ export async function revertSettings(
   for (const l of steps)
     if (!same(await valueNow(deps.db, agent, l), direction === "undo" ? l.to : l.from)) throw changedSince();
   for (const l of steps) await setValue(deps, userId, a.orgId, agent.id, l, direction === "undo" ? l.from : l.to);
+  // Who it answers and its AI have no event of their own.
+  await publishAgentsChanged(deps.pubsub, a.orgId);
 }

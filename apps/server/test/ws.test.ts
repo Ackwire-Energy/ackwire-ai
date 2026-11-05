@@ -483,5 +483,22 @@ test("a socket subscribed to no channel hears of the agents and channels the wor
   });
   expect(agent.status).toBe(200);
   expect(await heard("agents.changed")).toEqual({ type: "event", scope: "org", event: { type: "agents.changed" } });
+
+  c.frames.length = 0;
+  const brain = await owner(`/api/app/organizations/${orgId}/agents/${agentId}/brain`, {
+    method: "PUT",
+    json: { fallback: false },
+  });
+  expect(brain.status).toBe(200);
+  expect(await heard("agents.changed")).toEqual({ type: "event", scope: "org", event: { type: "agents.changed" } });
+
+  c.frames.length = 0;
+  const dm = await owner(`/api/app/organizations/${orgId}/dms`, { json: { agentId } });
+  expect(dm.status).toBe(200);
+  expect(await heard("channels.changed")).toEqual({
+    type: "event",
+    scope: "user",
+    event: { type: "channels.changed" },
+  });
   c.ws.close();
 });

@@ -28,7 +28,7 @@ import { type AgentDeletionDeps, deleteAgent } from "../agent-deletion";
 import { type Agent, getAgent, updateAgent } from "../agents";
 import { audienceNotice, canTalkTo, seesAgentDetails, speakerFor } from "../audience";
 import { recordAudit } from "../audit";
-import { caches } from "../cache";
+import { caches, invalidateOrg } from "../cache";
 import { sha256 } from "../crypto";
 import { publishDelivery } from "../delivery";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
@@ -441,7 +441,11 @@ export async function decideProposal(
     }
     return row;
   });
-  if (decided.status === "accepted" && decided.agentId) await publishAgentsChanged(events.pubsub, orgId);
+  if (decided.status === "accepted" && decided.agentId) {
+    // Cleared inside the transaction too: a run reading in between may have cached the agent as it was.
+    invalidateOrg(orgId);
+    await publishAgentsChanged(events.pubsub, orgId);
+  }
   await events.flush();
   // Deleting closes its missions and stops its work on its computer, which can't run inside the decision's
   // transaction; failing, the row is open again so someone can retry.

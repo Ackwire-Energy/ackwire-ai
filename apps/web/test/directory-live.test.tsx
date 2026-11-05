@@ -4,8 +4,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent } from "@testing-library/react";
-import { DESKTOP_QUERY } from "@/components/NavDrawer";
-import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState, withRightHand } from "./fake-api";
+import { COMPACT_QUERY, DESKTOP_QUERY } from "@/components/NavDrawer";
+import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedDm, seedState, withRightHand } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 let media: { mockRestore: () => void } | null = null;
@@ -38,11 +38,11 @@ function lodiMakes(state: FakeState) {
   ];
 }
 
-async function open(state: FakeState = seedState(), path = `/org/${ORG_ID}/c/${ENG_ID}`) {
+async function open(state: FakeState = seedState(), path = `/org/${ORG_ID}/c/${ENG_ID}`, width = DESKTOP_QUERY) {
   media = spyOn(window, "matchMedia").mockImplementation(
     (q: string) =>
       ({
-        matches: q === DESKTOP_QUERY,
+        matches: q === width,
         media: q,
         addEventListener: () => {},
         removeEventListener: () => {},
@@ -61,6 +61,12 @@ async function open(state: FakeState = seedState(), path = `/org/${ORG_ID}/c/${E
   };
   return { ...r, state, api, agentReads, dmReads, orgEvent };
 }
+
+/** Past the gap between two reads of a list: what a burst left for its end has been read. */
+const gapEnds = async () => {
+  await act(() => new Promise((r) => setTimeout(r, 600)));
+  await settle(6);
+};
 
 const column = (channel: string) => screen().queryByRole("complementary", { name: `Membros de #${channel}` });
 const memberNames = (channel: string) =>
@@ -86,7 +92,7 @@ describe("Lodi made agents and channels while the app was open", () => {
     expect(screen().getByRole("button", { name: "Membros do canal (2)" })).toBeTruthy();
   });
 
-  test("what was reported: the sidebar hears of the channel from Lodi's receipt, the agent list stays old", async () => {
+  test("the sidebar hears of the channel from Lodi's receipt while the agent list stays old", async () => {
     const app = await open();
     lodiMakes(app.state);
     const receipt = {
@@ -159,14 +165,85 @@ describe("what changes elsewhere shows everywhere, without a reload", () => {
     expect(channelLink("geral")).toBeTruthy();
     app.state.channels = app.state.channels.filter((c) => c.name !== "geral");
     await app.orgEvent("channels.changed");
+    await gapEnds();
     expect(channelLink("geral")).toBeUndefined();
   });
 
-  test("the DM list names an agent as it is now", async () => {
-    const app = await open(withRightHand(seedState()));
+  test("the phone-width members sheet, open when an agent joins", async () => {
+    const app = await open(seedState(), `/org/${ORG_ID}/c/${ENG_ID}`, COMPACT_QUERY);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Membros do canal (4)" })));
+    await settle(2);
+    const base = app.state.agents[0] as (typeof app.state.agents)[number];
+    app.state.agents.push({ ...base, id: "a-iara", name: "Iara", handle: "iara" });
+    app.state.channelMembers[ENG_ID]?.push({ type: "agent", id: "a-iara" });
+    await app.orgEvent("channels.changed");
+    const sheet = screen().getByRole("dialog", { name: "Membros de #eng" });
+    expect(sheet.textContent).toContain("Iara");
+  });
+
+  test("Agentes e acesso: a new agent gets its row, a renamed one its name", async () => {
+    const app = await open(seedState(), `/org/${ORG_ID}/settings/access`);
+    const base = app.state.agents[0] as (typeof app.state.agents)[number];
+    app.state.agents.push({ ...base, id: "a-iara", name: "Iara", handle: "iara" });
+    const ada = app.state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.name = "Ada Lima";
+    await app.orgEvent("agents.changed");
+    const matrix = screen().getByRole("region", { name: "Acesso dos agentes" });
+    expect(matrix.textContent).toContain("Iara");
+    expect(matrix.textContent).toContain("Ada Lima");
+  });
+
+  test("a DM names its agent as it is now", async () => {
+    const state = withRightHand(seedState());
+    const dmId = seedDm(state, { type: "agent", id: ADA_ID });
+    const app = await open(state, `/org/${ORG_ID}/c/${dmId}`);
     const before = app.dmReads.mock.calls.length;
+    const dm = app.state.dms.find((d) => d.channelId === dmId);
+    if (dm) dm.with.name = "Ada Lima";
+    const ada = app.state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.name = "Ada Lima";
     await app.orgEvent("agents.changed");
     expect(app.dmReads.mock.calls.length).toBeGreaterThan(before);
+    expect(screen().getByRole("combobox", { name: /Ada Lima/ })).toBeTruthy();
+  });
+
+  test("the first agent to join an empty channel: the composer's suggestions speak to it", async () => {
+    const state = seedState();
+    state.messages = state.messages.filter((m) => m.channelId !== ENG_ID);
+    state.channelMembers[ENG_ID] = (state.channelMembers[ENG_ID] ?? []).filter((m) => m.type === "person");
+    const app = await open(state);
+    expect(document.body.textContent).not.toContain("@Ada ");
+    app.state.channelMembers[ENG_ID] = [...(app.state.channelMembers[ENG_ID] ?? []), { type: "agent", id: ADA_ID }];
+    await app.orgEvent("channels.changed");
+    expect(document.body.textContent).toContain("@Ada ");
+  });
+});
+
+describe("a burst is a read at once and a read when it ends, on any screen", () => {
+  test("ten agents made one after the other, each joining the open channel", async () => {
+    const app = await open();
+    const memberReads = spyOn(app.api.chat, "members");
+    const agents = app.agentReads.mock.calls.length;
+    const dms = app.dmReads.mock.calls.length;
+    const base = app.state.agents[0] as (typeof app.state.agents)[number];
+    for (let i = 0; i < 10; i++) {
+      const id = `a-new-${i}`;
+      app.state.agents.push({ ...base, id, name: `Novo ${i}`, handle: `novo${i}` });
+      app.state.channelMembers[ENG_ID]?.push({ type: "agent", id });
+      const joined = { type: "channel.member_added", channelId: ENG_ID, member: { type: "agent", id } };
+      await act(async () => {
+        const socket = app.sockets.last();
+        socket.push({ type: "event", scope: "org", event: { type: "agents.changed" } });
+        socket.push({ type: "event", scope: "org", event: { type: "channels.changed" } });
+        socket.push({ type: "event", channelId: ENG_ID, event: joined });
+      });
+      await settle(1);
+    }
+    await gapEnds();
+    expect(app.agentReads.mock.calls.length).toBeLessThanOrEqual(agents + 2);
+    expect(app.dmReads.mock.calls.length).toBeLessThanOrEqual(dms + 2);
+    expect(memberReads.mock.calls.length).toBeLessThanOrEqual(4);
+    expect(memberNames("eng")).toContain("Novo 9");
   });
 });
 
@@ -180,6 +257,16 @@ describe("what happened while nobody could hear", () => {
     await settle(8);
     expect(channelLink("vendas")).toBeTruthy();
     expect(app.agentReads.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  test("a reconnect names who joined the workspace meanwhile", async () => {
+    const app = await open();
+    const readsOfPeople = spyOn(app.api.orgs, "members");
+    await act(async () => app.sockets.last().drop());
+    await act(() => new Promise((r) => setTimeout(r, 1200)));
+    await act(async () => app.sockets.last().open());
+    await settle(8);
+    expect(readsOfPeople.mock.calls.length).toBeGreaterThan(0);
   });
 
   test("back to a tab hidden for a while: the same, with the socket still up", async () => {

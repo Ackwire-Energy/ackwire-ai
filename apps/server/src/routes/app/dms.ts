@@ -92,7 +92,9 @@ export function dmRoutes(deps: AppDeps) {
       responses: { 200: json(z.object({ channelId: z.uuid() })), ...errors },
     }),
     async (c) => {
-      const channel = await openDm(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json"));
+      const channel = await openDm(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json"), {
+        pubsub: adapters.pubsub,
+      });
       return c.json({ channelId: channel.id }, 200);
     },
   );

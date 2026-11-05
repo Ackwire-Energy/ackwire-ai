@@ -1727,6 +1727,7 @@ export function agentRoutes(deps: AppDeps) {
       // Its computers hear which account each agent thinks with (system mode lends the folders by it), on every save:
       // the one an old plan was on may be none the view shows (the team's right hand, which is on no computer).
       await publishMachineAgentsChanged(adapters.pubsub, orgId);
+      await publishAgentsChanged(adapters.pubsub, orgId);
       return c.json(view, 200);
     },
   );

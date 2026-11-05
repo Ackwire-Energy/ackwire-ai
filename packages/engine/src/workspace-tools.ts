@@ -2,6 +2,7 @@ import { holdEvents, type PubSub } from "@agenteschat/adapters";
 import { and, eq, isNull, schema, sql } from "@agenteschat/db";
 import { type ActionRecord, actWithUndo } from "./agent-actions";
 import { currentHandles } from "./agents";
+import { invalidateOrg } from "./cache";
 import { addChannelMember } from "./channels";
 import { getChannelCached } from "./context";
 import { personBehindCall } from "./requester";
@@ -111,6 +112,8 @@ export function createWorkspaceToolSource(deps: { pubsub?: PubSub }): ToolSource
               after: { agentId: agent.id, autoReply },
             }),
           );
+          // Cleared inside the transaction too: a run reading in between may have cached the channel as it was.
+          invalidateOrg(ctx.orgId);
           await events.flush();
           return { content: `Added @${agent.handle} to #${channel.name}.` };
         } catch (error) {

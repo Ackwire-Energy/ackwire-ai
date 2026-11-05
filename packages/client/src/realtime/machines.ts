@@ -1,4 +1,4 @@
-import type { QueryClient } from "@tanstack/react-query";
+import type { InvalidateQueryFilters, QueryClient } from "@tanstack/react-query";
 import { keys } from "../api/keys";
 import type {
   Agent,
@@ -14,6 +14,7 @@ import type {
   OrgDeletion,
   OrgStanding,
 } from "../api/types";
+import { pacer } from "../lib/pace";
 
 const MACHINE_EVENTS = new Set([
   "machine.status",
@@ -245,9 +246,19 @@ const SETUP_FIELDS = [
 const isAgentPart = (k: readonly unknown[], orgId: string, part: string) =>
   k[0] === "org" && k[1] === orgId && k[2] === "agent" && k[4] === part && k.length === 5;
 
+/** One read per list at the start of a burst (an import, a team), one at its end, however many events it sends. */
+const READ_GAP_MS = 500;
+const pacers = new WeakMap<QueryClient, ReturnType<typeof pacer>>();
+
+function readList(qc: QueryClient, list: string, filters: InvalidateQueryFilters) {
+  const pace = pacers.get(qc) ?? pacer(READ_GAP_MS);
+  pacers.set(qc, pace);
+  pace(list, () => void qc.invalidateQueries(filters));
+}
+
 /** Every channel's members, roster and hover card (the members column, the channel's details): read again. */
 const refreshChannelMembers = (qc: QueryClient, orgId: string, channelId?: string) =>
-  qc.invalidateQueries({
+  readList(qc, `${orgId}:members:${channelId ?? "all"}`, {
     predicate: ({ queryKey: k }) =>
       k[0] === "org" &&
       k[1] === orgId &&
@@ -280,8 +291,8 @@ export function readUnknownMembers(
     return true;
   };
   const missing = members.filter(unknown);
-  if (missing.some((m) => m.type === "agent")) void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
-  if (missing.some((m) => m.type === "person")) void qc.invalidateQueries({ queryKey: keys.members(orgId) });
+  if (missing.some((m) => m.type === "agent")) readList(qc, `${orgId}:agents`, { queryKey: keys.agents(orgId) });
+  if (missing.some((m) => m.type === "person")) readList(qc, `${orgId}:people`, { queryKey: keys.members(orgId) });
 }
 
 /**
@@ -295,7 +306,7 @@ export function applyMembershipEvent(qc: QueryClient, orgId: string, event: Chan
     event.type !== "channel.member_updated"
   )
     return false;
-  void refreshChannelMembers(qc, orgId, event.channelId);
+  refreshChannelMembers(qc, orgId, event.channelId);
   return true;
 }
 
@@ -319,23 +330,25 @@ export function applyMembershipEvent(qc: QueryClient, orgId: string, event: Chan
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
   if (event.type === "agents.changed") {
     // Under `agents`: the former ones. The DMs name each agent as the server knows it.
-    for (const key of [keys.agents(orgId), keys.dms(orgId), keys.team(orgId), keys.overview(orgId)])
-      void qc.invalidateQueries({ queryKey: key });
+    readList(qc, `${orgId}:agents`, { queryKey: keys.agents(orgId) });
+    readList(qc, `${orgId}:dms`, { queryKey: keys.dms(orgId) });
+    readList(qc, `${orgId}:team`, { queryKey: keys.team(orgId) });
+    readList(qc, `${orgId}:overview`, { queryKey: keys.overview(orgId) });
     // Each channel's roster names them too, and so does an agent's open page.
-    void refreshChannelMembers(qc, orgId);
-    void qc.invalidateQueries({ predicate: (q) => isAgentPart(q.queryKey, orgId, "detail") });
+    refreshChannelMembers(qc, orgId);
+    readList(qc, `${orgId}:agent-pages`, { predicate: (q) => isAgentPart(q.queryKey, orgId, "detail") });
     return true;
   }
   if (event.type === "channels.changed") {
-    void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
-    void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
-    void refreshChannelMembers(qc, orgId);
-    void qc.invalidateQueries({ predicate: (q) => isAgentPart(q.queryKey, orgId, "channels") });
+    readList(qc, `${orgId}:channels`, { queryKey: keys.channels(orgId) });
+    readList(qc, `${orgId}:dms`, { queryKey: keys.dms(orgId) });
+    refreshChannelMembers(qc, orgId);
+    readList(qc, `${orgId}:agent-channels`, { predicate: (q) => isAgentPart(q.queryKey, orgId, "channels") });
     return true;
   }
   if (event.type === "org.members") {
     // Who is in which channel follows who is in the workspace (a newcomer joins #general and the invited channels).
-    void refreshChannelMembers(qc, orgId);
+    refreshChannelMembers(qc, orgId);
     // Roles decide whom an agent answers: its `canTalk` and the routines shown follow them.
     for (const key of [
       keys.people(orgId),

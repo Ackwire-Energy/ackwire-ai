@@ -1,25 +1,30 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { channelTopic, orgTopic } from "@agenteschat/adapters";
+import { channelTopic, orgTopic, userTopic } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
   archiveAgent,
   archiveChannel,
+  caches,
   channelMembersDetail,
   createAgent,
   createChannel,
+  createProposedAgent,
   createSetupToolSource,
   createTeam,
   createToolGateway,
+  createWorkspaceToolSource,
   deleteAgent,
   deleteChannel,
   joinChannel,
   listChannelMembers,
+  openDm,
   openPersonAgentDm,
   PROPOSE_TEAM_TOOL,
   postPersonMessage,
   RIGHT_HAND,
   removeChannelMember,
+  revertSettings,
   setAgentAppearance,
   setAgentChannels,
   type ToolContext,
@@ -30,6 +35,7 @@ import {
   updateChannel,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -81,6 +87,36 @@ async function lodiRun(fx: Fixture, body: string): Promise<ToolContext> {
     runId: run.id,
     channelId: dm.id,
     threadRootId: run.threadRootId,
+    triggerMessageId: trigger.id,
+  };
+}
+
+/** A run of @dev: the right hand is denied some tools. */
+async function devRun(fx: Fixture, body: string): Promise<ToolContext> {
+  const trigger = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, {
+    body,
+  });
+  const [run] = await fx.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: fx.org.id,
+      agentId: fx.agent.id,
+      channelId: fx.general.id,
+      threadRootId: trigger.id,
+      triggerMessageId: trigger.id,
+      trigger: "mention",
+      hop: 1,
+      status: "done",
+    })
+    .returning();
+  if (!run) throw new Error("no run");
+  return {
+    db: fx.db,
+    orgId: fx.org.id,
+    agentId: fx.agent.id,
+    runId: run.id,
+    channelId: fx.general.id,
+    threadRootId: trigger.id,
     triggerMessageId: trigger.id,
   };
 }
@@ -165,6 +201,31 @@ describe("what Lodi creates reaches every open app, after its transaction commit
   });
 });
 
+describe("what runs cached while a transaction was open goes with its commit", () => {
+  test("add_agent_to_channel: a run reading between the write and the commit doesn't keep the old members", async () => {
+    f = await setup({ rightHand: true });
+    const channel = await createChannel(f.db, f.owner.id, f.org.id, { name: "vendas" });
+    const ctx = await devRun(f, "põe o dev no vendas");
+    const key = `${f.org.id}:${channel.id}`;
+    const transaction = f.db.transaction.bind(f.db);
+    f.db.transaction = (async (run: (tx: never) => Promise<unknown>) =>
+      transaction(async (tx) => {
+        const out = await run(tx as never);
+        caches.channelMembers.set(key, ["as it was"]);
+        return out;
+      })) as typeof f.db.transaction;
+    const tools = createToolGateway({ sources: [createWorkspaceToolSource({ pubsub: f.pubsub })] });
+    const res = await tools.invoke(ctx, {
+      toolUseId: `tu_${crypto.randomUUID()}`,
+      name: "add_agent_to_channel",
+      input: { agent: "@dev", channel: "vendas" },
+    });
+    if (res.type !== "result") throw new Error(`not a result: ${res.type}`);
+    expect(res.output.content).toContain("Added");
+    expect(caches.channelMembers.get(key)).toBeUndefined();
+  });
+});
+
 describe("every path that changes the agents or the channels tells the workspace", () => {
   const input = { name: "Iara", handle: "iara", role: "", instructions: "x" };
   const defaults = { model: "auto" };
@@ -225,6 +286,86 @@ describe("every path that changes the agents or the channels tells the workspace
     expect(announced(log, CHANNELS)).toBe(4);
     await setAgentChannels(db, owner.id, org.id, agent.id, [{ channelId: channel.id }], { pubsub });
     expect(announced(log, CHANNELS)).toBe(5);
+  });
+
+  test("Desfazer of a change to who it answers or to its AI, which have no editor of their own to announce them", async () => {
+    f = await setup();
+    const log = watch(f);
+    const { db, pubsub, org, owner, agent } = f;
+    const everyone = { mode: "everyone", userIds: [], roleIds: [] };
+    const action = {
+      orgId: org.id,
+      targetId: agent.id,
+      params: {
+        lines: [{ field: "audience", from: { mode: "owner", userIds: [], roleIds: [] }, to: everyone, label: "" }],
+      },
+    } as unknown as Parameters<typeof revertSettings>[1];
+    await revertSettings({ db, pubsub }, action, owner.id, "undo", () => new Error("changed"));
+    expect(announced(log, AGENTS)).toBe(1);
+  });
+
+  test("a proposed agent, on one click: read again once it has its AI, which moves who may talk to it", async () => {
+    f = await setup();
+    const { db, pubsub, org, owner, gateway } = f;
+    const ctx = await devRun(f, "cria um agente de cobrança");
+    const { machineId } = await pairMachine({ db, pubsub }, owner.id, org.id, { name: "MacBook", exec: true });
+    await db
+      .update(schema.machines)
+      .set({
+        protocol: 8,
+        executors: { claude: { version: "2.1.300", loggedIn: true }, detectedAt: new Date().toISOString() },
+      })
+      .where(eq(schema.machines.id, machineId));
+    await db.insert(schema.machineAccounts).values({
+      id: "0193aaaa-0000-4000-8000-000000000009",
+      orgId: org.id,
+      machineId,
+      kind: "claude_code",
+      label: "Claude",
+      status: "active",
+      createdBy: owner.id,
+    });
+    const tools = createToolGateway({ sources: [createSetupToolSource({ pubsub, ai: { gateway } })] });
+    const res = await tools.invoke(ctx, {
+      toolUseId: `tu_${crypto.randomUUID()}`,
+      name: "propose_agent",
+      input: {
+        name: "Caio",
+        handle: "caio",
+        role: "Cobrança",
+        instructions: "Lembra quem atrasou.",
+        why: "Você pediu alguém para cobrar quem atrasa.",
+      },
+    });
+    if (res.type !== "result") throw new Error(`not a result: ${res.type}`);
+    if (res.output.isError) throw new Error(res.output.content);
+    const { messageId } = (res.output.data as { agentProposal: { messageId: string } }).agentProposal;
+    const log = watch(f);
+    const made = await createProposedAgent({ db, pubsub, gateway }, owner.id, org.id, messageId);
+    expect(made.ai).toBe("account");
+    expect(announced(log, AGENTS)).toBe(2);
+  });
+
+  test("a new DM reaches its people's other devices, and only theirs", async () => {
+    f = await setup();
+    const { db, pubsub, org, owner, agent } = f;
+    const bia = await addMember(db, org.id, "member", "bia");
+    const heard: string[] = [];
+    for (const [who, id] of [
+      ["owner", owner.id],
+      ["bia", bia.id],
+    ] as const)
+      pubsub.subscribe(userTopic(org.id, id), (e) => {
+        if (e.type === CHANNELS) heard.push(who);
+      });
+    const log = watch(f);
+    await openDm(db, owner.id, org.id, { agentId: agent.id }, { pubsub });
+    expect(heard).toEqual(["owner"]);
+    await openDm(db, owner.id, org.id, { userId: bia.id }, { pubsub });
+    expect(heard).toEqual(["owner", "owner", "bia"]);
+    await openDm(db, owner.id, org.id, { userId: bia.id }, { pubsub });
+    expect(heard).toHaveLength(3);
+    expect(announced(log, CHANNELS)).toBe(0);
   });
 
   test("an archived agent stays a member, but leaves what a channel lists until it is back", async () => {
