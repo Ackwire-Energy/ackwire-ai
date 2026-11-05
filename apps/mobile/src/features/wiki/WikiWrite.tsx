@@ -295,7 +295,7 @@ function Writer({ page, title, folder }: { page: WikiPage | null; title: string;
             {folder ? (
               <View style={styles.folder}>
                 <Icon name="archive" size={13} color={c.faint} />
-                <Text variant="footnote" tone="faint">
+                <Text variant="footnote" tone="faint" style={styles.shrink}>
                   {folder}
                 </Text>
               </View>
@@ -472,6 +472,7 @@ export function WikiNewSheet({
 }
 
 const styles = StyleSheet.create({
+  shrink: { flexShrink: 1 },
   fill: { flex: 1 },
   grow: { flex: 1, minWidth: 0 },
   head: { paddingHorizontal: 20, paddingTop: 10, gap: 2 },

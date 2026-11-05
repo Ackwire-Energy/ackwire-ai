@@ -4,9 +4,13 @@
   /* "Tempo" warms as a task goes on (full at 40 min), like an operating system's task manager. */
   --tm-heat: color-mix(in srgb, var(--warn) 22%, var(--warn-soft));
 }
+/* A width of its own: in the page head's actions, which size to what they hold, a flex basis counted for nothing and
+   the field fell to its 220px minimum, cutting its placeholder mid-word. */
 .tm-search {
-  flex: 0 1 360px;
+  flex: 0 1 auto;
+  width: 360px;
   min-width: 220px;
+  max-width: 100%;
 }
 .tm-search > .ac-searchfield {
   width: 100%;
@@ -131,6 +135,9 @@ html:not([data-pointer]) .tm-card:focus-visible {
   --card-pad: 0;
   gap: 0;
   overflow: hidden;
+  /* The card's own face, resolved here: inside it `--surface-raised` is a step up, which painted the buttons' ground
+     and the rings of the apps' logos lighter than the rows in dark. */
+  --tm-ground: var(--surface-raised);
 }
 .tm-list {
   margin: 0;
@@ -180,11 +187,12 @@ html:not([data-pointer]) .tm-card:focus-visible {
   background: var(--plate-soft);
 }
 .tm-list > .tm-row[data-selected] {
+  --tm-ground: var(--chosen-bg);
   background: var(--chosen-bg);
   box-shadow: var(--chosen-shadow);
 }
 html:not([data-pointer]) .tm-row:has(.tm-hit:focus-visible) {
-  box-shadow: inset 0 0 0 2px var(--focus-color);
+  box-shadow: var(--focus-ring-inset);
 }
 .tm-cell {
   display: flex;
@@ -218,7 +226,7 @@ html:not([data-pointer]) .tm-row:has(.tm-hit:focus-visible) {
   overflow: visible;
 }
 .tm-cell--act {
-  --tm-act-bg: var(--surface-raised);
+  --tm-act-bg: var(--tm-ground, var(--surface-raised));
   position: absolute;
   inset-block: 0;
   right: 0;
@@ -228,7 +236,7 @@ html:not([data-pointer]) .tm-row:has(.tm-hit:focus-visible) {
   padding-left: 28px;
   padding-right: 12px;
   /* The row's own background under the buttons, fading in from the left over the text they cover. */
-  background: linear-gradient(var(--tm-act-bg), var(--tm-act-bg)), var(--surface-raised);
+  background: linear-gradient(var(--tm-act-bg), var(--tm-act-bg)), var(--tm-ground, var(--surface-raised));
   mask-image: linear-gradient(to right, transparent, #000 28px);
 }
 .tm-list > .tm-row:hover > .tm-cell--act {
@@ -405,6 +413,7 @@ html:not([data-pointer]) .tm-more:focus-visible {
 @media (max-width: 760px) {
   .tm-search {
     flex-basis: 100%;
+    width: 100%;
   }
   .tm-card.ac-card {
     width: 156px;

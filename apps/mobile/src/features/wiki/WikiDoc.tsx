@@ -91,13 +91,14 @@ function Block({
             hitSlop={10}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: b.done, disabled: !onToggleTask }}
+            // Ink, as a task's criteria check: blue is the agents' color, and a fixed white broke on dark.
             style={({ pressed }) => [
               styles.box,
-              b.done ? { backgroundColor: c.agent } : { borderWidth: 1.5, borderColor: c.line2 },
+              b.done ? { backgroundColor: c.ink } : { borderWidth: 1.5, borderColor: c.line2 },
               pressed && styles.pressed,
             ]}
           >
-            {b.done ? <Icon name="check" size={13} color="#fff" /> : null}
+            {b.done ? <Icon name="check" size={13} color={c.bg} /> : null}
           </Pressable>
           <Text variant="body" tone={b.done ? "muted" : "ink2"} style={styles.grow} selectable>
             {runs(b.runs)}

@@ -502,7 +502,7 @@ function EndedRow({ task, divider, meId }: { task: EndedTask; divider: boolean; 
           ) : (
             <PixelStopped size={10} />
           )}
-          <Text variant="footnote" tone="muted" numberOfLines={1}>
+          <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
             {how}
           </Text>
         </View>

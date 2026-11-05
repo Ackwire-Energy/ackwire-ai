@@ -213,7 +213,7 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
   const card = (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.head}>
-        <LineIcon name="doc" size={16} color={colors.ink2} variant="subhead" />
+        <LineIcon variant="subhead" name="doc" size={16} color={colors.ink2} />
         <Text variant="subhead" tone="ink2" style={styles.fill}>
           {runs.map((r, i) =>
             r.bold ? (

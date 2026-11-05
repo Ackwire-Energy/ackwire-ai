@@ -32,7 +32,18 @@ import {
   View,
 } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
-import { Button, Chip, Icon, IconButton, type IconName, PixelOrbit, Text, useReducedMotion, useToast } from "@/ui";
+import {
+  Button,
+  Chip,
+  Icon,
+  IconButton,
+  type IconName,
+  LineIcon,
+  PixelOrbit,
+  Text,
+  useReducedMotion,
+  useToast,
+} from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
 import { IssueWorkLine } from "../chat/WorkLine";
@@ -312,7 +323,7 @@ function WorkCard({ issue: i }: { issue: Issue }) {
     <View style={[styles.work, surface]}>
       <View style={styles.workHead}>
         <Face who={i.assignee} size={24} mode={state === "running" ? "run" : state === "stalled" ? "rest" : "idle"} />
-        <Text variant="body" style={styles.bold}>
+        <Text variant="body" numberOfLines={1} style={[styles.bold, styles.shrink]}>
           {name}
         </Text>
         <Text variant="body" tone="muted" style={styles.grow} numberOfLines={1}>
@@ -376,10 +387,18 @@ function WorkCard({ issue: i }: { issue: Issue }) {
                 layout={reduced ? undefined : LinearTransition.duration(220)}
                 style={styles.stepRow}
               >
+                {/* On the step's first line: a step that wraps had its mark centred between its lines. */}
                 {l.going ? (
-                  <PixelOrbit color={color} size={12} />
+                  <LineIcon variant="small" size={12}>
+                    <PixelOrbit color={color} size={12} />
+                  </LineIcon>
                 ) : (
-                  <Icon name={l.step.outcome === "refused" ? "x" : "checkc"} size={13} color={c.faint} />
+                  <LineIcon
+                    variant="small"
+                    name={l.step.outcome === "refused" ? "x" : "checkc"}
+                    size={13}
+                    color={c.faint}
+                  />
                 )}
                 <Text variant="small" tone={l.last ? "ink2" : "muted"} style={styles.grow}>
                   {l.text}
@@ -834,9 +853,11 @@ const styles = StyleSheet.create({
   work: { marginHorizontal: 16, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
   workHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   steps: { gap: 6 },
-  stepRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  stepRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   bold: { fontWeight: "600" },
   grow: { flex: 1, minWidth: 0 },
+  // A long name gives way to the state after it rather than pushing it off the card.
+  shrink: { flexShrink: 1 },
   groupTitle: { paddingTop: 24, paddingBottom: 8, paddingHorizontal: 20, letterSpacing: 0.4 },
   desc: { paddingHorizontal: 20 },
   card: { marginHorizontal: 16, borderRadius: 14, overflow: "hidden" },

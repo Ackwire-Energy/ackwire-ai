@@ -469,7 +469,6 @@ const styles = StyleSheet.create({
   card: { marginTop: 12, borderRadius: CARD, overflow: "hidden" },
   sky: { height: 6 },
   head: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  tile: { width: 28, height: 28, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
   subRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },

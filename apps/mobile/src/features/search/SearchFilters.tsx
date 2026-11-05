@@ -59,6 +59,8 @@ export function FilterChips({ chips, onRemove }: { chips: SearchChip[]; onRemove
                 onPress={() => onRemove(chip)}
                 accessibilityRole="button"
                 accessibilityLabel={t("searchPage.removeFilter", { filter: label })}
+                // A 32-point pill: the slop makes its target 44 without spacing the row out.
+                hitSlop={{ top: 6, bottom: 6 }}
                 fill={false}
                 contentStyle={[styles.chip, { backgroundColor: c.sunken }]}
               >

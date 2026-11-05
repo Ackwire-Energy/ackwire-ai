@@ -30,7 +30,7 @@
 }
 .tm-logos > .tm-logo {
   border-radius: 7px;
-  outline: 2px solid var(--raised);
+  outline: 2px solid var(--tm-ground, var(--raised));
 }
 .tm-logos > .tm-logo + .tm-logo {
   margin-left: -4px;
@@ -146,12 +146,12 @@
   max-width: none;
   padding: var(--menu-pad);
 }
-/* The buttons on the room (`.ac-popover`), in its corner; the face, the words and the reason further in. */
+/* The buttons on the room (`.ac-popover`), in its corner; the face, the words and the reason further in. The face
+   on the title's first line (`.ac-iconline` on its 20px line). */
 .tm-confirm__head {
-  display: flex;
-  align-items: flex-start;
   gap: 12px;
   padding: var(--popover-in) var(--popover-in) 0;
+  line-height: 20px;
 }
 .tm-confirm > .tm-why.ac-input {
   width: auto;
@@ -234,7 +234,7 @@
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 .tm-cfm__acts > .tm-why {

@@ -77,7 +77,7 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
         ) : null}
         {q ? (
           <View style={[styles.line, styles.pad]}>
-            <LineIcon name="agent" size={12} color={c.faint} variant="caption" />
+            <LineIcon variant="caption" name="agent" size={14} color={c.faint} />
             <Text variant="caption" tone="faint" style={styles.grow}>
               {t(consultOriginKey(q, Boolean(channelName)), {
                 from: from.name,
@@ -129,7 +129,7 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
       </ScrollView>
       <View style={[styles.foot, { paddingBottom: insets.bottom + 8 }]}>
         <View style={[styles.note, { backgroundColor: c.sunken }]}>
-          <LineIcon name="lock" size={13} color={c.muted} variant="footnote" />
+          <LineIcon variant="footnote" name="lock" size={16} color={c.muted} />
           <Text variant="footnote" tone="muted" style={styles.grow}>
             <Text variant="footnote" tone="ink2" style={styles.bold}>
               {t("chat.consultPanel.readOnly")}
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   list: { paddingVertical: 12, gap: 2 },
   pad: { paddingHorizontal: 16 },
-  // Its icon on the first line when the words wrap (a long name, a channel), as the note's below.
+  // Sentences that wrap: the icon stays on their first line (`LineIcon`), not between the lines.
   line: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 6 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },

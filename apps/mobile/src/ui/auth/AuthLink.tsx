@@ -11,6 +11,7 @@ export function AuthLink({ lead, label, onPress }: { lead?: string; label: strin
           {lead}
         </Text>
       ) : null}
+      {/* A 20-point line: 12 of slop around it reaches the 44-point target. */}
       <Pressable
         onPress={onPress}
         accessibilityRole="link"

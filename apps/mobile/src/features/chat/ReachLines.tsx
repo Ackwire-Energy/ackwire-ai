@@ -31,7 +31,8 @@ import { ConsultPairRow, useConsultById } from "./ConsultGroup";
 /**
  * On the phone, under an agent's message, every agent it @named that its mention didn't wake (`meta.reach`): one
  * outside the conversation got it by direct message (the two agents' pair row, opening their conversation), one it couldn't call
- * says why, and the agent's owner can let that person talk to it. The team actions' sunken row (TeamChecks.tsx).
+ * says why, and the agent's owner can let that person talk to it. The receipts' card, as the team actions' rows
+ * beside it (TeamChecks.tsx): a sunken fill here stood apart from the raised cards under the same reply.
  */
 export function ReachLines({ message: m }: { message: Message }) {
   const list = reachOf(m.meta);
@@ -67,7 +68,7 @@ function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: 
   // Handed to it by direct message: the two agents talking, as the pair row that opens their conversation.
   if (talk) return <ConsultPairRow askerId={authorId} channelId={channelId} items={[talk]} inline />;
   return (
-    <View style={[styles.one, { backgroundColor: colors.sunken }]}>
+    <View style={[styles.one, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
       <View style={styles.tx}>
         <LineIcon name={handed ? "chat" : "info"} size={15} color={colors.muted} variant="small" />
       </View>
@@ -229,7 +230,11 @@ const styles = StyleSheet.create({
     paddingVertical: (50 - 32) / 2,
     paddingLeft: 12,
     paddingRight: 10,
-    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
+    borderBottomLeftRadius: 6,
   },
   // The "small" line (20) on the action's middle.
   tx: { paddingTop: (32 - 20) / 2 },

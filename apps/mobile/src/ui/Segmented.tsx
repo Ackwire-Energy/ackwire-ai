@@ -43,6 +43,8 @@ export function Segmented({ items, value, onChange, wide = false }: SegmentedPro
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
             style={({ pressed }) => [wide ? { flex: 1 } : null, pressed && !on ? { opacity: 0.6 } : null]}
+            // A 28-point segment: the slop gives it the 44 a finger needs, past the track's own padding.
+            hitSlop={{ top: 8, bottom: 8 }}
           >
             <View
               style={[

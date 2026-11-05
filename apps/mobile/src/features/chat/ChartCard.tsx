@@ -78,7 +78,8 @@ export const ChartCard = memo(function ChartCard({
           onPress={() => setTable((v) => !v)}
           accessibilityRole="switch"
           accessibilityState={{ checked: table }}
-          // 44 tall to the finger; across, the expand button beside it has its own.
+          // 30 tall in the card's head: the slop gives it the 44-point target, only up and down so it doesn't reach
+          // into the full-screen button beside it.
           hitSlop={{ top: 7, bottom: 7 }}
           style={[styles.pill, table ? { backgroundColor: c.plate } : null]}
           contentStyle={styles.center}
@@ -566,7 +567,7 @@ const styles = StyleSheet.create({
   pending: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 14 },
   top: { flexDirection: "row", alignItems: "flex-start", gap: 4, paddingLeft: 14, paddingRight: 4, paddingTop: 10 },
   titles: { flex: 1, gap: 2, paddingTop: 4 },
-  pill: { height: 30, paddingHorizontal: 10, borderRadius: 15 },
+  pill: { minHeight: 30, paddingHorizontal: 10, borderRadius: 15 },
   tool: { height: 30, width: 32, borderRadius: 15 },
   center: { alignItems: "center", justifyContent: "center" },
   body: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 12 },

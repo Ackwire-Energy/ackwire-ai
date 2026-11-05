@@ -185,7 +185,7 @@ export function Step({
       {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
       <View style={[styles.n, { backgroundColor: state === "done" ? c.ok : state === "later" ? c.plate : c.ink }]}>
         {state === "done" ? (
-          <Icon name="check" size={12} color="#ffffff" />
+          <Icon name="check" size={12} color={c.bg} />
         ) : (
           <Text variant="caption" style={[styles.nText, { color: state === "later" ? c.faint : c.bg }]}>
             {n}

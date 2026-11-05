@@ -52,13 +52,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cmp-entry__dot {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--warn);
-}
 
 /* The dialog: up to 96vw × 94vh. Its words never end on a word alone. */
 .ac-dialog.cmp-dialog {
@@ -496,6 +489,25 @@
 .cmp-banner__t span {
   color: var(--muted);
   font-size: 12.5px;
+}
+/* Its button beside words that wrap (a request's whole ask): on their first line, not the middle of the lines. The
+   words start as far down as the small button (32, 40 on touch) centres a line, so their first runs through its middle. */
+.cmp-banner:has(> .ac-btn) {
+  --cmp-banner-btn: var(--control-h-sm);
+  align-items: flex-start;
+}
+@media (pointer: coarse) {
+  .cmp-banner:has(> .ac-btn) {
+    --cmp-banner-btn: var(--control-h-md);
+  }
+}
+.cmp-banner:has(> .ac-btn) > .cmp-banner__t {
+  margin-top: calc((var(--cmp-banner-btn) - 22px) / 2);
+}
+@supports (top: 1lh) {
+  .cmp-banner:has(> .ac-btn) > .cmp-banner__t {
+    margin-top: calc((var(--cmp-banner-btn) - 1lh) / 2);
+  }
 }
 
 /* The request this person helps with, above the stage. */

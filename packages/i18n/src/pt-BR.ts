@@ -5879,7 +5879,7 @@ export const ptBR = {
     agentRole: "Agente · {{role}}",
     pr: "PR #{{number}}",
     open: "#{{number}} {{title}}",
-    empty: "Crie uma, ou peça no chat: “Lia, cria uma tarefa para esse erro”.",
+    empty: "Crie uma, ou peça a um agente no chat.",
     noResults: "Nenhuma tarefa com esses filtros.",
     columnEmpty: "Nada aqui.",
     form: {

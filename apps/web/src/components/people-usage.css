@@ -44,7 +44,7 @@
 .pu-head__acts {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex: none;
 }
 .pu-chip {
@@ -202,8 +202,10 @@ th.pu-num .pu-sort {
 .pu-now > .ac-iconline {
   gap: 6px;
 }
+/* Cut out of the card's own face (the kit's `--stack-ring`): inside the card `--surface-raised` is a step up, a lighter
+   ring in dark. */
 .pu-faces .ac-avatar {
-  outline: 2px solid var(--surface-raised);
+  outline: 2px solid var(--stack-ring, var(--surface-raised));
 }
 
 /* A month's use against its limit: the words, then the bar; amber from 80%, red at it. */
@@ -322,6 +324,7 @@ th.pu-num .pu-sort {
 }
 .pu-limit__acts {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -329,8 +332,13 @@ th.pu-num .pu-sort {
   font-size: 13.5px;
   color: var(--muted);
 }
-.pu-amount {
+/* A small field of the ruler, as the small Save and Cancel beside it (as a task's reason field is). */
+.pu-amount.ac-input {
   width: 110px;
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm);
+  border-radius: var(--control-r-sm);
+  font-size: var(--control-fs-sm);
 }
 .pu-days .ac-usage-days {
   height: 110px;
@@ -422,20 +430,24 @@ th.pu-num .pu-sort {
   padding: 0;
   list-style: none;
 }
+/* A person, their choice and, for an amount, its field need ~450px: on a phone they wrap instead of running out of
+   the card. */
 .pu-limits__list li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 8px 12px;
 }
 .pu-limits__who {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-width: 160px;
+  min-width: min(160px, 100%);
 }
 .pu-pick {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -499,8 +511,10 @@ th.pu-num .pu-sort {
 }
 
 /* A request for more in the inbox: its two answers and the person's month. */
+/* Its answers and "see the month" are wider than a phone's inbox column: they wrap. */
 .pu-asks {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin-top: 8px;

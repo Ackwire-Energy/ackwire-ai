@@ -143,6 +143,8 @@ export function ConsultPairRow({
         }}
         disabled={!opens}
         accessibilityRole="button"
+        // A 28-point row: 8 above and below gives it the 44-point target.
+        hitSlop={{ top: 8, bottom: 8 }}
         style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.plate }]}
       >
         <AgentFace agentId={askerId} size={FACE} live={false} />
@@ -198,7 +200,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    height: 28,
+    minHeight: 28,
     paddingHorizontal: ROW_INSET,
     borderRadius: 10,
     flexShrink: 1,

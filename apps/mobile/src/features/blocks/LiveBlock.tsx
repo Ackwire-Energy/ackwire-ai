@@ -383,7 +383,9 @@ export function LiveBlockCard({ id, version }: { id: string; version?: number })
             </Text>
           ) : null}
         </View>
-        <IconButton icon="expand" label={t("mobile.blocks.openBig")} onPress={open} />
+        <View style={styles.headButton}>
+          <IconButton icon="expand" label={t("mobile.blocks.openBig")} onPress={open} />
+        </View>
       </View>
       <LiveBlock id={a.id} version={a.shownVersion} html={a.content.html} agentId={agentId} />
     </View>
@@ -451,6 +453,8 @@ const styles = StyleSheet.create({
   sky: { position: "absolute", top: 0, left: 0, right: 0, height: 8, opacity: 0.7 },
   head: { flexDirection: "row", alignItems: "flex-start", gap: 4, paddingLeft: 14, paddingRight: 4, paddingTop: 12 },
   titles: { flex: 1, minWidth: 0 },
+  // The 40-point button centred on the title's first line: its top sat level with the text, its middle a line lower.
+  headButton: { marginTop: -10 },
   bold: { fontWeight: "600" },
   web: { backgroundColor: "transparent" },
   fill: { flex: 1 },

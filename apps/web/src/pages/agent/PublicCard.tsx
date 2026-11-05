@@ -82,7 +82,7 @@ export function AgentPublicCard({
                   </span>
                 )}
                 <span className="agp-person__t">
-                  <b>{owner ? owner.name : t("newAgent.noOwnerOption")}</b>
+                  <b className="ac-captop">{owner ? owner.name : t("newAgent.noOwnerOption")}</b>
                   <span>{owner ? t("agentPage.overview.ownerRole") : t("newAgent.noOwnerHelp")}</span>
                 </span>
               </div>

@@ -86,8 +86,8 @@ describe("Contas de IA", () => {
     const add = within(screen().getByRole("region", { name: "Chaves de provedor" })).getByRole("button", {
       name: "Adicionar chave",
     });
-    expect(connect.parentElement?.querySelector("h2")?.textContent).toBe("Seus planos");
-    expect(add.parentElement?.querySelector("h2")?.textContent).toBe("Chaves de provedor");
+    expect(connect.closest(".ac-card__head")?.querySelector("h2")?.textContent).toBe("Seus planos");
+    expect(add.closest(".ac-card__head")?.querySelector("h2")?.textContent).toBe("Chaves de provedor");
     expect(connect.className).toBe(add.className);
     await act(async () => fireEvent.click(connect));
     await settle(4);
@@ -292,9 +292,9 @@ describe("Contas de IA: a plan with a login per agent", () => {
     expect(row?.textContent).toContain("chave …4f2a · Ada, Theo e Lia pensam com ela");
     expect(row?.querySelectorAll(".ac-planmeter")).toHaveLength(1);
     expect(row?.textContent).toContain("62%");
-    // Its name's capitals start at its mark's top; its actions stay in the row's middle, evenly spaced.
+    // Its name's capitals start at its mark's top; its actions, evenly spaced, on the name's line, risen with it.
     expect(row?.querySelector(".list-col > :first-child")?.classList.contains("ac-captop")).toBe(true);
-    expect(row?.querySelector(":scope > .ac-acts")).not.toBeNull();
+    expect(row?.querySelector(":scope > .ac-acts.ac-captail.ac-captop")).not.toBeNull();
   });
 
   test("one login signed out: whose, said under the facts", async () => {

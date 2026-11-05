@@ -599,17 +599,21 @@ export function WorkingLine({
           </Text>
         ) : null}
         {seeable ? (
-          <Pressable
-            onPress={see}
-            accessibilityRole="button"
-            accessibilityLabel={`${t("run.strip.see")} · ${lead?.name ?? ""}`}
-            hitSlop={8}
-            style={({ pressed }) => pressed && styles.pressed}
-          >
-            <Text variant="caption" tone="ink" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.ink}>
-              {t("run.strip.see")}
-            </Text>
-          </Pressable>
+          <>
+            <View style={[styles.sep, { backgroundColor: c.line }]} />
+            <Pressable
+              onPress={see}
+              accessibilityRole="button"
+              accessibilityLabel={`${t("run.strip.see")} · ${lead?.name ?? ""}`}
+              // A 16-point word in a 28-point pill: 14 above and below makes the 44 a finger needs.
+              hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
+              style={({ pressed }) => pressed && styles.pressed}
+            >
+              <Text variant="caption" tone="ink" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.ink}>
+                {t("run.strip.see")}
+              </Text>
+            </Pressable>
+          </>
         ) : null}
         {/* No stop here: the composer's, right under the line, is the one stop (two side by side read as noise). */}
       </Animated.View>

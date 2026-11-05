@@ -458,7 +458,7 @@ export function StopAllConfirm({
       align="end"
       className="tm-confirm"
     >
-      <div className="tm-confirm__head">
+      <div className="tm-confirm__head ac-iconline">
         <AgentAvatar agentId={agentId} name={name} size="sm" />
         <div className="tm-confirm__text">
           <b>{title}</b>

@@ -420,18 +420,16 @@ export function DecisionCardView({ decision: d, mission }: { decision: MissionDe
                 pressed && styles.pressed,
               ]}
             >
-              {on ? (
-                <View style={styles.optCheck}>
-                  <LineIcon name="check" size={16} color={c.bg} variant="body" />
-                </View>
-              ) : null}
+              {on ? <LineIcon variant="body" name="check" size={16} color={c.bg} /> : null}
               <Text variant="body" style={[styles.optText, { color: on ? c.bg : c.ink }]}>
                 {o}
               </Text>
               {o === rec ? (
-                <Text variant="caption" style={{ color: on ? c.bg : c.faint, opacity: on ? 0.7 : 1 }}>
-                  {t("mobile.mission.decision.recommended")}
-                </Text>
+                <LineIcon variant="body" size={16}>
+                  <Text variant="caption" style={{ color: on ? c.bg : c.faint, opacity: on ? 0.7 : 1 }}>
+                    {t("mobile.mission.decision.recommended")}
+                  </Text>
+                </LineIcon>
               ) : null}
             </Pressable>
           );
@@ -486,7 +484,7 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
     <View style={[investigated ? styles.inv : styles.askcard, surface]}>
       <View style={styles.row}>
         <Icon name="target" size={15} color={c.muted} />
-        <Text variant="caption" tone="muted" style={styles.bold}>
+        <Text variant="caption" tone="muted" style={[styles.bold, styles.shrink]}>
           {investigated
             ? t("missions.findings.proposed")
             : items.length > 0
@@ -508,7 +506,9 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
       {items.slice(0, 4).map((it, i) => (
         <View key={it.id} style={styles.planRow}>
           <View style={styles.n}>
-            <Count value={i + 1} size={13} />
+            <LineIcon variant="small" size={16}>
+              <Count value={i + 1} size={13} />
+            </LineIcon>
           </View>
           <Text variant="small" tone="ink2" style={styles.grow}>
             {it.title}
@@ -648,10 +648,11 @@ function Findings({ findings }: { findings: MissionFinding[] }) {
 const STEP_N = 16;
 
 const styles = StyleSheet.create({
+  shrink: { flexShrink: 1 },
   mcard: { marginTop: 8, padding: 14, borderRadius: 20, gap: 0 },
   pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  grow: { flex: 1 },
+  grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   title: { marginTop: 6, marginBottom: 10 },
   titlePinned: { marginTop: 4, marginBottom: 8 },
@@ -660,7 +661,7 @@ const styles = StyleSheet.create({
   summary: { marginBottom: 10 },
   log: { fontSize: 12, lineHeight: 17, marginBottom: 10 },
   acts: { flexDirection: "row", gap: 8, marginTop: 4 },
-  // A line that can wrap: its marks sit on the first line (`LineIcon`).
+  // Its words wrap to two lines: the icons stay on the first.
   done: {
     marginTop: 8,
     flexDirection: "row",
@@ -671,12 +672,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   opts: { gap: 6 },
-  // "Recommended" on the option's first line (its baseline) when the option wraps; the check on that line too.
-  opt: { flexDirection: "row", alignItems: "baseline", gap: 10, padding: 12, borderRadius: 14 },
-  optCheck: { alignSelf: "flex-start" },
+  // A long option wraps: its check and "Recommended" stay on its first line.
+  opt: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderRadius: 14 },
   optText: { flex: 1, fontWeight: "500" },
-  // The step's number on its first line's baseline, never centered beside two lines.
-  planRow: { flexDirection: "row", alignItems: "baseline", gap: 10, paddingVertical: 4 },
+  // A step's title wraps: its number stays on the first line.
+  planRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 4 },
   n: { width: STEP_N, alignItems: "flex-end" },
   // Under the steps' words: past the number's column and the row's gap.
   more: { paddingLeft: STEP_N + 10, paddingBottom: 8 },

@@ -79,7 +79,7 @@ export function ToolsScreen({ connectionId }: { connectionId: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  // The phone's settings: groups on the grouped gray.
+  // The pushed screens' 16-point margin, as the connection screen it opens from.
   page: { paddingHorizontal: 16, paddingTop: 8, gap: 14 },
   // The page's own gap, for what fades in together.
   stack: { gap: 14 },

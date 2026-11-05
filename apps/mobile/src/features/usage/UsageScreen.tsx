@@ -97,7 +97,7 @@ export function UsageScreen() {
                       <View key={machineId} style={styles.machine}>
                         <View style={styles.machineName}>
                           <Icon name="laptop" size={12} color={c.faint} />
-                          <Text variant="caption" tone="faint" style={styles.caps}>
+                          <Text variant="caption" tone="faint" style={[styles.caps, styles.shrink]}>
                             {list[0]?.machineName.toLocaleUpperCase()}
                           </Text>
                         </View>
@@ -136,7 +136,7 @@ export function UsageScreen() {
                     key={k.kind}
                     style={[styles.kind, i > 0 && { borderTopColor: c.line, borderTopWidth: StyleSheet.hairlineWidth }]}
                   >
-                    <Text variant="subhead" tone="ink" style={styles.grow}>
+                    <Text variant="subhead" tone="ink" numberOfLines={1} style={styles.grow}>
                       {t(`settings.kinds.${k.kind}`)}
                     </Text>
                     <Text variant="small" tone="muted" style={styles.tabular}>
@@ -226,10 +226,10 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
           key={a.agentId}
           onPress={() => openAgentUsage(a.agentId)}
           accessibilityRole="button"
-          style={({ pressed }) => [styles.share, i > 0 && divided, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.share, styles.shareRow, i > 0 && divided, pressed && styles.pressed]}
         >
           <AgentFace agentId={a.agentId} size={18} live={false} />
-          <Text variant="small" tone="ink" style={[styles.grow, styles.bold]}>
+          <Text variant="small" tone="ink" numberOfLines={1} style={[styles.grow, styles.bold]}>
             {dir.agentById.get(a.agentId)?.name ?? a.name}
           </Text>
           <Text variant="small" tone="ink2" style={styles.shareNum}>
@@ -245,10 +245,10 @@ function AgentShares({ shares, window }: { shares: ReturnType<typeof accountShar
           onPress={() => setOpen(true)}
           accessibilityRole="button"
           accessibilityState={{ expanded: false }}
-          style={({ pressed }) => [styles.share, divided, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.share, styles.shareRow, divided, pressed && styles.pressed]}
         >
           <View style={styles.face} />
-          <Text variant="small" tone="ink" style={[styles.grow, styles.bold]}>
+          <Text variant="small" tone="ink" numberOfLines={1} style={[styles.grow, styles.bold]}>
             {t("usageViews.moreAgents", { count: shares.rest.length })}
           </Text>
           <Text variant="small" tone="ink2" style={styles.shareNum}>
@@ -367,6 +367,7 @@ function DefaultBudgetCard() {
 
 const styles = StyleSheet.create({
   pressed: { opacity: 0.6 },
+  shrink: { flexShrink: 1 },
   screen: { flex: 1 },
   in: { paddingHorizontal: 16, paddingTop: 8, gap: 14 },
   // The page's own gap, for the cards that fade in together.
@@ -381,6 +382,8 @@ const styles = StyleSheet.create({
   divided: { borderTopWidth: StyleSheet.hairlineWidth },
   // An account's agents: face, name, share, tokens, the numbers in right-aligned columns that fit 390 pt.
   share: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 32 },
+  // The rows that open an agent: a finger's 44 points (the column titles above them stay at 32).
+  shareRow: { minHeight: 44 },
   face: { width: 18 },
   shareNum: { minWidth: 44, textAlign: "right", fontVariant: ["tabular-nums"] },
   shareTokens: { minWidth: 68, textAlign: "right", fontVariant: ["tabular-nums"] },

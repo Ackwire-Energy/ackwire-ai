@@ -83,7 +83,8 @@ export function ConnectorIcon({
       )}
       {check ? (
         <View style={[styles.check, { backgroundColor: c.ok, borderColor: c.bg }]}>
-          <Icon name="check" size={12} color="#ffffff" />
+          {/* The ring's color for the mark too: white on dark's light green was hard to read. */}
+          <Icon name="check" size={12} color={c.bg} />
         </View>
       ) : null}
     </View>

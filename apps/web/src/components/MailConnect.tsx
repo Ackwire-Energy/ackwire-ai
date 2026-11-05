@@ -915,7 +915,7 @@ export function MailRow({
     <div className="ac-list__row connected-row">
       <MailIcon choice={choice} size="lg" />
       <span className="list-col connected-row__text">
-        <span className="list-title">
+        <span className="list-title ac-captop">
           <span>{mailChoiceName(t, choice)}</span>
           {account.status === "needs_reconnect" ? (
             <Chip icon="alert" tone="waiting">

@@ -18,7 +18,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { ComputerIcon, ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg, useOrgMaybe } from "@/providers/org";
-import { Button, Icon, type IconName, InfoHint, LineIcon, SheetScreen, Text } from "@/ui";
+import { Button, type IconName, InfoHint, LineIcon, SheetScreen, Text } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
 import { setupNoticeLine } from "./logic";
@@ -199,9 +199,8 @@ export function SetupNotice() {
             {line}
           </Text>
         </View>
-        <View style={styles.more}>
-          <Icon name="right" size={16} color={c.faint} />
-        </View>
+        {/* On the title's line, as the icon on the left: in the card's middle it floated between the lines. */}
+        <LineIcon variant="callout" name="right" size={16} color={c.faint} />
       </Pressable>
     </View>
   );
@@ -225,7 +224,5 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 10,
   },
-  // The chevron belongs to the whole card, so it stays in its middle.
-  more: { alignSelf: "center" },
   pressed: { opacity: 0.85 },
 });

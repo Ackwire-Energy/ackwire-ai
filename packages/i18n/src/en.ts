@@ -5789,7 +5789,7 @@ export const en = {
     agentRole: "Agent · {{role}}",
     pr: "PR #{{number}}",
     open: "#{{number}} {{title}}",
-    empty: "Create one, or ask in the chat: “Lia, create a task for this error”.",
+    empty: "Create one, or ask an agent in a chat.",
     noResults: "No tasks match these filters.",
     columnEmpty: "Nothing here.",
     form: {

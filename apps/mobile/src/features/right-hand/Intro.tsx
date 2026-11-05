@@ -70,7 +70,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
     <View style={styles.intro}>
       <View style={styles.head}>
         <AgentFace agentId={agent.id} size={36} />
-        <Text variant="body" style={styles.bold}>
+        <Text variant="body" style={[styles.bold, styles.shrink]}>
           {agent.name}
         </Text>
       </View>
@@ -365,6 +365,8 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   sticker: { width: MESSAGE_STICKER, height: MESSAGE_STICKER, marginTop: 4 },
   fill: { flex: 1, minWidth: 0 },
+  // A long name wraps beside the face instead of running past the screen's edge.
+  shrink: { flexShrink: 1 },
   card: { marginTop: 6, borderRadius: 20, padding: 14, gap: 10 },
   // A question that wraps keeps its icon on its first line.
   cardHead: { flexDirection: "row", alignItems: "flex-start", gap: 10 },

@@ -351,7 +351,7 @@ function StickerTab({
             >
               <View style={styles.agent}>
                 <AgentFace agentId={agent.id} size={22} live={false} />
-                <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.bold}>
+                <Text variant="footnote" tone="muted" numberOfLines={1} style={[styles.bold, styles.shrink]}>
                   {agent.name}
                 </Text>
               </View>
@@ -399,6 +399,7 @@ function StickerCell({
 }
 
 const styles = StyleSheet.create({
+  shrink: { flexShrink: 1 },
   picker: { gap: 10 },
   tabs: { alignItems: "center" },
   // Runs past the sheet's padding, so a long last chip scrolls instead of being cut at it.

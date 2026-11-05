@@ -20,11 +20,13 @@ import {
   LivePause,
   Text,
   ToggleSwitch,
+  textLineOf,
   useHeaderSlot,
   useScrollUnderPushedOptions,
   useTheme,
 } from "@/ui";
 import { withAlpha } from "@/ui/palette";
+import { leadBox } from "@/ui/type-scale";
 import { useColors } from "./hooks";
 
 /**
@@ -93,6 +95,11 @@ export function ActionList({ items }: { items: ActionItem[] }) {
 /** One action, on a GroupedRow's numbers: 14 pt sides, the 32 pt leading column, 12 apart, 50 tall at least. */
 function ActionRow({ item: it, leading }: { item: ActionItem; leading: ReactNode }) {
   const c = useColors();
+  const { fontScale } = useWindowDimensions();
+  const line = textLineOf("body", fontScale);
+  // A hint that may wrap: the icon and what is on the right stay on the label's line, not the row's middle.
+  const tall = Boolean(it.hint) && !it.oneLine;
+  const onLine = (size: number) => (tall ? leadBox(line, size) : null);
   const press = it.onPress;
   return (
     <Pressable
@@ -111,11 +118,16 @@ function ActionRow({ item: it, leading }: { item: ActionItem; leading: ReactNode
       accessibilityLabel={it.hint ? `${it.label}. ${it.hint}` : it.label}
       style={({ pressed }) => [
         styles.action,
+        tall && styles.actionTall,
         pressed && { backgroundColor: c.sunken },
         it.disabled && { opacity: 0.5 },
       ]}
     >
-      {leading ? <View style={styles.actionLead}>{leading}</View> : null}
+      {leading ? (
+        <View style={styles.actionLead}>
+          {tall && !it.leading ? <View style={onLine(20)}>{leading}</View> : leading}
+        </View>
+      ) : null}
       <View style={styles.actionText}>
         <Text variant="body" tone={it.danger ? "danger" : "ink"} {...(it.oneLine ? { numberOfLines: 1 } : {})}>
           {it.marks
@@ -137,9 +149,19 @@ function ActionRow({ item: it, leading }: { item: ActionItem; leading: ReactNode
           </Text>
         ) : null}
       </View>
-      {it.code ? <Text style={[styles.mono, { color: c.faint }]}>{it.code}</Text> : null}
-      {it.trailing}
-      {it.checked === undefined ? null : <ToggleSwitch value={it.checked} />}
+      {it.code ? (
+        <View style={tall ? [styles.onLine, { minHeight: line.height }] : null}>
+          <Text style={[styles.mono, { color: c.faint }]}>{it.code}</Text>
+        </View>
+      ) : null}
+      {it.trailing ? (
+        <View style={tall ? [styles.onLine, { minHeight: line.height }] : null}>{it.trailing}</View>
+      ) : null}
+      {it.checked === undefined ? null : (
+        <View style={onLine(28)}>
+          <ToggleSwitch value={it.checked} />
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -314,6 +336,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
+  // A wrapping hint: the label starts where a one-line row's does (its 22 points centred in 50), as GroupedRow's.
+  actionTall: { alignItems: "flex-start", paddingVertical: 14 },
+  onLine: { justifyContent: "center" },
   actionLead: { width: 32, alignItems: "center", justifyContent: "center" },
   actionText: { flex: 1, minWidth: 0 },
   mono: { fontFamily: MONO, fontSize: 13 },

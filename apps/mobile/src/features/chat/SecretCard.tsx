@@ -275,7 +275,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
               </Text>
             ) : null}
             <View style={styles.note}>
-              <LineIcon name="lock" size={13} color={c.muted} variant="footnote" />
+              <LineIcon variant="footnote" name="lock" size={13} color={c.muted} />
               <Text variant="footnote" tone="muted" style={styles.grow}>
                 {code ? t("mobile.vault.card.codeNote") : t("secret.private")}
               </Text>
@@ -293,7 +293,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                   accessibilityHint={t("mobile.vault.card.saveText")}
                   style={({ pressed }) => [styles.saveRow, pressed && styles.pressed]}
                 >
-                  <Icon name={site ? "globe" : "key"} size={15} color={c.muted} />
+                  <LineIcon variant="subhead" name={site ? "globe" : "key"} size={16} color={c.muted} />
                   <View style={styles.grow}>
                     <Text variant="subhead" style={styles.semibold}>
                       {t("mobile.vault.card.save")}
@@ -426,7 +426,8 @@ const styles = StyleSheet.create({
   input: { ...fieldText("body"), paddingVertical: 10 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   save: { gap: 10, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  saveRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  // Its explanation wraps: the icon and the switch stay on the title's line, not centred on the whole row.
+  saveRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   agents: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },
   retry: { flexDirection: "row", alignItems: "center", gap: 6 },
   pressed: { opacity: 0.6 },

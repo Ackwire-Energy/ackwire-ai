@@ -326,6 +326,8 @@ export function ChoiceChips<K extends string>({
             accessibilityRole="radio"
             accessibilityState={{ selected: on }}
             fill={false}
+            // 34 tall: the slop gives it a finger's 44 without spacing the row out.
+            hitSlop={{ top: 5, bottom: 5 }}
             contentStyle={[styles.chip, { backgroundColor: on ? c.ink : c.chip }]}
           >
             {item.icon ? item.icon(ink) : null}
@@ -499,10 +501,13 @@ export function AudienceFields({
         </>
       )}
       <View style={styles.exposure}>
-        <LineIcon name="shield" size={13} color={c.faint} variant="footnote" />
-        <Text variant="footnote" tone="faint" style={styles.grow}>
-          {t("widgets.exposure")}
-        </Text>
+        {/* Down by the footer's own top padding, onto its first line (at the row's top it sat above the text). */}
+        <View style={styles.exposureIcon}>
+          <LineIcon variant="footnote" name="shield" size={14} color={c.faint} />
+        </View>
+        <View style={styles.grow}>
+          <GroupedFooter>{t("widgets.exposure")}</GroupedFooter>
+        </View>
       </View>
     </>
   );
@@ -529,7 +534,8 @@ const styles = StyleSheet.create({
   proposalTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   proposalActions: { flexDirection: "row", justifyContent: "flex-end", flexWrap: "wrap", gap: 8 },
   chips: { gap: 6, paddingHorizontal: 16 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, height: 34, paddingHorizontal: 12, borderRadius: 17 },
+  // Min heights: with a large text size the label grows past them instead of being clipped.
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 34, paddingHorizontal: 12, borderRadius: 17 },
   segments: { paddingHorizontal: 16 },
   // In GroupedRow's text column: its 14 side, the 32 leading column and the 12 gap.
   roles: {
@@ -540,8 +546,16 @@ const styles = StyleSheet.create({
     paddingRight: 14,
     paddingBottom: 12,
   },
-  roleChip: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 12, borderRadius: 16 },
+  roleChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 32,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
   faded: { opacity: 0.35 },
-  // A footer (GroupedFooter's 7 over it, 16 sides) with its icon on the first line, the words right after it.
-  exposure: { flexDirection: "row", alignItems: "flex-start", gap: 6, paddingTop: 7, paddingHorizontal: 16 },
+  exposure: { flexDirection: "row", alignItems: "flex-start", gap: 6, paddingLeft: 16, paddingTop: 10 },
+  // GroupedFooter's paddingTop.
+  exposureIcon: { paddingTop: 7 },
 });

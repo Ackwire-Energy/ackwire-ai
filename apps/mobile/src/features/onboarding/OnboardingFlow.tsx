@@ -6,14 +6,15 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { type ComponentProps, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { signOut } from "@/features/account";
 import { authClient } from "@/lib/auth";
 import { serverUrl } from "@/lib/server";
 import { useOrgGate } from "@/providers/org";
-import { AgentAvatar, Button, fieldText, Icon, type IconName, LineIcon, Text, useTheme } from "@/ui";
+import { AgentAvatar, Button, fieldText, Icon, type IconName, LineIcon, Text, textLineOf, useTheme } from "@/ui";
+import { leadBox } from "@/ui/type-scale";
 import { fullLook } from "../agents/edit";
 import { openPage } from "../ai/parts";
 import { confirmationSentTo, forgetConfirmationSent } from "../auth/confirmation";
@@ -252,6 +253,7 @@ function ConfirmationNote({ email }: { email: string }) {
             onPress={() => void resend()}
             disabled={sent === "sending"}
             accessibilityRole="button"
+            // A 20-point line: 12 of slop around it reaches the 44-point target.
             hitSlop={12}
             style={({ pressed }) => [styles.linkButton, pressed ? styles.pressed : null]}
           >
@@ -299,13 +301,21 @@ function Line({
   onPress: () => void;
 }) {
   const { colors: c } = useTheme();
+  const { fontScale } = useWindowDimensions();
+  // A help line that wraps: the icon and the word on the right stay on the title's line, not the row's middle.
+  const line = sub ? textLineOf("body", fontScale) : null;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      style={({ pressed }) => [styles.line, { borderColor: c.line }, pressed ? { backgroundColor: c.sunken } : null]}
+      style={({ pressed }) => [
+        styles.line,
+        line ? styles.lineTall : null,
+        { borderColor: c.line },
+        pressed ? { backgroundColor: c.sunken } : null,
+      ]}
     >
-      <View style={styles.lead}>{lead}</View>
+      <View style={[styles.lead, line ? leadBox(line, 18) : null]}>{lead}</View>
       <View style={styles.grow}>
         <Text variant="body" style={styles.bold}>
           {title}
@@ -317,9 +327,11 @@ function Line({
         ) : null}
       </View>
       {end ? (
-        <Text variant="small" style={styles.bold}>
-          {end}
-        </Text>
+        <View style={line ? [styles.end, { minHeight: line.height }] : null}>
+          <Text variant="small" style={styles.bold}>
+            {end}
+          </Text>
+        </View>
       ) : null}
     </Pressable>
   );
@@ -360,7 +372,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  lineTall: { alignItems: "flex-start", paddingVertical: 12 },
   lead: { width: 38, alignItems: "center" },
+  end: { justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8 },

@@ -215,7 +215,8 @@ export const RoutineRow = memo(function RoutineRow({
       </View>
       <View style={styles.below}>
         <View style={styles.when}>
-          <LineIcon name={whenIcon(r)} size={15} color={c.muted} variant="subhead" />
+          {/* On the schedule's first line's reading middle (a fixed 2-point nudge sat it above the letters). */}
+          <LineIcon variant="subhead" name={whenIcon(r)} size={14} color={c.muted} />
           <View style={styles.grow}>
             <Text variant="subhead" tone={paused ? "muted" : "ink2"} numberOfLines={2}>
               {whenText(r)}
@@ -252,13 +253,13 @@ const styles = StyleSheet.create({
   top: { flexDirection: "row", alignItems: "flex-start", gap: GAP },
   main: { flex: 1, minWidth: 0, gap: 4, paddingTop: 1 },
   title: { fontWeight: "600" },
-  // The delivery's words and the when's below start on one column: 13 + 8 = 15 + 6.
+  // The delivery's words and the when's below start on one column: 13 + 8 = 14 + 7.
   line: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
   shrink: { flexShrink: 1, minWidth: 0 },
   grow: { flex: 1, minWidth: 0 },
   chips: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4 },
   below: { marginLeft: AVATAR + GAP, gap: 8 },
-  when: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  when: { flexDirection: "row", alignItems: "flex-start", gap: 7 },
   runs: { flexDirection: "row", alignItems: "center", gap: 10 },
   bold: { fontWeight: "600" },
 });

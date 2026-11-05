@@ -347,7 +347,8 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
                         }}
                         accessibilityRole="button"
                         accessibilityState={{ expanded: open }}
-                        hitSlop={12}
+                        // An 18-point line: the slop gives "Show" the 44 a finger needs.
+                        hitSlop={{ top: 13, bottom: 13, left: 6, right: 6 }}
                         style={({ pressed }) => [styles.runMore, pressed && styles.pressed]}
                       >
                         <Text variant="footnote" tone="ink2" style={styles.bold}>
@@ -559,7 +560,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
               )}
               {origin ? (
                 <View style={styles.origin}>
-                  <LineIcon name="clock" size={13} color={c.muted} variant="footnote" />
+                  <LineIcon variant="footnote" name="clock" size={13} color={c.muted} />
                   <Text variant="footnote" tone="muted" style={styles.grow}>
                     {origin}
                   </Text>
@@ -797,8 +798,8 @@ export function ThreadLink({ thread }: { thread: ThreadInfo }) {
       onPress={() => router.push(chatHref(thread.channelId, thread.id))}
       accessibilityRole="button"
       accessibilityLabel={t("mobile.chat.replies", { count: thread.replyCount })}
-      // 36 drawn, 44 to the finger.
-      hitSlop={4}
+      // A 36-point link under the message: the slop gives it the 44 a finger needs.
+      hitSlop={{ top: 4, bottom: 4 }}
       style={({ pressed }) => [styles.tlink, surface, pressed && styles.pressed]}
     >
       <View style={styles.faces}>
@@ -829,7 +830,7 @@ export function ThreadLink({ thread }: { thread: ThreadInfo }) {
 }
 
 const styles = StyleSheet.create({
-  grow: { flex: 1 },
+  grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
   bold: { fontWeight: "600" },
   flip: { transform: [{ rotate: "180deg" }] },
@@ -843,7 +844,7 @@ const styles = StyleSheet.create({
   // 12 above the hairline (with the list's gap) and 12 under it.
   divided: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   itemDone: { opacity: 0.7 },
-  // The mark on the title's first line.
+  // The mark on the title's first line: centred on the whole item it floated beside a two-line title and its values.
   itemRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   // A request's decision: one row under its values, left-aligned, every button the strip's height.
   itemActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },

@@ -553,7 +553,8 @@ function WikiPage({ slug }: { slug: string }) {
               <Text variant="display2" accessibilityRole="header">
                 {p.title}
               </Text>
-              <View style={styles.pageByline}>
+              {/* Top-aligned, the face on the first line: a long "by … for …" line wraps under it. */}
+              <View style={[styles.byline, styles.top]}>
                 <LineIcon variant="footnote" size={18}>
                   <Face who={p.updatedBy} size={18} />
                 </LineIcon>
@@ -884,8 +885,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.85 },
   pressedWord: { opacity: 0.6 },
   byline: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
-  // The page's line can wrap: the face sits on its first line.
-  pageByline: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 2 },
+  top: { alignItems: "flex-start" },
   // On the buttons' ruler (48, `Button` md), its icon as theirs (18); 16 in from the edge, as the page's sides.
   fab: {
     position: "absolute",

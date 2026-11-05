@@ -213,6 +213,8 @@ function WaitingOpenCard({
             <Pressable
               onPress={openWaitingActivity}
               accessibilityRole="button"
+              // The slop reaches over the footer's 10 points above and the card's 14 below, toward a 44-point target.
+              hitSlop={{ top: 10, bottom: 14 }}
               style={({ pressed }) => [styles.more, pressed && styles.pressed]}
             >
               {faces.length > 0 ? (

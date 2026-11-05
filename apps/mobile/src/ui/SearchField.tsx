@@ -101,6 +101,7 @@ export function SearchField({
             onPress={() => onChangeText("")}
             accessibilityRole="button"
             accessibilityLabel={t("mobile.a11y.clearSearch")}
+            // A 16-point glyph: 14 of slop around it gives the 44-point target.
             hitSlop={14}
             style={({ pressed }) => (pressed ? { opacity: 0.4 } : null)}
           >

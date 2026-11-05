@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { atRule, builtCss, declarations, topLevel } from "./built-css";
 
-test("what ships wraps a hold from its top, its lead on the first line and its button in the middle; the other notices are one-line strips, and on phones all share the hold's top line", async () => {
+test("what ships wraps a hold from its top, its lead and its button on the first line; the other notices are one-line strips, and on phones all share the hold's top line and end their buttons at the right edge", async () => {
   const css = await builtCss();
   const shipped = topLevel(css);
   const phone = atRule(css, "@media (max-width: 640px)");
@@ -23,8 +23,8 @@ test("what ships wraps a hold from its top, its lead on the first line and its b
   expect(css).toContain(
     "@supports (top:1lh){.hold-banner>:first-child{translate:0 calc(.5lh - var(--cap-mid) - 50%)}}",
   );
-  // The button in the middle of the lines, as tall as one line to the row; on phones, on a row of its own.
-  expect(last(shipped, ".hold-banner>.outage__acts", "align-self")).toBe("center");
+  // The button on the first line, as tall as one line to the row; on phones, on a row of its own.
+  expect(last(shipped, ".hold-banner>.outage__acts", "align-self")).toBe("flex-start");
   expect(last(shipped, ".hold-banner>.outage__acts", "margin-block")).toBe("calc(11px - var(--control-h-sm) / 2)");
   expect(last(phone, ".hold-banner>.outage__acts", "margin-block")).toBe("0");
 
@@ -45,7 +45,11 @@ test("what ships wraps a hold from its top, its lead on the first line and its b
   expect(last(phone, ".outage__close", "margin")).toBe(
     "calc(11px - var(--cap-mid) - var(--control-h-sm) / 2) -12px 0 0",
   );
-  // A ghost's words start under the words above, and no button stretches.
-  expect(last(phone, ".outage__acts>.ac-btn--ghost:first-child", "margin-left")).toBe("-12px");
+  // The buttons end the notice at its right edge, under the ×, a ghost's words on the padding line; the setup
+  // notice's faces end that row, so its button stays under the words. No button stretches.
+  expect(last(phone, ".outage__acts", "justify-content")).toBe("flex-end");
+  expect(last(phone, ".outage__acts>.ac-btn--ghost:last-child", "margin-right")).toBe("-12px");
+  expect(last(phone, ".setup-notice .outage__acts", "justify-content")).toBe("flex-start");
+  expect(last(phone, ".setup-notice .outage__acts>.ac-btn--ghost:first-child", "margin-left")).toBe("-12px");
   expect(phone).not.toContain(".outage__acts>.ac-btn:not(.ac-btn--icon)");
 });

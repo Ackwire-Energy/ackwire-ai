@@ -230,7 +230,7 @@ function MemoryDetail({ id }: { id: string }) {
         <View style={styles.body}>
           <View style={styles.who}>
             <Face who={{ type: "agent", id: agentId }} size={20} />
-            <Text variant="subhead" tone="faint">
+            <Text variant="subhead" tone="faint" style={styles.shrink}>
               {t("mobile.memory.of", { name })}
             </Text>
           </View>
@@ -293,6 +293,7 @@ function MemoryDetail({ id }: { id: string }) {
 }
 
 const styles = StyleSheet.create({
+  shrink: { flexShrink: 1 },
   fill: { flex: 1 },
   lead: { paddingHorizontal: 20, marginTop: -4 },
   search: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },

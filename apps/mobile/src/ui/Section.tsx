@@ -24,11 +24,11 @@ export function Section({ title, count, action, children }: SectionProps) {
         {count !== undefined ? <Count value={count} size={13} weight={weights.medium} color={colors.faint} /> : null}
         <View style={{ flex: 1 }} />
         {action ? (
-          // A 44 pt target around the 18 pt line; it dims under the finger.
+          // The label's line is 18 tall: 13 of slop around it gives the 44-point target; it dims under the finger.
           <Pressable
             onPress={action.onPress}
             accessibilityRole="button"
-            hitSlop={14}
+            hitSlop={13}
             style={({ pressed }) => (pressed ? { opacity: 0.6 } : null)}
           >
             <Text variant="label" tone="muted">

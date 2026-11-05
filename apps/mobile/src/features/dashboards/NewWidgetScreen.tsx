@@ -465,7 +465,8 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
     body = (
       <View style={styles.failed}>
         <View style={styles.failedLine}>
-          <LineIcon name="info" size={13} color={c.warn} variant="footnote" />
+          {/* On the reason's first line (at the row's top it sat above the letters). */}
+          <LineIcon variant="footnote" name="info" size={16} color={c.warn} />
           <Text variant="footnote" style={[styles.grow, { color: c.warn }]}>
             {t("dashboards.newWidget.testFailed", { reason: widgetWords.failure(draft) })}
           </Text>
@@ -634,7 +635,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    height: 28,
+    minHeight: 28,
     paddingHorizontal: 6,
     borderRadius: 10,
   },
@@ -647,7 +648,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    height: 30,
+    minHeight: 30,
     maxWidth: "100%",
     paddingHorizontal: 10,
     borderRadius: 15,
@@ -657,7 +658,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    height: 28,
+    minHeight: 28,
     paddingHorizontal: 8,
     borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,

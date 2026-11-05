@@ -6224,7 +6224,7 @@
     "agentRole": "Agent · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "Utwórz zadanie albo poproś na czacie: „Lia, utwórz zadanie dla tego błędu”.",
+    "empty": "Utwórz zadanie albo poproś agenta na czacie.",
     "noResults": "Żadne zadanie nie pasuje do tych filtrów.",
     "columnEmpty": "Nic tu nie ma.",
     "form": {

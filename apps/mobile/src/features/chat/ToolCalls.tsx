@@ -867,12 +867,13 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 6,
     overflow: "hidden",
   },
-  // Its logos and words in the rows' columns (the lines' 4 of padding and a row's own 8).
+  // The block opens from here, 44 tall (a finger's target); its logos and words in the rows' columns (the lines'
+  // 4 of padding and a row's own 8).
   head: {
     flexDirection: "row",
     alignItems: "center",
     gap: ROW_GAP,
-    minHeight: 42,
+    minHeight: 44,
     paddingLeft: 4 + ROW_PAD,
     paddingRight: 10,
   },

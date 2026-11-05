@@ -1194,7 +1194,7 @@ function KeyPage({ mayAddKey, keyForm: form, keyButton = true, keySaved, onSaveK
                       <Text variant="small" tone="faint">
                         {t("onboarding.keyFromOther")}
                       </Text>
-                      {/* The app's small button (36 pt): something tapped is on the buttons' ruler. */}
+                      {/* Buttons, not tag pills: each one switches the key's provider. */}
                       {others.map((p) => (
                         <Button
                           key={p.id}

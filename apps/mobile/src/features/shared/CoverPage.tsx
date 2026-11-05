@@ -1,11 +1,12 @@
 import { useHeaderHeight } from "expo-router/react-navigation";
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WorkspaceSky } from "@/sky/Sky";
-import { Icon, type IconName, SectionHeader, Text } from "@/ui";
+import { Icon, type IconName, SectionHeader, Text, textLineOf } from "@/ui";
 import { CoverBarBackdrop, CoverParallax, useCoverScroll } from "@/ui/cover";
+import { leadBox } from "@/ui/type-scale";
 import { useColors } from "./hooks";
 import { PushedHeader, Tile } from "./parts";
 
@@ -77,7 +78,7 @@ export function PageSection({ title, count }: { title: string; count?: number | 
 
 /**
  * A loose row, as Conversas' (the hairline starts at the text): a tile, the label, a value, the chevron. With
- * `below` the tile and the chevron stay in the row's middle, as a GroupedRow's.
+ * `below` the tile stays at the top with the label, and the value and the chevron on the label's line.
  */
 export function PageRow({
   icon,
@@ -101,7 +102,10 @@ export function PageRow({
   chevron?: boolean;
 }) {
   const c = useColors();
+  const { fontScale } = useWindowDimensions();
   const lead = leading ?? (icon ? <Tile icon={icon} size={TILE} /> : null);
+  // Beside a row that grows under its label, what is on the right stays on the label's line, not the row's middle.
+  const line = below ? textLineOf("body", fontScale) : null;
   return (
     <Pressable
       onPress={onPress}
@@ -110,7 +114,10 @@ export function PageRow({
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
     >
       {divider ? <View style={[styles.rowLine, { backgroundColor: c.line2 }]} /> : null}
-      {lead}
+      {lead ? (
+        // Beside a row that grows under its label (a plan's meter), the tile stays with the label, at the top.
+        <View style={below ? styles.top : undefined}>{lead}</View>
+      ) : null}
       <View style={styles.grow}>
         <Text variant="body" tone={danger ? "danger" : "ink"} numberOfLines={1}>
           {label}
@@ -118,11 +125,15 @@ export function PageRow({
         {below}
       </View>
       {value ? (
-        <Text variant="body" tone="faint" numberOfLines={1} style={styles.value}>
+        <Text variant="body" tone="faint" numberOfLines={1} style={[styles.value, line ? styles.top : null]}>
           {value}
         </Text>
       ) : null}
-      {chevron ? <Icon name="right" size={15} color={c.faint} /> : null}
+      {chevron ? (
+        <View style={line ? [styles.top, leadBox(line, 15)] : undefined}>
+          <Icon name="right" size={15} color={c.faint} />
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -139,7 +150,8 @@ const styles = StyleSheet.create({
   // Not clipped: on a pull the sky grows up into the gap above the content.
   band: { paddingHorizontal: 20, paddingBottom: 20 },
   faceLine: { flexDirection: "row", alignItems: "center", gap: 14 },
-  acts: { flexDirection: "row", gap: 8, marginTop: 16 },
+  // Wraps: two buttons with long labels (some languages) would run past the screen's edge in one line.
+  acts: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 16 },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -157,4 +169,5 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
   },
   value: { maxWidth: "45%" },
+  top: { alignSelf: "flex-start" },
 });

@@ -11,7 +11,7 @@ import {
   workspaceHeadline,
 } from "@agenteschat/client/lib/notifications";
 import type { Words } from "@agenteschat/client/lib/routine-view";
-import { Avatar, ComputerIcon, Icon } from "@agenteschat/ui";
+import { Avatar, ComputerIcon, cx, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
@@ -85,50 +85,50 @@ export function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; c
   if (n.kind === "join_request") return <Avatar name={askersOf(n).names[0] ?? ""} size="sm" className={className} />;
   if (n.kind === "computer_ready")
     return (
-      <span className="nt-sys" aria-hidden="true">
+      <span className={cx("nt-sys", className)} aria-hidden="true">
         <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={16} />
       </span>
     );
   if (n.kind === "composio_limit" || n.kind === "connector_tool_changed")
     return (
-      <span className="nt-sys" aria-hidden="true">
+      <span className={cx("nt-sys", className)} aria-hidden="true">
         <Icon name="plug" size={16} />
       </span>
     );
   if (n.kind === "skill_update")
     return (
-      <span className="nt-sys" aria-hidden="true">
+      <span className={cx("nt-sys", className)} aria-hidden="true">
         <Icon name="book" size={16} />
       </span>
     );
   if (n.kind === "computer_disk_full")
     return (
-      <span className="nt-sys" aria-hidden="true">
+      <span className={cx("nt-sys", className)} aria-hidden="true">
         <Icon name="drive" size={16} />
       </span>
     );
   if (n.kind === "computer_no_chrome")
     return (
-      <span className="nt-sys" aria-hidden="true">
+      <span className={cx("nt-sys", className)} aria-hidden="true">
         <Icon name="globe" size={16} />
       </span>
     );
   if (n.kind === "app_created")
     return (
-      <span className="nt-sys" aria-hidden="true">
+      <span className={cx("nt-sys", className)} aria-hidden="true">
         <Icon name="agent" size={16} />
       </span>
     );
   if (n.kind === "usage_limit")
     return (
-      <span className="nt-sys" aria-hidden="true">
+      <span className={cx("nt-sys", className)} aria-hidden="true">
         <Icon name="wallet" size={16} />
       </span>
     );
   if (n.kind !== "org_standing") return null;
   const status = n.latest.statusTo;
   return (
-    <span className="nt-sys" aria-hidden="true">
+    <span className={cx("nt-sys", className)} aria-hidden="true">
       <Icon name={status === "active" ? "check" : status === "suspended" ? "block" : "pause"} size={16} />
     </span>
   );

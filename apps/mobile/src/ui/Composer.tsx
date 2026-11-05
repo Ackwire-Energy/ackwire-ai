@@ -213,6 +213,8 @@ export function Composer({
               key={s.label}
               onPress={() => put(s.text ?? s.label)}
               accessibilityRole="button"
+              // 32 tall: the slop reaches 44 without pushing the field down.
+              hitSlop={{ top: 6, bottom: 6 }}
               style={[styles.pill, { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
             >
               <View style={styles.pillIn}>

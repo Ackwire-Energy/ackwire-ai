@@ -214,9 +214,10 @@ export function ApprovalEmailLetter({ email, full }: { email: ApprovalEmail; ful
             {email.body}
           </Text>
           {!full && long ? (
+            // An 18-point line: 13 of slop around it gives the 44-point target.
             <Pressable
               accessibilityRole="button"
-              hitSlop={12}
+              hitSlop={13}
               onPress={() => setOpen((o) => !o)}
               style={({ pressed }) => (pressed ? styles.pressed : null)}
             >

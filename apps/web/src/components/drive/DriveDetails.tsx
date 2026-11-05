@@ -171,10 +171,11 @@ export function DriveDetails({
       <AudienceLine artifact={a} />
 
       <DetailsSection title={isAgent ? t("drive.madeBy") : t("drive.sentBy")}>
-        <div className="drive-author">
+        {/* The name's capitals on the face's top edge: the line under it (a long role) may wrap. */}
+        <div className="drive-author ac-faceline">
           <ActorAvatar size="md" actor={a.createdBy} name={authorName(a.createdBy)} />
           <span>
-            <b>{authorName(a.createdBy)}</b>
+            <b className="ac-captop">{authorName(a.createdBy)}</b>
             <small>
               {isAgent
                 ? role
@@ -206,14 +207,16 @@ export function DriveDetails({
                     </span>
                   </span>
                   {!latest && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      aria-label={t("drive.seeVersionLabel", { version: v.version })}
-                      onClick={() => openFile(v.version)}
-                    >
-                      {t("drive.seeVersion")}
-                    </Button>
+                    <span className="drive-versions__tail">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label={t("drive.seeVersionLabel", { version: v.version })}
+                        onClick={() => openFile(v.version)}
+                      >
+                        {t("drive.seeVersion")}
+                      </Button>
+                    </span>
                   )}
                 </li>
               );

@@ -56,7 +56,7 @@ export function Filters({ items, value, onChange }: FiltersProps) {
             }}
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
-            // 44 pt tall to the finger; side by side, the chips' own width is their target.
+            // The pill is 34 tall: the slop makes its target the 44 a finger needs without spacing the row out.
             hitSlop={{ top: 5, bottom: 5 }}
             style={({ pressed }) => (pressed && !on ? { opacity: 0.6 } : null)}
           >

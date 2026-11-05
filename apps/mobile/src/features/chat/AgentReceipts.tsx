@@ -139,8 +139,8 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
         disabled={!hasAgents}
         accessibilityRole={hasAgents ? "button" : "text"}
         accessibilityLabel={label}
-        // 44 to the finger, more of it below: above is the message's own long press.
-        hitSlop={{ top: 8, bottom: 16, left: 8, right: 8 }}
+        // A 20-point line: 12 above and below gives it the 44-point target.
+        hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
         style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       >
         {line.faces.length > 0 ? (

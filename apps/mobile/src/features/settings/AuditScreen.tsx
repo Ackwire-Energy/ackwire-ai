@@ -217,7 +217,7 @@ function OutcomeLine({ mood, mark, text }: { mood: AuditMood; mark: AuditMark; t
   return (
     <View style={styles.outcome}>
       <LineIcon name={MARK_ICON[mark]} size={13} color={color} variant="caption" />
-      <Text variant="caption" style={[styles.semibold, { color }]} numberOfLines={1}>
+      <Text variant="caption" style={[styles.semibold, { color }, styles.shrink]} numberOfLines={1}>
         {text}
       </Text>
     </View>
@@ -399,6 +399,7 @@ function KeyValues({ entries }: { entries: [string, unknown][] }) {
 }
 
 const styles = StyleSheet.create({
+  shrink: { flexShrink: 1 },
   // The other settings screens' note: on the groups' edge, not indented past it.
   note: { paddingHorizontal: 4, paddingTop: 10 },
   loading: { marginTop: 24 },

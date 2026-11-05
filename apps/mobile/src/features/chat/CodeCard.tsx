@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14 },
   sheetTitle: { flex: 1, textAlign: "center" },
   sheetTools: { flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-  pill: { height: 32, paddingHorizontal: 14, borderRadius: 16 },
+  pill: { minHeight: 32, paddingHorizontal: 14, borderRadius: 16 },
   fill: { flex: 1 },
   sheetBody: { paddingHorizontal: 16, paddingTop: 4 },
 });

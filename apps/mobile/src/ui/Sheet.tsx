@@ -151,7 +151,7 @@ export function Sheet({ open, onClose, children, solid = false, onGone }: SheetP
               accessibilityRole="adjustable"
               accessibilityLabel={t("mobile.a11y.grabber")}
             >
-              <View style={[styles.grabBar, { backgroundColor: colors.line2 }]} />
+              <View style={[styles.grabBar, { backgroundColor: colors.grabber }]} />
             </View>
             <ScrollView
               keyboardShouldPersistTaps="handled"
@@ -173,6 +173,7 @@ const styles = StyleSheet.create({
   sheet: { marginHorizontal: INSET, marginBottom: INSET, borderRadius: RADIUS, flexShrink: 1 },
   surface: { borderRadius: RADIUS, paddingTop: 8, overflow: "hidden", flexShrink: 1 },
   grab: { alignItems: "center", paddingTop: 4, paddingBottom: 10 },
-  // The system's own grabber (`SheetSurface`): 36 × 5, round ends.
+  // The system's own grabber (as `SheetSurface` draws it): 36 × 5, round ends; the hairline's tone was too faint on
+  // the glass.
   grabBar: { width: 36, height: 5, borderRadius: 2.5 },
 });

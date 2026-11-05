@@ -1,12 +1,13 @@
 import { Children, isValidElement, type ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { useInfoHint } from "./InfoHint";
-import { Text } from "./Text";
+import { Text, textLineOf } from "./Text";
 import { ToggleSwitch } from "./Toggle";
 import { useTheme } from "./theme";
+import { leadBox } from "./type-scale";
 
 /** The leading column of a row with a face or a mark: whatever leads is centered in it. */
 const LEAD = 32;
@@ -133,7 +134,8 @@ export function GroupedRow(props: GroupedRowProps) {
 
 /** VoiceOver merges a button inside the row's button into it: the row reads the note out with its label. */
 function HintedRow({ hint, ...props }: GroupedRowProps & { hint: { name: string; text: string } }) {
-  const info = useInfoHint(hint);
+  // On the label's line: in a row whose text wraps the ⓘ stays beside the label, not at the row's top edge.
+  const info = useInfoHint({ ...hint, variant: "body" });
   return (
     <View>
       <Row {...props} said={hint.text} after={info.button} />
@@ -165,6 +167,7 @@ function Row({
   after,
 }: Omit<GroupedRowProps, "hint"> & { said?: string; after?: ReactNode }) {
   const { colors: c } = useTheme();
+  const { fontScale } = useWindowDimensions();
   const tone = danger ? c.danger : faint ? c.faint : c.ink;
   // A switch answers the finger as it flips, as `Toggle` does.
   const press =
@@ -174,6 +177,11 @@ function Row({
           onPress();
         }
       : onPress;
+  // Text that can take more than one line: the tile sits at the top and what is on the right stays on the
+  // label's line (centred on the whole row it floated between lines). One-line rows keep everything centred.
+  const tall = labelLines > 1 || subLines > 1 || Boolean(below) || Boolean(belowText);
+  const line = tall ? textLineOf("body", fontScale) : null;
+  const onLine = (size: number) => (line ? [leadBox(line, size), styles.onLine] : null);
   return (
     <Pressable
       onPress={press}
@@ -185,7 +193,11 @@ function Row({
         ...(toggle !== undefined ? { checked: toggle } : {}),
         ...(checked !== undefined ? { selected: checked } : {}),
       }}
-      style={({ pressed }) => [styles.row, pressed && onPress ? { backgroundColor: c.sunken } : null]}
+      style={({ pressed }) => [
+        styles.row,
+        tall ? styles.tall : null,
+        pressed && onPress ? { backgroundColor: c.sunken } : null,
+      ]}
     >
       {/* One column for whatever leads (an icon's tile, a 26 to 36 face, a mark): the text, and the hairline above,
           start at 58 in every row, so a list mixing tiles and faces reads as one column. */}
@@ -214,7 +226,7 @@ function Row({
         ) : null}
       </View>
       {valueLeading ? (
-        <View style={[styles.value, styles.valued]}>
+        <View style={[styles.value, styles.valued, line ? { minHeight: line.height } : null]}>
           {valueLeading}
           {value ? (
             <Text variant="callout" tone="faint" numberOfLines={1} style={styles.shrink}>
@@ -223,15 +235,33 @@ function Row({
           ) : null}
         </View>
       ) : value ? (
-        <Text variant="callout" tone="faint" numberOfLines={1} style={styles.value}>
-          {value}
-        </Text>
+        <View style={[styles.value, line ? { minHeight: line.height, justifyContent: "center" } : null]}>
+          <Text variant="callout" tone="faint" numberOfLines={1} style={styles.shrink}>
+            {value}
+          </Text>
+        </View>
       ) : null}
       {after}
-      {checked ? <Icon name="check" size={18} color={c.ink} /> : null}
-      {toggle !== undefined ? <ToggleSwitch value={toggle} /> : null}
-      {chevron ? <Icon name="right" size={15} color={c.faint} /> : null}
-      {more ? <Icon name="more" size={18} color={c.faint} /> : null}
+      {checked ? (
+        <View style={onLine(18)}>
+          <Icon name="check" size={18} color={c.ink} />
+        </View>
+      ) : null}
+      {toggle !== undefined ? (
+        <View style={onLine(28)}>
+          <ToggleSwitch value={toggle} />
+        </View>
+      ) : null}
+      {chevron ? (
+        <View style={onLine(15)}>
+          <Icon name="right" size={15} color={c.faint} />
+        </View>
+      ) : null}
+      {more ? (
+        <View style={onLine(18)}>
+          <Icon name="more" size={18} color={c.faint} />
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -337,6 +367,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
+  // Wrapping text starts where a one-line row's label does (its 22 points centred in 50), not 8 from the top.
+  tall: { alignItems: "flex-start", paddingVertical: 14 },
+  // A control taller than the label's line (the 28-point switch) is centred on it rather than pushed below it.
+  onLine: { justifyContent: "center" },
   tile: {
     width: TILE,
     height: TILE,

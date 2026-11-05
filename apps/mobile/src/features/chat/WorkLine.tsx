@@ -63,8 +63,15 @@ function Line({ work, onThread, extra }: { work: WorkView; onThread?: () => void
   const c = useColors();
   const { view, stop, t } = useLine(work);
   const jump = useContext(JumpToMessageContext);
+  // An icon per state, never a colored dot: the shape says it without the color.
   const mark =
-    view.tone === "done" ? c.ok : view.tone === "failed" ? c.danger : view.tone === "stopped" ? c.muted : c.warn;
+    view.tone === "done"
+      ? { icon: "check" as const, color: c.ok }
+      : view.tone === "failed"
+        ? { icon: "x" as const, color: c.danger }
+        : view.tone === "stopped"
+          ? { icon: "pause" as const, color: c.muted }
+          : { icon: "clock" as const, color: c.warn };
   // Ver resultado: the report where it was asked, scrolled to when this conversation shows it.
   const seeResult = (messageId: string) => {
     if (!jump?.(messageId)) router.push(chatHref(work.channelId, work.homeThreadId));
@@ -78,9 +85,7 @@ function Line({ work, onThread, extra }: { work: WorkView; onThread?: () => void
             <PixelOrbit color="sky" size={12} />
           </LineIcon>
         ) : (
-          <LineIcon variant="small" size={8}>
-            <View style={[styles.dot, { backgroundColor: mark }]} />
-          </LineIcon>
+          <LineIcon variant="small" name={mark.icon} size={12} color={mark.color} />
         )}
       </View>
       <View style={styles.body}>
@@ -253,7 +258,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   mark: { width: 16, alignItems: "center" },
-  dot: { width: 8, height: 8, borderRadius: 4 },
   body: { flex: 1, minWidth: 0, gap: 4 },
   actions: { flexDirection: "row", flexWrap: "wrap", columnGap: 14, rowGap: 4, marginTop: 2 },
   action: { fontWeight: "600" },
