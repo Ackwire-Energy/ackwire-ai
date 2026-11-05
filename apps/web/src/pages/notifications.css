@@ -87,6 +87,8 @@
 .nt-wait > * {
   --raised: var(--raised-2);
   --surface-raised: var(--raised-2);
+  --card-face-top: var(--raised-2);
+  --card-key-bottom: var(--raised-2);
 }
 .nt-wh {
   display: flex;
@@ -439,11 +441,18 @@ html:not([data-pointer]) .nt-sug button:focus-visible {
 .nt-item:only-child {
   border-radius: 20px;
 }
+/* The row's ground, opaque over the list card's face, is also the ring that cuts a second face or an emoji out of the
+   first (`.nt-stk`, `.nt-emo`): a fixed card-colored ring drew a lighter circle on a hovered or current row in dark. */
+.nt-item {
+  --nt-ground: var(--raised);
+}
 .nt-item:hover {
-  background: color-mix(in srgb, var(--sunken) 40%, transparent);
+  --nt-ground: color-mix(in srgb, var(--sunken) 40%, var(--raised));
+  background: var(--nt-ground);
 }
 .nt-item.is-cur {
-  background: color-mix(in srgb, var(--sunken) 75%, transparent);
+  --nt-ground: color-mix(in srgb, var(--sunken) 75%, var(--raised));
+  background: var(--nt-ground);
 }
 /* A box of its own, so the face's top is the row's (no line around it). */
 .nt-who {
@@ -590,7 +599,7 @@ html:not([data-pointer]) .nt-sug button:focus-visible {
   position: absolute;
   right: -2px;
   bottom: -2px;
-  box-shadow: 0 0 0 2px var(--raised);
+  box-shadow: 0 0 0 2px var(--nt-ground, var(--raised));
 }
 .nt-more {
   display: inline-flex;
@@ -686,7 +695,7 @@ html:not([data-pointer]) .nt-more:focus-visible {
   height: 22px;
   border-radius: 50%;
   background: var(--sunken);
-  box-shadow: 0 0 0 2px var(--raised);
+  box-shadow: 0 0 0 2px var(--nt-ground, var(--raised));
   display: inline-flex;
   align-items: center;
   justify-content: center;

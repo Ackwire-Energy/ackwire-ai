@@ -93,7 +93,8 @@
   cursor: pointer;
 }
 .apps-client:hover {
-  background: var(--surface);
+  /* A plate over its own face: the page's color was no change on the white page in light. */
+  background: linear-gradient(var(--plate-soft), var(--plate-soft)), var(--raised);
 }
 html:not([data-pointer]) .apps-client:focus-visible {
   outline: none;

@@ -107,6 +107,14 @@ button.mi-pill {
 button.mi-pill:hover {
   background: color-mix(in srgb, var(--ink) 10%, var(--sunken));
 }
+/* The people in a mission's header: their faces are cut out of the pill's ground, hovered or not; the page's ring drew
+   gray circles on the near-black pill in dark. */
+.mh__people {
+  --stack-ring: var(--sunken);
+}
+button.mh__people:hover {
+  --stack-ring: color-mix(in srgb, var(--ink) 10%, var(--sunken));
+}
 html:not([data-pointer]) button.mi-pill:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);

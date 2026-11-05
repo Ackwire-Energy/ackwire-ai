@@ -98,14 +98,22 @@ html:not([data-pointer]) .threads-group__head button:focus-visible {
 .thread-row:first-child {
   border-top: 0;
 }
+/* The faces in a row are ringed in the row's own ground (`--stack-ring`), which follows its plate: the page's ring
+   drew a lighter circle around them on the darker open row in dark. */
+.thread-row {
+  --stack-ring: var(--raised);
+}
 .thread-row:hover {
-  background: color-mix(in srgb, var(--sunken) 45%, var(--raised));
+  --stack-ring: color-mix(in srgb, var(--sunken) 45%, var(--raised));
+  background: var(--stack-ring);
 }
 .thread-row.is-open {
-  background: color-mix(in srgb, var(--sunken) 80%, var(--raised));
+  --stack-ring: color-mix(in srgb, var(--sunken) 80%, var(--raised));
+  background: var(--stack-ring);
 }
 .thread-row.is-picked {
-  background: color-mix(in srgb, var(--ink) 4%, var(--raised));
+  --stack-ring: color-mix(in srgb, var(--ink) 4%, var(--raised));
+  background: var(--stack-ring);
 }
 .thread-row__lead {
   position: relative;

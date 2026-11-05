@@ -1218,7 +1218,8 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 }
 .is-current .issue-work__dot {
   background: var(--agent);
-  color: #fff;
+  /* Dark's agent blue is light: its own ink, not white. */
+  color: var(--on-agent);
 }
 
 /* Background work in a task's details (IssueWorkBlock): its line starts on the panel's own gap and spans the

@@ -7,6 +7,11 @@
 .sidebar {
   --presence-ring: var(--side);
 }
+/* A hovered row's plate, so the ring never shows as a dark arc around the badge on it in dark. */
+.sidebar__item:hover,
+.members-side__row.profile-trigger:hover {
+  --presence-ring: var(--side-hover);
+}
 .sidebar__item[data-status="active"] {
   --presence-ring: var(--side-chosen);
 }
@@ -199,7 +204,8 @@ html:not([data-pointer]) .status-field__emoji:focus-visible {
   cursor: pointer;
 }
 .status-avail__opt:hover {
-  background: var(--surface);
+  /* The kit's row hover: in the dialog the page's color was a near-black plate in dark. */
+  background: var(--plate-soft);
 }
 .status-avail__text {
   display: flex;

@@ -1058,7 +1058,8 @@ html:not([data-pointer]) .thread-line:focus-visible {
   inset: 0;
   padding: 0;
   border: 0;
-  background: rgba(10, 10, 10, 0.4);
+  /* The dialog's own dim (`--scrim`), so both read the same in each theme. */
+  background: var(--scrim);
   cursor: default;
   animation: thread-scrim-in 0.24s var(--out);
 }
