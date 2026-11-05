@@ -311,9 +311,11 @@ function AgentRow({
 
 const styles = StyleSheet.create({
   l1: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
-  // The name stays whole; a long role gives way (a share of an unsized box measured as almost nothing: "Re…").
-  name: { flexShrink: 0 },
-  role: { flexShrink: 1, minWidth: 0 },
+  // A long role gives way first (a share of an unsized box measured as almost nothing: "Re…"): its weight takes
+  // nearly all the overflow. The name gives way only once the role is gone, so a long one ends in an ellipsis
+  // instead of pushing the pin and the time off the screen.
+  name: { flexShrink: 1 },
+  role: { flexShrink: 1000, minWidth: 0 },
   work: { flexDirection: "row", alignItems: "center", gap: 7, minWidth: 0, marginTop: 2 },
   medium: { fontWeight: "500" },
   shrink: { flexShrink: 1 },

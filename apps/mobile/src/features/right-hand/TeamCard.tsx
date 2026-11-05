@@ -174,7 +174,9 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
           <View style={styles.agentFoot}>
             <View style={[styles.pill, { backgroundColor: c.raised }]}>
               <Icon name="hash" size={12} color={c.muted} />
-              <Text variant="caption">{a.channel}</Text>
+              <Text variant="caption" numberOfLines={1} style={styles.shrink}>
+                {a.channel}
+              </Text>
               {plan.newChannels.includes(a.channel) ? (
                 <Text variant="caption" style={[styles.bold, { color: c.info }]}>
                   {t("teamPlan.card.new")}
@@ -606,7 +608,7 @@ export function TeamMapSheet({ plan, open, onClose }: { plan: TeamPlan; open: bo
           <View key={col.channel} style={[styles.mapCol, { borderColor: c.line2 }]}>
             <View style={styles.line}>
               <Icon name="hash" size={14} color={c.muted} />
-              <Text variant="body" style={styles.bold}>
+              <Text variant="body" style={[styles.bold, styles.shrink]}>
                 {col.channel}
               </Text>
               {col.fresh ? (
@@ -753,6 +755,7 @@ export function TeamTemplatesSheet({
 }
 
 const styles = StyleSheet.create({
+  shrink: { flexShrink: 1 },
   chips: { gap: 8, marginTop: 6 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chipFoot: { flexDirection: "row", alignItems: "center", gap: 12 },
@@ -777,6 +780,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 999,
+    // A long channel name ends in an ellipsis inside the pill, leaving room for "Adjust" beside it.
+    flexShrink: 1,
   },
   section: { gap: 6, marginTop: 4 },
   line: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
