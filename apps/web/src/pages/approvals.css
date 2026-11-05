@@ -546,9 +546,12 @@ html:not([data-pointer]) .ap-link:focus-visible {
     grid-template-columns: 28px minmax(0, 1fr) auto;
     align-items: start;
   }
+  /* Open on the title's first line (its 22px line, with the same rise), not centred on the wrapped title. */
   .ap-mi__row .ap-row__end {
     grid-column: auto;
-    align-self: center;
+    height: 22px;
+    margin-block-start: calc(var(--cap-top) - 11px);
+    font-size: 14px;
   }
   .ap-mi__row .ap-row__end > .ac-chip {
     display: none;
@@ -769,13 +772,14 @@ html:not([data-pointer]) .ap-li:focus-visible {
   padding: 0 0 16px 28px;
   border-left: 1px solid var(--line);
 }
+/* The face's top on the first line's capitals (`.ac-captop` on "by"), as a chat name starts at its face. */
 .ap-review__head {
   position: sticky;
   top: 0;
   z-index: 3;
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: 14px;
   padding: 18px 0 12px;
   background: var(--bg);
@@ -788,7 +792,8 @@ html:not([data-pointer]) .ap-li:focus-visible {
 }
 .ap-review__by,
 .ap-review__title {
-  margin: 0;
+  margin-inline: 0;
+  margin-block-end: 0;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -803,6 +808,7 @@ html:not([data-pointer]) .ap-li:focus-visible {
   font-weight: 600;
 }
 .ap-review__title {
+  margin-block-start: 0;
   font-size: 22px;
   line-height: 28px;
   font-weight: 650;
