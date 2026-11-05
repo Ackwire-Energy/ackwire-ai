@@ -240,6 +240,31 @@ const ASK_USER = "ask_user";
 
 const isBuiltIn = (tool: Pick<ToolDefinition, "scope" | "connectionId">) => tool.scope === "" && !tool.connectionId;
 
+/** `input` with the text under `from` moved to `to`; blank text stays, for the refusal to say `to` is missing. */
+function renamed(input: Record<string, unknown>, from: string, to: string) {
+  const { [from]: value, ...rest } = input;
+  return to in input || typeof value !== "string" || !value.trim() ? input : { ...rest, [to]: value };
+}
+
+/**
+ * The names models guess for a field of our tools when a computer brain's harness held the schema back. Only these:
+ * a call that also has the real field stays as it is, and any other mistake is refused with what the tool takes.
+ */
+const INPUT_ALIASES = new Map<string, (input: Record<string, unknown>) => Record<string, unknown>>([
+  ["offer_connect_app", (input) => renamed(input, "reason", "why")],
+  ["browser_ask_person", (input) => renamed(input, "message", "instructions")],
+  [
+    "browser_do",
+    (input) =>
+      Array.isArray(input.steps)
+        ? {
+            ...input,
+            steps: input.steps.map((s) => (s && typeof s === "object" ? renamed(s, "action", "do") : s)),
+          }
+        : input,
+  ],
+]);
+
 /** Whether a call of this tool waits for a person: an approval, or a built-in question. */
 const asksPerson = (tool: ToolDefinition, decision: PolicyDecision) =>
   decision.action === "approve" || isSensitive(tool) || (tool.name === ASK_USER && isBuiltIn(tool));
@@ -891,6 +916,8 @@ export function createToolGateway(deps: {
       const record: typeof addRunStep = (db, run, kind, data) =>
         ctx.runId ? addRunStep(db, run, kind, data) : Promise.resolve();
       let tool = unknownInDirectory ? undefined : (all.get(call.name) ?? directoryTool);
+      const alias = tool && !tool.connectionId ? INPUT_ALIASES.get(tool.name) : undefined;
+      if (alias) call = { ...call, input: alias(call.input) };
       // What the live chip shows (the short label of a built-in tool, never a connector's input; the app and its
       // service): the chat's line of this call says the same after the run. A permission check also keeps its
       // command, masked, to open.

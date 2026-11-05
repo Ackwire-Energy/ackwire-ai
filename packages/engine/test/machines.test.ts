@@ -1110,7 +1110,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
 
   /** An agent that asks for NPM_TOKEN when told "publica", then says what it got (`before`: ahead of the ask). */
   async function asking(
-    target: ({ target: "env" } | { target: "file"; path: string }) & { site?: string } = { target: "env" },
+    target: ({ target?: "env" } | { target: "file"; path: string }) & { site?: string } = { target: "env" },
     runnerOptions: FakeRunnerOptions = {},
     before?: () => Promise<unknown>,
   ) {
@@ -1388,6 +1388,26 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     ]);
     expect(everything).not.toContain(OLD);
     expect(everything).not.toContain(NEW);
+  });
+
+  test("`target` is env unless it says file; anything else is refused with the values", async () => {
+    const { row } = await asking({});
+    expect(row).toMatchObject({ name: "NPM_TOKEN", targetPath: null });
+    const [run] = await f.db.select().from(schema.agentRuns);
+    const ctx: ToolContext = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run?.id as string,
+      channelId: f.general.id,
+      threadRootId: run?.threadRootId as string,
+      triggerMessageId: run?.triggerMessageId as string,
+    };
+    const input = { name: "OTHER_TOKEN", purpose: "outro pacote", target: "my home folder" };
+    const refused = await f.tools?.invoke(ctx, { toolUseId: "t1", name: "request_secret", input });
+    expect(refused).toMatchObject({ type: "result", output: { isError: true } });
+    expect(refused?.type === "result" ? refused.output.content : "").toContain('must be one of "env", "file"');
+    expect(await f.db.select().from(schema.secretRequests)).toHaveLength(1);
   });
 
   test("one run asks once per key: a second ask waits on the open card, and once given it isn't asked again until tried", async () => {
