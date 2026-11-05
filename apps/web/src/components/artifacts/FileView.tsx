@@ -1,8 +1,8 @@
 import type { ArtifactFileContent } from "@agenteschat/client";
 import { useArtifactBlob } from "@agenteschat/client";
 import { fileIcon, formatBytes, MAX_PREVIEW_BYTES, previewKind, previewType } from "@agenteschat/client/lib/files";
-import { Button, Icon, Spinner } from "@agenteschat/ui";
-import { useEffect, useState } from "react";
+import { Button, Icon, Spinner, VideoPlayer, type VideoPlayerLabels } from "@agenteschat/ui";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useOrg } from "@/components/org-context";
@@ -37,6 +37,27 @@ export function FileSummary({ content }: { content: ArtifactFileContent }) {
   );
 }
 
+/** The video player's words in the active language. */
+export function useVideoLabels(): VideoPlayerLabels {
+  const { t } = useTranslation();
+  return useMemo(
+    () => ({
+      play: t("files.video.play"),
+      pause: t("files.video.pause"),
+      replay: t("files.video.replay"),
+      seek: t("files.video.seek"),
+      volume: t("files.video.volume"),
+      mute: t("files.video.mute"),
+      unmute: t("files.video.unmute"),
+      speed: (speed: number) => t("files.video.speed", { speed }),
+      fullscreen: t("files.video.fullscreen"),
+      exitFullscreen: t("files.video.exitFullscreen"),
+      open: t("files.video.open"),
+    }),
+    [t],
+  );
+}
+
 /** Images up to this size get a thumbnail in the chat card (bigger ones only in the viewer). */
 export const MAX_THUMB_BYTES = 8 * 1024 * 1024;
 
@@ -60,8 +81,9 @@ export function usePreviewUrl(artifactId: string, version: number, contentType: 
 
 /**
  * A file on a chat message, as a tile that sits beside the others: images show
- * their thumbnail (a click opens the viewer); the rest show the type, name and
- * size (a click opens the viewer) with Baixar.
+ * their thumbnail (a click opens the viewer); videos play right there (a corner
+ * button opens the viewer); the rest show the type, name and size (a click
+ * opens the viewer) with Baixar.
  */
 export function FileCardPreview({
   content,
@@ -79,11 +101,29 @@ export function FileCardPreview({
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
-  const image = previewKind(content.contentType) === "image" && content.size <= MAX_THUMB_BYTES;
+  const kind = previewKind(content.contentType);
+  const image = kind === "image" && content.size <= MAX_THUMB_BYTES;
   const { url, failed } = usePreviewUrl(artifactId, version, content.contentType, image);
   // The tile keeps its loading size until the image is decoded: its size changes once, not to nothing and back.
   const [decoded, setDecoded] = useState<string | null>(null);
-  const download = () => fileSaver.save(api.artifacts.fileUrl(org.id, artifactId, { version }), content.name);
+  // A video this browser can't play (a codec it lacks) falls back to the file's row.
+  const [videoFailed, setVideoFailed] = useState(false);
+  const videoLabels = useVideoLabels();
+  const fileUrl = api.artifacts.fileUrl(org.id, artifactId, { version });
+  const download = () => fileSaver.save(fileUrl, content.name);
+  if (kind === "video" && !videoFailed) {
+    // Played straight from the download, in parts: it starts at once, whatever its size.
+    return (
+      <VideoPlayer
+        src={fileUrl}
+        name={content.name}
+        size={formatBytes(i18n.language, content.size)}
+        labels={videoLabels}
+        onOpen={onOpen}
+        onFailed={() => setVideoFailed(true)}
+      />
+    );
+  }
   if (image && !failed) {
     return (
       <button
@@ -134,8 +174,8 @@ export function FileCardPreview({
 
 /**
  * An uploaded file in the viewer (its name, size and Baixar are in the viewer's header): an inline preview only for
- * raster images and PDF (a blob of exactly that type, never the file's own origin), and the text of small text files,
- * read-only.
+ * raster images and PDF (a blob of exactly that type, never the file's own origin), videos in our player (a media
+ * element never runs the file as a page), and the text of small text files, read-only.
  */
 export function FileView({
   content,
@@ -149,9 +189,34 @@ export function FileView({
   title: string;
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const api = useApi();
   const kind = previewKind(content.contentType);
-  const canPreview = kind !== null && content.size <= MAX_PREVIEW_BYTES;
-  const { url, failed } = usePreviewUrl(artifactId, version, content.contentType, canPreview);
+  // A video streams from the download: any size plays. The rest load whole, up to the preview limit.
+  const canPreview = kind !== null && (kind === "video" || content.size <= MAX_PREVIEW_BYTES);
+  const { url, failed } = usePreviewUrl(artifactId, version, content.contentType, canPreview && kind !== "video");
+  const [videoFailed, setVideoFailed] = useState(false);
+  const videoLabels = useVideoLabels();
+
+  // A video fills the viewer, with its controls.
+  if (kind === "video") {
+    return (
+      <div className="file-view file-view--image">
+        {videoFailed ? (
+          <p className="small muted">{t("files.previewFailed")}</p>
+        ) : (
+          <VideoPlayer
+            key={`${artifactId}:${version}`}
+            variant="viewer"
+            src={api.artifacts.fileUrl(org.id, artifactId, { version })}
+            name={content.name}
+            labels={videoLabels}
+            onFailed={() => setVideoFailed(true)}
+          />
+        )}
+      </div>
+    );
+  }
 
   // A picture fills the viewer, with its zoom.
   if (kind === "image" && canPreview && url && !failed) {

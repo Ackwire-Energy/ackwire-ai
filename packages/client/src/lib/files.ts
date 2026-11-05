@@ -4,24 +4,30 @@ export const MAX_UPLOAD_MB = MAX_UPLOAD_BYTES / 1024 / 1024;
 /** Same limit as the server (`SKILL_LIMITS.assetBytes`): the images and other files a skill keeps, in MB. */
 export const SKILL_ASSET_MB = 20;
 
-/** Previews bigger than this are download-only (the bytes load into memory). */
+/** Previews bigger than this are download-only (the bytes load into memory). Videos stream instead: any size plays. */
 export const MAX_PREVIEW_BYTES = 25 * 1024 * 1024;
+
+export type PreviewKind = "image" | "pdf" | "video";
 
 /**
  * The only types previewed inline (ADR 0025): raster images and PDF, loaded
- * from the download as a blob of exactly this type. SVG, HTML and the rest
- * are download-only.
+ * from the download as a blob of exactly this type; videos, played by a video
+ * player straight from the download (in parts), never as a page. SVG, HTML
+ * and the rest are download-only.
  */
-const PREVIEW: Record<string, "image" | "pdf"> = {
+const PREVIEW: Record<string, PreviewKind> = {
   "image/png": "image",
   "image/jpeg": "image",
   "image/gif": "image",
   "image/webp": "image",
   "application/pdf": "pdf",
+  "video/mp4": "video",
+  "video/webm": "video",
+  "video/quicktime": "video",
 };
 
-/** `image`, `pdf` or null (download only). `contentType` may carry parameters. */
-export function previewKind(contentType: string): "image" | "pdf" | null {
+/** `image`, `pdf`, `video` or null (download only). `contentType` may carry parameters. */
+export function previewKind(contentType: string): PreviewKind | null {
   const base = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
   return PREVIEW[base] ?? null;
 }
@@ -35,7 +41,7 @@ const extension = (name: string) => {
 };
 
 /** The design system icons a file can show (all exist in `@agenteschat/ui`'s `IconName`). */
-export type FileIconName = "image" | "document" | "table" | "archive" | "code" | "page" | "file";
+export type FileIconName = "image" | "video" | "document" | "table" | "archive" | "code" | "page" | "file";
 
 const BY_EXTENSION: Record<string, FileIconName> = {
   png: "image",
@@ -46,6 +52,12 @@ const BY_EXTENSION: Record<string, FileIconName> = {
   svg: "image",
   bmp: "image",
   heic: "image",
+  mp4: "video",
+  m4v: "video",
+  mov: "video",
+  webm: "video",
+  mkv: "video",
+  avi: "video",
   pdf: "document",
   doc: "document",
   docx: "document",
@@ -94,6 +106,7 @@ export function fileIcon(name: string, contentType = ""): FileIconName {
   if (byName) return byName;
   const type = previewType(contentType);
   if (type.startsWith("image/")) return "image";
+  if (type.startsWith("video/")) return "video";
   if (type === "application/pdf") return "document";
   if (type.startsWith("text/")) return "document";
   if (type.includes("zip") || type.includes("compressed")) return "archive";

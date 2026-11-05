@@ -11135,6 +11135,19 @@
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "Zu groß für eine Vorschau. Lad sie herunter, um sie zu öffnen.",
     "downloadOnly": "Keine Vorschau für diesen Dateityp. Lad sie herunter, um sie zu öffnen.",
+    "video": {
+      "play": "Abspielen",
+      "pause": "Pausieren",
+      "replay": "Erneut abspielen",
+      "seek": "Position im Video",
+      "volume": "Lautstärke",
+      "mute": "Ton aus",
+      "unmute": "Ton an",
+      "speed": "Geschwindigkeit {{speed}}×",
+      "fullscreen": "Vollbild",
+      "exitFullscreen": "Vollbild beenden",
+      "open": "Öffnen"
+    },
     "zoom": {
       "toolbar": "Zoom",
       "in": "Vergrößern",

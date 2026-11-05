@@ -11570,6 +11570,19 @@
     "pdfFrame": "PDF : {{title}}",
     "tooBigToPreview": "Trop volumineux pour l'aperçu. Téléchargez-le pour l'ouvrir.",
     "downloadOnly": "Pas d'aperçu pour ce type de fichier. Téléchargez-le pour l'ouvrir.",
+    "video": {
+      "play": "Lire",
+      "pause": "Pause",
+      "replay": "Revoir",
+      "seek": "Position dans la vidéo",
+      "volume": "Volume",
+      "mute": "Couper le son",
+      "unmute": "Activer le son",
+      "speed": "Vitesse {{speed}}×",
+      "fullscreen": "Plein écran",
+      "exitFullscreen": "Quitter le plein écran",
+      "open": "Ouvrir"
+    },
     "zoom": {
       "toolbar": "Zoom",
       "in": "Agrandir",

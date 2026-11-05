@@ -932,6 +932,7 @@
   "files": {
     "type": {
       "image": "图片",
+      "video": "视频",
       "pdf": "PDF",
       "document": "文档",
       "table": "表格",
@@ -956,7 +957,17 @@
     "openImage": "打开图片",
     "imageOf": "第 {{index}} 张图片，共 {{count}} 张",
     "place": "{{index}}/{{count}}",
-    "noPreview": "此文件无法在应用中打开。请分享到其他应用打开。"
+    "noPreview": "此文件无法在应用中打开。请分享到其他应用打开。",
+    "video": {
+      "play": "播放",
+      "pause": "暂停",
+      "replay": "重新播放",
+      "seek": "视频中的位置",
+      "mute": "静音",
+      "unmute": "取消静音",
+      "fullscreen": "全屏",
+      "open": "打开"
+    }
   },
   "issues": {
     "title": "任务",

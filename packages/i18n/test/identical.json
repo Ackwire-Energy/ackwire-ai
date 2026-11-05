@@ -227,7 +227,8 @@
       "vault.kindPlural.login",
       "vault.kindPlural.loginTitle",
       "vault.source.bitwarden.field.clientId",
-      "vault.source.bitwarden.field.clientSecret"
+      "vault.source.bitwarden.field.clientSecret",
+      "files.video.volume"
     ],
     "es": [
       "agent.builtinName",
@@ -761,7 +762,9 @@
       "vault.field.keyNamePlaceholder",
       "vault.field.websitePlaceholder",
       "vault.row.agents",
-      "vault.use.routine"
+      "vault.use.routine",
+      "files.video.pause",
+      "files.video.volume"
     ],
     "de": [
       "access.agentCol",
@@ -1428,7 +1431,8 @@
       "vault.scope.team",
       "vault.source.bitwarden.field.server",
       "vault.tab.team",
-      "vault.use.routine"
+      "vault.use.routine",
+      "files.video.volume"
     ],
     "nl": [
       "access.agentCol",
@@ -1933,7 +1937,8 @@
       "vault.scope.team",
       "vault.source.bitwarden.field.server",
       "vault.tab.team",
-      "vault.use.routine"
+      "vault.use.routine",
+      "files.video.volume"
     ],
     "ja": [
       "access.area.vault",
@@ -2497,7 +2502,8 @@
       "vault.field.websitePlaceholder",
       "vault.kind.login",
       "vault.source.bitwarden.field.folder",
-      "vault.source.bitwarden.field.server"
+      "vault.source.bitwarden.field.server",
+      "files.video.volume"
     ],
     "tr": [
       "access.area.forum",
@@ -3104,7 +3110,8 @@
       "vault.field.keyName",
       "vault.field.keyNamePlaceholder",
       "vault.field.websitePlaceholder",
-      "vault.use.routine"
+      "vault.use.routine",
+      "files.video.pause"
     ],
     "de": [
       "activityNow.kind.browser",
@@ -3164,7 +3171,8 @@
       "vault.kind.login",
       "vault.kinds.login",
       "vault.scope.team",
-      "vault.tab.team"
+      "vault.tab.team",
+      "files.type.video"
     ],
     "it": [
       "activityNow.kind.browser",
@@ -3204,7 +3212,8 @@
       "vault.kind.login",
       "vault.scope.team",
       "vault.tab.team",
-      "vault.use.routine"
+      "vault.use.routine",
+      "files.type.video"
     ],
     "nl": [
       "activityNow.kind.browser",
@@ -3266,7 +3275,8 @@
       "vault.kinds.login",
       "vault.scope.team",
       "vault.tab.team",
-      "vault.use.routine"
+      "vault.use.routine",
+      "files.type.video"
     ],
     "ja": [
       "browser.live.key.Enter",
@@ -3321,7 +3331,8 @@
       "vault.contact.email",
       "vault.field.keyNamePlaceholder",
       "vault.field.websitePlaceholder",
-      "vault.kind.login"
+      "vault.kind.login",
+      "files.type.video"
     ],
     "tr": [
       "activityNow.kind.limit",
@@ -3334,7 +3345,8 @@
       "mission.plan.section",
       "onb.logo",
       "vault.field.keyNamePlaceholder",
-      "vault.field.websitePlaceholder"
+      "vault.field.websitePlaceholder",
+      "files.type.video"
     ],
     "pl": [
       "activityNow.kind.limit",

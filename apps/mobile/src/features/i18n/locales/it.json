@@ -1078,6 +1078,7 @@
   "files": {
     "type": {
       "image": "Immagine",
+      "video": "Video",
       "pdf": "PDF",
       "document": "Documento",
       "table": "Tabella",
@@ -1102,7 +1103,17 @@
     "openImage": "Apri immagine",
     "imageOf": "Immagine {{index}} di {{count}}",
     "place": "{{index}} di {{count}}",
-    "noPreview": "Questo file non si apre nell'app. Condividilo per aprirlo in un'altra app."
+    "noPreview": "Questo file non si apre nell'app. Condividilo per aprirlo in un'altra app.",
+    "video": {
+      "play": "Riproduci",
+      "pause": "Pausa",
+      "replay": "Riguarda",
+      "seek": "Posizione nel video",
+      "mute": "Disattiva audio",
+      "unmute": "Attiva audio",
+      "fullscreen": "Schermo intero",
+      "open": "Apri"
+    }
   },
   "issues": {
     "title": "Attività",

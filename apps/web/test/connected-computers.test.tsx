@@ -1060,8 +1060,11 @@ describe("realtime: machines and agent computers", () => {
 });
 
 describe("file helpers", () => {
-  test("previews only raster images and PDF", () => {
+  test("previews only raster images, PDF and video", () => {
     expect(previewKind("image/png")).toBe("image");
+    expect(previewKind("video/mp4")).toBe("video");
+    expect(previewKind("video/quicktime")).toBe("video");
+    expect(previewKind("video/x-msvideo")).toBeNull();
     expect(previewKind("image/jpeg; charset=binary")).toBe("image");
     expect(previewKind("application/pdf")).toBe("pdf");
     expect(previewKind("image/svg+xml")).toBeNull();
@@ -1075,6 +1078,8 @@ describe("file helpers", () => {
     expect(fileIcon("site.zip")).toBe("archive");
     expect(fileIcon("contrato.pdf")).toBe("document");
     expect(fileIcon("sem-extensao", "image/webp")).toBe("image");
+    expect(fileIcon("abertura.MOV")).toBe("video");
+    expect(fileIcon("sem-extensao", "video/webm")).toBe("video");
     expect(fileIcon("binario")).toBe("file");
     expect(formatBytes("pt-BR", 1536)).toContain("1,5");
     expect(formatBytes("en", 3 * 1024 * 1024)).toContain("3");

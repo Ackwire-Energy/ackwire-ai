@@ -932,6 +932,7 @@
   "files": {
     "type": {
       "image": "Gambar",
+      "video": "Video",
       "pdf": "PDF",
       "document": "Dokumen",
       "table": "Tabel",
@@ -956,7 +957,17 @@
     "openImage": "Buka gambar",
     "imageOf": "Gambar {{index}} dari {{count}}",
     "place": "{{index}} dari {{count}}",
-    "noPreview": "File ini tidak bisa dibuka di aplikasi. Bagikan untuk membukanya di aplikasi lain."
+    "noPreview": "File ini tidak bisa dibuka di aplikasi. Bagikan untuk membukanya di aplikasi lain.",
+    "video": {
+      "play": "Putar",
+      "pause": "Jeda",
+      "replay": "Putar lagi",
+      "seek": "Posisi dalam video",
+      "mute": "Bisukan",
+      "unmute": "Nyalakan suara",
+      "fullscreen": "Layar penuh",
+      "open": "Buka"
+    }
   },
   "issues": {
     "title": "Tugas",

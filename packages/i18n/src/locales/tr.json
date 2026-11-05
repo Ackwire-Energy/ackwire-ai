@@ -11071,6 +11071,19 @@
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "Önizleme için çok büyük. Açmak için indirin.",
     "downloadOnly": "Bu dosya türü için önizleme yok. Açmak için indirin.",
+    "video": {
+      "play": "Oynat",
+      "pause": "Duraklat",
+      "replay": "Tekrar oynat",
+      "seek": "Videodaki konum",
+      "volume": "Ses düzeyi",
+      "mute": "Sesi kapat",
+      "unmute": "Sesi aç",
+      "speed": "Hız {{speed}}×",
+      "fullscreen": "Tam ekran",
+      "exitFullscreen": "Tam ekrandan çık",
+      "open": "Aç"
+    },
     "zoom": {
       "toolbar": "Yakınlaştırma",
       "in": "Yakınlaştır",

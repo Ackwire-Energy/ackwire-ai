@@ -1077,7 +1077,7 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   margin-top: 6px;
 }
 /* A tile wider than its thumbnail (or a file's row): the thumbnail keeps to its right edge, under the bubble. */
-.ac-msg--own .artifact-tile > :is(.file-thumb, .file-row) {
+.ac-msg--own .artifact-tile > :is(.file-thumb, .file-row, .ac-video) {
   margin-left: auto;
 }
 /* A table on my bubble is cut from the page's color, as its code blocks are (the kit's `--surface-sunken` there). */
@@ -7030,6 +7030,11 @@ html:not([data-pointer]) .file-row__open:focus-visible {
 .artifact-viewer--image .artifact-viewer__versions {
   min-height: 0;
   overflow-y: auto;
+}
+/* A video fills the viewer the same way, its glass bar over its foot. */
+.file-view--image > .ac-video--viewer {
+  flex: 1 1 auto;
+  min-height: 240px;
 }
 .file-view--image .file-view__preview {
   flex: 1 1 auto;

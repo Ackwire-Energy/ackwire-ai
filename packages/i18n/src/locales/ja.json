@@ -10701,6 +10701,19 @@
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "大きすぎてプレビューできません。ダウンロードして開いてください。",
     "downloadOnly": "この種類のファイルはプレビューできません。ダウンロードして開いてください。",
+    "video": {
+      "play": "再生",
+      "pause": "一時停止",
+      "replay": "もう一度再生",
+      "seek": "動画の再生位置",
+      "volume": "音量",
+      "mute": "ミュート",
+      "unmute": "ミュート解除",
+      "speed": "速度 {{speed}}×",
+      "fullscreen": "全画面表示",
+      "exitFullscreen": "全画面表示を終了",
+      "open": "開く"
+    },
     "zoom": {
       "toolbar": "ズーム",
       "in": "拡大",

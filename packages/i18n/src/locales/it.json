@@ -11580,6 +11580,19 @@
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "Troppo grande per l'anteprima. Scaricalo per aprirlo.",
     "downloadOnly": "Nessuna anteprima per questo tipo di file. Scaricalo per aprirlo.",
+    "video": {
+      "play": "Riproduci",
+      "pause": "Pausa",
+      "replay": "Riguarda",
+      "seek": "Posizione nel video",
+      "volume": "Volume",
+      "mute": "Disattiva audio",
+      "unmute": "Attiva audio",
+      "speed": "Velocità {{speed}}×",
+      "fullscreen": "Schermo intero",
+      "exitFullscreen": "Esci da schermo intero",
+      "open": "Apri"
+    },
     "zoom": {
       "toolbar": "Zoom",
       "in": "Ingrandisci",

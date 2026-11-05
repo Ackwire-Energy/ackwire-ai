@@ -10807,6 +10807,20 @@ export const ptBR = {
     pdfFrame: "PDF: {{title}}",
     tooBigToPreview: "Arquivo grande demais para a prévia. Baixe para abrir.",
     downloadOnly: "Sem prévia para este tipo de arquivo. Baixe para abrir.",
+    /** The video player's controls (chat tile and viewer). */
+    video: {
+      play: "Tocar",
+      pause: "Pausar",
+      replay: "Ver de novo",
+      seek: "Posição no vídeo",
+      volume: "Volume",
+      mute: "Tirar o som",
+      unmute: "Ligar o som",
+      speed: "Velocidade {{speed}}×",
+      fullscreen: "Tela cheia",
+      exitFullscreen: "Sair da tela cheia",
+      open: "Abrir",
+    },
     zoom: {
       toolbar: "Zoom",
       in: "Ampliar",

@@ -1026,6 +1026,7 @@ export const featureKeysPtBR = {
   files: {
     type: {
       image: "Imagem",
+      video: "Vídeo",
       pdf: "PDF",
       document: "Documento",
       table: "Tabela",
@@ -1051,6 +1052,16 @@ export const featureKeysPtBR = {
     imageOf: "Imagem {{index}} de {{count}}",
     place: "{{index}} de {{count}}",
     noPreview: "Este arquivo não abre no app. Compartilhe para abrir em outro app.",
+    video: {
+      play: "Tocar",
+      pause: "Pausar",
+      replay: "Ver de novo",
+      seek: "Posição no vídeo",
+      mute: "Tirar o som",
+      unmute: "Ligar o som",
+      fullscreen: "Tela cheia",
+      open: "Abrir",
+    },
   },
   issues: {
     title: "Tarefas",

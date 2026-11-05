@@ -932,6 +932,7 @@
   "files": {
     "type": {
       "image": "이미지",
+      "video": "동영상",
       "pdf": "PDF",
       "document": "문서",
       "table": "표",
@@ -956,7 +957,17 @@
     "openImage": "사진 열기",
     "imageOf": "사진 {{count}}장 중 {{index}}번째",
     "place": "{{count}}개 중 {{index}}번째",
-    "noPreview": "이 파일은 앱에서 열리지 않아요. 공유해서 다른 앱으로 열어 보세요."
+    "noPreview": "이 파일은 앱에서 열리지 않아요. 공유해서 다른 앱으로 열어 보세요.",
+    "video": {
+      "play": "재생",
+      "pause": "일시정지",
+      "replay": "다시 보기",
+      "seek": "동영상 재생 위치",
+      "mute": "음소거",
+      "unmute": "음소거 해제",
+      "fullscreen": "전체 화면",
+      "open": "열기"
+    }
   },
   "issues": {
     "title": "작업",

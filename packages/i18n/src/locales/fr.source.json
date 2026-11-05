@@ -26130,6 +26130,39 @@
   "files.downloadOnly": {
     "value": "No preview for this type of file. Download it to open."
   },
+  "files.video.play": {
+    "value": "Play"
+  },
+  "files.video.pause": {
+    "value": "Pause"
+  },
+  "files.video.replay": {
+    "value": "Play again"
+  },
+  "files.video.seek": {
+    "value": "Position in the video"
+  },
+  "files.video.volume": {
+    "value": "Volume"
+  },
+  "files.video.mute": {
+    "value": "Mute"
+  },
+  "files.video.unmute": {
+    "value": "Unmute"
+  },
+  "files.video.speed": {
+    "value": "Speed {{speed}}×"
+  },
+  "files.video.fullscreen": {
+    "value": "Full screen"
+  },
+  "files.video.exitFullscreen": {
+    "value": "Exit full screen"
+  },
+  "files.video.open": {
+    "value": "Open"
+  },
   "files.zoom.toolbar": {
     "value": "Zoom"
   },
