@@ -2,7 +2,7 @@ import { useHomeBoard, type Widget } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Icon, Text } from "@/ui";
+import { Icon, Text, useTheme } from "@/ui";
 import { newWidgetHref } from "../dashboards/BoardScreen";
 import { HOME, widgetsInOrder } from "../dashboards/logic";
 import { WidgetPeek } from "../dashboards/WidgetPeek";
@@ -20,6 +20,7 @@ const STRIP_WIDGET = 156;
 export function HomeWidgets({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { t } = useTranslation();
   const c = useColors();
+  const { shadows } = useTheme();
   const orgId = useOrgId();
   const home = useHomeBoard(orgId);
   if (home.loading && !home.board) return null;
@@ -49,17 +50,24 @@ export function HomeWidgets({ collapsed, onToggle }: { collapsed: boolean; onTog
               />
             </View>
           ))}
-          {/* "Ver todos" ends the strip: Dashboards, where every board and widget is. */}
+          {/* "Ver todos" ends the strip, on no plate: a round button with the arrow, its words under it. */}
           <Pressable
             onPress={() => router.push("/dashboards")}
             accessibilityRole="button"
             accessibilityLabel={t("dashboards.seeAll")}
-            style={({ pressed }) => [styles.all, { backgroundColor: c.sunken }, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.all, pressed && styles.pressed]}
           >
-            <Text variant="small" tone="muted" style={styles.medium}>
+            <View
+              style={[
+                styles.allButton,
+                { backgroundColor: c.raised, boxShadow: `0px 0px 0px 0.5px ${c.line2}, ${shadows.e1}` },
+              ]}
+            >
+              <Icon name="right" size={20} color={c.ink2} />
+            </View>
+            <Text variant="footnote" tone="muted" style={styles.medium} numberOfLines={1}>
               {t("dashboards.seeAll")}
             </Text>
-            <Icon name="right" size={15} color={c.muted} />
           </Pressable>
         </ScrollView>
       ) : canAdd ? (
@@ -88,14 +96,8 @@ const styles = StyleSheet.create({
   medium: { fontWeight: "500" },
   // Room above and below: the cards' hairline and shadow are never cut by the strip's edge.
   strip: { paddingHorizontal: 16, gap: GAP, paddingTop: 4, paddingBottom: 6 },
-  all: {
-    width: 104,
-    borderRadius: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-  },
+  all: { width: 84, alignItems: "center", justifyContent: "center", gap: 8 },
+  allButton: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   pressed: { opacity: 0.7 },
   item: { width: STRIP_WIDGET },
   empty: {

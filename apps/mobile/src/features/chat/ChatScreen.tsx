@@ -1481,9 +1481,8 @@ function Chat({
       ? t("issues.commentPlaceholder")
       : t("mobile.chat.reply")
     : dm
-      ? rightHand
-        ? `${t("mobile.chat.messageTo", { name: dm.with.name })} · ${t("rightHand.composerHint")}`
-        : t("mobile.chat.messageTo", { name: dm.with.name })
+      ? // One line on the phone: the right hand's "nada muda sem você" doesn't fit beside its name.
+        t("mobile.chat.messageTo", { name: dm.with.name })
       : t("mobile.chat.messageIn", { channel: channel ? `#${channel.name}` : "" });
   // What to say next comes from the latest card: a code change, a file; none
   // while the agent works, asks or waits for an approval.

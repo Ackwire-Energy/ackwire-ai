@@ -89,10 +89,10 @@ test("Configurações has its section for who manages agents, at its own screen"
 
 test("its DM, cards and profile treat it apart through the one shared helper", () => {
   const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
-  // No computer in its DM, its own line and composer hint.
+  // No computer in its DM, and its own line; its field says "Mensagem para …" on one line, as every DM's.
   const chat = src("chat/ChatScreen.tsx");
   expect(chat).toContain("isRightHand(dmAgent)");
-  expect(chat).toContain('t("rightHand.composerHint")');
+  expect(chat).not.toContain('t("rightHand.composerHint")');
   expect(chat).toMatch(/dmComputer = dmAgentId && !isThread && !rightHand/);
   // Never archived or deleted from the phone.
   expect(src("agents/AgentEditScreen.tsx")).toContain("admin && !rightHand");

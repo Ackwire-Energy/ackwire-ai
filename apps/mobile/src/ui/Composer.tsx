@@ -282,27 +282,35 @@ export function Composer({
               {face}
             </Animated.View>
           ) : null}
-          <TextInput
-            ref={input}
-            {...(inputNativeID ? { nativeID: inputNativeID } : {})}
-            value={text}
-            onChangeText={(next) => {
-              setText(next);
-              if (next.trim()) onType?.(next);
-            }}
-            {...(selection ? { selection } : {})}
-            onSelectionChange={(e) => {
-              setCaret(e.nativeEvent.selection.end);
-              if (selection) setSelection(undefined);
-            }}
-            placeholder={placeholder}
-            placeholderTextColor={colors.faint}
-            multiline
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            accessibilityLabel={placeholder}
-            style={[inputText, { color: colors.ink }]}
-          />
+          {/* The placeholder is ours, on one line (cut with "…"): a long one wrapped and grew the empty field. */}
+          <View style={styles.inputBox}>
+            {!text ? (
+              <View style={styles.placeholder} pointerEvents="none">
+                <RNText numberOfLines={1} style={[placeholderText, { color: colors.faint }]}>
+                  {placeholder}
+                </RNText>
+              </View>
+            ) : null}
+            <TextInput
+              ref={input}
+              {...(inputNativeID ? { nativeID: inputNativeID } : {})}
+              value={text}
+              onChangeText={(next) => {
+                setText(next);
+                if (next.trim()) onType?.(next);
+              }}
+              {...(selection ? { selection } : {})}
+              onSelectionChange={(e) => {
+                setCaret(e.nativeEvent.selection.end);
+                if (selection) setSelection(undefined);
+              }}
+              multiline
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              accessibilityLabel={placeholder}
+              style={[inputText, styles.inputFill, { color: colors.ink }]}
+            />
+          </View>
           {mediaButton ? (
             <Animated.View
               entering={reducedMotion ? undefined : FadeIn.duration(140)}
@@ -412,7 +420,19 @@ const inputText: TextStyle = {
   }),
 };
 
+/** The placeholder's words, as the field's own text sits on its first line. */
+const placeholderText: TextStyle = {
+  fontSize: body.fontSize,
+  fontWeight: body.fontWeight,
+  letterSpacing: body.letterSpacing,
+  ...Platform.select<TextStyle>({ android: { lineHeight: body.lineHeight, includeFontPadding: false } }),
+};
+
 const styles = StyleSheet.create({
+  inputBox: { flex: 1, minWidth: 0 },
+  inputFill: { flex: 0, width: "100%" },
+  // Over the empty field's one line, centered on it.
+  placeholder: { position: "absolute", left: 0, right: 0, bottom: 0, height: SEND, justifyContent: "center" },
   // The row runs to the screen edges (past the composer's own inset) so a long last chip scrolls instead of
   // being cut at the padding.
   pillsBleed: { marginHorizontal: -10 },
