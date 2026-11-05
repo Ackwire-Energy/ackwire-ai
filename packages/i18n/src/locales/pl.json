@@ -5099,7 +5099,7 @@
   },
   "proposals": {
     "title": "Propozycje ulepszeń",
-    "subtitle": "Agenci proponują zmiany w instrukcjach, rolach i dostępach zespołu albo w kontekście {{org}}, gdy ktoś o to poprosi lub lekcja się powtarza. Nic się nie zmienia, dopóki ktoś tego nie zaakceptuje.",
+    "subtitle": "Zmiany proponowane przez agentów. Nic się nie zmienia bez akceptacji.",
     "list": "Propozycje",
     "proposes": "<b>{{agent}}</b> proponuje · {{target}}",
     "proposesMany": "<b>{{agent}}</b> proponuje · instrukcje agentów: {{count}}",
@@ -11498,6 +11498,7 @@
   },
   "searchPage": {
     "title": "Szukaj w przestrzeni roboczej",
+    "subtitle": "Wiadomości, kontekst i działania zespołu w twoich kanałach.",
     "label": "Szukaj",
     "placeholder": "Wiadomości, decyzje, podsumowania…",
     "filter": "Typ",
@@ -12087,7 +12088,7 @@
       },
       "saved": "{{name}} używa teraz: {{computer}}."
     },
-    "lead": "Gdzie pracują twoi agenci: komputer tego serwera i każdy inny komputer, który podłączysz.",
+    "lead": "Gdzie pracują twoi agenci: ten serwer i każdy podłączony komputer.",
     "leadCloud": "Gdzie pracują twoi agenci: komputer tylko dla tej przestrzeni roboczej, zawsze włączony.",
     "about": "O tym komputerze",
     "how": "Jak działają komputery",
@@ -12700,25 +12701,25 @@
     },
     "sectionText": {
       "account": "Twój profil i wygląd aplikacji dla ciebie.",
-      "notifications": "Skrzynka zachowuje wszystko. Tutaj wybierasz, co dociera do ciebie jako powiadomienie w tej przestrzeni roboczej.",
+      "notifications": "Co dociera do ciebie tutaj jako powiadomienie. Skrzynka zachowuje wszystko.",
       "general": "Nazwa, strefa czasowa i to, co każdy agent wie o przestrzeni roboczej.",
-      "right_hand": "Asystent, który z każdą osobą buduje zespół, w jej DM i z jej uprawnieniami.",
+      "right_hand": "Asystent, który buduje zespół z każdą osobą, w jej DM.",
       "members": "Kto jest w przestrzeni roboczej oraz zaproszenia.",
       "roles": "Co może każda osoba. Role się sumują.",
-      "vault": "Hasła, klucze i dane kontaktowe, których używają twoi agenci. Wpisują hasła i używają kluczy, nigdy ich nie widząc.",
+      "vault": "Hasła, klucze i kontakty twoich agentów. Haseł nigdy nie widzą.",
       "access": "Z czego może korzystać każdy agent: jeden poziom na konektor.",
       "connectors": "Usługi i serwery MCP podłączone raz dla całej przestrzeni roboczej.",
       "skills": "Instrukcje w Markdown, które agenci otwierają, gdy ich potrzebują.",
       "keys": "Twoje plany i klucze API przestrzeni roboczej.",
       "storage": "Gdzie są przechowywane pliki przestrzeni roboczej.",
       "usage": "Ile AI używa każda osoba i każdy agent, oraz limity miesiąca.",
-      "audit": "Co agenci zrobili poza rozmową i co zmieniły osoby. Widzą to tylko administratorzy.",
-      "import": "Przenieś agentów z innej aplikacji lub przestrzeni roboczej i zabierz tę, dokąd chcesz.",
-      "billing": "Plan agentes.chat tej przestrzeni roboczej, karta i faktury są na naszej stronie, poza aplikacją.",
-      "media": "Co osoby mogą wysyłać w rozmowie i kiedy agenci wysyłają GIF-a lub naklejkę.",
+      "audit": "Co agenci zrobili poza rozmową i co zmienili ludzie.",
+      "import": "Przenieś agentów z innej aplikacji lub przestrzeni albo zabierz tę.",
+      "billing": "Plan, karta i faktury, na naszej stronie poza aplikacją.",
+      "media": "Co można wysłać w rozmowie, oraz GIF-y i naklejki agentów.",
       "voice": "Wiadomości głosowe w rozmowach i to, kto zamienia głos na tekst.",
-      "apps": "Zlecaj zadania agentom tej przestrzeni roboczej z Claude, Cursor i innych aplikacji.",
-      "approvals": "Kto decyduje za ciebie, gdy agent prosi o coś, co czeka na twoje zatwierdzenie."
+      "apps": "Zlecaj zadania agentom z Claude, Cursor i innych aplikacji.",
+      "approvals": "Kto decyduje za ciebie, gdy agent prosi o twoją zgodę."
     },
     "title": "Ustawienia",
     "account": {
@@ -13133,7 +13134,7 @@
   },
   "gallery": {
     "title": "Galeria komponentów",
-    "subtitle": "Tylko do programowania. Komponenty @agenteschat/ui ze stanami zatwierdzonych ekranów."
+    "subtitle": "Tylko do developmentu: komponenty @agenteschat/ui."
   },
   "format": {
     "list": "{{names, list}}",
@@ -14871,6 +14872,7 @@
   },
   "taskManager": {
     "title": "Menedżer zadań",
+    "subtitle": "Co agenci robią teraz i co skończyło się dzisiaj.",
     "nav": "Menedżer zadań",
     "search": "Szukaj zadania, agenta lub aplikacji",
     "working_one": "{{count}} pracuje",
@@ -15240,7 +15242,7 @@
   },
   "dashboards": {
     "title": "Dashboardy",
-    "subtitle": "Liczby i wykresy, które agenci utrzymują w aktualności, dla całej przestrzeni roboczej albo tylko niektórych ról.",
+    "subtitle": "Liczby i wykresy, które agenci utrzymują w aktualności.",
     "sidebar": "Dashboardy",
     "navWhat": "Liczby i wykresy, które agenci utrzymują w aktualności",
     "new": "Nowy dashboard",

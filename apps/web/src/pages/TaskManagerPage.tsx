@@ -214,7 +214,7 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
       <PageHeader
         title={t("taskManager.title")}
         meta={
-          (summary.working > 0 || summary.waiting > 0) && (
+          summary.working > 0 || summary.waiting > 0 ? (
             <span className="tm-sum">
               {summary.working > 0 && (
                 <span className="tm-sum__item">
@@ -229,6 +229,8 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
                 </span>
               )}
             </span>
+          ) : (
+            t("taskManager.subtitle")
           )
         }
         actions={

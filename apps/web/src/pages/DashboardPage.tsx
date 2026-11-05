@@ -153,7 +153,7 @@ function Board({
         <BackCrumb />
         <PageHeader
           title={title}
-          meta={board.about}
+          meta={board.about || t("dashboards.subtitle")}
           actions={
             <>
               {board.canManage && !isHome && (

@@ -123,7 +123,7 @@ export function SearchPage({ scope }: { scope?: string }) {
 
   return (
     <div className="page page--full">
-      <PageHeader title={t("searchPage.title")} />
+      <PageHeader title={t("searchPage.title")} meta={t("searchPage.subtitle")} />
       <SearchBox
         chips={chips}
         onChipsChange={setChips}

@@ -7890,8 +7890,9 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 
 /*
  * Every inner page's header (PageHeader): the title, 28px on a 40px line (the height of the page's buttons, so they
- * centre on it), the page's line under it, the buttons at the end of the title's line, then the page's bar. One shape
- * on every page, so a title starts at the same place wherever you go.
+ * centre on it), the page's line under it (always there, always one line), the buttons at the end of the title's line,
+ * then the page's bar. One shape and one height on every page, so a title and what follows start at the same place
+ * wherever you go.
  */
 .ac-pagehead {
   display: flex;
@@ -7929,12 +7930,14 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   overflow-wrap: anywhere;
 }
 .ac-pagehead__meta {
+  min-height: 20px;
   margin: -2px 0 0;
-  max-width: 72ch;
+  overflow: hidden;
   font-size: 14px;
   line-height: 20px;
   color: var(--muted);
-  text-wrap: pretty;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .ac-pagehead__actions {
   display: flex;

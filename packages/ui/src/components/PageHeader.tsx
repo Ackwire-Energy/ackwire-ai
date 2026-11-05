@@ -3,8 +3,11 @@ import { cx } from "../cx";
 
 export interface PageHeaderProps {
   title: ReactNode;
-  /** The line under the title: what the page holds now (counts, the period shown) or what it is for. */
-  meta?: ReactNode;
+  /**
+   * The line under the title, on every page: what the page holds now (counts, the period shown) or what it is for, in
+   * one short line. Its room stays while it loads (`false`), so the page doesn't move when it arrives.
+   */
+  meta: ReactNode;
   /** Read out when the line changes (a calendar's period). */
   metaLive?: boolean;
   /** Before the title on its line, e.g. the way back out of a folder. */
@@ -55,11 +58,14 @@ export function PageHeader({
           ) : (
             heading
           )}
-          {(meta || meta === 0) && (
-            <p className="ac-pagehead__meta" aria-live={metaLive ? "polite" : undefined}>
-              {meta}
-            </p>
-          )}
+          <p
+            className="ac-pagehead__meta"
+            aria-live={metaLive ? "polite" : undefined}
+            // One line: a longer one ends in "…", and the whole of it shows on hover.
+            title={typeof meta === "string" ? meta : undefined}
+          >
+            {meta}
+          </p>
         </div>
         {actions && <div className="ac-pagehead__actions">{actions}</div>}
       </div>

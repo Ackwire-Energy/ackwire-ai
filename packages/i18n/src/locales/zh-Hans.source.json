@@ -9588,6 +9588,78 @@
   "approvals.missions.open": {
     "value": "Open"
   },
+  "approvals.review.list": {
+    "value": "Requests"
+  },
+  "approvals.review.where": {
+    "value": "Where"
+  },
+  "approvals.review.effect": {
+    "value": "Effect"
+  },
+  "approvals.review.effects.external": {
+    "value": "Leaves the company"
+  },
+  "approvals.review.effects.production": {
+    "value": "Goes to production"
+  },
+  "approvals.review.effects.unsent": {
+    "value": "Nothing is sent"
+  },
+  "approvals.review.effects.readsOnly": {
+    "value": "Only reads"
+  },
+  "approvals.review.undo": {
+    "value": "Undo"
+  },
+  "approvals.review.deadline": {
+    "value": "Time left"
+  },
+  "approvals.review.decides": {
+    "value": "Who decides"
+  },
+  "approvals.review.state": {
+    "value": "Status"
+  },
+  "approvals.review.why": {
+    "value": "Why {{name}} asks"
+  },
+  "approvals.review.email": {
+    "value": "The email"
+  },
+  "approvals.review.text": {
+    "value": "What it will publish"
+  },
+  "approvals.review.textDone": {
+    "value": "What it published"
+  },
+  "approvals.review.values": {
+    "value": "What it will do"
+  },
+  "approvals.review.valuesDone": {
+    "value": "What it did"
+  },
+  "approvals.review.more": {
+    "value": "Show all"
+  },
+  "approvals.review.less": {
+    "value": "Show less"
+  },
+  "approvals.review.trail": {
+    "value": "How it got here"
+  },
+  "approvals.review.showSteps": {
+    "value": "See each step"
+  },
+  "approvals.review.hideSteps": {
+    "value": "Hide the steps"
+  },
+  "approvals.review.asked": {
+    "value": "Asked for approval"
+  },
+  "approvals.review.grants": {
+    "value": "{{name}} will {{doing}}, this once, with these values."
+  },
   "agent.editIdentity": {
     "value": "Edit name and role"
   },
@@ -11468,7 +11540,7 @@
     "value": "Improvement proposals"
   },
   "proposals.subtitle": {
-    "value": "Agents propose changes to the team's instructions, roles and access, or to the {{org}} context, when someone asks or a lesson repeats. Nothing changes until someone accepts."
+    "value": "Changes the agents propose. Nothing changes until someone accepts."
   },
   "proposals.list": {
     "value": "Proposals"
@@ -25877,6 +25949,9 @@
   "searchPage.title": {
     "value": "Search the workspace"
   },
+  "searchPage.subtitle": {
+    "value": "Messages, context and team actions in the channels you're in."
+  },
   "searchPage.label": {
     "value": "Search"
   },
@@ -26149,6 +26224,39 @@
   },
   "files.downloadOnly": {
     "value": "No preview for this type of file. Download it to open."
+  },
+  "files.video.play": {
+    "value": "Play"
+  },
+  "files.video.pause": {
+    "value": "Pause"
+  },
+  "files.video.replay": {
+    "value": "Play again"
+  },
+  "files.video.seek": {
+    "value": "Position in the video"
+  },
+  "files.video.volume": {
+    "value": "Volume"
+  },
+  "files.video.mute": {
+    "value": "Mute"
+  },
+  "files.video.unmute": {
+    "value": "Unmute"
+  },
+  "files.video.speed": {
+    "value": "Speed {{speed}}×"
+  },
+  "files.video.fullscreen": {
+    "value": "Full screen"
+  },
+  "files.video.exitFullscreen": {
+    "value": "Exit full screen"
+  },
+  "files.video.open": {
+    "value": "Open"
   },
   "files.zoom.toolbar": {
     "value": "Zoom"
@@ -27242,7 +27350,7 @@
     "value": "{{name}} now uses {{computer}}."
   },
   "computers.lead": {
-    "value": "Where your agents work: this server's computer and any other computer you connect."
+    "value": "Where your agents work: this server and any computer you connect."
   },
   "computers.leadCloud": {
     "value": "Where your agents work: a computer just for this workspace, always on."
@@ -28679,13 +28787,13 @@
     "value": "Your profile and how the app looks for you."
   },
   "settings.sectionText.notifications": {
-    "value": "The inbox keeps everything. Here you choose what reaches you as a notification, in this workspace."
+    "value": "What reaches you as an alert here. The inbox keeps everything."
   },
   "settings.sectionText.general": {
     "value": "Name, time zone and what every agent knows about the workspace."
   },
   "settings.sectionText.right_hand": {
-    "value": "The assistant that builds the team with each person, in their DM and with their permissions."
+    "value": "The assistant that builds the team with each person, in their DM."
   },
   "settings.sectionText.members": {
     "value": "Who is in the workspace, and invitations."
@@ -28694,7 +28802,7 @@
     "value": "What each person can do. Roles add up."
   },
   "settings.sectionText.vault": {
-    "value": "Passwords, keys and contact details your agents use. They type passwords and use keys without ever seeing them."
+    "value": "Your agents' passwords, keys and contacts. They never see a password."
   },
   "settings.sectionText.access": {
     "value": "What each agent can use: one level per connector."
@@ -28715,25 +28823,25 @@
     "value": "How much AI each person and each agent uses, and the month's limits."
   },
   "settings.sectionText.audit": {
-    "value": "What the agents did outside the conversation and what people changed. Only admins see it."
+    "value": "What agents did outside the conversation and what people changed."
   },
   "settings.sectionText.import": {
-    "value": "Bring agents from another app or workspace, and take this one wherever you want."
+    "value": "Bring agents from another app or workspace, or take this one along."
   },
   "settings.sectionText.billing": {
-    "value": "This workspace's agentes.chat plan, card and invoices are on a page of ours, outside the app."
+    "value": "The plan, card and invoices, on a page of ours outside the app."
   },
   "settings.sectionText.media": {
-    "value": "What people can send in a conversation, and when agents send a GIF or a sticker."
+    "value": "What can be sent in a conversation, and the agents' GIFs and stickers."
   },
   "settings.sectionText.voice": {
     "value": "Voice messages in conversations, and who turns voice into text."
   },
   "settings.sectionText.apps": {
-    "value": "Ask this workspace's agents for tasks from Claude, Cursor and other apps."
+    "value": "Ask the agents for tasks from Claude, Cursor and other apps."
   },
   "settings.sectionText.approvals": {
-    "value": "Who decides for you when an agent asks for something that waits for your approval."
+    "value": "Who decides for you when an agent asks for your approval."
   },
   "settings.title": {
     "value": "Settings"
@@ -29681,7 +29789,7 @@
     "value": "Component gallery"
   },
   "gallery.subtitle": {
-    "value": "Development only. The @agenteschat/ui components with the states of the approved screens."
+    "value": "Development only: the @agenteschat/ui components."
   },
   "format.list": {
     "value": "{{names, list}}"
@@ -33428,6 +33536,9 @@
   "taskManager.title": {
     "value": "Task manager"
   },
+  "taskManager.subtitle": {
+    "value": "What the agents are doing now and what ended today."
+  },
   "taskManager.nav": {
     "value": "Task manager"
   },
@@ -34230,7 +34341,7 @@
     "value": "Dashboards"
   },
   "dashboards.subtitle": {
-    "value": "Numbers and charts the agents keep up to date, for the workspace or only some roles."
+    "value": "Numbers and charts the agents keep up to date."
   },
   "dashboards.sidebar": {
     "value": "Dashboards"
@@ -35200,134 +35311,5 @@
   },
   "teamTemplates.ask": {
     "value": "I used the {{name}} template. To fit it to your business: **what makes {{org}} different?**"
-  },
-  "files.video.play": {
-    "value": "Play"
-  },
-  "files.video.pause": {
-    "value": "Pause"
-  },
-  "files.video.replay": {
-    "value": "Play again"
-  },
-  "files.video.seek": {
-    "value": "Position in the video"
-  },
-  "files.video.volume": {
-    "value": "Volume"
-  },
-  "files.video.mute": {
-    "value": "Mute"
-  },
-  "files.video.unmute": {
-    "value": "Unmute"
-  },
-  "files.video.speed": {
-    "value": "Speed {{speed}}×"
-  },
-  "files.video.fullscreen": {
-    "value": "Full screen"
-  },
-  "files.video.exitFullscreen": {
-    "value": "Exit full screen"
-  },
-  "files.video.open": {
-    "value": "Open"
-  },
-  "dm.profile": {
-    "value": "View profile"
-  },
-  "aiAccounts.connect.needsCloud.claude_code": {
-    "value": "Not ready on {{computer}} yet"
-  },
-  "aiAccounts.connect.needsCloud.codex": {
-    "value": "Not ready on {{computer}} yet"
-  },
-  "aiAccounts.connect.needsCloud.cursor": {
-    "value": "Not ready on {{computer}} yet"
-  },
-  "aiAccounts.connect.needsCloud.opencode": {
-    "value": "Not ready on {{computer}} yet"
-  },
-  "rightHand.callWith": {
-    "value": "call with @{{handle}}"
-  },
-  "sidebarAgents.seeAll": {
-    "value": {
-      "one": "See the {{count}} agent",
-      "other": "See all {{count}} agents"
-    }
-  },
-  "approvals.review.list": {
-    "value": "Requests"
-  },
-  "approvals.review.where": {
-    "value": "Where"
-  },
-  "approvals.review.effect": {
-    "value": "Effect"
-  },
-  "approvals.review.effects.external": {
-    "value": "Leaves the company"
-  },
-  "approvals.review.effects.production": {
-    "value": "Goes to production"
-  },
-  "approvals.review.effects.unsent": {
-    "value": "Nothing is sent"
-  },
-  "approvals.review.effects.readsOnly": {
-    "value": "Only reads"
-  },
-  "approvals.review.undo": {
-    "value": "Undo"
-  },
-  "approvals.review.deadline": {
-    "value": "Time left"
-  },
-  "approvals.review.decides": {
-    "value": "Who decides"
-  },
-  "approvals.review.state": {
-    "value": "Status"
-  },
-  "approvals.review.why": {
-    "value": "Why {{name}} asks"
-  },
-  "approvals.review.email": {
-    "value": "The email"
-  },
-  "approvals.review.text": {
-    "value": "What it will publish"
-  },
-  "approvals.review.textDone": {
-    "value": "What it published"
-  },
-  "approvals.review.values": {
-    "value": "What it will do"
-  },
-  "approvals.review.more": {
-    "value": "Show all"
-  },
-  "approvals.review.less": {
-    "value": "Show less"
-  },
-  "approvals.review.trail": {
-    "value": "How it got here"
-  },
-  "approvals.review.showSteps": {
-    "value": "See each step"
-  },
-  "approvals.review.hideSteps": {
-    "value": "Hide the steps"
-  },
-  "approvals.review.asked": {
-    "value": "Asked for approval"
-  },
-  "approvals.review.grants": {
-    "value": "{{name}} will {{doing}}, this once, with these values."
-  },
-  "approvals.review.valuesDone": {
-    "value": "What it did"
   }
 }

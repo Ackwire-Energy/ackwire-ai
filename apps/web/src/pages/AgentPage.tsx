@@ -134,14 +134,8 @@ export function AgentPage(props: AgentPageProps) {
   if (isRightHand(agent) && can(org, "manage_agents")) {
     return (
       <div className="page page--full">
-        <PageHeader
-          title={agent.name}
-          meta={
-            tellsNameStory(agent)
-              ? `${t("settings.sectionText.right_hand")} ${t("rightHand.profile.nameStory")}`
-              : t("settings.sectionText.right_hand")
-          }
-        />
+        <PageHeader title={agent.name} meta={t("settings.sectionText.right_hand")} />
+        {tellsNameStory(agent) && <p className="small muted">{t("rightHand.profile.nameStory")}</p>}
         <RightHandSettingsSection />
       </div>
     );

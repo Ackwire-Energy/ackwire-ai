@@ -4776,7 +4776,7 @@
   },
   "proposals": {
     "title": "Verbeteringsvoorstellen",
-    "subtitle": "Agents stellen wijzigingen voor in de instructies, rollen en toegang van het team, of in de context van {{org}}, als iemand erom vraagt of een les terugkomt. Er verandert niets tot iemand accepteert.",
+    "subtitle": "Wijzigingen die de agents voorstellen. Niets verandert zonder akkoord.",
     "list": "Voorstellen",
     "proposes": "<b>{{agent}}</b> stelt voor · {{target}}",
     "proposesMany": "<b>{{agent}}</b> stelt voor · instructies van {{count}} agents",
@@ -10771,6 +10771,7 @@
   },
   "searchPage": {
     "title": "De werkruimte doorzoeken",
+    "subtitle": "Berichten, context en teamacties in je kanalen.",
     "label": "Zoeken",
     "placeholder": "Berichten, besluiten, samenvattingen…",
     "filter": "Type",
@@ -11350,7 +11351,7 @@
       },
       "saved": "{{name}} gebruikt nu {{computer}}."
     },
-    "lead": "Waar je agents werken: de computer van deze server en elke andere computer die je koppelt.",
+    "lead": "Waar je agents werken: deze server en elke computer die je koppelt.",
     "leadCloud": "Waar je agents werken: een computer alleen voor deze werkruimte, altijd aan.",
     "about": "Over deze computer",
     "how": "Zo werken computers",
@@ -11934,25 +11935,25 @@
     },
     "sectionText": {
       "account": "Je profiel en hoe de app er voor jou uitziet.",
-      "notifications": "De inbox bewaart alles. Hier kies je wat je als melding bereikt, in deze werkruimte.",
+      "notifications": "Wat je hier als melding bereikt. De inbox bewaart alles.",
       "general": "Naam, tijdzone en wat elke agent over de werkruimte weet.",
-      "right_hand": "De assistent die met elke persoon het team samenstelt, in hun DM en met hun rechten.",
+      "right_hand": "De assistent die met ieder het team opbouwt, in hun DM.",
       "members": "Wie er in de werkruimte zit, en uitnodigingen.",
       "roles": "Wat iedereen kan doen. Rollen tellen op.",
-      "vault": "Wachtwoorden, sleutels en contactgegevens die je agenten gebruiken. Ze typen wachtwoorden en gebruiken sleutels zonder ze ooit te zien.",
+      "vault": "Wachtwoorden, sleutels en contacten van je agents. Wachtwoorden zien ze nooit.",
       "access": "Wat elke agent kan gebruiken: één niveau per connector.",
       "connectors": "Diensten en MCP-servers die één keer voor de hele werkruimte zijn gekoppeld.",
       "skills": "Markdown-instructies die agents openen als ze ze nodig hebben.",
       "keys": "Je abonnementen en de API-sleutels van de werkruimte.",
       "storage": "Waar de bestanden van de werkruimte staan.",
       "usage": "Hoeveel AI elke persoon en elke agent gebruikt, en de limieten van de maand.",
-      "audit": "Wat de agents buiten het gesprek deden en wat mensen wijzigden. Alleen beheerders zien het.",
-      "import": "Haal agents uit een andere app of werkruimte, en neem deze mee waarheen je wilt.",
-      "billing": "Het agentes.chat-abonnement, de kaart en de facturen van deze werkruimte staan op een pagina van ons, buiten de app.",
-      "media": "Wat mensen in een gesprek kunnen sturen, en wanneer agents een GIF of sticker sturen.",
+      "audit": "Wat agents buiten het gesprek deden en wat mensen veranderden.",
+      "import": "Haal agents uit een andere app of werkruimte, of neem deze mee.",
+      "billing": "Het abonnement, de kaart en de facturen, op een pagina van ons buiten de app.",
+      "media": "Wat je in een gesprek kunt sturen, en de gifs en stickers van de agents.",
       "voice": "Spraakberichten in gesprekken, en wie spraak omzet in tekst.",
-      "apps": "Vraag de agents van deze werkruimte om taken vanuit Claude, Cursor en andere apps.",
-      "approvals": "Wie voor je beslist als een agent iets vraagt dat op je goedkeuring wacht."
+      "apps": "Geef de agents taken vanuit Claude, Cursor en andere apps.",
+      "approvals": "Wie voor je beslist als een agent om je goedkeuring vraagt."
     },
     "title": "Instellingen",
     "account": {
@@ -12343,7 +12344,7 @@
   },
   "gallery": {
     "title": "Componentengalerij",
-    "subtitle": "Alleen voor ontwikkeling. De componenten van @agenteschat/ui met de statussen van de goedgekeurde schermen."
+    "subtitle": "Alleen voor ontwikkeling: de componenten van @agenteschat/ui."
   },
   "format": {
     "list": "{{names, list}}",
@@ -14082,6 +14083,7 @@
   },
   "taskManager": {
     "title": "Taakbeheer",
+    "subtitle": "Wat de agents nu doen en wat vandaag klaar is.",
     "nav": "Taakbeheer",
     "search": "Zoek een taak, agent of app",
     "working_one": "{{count}} bezig",
@@ -14431,7 +14433,7 @@
   },
   "dashboards": {
     "title": "Dashboards",
-    "subtitle": "Getallen en grafieken die de agents actueel houden, voor de werkruimte of alleen voor sommige rollen.",
+    "subtitle": "Getallen en grafieken die de agents actueel houden.",
     "sidebar": "Dashboards",
     "navWhat": "Getallen en grafieken die de agents actueel houden",
     "new": "Nieuw dashboard",
