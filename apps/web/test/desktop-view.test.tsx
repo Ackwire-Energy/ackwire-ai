@@ -908,6 +908,24 @@ describe("the agent's screen in the computer dialog", () => {
     expect(document.querySelector(".ac-toast")).toBeNull();
   });
 
+  test("the bar leaves the keys on the screen: a press on it takes nothing, and Esc in an empty note brings them back", async () => {
+    const t = await controlled();
+    const foot = document.querySelector(".brw-ac__back") as HTMLElement;
+    // A press on the bar or its button keeps the browser's focus off it, so Enter stays the computer's.
+    expect(fireEvent.mouseDown(foot)).toBe(false);
+    expect(fireEvent.mouseDown(within(foot).getByRole("button", { name: "Devolver" }))).toBe(false);
+    await act(async () => t.field().focus());
+    await click(view().getByRole("button", { name: "Deixar um recado" }));
+    const note = view().getByRole("textbox", { name: "Recado para a Ada" });
+    expect(document.activeElement === note).toBe(true);
+    // In the note, a press stays the field's own, to place the caret.
+    expect(fireEvent.mouseDown(note)).toBe(true);
+    await act(async () => fireEvent.keyDown(note, { key: "Escape" }));
+    expect(view().queryByRole("textbox", { name: "Recado para a Ada" })).toBeNull();
+    expect(document.activeElement === t.field()).toBe(true);
+    expect(calls(t, "browser.done")).toEqual([]);
+  });
+
   test("a hand back that fails: said in the head, the note kept to send again", async () => {
     const t = await controlled();
     replaceOn(t.api.browser, "done", async () => {

@@ -93,6 +93,8 @@ import { SiteIcon, siteName } from "./SiteIcon";
 import "./browser.css";
 
 const FAIL_REASONS = ["code", "password", "blocked"] as const;
+/** The reason goes before it, in the 1000 the server takes. */
+const FAIL_NOTE_MAX = 900;
 /** The scroll hint goes this long after the wheel's last tick. */
 const SCROLL_HINT_IDLE_MS = 1200;
 const KEYS = ["Tab", "Enter", "Backspace", "Escape"] as const;
@@ -679,6 +681,7 @@ export function BrowserCard({
   useEffect(() => {
     if (inControl) return;
     setCapturing(false);
+    setFailing(false);
   }, [inControl]);
   // Control ending, or the page going (closed, opening, someone else's) before its pointers lifted, lets go of them:
   // the next press starts fresh.
@@ -778,6 +781,7 @@ export function BrowserCard({
       {
         onSuccess: () => {
           setFailing(false);
+          setBackNote("");
           fold();
           onSettled?.();
         },
@@ -1375,7 +1379,7 @@ export function BrowserCard({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={t("browser.live.failPlaceholder")}
-              maxLength={900}
+              maxLength={FAIL_NOTE_MAX}
             />
             <div className="brw-ac__row">
               <span className="brw-grow" />
@@ -1479,7 +1483,15 @@ export function BrowserCard({
           onBack={finish}
           other={
             ask && (
-              <Button size="sm" variant="ghost" onClick={() => setFailing(true)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={actions.done.isPending}
+                onClick={() => {
+                  setNote((words) => words || backNote.slice(0, FAIL_NOTE_MAX));
+                  setFailing(true);
+                }}
+              >
                 {surface ? t("browser.inCard.couldnt") : t("browser.inCard.giveUp")}
               </Button>
             )

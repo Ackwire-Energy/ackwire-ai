@@ -424,6 +424,34 @@ describe("the computer dialog, live", () => {
     expect(box().querySelector(".cmp-acts")?.textContent).not.toMatch(/Pronto|Não consegui/);
   });
 
+  test("Não consegui on the screen takes the words written in the bar, and Pronto waits for its answer", async () => {
+    const t = await dialog({ handoff: screenAsk() });
+    await click(within(box().querySelector(".cmp-banner") as HTMLElement).getByRole("button", { name: "Ajudar" }));
+    await settle(4);
+    const foot = box().querySelector(".dsk > .brw-ac__back") as HTMLElement;
+    // Together, so they wrap as one and the main one never sits alone under the other.
+    expect(foot.querySelector(".brw-ac__ways")?.textContent).toBe("Não conseguiPronto");
+    await click(within(foot).getByRole("button", { name: "Deixar um recado" }));
+    await act(async () =>
+      fireEvent.change(within(foot).getByRole("textbox", { name: "Recado para a Ada" }), {
+        target: { value: "O token venceu" },
+      }),
+    );
+    const browser = t.api.browser as { failed: (...args: unknown[]) => Promise<unknown> };
+    const failed = browser.failed;
+    let answer = () => {};
+    browser.failed = (...args) =>
+      new Promise((done) => {
+        answer = () => done(failed(...args));
+      });
+    await click(within(foot).getByRole("button", { name: "Não consegui" }));
+    await click(within(foot).getByRole("button", { name: "Pronto" }));
+    expect(calls(t, "browser.done")).toEqual([]);
+    await act(async () => answer());
+    await settle(4);
+    expect(calls(t, "browser.failed")).toEqual([[ORG_ID, "h-screen", "O token venceu"]]);
+  });
+
   test("a sign-in request in the browser, its window on the screen: who may drive the screen helps on the whole screen, the request on top", async () => {
     const browserAsk = screenAsk({ id: "h-sign-in", screen: "browser", instructions: "Entrar no painel da loja" });
     const b = await backend({ handoff: browserAsk, browser: true });

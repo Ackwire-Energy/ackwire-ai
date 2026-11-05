@@ -434,7 +434,7 @@ export function DesktopView({
       },
     );
   const finish = () => {
-    if (!handoff) return;
+    if (!handoff || actions.failed.isPending) return;
     head?.setFull(false);
     const words = backNote.trim();
     actions.done.mutate(words ? { handoffId: handoff.id, note: words } : handoff.id, {
@@ -446,8 +446,18 @@ export function DesktopView({
     });
   };
   const giveUp = () => {
-    if (!handoff) return;
-    actions.failed.mutate({ handoffId: handoff.id }, { onSuccess: () => onSettled?.(), onError: didntWork });
+    if (!handoff || actions.done.isPending) return;
+    const words = backNote.trim();
+    actions.failed.mutate(
+      { handoffId: handoff.id, ...(words ? { note: words } : {}) },
+      {
+        onSuccess: () => {
+          setBackNote("");
+          onSettled?.();
+        },
+        onError: didntWork,
+      },
+    );
   };
 
   const handBackLabel = handoff?.kind === "ask" ? t("browser.inCard.done") : t("browser.inCard.handBack");

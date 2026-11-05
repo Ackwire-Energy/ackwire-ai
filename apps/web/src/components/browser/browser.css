@@ -848,9 +848,14 @@ html:not([data-pointer]) .brw-ac__stage[tabindex]:focus-visible {
 .brw-ac__add {
   font-size: 13px;
 }
-/* The note takes the title's place, and a line of its own where the row is narrow: the buttons stay on the right. */
-.brw-ac__back .brw-ac__row {
+/* The note takes the title's place, and a line of its own where the row is narrow: the buttons stay together, on the right. */
+.brw-ac__ways {
+  display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
 }
 .brw-ac__back .brw-ac__note {
   flex: 1 1 240px;

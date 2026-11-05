@@ -17,7 +17,9 @@ mock.module("@novnc/novnc", () => ({
 import { BROWSER_STUCK_MS, type BrowserHandoff, type SocketFactory } from "@agenteschat/client";
 import { icons, isApple } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { useState } from "react";
 import { BrowserCard, titleKind } from "@/components/browser/BrowserCard";
+import { HandBackFoot } from "@/components/computer/control";
 import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
 import { fakeSockets } from "./fake-socket";
 import { onScreen, renderApp, renderPage, screen, settle } from "./render";
@@ -278,6 +280,59 @@ describe("a help request opens the agent's browser in its card", () => {
     // The answer is its reason to be open: Esc leaves it.
     await act(async () => fireEvent.keyDown(note, { key: "Escape" }));
     expect(within(card).getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
+  });
+
+  test("a note left from an earlier turn shows, but takes no keys: Enter there would hand back", async () => {
+    const { state } = seedRequest();
+    await renderPage(
+      <HandBackFoot
+        title="Devolver à Ada"
+        label="Devolver"
+        grammar={{ name: "Ada", context: "female" }}
+        note="Deixei aberto"
+        onNote={() => {}}
+        noteFirst={false}
+        pending={false}
+        onBack={() => {}}
+      />,
+      { api: createFakeApi(state) },
+    );
+    await settle(2);
+    const note = screen().getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
+    expect(note.value).toBe("Deixei aberto");
+    expect(document.activeElement === note).toBe(false);
+  });
+
+  test("Desistir keeps the words written in the bar, and a form left open goes with control", async () => {
+    const { state, handoff } = seedRequest();
+    const active: BrowserHandoff = { ...handoff, status: "active", controllerUserId: "u-walter" };
+    let turn = (_: BrowserHandoff) => {};
+    function Turns() {
+      const [now, setNow] = useState(active);
+      turn = setNow;
+      return <BrowserCard agentId={ADA_ID} name="Ada" handoff={now} canTakeOver />;
+    }
+    await renderPage(<Turns />, { api: createFakeApi(state), org: true });
+    await settle(6);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Deixar um recado" })));
+    await act(async () =>
+      fireEvent.change(within(card).getByRole("textbox", { name: "Recado para a Ada" }), {
+        target: { value: "O código venceu" },
+      }),
+    );
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Desistir" })));
+    const why = within(card).getByPlaceholderText("Conte com suas palavras") as HTMLTextAreaElement;
+    expect(why.value).toBe("O código venceu");
+
+    // Control ends with the form open: the next turn starts at the bar, not at why this one failed.
+    await act(async () => turn({ ...active, id: "someone-else", controllerUserId: "u-other" }));
+    await settle(2);
+    expect(card.querySelector(".brw-ac__fail")).toBeNull();
+    await act(async () => turn({ ...active, id: "next-turn", kind: "takeover" }));
+    await settle(2);
+    expect(within(card).queryByPlaceholderText("Conte com suas palavras")).toBeNull();
+    expect(card.querySelector(".brw-ac__back")).not.toBeNull();
   });
 });
 
