@@ -1288,9 +1288,10 @@ test("pull: a piece waits for the one before it to leave for the worker's pipe",
   const q = await requestOn(ana);
   // As a real pipe does it: `writableLength` says nothing, and a write's callback comes when the bytes left.
   const flushes: (() => void)[] = [];
+  let holding = true;
   const write = ana.stdin.write.bind(ana.stdin);
   ana.stdin.write = ((line: string, flushed?: () => void) => {
-    if (flushed) flushes.push(flushed);
+    if (flushed) holding ? flushes.push(flushed) : queueMicrotask(flushed);
     return write(line);
   }) as typeof ana.stdin.write;
   ana.send({ type: "pull.start", pullId });
@@ -1301,8 +1302,7 @@ test("pull: a piece waits for the one before it to leave for the worker's pipe",
   await waitFor(() => ana.of("pull.chunk").length === 2);
   await Bun.sleep(40);
   expect(ana.of("pull.chunk")).toHaveLength(2);
-  flushes.shift()?.();
-  await waitFor(() => ana.of("pull.chunk").length === 3);
+  holding = false;
   flushes.shift()?.();
   await waitFor(() => ana.of("pull.end").length === 1);
   ana.send({ type: "result", id: q.id, ok: true, data: { size: bytes.length, sha256: "x" } });

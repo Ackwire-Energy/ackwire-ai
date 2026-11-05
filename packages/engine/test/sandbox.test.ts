@@ -410,7 +410,10 @@ describe("Drive and skills", () => {
     expect(writes().slice(before)).toMatchObject([{ path: ".skills/graficos/scripts/plot.py" }]);
 
     // Updated: what stayed behind comes, once, and the rest isn't copied again.
-    await runner.hello(paired.token, { protocol: FILE_PULL_PROTOCOL });
+    await f.db
+      .update(schema.machines)
+      .set({ protocol: FILE_PULL_PROTOCOL })
+      .where(eq(schema.machines.id, paired.machineId));
     const pulls = () => runner.sent.filter((s) => s.type === "request" && s.op === "pull");
     const updated = await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
     expect(updated.content).not.toContain("Not copied");
