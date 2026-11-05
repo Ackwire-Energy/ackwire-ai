@@ -4172,6 +4172,12 @@
           "high": "Denkt bei schweren Aufgaben mehr nach. Langsamer und teurer.",
           "max": "Denkt so viel wie möglich nach. Viel langsamer und teurer."
         },
+        "speed": "Geschwindigkeit",
+        "speeds": {
+          "standard": "Standard",
+          "fast": "Schnell"
+        },
+        "speedText": "Antwortet in Unterhaltungen schneller und verbraucht das Abo 2,5× so schnell. Routinen und lange Aufgaben bleiben beim Standard.",
         "modelLine": {
           "opus": "Das leistungsstärkste. Verbraucht das Abo schneller.",
           "sonnet": "Ausgewogen. Gut für fast alles.",
@@ -4194,10 +4200,13 @@
           "contents": {
             "model": "Kontextfenster",
             "auto": "Kontextfenster und wem er antwortet",
-            "fixed": "Aufwand, Kontextfenster und wem er antwortet"
+            "fixed": "Aufwand, Kontextfenster und wem er antwortet",
+            "autoSpeed": "Geschwindigkeit, Kontextfenster und wem er antwortet",
+            "fixedSpeed": "Aufwand, Geschwindigkeit, Kontextfenster und wem er antwortet"
           },
           "allDefault": "Alles Standard",
           "effort": "Aufwand: {{level}}",
+          "speed": "Geschwindigkeit: schnell",
           "context": "Kontext: {{size}}",
           "sharing": "Antwortet anderen Personen",
           "waits": "Wartet auf den Computer"
@@ -12524,6 +12533,10 @@
     "working": "Im Hintergrund"
   },
   "chat": {
+    "speedFallback": {
+      "text": "ChatGPT hat die schnelle Geschwindigkeit für dieses Konto oder Modell abgelehnt. Diese Antwort kam deshalb in Standardgeschwindigkeit.",
+      "action": "Agent öffnen"
+    },
     "usageWhen": {
       "at": "um {{time}}",
       "on": "{{day}} um {{time}}",

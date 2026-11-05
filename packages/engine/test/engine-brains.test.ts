@@ -1062,6 +1062,113 @@ test("a plan limit falls back to the model brain; the reply carries a quiet note
   expect(computerBrainUnavailable("claude_code", machineId, statusOf(machineId))?.code).toBe("plan_limit");
 });
 
+test("Fast: the turn of a conversation asks for it; refused, the reply says it came at standard speed", async () => {
+  f = await setup({});
+  await computerAgent(f, { brain: "codex", brainModel: "gpt-6.1-sol", brainSpeed: "fast" });
+  const { brain, seen } = scriptedComputerBrain((n) =>
+    n === 0
+      ? [
+          { type: "speed_fallback", message: "Fast mode is not available for this account." },
+          { type: "done", text: "Respondi." },
+        ]
+      : [{ type: "done", text: "De novo." }],
+  );
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { codex: () => ({ ...brain, kind: "codex" }) },
+    machines: {
+      status: async (id) =>
+        statusOf(id, {
+          protocol: MACHINE_PROTOCOL_VERSION,
+          executors: { codex: { version: "codex-cli 0.166.0" }, detectedAt: new Date().toISOString() },
+        }),
+    },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  expect(seen[0]).toMatchObject({ speed: "fast", model: "gpt-6.1-sol" });
+  const reply = (await timeline(f)).at(-1);
+  expect(reply).toMatchObject({ body: "Respondi.", meta: { speedFallback: true } });
+  const steps = await f.db.select().from(schema.agentRunSteps);
+  expect(steps.some((s) => (s.data as { speedFallback?: string }).speedFallback?.includes("not available"))).toBe(true);
+
+  // The agent moves to a model without it: the value stays, nothing goes out.
+  await f.db.update(schema.agents).set({ brainModel: "gpt-5.5" }).where(eq(schema.agents.id, f.agent.id));
+  await post(f, "@dev e agora?");
+  await drainOutbox(f.db, handlers);
+  expect(seen[1]?.speed).toBeUndefined();
+  expect((await timeline(f)).at(-1)?.meta.speedFallback).toBeUndefined();
+});
+
+test("Fast stays out of every run nobody waits for", async () => {
+  f = await setup({});
+  await computerAgent(f, { brain: "codex", brainModel: "gpt-6.1-sol", brainSpeed: "fast" });
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Feito." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { codex: () => ({ ...brain, kind: "codex" }) },
+    machines: {
+      status: async (id) =>
+        statusOf(id, {
+          protocol: MACHINE_PROTOCOL_VERSION,
+          executors: { codex: { version: "codex-cli 0.166.0" }, detectedAt: new Date().toISOString() },
+        }),
+    },
+  });
+  const called = { id: "11111111-1111-4111-8111-111111111111", name: "Resumo" };
+  const ran: string[] = [];
+  const turnFor = async (change?: (trigger: string, run: string) => Promise<unknown>) => {
+    const posted = await post(f as Fixture, "@dev oi");
+    const [run] = await (f as Fixture).db
+      .select()
+      .from(schema.agentRuns)
+      .where(eq(schema.agentRuns.triggerMessageId, posted.id));
+    const id = (run as { id: string }).id;
+    ran.push(id);
+    await change?.(posted.id, id);
+    await drainOutbox((f as Fixture).db, handlers);
+    return seen.at(-1)?.speed;
+  };
+  const withMeta = (meta: Record<string, unknown>) => (trigger: string) =>
+    (f as Fixture).db.update(schema.messages).set({ meta }).where(eq(schema.messages.id, trigger));
+
+  expect(await turnFor()).toBe("fast");
+  expect(await turnFor(withMeta({ routine: called }))).toBeUndefined();
+  expect(await turnFor(withMeta({ viaRoutine: called }))).toBeUndefined();
+  expect(await turnFor(withMeta({ issueId: "22222222-2222-4222-8222-222222222222" }))).toBeUndefined();
+  expect(
+    await turnFor((_, run) =>
+      (f as Fixture).db.update(schema.agentRuns).set({ background: true }).where(eq(schema.agentRuns.id, run)),
+    ),
+  ).toBeUndefined();
+
+  // Asked by another agent: in someone's conversation it goes fast, for a routine's run it doesn't.
+  const fromAgent = (background: boolean) => async (trigger: string, run: string) => {
+    const fx = f as Fixture;
+    const asker = ran[0] as string;
+    await fx.db.update(schema.agentRuns).set({ background }).where(eq(schema.agentRuns.id, asker));
+    await fx.db
+      .update(schema.messages)
+      .set({ authorType: "agent", authorUserId: null, authorAgentId: fx.agent.id })
+      .where(eq(schema.messages.id, trigger));
+    await fx.db.insert(schema.agentConsultations).values({
+      orgId: fx.org.id,
+      askerRunId: asker,
+      askerAgentId: fx.agent.id,
+      targetAgentId: fx.agent.id,
+      targetRunId: run,
+      channelId: fx.general.id,
+      messageId: trigger,
+      waitId: `async:${crypto.randomUUID()}`,
+      question: "Pode olhar?",
+      chain: [fx.agent.id],
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+  };
+  expect(await turnFor(fromAgent(false))).toBe("fast");
+  expect(await turnFor(fromAgent(true))).toBeUndefined();
+});
+
 test("Claude Code lists every tool; the model brain standing in lists the core ones and finds the rest", async () => {
   f = await setup({ toolsOnDemand: true, issueTools: true, reply: () => ({ chunks: ["Respondi pela API."] }) });
   await computerAgent(f);

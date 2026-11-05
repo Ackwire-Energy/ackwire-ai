@@ -10167,6 +10167,18 @@
   "agentPage.work.brain.effortText.max": {
     "value": "Thinks as much as possible. Much slower and pricier."
   },
+  "agentPage.work.brain.speed": {
+    "value": "Speed"
+  },
+  "agentPage.work.brain.speeds.standard": {
+    "value": "Standard"
+  },
+  "agentPage.work.brain.speeds.fast": {
+    "value": "Fast"
+  },
+  "agentPage.work.brain.speedText": {
+    "value": "Answers faster in conversations and uses the plan 2.5× as fast. Routines and long tasks stay at standard speed."
+  },
   "agentPage.work.brain.modelLine.opus": {
     "value": "The most capable. Uses up the plan faster."
   },
@@ -10218,11 +10230,20 @@
   "agentPage.work.brain.advanced.contents.fixed": {
     "value": "Effort, context window and who it answers"
   },
+  "agentPage.work.brain.advanced.contents.autoSpeed": {
+    "value": "Speed, context window and who it answers"
+  },
+  "agentPage.work.brain.advanced.contents.fixedSpeed": {
+    "value": "Effort, speed, context window and who it answers"
+  },
   "agentPage.work.brain.advanced.allDefault": {
     "value": "All defaults"
   },
   "agentPage.work.brain.advanced.effort": {
     "value": "Effort: {{level}}"
+  },
+  "agentPage.work.brain.advanced.speed": {
+    "value": "Fast speed"
   },
   "agentPage.work.brain.advanced.context": {
     "value": "Context: {{size}}"
@@ -30390,6 +30411,12 @@
   },
   "work.working": {
     "value": "In the background"
+  },
+  "chat.speedFallback.text": {
+    "value": "ChatGPT refused Fast speed on this account or model, so this reply came at standard speed."
+  },
+  "chat.speedFallback.action": {
+    "value": "Open agent"
   },
   "chat.usageWhen.at": {
     "value": "at {{time}}"

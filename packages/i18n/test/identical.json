@@ -763,7 +763,8 @@
       "team.sectors.routines",
       "files.video.pause",
       "files.video.volume",
-      "taskManager.waitGroup.routines"
+      "taskManager.waitGroup.routines",
+      "agentPage.work.brain.speeds.standard"
     ],
     "de": [
       "access.agentCol",
@@ -1123,7 +1124,8 @@
       "team.list.col.agent",
       "team.list.col.person",
       "approvals.review.state",
-      "agentSide.label"
+      "agentSide.label",
+      "agentPage.work.brain.speeds.standard"
     ],
     "it": [
       "access.area.browser",
@@ -1411,7 +1413,8 @@
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
       "files.video.volume",
-      "taskManager.waitGroup.routines"
+      "taskManager.waitGroup.routines",
+      "agentPage.work.brain.speeds.standard"
     ],
     "nl": [
       "access.agentCol",

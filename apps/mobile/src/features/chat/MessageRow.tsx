@@ -108,6 +108,7 @@ import { MessageText } from "./MessageText";
 import { ReachLines } from "./ReachLines";
 import { Receipts } from "./Receipts";
 import { SecretCard } from "./SecretCard";
+import { SpeedFallbackLine } from "./StoppedLine";
 import { TeamChecks } from "./TeamChecks";
 import { SavedTools, TurnTools } from "./ToolCalls";
 import { recentTurn, stepLimitOf, stoppedOf, turnOpener } from "./turn";
@@ -694,6 +695,7 @@ export const MessageRow = memo(function MessageRow({
           ) : null}
           {media ? <ChatMedia media={media} liveId={m.id} /> : null}
           {voiceOf(meta) ? <VoiceMessage message={m} /> : null}
+          {isAgent && meta?.speedFallback === true ? <SpeedFallbackLine message={m} /> : null}
           {(stopped || atLimit || providerCut) && m.agentRunId ? (
             <StoppedLine
               message={m}

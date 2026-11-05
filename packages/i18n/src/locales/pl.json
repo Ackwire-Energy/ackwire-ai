@@ -4475,6 +4475,12 @@
           "high": "Myśli więcej przy trudnych zadaniach. Wolniej i drożej.",
           "max": "Myśli tyle, ile się da. Dużo wolniej i drożej."
         },
+        "speed": "Szybkość",
+        "speeds": {
+          "standard": "Standardowa",
+          "fast": "Szybka"
+        },
+        "speedText": "Odpowiada szybciej w rozmowach i zużywa plan 2,5× szybciej. Rutyny i długie zadania zostają przy standardowej szybkości.",
         "modelLine": {
           "opus": "Najbardziej zaawansowany. Szybciej zużywa plan.",
           "sonnet": "Zrównoważony. Dobry prawie do wszystkiego.",
@@ -4497,10 +4503,13 @@
           "contents": {
             "model": "Okno kontekstu",
             "auto": "Okno kontekstu i komu odpowiada",
-            "fixed": "Wysiłek, okno kontekstu i komu odpowiada"
+            "fixed": "Wysiłek, okno kontekstu i komu odpowiada",
+            "autoSpeed": "Szybkość, okno kontekstu i komu odpowiada",
+            "fixedSpeed": "Wysiłek, szybkość, okno kontekstu i komu odpowiada"
           },
           "allDefault": "Wszystko domyślne",
           "effort": "Wysiłek: {{level}}",
+          "speed": "Szybkość: szybka",
           "context": "Kontekst: {{size}}",
           "sharing": "Odpowiada innym osobom",
           "waits": "Czeka na komputer"
@@ -13381,6 +13390,10 @@
     "working": "W tle"
   },
   "chat": {
+    "speedFallback": {
+      "text": "ChatGPT odrzucił szybkość Szybka dla tego konta lub modelu, więc ta odpowiedź przyszła ze standardową szybkością.",
+      "action": "Otwórz agenta"
+    },
     "usageWhen": {
       "at": "o {{time}}",
       "on": "{{day}} o {{time}}",

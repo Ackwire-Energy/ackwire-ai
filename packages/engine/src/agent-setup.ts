@@ -1,3 +1,4 @@
+import { type BrainSpeed, isBrainSpeed } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { type ContextLimit, isAutoModel, isContextLimit } from "@agenteschat/providers";
 import { type CodingPlan, PLAN_ALIASES, planOf } from "@agenteschat/providers/plans";
@@ -57,13 +58,15 @@ export interface AgentSetupInput {
   machineId?: unknown;
   account?: unknown;
   effort?: unknown;
+  speed?: unknown;
   contextTokens?: unknown;
   fallback?: unknown;
   onlyOwner?: unknown;
   autonomy?: unknown;
 }
 
-type Setup = schema.AgentSetup & { onlyOwner?: boolean; autonomy?: CommandApproval };
+/** `speed` goes to the agents picked, never into what new agents start with: Fast is off until someone turns it on. */
+type Setup = schema.AgentSetup & { onlyOwner?: boolean; autonomy?: CommandApproval; speed?: BrainSpeed };
 
 /** Why an agent can't take the setup. */
 export type SetupReason =
@@ -133,6 +136,9 @@ function readSetup(input: AgentSetupInput): Setup {
   if (effort !== null && !isBrainEffortSetting(effort)) {
     throw new ValidationError("Choose auto, low, medium, high, xhigh or max", "brain.invalid_effort");
   }
+  if (input.speed !== undefined && !isBrainSpeed(input.speed)) {
+    throw new ValidationError("Choose standard or fast", "brain.invalid_speed");
+  }
   for (const flag of [input.fallback, input.onlyOwner]) {
     if (flag !== undefined && typeof flag !== "boolean")
       throw new ValidationError("A switch is on or off", "setup.invalid");
@@ -143,6 +149,7 @@ function readSetup(input: AgentSetupInput): Setup {
     machineId,
     account: nullableId(input.account, "account"),
     effort,
+    ...(input.speed !== undefined ? { speed: input.speed } : {}),
     contextTokens,
     fallback: (input.fallback as boolean | undefined) ?? true,
     ...(input.onlyOwner !== undefined ? { onlyOwner: input.onlyOwner as boolean } : {}),
@@ -385,6 +392,7 @@ function planFor(
   const how = {
     model: setup.model,
     effort: setup.effort ?? null,
+    ...(setup.speed ? { speed: setup.speed } : {}),
     contextTokens: setup.contextTokens ?? null,
     fallback: setup.fallback ?? true,
   };
@@ -393,6 +401,7 @@ function planFor(
     t.brainAccountId === account &&
     sameModel(kind, t.brainModel, how.model) &&
     t.brainEffort === how.effort &&
+    (how.speed === undefined || t.brainSpeed === how.speed) &&
     t.contextTokens === how.contextTokens &&
     t.brainFallback === how.fallback &&
     (onlyOwner === undefined || !answersOthers(audienceOf(t), t.ownerUserId) === onlyOwner);

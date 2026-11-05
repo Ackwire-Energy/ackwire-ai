@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { MODEL_CATALOG } from "../src/catalog";
 import {
   CODING_PLANS,
   claudeCodeModel,
+  FAST_MODE_MODELS,
   isPlanModelId,
   PLAN_ALIASES,
   PLAN_IDS,
@@ -10,6 +12,7 @@ import {
   planModel,
   planModelById,
   planModelValue,
+  speedFits,
 } from "../src/plans";
 
 const models = (plan: PlanId): readonly PlanModel[] => CODING_PLANS[plan].claudeCode.models;
@@ -159,5 +162,20 @@ describe("coding plans' models", () => {
     expect(isPlanModelId("deepseek-v4.1-flash")).toBe(true);
     expect(isPlanModelId("MiniMax-M3.1-Flash[1m]")).toBe(true);
     expect(isPlanModelId("gpt-6-sol")).toBe(false);
+  });
+
+  test("Velocidade fits Codex on a ChatGPT sign-in with a model that has Fast mode, or the choice of one", () => {
+    for (const model of FAST_MODE_MODELS) expect(speedFits({ kind: "codex", model })).toBe(true);
+    expect(speedFits({ kind: "codex", model: "auto" })).toBe(true);
+    expect(speedFits({ kind: "codex", model: null })).toBe(true);
+    expect(speedFits({ kind: "codex", model: "gpt-5.5" })).toBe(false);
+    expect(speedFits({ kind: "codex", provider: "zai", model: "gpt-6-sol" })).toBe(false);
+    expect(speedFits({ kind: "claude_code", model: "gpt-6-sol" })).toBe(false);
+    expect(speedFits({ kind: "model", model: "gpt-6-sol" })).toBe(false);
+  });
+
+  test("every model we offer on Codex is on Fast mode's list, Automático's picks included", () => {
+    for (const [id, m] of Object.entries(MODEL_CATALOG))
+      if (m.provider === "openai") expect(FAST_MODE_MODELS).toContain(id);
   });
 });

@@ -4238,6 +4238,11 @@ export const ptBR = {
           high: "Pensa mais em tarefas difíceis. Demora e gasta mais.",
           max: "Pensa o máximo que puder. Bem mais lento e caro.",
         },
+        /** Velocidade (ADR 0149): shown on a ChatGPT plan with a model that has Fast mode. `2,5×` is OpenAI's rate. */
+        speed: "Velocidade",
+        speeds: { standard: "Padrão", fast: "Rápida" },
+        speedText:
+          "Responde mais rápido nas conversas e gasta o plano 2,5× mais depressa. Rotinas e tarefas longas seguem no padrão.",
         /** The model picker's line under each Claude Code model (other models show their name only). */
         modelLine: {
           opus: "O mais capaz. Gasta o plano mais rápido.",
@@ -4265,10 +4270,13 @@ export const ptBR = {
             model: "Janela de contexto",
             auto: "Janela de contexto e quem atende",
             fixed: "Esforço, janela de contexto e quem atende",
+            autoSpeed: "Velocidade, janela de contexto e quem atende",
+            fixedSpeed: "Esforço, velocidade, janela de contexto e quem atende",
           },
           /** After a save: nothing changed from the defaults, else only what did. */
           allDefault: "Tudo no padrão",
           effort: "Esforço {{level}}",
+          speed: "Velocidade rápida",
           context: "Contexto de {{size}}",
           sharing: "Atende outras pessoas",
           waits: "Espera o computador voltar",
@@ -12234,6 +12242,11 @@ export const ptBR = {
     working: "Em segundo plano",
   },
   chat: {
+    /** Under a reply that came at standard speed because Fast was refused (`meta.speedFallback`, ADR 0149). */
+    speedFallback: {
+      text: "O ChatGPT recusou a velocidade Rápida nesta conta ou neste modelo, então esta resposta veio no padrão.",
+      action: "Abrir agente",
+    },
     /** When a waiting agent goes on (`usageWhen`). */
     usageWhen: { at: "às {{time}}", on: "{{day}} às {{time}}", date: "em {{date}}" },
     /** Typing bar: "{{names}} está {{doing}}" (agents' verbs come from their tool calls). */

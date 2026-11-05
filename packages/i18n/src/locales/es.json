@@ -4296,6 +4296,12 @@
           "high": "Piensa más en las tareas difíciles. Más lento y más caro.",
           "max": "Piensa todo lo posible. Mucho más lento y caro."
         },
+        "speed": "Velocidad",
+        "speeds": {
+          "standard": "Estándar",
+          "fast": "Rápida"
+        },
+        "speedText": "Responde más rápido en las conversaciones y consume el plan 2,5× más deprisa. Las rutinas y las tareas largas siguen en estándar.",
         "modelLine": {
           "opus": "El más capaz. Consume el plan más rápido.",
           "sonnet": "Equilibrado. Bueno para casi todo.",
@@ -4318,10 +4324,13 @@
           "contents": {
             "model": "Ventana de contexto",
             "auto": "Ventana de contexto y a quién responde",
-            "fixed": "Esfuerzo, ventana de contexto y a quién responde"
+            "fixed": "Esfuerzo, ventana de contexto y a quién responde",
+            "autoSpeed": "Velocidad, ventana de contexto y a quién responde",
+            "fixedSpeed": "Esfuerzo, velocidad, ventana de contexto y a quién responde"
           },
           "allDefault": "Todo predeterminado",
           "effort": "Esfuerzo: {{level}}",
+          "speed": "Velocidad: rápida",
           "context": "Contexto: {{size}}",
           "sharing": "Responde a otras personas",
           "waits": "Espera a la computadora"
@@ -12907,6 +12916,10 @@
     "working": "En segundo plano"
   },
   "chat": {
+    "speedFallback": {
+      "text": "ChatGPT rechazó la velocidad Rápida en esta cuenta o modelo, así que esta respuesta salió en estándar.",
+      "action": "Abrir agente"
+    },
     "usageWhen": {
       "at": "a las {{time}}",
       "on": "el {{day}} a las {{time}}",

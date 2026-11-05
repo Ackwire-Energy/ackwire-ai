@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { ACCOUNTS_PROTOCOL, BRAIN_PROTOCOL, CONTEXT_LIMIT_PROTOCOL, MISSION_PROTOCOL } from "@agenteschat/adapters";
+import {
+  ACCOUNTS_PROTOCOL,
+  BRAIN_PROTOCOL,
+  CONTEXT_LIMIT_PROTOCOL,
+  MISSION_PROTOCOL,
+  SPEED_PROTOCOL,
+} from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { planOf } from "@agenteschat/providers/plans";
 import {
@@ -26,8 +32,8 @@ import {
   executorBrain,
   normalizeBrainModel,
 } from "../src/brain-settings";
-import { contextFields, recordPlanUsage } from "../src/brains/claude-code";
-import { brainAccountFor, planIsOwners } from "../src/brains/select";
+import { contextFields, recordPlanUsage, speedFields } from "../src/brains/claude-code";
+import { brainAccountFor, brainSpeedFor, planIsOwners } from "../src/brains/select";
 import { queuePlanLent } from "../src/email";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
@@ -250,6 +256,65 @@ describe("context window (Configuração avançada)", () => {
     expect(brainModelOptions("claude_code").find((o) => o.value === "opus")?.contextWindow).toBe(1_000_000);
     // A coding plan's models are listed from its catalog by the apps, which read the window off the id (`[1m]`).
     expect(planOf("minimax")?.claudeCode.models.every((m) => m.id.endsWith("[1m]"))).toBe(true);
+  });
+});
+
+describe("Velocidade (ADR 0149)", () => {
+  const fastAgent = { brain: "codex", brainSpeed: "fast", builtin: null };
+  const onPlan = { kind: "codex" as const, model: "gpt-6.1-sol" };
+  const conversation = { background: false, workId: null };
+
+  test("a conversation's turn of an agent set to it, with a model and sign-in that have it", () => {
+    expect(brainSpeedFor(fastAgent, onPlan, conversation, false)).toBe("fast");
+    expect(brainSpeedFor(fastAgent, { kind: "codex" }, conversation, false)).toBe("fast");
+    expect(brainSpeedFor({ ...fastAgent, brainSpeed: "standard" }, onPlan, conversation, false)).toBeUndefined();
+  });
+
+  test("never a routine, long work or a mission: nobody is waiting", () => {
+    expect(brainSpeedFor(fastAgent, onPlan, conversation, true)).toBeUndefined();
+    expect(brainSpeedFor(fastAgent, onPlan, { ...conversation, background: true }, false)).toBeUndefined();
+    expect(brainSpeedFor(fastAgent, onPlan, { ...conversation, workId: "work" }, false)).toBeUndefined();
+    expect(brainSpeedFor(fastAgent, { ...onPlan, missionId: "mission" }, conversation, false)).toBeUndefined();
+  });
+
+  test("never where it doesn't apply: another model, sign-in or brain, a mission's other brain, the right hand", () => {
+    expect(brainSpeedFor(fastAgent, { kind: "codex", model: "gpt-5.5" }, conversation, false)).toBeUndefined();
+    const keyAccount = { id: "a", label: "Key", status: "active" as const, provider: "zai" };
+    expect(brainSpeedFor(fastAgent, { ...onPlan, account: keyAccount }, conversation, false)).toBeUndefined();
+    const onClaude = { ...fastAgent, brain: "claude_code" };
+    expect(brainSpeedFor(onClaude, { kind: "claude_code", model: "opus" }, conversation, false)).toBeUndefined();
+    expect(brainSpeedFor(onClaude, onPlan, conversation, false)).toBeUndefined();
+    expect(brainSpeedFor({ ...fastAgent, builtin: "right_hand" }, onPlan, conversation, false)).toBeUndefined();
+  });
+
+  test("it travels only to a runner that knows it (protocol 46)", () => {
+    expect(speedFields(SPEED_PROTOCOL, { speed: "fast" })).toEqual({ speed: "fast" });
+    expect(speedFields(SPEED_PROTOCOL - 1, { speed: "fast" })).toEqual({});
+    expect(speedFields(SPEED_PROTOCOL, {})).toEqual({});
+  });
+
+  test("saved with the same permission as the effort, audited, kept through a switch; anything else is refused", async () => {
+    const { fx, deps, bia, row, audits } = await world();
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code" });
+    expect(await row()).toMatchObject({ brainSpeed: "standard" });
+    const saved = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { speed: "fast" });
+    expect(saved.speed).toBe("fast");
+    expect((await audits("agent.brain")).at(-1)?.details).toMatchObject({
+      from: { speed: "standard" },
+      to: { speed: "fast" },
+    });
+    await expect(setAgentBrain(deps, bia.id, fx.org.id, fx.agent.id, { speed: "standard" })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    await expect(setAgentBrain(deps, bia.id, fx.org.id, fx.agent.id, { effort: "low" })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    await expect(setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { speed: "turbo" })).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    // A move to what doesn't take it leaves the choice there for when it comes back.
+    expect((await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "model" })).speed).toBe("fast");
+    expect(await row()).toMatchObject({ brain: "model", brainSpeed: "fast" });
   });
 });
 

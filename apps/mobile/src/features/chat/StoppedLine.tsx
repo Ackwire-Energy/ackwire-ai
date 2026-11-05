@@ -1,9 +1,11 @@
 import { type Message, useStopReason } from "@agenteschat/client";
+import { seesDetails } from "@agenteschat/client/lib/audience";
 import type { StoppedNotice } from "@agenteschat/client/lib/notices";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, LineIcon, Text, useToast } from "@/ui";
+import { openAgentAi } from "../ai/AgentAiScreen";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { ReasonField } from "../task-manager/parts";
 
@@ -96,9 +98,43 @@ export function StoppedLine({ message, notice }: { message: Message; notice: Sto
   );
 }
 
+/** Under a reply that came at standard speed because Fast was refused (`meta.speedFallback`), with the way to the agent. */
+export function SpeedFallbackLine({ message }: { message: Message }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const dir = useDirectory();
+  const agent = dir.agentById.get(message.author.id ?? "");
+  return (
+    <View style={styles.inRow}>
+      <View style={styles.head}>
+        <LineIcon name="info" size={13} color={c.faint} variant="caption" />
+        <Text variant="caption" tone="faint" style={styles.grow}>
+          {t("chat.speedFallback.text")}
+          {agent && seesDetails(agent) ? (
+            <>
+              {" "}
+              <Text
+                variant="caption"
+                tone="muted"
+                style={styles.bold}
+                onPress={() => openAgentAi(agent.id)}
+                accessibilityRole="link"
+                suppressHighlighting
+              >
+                {t("chat.speedFallback.action")}
+              </Text>
+            </>
+          ) : null}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   // Aligned with the messages' words, as the other automatic lines (`EventLine`).
   line: { marginVertical: 4, paddingLeft: 56, paddingRight: 16 },
+  inRow: { marginTop: 4 },
   head: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },

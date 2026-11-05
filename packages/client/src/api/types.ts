@@ -738,6 +738,8 @@ export interface AgentBrainLine {
   account?: string;
   /** On a plan: that account's limits as last reported; absent: not known yet. */
   usage?: PlanUsage;
+  /** Set to Rápida where that applies to what it thinks with; absent: standard speed. */
+  speed?: "fast";
 }
 
 /** `appearance` as stored: the UI only draws known values. */
@@ -5081,6 +5083,8 @@ export interface AgentBrain {
   account: string | null;
   /** How much it thinks before answering; `auto` = picked per task; null = the brain's default. */
   effort: BrainEffortSetting | null;
+  /** How fast it answers in conversations; kept whatever it thinks with, applied only where `speedFits`. */
+  speed: BrainSpeed;
   /** The most context it reads, in tokens (200K, 400K or 1M), any brain; null = its model's window. */
   contextTokens?: number | null;
   /**
@@ -5116,6 +5120,8 @@ export type BrainScope = "mine" | "workspace";
 export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
 /** A level, or "Automático" (each run picks low, medium or high with the model). */
 export type BrainEffortSetting = BrainEffort | "auto";
+
+export type BrainSpeed = "standard" | "fast";
 
 export type MachineAccountKind = "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
 
@@ -5227,6 +5233,7 @@ export interface AgentBrainInput {
   /** The account thinks for another agent: take it from that one. */
   moveAccount?: boolean;
   effort?: BrainEffortSetting | null;
+  speed?: BrainSpeed;
   /** 200K, 400K or 1M tokens; null = the model's window; omitted = keep. */
   contextTokens?: number | null;
 }
@@ -5242,6 +5249,8 @@ export interface AgentSetup {
   machineId?: string | null;
   account?: string | null;
   effort?: BrainEffortSetting | null;
+  /** Omitted = each agent keeps its own. */
+  speed?: BrainSpeed;
   contextTokens?: number | null;
   fallback?: boolean;
   /** "Atende outras pessoas" off, for the agents that move onto the plan. */

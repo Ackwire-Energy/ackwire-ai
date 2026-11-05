@@ -1,5 +1,6 @@
+import { speedFits } from "@agenteschat/providers/plans";
 import type { TFunction } from "i18next";
-import type { BrainKind } from "../api/types";
+import type { AgentBrain, BrainKind, BrainSpeed } from "../api/types";
 import { type ContextLimit, contextSize } from "./context-limits";
 
 /*
@@ -13,8 +14,22 @@ import { type ContextLimit, contextSize } from "./context-limits";
 export type EffortLevel = "low" | "medium" | "high" | "max";
 export const EFFORT_LEVELS: readonly EffortLevel[] = ["low", "medium", "high", "max"];
 
+/** Velocidade's choices (ADR 0149). */
+export const SPEEDS: readonly BrainSpeed[] = ["standard", "fast"];
+
+/** Velocidade means something for what this view thinks with; the right hand (its `scope`) has none. */
+export const viewSpeedFits = (view: Pick<AgentBrain, "brain" | "account" | "accounts" | "effectiveModel" | "scope">) =>
+  !view.scope &&
+  speedFits({
+    kind: view.brain,
+    provider: view.accounts.find((a) => a.id === view.account)?.provider,
+    model: view.effectiveModel,
+  });
+
 export interface Advanced {
   effort: EffortLevel;
+  /** Always `standard` where Velocidade doesn't show (`viewSpeedFits`). */
+  speed: BrainSpeed;
   contextTokens: ContextLimit | null;
   /** "Atende outras pessoas" off. */
   onlyOwner: boolean;
@@ -22,7 +37,13 @@ export interface Advanced {
 }
 
 /** A new agent's: medium effort, its model's window, its owner only on a plan (ADR 0059 §5), the API when away. */
-export const ADVANCED_DEFAULTS: Advanced = { effort: "medium", contextTokens: null, onlyOwner: true, fallback: true };
+export const ADVANCED_DEFAULTS: Advanced = {
+  effort: "medium",
+  speed: "standard",
+  contextTokens: null,
+  onlyOwner: true,
+  fallback: true,
+};
 
 /** "Voltar ao padrão": the API brain has only the context limit there, so the rest stays as it is. */
 export const advancedDefaults = (kind: BrainKind, now: Advanced): Advanced =>
@@ -33,8 +54,12 @@ export const isAdvancedDefault = (kind: BrainKind, now: Advanced) =>
 type AdvancedOf = { kind: BrainKind; autoModel: boolean; apiKey: boolean; now: Advanced };
 
 /** The row's line: what the dialog holds ("Esforço, janela de contexto e quem atende"), the effort only with a fixed model. */
-export function advancedContents(t: TFunction, o: Pick<AdvancedOf, "kind" | "autoModel">): string {
-  const which = o.kind === "model" ? "model" : o.autoModel ? "auto" : "fixed";
+export function advancedContents(
+  t: TFunction,
+  o: Pick<AdvancedOf, "kind" | "autoModel"> & { speed?: boolean },
+): string {
+  const line = o.autoModel ? "auto" : "fixed";
+  const which = o.kind === "model" ? "model" : o.speed ? (`${line}Speed` as const) : line;
   return t(`agentPage.work.brain.advanced.contents.${which}`);
 }
 
@@ -57,6 +82,7 @@ export function advancedParts(t: TFunction, _language: string, o: AdvancedOf): s
           level: t(`agentPage.work.brain.effortsLower.${now.effort}`),
         })
       : null,
+    computer && now.speed === "fast" ? t("agentPage.work.brain.advanced.speed") : null,
     now.contextTokens ? t("agentPage.work.brain.advanced.context", { size: contextSize(now.contextTokens) }) : null,
     computer && !now.onlyOwner ? t("agentPage.work.brain.advanced.sharing") : null,
     computer && o.apiKey && !now.fallback ? t("agentPage.work.brain.advanced.waits") : null,
