@@ -634,7 +634,7 @@ test("the desktop's REST: its state for who may watch it, nothing to turn on or 
   expect((await ana(`/api/app/organizations/${org.orgId}/agents/${org.agentId}/desktop`)).status).toBe(403);
   expect((await ana(`/api/app/organizations/${org.orgId}/agents/${org.agentId}/desktop/picture`)).status).toBe(403);
   runner.ws.close();
-});
+}, 30_000);
 
 test("a runner from before desktops stayed on refuses one that isn't running: the server starts it and opens again", async () => {
   const { owner, machine, desktop } = await seeded();

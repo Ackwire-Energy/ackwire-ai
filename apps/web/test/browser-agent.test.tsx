@@ -11,7 +11,10 @@ import { STORAGE_KEYS } from "@/lib/storage";
 import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 const READY: AgentBrowserSettings = {
   allowedDomains: null,

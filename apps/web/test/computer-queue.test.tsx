@@ -10,7 +10,10 @@ import { atRule, builtCss, declarations, topLevel } from "./built-css";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 const NOVA_ID = "00000000-0000-4000-8000-0000000000a7";
 const RIO_ID = "00000000-0000-4000-8000-0000000000a8";
