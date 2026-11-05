@@ -30,9 +30,16 @@ const FACE = 18;
 /** Opens Agentes (who is working, doing what). */
 const openAgents = () => router.navigate("/agents");
 
-/** The workspace's sky behind Conversas' bar, large title and greeting, fading out toward the list. */
+/**
+ * The workspace's sky behind Conversas' bar, large title and greeting: faint, so the title and the right hand's field
+ * lead, and gone before the field.
+ */
 export function GreetingSky() {
-  return <WorkspaceSky fade={0.45} style={StyleSheet.absoluteFill} />;
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.sky]}>
+      <WorkspaceSky fade={0.22} style={StyleSheet.absoluteFill} />
+    </View>
+  );
 }
 
 /**
@@ -201,6 +208,7 @@ export function FirstAgentEmpty() {
 }
 
 const styles = StyleSheet.create({
+  sky: { opacity: 0.5 },
   mini: { paddingHorizontal: 20, paddingBottom: 18 },
   line: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
   after: { marginTop: 14, marginHorizontal: -4 },
