@@ -26,7 +26,6 @@ import {
   Button,
   Filters,
   HoldButton,
-  Icon,
   type IconName,
   LargeTitleScreen,
   LIST_AVATAR,
