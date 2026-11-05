@@ -1,6 +1,12 @@
-import type { ToolChange } from "@agenteschat/client";
-import { inputFields } from "@agenteschat/client/lib/custom-tools";
-import { type DiffLine, diffLines } from "@agenteschat/ui";
+import { type DiffLine, diffLines } from "@agenteschat/ui/diff";
+import type { TFunction } from "i18next";
+import type { ToolChange } from "../api/types";
+import { inputFields } from "./custom-tools";
+
+/*
+ * What a connected server changed in an approved tool (ADR 0117), cut down to the changes: shared by the web's
+ * Conectores and the phone's Ferramentas, so both say the same thing about the same change.
+ */
 
 /** Marks the unchanged lines left out between two changes (ADR 0117 review: only what changed, briefly framed). */
 export const ELIDED = "…";
@@ -97,4 +103,13 @@ export function toolChangeDiff(change: Pick<ToolChange, "before" | "after">): To
   const newTop = schemaLines(without(after.inputSchema, "properties"));
   const schema = oldTop.join("\n") === newTop.join("\n") ? null : changedOnly(diffLines(oldTop, newTop));
   return { description, fields, schema };
+}
+
+/** "O texto mudou · 2 campos mudaram": what changed, in a few words (the list's line under each tool's name). */
+export function toolChangeSummary(t: TFunction, diff: ToolChangeDiff): string {
+  const parts: string[] = [];
+  if (diff.description) parts.push(t("connectors.toolChanges.textChanged"));
+  if (diff.fields.length > 0) parts.push(t("connectors.toolChanges.fieldsChanged", { count: diff.fields.length }));
+  if (parts.length === 0) parts.push(t("connectors.toolChanges.inputChanged"));
+  return parts.join(" · ");
 }

@@ -13,7 +13,7 @@ import {
   reviewDecisions,
   reviewToolsOf,
 } from "@agenteschat/client/lib/tool-review";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import {
@@ -46,6 +46,13 @@ import {
   waitingHits,
 } from "./review";
 
+/** What a screen pins at its bottom for the review's save: the words, whether it is busy, what a tap does. */
+export interface SaveBar {
+  label: string;
+  busy: boolean;
+  onPress: () => void;
+}
+
 /**
  * "O que faz", between connecting and who uses it (the web's second step): a server connected by its address
  * shows its tools as they came classified, by subject, each with the web's control to change it (saved on
@@ -58,12 +65,15 @@ export function ReviewStep({
   name,
   onNext,
   onScreen = false,
+  onSaveBar,
 }: {
   connectionId: string;
   def: ConnectorDef | null;
   name: string;
   onNext: () => void;
   onScreen?: boolean;
+  /** On its own screen, the save goes to the screen's bottom bar (ref-stable: a state setter); null when none. */
+  onSaveBar?: (bar: SaveBar | null) => void;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -77,7 +87,14 @@ export function ReviewStep({
   );
   if (target.kind === "server") {
     return (
-      <ServerReview key={target.server.id} server={target.server} name={name} onNext={onNext} onScreen={onScreen} />
+      <ServerReview
+        key={target.server.id}
+        server={target.server}
+        name={name}
+        onNext={onNext}
+        onScreen={onScreen}
+        onSaveBar={onSaveBar}
+      />
     );
   }
   if (target.kind === "loading") return <ActivityIndicator color={c.muted} />;
@@ -101,11 +118,13 @@ function ServerReview({
   name,
   onNext,
   onScreen,
+  onSaveBar,
 }: {
   server: CustomServer;
   name: string;
   onNext: () => void;
   onScreen: boolean;
+  onSaveBar?: ((bar: SaveBar | null) => void) | undefined;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -140,6 +159,20 @@ function ServerReview({
       },
     );
   };
+  const saveLabel = save.isPending
+    ? t("mobile.connectors.review.saving")
+    : onScreen
+      ? t("common.save")
+      : t("connectFlow.next");
+  // Pinned at the screen's bottom (Ferramentas): the bar gets the words and the state, a tap the latest `next`.
+  const nextNow = useRef(next);
+  useEffect(() => {
+    nextNow.current = next;
+  });
+  useEffect(() => {
+    onSaveBar?.({ label: saveLabel, busy, onPress: () => nextNow.current() });
+  }, [onSaveBar, saveLabel, busy]);
+  useEffect(() => () => onSaveBar?.(null), [onSaveBar]);
   return (
     <>
       {server.toolsError ? <Problem text={t("toolReview.unreadable", { reason: server.toolsError })} /> : null}
@@ -166,15 +199,7 @@ function ServerReview({
         <GroupedFooter>{left > 0 ? t("toolReview.missing", { count: left }) : t("toolReview.later")}</GroupedFooter>
       </View>
       {failed ? <Problem key={failed} text={failed} /> : null}
-      <Button
-        variant="primary"
-        wide
-        label={
-          save.isPending ? t("mobile.connectors.review.saving") : onScreen ? t("common.save") : t("connectFlow.next")
-        }
-        disabled={busy}
-        onPress={next}
-      />
+      {onSaveBar ? null : <Button variant="primary" wide label={saveLabel} disabled={busy} onPress={next} />}
     </>
   );
 }

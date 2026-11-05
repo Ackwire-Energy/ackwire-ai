@@ -136,6 +136,7 @@ function AppStack() {
       <Stack.Screen name="agent-tasks/[agentId]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/tools" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="connectors/change" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="connectors/[id]" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen
         name="connectors/oauth"

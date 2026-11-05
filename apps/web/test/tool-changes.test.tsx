@@ -4,8 +4,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { ToolChange } from "@agenteschat/client";
+import { toolChangeDiff } from "@agenteschat/client/lib/tool-changes";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { toolChangeDiff } from "@/lib/tool-changes";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
