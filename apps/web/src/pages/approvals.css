@@ -754,7 +754,7 @@ html:not([data-pointer]) .ap-li:focus-visible {
 .ap-run__acts {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   padding-left: 34px;
 }
 .ap-run .ap-run__items {

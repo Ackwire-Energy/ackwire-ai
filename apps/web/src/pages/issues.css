@@ -1170,7 +1170,7 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 .issue-work__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 .issue-work__steps {
   list-style: none;
@@ -1252,7 +1252,7 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 /* A compact control of the ruler (32px, its radius), beside the small button it follows. */
 .issue-ask__other {

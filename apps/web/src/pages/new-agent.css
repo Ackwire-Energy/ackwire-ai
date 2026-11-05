@@ -255,7 +255,7 @@
 .newag__born-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   margin-top: 10px;
 }
 .newag__on-sky.ac-btn {
