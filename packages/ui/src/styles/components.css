@@ -8125,6 +8125,11 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
     flex-basis: 100%;
     min-height: 0;
   }
+  /* A line of its own here: with nothing in it yet (Settings' "Saved" between saves) it left a blank row and its gap
+     under the title. */
+  .ac-pagehead__actions:not(:has(> :not(:empty))) {
+    display: none;
+  }
   .ac-pagehead__actions > .ac-btn:not(.ac-btn--icon) {
     flex: 1 1 auto;
   }

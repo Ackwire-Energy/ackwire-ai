@@ -5981,7 +5981,7 @@
     "agentRole": "Agente · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "Crea una, o pídela en el chat: “Lia, crea una tarea para este error”.",
+    "empty": "Crea una, o pídesela a un agente en el chat.",
     "noResults": "Ninguna tarea coincide con estos filtros.",
     "columnEmpty": "Nada aquí.",
     "form": {

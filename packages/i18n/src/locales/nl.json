@@ -5863,7 +5863,7 @@
     "agentRole": "Agent · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "Maak er een, of vraag het in de chat: “Lia, maak een taak voor deze fout”.",
+    "empty": "Maak er een, of vraag een agent erom in de chat.",
     "noResults": "Geen taken die bij deze filters passen.",
     "columnEmpty": "Niets hier.",
     "form": {

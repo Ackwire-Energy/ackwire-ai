@@ -374,7 +374,8 @@ export function RoutinesPage() {
             sky
             title={t("routines.emptyTitle")}
             actions={
-              <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+              // The page head has the one primary "New routine": here it is secondary.
+              <Button icon="plus" onClick={() => setCreating(true)}>
                 {t("routines.new")}
               </Button>
             }

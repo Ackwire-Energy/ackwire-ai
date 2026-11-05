@@ -11894,8 +11894,10 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
 .sidebar__more[data-state="open"] {
   background: var(--plate);
 }
+/* Wide enough that each tool's one-line description ends on a line of its own, not a word left alone
+   ("…na hora / marcada"). */
 .sidebar__more-menu {
-  width: 300px;
+  width: 340px;
   max-width: calc(100vw - 32px);
   max-height: none;
 }

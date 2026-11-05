@@ -6041,7 +6041,7 @@
     "agentRole": "Agente · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "Creane una, o chiedi in chat: “Lia, crea un'attività per questo errore”.",
+    "empty": "Creane una, o chiedila a un agente in chat.",
     "noResults": "Nessuna attività corrisponde a questi filtri.",
     "columnEmpty": "Niente qui.",
     "form": {

@@ -629,7 +629,8 @@ function WikiEmpty({ onNew, onImport, onNav }: { onNew: () => void; onImport: ()
         actions={
           can(org, "edit_wiki") && (
             <div className="wiki-empty__acts">
-              <Button variant="primary" onClick={onImport}>
+              {/* The page head has the one primary ("New page"): the empty state's ways in are secondary. */}
+              <Button onClick={onImport}>
                 <ObsidianMark size={16} />
                 {t("wiki.import.cta")}
               </Button>

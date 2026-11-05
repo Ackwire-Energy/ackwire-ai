@@ -197,7 +197,8 @@ export function IssuesPage() {
             sky
             title={t("issues.emptyTitle")}
             actions={
-              <Button variant="primary" icon="plus" onClick={() => setCreating({ columnId: null })}>
+              // The page head has the one primary "New task": here it is secondary.
+              <Button icon="plus" onClick={() => setCreating({ columnId: null })}>
                 {t("issues.new")}
               </Button>
             }

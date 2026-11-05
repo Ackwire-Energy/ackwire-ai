@@ -5625,7 +5625,7 @@
     "agentRole": "Agen · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "Buat satu, atau minta di chat: “Lia, buat tugas untuk error ini”.",
+    "empty": "Buat satu, atau minta agen di chat.",
     "noResults": "Tidak ada tugas yang cocok dengan filter ini.",
     "columnEmpty": "Tidak ada apa-apa di sini.",
     "form": {
