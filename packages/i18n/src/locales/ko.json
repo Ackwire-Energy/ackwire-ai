@@ -2848,11 +2848,16 @@
   "secret": {
     "group": "{{agent}}의 비밀 정보 요청",
     "chip": "대기 중",
-    "targetEnv": "{{agent}}의 컴퓨터에 {{name}} 변수로 들어가요.",
+    "targetEnv": "{{agent}}의 컴퓨터로 가서 명령에 쓰여요.",
     "targetFile": "{{agent}}의 컴퓨터에 있는 {{path}} 파일로 들어가요.",
     "targetSite": "{{host}}에서 {{agent}}의 브라우저만 이 값을 입력해요. {{agent}}의 명령어에는 들어가지 않아요.",
     "replaces": "{{agent}}이(가) 이 이름으로 이미 가진 키를 대체해요.",
-    "label": "{{name}} 값",
+    "labelPassword": "{{host}} 비밀번호",
+    "labelCode": "{{host}} 코드",
+    "labelKey": "{{agent}}의 컴퓨터용 키",
+    "labelFile": "파일 {{path}}",
+    "placeholder": "여기에 입력",
+    "account": "계정: {{username}}.",
     "private": "암호화되어 컴퓨터로 바로 전송돼요. 채팅에 남지 않고 에이전트도 볼 수 없어요.",
     "send": "보내기",
     "decline": "거절",
@@ -2860,8 +2865,17 @@
     "waitingFor": "{{person}}만 답할 수 있어요.",
     "outcomeBy": "{{person}}이(가) 전달함",
     "outcomeByYou": "내가 전달함",
-    "outcomeWithdrawn": "더 이상 필요 없음",
-    "alreadyAnswered": "이미 답했거나 만료된 요청이에요.",
+    "outcomeWithdrawn": "{{agent}}에게 더 이상 필요하지 않아요.",
+    "endedDeclined": "거절했어요. {{agent}}은(는) 이것 없이 계속해요.",
+    "endedExpired": "제시간에 아무도 답하지 않았어요. {{agent}}은(는) 이것 없이 계속하고 다시 요청할 수 있어요.",
+    "endedRunStopped": "답변 전에 {{agent}}의 작업이 멈췄어요. 아직 필요하면 {{agent}}에게 다시 요청하세요.",
+    "endedSuperseded": "{{agent}}이(가) 더 새로운 요청으로 다시 물었어요.",
+    "endedComputer": "이제 {{agent}}에게 전달할 수 없어요. 요청한 컴퓨터가 바뀌었어요. {{agent}}에게 다시 요청해 달라고 하세요.",
+    "endedPersonLeft": "{{person}}이(가) 답하기 전에 워크스페이스를 떠났어요.",
+    "endedClosed": "이 요청은 답변 전에 닫혔어요. 아직 필요하면 {{agent}}에게 다시 요청하세요.",
+    "seeNewer": "새 요청 보기",
+    "computerAway": "{{agent}}의 컴퓨터가 지금 응답하지 않아요. 이 요청은 {{time}}까지 열려 있어요. 잠시 후 다시 시도하세요.",
+    "computerPaused": "소유자가 {{agent}}의 컴퓨터를 일시 중지했어요. 이 요청은 {{time}}까지 열려 있어요.",
     "failed": "전달하지 못했어요. 에이전트의 컴퓨터가 켜져 있나요?",
     "empty": "값을 입력하세요.",
     "tooLarge": "너무 커요(최대 16KB)."
@@ -5382,7 +5396,7 @@
     },
     "vault_write": {
       "label": "Vault 연락처 편집",
-      "description": "Vault에 연락처를 저장하고 업데이트하며, 저장된 로그인의 사용자 이름이나 설명을 바꾸고, 자신이 저장한 것을 삭제해요."
+      "description": "Vault에 연락처를 저장하고 업데이트하며, 저장된 로그인의 사용자 이름이나 설명을 바꾸고, 직접 만드는 계정의 비밀번호를 만들고, 자신이 저장한 것을 삭제해요."
     },
     "github_git_read": {
       "label": "저장소 클론(git)",
@@ -12713,6 +12727,10 @@
       "label": "스킬 스크립트 실행",
       "description": "환경에서 스킬의 스크립트를 실행해요."
     },
+    "vault_make_password": {
+      "label": "비밀번호 만들기",
+      "description": "자기 컴퓨터에서 강력한 비밀번호를 만들어, 보지 않고 Vault에 키로 보관해요."
+    },
     "computer_status": {
       "label": "컴퓨터 확인",
       "description": "어떤 컴퓨터인지, 응답하고 있는지 알려 줘요."
@@ -12768,6 +12786,10 @@
     "browser_type_secret": {
       "label": "비밀번호 입력",
       "description": "받은 비밀번호를 보지 않고 비밀번호나 코드 필드에 입력해요."
+    },
+    "browser_make_password": {
+      "label": "비밀번호 만들기",
+      "description": "자기 컴퓨터에서 사이트용 강력한 비밀번호를 만들어, 보지 않고 Vault에 보관하고 입력해요."
     },
     "browser_wait": {
       "label": "페이지 기다리기",
@@ -13108,6 +13130,7 @@
         "browser_scroll": "페이지를 스크롤했어요",
         "browser_upload": "파일을 업로드했어요",
         "browser_type_secret": "비밀번호를 입력했어요",
+        "browser_make_password": "비밀번호를 만들었어요",
         "browser_wait": "페이지를 기다렸어요",
         "browser_screenshot": "스크린샷을 찍었어요",
         "browser_ask_person": "도움을 요청했어요",

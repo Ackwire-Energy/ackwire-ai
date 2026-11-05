@@ -42,7 +42,8 @@ const SecretRequest = z
     threadId: z.uuid().nullable(),
     messageId: z.uuid().nullable(),
     requestedForUserId: z.string(),
-    name: z.string(),
+    name: z.string().openapi({ description: "The agent's own name for it. People read `label`." }),
+    label: z.string().nullable().openapi({ description: "What people read, in the agent's words; null: derive one." }),
     purpose: z.string(),
     target: Target,
     site: z
@@ -62,6 +63,11 @@ const SecretRequest = z
       .literal(true)
       .optional()
       .openapi({ description: "The agent took it back (`withdraw_request`): it no longer needs it." }),
+    endReason: z
+      .enum(["run_stopped", "withdrawn", "person_left", "superseded", "computer_changed"])
+      .nullable()
+      .openapi({ description: "Why it closed with nobody answering; null when answered, expired or unknown." }),
+    supersededBy: z.uuid().nullable().openapi({ description: "The newer request that took its place." }),
     replaces: z
       .boolean()
       .openapi({ description: "The agent already held this name on this computer: a delivery replaces that value." }),
@@ -91,6 +97,7 @@ export const SecretBox = z
 const AgentSecret = z
   .object({
     name: z.string(),
+    label: z.string(),
     target: Target,
     machineId: z.uuid().nullable(),
     deliveredAt: z.string(),

@@ -1,7 +1,7 @@
 import { vaultRule, vaultRuleLabel } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { cutText } from "../format";
-import { VAULT_LIST_TOOL, VAULT_READ_SCOPE, VAULT_WRITE_SCOPE } from "../tools/scopes";
+import { VAULT_LIST_TOOL, VAULT_READ_SCOPE, VAULT_SAVE_TOOL, VAULT_WRITE_SCOPE } from "../tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { untrustedBlock } from "../untrusted";
 import {
@@ -30,7 +30,6 @@ import {
  * person behind the run.
  */
 
-export const VAULT_SAVE_TOOL = "vault_save";
 export const VAULT_DELETE_TOOL = "vault_delete";
 /** Items one `vault_list` shows at most: past that, the agent narrows it down. */
 export const VAULT_LIST_MAX = 60;
@@ -228,7 +227,7 @@ export function createVaultToolSource(deps: VaultDeps): ToolSource {
   const save: ToolDefinition = {
     name: VAULT_SAVE_TOOL,
     description:
-      "Keep contact details in the Vault, or change what isn't secret there. Without `id`: a new contact (`title` and its fields), personal to the person behind this run (only they see it, and their agents use it when they ask). With `id` (from vault_list): change a contact's title or fields, a login's username, or any item's description, on that person's own items, or on the team's when they manage credentials. Passwords and keys are never saved here: people save them in Settings, Vault, or from your request card. Do it when a person asks, or offers details worth keeping.",
+      "Keep contact details in the Vault, or change what isn't secret there. Without `id`: a new contact (`title` and its fields), personal to the person behind this run (only they see it, and their agents use it when they ask). With `id` (from vault_list): change a contact's title or fields, a login's username, or any item's description, on that person's own items, or on the team's when they manage credentials. Passwords and keys are never saved here: people save them in Settings, Vault, or from your request card, and you make your own with `browser_make_password` or `vault_make_password`. Do it when a person asks, or offers details worth keeping.",
     scope: VAULT_WRITE_SCOPE,
     inputSchema: {
       type: "object",

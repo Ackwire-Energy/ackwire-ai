@@ -1864,7 +1864,6 @@
       "as": "{{username}}としてログインします。",
       "saved": "Vaultに保存しました",
       "notSaved": "送信しましたが、Vaultには保存していません",
-      "codeLabel": "{{name}}のコード",
       "codeIncomplete": "コードの数字をすべて入力してください。",
       "codeNote": "暗号化してコンピューターに直接送ります。コードは保存されません。"
     }

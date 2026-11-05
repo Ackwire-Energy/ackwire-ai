@@ -578,6 +578,9 @@ async function claimScreens(tx: Executor, orgId: string, agentId: string, screen
 }
 
 /** The screen showing the same window has an open handoff: this one can't start. */
+/** It ended meanwhile: the apps read it again, and its card settles. Someone else in control has no code. */
+const handoffOver = () => new ConflictError("This is already over", "browser.handoff_over");
+
 class SameWindowError extends ConflictError {
   constructor(readonly open: BrowserHandoffRow) {
     super(
@@ -1106,7 +1109,7 @@ export async function claimHandoff(deps: HandoffDeps, actorId: string, orgId: st
   const current = await loadHandoff(deps.db, orgId, handoffId);
   await requireBrowserControl(deps.db, actorId, orgId, current.agentId, current, current.screen);
   await SCREENS[current.screen].mayControl?.(deps.db, actorId, orgId, current.agentId);
-  if (!OPEN.includes(current.status)) throw new ConflictError("This is already over");
+  if (!OPEN.includes(current.status)) throw handoffOver();
   if (current.status === "active" && current.controllerUserId === actorId) return handoffView(current);
   const now = Date.now();
   const [row] = await deps.db
@@ -1178,7 +1181,7 @@ export async function finishHandoff(
   });
   if (!ended) {
     const now = await loadHandoff(deps.db, orgId, handoffId);
-    throw new ConflictError(OPEN.includes(now.status) ? "Someone else is in control" : "This is already over");
+    throw OPEN.includes(now.status) ? new ConflictError("Someone else is in control") : handoffOver();
   }
   await settle(deps, ended, actorId);
   return handoffView(ended);
@@ -1204,7 +1207,7 @@ export async function cancelHandoff(deps: HandoffDeps, actorId: string, orgId: s
     if (rows[0]) await syncCard(tx, rows[0]);
     return rows;
   });
-  if (!row) throw new ConflictError("This is already over");
+  if (!row) throw handoffOver();
   await settle(deps, row);
   return handoffView(row);
 }

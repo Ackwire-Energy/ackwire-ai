@@ -9,9 +9,12 @@ export {
   listUsableVault,
   releaseVaultKeys,
   releaseVaultLogin,
+  restoreMadePassword,
+  saveMadePassword,
   saveVaultItemByAgent,
   VAULT_MAX_KEYS,
   type VaultBrowserProfile,
+  type VaultMadeTarget,
 } from "./agents";
 export { connectVaultSource, deleteVaultConnection, syncVaultConnection, updateVaultConnection } from "./connections";
 export { importVaultCsv } from "./csv";

@@ -9,6 +9,8 @@ import {
   type ErrorReporter,
   formatVaultRule,
   type MachineReplies,
+  PASSWORD_CLASSES,
+  PASSWORD_LENGTH,
   type PubSub,
   sealSecret,
   VAULT_PROTOCOL,
@@ -20,7 +22,7 @@ import { and, type Database, desc, eq, isNull, schema, sql } from "@agenteschat/
 import { getAgentCached } from "../agents";
 import type { Judge } from "../judge";
 import { callWhenBack, type MachineCaller, MachineRequestError } from "../machine-hub";
-import { requestVaultKey, vaultUpdateText } from "../machine-provider";
+import { requestMadePassword, requestVaultKey, vaultUpdateText } from "../machine-provider";
 import { MachineOfflineError, MachinePausedError } from "../machines";
 import { missionOfRun } from "../mission-context";
 import { getSandboxSettings, SANDBOX_SCOPE, withConnectedMachine } from "../sandbox";
@@ -48,16 +50,28 @@ import { requestSecretTool } from "../secret-request-tool";
 import { REQUEST_SECRET_TOOL, SITE_SECRET_TTL_TEXT, siteSecretGone } from "../secrets";
 import { toolDetail } from "../tool-detail";
 import type { JsonSchema } from "../tools/json-schema";
-import { grantedScopeKeys, isAllowed, toolAccess, VAULT_LIST_TOOL, VAULT_READ_SCOPE } from "../tools/scopes";
+import {
+  grantedScopeKeys,
+  isAllowed,
+  toolAccess,
+  VAULT_LIST_TOOL,
+  VAULT_READ_SCOPE,
+  VAULT_SAVE_TOOL,
+  VAULT_WRITE_SCOPE,
+} from "../tools/scopes";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { SHARE_HINT, SHARE_INPUT, shareSavedFile } from "../uploads";
 import {
   checkVaultLogin,
+  deleteVaultItemByAgent,
   recordVaultUse,
   releaseVaultLogin,
+  restoreMadePassword,
+  saveMadePassword,
   type VaultBrowserProfile,
   type VaultDeps,
   VaultRefusal,
+  vaultItemName,
 } from "../vault";
 import type { BrowserPageReader } from "../web-tools";
 import {
@@ -968,11 +982,12 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     id: string,
     status: { machineName: string; protocol: number },
     profile: { id: string; name: string } | null,
+    made: boolean,
   ): Promise<string | null> {
     const vault = deps.vault;
     if (!vault) return "The Vault isn't available on this server: ask the person for the password with request_secret.";
     const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
-    if (!isAllowed(toolAccess(granted, { name: VAULT_LIST_TOOL, scope: VAULT_READ_SCOPE }))) {
+    if (!made && !isAllowed(toolAccess(granted, { name: VAULT_LIST_TOOL, scope: VAULT_READ_SCOPE }))) {
       return 'You may not use the Vault ("See the Vault" is off for you). Ask for it with request_permission, or ask the person for the password with request_secret.';
     }
     if (status.protocol < VAULT_PROTOCOL) return vaultUpdateText(status.machineName, "type Vault logins");
@@ -1042,7 +1057,11 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
    * steps go to the chat's trail from here (a `browser_do`; single tools are
    * on it by their own name).
    */
-  async function plan(ctx: ToolContext, steps: ScreenStep[], options: { trail?: boolean } = {}): Promise<ToolOutput> {
+  async function plan(
+    ctx: ToolContext,
+    steps: ScreenStep[],
+    options: { trail?: boolean; made?: boolean } = {},
+  ): Promise<ToolOutput> {
     for (const s of steps) {
       const refused = s.do === "open" && s.url ? await outboundRefusal(ctx, s.url) : null;
       if (refused) return refused;
@@ -1065,7 +1084,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       const login = s.login?.trim();
       if (login) {
         if (logins.has(login)) continue;
-        const refused = await loginRefusal(ctx, login, linked.status, linked.profile);
+        const refused = await loginRefusal(ctx, login, linked.status, linked.profile, options.made === true);
         if (refused) return { content: refused, isError: true };
         logins.add(login);
         continue;
@@ -1146,6 +1165,65 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     // A step that ran and only failed its check was done: not an error (it must not be done again).
     const nothingDone = report.steps.every((s) => s.status !== "done" && !s.ran);
     return { content, ...(f.failed && nothingDone ? { isError: true } : {}), data };
+  }
+
+  /**
+   * `browser_make_password` (ADR 0144 §8): the computer makes the password, the Vault keeps it for this page's site,
+   * and only then is it typed, as any Vault login is, into each field. A form can't be sent with a password the Vault
+   * doesn't have. Typed nowhere (a wrong field, a page that moved on): what was saved goes back, so a good password
+   * isn't left behind one no site ever saw. The value is in this process only while it is sealed.
+   */
+  async function makePassword(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
+    const vault = deps.vault;
+    if (!vault || !hub) return { content: "The Vault isn't available on this server.", isError: true };
+    const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
+    if (!isAllowed(toolAccess(granted, { name: VAULT_SAVE_TOOL, scope: VAULT_WRITE_SCOPE }))) {
+      return {
+        content:
+          'You may not keep passwords in the Vault ("Edit Vault contacts" is off for you). Ask for it with request_permission.',
+        isError: true,
+      };
+    }
+    const run = ids(ctx);
+    const undo = str(input.undo).trim();
+    try {
+      if (undo) {
+        const { item } = await restoreMadePassword(vault, run, undo);
+        return {
+          content: `The earlier password of ${vaultItemName(item)} is back in the Vault, and the last one is gone.`,
+        };
+      }
+      const linked = await linkFor(ctx);
+      if (!linked.ok) return { content: linked.text, isError: true };
+      const at = await linked.link.act({ command: "get", args: ["url"], timeoutSeconds: COMMAND_SECONDS });
+      const website = at.ok ? pageOrigin(urlOf(at.data)) : null;
+      if (!website?.startsWith("https://")) {
+        return { content: "Open the site's HTTPS page with the password field first.", isError: true };
+      }
+      const agent = scopeOf(ctx.agentId, await getAgentCached(ctx.db, ctx.orgId, ctx.agentId));
+      const value = await requestMadePassword(hub, linked.status.machineId, agent, input, ctx.signal);
+      const profile = await vaultProfile(ctx, linked.profile);
+      const username = str(input.username).trim() || null;
+      const saved = await saveMadePassword(vault, run, { website, username }, value, profile);
+      const fields = [str(input.target), str(input.confirm)].map((t) => t.trim()).filter(Boolean);
+      const typed = await plan(
+        ctx,
+        fields.map((target) => ({ do: "type_secret", target, login: saved.item.id })),
+        { made: true },
+      );
+      if (typed.isError) {
+        await (saved.outcome === "created"
+          ? deleteVaultItemByAgent(vault, run, saved.item.id)
+          : restoreMadePassword(vault, run, saved.item.id));
+        return { ...typed, content: `${typed.content}\nNothing was typed, and the Vault is as it was.` };
+      }
+      return {
+        ...typed,
+        content: `${typed.content}\nThe Vault keeps this password as login ${saved.item.id}${saved.outcome === "updated" ? ", in place of the one it had" : ""}: sign in with it from now on. Now send the form. If the site turns the password down, call this again with the \`length\` and \`classes\` it asks for.${saved.outcome === "updated" ? ` If the old one stays in force, \`undo\` with this id brings it back.` : ""}`,
+      };
+    } catch (error) {
+      return { content: vaultErrorText(error), isError: true };
+    }
   }
 
   /**
@@ -1251,6 +1329,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
   const requestBrowserSecret = requestSecretTool({
     scope: BROWSER_SCOPE,
     browserOnly: true,
+    ...(deps.pubsub ? { pubsub: deps.pubsub } : {}),
     async onComputer(ctx, fn) {
       const status = await machineOf(ctx);
       if (!status.available) throw new Error(browserUnavailableText(status));
@@ -1573,6 +1652,40 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       },
     ),
     tool(
+      "browser_make_password",
+      `For an account you are making, or a password you are changing, yourself: makes a strong password on your computer, keeps it in the Vault for this site and \`username\`, and types it into \`target\` and \`confirm\`. You never see it. Never ask a person to invent one. Then send the form yourself.`,
+      {
+        type: "object",
+        properties: {
+          target: targetProp,
+          confirm: { type: "string", maxLength: 500, description: "The field that repeats the password, if any." },
+          username: { type: "string", maxLength: 200, description: "The account's username or email." },
+          length: {
+            type: "integer",
+            minimum: PASSWORD_LENGTH.min,
+            maximum: PASSWORD_LENGTH.max,
+            description: `Default ${PASSWORD_LENGTH.default}.`,
+          },
+          classes: {
+            type: "array",
+            items: { enum: [...PASSWORD_CLASSES] },
+            description: "What it's made of, when the site limits it. Default: all.",
+          },
+          undo: {
+            type: "string",
+            maxLength: 64,
+            description: "A login's id: back to the password it had before you made this one, typing nothing.",
+          },
+        },
+        additionalProperties: false,
+      },
+      (input, ctx) =>
+        str(input.undo).trim() || str(input.target).trim()
+          ? makePassword(input, ctx)
+          : Promise.resolve({ content: "Say which field (`target`).", isError: true }),
+      { onThePage: true },
+    ),
+    tool(
       "browser_wait",
       `${BROWSER_TOOL_INFO.browser_wait.description} Prefer this to waiting blindly after something that loads. \`until\` takes a condition in words (\`the export finished\`, \`the payment shows as approved\`), checked each time the page changes.`,
       {
@@ -1773,7 +1886,10 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       const profiles = await agentBrowserProfiles(ctx.db, ctx.orgId, ctx.agentId);
       const status = await machineOf(ctx);
       if (!status.available && profiles.length === 0) return [];
-      const offered = profiles.length > 0 ? [...definitions, profileTool(profiles)] : definitions;
+      // A password made here goes to the Vault: without keeping one there, it would be typed and lost.
+      const mayKeep = deps.vault && isAllowed(toolAccess(granted, { name: VAULT_SAVE_TOOL, scope: VAULT_WRITE_SCOPE }));
+      const usable = mayKeep ? definitions : definitions.filter((t) => t.name !== "browser_make_password");
+      const offered = profiles.length > 0 ? [...usable, profileTool(profiles)] : usable;
       // A browser password needs `request_secret`: the computer's tools offer it when the agent may run code
       // there; otherwise this source does, bound to one site (one tool by that name either way).
       const sandboxOffers =

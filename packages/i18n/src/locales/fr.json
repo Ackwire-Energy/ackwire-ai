@@ -3061,11 +3061,16 @@
   "secret": {
     "group": "Demande de secret de {{agent}}",
     "chip": "En attente",
-    "targetEnv": "Ajouté comme variable {{name}} sur l'ordinateur de {{agent}}.",
+    "targetEnv": "Va sur l'ordinateur de {{agent}}, pour ses commandes.",
     "targetFile": "Va dans le fichier {{path}} sur l'ordinateur de {{agent}}.",
     "targetSite": "Seul le navigateur de {{agent}} le saisit, sur {{host}}. Il reste hors des commandes de {{agent}}.",
     "replaces": "Remplace la clé que {{agent}} a déjà sous ce nom.",
-    "label": "Valeur de {{name}}",
+    "labelPassword": "Mot de passe de {{host}}",
+    "labelCode": "Code de {{host}}",
+    "labelKey": "Une clé pour l'ordinateur de {{agent}}",
+    "labelFile": "Le fichier {{path}}",
+    "placeholder": "Saisissez-le ici",
+    "account": "Compte : {{username}}.",
     "private": "Envoyé chiffré directement à l'ordinateur. Il reste hors du chat et loin de l'agent.",
     "send": "Envoyer",
     "decline": "Refuser",
@@ -3073,8 +3078,17 @@
     "waitingFor": "Seul(e) {{person}} peut répondre.",
     "outcomeBy": "Fourni par {{person}}",
     "outcomeByYou": "Fourni par vous",
-    "outcomeWithdrawn": "N'est plus nécessaire",
-    "alreadyAnswered": "Cette demande a déjà reçu une réponse ou a expiré.",
+    "outcomeWithdrawn": "{{agent}} n'en a plus besoin.",
+    "endedDeclined": "Refusé. {{agent}} continue sans cela.",
+    "endedExpired": "Personne n'a répondu à temps. {{agent}} continue sans cela et peut redemander.",
+    "endedRunStopped": "La tâche de {{agent}} s'est arrêtée avant la réponse. Redemandez à {{agent}} si vous en avez encore besoin.",
+    "endedSuperseded": "{{agent}} a redemandé dans une demande plus récente.",
+    "endedComputer": "Cela n'atteint plus {{agent}} : l'ordinateur qui a demandé a changé. Demandez à {{agent}} de redemander.",
+    "endedPersonLeft": "{{person}} a quitté l'espace de travail avant de répondre.",
+    "endedClosed": "Cette demande a été fermée avant toute réponse. Redemandez à {{agent}} si vous en avez encore besoin.",
+    "seeNewer": "Voir la demande plus récente",
+    "computerAway": "L'ordinateur de {{agent}} ne répond pas pour le moment. Cette demande reste ouverte jusqu'à {{time}}. Réessayez dans un instant.",
+    "computerPaused": "L'ordinateur de {{agent}} est mis en pause par son propriétaire. Cette demande reste ouverte jusqu'à {{time}}.",
     "failed": "Impossible de le transmettre. L'ordinateur de l'agent est-il allumé ?",
     "empty": "Saisissez la valeur.",
     "tooLarge": "Trop volumineux (16 Ko maximum)."
@@ -5813,7 +5827,7 @@
     },
     "vault_write": {
       "label": "Modifier les coordonnées du Vault",
-      "description": "Enregistrer et mettre à jour des coordonnées dans le Vault, changer le nom d'utilisateur d'un identifiant enregistré ou une description, et supprimer ce qu'il a enregistré."
+      "description": "Enregistrer et mettre à jour des coordonnées dans le Vault, changer le nom d'utilisateur d'un identifiant enregistré ou une description, créer des mots de passe pour les comptes qu'il ouvre, et supprimer ce qu'il a enregistré."
     },
     "github_git_read": {
       "label": "Cloner des dépôts (git)",
@@ -13671,6 +13685,10 @@
       "label": "Exécuter le script d'une compétence",
       "description": "Exécute le script d'une compétence dans l'environnement."
     },
+    "vault_make_password": {
+      "label": "Créer un mot de passe",
+      "description": "Crée un mot de passe fort sur son ordinateur et le garde dans le Vault comme clé, sans le voir."
+    },
     "computer_status": {
       "label": "Vérifier l'ordinateur",
       "description": "Indique de quel ordinateur il s'agit et s'il répond."
@@ -13726,6 +13744,10 @@
     "browser_type_secret": {
       "label": "Saisir un mot de passe",
       "description": "Saisit un mot de passe que vous lui avez donné dans un champ de mot de passe ou de code, sans le voir."
+    },
+    "browser_make_password": {
+      "label": "Créer un mot de passe",
+      "description": "Crée un mot de passe fort pour un site sur son ordinateur, le garde dans le Vault et le saisit, sans le voir."
     },
     "browser_wait": {
       "label": "Attendre la page",
@@ -14119,6 +14141,7 @@
         "browser_scroll": "A fait défiler la page",
         "browser_upload": "A envoyé un fichier",
         "browser_type_secret": "A saisi un mot de passe",
+        "browser_make_password": "A créé un mot de passe",
         "browser_wait": "A attendu la page",
         "browser_screenshot": "A pris une capture d'écran",
         "browser_ask_person": "A demandé de l'aide",

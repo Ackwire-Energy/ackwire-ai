@@ -2056,7 +2056,6 @@
       "as": "Se connecte en tant que {{username}}.",
       "saved": "Enregistré dans le Vault",
       "notSaved": "Envoyé, mais pas enregistré dans le Vault",
-      "codeLabel": "Code pour {{name}}",
       "codeIncomplete": "Saisissez tous les chiffres du code.",
       "codeNote": "Envoyé chiffré directement à l'ordinateur. Les codes ne sont jamais enregistrés."
     }

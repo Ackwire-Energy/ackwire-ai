@@ -1,6 +1,7 @@
 import type { BrowserHandoff } from "@agenteschat/client";
 import {
   drivesOnDesktop,
+  HANDOFF_OVER,
   handoffFuse,
   handoffIsMine,
   handoffScreen,
@@ -83,11 +84,14 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   const take = () =>
     actions.takeControl.mutate(current.id, {
       onSuccess: show,
-      onError: (err) =>
+      onError: (err) => {
+        // It ended meanwhile: the card says so itself (`useBrowserHandoffMutations` reads it again).
+        if ((err as { code?: string }).code === HANDOFF_OVER) return;
         toast.show(
           (err as { status?: number }).status === 409 ? t("browser.card.busy") : t("browser.card.openFailed"),
           "error",
-        ),
+        );
+      },
     });
   // A notification asked for this request: take it (or show it, when it's already mine).
   const asked = useBrowserCardRequest({ handoffId: current.id });

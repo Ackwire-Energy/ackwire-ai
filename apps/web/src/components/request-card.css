@@ -114,11 +114,10 @@
   flex-direction: column;
   gap: 1px;
 }
+/* What it asks and where it goes wrap: cut, they hide the meaning. */
 .rq__wt b,
 .rq__wt small {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .rq__wt b {
   font-size: 14px;
@@ -268,17 +267,18 @@ html:not([data-pointer]) .rq__more:focus-visible {
 }
 .rq-done__line {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   font-size: 13px;
   color: var(--muted);
 }
+/* On the first line of its words, however many they wrap to. */
 .rq-done__mark {
   flex: none;
   display: inline-grid;
   place-items: center;
   width: 14px;
-  height: 14px;
+  height: 1lh;
 }
 .rq-done__mark > span {
   width: 8px;
@@ -292,9 +292,7 @@ html:not([data-pointer]) .rq__more:focus-visible {
 }
 .rq-done__text {
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .rq-done__text b {
   font-weight: 600;

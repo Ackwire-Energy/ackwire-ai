@@ -2947,11 +2947,16 @@
   "secret": {
     "group": "{{agent}} ajanından gizli bilgi isteği",
     "chip": "Bekliyor",
-    "targetEnv": "{{agent}} ajanının bilgisayarına {{name}} değişkeni olarak girer.",
+    "targetEnv": "{{agent}} ajanının bilgisayarına, komutları için gider.",
     "targetFile": "{{agent}} ajanının bilgisayarındaki {{path}} dosyasına gider.",
     "targetSite": "Bunu yalnızca {{agent}} ajanının tarayıcısı, {{host}} üzerinde yazar. {{agent}} ajanının komutlarının dışında kalır.",
     "replaces": "{{agent}} ajanının bu adla zaten sahip olduğu anahtarın yerini alır.",
-    "label": "{{name}} değeri",
+    "labelPassword": "{{host}} şifresi",
+    "labelCode": "{{host}} kodu",
+    "labelKey": "{{agent}} bilgisayarı için bir anahtar",
+    "labelFile": "{{path}} dosyası",
+    "placeholder": "Buraya yazın",
+    "account": "Hesap: {{username}}.",
     "private": "Şifrelenmiş olarak doğrudan bilgisayara gönderilir. Sohbetin dışında ve ajandan uzak kalır.",
     "send": "Gönder",
     "decline": "Reddet",
@@ -2959,8 +2964,17 @@
     "waitingFor": "Yalnızca {{person}} yanıtlayabilir.",
     "outcomeBy": "{{person}} iletti",
     "outcomeByYou": "Siz ilettiniz",
-    "outcomeWithdrawn": "Artık gerekmiyor",
-    "alreadyAnswered": "Bu istek zaten yanıtlandı ya da süresi doldu.",
+    "outcomeWithdrawn": "{{agent}} artık buna ihtiyaç duymuyor.",
+    "endedDeclined": "Reddedildi. {{agent}} bunsuz devam ediyor.",
+    "endedExpired": "Kimse zamanında yanıtlamadı. {{agent}} bunsuz devam ediyor ve yeniden isteyebilir.",
+    "endedRunStopped": "{{agent}} görevi yanıttan önce durdu. Hâlâ gerekiyorsa {{agent}} ajanından yeniden isteyin.",
+    "endedSuperseded": "{{agent}} daha yeni bir istekle yeniden istedi.",
+    "endedComputer": "Bu artık {{agent}} ajanına ulaşamaz: isteyen bilgisayar değişti. {{agent}} ajanından yeniden istemesini isteyin.",
+    "endedPersonLeft": "{{person}} yanıtlamadan önce çalışma alanından ayrıldı.",
+    "endedClosed": "Bu istek yanıtlanmadan kapandı. Hâlâ gerekiyorsa {{agent}} ajanından yeniden isteyin.",
+    "seeNewer": "Daha yeni isteği gör",
+    "computerAway": "{{agent}} bilgisayarı şu anda yanıt vermiyor. Bu istek {{time}} saatine kadar açık kalır. Birazdan yeniden deneyin.",
+    "computerPaused": "{{agent}} bilgisayarı sahibi tarafından duraklatıldı. Bu istek {{time}} saatine kadar açık kalır.",
     "failed": "İletilemedi. Ajanın bilgisayarı açık mı?",
     "empty": "Değeri yazın.",
     "tooLarge": "Çok büyük (en fazla 16 KB)."
@@ -5565,7 +5579,7 @@
     },
     "vault_write": {
       "label": "Vault iletişim bilgilerini düzenleme",
-      "description": "Vault'ta iletişim bilgilerini kaydetme ve güncelleme, kayıtlı bir girişin kullanıcı adını ya da bir açıklamayı değiştirme ve kendi kaydettiklerini silme."
+      "description": "Vault'ta iletişim bilgilerini kaydetme ve güncelleme, kayıtlı bir girişin kullanıcı adını ya da bir açıklamayı değiştirme, açtığı hesaplar için şifre oluşturma ve kendi kaydettiklerini silme."
     },
     "github_git_read": {
       "label": "Depo klonlama (git)",
@@ -13127,6 +13141,10 @@
       "label": "Beceri betiği çalıştır",
       "description": "Bir becerinin betiğini ortamda çalıştırır."
     },
+    "vault_make_password": {
+      "label": "Şifre oluştur",
+      "description": "Bilgisayarında güçlü bir şifre oluşturur ve görmeden Vault'ta anahtar olarak saklar."
+    },
     "computer_status": {
       "label": "Bilgisayarı kontrol et",
       "description": "Hangi bilgisayar olduğunu ve yanıt verip vermediğini söyler."
@@ -13182,6 +13200,10 @@
     "browser_type_secret": {
       "label": "Şifre yaz",
       "description": "Ona verdiğiniz bir şifreyi, görmeden bir şifre veya kod alanına yazar."
+    },
+    "browser_make_password": {
+      "label": "Şifre oluştur",
+      "description": "Bilgisayarında bir site için güçlü bir şifre oluşturur, görmeden Vault'ta saklar ve yazar."
     },
     "browser_wait": {
       "label": "Sayfayı bekle",
@@ -13525,6 +13547,7 @@
         "browser_scroll": "Sayfayı kaydırdı",
         "browser_upload": "Bir dosya yükledi",
         "browser_type_secret": "Bir şifre yazdı",
+        "browser_make_password": "Bir şifre oluşturdu",
         "browser_wait": "Sayfayı bekledi",
         "browser_screenshot": "Ekran görüntüsü aldı",
         "browser_ask_person": "Yardım istedi",

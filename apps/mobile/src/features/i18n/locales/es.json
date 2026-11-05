@@ -2056,7 +2056,6 @@
       "as": "Inicia sesión como {{username}}.",
       "saved": "Guardado en el Vault",
       "notSaved": "Enviado, pero no guardado en el Vault",
-      "codeLabel": "Código para {{name}}",
       "codeIncomplete": "Escribe todos los dígitos del código.",
       "codeNote": "Se envía cifrado directo a la computadora. Los códigos nunca se guardan."
     }

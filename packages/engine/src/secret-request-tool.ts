@@ -1,4 +1,4 @@
-import { isReservedSecretName } from "@agenteschat/adapters";
+import { isReservedSecretName, type PubSub } from "@agenteschat/adapters";
 import { and, eq, gt, isNull, ne, or, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { type ComputerHandle, requireComputerManager } from "./sandbox";
@@ -7,8 +7,10 @@ import {
   REQUEST_SECRET_TOOL,
   requesterOfRun,
   SECRET_TTL_MS,
+  secretLabelOf,
   secretOnComputer,
   secretStillHeld,
+  supersedeOlderSecretRequests,
 } from "./secrets";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 
@@ -18,6 +20,14 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 export const CODE_DIGITS = { min: 4, max: 12 } as const;
 /** Longest username a request may carry (the Vault keeps the same). */
 export const MAX_SECRET_USERNAME = 200;
+/** Longest label a card shows. */
+export const MAX_SECRET_LABEL = 80;
+
+/** The agent's label as people read it; a variable-style one (`LIA_GOOGLE_PASSWORD`) is no label at all. */
+export function friendlyLabel(raw: unknown): string | null {
+  const label = str(raw).trim().slice(0, MAX_SECRET_LABEL);
+  return label && !/^[A-Z0-9_]+$/.test(label) ? label : null;
+}
 
 /** A `request_secret` site as its origin (`https://host[:port]`), or null when it isn't a web address. */
 export function secretSite(raw: string): string | null {
@@ -49,6 +59,7 @@ export function requestSecretTool(opts: {
   browserOnly: boolean;
   /** A workspace path for `target: file` (the computer's variant). */
   toolPath?: (raw: string) => string;
+  pubsub?: PubSub;
   /** The computer the key is made on (and the secret later delivered to). */
   onComputer: <T>(ctx: ToolContext, fn: (computer: ComputerHandle) => Promise<T>) => Promise<T>;
 }): ToolDefinition {
@@ -63,7 +74,7 @@ export function requestSecretTool(opts: {
     type: "string",
     maxLength: MAX_SECRET_USERNAME,
     description:
-      "With `site`: the account's username or email when you know it. The card shows it, and saves it with the password when the person keeps it in the Vault.",
+      "With `site`: the account's username or email. Always give it when you know it (the address you typed, your own mailbox's): the card shows it and keeps it with the password.",
   } as const;
   const code = {
     type: "object",
@@ -73,12 +84,23 @@ export function requestSecretTool(opts: {
     description:
       "With `site`: a one-time code (sent by text message or email) instead of a password: the card shows one box per digit. Never saved; type it at once.",
   } as const;
+  const label = {
+    type: "string",
+    maxLength: MAX_SECRET_LABEL,
+    description: "What the person reads, in their language (`Senha da Conta Google`). `name` stays yours.",
+  } as const;
+  const purpose = {
+    type: "string",
+    minLength: 1,
+    maxLength: 300,
+    description: "Why you need it, in one sentence, shown to the person",
+  } as const;
   return {
     name: REQUEST_SECRET_TOOL,
     description: [
       opts.browserOnly
-        ? "Ask the person who asked you for a password or code to sign in on a site in your browser, and whenever they ask to send one privately. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you, and it will only ever be typed on that one site (`site`, the login page's address). Never ask for passwords or codes in a normal message. `name` is UPPER_SNAKE_CASE. Give `username` when you know the account, and `code` for a one-time code. Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Type it with `browser_type_secret`."
-        : "Ask the person who asked you for a secret your computer needs: a token or password for a CLI, the code that finishes a sign-in, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or codes in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` (an environment variable in your commands) or `file` (a path in your workspace, e.g. `.npmrc` or `.env`, written with mode 600). For a site your browser signs in to, give `site` (and `username` when you know it, or `code` for a one-time code). Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Use it by name, never print it. Look in the Vault first (`vault_list`) when you have it: a saved login or key needs no request.",
+        ? "Ask the person who asked you for a password or code to sign in on a site in your browser, and whenever they ask to send one privately. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you, and it will only ever be typed on that one site (`site`, the login page's address). Never ask for passwords or codes in a normal message. `name` is UPPER_SNAKE_CASE. Give `label`, `username` when you know the account, and `code` for a one-time code. Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Type it with `browser_type_secret`. Not for an account you make yourself: `browser_make_password`."
+        : "Ask the person who asked you for a secret your computer needs: a token or password for a CLI, the code that finishes a sign-in, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or codes in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` (an environment variable in your commands) or `file` (a path in your workspace, e.g. `.npmrc` or `.env`, written with mode 600). Give `label`. For a site your browser signs in to, give `site` (and `username` when you know it, or `code` for a one-time code). Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Use it by name, never print it. Look in the Vault first (`vault_list`) when you have it: a saved login or key needs no request. Not for a password you can make yourself: `browser_make_password`, `vault_make_password`.",
       AGAIN,
     ].join(" "),
     scope: opts.scope,
@@ -87,12 +109,8 @@ export function requestSecretTool(opts: {
           type: "object",
           properties: {
             name: { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,63}$" },
-            purpose: {
-              type: "string",
-              minLength: 1,
-              maxLength: 300,
-              description: "What it is for, shown to the person",
-            },
+            label,
+            purpose,
             site,
             username,
             code,
@@ -104,12 +122,8 @@ export function requestSecretTool(opts: {
           type: "object",
           properties: {
             name: { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,63}$" },
-            purpose: {
-              type: "string",
-              minLength: 1,
-              maxLength: 300,
-              description: "What it is for, shown to the person",
-            },
+            label,
+            purpose,
             target: { enum: ["env", "file"] },
             path: { type: "string", maxLength: 300, description: "With target file: where it goes in your workspace" },
             site,
@@ -119,7 +133,7 @@ export function requestSecretTool(opts: {
           required: ["name", "purpose", "target"],
           additionalProperties: false,
         },
-    describe: (input) => ({ title: `Ask for the secret ${str(input.name)}` }),
+    describe: (input) => ({ title: `Ask for ${friendlyLabel(input.label) ?? "a secret"}` }),
     async execute(input, ctx) {
       try {
         const requester = await requesterOfRun(ctx);
@@ -268,6 +282,7 @@ export function requestSecretTool(opts: {
               toolUseId: ctx.toolUseId ?? id,
               requestedForUserId: requester,
               name,
+              label: friendlyLabel(input.label),
               // The person sees the one site a browser password may be typed on.
               purpose: origin ? `${str(input.purpose).trim()} (${new URL(origin).host})` : str(input.purpose).trim(),
               site: origin,
@@ -289,7 +304,7 @@ export function requestSecretTool(opts: {
             target: { type: "agent", id: ctx.agentId },
             details: {
               requestId: id,
-              name,
+              name: secretLabelOf(inserted),
               target: kind === "file" ? { kind, path } : kind === "site" && origin ? { kind, site: origin } : { kind },
               requestedFor: requester,
               ...(held ? { replaces: true } : {}),
@@ -299,6 +314,7 @@ export function requestSecretTool(opts: {
           return inserted;
         });
         if ("refused" in row) return { content: row.refused, isError: true };
+        await supersedeOlderSecretRequests({ db: ctx.db, pubsub: opts.pubsub }, row);
         return { content: "", waitForSecret: { requestId: row.id } };
       } catch (error) {
         return failed(error);

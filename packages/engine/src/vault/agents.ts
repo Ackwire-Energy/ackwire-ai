@@ -30,9 +30,9 @@ import {
   type VaultRunPerson,
   vaultPersonOfRun,
 } from "./access";
-import { assertRoom, cleanContact, cleanText, connectionRow } from "./items";
+import { assertRoom, cleanContact, cleanKeyName, cleanText, cleanWebsite, connectionRow } from "./items";
 import { named, refuse, vaultItemName } from "./refusals";
-import { readItemValue, sealItemValue } from "./seal";
+import { openItemValue, readItemValue, sealItemValue } from "./seal";
 import {
   VAULT_LIMITS,
   type VaultAgentChange,
@@ -59,6 +59,9 @@ import {
 } from "./views";
 
 const { vaultConnections, vaultItems } = schema;
+
+/** Values a made password keeps behind it (`previousSecrets`): a few retries with other shapes never drop a good one. */
+export const VAULT_PREVIOUS_KEPT = 5;
 
 /** Most keys one command gets at once. */
 export const VAULT_MAX_KEYS = 10;
@@ -474,6 +477,134 @@ async function createContact(
   });
   await publishVaultChanged(deps.pubsub, run.orgId);
   return { outcome: "created", item: agentView(row, contact) };
+}
+
+/** What a made password is saved as: a login for a site and username, or a key for commands. */
+export type VaultMadeTarget = { website: string; username: string | null } | { keyName: string; title: string };
+
+/** A value the agent made replaces only what the run could type or use anyway, on the terms of `vault_save`. */
+function assertMayReplace(item: ItemRow, run: VaultRun, person: VaultRunPerson) {
+  if (item.ownerUserId || item.createdByAgentId === run.agentId || (person.personId && person.manages)) return;
+  throw refuse.notAllowed(
+    `${named(item)} is the team's and you didn't make it: only someone who manages credentials changes it. Nothing was changed.`,
+  );
+}
+
+/**
+ * A password an agent's computer made, into the Vault (ADR 0144 §8), before anything is typed: a form sent with a
+ * password the Vault doesn't have would lock the agent out. The same login or key again (the person's own first,
+ * then the team's) takes the new value, keeping the old one sealed behind it for `restoreMadePassword`: a site that
+ * turned the new one down still takes the old one.
+ *
+ * A new one is the team's, open to everyone, for this agent (with `profile`, for every agent of that shared browser
+ * profile, or it couldn't be typed there): the session it opens stays in the agent's browser for all its work (§5),
+ * so its next run needs it whoever asked. Only its site, username and name show; the value comes back to nobody.
+ */
+export async function saveMadePassword(
+  deps: VaultDeps,
+  run: VaultRun,
+  target: VaultMadeTarget,
+  value: string,
+  profile: VaultBrowserProfile | null = null,
+): Promise<VaultAgentResult> {
+  const { db } = deps;
+  const person = await vaultPersonOfRun(db, run);
+  const fields = await asRefusal(() => {
+    if ("keyName" in target) {
+      const keyName = cleanKeyName(target.keyName);
+      const title = cleanText(target.title, VAULT_LIMITS.title, "title") || keyName;
+      return { kind: "key" as const, title, website: null, username: null, keyName };
+    }
+    const website = cleanWebsite(target.website);
+    const username = cleanText(target.username, VAULT_LIMITS.username, "username") || null;
+    return { kind: "login" as const, title: hostOf(website), website, username, keyName: null };
+  });
+  const state = await loadVault(db, run.orgId);
+  const same = state.items.filter(
+    (item) =>
+      item.kind === fields.kind &&
+      !item.connectionId &&
+      usable(item, undefined, person, run.agentId) &&
+      (fields.website
+        ? item.username === fields.username && forSite(item, fields.website)
+        : item.keyName === fields.keyName),
+  );
+  const existing = same.find((item) => item.ownerUserId && item.ownerUserId === person.personId) ?? same[0];
+  if (existing) {
+    assertMayReplace(existing, run, person);
+    const sealed = await sealItemValue(deps, existing, existing.secretVersion + 1, value);
+    const { secretCiphertext, wrappedDataKey, kekId, secretVersion } = existing;
+    const kept =
+      secretCiphertext && wrappedDataKey && kekId
+        ? [...existing.previousSecrets, { secretCiphertext, wrappedDataKey, kekId, secretVersion }]
+        : existing.previousSecrets;
+    const row = await replaceValue(deps, run, person, existing, sealed, kept.slice(-VAULT_PREVIOUS_KEPT));
+    return { outcome: "updated", item: agentView(row, null) };
+  }
+  await asRefusal(() => assertRoom(db, run.orgId));
+  const id = Bun.randomUUIDv7();
+  const sealed = await sealItemValue(deps, { orgId: run.orgId, id, ownerUserId: null }, 1, value);
+  const row = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(vaultItems)
+      .values({
+        id,
+        orgId: run.orgId,
+        ownerUserId: null,
+        ...fields,
+        // Sign-up and sign-in are often on different hosts of one site (the rule falls back to exact when it has none).
+        match: "website" in target ? "site" : "exact",
+        ...sealed,
+        audienceEveryone: true,
+        agentIds: [...new Set([run.agentId, ...(profile?.agentIds ?? [])])],
+        createdByAgentId: run.agentId,
+      })
+      .returning();
+    if (!created) throw new Error("vault item insert returned nothing");
+    await recordAgentChange(tx, run, person, id, "create");
+    await auditByAgent(tx, run, person, "vault.item_created", created, { made: true });
+    return created;
+  });
+  await publishVaultChanged(deps.pubsub, run.orgId);
+  return { outcome: "created", item: agentView(row, null) };
+}
+
+/** An item's value and the ones kept behind it, in one step that loses to any other change. */
+async function replaceValue(
+  deps: VaultDeps,
+  run: VaultRun,
+  person: VaultRunPerson,
+  item: ItemRow,
+  sealed: Awaited<ReturnType<typeof sealItemValue>>,
+  previousSecrets: ItemRow["previousSecrets"],
+) {
+  const row = await deps.db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(vaultItems)
+      .set({ ...sealed, previousSecrets, updatedAt: vaultNow(deps) })
+      .where(and(eq(vaultItems.id, item.id), eq(vaultItems.secretVersion, item.secretVersion)))
+      .returning();
+    if (!updated) throw refuse.notAllowed("It changed meanwhile. Nothing was replaced. Try again.");
+    await recordAgentChange(tx, run, person, item.id, "edit");
+    await auditByAgent(tx, run, person, "vault.item_changed", updated, { fields: ["secret"], made: true });
+    return updated;
+  });
+  await publishVaultChanged(deps.pubsub, run.orgId);
+  return row;
+}
+
+/** The value before the last made password comes back in its place, as a new version. */
+export async function restoreMadePassword(deps: VaultDeps, run: VaultRun, itemId: string): Promise<VaultAgentResult> {
+  const person = await vaultPersonOfRun(deps.db, run);
+  const { item } = await itemForRun(deps, run, person, itemId, "item");
+  assertMayReplace(item, run, person);
+  const last = item.previousSecrets.at(-1);
+  if (!last) throw refuse.notAllowed(`${named(item)} keeps no earlier password.`);
+  const value = await openItemValue(deps, { ...item, ...last }).catch(() => null);
+  if (value === null) throw refuse.noValue(item);
+  const sealed = await sealItemValue(deps, item, item.secretVersion + 1, value);
+  const row = await replaceValue(deps, run, person, item, sealed, item.previousSecrets.slice(0, -1));
+  return { outcome: "updated", item: agentView(row, null) };
 }
 
 /**

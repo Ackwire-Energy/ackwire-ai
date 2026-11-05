@@ -7,7 +7,7 @@ import type { MergeDone } from "./command-policy";
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 45;
+export const MACHINE_PROTOCOL_VERSION = 47;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -513,6 +513,21 @@ export const ANTIGRAVITY_PROTOCOL = 44;
  * that tries to send a typed password in an address is stopped. The server sends none of these to an older runner.
  */
 export const VAULT_PROTOCOL = 45;
+/**
+ * From this protocol on (ADR 0144 §8): `vault.password` makes a password in the agent's process (its worker in system
+ * mode) and answers it sealed to the one-use public key the request carries, so it reaches the Vault as a box: no
+ * command line, log or relay on the way reads it. 46 is `SPEED_PROTOCOL`'s. The server sends it to no older runner.
+ */
+export const VAULT_PASSWORD_PROTOCOL = 47;
+/** What a password is made of. */
+export const PASSWORD_CLASSES = ["lower", "upper", "digits", "symbols"] as const;
+export type PasswordClass = (typeof PASSWORD_CLASSES)[number];
+/** The shape of a password `vault.password` makes: a site's own rules, as the agent read them. */
+export interface PasswordRules {
+  length: number;
+  classes: PasswordClass[];
+}
+export const PASSWORD_LENGTH = { min: 8, max: 128, default: 20 } as const;
 /**
  * Protocol 45 (ADR 0144 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
  * only, from the moment it got it (never across its own restart). The server counts a `site` delivery older than this
@@ -1778,6 +1793,8 @@ export type MachineRequest = (
   | { op: "desktop.text" }
   /** Protocol 45: a one-use key the request's agent's Vault values are sealed to (ADR 0144). */
   | { op: "vault.key" }
+  /** `requestId` and `publicKey`: what the answer is sealed to (`madePasswordAad`). */
+  | { op: "vault.password"; requestId: string; publicKey: string; rules: PasswordRules }
 ) & {
   agent?: AgentScope;
   /** Protocol 34: a `browser.*` op in this browser profile's session instead of the agent's (ADR 0110). */
@@ -1833,6 +1850,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "desktop.apps",
   "desktop.text",
   "vault.key",
+  "vault.password",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -1956,6 +1974,7 @@ export interface MachineReplies {
   "desktop.text": { text: string } | { same: true };
   /** Protocol 45: the key's id, its public key (raw P-256, base64) and when it stops opening anything (ISO). */
   "vault.key": { vaultKey: { keyId: string; publicKey: string; expiresAt: string } };
+  "vault.password": { box: WireSecretBox };
 }
 
 /** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */

@@ -21,6 +21,7 @@ import { consultedFor } from "./consultations";
 import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
+import { MachineRequestError } from "./machine-hub";
 import { notifySecretRequest, resolveSecretRequestNotifications } from "./notification-producers";
 import { requireActiveMembership } from "./organizations";
 import { enqueue } from "./outbox";
@@ -52,7 +53,10 @@ export interface SecretRequestView {
   threadId: string | null;
   messageId: string | null;
   requestedForUserId: string;
+  /** The agent's own name for it (`GITHUB_TOKEN`), for the box's binding: people read `label`, never this. */
   name: string;
+  /** What people read, when the agent gave one (`Senha da Conta Google`); else the apps derive one. */
+  label: string | null;
   purpose: string;
   target: SecretTarget;
   /** For a browser password: the only site it may be typed on (`https://host`). */
@@ -69,8 +73,12 @@ export interface SecretRequestView {
   expiresAt: string;
   deliveredAt: string | null;
   removed: boolean;
-  /** The agent took it back (`withdraw_request`): it no longer needs it. Kept on the card by later syncs. */
+  /** The agent took it back (`withdraw_request`): it no longer needs it. */
   withdrawn?: true;
+  /** Why it closed with nobody answering. Null: answered, expired, or closed before this was kept. */
+  endReason: SecretRequestRow["endReason"];
+  /** The newer request that took its place, when one did. */
+  supersededBy: string | null;
   /** The agent already held this name on this computer: a delivery replaces that value. */
   replaces: boolean;
 }
@@ -116,6 +124,7 @@ export function secretRequestView(row: SecretRequestRow): SecretRequestView {
     messageId: row.messageId,
     requestedForUserId: row.requestedForUserId,
     name: row.name,
+    label: row.label ?? null,
     purpose: row.purpose,
     target: targetOf(row),
     site: row.site,
@@ -128,7 +137,21 @@ export function secretRequestView(row: SecretRequestRow): SecretRequestView {
     deliveredAt: row.deliveredAt?.toISOString() ?? null,
     removed: row.removedAt !== null,
     replaces: row.replaces,
+    ...(row.endReason === "withdrawn" ? { withdrawn: true as const } : {}),
+    endReason: row.endReason ?? null,
+    supersededBy: row.supersededBy ?? null,
   };
+}
+
+/**
+ * What people read for a request outside the card (a message's preview, the audit, the Vault): the agent's label, else
+ * the site, else its name in plain words. The variable-style name stays with the agent.
+ */
+export function secretLabelOf(row: Pick<SecretRequestRow, "label" | "site" | "name">): string {
+  if (row.label) return row.label;
+  if (row.site) return new URL(row.site).host;
+  const words = row.name.replaceAll("_", " ").toLowerCase();
+  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 }
 
 /** What the model hears back once the request is closed. Never the value. */
@@ -167,6 +190,18 @@ export function secretResult(row: SecretRequestRow | undefined): { content: stri
         content: `The person declined to give ${row.name}. Don't ask again in this conversation; say what you can do without it.`,
       };
     case "canceled":
+      if (row.endReason === "superseded") {
+        return {
+          content: `A newer request for ${row.name} took this one's place: the run that asked it goes on with it. Don't ask again here.`,
+          isError: true,
+        };
+      }
+      if (row.endReason === "computer_changed") {
+        return {
+          content: `The request for ${row.name} can't be answered: it was asked on a computer you no longer use, or that lost its key. Ask again if you still need it.`,
+          isError: true,
+        };
+      }
       return { content: `The request for ${row.name} was withdrawn: it won't come.`, isError: true };
     default:
       return {
@@ -223,6 +258,64 @@ const deliveryOrder = (row: SecretRequestRow) => {
   if (!row.deliveredAt) throw new Error("A delivered secret has no delivery time");
   return `${row.deliveredAt.toISOString()}|${row.id}`;
 };
+
+/** A request that ended (`secret.closed`): a computer that can't take it now answers its own code, and it stays open. */
+const closedRequest = () => new ConflictError("This request was already answered or expired", "secret.closed");
+
+/** The computer that made the request's key is no longer the agent's, or it no longer has the key. */
+const keyIsGone = (error: unknown) =>
+  (error instanceof ConflictError && error.code === "secret.computer_changed") ||
+  (error instanceof Error && error.cause instanceof MachineRequestError && error.cause.code === "not_found");
+
+/** Closes a waiting request nobody answered: its card says why, its run goes on, the computer drops its key. */
+async function closeInTx(tx: Executor, row: SecretRequestRow, set: Partial<SecretRequestRow>) {
+  const [closed] = await tx
+    .update(secretRequests)
+    .set({ status: "canceled", ...set })
+    .where(and(eq(secretRequests.id, row.id), eq(secretRequests.status, "pending")))
+    .returning();
+  if (!closed) return null;
+  await syncSecretMessage(tx, closed);
+  await enqueue(tx, resumeJob(closed));
+  await enqueueSecretDiscard(tx, closed);
+  return closed;
+}
+
+async function closeRequest(
+  deps: { db: Database; pubsub?: PubSub },
+  row: SecretRequestRow,
+  endReason: NonNullable<SecretRequestRow["endReason"]>,
+) {
+  const closed = await deps.db.transaction((tx) => closeInTx(tx, row, { endReason }));
+  if (closed) await publishSecret(deps, closed, "secret.updated");
+}
+
+/**
+ * A newer request for the same thing takes the place of what is still open (asked by another run: the same run waits
+ * on its own): two live cards for one password would each take a value, and the first answer would go for nothing.
+ */
+export async function supersedeOlderSecretRequests(deps: { db: Database; pubsub?: PubSub }, newer: SecretRequestRow) {
+  const older = await deps.db
+    .select()
+    .from(secretRequests)
+    .where(
+      and(
+        eq(secretRequests.orgId, newer.orgId),
+        eq(secretRequests.agentId, newer.agentId),
+        eq(secretRequests.name, newer.name),
+        eq(secretRequests.status, "pending"),
+        ne(secretRequests.id, newer.id),
+        sql`${secretRequests.site} is not distinct from ${newer.site}`,
+        sql`${secretRequests.targetPath} is not distinct from ${newer.targetPath}`,
+      ),
+    );
+  for (const row of older) {
+    const closed = await deps.db.transaction((tx) =>
+      closeInTx(tx, row, { endReason: "superseded", supersededBy: newer.id }),
+    );
+    if (closed) await publishSecret(deps, closed, "secret.updated");
+  }
+}
 
 /** One secret action on the computer: the runner keeps the key and the value (runner protocol 3, ADR 0027). */
 export async function secretOnComputer(
@@ -389,14 +482,18 @@ export async function deliverSecret(
   rawBox: unknown,
 ): Promise<SecretRequestView> {
   const row = await loadForRequester(deps.db, actorId, orgId, requestId);
-  if (statusOf(row) !== "pending") throw new ConflictError("This request was already answered or expired");
+  if (statusOf(row) !== "pending") throw closedRequest();
   const box = parseSecretBox(rawBox);
   if (!box) throw new ValidationError("Invalid secret box");
   const target = targetOf(row);
   const aad = secretAad({ requestId: row.id, orgId, name: row.name, target });
   const reply = await onRequestComputer(deps, row, (computer) =>
     secretOnComputer(computer, { action: "deliver", requestId: row.id, name: row.name, target, aad, box }),
-  );
+  ).catch(async (error: unknown) => {
+    // No computer can open this box anymore: the request ends here, or its card would go on taking values for nothing.
+    if (keyIsGone(error)) await closeRequest(deps, row, "computer_changed");
+    throw error;
+  });
   let delivered: SecretRequestRow | null;
   try {
     delivered = await deps.db.transaction(async (tx) => {
@@ -454,7 +551,7 @@ export async function deliverSecret(
   if (!delivered) {
     const recovered = await reconcileStagedDelivery(deps, row);
     if (recovered) return recovered;
-    throw new ConflictError("This request was already answered or expired");
+    throw closedRequest();
   }
   try {
     await activateDeliveredSecret(deps, orgId, row.id);
@@ -547,7 +644,7 @@ export async function activateDeliveredSecret(
       target: { type: "agent", id: row.agentId },
       details: {
         requestId: row.id,
-        name: row.name,
+        name: secretLabelOf(row),
         target: targetOf(row),
         machineId: row.machineId,
         size: row.deliveredSize,
@@ -598,11 +695,11 @@ export async function declineSecret(
       actor: { type: "person", id: actorId },
       action: "secret.declined",
       target: { type: "agent", id: row.agentId },
-      details: { requestId: row.id, name: row.name },
+      details: { requestId: row.id, name: secretLabelOf(row) },
     });
     return updated;
   });
-  if (!declined) throw new ConflictError("This request was already answered or expired");
+  if (!declined) throw closedRequest();
   await publishSecret(deps, declined, "secret.updated");
   const sandbox = deps.sandbox;
   if (sandbox) {
@@ -633,7 +730,7 @@ export async function expireSecretRequests(deps: { db: Database; pubsub?: PubSub
         actor: { type: "system", id: null },
         action: "secret.expired",
         target: { type: "agent", id: row.agentId },
-        details: { requestId: row.id, name: row.name },
+        details: { requestId: row.id, name: secretLabelOf(row) },
       });
     }
     return rows;
@@ -651,7 +748,7 @@ export async function withdrawSecretRequest(
   const withdrawn = await deps.db.transaction(async (tx) => {
     const [row] = await tx
       .update(secretRequests)
-      .set({ status: "canceled" })
+      .set({ status: "canceled", endReason: "withdrawn" })
       .where(
         and(
           eq(secretRequests.id, requestId),
@@ -661,7 +758,7 @@ export async function withdrawSecretRequest(
       )
       .returning();
     if (!row) return null;
-    await syncSecretMessage(tx, row, { ...secretRequestView(row), withdrawn: true });
+    await syncSecretMessage(tx, row);
     await enqueue(tx, resumeJob(row));
     await enqueueSecretDiscard(tx, row);
     await recordAudit(tx, {
@@ -669,12 +766,11 @@ export async function withdrawSecretRequest(
       actor: { type: "agent", id: agentId },
       action: "secret.canceled",
       target: { type: "agent", id: agentId },
-      details: { requestId: row.id, name: row.name },
+      details: { requestId: row.id, name: secretLabelOf(row) },
     });
     return row;
   });
-  if (withdrawn)
-    await publishSecret(deps, withdrawn, "secret.updated", { ...secretRequestView(withdrawn), withdrawn: true });
+  if (withdrawn) await publishSecret(deps, withdrawn, "secret.updated");
   return withdrawn;
 }
 
@@ -682,7 +778,7 @@ export async function withdrawSecretRequest(
 export async function cancelSecretRequestsFor(tx: Executor, orgId: string, userId: string) {
   const rows = await tx
     .update(secretRequests)
-    .set({ status: "canceled" })
+    .set({ status: "canceled", endReason: "person_left" })
     .where(
       and(
         eq(secretRequests.orgId, orgId),
@@ -703,7 +799,7 @@ export async function cancelSecretRequestsFor(tx: Executor, orgId: string, userI
 export async function cancelSecretRequests(tx: Executor, runId: string) {
   const rows = await tx
     .update(secretRequests)
-    .set({ status: "canceled" })
+    .set({ status: "canceled", endReason: "run_stopped" })
     .where(and(eq(secretRequests.runId, runId), eq(secretRequests.status, "pending")))
     .returning();
   for (const row of rows) await enqueueSecretDiscard(tx, row);
@@ -711,7 +807,9 @@ export async function cancelSecretRequests(tx: Executor, runId: string) {
 }
 
 export interface AgentSecretView {
+  /** What removing it goes by; people read `label`. */
   name: string;
+  label: string;
   target: SecretTarget;
   machineId: string | null;
   deliveredAt: string;
@@ -740,6 +838,7 @@ export async function listAgentSecrets(db: Database, actorId: string, orgId: str
     .map(
       (r): AgentSecretView => ({
         name: r.name,
+        label: secretLabelOf(r),
         target: targetOf(r),
         machineId: r.machineId,
         deliveredAt: (r.deliveredAt ?? r.createdAt).toISOString(),
@@ -846,7 +945,7 @@ async function removeSecret(
       actor: { type: "person", id: actorId },
       action: "secret.removed",
       target: { type: "agent", id: agentId },
-      details: { name, machineId },
+      details: { name: secretLabelOf({ label: null, site: null, name }), machineId },
     });
   });
 }

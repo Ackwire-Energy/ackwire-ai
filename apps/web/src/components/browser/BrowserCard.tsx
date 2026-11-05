@@ -113,6 +113,7 @@ const STEP_ICON = {
   browser_scroll: "chevronDown",
   browser_upload: "upload",
   browser_type_secret: "key",
+  browser_make_password: "key",
   browser_wait: "clock",
   browser_screenshot: "image",
   browser_ask_person: "person",

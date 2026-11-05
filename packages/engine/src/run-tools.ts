@@ -24,7 +24,7 @@ import {
 import { routineBriefOf } from "./routine-brief";
 import type { BridgeIdentity } from "./run-tool-tokens";
 import { type AgentRun, replyThreadOf } from "./runs";
-import { publishSecret, type SecretRequestRow, secretRequestView, syncSecretMessage } from "./secrets";
+import { publishSecret, type SecretRequestRow, secretLabelOf, secretRequestView, syncSecretMessage } from "./secrets";
 import { artifactToolDetail, promptAnswer, promptPoll, toolCode, toolCommand, toolDetail } from "./tool-detail";
 import { directoryRole, HARNESS_PREFIX, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
@@ -782,8 +782,9 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
       .returning();
     if (!request) continue;
     // The card names the key itself: this text is for previews and notifications, a sentence of its own.
-    const message = await card(asked, `${agentName} asked for a key: ${request.name}`, {
-      ...bodyCode("secret_request", { agent: agentName, name: request.name }),
+    const what = secretLabelOf(request);
+    const message = await card(asked, `${agentName} asked for a key: ${what}`, {
+      ...bodyCode("secret_request", { agent: agentName, name: what }),
       secretRequestId: request.id,
       secretRequest: secretRequestView(request),
     });

@@ -25,6 +25,7 @@ export const BROWSER_TOOLS = [
   "browser_scroll",
   "browser_upload",
   "browser_type_secret",
+  "browser_make_password",
   "browser_wait",
   "browser_screenshot",
   "browser_ask_person",
@@ -57,6 +58,11 @@ export const BROWSER_TOOL_INFO: Record<BrowserToolName, { label: string; descrip
   browser_type_secret: {
     label: "Type a password",
     description: "Types a password you gave it into a password or code field, without seeing it.",
+  },
+  browser_make_password: {
+    label: "Make a password",
+    description:
+      "Makes a strong password for a site on its computer, keeps it in the Vault and types it, never seeing it.",
   },
   browser_wait: { label: "Wait for the page", description: "Waits until a text, address or element shows up." },
   browser_screenshot: { label: "Take a screenshot", description: "Saves an image of the page in the agent's folder." },

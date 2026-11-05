@@ -3156,11 +3156,16 @@
   "secret": {
     "group": "Prośba o sekret od {{agent}}",
     "chip": "Czeka",
-    "targetEnv": "Trafi jako zmienna {{name}} na komputer: {{agent}}.",
+    "targetEnv": "Trafi na komputer: {{agent}}, do poleceń.",
     "targetFile": "Trafi do pliku {{path}} na komputerze: {{agent}}.",
     "targetSite": "Wpisuje go tylko przeglądarka agenta {{agent}}, na {{host}}. Nie trafia do poleceń agenta {{agent}}.",
     "replaces": "Zastępuje klucz, który {{agent}} ma już pod tą nazwą.",
-    "label": "Wartość {{name}}",
+    "labelPassword": "Hasło do {{host}}",
+    "labelCode": "Kod do {{host}}",
+    "labelKey": "Klucz do komputera: {{agent}}",
+    "labelFile": "Plik {{path}}",
+    "placeholder": "Wpisz tutaj",
+    "account": "Konto: {{username}}.",
     "private": "Wysyłane szyfrowane prosto na komputer. Nie trafia do czatu ani do agenta.",
     "send": "Wyślij",
     "decline": "Odmów",
@@ -3168,8 +3173,17 @@
     "waitingFor": "Odpowiedzieć może tylko {{person}}.",
     "outcomeBy": "Dostarczone przez: {{person}}",
     "outcomeByYou": "Dostarczone przez ciebie",
-    "outcomeWithdrawn": "Już niepotrzebne",
-    "alreadyAnswered": "Ta prośba ma już odpowiedź albo wygasła.",
+    "outcomeWithdrawn": "{{agent}}: to już niepotrzebne.",
+    "endedDeclined": "Odrzucono. {{agent}}: dalsza praca bez tego.",
+    "endedExpired": "Nikt nie odpowiedział na czas. {{agent}}: dalsza praca bez tego, można poprosić ponownie.",
+    "endedRunStopped": "Zadanie zatrzymało się przed odpowiedzią ({{agent}}). Poproś ponownie: {{agent}}, jeśli nadal tego potrzebujesz.",
+    "endedSuperseded": "{{agent}}: ponowna prośba w nowszym żądaniu.",
+    "endedComputer": "To już nie dotrze ({{agent}}): komputer, który prosił, się zmienił. Poproś o ponowną prośbę: {{agent}}.",
+    "endedPersonLeft": "{{person}}: opuszczono workspace przed odpowiedzią.",
+    "endedClosed": "To żądanie zamknięto przed odpowiedzią. Poproś ponownie: {{agent}}, jeśli nadal tego potrzebujesz.",
+    "seeNewer": "Zobacz nowsze żądanie",
+    "computerAway": "Komputer nie odpowiada teraz ({{agent}}). To żądanie pozostaje otwarte do {{time}}. Spróbuj ponownie za chwilę.",
+    "computerPaused": "Właściciel wstrzymał komputer ({{agent}}). To żądanie pozostaje otwarte do {{time}}.",
     "failed": "Nie udało się dostarczyć. Czy komputer agenta jest włączony?",
     "empty": "Wpisz wartość.",
     "tooLarge": "Za duże (maksymalnie 16 KB)."
@@ -6003,7 +6017,7 @@
     },
     "vault_write": {
       "label": "Edycja kontaktów w Vault",
-      "description": "Zapisywanie i aktualizowanie danych kontaktowych w Vault, zmiana nazwy użytkownika zapisanego loginu lub opisu oraz usuwanie tego, co sam zapisał."
+      "description": "Zapisywanie i aktualizowanie danych kontaktowych w Vault, zmiana nazwy użytkownika zapisanego loginu lub opisu, tworzenie haseł do zakładanych przez siebie kont oraz usuwanie tego, co sam zapisał."
     },
     "github_git_read": {
       "label": "Klonowanie repozytoriów (git)",
@@ -14084,6 +14098,10 @@
       "label": "Uruchom skrypt umiejętności",
       "description": "Uruchamia skrypt umiejętności w środowisku."
     },
+    "vault_make_password": {
+      "label": "Utwórz hasło",
+      "description": "Tworzy silne hasło na swoim komputerze i trzyma je w Vault jako klucz, nie widząc go."
+    },
     "computer_status": {
       "label": "Sprawdź komputer",
       "description": "Mówi, który to komputer i czy odpowiada."
@@ -14139,6 +14157,10 @@
     "browser_type_secret": {
       "label": "Wpisz hasło",
       "description": "Wpisuje podane przez ciebie hasło w pole hasła lub kodu, nie widząc go."
+    },
+    "browser_make_password": {
+      "label": "Utwórz hasło",
+      "description": "Tworzy silne hasło do strony na swoim komputerze, trzyma je w Vault i wpisuje, nie widząc go."
     },
     "browser_wait": {
       "label": "Poczekaj na stronę",
@@ -14535,6 +14557,7 @@
         "browser_scroll": "Przewinięto stronę",
         "browser_upload": "Przesłano plik",
         "browser_type_secret": "Wpisano hasło",
+        "browser_make_password": "Utworzono hasło",
         "browser_wait": "Czekano na stronę",
         "browser_screenshot": "Zrobiono zrzut ekranu",
         "browser_ask_person": "Poproszono o pomoc",

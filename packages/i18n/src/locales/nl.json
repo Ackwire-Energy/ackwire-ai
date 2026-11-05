@@ -2961,11 +2961,16 @@
   "secret": {
     "group": "Geheim verzoek van {{agent}}",
     "chip": "Wacht",
-    "targetEnv": "Komt als de variabele {{name}} op de computer van {{agent}}.",
+    "targetEnv": "Gaat naar de computer van {{agent}}, voor zijn opdrachten.",
     "targetFile": "Komt in het bestand {{path}} op de computer van {{agent}}.",
     "targetSite": "Alleen de browser van {{agent}} typt het, op {{host}}. Het blijft buiten de opdrachten van {{agent}}.",
     "replaces": "Vervangt de sleutel die {{agent}} al onder deze naam heeft.",
-    "label": "Waarde van {{name}}",
+    "labelPassword": "Wachtwoord voor {{host}}",
+    "labelCode": "Code voor {{host}}",
+    "labelKey": "Een sleutel voor de computer van {{agent}}",
+    "labelFile": "Het bestand {{path}}",
+    "placeholder": "Typ het hier",
+    "account": "Gebruiker: {{username}}.",
     "private": "Versleuteld rechtstreeks naar de computer gestuurd. Het blijft buiten de chat en uit handen van de agent.",
     "send": "Sturen",
     "decline": "Weigeren",
@@ -2973,8 +2978,17 @@
     "waitingFor": "Alleen {{person}} kan antwoorden.",
     "outcomeBy": "Geleverd door {{person}}",
     "outcomeByYou": "Geleverd door jou",
-    "outcomeWithdrawn": "Niet meer nodig",
-    "alreadyAnswered": "Dit verzoek is al beantwoord of verlopen.",
+    "outcomeWithdrawn": "{{agent}} heeft dit niet meer nodig.",
+    "endedDeclined": "Geweigerd. {{agent}} gaat zonder dit verder.",
+    "endedExpired": "Niemand antwoordde op tijd. {{agent}} gaat zonder dit verder en kan het opnieuw vragen.",
+    "endedRunStopped": "De taak van {{agent}} stopte vóór het antwoord. Vraag het {{agent}} opnieuw als je het nog nodig hebt.",
+    "endedSuperseded": "{{agent}} vroeg het opnieuw in een nieuwer verzoek.",
+    "endedComputer": "Dit bereikt {{agent}} niet meer: de computer die het vroeg is veranderd. Vraag {{agent}} om het opnieuw te vragen.",
+    "endedPersonLeft": "{{person}} heeft de workspace verlaten voor het antwoord.",
+    "endedClosed": "Dit verzoek is gesloten voordat iemand antwoordde. Vraag het {{agent}} opnieuw als je het nog nodig hebt.",
+    "seeNewer": "Nieuwer verzoek bekijken",
+    "computerAway": "De computer van {{agent}} antwoordt nu niet. Dit verzoek blijft open tot {{time}}. Probeer het zo opnieuw.",
+    "computerPaused": "De computer van {{agent}} is door de eigenaar gepauzeerd. Dit verzoek blijft open tot {{time}}.",
     "failed": "Kon het niet leveren. Staat de computer van de agent aan?",
     "empty": "Typ de waarde.",
     "tooLarge": "Te groot (maximaal 16 KB)."
@@ -5647,7 +5661,7 @@
     },
     "vault_write": {
       "label": "Contacten in de Vault bewerken",
-      "description": "Contactgegevens in de Vault opslaan en bijwerken, de gebruikersnaam van een opgeslagen login of een beschrijving wijzigen, en verwijderen wat hij heeft opgeslagen."
+      "description": "Contactgegevens in de Vault opslaan en bijwerken, de gebruikersnaam van een opgeslagen login of een beschrijving wijzigen, wachtwoorden maken voor accounts die hij aanmaakt, en verwijderen wat hij heeft opgeslagen."
     },
     "github_git_read": {
       "label": "Repositories klonen (git)",
@@ -13266,6 +13280,10 @@
       "label": "Skillscript uitvoeren",
       "description": "Voert het script van een skill uit in de omgeving."
     },
+    "vault_make_password": {
+      "label": "Wachtwoord maken",
+      "description": "Maakt een sterk wachtwoord op zijn computer en bewaart het als sleutel in de Vault, zonder het te zien."
+    },
     "computer_status": {
       "label": "Computer controleren",
       "description": "Zegt welke computer het is en of hij reageert."
@@ -13321,6 +13339,10 @@
     "browser_type_secret": {
       "label": "Wachtwoord typen",
       "description": "Typt een wachtwoord dat je gaf in een wachtwoord- of codeveld, zonder het te zien."
+    },
+    "browser_make_password": {
+      "label": "Wachtwoord maken",
+      "description": "Maakt een sterk wachtwoord voor een site op zijn computer, bewaart het in de Vault en typt het, zonder het te zien."
     },
     "browser_wait": {
       "label": "Wachten op de pagina",
@@ -13711,6 +13733,7 @@
         "browser_scroll": "Door de pagina gescrold",
         "browser_upload": "Een bestand geüpload",
         "browser_type_secret": "Een wachtwoord getypt",
+        "browser_make_password": "Een wachtwoord gemaakt",
         "browser_wait": "Op de pagina gewacht",
         "browser_screenshot": "Een screenshot gemaakt",
         "browser_ask_person": "Om hulp gevraagd",

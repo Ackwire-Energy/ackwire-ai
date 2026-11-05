@@ -2870,7 +2870,10 @@ export interface SecretRequest {
   messageId: string | null;
   /** The only person who can answer. */
   requestedForUserId: string;
+  /** The agent's own name for it, for the box's binding: never shown. */
   name: string;
+  /** What people read, in the agent's words. Null or absent: `secretLabel` derives one. */
+  label?: string | null;
   purpose: string;
   target: SecretTarget;
   /** For a browser password: the only site it may be typed on (`https://host`). */
@@ -2885,6 +2888,10 @@ export interface SecretRequest {
   removed: boolean;
   /** The agent took it back: it no longer needs it. */
   withdrawn?: true;
+  /** Why it closed with nobody answering. Null or absent: answered, expired, or closed before this was kept. */
+  endReason?: "run_stopped" | "withdrawn" | "person_left" | "superseded" | "computer_changed" | null;
+  /** The newer request that took its place. */
+  supersededBy?: string | null;
   /** The agent already held this name on this computer: a delivery replaces that value. */
   replaces?: boolean;
   /**
@@ -2898,7 +2905,9 @@ export interface SecretRequest {
 
 /** A secret on an agent's computer, by name (the agent page). */
 export interface AgentSecret {
+  /** What removing it goes by, never shown: people read `label`. */
   name: string;
+  label: string;
   target: SecretTarget;
   machineId: string | null;
   deliveredAt: string;

@@ -47,7 +47,7 @@ import { agentSecrets, handleSecret } from "./secrets";
 import type { DataSockets } from "./streams";
 import type { TaskManager } from "./tasks";
 import type { Terminals } from "./terminal";
-import { openExecKeys, parseExecVault, runnerVault } from "./vault";
+import { openExecKeys, parseExecVault, runnerVault, sealMadePassword } from "./vault";
 
 /**
  * Requests one connection runs at once, whatever they are: a bound on a flood, far above what room allows
@@ -101,6 +101,7 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "desktop.capture",
   "desktop.apps",
   "vault.key",
+  "vault.password",
 ]);
 
 /**
@@ -155,6 +156,8 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "desktop.text": "agent",
   // ADR 0144: the key lives in the process that opens the values (the agent's worker), so root never holds one.
   "vault.key": "agent",
+  // The password is made and sealed where the Vault's values open: root relays only the box.
+  "vault.password": "agent",
 };
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
@@ -547,6 +550,9 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
       throw new RunnerError("bad_request", "A Vault key belongs to an agent");
     }
     return { vaultKey: await runnerVault.issueKey(agentId) } satisfies MachineReplies["vault.key"];
+  }
+  if (req.op === "vault.password") {
+    return { box: await sealMadePassword(req, req.agent?.id) } satisfies MachineReplies["vault.password"];
   }
   // Protocol 10: the folders this agent may use besides its own.
   if (ctx.access && req.agent) ctx = { ...ctx, grants: await realFoldersFor(ctx.access(), String(req.agent.id)) };

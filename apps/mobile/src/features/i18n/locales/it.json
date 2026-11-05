@@ -2056,7 +2056,6 @@
       "as": "Accede come {{username}}.",
       "saved": "Salvato nel Vault",
       "notSaved": "Inviato, ma non salvato nel Vault",
-      "codeLabel": "Codice per {{name}}",
       "codeIncomplete": "Digita tutte le cifre del codice.",
       "codeNote": "Inviato cifrato direttamente al computer. I codici non vengono mai salvati."
     }

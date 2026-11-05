@@ -647,6 +647,14 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const [picking, setPicking] = useState<string | null>(null);
   const q = answered ?? question;
   const choices = q.choices ?? [];
+  // Refused because it ended (someone answered, its run stopped): the card closes here, even if no event came.
+  const [ended, setEnded] = useState(false);
+  const refused = (err: unknown, failed: string) => {
+    if ((err as { status?: number }).status !== 409) return toast({ title: failed, icon: "x" });
+    asks?.settle(q.id);
+    setEnded(true);
+    setAnswered({ ...q, status: "answered", answer: null, answeredByUserId: null });
+  };
 
   const answer = (input: { choice: string } | { text: string }) => {
     setPicking("choice" in input ? input.choice : null);
@@ -657,12 +665,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
         asks?.settle(q.id);
         setAnswered({ ...res, answer: res.answer ?? ("choice" in input ? input.choice : input.text) });
       })
-      .catch((err: unknown) =>
-        toast({
-          title: (err as { status?: number }).status === 409 ? t("mobile.chat.question.taken") : t("mobile.app.failed"),
-          icon: "x",
-        }),
-      )
+      .catch((err: unknown) => refused(err, t("mobile.app.failed")))
       .finally(() => setPicking(null));
   };
   const [skipping, setSkipping] = useState(false);
@@ -674,13 +677,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
         asks?.settle(q.id);
         setAnswered(res);
       })
-      .catch((err: unknown) =>
-        toast({
-          title:
-            (err as { status?: number }).status === 409 ? t("mobile.chat.question.taken") : t("question.skipFailed"),
-          icon: "x",
-        }),
-      )
+      .catch((err: unknown) => refused(err, t("question.skipFailed")))
       .finally(() => setSkipping(false));
   };
   const busy = picking !== null || skipping;
@@ -699,7 +696,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
                 ? t("question.dismissed", { name: who })
                 : t("question.dismissedByYou")
               : q.answer === null
-                ? t("mobile.chat.question.closed")
+                ? t(ended ? "mobile.chat.question.taken" : "mobile.chat.question.closed")
                 : who
                   ? t("mobile.chat.question.answered", { name: who, answer: said })
                   : t("mobile.chat.question.answeredByYou", { answer: said })

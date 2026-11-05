@@ -7165,7 +7165,7 @@
     "value": "Waiting"
   },
   "secret.targetEnv": {
-    "value": "Goes in as the variable {{name}} on {{agent}}'s computer."
+    "value": "Goes to {{agent}}'s computer, for its commands."
   },
   "secret.targetFile": {
     "value": "Goes to the file {{path}} on {{agent}}'s computer."
@@ -7175,9 +7175,6 @@
   },
   "secret.replaces": {
     "value": "Replaces the key {{agent}} already has under this name."
-  },
-  "secret.label": {
-    "value": "Value of {{name}}"
   },
   "secret.private": {
     "value": "Sent encrypted straight to the computer. It stays out of the chat and away from the agent."
@@ -7201,10 +7198,7 @@
     "value": "Delivered by you"
   },
   "secret.outcomeWithdrawn": {
-    "value": "No longer needed"
-  },
-  "secret.alreadyAnswered": {
-    "value": "This request was already answered or expired."
+    "value": "{{agent}} no longer needs this."
   },
   "secret.failed": {
     "value": "Couldn't deliver it. Is the agent's computer on?"
@@ -13522,7 +13516,7 @@
     "value": "Edit Vault contacts"
   },
   "scopes.vault_write.description": {
-    "value": "Save and update contact details in the Vault, change a saved login's username or a description, and delete what it saved."
+    "value": "Save and update contact details in the Vault, change a saved login's username or a description, make passwords for accounts it creates, and delete what it saved."
   },
   "scopes.github_git_read.label": {
     "value": "Clone repositories (git)"
@@ -35854,5 +35848,68 @@
   },
   "teamTemplates.ask": {
     "value": "I used the {{name}} template. To fit it to your business: **what makes {{org}} different?**"
+  },
+  "secret.labelPassword": {
+    "value": "Password for {{host}}"
+  },
+  "secret.labelCode": {
+    "value": "Code for {{host}}"
+  },
+  "secret.labelKey": {
+    "value": "A key for {{agent}}'s computer"
+  },
+  "secret.labelFile": {
+    "value": "The file {{path}}"
+  },
+  "secret.placeholder": {
+    "value": "Type it here"
+  },
+  "secret.account": {
+    "value": "Account: {{username}}."
+  },
+  "secret.endedDeclined": {
+    "value": "Declined. {{agent}} goes on without it."
+  },
+  "secret.endedExpired": {
+    "value": "Nobody answered in time. {{agent}} goes on without it, and can ask again."
+  },
+  "secret.endedRunStopped": {
+    "value": "{{agent}}'s task stopped before this was answered. Ask {{agent}} again if you still need it."
+  },
+  "secret.endedSuperseded": {
+    "value": "{{agent}} asked again in a newer request."
+  },
+  "secret.endedComputer": {
+    "value": "This can't reach {{agent}} anymore: the computer that asked changed. Ask {{agent}} to ask again."
+  },
+  "secret.endedPersonLeft": {
+    "value": "{{person}} left the workspace before answering."
+  },
+  "secret.endedClosed": {
+    "value": "This request closed before anyone answered. Ask {{agent}} again if you still need it."
+  },
+  "secret.seeNewer": {
+    "value": "See the newer request"
+  },
+  "secret.computerAway": {
+    "value": "{{agent}}'s computer isn't answering right now. This request stays open until {{time}}. Try again in a moment."
+  },
+  "secret.computerPaused": {
+    "value": "{{agent}}'s computer is paused by its owner. This request stays open until {{time}}."
+  },
+  "builtinTools.vault_make_password.label": {
+    "value": "Make a password"
+  },
+  "builtinTools.vault_make_password.description": {
+    "value": "Makes a strong password on its computer and keeps it in the Vault as a key, never seeing it."
+  },
+  "builtinTools.browser_make_password.label": {
+    "value": "Make a password"
+  },
+  "builtinTools.browser_make_password.description": {
+    "value": "Makes a strong password for a site on its computer, keeps it in the Vault and types it, never seeing it."
+  },
+  "browser.watch.step.browser_make_password": {
+    "value": "Made a password"
   }
 }

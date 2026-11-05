@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
@@ -7,10 +8,19 @@ import {
   type MachineRequest,
   SITE_SECRET_TTL_MS as PROTOCOL_SITE_SECRET_TTL_MS,
   parseServerFrame,
+  VAULT_PASSWORD_PROTOCOL,
   VAULT_PROTOCOL,
   VAULT_TYPE_REFUSALS,
 } from "@agenteschat/adapters/machine-protocol";
-import { type SecretTarget, sealSecret, secretAad, vaultAad } from "@agenteschat/adapters/secret-box";
+import {
+  generateSecretKeyPair,
+  madePasswordAad,
+  openSecret,
+  type SecretTarget,
+  sealSecret,
+  secretAad,
+  vaultAad,
+} from "@agenteschat/adapters/secret-box";
 import { describeRequest, handleRequest, NEW_WORK_OPS, OP_ROUTES, type RequestScope } from "../../runner/handlers";
 import { agentSecrets, dropStoredSiteSecrets, handleSecret, secretValue } from "../../runner/secrets";
 import {
@@ -19,12 +29,14 @@ import {
   fieldRefusalOf,
   fillMarkSelector,
   fillUnmarkScript,
+  makePassword,
   newFillMark,
   parseExecVault,
   parseTypeVault,
   RunnerVault,
   runnerVault,
   SITE_SECRET_TTL_MS,
+  sealMadePassword,
   urlCarries,
   VAULT_KEY_TTL_MS,
   VAULT_KEYS_PER_AGENT,
@@ -47,6 +59,39 @@ const bia = { id: "7b7b7b7b-0135-7000-8000-000000000002", handle: "infra" };
 const RULE = "exact:https://shop.example.com";
 
 // ── Protocol ─────────────────────────────────────────────────────────────────
+
+test("protocol 47 makes passwords: in the agent's process, sealed to the one call that asked", async () => {
+  expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(VAULT_PASSWORD_PROTOCOL);
+  expect(VAULT_PASSWORD_PROTOCOL).toBe(47);
+  expect(MACHINE_OPS).toContain("vault.password");
+  expect(OP_ROUTES["vault.password"]).toBe("agent");
+  const pair = await generateSecretKeyPair();
+  const requestId = randomUUID();
+  const rules = { length: 16, classes: ["lower", "digits"] };
+  const box = await sealMadePassword({ requestId, publicKey: pair.publicKey, rules }, ana.id);
+  const value = await openSecret(pair.privateKey, box, madePasswordAad({ requestId, agentId: ana.id }));
+  expect(value).toMatch(/^[a-z0-9]{16}$/);
+  // Bound to its request and its agent.
+  await expect(openSecret(pair.privateKey, box, madePasswordAad({ requestId, agentId: bia.id }))).rejects.toThrow();
+  const refused = (raw: unknown) => sealMadePassword({ requestId, publicKey: pair.publicKey, rules: raw }, ana.id);
+  expect(await errorCode(() => refused({ length: 7, classes: ["lower"] }))).toBe("bad_request");
+  expect(await errorCode(() => refused({ length: 20, classes: [] }))).toBe("bad_request");
+  expect(await errorCode(() => refused({ length: 20, classes: ["emoji"] }))).toBe("bad_request");
+});
+
+test("a made password has its length, every class asked for, and no two alike", () => {
+  const rules = { length: 12, classes: ["lower", "upper", "digits", "symbols"] as const };
+  const made = Array.from({ length: 200 }, () => makePassword({ ...rules, classes: [...rules.classes] }));
+  for (const p of made) {
+    expect(p).toHaveLength(12);
+    expect(p).toMatch(/[a-z]/);
+    expect(p).toMatch(/[A-Z]/);
+    expect(p).toMatch(/[2-9]/);
+    expect(p).toMatch(/[!@#$%*\-_=+?]/);
+  }
+  expect(new Set(made).size).toBe(made.length);
+  expect(makePassword({ length: 8, classes: ["digits"] })).toMatch(/^[2-9]{8}$/);
+});
 
 test("protocol 45 carries the Vault: vault.key is an op of the agent's own process and new work", () => {
   expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(VAULT_PROTOCOL);

@@ -2989,11 +2989,17 @@ export const en = {
   secret: {
     group: "Secret request from {{agent}}",
     chip: "Waiting",
-    targetEnv: "Goes in as the variable {{name}} on {{agent}}'s computer.",
+    targetEnv: "Goes to {{agent}}'s computer, for its commands.",
     targetFile: "Goes to the file {{path}} on {{agent}}'s computer.",
     targetSite: "Only {{agent}}'s browser types it, on {{host}}. It stays out of {{agent}}'s commands.",
     replaces: "Replaces the key {{agent}} already has under this name.",
-    label: "Value of {{name}}",
+    /** What a request is called when the agent gave no label of its own. */
+    labelPassword: "Password for {{host}}",
+    labelCode: "Code for {{host}}",
+    labelKey: "A key for {{agent}}'s computer",
+    labelFile: "The file {{path}}",
+    placeholder: "Type it here",
+    account: "Account: {{username}}.",
     private: "Sent encrypted straight to the computer. It stays out of the chat and away from the agent.",
     send: "Send",
     decline: "Decline",
@@ -3001,8 +3007,20 @@ export const en = {
     waitingFor: "Only {{person}} can answer.",
     outcomeBy: "Delivered by {{person}}",
     outcomeByYou: "Delivered by you",
-    outcomeWithdrawn: "No longer needed",
-    alreadyAnswered: "This request was already answered or expired.",
+    outcomeWithdrawn: "{{agent}} no longer needs this.",
+    /** How a request ended with nobody delivering it: what happened and what's next, in the line that replaces its card. */
+    endedDeclined: "Declined. {{agent}} goes on without it.",
+    endedExpired: "Nobody answered in time. {{agent}} goes on without it, and can ask again.",
+    endedRunStopped: "{{agent}}'s task stopped before this was answered. Ask {{agent}} again if you still need it.",
+    endedSuperseded: "{{agent}} asked again in a newer request.",
+    endedComputer: "This can't reach {{agent}} anymore: the computer that asked changed. Ask {{agent}} to ask again.",
+    endedPersonLeft: "{{person}} left the workspace before answering.",
+    endedClosed: "This request closed before anyone answered. Ask {{agent}} again if you still need it.",
+    seeNewer: "See the newer request",
+    /** Sending failed, but the request is still open: only its computer can't take it now. */
+    computerAway:
+      "{{agent}}'s computer isn't answering right now. This request stays open until {{time}}. Try again in a moment.",
+    computerPaused: "{{agent}}'s computer is paused by its owner. This request stays open until {{time}}.",
     failed: "Couldn't deliver it. Is the agent's computer on?",
     empty: "Type the value.",
     tooLarge: "Too large (16 KB at most).",
@@ -5591,7 +5609,7 @@ export const en = {
     vault_write: {
       label: "Edit Vault contacts",
       description:
-        "Save and update contact details in the Vault, change a saved login's username or a description, and delete what it saved.",
+        "Save and update contact details in the Vault, change a saved login's username or a description, make passwords for accounts it creates, and delete what it saved.",
     },
     github_git_read: {
       label: "Clone repositories (git)",
@@ -12814,6 +12832,10 @@ export const en = {
       label: "Run skill script",
       description: "Runs a skill's script in the environment.",
     },
+    vault_make_password: {
+      label: "Make a password",
+      description: "Makes a strong password on its computer and keeps it in the Vault as a key, never seeing it.",
+    },
     computer_status: {
       label: "Check the computer",
       description: "Says which computer it is and whether it's answering.",
@@ -12869,6 +12891,11 @@ export const en = {
     browser_type_secret: {
       label: "Type a password",
       description: "Types a password you gave it into a password or code field, without seeing it.",
+    },
+    browser_make_password: {
+      label: "Make a password",
+      description:
+        "Makes a strong password for a site on its computer, keeps it in the Vault and types it, never seeing it.",
     },
     browser_wait: {
       label: "Wait for the page",
@@ -13213,6 +13240,7 @@ export const en = {
         browser_scroll: "Scrolled the page",
         browser_upload: "Uploaded a file",
         browser_type_secret: "Typed a password",
+        browser_make_password: "Made a password",
         browser_wait: "Waited for the page",
         browser_screenshot: "Took a screenshot",
         browser_ask_person: "Asked for help",

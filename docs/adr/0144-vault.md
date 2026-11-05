@@ -11,7 +11,8 @@
   `0214_vault`; engine `packages/engine/src/vault/*` (access, items, connections, sync, CSV import, uses, the agent
   tools in `tools.ts`); sources `packages/adapters/src/vault/*` (the port `source.ts`, the site rule `site.ts`,
   `onepassword.ts`, `bitwarden.ts`); the box's additional data `vaultAad` in `packages/adapters/src/secret-box.ts`;
-  protocol 45 (`VAULT_PROTOCOL`, `vault.key`, `agentes:type_vault`, `exec.vault`) and the runner's in-memory store
+  protocol 45 (`VAULT_PROTOCOL`, `vault.key`, `agentes:type_vault`, `exec.vault`), protocol 47 (`vault.password`) and
+  the runner's in-memory store
   `apps/server/runner/vault.ts`; routes `apps/server/src/routes/app/vault.ts`; client `packages/client/src/vault/*`;
   web `apps/web/src/components/vault/*`; phone `apps/mobile/src/features/vault/*`
 
@@ -166,7 +167,9 @@ shows.
   personal or the team's (the team's only with `manage_credentials`), and the agents that may use it, starting with
   the one that asked. The card delivers the box as before and then sends the value once, over TLS, to be sealed in
   the Vault: the only moment the server gets a value a person typed.
-- A **username** the agent may fill in, shown on the card and kept with the login.
+- A **username** the agent gives when it knows it, shown on the card and kept with the login.
+- A **label** in the agent's words ("Senha da Conta Google"). The `name` is the agent's own: people read the label, or
+  one the apps derive from the kind and site, on the card, in notifications, the Vault, the audit and Atividade.
 - A **code** mode (`digits`), with one box per digit, typed by the runner into one field or one field per digit.
 
 A site's password from a request is no longer written to `store.json`: the runner keeps it in memory for 15
@@ -189,6 +192,37 @@ use it beside them); a CSV import from a browser or password manager export (web
 and one card per source to connect, generated from what the source describes.
 The apps reload the Vault on `vault.changed`, sent when an item, a connection or an access changes, never for a use
 alone (a fill, a key or a read): agents at work don't make every open app reload it.
+
+### 8. Passwords agents make
+
+An agent making an account of its own needs no person: asked to invent a password, a person gives one the agent can't
+keep, and a form sent with a password nobody kept is a locked account. `browser_make_password` (browser and `vault:write`
+scopes) and, for what a command uses, `vault_make_password` (a key, through `run_code`'s `keys`):
+
+1. The engine makes a key pair for this one call and sends `vault.password` (protocol 47, `VAULT_PASSWORD_PROTOCOL`)
+   with its public half, the agent's rules (`length`, `classes`) and a request id. An older runner never gets it, and
+   the agent reads that its computer needs an update.
+2. In the agent's own process (its worker in system mode) the runner makes the password from the OS's random source,
+   at least one character of each class, and answers it sealed with the ADR 0027 box, bound by `madePasswordAad`
+   (request and agent). Root, the hub and anything relaying hold a box. No command line, log, argument or tool result
+   carries the value, and the model never sees it.
+3. The engine opens the box in memory and seals the value into the Vault, as the card's "Save to the Vault" does for a
+   person's value (§5: the server sees built-in values, the database alone opens nothing). Only then is it typed.
+4. Typing is the ordinary login path of §4 (`agentes:type_vault`, once per field, password and confirmation): the same
+   origin, frame and field checks, guard, redaction and use record.
+
+Saving comes first so no form can go out with a value the Vault doesn't hold. A save that fails types nothing. A fill
+that types nothing puts the Vault back as it was. A password that replaces another keeps the old one sealed behind it
+(`previous_secrets`, its own version in its own seal, the last 5): the site may have turned the new one down, or a
+retry may have run after an accepted change, so `undo` brings the old one back. A person's new value clears them.
+
+What it makes: for a login, the page's own origin with `match: site`, since sign-up and sign-in are often on different
+hosts of one site, and the `username` given. The same login again (the person's own first, then the team's) takes the
+new value, on the terms of §2, and an agent may always change what it made. A new one is the team's, open to everyone,
+for this agent, or for every agent of the shared browser profile it is made in: the session it opens stays in the
+agent's browser for all its work (§5), so the agent's next run needs it whoever asked. It shows in Settings, Vault with
+its site and username, where people replace it as any other, and the value comes back to nobody (§2). Every step is in
+the audit log, never with the value. Desktop apps stay out: nothing types a password there.
 
 ## Consequences
 
