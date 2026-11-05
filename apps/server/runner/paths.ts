@@ -136,6 +136,16 @@ async function resolveWithin(
   }
 }
 
+/** `abs` through its symlinks, as far as it exists; what doesn't exist yet stays as it is. */
+export async function realOrNearest(abs: string): Promise<string> {
+  try {
+    return await realpath(abs);
+  } catch {
+    const up = path.dirname(abs);
+    return up === abs ? abs : path.join(await realOrNearest(up), path.basename(abs));
+  }
+}
+
 /**
  * Resolves a request path inside the workspace. `workspaceReal` must already
  * be a real path (fs.realpath). Existing targets are resolved through their

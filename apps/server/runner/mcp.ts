@@ -5,6 +5,7 @@ import { createConnection, createServer, type Server, type Socket } from "node:n
 import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
+import { PassThrough } from "node:stream";
 import {
   ASK_AFTER_TASK,
   ASK_IN_CHAT,
@@ -85,6 +86,31 @@ export interface McpTaskInfo {
    * (no ended run's token is ever sent, nothing is logged).
    */
   idle?: boolean;
+  /**
+   * A CLI with the delegated profile: Claude Code's own tools, served here (`delegated-tools.ts`). Its relay opens a
+   * `session`, the only way to them; every other executor's list and calls stay as they are.
+   */
+  delegated?: DelegatedSurface;
+}
+
+/** One block of a tool's result (MCP `content`). */
+export type McpContent = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
+export type McpToolResult = { content: McpContent[]; isError: boolean };
+
+/** What `delegated-tools.ts` serves on a session. */
+export interface DelegatedSurface {
+  tools: readonly McpToolInfo[];
+  scope: CommandScope;
+  profile: CommandProfile;
+  branches?: readonly string[];
+  /** `id`: the JSON-RPC request's, for `cancel`. `ask`: the bridge, for the permission prompt. */
+  call(
+    name: string,
+    args: Record<string, unknown>,
+    ctx: { id: string | number; ask: ToolCaller },
+  ): Promise<McpToolResult>;
+  /** Ends the call `id`, or without it every call in progress. */
+  cancel(id?: string | number): void;
 }
 
 /** Every string inside `value` through `redact` (keys kept). */
@@ -137,8 +163,11 @@ export interface IpcRequest {
   token: string;
   tool: string;
   args: Record<string, unknown>;
-  /** `list`: the tools this task (or run) may use (`tool` and `args` unused). Default: a call. */
-  kind?: "call" | "list";
+  /**
+   * `list`: the tools this task (or run) may use (`tool` and `args` unused). `session`: a delegated CLI's relay (the
+   * rest of the connection is MCP itself, `runMcpRelay`). Default: a call.
+   */
+  kind?: "call" | "list" | "session";
 }
 
 /**
@@ -451,7 +480,7 @@ export class McpBridge {
     let buf = "";
     socket.setEncoding("utf8");
     socket.on("error", () => {});
-    socket.on("data", (chunk: string) => {
+    const onData = (chunk: string) => {
       buf += chunk;
       if (buf.length > MCP_ARGS_MAX_CHARS * 2) {
         socket.end(`${JSON.stringify({ ok: false, error: "Request too large" })}\n`);
@@ -460,6 +489,7 @@ export class McpBridge {
       const nl = buf.indexOf("\n");
       if (nl < 0) return;
       const line = buf.slice(0, nl);
+      const rest = buf.slice(nl + 1);
       buf = "";
       let req: IpcRequest;
       try {
@@ -468,11 +498,41 @@ export class McpBridge {
         socket.end(`${JSON.stringify({ ok: false, error: "Bad request" })}\n`);
         return;
       }
+      if (req.kind === "session") {
+        socket.off("data", onData);
+        this.session(socket, req, rest);
+        return;
+      }
       void this.handle(req).then((reply) => {
         if (reply.ok === false && !reply.idle) this.opts.log?.(`mcp ${String(req.tool)} refused: ${reply.error}`);
         socket.end(`${JSON.stringify(reply)}\n`);
       });
-    });
+    };
+    socket.on("data", onData);
+  }
+
+  /** A delegated CLI's relay: from here on the connection is MCP, served in this process, as the agent. */
+  private session(socket: Socket, req: IpcRequest, rest: string) {
+    const info = typeof req.taskId === "string" ? this.opts.task(req.taskId) : null;
+    if (!info?.delegated || typeof req.token !== "string" || !sameToken(info.token, req.token)) {
+      socket.end(`${JSON.stringify({ ok: false, error: "Not allowed: this task has no agentes tools." })}\n`);
+      return;
+    }
+    const { delegated } = info;
+    const input = new PassThrough({ encoding: "utf8" });
+    input.write(rest);
+    socket.pipe(input);
+    void runMcpServer({
+      taskId: req.taskId,
+      socketPath: this.socketPath,
+      token: req.token,
+      input,
+      output: socket,
+      ipc: (r) => this.handle(r),
+      scope: delegated.scope,
+      profile: delegated.profile,
+      context: { ...(delegated.branches ? { branches: delegated.branches } : {}), delegated },
+    }).finally(() => socket.end());
   }
 
   async close() {
@@ -669,7 +729,7 @@ export async function handleMcpMessage(
   /** The turn's permission profile (ADR 0053 §3): a `plan` turn's prompts are answered here, never asked. */
   profile: CommandProfile = "work",
   /** Whose prompts these are: the agent's own branches, and whether a background task asks (`PromptContext`). */
-  context: PromptContext = {},
+  context: McpContext = {},
 ): Promise<Record<string, unknown> | null> {
   if (typeof message !== "object" || message === null || Array.isArray(message)) {
     return rpcError(null, -32600, "Invalid request");
@@ -679,9 +739,14 @@ export async function handleMcpMessage(
   const id: JsonRpcId = hasId ? (m.id as string | number) : null;
   if (m.jsonrpc !== "2.0" || typeof m.method !== "string")
     return hasId ? rpcError(id, -32600, "Invalid request") : null;
+  const params = (typeof m.params === "object" && m.params !== null ? m.params : {}) as Record<string, unknown>;
+  const { delegated } = context;
+  if (m.method === "notifications/cancelled" && delegated) {
+    const asked = params.requestId;
+    if (typeof asked === "string" || typeof asked === "number") delegated.cancel(asked);
+  }
   // Notifications (`notifications/initialized`, `notifications/cancelled`…) need no answer.
   if (!hasId) return null;
-  const params = (typeof m.params === "object" && m.params !== null ? m.params : {}) as Record<string, unknown>;
   switch (m.method) {
     case "initialize":
       return {
@@ -706,15 +771,29 @@ export async function handleMcpMessage(
         id,
         result: {
           // Read-only tools say so (Codex runs them without an approval even when told to ask).
-          tools: (list ? await list() : MISSION_MCP_TOOLS).map((tool) => ({
-            ...tool,
-            ...(READ_ONLY_TOOLS.has(tool.name) ? { annotations: { readOnlyHint: true } } : {}),
-            ...(ALWAYS_LOADED.has(tool.name) ? { _meta: { "anthropic/alwaysLoad": true } } : {}),
-          })),
+          tools: [
+            ...(delegated?.tools ?? []),
+            ...(list ? await list() : MISSION_MCP_TOOLS)
+              .filter((tool) => !delegated?.tools.some((t) => t.name === tool.name))
+              .map((tool) => ({
+                ...tool,
+                ...(READ_ONLY_TOOLS.has(tool.name) ? { annotations: { readOnlyHint: true } } : {}),
+                ...(ALWAYS_LOADED.has(tool.name) ? { _meta: { "anthropic/alwaysLoad": true } } : {}),
+              })),
+          ],
         },
       };
     case "tools/call": {
       const name = typeof params.name === "string" ? params.name : "";
+      if (delegated?.tools.some((t) => t.name === name)) {
+        const given = params.arguments;
+        const input = typeof given === "object" && given !== null && !Array.isArray(given) ? given : {};
+        const result = await delegated.call(name, input as Record<string, unknown>, {
+          id: id as string | number,
+          ask: call,
+        });
+        return { jsonrpc: "2.0", id, result };
+      }
       const tools = list ? await list() : MISSION_MCP_TOOLS;
       // With the server's list, a name it lacks still goes there: the executor may list what it had before (a
       // kept-alive one), and the server runs any tool the agent may use, or says why not and what to call instead.
@@ -758,6 +837,9 @@ export interface PromptContext {
   /** Nobody answers beyond this computer (a background task outside a mission): an ordinary push goes through here. */
   local?: boolean;
 }
+
+/** What an MCP process serves besides the server's tools. */
+type McpContext = PromptContext & { delegated?: DelegatedSurface };
 
 /**
  * Claude Code asks (`--permission-prompt-tool mcp__agentes__permission_prompt`)
@@ -867,6 +949,10 @@ export async function runMcpServer(options: {
   refreshMs?: number;
   /** Tests: `TOOLS_POLL_MS`. */
   pollMs?: number;
+  /** How calls reach the daemon. Default: over `socketPath`. Inside the daemon (a `session`): straight to its bridge. */
+  ipc?: (req: IpcRequest) => Promise<IpcReply>;
+  /** Default: `AGENTES_MCP_BRANCHES` and `AGENTES_MCP_TASK`. */
+  context?: McpContext;
 }): Promise<number> {
   const token =
     options.token ??
@@ -879,18 +965,18 @@ export async function runMcpServer(options: {
     })();
   const out = options.output ?? process.stdout;
   const write = (msg: unknown) => out.write(`${JSON.stringify(msg)}\n`);
-  const context = mcpContextFromEnv(process.env);
+  const context: McpContext = options.context ?? mcpContextFromEnv(process.env);
+  const ipc = options.ipc ?? ((req: IpcRequest) => ipcCall(options.socketPath, req));
   // A background task outside a mission has no tools of ours: only the prompt, answered on this computer.
   const call: ToolCaller = context.local
     ? async () => ({ ok: false, error: NOBODY_TO_ASK })
-    : (tool, args) => ipcCall(options.socketPath, { taskId: options.taskId, token, tool, args });
+    : (tool, args) => ipc({ taskId: options.taskId, token, tool, args });
   // The run's tools, asked from the server through the daemon (cached here: one process per task or run). A list
   // that changed (a scope granted, a connector added, a mission thread, another run's groups): the executor re-reads
   // it (Claude Code 2.1.316 does, between the tool calls of a turn; Codex 0.165.0 doesn't, `brain-codex-app.ts`).
-  const cache = new McpToolCache(
-    () => ipcCall(options.socketPath, { taskId: options.taskId, token, tool: "", args: {}, kind: "list" }),
-    { onChange: () => write({ jsonrpc: "2.0", method: "notifications/tools/list_changed" }) },
-  );
+  const cache = new McpToolCache(() => ipc({ taskId: options.taskId, token, tool: "", args: {}, kind: "list" }), {
+    onChange: () => write({ jsonrpc: "2.0", method: "notifications/tools/list_changed" }),
+  });
   const list: ToolLister = context.local ? async () => PROMPT_ONLY : () => cache.get();
   let stopped = false;
   let refresher: ReturnType<typeof setTimeout> | undefined;
@@ -927,10 +1013,36 @@ export async function runMcpServer(options: {
       .finally(() => inflight.delete(p));
     inflight.add(p);
   }
+  // The CLI is gone: nobody takes these calls' answers. What was moved to the background stays.
+  context.delegated?.cancel();
   await Promise.all(inflight);
   stopped = true;
   clearTimeout(refresher);
   return 0;
+}
+
+/**
+ * `agentes-runner mcp --relay`: a delegated CLI's MCP server, as seen from the user holding the sign-in. It says who
+ * it is, then only moves bytes: nothing the model or the agent's code wrote is read in that user's process.
+ */
+export function runMcpRelay(options: {
+  taskId: string;
+  socketPath: string;
+  token: string;
+  input?: NodeJS.ReadableStream;
+  output?: NodeJS.WritableStream;
+}): Promise<number> {
+  return new Promise((resolve) => {
+    const socket = createConnection(options.socketPath);
+    socket.once("error", () => resolve(1));
+    socket.once("close", () => resolve(0));
+    socket.once("connect", () => {
+      const hello: IpcRequest = { kind: "session", taskId: options.taskId, token: options.token, tool: "", args: {} };
+      socket.write(`${JSON.stringify(hello)}\n`);
+      (options.input ?? process.stdin).pipe(socket);
+      socket.pipe(options.output ?? process.stdout);
+    });
+  });
 }
 
 // ── How executors get it ─────────────────────────────────────────────────────
@@ -1014,6 +1126,8 @@ export function claudeMcpConfig(input: {
   branches?: readonly string[];
   /** A background task's executor: a mission's, or one outside a mission (`local`: only the prompt, answered here). */
   task?: "mission" | "local";
+  /** A delegated CLI: the byte relay to the agent's worker, which serves MCP itself (`runMcpRelay`). */
+  relay?: boolean;
 }) {
   const [command, ...args] = input.command;
   return {
@@ -1021,7 +1135,7 @@ export function claudeMcpConfig(input: {
       agentes: {
         type: "stdio",
         command,
-        args: [...args, "mcp", "--task", input.taskId],
+        args: [...args, "mcp", ...(input.relay ? ["--relay"] : []), "--task", input.taskId],
         ...(input.alwaysLoad ? { alwaysLoad: true } : {}),
         env: {
           AGENTES_MCP_TOKEN: input.token,
