@@ -1892,13 +1892,15 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
   padding-top: 24px;
   padding-bottom: 24px;
 }
-/* Room for the cards' shadows and focus rings at the scrolling column's edges. */
+/* Room at the scrolling column's edges for what reaches past its content: the cards' shadows and focus rings, and the
+   hover plate and field of the title and the description, 10px out on each side (`.issue-inplace`), which 4px cut
+   flat at both ends. */
 .issue-page--talk > .issue-page__main {
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  margin: -4px;
-  padding: 4px;
+  margin: -10px;
+  padding: 10px;
 }
 .issue-page__talk {
   min-height: 0;
