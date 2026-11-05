@@ -406,7 +406,11 @@ function KeysSection({ locale }: { locale: string }) {
                 key={k.id}
                 leading={<ProviderLogo id={k.provider} size="sm" />}
                 label={k.label}
-                sub={`${providerLabel(k.provider)} · ${t("settings.keyEndsIn", { hint: k.keyHint })} · ${t("settings.keyAdded", { when: relativeTime(t, locale, k.createdAt) })}`}
+                sub={[
+                  providerLabel(k.provider),
+                  t("settings.keyEndsIn", { hint: k.keyHint }),
+                  t("settings.keyAdded", { when: relativeTime(t, locale, k.createdAt) }),
+                ].join(" · ")}
                 value={isDefault ? t("settings.default") : undefined}
                 more
                 onPress={() => actions(k, isDefault)}
