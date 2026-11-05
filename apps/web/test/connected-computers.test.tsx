@@ -279,9 +279,7 @@ describe("Configurações → Computadores", () => {
     expect(links).toContain("Computadores");
     expect(links).not.toContain("Sandbox");
     const body = document.querySelector(".settings__body") as HTMLElement;
-    expect(body.textContent).toContain(
-      "Onde os agentes trabalham: o computador deste servidor e qualquer outro computador que você conectar.",
-    );
+    expect(body.textContent).toContain("Onde os agentes trabalham: este servidor e outros que você conectar.");
     // No kinds side by side anymore, and never "in the cloud" here.
     expect(screen().queryByRole("region", { name: "Onde os agentes trabalham" })).toBeNull();
     expect(body.textContent).not.toMatch(/Na nuvem|No seu computador|Computador na nuvem/);

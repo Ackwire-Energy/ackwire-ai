@@ -2,14 +2,17 @@ import type { Artifact } from "@agenteschat/client";
 import { useArtifact, useArtifactVersions } from "@agenteschat/client";
 import { patchCounts } from "@agenteschat/client/lib/artifacts";
 import { artifactPlace } from "@agenteschat/client/lib/drive";
-import { formatBytes } from "@agenteschat/client/lib/files";
+import { formatBytes, previewKind } from "@agenteschat/client/lib/files";
 import { relativeTime } from "@agenteschat/client/lib/format";
-import { Button, Chip, DetailsDialog, DetailsSection, Icon, Menu, MenuItem } from "@agenteschat/ui";
+import { Button, Chip, DetailsDialog, DetailsSection, Icon, Menu, MenuItem, VideoPlayer } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useApi } from "@/api/context";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { ArtifactMoreMenu, useArtifactDownload } from "@/components/artifacts/ArtifactActions";
 import { artifactLink, useArtifactViewer, useAuthorName } from "@/components/artifacts/ArtifactViewer";
+import { useVideoLabels } from "@/components/artifacts/FileView";
 import { goToTarget } from "@/components/NotificationOpen";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -64,6 +67,12 @@ export function DriveDetails({
   const detail = useArtifact(org.id, a.id, a.version);
   const versions = useArtifactVersions(org.id, a.id);
   const content = detail.data?.content;
+  const api = useApi();
+  const videoLabels = useVideoLabels();
+  // A video plays right here (streamed in parts, any size): no "Open" to reach it; a codec this browser lacks shows
+  // the file's preview again.
+  const [videoFailed, setVideoFailed] = useState(false);
+  const video = content?.kind === "file" && previewKind(content.contentType) === "video" && !videoFailed;
   const formats = downloads.formats(a.kind);
   const isAgent = a.createdBy.type === "agent";
   const role = isAgent ? dir.agentById.get(a.createdBy.id)?.role : undefined;
@@ -110,11 +119,25 @@ export function DriveDetails({
       subtitle={<span className="tabular">{facts.join(" · ")}</span>}
       page={{ label: t("artifacts.openFile"), onOpen: () => openFile() }}
     >
-      <DrivePreview artifact={a} size="lg" />
+      {video && content?.kind === "file" ? (
+        <VideoPlayer
+          key={`${a.id}:${a.version}`}
+          variant="viewer"
+          className="drive-details__video"
+          src={api.artifacts.fileUrl(org.id, a.id, { version: a.version })}
+          name={content.name}
+          labels={videoLabels}
+          onFailed={() => setVideoFailed(true)}
+        />
+      ) : (
+        <DrivePreview artifact={a} size="lg" />
+      )}
       <div className="drive-details__actions">
-        <Button variant="primary" icon="external" onClick={() => openFile()}>
-          {t("artifacts.openFile")}
-        </Button>
+        {!video && (
+          <Button variant="primary" icon="external" onClick={() => openFile()}>
+            {t("artifacts.openFile")}
+          </Button>
+        )}
         {formats.length > 1 ? (
           <Menu
             align="end"
@@ -128,7 +151,11 @@ export function DriveDetails({
             ))}
           </Menu>
         ) : (
-          <Button icon="download" onClick={() => void downloads.save(a, formats[0]?.format, a.version, content)}>
+          <Button
+            variant={video ? "primary" : undefined}
+            icon="download"
+            onClick={() => void downloads.save(a, formats[0]?.format, a.version, content)}
+          >
             {t("artifacts.download")}
           </Button>
         )}

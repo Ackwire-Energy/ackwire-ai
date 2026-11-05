@@ -4925,7 +4925,7 @@
   },
   "proposals": {
     "title": "Propuestas de mejora",
-    "subtitle": "Los agentes proponen cambios en las instrucciones, los roles y los accesos del equipo, o en el contexto de {{org}}, cuando alguien lo pide o una lección se repite. Nada cambia hasta que alguien acepta.",
+    "subtitle": "Cambios que proponen los agentes. Nada cambia hasta que alguien acepta.",
     "list": "Propuestas",
     "proposes": "<b>{{agent}}</b> propone · {{target}}",
     "proposesMany": "<b>{{agent}}</b> propone · instrucciones de {{count}} agentes",
@@ -9501,6 +9501,8 @@
     "thousand": "k",
     "building": "Armándolo…",
     "openBig": "Abrir en grande",
+    "showAll": "Mostrar todo",
+    "showLess": "Mostrar menos",
     "keep": "Guardar en el Drive",
     "kept": "Guardado en el Drive",
     "inDrive": "En el Drive",
@@ -11134,6 +11136,7 @@
   },
   "searchPage": {
     "title": "Buscar en el espacio de trabajo",
+    "subtitle": "Mensajes, contexto y acciones del equipo en tus canales.",
     "label": "Buscar",
     "placeholder": "Mensajes, decisiones, resúmenes…",
     "filter": "Tipo",
@@ -11752,7 +11755,7 @@
       },
       "saved": "{{name}} ahora usa {{computer}}."
     },
-    "lead": "Donde trabajan tus agentes: la computadora de este servidor y cualquier otra que conectes.",
+    "lead": "Dónde trabajan tus agentes: este servidor y los computadores que conectes.",
     "leadCloud": "Donde trabajan tus agentes: una computadora solo para este espacio de trabajo, siempre encendida.",
     "about": "Acerca de esta computadora",
     "how": "Cómo funcionan las computadoras",
@@ -12351,25 +12354,25 @@
     },
     "sectionText": {
       "account": "Tu perfil y cómo se ve la app para ti.",
-      "notifications": "La bandeja de entrada guarda todo. Aquí eliges qué te llega como notificación en este espacio de trabajo.",
+      "notifications": "Lo que te llega como aviso aquí. La bandeja de entrada guarda todo.",
       "general": "Nombre, zona horaria y lo que todos los agentes saben del espacio de trabajo.",
-      "right_hand": "El asistente que arma el equipo con cada persona, en su DM y con sus permisos.",
+      "right_hand": "El asistente que arma el equipo con cada persona, en su DM.",
       "members": "Quién está en el espacio de trabajo, e invitaciones.",
       "roles": "Lo que puede hacer cada persona. Los roles se suman.",
-      "vault": "Contraseñas, claves y datos de contacto que usan tus agentes. Escriben contraseñas y usan claves sin verlas nunca.",
+      "vault": "Contraseñas, claves y contactos de tus agentes. Nunca ven una contraseña.",
       "access": "Lo que puede usar cada agente: un nivel por conector.",
       "connectors": "Servicios y servidores MCP conectados una sola vez para todo el espacio de trabajo.",
       "skills": "Instrucciones en Markdown que los agentes abren cuando las necesitan.",
       "keys": "Tus planes y las claves de API del espacio de trabajo.",
       "storage": "Dónde viven los archivos del espacio de trabajo.",
       "usage": "Cuánta IA usa cada persona y cada agente, y los límites del mes.",
-      "audit": "Lo que hicieron los agentes fuera de la conversación y lo que cambiaron las personas. Solo lo ven los admins.",
-      "import": "Trae agentes de otra app o espacio de trabajo, y lleva este adonde quieras.",
-      "billing": "El plan de agentes.chat, la tarjeta y las facturas de este espacio de trabajo están en una página nuestra, fuera de la app.",
-      "media": "Lo que las personas pueden enviar en una conversación, y cuándo los agentes envían un GIF o un sticker.",
+      "audit": "Lo que los agentes hicieron fuera de la conversación y lo que cambió la gente.",
+      "import": "Trae agentes de otra app o espacio de trabajo, o llévate este.",
+      "billing": "El plan, la tarjeta y las facturas, en una página nuestra fuera de la app.",
+      "media": "Lo que se puede enviar en la conversación, y los GIF y stickers de los agentes.",
       "voice": "Mensajes de voz en las conversaciones, y quién convierte la voz en texto.",
-      "apps": "Pide tareas a los agentes de este espacio de trabajo desde Claude, Cursor y otras apps.",
-      "approvals": "Quién decide por ti cuando un agente pide algo que espera tu aprobación."
+      "apps": "Pide tareas a los agentes desde Claude, Cursor y otras apps.",
+      "approvals": "Quién decide por ti cuando un agente pide tu aprobación."
     },
     "title": "Configuración",
     "account": {
@@ -12811,7 +12814,7 @@
   },
   "gallery": {
     "title": "Galería de componentes",
-    "subtitle": "Solo para desarrollo. Los componentes de @agenteschat/ui con los estados de las pantallas aprobadas."
+    "subtitle": "Solo en desarrollo: los componentes de @agenteschat/ui."
   },
   "format": {
     "list": "{{names, list}}",
@@ -14527,6 +14530,7 @@
   },
   "taskManager": {
     "title": "Gestor de tareas",
+    "subtitle": "Lo que los agentes hacen ahora y lo que terminó hoy.",
     "nav": "Gestor de tareas",
     "search": "Busca una tarea, agente o app",
     "working_one": "{{count}} trabajando",
@@ -14916,7 +14920,7 @@
   },
   "dashboards": {
     "title": "Paneles",
-    "subtitle": "Números y gráficos que los agentes mantienen al día, para el espacio de trabajo o solo para algunos roles.",
+    "subtitle": "Números y gráficos que los agentes mantienen al día.",
     "sidebar": "Paneles",
     "navWhat": "Números y gráficos que los agentes mantienen al día",
     "new": "Nuevo panel",

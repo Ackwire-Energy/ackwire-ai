@@ -4760,7 +4760,7 @@
   },
   "proposals": {
     "title": "İyileştirme önerileri",
-    "subtitle": "Biri istediğinde ya da bir ders tekrarlandığında ajanlar ekibin talimatlarında, rollerinde ve erişimlerinde ya da {{org}} bağlamında değişiklik önerir. Biri kabul edene kadar hiçbir şey değişmez.",
+    "subtitle": "Ajanların önerdiği değişiklikler. Biri kabul etmeden hiçbir şey değişmez.",
     "list": "Öneriler",
     "proposes": "<b>{{agent}}</b> öneriyor · {{target}}",
     "proposesMany": "<b>{{agent}}</b> öneriyor · {{count}} ajanın talimatları",
@@ -9138,6 +9138,8 @@
     "thousand": "B",
     "building": "Hazırlanıyor…",
     "openBig": "Büyük aç",
+    "showAll": "Tümünü göster",
+    "showLess": "Daha az göster",
     "keep": "Drive'da sakla",
     "kept": "Drive'da saklandı",
     "inDrive": "Drive'da",
@@ -10722,6 +10724,7 @@
   },
   "searchPage": {
     "title": "Çalışma alanında ara",
+    "subtitle": "Kanallarınızdaki mesajlar, bağlam ve ekip işlemleri.",
     "label": "Ara",
     "placeholder": "Mesajlar, kararlar, özetler…",
     "filter": "Tür",
@@ -11335,7 +11338,7 @@
       },
       "saved": "{{name}} artık {{computer}} kullanıyor."
     },
-    "lead": "Ajanlarınızın çalıştığı yer: bu sunucunun bilgisayarı ve bağladığınız diğer bilgisayarlar.",
+    "lead": "Ajanlarınızın çalıştığı yer: bu sunucu ve bağladığınız bilgisayarlar.",
     "leadCloud": "Ajanlarınızın çalıştığı yer: yalnızca bu çalışma alanına ait, her zaman açık bir bilgisayar.",
     "about": "Bu bilgisayar hakkında",
     "how": "Bilgisayarlar nasıl çalışır",
@@ -11920,25 +11923,25 @@
     },
     "sectionText": {
       "account": "Profiliniz ve uygulamanın size nasıl göründüğü.",
-      "notifications": "Gelen kutusu her şeyi saklar. Burada, bu çalışma alanında size neyin bildirim olarak ulaşacağını seçersiniz.",
+      "notifications": "Burada size bildirim olarak ulaşanlar. Gelen kutusu her şeyi saklar.",
       "general": "Ad, saat dilimi ve her ajanın çalışma alanı hakkında bildikleri.",
-      "right_hand": "Herkesle kendi DM'inde, kendi izinleriyle ekibi kuran asistan.",
+      "right_hand": "Her kişiyle kendi DM'inde ekibi kuran asistan.",
       "members": "Çalışma alanında kimler var ve davetler.",
       "roles": "Her kişinin neler yapabileceği. Roller toplanır.",
-      "vault": "Ajanlarınızın kullandığı şifreler, anahtarlar ve iletişim bilgileri. Şifreleri yazar ve anahtarları kullanırlar, ama bunları hiç görmezler.",
+      "vault": "Ajanlarınızın parolaları, anahtarları ve kişileri. Parolaları asla görmezler.",
       "access": "Her ajanın neleri kullanabileceği: bağlayıcı başına bir düzey.",
       "connectors": "Tüm çalışma alanı için bir kez bağlanan hizmetler ve MCP sunucuları.",
       "skills": "Ajanların ihtiyaç duyduklarında açtıkları Markdown talimatları.",
       "keys": "Planlarınız ve çalışma alanının API anahtarları.",
       "storage": "Çalışma alanının dosyalarının durduğu yer.",
       "usage": "Her kişinin ve her ajanın ne kadar yapay zekâ kullandığı ve ayın limitleri.",
-      "audit": "Ajanların konuşma dışında yaptıkları ve kişilerin değiştirdikleri. Yalnızca yöneticiler görür.",
-      "import": "Başka bir uygulamadan ya da çalışma alanından ajan getirin ve bu çalışma alanını istediğiniz yere götürün.",
-      "billing": "Bu çalışma alanının agentes.chat planı, kartı ve faturaları uygulamanın dışında, bize ait bir sayfada.",
-      "media": "Kişilerin bir konuşmada neler gönderebileceği ve ajanların ne zaman GIF ya da çıkartma göndereceği.",
+      "audit": "Ajanların konuşma dışında yaptıkları ve kişilerin değiştirdikleri.",
+      "import": "Başka bir uygulamadan veya çalışma alanından ajan getirin ya da bunu taşıyın.",
+      "billing": "Plan, kart ve faturalar, uygulama dışındaki sayfamızda.",
+      "media": "Konuşmada neler gönderilebildiği ve ajanların GIF'leri ile çıkartmaları.",
       "voice": "Konuşmalardaki sesli mesajlar ve sesi metne kimin dönüştürdüğü.",
-      "apps": "Claude, Cursor ve diğer uygulamalardan bu çalışma alanının ajanlarına görev verin.",
-      "approvals": "Bir ajan onayınızı bekleyen bir şey istediğinde sizin yerinize kimin karar vereceği."
+      "apps": "Claude, Cursor ve diğer uygulamalardan ajanlara görev verin.",
+      "approvals": "Bir ajan onayınızı istediğinde sizin yerinize kimin karar verdiği."
     },
     "title": "Ayarlar",
     "account": {
@@ -12362,7 +12365,7 @@
   },
   "gallery": {
     "title": "Bileşen galerisi",
-    "subtitle": "Yalnızca geliştirme için. Onaylanan ekranların durumlarıyla @agenteschat/ui bileşenleri."
+    "subtitle": "Yalnızca geliştirme için: @agenteschat/ui bileşenleri."
   },
   "format": {
     "list": "{{names, list}}",
@@ -14010,6 +14013,7 @@
   },
   "taskManager": {
     "title": "Görev yöneticisi",
+    "subtitle": "Ajanların şu an yaptıkları ve bugün bitenler.",
     "nav": "Görev yöneticisi",
     "search": "Görev, ajan veya uygulama ara",
     "working_one": "{{count}} çalışıyor",
@@ -14388,7 +14392,7 @@
   },
   "dashboards": {
     "title": "Panolar",
-    "subtitle": "Ajanların güncel tuttuğu sayılar ve grafikler. Tüm çalışma alanı ya da yalnızca bazı roller için.",
+    "subtitle": "Ajanların güncel tuttuğu sayılar ve grafikler.",
     "sidebar": "Panolar",
     "navWhat": "Ajanların güncel tuttuğu sayılar ve grafikler",
     "new": "Yeni pano",

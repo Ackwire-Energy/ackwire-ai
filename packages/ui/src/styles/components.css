@@ -6239,7 +6239,7 @@ button.ac-voice__play:active {
 }
 .ac-video--tile .ac-video__media {
   width: auto;
-  min-width: 220px;
+  min-width: min(220px, 100%);
   max-width: 100%;
   max-height: 320px;
 }
@@ -6546,6 +6546,27 @@ button.ac-voice__play:active {
 .ac-video--tile .ac-video__total {
   display: none;
 }
+/* The bar fits the player's width, wherever it is (a chat column, a dialog, a phone): the timeline keeps its room and
+   the extras leave from the least needed, the total time, then the speed and the sound, then the clock. */
+.ac-video__bar {
+  container: ac-video-bar / inline-size;
+}
+@container ac-video-bar (max-width: 360px) {
+  .ac-video__total {
+    display: none;
+  }
+}
+@container ac-video-bar (max-width: 280px) {
+  .ac-video__speed,
+  .ac-video__sound {
+    display: none;
+  }
+}
+@container ac-video-bar (max-width: 200px) {
+  .ac-video__time {
+    display: none;
+  }
+}
 @media (hover: none) {
   .ac-video__volume {
     display: none;
@@ -6592,7 +6613,9 @@ html:not([data-pointer]) .ac-video__rail:focus-visible .ac-video__knob {
   align-self: center;
   width: 1px;
   height: 16px;
-  margin: 0 4px 0 2px;
+  /* The chip's edge is drawn, the next tool's glyph sits ~8px inside its button: the extra room on the left makes
+     the hairline look centred between them. */
+  margin: 0 0 0 8px;
   background: var(--line2);
 }
 .ac-composer--inline-pills .ac-composer__agent {
@@ -7900,6 +7923,91 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 @media (max-width: 560px) {
   .ac-recur__period {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/*
+ * Every inner page's header (PageHeader): the title, 28px on a 40px line (the height of the page's buttons, so they
+ * centre on it), the page's line under it (always there, always one line), the buttons at the end of the title's line,
+ * then the page's bar. One shape and one height on every page, so a title and what follows start at the same place
+ * wherever you go.
+ */
+.ac-pagehead {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.ac-pagehead__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+.ac-pagehead__text {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.ac-pagehead__titleline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ac-pagehead__title {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.ac-pagehead__meta {
+  min-height: 20px;
+  margin: -2px 0 0;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ac-pagehead__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-left: auto;
+}
+.ac-pagehead__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  min-width: 0;
+}
+/* A phone: the buttons take their own row under the title, as wide as it, without their keys. */
+@media (max-width: 760px) {
+  .ac-pagehead__title {
+    font-size: 24px;
+    line-height: 36px;
+  }
+  .ac-pagehead__actions {
+    flex-basis: 100%;
+    min-height: 0;
+  }
+  .ac-pagehead__actions > .ac-btn:not(.ac-btn--icon) {
+    flex: 1 1 auto;
+  }
+  .ac-pagehead__actions .ac-btn__kbd {
+    display: none;
   }
 }
 

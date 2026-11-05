@@ -592,9 +592,7 @@ describe("Configurações do workspace", () => {
     await go(state, "settings/billing");
     expect(nav().getByRole("link", { name: "Plano e cobrança" }).getAttribute("aria-current")).toBe("page");
     expect(screen().getByRole("heading", { level: 2, name: "Plano e cobrança" })).toBeTruthy();
-    expect(document.body.textContent).toContain(
-      "O plano do agentes.chat deste workspace, o cartão e as faturas ficam numa página nossa, fora do app.",
-    );
+    expect(document.body.textContent).toContain("O plano, o cartão e as faturas, numa página nossa fora do app.");
     await click(screen().getByRole("button", { name: "Abrir plano e cobrança" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "orgs.billingLink")?.args).toEqual([ORG_ID, "settings"]);

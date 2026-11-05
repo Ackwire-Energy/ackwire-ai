@@ -106,7 +106,7 @@ describe("route guards", () => {
     await renderApp(`/org/${ORG_ID}/threads`, { api: createFakeApi() });
     await settle();
     expect(screen().getByRole("heading", { level: 1, name: "Threads" })).toBeTruthy();
-    expect(document.querySelector(".list-head__sub")?.textContent).toBe("Assuntos que saíram dos canais e das DMs.");
+    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe("Assuntos que saíram dos canais e das DMs.");
     expect(screen().getByText("Nenhuma thread ainda")).toBeTruthy();
     // All teaches how a thread starts; the other tabs only say they're empty and lead back to All.
     expect(document.querySelector(".ac-empty__text")?.textContent).toBe(

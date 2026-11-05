@@ -3,7 +3,7 @@ import { useAgentGroups, useAiStatus, useFormerAgents, useTeam } from "@agentesc
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
-import { Button, Card, EmptyState, Icon, Segmented } from "@agenteschat/ui";
+import { Button, Card, EmptyState, Icon, PageHeader, Segmented } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -55,28 +55,18 @@ export function TeamPage() {
   const shown = view !== "usage" && data && agents.length > 0 ? data : null;
   return (
     <div className="page team">
-      <header className="team-head">
-        <div className="team-head__title">
-          <Icon name="agent" size={20} />
-          <h1>{t("team.title")}</h1>
-          {data && (
-            <span className="team-head__sub">
-              {[
-                t("team.people", { count: dir.members.length }),
-                t("team.agents", { count: agents.length }),
-                t("team.sectorsCount", { count: groups.length }),
-              ].join(" · ")}
-            </span>
-          )}
-        </div>
-        <div className="row team-head__actions">
-          <Segmented
-            value={view}
-            onValueChange={pick}
-            label={t("team.viewLabel")}
-            options={VIEWS.map((v) => ({ value: v, label: t(`team.view.${v}`) }))}
-          />
-          {can(org, "create_agents") && (
+      <PageHeader
+        title={t("team.title")}
+        meta={
+          data &&
+          [
+            t("team.people", { count: dir.members.length }),
+            t("team.agents", { count: agents.length }),
+            t("team.sectorsCount", { count: groups.length }),
+          ].join(" · ")
+        }
+        actions={
+          can(org, "create_agents") && (
             <>
               <Button asChild icon="archiveBox">
                 <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "import" }}>
@@ -89,9 +79,16 @@ export function TeamPage() {
                 </Link>
               </Button>
             </>
-          )}
-        </div>
-      </header>
+          )
+        }
+      >
+        <Segmented
+          value={view}
+          onValueChange={pick}
+          label={t("team.viewLabel")}
+          options={VIEWS.map((v) => ({ value: v, label: t(`team.view.${v}`) }))}
+        />
+      </PageHeader>
       {view !== "usage" && team.isLoading && <LoadingCards count={2} />}
       {view !== "usage" && team.isError && !data && (
         <ErrorState error={team.error} onRetry={() => void team.refetch()} />

@@ -4780,7 +4780,7 @@
   },
   "proposals": {
     "title": "Verbesserungsvorschläge",
-    "subtitle": "Agenten schlagen Änderungen an Anweisungen, Rollen und Zugriffen des Teams oder am Kontext von {{org}} vor, wenn jemand darum bittet oder sich eine Lektion wiederholt. Nichts ändert sich, bis jemand annimmt.",
+    "subtitle": "Änderungen, die die Agenten vorschlagen. Nichts ändert sich ohne Zustimmung.",
     "list": "Vorschläge",
     "proposes": "<b>{{agent}}</b> schlägt vor · {{target}}",
     "proposesMany": "<b>{{agent}}</b> schlägt vor · Anweisungen von {{count}} Agenten",
@@ -9198,6 +9198,8 @@
     "thousand": "Tsd.",
     "building": "Wird zusammengestellt…",
     "openBig": "Groß öffnen",
+    "showAll": "Alles anzeigen",
+    "showLess": "Weniger anzeigen",
     "keep": "In Drive behalten",
     "kept": "In Drive behalten",
     "inDrive": "In Drive",
@@ -10786,6 +10788,7 @@
   },
   "searchPage": {
     "title": "Workspace durchsuchen",
+    "subtitle": "Nachrichten, Kontext und Team-Aktionen in deinen Kanälen.",
     "label": "Suche",
     "placeholder": "Nachrichten, Entscheidungen, Zusammenfassungen…",
     "filter": "Typ",
@@ -11399,7 +11402,7 @@
       },
       "saved": "{{name}} nutzt jetzt {{computer}}."
     },
-    "lead": "Wo deine Agenten arbeiten: der Computer dieses Servers und jeder andere Computer, den du verbindest.",
+    "lead": "Wo deine Agenten arbeiten: dieser Server und jeder Computer, den du verbindest.",
     "leadCloud": "Wo deine Agenten arbeiten: ein Computer nur für diesen Workspace, immer an.",
     "about": "Über diesen Computer",
     "how": "So funktionieren Computer",
@@ -11984,25 +11987,25 @@
     },
     "sectionText": {
       "account": "Dein Profil und wie die App für dich aussieht.",
-      "notifications": "Der Posteingang behält alles. Hier wählst du, was dich in diesem Workspace als Benachrichtigung erreicht.",
+      "notifications": "Was dich hier als Benachrichtigung erreicht. Der Posteingang behält alles.",
       "general": "Name, Zeitzone und was jeder Agent über den Workspace weiß.",
-      "right_hand": "Der Assistent, der mit jeder Person das Team aufbaut, in ihrer DM und mit ihren Berechtigungen.",
+      "right_hand": "Der Assistent, der mit jeder Person das Team aufbaut, in ihrer DM.",
       "members": "Wer im Workspace ist, und Einladungen.",
       "roles": "Was jede Person darf. Rollen addieren sich.",
-      "vault": "Passwörter, Schlüssel und Kontaktdaten, die deine Agenten verwenden. Sie geben Passwörter ein und verwenden Schlüssel, ohne sie je zu sehen.",
+      "vault": "Passwörter, Schlüssel und Kontakte deiner Agenten. Passwörter sehen sie nie.",
       "access": "Was jeder Agent nutzen kann: eine Stufe pro Konnektor.",
       "connectors": "Dienste und MCP-Server, die einmal für den ganzen Workspace verbunden werden.",
       "skills": "Markdown-Anweisungen, die Agenten öffnen, wenn sie sie brauchen.",
       "keys": "Deine Abos und die API-Schlüssel des Workspace.",
       "storage": "Wo die Dateien des Workspace liegen.",
       "usage": "Wie viel KI jede Person und jeder Agent nutzt, und die Limits des Monats.",
-      "audit": "Was die Agenten außerhalb der Unterhaltung getan und was Personen geändert haben. Nur Admins sehen es.",
-      "import": "Hol Agenten aus einer anderen App oder einem anderen Workspace und nimm diesen mit, wohin du willst.",
-      "billing": "Der agentes.chat-Tarif, die Karte und die Rechnungen dieses Workspace liegen auf einer eigenen Seite von uns, außerhalb der App.",
-      "media": "Was Personen in einer Unterhaltung senden können und wann Agenten ein GIF oder einen Sticker senden.",
+      "audit": "Was Agenten außerhalb der Unterhaltung taten und was Personen änderten.",
+      "import": "Hol Agenten aus einer anderen App oder einem anderen Workspace, oder nimm diesen mit.",
+      "billing": "Plan, Karte und Rechnungen, auf einer Seite von uns außerhalb der App.",
+      "media": "Was man in Unterhaltungen senden kann, und die GIFs und Sticker der Agenten.",
       "voice": "Sprachnachrichten in Unterhaltungen und wer Sprache in Text umwandelt.",
-      "apps": "Bitte die Agenten dieses Workspace aus Claude, Cursor und anderen Apps um Aufgaben.",
-      "approvals": "Wer für dich entscheidet, wenn ein Agent etwas anfragt, das auf deine Freigabe wartet."
+      "apps": "Gib den Agenten Aufgaben aus Claude, Cursor und anderen Apps.",
+      "approvals": "Wer für dich entscheidet, wenn ein Agent deine Freigabe braucht."
     },
     "title": "Einstellungen",
     "account": {
@@ -12432,7 +12435,7 @@
   },
   "gallery": {
     "title": "Komponentengalerie",
-    "subtitle": "Nur für die Entwicklung. Die Komponenten von @agenteschat/ui mit den Zuständen der freigegebenen Bildschirme."
+    "subtitle": "Nur für die Entwicklung: die Komponenten von @agenteschat/ui."
   },
   "format": {
     "list": "{{names, list}}",
@@ -14080,6 +14083,7 @@
   },
   "taskManager": {
     "title": "Task-Manager",
+    "subtitle": "Was die Agenten gerade tun und was heute fertig wurde.",
     "nav": "Task-Manager",
     "search": "Aufgabe, Agent oder App suchen",
     "working_one": "{{count}} in Arbeit",
@@ -14458,7 +14462,7 @@
   },
   "dashboards": {
     "title": "Dashboards",
-    "subtitle": "Zahlen und Diagramme, die die Agenten aktuell halten, für den Workspace oder nur für einige Rollen.",
+    "subtitle": "Zahlen und Diagramme, die die Agenten aktuell halten.",
     "sidebar": "Dashboards",
     "navWhat": "Zahlen und Diagramme, die die Agenten aktuell halten",
     "new": "Neues Dashboard",

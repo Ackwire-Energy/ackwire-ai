@@ -103,7 +103,7 @@ export interface ToolSideEffects {
   /** Memory changes, for the "memory updated" card (`meta.memoryUpdates`). */
   memoryUpdates?: MemoryUpdate[];
   /** Artifacts created or changed (`meta.artifacts`). */
-  artifacts?: { id: string; version: number }[];
+  artifacts?: ArtifactLink[];
   /** A mission proposed with its home elsewhere: its link card (`meta.missionLink`). */
   missionLink?: { missionId: string; threadId: string } | null;
   /** The agent reacted (`react`) instead of replying. */
@@ -182,7 +182,12 @@ export function absorbBrowserCall(
   ]);
 }
 
-type ArtifactLink = { id: string; version: number };
+/**
+ * A file on the reply (`meta.artifacts`), with its title: the agent reads its own message's files by name and id in
+ * the conversation (context.ts `ownFilesNote`), from the meta written at post time, so "send it to Ana" finds that
+ * file instead of a search. People's attachments carry the same shape (`attachmentRefsFor` in messages.ts).
+ */
+export type ArtifactLink = { id: string; version: number; title: string };
 
 /** Adds files to the reply's cards: one per file, its newest version in the first one's place. */
 function withArtifacts(list: ArtifactLink[] | undefined, more: ArtifactLink[]): ArtifactLink[] {
@@ -201,7 +206,7 @@ function withArtifacts(list: ArtifactLink[] | undefined, more: ArtifactLink[]): 
  */
 export function absorbToolData(t: ToolSideEffects, data: Record<string, unknown> | undefined): MemoryUpdate | null {
   if (!data) return null;
-  const artifact = data.artifact as { id: string; version: number } | undefined;
+  const artifact = data.artifact as ArtifactLink | undefined;
   if (artifact) t.artifacts = withArtifacts(t.artifacts, [artifact]);
   const link = data.missionLink as { missionId: string; threadId: string } | undefined;
   if (link?.missionId && link.threadId) t.missionLink = link;

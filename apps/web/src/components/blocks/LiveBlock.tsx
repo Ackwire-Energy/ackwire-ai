@@ -20,20 +20,24 @@ import { useDarkTheme } from "@/lib/grow";
 import { useToast } from "@/lib/toast";
 import "./blocks.css";
 
-/** Taller than this and a block scrolls inside the card; "Abrir grande" shows it all. */
-const INLINE_MAX_HEIGHT = 640;
+/**
+ * In the conversation a block is always this tall, from its first frame: the chat never jumps while it loads or
+ * grows. A taller page is cut with a fade and "Show all" opens it in place; "Open large" shows it in the viewer.
+ */
+const INLINE_HEIGHT = 420;
 
+type Kept = { height?: number; open?: boolean; sent?: { text: string; at: string } };
 /**
  * What stays when a frame goes away (scrolled out, opened big). Its state is everyone's and lives on the server
- * (`useSharedBlock`); this is only how tall it was and what this person sent from it.
+ * (`useSharedBlock`); this is only how tall it was, whether it was shown whole and what this person sent from it.
  */
-const kept = new Map<string, { height?: number; sent?: { text: string; at: string } }>();
-const keptOf = (key: string) => {
+const kept = new Map<string, Kept>();
+const keptOf = (key: string): Kept => {
   const found = kept.get(key);
   if (found) return found;
-  const fresh = {};
+  const fresh: Kept = {};
   kept.set(key, fresh);
-  return fresh as { height?: number; sent?: { text: string; at: string } };
+  return fresh;
 };
 
 /** What a running page is told: everyone's state, without what this person is still changing. */
@@ -71,7 +75,7 @@ function BlockFrame({
   html,
   title,
   color,
-  maxHeight,
+  initialHeight,
   shared,
   rev,
   onEvent,
@@ -81,7 +85,8 @@ function BlockFrame({
   html: string;
   title: string;
   color: Parameters<typeof chartRamp>[0];
-  maxHeight: number;
+  /** Until the page says how tall it is. The frame then takes the page's whole height (never a scroll inside). */
+  initialHeight: number;
   /** Everyone's state; the page starts from it and is told each time it moves (`rev`). */
   shared: ForPage | null;
   rev: number;
@@ -160,7 +165,7 @@ function BlockFrame({
     if (sharedRef.current) frame.current?.contentWindow?.postMessage(sharedRef.current, "*");
   }, [rev]);
 
-  if (!page || !url) return <div className="live-block__room" style={{ height: height || 120 }} />;
+  if (!page || !url) return <div className="live-block__room" style={{ height: height || initialHeight }} />;
   return (
     <iframe
       ref={frame}
@@ -169,7 +174,7 @@ function BlockFrame({
       title={title}
       sandbox={PAGE_SANDBOX}
       referrerPolicy="no-referrer"
-      style={{ height: Math.min(height || 120, maxHeight) }}
+      style={{ height: height || initialHeight }}
     />
   );
 }
@@ -203,7 +208,15 @@ export function LiveBlock({
   const [draft, setDraft] = useState<Extract<BlockEvent, { type: "draft" }> | null>(null);
   const [broken, setBroken] = useState(false);
   const [sent, setSent] = useState(keptOf(blockKey).sent ?? null);
+  const [height, setHeight] = useState(keptOf(blockKey).height ?? 0);
+  const [open, setOpen] = useState(keptOf(blockKey).open ?? false);
   const changedAt = useRef(0);
+  // Taller than the card: cut with a fade, "Show all" under it.
+  const tall = !big && height > INLINE_HEIGHT;
+  const toggleOpen = () => {
+    keptOf(blockKey).open = !open;
+    setOpen(!open);
+  };
   const reply = useBlockReply(org.id, id);
   const shared = useSharedBlock(org.id, id, version);
   const toast = useToast();
@@ -215,6 +228,7 @@ export function LiveBlock({
     );
 
   const onEvent = (e: BlockEvent) => {
+    if (e.type === "height") setHeight(e.height);
     if (e.type === "state") shared.fromPage(e.state, e.used);
     if (e.type === "draw") void shared.draw(e.name, e.options);
     if (e.type !== "draft") return;
@@ -253,23 +267,39 @@ export function LiveBlock({
   const same = sent !== null && sent.text === draft?.text;
   return (
     <div ref={ref}>
-      {(near || big) && shared.loaded ? (
-        <BlockFrame
-          blockKey={blockKey}
-          html={html}
-          title={title}
-          color={colorOf(agent)}
-          maxHeight={big ? 100_000 : INLINE_MAX_HEIGHT}
-          shared={shared.forPage}
-          rev={shared.block?.rev ?? 0}
-          onEvent={onEvent}
-          onFailed={() => setBroken(true)}
-        />
-      ) : (
-        <div
-          className="live-block__room"
-          style={{ height: Math.min(keptOf(blockKey).height ?? 120, INLINE_MAX_HEIGHT) }}
-        />
+      <div
+        className="live-block__view"
+        data-cut={(tall && !open) || undefined}
+        style={big ? undefined : { height: tall && open ? height : INLINE_HEIGHT }}
+      >
+        {(near || big) && shared.loaded ? (
+          <BlockFrame
+            blockKey={blockKey}
+            html={html}
+            title={title}
+            color={colorOf(agent)}
+            initialHeight={big ? 120 : INLINE_HEIGHT}
+            shared={shared.forPage}
+            rev={shared.block?.rev ?? 0}
+            onEvent={onEvent}
+            onFailed={() => setBroken(true)}
+          />
+        ) : (
+          <div className="live-block__room" style={{ height: big ? (keptOf(blockKey).height ?? 120) : "100%" }} />
+        )}
+      </div>
+      {tall && (
+        <div className="live-block__more">
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={open ? "chevronUp" : "chevronDown"}
+            aria-expanded={open}
+            onClick={toggleOpen}
+          >
+            {open ? t("blocks.showLess") : t("blocks.showAll")}
+          </Button>
+        </div>
       )}
       {same ? (
         <div className="live-block__foot">

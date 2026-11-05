@@ -4613,7 +4613,7 @@
   },
   "proposals": {
     "title": "Usulan perbaikan",
-    "subtitle": "Agen mengusulkan perubahan pada instruksi, peran, dan akses tim, atau pada konteks {{org}}, saat seseorang meminta atau sebuah pelajaran berulang. Tidak ada yang berubah sampai seseorang menerimanya.",
+    "subtitle": "Perubahan yang diusulkan agen. Tidak ada yang berubah sebelum ada yang menerima.",
     "list": "Usulan",
     "proposes": "<b>{{agent}}</b> mengusulkan · {{target}}",
     "proposesMany": "<b>{{agent}}</b> mengusulkan · instruksi {{count}} agen",
@@ -8866,6 +8866,8 @@
     "thousand": "rb",
     "building": "Menyusun…",
     "openBig": "Buka besar",
+    "showAll": "Tampilkan semua",
+    "showLess": "Tampilkan lebih sedikit",
     "keep": "Simpan di Drive",
     "kept": "Tersimpan di Drive",
     "inDrive": "Di Drive",
@@ -10409,6 +10411,7 @@
   },
   "searchPage": {
     "title": "Cari di ruang kerja",
+    "subtitle": "Pesan, konteks, dan tindakan tim di kanal-kanalmu.",
     "label": "Cari",
     "placeholder": "Pesan, keputusan, ringkasan…",
     "filter": "Jenis",
@@ -11017,7 +11020,7 @@
       },
       "saved": "{{name}} sekarang memakai {{computer}}."
     },
-    "lead": "Tempat agenmu bekerja: komputer server ini dan komputer lain yang kamu hubungkan.",
+    "lead": "Tempat agenmu bekerja: server ini dan komputer mana pun yang kamu hubungkan.",
     "leadCloud": "Tempat agenmu bekerja: komputer khusus untuk ruang kerja ini, selalu menyala.",
     "about": "Tentang komputer ini",
     "how": "Cara kerja komputer",
@@ -11588,25 +11591,25 @@
     },
     "sectionText": {
       "account": "Profilmu dan tampilan aplikasi untukmu.",
-      "notifications": "Kotak masuk menyimpan semuanya. Di sini kamu memilih apa yang sampai padamu sebagai notifikasi, di ruang kerja ini.",
+      "notifications": "Apa yang sampai padamu sebagai notifikasi di sini. Kotak masuk menyimpan semuanya.",
       "general": "Nama, zona waktu, dan apa yang diketahui setiap agen tentang ruang kerja.",
-      "right_hand": "Asisten yang menyusun tim bersama tiap orang, di DM mereka dan dengan izin mereka.",
+      "right_hand": "Asisten yang menyusun tim bersama setiap orang, di DM mereka.",
       "members": "Siapa saja yang ada di ruang kerja, dan undangan.",
       "roles": "Yang bisa dilakukan tiap orang. Peran saling menambah.",
-      "vault": "Kata sandi, kunci, dan kontak yang digunakan agenmu. Mereka mengetik kata sandi dan memakai kunci tanpa pernah melihatnya.",
+      "vault": "Kata sandi, kunci, dan kontak agenmu. Mereka tidak pernah melihat kata sandi.",
       "access": "Yang bisa dipakai tiap agen: satu tingkat per konektor.",
       "connectors": "Layanan dan server MCP yang dihubungkan sekali untuk seluruh ruang kerja.",
       "skills": "Instruksi Markdown yang dibuka agen saat dibutuhkan.",
       "keys": "Paketmu dan kunci API ruang kerja.",
       "storage": "Tempat file ruang kerja disimpan.",
       "usage": "Berapa banyak AI yang dipakai tiap orang dan tiap agen, dan batas bulan ini.",
-      "audit": "Yang dilakukan agen di luar percakapan dan yang diubah orang. Hanya admin yang melihatnya.",
-      "import": "Bawa agen dari aplikasi atau ruang kerja lain, dan bawa ruang kerja ini ke mana pun kamu mau.",
-      "billing": "Paket agentes.chat, kartu, dan faktur ruang kerja ini ada di halaman kami, di luar aplikasi.",
-      "media": "Apa yang bisa dikirim orang di percakapan, dan kapan agen mengirim GIF atau stiker.",
+      "audit": "Apa yang dilakukan agen di luar percakapan dan apa yang diubah orang.",
+      "import": "Bawa agen dari aplikasi atau ruang kerja lain, atau bawa yang ini.",
+      "billing": "Paket, kartu, dan tagihan, di halaman kami di luar aplikasi.",
+      "media": "Apa yang bisa dikirim di percakapan, serta GIF dan stiker agen.",
       "voice": "Pesan suara di percakapan, dan siapa yang mengubah suara menjadi teks.",
-      "apps": "Minta tugas ke agen ruang kerja ini dari Claude, Cursor, dan aplikasi lain.",
-      "approvals": "Siapa yang memutuskan untukmu saat agen meminta sesuatu yang menunggu persetujuanmu."
+      "apps": "Minta tugas ke agen dari Claude, Cursor, dan aplikasi lain.",
+      "approvals": "Siapa yang memutuskan untukmu saat agen meminta persetujuanmu."
     },
     "title": "Pengaturan",
     "account": {
@@ -12024,7 +12027,7 @@
   },
   "gallery": {
     "title": "Galeri komponen",
-    "subtitle": "Khusus pengembangan. Komponen @agenteschat/ui dengan status dari layar yang sudah disetujui."
+    "subtitle": "Hanya untuk pengembangan: komponen @agenteschat/ui."
   },
   "format": {
     "list": "{{names, list}}",
@@ -13700,6 +13703,7 @@
   },
   "taskManager": {
     "title": "Pengelola tugas",
+    "subtitle": "Apa yang sedang dikerjakan agen dan apa yang selesai hari ini.",
     "nav": "Pengelola tugas",
     "search": "Cari tugas, agen, atau aplikasi",
     "working_other": "{{count}} sedang bekerja",
@@ -14067,7 +14071,7 @@
   },
   "dashboards": {
     "title": "Dasbor",
-    "subtitle": "Angka dan grafik yang dijaga tetap terbaru oleh agen, untuk ruang kerja atau hanya beberapa peran.",
+    "subtitle": "Angka dan grafik yang dijaga tetap terbaru oleh agen.",
     "sidebar": "Dasbor",
     "navWhat": "Angka dan grafik yang dijaga tetap terbaru oleh agen",
     "new": "Dasbor baru",

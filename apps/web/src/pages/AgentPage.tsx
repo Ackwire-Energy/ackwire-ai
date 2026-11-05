@@ -33,6 +33,7 @@ import {
   EmptyState,
   Icon,
   normalizeAppearance,
+  PageHeader,
   TabPanel,
   Tabs,
 } from "@agenteschat/ui";
@@ -134,11 +135,8 @@ export function AgentPage(props: AgentPageProps) {
   if (isRightHand(agent) && can(org, "manage_agents")) {
     return (
       <div className="page page--full">
-        <header className="page__header">
-          <h1 className="page-title">{agent.name}</h1>
-          <p className="muted">{t("settings.sectionText.right_hand")}</p>
-          {tellsNameStory(agent) && <p className="small muted">{t("rightHand.profile.nameStory")}</p>}
-        </header>
+        <PageHeader title={agent.name} meta={t("settings.sectionText.right_hand")} />
+        {tellsNameStory(agent) && <p className="small muted">{t("rightHand.profile.nameStory")}</p>}
         <RightHandSettingsSection />
       </div>
     );

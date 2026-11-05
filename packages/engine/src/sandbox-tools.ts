@@ -929,7 +929,7 @@ export function createSandboxToolSource(
               });
           return {
             content: `Saved ${path} to the Drive as "${a.title}" (${a.kind}), artifact ${a.id}, version ${a.version}.`,
-            data: { artifact: { id: a.id, version: a.version } },
+            data: { artifact: { id: a.id, version: a.version, title: a.title } },
           };
         } catch (error) {
           return failed(error);
@@ -984,7 +984,7 @@ export function createSandboxToolSource(
           if (!done) return { content: `Failed: ${row.error ?? "the upload did not finish"}`, isError: true };
           return {
             content: `Uploaded ${path} to the Drive as "${done.title}" (file, ${formatBytes(done.size)}), artifact ${done.id}, version ${done.version}.`,
-            data: { artifact: { id: done.id, version: done.version } },
+            data: { artifact: { id: done.id, version: done.version, title: done.title } },
           };
         } catch (error) {
           return failed(error);

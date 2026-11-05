@@ -55,6 +55,7 @@ import {
   Icon,
   type IconName,
   Kbd,
+  PageHeader,
   SearchInput,
   Segmented,
   StepTrack,
@@ -283,23 +284,21 @@ export function ApprovalsPage() {
   return (
     <div className="page page--list ap">
       <div className="ap__main">
-        <header className="list-head">
-          <div>
-            <h1>{t("approvals.title")}</h1>
-            <p className="list-head__sub">
-              {waitingYou > 0 ? (
-                <>
-                  {t("approvals.summary", { count: waitingYou })}
-                  {urgentLeft && urgentLeft <= 2 * URGENT_MS
-                    ? ` · ${t("approvals.urgent", { time: timeLeft(t, urgent.expiresAt) ?? "" })}`
-                    : ""}
-                </>
-              ) : (
-                t("approvals.nothing")
-              )}
-            </p>
-          </div>
-        </header>
+        <PageHeader
+          title={t("approvals.title")}
+          meta={
+            waitingYou > 0 ? (
+              <>
+                {t("approvals.summary", { count: waitingYou })}
+                {urgentLeft && urgentLeft <= 2 * URGENT_MS
+                  ? ` · ${t("approvals.urgent", { time: timeLeft(t, urgent.expiresAt) ?? "" })}`
+                  : ""}
+              </>
+            ) : (
+              t("approvals.nothing")
+            )
+          }
+        />
         <Toolbar
           label={t("approvals.filters")}
           search={

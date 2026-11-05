@@ -221,6 +221,7 @@ export {
 } from "./components/Message";
 export { stopPlayback } from "./components/media-playback";
 export { OptionList, type OptionListItem, type OptionListProps } from "./components/OptionList";
+export { PageHeader, type PageHeaderProps } from "./components/PageHeader";
 export {
   PixelDone,
   type PixelDoneProps,

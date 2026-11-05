@@ -3,6 +3,7 @@ import { type BlockEvent, blockEvent, blockPage, DRAFT_SETTLE_MS } from "@agente
 import { clockHour } from "@agenteschat/client/lib/format";
 import { chartRamp } from "@agenteschat/ui/sky/chart";
 import { randomUUID } from "expo-crypto";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,12 +13,13 @@ import { Button, IconButton, Sky, Text, useTheme, useToast } from "@/ui";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader, tapHaptic } from "../shared/parts";
-import { blockMayLoad, hostScript, INLINE_MAX_HEIGHT, themeScript, withLiveBlock } from "./logic";
+import { blockMayLoad, hostScript, INLINE_HEIGHT, themeScript, withLiveBlock } from "./logic";
 
 const SYSTEM_FONT = '-apple-system,BlinkMacSystemFont,"SF Pro Text",Roboto,system-ui,sans-serif';
 
 interface Kept {
   height?: number;
+  open?: boolean;
   sent?: { text: string; at: string };
 }
 
@@ -26,7 +28,7 @@ type ForPage = { state: Record<string, unknown>; who: Record<string, BlockChange
 
 /**
  * What stays when a frame goes away (scrolled out, opened on its screen). Its state is everyone's and lives on the
- * server (`useSharedBlock`); this is only how tall it was and what this person sent from it.
+ * server (`useSharedBlock`); this is only how tall it was, whether it was shown whole and what this person sent from it.
  */
 const kept = new Map<string, Kept>();
 const keptOf = (key: string): Kept => {
@@ -58,7 +60,7 @@ const liveStore = {
 /**
  * The block's page in a web view: no cookies, no storage, no files, no windows, no way off the page, and it scrolls
  * with the conversation instead of holding on to the finger (on Android a web view set to scroll never gives a drag
- * back to the list). Its height comes from the page. Off the list, on its own screen, it scrolls by itself.
+ * back to the list). As tall as its page (the card cuts it). Off the list, on its own screen, it scrolls by itself.
  */
 function BlockWebView({
   blockKey,
@@ -145,7 +147,7 @@ function BlockWebView({
       bounces={false}
       overScrollMode="never"
       showsVerticalScrollIndicator={false}
-      style={[styles.web, !scrolls && { height: Math.min(height || 160, INLINE_MAX_HEIGHT) }]}
+      style={[styles.web, !scrolls && { height: height || INLINE_HEIGHT }]}
       onMessage={(e) => {
         const event = blockEvent(e.nativeEvent.data);
         if (!event) return;
@@ -194,7 +196,16 @@ export function LiveBlock({
   const { fromPage, draw } = shared;
   const [draft, setDraft] = useState<Extract<BlockEvent, { type: "draft" }> | null>(null);
   const [sent, setSent] = useState(keptOf(blockKey).sent ?? null);
+  const [height, setHeight] = useState(keptOf(blockKey).height ?? 0);
+  const [open, setOpen] = useState(keptOf(blockKey).open ?? false);
   const changedAt = useRef(0);
+  // Taller than the card: cut with a fade, "Show all" under it.
+  const tall = !screen && height > INLINE_HEIGHT;
+  const toggleOpen = () => {
+    tapHaptic();
+    keptOf(blockKey).open = !open;
+    setOpen(!open);
+  };
 
   useEffect(() => {
     if (screen) return;
@@ -204,6 +215,7 @@ export function LiveBlock({
 
   const onEvent = useCallback(
     (e: BlockEvent) => {
+      if (e.type === "height") setHeight(e.height);
       if (e.type === "state") fromPage(e.state, e.used);
       if (e.type === "draw") void draw(e.name, e.options);
       if (e.type !== "draft") return;
@@ -242,32 +254,48 @@ export function LiveBlock({
     : "";
   return (
     <View style={screen ? styles.fill : undefined}>
-      {(screen || allowed) && !shared.loaded ? (
-        // Everyone's state first: a page that started from its own would show something else for a moment.
-        <View style={[styles.asleep, { height: Math.min(keptOf(blockKey).height ?? 120, INLINE_MAX_HEIGHT) }]}>
-          <ActivityIndicator color={c.faint} />
+      <View style={screen ? styles.fill : [styles.view, { height: tall && open ? height : INLINE_HEIGHT }]}>
+        {(screen || allowed) && !shared.loaded ? (
+          // Everyone's state first: a page that started from its own would show something else for a moment.
+          <View style={[styles.asleep, styles.fill]}>
+            <ActivityIndicator color={c.faint} />
+          </View>
+        ) : screen || allowed ? (
+          <BlockWebView
+            blockKey={blockKey}
+            html={html}
+            color={agentLook(agent).color}
+            scrolls={screen}
+            shared={shared.forPage}
+            rev={shared.block?.rev ?? 0}
+            onEvent={onEvent}
+          />
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => liveStore.claim(blockKey)}
+            style={[styles.asleep, styles.fill]}
+          >
+            <Text variant="footnote" tone="muted">
+              {t("mobile.blocks.wake")}
+            </Text>
+          </Pressable>
+        )}
+        {tall && !open ? (
+          <LinearGradient pointerEvents="none" colors={[`${c.raised}00`, c.raised]} style={styles.fade} />
+        ) : null}
+      </View>
+      {tall ? (
+        <View style={styles.more}>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={open ? undefined : "down"}
+            label={open ? t("blocks.showLess") : t("blocks.showAll")}
+            onPress={toggleOpen}
+          />
         </View>
-      ) : screen || allowed ? (
-        <BlockWebView
-          blockKey={blockKey}
-          html={html}
-          color={agentLook(agent).color}
-          scrolls={screen}
-          shared={shared.forPage}
-          rev={shared.block?.rev ?? 0}
-          onEvent={onEvent}
-        />
-      ) : (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => liveStore.claim(blockKey)}
-          style={[styles.asleep, { height: Math.min(keptOf(blockKey).height ?? 120, INLINE_MAX_HEIGHT) }]}
-        >
-          <Text variant="footnote" tone="muted">
-            {t("mobile.blocks.wake")}
-          </Text>
-        </Pressable>
-      )}
+      ) : null}
       {same ? (
         <View style={[styles.foot, { borderTopColor: c.line2 }]}>
           <View style={styles.sent}>
@@ -412,6 +440,9 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   center: { alignItems: "center", justifyContent: "center" },
   asleep: { alignItems: "center", justifyContent: "center" },
+  view: { overflow: "hidden" },
+  fade: { position: "absolute", left: 0, right: 0, bottom: 0, height: 56 },
+  more: { alignItems: "center", paddingBottom: 8 },
   foot: { gap: 8, padding: 12, borderTopWidth: StyleSheet.hairlineWidth },
   sent: { flexDirection: "row", alignItems: "center", gap: 8 },
   mark: { width: 5, height: 5 },
