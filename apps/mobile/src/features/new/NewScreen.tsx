@@ -1,33 +1,43 @@
+import { type AgentPresetColor, gradientOf, mixHex } from "@agenteschat/ui/agent/engine";
 import { router, useIsFocused } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { BackHandler, Keyboard, ScrollView, StyleSheet, type TextInputInstance, View } from "react-native";
-import Animated, { LinearTransition } from "react-native-reanimated";
+import { BackHandler, Keyboard, StyleSheet, type TextInputInstance, View } from "react-native";
+import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { GroupedHeader, GroupedList, GroupedRow, type GroupedRowProps, PressScale, SearchField, Text } from "@/ui";
+import {
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  Icon,
+  type IconName,
+  PixelOrbit,
+  SearchField,
+  Text,
+  useReducedMotion,
+  useTheme,
+} from "@/ui";
 import { busyAgents } from "../agents/logic";
-import { AgentFace } from "../shared/Face";
+import { AgentFace, Face } from "../shared/Face";
 import { useDirectory, useMeId } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { useConversations, useWorkingNow } from "../shared/queries";
 import { newWikiPage } from "../wiki/WikiScreen";
-import { ChatTargets } from "./ChatTargets";
-import { askTargets, type CreateItem, createItems } from "./logic";
+import { askTargets, type CreateItem, chatMatches, createItems } from "./logic";
 import { useOpenDm } from "./useOpenDm";
 
-/** Faces in the row that move (a long team stays light). */
-const LIVE_FACES = 6;
-
 /**
- * "New", the "+" of the tabs, as a pushed screen on the grouped gray with nothing focused (no keyboard until the
- * person taps): the large title, the "Chat with…" search, the agents as a row of faces with their names (the one you
- * talked to last first; a tap opens your conversation ready to type), then what to start as a settings-like list,
- * each where this person may, and "Invite people" in a list of its own. Tapping the search folds the title away and
- * lists people and agents as it filters; "Cancel" brings the screen back.
+ * "New", the "+" of the tabs, as the system's "new message": a pushed screen on the grouped gray with the "To" field
+ * on top (nothing focused until the person taps) and everything else as rows. What to start, each with its icon on a
+ * soft tile of its own color (found at a glance); the agents, the one you talked to last first, a tap opening your
+ * conversation ready to type; then the people, and "Invite people" at their end. Typing filters the same agents and
+ * people (what to start steps aside), and "Cancel" brings the screen back.
  */
 export function NewScreen() {
   const { t } = useTranslation();
   const focused = useIsFocused();
+  const reduced = useReducedMotion();
   const { org } = useOrg();
   const meId = useMeId();
   const dir = useDirectory();
@@ -37,9 +47,18 @@ export function NewScreen() {
   const field = useRef<TextInputInstance>(null);
   const [q, setQ] = useState("");
   const [searching, setSearching] = useState(false);
-  const agents = useMemo(() => askTargets(dir.agents, list.rows), [dir.agents, list.rows]);
+  const typed = q.trim();
+  const recent = useMemo(() => askTargets(dir.agents, list.rows), [dir.agents, list.rows]);
+  const found = useMemo(
+    () => chatMatches(typed, dir.agents, dir.memberById.values(), meId),
+    [typed, dir.agents, dir.memberById, meId],
+  );
+  // No words: the agents in the order you talk to them; words: the matches.
+  const agents = typed ? found.agents : recent;
+  const people = found.people;
   const ownsAgent = Boolean(meId) && dir.agents.some((a) => a.ownerUserId === meId);
   const items = createItems(org, { ownsAgent });
+  const invite = !typed && items.includes("invite");
 
   const talkTo = (agentId: string) => void openDm({ agentId }, { compose: true, replace: true });
   const cancel = () => {
@@ -59,9 +78,13 @@ export function NewScreen() {
     return () => sub.remove();
   });
 
+  // Groups that come and go as the person types fade, and what stays slides into place.
+  const fade = reduced ? {} : { entering: FadeIn.duration(160), exiting: FadeOut.duration(120) };
+  const layout = reduced ? undefined : LinearTransition.duration(220);
+
   return (
     <PushedLargeTitle title={t("mobile.new.title")} collapsed={searching} grouped>
-      <Animated.View layout={LinearTransition.duration(220)}>
+      <Animated.View layout={layout}>
         <View style={styles.search}>
           <SearchField
             ref={field}
@@ -75,144 +98,146 @@ export function NewScreen() {
             autoCorrect={false}
           />
         </View>
-        {searching ? (
-          <View style={styles.results}>
-            <ChatTargets q={q} onAgent={talkTo} onPerson={(userId) => void openDm({ userId }, { replace: true })} />
-          </View>
-        ) : (
-          <>
-            {agents.length > 0 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.faces}>
-                {agents.map((a, i) => (
-                  <AgentChip
-                    key={a.id}
-                    agentId={a.id}
-                    name={a.name}
-                    working={busy.has(a.id)}
-                    live={i < LIVE_FACES}
-                    onPress={() => talkTo(a.id)}
+        <View style={styles.lists}>
+          {!typed ? (
+            <Animated.View {...fade} layout={layout}>
+              <CreateList items={items.filter((i) => i !== "invite")} />
+            </Animated.View>
+          ) : null}
+          {agents.length > 0 ? (
+            <Animated.View {...fade} layout={layout}>
+              <GroupedHeader>{t("mobile.find.agents")}</GroupedHeader>
+              <GroupedList>
+                {agents.map((a) => {
+                  const working = busy.has(a.id);
+                  return (
+                    <GroupedRow
+                      key={a.id}
+                      leading={<AgentFace agentId={a.id} size={30} mode={working ? "run" : "idle"} live={false} />}
+                      label={a.name}
+                      {...(a.role?.trim() ? { sub: a.role.trim() } : {})}
+                      {...(working
+                        ? {
+                            value: t("taskManager.state.working"),
+                            valueLeading: <PixelOrbit color={agentLook(a).color} size={12} />,
+                          }
+                        : {})}
+                      chevron
+                      onPress={() => talkTo(a.id)}
+                    />
+                  );
+                })}
+              </GroupedList>
+            </Animated.View>
+          ) : null}
+          {people.length > 0 || invite ? (
+            <Animated.View {...fade} layout={layout}>
+              <GroupedHeader>{t("mobile.new.people")}</GroupedHeader>
+              <GroupedList>
+                {people.map((p) => (
+                  <GroupedRow
+                    key={p.userId}
+                    leading={<Face who={{ type: "person", id: p.userId }} size={30} />}
+                    label={p.name}
+                    chevron
+                    onPress={() => void openDm({ userId: p.userId }, { replace: true })}
                   />
                 ))}
-              </ScrollView>
-            ) : null}
-            <CreateLists items={items} />
-          </>
-        )}
+                {invite ? (
+                  <GroupedRow
+                    leading={<TintTile icon="members" color="teal" />}
+                    label={t("members.inviteTitle")}
+                    sub={t("mobile.new.inviteHint")}
+                    chevron
+                    onPress={() => router.push("/invite-people")}
+                  />
+                ) : null}
+              </GroupedList>
+            </Animated.View>
+          ) : null}
+          {typed && agents.length + people.length === 0 && !dir.loading ? (
+            <Text tone="faint" style={styles.empty}>
+              {t("mobile.find.nothing", { q: typed })}
+            </Text>
+          ) : null}
+        </View>
       </Animated.View>
     </PushedLargeTitle>
   );
 }
 
-/** One agent you can talk to: its face and its name under it, nothing around them. */
-function AgentChip({
-  agentId,
-  name,
-  working,
-  live,
-  onPress,
-}: {
-  agentId: string;
-  name: string;
-  working: boolean;
-  live: boolean;
-  onPress: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <PressScale
-      to={0.96}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={working ? t("mobile.a11y.agentWorking", { name }) : t("mobile.a11y.agent", { name })}
-      style={styles.face}
-      contentStyle={styles.faceIn}
-    >
-      <AgentFace agentId={agentId} size={52} mode={working ? "run" : "idle"} live={live} />
-      <Text variant="caption" tone="ink2" numberOfLines={1}>
-        {name}
-      </Text>
-    </PressScale>
-  );
-}
+/** Each thing to start has a color of its own, so it is found without reading. */
+const CREATE_LOOK: Record<Exclude<CreateItem, "invite">, { icon: IconName; color: AgentPresetColor }> = {
+  agent: { icon: "agent", color: "violet" },
+  channel: { icon: "hash", color: "sky" },
+  task: { icon: "checkc", color: "green" },
+  routine: { icon: "clock", color: "amber" },
+  wiki: { icon: "file", color: "graphite" },
+};
 
-type CreateRow = Required<Pick<GroupedRowProps, "icon" | "label" | "sub" | "onPress">>;
-
-/**
- * What to start, as rows with an icon, a short name and a hint under it; "Invite people" is a list of its own
- * below, since it brings people in rather than making something.
- */
-function CreateLists({ items }: { items: CreateItem[] }) {
+/** What to start, as rows: a soft tile of its color, a short name and a hint under it. */
+function CreateList({ items }: { items: CreateItem[] }) {
   const { t } = useTranslation();
   // The short names reuse labels already translated in every language (a form field's or a screen's name elsewhere).
-  const spec: Record<CreateItem, CreateRow> = {
-    agent: {
-      icon: "agent",
-      label: t("missions.new.agent"),
-      sub: t("mobile.new.agentHint"),
-      onPress: () => router.push("/new-agent"),
-    },
+  const spec: Record<Exclude<CreateItem, "invite">, { label: string; sub: string; onPress: () => void }> = {
+    agent: { label: t("missions.new.agent"), sub: t("mobile.new.agentHint"), onPress: () => router.push("/new-agent") },
     channel: {
-      icon: "hash",
       label: t("missions.new.channel"),
       sub: t("mobile.chats.newChannelHint"),
       onPress: () => router.push("/new-channel"),
     },
-    task: {
-      icon: "checkc",
-      label: t("mobile.agent.task"),
-      sub: t("mobile.new.taskHint"),
-      onPress: () => router.push("/issues/new"),
-    },
+    task: { label: t("mobile.agent.task"), sub: t("mobile.new.taskHint"), onPress: () => router.push("/issues/new") },
     routine: {
-      icon: "clock",
       label: t("routines.panel.eyebrow"),
       sub: t("mobile.new.routineHint"),
       onPress: () => router.push("/routines/new"),
     },
-    wiki: {
-      icon: "file",
-      label: t("mobile.new.wikiPage"),
-      sub: t("mobile.new.wikiHint"),
-      onPress: () => newWikiPage(),
-    },
-    invite: {
-      icon: "members",
-      label: t("members.inviteTitle"),
-      sub: t("mobile.new.inviteHint"),
-      onPress: () => router.push("/invite-people"),
-    },
+    wiki: { label: t("mobile.new.wikiPage"), sub: t("mobile.new.wikiHint"), onPress: () => newWikiPage() },
   };
-  const create = items.filter((i) => i !== "invite");
+  const create = items.filter((i): i is Exclude<CreateItem, "invite"> => i !== "invite");
+  if (create.length === 0) return null;
   return (
-    <View style={styles.lists}>
-      {create.length > 0 ? (
-        <>
-          <GroupedHeader>{t("mobile.new.create")}</GroupedHeader>
-          <GroupedList>
-            {create.map((item) => (
-              <GroupedRow key={item} {...spec[item]} subLines={2} chevron />
-            ))}
-          </GroupedList>
-        </>
-      ) : null}
-      {items.includes("invite") ? (
-        <View style={styles.apart}>
-          <GroupedList>
-            <GroupedRow {...spec.invite} subLines={2} chevron />
-          </GroupedList>
-        </View>
-      ) : null}
+    <>
+      <GroupedHeader>{t("mobile.new.create")}</GroupedHeader>
+      <GroupedList>
+        {create.map((item) => (
+          <GroupedRow
+            key={item}
+            leading={<TintTile {...CREATE_LOOK[item]} />}
+            {...spec[item]}
+            subLines={2}
+            chevron
+          />
+        ))}
+      </GroupedList>
+    </>
+  );
+}
+
+/** An icon on a soft tile of its color: the color's light tone over the row, its deep tone for the glyph. */
+function TintTile({ icon, color }: { icon: IconName; color: AgentPresetColor }) {
+  const { colors, scheme } = useTheme();
+  const [light, deep] = gradientOf(color);
+  const dark = scheme === "dark";
+  return (
+    <View style={[styles.tint, { backgroundColor: mixHex(colors.raised, light, dark ? 0.3 : 0.45) }]}>
+      <Icon name={icon} size={16} color={dark ? light : deep} />
     </View>
   );
 }
 
+const TILE = 30;
+
 const styles = StyleSheet.create({
   search: { paddingHorizontal: 16, paddingBottom: 4 },
-  results: { paddingHorizontal: 16, paddingTop: 8, gap: 10 },
-  // The row runs edge to edge, its first and last faces at the screen's margin.
-  faces: { gap: 14, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 2 },
-  face: { width: 62 },
-  faceIn: { alignItems: "center", gap: 6 },
-  lists: { paddingHorizontal: 16 },
-  apart: { marginTop: 22 },
+  lists: { paddingHorizontal: 16, paddingBottom: 24 },
+  tint: {
+    width: TILE,
+    height: TILE,
+    // Proportional, as the faces' tiles beside it.
+    borderRadius: Math.round(TILE * 0.3),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  empty: { textAlign: "center", paddingVertical: 32 },
 });
