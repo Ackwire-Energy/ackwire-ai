@@ -4742,6 +4742,12 @@ html:not([data-pointer]) .cflow__more summary:focus-visible {
   font-weight: 600;
   color: var(--ink2);
   border-radius: var(--radius-sm);
+  list-style: none;
+}
+/* A flex summary loses its triangle in Blink, not in the Mac app's WebKit: there it stood before the filter icon, at
+   the line's start. */
+.mail-rules > summary::-webkit-details-marker {
+  display: none;
 }
 html:not([data-pointer]) .mail-rules > summary:focus-visible {
   outline: none;
@@ -5966,9 +5972,10 @@ html:not([data-pointer]) .wiki-link:focus-visible {
 .save-wiki__page:hover {
   background: var(--plate);
 }
+/* The list scrolls with its rows at its edges: the ring goes inside, where the list can't clip it. */
 html:not([data-pointer]) .save-wiki__page:focus-visible {
   outline: none;
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .save-wiki__page--new {
   color: var(--ink2);
@@ -9555,6 +9562,10 @@ html:not([data-pointer]) .agp-cell:focus-visible {
 .agp-tabs .ac-tab[data-state="active"]::after {
   bottom: 0;
 }
+/* The strip scrolls sideways with its tabs at its top and its ends, where it clips their rings: drawn inside. */
+html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
+  box-shadow: var(--focus-ring-inset);
+}
 .agp-badge {
   display: inline-flex;
   align-items: center;
@@ -12942,7 +12953,7 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 }
 html:not([data-pointer]) .settings-row--open:focus-visible {
   outline: none;
-  box-shadow: inset var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .settings-row__chevron {
   flex: none;

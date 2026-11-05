@@ -85,7 +85,7 @@ html:not([data-pointer]) .home-sec__more:focus-visible {
 }
 html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   outline: none;
-  box-shadow: inset var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .home-row__face {
   display: flex;

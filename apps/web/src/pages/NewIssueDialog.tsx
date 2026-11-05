@@ -18,6 +18,7 @@ import {
   Select,
   Spinner,
   Switch,
+  useAutoGrow,
 } from "@agenteschat/ui";
 import { type ClipboardEvent, type KeyboardEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -88,6 +89,9 @@ export function NewIssueDialog({
   const chosen = actorFromKey(assignee);
   const agent = chosen?.type === "agent" ? actors.dir.agentById.get(chosen.id) : undefined;
   const quickCriteria = wide ? [] : splitCriteria(text).criteria;
+  // The text box as tall as its text, also where the engine can't size it from CSS (`field-sizing`, which the Mac
+  // app's WebKit lacks); measured again when the form swaps the quick box for the full one (another textarea).
+  useAutoGrow(textRef, wide ? `w${description}` : `q${text}`, open);
   const mod = modKey();
 
   const expand = () => {

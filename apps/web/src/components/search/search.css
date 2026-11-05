@@ -48,6 +48,10 @@
 .search-box__input:focus {
   outline: none;
 }
+/* Our × clears the field and its filters: the engines' own × (WebKit's, Blink's) would sit beside it at the end. */
+.search-box__input::-webkit-search-cancel-button {
+  display: none;
+}
 .search-box__input::placeholder {
   color: var(--faint);
 }

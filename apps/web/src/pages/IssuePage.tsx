@@ -22,6 +22,7 @@ import {
   Select,
   TabPanel,
   Tabs,
+  useAutoGrow,
   WorkSweep,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -322,6 +323,8 @@ function IssueDescription({ issue: i, hasFiles, onSaved }: { issue: Issue; hasFi
   const sent = useSent<string>(i.description);
   const description = sent.pending ?? i.description;
   const ref = useFocusAtEnd<HTMLTextAreaElement>(draft !== null);
+  // As tall as its text where the engine can't size it from CSS (`field-sizing`, which the Mac app's WebKit lacks).
+  useAutoGrow(ref, draft ?? "", draft !== null);
   const save = () => {
     if (draft === null) return;
     const next = draft.trim();

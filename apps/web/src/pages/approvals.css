@@ -404,7 +404,7 @@ html:not([data-pointer]) .ap-refuse__suggest button:focus-visible {
   background: color-mix(in srgb, var(--sunken) 45%, transparent);
 }
 html:not([data-pointer]) .ap-row:focus-visible {
-  box-shadow: inset var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .ap-row.is-selected {
   background: color-mix(in srgb, var(--sunken) 80%, transparent);
@@ -679,8 +679,9 @@ html:not([data-pointer]) .ap-link:focus-visible {
 .ap-li:hover {
   background: color-mix(in srgb, var(--ink) 4%, transparent);
 }
+/* The list scrolls with no room on its left (the rows' plates start on the page's edge): the ring goes inside. */
 html:not([data-pointer]) .ap-li:focus-visible {
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 .ap-li.is-selected {
   background: color-mix(in srgb, var(--ink) 7%, transparent);
