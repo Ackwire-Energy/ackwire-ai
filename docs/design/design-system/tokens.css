@@ -55,6 +55,9 @@
   /* Keyboard focus: a gray ring a pixel off the control, as strong as a control's border (3:1). */
   --focus-color: var(--line-strong);
   --focus-ring: 0 0 0 1px var(--raised), 0 0 0 3px var(--focus-color);
+  /* The same ring drawn inside: for a row flush with a box that clips it (a list's rounded card, a scroller). Not
+     `inset var(--focus-ring)`: that insets only the first of its two shadows, and the ring itself stays outside. */
+  --focus-ring-inset: inset 0 0 0 2px var(--focus-color);
   --overlay: var(--e3);
   /* Chosen, pressed the same in both themes (each theme's --chosen-bg and --chosen-press): held down into the page
      like a pressed key, inside a hairline (--chosen-press alone for a card that keeps its own outline). Never a thick

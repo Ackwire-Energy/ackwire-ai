@@ -165,6 +165,9 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
 }
 .members-side__line.status-line {
   display: flex;
+}
+/* With an icon it is an `.ac-iconline`, which places the icon on the line itself (one line here, so its middle). */
+.members-side__line.status-line:not(.ac-iconline) {
   align-items: center;
 }
 .members-side__work {

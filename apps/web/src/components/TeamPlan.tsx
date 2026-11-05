@@ -574,7 +574,7 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
                 <div key={a.handle} className="tp-map__agent">
                   <span className="ac-faceline">
                     <AgentAvatar name={a.name} appearance={lookOf(a)} size="sm" />
-                    <span>
+                    <span className="ac-captop">
                       <b>{a.name}</b> <span className="small muted">{a.role}</span>
                     </span>
                   </span>
@@ -592,7 +592,7 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
         {plan.weekly && lodi && (
           <p className="tp-map__lodi ac-faceline">
             <AgentAvatar agentId={lodi.id} name={lodi.name} size="sm" />
-            <span>{t("teamPlan.map.reviewer", { name: lodi.name })}</span>
+            <span className="ac-captop">{t("teamPlan.map.reviewer", { name: lodi.name })}</span>
           </p>
         )}
         {plan.approvals && (
