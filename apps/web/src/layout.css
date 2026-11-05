@@ -1412,6 +1412,7 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   text-decoration: line-through;
 }
 .proposals {
+  container: proposals / inline-size;
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
@@ -1428,6 +1429,14 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   flex: 999 1 480px;
   min-width: 0;
   gap: 16px;
+}
+/* Too narrow for the list beside the proposal (260 + 16 + 480): it goes above it at its full width instead of a
+   320px column left alone on the left, whatever the window (the sidebar takes its share of it). */
+@container proposals (max-width: 755px) {
+  .proposals__list {
+    flex-basis: 100%;
+    max-width: none;
+  }
 }
 .proposals__actions {
   display: flex;
@@ -3815,12 +3824,14 @@ html:not([data-pointer]) .settings-tile:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring), var(--card-shadow);
 }
-@media (max-width: 760px) {
+/* The sections' column beside the page needs the window: on a tablet (the sidebar an icon rail, 761–940px) its 216px
+   left the page ~380px, narrower than on a phone, with every row and card still in its wide layout (a 300px control
+   beside a sliver of a label). Up to there the sections are the strip above the page, as on a phone. */
+@media (max-width: 940px) {
   .settings {
     flex-direction: column;
     align-items: stretch;
     gap: 20px;
-    padding: 20px 16px 96px;
   }
   .settings__nav {
     position: static;
@@ -3834,8 +3845,8 @@ html:not([data-pointer]) .settings-tile:focus-visible {
   .settings__groups {
     flex-direction: row;
     gap: 4px;
-    margin: 0 -16px;
-    padding: 2px 16px 6px;
+    margin: 0 -28px;
+    padding: 2px 28px 6px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -3853,6 +3864,15 @@ html:not([data-pointer]) .settings-tile:focus-visible {
   .settings__link {
     flex: none;
     white-space: nowrap;
+  }
+}
+@media (max-width: 760px) {
+  .settings {
+    padding: 20px 16px 96px;
+  }
+  .settings__groups {
+    margin: 0 -16px;
+    padding: 2px 16px 6px;
   }
   .settings-row {
     flex-direction: column;
@@ -5188,6 +5208,24 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   .tr-seg .ac-seg__item {
     padding: 0 7px;
     gap: 5px;
+  }
+}
+/* The agent's tools (read only, `ToolLevelsView`) also show in the panel beside its DM (`agp-side`): there the pixel
+   strip goes under the subject's name too, or its 196px leave the name a sliver. */
+@container agp-side (max-width: 640px) {
+  .tr-subj__h {
+    grid-template-columns: minmax(0, 1fr) 16px;
+    row-gap: 10px;
+    padding: 14px;
+  }
+  .tr-subj__strip {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-self: start;
+    width: 100%;
+  }
+  .tr-subj__b {
+    padding: 2px 4px 8px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

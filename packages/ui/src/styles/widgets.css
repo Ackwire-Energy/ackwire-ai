@@ -508,8 +508,11 @@ html:not([data-pointer]) .wg__resolve:focus-visible {
   justify-content: space-between;
   border-top: 0;
 }
+/* On a one-column widget eight dates need more than its width: they shrink and end in "…" (above) instead of the
+   latest running past the card. */
 .wk-axis--line span {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .wk-list {
   display: flex;

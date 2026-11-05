@@ -324,6 +324,7 @@ th.pu-num .pu-sort {
 }
 .pu-limit__acts {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -424,20 +425,24 @@ th.pu-num .pu-sort {
   padding: 0;
   list-style: none;
 }
+/* A person, their choice and, for an amount, its field need ~450px: on a phone they wrap instead of running out of
+   the card. */
 .pu-limits__list li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 8px 12px;
 }
 .pu-limits__who {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-width: 160px;
+  min-width: min(160px, 100%);
 }
 .pu-pick {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -501,8 +506,10 @@ th.pu-num .pu-sort {
 }
 
 /* A request for more in the inbox: its two answers and the person's month. */
+/* Its answers and "see the month" are wider than a phone's inbox column: they wrap. */
 .pu-asks {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin-top: 8px;

@@ -1329,8 +1329,10 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   .issues-now__list::-webkit-scrollbar {
     display: none;
   }
+  /* Who works on it keeps a cap here too: as `auto`, an agent's live step line took its whole length before the
+     task's title got any. */
   .issue-list__row {
-    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-columns: 44px minmax(0, 1fr) fit-content(40%);
     gap: 10px;
   }
   .issue-list__due {

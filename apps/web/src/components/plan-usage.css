@@ -272,3 +272,13 @@
     display: none;
   }
 }
+/* The agent's Usage tab also opens in the panel beside its DM (`agp-side`, 420–760px): the same two columns there, or
+   the meter and the figures leave the name a sliver. */
+@container agp-side (max-width: 720px) {
+  .plan-source {
+    grid-template-columns: minmax(0, 1fr) 100px;
+  }
+  .plan-source > .ac-meter {
+    display: none;
+  }
+}
