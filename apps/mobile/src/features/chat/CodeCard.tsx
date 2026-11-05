@@ -217,7 +217,8 @@ export function CodeSheet() {
 
 const styles = StyleSheet.create({
   card: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
-  top: { flexDirection: "row", alignItems: "center", gap: 2, height: 38, paddingLeft: 12, paddingRight: 4 },
+  // The language starts where the code does (the body's 14).
+  top: { flexDirection: "row", alignItems: "center", gap: 2, height: 38, paddingLeft: 14, paddingRight: 4 },
   lang: { flex: 1 },
   // Round while it holds the icon alone (its least width centers it), a pill once "Copied" shows.
   tool: {

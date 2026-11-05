@@ -773,6 +773,8 @@ function StoppedLine({
           <PressScale
             onPress={onContinue}
             accessibilityRole="button"
+            // 26 drawn, 44 to the finger.
+            hitSlop={9}
             style={[styles.continue, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
           >
             <View style={styles.continueIn}>

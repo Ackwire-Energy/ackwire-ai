@@ -265,7 +265,11 @@ function Bars({ spec, accent, big, still }: { spec: ChartSpec; accent: AgentColo
             onPress={() => setPicked((p) => (p === i ? null : i))}
             accessibilityRole="button"
             accessibilityLabel={`${label}: ${formatChartValue(value, spec.unit, i18n.language)}`}
-            style={[styles.barRow, picked !== null && picked !== i ? styles.dim : null]}
+            style={({ pressed }) => [
+              styles.barRow,
+              picked !== null && picked !== i ? styles.dim : null,
+              pressed && styles.pressed,
+            ]}
           >
             <Text variant="footnote" tone="ink2" numberOfLines={1} style={styles.barLabel}>
               {label}
@@ -492,7 +496,11 @@ function Pie({ spec, accent, big }: { spec: ChartSpec; accent: AgentColorName; b
               // biome-ignore lint/suspicious/noArrayIndexKey: the slices, in order
               key={i}
               onPress={() => setPicked((p) => (p === i ? null : i))}
-              style={[styles.legendRow, picked !== null && picked !== i ? styles.dim : null]}
+              style={({ pressed }) => [
+                styles.legendRow,
+                picked !== null && picked !== i ? styles.dim : null,
+                pressed && styles.pressed,
+              ]}
             >
               <View style={[styles.swatch, { backgroundColor: slices[i % slices.length] }]} />
               <Text variant="footnote" tone="ink2" numberOfLines={1} style={styles.flex}>
@@ -565,6 +573,7 @@ const styles = StyleSheet.create({
   bars: { gap: 8 },
   barRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   dim: { opacity: 0.5 },
+  pressed: { opacity: 0.6 },
   barLabel: { width: "34%" },
   rail: { flex: 1 },
   railTrack: { borderRadius: 6, overflow: "hidden" },

@@ -155,7 +155,7 @@ export function useVoiceComposer(input: Omit<VoiceTarget, "allowed"> & { enabled
         style={[styles.button, holding && { backgroundColor: c.danger }, micStyle]}
       >
         <View style={styles.center}>
-          <Icon name="mic" size={21} color={holding ? "#fff" : c.muted} />
+          <Icon name="mic" size={20} color={holding ? "#fff" : c.muted} />
         </View>
       </Animated.View>
     </GestureDetector>
@@ -181,7 +181,7 @@ export function useVoiceComposer(input: Omit<VoiceTarget, "allowed"> & { enabled
             style={[styles.play, { backgroundColor: c.ink }]}
           >
             <View style={styles.center}>
-              <Icon name={take.listening ? "pause" : "play"} size={14} color={c.bg} />
+              <Icon name={take.listening ? "pause" : "play"} size={15} color={c.bg} />
             </View>
           </PressScale>
         ) : (
@@ -193,7 +193,7 @@ export function useVoiceComposer(input: Omit<VoiceTarget, "allowed"> & { enabled
         {holding ? (
           <Animated.View style={[styles.slide, slideStyle]}>
             <View style={styles.chev}>
-              <Icon name="chev" size={14} color={c.faint} />
+              <Icon name="chev" size={15} color={c.faint} />
             </View>
             <Text variant="small" tone="faint" numberOfLines={1}>
               {t("voice.slideToDelete")}
