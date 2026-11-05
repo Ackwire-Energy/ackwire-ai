@@ -44,21 +44,28 @@ const newest = (usages: (PlanUsage | null)[]) =>
 
 /**
  * The logins of one account together, as the server tells them apart: the same computer, owner, CLI and plan, and
- * the same email (any case) and Claude organization, or key's last 4. Never the label, which any rename can repeat.
+ * the same email (any case) and Claude organization (one not said is any), or key's last 4. Never the label, which any rename can repeat.
  * A login whose email or key the viewer can't see (another person's) is a row of its own.
  */
 export function groupPlans<A extends MachineAccount & { machineId?: string }>(
   accounts: readonly A[],
 ): PlanAccount<A>[] {
-  const groups = new Map<string, A[]>();
+  const groups: { key: string; org: string | null; logins: A[] }[] = [];
   for (const a of accounts) {
     const identity = a.provider ? a.keyHint : a.email?.toLowerCase();
-    const key = identity
-      ? JSON.stringify([a.machineId ?? null, a.ownerId, a.kind, a.provider, identity, a.providerOrgId ?? null])
-      : a.id;
-    groups.set(key, [...(groups.get(key) ?? []), a]);
+    const key = identity ? JSON.stringify([a.machineId ?? null, a.ownerId, a.kind, a.provider, identity]) : a.id;
+    const org = a.providerOrgId ?? null;
+    // Like the server's, an organization not said matches any: only two known ones tell logins apart.
+    const same = groups.filter((g) => g.key === key);
+    const group =
+      org === null ? same[0] : (same.find((g) => g.org === org) ?? same.find((g) => g.org === null));
+    if (!group) groups.push({ key, org, logins: [a] });
+    else {
+      group.logins.push(a);
+      group.org ??= org;
+    }
   }
-  return [...groups.values()].map((logins) => ({
+  return groups.map(({ logins }) => ({
     key: logins[0]?.id ?? "",
     logins,
     usedBy: logins.flatMap((l) => l.usedBy),

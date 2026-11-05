@@ -103,6 +103,12 @@ describe("groupPlans: one row per account, its logins together", () => {
       ["a", ["a"]],
       ["b", ["b", "c"]],
     ]);
+    // A login that doesn't say its organization is a login of either, as the server reads it.
+    expect(rows([claude("a", null), claude("b", "org-team"), claude("c", null)])).toEqual([["a", ["a", "b", "c"]]]);
+    expect(rows([claude("a", "org-personal"), claude("b", null), claude("c", "org-team")])).toEqual([
+      ["a", ["a", "b"]],
+      ["c", ["c"]],
+    ]);
   });
 
   test("a login the computer couldn't check is neither signed in nor signed out", () => {
