@@ -34,15 +34,12 @@ test("space, not lines, sets the sidebar's parts apart: 14px over each one with 
 test("an agent's role sits under its name, one line, beside a face as tall as both, and gone in the rail", () => {
   const role = ".sidebar__item-role";
   // One line ending in "…", what it is on too: the row stays two lines and everything in it shares its middle.
-  expect([value(role, "white-space"), value(role, "text-overflow"), value(".sidebar__item-work", "white-space")]).toEqual([
-    "nowrap",
-    "ellipsis",
-    undefined,
-  ]);
-  expect([value(role, "font-size"), value(role, "color")]).toEqual([
-    "12px",
-    "var(--ink-muted)",
-  ]);
+  expect([
+    value(role, "white-space"),
+    value(role, "text-overflow"),
+    value(".sidebar__item-work", "white-space"),
+  ]).toEqual(["nowrap", "ellipsis", undefined]);
+  expect([value(role, "font-size"), value(role, "color")]).toEqual(["12px", "var(--ink-muted)"]);
   expect([value(".sidebar__item-text", "flex-direction"), value(".sidebar__item-text", "min-width")]).toEqual([
     "column",
     "0",
