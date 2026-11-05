@@ -423,6 +423,18 @@ test.if(posix)("a CLI that prints no link, or isn't installed, fails the begin a
   );
   expect(err2?.message).toContain("not installed");
   expect(existsSync(path.join(missing.root, "claude_code", LOGIN(6)))).toBe(false);
+  // Behind the auth egress prefix too, which would otherwise start and exit 127.
+  const prefixed = setup({
+    commands: { claude_code: ["/nonexistent/claude-xyz"] },
+    lending: { chown: async () => {} },
+    authEgress: () => ["/usr/bin/env", "FAKE_AUTH_GROUP=1"],
+    beginWaitMs: 300,
+  });
+  const err3 = await prefixed.m.begin("claude_code", LOGIN(7)).then(
+    () => null,
+    (e: Error) => e,
+  );
+  expect(err3?.message).toContain("not installed");
 });
 
 test.if(posix)("a sign-in nobody finishes expires: the CLI is killed and the folder removed", async () => {

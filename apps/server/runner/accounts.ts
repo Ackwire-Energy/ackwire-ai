@@ -50,6 +50,7 @@ import {
   claudePlan,
   claudeTier,
   GROK_BIN,
+  isExecutable,
   OPENCODE_BIN,
   resolveCommand,
 } from "./executors";
@@ -1205,7 +1206,9 @@ export class AccountManager {
     if (!prefix) return command;
     // Resolved here: `setpriv` would look the CLI up on the PATH again, shared `bin/` included.
     const [file, ...pre] = command;
-    return [...prefix, resolveCommand(file ?? "", process.env.PATH), ...pre];
+    const cli = resolveCommand(file ?? "", process.env.PATH);
+    // A missing CLI under setpriv exits 127 instead of failing to start, which says "not installed".
+    return isExecutable(cli) ? [...prefix, cli, ...pre] : [cli, ...pre];
   }
 
   private authEgressSaid: string[] | null | undefined;
