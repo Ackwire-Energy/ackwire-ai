@@ -1,5 +1,14 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
-import { AGENT_ACTION_KINDS, AGENT_STYLES, ONBOARDING_STEPS, STANDING_STATES, START_PAGES } from "@agenteschat/engine";
+import {
+  AGENT_ACTION_KINDS,
+  AGENT_STYLES,
+  CHAT_OPEN_AT,
+  CHAT_STYLES,
+  CHAT_TONES,
+  ONBOARDING_STEPS,
+  STANDING_STATES,
+  START_PAGES,
+} from "@agenteschat/engine";
 import { CONTEXT_LIMITS, ENDPOINT_STYLES, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
@@ -43,6 +52,16 @@ export const StartChoice = z
     description:
       "What opens when the app starts here (ADR 0108): `home` (Início, Conversas on the phone), `last` (where the person was, kept on each device) or `channel` (open the home when they are no longer in it).",
   });
+
+export const ChatPrefs = z
+  .object({
+    channelStyle: z.enum(CHAT_STYLES).optional(),
+    dmStyle: z.enum(CHAT_STYLES).optional(),
+    channelTone: z.enum(CHAT_TONES).optional(),
+    dmTone: z.enum(CHAT_TONES).optional(),
+    openAt: z.enum(CHAT_OPEN_AT).optional(),
+  })
+  .openapi("ChatPrefs");
 
 export const Organization = z
   .object({
@@ -109,6 +128,10 @@ export const Organization = z
     agentStyle: z.enum(AGENT_STYLES).nullable().optional().openapi({
       description:
         "In `GET /me`: how agents talk to you here (`PUT …/me/agent-style`, ADR 0147): `simple` or `technical`; null until you pick, and agents talk simply. Absent elsewhere.",
+    }),
+    chatPrefs: ChatPrefs.optional().openapi({
+      description:
+        "In `GET /me`: how conversations look to you here (`PUT …/me/chat`). Only what you chose: a key not here keeps the app's default. Absent elsewhere.",
     }),
   })
   .openapi("Organization");
@@ -405,6 +428,10 @@ export const Channel = z
     }),
     mentionCount: z.number().int().optional().openapi({
       description: "Channel list only: of `unreadCount`, the messages that mention you (counted even while muted).",
+    }),
+    lastReadAt: z.string().nullable().optional().openapi({
+      description:
+        "Channel list only: where the unread starts (when you last read it, or joined); null when not a member.",
     }),
     can: z.object({ post: z.boolean(), callAgents: z.boolean(), manage: z.boolean() }).optional().openapi({
       description:

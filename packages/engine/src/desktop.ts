@@ -24,6 +24,7 @@ import {
   touchControl,
 } from "./browser/handoff";
 import { HANDOFF_KEEPALIVE_MS } from "./browser/live";
+import { TtlCache } from "./cache";
 import { ForbiddenError, NotFoundError } from "./errors";
 import type { MachineCaller, MachineHub } from "./machine-hub";
 import {
@@ -93,7 +94,7 @@ export async function desktopTarget(
  */
 async function streamAccess(
   db: Database,
-  input: StreamInput,
+  input: Pick<StreamInput, "userId" | "orgId" | "agentId" | "request">,
 ): Promise<{ refused: number; reason: string } | { driven: string | null; control: string | null }> {
   const { userId, orgId, agentId, request } = input;
   const closed = closedRefusal(await orgStanding(db, orgId));
@@ -345,6 +346,106 @@ export async function desktopStatus(
     controlRefusal,
     held,
   };
+}
+
+/** How long one capture answers everyone asking: however many ask, the computer takes at most one in this time. */
+const PICTURE_TTL_MS = 4_000;
+/** A picture counts as watching in the audit log, once per person and agent in this time. */
+const PICTURE_AUDIT_MS = 3600_000;
+
+export interface DesktopPicture {
+  /** A JPEG, base64. */
+  data: string;
+  width: number;
+  height: number;
+  capturedAt: string;
+}
+
+export interface DesktopPictureView {
+  picture: DesktopPicture | null;
+  /** Why none: `stopped` (its screen isn't running), `hidden` (someone else is in control), `unavailable`. */
+  reason: "stopped" | "hidden" | "unavailable" | null;
+}
+
+// ponytail: the agent's screen only, through `desktop.capture` (desktop use); a computer without screens, or a person
+// with its browser alone, shows the live view's button instead. `browser.capture` boxes every element, for a judge.
+// Few: a picture is hundreds of KB, and an expired one stays in memory until a newer one pushes it out.
+const pictures = new TtlCache<DesktopPictureView>(PICTURE_TTL_MS, 64);
+const capturing = new Map<string, Promise<DesktopPictureView>>();
+const pictureAudits = new TtlCache<true>(PICTURE_AUDIT_MS);
+
+/**
+ * `GET …/agents/{agentId}/desktop/picture`: a recent picture of an agent's screen, for whoever may watch it now (a
+ * watching stream's own check, so someone else in control hides it too). It never starts a screen: one that isn't
+ * running answers `stopped`, and a capture marks a running one used, as a viewer keeps it from being parked.
+ */
+export async function desktopPicture(
+  deps: DesktopDeps,
+  userId: string,
+  orgId: string,
+  agentId: string,
+): Promise<DesktopPictureView> {
+  const { db, hub } = deps;
+  const access = await streamAccess(db, { userId, orgId, agentId, request: { kind: "desktop", mode: "watch" } });
+  if ("refused" in access) {
+    if (access.reason === "someone_in_control") return { picture: null, reason: "hidden" };
+    if (access.refused === STREAM_CLOSE.notFound) throw new NotFoundError("Agent not found");
+    throw new ForbiddenError("You may not watch this agent's computer");
+  }
+  const served = await desktopTarget(db, ANYWHERE, orgId, agentId, "desktop");
+  if ("refused" in served || !hub) return { picture: null, reason: "unavailable" };
+  const key = `${orgId}:${agentId}`;
+  let view = pictures.get(key);
+  if (!view) {
+    // Those asking while a capture runs wait for it: the computer's queue is the agent's own too.
+    let capture = capturing.get(key);
+    if (!capture) {
+      capture = capturePicture(hub, served)
+        .then((taken) => {
+          pictures.set(key, taken);
+          return taken;
+        })
+        .finally(() => capturing.delete(key));
+      capturing.set(key, capture);
+    }
+    view = await capture;
+  }
+  if (view.picture && !pictureAudits.get(`${userId}:${agentId}`)) {
+    pictureAudits.set(`${userId}:${agentId}`, true);
+    await recordAudit(db, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "desktop.watched",
+      target: { type: "agent", id: agentId },
+      details: { machineId: served.machineId, picture: true, seconds: 0 },
+    });
+  }
+  return view;
+}
+
+async function capturePicture(
+  hub: MachineCaller,
+  { machineId, agent }: Extract<StreamTarget, { machineId: string }>,
+): Promise<DesktopPictureView> {
+  try {
+    const status = await hub.call<"desktop.session.status">(
+      machineId,
+      { op: "desktop.session.status", agent },
+      { timeoutMs: 5_000 },
+    );
+    if (!status.running) return { picture: null, reason: "stopped" };
+    const shot = await hub.call<"desktop.capture">(machineId, { op: "desktop.capture", agent }, { timeoutMs: 10_000 });
+    const picture = {
+      data: shot.data,
+      width: shot.width,
+      height: shot.height,
+      capturedAt: new Date().toISOString(),
+    };
+    return { picture, reason: null };
+  } catch {
+    // The computer went away, paused, or doesn't serve desktop use: the apps offer the live screen instead.
+    return { picture: null, reason: "unavailable" };
+  }
 }
 
 // ── Control on this server ────────────────────────────────────────────────────

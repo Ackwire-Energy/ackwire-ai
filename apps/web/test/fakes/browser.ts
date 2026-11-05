@@ -171,6 +171,12 @@ export function createFakeBrowser(
         ...(open ? { handoff: open, controllerUserId: open.status === "active" ? open.controllerUserId : null } : {}),
       };
     },
+    picture: async (orgId, agentId) => {
+      log("desktop.picture", orgId, agentId);
+      if (forbidden.has(agentId)) throw new ApiError(403, "forbidden", "You can't use this agent's desktop");
+      const picture = { data: "c2NyZWVu", width: 1280, height: 800, capturedAt: new Date().toISOString() };
+      return desktops.get(agentId)?.running ? { picture, reason: null } : { picture: null, reason: "stopped" };
+    },
   };
   return { client, desktop, settings, handoffs, desktops, forbidden, watchOnly, sameWindow };
 }

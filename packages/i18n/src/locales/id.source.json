@@ -22438,6 +22438,12 @@
   "blocks.openBig": {
     "value": "Open large"
   },
+  "blocks.showAll": {
+    "value": "Show all"
+  },
+  "blocks.showLess": {
+    "value": "Show less"
+  },
   "blocks.keep": {
     "value": "Keep in Drive"
   },
@@ -29170,6 +29176,93 @@
   "settings.account.activityFailed": {
     "value": "Couldn't save that. Try again."
   },
+  "settings.account.chat.title": {
+    "value": "Conversations"
+  },
+  "settings.account.chat.density": {
+    "value": "Conversation density"
+  },
+  "settings.account.chat.densityHelp": {
+    "value": "Changes only for you, on all your devices"
+  },
+  "settings.account.chat.where": {
+    "value": "Where it applies"
+  },
+  "settings.account.chat.channels": {
+    "value": "Channels"
+  },
+  "settings.account.chat.dms": {
+    "value": "DMs"
+  },
+  "settings.account.chat.comfortable": {
+    "value": "Comfortable"
+  },
+  "settings.account.chat.left": {
+    "value": "All on the left"
+  },
+  "settings.account.chat.bubbles": {
+    "value": "Bubbles"
+  },
+  "settings.account.chat.compact": {
+    "value": "Compact"
+  },
+  "settings.account.chat.toneDms": {
+    "value": "My messages in DMs"
+  },
+  "settings.account.chat.toneDmsHelp": {
+    "value": "In the color of the agent you're talking to"
+  },
+  "settings.account.chat.toneChannels": {
+    "value": "My messages in channels"
+  },
+  "settings.account.chat.toneChannelsHelp": {
+    "value": "In blue"
+  },
+  "settings.account.chat.toneLight": {
+    "value": "Light"
+  },
+  "settings.account.chat.toneStrong": {
+    "value": "Strong"
+  },
+  "settings.account.chat.openAt": {
+    "value": "When I open a conversation, take me to"
+  },
+  "settings.account.chat.openRead": {
+    "value": "Last message read"
+  },
+  "settings.account.chat.openLatest": {
+    "value": "Latest message"
+  },
+  "settings.account.chat.sample.ask": {
+    "value": "How many are left?"
+  },
+  "settings.account.chat.sample.answer": {
+    "value": "14 left. Shall I tell them?"
+  },
+  "settings.account.chat.sample.go": {
+    "value": "Go ahead."
+  },
+  "settings.account.chat.sample.send": {
+    "value": "Send it to the 14 clinics."
+  },
+  "settings.account.chat.sample.sent": {
+    "value": "Sent to all 14."
+  },
+  "settings.account.chat.sample.new1": {
+    "value": "9 have confirmed already."
+  },
+  "settings.account.chat.sample.new2": {
+    "value": "3 more just now."
+  },
+  "settings.account.chat.sample.new3": {
+    "value": "2 left, I'll call tomorrow."
+  },
+  "settings.account.chat.sample.new4": {
+    "value": "Report updated in the Drive."
+  },
+  "settings.account.chat.sample.newCount": {
+    "value": "4 new"
+  },
   "settings.account.agentStyle": {
     "value": "How agents talk to you"
   },
@@ -33692,6 +33785,48 @@
   "desktop.browserOnly.role": {
     "value": "Your role gives you {{name}}'s browser, not the whole computer"
   },
+  "agentSide.label": {
+    "value": "Details"
+  },
+  "agentSide.show": {
+    "value": "Show details"
+  },
+  "agentSide.hide": {
+    "value": "Hide details"
+  },
+  "agentSide.seeAll": {
+    "value": "See all"
+  },
+  "agentSide.thinks": {
+    "value": "How it thinks"
+  },
+  "agentSide.thinksWith": {
+    "value": "Thinks with"
+  },
+  "agentSide.owner": {
+    "value": "Owner"
+  },
+  "agentSide.usage": {
+    "value": "This month"
+  },
+  "agentSide.spentOf": {
+    "value": "{{spent}} of {{limit}}"
+  },
+  "agentSide.tasks": {
+    "value": "Recent tasks"
+  },
+  "agentSide.usingBrowser": {
+    "value": "Using Chrome"
+  },
+  "agentSide.usingScreen": {
+    "value": "Using the computer"
+  },
+  "agentSide.screenOff": {
+    "value": "The screen is off"
+  },
+  "agentSide.screenOffHelp": {
+    "value": "It turns on when someone watches."
+  },
   "agentComputer.title": {
     "value": "{{name}}'s computer"
   },
@@ -33706,6 +33841,9 @@
   },
   "agentComputer.button": {
     "value": "Computer"
+  },
+  "agentComputer.pictureNow": {
+    "value": "A moment ago"
   },
   "agentComputer.choose": {
     "value": "Choose a computer"

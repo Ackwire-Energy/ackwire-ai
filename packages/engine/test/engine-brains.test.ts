@@ -898,6 +898,97 @@ test("a question asked through the bridge: the text written before it comes firs
   expect(main.some((m) => m.body.includes("você me passa a ida e a volta"))).toBe(false);
 });
 
+test("a question asked after the brain dropped a draft for a call: only the text written after that call leads the card", async () => {
+  f = await setup({ askUser: true });
+  const machineId = await computerAgent(f);
+  const dropped =
+    'You are right, I did not have the right context. When you said "send it to Acme", the video was europe_trip.mp4, and I sent';
+  const answer =
+    "You were right, I didn't have the right context: the video we were finishing was europe_trip.mp4, but I sent lisbon_v3.mp4, an older version. Pick in the card which one I should send.";
+  const { brain } = scriptedComputerBrain(async function* (n, turn) {
+    if (n > 0) return;
+    // One model call of the turn stops mid-sentence to look something up (a call the brain runs on its own)...
+    yield { type: "text_delta", text: dropped };
+    yield {
+      type: "tool_call",
+      id: "look-1",
+      name: "Bash",
+      input: { command: "ls renders" },
+      executed: { content: "europe_trip.mp4\nlisbon_v3.mp4" },
+    };
+    // ...and the next one writes the answer again from the start, then asks through the bridge.
+    yield { type: "text_delta", text: answer };
+    const result = await executeToolForRun(
+      f.jobDeps,
+      { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
+      {
+        id: "ask-1",
+        name: "ask_user",
+        input: {
+          why: "I sent the wrong file before; the person picks the right one.",
+          question: "Which video do I send to Acme?",
+          choices: ["europe_trip.mp4", "lisbon_v3.mp4"],
+        },
+      },
+    );
+    yield { type: "tool_call", id: "ask-1", name: "ask_user", input: {}, executed: result };
+    // Claude Code's result is its last model call's text.
+    yield { type: "done", text: answer };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev you sent the wrong video");
+  await drainOutbox(f.db, handlers);
+
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("waiting_input");
+  const main = await timeline(f);
+  const fromAgent = main.filter((m) => m.author.type === "agent");
+  // The answer, then the card: never the dropped draft glued in front of it.
+  expect(fromAgent.map((m) => (m.meta.question ? "card" : m.body))).toEqual([answer, "card"]);
+  expect(main.some((m) => m.body.includes("and I sent"))).toBe(false);
+});
+
+test("a computer brain that fails after calls posts what it said after its last call, not every stretch glued", async () => {
+  f = await setup({ reply: () => ({ chunks: ["Respondi pela API."] }) });
+  await computerAgent(f);
+  const { brain } = scriptedComputerBrain(async function* () {
+    // Dropped mid-sentence for a call, then written anew after it.
+    yield { type: "text_delta", text: "Let me check whether Go is" };
+    yield {
+      type: "tool_call",
+      id: "b-1",
+      name: "Bash",
+      input: { command: "go version" },
+      executed: { content: "go: not found" },
+    };
+    yield { type: "text_delta", text: "Go isn't installed here, so I'm installing it now." };
+    yield {
+      type: "tool_call",
+      id: "b-2",
+      name: "Bash",
+      input: { command: "brew install go" },
+      executed: { content: "installing" },
+    };
+    yield { type: "error", code: "executor_crashed", message: "Claude Code exited", retryable: true };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev is Go installed there?");
+  await drainOutbox(f.db, handlers);
+
+  const last = (await timeline(f)).at(-1);
+  expect(last?.meta.brainInterrupted).toMatchObject({ text: "Go isn't installed here, so I'm installing it now." });
+  expect(last?.body).toContain("Go isn't installed here, so I'm installing it now.");
+  expect(last?.body).not.toContain("Let me check whether Go is");
+});
+
 test("sent on after its turn, a computer brain that opens again with the same line and asks posts that line once", async () => {
   const opening = 'Vou procurar a integração do serviço de cobrança e consultar os gastos de "acme".';
   f = await setup({ askUser: true, judge: (kind) => (kind === "follow_through" ? "continue" : undefined) });
@@ -1948,7 +2039,7 @@ function effectTools(fx: () => Fixture) {
         execute: async () => ({
           content: "Saved.",
           data: {
-            artifact: { id: artifactId, version: 1 },
+            artifact: { id: artifactId, version: 1, title: "deploy.md" },
             memoryUpdate: {
               action: "remembered",
               itemId: "item-1",
@@ -2280,7 +2371,7 @@ test("bridged side effects reach the engine: artifacts and memory cards on the r
 
   const reply = (await f.db.select().from(schema.messages)).find((m) => m.body === "Anotado.");
   expect(reply?.threadId).toBeNull();
-  expect(reply?.meta.artifacts).toEqual([{ id: fx.artifactId, version: 1 }]);
+  expect(reply?.meta.artifacts).toEqual([{ id: fx.artifactId, version: 1, title: "deploy.md" }]);
   expect(reply?.meta.memoryUpdates).toMatchObject([{ action: "remembered", text: "Deploys happen on Fridays" }]);
   expect(events.some((e) => e.type === "memory.updated")).toBe(true);
 });

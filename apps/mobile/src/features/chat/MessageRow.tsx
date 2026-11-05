@@ -12,6 +12,7 @@ import {
   useConsultations,
   useContinuedRun,
   useReactions,
+  useRoles,
   useToggleReaction,
   useWaiting,
 } from "@agenteschat/client";
@@ -19,6 +20,7 @@ import { foldTalk, TALK_LINE_CHARS, talksToAgent } from "@agenteschat/client/lib
 import { APP_BRANDS } from "@agenteschat/client/lib/apps";
 import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import { type RunPosition, runAround } from "@agenteschat/client/lib/chat";
+import { mineOnRight } from "@agenteschat/client/lib/chat-look";
 import { choiceReplyLine } from "@agenteschat/client/lib/choices";
 import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
@@ -28,6 +30,7 @@ import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
 import { isMediaAfterReply, messageMediaOf } from "@agenteschat/client/lib/media";
+import { memberRoleColor } from "@agenteschat/client/lib/member-groups";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { missionSetupOf } from "@agenteschat/client/lib/missions";
 import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notices";
@@ -37,6 +40,7 @@ import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/cl
 import { appVia } from "@agenteschat/client/lib/via";
 import { voiceOf } from "@agenteschat/client/lib/voice";
 import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
+import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
@@ -93,10 +97,12 @@ import {
   missionCardRef,
   missionLinkOf,
   missionPlanOf,
+  nameInk,
   questionOf,
   reactionPills,
   workStepsOf,
 } from "./logic";
+import { lookRows, useRowLook } from "./look";
 import { MemoryMarks } from "./MemoryMark";
 import { MessageText } from "./MessageText";
 import { ReachLines } from "./ReachLines";
@@ -305,8 +311,25 @@ export const MessageRow = memo(function MessageRow({
   const brainWait = isAgent && Boolean(brainUnavailableOf(meta)?.machineId);
   // The root of an issue's work thread (asked an agent to implement it): the issue card.
   const issueWork = issueWorkOf(meta);
-  // My own message: a light bubble on the right, no face or name.
+  // My own message. In the styles that keep it apart, a bubble on the right with no face or name; in the others, a row
+  // like anyone's.
   const mine = m.author.type === "person" && Boolean(meId) && m.author.id === meId;
+  const look = useRowLook();
+  const onRight = mine && mineOnRight(look.style);
+  const bubbled = look.style === "bubbles";
+  const compact = look.style === "compact";
+  const { scheme } = useTheme();
+  const roles = useRoles(orgId).data?.roles;
+  const member = m.author.type === "person" && m.author.id ? dir.memberById.get(m.author.id) : undefined;
+  const roleColor = member ? memberRoleColor(member, roles ?? []) : undefined;
+  const nameColor = !bubbled
+    ? undefined
+    : isAgent
+      ? nameInk(color, scheme === "dark")
+      : roleColor
+        ? nameInk(roleColor as AgentColorName, scheme === "dark")
+        : undefined;
+  const solidInk = bubbled && look.tone === "strong" ? ON_SOLID : undefined;
   const myHandle = useMyHandle();
   const mentionsMe = !mine && mentionsReader({ body, meta }, myHandle);
 
@@ -335,20 +358,20 @@ export const MessageRow = memo(function MessageRow({
   const foot = (
     <>
       {thread && !meta?.missionStart ? (
-        <View style={mine ? styles.meEnd : undefined}>
+        <View style={onRight ? styles.meEnd : undefined}>
           <ThreadLink thread={thread} />
         </View>
       ) : null}
       {readOnly ? null : (
-        <View style={mine ? styles.meEnd : undefined}>
+        <View style={onRight ? styles.meEnd : undefined}>
           <Reactions message={m} meId={meId} />
         </View>
       )}
       {m.local === "pending" || (m.local === "failed" && offline) ? (
-        <Sending offline={offline} end={mine} />
+        <Sending offline={offline} end={onRight} />
       ) : m.local === "failed" ? (
         <Pressable onPress={() => onRetry?.(m)} accessibilityRole="button" hitSlop={8}>
-          <Text variant="caption" tone="danger" style={mine ? styles.meStatus : undefined}>
+          <Text variant="caption" tone="danger" style={onRight ? styles.meStatus : undefined}>
             {t("mobile.chat.failed")}
           </Text>
         </Pressable>
@@ -356,7 +379,17 @@ export const MessageRow = memo(function MessageRow({
     </>
   );
 
-  if (mine) {
+  if (onRight) {
+    const stamp = (
+      <View style={styles.stamp}>
+        <Text variant="caption" tone="muted" style={solidInk ? { color: solidInk } : undefined}>
+          {when.time(m.createdAt)}
+        </Text>
+        <ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} {...(solidInk ? { ink: solidInk } : {})} />
+      </View>
+    );
+    // A voice message and a choice's answer lead with their own player or line, so their time stays under them.
+    const myBubble = bubbled && Boolean(body) && !voiceOf(meta) && !choiceReply;
     // A voice message's player, a choice's answer, the bubble, or the GIF or sticker or the files of a message
     // with no words, leads.
     const lead = voiceOf(meta) ? (
@@ -366,15 +399,26 @@ export const MessageRow = memo(function MessageRow({
     ) : choiceReply ? (
       <View style={styles.meFiles}>{choiceReply}</View>
     ) : body ? (
-      <View style={[styles.bubble, BUBBLE_RUN[run], { backgroundColor: c.bubble }]}>
-        <MessageText
-          body={body}
-          muted={m.local === "pending"}
-          selectable={false}
-          accent={accent}
-          channelRefs={channelRefsOf(m.meta)}
-          everyone={m.meta?.mentionsEveryone === true}
-        />
+      <View
+        style={[
+          bubbled ? lookRows.bubble : styles.bubble,
+          bubbled && styles.bubbleEnd,
+          BUBBLE_RUN[run],
+          { backgroundColor: (bubbled && look.fill) || c.bubble },
+        ]}
+      >
+        <View style={bubbled ? styles.bubbleLine : undefined}>
+          <MessageText
+            body={body}
+            muted={m.local === "pending"}
+            selectable={false}
+            accent={accent}
+            channelRefs={channelRefsOf(m.meta)}
+            everyone={m.meta?.mentionsEveryone === true}
+            {...(solidInk ? { ink: solidInk } : {})}
+          />
+          {bubbled && !m.local ? stamp : null}
+        </View>
       </View>
     ) : media ? (
       <View style={styles.meFiles}>
@@ -423,7 +467,7 @@ export const MessageRow = memo(function MessageRow({
         </View>
         {/* One time per run of my rows (they group a few minutes apart), under its last, the receipt's mark ending
             its line; a send in flight says so. */}
-        {!m.local && (run === "end" || run === "solo") ? (
+        {!m.local && (run === "end" || run === "solo") && !myBubble ? (
           <View style={styles.meTime}>
             <Text variant="caption" tone="faint">
               {when.time(m.createdAt)}
@@ -435,6 +479,136 @@ export const MessageRow = memo(function MessageRow({
     );
   }
 
+  // Under a name, or in a bubble with it: the same line, its time last. In `bubbles` it goes in the bubble's end when
+  // there is one; in a DM the line is only what a tag has to say.
+  const who = (inBubble: boolean) => (
+    <View
+      style={[
+        styles.who,
+        m.author.type === "person" && !inBubble && !compact && styles.whoRoom,
+        (inBubble || compact) && styles.whoTight,
+      ]}
+    >
+      {!bubbled || look.names ? (
+        <Text
+          variant="footnote"
+          tone="ink2"
+          style={[styles.name, nameColor ? { color: nameColor } : undefined]}
+          numberOfLines={1}
+        >
+          {name}
+        </Text>
+      ) : null}
+      {reminder ? <Tag icon="bell" label={t("channel.reminder")} /> : null}
+      {via ? (
+        <Tag
+          icon="sparkle"
+          lead={viaMark ? <ProviderLogo id={viaMark} size="xs" /> : undefined}
+          label={t("apps.via", { name: via.name })}
+          hint={t("apps.viaTip", { person: name, name: via.name })}
+        />
+      ) : null}
+      {routine ? (
+        // The tag opens the routine (Rotinas, as on the web); "Ver relatório" beside it unfolds the report.
+        <Tag
+          icon="clock"
+          label={t("channel.routineTag", { name: routine.name })}
+          onPress={() => router.push(routineHref(routine.id))}
+          hint={t("channel.routineTagTip")}
+        />
+      ) : null}
+      {routine && report ? (
+        <Pressable
+          onPress={() => setReportOpen((o) => !o)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: reportOpen }}
+          hitSlop={6}
+          style={styles.shrink}
+        >
+          <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
+            {reportOpen ? t("channel.routineReportHide") : t("channel.routineReport")}
+          </Text>
+        </Pressable>
+      ) : null}
+      {talker ? (
+        <Text
+          variant="caption"
+          tone="faint"
+          numberOfLines={1}
+          style={styles.shrink}
+          accessibilityHint={t("chat.notice.talkerTip")}
+        >
+          {t("chat.notice.talker")}
+        </Text>
+      ) : null}
+      {helping ? <HelpingTag consultation={helping} channelId={m.channelId} /> : null}
+      {!reminder && !routine && !talker && !helping && agent?.role && !bubbled && !compact ? (
+        <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
+          {agent.role}
+        </Text>
+      ) : null}
+      {inBubble || compact ? null : (
+        <Text variant="footnote" tone="faint">
+          {when.time(m.createdAt)}
+        </Text>
+      )}
+      {brainWait ? <AwayPill message={m} /> : null}
+      {m.pinned ? <PinMark /> : null}
+      {(receipt || seenBy) && !m.local && !inBubble ? (
+        <View style={compact ? undefined : styles.whoMark}>
+          <ReceiptMark message={m} mine={mine} receipt={receipt} seenBy={seenBy} />
+        </View>
+      ) : null}
+    </View>
+  );
+  const pinLine =
+    grouped && m.pinned ? (
+      <View style={styles.pinLine}>
+        <PinMark />
+        <Text variant="caption" tone="faint">
+          {t("mobile.pins.mark")}
+        </Text>
+      </View>
+    ) : null;
+  const words = brainWait ? (
+    <BrainWait
+      message={m}
+      fallback={
+        body ? (
+          <MessageText
+            body={body}
+            muted={m.local === "pending"}
+            selectable={false}
+            accent={accent}
+            channelRefs={channelRefsOf(m.meta)}
+            everyone={m.meta?.mentionsEveryone === true}
+          />
+        ) : null
+      }
+    />
+  ) : choiceReply ? (
+    choiceReply
+  ) : body ? (
+    <MessageText
+      body={talk ? talk.lead : body}
+      muted={m.local === "pending" || workOver}
+      selectable={false}
+      accent={accent}
+      channelRefs={channelRefsOf(m.meta)}
+      everyone={m.meta?.mentionsEveryone === true}
+    />
+  ) : null;
+  // The bubble holds its words, the tags of its name line and, at its end, the time; a row with none keeps its line.
+  const inBubble = bubbled && Boolean(body) && !brainWait && !choiceReply;
+  const tagged = Boolean(reminder || via || routine || talker || helping || m.pinned);
+  const opener = opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null;
+  const reportOpened =
+    report && reportOpen ? (
+      <View style={[styles.report, { borderLeftColor: c.line }]}>
+        <MessageText body={report} />
+      </View>
+    ) : null;
+
   return (
     <>
       {pair}
@@ -444,120 +618,61 @@ export const MessageRow = memo(function MessageRow({
         accessibilityHint={press ? t("mobile.chat.longPressHint") : undefined}
         style={({ pressed }) => [
           styles.msg,
+          bubbled && lookRows.bubblesRow,
+          compact && lookRows.compactRow,
           grouped && styles.cont,
           mentionsMe && { backgroundColor: `${c.amber}17`, borderLeftWidth: 2, borderLeftColor: c.amber },
           pressed && press && { backgroundColor: c.sunken },
         ]}
       >
-        <View style={styles.avslot}>{grouped ? null : <Face who={m.author} size={34} live={false} />}</View>
+        {compact ? (
+          <Text variant="caption" tone="faint" style={lookRows.compactClock}>
+            {when.time(m.createdAt)}
+          </Text>
+        ) : null}
+        <View style={[styles.avslot, bubbled && lookRows.bubblesSlot, compact && lookRows.compactSlot]}>
+          {grouped ? null : <Face who={m.author} size={compact ? 18 : bubbled ? 30 : 34} live={false} />}
+        </View>
         <View style={styles.body}>
-          {grouped ? null : (
-            <View style={[styles.who, m.author.type === "person" && styles.whoRoom]}>
-              <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
-                {name}
-              </Text>
-              {reminder ? <Tag icon="bell" label={t("channel.reminder")} /> : null}
-              {via ? (
-                <Tag
-                  icon="sparkle"
-                  lead={viaMark ? <ProviderLogo id={viaMark} size="xs" /> : undefined}
-                  label={t("apps.via", { name: via.name })}
-                  hint={t("apps.viaTip", { person: name, name: via.name })}
-                />
-              ) : null}
-              {routine ? (
-                // The tag opens the routine (Rotinas, as on the web); "Ver relatório" beside it unfolds the report.
-                <Tag
-                  icon="clock"
-                  label={t("channel.routineTag", { name: routine.name })}
-                  onPress={() => router.push(routineHref(routine.id))}
-                  hint={t("channel.routineTagTip")}
-                />
-              ) : null}
-              {routine && report ? (
-                <Pressable
-                  onPress={() => setReportOpen((o) => !o)}
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: reportOpen }}
-                  hitSlop={6}
-                  style={styles.shrink}
-                >
-                  <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
-                    {reportOpen ? t("channel.routineReportHide") : t("channel.routineReport")}
-                  </Text>
-                </Pressable>
-              ) : null}
-              {talker ? (
-                <Text
-                  variant="caption"
-                  tone="faint"
-                  numberOfLines={1}
-                  style={styles.shrink}
-                  accessibilityHint={t("chat.notice.talkerTip")}
-                >
-                  {t("chat.notice.talker")}
-                </Text>
-              ) : null}
-              {helping ? <HelpingTag consultation={helping} channelId={m.channelId} /> : null}
-              {!reminder && !routine && !talker && !helping && agent?.role ? (
-                <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
-                  {agent.role}
-                </Text>
-              ) : null}
-              <Text variant="footnote" tone="faint">
-                {when.time(m.createdAt)}
-              </Text>
-              {brainWait ? <AwayPill message={m} /> : null}
-              {m.pinned ? <PinMark /> : null}
-              {receipt && !m.local ? (
-                <View style={styles.whoMark}>
-                  <ReceiptMark message={m} mine={false} receipt={receipt} />
+          {inBubble ? (
+            <>
+              {pinLine}
+              {reportOpened}
+              <View style={[lookRows.bubble, OTHER_RUN[run], { backgroundColor: c.bubble }]}>
+                {!grouped && (look.names || tagged) ? who(true) : null}
+                {opener}
+                <View style={styles.bubbleLine}>
+                  {words}
+                  <View style={styles.stamp}>
+                    <Text variant="caption" tone="muted">
+                      {when.time(m.createdAt)}
+                    </Text>
+                    {receipt || seenBy ? (
+                      <ReceiptMark message={m} mine={mine} receipt={receipt} seenBy={seenBy} />
+                    ) : null}
+                  </View>
                 </View>
-              ) : null}
-            </View>
+              </View>
+            </>
+          ) : compact && !grouped ? (
+            <>
+              <View style={styles.compactLine}>
+                {who(false)}
+                {!reportOpened && !opener ? words : null}
+              </View>
+              {reportOpened}
+              {opener}
+              {reportOpened || opener ? words : null}
+            </>
+          ) : (
+            <>
+              {grouped ? null : who(false)}
+              {pinLine}
+              {reportOpened}
+              {opener}
+              {words}
+            </>
           )}
-          {grouped && m.pinned ? (
-            <View style={styles.pinLine}>
-              <PinMark />
-              <Text variant="caption" tone="faint">
-                {t("mobile.pins.mark")}
-              </Text>
-            </View>
-          ) : null}
-          {report && reportOpen ? (
-            <View style={[styles.report, { borderLeftColor: c.line }]}>
-              <MessageText body={report} />
-            </View>
-          ) : null}
-          {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
-          {brainWait ? (
-            <BrainWait
-              message={m}
-              fallback={
-                body ? (
-                  <MessageText
-                    body={body}
-                    muted={m.local === "pending"}
-                    selectable={false}
-                    accent={accent}
-                    channelRefs={channelRefsOf(m.meta)}
-                    everyone={m.meta?.mentionsEveryone === true}
-                  />
-                ) : null
-              }
-            />
-          ) : choiceReply ? (
-            choiceReply
-          ) : body ? (
-            <MessageText
-              body={talk ? talk.lead : body}
-              muted={m.local === "pending" || workOver}
-              selectable={false}
-              accent={accent}
-              channelRefs={channelRefsOf(m.meta)}
-              everyone={m.meta?.mentionsEveryone === true}
-            />
-          ) : null}
           {talk && !brainWait ? (
             <Pressable
               onPress={() => {
@@ -945,6 +1060,17 @@ const BUBBLE_RUN: Record<RunPosition, { borderTopRightRadius?: number; borderBot
   end: { borderTopRightRadius: 6, borderBottomRightRadius: BUBBLE_CUT },
 };
 
+/** Anyone else's bubble in `bubbles`: the same, on the left. */
+const OTHER_RUN: Record<RunPosition, { borderTopLeftRadius?: number; borderBottomLeftRadius?: number }> = {
+  solo: {},
+  start: { borderBottomLeftRadius: 6 },
+  mid: { borderTopLeftRadius: 6, borderBottomLeftRadius: 6 },
+  end: { borderTopLeftRadius: 6 },
+};
+
+/** Words and time on my solid bubble. */
+const ON_SOLID = "#ffffff";
+
 const styles = StyleSheet.create({
   // Readable turns: more room between turns, a quieter name and time.
   msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
@@ -958,6 +1084,18 @@ const styles = StyleSheet.create({
   // never wraps the line.
   whoRoom: { paddingRight: 40 },
   whoMark: { position: "absolute", top: 0, right: 0, height: 19, justifyContent: "center" },
+  whoTight: { marginBottom: 0 },
+  // The time ends the words' line when it fits; a longer text pushes it to a line of its own, at the bubble's end.
+  bubbleLine: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    alignItems: "flex-end",
+    columnGap: 8,
+  },
+  bubbleEnd: { alignSelf: "flex-end" },
+  stamp: { flexDirection: "row", alignItems: "center", gap: 4, height: 16, marginLeft: "auto" },
+  compactLine: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 6 },
   name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
   me: { paddingLeft: 64, paddingRight: 16, paddingVertical: 10, marginTop: 4, alignItems: "flex-end" },
   meCont: { paddingTop: 1, marginTop: 0 },

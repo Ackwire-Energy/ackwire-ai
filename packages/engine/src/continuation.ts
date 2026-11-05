@@ -102,7 +102,7 @@ export function onlySafetyRefusals(tried: string[]): boolean {
  */
 export function findableNudge(means: string[], tried: string[]) {
   const have = means.length > 0 ? means.join("; ") : "your tools and find_tools";
-  return `Not asked yet: ask a person only for what only they can give, and this you can find. Your means: ${have}. Already tried:\n${triedBlock(tried)}\n${SAFETY_FINAL} Find it first: search the web for the docs and read them, try it (on your computer, or with web_fetch), search the workspace for a name the person uses. When something stays unclear, state your assumption and go on. Ask only for what only a person can give (a key through request_secret, a decision, an approval). If you still need to ask, call ask_user again: that one is asked.`;
+  return `Not asked yet: ask a person only for what only they can give, and this you can find. Your means: ${have}. Already tried:\n${triedBlock(tried)}\n${SAFETY_FINAL} Find it first: search the web for the docs and read them, try it (on your computer, or with web_fetch), search the workspace for a name the person uses. When something stays unclear, state your assumption and go on with work you can undo; a message to someone else can't be undone, so settle what and to whom from the conversation first. Ask only for what only a person can give (a key through request_secret, a decision, an approval). If you still need to ask, call ask_user again: that one is asked.`;
 }
 
 /** What a run reads, once, when it described what only a person can give instead of asking for it. */

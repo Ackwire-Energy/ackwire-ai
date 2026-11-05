@@ -175,6 +175,7 @@
       "run.ctx.minutes",
       "searchPage.hasLabel.link",
       "searchPage.words.has.link",
+      "settings.account.chat.dms",
       "settings.group.org",
       "settings.media.gifs",
       "settings.orgTitle",
@@ -1121,7 +1122,8 @@
       "teamTemplates.channels.bia",
       "team.list.col.agent",
       "team.list.col.person",
-      "approvals.review.state"
+      "approvals.review.state",
+      "agentSide.label"
     ],
     "it": [
       "access.area.browser",
@@ -1905,7 +1907,8 @@
       "approvals.review.effect",
       "approvals.review.state",
       "files.video.volume",
-      "taskManager.waitGroup.routines"
+      "taskManager.waitGroup.routines",
+      "agentSide.label"
     ],
     "ja": [
       "access.area.vault",

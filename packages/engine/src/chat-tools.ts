@@ -14,6 +14,7 @@ import { runReadOutsideById } from "./outside";
 import { actingRoutineOfCall, personBehindCall } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
 import { personCanPost } from "./routine-state";
+import type { ArtifactLink } from "./run-tools";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 
@@ -178,7 +179,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             threadId: null,
             runId: ctx.runId,
           };
-          const files: string[] = [];
+          const files: ArtifactLink[] = [];
           for (const id of ids) {
             // A routine's own files live in its room, which only its run reads.
             const shared = await shareArtifact(deps.artifacts, actor, ctx.orgId, id, {
@@ -186,7 +187,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
               // Only a routine's own run takes files from its room; a run it woke takes none from its conversation.
               alsoFrom: routine && ctx.background ? ctx.channelId : null,
             });
-            files.push(shared.artifact.id);
+            files.push({ id: shared.artifact.id, version: shared.artifact.version, title: shared.artifact.title });
           }
           const [run] = await ctx.db
             .select({ hop: schema.agentRuns.hop })
@@ -221,7 +222,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
               fromChannelId: ctx.channelId,
               toChannelId: channel.id,
               requesterUserId: requester,
-              artifactIds: files,
+              artifactIds: files.map((f) => f.id),
               ...(routine ? { routineId: routine.routineId, creatorUserId: creator } : {}),
             },
           });
@@ -242,15 +243,20 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
     {
       name: SEND_DM_TOOL,
       description:
-        'Send a direct message to a person in the organization, e.g. "avisa a Thay na DM". `person` is their name, @handle or email. It goes in your DM with them (they get a notification); say in the text who asked and why, in their language. Only when someone asked you. If several people match, ask which one. Then reply here saying you sent it.',
+        'Send a direct message to a person in the organization, e.g. "avisa a Ana na DM". `person` is their name, @handle or email. It goes in your DM with them (they get a notification); say in the text who asked and why, in their language. Attach files (a video, a PDF, an image, a document) with `artifact_ids`: from list_artifacts, files you made, or files attached in this conversation; a file from another DM goes as a copy. Never send only a file\'s name when the person should get the file. Only when someone asked you. If several people match, ask which one. Then reply here saying you sent it.',
       scope: "",
       inputSchema: {
         type: "object",
         properties: {
           person: { type: "string", minLength: 1, maxLength: 200 },
-          text: { type: "string", minLength: 1, maxLength: MAX_MESSAGE_LENGTH },
+          text: { type: "string", maxLength: MAX_MESSAGE_LENGTH },
+          artifact_ids: {
+            type: "array",
+            items: { type: "string", minLength: 36, maxLength: 36 },
+            maxItems: MAX_FILES,
+          },
         },
-        required: ["person", "text"],
+        required: ["person"],
         additionalProperties: false,
       },
       describe: (input) => ({
@@ -266,7 +272,8 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
           const creator = routine?.creatorUserId ?? null;
           if (!requester && !creator) return { content: "Only a person's request can send a DM.", isError: true };
           const text = str(input.text).trim();
-          if (!text) return { content: "Give the text to send.", isError: true };
+          const ids = [...new Set((Array.isArray(input.artifact_ids) ? input.artifact_ids : []).map(String))];
+          if (!text && ids.length === 0) return { content: "Give a text or files to send.", isError: true };
           const matches = await findMember(ctx, str(input.person));
           if (matches.length === 0) {
             return { content: `No one called "${str(input.person)}" in this organization.`, isError: true };
@@ -295,6 +302,24 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
           }
           const dm = await openPersonAgentDm(ctx.db, ctx.orgId, to.userId, ctx.agentId);
           if (dm.id === ctx.channelId) return { content: SAME_CONVERSATION, isError: true };
+          // Files are brought as post_message brings them: the same file when the DM can see it, a copy from
+          // another DM or a private channel the person who asked is in. A routine has no requester, so it sends
+          // only files from its own room, never ones from its creator's conversations.
+          const actor = {
+            type: "agent" as const,
+            agentId: ctx.agentId,
+            channelId: dm.id,
+            threadId: null,
+            runId: ctx.runId,
+          };
+          const files: ArtifactLink[] = [];
+          for (const id of ids) {
+            const shared = await shareArtifact(deps.artifacts, actor, ctx.orgId, id, {
+              requesterUserId: requester,
+              alsoFrom: routine && ctx.background ? ctx.channelId : null,
+            });
+            files.push({ id: shared.artifact.id, version: shared.artifact.version, title: shared.artifact.title });
+          }
           const [run] = await ctx.db
             .select({ hop: schema.agentRuns.hop })
             .from(schema.agentRuns)
@@ -313,6 +338,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             body: text,
             // Started by the agent on someone's behalf: the person is notified (an agent's reply isn't).
             meta: {
+              ...(files.length > 0 ? { artifacts: files } : {}),
               agentDm: origin(ctx, requester),
               ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
               ...((await runReadOutsideById(ctx.db, ctx.orgId, ctx.runId)) ? { readOutside: true } : {}),
@@ -334,6 +360,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
               toUserId: to.userId,
               fromChannelId: ctx.channelId,
               requesterUserId: requester,
+              artifactIds: files.map((f) => f.id),
               ...(routine ? { routineId: routine.routineId, creatorUserId: creator } : {}),
             },
           });
@@ -343,7 +370,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
           }
           const note = unreachedNote(unreached, `your DM with ${to.name}`, false);
           return {
-            content: `Sent to ${to.name} in your DM with them: ${messageLink(ctx.orgId, message)}. Tell the person who asked.${note ? ` ${note}` : ""}`,
+            content: `Sent to ${to.name} in your DM with them${files.length > 0 ? ` with ${files.length} file(s)` : ""}: ${messageLink(ctx.orgId, message)}. Tell the person who asked.${note ? ` ${note}` : ""}`,
             data: { message: { id: message.id, channelId: dm.id } },
           };
         } catch (error) {

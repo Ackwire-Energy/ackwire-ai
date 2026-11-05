@@ -86,7 +86,9 @@ export const ROUTINE_NO_REPLY = "NO_REPLY";
 
 /**
  * Investigate first (ADR 0037): agents with tools look before answering, read
- * without asking, and ask only for decisions that are the person's.
+ * without asking, and ask only for decisions that are the person's. Going on with an assumption is only for work
+ * that can be undone: a message sent to someone else can't be taken back, so what and to whom come from the
+ * conversation, or from a question when it stays unclear; and nothing the conversation already settled is asked.
  */
 export const HOW_YOU_WORK = [
   "# How you work",
@@ -100,7 +102,7 @@ export const HOW_YOU_WORK = [
   "- An empty or blocked result is not a closed way: when a search, a page or a tool gives nothing, fails or is blocked, change the words, the source or the tool and try again. When a way is really closed (no access, a refusal), take another that still gets the people what they need: another tool, the colleague whose role covers it, a document or a copy instead of a move. A refusal for safety (a credential, private data in an address, secrets, sending data out) is final: never send that data another way. Say what was refused. When a tool or the platform fails, say plainly what failed and what the person can do, or that it's on our side and to try again later; never paste a raw error or send anyone to support.",
   "- Before saying you can't or don't have a tool, check your means (listed under Your means): your tools and find_tools, your computer, browser and terminal, and the teammates whose role covers it. The public web is always yours to read. A service with no connector but a web version (a messaging app, a social network, a bank): use it in your browser, the person signing in.",
   `- ${HAND_OVER_STEP} If nothing you have can hand it over, say in one line what you tried and the one step they must do.`,
-  "- Before asking a person, find what you can (an API's docs and address on the web, a name the person uses in the workspace, a fact in the files), and ask only for what only they can give: a key, a decision, a preference, an approval, a payment. When something stays unclear, state your assumption and go on. A password, a key or contact details: look in the Vault first (`vault_list`, when you have it). Hold a key for a service? Use it, not an app connection. A secret or a key always through `request_secret`, never as a chat question; with no `request_secret`, say which key is needed and where it is set up.",
+  "- Before asking a person, find what you can (an API's docs and address on the web, a name the person uses in the workspace, a fact in the files), and ask only for what only they can give: a key, a decision, a preference, an approval, a payment. When something stays unclear, state your assumption and go on, unless it's a send to someone else, which can't be undone: take what and to whom from the conversation (what is right above the request is what's meant) and, if still unsure, ask before sending. Never ask, in text or on a card, what the person, the conversation or your own reply already made clear. A password, a key or contact details: look in the Vault first (`vault_list`, when you have it). Hold a key for a service? Use it, not an app connection. A secret or a key always through `request_secret`, never as a chat question; with no `request_secret`, say which key is needed and where it is set up.",
   "- A person asking for something of their own (their messages, account, files) consents to the access it needs: don't ask again or warn about privacy. If the way is unclear, offer to start ('I can do it in my browser: you'll scan a QR code. Shall I start?'), never refuse. Someone else's account is not consent; passwords never come through the chat; sensitive actions still need approval.",
   "- When a key you were given is refused (a 401, or a 403 saying the key is invalid or expired), first check you sent it as the API's docs say (header, prefix, test or live address). If you did, ask once for a new one with `request_secret` under the same name (one of your keys, listed with your computer), its purpose saying in one line, in the person's language, what failed ('TYPESAFE_API_KEY was refused (401). Can you send a new one?'): the new one replaces the old. If the new one is refused too, don't ask again: say what failed and stop.",
   "- Lead with the answer. When asked why you couldn't do something, skip the why and the apology: do it now and give the answer. Match the length asked for; when the person asked for an internal change (an issue created, a routine changed), confirm it in one or two lines: the details show under your reply. A change you made on your own doesn't shorten the answer to the question asked, and findings you also recorded somewhere (an issue, a comment, memory) are still said in the reply: the numbers, ids and times, with the link as an extra, never instead. A thanks or an ok asks nothing: answer in a line or react, without looking anything up.",
@@ -1785,14 +1787,37 @@ export function ownMediaNote(media: MessageMedia, names: Map<string, string>): s
   return `[You sent a sticker: ${names.get(stickerNameKey(media.agentId)) ?? "an agent"} (${media.mood})]`;
 }
 
-/** Files a person attached (`meta.artifacts`): titles and ids, so the agent can open them with its file tools. */
-export function attachedLine(m: Pick<Message, "authorUserId" | "meta">): string {
-  const files = m.authorUserId ? m.meta?.artifacts : undefined;
-  if (!Array.isArray(files) || files.length === 0) return "";
-  const list = files
+/** A file's title as one short line: some come from outside (an email attachment's name). */
+const FILE_TITLE_MAX = 120;
+const fileTitle = (title: unknown) =>
+  (typeof title === "string" && cutText(title.replace(/["\s]+/g, " ").trim(), FILE_TITLE_MAX)) || "file";
+
+/** The files on a message (`meta.artifacts`, titles written at post time): `"title" (artifact id), …`, or "". */
+function fileList(meta: Message["meta"] | undefined): string {
+  const files = meta?.artifacts;
+  if (!Array.isArray(files)) return "";
+  return files
     .filter((f): f is { id: string; title?: unknown } => Boolean(f) && typeof f.id === "string")
-    .map((f) => `"${typeof f.title === "string" ? f.title : "file"}" (artifact ${f.id})`);
-  return list.length > 0 ? `\n(attached files: ${list.join(", ")})` : "";
+    .map((f) => `"${fileTitle(f.title)}" (artifact ${f.id})`)
+    .join(", ");
+}
+
+/**
+ * Files attached to someone else's message (a person's or another agent's): titles and ids, so the agent can open or
+ * send them with its file tools instead of searching the Drive for a file by name.
+ */
+export function attachedLine(m: Pick<Message, "meta">): string {
+  const list = fileList(m.meta);
+  return list ? `\n(attached files: ${list})` : "";
+}
+
+/**
+ * The files the agent attached to its own message, told on the people's side like `ownMediaNote` (so it never
+ * learns to write the line in a reply): "send it to Ana" then names that file, not the Drive's newest one.
+ */
+export function ownFilesNote(meta: Message["meta"] | undefined): string {
+  const list = fileList(meta);
+  return list ? `[Files you attached to your message above: ${list}]` : "";
 }
 
 /** What the agent's computer allows it (protocol 10); null when it doesn't say (an older runner) or is gone. */
@@ -2160,7 +2185,7 @@ export function toTurns(
     // Quote reply, files and a GIF or a sticker (ADR 0091): from the meta written at post time (no query here).
     const media = mediaOf(m.meta);
     const text = cutIds.has(m.id) ? cutOld(m) : m.body;
-    const said = `${quotedLine(m.meta)}${relayed ? neutralizeUntrusted(text) : text}${attachedLine(m)}`;
+    const said = `${quotedLine(m.meta)}${relayed ? neutralizeUntrusted(text) : text}${own ? "" : attachedLine(m)}`;
     const body = media && !own ? [said, mediaLine(media, names)].filter(Boolean).join("\n") : said;
     const notes = undoNotes(m.meta);
     // The agent's own sticker or GIF with no text (the silent one after its reply) has no turn of its own: below.
@@ -2170,11 +2195,12 @@ export function toTurns(
       if (last && last.role === role) last.parts.push({ id: m.id, text });
       else turns.push({ role, parts: [{ id: m.id, text }] });
     }
-    // Its own sticker or GIF, someone undoing (or redoing) what this reply did, or its mention missing an agent
-    // that wasn't here: news for the agent, on the people's side.
+    // Its own sticker or GIF, the files it attached, someone undoing (or redoing) what this reply did, or its
+    // mention missing an agent that wasn't here: news for the agent, on the people's side.
     const news = own
       ? [
           media ? ownMediaNote(media, names) : "",
+          ownFilesNote(m.meta),
           options.origins?.get(m.id) ?? "",
           notes,
           m.id === latestOwn ? unreachedLine(m.meta, options.canAddAgents === true) : "",

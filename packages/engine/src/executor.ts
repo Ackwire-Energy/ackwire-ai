@@ -232,6 +232,7 @@ import { type ReleaseReason, releaseHeldInbox, releaseInbox, takeInbox, whileHel
 import { deliverNoticeToRun } from "./run-resume";
 import { issueRunToolToken, revokeRunToolTokens } from "./run-tool-tokens";
 import {
+  type ArtifactLink,
   absorbBrowserCall,
   absorbToolData,
   type BrowserTrailStep,
@@ -481,8 +482,8 @@ export interface Transcript {
   deltaSeq: number;
   /** Memory changes made by tools, not yet attached to a posted message (`meta.memoryUpdates`). */
   memoryUpdates?: MemoryUpdate[];
-  /** Artifacts created or changed by tools, not yet attached to a posted message (`meta.artifacts`). */
-  artifacts?: { id: string; version: number }[];
+  /** Artifacts created or changed by tools, not yet attached to a posted message (`meta.artifacts`, with titles). */
+  artifacts?: ArtifactLink[];
   /** A mission proposed with its home elsewhere (a flat DM's new thread): the reply carries its link card (`meta.missionLink`). */
   missionLink?: { missionId: string; threadId: string } | null;
   /** Agents it consulted (`ask_agent`, ADR 0034), not yet shown on a posted message (`meta.consulted`). */
@@ -2875,7 +2876,7 @@ async function executeRunInner(
   const suspendedByBridge = async (
     status: "waiting_approval" | "waiting_input",
     said: string,
-    textBefore?: (at: number) => string,
+    textBefore?: (askedAt: number, graceMs: number) => string,
   ) => {
     await deferred;
     const [row] = await db.select({ transcript: agentRuns.transcript }).from(agentRuns).where(eq(agentRuns.id, run.id));
@@ -2884,13 +2885,15 @@ async function executeRunInner(
     // The turn that asked is over: from now on a decision resumes the run by itself.
     if (stored?.pending) t.pending = { calls: stored.pending.calls.map(({ inTurn: _, ...call }) => call) };
     t.postedCount = Math.max(t.postedCount, stored?.postedCount ?? 0);
-    // A question the brain asked mid-turn is already posted. Only what it wrote before asking leads to it
-    // (posted just before the card, so it reads first); what it wrote after only repeats the question.
+    // A question the brain asked mid-turn is already posted. Only what it wrote right before asking leads to it
+    // (posted just before the card, so it reads first): not what it wrote after (it only repeats the question), nor
+    // what it wrote before an earlier call of the turn (narration, or a draft it dropped half-written for that call
+    // and wrote again after it).
     const asked = await bridgedQuestionCard(t);
     let text = pauseLead(stripSentinel(said));
     let at: Date | undefined;
     if (asked && textBefore) {
-      text = stripSentinel(textBefore(asked.askedAt + ASKED_GRACE_MS));
+      text = stripSentinel(textBefore(asked.askedAt, ASKED_GRACE_MS));
       at = new Date(asked.cardAt.getTime() - 1);
     }
     // A background run never posts by itself (ADR 0053 §5): its cards speak for it.
@@ -2921,9 +2924,10 @@ async function executeRunInner(
 
   /**
    * A computer brain failed mid-turn after tools already ran (ADR 0032 §5):
-   * no fallback (the model brain would redo them). What it said, and which
-   * tools it used, are posted (`meta.brainInterrupted`, the app adds the note
-   * in the person's language) and the run ends there.
+   * no fallback (the model brain would redo them). What it said after its
+   * last call (`lastText`), and which tools it used, are posted
+   * (`meta.brainInterrupted`, the app adds the note in the person's
+   * language) and the run ends there.
    */
   const interruptedAfterTools = async (
     from: BrainKind,
@@ -3829,7 +3833,11 @@ async function executeRunInner(
               }
             },
             ...(deps.planLimitGraceMs !== undefined ? { limitGraceMs: deps.planLimitGraceMs } : {}),
-            onExecuted: (call) => executedNow.push(call),
+            onExecuted: (call) => {
+              executedNow.push(call);
+              // The text it streams next is another model call's: never one reply with what it wrote before.
+              deltas.toolEnded();
+            },
             onSteerRead: (uuids) => live.read(uuids),
             // The end of a wait for room, for the operator's analytics (`work-analytics.ts`): the turn's own first
             // step can come minutes later.
@@ -3923,7 +3931,7 @@ async function executeRunInner(
           // pending calls the bridge wrote (no fallback, no failure; the decision resumes the session).
           const [row] = await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id));
           if (row?.status === "waiting_approval" || row?.status === "waiting_input") {
-            return suspendedByBridge(row.status, deltas.text().trim(), deltas.text() ? deltas.textBefore : undefined);
+            return suspendedByBridge(row.status, deltas.lastText(), deltas.text() ? deltas.textBefore : undefined);
           }
         }
         // Only while the run is running: never over the pending calls of a bridged pause.
@@ -3988,7 +3996,7 @@ async function executeRunInner(
                 ? { code: error.code, message: error.message }
                 : { code: "brain_failed", message: error instanceof Error ? error.message : String(error) };
             const names = [...new Set(executed.map((c) => c.name))];
-            return interruptedAfterTools(turnPlan.kind, failure, names, deltas.text());
+            return interruptedAfterTools(turnPlan.kind, failure, names, deltas.lastText());
           }
         }
         // A computer brain that can't answer now (offline, not logged in, plan limit, a retryable failure):
@@ -5162,6 +5170,23 @@ function createDeltaPublisher(
   let sentUpTo = 0;
   /** When each piece arrived: [ms, length of `all` once it was added]. */
   const marks: [number, number][] = [];
+  /**
+   * Where a call the brain ran inside its turn ended: [ms, length of `all` then]. A computer brain's turn spans many
+   * model calls; the text of each is a stretch of its own, and one may stop mid-sentence for a call and be written
+   * again after it. Nothing posted ever glues them.
+   */
+  const breaks: [number, number][] = [];
+  /** The turn's text cut at those calls, each stretch trimmed, empty ones left out. */
+  const stretches = () => {
+    const out: string[] = [];
+    let from = 0;
+    for (const cut of [...breaks.map(([, at]) => at), all.length]) {
+      const piece = all.slice(from, cut).trim();
+      if (piece) out.push(piece);
+      from = cut;
+    }
+    return out;
+  };
   let seq = startSeq;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pending: Promise<void> = Promise.resolve();
@@ -5221,16 +5246,41 @@ function createDeltaPublisher(
       await pending;
     },
     seq: () => seq,
-    /** Everything streamed in this turn (kept when the run is canceled mid-stream). */
-    text: () => all,
-    /** What had streamed by `at` (ms): the text a computer brain wrote before a bridged call. */
-    textBefore(at: number) {
-      let length = 0;
+    /** A call the brain ran inside its turn ended (through the bridge or on its own): later text is a new stretch. */
+    toolEnded() {
+      breaks.push([Date.now(), all.length]);
+    },
+    /**
+     * Everything streamed in this turn (kept when the run is canceled mid-stream), the stretches between the brain's
+     * calls set apart as paragraphs.
+     */
+    text: () => stretches().join("\n\n"),
+    /**
+     * What the brain said after its last call, as its final answer is (the model brain's is its last call's text): the
+     * stretches before it were said on the way, or dropped half-written for a call and written again after it.
+     */
+    lastText: () => stretches().at(-1) ?? "",
+    /**
+     * What led to a bridged call made at `askedAt` (ms): the stretch the brain was writing then, from the call before
+     * it. Text that lands up to `graceMs` later still counts (the stream can trail the call), but never past a call
+     * that ended after it (the asking one): what follows only repeats the question.
+     */
+    textBefore(askedAt: number, graceMs = 0) {
+      let end = 0;
       for (const [when, upTo] of marks) {
-        if (when > at) break;
-        length = upTo;
+        if (when > askedAt + graceMs) break;
+        end = upTo;
       }
-      return all.slice(0, length);
+      let start = 0;
+      for (const [when, at] of breaks) {
+        // No text after it by then: the asking call itself (ended in the same millisecond), or nothing written since.
+        if (when > askedAt || at >= end) {
+          end = Math.min(end, at);
+          break;
+        }
+        start = at;
+      }
+      return all.slice(start, end);
     },
   };
 }

@@ -443,7 +443,7 @@ export function createBlockToolSource(deps: ArtifactDeps): ToolSource {
             });
         return {
           content: `Showing "${a.title}" in your reply as block ${a.id}. Write a line or two around it, and don't repeat what it shows.`,
-          data: { artifact: { id: a.id, version: a.version } },
+          data: { artifact: { id: a.id, version: a.version, title: a.title } },
         };
       } catch (error) {
         return failed(error);
@@ -499,7 +499,7 @@ export function createBlockToolSource(deps: ArtifactDeps): ToolSource {
         });
         return {
           content: `The vote is in your reply. It closes on ${closesAt.toISOString()} or when everyone has voted, and you'll hear the result then. Say in a line what you're asking and end your turn.`,
-          data: { artifact: { id: a.id, version: a.version } },
+          data: { artifact: { id: a.id, version: a.version, title: a.title } },
         };
       } catch (error) {
         return failed(error);
@@ -556,7 +556,7 @@ export function createBlockToolSource(deps: ArtifactDeps): ToolSource {
         });
         return {
           content: "The card is in your reply. Their pick reaches you as their next message: end your turn now.",
-          data: { artifact: { id: a.id, version: a.version } },
+          data: { artifact: { id: a.id, version: a.version, title: a.title } },
         };
       } catch (error) {
         return failed(error);

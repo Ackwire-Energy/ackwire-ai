@@ -79,6 +79,7 @@ describe("sign-up policy (self-host)", () => {
         start: { page: "home", channelId: null },
         showActivity: false,
         agentStyle: null,
+        chatPrefs: {},
       },
     ] as never);
   });

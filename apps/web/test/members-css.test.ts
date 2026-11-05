@@ -49,3 +49,11 @@ test("the column's add row: a 24px plus tile and 13px text, so it fits one line 
   // The dialogs' add rows keep the 32px tile beside their 32px avatars.
   expect(last(".member-row__plus", "width")).toBe("32px");
 });
+
+test("a DM's floating sidebar: 360px over the chat, and where panels take the whole screen it does too", async () => {
+  const css = await builtCss("src/components/agents/agent-sidebar.css");
+  const width = (sheet: string) =>
+    declarations(sheet, ".thread-panel.dm-side--float").find(([p]) => p === "width")?.[1];
+  expect(width(topLevel(css))).toBeUndefined();
+  expect(width(atRule(css, "@media (min-width: 861px)"))).toContain("360px");
+});

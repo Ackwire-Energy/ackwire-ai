@@ -1,4 +1,4 @@
-import { desktopStatus } from "@agenteschat/engine";
+import { desktopPicture, desktopStatus, TooManyError } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { BrowserHandoff } from "./browser";
 import { type AppDeps, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
@@ -36,6 +36,26 @@ const DesktopStatus = z
   })
   .openapi("DesktopStatus");
 
+const DesktopPicture = z
+  .object({
+    picture: z
+      .object({
+        data: z.string().openapi({ description: "A JPEG, base64." }),
+        width: z.number().int(),
+        height: z.number().int(),
+        capturedAt: z.string(),
+      })
+      .nullable(),
+    reason: z.enum(["stopped", "hidden", "unavailable"]).nullable().openapi({
+      description:
+        "Why there is none: `stopped` (its screen isn't running, and this never starts it), `hidden` (someone else is in control), `unavailable`.",
+    }),
+  })
+  .openapi("DesktopPicture");
+
+/** A person's refreshes, every agent together: a few tabs on the slowest computers stay under it. */
+const PICTURES_PER_MINUTE = { limit: 120, windowMs: 60_000 };
+
 /**
  * An agent's desktop (ADR 0058): its state. The live screen is a WebSocket (`/api/desktop`), which starts the
  * desktop when it isn't running; it then stays on. Taking control and handing back are the screens' routes
@@ -60,6 +80,25 @@ export function desktopRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
       return c.json(await desktopStatus(desktopDeps(), c.get("user").id, orgId, agentId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agents/{agentId}/desktop/picture",
+      tags,
+      security,
+      summary: "A recent picture of an agent's screen, for whoever may watch it; never starts a stopped one",
+      request: { params: AgentParams },
+      responses: { 200: json(DesktopPicture), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      const userId = c.get("user").id;
+      const limit = await deps.adapters.rateLimiter.consume(`desktop-picture:${userId}`, PICTURES_PER_MINUTE);
+      if (!limit.allowed) throw new TooManyError("Slow down");
+      return c.json(await desktopPicture(desktopDeps(), userId, orgId, agentId), 200);
     },
   );
 

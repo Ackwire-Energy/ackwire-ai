@@ -6,8 +6,11 @@
 /** Frames kept running at once: each is a browser of its own in memory, and the rest wait for a tap. */
 export const MAX_LIVE_BLOCKS = 3;
 
-/** Taller than this and a block is opened on its own screen, which shows it all. */
-export const INLINE_MAX_HEIGHT = 560;
+/**
+ * In the conversation a block is always this tall, from its first frame: the list never jumps while it loads or
+ * grows. A taller page is cut with a fade and "Show all" opens it in place; its own screen shows it all.
+ */
+export const INLINE_HEIGHT = 380;
 
 /**
  * Where a block may go: nowhere. Its page is the first load. Anything else would be how a page sends out what it
