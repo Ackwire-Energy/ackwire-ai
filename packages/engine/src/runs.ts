@@ -46,6 +46,10 @@ export function computerWaitOf(run: Pick<AgentRun, "status" | "waitingMachineId"
   return wait?.code === "busy" ? ("queued" as const) : ("away" as const);
 }
 
+/** `r.status` as people read it (`computerWaitOf`), for a raw select over `agent_runs r`. */
+export const shownStatusSql = sql`(case when r.status = 'running' and r.waiting_machine_id is not null
+  then 'waiting_input' else r.status end)`;
+
 /**
  * For a select over `agent_runs`: waiting on its plan's limit (`plan`) or its budget (`budget`), long work paused near
  * one too (`usage_pause`, by its `source`): it answers when that renews, nobody is asked.

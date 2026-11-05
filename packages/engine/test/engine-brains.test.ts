@@ -23,6 +23,7 @@ import {
   computerBrainUnavailable,
   computerMediaNote,
   computerQueue,
+  consultationWait,
   createAgent,
   createAgentRuns,
   createChannel,
@@ -57,7 +58,9 @@ import {
   SESSION_IDLE_MS,
   SESSION_MAX_INPUT_TOKENS,
   sessionLostNote,
+  statusReply,
   type ToolSource,
+  taskManager,
 } from "../src";
 import { computerPrompt } from "../src/brains/prompt";
 import { afterSteered } from "../src/steering";
@@ -2810,6 +2813,123 @@ test("a run asking again from the line stays in it for everyone reading, until t
   expect(seenTypes.indexOf("agent.thinking")).toBeGreaterThanOrEqual(0);
   expect(seenTypes.indexOf("agent.thinking")).toBeLessThan(seenTypes.indexOf("agent.typing"));
   expect(seenTypes).toContain("message.claimed");
+});
+
+test("the Task Manager and a consultation read an ask from the line as the wait it is", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const reads: unknown[] = [];
+  const { brain } = scriptedComputerBrain(async function* (n): AsyncGenerator<BrainEvent> {
+    if (n > 0) {
+      const view = await taskManager(f.db, f.owner.id, f.org.id);
+      const [run] = await f.db.select().from(schema.agentRuns);
+      const consult = run && consultationWait(run);
+      reads.push({ task: view.tasks.map((t) => [t.status, t.held]), computers: view.computers, consult });
+    }
+    yield { type: "error", code: "busy", message: "The computer is busy.", retryable: true };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS + 1_000), maxBatches: 1 });
+  expect(reads).toEqual([
+    {
+      task: [["waiting_input", "computer_busy"]],
+      computers: [{ id: machineId, name: "MacBook", working: 0, inLine: 1 }],
+      consult: "computer",
+    },
+  ]);
+});
+
+test("an ask cut off by a restart: its new job asks again, and a turn taken shows it working to everyone", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const reads: { waiting: string[]; working: string[]; handled: unknown; active: string[]; machine: unknown }[] = [];
+  let asked = "";
+  const { brain } = scriptedComputerBrain(async function* (n): AsyncGenerator<BrainEvent> {
+    if (n === 0) {
+      yield { type: "error", code: "busy", message: "The computer is busy.", retryable: true };
+      return;
+    }
+    yield { type: "text_delta", text: "Pronto." };
+    await Bun.sleep(0);
+    await Bun.sleep(0);
+    const line = await computerQueue(f.db, f.owner.id, f.org.id, machineId);
+    const [row] = await f.db.select().from(schema.agentRuns);
+    reads.push({
+      waiting: line.waiting.map((w) => w.runId),
+      working: line.working.map((w) => w.runId),
+      handled: (await timeline(f)).find((m) => m.id === asked)?.receipts?.handled.map((h) => h.status),
+      active: (await activeRunsIn(f.db, f.org.id, f.general.id)).map((r) => r.status),
+      machine: row?.waitingMachineId,
+    });
+    yield { type: "done", text: "Pronto." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  asked = (await post(f, "@dev oi")).id;
+  await drainOutbox(f.db, handlers);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  const id = run?.id ?? "";
+
+  // The worker died asking: `running`, its machine kept, its beat old, and its wait's job gone with it.
+  const long = new Date(Date.now() - 3_600_000);
+  await f.db.delete(schema.outbox).where(eq(schema.outbox.kind, "agent_run.execute"));
+  await f.db.update(schema.agentRuns).set({ status: "running", heartbeatAt: long }).where(eq(schema.agentRuns.id, id));
+  expect((await recoverStaleRuns({ db: f.db, pubsub: f.pubsub })).resumed).toEqual([id]);
+  await drainOutbox(f.db, handlers);
+  expect(reads).toEqual([{ waiting: [], working: [id], handled: ["running"], active: ["running"], machine: null }]);
+});
+
+test("a run that waited in line counts its work from the turn it got, not from the wait", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  let room = false;
+  const notes: unknown[] = [];
+  const heard: string[] = [];
+  const { brain } = scriptedComputerBrain(async function* (): AsyncGenerator<BrainEvent> {
+    if (!room) {
+      yield { type: "error", code: "busy", message: "The computer is busy.", retryable: true };
+      return;
+    }
+    yield { type: "text_delta", text: "Pronto." };
+    await Bun.sleep(0);
+    await Bun.sleep(0);
+    const [row] = await f.db.select().from(schema.agentRuns);
+    notes.push((await statusReply(f.db, row as NonNullable<typeof row>, new Date())).meta.bodyParams.minutes);
+    notes.push(
+      Date.now() - Date.parse((await activeRunsIn(f.db, f.org.id, f.general.id))[0]?.startedAt ?? "") < 60_000,
+    );
+    notes.push(heard.filter((type) => type === "agent.status").length);
+    yield { type: "done", text: "Pronto." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  await f.db.update(schema.agentRuns).set({ startedAt: new Date(Date.now() - 11 * 60_000) });
+  expect((await computerQueue(f.db, f.owner.id, f.org.id, machineId)).waiting).toHaveLength(1);
+  room = true;
+  f.pubsub.subscribe(orgTopic(f.org.id), (e) => {
+    const event = (e as { event?: { type?: string } }).event;
+    if (event?.type) heard.push(event.type);
+  });
+  await drainOutbox(f.db, handlers, { now: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS + 1_000) });
+  // Once as the ask starts, once as the computer takes the turn.
+  expect(notes).toEqual(["1", true, 2]);
 });
 
 test("a person's message during the ask joins the wait: its receipt says the line, as a reload would", async () => {

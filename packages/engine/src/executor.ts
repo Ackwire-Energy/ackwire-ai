@@ -1014,6 +1014,10 @@ async function executeRunInner(
         .set({ heartbeatAt: new Date() })
         .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "running")));
       if (options.owned && !(await options.owned())) return;
+      // Its machine kept: the worker died asking from the line. This job asks again, or the run would read as waiting
+      // all through the turn it gets.
+      lineMachine = run.waitingMachineId;
+      askingForRoom = lineMachine !== null;
     }
     if (run.status === "waiting_approval" || run.status === "waiting_input") {
       const stored = run.transcript as unknown as Transcript | null;
@@ -1242,6 +1246,7 @@ async function executeRunInner(
   /**
    * The ask from the line worked (a computer took the turn, or the model stands in): the run leaves the line, and the
    * conversation hears now what `askingForRoom` held back. A turn can open with a tool, so no word of it may come.
+   * A run's first turn starts its clock here: minutes in line are no minutes of work.
    */
   const leaveLine = async () => {
     const machineId = lineMachine;
@@ -1249,7 +1254,7 @@ async function executeRunInner(
     lineMachine = null;
     await db
       .update(agentRuns)
-      .set({ waitingMachineId: null })
+      .set({ waitingMachineId: null, ...(run.turns === 0 ? { startedAt: new Date() } : {}) })
       .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "running")));
     await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, ...bg });
     await publishChannelEvent(deps.pubsub, {
@@ -1260,6 +1265,7 @@ async function executeRunInner(
       runId: run.id,
     });
     await publishChannelEvent(deps.pubsub, event("running"));
+    await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
     await publishQueueChanged(deps.pubsub, run.orgId, machineId);
   };
   /** Writes that don't need to finish before the model call (steps, usage log); flushed after it. */
