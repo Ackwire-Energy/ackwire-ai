@@ -172,7 +172,9 @@
 .wd__cond .ac-input {
   flex: 1;
   min-width: 0;
-  height: 36px;
+  /* A small field of the ruler, as the panel's small buttons under it. */
+  height: var(--control-h-sm);
+  border-radius: var(--control-r-sm);
 }
 .wd__alert-acts {
   display: flex;
