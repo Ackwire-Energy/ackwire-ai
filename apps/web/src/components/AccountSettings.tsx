@@ -20,7 +20,7 @@ import {
   Switch,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -248,7 +248,23 @@ export function AccountSection() {
           id="account-delete"
           icon="trash"
           title={t("deleteAccount.menu")}
-          subtitle={t("deleteAccount.card.text")}
+          subtitle={
+            <>
+              {t("deleteAccount.card.text")}
+              {org.role === "owner" && (
+                <>
+                  {" "}
+                  <Link
+                    className="ac-link"
+                    to="/org/$orgId/settings/$section"
+                    params={{ orgId: org.id, section: "general" }}
+                  >
+                    {t("deleteAccount.card.oneWorkspace")}
+                  </Link>
+                </>
+              )}
+            </>
+          }
           action={
             <Button size="sm" variant="danger" onClick={() => setAccount("delete")}>
               {t("deleteAccount.card.button")}

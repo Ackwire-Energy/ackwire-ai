@@ -2418,12 +2418,6 @@
   "me.zone.none": {
     "value": "No time zone by that name"
   },
-  "delete.title": {
-    "value": "Delete your account"
-  },
-  "delete.intro": {
-    "value": "There's no undo."
-  },
   "delete.goes.account": {
     "value": "Your account, your access and your sessions are gone."
   },

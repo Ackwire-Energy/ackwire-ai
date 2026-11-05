@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { deletingText, restorable } from "@agenteschat/client/lib/deletion";
+import { readFileSync } from "node:fs";
+import { accountOutOfReach, deletedByText, deletingText, restorable } from "@agenteschat/client/lib/deletion";
 import { suspendedText } from "@agenteschat/client/lib/errors";
 import { type OutageTargetLike, targetOptions } from "@agenteschat/client/lib/machine-outages";
 import { computerIcon, type MachineOutage, targetText } from "../../src/features/outages/logic";
@@ -62,13 +63,58 @@ describe("an organization being deleted on the phone", () => {
 
   test("who deleted it and when it goes; only owners restore it, and only before that", async () => {
     const t = await translator("pt-BR");
-    expect(deletingText(t, "pt-BR", deletion)).toMatch(/^Bia apagou em .+\. Ele some de vez em .+\.$/);
-    expect(deletingText(t, "pt-BR", { ...deletion, dueAt: null, requestedBy: null })).toMatch(
-      /^Alguém apagou em .+\.$/,
+    expect(deletingText(t, "pt-BR", deletion)).toMatch(
+      /^Este workspace já está sendo apagado\. Não precisa fazer nada, ele some em .+\.$/,
     );
+    expect(deletingText(t, "pt-BR", { ...deletion, dueAt: null })).toBe(
+      "Este workspace já está sendo apagado. Não precisa fazer nada.",
+    );
+    expect(deletedByText(t, "pt-BR", deletion)).toMatch(/^Bia apagou em .+\.$/);
+    expect(deletedByText(t, "pt-BR", { ...deletion, requestedBy: null })).toMatch(/^Alguém apagou em .+\.$/);
     expect(restorable(orgs[0])).toBe(false);
     expect(restorable({ role: "owner", deletion })).toBe(true);
     expect(restorable({ role: "owner", deletion: { ...deletion, dueAt: null } })).toBe(false);
+  });
+});
+
+describe("Apagar conta on the phone's closed screens and first run", () => {
+  const read = (path: string) => readFileSync(new URL(`../../src/${path}`, import.meta.url), "utf8");
+  const deletion = { dueAt: new Date(Date.now() + 86_400_000).toISOString(), requestedAt: null, requestedBy: null };
+
+  test("offered only with no workspace that opens", () => {
+    const closing = { id: "a", role: "owner" as const, deletion };
+    expect(accountOutOfReach([closing, { id: "b", role: "member" as const }])).toBe(false);
+    expect(accountOutOfReach([closing])).toBe(true);
+    expect(accountOutOfReach([])).toBe(true);
+  });
+
+  test("every entry goes through WholeAccount, which asks that, after Sair", () => {
+    expect(read("ui/auth/WholeAccount.tsx")).toContain("if (!accountOutOfReach(orgs)) return null;");
+    for (const screen of [
+      "ui/auth/DeletingWorkspace.tsx",
+      "ui/auth/SuspendedWorkspace.tsx",
+      "features/onboarding/OnboardingFlow.tsx",
+    ]) {
+      const code = read(screen);
+      expect(code).not.toContain('label={t("deleteAccount.menu")}');
+      expect(code.indexOf("<WholeAccount")).toBeGreaterThan(code.indexOf('t("mobile.org.signOut")'));
+    }
+  });
+
+  test("the first workspace that opens is the main action, Restaurar only with nowhere else to go", () => {
+    expect(read("ui/auth/DeletingWorkspace.tsx")).toContain(
+      'variant={others.some(workspaceOpens) ? "secondary" : "primary"}',
+    );
+    for (const screen of ["ui/auth/DeletingWorkspace.tsx", "ui/auth/SuspendedWorkspace.tsx"])
+      expect(read(screen)).toContain('variant={i === 0 && workspaceOpens(o) ? "primary" : "secondary"}');
+  });
+
+  test("the lists and the deletion screen say closed and same-named apart", () => {
+    expect(read("features/me/PreferencePages.tsx")).toContain("sub={notes.get(o.id)}");
+    const screen = read("features/me/DeleteAccountScreen.tsx");
+    expect(screen).toContain('t("deleteAccount.title")');
+    expect(screen).toContain('t("deleteAccount.intro")');
+    expect(screen).toContain('t("deleteAccount.oneWorkspace")');
   });
 });
 

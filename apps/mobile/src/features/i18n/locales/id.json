@@ -912,8 +912,6 @@
     }
   },
   "delete": {
-    "title": "Hapus akunmu",
-    "intro": "Ini tidak bisa dibatalkan.",
     "goes": {
       "account": "Akunmu, aksesmu, dan sesimu akan hilang.",
       "orgs": "Ruang kerja yang anggotanya hanya kamu akan dihapus.",

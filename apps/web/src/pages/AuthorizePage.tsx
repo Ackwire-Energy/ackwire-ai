@@ -7,6 +7,7 @@ import {
   defaultWorkspace,
   requestedAccess,
 } from "@agenteschat/client/lib/apps";
+import { workspaceLabel, workspaceNotes } from "@agenteschat/client/lib/deletion";
 import { signInPath } from "@agenteschat/client/lib/guards";
 import { visibleText } from "@agenteschat/client/lib/text";
 import { isAppLocale } from "@agenteschat/i18n/locale";
@@ -209,6 +210,7 @@ function ConsentForm({
   onPick: () => void;
 }) {
   const auth = useAuth();
+  const { i18n } = useTranslation();
   const qc = useQueryClient();
   const client = consent.request.client;
   const [orgId, setOrgId] = useState(() => defaultWorkspace(consent));
@@ -228,6 +230,7 @@ function ConsentForm({
   const only = consent.workspaces.length === 1 ? consent.workspaces[0] : null;
   // Every workspace paused (on hold until billing is paid, say): Permitir can't be pressed, so the page says why.
   const nonePickable = !defaultWorkspace(consent);
+  const notes = workspaceNotes(t, i18n.language, consent.workspaces);
   return (
     <Card padded as="div" className="consent">
       <form
@@ -296,7 +299,7 @@ function ConsentForm({
               }}
               options={consent.workspaces.map((w) => ({
                 value: w.id,
-                label: w.paused ? t("apps.consent.paused", { name: w.name }) : w.name,
+                label: workspaceLabel(w.paused ? t("apps.consent.paused", { name: w.name }) : w.name, notes.get(w.id)),
                 disabled: w.paused,
               }))}
             />

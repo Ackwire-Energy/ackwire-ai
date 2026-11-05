@@ -3,9 +3,13 @@ import { formatTimeLeft } from "@agenteschat/client/lib/actions";
 import {
   type AccountDeletionLine,
   accountDeletionLines,
+  deletableWorkspaces,
   deletionProof,
   proofToSend,
   soleOwnerWaysOut,
+  workspaceLabel,
+  workspaceNotes,
+  workspaceOpens,
 } from "@agenteschat/client/lib/deletion";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
@@ -36,13 +40,14 @@ const LINE_ICON: Record<AccountDeletionLine["kind"], IconName> = {
 };
 
 /**
- * Apagar conta (App Store 5.1.1(v)): what goes and what stays, from the preflight (what closes, what they leave, the
- * computers removed, what stays behind with where to disconnect it on the website, and where plans are billed that
- * theirs stop renewing), then a hold. A workspace that
- * still needs this person as its only owner comes first, with its two ways out on the website (People, or deleting
- * it; its onboarding, while it's still being set up). Then the proof that it's them (ADR 0088 §2): a code emailed to
- * them, or on a server that sends no email their password, which the website adds first to an account without one.
- * A server from before the preflight gets the fixed lines and the hold, as it always did.
+ * Apagar conta (App Store 5.1.1(v)). The title and first line say it's the whole account, not one workspace. What goes
+ * and what stays, from the preflight (each workspace that closes with what it holds, what they leave, the computers
+ * removed, what stays behind with where to disconnect it on the website, and where plans are billed that theirs stop
+ * renewing), the way to delete just a workspace on the website, then a hold. A workspace that still needs this person
+ * as its only owner comes first, with its two ways out on the website (People, or deleting it; its onboarding, while
+ * it's still being set up). Then the proof that it's them (ADR 0088 §2): a code emailed to them, or on a server that
+ * sends no email their password, which the website adds first to an account without one. A server from before the
+ * preflight gets the fixed lines and the hold, as it always did.
  */
 export function DeleteAccountScreen() {
   const { t, i18n } = useTranslation();
@@ -83,7 +88,9 @@ export function DeleteAccountScreen() {
     : [];
   const inSetup = (id: string) => me?.organizations.some((o) => o.id === id && settingUp(o)) === true;
   // Where the website's account menu adds a password: a workspace of theirs that is open.
-  const shell = me?.organizations.find((o) => !o.deletion && o.standing?.state !== "suspended" && !settingUp(o));
+  const shell = me?.organizations.find(workspaceOpens);
+  const own = deletableWorkspaces(me?.organizations ?? []);
+  const notes = workspaceNotes(t, i18n.language, me?.organizations ?? []);
 
   const codeOut = (email: string, resendIn: number) => setSent({ email, resendAt: Date.now() + resendIn * 1000 });
   const sendCode = async () => {
@@ -164,9 +171,9 @@ export function DeleteAccountScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
       >
-        <Text variant="display">{t("mobile.delete.title")}</Text>
+        <Text variant="display">{t("deleteAccount.title")}</Text>
         <Text variant="body" tone="muted">
-          {t("mobile.delete.intro")}
+          {t("deleteAccount.intro")}
         </Text>
         <Card>
           <View style={styles.list}>
@@ -182,6 +189,26 @@ export function DeleteAccountScreen() {
             {line("phones", "x", t("mobile.delete.goes.phones"))}
           </View>
         </Card>
+        {own.length > 0 && blockers.length === 0 && blockedBy.length === 0 ? (
+          <Card>
+            <View style={styles.list}>
+              <Text variant="small" tone="ink2">
+                {t("deleteAccount.oneWorkspace")}
+              </Text>
+              <View style={styles.acts}>
+                {own.map((o) => (
+                  <Button
+                    key={o.id}
+                    variant="secondary"
+                    size="sm"
+                    label={t("deleteAccount.deleteOrg", { name: workspaceLabel(o.name, notes.get(o.id)) })}
+                    onPress={() => web(soleOwnerWaysOut(o.id, settingUp(o)).delete)}
+                  />
+                ))}
+              </View>
+            </View>
+          </Card>
+        ) : null}
         {plan.isError && !legacy ? (
           <Button variant="secondary" label={t("mobile.common.retry")} onPress={() => void plan.refetch()} />
         ) : !plan.data && !legacy ? (

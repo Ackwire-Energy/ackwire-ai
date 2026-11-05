@@ -3,6 +3,7 @@ import { orgTopic, type RealtimeEvent } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
+  archiveAgent,
   createLocalKeyWrapper,
   createOrganization,
   deleteAccount,
@@ -17,6 +18,7 @@ import {
   setOrgStanding,
   UnauthorizedError,
   USER_FILES_PURGE_JOB,
+  workspaceContents,
 } from "../src";
 import { addMember, addUser, type Fixture, makeAdmin, SECRET, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
@@ -89,6 +91,17 @@ const agentComputer = async () =>
   (await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id)))[0]?.machineId;
 
 describe("deleting an account", () => {
+  test("the preflight's counts: the agents still working there and the messages people can read", async () => {
+    f = await setup();
+    const before = (await workspaceContents(f.db, [f.org.id])).get(f.org.id);
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "oi" });
+    await archiveAgent(f.db, f.owner.id, f.org.id, f.agent.id);
+    expect((await workspaceContents(f.db, [f.org.id])).get(f.org.id)).toEqual({
+      agents: (before?.agents ?? 0) - 1,
+      messages: (before?.messages ?? 0) + 1,
+    });
+  });
+
   test("refused for the only owner of a workspace with others in it, with its name and id; nothing changes", async () => {
     f = await setup();
     enableOperatorEvents();

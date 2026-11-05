@@ -418,6 +418,8 @@
       "team.list.col.roles"
     ],
     "fr": [
+      "deleteAccount.agentCount",
+      "deleteAccount.messageCount",
       "access.agentCol",
       "agent.builtinName",
       "agent.handleLabel",
@@ -1412,6 +1414,7 @@
       "taskManager.waitGroup.routines"
     ],
     "nl": [
+      "deleteAccount.agentCount",
       "access.agentCol",
       "access.area.browser",
       "access.area.skills",
@@ -2611,6 +2614,7 @@
       "teamTemplates.channels.ada"
     ],
     "pl": [
+      "deleteAccount.agentCount",
       "access.agentCol",
       "agent.builtinName",
       "agentPage.fields.model",

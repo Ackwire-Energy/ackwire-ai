@@ -166,8 +166,10 @@ describe("a workspace being deleted: a screen of its own", () => {
   test("its owners restore it before the date, and it opens again", async () => {
     const { state, services } = await open(`/org/${ORG_ID}/settings`, { deletion: deletion(soon(6)) });
     expect(screen().getByRole("heading", { name: "Acme está sendo apagado" })).toBeTruthy();
+    expect(document.body.textContent).toContain(
+      "Este workspace já está sendo apagado. Não precisa fazer nada, ele some em",
+    );
     expect(document.body.textContent).toContain("João apagou em");
-    expect(document.body.textContent).toContain("Ele some de vez em");
     // Its socket is refused: GET /me is asked again every 30 s.
     expect(meEvery(services.queryClient)).toContain(30_000);
     expect(
@@ -192,7 +194,8 @@ describe("a workspace being deleted: a screen of its own", () => {
     await open(`/org/${ORG_ID}`, { deletion: deletion(null) });
     expect(screen().getByRole("heading", { name: "Acme está sendo apagado" })).toBeTruthy();
     expect(screen().queryByRole("button", { name: "Restaurar workspace" })).toBeNull();
-    expect(document.body.textContent).not.toContain("some de vez");
+    expect(document.body.textContent).toContain("Este workspace já está sendo apagado. Não precisa fazer nada.");
+    expect(document.body.textContent).not.toContain("some em");
     expect(document.body.textContent).not.toContain("Só um dono");
   });
 });
@@ -222,6 +225,45 @@ describe("a workspace being deleted, at its end and in the desktop app", () => {
     } finally {
       delete app.__agentesDesktop;
     }
+  });
+});
+
+describe("the workspace menu tells closed and same-named workspaces apart", () => {
+  const rows = async () => {
+    await act(async () => {
+      fireEvent.click(screen().getByRole("button", { name: /^Menu do workspace/ }));
+    });
+    await settle(4);
+    return within(screen().getByRole("menu", { name: "Seus workspaces" })).getAllByRole("menuitem");
+  };
+
+  test("one being deleted says so with its date, one on its own looks as ever", async () => {
+    await open(`/org/${ORG_ID}/issues`, {
+      beta: {
+        id: BETA_ID,
+        name: "Beta",
+        role: "owner",
+        deletion: { dueAt: soon(5), requestedAt: soon(-2), requestedBy: null },
+      },
+    });
+    const [acme, beta] = await rows();
+    expect(acme?.textContent).not.toContain("Sendo apagado");
+    expect(acme?.textContent).not.toContain("Criado em");
+    expect(beta?.textContent).toContain("Sendo apagado, some em");
+  });
+
+  test("two live ones with the same name read their creation dates", async () => {
+    const state = seedState();
+    if (!state.me) throw new Error("signed in");
+    state.me.organizations = [
+      { id: ORG_ID, name: "Acme", role: "owner", createdAt: "2026-01-10T12:00:00.000Z" },
+      { id: BETA_ID, name: "Acme", role: "owner", createdAt: "2026-03-02T12:00:00.000Z" },
+    ];
+    await renderApp(`/org/${ORG_ID}/issues`, { api: createFakeApi(state) });
+    await settle(8);
+    const [first, second] = await rows();
+    expect(first?.textContent).toMatch(/Criado em 10 jan/);
+    expect(second?.textContent).toMatch(/Criado em 2 mar/);
   });
 });
 
@@ -257,7 +299,7 @@ describe("deleting your account (Configurações › Sua conta)", () => {
     await settle(6);
     // Kept in the address: a sign-in again comes back to it.
     expect(router.state.location.search).toMatchObject({ account: "delete" });
-    const dialog = screen().getByRole("dialog", { name: "Apagar a sua conta?" });
+    const dialog = screen().getByRole("dialog", { name: "Apagar a sua conta inteira?" });
     expect(dialog.textContent).toContain("Antes de apagar");
     expect(dialog.textContent).toContain(
       "Você é a única pessoa dona de Beta. Torne outra pessoa dona, ou apague Beta.",
@@ -301,7 +343,7 @@ describe("deleting your account (Configurações › Sua conta)", () => {
       onboarding: { step: "agents", generalChannelId: "c-beta" },
     };
     await open(`/org/${ORG_ID}/issues?account=delete`, { state, beta });
-    const dialog = screen().getByRole("dialog", { name: "Apagar a sua conta?" });
+    const dialog = screen().getByRole("dialog", { name: "Apagar a sua conta inteira?" });
     expect(dialog.textContent).toContain(
       "Você é a única pessoa dona de Beta. Termine de configurar para tornar outra pessoa dona, ou apague Beta.",
     );
@@ -311,21 +353,26 @@ describe("deleting your account (Configurações › Sua conta)", () => {
     expect(within(dialog).getByRole("link", { name: "Apagar Beta" }).getAttribute("href")).toBe("/onboarding?delete=1");
   });
 
-  test("where there is no Sua conta: a workspace being deleted, one suspended, and the onboarding", async () => {
+  test("only for someone with no workspace that opens: under its own heading, apart from Restaurar and Sair", async () => {
+    const closing = { dueAt: soon(6), requestedAt: soon(-1), requestedBy: null };
+    const betaClosed: OrgSummary = { id: BETA_ID, name: "Beta", role: "member", deletion: closing };
+    const heading = () => screen().getByRole("region", { name: "Sua conta inteira" });
     const ask = async () => {
-      await click(screen().getByRole("button", { name: "Apagar conta" }));
+      await click(within(heading()).getByRole("button", { name: "Apagar conta…" }));
       await settle(6);
-      expect(screen().getByRole("dialog", { name: "Apagar a sua conta?" })).toBeTruthy();
+      expect(screen().getByRole("dialog", { name: "Apagar a sua conta inteira?" })).toBeTruthy();
     };
-    const { router } = await open(`/org/${ORG_ID}`, {
-      deletion: { dueAt: soon(6), requestedAt: soon(-1), requestedBy: null },
-    });
+    const { router } = await open(`/org/${ORG_ID}`, { deletion: closing, beta: betaClosed });
+    expect(within(heading()).queryByRole("button", { name: "Restaurar workspace" })).toBeNull();
+    expect(within(heading()).queryByRole("button", { name: "Sair" })).toBeNull();
+    // Restaurar is still the owner's, and with nowhere else to go it is the main action.
+    expect(screen().getByRole("button", { name: "Restaurar workspace" }).className).toContain("ac-btn--primary");
     await ask();
     // Kept in the address: a sign-in again comes back to it.
     expect(router.state.location.search).toMatchObject({ account: "delete" });
 
     cleanup();
-    await open(`/org/${ORG_ID}`, { standing: { state: "suspended", reason: null } });
+    await open(`/org/${ORG_ID}`, { standing: { state: "suspended", reason: null }, beta: betaClosed });
     expect(screen().getByRole("heading", { name: "Este workspace está indisponível" })).toBeTruthy();
     await ask();
 
@@ -335,15 +382,72 @@ describe("deleting your account (Configurações › Sua conta)", () => {
     state.me.organizations = [];
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(8);
-    await ask();
+    const account = document.querySelector(".onb__account");
+    expect(account?.textContent).toContain("Sua conta inteira");
+    if (!account) throw new Error("no account section");
+    await click(within(account as HTMLElement).getByRole("button", { name: "Apagar conta" }));
+    await settle(6);
+    expect(screen().getByRole("dialog", { name: "Apagar a sua conta inteira?" })).toBeTruthy();
+  });
+
+  test("with another workspace that opens, a closed screen never offers it: going there is the main action", async () => {
+    const closing = { dueAt: soon(6), requestedAt: soon(-1), requestedBy: null };
+    const noAccountDeletion = () => {
+      expect(screen().queryByRole("button", { name: /^Apagar conta/ })).toBeNull();
+      expect(screen().queryByRole("region", { name: "Sua conta inteira" })).toBeNull();
+    };
+    await open(`/org/${ORG_ID}`, { deletion: closing });
+    noAccountDeletion();
+    expect(screen().getByRole("link", { name: "Beta" }).className).toContain("ac-btn--primary");
+    expect(screen().getByRole("button", { name: "Restaurar workspace" }).className).not.toContain("ac-btn--primary");
+
+    cleanup();
+    await open(`/org/${ORG_ID}`, { standing: { state: "suspended", reason: null } });
+    noAccountDeletion();
+    expect(screen().getByRole("link", { name: "Beta" }).className).toContain("ac-btn--primary");
+
+    // Even from the address: this account's deletion starts in Sua conta.
+    cleanup();
+    await open(`/org/${ORG_ID}?account=delete`, { deletion: closing });
+    expect(screen().queryByRole("dialog")).toBeNull();
+
+    cleanup();
+    const state = seedState();
+    if (!state.me) throw new Error("signed in");
+    state.me.organizations = [{ id: BETA_ID, name: "Beta", role: "owner" }];
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(8);
+    noAccountDeletion();
+    expect(document.querySelector(".onb__account")).toBeNull();
+  });
+
+  test("one still being set up doesn't count as a way to Sua conta", async () => {
+    const closing = { dueAt: soon(6), requestedAt: soon(-1), requestedBy: null };
+    await open(`/org/${ORG_ID}`, {
+      deletion: closing,
+      beta: { id: BETA_ID, name: "Beta", role: "owner", onboarding: { step: "agents", generalChannelId: "c-beta" } },
+    });
+    expect(screen().getByRole("region", { name: "Sua conta inteira" })).toBeTruthy();
+  });
+
+  test("Sua conta points to Geral for someone who owns this workspace and only meant it", async () => {
+    await open(`/org/${ORG_ID}/settings/account`);
+    const card = screen().getByRole("region", { name: "Apagar conta" });
+    expect(
+      within(card).getByRole("link", { name: "Quer apagar só este workspace? Fica em Geral." }).getAttribute("href"),
+    ).toBe(`/org/${ORG_ID}/settings/general`);
+    cleanup();
+    await open(`/org/${ORG_ID}/settings/account`, { role: "member" });
+    expect(screen().queryByRole("link", { name: /Quer apagar só este workspace/ })).toBeNull();
   });
 
   test("what closes, what you leave, what stays; the code from the email, then out to the sign-in", async () => {
     const state = seedState({
       deletionPlan: {
         closes: [
-          { id: ORG_ID, name: "Acme" },
+          { id: ORG_ID, name: "Acme", agents: 12, messages: 340 },
           { id: "00000000-0000-4000-8000-0000000000c3", name: "Rascunho", deletion: { dueAt: soon(3) } },
+          { id: "00000000-0000-4000-8000-0000000000c4", name: "Vazio", agents: 0, messages: 0 },
         ],
         leaves: [{ id: BETA_ID, name: "Beta", role: "member" }],
         soleOwner: [],
@@ -358,9 +462,12 @@ describe("deleting your account (Configurações › Sua conta)", () => {
     state.authConfig = { ...state.authConfig, billingUrl: "https://billing.example.com" };
     // Kept in the address: a sign-in again comes back to it.
     const { router } = await open(`/org/${ORG_ID}/issues?account=delete`, { state });
-    const dialog = screen().getByRole("dialog", { name: "Apagar a sua conta?" });
+    const dialog = screen().getByRole("dialog", { name: "Apagar a sua conta inteira?" });
     for (const line of [
-      "Acme fecha agora e é apagado de vez em",
+      "Isto apaga a sua conta inteira, não só um workspace. Não tem volta.",
+      // What each one holds, so one with work in it can't be taken for an empty copy.
+      "Acme fecha agora, com 12 agentes e 340 mensagens. Só você está lá, então ele é apagado de vez em",
+      "Vazio fecha agora, sem agentes nem mensagens.",
       // Being deleted already, on its own date.
       "Rascunho já está sendo apagado. Ele some de vez em",
       "Você sai de Beta.",
@@ -377,6 +484,11 @@ describe("deleting your account (Configurações › Sua conta)", () => {
     );
     expect(within(dialog).getByRole("link", { name: "Desconectar Chave da Ana" }).getAttribute("href")).toBe(
       `/org/${BETA_ID}/settings/keys`,
+    );
+    // The way to delete just a workspace, for someone who only meant that.
+    expect(dialog.textContent).toContain("Quer apagar só um workspace? A sua conta continua.");
+    expect(within(dialog).getByRole("link", { name: "Apagar Acme" }).getAttribute("href")).toBe(
+      `/org/${ORG_ID}/settings/general?delete=1`,
     );
     expect(within(dialog).queryByRole("button", { name: "Apagar conta" })).toBeNull();
     await click(within(dialog).getByRole("button", { name: "Enviar código" }));

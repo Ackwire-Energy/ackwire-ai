@@ -11,6 +11,7 @@ export const ptBR = {
   common: {
     close: "Fechar",
     joinSentences: "{{a}} {{b}}",
+    cantUndo: "Não dá para desfazer.",
     removeName: "Remover {{name}}",
     /** The ⓘ hint's name beside a label: "Sobre Fuso horário". */
     about: "Sobre {{label}}",
@@ -1347,6 +1348,8 @@ export const ptBR = {
     addPasswordReauth: "Entre de novo para adicionar uma senha.",
     yourWorkspaces: "Seus workspaces",
     youAreHere: "Você está aqui",
+    /** Beside a workspace's name, only when another of the person's has the same name. */
+    createdOn: "Criado em {{date}}",
     newWorkspace: "Novo workspace",
     wiki: "Wiki",
     settings: "Configurações",
@@ -4742,7 +4745,7 @@ export const ptBR = {
       audience: "Quem pode falar",
       channels: "Canais",
       computer: "Computador",
-      danger: "Arquivar",
+      danger: "Arquivar ou apagar",
       keySafe: "A chave fica cifrada no servidor. Ninguém vê.",
       spentOf: "gastos em {{month}}, de {{amount}}",
       spentOfDefault: "gastos em {{month}}, de {{amount}} (padrão do workspace)",
@@ -7757,6 +7760,7 @@ export const ptBR = {
     removeAgents_one: "{{names}} usa esta skill e deixa de ter acesso a ela.",
     removeAgents_other: "{{names}} usam esta skill e deixam de ter acesso a ela.",
     removeNone: "Nenhum agente usa esta skill.",
+    removeGone: "Ela sai do workspace e não dá para desfazer.",
     removed: "{{name}} removida.",
     agentTitle: "Skills",
     agentSubtitle: "O que {{name}} pode abrir quando precisar.",
@@ -13410,6 +13414,8 @@ export const ptBR = {
     bannerSub:
       "Dá para ler e escrever normalmente. Os agentes não respondem nem trabalham enquanto ele estiver em espera.",
     label: "Status do workspace",
+    /** Beside a suspended workspace's name in a list of workspaces. */
+    row: "Indisponível",
     screen: {
       title: "Este workspace está indisponível",
       text: "As conversas e os agentes dele estão fechados por enquanto.",
@@ -13521,8 +13527,12 @@ export const ptBR = {
   /** A workspace being deleted: the screen in its place until it goes. */
   deleting: {
     title: "{{name}} está sendo apagado",
-    text: "{{by}} apagou em {{date}}. Ele some de vez em {{due}}.",
-    textLate: "{{by}} apagou em {{date}}.",
+    text: "Este workspace já está sendo apagado. Não precisa fazer nada, ele some em {{date}}.",
+    textLate: "Este workspace já está sendo apagado. Não precisa fazer nada.",
+    by: "{{by}} apagou em {{date}}.",
+    /** Beside its name in a list of workspaces. */
+    row: "Sendo apagado, some em {{date}}",
+    rowLate: "Sendo apagado",
     /** `{{by}}` once the account that deleted it is gone. */
     someone: "Alguém",
     restore: "Restaurar workspace",
@@ -13535,10 +13545,24 @@ export const ptBR = {
     card: {
       text: "Você sai de todos os workspaces e a sua conta é apagada de vez.",
       button: "Apagar conta…",
+      /** The link to Configurações › Geral, for someone who only meant this workspace. */
+      oneWorkspace: "Quer apagar só este workspace? Fica em Geral.",
     },
-    title: "Apagar a sua conta?",
-    closes_one: "{{names}} fecha agora e é apagado de vez em {{date}}. Só você está lá.",
-    closes_other: "{{names}} fecham agora e são apagados de vez em {{date}}. Só você está lá.",
+    title: "Apagar a sua conta inteira?",
+    intro: "Isto apaga a sua conta inteira, não só um workspace. Não tem volta.",
+    /** The heading over deleting the account on a closed workspace's screen and on the onboarding. */
+    whole: "Sua conta inteira",
+    /** Over links to delete a workspace instead. */
+    oneWorkspace: "Quer apagar só um workspace? A sua conta continua.",
+    closes: "{{name}} fecha agora. Só você está lá, então ele é apagado de vez em {{date}}.",
+    /** `{{what}}`: "3 agentes e 40 mensagens", from `agentCount` and `messageCount`. */
+    closesWith: "{{name}} fecha agora, com {{what}}. Só você está lá, então ele é apagado de vez em {{date}}.",
+    closesEmpty:
+      "{{name}} fecha agora, sem agentes nem mensagens. Só você está lá, então ele é apagado de vez em {{date}}.",
+    agentCount_one: "{{value}} agente",
+    agentCount_other: "{{value}} agentes",
+    messageCount_one: "{{value}} mensagem",
+    messageCount_other: "{{value}} mensagens",
     leaves: "Você sai de {{names}}.",
     messages: "Suas mensagens ficam nos workspaces sem o seu nome.",
     computers_one: "Seu computador conectado a {{name}} sai de lá: {{computers}}.",

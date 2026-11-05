@@ -58,6 +58,7 @@ import {
   unfinishedWorkspaces,
   updateOrganization,
   updateOrgSettings,
+  workspaceContents,
   workspaceDeletions,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -522,6 +523,7 @@ export function accountRoutes(deps: AppDeps) {
               permissions: [...m.permissions],
               rank: m.rank,
               logo: m.orgLogo ?? null,
+              ...(m.orgCreatedAt ? { createdAt: m.orgCreatedAt.toISOString() } : {}),
               ...(m.start ? { start: m.start } : {}),
               showActivity: m.showActivity ?? false,
               agentStyle: m.agentStyle ?? null,
@@ -651,6 +653,16 @@ export function accountRoutes(deps: AppDeps) {
                 z.object({
                   id: z.uuid(),
                   name: z.string(),
+                  agents: z
+                    .number()
+                    .int()
+                    .optional()
+                    .openapi({ description: "Its agents, unless already being deleted." }),
+                  messages: z
+                    .number()
+                    .int()
+                    .optional()
+                    .openapi({ description: "Its messages, unless already being deleted." }),
                   deletion: z
                     .object({
                       dueAt: z
@@ -695,13 +707,19 @@ export function accountRoutes(deps: AppDeps) {
     async (c) => {
       const user = c.get("user");
       const [plan, owner] = await Promise.all([accountDeletionPlan(db, user.id), pinnedOwner(db)]);
+      const contents = await workspaceContents(
+        db,
+        plan.closes.flatMap((o) => (o.dueAt ? [] : [o.id])),
+      );
       const now = Date.now();
       return c.json(
         {
           ...plan,
           // As `GET /me` says it: no date once it passed.
           closes: plan.closes.map(({ dueAt, ...org }) =>
-            dueAt ? { ...org, deletion: { dueAt: dueAt.getTime() > now ? dueAt.toISOString() : null } } : org,
+            dueAt
+              ? { ...org, deletion: { dueAt: dueAt.getTime() > now ? dueAt.toISOString() : null } }
+              : { ...org, ...contents.get(org.id) },
           ),
           serverOwner: owner === user.id,
         },

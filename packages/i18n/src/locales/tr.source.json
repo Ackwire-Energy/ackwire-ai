@@ -8,6 +8,9 @@
   "common.joinSentences": {
     "value": "{{a}} {{b}}"
   },
+  "common.cantUndo": {
+    "value": "This can't be undone."
+  },
   "common.removeName": {
     "value": "Remove {{name}}"
   },
@@ -3301,6 +3304,9 @@
   },
   "shell.youAreHere": {
     "value": "You are here"
+  },
+  "shell.createdOn": {
+    "value": "Created on {{date}}"
   },
   "shell.newWorkspace": {
     "value": "New workspace"
@@ -11394,7 +11400,7 @@
     "value": "Computer"
   },
   "agentPage.settings.danger": {
-    "value": "Archive"
+    "value": "Archive or delete"
   },
   "agentPage.settings.keySafe": {
     "value": "The key stays encrypted on the server. Nobody sees it."
@@ -18957,6 +18963,9 @@
   },
   "skills.removeNone": {
     "value": "No agent uses this skill."
+  },
+  "skills.removeGone": {
+    "value": "It leaves the workspace and this can't be undone."
   },
   "skills.removed": {
     "value": "{{name}} removed."
@@ -32887,6 +32896,9 @@
   "standing.label": {
     "value": "Workspace status"
   },
+  "standing.row": {
+    "value": "Unavailable"
+  },
   "standing.screen.title": {
     "value": "This workspace is unavailable"
   },
@@ -33071,10 +33083,19 @@
     "value": "{{name}} is being deleted"
   },
   "deleting.text": {
-    "value": "{{by}} deleted it on {{date}}. It goes for good on {{due}}."
+    "value": "This workspace is already being deleted. There's nothing you need to do, it goes on {{date}}."
   },
   "deleting.textLate": {
+    "value": "This workspace is already being deleted. There's nothing you need to do."
+  },
+  "deleting.by": {
     "value": "{{by}} deleted it on {{date}}."
+  },
+  "deleting.row": {
+    "value": "Being deleted, goes on {{date}}"
+  },
+  "deleting.rowLate": {
+    "value": "Being deleted"
   },
   "deleting.someone": {
     "value": "Someone"
@@ -33097,13 +33118,40 @@
   "deleteAccount.card.button": {
     "value": "Delete account…"
   },
+  "deleteAccount.card.oneWorkspace": {
+    "value": "Want to delete just this workspace? It's in General."
+  },
   "deleteAccount.title": {
-    "value": "Delete your account?"
+    "value": "Delete your whole account?"
+  },
+  "deleteAccount.intro": {
+    "value": "This deletes your whole account, not just one workspace. It can't be undone."
+  },
+  "deleteAccount.whole": {
+    "value": "Your whole account"
+  },
+  "deleteAccount.oneWorkspace": {
+    "value": "Want to delete just one workspace? Your account stays."
   },
   "deleteAccount.closes": {
+    "value": "{{name}} closes now. You're the only one there, so it's deleted for good on {{date}}."
+  },
+  "deleteAccount.closesWith": {
+    "value": "{{name}} closes now, with {{what}}. You're the only one there, so it's deleted for good on {{date}}."
+  },
+  "deleteAccount.closesEmpty": {
+    "value": "{{name}} closes now, with no agents or messages. You're the only one there, so it's deleted for good on {{date}}."
+  },
+  "deleteAccount.agentCount": {
     "value": {
-      "one": "{{names}} closes now and is deleted for good on {{date}}. You're the only one there.",
-      "other": "{{names}} close now and are deleted for good on {{date}}. You're the only one there."
+      "one": "{{value}} agent",
+      "other": "{{value}} agents"
+    }
+  },
+  "deleteAccount.messageCount": {
+    "value": {
+      "one": "{{value}} message",
+      "other": "{{value}} messages"
     }
   },
   "deleteAccount.leaves": {

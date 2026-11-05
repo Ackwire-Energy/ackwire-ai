@@ -14,6 +14,7 @@ import { authClient } from "@/lib/auth";
 import { serverUrl } from "@/lib/server";
 import { useOrgGate } from "@/providers/org";
 import { AgentAvatar, Button, fieldText, Icon, type IconName, LineIcon, Text, useTheme } from "@/ui";
+import { WholeAccount } from "@/ui/auth/WholeAccount";
 import { fullLook } from "../agents/edit";
 import { openPage } from "../ai/parts";
 import { confirmationSentTo, forgetConfirmationSent } from "../auth/confirmation";
@@ -192,8 +193,8 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
           disabled={orgName.length === 0 || pending}
           onPress={() => void save()}
         />
-        {/* Until a workspace is set up this is the only screen: the ways out of the account, and of a workspace made
-            by mistake, are here (deleting either on the website). */}
+        {/* Until a workspace is set up this is the only screen: the way out of a workspace made by mistake is here, and
+            of the account for someone with no other workspace that opens (deleting either on the website). */}
         {onLeave && !created ? (
           <Button variant="ghost" wide label={t("mobile.common.back")} disabled={pending} onPress={onLeave} />
         ) : null}
@@ -213,13 +214,13 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
           disabled={pending}
           onPress={() => void signOut()}
         />
-        <Button
-          variant="ghost"
-          wide
-          label={t("deleteAccount.menu")}
-          disabled={pending}
-          onPress={() => openPage(`${serverUrl()}/onboarding?account=delete`)}
-        />
+        {me.data ? (
+          <WholeAccount
+            orgs={me.data.organizations}
+            disabled={pending}
+            onDelete={() => openPage(`${serverUrl()}/onboarding?account=delete`)}
+          />
+        ) : null}
       </View>
     </KeyboardAvoidingView>
   );

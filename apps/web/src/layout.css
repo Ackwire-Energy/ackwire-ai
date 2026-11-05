@@ -7533,6 +7533,9 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
 .suspended-page__others > h2 {
   flex-basis: 100%;
 }
+.suspended-page__account {
+  margin-top: 32px;
+}
 .computers-empty {
   display: flex;
   flex-wrap: wrap;

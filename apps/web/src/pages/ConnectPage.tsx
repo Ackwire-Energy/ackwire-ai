@@ -1,5 +1,6 @@
 import type { Machine } from "@agenteschat/client";
 import { ApiError, useConfirmDevice, useDenyDevice, useMachineDevice, useMe } from "@agenteschat/client";
+import { workspaceLabel, workspaceNotes } from "@agenteschat/client/lib/deletion";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { computerKind, formatUserCode, locationText } from "@agenteschat/client/lib/machines";
@@ -172,6 +173,7 @@ export function ConnectPage({ code }: { code: string }) {
 
   const place = locationText(request.approxLocation);
   const org = orgs.find((o) => o.id === orgId);
+  const notes = workspaceNotes(t, i18n.language, me.data?.organizations ?? []);
   const busy = confirm.isPending || deny.isPending;
   return (
     <CenteredLayout narrow>
@@ -237,7 +239,7 @@ export function ConnectPage({ code }: { code: string }) {
                 <Select
                   value={orgId}
                   onValueChange={setOrgId}
-                  options={orgs.map((o) => ({ value: o.id, label: o.name }))}
+                  options={orgs.map((o) => ({ value: o.id, label: workspaceLabel(o.name, notes.get(o.id)) }))}
                 />
               </Field>
               <Field label={t("machines.name")} id="connect-name" help={t("machines.nameHelp")}>

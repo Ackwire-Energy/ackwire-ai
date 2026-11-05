@@ -236,7 +236,7 @@ export const words: EmailWords = {
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} is je code om een werkruimte te verwijderen`,
-    subjectAccount: (code) => `${code} is je code om je account te verwijderen`,
+    subjectAccount: (code) => `${code} is je code om je hele account te verwijderen`,
     preheader: "Typ hem in agentes.chat om te bevestigen. Hij werkt 10 minuten.",
     headline: "Je code",
     workspace: (org) => [
@@ -245,9 +245,9 @@ export const words: EmailWords = {
       " te verwijderen. Hij gaat meteen voor iedereen dicht en wordt 7 dagen later definitief verwijderd.",
     ],
     account: (email) => [
-      "Typ deze code om het account ",
+      "Typ deze code om het hele account ",
       { b: email },
-      " te verwijderen. Het verdwijnt meteen, en de werkruimtes waar alleen jij in zit gaan mee dicht.",
+      " te verwijderen, niet alleen één werkruimte. Het verdwijnt meteen, en de werkruimtes waar alleen jij in zit gaan mee dicht.",
     ],
     support: (address) => [
       "Hij werkt 10 minuten, en zonder deze code wordt er niets verwijderd. Was jij het niet? Deel hem dan niet en schrijf naar ",

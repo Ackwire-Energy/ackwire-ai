@@ -946,7 +946,10 @@ function RoutineRow({
         open={deleting}
         onOpenChange={(o) => !o && setDeleting(false)}
         title={t("routines.deleteTitle", { name: title })}
-        description={running ? t("routines.deleteBodyRunning") : t("routines.deleteBody")}
+        description={t("common.joinSentences", {
+          a: running ? t("routines.deleteBodyRunning") : t("routines.deleteBody"),
+          b: t("common.cantUndo"),
+        })}
         closeLabel={t("common.close")}
         width={440}
       >

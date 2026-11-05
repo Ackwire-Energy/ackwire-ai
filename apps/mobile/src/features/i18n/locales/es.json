@@ -1054,8 +1054,6 @@
     }
   },
   "delete": {
-    "title": "Eliminar tu cuenta",
-    "intro": "No se puede deshacer.",
     "goes": {
       "account": "Tu cuenta, tu acceso y tus sesiones desaparecen.",
       "orgs": "Se eliminan los espacios de trabajo donde eres el único miembro.",

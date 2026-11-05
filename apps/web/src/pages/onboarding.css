@@ -125,9 +125,26 @@ html:not([data-pointer]) .onb__signout:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* Deleting the account, apart from the workspace's way out and from Sair, under a heading of its own. */
+.onb__account {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-top: 16px;
+}
+.onb__account-title {
+  padding: 0 10px;
+  color: var(--faint);
+  font-size: 12px;
+}
 @media (max-width: 760px) {
   .onb__signout {
     align-self: center;
+  }
+  .onb__account {
+    align-items: center;
+    margin-top: 0;
   }
 }
 /* The host's face and its bubble start at one top, the bubble's small corner pointing at the face. */

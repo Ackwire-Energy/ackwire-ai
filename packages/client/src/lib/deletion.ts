@@ -1,7 +1,9 @@
 import type { TFunction } from "i18next";
 import type { AccountDeletionPlan, AuthConfig, DeletionProofInput, OrgDeletion, OrgSummary } from "../api/types";
-import { formatShortDate, joinNames } from "./format";
+import { formatInt, formatShortDate, formatTime, joinNames } from "./format";
+import { settingUp } from "./guards";
 import { CODE_LENGTH, sendsEmail } from "./join-requests";
+import { matchesName } from "./text";
 
 /** Days a deleted workspace stays closed and restorable (the engine's `WORKSPACE_DELETION_DAYS`). */
 export const DELETION_DAYS = 7;
@@ -13,16 +15,89 @@ export const deletionDueFrom = (now = new Date()) => new Date(now.getTime() + DE
 export const restorable = (org: Pick<OrgSummary, "role" | "deletion">, now = Date.now()) =>
   org.role === "owner" && !!org.deletion?.dueAt && Date.parse(org.deletion.dueAt) > now;
 
-/** The closing screen's line: who deleted it and when, then when it goes for good while that's still ahead. */
-export function deletingText(t: TFunction, locale: string, deletion: OrgDeletion, now = Date.now()): string | null {
+/** When it goes for good, while that's still ahead. */
+const dueDate = (deletion: Pick<OrgDeletion, "dueAt">, now: number) =>
+  deletion.dueAt && Date.parse(deletion.dueAt) > now ? deletion.dueAt : null;
+
+/** The closing screen's line: what's going on, that nothing more is needed, and when it goes while that's ahead. */
+export function deletingText(t: TFunction, locale: string, deletion: OrgDeletion, now = Date.now()): string {
+  const due = dueDate(deletion, now);
+  return due ? t("deleting.text", { date: formatShortDate(locale, due) }) : t("deleting.textLate");
+}
+
+/** The closing screen's second line: who deleted it and when. */
+export function deletedByText(t: TFunction, locale: string, deletion: OrgDeletion): string | null {
   if (!deletion.requestedAt) return null;
   const by = deletion.requestedBy?.name || t("deleting.someone");
-  const date = formatShortDate(locale, deletion.requestedAt);
-  const due = deletion.dueAt && Date.parse(deletion.dueAt) > now ? deletion.dueAt : null;
-  return due
-    ? t("deleting.text", { by, date, due: formatShortDate(locale, due) })
-    : t("deleting.textLate", { by, date });
+  return t("deleting.by", { by, date: formatShortDate(locale, deletion.requestedAt) });
 }
+
+/** What `settingUp` and the standing read of a workspace, and no more: the phone's lists carry narrower rows. */
+interface WorkspaceState {
+  id: string;
+  role?: string;
+  onboarding?: unknown;
+  deletion?: unknown;
+  standing?: { state: string };
+}
+
+/** A workspace that opens: not closed (being deleted or suspended) and not still being set up. */
+export const workspaceOpens = (org: WorkspaceState) =>
+  !org.deletion && org.standing?.state !== "suspended" && !settingUp(org);
+
+/**
+ * Whether a closed workspace's screen or the onboarding must offer deleting the account: it lives in Sua conta, inside
+ * a workspace that opens, and with none this is the only way to it (App Store 5.1.1(v), ADR 0035).
+ */
+export const accountOutOfReach = (orgs: readonly WorkspaceState[]) => !orgs.some(workspaceOpens);
+
+/** Where a closed workspace's screen sends the person: their other workspaces, none suspended, those that open first. */
+export function otherWorkspaces<O extends WorkspaceState>(orgs: readonly O[], orgId: string): O[] {
+  const others = orgs.filter((o) => o.id !== orgId && o.standing?.state !== "suspended");
+  return [...others.filter(workspaceOpens), ...others.filter((o) => !workspaceOpens(o))];
+}
+
+/**
+ * The workspaces a person could delete instead of their account (ADR 0088 §1): theirs to delete, and not closed. One
+ * still being set up counts: its onboarding deletes it (`soleOwnerWaysOut`).
+ */
+export const deletableWorkspaces = <O extends WorkspaceState>(orgs: readonly O[]) =>
+  orgs.filter((o) => o.role === "owner" && !o.deletion && o.standing?.state !== "suspended");
+
+type ListedWorkspace = Pick<OrgSummary, "id" | "name" | "createdAt" | "deletion" | "standing">;
+
+/**
+ * What a list says beside a workspace's name, by id: a closed one says so wherever it is, with its date when it's being
+ * deleted. Two of a person's workspaces with the same name differ by that, else by when each was made (down to the time
+ * when that's the same day). Any other workspace has no entry, so it looks as it always did.
+ */
+export function workspaceNotes(t: TFunction, locale: string, orgs: readonly ListedWorkspace[], now = Date.now()) {
+  const state = ({ deletion, standing }: ListedWorkspace) => {
+    if (deletion) {
+      const due = dueDate(deletion, now);
+      return due ? t("deleting.row", { date: formatShortDate(locale, due) }) : t("deleting.rowLate");
+    }
+    return standing?.state === "suspended" ? t("standing.row") : null;
+  };
+  const day = ({ createdAt }: ListedWorkspace) => (createdAt ? formatShortDate(locale, createdAt) : null);
+  const made = (org: ListedWorkspace, twins: ListedWorkspace[]) => {
+    if (!org.createdAt) return null;
+    const sameDay = twins.some((o) => day(o) === day(org));
+    const date = sameDay ? `${day(org)}, ${formatTime(locale, org.createdAt)}` : day(org);
+    return t("shell.createdOn", { date });
+  };
+  const notes = new Map<string, string>();
+  for (const org of orgs) {
+    const said = state(org);
+    const twins = orgs.filter((o) => o.id !== org.id && matchesName(o.name, org.name));
+    const note = [said, twins.some((o) => state(o) === said) ? made(org, twins) : null].filter(Boolean).join(" · ");
+    if (note) notes.set(org.id, note);
+  }
+  return notes;
+}
+
+/** A workspace's name in a flat list (a button, a select, a native menu), with its note from `workspaceNotes`. */
+export const workspaceLabel = (name: string, note: string | undefined) => (note ? `${name} (${note})` : name);
 
 /** What proves it's the person before deleting: a code emailed to them, their password, or a password added first. */
 export type DeletionProof = "code" | "password" | "addPassword";
@@ -68,11 +143,26 @@ export const soleOwnerWaysOut = (orgId: string, settingUp: boolean) =>
     : { people: `/org/${orgId}/settings/members`, delete: `/org/${orgId}/settings/general?delete=1` };
 
 /**
- * What deleting the account does, in the person's words, from its preflight: the workspaces that close with it (one
- * being deleted already on its own date) and those they leave, per workspace the computers removed and what stays
- * behind with where to disconnect each, where plans are billed (`billing`) that those they pay for stop renewing with
- * nothing refunded, that their messages stay, and, on a self-hosted server they set up, that its settings lose their
- * owner here.
+ * What a workspace that closes with the account holds, in words: "3 agentes e 40 mensagens" with `common`'s list,
+ * null when it holds nothing, undefined from an older server, which doesn't say.
+ */
+function contentsText(t: TFunction, locale: string, org: AccountDeletionPlan["closes"][number]) {
+  if (org.agents === undefined || org.messages === undefined) return undefined;
+  const parts = [
+    org.agents > 0 ? t("deleteAccount.agentCount", { count: org.agents, value: formatInt(locale, org.agents) }) : "",
+    org.messages > 0
+      ? t("deleteAccount.messageCount", { count: org.messages, value: formatInt(locale, org.messages) })
+      : "",
+  ].filter(Boolean);
+  return parts.length > 0 ? joinNames(parts, t) : null;
+}
+
+/**
+ * What deleting the account does, in the person's words, from its preflight: each workspace that closes with it and
+ * what it holds (one being deleted already on its own date) and those they leave, per workspace the computers removed
+ * and what stays behind with where to disconnect each, where plans are billed (`billing`) that those they pay for stop
+ * renewing with nothing refunded, that their messages stay, and, on a self-hosted server they set up, that its settings
+ * lose their owner here.
  */
 export function accountDeletionLines(
   t: TFunction,
@@ -92,10 +182,16 @@ export function accountDeletionLines(
     return [...groups];
   };
   const lines: AccountDeletionLine[] = [];
-  const closing = plan.closes.filter((o) => !o.deletion);
-  if (closing.length > 0) {
-    const date = formatShortDate(locale, deletionDueFrom(now));
-    const text = t("deleteAccount.closes", { count: closing.length, names: names(closing), date });
+  const date = formatShortDate(locale, deletionDueFrom(now));
+  for (const org of plan.closes) {
+    if (org.deletion) continue;
+    const what = contentsText(t, locale, org);
+    const text =
+      what === undefined
+        ? t("deleteAccount.closes", { name: org.name, date })
+        : what === null
+          ? t("deleteAccount.closesEmpty", { name: org.name, date })
+          : t("deleteAccount.closesWith", { name: org.name, what, date });
     lines.push({ kind: "closes", text });
   }
   for (const { name, deletion } of plan.closes) {
