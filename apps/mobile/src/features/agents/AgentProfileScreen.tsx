@@ -33,7 +33,7 @@ import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import Animated from "react-native-reanimated";
+import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import {
@@ -52,6 +52,7 @@ import {
   Segmented,
   Sky,
   Text,
+  useReducedMotion,
   useToast,
   WithPresence,
 } from "@/ui";
@@ -170,6 +171,7 @@ function Profile({ id }: { id: string }) {
   const rightHand = isRightHand(agent);
   // Which view shows; only for this visit.
   const [tab, setTab] = useState<ProfileTab>("today");
+  const reduced = useReducedMotion();
   const modelLabel = useModelLabel();
   const detail = useAgentDetail(orgId, id);
   const access = useAgentAccess(orgId, id, details);
@@ -721,7 +723,12 @@ function Profile({ id }: { id: string }) {
                 wide
               />
             </View>
-            <View style={styles.page}>{tab === "today" ? todayView : tab === "access" ? accessView : memoryView}</View>
+            {/* A view picked fades in; the one the profile opens on just shows. */}
+            <LayoutAnimationConfig skipEntering>
+              <Animated.View key={tab} entering={reduced ? undefined : TAB_IN} style={styles.page}>
+                {tab === "today" ? todayView : tab === "access" ? accessView : memoryView}
+              </Animated.View>
+            </LayoutAnimationConfig>
           </>
         ) : (
           <View style={styles.page}>{nowBlock}</View>
@@ -957,6 +964,8 @@ export function MemoryFix({
     </>
   );
 }
+
+const TAB_IN = FadeIn.duration(160);
 
 /** Height of the sky cover, the bar's area included. */
 const COVER_HEIGHT = 250;
