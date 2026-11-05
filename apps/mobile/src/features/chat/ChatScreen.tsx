@@ -1325,6 +1325,7 @@ function Chat({
             about={personDm ? <PersonStatusCard userId={personDm} /> : undefined}
             onPins={openPins}
             onMembers={channel && !dm ? openMembers : undefined}
+            onSearch={dm && searchPlace ? openSearch : undefined}
           />,
         );
   // Holding the pill: "Trocar de conversa". The pick swaps the conversation in place (the route's params; the
@@ -1385,8 +1386,7 @@ function Chat({
         extraActions={
           (dmAgentId ? 1 : 0) +
           (queueShown ? 1 : 0) +
-          (agentTasks ? tasksBadge(agentTasks).room : 0) +
-          (searchPlace ? 1 : 0)
+          (agentTasks ? tasksBadge(agentTasks).room : 0)
         }
         onPress={dmAgentId ? () => router.push(`/agent/${dmAgentId}`) : openOptions}
         {...hold}
@@ -1460,7 +1460,10 @@ function Chat({
         ) : dmComputer ? (
           <DmComputerButton agentId={dmComputer.agentId} onOpen={leavePlace} />
         ) : null}
-        {searchPlace ? <IconButton icon="search" label={t("searchPage.searchHere")} onPress={openSearch} /> : null}
+        {/* A DM searches from its "…" (its name and the agent's own buttons keep the room). */}
+        {searchPlace && !dm ? (
+          <IconButton icon="search" label={t("searchPage.searchHere")} onPress={openSearch} />
+        ) : null}
         <IconButton icon="more" label={t("mobile.chat.options")} onPress={openOptions} />
       </>
     ) : null;

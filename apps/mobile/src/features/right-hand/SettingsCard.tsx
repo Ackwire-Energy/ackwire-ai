@@ -161,7 +161,6 @@ function SettingsRow({
           <AskDone
             done={p.status === "accepted" && !receipt?.undoneAt && delegate?.state !== "undone"}
             words={words}
-            at={p.decidedAt}
             more={
               byRightHand && delegate?.reason
                 ? {
@@ -274,7 +273,7 @@ function SettingsRow({
       waitsFor={state}
       lead={(p.stale ? t("rightHand.card.staleHelp", g) : p.why) || t("proposals.titleSettings", g)}
       well={{
-        tile: <AgentFace agentId={p.agentId} size={32} live={false} />,
+        tile: <AgentFace agentId={p.agentId} size={20} live={false} />,
         title: t("rightHand.card.settings", { name }),
         detail: [agent?.handle ? `@${agent.handle}` : null, agent?.role].filter(Boolean).join(" · "),
       }}

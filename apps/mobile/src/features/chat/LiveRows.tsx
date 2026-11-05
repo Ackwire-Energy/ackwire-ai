@@ -196,7 +196,7 @@ export const TurnRow = memo(function TurnRow({
   const items = turnItems(run);
   // The first thing it said opens the block, above its tools.
   const { said, lines } = turnOpener(items);
-  // At work with no words yet: the waiting row (its face, the pixels and what it does now), no name.
+  // At work with no words yet: the waiting row (its face, its name line, the pixels and what it does now).
   const waiting = waitsForWords(run);
   const wordsOnTop = !said && lines.length === 0;
   const now = useNow(1000);
@@ -237,6 +237,20 @@ export const TurnRow = memo(function TurnRow({
   );
   if (quiet) return null;
 
+  // The name line of a message: its name, its role and, in the time's place, how long it has worked.
+  const whoLine = (clock: ReactNode) => (
+    <View style={styles.who}>
+      <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
+        {agent?.name ?? ""}
+      </Text>
+      {agent?.role ? (
+        <Text variant="caption" tone="faint" numberOfLines={1} style={styles.role}>
+          {agent.role}
+        </Text>
+      ) : null}
+      {clock}
+    </View>
+  );
   if (waiting)
     return (
       <>
@@ -245,7 +259,10 @@ export const TurnRow = memo(function TurnRow({
           <View style={styles.avslot}>
             <AgentFace agentId={run.agentId} size={34} mode="think" />
           </View>
-          <WaitLine work={run.work} color={color} tail={<RunTail run={run} now={now} />} />
+          <View style={styles.body}>
+            {whoLine(<RunClock run={run} now={now} />)}
+            <WaitLine work={run.work} color={color} />
+          </View>
         </View>
       </>
     );
@@ -257,28 +274,20 @@ export const TurnRow = memo(function TurnRow({
           <AgentFace agentId={run.agentId} size={34} mode={live ? (phase === "writing" ? "run" : "think") : "idle"} />
         </View>
         <View style={styles.body}>
-          <View style={styles.who}>
-            <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
-              {agent?.name ?? ""}
-            </Text>
-            {/* While it works, the line above the box says so: the block has its start time, as a message (the web's
-              `RunClock`); "parado" once stopped. */}
+          {/* While it works, the time's place says for how long (its start time until two seconds in); "parado" once
+            stopped. Its stop is the composer's. */}
+          {whoLine(
             <View style={styles.state} accessible accessibilityLiveRegion="polite" accessibilityLabel={word}>
               {live ? (
-                <Text variant="footnote" tone="faint">
-                  {when.time(new Date(since ?? mountedAt).toISOString())}
-                </Text>
+                <RunClock run={run} now={now} startedAt={when.time(new Date(since ?? mountedAt).toISOString())} />
               ) : (
                 <Text variant="footnote" tone="faint" maxFontSizeMultiplier={CHROME_MAX_SCALE}>
                   {word}
                   {took}
                 </Text>
               )}
-            </View>
-            {/* Its words arriving: its time and its stop after the time it started (the line above the composer no
-              longer says them while the row shows). */}
-            {live ? <RunTail run={run} now={now} /> : null}
-          </View>
+            </View>,
+          )}
           {/* Nothing said and no steps yet: the words stream where the opener stands, so the line it opens
             with stays put when a tool call turns it into narration. */}
           {wordsOnTop && run.text ? (
@@ -298,12 +307,12 @@ export const TurnRow = memo(function TurnRow({
 });
 
 /**
- * The waiting row's body beside the face, centered on it (as the web's `.ac-wait`): three 4px pixels in the agent's
- * color lighting up in turn with a 2px hop (its light tone in the dark theme), then a muted line saying what it does
- * now (`waitStep`), each new one fading in, in one width (cut with "…", the whole step for screen readers), and
- * `tail` after it (its time and its stop). Reduce Motion: the pixels stand still at 60%, the line just swaps.
+ * The waiting row's words, under its name line where its reply will be (as the web's `.ac-wait`): three 4px pixels in
+ * the agent's color lighting up in turn with a 2px hop (its light tone in the dark theme), then a muted line saying
+ * what it does now (`waitStep`), each new one fading in, cut with "…" (the whole step for screen readers). Reduce
+ * Motion: the pixels stand still at 60%, the line just swaps.
  */
-function WaitLine({ work, color, tail }: { work: LiveRun["work"]; color: AgentColorName; tail?: ReactNode }) {
+function WaitLine({ work, color }: { work: LiveRun["work"]; color: AgentColorName }) {
   const { t } = useTranslation();
   const { scheme } = useTheme();
   const reduced = useReducedMotion();
@@ -332,43 +341,35 @@ function WaitLine({ work, color, tail }: { work: LiveRun["work"]; color: AgentCo
           })}
         </View>
         <Animated.View key={step} entering={reduced ? undefined : FadeIn.duration(160)} style={styles.waitStep}>
-          <Text variant="footnote" tone="muted" numberOfLines={1}>
+          <Text variant="small" tone="muted" numberOfLines={1}>
             {step}
           </Text>
         </Animated.View>
       </View>
-      {tail}
     </View>
   );
 }
 
 /**
- * The end of an agent's live row (the web's `RunTail`): "· 12 s" while it works and its stop when it is the run here
- * I'd stop. The line above the composer says neither while the row shows, so they sit where the eye already is. The
- * clock keeps its room from the start, so the stop never shifts when the seconds appear.
+ * How long an agent's live turn has worked ("12 s"), in the time's place of its name line, as the web's `RunTail`
+ * says it; before two seconds, `startedAt` (when it started) or nothing.
  */
-function RunTail({ run, now }: { run: LiveRun; now: number }) {
+function RunClock({ run, now, startedAt }: { run: LiveRun; now: number; startedAt?: string }) {
   const { t } = useTranslation();
-  const rows = useContext(LiveRowsContext);
   const atWork = run.status === "thinking" || run.status === "queued" || run.status === "running";
-  const stops = rows?.stopRunId === run.runId ? [run] : [];
-  if (!atWork && stops.length === 0) return null;
   const took = atWork ? runElapsed(t, run, now) : null;
+  const shown = took ?? startedAt;
+  if (!shown) return null;
   return (
-    <View style={styles.tail}>
-      {atWork ? (
-        <Text
-          variant="footnote"
-          tone="faint"
-          numberOfLines={1}
-          maxFontSizeMultiplier={CHROME_MAX_SCALE}
-          style={styles.tailClock}
-        >
-          {took ? `· ${took}` : ""}
-        </Text>
-      ) : null}
-      {rows ? <LineStop runs={stops} onStop={rows.onStop} rule={false} place="row" /> : null}
-    </View>
+    <Text
+      variant="footnote"
+      tone="faint"
+      numberOfLines={1}
+      maxFontSizeMultiplier={CHROME_MAX_SCALE}
+      style={styles.clock}
+    >
+      {shown}
+    </Text>
   );
 }
 
@@ -864,16 +865,12 @@ const styles = StyleSheet.create({
   msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
-  // Centered on the 34px face (its slot starts 2px down); face, pixels and words one step apart.
-  wait: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 11, height: 34, marginTop: 2 },
-  waitWords: { flexDirection: "row", alignItems: "center", gap: 11, flexShrink: 1, minWidth: 0 },
-  // One width whatever it says (a narrow screen gives way), cut with "…": its time and its stop never move under a
-  // finger as the step turns.
-  waitStep: { flexBasis: 200, flexGrow: 0, flexShrink: 1, minWidth: 0 },
-  // The row's end: "· 12 s" and the stop. The clock keeps room for its seconds, and the stop never raises the line it
-  // ends (24 points drawn in a 16-point line).
-  tail: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
-  tailClock: { minWidth: 44, fontVariant: ["tabular-nums"] },
+  // Where its words will be: the pixels and what it does now on the message text's first line (24 high).
+  wait: { flexDirection: "row", alignItems: "center", minHeight: 24 },
+  waitWords: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1, minWidth: 0 },
+  waitStep: { flexShrink: 1, minWidth: 0 },
+  clock: { fontVariant: ["tabular-nums"] },
+  role: { flexShrink: 0 },
   rowStop: {
     width: 24,
     height: 24,

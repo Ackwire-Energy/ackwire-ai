@@ -45,7 +45,9 @@ import {
   ApprovalTraits,
   ApproveAlwaysButton,
   ApproveAlwaysHint,
+  approvalHeadline,
   approvalTitleText,
+  useApprovalSource,
   useCancelAhead,
   useOriginShort,
 } from "../approvals/parts";
@@ -101,34 +103,35 @@ export function ApprovalInline({ approvalId, messageId }: { approvalId: string; 
   return <ApprovalDone approval={a} />;
 }
 
-/** One decided request, as one line: how it ended and its values, so several of one tool are told apart. */
+/**
+ * One decided request, as the conversation's event line: how it ended and what it did ("Aprovado por você · Gerar
+ * imagem"); its values (so several of one tool are told apart), when it goes out if approved ahead, and the reason
+ * open under it.
+ */
 function ApprovalDone({ approval: a }: { approval: Approval }) {
   const { t, i18n } = useTranslation();
   const meId = useMeId();
   const dir = useDirectory();
   const outcome = decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name);
-  // Approved ahead and still to run: when it goes out, said on its line, and a way to withdraw it.
+  // Approved ahead and still to run: when it goes out, said under its line, and a way to withdraw it.
   const scheduled = aheadPhase(a) === "scheduled" && a.runAt;
   const cancelAhead = useCancelAhead();
-  const words = [
-    `${outcome}: ${markName(approvalTitleText(t, a))}`,
+  const lines = [
     approvalSummary(a, i18n.language),
     scheduled ? t("approval.ahead.scheduled", { when: nextLabel(i18n.language, scheduled) }) : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+    a.reason ? t("approval.reasonLine", { reason: a.reason }) : null,
+  ].filter((x): x is string => Boolean(x));
   const done = (
     <AskDone
       done={a.status === "approved"}
-      words={words}
-      at={scheduled ? null : askEndedAt(a)}
+      words={`${outcome} · ${markName(approvalHeadline(t, a, i18n.language))}`}
       more={
-        a.reason
+        lines.length > 0
           ? {
               label: t("approval.seeDetails"),
               content: (
                 <Text variant="small" tone="muted">
-                  {t("approval.reasonLine", { reason: a.reason })}
+                  {lines.join("\n")}
                 </Text>
               ),
             }
@@ -302,7 +305,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
       well={
         single
           ? {
-              tile: <ApprovalMark approval={first} size={32} />,
+              tile: <ApprovalMark approval={first} size={20} />,
               title: head(single),
               more: {
                 label: t("approval.run.show"),
@@ -360,8 +363,9 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
           </View>
         )
       }
+      expiry={deadline ? <ExpiryLine createdAt={first.createdAt} expiresAt={deadline} /> : undefined}
       foot={
-        <AskFoot expiry={deadline ? <ExpiryLine createdAt={first.createdAt} expiresAt={deadline} /> : undefined}>
+        <AskFoot>
           {single ? decide(single, t("approval.run.approve"), true) : decide(items, t("approval.all.approve"), false)}
         </AskFoot>
       }
@@ -398,11 +402,12 @@ function ApprovalGroupItem({
   const cancelAhead = useCancelAhead();
   const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   const pending = a.status === "pending";
+  const source = useApprovalSource(a);
   const detail = a.email
     ? [a.email.to.join(", "), a.email.subject].filter(Boolean).join(" · ")
     : !a.connector
       ? a.detail
-      : approvalSummary(a, i18n.language) || null;
+      : [source.name, approvalSummary(a, i18n.language)].filter(Boolean).join(" · ");
   const own = itemOwnWords(a, lead);
   const scheduled = aheadPhase(a) === "scheduled" && a.runAt;
   return (
@@ -536,11 +541,12 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
     );
   // An email says to whom and about what; a connector's detail is its raw call (`tool · key=value`), so its
   // values in words instead, the call under "Ver detalhes".
+  const source = useApprovalSource(a);
   const detail = a.email
     ? [a.email.to.join(", "), a.email.subject].filter(Boolean).join(" · ")
     : !a.connector
       ? a.detail
-      : approvalSummary(a, i18n.language) || null;
+      : [source.name, approvalSummary(a, i18n.language)].filter(Boolean).join(" · ");
   return (
     <AskCard
       id={a.id}
@@ -549,8 +555,8 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
       waitsFor={a.canDecide ? "you" : owner ? t("ask.waitingFor", { name: owner }) : null}
       lead={approvalWhy(a) ?? t("approval.askPlain")}
       well={{
-        tile: <ApprovalMark approval={a} size={32} />,
-        title: approvalTitleText(t, a),
+        tile: <ApprovalMark approval={a} size={20} />,
+        title: approvalHeadline(t, a, i18n.language),
         detail,
         more: {
           label: a.email ? t("approval.seeEmail") : t("approval.seeDetails"),
@@ -581,9 +587,10 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
           ),
         },
       }}
-      body={<ApprovalAheadLine approval={a} />}
+      body={aheadPhase(a) === "asking" && a.runAt ? <ApprovalAheadLine approval={a} /> : undefined}
+      expiry={<ExpiryLine createdAt={a.createdAt} expiresAt={a.expiresAt} />}
       foot={
-        <AskFoot expiry={<ExpiryLine createdAt={a.createdAt} expiresAt={a.expiresAt} />}>
+        <AskFoot>
           {a.canDecide ? (
             <>
               <View style={styles.itemActs}>

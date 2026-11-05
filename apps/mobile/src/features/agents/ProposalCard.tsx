@@ -34,7 +34,6 @@ import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, Icon, Text, useTheme } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
-import { askEndedAt } from "../chat/ask-store";
 import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
 import { requestComposerText } from "../chat/composer-request";
 import { markName } from "../chat/logic";
@@ -164,7 +163,7 @@ export function AgentProposalView({
         waitsFor={decides ? "you" : sends && !card.askedAt ? t("rightHand.card.onlyCreators") : null}
         lead={why || t("actionCard.agentProposal.title", { agent: proposer })}
         well={{
-          tile: <AgentAvatar agent={fullLook(draft.appearance)} size={32} name={draft.name} live={false} />,
+          tile: <AgentAvatar agent={fullLook(draft.appearance)} size={20} name={draft.name} live={false} />,
           title: draft.name,
           detail: [`@${draft.handle}`, draft.role].filter(Boolean).join(" · "),
           more: {
@@ -188,8 +187,9 @@ export function AgentProposalView({
             </>
           ) : undefined
         }
+        expiry={<ExpiryLine createdAt={sentAt} expiresAt={card.expiresAt} />}
         foot={
-          <AskFoot expiry={<ExpiryLine createdAt={sentAt} expiresAt={card.expiresAt} />}>
+          <AskFoot>
             {decides && rightHand ? (
               <>
                 <Button
@@ -287,8 +287,7 @@ export function AgentProposalView({
   return (
     <AskDone
       done={status === "created" && delegate?.state !== "undone"}
-      words={byRightHand ? `${markName(draft.name)} · ${delegated}` : `${outcome}: ${markName(draft.name)}`}
-      at={byRightHand ? delegate?.at : askEndedAt({ ...card, status })}
+      words={byRightHand ? `${markName(draft.name)} · ${delegated}` : `${outcome} · ${markName(draft.name)}`}
       more={{
         label: t(byRightHand && delegate?.state === "approved" ? "rightHandApprovals.card.why" : "ask.seeChange"),
         content: (

@@ -185,13 +185,14 @@ function HandoffAsk({
       waitsFor={mine ? "you" : asked ? t("ask.waitingFor", { name: asked }) : null}
       lead={h.instructions}
       well={{
-        tile: <IconTile name={desktop ? "laptop" : "globe"} size={32} />,
+        tile: <IconTile name={desktop ? "laptop" : "globe"} size={20} />,
         title: name,
         detail: null,
         more: desktop ? null : { label: t("ask.seeScreen"), content: <ScreenPeek agentId={h.agentId} /> },
       }}
+      expiry={h.expiresAt ? <ExpiryLine createdAt={h.createdAt} expiresAt={h.expiresAt} /> : null}
       foot={
-        <AskFoot expiry={h.expiresAt ? <ExpiryLine createdAt={h.createdAt} expiresAt={h.expiresAt} /> : null}>
+        <AskFoot>
           {mine ? (
             <AskButtons
               primary={

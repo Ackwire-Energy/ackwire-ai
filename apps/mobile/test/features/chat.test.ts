@@ -514,10 +514,9 @@ describe("working line", () => {
     // Two agents out of view: the line can't say whose time or stop.
     const both = workingEntries([ada, atlas], [], name);
     expect(awayRun(both, [ada, atlas], () => false)).toBeUndefined();
-    // The step keeps one width in the line and in the row, so the clock and the stop never move as it turns.
+    // The step keeps one width in the line, so its clock and its stop never move as it turns.
     const lines = await source("features/chat/LiveRows.tsx");
     expect(lines).toContain("barStep: { flexBasis: 150, flexGrow: 0, flexShrink: 1, minWidth: 0 },");
-    expect(lines).toContain("waitStep: { flexBasis: 200, flexGrow: 0, flexShrink: 1, minWidth: 0 },");
     // "Ver" only once its row is in the conversation, and then the stop after it, without a second rule.
     const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
     expect(line).toContain("const seeable = away && turnShows(away, now) ? away : undefined;");
@@ -535,16 +534,14 @@ describe("working line", () => {
     expect(rowStopOf(runs, () => false)).toBeUndefined();
   });
 
-  test("the live row ends in its time and its stop, outside its spoken step so both stay reachable", async () => {
+  test("the live row reads as a message: its name line ends in how long it has worked; its stop is the composer's", async () => {
     const lines = await source("features/chat/LiveRows.tsx");
     const row = lines.slice(lines.indexOf("export const TurnRow"), lines.indexOf("function WaitLine("));
-    expect(row).toContain("<WaitLine work={run.work} color={color} tail={<RunTail run={run} now={now} />} />");
-    expect(row).toContain("{live ? <RunTail run={run} now={now} /> : null}");
-    const tail = lines.slice(lines.indexOf("function RunTail("), lines.indexOf("function RevealText("));
-    expect(tail).toContain("runElapsed(t, run, now)");
-    expect(tail).toContain('<LineStop runs={stops} onStop={rows.onStop} rule={false} place="row" />');
-    // 24 points drawn, 44 to the finger.
-    expect(lines).toContain("hitSlop={10}");
+    expect(row).toContain("{whoLine(<RunClock run={run} now={now} />)}");
+    expect(row).toContain("<WaitLine work={run.work} color={color} />");
+    expect(row).not.toContain("LineStop");
+    const clock = lines.slice(lines.indexOf("function RunClock("), lines.indexOf("function RevealText("));
+    expect(clock).toContain("runElapsed(t, run, now)");
   });
 
   test("once its words arrive, the block's header says the name and its start time, as on the web (no orbit)", async () => {

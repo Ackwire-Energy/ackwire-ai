@@ -9,7 +9,7 @@ import {
 import { can } from "@agenteschat/client/lib/permissions";
 import { secretAad } from "@agenteschat/client/lib/secret-box";
 import { secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
-import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
+import { secretOutcome } from "@agenteschat/client/lib/secret-words";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
@@ -174,12 +174,11 @@ export function SecretCard({ request }: { request: SecretRequest }) {
         <AskDone
           done={r.status === "delivered"}
           words={[
-            `${secretOutcome(t, r, mine, person)}: ${markName(r.name)}`,
+            `${secretOutcome(t, r, mine, person)} · ${markName(r.name)}`,
             kept === "saved" ? t("mobile.vault.card.saved") : null,
           ]
             .filter(Boolean)
             .join(" · ")}
-          at={secretEndedAt(r)}
           more={{
             label: t("approval.seeDetails"),
             content: (
@@ -218,7 +217,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       agentId={r.agentId}
       waitsFor={mine ? "you" : t("ask.waitingFor", { name: person })}
       lead={r.purpose}
-      well={{ tile: <IconTile name="lock" size={32} />, title: r.name, detail: where }}
+      well={{ tile: <IconTile name="lock" size={20} />, title: r.name, detail: where }}
       body={
         mine ? (
           <>
@@ -357,8 +356,9 @@ export function SecretCard({ request }: { request: SecretRequest }) {
           </>
         ) : null
       }
+      expiry={<ExpiryLine expiresAt={r.expiresAt} />}
       foot={
-        <AskFoot expiry={<ExpiryLine expiresAt={r.expiresAt} />}>
+        <AskFoot>
           {mine ? (
             <AskButtons
               primary={

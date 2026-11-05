@@ -534,6 +534,7 @@ export function ChannelOptions({
   about,
   onPins,
   onMembers,
+  onSearch,
 }: {
   channelId: string;
   title: string;
@@ -546,6 +547,8 @@ export function ChannelOptions({
   onPins: () => void;
   /** A channel: who is in it (and, for admins, adding and removing). */
   onMembers?: (() => void) | undefined;
+  /** A DM: searching it (its header keeps the room for the name and the agent's own buttons). */
+  onSearch?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -565,6 +568,9 @@ export function ChannelOptions({
       {about}
       <ActionList
         items={[
+          ...(onSearch
+            ? [{ key: "search", icon: "search" as const, label: t("searchPage.searchHere"), onPress: onSearch }]
+            : []),
           ...(onMembers
             ? [{ key: "members", icon: "members" as const, label: t("shell.members"), onPress: onMembers }]
             : []),
