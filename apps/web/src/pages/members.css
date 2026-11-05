@@ -117,6 +117,8 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
   gap: 6px var(--space-3);
+  /* Room above the risen name's line for the 32px button centred on it. */
+  padding-block: var(--row-py);
 }
 .members-person__name {
   align-self: flex-start;

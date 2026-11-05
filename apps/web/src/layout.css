@@ -7707,6 +7707,8 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
 }
 .machine-tool:has(> .list-col > .ac-captop) {
   align-items: flex-start;
+  /* Room above the risen name's line for Turn off, centred on it. */
+  padding-block: var(--row-py);
 }
 .machine-tool__tail {
   display: flex;
