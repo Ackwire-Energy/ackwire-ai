@@ -1967,7 +1967,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
 
   test("a site's password is the browser's alone where the runner keeps it so: its card, its box and the agent say so", async () => {
     const SITE = "https://dashboard.stripe.com";
-    const { runner, row } = await asking({ target: "env", site: "dashboard.stripe.com/login" }, { sites: true });
+    const { runner, row } = await asking({ site: "dashboard.stripe.com/login" }, { sites: true });
     expect(row).toMatchObject({ targetKind: "site", site: SITE });
     const [card] = await f.db
       .select()
