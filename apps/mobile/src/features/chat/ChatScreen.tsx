@@ -118,7 +118,7 @@ import { RemindSheet } from "../reminders/RemindSheet";
 import { RightHandIntro } from "../right-hand/Intro";
 import { ConversationSearch } from "../search/ConversationSearch";
 import { hitTarget } from "../search/logic";
-import { AgentFace, Face } from "../shared/Face";
+import { AgentFace, Face, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useMyHandle, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, previewOf } from "../shared/logic";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
@@ -1330,7 +1330,13 @@ function Chat({
             title={title}
             {...(optionsLine ? { subtitle: optionsLine } : {})}
             leading={
-              dm ? <Face who={{ type: dm.with.type, id: dm.with.id }} size={36} live={false} /> : <Tile icon="hash" />
+              dm ? (
+                <OpensAgent agentId={dm.with.id}>
+                  <Face who={{ type: dm.with.type, id: dm.with.id }} size={36} live={false} />
+                </OpensAgent>
+              ) : (
+                <Tile icon="hash" />
+              )
             }
             agentId={dmAgentId}
             about={personDm ? <PersonStatusCard userId={personDm} /> : undefined}
