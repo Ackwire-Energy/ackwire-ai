@@ -259,7 +259,7 @@ type Range = ReturnType<typeof analyticsRange>;
 
 const total = (column: unknown) => sql<number>`coalesce(sum(${column}), 0)`.mapWith(Number);
 /** Rows, or distinct values of `column`, among the rows where `filter` holds when there is one. */
-const howMany = (filter?: SQL, column?: unknown) => {
+export const howMany = (filter?: SQL, column?: unknown) => {
   const what = column === undefined ? sql`*` : sql`distinct ${column}`;
   return (filter ? sql<number>`count(${what}) filter (where ${filter})` : sql<number>`count(${what})`).mapWith(Number);
 };
