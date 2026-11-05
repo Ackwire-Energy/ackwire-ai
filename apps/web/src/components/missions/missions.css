@@ -395,9 +395,10 @@ a.mi-ref:hover code {
   color: var(--faint);
 }
 /* A small inline select (Select size="sm": the compact step of the ruler, like the card's buttons). */
+/* Never past its column: beside the label in a 360px thread or on a phone the column is under 160px. */
 .mi-plan__who {
   width: auto;
-  min-width: 160px;
+  min-width: min(160px, 100%);
 }
 .mi-plan__foot {
   display: flex;
