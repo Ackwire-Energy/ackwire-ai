@@ -214,7 +214,12 @@ export function ApprovalEmailLetter({ email, full }: { email: ApprovalEmail; ful
             {email.body}
           </Text>
           {!full && long ? (
-            <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setOpen((o) => !o)}>
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={12}
+              onPress={() => setOpen((o) => !o)}
+              style={({ pressed }) => (pressed ? styles.pressed : null)}
+            >
               <Text variant="footnote" tone="ink2" style={[styles.medium, styles.underline]}>
                 {open ? t("approval.email.less") : t("approval.email.more")}
               </Text>
@@ -392,7 +397,7 @@ export function ApprovalAheadLine({
   if (aheadPhase(a) !== "asking" || !a.runAt) return null;
   return (
     <View style={styles.origin}>
-      <LineIcon name="clock" size={14} color={c.ink2} variant="small" />
+      <LineIcon name="clock" size={15} color={c.ink2} variant="small" />
       <Text variant="small" tone="ink" style={[styles.grow, styles.medium]}>
         {t("approval.ahead.line", { when: nextLabel(i18n.language, a.runAt) })}
       </Text>
@@ -493,8 +498,9 @@ export function ApprovalFuse({ approval: a }: { approval: Pick<Approval, "create
 const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   facts: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4 },
-  fact: { flexDirection: "row", gap: 10, paddingVertical: 7 },
-  factStacked: { gap: 2, paddingVertical: 7 },
+  // With the box's 4, the first and last fact sit 10 from its edge, as the letter's head and body do.
+  fact: { flexDirection: "row", gap: 10, paddingVertical: 6 },
+  factStacked: { gap: 2, paddingVertical: 6 },
   wrapAnywhere: { flexShrink: 1 },
   factKey: { width: 92 },
   grow: { flex: 1, minWidth: 0 },
@@ -502,7 +508,7 @@ const styles = StyleSheet.create({
   why: { gap: 4 },
   origin: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   fuse: { flexDirection: "row", alignItems: "center", gap: 10 },
-  letter: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, borderBottomLeftRadius: 4, overflow: "hidden" },
+  letter: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, borderBottomLeftRadius: 6, overflow: "hidden" },
   letterHead: { gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   letterBody: { gap: 6, paddingHorizontal: 12, paddingVertical: 10 },
   answers: {
@@ -515,6 +521,7 @@ const styles = StyleSheet.create({
   },
   medium: { fontWeight: "600" },
   underline: { textDecorationLine: "underline" },
+  pressed: { opacity: 0.6 },
   saidRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   expiry: { fontWeight: "500", fontVariant: ["tabular-nums"] },
   always: { gap: 4 },

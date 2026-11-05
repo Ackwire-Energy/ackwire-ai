@@ -12,12 +12,24 @@ import { choiceOf, MAIL_BRANDS } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
 import { useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import { Dither } from "@/sky/Dither";
-import { Button, EmptyState, Filters, Icon, SearchField, SectionHeader, Text } from "@/ui";
+import {
+  Button,
+  EmptyState,
+  Filters,
+  Icon,
+  LineIcon,
+  PressScale,
+  SearchField,
+  SectionHeader,
+  Text,
+  useReducedMotion,
+} from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
@@ -183,32 +195,33 @@ function Gallery() {
                     {...(connectedCount > 0 ? { count: connectedCount } : {})}
                   />
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-                    {/* Adding one opens the row: always in sight, never at the end of a sideways scroll. */}
-                    {admin ? <AddressTile onPress={() => sheet.open(<AddressSheet />)} /> : null}
-                    {/* Mailboxes first, as on the web, by their name ("Suporte"). */}
-                    {mailboxes.map((a) => (
-                      <Pressable
-                        key={a.id}
-                        onPress={() => sheet.open(<MailboxSheet accountId={a.id} />)}
-                        accessibilityRole="button"
-                        accessibilityLabel={t("mobile.connectors.connectedCheck", { name: a.label })}
-                        style={styles.mini}
-                      >
-                        <ConnectorIcon def={MAIL_BRANDS[choiceOf(a)] ?? null} label={a.label} size={48} check />
-                        <Text variant="caption" tone="muted" numberOfLines={1}>
-                          {a.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                    {/* Services, then servers connected by address (oldest first, as on the web). */}
-                    {[...apps, ...mcps].map((item) => (
-                      <ConnectedTile
-                        key={item.id}
-                        item={item}
-                        waiting={admin && item.pending > 0}
-                        onPress={() => openItem(item)}
-                      />
-                    ))}
+                    {/* A connection made or removed while the row is in sight fades, and the others slide over. */}
+                    <LayoutAnimationConfig skipEntering>
+                      {/* Adding one opens the row: always in sight, never at the end of a sideways scroll. */}
+                      {admin ? <AddressTile onPress={() => sheet.open(<AddressSheet />)} /> : null}
+                      {/* Mailboxes first, as on the web, by their name ("Suporte"). */}
+                      {mailboxes.map((a) => (
+                        <MiniTile
+                          key={a.id}
+                          onPress={() => sheet.open(<MailboxSheet accountId={a.id} />)}
+                          label={t("mobile.connectors.connectedCheck", { name: a.label })}
+                        >
+                          <ConnectorIcon def={MAIL_BRANDS[choiceOf(a)] ?? null} label={a.label} size={48} check />
+                          <Text variant="caption" tone="muted" numberOfLines={1}>
+                            {a.label}
+                          </Text>
+                        </MiniTile>
+                      ))}
+                      {/* Services, then servers connected by address (oldest first, as on the web). */}
+                      {[...apps, ...mcps].map((item) => (
+                        <ConnectedTile
+                          key={item.id}
+                          item={item}
+                          waiting={admin && item.pending > 0}
+                          onPress={() => openItem(item)}
+                        />
+                      ))}
+                    </LayoutAnimationConfig>
                   </ScrollView>
                 </>
               ) : null}
@@ -316,21 +329,19 @@ function ConnectedTile({ item, waiting, onPress }: { item: ConnectedItem; waitin
   const c = useColors();
   const name = itemName(t, item);
   return (
-    <Pressable
+    <MiniTile
       onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={
+      label={
         waiting
           ? `${name}, ${t("toolReview.decideTitle", { count: item.pending })}`
           : t("mobile.connectors.connectedCheck", { name })
       }
-      style={styles.mini}
     >
       <View>
         <ConnectorIcon def={item.def} image={item.image} label={name} size={48} check={!waiting} />
         {waiting ? (
           <View style={[styles.waitBadge, { backgroundColor: c.amber, borderColor: c.bg }]}>
-            <Icon name="wait" size={11} color={c.bg} />
+            <Icon name="wait" size={12} color={c.bg} />
           </View>
         ) : null}
       </View>
@@ -342,7 +353,38 @@ function ConnectedTile({ item, waiting, onPress }: { item: ConnectedItem; waitin
       >
         {name}
       </Text>
-    </Pressable>
+    </MiniTile>
+  );
+}
+
+const TILE_IN = FadeIn.duration(160);
+const TILE_OUT = FadeOut.duration(120);
+const TILE_SLIDE = LinearTransition.duration(220);
+
+/**
+ * A tile of the connected row: it gives under the finger (opening it is plain navigation, so no haptic), and it fades
+ * in or out as a connection is made or removed while the row is in sight (none of it with reduced motion).
+ */
+function MiniTile({ onPress, label, children }: { onPress: () => void; label: string; children: ReactNode }) {
+  const reduced = useReducedMotion();
+  return (
+    <Animated.View
+      entering={reduced ? undefined : TILE_IN}
+      exiting={reduced ? undefined : TILE_OUT}
+      layout={reduced ? undefined : TILE_SLIDE}
+    >
+      <PressScale
+        haptic={false}
+        fill={false}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        style={styles.mini}
+        contentStyle={styles.miniIn}
+      >
+        {children}
+      </PressScale>
+    </Animated.View>
   );
 }
 
@@ -372,19 +414,14 @@ function AddressTile({ onPress }: { onPress: () => void }) {
   const { t } = useTranslation();
   const c = useColors();
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={t("mobile.connectors.addMcp")}
-      style={styles.mini}
-    >
+    <MiniTile onPress={onPress} label={t("mobile.connectors.addMcp")}>
       <View style={[styles.addTile, { borderColor: c.line2 }]}>
         <Icon name="plus" size={20} color={c.muted} />
       </View>
       <Text variant="caption" tone="muted" numberOfLines={1}>
         {t("mobile.connectors.addMcp")}
       </Text>
-    </Pressable>
+    </MiniTile>
   );
 }
 
@@ -467,7 +504,7 @@ function Tile({
         {name}
       </Text>
       <View style={styles.tileText}>
-        {locked ? <Icon name="lock" size={13} color={c.muted} /> : null}
+        {locked ? <LineIcon name="lock" size={15} color={c.muted} variant="small" /> : null}
         <Text variant="small" tone="muted" numberOfLines={2} style={styles.grow}>
           {text}
         </Text>
@@ -483,7 +520,8 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
   row: { gap: 14, paddingHorizontal: 16, paddingBottom: 6 },
-  mini: { width: 64, alignItems: "center", gap: 6 },
+  mini: { width: 64 },
+  miniIn: { alignItems: "center", gap: 6 },
   addTile: {
     width: 48,
     height: 48,
@@ -500,7 +538,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 8,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
   },
   faces: { flexDirection: "row" },
@@ -524,7 +562,8 @@ const styles = StyleSheet.create({
   band: { width: 88, alignSelf: "stretch", minHeight: 72, alignItems: "center", justifyContent: "center" },
   cardText: { flex: 1, minWidth: 0, paddingVertical: 12, paddingRight: 14 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, paddingHorizontal: 16, paddingTop: 10 },
-  tileText: { flexDirection: "row", alignItems: "center", gap: 4 },
+  // The lock on the first of the two lines.
+  tileText: { flexDirection: "row", alignItems: "flex-start", gap: 4 },
   tile: {
     width: "48%",
     flexGrow: 1,

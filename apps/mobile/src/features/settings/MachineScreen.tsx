@@ -188,7 +188,7 @@ export function MachineScreen({ machineId }: { machineId: string }) {
             {countryFlagSvg(m.egress.country) ? (
               <SvgXml xml={countryFlagSvg(m.egress.country) as string} width={20} height={14} />
             ) : (
-              <Icon name="globe" size={14} color={c.muted} />
+              <Icon name="globe" size={15} color={c.muted} />
             )}
             <Text variant="small" tone="muted">
               {t("machines.egress.line", { ip: m.egress.ip })}

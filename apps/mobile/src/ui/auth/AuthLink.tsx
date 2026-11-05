@@ -11,7 +11,12 @@ export function AuthLink({ lead, label, onPress }: { lead?: string; label: strin
           {lead}
         </Text>
       ) : null}
-      <Pressable onPress={onPress} accessibilityRole="link" hitSlop={8}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="link"
+        hitSlop={12}
+        style={({ pressed }) => (pressed ? { opacity: 0.6 } : null)}
+      >
         <Text variant="subhead" style={{ fontWeight: "600" }}>
           {label}
         </Text>

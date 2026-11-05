@@ -9,6 +9,7 @@ import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, ProviderLogo, useToast } from "@/ui";
 import { Note, openPage } from "../ai/parts";
 import { useColors } from "../shared/hooks";
+import { errorHaptic, Loaded, successHaptic } from "../shared/parts";
 import { CommandBlock, chooseAction, confirmAction, Gap, SettingsPage } from "./parts";
 
 /**
@@ -56,12 +57,17 @@ export function AppsScreen() {
               cancel: t("common.cancel"),
               onConfirm: () =>
                 mutation.mutate(item.id, {
-                  onSuccess: () =>
+                  onSuccess: () => {
+                    successHaptic();
                     toast({
                       title: app ? t("apps.disconnected", { name: item.name }) : t("apps.tokens.revoked"),
                       icon: "check",
-                    }),
-                  onError: (err) => toast({ title: errorText(t, err), icon: "x" }),
+                    });
+                  },
+                  onError: (err) => {
+                    errorHaptic();
+                    toast({ title: errorText(t, err), icon: "x" });
+                  },
                 }),
             }),
         },
@@ -71,54 +77,56 @@ export function AppsScreen() {
   };
   return (
     <SettingsPage title={title}>
-      <GroupedFooter>{t("settings.sectionText.apps")}</GroupedFooter>
-      <GroupedHeader>{t("apps.server")}</GroupedHeader>
-      <CommandBlock command={data.serverUrl} copiedTitle={t("apps.serverCopied")} />
-      <Gap />
-      <GroupedList>
-        <GroupedRow icon="plus" label={t("apps.connect")} chevron onPress={connect} />
-      </GroupedList>
-      {isAppsEmpty(data) ? <GroupedFooter>{t("apps.empty")}</GroupedFooter> : null}
-      {data.apps.length > 0 ? (
-        <>
-          <GroupedHeader>{t("apps.connected")}</GroupedHeader>
-          <GroupedList>
-            {data.apps.map((app) => {
-              const mark = appMark(app);
-              return (
-                <GroupedRow
-                  key={app.id}
-                  label={app.name}
-                  sub={t(`apps.access.${app.access}`)}
-                  belowText={appFacts(t, i18n.language, app)}
-                  {...(mark.kind === "computer"
-                    ? { icon: "laptop" as const }
-                    : { leading: <ProviderLogo id={mark.kind === "brand" ? mark.id : mark.letter} size="sm" /> })}
-                  more
-                  onPress={() => drop("app", app)}
-                />
-              );
-            })}
-          </GroupedList>
-        </>
-      ) : null}
-      <GroupedHeader>{t("apps.tokens.title")}</GroupedHeader>
-      <GroupedList>
-        {data.tokens.map((token) => (
-          <GroupedRow
-            key={token.id}
-            icon="lock"
-            label={token.name}
-            sub={t(`apps.access.${token.access}`)}
-            belowText={tokenFacts(t, i18n.language, token)}
-            more
-            onPress={() => drop("token", token)}
-          />
-        ))}
-        <GroupedRow icon="plus" label={t("apps.tokens.create")} chevron onPress={connect} />
-      </GroupedList>
-      <GroupedFooter>{t("apps.tokens.text")}</GroupedFooter>
-      <GroupedFooter>{t("apps.footer")}</GroupedFooter>
+      <Loaded>
+        <GroupedFooter>{t("settings.sectionText.apps")}</GroupedFooter>
+        <GroupedHeader>{t("apps.server")}</GroupedHeader>
+        <CommandBlock command={data.serverUrl} copiedTitle={t("apps.serverCopied")} />
+        <Gap />
+        <GroupedList>
+          <GroupedRow icon="plus" label={t("apps.connect")} chevron onPress={connect} />
+        </GroupedList>
+        {isAppsEmpty(data) ? <GroupedFooter>{t("apps.empty")}</GroupedFooter> : null}
+        {data.apps.length > 0 ? (
+          <>
+            <GroupedHeader>{t("apps.connected")}</GroupedHeader>
+            <GroupedList>
+              {data.apps.map((app) => {
+                const mark = appMark(app);
+                return (
+                  <GroupedRow
+                    key={app.id}
+                    label={app.name}
+                    sub={t(`apps.access.${app.access}`)}
+                    belowText={appFacts(t, i18n.language, app)}
+                    {...(mark.kind === "computer"
+                      ? { icon: "laptop" as const }
+                      : { leading: <ProviderLogo id={mark.kind === "brand" ? mark.id : mark.letter} size="sm" /> })}
+                    more
+                    onPress={() => drop("app", app)}
+                  />
+                );
+              })}
+            </GroupedList>
+          </>
+        ) : null}
+        <GroupedHeader>{t("apps.tokens.title")}</GroupedHeader>
+        <GroupedList>
+          {data.tokens.map((token) => (
+            <GroupedRow
+              key={token.id}
+              icon="lock"
+              label={token.name}
+              sub={t(`apps.access.${token.access}`)}
+              belowText={tokenFacts(t, i18n.language, token)}
+              more
+              onPress={() => drop("token", token)}
+            />
+          ))}
+          <GroupedRow icon="plus" label={t("apps.tokens.create")} chevron onPress={connect} />
+        </GroupedList>
+        <GroupedFooter>{t("apps.tokens.text")}</GroupedFooter>
+        <GroupedFooter>{t("apps.footer")}</GroupedFooter>
+      </Loaded>
     </SettingsPage>
   );
 }

@@ -11,11 +11,21 @@ import { isAppLocale, localeInfo } from "@agenteschat/i18n/locale";
 import Constants from "expo-constants";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
 import { useSoundChoice } from "@/lib/sounds";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, type IconName, PersonAvatar, ProviderLogo, Text, useTheme, WithPresence } from "@/ui";
+import {
+  Button,
+  Icon,
+  type IconName,
+  PersonAvatar,
+  PressScale,
+  ProviderLogo,
+  Text,
+  useTheme,
+  WithPresence,
+} from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { CoverPage, PageRow, PageSection, TILE } from "../shared/CoverPage";
 import { AgentFace } from "../shared/Face";
@@ -211,34 +221,41 @@ export function MeScreen() {
         <>
           <PageSection title={t("mobile.me.yourAgents")} count={myAgents.length} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.crew}>
+            {/* Tiles: they give under the finger; opening one is plain navigation, so no haptic. */}
             {myAgents.map((a) => (
-              <Pressable
+              <PressScale
                 key={a.id}
+                haptic={false}
+                fill={false}
                 onPress={() => open(`/agent/${a.id}`)}
                 accessibilityRole="button"
                 accessibilityLabel={a.name}
                 style={styles.crewItem}
+                contentStyle={styles.crewIn}
               >
-                <AgentFace agentId={a.id} size={52} presence />
+                <AgentFace agentId={a.id} size={CREW} presence />
                 <Text variant="caption" tone="ink2" numberOfLines={1}>
                   {a.name}
                 </Text>
-              </Pressable>
+              </PressScale>
             ))}
             {can(org.org, "create_agents") ? (
-              <Pressable
+              <PressScale
+                haptic={false}
+                fill={false}
                 onPress={() => open("/new-agent")}
                 accessibilityRole="button"
                 accessibilityLabel={t("mobile.me.newAgent")}
                 style={styles.crewItem}
+                contentStyle={styles.crewIn}
               >
                 <View style={[styles.add, { borderColor: c.line2 }]}>
-                  <Icon name="plus" size={22} color={c.faint} />
+                  <Icon name="plus" size={24} color={c.faint} />
                 </View>
                 <Text variant="caption" tone="muted" numberOfLines={1}>
                   {t("mobile.me.newAgent")}
                 </Text>
-              </Pressable>
+              </PressScale>
             ) : null}
           </ScrollView>
         </>
@@ -383,21 +400,25 @@ function PlanRow({
   );
 }
 
+/** Your agents' faces, and the new agent's dashed tile beside them (its corner 30% of it, as a tile's). */
+const CREW = 52;
+
 const styles = StyleSheet.create({
-  gapBig: { height: 22 },
+  gapBig: { height: 24 },
   // A ring in the page's color lifts the photo off the sky.
-  ring: { borderRadius: 40, borderWidth: 3 },
+  ring: { borderRadius: 999, borderWidth: 3 },
   crew: { gap: 14, paddingHorizontal: 20, paddingVertical: 4 },
-  crewItem: { width: 62, alignItems: "center", gap: 6 },
+  crewItem: { width: 62 },
+  crewIn: { alignItems: "center", gap: 6 },
   add: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: CREW,
+    height: CREW,
+    borderRadius: Math.round(CREW * 0.3),
     borderWidth: 1.5,
     borderStyle: "dashed",
     alignItems: "center",
     justifyContent: "center",
   },
-  meter: { marginTop: 6, marginBottom: 3 },
+  meter: { marginTop: 6, marginBottom: 4 },
   version: { paddingHorizontal: 20, paddingTop: 14 },
 });

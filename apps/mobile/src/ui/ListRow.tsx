@@ -7,7 +7,9 @@ import { weights } from "./type-scale";
 /** The avatar column of a full-width list row (52pt: an agent's body, a person's photo, a tile). */
 export const LIST_AVATAR = 52;
 /** The gap between the avatar and the text. */
-const GAP = 13;
+const GAP = 12;
+/** The unread dot sits nearer the text than the row's gap. */
+const DOT_GAP = 10;
 /** Where the hairline between rows starts: the text column. */
 export const LIST_INSET = 14 + LIST_AVATAR + GAP;
 
@@ -132,7 +134,7 @@ const styles = StyleSheet.create({
     minHeight: 82,
   },
   divider: { position: "absolute", top: 0, left: LIST_INSET, right: 0, height: StyleSheet.hairlineWidth },
-  dot: { width: 10, height: 10, borderRadius: 5, marginLeft: -3 },
+  dot: { width: 10, height: 10, borderRadius: 5, marginLeft: DOT_GAP - GAP },
   avatar: { width: LIST_AVATAR, height: LIST_AVATAR, alignItems: "center", justifyContent: "center" },
   tx: { flex: 1, minWidth: 0, gap: 2 },
   // The time sits on the name's baseline, on its first line when it wraps: never centered beside two lines.

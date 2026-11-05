@@ -216,10 +216,10 @@ export function Composer({
               style={[styles.pill, { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
             >
               <View style={styles.pillIn}>
-                <Icon name={s.icon} size={14} color={colors.muted} />
+                <Icon name={s.icon} size={15} color={colors.muted} />
                 <RNText
                   maxFontSizeMultiplier={CHROME_MAX_SCALE}
-                  style={[systemText("subhead", weights.medium), styles.pillText, { color: colors.ink2 }]}
+                  style={[systemText("subhead", weights.medium), { color: colors.ink2 }]}
                 >
                   {s.label}
                 </RNText>
@@ -257,7 +257,7 @@ export function Composer({
             >
               <Glass style={styles.plusGlass} intensity={50}>
                 <View style={styles.center}>
-                  <Icon name="plus" size={22} color={colors.ink2} />
+                  <Icon name="plus" size={24} color={colors.ink2} />
                 </View>
               </Glass>
             </PressScale>
@@ -326,7 +326,7 @@ export function Composer({
                 style={styles.media}
               >
                 <View style={styles.center}>
-                  <Icon name="sticker" size={22} color={colors.muted} />
+                  <Icon name="sticker" size={20} color={colors.muted} />
                 </View>
               </PressScale>
             </Animated.View>
@@ -410,10 +410,11 @@ const inputText: TextStyle = {
   paddingHorizontal: 0,
   ...Platform.select<TextStyle>({
     ios: { paddingTop: 8, paddingBottom: 8 },
+    // The one line centered in the send button's height: the field is exactly as tall.
     default: {
       lineHeight: body.lineHeight,
-      paddingTop: 7,
-      paddingBottom: 7,
+      paddingTop: (SEND - (body.lineHeight ?? SEND)) / 2,
+      paddingBottom: (SEND - (body.lineHeight ?? SEND)) / 2,
       textAlignVertical: "center",
       includeFontPadding: false,
     },
@@ -439,7 +440,6 @@ const styles = StyleSheet.create({
   pills: { gap: 6, paddingHorizontal: 14, paddingBottom: 8 },
   pill: { height: 32, borderRadius: 999 },
   pillIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12 },
-  pillText: { fontSize: 14, lineHeight: 18 },
   row: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   plus: { width: FIELD, height: FIELD, borderRadius: FIELD / 2 },
   plusGlass: { flex: 1, borderRadius: FIELD / 2 },

@@ -15,8 +15,10 @@ import {
   LineIcon,
   ProviderLogo,
   Text,
+  textLineOf,
   useTheme,
 } from "@/ui";
+import { BUTTON_SIZES } from "@/ui/Button";
 import { useColors } from "../shared/hooks";
 
 /**
@@ -339,16 +341,30 @@ export function Waiting({ label }: { label: string }) {
   );
 }
 
+/** A step's number, in a circle on its title's first line. */
+const N = 22;
+/** The pasted-key field, and the small Paste button inside it with as much room above, below and after it. */
+const FIELD = 46;
+const PASTE_INSET = (FIELD - BUTTON_SIZES.sm.height) / 2;
+
 const styles = StyleSheet.create({
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingHorizontal: 4 },
   // As a group's footer (`GroupedFooter`).
-  foot: { paddingTop: 7, paddingHorizontal: 16 },
+  foot: { paddingTop: 8, paddingHorizontal: 16 },
   grow: { flex: 1, minWidth: 0 },
   card: { borderRadius: 14, overflow: "hidden" },
-  step: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
-  divider: { position: "absolute", top: 0, left: 48, right: 0, height: StyleSheet.hairlineWidth },
-  n: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", marginTop: 1 },
-  nText: { fontWeight: "700", fontSize: 12, lineHeight: 14 },
+  step: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
+  divider: { position: "absolute", top: 0, left: 14 + N + 12, right: 0, height: StyleSheet.hairlineWidth },
+  // Centered where the eye reads the callout title's first line.
+  n: {
+    width: N,
+    height: N,
+    borderRadius: N / 2,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: textLineOf("callout", 1).middle - N / 2,
+  },
+  nText: { fontWeight: "700", lineHeight: 14 },
   text: { flex: 1, minWidth: 0, gap: 4 },
   bold: { fontWeight: "600" },
   side: { marginTop: 6, flexDirection: "row", flexWrap: "wrap", gap: 8 },
@@ -357,11 +373,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    minHeight: 46,
+    minHeight: FIELD,
     marginTop: 6,
     paddingLeft: 12,
-    paddingRight: 5,
-    borderRadius: 12,
+    paddingRight: PASTE_INSET,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
   },
   // Without "Colar" beside it, the text keeps the same edge on both sides.

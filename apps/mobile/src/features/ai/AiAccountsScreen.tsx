@@ -31,7 +31,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, GroupedList, GroupedRow, InfoHint, ProviderLogo, Text, useToast } from "@/ui";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
-import { PushedHeader } from "../shared/parts";
+import { errorHaptic, PushedHeader, successHaptic } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
 import { AddAccount } from "./AddAccount";
 import { openConnectAi } from "./NoAiCard";
@@ -99,7 +99,10 @@ export function AiAccountsScreen() {
   const own = ownSignIns(ai.data);
   const several = onSeveralComputers(rows);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
-  const failed = () => toast({ title: t("agentPage.work.failed"), icon: "x" });
+  const failed = () => {
+    errorHaptic();
+    toast({ title: t("agentPage.work.failed"), icon: "x" });
+  };
 
   const rename = (a: Account) => {
     if (Platform.OS !== "ios") return;
@@ -114,6 +117,7 @@ export function AiAccountsScreen() {
             const name = (value ?? "").trim().slice(0, 40);
             if (!name || name === a.label) return;
             api.machines.renameAccount(orgId, a.machineId, a.id, name).then(() => {
+              successHaptic();
               toast({ title: t("aiAccounts.page.renamed", { label: name }), icon: "check" });
               refetch();
             }, failed);
@@ -129,6 +133,7 @@ export function AiAccountsScreen() {
   // One more of the person's agents thinks with an account made for all of them there: no sign-in.
   const give = (a: Account, agent: { id: string; name: string }) =>
     api.agents.setBrain(orgId, agent.id, { brain: a.kind, account: a.id }).then(() => {
+      successHaptic();
       toast({ title: t("aiAccounts.done.savedAgent", { agent: agent.name, label: a.label }), icon: "check" });
       refetch();
       for (const key of [keys.agents(orgId), keys.aiStatus(orgId), keys.agentBrain(orgId, agent.id)])
@@ -154,6 +159,7 @@ export function AiAccountsScreen() {
           style: "destructive",
           onPress: () =>
             api.machines.removeAccount(orgId, a.machineId, a.id).then(() => {
+              successHaptic();
               toast({ title: t("aiAccounts.page.disconnected", { label: a.label }), icon: "check" });
               refetch();
               void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
@@ -335,7 +341,10 @@ function KeysSection({ locale }: { locale: string }) {
   const update = useUpdateSettings(orgId);
   const live = (credentials.data ?? []).filter((k) => !k.revokedAt);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
-  const failed = () => toast({ title: t("agentPage.work.failed"), icon: "x" });
+  const failed = () => {
+    errorHaptic();
+    toast({ title: t("agentPage.work.failed"), icon: "x" });
+  };
 
   const rotate = (k: Credential) => {
     if (Platform.OS !== "ios") return;
@@ -350,6 +359,7 @@ function KeysSection({ locale }: { locale: string }) {
             const apiKey = (value ?? "").trim();
             if (apiKey.length < 8) return;
             api.agents.rotateCredential(orgId, k.id, { apiKey }).then(() => {
+              successHaptic();
               toast({ title: t("settings.rotated"), icon: "check" });
               refetch();
             }, failed);
@@ -365,7 +375,11 @@ function KeysSection({ locale }: { locale: string }) {
       {
         text: t("settings.remove"),
         style: "destructive",
-        onPress: () => api.agents.removeCredential(orgId, k.id, true).then(refetch, failed),
+        onPress: () =>
+          api.agents.removeCredential(orgId, k.id, true).then(() => {
+            successHaptic();
+            refetch();
+          }, failed),
       },
     ]);
   const actions = (k: Credential, isDefault: boolean) =>
@@ -442,12 +456,12 @@ const styles = StyleSheet.create({
   // The settings screens' side margin: the groups on the same 16 pt edge as everywhere else.
   in: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   sectionHead: { gap: 4, paddingHorizontal: 2 },
-  keysHead: { marginTop: 18 },
+  keysHead: { marginTop: 20 },
   below: { gap: 8, marginTop: 6 },
   meter: { gap: 4 },
   meterLine: { flexDirection: "row", justifyContent: "space-between" },
-  bar: { height: 6, borderRadius: 3, overflow: "hidden" },
-  fill: { height: 6, borderRadius: 3 },
+  bar: { height: 6, borderRadius: 999, overflow: "hidden" },
+  fill: { height: 6, borderRadius: 999 },
   bold: { fontWeight: "600" },
   grow: { flex: 1, minWidth: 0 },
   start: { alignSelf: "flex-start" },

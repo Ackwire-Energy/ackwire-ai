@@ -212,7 +212,13 @@ export function AccountPage() {
     >
       <View style={styles.photo}>
         <PersonAvatar name={draft.name || "?"} size={92} photo={photo} />
-        <Pressable onPress={changePhoto} disabled={uploading} accessibilityRole="button" hitSlop={8}>
+        <Pressable
+          onPress={changePhoto}
+          disabled={uploading}
+          accessibilityRole="button"
+          hitSlop={12}
+          style={({ pressed }) => (pressed ? styles.pressed : null)}
+        >
           <Text variant="subhead" tone={uploading ? "faint" : "ink2"} style={styles.semibold}>
             {t("mobile.me.account.changePhoto")}
           </Text>
@@ -439,10 +445,11 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   photo: { alignItems: "center", gap: 8, paddingTop: 6, paddingBottom: 14 },
   semibold: { fontWeight: "600" },
+  pressed: { opacity: 0.6 },
   input: { flex: 1, paddingVertical: 12, paddingHorizontal: 0 },
   handle: { flexDirection: "row", alignItems: "center", gap: 1 },
   error: { paddingTop: 8, paddingHorizontal: 16 },
-  gapBig: { height: 22 },
+  gapBig: { height: 24 },
   search: { paddingTop: 4, paddingBottom: 8 },
   zoneList: { paddingHorizontal: 16 },
   // Room for the shadow beside the rows (and above and below the group), cut where two rows meet: no line across.

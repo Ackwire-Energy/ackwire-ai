@@ -32,7 +32,7 @@ export function SectionHeader({ title, count, action }: SectionHeaderProps) {
           onPress={action.onPress}
           accessibilityRole="button"
           accessibilityLabel={action.label}
-          hitSlop={8}
+          hitSlop={12}
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}
         >
           <Text variant="small" tone="faint" numberOfLines={1} style={styles.actionText}>

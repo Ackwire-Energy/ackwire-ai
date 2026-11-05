@@ -40,7 +40,7 @@ export function SearchField({
   onBlur,
   ...rest
 }: SearchFieldProps) {
-  const { colors } = useTheme();
+  const { colors, reducedMotion } = useTheme();
   const { t } = useTranslation();
   const input = useRef<TextInputInstance | null>(null);
   useImperativeHandle(ref, () => input.current as TextInputInstance, []);
@@ -56,7 +56,7 @@ export function SearchField({
   return (
     <View style={{ flexDirection: "row", alignItems: "center" }}>
       <Animated.View
-        layout={LinearTransition.duration(220)}
+        layout={reducedMotion ? undefined : LinearTransition.duration(220)}
         style={{
           flex: 1,
           flexDirection: "row",
@@ -94,14 +94,18 @@ export function SearchField({
             onPress={() => onChangeText("")}
             accessibilityRole="button"
             accessibilityLabel={t("mobile.a11y.clearSearch")}
-            hitSlop={8}
+            hitSlop={14}
+            style={({ pressed }) => (pressed ? { opacity: 0.4 } : null)}
           >
             <Icon name="x" size={16} color={colors.faint} />
           </Pressable>
         ) : null}
       </Animated.View>
       {cancelShown ? (
-        <Animated.View entering={FadeInRight.duration(220)} exiting={FadeOutRight.duration(180)}>
+        <Animated.View
+          entering={reducedMotion ? undefined : FadeInRight.duration(220)}
+          exiting={reducedMotion ? undefined : FadeOutRight.duration(180)}
+        >
           <Pressable
             onPress={cancel}
             accessibilityRole="button"

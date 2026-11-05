@@ -23,9 +23,9 @@ export function Chip({ icon, label, leading, trailing }: ChipProps) {
       style={{
         flexDirection: "row",
         alignItems: "center",
-        gap: 5,
+        gap: 4,
         minHeight: 24,
-        paddingHorizontal: 9,
+        paddingHorizontal: 10,
         borderRadius: 999,
         backgroundColor: colors.chip,
         alignSelf: "flex-start",
@@ -33,7 +33,7 @@ export function Chip({ icon, label, leading, trailing }: ChipProps) {
         maxWidth: "100%",
       }}
     >
-      {leading ?? (icon ? <Icon name={icon} size={13} color={colors.muted} /> : null)}
+      {leading ?? (icon ? <Icon name={icon} size={12} color={colors.muted} /> : null)}
       <RNText
         numberOfLines={1}
         maxFontSizeMultiplier={CHROME_MAX_SCALE}

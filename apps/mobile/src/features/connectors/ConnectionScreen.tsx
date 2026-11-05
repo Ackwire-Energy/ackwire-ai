@@ -85,7 +85,7 @@ function Connection({ id }: { id: string }) {
         scrollEventThrottle={16}
         contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
       >
         <View style={[styles.head, { paddingTop: insets.top + 56 }]}>
           <ConnectorIcon
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   sheet: { gap: 14 },
   field: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -266,5 +266,5 @@ const styles = StyleSheet.create({
   loading: { marginTop: 24 },
   body: { paddingHorizontal: 16 },
   lead: { paddingHorizontal: 16, paddingTop: 12 },
-  gap: { height: 22 },
+  gap: { height: 24 },
 });

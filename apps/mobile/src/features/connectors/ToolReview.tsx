@@ -382,5 +382,6 @@ function ToolList({
 
 const styles = StyleSheet.create({
   accept: { paddingTop: 12 },
-  again: { paddingTop: 18 },
+  // A header's room above a group with none.
+  again: { paddingTop: 20 },
 });

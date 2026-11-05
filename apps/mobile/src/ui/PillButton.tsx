@@ -39,7 +39,7 @@ export function PillButton({
       <View style={styles.face}>
         <RNText
           maxFontSizeMultiplier={CHROME_MAX_SCALE}
-          style={[systemText("footnote", weights.semibold), styles.word, { color: colors.ink }]}
+          style={[systemText("footnote", weights.semibold), { color: colors.ink }]}
         >
           {label}
           {detail ? (
@@ -53,7 +53,6 @@ export function PillButton({
 
 const styles = StyleSheet.create({
   pill: { height: 32, borderRadius: 16 },
-  face: { flexGrow: 1, paddingHorizontal: 13, alignItems: "center", justifyContent: "center" },
-  word: { fontSize: 14 },
+  face: { flexGrow: 1, paddingHorizontal: 14, alignItems: "center", justifyContent: "center" },
   detail: { fontVariant: ["tabular-nums"] },
 });

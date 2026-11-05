@@ -3,6 +3,7 @@ import * as Clipboard from "expo-clipboard";
 import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-router";
 import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { needsHeaderBlur } from "@/lib/nav";
 import {
   BarPressable,
@@ -92,9 +93,18 @@ export function ActionList({ items }: { items: ActionItem[] }) {
 /** One action, on a GroupedRow's numbers: 14 pt sides, the 32 pt leading column, 12 apart, 50 tall at least. */
 function ActionRow({ item: it, leading }: { item: ActionItem; leading: ReactNode }) {
   const c = useColors();
+  const press = it.onPress;
   return (
     <Pressable
-      onPress={it.onPress}
+      // A switch answers the finger as it flips, as `GroupedRow`'s does.
+      onPress={
+        it.checked !== undefined && press
+          ? () => {
+              haptics.selection();
+              press();
+            }
+          : press
+      }
       disabled={it.disabled || !it.onPress}
       accessibilityRole={it.checked === undefined ? "button" : "switch"}
       {...(it.checked === undefined ? {} : { accessibilityState: { checked: it.checked } })}
@@ -281,6 +291,18 @@ export function copyText(text: string): Promise<boolean> {
 
 /** Code only (branches, commands). */
 export const MONO = fonts.mono;
+
+const LOADED_IN = FadeIn.duration(200);
+
+/**
+ * What comes in while the screen is watched (what it waited for, in its spinner's place; another tab's rows): it fades
+ * in. The page holds it in a `LayoutAnimationConfig skipEntering` (`SettingsPage`, the account pages' `Page`), so what
+ * had loaded before the screen opened is simply there; so is everything with reduced motion.
+ */
+export function Loaded({ children }: { children: ReactNode }) {
+  const { reducedMotion } = useTheme();
+  return <Animated.View entering={reducedMotion ? undefined : LOADED_IN}>{children}</Animated.View>;
+}
 
 const styles = StyleSheet.create({
   tile: { alignItems: "center", justifyContent: "center" },

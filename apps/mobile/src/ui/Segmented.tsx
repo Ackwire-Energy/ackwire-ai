@@ -12,6 +12,10 @@ export type SegmentedProps = FiltersProps & {
   wide?: boolean;
 };
 
+/** The track's inset around the segments; a segment's corner is the track's less it, so the two stay concentric. */
+const PAD = 4;
+const RADIUS = 14;
+
 /** A segmented control: a sunken track, the selected segment raised. */
 export function Segmented({ items, value, onChange, wide = false }: SegmentedProps) {
   const { colors, shadows } = useTheme();
@@ -19,8 +23,8 @@ export function Segmented({ items, value, onChange, wide = false }: SegmentedPro
     <View
       style={{
         flexDirection: "row",
-        padding: 3,
-        borderRadius: 12,
+        padding: PAD,
+        borderRadius: RADIUS,
         backgroundColor: colors.sunken,
         boxShadow: "inset 0px 1px 2px 0px rgba(0, 0, 0, 0.06)",
         alignSelf: wide ? "stretch" : "flex-start",
@@ -38,14 +42,15 @@ export function Segmented({ items, value, onChange, wide = false }: SegmentedPro
             }}
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
-            style={wide ? { flex: 1 } : undefined}
+            style={({ pressed }) => [wide ? { flex: 1 } : null, pressed && !on ? { opacity: 0.6 } : null]}
           >
             <View
               style={[
                 {
-                  minHeight: 30,
+                  // 28 inside the 4 pt inset: the control stays 36 tall.
+                  minHeight: 28,
                   paddingHorizontal: 12,
-                  borderRadius: 9,
+                  borderRadius: RADIUS - PAD,
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "center",
@@ -54,7 +59,7 @@ export function Segmented({ items, value, onChange, wide = false }: SegmentedPro
                 on ? { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` } : null,
               ]}
             >
-              {item.icon ? <Icon name={item.icon} size={14} color={on ? colors.ink : colors.muted} /> : null}
+              {item.icon ? <Icon name={item.icon} size={13} color={on ? colors.ink : colors.muted} /> : null}
               <RNText
                 maxFontSizeMultiplier={CHROME_MAX_SCALE}
                 style={[systemText("footnote", weights.semibold), { color: on ? colors.ink : colors.muted }]}

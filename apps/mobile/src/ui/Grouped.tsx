@@ -1,5 +1,7 @@
-import { Children, Fragment, isValidElement, type ReactNode } from "react";
+import { Children, isValidElement, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
+import { haptics } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { useInfoHint } from "./InfoHint";
 import { Text } from "./Text";
@@ -8,6 +10,13 @@ import { useTheme } from "./theme";
 
 /** The leading column of a row with a face or a mark: whatever leads is centered in it. */
 const LEAD = 32;
+/** A row's icon tile; its corner is 30% of it, as every tile's. */
+const TILE = 28;
+
+/** A row that comes or goes while the list is on screen fades; what is around it slides into place. */
+const ROW_IN = FadeIn.duration(160);
+const ROW_OUT = FadeOut.duration(120);
+const SLIDE = LinearTransition.duration(220);
 
 /**
  * Settings as on the iPhone: grouped inset lists, radius 14, hairlines inset to
@@ -15,50 +24,67 @@ const LEAD = 32;
  * rows it draws nothing, never an empty card.
  */
 export function GroupedList({ children }: { children?: ReactNode }) {
-  const { colors: c, shadows } = useTheme();
+  const { colors: c, shadows, reducedMotion } = useTheme();
   const items = Children.toArray(children).filter(isValidElement);
   if (items.length === 0) return null;
   return (
-    <View style={[styles.list, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}>
-      {items.map((child, i) => (
-        <Fragment key={child.key ?? i}>
-          {i > 0 ? (
-            <View
-              style={[
-                styles.divider,
-                {
-                  backgroundColor: c.line2,
-                  marginLeft: (child.props as { icon?: unknown; leading?: unknown }).icon
-                    ? 54
-                    : (child.props as { leading?: unknown }).leading
-                      ? 14 + LEAD + 12
-                      : 14,
-                },
-              ]}
-            />
-          ) : null}
-          {child}
-        </Fragment>
-      ))}
-    </View>
+    // The rows it opens with appear with the screen, and when the whole group goes its rows go with it: neither fades.
+    <LayoutAnimationConfig skipEntering skipExiting>
+      <Animated.View
+        layout={reducedMotion ? undefined : SLIDE}
+        style={[styles.list, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
+      >
+        {items.map((child, i) => (
+          <Animated.View
+            key={child.key ?? i}
+            entering={reducedMotion ? undefined : ROW_IN}
+            exiting={reducedMotion ? undefined : ROW_OUT}
+            layout={reducedMotion ? undefined : SLIDE}
+          >
+            {i > 0 ? (
+              <View
+                style={[
+                  styles.divider,
+                  {
+                    backgroundColor: c.line2,
+                    marginLeft: (child.props as { icon?: unknown; leading?: unknown }).icon
+                      ? 14 + TILE + 12
+                      : (child.props as { leading?: unknown }).leading
+                        ? 14 + LEAD + 12
+                        : 14,
+                  },
+                ]}
+              />
+            ) : null}
+            {child}
+          </Animated.View>
+        ))}
+      </Animated.View>
+    </LayoutAnimationConfig>
   );
 }
 
-/** The small uppercase header of a group. */
+/** The small uppercase header of a group (it slides with the groups when one above grows or shrinks). */
 export function GroupedHeader({ children }: { children: string }) {
+  const { reducedMotion } = useTheme();
   return (
-    <Text variant="footnote" tone="faint" accessibilityRole="header" style={styles.header}>
-      {children.toLocaleUpperCase()}
-    </Text>
+    <Animated.View layout={reducedMotion ? undefined : SLIDE}>
+      <Text variant="footnote" tone="faint" accessibilityRole="header" style={styles.header}>
+        {children.toLocaleUpperCase()}
+      </Text>
+    </Animated.View>
   );
 }
 
 /** The faint explanation under a group. */
 export function GroupedFooter({ children }: { children: ReactNode }) {
+  const { reducedMotion } = useTheme();
   return (
-    <Text variant="footnote" tone="faint" style={styles.footer}>
-      {children}
-    </Text>
+    <Animated.View layout={reducedMotion ? undefined : SLIDE}>
+      <Text variant="footnote" tone="faint" style={styles.footer}>
+        {children}
+      </Text>
+    </Animated.View>
   );
 }
 
@@ -139,9 +165,17 @@ function Row({
 }: Omit<GroupedRowProps, "hint"> & { said?: string; after?: ReactNode }) {
   const { colors: c } = useTheme();
   const tone = danger ? c.danger : faint ? c.faint : c.ink;
+  // A switch answers the finger as it flips, as `Toggle` does.
+  const press =
+    toggle !== undefined && onPress
+      ? () => {
+          haptics.selection();
+          onPress();
+        }
+      : onPress;
   return (
     <Pressable
-      onPress={onPress}
+      onPress={press}
       disabled={disabled || !onPress}
       accessibilityRole={toggle !== undefined ? "switch" : "button"}
       accessibilityLabel={[label, belowText, said, value].filter(Boolean).join(", ")}
@@ -289,8 +323,8 @@ function HintedField({ label, hint, children, onPress }: GroupedFieldProps & { h
 const styles = StyleSheet.create({
   list: { borderRadius: 14, overflow: "hidden" },
   divider: { height: StyleSheet.hairlineWidth },
-  header: { paddingTop: 18, paddingBottom: 7, paddingHorizontal: 16, letterSpacing: 0.4 },
-  footer: { paddingTop: 7, paddingHorizontal: 16 },
+  header: { paddingTop: 20, paddingBottom: 8, paddingHorizontal: 16, letterSpacing: 0.4 },
+  footer: { paddingTop: 8, paddingHorizontal: 16 },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -299,7 +333,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  tile: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  tile: {
+    width: TILE,
+    height: TILE,
+    borderRadius: Math.round(TILE * 0.3),
+    alignItems: "center",
+    justifyContent: "center",
+  },
   lead: { width: LEAD, alignItems: "center", justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
   value: { flexShrink: 1, maxWidth: "50%" },

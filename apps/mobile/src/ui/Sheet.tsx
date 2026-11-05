@@ -139,7 +139,7 @@ export function Sheet({ open, onClose, children, solid = false }: SheetProps) {
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 22 + Math.max(0, insets.bottom - INSET) }}
+              contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 24 + Math.max(0, insets.bottom - INSET) }}
             >
               {children}
             </ScrollView>
@@ -156,5 +156,6 @@ const styles = StyleSheet.create({
   sheet: { marginHorizontal: INSET, marginBottom: INSET, borderRadius: RADIUS, flexShrink: 1 },
   surface: { borderRadius: RADIUS, paddingTop: 8, overflow: "hidden", flexShrink: 1 },
   grab: { alignItems: "center", paddingTop: 4, paddingBottom: 10 },
-  grabBar: { width: 38, height: 5, borderRadius: 3 },
+  // The system's own grabber (`SheetSurface`): 36 × 5, round ends.
+  grabBar: { width: 36, height: 5, borderRadius: 2.5 },
 });

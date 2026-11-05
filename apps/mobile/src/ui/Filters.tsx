@@ -56,6 +56,9 @@ export function Filters({ items, value, onChange }: FiltersProps) {
             }}
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
+            // 44 pt tall to the finger; side by side, the chips' own width is their target.
+            hitSlop={{ top: 5, bottom: 5 }}
+            style={({ pressed }) => (pressed && !on ? { opacity: 0.6 } : null)}
           >
             <View
               style={{
@@ -74,7 +77,7 @@ export function Filters({ items, value, onChange }: FiltersProps) {
               >
                 {item.label}
               </RNText>
-              {item.count !== undefined ? <Count value={item.count} size={14} color={color} /> : null}
+              {item.count !== undefined ? <Count value={item.count} size={15} color={color} /> : null}
             </View>
           </Pressable>
         );

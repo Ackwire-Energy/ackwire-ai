@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
   // The other settings screens' note: on the groups' edge, not indented past it.
   note: { paddingHorizontal: 4, paddingTop: 10 },
   loading: { marginTop: 24 },
-  end: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 3 },
+  end: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },
   outcome: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
   time: { fontVariant: ["tabular-nums"] },
   semibold: { fontWeight: "600" },

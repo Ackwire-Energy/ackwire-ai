@@ -45,7 +45,7 @@ export function Row({
         paddingVertical: 12,
         paddingHorizontal: 14,
         minHeight: 60,
-        backgroundColor: pressed ? "rgba(127, 127, 127, 0.08)" : "transparent",
+        backgroundColor: pressed ? colors.sunken : "transparent",
       }}
     >
       {divider ? (
@@ -75,7 +75,7 @@ export function Row({
           ) : null}
           {below}
         </View>
-        {meta ? <View style={{ alignItems: "flex-end", gap: 5 }}>{meta}</View> : null}
+        {meta ? <View style={{ alignItems: "flex-end", gap: 4 }}>{meta}</View> : null}
       </View>
       {chevron ? <Icon name="right" size={15} color={colors.faint} /> : null}
     </View>

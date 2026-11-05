@@ -629,7 +629,13 @@ function ConnectStep({
                 onPress={() => void Clipboard.getStringAsync().then((v) => setKey(v.trim()))}
                 accessibilityRole="button"
                 accessibilityLabel={t("mobile.connectors.paste")}
-                style={[styles.paste, { borderColor: c.line }]}
+                // 40 tall beside the field: 44 to the finger.
+                hitSlop={4}
+                style={({ pressed }) => [
+                  styles.paste,
+                  { borderColor: c.line },
+                  pressed ? { backgroundColor: c.sunken } : null,
+                ]}
               >
                 <Text variant="small" style={styles.bold}>
                   {t("mobile.connectors.paste")}
@@ -692,10 +698,10 @@ const styles = StyleSheet.create({
   cap: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   steps: { gap: 8 },
   progress: { flexDirection: "row", gap: 6 },
-  dash: { flex: 1, height: 3, borderRadius: 2 },
+  dash: { flex: 1, height: 3, borderRadius: 999 },
   fieldBox: { gap: 6 },
   field: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -705,7 +711,7 @@ const styles = StyleSheet.create({
   paste: {
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
   },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8 },

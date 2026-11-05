@@ -41,7 +41,7 @@ export function CoverPage({
         scrollEventThrottle={16}
         contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
       >
         {/* The workspace's sky, as on Conversas, reaching up behind the clear bar and the status bar. */}
         <View style={[styles.band, { paddingTop: insets.top + 62 }]}>
@@ -129,23 +129,32 @@ export function PageRow({
 
 /** The rows' tile, and what a leading face of the same size takes. */
 export const TILE = 36;
+/** The rows' side inset and the gap after the tile: the hairline starts where the text does. */
+const ROW_INSET = 20;
+const ROW_GAP = 12;
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   grow: { flex: 1, minWidth: 0 },
   // Not clipped: on a pull the sky grows up into the gap above the content.
-  band: { paddingHorizontal: 20, paddingBottom: 18 },
+  band: { paddingHorizontal: 20, paddingBottom: 20 },
   faceLine: { flexDirection: "row", alignItems: "center", gap: 14 },
   acts: { flexDirection: "row", gap: 8, marginTop: 16 },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 13,
+    gap: ROW_GAP,
     minHeight: 56,
     paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingHorizontal: ROW_INSET,
   },
-  // From the text column: 20 + the 36 tile + 13.
-  rowLine: { position: "absolute", top: 0, right: 0, left: 69, height: StyleSheet.hairlineWidth },
+  // From the text column.
+  rowLine: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    left: ROW_INSET + TILE + ROW_GAP,
+    height: StyleSheet.hairlineWidth,
+  },
   value: { maxWidth: "45%" },
 });

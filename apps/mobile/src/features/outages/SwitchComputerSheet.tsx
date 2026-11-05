@@ -85,8 +85,8 @@ function SwitchForm({
   const target = options.find((x) => x.key === targetKey) ?? null;
   const count = chosen.size;
 
+  // The switch's row gives its own tap (`GroupedRow`).
   const toggle = (agentId: string) => {
-    tapHaptic();
     setUnchecked((prev) => {
       const next = new Set(prev);
       if (next.has(agentId)) next.delete(agentId);
@@ -206,7 +206,7 @@ function BrainsLine({ brains, text }: { brains: TargetOption["brains"]; text: st
 
 const styles = StyleSheet.create({
   // The marks stay on the first of its two lines.
-  descLine: { flexDirection: "row", alignItems: "flex-start", gap: 5, minWidth: 0 },
+  descLine: { flexDirection: "row", alignItems: "flex-start", gap: 6, minWidth: 0 },
   acts: { gap: 8, marginTop: 4 },
   shrink: { flexShrink: 1 },
 });

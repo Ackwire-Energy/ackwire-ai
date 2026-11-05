@@ -16,15 +16,21 @@ export interface SectionProps {
 export function Section({ title, count, action, children }: SectionProps) {
   const { colors } = useTheme();
   return (
-    <View style={{ paddingHorizontal: 16, marginTop: 22 }}>
+    <View style={{ paddingHorizontal: 16, marginTop: 24 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, paddingBottom: 10 }}>
         <Text variant="label" accessibilityRole="header" style={{ flexShrink: 1 }}>
           {title}
         </Text>
-        {count !== undefined ? <Count value={count} size={14} weight={weights.medium} color={colors.faint} /> : null}
+        {count !== undefined ? <Count value={count} size={13} weight={weights.medium} color={colors.faint} /> : null}
         <View style={{ flex: 1 }} />
         {action ? (
-          <Pressable onPress={action.onPress} accessibilityRole="button" hitSlop={8}>
+          // A 44 pt target around the 18 pt line; it dims under the finger.
+          <Pressable
+            onPress={action.onPress}
+            accessibilityRole="button"
+            hitSlop={14}
+            style={({ pressed }) => (pressed ? { opacity: 0.6 } : null)}
+          >
             <Text variant="label" tone="muted">
               {action.label}
             </Text>

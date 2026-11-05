@@ -104,7 +104,7 @@ function WaitCard({ card }: { card: NonNullable<ReturnType<typeof useBrainWait>>
 }
 
 const styles = StyleSheet.create({
-  card: { gap: 8, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 16, marginTop: 4, maxWidth: 520 },
+  card: { gap: 8, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, marginTop: 4, maxWidth: 520 },
   // A title on two lines keeps the icon on its first.
   top: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, minWidth: 0, fontWeight: "600" },
@@ -112,6 +112,6 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   acts: { flexDirection: "row" },
   // Never wraps: on a full name line it moves whole to the next.
-  pill: { flexShrink: 0, alignSelf: "center", paddingHorizontal: 7, paddingVertical: 1, borderRadius: 999 },
+  pill: { flexShrink: 0, alignSelf: "center", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
   pillText: { fontWeight: "600" },
 });
