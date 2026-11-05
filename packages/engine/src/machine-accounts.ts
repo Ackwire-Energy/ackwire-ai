@@ -1095,14 +1095,20 @@ export async function beginAccountLogin(
   // row; signing in again keeps the row's, whatever the policy says now (none known: the runner does as before).
   let method: ClaudeLoginMethod | undefined;
   if (kind === "claude_code" && provider === undefined && (again || shared)) {
-    const system = machine.executors?.mode === "system";
+    const said = protocol >= CLAUDE_AUTH_PROTOCOL ? machine.executors?.claudeLoginMethods : undefined;
+    // Only a system-mode runner offers setup-token alone (a single-user one refuses it), so believing it grants
+    // nothing; the hub keeps a single-user machine's mode when its runner later moves to system mode.
+    const system =
+      machine.executors?.mode === "system" || (said?.includes("setup_token") === true && !said.includes("cli_login"));
     const kept = existing?.authMethod;
+    // A one-agent login becoming one for all agents in system mode starts over the runner's way: its row's
+    // cli_login was only read off its folder.
+    const widens = system && shared && existing?.shared === false;
     method = again
-      ? isClaudeLoginMethod(kept)
+      ? isClaudeLoginMethod(kept) && !widens
         ? kept
         : undefined
       : claudeAuthMethodFor(await claudeAuthPolicy(deps.db), orgId, system);
-    const said = protocol >= CLAUDE_AUTH_PROTOCOL ? machine.executors?.claudeLoginMethods : undefined;
     if (!again && method === "cli_login" && !claudeLoginMethodsOf(said, system).includes("cli_login")) {
       throw new ConflictError(
         "This computer's runner can't use Claude's own login for all agents yet. Update its runner, or ask support.",

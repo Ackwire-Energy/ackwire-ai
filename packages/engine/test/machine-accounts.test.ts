@@ -1896,6 +1896,30 @@ test("a runner that can use Claude's own login for all agents gets it; an older 
   expect(await accountRow(chatgpt.loginId)).toMatchObject({ authMethod: "cli_login" });
 });
 
+test("system mode: one agent's Claude login signed in again for all agents goes without its read-off method", async () => {
+  f = await setup();
+  const { machineId } = await systemMachine(CLAUDE_AUTH_PROTOCOL, ["setup_token"]);
+  await addAccount(machineId, CLAUDE_ID, "claude_code", { status: "signed_out", authMethod: "cli_login" });
+  const runner = fakeHub(machineId, () => ({ url: "https://claude.ai/x" }), { protocol: CLAUDE_AUTH_PROTOCOL });
+  await beginAccountLogin(runner.deps, f.owner.id, f.org.id, machineId, "claude_code", CLAUDE_ID);
+  expect(runner.calls[0]).toMatchObject({ action: "begin", again: true, shared: true });
+  expect(runner.calls[0]).not.toHaveProperty("method");
+});
+
+test("a runner that says it signs in for all agents with a token alone is in system mode, whatever the hub kept", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(CLAUDE_AUTH_PROTOCOL);
+  const [m] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, machineId));
+  await f.db
+    .update(schema.machines)
+    .set({ executors: { ...m?.executors, claudeLoginMethods: ["setup_token"] } })
+    .where(eq(schema.machines.id, machineId));
+  const runner = fakeHub(machineId, () => ({ url: "https://claude.ai/x" }), { protocol: CLAUDE_AUTH_PROTOCOL });
+  const login = await beginAccountLogin(runner.deps, f.owner.id, f.org.id, machineId, "claude_code");
+  expect(runner.calls[0]).toMatchObject({ action: "begin", shared: true, method: "setup_token" });
+  expect(await accountRow(login.loginId)).toMatchObject({ authMethod: "setup_token" });
+});
+
 test("reports: the method and Claude's organization stay when not said; an inconclusive look keeps the status", async () => {
   f = await setup();
   const { machineId } = await ownedMachine(CLAUDE_AUTH_PROTOCOL);

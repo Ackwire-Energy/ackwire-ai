@@ -1338,7 +1338,13 @@ export class AccountManager {
       if (method === "setup_token" && (!this.opts.lending || !shared)) {
         throw new RunnerError("bad_request", "A Claude token signs in here only for all agents of a shared computer");
       }
-      if (method === "cli_login" && this.opts.lending && shared) {
+      // Signing in again a one-agent folder for all agents starts over below, the setup-token way.
+      if (
+        method === "cli_login" &&
+        this.opts.lending &&
+        shared &&
+        (!again || (this.keptMethod(kind, loginId) === "cli_login" && this.isShared(kind, loginId)))
+      ) {
         throw new RunnerError(
           "unsupported",
           "This computer can't make a Claude sign-in for all agents with Claude's own login yet.",

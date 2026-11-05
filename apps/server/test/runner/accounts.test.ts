@@ -1399,6 +1399,23 @@ test.if(posix)(
       account: { authMethod: "cli_login" },
     });
     expect(runs().map((r) => r.args)).toEqual(["setup-token", "auth login", "auth status --json"]);
+    // Signing it in again for all agents, its cli_login named or not: it starts over, as a token.
+    for (const method of ["cli_login", undefined]) {
+      expect(await signInClaude(m, one, true, true, method)).toMatchObject({
+        state: "done",
+        account: { shared: true, authMethod: "setup_token" },
+      });
+      expect(readFileSync(path.join(root, "claude_code", `${one}.method`), "utf8")).toBe("setup_token");
+      // Back to one agent's login, without a kept method, as an older runner left it.
+      rmSync(path.join(root, "claude_code", `${one}.shared`), { force: true });
+      rmSync(path.join(root, "claude_code", `${one}.method`), { force: true });
+    }
+    // A shared folder that does keep Claude's own login is still refused.
+    writeFileSync(path.join(root, "claude_code", `${one}.shared`), "");
+    writeFileSync(path.join(root, "claude_code", `${one}.method`), "cli_login");
+    expect(await errorCode(() => m.begin("claude_code", one, true, undefined, undefined, true, "cli_login"))).toBe(
+      "unsupported",
+    );
   },
   20_000,
 );
