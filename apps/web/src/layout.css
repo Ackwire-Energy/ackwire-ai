@@ -4742,6 +4742,12 @@ html:not([data-pointer]) .cflow__more summary:focus-visible {
   font-weight: 600;
   color: var(--ink2);
   border-radius: var(--radius-sm);
+  list-style: none;
+}
+/* A flex summary loses its triangle in Blink, not in the Mac app's WebKit: there it stood before the filter icon, at
+   the line's start. */
+.mail-rules > summary::-webkit-details-marker {
+  display: none;
 }
 html:not([data-pointer]) .mail-rules > summary:focus-visible {
   outline: none;
