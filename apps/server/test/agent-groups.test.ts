@@ -17,7 +17,17 @@ beforeEach(async () => {
 });
 afterEach(() => t.close());
 
-type Groups = { groups: { id: string; name: string; agentIds: string[] }[] };
+type Groups = {
+  groups: {
+    id: string;
+    name: string;
+    agentIds: string[];
+    color: string;
+    icon: string;
+    leadUserId: string | null;
+    backupUserId: string | null;
+  }[];
+};
 
 /** The owner's workspace with @dev and @ops, and a member. */
 async function workspace() {
@@ -38,8 +48,36 @@ test("agent groups API: owners and admins change them, members read them, agents
   const created = await api(owner, "/agent-groups", { json: { name: "Integrations", agentIds: [ops, dev] } });
   expect(created.status).toBe(201);
   const { groups } = (await created.json()) as Groups;
-  expect(groups).toEqual([{ id: expect.any(String), name: "Integrations", agentIds: [ops, dev] }]);
+  expect(groups).toEqual([
+    {
+      id: expect.any(String),
+      name: "Integrations",
+      agentIds: [ops, dev],
+      color: "graphite",
+      icon: "person",
+      leadUserId: null,
+      backupUserId: null,
+    },
+  ]);
   const id = groups[0]?.id ?? "";
+  // A setor's look and people (ADR 0148): a lead in the workspace, a known color.
+  const people = (await (await api(owner, "/members")).json()) as { members: { userId: string; email: string }[] };
+  const memberId = people.members.find((m) => m.email === "member@example.com")?.userId;
+  expect(memberId).toBeTruthy();
+  const lead = await api(owner, `/agent-groups/${id}`, {
+    method: "PATCH",
+    json: { color: "teal", icon: "code", leadUserId: memberId },
+  });
+  expect(((await lead.json()) as Groups).groups[0]).toMatchObject({
+    color: "teal",
+    icon: "code",
+    leadUserId: memberId,
+  });
+  expect((await api(owner, `/agent-groups/${id}`, { method: "PATCH", json: { color: "sky" } })).status).toBe(400);
+  await api(owner, `/agent-groups/${id}`, {
+    method: "PATCH",
+    json: { color: "graphite", icon: "person", leadUserId: null },
+  });
 
   expect((await api(member, "/agent-groups", { json: { name: "Meu" } })).status).toBe(403);
   expect((await api(member, `/agent-groups/${id}`, { method: "PATCH", json: { name: "Outro" } })).status).toBe(403);

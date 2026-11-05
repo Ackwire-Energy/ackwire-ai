@@ -53,7 +53,8 @@ export function useConnectKey(orgId: string, asked?: string) {
       setSaving(false);
     }
   };
-  return { provider, setProvider, key, setKey, looksRight, ready: clean.length > 0, saving, failed, save };
+  // `asked`: what opened the sheet, so "Outro provedor" (ADR 0146) opens on its own form.
+  return { provider, setProvider, key, setKey, looksRight, ready: clean.length > 0, saving, failed, save, asked };
 }
 
 export type ConnectKey = ReturnType<typeof useConnectKey>;

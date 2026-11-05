@@ -31,9 +31,7 @@ test("iOS: the app's pages open the app once team and bundle ids are set, the on
   for (const path of ["/invite/*", "/reset-password", "/signup", "/org/*/c/*", "/org/*/threads/*", "/org/*/dm/*"])
     expect(paths).toContain(path);
   // Never the API, sign-in callbacks or pages the app has no screen for.
-  expect(paths?.some((p) => p.startsWith("/api") || /forum|calendar|billing|roles|voice|settings\/\*/.test(p))).toBe(
-    false,
-  );
+  expect(paths?.some((p) => p.startsWith("/api") || /calendar|billing|roles|voice|settings\/\*/.test(p))).toBe(false);
 });
 
 test("Android: every package with every signing fingerprint, upper-cased; nothing without them", () => {

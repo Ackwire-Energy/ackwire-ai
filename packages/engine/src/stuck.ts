@@ -55,11 +55,9 @@ export interface StuckState {
   endAt?: number;
 }
 
-/** What a forum's turn or synthesis found stuck reads once: never told to say what blocks it, its last words are its post. */
-export const STUCK_FORUM_NOTE = "Your last steps repeat without getting you closer to done. Try a different approach.";
-
-/** What any other run found stuck reads once. */
-export const STUCK_NOTE = `${STUCK_FORUM_NOTE} If something blocks you, stop and say plainly what it is.`;
+/** What a run found stuck reads once. */
+export const STUCK_NOTE =
+  "Your last steps repeat without getting you closer to done. Try a different approach. If something blocks you, stop and say plainly what it is.";
 
 /** What a conversation run found stuck again reads: the run ends with its answer, and Continuar under it. */
 export const STUCK_END_REPLY_NOTE =

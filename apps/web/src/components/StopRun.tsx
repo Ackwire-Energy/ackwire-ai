@@ -111,8 +111,7 @@ export function runContext(t: TFunction, run: LiveRun, now = Date.now()) {
 /**
  * The small "Parar" (a pixel stop square; a danger tint only on hover). A
  * click stops right away; it spins with "Parando…" until the server says so.
- * The chat stops from its composer instead; this one is for other live views
- * (the forum's turn).
+ * The chat stops from its composer too; this one sits on a run's row and bar.
  */
 export function StopButton({ run, onStop }: { run: LiveRun; onStop: (r: LiveRun) => void; place?: string }) {
   const { t } = useTranslation();

@@ -34,7 +34,6 @@ import {
   createFakeScheduleReader,
   createFindAgentToolSource,
   createFollowUpToolSource,
-  createForumToolSource,
   createHandOffToolSource,
   createIssueToolSource,
   createJobHandlers,
@@ -197,8 +196,6 @@ export async function setup(
     skillTools?: boolean;
     /** Fake embeddings (hybrid search). Off: full-text only, no embedding usage rows. */
     embeddings?: boolean;
-    /** Add the forum tools (open_forum_topic, post_in_forum, read_forum_topic). */
-    forumTools?: boolean;
     /** Add the scheduling tools (schedule_reminder, create_routine…). */
     scheduleTools?: boolean;
     /** Keep the workspace's right hand (ADR 0137). Off: its only agent is `@dev`. */
@@ -361,8 +358,7 @@ export async function setup(
       : []),
     ...(options.contextTools ? [createContextToolSource(context)] : []),
     ...(options.scheduleTools ? [createScheduleToolSource({ pubsub, context })] : []),
-    ...(options.forumTools ? [createForumToolSource({ pubsub, artifacts: artifactDeps })] : []),
-    ...(options.wikiTools ? [createWikiToolSource({ pubsub, search: context, artifacts: artifactDeps })] : []),
+    ...(options.wikiTools ? [createWikiToolSource({ pubsub, search: context })] : []),
     ...(sandboxDeps
       ? [
           createSandboxToolSource({

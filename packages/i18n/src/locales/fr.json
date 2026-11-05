@@ -303,6 +303,12 @@
       "short": "clés d'IA",
       "say": "gère les clés d'IA"
     },
+    "use_others_plans": {
+      "title": "Utiliser les forfaits d’autres personnes",
+      "desc": "Donner aux agents qu’on peut modifier un forfait connecté par quelqu’un d’autre. Son propriétaire reçoit un e-mail et peut le reprendre.",
+      "short": "utiliser les forfaits d’autres personnes",
+      "say": "utilise les forfaits d’autres personnes"
+    },
     "edit_wiki": {
       "title": "Modifier le wiki",
       "desc": "Créer et modifier des pages.",
@@ -362,12 +368,6 @@
       "desc": "L'abonnement, la carte et les factures.",
       "short": "facturation",
       "say": "gère la facturation"
-    },
-    "use_others_plans": {
-      "title": "Utiliser les forfaits d’autres personnes",
-      "desc": "Donner aux agents qu’on peut modifier un forfait connecté par quelqu’un d’autre. Son propriétaire reçoit un e-mail et peut le reprendre.",
-      "short": "utiliser les forfaits d’autres personnes",
-      "say": "utilise les forfaits d’autres personnes"
     }
   },
   "auth": {
@@ -985,7 +985,7 @@
       "theo": {
         "name": "Theo",
         "role": "PM",
-        "desc": "Organise les tâches et anime le forum."
+        "desc": "Organise les tâches et tient la feuille de route à jour."
       },
       "ada": {
         "name": "Ada",
@@ -1136,7 +1136,6 @@
     "agent_reply": "Un agent a répondu",
     "agent_question": "Une question pour vous",
     "approval": "Une approbation vous attend",
-    "forum_turn": "À vous de donner votre avis",
     "mission_stopped": "Une mission s'est arrêtée",
     "routine_failed": "Une routine n'a pas abouti",
     "run_failed": "Un agent n'a pas pu terminer",
@@ -1285,7 +1284,7 @@
     "category": {
       "waiting": {
         "title": "Vous attend",
-        "help": "Approbations, questions des agents, votre tour dans le forum, demandes d'aide dans le navigateur"
+        "help": "Approbations, questions des agents, demandes d'aide dans le navigateur"
       },
       "replies": {
         "title": "Réponses des agents",
@@ -1356,7 +1355,6 @@
       "drive": "Fichiers, rapports et tableaux",
       "routines": "Ce que les agents font seuls, à heure fixe",
       "calendar": "Réunions et échéances",
-      "forum": "Quand une décision demande plusieurs avis",
       "team": "Qui est qui : personnes, agents et leurs groupes"
     },
     "customizeSidebar": "Personnaliser la barre latérale",
@@ -1430,7 +1428,6 @@
     "team": "Équipe",
     "calendar": "Agenda",
     "drive": "Drive",
-    "forum": "Forum",
     "members": "Membres",
     "channels": "Canaux",
     "agents": "Agents",
@@ -1478,29 +1475,29 @@
     "unreadNotifications_other": "{{count}} notifications non lues"
   },
   "agentGroups": {
-    "group": "Groupe",
-    "none": "Aucun groupe",
-    "newGroup": "Nouveau groupe",
-    "newFromAgent": "Nouveau groupe…",
+    "group": "Service",
+    "none": "Sans service",
+    "newGroup": "Nouveau service",
+    "newFromAgent": "Nouveau service…",
     "nameLabel": "Nom",
-    "namePlaceholder": "Ex. Produit et marketing",
-    "create": "Créer le groupe",
-    "renameTitle": "Renommer le groupe",
-    "rename": "Renommer",
+    "namePlaceholder": "Ex. : Ventes",
+    "create": "Créer le service",
+    "renameTitle": "Modifier le service",
+    "rename": "Modifier",
     "options": "Options de {{name}}",
     "moveUp": "Monter",
     "moveDown": "Descendre",
-    "delete": "Supprimer le groupe",
-    "deleteTitle": "Supprimer le groupe {{name}} ?",
+    "delete": "Supprimer le service",
+    "deleteTitle": "Supprimer le service {{name}} ?",
     "deleteText": "Ses agents retournent dans Agents.",
     "dropHere": "Faites glisser des agents ici",
-    "moved": "{{name}} a rejoint le groupe {{group}}",
-    "movedOut": "{{name}} a quitté le groupe {{group}}",
+    "moved": "{{name}} est passé dans {{group}}",
+    "movedOut": "{{name}} a quitté {{group}}",
     "undo": "Annuler"
   },
   "sidebarAgents": {
     "options": "Options des agents",
-    "add": "Nouvel agent ou groupe",
+    "add": "Nouvel agent ou service",
     "order": "Ordre",
     "sort": {
       "workspace": "Celui de l’espace de travail",
@@ -1510,7 +1507,7 @@
     "showAll": "Afficher les agents qui ne me parlent pas",
     "collapseAll": "Tout replier",
     "expandAll": "Tout déplier",
-    "organize": "Organiser les groupes dans Équipe",
+    "organize": "Organiser les services dans Équipe",
     "more_one": "1 agent de plus dans Équipe",
     "more_many": "{{count}} agents de plus dans Équipe",
     "more_other": "{{count}} agents de plus dans Équipe",
@@ -1526,8 +1523,8 @@
     "talksOnlyMore_one": "ne parle qu’à {{name}} et {{count}} autre",
     "talksOnlyMore_many": "ne parle qu’à {{name}} et {{count}} autres",
     "talksOnlyMore_other": "ne parle qu’à {{name}} et {{count}} autres",
-    "changeGroup": "Changer de groupe",
-    "newGroupWith": "Nouveau groupe avec {{name}}",
+    "changeGroup": "Déplacer vers un service",
+    "newGroupWith": "Nouveau service avec {{name}}",
     "dmsEmpty": "Vos conversations avec des personnes apparaissent ici."
   },
   "sidebarPins": {
@@ -1553,61 +1550,111 @@
   },
   "team": {
     "title": "Équipe",
-    "groups": {
-      "title": "Groupes d’agents"
+    "people_one": "{{count}} personne",
+    "people_many": "{{count}} personnes",
+    "people_other": "{{count}} personnes",
+    "agents_one": "{{count}} agent",
+    "agents_many": "{{count}} agents",
+    "agents_other": "{{count}} agents",
+    "sectorsCount_one": "{{count}} service",
+    "sectorsCount_many": "{{count}} services",
+    "sectorsCount_other": "{{count}} services",
+    "viewLabel": "Vue de l'équipe",
+    "view": {
+      "list": "Liste",
+      "chart": "Organigramme",
+      "map": "Carte",
+      "sectors": "Services",
+      "usage": "Gouvernance et usage"
     },
-    "subtitle_one": "{{count}} agent, regroupé selon qui s'en occupe.",
-    "subtitle_many": "{{count}} agents, regroupés selon qui s'occupe de chacun.",
-    "subtitle_other": "{{count}} agents, regroupés selon qui s'occupe de chacun.",
-    "working_one": "{{count}} au travail en ce moment.",
-    "working_many": "{{count}} au travail en ce moment.",
-    "working_other": "{{count}} au travail en ce moment.",
-    "skyLabel": "Agents regroupés par personne responsable. Touchez un agent pour voir ce qu'il fait.",
-    "tapHint": "Touchez un agent",
-    "asked": "{{from}} a demandé à {{to}}",
     "noOwner": "Aucun responsable",
-    "openAgent": "{{name}}, voir les détails",
-    "close": "Fermer",
-    "details": "Détails de {{name}}",
-    "of": "par {{name}}",
-    "does": "Ce qu'il fait",
-    "does_female": "Ce qu'elle fait",
-    "canDo": "Ce qu'il peut faire",
-    "canDo_female": "Ce qu'elle peut faire",
-    "onlyChat": "Conversation uniquement",
     "workingNow": "Au travail en ce moment",
     "available": "Disponible",
-    "talk": "Parler",
-    "edit": "Modifier",
-    "feedTitle": "Conversations entre agents",
-    "feedWindow": "dernières 24 h",
-    "feedEmpty": "Aucun agent n'a demandé d'aide à un autre ces dernières 24 h.",
     "archived": "Archivé",
-    "consultation": {
-      "open": "En attente de la réponse",
-      "answered": "Répondu",
-      "expired": "Sans réponse",
-      "failed": "Sans réponse"
-    },
     "emptyTitle": "Aucun agent pour l'instant",
     "empty": "Créez le premier agent pour former l'équipe.",
-    "cap": {
-      "drive": "Fichiers",
-      "issues": "Tâches",
-      "calendar": "Agenda",
-      "schedule": "Routines",
-      "forum": "Forum",
-      "wiki": "Wiki",
-      "sandbox": "Ordinateur",
-      "desktop": "Écran",
-      "browser": "Navigateur",
-      "database": "Bases de données",
-      "github": "GitHub",
-      "sentry": "Sentry",
-      "linear": "Linear",
-      "mail": "E-mail",
-      "vault": "Vault",
-      "custom": "Outils de l'espace de travail"
+    "list": {
+      "agents": "Agents",
+      "people": "Personnes",
+      "search": "Rechercher par nom, rôle ou canal",
+      "filterLabel": "Afficher les agents",
+      "filter": {
+        "mine": "Les miens",
+        "working": "Au travail en ce moment",
+        "waiting": "Vous attend",
+        "noOwner": "Aucun responsable"
+      },
+      "groupBy": "Regrouper par",
+      "by": {
+        "sector": "Regrouper par : service",
+        "owner": "Regrouper par : responsable",
+        "none": "Sans regroupement"
+      },
+      "col": {
+        "agent": "Agent",
+        "role": "Rôle",
+        "owner": "Responsable",
+        "channels": "Où il est",
+        "now": "Maintenant",
+        "menu": "Options",
+        "person": "Personne",
+        "roles": "Rôles",
+        "caresFor": "S'occupe de"
+      },
+      "noChannel": "Dans aucun canal",
+      "none": "Aucun agent ne correspond."
+    },
+    "chart": {
+      "byLabel": "Organigramme par",
+      "byPerson": "Par personne",
+      "bySector": "Par service",
+      "subPerson": "Chaque agent sous la personne qui en est responsable, ou sous la tête de son service quand il n'en a pas.",
+      "subSector": "Chaque service avec ses agents. {{name}} travaille avec tout le monde.",
+      "workspace": "Espace de travail",
+      "responsible": "Responsables : {{names}}"
+    },
+    "map": {
+      "lead": "Qui s'occupe des agents, les canaux où ils sont, ce que chacun fait seul et ce qui attend une personne. Les lignes pointillées relient les agents qui se sont demandé de l'aide ces dernières 24 h.",
+      "lodi": "Organise l'équipe avec vous",
+      "hint": "Faites glisser un agent vers un autre canal et {{name}} prépare le changement pour que vous l'appliquiez",
+      "proposed": "{{name}} a préparé le changement dans votre conversation. Appliquez-le là-bas.",
+      "open": "Ouvrir",
+      "reasonMove": "Déplacer {{agent}} de #{{from}} vers #{{to}}, depuis la carte de l'équipe.",
+      "reasonJoin": "Ajouter {{agent}} à #{{to}}, depuis la carte de l'équipe.",
+      "waiting_one": "{{count}} demande attend une approbation",
+      "waiting_many": "{{count}} demandes attendent une approbation",
+      "waiting_other": "{{count}} demandes attendent une approbation",
+      "moreRoutines_one": "et {{count}} autre routine",
+      "moreRoutines_many": "et {{count}} autres routines",
+      "moreRoutines_other": "et {{count}} autres routines",
+      "empty": "Aucun agent n'est encore dans un canal.",
+      "others": "Autres canaux"
+    },
+    "sectors": {
+      "lead": "Chaque service a un responsable, un suppléant, ses agents, leurs canaux et leurs routines.",
+      "ask": "Parler à {{name}}",
+      "askText": "Aide-moi à organiser l'équipe en services.",
+      "leadLabel": "Responsable",
+      "backupLabel": "Suppléant",
+      "leadOf": "Responsable de {{name}}",
+      "backupOf": "Suppléant dans {{name}}",
+      "nobody": "Personne",
+      "none": "Aucun",
+      "channels": "Canaux",
+      "routines": "Routines",
+      "leads": "Responsable de {{name}}",
+      "covers": "Suppléant dans {{name}}",
+      "placeHint": "Faites glisser un agent sur un service pour l'y mettre.",
+      "gap": {
+        "noLead": "Pas encore de responsable. Choisissez qui s'occupe de ce service.",
+        "noBackup": "Pas de suppléant. Si le responsable est absent, personne ne prend le relais."
+      },
+      "emptyTitle": "Aucun service pour l'instant",
+      "empty": "Les services organisent les agents par domaine, comme Ventes ou Support. Ils apparaissent comme des sections dans les listes de tout le monde."
+    },
+    "usage": {
+      "lead": "Ce que chaque personne utilise des agents ce mois-ci, et les limites.",
+      "settings": "Aussi dans Paramètres"
     }
   },
   "sky": {
@@ -1920,6 +1967,12 @@
         "invite": "Inviter des personnes",
         "firstTask": "Donner une première tâche à {{name}}"
       },
+      "style": {
+        "question": "Comment préférez-vous que je vous parle ?",
+        "text": "Cela vaut pour tous les agents, et vous pouvez le changer quand vous voulez dans votre compte.",
+        "simple": "Simple, sans jargon",
+        "technical": "Technique, avec les détails"
+      },
       "firstTask": {
         "theo": "Prépare le plan de notre première semaine : que fait chacun de nous en premier ?",
         "ada": "Que pourrais-tu construire ou automatiser pour nous en premier ?",
@@ -2048,6 +2101,101 @@
       "open": "Ouvrir",
       "web": "Ouvrir sur le site",
       "notAllowed": "Vous n'avez pas accès à cet écran"
+    }
+  },
+  "teamWeek": {
+    "title": "Semaine de l’équipe",
+    "suggestions_one": "{{count}} proposition",
+    "suggestions_many": "{{count}} propositions",
+    "suggestions_other": "{{count}} propositions",
+    "stat": {
+      "done": "tâches faites",
+      "stuck": "bloquées",
+      "waiting": "vous attendent",
+      "budget": "sur {{budget}} ce mois-ci"
+    },
+    "worked": "Ce qui a marché",
+    "workedRuns_one": "{{name}} a fait {{count}} travail dans #{{channel}}",
+    "workedRuns_many": "{{name}} a fait {{count}} travaux dans #{{channel}}",
+    "workedRuns_other": "{{name}} a fait {{count}} travaux dans #{{channel}}",
+    "workedTasks_one": "{{name}} a fermé {{count}} tâche",
+    "workedTasks_many": "{{name}} a fermé {{count}} tâches",
+    "workedTasks_other": "{{name}} a fermé {{count}} tâches",
+    "improve": "À améliorer",
+    "approvals": {
+      "title_one": "{{count}} demande de {{name}} vous attend",
+      "title_many": "{{count}} demandes de {{name}} vous attendent",
+      "title_other": "{{count}} demandes de {{name}} vous attendent",
+      "line": "En attente depuis {{since}}.",
+      "action": "Voir et approuver",
+      "hide": "Masquer"
+    },
+    "budget": {
+      "title": "Budget de {{name}} : {{from}} → {{to}}",
+      "line_one": "S’est arrêté {{count}} fois à la limite du mois.",
+      "line_many": "S’est arrêté {{count}} fois à la limite du mois.",
+      "line_other": "S’est arrêté {{count}} fois à la limite du mois."
+    },
+    "channel": {
+      "title": "Mettre {{name}} dans #{{channel}}",
+      "line": "{{name}} n’est dans aucun canal, donc personne ne lui a parlé de la semaine."
+    },
+    "unanswered": {
+      "title": "Un agent pour les questions de #{{channel}}",
+      "line_one": "{{count}} question est restée sans réponse dans #{{channel}} cette semaine.",
+      "line_many": "{{count}} questions sont restées sans réponse dans #{{channel}} cette semaine.",
+      "line_other": "{{count}} questions sont restées sans réponse dans #{{channel}} cette semaine.",
+      "action": "Proposer un agent",
+      "message": "Propose un agent pour répondre aux questions restées sans réponse dans #{{channel}} cette semaine.",
+      "done": "Demandé à {{name}}"
+    },
+    "routine": {
+      "title": "Routine de {{name}} tous les jours à {{time}}",
+      "line_one": "Vous l’avez demandé {{count}} fois cette semaine : « {{text}} »",
+      "line_many": "Vous l’avez demandé {{count}} jours cette semaine : « {{text}} »",
+      "line_other": "Vous l’avez demandé {{count}} jours cette semaine : « {{text}} »",
+      "action": "Créer la routine",
+      "done": "Routine créée"
+    },
+    "stalled": {
+      "title": "Étapes à l’arrêt dans #{{number}} {{title}}",
+      "line_one": "L’étape {{steps}} est à l’arrêt depuis {{hours}} h en attendant #{{on}}.",
+      "line_many": "Les étapes {{steps}} sont à l’arrêt depuis {{hours}} h en attendant #{{on}}.",
+      "line_other": "Les étapes {{steps}} sont à l’arrêt depuis {{hours}} h en attendant #{{on}}.",
+      "action": "Lancer en parallèle",
+      "message": "@{{handle}} les étapes {{steps}} n’ont pas besoin d’attendre #{{on}}. Continue-les en parallèle.",
+      "messageNoAgent": "Les étapes {{steps}} n’ont pas besoin d’attendre #{{on}}. Elles peuvent avancer en parallèle.",
+      "done": "Message envoyé"
+    },
+    "applied": "Appliqué",
+    "undo": "Annuler",
+    "gone": "Ne s’applique plus",
+    "applyAll_one": "Appliquer la suggestion",
+    "applyAll_many": "Appliquer les {{count}}",
+    "applyAll_other": "Appliquer les {{count}}",
+    "notNow": "Pas maintenant",
+    "dismissed": "Rien ne change pour l’instant. Posez toutes vos questions sur la semaine ici même.",
+    "change": "Modifier",
+    "every": {
+      "sun": "Tous les dimanches à {{time}}",
+      "mon": "Tous les lundis à {{time}}",
+      "tue": "Tous les mardis à {{time}}",
+      "wed": "Tous les mercredis à {{time}}",
+      "thu": "Tous les jeudis à {{time}}",
+      "fri": "Tous les vendredis à {{time}}",
+      "sat": "Tous les samedis à {{time}}"
+    },
+    "off": "Désactivée",
+    "schedule": {
+      "title": "Quand elle arrive",
+      "day": "Jour",
+      "hour": "Heure",
+      "stop": "Ne plus la recevoir",
+      "start": "La recevoir à nouveau"
+    },
+    "settings": {
+      "label": "Semaine de l’équipe",
+      "help": "Chaque semaine, {{name}} vous raconte dans votre DM comment l’équipe s’en est sortie et ce qu’il faut améliorer. Seuls les admins la reçoivent."
     }
   },
   "routing": {
@@ -3282,7 +3430,9 @@
       "browser": "A besoin de vous dans le navigateur",
       "desktop": "A besoin de vous sur l'ordinateur",
       "proposal": "Propose une modification",
-      "agent": "Propose un nouvel agent"
+      "agent": "Propose un nouvel agent",
+      "team": "Propose une équipe",
+      "firstTask": "Première tâche"
     },
     "waitingYou": "vous attend",
     "waitingFor": "attend {{name}}",
@@ -3297,6 +3447,8 @@
       "desktop": "<b>{{name}}</b> a besoin de vous sur l'ordinateur · {{what}}",
       "proposal": "<b>{{name}}</b> propose une modification · {{what}}",
       "agent": "<b>{{name}}</b> propose un nouvel agent · {{what}}",
+      "team": "<b>{{name}}</b> propose une équipe · {{what}}",
+      "firstTask": "<b>{{name}}</b> suggère une première tâche · {{what}}",
       "more": "+{{count}}",
       "see": "Voir"
     }
@@ -3530,6 +3682,11 @@
   },
   "notifications": {
     "title": "Notifications",
+    "planLent": {
+      "takeBack": "Reprendre",
+      "takeBackAll": "Reprendre de tous les agents",
+      "done": "Votre forfait est revenu"
+    },
     "docTitleUnread": "({{count}}) Notifications",
     "summaryWaiting_one": "{{count}} chose vous attend",
     "summaryWaiting_many": "{{count}} choses vous attendent",
@@ -3578,17 +3735,6 @@
       "stoppedForF": "Bloquée depuis {{time}}",
       "stoppedForM": "Bloqué depuis {{time}}",
       "openThread": "Ouvrir la conversation",
-      "table": "vous a invité à la table",
-      "roundWaits": "Le tour attend depuis {{time}}",
-      "yourTurn": "Tour {{round}} sur {{rounds}} · c'est à vous de parler",
-      "yourTurnNoRound": "C'est à vous de parler",
-      "seatYou": "Vous",
-      "seatYours": "votre tour",
-      "seatSpoke": "a parlé",
-      "seatPassed": "a passé",
-      "seatLater": "plus tard",
-      "speak": "Parler à la table",
-      "pass": "Passer votre tour",
       "approval": "demande une approbation",
       "decide": "Décider dans Approbations",
       "wants": "<b>{{name}}</b> veut <b>{{action}}</b>",
@@ -3609,8 +3755,7 @@
         "send": "envoyer un message à l'extérieur",
         "draft": "enregistrer un brouillon"
       },
-      "resolved": "{{name}} a reçu votre réponse et s'est remis au travail",
-      "resolvedForum": "Votre tour est dans le cycle"
+      "resolved": "{{name}} a reçu votre réponse et s'est remis au travail"
     },
     "what": {
       "mention": "<b>{{name}}</b> vous a mentionné",
@@ -3632,8 +3777,6 @@
       "issueComment_other": "<b>{{names}}</b> ont commenté une tâche que vous suivez",
       "issueStatus": "<b>{{name}}</b> a déplacé une tâche que vous suivez",
       "issueDone": "<b>{{name}}</b> a terminé une tâche que vous suivez",
-      "forumTurn": "<b>{{name}}</b> vous a invité à la table",
-      "forumSynthesis": "<b>{{name}}</b> a publié la synthèse de votre sujet",
       "approval": "<b>{{name}}</b> a demandé une approbation",
       "missionFinished": "<b>{{name}}</b> a terminé une mission",
       "missionStopped": "<b>{{name}}</b> a arrêté une mission",
@@ -3651,6 +3794,7 @@
       "agentUnreached": "Une routine n'a pas pu appeler <b>{{name}}</b>",
       "browserProfileRequest": "<b>{{name}}</b> demande un profil de navigateur de plus pour <b>{{agent}}</b>",
       "desktopTaken": "<b>{{name}}</b> a pris le contrôle de l'écran de l'ordinateur de <b>{{agent}}</b>",
+      "planLent": "<b>{{name}}</b> a connecté votre forfait {{plan}} à <b>{{agent}}</b>",
       "routineWaitingPlan": "<b>{{name}}</b> attend la réinitialisation de son abonnement pour exécuter une routine",
       "planResetUnknown": "{{plan}} n'a pas indiqué quand sa limite se réinitialise. Le travail de <b>{{name}}</b> attend toujours.",
       "catchUpClosed_one": "<b>{{name}}</b> est de retour et a sauté {{count}} conversation qui n'avait pas besoin de réponse",
@@ -3685,8 +3829,7 @@
       "usageLimitReached": "<b>{{name}}</b> a atteint sa limite de {{amount}}",
       "usageLimitRequest": "<b>{{name}}</b> a atteint sa limite de {{amount}} et en demande plus",
       "usageLimitRaised": "<b>{{name}}</b> a relevé votre limite pour ce mois",
-      "usageLimitRefused": "<b>{{name}}</b> a refusé votre demande d'utilisation supplémentaire",
-      "planLent": "<b>{{name}}</b> a connecté votre forfait {{plan}} à <b>{{agent}}</b>"
+      "usageLimitRefused": "<b>{{name}}</b> a refusé votre demande d'utilisation supplémentaire"
     },
     "usageLimit": {
       "runs_one": "{{count}} demande ce mois-ci",
@@ -3705,7 +3848,6 @@
       "threadOnly": "Fil",
       "dm": "Message direct",
       "issue": "Tâche #{{number}}",
-      "forum": "Forum",
       "mission": "Mission",
       "routine": "Routine",
       "approval": "Approbation",
@@ -3765,7 +3907,6 @@
       "channel": "Répondre dans #{{channel}}",
       "issue": "Commenter #{{number}}",
       "issueNoNumber": "Commenter la tâche",
-      "forum": "Votre position en une ou deux phrases",
       "reply": "Répondre",
       "sends": "envoie",
       "closes": "ferme",
@@ -3794,9 +3935,6 @@
       "sent": "Réponse envoyée",
       "see": "Voir",
       "answered": "{{name}} a reçu votre réponse",
-      "spoke": "Votre tour est dans le cycle",
-      "passed": "Vous avez passé votre tour",
-      "passedDetail": "Le cycle continue. La synthèse arrivera ici dès sa sortie.",
       "decideThere": "Cette demande se décide dans Approbations"
     },
     "calmTitle": "Vous êtes à jour",
@@ -3805,12 +3943,7 @@
     "noneUnread": "Tout est lu.",
     "noneHere": "Rien ici pour l'instant.",
     "noneDone": "Rien marqué comme terminé ces 30 derniers jours.",
-    "more": "Afficher plus",
-    "planLent": {
-      "takeBack": "Reprendre",
-      "takeBackAll": "Reprendre de tous les agents",
-      "done": "Votre forfait est revenu"
-    }
+    "more": "Afficher plus"
   },
   "approvals": {
     "title": "Approbations",
@@ -4113,6 +4246,7 @@
         "accountMove": "Utilisé par {{agents}} · Le déplacer ici",
         "accountAlso": "Aussi utilisé par {{agents}}",
         "accountOf": "De {{name}}",
+        "accountOthers": "Les forfaits d’autres personnes indiquent à qui ils sont. Leur propriétaire reçoit un e-mail et peut les reprendre.",
         "addAccount": "Ajouter un compte",
         "signInAgain": "Se reconnecter",
         "connectPlan": "Connecter un autre abonnement",
@@ -4277,8 +4411,7 @@
           "sendFailed": "Impossible d'envoyer le code. Vérifiez-le et réessayez.",
           "done": "Le compte {{account}} est sur {{computer}}. Cliquez sur Utiliser pour enregistrer."
         },
-        "offCloud": "{{computer}} ne répond pas",
-        "accountOthers": "Les forfaits d’autres personnes indiquent à qui ils sont. Leur propriétaire reçoit un e-mail et peut les reprendre."
+        "offCloud": "{{computer}} ne répond pas"
       },
       "computer": {
         "title": "Où {{name}} travaille-t-il ?",
@@ -4367,7 +4500,7 @@
       "machine": "Ordinateur",
       "brain": "Qui réfléchit",
       "repos": "Dépôts GitHub",
-      "group": "Groupe",
+      "group": "Service",
       "handle": "Mentions"
     },
     "lines": {
@@ -4929,8 +5062,8 @@
       "pm": {
         "name": "PM",
         "agent": "Theo",
-        "desc": "Organise les tâches, les résumés et le forum.",
-        "instructions": "Cherche d'abord (tâches, fils, wiki, retours) et ne demande que ce qui manque.\nOrganise les tâches, résume les longues discussions et tient la feuille de route à jour.\nChaque vendredi, publie le résumé de la semaine sur le forum."
+        "desc": "Organise les tâches et les résumés.",
+        "instructions": "Cherche d'abord (tâches, fils, wiki, retours) et ne demande que ce qui manque.\nOrganise les tâches, résume les longues discussions et tient la feuille de route à jour."
       },
       "support": {
         "name": "Support",
@@ -5470,10 +5603,6 @@
       "title": "Message direct avec {{name}}",
       "text": "Les messages directs ne sont pas encore arrivés. Pour l'instant, parlez avec {{name}} dans un canal."
     },
-    "forum": {
-      "title": "Forum",
-      "text": "Les longues discussions et les annonces de l'espace de travail vivront ici."
-    },
     "search": {
       "title": "Rechercher dans l'espace de travail",
       "text": "La recherche dans les messages, tâches et fichiers apparaîtra ici.",
@@ -5602,10 +5731,6 @@
     "wiki_write": {
       "label": "Écrire dans le wiki",
       "description": "Créer et modifier des pages du wiki, seulement quand une personne le demande."
-    },
-    "forum_write": {
-      "label": "Forum",
-      "description": "Ouvrir des sujets du forum, les lire et publier en dehors de son tour."
     },
     "schedule_write": {
       "label": "Planification",
@@ -5895,8 +6020,10 @@
     "createdBy": "#{{number}} · créée par {{name}}",
     "createdByShort": "Créée par {{name}}",
     "fromMessage": "depuis <0>un message dans #{{channel}}</0>",
-    "fromForum": "depuis un sujet du forum",
     "fromAgent": "depuis une demande à un agent",
+    "subIssues_one": "Sous-tâches · {{count}}",
+    "subIssues_many": "Sous-tâches · {{count}}",
+    "subIssues_other": "Sous-tâches · {{count}}",
     "fromWebhook": "depuis un événement {{provider}}",
     "description": "Description",
     "noDescription": "Aucune description.",
@@ -5989,9 +6116,7 @@
       "artifact_linked": "a joint un fichier",
       "criterion_checked": "a coché le critère « {{text}} »",
       "criterion_unchecked": "a décoché le critère « {{text}} »",
-      "agent_asked": "a demandé à {{name}} de la faire",
-      "forum_opened": "l'a portée au forum : {{title}}",
-      "forum_evaluated": "a rapporté le résultat du forum : {{title}}"
+      "agent_asked": "a demandé à {{name}} de la faire"
     }
   },
   "routines": {
@@ -6078,8 +6203,6 @@
     "widgetChip": "Widget de tableau de bord",
     "widgetFixed": "Ce qu'il affiche, quand il se met à jour et qui s'en occupe se modifient depuis son widget.",
     "target": {
-      "forum": "Un sujet du forum",
-      "forumShort": "Forum",
       "dm": "Mon message direct avec l'agent",
       "artifact": "Un document dans le Drive",
       "dmShort": "Message direct",
@@ -6183,7 +6306,6 @@
         "thread": "Chaque exécution répond dans le même fil",
         "channel": "Tout le monde dans le canal le voit",
         "dm": "Vous seul le voyez",
-        "forum": "Les agents en discutent dans un sujet du forum",
         "artifact": "Devient un document dans le Drive",
         "widget": "Met à jour son widget, sans message"
       },
@@ -6270,7 +6392,6 @@
       "keepUtc": "Garder UTC",
       "adjust": "Ajuster",
       "next": "Suivant",
-      "forumAgents": "Agents qui en discutent",
       "agent": "Agent",
       "target": "Où livrer",
       "what": "Quoi faire",
@@ -7451,6 +7572,49 @@
     "list": "Modèles",
     "picks": "{{provider}} · Bons choix"
   },
+  "endpoint": {
+    "option": "Autre fournisseur",
+    "optionSub": "Compatible OpenAI ou Claude : une passerelle, Ollama, vLLM, LM Studio, LiteLLM",
+    "name": "Nom",
+    "namePlaceholder": "Ma passerelle",
+    "style": "API",
+    "styles": {
+      "openai": "OpenAI (Chat Completions)",
+      "anthropic": "Claude (Messages)"
+    },
+    "address": "Adresse",
+    "addressHelp": "L'adresse de base de l'API, comme {{example}}",
+    "key": "Clé d'API",
+    "keyHelp": "Laissez vide si le serveur ne demande pas de clé.",
+    "fetch": "Chercher les modèles",
+    "listFailed": "Le serveur n'a listé aucun modèle ({{error}}). Saisissez l'id de chaque modèle ci-dessous.",
+    "choose": "Choisissez les modèles que les agents peuvent utiliser",
+    "addModel": "Ajouter un modèle",
+    "add": "Ajouter",
+    "modelPlaceholder": "Id du modèle, comme llama-4",
+    "modelInvalid": "Cela ne ressemble pas à un id de modèle.",
+    "priceIn": "{{model}} : prix d'entrée",
+    "priceOut": "{{model}} : prix de sortie",
+    "priceInShort": "Entrée",
+    "priceOutShort": "Sortie",
+    "priceUnit": "US$ par million de tokens",
+    "priceBoth": "Remplissez l'entrée et la sortie, ou aucune des deux.",
+    "priceInvalid": "Utilisez un nombre, comme 0.50",
+    "unpriced": "Un modèle sans prix ne coûte rien dans les budgets : seuls ses tokens sont comptés.",
+    "save": "Enregistrer et tester",
+    "saveModels": "Enregistrer et tester à nouveau",
+    "testing": "Test de chaque modèle…",
+    "results": "Test de chaque modèle",
+    "check": {
+      "ok": "Fonctionne, avec des outils",
+      "noTools": "Répond, mais n'a utilisé aucun outil. Les agents ont besoin d'outils pour travailler.",
+      "failed": "Échec : {{error}}"
+    },
+    "done": "Terminer",
+    "models": "Modèles",
+    "modelsTitle": "Modèles de {{name}}",
+    "budgetUnpriced": "Le modèle de cet agent n'a pas de prix, son budget ne peut donc pas compter ce qu'il dépense. Ses tokens sont comptés."
+  },
   "timezone": {
     "search": "Rechercher un fuseau horaire",
     "searchPlaceholder": "Ville, pays, UTC−3…",
@@ -8369,7 +8533,6 @@
     "inviteKeywords": "inviter invitation invitations membre membres personne personnes équipe invite member people team",
     "wikiPage": "page du wiki",
     "wikiNew": "Nouvelle page du wiki",
-    "forum": "sujet du forum",
     "jump": "Aller à…",
     "open": "Aller à, ou demander à un agent",
     "placeholder": "Aller à, ou demander à un agent…",
@@ -8385,528 +8548,6 @@
     "newConversation": "nouvelle conversation",
     "askLabel": "{{name}}, {{text}}",
     "empty": "Rien pour « {{q}} »."
-  },
-  "forum": {
-    "title": "Forum",
-    "subtitle": "Une question avec un objectif. Les agents en débattent par tours, un à la fois, et concluent par une synthèse.",
-    "guard": "Tout le monde dans l'espace de travail peut le lire. Chaque tour est une exécution normale : les outils et les approbations s'appliquent.",
-    "new": "Nouveau sujet",
-    "filters": "Filtrer les sujets",
-    "filter": {
-      "open": "En discussion",
-      "done": "Conclus",
-      "mine": "Les miens"
-    },
-    "listTitle": {
-      "open": "En discussion",
-      "done": "Conclus",
-      "mine": "Mes sujets"
-    },
-    "agentFilter": "Agents",
-    "agentCount_one": "{{count}} agent",
-    "agentCount_many": "{{count}} agents",
-    "agentCount_other": "{{count}} agents",
-    "search": "Rechercher dans le forum",
-    "clearFilters": "Effacer les filtres",
-    "emptyFilter": "Aucun sujet ne correspond à ces filtres.",
-    "liveNow": "En débat maintenant",
-    "needsYou": "Vous attend",
-    "status": {
-      "open": "En discussion",
-      "stalled": "Bloqué",
-      "reopened": "Rouvert",
-      "done": "Conclu",
-      "canceled": "Annulé"
-    },
-    "reopenedBy": "Rouvert par {{name}}",
-    "roundOf": "tour {{round}} sur {{rounds}}",
-    "rounds_one": "{{count}} tour",
-    "rounds_many": "{{count}} tours",
-    "rounds_other": "{{count}} tours",
-    "until": "jusqu'à {{when}}",
-    "noDeadline": "sans échéance",
-    "deadlineToday": "aujourd'hui, {{time}}",
-    "deadlineTomorrow": "demain, {{time}}",
-    "you": "{{name}} (vous)",
-    "empty": {
-      "title": "Aucun sujet pour l'instant",
-      "text": "Soumettez une question difficile aux agents pour qu'ils en débattent par tours. Vous pouvez aussi le faire depuis le chat : « @agent, portez ça au forum »."
-    },
-    "live": {
-      "writing": "{{name}} écrit",
-      "reading": "{{name}} lit la discussion",
-      "yourTurn": "À vous",
-      "waiting": "En attente de {{name}}",
-      "synthesis": "{{name}} rédige la synthèse",
-      "stalled": "Bloqué au tour de {{name}}",
-      "stalled_female": "Bloqué au tour de {{name}}",
-      "stalledSynthesis": "Bloqué à la synthèse",
-      "next": "ensuite : {{name}}",
-      "thenSynthesis": "puis : la synthèse"
-    },
-    "need": {
-      "turnTitle": "À vous dans « {{title}} »",
-      "turn": "À vous au tour {{round}}. Le tour vous attend.",
-      "turnDeadline": "À vous au tour {{round}}. Si vous ne prenez pas la parole avant {{when}}, la discussion continue sans vous.",
-      "speak": "Prendre la parole",
-      "issues_one": "La synthèse propose {{count}} tâche. Elle n'est créée que si quelqu'un l'approuve.",
-      "issues_many": "La synthèse propose {{count}} tâches. Elles ne sont créées que si quelqu'un les approuve.",
-      "issues_other": "La synthèse propose {{count}} tâches. Elles ne sont créées que si quelqu'un les approuve.",
-      "planIssues_one": "Le plan propose {{count}} tâche. Elle n'est créée que si quelqu'un l'approuve.",
-      "planIssues_many": "Le plan propose {{count}} tâches. Elles ne sont créées que si quelqu'un les approuve.",
-      "planIssues_other": "Le plan propose {{count}} tâches. Elles ne sont créées que si quelqu'un les approuve.",
-      "subIssues_one": "Le plan propose {{count}} sous-tâche dans #{{number}}. Elle n'est créée que si quelqu'un l'approuve.",
-      "subIssues_many": "Le plan propose {{count}} sous-tâches dans #{{number}}. Elles ne sont créées que si quelqu'un les approuve.",
-      "subIssues_other": "Le plan propose {{count}} sous-tâches dans #{{number}}. Elles ne sont créées que si quelqu'un les approuve.",
-      "review": "Vérifier les tâches",
-      "budget": "{{name}} n'a plus de budget et passera ses prochains tours.",
-      "budget_female": "{{name}} n'a plus de budget et passera ses prochains tours.",
-      "seeBudget": "Voir le budget",
-      "stalled": "Bloqué : personne ne parle tant que quelqu'un ne relance pas.",
-      "resume": "Relancer"
-    },
-    "row": {
-      "canceled": "Annulé, sans synthèse."
-    },
-    "origin": {
-      "direct": "Directement dans le forum",
-      "agent": "{{name}}, #{{channel}}",
-      "agentNoChannel": "Ouvert par {{name}}",
-      "suggestion": "suggéré par {{name}}",
-      "suggestionIn": "suggéré par {{name}} dans #{{channel}}",
-      "issue": "Tâche #{{number}}",
-      "issueBy": "Tâche #{{number}} · demandée par {{name}}",
-      "issueBy_female": "Tâche #{{number}} · demandée par {{name}}",
-      "routine": "Une routine",
-      "conversation": "Une conversation"
-    },
-    "track": {
-      "label_one": "{{count}} tour d'agent, {{rounds}}",
-      "label_many": "{{count}} tours d'agents, {{rounds}}",
-      "label_other": "{{count}} tours d'agents, {{rounds}}",
-      "spoke": "Tour {{round}} · {{name}} · {{stance}}",
-      "spokeNoStance": "Tour {{round}} · {{name}}",
-      "person": "Tour {{round}} · {{name}} a rejoint",
-      "seat": "Tour {{round}} · {{name}} a parlé à son tour",
-      "passed": "Tour {{round}} · {{name}} a passé",
-      "waiting": "Le tour attend {{name}}",
-      "waitingMe": "Le tour vous attend",
-      "seatPending": "Tour {{round}} · au tour de {{name}}",
-      "live": "{{name}} écrit",
-      "sleep": "Bloqué au tour de {{name}}",
-      "sleep_female": "Bloqué au tour de {{name}}",
-      "synthesis": "Synthèse de {{name}}",
-      "synthesis_female": "Synthèse de {{name}}",
-      "synthesisLive": "{{name}} rédige la synthèse",
-      "skipped": "Tour {{round}} · {{name}} n'a pas parlé",
-      "budget": "Tour {{round}} · {{name}} a passé son tour : le budget de l'agent est épuisé",
-      "pending": "Tour {{round}} · au tour de {{name}}",
-      "pending_female": "Tour {{round}} · au tour de {{name}}",
-      "round": "Tour {{n}}",
-      "roundShort": "T{{n}}",
-      "key": "Chaque colonne est un tour, de la couleur de qui a parlé. Sa hauteur correspond à la longueur du tour.",
-      "keyLive": "La silhouette indique qui parle maintenant. Les points sont les tours restants.",
-      "keyDone": "Le large bloc à la fin est la synthèse.",
-      "keyClick": "Cliquez pour aller au tour."
-    },
-    "stance": {
-      "propose": "Propose",
-      "agree": "D'accord avec {{name}}",
-      "agreeAny": "D'accord",
-      "disagree": "Pas d'accord avec {{name}}",
-      "disagreeAny": "Pas d'accord",
-      "shift": "Change d'avis",
-      "ask": "Pose une question",
-      "askPeople": "Interroge les personnes",
-      "reply": "Répond à {{name}}",
-      "replyAny": "Répond",
-      "people": "les personnes"
-    },
-    "topic": {
-      "back": "Forum",
-      "goal": "Objectif",
-      "responsible": "Responsable",
-      "requestedBy": "Demandé par",
-      "reopenedFor": "rouvert par {{name}} pour le tour {{round}}",
-      "conclude": "Conclure",
-      "concluding": "Conclusion…",
-      "more": "Plus d'actions",
-      "copyLink": "Copier le lien",
-      "linkCopied": "Lien copié. Quiconque l'ouvre lit tout le sujet.",
-      "editParticipants": "Modifier les participants",
-      "cancel": "Annuler le sujet",
-      "notFound": "Sujet introuvable."
-    },
-    "table": {
-      "title": "La table",
-      "order": "parlent dans cet ordre, une fois par tour",
-      "orderDone": "ont parlé dans cet ordre",
-      "writes": "rédige la synthèse",
-      "writesPlan": "rédige le plan",
-      "seatedPerson": "personne · à la table",
-      "next": "suivant",
-      "yourTurn": "À vous",
-      "waits": "le tour attend",
-      "writing": "écrit",
-      "reading": "lit la discussion…",
-      "rereading": "relit les tours…",
-      "writingSynthesis": "rédige la synthèse",
-      "stopped": "arrêté ici",
-      "broke": "sans budget, passe son tour",
-      "wroteSynthesis": "a rédigé la synthèse",
-      "spokeAt": "a parlé à {{time}}",
-      "passed": "a passé",
-      "notYet": "n'a pas encore parlé",
-      "readsCanEnter": "lit et peut rejoindre",
-      "entered": "a rejoint au tour {{round}}",
-      "sits": "à la table",
-      "orgReads": "tout l'espace de travail lit"
-    },
-    "posts": {
-      "round": "Tour {{n}}",
-      "startedWith": "a commencé avec {{name}}",
-      "spokeCount": "{{said}} sur {{total}} ont parlé",
-      "none": "{{name}} parle en premier. Le premier tour a commencé.",
-      "person": "personne",
-      "starts": "Le tour {{round}} commence ici",
-      "started": "Le tour {{round}} a commencé ici",
-      "last": "C'était le dernier tour : la contribution va dans la synthèse",
-      "askedRound": "A demandé un nouveau tour",
-      "inTurn": "À son tour",
-      "reroundFrom": "Demander un tour à partir d'ici",
-      "replyTo": "Aller à la contribution de {{name}}",
-      "budgetSkip": "{{name}} a passé son tour : le budget de l'agent est épuisé.",
-      "passedTurn": "{{name}} a passé.",
-      "didntSpeak_one": "{{names}} n'a pas parlé pendant ce tour.",
-      "didntSpeak_many": "{{names}} n'ont pas parlé pendant ce tour.",
-      "didntSpeak_other": "{{names}} n'ont pas parlé pendant ce tour.",
-      "stopped": "Arrêté en plein tour.",
-      "comments": "Commentaires",
-      "afterSynthesis": "après la synthèse"
-    },
-    "liveTurn": {
-      "writing": "écrit · tour {{round}}",
-      "reading": "lit la discussion · tour {{round}}",
-      "synthesis": "rédige la synthèse",
-      "rereading": "relit les tours",
-      "readingLine": "Lecture de la discussion…",
-      "waitsFor": "Le tour attend {{name}}, qui est à la table.",
-      "yourTurn": "À vous",
-      "yourTurnSub": "tour {{round}} · le tour vous attend",
-      "yourTurnPlaceholder": "Qu'en pensez-vous ? Les agents le lisent avant le prochain tour.",
-      "pass": "Passer",
-      "send": "Envoyer",
-      "deadline": "Si vous ne prenez pas la parole avant {{when}}, la discussion continue sans vous.",
-      "passed": "Vous avez passé. Le tour continue sans vous cette fois.",
-      "spoke": "Vous avez parlé à votre tour. Le tour continue dans l'ordre de la table."
-    },
-    "stalled": {
-      "title": "Bloqué au tour de {{name}}",
-      "title_female": "Bloqué au tour de {{name}}",
-      "titleSynthesis": "Bloqué à la synthèse",
-      "stopped": "{{name}} a arrêté le tour. Personne ne parle tant que quelqu'un ne relance pas.",
-      "stoppedAnon": "Le tour a été arrêté. Personne ne parle tant que quelqu'un ne relance pas.",
-      "failed": "Le tour a échoué. Réessayez, ou concluez avec ce qui a été dit.",
-      "resume": "Relancer",
-      "retry": "Réessayer",
-      "concludeNow": "Conclure maintenant",
-      "resumed": "Sujet relancé."
-    },
-    "closed": {
-      "canceled": "Annulé, sans synthèse. Les contributions restent ici, lisibles par tous.",
-      "synthesizing": "{{name}} rédige la synthèse. Plus personne ne parle dans ce sujet.",
-      "synthesizing_female": "{{name}} rédige la synthèse. Plus personne ne parle dans ce sujet."
-    },
-    "composer": {
-      "label": "Participer à la discussion",
-      "placeholder": "Participer à la discussion…",
-      "hint": "Vous pouvez intervenir à tout moment : le tour en cours se termine et le prochain tour part de votre contribution.",
-      "hintLast": "Vous pouvez intervenir à tout moment : le tour en cours se termine et, comme c'est le dernier tour, votre contribution va directement dans la synthèse.",
-      "moreRound": "Un tour de plus à partir de votre contribution",
-      "send": "Envoyer",
-      "sent": "Votre contribution est publiée : le prochain tour en part.",
-      "sentLast": "Votre contribution va dans la synthèse.",
-      "commentLabel": "Commentaire",
-      "commentPlaceholder": "Commenter…",
-      "comment": "Commenter",
-      "commentAndRound": "Commenter et demander un tour",
-      "commented": "Commentaire publié. Le sujet reste conclu.",
-      "reround": "Demander un nouveau tour à partir de ce commentaire",
-      "doneHint": "Le sujet est conclu : commenter ne le rouvre pas, sauf si vous demandez un tour.",
-      "reroundHint": "Les agents à la table répondent à votre commentaire dans un nouveau tour et {{name}} réécrit la synthèse.",
-      "reroundHint_female": "Les agents à la table répondent à votre commentaire dans un nouveau tour et {{name}} réécrit la synthèse."
-    },
-    "newRound": {
-      "title": "Demander un nouveau tour",
-      "text": "Le tour {{round}} part de votre commentaire et le sujet est rouvert à votre nom.",
-      "textFrom": "Le tour {{round}} part de ce commentaire et le sujet est rouvert à votre nom.",
-      "note": "Ce que vous voulez ajouter",
-      "notePlaceholder": "Facultatif : ce que les agents doivent réexaminer",
-      "defaultBody": "J'ai demandé un nouveau tour à partir de ce commentaire.",
-      "who": "Qui répond",
-      "whoHint": "dans l'ordre de la table",
-      "speaksAt": "parle en {{n}}",
-      "broke": "sans budget : passera son tour",
-      "ok": "Demander un tour",
-      "done": "Sujet rouvert : tour {{round}}."
-    },
-    "conclude": {
-      "title": "Conclure le sujet ?",
-      "text": "Personne ne commence de nouveau tour. Ce qui a été dit devient la synthèse.",
-      "finishes": "{{name}} termine son tour",
-      "finishes_female": "{{name}} termine son tour",
-      "finishesSub": "C'est son tour maintenant. Ensuite, plus personne ne parle.",
-      "nobody": "Personne n'écrit en ce moment",
-      "nobodySub": "La synthèse commence tout de suite.",
-      "writes": "{{name}} rédige la synthèse",
-      "writes_female": "{{name}} rédige la synthèse",
-      "writesSub": "Décision, avantages et inconvénients de chacun, questions ouvertes, prochaines étapes et tâches suggérées.",
-      "writesSubPlan": "Objectif, ce qui est inclus ou exclu, étapes, risques, comment mesurer et tâches par étape.",
-      "goes": "Devient un document dans le Drive et retourne là d'où il vient",
-      "goesSub": "Les tâches suggérées ne sont créées que si quelqu'un les approuve.",
-      "keep": "Continuer la discussion",
-      "ok": "Conclure",
-      "done": "Conclusion en cours : la synthèse apparaît ici et dans le Drive."
-    },
-    "cancel": {
-      "title": "Annuler sans synthèse ?",
-      "text": "Plus personne ne parle et rien ne va dans le Drive. Les contributions restent ici, lisibles par tous.",
-      "keep": "Garder le sujet",
-      "ok": "Annuler le sujet",
-      "done": "Sujet annulé. Les contributions restent dans le forum."
-    },
-    "side": {
-      "title": "Où en est chacun",
-      "titleDone": "Où chacun a fini",
-      "agree_one": "{{count}} sur {{total}} est d'accord",
-      "agree_many": "{{count}} sur {{total}} sont d'accord",
-      "agree_other": "{{count}} sur {{total}} sont d'accord",
-      "withProposal": "avec la proposition sur la table",
-      "withDecision": "avec la décision",
-      "askers_one": "{{names}} a encore une question",
-      "askers_many": "{{names}} ont encore une question",
-      "askers_other": "{{names}} ont encore une question",
-      "agents": "Chaque agent",
-      "notYet": "N'a pas encore parlé",
-      "firstWriting": "Rédaction du premier tour…",
-      "writingNow": "écrit en ce moment…",
-      "broke": "sans budget : passe son tour",
-      "spoke": "a parlé",
-      "laneKey": "Un carré par tour. En haut : pour la proposition sur la table. En bas : contre. Au milieu : une question.",
-      "laneLabel": "{{name}} : {{list}}",
-      "laneEmpty": "{{name}} : aucun tour",
-      "laneRound": "tour {{round}} : {{stance}}",
-      "laneLive": "tour {{round}} : écrit",
-      "details": "Détails",
-      "rounds": "Tours",
-      "roundsDone": "{{round}} sur {{rounds}}",
-      "format": "Type de résultat",
-      "deadline": "Échéance",
-      "origin": "Origine",
-      "openedBy": "Ouvert par",
-      "participants": "Participants"
-    },
-    "format": {
-      "decision": "Décision",
-      "plan": "Plan",
-      "decisionHint": "Une décision, avec les avantages et inconvénients de chacun, les questions ouvertes et les prochaines étapes.",
-      "planHint": "Un plan : ce qui est inclus et ce qui ne l'est pas, les étapes dans l'ordre avec qui les fait, les risques et comment mesurer. Les étapes deviennent des tâches."
-    },
-    "formatLower": {
-      "decision": "décision",
-      "plan": "plan"
-    },
-    "synthesis": {
-      "eyebrow": "Synthèse",
-      "eyebrowPlan": "Plan",
-      "closed": "{{name}} a clos le sujet",
-      "closed_female": "{{name}} a clos le sujet",
-      "closedPlan": "{{name}} a clos le plan",
-      "closedPlan_female": "{{name}} a clos le plan",
-      "rewrote": "{{name}} a réécrit la synthèse",
-      "rewrote_female": "{{name}} a réécrit la synthèse",
-      "meta": "{{posts}} tours de {{agents}} agents",
-      "metaPeople": "{{posts}} tours de {{agents}} agents et de personnes",
-      "version": "version {{n}}",
-      "versionN": "Version {{n}}",
-      "decision": "Décision",
-      "objective": "Objectif",
-      "prosCons": "Avantages et inconvénients de chacun",
-      "why": "Pourquoi",
-      "openQuestions": "Questions ouvertes",
-      "nextSteps": "Prochaines étapes",
-      "forRequester": "Pour {{name}} :",
-      "forRequester_female": "Pour {{name}} :",
-      "inScope": "Ce qui est inclus",
-      "outOfScope": "Ce qui est exclu",
-      "steps": "Étapes, dans l'ordre",
-      "after": "après {{n}}",
-      "startNow": "peut commencer maintenant",
-      "risks": "Risques",
-      "metrics": "Comment mesurer",
-      "changes": "Version {{n}} · ce qui a changé",
-      "showV": "Voir la version {{n}}",
-      "hideV": "Masquer la version {{n}}",
-      "replaced": "remplacée après le tour {{round}}",
-      "none": "aucun",
-      "issues": "Tâches suggérées",
-      "subIssues": "Sous-tâches suggérées dans #{{number}}",
-      "marked": "{{on}} sur {{total}} cochées",
-      "allCreated": "toutes créées",
-      "goesTo": "confiée à {{name}}",
-      "with": "avec {{name}}",
-      "step": "étape {{n}}",
-      "approveTitle": "{{name}} suggère, une personne approuve",
-      "approveTitle_female": "{{name}} suggère, une personne approuve",
-      "approveText": "Rien n'est créé sans vous. Chaque tâche est déjà attribuée à la personne nommée.",
-      "approveTextPlan": "Chaque étape devient une sous-tâche, déjà attribuée à qui la réalise. Rien n'est créé sans vous.",
-      "create_one": "Créer {{count}} tâche",
-      "create_many": "Créer {{count}} tâches",
-      "create_other": "Créer {{count}} tâches",
-      "createSub_one": "Créer {{count}} sous-tâche dans #{{number}}",
-      "createSub_many": "Créer {{count}} sous-tâches dans #{{number}}",
-      "createSub_other": "Créer {{count}} sous-tâches dans #{{number}}",
-      "created_one": "{{count}} tâche créée.",
-      "created_many": "{{count}} tâches créées.",
-      "created_other": "{{count}} tâches créées.",
-      "createdSub_one": "{{count}} sous-tâche créée dans #{{number}}.",
-      "createdSub_many": "{{count}} sous-tâches créées dans #{{number}}.",
-      "createdSub_other": "{{count}} sous-tâches créées dans #{{number}}.",
-      "wentTo": "Où c'est allé",
-      "backIssue": "Retourne à la tâche #{{number}}",
-      "backIssueDone": "Retourné à la tâche #{{number}} : plan + {{count}} sous-tâches",
-      "backChannel": "Retourné à la conversation d'origine",
-      "backNone": "Reste dans le forum",
-      "saveWiki": "Enregistrer dans le wiki"
-    },
-    "form": {
-      "title": "Nouveau sujet",
-      "fromIssue": "Évaluer dans le forum",
-      "editSuggestion": "Modifier la suggestion",
-      "subtitle": "Les agents parlent un par un, dans l'ordre de la table, et le premier rédige la synthèse.",
-      "templatesText": "Partez d'un modèle ou d'une page blanche. Vous pouvez tout modifier avant de l'ouvrir.",
-      "tip": "Astuce : dans le chat, « @agent, portez ça au forum » ouvre aussi un sujet.",
-      "templateMeta": "{{rounds}} · {{format}}",
-      "templates": {
-        "tech": {
-          "title": "Décision technique",
-          "text": "Choisir une option, avec les risques et un plan.",
-          "goal": "Choisir une option et dire pourquoi, avec les risques et les prochaines étapes."
-        },
-        "review": {
-          "title": "Examiner une proposition",
-          "text": "Trouver les failles et repartir avec ce qu'il faut changer.",
-          "goal": "Lire la proposition, relever les failles et repartir avec une liste de ce qu'il faut changer."
-        },
-        "brain": {
-          "title": "Remue-méninges",
-          "text": "Rassembler des idées et en choisir 3 à tester.",
-          "goal": "Rassembler des idées, les regrouper et choisir les 3 meilleures à tester."
-        },
-        "postmortem": {
-          "title": "Post-mortem",
-          "text": "Ce qui s'est passé, pourquoi, et ce qui change.",
-          "goal": "Raconter ce qui s'est passé, trouver la cause et dire ce qui change pour que cela ne se reproduise pas."
-        },
-        "blank": {
-          "title": "Page blanche",
-          "text": "Écrivez la question et choisissez qui en débat."
-        }
-      },
-      "question": "Votre question",
-      "questionPlaceholder": "Ex. : Passer la file outbox à LISTEN/NOTIFY ?",
-      "origin": "Depuis {{origin}}. Le résultat y retourne.",
-      "format": "Ce qui en ressort",
-      "goal": "Objectif",
-      "goalPlaceholder": "Ex. : une décision avec les risques et un plan de déploiement.",
-      "table": "La table",
-      "tableHint": "dans l'ordre de parole · glissez ou utilisez les flèches",
-      "personSeat": "personne · le tour attend ce passage",
-      "addAgents": "Ajouter des agents à la table",
-      "add": "Ajouter {{name}} à la table",
-      "up": "Monter {{name}}",
-      "down": "Descendre {{name}}",
-      "remove": "Retirer {{name}}",
-      "unseat": "Retirer {{name}} de la table",
-      "noTalk": "ne vous répond pas",
-      "noTalkTitle": "{{name}} ne vous répond pas",
-      "oneAgent": "Avec un seul agent, utilisez un fil ou « Demander à {{name}} » sur la tâche. Le forum sert aux points de vue qui peuvent diverger.",
-      "minAgents": "Choisissez au moins 2 agents pour une discussion.",
-      "people": "Personnes notifiées",
-      "peopleHint": "tout l'espace de travail peut le lire",
-      "meAlways": "vous, toujours notifié",
-      "seatMe": "Je m'assieds à la table",
-      "seatMeHint": "m'attendre pendant les tours",
-      "seatOther": "{{name}} s'assied à la table",
-      "seatOtherHint": "le tour attend ce passage",
-      "rounds": "Tours",
-      "deadline": "Échéance",
-      "deadlines": {
-        "none": "Sans échéance",
-        "today": "Aujourd'hui, 18 h",
-        "tomorrow": "Demain",
-        "friday": "Vendredi"
-      },
-      "approvals": "Chaque tour est une exécution normale : les approbations s'appliquent.",
-      "create": "Ouvrir le sujet",
-      "open": "Ouvrir le forum",
-      "created": "Sujet ouvert. {{name}} parle en premier. Tout l'espace de travail peut le lire."
-    },
-    "participantsDialog": {
-      "title": "Participants",
-      "text": "{{agents}} agents à la table et {{people}}.",
-      "people_one": "{{count}} personne notifiée",
-      "people_many": "{{count}} personnes notifiées",
-      "people_other": "{{count}} personnes notifiées",
-      "search": "Rechercher des participants",
-      "speaksAt": "parle en {{n}}",
-      "entered": "a rejoint la discussion",
-      "notified": "a été notifié et peut rejoindre",
-      "org": "Tout l'espace de travail",
-      "orgReads": "lit le sujet",
-      "note": "Les changements à la table s'appliquent à partir du prochain tour.",
-      "edit": "Modifier",
-      "saved": "Participants mis à jour."
-    },
-    "suggestion": {
-      "label": "Suggestion de forum",
-      "title": "Ça mérite un forum ?",
-      "by": "{{name}} suggère",
-      "edit": "Modifier",
-      "table": "La table",
-      "open": "Ouvrir le forum",
-      "notNow": "Pas maintenant",
-      "note": "Seule une personne peut l'ouvrir. Il est à votre nom.",
-      "opened": "Forum ouvert",
-      "openedBy": "par {{name}}, depuis cette conversation",
-      "openedToast": "Forum ouvert. Il est à votre nom.",
-      "dismissed": "{{name}} a écarté la suggestion.",
-      "dismissedMe": "Vous avez écarté la suggestion.",
-      "undo": "Annuler"
-    },
-    "card": {
-      "label": "Sujet du forum",
-      "see": "Voir la discussion"
-    },
-    "issue": {
-      "section": "Forum",
-      "evaluate": "Évaluer dans le forum",
-      "evaluateTitle": "Demande plus d'un point de vue",
-      "evaluateText": "Le forum sert quand ceux qui décident peuvent être en désaccord. Le résultat revient à cette tâche.",
-      "inForum": "En cours d'évaluation dans le forum",
-      "evaluated": "Évaluée dans le forum",
-      "outPlan": "il en ressort un plan",
-      "outDecision": "il en ressort une décision",
-      "subIssues_one": "Sous-tâches · {{count}}",
-      "subIssues_many": "Sous-tâches · {{count}}",
-      "subIssues_other": "Sous-tâches · {{count}}"
-    },
-    "notify": {
-      "your_turn": "À vous dans « {{title}} ».",
-      "requested": "Un forum a été ouvert à votre demande : « {{title}} ».",
-      "concluded": "Le forum « {{title}} » est terminé.",
-      "open": "Ouvrir"
-    }
   },
   "code": {
     "ranSummary_one": "A exécuté {{count}} ligne de {{language}} · sortie {{size}}",
@@ -9374,7 +9015,6 @@
     "saveNew": "Créer la page {{title}}",
     "savedTo": "Enregistré dans {{title}}.",
     "fromMessage": "depuis un message dans #{{channel}}",
-    "fromForum": "depuis la synthèse du forum",
     "note": {
       "created": "a créé la page",
       "edited": "a modifié",
@@ -9385,9 +9025,7 @@
       "moved": "déplacée vers « {{folder}} »",
       "moved_root": "déplacée à la racine",
       "saved_message": "a enregistré un message",
-      "saved_synthesis": "a enregistré la synthèse du forum",
       "created_from_message": "créée à partir d'un message",
-      "created_from_synthesis": "créée à partir de la synthèse du forum",
       "imported": "importée depuis « {{source}} »"
     }
   },
@@ -9694,7 +9332,6 @@
       "wiki": "Wiki",
       "skills": "Compétences",
       "schedule": "Rappels et routines",
-      "forum": "Forum",
       "sandbox": "Exécuter du code",
       "browser": "Navigateur",
       "setup": "Configuration de l'espace de travail",
@@ -9728,9 +9365,6 @@
       },
       "schedule": {
         "write": "Crée des rappels et des routines pour la personne qui l'a demandé."
-      },
-      "forum": {
-        "write": "Ouvre des sujets, lit et publie dans le forum."
       },
       "sandbox": {
         "write": "Exécute du code sur l'ordinateur de l'agent."
@@ -11676,6 +11310,9 @@
       "unknown": "Ce rôle n'existe plus.",
       "orderIncomplete": "Les rôles ont changé. Rechargez et réessayez."
     },
+    "teamProposal": {
+      "undoExpired": "Plus d'un jour s'est écoulé depuis la création de cette équipe, elle ne peut donc plus être annulée ici. Archive ses agents sur leurs pages."
+    },
     "agentProposal": {
       "decided": "Quelqu'un a déjà tranché cette proposition.",
       "expired": "Cette proposition a expiré : personne n'a tranché en un jour.",
@@ -11771,8 +11408,7 @@
       "rangeTooLong": "Le contexte d'un fil contient au maximum {{max}} messages.",
       "titleTooLong": "Un titre contient au maximum {{max}} caractères.",
       "noContext": "Ce fil ne provient pas d'une plage de conversation.",
-      "notUndoable": "Seul un fil créé à partir d'une plage peut être annulé.",
-      "forum": "Les sujets du forum n'ont pas de fils."
+      "notUndoable": "Seul un fil créé à partir d'une plage peut être annulé."
     },
     "routine": {
       "tooFrequent": "Une routine s'exécute au maximum toutes les 15 minutes. Choisissez un intervalle plus long.",
@@ -11831,8 +11467,8 @@
       "noPendingUpdate": "Aucune mise à jour de cette compétence n'est en attente."
     },
     "agentGroup": {
-      "notFound": "Ce groupe n'existe plus.",
-      "tooMany": "Cet espace de travail a déjà {{max}} groupes. Supprimez-en un d'abord."
+      "notFound": "Ce service n'existe plus.",
+      "tooMany": "Cet espace de travail a déjà {{max}} services. Supprimez-en un d'abord."
     },
     "handle": {
       "invalid": "Un @ contient de {{min}} à {{max}} lettres minuscules, chiffres, - ou _.",
@@ -12493,8 +12129,7 @@
       "unattended": "de lui-même"
     },
     "where": {
-      "dm": "conversation privée",
-      "forum": "forum : {{name}}"
+      "dm": "conversation privée"
     },
     "system": "Système",
     "removed": "Retiré",
@@ -12571,7 +12206,6 @@
         "mission": "une mission",
         "thread": "un fil",
         "channel": "un canal",
-        "forum": "un sujet du forum",
         "artifact": "un fichier du Drive",
         "agent": "un agent",
         "machine": "un ordinateur",
@@ -12699,7 +12333,11 @@
       "device": "Sur cet appareil",
       "activity": "Montrer ce que les agents ont fait sous chaque réponse",
       "activityHelp": "Les outils utilisés et le temps que cela a pris. Pendant qu'ils travaillent, vous voyez toujours ce qu'ils font.",
-      "activityFailed": "Impossible d'enregistrer. Réessayez."
+      "activityFailed": "Impossible d'enregistrer. Réessayez.",
+      "agentStyle": "Comment les agents vous parlent",
+      "agentStyleHelp": "Simple : ce qui s'est passé et quoi faire, en quelques mots. Technique : avec les chemins, les codes et les détails.",
+      "agentStyleSimple": "Simple",
+      "agentStyleTechnical": "Technique"
     },
     "orgTitle": "Espace de travail",
     "name": "Nom",
@@ -13349,8 +12987,6 @@
       "seconds": "{{n}} s",
       "minutes": "{{n}} min",
       "step": {
-        "openingForumTopic": "A ouvert un sujet du forum",
-        "postingInForum": "A écrit dans le forum",
         "schedulingReminder": "A programmé un rappel",
         "creatingRoutine": "A créé une routine",
         "updatingRoutine": "A modifié une routine",
@@ -13402,7 +13038,6 @@
         "writingWiki": "A écrit dans le wiki",
         "readingWiki": "A lu le wiki",
         "linkingWiki": "A lié une page wiki",
-        "readingForum": "A lu le forum",
         "creatingChannel": "A créé un canal",
         "offeringConnectAi": "A proposé de connecter une IA",
         "offeringConnectApp": "A proposé de connecter une app",
@@ -13421,7 +13056,6 @@
         "handingOff": "A livré un rapport",
         "recordingFindings": "A noté les résultats",
         "deliveringMission": "A livré la mission",
-        "suggestingForumTopic": "A suggéré un sujet de forum",
         "requestingAccess": "A demandé un accès",
         "requestingSecret": "A demandé un secret",
         "queryingDatabase": "A interrogé la base de données",
@@ -13432,8 +13066,6 @@
       }
     },
     "activity": {
-      "openingForumTopic": "ouverture d'un sujet du forum",
-      "postingInForum": "écriture dans le forum",
       "schedulingReminder": "programmation d'un rappel",
       "creatingRoutine": "création d'une routine",
       "updatingRoutine": "modification d'une routine",
@@ -13488,7 +13120,6 @@
       "writingWiki": "écriture dans le wiki",
       "readingWiki": "lecture du wiki",
       "linkingWiki": "liaison d'une page wiki",
-      "readingForum": "lecture du forum",
       "creatingChannel": "création d'un canal",
       "offeringConnectAi": "préparation de la connexion d'une IA",
       "offeringConnectApp": "préparation de la connexion d'une app",
@@ -13507,7 +13138,6 @@
       "handingOff": "livraison d'un rapport",
       "recordingFindings": "prise de notes des résultats",
       "deliveringMission": "livraison de la mission",
-      "suggestingForumTopic": "suggestion d'un sujet de forum",
       "requestingAccess": "demande d'accès",
       "requestingSecret": "demande d'un secret",
       "queryingDatabase": "interrogation de la base de données",
@@ -13556,6 +13186,7 @@
       "autonomy_digest_one": "{{count}} alerte semblait connue ou sans danger, je n'ai donc pas travaillé dessus :",
       "autonomy_digest_many": "{{count}} alertes semblaient connues ou sans danger, je n'ai donc pas travaillé dessus :",
       "autonomy_digest_other": "{{count}} alertes semblaient connues ou sans danger, je n'ai donc pas travaillé dessus :",
+      "team_week": "La semaine de l’équipe, du {{from}} au {{to}}",
       "autonomy_loop": "J'ai arrêté de travailler là-dessus de moi-même. C'est revenu {{count}} fois en un jour ({{title}}). Dites-moi comment vous voulez que je le traite.",
       "mission_plan": "Plan pour « {{title}} » sur {{computer}}",
       "mission_planNoComputer": "Plan pour « {{title}} »",
@@ -13624,6 +13255,7 @@
       "action_approvals": "Approbations qui vous attendent",
       "action_open_page": "Ouvrir un écran",
       "agent_proposal": "A proposé un nouvel agent : {{name}}",
+      "team_proposal": "A proposé une équipe : {{names}}",
       "settings_proposal": "A proposé un changement pour {{names}}",
       "approval_request": "Demande d'approbation : {{title}}",
       "secret_request": "{{agent}} a demandé une clé : {{name}}",
@@ -13652,10 +13284,7 @@
       },
       "interrupted": "Interrompu par un redémarrage du serveur. Redemandez pour continuer.",
       "step_limit": "Je n'avais plus d'étapes avant de terminer.",
-      "stuck": "J'ai été bloqué et je me suis arrêté avant de terminer.",
-      "forum_suggestion": "Cela mérite un forum ? « {{title}} »",
-      "forum_concluded": "Le forum « {{title}} » est terminé. La synthèse est dans le fichier ci-dessous.",
-      "forum_concluded_issues": "Le forum « {{title}} » est terminé. La synthèse est dans le fichier ci-dessous, avec {{count}} tâche(s) suggérée(s) à approuver."
+      "stuck": "J'ai été bloqué et je me suis arrêté avant de terminer."
     }
   },
   "builtinTools": {
@@ -13798,22 +13427,6 @@
     "schedule_action": {
       "label": "Programmer une action",
       "description": "Prépare l'action d'une app connectée pour une heure donnée. Une personne l'approuve maintenant."
-    },
-    "suggest_forum_topic": {
-      "label": "Suggérer un sujet de forum",
-      "description": "Suggère une discussion entre agents. Une personne l'ouvre."
-    },
-    "open_forum_topic": {
-      "label": "Ouvrir un sujet de forum",
-      "description": "Porte un sujet dans une discussion entre agents."
-    },
-    "post_in_forum": {
-      "label": "Publier dans le forum",
-      "description": "Publie dans un sujet en dehors de son tour."
-    },
-    "read_forum_topic": {
-      "label": "Lire un sujet de forum",
-      "description": "Lit l'objectif et les réponses d'un sujet."
     },
     "search_wiki": {
       "label": "Chercher dans le wiki",
@@ -15461,5 +15074,205 @@
       "promptRequired": "Dites ce que le widget doit afficher.",
       "notTested": "Testez d'abord : le widget est créé une fois le test réussi."
     }
+  },
+  "teamPlan": {
+    "start": {
+      "question": "Que fait {{org}} ? Avec ça je monte une équipe prête, et tu n'as plus qu'à vérifier.",
+      "orWrite": "Ou écris-le à ta façon ci-dessous, en une phrase.",
+      "footer": "Tu sais déjà ce que tu veux ?",
+      "templates": "Voir les modèles d'équipe",
+      "presets": "Agents tout prêts"
+    },
+    "business": {
+      "agency": "Agence",
+      "store": "Boutique en ligne",
+      "clinic": "Clinique ou cabinet",
+      "software": "Logiciels et apps",
+      "support": "Service client",
+      "services": "Cabinet de services",
+      "other": "Autre chose"
+    },
+    "answered": "répondue",
+    "step": "Question {{step}} sur {{of}}",
+    "send": "Envoyer {{count}}",
+    "card": {
+      "new": "nouveau",
+      "routines": "Routines",
+      "skills": "Skills",
+      "create": "Créer l'équipe",
+      "adjust": "Ajuster",
+      "adjustName": "Ajuster {{name}}",
+      "map": "Voir en carte",
+      "agents_one": "{{count}} agent",
+      "agents_other": "{{count}} agents",
+      "newChannels_one": "{{count}} nouveau canal",
+      "newChannels_other": "{{count}} nouveaux canaux",
+      "routineCount_one": "{{count}} routine",
+      "routineCount_other": "{{count}} routines",
+      "weekly": "je te raconte ici comment s'est passée la semaine de l'équipe",
+      "failed": "L'équipe n'a pas été créée : {{step}} a échoué ({{reason}}). Rien n'a été fait, tu peux donc réessayer.",
+      "retry": "Réessayer",
+      "onlyCreators": "Seules les personnes qui créent des agents créent l'équipe.",
+      "created": "Équipe créée par {{name}}",
+      "createdYou": "Équipe créée par toi",
+      "skillsWait": "Les skills attendent un admin.",
+      "weeklyWait": "Mon bilan de la semaine attend la personne qui gère mes routines.",
+      "undone": "Équipe annulée",
+      "dismissed": "Équipe écartée"
+    },
+    "firstTask": {
+      "suggestion": "suggestion",
+      "lead": "Une tâche courte par agent, pour voir chacun au travail aujourd'hui.",
+      "open": "Ouvrir avec la tâche",
+      "invite": "Inviter {{names}}",
+      "later": "Plus tard"
+    },
+    "adjust": {
+      "title": "Ajuster {{name}}",
+      "name": "Nom",
+      "role": "Rôle",
+      "line": "Ce qu'il fait",
+      "instructions": "Instructions",
+      "channel": "Canal",
+      "firstTask": "Première tâche"
+    },
+    "map": {
+      "title": "L'équipe en carte",
+      "people": "Personnes",
+      "reviewer": "{{name}} passe en revue la semaine de l'équipe",
+      "waits": "Attend ton accord"
+    },
+    "templates": {
+      "title": "Modèles d'équipe",
+      "lead": "Une équipe prête pour ton type d'activité. Ensuite {{name}} l'ajuste avec toi.",
+      "use": "Utiliser ce modèle",
+      "none": "Aucun de ceux-ci",
+      "noneSub": "Dis ce que tu fais et {{name}} la monte",
+      "tailor": "Ensuite je pose 2 questions pour l'adapter à ton activité."
+    },
+    "weekly": {
+      "name": "La semaine de l'équipe"
+    }
+  },
+  "teamTemplates": {
+    "lead": "Une équipe pour {{org}}, chaque agent dans son canal. Tu peux l'ajuster avant de la créer.",
+    "agency": {
+      "name": "Agence marketing",
+      "sub": "Contenu, publicités et service client",
+      "desc": "Pour une agence qui gère le contenu et les campagnes de ses clients."
+    },
+    "store": {
+      "name": "Boutique en ligne",
+      "sub": "Commandes, stock et réseaux sociaux",
+      "desc": "Pour une boutique qui vend en ligne et répond à ses acheteurs."
+    },
+    "clinic": {
+      "name": "Clinique ou cabinet",
+      "sub": "Rendez-vous sur WhatsApp, facturation et suivi",
+      "desc": "Pour une clinique ou un cabinet qui prend les rendez-vous des patients et assure le suivi."
+    },
+    "software": {
+      "name": "Logiciels et apps",
+      "sub": "Support, facturation et code",
+      "desc": "Pour une entreprise qui vend un logiciel et s'occupe de ses propres clients."
+    },
+    "support": {
+      "name": "Service client",
+      "sub": "File de clients et base de réponses",
+      "desc": "Pour une équipe qui répond à beaucoup de clients chaque jour."
+    },
+    "services": {
+      "name": "Cabinet de services",
+      "sub": "Comptabilité, droit, conseil",
+      "desc": "Pour un cabinet qui prend les rendez-vous, envoie des propositions et facture."
+    },
+    "agents": {
+      "iara": {
+        "role": "Service client",
+        "line": "Répond aux clients sur WhatsApp et par e-mail. T'appelle quand elle ne sait pas.",
+        "routine": "Résumer ce qui est resté sans réponse",
+        "task": "Répondre au dernier message client en attente"
+      },
+      "caio": {
+        "role": "Facturation",
+        "line": "Relance les retards de paiement et envoie la relance après ton accord.",
+        "routine": "Lister qui a un paiement en retard",
+        "task": "Lister qui est en retard ce mois-ci"
+      },
+      "ada": {
+        "role": "Dev",
+        "line": "Corrige les bugs signalés par les clients et ouvre la PR.",
+        "routine": "Lister les nouveaux bugs",
+        "task": "Regarder le dernier bug signalé par un client"
+      },
+      "lia": {
+        "role": "Contenu",
+        "line": "Écrit posts et scripts dans le ton de l'entreprise et les programme après ton accord.",
+        "routine": "Proposer les posts de la semaine",
+        "task": "Proposer trois posts pour cette semaine"
+      },
+      "theo": {
+        "role": "Ventes",
+        "line": "Relance toutes les personnes qui ont demandé un devis et rédige les propositions.",
+        "routine": "Lister qui a demandé un devis sans réponse",
+        "task": "Lister qui a demandé un devis cette semaine"
+      },
+      "nina": {
+        "role": "Agenda",
+        "line": "Prend, confirme et déplace les rendez-vous, et rappelle les clients la veille.",
+        "routine": "Confirmer les rendez-vous de demain",
+        "task": "Me montrer les rendez-vous de demain"
+      },
+      "otto": {
+        "role": "Commandes",
+        "line": "Suit les commandes et le stock et prévient de ce qui manque bientôt.",
+        "routine": "Prévenir de ce qui manque bientôt en stock",
+        "task": "Lister les commandes qui attendent encore l'envoi"
+      },
+      "bia": {
+        "role": "Base de réponses",
+        "line": "Tient la base de réponses à jour avec ce que l'équipe répond.",
+        "routine": "Mettre à jour la base avec les réponses de la semaine",
+        "task": "Lister les 5 questions que les clients posent le plus"
+      }
+    },
+    "channels": {
+      "iara": "support",
+      "caio": "finances",
+      "ada": "eng",
+      "lia": "contenu",
+      "theo": "ventes",
+      "nina": "agenda",
+      "otto": "commandes",
+      "bia": "support"
+    },
+    "skills": {
+      "voice": {
+        "name": "Ton de voix",
+        "line": "comment l'entreprise parle aux clients"
+      },
+      "dunning": {
+        "name": "Plan de relance",
+        "line": "un rappel le jour de l'échéance, puis le 3e et le 7e jour de retard"
+      },
+      "answers": {
+        "name": "Base de réponses",
+        "line": "les réponses validées de l'équipe aux questions fréquentes"
+      },
+      "proposal": {
+        "name": "Trame de proposition",
+        "line": "ce que dit chaque proposition, et dans quel ordre"
+      },
+      "schedule": {
+        "name": "Règles d'agenda",
+        "line": "horaires, pauses et combien de temps à l'avance on peut réserver"
+      },
+      "review": {
+        "name": "Revue de code",
+        "line": "ce qu'il faut vérifier avant d'ouvrir une PR"
+      }
+    },
+    "approvals": "Ce qui part vers les clients attend ton accord. Tu pourras le libérer plus tard, quand tu leur feras confiance.",
+    "ask": "J'ai utilisé le modèle {{name}}. Pour l'adapter à ton activité : **qu'est-ce que {{org}} fait de différent ?**"
   }
 }

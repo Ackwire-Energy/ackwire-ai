@@ -165,11 +165,6 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
     label: "Write to the wiki",
     description: "Create and edit wiki pages, only when a person asks.",
   },
-  "forum:write": {
-    label: "Forum",
-    description:
-      "Suggest forum topics (a person opens them), open one when a person asks, read them and post outside its own turn.",
-  },
   "schedule:write": {
     label: "Schedule",
     description: "Create reminders and routines from the chat, for the person asking, in that person's time zone.",
@@ -234,7 +229,6 @@ export const DEFAULT_AGENT_SCOPES = [
   "drive:write",
   "skills:read",
   "schedule:write",
-  "forum:write",
   "wiki:read",
   "wiki:write",
   "setup:write",

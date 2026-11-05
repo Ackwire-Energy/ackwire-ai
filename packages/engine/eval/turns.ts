@@ -9,6 +9,7 @@ import {
   ASK_CHOICES_LINE,
   CONTINUE_THE_CONVERSATION,
   createAgent,
+  createAgentStyleToolSource,
   createSetStatusToolSource,
   createSetupToolSource,
   createUsageToolSource,
@@ -195,7 +196,6 @@ export async function turnsWorld(options: Pick<NonNullable<Parameters<typeof set
     issueTools: true,
     calendarTools: true,
     skillTools: true,
-    forumTools: true,
     scheduleTools: true,
     wikiTools: true,
     machines: true,
@@ -204,6 +204,7 @@ export async function turnsWorld(options: Pick<NonNullable<Parameters<typeof set
     toolSources: [
       createUsageToolSource(),
       createSetStatusToolSource({}),
+      createAgentStyleToolSource(),
       createWorkspaceToolSource({}),
       createSetupToolSource({}),
       createWebToolSource({}),

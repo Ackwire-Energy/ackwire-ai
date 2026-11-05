@@ -8,8 +8,6 @@ export interface PushStrings {
   approvalFromRoutine: (routine: string) => string;
   questionTitle: (actor: string) => string;
   questionBody: string;
-  forumTitle: string;
-  forumBody: string;
   mentionTitle: (actor: string) => string;
   replyTitle: (actor: string) => string;
   missionStoppedTitle: string;
@@ -63,6 +61,8 @@ export interface PushStrings {
   usageRaisedTitle: (admin: string) => string;
   usageRaisedBody: string;
   usageRefusedTitle: (admin: string) => string;
+  /** Lodi's weekly card (ADR 0137 §9): its message's text, so the push and the conversation list read it. */
+  teamWeekReady: string;
 }
 
 export const en: PushStrings = {
@@ -74,8 +74,6 @@ export const en: PushStrings = {
   approvalFromRoutine: (routine) => `Routine «${routine}»`,
   questionTitle: (a) => `${a} has a question for you`,
   questionBody: "Tap to answer.",
-  forumTitle: "Your turn to weigh in",
-  forumBody: "Tap to join the conversation.",
   mentionTitle: (a) => `${a} mentioned you`,
   replyTitle: (a) => `${a} replied`,
   missionStoppedTitle: "A mission stopped",
@@ -139,4 +137,5 @@ export const en: PushStrings = {
   usageRaisedTitle: (a) => `${a} raised your limit this month`,
   usageRaisedBody: "You can keep going.",
   usageRefusedTitle: (a) => `${a} declined your request for more usage`,
+  teamWeekReady: "Your team's week is ready",
 };

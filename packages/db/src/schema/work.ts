@@ -90,10 +90,10 @@ export const issues = pgTable(
       .$type<{ id: string; text: string; done: boolean; doneBy?: { type: "person" | "agent"; id: string } | null }[]>()
       .notNull()
       .default([]),
-    /** `{ type: "manual" | "message" | "forum" | "agent" | "webhook", … }`. */
+    /** `{ type: "manual" | "message" | "agent" | "webhook", … }`. */
     source: jsonb().$type<Record<string, unknown>>().notNull().default({ type: "manual" }),
     channelId: uuid(),
-    /** A sub-issue of this one (e.g. a step of a plan the forum made for it). */
+    /** A sub-issue of this one (a step of a plan). */
     parentIssueId: uuid().references((): AnyPgColumn => issues.id, { onDelete: "set null" }),
     /** `[{ number, url, openedBy }]`. */
     pullRequests: jsonb().$type<Record<string, unknown>[]>().notNull().default([]),

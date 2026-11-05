@@ -9,3 +9,8 @@ import { createContext, useContext } from "react";
 export const AgentPanelContext = createContext<((agentId: string, tab?: AgentTab) => void) | null>(null);
 
 export const useOpenAgentPanel = () => useContext(AgentPanelContext);
+
+/** The agent whose page that panel shows now (its openers' `aria-expanded`), null when it is closed. */
+export const AgentPanelShownContext = createContext<string | null>(null);
+
+export const useAgentPanelShown = () => useContext(AgentPanelShownContext);

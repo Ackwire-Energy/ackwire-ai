@@ -21,7 +21,7 @@ const ID = "7d2a4c11-93e8-4a0b-b5f2-0c6a9e1d3b77";
 const ORIGIN = "https://app.example";
 const inApp = (url: unknown) => inAppPath(url, ORIGIN);
 
-/** A route file's path: `forum_` leaves its layout, `index` is its parent's page. */
+/** A route file's path: `wiki_` leaves its layout, `index` is its parent's page. */
 function routePath(file: string): string {
   const segments = file
     .replace(/\.tsx$/, "")
@@ -188,11 +188,6 @@ const PUSHED: { kind: AppNotification["kind"]; n: Partial<AppNotification>; to: 
     n: { waiting: true, source: { channelId: "c1", threadId: "t1", messageId: "m1", questionId: "q1" } },
     to: "/org/$orgId/threads/$threadId",
   },
-  {
-    kind: "forum_turn",
-    n: { waiting: true, source: { topicId: "f1", channelId: "c1" } },
-    to: "/org/$orgId/forum/$topicId",
-  },
   { kind: "mention", n: { source: { channelId: "c1", messageId: "m1" } }, to: "/org/$orgId/c/$channelId" },
   {
     kind: "dm",
@@ -322,7 +317,6 @@ describe("a pushed notification that can't be read", () => {
   });
 
   test("names nothing: the inbox", () => {
-    expect(fallbackTarget(data({ kind: "forum_turn" }))).toBeNull();
     expect(fallbackTarget(data({}))).toBeNull();
   });
 

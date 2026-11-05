@@ -1,4 +1,4 @@
-/* Equipe: the agents in the pixel sky, grouped by their person. */
+/* Equipe (ADR 0148): one header, five views of the same team. */
 .page.team {
   max-width: none;
   gap: 20px;
@@ -7,324 +7,576 @@
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
+}
+.team-head__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 .team-head h1 {
   margin: 0;
-  font-family: var(--font-display);
-  font-weight: var(--font-display-weight, 300);
-  font-size: clamp(30px, 4vw, 40px);
-  line-height: 1.05;
-  letter-spacing: -0.03em;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 .team-head__sub {
-  margin: 6px 0 0;
-  max-width: 60ch;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
   color: var(--muted);
 }
-
-/* The sky: the field is a canvas; agents, people and the card sit on top. */
-.team-sky {
-  position: relative;
-  height: 620px;
-  transition: height 0.4s var(--out);
-  border-radius: var(--radius-section);
-  overflow: hidden;
-  box-shadow: var(--e1), var(--top);
-}
-.team-sky[data-small] {
-  height: 460px;
-}
-.team-sky[data-narrow] .team-sky__agent {
-  --fig: 36px;
-}
-.team-sky__stage {
-  position: absolute;
-  inset: 0;
-}
-.team-sky__person {
-  position: absolute;
-  transform: translate(-50%, 0);
-  display: inline-flex;
-  align-items: center;
+.team-head__actions {
+  flex-wrap: wrap;
   gap: 8px;
-  height: 28px;
-  padding: 0 10px 0 4px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--raised) 90%, transparent);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 650;
-  white-space: nowrap;
-  pointer-events: none;
-  transition:
-    left 0.5s var(--out),
-    top 0.5s var(--out);
 }
-.team-sky__agent {
-  /* The sprite's center sits on its spot (padding 4 + figure padding 6 + half the sprite); the name hangs below. */
-  --fig: 56px;
-  position: absolute;
-  transform: translate(-50%, calc(-10px - var(--fig) / 2));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 4px;
-  border: 0;
-  border-radius: 16px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  cursor: pointer;
-  transition:
-    left 0.5s var(--out),
-    top 0.5s var(--out);
-}
-html:not([data-pointer]) .team-sky__agent:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.team-sky__agent[aria-pressed="true"] .team-sky__figure {
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-}
-.team-sky__figure {
-  display: grid;
-  place-items: center;
-  padding: 6px;
-  animation: team-bob 3.2s ease-in-out infinite;
-  animation-delay: var(--bob-delay, 0s);
-}
-@keyframes team-bob {
-  0%,
-  100% {
-    transform: translateY(-2px);
-  }
-  50% {
-    transform: translateY(2px);
-  }
-}
-.team-sky__tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 20px;
-  padding: 0 7px;
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--raised) 82%, transparent);
-  box-shadow: 0 1px 2px rgba(0, 20, 60, 0.18);
-  font-size: 11px;
-  font-weight: 650;
-  white-space: nowrap;
-}
-.team-sky__hint {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--raised) 90%, transparent);
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 600;
-  pointer-events: none;
-}
-
-/* The agent's card, inside the sky. */
-.team-card {
-  position: absolute;
-  left: 16px;
-  bottom: 16px;
-  z-index: 2;
-  box-sizing: border-box;
-  width: 360px;
-  max-width: calc(100% - 32px);
-  max-height: calc(100% - 32px);
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 18px;
-  border-radius: 20px;
-  background: var(--raised);
-  box-shadow: var(--e2), var(--top);
-  animation: team-in 0.3s var(--out);
-}
-@keyframes team-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.team-card__close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-}
-.team-card__head {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  padding-right: 32px;
-}
-.team-card__title {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.team-card__title h3 {
+.team-empty {
   margin: 0;
-  font-family: var(--font-display);
-  font-weight: var(--font-display-weight, 300);
-  font-size: 26px;
-  line-height: 30px;
-  letter-spacing: -0.02em;
-}
-.team-card__meta {
+  padding: 16px;
   color: var(--muted);
-  font-size: 13px;
-  line-height: 18px;
 }
-.team-card__status {
+.team-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Bits every view shares: a face with a name, a setor's mark with its name, chips, the agent's status. */
+.team-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.team-who__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.team-who--chip {
+  padding: 3px 8px 3px 4px;
+  border-radius: var(--control-r-sm);
+  background: var(--sunken);
+}
+.team-who--chip[draggable="true"] {
+  cursor: grab;
+}
+.team-sector {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
+}
+.team-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.team-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--control-r-sm);
+  background: var(--sunken);
+  color: inherit;
+  text-decoration: none;
+  font-size: 13.5px;
+}
+.team-chip--more {
   color: var(--muted);
 }
-.team-card__status[data-busy] {
+.team-channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.team-now {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.team-now[data-busy] {
   color: var(--ink);
 }
-.team-card__dot {
+.team-now[data-waiting] {
+  color: var(--agent);
+}
+.team-now__dot,
+.team-node__dot {
   width: 7px;
   height: 7px;
+  flex: none;
   border-radius: 50%;
   background: var(--ok);
 }
-/* A chip clears the line above it by the gap of a section's rows (8px), not the title's 4px. */
-.team-card__title > :is(.noai-chip, .ac-chip) {
-  align-self: flex-start;
-  margin-top: 4px;
-}
-.team-card__sec {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.team-card__eyebrow {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-}
-.team-card__call {
-  margin: 0;
-  font-size: 15px;
-  line-height: 22px;
-}
-.team-card__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.team-card__acts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
 
-/* What agents asked each other: a grid under the sky. */
-.team-feed {
-  gap: 0;
-  padding: 8px;
+/* Lista: the shared table, with a section row per setor or owner. */
+.team-table__section th {
+  padding-top: 16px;
+  font-size: 13px;
+  color: var(--ink);
 }
-.team-feed__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px 10px;
+.team-table__role {
+  max-width: 220px;
 }
-.team-feed__head h2 {
-  flex: 1;
-  margin: 0;
-  font-size: 14px;
-  font-weight: 650;
+.team-table__menu {
+  width: 1%;
 }
 .team-archived {
   gap: 0;
   padding: 8px;
 }
+.team-archived__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 10px;
+}
+.team-archived__head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+}
 .team-archived .member-row {
   margin: 0;
 }
-.team-feed__window {
-  font-size: 12px;
-  color: var(--muted);
-}
-.team-feed__empty {
-  margin: 0;
-  padding: 4px 8px 10px;
-  color: var(--muted);
-}
-.team-feed__grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-.team-feed__item {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 10px;
-  border-radius: 14px;
-  transition: background-color 0.6s;
-}
-.team-feed__item[data-fresh] {
-  background: var(--sunken);
-}
-.team-feed__pair {
+
+/* A card in the org chart and on the map: a face, a name, a muted line. */
+.team-node {
   display: flex;
   align-items: center;
-  gap: 2px;
-  flex: none;
-  color: var(--muted);
-}
-.team-feed__text {
+  gap: 10px;
   min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  box-shadow: var(--e1);
+}
+.team-node__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+.team-node--agent[draggable="true"] {
+  cursor: grab;
+}
+.team-node--person[data-none] {
+  border-style: dashed;
+  box-shadow: none;
+}
+
+/* Organograma › Por pessoa: the workspace and its right hand on top, a column per person under one line. */
+.team-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.team-chart__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.team-tree {
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+.team-tree__top {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 20px;
+}
+.team-tree__top::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  height: 20px;
+  border-left: 1px solid var(--line);
+}
+.team-tree__top > .team-node {
+  position: relative;
+  min-width: 220px;
+}
+.team-tree__top > .team-node + .team-node::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -17px;
+  height: 16px;
+  border-left: 1px solid var(--line);
+}
+.team-tree__row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  min-width: min-content;
+}
+.team-tree__col {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  width: 180px;
+  padding-top: 20px;
+}
+/* The bar across the columns, and each column's drop to its person. */
+.team-tree__col::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -6px;
+  right: -6px;
+  border-top: 1px solid var(--line);
+}
+.team-tree__col:first-child::before {
+  left: 50%;
+}
+.team-tree__col:last-child::before {
+  right: 50%;
+}
+.team-tree__col:only-child::before {
+  display: none;
+}
+.team-tree__col::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 20px;
+  border-left: 1px solid var(--line);
+}
+.team-tree__agents {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-left: 12px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+
+/* Organograma › Por setor: one frame per setor in its color. */
+.team-frames {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.team-frame {
+  --sector: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1.5px solid color-mix(in srgb, var(--sector) 45%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--sector) 7%, var(--surface));
+}
+.team-frame[data-none] {
+  border-style: dashed;
+  border-color: var(--line);
+  background: none;
+}
+.team-frame[data-drop="true"] {
+  border-color: var(--agent);
+}
+.team-frame__head {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 13px;
-  line-height: 18px;
+  padding-bottom: 4px;
 }
-.team-feed__text time {
-  color: var(--muted);
+.team-frame__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
 }
-.team-feed__status {
-  color: var(--muted);
+.team-frame__title b {
+  color: color-mix(in srgb, var(--sector) 70%, var(--ink));
 }
 
-@media (max-width: 1000px) {
-  .team-feed__grid {
-    grid-template-columns: 1fr;
-  }
+/* Mapa: people on top, a column per channel, the lines drawn under the cards. */
+.team-map {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
+.team-map__lead,
+.team-map__hint {
+  margin: 0;
+}
+.team-map__hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.team-map__canvas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+  padding: 24px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--ink) 10%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px,
+    var(--sunken);
+}
+.team-map__lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.team-map__lines path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ink) 35%, transparent);
+  stroke-width: 1.25;
+}
+.team-map__lines path[data-kind="ask"] {
+  stroke: var(--agent);
+  stroke-dasharray: 4 4;
+}
+.team-map__people {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+.team-map__people .team-node {
+  min-width: 180px;
+}
+.team-map__cols {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.team-map__col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--e1);
+}
+.team-map__col[data-none] {
+  border-style: dashed;
+  background: none;
+  box-shadow: none;
+}
+.team-map__col[data-drop="true"] {
+  outline: 2px solid var(--agent);
+  outline-offset: 2px;
+}
+.team-map__head {
+  font-weight: 650;
+}
+.team-map__head a {
+  color: inherit;
+  text-decoration: none;
+}
+.team-map__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sunken);
+  cursor: grab;
+}
+.team-map__who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.team-map__does {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+.team-map__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 6px 0 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.team-map__facts li {
+  gap: 6px;
+}
+.team-map__facts li[data-tone="waiting"] {
+  color: var(--agent);
+}
+.team-map__others {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.team-map__drop[data-drop="true"] {
+  outline: 2px solid var(--agent);
+}
+.team-map__lodi {
+  position: relative;
+  align-self: center;
+  min-width: 260px;
+  border-style: dashed;
+}
+
+/* Setores: one card per setor in two columns, a row per thing it has. */
+.team-sectors {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.team-sectors__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.team-sectors__acts {
+  gap: 8px;
+}
+.team-sectors__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.team-sector-card {
+  --sector: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+.team-sector-card[data-none] {
+  border: 1px dashed var(--line);
+  background: none;
+  box-shadow: none;
+}
+.team-sector-card[data-drop="true"] {
+  outline: 2px solid var(--agent);
+  outline-offset: 2px;
+}
+.team-sector-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.team-sector-card__title {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.team-sector-card__title h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+}
+.team-sector-card__rows {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 10px 16px;
+  margin: 0;
+  align-items: start;
+}
+.team-sector-card__rows dt {
+  padding-top: 3px;
+  color: var(--muted);
+}
+.team-sector-card__rows dd {
+  min-width: 0;
+  margin: 0;
+}
+.team-sector-card__people {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.team-sector-card__gap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -16px -16px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 14px 14px;
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.team-sector-card__gap-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+.team-gap {
+  font-weight: 600;
+  color: var(--warn);
+}
+.agent-group-look {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* Governança e uso: Settings' Uso › Pessoas, with a line to where it also lives. */
+.team-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.team-usage__lead {
+  margin: 0;
+}
+.team-usage__lead .ac-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 @media (max-width: 720px) {
   .page.team {
     padding: 16px 16px 40px;
     gap: 16px;
+  }
+  .team-head__sub {
+    display: none;
   }
   .team-head__actions {
     width: 100%;
@@ -332,66 +584,15 @@ html:not([data-pointer]) .team-sky__agent:focus-visible {
   .team-head__actions > .ac-btn {
     flex: 1 1 auto;
   }
-  .team-sky {
-    height: 600px;
+  .team-sectors__grid {
+    grid-template-columns: 1fr;
   }
-  .team-card {
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-    width: auto;
-    max-width: none;
+  .team-map__canvas {
+    gap: 16px;
+    padding: 12px;
   }
-  .team-sky__hint {
-    top: auto;
-    bottom: 12px;
-    right: 12px;
+  /* Too narrow for the lines to say anything: the columns stack. */
+  .team-map__lines {
+    display: none;
   }
-}
-@media (prefers-reduced-motion: reduce) {
-  .team-sky__figure,
-  .team-card {
-    animation: none;
-  }
-  .team-sky__agent,
-  .team-sky__person {
-    transition: none;
-  }
-}
-
-/* Grupos de agentes (ADR 0083): one list per group, the agents in none first, for who arranges. */
-.team-groups {
-  gap: 4px;
-  padding: 8px;
-}
-.team-groups__group {
-  display: flex;
-  flex-direction: column;
-  padding: 4px 8px 8px;
-  border-radius: var(--control-r-sm);
-}
-.team-groups__group[data-drop="true"] {
-  background: color-mix(in srgb, var(--agent) 9%, transparent);
-}
-.team-groups__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 28px;
-}
-.team-groups__head h3 {
-  flex: 1;
-  margin: 0;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--faint);
-}
-.team-groups__agent {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  align-items: center;
-  gap: var(--space-3);
-  color: inherit;
-  text-decoration: none;
 }

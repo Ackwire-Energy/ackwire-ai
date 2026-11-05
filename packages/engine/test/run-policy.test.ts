@@ -122,7 +122,7 @@ describe("run policy table", () => {
     for (const name of ["post_message", "send_dm", "ask_agent", "tell_agent"])
       expect(decide(r, builtIn(name))).toBe("allow");
     // A routine never starts or changes routines, so routines can't feed each other.
-    const never = ["create_routine", "update_routine", "run_routine_now", "schedule_reminder", "open_forum_topic"];
+    const never = ["create_routine", "update_routine", "run_routine_now", "schedule_reminder"];
     for (const name of never)
       expect(toolPolicy(r, builtIn(name, "schedule:write"))).toEqual({
         action: "refuse",

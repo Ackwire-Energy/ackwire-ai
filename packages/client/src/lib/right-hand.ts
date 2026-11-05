@@ -49,7 +49,8 @@ export const presetsLeft = (teamHandles: readonly string[]) => PRESETS.filter((p
 /**
  * The cards under the right hand's greeting at the top of its DM (ADR 0137): Connect AI while there is none. With one,
  * how to start (for whoever may create agents): with no agent yet, or, still alone, while the team is only ready-made
- * agents and some are left, each tile its own Criar. And, the team here and nobody else yet, what next. None after.
+ * agents and some are left, each tile its own Criar. And, the team here and nobody else yet, what next. Last, once an AI is
+ * there, how the person wants agents to talk to them, until they pick (ADR 0147).
  */
 export function introCards(s: {
   noAi: boolean;
@@ -60,7 +61,9 @@ export function introCards(s: {
   createsAgents: boolean;
   /** The person is the workspace's only member. */
   alone: boolean;
-}): ("connect" | "start" | "next")[] {
+  /** They never picked how agents talk to them (`agentStyle` null; undefined from an older server). */
+  askStyle?: boolean;
+}): ("connect" | "start" | "next" | "style")[] {
   if (s.noAi) return ["connect"];
   const presets = new Set<string>(PRESETS);
   const start =
@@ -69,5 +72,9 @@ export function introCards(s: {
     (s.teamHandles.length === 0 ||
       (s.alone && presetsLeft(s.teamHandles).length > 0 && s.teamHandles.every((h) => presets.has(h))));
   const next = s.teamHandles.length > 0 && s.alone;
-  return [...(start ? (["start"] as const) : []), ...(next ? (["next"] as const) : [])];
+  return [
+    ...(start ? (["start"] as const) : []),
+    ...(next ? (["next"] as const) : []),
+    ...(s.askStyle && s.aiKnown ? (["style"] as const) : []),
+  ];
 }

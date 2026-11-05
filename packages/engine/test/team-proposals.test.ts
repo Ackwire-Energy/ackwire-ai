@@ -1,0 +1,358 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { and, eq, isNull, schema } from "@agenteschat/db";
+import {
+  createRole,
+  createSetupToolSource,
+  createTeam,
+  createToolGateway,
+  denyTeam,
+  listTeamTemplates,
+  OFFER_ANSWERS_TOOL,
+  openPersonAgentDm,
+  PROPOSE_TEAM_TOOL,
+  postPersonMessage,
+  RIGHT_HAND,
+  rightHandPrompt,
+  setMemberRoles,
+  TEAM_INTERVIEW,
+  TEAM_TEMPLATES,
+  type TeamProposalCard,
+  type ToolContext,
+  undoTeam,
+  useTeamTemplate,
+} from "../src";
+import { addMember, type Fixture, setup } from "./fixtures";
+
+let f: Fixture;
+afterEach(async () => {
+  await f?.close();
+});
+
+const lodiOf = async (fx: Fixture) => {
+  const [lodi] = await fx.db
+    .select()
+    .from(schema.agents)
+    .where(and(eq(schema.agents.orgId, fx.org.id), eq(schema.agents.builtin, RIGHT_HAND)));
+  if (!lodi) throw new Error("no right hand");
+  return lodi;
+};
+
+async function lodiRun(fx: Fixture, userId: string, body: string): Promise<ToolContext> {
+  const lodi = await lodiOf(fx);
+  const dm = await openPersonAgentDm(fx.db, fx.org.id, userId, lodi.id);
+  const trigger = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, userId, fx.org.id, dm.id, { body });
+  const [run] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
+  if (!run) throw new Error("no run");
+  return {
+    db: fx.db,
+    orgId: fx.org.id,
+    agentId: lodi.id,
+    runId: run.id,
+    channelId: dm.id,
+    threadRootId: run.threadRootId,
+    triggerMessageId: trigger.id,
+  };
+}
+
+const gatewayOf = (fx: Fixture) => createToolGateway({ sources: [createSetupToolSource({ pubsub: fx.pubsub })] });
+async function call(fx: Fixture, ctx: ToolContext, name: string, input: Record<string, unknown>) {
+  const res = await gatewayOf(fx).invoke(ctx, { toolUseId: `tu_${crypto.randomUUID()}`, name, input });
+  if (res.type !== "result") throw new Error(`not a result: ${res.type}`);
+  return res.output;
+}
+
+async function cardOf(fx: Fixture, messageId: string) {
+  const [m] = await fx.db.select().from(schema.messages).where(eq(schema.messages.id, messageId));
+  return m?.meta.actionCard as TeamProposalCard;
+}
+
+const TEAM = {
+  lead: "3 agentes para a Acme, cada um no seu canal.",
+  agents: [
+    {
+      name: "Iara",
+      handle: "iara",
+      role: "Atendimento",
+      line: "Responde os clientes no WhatsApp e no e-mail.",
+      look: { color: "rose", eyes: "happy", accessory: "flower" },
+      channel: "atendimento",
+      routines: [{ schedule: "0 9 * * *", prompt: "Resuma o que ficou sem resposta.", title: "Resumo do dia" }],
+      first_task: "Responder a última mensagem da Clínica Bem Estar",
+    },
+    {
+      name: "Caio",
+      handle: "caio",
+      role: "Cobrança",
+      line: "Lembra quem atrasou o pagamento.",
+      channel: "financeiro",
+      routines: [{ schedule: "0 8 * * 1", prompt: "Liste quem está atrasado.", title: "Atrasados" }],
+    },
+    { name: "Ada", handle: "ada", role: "Dev", line: "Corrige os bugs.", channel: "general" },
+  ],
+  skills: [{ title: "Tom de voz da Acme", line: "como a Acme fala", agents: ["iara", "caio"] }],
+  approvals: "As cobranças do Caio esperam a sua aprovação.",
+  invite: ["Bruno"],
+  weekly_check: true,
+};
+
+const activeAgents = async (fx: Fixture) =>
+  (
+    await fx.db
+      .select()
+      .from(schema.agents)
+      .where(and(eq(schema.agents.orgId, fx.org.id), isNull(schema.agents.archivedAt)))
+  ).map((a) => a.handle);
+
+describe("the right hand's team setup tools", () => {
+  test("only the right hand has them", async () => {
+    f = await setup({ rightHand: true });
+    const lodi = (await gatewayOf(f).granted(await lodiRun(f, f.owner.id, "oi"))).map((t) => t.name);
+    expect(lodi).toContain(PROPOSE_TEAM_TOOL);
+    expect(lodi).toContain(OFFER_ANSWERS_TOOL);
+    const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "oi",
+    });
+    const others = await gatewayOf(f).granted({
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: crypto.randomUUID(),
+      channelId: f.general.id,
+      threadRootId: trigger.id,
+      triggerMessageId: trigger.id,
+    });
+    expect(others.map((t) => t.name)).not.toContain(PROPOSE_TEAM_TOOL);
+  });
+
+  test("offer_answers posts its question with the answers to tap, once a turn", async () => {
+    f = await setup({ rightHand: true });
+    const ctx = await lodiRun(f, f.owner.id, "Software e apps");
+    const out = await call(f, ctx, OFFER_ANSWERS_TOOL, {
+      text: "**O que mais toma o seu tempo hoje?**",
+      choices: ["Responder clientes", "Cobrar quem atrasou", "Outra coisa"],
+      multiple: true,
+      step: 2,
+      of: 3,
+    });
+    expect(out.isError).toBeFalsy();
+    const [asked] = await f.db.select().from(schema.messages).where(eq(schema.messages.agentRunId, ctx.runId));
+    expect(asked?.body).toBe("**O que mais toma o seu tempo hoje?**");
+    expect(asked?.meta.replyChips).toEqual({
+      choices: ["Responder clientes", "Cobrar quem atrasou", "Outra coisa"],
+      multiple: true,
+      step: 2,
+      of: 3,
+    });
+    const again = await call(f, ctx, OFFER_ANSWERS_TOOL, { text: "E mais?", step: 3, of: 3 });
+    expect(again.isError).toBe(true);
+  });
+
+  test("its prompt runs the interview while there is no team, in its DM", async () => {
+    f = await setup({ rightHand: true });
+    await f.db.update(schema.agents).set({ archivedAt: new Date() }).where(eq(schema.agents.id, f.agent.id));
+    const lodi = await lodiOf(f);
+    const prompt = await rightHandPrompt(
+      { db: f.db },
+      { orgId: f.org.id, agent: lodi, personId: f.owner.id, inDm: true },
+    );
+    expect(prompt).toContain(TEAM_INTERVIEW);
+    expect(prompt).toContain("ONE propose_team card");
+  });
+});
+
+describe("the team card", () => {
+  test("propose_team posts one card: new channels marked, routines read, the weekly check; a newer one replaces it", async () => {
+    f = await setup({ rightHand: true });
+    const ctx = await lodiRun(f, f.owner.id, "Só o Bruno");
+    const out = await call(f, ctx, PROPOSE_TEAM_TOOL, {
+      ...TEAM,
+      agents: TEAM.agents.map((a) => ({ ...a, handle: `${a.handle}x` })),
+      skills: [{ ...TEAM.skills[0], agents: ["iarax", "caiox"] }],
+    });
+    expect(out.content).toStartWith("Posted the team card");
+    const id = (out.data as { actionCard: { messageId: string } }).actionCard.messageId;
+    const card = await cardOf(f, id);
+    expect(card.state).toBe("pending");
+    expect(card.params.newChannels.sort()).toEqual(["atendimento", "financeiro"]);
+    expect(card.params.agents[0]?.routines[0]?.rule).not.toBeNull();
+    expect(card.params.weekly?.cron).toBe("0 17 * * 5");
+    expect(card.params.skills[0]?.name).toBe("tom-de-voz-da-acme");
+    expect(card.params.invite).toEqual(["Bruno"]);
+    const newer = await call(f, ctx, PROPOSE_TEAM_TOOL, {
+      lead: "Só a Iara",
+      agents: [{ ...TEAM.agents[0], handle: "iaray" }],
+    });
+    expect(newer.isError).toBeFalsy();
+    expect((await cardOf(f, id)).state).toBe("superseded");
+  });
+
+  test("a taken handle or a skill for someone off the team is refused with the reason", async () => {
+    f = await setup({ rightHand: true });
+    const ctx = await lodiRun(f, f.owner.id, "monta o time");
+    const taken = await call(f, ctx, PROPOSE_TEAM_TOOL, {
+      lead: "x",
+      agents: [{ ...TEAM.agents[0], handle: f.agent.handle }],
+    });
+    expect(taken.isError).toBe(true);
+    expect(taken.content).toContain("already taken");
+    const stranger = await call(f, ctx, PROPOSE_TEAM_TOOL, {
+      lead: "x",
+      agents: [TEAM.agents[0]],
+      skills: [{ title: "Voz", line: "como fala", agents: ["zeca"] }],
+    });
+    expect(stranger.isError).toBe(true);
+  });
+
+  test("Criar o time makes it all as the clicker, Desfazer takes it back", async () => {
+    f = await setup({ rightHand: true });
+    const ctx = await lodiRun(f, f.owner.id, "Só o Bruno");
+    const out = await call(f, ctx, PROPOSE_TEAM_TOOL, TEAM);
+    const id = (out.data as { actionCard: { messageId: string } }).actionCard.messageId;
+    const made = await createTeam({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id);
+    expect(made.card.state).toBe("created");
+    expect(made.card.created?.agentIds).toHaveLength(3);
+    // #general existed: only the two new channels are the team's own.
+    expect(made.card.created?.channelIds).toHaveLength(2);
+    expect(made.card.created?.routineIds).toHaveLength(3);
+    expect(made.card.created?.skillIds).toHaveLength(1);
+    expect(made.card.created?.skipped).toEqual([]);
+    expect(await activeAgents(f)).toEqual(expect.arrayContaining(["iara", "caio", "ada"]));
+    const iara = (await f.db.select().from(schema.agents).where(eq(schema.agents.handle, "iara")))[0];
+    expect(iara?.ownerUserId).toBe(f.owner.id);
+    const [atendimento] = await f.db.select().from(schema.channels).where(eq(schema.channels.name, "atendimento"));
+    const seat = await f.db
+      .select()
+      .from(schema.channelMembers)
+      .where(
+        and(
+          eq(schema.channelMembers.channelId, atendimento?.id ?? ""),
+          eq(schema.channelMembers.agentId, iara?.id ?? ""),
+        ),
+      );
+    expect(seat).toHaveLength(1);
+    const lodi = await lodiOf(f);
+    const weekly = await f.db.select().from(schema.routines).where(eq(schema.routines.agentId, lodi.id));
+    expect(weekly).toHaveLength(1);
+    const skill = await f.db
+      .select()
+      .from(schema.agentSkills)
+      .where(eq(schema.agentSkills.agentId, iara?.id ?? ""));
+    expect(skill).toHaveLength(1);
+    // Twice is once.
+    await expect(createTeam({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id)).rejects.toThrow();
+
+    const undone = await undoTeam({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id);
+    expect(undone.card.state).toBe("undone");
+    expect(await activeAgents(f)).not.toContain("iara");
+    const live = await f.db
+      .select()
+      .from(schema.routines)
+      .where(and(eq(schema.routines.orgId, f.org.id), isNull(schema.routines.deletedAt)));
+    expect(live.filter((r) => made.card.created?.routineIds.includes(r.id))).toEqual([]);
+    const [gone] = await f.db.select().from(schema.channels).where(eq(schema.channels.name, "atendimento"));
+    expect(gone?.archivedAt).not.toBeNull();
+  });
+
+  test("a step that fails creates nothing: the card stays open and says which step", async () => {
+    f = await setup({ rightHand: true });
+    const ctx = await lodiRun(f, f.owner.id, "monta o time");
+    const out = await call(f, ctx, PROPOSE_TEAM_TOOL, TEAM);
+    const id = (out.data as { actionCard: { messageId: string } }).actionCard.messageId;
+    // Someone takes Caio's handle before the click.
+    await f.db.insert(schema.agents).values({
+      orgId: f.org.id,
+      name: "Outro Caio",
+      handle: "caio",
+      role: "",
+      instructions: "",
+      model: "auto",
+      ownerUserId: f.owner.id,
+    });
+    const tried = await createTeam({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id);
+    expect(tried.card.state).toBe("pending");
+    expect(tried.card.error?.step).toBe("Caio");
+    expect(tried.card.error).toMatchObject({ status: 409, code: "agent.handle_taken" });
+    expect(await activeAgents(f)).not.toContain("iara");
+    expect((await f.db.select().from(schema.channels).where(eq(schema.channels.name, "atendimento"))).length).toBe(0);
+    expect((await cardOf(f, id)).error?.step).toBe("Caio");
+  });
+
+  test("a member who creates agents: the team without the skills (an admin's), which the receipt names", async () => {
+    f = await setup({ rightHand: true });
+    // Not in #general, where Ada goes: the team joins them there, as an agent works only where its owner is.
+    const member = await addMember(f.db, f.org.id, "member");
+    const makers = await createRole(f.db, f.owner.id, f.org.id, { name: "Makers", permissions: ["create_agents"] });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, member.id, [makers.id]);
+    const ctx = await lodiRun(f, member.id, "monta o time");
+    const out = await call(f, ctx, PROPOSE_TEAM_TOOL, { ...TEAM, weekly_check: false });
+    const id = (out.data as { actionCard: { messageId: string } }).actionCard.messageId;
+    const made = await createTeam({ db: f.db, pubsub: f.pubsub }, member.id, f.org.id, id);
+    expect(made.card.state).toBe("created");
+    expect(made.card.created?.skillIds).toEqual([]);
+    expect(made.card.created?.skipped).toEqual(["skills"]);
+    const inGeneral = await f.db
+      .select()
+      .from(schema.channelMembers)
+      .where(and(eq(schema.channelMembers.channelId, f.general.id), eq(schema.channelMembers.userId, member.id)));
+    expect(inGeneral.length).toBe(1);
+  });
+
+  test("a private channel the person isn't in can't be named, and a template picks a free name", async () => {
+    f = await setup({ rightHand: true });
+    const member = await addMember(f.db, f.org.id, "member");
+    const makers = await createRole(f.db, f.owner.id, f.org.id, { name: "Makers", permissions: ["create_agents"] });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, member.id, [makers.id]);
+    await f.db.insert(schema.channels).values({
+      orgId: f.org.id,
+      name: "financeiro",
+      visibility: "private",
+      createdByUserId: f.owner.id,
+    });
+    const ctx = await lodiRun(f, member.id, "monta o time");
+    const out = await call(f, ctx, PROPOSE_TEAM_TOOL, { ...TEAM, weekly_check: false });
+    expect(out.isError).toBe(true);
+    expect(out.content).toContain("#financeiro");
+    const templates = await listTeamTemplates({ db: f.db }, member.id, f.org.id, "pt-BR");
+    expect(templates.find((t) => t.id === "software")?.team.agents[1]?.channel).toBe("financeiro-2");
+  });
+
+  test("Descartar closes it for good", async () => {
+    f = await setup({ rightHand: true });
+    const ctx = await lodiRun(f, f.owner.id, "monta o time");
+    const out = await call(f, ctx, PROPOSE_TEAM_TOOL, TEAM);
+    const id = (out.data as { actionCard: { messageId: string } }).actionCard.messageId;
+    expect((await denyTeam({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id)).card.state).toBe("denied");
+    await expect(createTeam({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id)).rejects.toThrow();
+  });
+});
+
+describe("team templates", () => {
+  test("six, in the person's language, each a team its card would propose", async () => {
+    f = await setup({ rightHand: true });
+    const list = await listTeamTemplates({ db: f.db }, f.owner.id, f.org.id, "pt-BR");
+    expect(list.map((t) => t.id)).toEqual([...TEAM_TEMPLATES]);
+    const software = list.find((t) => t.id === "software");
+    expect(software?.name).toBe("Software e apps");
+    expect(software?.team.agents.map((a) => [a.name, a.channel])).toEqual([
+      ["Iara", "atendimento"],
+      ["Caio", "financeiro"],
+      ["Ada", "eng"],
+    ]);
+    expect(software?.team.weekly).not.toBeNull();
+    expect(software?.team.skills.map((s) => s.title)).toEqual(["Tom de voz", "Régua de cobrança"]);
+    const en = await listTeamTemplates({ db: f.db }, f.owner.id, f.org.id, "en");
+    expect(en.find((t) => t.id === "software")?.team.agents[0]?.channel).toBe("support");
+  });
+
+  test("Usar este modelo posts its card and the first question to fit it, in the person's DM with Lodi", async () => {
+    f = await setup({ rightHand: true });
+    const used = await useTeamTemplate({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "clinic", "pt-BR");
+    const card = await cardOf(f, used.messageId);
+    expect(card.params.template).toBe("clinic");
+    expect(card.params.agents.map((a) => a.name)).toEqual(["Nina", "Caio", "Iara"]);
+    const rows = await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, used.channelId));
+    const question = rows.find((m) => m.meta.replyChips);
+    expect(question?.meta.replyChips).toEqual({ choices: [], multiple: false, step: 1, of: 2 });
+    expect(question?.body).toContain("Clínica ou consultório");
+  });
+});

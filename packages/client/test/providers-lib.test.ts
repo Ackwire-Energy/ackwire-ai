@@ -17,7 +17,8 @@ const OPENROUTER = ["sk", "or", "v1", "0123456789abcdef".repeat(4)].join("-");
 
 describe("whose key is it", () => {
   test("the same providers as the server's catalog, in its order: Claude, OpenAI, Gemini, then the rest", () => {
-    expect(PROVIDERS.map((p) => p.id)).toEqual([...PROVIDER_IDS]);
+    // A workspace's own endpoint (`custom`) has a form of its own, never a key's.
+    expect(PROVIDERS.map((p) => p.id)).toEqual(PROVIDER_IDS.filter((id) => id !== "custom"));
   });
 
   test("a Gemini key, either kind AI Studio hands out, fits Gemini alone, whichever provider was chosen", () => {

@@ -20,6 +20,7 @@ import {
   cacheMessageMeta,
   cacheMessageWork,
   cachePinned,
+  cacheTeamCard,
   catchUpChannel,
   consultSeeds,
   consultsIn,
@@ -302,6 +303,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "agent.proposal.updated":
       // An agent's proposal of a new agent was created or denied (by anyone): its card.
       cacheAgentProposal(qc, orgId, event, event);
+      break;
+    case "team.proposal.updated":
+      // The right hand's team card changed (created, failed, adjusted, dismissed, undone): the whole card.
+      cacheTeamCard(qc, orgId, event, event.card);
       break;
     case "browser.handoff.updated": {
       const { handoff } = event;

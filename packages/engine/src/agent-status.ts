@@ -467,7 +467,7 @@ export function activityOf(
   if (group === "sandbox" || group === "github") return { kind: "coding", subject: null, text: "Coding" };
   if (group === "drive") return { kind: "files", subject: null, text: "Working on files" };
   if (group === "wiki") return { kind: "wiki", subject: null, text: "Writing in the wiki" };
-  if (["issues", "linear", "calendar", "schedule", "forum"].includes(group)) {
+  if (["issues", "linear", "calendar", "schedule"].includes(group)) {
     return { kind: "planning", subject: null, text: "Organizing tasks" };
   }
   if (group === "mail") return { kind: "mail", subject: null, text: "Handling email" };

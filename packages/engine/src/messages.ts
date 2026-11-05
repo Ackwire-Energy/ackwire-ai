@@ -848,7 +848,7 @@ export async function insertMessageWithRuns(
         returning id
       ), assess as (
         -- A reply: the thread's title and "resolved?" are assessed a while later (threads.assess);
-        -- a newer reply's job takes over. Forum replies are skipped by the handler. An agent's silent sticker or GIF
+        -- a newer reply's job takes over. An agent's silent sticker or GIF
         -- after its reply leaves it to the reply's own job (the assessment doesn't count it as newer).
         insert into ${outbox} (id, org_id, kind, payload, dedupe_key, max_attempts, next_attempt_at)
         select gen_random_uuid(), ${input.orgId}::uuid, 'threads.assess',
@@ -1015,9 +1015,6 @@ export async function postPersonMessage(
   // One access check (membership + channel) instead of two round trips.
   const { channel, membership, workspace } = await requireChannelAccess(deps.db, userId, orgId, channelId);
   if (!can(membership, "post")) throw postRefusal(workspace);
-  // A forum topic is written through the forum (its turns), never as a plain chat (ADR 0022).
-  if (channel.kind === "forum")
-    throw new ValidationError("Post in the forum from the topic's page", "forum.post_from_topic");
   // A task's conversation (ADR 0145): an agent mentioned there that sees the task joins it, so the mention wakes it.
   if (channel.kind === "task") {
     await admitTaskAgents(deps.db, orgId, channelId, {

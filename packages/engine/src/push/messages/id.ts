@@ -10,8 +10,6 @@ export const strings: Partial<PushStrings> = {
   approvalFromRoutine: (routine) => `Rutinitas «${routine}»`,
   questionTitle: (a) => `${a} punya pertanyaan untukmu`,
   questionBody: "Ketuk untuk menjawab.",
-  forumTitle: "Giliranmu memberi pendapat",
-  forumBody: "Ketuk untuk ikut diskusi.",
   mentionTitle: (a) => `${a} menyebutmu`,
   replyTitle: (a) => `${a} membalas`,
   missionStoppedTitle: "Sebuah misi berhenti",
@@ -75,4 +73,5 @@ export const strings: Partial<PushStrings> = {
   usageRaisedTitle: (a) => `${a} menaikkan batasmu bulan ini`,
   usageRaisedBody: "Kamu bisa lanjut.",
   usageRefusedTitle: (a) => `${a} menolak permintaan tambahan pemakaianmu`,
+  teamWeekReady: "Ringkasan minggu timmu sudah siap",
 };

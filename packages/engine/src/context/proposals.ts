@@ -761,11 +761,13 @@ async function cardOf(db: Executor, p: Proposal) {
     )
     .orderBy(asc(messages.createdAt))
     .limit(1);
-  if (!message?.agentRunId) return null;
+  if (!message) return null;
+  // Lodi's weekly card (ADR 0137 §9) is posted by no run: its receipts carry none and no notice follows a decision.
   const at = { runId: message.agentRunId, messageId: message.id, channelId: message.channelId };
-  const settings = settingsCardOf(message.meta);
-  if (settings) return { ...at, ids: settings.proposalIds };
-  const updates = message.meta.memoryUpdates as { proposalId?: string; proposalIds?: string[] }[];
+  const listed = (message.meta.actionCard as { proposalIds?: unknown } | undefined)?.proposalIds;
+  if (Array.isArray(listed)) return { ...at, ids: listed.filter((id): id is string => typeof id === "string") };
+  if (!at.runId) return null;
+  const updates = (message.meta.memoryUpdates ?? []) as { proposalId?: string; proposalIds?: string[] }[];
   const update = updates.find((u) => u.proposalId === p.id || u.proposalIds?.includes(p.id));
   return { ...at, ids: update?.proposalIds?.length ? update.proposalIds : [p.id] };
 }
@@ -777,7 +779,8 @@ async function cardOf(db: Executor, p: Proposal) {
  */
 async function tellProposer(deps: { db: Database; pubsub?: PubSub }, p: Proposal, via?: string) {
   const card = await cardOf(deps.db, p);
-  if (!card) return;
+  if (!card?.runId) return;
+  const runId = card.runId;
   // The card's own key: a message may show several.
   const key = card.ids[0] ?? p.id;
   const delivered = await deps.db.transaction(async (tx) => {
@@ -792,7 +795,7 @@ async function tellProposer(deps: { db: Database; pubsub?: PubSub }, p: Proposal
     const [run] = await tx
       .select()
       .from(agentRuns)
-      .where(and(eq(agentRuns.orgId, p.orgId), eq(agentRuns.id, card.runId)));
+      .where(and(eq(agentRuns.orgId, p.orgId), eq(agentRuns.id, runId)));
     if (!run || run.agentId !== p.proposedByAgentId) return null;
     const [sent] = await tx
       .select({ id: messages.id })

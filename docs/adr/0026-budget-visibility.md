@@ -17,9 +17,8 @@ Every member saw dollars: the sidebar showed what their agents spent ("US$ 1.56 
 - `GET …/overview` → `budgetUsedPercent`: this month's spend of the active agents over the sum of their effective budgets (the workspace's 100%). No `myAgentsSpendUsd`.
 - Agent list and detail → `budgetUsedPercent`; `monthlyBudgetUsd` (and, in the detail, `defaultBudgetUsd` when the agent follows the default) only for admins.
 - Message `usage` → model and tokens only. Runs → tokens only; run steps drop `costNanoUsd`.
-- Routines → no budget fields (routine caps were removed on 2026-10-17, migration 0065: a routine runs on its agent's budget). Forum topics → `budgetUsedPercent` (null without a cap), no amounts. Agent computer → no cost.
+- Routines → no budget fields (routine caps were removed on 2026-10-17, migration 0065: a routine runs on its agent's budget). Agent computer → no cost.
 - `budget.warning` / `budget.exhausted` events carry `percent`; the email says "usou 80% do orçamento".
-- Members can't set money: a member's `budgetUsd` on a forum topic is ignored (the topic gets the default cap).
 - Admins see amounts in one place: `GET …/usage/report` (Settings → Usage) adds `defaultAgentBudgetUsd` and, per agent, the effective `monthlyBudgetUsd`, `budgetIsDefault` and `budgetUsedPercent`. `GET/PATCH …/settings` carries `defaultAgentBudgetUsd` for admins.
 
 Tokens stay visible: hiding them buys nothing.

@@ -486,16 +486,16 @@ describe("live agent runs (streaming)", () => {
     s = applyChannelEvent(s, tool("propose_agent", "tu1"));
     s = applyChannelEvent(s, posted("m8", "c1", { actionCard: { kind: "agent_proposal" } }));
     s = applyChannelEvent(s, tool(null, "tu1"));
-    // Any tool's post: a forum topic's card here, a DM to another agent.
-    s = applyChannelEvent(s, tool("suggest_forum_topic", "tu2"));
-    s = applyChannelEvent(s, posted("m7", "c1", { forumSuggestion: { title: "Rotinas" } }));
+    // Any tool's post: a Connect card here, a DM to another agent.
+    s = applyChannelEvent(s, tool("offer_connect_app", "tu2"));
+    s = applyChannelEvent(s, posted("m7", "c1", { actionCard: { kind: "connect_app" } }));
     s = applyChannelEvent(s, posted("m6", "dm1", { agentNote: { runId: "r1" } }));
     s = applyChannelEvent(s, tool(null, "tu2"));
     s = applyChannelEvent(s, delta(1, "Propus o Caio."));
     const [row] = runsInChannel(s, "c1");
     expect(row?.work).toMatchObject([
       { kind: "call", tool: "propose_agent", running: false },
-      { kind: "call", tool: "suggest_forum_topic", running: false },
+      { kind: "call", tool: "offer_connect_app", running: false },
     ]);
     expect(row?.text).toBe("Propus o Caio.");
     // Its reply, with no call running, ends it.

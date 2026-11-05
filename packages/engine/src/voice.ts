@@ -129,11 +129,8 @@ export async function acceptVoiceClip(
     language?: string | null;
   },
 ): Promise<{ clipId: string }> {
-  const { channel, membership } = await requireChannelAccess(deps.db, userId, orgId, channelId);
+  const { membership } = await requireChannelAccess(deps.db, userId, orgId, channelId);
   if (!can(membership, "post")) throw new ForbiddenError();
-  if (channel.kind === "forum") {
-    throw new ValidationError("Post in the forum from the topic's page", "forum.post_from_topic");
-  }
   const clientId = input.clientId.trim().slice(0, 64);
   if (!clientId) throw new ValidationError("clientId is required", "voice.client_id_required");
   const [existing] = await deps.db

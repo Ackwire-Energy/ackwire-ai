@@ -243,9 +243,7 @@ async function offerableChannels(db: Database, at: DraftPlace) {
     .from(channels)
     .where(and(eq(channels.orgId, at.orgId), eq(channels.id, at.channelId)));
   const publicHere =
-    !conversation ||
-    conversation.kind === "forum" ||
-    (conversation.kind === "channel" && conversation.visibility === "public" && !conversation.dmKey);
+    !conversation || (conversation.kind === "channel" && conversation.visibility === "public" && !conversation.dmKey);
   const person = at.personId;
   if (!person || closed.length === 0 || publicHere) return open;
   const people = await db
@@ -334,7 +332,7 @@ function mailboxNamed(boxes: Offer["mailboxes"], asked: string) {
 }
 
 /** A routine to create with the agent, read now in the asker's time zone. */
-async function checkRoutine(
+export async function checkRoutine(
   deps: { db: Database; context?: ContextDeps },
   at: DraftPlace,
   raw: unknown,
@@ -538,7 +536,7 @@ export async function mayCreateAgents(db: Database, orgId: string, userId: strin
 /**
  * Whether someone who holds `permission` (by default, may create agents) can open this conversation, and so act on a
  * card in it (the decision routes read it as `requireChannelAccess` does): any of them in a public channel, which they
- * may join, or a forum; in a DM or a private channel, only one of its members.
+ * may join; in a DM or a private channel, only one of its members.
  */
 export async function deciderCanOpen(
   db: Database,
@@ -551,9 +549,7 @@ export async function deciderCanOpen(
     .from(channels)
     .where(and(eq(channels.orgId, orgId), eq(channels.id, channelId)));
   if (!channel) return false;
-  if (channel.kind === "forum" || (channel.kind === "channel" && channel.visibility === "public" && !channel.dmKey)) {
-    return true;
-  }
+  if (channel.kind === "channel" && channel.visibility === "public" && !channel.dmKey) return true;
   const members = await db
     .select({ may: maySql(orgId, channelMembers.userId, permission) })
     .from(channelMembers)
@@ -641,7 +637,7 @@ async function claim(
 ) {
   const found = await proposalMessage(deps.db, userId, orgId, messageId);
   await requirePermission(deps.db, userId, orgId, "create_agents");
-  // A crash between this claim and the agent leaves it `creating`, decided for good (as the forum's suggestions).
+  // A crash between this claim and the agent leaves it `creating`, decided for good.
   const decided = () => new ConflictError("This proposal was already decided", "agent_proposal.decided");
   if (found.card.state !== "pending") throw decided();
   if (expired(found.card)) throw new ConflictError("This proposal expired", "agent_proposal.expired");

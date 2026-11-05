@@ -463,7 +463,7 @@ describe("Criar agente: steps", () => {
     await toReview();
     const content = () => screen().getByRole("heading", { level: 1 }).closest(".newag__content") as HTMLElement;
     expect(title()).toBe("Tudo certo com o Theo?");
-    expect(content().textContent).toContain("PM · Organiza tarefas, resumos e o fórum.");
+    expect(content().textContent).toContain("PM · Organiza tarefas e resumos.");
     expect(content().textContent).toContain("@theo");
     // The title says it all: no lead, and no note under the summary.
     expect(content().querySelector(".onb__lead, .newag__note")).toBeNull();

@@ -298,6 +298,12 @@
       "short": "yapay zeka anahtarları",
       "say": "yapay zeka anahtarlarıyla ilgilenir"
     },
+    "use_others_plans": {
+      "title": "Başkalarının planlarını kullanma",
+      "desc": "Düzenleyebildiği ajanlara başka birinin bağladığı bir planı verir. Sahibi bir e-posta alır ve geri alabilir.",
+      "short": "başkalarının planlarını kullanma",
+      "say": "başkalarının planlarını kullanır"
+    },
     "edit_wiki": {
       "title": "Wiki'yi düzenleme",
       "desc": "Sayfa oluşturma ve değiştirme.",
@@ -357,12 +363,6 @@
       "desc": "Plan, kart ve faturalar.",
       "short": "faturalandırma",
       "say": "faturalandırmayla ilgilenir"
-    },
-    "use_others_plans": {
-      "title": "Başkalarının planlarını kullanma",
-      "desc": "Düzenleyebildiği ajanlara başka birinin bağladığı bir planı verir. Sahibi bir e-posta alır ve geri alabilir.",
-      "short": "başkalarının planlarını kullanma",
-      "say": "başkalarının planlarını kullanır"
     }
   },
   "auth": {
@@ -953,7 +953,7 @@
       "theo": {
         "name": "Theo",
         "role": "Ürün Yöneticisi",
-        "desc": "Görevleri düzenler ve forumu yönetir."
+        "desc": "Görevleri düzenler ve yol haritasını güncel tutar."
       },
       "ada": {
         "name": "Ada",
@@ -1100,7 +1100,6 @@
     "agent_reply": "Bir ajan yanıt verdi",
     "agent_question": "Size bir soru var",
     "approval": "Sizi bekleyen bir onay var",
-    "forum_turn": "Görüş bildirme sırası sizde",
     "mission_stopped": "Bir misyon durdu",
     "routine_failed": "Bir rutin tamamlanmadı",
     "run_failed": "Bir ajan işini bitiremedi",
@@ -1249,7 +1248,7 @@
     "category": {
       "waiting": {
         "title": "Sizi bekliyor",
-        "help": "Onaylar, ajanların soruları, forumda sıranızın gelmesi, tarayıcıda yardım istekleri"
+        "help": "Onaylar, ajanların soruları, tarayıcıda yardım istekleri"
       },
       "replies": {
         "title": "Ajanların yanıtları",
@@ -1320,7 +1319,6 @@
       "drive": "Dosyalar, raporlar ve tablolar",
       "routines": "Ajanların zamanında kendi başlarına yaptıkları",
       "calendar": "Toplantılar ve son tarihler",
-      "forum": "Bir kararın birkaç bakış açısına ihtiyacı olduğunda",
       "team": "Kim kimdir: kişiler, ajanlar ve grupları"
     },
     "customizeSidebar": "Kenar çubuğunu özelleştir",
@@ -1392,7 +1390,6 @@
     "team": "Ekip",
     "calendar": "Takvim",
     "drive": "Drive",
-    "forum": "Forum",
     "members": "Üyeler",
     "channels": "Kanallar",
     "agents": "Ajanlar",
@@ -1435,29 +1432,29 @@
     "unreadNotifications_other": "{{count}} okunmamış bildirim"
   },
   "agentGroups": {
-    "group": "Grup",
-    "none": "Grup yok",
-    "newGroup": "Yeni grup",
-    "newFromAgent": "Yeni grup…",
+    "group": "Departman",
+    "none": "Departman yok",
+    "newGroup": "Yeni departman",
+    "newFromAgent": "Yeni departman…",
     "nameLabel": "Ad",
-    "namePlaceholder": "Örn. Ürün ve pazarlama",
-    "create": "Grup oluştur",
-    "renameTitle": "Grubu yeniden adlandır",
-    "rename": "Yeniden adlandır",
+    "namePlaceholder": "Örn.: Satış",
+    "create": "Departman oluştur",
+    "renameTitle": "Departmanı düzenle",
+    "rename": "Düzenle",
     "options": "{{name}} seçenekleri",
     "moveUp": "Yukarı taşı",
     "moveDown": "Aşağı taşı",
-    "delete": "Grubu sil",
-    "deleteTitle": "{{name}} grubu silinsin mi?",
+    "delete": "Departmanı sil",
+    "deleteTitle": "{{name}} departmanı silinsin mi?",
     "deleteText": "Ajanları Ajanlar bölümüne geri döner.",
     "dropHere": "Ajanları buraya sürükleyin",
-    "moved": "{{name}} artık {{group}} grubunda",
-    "movedOut": "{{name}}, {{group}} grubundan ayrıldı",
+    "moved": "{{name}}, {{group}} departmanına geçti",
+    "movedOut": "{{name}}, {{group}} departmanından ayrıldı",
     "undo": "Geri al"
   },
   "sidebarAgents": {
     "options": "Ajan seçenekleri",
-    "add": "Yeni ajan veya grup",
+    "add": "Yeni ajan veya departman",
     "order": "Sıra",
     "sort": {
       "workspace": "Çalışma alanı sırası",
@@ -1467,7 +1464,7 @@
     "showAll": "Benimle konuşmayan ajanları göster",
     "collapseAll": "Tümünü daralt",
     "expandAll": "Tümünü genişlet",
-    "organize": "Grupları Ekip'te düzenle",
+    "organize": "Departmanları Ekip'te düzenle",
     "more_one": "Ekip'te 1 ajan daha",
     "more_other": "Ekip'te {{count}} ajan daha",
     "createFirst": "İlk ajanı oluştur",
@@ -1479,8 +1476,8 @@
     "talksOnly": "yalnızca {{name}} ile konuşur",
     "talksOnlyMore_one": "yalnızca {{name}} ve {{count}} kişiyle daha konuşur",
     "talksOnlyMore_other": "yalnızca {{name}} ve {{count}} kişiyle daha konuşur",
-    "changeGroup": "Grubu değiştir",
-    "newGroupWith": "{{name}} ile yeni grup",
+    "changeGroup": "Departmana taşı",
+    "newGroupWith": "{{name}} ile yeni departman",
     "dmsEmpty": "Kişilerle konuşmalarınız burada görünür."
   },
   "sidebarPins": {
@@ -1506,59 +1503,106 @@
   },
   "team": {
     "title": "Ekip",
-    "groups": {
-      "title": "Ajan grupları"
+    "people_one": "{{count}} kişi",
+    "people_other": "{{count}} kişi",
+    "agents_one": "{{count}} ajan",
+    "agents_other": "{{count}} ajan",
+    "sectorsCount_one": "{{count}} departman",
+    "sectorsCount_other": "{{count}} departman",
+    "viewLabel": "Ekip görünümü",
+    "view": {
+      "list": "Liste",
+      "chart": "Organizasyon şeması",
+      "map": "Harita",
+      "sectors": "Departmanlar",
+      "usage": "Yönetişim ve kullanım"
     },
-    "subtitle_one": "{{count}} ajan, onunla kimin ilgilendiğine göre gruplandı.",
-    "subtitle_other": "{{count}} ajan, her biriyle kimin ilgilendiğine göre gruplandı.",
-    "working_one": "Şu anda {{count}} tanesi çalışıyor.",
-    "working_other": "Şu anda {{count}} tanesi çalışıyor.",
-    "skyLabel": "Sorumlu kişiye göre gruplanmış ajanlar. Ne yaptığını görmek için bir ajana dokunun.",
-    "tapHint": "Bir ajana dokunun",
-    "asked": "{{from}}, {{to}} ajanına sordu",
     "noOwner": "Sorumlu yok",
-    "openAgent": "{{name}}, ayrıntıları gör",
-    "close": "Kapat",
-    "details": "{{name}} ayrıntıları",
-    "of": "{{name}} tarafından",
-    "does": "Ne yapar",
-    "does_female": "Ne yapar",
-    "canDo": "Neler yapabilir",
-    "canDo_female": "Neler yapabilir",
-    "onlyChat": "Yalnızca konuşma",
     "workingNow": "Şu anda çalışıyor",
     "available": "Müsait",
-    "talk": "Konuş",
-    "edit": "Düzenle",
-    "feedTitle": "Ajanlar arası konuşmalar",
-    "feedWindow": "son 24 sa",
-    "feedEmpty": "Son 24 saatte hiçbir ajan bir başkasından yardım istemedi.",
     "archived": "Arşivlenenler",
-    "consultation": {
-      "open": "Yanıt bekleniyor",
-      "answered": "Yanıtladı",
-      "expired": "Yanıt alamadı",
-      "failed": "Yanıt alamadı"
-    },
     "emptyTitle": "Henüz ajan yok",
     "empty": "Ekibi kurmak için ilk ajanı oluşturun.",
-    "cap": {
-      "drive": "Dosyalar",
-      "issues": "Görevler",
-      "calendar": "Takvim",
-      "schedule": "Rutinler",
-      "forum": "Forum",
-      "wiki": "Wiki",
-      "sandbox": "Bilgisayar",
-      "desktop": "Ekran",
-      "browser": "Tarayıcı",
-      "database": "Veritabanları",
-      "github": "GitHub",
-      "sentry": "Sentry",
-      "linear": "Linear",
-      "mail": "E-posta",
-      "vault": "Vault",
-      "custom": "Çalışma alanı araçları"
+    "list": {
+      "agents": "Ajanlar",
+      "people": "Kişiler",
+      "search": "Ad, rol veya kanala göre arayın",
+      "filterLabel": "Ajanları göster",
+      "filter": {
+        "mine": "Benimkiler",
+        "working": "Şu anda çalışıyor",
+        "waiting": "Sizi bekliyor",
+        "noOwner": "Sorumlu yok"
+      },
+      "groupBy": "Gruplama",
+      "by": {
+        "sector": "Gruplama: departman",
+        "owner": "Gruplama: sorumlu",
+        "none": "Gruplama yok"
+      },
+      "col": {
+        "agent": "Ajan",
+        "role": "Rol",
+        "owner": "Sorumlu",
+        "channels": "Bulunduğu yer",
+        "now": "Şimdi",
+        "menu": "Seçenekler",
+        "person": "Kişi",
+        "roles": "Roller",
+        "caresFor": "İlgilendiği"
+      },
+      "noChannel": "Hiçbir kanalda değil",
+      "none": "Eşleşen ajan yok."
+    },
+    "chart": {
+      "byLabel": "Organizasyon şeması",
+      "byPerson": "Kişiye göre",
+      "bySector": "Departmana göre",
+      "subPerson": "Her ajan, sorumlu kişinin altında, sorumlusu yoksa departmanının liderinin altında.",
+      "subSector": "Her departman ajanlarıyla. {{name}} herkesle çalışır.",
+      "workspace": "Çalışma alanı",
+      "responsible": "Sorumlular: {{names}}"
+    },
+    "map": {
+      "lead": "Ajanlarla kim ilgileniyor, hangi kanallarda bulunuyorlar, her biri kendi başına ne yapıyor ve ne bir kişiyi bekliyor. Kesikli çizgiler son bir günde birbirinden yardım isteyen ajanlardır.",
+      "lodi": "Ekibi sizinle düzenler",
+      "hint": "Bir ajanı başka bir kanala sürükleyin, {{name}} değişikliği uygulamanız için hazırlasın",
+      "proposed": "{{name}} değişikliği konuşmanızda hazırladı. Orada uygulayın.",
+      "open": "Aç",
+      "reasonMove": "Ekip haritasından: {{agent}} #{{from}} kanalından #{{to}} kanalına taşınsın.",
+      "reasonJoin": "Ekip haritasından: {{agent}} #{{to}} kanalına eklensin.",
+      "waiting_one": "{{count}} istek onay bekliyor",
+      "waiting_other": "{{count}} istek onay bekliyor",
+      "moreRoutines_one": "ve {{count}} rutin daha",
+      "moreRoutines_other": "ve {{count}} rutin daha",
+      "empty": "Henüz hiçbir ajan bir kanalda değil.",
+      "others": "Diğer kanallar"
+    },
+    "sectors": {
+      "lead": "Her departmanın bir sorumlusu, bir yedeği, ajanları ve onların kanalları ile rutinleri vardır.",
+      "ask": "{{name}} ile konuşun",
+      "askText": "Ekibi departmanlara ayırmama yardım et.",
+      "leadLabel": "Sorumlu",
+      "backupLabel": "Yedek",
+      "leadOf": "{{name}} sorumlusu",
+      "backupOf": "{{name}} yedeği",
+      "nobody": "Kimse",
+      "none": "Yok",
+      "channels": "Kanallar",
+      "routines": "Rutinler",
+      "leads": "{{name}} sorumlusu",
+      "covers": "{{name}} yedeği",
+      "placeHint": "Bir ajanı oraya koymak için bir departmanın üzerine sürükleyin.",
+      "gap": {
+        "noLead": "Henüz sorumlu yok. Bu departmanla kimin ilgileneceğini seçin.",
+        "noBackup": "Yedek yok. Sorumlu yokken kimse onun yerine bakmaz."
+      },
+      "emptyTitle": "Henüz departman yok",
+      "empty": "Departmanlar ajanları Satış veya Destek gibi alanlara göre düzenler. Herkesin listelerinde bölüm olarak görünürler."
+    },
+    "usage": {
+      "lead": "Bu ay her kişinin ajanları ne kadar kullandığı ve sınırlar.",
+      "settings": "Ayarlar'da da var"
     }
   },
   "sky": {
@@ -1844,6 +1888,12 @@
         "invite": "Kişileri davet et",
         "firstTask": "{{name}} için ilk görevi ver"
       },
+      "style": {
+        "question": "Sizinle nasıl konuşmamı istersiniz?",
+        "text": "Tüm ajanlar için geçerli, hesabınızdan istediğiniz zaman değiştirebilirsiniz.",
+        "simple": "Basit, teknik terim yok",
+        "technical": "Teknik, ayrıntılarıyla"
+      },
       "firstTask": {
         "theo": "İlk haftamızın planını çıkar: her birimiz önce ne yapıyor?",
         "ada": "Bizim için önce neyi geliştirebilir ya da otomatikleştirebilirsin?",
@@ -1968,6 +2018,92 @@
       "open": "Aç",
       "web": "Sitede aç",
       "notAllowed": "Bu ekrana erişiminiz yok"
+    }
+  },
+  "teamWeek": {
+    "title": "Ekibin haftası",
+    "suggestions_one": "{{count}} öneri",
+    "suggestions_other": "{{count}} öneri",
+    "stat": {
+      "done": "biten görev",
+      "stuck": "takıldı",
+      "waiting": "seni bekliyor",
+      "budget": "bu ay {{budget}} bütçenin"
+    },
+    "worked": "İşe yarayanlar",
+    "workedRuns_one": "{{name}}, #{{channel}} kanalında {{count}} iş yaptı",
+    "workedRuns_other": "{{name}}, #{{channel}} kanalında {{count}} iş yaptı",
+    "workedTasks_one": "{{name}} {{count}} görevi kapattı",
+    "workedTasks_other": "{{name}} {{count}} görevi kapattı",
+    "improve": "İyileştirilecekler",
+    "approvals": {
+      "title_one": "{{name}} için {{count}} istek seni bekliyor",
+      "title_other": "{{name}} için {{count}} istek seni bekliyor",
+      "line": "{{since}} tarihinden beri bekliyor.",
+      "action": "Gör ve onayla",
+      "hide": "Gizle"
+    },
+    "budget": {
+      "title": "{{name}} bütçesi: {{from}} → {{to}}",
+      "line_one": "Aylık sınırda {{count}} kez durdu.",
+      "line_other": "Aylık sınırda {{count}} kez durdu."
+    },
+    "channel": {
+      "title": "{{name}} ajanını #{{channel}} kanalına ekle",
+      "line": "{{name}} hiçbir kanalda değil, bu yüzden bütün hafta kimse onunla konuşmadı."
+    },
+    "unanswered": {
+      "title": "#{{channel}} soruları için bir ajan",
+      "line_one": "Bu hafta #{{channel}} kanalında {{count}} soru cevapsız kaldı.",
+      "line_other": "Bu hafta #{{channel}} kanalında {{count}} soru cevapsız kaldı.",
+      "action": "Ajan öner",
+      "message": "Bu hafta #{{channel}} kanalında cevapsız kalan soruları cevaplayacak bir ajan öner.",
+      "done": "{{name}} ajanına soruldu"
+    },
+    "routine": {
+      "title": "{{name}} rutini her gün {{time}}",
+      "line_one": "Bunu bu hafta {{count}} kez istedin: “{{text}}”",
+      "line_other": "Bunu bu hafta {{count}} gün istedin: “{{text}}”",
+      "action": "Rutin oluştur",
+      "done": "Rutin oluşturuldu"
+    },
+    "stalled": {
+      "title": "#{{number}} {{title}} görevindeki adımlar durdu",
+      "line_one": "{{steps}} adımı #{{on}} için {{hours}} saattir bekliyor.",
+      "line_other": "{{steps}} adımları #{{on}} için {{hours}} saattir bekliyor.",
+      "action": "Paralel yürüt",
+      "message": "@{{handle}} {{steps}} adımlarının #{{on}} için beklemesi gerekmiyor. Onlarla paralel devam et.",
+      "messageNoAgent": "{{steps}} adımlarının #{{on}} için beklemesi gerekmiyor. Paralel ilerleyebilirler.",
+      "done": "Mesaj gönderildi"
+    },
+    "applied": "Uygulandı",
+    "undo": "Geri al",
+    "gone": "Artık geçerli değil",
+    "applyAll_one": "Öneriyi uygula",
+    "applyAll_other": "{{count}} öneriyi uygula",
+    "notNow": "Şimdi değil",
+    "dismissed": "Şimdilik bir şey değişmiyor. Hafta hakkında her şeyi burada sorabilirsin.",
+    "change": "Değiştir",
+    "every": {
+      "sun": "Her pazar {{time}}",
+      "mon": "Her pazartesi {{time}}",
+      "tue": "Her salı {{time}}",
+      "wed": "Her çarşamba {{time}}",
+      "thu": "Her perşembe {{time}}",
+      "fri": "Her cuma {{time}}",
+      "sat": "Her cumartesi {{time}}"
+    },
+    "off": "Kapalı",
+    "schedule": {
+      "title": "Ne zaman gelir",
+      "day": "Gün",
+      "hour": "Saat",
+      "stop": "Almayı bırak",
+      "start": "Yeniden al"
+    },
+    "settings": {
+      "label": "Ekibin haftası",
+      "help": "{{name}} her hafta DM’inde ekibin nasıl geçtiğini ve neyin iyileştirilebileceğini anlatır. Yalnızca yöneticiler alır."
     }
   },
   "routing": {
@@ -3179,7 +3315,9 @@
       "browser": "Tarayıcıda size ihtiyacı var",
       "desktop": "Bilgisayarda size ihtiyacı var",
       "proposal": "Bir değişiklik öneriyor",
-      "agent": "Yeni bir ajan öneriyor"
+      "agent": "Yeni bir ajan öneriyor",
+      "team": "Bir ekip öneriyor",
+      "firstTask": "İlk görev"
     },
     "waitingYou": "sizi bekliyor",
     "waitingFor": "{{name}} bekleniyor",
@@ -3194,6 +3332,8 @@
       "desktop": "<b>{{name}}</b> bilgisayarda size ihtiyaç duyuyor · {{what}}",
       "proposal": "<b>{{name}}</b> bir değişiklik öneriyor · {{what}}",
       "agent": "<b>{{name}}</b> yeni bir ajan öneriyor · {{what}}",
+      "team": "<b>{{name}}</b> bir ekip öneriyor · {{what}}",
+      "firstTask": "<b>{{name}}</b> ilk görevi öneriyor · {{what}}",
       "more": "+{{count}}",
       "see": "Gör"
     }
@@ -3419,6 +3559,11 @@
   },
   "notifications": {
     "title": "Bildirimler",
+    "planLent": {
+      "takeBack": "Geri al",
+      "takeBackAll": "Tüm ajanlardan geri al",
+      "done": "Planın geri geldi"
+    },
     "docTitleUnread": "({{count}}) Bildirimler",
     "summaryWaiting_one": "Sizi bekleyen {{count}} şey var",
     "summaryWaiting_other": "Sizi bekleyen {{count}} şey var",
@@ -3464,17 +3609,6 @@
       "stoppedForF": "{{time}} süredir durdu",
       "stoppedForM": "{{time}} süredir durdu",
       "openThread": "Sohbeti aç",
-      "table": "sizi masaya çağırdı",
-      "roundWaits": "Tur {{time}} bekliyor",
-      "yourTurn": "Tur {{round}}/{{rounds}} · konuşma sırası sizde",
-      "yourTurnNoRound": "Konuşma sırası sizde",
-      "seatYou": "Siz",
-      "seatYours": "sıra sizde",
-      "seatSpoke": "konuştu",
-      "seatPassed": "pas geçti",
-      "seatLater": "sonra",
-      "speak": "Masada konuşun",
-      "pass": "Sıranızı pas geçin",
       "approval": "onay istiyor",
       "decide": "Onaylar bölümünde karar verin",
       "wants": "<b>{{name}}</b> şunu yapmak istiyor: <b>{{action}}</b>",
@@ -3494,8 +3628,7 @@
         "send": "dışarıya mesaj gönderme",
         "draft": "taslak kaydetme"
       },
-      "resolved": "{{name}} yanıtınızı aldı ve işine döndü",
-      "resolvedForum": "Sıranız turda yerini aldı"
+      "resolved": "{{name}} yanıtınızı aldı ve işine döndü"
     },
     "what": {
       "mention": "<b>{{name}}</b> sizden bahsetti",
@@ -3514,8 +3647,6 @@
       "issueComment_other": "<b>{{names}}</b> takip ettiğiniz bir göreve yorum yaptı",
       "issueStatus": "<b>{{name}}</b> takip ettiğiniz bir görevi taşıdı",
       "issueDone": "<b>{{name}}</b> takip ettiğiniz bir görevi bitirdi",
-      "forumTurn": "<b>{{name}}</b> sizi masaya çağırdı",
-      "forumSynthesis": "<b>{{name}}</b> konunuzun sentezini yayınladı",
       "approval": "<b>{{name}}</b> onay istedi",
       "missionFinished": "<b>{{name}}</b> bir misyonu bitirdi",
       "missionStopped": "<b>{{name}}</b> bir misyonu durdurdu",
@@ -3531,6 +3662,7 @@
       "agentUnreached": "Bir rutin <b>{{name}}</b> ajanını çağıramadı",
       "browserProfileRequest": "<b>{{name}}</b>, <b>{{agent}}</b> için bir tarayıcı profili daha istiyor",
       "desktopTaken": "<b>{{name}}</b>, <b>{{agent}}</b> ajanının bilgisayar ekranını devraldı",
+      "planLent": "<b>{{name}}</b>, {{plan}} planını <b>{{agent}}</b> ajanına bağladı",
       "routineWaitingPlan": "<b>{{name}}</b> bir rutini çalıştırmak için planının sıfırlanmasını bekliyor",
       "planResetUnknown": "{{plan}} sınırının ne zaman sıfırlanacağını söylemedi. <b>{{name}}</b> ajanının işi hâlâ bekliyor.",
       "catchUpClosed_one": "<b>{{name}}</b> döndü ve yanıt gerektirmeyen {{count}} konuşmayı atladı",
@@ -3563,8 +3695,7 @@
       "usageLimitReached": "<b>{{name}}</b> {{amount}} limitine ulaştı",
       "usageLimitRequest": "<b>{{name}}</b> {{amount}} limitine ulaştı ve daha fazlasını istiyor",
       "usageLimitRaised": "<b>{{name}}</b> bu ayki limitini artırdı",
-      "usageLimitRefused": "<b>{{name}}</b> daha fazla kullanım isteğini reddetti",
-      "planLent": "<b>{{name}}</b>, {{plan}} planını <b>{{agent}}</b> ajanına bağladı"
+      "usageLimitRefused": "<b>{{name}}</b> daha fazla kullanım isteğini reddetti"
     },
     "usageLimit": {
       "runs_one": "Bu ay {{count}} istek",
@@ -3582,7 +3713,6 @@
       "threadOnly": "İleti dizisi",
       "dm": "Doğrudan mesaj",
       "issue": "Görev #{{number}}",
-      "forum": "Forum",
       "mission": "Misyon",
       "routine": "Rutin",
       "approval": "Onay",
@@ -3638,7 +3768,6 @@
       "channel": "#{{channel}} kanalında yanıtla",
       "issue": "#{{number}} görevine yorum yap",
       "issueNoNumber": "Göreve yorum yap",
-      "forum": "Bir iki cümleyle görüşünüz",
       "reply": "Yanıtla",
       "sends": "gönderir",
       "closes": "kapatır",
@@ -3666,9 +3795,6 @@
       "sent": "Yanıt gönderildi",
       "see": "Gör",
       "answered": "{{name}} yanıtınızı aldı",
-      "spoke": "Sıranız turda yerini aldı",
-      "passed": "Sıranızı pas geçtiniz",
-      "passedDetail": "Tur devam ediyor. Sentez çıktığında buraya gelir.",
       "decideThere": "Bu isteğe Onaylar bölümünde karar verilir"
     },
     "calmTitle": "Her şey güncel",
@@ -3677,12 +3803,7 @@
     "noneUnread": "Hepsi okundu.",
     "noneHere": "Şimdilik burada bir şey yok.",
     "noneDone": "Son 30 günde tamamlandı olarak işaretlenen bir şey yok.",
-    "more": "Daha fazla göster",
-    "planLent": {
-      "takeBack": "Geri al",
-      "takeBackAll": "Tüm ajanlardan geri al",
-      "done": "Planın geri geldi"
-    }
+    "more": "Daha fazla göster"
   },
   "approvals": {
     "title": "Onaylar",
@@ -3961,6 +4082,7 @@
         "accountMove": "{{agents}} kullanıyor · Buraya taşı",
         "accountAlso": "{{agents}} da kullanıyor",
         "accountOf": "{{name}} hesabı",
+        "accountOthers": "Başkalarının planları kimin olduğunu gösterir. Sahibi bir e-posta alır ve geri alabilir.",
         "addAccount": "Hesap ekle",
         "signInAgain": "Yeniden giriş yap",
         "connectPlan": "Başka bir plan bağla",
@@ -4119,8 +4241,7 @@
           "sendFailed": "Kod gönderilemedi. Kontrol edip tekrar deneyin.",
           "done": "{{account}} hesabı {{computer}} üzerinde. Kaydetmek için Kullan'a tıklayın."
         },
-        "offCloud": "{{computer}} yanıt vermiyor",
-        "accountOthers": "Başkalarının planları kimin olduğunu gösterir. Sahibi bir e-posta alır ve geri alabilir."
+        "offCloud": "{{computer}} yanıt vermiyor"
       },
       "computer": {
         "title": "{{name}} nerede çalışsın?",
@@ -4202,7 +4323,7 @@
       "machine": "Bilgisayar",
       "brain": "Düşünen yapay zeka",
       "repos": "GitHub depoları",
-      "group": "Grup",
+      "group": "Departman",
       "handle": "Bahsetmeler"
     },
     "lines": {
@@ -4713,8 +4834,8 @@
       "pm": {
         "name": "Ürün Yöneticisi",
         "agent": "Theo",
-        "desc": "Görevleri, özetleri ve forumu düzenler.",
-        "instructions": "Önce araştırır (görevler, ileti dizileri, wiki, geri bildirimler) ve yalnızca eksik kalanı sorar.\nGörevleri düzenler, uzun tartışmaları özetler ve yol haritasını güncel tutar.\nHer cuma haftanın özetini foruma yazar."
+        "desc": "Görevleri ve özetleri düzenler.",
+        "instructions": "Önce araştırır (görevler, ileti dizileri, wiki, geri bildirimler) ve yalnızca eksik kalanı sorar.\nGörevleri düzenler, uzun tartışmaları özetler ve yol haritasını güncel tutar."
       },
       "support": {
         "name": "Destek",
@@ -5234,10 +5355,6 @@
       "title": "{{name}} ile doğrudan mesaj",
       "text": "Doğrudan mesajlar henüz gelmedi. Şimdilik {{name}} ile bir kanalda konuşun."
     },
-    "forum": {
-      "title": "Forum",
-      "text": "Uzun tartışmalar ve çalışma alanı duyuruları burada olacak."
-    },
     "search": {
       "title": "Çalışma alanında ara",
       "text": "Mesajlarda, görevlerde ve dosyalarda arama burada görünecek.",
@@ -5366,10 +5483,6 @@
     "wiki_write": {
       "label": "Wiki'ye yazma",
       "description": "Yalnızca bir kişi istediğinde wiki sayfası oluşturma ve düzenleme."
-    },
-    "forum_write": {
-      "label": "Forum",
-      "description": "Forum konusu açma, okuma ve kendi sırası dışında yazma."
     },
     "schedule_write": {
       "label": "Zamanlama",
@@ -5647,8 +5760,9 @@
     "createdBy": "#{{number}} · oluşturan: {{name}}",
     "createdByShort": "Oluşturan: {{name}}",
     "fromMessage": "<0>#{{channel}} kanalındaki bir mesajdan</0>",
-    "fromForum": "bir forum konusundan",
     "fromAgent": "bir ajana yapılan bir istekten",
+    "subIssues_one": "Alt görevler · {{count}}",
+    "subIssues_other": "Alt görevler · {{count}}",
     "fromWebhook": "bir {{provider}} olayından",
     "description": "Açıklama",
     "noDescription": "Açıklama yok.",
@@ -5736,9 +5850,7 @@
       "artifact_linked": "bir dosya ekledi",
       "criterion_checked": "\"{{text}}\" kriterini işaretledi",
       "criterion_unchecked": "\"{{text}}\" kriterinin işaretini kaldırdı",
-      "agent_asked": "{{name}} ajanından yapmasını istedi",
-      "forum_opened": "foruma taşıdı: {{title}}",
-      "forum_evaluated": "forumun sonucunu geri getirdi: {{title}}"
+      "agent_asked": "{{name}} ajanından yapmasını istedi"
     }
   },
   "routines": {
@@ -5824,8 +5936,6 @@
     "widgetChip": "Pano widget'ı",
     "widgetFixed": "Ne gösterdiği, ne zaman güncellendiği ve kimin ilgilendiği widget'ından değiştirilir.",
     "target": {
-      "forum": "Bir forum konusu",
-      "forumShort": "Forum",
       "dm": "Ajanla doğrudan mesajım",
       "artifact": "Drive'da bir belge",
       "dmShort": "DM",
@@ -5925,7 +6035,6 @@
         "thread": "Her çalıştırma aynı ileti dizisinde yanıt verir",
         "channel": "Kanaldaki herkes görür",
         "dm": "Yalnızca siz görürsünüz",
-        "forum": "Ajanlar bir forum konusunda tartışır",
         "artifact": "Drive'da bir belgeye dönüşür",
         "widget": "Widget'ını günceller, mesaj göndermez"
       },
@@ -6012,7 +6121,6 @@
       "keepUtc": "UTC'de kalsın",
       "adjust": "Ayarla",
       "next": "Sonrakiler",
-      "forumAgents": "Tartışan ajanlar",
       "agent": "Ajan",
       "target": "Nereye gönderilsin",
       "what": "Ne yapılsın",
@@ -7112,6 +7220,49 @@
     "list": "Modeller",
     "picks": "{{provider}} · İyi seçenekler"
   },
+  "endpoint": {
+    "option": "Başka bir sağlayıcı",
+    "optionSub": "OpenAI veya Claude uyumlu: bir ağ geçidi, Ollama, vLLM, LM Studio, LiteLLM",
+    "name": "Ad",
+    "namePlaceholder": "Ağ geçidim",
+    "style": "API",
+    "styles": {
+      "openai": "OpenAI (Chat Completions)",
+      "anthropic": "Claude (Messages)"
+    },
+    "address": "Adres",
+    "addressHelp": "API'nin temel adresi, örneğin {{example}}",
+    "key": "API anahtarı",
+    "keyHelp": "Sunucu anahtar istemiyorsa boş bırakın.",
+    "fetch": "Modelleri getir",
+    "listFailed": "Sunucu hiç model listelemedi ({{error}}). Her modelin kimliğini aşağıya yazın.",
+    "choose": "Ajanların kullanabileceği modelleri seçin",
+    "addModel": "Model ekle",
+    "add": "Ekle",
+    "modelPlaceholder": "Model kimliği, örneğin llama-4",
+    "modelInvalid": "Bu bir model kimliğine benzemiyor.",
+    "priceIn": "{{model}}: giriş fiyatı",
+    "priceOut": "{{model}}: çıkış fiyatı",
+    "priceInShort": "Giriş",
+    "priceOutShort": "Çıkış",
+    "priceUnit": "Milyon token başına US$",
+    "priceBoth": "Girişi ve çıkışı doldurun ya da ikisini de boş bırakın.",
+    "priceInvalid": "0.50 gibi bir sayı kullanın",
+    "unpriced": "Fiyatı olmayan bir model bütçelerde bir şey tutmaz: yalnızca token'ları sayılır.",
+    "save": "Kaydet ve test et",
+    "saveModels": "Kaydet ve yeniden test et",
+    "testing": "Her model test ediliyor…",
+    "results": "Her modelin testi",
+    "check": {
+      "ok": "Çalışıyor, araçlarla",
+      "noTools": "Yanıt veriyor ama araç kullanmadı. Ajanların çalışmak için araçlara ihtiyacı var.",
+      "failed": "Başarısız: {{error}}"
+    },
+    "done": "Bitti",
+    "models": "Modeller",
+    "modelsTitle": "{{name}} modelleri",
+    "budgetUnpriced": "Bu ajanın modelinin fiyatı yok, bu yüzden bütçesi harcadığını sayamaz. Token'ları sayılır."
+  },
   "timezone": {
     "search": "Saat dilimi ara",
     "searchPlaceholder": "Şehir, ülke, UTC−3…",
@@ -7990,7 +8141,6 @@
     "inviteKeywords": "davet davetiye davetler üye üyeler kişi kişiler ekip invite invitation member people team",
     "wikiPage": "wiki sayfası",
     "wikiNew": "Yeni wiki sayfası",
-    "forum": "forum konusu",
     "jump": "Git…",
     "open": "Bir yere gidin ya da bir ajana sorun",
     "placeholder": "Bir yere gidin ya da bir ajana sorun…",
@@ -8006,499 +8156,6 @@
     "newConversation": "yeni konuşma",
     "askLabel": "{{name}}, {{text}}",
     "empty": "“{{q}}” için sonuç yok."
-  },
-  "forum": {
-    "title": "Forum",
-    "subtitle": "Hedefi olan bir soru. Ajanlar onu turlar hâlinde, sırayla tartışır ve bir sentezle kapatır.",
-    "guard": "Çalışma alanındaki herkes okuyabilir. Her sıra normal bir çalıştırmadır: araçlar ve onaylar geçerlidir.",
-    "new": "Yeni konu",
-    "filters": "Konuları filtrele",
-    "filter": {
-      "open": "Tartışılıyor",
-      "done": "Sonuçlandı",
-      "mine": "Benim"
-    },
-    "listTitle": {
-      "open": "Tartışılıyor",
-      "done": "Sonuçlandı",
-      "mine": "Konularım"
-    },
-    "agentFilter": "Ajanlar",
-    "agentCount_one": "{{count}} ajan",
-    "agentCount_other": "{{count}} ajan",
-    "search": "Forumda ara",
-    "clearFilters": "Filtreleri temizle",
-    "emptyFilter": "Bu filtrelerle eşleşen konu yok.",
-    "liveNow": "Şu anda tartışılıyor",
-    "needsYou": "Size ihtiyaç var",
-    "status": {
-      "open": "Tartışılıyor",
-      "stalled": "Takıldı",
-      "reopened": "Yeniden açıldı",
-      "done": "Sonuçlandı",
-      "canceled": "İptal edildi"
-    },
-    "reopenedBy": "{{name}} tarafından yeniden açıldı",
-    "roundOf": "tur {{round}}/{{rounds}}",
-    "rounds_one": "{{count}} tur",
-    "rounds_other": "{{count}} tur",
-    "until": "son tarih: {{when}}",
-    "noDeadline": "son tarih yok",
-    "deadlineToday": "bugün, {{time}}",
-    "deadlineTomorrow": "yarın, {{time}}",
-    "you": "{{name}} (siz)",
-    "empty": {
-      "title": "Henüz konu yok",
-      "text": "Ajanların turlar hâlinde tartışması için zor bir soru getirin. Bunu sohbetten de yapabilirsiniz: “@ajan bunu foruma taşı”."
-    },
-    "live": {
-      "writing": "{{name}} yazıyor",
-      "reading": "{{name}} tartışmayı okuyor",
-      "yourTurn": "Sıra sizde",
-      "waiting": "{{name}} bekleniyor",
-      "synthesis": "{{name}} sentezi yazıyor",
-      "stalled": "{{name}} sırasında takıldı",
-      "stalledSynthesis": "Sentezde takıldı",
-      "next": "sıradaki: {{name}}",
-      "thenSynthesis": "sonra: sentez"
-    },
-    "need": {
-      "turnTitle": "“{{title}}” konusunda sıra sizde",
-      "turn": "{{round}}. turda sıra sizde. Tur sizi bekliyor.",
-      "turnDeadline": "{{round}}. turda sıra sizde. {{when}} zamanına kadar konuşmazsanız tartışma sizsiz devam eder.",
-      "speak": "Şimdi konuş",
-      "issues_one": "Sentez {{count}} görev öneriyor. Yalnızca biri onaylarsa oluşturulur.",
-      "issues_other": "Sentez {{count}} görev öneriyor. Yalnızca biri onaylarsa oluşturulurlar.",
-      "planIssues_one": "Plan {{count}} görev öneriyor. Yalnızca biri onaylarsa oluşturulur.",
-      "planIssues_other": "Plan {{count}} görev öneriyor. Yalnızca biri onaylarsa oluşturulurlar.",
-      "subIssues_one": "Plan #{{number}} içinde {{count}} alt görev öneriyor. Yalnızca biri onaylarsa oluşturulur.",
-      "subIssues_other": "Plan #{{number}} içinde {{count}} alt görev öneriyor. Yalnızca biri onaylarsa oluşturulurlar.",
-      "review": "Görevleri incele",
-      "budget": "{{name}} bütçesini tüketti ve sonraki sıralarını atlayacak.",
-      "budget_female": "{{name}} bütçesini tüketti ve sonraki sıralarını atlayacak.",
-      "seeBudget": "Bütçeyi gör",
-      "stalled": "Takıldı: biri devam ettirene kadar kimse konuşmuyor.",
-      "resume": "Devam ettir"
-    },
-    "row": {
-      "canceled": "Sentez olmadan iptal edildi."
-    },
-    "origin": {
-      "direct": "Doğrudan forumda",
-      "agent": "{{name}}, #{{channel}}",
-      "agentNoChannel": "Açan: {{name}}",
-      "suggestion": "öneren: {{name}}",
-      "suggestionIn": "öneren: {{name}}, #{{channel}} kanalında",
-      "issue": "Görev #{{number}}",
-      "issueBy": "Görev #{{number}} · isteyen: {{name}}",
-      "routine": "Rutin",
-      "conversation": "Bir konuşma"
-    },
-    "track": {
-      "label_one": "{{count}} ajan sırası, {{rounds}}",
-      "label_other": "{{count}} ajan sırası, {{rounds}}",
-      "spoke": "Tur {{round}} · {{name}} · {{stance}}",
-      "spokeNoStance": "Tur {{round}} · {{name}}",
-      "person": "Tur {{round}} · {{name}} katıldı",
-      "seat": "Tur {{round}} · {{name}} sırasında konuştu",
-      "passed": "Tur {{round}} · {{name}} pas geçti",
-      "waiting": "Tur {{name}} bekliyor",
-      "waitingMe": "Tur sizi bekliyor",
-      "seatPending": "Tur {{round}} · sıra {{name}} için",
-      "live": "{{name}} yazıyor",
-      "sleep": "{{name}} sırasında takıldı",
-      "synthesis": "Sentez: {{name}}",
-      "synthesisLive": "{{name}} sentezi yazıyor",
-      "skipped": "Tur {{round}} · {{name}} konuşmadı",
-      "budget": "Tur {{round}} · {{name}} atladı: ajanın bütçesi bitti",
-      "pending": "Tur {{round}} · sıra {{name}} için",
-      "round": "Tur {{n}}",
-      "roundShort": "T{{n}}",
-      "key": "Her sütun bir sıradır, konuşanın renginde. Yüksekliği sıranın uzunluğudur.",
-      "keyLive": "Figür şu anda konuşandır. Noktalar kalan sıralardır.",
-      "keyDone": "Sondaki geniş blok sentezdir.",
-      "keyClick": "Sıraya gitmek için tıklayın."
-    },
-    "stance": {
-      "propose": "Öneriyor",
-      "agree": "Aynı fikirde: {{name}}",
-      "agreeAny": "Aynı fikirde",
-      "disagree": "Aynı fikirde değil: {{name}}",
-      "disagreeAny": "Aynı fikirde değil",
-      "shift": "Görüşünü değiştiriyor",
-      "ask": "Soruyor",
-      "askPeople": "Kişilere soruyor",
-      "reply": "Yanıt veriyor: {{name}}",
-      "replyAny": "Yanıt veriyor",
-      "people": "kişiler"
-    },
-    "topic": {
-      "back": "Forum",
-      "goal": "Hedef",
-      "responsible": "Sorumlu",
-      "requestedBy": "İsteyen",
-      "reopenedFor": "{{round}}. tur için {{name}} tarafından yeniden açıldı",
-      "conclude": "Sonuçlandır",
-      "concluding": "Sonuçlandırılıyor…",
-      "more": "Diğer işlemler",
-      "copyLink": "Bağlantıyı kopyala",
-      "linkCopied": "Bağlantı kopyalandı. Açan kişi konunun tamamını okur.",
-      "editParticipants": "Katılımcıları düzenle",
-      "cancel": "Konuyu iptal et",
-      "notFound": "Konu bulunamadı."
-    },
-    "table": {
-      "title": "Masa",
-      "order": "bu sırayla, her turda bir kez konuşur",
-      "orderDone": "bu sırayla konuştu",
-      "writes": "sentezi yazar",
-      "writesPlan": "planı yazar",
-      "seatedPerson": "kişi · masada",
-      "next": "sıradaki",
-      "yourTurn": "Sıra sizde",
-      "waits": "tur bekliyor",
-      "writing": "yazıyor",
-      "reading": "tartışmayı okuyor…",
-      "rereading": "turları yeniden okuyor…",
-      "writingSynthesis": "sentezi yazıyor",
-      "stopped": "burada durdu",
-      "broke": "bütçesi bitti, sırasını atlıyor",
-      "wroteSynthesis": "sentezi yazdı",
-      "spokeAt": "{{time}} saatinde konuştu",
-      "passed": "pas geçti",
-      "notYet": "henüz konuşmadı",
-      "readsCanEnter": "okur ve katılabilir",
-      "entered": "{{round}}. turda katıldı",
-      "sits": "masada",
-      "orgReads": "tüm çalışma alanı okur"
-    },
-    "posts": {
-      "round": "Tur {{n}}",
-      "startedWith": "{{name}} ile başladı",
-      "spokeCount": "{{total}} katılımcıdan {{said}} tanesi konuştu",
-      "none": "İlk {{name}} konuşur. İlk tur başladı.",
-      "person": "kişi",
-      "starts": "{{round}}. tur burada başlar",
-      "started": "{{round}}. tur burada başladı",
-      "last": "Bu son turdu: gönderi sentezde yer alır",
-      "askedRound": "Yeni bir tur istedi",
-      "inTurn": "Sırasında",
-      "reroundFrom": "Buradan bir tur iste",
-      "replyTo": "{{name}} gönderisine git",
-      "budgetSkip": "{{name}} sırasını atladı: ajanın bütçesi bitti.",
-      "passedTurn": "{{name}} pas geçti.",
-      "didntSpeak_one": "{{names}} bu turda konuşmadı.",
-      "didntSpeak_other": "{{names}} bu turda konuşmadı.",
-      "stopped": "Sıranın ortasında durdu.",
-      "comments": "Yorumlar",
-      "afterSynthesis": "sentezden sonra"
-    },
-    "liveTurn": {
-      "writing": "yazıyor · tur {{round}}",
-      "reading": "tartışmayı okuyor · tur {{round}}",
-      "synthesis": "sentezi yazıyor",
-      "rereading": "turları yeniden okuyor",
-      "readingLine": "Tartışma okunuyor…",
-      "waitsFor": "Tur, masada oturan {{name}} katılımcısını bekliyor.",
-      "yourTurn": "Sıra sizde",
-      "yourTurnSub": "tur {{round}} · tur sizi bekliyor",
-      "yourTurnPlaceholder": "Ne düşünüyorsunuz? Ajanlar bunu bir sonraki sıradan önce okur.",
-      "pass": "Pas geç",
-      "send": "Gönder",
-      "deadline": "{{when}} zamanına kadar konuşmazsanız tartışma sizsiz devam eder.",
-      "passed": "Pas geçtiniz. Tur bu sefer sizsiz devam ediyor.",
-      "spoke": "Sıranızda konuştunuz. Tur masadaki sırayla devam ediyor."
-    },
-    "stalled": {
-      "title": "{{name}} sırasında takıldı",
-      "titleSynthesis": "Sentezde takıldı",
-      "stopped": "{{name}} sırayı durdurdu. Biri devam ettirene kadar kimse konuşmuyor.",
-      "stoppedAnon": "Sıra durduruldu. Biri devam ettirene kadar kimse konuşmuyor.",
-      "failed": "Sıra başarısız oldu. Tekrar deneyin ya da söylenenlerle sonuçlandırın.",
-      "resume": "Devam ettir",
-      "retry": "Tekrar dene",
-      "concludeNow": "Şimdi sonuçlandır",
-      "resumed": "Konu devam ettirildi."
-    },
-    "closed": {
-      "canceled": "Sentez olmadan iptal edildi. Gönderiler herkesin okuması için burada kalır.",
-      "synthesizing": "{{name}} sentezi yazıyor. Bu konuda başka kimse konuşmuyor."
-    },
-    "composer": {
-      "label": "Tartışmaya katılın",
-      "placeholder": "Tartışmaya katılın…",
-      "hint": "İstediğiniz zaman katılabilirsiniz: mevcut sıra biter ve sonraki tur sizin gönderinizden başlar.",
-      "hintLast": "İstediğiniz zaman katılabilirsiniz: mevcut sıra biter ve bu son turda gönderiniz doğrudan sentezde yer alır.",
-      "moreRound": "Gönderinizden itibaren bir tur daha",
-      "send": "Gönder",
-      "sent": "Gönderiniz eklendi: sonraki tur ondan başlar.",
-      "sentLast": "Gönderiniz sentezde yer alır.",
-      "commentLabel": "Yorum",
-      "commentPlaceholder": "Yorum yapın…",
-      "comment": "Yorum yap",
-      "commentAndRound": "Yorum yap ve tur iste",
-      "commented": "Yorum gönderildi. Konu sonuçlanmış olarak kalır.",
-      "reround": "Bu yorumdan itibaren yeni bir tur iste",
-      "doneHint": "Konu sonuçlandı: tur istemediğiniz sürece yorum yapmak onu yeniden açmaz.",
-      "reroundHint": "Masadaki ajanlar yorumunuza yeni bir turda yanıt verir ve {{name}} sentezi yeniden yazar."
-    },
-    "newRound": {
-      "title": "Yeni bir tur iste",
-      "text": "{{round}}. tur yorumunuzdan başlar ve konu sizin adınıza yeniden açılır.",
-      "textFrom": "{{round}}. tur bu yorumdan başlar ve konu sizin adınıza yeniden açılır.",
-      "note": "Eklemek istedikleriniz",
-      "notePlaceholder": "İsteğe bağlı: ajanların yeniden bakması gereken şey",
-      "defaultBody": "Bu yorumdan itibaren yeni bir tur istedim.",
-      "who": "Kim yanıtlar",
-      "whoHint": "masadaki sırayla",
-      "speaksAt": "{{n}}. sırada konuşur",
-      "broke": "bütçesi bitti: sırasını atlayacak",
-      "ok": "Tur iste",
-      "done": "Konu yeniden açıldı: {{round}}. tur."
-    },
-    "conclude": {
-      "title": "Konu sonuçlandırılsın mı?",
-      "text": "Kimse yeni bir sıraya başlamaz. Söylenenler sentez olur.",
-      "finishes": "{{name}} sırasını bitirir",
-      "finishes_female": "{{name}} sırasını bitirir",
-      "finishesSub": "Şimdi onun sırası. Ondan sonra başka kimse konuşmaz.",
-      "nobody": "Şu anda kimse yazmıyor",
-      "nobodySub": "Sentez hemen başlar.",
-      "writes": "Sentezi {{name}} yazar",
-      "writesSub": "Karar, herkesin artıları ve eksileri, açık sorular, sonraki adımlar ve önerilen görevler.",
-      "writesSubPlan": "Hedef, kapsama girenler ve girmeyenler, adımlar, riskler, nasıl ölçüleceği ve adım başına görevler.",
-      "goes": "Drive'da bir belge olur ve geldiği yere geri döner",
-      "goesSub": "Önerilen görevler yalnızca biri onaylarsa oluşturulur.",
-      "keep": "Tartışmaya devam et",
-      "ok": "Sonuçlandır",
-      "done": "Sonuçlandırılıyor: sentez burada ve Drive'da görünecek."
-    },
-    "cancel": {
-      "title": "Sentez olmadan iptal edilsin mi?",
-      "text": "Artık kimse konuşmaz ve Drive'a hiçbir şey gitmez. Gönderiler herkesin okuması için burada kalır.",
-      "keep": "Konuyu koru",
-      "ok": "Konuyu iptal et",
-      "done": "Konu iptal edildi. Gönderiler forumda kalır."
-    },
-    "side": {
-      "title": "Herkes nerede duruyor",
-      "titleDone": "Herkes nerede kaldı",
-      "agree_one": "{{total}} katılımcıdan {{count}} tanesi aynı fikirde",
-      "agree_other": "{{total}} katılımcıdan {{count}} tanesi aynı fikirde",
-      "withProposal": "masadaki öneriyle",
-      "withDecision": "kararla",
-      "askers_one": "{{names}} aklında bir soruyla kaldı",
-      "askers_other": "{{names}} akıllarında bir soruyla kaldı",
-      "agents": "Her ajan",
-      "notYet": "Henüz konuşmadı",
-      "firstWriting": "İlk sıra yazılıyor…",
-      "writingNow": "şimdi yazıyor…",
-      "broke": "bütçesi bitti: sırasını atlıyor",
-      "spoke": "konuştu",
-      "laneKey": "Her tur için bir kare. Yukarı: masadaki önerinin lehine. Aşağı: aleyhine. Orta: bir soru.",
-      "laneLabel": "{{name}}: {{list}}",
-      "laneEmpty": "{{name}}: sıra yok",
-      "laneRound": "tur {{round}}: {{stance}}",
-      "laneLive": "tur {{round}}: yazıyor",
-      "details": "Ayrıntılar",
-      "rounds": "Turlar",
-      "roundsDone": "{{round}}/{{rounds}}",
-      "format": "Biçim",
-      "deadline": "Son tarih",
-      "origin": "Kaynak",
-      "openedBy": "Açan",
-      "participants": "Katılımcılar"
-    },
-    "format": {
-      "decision": "Karar",
-      "plan": "Plan",
-      "decisionHint": "Bir karar: herkesin artıları ve eksileri, açık sorular ve sonraki adımlarla.",
-      "planHint": "Bir plan: kapsama girenler ve girmeyenler, kimin yapacağıyla birlikte sıralı adımlar, riskler ve nasıl ölçüleceği. Adımlar görev olur."
-    },
-    "formatLower": {
-      "decision": "karar",
-      "plan": "plan"
-    },
-    "synthesis": {
-      "eyebrow": "Sentez",
-      "eyebrowPlan": "Plan",
-      "closed": "{{name}} konuyu kapattı",
-      "closedPlan": "{{name}} planı kapattı",
-      "rewrote": "{{name}} sentezi yeniden yazdı",
-      "meta": "{{agents}} ajandan {{posts}} sıra",
-      "metaPeople": "{{agents}} ajandan ve kişilerden {{posts}} sıra",
-      "version": "sürüm {{n}}",
-      "versionN": "Sürüm {{n}}",
-      "decision": "Karar",
-      "objective": "Hedef",
-      "prosCons": "Herkesin artıları ve eksileri",
-      "why": "Neden",
-      "openQuestions": "Açık sorular",
-      "nextSteps": "Sonraki adımlar",
-      "forRequester": "{{name}} için:",
-      "inScope": "Kapsama girenler",
-      "outOfScope": "Kapsama girmeyenler",
-      "steps": "Sırasıyla adımlar",
-      "after": "{{n}}. adımdan sonra",
-      "startNow": "hemen başlayabilir",
-      "risks": "Riskler",
-      "metrics": "Nasıl ölçülür",
-      "changes": "Sürüm {{n}} · neler değişti",
-      "showV": "{{n}}. sürümü gör",
-      "hideV": "{{n}}. sürümü gizle",
-      "replaced": "{{round}}. turdan sonra değiştirildi",
-      "none": "yok",
-      "issues": "Önerilen görevler",
-      "subIssues": "#{{number}} içinde önerilen alt görevler",
-      "marked": "{{total}} öğeden {{on}} tanesi işaretli",
-      "allCreated": "hepsi oluşturuldu",
-      "goesTo": "atanan: {{name}}",
-      "with": "birlikte: {{name}}",
-      "step": "adım {{n}}",
-      "approveTitle": "{{name}} önerir, bir kişi onaylar",
-      "approveText": "Siz olmadan hiçbir şey oluşturulmaz. Her görev zaten adı geçen kişiye gider.",
-      "approveTextPlan": "Her adım, kimin yapacağı belli bir alt görev olur. Siz olmadan hiçbir şey oluşturulmaz.",
-      "create_one": "{{count}} görev oluştur",
-      "create_other": "{{count}} görev oluştur",
-      "createSub_one": "#{{number}} içinde {{count}} alt görev oluştur",
-      "createSub_other": "#{{number}} içinde {{count}} alt görev oluştur",
-      "created_one": "{{count}} görev oluşturuldu.",
-      "created_other": "{{count}} görev oluşturuldu.",
-      "createdSub_one": "#{{number}} içinde {{count}} alt görev oluşturuldu.",
-      "createdSub_other": "#{{number}} içinde {{count}} alt görev oluşturuldu.",
-      "wentTo": "Nereye gitti",
-      "backIssue": "#{{number}} numaralı göreve geri döner",
-      "backIssueDone": "#{{number}} numaralı göreve geri döndü: plan + {{count}} alt görev",
-      "backChannel": "Geldiği konuşmaya geri döndü",
-      "backNone": "Forumda kalır",
-      "saveWiki": "Wiki'ye kaydet"
-    },
-    "form": {
-      "title": "Yeni konu",
-      "fromIssue": "Forumda değerlendir",
-      "editSuggestion": "Öneriyi düzenle",
-      "subtitle": "Ajanlar masadaki sırayla tek tek konuşur ve ilki sentezi yazar.",
-      "templatesText": "Bir şablondan ya da sıfırdan başlayın. Açmadan önce her şeyi değiştirebilirsiniz.",
-      "tip": "İpucu: sohbette “@ajan bunu foruma taşı” yazmak da bir konu açar.",
-      "templateMeta": "{{rounds}} · {{format}}",
-      "templates": {
-        "tech": {
-          "title": "Teknik karar",
-          "text": "Riskler ve bir planla bir seçenek seçin.",
-          "goal": "Bir seçenek seçin ve nedenini risklerle ve sonraki adımlarla söyleyin."
-        },
-        "review": {
-          "title": "Bir öneriyi incele",
-          "text": "Açıkları bulun ve neyin değişeceğiyle ayrılın.",
-          "goal": "Öneriyi okuyun, açıkları gösterin ve değişecekler listesiyle ayrılın."
-        },
-        "brain": {
-          "title": "Beyin fırtınası",
-          "text": "Fikir toplayın ve test etmek için 3 tanesini seçin.",
-          "goal": "Fikir toplayın, gruplayın ve test etmek için en iyi 3 tanesini seçin."
-        },
-        "postmortem": {
-          "title": "Olay sonrası analiz",
-          "text": "Ne oldu, neden oldu ve ne değişecek.",
-          "goal": "Ne olduğunu anlatın, nedenini bulun ve bir daha olmaması için neyin değişeceğini söyleyin."
-        },
-        "blank": {
-          "title": "Sıfırdan",
-          "text": "Soruyu yazın ve kimin tartışacağını seçin."
-        }
-      },
-      "question": "Soru",
-      "questionPlaceholder": "Örn.: Outbox kuyruğunu LISTEN/NOTIFY'a taşıyalım mı?",
-      "origin": "Kaynak: {{origin}}. Sonuç oraya geri döner.",
-      "format": "Ne çıkacak",
-      "goal": "Hedef",
-      "goalPlaceholder": "Örn.: riskleri ve bir geçiş planıyla bir karar.",
-      "table": "Masa",
-      "tableHint": "konuşma sırasıyla · sürükleyin veya okları kullanın",
-      "personSeat": "kişi · tur bu sırayı bekler",
-      "addAgents": "Masaya ajan ekle",
-      "add": "{{name}} masaya ekle",
-      "up": "{{name}} yukarı taşı",
-      "down": "{{name}} aşağı taşı",
-      "remove": "Kaldır: {{name}}",
-      "unseat": "{{name}} masadan çıkar",
-      "noTalk": "size yanıt vermiyor",
-      "noTalkTitle": "{{name}} size yanıt vermiyor",
-      "oneAgent": "Tek bir ajanla bir ileti dizisi ya da görevdeki “{{name}} ajanına sor” seçeneğini kullanın. Forum, birbirinden farklı düşünebilecek görüşler içindir.",
-      "minAgents": "Bir tartışma için en az 2 ajan seçin.",
-      "people": "Bildirim gönderilen kişiler",
-      "peopleHint": "çalışma alanındaki herkes okuyabilir",
-      "meAlways": "siz, her zaman bildirim alırsınız",
-      "seatMe": "Masada ben de oturuyorum",
-      "seatMeHint": "turlarda beni bekle",
-      "seatOther": "{{name}} masada oturuyor",
-      "seatOtherHint": "tur bu sırayı bekler",
-      "rounds": "Turlar",
-      "deadline": "Son tarih",
-      "deadlines": {
-        "none": "Son tarih yok",
-        "today": "Bugün, 18.00",
-        "tomorrow": "Yarın",
-        "friday": "Cuma"
-      },
-      "approvals": "Her sıra normal bir çalıştırmadır: onaylar geçerlidir.",
-      "create": "Konuyu aç",
-      "open": "Forumu aç",
-      "created": "Konu açıldı. İlk {{name}} konuşur. Çalışma alanındaki herkes okuyabilir."
-    },
-    "participantsDialog": {
-      "title": "Katılımcılar",
-      "text": "Masada {{agents}} ajan ve {{people}}.",
-      "people_one": "bildirim gönderilen {{count}} kişi",
-      "people_other": "bildirim gönderilen {{count}} kişi",
-      "search": "Katılımcılarda ara",
-      "speaksAt": "{{n}}. sırada konuşur",
-      "entered": "tartışmaya katıldı",
-      "notified": "bildirim aldı ve katılabilir",
-      "org": "Tüm çalışma alanı",
-      "orgReads": "konuyu okur",
-      "note": "Masadaki değişiklikler sonraki turdan itibaren geçerli olur.",
-      "edit": "Düzenle",
-      "saved": "Katılımcılar güncellendi."
-    },
-    "suggestion": {
-      "label": "Forum önerisi",
-      "title": "Forumluk bir konu mu?",
-      "by": "{{name}} öneriyor",
-      "edit": "Düzenle",
-      "table": "Masa",
-      "open": "Forumu aç",
-      "notNow": "Şimdi değil",
-      "note": "Onu yalnızca bir kişi açabilir. Sizin adınıza açılır.",
-      "opened": "Forum açıldı",
-      "openedBy": "{{name}} tarafından, bu konuşmadan",
-      "openedToast": "Forum açıldı. Sizin adınıza.",
-      "dismissed": "{{name}} öneriyi reddetti.",
-      "dismissedMe": "Öneriyi reddettiniz.",
-      "undo": "Geri al"
-    },
-    "card": {
-      "label": "Forum konusu",
-      "see": "Tartışmayı gör"
-    },
-    "issue": {
-      "section": "Forum",
-      "evaluate": "Forumda değerlendir",
-      "evaluateTitle": "Birden fazla görüş gerekiyor",
-      "evaluateText": "Forum, karar verenlerin farklı düşünebileceği durumlar içindir. Sonuç bu göreve geri gelir.",
-      "inForum": "Forumda değerlendiriliyor",
-      "evaluated": "Forumda değerlendirildi",
-      "outPlan": "bir plan çıkar",
-      "outDecision": "bir karar çıkar",
-      "subIssues_one": "Alt görevler · {{count}}",
-      "subIssues_other": "Alt görevler · {{count}}"
-    },
-    "notify": {
-      "your_turn": "“{{title}}” konusunda sıra sizde.",
-      "requested": "İsteğiniz üzerine bir forum açıldı: “{{title}}”.",
-      "concluded": "“{{title}}” forumu sona erdi.",
-      "open": "Aç"
-    }
   },
   "code": {
     "ranSummary_one": "{{count}} satır {{language}} çalıştırıldı · çıktı {{size}}",
@@ -8941,7 +8598,6 @@
     "saveNew": "{{title}} sayfasını oluştur",
     "savedTo": "{{title}} sayfasına kaydedildi.",
     "fromMessage": "#{{channel}} kanalındaki bir mesajdan",
-    "fromForum": "forum sentezinden",
     "note": {
       "created": "sayfayı oluşturdu",
       "edited": "düzenledi",
@@ -8952,9 +8608,7 @@
       "moved": "\"{{folder}}\" klasörüne taşıdı",
       "moved_root": "köke taşıdı",
       "saved_message": "bir mesajı kaydetti",
-      "saved_synthesis": "forum sentezini kaydetti",
       "created_from_message": "bir mesajdan oluşturuldu",
-      "created_from_synthesis": "forum sentezinden oluşturuldu",
       "imported": "\"{{source}}\" kaynağından içe aktardı"
     }
   },
@@ -9251,7 +8905,6 @@
       "wiki": "Wiki",
       "skills": "Beceriler",
       "schedule": "Hatırlatıcılar ve rutinler",
-      "forum": "Forum",
       "sandbox": "Kod çalıştırma",
       "browser": "Tarayıcı",
       "setup": "Çalışma alanı kurulumu",
@@ -9285,9 +8938,6 @@
       },
       "schedule": {
         "write": "İsteyen kişi için hatırlatıcılar ve rutinler oluşturur."
-      },
-      "forum": {
-        "write": "Forumda konu açar, okur ve yazar."
       },
       "sandbox": {
         "write": "Ajanın bilgisayarında kod çalıştırır."
@@ -11175,6 +10825,9 @@
       "unknown": "O rol artık yok.",
       "orderIncomplete": "Roller değişti. Yeniden yükleyip tekrar deneyin."
     },
+    "teamProposal": {
+      "undoExpired": "Bu ekip oluşturulalı bir günden fazla oldu, bu yüzden burada geri alınamaz. Ajanları kendi sayfalarından arşivle."
+    },
     "agentProposal": {
       "decided": "Bu öneri hakkında zaten biri karar verdi.",
       "expired": "Bu önerinin süresi doldu: bir gün içinde kimse karar vermedi.",
@@ -11270,8 +10923,7 @@
       "rangeTooLong": "Bir ileti dizisinin bağlamı en fazla {{max}} mesaj tutar.",
       "titleTooLong": "Bir başlık en fazla {{max}} karakter olabilir.",
       "noContext": "Bu ileti dizisi bir konuşma aralığından oluşturulmadı.",
-      "notUndoable": "Yalnızca bir aralıktan oluşturulan ileti dizisi geri alınabilir.",
-      "forum": "Forum konularında ileti dizisi olmaz."
+      "notUndoable": "Yalnızca bir aralıktan oluşturulan ileti dizisi geri alınabilir."
     },
     "routine": {
       "tooFrequent": "Bir rutin en sık 15 dakikada bir çalışır. Daha uzun bir aralık seçin.",
@@ -11329,8 +10981,8 @@
       "noPendingUpdate": "Bu beceri için bekleyen güncelleme yok."
     },
     "agentGroup": {
-      "notFound": "Bu grup artık yok.",
-      "tooMany": "Bu çalışma alanında zaten {{max}} grup var. Önce birini silin."
+      "notFound": "Bu departman artık yok.",
+      "tooMany": "Bu çalışma alanında zaten {{max}} departman var. Önce birini silin."
     },
     "handle": {
       "invalid": "Bir @ adı {{min}} ile {{max}} arasında küçük harf, rakam, - veya _ içerir.",
@@ -11977,8 +11629,7 @@
       "unattended": "kendi başına"
     },
     "where": {
-      "dm": "özel sohbet",
-      "forum": "forum: {{name}}"
+      "dm": "özel sohbet"
     },
     "system": "Sistem",
     "removed": "Kaldırıldı",
@@ -12055,7 +11706,6 @@
         "mission": "bir misyon",
         "thread": "bir ileti dizisi",
         "channel": "bir kanal",
-        "forum": "bir forum konusu",
         "artifact": "bir Drive dosyası",
         "agent": "bir ajan",
         "machine": "bir bilgisayar",
@@ -12183,7 +11833,11 @@
       "device": "Bu cihazda",
       "activity": "Ajanların yaptıklarını her yanıtın altında göster",
       "activityHelp": "Kullandıkları araçlar ve ne kadar sürdüğü. Çalışırken ne yaptıklarını yine görürsünüz.",
-      "activityFailed": "Kaydedilemedi. Yeniden deneyin."
+      "activityFailed": "Kaydedilemedi. Yeniden deneyin.",
+      "agentStyle": "Ajanların sizinle nasıl konuştuğu",
+      "agentStyleHelp": "Basit: ne olduğu ve ne yapmanız gerektiği, birkaç kelimeyle. Teknik: yollar, kodlar ve ayrıntılarla.",
+      "agentStyleSimple": "Basit",
+      "agentStyleTechnical": "Teknik"
     },
     "orgTitle": "Çalışma alanı",
     "name": "Ad",
@@ -12795,8 +12449,6 @@
       "seconds": "{{n}} sn",
       "minutes": "{{n}} dk",
       "step": {
-        "openingForumTopic": "Bir forum konusu açtı",
-        "postingInForum": "Foruma yazdı",
         "schedulingReminder": "Bir hatırlatıcı planladı",
         "creatingRoutine": "Bir rutin oluşturdu",
         "updatingRoutine": "Bir rutini değiştirdi",
@@ -12848,7 +12500,6 @@
         "writingWiki": "Wiki'ye yazdı",
         "readingWiki": "Wiki'yi okudu",
         "linkingWiki": "Bir wiki sayfasını bağladı",
-        "readingForum": "Forumu okudu",
         "creatingChannel": "Bir kanal oluşturdu",
         "offeringConnectAi": "Bir yapay zeka bağlamayı önerdi",
         "offeringConnectApp": "Bir uygulama bağlamayı önerdi",
@@ -12867,7 +12518,6 @@
         "handingOff": "Bir rapor teslim etti",
         "recordingFindings": "Bulguları not etti",
         "deliveringMission": "Misyonu teslim etti",
-        "suggestingForumTopic": "Bir forum konusu önerdi",
         "requestingAccess": "Erişim istedi",
         "requestingSecret": "Gizli bilgi istedi",
         "queryingDatabase": "Veritabanını sorguladı",
@@ -12878,8 +12528,6 @@
       }
     },
     "activity": {
-      "openingForumTopic": "forum konusu açıyor",
-      "postingInForum": "foruma yazıyor",
       "schedulingReminder": "hatırlatıcı planlıyor",
       "creatingRoutine": "rutin oluşturuyor",
       "updatingRoutine": "rutini değiştiriyor",
@@ -12934,7 +12582,6 @@
       "writingWiki": "wiki'ye yazıyor",
       "readingWiki": "wiki'yi okuyor",
       "linkingWiki": "wiki sayfası bağlıyor",
-      "readingForum": "forumu okuyor",
       "creatingChannel": "kanal oluşturuyor",
       "offeringConnectAi": "yapay zeka bağlantısını hazırlıyor",
       "offeringConnectApp": "uygulama bağlantısını hazırlıyor",
@@ -12953,7 +12600,6 @@
       "handingOff": "rapor teslim ediyor",
       "recordingFindings": "bulguları not ediyor",
       "deliveringMission": "misyonu teslim ediyor",
-      "suggestingForumTopic": "forum konusu öneriyor",
       "requestingAccess": "erişim istiyor",
       "requestingSecret": "gizli bilgi istiyor",
       "queryingDatabase": "veritabanını sorguluyor",
@@ -13000,6 +12646,7 @@
       },
       "autonomy_digest_one": "{{count}} uyarı bilinen veya zararsız görünüyordu, bu yüzden üzerinde çalışmadım:",
       "autonomy_digest_other": "{{count}} uyarı bilinen veya zararsız görünüyordu, bu yüzden üzerinde çalışmadım:",
+      "team_week": "Ekibin haftası nasıl geçti, {{from}} – {{to}}",
       "autonomy_loop": "Bu konuda kendi başıma çalışmayı bıraktım. Bir günde {{count}} kez geri geldi ({{title}}). Nasıl ele almamı istediğini söyle.",
       "mission_plan": "{{computer}} üzerinde “{{title}}” için plan",
       "mission_planNoComputer": "“{{title}}” için plan",
@@ -13068,6 +12715,7 @@
       "action_approvals": "Sizi bekleyen onaylar",
       "action_open_page": "Bir ekran aç",
       "agent_proposal": "Yeni bir ajan önerdi: {{name}}",
+      "team_proposal": "Bir ekip önerdi: {{names}}",
       "settings_proposal": "{{names}} için bir değişiklik önerdi",
       "approval_request": "Onay isteği: {{title}}",
       "secret_request": "{{agent}} bir anahtar istedi: {{name}}",
@@ -13093,10 +12741,7 @@
       },
       "interrupted": "Sunucu yeniden başlatıldığı için kesildi. Devam etmek için yeniden sorun.",
       "step_limit": "Bitirmeden adımlarım tükendi.",
-      "stuck": "Takıldım ve bitirmeden durdum.",
-      "forum_suggestion": "Forum açmaya değer mi? \"{{title}}\"",
-      "forum_concluded": "\"{{title}}\" forumu sona erdi. Sentez aşağıdaki dosyada.",
-      "forum_concluded_issues": "\"{{title}}\" forumu sona erdi. Sentez, onaylanacak {{count}} önerilen görevle birlikte aşağıdaki dosyada."
+      "stuck": "Takıldım ve bitirmeden durdum."
     }
   },
   "builtinTools": {
@@ -13239,22 +12884,6 @@
     "schedule_action": {
       "label": "İşlem planla",
       "description": "Bağlı bir uygulamanın işlemini belirli bir zaman için hazırlar. Bir kişi şimdi onaylar."
-    },
-    "suggest_forum_topic": {
-      "label": "Forum konusu öner",
-      "description": "Ajanlar arasında bir tartışma önerir. Bir kişi açar."
-    },
-    "open_forum_topic": {
-      "label": "Forum konusu aç",
-      "description": "Bir konuyu ajanlar arasında tartışmaya taşır."
-    },
-    "post_in_forum": {
-      "label": "Foruma yaz",
-      "description": "Kendi sırası dışında bir konuya yazar."
-    },
-    "read_forum_topic": {
-      "label": "Forum konusunu oku",
-      "description": "Bir konunun hedefini ve yanıtlarını okur."
     },
     "search_wiki": {
       "label": "Wiki'de ara",
@@ -14772,5 +14401,205 @@
       "promptRequired": "Widget'ın ne göstermesi gerektiğini yazın.",
       "notTested": "Önce test edin: widget, testi başarılı olunca oluşturulur."
     }
+  },
+  "teamPlan": {
+    "start": {
+      "question": "{{org}} ne iş yapıyor? Buna göre hazır bir ekip kurarım, sen sadece kontrol edersin.",
+      "orWrite": "Ya da aşağıya kendi sözlerinle, tek cümleyle yaz.",
+      "footer": "Ne istediğini biliyor musun?",
+      "templates": "Ekip şablonlarını gör",
+      "presets": "Hazır ajanlar"
+    },
+    "business": {
+      "agency": "Ajans",
+      "store": "Online mağaza",
+      "clinic": "Klinik veya muayenehane",
+      "software": "Yazılım ve uygulamalar",
+      "support": "Müşteri hizmetleri",
+      "services": "Hizmet ofisi",
+      "other": "Başka bir şey"
+    },
+    "answered": "yanıtlandı",
+    "step": "Soru {{step}}/{{of}}",
+    "send": "{{count}} gönder",
+    "card": {
+      "new": "yeni",
+      "routines": "Rutinler",
+      "skills": "Skill'ler",
+      "create": "Ekibi oluştur",
+      "adjust": "Ayarla",
+      "adjustName": "{{name}} ayarla",
+      "map": "Harita olarak gör",
+      "agents_one": "{{count}} ajan",
+      "agents_other": "{{count}} ajan",
+      "newChannels_one": "{{count}} yeni kanal",
+      "newChannels_other": "{{count}} yeni kanal",
+      "routineCount_one": "{{count}} rutin",
+      "routineCount_other": "{{count}} rutin",
+      "weekly": "ekibin haftasının nasıl geçtiğini burada anlatırım",
+      "failed": "Ekip oluşturulmadı: {{step}} başarısız oldu ({{reason}}). Hiçbir şey oluşturulmadı, tekrar deneyebilirsin.",
+      "retry": "Tekrar dene",
+      "onlyCreators": "Ekibi yalnızca ajan oluşturabilenler oluşturur.",
+      "created": "Ekibi {{name}} oluşturdu",
+      "createdYou": "Ekibi sen oluşturdun",
+      "skillsWait": "Skill'ler bir yöneticiyi bekliyor.",
+      "weeklyWait": "Haftalık değerlendirmem, rutinlerimi yöneten kişiyi bekliyor.",
+      "undone": "Ekip geri alındı",
+      "dismissed": "Ekip bırakıldı"
+    },
+    "firstTask": {
+      "suggestion": "öneri",
+      "lead": "Her ajan için kısa bir görev, bugün her birini çalışırken gör.",
+      "open": "Görevle aç",
+      "invite": "{{names}} davet et",
+      "later": "Sonra"
+    },
+    "adjust": {
+      "title": "{{name}} ayarla",
+      "name": "Ad",
+      "role": "Rol",
+      "line": "Ne yapar",
+      "instructions": "Talimatlar",
+      "channel": "Kanal",
+      "firstTask": "İlk görev"
+    },
+    "map": {
+      "title": "Harita olarak ekip",
+      "people": "Kişiler",
+      "reviewer": "{{name}} ekibin haftasını değerlendirir",
+      "waits": "Onayını bekliyor"
+    },
+    "templates": {
+      "title": "Ekip şablonları",
+      "lead": "İşletme türüne uygun hazır bir ekip. Sonra {{name}} seninle birlikte uyarlar.",
+      "use": "Bu şablonu kullan",
+      "none": "Hiçbiri",
+      "noneSub": "Ne yaptığını anlat, {{name}} kursun",
+      "tailor": "Sonra işine uyarlamak için 2 soru soracağım."
+    },
+    "weekly": {
+      "name": "Ekibin haftası"
+    }
+  },
+  "teamTemplates": {
+    "lead": "{{org}} için bir ekip, her ajan kendi kanalında. Oluşturmadan önce ayarlayabilirsin.",
+    "agency": {
+      "name": "Pazarlama ajansı",
+      "sub": "İçerik, reklam ve müşteri hizmetleri",
+      "desc": "Müşterilerinin içeriğini ve kampanyalarını yöneten bir ajans için."
+    },
+    "store": {
+      "name": "Online mağaza",
+      "sub": "Siparişler, stok ve sosyal medya",
+      "desc": "Online satış yapan ve alıcılarına yanıt veren bir mağaza için."
+    },
+    "clinic": {
+      "name": "Klinik veya muayenehane",
+      "sub": "WhatsApp ile randevu, ödeme ve kontrol",
+      "desc": "Hasta randevusu veren ve kontrolleri takip eden bir klinik veya muayenehane için."
+    },
+    "software": {
+      "name": "Yazılım ve uygulamalar",
+      "sub": "Destek, ödeme ve kod",
+      "desc": "Yazılım satan ve kendi müşterileriyle ilgilenen bir şirket için."
+    },
+    "support": {
+      "name": "Müşteri hizmetleri",
+      "sub": "Müşteri kuyruğu ve yanıt tabanı",
+      "desc": "Her gün çok sayıda müşteriye yanıt veren bir ekip için."
+    },
+    "services": {
+      "name": "Hizmet ofisi",
+      "sub": "Muhasebe, hukuk, danışmanlık",
+      "desc": "Müşterilere randevu veren, teklif gönderen ve fatura kesen bir ofis için."
+    },
+    "agents": {
+      "iara": {
+        "role": "Müşteri hizmetleri",
+        "line": "Müşterilere WhatsApp ve e-postadan yanıt verir. Bilmediğinde seni çağırır.",
+        "routine": "Yanıtsız kalanları özetle",
+        "task": "Bekleyen son müşteri mesajını yanıtla"
+      },
+      "caio": {
+        "role": "Tahsilat",
+        "line": "Ödemesi gecikenlere hatırlatır ve onayından sonra ödeme hatırlatmasını gönderir.",
+        "routine": "Ödemesi gecikenleri listele",
+        "task": "Bu ay gecikenleri listele"
+      },
+      "ada": {
+        "role": "Dev",
+        "line": "Müşterilerin bildirdiği hataları düzeltir ve PR açar.",
+        "routine": "Yeni hataları listele",
+        "task": "Bir müşterinin bildirdiği son hataya bak"
+      },
+      "lia": {
+        "role": "İçerik",
+        "line": "Şirketin üslubuyla gönderi ve senaryo yazar, onayından sonra planlar.",
+        "routine": "Haftanın gönderilerini öner",
+        "task": "Bu hafta için üç gönderi öner"
+      },
+      "theo": {
+        "role": "Satış",
+        "line": "Teklif isteyen herkesi takip eder ve teklifleri yazar.",
+        "routine": "Teklif isteyip yanıt alamayanları listele",
+        "task": "Bu hafta teklif isteyenleri listele"
+      },
+      "nina": {
+        "role": "Randevu",
+        "line": "Randevu verir, onaylar, değiştirir ve müşterilere bir gün önce hatırlatır.",
+        "routine": "Yarının randevularını onayla",
+        "task": "Yarının randevularını göster"
+      },
+      "otto": {
+        "role": "Siparişler",
+        "line": "Siparişleri ve stoku takip eder, biten şeyleri haber verir.",
+        "routine": "Stokta bitmek üzere olanları haber ver",
+        "task": "Hâlâ gönderim bekleyen siparişleri listele"
+      },
+      "bia": {
+        "role": "Yanıt tabanı",
+        "line": "Yanıt tabanını ekibin verdiği yanıtlarla güncel tutar.",
+        "routine": "Tabanı haftanın yanıtlarıyla güncelle",
+        "task": "Müşterilerin en çok sorduğu 5 soruyu listele"
+      }
+    },
+    "channels": {
+      "iara": "destek",
+      "caio": "finans",
+      "ada": "eng",
+      "lia": "icerik",
+      "theo": "satis",
+      "nina": "randevu",
+      "otto": "siparis",
+      "bia": "destek"
+    },
+    "skills": {
+      "voice": {
+        "name": "Üslup",
+        "line": "şirketin müşterilerle nasıl konuştuğu"
+      },
+      "dunning": {
+        "name": "Tahsilat planı",
+        "line": "vade günü, sonra gecikmenin 3. ve 7. gününde hatırlatma"
+      },
+      "answers": {
+        "name": "Yanıt tabanı",
+        "line": "ekibin sık sorulan sorulara onaylı yanıtları"
+      },
+      "proposal": {
+        "name": "Teklif taslağı",
+        "line": "her teklifin ne söylediği ve hangi sırayla"
+      },
+      "schedule": {
+        "name": "Randevu kuralları",
+        "line": "saatler, aralar ve ne kadar önceden randevu alınabileceği"
+      },
+      "review": {
+        "name": "Kod incelemesi",
+        "line": "PR açmadan önce neyin kontrol edileceği"
+      }
+    },
+    "approvals": "Müşterilere gidenler onayını bekler. Onlara güvendiğinde daha sonra serbest bırakabilirsin.",
+    "ask": "{{name}} şablonunu kullandım. İşine uyarlamak için: **{{org}} neyi farklı yapıyor?**"
   }
 }

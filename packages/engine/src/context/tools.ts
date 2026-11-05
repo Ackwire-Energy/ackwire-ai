@@ -117,7 +117,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             type: "array",
             items: {
               type: "string",
-              enum: ["message", "context_item", "issue", "forum_topic", "forum_reply", "file", "wiki", "action"],
+              enum: ["message", "context_item", "issue", "file", "wiki", "action"],
             },
           },
           limit: { type: "integer", minimum: 1, maximum: 20 },

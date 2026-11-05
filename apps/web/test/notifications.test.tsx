@@ -889,18 +889,9 @@ describe("Esperando você: what only points somewhere is one row", () => {
       latest: { title: "Run deploy workflow" },
       updatedAt: ago(5),
     });
-    const turn = notification({
-      id: "n-turn",
-      kind: "forum_turn",
-      waiting: true,
-      actors: [{ type: "agent", id: ATLAS_ID }],
-      source: { topicId: "t-1", label: "Preço do plano Pro" },
-      latest: { title: "Preço do plano Pro", round: 2, rounds: 3 },
-      updatedAt: ago(8),
-    });
     const items = inbox();
-    await go(seedState({ notifications: [...items, approval, turn, asks()] }));
-    for (const id of ["n-q", "n-ap", "n-turn"]) {
+    await go(seedState({ notifications: [...items, approval, asks()] }));
+    for (const id of ["n-q", "n-ap"]) {
       const line = row(id).querySelector(".nt-wacts") as HTMLElement;
       expect(line.classList.contains("ac-acts")).toBe(true);
       expect(line.lastElementChild?.matches(".nt-tail.ac-acts")).toBe(true);

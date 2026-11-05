@@ -6,6 +6,8 @@ import {
   useCredentials,
   useModels,
   usePlatformKey,
+  useSetTeamWeekPrefs,
+  useTeamWeekPrefs,
   useUpdateAgent,
 } from "@agenteschat/client";
 import { audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
@@ -38,6 +40,7 @@ import { PlanReplies } from "@/components/ai/PlanReplies";
 import { useConnectAi } from "@/components/ConnectAi";
 import { PrefRow } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
+import { TeamWeekSchedule } from "@/components/TeamWeekCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { fullLook, lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
@@ -210,6 +213,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
               </span>
             }
           />
+          <TeamWeekPref name={agent.name} />
         </div>
       </Card>
       <Card aria-labelledby="rh-audience">
@@ -266,5 +270,33 @@ function RightHandForm({ agent }: { agent: Agent }) {
         </DialogFooter>
       </Dialog>
     </>
+  );
+}
+
+/** "Semana da equipe" (ADR 0137 §9): the admin's own day and hour of Lodi's weekly card, or off. */
+function TeamWeekPref({ name }: { name: string }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const admin = can(org, "administrator");
+  const prefs = useTeamWeekPrefs(org.id, admin).data;
+  const set = useSetTeamWeekPrefs(org.id);
+  const toast = useToast();
+  if (!admin || !prefs) return null;
+  return (
+    <PrefRow
+      id="rh-team-week"
+      icon="calendar"
+      label={t("teamWeek.settings.label")}
+      help={t("teamWeek.settings.help", agentGrammar(name))}
+      control={
+        <span className="rh-set__week">
+          <TeamWeekSchedule
+            prefs={prefs}
+            locale={i18n.language}
+            onChange={(patch) => set.mutate(patch, { onError: (e) => toast.show(errorText(t, e), "error") })}
+          />
+        </span>
+      }
+    />
   );
 }

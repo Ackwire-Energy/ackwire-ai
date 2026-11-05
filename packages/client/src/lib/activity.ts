@@ -40,8 +40,6 @@ export type ActivityKind =
   | "schedulingReminder"
   | "creatingRoutine"
   | "updatingRoutine"
-  | "openingForumTopic"
-  | "postingInForum"
   | "proposingMission"
   | "messagingMission"
   | "updatingPlan"
@@ -64,7 +62,6 @@ export type ActivityKind =
   | "writingWiki"
   | "readingWiki"
   | "linkingWiki"
-  | "readingForum"
   | "creatingChannel"
   | "offeringConnectAi"
   | "offeringConnectApp"
@@ -83,7 +80,6 @@ export type ActivityKind =
   | "handingOff"
   | "recordingFindings"
   | "deliveringMission"
-  | "suggestingForumTopic"
   | "requestingAccess"
   | "requestingSecret"
   | "queryingDatabase"
@@ -153,10 +149,6 @@ const BUILTIN: Record<string, ActivityKind> = {
   schedule_reminder: "schedulingReminder",
   create_routine: "creatingRoutine",
   update_routine: "updatingRoutine",
-  // The forum.
-  open_forum_topic: "openingForumTopic",
-  post_in_forum: "postingInForum",
-  read_forum_topic: "readingForum",
   read_skill_file: "consultingSkill",
   update_skill: "consultingSkill",
   // Missions (the agent's tools and the executor's MCP tools).
@@ -199,7 +191,6 @@ const BUILTIN: Record<string, ActivityKind> = {
   hand_off: "handingOff",
   record_findings: "recordingFindings",
   complete_mission: "deliveringMission",
-  suggest_forum_topic: "suggestingForumTopic",
   request_permission: "requestingAccess",
   request_folder_access: "requestingAccess",
   request_secret: "requestingSecret",

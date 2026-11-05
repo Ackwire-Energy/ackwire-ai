@@ -1,6 +1,6 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
-import { AGENT_ACTION_KINDS, ONBOARDING_STEPS, STANDING_STATES, START_PAGES } from "@agenteschat/engine";
-import { CONTEXT_LIMITS, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
+import { AGENT_ACTION_KINDS, AGENT_STYLES, ONBOARDING_STEPS, STANDING_STATES, START_PAGES } from "@agenteschat/engine";
+import { CONTEXT_LIMITS, ENDPOINT_STYLES, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
 /** A last message that was only a GIF or a sticker (ADR 0091): the apps say which, translated, in its preview. */
@@ -106,6 +106,10 @@ export const Organization = z
       description:
         "In `GET /me`: whether you see what agents did under each reply (`PUT …/me/activity`), off by default. Absent elsewhere.",
     }),
+    agentStyle: z.enum(AGENT_STYLES).nullable().optional().openapi({
+      description:
+        "In `GET /me`: how agents talk to you here (`PUT …/me/agent-style`, ADR 0147): `simple` or `technical`; null until you pick, and agents talk simply. Absent elsewhere.",
+    }),
   })
   .openapi("Organization");
 
@@ -128,11 +132,51 @@ export const Invitation = z
   .object({ id: z.uuid(), email: z.string(), role: Role, roleIds: RoleIds, expiresAt: z.string() })
   .openapi("Invitation");
 
+/** Per million tokens, in US dollars, as people type prices. */
+export const EndpointPrices = z
+  .object({
+    input: z.number().min(0).max(10_000),
+    output: z.number().min(0).max(10_000),
+    cacheRead: z.number().min(0).max(10_000).optional().openapi({ description: "Absent: the input price." }),
+    cacheWrite: z.number().min(0).max(10_000).optional().openapi({ description: "Absent: the input price." }),
+  })
+  .openapi("EndpointPrices");
+
+export const EndpointModel = z
+  .object({
+    id: z.string().min(1).max(200).openapi({ description: "The id the endpoint takes." }),
+    label: z.string().max(120).optional(),
+    prices: EndpointPrices.optional().openapi({
+      description: "Absent: unpriced. Its calls are recorded with their tokens and cost 0, so no budget limits them.",
+    }),
+    check: z
+      .enum(["ok", "no_tools", "failed"])
+      .optional()
+      .openapi({ description: "The last test call: it called a tool, answered without one, or failed." }),
+  })
+  .openapi("EndpointModel");
+
+export const EndpointStyle = z.enum(ENDPOINT_STYLES).openapi("EndpointStyle", {
+  description: "The API the endpoint speaks: OpenAI's Chat Completions or Anthropic's Messages.",
+});
+
+export const EndpointCheck = z
+  .object({
+    model: z.string(),
+    check: z.enum(["ok", "no_tools", "failed"]),
+    error: z.string().optional().openapi({ description: "The server's words, when it failed." }),
+  })
+  .openapi("EndpointCheck");
+
 export const Credential = z
   .object({
     id: z.uuid(),
     provider: ProviderId,
     label: z.string(),
+    endpoint: z
+      .object({ style: EndpointStyle, baseURL: z.string(), models: z.array(EndpointModel) })
+      .optional()
+      .openapi({ description: "A workspace's own endpoint (`custom`, ADR 0146): its address, API and models." }),
     keyHint: z.string().openapi({ description: "Last 4 characters of the key. The key itself is never returned." }),
     workspaceIdHint: z
       .string()
@@ -635,6 +679,14 @@ export const Model = z
     tier: ModelTier.optional().openapi({
       description: "The size Automático uses it for on its provider's key, by default.",
     }),
+    endpoint: z
+      .object({ credentialId: z.uuid(), name: z.string() })
+      .optional()
+      .openapi({ description: "A workspace endpoint's model (ADR 0146): whose credential, under what name." }),
+    unpriced: z
+      .boolean()
+      .optional()
+      .openapi({ description: "No prices known: its calls cost 0, so a budget can't count money for it." }),
   })
   .openapi("Model");
 

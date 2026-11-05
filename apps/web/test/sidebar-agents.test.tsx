@@ -97,7 +97,7 @@ describe("Agentes and its groups", () => {
     await go(asMember(withGroups()));
     expect(within(nav()).queryByRole("button", { name: "Diretoria" })).toBeNull();
     expect(nav().querySelector("[draggable='true'][data-agent-row], [data-agent-row] [draggable='true']")).toBeNull();
-    expect(within(nav()).queryByRole("button", { name: "Novo agente ou grupo" })).toBeNull();
+    expect(within(nav()).queryByRole("button", { name: "Novo agente ou setor" })).toBeNull();
   });
 
   test("closed, a group still shows the agent that wrote to me, and the working count while one works", async () => {
@@ -174,15 +174,15 @@ describe("Agentes and its groups", () => {
   });
 });
 
-describe("Mudar de grupo", () => {
+describe("Mudar de setor", () => {
   test("the row's right click moves the agent, and the toast's Desfazer puts it back", async () => {
     const { state } = await go(withGroups());
     await rightClick(within(nav()).getByRole("link", { name: /^Ada/ }));
-    expect(items()).toEqual(expect.arrayContaining(["Sem grupo", "Integrations", "Diretoria", "Novo grupo com Ada"]));
+    expect(items()).toEqual(expect.arrayContaining(["Sem setor", "Integrations", "Diretoria", "Novo setor com Ada"]));
     await pick("Integrations");
     expect(rowsIn(section("Integrations"))).toEqual(["Atlas", "Ada"]);
     const toast = screen()
-      .getByText("Ada foi para o grupo Integrations")
+      .getByText("Ada foi para o setor Integrations")
       .closest("[role='status'], li, div") as HTMLElement;
     await click(within(toast.parentElement as HTMLElement).getByRole("button", { name: "Desfazer" }));
     expect(rowsIn(section("Agentes"))).toEqual(["Ada"]);

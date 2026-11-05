@@ -67,7 +67,7 @@ const INFORMING_NOTICES: ReadonlySet<string> = new Set(["agent_note", "wait_resu
  * it chimes in on, `meta.joined`), another agent's @mention woke them
  * (`byAnotherAgent`), or a notice that only informs woke them
  * (`INFORMING_NOTICES`). Never a person's mention, a DM, another agent's
- * `ask_agent` consultation (a DM between agents), a forum turn, a routine's
+ * `ask_agent` consultation (a DM between agents), a routine's
  * call or report, a quote reply to this agent, a router follow-up to the agent
  * the person was talking to, nor a run a person answered or wrote into
  * (`answerOwed`). A run catching up after a usage pause (`catchUp`) may pass whoever called it: what it was asked

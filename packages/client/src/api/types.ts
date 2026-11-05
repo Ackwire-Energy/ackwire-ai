@@ -239,7 +239,13 @@ export interface OrgSummary {
   start?: StartChoice;
   /** From `GET /me`: whether I see what agents did under each reply. Absent (an older server): off. */
   showActivity?: boolean;
+  /** How agents talk to me here (ADR 0147): null until I pick (they talk simply); absent from an older server. */
+  agentStyle?: AgentStyle | null;
 }
+
+/** How agents talk to a person (ADR 0147): the server's `AGENT_STYLES`. */
+export const AGENT_STYLES = ["simple", "technical"] as const;
+export type AgentStyle = (typeof AGENT_STYLES)[number];
 
 /** What opens when the app starts in a workspace (ADR 0108): the app's home, where the person was, or a channel. */
 export type StartPage = "home" | "last" | "channel";
@@ -508,14 +514,45 @@ export type JoinApproval = { outcome: "joined" } | { outcome: "invited"; url: st
 
 export interface Credential {
   id: string;
-  /** "anthropic", "openai", … */
+  /** "anthropic", "openai", …, "custom" (a workspace's own endpoint). */
   provider: string;
   label: string;
   keyHint: string;
   /** Last characters of the Anthropic workspace the key is scoped to, if set. */
   workspaceIdHint?: string | null;
+  /** `custom` (ADR 0146): the endpoint's address, API and models. */
+  endpoint?: { style: EndpointStyle; baseURL: string; models: EndpointModel[] };
   createdAt: string;
   revokedAt: string | null;
+}
+
+/** The API a workspace's own endpoint speaks: OpenAI's Chat Completions or Anthropic's Messages. */
+export type EndpointStyle = "openai" | "anthropic";
+
+/** Per million tokens, in US dollars. A cache price left out is the input's. */
+export interface EndpointPrices {
+  input: number;
+  output: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+}
+
+/** The last test call of a model: it called a tool, answered without one, or failed. */
+export type EndpointCheckResult = "ok" | "no_tools" | "failed";
+
+export interface EndpointModel {
+  id: string;
+  label?: string;
+  /** Absent: unpriced (its calls cost 0, so no budget limits them). */
+  prices?: EndpointPrices;
+  check?: EndpointCheckResult;
+}
+
+export interface EndpointCheck {
+  model: string;
+  check: EndpointCheckResult;
+  /** The server's words, when it failed. */
+  error?: string;
 }
 
 /** Who can talk to an agent: everyone, some people, or only its owner. */
@@ -623,13 +660,32 @@ export interface FormerAgent {
 }
 
 /**
- * A named group of the workspace's agents (ADR 0083), shared by everyone in it: the sidebar's sections. The list
- * comes in the workspace's order; `agentIds` in the group's. An agent is in one group at most.
+ * A named group of the workspace's agents (ADR 0083), shared by everyone in it: the sidebar's sections, shown as a
+ * setor (ADR 0148). The list comes in the workspace's order; `agentIds` in the group's. An agent is in one group at
+ * most.
  */
 export interface AgentGroup {
   id: string;
   name: string;
   agentIds: string[];
+  /** One of the roles' colors; absent from an older server (graphite). */
+  color?: string;
+  /** One of the roles' icons; absent from an older server. */
+  icon?: string;
+  /** Who leads it: its agents with no owner report to them on the org chart. */
+  leadUserId?: string | null;
+  /** Who covers for the lead. */
+  backupUserId?: string | null;
+}
+
+/** What a setor's look and people may change to; null clears a person. */
+export interface AgentGroupPatch {
+  name?: string;
+  index?: number;
+  color?: string;
+  icon?: string;
+  leadUserId?: string | null;
+  backupUserId?: string | null;
 }
 
 /** An agent on the team screen: what it can do. What it does comes from its instructions (`Agent`). */
@@ -644,6 +700,8 @@ export interface TeamAgent {
   capabilities: string[];
   /** Working on something right now. */
   busy: boolean;
+  /** The channels it is in that I may see, in the sidebar's order; absent from an older server. */
+  channelIds?: string[];
   canTalk: boolean;
   /** Whether I see how it works (absent = yes); without it `capabilities` is empty. */
   seesDetails?: boolean;
@@ -769,6 +827,82 @@ export interface ProposalApplied {
   mailAccountIds: string[];
 }
 
+/** One agent on the right hand's team card (ADR 0137 §10). */
+export interface TeamAgentDraft {
+  name: string;
+  handle: string;
+  role: string;
+  line: string;
+  instructions: string;
+  appearance: Required<AgentLookInput> | null;
+  /** The channel it lives in, by name. */
+  channel: string;
+  routines: ProposedRoutine[];
+  firstTask: string | null;
+}
+
+export interface TeamSkillDraft {
+  name: string;
+  title: string;
+  description: string;
+  body: string;
+  /** Handles of the team's agents that get it. */
+  agents: string[];
+}
+
+export interface TeamPlan {
+  lead: string;
+  agents: TeamAgentDraft[];
+  /** Channel names the team creates. */
+  newChannels: string[];
+  skills: TeamSkillDraft[];
+  /** The right hand's own weekly check. */
+  weekly: ProposedRoutine | null;
+  approvals: string;
+  /** People named as working there, invited after. */
+  invite: string[];
+  template?: string;
+}
+
+/** The right hand's team card (`meta.actionCard`): several agents created in one click ("Criar o time"). */
+export interface TeamProposalCard {
+  kind: "team_proposal";
+  forUserId: string | null;
+  params: TeamPlan;
+  state: "pending" | "creating" | "created" | "denied" | "superseded" | "undone";
+  decidedByUserId: string | null;
+  decidedAt: string | null;
+  expiresAt: string;
+  created?: {
+    agentIds: string[];
+    channelIds: string[];
+    routineIds: string[];
+    skillIds: string[];
+    skipped: ("skills" | "weekly")[];
+    noAi: string[];
+  };
+  /** The last try failed at `step`, creating nothing: `reason` in English, `status`/`code`/`params` to translate. */
+  error?: { step: string; reason: string; status?: number; code?: string; params?: Record<string, unknown> } | null;
+  undoneAt?: string;
+}
+
+/** A team template by business type ("Ver modelos de time"), in the person's language. */
+export interface TeamTemplate {
+  id: string;
+  name: string;
+  sub: string;
+  description: string;
+  team: TeamPlan;
+}
+
+/** `meta.replyChips` of a right hand's question: answers to tap, each sent as the person's own message. */
+export interface ReplyChips {
+  choices: string[];
+  multiple: boolean;
+  step: number;
+  of: number;
+}
+
 /** An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0081). A person creates it or says no. */
 export interface AgentProposalCard {
   kind: "agent_proposal";
@@ -823,6 +957,10 @@ export interface Model {
   pick?: boolean;
   /** The size Automático uses it for on its provider's key, by default. */
   tier?: ModelTier;
+  /** A workspace endpoint's model (ADR 0146): whose credential, under what name. */
+  endpoint?: { credentialId: string; name: string };
+  /** No prices known: its calls cost 0, so a budget can't count money for it. */
+  unpriced?: boolean;
 }
 
 export interface AgentUsage {
@@ -1269,14 +1407,6 @@ export type ChannelEvent =
       usage?: "plan" | "budget";
     }
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval }
-  /** An agent's forum suggestion card was accepted or dismissed: its `meta.forumSuggestion` now. */
-  | {
-      type: "forum.suggestion.updated";
-      channelId: string;
-      threadId: string | null;
-      messageId: string;
-      suggestion: ForumSuggestion;
-    }
   /** An agent's proposal of a new agent was decided (ADR 0081): the decision on its card (`meta.actionCard`). */
   | ({
       type: "agent.proposal.updated";
@@ -1284,6 +1414,14 @@ export type ChannelEvent =
       threadId: string | null;
       messageId: string;
     } & AgentProposalDecision)
+  /** The right hand's team card changed (ADR 0137 §10): the whole card. */
+  | {
+      type: "team.proposal.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      card: TeamProposalCard;
+    }
   /** The right hand looked at a card for someone (ADR 0139): its `meta.actionCard.delegate` now. */
   | {
       type: "card.delegate";
@@ -2308,15 +2446,7 @@ export type CustomConnectStart =
 
 // ── Knowledge (phase 5: apps/server/src/routes/app/knowledge.ts) ─────────────
 
-export type SearchKind =
-  | "message"
-  | "context_item"
-  | "issue"
-  | "forum_topic"
-  | "forum_reply"
-  | "file"
-  | "wiki"
-  | "action";
+export type SearchKind = "message" | "context_item" | "issue" | "file" | "wiki" | "action";
 
 export interface SearchHit {
   kind: SearchKind;
@@ -3040,7 +3170,6 @@ export interface Issue {
   source:
     | { type: "manual" }
     | { type: "message"; channelId: string; messageId: string }
-    | { type: "forum"; threadId: string }
     | { type: "agent"; agentId: string }
     | { type: "webhook"; provider: string };
   /** The channel it lives in (from a message, or chosen). */
@@ -3054,12 +3183,10 @@ export interface Issue {
   backgroundWork?: WorkView | null;
   /** Its conversation (ADR 0145), once opened or written: a thread of its own channel. */
   conversation?: IssueConversation | null;
-  /** The issue this one is a sub-issue of (a plan step from the forum). */
+  /** The issue this one is a sub-issue of. */
   parentIssueId?: string | null;
   /** On the detail: its sub-issues. */
   subIssues?: { id: string; number: number; title: string; status: IssueStatus; assignee: Actor | null }[];
-  /** On the detail: forum topics opened from it ("Avaliar no fórum"), oldest first. */
-  forumTopics?: { id: string; title: string; status: ForumStatus; format: ForumFormat }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -3244,12 +3371,8 @@ export interface RoutineEmailFilter {
   text?: string;
 }
 
-/** Where a routine created here delivers; `forum` opens a topic with these agents each time. */
-export type RoutineTargetInput =
-  | { type: "channel"; channelId: string }
-  | { type: "dm" }
-  | { type: "artifact" }
-  | { type: "forum"; agentIds: string[]; rounds?: number };
+/** Where a routine created here delivers. */
+export type RoutineTargetInput = { type: "channel"; channelId: string } | { type: "dm" } | { type: "artifact" };
 
 /**
  * Also `conversation`: a thread or DM, from an agent's `schedule_reminder` or
@@ -4166,329 +4289,6 @@ export type MachineEvent =
   /** Waiting agents moved off an offline computer ("Trocar computador"). */
   | { type: "machine.agents_moved"; machineId: string };
 
-// ── Forum (apps/server/src/routes/app/forum.ts, ADR 0022) ───────────────────
-
-/** `stalled`: a person stopped the turn (or it failed) and nobody speaks until "Retomar". */
-export type ForumStatus = "open" | "stalled" | "done" | "canceled";
-export type ForumPhase = "discussing" | "waiting_person" | "synthesizing" | "finished";
-/** What comes out: a decision (pros and cons, next steps) or a plan (scope, steps, risks, metrics). */
-export type ForumFormat = "decision" | "plan";
-
-/** A place at the table: an agent, or a person who sat down (speaking order). */
-export interface ForumSeat {
-  type: "agent" | "person";
-  id: string;
-}
-
-export interface ForumOwner {
-  type: "agent" | "person";
-  id: string;
-}
-
-/** An issue the synthesis suggests; created only when a person approves it. */
-export interface ForumSuggestedIssue {
-  title: string;
-  description: string;
-  /** The plan step it comes from (1-based). */
-  step?: number;
-  /** Becomes the assignee when the issue is created. */
-  owner?: ForumOwner | null;
-}
-
-/**
- * How a seat's turn in a round went: `skipped_budget` (the agent's own budget
- * was out), `passed` (a seated person passed), `skipped` (the round ended
- * early, or not chosen for a new round), `stopped` / `failed` (the turn that
- * stalled the topic), `live` (writing now), `waiting` (a seated person's
- * turn), `pending` (to come).
- */
-export type ForumTrackStatus =
-  | "spoke"
-  | "skipped_budget"
-  | "passed"
-  | "skipped"
-  | "stopped"
-  | "failed"
-  | "live"
-  | "waiting"
-  | "pending";
-
-export interface ForumTrackEntry {
-  seat: ForumSeat;
-  status: ForumTrackStatus;
-  postId: string | null;
-  /** The post's length in characters (the column's height). */
-  length: number;
-}
-
-export interface ForumTrackRound {
-  round: number;
-  /** People's free posts that lead this round (not seated turns). */
-  personPosts: { userId: string; postId: string | null; length: number }[];
-  entries: ForumTrackEntry[];
-}
-
-/** The round track: each round (up to `rounds`), each seat's turn in order; the synthesis at the end. */
-export interface ForumTrack {
-  rounds: ForumTrackRound[];
-  synthesis: { agentId: string | null; status: "live" | "done" | "stalled"; revision: number } | null;
-}
-
-export type ForumOriginKind = "direct" | "channel" | "agent" | "suggestion" | "issue" | "routine";
-
-export interface ForumOrigin {
-  kind: ForumOriginKind;
-  channelId: string | null;
-  messageId: string | null;
-  issueId: string | null;
-  issueNumber: number | null;
-  routineId: string | null;
-  /** The agent that opened it when asked (`agent`) or suggested it (`suggestion`). */
-  agentId: string | null;
-}
-
-export interface ForumNextStep {
-  text: string;
-  owner: ForumOwner | null;
-  ownerLabel: string | null;
-  when: string | null;
-}
-
-export interface ForumDecisionCards {
-  format: "decision";
-  decision: string;
-  /** Why it was decided (syntheses before this field have none). */
-  reasons?: string[];
-  positions: { agentId: string | null; name: string; pros: string[]; cons: string[] }[];
-  openQuestions: string[];
-  nextSteps: ForumNextStep[];
-  suggestedIssues: ForumSuggestedIssue[];
-  /** Version 2+: what changed. */
-  changes: string[];
-}
-
-export interface ForumPlanStep {
-  title: string;
-  owner: ForumOwner | null;
-  ownerLabel: string | null;
-  /** The step it waits for (1-based), or null: it can start now. */
-  after: number | null;
-  size: string | null;
-}
-
-export interface ForumPlanCards {
-  format: "plan";
-  objective: string;
-  summaryForRequester: string;
-  inScope: string[];
-  outOfScope: string[];
-  steps: ForumPlanStep[];
-  risks: string[];
-  metrics: string[];
-  openQuestions: string[];
-  suggestedIssues: ForumSuggestedIssue[];
-  changes: string[];
-}
-
-export type ForumSynthesisCards = ForumDecisionCards | ForumPlanCards;
-
-export interface ForumSynthesis {
-  /** The Drive document (null when it couldn't be written). */
-  artifactId: string | null;
-  /** The document's version. */
-  version: number;
-  /** Which synthesis: 1, then 2… after each new round asked from a comment. */
-  revision: number;
-  format: ForumFormat;
-  suggestedIssues: ForumSuggestedIssue[];
-  structured: ForumSynthesisCards | null;
-  /** The synthesis file was deleted. */
-  deleted?: boolean;
-  versions: {
-    revision: number;
-    artifactVersion: number | null;
-    createdAt: string;
-    afterRound: number;
-    changes: string[];
-  }[];
-  /** Issues already created from it (by a person's approval). */
-  createdIssues: { id: string; number: number; title: string }[];
-}
-
-export interface ForumStall {
-  reason: "stopped" | "failed";
-  byUserId: string | null;
-  agentId: string | null;
-  round: number;
-  /** The synthesis was the turn that stopped. */
-  synthesis: boolean;
-  at: string;
-}
-
-/** A discussion among agents (and seated people), in rounds, ending in a synthesis. No money here. */
-export interface ForumTopic {
-  id: string;
-  title: string;
-  /** The question or goal. */
-  goal: string;
-  status: ForumStatus;
-  phase: ForumPhase;
-  format: ForumFormat;
-  /** The round in progress (or the last one when finished), from 1. */
-  round: number;
-  rounds: number;
-  agentIds: string[];
-  /** People notified (they can post any time). */
-  userIds: string[];
-  /** The speaking order: agents and the people who sat down. */
-  seats: ForumSeat[];
-  createdBy: { type: "person" | "agent"; id: string };
-  origin: ForumOrigin;
-  originChannelId: string | null;
-  /** "Responsável": runs run on their behalf. */
-  responsibleUserId: string | null;
-  /** "Pedido de" (e.g. the origin issue's author). */
-  requestedByUserId: string | null;
-  /** Writes the synthesis (null: the first agent). */
-  ownerAgentId: string | null;
-  deadline: string | null;
-  /** The seated person whose turn it is ("Sua vez"). */
-  waitingUserId: string | null;
-  stall: ForumStall | null;
-  reopened: { byUserId: string; at: string } | null;
-  /** The topic's hidden channel: subscribe to it for the agents' live runs. */
-  channelId: string;
-  createdAt: string;
-  lastActivityAt: string;
-  /** Agents working right now. */
-  activeAgentIds: string[];
-  track: ForumTrack;
-  synthesis: ForumSynthesis | null;
-}
-
-export type ForumStanceKind = "propose" | "agree" | "disagree" | "shift" | "ask" | "reply";
-
-/** What a post says about the proposal on the table, and toward whom. */
-export interface ForumStance {
-  kind: ForumStanceKind;
-  target?: { type: "agent" | "person" | "people"; id?: string; handle?: string };
-}
-
-/** `turn`: an agent's (or seated person's `seat`) turn; `free`: a person's post that leads the next round; `comment`: after the synthesis. */
-export type ForumPostKind = "turn" | "free" | "seat" | "comment" | "synthesis";
-
-export interface ForumPost {
-  id: string;
-  topicId: string;
-  round: number;
-  author: { type: "person" | "agent"; id: string };
-  body: string;
-  /** Agent posts: the run (the work summary under the post). */
-  agentRunId: string | null;
-  kind: ForumPostKind;
-  stance: ForumStance | null;
-  /** The post this one answers. */
-  replyTo: string | null;
-  /** The agent's position in one line. */
-  position: string | null;
-  /** A person asked for one more round from this post. */
-  requestRound?: { agentIds: string[] | null };
-  meta?: Record<string, unknown>;
-  createdAt: string;
-}
-
-/** One synthesis written (version 2+ after a new round asked from a comment). */
-export interface ForumSynthesisVersion {
-  revision: number;
-  artifactId: string | null;
-  artifactVersion: number | null;
-  agentId: string;
-  format: ForumFormat;
-  afterRound: number;
-  createdAt: string;
-  structured: ForumSynthesisCards;
-  markdown: string;
-}
-
-export interface ForumTopicDetail extends ForumTopic {
-  posts: ForumPost[];
-  syntheses: ForumSynthesisVersion[];
-}
-
-export interface ForumTopicInput {
-  title: string;
-  goal: string;
-  agentIds: string[];
-  userIds?: string[];
-  rounds?: number;
-  /** ISO; when it passes, a seated person's turn is skipped, then the synthesis. */
-  deadline?: string;
-  /** Writes the synthesis (default: the first agent). */
-  ownerAgentId?: string;
-  format?: ForumFormat;
-  /** The speaking order, agents and seated people mixed (default: the agents in order). */
-  seats?: ForumSeat[];
-  /** "Avaliar no fórum": the result comes back to the issue. */
-  originIssueId?: string;
-  /** From a thread: the synthesis comes back to that thread. */
-  originMessageId?: string;
-}
-
-/** `POST …/posts`: `requestRound` asks for one more round (reopens a concluded topic). */
-export interface ForumPostInput {
-  body: string;
-  requestRound?: { agentIds?: string[] };
-  replyTo?: string;
-}
-
-/** `PUT …/forum/topics/{id}/participants`. */
-export interface ForumParticipantsInput {
-  addAgentIds?: string[];
-  removeAgentIds?: string[];
-  addUserIds?: string[];
-  removeUserIds?: string[];
-  seatUserIds?: string[];
-  unseatUserIds?: string[];
-}
-
-/** An agent's "Vale um fórum?" card (`meta.forumSuggestion` of its message). Only a person opens it. */
-export interface ForumSuggestion {
-  title: string;
-  goal: string;
-  agentIds: string[];
-  rounds: number;
-  format: ForumFormat;
-  suggestedByAgentId: string;
-  state: "pending" | "accepted" | "dismissed";
-  topicId: string | null;
-  decidedByUserId: string | null;
-  decidedAt: string | null;
-}
-
-/** "Abrir fórum" with the fields adjusted ("Editar"). */
-export type ForumSuggestionOverrides = Partial<Omit<ForumTopicInput, "originIssueId" | "originMessageId">>;
-
-/** Org broadcasts about the forum. */
-export type ForumEvent =
-  | {
-      type: "forum.topic.updated";
-      topicId: string;
-      status: ForumStatus;
-      round: number;
-      phase?: ForumPhase;
-      waitingUserId?: string;
-      activeAgentIds?: string[];
-    }
-  | { type: "forum.post.created"; topicId: string; post: ForumPost };
-
-/** For me: my seated turn, a topic opened on my request, a topic I asked for concluded. */
-export type ForumUserEvent =
-  | { type: "forum.your_turn"; topicId: string; title: string; round: number; deadline: string | null }
-  | { type: "forum.requested"; topicId: string; title: string; byUserId: string; issueNumber?: number }
-  | { type: "forum.concluded"; topicId: string; title: string; revision: number };
-
-export type ForumFilter = "open" | "done" | "mine";
-
 // ── Wiki (expected from the backend; the fake defines the shapes) ────────────
 
 /** Who wrote a version: a person, or an agent (and the person who asked it). */
@@ -4747,7 +4547,7 @@ export interface ImportedSource {
   counts: Record<ImportItemKind, number>;
 }
 
-/** Where a page is mentioned: other pages, messages, forum topics, issues. */
+/** Where a page is mentioned: other pages, messages, issues. */
 export type WikiBacklink =
   | { kind: "page"; slug: string; title: string; excerpt?: string }
   | {
@@ -4760,7 +4560,6 @@ export type WikiBacklink =
       excerpt: string;
       at: string;
     }
-  | { kind: "forum"; topicId: string; title: string }
   | { kind: "issue"; number: number; title: string };
 
 export interface WikiPage extends WikiPageSummary {
@@ -4861,7 +4660,7 @@ export interface ThreadInfo {
   id: string;
   channelId: string;
   channelName: string;
-  channelKind: "channel" | "dm" | "forum" | "task";
+  channelKind: "channel" | "dm" | "task";
   /** Null: show `rootText`. */
   title: string | null;
   rootText: string;
@@ -5784,8 +5583,6 @@ export type NotificationKind =
   | "issue_assigned"
   | "issue_comment"
   | "issue_status"
-  | "forum_turn"
-  | "forum_synthesis"
   | "approval"
   | "mission_finished"
   | "mission_stopped"
@@ -6043,9 +5840,6 @@ export interface NotificationLatest {
   suggestions?: string[];
   /** Approvals. */
   expiresAt?: string;
-  /** Forum turns. */
-  round?: number;
-  rounds?: number;
   /**
    * `routine_paused`: why (a `RoutinePausedReason`); `routine_failed`: its failed run's code (`routines.code.*`).
    * Both said in the person's language.
@@ -6131,7 +5925,7 @@ export interface AuditRow {
   details: Record<string, unknown>;
   runId: string | null;
   channelId: string | null;
-  channel: { id: string; name: string; kind: "channel" | "dm" | "forum" | "task" } | null;
+  channel: { id: string; name: string; kind: "channel" | "dm" | "task" } | null;
   onBehalfOf: { id: string; name: string | null } | null;
   outcome: AuditOutcome | null;
   /** The approval the call waited for or ran after, as it stands now. */
@@ -6191,16 +5985,7 @@ export interface NoticePrefs {
 }
 
 /** A tool at the top of the sidebar (`SIDEBAR_ITEMS` in packages/engine/src/sidebar-items.ts). */
-export type SidebarItem =
-  | "approvals"
-  | "threads"
-  | "issues"
-  | "wiki"
-  | "drive"
-  | "routines"
-  | "calendar"
-  | "forum"
-  | "team";
+export type SidebarItem = "approvals" | "threads" | "issues" | "wiki" | "drive" | "routines" | "calendar" | "team";
 /** `always` in the list, `more` only in the More menu, `auto` in the list while its count is above zero. */
 export type SidebarPlace = "always" | "more" | "auto";
 /** Where I put each tool I moved, in one workspace (`GET …/me/sidebar`); the others keep their default. */

@@ -532,7 +532,7 @@ export function ApprovalsCardView({ message, card }: { message: Message; card: A
   );
 }
 
-function CardApproval({ id }: { id: string }) {
+export function CardApproval({ id }: { id: string }) {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const list = useApprovals(org.id);

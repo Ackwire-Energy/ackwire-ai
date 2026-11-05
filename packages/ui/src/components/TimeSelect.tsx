@@ -1,6 +1,7 @@
 import { Popover as RPopover } from "radix-ui";
 import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { cx } from "../cx";
+import { EDGE_ROOM } from "../floating";
 import { useFieldControl } from "./Field";
 
 /** Every `step` minutes of the day: "00:00", "00:15", … */
@@ -160,6 +161,7 @@ export function TimeSelect({ value, onChange, step = 15, id, disabled, className
           className="ac-menu ac-time__list"
           align="start"
           sideOffset={4}
+          collisionPadding={EDGE_ROOM}
           // Focus stays in the text box (combobox).
           onOpenAutoFocus={(e) => e.preventDefault()}
           onCloseAutoFocus={(e) => e.preventDefault()}

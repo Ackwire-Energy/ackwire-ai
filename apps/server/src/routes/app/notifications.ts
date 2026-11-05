@@ -141,7 +141,7 @@ const NotificationParams = OrgParams.extend({ notificationId: z.uuid() });
 
 const NoticeCategory = z.enum(NOTICE_CATEGORIES).openapi({
   description:
-    "`waiting` (approvals, questions, forum turns, help in the browser, anything waiting on you), `replies` (an agent's answer to you), `mentions` (mentions and DMs), `threads`, `tasks`, `routines` (missions and routines that stopped or failed), `computers`, `reactions`.",
+    "`waiting` (approvals, questions, help in the browser, anything waiting on you), `replies` (an agent's answer to you), `mentions` (mentions and DMs), `threads`, `tasks`, `routines` (missions and routines that stopped or failed), `computers`, `reactions`.",
 });
 const NoticePrefs = z.object({
   categories: z.array(z.object({ id: NoticeCategory, on: z.boolean() })),
@@ -150,7 +150,7 @@ const NoticePrefs = z.object({
 
 /**
  * The person's inbox: mentions, thread replies, DMs, agents' questions,
- * issues, forum turns, approvals, missions, routines, reactions. Live
+ * issues, approvals, missions, routines, reactions. Live
  * updates arrive on the WebSocket as user events (`notification.upserted`,
  * `notification.removed`, `notification.counts`).
  */

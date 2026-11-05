@@ -949,7 +949,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(panel.querySelector(".ai-panel__head")).toBeNull();
     expect(shownText(panel).split("Você paga pelo uso, direto ao provedor.")).toHaveLength(2);
     expect(shownText(panel)).toContain("Todo agente sem plano pensa com ela.");
-    // Every maker as a tile, Gemini third.
+    // Every maker as a tile, Gemini third; a workspace's own endpoint last (ADR 0146).
     const makers = within(panel).getByRole("group", { name: "Provedor" });
     expect([...makers.querySelectorAll(".ac-option__title")].map((el) => el.textContent)).toEqual([
       "Claude",
@@ -960,6 +960,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
       "Z.ai",
       "MiniMax",
       "OpenRouter",
+      "Outro provedor",
     ]);
     // OpenRouter passes what is sent on to other providers: its privacy settings say who may keep it, in the ⓘ.
     await click(within(panel).getByRole("button", { name: "OpenRouter" }));

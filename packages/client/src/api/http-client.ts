@@ -2,6 +2,7 @@ import { createDashboardsApi } from "../dashboards/api";
 import { humanCheckHeaders } from "../lib/human-check";
 import type { OnboardingStepId } from "../lib/onboarding";
 import { CLOUD_SERVER } from "../lib/server";
+import type { TeamWeekPrefs } from "../lib/team-week";
 import { consultSeeds } from "../realtime/consults";
 import { steerStore } from "../realtime/steer";
 import type { VaultConnection, VaultImportResult, VaultItem, VaultItemDetail, VaultOverview } from "../vault/types";
@@ -31,6 +32,7 @@ import type {
   AgentSetupResult,
   AgentSkill,
   AgentStatus,
+  AgentStyle,
   AgentUsage,
   AiAccounts,
   AiStatus,
@@ -81,12 +83,10 @@ import type {
   DeviceRequest,
   DirectMessage,
   DmRead,
+  EndpointCheck,
+  EndpointModel,
   ForeignMailbox,
   FormerAgent,
-  ForumPost,
-  ForumSuggestion,
-  ForumTopic,
-  ForumTopicDetail,
   GifKey,
   GifPage,
   GitHubAppInstallation,
@@ -201,6 +201,8 @@ import type {
   TaskOutput,
   TaskSteps,
   Team,
+  TeamProposalCard,
+  TeamTemplate,
   ThreadFilters,
   ThreadFollow,
   ThreadInfo,
@@ -541,6 +543,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       setStart: (orgId, input) => request<StartChoice>(`${org(orgId)}/me/start`, { method: "PUT", json: input }),
       setShowActivity: async (orgId, show) =>
         (await request<{ show: boolean }>(`${org(orgId)}/me/activity`, { method: "PUT", json: { show } })).show,
+      setAgentStyle: async (orgId, style) =>
+        (await request<{ style: AgentStyle }>(`${org(orgId)}/me/agent-style`, { method: "PUT", json: { style } }))
+          .style,
       sidebarItems: async (orgId) => (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`)).items,
       setSidebarItem: async (orgId, item, place) =>
         (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`, { method: "PATCH", json: { item, place } }))
@@ -621,6 +626,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<void>(`${org(orgId)}/usage/people/${enc(userId)}/raise`, { json: { limitUsd } }),
       refuseMoreUsage: (orgId, userId) =>
         request<void>(`${org(orgId)}/usage/people/${enc(userId)}/refuse`, { json: {} }),
+      teamWeek: (orgId) => request<TeamWeekPrefs>(`${org(orgId)}/team-week`),
+      setTeamWeek: (orgId, patch) => request<TeamWeekPrefs>(`${org(orgId)}/team-week`, { method: "PUT", json: patch }),
+      actOnTeamWeek: (orgId, messageId, act) =>
+        request<void>(`${org(orgId)}/team-week/${enc(messageId)}`, { json: act }),
       audit: (orgId, query = {}) =>
         request<AuditPage>(`${org(orgId)}/audit`, {
           query: {
@@ -675,6 +684,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       list: async (orgId) => (await request<{ agents: Agent[] }>(`${org(orgId)}/agents`)).agents,
       planUsage: (orgId, agentId) => request<AgentPlanUsage>(`${org(orgId)}/agents/${enc(agentId)}/usage`),
       team: (orgId) => request<Team>(`${org(orgId)}/team`),
+      proposeChannelMove: (orgId, input) => request(`${org(orgId)}/team/channel-move`, { json: input }),
       create: (orgId, input) => request<Agent>(`${org(orgId)}/agents`, { json: input }),
       proposal: (orgId, messageId) => request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}`),
       denyProposal: (orgId, messageId) =>
@@ -686,6 +696,29 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         ),
       askProposal: (orgId, messageId) =>
         request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/ask`, { json: {} }),
+      createTeam: (orgId, messageId) =>
+        request<{ card: TeamProposalCard; noAi?: string[] }>(`${org(orgId)}/team-proposals/${enc(messageId)}/create`, {
+          json: {},
+        }),
+      denyTeam: (orgId, messageId) =>
+        request<{ card: TeamProposalCard }>(`${org(orgId)}/team-proposals/${enc(messageId)}/deny`, { json: {} }),
+      undoTeam: (orgId, messageId) =>
+        request<{ card: TeamProposalCard }>(`${org(orgId)}/team-proposals/${enc(messageId)}/undo`, { json: {} }),
+      adjustTeamAgent: (orgId, messageId, handle, patch) =>
+        request<{ card: TeamProposalCard }>(`${org(orgId)}/team-proposals/${enc(messageId)}/agents/${enc(handle)}`, {
+          method: "PATCH",
+          json: patch,
+        }),
+      teamTemplates: async (orgId, locale) =>
+        (
+          await request<{ templates: TeamTemplate[] }>(`${org(orgId)}/team-templates`, {
+            ...(locale ? { query: { locale } } : {}),
+          })
+        ).templates,
+      applyTeamTemplate: (orgId, templateId, locale) =>
+        request<{ channelId: string; messageId: string }>(`${org(orgId)}/team-templates/${enc(templateId)}/use`, {
+          json: locale ? { locale } : {},
+        }),
       decideCostly: (orgId, signalId, decision) =>
         request<{ state: CostlyDecision }>(`${org(orgId)}/autonomy-proposals/${enc(signalId)}`, {
           json: { decision },
@@ -707,7 +740,18 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       models: () => request<{ models: Model[]; defaultModel: string }>("/api/app/models"),
       credentials: async (orgId) =>
         (await request<{ credentials: Credential[] }>(`${org(orgId)}/credentials`)).credentials,
-      addCredential: (orgId, input) => request<Credential>(`${org(orgId)}/credentials`, { json: input }),
+      addCredential: (orgId, input) =>
+        request<Credential & { checks?: EndpointCheck[] }>(`${org(orgId)}/credentials`, { json: input }),
+      endpointModels: (orgId, input) =>
+        request<{ baseURL: string; models: { id: string; label?: string }[]; error?: string }>(
+          `${org(orgId)}/credentials/endpoint-models`,
+          { json: input },
+        ),
+      setEndpointModels: (orgId, id, models) =>
+        request<{ models: EndpointModel[]; checks: EndpointCheck[] }>(`${org(orgId)}/credentials/${enc(id)}/models`, {
+          method: "PUT",
+          json: { models },
+        }),
       rotateCredential: (orgId, id, input) =>
         request<Credential>(`${org(orgId)}/credentials/${enc(id)}/rotate`, { json: input }),
       removeCredential: (orgId, id, purge) =>
@@ -1517,40 +1561,6 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       prefs: (orgId) => request<NoticePrefs>(`${org(orgId)}/notification-prefs`),
       setPref: (orgId, category, on) =>
         request<NoticePrefs>(`${org(orgId)}/notification-prefs`, { method: "PUT", json: { category, on } }),
-    },
-    forum: {
-      list: async (orgId) => (await request<{ topics: ForumTopic[] }>(`${org(orgId)}/forum/topics`)).topics,
-      get: (orgId, topicId) => request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}`),
-      create: (orgId, input) => request<ForumTopicDetail>(`${org(orgId)}/forum/topics`, { json: input }),
-      post: (orgId, topicId, input) =>
-        request<ForumPost>(`${org(orgId)}/forum/topics/${enc(topicId)}/posts`, { json: input }),
-      conclude: (orgId, topicId) =>
-        request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}/conclude`, { json: {} }),
-      cancel: (orgId, topicId) =>
-        request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}/cancel`, { json: {} }),
-      pass: (orgId, topicId) =>
-        request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}/pass`, { json: {} }),
-      resume: (orgId, topicId) =>
-        request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}/resume`, { json: {} }),
-      participants: (orgId, topicId, input) =>
-        request<ForumTopicDetail>(`${org(orgId)}/forum/topics/${enc(topicId)}/participants`, {
-          method: "PUT",
-          json: input,
-        }),
-      createIssues: (orgId, topicId, items) =>
-        request<{ numbers: number[]; issues: { id: string; number: number; title: string }[] }>(
-          `${org(orgId)}/forum/topics/${enc(topicId)}/issues`,
-          { json: { items } },
-        ),
-      acceptSuggestion: (orgId, messageId, overrides) =>
-        request<{ topic: ForumTopicDetail; suggestion: ForumSuggestion }>(
-          `${org(orgId)}/forum/suggestions/${enc(messageId)}/accept`,
-          { json: overrides ?? {} },
-        ),
-      dismissSuggestion: (orgId, messageId) =>
-        request<{ suggestion: ForumSuggestion }>(`${org(orgId)}/forum/suggestions/${enc(messageId)}/dismiss`, {
-          json: {},
-        }),
     },
     calendar: {
       range: (orgId, from, to) => request<CalendarRange>(`${org(orgId)}/calendar`, { query: { from, to } }),

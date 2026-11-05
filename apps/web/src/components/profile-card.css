@@ -2,7 +2,7 @@
 .mcard.profile-card {
   position: relative;
   width: 340px;
-  max-width: calc(100vw - 16px);
+  max-width: calc(100vw - 24px);
   max-height: min(720px, var(--radix-popover-content-available-height, calc(100dvh - 16px)));
   padding: 0;
   overflow-x: hidden;
@@ -190,7 +190,7 @@ html:not([data-pointer]) .mcard__emoji:focus-visible {
   flex-direction: column;
   gap: 12px;
   width: 380px;
-  max-width: calc(100vw - 16px);
+  max-width: calc(100vw - 24px);
   max-height: min(640px, var(--radix-popover-content-available-height, calc(100dvh - 16px)));
   overflow-y: auto;
   padding: var(--menu-pad);

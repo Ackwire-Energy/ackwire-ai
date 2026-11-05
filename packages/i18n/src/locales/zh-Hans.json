@@ -293,6 +293,12 @@
       "short": "AI 密钥",
       "say": "管理 AI 密钥"
     },
+    "use_others_plans": {
+      "title": "使用其他人的套餐",
+      "desc": "把其他人连接的套餐给自己能编辑的智能体使用。套餐的主人会收到邮件，并且可以收回。",
+      "short": "使用其他人的套餐",
+      "say": "使用其他人的套餐"
+    },
     "edit_wiki": {
       "title": "编辑 wiki",
       "desc": "创建和修改页面。",
@@ -352,12 +358,6 @@
       "desc": "套餐、银行卡和发票。",
       "short": "账单",
       "say": "管理账单"
-    },
-    "use_others_plans": {
-      "title": "使用其他人的套餐",
-      "desc": "把其他人连接的套餐给自己能编辑的智能体使用。套餐的主人会收到邮件，并且可以收回。",
-      "short": "使用其他人的套餐",
-      "say": "使用其他人的套餐"
     }
   },
   "auth": {
@@ -921,7 +921,7 @@
       "theo": {
         "name": "Theo",
         "role": "产品经理",
-        "desc": "整理任务，主持论坛。"
+        "desc": "整理任务，保持路线图最新。"
       },
       "ada": {
         "name": "Ada",
@@ -1064,7 +1064,6 @@
     "agent_reply": "智能体回复了",
     "agent_question": "有个问题要问你",
     "approval": "有一项审批在等你处理",
-    "forum_turn": "轮到你发表意见了",
     "mission_stopped": "一项专项任务已停止",
     "routine_failed": "一项例行工作没有完成",
     "run_failed": "一个智能体未能完成",
@@ -1213,7 +1212,7 @@
     "category": {
       "waiting": {
         "title": "等你处理",
-        "help": "审批、智能体的提问、论坛中轮到你、浏览器中的求助"
+        "help": "审批、智能体的提问、浏览器中的求助"
       },
       "replies": {
         "title": "智能体的回复",
@@ -1284,7 +1283,6 @@
       "drive": "文件、报告和表格",
       "routines": "智能体按时自己完成的工作",
       "calendar": "会议和截止日期",
-      "forum": "当一个决定需要多方意见时",
       "team": "谁是谁：成员、智能体及其分组"
     },
     "customizeSidebar": "自定义侧边栏",
@@ -1354,7 +1352,6 @@
     "team": "团队",
     "calendar": "日历",
     "drive": "Drive",
-    "forum": "论坛",
     "members": "成员",
     "channels": "频道",
     "agents": "智能体",
@@ -1392,29 +1389,29 @@
     "unreadNotifications_other": "{{count}} 条未读通知"
   },
   "agentGroups": {
-    "group": "分组",
-    "none": "无分组",
-    "newGroup": "新建分组",
-    "newFromAgent": "新建分组…",
+    "group": "部门",
+    "none": "无部门",
+    "newGroup": "新建部门",
+    "newFromAgent": "新建部门…",
     "nameLabel": "名称",
-    "namePlaceholder": "例如：产品和市场",
-    "create": "创建分组",
-    "renameTitle": "重命名分组",
-    "rename": "重命名",
+    "namePlaceholder": "例如：销售",
+    "create": "创建部门",
+    "renameTitle": "编辑部门",
+    "rename": "编辑",
     "options": "{{name}} 选项",
     "moveUp": "上移",
     "moveDown": "下移",
-    "delete": "删除分组",
-    "deleteTitle": "删除分组 {{name}}？",
+    "delete": "删除部门",
+    "deleteTitle": "删除部门“{{name}}”？",
     "deleteText": "其中的智能体会回到“智能体”。",
     "dropHere": "把智能体拖到这里",
-    "moved": "{{name}} 已移到分组“{{group}}”",
-    "movedOut": "{{name}} 已离开分组“{{group}}”",
+    "moved": "{{name}} 已移到 {{group}}",
+    "movedOut": "{{name}} 已离开 {{group}}",
     "undo": "撤销"
   },
   "sidebarAgents": {
     "options": "智能体选项",
-    "add": "新建智能体或分组",
+    "add": "新建智能体或部门",
     "order": "顺序",
     "sort": {
       "workspace": "工作区的顺序",
@@ -1424,7 +1421,7 @@
     "showAll": "显示不与我对话的智能体",
     "collapseAll": "全部收起",
     "expandAll": "全部展开",
-    "organize": "在团队中整理分组",
+    "organize": "在团队中整理部门",
     "more_other": "团队中还有 {{count}} 个智能体",
     "createFirst": "创建第一个智能体",
     "working_other": "{{count}} 个工作中",
@@ -1432,8 +1429,8 @@
     "workingIn": "正在 #{{channel}} 工作",
     "talksOnly": "只与 {{name}} 对话",
     "talksOnlyMore_other": "只与 {{name}} 和另外 {{count}} 人对话",
-    "changeGroup": "更换分组",
-    "newGroupWith": "与 {{name}} 新建分组",
+    "changeGroup": "移到部门",
+    "newGroupWith": "包含 {{name}} 的新部门",
     "dmsEmpty": "你与成员的对话会显示在这里。"
   },
   "sidebarPins": {
@@ -1459,57 +1456,101 @@
   },
   "team": {
     "title": "团队",
-    "groups": {
-      "title": "智能体分组"
+    "people_other": "{{count}} 人",
+    "agents_other": "{{count}} 个智能体",
+    "sectorsCount_other": "{{count}} 个部门",
+    "viewLabel": "团队视图",
+    "view": {
+      "list": "列表",
+      "chart": "组织架构图",
+      "map": "地图",
+      "sectors": "部门",
+      "usage": "治理与用量"
     },
-    "subtitle_other": "{{count}} 个智能体，按负责人分组。",
-    "working_other": "{{count}} 个正在工作。",
-    "skyLabel": "按负责人分组的智能体。点击智能体查看它做什么。",
-    "tapHint": "点击一个智能体",
-    "asked": "{{from}} 询问了 {{to}}",
     "noOwner": "无负责人",
-    "openAgent": "{{name}}，查看详情",
-    "close": "关闭",
-    "details": "{{name}} 的详情",
-    "of": "由 {{name}} 负责",
-    "does": "他做什么",
-    "does_female": "她做什么",
-    "canDo": "他能做什么",
-    "canDo_female": "她能做什么",
-    "onlyChat": "仅对话",
     "workingNow": "正在工作",
     "available": "空闲",
-    "talk": "对话",
-    "edit": "编辑",
-    "feedTitle": "智能体之间的对话",
-    "feedWindow": "最近 24 小时",
-    "feedEmpty": "最近 24 小时内，没有智能体向其他智能体求助。",
     "archived": "已归档",
-    "consultation": {
-      "open": "等待回答",
-      "answered": "已回答",
-      "expired": "没有得到回答",
-      "failed": "没有得到回答"
-    },
     "emptyTitle": "还没有智能体",
     "empty": "创建第一个智能体，组建你的团队。",
-    "cap": {
-      "drive": "文件",
-      "issues": "任务",
-      "calendar": "日历",
-      "schedule": "例行工作",
-      "forum": "论坛",
-      "wiki": "Wiki",
-      "sandbox": "电脑",
-      "desktop": "屏幕",
-      "browser": "浏览器",
-      "database": "数据库",
-      "github": "GitHub",
-      "sentry": "Sentry",
-      "linear": "Linear",
-      "mail": "邮件",
-      "vault": "Vault",
-      "custom": "工作区工具"
+    "list": {
+      "agents": "智能体",
+      "people": "成员",
+      "search": "按名称、角色或频道搜索",
+      "filterLabel": "显示智能体",
+      "filter": {
+        "mine": "我的",
+        "working": "正在工作",
+        "waiting": "等你处理",
+        "noOwner": "无负责人"
+      },
+      "groupBy": "分组方式",
+      "by": {
+        "sector": "分组方式：部门",
+        "owner": "分组方式：负责人",
+        "none": "不分组"
+      },
+      "col": {
+        "agent": "智能体",
+        "role": "角色",
+        "owner": "负责人",
+        "channels": "所在位置",
+        "now": "现在",
+        "menu": "选项",
+        "person": "成员",
+        "roles": "角色",
+        "caresFor": "负责"
+      },
+      "noChannel": "不在任何频道",
+      "none": "没有匹配的智能体。"
+    },
+    "chart": {
+      "byLabel": "组织架构图方式",
+      "byPerson": "按人员",
+      "bySector": "按部门",
+      "subPerson": "每个智能体显示在负责人之下，没有负责人时显示在其部门负责人之下。",
+      "subSector": "每个部门及其智能体。{{name}} 和所有人一起工作。",
+      "workspace": "工作区",
+      "responsible": "负责人：{{names}}"
+    },
+    "map": {
+      "lead": "谁负责这些智能体、它们在哪些频道、各自独立做什么、哪些在等人处理。虚线表示过去一天里互相求助过的智能体。",
+      "lodi": "和你一起整理团队",
+      "hint": "把智能体拖到另一个频道，{{name}} 会准备好更改，由你来应用",
+      "proposed": "{{name}} 已在你们的对话中准备好更改。请在那里应用。",
+      "open": "打开",
+      "reasonMove": "从团队地图：把 {{agent}} 从 #{{from}} 移到 #{{to}}。",
+      "reasonJoin": "从团队地图：把 {{agent}} 加入 #{{to}}。",
+      "waiting_other": "{{count}} 个请求等待审批",
+      "moreRoutines_other": "另有 {{count}} 项例行工作",
+      "empty": "还没有智能体在频道中。",
+      "others": "其他频道"
+    },
+    "sectors": {
+      "lead": "每个部门都有负责人、替补、智能体，以及它们的频道和例行工作。",
+      "ask": "和 {{name}} 对话",
+      "askText": "帮我把团队按部门整理一下。",
+      "leadLabel": "负责人",
+      "backupLabel": "替补",
+      "leadOf": "{{name}} 的负责人",
+      "backupOf": "{{name}} 的替补",
+      "nobody": "无人",
+      "none": "无",
+      "channels": "频道",
+      "routines": "例行工作",
+      "leads": "负责 {{name}}",
+      "covers": "替补 {{name}}",
+      "placeHint": "把智能体拖到某个部门即可放入该部门。",
+      "gap": {
+        "noLead": "还没有负责人。请选择负责这个部门的人。",
+        "noBackup": "没有替补。负责人不在时，没人接手。"
+      },
+      "emptyTitle": "还没有部门",
+      "empty": "部门按领域整理智能体，比如销售或支持。它们会作为分区显示在每个人的列表中。"
+    },
+    "usage": {
+      "lead": "本月每个人使用智能体的情况，以及上限。",
+      "settings": "设置中也有"
     }
   },
   "sky": {
@@ -1776,6 +1817,12 @@
         "invite": "邀请成员",
         "firstTask": "给 {{name}} 第一个任务"
       },
+      "style": {
+        "question": "你希望我怎么跟你说？",
+        "text": "对所有智能体都有效，你可以随时在账户中更改。",
+        "simple": "简单，不用术语",
+        "technical": "技术，附带细节"
+      },
       "firstTask": {
         "theo": "制定我们第一周的计划：我们每个人先做什么？",
         "ada": "你能先为我们构建或自动化什么？",
@@ -1896,6 +1943,83 @@
       "open": "打开",
       "web": "在网站上打开",
       "notAllowed": "你无权访问此页面"
+    }
+  },
+  "teamWeek": {
+    "title": "团队周报",
+    "suggestions_other": "{{count}} 条建议",
+    "stat": {
+      "done": "完成的任务",
+      "stuck": "卡住了",
+      "waiting": "在等你",
+      "budget": "本月预算 {{budget}}"
+    },
+    "worked": "做得好的",
+    "workedRuns_other": "{{name}} 在 #{{channel}} 完成了 {{count}} 项工作",
+    "workedTasks_other": "{{name}} 关闭了 {{count}} 个任务",
+    "improve": "可以改进的",
+    "approvals": {
+      "title_other": "{{name}} 的 {{count}} 个请求在等你",
+      "line": "从 {{since}} 起在等。",
+      "action": "查看并批准",
+      "hide": "收起"
+    },
+    "budget": {
+      "title": "{{name}} 的预算：{{from}} → {{to}}",
+      "line_other": "本月 {{count}} 次停在上限。"
+    },
+    "channel": {
+      "title": "把 {{name}} 加入 #{{channel}}",
+      "line": "{{name}} 不在任何频道里，所以这一周没人和它说话。"
+    },
+    "unanswered": {
+      "title": "一个回答 #{{channel}} 问题的智能体",
+      "line_other": "本周 #{{channel}} 有 {{count}} 个问题没人回答。",
+      "action": "提议一个智能体",
+      "message": "提议一个智能体，回答本周 #{{channel}} 里没人回答的问题。",
+      "done": "已请 {{name}}"
+    },
+    "routine": {
+      "title": "{{name}} 的例行任务：每天 {{time}}",
+      "line_other": "本周你有 {{count}} 天都这样要求过：“{{text}}”",
+      "action": "创建例行任务",
+      "done": "例行任务已创建"
+    },
+    "stalled": {
+      "title": "#{{number}} {{title}} 的步骤停了",
+      "line_other": "步骤 {{steps}} 已经停了 {{hours}} 小时，在等 #{{on}}。",
+      "action": "并行推进",
+      "message": "@{{handle}} 步骤 {{steps}} 不需要等 #{{on}}。请并行推进它们。",
+      "messageNoAgent": "步骤 {{steps}} 不需要等 #{{on}}。可以并行推进。",
+      "done": "消息已发送"
+    },
+    "applied": "已应用",
+    "undo": "撤销",
+    "gone": "已不适用",
+    "applyAll_other": "全部应用 {{count}} 条",
+    "notNow": "以后再说",
+    "dismissed": "目前没有变化。关于这一周的问题都可以在这里问。",
+    "change": "更改",
+    "every": {
+      "sun": "每周日 {{time}}",
+      "mon": "每周一 {{time}}",
+      "tue": "每周二 {{time}}",
+      "wed": "每周三 {{time}}",
+      "thu": "每周四 {{time}}",
+      "fri": "每周五 {{time}}",
+      "sat": "每周六 {{time}}"
+    },
+    "off": "已关闭",
+    "schedule": {
+      "title": "什么时候发",
+      "day": "星期",
+      "hour": "时间",
+      "stop": "不再接收",
+      "start": "重新接收"
+    },
+    "settings": {
+      "label": "团队周报",
+      "help": "每周 {{name}} 会在你的私信里告诉你团队的情况和可以改进的地方。只有管理员会收到。"
     }
   },
   "routing": {
@@ -3077,7 +3201,9 @@
       "browser": "需要你在浏览器中操作",
       "desktop": "需要你在电脑上操作",
       "proposal": "提议一项更改",
-      "agent": "提议创建新智能体"
+      "agent": "提议创建新智能体",
+      "team": "提议一个团队",
+      "firstTask": "第一个任务"
     },
     "waitingYou": "等你处理",
     "waitingFor": "等待 {{name}}",
@@ -3092,6 +3218,8 @@
       "desktop": "<b>{{name}}</b> 需要你在电脑上操作 · {{what}}",
       "proposal": "<b>{{name}}</b> 提议一项更改 · {{what}}",
       "agent": "<b>{{name}}</b> 提议创建新智能体 · {{what}}",
+      "team": "<b>{{name}}</b> 提议了一个团队 · {{what}}",
+      "firstTask": "<b>{{name}}</b> 建议了第一个任务 · {{what}}",
       "more": "+{{count}}",
       "see": "查看"
     }
@@ -3315,6 +3443,11 @@
   },
   "notifications": {
     "title": "通知",
+    "planLent": {
+      "takeBack": "收回",
+      "takeBackAll": "从所有智能体收回",
+      "done": "你的套餐已收回"
+    },
     "docTitleUnread": "({{count}}) 通知",
     "summaryWaiting_other": "{{count}} 件事等你处理",
     "summaryUnread_other": "{{count}} 条未读",
@@ -3357,17 +3490,6 @@
       "stoppedForF": "已停下 {{time}}",
       "stoppedForM": "已停下 {{time}}",
       "openThread": "打开对话",
-      "table": "邀请你上圆桌发言",
-      "roundWaits": "本轮等待 {{time}}",
-      "yourTurn": "第 {{round}} 轮，共 {{rounds}} 轮 · 轮到你发言了",
-      "yourTurnNoRound": "轮到你发言了",
-      "seatYou": "你",
-      "seatYours": "轮到你",
-      "seatSpoke": "已发言",
-      "seatPassed": "已跳过",
-      "seatLater": "稍后",
-      "speak": "在圆桌上发言",
-      "pass": "跳过你的发言",
       "approval": "请求审批",
       "decide": "在“审批”中决定",
       "wants": "<b>{{name}}</b> 想要<b>{{action}}</b>",
@@ -3386,8 +3508,7 @@
         "send": "向外部发送消息",
         "draft": "保存草稿"
       },
-      "resolved": "{{name}} 收到了你的回复，已继续工作",
-      "resolvedForum": "你的发言已进入本轮"
+      "resolved": "{{name}} 收到了你的回复，已继续工作"
     },
     "what": {
       "mention": "<b>{{name}}</b> 提及了你",
@@ -3403,8 +3524,6 @@
       "issueComment_other": "<b>{{names}}</b> 评论了你关注的任务",
       "issueStatus": "<b>{{name}}</b> 移动了你关注的任务",
       "issueDone": "<b>{{name}}</b> 完成了你关注的任务",
-      "forumTurn": "<b>{{name}}</b> 邀请你上圆桌发言",
-      "forumSynthesis": "<b>{{name}}</b> 发布了你的主题的总结",
       "approval": "<b>{{name}}</b> 请求审批",
       "missionFinished": "<b>{{name}}</b> 完成了一个专项任务",
       "missionStopped": "<b>{{name}}</b> 停止了一个专项任务",
@@ -3418,6 +3537,7 @@
       "agentUnreached": "一个例行工作无法叫到 <b>{{name}}</b>",
       "browserProfileRequest": "<b>{{name}}</b> 申请为 <b>{{agent}}</b> 再添加一个浏览器配置文件",
       "desktopTaken": "<b>{{name}}</b> 接管了 <b>{{agent}}</b> 的电脑屏幕",
+      "planLent": "<b>{{name}}</b> 把你的 {{plan}} 套餐连接到了 <b>{{agent}}</b>",
       "routineWaitingPlan": "<b>{{name}}</b> 正在等待套餐额度重置后运行例行工作",
       "planResetUnknown": "{{plan}} 没有说明额度何时重置。<b>{{name}}</b> 的工作仍在等待。",
       "catchUpClosed_other": "<b>{{name}}</b> 已恢复，并跳过了 {{count}} 个无需回复的对话",
@@ -3448,8 +3568,7 @@
       "usageLimitReached": "<b>{{name}}</b> 已达到 {{amount}} 的额度",
       "usageLimitRequest": "<b>{{name}}</b> 已达到 {{amount}} 的额度并申请增加",
       "usageLimitRaised": "<b>{{name}}</b> 提高了你本月的额度",
-      "usageLimitRefused": "<b>{{name}}</b> 拒绝了你增加使用的申请",
-      "planLent": "<b>{{name}}</b> 把你的 {{plan}} 套餐连接到了 <b>{{agent}}</b>"
+      "usageLimitRefused": "<b>{{name}}</b> 拒绝了你增加使用的申请"
     },
     "usageLimit": {
       "runs_other": "本月 {{count}} 次请求",
@@ -3466,7 +3585,6 @@
       "threadOnly": "话题",
       "dm": "私信",
       "issue": "任务 #{{number}}",
-      "forum": "论坛",
       "mission": "专项任务",
       "routine": "例行工作",
       "approval": "审批",
@@ -3518,7 +3636,6 @@
       "channel": "在 #{{channel}} 中回复",
       "issue": "评论 #{{number}}",
       "issueNoNumber": "评论任务",
-      "forum": "用一两句话表明你的立场",
       "reply": "回复",
       "sends": "发送",
       "closes": "关闭",
@@ -3545,9 +3662,6 @@
       "sent": "回复已发送",
       "see": "查看",
       "answered": "{{name}} 收到了你的回复",
-      "spoke": "你的发言已进入本轮",
-      "passed": "你跳过了发言",
-      "passedDetail": "本轮继续进行。总结发布后会出现在这里。",
       "decideThere": "这个请求需要在“审批”中决定"
     },
     "calmTitle": "全部处理完了",
@@ -3556,12 +3670,7 @@
     "noneUnread": "全部已读。",
     "noneHere": "这里暂时没有内容。",
     "noneDone": "过去 30 天内没有标记为完成的内容。",
-    "more": "显示更多",
-    "planLent": {
-      "takeBack": "收回",
-      "takeBackAll": "从所有智能体收回",
-      "done": "你的套餐已收回"
-    }
+    "more": "显示更多"
   },
   "approvals": {
     "title": "审批",
@@ -3856,6 +3965,7 @@
         "accountMove": "{{agents}} 正在使用 · 移到这里",
         "accountAlso": "{{agents}} 也在使用",
         "accountOf": "{{name}} 的",
+        "accountOthers": "其他人的套餐会显示是谁的。主人会收到邮件，并且可以收回。",
         "addAccount": "添加账号",
         "signInAgain": "重新登录",
         "connectPlan": "连接其他套餐",
@@ -4010,8 +4120,7 @@
           "sendFailed": "无法发送代码，请检查后重试。",
           "done": "{{account}} 账号已在 {{computer}} 上。点击“使用”保存。"
         },
-        "offCloud": "{{computer}} 无响应",
-        "accountOthers": "其他人的套餐会显示是谁的。主人会收到邮件，并且可以收回。"
+        "offCloud": "{{computer}} 无响应"
       },
       "computer": {
         "title": "{{name}} 在哪里工作？",
@@ -4098,7 +4207,7 @@
       "machine": "电脑",
       "brain": "思考方式",
       "repos": "GitHub 仓库",
-      "group": "分组",
+      "group": "部门",
       "handle": "提及"
     },
     "lines": {
@@ -4608,8 +4717,8 @@
       "pm": {
         "name": "产品经理",
         "agent": "Theo",
-        "desc": "整理任务、摘要和论坛。",
-        "instructions": "先自己查找（任务、话题、Wiki、反馈），只问剩下不清楚的。\n整理任务，总结冗长的讨论，保持路线图最新。\n每周五在论坛上发布本周摘要。"
+        "desc": "整理任务和摘要。",
+        "instructions": "先自己查找（任务、话题、Wiki、反馈），只问剩下不清楚的。\n整理任务，总结冗长的讨论，保持路线图最新。"
       },
       "support": {
         "name": "客服",
@@ -5109,10 +5218,6 @@
       "title": "与 {{name}} 的私信",
       "text": "私信功能还没上线。目前请在频道中与 {{name}} 交流。"
     },
-    "forum": {
-      "title": "论坛",
-      "text": "长篇讨论和工作区公告将放在这里。"
-    },
     "search": {
       "title": "搜索工作区",
       "text": "这里将可以搜索消息、任务和文件。",
@@ -5241,10 +5346,6 @@
     "wiki_write": {
       "label": "写入 wiki",
       "description": "创建和编辑 wiki 页面，仅在有人要求时。"
-    },
-    "forum_write": {
-      "label": "论坛",
-      "description": "创建论坛主题、阅读主题，并在非自己的轮次发帖。"
     },
     "schedule_write": {
       "label": "日程安排",
@@ -5522,8 +5623,8 @@
     "createdBy": "#{{number}} · 由 {{name}} 创建",
     "createdByShort": "由 {{name}} 创建",
     "fromMessage": "来自<0>#{{channel}} 中的一条消息</0>",
-    "fromForum": "来自一个论坛主题",
     "fromAgent": "来自对智能体的一个请求",
+    "subIssues_other": "子任务 · {{count}}",
     "fromWebhook": "来自一个 {{provider}} 事件",
     "description": "描述",
     "noDescription": "没有描述。",
@@ -5612,9 +5713,7 @@
       "artifact_linked": "附加了一个文件",
       "criterion_checked": "勾选了标准“{{text}}”",
       "criterion_unchecked": "取消勾选了标准“{{text}}”",
-      "agent_asked": "请 {{name}} 来完成",
-      "forum_opened": "将它提交到论坛：{{title}}",
-      "forum_evaluated": "带回了论坛的结果：{{title}}"
+      "agent_asked": "请 {{name}} 来完成"
     }
   },
   "routines": {
@@ -5700,8 +5799,6 @@
     "widgetChip": "仪表盘小组件",
     "widgetFixed": "显示什么、何时更新、由谁负责，都在它的小组件里修改。",
     "target": {
-      "forum": "论坛主题",
-      "forumShort": "论坛",
       "dm": "我与智能体的私信",
       "artifact": "Drive 中的文档",
       "dmShort": "私信",
@@ -5799,7 +5896,6 @@
         "thread": "每次运行都在同一个话题中回复",
         "channel": "频道里的所有人都能看到",
         "dm": "只有你能看到",
-        "forum": "智能体在论坛主题中讨论",
         "artifact": "生成 Drive 中的文档",
         "widget": "更新它的小组件，不发消息"
       },
@@ -5886,7 +5982,6 @@
       "keepUtc": "保留 UTC",
       "adjust": "调整",
       "next": "下次",
-      "forumAgents": "参与讨论的智能体",
       "agent": "智能体",
       "target": "发送到哪里",
       "what": "做什么",
@@ -6905,6 +7000,49 @@
     "list": "模型",
     "picks": "{{provider}} · 推荐选择"
   },
+  "endpoint": {
+    "option": "其他提供方",
+    "optionSub": "兼容 OpenAI 或 Claude：网关、Ollama、vLLM、LM Studio、LiteLLM",
+    "name": "名称",
+    "namePlaceholder": "我的网关",
+    "style": "API",
+    "styles": {
+      "openai": "OpenAI (Chat Completions)",
+      "anthropic": "Claude (Messages)"
+    },
+    "address": "地址",
+    "addressHelp": "API 的基础地址，例如 {{example}}",
+    "key": "API 密钥",
+    "keyHelp": "如果服务器不需要密钥，请留空。",
+    "fetch": "获取模型",
+    "listFailed": "服务器没有列出模型（{{error}}）。请在下方输入每个模型的 ID。",
+    "choose": "选择智能体可以使用的模型",
+    "addModel": "添加模型",
+    "add": "添加",
+    "modelPlaceholder": "模型 ID，例如 llama-4",
+    "modelInvalid": "这看起来不像模型 ID。",
+    "priceIn": "{{model}}：输入价格",
+    "priceOut": "{{model}}：输出价格",
+    "priceInShort": "输入",
+    "priceOutShort": "输出",
+    "priceUnit": "每百万 token 的 US$",
+    "priceBoth": "请同时填写输入和输出，或都不填。",
+    "priceInvalid": "请使用数字，例如 0.50",
+    "unpriced": "没有价格的模型在预算中不计费用：只统计它的 token。",
+    "save": "保存并测试",
+    "saveModels": "保存并重新测试",
+    "testing": "正在测试每个模型…",
+    "results": "每个模型的测试",
+    "check": {
+      "ok": "可用，支持工具",
+      "noTools": "会回答，但没有使用工具。智能体需要工具才能工作。",
+      "failed": "失败：{{error}}"
+    },
+    "done": "完成",
+    "models": "模型",
+    "modelsTitle": "{{name}} 的模型",
+    "budgetUnpriced": "此智能体的模型没有价格，因此预算无法统计它的花费。它的 token 会被统计。"
+  },
   "timezone": {
     "search": "搜索时区",
     "searchPlaceholder": "城市、国家、UTC+8…",
@@ -7779,7 +7917,6 @@
     "inviteKeywords": "邀请 邀请函 成员 人 团队 invite member people team",
     "wikiPage": "wiki 页面",
     "wikiNew": "新建 Wiki 页面",
-    "forum": "论坛主题",
     "jump": "前往…",
     "open": "前往，或询问智能体",
     "placeholder": "前往，或询问智能体…",
@@ -7795,498 +7932,6 @@
     "newConversation": "新对话",
     "askLabel": "{{name}}，{{text}}",
     "empty": "没有找到“{{q}}”相关内容。"
-  },
-  "forum": {
-    "title": "论坛",
-    "subtitle": "一个带有目标的问题。智能体们轮流分轮讨论，最后给出总结。",
-    "guard": "工作区中的所有人都可以阅读。每一轮发言都是一次普通运行：工具和审批照常适用。",
-    "new": "新主题",
-    "filters": "筛选主题",
-    "filter": {
-      "open": "讨论中",
-      "done": "已结束",
-      "mine": "我的"
-    },
-    "listTitle": {
-      "open": "讨论中",
-      "done": "已结束",
-      "mine": "我的主题"
-    },
-    "agentFilter": "智能体",
-    "agentCount_other": "{{count}} 个智能体",
-    "search": "搜索论坛",
-    "clearFilters": "清除筛选",
-    "emptyFilter": "没有符合这些筛选条件的主题。",
-    "liveNow": "正在讨论",
-    "needsYou": "需要你参与",
-    "status": {
-      "open": "讨论中",
-      "stalled": "已停滞",
-      "reopened": "已重新开启",
-      "done": "已结束",
-      "canceled": "已取消"
-    },
-    "reopenedBy": "由 {{name}} 重新开启",
-    "roundOf": "第 {{round}} 轮，共 {{rounds}} 轮",
-    "rounds_other": "{{count}} 轮",
-    "until": "截至 {{when}}",
-    "noDeadline": "无截止时间",
-    "deadlineToday": "今天 {{time}}",
-    "deadlineTomorrow": "明天 {{time}}",
-    "you": "{{name}}（你）",
-    "empty": {
-      "title": "还没有主题",
-      "text": "提出一个难题，让智能体们分轮讨论。你也可以在聊天中发起：“@智能体 把这个拿到论坛讨论”。"
-    },
-    "live": {
-      "writing": "{{name}} 正在撰写",
-      "reading": "{{name}} 正在阅读讨论",
-      "yourTurn": "轮到你了",
-      "waiting": "等待 {{name}}",
-      "synthesis": "{{name}} 正在撰写总结",
-      "stalled": "在 {{name}} 的发言轮次停滞",
-      "stalled_female": "在 {{name}} 的发言轮次停滞",
-      "stalledSynthesis": "在总结阶段停滞",
-      "next": "下一位：{{name}}",
-      "thenSynthesis": "然后：总结"
-    },
-    "need": {
-      "turnTitle": "轮到你在“{{title}}”中发言",
-      "turn": "第 {{round}} 轮轮到你了，本轮在等你。",
-      "turnDeadline": "第 {{round}} 轮轮到你了。如果你在 {{when}} 前没有发言，讨论将在没有你的情况下继续。",
-      "speak": "立即发言",
-      "issues_other": "总结建议了 {{count}} 个任务，只有在有人批准后才会创建。",
-      "planIssues_other": "计划建议了 {{count}} 个任务，只有在有人批准后才会创建。",
-      "subIssues_other": "计划建议在 #{{number}} 中创建 {{count}} 个子任务，只有在有人批准后才会创建。",
-      "review": "审核任务",
-      "budget": "{{name}} 的预算已用完，将跳过他接下来的发言。",
-      "budget_female": "{{name}} 的预算已用完，将跳过她接下来的发言。",
-      "seeBudget": "查看预算",
-      "stalled": "已停滞：在有人恢复之前，没有人会发言。",
-      "resume": "恢复"
-    },
-    "row": {
-      "canceled": "已取消，没有总结。"
-    },
-    "origin": {
-      "direct": "直接在论坛中发起",
-      "agent": "{{name}}，#{{channel}}",
-      "agentNoChannel": "由 {{name}} 发起",
-      "suggestion": "由 {{name}} 建议",
-      "suggestionIn": "由 {{name}} 在 #{{channel}} 中建议",
-      "issue": "任务 #{{number}}",
-      "issueBy": "任务 #{{number}} · 由 {{name}} 提出",
-      "issueBy_female": "任务 #{{number}} · 由 {{name}} 提出",
-      "routine": "例行工作",
-      "conversation": "一段对话"
-    },
-    "track": {
-      "label_other": "{{count}} 次智能体发言，{{rounds}}",
-      "spoke": "第 {{round}} 轮 · {{name}} · {{stance}}",
-      "spokeNoStance": "第 {{round}} 轮 · {{name}}",
-      "person": "第 {{round}} 轮 · {{name}} 加入了",
-      "seat": "第 {{round}} 轮 · {{name}} 按顺序发言",
-      "passed": "第 {{round}} 轮 · {{name}} 跳过了",
-      "waiting": "本轮在等 {{name}}",
-      "waitingMe": "本轮在等你",
-      "seatPending": "第 {{round}} 轮 · 轮到 {{name}}",
-      "live": "{{name}} 正在撰写",
-      "sleep": "在 {{name}} 的发言轮次停滞",
-      "sleep_female": "在 {{name}} 的发言轮次停滞",
-      "synthesis": "{{name}} 的总结",
-      "synthesis_female": "{{name}} 的总结",
-      "synthesisLive": "{{name}} 正在撰写总结",
-      "skipped": "第 {{round}} 轮 · {{name}} 没有发言",
-      "budget": "第 {{round}} 轮 · {{name}} 已跳过：智能体的预算已用完",
-      "pending": "第 {{round}} 轮 · 轮到 {{name}}",
-      "pending_female": "第 {{round}} 轮 · 轮到 {{name}}",
-      "round": "第 {{n}} 轮",
-      "roundShort": "第{{n}}轮",
-      "key": "每一列代表一次发言，颜色对应发言者，高度代表发言长度。",
-      "keyLive": "图标表示当前发言者，圆点表示剩余的发言轮次。",
-      "keyDone": "末尾的宽块是总结。",
-      "keyClick": "点击即可跳到那次发言。"
-    },
-    "stance": {
-      "propose": "提议",
-      "agree": "同意 {{name}}",
-      "agreeAny": "同意",
-      "disagree": "不同意 {{name}}",
-      "disagreeAny": "不同意",
-      "shift": "改变立场",
-      "ask": "提问",
-      "askPeople": "向成员提问",
-      "reply": "回复 {{name}}",
-      "replyAny": "回复",
-      "people": "成员"
-    },
-    "topic": {
-      "back": "论坛",
-      "goal": "目标",
-      "responsible": "负责人",
-      "requestedBy": "提出者",
-      "reopenedFor": "由 {{name}} 重新开启，进入第 {{round}} 轮",
-      "conclude": "结束讨论",
-      "concluding": "正在结束…",
-      "more": "更多操作",
-      "copyLink": "复制链接",
-      "linkCopied": "链接已复制。打开链接的人可以阅读整个主题。",
-      "editParticipants": "编辑参与者",
-      "cancel": "取消主题",
-      "notFound": "找不到主题。"
-    },
-    "table": {
-      "title": "讨论席",
-      "order": "按此顺序发言，每轮一次",
-      "orderDone": "按此顺序发言过",
-      "writes": "撰写总结",
-      "writesPlan": "撰写计划",
-      "seatedPerson": "成员 · 在讨论席",
-      "next": "下一位",
-      "yourTurn": "轮到你了",
-      "waits": "本轮在等待",
-      "writing": "正在撰写",
-      "reading": "正在阅读讨论…",
-      "rereading": "正在重读各轮发言…",
-      "writingSynthesis": "正在撰写总结",
-      "stopped": "停在这里",
-      "broke": "预算用完，跳过本次发言",
-      "wroteSynthesis": "撰写了总结",
-      "spokeAt": "于 {{time}} 发言",
-      "passed": "跳过了",
-      "notYet": "还没有发言",
-      "readsCanEnter": "可阅读并随时加入",
-      "entered": "在第 {{round}} 轮加入",
-      "sits": "在讨论席",
-      "orgReads": "整个工作区都可阅读"
-    },
-    "posts": {
-      "round": "第 {{n}} 轮",
-      "startedWith": "从 {{name}} 开始",
-      "spokeCount": "{{total}} 位中已有 {{said}} 位发言",
-      "none": "{{name}} 首先发言，第一轮已经开始。",
-      "person": "成员",
-      "starts": "第 {{round}} 轮从这里开始",
-      "started": "第 {{round}} 轮从这里开始了",
-      "last": "这是最后一轮：此发言会纳入总结",
-      "askedRound": "请求了新一轮",
-      "inTurn": "在自己的轮次中",
-      "reroundFrom": "从这里请求新一轮",
-      "replyTo": "跳到 {{name}} 的发言",
-      "budgetSkip": "{{name}} 跳过了本次发言：智能体的预算已用完。",
-      "passedTurn": "{{name}} 跳过了。",
-      "didntSpeak_other": "{{names}} 在本轮没有发言。",
-      "stopped": "在发言中途停止。",
-      "comments": "评论",
-      "afterSynthesis": "总结之后"
-    },
-    "liveTurn": {
-      "writing": "正在撰写 · 第 {{round}} 轮",
-      "reading": "正在阅读讨论 · 第 {{round}} 轮",
-      "synthesis": "正在撰写总结",
-      "rereading": "正在重读各轮发言",
-      "readingLine": "正在阅读讨论…",
-      "waitsFor": "本轮在等待在讨论席上的 {{name}}。",
-      "yourTurn": "轮到你了",
-      "yourTurnSub": "第 {{round}} 轮 · 本轮在等你",
-      "yourTurnPlaceholder": "你怎么看？智能体会在下一次发言前阅读。",
-      "pass": "跳过",
-      "send": "发送",
-      "deadline": "如果你在 {{when}} 前没有发言，讨论将在没有你的情况下继续。",
-      "passed": "你跳过了。本轮这次会在没有你的情况下继续。",
-      "spoke": "你已在自己的轮次中发言。本轮将按讨论席的顺序继续。"
-    },
-    "stalled": {
-      "title": "在 {{name}} 的发言轮次停滞",
-      "title_female": "在 {{name}} 的发言轮次停滞",
-      "titleSynthesis": "在总结阶段停滞",
-      "stopped": "{{name}} 停止了本次发言。在有人恢复之前，没有人会发言。",
-      "stoppedAnon": "本次发言已停止。在有人恢复之前，没有人会发言。",
-      "failed": "本次发言失败。请重试，或根据已有发言结束讨论。",
-      "resume": "恢复",
-      "retry": "重试",
-      "concludeNow": "立即结束",
-      "resumed": "主题已恢复。"
-    },
-    "closed": {
-      "canceled": "已取消，没有总结。发言会保留在这里，任何人都可以阅读。",
-      "synthesizing": "{{name}} 正在撰写总结，其他人不再在这个主题中发言。",
-      "synthesizing_female": "{{name}} 正在撰写总结，其他人不再在这个主题中发言。"
-    },
-    "composer": {
-      "label": "加入讨论",
-      "placeholder": "加入讨论…",
-      "hint": "你可以随时加入：当前发言结束后，下一轮将从你的发言开始。",
-      "hintLast": "你可以随时加入：当前发言结束后，由于这是最后一轮，你的发言将直接纳入总结。",
-      "moreRound": "从你的发言再开一轮",
-      "send": "发送",
-      "sent": "你的发言已加入：下一轮将从它开始。",
-      "sentLast": "你的发言将纳入总结。",
-      "commentLabel": "评论",
-      "commentPlaceholder": "评论…",
-      "comment": "评论",
-      "commentAndRound": "评论并请求新一轮",
-      "commented": "评论已发布，主题仍为已结束状态。",
-      "reround": "从这条评论请求新一轮",
-      "doneHint": "主题已结束：评论不会重新开启它，除非你请求新一轮。",
-      "reroundHint": "讨论席上的智能体会在新一轮中回复你的评论，{{name}} 会重写总结。",
-      "reroundHint_female": "讨论席上的智能体会在新一轮中回复你的评论，{{name}} 会重写总结。"
-    },
-    "newRound": {
-      "title": "请求新一轮",
-      "text": "第 {{round}} 轮将从你的评论开始，主题以你的名义重新开启。",
-      "textFrom": "第 {{round}} 轮将从这条评论开始，主题以你的名义重新开启。",
-      "note": "你想补充的内容",
-      "notePlaceholder": "可选：智能体应该重新审视什么",
-      "defaultBody": "我从这条评论请求了新一轮。",
-      "who": "谁来回复",
-      "whoHint": "按讨论席的顺序",
-      "speaksAt": "第 {{n}} 个发言",
-      "broke": "预算用完：将跳过本次发言",
-      "ok": "请求新一轮",
-      "done": "主题已重新开启：第 {{round}} 轮。"
-    },
-    "conclude": {
-      "title": "结束这个主题？",
-      "text": "不会再开始新的发言，已有的发言将形成总结。",
-      "finishes": "{{name}} 完成他的发言",
-      "finishes_female": "{{name}} 完成她的发言",
-      "finishesSub": "现在轮到他们发言，之后不再有人发言。",
-      "nobody": "现在没有人在撰写",
-      "nobodySub": "总结会立即开始。",
-      "writes": "{{name}} 撰写总结",
-      "writes_female": "{{name}} 撰写总结",
-      "writesSub": "决定、各方的利弊、待解决问题、后续步骤和建议的任务。",
-      "writesSubPlan": "目标、范围内外、步骤、风险、衡量方式以及每个步骤的任务。",
-      "goes": "成为 Drive 中的一份文档，并回到它的来源",
-      "goesSub": "建议的任务只有在有人批准后才会创建。",
-      "keep": "继续讨论",
-      "ok": "结束讨论",
-      "done": "正在结束：总结会显示在这里和 Drive 中。"
-    },
-    "cancel": {
-      "title": "取消且不生成总结？",
-      "text": "不会再有人发言，也不会有内容进入 Drive。发言会保留在这里，任何人都可以阅读。",
-      "keep": "保留主题",
-      "ok": "取消主题",
-      "done": "主题已取消，发言保留在论坛中。"
-    },
-    "side": {
-      "title": "各方立场",
-      "titleDone": "各方最终立场",
-      "agree_other": "{{total}} 位中有 {{count}} 位同意",
-      "withProposal": "支持讨论席上的提议",
-      "withDecision": "支持这个决定",
-      "askers_other": "{{names}} 仍有疑问",
-      "agents": "每个智能体",
-      "notYet": "还没有发言",
-      "firstWriting": "正在撰写第一次发言…",
-      "writingNow": "正在撰写…",
-      "broke": "预算用完：跳过本次发言",
-      "spoke": "已发言",
-      "laneKey": "每轮一个方块。向上：支持讨论席上的提议。向下：反对。中间：提问。",
-      "laneLabel": "{{name}}：{{list}}",
-      "laneEmpty": "{{name}}：没有发言",
-      "laneRound": "第 {{round}} 轮：{{stance}}",
-      "laneLive": "第 {{round}} 轮：正在撰写",
-      "details": "详情",
-      "rounds": "轮数",
-      "roundsDone": "{{round}} / {{rounds}}",
-      "format": "形式",
-      "deadline": "截止时间",
-      "origin": "来源",
-      "openedBy": "发起人",
-      "participants": "参与者"
-    },
-    "format": {
-      "decision": "决定",
-      "plan": "计划",
-      "decisionHint": "一个决定，附带各方的利弊、待解决问题和后续步骤。",
-      "planHint": "一份计划：范围内外、按顺序排列并注明负责人的步骤、风险和衡量方式。步骤会变成任务。"
-    },
-    "formatLower": {
-      "decision": "决定",
-      "plan": "计划"
-    },
-    "synthesis": {
-      "eyebrow": "总结",
-      "eyebrowPlan": "计划",
-      "closed": "{{name}} 结束了主题",
-      "closed_female": "{{name}} 结束了主题",
-      "closedPlan": "{{name}} 完成了计划",
-      "closedPlan_female": "{{name}} 完成了计划",
-      "rewrote": "{{name}} 重写了总结",
-      "rewrote_female": "{{name}} 重写了总结",
-      "meta": "来自 {{agents}} 个智能体的 {{posts}} 次发言",
-      "metaPeople": "来自 {{agents}} 个智能体和成员的 {{posts}} 次发言",
-      "version": "第 {{n}} 版",
-      "versionN": "第 {{n}} 版",
-      "decision": "决定",
-      "objective": "目标",
-      "prosCons": "各方的利弊",
-      "why": "原因",
-      "openQuestions": "待解决问题",
-      "nextSteps": "后续步骤",
-      "forRequester": "给 {{name}}：",
-      "forRequester_female": "给 {{name}}：",
-      "inScope": "范围内",
-      "outOfScope": "范围外",
-      "steps": "步骤（按顺序）",
-      "after": "在 {{n}} 之后",
-      "startNow": "可以立即开始",
-      "risks": "风险",
-      "metrics": "衡量方式",
-      "changes": "第 {{n}} 版 · 变更内容",
-      "showV": "查看第 {{n}} 版",
-      "hideV": "隐藏第 {{n}} 版",
-      "replaced": "在第 {{round}} 轮后被替换",
-      "none": "无",
-      "issues": "建议的任务",
-      "subIssues": "在 #{{number}} 中建议的子任务",
-      "marked": "已勾选 {{on}} / {{total}}",
-      "allCreated": "已全部创建",
-      "goesTo": "交给 {{name}}",
-      "with": "与 {{name}} 一起",
-      "step": "第 {{n}} 步",
-      "approveTitle": "{{name}} 提出建议，由成员批准",
-      "approveTitle_female": "{{name}} 提出建议，由成员批准",
-      "approveText": "没有你，什么都不会创建。每个任务都已分配给指定的人。",
-      "approveTextPlan": "每个步骤都会变成一个子任务，并已注明负责人。没有你，什么都不会创建。",
-      "create_other": "创建 {{count}} 个任务",
-      "createSub_other": "在 #{{number}} 中创建 {{count}} 个子任务",
-      "created_other": "已创建 {{count}} 个任务。",
-      "createdSub_other": "已在 #{{number}} 中创建 {{count}} 个子任务。",
-      "wentTo": "去向",
-      "backIssue": "回到任务 #{{number}}",
-      "backIssueDone": "已回到任务 #{{number}}：计划 + {{count}} 个子任务",
-      "backChannel": "已回到它来源的对话",
-      "backNone": "留在论坛中",
-      "saveWiki": "保存到 Wiki"
-    },
-    "form": {
-      "title": "新主题",
-      "fromIssue": "在论坛中评估",
-      "editSuggestion": "编辑建议",
-      "subtitle": "智能体按讨论席的顺序依次发言，第一位负责撰写总结。",
-      "templatesText": "从模板开始或从头开始。开启前所有内容都可以修改。",
-      "tip": "提示：在聊天中输入“@智能体 把这个拿到论坛讨论”也可以开启主题。",
-      "templateMeta": "{{rounds}} · {{format}}",
-      "templates": {
-        "tech": {
-          "title": "技术决策",
-          "text": "选出一个方案，附带风险和计划。",
-          "goal": "选出一个方案并说明原因，附带风险和后续步骤。"
-        },
-        "review": {
-          "title": "审阅提案",
-          "text": "找出漏洞，带着修改清单离开。",
-          "goal": "阅读提案，指出漏洞，最后得出一份修改清单。"
-        },
-        "brain": {
-          "title": "头脑风暴",
-          "text": "收集想法，选出 3 个来测试。",
-          "goal": "收集想法、分组，并选出最好的 3 个来测试。"
-        },
-        "postmortem": {
-          "title": "事后复盘",
-          "text": "发生了什么、为什么，以及要改变什么。",
-          "goal": "讲清发生了什么，找出原因，并说明要做哪些改变来避免再次发生。"
-        },
-        "blank": {
-          "title": "从头开始",
-          "text": "写下问题，并选择谁来讨论。"
-        }
-      },
-      "question": "问题",
-      "questionPlaceholder": "例如：要把 outbox 队列改为 LISTEN/NOTIFY 吗？",
-      "origin": "来自 {{origin}}，结果会回到那里。",
-      "format": "产出形式",
-      "goal": "目标",
-      "goalPlaceholder": "例如：一个附带风险和上线计划的决定。",
-      "table": "讨论席",
-      "tableHint": "按发言顺序 · 拖动或使用箭头调整",
-      "personSeat": "成员 · 本轮会等待这次发言",
-      "addAgents": "把智能体加入讨论席",
-      "add": "把 {{name}} 加入讨论席",
-      "up": "上移 {{name}}",
-      "down": "下移 {{name}}",
-      "remove": "移除 {{name}}",
-      "unseat": "让 {{name}} 离开讨论席",
-      "noTalk": "不回复你",
-      "noTalkTitle": "{{name}} 不回复你",
-      "oneAgent": "只有一个智能体时，请使用话题，或在任务中使用“询问 {{name}}”。论坛适用于可能存在分歧的观点。",
-      "minAgents": "讨论至少需要选择 2 个智能体。",
-      "people": "会收到通知的成员",
-      "peopleHint": "工作区中的所有人都可以阅读",
-      "meAlways": "你，始终会收到通知",
-      "seatMe": "我加入讨论席",
-      "seatMeHint": "各轮会等待我发言",
-      "seatOther": "{{name}} 加入讨论席",
-      "seatOtherHint": "本轮会等待这次发言",
-      "rounds": "轮数",
-      "deadline": "截止时间",
-      "deadlines": {
-        "none": "无截止时间",
-        "today": "今天下午 6 点",
-        "tomorrow": "明天",
-        "friday": "周五"
-      },
-      "approvals": "每次发言都是一次普通运行：审批照常适用。",
-      "create": "开启主题",
-      "open": "开启论坛",
-      "created": "主题已开启。{{name}} 首先发言，工作区中的所有人都可以阅读。"
-    },
-    "participantsDialog": {
-      "title": "参与者",
-      "text": "讨论席上有 {{agents}} 个智能体，以及{{people}}。",
-      "people_other": "{{count}} 位收到通知的成员",
-      "search": "搜索参与者",
-      "speaksAt": "第 {{n}} 个发言",
-      "entered": "加入了讨论",
-      "notified": "已收到通知，可以加入",
-      "org": "整个工作区",
-      "orgReads": "可阅读主题",
-      "note": "对讨论席的修改将从下一轮开始生效。",
-      "edit": "编辑",
-      "saved": "参与者已更新。"
-    },
-    "suggestion": {
-      "label": "论坛建议",
-      "title": "值得开个论坛吗？",
-      "by": "{{name}} 建议",
-      "edit": "编辑",
-      "table": "讨论席",
-      "open": "开启论坛",
-      "notNow": "以后再说",
-      "note": "只有成员可以开启，它将以你的名义开启。",
-      "opened": "论坛已开启",
-      "openedBy": "由 {{name}} 从这段对话开启",
-      "openedToast": "论坛已开启，以你的名义。",
-      "dismissed": "{{name}} 忽略了这条建议。",
-      "dismissedMe": "你忽略了这条建议。",
-      "undo": "撤销"
-    },
-    "card": {
-      "label": "论坛主题",
-      "see": "查看讨论"
-    },
-    "issue": {
-      "section": "论坛",
-      "evaluate": "在论坛中评估",
-      "evaluateTitle": "需要不止一种观点",
-      "evaluateText": "当做决定的各方可能存在分歧时，就用论坛。结果会回到这个任务。",
-      "inForum": "正在论坛中评估",
-      "evaluated": "已在论坛中评估",
-      "outPlan": "产出一份计划",
-      "outDecision": "产出一个决定",
-      "subIssues_other": "子任务 · {{count}}"
-    },
-    "notify": {
-      "your_turn": "轮到你在“{{title}}”中发言。",
-      "requested": "应你的请求开启了一个论坛：“{{title}}”。",
-      "concluded": "论坛“{{title}}”已结束。",
-      "open": "打开"
-    }
   },
   "code": {
     "ranSummary_other": "运行了 {{count}} 行 {{language}} 代码 · 输出 {{size}}",
@@ -8706,7 +8351,6 @@
     "saveNew": "创建页面 {{title}}",
     "savedTo": "已保存到 {{title}}。",
     "fromMessage": "来自 #{{channel}} 中的一条消息",
-    "fromForum": "来自论坛总结",
     "note": {
       "created": "创建了页面",
       "edited": "编辑了",
@@ -8717,9 +8361,7 @@
       "moved": "移到了“{{folder}}”",
       "moved_root": "移到了根目录",
       "saved_message": "保存了一条消息",
-      "saved_synthesis": "保存了论坛总结",
       "created_from_message": "从一条消息创建",
-      "created_from_synthesis": "从论坛总结创建",
       "imported": "从“{{source}}”导入"
     }
   },
@@ -9010,7 +8652,6 @@
       "wiki": "Wiki",
       "skills": "技能",
       "schedule": "提醒和例行工作",
-      "forum": "论坛",
       "sandbox": "运行代码",
       "browser": "浏览器",
       "setup": "工作区设置",
@@ -9044,9 +8685,6 @@
       },
       "schedule": {
         "write": "为提出请求的人创建提醒和例行工作。"
-      },
-      "forum": {
-        "write": "在论坛中发起话题、阅读和发帖。"
       },
       "sandbox": {
         "write": "在智能体的电脑上运行代码。"
@@ -10880,6 +10518,9 @@
       "unknown": "这个角色已不存在。",
       "orderIncomplete": "角色已发生变化，请重新加载后重试。"
     },
+    "teamProposal": {
+      "undoExpired": "这个团队创建已超过一天，无法在这里撤销。请在各智能体的页面上归档它们。"
+    },
     "agentProposal": {
       "decided": "已经有人对这条建议做出了决定。",
       "expired": "这条建议已过期：一天内没有人做出决定。",
@@ -10975,8 +10616,7 @@
       "rangeTooLong": "话题的上下文最多容纳 {{max}} 条消息。",
       "titleTooLong": "标题最多 {{max}} 个字符。",
       "noContext": "这个话题不是由对话中的一段消息创建的。",
-      "notUndoable": "只有由一段消息创建的话题才能撤销。",
-      "forum": "论坛主题没有话题。"
+      "notUndoable": "只有由一段消息创建的话题才能撤销。"
     },
     "routine": {
       "tooFrequent": "例行工作最短每 15 分钟运行一次，请选择更长的间隔。",
@@ -11033,8 +10673,8 @@
       "noPendingUpdate": "这个技能没有待处理的更新。"
     },
     "agentGroup": {
-      "notFound": "这个分组已不存在。",
-      "tooMany": "此工作区已有 {{max}} 个分组，请先删除一个。"
+      "notFound": "这个部门已不存在。",
+      "tooMany": "这个工作区已有 {{max}} 个部门。请先删除一个。"
     },
     "handle": {
       "invalid": "@ 名称需为 {{min}} 到 {{max}} 个小写字母、数字、- 或 _。",
@@ -11667,8 +11307,7 @@
       "unattended": "自主执行"
     },
     "where": {
-      "dm": "私密对话",
-      "forum": "论坛：{{name}}"
+      "dm": "私密对话"
     },
     "system": "系统",
     "removed": "已移除",
@@ -11745,7 +11384,6 @@
         "mission": "一项专项任务",
         "thread": "一个话题",
         "channel": "一个频道",
-        "forum": "一个论坛主题",
         "artifact": "一个 Drive 文件",
         "agent": "一个智能体",
         "machine": "一台电脑",
@@ -11873,7 +11511,11 @@
       "device": "在此设备上",
       "activity": "在每条回复下显示智能体做了什么",
       "activityHelp": "它们使用的工具和花费的时间。在它们工作时，你仍能看到它们在做什么。",
-      "activityFailed": "无法保存，请重试。"
+      "activityFailed": "无法保存，请重试。",
+      "agentStyle": "智能体如何跟你说话",
+      "agentStyleHelp": "简单：用几句话说清发生了什么、要做什么。技术：附带路径、代码和细节。",
+      "agentStyleSimple": "简单",
+      "agentStyleTechnical": "技术"
     },
     "orgTitle": "工作区",
     "name": "名称",
@@ -12475,8 +12117,6 @@
       "seconds": "{{n}} 秒",
       "minutes": "{{n}} 分钟",
       "step": {
-        "openingForumTopic": "发起了论坛主题",
-        "postingInForum": "在论坛中发了帖",
         "schedulingReminder": "设置了提醒",
         "creatingRoutine": "创建了例行工作",
         "updatingRoutine": "修改了例行工作",
@@ -12528,7 +12168,6 @@
         "writingWiki": "在 Wiki 中写了内容",
         "readingWiki": "阅读了 Wiki",
         "linkingWiki": "链接了 Wiki 页面",
-        "readingForum": "阅读了论坛",
         "creatingChannel": "创建了频道",
         "offeringConnectAi": "提议连接 AI",
         "offeringConnectApp": "提议连接一个应用",
@@ -12547,7 +12186,6 @@
         "handingOff": "交付了报告",
         "recordingFindings": "记录了发现",
         "deliveringMission": "交付了专项任务",
-        "suggestingForumTopic": "建议了论坛主题",
         "requestingAccess": "申请了权限",
         "requestingSecret": "请求了机密信息",
         "queryingDatabase": "查询了数据库",
@@ -12558,8 +12196,6 @@
       }
     },
     "activity": {
-      "openingForumTopic": "发起论坛主题",
-      "postingInForum": "在论坛中发帖",
       "schedulingReminder": "设置提醒",
       "creatingRoutine": "创建例行工作",
       "updatingRoutine": "修改例行工作",
@@ -12614,7 +12250,6 @@
       "writingWiki": "在 Wiki 中写内容",
       "readingWiki": "阅读 Wiki",
       "linkingWiki": "链接 Wiki 页面",
-      "readingForum": "阅读论坛",
       "creatingChannel": "创建频道",
       "offeringConnectAi": "准备连接 AI",
       "offeringConnectApp": "准备连接应用",
@@ -12633,7 +12268,6 @@
       "handingOff": "交付报告",
       "recordingFindings": "记录发现",
       "deliveringMission": "交付专项任务",
-      "suggestingForumTopic": "建议论坛主题",
       "requestingAccess": "申请权限",
       "requestingSecret": "请求机密信息",
       "queryingDatabase": "查询数据库",
@@ -12680,6 +12314,7 @@
         "long": "这需要很多步骤，而且没人直接要求。我可以继续吗？"
       },
       "autonomy_digest_other": "{{count}} 条警报看起来是已知的或无害的，所以我没有处理：",
+      "team_week": "团队这一周，{{from}} 至 {{to}}",
       "autonomy_loop": "我已主动停止处理这件事。它一天内重复出现了 {{count}} 次（{{title}}）。告诉我你希望怎么处理。",
       "mission_plan": "在 {{computer}} 上执行“{{title}}”的计划",
       "mission_planNoComputer": "“{{title}}”的计划",
@@ -12748,6 +12383,7 @@
       "action_approvals": "等你处理的审批",
       "action_open_page": "打开页面",
       "agent_proposal": "提议了一个新智能体：{{name}}",
+      "team_proposal": "提议了一个团队：{{names}}",
       "settings_proposal": "提议更改 {{names}}",
       "approval_request": "审批请求：{{title}}",
       "secret_request": "{{agent}} 请求了一个密钥：{{name}}",
@@ -12770,10 +12406,7 @@
       },
       "interrupted": "因服务器重启而中断。请再问一次以继续。",
       "step_limit": "完成前步骤已用完。",
-      "stuck": "我卡住了，在完成前停了下来。",
-      "forum_suggestion": "值得开个论坛讨论吗？“{{title}}”",
-      "forum_concluded": "论坛“{{title}}”已结束。总结在下方的文件中。",
-      "forum_concluded_issues": "论坛“{{title}}”已结束。总结在下方的文件中，另有 {{count}} 个建议任务待批准。"
+      "stuck": "我卡住了，在完成前停了下来。"
     }
   },
   "builtinTools": {
@@ -12916,22 +12549,6 @@
     "schedule_action": {
       "label": "计划一项操作",
       "description": "为已连接应用的操作设定执行时间，由成员现在批准。"
-    },
-    "suggest_forum_topic": {
-      "label": "建议论坛主题",
-      "description": "建议智能体之间展开讨论，由成员发起。"
-    },
-    "open_forum_topic": {
-      "label": "发起论坛主题",
-      "description": "把一个议题带到智能体之间的讨论中。"
-    },
-    "post_in_forum": {
-      "label": "在论坛中发帖",
-      "description": "在轮到自己之外的时候在主题中发帖。"
-    },
-    "read_forum_topic": {
-      "label": "阅读论坛主题",
-      "description": "阅读主题的目标和回复。"
     },
     "search_wiki": {
       "label": "搜索 Wiki",
@@ -14537,5 +14154,202 @@
       "promptRequired": "说说小组件应该显示什么。",
       "notTested": "请先测试：测试成功后才会创建小组件。"
     }
+  },
+  "teamPlan": {
+    "start": {
+      "question": "{{org}}是做什么的？我会据此组建一支现成的团队，你只需确认。",
+      "orWrite": "或者在下面用你自己的话写一句。",
+      "footer": "已经知道想要什么了？",
+      "templates": "查看团队模板",
+      "presets": "现成的智能体"
+    },
+    "business": {
+      "agency": "代理公司",
+      "store": "网店",
+      "clinic": "诊所或工作室",
+      "software": "软件与应用",
+      "support": "客户服务",
+      "services": "服务事务所",
+      "other": "其他"
+    },
+    "answered": "已回答",
+    "step": "第 {{step}} 个问题，共 {{of}} 个",
+    "send": "发送 {{count}} 项",
+    "card": {
+      "new": "新",
+      "routines": "例行任务",
+      "skills": "技能",
+      "create": "创建团队",
+      "adjust": "调整",
+      "adjustName": "调整{{name}}",
+      "map": "以地图查看",
+      "agents_other": "{{count}} 个智能体",
+      "newChannels_other": "{{count}} 个新频道",
+      "routineCount_other": "{{count}} 个例行任务",
+      "weekly": "我会在这里告诉你团队这一周过得怎样",
+      "failed": "团队没有创建：{{step}} 失败了（{{reason}}）。什么都没有创建，你可以再试一次。",
+      "retry": "再试一次",
+      "onlyCreators": "只有能创建智能体的人才能创建团队。",
+      "created": "由{{name}}创建的团队",
+      "createdYou": "由你创建的团队",
+      "skillsWait": "技能在等管理员。",
+      "weeklyWait": "我的每周回顾在等管理我例行任务的人。",
+      "undone": "团队已撤销",
+      "dismissed": "团队已舍弃"
+    },
+    "firstTask": {
+      "suggestion": "建议",
+      "lead": "每个智能体一个简短任务，让你今天就看到每个人在工作。",
+      "open": "带着任务打开",
+      "invite": "邀请{{names}}",
+      "later": "稍后"
+    },
+    "adjust": {
+      "title": "调整{{name}}",
+      "name": "名称",
+      "role": "角色",
+      "line": "做什么",
+      "instructions": "指令",
+      "channel": "频道",
+      "firstTask": "第一个任务"
+    },
+    "map": {
+      "title": "以地图查看团队",
+      "people": "人员",
+      "reviewer": "{{name}}回顾团队的一周",
+      "waits": "等待你的批准"
+    },
+    "templates": {
+      "title": "团队模板",
+      "lead": "适合你业务类型的现成团队。之后{{name}}会和你一起调整。",
+      "use": "使用这个模板",
+      "none": "都不是",
+      "noneSub": "说说你做什么，{{name}}来组建",
+      "tailor": "之后我会问 2 个问题，让它更贴合你的业务。"
+    },
+    "weekly": {
+      "name": "团队的一周"
+    }
+  },
+  "teamTemplates": {
+    "lead": "为{{org}}准备的团队，每个智能体都有自己的频道。创建前可以调整。",
+    "agency": {
+      "name": "营销代理公司",
+      "sub": "内容、广告和客户服务",
+      "desc": "适合为客户运营内容和推广活动的代理公司。"
+    },
+    "store": {
+      "name": "网店",
+      "sub": "订单、库存和社交媒体",
+      "desc": "适合在线销售并回复买家的网店。"
+    },
+    "clinic": {
+      "name": "诊所或工作室",
+      "sub": "WhatsApp 预约、收费和复诊",
+      "desc": "适合为患者预约并跟进复诊的诊所或工作室。"
+    },
+    "software": {
+      "name": "软件与应用",
+      "sub": "支持、收费和代码",
+      "desc": "适合销售软件并照顾自有客户的公司。"
+    },
+    "support": {
+      "name": "客户服务",
+      "sub": "客户队列和回答库",
+      "desc": "适合每天要回复大量客户的团队。"
+    },
+    "services": {
+      "name": "服务事务所",
+      "sub": "会计、法律、咨询",
+      "desc": "适合为客户预约、发送方案并收费的事务所。"
+    },
+    "agents": {
+      "iara": {
+        "role": "客户服务",
+        "line": "在 WhatsApp 和邮件上回复客户。不知道时会叫你。",
+        "routine": "汇总还没回复的内容",
+        "task": "回复最近一条等待中的客户消息"
+      },
+      "caio": {
+        "role": "收款",
+        "line": "提醒逾期付款的人，并在你同意后发送催款。",
+        "routine": "列出付款逾期的人",
+        "task": "列出本月逾期的人"
+      },
+      "ada": {
+        "role": "开发",
+        "line": "修复客户报告的 bug 并提交 PR。",
+        "routine": "列出新的 bug",
+        "task": "查看客户最近报告的 bug"
+      },
+      "lia": {
+        "role": "内容",
+        "line": "按公司的语气写帖子和脚本，在你同意后排期发布。",
+        "routine": "提出本周的帖子",
+        "task": "为本周提出三个帖子"
+      },
+      "theo": {
+        "role": "销售",
+        "line": "跟进所有询价的人并撰写方案。",
+        "routine": "列出询价后没有得到回复的人",
+        "task": "列出本周询价的人"
+      },
+      "nina": {
+        "role": "日程",
+        "line": "预约、确认和改约，并在前一天提醒客户。",
+        "routine": "确认明天的预约",
+        "task": "给我看明天的预约"
+      },
+      "otto": {
+        "role": "订单",
+        "line": "跟踪订单和库存，提醒快用完的东西。",
+        "routine": "提醒库存里快用完的东西",
+        "task": "列出还在等待发货的订单"
+      },
+      "bia": {
+        "role": "回答库",
+        "line": "让回答库与团队的回答保持一致。",
+        "routine": "用本周的回答更新回答库",
+        "task": "列出客户最常问的 5 个问题"
+      }
+    },
+    "channels": {
+      "iara": "support",
+      "caio": "billing",
+      "ada": "eng",
+      "lia": "content",
+      "theo": "sales",
+      "nina": "schedule",
+      "otto": "orders",
+      "bia": "support"
+    },
+    "skills": {
+      "voice": {
+        "name": "语气",
+        "line": "公司如何与客户说话"
+      },
+      "dunning": {
+        "name": "催款规则",
+        "line": "到期当天提醒，然后在逾期第 3 天和第 7 天提醒"
+      },
+      "answers": {
+        "name": "回答库",
+        "line": "团队对常见问题的已批准回答"
+      },
+      "proposal": {
+        "name": "方案提纲",
+        "line": "每份方案写什么、按什么顺序"
+      },
+      "schedule": {
+        "name": "预约规则",
+        "line": "时间段、间隔以及可以提前多久预约"
+      },
+      "review": {
+        "name": "代码审查",
+        "line": "提交 PR 前要检查什么"
+      }
+    },
+    "approvals": "发给客户的内容需要你批准。等你信任它们后，可以再放开。",
+    "ask": "我用了「{{name}}」模板。为了贴合你的业务：**{{org}}有什么不同？**"
   }
 }

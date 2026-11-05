@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const privacyPtBR: LegalDocument = {
   title: "Política de privacidade",
   summary: "O que coletamos, o que os agentes enviam e para onde, quem pode ver o seu workspace e os seus direitos.",
-  updated: "2026-11-03",
+  updated: "2026-11-04",
   sections: [
     {
       id: "overview",
@@ -47,7 +47,7 @@ export const privacyPtBR: LegalDocument = {
       id: "workspace-content",
       heading: "4. Conteúdo do Workspace, tratado em nome dos workspaces",
       blocks: [
-        "O Conteúdo do Workspace inclui mensagens em canais, threads e mensagens diretas, arquivos do Drive e páginas da wiki. Inclui também tarefas, tópicos do fórum, rotinas, eventos do calendário e aprovações, as instruções, configurações e a memória dos agentes, o que os agentes escrevem e fazem, e os dados que os agentes leem pelos conectores, bancos de dados e computadores que o workspace conecta. Nós o tratamos só para fazer funcionar o workspace e os agentes como o workspace os configurou, mostrá-lo aos membros do workspace, enviar as notificações que eles pedem e prestar suporte.",
+        "O Conteúdo do Workspace inclui mensagens em canais, threads e mensagens diretas, arquivos do Drive e páginas da wiki. Inclui também tarefas, rotinas, eventos do calendário e aprovações, as instruções, configurações e a memória dos agentes, o que os agentes escrevem e fazem, e os dados que os agentes leem pelos conectores, bancos de dados e computadores que o workspace conecta. Nós o tratamos só para fazer funcionar o workspace e os agentes como o workspace os configurou, mostrá-lo aos membros do workspace, enviar as notificações que eles pedem e prestar suporte.",
         "O Conteúdo do Workspace pertence ao workspace: os membros veem o que os canais e as permissões dele permitem, e os donos e administradores dele o gerenciam. As mensagens que você escreveu continuam no workspace depois que você sai dele ou exclui a sua conta, a não ser que o workspace as apague.",
       ],
     },

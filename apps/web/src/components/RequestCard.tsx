@@ -9,7 +9,16 @@ import "./request-card.css";
  * What an agent can ask of a person in the conversation: each says so in the card's header and in the bar.
  * "proposal": a change to the workspace's context or an agent's instructions; "agent": a new agent.
  */
-export type RequestKind = "approval" | "secret" | "question" | "browser" | "desktop" | "proposal" | "agent";
+export type RequestKind =
+  | "approval"
+  | "secret"
+  | "question"
+  | "browser"
+  | "desktop"
+  | "proposal"
+  | "agent"
+  | "team"
+  | "firstTask";
 
 /** A request waiting for the viewer, as its card registers it: the bar above the composer says it. */
 export type PendingAsk = { id: string; kind: RequestKind; agentId: string; what: string };

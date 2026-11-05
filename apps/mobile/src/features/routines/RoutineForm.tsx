@@ -47,9 +47,6 @@ import {
   draftInput,
   draftOf,
   everyMinutes,
-  FORUM_ROUNDS,
-  type ForumRounds,
-  forumAgentsOf,
   INBOX,
   inboxOf,
   isDoneOnce,
@@ -62,7 +59,6 @@ import {
   ruleOf,
   TARGET_ARTIFACT,
   TARGET_DM,
-  TARGET_FORUM,
   TARGET_KEEP,
   type TriggerKind,
   targetChoice,
@@ -86,8 +82,7 @@ const zoneLabel = (zone: string, locale: string) =>
 /**
  * "Nova rotina" and "Editar rotina" (`?edit=<id>`), a screen pushed over Rotinas with the native bar (back, the
  * title, "Criar" or "Salvar"), the web's form for the phone: a starting point (new and empty), the agent, where it
- * delivers (a channel, the DM, a Drive document, a forum topic with its agents and rounds; a routine made in the
- * chat keeps its conversation), what to do, a name, and when: a phrase the server reads ("toda segunda às 9h")
+ * delivers (a channel, the DM, a Drive document; a routine made in the chat keeps its conversation), what to do, a name, and when: a phrase the server reads ("toda segunda às 9h")
  * shown back as a sentence with the next runs and its time zone (a screen of its own), an event, or an email.
  * Then when it posts and what it may do on its own. Editing saves only what changed.
  */
@@ -364,14 +359,8 @@ function Form({ routine }: { routine: Routine | undefined }) {
     ...(channels.data ?? []).map((ch) => ({ key: ch.id, icon: "hash" as const, label: `#${ch.name}` })),
     { key: TARGET_DM, icon: "chat", label: t("routines.target.dm") },
     { key: TARGET_ARTIFACT, icon: "doc", label: t("routines.target.artifact") },
-    { key: TARGET_FORUM, icon: "members", label: t("routines.target.forum") },
   ];
   const target = targets.find((o) => o.key === d.target);
-  const toggleForumAgent = (id: string, on: boolean) =>
-    setD((x) => {
-      const base = forumAgentsOf(x);
-      return { ...x, forumAgents: on ? [...new Set([...base, id])] : base.filter((y) => y !== id) };
-    });
   const input = [fieldText("callout"), styles.input, { color: c.ink }];
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
@@ -458,32 +447,6 @@ function Form({ routine }: { routine: Routine | undefined }) {
                 ))
             : null}
         </GroupedList>
-        {d.target === TARGET_FORUM ? (
-          <>
-            <GroupedHeader>{t("routines.form.forumAgents")}</GroupedHeader>
-            <GroupedList>
-              {agents.map((a) => {
-                const on = forumAgentsOf(d).includes(a.id);
-                return (
-                  <GroupedRow
-                    key={a.id}
-                    label={a.name}
-                    leading={<AgentFace agentId={a.id} size={26} live={false} />}
-                    checked={on}
-                    onPress={() => toggleForumAgent(a.id, !on)}
-                  />
-                );
-              })}
-            </GroupedList>
-            <GroupedHeader>{t("forum.form.rounds")}</GroupedHeader>
-            <Segmented
-              items={FORUM_ROUNDS.map((n) => ({ key: n, label: n }))}
-              value={d.forumRounds}
-              onChange={(k) => set({ forumRounds: k as ForumRounds })}
-            />
-          </>
-        ) : null}
-
         <GroupedHeader>{t("routines.form.what")}</GroupedHeader>
         {promptHidden ? (
           <GroupedFooter>{t("routines.detailsHidden")}</GroupedFooter>

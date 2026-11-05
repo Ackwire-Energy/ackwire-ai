@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import type { ComputerQueue, Message, QueuePurpose, QueueWaiting, QueueWorking } from "../api/types";
 import type { MessageReceipt, ReceiptPhase } from "../realtime/receipts";
-import { namesText } from "./format";
+import { namesText, ordinalForm } from "./format";
 import { agentGrammar } from "./grammar";
 
 /**
@@ -23,7 +23,7 @@ export function durationText(t: TFunction, ms: number) {
 
 /** "1st", "4º", "4." in the language's own ordinal form. */
 export function nthText(t: TFunction, locale: string, n: number) {
-  const form = new Intl.PluralRules(locale, { type: "ordinal" }).select(n);
+  const form = ordinalForm(locale, n);
   return t(`queue.nth.${form === "one" || form === "two" || form === "few" ? form : "other"}`, { n });
 }
 

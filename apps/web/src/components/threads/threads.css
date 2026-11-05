@@ -867,6 +867,10 @@ html:not([data-pointer]) .thread-line:focus-visible {
 .thread-line__dot {
   color: var(--faint);
 }
+.thread-line__when {
+  display: inline-flex;
+  gap: inherit;
+}
 
 /*
  * The thread panel over a channel: a sheet floating on the right of the work area (the channel keeps
@@ -993,6 +997,24 @@ html:not([data-pointer]) .thread-line:focus-visible {
   .thread-panel--wide {
     width: auto;
   }
+}
+/* Its × (AgentPanel), top right where the cover's buttons end, stays put while the page scrolls under it; the
+   cover's own buttons, a page's header and the tabs stuck under it make room for it. */
+.thread-panel--wide:focus {
+  outline: none;
+}
+.thread-panel__close {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  right: 14px;
+}
+.thread-panel--wide .agp-cover__acts {
+  right: 48px;
+}
+.thread-panel--wide .page__header,
+.thread-panel--wide .agp-tabs .ac-tabs {
+  padding-right: 48px;
 }
 /* Under a panel: the conversation dims like under a dialog (.ac-dialog__scrim, e.g. a routine's details),
    and a click there closes the panel. */

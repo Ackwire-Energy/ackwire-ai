@@ -396,7 +396,7 @@ function PageMeta({
   );
 }
 
-/** Where the page is mentioned: pages, conversations (a DM says who it is with), forum topics and issues. */
+/** Where the page is mentioned: pages, conversations (a DM says who it is with) and issues. */
 function Backlinks({ page }: { page: WikiPageData }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -447,20 +447,6 @@ function Backlinks({ page }: { page: WikiPageData }) {
             </Link>
           );
         }
-        if (b.kind === "forum")
-          return (
-            <Link
-              key={`f:${b.topicId}`}
-              to="/org/$orgId/forum/$topicId"
-              params={{ orgId: org.id, topicId: b.topicId }}
-              className="wiki-ref ac-iconline"
-            >
-              <Icon name="message" size={16} />
-              <span>
-                <b>{b.title}</b>
-              </span>
-            </Link>
-          );
         return (
           <Link
             key={`i:${b.number}`}

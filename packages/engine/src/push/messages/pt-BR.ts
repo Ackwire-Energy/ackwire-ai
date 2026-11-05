@@ -9,8 +9,6 @@ export const ptBR: PushStrings = {
   approvalFromRoutine: (routine) => `Rotina «${routine}»`,
   questionTitle: (a) => `${a} tem uma pergunta para você`,
   questionBody: "Toque para responder.",
-  forumTitle: "Sua vez de opinar",
-  forumBody: "Toque para entrar na conversa.",
   mentionTitle: (a) => `${a} mencionou você`,
   replyTitle: (a) => `${a} respondeu`,
   missionStoppedTitle: "Uma missão parou",
@@ -74,4 +72,5 @@ export const ptBR: PushStrings = {
   usageRaisedTitle: (a) => `${a} aumentou seu limite deste mês`,
   usageRaisedBody: "Pode continuar.",
   usageRefusedTitle: (a) => `${a} recusou seu pedido de mais uso`,
+  teamWeekReady: "Sua semana da equipe está pronta",
 };

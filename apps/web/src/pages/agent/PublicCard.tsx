@@ -30,7 +30,7 @@ export function AskAccessButton({ agent, size = "sm" }: { agent: Pick<Agent, "ow
  * The agent's page for someone who doesn't see how it works (`seesDetails`): its face, name and role, who answers
  * for it, who it answers, where it works, and a way to ask for access. No tabs.
  */
-export function AgentPublicCard({ agent, onClose }: { agent: Agent; onClose?: () => void }) {
+export function AgentPublicCard({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
@@ -45,19 +45,6 @@ export function AgentPublicCard({ agent, onClose }: { agent: Agent; onClose?: ()
         <section className="agp-idcard" aria-label={agent.name}>
           <div className="agp-cover">
             <AgentCover color={(look?.color ?? "indigo") as AgentColor} busy={false} />
-            {onClose && (
-              <div className="agp-cover__acts">
-                <Button
-                  size="sm"
-                  iconOnly
-                  icon="close"
-                  className="agp-glass"
-                  aria-label={t("common.close")}
-                  title={t("common.close")}
-                  onClick={onClose}
-                />
-              </div>
-            )}
           </div>
           <span className="agp-face">
             <AgentAvatar agentId={agent.id} size="xl" name={agent.name} />

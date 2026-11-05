@@ -53,7 +53,7 @@ export const wikiPages = pgTable(
     agentEditorIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     /** The folder whose audience this page follows; null = its own audience, or open. */
     audienceFolder: text(),
-    /** Where it came from: "Salvar na wiki" (`message`, `forum_topic`) or an import (`obsidian`, id = the vault's name). */
+    /** Where it came from: "Salvar na wiki" (`message`) or an import (`obsidian`, id = the vault's name). */
     source: jsonb().$type<{ type: string; id: string; channelId?: string; attachments?: Record<string, string> }>(),
     /** `person` or `agent`. */
     createdByType: text().notNull(),
@@ -127,7 +127,7 @@ export const wikiPageVersions = pgTable(
 
 /**
  * `[[…]]` links, from a page or from anything else that can mention one (a
- * message, a forum post, an issue). `toPageId` is null while the target
+ * message, an issue). `toPageId` is null while the target
  * doesn't exist. Backlinks and the graph come from here.
  */
 export const wikiLinks = pgTable(

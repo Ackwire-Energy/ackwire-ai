@@ -27,7 +27,7 @@ const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
 /**
  * The core search index (docs/adr/0017-search-and-context.md):
- * one row per searchable thing (message, context item, issue, forum post,
+ * one row per searchable thing (message, context item, issue,
  * file), fed by the outbox. Hybrid: full-text (`tsv`, `simple` config so
  * Portuguese and English both work) + pgvector (`embedding`, optional).
  * Visibility travels with the document: `channel_ids` are ALL required (the

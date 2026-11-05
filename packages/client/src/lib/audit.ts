@@ -160,7 +160,6 @@ const AREAS = [
   "mission",
   "thread",
   "channel",
-  "forum",
   "artifact",
   "agent",
   "machine",
@@ -195,12 +194,11 @@ export const auditHint = (row: AuditRow) =>
   auditStr(row.details.subject) ??
   auditStr(row.details.email);
 
-/** Where it happened: "#geral", "conversa privada", "fórum: …". */
+/** Where it happened: "#geral", "conversa privada". */
 export function auditWhere(t: TFunction, row: AuditRow) {
   const c = row.channel;
   if (!c) return null;
   if (c.kind === "dm") return t("audit.where.dm");
-  if (c.kind === "forum") return t("audit.where.forum", { name: c.name });
   return `#${c.name}`;
 }
 

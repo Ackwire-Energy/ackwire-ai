@@ -160,7 +160,6 @@ import {
 import { type ChannelEvent, liveTurns, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
 import { FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
-import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
 import { type CodeSetup, codeStart } from "./git/machine";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
@@ -243,15 +242,7 @@ import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
 import { standingErrorDetail, standingRefusal } from "./standing";
 import { personAskedLately, rerootRun, runStretchOf } from "./stretch";
-import {
-  isStuck,
-  noteStep,
-  STUCK_END_NOTE,
-  STUCK_END_REPLY_NOTE,
-  STUCK_FORUM_NOTE,
-  STUCK_NOTE,
-  type StuckState,
-} from "./stuck";
+import { isStuck, noteStep, STUCK_END_NOTE, STUCK_END_REPLY_NOTE, STUCK_NOTE, type StuckState } from "./stuck";
 import { archivedAgentsPrompt, FIND_AGENT_TOOL, renamedAgentsPrompt, teammateMeans } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials, maskCredentialsExcept, scrubSignIns } from "./tool-detail";
@@ -744,7 +735,7 @@ export const WRAP_UP_NOTE =
 const ACCOUNT_REFUSALS = new Set([401, 402, 403, 429]);
 
 /**
- * What a conversation run near its cap reads once (not a forum's): where it stands, so the person can let it go on
+ * What a conversation run near its cap reads once: where it stands, so the person can let it go on
  * (Continuar).
  */
 export const WRAP_UP_REPLY_NOTE =
@@ -1161,11 +1152,6 @@ async function executeRunInner(
       ...(usage ? { usage } : {}),
     });
     deps.onTiming?.("run_ms", Date.now() - claimedAt, { runId: run.id, status });
-    // A forum turn ended: announce the post and move the topic on (ADR 0022). A question to people
-    // (`waiting_input`) doesn't hold the discussion either.
-    if (channelRow?.kind === "forum" && status !== "waiting_approval") {
-      await onForumRunFinished({ db, pubsub: deps.pubsub }, run.orgId, run.channelId, run.id).catch(() => {});
-    }
     // Paused on a decision (an approval, a secret, a mission's): what came in during this turn and wasn't
     // read gets a run of its own; nothing sent to the agent waits behind the decision. Before the consultation hook:
     // a hand-off among them is being worked on again, not waiting on a person (`reportHandOffs`).
@@ -1732,10 +1718,10 @@ async function executeRunInner(
       })),
     };
     // A mention reaches only this conversation's members: the agents it names that aren't here stay on the message,
-    // and the agent reads so in its next context (`toTurns`). Not where mentions start nobody anyway (the forum, the
-    // agents' DM).
+    // and the agent reads so in its next context (`toTurns`). Not where mentions start nobody anyway (the agents'
+    // DM).
     const unreached =
-      note || !channelRow || channelRow.kind === "forum" || isAgentOnlyDm(channelRow)
+      note || !channelRow || isAgentOnlyDm(channelRow)
         ? []
         : await unreachedAgents(tx, {
             orgId: run.orgId,
@@ -2403,7 +2389,7 @@ async function executeRunInner(
     }
   }
   // The context budget reads the model's window: an OpenRouter model's comes with its list.
-  await modelInfoFor(db, thinker.model);
+  await modelInfoFor(db, thinker.model, run.orgId);
   let plan: BrainPlan = brainPlan;
   /**
    * What the turn-end judge reads (ADR 0109), filled only when it runs: the run's general means (`turnMeans`, its
@@ -2477,12 +2463,6 @@ async function executeRunInner(
       await saveTranscript(db, transcript);
     }
   }
-
-  /**
-   * A forum's turn or synthesis belongs to the topic's order (ADR 0022): at the cap it fails, so the topic stalls
-   * and Retomar does it again, instead of a step-limit line taken for the agent's post or the decision.
-   */
-  const forum = channelRow?.kind === "forum";
 
   /** Ends the run with a closing line the server writes (`code`), with what it changed (its receipts) and its cards. */
   const closeWith = async (
@@ -3327,7 +3307,6 @@ async function executeRunInner(
    */
   const longWorkPause = async () => {
     const t = transcript as Transcript;
-    if (forum) return null;
     if (overrideHolds(t.usagePause?.override)) {
       const now = await usageReading();
       return now && continuesPastPlan(now) ? now : null;
@@ -3437,9 +3416,7 @@ async function executeRunInner(
   /** The first computer turn's checkouts sync, started during the quiet window for that plan. */
   let earlyCode: { plan: BrainPlan; code: Promise<CodeSetup | null> } | null = null;
   const autoTick: ReturnType<typeof setInterval> | null =
-    run.background || run.workId || forum
-      ? null
-      : setInterval(() => void autoMove().catch(() => {}), deps.workTickMs ?? 5_000);
+    run.background || run.workId ? null : setInterval(() => void autoMove().catch(() => {}), deps.workTickMs ?? 5_000);
   try {
     // A person who writes in a few messages gets one answer: what they add in the next seconds is read with the first.
     // A routed run skips it: the router already waited for the burst, its trigger is the last message of it.
@@ -3489,11 +3466,11 @@ async function executeRunInner(
       if (await isCanceled()) return stopCanceled("");
       closing = false;
       // At the cap the inbox stays as it is: a message never gets marked read and then lost (the run's end
-      // hands it to a run of its own). A routine's run fails there (its ledger says so), and so does a forum's;
+      // hands it to a run of its own). A routine's run fails there (its ledger says so);
       // any other says it ran out of steps, or that it got stuck, with Continuar.
       if (run.turns >= maxTurns) {
         const stuck = transcript.stuck?.endAt !== undefined;
-        if (run.background || forum) return fail(stuck ? STUCK_ERROR : "too_many_tool_calls");
+        if (run.background) return fail(stuck ? STUCK_ERROR : "too_many_tool_calls");
         return stuck ? endStuck() : endAtStepLimit();
       }
       const steered = await deliverSteering(firstTurn && run.turns === 0);
@@ -3524,10 +3501,9 @@ async function executeRunInner(
         await usageCardResumed({ db, pubsub: deps.pubsub }, run.orgId, card).catch(() => {});
       }
       // Near the cap it is told once to wrap up: a routine's run hands off what it has (ADR 0053 §10), any other
-      // but a forum's replies with where it stands.
+      // replies with where it stands.
       if (
         plan.kind === "model" &&
-        !forum &&
         !transcript.wrapUpNoted &&
         transcript.stuck?.endAt === undefined &&
         run.turns >= Math.max(0, maxTurns - WRAP_UP_TURNS)
@@ -3886,9 +3862,8 @@ async function executeRunInner(
         }
         // The person behind it is at their monthly limit (ADR 0141): the agent says so with "Pedir mais" and stops.
         if (error instanceof PersonLimitError) return failPersonLimit(error.personId);
-        // The agent's monthly budget: the run waits for the next month or a raise. A forum's turn fails instead:
-        // the topic's order moves on without it.
-        if (error instanceof BudgetExceededError && !forum) {
+        // The agent's monthly budget: the run waits for the next month or a raise.
+        if (error instanceof BudgetExceededError) {
           return waitForUsage({ code: "budget", message: error.message, soon: error.byReservations });
         }
         // Held or suspended meanwhile: that is why, whatever the brain made of the refusal.
@@ -4090,20 +4065,16 @@ async function executeRunInner(
                 steps: stuck.steps,
               });
               stuck.since = run.turns;
-              const action = !verdict.stuck ? null : !stuck.noted ? "note" : forum ? "fail" : "end";
+              const action = !verdict.stuck ? null : !stuck.noted ? "note" : "end";
               later(() => addRunStep(db, run, "context", { stuckCheck: { sign, ...verdict, action } }));
               if (action === "note") {
                 stuck.noted = true;
-                appendUserText(transcript, forum ? STUCK_FORUM_NOTE : STUCK_NOTE);
+                appendUserText(transcript, STUCK_NOTE);
               } else if (action === "end") {
                 // As near the cap: a couple of calls to say where it stands, then the run ends.
                 stuck.endAt = run.turns + WRAP_UP_TURNS;
                 maxTurns = Math.min(maxTurns, stuck.endAt);
                 appendUserText(transcript, run.background ? STUCK_END_NOTE : STUCK_END_REPLY_NOTE);
-              } else if (action === "fail") {
-                // A forum's turn never wraps up (its words would be its post): it fails, and the topic stalls.
-                await saveTranscript(db, transcript);
-                return fail(STUCK_ERROR);
               }
             }
           }
@@ -4292,7 +4263,7 @@ async function executeRunInner(
                 : undefined;
       const t = transcript;
       // How the turn ends (ADR 0097): it goes on in this run (told why), it waits on something durable, it asks a
-      // person with a card, or it is done. One choke point for every run kind but a routine's (above) and a forum's.
+      // person with a card, or it is done. One choke point for every run kind but a routine's (above).
       const decided = t.decided;
       delete t.decided;
       const betweenAgents = Boolean(channelRow && isAgentOnlyDm(channelRow));
@@ -4306,7 +4277,7 @@ async function executeRunInner(
       // is that answer, and nothing wakes it there again.
       const owesAnswer = !betweenAgents || (await answersOpen(db, run).catch(() => false));
       const state = t.continuation ?? { count: 0 };
-      // A forum's turn is its post (the topic moves on); a run at its turn cap has no turn left to give.
+      // A run at its turn cap has no turn left to give.
       const capped = run.turns + 1 >= maxTurns;
       const outside =
         text.includes("@") && channelRow
@@ -4355,7 +4326,7 @@ async function executeRunInner(
         decided: decided && !silent && !said && !capped && !closingSummary(t, true) ? decided : null,
         unanswered: !silent && !viaRoutine && (sentinelOnly || (!text && !anythingPosted)),
         unreached,
-        judged: owesAnswer && !forum && !capped ? judged : "",
+        judged: owesAnswer && !capped ? judged : "",
         mission: Boolean(plan.missionId),
         // A mission's card already asking a person brings it back too.
         wakesLater: async () =>

@@ -232,7 +232,7 @@ import { ActorAvatar, AgentAvatar, PersonAvatar } from "@/components/AgentAvatar
 import { AgentPanel } from "@/components/AgentPanel";
 import { ApprovalAsk, ApprovalGroupAsk } from "@/components/ApprovalAsk";
 import { InlineApproval } from "@/components/ApprovalItem";
-import { AgentPanelContext, useOpenAgentPanel } from "@/components/agent-panel-context";
+import { AgentPanelContext, AgentPanelShownContext, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { objectUrls } from "@/components/artifacts/FileView";
 import { MessageWorkLine } from "@/components/BackgroundWork";
@@ -263,7 +263,6 @@ import { DatePill, type DatePillHandle } from "@/components/DatePill";
 import { DeleteChannelDialog } from "@/components/DeleteChannelDialog";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { useArchiveChannelWithUndo } from "@/components/entity-menus";
-import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { InPlaceProvider } from "@/components/InPlace";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { ArrivalCard, useArrival } from "@/components/invite/Arrival";
@@ -320,6 +319,7 @@ import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
 import { SearchResultsPanel } from "@/components/search/SearchResultsPanel";
 import { TeamChecks } from "@/components/TeamChecks";
+import { ReplyChips } from "@/components/TeamPlan";
 import { ToLatest } from "@/components/ToLatest";
 import { LiveTools, SavedTools } from "@/components/ToolCalls";
 import { AgentTasksPanel } from "@/components/tasks/AgentTasksPanel";
@@ -771,7 +771,8 @@ function ChannelView({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || draftRef.current.trim()) return;
       if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
-      if (!stopTarget) return;
+      // The agent's page over the conversation: an Esc its fields keep is not for the run under it.
+      if (!stopTarget || profile) return;
       e.preventDefault();
       stopRun(stopTarget);
     };
@@ -783,8 +784,15 @@ function ChannelView({
   // The header search's results, in the same panel (one panel at a time).
   const [searchOpen, setSearchOpen] = useState(false);
   // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place, at a tab when a card asks
-  // (its memory); one panel at a time.
-  const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab } | null>(null);
+  // (its memory); one panel at a time. Its opener again closes it (`close`, counted, so unsaved edits ask first).
+  const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab; close?: number } | null>(null);
+  // What had the focus when the profile opened: it gets it back when the panel closes.
+  const profileOpener = useRef<HTMLElement | null>(null);
+  const closeProfile = useCallback(() => {
+    setProfile(null);
+    if (profileOpener.current?.isConnected) profileOpener.current.focus();
+    profileOpener.current = null;
+  }, []);
   // A question an agent asked another from here, opened from its line in the reply ("Theo ⇄ Iris"): one panel too.
   const [consultId, setConsultId] = useState<string | null>(null);
   // A DM with an agent: its tasks (ADR 0128), from the pill in the header; one panel too, any other one closes it.
@@ -804,7 +812,12 @@ function ChannelView({
     setPanel(null);
     setSearchOpen(false);
     setConsultId(null);
-    setProfile({ agentId, tab });
+    const from = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setProfile((open) => {
+      if (open?.agentId === agentId && open.tab === tab) return { ...open, close: (open.close ?? 0) + 1 };
+      profileOpener.current = from;
+      return { agentId, tab };
+    });
   }, []);
   // A sidebar row's settings button: the agent's page beside this conversation, or beside its own once it shows.
   useEffect(() => {
@@ -2043,7 +2056,9 @@ function ChannelView({
             {/* A page's own header (a DM's) gets the agent's tasks for its pill (`AgentTasksPill`). */}
             {chrome?.header ? (
               <AgentTasksContext.Provider value={tasksControl}>
-                {typeof chrome.header === "function" ? chrome.header({ onSearch: openSearch }) : chrome.header}
+                <AgentPanelShownContext.Provider value={profile?.agentId ?? null}>
+                  {typeof chrome.header === "function" ? chrome.header({ onSearch: openSearch }) : chrome.header}
+                </AgentPanelShownContext.Provider>
               </AgentTasksContext.Provider>
             ) : (
               <ChannelHeader
@@ -2499,7 +2514,8 @@ function ChannelView({
               key={`${profile.agentId}:${profile.tab ?? ""}`}
               agentId={profile.agentId}
               tab={profile.tab}
-              onClose={() => setProfile(null)}
+              closeRequest={profile.close}
+              onClose={closeProfile}
             />
           )}
           {consultId && (
@@ -3759,8 +3775,6 @@ export const TimelineMessage = memo(function TimelineMessage({
   const replyRun = mediaAfter ? null : m.agentRunId;
   // "Responder": the message this one quotes.
   const quoted = useMemo(() => replyOf(m.meta) ?? replyContext ?? null, [m.meta, replyContext]);
-  // An agent opened a forum topic from here: the topic card with "Ver discussão".
-  const forumTopicId = m.author.type === "agent" ? forumTopicOfMessage(meta) : null;
   // A mission's cards (ADR 0029): the plan, a decision, a review; a report says where it ran.
   const missionPlan = m.author.type === "agent" ? missionPlanOf(meta) : null;
   const missionDecision = m.author.type === "agent" && meta.missionDecision ? m : null;
@@ -3780,8 +3794,6 @@ export const TimelineMessage = memo(function TimelineMessage({
   );
   // The root of a mission in the channel: its work lives in its thread.
   const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.openThread !== undefined;
-  // An agent suggests a topic ("Vale um fórum?"): only a person opens it.
-  const forumSuggestion = m.author.type === "agent" ? forumSuggestionOf(meta) : null;
   // It asked other agents before answering: one row right before the reply, its run's questions (on the run's last
   // message here, or on its live row while it works) and the ones its `meta.consulted` names.
   const consulted = useMemo(() => (m.author.type === "agent" ? consultationsOf(m.meta) : []), [m.author.type, m.meta]);
@@ -3820,7 +3832,6 @@ export const TimelineMessage = memo(function TimelineMessage({
     question ||
     secretRequest ||
     missionCard ||
-    forumSuggestion ||
     issueWork;
   const feedback = !readOnly && m.author.type === "agent" && !card && !m.local && !live && !mediaAfter;
   const menu = useMessageMenu(m, channelName ?? "", {
@@ -4089,7 +4100,6 @@ export const TimelineMessage = memo(function TimelineMessage({
               !approvalId &&
               // A secret request's card names the key itself: its fallback text ("Theo asked for a key") is for pushes.
               !secretRequest &&
-              !forumSuggestion &&
               !issueWork &&
               !waitNotice &&
               !noAi &&
@@ -4201,7 +4211,6 @@ export const TimelineMessage = memo(function TimelineMessage({
                 enabled={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
               />
             )}
-            {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
             {missionPlan && <MissionPlanCard plan={missionPlan} />}
             {missionReview && <MissionReviewCard message={missionReview} />}
             {missionSetup && <MissionSetupCard setup={missionSetup} threadId={m.threadId ?? null} />}
@@ -4251,6 +4260,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
             {noAi && <NoAiCard message={m} />}
             {actionCard && <ActionCard message={m} />}
+            {m.author.type === "agent" && !m.local && m.meta?.replyChips ? <ReplyChips message={m} /> : null}
             {usageWait?.closed ? (
               <UsageWaitClosed message={m} wait={{ ...usageWait, closed: usageWait.closed }} />
             ) : (
@@ -4259,7 +4269,6 @@ export const TimelineMessage = memo(function TimelineMessage({
             {question && <QuestionCard question={question} />}
             {secretRequest && <SecretCard request={secretRequest} />}
             {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
-            {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
             {missionDecision && <MissionDecisionCard message={missionDecision} />}
             {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
             {missionCommand && <MissionCommandCard command={missionCommand} />}
