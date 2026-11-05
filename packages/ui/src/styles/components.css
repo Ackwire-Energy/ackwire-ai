@@ -7332,11 +7332,16 @@ html:not([data-pointer]) .ac-gif:focus-visible {
   white-space: nowrap;
 }
 .ac-palette__sub {
+  /* A long place gives way ("…") with the label, instead of pushing the row past the palette's edge. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--faint);
   font-size: 12.5px;
   white-space: nowrap;
 }
 .ac-palette__enter {
+  flex: none;
   margin-left: auto;
 }
 .ac-palette__empty {

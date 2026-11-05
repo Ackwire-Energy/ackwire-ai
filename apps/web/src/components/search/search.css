@@ -98,6 +98,7 @@
 .search-results__bar > :first-child {
   margin-right: auto;
 }
+/* With a face, also an .ac-iconline: the face on the first line's capitals (who and when), the text under it. */
 .search-hit {
   display: flex;
   align-items: flex-start;
