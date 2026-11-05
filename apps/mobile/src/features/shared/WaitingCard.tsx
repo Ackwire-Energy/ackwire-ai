@@ -10,7 +10,7 @@ import { useSurface } from "./parts";
 const FACE = 36;
 
 export interface WaitingCardProps {
-  /** The agent asking: its face leads the card and its sky tints the card's top. */
+  /** The agent asking: its face leads the card and its sky tints the card's top (gray when none asks). */
   agentId?: string | null;
   /** Leads the card when no agent asks (a connector's mark, the faces of who asks to join), FACE points wide. */
   leading?: ReactNode;
@@ -33,9 +33,9 @@ export interface WaitingCardProps {
 
 /**
  * One thing waiting on you, as Atividade and Conversas' strip show it: the card with its cut corner (square
- * bottom left, as the chat's blocks), the asking agent's sky faint across the top, its face with the name and the
- * kind under it (the icon in amber, the waiting color), the request in words, then the fuse and "expira em" (or
- * where and when) and one tactile button.
+ * bottom left, as the chat's blocks), the asking agent's sky faint across the top (gray when no agent asks), its face
+ * with the name and the kind under it (the icon in amber, the waiting color), the request in words, then the fuse and
+ * "expira em" (or where and when) and one tactile button.
  */
 export function WaitingCard({
   agentId,
@@ -58,9 +58,14 @@ export function WaitingCard({
   return (
     <View style={[styles.card, surface]}>
       <View style={styles.clip}>
-        {agent ? (
-          <Sky color={agentLook(agent).color} depth={0.55} fade={0.15} surface="raised" style={styles.sky} />
-        ) : null}
+        {/* The asking agent's sky; a gray one when no agent asks (a server, people), so every card reads the same. */}
+        <Sky
+          color={agent ? agentLook(agent).color : "graphite"}
+          depth={0.55}
+          fade={0.15}
+          surface="raised"
+          style={styles.sky}
+        />
         <Pressable
           onPress={onPress}
           disabled={!onPress}
