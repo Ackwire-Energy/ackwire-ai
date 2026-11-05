@@ -100,11 +100,11 @@ const size = (r: ModelRequest) =>
  * `set_reply_style` named in the rarer tools' label (ADR 0147), 44,969 with `react` reaching an older message by its
  * author and a key used before an app connection, once two rules stopped repeating each other, 44,966 with rules people
  * gave (`remember` kind rule, ADR 0120), the private card for passwords and codes and @todos, once two more rules
- * stopped repeating others, and 353 more with a send to someone else settled from the conversation before it goes
- * (no assumption on what can't be undone) and nothing offered or promised beyond the list; the ceiling leaves a
- * little room.
+ * stopped repeating others, and 45,669 with a send to someone else settled from the conversation before it goes
+ * (no assumption on what can't be undone), nothing offered or promised beyond the list and files on `send_dm`; the
+ * ceiling leaves a little room.
  */
-const OI_CEILING_CHARS = 45_500;
+const OI_CEILING_CHARS = 45_900;
 
 test("a DM 'oi' stays under the size ceiling", async () => {
   const [request] = await play(TURNS.find((t) => t.id === "greet-dm") as ScriptedTurn);
