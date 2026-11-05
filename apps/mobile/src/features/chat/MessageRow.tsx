@@ -909,6 +909,8 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
                     <PressScale
                       onPress={() => toggle.mutate({ reaction: p.reaction, on: !p.mine })}
                       fill={false}
+                      // 30 drawn, 44 to the finger; not sideways, where the next pill is 6 away.
+                      hitSlop={REACT_SLOP}
                       accessibilityRole="button"
                       accessibilityLabel={t("mobile.chat.reactionLabel", { emoji: p.emoji, count: p.people })}
                       accessibilityState={{ selected: p.mine }}
@@ -944,6 +946,7 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
   );
 }
 
+const REACT_SLOP = { top: 7, bottom: 7 };
 const PILL_IN = FadeIn.duration(160);
 const PILL_OUT = FadeOut.duration(120);
 const PILL_MOVE = LinearTransition;

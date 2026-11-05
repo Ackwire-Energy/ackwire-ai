@@ -60,7 +60,6 @@ import { genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { askEndedAt } from "./ask-store";
 import { AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "./asks";
 import { markName, threadFaces } from "./logic";
 
@@ -797,6 +796,8 @@ export function ThreadLink({ thread }: { thread: ThreadInfo }) {
       onPress={() => router.push(chatHref(thread.channelId, thread.id))}
       accessibilityRole="button"
       accessibilityLabel={t("mobile.chat.replies", { count: thread.replyCount })}
+      // 36 drawn, 44 to the finger.
+      hitSlop={4}
       style={({ pressed }) => [styles.tlink, surface, pressed && styles.pressed]}
     >
       <View style={styles.faces}>

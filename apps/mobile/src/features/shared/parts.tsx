@@ -40,7 +40,7 @@ export function Tile({ icon, size = 36, children }: { icon?: IconName; size?: nu
     <View
       style={[
         styles.tile,
-        { width: size, height: size, borderRadius: Math.round(size / 3), backgroundColor: c.sunken },
+        { width: size, height: size, borderRadius: Math.round(size * 0.3), backgroundColor: c.sunken },
       ]}
     >
       {children ?? (icon ? <Icon name={icon} size={Math.round(size / 2)} color={c.muted} /> : null)}

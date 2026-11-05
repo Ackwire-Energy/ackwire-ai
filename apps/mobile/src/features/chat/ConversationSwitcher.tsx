@@ -1,12 +1,12 @@
 import { previewBody } from "@agenteschat/client/lib/message-body";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet } from "react-native";
-import { Card, Count, Icon, Row, SearchField, Text } from "@/ui";
+import { StyleSheet, View } from "react-native";
+import { Count, GroupedHeader, GroupedList, GroupedRow, SearchField, Text } from "@/ui";
 import { type ConversationRow, rowName } from "../chats/logic";
 import { matches } from "../search/logic";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory } from "../shared/hooks";
+import { useDirectory } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { Tile } from "../shared/parts";
 import { useConversations } from "../shared/queries";
@@ -26,7 +26,6 @@ export function ConversationSwitcher({
   onPick: (channelId: string) => void;
 }) {
   const { t } = useTranslation();
-  const c = useColors();
   const dir = useDirectory();
   const { rows } = useConversations();
   const [q, setQ] = useState("");
@@ -44,13 +43,14 @@ export function ConversationSwitcher({
     ].filter((g) => g.rows.length > 0);
   }, [rows, q, dir.agentById, t]);
 
+  // The sheets' rows (a face or a tile in the 32 column), as Novo's and the actions' sheets.
   const leading = (r: Conversation) =>
     r.kind === "channel" ? (
-      <Tile icon="hash" size={34} />
+      <Tile icon="hash" size={30} />
     ) : r.with.type === "agent" ? (
-      <AgentFace agentId={r.with.id} size={34} mode={r.working ? "run" : "idle"} live={false} />
+      <AgentFace agentId={r.with.id} size={30} mode={r.working ? "run" : "idle"} live={false} />
     ) : (
-      <Face who={{ type: r.with.type, id: r.with.id }} size={34} live={false} />
+      <Face who={{ type: r.with.type, id: r.with.id }} size={30} live={false} />
     );
   const subtitle = (r: Conversation): string | undefined => {
     if (r.kind === "dm" && r.working) return t("mobile.chat.switchWorking");
@@ -69,31 +69,29 @@ export function ConversationSwitcher({
         </Text>
       ) : (
         groups.map((g) => (
-          <Card key={g.key} style={styles.group}>
-            <Text variant="label" style={styles.sec}>
-              {g.label}
-            </Text>
-            {g.rows.map((r) => {
-              const sub = subtitle(r);
-              const current = r.channelId === channelId;
-              return (
-                <Row
-                  key={r.key}
-                  leading={leading(r)}
-                  title={rowName(r)}
-                  {...(sub ? { subtitle: sub } : {})}
-                  meta={
-                    current ? (
-                      <Icon name="check" size={18} color={c.muted} />
-                    ) : r.unread > 0 ? (
-                      <Count value={r.unread} max={99} inverted />
-                    ) : undefined
-                  }
-                  onPress={() => onPick(r.channelId)}
-                />
-              );
-            })}
-          </Card>
+          <View key={g.key}>
+            <GroupedHeader>{g.label}</GroupedHeader>
+            <GroupedList>
+              {g.rows.map((r) => {
+                const sub = subtitle(r);
+                const current = r.channelId === channelId;
+                return (
+                  <GroupedRow
+                    key={r.key}
+                    leading={leading(r)}
+                    label={rowName(r)}
+                    {...(sub ? { sub } : {})}
+                    {...(current
+                      ? { checked: true }
+                      : r.unread > 0
+                        ? { valueLeading: <Count value={r.unread} max={99} inverted /> }
+                        : {})}
+                    onPress={() => onPick(r.channelId)}
+                  />
+                );
+              })}
+            </GroupedList>
+          </View>
         ))
       )}
     </>
@@ -102,6 +100,4 @@ export function ConversationSwitcher({
 
 const styles = StyleSheet.create({
   empty: { paddingVertical: 8 },
-  group: { marginTop: 10 },
-  sec: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 2 },
 });
