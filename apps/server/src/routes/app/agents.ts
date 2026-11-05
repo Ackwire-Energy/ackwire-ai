@@ -55,6 +55,7 @@ import {
   pickerEndpoint,
   pickerModels,
   proposeChannelMove,
+  publishAgentsChanged,
   publishMachineAgentsChanged,
   requirePermission,
   revokeCredential,
@@ -896,13 +897,19 @@ export function agentRoutes(deps: AppDeps) {
           // New agents start on "Automático".
           NEW_AGENT_DEFAULTS,
           // The person's Criar agente: what they pick is what the next one starts with (ADR 0094).
-          { remember: true },
+          { remember: true, pubsub: adapters.pubsub },
         );
       let agent = proposal
         ? await createAgentFromProposal({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, proposal, make)
         : await make();
-      if (audience) agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
-      if (appearance) agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance);
+      if (audience) {
+        agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
+        await publishAgentsChanged(adapters.pubsub, orgId);
+      }
+      if (appearance)
+        agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance, {
+          pubsub: adapters.pubsub,
+        });
       // Born on the workspace's own computer: it lists its agents again.
       if (agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       const userId = c.get("user").id;
@@ -1383,8 +1390,12 @@ export function agentRoutes(deps: AppDeps) {
             { pubsub: adapters.pubsub },
           )
         : null;
-      if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience, mailLossSeen);
-      if (appearance !== undefined) agent = await setAgentAppearance(db, actor, orgId, agentId, appearance);
+      if (audience) {
+        agent = await setAgentAudience(db, actor, orgId, agentId, audience, mailLossSeen);
+        await publishAgentsChanged(adapters.pubsub, orgId);
+      }
+      if (appearance !== undefined)
+        agent = await setAgentAppearance(db, actor, orgId, agentId, appearance, { pubsub: adapters.pubsub });
       if (!agent) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");
@@ -1718,6 +1729,7 @@ export function agentRoutes(deps: AppDeps) {
       // Its computers hear which account each agent thinks with (system mode lends the folders by it), on every save:
       // the one an old plan was on may be none the view shows (the team's right hand, which is on no computer).
       await publishMachineAgentsChanged(adapters.pubsub, orgId);
+      await publishAgentsChanged(adapters.pubsub, orgId);
       return c.json(view, 200);
     },
   );
@@ -1766,6 +1778,7 @@ export function agentRoutes(deps: AppDeps) {
       // Their computers hear which account each agent thinks with now (system mode lends the folders by it).
       if (!input.preview && results.some((r) => r.status === "applied")) {
         await publishMachineAgentsChanged(adapters.pubsub, orgId);
+        await publishAgentsChanged(adapters.pubsub, orgId);
       }
       return c.json({ results }, 200);
     },

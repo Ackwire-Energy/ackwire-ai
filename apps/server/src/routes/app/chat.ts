@@ -198,7 +198,9 @@ export function chatRoutes(deps: AppDeps) {
       responses: { 201: json(Channel, "Created"), ...errors },
     }),
     async (c) => {
-      const r = await createChannel(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json"));
+      const r = await createChannel(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json"), {
+        pubsub: adapters.pubsub,
+      });
       return c.json(
         {
           id: r.id,

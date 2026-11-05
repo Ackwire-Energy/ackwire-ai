@@ -80,7 +80,13 @@ export async function restoreDms(db: Executor, orgId: string, userId: string) {
  * participants; nobody else can join or read it. In a DM with an agent, the
  * agent answers every message from the person (no router).
  */
-export async function openDm(db: Database, actorId: string, orgId: string, target: DmTarget) {
+export async function openDm(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  target: DmTarget,
+  options: { pubsub?: PubSub } = {},
+) {
   const membership = await requirePermission(db, actorId, orgId, "post");
   let other: string;
   let blockedAgent: Agent | null = null;
@@ -139,6 +145,11 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
     return channel;
   });
   if ("agentId" in target) caches.scopes.deletePrefix(`${orgId}:${target.agentId}:visible`);
+  // Only its people: the other's list and this person's other devices, before anyone writes in it.
+  if (created) {
+    for (const userId of "userId" in target ? [actorId, target.userId] : [actorId])
+      await publishUserEvent(options.pubsub, orgId, userId, { type: "channels.changed" });
+  }
   const channel = created ?? (await existing()); // a concurrent open won the race
   if (!channel) throw new Error("could not open the conversation");
   return channel;

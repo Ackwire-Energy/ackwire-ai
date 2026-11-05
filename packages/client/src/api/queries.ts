@@ -45,7 +45,7 @@ import { upsertMessage, withLocalCopies } from "../lib/timeline";
 import { voiceOf } from "../lib/voice";
 import type { WikiAccess } from "../lib/wiki";
 import type { RealtimeConnection } from "../realtime/connection";
-import { setOrgDeletion } from "../realtime/machines";
+import { readUnknownMembers, setOrgDeletion } from "../realtime/machines";
 import type { ApiClient } from "./client";
 import { type AgentReactionEffect, useAgentReaction, useApi, useCardVia } from "./context";
 import { ApiError } from "./http";
@@ -175,6 +175,12 @@ import type {
 
 // ── Shared query options (also used by route guards) ─────────────────────────
 
+/**
+ * The lists of who and where. Back to a tab, what went stale is read at once: the socket may have stayed up while
+ * events never reached it (a sleeping tab), so no reconnect would catch it up.
+ */
+const BACK_TO_TAB = { refetchOnWindowFocus: true } as const;
+
 export const meQuery = (api: ApiClient) =>
   // Kept for good: the device snapshot (`snapshot.ts`) is dropped when `me` leaves the cache.
   queryOptions({
@@ -188,7 +194,12 @@ export const authConfigQuery = (api: ApiClient) =>
 export const instanceQuery = (api: ApiClient) =>
   queryOptions({ queryKey: keys.instance, queryFn: () => api.system.instance(), staleTime: 60_000 });
 export const channelsQuery = (api: ApiClient, orgId: string) =>
-  queryOptions({ queryKey: keys.channels(orgId), queryFn: () => api.chat.channels(orgId), staleTime: 30_000 });
+  queryOptions({
+    queryKey: keys.channels(orgId),
+    queryFn: () => api.chat.channels(orgId),
+    staleTime: 30_000,
+    ...BACK_TO_TAB,
+  });
 /**
  * An invitation's preview (its page, and the sign-in that leads to it). One that got no answer is asked twice more:
  * the server may be restarting, and it's no expired link.
@@ -401,7 +412,12 @@ export const useOrganization = (orgId: string) => {
 
 export const useMembers = (orgId: string) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.members(orgId), queryFn: () => api.orgs.members(orgId), staleTime: 30_000 });
+  return useQuery({
+    queryKey: keys.members(orgId),
+    queryFn: () => api.orgs.members(orgId),
+    staleTime: 30_000,
+    ...BACK_TO_TAB,
+  });
 };
 
 export function useChangeRole(orgId: string) {
@@ -589,7 +605,12 @@ export function useRevokeInvitation(orgId: string) {
 
 export const useAgents = (orgId: string) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.agents(orgId), queryFn: () => api.agents.list(orgId), staleTime: 30_000 });
+  return useQuery({
+    queryKey: keys.agents(orgId),
+    queryFn: () => api.agents.list(orgId),
+    staleTime: 30_000,
+    ...BACK_TO_TAB,
+  });
 };
 
 /** Agents no longer in the team: the directories name their old messages with these (fresh with `useAgents`). */
@@ -1006,8 +1027,13 @@ export function usePlaceChannel(orgId: string) {
 export const channelMembersQuery = (api: ApiClient, orgId: string, channelId: string) =>
   queryOptions({
     queryKey: keys.channelMembers(orgId, channelId),
-    queryFn: () => api.chat.members(orgId, channelId),
+    queryFn: async ({ client }) => {
+      const members = await api.chat.members(orgId, channelId);
+      readUnknownMembers(client, orgId, members);
+      return members;
+    },
     staleTime: 30_000,
+    ...BACK_TO_TAB,
   });
 
 export const useChannelMembers = (orgId: string, channelId: string, enabled = true) => {
@@ -2746,9 +2772,14 @@ export const useRoster = (orgId: string, channelId: string, enabled = true) => {
   const api = useApi();
   return useQuery({
     queryKey: keys.roster(orgId, channelId),
-    queryFn: () => api.chat.roster(orgId, channelId),
+    queryFn: async ({ client }) => {
+      const roster = await api.chat.roster(orgId, channelId);
+      readUnknownMembers(client, orgId, roster);
+      return roster;
+    },
     enabled,
     staleTime: 30_000,
+    ...BACK_TO_TAB,
   });
 };
 
@@ -2827,7 +2858,12 @@ export function useDeleteChannel(orgId: string) {
 
 export const useDms = (orgId: string) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.dms(orgId), queryFn: () => api.dms.list(orgId), staleTime: 30_000 });
+  return useQuery({
+    queryKey: keys.dms(orgId),
+    queryFn: () => api.dms.list(orgId),
+    staleTime: 30_000,
+    ...BACK_TO_TAB,
+  });
 };
 
 /** "Visto" in a DM between people: where the others stopped reading (live: `channel.read`). */
