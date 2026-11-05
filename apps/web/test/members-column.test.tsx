@@ -280,6 +280,25 @@ describe("Adicionar pessoa ou agente at the bottom", () => {
     expect(screen().queryByRole("dialog", { name: /^#eng/ })).toBeNull();
   });
 
+  test("never offers the right hand: it is in no channel", async () => {
+    widthIs(DESKTOP_QUERY);
+    const state = withRightHand(seedState());
+    state.agents.push({
+      ...(state.agents.find((a) => a.id === ATLAS_ID) as FakeState["agents"][number]),
+      id: "a-theo",
+      name: "Theo",
+      handle: "theo",
+    });
+    await open(state);
+    await act(async () =>
+      fireEvent.click(within(column() as HTMLElement).getByRole("button", { name: "Adicionar pessoa ou agente" })),
+    );
+    await settle(4);
+    const add = screen().getByRole("dialog", { name: "Adicionar a #eng" });
+    expect(within(add).queryByText("Lodi")).toBeNull();
+    expect(within(add).getByText("Theo")).toBeTruthy();
+  });
+
   test("the phone's sheet has it too, and it closes the sheet", async () => {
     widthIs(COMPACT_QUERY);
     await open();

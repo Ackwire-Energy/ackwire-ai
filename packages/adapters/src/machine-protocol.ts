@@ -1,3 +1,4 @@
+import type { MergeDone } from "./command-policy";
 /**
  * The wire protocol between our server and the runner on a connected
  * computer (ADR 0025). JSON text frames over one WebSocket the runner opens
@@ -629,6 +630,18 @@ export interface PlanUsage {
   limited?: boolean;
   source: "turn" | "probe";
   at: string;
+  /** Server side only: the models at a limit of their own (`PlanModelLimit`), by model id. */
+  models?: Record<string, PlanModelLimit>;
+}
+
+/**
+ * A model's own limit on a plan whose models each have one (`limitsPerModel`), seen `at`: until `until` (absent: not
+ * known), or `region` when the model answers only once the account allows the region it needs.
+ */
+export interface PlanModelLimit {
+  at: string;
+  until?: string;
+  region?: true;
 }
 
 /** The computer's own sign-ins' usage (protocol 19), by brain. */
@@ -1505,6 +1518,8 @@ export interface MachineAgent {
   locale?: string;
   /** Protocol 20: the account on this machine it thinks with (system mode lends its folder to the agent's user). */
   account?: string;
+  /** The other accounts here it thinks with: the team's right hand on people's own plans (ADR 0137 §11). */
+  accounts?: string[];
 }
 
 /** The pause state (protocol 9). `until` null: paused until the owner resumes. */
@@ -1649,6 +1664,8 @@ export type MachineRequest = (
       stream: boolean;
       /** A person approved this very command (an approval card): it runs even when the command policy would hold it. */
       approved?: boolean;
+      /** The repositories the agent merges in without asking: a command that is only such a merge runs (`loneMerge`). */
+      mergeRepos?: string[];
       /** Protocol 45: Vault keys for this command only (ADR 0144). */
       vault?: ExecVault;
     }
@@ -1820,7 +1837,15 @@ export const MACHINE_OPS: readonly MachineOp[] = [
 
 /** What each op answers with `ok: true`. */
 export interface MachineReplies {
-  exec: { exitCode: number; stdout: string; stderr: string; timedOut: boolean; canceled?: { killed: boolean } };
+  exec: {
+    exitCode: number;
+    stdout: string;
+    stderr: string;
+    timedOut: boolean;
+    canceled?: { killed: boolean };
+    /** It ran as a merge the agent does without asking (`mergeRepos`). */
+    merge?: MergeDone;
+  };
   /** `base64: null`: no such file. */
   read: { base64: string | null; size: number };
   write: { size: number };

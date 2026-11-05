@@ -3,6 +3,7 @@ import { ApiError, NetworkError } from "../api/http";
 import type { AuthConfig, OrgStanding } from "../api/types";
 import { billingHoldOf } from "./billing";
 import { MAX_UPLOAD_MB } from "./files";
+import { lowerFirst } from "./format";
 import { limitRefusalText } from "./limits";
 import { endSentence } from "./text";
 
@@ -19,6 +20,7 @@ const KNOWN = {
   "channel.post_denied": "channel.perms.readOnlyComposer",
   "channel.permission_forbidden": "channel.perms.forbidden",
   "agent.handle_taken": "newAgent.errors.handleTaken",
+  "agent.right_hand_permanent": "errors.rightHand.permanent",
   "agent_proposal.decided": "errors.agentProposal.decided",
   "approval.always_unavailable": "errors.approval.alwaysUnavailable",
   "agent_proposal.expired": "errors.agentProposal.expired",
@@ -45,6 +47,13 @@ const KNOWN = {
   "machine.target_not_found": "errors.machine.targetNotFound",
   "machine.target_same": "errors.machine.targetSame",
   "machine.target_paused": "errors.machine.targetPaused",
+  // A computer that can't take the request now (`MachineOfflineError`, `MachinePausedError`: `name`), or its own
+  // refusal (`MachineRequestError`, as `machine.<code>`).
+  "machine.offline": "errors.machine.offline",
+  "machine.paused": "errors.machine.paused",
+  "machine.timeout": "errors.machine.timeout",
+  "machine.exec_disabled": "errors.mission.execDisabled",
+  budget_exceeded: "agentPage.activity.errors.budget_exceeded",
   "agent_group.not_found": "errors.agentGroup.notFound",
   "agent_group.too_many": "errors.agentGroup.tooMany",
   "thread.context_not_visible": "errors.thread.contextNotVisible",
@@ -437,6 +446,9 @@ export function knownErrorText(t: TFunction, error: unknown, locale = "en"): str
   // The person who connected the mailbox is gone or unnamed: no blank name in the sentence.
   if (error.code === "mail.owner_only" && !error.params?.ownerName)
     return t("errors.mail.ownerOnlyUnknown", error.params);
+  // `provider`: the provider whose key is missing, when the server could name it.
+  if (error.code === "missing_credential" && typeof error.params?.provider === "string")
+    return t("agentPage.activity.errors.missing_credential", error.params);
   // Own keys only: a code from an address (`/login?error=toString`) names no line of Object's.
   const key = Object.hasOwn(KNOWN, error.code) ? KNOWN[error.code as keyof typeof KNOWN] : undefined;
   if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
@@ -461,10 +473,28 @@ const noAnswerText = (t: TFunction) => t(deviceOffline() ? "common.offline" : "c
 
 /**
  * The words of a refusal the app doesn't translate: the server's own (English, written for people) for a 4xx, in
- * every language, since English is every language's fallback; a 5xx's are for the log.
+ * every language, since English is every language's fallback, and for a computer's own refusal (its 503
+ * `machine.<code>`); any other 5xx's (a runner's `machine.internal` too) are for the log, and the person reads that it
+ * failed on our side.
  */
 function untranslatedText(t: TFunction, error: ApiError): string {
-  return error.status < 500 && error.message ? error.message : t("common.unknownError");
+  const told = error.status < 500 || (error.code.startsWith("machine.") && error.code !== "machine.internal");
+  return told && error.message ? error.message : t("common.ourSide");
+}
+
+/** `ForbiddenError`'s message when it says nothing more (mirrors packages/engine errors.ts). */
+const FORBIDDEN_DEFAULT = "You don't have permission to do this";
+
+/**
+ * A 403 in the person's words: a code the app knows, else the server's own sentence of why, coded or not ("Only the
+ * channel's creator or an admin can add members"), else that they can't do this. Never "ask an admin": the person may
+ * be one, and the refusal may not be about their role. `bad_origin`'s words are for a developer.
+ */
+export function forbiddenText(t: TFunction, error: ApiError, locale?: string): string {
+  const known = knownErrorText(t, error, locale);
+  if (known) return known;
+  const own = error.code !== "bad_origin" && error.message && error.message !== FORBIDDEN_DEFAULT;
+  return own ? error.message : t("common.notAllowed");
 }
 
 /**
@@ -567,10 +597,29 @@ export function errorText(t: TFunction, error: unknown, locale?: string): string
     const known = knownErrorText(t, error, locale);
     if (known) return known;
     if (error.status === 413) return t("errors.artifact.fileTooLarge", { max: MAX_UPLOAD_MB });
-    if (error.status === 403) return t("common.notAllowed");
+    if (error.status === 403) return forbiddenText(t, error, locale);
   }
   if (noAnswer(error)) return noAnswerText(t);
   return error instanceof ApiError ? untranslatedText(t, error) : t("common.unknownError");
+}
+
+const KEY_FAILURES = new Set([
+  "run.missing_credential",
+  "run.credential_revoked",
+  "run.credential_wrong_provider",
+  "run.provider_account",
+]);
+
+/**
+ * The one thing to do about a failed run, by its code, for someone who can: another key (`keys`: who manages them), or
+ * another model (the agent's owner or who manages agents). Null when nothing fixes it or it's someone else's to do.
+ */
+export function failedRunFix(
+  code: string | null | undefined,
+  who: { keys: boolean; admin: boolean; owner: boolean },
+): "useKey" | "changeModel" | null {
+  if (code === "run.model_unlisted") return who.admin || who.owner ? "changeModel" : null;
+  return code && KEY_FAILURES.has(code) && who.keys ? "useKey" : null;
 }
 
 /**
@@ -582,4 +631,21 @@ export function runErrorText(t: TFunction, code: string | null | undefined, para
   if (!key || key === "failed") return null;
   const say = t as unknown as (key: string, options: Record<string, unknown>) => string;
   return say(`agentPage.activity.errors.${key}`, { ...params, defaultValue: "" }) || null;
+}
+
+/**
+ * A failed run as one line for the conversation: a restriction in its words, a computer that stayed busy, else
+ * "couldn't answer" with the reason going on as part of the sentence. Null when no reason has words.
+ */
+export function runFailureLine(
+  t: TFunction,
+  agent: string,
+  failure: { code?: string | null; params?: Record<string, unknown> },
+  locale?: string,
+): string | null {
+  const refusal = restrictionLine(t, failure.code, failure.params);
+  if (refusal) return t("channel.runRefused", { agent, reason: refusal });
+  if (failure.code === "run.computer_busy") return t("channel.runBusy", { agent });
+  const why = runErrorText(t, failure.code, failure.params);
+  return why ? t("channel.runFailed", { agent, reason: lowerFirst(why.replace(/\.$/, ""), locale) }) : null;
 }

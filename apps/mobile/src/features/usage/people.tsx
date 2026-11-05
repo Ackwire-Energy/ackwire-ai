@@ -1,9 +1,19 @@
-import type { AppNotification, UsagePlace } from "@agenteschat/client";
-import { usePeopleUsage, usePersonUsage, useRaisePersonLimit, useRefuseMoreUsage } from "@agenteschat/client";
+import type { AppNotification, PersonLimitCard, UsagePlace } from "@agenteschat/client";
+import {
+  keys,
+  useApi,
+  usePeopleUsage,
+  usePersonUsage,
+  useRaisePersonLimit,
+  useRefuseMoreUsage,
+} from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatDecimal, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
 import type { PersonRow } from "@agenteschat/client/lib/person-usage";
+import { useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import type { TFunction } from "i18next";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
@@ -122,6 +132,78 @@ export function MyUsageCard() {
   );
 }
 
+/**
+ * The agent's card when the person behind its run is at their monthly limit, as the web's: for that person, why, with
+ * "Pedir mais" and their month; for anyone else, whose limit it is. Once raised, one quiet line.
+ */
+export function PersonLimitNote({ card }: { card: PersonLimitCard }) {
+  const { t, i18n } = useTranslation();
+  const { orgId } = useOrg();
+  const c = useColors();
+  const dir = useDirectory();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const meId = useMeId();
+  const [asked, setAsked] = useState(false);
+  const [pending, setPending] = useState(false);
+  const mine = card.userId === meId;
+  const nameOf = (id?: string | null) => (id ? (dir.memberById.get(id)?.name ?? t("channel.unknownPerson")) : "");
+  const by = nameOf(card.byUserId);
+  const date = formatShortDate(i18n.language, card.renewsAt);
+  const ask = async () => {
+    setPending(true);
+    try {
+      await api.orgs.requestMoreUsage(orgId);
+      setAsked(true);
+      void qc.invalidateQueries({ queryKey: keys.personUsage(orgId, meId ?? "") });
+    } catch (error) {
+      toast({ title: errorText(t, error), icon: "x" });
+    } finally {
+      setPending(false);
+    }
+  };
+  const title =
+    card.state === "raised"
+      ? t(mine ? "peopleUsage.card.raised" : "peopleUsage.card.raisedOther", { name: by })
+      : mine
+        ? t("peopleUsage.card.title")
+        : t("peopleUsage.card.other", { name: nameOf(card.userId) });
+  return (
+    <View style={[styles.limitCard, { backgroundColor: c.sunken }]}>
+      <Text variant="subhead" tone="ink">
+        {title}
+      </Text>
+      {mine && card.state !== "raised" ? (
+        <>
+          <Text variant="footnote" tone="muted">
+            {card.state === "refused"
+              ? t("peopleUsage.card.refused", { name: by, date })
+              : t("peopleUsage.card.text", { date })}
+          </Text>
+          <View style={styles.acts}>
+            {card.state !== "refused" ? (
+              <Button
+                variant="primary"
+                size="sm"
+                label={asked ? t("peopleUsage.card.asked") : t("peopleUsage.card.ask")}
+                disabled={asked || pending}
+                onPress={() => void ask()}
+              />
+            ) : null}
+            <Button
+              variant="secondary"
+              size="sm"
+              label={t("peopleUsage.card.see")}
+              onPress={() => router.push("/usage" as never)}
+            />
+          </View>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
 /** "Aumentar para US$ X este mês" and "Recusar" on a person's request for more (who decides). */
 export function UsageLimitActions({ n }: { n: AppNotification }) {
   const { t, i18n } = useTranslation();
@@ -162,4 +244,5 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   tabular: { fontVariant: ["tabular-nums"] },
   acts: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
+  limitCard: { marginTop: 10, borderRadius: 14, padding: 12, gap: 6, alignItems: "flex-start" },
 });

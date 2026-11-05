@@ -178,7 +178,7 @@ function IconTile({ kind: a }: { kind: AgentAction }) {
   const { colors, shadows } = useTheme();
   return (
     <View style={[styles.tile, { backgroundColor: colors.raised, boxShadow: shadows.e1 }]}>
-      <Icon name={receiptIcon(a.kind)} size={14} color={colors.ink2} />
+      <Icon name={receiptIcon(a.kind)} size={16} color={colors.ink2} />
     </View>
   );
 }
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 10,
+    gap: 8,
     minHeight: 50,
     paddingVertical: 9,
     paddingLeft: 12,

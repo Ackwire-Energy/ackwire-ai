@@ -18,7 +18,13 @@ import {
   sql,
 } from "@agenteschat/db";
 import { type ActiveCover, activeCoversFrom, activeCoversTo } from "./approval-covers";
-import { addApprovalRules, COMMAND_RULE_TOOL, type RememberedKind, rememberedKindOf } from "./approval-rules";
+import {
+  addApprovalRules,
+  addRoutineOwnActions,
+  COMMAND_RULE_TOOL,
+  type RememberedKind,
+  rememberedKindOf,
+} from "./approval-rules";
 import { recordAudit } from "./audit";
 import { approvalCardVia } from "./card-via";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
@@ -710,7 +716,8 @@ async function enqueueResume(tx: Executor, row: Pick<Approval, "id" | "orgId" | 
  * the run then executes exactly the hashed action, or tells the model it was
  * refused (with the reason). `always` ("Aprovar sempre", only where the
  * approval offers it) also keeps its kind for good in the same transaction:
- * the agent's next calls of that kind run without asking.
+ * the agent's next calls of that kind run without asking; on a routine's card
+ * ("Sempre nesta rotina"), that routine's next runs only.
  */
 export async function decideApproval(
   /** `memory`: how the lesson from a refusal is judged (context/items.ts `MemoryJudging`). */
@@ -787,7 +794,18 @@ export async function decideApproval(
       ) {
         throw new ConflictError("This request can't be approved for good", "approval.always_unavailable");
       }
-      await addApprovalRules(tx, { orgId, agentId: row.agentId, connectionId: always.connectionId }, always, actorId);
+      if (!always.routineId) {
+        await addApprovalRules(tx, { orgId, agentId: row.agentId, connectionId: always.connectionId }, always, actorId);
+      } else if (
+        !(await addRoutineOwnActions(
+          tx,
+          { orgId, agentId: row.agentId, routineId: always.routineId },
+          always.actions,
+          actorId,
+        ))
+      ) {
+        throw new ConflictError("This request can't be approved for good", "approval.always_unavailable");
+      }
     }
     if (updated?.status === "refused") await settleAheadRoutine(tx, updated);
     if (updated) await auditDecision(tx, updated, expired ? null : actorId, always, via);

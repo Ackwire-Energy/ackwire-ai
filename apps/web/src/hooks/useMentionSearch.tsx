@@ -1,6 +1,8 @@
 import type { ChannelMember } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
-import { Avatar, type ComposerSuggestion } from "@agenteschat/ui";
+import { everyoneSuggestion } from "@agenteschat/client/lib/everyone";
+import { mentionReaches } from "@agenteschat/client/lib/right-hand";
+import { Avatar, type ComposerSuggestion, Icon } from "@agenteschat/ui";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -16,10 +18,11 @@ type Row = ComposerSuggestion & { inChannel: boolean; rank: number; hay: string 
 /**
  * "@" suggestions: the channel's members first (people and agents), then the
  * rest of the workspace. Agents outside the channel say so (`note`).
- * Without `members` (an issue), everyone is one list.
+ * Without `members` (an issue), everyone is one list. `kind`: a channel's or a DM's (`mentionReaches`).
+ * `everyone`: the person may mention everyone here (`offersEveryone`), so `@todos`, in their language, comes first.
  */
-export function useMentionSearch(members?: ChannelMember[]) {
-  const { t } = useTranslation();
+export function useMentionSearch(members?: ChannelMember[], kind: "channel" | "dm" = "channel", everyone = false) {
+  const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   return useCallback(
@@ -30,7 +33,7 @@ export function useMentionSearch(members?: ChannelMember[]) {
       const rows: Row[] = [
         // Agents that don't answer me aren't offered (the server would skip them anyway).
         ...dir.agents.filter(canTalk).map((a) => {
-          const here = inChannel("agent", a.id);
+          const here = inChannel("agent", a.id) || mentionReaches(a, kind);
           return {
             key: `agent:${a.id}`,
             insert: a.handle,
@@ -67,11 +70,22 @@ export function useMentionSearch(members?: ChannelMember[]) {
       const sorted = all.sort(
         (a, b) => Number(b.inChannel) - Number(a.inChannel) || a.rank - b.rank || a.label.localeCompare(b.label),
       );
-      return sorted.slice(0, LIMIT).map(({ inChannel: on, rank: _r, hay: _h, ...s }) => ({
+      const listed = sorted.slice(0, LIMIT).map(({ inChannel: on, rank: _r, hay: _h, ...s }) => ({
         ...s,
         group: members ? (on ? here : rest) : undefined,
       }));
+      const word = everyone ? everyoneSuggestion(query, i18n.language) : null;
+      if (!word) return listed;
+      const everyoneRow: ComposerSuggestion = {
+        key: "everyone",
+        insert: word,
+        label: `@${word}`,
+        description: t("mentions.everyone"),
+        leading: <Icon name="members" size={16} />,
+        group: members ? here : undefined,
+      };
+      return [everyoneRow, ...listed];
     },
-    [dir, members, me.user.id, t],
+    [dir, members, kind, me.user.id, t, everyone, i18n.language],
   );
 }

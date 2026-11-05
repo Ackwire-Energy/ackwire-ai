@@ -90,16 +90,6 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
   const [panel, setPanel] = useState<string | null>(null);
   // The computer whose line is open ("Ver fila"): the line's own dialog, as a conversation's header opens it.
   const [queueOf, setQueueOf] = useState<string | null>(null);
-  // Esc closes the panel, like a thread's; an Escape a dialog over it took is the dialog's alone.
-  useEffect(() => {
-    if (!panel) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[role="dialog"]')) return;
-      setPanel(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [panel]);
 
   const all = view.data?.tasks ?? [];
   const activity = view.data?.activity;

@@ -1,9 +1,11 @@
 import {
   accessMatrix,
   getAgentAccess,
+  getAgentMergeRepositories,
   getAgentRepositories,
   MAX_AGENT_REPOSITORIES,
   setAgentAccess,
+  setAgentMergeRepositories,
   setAgentRepositories,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -136,6 +138,57 @@ export function accessRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
       const repositories = await setAgentRepositories(
+        db,
+        c.get("user").id,
+        orgId,
+        agentId,
+        c.req.valid("json").repositories,
+      );
+      return c.json({ repositories }, 200);
+    },
+  );
+
+  const MergeRepositories = z
+    .object({
+      repositories: z.array(z.string()).openapi({
+        description:
+          "owner/name, never a whole account: where it merges with no approval card, each merge audited and with a receipt.",
+      }),
+    })
+    .openapi("AgentMergeRepositories");
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agents/{agentId}/merge-repositories",
+      tags,
+      security,
+      summary: "Where the agent merges without asking (Pode fazer merge sem perguntar)",
+      request: { params: AgentParams },
+      responses: { 200: json(MergeRepositories), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      return c.json({ repositories: await getAgentMergeRepositories(db, c.get("user").id, orgId, agentId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/agents/{agentId}/merge-repositories",
+      tags,
+      security,
+      summary: "Replace where the agent merges without asking (its owner or an admin); audited",
+      request: {
+        params: AgentParams,
+        body: body(z.object({ repositories: z.array(z.string().max(220)).max(MAX_AGENT_REPOSITORIES) })),
+      },
+      responses: { 200: json(MergeRepositories), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      const repositories = await setAgentMergeRepositories(
         db,
         c.get("user").id,
         orgId,

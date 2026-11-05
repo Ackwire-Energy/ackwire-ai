@@ -4,7 +4,9 @@
  * the workspace), the part of the name or handle that matched, and the text after picking.
  */
 
+import type { Agent } from "@agenteschat/client";
 import { channelQuery, insertChannelRef } from "@agenteschat/client/lib/channel-refs";
+import { mentionReaches } from "@agenteschat/client/lib/right-hand";
 
 /** Lowercase, accent-free: "João" → "joao" (same length for composed text). */
 export const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -24,6 +26,7 @@ export interface MentionAgent {
   role?: string | null;
   /** The server's `canTalk` (absent = yes): agents that don't answer me aren't offered. */
   canTalk?: boolean;
+  builtin?: Agent["builtin"];
 }
 
 export interface MentionPerson {
@@ -60,7 +63,8 @@ const matchIn = (value: string, q: string) => {
 /**
  * Who "@<query>" can mean: agents I can talk to and the other people of the workspace, filtered by name,
  * handle or e-mail; members of the conversation first, then names or handles that start with the query,
- * then the rest, by name. `members` = the conversation's members (`type:id` keys); null = everyone is in.
+ * then the rest, by name. `members` = a channel's members (`type:id` keys), and the right hand is in every channel
+ * (`mentionReaches`); null = everyone is in (a DM).
  */
 export function mentionOptions(input: {
   query: string;
@@ -81,6 +85,7 @@ export function mentionOptions(input: {
     handle: string,
     role: string | null,
     extra = "",
+    reached = false,
   ) => {
     const hay = `${fold(name)} ${fold(handle)} ${fold(extra)}`;
     if (q && !hay.includes(q)) return;
@@ -93,9 +98,20 @@ export function mentionOptions(input: {
           ? { in: "handle" as const, start: h, end: h + q.length }
           : null;
     const rank = fold(name).startsWith(q) || fold(handle).startsWith(q) ? 0 : 1;
-    rows.push({ key: `${type}:${id}`, type, id, name, handle, role, inChannel: inChannel(type, id), match, rank });
+    rows.push({
+      key: `${type}:${id}`,
+      type,
+      id,
+      name,
+      handle,
+      role,
+      inChannel: reached || inChannel(type, id),
+      match,
+      rank,
+    });
   };
-  for (const a of input.agents) if (a.canTalk !== false) push("agent", a.id, a.name, a.handle, a.role || null);
+  for (const a of input.agents)
+    if (a.canTalk !== false) push("agent", a.id, a.name, a.handle, a.role || null, "", mentionReaches(a, "channel"));
   for (const p of input.people) if (p.userId !== input.meId) push("person", p.userId, p.name, p.handle, null, p.email);
   rows.sort((a, b) => Number(b.inChannel) - Number(a.inChannel) || a.rank - b.rank || a.name.localeCompare(b.name));
   return rows.slice(0, input.limit ?? MENTION_LIMIT).map(({ rank: _rank, ...o }) => o);

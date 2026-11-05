@@ -158,7 +158,7 @@ import {
 import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { inDesktopApp } from "@/lib/desktop";
-import { limitOffers, planMeterText, planWord } from "@/lib/plan-usage";
+import { limitOffers, modelLimitText, planMeterText, planWord } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
 import { useAgentEdit } from "./context";
 import "@/components/browser/browser.css";
@@ -1207,6 +1207,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         : lockedHere
           ? t("connectAi.accountsLocked", { name: pairer ?? "", computer: computerName })
           : null;
+  // The model's own limit on its plan, which the account's meters above don't show.
+  const modelLimit = modelLimitText(t, i18n.language, usage, card, shownModel);
   const accountField = accountsOn && accountKind && (
     <BrainField label={t("agentPage.work.brain.account")}>
       {/* The account and its plan's usage in one outline: the meters hang under its picker, they are that account's. */}
@@ -1236,6 +1238,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       {accountNote && (
         <SettingNote icon={signedOut ? "alert" : view.canUsePlans && !lends ? "lock" : "info"}>
           {accountNote}
+        </SettingNote>
+      )}
+      {modelLimit && (
+        <SettingNote icon="alert" live>
+          {modelLimit}
         </SettingNote>
       )}
       {usage && extraUsageOn(usage) && (

@@ -13,7 +13,7 @@ import type {
 import { accountTitle, groupPlans, ownSignInName, ownSignIns, ownSignInTitle } from "./ai-accounts";
 import { daysBetween, formatPercent, formatShortDate, formatTime, relativeTime } from "./format";
 import { brainName } from "./outages";
-import { planOf } from "./plans";
+import { modelLimitOf, ownLimitsModel, planOf } from "./plans";
 
 /**
  * The words of the plan usage views (ADR 0063), shared by the web and the phone: a plan meter's text, an
@@ -68,6 +68,30 @@ export function usageWhen(t: TFunction, locale: string | undefined, iso: string,
   }
   const date = new Intl.DateTimeFormat(loc, { day: "numeric", month: "long" }).format(new Date(iso));
   return t("chat.usageWhen.date", { date: loc.startsWith("pt") ? date.replace(/^1 /, "1º ") : date });
+}
+
+/**
+ * The brain card's line when the agent's model is at a limit of its own on its plan (`PlanUsage.models`), so the
+ * account's meters don't read as room for it: when it resets, or the region it needs. Null: none now.
+ */
+export function modelLimitText(
+  t: TFunction,
+  locale: string | undefined,
+  usage: Pick<PlanUsage, "models"> | null | undefined,
+  provider: string | null | undefined,
+  value: string | null | undefined,
+  now = new Date(),
+): string | null {
+  const model = ownLimitsModel(provider, value);
+  const limit = model ? modelLimitOf(usage?.models, model.id, now.getTime()) : null;
+  if (!model || !limit) return null;
+  if (limit.region) return t("brain.modelRegion", { model: model.label });
+  return limit.until === null
+    ? t("brain.modelLimitUnknown", { model: model.label })
+    : t("brain.modelLimit", {
+        model: model.label,
+        when: usageWhen(t, locale, new Date(limit.until).toISOString(), now),
+      });
 }
 
 /** When the next month starts (UTC): an agent's monthly budget renews then. */

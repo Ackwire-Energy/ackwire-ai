@@ -13,6 +13,8 @@ import { type OutboundCode, outboundUrlProblem } from "./outbound-url";
  *   rollbacks, publishing, `gh api`, printed tokens), matched on normalized
  *   arguments (`gh -R`, `git -C/-c`): refused at once with the kind it is,
  *   never asked.
+ * - `loneMerge`: the one merge the computer may run without a person, for a
+ *   repository the agent's owner chose (`mergeRepos`).
  * - `gitPushes` / `heldPush` / `approvalNeeded`: where each push goes, read
  *   with git on the computer (the remote's default branch, the protected
  *   ones, the agent's own): a push to the default branch, a force push to
@@ -1119,6 +1121,127 @@ export function deniedMessage(
 /** On the deny list: refused at once, never shown to anyone, never judged. */
 export const deniedInMissions = (toolName: string, input: Record<string, unknown> | null | undefined) =>
   deniedMessage(toolName, input) !== null;
+
+// ── Merges an agent may do on its own ────────────────────────────────────────
+
+/** A merge the computer may run without a person (`loneMerge`). `dir`: where it runs, from the command's folder. */
+export interface LoneMerge {
+  dir: string;
+  /** `owner/name` as the command names it; null: the folder's remotes say. */
+  repo: string | null;
+  /** `gh pr merge`'s pull request. */
+  pr: number | null;
+  /** `git merge`'s branch. */
+  ref: string | null;
+}
+
+/** What a merge the agent may do on its own touched, for its receipt: `pr` for a pull request, else `ref`. */
+export type MergeDone = Pick<LoneMerge, "pr" | "ref"> & { repo: string };
+
+const GITHUB_REPO = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
+
+/**
+ * `owner/name` of a GitHub repository as a command or a remote writes it (`owner/name`, a github.com URL or its ssh
+ * form, our git proxy's URL), or null for anything else, another host included.
+ */
+export function githubRepo(value: string): string | null {
+  const proxied = /\/api\/git\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/(.+)$/i.exec(value.trim())?.[1];
+  const repo = (proxied ?? value.trim())
+    .replace(/^(https:\/\/|ssh:\/\/git@|git@)?github\.com[/:]/i, "")
+    .replace(/\/+$/, "")
+    .replace(/\.git$/i, "");
+  return GITHUB_REPO.test(repo) ? repo : null;
+}
+
+/** gh's options that take a value, and those that don't, of what `loneMerge` lets through. */
+const GH_MERGE_VALUE = new Set(["--subject", "-t", "--body", "-b", "--match-head-commit"]);
+const GH_MERGE_FLAG = new Set(["--squash", "-s", "--merge", "-m", "--rebase", "-r"]);
+const GIT_MERGE_VALUE = new Set(["-m", "--message"]);
+const GIT_MERGE_FLAG = new Set(["--no-ff", "--ff", "--ff-only", "--squash", "--no-edit"]);
+
+/**
+ * The plain words among these options, read as the program does (an option's value is its value, whatever it looks
+ * like), or null at any other option. `named`: where gh's `-R` goes; without it `-R` is one of those others.
+ */
+function plainWords(
+  args: readonly string[],
+  flags: ReadonlySet<string>,
+  values: ReadonlySet<string>,
+  named?: string[],
+): string[] | null {
+  const plain: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i] as string;
+    const glued = named && /^--repo=(.*)$|^-R(.+)$/.exec(a);
+    if (named && (a === "-R" || a === "--repo")) named.push(args[++i] ?? "");
+    else if (glued) named.push(glued[1] ?? glued[2] ?? "");
+    else if (values.has(a)) i++;
+    else if (!a.startsWith("-")) plain.push(a);
+    else if (!flags.has(a) && !values.has(a.split("=")[0] as string)) return null;
+  }
+  return plain;
+}
+
+const into = (dir: string, to: string) => (path.isAbsolute(to) ? to : path.join(dir, to));
+
+function ghMerge(rest: readonly string[]): Pick<LoneMerge, "repo" | "pr"> | null {
+  const named: string[] = [];
+  const words = plainWords(rest, GH_MERGE_FLAG, GH_MERGE_VALUE, named);
+  if (words?.length !== 3 || words[0] !== "pr" || words[1] !== "merge" || named.length > 1) return null;
+  const url = /^(https:\/\/github\.com\/[^/]+\/[^/]+)\/pull\/(\d+)\/?$/.exec(words[2] as string);
+  const number = url?.[2] ?? /^\d+$/.exec(words[2] as string)?.[0];
+  if (!number) return null;
+  const given = [...named, ...(url?.[1] ? [url[1]] : [])].map(githubRepo);
+  if (given.some((r) => r === null)) return null;
+  // gh goes by the URL; two names that differ leave which repository unknown.
+  if (given[1] && given[0]?.toLowerCase() !== given[1].toLowerCase()) return null;
+  return { repo: given[0] ?? null, pr: Number(number) };
+}
+
+function gitMerge(rest: readonly string[]): { dir: string; ref: string } | null {
+  const at = rest[0] === "-C" ? (rest[1] ?? "") : null;
+  const words = plainWords(at === null ? rest : rest.slice(2), GIT_MERGE_FLAG, GIT_MERGE_VALUE);
+  if (words?.length !== 2 || words[0] !== "merge" || at === "") return null;
+  return { dir: at ?? ".", ref: words[1] as string };
+}
+
+/**
+ * A command or shell script that is one merge and nothing else, the shape the computer may run on its own for a
+ * repository the agent was allowed (`mergeRepos`): `gh pr merge <number or URL> [-R owner/name]` or `git merge
+ * <branch>` with only the options above, after at most `set -e` lines and a `cd` joined by `&&` (a `cd` that fails
+ * must stop the merge). Anything else, or anything this can't follow, is null and waits for a person: `--admin`,
+ * `--delete-branch` (agents don't delete branches), `--auto` (nothing merged yet to report), a path to the program,
+ * a wrapper, a pipe, a redirection, two merges (one exit code can't say which ran), a word over several lines or
+ * opening with `#` (the words here are the shell's only without those: dropping a comment line can move a closing
+ * quote, and the shell drops `#5 -R a/b`, so that `gh pr merge --squash #5 -R a/b` merges the folder's own branch).
+ */
+export function loneMerge(text: string): LoneMerge | null {
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#"))
+    .join("\n");
+  const words = shellWords(lines);
+  const cmds = simpleCommands(lines);
+  const last = cmds?.at(-1);
+  if (!words || !cmds || !last || cmds.some((s) => s.piped || s.writes.length > 0 || s.reads.length > 0)) return null;
+  if (cmds.some((s) => s.argv.some((w) => w.includes("\n") || w.startsWith("#")))) return null;
+  if (words.some((w) => w.op === "list" && w.text === "||")) return null;
+  let dir = ".";
+  for (const { argv } of cmds.slice(0, -1)) {
+    if (argv[0] === "cd" && argv.length === 2 && !/^[~-]/.test(argv[1] as string)) {
+      dir = into(dir, argv[1] as string);
+    } else if (!/^set( -[eux]+| -[eux]*o pipefail)+$/.test(argv.join(" "))) return null;
+  }
+  if (dir !== "." && words.some((w) => w.op === "list" && w.text !== "&&")) return null;
+  const [program, ...rest] = last.argv;
+  if (program === "gh") {
+    const merge = ghMerge(rest);
+    return merge && { dir, ref: null, ...merge };
+  }
+  const merge = program === "git" ? gitMerge(rest) : null;
+  return merge && { repo: null, pr: null, ref: merge.ref, dir: into(dir, merge.dir) };
+}
 
 // ── Pushes: where each one goes, read with git on the computer ───────────────
 

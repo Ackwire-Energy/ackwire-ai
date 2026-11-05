@@ -2,7 +2,8 @@ import { expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import { waitsForComputer } from "../src/lib/machine-outages";
 import { serverBody } from "../src/lib/message-body";
-import { usageWhen } from "../src/lib/plan-usage";
+import { modelLimitText, usageWhen } from "../src/lib/plan-usage";
+import { usageWaitFix } from "../src/lib/usage-pause";
 
 /** Says the key and its values, so a test reads which words were picked. */
 const t = ((key: string, values: Record<string, unknown> = {}) => {
@@ -66,4 +67,53 @@ test("a catch-up skipped as already handled says why in place of its promise, an
   // A reason the app doesn't know: the note keeps its own words.
   const odd = { ...meta, usageWait: { ...usageWait, closed: { reason: "weird" } } };
   expect(serverBody(t, "x", odd, "en").startsWith("chat.body.plan_limit_wait ")).toBe(true);
+});
+
+test("a model's own limit: the note names the model and the way out, the brain card says it under the plan's meters", () => {
+  const now = new Date("2026-11-04T12:00:00Z");
+  const until = "2026-11-05T05:44:00.000Z";
+  const note = serverBody(
+    t,
+    "x",
+    {
+      bodyCode: "plan_model_limit_wait",
+      bodyParams: { plan: "OpenCode Go", model: "DeepSeek V4.1 Flash", agent: "Lia" },
+      usageWait: { code: "plan_limit", resetsAt: until },
+    },
+    "en",
+  );
+  expect(note.startsWith("chat.body.plan_model_limit_wait ")).toBe(true);
+  expect(note).toContain('"model":"DeepSeek V4.1 Flash","agent":"Lia"');
+  expect(serverBody(t, "x", { bodyCode: "plan_model_region_wait", bodyParams: { model: "DeepSeek V4.1 Flash" } })).toBe(
+    'chat.body.plan_model_region_wait {"model":"DeepSeek V4.1 Flash","when":""}',
+  );
+  const at = now.toISOString();
+  const models = { "deepseek-v4.1-flash": { at, until } };
+  const usage = { models };
+  expect(modelLimitText(t, "en", usage, "opencode", "deepseek-v4.1-flash", now)).toStartWith("brain.modelLimit ");
+  expect(modelLimitText(t, "en", usage, "opencode", "glm-5.3", now)).toBeNull();
+  // Only a plan whose models have their own limits, and only while the limit holds.
+  expect(modelLimitText(t, "en", usage, "zai", "deepseek-v4.1-flash", now)).toBeNull();
+  expect(modelLimitText(t, "en", usage, "opencode", "deepseek-v4.1-flash", new Date(until))).toBeNull();
+  const region = { models: { "deepseek-v4.1-flash": { at, region: true as const } } };
+  expect(modelLimitText(t, "en", region, "opencode", "deepseek-v4.1-flash", now)).toBe(
+    'brain.modelRegion {"model":"DeepSeek V4.1 Flash"}',
+  );
+  expect(
+    modelLimitText(t, "en", region, "opencode", "deepseek-v4.1-flash", new Date(now.getTime() + 3600_000)),
+  ).toBeNull();
+});
+
+test("a wait's way out: another model for its owner or an admin, a higher budget for an admin, none for a plan's limit", () => {
+  const anyone = { admin: false, owner: false };
+  const owner = { admin: false, owner: true };
+  const admin = { admin: true, owner: false };
+  for (const bodyCode of ["plan_model_limit_wait", "plan_model_limit_wait_unknown", "plan_model_region_wait"]) {
+    expect(usageWaitFix({ bodyCode }, owner)).toBe("changeModel");
+    expect(usageWaitFix({ bodyCode }, admin)).toBe("changeModel");
+    expect(usageWaitFix({ bodyCode }, anyone)).toBeNull();
+  }
+  expect(usageWaitFix({ bodyCode: "budget_wait" }, admin)).toBe("raiseBudget");
+  expect(usageWaitFix({ bodyCode: "budget_wait" }, owner)).toBeNull();
+  expect(usageWaitFix({ bodyCode: "plan_limit_wait" }, admin)).toBeNull();
 });

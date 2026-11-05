@@ -88,6 +88,14 @@ export const INTERRUPTED_BY_RESTART = "Interrupted by a server restart";
  * program, missing CLI, plan limit) keep their own code.
  */
 const COMPUTER_ERRORS = new Set(["runner_error", "runner_failed", "claude_failed", "bad_request"]);
+/** Any other CLI's failed turn (`codex_failed`, `opencode_failed`, `brain_failed`…): the computer's problem too. */
+const CLI_FAILED = /^[a-z]+(?:_[a-z]+)*_failed$/;
+
+/** A run that stopped on an error of ours that kept repeating (`gave up` in the executor): its stored text's start. */
+export const OUR_ERROR = "Stopped after an error";
+
+/** Starts a `provider_error:`'s detail when the provider refused the key's account (`run.provider_account`). */
+export const PROVIDER_ACCOUNT = "account: ";
 
 /** Older stored errors name Claude's provider by the company, "Anthropic": they read with today's label. */
 const providerNow = (label: string) => (label === "Anthropic" ? PROVIDERS.anthropic.label : label);
@@ -114,9 +122,17 @@ export function runErrorDetail(error: string | null | undefined): {
   ];
   if (simple.includes(error)) return { errorCode: `run.${error}` };
   if (error === "timeout") return { errorCode: "run.computer_timeout", errorParams: { code: error } };
-  if (COMPUTER_ERRORS.has(error)) return { errorCode: "run.computer_failed", errorParams: { code: error } };
+  if (COMPUTER_ERRORS.has(error) || CLI_FAILED.test(error))
+    return { errorCode: "run.computer_failed", errorParams: { code: error } };
+  // The agent's account folder isn't on its computer anymore: choose another account or add it again.
+  if (error === "account_missing") return { errorCode: "run.account_missing" };
+  // Ours, not the person's: the detail (a driver's message) stays for the log, never shown as the reason.
+  if (error.startsWith(OUR_ERROR)) return { errorCode: "run.our_error" };
   if (error.startsWith("provider_error:")) {
-    return { errorCode: "run.provider_error", errorParams: { detail: error.slice(15).trim() } };
+    const detail = error.slice(15).trim();
+    return detail.startsWith(PROVIDER_ACCOUNT)
+      ? { errorCode: "run.provider_account", errorParams: { detail: detail.slice(PROVIDER_ACCOUNT.length) } }
+      : { errorCode: "run.provider_error", errorParams: { detail } };
   }
   if (error.startsWith("gave_up:"))
     return { errorCode: "run.provider_unavailable", errorParams: { detail: error.slice(8).trim() } };

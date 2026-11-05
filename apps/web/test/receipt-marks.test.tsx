@@ -331,12 +331,12 @@ describe("an agent waiting on its plan's limit", () => {
     ];
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(8);
-    expect(row("p1").textContent).toContain("Ada responde quando o plano renovar");
+    expect(row("p1").textContent).toContain("Ada está esperando o plano");
     expect(row("p1").textContent).not.toContain("esperando sua resposta");
     await act(async () => fireEvent.click(row("p1").querySelector(".ac-receipt__check") as HTMLElement));
     await settle(2);
     const popover = screen().getByRole("dialog", { name: "Agentes" });
-    expect(within(popover).getByText("Responde quando o plano renovar")).toBeTruthy();
+    expect(within(popover).getByText("Esperando o plano")).toBeTruthy();
     expect(popover.textContent).not.toContain("Escolhido pelo Jev");
   });
 });

@@ -98,8 +98,9 @@ const size = (r: ModelRequest) =>
  * links (`offer_install_skill` and `update_skill_from_source` load on demand), 44,789 with the right hand's cards named in
  * the setup group's label (ADR 0137 §4), 44,982 with the plain-words rule that leads with what the person must do and
  * `set_reply_style` named in the rarer tools' label (ADR 0147), 44,969 with `react` reaching an older message by its
- * author and a key used before an app connection, once two rules stopped repeating each other; the ceiling leaves a
- * little room.
+ * author and a key used before an app connection, once two rules stopped repeating each other, 44,966 with rules people
+ * gave (`remember` kind rule, ADR 0120), the private card for passwords and codes and @todos, once two more rules
+ * stopped repeating others; the ceiling leaves a little room.
  */
 const OI_CEILING_CHARS = 45_000;
 

@@ -1,6 +1,15 @@
 import { type Message, useAiStatus, useApi } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf, noAiCardOf, planOfKind, signInAgainPlan } from "@agenteschat/client/lib/no-ai";
+import {
+  aiStateOf,
+  mayConnectAi,
+  noAiCardOf,
+  noAiLineKey,
+  planLineFix,
+  planLinePasses,
+  planOfKind,
+  signInAgainPlan,
+} from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -63,18 +72,24 @@ export function NoAiCard({ message: m }: { message: Message }) {
     card.forUserId === meId || (meId !== null && agent?.ownerUserId === meId) || can(org, "manage_agents");
   const answering = answer === "answering";
   // The team's right hand on a plan that can't think now (ADR 0137 §7): one plain line, and the way to an API key.
-  const planLine = card.planLine && !(card.planLine === "computer_away" && state === "ready") ? card.planLine : null;
+  const planLine = card.planLine && !(planLinePasses(card.planLine) && state === "ready") ? card.planLine : null;
+  const mayConnect = mayConnectAi(agent, meId, org);
+  const fix = planLine ? planLineFix(planLine, agent, meId, org) : null;
+  const owner = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name.split(" ")[0] : undefined;
+  const locked = (
+    <Text variant="footnote" tone="muted">
+      {!planLine && owner ? t("noAi.locked", { name, owner }) : t("noAi.lockedAdmins")}
+    </Text>
+  );
   const title = answering
     ? t("noAi.card.answering", { name })
     : planLine
-      ? t(`noAi.rightHand.${planLine}`, { name })
+      ? t(`noAi.rightHand.${planLine}`, { name, model: card.model })
       : ready
         ? t("noAi.card.connected", { name })
         : answer === "still_missing"
           ? t("noAi.card.stillMissing", { name })
-          : card.own
-            ? t(`noAi.notSignedIn.${card.own}`, agentGrammar(name))
-            : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(name));
+          : t(noAiLineKey(card), agentGrammar(name));
   const answerNow = async () => {
     setAnswer("pending");
     try {
@@ -94,12 +109,22 @@ export function NoAiCard({ message: m }: { message: Message }) {
         </Text>
       </View>
       {answering ? null : planLine ? (
-        <Button
-          variant="secondary"
-          size="sm"
-          label={t("noAi.rightHand.useKey")}
-          onPress={() => openConnectAi({ from: m.id, intent: "api_key", agentId: card.agentId })}
-        />
+        fix ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            label={t(fix === "connectMine" ? "rightHand.settings.connectMine" : "noAi.rightHand.useKey")}
+            onPress={() =>
+              openConnectAi({
+                from: m.id,
+                agentId: card.agentId,
+                ...(fix === "connectMine" ? {} : { intent: "api_key" }),
+              })
+            }
+          />
+        ) : (
+          locked
+        )
       ) : ready || answer === "pending" ? (
         mayAnswer ? (
           <Button
@@ -110,6 +135,8 @@ export function NoAiCard({ message: m }: { message: Message }) {
             onPress={() => void answerNow()}
           />
         ) : null
+      ) : !mayConnect ? (
+        locked
       ) : (
         <Button
           variant="secondary"

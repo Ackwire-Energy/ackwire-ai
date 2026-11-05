@@ -194,7 +194,7 @@ describe("the right hand elsewhere", () => {
 
   test("Mudar visual: the face and the choices in the dialog's body, Cancelar and Salvar in its footer", async () => {
     await go(withRightHand(seedState()), "settings/right_hand");
-    await click(screen().getByRole("button", { name: "Mudar visual" }));
+    await click(screen().getByRole("button", { name: "Mudar o visual do Lodi" }));
     const dialog = screen().getByRole("dialog", { name: "Mudar visual" });
     const body = dialog.querySelector(":scope > .ac-dialog__body") as HTMLElement;
     expect(body.querySelector(".rh-set__face")).not.toBeNull();

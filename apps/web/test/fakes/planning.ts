@@ -748,6 +748,7 @@ export function createMockPlanning(
         if (patch.agentId !== undefined) r.agentId = patch.agentId;
         if (patch.target !== undefined) r.target = patch.target;
         if (patch.report !== undefined) r.report = patch.report;
+        if (patch.ownActions !== undefined) r.ownActions = patch.ownActions;
         if (patch.active !== undefined) setActive(r, patch.active);
         if (patch.trigger?.type === "schedule") r.trigger = scheduleOf(patch.trigger);
         else if (patch.trigger?.type === "once")

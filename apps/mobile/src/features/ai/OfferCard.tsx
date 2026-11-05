@@ -30,6 +30,7 @@ import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import { Button, Icon, type IconName, Text, useTheme } from "@/ui";
 import { AskDone } from "../chat/asks";
+import { PersonLimitNote } from "../usage/people";
 import { openPage } from "./parts";
 
 /**
@@ -49,6 +50,7 @@ export function OfferCard({ message: m }: { message: Message }) {
   if (card.kind === "approvals") return <Approvals card={card} />;
   if (card.kind === "member_changes") return <People card={card} />;
   if (card.kind === "open_page") return <OpenScreen card={card} />;
+  if (card.kind === "person_limit") return <PersonLimitNote card={card} />;
   return null;
 }
 

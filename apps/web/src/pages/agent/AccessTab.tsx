@@ -20,7 +20,7 @@ import { CardHead, ChangedTag, useAgentEdit, WasLine } from "./context";
 import { DatabaseAccessCard } from "./DatabaseAccess";
 import { MailAccessCard } from "./MailAccess";
 import { ReadOnlyNote } from "./pieces";
-import { ReposBlock } from "./Repos";
+import { MergeReposBlock, ReposBlock } from "./Repos";
 
 type AccessFilter = "all" | "on" | "ask";
 
@@ -68,7 +68,14 @@ export function AccessTab() {
         changed={changed || (isGithub(r) && Boolean(changeOf("repos")))}
         tag={changed ? <ChangedTag changeKey={key} /> : undefined}
         extra={changed ? <WasLine changeKey={key} /> : undefined}
-        below={isGithub(r) && level(r) !== "none" ? <ReposBlock /> : undefined}
+        below={
+          isGithub(r) && level(r) !== "none" ? (
+            <>
+              <ReposBlock />
+              <MergeReposBlock />
+            </>
+          ) : undefined
+        }
       />
     );
   };

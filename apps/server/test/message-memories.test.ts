@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { channelTopic } from "@agenteschat/adapters";
+import { and, eq, schema } from "@agenteschat/db";
 import { consolidateItem } from "@agenteschat/engine";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 beforeEach(async () => {
@@ -46,4 +47,42 @@ test("memory marks: messages list what an agent saved from them; forgetting it o
   expect((await list())?.memories).toBeUndefined();
   await Bun.sleep(5);
   expect(events.filter((e) => e.type === "message.memories").at(-1)).toMatchObject({ messageId: m.id, memories: [] });
+});
+
+test("a rule's giver rewrites it over the API, its grant included; the owner too, keeping the giver; nobody else", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const bia = await joinByInvitation(t, owner, orgId, "bia@example.com");
+  const caio = await joinByInvitation(t, owner, orgId, "caio@example.com");
+  const [giver] = await t.db.select().from(schema.users).where(eq(schema.users.email, "bia@example.com"));
+  const { item } = await consolidateItem(t.db, {
+    orgId,
+    kind: "rule",
+    scopeType: "agent",
+    scopeId: agentId,
+    agentId,
+    content: "Send the offers to the group, without asking me before each send.",
+    channelIds: [],
+    createdByKind: "person",
+    createdById: giver?.id,
+  });
+  const edit = (b: typeof owner, id: string, text: string) =>
+    b(`/api/app/organizations/${orgId}/memories/${id}`, { method: "PATCH", json: { text } });
+
+  expect((await edit(caio, item.id, "Send them to group C too.")).status).toBe(403);
+  const byBia = await edit(bia, item.id, "Send the offers to groups A and B, without asking me before each send.");
+  expect(byBia.status).toBe(200);
+  const { id } = (await byBia.json()) as { id: string };
+  expect((await edit(owner, id, "Send the offers to group A, without asking before each send.")).status).toBe(200);
+  const rules = await t.db
+    .select()
+    .from(schema.contextItems)
+    .where(and(eq(schema.contextItems.kind, "rule"), eq(schema.contextItems.status, "active")));
+  expect(rules).toEqual([
+    expect.objectContaining({
+      content: "Send the offers to group A, without asking before each send.",
+      createdById: giver?.id,
+    }),
+  ]);
 });

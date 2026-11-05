@@ -365,6 +365,7 @@ function ReasonInput({
   return (
     <Input
       className="tm-why"
+      data-esc-own={onEscape ? "" : undefined}
       value={value}
       maxLength={500}
       placeholder={placeholder}

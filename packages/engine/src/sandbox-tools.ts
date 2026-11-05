@@ -35,6 +35,7 @@ import { fedByRoutine, runAuthorityById } from "./authority";
 import { sniffModelImage } from "./avatars";
 import { publishChannelEvent } from "./events";
 import { cutText, formatBytes, textOfBytes } from "./format";
+import { mergeReposOfCall } from "./git/repos";
 import { isAbsoluteMachinePath, requestFolderAccess } from "./machine-access";
 import { MachineRequestError } from "./machine-hub";
 import { notAllowedMessage, requestVaultKey, vaultUpdateText } from "./machine-provider";
@@ -405,7 +406,12 @@ function execOutput(label: string, r: ExecResult, seconds: number, timeout: numb
   return {
     content: parts.join("\n"),
     isError: r.timedOut || r.exitCode !== 0,
-    data: { exitCode: r.exitCode, timedOut: r.timedOut, ...(r.canceled ? { canceled: r.canceled } : {}) },
+    data: {
+      exitCode: r.exitCode,
+      timedOut: r.timedOut,
+      ...(r.canceled ? { canceled: r.canceled } : {}),
+      ...(r.merge ? { merge: r.merge } : {}),
+    },
   };
 }
 
@@ -521,8 +527,13 @@ export function createSandboxToolSource(
    * `agent.tool.output` (every 250 ms at most, ≤ 64 KB per call, secrets masked).
    */
   const execLive = async (ctx: ToolContext, computer: ComputerHandle, given: ExecRequest) => {
+    const mergeRepos = ctx.approved ? [] : await mergeReposOfCall(ctx);
     // Canceling the run stops the command (killed when the provider can).
-    const request: ExecRequest = ctx.signal ? { ...given, signal: ctx.signal } : given;
+    const request: ExecRequest = {
+      ...given,
+      ...(ctx.signal ? { signal: ctx.signal } : {}),
+      ...(mergeRepos.length > 0 ? { mergeRepos } : {}),
+    };
     const { id, provider } = computer;
     if (!provider.execStream || !deps.pubsub || !ctx.toolUseId) return provider.exec(id, request);
     // Where the run's other events go.

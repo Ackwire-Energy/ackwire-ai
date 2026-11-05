@@ -91,6 +91,7 @@ function ThreadTitle({ thread }: { thread: ThreadInfo }) {
       <input
         ref={input}
         className="thread-title__input"
+        data-esc-own=""
         value={value}
         maxLength={200}
         aria-label={t("threads.view.titleLabel")}

@@ -290,6 +290,11 @@ export interface MemoryJudging {
    * decides (the background learning job never silently replaces what a person wrote, ADR 0120).
    */
   mayReplace?: (old: ContextItem) => boolean;
+  /**
+   * A rule a person gave in their own message, in a run that read nothing outside (ADR 0120, rules people gave): it
+   * may hold a permission ("no need to ask me before each send"), so the permission check is skipped.
+   */
+  personsRule?: boolean;
 }
 
 /**
@@ -306,7 +311,7 @@ export async function consolidateItem(
   judging: MemoryJudging = {},
 ): Promise<ConsolidateResult> {
   const { judge } = judging;
-  await checkPermissionText(judge, input.orgId, `${input.title ?? ""}\n${input.content}`);
+  if (!judging.personsRule) await checkPermissionText(judge, input.orgId, `${input.title ?? ""}\n${input.content}`);
   // By meaning first (outside the transaction: the judge is a network call); words when it can't.
   if (judge && judging.semantic) {
     const plan = await planConsolidation(db, judge, input);
@@ -328,6 +333,8 @@ export async function consolidateItem(
           isNull(contextItems.supersededBy),
           input.agentId ? eq(contextItems.agentId, input.agentId) : isNull(contextItems.agentId),
           eq(contextItems.scopeType, input.scopeType),
+          // A rule holds by its giver (`rulesForPerson`): the same words from someone else are their own rule.
+          input.kind === "rule" ? eq(contextItems.createdById, input.createdById ?? "") : undefined,
           or(eq(contextItems.subjectKey, subjectKey), sql`${contextItems.content} = ${input.content}`),
         ),
       )
@@ -556,13 +563,15 @@ export async function listOrgMemoryRows(db: Database, actorId: string, orgId: st
 }
 
 /**
- * Agent memories: the agent's owner or admins. Org-wide items: admins (`configure`).
+ * Agent memories: the agent's owner or admins (a rule people gave: its giver too). Org-wide items: admins (`configure`).
  * An owner who isn't an admin changes only items they can see (the edit answers
  * with the content); to them the others don't exist.
  */
 async function requireEdit(db: Database, actorId: string, item: ContextItem) {
   const membership = await requirePermission(db, actorId, item.orgId, "read");
   if (can(membership, "review_memory")) return;
+  // A rule people gave: its giver takes it back too.
+  if (item.kind === "rule" && item.createdByKind === "person" && item.createdById === actorId) return;
   if (item.agentId) {
     const agent = await getAgent(db, item.orgId, item.agentId);
     if (agent?.ownerUserId === actorId) {
@@ -573,6 +582,13 @@ async function requireEdit(db: Database, actorId: string, item: ContextItem) {
   }
   throw new ForbiddenError("Only the agent's owner or an admin can change this");
 }
+
+/** Whether `actorId` may change or remove the item (`requireEdit`, as a yes/no). */
+export const mayEditItem = (db: Database, actorId: string, item: ContextItem) =>
+  requireEdit(db, actorId, item).then(
+    () => true,
+    () => false,
+  );
 
 async function loadItem(db: Database, orgId: string, itemId: string) {
   const [row] = await db
@@ -597,7 +613,8 @@ export async function editContextItem(
 ): Promise<ContextItem> {
   const item = await loadItem(db, orgId, itemId);
   await requireEdit(db, actorId, item);
-  if (input.content !== undefined && input.content !== item.content) {
+  // A rule passes `requireEdit` only for its giver, the agent's owner or an admin: people who may give it anyway.
+  if (input.content !== undefined && input.content !== item.content && item.kind !== "rule") {
     await checkPermissionText(judge, orgId, `${input.title ?? item.title ?? ""}\n${input.content}`);
   }
   let current = item;
@@ -620,7 +637,8 @@ export async function editContextItem(
         confidence: Math.max(item.confidence, 0.9),
         pinned: input.pinned ?? item.pinned,
         createdByKind: "person",
-        createdById: actorId,
+        // A rule holds by its giver (`rulesForPerson`): an owner's or admin's edit keeps it the giver's.
+        createdById: item.kind === "rule" && item.createdByKind === "person" ? (item.createdById ?? actorId) : actorId,
       }),
     );
   }

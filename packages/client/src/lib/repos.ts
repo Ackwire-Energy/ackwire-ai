@@ -55,6 +55,12 @@ export function repoExists(listing: GitHubRepositories | undefined, entry: strin
   return isAccount(entry) || account.repositories.some((r) => r.fullName.toLowerCase() === entry.toLowerCase());
 }
 
+/** What "merge without asking" picks from: the repositories GitHub reaches that the agent may use (`reach`, empty: all). */
+export const mergeChoices = (listing: GitHubRepositories | undefined, reach: string[]) =>
+  (listing?.accounts ?? [])
+    .flatMap((a) => a.repositories.map((r) => r.fullName))
+    .filter((name) => reach.length === 0 || covers(reach, name));
+
 /** Whether the list covers a repository (itself, or its whole account). */
 export const covers = (list: string[], fullName: string) => {
   const f = fullName.toLowerCase();

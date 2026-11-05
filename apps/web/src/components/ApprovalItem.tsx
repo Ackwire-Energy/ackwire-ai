@@ -11,6 +11,7 @@ import {
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import {
   aheadEndLine,
+  alwaysRoutineName,
   approvalSummary,
   approvalTitle,
   approvalWaitsFor,
@@ -24,8 +25,10 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { ApprovalCard, Button, cx, Icon } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
+import { useContext } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AgentWho } from "@/components/AgentAvatar";
+import { OpenDetailsContext } from "@/components/details-link";
 import { EmailLetter } from "@/components/EmailLetter";
 import { RequestDone } from "@/components/RequestCard";
 import { CardSky, colorOf, prepareBurst } from "@/components/Sky";
@@ -100,9 +103,11 @@ export function ApproveAlways({
   const openPanel = useOpenAgentPanel();
   const decide = useDecideApproval(org.id);
   const others = useDecideApprovals(org.id);
+  const details = useContext(OpenDetailsContext);
   if (!approveAlwaysOffered(approval)) return null;
   const g = agentGrammar(agent?.name ?? t("channel.unknownAgent"));
   const kind = approval.approveAlways;
+  const routine = alwaysRoutineName(t, approval);
   // In a conversation: the agent's Acesso in the panel beside it; elsewhere, its page.
   const open = () =>
     openPanel
@@ -120,6 +125,22 @@ export function ApproveAlways({
       () => {
         burst();
         if (also.length) others.mutate({ ids: also, decision: "approve" });
+        if (routine && kind?.routineId) {
+          const id = kind.routineId;
+          toast.show(
+            t("approval.always.doneRoutine", { routine }),
+            "info",
+            {
+              label: t("approval.always.open"),
+              run: () =>
+                details
+                  ? details({ kind: "routine", id })
+                  : void navigate({ to: "/org/$orgId/routines", params: { orgId: org.id }, search: { open: id } }),
+            },
+            t("approval.always.undoRoutine"),
+          );
+          return;
+        }
         toast.show(
           t("approval.always.done", { name: g.name }),
           "info",

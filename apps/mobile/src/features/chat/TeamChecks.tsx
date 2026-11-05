@@ -55,7 +55,7 @@ function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
   return (
     <View style={[styles.one, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
       <View style={[styles.tile, { backgroundColor: colors.raised, boxShadow: shadows.e1 }]}>
-        <Icon name={ICONS[targetKind(target)]} size={14} color={colors.ink2} />
+        <Icon name={ICONS[targetKind(target)]} size={16} color={colors.ink2} />
       </View>
       <View style={[styles.grow, styles.tx]}>
         <Text variant="small" tone="ink2" style={styles.oneText}>
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   one: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 10,
+    gap: 8,
     minHeight: 50,
     paddingVertical: 9,
     paddingLeft: 12,

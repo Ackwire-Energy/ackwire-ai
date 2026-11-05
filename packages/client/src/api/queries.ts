@@ -76,6 +76,7 @@ import type {
   AuditQuery,
   AuditRow,
   BlockState,
+  BrainScope,
   CalendarEventInput,
   CalendarEventPatch,
   CardDelegate,
@@ -1709,6 +1710,7 @@ export function useDecideApproval(orgId: string) {
       cacheApproval(qc, orgId, approval);
       void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
       if (always) void qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, approval.agentId) });
+      if (always && approval.approveAlways?.routineId) void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
     },
   });
 }
@@ -1957,6 +1959,26 @@ export const useAgentRepos = (orgId: string, agentId: string, enabled = true) =>
     retry: false,
   });
 };
+
+/** Where the agent merges with no approval card ("Pode fazer merge sem perguntar"). */
+export const useAgentMergeRepos = (orgId: string, agentId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentMergeRepos(orgId, agentId),
+    queryFn: () => api.repositories.merge(orgId, agentId),
+    enabled,
+    retry: false,
+  });
+};
+
+export function useSetAgentMergeRepos(orgId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (repositories: string[]) => api.repositories.setMerge(orgId, agentId, repositories),
+    onSuccess: (repositories) => qc.setQueryData(keys.agentMergeRepos(orgId, agentId), repositories),
+  });
+}
 
 export function useRemoveGitHubApp(orgId: string) {
   const api = useApi();
@@ -3999,11 +4021,18 @@ export function useSaveSandboxSettings(orgId: string) {
  * "Quem pensa" (its owner or an admin; members don't load it). `pollMs`: asked again this often where no event
  * keeps it current (the onboarding opens no socket).
  */
-export const useAgentBrain = (orgId: string, agentId: string, enabled = true, pollMs: number | false = false) => {
+export const useAgentBrain = (
+  orgId: string,
+  agentId: string,
+  enabled = true,
+  pollMs: number | false = false,
+  /** The team's right hand's workspace AI (admins), under the same key so every invalidation reaches it. */
+  scope?: BrainScope,
+) => {
   const api = useApi();
   return useQuery({
-    queryKey: keys.agentBrain(orgId, agentId),
-    queryFn: () => api.agents.brain(orgId, agentId),
+    queryKey: scope ? [...keys.agentBrain(orgId, agentId), scope] : keys.agentBrain(orgId, agentId),
+    queryFn: () => api.agents.brain(orgId, agentId, scope),
     enabled,
     retry: false,
     refetchInterval: pollMs,
@@ -5416,6 +5445,7 @@ export function useReminderAction(orgId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.reminders(orgId) });
       void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
     },
   });
 }

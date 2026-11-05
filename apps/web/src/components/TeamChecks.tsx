@@ -54,7 +54,7 @@ function TeamCheckRow({ check, selfId }: { check: TeamCheck; selfId: string | nu
   return (
     <div className="ag-rc">
       <span className="ag-rc__ic" aria-hidden="true">
-        <Icon name={ICONS[targetKind(target)]} size={14} />
+        <Icon name={ICONS[targetKind(target)]} size={16} />
       </span>
       <span className="ag-rc__tx">
         <span className="ag-rc__sentence" title={check.targets.join(", ")}>

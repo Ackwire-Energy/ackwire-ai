@@ -640,7 +640,11 @@ export function agentRoutes(deps: AppDeps) {
                     "no_computer",
                     "cli_missing",
                     "computer_away",
+                    "computer_failed",
                     "plan_limit",
+                    "model_limit",
+                    "model_region",
+                    "commands_off",
                     "plan_not_shared",
                     "runner_outdated",
                     "plan_tools",
@@ -667,7 +671,7 @@ export function agentRoutes(deps: AppDeps) {
       await requirePermission(db, userId, orgId, "read");
       const status = aiStatusDeps(deps);
       const [ai, routing] = await Promise.all([
-        orgAiStatus(status, orgId),
+        orgAiStatus(status, orgId, userId),
         orgRouting(status, deps.extras?.router?.routing ?? null, orgId, userId),
       ]);
       return c.json({ ...ai, ...routing }, 200);
@@ -1216,6 +1220,12 @@ export function agentRoutes(deps: AppDeps) {
     },
   );
 
+  /** The team's right hand's AIs (ADR 0137 §11): the caller's own (the default) or the workspace's. */
+  const BrainScope = z.enum(["mine", "workspace"]).openapi({
+    description:
+      "The team's right hand only: `mine`, the caller's own AI for their DM with it (any member); `workspace`, what every DM thinks with while its person has none (admins). Ignored for other agents.",
+  });
+
   const AgentParams = OrgParams.extend({ agentId: z.uuid() });
 
   const UsageQueueRow = z.object({
@@ -1635,13 +1645,14 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        '"Quem pensa" (ADR 0032): the model (API), Claude Code or Codex on its computer, the model and the fallback, with what its computer offers. An admin or the agent\'s owner.',
-      request: { params: AgentParams },
+        "\"Quem pensa\" (ADR 0032): the model (API), Claude Code or Codex on its computer, the model and the fallback, with what its computer offers. An admin or the agent's owner; the team's right hand's `mine`, any member.",
+      request: { params: AgentParams, query: z.object({ scope: BrainScope.optional() }) },
       responses: { 200: json(AgentBrain), ...errors },
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      return c.json(await getAgentBrain({ db }, c.get("user").id, orgId, agentId), 200);
+      const scope = c.req.valid("query").scope ?? "mine";
+      return c.json(await getAgentBrain({ db }, c.get("user").id, orgId, agentId, scope), 200);
     },
   );
 
@@ -1657,6 +1668,7 @@ export function agentRoutes(deps: AppDeps) {
         params: AgentParams,
         body: body(
           z.object({
+            scope: BrainScope.optional(),
             brain: BrainKind.optional(),
             model: z.string().max(80).nullable().optional().openapi({
               description:
@@ -1696,7 +1708,11 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const view = await setAgentBrain({ db }, c.get("user").id, orgId, agentId, c.req.valid("json"));
+      const input = c.req.valid("json");
+      const view = await setAgentBrain({ db }, c.get("user").id, orgId, agentId, {
+        ...input,
+        scope: input.scope ?? "mine",
+      });
       // Its computers hear which account each agent thinks with (system mode lends the folders by it), on every save:
       // the one an old plan was on may be none the view shows (the team's right hand, which is on no computer).
       await publishMachineAgentsChanged(adapters.pubsub, orgId);

@@ -57,6 +57,7 @@ export const keys = {
   githubApp: (orgId: string) => ["org", orgId, "github-app"] as const,
   githubRepos: (orgId: string) => ["org", orgId, "github-repositories"] as const,
   agentRepos: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "repositories"] as const,
+  agentMergeRepos: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "merge-repositories"] as const,
   customServers: (orgId: string) => ["org", orgId, "custom-servers"] as const,
   toolChanges: (orgId: string) => ["org", orgId, "tool-changes"] as const,
   scopes: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "scopes"] as const,

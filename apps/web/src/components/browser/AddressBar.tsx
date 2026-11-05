@@ -106,6 +106,7 @@ export function AddressBar({
           spellCheck={false}
           maxLength={2048}
           readOnly={readOnly}
+          data-esc-own={draft === null ? undefined : ""}
           value={draft ?? shownAddress(url)}
           onFocus={(e) => {
             // The whole address, selected, as a browser's bar does: typing replaces it.

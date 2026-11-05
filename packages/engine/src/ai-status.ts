@@ -8,7 +8,7 @@ import { type BrainKind, isComputerBrain } from "./brains/types";
 import type { ModelGateway } from "./gateway";
 import type { MachineStatus } from "./machine-hub";
 import { missionTurnFor } from "./missions-engine";
-import { thinkingAgent } from "./right-hand";
+import { isRightHand, rightHandPerson, thinkingAgent } from "./right-hand";
 import { orgKeyProviders, orgModelProvider, type RoutingSetup } from "./router";
 import { planSignInsOf } from "./router-plan";
 import type { AgentRun } from "./runs";
@@ -22,9 +22,10 @@ import type { AgentRun } from "./runs";
 export type AiState = "ready" | "no_ai" | "waiting";
 
 /**
- * Why an agent has no AI, as its card and the Connect dialog put it. The team's right hand on a plan also says its
- * computer is away, its plan is at its limit, the plan answers only its owner, the computer's runner needs an update,
- * or the plan's CLI there offers tools of its own (`rightHandNoAiReason`).
+ * Why an agent has no AI, as its card and the Connect dialog put it (`cli_missing`: its computer has no such CLI). The
+ * team's right hand on a plan also says its computer is away or had a problem, its plan is at its limit (or its model's own limit, or
+ * the region that model needs), the plan answers only its owner, the computer's runner needs an update, commands or
+ * the CLI are off there, or the plan's CLI there offers tools of its own (`rightHandNoAiReason`).
  */
 export type NoAiReason =
   | "no_key"
@@ -32,7 +33,11 @@ export type NoAiReason =
   | "no_computer"
   | "cli_missing"
   | "computer_away"
+  | "computer_failed"
   | "plan_limit"
+  | "model_limit"
+  | "model_region"
+  | "commands_off"
   | "plan_not_shared"
   | "runner_outdated"
   | "plan_tools";
@@ -59,7 +64,7 @@ type AiAgent = Pick<
   Agent,
   "orgId" | "model" | "credentialId" | "brain" | "brainFallback" | "brainAccountId" | "machineId"
 > &
-  Partial<Pick<Agent, "builtin" | "ownerUserId">>;
+  Partial<Pick<Agent, "builtin" | "ownerUserId" | "planForOthers">>;
 
 /** The run being checked: a mission's turn thinks with the mission's brain, and background work never falls back. */
 type AiRun = Pick<AgentRun, "id" | "orgId" | "agentId" | "threadRootId" | "triggerMessageId" | "background">;
@@ -86,9 +91,17 @@ export const noAiReasonOf = (code: string): NoAiReason =>
 export const ownNotSignedIn = (code: string, kind: BrainKind, account: unknown): Pick<AgentAi, "own"> =>
   code === "not_logged_in" && !account && isComputerBrain(kind) ? { own: kind } : {};
 
-/** One agent (for one run, when given: right after its row is read, before any judge or model call). */
-export async function agentAiState(deps: AiStatusDeps, given: AiAgent, run?: AiRun): Promise<AgentAi> {
-  const agent = await thinkingAgent(deps.db, given);
+/**
+ * One agent (for one run, when given: right after its row is read, before any judge or model call). `viewer`: with no
+ * run, whose DM with the right hand it is asked for (its AI is each person's own, §11).
+ */
+export async function agentAiState(deps: AiStatusDeps, given: AiAgent, run?: AiRun, viewer?: string): Promise<AgentAi> {
+  const person = run ? await rightHandPerson(deps.db, given, run) : (viewer ?? null);
+  const agent = await thinkingAgent(deps.db, given, person);
+  // The workspace's plan while "Atende outras pessoas" is off: it thinks for nobody but its owner.
+  if (isRightHand(agent) && brainOf(agent.brain) !== "model" && !agent.planForOthers && person) {
+    if (person !== agent.ownerUserId) return { state: "no_ai", reason: "plan_not_shared" };
+  }
   const mission = run ? await missionTurnFor(deps.db, run).catch(() => null) : null;
   const kind = mission?.brain ?? brainOf(agent.brain);
   if (kind === "model") return (await modelReady(deps, agent)) ? READY : { state: "no_ai", reason: "no_key" };
@@ -116,6 +129,7 @@ const agentFields = {
   brainAccountId: schema.agents.brainAccountId,
   machineId: schema.agents.machineId,
   builtin: schema.agents.builtin,
+  planForOthers: schema.agents.planForOthers,
   ownerUserId: schema.agents.ownerUserId,
 };
 
@@ -127,9 +141,12 @@ const activeAgents = (db: Executor, orgId: string) =>
     .orderBy(asc(schema.agents.createdAt));
 
 /** Every agent that isn't archived, and `any`: at least one of them is ready or waiting for its computer. */
-export async function orgAiStatus(deps: AiStatusDeps, orgId: string) {
+export async function orgAiStatus(deps: AiStatusDeps, orgId: string, viewer?: string) {
   const states = await Promise.all(
-    (await activeAgents(deps.db, orgId)).map(async (a) => ({ agentId: a.id, ...(await agentAiState(deps, a)) })),
+    (await activeAgents(deps.db, orgId)).map(async (a) => ({
+      agentId: a.id,
+      ...(await agentAiState(deps, a, undefined, viewer)),
+    })),
   );
   return { any: states.some((s) => s.state !== "no_ai"), agents: states };
 }
@@ -150,8 +167,19 @@ export async function agentAiStates(deps: AiStatusDeps, orgId: string, agentIds:
 
 /** `orgAiStatus(…).any`, stopping at the first agent that has an AI (it runs before routing every message). */
 export async function orgHasAi(deps: AiStatusDeps, orgId: string): Promise<boolean> {
-  for (const agent of await activeAgents(deps.db, orgId)) {
+  const agents = await activeAgents(deps.db, orgId);
+  for (const agent of agents) {
     if ((await agentAiState(deps, agent)).state !== "no_ai") return true;
+  }
+  // A person's own AI for the right hand (§11) may be the only one: connecting a plan for it leaves its row on no AI.
+  const rightHand = agents.find(isRightHand);
+  if (!rightHand) return false;
+  const people = await deps.db
+    .select({ userId: schema.rightHandBrains.userId })
+    .from(schema.rightHandBrains)
+    .where(eq(schema.rightHandBrains.orgId, orgId));
+  for (const { userId } of people) {
+    if ((await agentAiState(deps, rightHand, undefined, userId)).state !== "no_ai") return true;
   }
   return false;
 }

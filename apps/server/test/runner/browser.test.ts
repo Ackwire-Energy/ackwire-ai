@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
@@ -48,6 +48,7 @@ import {
   type OwnChrome,
   relayCommands,
   type StreamSocket,
+  selectFieldScript,
 } from "../../runner/browser";
 import { handleRequest, type RequestScope } from "../../runner/handlers";
 import { agentWorkspace } from "../../runner/paths";
@@ -532,6 +533,258 @@ test.if(posix)("the runner starts the agent's Chrome itself and every command co
   expect(other[other.indexOf("--session") + 1]).toBe("agent-9f00aa11");
   expect(t.chromes).toHaveLength(2);
   expect(other[other.indexOf("--cdp") + 1]).toBe(String(t.chromes[1]?.port));
+});
+
+test("a click goes as a person's: the box, then a pointer path into it, a check and a held press; a covered one the plain way", async () => {
+  const t = setup();
+  await t.act("open", ["https://shop.example.com"]);
+  t.page({
+    boxes: { "@e1": { x: 600, y: 400, width: 120, height: 40 } },
+    viewport: [1280, 800],
+    hit: { tag: "BUTTON", box: [600, 400, 720, 440] },
+  });
+  expect(await t.act("click", ["@e1"])).toMatchObject({ success: true, data: { clicked: "@e1" } });
+  const batches = t
+    .logged()
+    .filter((c) => c.args.includes("batch"))
+    .map((c) => JSON.parse(c.stdin) as string[][]);
+  // In view: the page stays where it is.
+  expect(batches[0]).toEqual([
+    ["get", "box", "@e1"],
+    ["eval", "[window.innerWidth, window.innerHeight]"],
+  ]);
+  const human = batches[1] ?? [];
+  expect(human[0]?.slice(0, 2)).toEqual(["mouse", "move"]);
+  expect(human.at(-4)?.[0]).toBe("eval");
+  const moves = human.filter((c) => c[0] === "mouse" && c[1] === "move");
+  expect(moves.length).toBeGreaterThan(8);
+  const [x, y] = (moves.at(-1) ?? []).slice(2, 4).map(Number);
+  expect(x).toBeGreaterThan(600);
+  expect(x).toBeLessThan(720);
+  expect(y).toBeGreaterThan(400);
+  expect(y).toBeLessThan(440);
+  expect(human.slice(-3).map((c) => c.slice(0, 2).join(" "))).toEqual([
+    "mouse down",
+    `wait ${human.at(-2)?.[1]}`,
+    "mouse up",
+  ]);
+  expect(t.logged().some((c) => c.args.at(-2) === "click")).toBe(false);
+  // The next path starts where this one ended.
+  await t.act("click", ["@e1"]);
+  const next = JSON.parse(
+    t
+      .logged()
+      .filter((c) => c.args.includes("batch"))
+      .at(-1)?.stdin ?? "[]",
+  ) as string[][];
+  const start = next.find((c) => c[1] === "move") ?? [];
+  expect(Math.abs(Number(start[2]) - (x ?? 0)) + Math.abs(Number(start[3]) - (y ?? 0))).toBeLessThan(60);
+  // Covered (a banner over it) once the pointer is there: the browser's own click, which says what covers it.
+  const lastBatch = () =>
+    JSON.parse(
+      t
+        .logged()
+        .filter((c) => c.args.includes("batch"))
+        .at(-1)?.stdin ?? "[]",
+    ) as string[][];
+  t.page({ hit: { tag: "DIV", box: [0, 300, 1280, 800] } });
+  expect(await t.act("click", ["@e1"])).toMatchObject({ success: true });
+  expect(lastBatch()).toEqual([["click", "@e1"]]);
+  // In a frame its box is in that frame's coordinates: what the top page has there isn't it.
+  t.page({ hit: { tag: "A", box: [620, 410, 700, 430] } });
+  await t.act("click", ["@e1"]);
+  expect(lastBatch()).toEqual([["click", "@e1"]]);
+  // Not all in view: scrolled there, and looked at again where it went.
+  t.page({
+    hit: { tag: "BUTTON", box: [600, 400, 720, 440] },
+    boxes: { "@e1": { x: 600, y: 1400, width: 120, height: 40 } },
+  });
+  await t.act("click", ["@e1"]);
+  const looks = t
+    .logged()
+    .filter((c) => c.args.includes("batch"))
+    .map((c) => JSON.parse(c.stdin) as string[][])
+    .slice(-4);
+  expect(looks[0]?.[0]).toEqual(["get", "box", "@e1"]);
+  expect(looks[1]?.slice(0, 2)).toEqual([
+    ["scrollintoview", "@e1"],
+    ["get", "box", "@e1"],
+  ]);
+  t.page({ boxes: { "@e1": { x: 600, y: 400, width: 120, height: 40 } } });
+  // No box (not found), or a flag: the plain command.
+  await t.act("click", ["@e9"]);
+  expect(t.logged().at(-1)?.args.slice(-2)).toEqual(["click", "@e9"]);
+  await t.act("click", ["@e1", "--new-tab"]);
+  expect(t.logged().at(-1)?.args.slice(-3)).toEqual(["click", "@e1", "--new-tab"]);
+  // A drag goes along the browser's own eased curve.
+  await t.act("drag", ["@e1", "@e2"]);
+  expect(t.logged().at(-1)?.args.slice(-4)).toEqual(["drag", "@e1", "@e2", "--human"]);
+});
+
+test("an action on a point of the page: the pointer goes along a path, text as keys when a field has the focus", async () => {
+  const t = setup();
+  await t.act("open", ["https://shop.example.com"]);
+  t.page({ viewport: [1280, 800] });
+  expect(await t.act("mouse", ["move", "900", "300"])).toMatchObject({ success: true, data: { x: 900, y: 300 } });
+  const batch = () =>
+    JSON.parse(
+      t
+        .logged()
+        .filter((c) => c.args.includes("batch"))
+        .at(-1)?.stdin ?? "[]",
+    ) as string[][];
+  const path = batch();
+  expect(path.length).toBeGreaterThan(8);
+  expect(path.every((c) => c[1] === "move")).toBe(true);
+  expect(path.at(-1)?.slice(2, 4)).toEqual(["900", "300"]);
+  // The next one starts from there, and a press goes as it came.
+  await t.act("mouse", ["move", "920", "310"]);
+  const next = batch()[0] ?? [];
+  expect(Math.abs(Number(next[2]) - 900)).toBeLessThan(25);
+  await t.act("mouse", ["down", "left"]);
+  expect(t.logged().at(-1)?.args.slice(-3)).toEqual(["mouse", "down", "left"]);
+  await t.act("mouse", ["up", "left"]);
+  expect(t.logged().at(-1)?.args.slice(-3)).toEqual(["mouse", "up", "left"]);
+  t.page({ focusedRef: "@e2", attrs: { "@e2": { tag: "INPUT", type: "search" } } });
+  expect(await t.act("keyboard", ["inserttext", "oi"])).toMatchObject({ success: true });
+  expect(
+    batch()
+      .filter((c) => c[0] === "press")
+      .map((c) => c[1]),
+  ).toEqual(["o", "i"]);
+  // No field has the focus: keys would be the page's shortcuts.
+  t.page({ focusedRef: null });
+  await t.act("keyboard", ["inserttext", "oi"]);
+  expect(t.logged().at(-1)?.args.slice(-3)).toEqual(["keyboard", "inserttext", "oi"]);
+});
+
+test("fill clicks the field, selects it and types over it with a person's gaps; a date field is filled at once", async () => {
+  const t = setup();
+  await t.act("open", ["https://shop.example.com"]);
+  t.page({
+    boxes: { "@e2": { x: 100, y: 100, width: 300, height: 30 } },
+    viewport: [1280, 800],
+    hit: { tag: "INPUT", type: "email", box: [100, 100, 400, 130], ref: "@e2" },
+  });
+  expect(await t.act("fill", ["@e2", "a@b.co"])).toMatchObject({ success: true, data: { filled: "@e2" } });
+  const human = JSON.parse(
+    t
+      .logged()
+      .filter((c) => c.args.includes("batch"))
+      .at(-1)?.stdin ?? "[]",
+  ) as string[][];
+  const at = human.map((c) => c[0]).lastIndexOf("eval");
+  const landed = human.filter((c) => c[1] === "move").at(-1) ?? [];
+  expect(human[at]).toEqual(["eval", selectFieldScript({ x: Number(landed[2]), y: Number(landed[3]) })]);
+  expect(human.some((c) => c[0] === "fill")).toBe(false);
+  expect(human.slice(at - 3, at).map((c) => `${c[0]}${c[1]}`)).toEqual([
+    "mousedown",
+    `wait${human[at - 2]?.[1]}`,
+    "mouseup",
+  ]);
+  const keys = human.slice(at + 1);
+  expect(keys.filter((c) => c[0] === "press").map((c) => c[1])).toEqual([..."a@b.co"]);
+  const waits = keys.filter((c) => c[0] === "wait").map((c) => Number(c[1]));
+  expect(waits).toHaveLength(6);
+  expect(new Set(waits).size).toBeGreaterThan(1);
+  t.page({ hit: { tag: "INPUT", type: "date", box: [100, 100, 400, 130] } });
+  await t.act("fill", ["@e2", "2026-11-05"]);
+  const plain = JSON.parse(
+    t
+      .logged()
+      .filter((c) => c.args.includes("batch"))
+      .at(-1)?.stdin ?? "[]",
+  ) as string[][];
+  expect(plain).toEqual([["fill", "@e2", "2026-11-05"]]);
+  // The click moved the focus off the field: nothing is typed anywhere else, the command goes as given.
+  t.page({ hit: { tag: "INPUT", type: "text", box: [100, 100, 400, 130] } });
+  expect(await t.act("fill", ["@e2", "oi"])).toMatchObject({ success: true });
+  const asGiven = JSON.parse(
+    t
+      .logged()
+      .filter((c) => c.args.includes("batch"))
+      .at(-1)?.stdin ?? "[]",
+  ) as string[][];
+  expect(asGiven).toEqual([["fill", "@e2", "oi"]]);
+});
+
+describe("a person takes control while the agent's pointer and keys are going", () => {
+  const typingPage = {
+    boxes: { "@e2": { x: 100, y: 100, width: 300, height: 30 } },
+    viewport: [1280, 800],
+    hit: { tag: "INPUT", type: "email", box: [100, 100, 400, 130], ref: "@e2" },
+  };
+  const started = async (command: string, args: string[]) => {
+    const t = setup();
+    await t.act("open", ["https://shop.example.com"]);
+    t.page({ ...typingPage, typingMs: 20_000 });
+    const before = t.logged().length;
+    const going = t.act(command, args);
+    await waitFor(() =>
+      t
+        .logged()
+        .slice(before)
+        .some((c) => /"press"|"move"/.test(c.stdin ?? "")),
+    );
+    return { t, before, going };
+  };
+
+  test("a person's turn stops a fill: told so, not typed again, and no button stays down", async () => {
+    const { t, before, going } = await started("fill", ["@e2", "a@b.co"]);
+    t.manager.setHandoff(dev.id, { status: "pending" });
+    await Bun.sleep(50);
+    t.manager.setHandoff(dev.id, { status: "active", controller: "Maria" });
+    const answer = await going;
+    expect(answer).toMatchObject({ success: false, data: null });
+    expect(answer.error).toContain("A person took control of your browser");
+    const after = t.logged().slice(before);
+    expect(after.at(-1)?.args.slice(-2)).toEqual(["mouse", "up"]);
+    expect(after.filter((c) => c.args.includes("batch")).map((c) => c.stdin)).not.toContain(
+      JSON.stringify([["fill", "@e2", "a@b.co"]]),
+    );
+  });
+
+  test("taking control stops a command under way even with no stream open yet, which queues behind it", async () => {
+    const { t, going } = await started("mouse", ["move", "900", "300"]);
+    const control = t.manager.streamStart(dev, "control");
+    expect((await going).error).toContain("A person took control");
+    await control;
+  });
+});
+
+test("after a hover the pointer goes straight to the next element, and curves again once it left", async () => {
+  const t = setup();
+  await t.act("open", ["https://shop.example.com"]);
+  t.page({
+    boxes: {
+      "@e1": { x: 100, y: 100, width: 40, height: 40 },
+      "@e2": { x: 700, y: 500, width: 40, height: 40 },
+    },
+    viewport: [1280, 800],
+  });
+  const lastMoves = () =>
+    (
+      JSON.parse(
+        t
+          .logged()
+          .filter((c) => c.stdin.includes('"move"'))
+          .at(-1)?.stdin ?? "[]",
+      ) as string[][]
+    )
+      .filter((c) => c[1] === "move")
+      .map((c) => ({ x: Number(c[2]), y: Number(c[3]) }));
+  const offLine = (path: { x: number; y: number }[]) => {
+    const a = path[0] as { x: number; y: number };
+    const b = path.at(-1) as { x: number; y: number };
+    const d = Math.hypot(b.x - a.x, b.y - a.y);
+    return Math.max(...path.map((p) => Math.abs((b.x - a.x) * (a.y - p.y) - (a.x - p.x) * (b.y - a.y)) / d));
+  };
+  await t.act("hover", ["@e1"]);
+  await t.act("hover", ["@e2"]);
+  expect(offLine(lastMoves())).toBeLessThan(3);
+  await t.act("click", ["@e1"]);
+  await t.act("click", ["@e2"]);
+  expect(offLine(lastMoves())).toBeGreaterThan(8);
 });
 
 test("a normal Chrome user agent for the platform, and the whole launch line per browser kind", () => {
