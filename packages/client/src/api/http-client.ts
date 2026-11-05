@@ -808,8 +808,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       runs: async (orgId, filter = {}) =>
         (await request<{ runs: Run[] }>(`${org(orgId)}/runs`, { query: filter })).runs,
       run: (orgId, runId) => request<{ run: Run; steps: RunStep[] }>(`${org(orgId)}/runs/${enc(runId)}`),
-      cancelRun: (orgId, runId, reason) =>
-        request<void>(`${org(orgId)}/runs/${enc(runId)}/cancel`, { json: reason ? { reason } : {} }),
+      cancelRun: (orgId, runId, reason, chain) =>
+        request<void>(`${org(orgId)}/runs/${enc(runId)}/cancel`, {
+          json: { ...(reason ? { reason } : {}), ...(chain ? { chain } : {}) },
+        }),
       stopReason: (orgId, runId, reason) =>
         request<void>(`${org(orgId)}/runs/${enc(runId)}/stop-reason`, { json: { reason } }),
       continueRun: (orgId, runId) =>

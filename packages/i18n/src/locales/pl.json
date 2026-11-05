@@ -9630,6 +9630,26 @@
     "startsIn": "zacznie za ~{{n}} min",
     "startsAfter": "zacznie, gdy {{after}} skończy",
     "left": "zostało ~{{n}} min",
+    "overdue": "trwa dłużej niż zwykle",
+    "openTask": "Otwórz zadanie",
+    "fill": {
+      "agent_one": "{{count}} od agenta",
+      "agent_few": "{{count}} od agentów",
+      "agent_many": "{{count}} od agentów",
+      "agent_other": "{{count}} od agentów",
+      "person_one": "{{count}} dla osoby",
+      "person_few": "{{count}} dla osób",
+      "person_many": "{{count}} dla osób",
+      "person_other": "{{count}} dla osób",
+      "routine_one": "{{count}} rutyna",
+      "routine_few": "{{count}} rutyny",
+      "routine_many": "{{count}} rutyn",
+      "routine_other": "{{count}} rutyny",
+      "work_one": "{{count}} długa praca",
+      "work_few": "{{count}} długie prace",
+      "work_many": "{{count}} długich prac",
+      "work_other": "{{count}} długie prace"
+    },
     "who": "{{name}}",
     "away": "Nieobecny od {{time}}",
     "purpose": {
@@ -9645,11 +9665,11 @@
       "yourDm": "twój DM",
       "dm": "DM z: {{name}}",
       "thread": "wątek w #{{name}}",
+      "agents": "rozmowa między agentami",
       "private": "prywatna rozmowa"
     },
     "live": {
       "nextEta": "Czeka na komputer. Następny w kolejce, za około {{n}} min",
-      "nextAfter": "Czeka na komputer. Następny w kolejce, gdy {{after}} skończy",
       "next": "Czeka na komputer. Następny w kolejce",
       "behind": "W kolejce, {{nth}}. Po: {{names}}",
       "position": "W kolejce, {{nth}}"
@@ -13396,6 +13416,7 @@
       "waitingAgents_female": "{{name}} przekazała część dalej i czeka na odpowiedź"
     },
     "consultPair": {
+      "took": "zajęło {{time}}",
       "asking": "pyta",
       "working": "pracuje nad tym",
       "waitingApproval": "czeka na zgodę",
@@ -15021,6 +15042,24 @@
     "tasks_many": "{{count}} zadań",
     "tasks_other": "{{count}} zadania",
     "free": "Bez zadań",
+    "hiddenTasks_one": "{{count}} zadanie, którego nie widzisz",
+    "hiddenTasks_few": "{{count}} zadania, których nie widzisz",
+    "hiddenTasks_many": "{{count}} zadań, których nie widzisz",
+    "hiddenTasks_other": "{{count}} zadania, których nie widzisz",
+    "hiddenLine_one": "Jeszcze {{count}} zadanie w rozmowach, których nie widzisz.",
+    "hiddenLine_few": "Jeszcze {{count}} zadania w rozmowach, których nie widzisz.",
+    "hiddenLine_many": "Jeszcze {{count}} zadań w rozmowach, których nie widzisz.",
+    "hiddenLine_other": "Jeszcze {{count}} zadania w rozmowach, których nie widzisz.",
+    "helpers_one": "{{count}} pomocnik",
+    "helpers_few": "{{count}} pomocników",
+    "helpers_many": "{{count}} pomocników",
+    "helpers_other": "{{count}} pomocników",
+    "delegated": {
+      "fromPerson": "zaczęło się od: {{name}}",
+      "fromYou": "zaczęło się od ciebie",
+      "fromRoutine": "zaczęło się od rutyny {{name}}",
+      "stopNote": "Jeśli to zatrzymasz, {{name}} się o tym dowie i nie poprosi ponownie sam z siebie."
+    },
     "columns": {
       "task": "Zadanie",
       "state": "Stan",
@@ -15030,6 +15069,7 @@
     },
     "sections": {
       "asked": "Zlecone przez osoby",
+      "delegated": "Zlecone przez agentów",
       "background": "Rutyny w tle"
     },
     "state": {
@@ -15103,6 +15143,11 @@
       "openManager": "Otwórz w menedżerze zadań"
     },
     "confirm": {
+      "chainTitle_one": "Zatrzymać {{name}} i {{count}} pomocnika?",
+      "chainTitle_few": "Zatrzymać {{name}} i {{count}} pomocników?",
+      "chainTitle_many": "Zatrzymać {{name}} i {{count}} pomocników?",
+      "chainTitle_other": "Zatrzymać {{name}} i {{count}} pomocników?",
+      "chainBody": "To, co już zrobiono, zostaje, a wszyscy się o tym dowiedzą.",
       "title_one": "Zatrzymać zadanie agenta {{name}}?",
       "title_few": "Zatrzymać {{count}} zadania agenta {{name}}?",
       "title_many": "Zatrzymać {{count}} zadań agenta {{name}}?",

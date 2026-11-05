@@ -68,6 +68,9 @@ describe("a shared computer's line on the phone", () => {
     expect(say("dev", "t1")).toBe("a thread in #dev");
     expect(say("secret")).toBe("a private conversation");
     expect(say("someone-elses-dm")).toBe("a private conversation");
+    expect(queueWhereText(en, queuePlace({ channelId: "x", threadId: null, agents: true }, channels, dms))).toBe(
+      "a conversation between agents",
+    );
   });
 
   test("an agent's turn for a message: the run its receipt follows, else its one turn waiting here", async () => {

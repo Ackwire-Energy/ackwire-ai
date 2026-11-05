@@ -4,6 +4,7 @@ import {
   addRunStep,
   cancelRun,
   continuePausedRuns,
+  createAgent,
   drainOutbox,
   ForbiddenError,
   listMessages,
@@ -11,6 +12,7 @@ import {
   mayContinuePause,
   NotFoundError,
   postPersonMessage,
+  sendNote,
   setStopReason,
   taskManager,
   taskSteps,
@@ -33,6 +35,78 @@ const stoppedNotices = async () =>
   (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).filter(
     (m) => (m.meta as { notice?: { kind?: string } }).notice?.kind === "run_stopped",
   );
+
+describe("work agents asked of each other (ADR 0128)", () => {
+  /** @dev, in #general, asked @infra in their private conversation; @infra's run is at work there. */
+  async function delegated() {
+    const infra = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Infra", handle: "infra", role: "Servers", instructions: "You run them.", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    await ask("@dev olha os bugs");
+    const [asker] = await runs();
+    if (!asker) throw new Error("no run");
+    const sent = await sendNote(f.db, {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: asker.id,
+      hop: 1,
+      targetAgentId: infra.id,
+      body: "Vê o log de ontem",
+      chain: [f.agent.id],
+    });
+    if (!sent) throw new Error("not sent");
+    const helper = (await runs()).find((r) => r.agentId === infra.id);
+    if (!helper) throw new Error("no helper run");
+    await f.db.update(schema.agentRuns).set({ status: "running" });
+    return { infra, asker, helper };
+  }
+
+  test("admins and the agent's owner see it, with who asked and what started it; others only count it", async () => {
+    f = await setup();
+    const { infra, asker, helper } = await delegated();
+
+    const view = await taskManager(f.db, f.owner.id, f.org.id);
+    const row = view.tasks.find((t) => t.runId === helper.id);
+    expect(row).toMatchObject({
+      agentId: infra.id,
+      channelKind: "dm",
+      betweenAgents: true,
+      label: "Vê o log de ontem",
+      canStop: true,
+      delegation: { agentId: f.agent.id, origin: { kind: "person", userId: f.owner.id } },
+    });
+    expect(view.tasks.find((t) => t.runId === asker.id)).toMatchObject({ delegation: null, helpers: 1 });
+    expect(view.hidden).toEqual({ total: 0, working: 0, byAgent: {} });
+    expect((await taskSteps(f.db, f.owner.id, f.org.id, helper.id)).steps).toEqual([]);
+
+    const member = await addMember(f.db, f.org.id, "member", "bia");
+    const theirs = await taskManager(f.db, member.id, f.org.id);
+    expect(theirs.tasks.find((t) => t.runId === helper.id)).toBeUndefined();
+    expect(theirs.hidden.byAgent[infra.id]).toBe(1);
+    expect(theirs.hidden.total).toBeGreaterThanOrEqual(1);
+    expect(JSON.stringify(theirs)).not.toContain("Vê o log");
+    await expect(taskSteps(f.db, member.id, f.org.id, helper.id)).rejects.toBeInstanceOf(NotFoundError);
+
+    // Its owner sees it without admin rights.
+    await f.db.update(schema.agents).set({ ownerUserId: member.id }).where(eq(schema.agents.id, infra.id));
+    expect((await taskManager(f.db, member.id, f.org.id)).tasks.map((t) => t.runId)).toContain(helper.id);
+  });
+
+  test("the chain of a routine says the routine; what ended there stays listed for who sees it", async () => {
+    f = await setup();
+    const { helper } = await delegated();
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "done", finishedAt: new Date() })
+      .where(eq(schema.agentRuns.id, helper.id));
+    const view = await taskManager(f.db, f.owner.id, f.org.id);
+    expect(view.ended.find((e) => e.runId === helper.id)).toMatchObject({ betweenAgents: true, status: "done" });
+  });
+});
 
 describe("stopping a task tells the agent (ADR 0128)", () => {
   test("a notice in that conversation, with the reason, which wakes nothing; the next turn reads it", async () => {

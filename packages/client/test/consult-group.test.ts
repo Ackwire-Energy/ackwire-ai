@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { TFunction } from "i18next";
 import type { RunConsultation } from "../src/api/types";
 import {
   consultAskedKey,
@@ -18,6 +19,7 @@ import {
   pairItemOf,
   shownConsultations,
 } from "../src/lib/consult-group";
+import { consultTimeText } from "../src/lib/consultations";
 
 const T0 = Date.parse("2026-10-29T10:00:00Z");
 const iso = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -365,4 +367,10 @@ describe("consultPair (the row before the reply)", () => {
     });
     expect(consultPair([], now)).toBeNull();
   });
+});
+
+test("a row's time: its clock while it's out, how long it took once it's back, in hours past the first", () => {
+  const t = ((key: string, values: { time: string }) => `${key} ${values.time}`) as unknown as TFunction;
+  expect(consultTimeText(t, "en", true, 42)).toBe("42 s");
+  expect(consultTimeText(t, "en", false, 1446 * 60)).toBe("chat.consultPair.took 24 h");
 });

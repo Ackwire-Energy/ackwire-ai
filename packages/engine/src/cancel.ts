@@ -204,7 +204,8 @@ export async function cancelRun(
   userId: string,
   orgId: string,
   runId: string,
-  options: { stopMessageId?: string; reason?: string; tell?: boolean } = {},
+  /** `chain`: what the run asked of other agents stops with it, all the way down (`stopHelpers`). */
+  options: { stopMessageId?: string; reason?: string; tell?: boolean; chain?: boolean } = {},
 ): Promise<{ id: string; status: RunStatus; previousStatus: RunStatus }> {
   const { db } = deps;
   const membership = await requireActiveMembership(db, userId, orgId);
@@ -224,6 +225,8 @@ export async function cancelRun(
   if (!(await mayStopRun(db, userId, membership, row)))
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can stop it", "run.cancel_forbidden");
 
+  // Loaded here: consultations stop their runs through this module.
+  const helpers = options.chain ? await (await import("./consultations")).stopHelpers(deps, userId, orgId, runId) : [];
   // The agent's owner or an admin decides for the whole conversation; who asked, only for what they sent.
   const forAll = row.ownerUserId === userId || can(membership, "manage_agents");
   const stopped = await stopRun(
@@ -240,7 +243,7 @@ export async function cancelRun(
   // The agent is told (ADR 0128), unless the stop came with a message to it ("Parar e mandar": that message says it)
   // or the agent stopped it itself on a person's word (`tell: false`).
   if (!options.stopMessageId && options.tell !== false) {
-    await tellAgentStopped(deps, row.run, stopped.previousStatus, userId, options.reason).catch(() => null);
+    await tellAgentStopped(deps, row.run, stopped.previousStatus, userId, options.reason, helpers).catch(() => null);
   }
   // Its usage note's "Don't run it" speaks for every turn that note took in, each for who may stop it.
   for (const id of stopped.joined ?? []) await cancelRun(deps, userId, orgId, id, { tell: false }).catch(() => null);
@@ -421,8 +424,7 @@ export async function stopRun(
     if (channelKind === "dm" && !standingErrorDetail(error)) {
       // Loaded here: consultations stop their runs through this module.
       const { onConsultedRunStopped } = await import("./consultations");
-      const reason = actor.type === "person" ? "stopped by a person" : actor.reason;
-      await onConsultedRunStopped(deps, run, reason).catch(() => null);
+      await onConsultedRunStopped(deps, run, error).catch(() => null);
     }
     // Nobody executes it: what was sent to it and not read gets a run of its own now, unless its workspace
     // or its agent's end stopped it (that run would only fail too), or a person said not to run its catch-up.

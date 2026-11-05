@@ -214,11 +214,14 @@ export function ReasonField({
 export function StopConfirm({
   agentId,
   count,
+  helpers = 0,
   onCancel,
   onStop,
 }: {
   agentId: string;
   count: number;
+  /** One task and the agents it asked, stopped together. */
+  helpers?: number;
   onCancel: () => void;
   onStop: (reason: string) => void;
 }) {
@@ -232,9 +235,11 @@ export function StopConfirm({
         <AgentFace agentId={agentId} size={24} live={false} />
         <Text variant="footnote" tone="muted" style={styles.grow}>
           <Text variant="footnote" tone="ink" style={styles.semibold}>
-            {t("taskManager.confirm.title", { count, name })}
+            {helpers
+              ? t("taskManager.confirm.chainTitle", { count: helpers, name })
+              : t("taskManager.confirm.title", { count, name })}
           </Text>
-          {` ${t("taskManager.confirm.short", { name })}`}
+          {` ${helpers ? t("taskManager.confirm.chainBody") : t("taskManager.confirm.short", { name })}`}
         </Text>
       </View>
       <View style={styles.confirmRow}>
@@ -245,7 +250,7 @@ export function StopConfirm({
         <Button
           variant="primary"
           size="sm"
-          label={t("taskManager.confirm.stop", { count })}
+          label={t("taskManager.confirm.stop", { count: count + helpers })}
           leading={(color) => <PixelStop size={10} color={color} moving={false} />}
           onPress={() => onStop(why)}
         />

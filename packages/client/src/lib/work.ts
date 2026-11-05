@@ -688,7 +688,8 @@ export function barStep(t: TFunction, run: Pick<LiveRun, "text" | "work">, local
 export function formatLineTime(locale: string, ms: number) {
   if (ms < 1000) return `${Math.max(1, Math.round(ms))} ms`;
   if (ms < 60_000) return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(ms / 1000)} s`;
-  return `${Math.round(ms / 60_000)} min`;
+  if (ms < 3600_000) return `${Math.round(ms / 60_000)} min`;
+  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: ms < 10 * 3600_000 ? 1 : 0 }).format(ms / 3600_000)} h`;
 }
 
 // ───────────────────────────── one call on its own ─────────────────────────────

@@ -9314,6 +9314,22 @@
     "startsIn": "démarre dans ~{{n}} min",
     "startsAfter": "démarre quand {{after}} aura fini",
     "left": "encore ~{{n}} min",
+    "overdue": "a dépassé le temps habituel",
+    "openTask": "Ouvrir la tâche",
+    "fill": {
+      "agent_one": "{{count}} demandée par un agent",
+      "agent_many": "{{count}} demandées par des agents",
+      "agent_other": "{{count}} demandées par des agents",
+      "person_one": "{{count}} pour une personne",
+      "person_many": "{{count}} pour des personnes",
+      "person_other": "{{count}} pour des personnes",
+      "routine_one": "{{count}} routine",
+      "routine_many": "{{count}} routines",
+      "routine_other": "{{count}} routines",
+      "work_one": "{{count}} travail long",
+      "work_many": "{{count}} travaux longs",
+      "work_other": "{{count}} travaux longs"
+    },
     "who": "{{name}}",
     "away": "Absent depuis {{time}}",
     "purpose": {
@@ -9329,11 +9345,11 @@
       "yourDm": "votre DM",
       "dm": "DM avec {{name}}",
       "thread": "un fil dans #{{name}}",
+      "agents": "une conversation entre agents",
       "private": "une conversation privée"
     },
     "live": {
       "nextEta": "En attente de l'ordinateur. Passe ensuite, dans environ {{n}} min",
-      "nextAfter": "En attente de l'ordinateur. Passe ensuite, quand {{after}} aura fini",
       "next": "En attente de l'ordinateur. Passe ensuite",
       "behind": "Dans la file, {{nth}}. Après {{names}}",
       "position": "Dans la file, {{nth}}"
@@ -12991,6 +13007,7 @@
       "waitingAgents_female": "{{name}} a confié une partie à d'autres et attend leur retour"
     },
     "consultPair": {
+      "took": "a pris {{time}}",
       "asking": "en train de demander",
       "working": "au travail",
       "waitingApproval": "attend une approbation",
@@ -14639,6 +14656,21 @@
     "tasks_many": "{{count}} tâches",
     "tasks_other": "{{count}} tâches",
     "free": "Libre",
+    "hiddenTasks_one": "{{count}} tâche que vous ne voyez pas",
+    "hiddenTasks_many": "{{count}} tâches que vous ne voyez pas",
+    "hiddenTasks_other": "{{count}} tâches que vous ne voyez pas",
+    "hiddenLine_one": "{{count}} tâche de plus dans des conversations que vous ne voyez pas.",
+    "hiddenLine_many": "{{count}} tâches de plus dans des conversations que vous ne voyez pas.",
+    "hiddenLine_other": "{{count}} tâches de plus dans des conversations que vous ne voyez pas.",
+    "helpers_one": "{{count}} assistant",
+    "helpers_many": "{{count}} assistants",
+    "helpers_other": "{{count}} assistants",
+    "delegated": {
+      "fromPerson": "démarré par {{name}}",
+      "fromYou": "démarré par vous",
+      "fromRoutine": "démarré par la routine {{name}}",
+      "stopNote": "Si vous l'arrêtez, {{name}} en est informé et ne redemandera pas de lui-même."
+    },
     "columns": {
       "task": "Tâche",
       "state": "État",
@@ -14648,6 +14680,7 @@
     },
     "sections": {
       "asked": "Demandées par des personnes",
+      "delegated": "Demandées par des agents",
       "background": "Routines en arrière-plan"
     },
     "state": {
@@ -14720,6 +14753,10 @@
       "openManager": "Ouvrir dans le gestionnaire des tâches"
     },
     "confirm": {
+      "chainTitle_one": "Arrêter {{name}} et {{count}} assistant ?",
+      "chainTitle_many": "Arrêter {{name}} et {{count}} assistants ?",
+      "chainTitle_other": "Arrêter {{name}} et {{count}} assistants ?",
+      "chainBody": "Ce qui est fait est conservé, et tous sont informés.",
       "title_one": "Arrêter la tâche de {{name}} ?",
       "title_many": "Arrêter les {{count}} tâches de {{name}} ?",
       "title_other": "Arrêter les {{count}} tâches de {{name}} ?",

@@ -9328,6 +9328,22 @@
     "startsIn": "inizia tra ~{{n}} min",
     "startsAfter": "inizia quando {{after}} finisce",
     "left": "mancano ~{{n}} min",
+    "overdue": "oltre il solito",
+    "openTask": "Apri attività",
+    "fill": {
+      "agent_one": "{{count}} chiesta da un agente",
+      "agent_many": "{{count}} chieste da agenti",
+      "agent_other": "{{count}} chieste da agenti",
+      "person_one": "{{count}} per una persona",
+      "person_many": "{{count}} per persone",
+      "person_other": "{{count}} per persone",
+      "routine_one": "{{count}} routine",
+      "routine_many": "{{count}} routine",
+      "routine_other": "{{count}} routine",
+      "work_one": "{{count}} lavoro lungo",
+      "work_many": "{{count}} lavori lunghi",
+      "work_other": "{{count}} lavori lunghi"
+    },
     "who": "{{name}}",
     "away": "Via da {{time}}",
     "purpose": {
@@ -9343,11 +9359,11 @@
       "yourDm": "il tuo DM",
       "dm": "DM con {{name}}",
       "thread": "un thread in #{{name}}",
+      "agents": "una conversazione tra agenti",
       "private": "una conversazione privata"
     },
     "live": {
       "nextEta": "In attesa del computer. È il prossimo, tra circa {{n}} min",
-      "nextAfter": "In attesa del computer. È il prossimo quando {{after}} finisce",
       "next": "In attesa del computer. È il prossimo",
       "behind": "In coda, {{nth}}. Dopo {{names}}",
       "position": "In coda, {{nth}}"
@@ -12995,6 +13011,7 @@
       "waitingAgents_female": "{{name}} ha passato una parte ad altri e aspetta notizie"
     },
     "consultPair": {
+      "took": "ha richiesto {{time}}",
       "asking": "sta chiedendo",
       "working": "al lavoro",
       "waitingApproval": "in attesa di approvazione",
@@ -14643,6 +14660,21 @@
     "tasks_many": "{{count}} attività",
     "tasks_other": "{{count}} attività",
     "free": "Disponibile",
+    "hiddenTasks_one": "{{count}} attività che non vedi",
+    "hiddenTasks_many": "{{count}} attività che non vedi",
+    "hiddenTasks_other": "{{count}} attività che non vedi",
+    "hiddenLine_one": "{{count}} attività in più in conversazioni che non vedi.",
+    "hiddenLine_many": "{{count}} attività in più in conversazioni che non vedi.",
+    "hiddenLine_other": "{{count}} attività in più in conversazioni che non vedi.",
+    "helpers_one": "{{count}} aiutante",
+    "helpers_many": "{{count}} aiutanti",
+    "helpers_other": "{{count}} aiutanti",
+    "delegated": {
+      "fromPerson": "iniziata da {{name}}",
+      "fromYou": "iniziata da te",
+      "fromRoutine": "iniziata dalla routine {{name}}",
+      "stopNote": "Se la fermi, {{name}} lo saprà e non la chiederà di nuovo da solo."
+    },
     "columns": {
       "task": "Attività",
       "state": "Stato",
@@ -14652,6 +14684,7 @@
     },
     "sections": {
       "asked": "Chieste da persone",
+      "delegated": "Chieste da agenti",
       "background": "Routine in background"
     },
     "state": {
@@ -14724,6 +14757,10 @@
       "openManager": "Apri in Gestione attività"
     },
     "confirm": {
+      "chainTitle_one": "Fermare {{name}} e {{count}} aiutante?",
+      "chainTitle_many": "Fermare {{name}} e {{count}} aiutanti?",
+      "chainTitle_other": "Fermare {{name}} e {{count}} aiutanti?",
+      "chainBody": "Ciò che è già fatto resta, e tutti lo sapranno.",
       "title_one": "Fermare l'attività di {{name}}?",
       "title_many": "Fermare le {{count}} attività di {{name}}?",
       "title_other": "Fermare le {{count}} attività di {{name}}?",

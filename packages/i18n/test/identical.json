@@ -418,6 +418,7 @@
       "team.list.col.roles"
     ],
     "fr": [
+      "queue.fill.routine",
       "access.agentCol",
       "agent.builtinName",
       "agent.handleLabel",
@@ -1124,6 +1125,7 @@
       "approvals.review.state"
     ],
     "it": [
+      "queue.fill.routine",
       "access.area.browser",
       "access.area.desktop",
       "access.cell",
@@ -1412,6 +1414,7 @@
       "taskManager.waitGroup.routines"
     ],
     "nl": [
+      "queue.fill.routine",
       "access.agentCol",
       "access.area.browser",
       "access.area.skills",

@@ -706,9 +706,9 @@ export interface ApiClient {
     run(orgId: string, runId: string): Promise<{ run: Run; steps: RunStep[] }>;
     /**
      * "Parar": stops a run (the person who started it, the agent's owner, admins). The agent is told, with `reason`
-     * when given (ADR 0128).
+     * when given (ADR 0128). `chain`: what it asked of other agents stops with it, all the way down.
      */
-    cancelRun(orgId: string, runId: string, reason?: string): Promise<void>;
+    cancelRun(orgId: string, runId: string, reason?: string, chain?: boolean): Promise<void>;
     /** "Dizer por quê" after stopping a task (only who stopped it, once): the agent reads it. */
     stopReason?(orgId: string, runId: string, reason: string): Promise<void>;
     /**

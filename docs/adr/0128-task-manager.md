@@ -67,3 +67,15 @@ Computers report no live memory, only the last day's average; the line says "ful
 - Admins and owners finally see routines' background runs while they run.
 - The page costs one query every 3 s per open page; its subqueries are bounded (100 runs, the run's own steps by `run_id`, the last hour of steps).
 - A computer brain's own tool use between bridge calls isn't visible in "using now".
+
+## Addendum (2026-11-05): work agents ask of each other
+
+A coordinator delegated to three agents in their private conversations. The computer filled up with that work, the task manager said "1 trabalhando" and the cards "Livre", because the list followed the conversations the caller is in and no person is a member of those. Nothing could be stopped.
+
+- **Who sees it.** `seesRunSql` (`computer-queue.ts`) is the one rule: the conversation's members, plus, for what no person is a member of (routines' background runs, agents' private conversations), admins and the agent's owner. The task manager, a task's steps and the line's rows read it. Other people's DMs stay theirs. A member behind the chain who is neither sees a count, as anyone else does.
+- **Their own section.** `delegation` says who asked and what started the chain (a person, a routine); "Pedidas por agentes" groups them by the agent that asked. There is no conversation to open: `betweenAgents` hides "Abrir na conversa", and the steps are what the panel shows.
+- **Counts for the rest.** `hidden` counts everything `visibleRuns` leaves out, per agent too, so the page's "trabalhando" covers what the computers' rows count and a busy agent's card never says "Livre". Never what the work is.
+- **Stopping a chain.** `cancelRun` with `chain` (`stopHelpers`): every open ask below the run closes top first and as told, so nobody it asked for wakes; a wake that never started goes; an ask unread in a colleague's inbox leaves it, or the stop would hand it on. The runs nobody else waits on stop and are told by name, and the run stopped reads which agents stopped with it.
+- **Stopping one helper.** Its asker is told who stopped it and not to ask again or hand it on unless a person asks (`endedWhy`), and wakes with that. The task's panel says so before the stop.
+- **The line's rows.** Each carries `canOpen` and `canStop`. A row opens the task (`?task=` on the web, its screen on the phone) and stops it; `where.agents` replaces "uma conversa privada" for who may see that work. The dialog says what fills the computer (`queueFillText`).
+- **No run holds room while it waits for a helper.** `ask_agent` and `tell_agent` return at once and the turn ends with the run `done` (`wakesLater`): what's left is a warm CLI, which closes when a turn needs the room.

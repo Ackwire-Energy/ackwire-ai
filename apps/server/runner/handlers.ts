@@ -62,6 +62,12 @@ export const MAX_IN_FLIGHT = 128;
 export const TURNS_WITHOUT_MEMORY = 8;
 /** What a coding CLI grows to once it runs (measured: about 0.6 GB). */
 export const TURN_BYTES = 0.6e9;
+/**
+ * A locked-down turn (`permissions.mode` `chat`, the team's right hand) has no folders, no browser and no tools of its
+ * own, so it is at most one CLI: it needs room for that and a margin, not `MIN_FREE_BYTES`. A person asks it what
+ * filled the computer, so it runs while the rest waits, and only a computer about to run out turns it away.
+ */
+export const LOCKED_TURN_MIN_FREE_BYTES = TURN_BYTES + 0.3e9;
 /** A CLI takes seconds to grow: a turn admitted this recently isn't in the memory reading yet, so it is counted. */
 export const TURN_SETTLE_MS = 30_000;
 /** How long a turn without room may wait while idle warm CLIs close for it, before `no_slot`. */
@@ -1379,14 +1385,16 @@ export class RequestRunner {
    * Room for one more brain turn: `MemAvailable`, less what the turns admitted in the last
    * `TURN_SETTLE_MS` will still take, leaves `MIN_FREE_BYTES` (1.5 GiB, the floor desktops keep). The
    * floor is more than the biggest thing a turn grows into (a computer-use agent, about 1.4 GB with its screen
-   * and browser), so the one admitted last still fits whole. Where the memory isn't known, a count instead.
+   * and browser), so the one admitted last still fits whole. Where the memory isn't known, a count instead. `locked`:
+   * a locked-down turn, on its own floor and past the count.
    */
-  private admit(): boolean {
+  private admit(locked = false): boolean {
     const now = (this.admission.now ?? Date.now)();
     this.admitted = this.admitted.filter((at) => now - at < TURN_SETTLE_MS);
     const free = this.memAvailable();
+    const floor = locked ? LOCKED_TURN_MIN_FREE_BYTES : MIN_FREE_BYTES;
     const room =
-      free === null ? this.turns < TURNS_WITHOUT_MEMORY : free - this.admitted.length * TURN_BYTES >= MIN_FREE_BYTES;
+      free === null ? locked || this.turns < TURNS_WITHOUT_MEMORY : free - this.admitted.length * TURN_BYTES >= floor;
     if (room) this.admitted.push(now);
     return room;
   }
@@ -1399,11 +1407,11 @@ export class RequestRunner {
    * No room for a turn: idle warm CLIs close, one at a time, until there is, for up to `RECLAIM_MS`. Not where
    * memory isn't known: room there is a count of turns, which closing idle CLIs doesn't change.
    */
-  private async reclaim(close: () => Promise<boolean>, signal: AbortSignal): Promise<boolean> {
+  private async reclaim(close: () => Promise<boolean>, signal: AbortSignal, locked: boolean): Promise<boolean> {
     const until = Date.now() + (this.admission.reclaimMs ?? RECLAIM_MS);
     while (!signal.aborted && Date.now() < until) {
       if (!(await close())) return false;
-      if (!signal.aborted && this.admit()) return true;
+      if (!signal.aborted && this.admit(locked)) return true;
     }
     return false;
   }
@@ -1424,8 +1432,9 @@ export class RequestRunner {
       return Promise.resolve();
     }
     const controller = new AbortController();
+    const locked = req.op === "brain.turn" && req.permissions?.mode === "chat";
     // A paused computer says so (the handler refuses new work), never that it is full.
-    if (req.op === "brain.turn" && !this.ctx.paused?.() && !this.admit()) {
+    if (req.op === "brain.turn" && !this.ctx.paused?.() && !this.admit(locked)) {
       const close = this.ctx.reclaimBrains;
       if (!close || this.memAvailable() === null) {
         this.full(id);
@@ -1435,7 +1444,7 @@ export class RequestRunner {
       this.inflight.set(id, controller);
       const session = (req as { session?: { id?: unknown } }).session?.id;
       const spare = brainKey(req.agent?.id ?? "", String(session ?? ""));
-      return this.reclaim(() => close(spare), controller.signal).then((room) => {
+      return this.reclaim(() => close(spare), controller.signal, locked).then((room) => {
         if (room && !this.closed) return this.run(id, req, controller);
         this.inflight.delete(id);
         if (controller.signal.aborted) this.reply(id, { ok: false, error: { code: "internal", message: "Canceled" } });

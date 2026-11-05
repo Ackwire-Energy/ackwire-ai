@@ -1,5 +1,12 @@
 import type { ManagedTask } from "@agenteschat/client";
-import { linePlace, taskSince, taskTitle, taskWhere } from "@agenteschat/client/lib/task-manager";
+import {
+  agentCardLine,
+  hiddenCount,
+  linePlace,
+  taskSince,
+  taskTitle,
+  taskWhere,
+} from "@agenteschat/client/lib/task-manager";
 import { formatDuration } from "@agenteschat/client/lib/work";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -41,6 +48,7 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
   const [asking, setAsking] = useState(false);
   const name = dir.nameOf({ type: "agent", id: agentId }) || t("channel.unknownAgent");
   const count = view?.rows.length ?? 0;
+  const hidden = hiddenCount(query.data?.hidden, agentId);
   const waiting = view?.waiting ?? 0;
   const stoppable = view?.stoppable ?? [];
   const waitingText = waiting > 0 ? t("taskManager.waiting", { count: waiting }) : null;
@@ -85,13 +93,13 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
                   stopping={stopping}
                   now={now}
                   divider={i > 0}
-                  onStop={() => stop([task.runId])}
+                  onStop={() => stop([task.runId], undefined, Boolean(task.helpers))}
                 />
               ))}
             </>
           ) : (
             <Text variant="footnote" tone="faint" style={styles.free}>
-              {t("taskManager.agentPanel.none", { name })}
+              {hidden > 0 ? agentCardLine(t, 0, hidden) : t("taskManager.agentPanel.none", { name })}
             </Text>
           )}
           {asking && stoppable.length > 1 ? (

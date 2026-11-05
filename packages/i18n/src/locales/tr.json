@@ -8888,6 +8888,18 @@
     "startsIn": "~{{n}} dk sonra başlar",
     "startsAfter": "{{after}} bitince başlar",
     "left": "~{{n}} dk kaldı",
+    "overdue": "normalden uzun sürüyor",
+    "openTask": "Görevi aç",
+    "fill": {
+      "agent_one": "bir ajanın istediği {{count}} iş",
+      "agent_other": "ajanların istediği {{count}} iş",
+      "person_one": "bir kişi için {{count}} iş",
+      "person_other": "kişiler için {{count}} iş",
+      "routine_one": "{{count}} rutin",
+      "routine_other": "{{count}} rutin",
+      "work_one": "{{count}} uzun iş",
+      "work_other": "{{count}} uzun iş"
+    },
     "who": "{{name}}",
     "away": "{{time}} uzakta",
     "purpose": {
@@ -8903,11 +8915,11 @@
       "yourDm": "DM'in",
       "dm": "{{name}} ile DM",
       "thread": "#{{name}} içinde bir konu",
+      "agents": "ajanlar arasında bir konuşma",
       "private": "özel bir konuşma"
     },
     "live": {
       "nextEta": "Bilgisayarı bekliyor. Sıradaki o, yaklaşık {{n}} dk sonra",
-      "nextAfter": "Bilgisayarı bekliyor. {{after}} bitince sıradaki o",
       "next": "Bilgisayarı bekliyor. Sıradaki o",
       "behind": "Sırada, {{nth}}. {{names}} sonrasında",
       "position": "Sırada, {{nth}}"
@@ -12459,6 +12471,7 @@
       "waitingAgents": "{{name}} işin bir kısmını devretti ve yanıt bekliyor"
     },
     "consultPair": {
+      "took": "{{time}} sürdü",
       "asking": "soruyor",
       "working": "üzerinde çalışıyor",
       "waitingApproval": "onay bekliyor",
@@ -13976,6 +13989,18 @@
     "tasks_one": "{{count}} görev",
     "tasks_other": "{{count}} görev",
     "free": "Boşta",
+    "hiddenTasks_one": "göremediğiniz {{count}} görev",
+    "hiddenTasks_other": "göremediğiniz {{count}} görev",
+    "hiddenLine_one": "Göremediğiniz konuşmalarda {{count}} görev daha var.",
+    "hiddenLine_other": "Göremediğiniz konuşmalarda {{count}} görev daha var.",
+    "helpers_one": "{{count}} yardımcı",
+    "helpers_other": "{{count}} yardımcı",
+    "delegated": {
+      "fromPerson": "{{name}} başlattı",
+      "fromYou": "siz başlattınız",
+      "fromRoutine": "{{name}} rutini başlattı",
+      "stopNote": "Durdurursanız {{name}} bunu öğrenir ve kendiliğinden yeniden istemez."
+    },
     "columns": {
       "task": "Görev",
       "state": "Durum",
@@ -13985,6 +14010,7 @@
     },
     "sections": {
       "asked": "Kişilerin istedikleri",
+      "delegated": "Ajanların istedikleri",
       "background": "Arka planda rutinler"
     },
     "state": {
@@ -14056,6 +14082,9 @@
       "openManager": "Görev yöneticisinde aç"
     },
     "confirm": {
+      "chainTitle_one": "{{name}} ve {{count}} yardımcı durdurulsun mu?",
+      "chainTitle_other": "{{name}} ve {{count}} yardımcı durdurulsun mu?",
+      "chainBody": "Yapılanlar kalır ve hepsi bilgilendirilir.",
       "title_one": "{{name}} ajanının görevi durdurulsun mu?",
       "title_other": "{{name}} ajanının {{count}} görevi durdurulsun mu?",
       "body": "Yapılanlar korunur ve {{name}} ajanına durdurduğunuz bildirilir.",

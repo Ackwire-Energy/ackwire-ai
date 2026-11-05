@@ -8,6 +8,7 @@ import {
   type AgentRun,
   answerNow,
   answerQuestion,
+  CONSULTATION_HUNG_MS,
   CONSULTATION_TTL_MS,
   cancelRun,
   consultationConversation,
@@ -21,8 +22,10 @@ import {
   enqueue,
   expireConsultations,
   grantScopes,
+  handOffsFrom,
   insertMessage,
   type JobHandlers,
+  LATER_JOB,
   listDms,
   listMessages,
   type MachineHub,
@@ -34,7 +37,9 @@ import {
   reportHandOffs,
   runAuthority,
   STRETCH,
+  sendNote,
   setAgentComputerTarget,
+  startNoteRun,
   startOrJoinRun,
   stretchCardOf,
   type ToolContext,
@@ -866,7 +871,9 @@ describe("ask_agent", () => {
 
     // Stopped while parked (nobody executes it): the question closes now, not after 15 minutes.
     await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, target.id);
-    expect((await consultations())[0]).toMatchObject({ status: "failed", answer: "stopped by a person" });
+    const [stopped] = await consultations();
+    expect(stopped?.status).toBe("failed");
+    expect(stopped?.answer).toContain("stopped it on purpose");
     expect((await consultationsIn(f.db, f.org.id, f.general.id))[0]).toMatchObject({
       status: "failed",
       waiting: null,
@@ -910,7 +917,9 @@ describe("ask_agent", () => {
 
     // Stopped from the app while held: no worker executes it, so no run end closes the question.
     await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, target.id);
-    expect((await consultations())[0]).toMatchObject({ status: "failed", answer: "stopped by a person" });
+    const [stopped] = await consultations();
+    expect(stopped?.status).toBe("failed");
+    expect(stopped?.answer).toMatch(/^.+ stopped it on purpose, so don't ask it again/);
     expect((await f.db.select().from(schema.approvals))[0]?.status).toBe("canceled");
     expect(github.executed).toHaveLength(0);
     // Where the person asked: the usual answer notice, and the "asking…" line ends.
@@ -938,8 +947,179 @@ describe("ask_agent", () => {
     expect(await expireConsultations({ db: f.db }, new Date(Date.now() + CONSULTATION_TTL_MS + 1000))).toBe(0);
     const after = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(after.filter(isReply)).toHaveLength(1);
-    expect(after.at(-1)?.body).toContain("stopped by a person");
+    expect(after.at(-1)?.body).toContain("stopped it on purpose");
     expect(github.executed).toHaveLength(0);
+  });
+
+  /** @dev asked @infra, whose run never ran: its job is lost here, so a test can put it where it needs it. */
+  async function asked() {
+    const infra = await addInfra();
+    const handlers: JobHandlers = {
+      ...f.handlers,
+      "agent_run.execute": async (job, ctx) => {
+        const [run] = await f.db
+          .select({ agentId: schema.agentRuns.agentId })
+          .from(schema.agentRuns)
+          .where(eq(schema.agentRuns.id, String(job.payload.runId)));
+        if (run?.agentId === infra.id) return;
+        await f.handlers["agent_run.execute"]?.(job, ctx);
+      },
+    };
+    await post("@dev deploy staging");
+    await drainOutbox(f.db, handlers);
+    const all = await runs();
+    const target = all.find((r) => r.agentId === infra.id);
+    const asker = all.find((r) => r.agentId === f.agent.id);
+    if (!target || !asker) throw new Error("no runs");
+    return { infra, handlers, target, asker };
+  }
+
+  const park = (runId: string, wait: Record<string, unknown>) =>
+    f.db
+      .update(schema.agentRuns)
+      .set({
+        status: "waiting_input",
+        transcript: { messages: [], postedUpTo: 0, postedCount: 0, deltaSeq: 0, ...wait },
+      })
+      .where(eq(schema.agentRuns.id, runId));
+
+  test("in line for hours without starting: the ask ends with why, its run stops, the asker hears it plainly", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { handlers, target } = await asked();
+    const busy = { kind: "claude_code", machineId: "m", code: "busy", waitId: Bun.randomUUIDv7() };
+    const sweep = new Date(Date.now() + CONSULTATION_TTL_MS + 1000);
+
+    // Still within the limit: it gets more time, as before.
+    await park(target.id, { waitingForBrain: busy, roomWaitSince: Date.now() });
+    expect(await expireConsultations({ db: f.db }, sweep)).toBe(0);
+    expect((await consultations())[0]?.status).toBe("open");
+
+    const later = new Date(sweep.getTime() + CONSULTATION_TTL_MS);
+    await park(target.id, { waitingForBrain: busy, roomWaitSince: later.getTime() - CONSULTATION_HUNG_MS });
+    expect(await expireConsultations({ db: f.db }, later)).toBe(1);
+    const [row] = await consultations();
+    expect(row?.status).toBe("failed");
+    expect(row?.answer).toContain("it stayed in line for room on its computer for over 2 hours");
+    expect((await runs()).find((r) => r.id === target.id)?.status).toBe("canceled");
+    await drainOutbox(f.db, handlers);
+    expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("stayed in line for room");
+  });
+
+  test("a turn that worked for hours and only now waits for room isn't hung: the wait's own clock counts", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { target } = await asked();
+    const sweep = new Date(Date.now() + CONSULTATION_HUNG_MS + 3 * CONSULTATION_TTL_MS);
+    await park(target.id, {
+      waitingForBrain: { kind: "claude_code", machineId: "m", code: "busy", waitId: Bun.randomUUIDv7() },
+      roomWaitSince: sweep.getTime() - 60_000,
+    });
+    expect(await expireConsultations({ db: f.db }, sweep)).toBe(0);
+    expect((await consultations())[0]?.status).toBe("open");
+  });
+
+  test("a colleague waiting on a person has no such limit: its card has its own deadline", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { target } = await asked();
+    await park(target.id, {});
+    const sweep = new Date(Date.now() + 3 * CONSULTATION_HUNG_MS);
+    expect(await expireConsultations({ db: f.db }, sweep)).toBe(0);
+    expect((await consultations())[0]?.status).toBe("open");
+    expect((await runs()).find((r) => r.id === target.id)?.status).toBe("waiting_input");
+  });
+
+  test("stopping a helper alone: its asker wakes knowing who stopped it and not to ask again", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { handlers, target, asker } = await asked();
+    await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, target.id);
+    await drainOutbox(f.db, handlers);
+    const sent = lastText(f.provider.calls.at(-1)?.request as ModelRequest);
+    expect(sent).toContain("stopped it on purpose");
+    expect(sent).toContain("don't ask it again or hand it to anyone else");
+    expect((await runs()).filter((r) => r.agentId === f.agent.id && r.id !== asker.id).length).toBe(1);
+  });
+
+  test("stopping a run with what it delegated is one action: all stop, each told, and nobody wakes", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { infra, handlers, target, asker } = await asked();
+    // The asker still at it, and a question of the same chain unread in the helper's inbox.
+    await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, asker.id));
+    const calls = f.provider.calls.length;
+
+    await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, asker.id, { chain: true });
+
+    expect((await consultations())[0]).toMatchObject({ status: "failed" });
+    expect((await consultations())[0]?.reportedAt).not.toBeNull();
+    const ended = await runs();
+    expect(ended.find((r) => r.id === target.id)?.status).toBe("canceled");
+    expect(ended.find((r) => r.id === asker.id)?.status).toBe("canceled");
+    // Nobody picks it up: no new run for either agent, and no model call.
+    await drainOutbox(f.db, handlers);
+    expect(await runs()).toHaveLength(ended.length);
+    expect(f.provider.calls.length).toBe(calls);
+    const notices = await f.db
+      .select({ channelId: schema.messages.channelId, body: schema.messages.body })
+      .from(schema.messages)
+      .where(sql`${schema.messages.meta}->'notice'->>'kind' = 'run_stopped'`);
+    expect(notices).toHaveLength(2);
+    expect(notices.find((n) => n.channelId === f.general.id)?.body).toContain(`What you asked of @${infra.handle}`);
+  });
+});
+
+describe("a hand-off held for room (ADR 0131 §7)", () => {
+  /** @dev's note to @infra the brakes deferred: its row has no run, and the look that starts it is in the outbox. */
+  async function deferred() {
+    const infra = await addInfra();
+    await post("@dev oi");
+    await drainOutbox(f.db, f.handlers);
+    const [asker] = await runs();
+    if (!asker) throw new Error("no run");
+    const sent = await sendNote(f.db, {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: asker.id,
+      hop: 1,
+      targetAgentId: infra.id,
+      body: "Olha os bugs novos.",
+      chain: [f.agent.id],
+      deferStart: true,
+    });
+    if (!sent) throw new Error("not sent");
+    await enqueue(f.db, {
+      orgId: f.org.id,
+      kind: LATER_JOB,
+      payload: { messageId: sent.message.id, agentId: infra.id, look: 1 },
+      dedupeKey: `${LATER_JOB}:${sent.message.id}:${infra.id}:1`,
+      runAt: new Date(Date.now() + 3600_000),
+    });
+    return { infra, asker, sent };
+  }
+
+  test("it stays open while its wake waits, so the asker never hears it was lost and the run answers it", async () => {
+    f = await setup({ askAgent: true, reply: () => ({ chunks: ["ok"] }) });
+    const { infra, asker, sent } = await deferred();
+    expect((await handOffsFrom(f.db, asker))[0]).toMatchObject({ target: null, parked: true });
+
+    const sweep = new Date(Date.now() + CONSULTATION_TTL_MS + 1000);
+    expect(await expireConsultations({ db: f.db }, sweep)).toBe(0);
+    const [row] = await consultations();
+    expect(row?.status).toBe("open");
+    expect(row?.expiresAt.getTime()).toBeGreaterThan(sweep.getTime());
+
+    await startNoteRun(f.db, sent.message, infra.id);
+    const run = (await runs()).find((r) => r.agentId === infra.id);
+    expect((await consultations())[0]).toMatchObject({ status: "open", targetRunId: run?.id });
+  });
+
+  test("past the limit it ends with why, and its wake never starts a run whose answer would go nowhere", async () => {
+    f = await setup({ askAgent: true, reply: () => ({ chunks: ["ok"] }) });
+    await deferred();
+    const sweep = new Date(Date.now() + CONSULTATION_HUNG_MS + 1000);
+    expect(await expireConsultations({ db: f.db }, sweep)).toBe(1);
+    const [row] = await consultations();
+    expect(row?.status).toBe("failed");
+    expect(row?.answer).toContain("it never got to start for over 2 hours");
+    const jobs = await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, LATER_JOB));
+    expect(jobs).toEqual([]);
   });
 });
 
@@ -1800,7 +1980,7 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     expect(await notesBack()).toEqual([]);
     await deleteAgent({ db: f.db, pubsub: f.pubsub, hub: f.machineHub }, f.owner.id, f.org.id, ops.id);
     expect((await consultations()).map((c) => [c.status, c.answer])).toEqual([
-      ["failed", "stopped by a person"],
+      ["failed", expect.stringContaining("stopped it on purpose")],
       ["failed", "agent_archived"],
     ]);
     await drainOutbox(f.db, handlers);
