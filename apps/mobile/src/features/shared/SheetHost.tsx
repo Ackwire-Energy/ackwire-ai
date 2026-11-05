@@ -47,9 +47,9 @@ export function SheetHostProvider({ children }: { children: ReactNode }) {
     }
     setOpen(false);
     for (const l of listeners.current) l(false);
-    const then = onClosed.current;
+    const closed = onClosed.current;
     onClosed.current = null;
-    then?.();
+    closed?.();
   }, []);
   const host = useMemo<SheetHost>(
     () => ({

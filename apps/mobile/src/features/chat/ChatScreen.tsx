@@ -2023,8 +2023,6 @@ function Chat({
                     runs={runs}
                     consults={lineConsults}
                     typing={typing}
-                    canStop={canStop}
-                    onStop={stopRun}
                     onOpenBrowser={(agentId) => {
                       // The agent's browser card opens in the conversation (at the end), not another screen.
                       toggleBrowser(agentId, true);

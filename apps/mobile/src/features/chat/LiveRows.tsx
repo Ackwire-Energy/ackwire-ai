@@ -62,7 +62,6 @@ import {
   type LineWords,
   leavingWords,
   lineFit,
-  lineStops,
   MSG_AVATAR,
   MSG_GAP,
   MSG_INSET,
@@ -381,18 +380,15 @@ export function browsingRuns(runs: LiveRun[]): LiveRun[] {
  * both, with an arrow; three dots first while only people type); one line with names in ink, crossfading
  * whenever it changes ("Theo e mais 2 estão trabalhando · Marina está digitando…"); the clock of a question
  * that is out. An agent whose live row is on screen is left out: the row says its step, its time and its stop,
- * once. Its row out of view, the line speaks for it: its face, the row's step after its name (one width, cut
- * with "…", so nothing after it moves as it turns), its time ("16 s"), whoever types beside it, then, after a
- * thin rule, "Ver" (back to the row) and "Parar" when I may stop it (one tap, no question: what it did stays
- * and can continue).
+ * once. Its row out of view, the line speaks for it: its face, the row's step after its name with its time right
+ * after it ("16 s"), whoever types beside it, then "Ver" (back to the row). It has no stop of its own: the box's,
+ * right under it, is the one.
  * Nothing moves with Reduce Motion or off screen.
  */
 export function WorkingLine({
   runs,
   consults,
   typing,
-  canStop,
-  onStop,
   onOpenBrowser,
   sight,
   onSee,
@@ -401,8 +397,6 @@ export function WorkingLine({
   consults: LiveConsult[];
   /** The people typing here (never me). */
   typing: string[];
-  canStop: (run: LiveRun) => boolean;
-  onStop: (run: LiveRun) => void;
   /** An agent in its browser: tapping the line opens its card in the conversation. */
   onOpenBrowser?: (agentId: string) => void;
   /** Which agents' live rows are on screen: the line leaves those out. */
@@ -427,8 +421,7 @@ export function WorkingLine({
   const asking = barAsking(entries);
   const agents = entries.filter((e) => e.type === "agent");
   const lead = agents[0];
-  // "Parar" and the time are one agent's: with several at work the line can't say whose (the box's own stop stops
-  // them all).
+  // The time is one agent's: with several at work the line can't say whose.
   const solo = agents.length === 1 ? lead : undefined;
   // One clock for the time and a question's clock, moving each second while one counts: a redraw in between (the
   // phrase turning, an event) reads the same second, so both step evenly; narrowing to one agent changes the pace, and a
@@ -439,7 +432,6 @@ export function WorkingLine({
   const away = awayRun(entries, runs, rowInView);
   const step = away && lead && !lead.consult ? barStep(t, away, i18n.language) : null;
   const color = lead ? agentLook(dir.agentById.get(lead.id)).color : null;
-  const stoppable = lineStops(entries, runs, canStop, rowInView);
   const took = away ? barElapsed(t, entries, runs, now) : null;
   // Who types beside that agent, after its time ("· Marina digitando…"): the names give way first, never what they do.
   const people = entries.flatMap((e) => (e.type === "person" ? [e.name] : []));
@@ -530,7 +522,7 @@ export function WorkingLine({
             );
           })}
         </View>
-        {/* The words, read as one (its "Ver" and "Parar" are buttons of their own). An agent in its browser:
+        {/* The words, read as one (its "Ver" is a button of its own). An agent in its browser:
             tapping opens it live. */}
         <Pressable
           disabled={!browsing}
@@ -574,7 +566,6 @@ export function WorkingLine({
         ) : null}
         {seeable ? (
           <>
-            <View style={[styles.sep, { backgroundColor: c.line }]} />
             <Pressable
               onPress={see}
               accessibilityRole="button"
@@ -588,17 +579,16 @@ export function WorkingLine({
             </Pressable>
           </>
         ) : null}
-        <LineStop runs={stoppable} onStop={onStop} rule={!seeable} />
+        {/* No stop here: the composer's, right under the line, is the one stop (two side by side read as noise). */}
       </Animated.View>
     </View>
   );
 }
 
 /**
- * "Parar": last in the line's pill after a thin rule (the working line's, and the requests' line's while it takes
- * its place), or at the end of the agent's live row (`place="row"`, no rule). One tap stops the agent, nothing asked,
- * and "Parando…" while it stops (in the row only its spinner, so the line keeps its width). 24 points drawn, 44 to
- * the finger.
+ * "Parar": last in the requests' line's pill after a thin rule (while it takes the working line's place), or at the
+ * end of the agent's live row (`place="row"`, no rule). One tap stops the agent, nothing asked, and "Parando…" while
+ * it stops (in the row only its spinner, so the line keeps its width). 24 points drawn, 44 to the finger.
  */
 export function LineStop({
   runs,
@@ -663,8 +653,7 @@ type LinePiece = (text: string, style?: StyleProp<TextStyle>, onTextLayout?: (e:
 
 /**
  * One agent whose row is out of view, as the web's `BarStep`: its name in ink and its row's step ("Nina consultando
- * o Email · …"). The step keeps one width (cut with "…"), so its time, "Ver" and the stop never move under a finger
- * as it turns; each new step fades in (a plain swap with Reduce Motion). The line's label says the whole step.
+ * o Email · …"), cut with "…" when the line is short of room, its time right after it; each new step fades in (a plain swap with Reduce Motion). The line's label says the whole step.
  */
 function AwayStep({ name, step, reduced }: { name: string; step: string; reduced: boolean }) {
   return (
@@ -845,11 +834,11 @@ const styles = StyleSheet.create({
   agents: { flexDirection: "row", flexShrink: 1, overflow: "hidden" },
   people: { flexDirection: "row", maxWidth: "100%" },
   shrink: { flexShrink: 1 },
-  // One agent out of view: its name, then its row's step in one width (cut with "…"), so its time, "Ver" and the stop
-  // never move as the step turns; a narrow screen still fits it.
+  // One agent out of view: its name, then its row's step (cut with "…" on a narrow screen).
   awayStep: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1, minWidth: 0 },
   awayName: { flexShrink: 0, maxWidth: 120 },
-  barStep: { flexBasis: 150, flexGrow: 0, flexShrink: 1, minWidth: 0 },
+  // Its own width, so the time follows the words instead of floating after a fixed gap.
+  barStep: { flexShrink: 1, minWidth: 0 },
   // Who types beside it, after its time: it gives way before the step does, its names first.
   also: { flexDirection: "row", flexShrink: 4, minWidth: 0 },
   wordsTap: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 },
