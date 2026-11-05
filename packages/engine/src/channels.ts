@@ -720,7 +720,7 @@ export async function addChannelMember(
   if (channel.kind === "dm") throw new ValidationError("A direct conversation keeps its participants");
   if ("userId" in member) {
     if (!(await managesChannel(db, membership, actorId, channel))) {
-      throw new ForbiddenError("Only the channel's creator or an admin can add members");
+      throw new ForbiddenError("Only the channel's creator or an admin can add members", "channel.members_forbidden");
     }
     if (!(await getMembership(db, member.userId, orgId))) {
       throw new ValidationError("That person is not a member of this organization");
@@ -831,7 +831,11 @@ export async function removeChannelMember(
   if (!channel) throw new NotFoundError("Channel not found");
   const self = "userId" in member && member.userId === actorId;
   if (!self && !(await managesChannel(db, membership, actorId, channel))) {
-    if ("userId" in member) throw new ForbiddenError("Only the channel's creator or an admin can remove members");
+    if ("userId" in member)
+      throw new ForbiddenError(
+        "Only the channel's creator or an admin can remove members",
+        "channel.members_forbidden",
+      );
     await requirePlacesAgent(db, membership, actorId, channel, member.agentId);
   }
   await db

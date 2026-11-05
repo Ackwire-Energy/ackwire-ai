@@ -65,6 +65,15 @@ describe("Auditoria in words (web and phone)", () => {
     );
   });
 
+  test("a merge done without asking says where", () => {
+    const merged = row({
+      action: "agent.merged_without_asking",
+      target: { type: "repository", id: "acme/app" },
+      details: {},
+    });
+    expect(auditSentence(t, merged, "en").text).toBe("audit.change.mergedWithoutAsking(acme/app)");
+  });
+
   test("a waiting call says what became of its approval or of the secret it asked for", () => {
     expect(auditOutcome(t, row())).toMatchObject({ mood: "done", text: "audit.outcome.done" });
     const waiting = row({ outcome: "pending", approval: { id: "ap", status: "pending", decidedBy: null } });

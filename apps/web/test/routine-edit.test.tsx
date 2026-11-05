@@ -47,6 +47,18 @@ const menu = async (name: string, item: string) => {
 };
 
 describe("Rotinas: editar, duplicar, apagar", () => {
+  test("Faz sozinha: taking an action away from the routine's page undoes Sempre nesta rotina", async () => {
+    const { state } = await open();
+    await menu("Resumo da semana", "Editar");
+    const page = screen().getByRole("dialog", { name: "Resumo da semana" });
+    const remove = within(page).getByRole("button", { name: /^Voltar a pedir antes de: / });
+    await click(remove);
+    await settle(4);
+    const update = state.calls.find((c) => c.method === "routines.update");
+    expect(update?.args[1]).toEqual({ ownActions: [] });
+    expect(within(page).queryByRole("button", { name: /^Voltar a pedir antes de: / })).toBeNull();
+  });
+
   test("Editar opens the routine's page; Quando opens its schedule and Salvar sends only what changed", async () => {
     const { state } = await open();
     await menu("Resumo da semana", "Editar");

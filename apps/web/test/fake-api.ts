@@ -248,6 +248,7 @@ export interface FakeState {
   refusedGithub?: string;
   /** Agents' GitHub repositories, in order (`repositories.get`); unset = every repository. */
   agentRepos?: Record<string, string[]>;
+  agentMergeRepos?: Record<string, string[]>;
   scopes: Record<string, ScopeGrant[]>;
   runs: Run[];
   /** A run's steps by id (`GET …/runs/{id}`, what an approval's review reads); unset = none. */
@@ -497,7 +498,11 @@ export function meWithRole(state: FakeState, permissions: string[]) {
 
 /** The permission areas `roles.list` sends (the server's `PERMISSION_AREAS`). */
 const PERMISSION_AREAS = [
-  { id: "chat", use: ["post", "create_channels"], keys: ["post", "create_channels", "manage_channels"] },
+  {
+    id: "chat",
+    use: ["post", "create_channels"],
+    keys: ["post", "create_channels", "mention_everyone", "manage_channels"],
+  },
   {
     id: "agents",
     use: ["talk_to_agents", "assign_work", "manage_routines"],
@@ -2430,7 +2435,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       brain: async (_orgId, agentId) => {
         const me = requireMe();
         const agent = state.agents.find((a) => a.id === agentId);
-        if (me.organizations[0]?.role === "member" && agent?.ownerUserId !== me.user.id)
+        if (me.organizations[0]?.role === "member" && agent?.ownerUserId !== me.user.id && !agent?.builtin)
           throw new ApiError(403, "agent.not_owner", "Only an admin or the agent's owner");
         return structuredClone(brainOf(agentId));
       },
@@ -3439,6 +3444,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       set: async (orgId, agentId, repositories) => {
         log("repositories.set", orgId, agentId, repositories);
         state.agentRepos = { ...(state.agentRepos ?? {}), [agentId]: [...repositories] };
+        return structuredClone(repositories);
+      },
+      merge: async (_orgId, agentId) => structuredClone(state.agentMergeRepos?.[agentId] ?? []),
+      setMerge: async (orgId, agentId, repositories) => {
+        log("repositories.setMerge", orgId, agentId, repositories);
+        state.agentMergeRepos = { ...(state.agentMergeRepos ?? {}), [agentId]: [...repositories] };
         return structuredClone(repositories);
       },
     },

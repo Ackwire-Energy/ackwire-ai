@@ -117,7 +117,7 @@ function EventLine({
       </span>
       {open && text && (
         <div className="cn-line__body">
-          <MessageBody body={text} resolveMention={dir.mentionName} />
+          <MessageBody body={text} resolveMention={dir.mentionName} mentionTone={dir.mentionTone} />
         </div>
       )}
     </div>
@@ -304,7 +304,7 @@ export function RoutineReport({ text }: { text: string }) {
   const dir = useDirectory(org.id);
   return (
     <div className="cn-report">
-      <MessageBody body={text} resolveMention={dir.mentionName} />
+      <MessageBody body={text} resolveMention={dir.mentionName} mentionTone={dir.mentionTone} />
     </div>
   );
 }

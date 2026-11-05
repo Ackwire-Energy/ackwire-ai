@@ -50,10 +50,14 @@ export function sqlReadsTarget(action: string | undefined): string | null {
 
 /**
  * "Aprovar sempre" shows on the card: the server offers it on this request, the person may decide it, and approving
- * takes no hold (what is high risk is never approved for good).
+ * takes no hold (what is high risk is never approved for good). "Sempre nesta rotina" reaches a routine's own job, a
+ * send included: the server already left merges, deploys, payments and deletions out.
  */
 export const approveAlwaysOffered = (a: Pick<Approval, "status" | "canDecide" | "approveAlways" | "tool" | "scope">) =>
-  a.status === "pending" && a.canDecide && Boolean(a.approveAlways) && approvalRisk(a) !== "high";
+  a.status === "pending" &&
+  a.canDecide &&
+  Boolean(a.approveAlways) &&
+  (Boolean(a.approveAlways?.routineId) || approvalRisk(a) !== "high");
 
 /**
  * Where an action prepared ahead (`runAt`, `schedule_action`) stands: waiting for a person (`asking`), approved and

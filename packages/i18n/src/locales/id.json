@@ -21,6 +21,7 @@
     "refreshing": "Menyegarkan",
     "retry": "Coba lagi",
     "unknownError": "Ada yang salah. Coba lagi.",
+    "ourSide": "Ada yang salah di pihak kami. Coba lagi sebentar lagi.",
     "signedOut": "Sesimu berakhir. Masuk lagi untuk melanjutkan.",
     "newVersion": "Versi baru agentes.chat sudah tersedia.",
     "reload": "Muat ulang",
@@ -41,7 +42,7 @@
     "today": "Hari ini",
     "yesterday": "Kemarin",
     "loadFailed": "Tidak bisa memuat ini. Periksa koneksimu dan coba lagi.",
-    "notAllowed": "Kamu tidak punya izin untuk ini. Minta bantuan Admin ruang kerja.",
+    "notAllowed": "Kamu tidak punya izin untuk ini.",
     "tooMany": "Terlalu banyak percobaan. Coba lagi nanti.",
     "offline": "Kamu sedang offline. Periksa koneksimu dan coba lagi.",
     "unreachable": "agentes.chat tidak bisa dijangkau sekarang. Coba lagi sebentar lagi."
@@ -208,6 +209,12 @@
       "desc": "Terbuka atau privat.",
       "short": "buat kanal",
       "say": "membuat kanal"
+    },
+    "mention_everyone": {
+      "title": "Sebut semua",
+      "desc": "Pakai @semua untuk memberi tahu semua orang di kanal, orang dan agen.",
+      "short": "sebut semua",
+      "say": "menyebut semua"
     },
     "manage_channels": {
       "title": "Atur kanal",
@@ -1747,7 +1754,7 @@
     "outage_other": "{{names}}: penyedia AI sedang gangguan · mencoba lagi sendiri",
     "queued_other": "{{names}} sedang antre untuk komputer",
     "away_other": "{{names}} menunggu komputer",
-    "plan_other": "{{names}} menjawab saat paket diatur ulang",
+    "plan_other": "{{names}} sedang menunggu paket",
     "budget_other": "{{names}} menjawab saat anggaran diperbarui",
     "line_other": "{{names}} mulai setelah pekerjaan lain selesai",
     "canceled_other": "{{names}} tidak akan menjawab",
@@ -1762,7 +1769,7 @@
       "outage": "Penyedia AI sedang gangguan · mencoba lagi sendiri",
       "queued": "Antre untuk komputer",
       "away": "Menunggu komputer",
-      "plan": "Menjawab saat paket diatur ulang",
+      "plan": "Menunggu paket",
       "budget": "Menjawab saat anggaran diperbarui",
       "line": "Mulai setelah pekerjaan lain selesai",
       "canceled": "Dibatalkan",
@@ -1845,8 +1852,6 @@
       "name": "Nama dan tampilan",
       "nameHelp": "Di bilah samping selalu tampil sebagai “{{label}}”.",
       "changeLook": "Ubah tampilan",
-      "ai": "AI dan model",
-      "aiHelp": "Otomatis memilih model termurah yang sanggup.",
       "budget": "Anggaran bulanan",
       "perMonth": "/bulan",
       "budgetHelp": "Saat mencapai batas, ia berhenti dan memberi tahu, seperti agen lain.",
@@ -1854,12 +1859,27 @@
       "audienceHelp": "Di luar itu, orang tidak melihat {{name}} di bilah samping.",
       "lock": "{{name}} tidak bisa diarsipkan atau dihapus. Ia tidak memposting apa pun kalau tak ada yang mengajaknya bicara.",
       "audit": "Lihat apa yang dilakukan {{name}}",
-      "onPlan": "Paket Claude · {{account}}",
       "change": "Ubah",
       "planHelp": "Yang membayar adalah pemilik paket. Saat komputernya tidak tersedia, percakapan memberi tahu dan menawarkan kunci API.",
-      "plan": "Paket",
-      "planOffer": "{{name}} bisa berpikir dengan paket kamu sebagai pengganti kunci API, di komputer tempat paket itu masuk, dan hanya menjangkau workspace ini.",
-      "usePlan": "Pakai paket"
+      "lookEdit": "Ubah tampilan {{name}}",
+      "planOwner": "dari {{owner}}",
+      "mine": "AI kamu",
+      "mineHelp": "Percakapanmu dengan {{name}} berpikir dengan paketmu atau paket yang dibagikan kepadamu, dan hanya percakapanmu.",
+      "connectMine": "Hubungkan paket saya",
+      "useWorkspace": "Pakai milik workspace",
+      "fallbackKey": "Tanpa paket sendiri, ia memakai kunci API workspace.",
+      "fallbackPlan": "Tanpa paket sendiri, ia memakai paket {{owner}}, yang menjawab semua orang.",
+      "fallbackYours": "Tanpa paket lain, ia memakai paket workspace, yang milikmu.",
+      "fallbackNone": "Tanpa paket sendiri, {{name}} tidak bisa menjawabmu: paket workspace hanya menjawab {{owner}}.",
+      "workspace": "AI workspace",
+      "workspaceHelp": "Yang tidak punya paket sendiri berbicara dengan {{name}} lewat AI ini.",
+      "workspacePlan": "Paket workspace",
+      "workspacePlanHelp": "Paket sebagai pengganti kunci. Paket ini menjawab orang lain hanya kalau pemiliknya mengizinkan.",
+      "noPlans": "Hubungkan paket di AI kamu untuk memakainya di sini.",
+      "pickPlan": "Pilih paket",
+      "sharesOn": "Aktif: yang tidak punya paket sendiri berbicara dengan {{name}} lewat paket ini.",
+      "sharesOff": "Nonaktif: hanya {{owner}} yang berbicara lewat paket ini. Yang tidak punya paket sendiri tidak mendapat jawaban.",
+      "sharesOffYou": "Nonaktif: hanya kamu yang berbicara lewat paket ini. Yang tidak punya paket sendiri tidak mendapat jawaban."
     },
     "card": {
       "settings": "{{name}} · Pengaturan",
@@ -2043,6 +2063,8 @@
     },
     "agent": "{{name}} tidak akan membalas karena belum terhubung ke AI.",
     "agent_female": "{{name}} tidak akan membalas karena belum terhubung ke AI.",
+    "cliMissing": "{{name}} tidak akan menjawab: program AI-nya tidak terpasang di komputer.",
+    "noComputer": "{{name}} tidak akan menjawab: AI-nya butuh komputer dan tidak ada satu pun.",
     "signedOut": "{{name}} tidak akan membalas karena AI-nya keluar dari akun.",
     "signedOut_female": "{{name}} tidak akan membalas karena AI-nya keluar dari akun.",
     "notSignedIn": {
@@ -2068,12 +2090,17 @@
     "action": "Hubungkan",
     "locked": "Siapa yang menghubungkan AI {{name}}: admin, dengan kunci API, atau {{owner}}, dengan paketnya sendiri.",
     "lockedAdmins": "Hanya admin yang bisa menghubungkan AI.",
+    "lockedOwner": "Hanya pemilik agen yang menghubungkan paket untuknya.",
     "rightHand": {
       "computer_away": "{{name}} tidak bisa menjawab sekarang: komputer paketnya sedang tidak tersedia.",
+      "computer_failed": "{{name}} tidak bisa menjawab sekarang: komputer paketnya mengalami masalah.",
       "plan_limit": "{{name}} tidak bisa menjawab sekarang: paketnya sudah mencapai batas.",
-      "plan_not_shared": "{{name}} berpikir dengan paket yang hanya menjawab pemiliknya.",
+      "plan_not_shared": "Hubungkan paketmu sendiri untuk berbicara dengan {{name}}: paket workspace hanya menjawab pemiliknya.",
       "runner_outdated": "{{name}} belum bisa menjawab sekarang: program di komputer paket perlu diperbarui.",
-      "plan_tools": "{{name}} berhenti sebelum menjawab: AI paket di komputer itu menawarkan alatnya sendiri.",
+      "plan_tools": "{{name}} berhenti sebelum menjawab: AI paket di komputer itu tidak tetap memakai alat agentes.chat saja.",
+      "model_limit": "{{name}} tidak bisa menjawab sekarang: {{model}} sudah mencapai batasnya sendiri di paket. Model lain di paket itu tetap berjalan.",
+      "model_region": "{{name}} tidak bisa menjawab: {{model}} butuh wilayah Global dinyalakan di OpenCode (Settings › Privacy).",
+      "commands_off": "{{name}} tidak bisa menjawab sekarang: perintah dimatikan di komputer paketnya, dan orang yang mengurusnya perlu menyalakannya.",
       "useKey": "Pakai kunci API"
     },
     "receipt": "Tidak ada yang akan menjawab: belum ada AI yang terhubung",
@@ -2282,6 +2309,8 @@
       "monthly": "dari jatah bulanannya"
     },
     "line": "Lanjut {{when}}, saat paket diatur ulang. Balasan singkat tetap jalan.",
+    "changeModel": "Ganti model",
+    "raiseBudget": "Naikkan anggaran",
     "lineUnknown": "Lanjut begitu paket diatur ulang. Balasan singkat tetap jalan.",
     "lineBudget": "Lanjut {{when}}, atau lebih cepat kalau anggarannya dinaikkan. Balasan singkat tetap jalan.",
     "continue": "Lanjutkan sekarang",
@@ -2459,6 +2488,7 @@
     },
     "memory": {
       "saved": "Disimpan ke <b>memori</b>: {{text}}",
+      "saved_rule": "Disimpan ke <b>aturanku</b>: {{text}}",
       "updated": "Memperbarui <b>memori</b>: {{text}}",
       "forgotten": "Dihapus dari <b>memori</b>: {{text}}"
     },
@@ -2490,6 +2520,10 @@
     },
     "agent": {
       "settings_changed": "Mengubah pengaturan <b>{{agentName}}</b>"
+    },
+    "pr": {
+      "merged": "Merge PR <b>#{{number}}</b> di <b>{{repo}}</b>",
+      "merged_branch": "Merge <b>{{ref}}</b> di <b>{{repo}}</b>"
     },
     "other": "Membuat perubahan",
     "copyWebhook": "Salin alamat webhook",
@@ -2761,7 +2795,7 @@
       "waiting_answer": "Menunggu jawaban",
       "waiting_computer": "Menunggu komputer",
       "queued_computer": "Antre untuk komputer",
-      "waiting_plan": "Menunggu paket diatur ulang",
+      "waiting_plan": "Menunggu paket",
       "waiting_budget": "Menunggu anggaran diatur ulang",
       "provider_down": "Penyedia AI sedang gangguan · mencoba lagi sendiri",
       "out_of_plan": "Batas paket habis",
@@ -2788,6 +2822,7 @@
     "inChannel": "Di kanal ini",
     "inWorkspace": "Di ruang kerja",
     "notInChannel": "tidak ada di kanal",
+    "everyone": "Semua di percakapan ini, orang dan agen",
     "offer": "{{name}} tidak ada di kanal dan tidak akan melihat sebutan ini.",
     "add": "Tambahkan ke kanal",
     "dismiss": "Nanti saja",
@@ -3280,7 +3315,12 @@
       "pushTo": "push ke {{branch}} di {{repo}}",
       "done": "Disetujui. {{name}} tidak akan meminta ini lagi.",
       "undoHere": "Untuk membatalkannya, buka Alat dan akses di halaman {{name}}.",
-      "open": "Buka"
+      "open": "Buka",
+      "routine": "Selalu di rutinitas ini",
+      "thisRoutine": "rutinitas ini",
+      "noteRoutine": "{{routine}} melakukan {{actions}} sendiri mulai sekarang, dengan nilai apa pun. Di luar rutinitas ini tetap bertanya. Untuk membatalkan: pengaturan rutinitas.",
+      "doneRoutine": "Disetujui. {{routine}} tidak akan meminta ini lagi.",
+      "undoRoutine": "Untuk membatalkannya, buka pengaturan rutinitas."
     },
     "email": {
       "from": "Dari",
@@ -4340,6 +4380,11 @@
       "cancel": "Batal",
       "forgotten": "Dilupakan. Ada di Arsip jika kamu ingin mengembalikannya.",
       "saved": "Tersimpan. Sekarang dihitung terverifikasi.",
+      "rules": "Aturan dari orang-orang",
+      "rulesNote": "Berlaku di semua pekerjaan untuk orang yang memberinya, dari mana pun permintaannya datang. Aturan dari penanggung jawab atau admin berlaku untuk semua.",
+      "ruleBy": "Dari {{name}} · {{date}}",
+      "removeRule": "Hapus",
+      "ruleRemoved": "Aturan dihapus. Ada di Arsip jika kamu ingin mengembalikannya.",
       "playbook": "Cara kerja {{name}}",
       "playbookNote": "Cara kerja yang disimpannya untuk dirinya sendiri. Tidak muncul di obrolan. Yang didapatnya dari luar dan tidak pernah dipakai lagi hilang sendiri dan tetap ada di Diarsipkan.",
       "details": "Detail teknis",
@@ -4397,6 +4442,7 @@
         "model_refused": "Model menolak menjawab.",
         "agent_archived": "Agen sudah diarsipkan.",
         "provider_error": "Penyedia model mengembalikan error: {{detail}}",
+        "provider_account": "Penyedia menolak kuncinya: mungkin tidak valid, kehabisan kredit, atau melewati kuota.",
         "provider_unavailable": "Penyedia model tidak menjawab: {{detail}}",
         "canceled": "Seseorang menghentikan tugas.",
         "interrupted": "Terputus karena server dimulai ulang.",
@@ -4404,7 +4450,7 @@
         "credential_revoked": "Kunci agen ini sudah dicabut.",
         "credential_wrong_provider": "Modelnya dari {{modelProvider}}, tapi kuncinya dari {{keyProvider}}.",
         "model_unlisted": "OpenRouter tidak lagi menyediakan {{model}}. Pilih model lain di pengaturan agen.",
-        "no_ai": "Agen belum punya AI yang terhubung.",
+        "no_ai": "Agen ini tidak punya AI yang tersedia.",
         "person_limit": "Orang yang meminta sudah mencapai batas pemakaiannya bulan ini.",
         "org_paused": "Agen di ruang kerja ini sedang dijeda.",
         "org_suspended": "Ruang kerja tidak tersedia.",
@@ -4413,6 +4459,8 @@
         "computer_busy": "Komputer terus sibuk dengan tugas lain.",
         "computer_failed": "Komputer mengalami masalah dan berhenti.",
         "computer_timeout": "Komputer terlalu lama menjawab.",
+        "account_missing": "Akun yang dipilih untuk agen ini sudah tidak ada di komputernya. Pilih akun lain di pengaturan agen, atau tambahkan lagi.",
+        "our_error": "Ada yang salah di pihak kami dan tugasnya berhenti. Minta lagi sebentar lagi.",
         "unknown": "Gagal."
       }
     },
@@ -4516,13 +4564,15 @@
       "decision": "Keputusan",
       "fact": "Fakta",
       "preference": "Preferensi",
-      "lesson": "Pelajaran"
+      "lesson": "Pelajaran",
+      "rule": "Aturan"
     },
     "kindsLower": {
       "decision": "keputusan",
       "fact": "fakta",
       "preference": "preferensi",
-      "lesson": "pelajaran"
+      "lesson": "pelajaran",
+      "rule": "aturan"
     },
     "verified": "Terverifikasi",
     "unverified": "Belum diverifikasi",
@@ -5267,7 +5317,7 @@
     },
     "github_pr_merge": {
       "label": "Merge pull request",
-      "description": "Merge pull request. Selalu minta persetujuan."
+      "description": "Merge pull request. Minta persetujuan, kecuali di repositori yang dipilih di halaman agen."
     },
     "github_issues_read": {
       "label": "Baca issue",
@@ -5910,7 +5960,8 @@
     },
     "ownActions": {
       "hint": "Setiap jalannya melakukan ini di aplikasi terhubung kamu tanpa bertanya. Tindakan lain di sana meminta persetujuan seseorang dulu, dan merge, deploy, serta rollback selalu meminta.",
-      "none": "Di aplikasi terhubung, rutinitas ini meminta persetujuan seseorang sebelum setiap tindakan. Agar bisa bekerja sendiri, beri tahu agen di chat tindakan apa saja yang boleh dilakukan."
+      "none": "Di aplikasi terhubung, rutinitas ini meminta persetujuan seseorang sebelum setiap tindakan. Agar bisa bekerja sendiri, beri tahu agen di chat tindakan apa saja yang boleh dilakukan.",
+      "remove": "Tanya lagi sebelum: {{action}}"
     },
     "ahead": {
       "approved": "Disetujui · jalan {{when}}",
@@ -6069,7 +6120,7 @@
       "waiting": "Menunggu seseorang menjawab",
       "waitingApproval": "Menunggu persetujuanmu",
       "waitingComputer": "Menunggu komputer",
-      "waitingPlan": "Menunggu paket diatur ulang",
+      "waitingPlan": "Menunggu paket",
       "waitingBudget": "Menunggu anggaran diperbarui",
       "reported": "Melaporkan temuannya",
       "silent": "Tidak ada yang baru, tetap diam",
@@ -6083,7 +6134,7 @@
       "previous_running": "Dilewati: yang sebelumnya masih berjalan",
       "previous_waiting": "Dilewati: yang sebelumnya masih menunggu seseorang",
       "waiting_computer": "Dilewati: menunggu komputer agen",
-      "waiting_plan": "Dilewati: menunggu paket diatur ulang",
+      "waiting_plan": "Dilewati: menunggu paket",
       "waiting_budget": "Dilewati: menunggu anggaran diatur ulang",
       "superseded": "Digantikan proses berikutnya",
       "stale": "Terlewat waktunya: komputernya kembali terlambat",
@@ -6115,13 +6166,17 @@
       "model_unlisted": "OpenRouter sudah tidak menyediakan model ini",
       "agent_archived": "Agennya diarsipkan",
       "interrupted": "Terputus karena server dimulai ulang",
-      "no_ai": "Agen ini belum terhubung ke AI",
+      "no_ai": "Agen ini tidak punya AI yang tersedia",
       "person_limit": "Tidak dijalankan: pembuatnya sudah mencapai batas pemakaian bulan ini",
       "org_paused": "Tidak jalan: agen ruang kerja sedang dijeda",
       "org_suspended": "Tidak jalan: ruang kerja tidak tersedia",
       "org_deleting": "Tidak jalan: ruang kerja sedang dihapus",
       "agent_paused": "Tidak jalan: agennya dijeda",
-      "computer_busy": "Komputernya terus sibuk dengan tugas lain"
+      "computer_busy": "Komputernya terus sibuk dengan tugas lain",
+      "computer_failed": "Komputer mengalami masalah dan berhenti",
+      "computer_timeout": "Komputer terlalu lama menjawab",
+      "account_missing": "Akun agen sudah tidak ada di komputernya",
+      "our_error": "Ada yang salah di pihak kami"
     },
     "openInChat": "Buka di percakapan",
     "stop": "Hentikan",
@@ -7191,6 +7246,7 @@
       "person": "Orang",
       "agent": "Agen",
       "routine": "Rutinitas",
+      "reminder": "Pengingat",
       "deadline": "Tenggat tugas"
     },
     "upcoming": "Mendatang",
@@ -7210,6 +7266,7 @@
     "kind": {
       "event": "Acara",
       "routine": "Rutinitas",
+      "reminder": "Pengingat",
       "deadline": "Tenggat tugas"
     },
     "every": {
@@ -7221,6 +7278,10 @@
     "runs_other": "{{count}} proses di hari-hari ini.",
     "routineDetail": "Rutinitas {{agent}} · dikirim ke {{target}}.",
     "deadlineDetail": "Tugas ini jatuh tempo.",
+    "reminderBy": "Dibuat oleh {{name}}",
+    "reminderPosted": "Diposting oleh {{agent}} · {{target}}",
+    "cancelReminder": "Batalkan pengingat",
+    "reminderCancelled": "Pengingat dibatalkan",
     "openIssue": "Buka tugas",
     "openRoutines": "Lihat di Rutinitas",
     "openRoutine": "Buka rutinitas",
@@ -7569,7 +7630,7 @@
         "updating": "{{program}} sedang diperbarui di {{computer}}. Ini berubah sendiri setelah selesai.",
         "runnerOld": "Program agentes.chat di {{computer}} sudah usang dan pembaruannya sedang dalam perjalanan. Ini berubah sendiri setelah selesai.",
         "execOff": "{{computer}} belum bisa menjalankan {{program}}. Kami sedang menanganinya, dan ini berubah sendiri.",
-        "toolOff": "{{program}} tidak diizinkan di {{computer}}. Minta tim dukungan untuk mengizinkannya.",
+        "toolOff": "{{program}} belum diizinkan di {{computer}}. Itu urusan kami: coba lagi nanti.",
         "preparing": "{{computer}} sedang disiapkan. Ini berubah sendiri setelah selesai."
       }
     },
@@ -8502,6 +8563,9 @@
       "paidTraining": "Penyedia mungkin memakai permintaan untuk melatih model. Nyalakan izinnya di OpenCode.",
       "freeTraining": "Gratis. Penyedia mungkin memakai permintaan untuk melatih model. Nyalakan izinnya di OpenCode."
     },
+    "modelLimit": "{{model}} mencapai batasnya sendiri di paket ini dan direset {{when}}. Model lain di paket tetap berfungsi.",
+    "modelLimitUnknown": "{{model}} mencapai batasnya sendiri di paket ini. Model lain di paket tetap berfungsi.",
+    "modelRegion": "{{model}} butuh region Global yang dinyalakan di OpenCode (Settings › Privacy). Model lain di paket tetap berfungsi.",
     "modelHow": {
       "globalRegion": "Nyalakan region Global di OpenCode, di Settings › Privacy. Tanpa itu, model ini tidak menjawab.",
       "paidTraining": "Penyedia model ini mungkin memakai permintaan untuk melatihnya. Di OpenCode, di Settings › Privacy, nyalakan izin untuk model berbayar. Tanpa itu, model ini tidak menjawab.",
@@ -9037,6 +9101,13 @@
     "failed": "Tidak bisa terhubung. Coba lagi sebentar lagi."
   },
   "repos": {
+    "merge": {
+      "label": "Boleh merge tanpa bertanya",
+      "none": "Tidak ada repositori yang dipilih. Setiap merge meminta persetujuan.",
+      "help": "Di repositori ini merge berjalan tanpa kartu persetujuan, tercatat di audit, dan meninggalkan tanda terima di percakapan. Hal sensitif lainnya tetap bertanya.",
+      "dialogTitle": "Tempat {{name}} merge tanpa bertanya",
+      "dialogDesc": "Hanya repositori yang sudah digunakan. Merge di tempat lain meminta persetujuan."
+    },
     "label": "Repositori mana",
     "all": "Semua repositori",
     "allLower": "semua repositori",
@@ -10491,7 +10562,8 @@
       "editorsExcludeYou": "Sertakan dirimu di antara orang yang mengedit, supaya halaman ini tetap bisa kamu kelola.",
       "titleTaken": "Sudah ada halaman bernama “{{title}}”.",
       "titleCharacters": "Judul tidak boleh berisi [ ] | atau #.",
-      "titleNoLetters": "Judul harus berisi huruf atau angka."
+      "titleNoLetters": "Judul harus berisi huruf atau angka.",
+      "lockAdminsOnly": "Hanya Admin yang bisa mengunci halaman."
     },
     "media": {
       "off": "GIF dan stiker dinonaktifkan di ruang kerja ini.",
@@ -10516,7 +10588,8 @@
       "decided": "Seseorang sudah memutuskan usulan ini.",
       "expired": "Usulan ini kedaluwarsa: tidak ada yang memutuskannya dalam sehari.",
       "routineMade": "Rutinitas agen ini sudah dibuat.",
-      "noRoutine": "Usulan ini tidak punya rutinitas untuk dibuat."
+      "noRoutine": "Usulan ini tidak punya rutinitas untuk dibuat.",
+      "notRequester": "Hanya orang yang memintanya yang bisa mengirimnya."
     },
     "approval": {
       "alwaysUnavailable": "Permintaan ini tidak bisa disetujui untuk seterusnya. Setujui yang ini saja."
@@ -10618,20 +10691,28 @@
       "agentNotInChannel": "Tambahkan agen ke percakapan dulu.",
       "webhookPaused": "Aktifkan rutinitas untuk mengujinya.",
       "continueExtraOff": "Jatah periode paket ini sudah habis dan pekerjaan panjang agen ini tidak memakai pemakaian tambahan berbayar. Aktifkan itu di pengaturan AI-nya untuk melanjutkan sekarang, atau agen melanjutkan setelah reset.",
-      "continueExtraUsedUp": "Jatah periode paket ini sudah habis dan pemakaian tambahan berbayarnya juga habis atau tidak tersedia. Agen melanjutkan setelah reset."
+      "continueExtraUsedUp": "Jatah periode paket ini sudah habis dan pemakaian tambahan berbayarnya juga habis atau tidak tersedia. Agen melanjutkan setelah reset.",
+      "actionsNeedApprover": "Hanya pemilik agen atau orang yang menyetujui tindakannya yang bisa membiarkan rutinitas bertindak sendiri.",
+      "editorOnly": "Hanya pembuat rutinitas, pemilik agen, atau Admin yang bisa mengubahnya.",
+      "widgetFixed": "Rutinitas ini menjaga widget tetap terbaru. Ubah dari widget-nya."
     },
     "run": {
       "notContinuable": "Jawaban ini sudah tidak bisa dilanjutkan.",
       "agentBusy": "Agen sedang bekerja di percakapan ini. Tunggu sampai selesai untuk melanjutkan.",
       "continueForbidden": "Hanya orang yang meminta, pemilik agen, atau Admin yang bisa melanjutkannya.",
-      "notRestartable": "Jawaban ini sudah dimulai, jadi tidak bisa diulang dari awal. Kirim lagi pesanmu."
+      "notRestartable": "Jawaban ini sudah dimulai, jadi tidak bisa diulang dari awal. Kirim lagi pesanmu.",
+      "cancelForbidden": "Hanya orang yang meminta, pemilik agen, atau Admin yang bisa menghentikannya.",
+      "answerForbidden": "Hanya orang yang meminta, pemilik agen, atau Admin yang bisa melakukan ini.",
+      "stopReasonForbidden": "Hanya orang yang menghentikannya yang bisa menyebut alasannya."
     },
     "artifact": {
       "fileTooLarge": "File melebihi {{max}} MB, batas per file.",
       "notVersioned": "Gambar, video, atau rekaman tidak punya versi. Kirim sebagai file baru.",
       "fileRequired": "Pilih file untuk diunggah.",
       "fileNameRequired": "File harus punya nama.",
-      "notFound": "File ini sudah tidak ada atau kamu tidak punya akses."
+      "notFound": "File ini sudah tidak ada atau kamu tidak punya akses.",
+      "deleteForbidden": "Hanya pembuatnya, orang yang meminta ke agen, pemilik agen, atau Admin yang bisa menghapus ini.",
+      "restoreForbidden": "Hanya orang yang bisa menghapusnya yang bisa memulihkannya."
     },
     "machine": {
       "forbidden": "Hanya Admin, atau orang yang menghubungkan komputer, yang bisa melakukan itu.",
@@ -10642,7 +10723,10 @@
       "targetOffline": "Komputer itu sedang offline. Pilih yang lain.",
       "targetNotFound": "Komputer itu sudah tidak ada. Pilih yang lain.",
       "targetSame": "Agen sudah ada di komputer itu.",
-      "targetPaused": "Komputer itu sedang dijeda. Pilih yang lain."
+      "targetPaused": "Komputer itu sedang dijeda. Pilih yang lain.",
+      "offline": "{{name}} sedang offline. Coba lagi setelah ia kembali.",
+      "paused": "{{name}} dijeda: tidak ada yang baru dimulai di sana sampai dilanjutkan.",
+      "timeout": "Komputer tidak menjawab tepat waktu. Coba lagi."
     },
     "github": {
       "repoMissing": "Repositori {{repo}} privat atau tidak ada di GitHub.",
@@ -10666,6 +10750,21 @@
     "agentGroup": {
       "notFound": "Departemen ini sudah tidak ada.",
       "tooMany": "Ruang kerja ini sudah punya {{max}} departemen. Hapus satu dulu."
+    },
+    "rightHand": {
+      "permanent": "Tangan kanan adalah bagian dari ruang kerja dan tetap di luar kanal. Sebuah @sebutan menjangkaunya di kanal mana pun."
+    },
+    "agent": {
+      "ownerOrAdmin": "Hanya pemilik agen atau Admin yang bisa melakukan ini.",
+      "detailsHidden": "Hanya orang yang berbicara dengan {{agentName}} yang bisa melihat cara kerjanya.",
+      "extraOwnerOnly": "Hanya pemilik agen yang bisa menyalakan atau mematikan penggunaan ekstra berbayar pada paket.",
+      "undoForbidden": "Hanya orang yang dibantu agen, pemiliknya, atau Admin yang bisa membatalkan ini."
+    },
+    "account": {
+      "notOwner": "Hanya orang yang menghubungkan akun atau paket ini yang bisa melakukan ini."
+    },
+    "channel": {
+      "membersForbidden": "Hanya pembuat kanal atau Admin yang bisa menambahkan atau menghapus orang."
     },
     "handle": {
       "invalid": "@ terdiri dari {{min}} sampai {{max}} huruf kecil, angka, - atau _.",
@@ -11303,6 +11402,7 @@
     "system": "Sistem",
     "removed": "Dihapus",
     "change": {
+      "mergedWithoutAsking": "Merge di {{repo}} tanpa bertanya",
       "pattern": "{{verb}} {{area}}",
       "approval": {
         "approved": "Menyetujui permintaan",
@@ -11801,7 +11901,7 @@
     },
     "card": {
       "title": "Kamu sudah mencapai batas pemakaianmu bulan ini",
-      "text": "Diperbarui pada {{date}}. Untuk lanjut sekarang, minta ke admin.",
+      "text": "Diperbarui pada {{date}}. Untuk lanjut sekarang, minta tambahan.",
       "ask": "Minta tambahan",
       "asked": "Permintaan terkirim",
       "see": "Lihat pemakaianku",
@@ -12324,6 +12424,10 @@
       "machine_task_resume_waits": "{{computer}} sudah kembali: “{{title}}” dilanjutkan dari titik berhentinya setelah proyeknya siap.",
       "machine_offline": "{{computer}} sedang offline.",
       "brain_unavailable": "{{brain}} tidak bisa menjawab sekarang. Aku akan menjawab saat ia kembali.",
+      "brain_unavailable_paused": "Komputer tempat {{brain}} berjalan sedang dijeda. Aku akan menjawab setelah dilanjutkan.",
+      "brain_unavailable_commands_off": "{{brain}} dimatikan di komputerku. Aku akan menjawab setelah orang yang mengurusnya menyalakannya.",
+      "brain_unavailable_outdated": "Program di komputerku perlu diperbarui agar {{brain}} bisa menjawab. Aku akan menjawab begitu sudah diperbarui.",
+      "brain_unavailable_plan_owner": "{{brain}} akan berpikir dengan paket yang bukan milik pemilikku, jadi tidak kupakai. Hubungkan akun pemilikku di halamanku.",
       "provider_unavailable": "Penyedia AI-ku sedang tidak merespons. Aku akan menjawab begitu ia kembali.",
       "brain_busy": "Komputerku sedang sibuk dengan tugas lain. Aku akan menjawab begitu ia luang.",
       "brain_queued": "Aku masih antre untuk komputer. Aku akan menjawab begitu ada tempat.",
@@ -12332,6 +12436,9 @@
       "plan_limit_cut_unknown": "Aku berhenti di batas paket {{plan}}. Aku akan melanjutkan dari titik terakhir begitu batasnya direset.",
       "plan_limit_wait": "Paket {{plan}} mencapai batasnya. Aku akan menjawab {{when}}, saat batasnya direset.",
       "plan_limit_wait_unknown": "Paket {{plan}} mencapai batasnya. Aku akan menjawab begitu batasnya direset.",
+      "plan_model_limit_wait": "{{model}} mencapai batasnya sendiri di {{plan}}. Model lain di paket tetap berfungsi: ganti model {{agent}} atau tunggu sampai direset {{when}}.",
+      "plan_model_limit_wait_unknown": "{{model}} mencapai batasnya sendiri di {{plan}}. Model lain di paket tetap berfungsi: ganti model {{agent}} atau tunggu sampai direset.",
+      "plan_model_region_wait": "Model ini ({{model}}) butuh region Global yang dinyalakan di OpenCode (Settings › Privacy).",
       "budget_wait": "Anggaranku untuk bulan ini sudah habis. Aku akan lanjut {{when}}, atau lebih cepat jika admin menaikkannya.",
       "usage_wait_canceled": "Dibatalkan. Tidak akan berjalan saat batasnya diatur ulang.",
       "usage_wait_archived": "Tidak akan berjalan: agennya diarsipkan.",
@@ -12350,14 +12457,20 @@
       "work_end_canceled": "Dihentikan setelah {{minutes}} menit.",
       "work_end_canceledBy": "Dihentikan oleh {{name}} setelah {{minutes}} menit.",
       "no_ai": "Aku belum bisa menjawab: aku belum punya AI yang terhubung.",
-      "person_limit": "Orang yang meminta sudah mencapai batas pemakaiannya bulan ini. Untuk lanjut sekarang, minta ke admin.",
+      "person_limit": "Orang yang meminta sudah mencapai batas pemakaiannya bulan ini.",
       "no_ai_signed_out": "Aku belum bisa menjawab: AI-ku sudah keluar.",
       "no_ai_not_signed_in": "Aku belum bisa menjawab: {{brain}} belum masuk di komputerku.",
       "no_ai_computer_away": "Aku tidak bisa menjawab sekarang: komputer paketku sedang tidak tersedia.",
+      "no_ai_computer_failed": "Aku tidak bisa menjawab sekarang: komputer paketku mengalami masalah.",
       "no_ai_plan_limit": "Aku tidak bisa menjawab sekarang: paket yang kupakai untuk berpikir sudah mencapai batas.",
-      "no_ai_plan_not_shared": "Aku tidak bisa menjawabmu lewat paket ini: paket ini hanya menjawab pemiliknya.",
+      "no_ai_plan_not_shared": "Aku tidak bisa menjawabmu lewat paket workspace: paket itu hanya menjawab pemiliknya. Hubungkan paketmu sendiri dan aku akan menjawab.",
       "no_ai_runner_outdated": "Aku belum bisa menjawab sekarang: program di komputer paketku perlu diperbarui.",
-      "no_ai_plan_tools": "Aku berhenti sebelum menjawab: AI paketku di komputer itu menawarkan alatnya sendiri.",
+      "no_ai_plan_tools": "Aku berhenti sebelum menjawab: AI paketku di komputer itu tidak tetap memakai alat agentes.chat saja.",
+      "no_ai_model_limit": "Aku tidak bisa menjawab sekarang: {{model}} sudah mencapai batasnya sendiri di paketku.",
+      "no_ai_model_region": "Aku tidak bisa menjawab: {{model}} butuh wilayah Global dinyalakan di OpenCode (Settings › Privacy).",
+      "no_ai_commands_off": "Aku tidak bisa menjawab sekarang: perintah dimatikan di komputer paketku.",
+      "no_ai_cli_missing": "Aku belum bisa menjawab: program AI-ku tidak terpasang di komputerku.",
+      "no_ai_no_computer": "Aku belum bisa menjawab: AI-ku butuh komputer dan aku tidak punya.",
       "redacted": "[dihapus: tampak seperti data masuk atau kunci]",
       "action_connect_ai": "Hubungkan AI",
       "action_connect_app": "Hubungkan {{name}}",

@@ -177,17 +177,18 @@ describe("the profile in the panel closes", () => {
     expect(screen().queryByRole("complementary", PANEL)).toBeNull();
   });
 
-  test("an agent's public card closes too: its ×, the overlay", async () => {
+  test("an agent's public card closes too, by its ×, with no overlay over the conversation", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     const ada = state.agents.find((a) => a.id === ADA_ID);
     if (ada) ada.seesDetails = false;
-    await openAda(state);
-    await click(document.querySelector(".thread-panel__scrim") as HTMLElement);
+    const { panel } = await openAda(state);
+    expect(document.querySelector(".thread-panel__scrim")).toBeNull();
+    await click(within(panel).getByRole("button", { name: "Fechar" }));
     expect(screen().queryByRole("complementary", PANEL)).toBeNull();
   });
 
-  test("Lodi's, for an admin (its settings, no tabs): its × and the overlay close it", async () => {
+  test("Lodi's, for an admin (its settings, no tabs): its × and Esc close it", async () => {
     const state = withRightHand(seedState());
     seedDm(state, { type: "agent", id: LODI_ID });
     const header = await go(state, `dm/agent/${LODI_ID}`);
@@ -197,7 +198,8 @@ describe("the profile in the panel closes", () => {
     await click(within(panel() as HTMLElement).getByRole("button", { name: "Fechar" }));
     expect(panel()).toBeNull();
     await click(trigger);
-    await click(document.querySelector(".thread-panel__scrim") as HTMLElement);
+    await act(async () => fireEvent.keyDown(panel() as HTMLElement, { key: "Escape" }));
+    await settle(2);
     expect(panel()).toBeNull();
   });
 });

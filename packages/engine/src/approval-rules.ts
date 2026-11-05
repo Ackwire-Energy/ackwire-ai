@@ -1,10 +1,10 @@
-import { and, asc, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { ForbiddenError, NotFoundError } from "./errors";
 import { can, getMembership, requirePermission } from "./organizations";
 
-const { approvalRules, connectorConnections, customTools, users } = schema;
+const { agents, approvalRules, connectorConnections, customTools, routines, users } = schema;
 
 /**
  * "Aprovar sempre" (docs/adr/0015): someone who decides an agent's approvals approves a kind of call for good, and
@@ -23,7 +23,17 @@ export interface RememberedKind {
   tool: string;
   /** The wrapped actions; none: the tool itself. */
   actions: string[];
+  /**
+   * "Sempre nesta rotina": kept as this routine's own actions (`addRoutineOwnActions`, `actions` are their names),
+   * never as a rule of the agent.
+   */
+  routineId?: string;
 }
+
+/** How many connected-app actions a routine may do on its own. */
+export const MAX_OWN_ACTIONS = 20;
+/** What `routines.own_actions` holds: a tool name or a Composio action's slug. */
+export const OWN_ACTION_NAME = /^[A-Za-z0-9_.:-]{1,128}$/;
 
 /**
  * The action of an "Aprovar sempre leituras" rule (`ToolDefinition.sqlReads`): the prefix, then the call's other
@@ -57,7 +67,7 @@ export function rememberedKindOf(value: unknown): RememberedKind | null {
   const v = value as Partial<RememberedKind> | null | undefined;
   if (!v || typeof v.tool !== "string" || !v.tool || !Array.isArray(v.actions)) return null;
   if (!v.actions.every((a) => typeof a === "string" && a)) return null;
-  return { tool: v.tool, actions: v.actions };
+  return { tool: v.tool, actions: v.actions, ...(typeof v.routineId === "string" ? { routineId: v.routineId } : {}) };
 }
 
 /** Whether `userId` decides an agent's approvals: its owner, or who holds `approve_actions`. */
@@ -97,6 +107,43 @@ export async function addApprovalRules(tx: Executor, at: RuleScope, kind: Rememb
     .onConflictDoNothing();
 }
 
+/**
+ * "Sempre nesta rotina" (in the decision's transaction): these actions join the routine's own, and its runs do them
+ * without asking (`ownJobCovers`). False when it can't: the routine is gone, moved to another agent or full. Undone
+ * in the routine's settings. Locked, so two people approving at once both land.
+ */
+export async function addRoutineOwnActions(
+  tx: Executor,
+  at: { orgId: string; agentId: string; routineId: string },
+  actions: readonly string[],
+  actorId: string,
+): Promise<boolean> {
+  const [row] = await tx
+    .select({ ownActions: routines.ownActions })
+    .from(routines)
+    .where(
+      and(
+        eq(routines.id, at.routineId),
+        eq(routines.orgId, at.orgId),
+        eq(routines.agentId, at.agentId),
+        isNull(routines.deletedAt),
+      ),
+    )
+    .for("update");
+  if (!row) return false;
+  const ownActions = [...new Set([...row.ownActions, ...actions])];
+  if (ownActions.length > MAX_OWN_ACTIONS) return false;
+  await tx.update(routines).set({ ownActions }).where(eq(routines.id, at.routineId));
+  await recordAudit(tx, {
+    orgId: at.orgId,
+    actor: { type: "person", id: actorId },
+    action: "routine.own_actions_added",
+    target: { type: "routine", id: at.routineId },
+    details: { before: row.ownActions, after: ownActions },
+  });
+  return true;
+}
+
 /** Who made the first of these rules, by name, for the quiet line of a call they let run; null when unknown. */
 export async function rulesApprover(db: Executor, ruleIds: string[]): Promise<string | null> {
   if (ruleIds.length === 0) return null;
@@ -132,6 +179,21 @@ export async function dropAgentRules(
       action: RULE_REMOVED_AUDIT,
       target: { type: "agent", id: rule.agentId },
       details: { connectionId: rule.connectionId, tool: rule.tool, action: rule.action, reason: "owner_changed" },
+    });
+  }
+  // "Merge without asking" is the same kind of word, and goes with it.
+  const cleared = await tx
+    .update(agents)
+    .set({ mergeRepos: [] })
+    .where(and(eq(agents.orgId, orgId), inArray(agents.id, agentIds), sql`${agents.mergeRepos} <> '[]'::jsonb`))
+    .returning({ id: agents.id });
+  for (const agent of cleared) {
+    await recordAudit(tx, {
+      orgId,
+      actor,
+      action: "agent.merge_repositories_changed",
+      target: { type: "agent", id: agent.id },
+      details: { repositories: [], reason: "owner_changed" },
     });
   }
 }

@@ -707,6 +707,7 @@ export function InPlaceText({
         <input
           ref={edit.field}
           id={id}
+          data-esc-own=""
           value={typed}
           size={Math.max(4, typed.length + 1)}
           maxLength={maxLength}

@@ -21,6 +21,7 @@
     "refreshing": "Wird aktualisiert",
     "retry": "Erneut versuchen",
     "unknownError": "Etwas ist schiefgelaufen. Versuch es noch einmal.",
+    "ourSide": "Bei uns ist etwas schiefgelaufen. Versuch es gleich noch einmal.",
     "signedOut": "Deine Sitzung ist abgelaufen. Melde dich erneut an, um weiterzumachen.",
     "newVersion": "Eine neue Version von agentes.chat ist da.",
     "reload": "Neu laden",
@@ -41,7 +42,7 @@
     "today": "Heute",
     "yesterday": "Gestern",
     "loadFailed": "Das konnte nicht geladen werden. Prüf deine Verbindung und versuch es noch einmal.",
-    "notAllowed": "Dafür hast du keine Berechtigung. Frag einen Admin des Workspace.",
+    "notAllowed": "Dafür hast du keine Berechtigung.",
     "tooMany": "Zu viele Versuche. Versuch es später noch einmal.",
     "offline": "Du bist offline. Prüf deine Verbindung und versuch es noch einmal.",
     "unreachable": "agentes.chat ist gerade nicht erreichbar. Versuch es gleich noch einmal."
@@ -213,6 +214,12 @@
       "desc": "Offen oder privat.",
       "short": "Kanäle erstellen",
       "say": "erstellt Kanäle"
+    },
+    "mention_everyone": {
+      "title": "Alle erwähnen",
+      "desc": "Mit @alle alle in einem Kanal benachrichtigen, Personen und Agenten.",
+      "short": "alle erwähnen",
+      "say": "erwähnt alle"
     },
     "manage_channels": {
       "title": "Kanäle ordnen",
@@ -1817,8 +1824,8 @@
     "queued_other": "{{names}} stehen in der Warteschlange des Computers",
     "away_one": "{{names}} wartet auf den Computer",
     "away_other": "{{names}} warten auf den Computer",
-    "plan_one": "{{names}} antwortet, wenn sich das Abo zurücksetzt",
-    "plan_other": "{{names}} antworten, wenn sich das Abo zurücksetzt",
+    "plan_one": "{{names}} wartet auf das Abo",
+    "plan_other": "{{names}} warten auf das Abo",
     "budget_one": "{{names}} antwortet, wenn sich das Budget erneuert",
     "budget_other": "{{names}} antworten, wenn sich das Budget erneuert",
     "line_one": "{{names}} beginnt, wenn eine andere Arbeit endet",
@@ -1836,7 +1843,7 @@
       "outage": "Der KI-Anbieter ist ausgefallen · versucht es von selbst erneut",
       "queued": "In der Warteschlange des Computers",
       "away": "Wartet auf den Computer",
-      "plan": "Antwortet, wenn sich das Abo zurücksetzt",
+      "plan": "Wartet auf das Abo",
       "budget": "Antwortet, wenn sich das Budget erneuert",
       "line": "Beginnt, wenn eine andere Arbeit endet",
       "canceled": "Abgebrochen",
@@ -1919,8 +1926,6 @@
       "name": "Name und Aussehen",
       "nameHelp": "In der Seitenleiste steht dabei immer „{{label}}“.",
       "changeLook": "Aussehen ändern",
-      "ai": "KI und Modell",
-      "aiHelp": "Automatisch wählt das günstigste Modell, das die Aufgabe schafft.",
       "budget": "Monatliches Budget",
       "perMonth": "/Monat",
       "budgetHelp": "Am Limit hält er an und sagt Bescheid, wie jeder Agent.",
@@ -1928,12 +1933,27 @@
       "audienceHelp": "Wer nicht dazugehört, sieht {{name}} nicht in der Seitenleiste.",
       "lock": "{{name}} kann weder archiviert noch gelöscht werden. Er postet nichts, solange niemand mit ihm spricht.",
       "audit": "Ansehen, was {{name}} getan hat",
-      "onPlan": "Claude-Abo · {{account}}",
       "change": "Ändern",
       "planHelp": "Es zahlt, wem das Abo gehört. Ist sein Computer nicht erreichbar, sagt die Unterhaltung das und bietet einen API-Schlüssel an.",
-      "plan": "Ein Abo",
-      "planOffer": "{{name}} kann statt mit einem API-Schlüssel mit deinem Abo denken, auf dem Computer, auf dem das Abo angemeldet ist, und erreicht dabei nur diesen Workspace.",
-      "usePlan": "Abo verwenden"
+      "lookEdit": "Aussehen von {{name}} ändern",
+      "planOwner": "von {{owner}}",
+      "mine": "Deine KI",
+      "mineHelp": "Dein Gespräch mit {{name}} denkt mit deinem Abo oder einem, das mit dir geteilt wurde, und nur deins.",
+      "connectMine": "Mein Abo verbinden",
+      "useWorkspace": "Die des Workspace nutzen",
+      "fallbackKey": "Ohne eigenes Abo nutzt es den API-Schlüssel des Workspace.",
+      "fallbackPlan": "Ohne eigenes Abo nutzt es das Abo von {{owner}}, das allen antwortet.",
+      "fallbackYours": "Ohne anderes Abo nutzt es das des Workspace, das dir gehört.",
+      "fallbackNone": "Ohne eigenes Abo kann {{name}} dir nicht antworten: Das Abo des Workspace antwortet nur {{owner}}.",
+      "workspace": "KI des Workspace",
+      "workspaceHelp": "Wer kein eigenes Abo hat, spricht über diese KI mit {{name}}.",
+      "workspacePlan": "Abo des Workspace",
+      "workspacePlanHelp": "Ein Abo statt des Schlüssels. Anderen antwortet es nur, wenn die Person, der es gehört, das erlaubt.",
+      "noPlans": "Verbinde unter Deine KI ein Abo, um es hier zu nutzen.",
+      "pickPlan": "Abo wählen",
+      "sharesOn": "An: Wer kein eigenes Abo hat, spricht über dieses Abo mit {{name}}.",
+      "sharesOff": "Aus: Nur {{owner}} spricht darüber. Wer kein eigenes Abo hat, bekommt keine Antwort.",
+      "sharesOffYou": "Aus: Nur du sprichst darüber. Wer kein eigenes Abo hat, bekommt keine Antwort."
     },
     "card": {
       "settings": "{{name}} · Einstellungen",
@@ -2130,6 +2150,8 @@
     },
     "agent": "{{name}} antwortet nicht, weil keine KI verbunden ist.",
     "agent_female": "{{name}} antwortet nicht, weil keine KI verbunden ist.",
+    "cliMissing": "{{name}} antwortet nicht: Das Programm der KI ist auf dem Computer nicht installiert.",
+    "noComputer": "{{name}} antwortet nicht: Die KI braucht einen Computer, und es gibt keinen.",
     "signedOut": "{{name}} antwortet nicht, weil seine KI abgemeldet ist.",
     "signedOut_female": "{{name}} antwortet nicht, weil ihre KI abgemeldet ist.",
     "notSignedIn": {
@@ -2155,12 +2177,17 @@
     "action": "Verbinden",
     "locked": "Wer die KI von {{name}} verbindet: ein Admin, mit einem API-Schlüssel, oder {{owner}}, mit dem eigenen Abo.",
     "lockedAdmins": "Nur ein Admin kann eine KI verbinden.",
+    "lockedOwner": "Nur die Person, der der Agent gehört, verbindet ein Abo für ihn.",
     "rightHand": {
       "computer_away": "{{name}} kann gerade nicht antworten: Der Computer, auf dem das Abo angemeldet ist, ist nicht erreichbar.",
+      "computer_failed": "{{name}} kann gerade nicht antworten: Der Computer des Abos hatte ein Problem.",
       "plan_limit": "{{name}} kann gerade nicht antworten: Das Abo hat sein Limit erreicht.",
-      "plan_not_shared": "{{name}} denkt mit einem Abo, das nur der Person antwortet, der es gehört.",
+      "plan_not_shared": "Verbinde dein eigenes Abo, um mit {{name}} zu sprechen: Das Abo des Workspace antwortet nur der Person, der es gehört.",
       "runner_outdated": "{{name}} kann gerade nicht antworten: Das Programm auf dem Computer des Abos braucht ein Update.",
-      "plan_tools": "{{name}} hat vor der Antwort gestoppt: Die KI des Abos bietet auf diesem Computer eigene Werkzeuge an.",
+      "plan_tools": "{{name}} hat vor der Antwort gestoppt: Die KI des Abos ist auf diesem Computer nicht bei den Werkzeugen von agentes.chat geblieben.",
+      "model_limit": "{{name}} kann gerade nicht antworten: {{model}} hat sein eigenes Limit im Abo erreicht. Die anderen Modelle des Abos funktionieren weiter.",
+      "model_region": "{{name}} kann nicht antworten: {{model}} braucht die Region Global, eingeschaltet in OpenCode (Settings › Privacy).",
+      "commands_off": "{{name}} kann gerade nicht antworten: Auf dem Computer des Abos sind Befehle ausgeschaltet, und wer ihn betreut, muss sie einschalten.",
       "useKey": "API-Schlüssel verwenden"
     },
     "receipt": "Niemand wird antworten: keine KI verbunden",
@@ -2365,6 +2392,8 @@
       "monthly": "seines Monats"
     },
     "line": "Geht {{when}} weiter, wenn sich das Abo zurücksetzt. Schnelle Antworten laufen weiter.",
+    "changeModel": "Modell wechseln",
+    "raiseBudget": "Budget erhöhen",
     "lineUnknown": "Geht weiter, sobald sich das Abo zurücksetzt. Schnelle Antworten laufen weiter.",
     "lineBudget": "Geht {{when}} weiter, oder früher, wenn das Budget erhöht wird. Schnelle Antworten laufen weiter.",
     "continue": "Jetzt weitermachen",
@@ -2549,6 +2578,7 @@
     },
     "memory": {
       "saved": "Im <b>Gedächtnis</b> gespeichert: {{text}}",
+      "saved_rule": "In <b>meinen Regeln</b> gespeichert: {{text}}",
       "updated": "<b>Gedächtnis</b> aktualisiert: {{text}}",
       "forgotten": "Aus dem <b>Gedächtnis</b> entfernt: {{text}}"
     },
@@ -2580,6 +2610,10 @@
     },
     "agent": {
       "settings_changed": "Einstellungen von <b>{{agentName}}</b> geändert"
+    },
+    "pr": {
+      "merged": "PR <b>#{{number}}</b> in <b>{{repo}}</b> gemergt",
+      "merged_branch": "<b>{{ref}}</b> in <b>{{repo}}</b> gemergt"
     },
     "other": "Eine Änderung vorgenommen",
     "copyWebhook": "Webhook-Adresse kopieren",
@@ -2858,7 +2892,7 @@
       "waiting_answer": "Wartet auf eine Antwort",
       "waiting_computer": "Wartet auf den Computer",
       "queued_computer": "In der Warteschlange des Computers",
-      "waiting_plan": "Wartet, bis sich das Abo zurücksetzt",
+      "waiting_plan": "Wartet auf das Abo",
       "waiting_budget": "Wartet, bis sich das Budget zurücksetzt",
       "provider_down": "Der KI-Anbieter ist ausgefallen · versucht es von selbst erneut",
       "out_of_plan": "Planlimit erreicht",
@@ -2885,6 +2919,7 @@
     "inChannel": "In diesem Kanal",
     "inWorkspace": "Im Workspace",
     "notInChannel": "nicht im Kanal",
+    "everyone": "Alle in diesem Gespräch, Personen und Agenten",
     "offer": "{{name}} ist nicht im Kanal und sieht die Erwähnung nicht.",
     "add": "Zum Kanal hinzufügen",
     "dismiss": "Nicht jetzt",
@@ -3400,7 +3435,12 @@
       "pushTo": "Push auf {{branch}} in {{repo}}",
       "done": "Freigegeben. {{name}} fragt dafür nicht mehr nach.",
       "undoHere": "Zum Rückgängigmachen geh auf der Seite von {{name}} zu Tools und Zugriff.",
-      "open": "Öffnen"
+      "open": "Öffnen",
+      "routine": "Immer in dieser Routine",
+      "thisRoutine": "diese Routine",
+      "noteRoutine": "{{routine}} erledigt {{actions}} ab jetzt selbstständig, mit beliebigen Werten. Außerhalb dieser Routine wird weiter gefragt. Rückgängig machen: in den Einstellungen der Routine.",
+      "doneRoutine": "Freigegeben. {{routine}} fragt danach nicht mehr.",
+      "undoRoutine": "Zum Rückgängigmachen geh in die Einstellungen der Routine."
     },
     "email": {
       "from": "Von",
@@ -4499,6 +4539,11 @@
       "cancel": "Abbrechen",
       "forgotten": "Vergessen. Es liegt im Archiv, falls du es zurückwillst.",
       "saved": "Gespeichert. Es gilt jetzt als bestätigt.",
+      "rules": "Regeln von Personen",
+      "rulesNote": "Gilt bei aller Arbeit für die Person, die die Regel gegeben hat, egal woher der Auftrag kommt. Regeln des Verantwortlichen oder eines Admins gelten für alle.",
+      "ruleBy": "Von {{name}} · {{date}}",
+      "removeRule": "Entfernen",
+      "ruleRemoved": "Regel entfernt. Sie liegt im Archiv, falls du sie zurückwillst.",
       "playbook": "So arbeitet {{name}}",
       "playbookNote": "Arbeitsweisen, die es für sich behält. Sie erscheinen nicht im Chat. Was es von außen aufgenommen und nie wieder genutzt hat, verschwindet von selbst und bleibt unter Archiviert.",
       "details": "Technische Details",
@@ -4560,6 +4605,7 @@
         "model_refused": "Das Modell hat die Antwort verweigert.",
         "agent_archived": "Der Agent wurde archiviert.",
         "provider_error": "Der Modellanbieter hat einen Fehler gemeldet: {{detail}}",
+        "provider_account": "Der Anbieter hat den Schlüssel abgelehnt: Er ist vielleicht ungültig, ohne Guthaben oder über dem Kontingent.",
         "provider_unavailable": "Der Modellanbieter hat nicht geantwortet: {{detail}}",
         "canceled": "Jemand hat die Aufgabe gestoppt.",
         "interrupted": "Durch einen Neustart des Servers unterbrochen.",
@@ -4567,7 +4613,7 @@
         "credential_revoked": "Der Schlüssel dieses Agenten wurde widerrufen.",
         "credential_wrong_provider": "Das Modell ist von {{modelProvider}}, der Schlüssel aber von {{keyProvider}}.",
         "model_unlisted": "OpenRouter bietet {{model}} nicht mehr an. Wähle in den Einstellungen des Agenten ein anderes Modell.",
-        "no_ai": "Der Agent hat keine KI verbunden.",
+        "no_ai": "Der Agent hatte keine KI verfügbar.",
         "person_limit": "Die anfragende Person hat ihr Nutzungslimit für diesen Monat erreicht.",
         "org_paused": "Die Agenten des Workspace sind pausiert.",
         "org_suspended": "Der Workspace ist nicht verfügbar.",
@@ -4576,6 +4622,8 @@
         "computer_busy": "Der Computer war mit anderen Aufgaben beschäftigt.",
         "computer_failed": "Der Computer hatte ein Problem und hat angehalten.",
         "computer_timeout": "Der Computer hat zu lange für eine Antwort gebraucht.",
+        "account_missing": "Das für diesen Agenten gewählte Konto ist nicht mehr auf seinem Computer. Wähl in den Einstellungen des Agenten ein anderes oder füg es erneut hinzu.",
+        "our_error": "Bei uns ist etwas schiefgelaufen, und die Aufgabe wurde angehalten. Frag gleich noch einmal.",
         "unknown": "Fehlgeschlagen."
       }
     },
@@ -4681,13 +4729,15 @@
       "decision": "Entscheidung",
       "fact": "Fakt",
       "preference": "Vorliebe",
-      "lesson": "Lektion"
+      "lesson": "Lektion",
+      "rule": "Regel"
     },
     "kindsLower": {
       "decision": "Entscheidung",
       "fact": "Fakt",
       "preference": "Vorliebe",
-      "lesson": "Lektion"
+      "lesson": "Lektion",
+      "rule": "Regel"
     },
     "verified": "Bestätigt",
     "unverified": "Nicht bestätigt",
@@ -5457,7 +5507,7 @@
     },
     "github_pr_merge": {
       "label": "Pull Requests mergen",
-      "description": "Einen Pull Request mergen. Fragt immer nach Freigabe."
+      "description": "Einen Pull Request mergen. Fragt nach Freigabe, außer in den auf der Seite des Agenten gewählten Repositorys."
     },
     "github_issues_read": {
       "label": "Issues lesen",
@@ -6102,7 +6152,8 @@
     },
     "ownActions": {
       "hint": "Jeder Lauf erledigt das in deinen verbundenen Apps, ohne zu fragen. Jede andere Aktion dort fragt zuerst eine Person, und Merge, Deploy und Rollback fragen immer.",
-      "none": "In verbundenen Apps fragt sie vor jeder Aktion eine Person. Damit sie ihre Aufgabe selbst erledigt, sag dem Agenten im Chat, welche Aktionen sie ausführen darf."
+      "none": "In verbundenen Apps fragt sie vor jeder Aktion eine Person. Damit sie ihre Aufgabe selbst erledigt, sag dem Agenten im Chat, welche Aktionen sie ausführen darf.",
+      "remove": "Wieder vorher fragen: {{action}}"
     },
     "ahead": {
       "approved": "Freigegeben · läuft {{when}}",
@@ -6267,7 +6318,7 @@
       "waiting": "Wartet auf eine Antwort",
       "waitingApproval": "Wartet auf deine Freigabe",
       "waitingComputer": "Wartet auf den Computer",
-      "waitingPlan": "Wartet, bis sich das Abo zurücksetzt",
+      "waitingPlan": "Wartet auf das Abo",
       "waitingBudget": "Wartet, bis sich das Budget erneuert",
       "reported": "Hat berichtet, was er gefunden hat",
       "silent": "Nichts Neues, still geblieben",
@@ -6281,7 +6332,7 @@
       "previous_running": "Übersprungen: Die vorherige lief noch",
       "previous_waiting": "Übersprungen: Die vorherige wartete noch auf jemanden",
       "waiting_computer": "Übersprungen: wartet auf den Computer des Agenten",
-      "waiting_plan": "Übersprungen: wartet, bis sich das Abo zurücksetzt",
+      "waiting_plan": "Übersprungen: wartet auf das Abo",
       "waiting_budget": "Übersprungen: wartet, bis sich das Budget zurücksetzt",
       "superseded": "Hat der nächsten Ausführung Platz gemacht",
       "stale": "Hat ihre Zeit verpasst: Der Computer kam zu spät zurück",
@@ -6313,13 +6364,17 @@
       "model_unlisted": "OpenRouter bietet das Modell nicht mehr an",
       "agent_archived": "Der Agent wurde archiviert",
       "interrupted": "Durch einen Serverneustart unterbrochen",
-      "no_ai": "Der Agent hat keine KI verbunden",
+      "no_ai": "Der Agent hatte keine KI verfügbar",
       "person_limit": "Nicht gelaufen: Die erstellende Person hat ihr Nutzungslimit für diesen Monat erreicht",
       "org_paused": "Nicht gelaufen: Die Agenten des Workspace waren pausiert",
       "org_suspended": "Nicht gelaufen: Der Workspace war nicht verfügbar",
       "org_deleting": "Nicht gelaufen: Der Workspace wurde gerade gelöscht",
       "agent_paused": "Nicht gelaufen: Der Agent war pausiert",
-      "computer_busy": "Der Computer war mit anderen Aufgaben beschäftigt"
+      "computer_busy": "Der Computer war mit anderen Aufgaben beschäftigt",
+      "computer_failed": "Der Computer hatte ein Problem und hat angehalten",
+      "computer_timeout": "Der Computer hat zu lange gebraucht, um zu antworten",
+      "account_missing": "Das Konto des Agenten ist nicht mehr auf seinem Computer",
+      "our_error": "Bei uns ist etwas schiefgelaufen"
     },
     "openInChat": "In der Unterhaltung öffnen",
     "stop": "Stoppen",
@@ -7471,6 +7526,7 @@
       "person": "Personen",
       "agent": "Agenten",
       "routine": "Routinen",
+      "reminder": "Erinnerungen",
       "deadline": "Fälligkeiten von Aufgaben"
     },
     "upcoming": "Demnächst",
@@ -7490,6 +7546,7 @@
     "kind": {
       "event": "Termin",
       "routine": "Routine",
+      "reminder": "Erinnerung",
       "deadline": "Fälligkeit einer Aufgabe"
     },
     "every": {
@@ -7502,6 +7559,10 @@
     "runs_other": "{{count}} Ausführungen in diesen Tagen.",
     "routineDetail": "Routine von {{agent}} · liefert an {{target}}.",
     "deadlineDetail": "Die Aufgabe ist fällig.",
+    "reminderBy": "Erstellt von {{name}}",
+    "reminderPosted": "Gepostet von {{agent}} · {{target}}",
+    "cancelReminder": "Erinnerung abbrechen",
+    "reminderCancelled": "Erinnerung abgebrochen",
     "openIssue": "Aufgabe öffnen",
     "openRoutines": "In Routinen ansehen",
     "openRoutine": "Routine öffnen",
@@ -7858,7 +7919,7 @@
         "updating": "{{program}} wird auf {{computer}} aktualisiert. Das ändert sich von selbst, wenn es fertig ist.",
         "runnerOld": "Das agentes.chat-Programm auf {{computer}} ist veraltet und ein Update ist unterwegs. Das ändert sich von selbst, wenn es fertig ist.",
         "execOff": "{{computer}} kann {{program}} noch nicht ausführen. Wir kümmern uns, und das ändert sich von selbst.",
-        "toolOff": "{{program}} ist auf {{computer}} nicht freigegeben. Bitte den Support, es freizugeben.",
+        "toolOff": "{{program}} ist auf {{computer}} noch nicht freigegeben. Das liegt an uns: Versuch es später noch einmal.",
         "preparing": "{{computer}} wird gerade fertig. Das ändert sich von selbst, wenn es so weit ist."
       }
     },
@@ -8821,6 +8882,9 @@
       "paidTraining": "Der Anbieter darf Anfragen nutzen, um das Modell zu trainieren. Schalte die Berechtigung in OpenCode ein.",
       "freeTraining": "Kostenlos. Der Anbieter darf Anfragen nutzen, um das Modell zu trainieren. Schalte die Berechtigung in OpenCode ein."
     },
+    "modelLimit": "{{model}} hat sein eigenes Limit in diesem Abo erreicht und setzt sich {{when}} zurück. Die anderen Modelle des Abos funktionieren weiter.",
+    "modelLimitUnknown": "{{model}} hat sein eigenes Limit in diesem Abo erreicht. Die anderen Modelle des Abos funktionieren weiter.",
+    "modelRegion": "{{model}} braucht die Global-Region in OpenCode (Settings › Privacy). Die anderen Modelle des Abos funktionieren weiter.",
     "modelHow": {
       "globalRegion": "Schalte in OpenCode unter Settings › Privacy die Global-Region ein. Ohne sie antwortet dieses Modell nicht.",
       "paidTraining": "Der Anbieter dieses Modells darf Anfragen nutzen, um es zu trainieren. Schalte in OpenCode unter Settings › Privacy die Berechtigung für kostenpflichtige Modelle ein. Ohne sie antwortet dieses Modell nicht.",
@@ -9375,6 +9439,13 @@
     "failed": "Verbindung fehlgeschlagen. Versuch es gleich noch einmal."
   },
   "repos": {
+    "merge": {
+      "label": "Darf ohne Nachfrage mergen",
+      "none": "Keine Repositorys ausgewählt. Jeder Merge fragt nach Freigabe.",
+      "help": "In diesen Repositorys läuft ein Merge ohne Freigabekarte, steht im Audit und hinterlässt einen Beleg in der Unterhaltung. Alles andere Sensible fragt weiter nach.",
+      "dialogTitle": "Wo {{name}} ohne Nachfrage mergt",
+      "dialogDesc": "Nur Repositorys, die bereits genutzt werden. Ein Merge an jedem anderen Ort fragt nach Freigabe."
+    },
     "label": "Welche Repositorys",
     "all": "Alle Repositorys",
     "allLower": "alle Repositorys",
@@ -10871,7 +10942,8 @@
       "editorsExcludeYou": "Nimm dich selbst unter die Personen auf, die bearbeiten, um diese Seite zu behalten.",
       "titleTaken": "Es gibt schon eine Seite namens „{{title}}“.",
       "titleCharacters": "Ein Titel darf kein [ ] | oder # enthalten.",
-      "titleNoLetters": "Ein Titel braucht Buchstaben oder Zahlen."
+      "titleNoLetters": "Ein Titel braucht Buchstaben oder Zahlen.",
+      "lockAdminsOnly": "Nur Admins sperren Seiten."
     },
     "media": {
       "off": "GIFs und Sticker sind in diesem Workspace ausgeschaltet.",
@@ -10896,7 +10968,8 @@
       "decided": "Über diesen Vorschlag hat schon jemand entschieden.",
       "expired": "Dieser Vorschlag ist abgelaufen: Niemand hat innerhalb eines Tages entschieden.",
       "routineMade": "Die Routine dieses Agenten wurde schon erstellt.",
-      "noRoutine": "Dieser Vorschlag hat keine Routine zum Erstellen."
+      "noRoutine": "Dieser Vorschlag hat keine Routine zum Erstellen.",
+      "notRequester": "Nur wer darum gebeten hat, kann es senden."
     },
     "approval": {
       "alwaysUnavailable": "Diese Anfrage kann nicht dauerhaft freigegeben werden. Gib nur diese eine frei."
@@ -10998,20 +11071,28 @@
       "agentNotInChannel": "Füg den Agent zuerst zur Unterhaltung hinzu.",
       "webhookPaused": "Schalte die Routine ein, um sie zu testen.",
       "continueExtraOff": "Das Zeitfenster dieses Abos ist aufgebraucht, und die lange Arbeit dieses Agenten nutzt keine bezahlte Zusatznutzung. Schalte sie in seinen KI-Einstellungen ein, um jetzt weiterzumachen, sonst geht es nach dem Zurücksetzen weiter.",
-      "continueExtraUsedUp": "Das Zeitfenster dieses Abos ist aufgebraucht, und seine bezahlte Zusatznutzung ist aufgebraucht oder nicht verfügbar. Es geht nach dem Zurücksetzen weiter."
+      "continueExtraUsedUp": "Das Zeitfenster dieses Abos ist aufgebraucht, und seine bezahlte Zusatznutzung ist aufgebraucht oder nicht verfügbar. Es geht nach dem Zurücksetzen weiter.",
+      "actionsNeedApprover": "Nur der Inhaber des Agenten oder wer seine Aktionen genehmigt, kann eine Routine selbstständig handeln lassen.",
+      "editorOnly": "Nur wer die Routine erstellt hat, der Inhaber des Agenten oder ein Admin kann sie ändern.",
+      "widgetFixed": "Diese Routine hält ein Widget aktuell. Ändere sie über das Widget."
     },
     "run": {
       "notContinuable": "Diese Antwort kann nicht mehr fortgesetzt werden.",
       "agentBusy": "Der Agent arbeitet schon in dieser Unterhaltung. Warte, bis er fertig ist, um weiterzumachen.",
       "continueForbidden": "Nur wer gefragt hat, der Inhaber des Agenten oder ein Admin kann fortsetzen.",
-      "notRestartable": "Diese Antwort hatte schon begonnen und kann nicht neu starten. Sende deine Nachricht noch einmal."
+      "notRestartable": "Diese Antwort hatte schon begonnen und kann nicht neu starten. Sende deine Nachricht noch einmal.",
+      "cancelForbidden": "Nur wer gefragt hat, der Inhaber des Agenten oder ein Admin kann das stoppen.",
+      "answerForbidden": "Nur wer gefragt hat, der Inhaber des Agenten oder ein Admin kann das tun.",
+      "stopReasonForbidden": "Nur wer gestoppt hat, kann den Grund angeben."
     },
     "artifact": {
       "fileTooLarge": "Die Datei ist größer als {{max}} MB, das Limit pro Datei.",
       "notVersioned": "Ein Bild, ein Video oder eine Aufnahme hat keine Versionen. Sende es als neue Datei.",
       "fileRequired": "Wähl eine Datei zum Hochladen.",
       "fileNameRequired": "Die Datei braucht einen Namen.",
-      "notFound": "Diese Datei gibt es nicht mehr, oder du hast keinen Zugriff."
+      "notFound": "Diese Datei gibt es nicht mehr, oder du hast keinen Zugriff.",
+      "deleteForbidden": "Nur wer es erstellt hat, wer den Agenten gefragt hat, der Inhaber des Agenten oder ein Admin kann das löschen.",
+      "restoreForbidden": "Nur wer es löschen durfte, kann es wiederherstellen."
     },
     "machine": {
       "forbidden": "Das kann nur ein Admin oder die Person, die den Computer verbunden hat.",
@@ -11022,7 +11103,10 @@
       "targetOffline": "Dieser Computer ist offline gegangen. Wähl einen anderen.",
       "targetNotFound": "Diesen Computer gibt es nicht mehr. Wähl einen anderen.",
       "targetSame": "Die Agenten sind schon auf diesem Computer.",
-      "targetPaused": "Dieser Computer ist pausiert. Wähl einen anderen."
+      "targetPaused": "Dieser Computer ist pausiert. Wähl einen anderen.",
+      "offline": "{{name}} ist gerade offline. Versuch es noch einmal, sobald er wieder da ist.",
+      "paused": "{{name}} ist pausiert: Darauf startet nichts Neues, bis er fortgesetzt wird.",
+      "timeout": "Der Computer hat nicht rechtzeitig geantwortet. Versuch es noch einmal."
     },
     "github": {
       "repoMissing": "Das Repository {{repo}} ist privat oder existiert nicht auf GitHub.",
@@ -11047,6 +11131,21 @@
     "agentGroup": {
       "notFound": "Diese Abteilung gibt es nicht mehr.",
       "tooMany": "Dieser Workspace hat schon {{max}} Abteilungen. Lösch zuerst eine."
+    },
+    "rightHand": {
+      "permanent": "Die rechte Hand gehört zum Workspace und bleibt außerhalb der Kanäle. Eine @Erwähnung erreicht sie in jedem davon."
+    },
+    "agent": {
+      "ownerOrAdmin": "Nur der Inhaber des Agenten oder ein Admin kann das tun.",
+      "detailsHidden": "Nur wer mit {{agentName}} spricht, sieht, wie es funktioniert.",
+      "extraOwnerOnly": "Nur der Inhaber des Agenten schaltet die bezahlte Zusatznutzung des Abos ein oder aus.",
+      "undoForbidden": "Nur die Person, für die der Agent gearbeitet hat, sein Inhaber oder ein Admin kann das rückgängig machen."
+    },
+    "account": {
+      "notOwner": "Nur wer dieses Konto oder Abo verbunden hat, kann das tun."
+    },
+    "channel": {
+      "membersForbidden": "Nur wer den Kanal erstellt hat oder ein Admin kann Personen hinzufügen oder entfernen."
     },
     "handle": {
       "invalid": "Ein @ hat {{min}} bis {{max}} Kleinbuchstaben, Zahlen, - oder _.",
@@ -11698,6 +11797,7 @@
     "system": "System",
     "removed": "Entfernt",
     "change": {
+      "mergedWithoutAsking": "In {{repo}} ohne Nachfrage gemergt",
       "pattern": "{{verb}}: {{area}}",
       "approval": {
         "approved": "Hat eine Anfrage freigegeben",
@@ -12207,7 +12307,7 @@
     },
     "card": {
       "title": "Du hast dein Nutzungslimit für diesen Monat erreicht",
-      "text": "Es erneuert sich am {{date}}. Um jetzt weiterzumachen, frag einen Admin.",
+      "text": "Es erneuert sich am {{date}}. Um jetzt weiterzumachen, bitte um mehr.",
       "ask": "Um mehr bitten",
       "asked": "Anfrage gesendet",
       "see": "Meine Nutzung ansehen",
@@ -12741,6 +12841,10 @@
       "machine_task_resume_waits": "{{computer}} ist zurück: „{{title}}“ läuft dort weiter, wo es aufgehört hat, sobald das Projekt bereit ist.",
       "machine_offline": "{{computer}} ist offline gegangen.",
       "brain_unavailable": "{{brain}} kann gerade nicht antworten. Ich antworte, sobald es wieder da ist.",
+      "brain_unavailable_paused": "Der Computer, auf dem {{brain}} läuft, ist pausiert. Ich antworte, sobald er fortgesetzt wird.",
+      "brain_unavailable_commands_off": "{{brain}} ist auf meinem Computer ausgeschaltet. Ich antworte, sobald die Person, die ihn betreut, es einschaltet.",
+      "brain_unavailable_outdated": "Das Programm auf meinem Computer braucht ein Update, bevor {{brain}} antworten kann. Ich antworte, sobald es aktualisiert ist.",
+      "brain_unavailable_plan_owner": "{{brain}} würde mit einem Abo denken, das nicht meinem Besitzer gehört, deshalb nutze ich es nicht. Verbinde das Konto meines Besitzers auf meiner Seite.",
       "provider_unavailable": "Mein KI-Anbieter antwortet gerade nicht. Ich antworte, sobald er wieder da ist.",
       "brain_busy": "Mein Computer ist gerade mit anderen Aufgaben beschäftigt. Ich antworte, sobald er frei ist.",
       "brain_queued": "Ich stehe noch in der Warteschlange des Computers. Ich antworte, sobald er Platz hat.",
@@ -12749,6 +12853,9 @@
       "plan_limit_cut_unknown": "Ich habe am Limit des {{plan}}-Abos aufgehört. Ich mache dort weiter, wo ich war, sobald es sich zurücksetzt.",
       "plan_limit_wait": "Das {{plan}}-Abo hat sein Limit erreicht. Ich antworte {{when}}, wenn es sich zurücksetzt.",
       "plan_limit_wait_unknown": "Das {{plan}}-Abo hat sein Limit erreicht. Ich antworte, sobald es sich zurücksetzt.",
+      "plan_model_limit_wait": "{{model}} hat sein eigenes Limit bei {{plan}} erreicht. Die anderen Modelle des Abos funktionieren weiter: Wechsle das Modell von {{agent}} oder warte, bis es sich {{when}} zurücksetzt.",
+      "plan_model_limit_wait_unknown": "{{model}} hat sein eigenes Limit bei {{plan}} erreicht. Die anderen Modelle des Abos funktionieren weiter: Wechsle das Modell von {{agent}} oder warte, bis es sich zurücksetzt.",
+      "plan_model_region_wait": "Dieses Modell ({{model}}) braucht die Global-Region in OpenCode (Settings › Privacy).",
       "budget_wait": "Mein Monatsbudget ist aufgebraucht. Ich mache {{when}} weiter, oder früher, wenn ein Admin es erhöht.",
       "usage_wait_canceled": "Abgebrochen. Es läuft nicht, wenn das Limit zurückgesetzt ist.",
       "usage_wait_archived": "Es läuft nicht: Der Agent wurde archiviert.",
@@ -12767,14 +12874,20 @@
       "work_end_canceled": "Nach {{minutes}} Min. gestoppt.",
       "work_end_canceledBy": "Von {{name}} nach {{minutes}} Min. gestoppt.",
       "no_ai": "Ich kann noch nicht antworten: Ich habe keine KI verbunden.",
-      "person_limit": "Die anfragende Person hat ihr Nutzungslimit für diesen Monat erreicht. Um jetzt weiterzumachen, frag einen Admin.",
+      "person_limit": "Die anfragende Person hat ihr Nutzungslimit für diesen Monat erreicht.",
       "no_ai_signed_out": "Ich kann noch nicht antworten: Meine KI ist abgemeldet.",
       "no_ai_not_signed_in": "Ich kann noch nicht antworten: {{brain}} ist auf meinem Computer nicht angemeldet.",
       "no_ai_computer_away": "Ich kann gerade nicht antworten: Der Computer, auf dem mein Abo angemeldet ist, ist nicht erreichbar.",
+      "no_ai_computer_failed": "Ich kann gerade nicht antworten: Der Computer meines Abos hatte ein Problem.",
       "no_ai_plan_limit": "Ich kann gerade nicht antworten: Das Abo, mit dem ich denke, hat sein Limit erreicht.",
-      "no_ai_plan_not_shared": "Über dieses Abo kann ich dir nicht antworten: Es antwortet nur der Person, der es gehört.",
+      "no_ai_plan_not_shared": "Über das Abo des Workspace kann ich dir nicht antworten: Es antwortet nur der Person, der es gehört. Verbinde dein eigenes Abo, dann antworte ich.",
       "no_ai_runner_outdated": "Ich kann gerade nicht antworten: Das Programm auf dem Computer meines Abos braucht ein Update.",
-      "no_ai_plan_tools": "Ich habe vor der Antwort gestoppt: Die KI meines Abos bietet auf diesem Computer eigene Werkzeuge an.",
+      "no_ai_plan_tools": "Ich habe vor der Antwort gestoppt: Die KI meines Abos ist auf diesem Computer nicht bei den Werkzeugen von agentes.chat geblieben.",
+      "no_ai_model_limit": "Ich kann gerade nicht antworten: {{model}} hat sein eigenes Limit in meinem Abo erreicht.",
+      "no_ai_model_region": "Ich kann nicht antworten: {{model}} braucht die Region Global, eingeschaltet in OpenCode (Settings › Privacy).",
+      "no_ai_commands_off": "Ich kann gerade nicht antworten: Auf dem Computer meines Abos sind Befehle ausgeschaltet.",
+      "no_ai_cli_missing": "Ich kann noch nicht antworten: Das Programm meiner KI ist auf meinem Computer nicht installiert.",
+      "no_ai_no_computer": "Ich kann noch nicht antworten: Meine KI braucht einen Computer, und ich habe keinen.",
       "redacted": "[entfernt: sah aus wie eine Anmeldung oder ein Schlüssel]",
       "action_connect_ai": "KI verbinden",
       "action_connect_app": "{{name}} verbinden",

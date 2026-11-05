@@ -24,7 +24,7 @@ import {
 import type { HelperSnapshot, HelperWindow } from "../../runner/desktop-helper";
 import { RunnerError } from "../../runner/errors";
 import { handleRequest, MAX_IN_FLIGHT, NEW_WORK_OPS, OP_ROUTES, RequestRunner } from "../../runner/handlers";
-import { errorCode, removeDirs, tempDir } from "./helpers";
+import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
 const FAKE = path.join(import.meta.dir, "fake-desktop-helper.mjs");
 /** Snapshots a helper took on a real XFCE desktop (1280×800), sanitized: the Applications menu open over Thunar. */
@@ -56,6 +56,7 @@ afterEach(() => {
 interface Logged {
   start?: { env: Record<string, string>; cwd: string; argv: string[] };
   request?: { id: number; op: string; [key: string]: unknown };
+  signal?: string;
 }
 
 /** A desktop manager on a fake desktop and the fake helper, as an agent's worker in system mode. */
@@ -517,6 +518,23 @@ describe("desktop use", () => {
     t.set({ fail: undefined });
     await t.manager.look(AGENT);
     expect(t.starts()).toBe(4);
+  });
+
+  test("a person taking control stops an action's input where it is, and the next one goes", async () => {
+    const t = setup({ state: { typing: true } });
+    await t.manager.look(AGENT);
+    // No request of a helper that isn't in an `input` may stop one: it would stay stopped for the next.
+    t.manager.stopInput(AGENT.id);
+    expect(t.logged().some((e) => e.signal)).toBe(false);
+    const going = failure(() => t.manager.act(AGENT, { kind: "type", text: "oi" }, false, t.where));
+    await waitFor(() => t.requests("input").length === 1);
+    t.manager.stopInput(AGENT.id);
+    const error = await going;
+    expect(error.code).toBe("bad_request");
+    expect(error.message).toContain("A person took control of your desktop");
+    expect(t.requests("input")).toHaveLength(1);
+    t.set({ typing: false });
+    expect(await t.manager.act(AGENT, { kind: "type", text: "oi" }, false, t.where)).toEqual({});
   });
 
   test("a desktop that started again gets a new helper, and refs from the old one are stale", async () => {

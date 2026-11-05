@@ -56,6 +56,9 @@
   "common.unknownError": {
     "value": "Something went wrong. Try again."
   },
+  "common.ourSide": {
+    "value": "Something went wrong on our side. Try again in a little while."
+  },
   "common.signedOut": {
     "value": "Your session ended. Sign in again to continue."
   },
@@ -117,7 +120,7 @@
     "value": "Couldn't load this. Check your connection and try again."
   },
   "common.notAllowed": {
-    "value": "You don't have permission for this. Ask a workspace admin."
+    "value": "You don't have permission for this."
   },
   "common.tooMany": {
     "value": "Too many tries. Try again later."
@@ -538,6 +541,18 @@
   },
   "permissions.create_channels.say": {
     "value": "creates channels"
+  },
+  "permissions.mention_everyone.title": {
+    "value": "Mention everyone"
+  },
+  "permissions.mention_everyone.desc": {
+    "value": "Use @everyone to notify everyone in a channel, people and agents."
+  },
+  "permissions.mention_everyone.short": {
+    "value": "mention everyone"
+  },
+  "permissions.mention_everyone.say": {
+    "value": "mentions everyone"
   },
   "permissions.manage_channels.title": {
     "value": "Arrange channels"
@@ -4468,8 +4483,8 @@
   },
   "receipts.plan": {
     "value": {
-      "one": "{{names}} answers when the plan resets",
-      "other": "{{names}} answer when the plan resets"
+      "one": "{{names}} is waiting on the plan",
+      "other": "{{names}} are waiting on the plan"
     }
   },
   "receipts.budget": {
@@ -4521,7 +4536,7 @@
     "value": "Waiting for the computer"
   },
   "receipts.status.plan": {
-    "value": "Answers when the plan resets"
+    "value": "Waiting on the plan"
   },
   "receipts.status.budget": {
     "value": "Answers when the budget renews"
@@ -4697,12 +4712,6 @@
   "rightHand.settings.changeLook": {
     "value": "Change look"
   },
-  "rightHand.settings.ai": {
-    "value": "AI and model"
-  },
-  "rightHand.settings.aiHelp": {
-    "value": "Automatic picks the cheapest model that does the job."
-  },
   "rightHand.settings.budget": {
     "value": "Monthly budget"
   },
@@ -4724,23 +4733,11 @@
   "rightHand.settings.audit": {
     "value": "See what {{name}} did"
   },
-  "rightHand.settings.onPlan": {
-    "value": "Claude plan · {{account}}"
-  },
   "rightHand.settings.change": {
     "value": "Change"
   },
   "rightHand.settings.planHelp": {
     "value": "The plan's owner pays. When its computer is away, the conversation says so and offers an API key."
-  },
-  "rightHand.settings.plan": {
-    "value": "A plan"
-  },
-  "rightHand.settings.planOffer": {
-    "value": "{{name}} can think with your plan instead of an API key. It runs on the computer where the plan is signed in and reaches only this workspace."
-  },
-  "rightHand.settings.usePlan": {
-    "value": "Use a plan"
   },
   "rightHand.card.settings": {
     "value": "{{name}} · Settings"
@@ -5187,6 +5184,12 @@
     "value": "{{name}} won't reply because he has no AI connected.",
     "female": "{{name}} won't reply because she has no AI connected."
   },
+  "noAi.cliMissing": {
+    "value": "{{name}} won't reply: the AI's program isn't installed on the computer."
+  },
+  "noAi.noComputer": {
+    "value": "{{name}} won't reply: the AI needs a computer and there is none."
+  },
   "noAi.signedOut": {
     "value": "{{name}} won't reply because his AI is signed out.",
     "female": "{{name}} won't reply because her AI is signed out."
@@ -5233,17 +5236,29 @@
   "noAi.rightHand.computer_away": {
     "value": "{{name}} can't answer now: the computer the plan is signed in on is away."
   },
+  "noAi.rightHand.computer_failed": {
+    "value": "{{name}} can't answer now: the computer the plan is signed in on had a problem."
+  },
   "noAi.rightHand.plan_limit": {
     "value": "{{name}} can't answer now: the plan reached its limit."
   },
   "noAi.rightHand.plan_not_shared": {
-    "value": "{{name}} thinks with a plan that answers only its owner."
+    "value": "Connect your own plan to talk to {{name}}: the workspace's plan serves only its owner."
   },
   "noAi.rightHand.runner_outdated": {
     "value": "{{name}} can't answer now: the program on the plan's computer needs an update."
   },
   "noAi.rightHand.plan_tools": {
-    "value": "{{name}} stopped before answering: the plan's AI on that computer offers tools of its own."
+    "value": "{{name}} stopped before answering: the plan's AI on that computer didn't stay within agentes.chat's tools."
+  },
+  "noAi.rightHand.model_limit": {
+    "value": "{{name}} can't answer now: {{model}} reached its own limit on the plan. The plan's other models still work."
+  },
+  "noAi.rightHand.model_region": {
+    "value": "{{name}} can't answer: {{model}} needs the Global region on in OpenCode (Settings › Privacy)."
+  },
+  "noAi.rightHand.commands_off": {
+    "value": "{{name}} can't answer now: commands are turned off on the plan's computer, and whoever looks after it needs to turn them on."
   },
   "noAi.rightHand.useKey": {
     "value": "Use an API key"
@@ -5673,6 +5688,12 @@
   },
   "usageCard.line": {
     "value": "Picks up {{when}}, when the plan resets. Quick replies keep going."
+  },
+  "usageCard.changeModel": {
+    "value": "Change model"
+  },
+  "usageCard.raiseBudget": {
+    "value": "Raise the budget"
   },
   "usageCard.lineUnknown": {
     "value": "Picks up as soon as the plan resets. Quick replies keep going."
@@ -6112,6 +6133,9 @@
   "agentActions.memory.saved": {
     "value": "Saved to <b>memory</b>: {{text}}"
   },
+  "agentActions.memory.saved_rule": {
+    "value": "Saved to <b>my rules</b>: {{text}}"
+  },
   "agentActions.memory.updated": {
     "value": "Updated <b>memory</b>: {{text}}"
   },
@@ -6168,6 +6192,12 @@
   },
   "agentActions.agent.settings_changed": {
     "value": "Changed the settings of <b>{{agentName}}</b>"
+  },
+  "agentActions.pr.merged": {
+    "value": "Merged PR <b>#{{number}}</b> in <b>{{repo}}</b>"
+  },
+  "agentActions.pr.merged_branch": {
+    "value": "Merged <b>{{ref}}</b> in <b>{{repo}}</b>"
   },
   "agentActions.other": {
     "value": "Made a change"
@@ -6910,7 +6940,7 @@
     "value": "In line for the computer"
   },
   "presence.agent.waiting_plan": {
-    "value": "Waiting for the plan to reset"
+    "value": "Waiting on the plan"
   },
   "presence.agent.waiting_budget": {
     "value": "Waiting for the budget to reset"
@@ -6974,6 +7004,9 @@
   },
   "mentions.notInChannel": {
     "value": "not in the channel"
+  },
+  "mentions.everyone": {
+    "value": "Everyone in this conversation, people and agents"
   },
   "mentions.offer": {
     "value": "{{name}} isn't in the channel and won't see the mention."
@@ -8228,6 +8261,21 @@
   },
   "approval.always.open": {
     "value": "Open"
+  },
+  "approval.always.routine": {
+    "value": "Always in this routine"
+  },
+  "approval.always.thisRoutine": {
+    "value": "this routine"
+  },
+  "approval.always.noteRoutine": {
+    "value": "{{routine}} does {{actions}} on its own from now on, with any values. Outside this routine it still asks. To undo: the routine's settings."
+  },
+  "approval.always.doneRoutine": {
+    "value": "Approved. {{routine}} won't ask for this again."
+  },
+  "approval.always.undoRoutine": {
+    "value": "To undo it, go to the routine's settings."
   },
   "approval.email.from": {
     "value": "From"
@@ -10910,6 +10958,21 @@
   "agentPage.memory.saved": {
     "value": "Saved. It counts as verified now."
   },
+  "agentPage.memory.rules": {
+    "value": "Rules people gave"
+  },
+  "agentPage.memory.rulesNote": {
+    "value": "Followed in all its work for whoever gave each one, wherever the work comes from. Rules from its owner or an admin hold for everyone."
+  },
+  "agentPage.memory.ruleBy": {
+    "value": "From {{name}} · {{date}}"
+  },
+  "agentPage.memory.removeRule": {
+    "value": "Remove"
+  },
+  "agentPage.memory.ruleRemoved": {
+    "value": "Rule removed. It's in Archived if you want it back."
+  },
   "agentPage.memory.playbook": {
     "value": "How {{name}} works"
   },
@@ -11079,6 +11142,9 @@
   "agentPage.activity.errors.provider_error": {
     "value": "The model provider returned an error: {{detail}}"
   },
+  "agentPage.activity.errors.provider_account": {
+    "value": "The provider refused the key: it may be invalid, out of credit or over its quota."
+  },
   "agentPage.activity.errors.provider_unavailable": {
     "value": "The model provider didn't answer: {{detail}}"
   },
@@ -11101,7 +11167,7 @@
     "value": "OpenRouter no longer offers {{model}}. Pick another model in the agent's settings."
   },
   "agentPage.activity.errors.no_ai": {
-    "value": "The agent has no AI connected."
+    "value": "The agent had no AI available."
   },
   "agentPage.activity.errors.person_limit": {
     "value": "The person who asked reached their usage limit for this month."
@@ -11126,6 +11192,12 @@
   },
   "agentPage.activity.errors.computer_timeout": {
     "value": "The computer took too long to answer."
+  },
+  "agentPage.activity.errors.account_missing": {
+    "value": "The account chosen for this agent isn't on its computer anymore. Choose another one in the agent's settings, or add it again."
+  },
+  "agentPage.activity.errors.our_error": {
+    "value": "Something went wrong on our side and it stopped. Ask again in a little while."
   },
   "agentPage.activity.errors.unknown": {
     "value": "Failed."
@@ -11363,6 +11435,9 @@
   "memory.kinds.lesson": {
     "value": "Lesson"
   },
+  "memory.kinds.rule": {
+    "value": "Rule"
+  },
   "memory.kindsLower.decision": {
     "value": "decision"
   },
@@ -11374,6 +11449,9 @@
   },
   "memory.kindsLower.lesson": {
     "value": "lesson"
+  },
+  "memory.kindsLower.rule": {
+    "value": "rule"
   },
   "memory.verified": {
     "value": "Verified"
@@ -13165,7 +13243,7 @@
     "value": "Merge pull requests"
   },
   "scopes.github_pr_merge.description": {
-    "value": "Merge a pull request. Always asks for approval."
+    "value": "Merge a pull request. Asks for approval, except in the repositories chosen on the agent's page."
   },
   "scopes.github_issues_read.label": {
     "value": "Read issues"
@@ -14687,6 +14765,9 @@
   "routines.ownActions.none": {
     "value": "In connected apps it asks a person before each action. To let it do its job on its own, tell the agent in the chat which actions it may do."
   },
+  "routines.ownActions.remove": {
+    "value": "Ask again before: {{action}}"
+  },
   "routines.ahead.approved": {
     "value": "Approved · runs {{when}}"
   },
@@ -15040,7 +15121,7 @@
     "value": "Waiting for the computer"
   },
   "routines.outcome.waitingPlan": {
-    "value": "Waiting for the plan to reset"
+    "value": "Waiting on the plan"
   },
   "routines.outcome.waitingBudget": {
     "value": "Waiting for the budget to renew"
@@ -15076,7 +15157,7 @@
     "value": "Skipped: waiting for the agent's computer"
   },
   "routines.code.waiting_plan": {
-    "value": "Skipped: waiting for the plan to reset"
+    "value": "Skipped: waiting on the plan"
   },
   "routines.code.waiting_budget": {
     "value": "Skipped: waiting for the budget to reset"
@@ -15172,7 +15253,7 @@
     "value": "Interrupted by a server restart"
   },
   "routines.code.no_ai": {
-    "value": "The agent has no AI connected"
+    "value": "The agent had no AI available"
   },
   "routines.code.person_limit": {
     "value": "Didn't run: its creator reached their usage limit for this month"
@@ -15191,6 +15272,18 @@
   },
   "routines.code.computer_busy": {
     "value": "The computer stayed busy with other tasks"
+  },
+  "routines.code.computer_failed": {
+    "value": "The computer had a problem and stopped"
+  },
+  "routines.code.computer_timeout": {
+    "value": "The computer took too long to answer"
+  },
+  "routines.code.account_missing": {
+    "value": "The agent's account isn't on its computer anymore"
+  },
+  "routines.code.our_error": {
+    "value": "Something went wrong on our side"
   },
   "routines.openInChat": {
     "value": "Open in the conversation"
@@ -18027,6 +18120,9 @@
   "calendar.filter.routine": {
     "value": "Routines"
   },
+  "calendar.filter.reminder": {
+    "value": "Reminders"
+  },
   "calendar.filter.deadline": {
     "value": "Task due dates"
   },
@@ -18078,6 +18174,9 @@
   "calendar.kind.routine": {
     "value": "Routine"
   },
+  "calendar.kind.reminder": {
+    "value": "Reminder"
+  },
   "calendar.kind.deadline": {
     "value": "Task due date"
   },
@@ -18104,6 +18203,18 @@
   },
   "calendar.deadlineDetail": {
     "value": "The task is due."
+  },
+  "calendar.reminderBy": {
+    "value": "Set by {{name}}"
+  },
+  "calendar.reminderPosted": {
+    "value": "Posted by {{agent}} · {{target}}"
+  },
+  "calendar.cancelReminder": {
+    "value": "Cancel reminder"
+  },
+  "calendar.reminderCancelled": {
+    "value": "Reminder cancelled"
   },
   "calendar.openIssue": {
     "value": "Open task"
@@ -18985,7 +19096,7 @@
     "value": "{{computer}} can't run {{program}} yet. We're on it, and this changes by itself."
   },
   "aiAccounts.connect.needsCloud.toolOff": {
-    "value": "{{program}} isn't allowed on {{computer}}. Ask support to allow it."
+    "value": "{{program}} isn't allowed on {{computer}} yet. That's on our side: try again later."
   },
   "aiAccounts.connect.needsCloud.preparing": {
     "value": "{{computer}} is getting ready. This changes by itself when it's done."
@@ -21436,6 +21547,15 @@
   "brain.modelNeeds.freeTraining": {
     "value": "Free. The provider may use requests to train the model. Turn on the permission in OpenCode."
   },
+  "brain.modelLimit": {
+    "value": "{{model}} hit its own limit on this plan and resets {{when}}. The plan's other models keep working."
+  },
+  "brain.modelLimitUnknown": {
+    "value": "{{model}} hit its own limit on this plan. The plan's other models keep working."
+  },
+  "brain.modelRegion": {
+    "value": "{{model}} needs the Global region turned on in OpenCode (Settings › Privacy). The plan's other models keep working."
+  },
   "brain.modelHow.globalRegion": {
     "value": "Turn on the Global region in OpenCode, under Settings › Privacy. Without it, this model doesn't answer."
   },
@@ -22815,6 +22935,21 @@
   },
   "oauthReturn.failed": {
     "value": "Couldn't connect. Try again in a moment."
+  },
+  "repos.merge.label": {
+    "value": "Can merge without asking"
+  },
+  "repos.merge.none": {
+    "value": "No repositories chosen. Every merge asks for approval."
+  },
+  "repos.merge.help": {
+    "value": "In these repositories a merge runs with no approval card, goes in the audit and leaves a receipt in the conversation. Everything else that's sensitive still asks."
+  },
+  "repos.merge.dialogTitle": {
+    "value": "Where {{name}} merges without asking"
+  },
+  "repos.merge.dialogDesc": {
+    "value": "Only repositories it already uses. A merge anywhere else asks for approval."
   },
   "repos.label": {
     "value": "Which repositories"
@@ -26231,6 +26366,9 @@
   "errors.wiki.titleNoLetters": {
     "value": "A title needs letters or numbers."
   },
+  "errors.wiki.lockAdminsOnly": {
+    "value": "Only admins lock pages."
+  },
   "errors.media.off": {
     "value": "GIFs and stickers are off in this workspace."
   },
@@ -26281,6 +26419,9 @@
   },
   "errors.agentProposal.noRoutine": {
     "value": "This proposal has no routine to create."
+  },
+  "errors.agentProposal.notRequester": {
+    "value": "Only the person who asked for it can send it."
   },
   "errors.approval.alwaysUnavailable": {
     "value": "This request can't be approved for good. Approve just this one."
@@ -26528,6 +26669,15 @@
   "errors.routine.continueExtraUsedUp": {
     "value": "This plan's window is used up and its paid extra usage is used up or unavailable. It picks up after the reset."
   },
+  "errors.routine.actionsNeedApprover": {
+    "value": "Only the agent's owner or someone who approves its actions can let a routine act on its own."
+  },
+  "errors.routine.editorOnly": {
+    "value": "Only who created the routine, the agent's owner or an admin can change it."
+  },
+  "errors.routine.widgetFixed": {
+    "value": "This routine keeps a widget up to date. Change it from its widget."
+  },
   "errors.run.notContinuable": {
     "value": "This answer can't be continued anymore."
   },
@@ -26539,6 +26689,15 @@
   },
   "errors.run.notRestartable": {
     "value": "This answer had already started, so it can't start over. Send your message again."
+  },
+  "errors.run.cancelForbidden": {
+    "value": "Only who asked, the agent's owner or an admin can stop it."
+  },
+  "errors.run.answerForbidden": {
+    "value": "Only who asked, the agent's owner or an admin can do this."
+  },
+  "errors.run.stopReasonForbidden": {
+    "value": "Only who stopped it can say why."
   },
   "errors.artifact.fileTooLarge": {
     "value": "The file is over {{max}} MB, the limit per file."
@@ -26554,6 +26713,12 @@
   },
   "errors.artifact.notFound": {
     "value": "This file no longer exists or you don't have access."
+  },
+  "errors.artifact.deleteForbidden": {
+    "value": "Only who created it, who asked the agent, the agent's owner or an admin can delete this."
+  },
+  "errors.artifact.restoreForbidden": {
+    "value": "Only who could delete it can restore it."
   },
   "errors.machine.forbidden": {
     "value": "Only an admin, or whoever connected the computer, can do that."
@@ -26581,6 +26746,15 @@
   },
   "errors.machine.targetPaused": {
     "value": "That computer is paused. Choose another one."
+  },
+  "errors.machine.offline": {
+    "value": "{{name}} is offline right now. Try again once it's back."
+  },
+  "errors.machine.paused": {
+    "value": "{{name}} is paused: nothing new starts on it until it's resumed."
+  },
+  "errors.machine.timeout": {
+    "value": "The computer didn't answer in time. Try again."
   },
   "errors.github.repoMissing": {
     "value": "The repository {{repo}} is private or doesn't exist on GitHub."
@@ -26635,6 +26809,27 @@
   },
   "errors.agentGroup.tooMany": {
     "value": "This workspace already has {{max}} departments. Delete one first."
+  },
+  "errors.rightHand.permanent": {
+    "value": "The right hand is part of the workspace and stays out of channels. An @mention reaches it in any of them."
+  },
+  "errors.agent.ownerOrAdmin": {
+    "value": "Only the agent's owner or an admin can do this."
+  },
+  "errors.agent.detailsHidden": {
+    "value": "Only who talks to {{agentName}} sees how it works."
+  },
+  "errors.agent.extraOwnerOnly": {
+    "value": "Only the agent's owner turns its plan's paid extra usage on or off."
+  },
+  "errors.agent.undoForbidden": {
+    "value": "Only the person the agent worked for, its owner or an admin can undo this."
+  },
+  "errors.account.notOwner": {
+    "value": "Only the person who connected this account or plan can do this."
+  },
+  "errors.channel.membersForbidden": {
+    "value": "Only the channel's creator or an admin can add or remove people."
   },
   "errors.handle.invalid": {
     "value": "An @ has {{min}} to {{max}} lowercase letters, numbers, - or _."
@@ -28231,6 +28426,9 @@
   "audit.removed": {
     "value": "Removed"
   },
+  "audit.change.mergedWithoutAsking": {
+    "value": "Merged in {{repo}} without asking"
+  },
   "audit.change.pattern": {
     "value": "{{verb}} {{area}}"
   },
@@ -29507,7 +29705,7 @@
     "value": "You've reached your usage limit for this month"
   },
   "peopleUsage.card.text": {
-    "value": "It renews on {{date}}. To keep going now, ask an admin."
+    "value": "It renews on {{date}}. To keep going now, ask for more."
   },
   "peopleUsage.card.ask": {
     "value": "Ask for more"
@@ -30888,6 +31086,18 @@
   "chat.body.brain_unavailable": {
     "value": "{{brain}} can't answer right now. I'll answer when it's back."
   },
+  "chat.body.brain_unavailable_paused": {
+    "value": "The computer {{brain}} runs on is paused. I'll answer once it's resumed."
+  },
+  "chat.body.brain_unavailable_commands_off": {
+    "value": "{{brain}} is turned off on my computer. I'll answer once whoever looks after it turns it on."
+  },
+  "chat.body.brain_unavailable_outdated": {
+    "value": "The program on my computer needs an update before {{brain}} can answer. I'll answer once it's updated."
+  },
+  "chat.body.brain_unavailable_plan_owner": {
+    "value": "{{brain}} would think with a plan that isn't my owner's, so I won't use it. Connect my owner's account on my page."
+  },
   "chat.body.provider_unavailable": {
     "value": "My AI provider isn't answering right now. I'll answer as soon as it's back."
   },
@@ -30911,6 +31121,15 @@
   },
   "chat.body.plan_limit_wait_unknown": {
     "value": "The {{plan}} plan hit its limit. I'll answer as soon as it resets."
+  },
+  "chat.body.plan_model_limit_wait": {
+    "value": "{{model}} hit its own limit on {{plan}}. The plan's other models keep working: change {{agent}}'s model or wait for it to reset {{when}}."
+  },
+  "chat.body.plan_model_limit_wait_unknown": {
+    "value": "{{model}} hit its own limit on {{plan}}. The plan's other models keep working: change {{agent}}'s model or wait for it to reset."
+  },
+  "chat.body.plan_model_region_wait": {
+    "value": "This model ({{model}}) needs the Global region turned on in OpenCode (Settings › Privacy)."
   },
   "chat.body.budget_wait": {
     "value": "My budget for the month ran out. I'll go on {{when}}, or sooner if an admin raises it."
@@ -30967,7 +31186,7 @@
     "value": "I can't answer yet: I have no AI connected."
   },
   "chat.body.person_limit": {
-    "value": "The person who asked reached their usage limit for this month. To keep going now, ask an admin."
+    "value": "The person who asked reached their usage limit for this month."
   },
   "chat.body.no_ai_signed_out": {
     "value": "I can't answer yet: my AI is signed out."
@@ -30978,17 +31197,35 @@
   "chat.body.no_ai_computer_away": {
     "value": "I can't answer now: the computer my plan is signed in on is away."
   },
+  "chat.body.no_ai_computer_failed": {
+    "value": "I can't answer now: the computer my plan is signed in on had a problem."
+  },
   "chat.body.no_ai_plan_limit": {
     "value": "I can't answer now: the plan I think with reached its limit."
   },
   "chat.body.no_ai_plan_not_shared": {
-    "value": "I can't answer you on this plan: it answers only its owner."
+    "value": "I can't answer you on the workspace's plan: it serves only its owner. Connect your own plan and I will."
   },
   "chat.body.no_ai_runner_outdated": {
     "value": "I can't answer now: the program on my plan's computer needs an update."
   },
   "chat.body.no_ai_plan_tools": {
-    "value": "I stopped before answering: my plan's AI on that computer offers tools of its own."
+    "value": "I stopped before answering: my plan's AI on that computer didn't stay within agentes.chat's tools."
+  },
+  "chat.body.no_ai_model_limit": {
+    "value": "I can't answer now: {{model}} reached its own limit on my plan."
+  },
+  "chat.body.no_ai_model_region": {
+    "value": "I can't answer: {{model}} needs the Global region on in OpenCode (Settings › Privacy)."
+  },
+  "chat.body.no_ai_commands_off": {
+    "value": "I can't answer now: commands are turned off on my plan's computer."
+  },
+  "chat.body.no_ai_cli_missing": {
+    "value": "I can't answer yet: my AI's program isn't installed on my computer."
+  },
+  "chat.body.no_ai_no_computer": {
+    "value": "I can't answer yet: my AI needs a computer and I have none."
   },
   "chat.body.redacted": {
     "value": "[removed: it looked like a sign-in or a key]"
@@ -35329,5 +35566,65 @@
   },
   "approvals.review.valuesDone": {
     "value": "What it did"
+  },
+  "rightHand.settings.lookEdit": {
+    "value": "Change {{name}}'s look"
+  },
+  "rightHand.settings.planOwner": {
+    "value": "from {{owner}}"
+  },
+  "rightHand.settings.mine": {
+    "value": "Your AI"
+  },
+  "rightHand.settings.mineHelp": {
+    "value": "Your conversation with {{name}} thinks with your plan or one shared with you, and only yours does."
+  },
+  "rightHand.settings.connectMine": {
+    "value": "Connect my plan"
+  },
+  "rightHand.settings.useWorkspace": {
+    "value": "Use the workspace's"
+  },
+  "rightHand.settings.fallbackKey": {
+    "value": "Without your own plan, it uses the workspace's API key."
+  },
+  "rightHand.settings.fallbackPlan": {
+    "value": "Without your own plan, it uses {{owner}}'s plan, which serves everyone."
+  },
+  "rightHand.settings.fallbackYours": {
+    "value": "Without another plan, it uses the workspace's, which is yours."
+  },
+  "rightHand.settings.fallbackNone": {
+    "value": "Without your own plan, {{name}} can't answer you: the workspace's plan serves only {{owner}}."
+  },
+  "rightHand.settings.workspace": {
+    "value": "Workspace AI"
+  },
+  "rightHand.settings.workspaceHelp": {
+    "value": "People without their own plan talk to {{name}} through this AI."
+  },
+  "rightHand.settings.workspacePlan": {
+    "value": "Workspace plan"
+  },
+  "rightHand.settings.workspacePlanHelp": {
+    "value": "A plan in place of the key. It serves other people only when its owner lets it."
+  },
+  "rightHand.settings.noPlans": {
+    "value": "Connect a plan under Your AI to use it here."
+  },
+  "rightHand.settings.pickPlan": {
+    "value": "Choose a plan"
+  },
+  "rightHand.settings.sharesOn": {
+    "value": "On: people without their own plan talk to {{name}} through this plan."
+  },
+  "rightHand.settings.sharesOff": {
+    "value": "Off: only {{owner}} talks through it. People without their own plan get no answer."
+  },
+  "rightHand.settings.sharesOffYou": {
+    "value": "Off: only you talk through it. People without their own plan get no answer."
+  },
+  "noAi.lockedOwner": {
+    "value": "Only the agent's owner connects a plan for it."
   }
 }

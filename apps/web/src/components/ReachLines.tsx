@@ -116,7 +116,7 @@ function ReachRow({
   return (
     <div className="ag-rc">
       <span className="ag-rc__ic" aria-hidden="true">
-        <Icon name={handed ? "agent" : "info"} size={14} />
+        <Icon name={handed ? "agent" : "info"} size={16} />
       </span>
       <span className="ag-rc__tx">
         <span className="ag-rc__sentence">

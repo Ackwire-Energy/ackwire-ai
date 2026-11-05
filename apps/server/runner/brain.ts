@@ -1354,8 +1354,8 @@ export class BrainManager {
   /** Sessions that answered here (`ranKeyOf`): resumed next time even where Claude Code's folder can't be looked at. */
   private readonly ran = new Set<string>();
   private closed = false;
-  /** The account its agent thinks with, as root last said (`keepAccount`); undefined: not said. */
-  private keep: string | null | undefined;
+  /** The accounts its agent thinks with, as root last said (`keepAccount`); undefined: not said. */
+  private keep: ReadonlySet<string> | undefined;
   private readonly log: (line: string) => void;
 
   constructor(private readonly opts: BrainManagerOptions) {
@@ -1367,14 +1367,14 @@ export class BrainManager {
    * A process on any other account closes, a busy one once its turn ends, so no process of this agent's user
    * keeps a sign-in the agent left or one that was removed.
    */
-  keepAccount(account: string | null) {
-    this.keep = account;
+  keepAccount(account: string | null, also: readonly string[] = []) {
+    this.keep = new Set([...(account ? [account] : []), ...also]);
     for (const l of [...this.live.values()]) if (!l.busy && this.left(l)) this.drop(l);
   }
 
   /** On an account its agent no longer thinks with (the computer's own sign-in is none). */
   private left(l: Live) {
-    return this.keep !== undefined && l.account !== null && l.account !== this.keep;
+    return this.keep !== undefined && l.account !== null && !this.keep.has(l.account);
   }
 
   /** New limits from the config: idle time for processes started from now on, the process cap at once. */

@@ -4,9 +4,12 @@ import path from "node:path";
 import {
   approvalNeeded,
   type GitPush,
+  githubRepo,
   gitPushes,
   type Hold,
   isProxyUrl,
+  loneMerge,
+  type MergeDone,
   pushRemote,
   type RepoFacts,
   simpleCommands,
@@ -134,7 +137,7 @@ const SHELLS = new Set(["bash", "sh", "zsh", "dash", "ksh"]);
 const INTERPRETERS = new Set(["python", "python3", "node", "bun", "deno", "ruby", "perl"]);
 
 /** The script an `<interpreter> <file>` command runs (`run_code`, a skill's script): its text and how it reads. */
-async function scriptOf(command: string, cwd: string): Promise<{ text: string; code: boolean } | null> {
+async function scriptOf(command: string, cwd: string): Promise<{ text: string; code: boolean; cut: boolean } | null> {
   const cmds = simpleCommands(command);
   const [bin = "", file] = cmds?.length === 1 ? (cmds[0]?.argv ?? []) : [];
   const name = path.basename(bin);
@@ -147,7 +150,7 @@ async function scriptOf(command: string, cwd: string): Promise<{ text: string; c
     try {
       const buffer = Buffer.alloc(Math.min(st.size, SCRIPT_MAX_BYTES));
       await handle.read(buffer, 0, buffer.length, 0);
-      return { text: buffer.toString("utf8"), code: !SHELLS.has(name) };
+      return { text: buffer.toString("utf8"), code: !SHELLS.has(name), cut: st.size > SCRIPT_MAX_BYTES };
     } finally {
       await handle.close();
     }
@@ -190,6 +193,38 @@ export async function commandApproval(
     ? await approvalNeeded(script.text, opts.how, { code: script.code, own: opts.own, facts: factsAt })
     : null;
   return inScript?.never ? inScript : (held ?? inScript);
+}
+
+/**
+ * The repository of a folder, when every remote it has is that one (gh may pick any of them, a fork's upstream too)
+ * and nothing tells gh otherwise: `remote.<name>.gh-resolved` names any repository, whatever the remotes say.
+ */
+async function remoteRepo(dir: string): Promise<string | null> {
+  const pinned = await git(dir, ["config", "--get-regexp", "^remote\\..*\\.gh-resolved$"]);
+  if (pinned?.split("\n").some((line) => !line.endsWith(" base"))) return null;
+  const remotes = await git(dir, ["remote", "-v"]);
+  const repos = [...(remotes ?? "").matchAll(/^\S+\t(\S+) \((?:fetch|push)\)$/gm)].map((m) =>
+    githubRepo(m[1] as string),
+  );
+  const [first] = repos;
+  return first && repos.every((r) => r?.toLowerCase() === first.toLowerCase()) ? first : null;
+}
+
+/**
+ * The merge a held command is, when it is nothing but that (`loneMerge`, the script it runs included) and its
+ * repository is one of `repos`, the agent's "merge without asking" list; null: it stays held. A repository nobody
+ * can tell is never in the list.
+ */
+export async function allowedMerge(
+  command: string,
+  opts: { cwd: string; repos: readonly string[] },
+): Promise<MergeDone | null> {
+  const script = await scriptOf(command, opts.cwd);
+  const merge = script?.code || script?.cut ? null : loneMerge(script?.text ?? command);
+  if (!merge) return null;
+  const repo = merge.repo ?? (await remoteRepo(path.resolve(opts.cwd, merge.dir)));
+  if (!repo || !opts.repos.some((r) => r.toLowerCase() === repo.toLowerCase())) return null;
+  return { repo, pr: merge.pr, ref: merge.ref };
 }
 
 /** A push (nothing held) that goes through our git proxy, where the server decides it with a person's grant. */

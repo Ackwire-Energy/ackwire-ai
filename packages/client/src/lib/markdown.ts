@@ -1,3 +1,5 @@
+import { EVERYONE_WORDS } from "@agenteschat/i18n/everyone";
+
 /**
  * The parsing half of a small, safe Markdown renderer for chat messages and
  * artifact documents: headings, paragraphs, lists, quotes, rules, GFM tables,
@@ -228,8 +230,16 @@ export function parseMarkdown(source: string, options: ParseOptions & { ranges?:
 export const INLINE =
   /(`[^`]+`)|(\*\*[^*]+?\*\*|__[^_]+?__)|((?<![\w*])\*[^*\s][^*]*?\*(?![\w*])|(?<![\w_])_[^_\s][^_]*?_(?![\w_]))|(\[[^\]]+\]\([^)\s]+\))|(https?:\/\/[^\s<>()]*[^\s<>().,;:!?'"])|(\[\[[^[\]\n]+\]\])|(~~[^~\s](?:[^~]*?[^~\s])?~~)/;
 export const SAFE_URL = /^(https?:|mailto:)/i;
-/** Same rule as the backend (`parseMentionHandles`): emails are not mentions. */
-export const MENTION = /(^|[^\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31})(?![\w@-])/g;
+/** The words for everyone outside the handles' letters (`@全員`, `@все`); the others are handles to `MENTION` already. */
+const OTHER_SCRIPT_EVERYONE = EVERYONE_WORDS.filter((w) => !/^[a-z0-9_-]+$/.test(w));
+/**
+ * Same rule as the backend (`parseMentionHandles`): emails are not mentions. Also the mention of everyone in any
+ * script (`@全員`), as the backend reads it (`mentionsEveryone`).
+ */
+export const MENTION = new RegExp(
+  `(^|[^\\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31}(?![\\w@-])|(?:${OTHER_SCRIPT_EVERYONE.join("|")})(?![\\p{L}\\p{N}_@-]))`,
+  "giu",
+);
 
 /** The first of `agents` a text @mentions, ignoring case as the backend does; undefined when it names none of them. */
 export function firstMentioned<A extends { handle: string }>(text: string, agents: readonly A[]): A | undefined {
@@ -256,6 +266,12 @@ export function parseWikiToken(token: string) {
   const label = (bar >= 0 ? inner.slice(bar + 1) : inner).trim() || title;
   return { title, label };
 }
+
+/**
+ * Whether a `[[link]]` to no page reads as a page's name. A sentence in brackets (ends like one, or runs long) is an
+ * agent's styling, so it shows as plain text instead of an offer to create a page of that name.
+ */
+export const readsAsPageTitle = (title: string) => title.length <= 80 && !/[.!?…:;]$/.test(title.trim());
 
 /** Every `[[link]]` title in a text, in order, without repeats. */
 export function wikiLinksIn(text: string): string[] {

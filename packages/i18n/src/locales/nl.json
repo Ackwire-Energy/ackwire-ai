@@ -21,6 +21,7 @@
     "refreshing": "Vernieuwen",
     "retry": "Opnieuw proberen",
     "unknownError": "Er ging iets mis. Probeer het opnieuw.",
+    "ourSide": "Er ging iets mis aan onze kant. Probeer het over een poosje opnieuw.",
     "signedOut": "Je sessie is verlopen. Log opnieuw in om verder te gaan.",
     "newVersion": "Er is een nieuwe versie van agentes.chat.",
     "reload": "Herladen",
@@ -41,7 +42,7 @@
     "today": "Vandaag",
     "yesterday": "Gisteren",
     "loadFailed": "Dit kon niet geladen worden. Controleer je verbinding en probeer het opnieuw.",
-    "notAllowed": "Je hebt hier geen toestemming voor. Vraag het aan een beheerder van de werkruimte.",
+    "notAllowed": "Je hebt hier geen toestemming voor.",
     "tooMany": "Te veel pogingen. Probeer het later opnieuw.",
     "offline": "Je bent offline. Controleer je verbinding en probeer het opnieuw.",
     "unreachable": "agentes.chat is nu niet bereikbaar. Probeer het zo opnieuw."
@@ -213,6 +214,12 @@
       "desc": "Open of privé.",
       "short": "kanalen maken",
       "say": "maakt kanalen"
+    },
+    "mention_everyone": {
+      "title": "Iedereen noemen",
+      "desc": "Met @iedereen iedereen in een kanaal een melding sturen, mensen en agents.",
+      "short": "iedereen noemen",
+      "say": "noemt iedereen"
     },
     "manage_channels": {
       "title": "Kanalen ordenen",
@@ -1820,8 +1827,8 @@
     "queued_other": "{{names}} staan in de rij voor de computer",
     "away_one": "{{names}} wacht op de computer",
     "away_other": "{{names}} wachten op de computer",
-    "plan_one": "{{names}} antwoordt als het abonnement opnieuw begint",
-    "plan_other": "{{names}} antwoorden als het abonnement opnieuw begint",
+    "plan_one": "{{names}} wacht op het abonnement",
+    "plan_other": "{{names}} wachten op het abonnement",
     "budget_one": "{{names}} antwoordt als het budget vernieuwt",
     "budget_other": "{{names}} antwoorden als het budget vernieuwt",
     "line_one": "{{names}} begint als ander werk klaar is",
@@ -1839,7 +1846,7 @@
       "outage": "De AI-aanbieder ligt eruit · probeert het zelf opnieuw",
       "queued": "In de rij voor de computer",
       "away": "Wacht op de computer",
-      "plan": "Antwoordt als het abonnement opnieuw begint",
+      "plan": "Wacht op het abonnement",
       "budget": "Antwoordt als het budget vernieuwt",
       "line": "Begint als ander werk klaar is",
       "canceled": "Geannuleerd",
@@ -1918,8 +1925,6 @@
       "name": "Naam en uiterlijk",
       "nameHelp": "In de zijbalk staat er altijd “{{label}}” bij.",
       "changeLook": "Uiterlijk wijzigen",
-      "ai": "AI en model",
-      "aiHelp": "Automatisch kiest het goedkoopste model dat het werk aankan.",
       "budget": "Maandbudget",
       "perMonth": "/maand",
       "budgetHelp": "Bij de limiet stopt hij en laat het weten, zoals elke agent.",
@@ -1927,12 +1932,27 @@
       "audienceHelp": "Wie erbuiten valt, ziet {{name}} niet in de zijbalk.",
       "lock": "{{name}} kan niet gearchiveerd of verwijderd worden. Hij plaatst niets zolang niemand met hem praat.",
       "audit": "Bekijk wat {{name}} deed",
-      "onPlan": "Claude-abonnement · {{account}}",
       "change": "Wijzigen",
       "planHelp": "De eigenaar van het abonnement betaalt. Is de computer ervan niet bereikbaar, dan zegt het gesprek dat en biedt het een API-sleutel aan.",
-      "plan": "Een abonnement",
-      "planOffer": "{{name}} kan met je abonnement denken in plaats van met een API-sleutel, op de computer waar het abonnement is ingelogd, zonder iets buiten deze workspace te bereiken.",
-      "usePlan": "Abonnement gebruiken"
+      "lookEdit": "Uiterlijk van {{name}} wijzigen",
+      "planOwner": "van {{owner}}",
+      "mine": "Jouw AI",
+      "mineHelp": "Jouw gesprek met {{name}} denkt met jouw abonnement of een abonnement dat met je gedeeld is, en alleen dat van jou.",
+      "connectMine": "Mijn abonnement koppelen",
+      "useWorkspace": "Die van de workspace gebruiken",
+      "fallbackKey": "Zonder eigen abonnement gebruikt het de API-sleutel van de workspace.",
+      "fallbackPlan": "Zonder eigen abonnement gebruikt het het abonnement van {{owner}}, dat iedereen antwoordt.",
+      "fallbackYours": "Zonder ander abonnement gebruikt het dat van de workspace, dat van jou is.",
+      "fallbackNone": "Zonder eigen abonnement kan {{name}} je niet antwoorden: het abonnement van de workspace antwoordt alleen {{owner}}.",
+      "workspace": "AI van de workspace",
+      "workspaceHelp": "Wie geen eigen abonnement heeft, praat via deze AI met {{name}}.",
+      "workspacePlan": "Abonnement van de workspace",
+      "workspacePlanHelp": "Een abonnement in plaats van de sleutel. Het antwoordt anderen alleen als de eigenaar dat toestaat.",
+      "noPlans": "Koppel een abonnement onder Jouw AI om het hier te gebruiken.",
+      "pickPlan": "Kies een abonnement",
+      "sharesOn": "Aan: wie geen eigen abonnement heeft, praat via dit abonnement met {{name}}.",
+      "sharesOff": "Uit: alleen {{owner}} praat erdoor. Wie geen eigen abonnement heeft, krijgt geen antwoord.",
+      "sharesOffYou": "Uit: alleen jij praat erdoor. Wie geen eigen abonnement heeft, krijgt geen antwoord."
     },
     "card": {
       "settings": "{{name}} · Instellingen",
@@ -2129,6 +2149,8 @@
     },
     "agent": "{{name}} antwoordt niet omdat hij geen AI gekoppeld heeft.",
     "agent_female": "{{name}} antwoordt niet omdat zij geen AI gekoppeld heeft.",
+    "cliMissing": "{{name}} antwoordt niet: het programma van de AI is niet op de computer geïnstalleerd.",
+    "noComputer": "{{name}} antwoordt niet: de AI heeft een computer nodig en die is er niet.",
     "signedOut": "{{name}} antwoordt niet omdat zijn AI is uitgelogd.",
     "signedOut_female": "{{name}} antwoordt niet omdat haar AI is uitgelogd.",
     "notSignedIn": {
@@ -2154,12 +2176,17 @@
     "action": "Koppelen",
     "locked": "Wie de AI van {{name}} koppelt: een beheerder, met een API-sleutel, of {{owner}}, met een eigen abonnement.",
     "lockedAdmins": "Alleen een beheerder kan een AI koppelen.",
+    "lockedOwner": "Alleen de eigenaar van de agent koppelt er een abonnement aan.",
     "rightHand": {
       "computer_away": "{{name}} kan nu niet antwoorden: de computer van het abonnement is niet bereikbaar.",
+      "computer_failed": "{{name}} kan nu niet antwoorden: de computer van het abonnement had een probleem.",
       "plan_limit": "{{name}} kan nu niet antwoorden: het abonnement heeft zijn limiet bereikt.",
-      "plan_not_shared": "{{name}} denkt met een abonnement dat alleen de eigenaar antwoordt.",
+      "plan_not_shared": "Koppel je eigen abonnement om met {{name}} te praten: het abonnement van de workspace antwoordt alleen de eigenaar.",
       "runner_outdated": "{{name}} kan nu niet antwoorden: het programma op de computer van het abonnement heeft een update nodig.",
-      "plan_tools": "{{name}} stopte voordat het antwoordde: de AI van het abonnement op die computer biedt eigen tools aan.",
+      "plan_tools": "{{name}} stopte voordat het antwoordde: de AI van het abonnement op die computer bleef niet binnen de tools van agentes.chat.",
+      "model_limit": "{{name}} kan nu niet antwoorden: {{model}} heeft zijn eigen limiet in het abonnement bereikt. De andere modellen van het abonnement werken nog.",
+      "model_region": "{{name}} kan niet antwoorden: {{model}} heeft de regio Global nodig, aangezet in OpenCode (Settings › Privacy).",
+      "commands_off": "{{name}} kan nu niet antwoorden: opdrachten staan uit op de computer van het abonnement, en wie die beheert moet ze aanzetten.",
       "useKey": "API-sleutel gebruiken"
     },
     "receipt": "Niemand antwoordt: geen AI gekoppeld",
@@ -2368,6 +2395,8 @@
       "monthly": "van zijn maand"
     },
     "line": "Gaat {{when}} verder, als het abonnement opnieuw begint. Snelle antwoorden gaan door.",
+    "changeModel": "Model wijzigen",
+    "raiseBudget": "Budget verhogen",
     "lineUnknown": "Gaat verder zodra het abonnement opnieuw begint. Snelle antwoorden gaan door.",
     "lineBudget": "Gaat {{when}} verder, of eerder als het budget omhoog gaat. Snelle antwoorden gaan door.",
     "continue": "Nu doorgaan",
@@ -2550,6 +2579,7 @@
     },
     "memory": {
       "saved": "Opgeslagen in <b>geheugen</b>: {{text}}",
+      "saved_rule": "Opgeslagen in <b>mijn regels</b>: {{text}}",
       "updated": "<b>Geheugen</b> bijgewerkt: {{text}}",
       "forgotten": "Uit <b>geheugen</b> verwijderd: {{text}}"
     },
@@ -2581,6 +2611,10 @@
     },
     "agent": {
       "settings_changed": "Heb de instellingen van <b>{{agentName}}</b> gewijzigd"
+    },
+    "pr": {
+      "merged": "PR <b>#{{number}}</b> in <b>{{repo}}</b> gemerged",
+      "merged_branch": "<b>{{ref}}</b> in <b>{{repo}}</b> gemerged"
     },
     "other": "Iets gewijzigd",
     "copyWebhook": "Webhookadres kopiëren",
@@ -2859,7 +2893,7 @@
       "waiting_answer": "Wacht op een antwoord",
       "waiting_computer": "Wacht op de computer",
       "queued_computer": "In de rij voor de computer",
-      "waiting_plan": "Wacht tot het abonnement opnieuw begint",
+      "waiting_plan": "Wacht op het abonnement",
       "waiting_budget": "Wacht tot het budget opnieuw begint",
       "provider_down": "De AI-aanbieder ligt eruit · probeert het zelf opnieuw",
       "out_of_plan": "Planlimiet bereikt",
@@ -2886,6 +2920,7 @@
     "inChannel": "In dit kanaal",
     "inWorkspace": "In de werkruimte",
     "notInChannel": "niet in het kanaal",
+    "everyone": "Iedereen in dit gesprek, mensen en agents",
     "offer": "{{name}} zit niet in het kanaal en ziet de vermelding niet.",
     "add": "Toevoegen aan kanaal",
     "dismiss": "Niet nu",
@@ -3401,7 +3436,12 @@
       "done": "Goedgekeurd. {{name}} vraagt hier niet meer om.",
       "undoHere": "Ongedaan maken kan bij Tools en toegang, op de pagina van {{name}}.",
       "undoHere_female": "Ongedaan maken kan bij Tools en toegang, op de pagina van {{name}}.",
-      "open": "Openen"
+      "open": "Openen",
+      "routine": "Altijd in deze routine",
+      "thisRoutine": "deze routine",
+      "noteRoutine": "{{routine}} doet {{actions}} vanaf nu zelf, met elke waarde. Buiten deze routine blijft het vragen. Ongedaan maken: de instellingen van de routine.",
+      "doneRoutine": "Goedgekeurd. {{routine}} vraagt dit niet meer.",
+      "undoRoutine": "Ongedaan maken kan bij de instellingen van de routine."
     },
     "email": {
       "from": "Van",
@@ -4534,6 +4574,11 @@
       "cancel": "Annuleren",
       "forgotten": "Vergeten. Het staat in Gearchiveerd als je het terug wilt.",
       "saved": "Opgeslagen. Het telt nu als geverifieerd.",
+      "rules": "Regels van mensen",
+      "rulesNote": "Geldt bij al het werk voor wie de regel gaf, waar het verzoek ook vandaan komt. Regels van de eigenaar of een admin gelden voor iedereen.",
+      "ruleBy": "Van {{name}} · {{date}}",
+      "removeRule": "Verwijderen",
+      "ruleRemoved": "Regel verwijderd. Hij staat in Gearchiveerd als je hem terug wilt.",
       "playbook": "Hoe {{name}} werkt",
       "playbook_female": "Hoe {{name}} werkt",
       "playbookNote": "Werkwijzen die het voor zichzelf bewaart. Ze verschijnen niet in de chat. Wat het van buitenaf oppikte en nooit opnieuw gebruikte, verdwijnt vanzelf en blijft in Gearchiveerd.",
@@ -4596,6 +4641,7 @@
         "model_refused": "Het model weigerde te antwoorden.",
         "agent_archived": "De agent is gearchiveerd.",
         "provider_error": "De modelaanbieder gaf een fout: {{detail}}",
+        "provider_account": "De aanbieder heeft de sleutel geweigerd: die is misschien ongeldig, zonder tegoed of over het quotum.",
         "provider_unavailable": "De modelaanbieder reageerde niet: {{detail}}",
         "canceled": "Iemand heeft de taak gestopt.",
         "interrupted": "Onderbroken door een herstart van de server.",
@@ -4603,7 +4649,7 @@
         "credential_revoked": "De sleutel van deze agent is ingetrokken.",
         "credential_wrong_provider": "Het model is van {{modelProvider}}, maar de sleutel is van {{keyProvider}}.",
         "model_unlisted": "OpenRouter biedt {{model}} niet meer aan. Kies een ander model in de instellingen van de agent.",
-        "no_ai": "De agent heeft geen AI gekoppeld.",
+        "no_ai": "De agent had geen AI beschikbaar.",
         "person_limit": "Wie het vroeg, heeft de gebruikslimiet voor deze maand bereikt.",
         "org_paused": "De agents van de werkruimte zijn gepauzeerd.",
         "org_suspended": "De werkruimte is niet beschikbaar.",
@@ -4612,6 +4658,8 @@
         "computer_busy": "De computer bleef bezig met andere taken.",
         "computer_failed": "De computer liep tegen een probleem aan en stopte.",
         "computer_timeout": "De computer deed er te lang over om te antwoorden.",
+        "account_missing": "Het account dat voor deze agent gekozen is staat niet meer op zijn computer. Kies een ander in de instellingen van de agent of voeg het opnieuw toe.",
+        "our_error": "Er ging iets mis aan onze kant en de taak is gestopt. Vraag het over een poosje opnieuw.",
         "unknown": "Mislukt."
       }
     },
@@ -4732,13 +4780,15 @@
       "decision": "Besluit",
       "fact": "Feit",
       "preference": "Voorkeur",
-      "lesson": "Les"
+      "lesson": "Les",
+      "rule": "Regel"
     },
     "kindsLower": {
       "decision": "besluit",
       "fact": "feit",
       "preference": "voorkeur",
-      "lesson": "les"
+      "lesson": "les",
+      "rule": "regel"
     },
     "verified": "Geverifieerd",
     "unverified": "Niet geverifieerd",
@@ -5500,7 +5550,7 @@
     },
     "github_pr_merge": {
       "label": "Pull requests mergen",
-      "description": "Een pull request mergen. Vraagt altijd om goedkeuring."
+      "description": "Een pull request mergen. Vraagt om goedkeuring, behalve in de repositories die op de pagina van de agent zijn gekozen."
     },
     "github_issues_read": {
       "label": "Issues lezen",
@@ -6151,7 +6201,8 @@
     },
     "ownActions": {
       "hint": "Elke run doet dit in je gekoppelde apps zonder te vragen. Elke andere actie daar vraagt eerst een persoon om goedkeuring, en merge, deploy en rollback vragen dat altijd.",
-      "none": "In gekoppelde apps vraagt ze voor elke actie eerst een persoon om goedkeuring. Wil je dat ze haar werk zelf doet, vertel de agent in de chat welke acties ze mag doen."
+      "none": "In gekoppelde apps vraagt ze voor elke actie eerst een persoon om goedkeuring. Wil je dat ze haar werk zelf doet, vertel de agent in de chat welke acties ze mag doen.",
+      "remove": "Weer vragen vóór: {{action}}"
     },
     "ahead": {
       "approved": "Goedgekeurd · draait {{when}}",
@@ -6316,7 +6367,7 @@
       "waiting": "Wacht tot iemand antwoordt",
       "waitingApproval": "Wacht op jouw goedkeuring",
       "waitingComputer": "Wacht op de computer",
-      "waitingPlan": "Wacht tot het abonnement opnieuw begint",
+      "waitingPlan": "Wacht op het abonnement",
       "waitingBudget": "Wacht tot het budget vernieuwt",
       "reported": "Heeft gemeld wat hij vond",
       "silent": "Niets nieuws, bleef stil",
@@ -6330,7 +6381,7 @@
       "previous_running": "Overgeslagen: de vorige draaide nog",
       "previous_waiting": "Overgeslagen: de vorige wachtte nog op iemand",
       "waiting_computer": "Overgeslagen: wacht op de computer van de agent",
-      "waiting_plan": "Overgeslagen: wacht tot het abonnement opnieuw begint",
+      "waiting_plan": "Overgeslagen: wacht op het abonnement",
       "waiting_budget": "Overgeslagen: wacht tot het budget opnieuw begint",
       "superseded": "Maakte plaats voor de volgende run",
       "stale": "Zijn moment gemist: de computer kwam te laat terug",
@@ -6362,13 +6413,17 @@
       "model_unlisted": "OpenRouter biedt het model niet meer aan",
       "agent_archived": "De agent is gearchiveerd",
       "interrupted": "Onderbroken door een herstart van de server",
-      "no_ai": "De agent heeft geen AI gekoppeld",
+      "no_ai": "De agent had geen AI beschikbaar",
       "person_limit": "Niet uitgevoerd: wie hem maakte, heeft de gebruikslimiet voor deze maand bereikt",
       "org_paused": "Niet gedraaid: de agents van de werkruimte waren gepauzeerd",
       "org_suspended": "Niet gedraaid: de werkruimte was niet beschikbaar",
       "org_deleting": "Niet gedraaid: de werkruimte werd verwijderd",
       "agent_paused": "Niet gedraaid: de agent was gepauzeerd",
-      "computer_busy": "De computer bleef bezig met andere taken"
+      "computer_busy": "De computer bleef bezig met andere taken",
+      "computer_failed": "De computer liep tegen een probleem aan en stopte",
+      "computer_timeout": "De computer deed er te lang over om te antwoorden",
+      "account_missing": "Het account van de agent staat niet meer op zijn computer",
+      "our_error": "Er ging iets mis aan onze kant"
     },
     "openInChat": "Openen in het gesprek",
     "stop": "Stoppen",
@@ -7520,6 +7575,7 @@
       "person": "Mensen",
       "agent": "Agents",
       "routine": "Routines",
+      "reminder": "Herinneringen",
       "deadline": "Deadlines van taken"
     },
     "upcoming": "Binnenkort",
@@ -7539,6 +7595,7 @@
     "kind": {
       "event": "Afspraak",
       "routine": "Routine",
+      "reminder": "Herinnering",
       "deadline": "Deadline van taak"
     },
     "every": {
@@ -7551,6 +7608,10 @@
     "runs_other": "{{count}} runs in deze dagen.",
     "routineDetail": "Routine van {{agent}} · levert aan {{target}}.",
     "deadlineDetail": "De deadline van de taak.",
+    "reminderBy": "Ingesteld door {{name}}",
+    "reminderPosted": "Geplaatst door {{agent}} · {{target}}",
+    "cancelReminder": "Herinnering annuleren",
+    "reminderCancelled": "Herinnering geannuleerd",
     "openIssue": "Taak openen",
     "openRoutines": "Bekijken in Routines",
     "openRoutine": "Routine openen",
@@ -7914,7 +7975,7 @@
         "updating": "{{program}} wordt bijgewerkt op {{computer}}. Dit verandert vanzelf als het klaar is.",
         "runnerOld": "Het agentes.chat-programma op {{computer}} is verouderd en een update is onderweg. Dit verandert vanzelf als het klaar is.",
         "execOff": "{{computer}} kan {{program}} nog niet uitvoeren. We zijn ermee bezig, en dit verandert vanzelf.",
-        "toolOff": "{{program}} is niet toegestaan op {{computer}}. Vraag de support om het toe te staan.",
+        "toolOff": "{{program}} is nog niet toegestaan op {{computer}}. Dat ligt aan ons: probeer het later opnieuw.",
         "preparing": "{{computer}} wordt klaargemaakt. Dit verandert vanzelf als het klaar is."
       }
     },
@@ -8887,6 +8948,9 @@
       "paidTraining": "De aanbieder kan verzoeken gebruiken om het model te trainen. Zet de toestemming aan in OpenCode.",
       "freeTraining": "Gratis. De aanbieder kan verzoeken gebruiken om het model te trainen. Zet de toestemming aan in OpenCode."
     },
+    "modelLimit": "{{model}} heeft zijn eigen limiet in dit abonnement bereikt en wordt {{when}} gereset. De andere modellen van het abonnement blijven werken.",
+    "modelLimitUnknown": "{{model}} heeft zijn eigen limiet in dit abonnement bereikt. De andere modellen van het abonnement blijven werken.",
+    "modelRegion": "{{model}} heeft de regio Global nodig in OpenCode (Settings › Privacy). De andere modellen van het abonnement blijven werken.",
     "modelHow": {
       "globalRegion": "Zet de regio Global aan in OpenCode, bij Settings › Privacy. Zonder die regio antwoordt dit model niet.",
       "paidTraining": "De aanbieder van dit model kan verzoeken gebruiken om het te trainen. Zet in OpenCode, bij Settings › Privacy, de toestemming voor betaalde modellen aan. Zonder die toestemming antwoordt dit model niet.",
@@ -9442,6 +9506,13 @@
     "failed": "Kon niet koppelen. Probeer het zo opnieuw."
   },
   "repos": {
+    "merge": {
+      "label": "Mag mergen zonder te vragen",
+      "none": "Geen repositories gekozen. Elke merge vraagt om goedkeuring.",
+      "help": "In deze repositories loopt een merge zonder goedkeuringskaart, komt in de audit en laat een bewijs achter in het gesprek. Al het andere gevoelige blijft vragen.",
+      "dialogTitle": "Waar {{name}} merget zonder te vragen",
+      "dialogDesc": "Alleen repositories die al gebruikt worden. Een merge ergens anders vraagt om goedkeuring."
+    },
     "label": "Welke repositories",
     "all": "Alle repositories",
     "allLower": "alle repositories",
@@ -10934,7 +11005,8 @@
       "editorsExcludeYou": "Neem jezelf op bij de mensen die bewerken, om deze pagina te houden.",
       "titleTaken": "Er is al een pagina met de naam “{{title}}”.",
       "titleCharacters": "Een titel mag geen [ ] | of # bevatten.",
-      "titleNoLetters": "Een titel heeft letters of cijfers nodig."
+      "titleNoLetters": "Een titel heeft letters of cijfers nodig.",
+      "lockAdminsOnly": "Alleen beheerders vergrendelen pagina's."
     },
     "media": {
       "off": "GIF's en stickers staan uit in deze werkruimte.",
@@ -10959,7 +11031,8 @@
       "decided": "Iemand heeft al over dit voorstel beslist.",
       "expired": "Dit voorstel is verlopen: niemand heeft er binnen een dag over beslist.",
       "routineMade": "De routine van deze agent is al aangemaakt.",
-      "noRoutine": "Dit voorstel heeft geen routine om aan te maken."
+      "noRoutine": "Dit voorstel heeft geen routine om aan te maken.",
+      "notRequester": "Alleen wie erom vroeg, kan het versturen."
     },
     "approval": {
       "alwaysUnavailable": "Dit verzoek kan niet voorgoed goedgekeurd worden. Keur alleen dit verzoek goed."
@@ -11061,20 +11134,28 @@
       "agentNotInChannel": "Voeg de agent eerst toe aan het gesprek.",
       "webhookPaused": "Zet de routine aan om hem te testen.",
       "continueExtraOff": "Het venster van dit abonnement is op en het lange werk van deze agent gebruikt geen betaald extra gebruik. Zet dat aan in de AI-instellingen om nu door te gaan, anders gaat hij verder na de reset.",
-      "continueExtraUsedUp": "Het venster van dit abonnement is op en het betaalde extra gebruik is ook op of niet beschikbaar. Hij gaat verder na de reset."
+      "continueExtraUsedUp": "Het venster van dit abonnement is op en het betaalde extra gebruik is ook op of niet beschikbaar. Hij gaat verder na de reset.",
+      "actionsNeedApprover": "Alleen de eigenaar van de agent of wie zijn acties goedkeurt, kan een routine zelfstandig laten handelen.",
+      "editorOnly": "Alleen wie de routine maakte, de eigenaar van de agent of een beheerder kan hem wijzigen.",
+      "widgetFixed": "Deze routine houdt een widget bij. Wijzig hem via de widget."
     },
     "run": {
       "notContinuable": "Dit antwoord kan niet meer voortgezet worden.",
       "agentBusy": "De agent is al bezig in dit gesprek. Wacht tot hij klaar is om door te gaan.",
       "continueForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan het voortzetten.",
-      "notRestartable": "Dit antwoord was al begonnen, dus het kan niet opnieuw beginnen. Stuur je bericht opnieuw."
+      "notRestartable": "Dit antwoord was al begonnen, dus het kan niet opnieuw beginnen. Stuur je bericht opnieuw.",
+      "cancelForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan het stoppen.",
+      "answerForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan dit doen.",
+      "stopReasonForbidden": "Alleen wie het stopte, kan zeggen waarom."
     },
     "artifact": {
       "fileTooLarge": "Het bestand is groter dan {{max}} MB, de limiet per bestand.",
       "notVersioned": "Een afbeelding, video of opname heeft geen versies. Stuur het als een nieuw bestand.",
       "fileRequired": "Kies een bestand om te uploaden.",
       "fileNameRequired": "Het bestand heeft een naam nodig.",
-      "notFound": "Dit bestand bestaat niet meer of je hebt geen toegang."
+      "notFound": "Dit bestand bestaat niet meer of je hebt geen toegang.",
+      "deleteForbidden": "Alleen wie het maakte, wie het de agent vroeg, de eigenaar van de agent of een beheerder kan dit verwijderen.",
+      "restoreForbidden": "Alleen wie het mocht verwijderen, kan het herstellen."
     },
     "machine": {
       "forbidden": "Alleen een beheerder, of wie de computer heeft gekoppeld, kan dat doen.",
@@ -11085,7 +11166,10 @@
       "targetOffline": "Die computer is offline gegaan. Kies een andere.",
       "targetNotFound": "Die computer bestaat niet meer. Kies een andere.",
       "targetSame": "De agents staan al op die computer.",
-      "targetPaused": "Die computer is gepauzeerd. Kies een andere."
+      "targetPaused": "Die computer is gepauzeerd. Kies een andere.",
+      "offline": "{{name}} is nu offline. Probeer het opnieuw zodra hij terug is.",
+      "paused": "{{name}} is gepauzeerd: er start niets nieuws op tot hij wordt hervat.",
+      "timeout": "De computer antwoordde niet op tijd. Probeer het opnieuw."
     },
     "github": {
       "repoMissing": "De repository {{repo}} is privé of bestaat niet op GitHub.",
@@ -11110,6 +11194,21 @@
     "agentGroup": {
       "notFound": "Deze afdeling bestaat niet meer.",
       "tooMany": "Deze werkruimte heeft al {{max}} afdelingen. Verwijder er eerst een."
+    },
+    "rightHand": {
+      "permanent": "De rechterhand hoort bij de werkruimte en blijft buiten de kanalen. Een @vermelding bereikt hem in elk kanaal."
+    },
+    "agent": {
+      "ownerOrAdmin": "Alleen de eigenaar van de agent of een beheerder kan dit doen.",
+      "detailsHidden": "Alleen wie met {{agentName}} praat, ziet hoe het werkt.",
+      "extraOwnerOnly": "Alleen de eigenaar van de agent zet het betaalde extra gebruik van het abonnement aan of uit.",
+      "undoForbidden": "Alleen de persoon voor wie de agent werkte, zijn eigenaar of een beheerder kan dit ongedaan maken."
+    },
+    "account": {
+      "notOwner": "Alleen wie dit account of abonnement heeft gekoppeld, kan dit doen."
+    },
+    "channel": {
+      "membersForbidden": "Alleen wie het kanaal maakte of een beheerder kan mensen toevoegen of verwijderen."
     },
     "handle": {
       "invalid": "Een @ heeft {{min}} tot {{max}} kleine letters, cijfers, - of _.",
@@ -11761,6 +11860,7 @@
     "system": "Systeem",
     "removed": "Verwijderd",
     "change": {
+      "mergedWithoutAsking": "Gemerged in {{repo}} zonder te vragen",
       "pattern": "{{verb}}: {{area}}",
       "approval": {
         "approved": "Een verzoek goedgekeurd",
@@ -12270,7 +12370,7 @@
     },
     "card": {
       "title": "Je hebt je gebruikslimiet voor deze maand bereikt",
-      "text": "Hij wordt vernieuwd op {{date}}. Om nu door te gaan, vraag het een admin.",
+      "text": "Hij wordt vernieuwd op {{date}}. Om nu door te gaan, vraag om meer.",
       "ask": "Om meer vragen",
       "asked": "Verzoek verstuurd",
       "see": "Mijn gebruik bekijken",
@@ -12810,6 +12910,10 @@
       "machine_task_resume_waits": "{{computer}} is terug: “{{title}}” gaat verder waar het stopte zodra het project klaar is.",
       "machine_offline": "{{computer}} is offline gegaan.",
       "brain_unavailable": "{{brain}} kan nu niet antwoorden. Ik antwoord zodra het terug is.",
+      "brain_unavailable_paused": "De computer waarop {{brain}} draait is gepauzeerd. Ik antwoord zodra die wordt hervat.",
+      "brain_unavailable_commands_off": "{{brain}} staat uit op mijn computer. Ik antwoord zodra wie die beheert het aanzet.",
+      "brain_unavailable_outdated": "Het programma op mijn computer heeft een update nodig voordat {{brain}} kan antwoorden. Ik antwoord zodra het bijgewerkt is.",
+      "brain_unavailable_plan_owner": "{{brain}} zou denken met een abonnement dat niet van mijn eigenaar is, dus ik gebruik het niet. Koppel het account van mijn eigenaar op mijn pagina.",
       "provider_unavailable": "Mijn AI-aanbieder reageert nu niet. Ik antwoord zodra die terug is.",
       "brain_busy": "Mijn computer is nu bezig met andere taken. Ik antwoord zodra hij vrij is.",
       "brain_queued": "Ik sta nog in de rij voor de computer. Ik antwoord zodra hij ruimte heeft.",
@@ -12818,6 +12922,9 @@
       "plan_limit_cut_unknown": "Ik ben gestopt bij de limiet van het {{plan}}-abonnement. Ik ga verder waar ik was zodra de limiet reset.",
       "plan_limit_wait": "Het {{plan}}-abonnement heeft de limiet bereikt. Ik antwoord {{when}}, als de limiet is gereset.",
       "plan_limit_wait_unknown": "Het {{plan}}-abonnement heeft de limiet bereikt. Ik antwoord zodra de limiet reset.",
+      "plan_model_limit_wait": "{{model}} heeft zijn eigen limiet bij {{plan}} bereikt. De andere modellen van het abonnement blijven werken: kies een ander model voor {{agent}} of wacht tot het {{when}} wordt gereset.",
+      "plan_model_limit_wait_unknown": "{{model}} heeft zijn eigen limiet bij {{plan}} bereikt. De andere modellen van het abonnement blijven werken: kies een ander model voor {{agent}} of wacht tot het wordt gereset.",
+      "plan_model_region_wait": "Dit model ({{model}}) heeft de regio Global nodig in OpenCode (Settings › Privacy).",
       "budget_wait": "Mijn budget voor deze maand is op. Ik ga {{when}} verder, of eerder als een beheerder het verhoogt.",
       "usage_wait_canceled": "Geannuleerd. Het draait niet als de limiet opnieuw begint.",
       "usage_wait_archived": "Het draait niet: de agent is gearchiveerd.",
@@ -12836,14 +12943,20 @@
       "work_end_canceled": "Gestopt na {{minutes}} min.",
       "work_end_canceledBy": "Gestopt door {{name}} na {{minutes}} min.",
       "no_ai": "Ik kan nog niet antwoorden: ik heb geen AI gekoppeld.",
-      "person_limit": "Wie het vroeg, heeft de gebruikslimiet voor deze maand bereikt. Om nu door te gaan, vraag het een admin.",
+      "person_limit": "Wie het vroeg, heeft de gebruikslimiet voor deze maand bereikt.",
       "no_ai_signed_out": "Ik kan nog niet antwoorden: mijn AI is uitgelogd.",
       "no_ai_not_signed_in": "Ik kan nog niet antwoorden: {{brain}} is niet ingelogd op mijn computer.",
       "no_ai_computer_away": "Ik kan nu niet antwoorden: de computer van mijn abonnement is niet bereikbaar.",
+      "no_ai_computer_failed": "Ik kan nu niet antwoorden: de computer van mijn abonnement had een probleem.",
       "no_ai_plan_limit": "Ik kan nu niet antwoorden: het abonnement waarmee ik denk heeft zijn limiet bereikt.",
-      "no_ai_plan_not_shared": "Ik kan je via dit abonnement niet antwoorden: het antwoordt alleen de eigenaar.",
+      "no_ai_plan_not_shared": "Ik kan je niet antwoorden via het abonnement van de workspace: het antwoordt alleen de eigenaar. Koppel je eigen abonnement, dan antwoord ik.",
       "no_ai_runner_outdated": "Ik kan nu niet antwoorden: het programma op de computer van mijn abonnement heeft een update nodig.",
-      "no_ai_plan_tools": "Ik stopte voordat ik antwoordde: de AI van mijn abonnement op die computer biedt eigen tools aan.",
+      "no_ai_plan_tools": "Ik stopte voordat ik antwoordde: de AI van mijn abonnement op die computer bleef niet binnen de tools van agentes.chat.",
+      "no_ai_model_limit": "Ik kan nu niet antwoorden: {{model}} heeft zijn eigen limiet in mijn abonnement bereikt.",
+      "no_ai_model_region": "Ik kan niet antwoorden: {{model}} heeft de regio Global nodig, aangezet in OpenCode (Settings › Privacy).",
+      "no_ai_commands_off": "Ik kan nu niet antwoorden: opdrachten staan uit op de computer van mijn abonnement.",
+      "no_ai_cli_missing": "Ik kan nog niet antwoorden: het programma van mijn AI is niet geïnstalleerd op mijn computer.",
+      "no_ai_no_computer": "Ik kan nog niet antwoorden: mijn AI heeft een computer nodig en ik heb er geen.",
       "redacted": "[verwijderd: leek op inloggegevens of een sleutel]",
       "action_connect_ai": "AI koppelen",
       "action_connect_app": "{{name}} koppelen",

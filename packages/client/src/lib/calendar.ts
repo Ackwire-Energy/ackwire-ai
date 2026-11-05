@@ -10,11 +10,11 @@ export const SNAP_MIN = 15;
 
 export type CalendarView = "day" | "week" | "month" | "agenda";
 /** Where an item comes from (its left color). */
-export type ItemSource = "person" | "agent" | "routine" | "deadline";
+export type ItemSource = "person" | "agent" | "routine" | "reminder" | "deadline";
 
 export interface CalItem {
   key: string;
-  kind: "event" | "routine" | "deadline";
+  kind: "event" | "routine" | "reminder" | "deadline";
   source: ItemSource;
   title: string;
   start: Date;
@@ -27,6 +27,10 @@ export interface CalItem {
   seriesId?: string | null;
   occurrenceStart?: string | null;
   routineId?: string;
+  /** A reminder: its id, who set it and whether this person may cancel it. */
+  reminderId?: string;
+  setBy?: string | null;
+  canCancel?: boolean;
   issueId?: string;
   issueNumber?: number;
   people: Actor[];
@@ -112,7 +116,7 @@ export function rangeLabel(locale: string, view: CalendarView, days: Date[], foc
 
 // ── Items ───────────────────────────────────────────────────────────────────
 
-/** Range data → items (events, routine runs, issue due dates). */
+/** Range data → items (events, routine runs, reminders, issue due dates). */
 export function toItems(range: CalendarRange | undefined): CalItem[] {
   if (!range) return [];
   return [
@@ -163,6 +167,25 @@ export function toItems(range: CalendarRange | undefined): CalItem[] {
         routineId: r.routineId,
         people: [{ type: "agent", id: r.agentId }],
         target: r.target,
+      }),
+    ),
+    ...(range.reminders ?? []).map(
+      (r): CalItem => ({
+        key: `reminder-${r.id}`,
+        kind: "reminder",
+        source: "reminder",
+        title: r.message,
+        // A moment too: a minute long, so one at 23:50 stays on its day; `layoutDay` draws it tall enough to read.
+        start: new Date(r.at),
+        end: addMinutes(new Date(r.at), 1),
+        allDay: false,
+        recurring: false,
+        agentId: r.agentId,
+        reminderId: r.id,
+        setBy: r.createdBy,
+        canCancel: r.canCancel,
+        people: [],
+        target: { type: "conversation", channelId: r.channelId, threadId: r.threadId, reminder: true },
       }),
     ),
     ...range.deadlines.map((d): CalItem => {
@@ -283,7 +306,7 @@ export function layoutDay(items: CalItem[], day: Date): Placed[] {
     .filter((it) => !isBarItem(it) && onDay(it, day))
     .map((item) => {
       const s = Math.max(item.start.getTime(), dayStart);
-      const e = Math.min(Math.max(item.end.getTime(), s + 15 * 60_000), dayEnd);
+      const e = Math.min(Math.max(item.end.getTime(), s + (item.kind === "reminder" ? 30 : 15) * 60_000), dayEnd);
       return { item, s, e };
     })
     .sort((a, b) => a.s - b.s || b.e - a.e);

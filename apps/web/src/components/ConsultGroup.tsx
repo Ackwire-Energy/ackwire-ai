@@ -248,12 +248,16 @@ function ConsultInPlace({
     <div className="ac-consult__body ac-consult__body--inline">
       <small>{withAgentFace(t(consultAskedKey(c), { name: from.name }), from.name, askerId)}</small>
       <div className="ac-consult__text ac-consult__text--q">
-        <MessageBody body={withoutRelayLine(c.question)} resolveMention={dir.mentionName} />
+        <MessageBody
+          body={withoutRelayLine(c.question)}
+          resolveMention={dir.mentionName}
+          mentionTone={dir.mentionTone}
+        />
       </div>
       <small>{t("chat.consultation.answerOf", { name: to.name, context: to.context })}</small>
       {state === "answered" ? (
         <div className="ac-consult__text">
-          <MessageBody body={c.answer ?? ""} resolveMention={dir.mentionName} />
+          <MessageBody body={c.answer ?? ""} resolveMention={dir.mentionName} mentionTone={dir.mentionTone} />
         </div>
       ) : (
         <p className="ac-consult__text ac-consult__text--q">{consultLineLabel(t, state, c, to)}</p>

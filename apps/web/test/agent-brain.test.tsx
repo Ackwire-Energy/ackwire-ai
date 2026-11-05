@@ -417,7 +417,7 @@ describe("Quem pensa (its dialog)", () => {
     );
     // Never the command for a computer of the person's own.
     expect(card(dialog, /^Claude/).textContent).toContain(
-      "O Claude Code não está liberado no MacBook. Peça ao suporte para liberar.",
+      "O Claude Code ainda não está liberado no MacBook. Isso é do nosso lado: tente de novo mais tarde.",
     );
   });
 
@@ -1457,6 +1457,26 @@ describe("Quem pensa: a coding plan's models", () => {
     await settle(2);
     return shown;
   };
+
+  test("the agent's model at a limit of its own: said under the plan's meters, which show the account's room", async () => {
+    const at = new Date().toISOString();
+    const until = new Date(Date.now() + 2 * 86_400_000).toISOString();
+    await onPlan(
+      "opencode",
+      { effectiveModel: "deepseek-v4.1-flash" },
+      {
+        usage: {
+          windows: [{ kind: "five_hour", usedPercent: 0 }],
+          source: "probe",
+          at,
+          models: { "deepseek-v4.1-flash": { at, until } },
+        },
+      },
+    );
+    const d = await brainDialog();
+    expect(d.textContent).toContain("O DeepSeek V4.1 Flash chegou ao limite dele neste plano e renova ");
+    expect(d.textContent).toContain("Os outros modelos do plano seguem funcionando.");
+  });
 
   test("every model of the plan in a select, by maker, each with what it's sold as and needs; saved by its id", async () => {
     const { state } = await onPlan("opencode");

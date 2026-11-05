@@ -37,6 +37,18 @@ import { type CrashedPage, countChromeTraffic, type TrafficCounter } from "./bro
 import { BROWSER_WM_CLASS } from "./desktop-look";
 import type { DesktopSessions } from "./desktop-session";
 import { RunnerError } from "./errors";
+import {
+  type Box,
+  HUMAN,
+  holdMs,
+  type PathPoint,
+  type Point,
+  pointerPath,
+  pointInBox,
+  randomSource,
+  startPoint,
+  typingDelays,
+} from "./human-input";
 import { GOOGLE_CHROME_LINUX, SYSTEM_BROWSER_DIR } from "./install-script";
 import { readJson, writeJson } from "./json-file";
 import { agentFolderName, isInside, ownedSafely } from "./paths";
@@ -115,6 +127,8 @@ import {
  * - The site allowlist is ours: `--allowed-domains` refuses persistent
  *   profiles, so navigations are checked before they go and the page after
  *   each action (top-level pages only; sub-resources aren't filtered).
+ * - An agent's clicks and typing reach the page as a person's (`humanly`, `humanAtPoint`, `human-input.ts`): a pointer
+ *   path, a held button, keys one by one. A person's own input (`relayCommands`) goes as they made it.
  * - Live view: the session's local stream (JPEG frames over a WebSocket) is
  *   relayed as `browser.frame` only while the server asked for it, with the
  *   active tab's address and title; a page that isn't repainting gets one
@@ -527,7 +541,8 @@ export const CHROME_ARGS = [
   "--disable-features=SigninPromoOnAvatarPill",
   "--restore-last-session",
 ];
-const HEADLESS_ARGS = ["--headless=new", "--window-size=1280,800"];
+/** `--screen-info`: without it a headless page's `screen` is 800x600, smaller than its own window. */
+const HEADLESS_ARGS = ["--headless=new", "--window-size=1280,800", "--screen-info={1280x800}"];
 /**
  * On the agent's desktop: maximized; X11 even when the runner itself runs in a
  * Wayland session. A headed Chrome shows a bar about the automation flag above
@@ -939,6 +954,148 @@ export interface InputState {
   drag?: { at: number; sent: number };
 }
 
+/** Agent commands the runner does with a pointer path, a held button and typed keys (`humanSteps`). */
+const HUMAN_COMMANDS = new Set(["click", "dblclick", "hover", "fill", "type"]);
+/** What `agent-browser` answers to each when the runner did it itself. */
+const HUMAN_DONE: Record<string, string> = { click: "clicked", hover: "hovered", fill: "filled" };
+/** The answer to a command a person's taking control cut short (`stopInput`). */
+const TOOK_OVER: BrowserAnswer = {
+  success: false,
+  data: null,
+  error:
+    "A person took control of your browser, so this stopped where it was. What it typed so far stays in the field: don't type it again, read the page before going on.",
+};
+/** What one command of a batch costs on its own (measured on a loaded Linux VPS): taken off each pointer step's wait. */
+const BATCH_STEP_MS = 8;
+/**
+ * A dialog opened by a held press stops the release's answer, and `agent-browser` only gives up on it after 30 s (its
+ * own `click` watches for the dialog, `mouse up` doesn't): the batch outlasts that, to hear why.
+ */
+const HELD_PRESS_MS = 33_000;
+const VIEWPORT = "[window.innerWidth, window.innerHeight]";
+
+/** A script's test for what `e` is: a field that takes keys. */
+const TEXT_FIELD = `(e.isContentEditable || e.tagName === "TEXTAREA" || (e.tagName === "INPUT" && /^(text|search|email|url|tel|password|number)$/.test(e.type)))`;
+
+/** A script's test for the control `n` belongs to: a point on another one than the element's middle isn't the element. */
+const OWN_CONTROL = `n && n.closest("a, button, input, select, textarea, summary, [role], [onclick]")`;
+
+/**
+ * A script for the page, run with the pointer at `at`, right before the press: the path takes a moment, and what it
+ * crossed or a scroll still running may have moved things. It throws unless what is there is the element or inside
+ * it, in the top page, on the same control as the element's middle (a card's own delete button isn't the card), and,
+ * for `typing`, a field that takes keys. A press there then lands where the agent meant; anything else (a banner over
+ * it, a date picker) goes the plain way, which reports a covering element itself. Nothing says which element the
+ * agent's ref is, so it is found by its box: an element inside a frame has its box in that frame's coordinates, and
+ * nothing the top page has at that point has that box, so it goes the plain way too.
+ */
+export function hitCheckScript(at: Point, box: Box, typing: boolean): string {
+  const [left, top, right, bottom] = [box.x, box.y, box.x + box.width, box.y + box.height];
+  const [cx, cy] = [box.x + box.width / 2, box.y + box.height / 2];
+  return `(() => { if (window !== top) throw new Error("agentes:frame"); const own = (n) => ${OWN_CONTROL}; const near = (a, b) => Math.abs(a - b) <= 1; const e = document.elementFromPoint(${at.x}, ${at.y}); let n = e; while (n) { const r = n.getBoundingClientRect(); if (near(r.left, ${left}) && near(r.top, ${top}) && near(r.right, ${right}) && near(r.bottom, ${bottom})) break; n = n.parentElement; } if (!n || /^I?FRAME$/.test(e.tagName) || own(e) !== own(document.elementFromPoint(${cx}, ${cy}))) throw new Error("agentes:covered"); ${typing ? `if (!${TEXT_FIELD}) throw new Error("agentes:not_text");` : ""} return true; })()`;
+}
+
+/** Whether the focus is on a field, before keys go out: anywhere else they would be the page's shortcuts. */
+const FOCUSED_FIELD = `(() => { const e = document.activeElement; if (!e || !${TEXT_FIELD}) throw new Error("agentes:not_text"); return true; })()`;
+
+/**
+ * What `fill` does once its field at `at` is clicked: selects what it holds, so the first key replaces it. Clearing
+ * it the way `agent-browser fill` does sends the page an `input` event no key made (`isTrusted` false). Throws when
+ * the focus isn't on that field (a disabled one takes no click): the keys would go to another.
+ */
+export function selectFieldScript(at: Point): string {
+  return `(() => { const e = document.activeElement; const h = document.elementFromPoint(${at.x}, ${at.y}); if (!e || !h || !(e === h || e.contains(h)) || !${TEXT_FIELD}) throw new Error("agentes:not_focused"); if (e.select) e.select(); else getSelection().selectAllChildren(e); return true; })()`;
+}
+
+/** One character as a key press (`fill` puts line breaks and tabs in as text, `type` presses them). */
+function keyCommand(ch: string, fill: boolean): string[] {
+  if (/^[!-~]$/.test(ch)) return ["press", ch];
+  if (ch === " ") return ["press", "Space"];
+  if (!fill && (ch === "\n" || ch === "\r")) return ["press", "Enter"];
+  if (!fill && ch === "\t") return ["press", "Tab"];
+  // Not on a US keyboard: in as text, as `agent-browser type` does.
+  return ["keyboard", "inserttext", ch];
+}
+
+/** `text` key by key with a person's gaps, as `agent-browser` batch commands. */
+function keysFor(text: string, fill: boolean, rng: () => number): string[][] {
+  const delays = typingDelays(text, rng);
+  return [...text].flatMap((ch, i) => [["wait", String(delays[i])], keyCommand(ch, fill)]);
+}
+
+/** A pointer path as `agent-browser` batch commands. */
+const moveCommands = (path: PathPoint[]) =>
+  path.map((p) => [
+    "mouse",
+    "move",
+    String(p.x),
+    String(p.y),
+    "--steps",
+    "1",
+    "--duration",
+    String(Math.max(1, p.ms - BATCH_STEP_MS)),
+  ]);
+
+/** About how long a batch of these commands takes. */
+const batchMs = (commands: string[][]) =>
+  commands.reduce(
+    (ms, c) =>
+      ms + BATCH_STEP_MS + (c[0] === "wait" ? Number(c[1]) : c[0] === "mouse" && c[1] === "move" ? Number(c[7]) : 0),
+    0,
+  );
+
+/**
+ * An agent's `click`, `dblclick`, `hover`, `fill` or `type` as a person does it, as `agent-browser` batch
+ * commands, given the element's box and the viewport (`human-input.ts`): the pointer goes along a path from
+ * `from` to a point inside the box; a click holds the button; `fill` clicks the field, selects what it holds
+ * and types over it key by key, `type` focuses it and types. `check`, when there is one, runs between `moves` and
+ * `act`: when it throws, the command as the agent gave it goes instead. Text too long to type goes in at once.
+ */
+export function humanSteps(
+  command: string,
+  args: string[],
+  box: Box,
+  view: { width: number; height: number },
+  from: Point | undefined,
+  rng: () => number,
+  straight = false,
+): { to: Point; check: string[] | null; moves: string[][]; act: string[][] } {
+  const [selector = "", text = ""] = args;
+  const to = pointInBox(box, rng);
+  const moves = moveCommands(
+    pointerPath(from ?? startPoint(to, view, rng), to, rng, {
+      size: Math.min(box.width, box.height),
+      bounds: view,
+      straight,
+    }),
+  );
+  const press = () => [
+    ["mouse", "down"],
+    ["wait", String(holdMs(rng))],
+    ["mouse", "up"],
+  ];
+  const typed = (command === "fill" || command === "type") && [...text].length <= HUMAN.typeMaxChars;
+  const check = ["eval", hitCheckScript(to, box, typed)];
+  if (command === "click") return { to, check, moves, act: press() };
+  if (command === "hover") return { to, check, moves, act: [] };
+  if (!typed) return { to, check: null, moves, act: [[command, ...args]] };
+  const keys = keysFor(text, command === "fill", rng);
+  const erase = text ? [] : [["press", "Backspace"]];
+  const act =
+    command === "fill"
+      ? [...press(), ["eval", selectFieldScript(to)], ...keys, ...erase]
+      : [["focus", selector], ...keys];
+  return { to, check, moves, act };
+}
+
+/** A batch's answers, one per command it ran. */
+function batchResults(out: BrowserAnswer): unknown[] | null {
+  if (Array.isArray(out.data)) return out.data;
+  return isRecord(out.data) && Array.isArray(out.data.results) ? out.data.results : null;
+}
+
+const failedStep = (r: unknown) => !isRecord(r) || r.success !== true;
+
 /** The longest gap a drag keeps between two of its events: a pause longer than this plays shorter. */
 export const DRAG_GAP_MAX_MS = 100;
 /** The furthest a drag's gaps may put an event behind the time its batch reached the computer. */
@@ -1155,6 +1312,10 @@ interface Stream {
 }
 
 /** What a frame says about the page besides its size: the active tab's address and title. */
+/** The pointer is where the agent's `hover` left it. */
+// ponytail: that stands for "a menu it opened is open"; asking the page (`:hover` up from the target) would tell for sure.
+const stayed = (s: Session) => !!s.hovered && s.hovered === s.pointer;
+
 const pageMeta = (stream: Stream) => ({
   ...(stream.url ? { url: stream.url } : {}),
   ...(stream.title ? { title: stream.title } : {}),
@@ -1191,6 +1352,14 @@ interface Session {
   /** When the agent's last command ran (not a person's input or a viewer). */
   actedAt?: number;
   link?: string;
+  /** Where the agent's pointer was left on the page (`humanly`). */
+  pointer?: Point;
+  /** Where its `hover` left it. While that is still `pointer` (the same object), a menu it opened is taken to be open. */
+  hovered?: Point;
+  /** Ends the agent's command under way when a person takes control (`stopInput`). */
+  acting?: AbortController;
+  /** When its `mouse down` went, while no `mouse up` followed. */
+  pressedAt?: number;
   /** When its desktop last failed to start for it (`desktopFor`). */
   desktopFailedAt?: number;
   /** How its page died since the agent last heard (`pageCrashed`), for its next action's answer. */
@@ -1872,7 +2041,27 @@ export class BrowserManager {
         if (left) return { success: false, data: null, error: left };
       }
     }
-    const answer = await this.run(session, [command, ...args], { timeoutMs, signal });
+    const acting = new AbortController();
+    session.acting = acting;
+    const stops = signal ? AbortSignal.any([signal, acting.signal]) : acting.signal;
+    const human =
+      (HUMAN_COMMANDS.has(command) ? await this.humanly(session, command, args, timeoutMs, stops) : null) ??
+      (await this.humanAtPoint(session, command, args, timeoutMs, stops));
+    const taken = acting.signal.aborted && !human?.success;
+    // Cut off during a press, the button would stay down under the person's pointer.
+    if (taken) await this.run(session, ["mouse", "up"], { timeoutMs: QUICK_TIMEOUT_MS });
+    const answer = taken
+      ? TOOK_OVER
+      : (human ??
+        // `--human`: its drag goes along an eased curve from where the pointer is, slower than a script's.
+        (await this.run(
+          session,
+          [command, ...args, ...(command === "drag" && !args.includes("--human") ? ["--human"] : [])],
+          {
+            timeoutMs,
+            signal,
+          },
+        )));
     // Up when it just answered (the next read skips the check); unknown after an error.
     session.aliveAt = answer.success ? this.now() : null;
     this.noteAct(session, command, args, answer, link);
@@ -1882,6 +2071,141 @@ export class BrowserManager {
       if (left) return { success: false, data: null, error: left };
     }
     return answer;
+  }
+
+  /**
+   * A `click`, `dblclick`, `hover`, `fill` or `type` on one element as a person does it (`humanSteps`), in two
+   * batches: the element's box and the viewport, then the pointer path and the press or the keys. Only an element
+   * not all in view is scrolled first, and looked at again: `scrollintoview` centers it even when it is in view, and
+   * the page would jump under every click. Null when it goes the plain way: other arguments (a flag, `--new-tab`), or
+   * an element with no box.
+   */
+  private async humanly(
+    session: Session,
+    command: string,
+    args: string[],
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ): Promise<BrowserAnswer | null> {
+    const selector = args[0];
+    const wants = command === "fill" || command === "type" ? 2 : 1;
+    if (!selector || selector.startsWith("-") || args.length !== wants) return null;
+    const opts = { timeoutMs, ...(signal ? { signal } : {}) };
+    const look = async (first: string[][]) => {
+      const seen = batchResults(
+        await this.run(session, ["batch", "--bail"], {
+          ...opts,
+          stdin: JSON.stringify([...first, ["get", "box", selector], ["eval", VIEWPORT]]),
+        }),
+      );
+      const boxOf = (r: unknown) => (isRecord(r) && isRecord(r.result) ? r.result : null);
+      const { x, y, width, height } = boxOf(seen?.[first.length]) ?? {};
+      const [vw, vh] = (boxOf(seen?.[first.length + 1])?.result ?? []) as unknown[];
+      const sizes = [width, height, vw, vh] as number[];
+      if (typeof x !== "number" || typeof y !== "number" || !sizes.every((n) => n >= 1)) return null;
+      return { box: { x, y, width, height } as Box, view: { width: vw, height: vh } as Box };
+    };
+    let seen = await look([]);
+    if (!seen) return null;
+    const { box, view } = seen;
+    if (box.x < 0 || box.y < 0 || box.x + box.width > view.width || box.y + box.height > view.height) {
+      seen = await look([["scrollintoview", selector]]);
+      if (!seen) return null;
+    }
+    const steps = humanSteps(command, args, seen.box, seen.view, session.pointer, randomSource(), stayed(session));
+    // Typing that wouldn't end well inside the command's time goes in at once.
+    let ran =
+      batchMs([...steps.moves, ...steps.act]) > timeoutMs / 2
+        ? [...steps.moves, [command, ...args]]
+        : [...steps.moves, ...(steps.check ? [steps.check] : []), ...steps.act];
+    session.pointer = steps.to;
+    if (command === "hover") session.hovered = steps.to;
+    let out = await this.run(session, ["batch", "--bail"], {
+      ...opts,
+      timeoutMs: Math.max(timeoutMs, HELD_PRESS_MS),
+      stdin: JSON.stringify(ran),
+    });
+    let results = batchResults(out);
+    // Our own script said no: before the press or once the field was clicked (no field has the focus). The agent's
+    // command goes as given then.
+    const said = results?.find(failedStep);
+    if (isRecord(said) && String(said.error).includes("agentes:")) {
+      ran = [[command, ...args]];
+      out = await this.run(session, ["batch", "--bail"], { ...opts, stdin: JSON.stringify(ran) });
+      results = batchResults(out);
+    }
+    if (!results) return out;
+    const bad = results.find(failedStep);
+    if (!bad) {
+      // The agent's own command ran last: its answer is the answer.
+      const last = results.at(-1);
+      if (ran.at(-1)?.[0] === command && results.length === ran.length && isRecord(last)) {
+        return { success: true, data: last.result ?? null };
+      }
+      const done = HUMAN_DONE[command];
+      return { success: true, data: done ? { [done]: selector } : { typed: args[1] } };
+    }
+    const entry = bad as Record<string, unknown>;
+    const warning = typeof entry.warning === "string" ? entry.warning : "";
+    // A dialog the press opened holds the release until someone answers it, as `agent-browser click` says.
+    if (command === "click" && /dialog is blocking the page/.test(warning)) {
+      return { success: true, data: { clicked: selector, dialogOpened: true, warning } };
+    }
+    const error = typeof entry.error === "string" && entry.error ? entry.error : (out.error ?? `Couldn't ${command}`);
+    return { success: false, data: null, error: (warning ? `${error}. ${warning}` : error).slice(0, 2000) };
+  }
+
+  /**
+   * What an agent does on a point of the page, not an element (it works from what it sees, `clickAt` in the engine's
+   * browser surface): `mouse move` goes along a path, `mouse up` waits out a held press, and `keyboard inserttext`
+   * goes as keys when a field has the focus. Null when it goes the plain way, as what is left of a press does.
+   */
+  private async humanAtPoint(
+    session: Session,
+    command: string,
+    args: string[],
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ): Promise<BrowserAnswer | null> {
+    const opts = { timeoutMs, ...(signal ? { signal } : {}) };
+    const [what, a = "", b = ""] = args;
+    if (command === "mouse" && what === "down") session.pressedAt = this.now();
+    if (command === "mouse" && what === "up" && session.pressedAt !== undefined) {
+      const left = session.pressedAt + holdMs(randomSource()) - this.now();
+      session.pressedAt = undefined;
+      if (left > 0) await new Promise((r) => setTimeout(r, left));
+    }
+    if (command === "mouse" && what === "move" && args.length === 3) {
+      const to = { x: Number(a), y: Number(b) };
+      const seen = await this.run(session, ["eval", VIEWPORT], opts);
+      const [width = 0, height = 0] = (isRecord(seen.data) && seen.data.result) as number[];
+      if (!Number.isFinite(to.x) || !Number.isFinite(to.y) || width < 1 || height < 1) return null;
+      const view = { width, height };
+      const rng = randomSource();
+      const from = session.pointer ?? startPoint(to, view, rng);
+      const path = moveCommands(pointerPath(from, to, rng, { bounds: view, straight: stayed(session) }));
+      session.pointer = to;
+      const out = await this.run(session, ["batch", "--bail"], { ...opts, stdin: JSON.stringify(path) });
+      const results = batchResults(out);
+      return results && !results.some(failedStep) ? { success: true, data: { moved: true, ...to } } : out;
+    }
+    if (command === "keyboard" && what === "inserttext" && args.length === 2 && a) {
+      if ([...a].length > HUMAN.typeMaxChars) return null;
+      const keys = keysFor(a, true, randomSource());
+      if (batchMs(keys) > timeoutMs / 2) return null;
+      const out = await this.run(session, ["batch", "--bail"], {
+        ...opts,
+        stdin: JSON.stringify([["eval", FOCUSED_FIELD], ...keys]),
+      });
+      const results = batchResults(out);
+      if (!results) return out;
+      const bad = results.find(failedStep);
+      if (!bad) return { success: true, data: { inserted: true } };
+      return isRecord(bad) && String(bad.error).includes("agentes:")
+        ? null
+        : { success: false, data: null, error: String(isRecord(bad) ? bad.error : out.error).slice(0, 2000) };
+    }
+    return null;
   }
 
   /** Paths stay in the agent's folder; URLs go only to allowed sites. Returns the args to run. */
@@ -2516,6 +2840,8 @@ export class BrowserManager {
     args: string[],
     opts: { timeoutMs: number; signal?: AbortSignal; stdin?: string; notUse?: boolean },
   ): Promise<BrowserAnswer> {
+    // An abort only reaches a process that is running: one that came first would not stop this.
+    if (opts.signal?.aborted) return { success: false, data: null, error: "Stopped" };
     const command = this.presentCommand() ?? (await this.ensureReady());
     if (!opts.notUse) session.lastUsed = this.now();
     // Never without our Chrome: `agent-browser` would launch its own, with the automation markers.
@@ -2845,11 +3171,7 @@ export class BrowserManager {
       ...(signal ? { signal } : {}),
     });
     // One answer per command it ran (`--bail`: up to the first failure); without them, the invocation's own.
-    const results = Array.isArray(out.data)
-      ? out.data
-      : isRecord(out.data) && Array.isArray(out.data.results)
-        ? out.data.results
-        : null;
+    const results = batchResults(out);
     const done = (r: unknown) => isRecord(r) && r.success === true;
     // Typed once every fill went through. Taking the mark off never decides it: a page may move on the moment its
     // field changes (a sign-in that sends itself), and the mark goes with the page then.
@@ -3037,6 +3359,7 @@ export class BrowserManager {
 
   /** `browser.handoff` from the server: a request waiting, a person in control, or none (null). */
   setHandoff(agentId: string, handoff: BrowserHandoffInfo | null) {
+    if (handoff?.status === "active") this.stopInput(agentId);
     this.heldUntil.delete(agentId);
     if (handoff && (handoff.status === "pending" || handoff.status === "active")) {
       this.handoffs.set(agentId, {
@@ -3047,6 +3370,15 @@ export class BrowserManager {
       });
     } else this.handoffs.delete(agentId);
     this.changed();
+  }
+
+  /**
+   * A person took control: the agent's pointer path or typing under way stops at its next step. `agent-browser` sends
+   * a batch's commands one by one from its own process, so killing that (`acting`) leaves only the one in flight, and
+   * what it typed isn't known: the agent reads the page before it acts again (`requirePageRead`).
+   */
+  stopInput(agentId: string) {
+    this.sessions.get(agentId)?.acting?.abort();
   }
 
   /** A person's turn is open on the agent's browser, or was when the server connection dropped. */
@@ -3138,6 +3470,8 @@ export class BrowserManager {
     const session = this.sessions.get(String(agent.id ?? ""));
     if (!session) throw new RunnerError("browser_closed", "The agent's browser isn't open");
     session.lastUsed = this.now();
+    // Before the wait: opening a stream queues behind the very command this stops.
+    if (mode === "control") session.acting?.abort();
     // One socket per session: a start while another opens waits for it, then only changes the mode.
     while (session.streamOpening) await session.streamOpening.catch(() => undefined);
     if (session.stream) {
@@ -3435,6 +3769,7 @@ export class BrowserManager {
         for (const command of relayCommands(e, stream.input)) {
           if (!(await this.relay(stream.port, command))) ok = false;
         }
+        if (stream.input.pointer) session.pointer = stream.input.pointer;
         if (ok) accepted += 1;
         else failed += 1;
       }

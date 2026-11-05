@@ -22,11 +22,11 @@ import { type RunPosition, runAround } from "@agenteschat/client/lib/chat";
 import { choiceReplyLine } from "@agenteschat/client/lib/choices";
 import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { mentionsReader } from "@agenteschat/client/lib/everyone";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
-import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply, messageMediaOf } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { missionSetupOf } from "@agenteschat/client/lib/missions";
@@ -308,7 +308,7 @@ export const MessageRow = memo(function MessageRow({
   // My own message: a light bubble on the right, no face or name.
   const mine = m.author.type === "person" && Boolean(meId) && m.author.id === meId;
   const myHandle = useMyHandle();
-  const mentionsMe = !mine && !!myHandle && mentionsHandle(body, myHandle);
+  const mentionsMe = !mine && mentionsReader({ body, meta }, myHandle);
 
   // The cards it carries: above an agent's tools, which come last.
   const cards = (
@@ -373,6 +373,7 @@ export const MessageRow = memo(function MessageRow({
           selectable={false}
           accent={accent}
           channelRefs={channelRefsOf(m.meta)}
+          everyone={m.meta?.mentionsEveryone === true}
         />
       </View>
     ) : media ? (
@@ -540,6 +541,7 @@ export const MessageRow = memo(function MessageRow({
                     selectable={false}
                     accent={accent}
                     channelRefs={channelRefsOf(m.meta)}
+                    everyone={m.meta?.mentionsEveryone === true}
                   />
                 ) : null
               }
@@ -553,6 +555,7 @@ export const MessageRow = memo(function MessageRow({
               selectable={false}
               accent={accent}
               channelRefs={channelRefsOf(m.meta)}
+              everyone={m.meta?.mentionsEveryone === true}
             />
           ) : null}
           {talk && !brainWait ? (

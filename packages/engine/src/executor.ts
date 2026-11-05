@@ -26,6 +26,7 @@ import {
   type ToolImage,
   textOf,
 } from "@agenteschat/providers";
+import { ownLimitsModel } from "@agenteschat/providers/plans";
 import { extraUsageLeft, PLAN_NOTICE, PLAN_PAUSE, planBinding } from "@agenteschat/ui/plan-state";
 import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
@@ -57,12 +58,16 @@ import { ModelBrain } from "./brains/model";
 import type { ComputerTurn } from "./brains/prompt";
 import {
   type BrainPlan,
+  type BrainUnavailability,
   bindingReset,
+  forgetModelLimit,
   forgetPlanLimit,
   mayFallBack,
   NO_AI_CODES,
+  noteModelLimit,
   notePlanLimit,
   recordRunBrain,
+  refusalScope,
   resolveBrain,
   storedPlanUsage,
   UNAVAILABLE_CODES,
@@ -129,6 +134,7 @@ import {
 } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { afterTurnDone, learnTags, reportLearnFailure } from "./context/learn";
+import { rulesForRun } from "./context/rules";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { EXPAND_TOOL, itemLabel, retrieveForRun } from "./context/tools";
 import { compactToolResults, cutOldToolSteps, cutResultIds, dropOldImages, fitContextWindow } from "./context-budget";
@@ -168,7 +174,7 @@ import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { type Judge, judgeCallOf } from "./judge";
 import { answerNoTurn, deliverLive, listenLiveSteering, renderSteered } from "./live-steer";
-import { touchMachineAccount } from "./machine-accounts";
+import { publishAccountsChanged, touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
 import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
 import { MEDIA_TOOLS } from "./media";
@@ -200,7 +206,14 @@ import {
   visibleText,
 } from "./reply-policy";
 import { routineCreatorOf, wikiPersonOf } from "./requester";
-import { isRightHand, RIGHT_HAND_AUTO, rightHandNoAiReason, scrubRightHandReply } from "./right-hand";
+import {
+  isRightHand,
+  RIGHT_HAND_AUTO,
+  rightHandNoAiReason,
+  rightHandPerson,
+  scrubRightHandReply,
+  withPersonalBrain,
+} from "./right-hand";
 import { routineBriefOf } from "./routine-brief";
 import { missStaleRoutineRun, routineRunWaitingForComputer, routineRunWaitingForPlan } from "./routine-firing";
 import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
@@ -230,7 +243,9 @@ import {
   addRunStep,
   isTerminal,
   NO_AI,
+  OUR_ERROR,
   PERSON_LIMIT,
+  PROVIDER_ACCOUNT,
   type RunStatus,
   replyThreadOf,
   runErrorDetail,
@@ -274,6 +289,7 @@ import {
   overrideHolds,
   type PlanReadingRef,
   planName,
+  REPARK_STEADY_MS,
   RESUME_AFTER_MS,
   RESUME_GAP_MS,
   retimeLine,
@@ -538,6 +554,10 @@ export interface Transcript {
     plan?: string;
     /** A plan wait's model (null: the brain's default): a turn through on another model doesn't wake it. */
     model?: string | null;
+    /** A plan wait on the model's own limit or the region it needs (`refusalScope`): a fresh reading of the account doesn't wake it. */
+    scope?: "model" | "region";
+    /** Parked again on its limit right after a wake: no wake for `REPARK_STEADY_MS` after that park, only its timer. */
+    steady?: true;
     /** A plan pause's: where its plan was read. */
     reading?: PlanReadingRef;
     /** Its computer is just gone (within the outage grace): it waits without a word, and no outage shows yet. */
@@ -552,7 +572,7 @@ export interface Transcript {
    * Since when (ms) this run waits on usage, across its re-parks, and how far along the re-checks of an unknown
    * reset it is (`LIMIT_LADDER_MS`); `noticed`: its owner heard that the reset is still unknown. Gone once a turn runs.
    */
-  usageWait?: { since: number; step: number; noticed?: boolean };
+  usageWait?: { since: number; step: number; noticed?: boolean; parkedAt?: number; resetsAt?: string };
   /**
    * The provider failed every attempt with a retryable error (I5): the run is parked on `OUTAGE_PARK`'s ladder
    * (`waitId`: the job that resumes it) since `since` (ms), `n` times so far. Cleared by the next model call that
@@ -757,7 +777,8 @@ const userFacing = (error: unknown): string | null => {
   // The message says what to do ("Add an API key…"); the UI shows it translated by its code (`runErrorDetail`).
   if (error instanceof MissingCredentialError) return error.message;
   if (error instanceof ValidationError || error instanceof NotFoundError) return error.message;
-  if (error instanceof ProviderError && !error.retryable) return `provider_error: ${error.message}`;
+  if (error instanceof ProviderError && !error.retryable)
+    return `provider_error: ${ACCOUNT_REFUSALS.has(error.status ?? 0) ? PROVIDER_ACCOUNT : ""}${error.message}`;
   return null;
 };
 
@@ -766,8 +787,7 @@ const retryableOutage = (error: unknown) =>
   (error instanceof ProviderError || error instanceof BrainFailure) && error.retryable;
 
 /** The card's words when the person behind a run is at their monthly limit (`bodyCode` `person_limit`). */
-const PERSON_LIMIT_TEXT =
-  "The person who asked reached their usage limit for this month. To keep going now, ask an admin.";
+const PERSON_LIMIT_TEXT = "The person who asked reached their usage limit for this month.";
 
 /** The note a run parked on a provider outage posts once (`bodyCode` `provider_unavailable`). */
 const PROVIDER_UNAVAILABLE_TEXT = "My AI provider isn't answering right now. I'll answer as soon as it's back.";
@@ -969,6 +989,8 @@ async function executeRunInner(
   /** And the line it waited in (`usageWaitKey`), on which model. */
   let waitedKey: string | undefined;
   let waitedModel: string | null | undefined;
+  /** When its wait's own timer was due: a claim before it was a wake (a turn through, a reading with room). */
+  let waitedUntil: string | undefined;
   const started = await transitionRun(db, runId, "queued", "running");
   if (started) {
     run = started;
@@ -1005,6 +1027,7 @@ async function executeRunInner(
       waitedPlan = stored?.waitingForBrain?.plan;
       waitedKey = stored?.waitingForBrain?.waitKey;
       waitedModel = stored?.waitingForBrain?.model;
+      waitedUntil = stored?.waitingForBrain?.until;
       // This job runs the run from now on, not its wait: handed back at a shutdown or retried, it goes on with the
       // run instead of finding it no longer waiting and doing nothing.
       if (options.wait && options.jobId) {
@@ -1146,6 +1169,7 @@ async function executeRunInner(
       runId: run.id,
       status,
       ...(error === NO_AI ? { reason: NO_AI } : {}),
+      ...(status === "failed" && error !== NO_AI ? runErrorDetail(error) : {}),
       ...(outage ? { outage } : {}),
       ...(computer ? { computer } : {}),
       ...(passed ? { passed } : {}),
@@ -1257,10 +1281,10 @@ async function executeRunInner(
    * Nothing to think with (ADR 0061): the run fails with `no_ai`, and the conversation gets its agent's
    * card with Connect. Background work only fails (its routine says why).
    */
-  const failNoAi = async (why: NoAiReason, own?: AgentAi["own"]) => {
+  const failNoAi = async (why: NoAiReason, own?: AgentAi["own"], model?: string) => {
     if (!run.background) {
       const cardDeps = { db, pubsub: deps.pubsub, gateway: deps.gateway, machines: deps.machines };
-      await postNoAiCard({ ...cardDeps, judge: deps.context?.judge }, run, why, own)
+      await postNoAiCard({ ...cardDeps, judge: deps.context?.judge }, run, why, own, model)
         .catch((error) => addRunStep(db, run, "error", { reason: "no_ai_card", message: String(error) }))
         .catch(() => {});
     }
@@ -1369,7 +1393,12 @@ async function executeRunInner(
   const needsContext = !run.transcript;
   /** What the run's policy refused of the tools the agent's scopes grant: who is behind it held them back. */
   const heldBack: string[] = [];
-  const agent = await getAgentCached(db, run.orgId, run.agentId);
+  const stored = await getAgentCached(db, run.orgId, run.agentId);
+  // The right hand thinks with the AI of the person whose DM this is, when they chose their own (ADR 0137 §11).
+  const agent =
+    stored && isRightHand(stored)
+      ? (await withPersonalBrain(db, stored, await rightHandPerson(db, stored, run))).agent
+      : stored;
   // Claude Code defers our tools itself (its ToolSearch): a new run lists every tool the agent has, the same in every
   // run, instead of the groups a judge picks, so its cached prefix holds across runs and sessions (ADR 0043).
   if (needsContext && deps.toolsOnDemand && agent && brainOf(agent.brain) === "claude_code") {
@@ -1809,7 +1838,7 @@ async function executeRunInner(
     const [workApplies, choicesApply] = every
       ? await Promise.all([workMayStart(ctx), someoneAnswers(ctx)])
       : [true, true];
-    const [context, memory, wikiPages] = await Promise.all([
+    const [context, memory, wikiPages, rules] = await Promise.all([
       buildRunContext(db, run, agent, {
         maxMessages: deps.contextMessages,
         toolsAvailable: tools.length > 0,
@@ -1868,6 +1897,7 @@ async function executeRunInner(
             },
           ).catch(() => ({ text: "", pageIds: [] as string[], held: false }))
         : Promise.resolve({ text: "", pageIds: [] as string[], held: false }),
+      rulesForRun(db, run, agent).catch(() => ({ text: "", itemIds: [] as string[] })),
     ]);
     await judging;
     const issueId = context.issueId;
@@ -1887,6 +1917,12 @@ async function executeRunInner(
           conversation: true,
           text: `# Earlier in this thread (summary)\n${itemLabel(summary)} ${summary.content}`,
         });
+    }
+    // Per turn like memory: who the run acts for picks the rules, so they never move the cached prompt.
+    if (rules.text) {
+      system.push({ turn: true, found: true, text: rules.text });
+      const ids = rules.itemIds;
+      later(() => recordContextUse(db, run.orgId, run.id, ids));
     }
     if (memory.text) {
       // Found for this trigger: per turn (a computer brain reads it in "# This turn").
@@ -2606,7 +2642,7 @@ async function executeRunInner(
    * is asked again every `COMPUTER_BUSY_RETRY_MS` until it runs.
    */
   const brainUnavailable = async (
-    u: { code: string; message: string; resetsAt?: string; queued?: boolean; retryAt?: number },
+    u: BrainUnavailability & { queued?: boolean; retryAt?: number },
     firstLook = false,
   ): Promise<"fallback" | "waited" | "failed" | "no" | "back" | "canceled"> => {
     const from = plan.kind;
@@ -2625,7 +2661,8 @@ async function executeRunInner(
     // The team's right hand on a plan (ADR 0137 §7): one line says why, with the way to an API key; it never stands
     // in on a key nor waits for the computer. Only waiting its turn for room stays a wait.
     if (isRightHand(agent) && u.code !== "busy" && !u.queued) {
-      await failNoAi(rightHandNoAiReason(u.code));
+      const ownModel = u.scope ? ownLimitsModel(plan.account?.provider, plan.model) : null;
+      await failNoAi(rightHandNoAiReason(u.code, ownModel ? u.scope : undefined), undefined, ownModel?.label);
       return "failed";
     }
     // Tools already ran in a turn cut off by its computer: only that computer may finish it (the model
@@ -2664,7 +2701,12 @@ async function executeRunInner(
     }
     // The plan's limit: nothing about the computer, the run waits for the plan in its own session.
     if (u.code === "plan_limit") {
-      await waitForUsage({ code: "plan_limit", message: u.message, ...(u.resetsAt ? { resetsAt: u.resetsAt } : {}) });
+      await waitForUsage({
+        code: "plan_limit",
+        message: u.message,
+        ...(u.resetsAt ? { resetsAt: u.resetsAt } : {}),
+        ...(u.scope ? { scope: u.scope } : {}),
+      });
       return "waited";
     }
     if (!machineId || !UNAVAILABLE_CODES.has(u.code)) return "no";
@@ -3017,6 +3059,37 @@ async function executeRunInner(
   };
 
   /**
+   * The plan refused this turn (`plan_limit`): whose limit it is (`refusalScope`), kept where the next turns look (the
+   * account's in this process's cache, a model's own on its account, which the pages show too).
+   */
+  const refusalOf = async (
+    machineId: string,
+    error: BrainFailure,
+  ): Promise<Pick<BrainUnavailability, "scope" | "resetsAt">> => {
+    const account = plan.account;
+    const ownModel = ownLimitsModel(account?.provider, plan.model);
+    if (!account || !ownModel) return error.resetsAt ? { resetsAt: error.resetsAt } : {};
+    const stored = await storedPlanUsage(db, run.orgId, machineId, plan.kind, account.id).catch(() => null);
+    const found = refusalScope(account.provider, plan.model, error.message, stored);
+    const resetsAt = error.resetsAt ?? (found.scope === "account" ? undefined : found.resetsAt);
+    if (found.scope === "account") {
+      notePlanLimit(machineId, plan.kind, resetsAt, Date.now(), account.id);
+      return resetsAt ? { resetsAt } : {};
+    }
+    const region = found.scope === "region";
+    await noteModelLimit(
+      db,
+      run.orgId,
+      account.id,
+      ownModel.id,
+      region ? { region } : resetsAt ? { until: resetsAt } : {},
+    )
+      .then(() => publishAccountsChanged(deps.pubsub, run.orgId, machineId))
+      .catch(() => {});
+    return { scope: found.scope, ...(!region && resetsAt ? { resetsAt } : {}) };
+  };
+
+  /**
    * The plan's limit (`plan_limit`) or the agent's monthly budget (`budget`) stops the run: it parks in its own
    * session (no computer to wait for) and a job resumes it when the limit resets (the refusal's time, else the
    * stored window's, else the re-checks of `LIMIT_LADDER_MS`), at the next month, or when the budget goes up
@@ -3031,10 +3104,13 @@ async function executeRunInner(
     soon?: boolean;
     /** Long work paused near a limit (ADR 0118): on what, how far along, and the plan's window. */
     pause?: { source: "plan" | "budget"; used: number; window?: string };
+    /** The model's own limit or the region it needs, not the account's (`refusalScope`). */
+    scope?: "model" | "region";
   }) => {
     await deferred;
     const t = transcript as Transcript;
     const now = Date.now();
+    const scope = u.code === "plan_limit" ? u.scope : undefined;
     const budget = u.code === "budget" || u.pause?.source === "budget";
     const paused = u.code === "usage_pause";
     const machineId = plan.session?.machineId ?? agent.machineId ?? "";
@@ -3045,7 +3121,8 @@ async function executeRunInner(
     // Its place in line: by when its conversation first paused, so parking again never moves it back.
     const line = await usageWaitPlace(db, run, key, wait.since, budget ? null : (plan.model ?? ""));
     let at = budget ? (u.soon ? Number.NaN : nextMonthStart(now)) : u.resetsAt ? Date.parse(u.resetsAt) : Number.NaN;
-    if (!budget && !(at > now) && machineId) {
+    // The account's windows say nothing about when a model's own limit resets.
+    if (!budget && !scope && !(at > now) && machineId) {
       const stored = await storedPlanUsage(db, run.orgId, machineId, plan.kind, plan.account?.id).catch(() => null);
       at = bindingReset(stored, now) ?? Number.NaN;
     }
@@ -3065,8 +3142,23 @@ async function executeRunInner(
       at = Math.min(at, brainBack > now ? brainBack : now + ladderDelay(wait.step++));
     }
     const runAt = new Date(at + RESUME_AFTER_MS + RESUME_GAP_MS * line.place);
-    const tellOwner = !budget && !paused && !known && !wait.noticed && now - wait.since >= UNKNOWN_RESET_NOTICE_MS;
+    // The region a model needs has no reset: its note already says what to turn on.
+    const tellOwner =
+      !budget &&
+      !paused &&
+      scope !== "region" &&
+      !known &&
+      !wait.noticed &&
+      now - wait.since >= UNKNOWN_RESET_NOTICE_MS;
     if (tellOwner) wait.noticed = true;
+    // Woken before its own timer and refused again at once: it goes on at its own reset only, and its note already
+    // says it all.
+    const woken = Date.parse(waitedUntil ?? "") > now;
+    const steady = woken && wait.parkedAt !== undefined && now - wait.parkedAt < REPARK_STEADY_MS;
+    const sameNote = steady && wait.resetsAt === resetsAt;
+    wait.parkedAt = now;
+    if (resetsAt) wait.resetsAt = resetsAt;
+    else delete wait.resetsAt;
     t.usageWait = wait;
     const cut = t.interruptedTurn?.cause === "plan_limit";
     const name = planName(plan.kind, plan.account?.provider);
@@ -3090,27 +3182,39 @@ async function executeRunInner(
             joined = join.note;
             return null;
           }
+          const ownModel = scope ? ownLimitsModel(plan.account?.provider, plan.model) : null;
+          const modelWords: Record<string, string> = ownModel ? { model: ownModel.label, agent: agent.name } : {};
           const [code, text] = budget
             ? [
                 "budget_wait",
                 "My budget for the month ran out. I'll go on when it renews, or sooner if an admin raises it.",
               ]
-            : cut
+            : ownModel && scope === "region"
               ? [
-                  known ? "plan_limit_cut" : "plan_limit_cut_unknown",
-                  `I stopped at the ${name} plan's limit. I'll pick up where I left off ${known ? "when" : "as soon as"} it resets.`,
+                  "plan_model_region_wait",
+                  `This model (${ownModel.label}) needs the Global region on in OpenCode (Settings › Privacy).`,
                 ]
-              : [
-                  known ? "plan_limit_wait" : "plan_limit_wait_unknown",
-                  `The ${name} plan hit its limit. I'll answer ${known ? "when" : "as soon as"} it resets.`,
-                ];
+              : ownModel
+                ? [
+                    known ? "plan_model_limit_wait" : "plan_model_limit_wait_unknown",
+                    `${ownModel.label} hit its own limit on ${name}. The plan's other models keep working: change ${agent.name}'s model or wait ${known ? "until it resets" : "for it to reset"}.`,
+                  ]
+                : cut
+                  ? [
+                      known ? "plan_limit_cut" : "plan_limit_cut_unknown",
+                      `I stopped at the ${name} plan's limit. I'll pick up where I left off ${known ? "when" : "as soon as"} it resets.`,
+                    ]
+                  : [
+                      known ? "plan_limit_wait" : "plan_limit_wait_unknown",
+                      `The ${name} plan hit its limit. I'll answer ${known ? "when" : "as soon as"} it resets.`,
+                    ];
           const m = await post(
             tx,
             replyThreadId,
             text,
             // `usageWait.resetsAt`: the apps say when in the reader's zone; `runId`: "Don't run it" cancels it.
             {
-              ...bodyCode(code, { plan: name }),
+              ...bodyCode(code, { plan: name, ...modelWords }),
               usageWait: { code: u.code, runId: run.id, forUserId, ...(resetsAt ? { resetsAt } : {}) },
             },
             undefined,
@@ -3121,7 +3225,8 @@ async function executeRunInner(
         })
       : null;
     // Parked again on the same wait, with no new note: its old one offers "Don't run it" again, with the new reset.
-    if (!note) await usageWaitNoteEnded(deps, run, false, u.pause ? undefined : (resetsAt ?? null)).catch(() => {});
+    if (!note && !sameNote)
+      await usageWaitNoteEnded(deps, run, false, u.pause ? undefined : (resetsAt ?? null)).catch(() => {});
     t.postedUpTo = t.messages.length;
     if (!u.soon) t.brainNotice = u.code;
     delete t.roomWaitSince;
@@ -3143,6 +3248,8 @@ async function executeRunInner(
       since: wait.since,
       ...(resetsAt ? { resetsAt } : {}),
       ...(budget ? {} : { plan: name, model: plan.model ?? null }),
+      ...(scope ? { scope } : {}),
+      ...(steady ? { steady: true as const } : {}),
       ...(u.pause ? { source: u.pause.source } : {}),
       // Continuar agora reads this plan's window again (`pauseContinuesPastPlan`).
       ...(u.pause?.source === "plan"
@@ -3693,7 +3800,12 @@ async function executeRunInner(
             onLimit: (resetsAt) => {
               turnLimited = true;
               const machineId = turnPlan.session?.machineId;
-              if (machineId && turnPlan.kind !== "model") {
+              // A plan whose models have their own limits: whose this one is waits for the refusal's words.
+              if (
+                machineId &&
+                turnPlan.kind !== "model" &&
+                !ownLimitsModel(turnPlan.account?.provider, turnPlan.model)
+              ) {
                 notePlanLimit(machineId, turnPlan.kind, resetsAt, Date.now(), turnPlan.account?.id);
               }
             },
@@ -3731,6 +3843,12 @@ async function executeRunInner(
           const planMachine = turnPlan.session?.machineId;
           if (planMachine && !turnLimited) {
             forgetPlanLimit(planMachine, turnPlan.kind, account?.id);
+            const ownModel = ownLimitsModel(account?.provider, turnPlan.model);
+            if (account && ownModel)
+              later(async () => {
+                if (await forgetModelLimit(db, run.orgId, account.id, ownModel.id))
+                  await publishAccountsChanged(deps.pubsub, run.orgId, planMachine);
+              });
             const key = usageWaitKey({
               code: "plan_limit",
               machineId: planMachine,
@@ -3827,11 +3945,7 @@ async function executeRunInner(
               drops: prev?.drops ?? 0,
               cause: "plan_limit",
             };
-            return waitForUsage({
-              code: "plan_limit",
-              message: error.message,
-              ...(error.resetsAt ? { resetsAt: error.resetsAt } : {}),
-            });
+            return waitForUsage({ code: "plan_limit", message: error.message, ...(await refusalOf(machineId, error)) });
           }
           // The right hand's CLI killed at a tool of its own (ADR 0137 §4): nothing of that turn is posted, only its
           // DM's line (`brainUnavailable`), whatever it did through the bridge before.
@@ -3852,10 +3966,15 @@ async function executeRunInner(
           error instanceof BrainFailure &&
           (error.retryable || UNAVAILABLE_CODES.has(error.code))
         ) {
+          const machineId = turnPlan.session?.machineId;
           const handled = await brainUnavailable({
             code: error.code,
             message: error.message,
-            ...(error.resetsAt ? { resetsAt: error.resetsAt } : {}),
+            ...(error.code === "plan_limit" && machineId
+              ? await refusalOf(machineId, error)
+              : error.resetsAt
+                ? { resetsAt: error.resetsAt }
+                : {}),
           });
           if (handled === "fallback") continue;
           if (handled === "waited" || handled === "failed") return;
@@ -4498,9 +4617,7 @@ async function executeRunInner(
       // The conversation shows this reason to everyone: a driver's message, never SQL text or a bug's raw words.
       const detail = refused ?? codedErrorMessage(error);
       if (!refused) await addRunStep(db, run, "error", { reason: "gave_up", message: String(error) }).catch(() => {});
-      return fail(
-        detail ? `Stopped after an error: ${cutText(detail, 300)}` : "Stopped after an error that kept repeating.",
-      );
+      return fail(detail ? `${OUR_ERROR}: ${cutText(detail, 300)}` : `${OUR_ERROR} that kept repeating.`);
     }
     throw error;
   } finally {

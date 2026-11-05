@@ -72,6 +72,28 @@ describe("Aprovar sempre on a request", () => {
     ).toBe("true");
   });
 
+  test("a routine's card: Sempre nesta rotina, what it covers, where it's undone, and the toast opens the routine", async () => {
+    const state = withComposio();
+    const [first] = state.approvals;
+    if (!first) throw new Error("no approval");
+    const routineId = "rt-1";
+    Object.assign(first, {
+      scope: "gmail:send",
+      origin: { kind: "routine", routineId, routineName: "Resumo da semana" },
+      approveAlways: { tool: `composio_${EXECUTOR}`, actions: ["GMAIL_SEND_EMAIL"], routineId },
+    });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(4);
+    const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    expect(within(card).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
+    expect(card.textContent).toContain("Fora desta rotina continua pedindo. Para desfazer: configurações da rotina.");
+    await click(within(card).getByRole("button", { name: "Sempre nesta rotina" }));
+    expect(approveCalls(state)).toEqual([[ORG_ID, first.id, undefined, true]]);
+    const toast = screen().getByRole("status");
+    expect(toast.textContent).toContain("Aprovado. Resumo da semana não pede mais para isso.");
+    expect(toast.textContent).toContain("Para desfazer, vá nas configurações da rotina.");
+  });
+
   test("a SQL read: Aprovar sempre leituras on the face, for that project's reads only", async () => {
     const state = seedState();
     const first = state.approvals[0];

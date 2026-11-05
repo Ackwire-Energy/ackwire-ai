@@ -96,7 +96,7 @@ export function createAskUserToolSource(deps: ResourcefulDeps = {}): ToolSource 
         .select({ kind: schema.channels.kind, dmKey: schema.channels.dmKey })
         .from(schema.channels)
         .where(and(eq(schema.channels.id, ctx.channelId), eq(schema.channels.orgId, ctx.orgId)));
-      // In an agents' DM only a run answering another agent's question for a person may ask (`consultedFor`).
+      // In an agents' DM only a run answering a question or note for a person it answers may ask (`consultedFor`).
       if (channel && isAgentOnlyDm(channel) && !(await consultedFor(ctx))) {
         return {
           content:

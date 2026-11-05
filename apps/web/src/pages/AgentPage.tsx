@@ -25,6 +25,7 @@ import { type RepoChoice, repoChoiceOf, repoListOf, reposText } from "@agentesch
 import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import {
   Button,
+  Card,
   colorKey,
   cx,
   Dialog,
@@ -47,7 +48,7 @@ import { DeleteAgentDialog } from "@/components/DeleteAgentDialog";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useWidenAsk } from "@/components/ReachLines";
-import { RightHandSettingsSection } from "@/components/RightHandSettings";
+import { RightHandMineRow, RightHandSettingsSection } from "@/components/RightHandSettings";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMatchMedia } from "@/hooks/useMatchMedia";
 import {
@@ -98,7 +99,7 @@ export interface AgentPageProps {
   onNavigate: (tab: AgentTab, section?: AgentSection) => void;
   /** Shown in the panel beside its DM (like a thread's), not as a page: closes the panel. */
   onClose?: () => void;
-  /** The panel's overlay was clicked (a new number each time): close, asking first when something is unsaved. */
+  /** The panel was asked to close (a new number each time): close, asking first when something is unsaved. */
   closeRequest?: number;
 }
 
@@ -142,7 +143,19 @@ export function AgentPage(props: AgentPageProps) {
       </div>
     );
   }
-  if (!seesDetails(agent) || isRightHand(agent)) return <AgentPublicCard agent={agent} />;
+  // Everyone else gives their own DM with it their plan (ADR 0137 §11).
+  if (isRightHand(agent)) {
+    return (
+      <AgentPublicCard agent={agent}>
+        <Card as="section" className="agp-card" aria-label={t("rightHand.settings.mine")}>
+          <div className="settings-rows">
+            <RightHandMineRow agent={agent} />
+          </div>
+        </Card>
+      </AgentPublicCard>
+    );
+  }
+  if (!seesDetails(agent)) return <AgentPublicCard agent={agent} />;
   return <AgentProfile key={agent.id} agent={agent} {...props} />;
 }
 

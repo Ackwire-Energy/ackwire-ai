@@ -97,6 +97,9 @@ export const caches = {
   readOutsideRuns: new TtlCache<true>(3600_000, 20_000),
 };
 
+/** `caches.contextPresence`'s key for whether an agent holds a rule people gave (`rulesForRun`). */
+export const rulesPresenceKey = (orgId: string, agentId: string) => `${orgId}:rules:${agentId}`;
+
 /** Forgets everything about an org (used after broad changes and in tests). */
 export function invalidateOrg(orgId: string) {
   for (const c of Object.values(caches)) c.deletePrefix(`${orgId}:`);

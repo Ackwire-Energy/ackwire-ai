@@ -66,6 +66,7 @@ export const KIND_ICON: Record<MemoryKind, IconName> = {
   fact: "info",
   preference: "preference",
   lesson: "agent",
+  rule: "flag",
 };
 
 /** "usado 9 vezes", "nunca usado", "sem uso há 40 dias" (archived and stale). */

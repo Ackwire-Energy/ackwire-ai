@@ -148,6 +148,7 @@ export function NoticeIsland() {
         ref={root}
         className={cx("ni", open && "ni--open", !open && small && "ni--small", !snap.items.length && "ni--leaving")}
         data-theme="dark"
+        data-esc-layer={open ? "" : undefined}
         onPointerEnter={enter}
         onPointerLeave={exit}
       >

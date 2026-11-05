@@ -466,6 +466,9 @@ export type ChannelEvent =
       status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
       /** `no_ai`: the agent has no AI to think with. */
       reason?: string;
+      /** `failed`: why, for the app to word (`runErrorDetail`). */
+      errorCode?: string;
+      errorParams?: Record<string, string>;
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */

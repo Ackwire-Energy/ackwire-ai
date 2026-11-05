@@ -77,10 +77,57 @@ describe("a failed request in the person's words (errorText)", () => {
     }
   });
 
-  test("a 500 is common.unknownError in both languages, never the server's own line", () => {
+  test("a 500 says it failed on our side in both languages, never the server's own line", () => {
     const error = new ApiError(500, "internal_error", "Something went wrong on our side");
-    expect(errorText(pt, error)).toBe("common.unknownError");
-    expect(errorText(en, error)).toBe("common.unknownError");
+    expect(errorText(pt, error)).toBe("common.ourSide");
+    expect(errorText(en, error)).toBe("common.ourSide");
+  });
+
+  test("a computer that can't take it: offline, paused, too slow or commands off in words; its own refusal as said", () => {
+    expect(errorText(pt, new ApiError(409, "machine.offline", "Mac is offline", { name: "Mac" }))).toBe(
+      "errors.machine.offline",
+    );
+    expect(errorText(pt, new ApiError(409, "machine.paused", "Mac is paused", { name: "Mac" }))).toBe(
+      "errors.machine.paused",
+    );
+    expect(errorText(pt, new ApiError(503, "machine.timeout", "the computer Mac did not answer in time"))).toBe(
+      "errors.machine.timeout",
+    );
+    expect(errorText(pt, new ApiError(503, "machine.exec_disabled", "Commands are off"))).toBe(
+      "errors.mission.execDisabled",
+    );
+    const own = "This folder is outside the folders this agent may use.";
+    expect(errorText(pt, new ApiError(503, "machine.not_allowed", own))).toBe(own);
+  });
+
+  test("a budget or a missing key in the person's words, naming the provider when the server does", () => {
+    expect(errorText(pt, new ApiError(402, "budget_exceeded", "This agent has used its monthly budget"))).toBe(
+      "agentPage.activity.errors.budget_exceeded",
+    );
+    const missing = "Add an API key for OpenAI in the workspace settings";
+    expect(errorText(pt, new ApiError(400, "missing_credential", missing, { provider: "OpenAI" }))).toBe(
+      "agentPage.activity.errors.missing_credential",
+    );
+    expect(errorText(pt, new ApiError(400, "missing_credential", missing))).toBe(missing);
+  });
+
+  test("a 403: a code's own line, else that they can't; never the server's words or an 'ask an admin' guess", () => {
+    const why = "Only the channel's creator or an admin can add members";
+    expect(errorText(pt, new ApiError(403, "channel.members_forbidden", why))).toBe("errors.channel.membersForbidden");
+    expect(errorText(pt, new ApiError(403, "account.not_owner", "Only the account's owner can rename it"))).toBe(
+      "errors.account.notOwner",
+    );
+    expect(errorText(pt, new ApiError(403, "run.cancel_forbidden", "x"))).toBe("errors.run.cancelForbidden");
+    expect(errorText(pt, new ApiError(403, "channel.post_denied", "x"))).toBe("channel.perms.readOnlyComposer");
+    expect(errorText(pt, new ApiError(403, "forbidden", why))).toBe("common.notAllowed");
+    expect(errorText(pt, new ApiError(403, "agent.no_words_yet", "This agent can't be added to a channel"))).toBe(
+      "common.notAllowed",
+    );
+    expect(errorText(pt, new ApiError(403, "bad_origin", "Cross-origin request refused"))).toBe("common.notAllowed");
+  });
+
+  test("a runner's internal failure is for the log: the person reads it's on our side", () => {
+    expect(errorText(pt, new ApiError(503, "machine.internal", "ENOENT: no such file"))).toBe("common.ourSide");
   });
 
   test("a 4xx the app doesn't know: the server's own words, English being every language's fallback", () => {
@@ -89,7 +136,7 @@ describe("a failed request in the person's words (errorText)", () => {
     expect(errorText(pt, error)).toBe("That thing is busy right now.");
     expect(errorText(en, error, "pt-BR")).toBe("That thing is busy right now.");
     // Codes the app knows, 413 and 403 say what they always said.
-    expect(errorText(pt, new ApiError(403, "forbidden", "Nope"))).toBe("common.notAllowed");
+    expect(errorText(pt, new ApiError(403, "forbidden", ""))).toBe("common.notAllowed");
     expect(errorText(pt, new ApiError(429, "rate_limited", "Slow down"))).toBe("common.tooMany");
   });
 
@@ -111,7 +158,7 @@ describe("a failed request in the person's words (errorText)", () => {
     expect(authErrorText(pt, { status: 403, code: "INVALID_ORIGIN", message: "Invalid origin" })).toBe(
       "Invalid origin",
     );
-    expect(authErrorText(en, { status: 500, message: "Internal Server Error" })).toBe("common.unknownError");
+    expect(authErrorText(en, { status: 500, message: "Internal Server Error" })).toBe("common.ourSide");
     expect(authErrorText(pt, { status: 429, message: "Too many" })).toBe("auth.tooManyTries");
   });
 
@@ -159,4 +206,10 @@ test("a provider's sign-in that didn't finish, by Better Auth's code: what the p
   for (const code of ["UNKNOWN", "constructor", "__proto__", ""]) expect(said(code)).toBe("auth.refused.other");
   // The codes the app says itself never read Object's own names either.
   expect(errorText(pt, new ApiError(403, "toString", ""))).toBe("common.notAllowed");
+});
+
+test("the right hand refused a place: its own line, never ask an admin", () => {
+  const t = ((key: string) => key) as unknown as TFunction;
+  const refused = new ApiError(403, "agent.right_hand_permanent", "The team's right hand can't be added to a channel");
+  expect(errorText(t, refused)).toBe("errors.rightHand.permanent");
 });

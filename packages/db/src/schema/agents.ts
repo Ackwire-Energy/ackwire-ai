@@ -7,6 +7,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -15,7 +16,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { machineAccounts, machines } from "./machines";
-import { organizations } from "./tenancy";
+import { organizationMembers, organizations } from "./tenancy";
 
 /**
  * API keys of model providers, owned by the organization (BYOK). Never
@@ -157,6 +158,11 @@ export const agents = pgTable(
      * PRs an hour) and which agents it may call. Validated in code (`autonomySettings`); `{}` = the defaults.
      */
     autonomyBrakes: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    /**
+     * "Pode fazer merge sem perguntar": the repositories (`owner/name`) it merges in with no approval card, each merge
+     * audited and with a receipt. Its owner or an admin sets it; every other sensitive kind still asks.
+     */
+    mergeRepos: jsonb().$type<string[]>().notNull().default([]),
     /** Its look in the app (color, eyes, accessory from a fixed allow-list). Null = the default look. */
     appearance: jsonb().$type<{ color: string; eyes: string; accessory: string }>(),
     /**
@@ -371,3 +377,38 @@ export interface AgentSetup {
   /** Its Autonomia (`agents.mission_command_approval`); null: the default. */
   autonomy?: string | null;
 }
+
+/**
+ * Each person's own AI for the team's right hand (ADR 0137 §11): the plan their DM with it thinks with, theirs or one
+ * shared with them. No row: their DM thinks with the workspace's (the right hand's own `agents` row). It goes with the
+ * person's membership and with the account.
+ */
+export const rightHandBrains = pgTable(
+  "right_hand_brains",
+  {
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text().notNull(),
+    /** A computer brain (`claude_code`, `codex`…): an API key is the workspace's, never a person's. */
+    brain: text().notNull(),
+    brainModel: text(),
+    brainAccountId: uuid().notNull(),
+    /** Someone else's plan, given with `use_others_plans`: who gave it (themselves); its owner may take it back. */
+    brainAccountLentBy: text().references(() => users.id, { onDelete: "set null" }),
+    brainEffort: text(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.orgId, t.userId] }),
+    foreignKey({
+      columns: [t.orgId, t.userId],
+      foreignColumns: [organizationMembers.orgId, organizationMembers.userId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.orgId, t.brainAccountId],
+      foreignColumns: [machineAccounts.orgId, machineAccounts.id],
+    }).onDelete("cascade"),
+    index().on(t.orgId, t.brainAccountId),
+  ],
+);

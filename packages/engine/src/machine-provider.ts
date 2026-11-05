@@ -104,6 +104,7 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
           timeoutSeconds: request.timeoutSeconds,
           stream: Boolean(onOutput),
           ...(request.approved ? { approved: true } : {}),
+          ...(request.mergeRepos?.length ? { mergeRepos: request.mergeRepos } : {}),
           // Vault keys for this one command (ADR 0144), sealed to a one-use key of this computer.
           ...(request.vault ? { vault: request.vault } : {}),
         },
@@ -115,6 +116,7 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
         stderr: r.stderr,
         timedOut: r.timedOut,
         ...(r.canceled ? { canceled: r.canceled } : {}),
+        ...(r.merge ? { merge: r.merge } : {}),
       };
     });
   return {

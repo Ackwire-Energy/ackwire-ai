@@ -6,7 +6,12 @@ desktop-helper.test.ts runs them in the test suite.
 import importlib.util
 import json
 import os
+import signal
+import stat
 import sys
+import tempfile
+import threading
+import time
 import unittest
 
 # Loading the helper from its file would leave a __pycache__ next to it, in the runner's sources.
@@ -231,6 +236,224 @@ class Steps(unittest.TestCase):
             h.check_settle({"lateMs": -1})
         with self.assertRaises(h.HelperError):
             h.check_settle({"soonMs": 1})
+
+
+class Human(unittest.TestCase):
+    screen = [1280, 800]
+
+    def test_a_straight_path_neither_curves_nor_overshoots(self):
+        for seed in range(200):
+            p = self.path([100, 400], [1000, 400], seed, straight=True)
+            self.assertTrue(all(x <= 1000 and abs(y - 400) <= 1 for x, y, _ in p))
+            self.assertEqual(p[-1][:2], [1000, 400])
+
+    def path(self, a, b, seed, **kw):
+        return h.pointer_path(a, b, h.random.Random(seed), self.screen, **kw)
+
+    def test_a_path_goes_from_where_the_pointer_is_to_exactly_the_point(self):
+        for seed in range(200):
+            p = self.path([10, 700], [1100, 90], seed)
+            first, last = p[0], p[-1]
+            self.assertLess(abs(first[0] - 10) + abs(first[1] - 700), 60)
+            self.assertEqual(last[:2], [1100, 90])
+            self.assertTrue(all(0 <= x < 1280 and 0 <= y < 800 for x, y, _ in p))
+            total = sum(ms for _, _, ms in p)
+            self.assertTrue(130 <= total <= 600, total)
+            self.assertGreater(len(p), 8)
+
+    def test_it_curves_and_slows_at_both_ends(self):
+        p = self.path([100, 400], [900, 400], 3)
+        self.assertGreater(max(abs(y - 400) for _, y, _ in p), 5)
+        steps = [abs(b[0] - a[0]) for a, b in zip(p, p[1:])]
+        middle = max(steps[len(steps) // 3 : 2 * len(steps) // 3])
+        self.assertGreater(middle, 3 * steps[0])
+
+    def test_long_moves_sometimes_overshoot_and_come_back(self):
+        past = [any(x > 1005 for x, _, _ in self.path([100, 400], [1000, 400], s)) for s in range(200)]
+        self.assertTrue(10 < sum(past) < 120, sum(past))
+        held = [any(x > 1005 for x, _, _ in self.path([100, 400], [1000, 400], s, held=True)) for s in range(200)]
+        self.assertFalse(any(held))
+
+    def test_the_time_grows_with_the_distance_and_a_seed_repeats(self):
+        near = sum(ms for _, _, ms in self.path([500, 400], [540, 400], 1))
+        far = sum(ms for _, _, ms in self.path([0, 0], [1200, 780], 1))
+        self.assertLess(near, far)
+        self.assertEqual(self.path([3, 4], [700, 500], 9), self.path([3, 4], [700, 500], 9))
+        self.assertEqual(self.path([5, 5], [5, 5], 1)[-1][:2], [5, 5])
+
+    def test_typing_waits(self):
+        text = "Hello, world. This is a test of the typing, really." * 4
+        waits = h.typing_delays(text, h.random.Random(2))
+        self.assertEqual(len(waits), len(text))
+        self.assertTrue(120 <= waits[0] <= 260)
+        self.assertTrue(all(38 <= w <= 100 + 40 + 120 + 450 for w in waits[1:]))
+        self.assertTrue(65 <= sum(waits[1:]) / (len(text) - 1) <= 100)
+        after = [w for c, w in zip(text, waits[1:]) if c in ",."]
+        plain = [w for c, w in zip(text, waits[1:]) if c.isalpha()]
+        self.assertGreater(sum(after) / len(after), sum(plain) / len(plain) + 30)
+
+
+class FakeX:
+    screen = [1280, 800]
+
+    def __init__(self, at):
+        self.at = at
+
+    def pointer(self):
+        return list(self.at)
+
+
+class HumanSteps(unittest.TestCase):
+    """The step API drives xdotool along a path, with held buttons, from where the pointer is."""
+
+    def desktop(self, at=(20, 30)):
+        d = h.Desktop()
+        d.x = FakeX(at)
+        d.rng = h.random.Random(4)
+        d.calls = []
+        d.xdotool = lambda *args, stdin=None, timeout=10: d.calls.append((args, stdin, timeout))
+        return d
+
+    def test_a_click_moves_along_a_path_then_holds_the_button(self):
+        d = self.desktop()
+        d.step("click", {"click": [600, 400]})
+        (args, _, timeout), = d.calls
+        moves = [(int(args[i + 1]), int(args[i + 2])) for i, a in enumerate(args) if a == "mousemove"]
+        self.assertGreater(len(moves), 8)
+        self.assertEqual(moves[-1], (600, 400))
+        self.assertLess(abs(moves[0][0] - 20) + abs(moves[0][1] - 30), 60)
+        down = args.index("mousedown")
+        self.assertEqual(args[down : down + 2], ("mousedown", "1"))
+        self.assertEqual(args[down + 2], "sleep")
+        self.assertTrue(0.04 <= float(args[down + 3]) <= 0.12)
+        self.assertEqual(args[down + 4 : down + 6], ("mouseup", "1"))
+        self.assertNotIn("click", args)
+        self.assertGreater(timeout, 10)
+
+    def test_a_double_click_waits_between_its_clicks(self):
+        d = self.desktop()
+        d.step("click", {"click": [600, 400], "button": 3, "count": 2})
+        args = d.calls[0][0]
+        self.assertEqual(args.count("mousedown"), 2)
+        first_up = args.index("mouseup")
+        self.assertEqual(args[first_up + 2], "sleep")
+        self.assertTrue(0.07 <= float(args[first_up + 3]) <= 0.15)
+        self.assertEqual(args[args.index("mousedown") + 1], "3")
+
+    def test_a_drag_holds_the_button_along_its_path(self):
+        d = self.desktop()
+        d.step("drag", {"drag": [100, 100, 700, 500]})
+        args = d.calls[0][0]
+        down, up = args.index("mousedown"), args.index("mouseup")
+        held = [(int(args[i + 1]), int(args[i + 2])) for i in range(down, up) if args[i] == "mousemove"]
+        self.assertGreater(len(held), 8)
+        self.assertEqual(held[-1], (700, 500))
+        self.assertEqual(args[up - 2], "sleep")
+
+    def test_a_scroll_goes_in_notches_with_gaps(self):
+        d = self.desktop()
+        d.step("scroll", {"scroll": [300, 300], "dy": 4, "dx": -1})
+        args = d.calls[0][0]
+        clicks = [args[i + 1] for i, a in enumerate(args) if a == "click"]
+        self.assertEqual(clicks, ["5", "5", "5", "5", "6"])
+        gaps = [float(args[i + 3]) for i, a in enumerate(args) if a == "click"]
+        self.assertTrue(all(0.03 <= g <= 0.41 for g in gaps))
+        self.assertGreater(len(set(gaps)), 1)
+
+    def test_typing_goes_key_by_key_on_stdin_and_pastes_the_rest(self):
+        d = self.desktop()
+        pasted = []
+        d.paste = pasted.append
+        slept = []
+        saved = h.time.sleep
+        h.time.sleep = slept.append
+        try:
+            d.step("type", {"type": "oi, Jo\u00e3o"})
+        finally:
+            h.time.sleep = saved
+        typed = [stdin.decode() for args, stdin, _ in d.calls]
+        self.assertEqual(typed, list("oi, Jo") + ["o"])
+        self.assertEqual(pasted, ["\u00e3"])
+        for args, _, _ in d.calls:
+            self.assertEqual(args[0], "type")
+            self.assertTrue(100 <= int(args[2]) <= 180)
+            self.assertNotIn("o", args)
+        self.assertGreater(sum(slept), 0.3)
+
+    def test_long_text_goes_at_the_even_pace(self):
+        d = self.desktop()
+        d.step("type", {"type": "x" * 201})
+        self.assertEqual({args[:3] for args, _, _ in d.calls}, {("type", "--delay", str(h.KEY_DELAY_MS))})
+        self.assertEqual(b"".join(stdin for _, stdin, _ in d.calls), b"x" * 201)
+
+    def test_a_person_taking_control_stops_typing_at_the_next_key(self):
+        for text, sent in (("oi tudo", 3), ("x" * 201, 3 * h.EVEN_CHUNK)):
+            d = self.desktop()
+
+            def typed(*args, stdin=None, timeout=10):
+                d.calls.append(stdin)
+                d.stopping = len(d.calls) == 3
+
+            d.xdotool = typed
+            saved = h.time.sleep
+            h.time.sleep = lambda _s: None
+            try:
+                with self.assertRaises(h.Stopped):
+                    d.step("type", {"type": text})
+            finally:
+                h.time.sleep = saved
+            self.assertEqual(len(b"".join(d.calls)), sent)
+
+    def test_a_stop_ends_the_input_and_only_it(self):
+        d = self.desktop()
+        d.stopping = True
+        with self.assertRaises(h.Stopped) as stopped:
+            d.input({"steps": [{"key": "a"}]})
+        self.assertEqual(stopped.exception.code, "stopped")
+        self.assertEqual(d.calls, [])
+        d.xdotool = lambda *args, **kw: d.calls.append(args)
+        d.input({"steps": [{"key": "a"}]})
+        self.assertEqual(len(d.calls), 1)
+
+    def test_a_person_taking_control_kills_a_pointer_path_and_lets_go_of_the_button(self):
+        d = h.Desktop()
+        d.x = FakeX((20, 30))
+        with tempfile.TemporaryDirectory() as tmp:
+            log = os.path.join(tmp, "log")
+            tool = os.path.join(tmp, "xdotool")
+            with open(tool, "w") as f:
+                f.write('#!/bin/sh\necho "$1 $2" >> %s\n[ "$1" = mousemove ] && exec sleep 30\nexit 0\n' % log)
+            os.chmod(tool, stat.S_IRWXU)
+            d.tools = {"xdotool": tool}
+            before = signal.signal(signal.SIGUSR1, d.stop_input)
+            timer = threading.Timer(0.2, os.kill, (os.getpid(), signal.SIGUSR1))
+            timer.start()
+            t0 = time.monotonic()
+            try:
+                with self.assertRaises(h.Stopped):
+                    d.step("click", {"click": [600, 400], "button": 3})
+            finally:
+                timer.join()
+                signal.signal(signal.SIGUSR1, before)
+            self.assertLess(time.monotonic() - t0, 5)
+            with open(log) as f:
+                self.assertEqual(f.read().splitlines()[-1], "mouseup 3")
+
+    def test_after_a_hover_the_pointer_goes_straight_and_curves_once_it_moved(self):
+        def off_line(args, a, b):
+            moves = [(int(args[i + 1]), int(args[i + 2])) for i, x in enumerate(args) if x == "mousemove"]
+            d = ((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5
+            return max(abs((b[0] - a[0]) * (a[1] - y) - (a[0] - x) * (b[1] - a[1])) / d for x, y in moves)
+
+        d = self.desktop()
+        d.step("move", {"move": [100, 100]})
+        d.x.at = (100, 100)
+        d.step("click", {"click": [800, 500]})
+        self.assertLess(off_line(d.calls[-1][0], (100, 100), (800, 500)), 3)
+        d.step("move", {"move": [100, 100]})
+        d.x.at = (140, 90)
+        d.step("click", {"click": [800, 500]})
+        self.assertGreater(off_line(d.calls[-1][0], (140, 90), (800, 500)), 3)
 
 
 class Screen(unittest.TestCase):

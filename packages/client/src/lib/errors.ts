@@ -3,6 +3,7 @@ import { ApiError, NetworkError } from "../api/http";
 import type { AuthConfig, OrgStanding } from "../api/types";
 import { billingHoldOf } from "./billing";
 import { MAX_UPLOAD_MB } from "./files";
+import { lowerFirst } from "./format";
 import { limitRefusalText } from "./limits";
 import { endSentence } from "./text";
 
@@ -19,6 +20,16 @@ const KNOWN = {
   "channel.post_denied": "channel.perms.readOnlyComposer",
   "channel.permission_forbidden": "channel.perms.forbidden",
   "agent.handle_taken": "newAgent.errors.handleTaken",
+  "agent.right_hand_permanent": "errors.rightHand.permanent",
+  "agent.not_owner": "errors.agent.ownerOrAdmin",
+  "usage_queue.cancel_forbidden": "errors.agent.ownerOrAdmin",
+  "agent.details_hidden": "errors.agent.detailsHidden",
+  "brain.extra_owner_only": "errors.agent.extraOwnerOnly",
+  "action.not_allowed": "errors.agent.undoForbidden",
+  "account.not_owner": "errors.account.notOwner",
+  "channel.members_forbidden": "errors.channel.membersForbidden",
+  "agent_proposal.not_requester": "errors.agentProposal.notRequester",
+  "proposal.not_requester": "errors.agentProposal.notRequester",
   "agent_proposal.decided": "errors.agentProposal.decided",
   "approval.always_unavailable": "errors.approval.alwaysUnavailable",
   "agent_proposal.expired": "errors.agentProposal.expired",
@@ -36,6 +47,8 @@ const KNOWN = {
   "artifact.file_required": "errors.artifact.fileRequired",
   "artifact.file_name_required": "errors.artifact.fileNameRequired",
   "artifact.not_found": "errors.artifact.notFound",
+  "artifact.delete_forbidden": "errors.artifact.deleteForbidden",
+  "artifact.restore_forbidden": "errors.artifact.restoreForbidden",
   "machine.forbidden": "errors.machine.forbidden",
   "machine.not_found": "errors.machine.notFound",
   "machine.name_required": "errors.machine.nameRequired",
@@ -45,6 +58,13 @@ const KNOWN = {
   "machine.target_not_found": "errors.machine.targetNotFound",
   "machine.target_same": "errors.machine.targetSame",
   "machine.target_paused": "errors.machine.targetPaused",
+  // A computer that can't take the request now (`MachineOfflineError`, `MachinePausedError`: `name`), or its own
+  // refusal (`MachineRequestError`, as `machine.<code>`).
+  "machine.offline": "errors.machine.offline",
+  "machine.paused": "errors.machine.paused",
+  "machine.timeout": "errors.machine.timeout",
+  "machine.exec_disabled": "errors.mission.execDisabled",
+  budget_exceeded: "agentPage.activity.errors.budget_exceeded",
   "agent_group.not_found": "errors.agentGroup.notFound",
   "agent_group.too_many": "errors.agentGroup.tooMany",
   "thread.context_not_visible": "errors.thread.contextNotVisible",
@@ -89,12 +109,18 @@ const KNOWN = {
   "run.not_continuable": "errors.run.notContinuable",
   "run.agent_busy": "errors.run.agentBusy",
   "run.continue_forbidden": "errors.run.continueForbidden",
+  "run.cancel_forbidden": "errors.run.cancelForbidden",
+  "run.answer_forbidden": "errors.run.answerForbidden",
+  "run.stop_reason_forbidden": "errors.run.stopReasonForbidden",
   "run.not_restartable": "errors.run.notRestartable",
   "routine.too_frequent": "errors.routine.tooFrequent",
   "routine.too_many": "errors.routine.tooMany",
   "routine.creator_cannot_post": "errors.routine.creatorCannotPost",
   "routine.take_over_no_access": "errors.routine.takeOverNoAccess",
   "routine.act_take_over": "errors.routine.actTakeOver",
+  "routine.actions_need_approver": "errors.routine.actionsNeedApprover",
+  "routine.editor_only": "errors.routine.editorOnly",
+  "routine.widget_fixed": "errors.routine.widgetFixed",
   "routine.agent_not_in_channel": "errors.routine.agentNotInChannel",
   "routine.webhook_paused": "errors.routine.webhookPaused",
   "routine.continue_extra_off": "errors.routine.continueExtraOff",
@@ -106,6 +132,8 @@ const KNOWN = {
   "wiki.audience_excludes_you": "errors.wiki.audienceExcludesYou",
   "wiki.audience_wider_than_folder": "errors.wiki.audienceWiderThanFolder",
   "wiki.edit_limited": "errors.wiki.editLimited",
+  "wiki.locked": "wiki.lockedHint",
+  "wiki.lock_admins_only": "errors.wiki.lockAdminsOnly",
   "wiki.editors_exclude_you": "errors.wiki.editorsExcludeYou",
   "role.name_required": "errors.role.nameRequired",
   "role.name_long": "errors.role.nameLong",
@@ -437,6 +465,9 @@ export function knownErrorText(t: TFunction, error: unknown, locale = "en"): str
   // The person who connected the mailbox is gone or unnamed: no blank name in the sentence.
   if (error.code === "mail.owner_only" && !error.params?.ownerName)
     return t("errors.mail.ownerOnlyUnknown", error.params);
+  // `provider`: the provider whose key is missing, when the server could name it.
+  if (error.code === "missing_credential" && typeof error.params?.provider === "string")
+    return t("agentPage.activity.errors.missing_credential", error.params);
   // Own keys only: a code from an address (`/login?error=toString`) names no line of Object's.
   const key = Object.hasOwn(KNOWN, error.code) ? KNOWN[error.code as keyof typeof KNOWN] : undefined;
   if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
@@ -461,11 +492,22 @@ const noAnswerText = (t: TFunction) => t(deviceOffline() ? "common.offline" : "c
 
 /**
  * The words of a refusal the app doesn't translate: the server's own (English, written for people) for a 4xx, in
- * every language, since English is every language's fallback; a 5xx's are for the log.
+ * every language, since English is every language's fallback, and for a computer's own refusal (its 503
+ * `machine.<code>`); any other 5xx's (a runner's `machine.internal` too) are for the log, and the person reads that it
+ * failed on our side.
  */
 function untranslatedText(t: TFunction, error: ApiError): string {
-  return error.status < 500 && error.message ? error.message : t("common.unknownError");
+  const told = error.status < 500 || (error.code.startsWith("machine.") && error.code !== "machine.internal");
+  return told && error.message ? error.message : t("common.ourSide");
 }
+
+/**
+ * A 403 in the person's words: a code the app knows, else that they can't do this, never the server's sentence (a
+ * code with a why worth saying gets a line in `KNOWN`). Never "ask an admin": the person may be one, and the refusal
+ * may not be about their role.
+ */
+export const forbiddenText = (t: TFunction, error: ApiError, locale?: string): string =>
+  knownErrorText(t, error, locale) ?? t("common.notAllowed");
 
 /**
  * A sign-in, sign-up or reset Better Auth refused (`{ status, code, message }`, a block's kind on agentes.chat Cloud)
@@ -567,10 +609,29 @@ export function errorText(t: TFunction, error: unknown, locale?: string): string
     const known = knownErrorText(t, error, locale);
     if (known) return known;
     if (error.status === 413) return t("errors.artifact.fileTooLarge", { max: MAX_UPLOAD_MB });
-    if (error.status === 403) return t("common.notAllowed");
+    if (error.status === 403) return forbiddenText(t, error, locale);
   }
   if (noAnswer(error)) return noAnswerText(t);
   return error instanceof ApiError ? untranslatedText(t, error) : t("common.unknownError");
+}
+
+const KEY_FAILURES = new Set([
+  "run.missing_credential",
+  "run.credential_revoked",
+  "run.credential_wrong_provider",
+  "run.provider_account",
+]);
+
+/**
+ * The one thing to do about a failed run, by its code, for someone who can: another key (`keys`: who manages them), or
+ * another model (the agent's owner or who manages agents). Null when nothing fixes it or it's someone else's to do.
+ */
+export function failedRunFix(
+  code: string | null | undefined,
+  who: { keys: boolean; admin: boolean; owner: boolean },
+): "useKey" | "changeModel" | null {
+  if (code === "run.model_unlisted") return who.admin || who.owner ? "changeModel" : null;
+  return code && KEY_FAILURES.has(code) && who.keys ? "useKey" : null;
 }
 
 /**
@@ -582,4 +643,21 @@ export function runErrorText(t: TFunction, code: string | null | undefined, para
   if (!key || key === "failed") return null;
   const say = t as unknown as (key: string, options: Record<string, unknown>) => string;
   return say(`agentPage.activity.errors.${key}`, { ...params, defaultValue: "" }) || null;
+}
+
+/**
+ * A failed run as one line for the conversation: a restriction in its words, a computer that stayed busy, else
+ * "couldn't answer" with the reason going on as part of the sentence. Null when no reason has words.
+ */
+export function runFailureLine(
+  t: TFunction,
+  agent: string,
+  failure: { code?: string | null; params?: Record<string, unknown> },
+  locale?: string,
+): string | null {
+  const refusal = restrictionLine(t, failure.code, failure.params);
+  if (refusal) return t("channel.runRefused", { agent, reason: refusal });
+  if (failure.code === "run.computer_busy") return t("channel.runBusy", { agent });
+  const why = runErrorText(t, failure.code, failure.params);
+  return why ? t("channel.runFailed", { agent, reason: lowerFirst(why.replace(/\.$/, ""), locale) }) : null;
 }

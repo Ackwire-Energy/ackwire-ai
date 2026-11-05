@@ -1390,6 +1390,99 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     expect(everything).not.toContain(NEW);
   });
 
+  test("one run asks once per key: a second ask waits on the open card, and once given it isn't asked again until tried", async () => {
+    const ask = { name: "NPM_TOKEN", purpose: "publicar o pacote no npm", target: "env" };
+    f = await setup({
+      machines: true,
+      reply: (req) => {
+        const last = JSON.stringify(req.messages.at(-1)?.content);
+        if (last.includes("tool_result")) return { chunks: ["Pronto."] };
+        // Asked twice in one turn, as an agent did when the person wrote while it waited.
+        if (last.includes("publica"))
+          return {
+            chunks: [""],
+            toolUses: [
+              { name: "request_secret", input: ask },
+              { name: "request_secret", input: ask },
+            ],
+          };
+        return { chunks: ["ok"] };
+      },
+    });
+    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    const paired = await pair();
+    const runner = fakeRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token);
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
+    const msg = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev publica o pacote",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const requests = () => f.db.select().from(schema.secretRequests);
+    const cards = async () =>
+      (await f.db.select().from(schema.messages)).filter(
+        (m) => (m.meta as { secretRequestId?: string }).secretRequestId,
+      );
+    const [row] = await requests();
+    if (!row) throw new Error("no secret request");
+    expect(await requests()).toHaveLength(1);
+    expect(await cards()).toHaveLength(1);
+
+    const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, msg.id));
+    const ctx: ToolContext = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run?.id as string,
+      channelId: f.general.id,
+      threadRootId: run?.threadRootId as string,
+      triggerMessageId: msg.id,
+    };
+    // Asked again while the card is open: the same request is waited on, no new one.
+    const again = await f.tools?.invoke(ctx, { toolUseId: "t9", name: "request_secret", input: ask });
+    expect(again).toEqual({ type: "secret", requestId: row.id });
+    expect(await requests()).toHaveLength(1);
+
+    const box = await sealSecret(
+      row.publicKey,
+      VALUE,
+      secretAad({ requestId: row.id, orgId: f.org.id, name: row.name, target: { kind: "env" } }),
+    );
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, box);
+    await drainOutbox(f.db, f.handlers);
+    const results = (await f.db.select().from(schema.agentRunSteps))
+      .filter((x) => x.kind === "tool_result")
+      .map((x) => (x.data as { content: string }).content);
+    expect(results.filter((r) => r.includes("NPM_TOKEN was delivered to your computer"))).toHaveLength(2);
+
+    // Given in this run and not tried yet: the agent is told it has it, and nobody is asked.
+    const given = await f.tools?.invoke(ctx, { toolUseId: "t10", name: "request_secret", input: ask });
+    expect(given?.type === "result" && given.output.content).toContain("NPM_TOKEN was already delivered");
+    expect(await requests()).toHaveLength(1);
+    expect(await cards()).toHaveLength(1);
+
+    // Tried since (a command ran): asking again is a refused key's replacement, as before.
+    await f.tools?.invoke(ctx, {
+      toolUseId: "t11",
+      name: "run_code",
+      input: { language: "bash", code: "npm publish" },
+    });
+    const replaced = await f.tools?.invoke(ctx, { toolUseId: "t12", name: "request_secret", input: ask });
+    expect(replaced?.type).toBe("secret");
+    const pending = (await requests()).filter((r) => r.status === "pending");
+    expect(pending).toMatchObject([{ name: "NPM_TOKEN", replaces: true }]);
+
+    // An open one past its deadline (not swept yet) isn't waited on: a new request is.
+    await f.db
+      .update(schema.secretRequests)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(schema.secretRequests.id, pending[0]?.id as string));
+    const late = await f.tools?.invoke(ctx, { toolUseId: "t13", name: "request_secret", input: ask });
+    expect(late?.type).toBe("secret");
+    expect(late?.type === "secret" && late.requestId).not.toBe(pending[0]?.id);
+  });
+
   test("a decline during staging prevents activation and leaves no live secret", async () => {
     let stagedWhilePending = false;
     const { runner, row } = await asking(
