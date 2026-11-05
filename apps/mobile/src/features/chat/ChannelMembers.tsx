@@ -7,7 +7,7 @@ import {
   useChannels,
   useRoster,
 } from "@agenteschat/client";
-import { listsAgent } from "@agenteschat/client/lib/audience";
+import { listsAgent, opensDetails } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
@@ -21,7 +21,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, Card, Icon, Row, SearchField, Text, useToast } from "@/ui";
-import { Face } from "../shared/Face";
+import { Face, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { ActionList, Tile, tapHaptic } from "../shared/parts";
@@ -99,6 +99,11 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
     tapHaptic();
     sheet.open(<MemberOptions channelId={channelId} channelName={channelName} who={w} removable={editable} />);
   };
+  // No options to give here: the row is the way to the agent, as its picture is in the options.
+  const seeAgent = (id: string) => {
+    sheet.close();
+    router.push(`/agent/${id}`);
+  };
   const group = (label: string, count: number, list: Who[]) =>
     list.length > 0 ? (
       <View>
@@ -126,7 +131,9 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
                       onPress: () => open(w),
                       meta: <Icon name="more" size={18} color={c.faint} />,
                     }
-                  : {})}
+                  : w.kind === "agent" && opensDetails(dir.anyAgent(w.id))
+                    ? { onPress: () => seeAgent(w.id) }
+                    : {})}
               />
             );
           })}
@@ -240,7 +247,11 @@ function MemberOptions({
   return (
     <>
       <SheetTitle
-        leading={<Face who={{ type: who.kind, id: who.id }} size={36} live={false} />}
+        leading={
+          <OpensAgent agentId={who.id}>
+            <Face who={{ type: who.kind, id: who.id }} size={36} live={false} />
+          </OpensAgent>
+        }
         title={who.name}
         subtitle={lineOf(t, { ...who, autoReply }, routing)}
       />

@@ -95,6 +95,19 @@ const said = (over: Partial<Message>) =>
   }) as Message;
 
 describe("a computer's line", () => {
+  test("an agent's picture in it opens its details beside the conversation, and the dialog closes", async () => {
+    const { api } = setup();
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(10);
+    await click(screen().getByRole("button", { name: "Computador · 2 aguardando" }));
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Fila de Studio" });
+    await click(within(dialog).getByRole("button", { name: "Perfil de Atlas" }));
+    await settle(6);
+    expect(screen().getByRole("complementary", { name: "Perfil do Atlas" })).toBeTruthy();
+    expect(screen().queryByRole("dialog", { name: "Fila de Studio" })).toBeNull();
+  });
+
   test("the header says who waits and opens the line in place: working now, in line, my request first", async () => {
     const { api } = setup();
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });

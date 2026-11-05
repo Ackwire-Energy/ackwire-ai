@@ -1,5 +1,5 @@
 import type { AgentTab } from "@agenteschat/client/lib/agent-edit";
-import { createContext, useContext } from "react";
+import { createContext, type ReactNode, useContext } from "react";
 
 /**
  * Opens an agent's page in the panel beside the conversation (like a thread's): "Ver perfil" in a DM's
@@ -14,3 +14,20 @@ export const useOpenAgentPanel = () => useContext(AgentPanelContext);
 export const AgentPanelShownContext = createContext<string | null>(null);
 
 export const useAgentPanelShown = () => useContext(AgentPanelShownContext);
+
+/** Both, for what sits under the page that holds the panel. */
+export function AgentPanelProvider({
+  open,
+  shown,
+  children,
+}: {
+  open: ((agentId: string, tab?: AgentTab) => void) | null;
+  shown: string | null;
+  children: ReactNode;
+}) {
+  return (
+    <AgentPanelContext.Provider value={open}>
+      <AgentPanelShownContext.Provider value={shown}>{children}</AgentPanelShownContext.Provider>
+    </AgentPanelContext.Provider>
+  );
+}

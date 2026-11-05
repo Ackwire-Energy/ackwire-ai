@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { Button, Chip, Count, Icon, PixelStop, Text, weights } from "@/ui";
 import { useOpenQueue } from "../queue/QueueSheet";
-import { AgentFace } from "../shared/Face";
+import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useNow, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider } from "../shared/SheetHost";
@@ -64,7 +64,9 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
       ) : (
         <>
           <View style={styles.head}>
-            <AgentFace agentId={agentId} size={28} mode={view && view.working > 0 ? "run" : "idle"} />
+            <OpensAgent agentId={agentId}>
+              <AgentFace agentId={agentId} size={28} mode={view && view.working > 0 ? "run" : "idle"} />
+            </OpensAgent>
             <Text variant="subhead" tone="muted" numberOfLines={1} style={styles.shrink}>
               {sub}
             </Text>

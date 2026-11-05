@@ -81,7 +81,7 @@ html:not([data-pointer]) .cq-link:focus-visible {
   padding: 8px;
   border-radius: 8px;
 }
-.cq__row > .ac-avatar {
+.cq__row .ac-avatar {
   margin: 1px;
 }
 .cq__row[data-mine] {

@@ -37,6 +37,7 @@ import { type CSSProperties, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ErrorState, LoadingList } from "@/components/Loading";
+import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useLive } from "@/realtime/context";
@@ -137,7 +138,7 @@ export function QueueDialog({
     >
       <DialogBody>
         {queue ? (
-          <QueueLists queue={queue} names={names} now={now} />
+          <QueueLists queue={queue} names={names} now={now} onLeave={() => onOpenChange(false)} />
         ) : q.isError ? (
           <ErrorState error={q.error} onRetry={() => void q.refetch()} />
         ) : (
@@ -155,7 +156,18 @@ export function QueueDialog({
   );
 }
 
-function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typeof useQueueNames>; now: number }) {
+function QueueLists({
+  queue,
+  names,
+  now,
+  onLeave,
+}: {
+  queue: Queue;
+  names: ReturnType<typeof useQueueNames>;
+  now: number;
+  /** An agent's picture opened its details: the dialog gives way. */
+  onLeave: () => void;
+}) {
   const { t, i18n } = useTranslation();
   const view = queueView(queue, names.viewerId);
   const allStarted = queueAllStartedText(t, view, now);
@@ -170,7 +182,9 @@ function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typ
         <ol className="cq__rows">
           {view.working.map((w) => (
             <li key={w.runId} className="cq__row" data-mine={w.mine || undefined}>
-              <AgentAvatar agentId={w.agentId} name={agentName(w.agentId)} size="xs" state="thinking" />
+              <OpensAgent agentId={w.agentId} onOpen={onLeave}>
+                <AgentAvatar agentId={w.agentId} name={agentName(w.agentId)} size="xs" state="thinking" />
+              </OpensAgent>
               <span className="cq__text">
                 <span className="cq__l1">
                   <b>{agentName(w.agentId)}</b>
@@ -197,7 +211,9 @@ function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typ
           <ol className="cq__rows">
             {view.waiting.map((w) => (
               <li key={w.runId} className="cq__row" data-mine={w.mine || undefined}>
-                <AgentAvatar agentId={w.agentId} name={agentName(w.agentId)} size="xs" state="idle" />
+                <OpensAgent agentId={w.agentId} onOpen={onLeave}>
+                  <AgentAvatar agentId={w.agentId} name={agentName(w.agentId)} size="xs" state="idle" />
+                </OpensAgent>
                 <span className="cq__text">
                   <span className="cq__l1">
                     <b>{agentName(w.agentId)}</b>

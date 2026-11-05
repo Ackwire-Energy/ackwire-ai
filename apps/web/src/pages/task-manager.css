@@ -34,13 +34,13 @@
 }
 .tm-card.ac-card {
   --card-pad: 0;
+  position: relative;
   gap: 8px;
   width: 184px;
   overflow: hidden;
   font: inherit;
   color: var(--ink);
   text-align: left;
-  cursor: pointer;
 }
 .tm-card__head {
   display: flex;
@@ -49,12 +49,25 @@
   min-width: 0;
   padding: 12px 12px 0;
 }
+/* The card's press: it covers the card, so the face (`OpensAgent`) alone sits above it. */
 .tm-card__text {
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: 1px;
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tm-card__text::after {
+  content: "";
+  position: absolute;
+  inset: 0;
 }
 .tm-card__text b,
 .tm-card__text small {
@@ -88,14 +101,16 @@
 .tm-card > .chart-spark {
   margin-top: auto;
 }
-.tm-card[aria-pressed="true"],
-.tm-card[aria-pressed="true"]:hover {
+.tm-card[data-pressed],
+.tm-card[data-pressed]:hover {
   background: var(--chosen-bg);
   box-shadow: var(--chosen-shadow);
   transform: var(--chosen-lift);
 }
-html:not([data-pointer]) .tm-card:focus-visible {
+html:not([data-pointer]) .tm-card__text:focus-visible {
   outline: none;
+}
+html:not([data-pointer]) .tm-card:has(.tm-card__text:focus-visible) {
   box-shadow: var(--card-shadow), var(--focus-ring);
 }
 

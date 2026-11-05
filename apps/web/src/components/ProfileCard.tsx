@@ -68,6 +68,7 @@ import { useOpensComputer } from "@/components/computer/facts";
 import { useOpenComputer } from "@/components/computer/open";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { NoAiChip } from "@/components/NoAi";
+import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { LetMeTalkButton, useWidenAsk } from "@/components/ReachLines";
 import { useEmojiLabels } from "@/components/Reactions";
@@ -485,7 +486,11 @@ function RightHandCardBody({ agent, onDone }: { agent: Agent; onDone: () => void
     <CardShell
       agent
       sky={<ProfileSky color={colorOf(agent)} />}
-      face={<AgentAvatar agentId={agent.id} size="lg" name={agent.name} />}
+      face={
+        <OpensAgent agentId={agent.id} onOpen={onDone}>
+          <AgentAvatar agentId={agent.id} size="lg" name={agent.name} />
+        </OpensAgent>
+      }
     >
       <div className="list-col mcard__names">
         <span className="profile-card__name">{agent.name}</span>
@@ -592,14 +597,16 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
       agent
       sky={<ProfileSky color={colorOf(agent)} busy={busy} />}
       face={
-        <AgentAvatar
-          agentId={agent.id}
-          size="lg"
-          name={agent.name}
-          presence={shown?.presence ?? null}
-          presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
-          asleep={isOutOfOffice(shown?.line)}
-        />
+        <OpensAgent agentId={agent.id} onOpen={onDone}>
+          <AgentAvatar
+            agentId={agent.id}
+            size="lg"
+            name={agent.name}
+            presence={shown?.presence ?? null}
+            presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
+            asleep={isOutOfOffice(shown?.line)}
+          />
+        </OpensAgent>
       }
       act={
         toComputer && (

@@ -236,7 +236,7 @@ import { ActorAvatar, AgentAvatar, PersonAvatar } from "@/components/AgentAvatar
 import { AgentPanel } from "@/components/AgentPanel";
 import { ApprovalAsk, ApprovalGroupAsk } from "@/components/ApprovalAsk";
 import { InlineApproval } from "@/components/ApprovalItem";
-import { AgentPanelContext, AgentPanelShownContext, useOpenAgentPanel } from "@/components/agent-panel-context";
+import { AgentPanelProvider, useAgentPanelShown, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { AgentSidebar } from "@/components/agents/AgentSidebar";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { objectUrls } from "@/components/artifacts/FileView";
@@ -833,6 +833,7 @@ function ChannelView({
     setTasksOpen((open) => !open);
   }, [profileKeeps]);
   const outerPanel = useOpenAgentPanel();
+  const outerShown = useAgentPanelShown();
   const openAgentPanel = useCallback(
     (agentId: string, tab?: AgentTab) => {
       if (profileKeeps()) return;
@@ -2146,7 +2147,10 @@ function ChannelView({
 
   return (
     // A thread inside the panel opens profiles in its channel's panel, not inside itself.
-    <AgentPanelContext.Provider value={chrome?.panel ? outerPanel : openAgentPanel}>
+    <AgentPanelProvider
+      open={chrome?.panel ? outerPanel : openAgentPanel}
+      shown={chrome?.panel ? outerShown : (profile?.agentId ?? null)}
+    >
       <MessageLookContext.Provider value={look}>
         <ChannelActionsContext.Provider value={actions}>
           <ChannelThreadsContext.Provider value={threadsView}>
@@ -2159,11 +2163,7 @@ function ChannelView({
               {/* A page's own header (a DM's) gets the agent's tasks for its pill (`AgentTasksPill`). */}
               {chrome?.header ? (
                 <AgentTasksContext.Provider value={tasksControl}>
-                  <AgentPanelShownContext.Provider value={profile?.agentId ?? null}>
-                    {typeof chrome.header === "function"
-                      ? chrome.header({ onSearch: openSearch, side })
-                      : chrome.header}
-                  </AgentPanelShownContext.Provider>
+                  {typeof chrome.header === "function" ? chrome.header({ onSearch: openSearch, side }) : chrome.header}
                 </AgentTasksContext.Provider>
               ) : (
                 <ChannelHeader
@@ -2601,7 +2601,7 @@ function ChannelView({
                 )}
               </div>
             </Tag>
-            {!chrome && membersColumn.sheet && (
+            {!chrome && !profile && membersColumn.sheet && (
               <MembersSheet
                 channel={channel}
                 isMember={isMember}
@@ -2666,7 +2666,7 @@ function ChannelView({
           </ChannelThreadsContext.Provider>
         </ChannelActionsContext.Provider>
       </MessageLookContext.Provider>
-    </AgentPanelContext.Provider>
+    </AgentPanelProvider>
   );
 }
 

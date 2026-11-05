@@ -27,7 +27,7 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { Button, CHROME_MAX_SCALE, Chip, Count, Icon, type IconName, PressScale, Text } from "@/ui";
 import { useComputerSays, useWatchableComputer } from "../chat/DmComputerButton";
 import { openComputer } from "../computer/AgentComputerRow";
-import { AgentFace } from "../shared/Face";
+import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { useSheet } from "../shared/SheetHost";
@@ -274,13 +274,15 @@ export function QueueLine({
   const c = useColors();
   const nth = position !== null ? nthText(t, i18n.language, position) : null;
   return (
-    <View
-      style={[styles.row, mine && { backgroundColor: c.sunken }]}
-      accessible
-      accessibilityLabel={[name, nth, line, first ? t("queue.youFirst") : null, time].filter(Boolean).join(", ")}
-    >
-      <AgentFace agentId={agentId} size={20} live={false} />
-      <View style={styles.text}>
+    <View style={[styles.row, mine && { backgroundColor: c.sunken }]}>
+      <OpensAgent agentId={agentId}>
+        <AgentFace agentId={agentId} size={20} live={false} />
+      </OpensAgent>
+      <View
+        style={styles.text}
+        accessible
+        accessibilityLabel={[name, nth, line, first ? t("queue.youFirst") : null, time].filter(Boolean).join(", ")}
+      >
         <View style={styles.l1}>
           <Text variant="small" tone="ink" numberOfLines={1} style={styles.name}>
             {name}

@@ -123,7 +123,8 @@ describe("the toggle", () => {
     await openDm();
     const body = screen().getByRole("main").querySelector(":scope > .channel__body") as HTMLElement;
     expect(body.lastElementChild).toBe(side());
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Perfil de Ada" })));
+    const header = screen().getByRole("main").querySelector(".channel__header") as HTMLElement;
+    await act(async () => fireEvent.click(within(header).getByRole("button", { name: "Perfil de Ada" })));
     await settle(6);
     expect(side()).toBeNull();
     expect(toggle()?.getAttribute("aria-pressed")).toBe("false");

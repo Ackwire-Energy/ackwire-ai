@@ -31,7 +31,7 @@ import {
   weights,
 } from "@/ui";
 import { useOpenQueue } from "../queue/QueueSheet";
-import { AgentFace } from "../shared/Face";
+import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
@@ -277,7 +277,9 @@ function AgentGroup({
         <Animated.View style={chevron}>
           <Icon name="chev" size={14} color={c.faint} />
         </Animated.View>
-        <AgentFace agentId={group.agentId} size={34} mode={line.mark === "working" ? "run" : "idle"} live={live} />
+        <OpensAgent agentId={group.agentId}>
+          <AgentFace agentId={group.agentId} size={34} mode={line.mark === "working" ? "run" : "idle"} live={live} />
+        </OpensAgent>
         <View style={styles.grow}>
           <View style={styles.nameRow}>
             <Text variant="callout" numberOfLines={1} style={[styles.semibold, styles.shrink]}>
@@ -369,7 +371,11 @@ function TaskRow({
       {divider ? (
         <View style={[styles.divider, flat ? styles.flatDivider : styles.taskDivider, { backgroundColor: c.line2 }]} />
       ) : null}
-      {flat ? <AgentFace agentId={task.agentId} size={30} live={false} /> : null}
+      {flat ? (
+        <OpensAgent agentId={task.agentId}>
+          <AgentFace agentId={task.agentId} size={30} live={false} />
+        </OpensAgent>
+      ) : null}
       <View style={styles.taskText}>
         <Text variant="subhead" numberOfLines={2} style={styles.medium}>
           {title}
@@ -443,7 +449,9 @@ function EndedRow({ task, divider, meId }: { task: EndedTask; divider: boolean; 
       style={({ pressed }) => [styles.task, styles.flat, pressed && { backgroundColor: c.sunken }]}
     >
       {divider ? <View style={[styles.divider, styles.flatDivider, { backgroundColor: c.line2 }]} /> : null}
-      <AgentFace agentId={task.agentId} size={30} live={false} />
+      <OpensAgent agentId={task.agentId}>
+        <AgentFace agentId={task.agentId} size={30} live={false} />
+      </OpensAgent>
       <View style={styles.taskText}>
         <Text variant="subhead" numberOfLines={1} style={styles.medium}>
           {title}
