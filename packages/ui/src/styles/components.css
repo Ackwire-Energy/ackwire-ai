@@ -229,6 +229,24 @@ html[data-pointer] :focus-visible {
     margin-block-start: calc(var(--cap-top) - 0.5lh);
   }
 }
+/*
+ * What ends a row whose words can wrap (a chip, its buttons, a switch) belongs to the first line, never to the row's
+ * middle: `.ac-captail` is a box as tall as that line (in the row's font size and line height), whatever it holds
+ * centred on it, so a 32px button reaches as far above the line as below. Beside a first line that rises
+ * (`.ac-captop`, in an `.ac-faceline`) it takes `.ac-captop` too and rises with it.
+ */
+.ac-captail {
+  display: flex;
+  flex: none;
+  align-self: flex-start;
+  align-items: center;
+  height: 22px;
+}
+@supports (top: 1lh) {
+  .ac-captail {
+    height: 1lh;
+  }
+}
 
 /*
  * The plate around a small ghost button's icon (32px around 16px, 40px on touch): what shows only on hover. A ghost
@@ -2532,8 +2550,10 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-list__row + .ac-list__row {
   border-top: 1px solid var(--line);
 }
-/* A ghost icon that ends a row (its actions' menu): its icon on the row's padding line, as far in as the row's lead. */
-.ac-list__row > .ac-btn--ghost.ac-btn--icon:last-child {
+/* A ghost icon that ends a row (its actions' menu): its icon on the row's padding line, as far in as the row's lead,
+   in the row's first-line box (`.ac-captail`) too. */
+.ac-list__row > .ac-btn--ghost.ac-btn--icon:last-child,
+.ac-list__row > .ac-captail:last-child > .ac-btn--ghost.ac-btn--icon:last-child {
   margin-right: calc(-1 * var(--ghost-plate));
 }
 a.ac-list__row:hover {

@@ -50,6 +50,7 @@ import {
   Alert,
   Button,
   Card,
+  CardHeader,
   Checkbox,
   CheckboxPill,
   Chip,
@@ -187,16 +188,18 @@ export function SkillsSection({ install, connected, skill }: { install?: string;
   const unavailable = skills.isError && (skills.error as { status?: number }).status === 404;
   return (
     <Card aria-labelledby="sec-skills">
-      <div className="row" style={{ gap: 12 }}>
-        <h2 id="sec-skills" className="ac-card__title" style={{ flex: "1 1 280px" }}>
-          {t("skills.title")}
-        </h2>
-        {!unavailable && (
-          <Button size="sm" icon="plus" onClick={() => setInstalling(true)}>
-            {t("skills.install")}
-          </Button>
-        )}
-      </div>
+      <CardHeader
+        id="sec-skills"
+        icon="bulb"
+        title={t("skills.title")}
+        action={
+          !unavailable && (
+            <Button size="sm" icon="plus" onClick={() => setInstalling(true)}>
+              {t("skills.install")}
+            </Button>
+          )
+        }
+      />
       {unavailable && <p className="small muted">{t("skills.unavailable")}</p>}
       {settings.data && (
         <>

@@ -161,7 +161,8 @@
   grid-template-columns: 28px minmax(0, 150px) minmax(0, 1fr) 170px;
   align-items: center;
   gap: 12px;
-  padding: 10px 0;
+  /* The plans' rows' depth (`.plan-block`), so the page's two lists keep one rhythm. */
+  padding: var(--row-py) 0;
   color: inherit;
   text-decoration: none;
 }

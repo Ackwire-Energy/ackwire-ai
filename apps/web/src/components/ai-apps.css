@@ -50,9 +50,12 @@
   min-width: 0;
 }
 
+/* A face line: the name's capitals at the mark's top, the menu on the name's line (`.ac-captop`, `.ac-captail`), with
+   room above that risen line for the 32px menu centred on it. */
 .app-row {
   flex-wrap: nowrap;
   align-items: flex-start;
+  padding-block: var(--row-py);
 }
 .app-row__main {
   flex: 1;
