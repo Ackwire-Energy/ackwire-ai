@@ -246,8 +246,8 @@ describe("artifact viewer", () => {
     expect(file.textContent).toContain("Adicionado: ");
     // No green or red: only the neutral diff classes.
     expect(dialog.innerHTML).not.toMatch(/\b(green|red)\b|#0f0|#f00/i);
-    await click(within(dialog).getByRole("button", { name: "Lado a lado" }));
-    expect(within(dialog).getByRole("button", { name: "Lado a lado" }).getAttribute("aria-pressed")).toBe("true");
+    await click(within(dialog).getByRole("radio", { name: "Lado a lado" }));
+    expect(within(dialog).getByRole("radio", { name: "Lado a lado" }).getAttribute("aria-checked")).toBe("true");
     const split = file.querySelector('[data-mode="split"]') as HTMLElement;
     const changed = Array.from(split.querySelectorAll(".artifact-split__row")).find((r) =>
       r.textContent?.includes("const total"),

@@ -138,7 +138,7 @@ function Ended({ task }: { task: EndedTask }) {
               ) : (
                 <PixelStopped size={10} />
               )}
-              <Text variant="footnote" tone="ink2" style={styles.semibold}>
+              <Text variant="footnote" tone="ink2" style={[styles.semibold, styles.shrink]}>
                 {endedText(t, task, meId)}
               </Text>
             </View>
@@ -197,7 +197,7 @@ function Page({
             <OpensAgent agentId={task.agentId}>
               <AgentFace agentId={task.agentId} size={24} live={false} />
             </OpensAgent>
-            <Text variant="small" tone="muted" style={styles.semibold}>
+            <Text variant="small" tone="muted" style={[styles.semibold, styles.shrink]}>
               {agent?.name ?? t("channel.unknownAgent")}
             </Text>
           </View>
@@ -255,6 +255,7 @@ function Page({
 }
 
 const styles = StyleSheet.create({
+  shrink: { flexShrink: 1 },
   screen: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   scroll: { paddingTop: 4 },

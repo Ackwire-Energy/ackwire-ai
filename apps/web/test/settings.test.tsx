@@ -138,7 +138,9 @@ describe("Configurações do workspace", () => {
     );
     const section = screen().getByRole("region", { name: "Conectores" });
     // The card's head is its title and Add; the GitHub app's purpose is its title's ⓘ.
-    expect(section.querySelector("#sec-conn")?.parentElement?.textContent).toBe("ConectoresAdicionar conector");
+    expect(section.querySelector("#sec-conn")?.closest(".ac-card__head")?.textContent).toBe(
+      "ConectoresAdicionar conector",
+    );
     const github = screen().getByRole("region", { name: "Repositórios do GitHub" });
     expect(hintOf("Repositórios do GitHub", github).text).toBe(
       "Instale o app do GitHub nas contas e repositórios que os agentes podem usar para código e pull requests. Só a Acme usa o que você instalar daqui.",

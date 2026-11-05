@@ -130,7 +130,13 @@ export function MemoryChangeCard({
           {t("memoryCard.was", { text: update.previousText })}
         </p>
       )}
+      {/* Undo, a button, before the ghost link: as every request card's row, the filled ones first. */}
       <div className="ac-approval__actions ac-acts">
+        {!undone && update.undo && undoesMemoryChange(update, dir.anyAgent(agentId), me.user.id, org, sentAt) && (
+          <Button size="sm" disabled={revert.isPending} loading={revert.isPending} onClick={() => revert.mutate()}>
+            {t("memoryCard.undo")}
+          </Button>
+        )}
         <Button asChild variant="ghost" size="sm">
           <Link
             to="/org/$orgId/agents/$agentId/memory"
@@ -140,11 +146,6 @@ export function MemoryChangeCard({
             {t("memoryCard.open", g)}
           </Link>
         </Button>
-        {!undone && update.undo && undoesMemoryChange(update, dir.anyAgent(agentId), me.user.id, org, sentAt) && (
-          <Button size="sm" disabled={revert.isPending} loading={revert.isPending} onClick={() => revert.mutate()}>
-            {t("memoryCard.undo")}
-          </Button>
-        )}
       </div>
     </div>
   );

@@ -56,6 +56,8 @@ export function Filters({ items, value, onChange }: FiltersProps) {
             }}
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
+            // The pill is 34 tall: the slop makes its target the 44 a finger needs without spacing the row out.
+            hitSlop={{ top: 5, bottom: 5 }}
           >
             <View
               style={{

@@ -93,7 +93,8 @@ export function SearchField({
             onPress={() => onChangeText("")}
             accessibilityRole="button"
             accessibilityLabel={t("mobile.a11y.clearSearch")}
-            hitSlop={8}
+            // A 16-point glyph: 14 of slop around it gives the 44-point target.
+            hitSlop={14}
           >
             <Icon name="x" size={16} color={colors.faint} />
           </Pressable>

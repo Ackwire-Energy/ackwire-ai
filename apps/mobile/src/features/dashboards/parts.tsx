@@ -23,6 +23,7 @@ import {
   GroupedRow,
   Icon,
   type IconName,
+  LineIcon,
   Segmented,
   Text,
   useTheme,
@@ -323,6 +324,8 @@ export function ChoiceChips<K extends string>({
             onPress={() => onChange(item.key)}
             accessibilityRole="radio"
             accessibilityState={{ selected: on }}
+            // 34 tall: the slop gives it a finger's 44 without spacing the row out.
+            hitSlop={{ top: 5, bottom: 5 }}
             style={[styles.chip, { backgroundColor: on ? c.ink : c.chip }]}
           >
             {item.icon ? item.icon(ink) : null}
@@ -495,7 +498,10 @@ export function AudienceFields({
         </>
       )}
       <View style={styles.exposure}>
-        <Icon name="shield" size={14} color={c.faint} />
+        {/* Down by the footer's own top padding, onto its first line (at the row's top it sat above the text). */}
+        <View style={styles.exposureIcon}>
+          <LineIcon variant="footnote" name="shield" size={14} color={c.faint} />
+        </View>
         <View style={styles.grow}>
           <GroupedFooter>{t("widgets.exposure")}</GroupedFooter>
         </View>
@@ -524,10 +530,20 @@ const styles = StyleSheet.create({
   proposalTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   proposalActions: { flexDirection: "row", justifyContent: "flex-end", flexWrap: "wrap", gap: 8 },
   chips: { gap: 6, paddingHorizontal: 16 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, height: 34, paddingHorizontal: 12, borderRadius: 17 },
+  // Min heights: with a large text size the label grows past them instead of being clipped.
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 34, paddingHorizontal: 12, borderRadius: 17 },
   segments: { paddingHorizontal: 16 },
   roles: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingLeft: 54, paddingRight: 14, paddingBottom: 12 },
-  roleChip: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 12, borderRadius: 16 },
+  roleChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 32,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
   faded: { opacity: 0.35 },
   exposure: { flexDirection: "row", alignItems: "flex-start", gap: 6, paddingLeft: 16, paddingTop: 10 },
+  // GroupedFooter's paddingTop.
+  exposureIcon: { paddingTop: 7 },
 });

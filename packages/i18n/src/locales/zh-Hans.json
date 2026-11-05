@@ -5648,7 +5648,7 @@
     "agentRole": "智能体 · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "新建一个，或在聊天中说：“Lia，为这个错误创建一个任务”。",
+    "empty": "新建一个，或在聊天中请智能体创建。",
     "noResults": "没有符合这些筛选条件的任务。",
     "columnEmpty": "这里什么都没有。",
     "form": {

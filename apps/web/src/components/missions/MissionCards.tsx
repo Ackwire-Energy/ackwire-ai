@@ -319,12 +319,8 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
       </div>
       {investigated ? (
         <>
+          {/* Start first, then Adjust: the plan's own card (below) and every request card lead with the main action. */}
           <div className="mi-plan__foot mi-findings__foot">
-            {adjust && (
-              <Button size="sm" icon="edit" onClick={adjust}>
-                {t("missions.findings.adjust")}
-              </Button>
-            )}
             {m?.role === "owner" && (
               <Button
                 variant="primary"
@@ -335,6 +331,11 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
                 onClick={start}
               >
                 {t("missions.findings.start")}
+              </Button>
+            )}
+            {adjust && (
+              <Button size="sm" icon="edit" onClick={adjust}>
+                {t("missions.findings.adjust")}
               </Button>
             )}
             {m && m.role !== "owner" && owner && (

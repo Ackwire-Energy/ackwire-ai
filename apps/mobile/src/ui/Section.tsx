@@ -24,7 +24,8 @@ export function Section({ title, count, action, children }: SectionProps) {
         {count !== undefined ? <Count value={count} size={14} weight={weights.medium} color={colors.faint} /> : null}
         <View style={{ flex: 1 }} />
         {action ? (
-          <Pressable onPress={action.onPress} accessibilityRole="button" hitSlop={8}>
+          // The label's line is 18 tall: 13 of slop around it gives the 44-point target.
+          <Pressable onPress={action.onPress} accessibilityRole="button" hitSlop={13}>
             <Text variant="label" tone="muted">
               {action.label}
             </Text>

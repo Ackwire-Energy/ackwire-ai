@@ -5,7 +5,7 @@ import { groupsWith } from "@agenteschat/client/lib/timeline";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, Icon, PixelOrbit, Text } from "@/ui";
+import { Button, LineIcon, PixelOrbit, Text } from "@/ui";
 import { chatHref } from "../links/logic";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -77,7 +77,7 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
         ) : null}
         {q ? (
           <View style={[styles.line, styles.pad]}>
-            <Icon name="agent" size={14} color={c.faint} />
+            <LineIcon variant="caption" name="agent" size={14} color={c.faint} />
             <Text variant="caption" tone="faint" style={styles.grow}>
               {t(consultOriginKey(q, Boolean(channelName)), {
                 from: from.name,
@@ -110,9 +110,12 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
         {q && state && state !== "answered" ? (
           <View style={[styles.line, styles.pad]} accessibilityLiveRegion="polite">
             {state === "working" ? (
-              <PixelOrbit color={agentLook(consulted).color} size={12} />
+              <LineIcon variant="caption" size={12}>
+                <PixelOrbit color={agentLook(consulted).color} size={12} />
+              </LineIcon>
             ) : (
-              <Icon
+              <LineIcon
+                variant="caption"
                 name={state === "waiting" || state === "offline" || state === "handedOn" ? "wait" : "clock"}
                 size={14}
                 color={c.faint}
@@ -126,7 +129,7 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
       </ScrollView>
       <View style={[styles.foot, { paddingBottom: insets.bottom + 8 }]}>
         <View style={[styles.note, { backgroundColor: c.sunken }]}>
-          <Icon name="lock" size={16} color={c.muted} />
+          <LineIcon variant="footnote" name="lock" size={16} color={c.muted} />
           <Text variant="footnote" tone="muted" style={styles.grow}>
             <Text variant="footnote" tone="ink2" style={styles.bold}>
               {t("chat.consultPanel.readOnly")}
@@ -153,10 +156,11 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   list: { paddingVertical: 12, gap: 2 },
   pad: { paddingHorizontal: 16 },
-  line: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 },
+  // Sentences that wrap: the icon stays on their first line (`LineIcon`), not between the lines.
+  line: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 6 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   answer: { gap: 4, paddingVertical: 8 },
   foot: { paddingHorizontal: 12, paddingTop: 8, gap: 8 },
-  note: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 16 },
+  note: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderRadius: 16 },
 });

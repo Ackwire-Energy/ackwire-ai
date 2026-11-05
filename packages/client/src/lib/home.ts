@@ -103,6 +103,11 @@ export const stepPermissions = (
  */
 export function firstSteps(input: {
   agents: number;
+  /**
+   * Agents the team made, without the right hand that every workspace starts with (the agents' count otherwise):
+   * "Create your first agent" is done by one of those, while the right hand alone already opens the steps after it.
+   */
+  made?: number;
   /** An agent has an AI to think with (`ai-status`'s `any`). */
   hasAi: boolean;
   /** An agent has worked here (`agent-status`'s `activeAt`). */
@@ -114,7 +119,7 @@ export function firstSteps(input: {
 }): FirstStep[] {
   const { agents, may } = input;
   const steps: FirstStep[] = [
-    ...(may.createAgents ? [{ id: "agent" as const, done: agents > 0 }] : []),
+    ...(may.createAgents ? [{ id: "agent" as const, done: (input.made ?? agents) > 0 }] : []),
     ...(agents > 0 && may.connectAi ? [{ id: "ai" as const, done: input.hasAi }] : []),
     ...(agents > 0 && may.talk ? [{ id: "ask" as const, done: input.asked }] : []),
     ...(may.invite ? [{ id: "team" as const, done: input.people > 1 }] : []),

@@ -6,12 +6,17 @@ const ROOT = join(import.meta.dir, "../../..");
 const LAYOUT = join(ROOT, "apps/web/src/layout.css");
 const KIT = join(ROOT, "packages/ui/src/styles/components.css");
 
-/** The rules of every `@media` block for the phone layout (760px and under), in order, as one sheet. */
+/**
+ * The rules of every `@media` block where Settings' sections are the strip above the page (940px and under: tablets
+ * and phones) or the phone layout (760px and under), in order, as one sheet.
+ */
 const phoneRules = (css: string) =>
   [
     ...css
       .replace(/\/\*[\s\S]*?\*\//g, "")
-      .matchAll(/@media\s*\((?:max-width:\s*760px|width\s*<=\s*760px)\)\s*\{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g),
+      .matchAll(
+        /@media\s*\((?:max-width:\s*(?:760|940)px|width\s*<=\s*(?:760|940)px)\)\s*\{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g,
+      ),
   ]
     .map((m) => m[1] ?? "")
     .join("\n");
@@ -27,16 +32,7 @@ test("the built stylesheet keeps what places the Settings header, the bucket's h
   expect(declarations(phoneRules(await Bun.file(LAYOUT).text()), ".settings__head")).toContainEqual(["padding", "0"]);
   // Every declaration the source writes for these ships as written.
   const sources: [string, string[]][] = [
-    [
-      LAYOUT,
-      [
-        ".grid-fields--wide",
-        ".page__header > p",
-        ".page__header-text > p",
-        ".key-row",
-        ".key-row > :not(.ac-brand, .list-col)",
-      ],
-    ],
+    [LAYOUT, [".grid-fields--wide", ".page__header > p", ".page__header-text > p", ".key-row", ".key-row__tail"]],
     [
       KIT,
       [
@@ -44,6 +40,7 @@ test("the built stylesheet keeps what places the Settings header, the bucket's h
         ".ac-card__key",
         ".ac-card__head:not(:has(.ac-card__sub)) .ac-card__key",
         ".ac-card__head:not(:has(.ac-card__sub)) .ac-card__key + .ac-card__heading",
+        ".ac-captail",
         ".ac-optrow__desc",
         ".ac-card__sub",
         ".ac-field__help",

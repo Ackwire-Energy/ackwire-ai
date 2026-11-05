@@ -178,7 +178,7 @@ export function ItemDetails({
       </span>
       {item.runs && <span className="small">{t("calendar.runs", { count: item.runs.length })}</span>}
       {item.location && (
-        <span className="small cal-details__row">
+        <span className="small ac-iconline cal-details__row">
           <Icon name="link" size={14} aria-hidden="true" />
           {/^https?:\/\//.test(item.location) ? (
             <a className="ac-link" href={item.location} target="_blank" rel="noreferrer">

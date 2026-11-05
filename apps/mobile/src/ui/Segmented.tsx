@@ -35,6 +35,8 @@ export function Segmented({ items, value, onChange }: SegmentedProps) {
             }}
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
+            // A 30-point segment: the slop gives it the 44 a finger needs, past the track's own padding.
+            hitSlop={{ top: 7, bottom: 7 }}
           >
             <View
               style={[

@@ -5785,7 +5785,7 @@
     "agentRole": "Ajan · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "Bir tane oluşturun ya da sohbette isteyin: “Lia, bu hata için bir görev oluştur”.",
+    "empty": "Bir tane oluşturun ya da sohbette bir ajandan isteyin.",
     "noResults": "Bu filtrelerle eşleşen görev yok.",
     "columnEmpty": "Burada bir şey yok.",
     "form": {

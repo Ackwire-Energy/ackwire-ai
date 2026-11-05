@@ -166,7 +166,7 @@ html:not([data-pointer]) .brw-site button:focus-visible {
 }
 .brw-use__acts {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
 .brw-confirm {
@@ -905,9 +905,6 @@ html:not([data-pointer]) .brw-ac__stage[tabindex]:focus-visible {
   color: var(--ink);
   background: var(--sunken);
 }
-.brw-tfield__send {
-  border-radius: 50%;
-}
 .brw-keycaps {
   position: absolute;
   right: 50px;
@@ -1195,6 +1192,12 @@ html:not([data-pointer]) .brw-kc:focus-visible {
   font-size: 12.5px;
 }
 @media (max-width: 760px) {
+  .brw-steps__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* The agent's Work tab in the panel beside its DM: three steps across 420px would be three slivers. */
+@container agp-side (max-width: 760px) {
   .brw-steps__grid {
     grid-template-columns: minmax(0, 1fr);
   }

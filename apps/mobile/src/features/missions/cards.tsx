@@ -256,7 +256,8 @@ export function ReviewCardView({ review: r, mission }: { review: MissionReview; 
   if (r.status !== "pending") {
     return (
       <View style={[styles.done, surface]}>
-        <Icon
+        <LineIcon
+          variant="small"
           name={r.status === "approved" ? "check" : "reply"}
           size={16}
           color={r.status === "approved" ? c.ok : c.muted}
@@ -420,14 +421,16 @@ export function DecisionCardView({ decision: d, mission }: { decision: MissionDe
                 pressed && styles.pressed,
               ]}
             >
-              {on ? <Icon name="check" size={16} color={c.bg} /> : null}
+              {on ? <LineIcon variant="body" name="check" size={16} color={c.bg} /> : null}
               <Text variant="body" style={[styles.optText, { color: on ? c.bg : c.ink }]}>
                 {o}
               </Text>
               {o === rec ? (
-                <Text variant="caption" style={{ color: on ? c.bg : c.faint, opacity: on ? 0.7 : 1 }}>
-                  {t("mobile.mission.decision.recommended")}
-                </Text>
+                <LineIcon variant="body" size={16}>
+                  <Text variant="caption" style={{ color: on ? c.bg : c.faint, opacity: on ? 0.7 : 1 }}>
+                    {t("mobile.mission.decision.recommended")}
+                  </Text>
+                </LineIcon>
               ) : null}
             </Pressable>
           );
@@ -467,11 +470,11 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
         accessibilityRole="button"
         style={[styles.done, surface]}
       >
-        <Icon name="check" size={16} color={c.ok} />
+        <LineIcon variant="small" name="check" size={16} color={c.ok} />
         <Text variant="small" tone="muted" style={styles.grow} numberOfLines={2}>
           {t("mobile.mission.plan.started", { title: m.title || goal })}
         </Text>
-        <Icon name="right" size={16} color={c.faint} />
+        <LineIcon variant="small" name="right" size={16} color={c.faint} />
       </Pressable>
     );
   }
@@ -482,7 +485,7 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
     <View style={[investigated ? styles.inv : styles.askcard, surface]}>
       <View style={styles.row}>
         <Icon name="target" size={15} color={c.muted} />
-        <Text variant="caption" tone="muted" style={styles.bold}>
+        <Text variant="caption" tone="muted" style={[styles.bold, styles.shrink]}>
           {investigated
             ? t("missions.findings.proposed")
             : items.length > 0
@@ -504,7 +507,9 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
       {items.slice(0, 4).map((it, i) => (
         <View key={it.id} style={styles.planRow}>
           <View style={styles.n}>
-            <Count value={i + 1} size={13} />
+            <LineIcon variant="small" size={16}>
+              <Count value={i + 1} size={13} />
+            </LineIcon>
           </View>
           <Text variant="small" tone="ink2" style={styles.grow}>
             {it.title}
@@ -640,10 +645,11 @@ function Findings({ findings }: { findings: MissionFinding[] }) {
 }
 
 const styles = StyleSheet.create({
+  shrink: { flexShrink: 1 },
   mcard: { marginTop: 8, padding: 14, borderRadius: 20, gap: 0 },
   pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  grow: { flex: 1 },
+  grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   title: { marginTop: 5, marginBottom: 10 },
   titlePinned: { marginTop: 4, marginBottom: 8 },
@@ -652,19 +658,22 @@ const styles = StyleSheet.create({
   summary: { marginBottom: 10 },
   log: { padding: 10, borderRadius: 12, marginBottom: 10 },
   acts: { flexDirection: "row", gap: 8, marginTop: 4 },
+  // Its words wrap to two lines: the icons stay on the first.
   done: {
     marginTop: 8,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 16,
   },
   opts: { gap: 6 },
-  opt: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 13 },
+  // A long option wraps: its check and "Recommended" stay on its first line.
+  opt: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderRadius: 13 },
   optText: { flex: 1, fontWeight: "500" },
-  planRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 },
+  // A step's title wraps: its number stays on the first line.
+  planRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 4 },
   n: { width: 16, alignItems: "flex-end" },
   more: { paddingLeft: 26, paddingBottom: 8 },
   inv: { marginTop: 8, padding: 14, borderRadius: 20 },

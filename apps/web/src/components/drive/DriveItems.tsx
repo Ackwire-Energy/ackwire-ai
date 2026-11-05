@@ -144,9 +144,11 @@ export function DriveRow({
           </button>
           <span className="drive-row__sub">
             <Icon name={itemIcon(a)} size={14} />
-            {t(`artifacts.kind.${a.kind}`)}
-            {a.version > 1 && ` · ${t("artifacts.version", { version: a.version })}`}
-            <span className="drive-row__mobile">{` · ${name} · ${when}`}</span>
+            <span className="drive-row__subtext">
+              {t(`artifacts.kind.${a.kind}`)}
+              {a.version > 1 && ` · ${t("artifacts.version", { version: a.version })}`}
+              <span className="drive-row__mobile">{` · ${name} · ${when}`}</span>
+            </span>
           </span>
         </span>
       </span>

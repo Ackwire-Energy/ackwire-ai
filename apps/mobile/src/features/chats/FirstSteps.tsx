@@ -1,5 +1,6 @@
 import { useAgentStatuses, useAiStatus, useOverview, useRoutines } from "@agenteschat/client";
 import { type FirstStep, firstSteps, startingOut, stepPermissions } from "@agenteschat/client/lib/home";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
@@ -24,6 +25,7 @@ function useFirstSteps(): FirstStep[] | null {
   if (dir.loading || !ai.isFetched || !statuses.isFetched || !overview.isFetched || !routines.isFetched) return null;
   const steps = firstSteps({
     agents: dir.agents.length,
+    made: dir.agents.filter((a) => !isRightHand(a)).length,
     hasAi: ai.data?.any ?? true,
     asked: (statuses.data ?? []).some((s) => s.activeAt !== null),
     people: overview.data?.people ?? 1,

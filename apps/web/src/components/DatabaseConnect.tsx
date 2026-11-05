@@ -793,7 +793,7 @@ export function DatabaseRow({
     <div className="ac-list__row connected-row">
       <DatabaseIcon size="lg" />
       <span className="list-col connected-row__text">
-        <span className="list-title">
+        <span className="list-title ac-captop">
           <span>{name}</span>
           {connection.status === "needs_reconnect" ? (
             <Chip icon="alert" tone="waiting">

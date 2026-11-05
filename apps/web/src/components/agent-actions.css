@@ -1,8 +1,8 @@
 /*
  * Receipts under an agent's reply: one
- * change is a quiet row (A); several are a group with
- * "N mudanças · há X" and Desfazer tudo (B). Cards like the reply's tools (the card face, its hairline and cut
- * corner, the same width), icon tiles, the countdown in tabular figures. The sentence wraps, whole; the icon and the
+ * change is a quiet row; several are a group with
+ * "N changes · X ago" and "Undo all". Cards like the reply's tools (the card face, its hairline and cut
+ * corner, the same width), flat icons, the countdown in tabular figures. The sentence wraps, whole; the icon and the
  * button sit on its first line. Undone rows are struck through and dimmed.
  */
 .ag-rcs {
@@ -26,6 +26,8 @@
   font-size: 14px;
   color: var(--muted);
 }
+/* The icon sits flat on the card, no tile of its own inside it: its 16px glyph 12px in from the card's edge, as the
+   other cards' first glyph. */
 .ag-rc__ic {
   flex: none;
   display: grid;
@@ -34,10 +36,7 @@
   height: 24px;
   /* On the first line's middle, which is the 32px button's. */
   margin-block: 4px;
-  border-radius: 8px;
-  background: var(--raised);
   color: var(--ink2);
-  box-shadow: var(--e1);
 }
 .ag-rc__tx {
   flex: 1;
@@ -126,9 +125,6 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
 .ag-rc.is-undone,
 .ag-rcg__it.is-undone {
   opacity: 0.8;
-}
-.ag-rc[data-phase="settled"] .ag-rc__ic {
-  box-shadow: none;
 }
 
 /* B: several changes */

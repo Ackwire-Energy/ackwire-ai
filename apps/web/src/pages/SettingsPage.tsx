@@ -724,17 +724,17 @@ function KeysSection() {
   const live = (credentials.data ?? []).filter((c) => !c.revokedAt);
   return (
     <Card aria-labelledby="sec-keys">
-      <div className="row" style={{ gap: 12 }}>
-        <div className="ac-hintline" style={{ flex: "1 1 280px" }}>
-          <h2 id="sec-keys" className="ac-card__title">
-            {t("settings.keysTitle")}
-          </h2>
-          <InfoHint name={t("common.about", { label: t("settings.keysTitle") })}>{t("settings.keysSubtitle")}</InfoHint>
-        </div>
-        <Button size="sm" icon="plus" onClick={() => setDialog({ type: "add" })}>
-          {t("settings.addKey")}
-        </Button>
-      </div>
+      <CardHeader
+        id="sec-keys"
+        icon="key"
+        title={t("settings.keysTitle")}
+        hint={{ name: t("common.about", { label: t("settings.keysTitle") }), text: t("settings.keysSubtitle") }}
+        action={
+          <Button size="sm" icon="plus" onClick={() => setDialog({ type: "add" })}>
+            {t("settings.addKey")}
+          </Button>
+        }
+      />
       {platform.data && <p className="small muted">{t("settings.platformAvailable")}</p>}
       {credentials.isLoading && <LoadingList count={2} avatar={false} trailing />}
       {credentials.isSuccess && live.length === 0 && <p className="small muted">{t("settings.noKeys")}</p>}
@@ -758,44 +758,46 @@ function KeysSection() {
                     </span>
                   </span>
                 </span>
-                {c.endpoint ? (
-                  <Button variant="ghost" size="sm" onClick={() => setDialog({ type: "models", cred: c })}>
-                    {t("endpoint.models")}
-                  </Button>
-                ) : isDefault ? (
-                  <Chip icon="check">{t("settings.default")}</Chip>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={updateSettings.isPending}
-                    loading={updateSettings.isPending}
-                    onClick={() => updateSettings.mutate({ defaultCredentialId: c.id })}
-                  >
-                    {t("settings.makeDefault")}
-                  </Button>
-                )}
-                <div className="row" style={{ gap: 4 }}>
-                  <Button variant="ghost" size="sm" onClick={() => setDialog({ type: "rotate", cred: c })}>
-                    {t("settings.rotate")}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="ac-btn--danger"
-                    disabled={isDefault}
-                    title={isDefault ? t("settings.removeDefaultBlocked") : undefined}
-                    aria-describedby={isDefault ? `default-note-${c.id}` : undefined}
-                    onClick={() => setDialog({ type: "remove", cred: c })}
-                  >
-                    {t("settings.remove")}
-                  </Button>
-                  {isDefault && (
-                    <span id={`default-note-${c.id}`} className="ac-visually-hidden">
-                      {t("settings.removeDefaultBlocked")}
-                    </span>
+                <span className="key-row__tail ac-captail ac-captop">
+                  {c.endpoint ? (
+                    <Button variant="ghost" size="sm" onClick={() => setDialog({ type: "models", cred: c })}>
+                      {t("endpoint.models")}
+                    </Button>
+                  ) : isDefault ? (
+                    <Chip icon="check">{t("settings.default")}</Chip>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={updateSettings.isPending}
+                      loading={updateSettings.isPending}
+                      onClick={() => updateSettings.mutate({ defaultCredentialId: c.id })}
+                    >
+                      {t("settings.makeDefault")}
+                    </Button>
                   )}
-                </div>
+                  <div className="row" style={{ gap: 4 }}>
+                    <Button variant="ghost" size="sm" onClick={() => setDialog({ type: "rotate", cred: c })}>
+                      {t("settings.rotate")}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="ac-btn--danger"
+                      disabled={isDefault}
+                      title={isDefault ? t("settings.removeDefaultBlocked") : undefined}
+                      aria-describedby={isDefault ? `default-note-${c.id}` : undefined}
+                      onClick={() => setDialog({ type: "remove", cred: c })}
+                    >
+                      {t("settings.remove")}
+                    </Button>
+                    {isDefault && (
+                      <span id={`default-note-${c.id}`} className="ac-visually-hidden">
+                        {t("settings.removeDefaultBlocked")}
+                      </span>
+                    )}
+                  </div>
+                </span>
               </div>
             );
           })}
@@ -1061,9 +1063,7 @@ function UsageSection() {
       )}
       {allowed && (
         <Card aria-labelledby="sec-usage">
-          <h2 id="sec-usage" className="ac-card__title">
-            {t("settings.usageTitle")}
-          </h2>
+          <CardHeader id="sec-usage" icon="chart" title={t("settings.usageTitle")} />
           {report.isLoading && <LoadingList count={4} avatar={false} trailing />}
           {report.isError && !report.data && <ErrorState error={report.error} onRetry={() => void report.refetch()} />}
           {report.data && (
@@ -1112,9 +1112,7 @@ function DefaultBudgetCard() {
   const dirty = saved !== undefined && amount > 0 && amount !== saved;
   return (
     <Card aria-labelledby="sec-default-budget">
-      <h2 id="sec-default-budget" className="ac-card__title">
-        {t("settings.defaultBudgetTitle")}
-      </h2>
+      <CardHeader id="sec-default-budget" icon="wallet" title={t("settings.defaultBudgetTitle")} />
       <form
         className="row"
         style={{ gap: 12, alignItems: "flex-end" }}

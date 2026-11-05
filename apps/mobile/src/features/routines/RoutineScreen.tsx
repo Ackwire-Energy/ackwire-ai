@@ -385,7 +385,8 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
               ) : null}
               {busy ? (
                 <View style={styles.note}>
-                  <Icon name="laptop" size={14} color={c.muted} />
+                  {/* On the note's first line, not above its letters at the row's top. */}
+                  <LineIcon variant="footnote" name="laptop" size={14} color={c.muted} />
                   <Text variant="footnote" tone="muted" style={styles.shrink}>
                     {say(busy)}
                   </Text>
@@ -572,9 +573,10 @@ function useNode(run: RoutineRun): { bg: string; ink: string; icon: IconName | n
   const c = useColors();
   const pixel = runPixelStatus(run.status);
   if (pixel === "ok") return { bg: c.ink, ink: c.bg, icon: "check" };
-  if (pixel === "failed") return { bg: c.danger, ink: "#ffffff", icon: "x" };
-  if (pixel === "skipped") return { bg: c.warn, ink: "#ffffff", icon: "pause" };
-  if (pixel === null && isRunAtWork(run.status)) return { bg: c.agent, ink: "#ffffff", icon: "play" };
+  // Each fill's own ink: white stood on dark's light red, amber and blue with too little contrast.
+  if (pixel === "failed") return { bg: c.danger, ink: c.bg, icon: "x" };
+  if (pixel === "skipped") return { bg: c.warn, ink: c.onWarn, icon: "pause" };
+  if (pixel === null && isRunAtWork(run.status)) return { bg: c.agent, ink: c.onAgent, icon: "play" };
   return { bg: c.sunken, ink: c.ink2, icon: null };
 }
 

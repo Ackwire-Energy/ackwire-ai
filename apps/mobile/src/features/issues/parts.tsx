@@ -8,7 +8,7 @@ import { router } from "expo-router";
 import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Chip, Icon, type IconName, PixelOrbit, Text } from "@/ui";
+import { Chip, Icon, type IconName, LineIcon, PixelOrbit, Text } from "@/ui";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -295,19 +295,23 @@ function BoardWork({ issue: i }: { issue: Issue }) {
   const doing = live ? work.plan.find((p) => p.state === "doing") : undefined;
   return (
     <View style={boardWork.box}>
+      {/* Icon and words in the warning color, as the card's state line: a tinted pill was a second surface. */}
       {blocked ? (
-        <Text variant="caption" style={[boardWork.badge, { backgroundColor: c.warnSoft, color: c.warn }]}>
-          {blocked}
-        </Text>
+        <View style={boardWork.blocked}>
+          <LineIcon name="wait" size={12} color={c.warn} variant="caption" />
+          <Text variant="caption" numberOfLines={2} style={[boardWork.blockedText, { color: c.warn }]}>
+            {blocked}
+          </Text>
+        </View>
       ) : null}
       {progress ? (
-        <Text variant="caption" tone="muted">
+        <Text variant="caption" tone="muted" numberOfLines={2}>
           {t("work.plan")} · {t("work.planProgress", progress)}
           {doing ? ` · ${doing.text}` : ""}
         </Text>
       ) : null}
       {live && work.lastUpdate ? (
-        <Text variant="caption" tone="muted">
+        <Text variant="caption" tone="muted" numberOfLines={2}>
           {t("work.lastUpdate")}: {work.lastUpdate.text}
         </Text>
       ) : null}
@@ -317,12 +321,7 @@ function BoardWork({ issue: i }: { issue: Issue }) {
 
 const boardWork = StyleSheet.create({
   box: { gap: 4 },
-  badge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 7,
-    paddingVertical: 1,
-    borderRadius: 6,
-    overflow: "hidden",
-    fontWeight: "600",
-  },
+  // Top-aligned: the icon stays on the first line when the words wrap.
+  blocked: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  blockedText: { flexShrink: 1, fontWeight: "600" },
 });

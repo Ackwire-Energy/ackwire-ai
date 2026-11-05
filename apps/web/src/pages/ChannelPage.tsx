@@ -1545,7 +1545,7 @@ function ChannelView({
         {missionReply && (
           <span className="ac-composer__pill composer-reply">
             <Icon name="message" size={14} />
-            {t("missions.reply.pill", { label: missionReply.label })}
+            <span className="ac-composer__pill-text">{t("missions.reply.pill", { label: missionReply.label })}</span>
             <button
               type="button"
               className="composer-reply__close"
@@ -1559,7 +1559,7 @@ function ChannelView({
         {pillAgents.map((a) => (
           <span key={a.id} className="ac-composer__agent">
             <AgentAvatar agentId={a.id} channelId={channel.id} name={a.name} size="xs" />
-            {a.name}
+            <span className="ac-composer__pill-text">{a.name}</span>
           </span>
         ))}
       </>

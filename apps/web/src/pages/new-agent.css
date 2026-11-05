@@ -255,7 +255,7 @@
 .newag__born-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   margin-top: 10px;
 }
 .newag__on-sky.ac-btn {
@@ -387,6 +387,12 @@
     animation: none;
     transition: none;
   }
+}
+
+/* Its own page in the desktop app: the workspace is the window less its title bar (desktop.css), so the rail and the
+   preview fill that area, not the whole window, and their foot doesn't sink under its edge. */
+html[data-desktop] .shell .newag:not(.newag-dialog > *) {
+  --onb-h: calc(100dvh - var(--titlebar-h));
 }
 
 /*

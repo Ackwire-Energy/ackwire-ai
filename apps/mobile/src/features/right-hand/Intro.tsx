@@ -72,7 +72,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
         <OpensAgent agentId={agent.id}>
           <AgentFace agentId={agent.id} size={36} />
         </OpensAgent>
-        <Text variant="body" style={styles.bold}>
+        <Text variant="body" style={[styles.bold, styles.shrink]}>
           {agent.name}
         </Text>
       </View>
@@ -210,6 +210,8 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
                 </Pressable>
               );
             })}
+            {/* With one created (three left), the last keeps its column's width instead of spanning the row. */}
+            {left.length % 2 === 1 ? <View style={styles.presetSpacer} /> : null}
           </View>
           <Button
             variant="secondary"
@@ -365,6 +367,8 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   sticker: { width: MESSAGE_STICKER, height: MESSAGE_STICKER, marginTop: 4 },
   fill: { flex: 1, minWidth: 0 },
+  // A long name wraps beside the face instead of running past the screen's edge.
+  shrink: { flexShrink: 1 },
   card: { marginTop: 6, borderRadius: 16, padding: 14, gap: 10 },
   presets: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   preset: {
@@ -377,4 +381,5 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 8,
   },
+  presetSpacer: { flexBasis: "47%", flexGrow: 1 },
 });

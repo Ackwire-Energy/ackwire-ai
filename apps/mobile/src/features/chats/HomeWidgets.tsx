@@ -37,7 +37,8 @@ export function HomeWidgets() {
         <Pressable
           onPress={() => router.push("/dashboards")}
           accessibilityRole="button"
-          hitSlop={8}
+          // A 20-point line: 12 of slop around it reaches the 44-point target.
+          hitSlop={12}
           style={({ pressed }) => [styles.more, pressed && styles.pressed]}
         >
           <Text variant="small" tone="muted" style={styles.medium}>

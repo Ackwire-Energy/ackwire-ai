@@ -196,7 +196,8 @@ function MemoryView({ agent }: { agent: Agent }) {
                   ? t("memory.editedByYou", { when: relativeTime(t, i18n.language, m.updatedAt) })
                   : memorySource(t, i18n.language, m)}
               </span>
-              <div className="row" style={{ gap: 4 }}>
+              {/* A row of ghosts: their words 16px apart, the last one on the item's padding line. */}
+              <div className="ac-acts">
                 <Button variant="ghost" size="sm" onClick={() => setEditing(m)}>
                   {t("memory.edit")}
                 </Button>

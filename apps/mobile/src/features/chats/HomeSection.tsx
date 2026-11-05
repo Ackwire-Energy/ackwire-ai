@@ -130,7 +130,8 @@ export function SeeAllRow({ label, onPress }: { label: string; onPress: () => vo
 }
 
 const styles = StyleSheet.create({
-  head: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 6 },
+  // The kit's `SectionHeader` and the widgets' head on the same screen leave 8 under the title, not 6.
+  head: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 8 },
   pressed: { opacity: 0.6 },
   title: { fontWeight: "600", flexShrink: 1 },
   grow: { flex: 1 },

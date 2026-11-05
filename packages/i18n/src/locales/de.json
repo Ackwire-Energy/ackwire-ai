@@ -5824,7 +5824,7 @@
     "agentRole": "Agent · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "Erstell eine, oder frag im Chat: „Lia, erstell eine Aufgabe für diesen Fehler“.",
+    "empty": "Erstell eine, oder bitte einen Agenten im Chat darum.",
     "noResults": "Keine Aufgaben passen zu diesen Filtern.",
     "columnEmpty": "Hier ist nichts.",
     "form": {

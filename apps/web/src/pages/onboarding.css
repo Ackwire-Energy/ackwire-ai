@@ -75,6 +75,17 @@
     transform: translateX(18px);
   }
 }
+/* Reduced motion: each step fades in where it stands, and the host arrives without its pop. */
+@media (prefers-reduced-motion: reduce) {
+  @starting-style {
+    .onb__body,
+    .onb__bubble,
+    .onb__answer,
+    .onb__actions {
+      transform: none;
+    }
+  }
+}
 .onb__back {
   align-self: flex-start;
   display: inline-flex;
@@ -146,6 +157,11 @@ html:not([data-pointer]) .onb__signout:focus-visible {
 /* A host agent that just arrived pops in. */
 .onb__host[data-fresh] .ac-avatar {
   animation: onb-pop 0.5s var(--spring) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .onb__host[data-fresh] .ac-avatar {
+    animation: none;
+  }
 }
 @keyframes onb-pop {
   from {

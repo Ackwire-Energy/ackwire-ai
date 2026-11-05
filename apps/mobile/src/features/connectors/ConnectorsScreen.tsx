@@ -17,7 +17,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Dither } from "@/sky/Dither";
-import { Button, EmptyState, Filters, Icon, SearchField, SectionHeader, Text } from "@/ui";
+import { Button, EmptyState, Filters, Icon, LineIcon, SearchField, SectionHeader, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
@@ -90,6 +90,7 @@ function Gallery() {
     const inCat = cat === "all" ? pool : pool.filter((d) => d.category === cat);
     return searchConnectors(inCat, q, (d) => `${connectorName(t, d)} ${connectorDescription(t, d)}`);
   }, [list, suggestions, cat, q, searching, t]);
+  const tiles = galleryTiles(rest, items);
   const cats = CATEGORIES.filter((k) => list.some((d) => d.category === k));
   // Without Composio here, the services that connect only through it are left out: admins read why.
   const composioOff = admin ? composioOffText(t, list, SUGGESTED) : null;
@@ -266,7 +267,7 @@ function Gallery() {
             <EmptyState icon="search" title={t("mobile.connectors.noResults")} />
           ) : (
             <View style={styles.grid}>
-              {galleryTiles(rest, items).map(({ def: d, connected: isConnected, opens, locked }) => (
+              {tiles.map(({ def: d, connected: isConnected, opens, locked }) => (
                 <Tile
                   key={d.id}
                   def={d}
@@ -277,6 +278,8 @@ function Gallery() {
                   onPress={opens ? open : undefined}
                 />
               ))}
+              {/* An odd last tile keeps its column's width instead of growing across the row. */}
+              {tiles.length % 2 === 1 ? <View style={styles.tileSpacer} /> : null}
             </View>
           )}
           {composioOff ? (
@@ -408,7 +411,7 @@ function Tile({
         {name}
       </Text>
       <View style={styles.tileText}>
-        {locked ? <Icon name="lock" size={13} color={c.muted} /> : null}
+        {locked ? <LineIcon variant="small" name="lock" size={13} color={c.muted} /> : null}
         <Text variant="small" tone="muted" numberOfLines={2} style={styles.grow}>
           {text}
         </Text>
@@ -463,7 +466,8 @@ const styles = StyleSheet.create({
   band: { width: 88, alignSelf: "stretch", minHeight: 72, alignItems: "center", justifyContent: "center" },
   cardText: { flex: 1, minWidth: 0, paddingVertical: 12, paddingRight: 14 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, paddingHorizontal: 16, paddingTop: 10 },
-  tileText: { flexDirection: "row", alignItems: "center", gap: 4 },
+  // The lock stays on the first line of a two-line description, not between its lines.
+  tileText: { flexDirection: "row", alignItems: "flex-start", gap: 4 },
   tile: {
     width: "48%",
     flexGrow: 1,
@@ -472,4 +476,5 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  tileSpacer: { width: "48%", flexGrow: 1 },
 });

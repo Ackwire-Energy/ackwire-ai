@@ -42,7 +42,7 @@
   }
 }
 
-/* A board's head: "Organize" and "+ Widget" as one raised pill, a hairline between them (gone under the pointer). */
+/* A board's head: "Organize" and "+ Widget" as one raised bar, a hairline between them (gone under the pointer). */
 .wb-pill {
   display: inline-flex;
   align-items: center;
@@ -50,7 +50,9 @@
   height: 32px;
   box-sizing: border-box;
   padding: 2px;
-  border-radius: 999px;
+  /* Buttons, not a label: the ruler's 30% corner (a pill is only for what you don't press), its two buttons inside
+     it concentric. */
+  border-radius: var(--control-r-sm);
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
 }
@@ -63,7 +65,7 @@
   box-sizing: border-box;
   padding: 0 12px 0 9px;
   border: 0;
-  border-radius: 999px;
+  border-radius: calc(var(--control-r-sm) - 2px);
   background: none;
   font: inherit;
   font-size: 13px;
@@ -432,9 +434,10 @@ html:not([data-pointer]) .wg__resolve:focus-visible {
   vertical-align: top;
 }
 /* A chart's note: a quiet caption under a hairline, at most two lines (`wk-clamp`). */
+/* As much room over its hairline as under it. */
 .wk-note {
-  margin: 14px 0 0;
-  padding-top: 12px;
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-3);
   border-top: 1px solid var(--line);
   font-size: 12.5px;
   line-height: 18px;
@@ -505,8 +508,11 @@ html:not([data-pointer]) .wg__resolve:focus-visible {
   justify-content: space-between;
   border-top: 0;
 }
+/* On a one-column widget eight dates need more than its width: they shrink and end in "…" (above) instead of the
+   latest running past the card. */
 .wk-axis--line span {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .wk-list {
   display: flex;
@@ -726,7 +732,11 @@ html:not([data-pointer]) :is(.wg__size, .wg__grip):focus-visible {
   box-shadow: var(--focus-ring);
 }
 
-/* A board's fixed tile (Home's "Waiting on you", "Working now"): rows from edge to edge. */
+/* A board's fixed tile (Home's "Waiting on you", "Working now"): rows from edge to edge, and its title on the rows'
+   16px inset, over their faces and its empty line. */
+.wg--fixed .wg__head {
+  padding-left: var(--space-4);
+}
 .wg--fixed .wg__body {
   padding: 4px 0 8px;
 }

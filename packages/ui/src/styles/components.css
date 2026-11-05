@@ -134,7 +134,10 @@ html[data-pointer] :focus-visible {
  * mode. Set on the children (custom properties inherit), so the container
  * keeps its own level and a card inside a dialog lifts once. Light mode is
  * unchanged (`--raised-2` is white there). App containers that hold raised
- * pieces add the same pair of declarations to their children.
+ * pieces add the same pair of declarations to their children. A card's top
+ * (`--card-face-top`, `--card-key-bottom`) steps up with them: set on the
+ * root, it stayed the container's color, and a card there faded from the
+ * container's face into its own in dark.
  */
 :where(
   .ac-dialog,
@@ -150,6 +153,8 @@ html[data-pointer] :focus-visible {
 ) > * {
   --raised: var(--raised-2);
   --surface-raised: var(--raised-2);
+  --card-face-top: var(--raised-2);
+  --card-key-bottom: var(--raised-2);
 }
 .ac-visually-hidden {
   position: absolute;
@@ -227,6 +232,24 @@ html[data-pointer] :focus-visible {
   .ac-captop,
   .ac-option > .ac-avatar:first-child + .ac-option__text > .ac-option__title {
     margin-block-start: calc(var(--cap-top) - 0.5lh);
+  }
+}
+/*
+ * What ends a row whose words can wrap (a chip, its buttons, a switch) belongs to the first line, never to the row's
+ * middle: `.ac-captail` is a box as tall as that line (in the row's font size and line height), whatever it holds
+ * centred on it, so a 32px button reaches as far above the line as below. Beside a first line that rises
+ * (`.ac-captop`, in an `.ac-faceline`) it takes `.ac-captop` too and rises with it.
+ */
+.ac-captail {
+  display: flex;
+  flex: none;
+  align-self: flex-start;
+  align-items: center;
+  height: 22px;
+}
+@supports (top: 1lh) {
+  .ac-captail {
+    height: 1lh;
   }
 }
 
@@ -934,6 +957,18 @@ textarea.ac-input {
 .ac-avatar-stack > .ac-avatar {
   box-shadow: 0 0 0 2px var(--stack-ring, var(--surface));
 }
+/*
+ * A raised container names its own face as that surface, resolved on the container itself (its children's `--raised`
+ * is a step up), so faces and makers' tiles stacked on a card, a list, a dialog or a menu are cut out of that face. The
+ * page's color drew rings around them there: darker on a dialog in dark (outside the work area `--surface` is the
+ * darkest ground), lighter on a menu. A row with a plate of its own sets the ring again.
+ */
+:where(.ac-dialog, .ac-details, .ac-card, .ac-list, .ac-composer, .ac-approval, .ac-alert) {
+  --stack-ring: var(--surface-raised);
+}
+:where(.ac-menu, .ac-toast, .ac-glass) {
+  --stack-ring: var(--glass-solid);
+}
 .ac-avatar-stack > .ac-avatar + .ac-avatar {
   margin-left: -6px;
 }
@@ -983,6 +1018,8 @@ textarea.ac-input {
 .ac-msg > * {
   --raised: var(--raised-2);
   --surface-raised: var(--raised-2);
+  --card-face-top: var(--raised-2);
+  --card-key-bottom: var(--raised-2);
   --sunken: var(--msg-well);
   --surface-sunken: var(--msg-well);
   --card-well: var(--msg-well);
@@ -1169,16 +1206,25 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   font-size: 14px;
   line-height: 20px;
 }
-/* An error line with its × after it: the × stays out of the .ac-iconline, centred on the whole line. */
+/*
+ * An error line with its fix and its × after it, out of the .ac-iconline: they stay on the reason's first line, not the
+ * middle of a reason that wraps. The words start as far down as a small button (32, 40 on touch) centres a line, so a
+ * one-line error is as tall as before and its first line runs through the buttons' middle.
+ */
 .ac-msg__error-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   margin: 2px 0 0;
 }
 .ac-msg__error-row > .ac-msg__error {
   min-width: 0;
-  margin: 0;
+  margin: calc((var(--control-h-sm) - 20px) / 2) 0 0;
+}
+@media (pointer: coarse) {
+  .ac-msg__error-row > .ac-msg__error {
+    margin-top: calc((var(--control-h-md) - 20px) / 2);
+  }
 }
 .ac-mention {
   color: var(--ink);
@@ -1979,6 +2025,8 @@ html:not([data-pointer]) .ac-radio:focus-visible {
   border-radius: var(--radius-lg);
   border: 0;
   background: var(--raised);
+  /* Faces or makers' tiles stacked on it are cut out of its own face (`--stack-ring`), chosen or not. */
+  --stack-ring: var(--raised);
   /* A visible outline in both themes (the e1 hairline alone disappears on dark surfaces). */
   box-shadow:
     0 0 0 1px var(--line2),
@@ -2007,6 +2055,7 @@ html:not([data-pointer]) .ac-radio:focus-visible {
 .ac-option[aria-pressed="true"],
 .ac-option[data-state="checked"] {
   --pressed: 0 0 0 1px var(--line2), 0 0 0 1px var(--line), var(--chosen-press);
+  --stack-ring: var(--chosen-bg);
   background: var(--chosen-bg);
   box-shadow: var(--pressed);
 }
@@ -2230,6 +2279,9 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-dialog__title {
   margin: 0;
   flex: 1;
+  /* A long word (an address, a file's name) wraps inside the head instead of pushing the close out. */
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 18px;
   line-height: 24px;
   font-weight: 650;
@@ -2283,7 +2335,8 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   flex: 1 1 auto;
   min-height: min(120px, 30vh);
   overflow-y: auto;
-  padding: 0 var(--dialog-pad);
+  /* As the body's: room for the first and last rows' focus rings, which the scroll area would clip. */
+  padding: 4px var(--dialog-pad);
 }
 .ac-dialog__empty {
   margin: 0;
@@ -2301,6 +2354,11 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-dialog__foot--bar {
   padding: 12px var(--dialog-pad) var(--dialog-pad);
   border-top: 1px solid var(--line);
+}
+/* Over that line, the body ends as far above it as the buttons start under it (it kept only its 4px of room for focus
+   rings). */
+.ac-dialog__body:has(+ .ac-dialog__foot--bar) {
+  padding-bottom: 12px;
 }
 .ac-dialog__foot-note {
   flex: 1;
@@ -2524,16 +2582,21 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-list__row + .ac-list__row {
   border-top: 1px solid var(--line);
 }
-/* A ghost icon that ends a row (its actions' menu): its icon on the row's padding line, as far in as the row's lead. */
-.ac-list__row > .ac-btn--ghost.ac-btn--icon:last-child {
+/* A ghost icon that ends a row (its actions' menu): its icon on the row's padding line, as far in as the row's lead,
+   in the row's first-line box (`.ac-captail`) too. */
+.ac-list__row > .ac-btn--ghost.ac-btn--icon:last-child,
+.ac-list__row > .ac-captail:last-child > .ac-btn--ghost.ac-btn--icon:last-child {
   margin-right: calc(-1 * var(--ghost-plate));
 }
+/* The soft plate, as a message row's hover: the page's color was no change on a list on the page in light, and a
+   near-black hole on a list in a dialog in dark (outside the work area `--surface` is the darkest ground). */
 a.ac-list__row:hover {
-  background: var(--surface);
+  background: var(--plate-soft);
 }
+/* The list clips at its rounded edge (`overflow: hidden`), where its rows' sides are: their ring goes inside. */
 html:not([data-pointer]) a.ac-list__row:focus-visible {
   outline: none;
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 
 /* A neutral clickable row for side lists (ListRow): lead, title, meta. */
@@ -2940,6 +3003,10 @@ html:not([data-pointer]) .ac-back:focus-visible {
 .ac-details__bar--titled > .ac-details__heading {
   flex: 1;
   min-width: 0;
+}
+/* The buttons (32px, 40px on touch) centred on that first line (28px), not hung from its top. */
+.ac-details__bar--titled > .ac-details__actions {
+  height: 28px;
 }
 .ac-details__heading {
   display: flex;
@@ -3638,7 +3705,20 @@ html:not([data-pointer]) .ac-date__day:focus-visible {
   font-size: 13px;
   color: var(--ink);
 }
+/* Never wider than the list: a long one (an e-mail address on a phone or in the agent's panel) ends in "…", its ✕
+   still in reach, instead of running out of its card. */
+.ac-tokens > li {
+  min-width: 0;
+  max-width: 100%;
+}
+.ac-token {
+  box-sizing: border-box;
+  max-width: 100%;
+}
 .ac-token__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 /* One that stays (no ✕): even on both sides. */
@@ -4695,10 +4775,24 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
 .ac-menu__separator {
   margin: 4px var(--menu-item-px);
 }
+/*
+ * Its words can wrap and can carry a second line: the icon and the buttons stay on the first line, not the middle of
+ * the toast. The icon and the words keep the room a small button takes (32, 40 on touch), so a one-line toast is as
+ * tall as before and its first line runs through the buttons' middle.
+ */
 .ac-toast {
-  align-items: center;
+  --toast-line-pad: calc((var(--control-h-sm) - 20px) / 2);
+  align-items: flex-start;
   gap: 12px;
   padding: 12px 14px 12px 12px;
+}
+@media (pointer: coarse) {
+  .ac-toast {
+    --toast-line-pad: calc((var(--control-h-md) - 20px) / 2);
+  }
+}
+.ac-toast > :is(.ac-icon, .ac-toast__text) {
+  margin-block: var(--toast-line-pad);
 }
 /* Each tone's soft glow from the right edge over the glass, as the sidebar's chosen row has (layout.css,
    `.sidebar__item[data-status="active"]::before`); its icon in the tone. After the glass rules: their `background`
@@ -5236,8 +5330,10 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 .ac-msg--own[data-menu-open="true"] {
   background: none;
 }
+/* 70% of the row where it is wide; in a narrow column (a thread or a task's conversation beside the chat, ~250px
+   after the 96px) that left the bubble ~170px, so up to 400px it may take the row, as on a narrow window (below). */
 .ac-msg--own > .ac-msg__body {
-  --own-max: min(70%, 640px);
+  --own-max: max(min(70%, 640px), min(100%, 400px));
   position: relative;
   flex: 0 1 auto;
   max-width: var(--own-max);
@@ -5813,6 +5909,19 @@ html:not([data-pointer]) .ac-react:focus-visible {
   color: var(--ink2);
   border: 0;
   white-space: nowrap;
+  /* A long name or label never runs past the composer: the pill shrinks to its row and its words end in "…"
+     (`.ac-composer__pill-text`), its face, icon and × kept whole. */
+  min-width: 0;
+  max-width: 100%;
+}
+.ac-composer__pill > :not(.ac-composer__pill-text),
+.ac-composer__agent > :not(.ac-composer__pill-text) {
+  flex: none;
+}
+.ac-composer__pill-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ac-composer__agent {
   padding-left: 4px;
@@ -6630,12 +6739,20 @@ html:not([data-pointer]) .ac-video__rail:focus-visible .ac-video__knob {
 .ac-composer__tools--format .ac-btn + .ac-composer__send {
   margin-left: auto;
 }
+/* As wide as its buttons where there is room; narrower (a thread or a task's conversation beside the chat, a phone),
+   it keeps the line with emoji, attach and send and scrolls sideways. A basis of its full width wrapped it onto a
+   line of its own in any composer under ~500px, the other buttons on a second one; `max-width` keeps it from
+   growing past its buttons, send's auto margin takes the rest. Scrolling sideways it clips on every side: 3px of
+   room around the buttons (taken back by the margin, so nothing moves) keep their focus rings whole. */
 .ac-composer__format {
   display: flex;
   align-items: center;
   gap: 2px;
-  flex: 0 1 auto;
+  flex: 1 1 0;
+  max-width: max-content;
   min-width: 0;
+  margin: -3px;
+  padding: 3px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -7332,11 +7449,16 @@ html:not([data-pointer]) .ac-gif:focus-visible {
   white-space: nowrap;
 }
 .ac-palette__sub {
+  /* A long place gives way ("…") with the label, instead of pushing the row past the palette's edge. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--faint);
   font-size: 12.5px;
   white-space: nowrap;
 }
 .ac-palette__enter {
+  flex: none;
   margin-left: auto;
 }
 .ac-palette__empty {
@@ -8003,6 +8125,11 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
     flex-basis: 100%;
     min-height: 0;
   }
+  /* A line of its own here: with nothing in it yet (Settings' "Saved" between saves) it left a blank row and its gap
+     under the title. */
+  .ac-pagehead__actions:not(:has(> :not(:empty))) {
+    display: none;
+  }
   .ac-pagehead__actions > .ac-btn:not(.ac-btn--icon) {
     flex: 1 1 auto;
   }
@@ -8605,15 +8732,11 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
 .ac-emoji__scroll {
   max-height: max(140px, calc(var(--radix-popover-content-available-height, 100vh) - 110px));
 }
+/* A select's too: its rows' descriptions wrap instead of running it off a phone's screen. */
 .ac-popover,
-.ac-menu--dropdown {
+.ac-menu--dropdown,
+.ac-menu--select {
   max-width: calc(100vw - 24px);
-}
-/* Narrow: the formatting buttons share one row with emoji, attach and send, and scroll sideways. */
-@media (max-width: 760px) {
-  .ac-composer__format {
-    flex: 1 1 0;
-  }
 }
 @media (max-width: 640px) {
   /* The time sits mid-row: anchor its tooltip to the message row instead, so it never runs past the screen. */
@@ -9264,13 +9387,16 @@ html:not([data-pointer]) .ac-effort:focus-visible .ac-effort__ramp {
   font-weight: 600;
   font-size: 14px;
 }
+/* Too narrow for the words beside a wide end (a choice of three on a phone or in the agent's panel), the end goes
+   under them, on the same side, instead of squeezing them to a word a line or running out of the card. */
 .ac-setrow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  gap: 8px 16px;
 }
 .ac-setrow__text {
-  flex: 1;
+  flex: 1 1 220px;
   min-width: 0;
 }
 .ac-setrow__title {
@@ -9292,6 +9418,8 @@ label.ac-setrow__title {
   align-items: center;
   gap: 8px;
   flex: none;
+  max-width: 100%;
+  margin-left: auto;
 }
 .ac-setmore__toggle {
   display: flex;

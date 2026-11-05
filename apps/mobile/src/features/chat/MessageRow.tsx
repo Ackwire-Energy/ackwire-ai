@@ -371,7 +371,8 @@ export const MessageRow = memo(function MessageRow({
       {m.local === "pending" || (m.local === "failed" && offline) ? (
         <Sending offline={offline} end={onRight} />
       ) : m.local === "failed" ? (
-        <Pressable onPress={() => onRetry?.(m)} accessibilityRole="button" hitSlop={8}>
+        // A 16-point caption: 14 of slop gives the retry its 44-point target.
+        <Pressable onPress={() => onRetry?.(m)} accessibilityRole="button" hitSlop={14}>
           <Text variant="caption" tone="danger" style={onRight ? styles.meStatus : undefined}>
             {t("mobile.chat.failed")}
           </Text>
@@ -523,7 +524,7 @@ export const MessageRow = memo(function MessageRow({
           onPress={() => setReportOpen((o) => !o)}
           accessibilityRole="button"
           accessibilityState={{ expanded: reportOpen }}
-          hitSlop={6}
+          hitSlop={NAME_LINE_SLOP}
           style={styles.shrink}
         >
           <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
@@ -886,6 +887,8 @@ function StoppedLine({
           <PressScale
             onPress={onContinue}
             accessibilityRole="button"
+            // 26 points tall in the line: the slop gives it the 44 a finger needs.
+            hitSlop={{ top: 9, bottom: 9, left: 4, right: 4 }}
             style={[styles.continue, { backgroundColor: c.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
           >
             <View style={styles.continueIn}>
@@ -947,7 +950,7 @@ function Tag({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityHint={hint}
-      hitSlop={6}
+      hitSlop={NAME_LINE_SLOP}
       style={styles.tagPress}
     >
       {chip}
@@ -972,7 +975,7 @@ function HelpingTag({ consultation: c, channelId }: { consultation: RunConsultat
       <Pressable
         onPress={() => router.push(consultationHref(c.id, channelId))}
         accessibilityRole="button"
-        hitSlop={6}
+        hitSlop={NAME_LINE_SLOP}
         style={styles.shrink}
       >
         <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
@@ -1019,10 +1022,12 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
                 accessibilityRole="button"
                 accessibilityLabel={t("mobile.chat.reactionLabel", { emoji: p.emoji, count: p.people })}
                 accessibilityState={{ selected: p.mine }}
+                hitSlop={{ top: 7, bottom: 7 }}
+                // The ring is always there (clear when not mine): adding it on a tap grew the pill and pushed the row.
                 style={[
                   styles.react,
-                  { backgroundColor: c.sunken },
-                  p.mine && { borderWidth: 1.5, borderColor: c.ink2 },
+                  styles.reactRing,
+                  { backgroundColor: c.sunken, borderColor: p.mine ? c.ink2 : "transparent" },
                 ]}
               >
                 <Text maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.emoji}>
@@ -1037,7 +1042,7 @@ function Reactions({ message: m, meId }: { message: Message; meId: string | null
             key={`a:${p.reaction}:${agentId}`}
             accessible
             accessibilityLabel={t("mobile.chat.agentReacted", { emoji: p.emoji })}
-            style={[styles.react, { backgroundColor: c.sunken }]}
+            style={[styles.react, styles.reactRing, { backgroundColor: c.sunken, borderColor: "transparent" }]}
           >
             <Text maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.emoji}>
               {p.emoji}
@@ -1162,5 +1167,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
   },
+  reactRing: { borderWidth: 1.5 },
   emoji: { fontSize: 15 },
 });
+
+/** Taps on the name line's small words and chips (16 to 20 points tall) reach 44 points without spreading them. */
+const NAME_LINE_SLOP = { top: 14, bottom: 14, left: 6, right: 6 };

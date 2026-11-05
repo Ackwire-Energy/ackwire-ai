@@ -224,7 +224,7 @@ function AppRow({ app, onDisconnect }: { app: ConnectedApp; onDisconnect: () => 
     <div className="ac-list__row app-row">
       <AppMark app={app} />
       <span className="list-col app-row__main">
-        <span className="list-title">
+        <span className="list-title ac-captop">
           <span className="app-row__name">{app.name}</span>
           <AccessChip access={app.access} />
         </span>
@@ -244,7 +244,7 @@ function TokenRow({ token, onRevoke }: { token: PersonalToken; onRevoke: () => v
         <Icon name="key" />
       </span>
       <span className="list-col app-row__main">
-        <span className="list-title">
+        <span className="list-title ac-captop">
           <span className="app-row__name">{token.name}</span>
           <AccessChip access={token.access} />
         </span>
@@ -265,16 +265,19 @@ function AccessChip({ access }: { access: AppAccess }) {
 function RowMenu({ name, label, onSelect }: { name: string; label: string; onSelect: () => void }) {
   const { t } = useTranslation();
   const menu = t("apps.actions", { name });
+  // On the name's line, risen with it, never in the middle of the name and its facts.
   return (
-    <Menu
-      align="end"
-      label={menu}
-      trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={menu} />}
-    >
-      <MenuItem icon="block" danger onSelect={onSelect}>
-        {label}
-      </MenuItem>
-    </Menu>
+    <span className="ac-captail ac-captop">
+      <Menu
+        align="end"
+        label={menu}
+        trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={menu} />}
+      >
+        <MenuItem icon="block" danger onSelect={onSelect}>
+          {label}
+        </MenuItem>
+      </Menu>
+    </span>
   );
 }
 

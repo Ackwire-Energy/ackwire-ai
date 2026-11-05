@@ -6043,7 +6043,7 @@
     "agentRole": "Agent · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "Créez-en une, ou demandez dans le chat : « Lia, créez une tâche pour cette erreur ».",
+    "empty": "Créez-en une, ou demandez-la à un agent dans le chat.",
     "noResults": "Aucune tâche ne correspond à ces filtres.",
     "columnEmpty": "Rien ici.",
     "form": {

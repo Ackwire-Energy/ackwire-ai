@@ -246,7 +246,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
         {left !== null && card.expiresAt ? (
           <>
             <Fuse color="amber" remaining={fuseRemaining(n.createdAt, card.expiresAt, now)} style={styles.fuse} />
-            <Text variant="caption" numberOfLines={1} style={[styles.when, { color: c.amber }]}>
+            <Text variant="caption" numberOfLines={1} style={[styles.when, { color: c.amber }, styles.shrink]}>
               {t("approval.expiresDetail", { time: left })}
             </Text>
           </>

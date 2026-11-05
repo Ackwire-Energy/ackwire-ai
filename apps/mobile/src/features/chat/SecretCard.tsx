@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { sealSecret } from "@/lib/secret-box";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, CodeInput, haptics, Icon, Segmented, Text, ToggleSwitch, useToast } from "@/ui";
+import { Button, Chip, CodeInput, haptics, Icon, LineIcon, Segmented, Text, ToggleSwitch, useToast } from "@/ui";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -264,7 +264,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
               </Text>
             ) : null}
             <View style={styles.note}>
-              <Icon name="lock" size={13} color={c.muted} />
+              <LineIcon variant="footnote" name="lock" size={13} color={c.muted} />
               <Text variant="footnote" tone="muted" style={styles.grow}>
                 {code ? t("mobile.vault.card.codeNote") : t("secret.private")}
               </Text>
@@ -282,7 +282,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
                   accessibilityHint={t("mobile.vault.card.saveText")}
                   style={styles.saveRow}
                 >
-                  <Icon name={site ? "globe" : "key"} size={16} color={c.muted} />
+                  <LineIcon variant="subhead" name={site ? "globe" : "key"} size={16} color={c.muted} />
                   <View style={styles.grow}>
                     <Text variant="subhead" style={styles.semibold}>
                       {t("mobile.vault.card.save")}
@@ -409,7 +409,8 @@ const styles = StyleSheet.create({
   input: { fontSize: 17, paddingVertical: 10 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   save: { gap: 10, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  saveRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  // Its explanation wraps: the icon and the switch stay on the title's line, not centred on the whole row.
+  saveRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   agents: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },
   retry: { flexDirection: "row", alignItems: "center", gap: 6 },
 });

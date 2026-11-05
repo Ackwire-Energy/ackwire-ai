@@ -398,7 +398,7 @@ export function BrowserCard({
               />
               {/* A take over asked for nothing: it only hands back. */}
               {handoff?.kind === "ask" ? (
-                <Pressable onPress={couldnt} accessibilityRole="button" hitSlop={6} style={styles.couldnt}>
+                <Pressable onPress={couldnt} accessibilityRole="button" hitSlop={8} style={styles.couldnt}>
                   <Text variant="small" tone="muted" style={styles.medium}>
                     {t("mobile.browser.live.couldnt")}
                   </Text>
@@ -463,7 +463,6 @@ const styles = StyleSheet.create({
   card: { marginTop: 12, borderRadius: 18, overflow: "hidden" },
   sky: { height: 6 },
   head: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  tile: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
   subRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 1 },

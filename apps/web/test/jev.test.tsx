@@ -145,22 +145,26 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     expect(document.body.textContent).not.toMatch(/jev|typesafe/i);
   });
 
-  test("its state sits on TypeSafe's tile's middle, however many lines its name and line take", async () => {
+  test("its state sits on its name's first line, however many lines its name and line take", async () => {
     await open({ aiStatus: routed("rules"), jev: OFF });
     const head = card().querySelector(".jev__head") as HTMLElement;
     expect(head.firstElementChild?.classList.contains("ac-brand--sm")).toBe(true);
-    expect(head.lastElementChild?.classList.contains("ac-chip")).toBe(true);
+    // The name rises to the tile's top; the state's box is that line's, risen with it.
+    expect(head.querySelector(".list-col > :first-child")?.classList.contains("ac-captop")).toBe(true);
+    const tail = head.lastElementChild as HTMLElement;
+    expect([...tail.classList]).toEqual(expect.arrayContaining(["ac-captail", "ac-captop"]));
+    expect(tail.firstElementChild?.classList.contains("ac-chip")).toBe(true);
     const layout = (await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text()).replace(
       /\/\*[\s\S]*?\*\//g,
       "",
     );
-    // The 30px tile at the row's top: its middle 15px down. No transform beside it, which the build would merge away.
-    expect(layout).toContain("\n.jev__head > .ac-chip {\n  translate: 0 calc(15px - 50%);\n}");
-    expect(layout).not.toMatch(/\.jev__head > \.ac-chip[^{]*\{[^}]*(align-self|transform)/);
-    const components = await Bun.file(
-      new URL("../../../packages/ui/src/styles/components.css", import.meta.url).pathname,
-    ).text();
-    expect(components).toMatch(/\n\.ac-brand--sm \{\n {2}width: 30px;\n {2}height: 30px;/);
+    // Nothing moves the chip off that line any more.
+    expect(layout).not.toMatch(/\.jev__head > \.ac-chip/);
+    const components = (
+      await Bun.file(new URL("../../../packages/ui/src/styles/components.css", import.meta.url).pathname).text()
+    ).replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(components).toMatch(/\n\.ac-captail \{[^}]*align-items: center;[^}]*height: 22px;/);
+    expect(components).toMatch(/\.ac-captail \{\n {4}height: 1lh;/);
   });
 
   test("off: why it helps, then its steps in place, each with its link; a short key isn't offered", async () => {
