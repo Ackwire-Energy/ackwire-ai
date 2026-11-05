@@ -126,8 +126,7 @@ export interface CodexBrainTurnRequest {
 /**
  * Codex features a `chat` turn turns off (protocol 41): the route's, and every other one of 0.164.0 that adds a tool
  * or reads something of the computer's. A name Codex doesn't know fails the turn (`Unknown feature flag`). Codex
- * 0.164.0 keeps its `exec` (a JavaScript sandbox with `apply_patch` and MCP resources in it) and its
- * `collaboration` tools whatever is off: the runner kills the turn on any of their items (`codexChatBreach`).
+ * 0.164.0 keeps its `exec` (a JavaScript sandbox with `apply_patch` and MCP resources in it) whatever is off.
  * `code_mode_host` stays off so `exec` fails closed: an `exec` cell, and an `apply_patch` it calls, emit no item for
  * the kill to see.
  */
@@ -157,6 +156,8 @@ export const CODEX_CHAT_OFF = [
  * A `chat` turn's `-c` overrides: no approvals (`exec` forces it anyway), no web search, no `AGENTS.md`, and our
  * bridge's tools offered to the model directly. Codex's catalog makes its models `code_mode_only` (gpt-5.6 and
  * gpt-6 in 0.164.0), which hides every MCP tool inside `exec`; with the host off that left the turn no tool at all.
+ * `agents.enabled=false` drops the `collaboration` tools the catalog turns on for gpt-6 although `multi_agent_v2` is
+ * off: a `spawn_agent` emits no item, and the sub-agent it starts calls our bridge unseen by the kill.
  * Codex 0.164.0 refuses an unknown value for each of these keys.
  */
 export const CODEX_CHAT_CONFIG = [
@@ -164,6 +165,7 @@ export const CODEX_CHAT_CONFIG = [
   'web_search="disabled"',
   "project_doc_max_bytes=0",
   `features.code_mode.direct_only_tool_namespaces=${JSON.stringify([`mcp__${CODEX_MCP_SERVER}`])}`,
+  "agents.enabled=false",
 ];
 
 /**

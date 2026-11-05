@@ -552,6 +552,14 @@ test("a chat turn offers our bridge's tools outside code mode, whose host stays 
   expect(disabled).toContain("code_mode_host");
 });
 
+test("a chat turn has no sub-agents: the catalog's collaboration tools are off", () => {
+  const overrides = (args: string[]) => args.flatMap((a, i) => (args[i - 1] === "-c" ? [a] : []));
+  const chat = codexTurnArgs({ cwd: "/c", lastFile: "/l.txt", runId: RUN, mcp: {}, chat: true });
+  const work = codexTurnArgs({ cwd: "/c", lastFile: "/l.txt", runId: RUN, mcp: {} });
+  expect(overrides(chat)).toContain("agents.enabled=false");
+  expect(overrides(work)).not.toContain("agents.enabled=false");
+});
+
 test("a chat turn's kill: anything but the model's words or our bridge's calls", () => {
   const item = (type: string, more: Record<string, unknown> = {}) => ({
     type: "item.started",
