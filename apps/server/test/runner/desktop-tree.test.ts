@@ -282,7 +282,7 @@ describe("the desktop as screen text", () => {
     const ctx = { workspaceReal: ws, exec: true, token: "agm_x", secretsDir: path.join(home, "secrets") };
     const call = (req: MachineRequest) =>
       handleRequest(ctx, req, { signal: new AbortController().signal, output: () => {} });
-    const agent = { id: "01a142cb-489d-7000-87a3-efb5adb382ca", handle: "dev" };
+    const agent = { id: "019a4d10-7e3c-7000-8a11-5ec4e7d2ee01", handle: "dev" };
     const [requestId, name, target] = ["req-0001-aaaa", "API_TOKEN", { kind: "env" as const }];
     const { publicKey } = (await call({ agent, op: "secret", action: "keypair", requestId })) as { publicKey: string };
     const aad = secretAad({ requestId, orgId: "org-1", name, target });
