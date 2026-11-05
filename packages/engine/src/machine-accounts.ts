@@ -26,6 +26,7 @@ import {
   PLAN_KEYS_PROTOCOL,
   PLAN_USAGE_PROTOCOL,
   type PlanUsage,
+  type ProviderFailureCause,
   type PubSub,
   parseSecretBox,
   type RunnerAccountInfo,
@@ -67,6 +68,7 @@ import {
   type MachineRow,
   publishMachineUpdated,
 } from "./machines";
+import { recordAccountFailure } from "./operator-events";
 import { can, requirePermission } from "./organizations";
 
 const { machineAccounts, agents, machines, users } = schema;
@@ -832,12 +834,47 @@ async function unshare(db: Executor, orgId: string, row: MachineAccountRow, shar
   return (using?.n ?? 0) > 1 ? releaseAgents(db, orgId, [row.id], now) : [];
 }
 
-/** A turn ran with it (best effort, after the turn). */
-export async function touchMachineAccount(db: Executor, orgId: string, accountId: string) {
+/** A turn ran with it (best effort, after the turn); `succeeded`: a Claude Code turn, its success kept too. */
+export async function touchMachineAccount(
+  db: Executor,
+  orgId: string,
+  accountId: string,
+  { succeeded = false }: { succeeded?: boolean } = {},
+) {
+  const now = new Date();
   await db
     .update(machineAccounts)
-    .set({ lastUsedAt: new Date() })
+    .set({ lastUsedAt: now, ...(succeeded ? { lastSuccessAt: now } : {}) })
     .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, accountId)));
+}
+
+/**
+ * Why a computer turn's failure was the provider's (or its sign-in's): the cause the runner said, else what its
+ * code means (an older runner). Null: not the provider's (canceled, offline, a refused request…).
+ */
+export function accountFailureCause(code: string, cause?: ProviderFailureCause): ProviderFailureCause | null {
+  if (cause) return cause;
+  if (code === "not_logged_in") return "auth_rejected";
+  if (code === "plan_limit") return "quota";
+  if (code === "claude_failed") return "unknown";
+  return null;
+}
+
+/** A Claude Code turn on the account failed for `cause`: kept on its row, and told the operator (`account.failure`). */
+export async function noteAccountFailure(
+  db: Executor,
+  failure: { orgId: string; accountId: string; code: string; cause: ProviderFailureCause; httpStatus?: number },
+) {
+  const [row] = await db
+    .update(machineAccounts)
+    .set({ lastFailureCause: failure.cause, lastFailureAt: new Date() })
+    .where(and(eq(machineAccounts.orgId, failure.orgId), eq(machineAccounts.id, failure.accountId)))
+    .returning({
+      machineId: machineAccounts.machineId,
+      kind: machineAccounts.kind,
+      authMethod: machineAccounts.authMethod,
+    });
+  if (row) await recordAccountFailure(db, { ...failure, ...row });
 }
 
 /** One row of the organization's accounts, on that machine, whatever its status. */

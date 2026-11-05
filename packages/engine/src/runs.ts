@@ -184,9 +184,12 @@ export async function transitionRun(
     transcript?: Record<string, unknown> | SQL;
     /** Waiting for this computer to come back (ADR 0032 §5); cleared by any move out of `waiting_input`. */
     waitingMachineId?: string | null;
+    /** A failure: the brain's code and the provider's cause (`run.finished`; not stored on the run). */
+    failure?: { code: string; cause?: string | null };
   } = {},
 ): Promise<AgentRun | null> {
   if (!canTransition(from, to)) throw new InvalidRunTransitionError(from, to);
+  const { failure, ...set } = patch;
   const now = new Date();
   const [row] = await db
     .update(agentRuns)
@@ -199,12 +202,18 @@ export async function transitionRun(
       ...(isTerminal(to) ? { finishedAt: now } : {}),
       // Only a run waiting for its computer keeps the machine it waits for.
       ...(to === "waiting_input" ? {} : { waitingMachineId: null }),
-      ...patch,
+      ...set,
     })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, from)))
     .returning();
   if (row && isTerminal(to)) {
-    await recordRunFinished(db, row);
+    await recordRunFinished(
+      db,
+      row,
+      to === "failed"
+        ? { code: failure?.code ?? runErrorDetail(row.error)?.errorCode ?? null, cause: failure?.cause ?? null }
+        : undefined,
+    );
     await releaseProfileTurns(db, row.id);
   }
   return row ?? null;

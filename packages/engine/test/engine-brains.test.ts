@@ -31,6 +31,7 @@ import {
   decideApproval,
   drainLocalRuns,
   drainOutbox,
+  enableOperatorEvents,
   enqueue,
   executeToolForRun,
   grantScopes,
@@ -48,6 +49,7 @@ import {
   openDm,
   postPersonMessage,
   recoverStaleRuns,
+  resetAccountFailures,
   resolveBrain,
   resumeRunsWaitingForMachine,
   roomHead,
@@ -1032,6 +1034,108 @@ test("the agent's account and effort reach its turn; a refused sign-in falls bac
   expect(seen.length).toBe(2);
   const after = await f.db.select().from(schema.agentRuns);
   expect(after.map((r) => r.status)).toEqual(["done", "done"]);
+});
+
+test("a Claude Code turn's provider failure is kept on its account and told the operator once per cause", async () => {
+  enableOperatorEvents();
+  resetAccountFailures();
+  try {
+    f = await setup({ reply: () => ({ chunks: ["Respondi pela API."] }) });
+    const ACCOUNT = "0193dddd-0000-4000-8000-000000000002";
+    const machineId = await computerAgent(f);
+    await f.db.insert(schema.machineAccounts).values({
+      id: ACCOUNT,
+      orgId: f.org.id,
+      machineId,
+      kind: "claude_code",
+      label: "Trabalho",
+      status: "active",
+      authMethod: "setup_token",
+      createdBy: f.owner.id,
+    });
+    await f.db.update(schema.agents).set({ brainAccountId: ACCOUNT }).where(eq(schema.agents.id, f.agent.id));
+    const script: BrainEvent[][] = [
+      [
+        {
+          type: "error",
+          code: "not_logged_in",
+          message: "x",
+          retryable: true,
+          cause: "account_disabled",
+          httpStatus: 400,
+        },
+      ],
+      [
+        {
+          type: "error",
+          code: "not_logged_in",
+          message: "x",
+          retryable: true,
+          cause: "account_disabled",
+          httpStatus: 400,
+        },
+      ],
+      [{ type: "done", text: "Feito." }],
+      // An older runner says no cause: its code says it.
+      [{ type: "error", code: "claude_failed", message: "boom", retryable: false }],
+      [{ type: "error", code: "canceled", message: "The turn was canceled.", retryable: false }],
+    ];
+    const { brain } = scriptedComputerBrain((n) => script[n] ?? []);
+    const handlers = createJobHandlers({
+      ...f.jobDeps,
+      brains: { claude_code: () => brain },
+      machines: { status: async (id) => statusOf(id, { protocol: ACCOUNTS_PROTOCOL }) },
+    });
+    const account = async () =>
+      (await f.db.select().from(schema.machineAccounts).where(eq(schema.machineAccounts.id, ACCOUNT)))[0];
+    const events = async (type: string) =>
+      (await f.db.select().from(schema.operatorEvents).where(eq(schema.operatorEvents.type, type))).map((e) => e.data);
+
+    await post(f, "@dev oi");
+    await drainOutbox(f.db, handlers);
+    expect(await account()).toMatchObject({ lastFailureCause: "account_disabled", lastSuccessAt: null });
+    expect((await account())?.lastFailureAt).toBeInstanceOf(Date);
+    expect(await events("account.failure")).toEqual([
+      {
+        accountId: ACCOUNT,
+        machineId,
+        kind: "claude_code",
+        authMethod: "setup_token",
+        cause: "account_disabled",
+        code: "not_logged_in",
+        httpStatus: 400,
+        runnerVersion: RUNNER.version,
+        protocol: RUNNER.protocol,
+      },
+    ]);
+    // The same cause again soon after: kept on the row, not told twice.
+    await post(f, "@dev de novo");
+    await drainOutbox(f.db, handlers);
+    expect(await events("account.failure")).toHaveLength(1);
+
+    await post(f, "@dev agora vai");
+    await drainOutbox(f.db, handlers);
+    expect((await account())?.lastSuccessAt).toBeInstanceOf(Date);
+
+    await post(f, "@dev e agora?");
+    await drainOutbox(f.db, handlers);
+    expect(await account()).toMatchObject({ lastFailureCause: "unknown" });
+    expect((await events("account.failure")).map((e) => (e as { cause: string }).cause)).toEqual([
+      "account_disabled",
+      "unknown",
+    ]);
+    const finished = (await events("run.finished")) as { status: string; failure?: unknown }[];
+    expect(finished.find((e) => e.status === "failed")?.failure).toEqual({ code: "claude_failed", cause: "unknown" });
+    expect(finished.filter((e) => e.status === "done").every((e) => e.failure === undefined)).toBe(true);
+
+    // Not the provider's: nothing kept nor told.
+    await post(f, "@dev cancela");
+    await drainOutbox(f.db, handlers);
+    expect(await account()).toMatchObject({ lastFailureCause: "unknown" });
+    expect(await events("account.failure")).toHaveLength(2);
+  } finally {
+    enableOperatorEvents(false);
+  }
 });
 
 test("the agent's account and effort apply to its own brain; signed out or an older runner: unavailable", async () => {
