@@ -11949,6 +11949,19 @@
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "Za duży na podgląd. Pobierz go, żeby otworzyć.",
     "downloadOnly": "Brak podglądu dla tego typu pliku. Pobierz go, żeby otworzyć.",
+    "video": {
+      "play": "Odtwórz",
+      "pause": "Wstrzymaj",
+      "replay": "Odtwórz ponownie",
+      "seek": "Pozycja w filmie",
+      "volume": "Głośność",
+      "mute": "Wycisz",
+      "unmute": "Włącz dźwięk",
+      "speed": "Prędkość {{speed}}×",
+      "fullscreen": "Pełny ekran",
+      "exitFullscreen": "Zamknij pełny ekran",
+      "open": "Otwórz"
+    },
     "zoom": {
       "toolbar": "Powiększenie",
       "in": "Powiększ",

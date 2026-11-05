@@ -1005,6 +1005,7 @@
   "files": {
     "type": {
       "image": "Görsel",
+      "video": "Video",
       "pdf": "PDF",
       "document": "Belge",
       "table": "Tablo",
@@ -1029,7 +1030,17 @@
     "openImage": "Görseli aç",
     "imageOf": "Görsel {{index}} / {{count}}",
     "place": "{{index}} / {{count}}",
-    "noPreview": "Bu dosya uygulamada açılmıyor. Başka bir uygulamada açmak için paylaşın."
+    "noPreview": "Bu dosya uygulamada açılmıyor. Başka bir uygulamada açmak için paylaşın.",
+    "video": {
+      "play": "Oynat",
+      "pause": "Duraklat",
+      "replay": "Tekrar oynat",
+      "seek": "Videodaki konum",
+      "mute": "Sesi kapat",
+      "unmute": "Sesi aç",
+      "fullscreen": "Tam ekran",
+      "open": "Aç"
+    }
   },
   "issues": {
     "title": "Görevler",

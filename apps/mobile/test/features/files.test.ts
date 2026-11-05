@@ -12,6 +12,8 @@ import {
   shareSource,
   singleImageHeight,
   utf8Bytes,
+  videoClock,
+  videoHeight,
   withExtension,
 } from "../../src/features/files/logic";
 import { clampZoomTranslate, containSize, doubleTapZoom, MAX_ZOOM, zoomAround } from "../../src/features/files/zoom";
@@ -21,6 +23,24 @@ const upload = (name: string, contentType: string, size = 1000, text?: string): 
   kind: "file",
   title: name,
   content: { kind: "file", name, contentType, size, sha256: "x", ...(text !== undefined ? { text } : {}) },
+});
+
+describe("videos", () => {
+  test("MP4 and MOV play in the app, as a video; other video types stay a card", () => {
+    expect(fileInfo(upload("abertura.mp4", "video/mp4"))).toMatchObject({ view: "video", type: "video", ext: "MP4" });
+    expect(fileInfo(upload("story.MOV", "video/quicktime")).view).toBe("video");
+    expect(fileInfo(upload("antigo.avi", "video/x-msvideo")).view).toBe("other");
+  });
+
+  test("its shape once known (16:9 before), kept between 9:16 and 2:1; its time as a clock", () => {
+    expect(videoHeight(320, null)).toBe(180);
+    expect(videoHeight(300, { width: 720, height: 1280 })).toBe(533);
+    expect(videoHeight(300, { width: 3000, height: 500 })).toBe(150);
+    expect(videoClock(7.9)).toBe("0:07");
+    expect(videoClock(725)).toBe("12:05");
+    expect(videoClock(3729)).toBe("1:02:09");
+    expect(videoClock(Number.NaN)).toBe("0:00");
+  });
 });
 
 describe("file kind, tile and size", () => {

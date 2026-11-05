@@ -1,5 +1,7 @@
 import { type ArtifactDetail, useApi, useArtifact } from "@agenteschat/client";
+import { formatBytes } from "@agenteschat/client/lib/files";
 import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Platform, Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,10 +14,11 @@ import { useFileActions } from "./actions";
 import { type FileInfo, fileInfo } from "./logic";
 import { FileTile, useFileLine } from "./MessageFiles";
 import { fileText, useRemoteFile } from "./source";
+import { VideoPlayer } from "./VideoPlayer";
 
 /**
  * A file opened from a message: Markdown and text drawn by the
- * app, PDF in a web view (iOS draws PDFs natively there), anything else as its card. Top: close, the
+ * app, PDF in a web view (iOS draws PDFs natively there), a video in our player, anything else as its card. Top: close, the
  * name and "Documento · 4 KB · Theo". Bottom: Ver no Drive and Compartilhar.
  */
 export function DocumentViewer({ id, version }: { id: string; version?: number }) {
@@ -40,7 +43,7 @@ function Viewer({ id, version }: { id: string; version?: number }) {
   const close = () => goBack();
   // A PDF is drawn in the web view on iOS only (Android's WebView has no PDF viewer).
   const pdf = info?.view === "pdf" && Platform.OS === "ios";
-  const shows = info ? info.view === "markdown" || info.view === "text" || pdf : false;
+  const shows = info ? info.view === "markdown" || info.view === "text" || info.view === "video" || pdf : false;
 
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
@@ -78,6 +81,8 @@ function Viewer({ id, version }: { id: string; version?: number }) {
           <TextPage detail={detail} markdown={info.view === "markdown"} />
         ) : pdf ? (
           <PdfPage detail={detail} />
+        ) : info.view === "video" ? (
+          <VideoPage detail={detail} info={info} />
         ) : (
           <BigCard info={info} />
         )}
@@ -175,6 +180,38 @@ function PdfPage({ detail }: { detail: ArtifactDetail }) {
   );
 }
 
+/** A video, filling the screen between the top and the bar; one this phone can't play shows its card. */
+function VideoPage({ detail, info }: { detail: ArtifactDetail; info: FileInfo }) {
+  const { i18n } = useTranslation();
+  const orgId = useOrgId();
+  const c = useColors();
+  const link = useRemoteFile(orgId, detail.id, detail.shownVersion);
+  const [failed, setFailed] = useState(false);
+  const source = useMemo(
+    () => (link.data ? { uri: link.data.uri, ...(link.data.headers ? { headers: link.data.headers } : {}) } : null),
+    [link.data],
+  );
+  if (failed || link.isError) return <BigCard info={info} />;
+  return (
+    <View style={[styles.page, styles.clip, styles.video]}>
+      {source ? (
+        <VideoPlayer
+          key={source.uri}
+          variant="screen"
+          source={source}
+          name={info.name}
+          size={info.size !== null ? formatBytes(i18n.language || "en", info.size) : undefined}
+          onFailed={() => setFailed(true)}
+        />
+      ) : (
+        <Center>
+          <ActivityIndicator color={c.faint} />
+        </Center>
+      )}
+    </View>
+  );
+}
+
 /** A type the app doesn't draw: its card, big, and Compartilhar opens it elsewhere. */
 function BigCard({ info }: { info: FileInfo }) {
   const { t } = useTranslation();
@@ -207,6 +244,7 @@ const styles = StyleSheet.create({
   pageInner: { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 28 },
   mono: { fontFamily: MONO, fontSize: 13, lineHeight: 19 },
   web: { flex: 1, backgroundColor: "transparent" },
+  video: { backgroundColor: "#000", borderBottomLeftRadius: 14, borderBottomRightRadius: 14, marginBottom: 12 },
   bigName: { marginTop: 14, textAlign: "center" },
   note: { marginTop: 10, textAlign: "center" },
   bar: {

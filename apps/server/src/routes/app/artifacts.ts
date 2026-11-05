@@ -33,6 +33,7 @@ import {
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
+import { rangedResponse } from "../../http/byte-range";
 import { apiError, errorResponse } from "../../http/errors";
 import {
   type AppDeps,
@@ -462,16 +463,14 @@ export function artifactRoutes(deps: AppDeps) {
       version: version ? Number(version) : undefined,
       format: format === "csv" || format === "patch" || format === "pdf" || format === "docx" ? format : undefined,
     });
-    return new Response(file.body, {
-      status: 200,
-      headers: {
-        "content-type": file.contentType,
-        "content-disposition": attachmentDisposition(file.filename),
-        "x-content-type-options": "nosniff",
-        "content-security-policy": "sandbox",
-        // no-transform: no proxy rewrites the bytes (Cloudflare's email obfuscation edits text/html).
-        "cache-control": "private, no-store, no-transform",
-      },
+    // In parts when asked (a video starts at once and jumps without the whole file first).
+    return rangedResponse(file.body, c.req.header("range"), {
+      "content-type": file.contentType,
+      "content-disposition": attachmentDisposition(file.filename),
+      "x-content-type-options": "nosniff",
+      "content-security-policy": "sandbox",
+      // no-transform: no proxy rewrites the bytes (Cloudflare's email obfuscation edits text/html).
+      "cache-control": "private, no-store, no-transform",
     });
   });
 

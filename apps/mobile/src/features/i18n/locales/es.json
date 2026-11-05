@@ -1078,6 +1078,7 @@
   "files": {
     "type": {
       "image": "Imagen",
+      "video": "Vídeo",
       "pdf": "PDF",
       "document": "Documento",
       "table": "Tabla",
@@ -1102,7 +1103,17 @@
     "openImage": "Abrir imagen",
     "imageOf": "Imagen {{index}} de {{count}}",
     "place": "{{index}} de {{count}}",
-    "noPreview": "Este archivo no se abre en la app. Compártelo para abrirlo en otra app."
+    "noPreview": "Este archivo no se abre en la app. Compártelo para abrirlo en otra app.",
+    "video": {
+      "play": "Reproducir",
+      "pause": "Pausar",
+      "replay": "Ver de nuevo",
+      "seek": "Posición en el video",
+      "mute": "Silenciar",
+      "unmute": "Activar sonido",
+      "fullscreen": "Pantalla completa",
+      "open": "Abrir"
+    }
   },
   "issues": {
     "title": "Tareas",

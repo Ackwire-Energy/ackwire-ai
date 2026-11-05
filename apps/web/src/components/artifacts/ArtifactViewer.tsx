@@ -98,9 +98,10 @@ export function ArtifactViewer({
   // A snapshot (a screenshot, a photo) has no versions: no history beside it, no "Enviar nova versão" (ADR 0019).
   const versioned = a?.versioned !== false;
   const canUploadVersion = Boolean(a?.canEdit && !old && a?.kind === "file" && versioned);
-  // A picture takes the whole viewer: its versions open beside it only when asked.
+  // A picture or a video takes the whole viewer: its versions open beside it only when asked.
+  const fileKind = a?.content.kind === "file" ? previewKind(a.content.contentType) : null;
   const image =
-    a?.content.kind === "file" && previewKind(a.content.contentType) === "image" && a.content.size <= MAX_PREVIEW_BYTES;
+    fileKind === "video" || (fileKind === "image" && a?.content.kind === "file" && a.content.size <= MAX_PREVIEW_BYTES);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const sideVersions = versioned && (!image || versionsOpen);
   const focusVersions = () =>
