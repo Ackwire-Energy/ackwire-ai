@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { and, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
+  actionHash,
   approverIds,
   createRole,
   decideApproval,
@@ -23,6 +24,8 @@ afterEach(async () => {
 
 const lastText = (req: ModelRequest) => JSON.stringify(req.messages.at(-1)?.content);
 
+const WHY = "I need a person's answer before I go on: this decides what I change next.";
+
 /** Asks for the browser for "open the site"; says what came back. */
 const reply = (req: ModelRequest) => {
   const last = lastText(req);
@@ -34,9 +37,8 @@ const reply = (req: ModelRequest) => {
         {
           name: "request_permission",
           input: {
-            why: "I need a person's answer before I go on: this decides what I change next.",
+            why: WHY,
             permission: "browser:use",
-            reason: "Open the landing page.",
           },
         },
       ],
@@ -66,7 +68,8 @@ test("a missing permission becomes an approval card; approving turns it on and t
   expect(run?.status).toBe("waiting_approval");
   const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
   expect(approval).toMatchObject({ tool: "request_permission", title: "Turn on: Use a browser" });
-  expect(approval?.detail).toBe("Open the landing page.");
+  expect(approval?.why).toBe(WHY);
+  expect(approval?.detail).toBe("");
   expect(await scopes()).not.toContain("browser:use");
 
   await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id ?? "", {
@@ -80,6 +83,25 @@ test("a missing permission becomes an approval card; approving turns it on and t
   expect((await missingPermissions({ db: f.db, orgId: f.org.id, agentId: f.agent.id })).map((m) => m.id)).not.toContain(
     "browser:use",
   );
+});
+
+test("a card asked with the old `reason` field still turns the permission on", async () => {
+  f = await setup({ permissionTools: true, reply });
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev open the site",
+  });
+  await drainOutbox(f.db, f.handlers);
+  const [approval] = await f.db.select().from(schema.approvals);
+  if (!approval) throw new Error("no approval");
+  const params = { ...approval.params, reason: "Open the landing page." };
+  const { tool, scope, connectionId } = approval;
+  await f.db
+    .update(schema.approvals)
+    .set({ params, actionHash: actionHash({ tool, scope, connectionId, params }) })
+    .where(eq(schema.approvals.id, approval.id));
+  await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval.id, { decision: "approve" });
+  await drainOutbox(f.db, f.handlers);
+  expect(await scopes()).toContain("browser:use");
 });
 
 test("refused: nothing is turned on", async () => {

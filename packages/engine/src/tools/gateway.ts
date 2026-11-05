@@ -1016,8 +1016,11 @@ export function createToolGateway(deps: {
       const problems = validateJson(tool.inputSchema, call.input);
       if (problems.length > 0) {
         // Through a directory the model never saw the schema up front: show it, so the next call can be right.
-        const schemaHint = viaDirectory ? `\nInput schema of ${tool.name}: ${compactSchema(tool.inputSchema)}` : "";
-        return finish({ content: `Invalid input: ${problems.join("; ")}${schemaHint}`, isError: true });
+        const listed = asListed(tool, decision);
+        const schemaHint = viaDirectory ? `\nInput schema of ${tool.name}: ${compactSchema(listed.inputSchema)}` : "";
+        // Everything the call lacks in one answer: told one field at a time, a model swaps one for the other.
+        const needsWhy = whyMissing ? `. ${WHY_REFUSAL}` : "";
+        return finish({ content: `Invalid input: ${problems.join("; ")}${needsWhy}${schemaHint}`, isError: true });
       }
       // A run a routine's reading feeds never sends a credential anywhere (ADR 0053 §3): a key it read on its
       // computer (a sandbox that can't keep it from being read) can't leave through any tool, on any brain. Any

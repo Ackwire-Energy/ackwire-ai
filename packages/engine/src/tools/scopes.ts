@@ -214,8 +214,9 @@ export const isBuiltinScope = (scope: string) => Object.hasOwn(BUILTIN_SCOPES, s
 
 /**
  * Granted to every new agent: reading context, keeping its own notes,
- * reading and writing Drive files, and reading issues (so any agent can check
- * the org's issues before answering about them; low risk), setting up the
+ * reading and writing Drive files, reading and writing issues (any agent checks
+ * the org's issues before answering about them, and a task someone asks for
+ * lands on the workspace's board, not in another tool; low risk), setting up the
  * workspace for whoever asks (cards a person clicks, channels with Undo), the
  * Vault (what people share with it there, ADR 0144), and its computer (running commands, its own browser and desktop): on a connected
  * computer each still needs the switch the person at that computer turned on.
@@ -224,6 +225,7 @@ export const isBuiltinScope = (scope: string) => Object.hasOwn(BUILTIN_SCOPES, s
 export const DEFAULT_AGENT_SCOPES = [
   "context:read",
   "issues:read",
+  "issues:write",
   "memory:write",
   "drive:read",
   "drive:write",

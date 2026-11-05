@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { createFakeMailConnector, createFakeMailPoller, createFakeMailTester } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
+import { turnsWorld } from "../eval/turns";
 import {
   CONNECTOR_ALL,
   type ConnectorDeps,
@@ -15,6 +16,7 @@ import {
   grantScopes,
   listApprovals,
   postPersonMessage,
+  rankTools,
   storeCustomConnection,
   type ToolContext,
   type ToolDefinition,
@@ -151,7 +153,7 @@ test("the request_permission call find_tools suggests is the one the card grants
       if (permission) {
         return {
           chunks: [],
-          toolUses: [{ name: "request_permission", input: { why: WHY, permission, reason: "Open the landing page." } }],
+          toolUses: [{ name: "request_permission", input: { why: WHY, permission } }],
         };
       }
       if (last.includes("open the site"))
@@ -178,6 +180,54 @@ test("the request_permission call find_tools suggests is the one the card grants
   expect(scopes.map((s) => s.scope)).toContain("browser:use");
   const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, asked.id));
   expect(run?.status).toBe("done");
+});
+
+const TASK_QUERIES = ["create issue task backlog", "criar tarefa no backlog"];
+
+/** `@dev`, with GitHub's `issue_write`, on demand; the fixture's agent lacks `issues:write`. */
+async function githubAgent() {
+  const mcp = fakeGithubMcp({ issueWrite: true });
+  const deps = (): ConnectorDeps => ({ db: f.db, keyWrappers: [f.keyWrapper], publicUrl: "https://chat.example.com" });
+  f = await setup({
+    issueTools: true,
+    permissionTools: true,
+    toolSources: [
+      { name: "connectors", tools: (ctx) => createConnectorToolSource({ ...deps(), connect: mcp.connect }).tools(ctx) },
+    ],
+  });
+  await createApiKeyConnection(deps(), f.owner.id, f.org.id, { connector: "github", apiKey: "ghp_secret_123456" });
+}
+
+test("a task is our board: create_issue ranks above GitHub's tool and every other, in English and Portuguese", async () => {
+  await githubAgent();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "issues:write" }]);
+  const github = (await f.tools?.granted(await nothingLoaded()))?.find((t) => t.name === "github_issue_write");
+  if (!github) throw new Error("no github_issue_write");
+  await f.close();
+  const world = await turnsWorld();
+  f = world;
+  const every = (await world.tools?.granted(await nothingLoaded())) ?? [];
+  for (const query of TASK_QUERIES) expect(rankTools([github, ...every], "", query)[0]?.name).toBe("create_issue");
+});
+
+test("without issues:write, find_tools says a task is our board and to ask, beside GitHub's tool it could use", async () => {
+  await githubAgent();
+  const ctx = await nothingLoaded();
+  for (const query of TASK_QUERIES) {
+    const text = await findTools(ctx, query);
+    const notYet = text.slice(text.indexOf(NOT_YET));
+    expect(notYet).toStartWith(`${NOT_YET}ask a person with request_permission`);
+    expect(notYet).toContain(`- permission "issues:write" (Issues), for:`);
+    expect(notYet).toContain(
+      "- create_issue: Create a task on this workspace's board: task, tarefa, backlog or issue mean this board, never GitHub or another tool unless the person names it",
+    );
+  }
+  expect(await findTools(ctx, "create issue task backlog")).toContain("- github_issue_write");
+  const asks = (await f.tools?.list(ctx))?.find((t) => t.name === "request_permission");
+  expect(asks?.description).toContain("A task goes on our board: ask for issues:write");
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "issues:write" }]);
+  const given = (await f.tools?.list(ctx))?.find((t) => t.name === "request_permission");
+  expect(given?.description).not.toContain("A task goes on our board");
 });
 
 const DESKTOP_DO =

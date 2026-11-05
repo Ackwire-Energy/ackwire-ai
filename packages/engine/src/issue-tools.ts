@@ -198,7 +198,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
     {
       name: "create_issue",
       description:
-        "Create an issue with a title, a description and acceptance criteria (a checklist), and optionally a priority, labels, an assignee and a due date. No permission needed: when work should be tracked, create it; the person sees it with Undo.",
+        "Create a task on this workspace's board: task, tarefa, backlog or issue mean this board, never GitHub or another tool unless the person names it (criar tarefa no backlog). It takes a title, a description and acceptance criteria (a checklist), and optionally a priority, labels, an assignee and a due date. No permission needed: when work should be tracked, create it; the person sees it with Undo.",
       scope: "issues:write",
       inputSchema: {
         type: "object",

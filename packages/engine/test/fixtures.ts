@@ -261,11 +261,11 @@ export async function setup(
     { model: "claude-sonnet-5-5" },
   );
   const agent = first;
-  // New agents get their computer by default; tests that use it grant it themselves.
+  // New agents get their computer and the task board by default; tests that use them grant them themselves.
   await db
     .delete(schema.agentScopes)
     .where(
-      sql`${schema.agentScopes.agentId} = ${agent.id} and ${schema.agentScopes.scope} in ('sandbox:run', 'browser:use', 'desktop:use')`,
+      sql`${schema.agentScopes.agentId} = ${agent.id} and ${schema.agentScopes.scope} in ('sandbox:run', 'browser:use', 'desktop:use', 'issues:write')`,
     );
   await addChannelMember(db, owner.id, org.id, general.id, { agentId: agent.id });
 
