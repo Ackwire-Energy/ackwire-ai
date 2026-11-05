@@ -622,7 +622,8 @@ export const MessageRow = memo(function MessageRow({
           bubbled && lookRows.bubblesRow,
           compact && lookRows.compactRow,
           grouped && styles.cont,
-          mentionsMe && { backgroundColor: `${c.amber}17`, borderLeftWidth: 2, borderLeftColor: c.amber },
+          // A mention of me: the row's tint says it, with round corners; no accent bar on its left edge.
+          mentionsMe && { backgroundColor: `${c.amber}17`, borderRadius: 14 },
           pressed && press && { backgroundColor: c.sunken },
         ]}
       >
