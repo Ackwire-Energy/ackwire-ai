@@ -15,10 +15,28 @@ const USAGE_NOTES = new Set([
   "plan_limit_cut_unknown",
   "plan_limit_wait",
   "plan_limit_wait_unknown",
+  "plan_model_limit_wait",
+  "plan_model_limit_wait_unknown",
+  "plan_model_region_wait",
   "budget_wait",
 ]);
 
 type Meta = Record<string, unknown> | undefined;
+
+/**
+ * A computer brain's wait (`meta.brainUnavailable.code`) that isn't its computer gone or busy, by the words that say
+ * it: paused by whoever connected it, its CLI or commands off there, a program to update, a plan not the owner's.
+ */
+const WAIT_CAUSES: Record<string, string> = {
+  machine_paused: "paused",
+  exec_disabled: "commands_off",
+  tool_off: "commands_off",
+  runner_outdated: "outdated",
+  codex_too_old: "outdated",
+  plan_not_owner: "plan_owner",
+};
+const waitCauseOf = (code: unknown) =>
+  typeof code === "string" && Object.hasOwn(WAIT_CAUSES, code) ? WAIT_CAUSES[code] : null;
 
 /**
  * The text of an agent message the server wrote itself (approval and secret
@@ -66,11 +84,16 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   const waitNote =
     code === "brain_unavailable" ? (m.brainUnavailable as { code?: unknown; long?: unknown } | undefined) : undefined;
   const busy = waitNote?.code === "busy";
-  const noAi = code === "no_ai" ? (m.noAi as { reason?: unknown; own?: unknown } | undefined) : undefined;
+  const noAi =
+    code === "no_ai" ? (m.noAi as { reason?: unknown; own?: unknown; model?: unknown } | undefined) : undefined;
   const signedOut = noAi?.reason === "not_signed_in";
-  // The team's right hand on a plan (ADR 0137 §7): why its plan can't think now (`RIGHT_HAND_PLAN_LINES`).
+  // The team's right hand on a plan (ADR 0137 §7): why its plan can't think now (`RIGHT_HAND_PLAN_LINES`); any agent's
+  // computer with no such CLI, or no computer at all.
   const planLine =
-    typeof noAi?.reason === "string" && RIGHT_HAND_PLAN_LINES.has(noAi.reason) ? `no_ai_${noAi.reason}` : null;
+    typeof noAi?.reason === "string" &&
+    (RIGHT_HAND_PLAN_LINES.has(noAi.reason) || noAi.reason === "cli_missing" || noAi.reason === "no_computer")
+      ? `no_ai_${noAi.reason}`
+      : null;
   const own =
     signedOut &&
     (noAi?.own === "codex" ||
@@ -138,10 +161,13 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   // A work that didn't finish or was stopped: why or by whom, and its last update.
   if (code === "work_end_failed" || code === "work_end_canceled") return workEndBody(t, code, params, m.workEnd, body);
   // An older note about a plan's limit (sent as the computer brain being unavailable): the plan's words.
-  if (code === "brain_unavailable" && (m.brainUnavailable as { code?: unknown } | undefined)?.code === "plan_limit") {
+  if (code === "brain_unavailable" && waitNote?.code === "plan_limit") {
     const plan = params.brain === "Codex" ? "ChatGPT" : "Claude";
     return t("chat.body.plan_limit_wait_unknown", { plan, defaultValue: body });
   }
+  // Waiting on something that doesn't pass by itself: its cause and who fixes it, not "until it's back".
+  const waitCause = code === "brain_unavailable" ? waitCauseOf(waitNote?.code) : null;
+  if (waitCause) return t(`chat.body.brain_unavailable_${waitCause}`, { ...params, defaultValue: body });
   // A secret request posted before the body named its agent.
   const anon = code === "secret_request" && typeof params.agent !== "string";
   // Still in line after a long while (the only busy note posted now); older notes keep their words.
@@ -157,8 +183,13 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
           ? "secret_requestAnon"
           : code;
   const key = `chat.body.${shown}`;
+  const model = typeof noAi?.model === "string" ? { model: noAi.model } : {};
   // i18next takes the first key that exists: a body with no `…NoComputer` words keeps its own.
-  return t(params.computer && !namesComputer ? [`${key}NoComputer`, key] : key, { ...params, defaultValue: body });
+  return t(params.computer && !namesComputer ? [`${key}NoComputer`, key] : key, {
+    ...params,
+    ...model,
+    defaultValue: body,
+  });
 }
 
 /**

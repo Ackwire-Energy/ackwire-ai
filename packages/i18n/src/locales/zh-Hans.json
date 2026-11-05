@@ -21,6 +21,7 @@
     "refreshing": "正在刷新",
     "retry": "重试",
     "unknownError": "出了点问题，请重试。",
+    "ourSide": "我们这边出了点问题，请稍后再试。",
     "signedOut": "你的会话已结束，请重新登录以继续。",
     "newVersion": "agentes.chat 有新版本了。",
     "reload": "重新加载",
@@ -41,7 +42,7 @@
     "today": "今天",
     "yesterday": "昨天",
     "loadFailed": "无法加载，请检查网络连接后重试。",
-    "notAllowed": "你没有权限执行此操作，请联系工作区管理员。",
+    "notAllowed": "你没有权限执行此操作。",
     "tooMany": "尝试次数过多，请稍后再试。",
     "offline": "你已离线，请检查网络连接后重试。",
     "unreachable": "暂时无法连接 agentes.chat，请稍后再试。"
@@ -208,6 +209,12 @@
       "desc": "公开或私密。",
       "short": "创建频道",
       "say": "创建频道"
+    },
+    "mention_everyone": {
+      "title": "提及所有人",
+      "desc": "用 @所有人 通知频道里的所有人，包括成员和智能体。",
+      "short": "提及所有人",
+      "say": "提及所有人"
     },
     "manage_channels": {
       "title": "整理频道",
@@ -1750,7 +1757,7 @@
     "outage_other": "{{names}}：AI 服务商出现故障 · 会自动重试",
     "queued_other": "{{names}} 正在排队等待电脑",
     "away_other": "{{names}} 正在等待电脑",
-    "plan_other": "{{names}} 将在套餐重置后回答",
+    "plan_other": "{{names}} 正在等待套餐",
     "budget_other": "{{names}} 将在预算更新后回答",
     "line_other": "其他工作结束后 {{names}} 就会开始",
     "canceled_other": "{{names}} 不会回答",
@@ -1765,7 +1772,7 @@
       "outage": "AI 服务商出现故障 · 会自动重试",
       "queued": "排队等待电脑",
       "away": "等待电脑",
-      "plan": "套餐重置后回答",
+      "plan": "正在等待套餐",
       "budget": "预算更新后回答",
       "line": "其他工作结束后开始",
       "canceled": "已取消",
@@ -1812,6 +1819,11 @@
         "import": "导入我的智能体",
         "form": "填写表单"
       },
+      "again": {
+        "question": "要和我一起组建团队吗？",
+        "action": "组建团队",
+        "message": "帮我组建团队。"
+      },
       "next": {
         "question": "团队到齐了。接下来呢？",
         "invite": "邀请成员",
@@ -1844,8 +1856,6 @@
       "name": "名称和外观",
       "nameHelp": "在侧边栏里它总是显示为“{{label}}”。",
       "changeLook": "更换外观",
-      "ai": "AI 和模型",
-      "aiHelp": "自动会选能完成任务的最便宜模型。",
       "budget": "每月预算",
       "perMonth": "/月",
       "budgetHelp": "达到上限时，它会像其他智能体一样停下并通知。",
@@ -1853,12 +1863,27 @@
       "audienceHelp": "不在范围内的人在侧边栏里看不到{{name}}。",
       "lock": "{{name}}不能归档或删除。没人和它说话时，它不会发任何内容。",
       "audit": "查看{{name}}做了什么",
-      "onPlan": "Claude 套餐 · {{account}}",
       "change": "更改",
       "planHelp": "费用由套餐的所有者支付。套餐所在的电脑不可用时，对话里会说明，并提供使用 API 密钥的选项。",
-      "plan": "套餐",
-      "planOffer": "{{name}} 可以用你的套餐思考，代替 API 密钥。它在套餐登录的电脑上运行，只能触及这个工作区。",
-      "usePlan": "使用套餐"
+      "lookEdit": "更改{{name}}的外观",
+      "planOwner": "来自{{owner}}",
+      "mine": "你的 AI",
+      "mineHelp": "你与{{name}}的对话使用你的套餐或共享给你的套餐思考，且仅限你的对话。",
+      "connectMine": "连接我的套餐",
+      "useWorkspace": "使用工作区的",
+      "fallbackKey": "没有自己的套餐时，使用工作区的 API 密钥。",
+      "fallbackPlan": "没有自己的套餐时，使用{{owner}}的套餐，它回复所有人。",
+      "fallbackYours": "没有其他套餐时，使用工作区的套餐，它是你的。",
+      "fallbackNone": "没有自己的套餐时，{{name}}无法回复你：工作区的套餐只回复{{owner}}。",
+      "workspace": "工作区 AI",
+      "workspaceHelp": "没有自己套餐的人通过这个 AI 与{{name}}交谈。",
+      "workspacePlan": "工作区套餐",
+      "workspacePlanHelp": "用套餐代替密钥。只有所有者允许时，它才回复其他人。",
+      "noPlans": "请先在“你的 AI”中连接套餐，才能在这里使用。",
+      "pickPlan": "选择套餐",
+      "sharesOn": "开启：没有自己套餐的人通过这个套餐与{{name}}交谈。",
+      "sharesOff": "关闭：只有{{owner}}能通过它交谈。没有自己套餐的人得不到回复。",
+      "sharesOffYou": "关闭：只有你能通过它交谈。没有自己套餐的人得不到回复。"
     },
     "card": {
       "settings": "{{name}} · 设置",
@@ -2042,6 +2067,8 @@
     },
     "agent": "{{name}} 不会回复，因为他还没有连接 AI。",
     "agent_female": "{{name}} 不会回复，因为她还没有连接 AI。",
+    "cliMissing": "{{name}} 不会回复：电脑上没有安装 AI 的程序。",
+    "noComputer": "{{name}} 不会回复：AI 需要一台电脑，但现在没有。",
     "signedOut": "{{name}} 不会回复，因为他的 AI 已退出登录。",
     "signedOut_female": "{{name}} 不会回复，因为她的 AI 已退出登录。",
     "notSignedIn": {
@@ -2061,12 +2088,17 @@
     "action": "连接",
     "locked": "谁可以为 {{name}} 连接 AI：管理员（使用 API 密钥），或 {{owner}}（使用自己的套餐）。",
     "lockedAdmins": "只有管理员可以连接 AI。",
+    "lockedOwner": "只有智能体的所有者才能为它连接套餐。",
     "rightHand": {
       "computer_away": "{{name}} 现在无法回答：套餐所在的电脑不可用。",
+      "computer_failed": "{{name}} 现在无法回答：套餐所在的电脑出了问题。",
       "plan_limit": "{{name}} 现在无法回答：套餐已达到上限。",
-      "plan_not_shared": "{{name}} 用的套餐只回复它的所有者。",
+      "plan_not_shared": "连接你自己的套餐才能与{{name}}交谈：工作区的套餐只回复其所有者。",
       "runner_outdated": "{{name}} 现在无法回复：套餐所在电脑上的程序需要更新。",
-      "plan_tools": "{{name}} 在回复前停下了：那台电脑上套餐的 AI 提供了它自己的工具。",
+      "plan_tools": "{{name}} 在回复前停下了：那台电脑上套餐的 AI 没有只使用 agentes.chat 的工具。",
+      "model_limit": "{{name}} 现在无法回答：{{model}} 已达到它在套餐中的自身上限。套餐中的其他模型仍可使用。",
+      "model_region": "{{name}} 无法回答：{{model}} 需要在 OpenCode 中开启 Global 区域（Settings › Privacy）。",
+      "commands_off": "{{name}} 现在无法回答：套餐所在的电脑上命令已关闭，需要负责这台电脑的人打开。",
       "useKey": "使用 API 密钥"
     },
     "receipt": "没有人会回复：未连接 AI",
@@ -2275,6 +2307,8 @@
       "monthly": "（每月额度）"
     },
     "line": "套餐重置后，将于{{when}}继续。快速回复不受影响。",
+    "changeModel": "更换模型",
+    "raiseBudget": "提高预算",
     "lineUnknown": "套餐一重置就会继续。快速回复不受影响。",
     "lineBudget": "将于{{when}}继续，如果预算提高会更早。快速回复不受影响。",
     "continue": "立即继续",
@@ -2449,6 +2483,7 @@
     },
     "memory": {
       "saved": "已存入<b>记忆</b>：{{text}}",
+      "saved_rule": "已存入<b>我的规则</b>：{{text}}",
       "updated": "已更新<b>记忆</b>：{{text}}",
       "forgotten": "已从<b>记忆</b>中移除：{{text}}"
     },
@@ -2480,6 +2515,10 @@
     },
     "agent": {
       "settings_changed": "更改了 <b>{{agentName}}</b> 的设置"
+    },
+    "pr": {
+      "merged": "已合并 <b>{{repo}}</b> 的 PR <b>#{{number}}</b>",
+      "merged_branch": "已将 <b>{{ref}}</b> 合并到 <b>{{repo}}</b>"
     },
     "other": "做了一项更改",
     "copyWebhook": "复制 Webhook 地址",
@@ -2751,7 +2790,7 @@
       "waiting_answer": "等待回复",
       "waiting_computer": "等待电脑",
       "queued_computer": "排队等待电脑",
-      "waiting_plan": "等待套餐额度重置",
+      "waiting_plan": "正在等待套餐",
       "waiting_budget": "等待预算重置",
       "provider_down": "AI 服务商出现故障 · 会自动重试",
       "out_of_plan": "套餐额度已用完",
@@ -2778,6 +2817,7 @@
     "inChannel": "在此频道中",
     "inWorkspace": "在工作区中",
     "notInChannel": "不在频道中",
+    "everyone": "此对话中的所有人，包括成员和智能体",
     "offer": "{{name}} 不在这个频道中，看不到这次提及。",
     "add": "添加到频道",
     "dismiss": "暂不",
@@ -3270,7 +3310,12 @@
       "done": "已批准。{{name}} 不会再询问这项操作。",
       "undoHere": "如需撤销，请前往 {{name}} 页面的“工具和权限”。",
       "undoHere_female": "如需撤销，请前往 {{name}} 页面的“工具和权限”。",
-      "open": "打开"
+      "open": "打开",
+      "routine": "在此例行工作中始终批准",
+      "thisRoutine": "此例行工作",
+      "noteRoutine": "从现在起，{{routine}}会自行执行{{actions}}，不限参数值。在此例行工作之外仍会询问。如需撤销：前往例行工作的设置。",
+      "doneRoutine": "已批准。{{routine}}不会再询问此操作。",
+      "undoRoutine": "如需撤销，请前往例行工作的设置。"
     },
     "email": {
       "from": "发件人",
@@ -4360,6 +4405,11 @@
       "cancel": "取消",
       "forgotten": "已忘记。如需恢复，可在“已归档”中找到。",
       "saved": "已保存，现在算作已验证。",
+      "rules": "大家定下的规则",
+      "rulesNote": "对定下规则的人的所有工作都适用，不论请求来自哪里。负责人或管理员的规则对所有人都适用。",
+      "ruleBy": "{{name}} · {{date}}",
+      "removeRule": "移除",
+      "ruleRemoved": "规则已移除。如需恢复，可在“已归档”中找到。",
       "playbook": "{{name}} 的工作方式",
       "playbook_female": "{{name}} 的工作方式",
       "playbookNote": "它为自己保留的工作方法。不会出现在聊天中。从外部获得且再也没用过的会自动移走，保留在“已归档”中。",
@@ -4418,6 +4468,7 @@
         "model_refused": "模型拒绝回答。",
         "agent_archived": "该智能体已归档。",
         "provider_error": "模型服务商返回了错误：{{detail}}",
+        "provider_account": "服务商拒绝了这个密钥：它可能无效、没有余额或超出配额。",
         "provider_unavailable": "模型服务商没有响应：{{detail}}",
         "canceled": "有人停止了这项任务。",
         "interrupted": "因服务器重启而中断。",
@@ -4425,7 +4476,7 @@
         "credential_revoked": "该智能体的密钥已被吊销。",
         "credential_wrong_provider": "模型来自 {{modelProvider}}，但密钥来自 {{keyProvider}}。",
         "model_unlisted": "OpenRouter 不再提供 {{model}}。请在智能体设置中选择其他模型。",
-        "no_ai": "该智能体没有连接 AI。",
+        "no_ai": "智能体当时没有可用的 AI。",
         "person_limit": "提出请求的人已达到本月的使用额度。",
         "org_paused": "工作区的智能体已暂停。",
         "org_suspended": "工作区不可用。",
@@ -4434,6 +4485,8 @@
         "computer_busy": "电脑一直忙于其他任务。",
         "computer_failed": "电脑遇到问题，已停止。",
         "computer_timeout": "电脑响应时间过长。",
+        "account_missing": "为这个智能体选择的账号已不在它的电脑上。请在智能体设置中选择另一个账号，或重新添加。",
+        "our_error": "我们这边出了点问题，任务已停止。请稍后再提一次。",
         "unknown": "失败。"
       }
     },
@@ -4548,13 +4601,15 @@
       "decision": "决定",
       "fact": "事实",
       "preference": "偏好",
-      "lesson": "经验"
+      "lesson": "经验",
+      "rule": "规则"
     },
     "kindsLower": {
       "decision": "决定",
       "fact": "事实",
       "preference": "偏好",
-      "lesson": "经验"
+      "lesson": "经验",
+      "rule": "规则"
     },
     "verified": "已验证",
     "unverified": "未验证",
@@ -5281,7 +5336,7 @@
     },
     "github_pr_merge": {
       "label": "合并 Pull Request",
-      "description": "合并 Pull Request。始终需要审批。"
+      "description": "合并 Pull Request。需要审批，在智能体页面选定的仓库除外。"
     },
     "github_issues_read": {
       "label": "读取 Issue",
@@ -5921,7 +5976,8 @@
     },
     "ownActions": {
       "hint": "每次运行都会在你已连接的应用中直接执行这些操作，无需询问。其中的其他操作会先请人审批，合并、部署和回滚始终需要审批。",
-      "none": "在已连接的应用中，每个操作前都会先请人审批。若要让它自动完成工作，请在聊天中告诉智能体可以执行哪些操作。"
+      "none": "在已连接的应用中，每个操作前都会先请人审批。若要让它自动完成工作，请在聊天中告诉智能体可以执行哪些操作。",
+      "remove": "之前再次询问：{{action}}"
     },
     "ahead": {
       "approved": "已批准 · {{when}}运行",
@@ -6080,7 +6136,7 @@
       "waiting": "等待有人回答",
       "waitingApproval": "等待你审批",
       "waitingComputer": "等待电脑",
-      "waitingPlan": "等待套餐重置",
+      "waitingPlan": "正在等待套餐",
       "waitingBudget": "等待预算更新",
       "reported": "已告知发现的内容",
       "silent": "没有新内容，保持安静",
@@ -6094,7 +6150,7 @@
       "previous_running": "已跳过：上一次仍在运行",
       "previous_waiting": "已跳过：上一次仍在等人回复",
       "waiting_computer": "已跳过：正在等待智能体的电脑",
-      "waiting_plan": "已跳过：正在等待套餐重置",
+      "waiting_plan": "已跳过：正在等待套餐",
       "waiting_budget": "已跳过：正在等待预算重置",
       "superseded": "让位给下一次运行",
       "stale": "错过了时间：电脑恢复得太晚",
@@ -6126,13 +6182,17 @@
       "model_unlisted": "OpenRouter 已不再提供此模型",
       "agent_archived": "智能体已归档",
       "interrupted": "因服务器重启而中断",
-      "no_ai": "智能体未连接 AI",
+      "no_ai": "智能体当时没有可用的 AI",
       "person_limit": "未运行:创建者已达到本月的使用额度",
       "org_paused": "未运行：工作区的智能体已暂停",
       "org_suspended": "未运行：工作区不可用",
       "org_deleting": "未运行：工作区正在被删除",
       "agent_paused": "未运行：智能体已暂停",
-      "computer_busy": "电脑一直忙于其他任务"
+      "computer_busy": "电脑一直忙于其他任务",
+      "computer_failed": "电脑遇到问题，已停止",
+      "computer_timeout": "电脑响应时间过长",
+      "account_missing": "智能体的账号已不在它的电脑上",
+      "our_error": "我们这边出了点问题"
     },
     "openInChat": "在对话中打开",
     "stop": "停止",
@@ -7190,6 +7250,7 @@
       "person": "成员",
       "agent": "智能体",
       "routine": "例行工作",
+      "reminder": "提醒",
       "deadline": "任务截止日期"
     },
     "upcoming": "即将到来",
@@ -7209,6 +7270,7 @@
     "kind": {
       "event": "日程",
       "routine": "例行工作",
+      "reminder": "提醒",
       "deadline": "任务截止日期"
     },
     "every": {
@@ -7220,6 +7282,10 @@
     "runs_other": "这几天共运行 {{count}} 次。",
     "routineDetail": "{{agent}} 的例行工作 · 发送到 {{target}}。",
     "deadlineDetail": "任务到期了。",
+    "reminderBy": "由 {{name}} 设置",
+    "reminderPosted": "由 {{agent}} 发布 · {{target}}",
+    "cancelReminder": "取消提醒",
+    "reminderCancelled": "提醒已取消",
     "openIssue": "打开任务",
     "openRoutines": "在“例行工作”中查看",
     "openRoutine": "打开例行工作",
@@ -7360,6 +7426,7 @@
     "files": "文件",
     "needsSandbox": "未保存",
     "assetLimit": "一个技能最多保存 {{max}} MB 的图片和其他文件。",
+    "moreFiles_other": "还有 {{count}} 个文件",
     "runsOnPc": "在智能体的电脑上运行",
     "reinstall": "重新安装该技能，智能体才能使用这个文件。",
     "edit": "编辑",
@@ -7576,7 +7643,7 @@
         "updating": "正在 {{computer}} 上更新 {{program}}。完成后这里会自动更新。",
         "runnerOld": "{{computer}} 上的 agentes.chat 程序版本较旧，更新正在路上。完成后这里会自动更新。",
         "execOff": "{{computer}} 暂时还不能运行 {{program}}。我们正在处理，这里会自动更新。",
-        "toolOff": "{{computer}} 上未允许 {{program}}。请联系支持团队开通。",
+        "toolOff": "{{computer}} 上还未允许 {{program}}。这是我们这边的问题：请稍后再试。",
         "preparing": "{{computer}} 正在准备中。完成后这里会自动更新。"
       }
     },
@@ -8515,6 +8582,9 @@
       "paidTraining": "服务商可能会用请求内容训练模型。请在 OpenCode 中开启该权限。",
       "freeTraining": "免费。服务商可能会用请求内容训练模型。请在 OpenCode 中开启该权限。"
     },
+    "modelLimit": "{{model}} 在这个套餐中达到了自身的限额，{{when}}重置。套餐里的其他模型仍可正常使用。",
+    "modelLimitUnknown": "{{model}} 在这个套餐中达到了自身的限额。套餐里的其他模型仍可正常使用。",
+    "modelRegion": "{{model}} 需要在 OpenCode 的 设置 › 隐私 中开启 Global 区域。套餐里的其他模型仍可正常使用。",
     "modelHow": {
       "globalRegion": "在 OpenCode 的 设置 › 隐私 中开启 Global 区域。否则这个模型不会回答。",
       "paidTraining": "这个模型的服务商可能会用请求内容训练模型。在 OpenCode 的 设置 › 隐私 中开启付费模型的该权限。否则这个模型不会回答。",
@@ -9050,6 +9120,13 @@
     "failed": "无法连接。请稍后再试。"
   },
   "repos": {
+    "merge": {
+      "label": "可不经询问直接合并",
+      "none": "未选择仓库。每次合并都需要审批。",
+      "help": "在这些仓库中，合并无需审批卡片，会记入审计，并在对话中留下回执。其他敏感操作仍会询问。",
+      "dialogTitle": "{{name}}可不经询问直接合并的位置",
+      "dialogDesc": "仅限已在使用的仓库。在其他位置合并需要审批。"
+    },
     "label": "哪些仓库",
     "all": "所有仓库",
     "allLower": "所有仓库",
@@ -10501,7 +10578,8 @@
       "editorsExcludeYou": "请把你自己加入可编辑的成员中，才能保留此页面的编辑权。",
       "titleTaken": "已经有一个名为“{{title}}”的页面。",
       "titleCharacters": "标题不能包含 [ ] | 或 #。",
-      "titleNoLetters": "标题需要包含字母或数字。"
+      "titleNoLetters": "标题需要包含字母或数字。",
+      "lockAdminsOnly": "只有管理员可以锁定页面。"
     },
     "media": {
       "off": "此工作区已关闭 GIF 和贴纸。",
@@ -10526,7 +10604,8 @@
       "decided": "已经有人对这条建议做出了决定。",
       "expired": "这条建议已过期：一天内没有人做出决定。",
       "routineMade": "这个智能体的例行工作已经创建。",
-      "noRoutine": "这条建议没有可创建的例行工作。"
+      "noRoutine": "这条建议没有可创建的例行工作。",
+      "notRequester": "只有提出请求的人可以发送。"
     },
     "approval": {
       "alwaysUnavailable": "这个请求不能永久批准，只能批准这一次。"
@@ -10628,20 +10707,28 @@
       "agentNotInChannel": "请先把智能体添加到对话中。",
       "webhookPaused": "请开启例行工作后再测试。",
       "continueExtraOff": "这个套餐的时间窗口额度已用完，而这个智能体的长时间工作没有启用付费额外用量。在它的 AI 设置中开启后即可立即继续，否则会在额度重置后继续。",
-      "continueExtraUsedUp": "这个套餐的时间窗口额度已用完，付费额外用量也已用完或不可用。它会在额度重置后继续。"
+      "continueExtraUsedUp": "这个套餐的时间窗口额度已用完，付费额外用量也已用完或不可用。它会在额度重置后继续。",
+      "actionsNeedApprover": "只有智能体负责人或批准其操作的人可以让例行工作自行执行。",
+      "editorOnly": "只有例行工作的创建者、智能体负责人或管理员可以修改它。",
+      "widgetFixed": "这项例行工作负责保持小组件最新。请从小组件修改。"
     },
     "run": {
       "notContinuable": "这个回答已无法继续。",
       "agentBusy": "智能体已在这段对话中工作，请等它完成后再继续。",
       "continueForbidden": "只有提问者、智能体负责人或管理员可以让它继续。",
-      "notRestartable": "这个回答已经开始，无法重新开始。请重新发送你的消息。"
+      "notRestartable": "这个回答已经开始，无法重新开始。请重新发送你的消息。",
+      "cancelForbidden": "只有提问者、智能体负责人或管理员可以停止它。",
+      "answerForbidden": "只有提问者、智能体负责人或管理员可以执行此操作。",
+      "stopReasonForbidden": "只有停止它的人可以说明原因。"
     },
     "artifact": {
       "fileTooLarge": "文件超过 {{max}} MB，这是单个文件的上限。",
       "notVersioned": "图片、视频或录音没有版本。请作为新文件发送。",
       "fileRequired": "请选择要上传的文件。",
       "fileNameRequired": "文件需要一个名称。",
-      "notFound": "这个文件已不存在，或你无权访问。"
+      "notFound": "这个文件已不存在，或你无权访问。",
+      "deleteForbidden": "只有创建者、向智能体提出请求的人、智能体负责人或管理员可以删除它。",
+      "restoreForbidden": "只有可以删除它的人才能恢复它。"
     },
     "machine": {
       "forbidden": "只有管理员或连接这台电脑的人可以执行此操作。",
@@ -10652,7 +10739,10 @@
       "targetOffline": "那台电脑已离线，请选择另一台。",
       "targetNotFound": "那台电脑已不存在，请选择另一台。",
       "targetSame": "智能体已经在那台电脑上了。",
-      "targetPaused": "那台电脑已暂停，请选择另一台。"
+      "targetPaused": "那台电脑已暂停，请选择另一台。",
+      "offline": "{{name}} 现在离线，等它恢复后再试。",
+      "paused": "{{name}} 已暂停：恢复之前不会在上面开始新的工作。",
+      "timeout": "电脑没有及时响应，请重试。"
     },
     "github": {
       "repoMissing": "仓库 {{repo}} 在 GitHub 上是私有的或不存在。",
@@ -10665,8 +10755,14 @@
       "tooManySkills": "这个链接包含超过 {{max}} 个技能，请链接到其中一个文件夹。",
       "invalidName": "名称只能使用小写字母、数字和连字符，最多 {{max}} 个字符。",
       "invalidDescription": "描述需为 1 到 {{max}} 个字符。",
-      "tooLarge": "技能太大（最大 {{max}} MB）。",
-      "tooManyFiles": "技能的文件太多（最多 {{max}} 个）。",
+      "tooLarge": "这个技能有 {{size}} MB 的文本和脚本，上限是 {{max}} MB。",
+      "tooManyFiles": "这个技能有 {{files}} 个文件，上限是 {{max}} 个。",
+      "repoTooLarge": "仓库太大，无法下载（最大 {{max}} MB）。请改为上传技能文件夹的 .zip。",
+      "noFrontmatter": "SKILL.md 顶部需要一个写有名称和描述的区块，放在两行 --- 之间。",
+      "bodyTooLong": "SKILL.md 太长（最多 {{max}} 个字符）。",
+      "noSkillMdZip": "zip 文件夹顶层没有 SKILL.md。",
+      "notGithubLink": "无法读取这个 GitHub 链接。请粘贴仓库或其中某个文件夹的链接。",
+      "badZip": "无法读取这个 zip。请不设密码，重新压缩技能文件夹。",
       "connectionGone": "读取 {{repo}} 的 GitHub 连接已失效。请重新连接 GitHub 以更新这个技能。",
       "linkHoldsSeveral": "链接里现在有多个技能。请从这个技能自己的文件夹重新安装。",
       "linkRenamed": "链接里现在是技能 {{name}}。",
@@ -10676,6 +10772,21 @@
     "agentGroup": {
       "notFound": "这个部门已不存在。",
       "tooMany": "这个工作区已有 {{max}} 个部门。请先删除一个。"
+    },
+    "rightHand": {
+      "permanent": "得力助手属于整个工作区，不加入频道。在任何频道 @提及它即可叫到它。"
+    },
+    "agent": {
+      "ownerOrAdmin": "只有智能体负责人或管理员可以执行此操作。",
+      "detailsHidden": "只有与 {{agentName}} 对话的人可以看到它的工作方式。",
+      "extraOwnerOnly": "只有智能体负责人可以开启或关闭套餐的付费额外用量。",
+      "undoForbidden": "只有智能体为其工作的人、智能体负责人或管理员可以撤销此操作。"
+    },
+    "account": {
+      "notOwner": "只有连接此账号或套餐的人可以执行此操作。"
+    },
+    "channel": {
+      "membersForbidden": "只有频道创建者或管理员可以添加或移除成员。"
     },
     "handle": {
       "invalid": "@ 名称需为 {{min}} 到 {{max}} 个小写字母、数字、- 或 _。",
@@ -11313,6 +11424,7 @@
     "system": "系统",
     "removed": "已移除",
     "change": {
+      "mergedWithoutAsking": "未经询问在 {{repo}} 中合并",
       "pattern": "{{verb}}{{area}}",
       "approval": {
         "approved": "批准了一个请求",
@@ -11811,7 +11923,7 @@
     },
     "card": {
       "title": "你已达到本月的使用额度",
-      "text": "将于 {{date}} 重置。如需现在继续,请联系管理员。",
+      "text": "将于 {{date}} 重置。如需现在继续，请申请增加。",
       "ask": "申请增加",
       "asked": "已发送申请",
       "see": "查看我的用量",
@@ -12340,6 +12452,10 @@
       "machine_task_resume_waits": "{{computer}} 恢复了：项目就绪后，“{{title}}”会从中断处继续。",
       "machine_offline": "{{computer}} 已离线。",
       "brain_unavailable": "{{brain}} 暂时无法回答。恢复后我会回复。",
+      "brain_unavailable_paused": "{{brain}} 运行的电脑已暂停。恢复后我会回复。",
+      "brain_unavailable_commands_off": "我的电脑上 {{brain}} 已关闭。负责这台电脑的人打开后我会回复。",
+      "brain_unavailable_outdated": "我电脑上的程序需要更新，{{brain}} 才能回答。更新后我会立即回复。",
+      "brain_unavailable_plan_owner": "{{brain}} 会使用不属于我主人的套餐来思考，所以我不使用它。请在我的页面上连接我主人的账号。",
       "provider_unavailable": "我的 AI 服务商暂时没有响应。恢复后我会尽快回复。",
       "brain_busy": "我的电脑正忙于其他任务。空闲后我会尽快回复。",
       "brain_queued": "我仍在排队等待电脑。一有空位我就会回复。",
@@ -12348,6 +12464,9 @@
       "plan_limit_cut_unknown": "我在 {{plan}} 套餐的限额处停了下来。重置后我会立即从停下的地方继续。",
       "plan_limit_wait": "{{plan}} 套餐已达限额。{{when}}重置后我会回复。",
       "plan_limit_wait_unknown": "{{plan}} 套餐已达限额。重置后我会立即回复。",
+      "plan_model_limit_wait": "{{model}} 在 {{plan}} 中达到了自身的限额。套餐里的其他模型仍可正常使用：更换 {{agent}} 的模型，或等它{{when}}重置。",
+      "plan_model_limit_wait_unknown": "{{model}} 在 {{plan}} 中达到了自身的限额。套餐里的其他模型仍可正常使用：更换 {{agent}} 的模型，或等它重置。",
+      "plan_model_region_wait": "这个模型（{{model}}）需要在 OpenCode 的 设置 › 隐私 中开启 Global 区域。",
       "budget_wait": "我本月的预算用完了。我会在{{when}}继续，如果管理员提高预算会更早。",
       "usage_wait_canceled": "已取消。限额重置后不会运行。",
       "usage_wait_archived": "不会运行：该智能体已归档。",
@@ -12366,14 +12485,20 @@
       "work_end_canceled": "{{minutes}} 分钟后停止。",
       "work_end_canceledBy": "{{minutes}} 分钟后由 {{name}} 停止。",
       "no_ai": "我暂时无法回答：我还没有连接 AI。",
-      "person_limit": "提出请求的人已达到本月的使用额度。如需现在继续,请联系管理员。",
+      "person_limit": "提出请求的人已达到本月的使用额度。",
       "no_ai_signed_out": "我暂时无法回答：我的 AI 已退出登录。",
       "no_ai_not_signed_in": "我暂时无法回答：{{brain}} 还没有在我的电脑上登录。",
       "no_ai_computer_away": "我现在无法回答：我的套餐所在的电脑不可用。",
+      "no_ai_computer_failed": "我现在无法回答：我的套餐所在的电脑出了问题。",
       "no_ai_plan_limit": "我现在无法回答：我用来思考的套餐已达到上限。",
-      "no_ai_plan_not_shared": "我无法用这个套餐回复你：它只回复自己的所有者。",
+      "no_ai_plan_not_shared": "我无法通过工作区的套餐回复你：它只回复其所有者。连接你自己的套餐后我就能回复。",
       "no_ai_runner_outdated": "我现在无法回复：我的套餐所在电脑上的程序需要更新。",
-      "no_ai_plan_tools": "我在回复前停下了：那台电脑上我的套餐的 AI 提供了它自己的工具。",
+      "no_ai_plan_tools": "我在回复前停下了：那台电脑上我的套餐的 AI 没有只使用 agentes.chat 的工具。",
+      "no_ai_model_limit": "我现在无法回答：{{model}} 已达到它在我套餐中的自身上限。",
+      "no_ai_model_region": "我无法回答：{{model}} 需要在 OpenCode 中开启 Global 区域（Settings › Privacy）。",
+      "no_ai_commands_off": "我现在无法回答：我套餐所在电脑上的命令已关闭。",
+      "no_ai_cli_missing": "我还无法回答：我的 AI 程序没有安装在我的电脑上。",
+      "no_ai_no_computer": "我还无法回答：我的 AI 需要一台电脑，而我没有。",
       "redacted": "[已删除：看起来像登录信息或密钥]",
       "action_connect_ai": "连接 AI",
       "action_connect_app": "连接 {{name}}",
@@ -13635,6 +13760,34 @@
       "queued": "排队中",
       "stopping": "正在停止…",
       "stopped": "已停止"
+    },
+    "wait": {
+      "pausedPlan": "已暂停：套餐已用 {{percent}}% {{window}}",
+      "pausedBudget": "已暂停：本月预算已用 {{percent}}%",
+      "planLimit": "{{plan}} 套餐已达限额",
+      "modelLimit": "{{model}} 已达限额",
+      "modelRegion": "{{model}} 需要 Global 区域",
+      "modelRegionNext": "请在 OpenCode 中开启（Settings › Privacy）",
+      "budgetOut": "本月预算已用完",
+      "workLine": "在智能体的工作队列中",
+      "workLineNext": "其他工作结束后开始",
+      "computerWait": "等待电脑",
+      "computerWaitNext": "准备好后继续",
+      "computerOfflineNext": "开机后继续",
+      "computerBusyNext": "有空位时开始",
+      "okNext": "有人审批后继续",
+      "answerNext": "有人回答后继续",
+      "back": "{{when}}继续",
+      "whenRenews": "重置后",
+      "whenSoon": "马上"
+    },
+    "waitGroup": {
+      "routines_other": "{{count}} 项例行工作",
+      "pausedPlan": "{{what}}已暂停：{{plan}} 套餐已用 {{percent}}% {{window}}，{{when}}继续。剩余额度留给对话。",
+      "pausedBudget": "{{what}}已暂停：本月预算已用 {{percent}}%，{{when}}继续。剩余额度留给对话。",
+      "planLimit": "{{what}}在等待：{{plan}} 套餐已达限额，{{when}}继续。",
+      "modelLimit": "{{what}}在等待：{{model}} 已达限额，{{when}}继续。套餐里的其他模型仍可正常使用。",
+      "budgetOut": "{{what}}在等待：本月预算已用完，{{when}}继续。"
     },
     "where": {
       "dm": "私信",

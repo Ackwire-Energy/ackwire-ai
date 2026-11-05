@@ -357,6 +357,20 @@ test("its DM's line: a runner to update and a CLI with tools of its own each say
   expect(UNAVAILABLE_CODES.has("tools_not_locked")).toBe(true);
 });
 
+test("its DM's line names the real cause: a model's own limit or region, commands off, a CLI missing, another's plan", () => {
+  expect(rightHandNoAiReason("plan_limit")).toBe("plan_limit");
+  expect(rightHandNoAiReason("plan_limit", "model")).toBe("model_limit");
+  expect(rightHandNoAiReason("plan_limit", "region")).toBe("model_region");
+  expect(rightHandNoAiReason("codex_too_old")).toBe("runner_outdated");
+  expect(rightHandNoAiReason("exec_disabled")).toBe("commands_off");
+  expect(rightHandNoAiReason("tool_off")).toBe("commands_off");
+  expect(rightHandNoAiReason("plan_not_owner")).toBe("plan_not_shared");
+  for (const code of ["cli_missing", "codex_missing", "opencode_missing", "antigravity_missing"])
+    expect(rightHandNoAiReason(code)).toBe("cli_missing");
+  // A failure that may pass is a problem on the computer: never "no AI connected", nor that it's away.
+  expect(rightHandNoAiReason("runner_error")).toBe("computer_failed");
+});
+
 test("an OpenCode turn of it goes out as the chat profile with no checkout; an older runner gets nothing", async () => {
   const sent: Record<string, unknown>[] = [];
   let protocol = MACHINE_PROTOCOL_VERSION;

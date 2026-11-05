@@ -8,6 +8,7 @@ import {
   ALL_REPOS,
   applyPick,
   covers,
+  mergeChoices,
   repoChoiceOf,
   repoExists,
   repoListOf,
@@ -86,6 +87,36 @@ const withRepos = (list: string[]) => {
   return state;
 };
 const saveBar = () => screen().queryByRole("region", { name: "Alterações não salvas" });
+
+describe('"Pode fazer merge sem perguntar"', () => {
+  test("it picks among what GitHub reaches and the agent may use", () => {
+    expect(mergeChoices(LISTING, [])).toHaveLength(4);
+    expect(mergeChoices(LISTING, ["acme/*"])).toEqual(["acme/app", "acme/api", "acme/infra"]);
+    expect(mergeChoices(LISTING, ["acme/api"])).toEqual(["acme/api"]);
+    expect(mergeChoices(undefined, [])).toEqual([]);
+  });
+
+  test("under GitHub: nothing chosen says so; the picker saves at once, outside the save bar", async () => {
+    const { state } = await go("?tab=access", withRepos(["acme/app", "acme/api"]));
+    const github = screen().getByRole("radiogroup", { name: "Nível em GitHub" });
+    await click(within(github).getByRole("radio", { name: "Ler e escrever" }));
+    const row = github.closest("li") as HTMLElement;
+    expect(row.textContent).toContain("Pode fazer merge sem perguntar");
+    expect(row.textContent).toContain("Nenhum repositório escolhido. Todo merge pede aprovação.");
+    await click(within(row).getByRole("button", { name: "Escolher" }));
+    const dialog = screen().getByRole("dialog", { name: "Onde Ada faz merge sem perguntar" });
+    // Only what the agent uses.
+    expect(within(dialog).queryByRole("checkbox", { name: /acme\/infra/ })).toBeNull();
+    await click(within(dialog).getByRole("checkbox", { name: /acme\/api/ }));
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    expect(state.calls.filter((c) => c.method === "repositories.setMerge").map((c) => c.args[2])).toEqual([
+      ["acme/api"],
+    ]);
+    expect(screen().queryByRole("dialog", { name: "Onde Ada faz merge sem perguntar" })).toBeNull();
+    expect(row.textContent).toContain("acme/api");
+    expect(row.textContent).toContain("entra na auditoria e deixa um recibo na conversa");
+  });
+});
 
 describe("agent page: GitHub repositories", () => {
   test("under GitHub: the chips, Mudar opens the picker, Usar estes goes to the save bar, Salvar sends the list", async () => {

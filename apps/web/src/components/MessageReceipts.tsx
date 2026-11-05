@@ -11,6 +11,7 @@ import {
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { mayConnectAi } from "@agenteschat/client/lib/no-ai";
 import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import { Icon, type IconName, PixelSpinner, Popover } from "@agenteschat/ui";
@@ -126,6 +127,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
 
   const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
   const names = (ids: string[]) => joinNames(ids.map(name), t);
+  const only = status?.kind === "no_ai" && status.agents.length === 1 ? status.agents[0] : undefined;
+  const mayConnect = mayConnectAi(only ? dir.agentById.get(only) : null, me.user.id, org);
   const mentionNeeded = status?.kind === "nobody" && status.mentionNeeded === true;
   const statusText =
     status === null
@@ -289,7 +292,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       {status?.kind === "no_ai" && (
         <span className="ac-receipt__words">
           <span>{t("noAi.receipt")}</span>
-          {connect && (
+          {connect && mayConnect && (
             <ReceiptAction>
               <button
                 type="button"

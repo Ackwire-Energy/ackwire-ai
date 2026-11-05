@@ -28,6 +28,7 @@ import { useChannelActions } from "@/components/channel-actions";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { COMPACT_QUERY } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
+import { useEscClose } from "@/hooks/useEscClose";
 import { useMatchMedia } from "@/hooks/useMatchMedia";
 import { groupHits, hitLink, SEARCH_PAGE, useHeaderSearch } from "@/hooks/useWorkspaceSearch";
 import "./search.css";
@@ -46,6 +47,7 @@ export function SearchResultsPanel({ channelId, onClose }: { channelId: string; 
   const channels = useChannels(org.id);
   const categories = useChannelCategories(org.id);
   const phone = useMatchMedia(COMPACT_QUERY);
+  useEscClose(onClose);
   const setShown = ws?.setShown;
   useEffect(() => {
     if (!setShown) return;

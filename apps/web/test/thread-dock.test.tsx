@@ -96,3 +96,32 @@ test("the members toggle with a thread open closes the thread and shows the memb
   expect(thread()).toBeNull();
   expect(members()).toBeTruthy();
 });
+
+test("over the agent's page with unsaved edits, opening a thread beside it asks first and keeps the page", async () => {
+  await openThread();
+  await click(screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
+  await settle(6);
+  const card = screen().getByRole("dialog", { name: "Perfil" });
+  await act(async () =>
+    fireEvent.pointerDown(within(card).getByRole("button", { name: "Mais" }), { button: 0, ctrlKey: false }),
+  );
+  await settle(2);
+  await click(within(screen().getByRole("menu", { name: "Mais" })).getByRole("menuitem", { name: "Ver perfil" }));
+  await settle(6);
+  const side = screen().getByRole("complementary", { name: "Perfil da Ada" });
+  expect(side.classList.contains("thread-panel--docked")).toBe(true);
+  expect(thread()).toBeNull();
+  // Radix tabs activate on mouse down.
+  const tab = within(side).getByRole("tab", { name: /^Configurações/ });
+  await act(async () => fireEvent.mouseDown(tab, { button: 0 }));
+  await settle(4);
+  await click(within(within(side).getByRole("group", { name: "Cor" })).getByRole("button", { name: "Rosa" }));
+  await click(screen().getByRole("button", { name: /^Mensagens fixadas \(/ }));
+  await settle(2);
+  const list = screen().getByRole("dialog", { name: "Mensagens fixadas em #eng" });
+  await click(list.querySelector(".thread-pop__row") as HTMLElement);
+  await settle(6);
+  expect(document.querySelector(".thread-panel--wide")).toBeTruthy();
+  expect(document.querySelector(".thread-panel:not(.thread-panel--wide)")).toBeNull();
+  expect(screen().getByRole("button", { name: "Continuar editando" })).toBeTruthy();
+});

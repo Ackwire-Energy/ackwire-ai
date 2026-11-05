@@ -109,3 +109,17 @@ describe("Usar planos de outras pessoas (ADR 0059 §3): one key in Apps e comput
     expect(saved().at(-1)).toEqual(["use_others_plans"]);
   });
 });
+
+describe("Mencionar todos (`@todos`): one key in Conversas", () => {
+  test("off for another role until it is turned on by itself", async () => {
+    const { saved } = await openRole("Suporte");
+    await click(screen().getByRole("button", { name: /Ajustar Conversas/ }));
+    await settle(2);
+    expect(screen().getByText("Usar @todos para avisar todo mundo de um canal, pessoas e agentes.")).toBeTruthy();
+    const toggle = screen().getByRole("switch", { name: /Mencionar todos/ });
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    await click(toggle);
+    await settle(4);
+    expect(saved().at(-1)).toEqual(["mention_everyone"]);
+  });
+});

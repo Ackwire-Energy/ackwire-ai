@@ -564,6 +564,7 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 .routine-own li {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   min-height: 26px;
   padding: 0 10px;
   border-radius: 8px;
@@ -571,6 +572,11 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   font-size: 12.5px;
   color: var(--ink2);
   overflow-wrap: anywhere;
+}
+.routine-own li .ac-btn {
+  width: 20px;
+  height: 20px;
+  margin-right: -6px;
 }
 .routine-details__where {
   display: flex;

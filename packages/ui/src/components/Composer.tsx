@@ -173,6 +173,8 @@ export interface ComposerProps {
   className?: string;
   /** Lets the parent focus the box or insert text (e.g. "Chamar um agente"). */
   textareaRef?: React.Ref<HTMLTextAreaElement>;
+  /** Esc in the box means something here (stopping an agent): a panel beside it doesn't close on it. */
+  keepsEsc?: boolean;
   /** "@" autocomplete (combobox pattern on the text box). */
   mentions?: ComposerMentions;
   /** "/" at the start of the box opens these commands (same combobox). */
@@ -379,6 +381,7 @@ export function Composer({
   id,
   className,
   textareaRef,
+  keepsEsc,
   mentions,
   commands,
   links,
@@ -688,6 +691,7 @@ export function Composer({
       id={id}
       rows={1}
       aria-label={label}
+      data-esc-own={keepsEsc ? "" : undefined}
       placeholder={placeholder}
       value={value}
       disabled={disabled}
@@ -774,6 +778,7 @@ export function Composer({
             data-disabled={disabled || undefined}
             data-dragging={dragging || undefined}
             data-voice={recording ? rec.phase : undefined}
+            data-esc-layer={recording || attachments ? "" : undefined}
             style={heldHeight ? { minHeight: heldHeight, maxHeight: heldHeight } : undefined}
             onDragOver={
               onFiles

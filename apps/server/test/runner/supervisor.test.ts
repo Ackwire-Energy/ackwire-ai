@@ -1183,6 +1183,9 @@ test("worker sessions follow the server's: they end when it drops and are welcom
   };
   t.sup.handoff(handoff);
   await waitFor(() => ana.of("browser.handoff").length === 1);
+  // Root sees a person take the desktop; the agent's keys are its worker's.
+  t.sup.desktopTaken(ANA.id);
+  await waitFor(() => ana.of("desktop.taken").length === 1);
 
   // The server's socket drops: so does the worker's session, and what it ran fails.
   t.sup.detach();

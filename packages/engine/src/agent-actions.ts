@@ -19,7 +19,8 @@ export const UNDO_WINDOW_MS = 5 * 60_000;
  * memory (saved, changed, forgotten), routines (created, changed, deleted), an agent
  * added to a channel, a channel created, wiki pages (created, edited), threads
  * (renamed, closed). Merge, deploy, rollback, anything that leaves the organization
- * and deletes that can't be restored keep asking (approvals). The API's enum is this list. The apps keep their own
+ * and deletes that can't be restored keep asking (approvals). A merge in a repository the agent merges in without
+ * asking only has its receipt (`final`: nothing undoes it). The API's enum is this list. The apps keep their own
  * copy (`@agenteschat/client`'s `AGENT_ACTION_KINDS`), and a test keeps the two the same.
  */
 export const AGENT_ACTION_KINDS = [
@@ -42,6 +43,7 @@ export const AGENT_ACTION_KINDS = [
   "skill.updated",
   /** A teammate's settings changed from the right hand's card (ADR 0137): by the person who clicked, not by an agent. */
   "agent.settings_changed",
+  "pr.merged",
 ] as const;
 export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
@@ -73,7 +75,8 @@ export type AgentActionTargetType =
   | "wiki_page"
   | "thread"
   | "skill"
-  | "agent";
+  | "agent"
+  | "repository";
 
 /** What the change was made to, with enough to label it ("#23 · Prompt…"). */
 export interface AgentActionTarget {
@@ -120,6 +123,8 @@ export interface ActionRecord {
   params?: AgentActionParams;
   before?: Record<string, unknown> | null;
   after?: Record<string, unknown> | null;
+  /** Nothing undoes it: its receipt is plain history from the start. */
+  final?: boolean;
 }
 
 type Row = typeof agentActions.$inferSelect;
@@ -172,7 +177,7 @@ export async function recordAgentActions(
           after: r.after ?? null,
           // Several in one call keep their order.
           createdAt: new Date(now.getTime() + i),
-          undoableUntil: new Date(now.getTime() + i + UNDO_WINDOW_MS),
+          undoableUntil: new Date(now.getTime() + i + (r.final ? 0 : UNDO_WINDOW_MS)),
         };
       }),
     )
@@ -267,7 +272,7 @@ export function describeAction(a: Pick<AgentActionView, "kind" | "target" | "par
     case "issue.assigned":
       return `assigned ${issue}${typeof p.assigneeName === "string" ? ` to ${p.assigneeName}` : ""}`;
     case "memory.saved":
-      return `saved to memory: "${String(p.text ?? "").slice(0, 120)}"`;
+      return `saved to ${p.rule === true ? "my rules" : "memory"}: "${String(p.text ?? "").slice(0, 120)}"`;
     case "memory.updated":
       return `changed a memory to "${String(p.text ?? "").slice(0, 120)}"`;
     case "memory.forgotten":
@@ -296,5 +301,7 @@ export function describeAction(a: Pick<AgentActionView, "kind" | "target" | "par
       return `changed the skill${title}`;
     case "agent.settings_changed":
       return `changed ${Array.isArray(p.fields) ? p.fields.join(", ") : "settings"} of ${t.title ?? "an agent"} from your card`;
+    case "pr.merged":
+      return `merged ${p.number ? `PR #${p.number}` : `${String(p.ref ?? "a branch")}`} in ${String(p.repo ?? t.title ?? "a repository")}`;
   }
 }

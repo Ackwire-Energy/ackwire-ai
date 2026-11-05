@@ -12,6 +12,7 @@ import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { TaskStepsBlock } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useEscClose } from "@/hooks/useEscClose";
 import { SayWhy, StopTaskButton, TaskStateChip, taskAge, UsingNow, useOpenTask } from "./TaskBits";
 import "@/components/threads/threads.css";
 
@@ -46,6 +47,7 @@ export function TaskPanel({
 }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
+  useEscClose(onClose);
   const dir = useDirectory(org.id);
   const openTask = useOpenTask();
   // The task as last seen while it was on: what the panel still says once it ended.

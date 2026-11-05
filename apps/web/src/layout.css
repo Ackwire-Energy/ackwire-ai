@@ -5775,6 +5775,8 @@ html:not([data-pointer]) .wiki-link:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .wiki-link--missing {
+  /* No chip behind it, so no chip's side padding: its words line up with the text around them. */
+  padding: 0;
   background: transparent;
   color: var(--muted);
   box-shadow: none;
@@ -12508,10 +12510,11 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   color: var(--ink-muted);
 }
 /* A plan's or a key's mark beside its name and facts: the name's capitals at the mark's top, what follows them (a
-   chip, the actions) in the row's middle. */
+   chip, the actions) in the row's middle. As deep as it is wide at its ends: a plan's meter makes it a block. */
 .ai-accounts__row,
 .key-row {
   align-items: flex-start;
+  padding: var(--space-4);
 }
 .ai-accounts__row > .ac-acts,
 .key-row > :not(.ac-brand, .list-col) {
@@ -13037,11 +13040,55 @@ html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
   max-width: 100%;
 }
 .rh-set__budget,
-.rh-set__plan {
+.rh-set__acts {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   max-width: 100%;
+}
+/* The look is edited from the face itself, one control tall like the name beside it. */
+.rh-set__face-edit {
+  display: flex;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.rh-set__face-edit .ac-avatar {
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+}
+.rh-set__face-edit:hover .ac-avatar {
+  filter: brightness(1.06);
+}
+html:not([data-pointer]) .rh-set__face-edit:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* In the panel beside a narrow conversation the row's buttons go under its text, as on a phone. */
+@container agp-side (max-width: 479px) {
+  .agp-card .settings-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .agp-card .settings-row__control {
+    flex: none;
+    justify-content: flex-start;
+  }
+}
+/* A plan on a line of its own under the row's text: its maker's mark, then its account. */
+.rh-set__planline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--ink);
+}
+.rh-set__planline b {
+  font-weight: 600;
 }
 /* Wide enough for its placeholder ("Padrão do workspace", longer in es, de, ru) after "US$". */
 .rh-set__budget .ac-input-affix {

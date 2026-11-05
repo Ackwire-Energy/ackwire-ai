@@ -919,7 +919,7 @@ function LimitsView({ switcher }: { switcher: ReactNode }) {
                   options={others.map((m) => ({
                     value: m.userId,
                     label: m.name,
-                    leading: <ActorAvatar actor={{ type: "person", id: m.userId }} name={m.name} size="xs" />,
+                    leading: <ActorAvatar actor={{ type: "person", id: m.userId }} name={m.name} size="sm" />,
                   }))}
                 />
               </li>

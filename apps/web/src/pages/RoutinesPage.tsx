@@ -1644,11 +1644,11 @@ function RoutineAside({
       value: a.id,
       label: a.name,
       description: a.role || undefined,
-      leading: actors.avatar({ type: "agent", id: a.id }),
+      leading: actors.avatar({ type: "agent", id: a.id }, "sm"),
     })),
     ...(actors.dir.agentById.has(r.agentId)
       ? []
-      : [{ value: r.agentId, label: actors.name(agent), description: undefined, leading: actors.avatar(agent) }]),
+      : [{ value: r.agentId, label: actors.name(agent), description: undefined, leading: actors.avatar(agent, "sm") }]),
   ];
   const choice = targetChoice(r.target);
   const channelList = channels.data ?? [];
@@ -2500,7 +2500,7 @@ function RoutineDialog({
                     value: a.id,
                     label: a.name,
                     description: a.role || undefined,
-                    leading: actors.avatar({ type: "agent", id: a.id }),
+                    leading: actors.avatar({ type: "agent", id: a.id }, "sm"),
                   }))}
                 />
               </Field>
@@ -2695,14 +2695,33 @@ function RoutineDialog({
 /** What a routine does in connected apps without asking (the job its creator set it up for), or that it asks for each. */
 function OwnActions({ routine }: { routine: Routine | undefined }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const action = useRoutineAction(org.id);
   const own = routine?.ownActions ?? [];
   if (own.length === 0) return <p className="small muted">{t("routines.ownActions.none")}</p>;
   return (
     <>
       <ul className="routine-own" aria-label={t("routines.panel.ownActions")}>
-        {own.map((action) => (
-          <li key={action} title={action}>
-            {ownActionName(t, action)}
+        {own.map((name) => (
+          <li key={name} title={name}>
+            {ownActionName(t, name)}
+            {routine?.canManage && (
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                icon="close"
+                aria-label={t("routines.ownActions.remove", { action: ownActionName(t, name) })}
+                disabled={action.isPending}
+                onClick={() =>
+                  action.mutate({
+                    type: "update",
+                    id: routine.id,
+                    patch: { ownActions: own.filter((a) => a !== name) },
+                  })
+                }
+              />
+            )}
           </li>
         ))}
       </ul>

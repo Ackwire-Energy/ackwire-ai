@@ -248,6 +248,7 @@ export interface FakeState {
   refusedGithub?: string;
   /** Agents' GitHub repositories, in order (`repositories.get`); unset = every repository. */
   agentRepos?: Record<string, string[]>;
+  agentMergeRepos?: Record<string, string[]>;
   scopes: Record<string, ScopeGrant[]>;
   runs: Run[];
   /** A run's steps by id (`GET …/runs/{id}`, what an approval's review reads); unset = none. */
@@ -497,7 +498,11 @@ export function meWithRole(state: FakeState, permissions: string[]) {
 
 /** The permission areas `roles.list` sends (the server's `PERMISSION_AREAS`). */
 const PERMISSION_AREAS = [
-  { id: "chat", use: ["post", "create_channels"], keys: ["post", "create_channels", "manage_channels"] },
+  {
+    id: "chat",
+    use: ["post", "create_channels"],
+    keys: ["post", "create_channels", "mention_everyone", "manage_channels"],
+  },
   {
     id: "agents",
     use: ["talk_to_agents", "assign_work", "manage_routines"],
@@ -2430,7 +2435,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       brain: async (_orgId, agentId) => {
         const me = requireMe();
         const agent = state.agents.find((a) => a.id === agentId);
-        if (me.organizations[0]?.role === "member" && agent?.ownerUserId !== me.user.id)
+        if (me.organizations[0]?.role === "member" && agent?.ownerUserId !== me.user.id && !agent?.builtin)
           throw new ApiError(403, "agent.not_owner", "Only an admin or the agent's owner");
         return structuredClone(brainOf(agentId));
       },
@@ -3441,6 +3446,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.agentRepos = { ...(state.agentRepos ?? {}), [agentId]: [...repositories] };
         return structuredClone(repositories);
       },
+      merge: async (_orgId, agentId) => structuredClone(state.agentMergeRepos?.[agentId] ?? []),
+      setMerge: async (orgId, agentId, repositories) => {
+        log("repositories.setMerge", orgId, agentId, repositories);
+        state.agentMergeRepos = { ...(state.agentMergeRepos ?? {}), [agentId]: [...repositories] };
+        return structuredClone(repositories);
+      },
     },
     scopes: {
       get: async (_orgId, agentId) => structuredClone(state.scopes[agentId] ?? []),
@@ -3817,6 +3828,12 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
               state.calls.push({ method: "working.taskSteps", args: [orgId, runId] });
               const createdAt = state.taskManager?.tasks.find((x) => x.runId === runId)?.createdAt ?? NOW.toISOString();
               return structuredClone(state.taskSteps?.[runId] ?? { run: { createdAt, finishedAt: null }, steps: [] });
+            },
+            continueTasks: async (orgId: string, runIds: string[]) => {
+              state.calls.push({ method: "working.continueTasks", args: [orgId, runIds] });
+              for (const task of state.taskManager?.tasks ?? [])
+                if (runIds.includes(task.runId)) Object.assign(task, { status: "running", held: null, wait: null });
+              return { continued: runIds.length };
             },
           },
         }

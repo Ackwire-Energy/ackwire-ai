@@ -962,7 +962,9 @@ describe("agent page: which computer", () => {
     expect(errorText(t, new ApiError(413, "artifact.file_too_large", "too large"))).toBe(
       "O arquivo passa de 50 MB, o limite por arquivo.",
     );
-    expect(errorText(t, new ApiError(500, "boom", "Server exploded"))).toBe("Algo deu errado. Tente de novo.");
+    expect(errorText(t, new ApiError(500, "boom", "Server exploded"))).toBe(
+      "Algo deu errado do nosso lado. Tente de novo daqui a pouco.",
+    );
     const en = createI18n("en");
     expect(errorText(en.t.bind(en), new ApiError(400, "machine.pairing_invalid", "x"))).toBe(
       "Invalid, used or expired code. Generate another one.",

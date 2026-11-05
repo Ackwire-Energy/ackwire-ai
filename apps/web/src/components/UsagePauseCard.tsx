@@ -10,9 +10,11 @@ import {
   type UsagePauseCard,
   type UsageWait,
   usagePauseText,
+  usageWaitFix,
 } from "@agenteschat/client/lib/usage-pause";
 import { Button, Icon } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { type ButtonHTMLAttributes, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
@@ -89,12 +91,25 @@ export function DontRunButton({ runId, may, count = 1 }: { runId: string | null;
  * speaks for), while the run still waits, and "Ver fila": everything else it picks up when the limit is back.
  */
 export function UsageWaitCancel({ message, wait }: { message: Message; wait: UsageWait }) {
+  const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const owner = dir.agentById.get(message.author.id ?? "")?.ownerUserId;
-  const may = mayContinueUsage(wait, me.user.id, owner, can(org, "manage_agents"));
+  const admin = can(org, "manage_agents");
+  const may = mayContinueUsage(wait, me.user.id, owner, admin);
+  const fix = usageWaitFix(message.meta, { admin, owner: owner === me.user.id });
   return (
     <span className="cq__acts">
+      {fix && message.author.id && (
+        <Link
+          to="/org/$orgId/agents/$agentId"
+          params={{ orgId: org.id, agentId: message.author.id }}
+          search={{ tab: "settings", sec: fix === "raiseBudget" ? "budget" : "brain" }}
+          className="ac-btn ac-btn--sm"
+        >
+          {t(`usageCard.${fix}`)}
+        </Link>
+      )}
       <DontRunButton runId={wait.runId} may={may} count={wait.count} />
       {message.author.id && <SeeUsageQueue agentId={message.author.id} />}
     </span>

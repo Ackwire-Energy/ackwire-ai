@@ -129,6 +129,7 @@ export function actionTextValues(
       return v;
     }
     case "memory.saved":
+      return p.rule === true ? { text: str(p.text), context: "rule" } : { text: str(p.text) };
     case "memory.updated":
     case "memory.forgotten":
       return { text: str(p.text) };
@@ -161,6 +162,10 @@ export function actionTextValues(
       return { name: str(p.name) || title };
     case "agent.settings_changed":
       return { agentName: str(p.agentName) || title };
+    case "pr.merged":
+      return p.number
+        ? { repo: str(p.repo), number: str(p.number) }
+        : { repo: str(p.repo), ref: str(p.ref), context: "branch" };
     default:
       // A kind the server knows and this build doesn't yet (an open tab, an older app): the key's own words.
       return {};

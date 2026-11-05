@@ -1,5 +1,5 @@
 import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, isNull, type SQL, schema, sql } from "@agenteschat/db";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { followWork } from "./agent-status";
 import { openApprovalCard, publishApproval } from "./approvals";
@@ -772,7 +772,8 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
     const [request] = await tx
       .update(secretRequests)
       .set({ threadId: asked.threadId, ...(brief || origin ? { channelId: asked.channelId } : {}) })
-      .where(eq(secretRequests.id, requestId))
+      // One card per request: a second call that waits on the same open one (`requestSecretTool`) posts none.
+      .where(and(eq(secretRequests.id, requestId), isNull(secretRequests.messageId)))
       .returning();
     if (!request) continue;
     // The card names the key itself: this text is for previews and notifications, a sentence of its own.

@@ -1,14 +1,14 @@
-import type { PubSub } from "@agenteschat/adapters";
+import type { PlanUsage, PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, schema, sql } from "@agenteschat/db";
-import { extraUsageLeft, planBinding } from "@agenteschat/ui/plan-state";
+import { extraUsageLeft, planBinding, planState } from "@agenteschat/ui/plan-state";
 import { recordAudit } from "./audit";
-import { storedPlanUsage } from "./brains/select";
+import { forgetPlanLimit, storedPlanUsage } from "./brains/select";
 import type { BrainKind } from "./brains/types";
 import { mayStopRun, runRequester } from "./cancel";
 import { ConflictError, ForbiddenError } from "./errors";
 import { publishMessageCreated } from "./events";
 import { type Message, messageView } from "./messages";
-import type { Membership } from "./organizations";
+import { can, type Membership, requireActiveMembership } from "./organizations";
 import { enqueue } from "./outbox";
 import { isTerminal } from "./runs";
 import { effectiveAgentBudget, monthStartUtc } from "./usage";
@@ -26,6 +26,11 @@ export const LIMIT_LADDER_MS = [2 * 60_000, 15 * 60_000, 30 * 60_000, 60 * 60_00
 /** A resumed run starts this long after the reset, and each next one of the same plan this much later. */
 export const RESUME_AFTER_MS = 30_000;
 export const RESUME_GAP_MS = 60_000;
+/**
+ * A wait parked again this soon after its last park was woken into the same limit (`steady`): no wake for this long
+ * after that park, only its own timer.
+ */
+export const REPARK_STEADY_MS = 10 * 60_000;
 /** A plan still silent about its reset after this long: the agent's owner hears it once. */
 export const UNKNOWN_RESET_NOTICE_MS = 24 * 3600_000;
 
@@ -185,7 +190,10 @@ export async function lineHeadLooks(db: Executor, orgId: string, key: string, no
  * person's reply on the same plan had already gone through. A long-work pause (95%) keeps its timer: a quick reply
  * going through says nothing about its line. One job per wait; the old timed one finds the wait gone and does nothing.
  * Only waits on the same `model` (a model's own weekly limit isn't lifted by another model's turn); a wait stored
- * without one is woken.
+ * without one is woken. `room`: a reading of the plan taken `at` has room again (`wakeOnRoom`): every wait on the
+ * account's limit that last parked before it, whatever its model. A wait that parked again right after a wake (`steady`)
+ * isn't woken for `REPARK_STEADY_MS` after that park (a wait behind the head of an unknown reset sleeps on a day's
+ * safety timer, so it must still be woken later).
  */
 export async function wakePlanWaits(
   db: Executor,
@@ -193,6 +201,7 @@ export async function wakePlanWaits(
   key: string,
   model: string | null,
   now = Date.now(),
+  room?: { at: number },
 ): Promise<string[]> {
   const { agentRuns } = schema;
   const rows = await db
@@ -203,6 +212,7 @@ export async function wakePlanWaits(
       waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
       until: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'until'`,
       since: waitSinceSql,
+      parkedAt: sql<string | null>`${agentRuns.transcript}->'usageWait'->>'parkedAt'`,
       createdAt: agentRuns.createdAt,
     })
     .from(agentRuns)
@@ -212,26 +222,51 @@ export async function wakePlanWaits(
         eq(agentRuns.status, "waiting_input"),
         sql`${agentRuns.transcript}->'waitingForBrain'->>'code' = 'plan_limit'`,
         sql`${agentRuns.transcript}->'waitingForBrain'->>'waitKey' = ${key}`,
-        sql`(not (${agentRuns.transcript}->'waitingForBrain' ? 'model') or ${agentRuns.transcript}->'waitingForBrain'->>'model' is not distinct from ${model})`,
+        sql`(not (${agentRuns.transcript}->'waitingForBrain' ? 'steady')
+          or coalesce((${agentRuns.transcript}->'usageWait'->>'parkedAt')::bigint, 0) < ${now - REPARK_STEADY_MS})`,
+        room
+          ? sql`not (${agentRuns.transcript}->'waitingForBrain' ? 'scope')`
+          : sql`(not (${agentRuns.transcript}->'waitingForBrain' ? 'model') or ${agentRuns.transcript}->'waitingForBrain'->>'model' is not distinct from ${model})`,
       ),
     )
     .orderBy(agentRuns.createdAt)
     .limit(100);
   const due = rows
-    .map((r) => ({ ...r, since: Number(r.since) }))
-    .filter((r) => r.waitId && !(Date.parse(r.until ?? "") <= now + RESUME_GAP_MS))
+    .map((r) => ({ ...r, since: Number(r.since), parkedAt: Number(r.parkedAt ?? r.since) }))
+    .filter((r) => r.waitId && !(Date.parse(r.until ?? "") <= now + RESUME_GAP_MS) && !(room && r.parkedAt >= room.at))
     .sort(inLineOrder);
   for (const [i, r] of due.entries()) {
     await enqueue(db, {
       orgId,
       kind: "agent_run.execute",
       payload: { runId: r.id, wait: r.waitId },
-      dedupeKey: `agent_run.execute:${r.id}:plan_back:${r.waitId}`,
+      dedupeKey: `agent_run.execute:${r.id}:${room ? "room_back" : "plan_back"}:${r.waitId}`,
       runAt: new Date(now + i * RESUME_GAP_MS),
       maxAttempts: 4,
     });
   }
   return due.map((r) => r.id);
+}
+
+/**
+ * A reading of a sign-in's plan (an account, or `accountId` absent: the computer's own) that the runner just reported:
+ * with no window full and no refusal, the plan has room again, so the runs parked on its limit go on now
+ * (`wakePlanWaits`), instead of waiting for a reset that already happened.
+ */
+export async function wakeOnRoom(
+  db: Executor,
+  orgId: string,
+  machineId: string,
+  kind: BrainKind,
+  accountId: string | undefined,
+  usage: PlanUsage,
+  now = Date.now(),
+): Promise<string[]> {
+  const at = Date.parse(usage.at);
+  if (!Number.isFinite(at) || planState(usage, now).state === "limited") return [];
+  forgetPlanLimit(machineId, kind, accountId);
+  const key = usageWaitKey({ code: "plan_limit", machineId, kind, accountId });
+  return wakePlanWaits(db, orgId, key, null, now, { at });
 }
 
 /**
@@ -476,12 +511,14 @@ async function setUsageCardState(
   deps: { db: Database; pubsub?: PubSub },
   orgId: string,
   messageId: string,
-  state: "resumed" | "ended",
+  state: "resumed" | "ended" | "continued",
+  fields: Partial<UsagePauseCard> = {},
 ) {
   const { messages } = schema;
+  const next = JSON.stringify({ ...fields, state });
   const [row] = await deps.db
     .update(messages)
-    .set({ meta: sql`jsonb_set(${messages.meta}, '{actionCard,state}', ${JSON.stringify(state)}::jsonb)` })
+    .set({ meta: sql`jsonb_set(${messages.meta}, '{actionCard}', (${messages.meta}->'actionCard') || ${next}::jsonb)` })
     .where(
       and(
         eq(messages.orgId, orgId),
@@ -766,6 +803,94 @@ export async function overrideUsagePause(
     ...(p.channelId ? { channelId: p.channelId } : {}),
   });
   return true;
+}
+
+/**
+ * Who may press Continuar agora on a paused run: the card's people (`mayStopRun`) and, for a routine's run, Rotinas'
+ * (its creator, whoever manages routines).
+ */
+export async function mayContinuePause(
+  db: Executor,
+  userId: string,
+  membership: Membership,
+  row: Parameters<typeof mayStopRun>[3] & { routineId: string | null; routineCreatorId: string | null },
+) {
+  if (row.routineId && (row.routineCreatorId === userId || can(membership, "manage_routines"))) return true;
+  return mayStopRun(db, userId, membership, row);
+}
+
+/**
+ * Continuar agora on several paused runs at once (the task manager's line over them): each goes on as from its card or
+ * Rotinas, so a run's pause may be refused alone (`assertMayContinuePause`) while the others go on, and a run's card
+ * says who let it go on. Refused for all of them, the first refusal is thrown. Runs that moved on meanwhile are skipped.
+ */
+export async function continuePausedRuns(
+  deps: { db: Database; pubsub?: PubSub },
+  userId: string,
+  orgId: string,
+  runIds: string[],
+): Promise<{ continued: number }> {
+  const { db } = deps;
+  const { agentRuns, agents, messages, routineRuns, routines } = schema;
+  const membership = await requireActiveMembership(db, userId, orgId);
+  const rows = await db
+    .select({
+      run: { id: agentRuns.id, orgId: agentRuns.orgId, triggerMessageId: agentRuns.triggerMessageId },
+      ownerUserId: agents.ownerUserId,
+      requester: runRequester,
+      routineId: routines.id,
+      routineCreatorId: routines.createdByUserId,
+      cardId: sql<string | null>`${agentRuns.transcript}->'usagePause'->>'cardId'`,
+      waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+      source: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'source'`,
+      resetsAt: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'resetsAt'`,
+    })
+    .from(agentRuns)
+    .innerJoin(agents, eq(agents.id, agentRuns.agentId))
+    .leftJoin(messages, and(eq(messages.id, agentRuns.triggerMessageId), eq(messages.orgId, agentRuns.orgId)))
+    .leftJoin(routineRuns, and(eq(routineRuns.agentRunId, agentRuns.id), eq(routineRuns.orgId, agentRuns.orgId)))
+    .leftJoin(routines, eq(routines.id, routineRuns.routineId))
+    .where(
+      and(
+        eq(agentRuns.orgId, orgId),
+        inArray(agentRuns.id, runIds),
+        eq(agentRuns.status, "waiting_input"),
+        sql`${agentRuns.transcript}->'waitingForBrain'->>'code' = 'usage_pause'`,
+      ),
+    );
+  let continued = 0;
+  let refused: unknown = null;
+  for (const row of rows) {
+    if (!row.waitId) continue;
+    try {
+      if (!(await mayContinuePause(db, userId, membership, row)))
+        throw new ForbiddenError("Only who asked, the agent's owner or an admin can do this", "run.answer_forbidden");
+      await assertMayContinuePause(db, orgId, row.run.id, "run");
+    } catch (error) {
+      refused ??= error;
+      continue;
+    }
+    const { waitId, resetsAt, source } = row;
+    const moved = await db.transaction((tx) =>
+      overrideUsagePause(tx, {
+        orgId,
+        runId: row.run.id,
+        waitId: waitId as string,
+        until: resetsAt,
+        userId,
+        details: { source: source ?? "plan" },
+      }),
+    );
+    if (!moved) continue;
+    continued++;
+    if (row.cardId)
+      await setUsageCardState(deps, orgId, row.cardId, "continued", {
+        continuedByUserId: userId,
+        continuedAt: new Date().toISOString(),
+      });
+  }
+  if (continued === 0 && refused) throw refused;
+  return { continued };
 }
 
 /**

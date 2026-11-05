@@ -15,6 +15,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { mentionsEveryone } from "@agenteschat/i18n/everyone";
 import { CHANNEL_REF } from "@agenteschat/ui/channel-refs";
 import { type AgentActionView, actionsFor } from "./agent-actions";
 import { currentHandles } from "./agents";
@@ -38,10 +39,11 @@ import { type MessageMemory, memoriesFor } from "./message-memories";
 import { readableBody, voiceOf } from "./message-preview";
 import { quietNoticeSql } from "./notices";
 import { can } from "./organizations";
+import { maySql } from "./permissions";
 import { afterReplyAnswered } from "./questions";
 import { rightHandReaches } from "./right-hand";
 import { inChannelRun, waitsOnUsage, workKeepsThread } from "./run-scope";
-import { computerWaitSql, NO_AI, outageParkedSql, passedSql, usageWaitSql } from "./runs";
+import { computerWaitSql, NO_AI, outageParkedSql, passedSql, runErrorDetail, usageWaitSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
 import { admitTaskAgents } from "./task-access";
@@ -187,6 +189,9 @@ export interface Receipts {
     status: "queued" | "running" | "waiting_approval" | "waiting_input" | "done" | "failed" | "canceled";
     /** `no_ai`: it failed for want of an AI to think with. */
     reason?: typeof NO_AI;
+    /** `failed` for another reason: why, for the app to word (`runErrorDetail`). */
+    errorCode?: string;
+    errorParams?: Record<string, string>;
     /** `waiting_input` parked on a provider outage: it retries by itself. */
     outage?: true;
     /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
@@ -305,6 +310,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
         runId: r.id,
         status: r.status,
         ...(r.error === NO_AI ? { reason: NO_AI } : {}),
+        ...(r.status === "failed" && r.error !== NO_AI ? runErrorDetail(r.error) : {}),
         ...(r.outage ? { outage: true as const } : {}),
         ...(r.computer ? { computer: r.computer } : {}),
         ...(r.usage ? { usage: r.usage } : {}),
@@ -590,6 +596,10 @@ export async function insertMessageWithRuns(
     (input.author.type === "agent" && input.author.runId === null ? input.author.stretchId : null) ?? null;
   const threadId = input.threadId ?? null;
   const channelNames = parseChannelNames(body);
+  // `@todos` (any language's word, `mentionsEveryone`) from a person who may `mention_everyone`: every member of the
+  // conversation is mentioned, but in a DM (plain text there). Never an agent's: one mentioning everyone would wake
+  // every agent here, and they would answer each other.
+  const everyone = person && mentionsEveryone(body);
   const startRuns = options.startRuns && person && !mediaOnly;
   const deliver = person && options.deliver !== false && !mediaOnly;
   // Agents the person only referenced (`classifyAddressees`): mentioned, but no run and no steering.
@@ -632,7 +642,11 @@ export async function insertMessageWithRuns(
           and mi.owner_id is distinct from ${userId}
           and not exists (select 1 from ${schema.missionParticipants} mp
             where mp.mission_id = mi.id and mp.user_id = ${userId} and mp.role = 'decide')
-      ), mentioned as (
+      ), everyone as (
+        select 1 where ${everyone}::boolean
+          and ${maySql(sql`${input.orgId}::uuid`, sql`${userId}::text`, "mention_everyone")}
+          and exists (select 1 from ${channels} ec where ec.id = ${input.channelId}::uuid and ec.kind <> 'dm')
+      ), named as (
         select a.id from ${agents} a
         where a.org_id = ${input.orgId}::uuid and a.archived_at is null
           and a.handle = any(${handles}::text[])
@@ -640,11 +654,21 @@ export async function insertMessageWithRuns(
           and (exists (select 1 from ${channelMembers} cm where cm.agent_id = a.id
               and cm.channel_id = ${input.channelId}::uuid)
             or ${rightHandReaches(sql`a`, sql`${input.channelId}::uuid`)})
+      ), everyone_agents as (
+        -- The agents that answer this person here (the others aren't "blocked": nobody named them), never Lodi, nor
+        -- one held (standing.ts: its run would only fail, as the router leaves it out).
+        select a.id from ${agents} a
+        join ${channelMembers} cm on cm.agent_id = a.id and cm.channel_id = ${input.channelId}::uuid
+        where exists (select 1 from everyone) and a.org_id = ${input.orgId}::uuid and a.archived_at is null
+          and a.operator_hold_at is null and a.builtin is null and a.id not in (select id from named)
+          and ${audienceSql("a", sql`${userId}::text`, inChannel)}
+      ), mentioned as (
+        select id from named union all select id from everyone_agents
       ), mentioned_people as (
         select om.user_id from ${schema.organizationMembers} om
         join ${channelMembers} pcm on pcm.user_id = om.user_id and pcm.channel_id = ${input.channelId}::uuid
-        where om.org_id = ${input.orgId}::uuid and om.handle = any(${handles}::text[])
-          and om.user_id is distinct from ${userId}
+        where om.org_id = ${input.orgId}::uuid and om.user_id is distinct from ${userId}
+          and (om.handle = any(${handles}::text[]) or exists (select 1 from everyone))
       ), answered as (
         -- A person's reply where an agent asked something (same channel and thread) answers it.
         update ${agentQuestions} q set status = 'answered', answer = ${body}, answered_by_user_id = ${userId},
@@ -659,7 +683,8 @@ export async function insertMessageWithRuns(
               -- whoever addresses it.
               and (${threadId}::uuid is not null
                 or not exists (select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'channel')
-                or oq.agent_id in (select id from mentioned)
+                -- Named: a mention of everyone is no answer to whatever each agent asked.
+                or oq.agent_id in (select id from named)
                 or exists (select 1 from ${agentRuns} ar join ${messages} tm on tm.id = ar.trigger_message_id
                   where ar.id = oq.run_id and tm.author_user_id = ${userId}))
             order by oq.created_at desc limit 1)
@@ -780,7 +805,12 @@ export async function insertMessageWithRuns(
           ${body},
           coalesce((select array_agg(id) from mentioned), '{}'::uuid[]),
           coalesce((select array_agg(user_id) from mentioned_people), '{}'::text[]),
-          ${JSON.stringify(input.meta ?? {})}::jsonb
+          -- Only this statement says a message mentions everyone.
+          (${JSON.stringify(input.meta ?? {})}::jsonb - 'mentionsEveryone' - 'everyoneAgentIds')
+            || coalesce((select jsonb_build_object('mentionsEveryone', true) from everyone), '{}'::jsonb)
+            -- The agents only the mention of everyone woke: they may stay quiet (reply-policy.ts).
+            || coalesce((select jsonb_build_object('everyoneAgentIds', jsonb_agg(id)) from everyone_agents
+                having count(*) > 0), '{}'::jsonb)
             || ${channelNames.length > 0 ? channelRefsSql(input.orgId, input.channelId, channelNames) : sql`'{}'::jsonb`}
             || coalesce((select jsonb_build_object('answersQuestionId', id) from answered), '{}'::jsonb)
             -- Delivered to a task in progress: nobody routes it again (no second run).

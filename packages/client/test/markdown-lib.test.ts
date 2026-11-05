@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { detailsAt, firstMentioned, parseMarkdown, tableAt } from "../src/lib/markdown";
+import { detailsAt, firstMentioned, parseMarkdown, readsAsPageTitle, tableAt } from "../src/lib/markdown";
 
 describe("mentions", () => {
   test("the first agent a text @mentions, as the backend reads it: any case, never an email", () => {
@@ -98,4 +98,12 @@ describe("collapsed details (ADR 0147)", () => {
       next: 3,
     });
   });
+});
+
+test("a [[link]] to no page reads as a page's name; a bracketed sentence doesn't", () => {
+  expect(readsAsPageTitle("Plano de férias")).toBe(true);
+  expect(readsAsPageTitle("Processos/Onboarding#Primeiro dia")).toBe(true);
+  expect(readsAsPageTitle("Ada está verificando os registros de recebimento e envio.")).toBe(false);
+  expect(readsAsPageTitle("Isso já foi resolvido?")).toBe(false);
+  expect(readsAsPageTitle("a".repeat(81))).toBe(false);
 });

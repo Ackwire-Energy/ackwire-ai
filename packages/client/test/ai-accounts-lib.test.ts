@@ -10,6 +10,7 @@ import {
   existingAi,
   groupPlans,
   lendable,
+  listsExisting,
   ownSignInListed,
   ownSignInName,
   ownSignInReady,
@@ -436,4 +437,11 @@ describe("a sign-in made again reuses the account (`reusableAccount`), and the c
     const [one] = groupPlans([chatgpt("only")]);
     expect(one && unusedCopies(one)).toEqual([]);
   });
+});
+
+test("Connect an AI starts with what the person has while the agent has no AI, and always for the right hand", () => {
+  expect(listsExisting({ builtin: null }, true)).toBe(true);
+  expect(listsExisting({ builtin: null }, false)).toBe(false);
+  expect(listsExisting({ builtin: "right_hand" }, false)).toBe(true);
+  expect(listsExisting(undefined, false)).toBe(false);
 });

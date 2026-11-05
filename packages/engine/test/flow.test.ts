@@ -174,7 +174,7 @@ test("the account's own refusal (an invalid key) fails the run untold: the perso
   await post(f, "@dev hi");
   expect(await toldAboutRun(f)).toEqual([]);
   const [run] = await f.db.select().from(schema.agentRuns);
-  expect([run?.status, run?.error]).toEqual(["failed", "provider_error: invalid provider API key"]);
+  expect([run?.status, run?.error]).toEqual(["failed", "provider_error: account: invalid provider API key"]);
 });
 
 test("a refused request fails the run with the provider's words, credentials masked, on the run and its error step", async () => {

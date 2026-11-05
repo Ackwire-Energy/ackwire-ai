@@ -30,11 +30,21 @@ export const NO_AI_TEXT = "I can't answer yet: I have no AI connected.";
 const NO_AI_SIGNED_OUT_TEXT = "I can't answer yet: my AI is signed out.";
 const noAiNotSignedInText = (own: NonNullable<AgentAi["own"]>) =>
   `I can't answer yet: ${BRAIN_NAMES[own]} isn't signed in on my computer.`;
-/** The team's right hand on a plan (`rightHandNoAiReason`): why that plan can't think for this message. */
-const RIGHT_HAND_TEXT: Partial<Record<NoAiReason, string>> = {
+/**
+ * Why it can't think, when that's more than no AI: its computer has no such CLI or no computer at all, and for the
+ * team's right hand on a plan (`rightHandNoAiReason`), why that plan can't think for this message.
+ */
+const REASON_TEXT: Partial<Record<NoAiReason, string>> = {
+  cli_missing: "I can't answer yet: my AI's program isn't installed on my computer.",
+  no_computer: "I can't answer yet: my AI needs a computer and I have none.",
   computer_away: "I can't answer now: the computer my plan is signed in on is away.",
+  computer_failed: "I can't answer now: the computer my plan is signed in on had a problem.",
   plan_limit: "I can't answer now: the plan I think with reached its limit.",
-  plan_not_shared: "I can't answer you on this plan: it answers only its owner.",
+  model_limit: "I can't answer now: the model I think with reached its own limit on my plan.",
+  model_region: "I can't answer: the model I think with needs the Global region on in OpenCode (Settings › Privacy).",
+  commands_off: "I can't answer now: commands are turned off on my plan's computer.",
+  plan_not_shared:
+    "I can't answer you on the workspace's plan: it serves only its owner. Connect your own plan and I will.",
   runner_outdated: "I can't answer now: the program on my plan's computer needs an update.",
   plan_tools: "I stopped before answering: my plan's AI on that computer offers tools of its own.",
 };
@@ -49,6 +59,8 @@ export interface NoAiCard extends ConnectIntent {
   reason: NoAiReason;
   /** With `not_signed_in`: the computer's own sign-in of this CLI isn't there, not an account's (`AgentAi.own`). */
   own?: AgentAi["own"];
+  /** With `model_limit` and `model_region`: the model's name the line says ("Kimi K2"). */
+  model?: string;
   /** The run that couldn't think (deleted when "Responder agora" starts it again). */
   runId: string;
 }
@@ -87,6 +99,7 @@ export async function postNoAiCard(
   run: AgentRun,
   reason: NoAiReason,
   own?: AgentAi["own"],
+  model?: string,
 ): Promise<Message | null> {
   const { db } = deps;
   const threadId = replyThreadOf(run);
@@ -111,6 +124,7 @@ export async function postNoAiCard(
       forUserId,
       reason,
       ...(own ? { own } : {}),
+      ...(model ? { model } : {}),
       ...intent,
       runId: run.id,
     };
@@ -121,7 +135,7 @@ export async function postNoAiCard(
       author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
       body: own
         ? noAiNotSignedInText(own)
-        : (RIGHT_HAND_TEXT[reason] ?? (reason === "not_signed_in" ? NO_AI_SIGNED_OUT_TEXT : NO_AI_TEXT)),
+        : (REASON_TEXT[reason] ?? (reason === "not_signed_in" ? NO_AI_SIGNED_OUT_TEXT : NO_AI_TEXT)),
       meta: { ...bodyCode(NO_AI), noAi },
     });
   });

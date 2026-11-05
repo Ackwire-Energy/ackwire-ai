@@ -54,3 +54,13 @@ const NOT_AIMED = /^(Tab|Escape|Shift|Control|Alt|AltGraph|Meta|Fn|CapsLock|NumL
  */
 export const aimsAtScreen = (e: KeyboardEvent, apple: boolean) =>
   pastes(e, apple) || (!e.ctrlKey && !e.metaKey && !e.altKey && !composes(e) && !NOT_AIMED.test(e.key));
+
+/** Whether the key landed in a text field that has something in it (not a checkbox or the like, which hold no text). */
+export const holdsText = (target: EventTarget | null) => {
+  if (!(target instanceof Element)) return false;
+  const field = target.closest<HTMLElement>(
+    "textarea, input:not([type=checkbox], [type=radio], [type=range], [type=button], [type=submit]), [contenteditable='true'], [contenteditable='']",
+  );
+  if (!field) return false;
+  return Boolean(("value" in field ? String(field.value) : (field.textContent ?? "")).trim());
+};

@@ -8,6 +8,7 @@ export {
   accountName,
   accountShares,
   brandOf,
+  modelLimitText,
   noWindowsText,
   ownPlanLines,
   partedUsage,

@@ -148,6 +148,37 @@ test.skipIf(!posix || !hasGit)(
   30_000,
 );
 
+test.skipIf(!hasGit)(
+  "a merge in a repository the agent merges in without asking runs and says so; everything else stays held",
+  async () => {
+    const { work, git } = gitRepo(dirs);
+    git("remote", "set-url", "origin", "https://github.com/acme/app.git");
+    git("branch", "feature");
+    const ctx = { workspaceReal: work, exec: true, token: "agm_x" };
+    const scope = { signal: new AbortController().signal, output: () => {} };
+    const exec = (command: string, mergeRepos?: string[]) =>
+      handleRequest(
+        ctx,
+        { op: "exec", command, timeoutSeconds: 30, stream: false, ...(mergeRepos ? { mergeRepos } : {}) },
+        scope,
+      ) as Promise<{ exitCode: number; merge?: unknown }>;
+    expect(await errorCode(() => exec("git merge feature"))).toBe("approval_needed");
+    expect(await errorCode(() => exec("git merge feature", ["acme/api"]))).toBe("approval_needed");
+    expect(await exec("git merge feature", ["acme/app"])).toMatchObject({
+      exitCode: 0,
+      merge: { repo: "acme/app", pr: null, ref: "feature" },
+    });
+    // The list covers merges, never what comes with one.
+    expect(await errorCode(() => exec("git merge feature && git push origin develop", ["acme/app"]))).toBe(
+      "approval_needed",
+    );
+    expect(await errorCode(() => exec("git push origin develop", ["acme/app"]))).toBe("approval_needed");
+    // Nothing held, nothing to report.
+    expect(await exec("true", ["acme/app"])).not.toHaveProperty("merge");
+  },
+  30_000,
+);
+
 test.skipIf(!posix || !hasGit)(
   "exec through our git proxy: a delete or a push to the default branch never runs, a person's approval or not",
   async () => {

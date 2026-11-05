@@ -312,7 +312,7 @@ test("a write tool with read access is refused plainly: it exists, who can chang
   const executed: string[] = [];
   const { call, ctx } = await vegaGateway(executed);
   const refusal =
-    "Not allowed: vega_crm_criar_tickets exists, but this agent's access to Vega CRM doesn't cover it (it needs write access). Only an admin can change that, on the agent's page in Tools and access (in Portuguese, Ferramentas e acesso): say so, never that the tool doesn't exist";
+    "Not allowed: vega_crm_criar_tickets exists, but this agent's access to Vega CRM doesn't cover it (it needs write access). Only an admin can change that, on the agent's page in Tools and access (in Portuguese, Ferramentas e acesso): say so (the person asking may be that admin), never that the tool doesn't exist";
   // By its name, through the connector's directory and through the one of tools on demand: the same answer.
   expect(await call("vega_crm_criar_tickets", {})).toEqual({ content: refusal, isError: true });
   expect(await call("vega_crm_use_tool", { tool: "criar_tickets", arguments: {} })).toEqual({

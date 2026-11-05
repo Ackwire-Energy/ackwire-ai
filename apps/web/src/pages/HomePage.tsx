@@ -305,7 +305,7 @@ function AskAgent({ agents, composer }: { agents: Agent[]; composer: RefObject<H
             options={agents.map((a) => ({
               value: a.id,
               label: a.name,
-              leading: <AgentAvatar agentId={a.id} name={a.name} size="xs" />,
+              leading: <AgentAvatar agentId={a.id} name={a.name} size="sm" />,
             }))}
             renderValue={(o) => (
               <span className="home-ask__agent">

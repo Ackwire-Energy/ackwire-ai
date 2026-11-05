@@ -66,6 +66,9 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
         : guessed;
     return stepLabel(t, { ...activity, tool: row.target.id ?? "" });
   }
+  if (row.action === "agent.merged_without_asking") {
+    return t("audit.change.mergedWithoutAsking", { repo: row.target.id ?? "" });
+  }
   const [area = "", rest = ""] = row.action.split(".");
   if (area === "approval") {
     const status = (["approved", "refused", "expired"] as const).find((s) => s === rest);

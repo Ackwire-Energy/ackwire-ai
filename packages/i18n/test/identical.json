@@ -761,7 +761,8 @@
       "team.list.col.menu",
       "team.sectors.routines",
       "files.video.pause",
-      "files.video.volume"
+      "files.video.volume",
+      "taskManager.waitGroup.routines"
     ],
     "de": [
       "access.agentCol",
@@ -1407,7 +1408,8 @@
       "teamPlan.card.routineCount",
       "teamTemplates.agents.ada.role",
       "teamTemplates.channels.ada",
-      "files.video.volume"
+      "files.video.volume",
+      "taskManager.waitGroup.routines"
     ],
     "nl": [
       "access.agentCol",
@@ -1902,7 +1904,8 @@
       "team.sectors.routines",
       "approvals.review.effect",
       "approvals.review.state",
-      "files.video.volume"
+      "files.video.volume",
+      "taskManager.waitGroup.routines"
     ],
     "ja": [
       "access.area.vault",

@@ -258,8 +258,8 @@ describe("the agents' receipt line under a person's message", () => {
     expect(line && keepsLine(line)).toBe(true);
     expect(receiptRows(waiting.m1)).toContainEqual({ agentId: "ada", phase: "plan" });
     const pt = await translator("pt-BR");
-    expect(pt(phaseKey("plan"))).toBe("Responde quando o plano renovar");
-    expect(pt("receipts.plan", { count: 1, names: "Ada" })).toBe("Ada responde quando o plano renovar");
+    expect(pt(phaseKey("plan"))).toBe("Esperando o plano");
+    expect(pt("receipts.plan", { count: 1, names: "Ada" })).toBe("Ada está esperando o plano");
     const canceled = applyReceiptEvent(waiting, {
       type: "message.handled",
       channelId: "c1",

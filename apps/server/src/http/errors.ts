@@ -7,6 +7,7 @@ import {
   MachineRequestError,
   MissingCredentialError,
   NotFoundError,
+  runErrorDetail,
   TooManyError,
   UnauthorizedError,
   ValidationError,
@@ -72,7 +73,11 @@ function domainError(error: unknown): [ContentfulStatusCode, string, string, Rec
   if (error instanceof ValidationError) return [400, error.code, error.message, error.params];
   if (error instanceof TooManyError) return [429, error.code, error.message, error.params];
   if (error instanceof BudgetExceededError) return [402, "budget_exceeded", error.message, { agentId: error.agentId }];
-  if (error instanceof MissingCredentialError) return [400, "missing_credential", error.message];
+  if (error instanceof MissingCredentialError) {
+    // `provider`: the one whose key is missing, when the message names it (the app says it in the person's words).
+    const provider = runErrorDetail(error.message)?.errorParams?.provider;
+    return [400, "missing_credential", error.message, provider ? { provider } : undefined];
+  }
   // A connected computer (ADR 0025, ADR 0036) that can't take the request now.
   if (error instanceof MachineOfflineError) return [409, "machine.offline", error.message, { name: error.machineName }];
   if (error instanceof MachinePausedError) {

@@ -8,8 +8,10 @@ import {
   initialScrollMinutes,
   layoutBars,
   layoutDay,
+  onDay,
   rangeLabel,
   runSlots,
+  toItems,
   upcomingItems,
   viewDays,
 } from "../src/lib/calendar";
@@ -90,6 +92,34 @@ describe("calendar layout", () => {
       ["late", 1, undefined],
     ]);
     expect(dayRuns([band], next).map((e) => [e.count, e.status])).toEqual([[2, undefined]]);
+  });
+
+  test("a reminder late at night stays on its day, in the grid, tall enough to read", () => {
+    const [late] = toItems({
+      events: [],
+      routines: [],
+      deadlines: [],
+      proposals: [],
+      reminders: [
+        {
+          id: "r",
+          message: "m",
+          at: at(23, 50).toISOString(),
+          forUserId: "u",
+          channelId: "c",
+          threadId: null,
+          agentId: "a",
+          createdBy: "u",
+          canCancel: true,
+        },
+      ],
+    });
+    const reminder = late as CalItem;
+    const next = new Date(2026, 9, 15);
+    expect(onDay(reminder, day)).toBe(true);
+    expect(onDay(reminder, next)).toBe(false);
+    expect(layoutDay([reminder], day).map((p) => [p.top, p.height])).toEqual([[1430, 10]]);
+    expect(layoutDay([{ ...reminder, start: at(9), end: at(9, 1) }], day).map((p) => p.height)).toEqual([30]);
   });
 
   test("overlapping events sit side by side; a later one gets the full width again", () => {

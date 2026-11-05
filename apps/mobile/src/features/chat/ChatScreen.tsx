@@ -45,10 +45,10 @@ import { canTalk } from "@agenteschat/client/lib/audience";
 import { runPosition, screenAboveEnd } from "@agenteschat/client/lib/chat";
 import { consultBlocksNearEnd, consultNoticeFolds, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { mentionsReader, offersEveryone } from "@agenteschat/client/lib/everyone";
 import { capitalize } from "@agenteschat/client/lib/format";
 import { issueTakenOf, issueWorkOf, taskConversationOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
-import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import {
   isMediaAfterReply,
   isMediaAlone,
@@ -407,7 +407,8 @@ function Chat({
   );
 
   // "Parar" in the working line (as on the web): who manages agents, the agent's owner, or who started it.
-  const manageAgents = can(useOrg().org, "manage_agents");
+  const { org } = useOrg();
+  const manageAgents = can(org, "manage_agents");
   const canStop = useCallback(
     (r: LiveRun) =>
       mayStopRun(r, {
@@ -647,11 +648,7 @@ function Chat({
         mine: r.kind === "message" && r.message.author.type === "person" && r.message.author.id === meId,
         // An agent's sticker or GIF after its reply (ADR 0091) is never news of its own.
         silent: r.kind === "message" && isMediaAfterReply(r.message.meta),
-        mentionsMe:
-          r.kind === "message" &&
-          !!myHandle &&
-          r.message.author.id !== meId &&
-          mentionsHandle(r.message.body, myHandle),
+        mentionsMe: r.kind === "message" && r.message.author.id !== meId && mentionsReader(r.message, myHandle),
         ...(r.kind === "message" && r.message.author.id
           ? { who: `${r.message.author.type}:${r.message.author.id}` }
           : r.kind === "run"
@@ -2051,7 +2048,13 @@ function Chat({
                       sigil === "#" ? (
                         <ChannelPicker query={query} pick={pick} />
                       ) : (
-                        <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
+                        <MentionPicker
+                          query={query}
+                          pick={pick}
+                          channelId={channelId}
+                          members={mentionMembers}
+                          everyone={offersEveryone(org, Boolean(dm))}
+                        />
                       )
                     }
                     onType={(text) => sendTyping(threadId, text)}

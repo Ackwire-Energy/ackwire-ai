@@ -15,6 +15,8 @@ export interface ExecRequest {
   signal?: AbortSignal;
   /** A person approved this very command (an approval card): the computer runs it even when its command policy would hold it. */
   approved?: boolean;
+  /** The repositories the agent merges in without asking (`loneMerge`). */
+  mergeRepos?: string[];
   /** Vault keys sealed to the computer's one-use key, for this command's environment only (ADR 0144). */
   vault?: Extract<MachineRequest, { op: "exec" }>["vault"];
 }
@@ -26,6 +28,8 @@ export interface ExecResult {
   timedOut: boolean;
   /** Stopped by `signal`. `killed` false: the provider couldn't kill it, we only stopped waiting. */
   canceled?: { killed: boolean };
+  /** It ran as a merge the agent does without asking (`mergeRepos`). */
+  merge?: MachineReplies["exec"]["merge"];
 }
 
 export interface SandboxFile {

@@ -3,6 +3,7 @@ import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
+  calendarRange,
   cancelReminder,
   createFakeScheduleReader,
   createLlmScheduleReader,
@@ -173,6 +174,7 @@ describe("reminders from the chat", () => {
     expect(result).toMatchObject({ name: "schedule_reminder", isError: false });
     expect(result?.content).toContain("tomorrow, ");
     expect(result?.content).toContain("at 09:00 (Brasília time)");
+    expect(result?.content).toContain("call it a reminder and say it shows in the calendar");
 
     const [routine] = await listRoutines(f.db, f.owner.id, f.org.id);
     expect(routine).toMatchObject({ trigger: { type: "once", timezone: "America/Sao_Paulo" }, active: true });
@@ -351,6 +353,102 @@ describe("reminders from the chat", () => {
     expect(asked?.meta.routineBrief).toMatchObject({ deliverTo: { channelId: f.general.id, threadId: null } });
     const runs = (await f.db.select().from(schema.agentRuns)).filter((r) => r.triggerMessageId === asked?.id);
     expect(runs).toHaveLength(1);
+  });
+
+  test("the calendar shows a pending reminder to who set it and who is in its conversation, no one else", async () => {
+    await world((req) => {
+      const last = JSON.stringify(req.messages.at(-1)?.content);
+      if (last.includes("tool_result")) return { chunks: ["ok"] };
+      if (last.includes("lembra"))
+        return {
+          chunks: [],
+          toolUses: [{ name: "schedule_reminder", input: { when: "amanhã às 10h", message: "reunião" } }],
+        };
+      return { chunks: ["ok"] };
+    });
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    const eve = await addMember(f.db, f.org.id, "member", "eve");
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bob.id });
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev me lembra amanhã às 10h da reunião",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const [mine] = await listReminders(f.db, f.owner.id, f.org.id);
+    const id = mine?.id ?? "";
+    const at = Date.parse(mine?.at ?? "");
+    const seen = async (userId: string, from = at - 3_600_000) =>
+      (
+        await calendarRange(
+          { db: f.db, pubsub: f.pubsub, publicUrl: "" },
+          userId,
+          f.org.id,
+          new Date(from).toISOString(),
+          new Date(from + 7_200_000).toISOString(),
+        )
+      ).reminders;
+
+    expect(await seen(f.owner.id)).toMatchObject([
+      {
+        id,
+        message: "reunião",
+        at: mine?.at,
+        forUserId: f.owner.id,
+        channelId: f.general.id,
+        agentId: f.agent.id,
+        createdBy: f.owner.id,
+        canCancel: true,
+      },
+    ]);
+    // In the conversation: sees it, can't cancel it. Outside it: nothing. Outside the range: nothing.
+    expect((await seen(bob.id))[0]).toMatchObject({ id, canCancel: false });
+    expect(await seen(eve.id)).toEqual([]);
+    expect(await seen(f.owner.id, at + 3_600_000)).toEqual([]);
+    // Cancelled, it leaves the calendar.
+    await cancelReminder({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id);
+    expect(await seen(f.owner.id)).toEqual([]);
+  });
+
+  test("what an agent was asked to do later stays with who asked, and an agent hidden from someone hides its reminder", async () => {
+    await world((req) => {
+      const last = JSON.stringify(req.messages.at(-1)?.content);
+      if (last.includes("tool_result")) return { chunks: ["ok"] };
+      if (last.includes("demite"))
+        return {
+          chunks: [],
+          toolUses: [
+            { name: "schedule_reminder", input: { when: "amanhã às 10h", message: "demite o Bob", ask_agent: true } },
+          ],
+        };
+      if (last.includes("lembra"))
+        return {
+          chunks: [],
+          toolUses: [{ name: "schedule_reminder", input: { when: "amanhã às 10h", message: "reunião" } }],
+        };
+      return { chunks: ["ok"] };
+    });
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bob.id });
+    for (const body of ["@dev demite o Bob amanhã às 10h", "@dev me lembra amanhã às 10h da reunião"]) {
+      await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body });
+      await drainOutbox(f.db, f.handlers);
+    }
+    const [first] = await listReminders(f.db, f.owner.id, f.org.id);
+    const at = Date.parse(first?.at ?? "");
+    const seen = async (userId: string) =>
+      (
+        await calendarRange(
+          { db: f.db, pubsub: f.pubsub, publicUrl: "" },
+          userId,
+          f.org.id,
+          new Date(at - 3_600_000).toISOString(),
+          new Date(at + 3_600_000).toISOString(),
+        )
+      ).reminders.map((r) => r.message);
+
+    expect((await seen(f.owner.id)).sort()).toEqual(["demite o Bob", "reunião"]);
+    expect(await seen(bob.id)).toEqual(["reunião"]);
+    await f.db.update(schema.agents).set({ audienceMode: "owner" }).where(eq(schema.agents.id, f.agent.id));
+    expect(await seen(bob.id)).toEqual([]);
   });
 
   test("only the person who asked can cancel; denying the scope hides the tools", async () => {

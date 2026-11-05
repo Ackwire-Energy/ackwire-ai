@@ -1,5 +1,5 @@
 import type { CalendarEvent, CalendarRange, SeriesScope } from "@agenteschat/client";
-import { useCalendar, useCalendarAction, useRoutines } from "@agenteschat/client";
+import { useCalendar, useCalendarAction, useReminderAction, useRoutines } from "@agenteschat/client";
 import {
   addDays,
   addMinutes,
@@ -18,6 +18,7 @@ import {
   viewDays,
   viewRange,
 } from "@agenteschat/client/lib/calendar";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { dateOnly, formatTime, joinNames, toYmd } from "@agenteschat/client/lib/format";
 import { runPixelStatus, runPixels } from "@agenteschat/client/lib/routine-view";
 import { browserTimezone } from "@agenteschat/client/lib/routines";
@@ -63,6 +64,7 @@ const SOURCES: { source: ItemSource; icon: IconName }[] = [
   { source: "person", icon: "person" },
   { source: "agent", icon: "agent" },
   { source: "routine", icon: "routines" },
+  { source: "reminder", icon: "bell" },
   { source: "deadline", icon: "issues" },
 ];
 type Filters = Record<ItemSource, boolean>;
@@ -94,6 +96,7 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
   const { org } = useOrg();
   const toast = useToast();
   const action = useCalendarAction(org.id);
+  const reminders = useReminderAction(org.id);
   const [today] = useState(() => todayProp ?? new Date());
   const [now, setNow] = useState(() => new Date());
   const [view, setView] = useState<CalendarView>("week");
@@ -102,7 +105,13 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
   const [focus, setFocus] = useState(() => startOfDay(day ? dateOnly(day) : today));
   const [businessOnly, setBusinessOnly] = useState(false);
   const [panel, setPanel] = useState(() => typeof window === "undefined" || window.innerWidth >= 1180);
-  const [filters, setFilters] = useState<Filters>({ person: true, agent: true, routine: true, deadline: true });
+  const [filters, setFilters] = useState<Filters>({
+    person: true,
+    agent: true,
+    routine: true,
+    reminder: true,
+    deadline: true,
+  });
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ draft: EventDraft | null; event: CalendarEvent | null } | null>(null);
   const [ask, setAsk] = useState<SeriesAsk | null>(null);
@@ -255,6 +264,16 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
     if (isSeries(e)) setAsk({ action: "delete", run });
     else run();
   };
+  const cancelReminder = (id: string) => {
+    setOpenKey(null);
+    reminders.mutate(
+      { type: "cancel", id },
+      {
+        onSuccess: () => toast.show(t("calendar.reminderCancelled")),
+        onError: (error) => toast.show(errorText(t, error), "error"),
+      },
+    );
+  };
   const details = (item: CalItem) => (
     <ItemDetails
       item={item}
@@ -267,6 +286,7 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
           : undefined
       }
       onDelete={item.kind === "event" ? () => remove(item) : undefined}
+      onCancel={item.reminderId && item.canCancel ? () => cancelReminder(item.reminderId as string) : undefined}
     />
   );
   const inGrid = items.filter((it) => days.some((d) => onDay(it, d)));
