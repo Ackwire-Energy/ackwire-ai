@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, useWindowDimensions, View } from "react-native";
 import { Icon } from "./Icon";
-import { Text } from "./Text";
+import { Text, textLineOf } from "./Text";
 import { useTheme } from "./theme";
+import { leadBox } from "./type-scale";
 
 export interface RowProps {
   leading?: ReactNode;
@@ -33,11 +34,16 @@ export function Row({
   below,
 }: RowProps) {
   const { colors } = useTheme();
+  const { fontScale } = useWindowDimensions();
+  // A subtitle that wraps or something under it: the leading sits at the top and the meta and chevron on the
+  // title's line (centred on the whole row they floated between lines). Short rows keep everything centred.
+  const tall = subtitleLines > 1 || Boolean(below);
+  const line = tall ? textLineOf("title", fontScale) : null;
   const body = (pressed: boolean) => (
     <View
       style={{
         flexDirection: "row",
-        alignItems: "center",
+        alignItems: tall ? "flex-start" : "center",
         gap: 12,
         padding: 14,
         minHeight: 60,
@@ -68,8 +74,16 @@ export function Row({
         ) : null}
         {below}
       </View>
-      {meta ? <View style={{ alignItems: "flex-end", gap: 5 }}>{meta}</View> : null}
-      {chevron ? <Icon name="right" size={16} color={colors.faint} /> : null}
+      {meta ? (
+        <View style={{ alignItems: "flex-end", gap: 5, minHeight: line?.height, justifyContent: "center" }}>
+          {meta}
+        </View>
+      ) : null}
+      {chevron ? (
+        <View style={line ? leadBox(line, 16) : null}>
+          <Icon name="right" size={16} color={colors.faint} />
+        </View>
+      ) : null}
     </View>
   );
   if (!onPress) return body(false);
