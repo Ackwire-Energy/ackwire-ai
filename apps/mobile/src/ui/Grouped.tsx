@@ -47,11 +47,11 @@ export function GroupedList({ children }: { children?: ReactNode }) {
                   styles.divider,
                   {
                     backgroundColor: c.line2,
-                    marginLeft: (child.props as { icon?: unknown; leading?: unknown }).icon
-                      ? 14 + TILE + 12
-                      : (child.props as { leading?: unknown }).leading
-                        ? 14 + LEAD + 12
-                        : 14,
+                    // A tile and a face share one leading column, so the text and its hairline start at one place.
+                    marginLeft: (child.props as { icon?: unknown; leading?: unknown }).icon ||
+                    (child.props as { leading?: unknown }).leading
+                      ? 14 + LEAD + 12
+                      : 14,
                   },
                 ]}
               />
@@ -186,12 +186,15 @@ function Row({
       }}
       style={({ pressed }) => [styles.row, pressed && onPress ? { backgroundColor: c.sunken } : null]}
     >
+      {/* One column for whatever leads (an icon's tile, a 26 to 36 face, a mark): the text, and the hairline above,
+          start at 58 in every row, so a list mixing tiles and faces reads as one column. */}
       {icon ? (
-        <View style={[styles.tile, { backgroundColor: danger ? c.plate : c.sunken }]}>
-          <Icon name={icon} size={16} color={danger ? c.danger : c.ink2} />
+        <View style={styles.lead}>
+          <View style={[styles.tile, { backgroundColor: danger ? c.plate : c.sunken }]}>
+            <Icon name={icon} size={16} color={danger ? c.danger : c.ink2} />
+          </View>
         </View>
       ) : null}
-      {/* One column for whatever leads (a 26 to 36 face, a mark): the text, and the hairline above, start at 58. */}
       {leading ? <View style={styles.lead}>{leading}</View> : null}
       <View style={styles.grow}>
         <Text variant="body" numberOfLines={labelLines} style={{ color: tone }}>

@@ -531,12 +531,12 @@ const styles = StyleSheet.create({
   chips: { gap: 6, paddingHorizontal: 16 },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, height: 34, paddingHorizontal: 12, borderRadius: 17 },
   segments: { paddingHorizontal: 16 },
-  // In GroupedRow's text column: its 14 side, the 28 tile and the 12 gap.
+  // In GroupedRow's text column: its 14 side, the 32 leading column and the 12 gap.
   roles: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
-    paddingLeft: 14 + 28 + 12,
+    paddingLeft: 14 + 32 + 12,
     paddingRight: 14,
     paddingBottom: 12,
   },

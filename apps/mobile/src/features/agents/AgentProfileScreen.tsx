@@ -839,11 +839,13 @@ function ButtonRow({
   return (
     <View style={styles.row}>
       {icon ? (
-        <View style={[styles.tile, { backgroundColor: c.sunken }]}>
-          <Icon name={icon} size={16} color={c.ink2} />
+        <View style={styles.lead}>
+          <View style={[styles.tile, { backgroundColor: c.sunken }]}>
+            <Icon name={icon} size={16} color={c.ink2} />
+          </View>
         </View>
       ) : null}
-      {leading}
+      {leading ? <View style={styles.lead}>{leading}</View> : null}
       <View style={styles.grow}>
         <View accessible accessibilityLabel={[label, sub].filter(Boolean).join(", ")}>
           <Text variant="body" numberOfLines={labelLines}>
@@ -994,6 +996,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
+  // One leading column for a tile or a mark, as `GroupedRow`'s: the text starts at 58 in every row.
+  lead: { width: 32, alignItems: "center", justifyContent: "center" },
   tile: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   value: { flexShrink: 1, maxWidth: "50%" },
   src: { flexDirection: "row", alignItems: "center", gap: 6 },
