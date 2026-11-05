@@ -497,7 +497,8 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   flex-direction: column;
   gap: 10px;
   max-width: var(--msg-card-w);
-  padding: 12px 14px;
+  /* The other cards' room in a message (the tools, the changes, a file). */
+  padding: var(--space-3);
   border-radius: var(--radius-md);
   border-bottom-left-radius: var(--radius-cut);
   background: var(--surface-raised);
@@ -1956,7 +1957,8 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   align-items: center;
   gap: 2px;
   height: 38px;
-  padding: 0 5px 0 14px;
+  /* The language starts on the code's own 16px edge (`.code-card__code`). */
+  padding: 0 5px 0 16px;
 }
 .code-card__lang {
   flex: 1;
@@ -2108,7 +2110,7 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   position: relative;
   margin: 2px 0;
   max-width: var(--msg-card-w);
-  border-radius: 16px;
+  border-radius: 14px;
   background: var(--surface-sunken);
   box-shadow: inset 0 0 0 1px var(--line);
 }
@@ -2124,13 +2126,16 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   display: flex;
   align-items: flex-start;
   gap: 2px;
-  padding: 12px 6px 4px 16px;
+  padding: 6px 6px 4px 16px;
 }
+/* The title's line centred on the 32px buttons beside it ((32 - 20) / 2 down), its capitals still 12px under the
+   card's top; a subtitle goes on under it. */
 .chart-card__titles {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
+  padding-top: 6px;
 }
 .chart-card__titles b {
   font-size: 14.5px;
@@ -5936,9 +5941,10 @@ html:not([data-pointer]) .save-wiki__page:focus-visible {
 .save-wiki__page .ac-icon {
   color: var(--faint);
 }
-/* "Respondendo a Ana" in the composer. */
+/* "Respondendo a Ana" in the composer: its × as far from the pill's end as from its top and bottom ((32 - 18) / 2),
+   concentric with the pill's corner. */
 .composer-reply {
-  padding-right: 4px;
+  padding-right: 7px;
 }
 .composer-reply__close {
   display: inline-grid;
@@ -6142,14 +6148,15 @@ html:not([data-pointer]) .stop-run:focus-visible {
   gap: 6px;
   color: var(--muted);
 }
+/* A compact button of the ruler (32px, its 30% corner), the cut corner its own. */
 .run-continue {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 26px;
-  padding: 0 10px 0 8px;
+  height: var(--control-h-sm);
+  padding: 0 12px 0 10px;
   border: 0;
-  border-radius: 9px 9px 9px 3px;
+  border-radius: var(--control-r-sm) var(--control-r-sm) var(--control-r-sm) 3px;
   background: var(--raised);
   box-shadow: var(--card-shadow);
   font: inherit;
@@ -6160,8 +6167,10 @@ html:not([data-pointer]) .stop-run:focus-visible {
   cursor: pointer;
   transition: transform 0.18s var(--spring);
 }
-.run-continue:hover:not(:disabled) {
-  transform: translateY(-1px);
+@media (prefers-reduced-motion: no-preference) {
+  .run-continue:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
 }
 html:not([data-pointer]) .run-continue:focus-visible {
   outline: none;
