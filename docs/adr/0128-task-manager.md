@@ -26,6 +26,8 @@ Most of it existed in pieces: `GET …/active-runs` lists the runs in progress i
 
 No cost and no tokens: this is where people stop work, not where they audit spend (that stays in Usage).
 
+A run waiting on no person's answer also carries `wait`: its code, the plan or budget (`key`), the model and scope of a model's own limit, how far a pause got and its window (from its `usage_wait` step, so a routine's run with no card has them too), when the limit resets and whether the caller may press Continuar agora. `taskWaitWords` turns it into the row's two lines, on the web and the phone ("Pausada: plano a 95% da semana", "Volta sáb às 18:00"); `taskWaitGroups` finds the rows on one limit, which get one line over them, with Continuar agora on a pause (`POST …/task-manager/continue`, `continuePausedRuns`: the card's and Rotinas' rules, each run on its own, its card saying who let it go on, a refusal for all of them returned as is). The Tempo column warms only for work at it: a wait for a known reason isn't stuck.
+
 A task's steps ("Ver passos") come from `taskSteps` (`GET …/task-manager/{runId}/steps`), with the same visibility: each call with the chat chip's fields and how it ended, never a connector's input or a tool's output (only a permission check's answer, which says whether a command ran). The full trail (`GET …/runs/{runId}`) still needs usage access.
 
 The page asks again every 3 s while it is shown (`TASK_MANAGER_POLL_MS`). Polling an authorized read keeps the visibility rule in one SQL query; per-person real-time fan-out can come later if the poll turns out too slow.

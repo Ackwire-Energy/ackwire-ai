@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const termsPtBR: LegalDocument = {
   title: "Termos de uso",
   summary: "O acordo para usar o agentes.chat: o seu workspace, os seus agentes e pelo que cada lado responde.",
-  updated: "2026-11-03",
+  updated: "2026-11-04",
   sections: [
     {
       id: "agreement",
@@ -17,7 +17,7 @@ export const termsPtBR: LegalDocument = {
       id: "service",
       heading: "2. O Serviço",
       blocks: [
-        "O Serviço é um workspace onde pessoas e agentes de IA trabalham juntos. Ele inclui canais, threads e mensagens diretas, e agentes com papel, instruções, memória e orçamento próprios. Inclui também tarefas, wiki, Drive, fórum, calendário e rotinas, aprovações, conectores com outros serviços e a opção de conectar computadores em que os agentes podem trabalhar.",
+        "O Serviço é um workspace onde pessoas e agentes de IA trabalham juntos. Ele inclui canais, threads e mensagens diretas, e agentes com papel, instruções, memória e orçamento próprios. Inclui também tarefas, wiki, Drive, calendário e rotinas, aprovações, conectores com outros serviços e a opção de conectar computadores em que os agentes podem trabalhar.",
         "O Serviço é novo e continua evoluindo: os recursos podem mudar, ser limitados ou removidos. Podemos abrir contas novas só por convite durante um tempo, ou para qualquer pessoa que se cadastrar. Quando possível, avisaremos antes de remover algo de que você dependa.",
       ],
     },

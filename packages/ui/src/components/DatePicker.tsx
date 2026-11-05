@@ -2,6 +2,7 @@ import { appLocale, localeInfo } from "@agenteschat/i18n/locale";
 import { Popover as RPopover } from "radix-ui";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "../cx";
+import { EDGE_ROOM } from "../floating";
 import { Icon } from "../icons/Icon";
 import { Button } from "./Button";
 import { useFieldControl } from "./Field";
@@ -167,6 +168,7 @@ export function DatePicker({
           className="ac-menu ac-date"
           align="start"
           sideOffset={4}
+          collisionPadding={EDGE_ROOM}
           role="dialog"
           aria-label={labels.choose}
           onOpenAutoFocus={(e) => e.preventDefault()}

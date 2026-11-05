@@ -12,6 +12,7 @@ import {
   Kbd,
   Menu,
   MenuItem,
+  PageHeader,
   SearchField,
   Toolbar,
   WorkSweep,
@@ -119,10 +120,11 @@ export function IssuesPage() {
   return (
     <div className="page issues">
       <div className="issues__main">
-        <header className="issues-head">
-          <div>
-            <h1>{t("issues.title")}</h1>
-            <p className="issues-head__sub">
+        <PageHeader
+          className="issues-head"
+          title={t("issues.title")}
+          meta={
+            <>
               <span>
                 {t("issues.summary", {
                   open: open.length,
@@ -132,12 +134,14 @@ export function IssuesPage() {
               {open.some((i) => !i.assignee) && (
                 <span> · {t("issues.unassigned", { count: open.filter((i) => !i.assignee).length })}</span>
               )}
-            </p>
-          </div>
-          <Button variant="primary" icon="plus" kbd={["N"]} onClick={() => setCreating({ columnId: null })}>
-            {t("issues.new")}
-          </Button>
-        </header>
+            </>
+          }
+          actions={
+            <Button variant="primary" icon="plus" kbd={["N"]} onClick={() => setCreating({ columnId: null })}>
+              {t("issues.new")}
+            </Button>
+          }
+        />
         <WorkingNow issues={all} onOpen={toggle} />
         <Toolbar
           label={t("issues.filters")}

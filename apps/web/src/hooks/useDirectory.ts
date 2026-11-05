@@ -3,6 +3,7 @@ import { useAgents, useFormerAgents, useMembers, useRoles } from "@agenteschat/c
 import { agentsByAnyHandle, formerById } from "@agenteschat/client/lib/directory";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { lookOf } from "@/lib/look";
 
 /** People and agents of the organization, by id and handle, for names and avatars. */
 export function useDirectory(orgId: string) {
@@ -43,6 +44,11 @@ export function useDirectory(orgId: string) {
     /** `@ada` → "Ada", `@joao` → "João"; unknown handles stay as typed. */
     const mentionName = (handle: string) =>
       agentByHandle.get(handle.toLowerCase())?.name ?? memberByHandle.get(handle.toLowerCase())?.name ?? null;
+    /** A mentioned agent's color; none for a person or an unknown handle (their chip stays neutral). */
+    const mentionTone = (handle: string) => {
+      const agent = agentByHandle.get(handle.toLowerCase());
+      return agent ? (lookOf(agent)?.color ?? "sky") : undefined;
+    };
     return {
       agents: agents.data ?? [],
       members: people,
@@ -53,6 +59,7 @@ export function useDirectory(orgId: string) {
       memberByHandle,
       authorName,
       mentionName,
+      mentionTone,
       agentInitials,
       roleName,
       loading: agents.isPending || members.isPending,

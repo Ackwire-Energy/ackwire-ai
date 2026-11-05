@@ -276,7 +276,7 @@ describe("push delivery", () => {
     expect(noticeCategoryOf("approval", true)).toBe("waiting");
     expect(noticeCategoryOf("thread_reply", true)).toBe("waiting");
     expect(noticeCategoryOf("agent_reply", false)).toBe("replies");
-    expect(noticeCategoryOf("forum_synthesis", false)).toBeNull();
+    expect(noticeCategoryOf("no_such_kind", false)).toBeNull();
     expect(noticePrefsOf({ threads: true, mentions: "no", junk: true })).toEqual({ threads: true });
     expect(noticePrefsOf(null)).toEqual({});
   });

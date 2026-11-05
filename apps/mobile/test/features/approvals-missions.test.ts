@@ -144,6 +144,23 @@ describe("Aprovar sempre on the phone", () => {
       subtitle: "To undo it, open her profile, in Always approved.",
     });
   });
+
+  test('"Sempre nesta rotina": the routine won\'t ask, and the place to undo it is its settings', async () => {
+    const pt = await translator("pt-BR");
+    const routine = {
+      ...offered,
+      scope: "gmail:send",
+      origin: { kind: "routine" as const, routineId: "r1", routineName: "Resumo da semana" },
+      approveAlways: { tool: "composio_exec", actions: ["GMAIL_SEND_EMAIL"], routineId: "r1" },
+    };
+    expect(approveAlwaysOffered(routine)).toBe(true);
+    expect(approveAlwaysLabel(pt, routine)).toBe("Sempre nesta rotina");
+    expect(approveAlwaysHint(pt, routine, "Ada")).toContain("Para desfazer: configurações da rotina.");
+    expect(approveAlwaysToast(pt, "Ada", "Resumo da semana")).toEqual({
+      title: "Aprovado. Resumo da semana não pede mais para isso.",
+      subtitle: "Para desfazer, vá nas configurações da rotina.",
+    });
+  });
 });
 
 describe("git requests on the phone", () => {

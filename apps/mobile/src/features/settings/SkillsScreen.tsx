@@ -30,6 +30,7 @@ import {
   hiddenRepoOf,
   hiddenRepoText,
   pickSkills,
+  SKILL_FILES_SHOWN,
   SKILL_UPDATE_TOAST,
   type SkillText,
   searchRepos,
@@ -289,9 +290,12 @@ export function SkillScreen({ id }: { id: string }) {
             <>
               <GroupedHeader>{t("skills.files")}</GroupedHeader>
               <GroupedList>
-                {s.files.map((f) => (
+                {s.files.slice(0, SKILL_FILES_SHOWN).map((f) => (
                   <GroupedRow key={f.path} label={f.path} labelLines={2} {...fileFacts(f)} />
                 ))}
+                {s.files.length > SKILL_FILES_SHOWN ? (
+                  <GroupedRow label={t("skills.moreFiles", { count: s.files.length - SKILL_FILES_SHOWN })} />
+                ) : null}
               </GroupedList>
             </>
           ) : null}

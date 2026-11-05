@@ -950,9 +950,9 @@ export class TaskManager {
    * task on any other account is canceled (`BrainManager.keepAccount` closes its turns' processes alike), so no
    * process of this agent's user keeps a sign-in the agent left or one that was removed.
    */
-  keepAccount(account: string | null) {
+  keepAccount(account: string | null, also: readonly string[] = []) {
     for (const t of this.journal.tasks) {
-      if (t.status === "running" && t.account && t.account !== account && !t.canceling) {
+      if (t.status === "running" && t.account && t.account !== account && !also.includes(t.account) && !t.canceling) {
         t.canceledWhy = "Stopped: this agent's AI account changed. Start it again to use the new one.";
         this.cancel(undefined, t.taskId);
       }

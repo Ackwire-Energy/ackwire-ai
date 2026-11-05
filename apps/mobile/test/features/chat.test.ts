@@ -22,6 +22,7 @@ import {
   markedParts,
   markName,
   mayStopRun,
+  mentionTint,
   mergeTimeline,
   missionCardRef,
   missionPlanOf,
@@ -45,7 +46,6 @@ import {
   tableHidden,
   threadFaces,
   threadTitleFrom,
-  toggleReaction,
   turnPhrase,
   workingEntries,
   workStepsOf,
@@ -645,14 +645,6 @@ describe("reactions", () => {
       { reaction: "+1", emoji: "👍", people: 2, agentIds: [], mine: true },
     ]);
   });
-  test("toggling mine adds, removes and drops empty ones", () => {
-    const on = toggleReaction([], "🙌", "me");
-    expect(on).toEqual([{ reaction: "🙌", count: 1, userIds: ["me"], agentIds: [] }]);
-    expect(toggleReaction(on, "🙌", "me")).toEqual([]);
-    const shared = toggleReaction([{ reaction: "🙌", count: 1, userIds: ["ana"] }], "🙌", "me");
-    expect(shared[0]?.userIds).toEqual(["ana", "me"]);
-    expect(shared[0]?.count).toBe(2);
-  });
 });
 
 describe("composer", () => {
@@ -736,6 +728,22 @@ describe("markdown", () => {
     expect(blocks[1]).toEqual({ kind: "paragraph", inline: [{ kind: "text", text: "Linha um\nlinha dois" }] });
     expect(blocks[3]).toMatchObject({ kind: "bullet", ordinal: "2" });
     expect(blocks[5]).toEqual({ kind: "code", lang: "ts", text: "const a = 1;" });
+  });
+  test("blocks: <details> is one collapsed block whose body stays Markdown; a fenced one is code (ADR 0147)", () => {
+    const blocks = parseBlocks(
+      "Falta dar acesso.\n<details>\n<summary>Detalhes</summary>\n\nO app recebeu `403`.\n```\n</details>\n```\n</details>\nPronto.",
+    );
+    expect(blocks.map((b) => b.kind)).toEqual(["paragraph", "details", "paragraph"]);
+    expect(blocks[1]).toEqual({
+      kind: "details",
+      summary: [{ kind: "text", text: "Detalhes" }],
+      body: "O app recebeu `403`.\n```\n</details>\n```",
+    });
+    expect(parseBlocks("```\n<details>\n```").map((b) => b.kind)).toEqual(["code"]);
+    // Still being written: it runs to the end.
+    expect(parseBlocks("<details><summary>Mais</summary>\nlinha")).toEqual([
+      { kind: "details", summary: [{ kind: "text", text: "Mais" }], body: "linha" },
+    ]);
   });
   test("blocks: a fence still being written is an open code block; a fence still opening is hidden", () => {
     expect(parseBlocks('Aqui:\n```chart\n{"type":"bar","ti')).toEqual([
@@ -1350,5 +1358,18 @@ describe("reading a conversation", () => {
   test("a thread view marks only its thread read, never its channel", () => {
     expect(readMark("c1", "t1")).toEqual({ kind: "thread", id: "t1" });
     expect(readMark("c1", null)).toEqual({ kind: "channel", id: "c1" });
+  });
+});
+
+describe("an agent's @mention", () => {
+  const agents = [{ handle: "Theo", previousHandles: ["teo"], appearance: { color: "rose" } }, { handle: "ada" }];
+
+  test("takes the agent's tone per theme, sky with no look; a person or an unknown handle gets none", () => {
+    const light = mentionTint("theo", agents, "light");
+    expect(light?.backgroundColor).toMatch(/^#[0-9a-f]{6}$/);
+    expect(mentionTint("theo", agents, "dark")?.backgroundColor).not.toBe(light?.backgroundColor);
+    expect(mentionTint("ada", agents, "light")?.color).not.toBe(light?.color);
+    expect(mentionTint("maria", agents, "light")).toBeUndefined();
+    expect(mentionTint("teo", agents, "light")).toEqual(light);
   });
 });

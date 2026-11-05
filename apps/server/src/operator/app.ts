@@ -70,7 +70,7 @@ export function createOperatorApp(deps: OperatorDeps, token: string) {
       title: "agentes.chat operator API",
       version: deps.version,
       description:
-        "Workspace and account lookups, workspace standing, billing holds and limits (ADR 0079), the events feed and review blocks, the workspaces' computers from an external provisioner, who may sign up (the waiting list and early-access invitations, ADR 0078), how new Claude sign-ins for all agents are made (ADR 0146), and how connectors are used (ADR 0103), for the people who run this instance (ADR 0056).",
+        "Workspace and account lookups, workspace standing, billing holds and limits (ADR 0079), the events feed and review blocks, the workspaces' computers from an external provisioner, who may sign up (the waiting list and early-access invitations, ADR 0078), how new Claude sign-ins for all agents are made (ADR 0149), and how connectors are used (ADR 0103), for the people who run this instance (ADR 0056).",
     },
     servers: [{ url: OPERATOR_API_PREFIX }],
     security: [{ operator: [] }],

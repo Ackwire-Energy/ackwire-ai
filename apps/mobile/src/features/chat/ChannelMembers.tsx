@@ -8,8 +8,10 @@ import {
   useRoster,
 } from "@agenteschat/client";
 import { listsAgent } from "@agenteschat/client/lib/audience";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
+import { joinsChannels } from "@agenteschat/client/lib/right-hand";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -305,7 +307,7 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
   const inChannel = new Set((roster.data ?? []).map((m) => `${m.type === "agent" ? "agent" : "person"}:${m.id}`));
   const candidates = [
     ...dir.agents
-      .filter((a) => listsAgent(org, a))
+      .filter((a) => listsAgent(org, a) && joinsChannels(a))
       .map((a) => ({ kind: "agent" as const, id: a.id, name: a.name, line: `@${a.handle}` })),
     ...[...dir.memberById.values()].map((m) => ({
       kind: "person" as const,
@@ -328,9 +330,9 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
       refresh();
       back();
     },
-    onError: () => {
+    onError: (error) => {
       refresh();
-      toast({ title: t("mobile.app.failed"), icon: "x" });
+      toast({ title: errorText(t, error), icon: "x" });
     },
   });
   // Someone not in the workspace yet, or an agent still to make: their own screens, the sheet closes for them.

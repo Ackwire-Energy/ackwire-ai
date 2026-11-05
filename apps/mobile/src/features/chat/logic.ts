@@ -11,8 +11,9 @@ import type {
 import { agentProposalOf, costlyProposalOf, stretchCardOf } from "@agenteschat/client/lib/action-cards";
 import { type ActivityEntry, barEntries, type barWords, markedPieces, markInk } from "@agenteschat/client/lib/activity";
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
+import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
-import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
+import { detailsAt, MENTION, type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import { messageMediaOf } from "@agenteschat/client/lib/media";
 import {
   answeredNotices,
@@ -30,8 +31,9 @@ import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines"
 import { secretRequestOf } from "@agenteschat/client/lib/secret-requests";
 import { usagePauseCardOf } from "@agenteschat/client/lib/usage-pause";
 import { voiceOf } from "@agenteschat/client/lib/voice";
+import { mentionTone } from "@agenteschat/ui/agent/engine";
 import type { TFunction } from "i18next";
-import { previewOf } from "../shared/logic";
+import { agentLook, previewOf } from "../shared/logic";
 import { continuesReply } from "./media";
 
 /**
@@ -526,23 +528,6 @@ export const hangsUnder = (
   Boolean(messageMediaOf(m.meta)) ||
   Boolean(issueWorkOf(m.meta));
 
-/** Toggle my reaction: the new list as the server will see it (optimistic). */
-export function toggleReaction(
-  reactions: ReactionCount[] | undefined,
-  reaction: string,
-  meId: string,
-): ReactionCount[] {
-  const list = reactions ?? [];
-  const hit = list.find((r) => r.reaction === reaction);
-  if (!hit) return [...list, { reaction, count: 1, userIds: [meId], agentIds: [] }];
-  const mine = hit.userIds.includes(meId);
-  const userIds = mine ? hit.userIds.filter((u) => u !== meId) : [...hit.userIds, meId];
-  const next = { ...hit, userIds, count: Math.max(0, hit.count + (mine ? -1 : 1)) };
-  return next.count === 0 && (next.agentIds?.length ?? 0) === 0
-    ? list.filter((r) => r.reaction !== reaction)
-    : list.map((r) => (r.reaction === reaction ? next : r));
-}
-
 // ── Pins ─────────────────────────────────────────────────────────────────────
 
 /** "Fixadas": one entry per message, the latest pin first (the server's order, kept even if events raced). */
@@ -622,7 +607,9 @@ export type Block =
   | { kind: "bullet"; inline: Inline[]; ordinal: string | null }
   | { kind: "quote"; inline: Inline[] }
   | { kind: "code"; lang: string; text: string; open?: boolean }
-  | { kind: "table"; header: Inline[][]; rows: Inline[][][]; align: TableAlign[] };
+  | { kind: "table"; header: Inline[][]; rows: Inline[][][]; align: TableAlign[] }
+  /** Closed until tapped (the shared `detailsAt`, ADR 0147): `body` is Markdown of its own. */
+  | { kind: "details"; summary: Inline[]; body: string };
 
 /** Widest a table's column gets at the default text size: a longer cell wraps inside it, at its words. */
 export const TABLE_COL_MAX = 280;
@@ -662,7 +649,17 @@ export function tableHidden(x: number, frame: number, total: number): { left: bo
   return { left: x > 1, right: frame > 0 && x + frame < total - 1 };
 }
 
-const MENTION = /(^|[^\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31})(?![\w@-])/g;
+/** A mentioned agent's chip in its own tone (`mentionTone`); none for a person or an unknown handle. */
+export function mentionTint(
+  handle: string,
+  agents: readonly { handle: string; previousHandles?: string[]; appearance?: unknown }[],
+  scheme: "light" | "dark",
+) {
+  const agent = agentsByAnyHandle(agents).get(handle.toLowerCase());
+  if (!agent) return undefined;
+  const tone = mentionTone(agentLook(agent).color, scheme === "dark");
+  return { color: tone.ink, backgroundColor: tone.background };
+}
 
 /** `#channel` references, then @mentions in the words between them. */
 function mentions(text: string, out: Inline[], kind: "text" | "bold" | "italic") {
@@ -732,11 +729,30 @@ export function parseInline(text: string): Inline[] {
 }
 
 /**
- * Blocks: fenced code (with its language), tables (the web's rule: `tableAt` from the shared parser, so a
- * table right under a sentence is still a table), headings, lists, quotes and paragraphs (lines of a
- * paragraph keep their breaks).
+ * Blocks: collapsed `<details>` (outside fenced code), then in the text around them fenced code (with its language),
+ * tables (the web's rule: `tableAt` from the shared parser, so a table right under a sentence is still a table),
+ * headings, lists, quotes and paragraphs (lines of a paragraph keep their breaks).
  */
 export function parseBlocks(body: string): Block[] {
+  const lines = body.split("\n");
+  const out: Block[] = [];
+  let from = 0;
+  let fence = false;
+  for (let n = 0; n < lines.length; n++) {
+    if (/^\s*```/.test(lines[n] ?? "")) fence = !fence;
+    const found = fence ? null : detailsAt(lines, n);
+    if (!found) continue;
+    out.push(...plainBlocks(lines.slice(from, n).join("\n")));
+    out.push({ kind: "details", summary: parseInline(found.details.summary), body: found.details.body });
+    from = found.next;
+    n = found.next - 1;
+  }
+  if (from === 0) return plainBlocks(body);
+  out.push(...plainBlocks(lines.slice(from).join("\n")));
+  return out;
+}
+
+function plainBlocks(body: string): Block[] {
   const out: Block[] = [];
   const parts = body.split(/```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/g);
   for (let i = 0; i < parts.length; i += 3) {

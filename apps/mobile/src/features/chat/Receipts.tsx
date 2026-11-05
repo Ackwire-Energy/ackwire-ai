@@ -23,7 +23,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Icon, PillButton, Text, useLivePaused, useTheme, useToast } from "@/ui";
+import { Icon, RowAction, Text, useLivePaused, useTheme, useToast } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -178,7 +178,7 @@ function IconTile({ kind: a }: { kind: AgentAction }) {
   const { colors, shadows } = useTheme();
   return (
     <View style={[styles.tile, { backgroundColor: colors.raised, boxShadow: shadows.e1 }]}>
-      <Icon name={receiptIcon(a.kind)} size={14} color={colors.ink2} />
+      <Icon name={receiptIcon(a.kind)} size={16} color={colors.ink2} />
     </View>
   );
 }
@@ -309,7 +309,7 @@ function UndoneBy({ action: a }: { action: AgentAction }) {
 }
 
 /**
- * Desfazer or Refazer: a raised pill next to one change, Desfazer with the time left in it; a quiet word in a group.
+ * Desfazer or Refazer: a row action next to one change, Desfazer with the time left in it; a quiet word in a group.
  * None for who may not use it. Once it had one, its room stays when its time is up, empty: the sentence never
  * rewraps.
  */
@@ -332,7 +332,7 @@ function RowButton({
   const redo = shown === "redo";
   const label = redo ? t("agentActions.redo") : t("agentActions.undo");
   const button = big ? (
-    <PillButton
+    <RowAction
       label={label}
       detail={redo ? undefined : v.timeLeft || formatTimeLeft(0)}
       onPress={redo ? onRedo : onUndo}
@@ -374,12 +374,12 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 16,
     borderBottomLeftRadius: 4,
   },
-  // The tile, the sentence's first line and the 32px pill share one middle; the sentence wraps under it.
+  // The tile, the sentence's first line and the 32px action share one middle; the sentence wraps under it.
   one: {
     marginTop: 12,
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 10,
+    gap: 8,
     minHeight: 50,
     paddingVertical: 9,
     paddingLeft: 12,

@@ -5,16 +5,13 @@ import {
   answerQuestion,
   continueRun,
   type createFakeJudge,
-  createForumTopic,
   createJevJudge,
   createJobHandlers,
   createLlmJudge,
   drainOutbox,
-  getForumTopic,
   noteStep,
   postPersonMessage,
   STUCK_END_REPLY_NOTE,
-  STUCK_FORUM_NOTE,
   STUCK_NOTE,
   type StuckState,
   type ToolSource,
@@ -199,33 +196,6 @@ describe("a run that goes in circles", () => {
     ]);
     const [line] = await agentMessages(run?.id ?? "");
     expect(line?.meta).toMatchObject({ bodyCode: "stuck", stepLimit: { stuck: true } });
-  });
-
-  test("a forum's turn is not told to say what blocks it (its words would be its post), then it fails as stuck", async () => {
-    f = await setup({
-      toolSources: [taskTools()],
-      artifactTools: true,
-      forumTools: true,
-      judge: (kind) => (kind === "stuck_run" ? 0.9 : undefined),
-      reply: () => deploy,
-    });
-    const topic = await createForumTopic(
-      { db: f.db, pubsub: f.pubsub, artifacts: f.artifactDeps },
-      { type: "person", userId: f.owner.id },
-      f.org.id,
-      { title: "Deploy de sexta", goal: "Decidir se o deploy sai na sexta.", agentIds: [f.agent.id], rounds: 1 },
-    );
-    await drainOutbox(f.db, f.handlers);
-
-    expect(requests()).toHaveLength(6);
-    const noted = lastText(requests()[3] as ModelRequest);
-    expect(noted).toContain(STUCK_FORUM_NOTE);
-    expect(noted).not.toContain(STUCK_NOTE);
-    expect(await runs()).toMatchObject([{ status: "failed", error: "stuck" }]);
-    expect(await getForumTopic(f.db, f.owner.id, f.org.id, topic.id)).toMatchObject({
-      status: "stalled",
-      stall: { reason: "failed", synthesis: false },
-    });
   });
 });
 

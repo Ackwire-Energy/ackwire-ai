@@ -1,6 +1,7 @@
 import { Popover as RPopover } from "radix-ui";
 import { type KeyboardEvent, type ReactNode, useId, useMemo, useRef, useState } from "react";
 import { cx } from "../cx";
+import { EDGE_ROOM } from "../floating";
 import { Icon, type IconName } from "../icons/Icon";
 import { Button } from "./Button";
 import { SearchField } from "./Toolbar";
@@ -115,7 +116,12 @@ export function FilterChip({
           </button>
         </RPopover.Trigger>
         <RPopover.Portal>
-          <RPopover.Content className="ac-menu ac-filter__menu" align="start" sideOffset={6}>
+          <RPopover.Content
+            className="ac-menu ac-filter__menu"
+            align="start"
+            sideOffset={6}
+            collisionPadding={EDGE_ROOM}
+          >
             {options.length > FILTER_SEARCH_AFTER && (
               <div className="ac-tz__searchrow">
                 <SearchField

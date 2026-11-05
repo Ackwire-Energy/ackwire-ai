@@ -1,4 +1,5 @@
 import { listsAgent } from "@agenteschat/client/lib/audience";
+import { joinsChannels } from "@agenteschat/client/lib/right-hand";
 import { Checkbox, InfoHint, SearchField, Token, TokenList } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -18,9 +19,15 @@ export interface PickRow {
 
 /**
  * People and agents of the org as pickable rows, minus `exclude`, filtered by `query`. Agents only as far as my lists
- * show them (`listsAgent`), plus the ones in `keep` (already picked), so they can still be taken out.
+ * show them (`listsAgent`), plus the ones in `keep` (already picked), so they can still be taken out. For a channel
+ * (`channel`), only the agents that join channels (`joinsChannels`).
  */
-export function useMemberRows(query: string, exclude: Set<PickKey> = new Set(), keep?: Set<PickKey>) {
+export function useMemberRows(
+  query: string,
+  exclude: Set<PickKey> = new Set(),
+  keep?: Set<PickKey>,
+  { channel = false }: { channel?: boolean } = {},
+) {
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const q = query.trim().toLowerCase();
@@ -35,7 +42,7 @@ export function useMemberRows(query: string, exclude: Set<PickKey> = new Set(), 
         sub: m.email,
       })),
     ...dir.agents
-      .filter((a) => listsAgent(org, a) || keep?.has(`agent:${a.id}`))
+      .filter((a) => (!channel || joinsChannels(a)) && (listsAgent(org, a) || keep?.has(`agent:${a.id}`)))
       .map((a) => ({
         key: `agent:${a.id}` as PickKey,
         kind: "agent" as const,
@@ -94,6 +101,7 @@ export function PeoplePicker({
   emptyText,
   selected,
   onChange,
+  channel = false,
 }: {
   label: string;
   searchLabel: string;
@@ -102,11 +110,13 @@ export function PeoplePicker({
   emptyText: (query: string) => string;
   selected: Set<PickKey>;
   onChange: (next: Set<PickKey>) => void;
+  /** Picking a channel's members: `useMemberRows`'s `channel`. */
+  channel?: boolean;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
-  const rows = useMemberRows(query, undefined, selected);
-  const all = useMemberRows("", undefined, selected);
+  const rows = useMemberRows(query, undefined, selected, { channel });
+  const all = useMemberRows("", undefined, selected, { channel });
   const picked = all.filter((r) => selected.has(r.key));
   const toggle = (key: PickKey, on: boolean) => {
     const next = new Set(selected);

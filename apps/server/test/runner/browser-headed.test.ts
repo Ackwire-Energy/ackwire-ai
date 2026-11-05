@@ -186,6 +186,7 @@ test("headless as before: its own window size, none of the headed flags", () => 
   const args = chromeLaunchArgs(VERSION, "/p", "linux", null);
   expect(args).toContain("--headless=new");
   expect(args).toContain("--window-size=1280,800");
+  expect(args).toContain("--screen-info={1280x800}");
   expect(args.some((a) => a.startsWith("--test-type"))).toBe(false);
   for (const flag of ["--start-maximized", "--ozone-platform=x11", "--class=agentes-browser"]) {
     expect(args).not.toContain(flag);

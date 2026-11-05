@@ -2,7 +2,7 @@
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 export const MAX_UPLOAD_MB = MAX_UPLOAD_BYTES / 1024 / 1024;
 /** Same limit as the server (`SKILL_LIMITS.assetBytes`): the images and other files a skill keeps, in MB. */
-export const SKILL_ASSET_MB = 20;
+export const SKILL_ASSET_MB = 40;
 
 /** Previews bigger than this are download-only (the bytes load into memory). Videos stream instead: any size plays. */
 export const MAX_PREVIEW_BYTES = 25 * 1024 * 1024;

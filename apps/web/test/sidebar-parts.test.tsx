@@ -142,7 +142,7 @@ describe("the parts' headers", () => {
   test("the footer has no Criar agente row: Agentes' + has it (always shown on touch screens)", async () => {
     await go();
     expect(nav().querySelector(".sidebar__create")).toBeNull();
-    expect(labels(await openPlus("Novo agente ou grupo"))).toEqual(["Criar agente", "Novo grupo"]);
+    expect(labels(await openPlus("Novo agente ou setor"))).toEqual(["Criar agente", "Novo setor"]);
     cleanup();
     const state = seedState();
     state.agents = [];
@@ -177,14 +177,14 @@ describe("one + per part", () => {
     expect(
       within(nav().querySelector(".sidebar__tools") as HTMLElement).getByRole("link", { name: "Equipe" }),
     ).toBeTruthy();
-    const menu = await openPlus("Novo agente ou grupo");
+    const menu = await openPlus("Novo agente ou setor");
     await click(within(menu).getByRole("menuitem", { name: "Criar agente" }));
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/new`);
   });
 
   test("Mensagens diretas' + is Nova mensagem, opening Ir para…; a member who may not create agents has no Agentes +", async () => {
     await go(asMember());
-    expect(within(head("Agentes")).queryByRole("button", { name: "Novo agente ou grupo" })).toBeNull();
+    expect(within(head("Agentes")).queryByRole("button", { name: "Novo agente ou setor" })).toBeNull();
     let asked = 0;
     const count = () => asked++;
     window.addEventListener("agentes:palette", count);
@@ -204,7 +204,7 @@ describe("the sidebar's own menu, on its empty space", () => {
       "Novo canal",
       "Nova categoria",
       "Criar agente",
-      "Novo grupo",
+      "Novo setor",
       "Equipe",
       "Restaurar ordem padrão",
     ]);

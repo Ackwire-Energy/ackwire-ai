@@ -618,15 +618,9 @@ function WikiPage({ slug }: { slug: string }) {
 }
 
 const backlinkKey = (b: WikiBacklink) =>
-  b.kind === "page"
-    ? `page:${b.slug}`
-    : b.kind === "message"
-      ? `message:${b.messageId}`
-      : b.kind === "issue"
-        ? `issue:${b.number}`
-        : `forum:${b.topicId}`;
+  b.kind === "page" ? `page:${b.slug}` : b.kind === "message" ? `message:${b.messageId}` : `issue:${b.number}`;
 
-/** Where a page is mentioned: another page, a conversation (opens there), a task, or a forum topic (web only). */
+/** Where a page is mentioned: another page, a conversation (opens there) or a task. */
 function BacklinkRow({ link: b, divider }: { link: WikiBacklink; divider: boolean }) {
   switch (b.kind) {
     case "page":
@@ -652,7 +646,7 @@ function BacklinkRow({ link: b, divider }: { link: WikiBacklink; divider: boolea
           onPress={() => router.push(chatHref(b.channelId))}
         />
       );
-    case "issue":
+    default:
       return (
         <Row
           divider={divider}
@@ -667,8 +661,6 @@ function BacklinkRow({ link: b, divider }: { link: WikiBacklink; divider: boolea
           onPress={() => router.push(`/issues/${b.number}`)}
         />
       );
-    default:
-      return <Row divider={divider} leading={<Tile icon="list" />} title={b.title} />;
   }
 }
 

@@ -22,6 +22,7 @@ import {
 } from "./notifications";
 import { maySql, type RolePermission } from "./permissions";
 import { stretchCardOf } from "./stretch";
+import { teamWeekCardOf } from "./team-week";
 
 /**
  * Where notifications come from: each flow calls one of these after
@@ -51,7 +52,6 @@ const {
 type ApprovalRow = typeof schema.approvals.$inferSelect;
 type QuestionRow = typeof schema.agentQuestions.$inferSelect;
 type IssueRow = typeof issues.$inferSelect;
-type TopicRow = typeof schema.forumTopics.$inferSelect;
 type MissionRow = typeof missions.$inferSelect;
 
 const person = (id: string | null | undefined): NotificationActor | null => (id ? { type: "user", id } : null);
@@ -127,7 +127,7 @@ export const agentReplyGroup = (channelId: string, threadId: string | null) =>
  * an agent answers (`agent_reply`, merged per conversation, ADR 0071), and
  * the people in a thread (`thread_reply`, merged per thread). Cards of the
  * agent's own flows (questions, approvals, secret requests) notify through
- * those flows instead; the forum notifies through its turns.
+ * those flows instead.
  */
 export async function notifyMessage(deps: NotificationDeps, orgId: string, messageId: string) {
   const { db } = deps;
@@ -137,7 +137,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
     .where(and(eq(messages.orgId, orgId), eq(messages.id, messageId)));
   if (!message || message.deletedAt) return;
   const meta = message.meta;
-  if (meta.questionId || meta.approvalId || meta.secretRequestId || meta.forum) return;
+  if (meta.questionId || meta.approvalId || meta.secretRequestId) return;
   // An agent's sticker or GIF after its own reply (ADR 0091) is silent: the reply already told whoever it was for.
   if (isMediaAfterReply(meta)) return;
   // An agent's follow-up line, and the notice that wakes it: the reply it brings notifies instead.
@@ -152,7 +152,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
     .select({ kind: channels.kind, name: channels.name, visibility: channels.visibility })
     .from(channels)
     .where(and(eq(channels.id, message.channelId), eq(channels.orgId, orgId)));
-  if (!channel || channel.kind === "forum") return;
+  if (!channel) return;
   // A task's conversation (ADR 0145): whoever sees the task, as its comments did.
   if (channel.kind === "task") return notifyTaskMessage(deps, message);
   const actor = message.authorType === "person" ? person(message.authorUserId) : agent(message.authorAgentId);
@@ -184,7 +184,14 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   const stoppedAt = card?.agentIds.at(-1);
   const owner = !behind && !card?.forUserId && stoppedAt ? await agentOwner(deps, stoppedAt) : null;
   // The autonomy brakes' proposal card, digest and loop stop (ADR 0131) are for the person they name.
-  const asker = behind ?? card?.forUserId ?? proposalCardOf(meta)?.forUserId ?? autonomyNoteFor(meta) ?? owner;
+  // Lodi's weekly card (ADR 0137 §9) is for the admin whose DM it is in.
+  const asker =
+    behind ??
+    card?.forUserId ??
+    proposalCardOf(meta)?.forUserId ??
+    autonomyNoteFor(meta) ??
+    teamWeekCardOf(meta)?.forUserId ??
+    owner;
   const ownerSees =
     asker !== null &&
     asker === owner &&
@@ -273,7 +280,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
         isNotNull(messages.authorUserId),
       ),
     );
-  const starter = root && !root.meta.routine && !root.meta.forum ? root.authorUserId : null;
+  const starter = root && !root.meta.routine ? root.authorUserId : null;
   // Explicit choices win: following adds someone, muting drops them even where they wrote.
   const choices = await threadFollowChoices(db, orgId, message.threadId);
   const inThread = [starter, ...people.map((p) => p.userId), ...choices.followers].filter(
@@ -724,50 +731,6 @@ async function notifyTaskMessage(deps: NotificationDeps, message: typeof message
   if (!text.trim()) return;
   await notifyIssueComment(deps, { type: message.authorType, id: author }, issue.id, message.id, text, {
     messageId: message.id,
-  });
-}
-
-// ── Forum ─────────────────────────────────────────────────────────────────────
-
-/** A seated person's turn at the table (waits for them). */
-export async function notifyForumTurn(deps: NotificationDeps, topic: TopicRow, userId: string, round: number) {
-  await notify(deps, {
-    orgId: topic.orgId,
-    userIds: [userId],
-    kind: "forum_turn",
-    groupKey: `forum_turn:${topic.id}:${round}`,
-    waiting: true,
-    actor: agent(topic.ownerAgentId),
-    source: { topicId: topic.id, channelId: topic.channelId, label: topic.title },
-    latest: {
-      title: topic.title,
-      text: notificationSnippet(topic.goal),
-      round,
-      rounds: topic.maxRounds,
-      ...(topic.deadline ? { expiresAt: topic.deadline.toISOString() } : {}),
-    },
-  });
-}
-
-/** The turn was taken, passed, skipped, or the topic moved on or ended. */
-export async function resolveForumTurns(deps: NotificationDeps, orgId: string, topicId: string, userIds?: string[]) {
-  await resolveNotifications(deps, orgId, { groupKeyPrefix: `forum_turn:${topicId}:`, userIds });
-}
-
-/** The synthesis (or plan) is out: whoever opened or asked for the topic. */
-export async function notifyForumSynthesis(
-  deps: NotificationDeps,
-  topic: TopicRow,
-  input: { agentId: string | null; revision: number; summary: string },
-) {
-  await notify(deps, {
-    orgId: topic.orgId,
-    userIds: [topic.requesterUserId, topic.requestedByUserId],
-    kind: "forum_synthesis",
-    groupKey: `forum_synthesis:${topic.id}:${input.revision}`,
-    actor: agent(input.agentId),
-    source: { topicId: topic.id, channelId: topic.channelId, label: topic.title },
-    latest: { title: topic.title, text: notificationSnippet(input.summary) },
   });
 }
 

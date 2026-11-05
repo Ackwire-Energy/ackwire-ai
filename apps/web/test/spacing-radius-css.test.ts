@@ -181,6 +181,11 @@ test("every hairline between a card's rows, and over its foot, has one step of r
   expect(last(plan, ".plan-block", "padding")).toBe("var(--row-py) 0");
 });
 
+test("Seus planos and the API keys: each row has the same room at its top and bottom as at its sides", async () => {
+  const layout = topLevel(await read(join(SRC, "layout.css")));
+  for (const row of [".ai-accounts__row", ".key-row"]) expect(last(layout, row, "padding")).toBe("var(--space-4)");
+});
+
 test("the settings sidebar's links are the ruler's compact step, the default one under a finger", async () => {
   const css = await read(join(SRC, "layout.css"));
   const top = topLevel(css);

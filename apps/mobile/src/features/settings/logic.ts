@@ -223,7 +223,6 @@ export const AREA_ICON: Record<string, IconName> = {
   wiki: "doc",
   skills: "bolt",
   schedule: "clock",
-  forum: "chat",
   sandbox: "code",
   browser: "globe",
   setup: "pen",

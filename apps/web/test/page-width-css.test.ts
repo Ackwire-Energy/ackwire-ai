@@ -6,7 +6,6 @@ const css = topLevel(
     "src/styles.css",
     "src/pages/wiki.css",
     "src/pages/issues.css",
-    "src/pages/forum.css",
     "src/pages/routines.css",
     "src/pages/team.css",
     "src/components/missions/missions.css",
@@ -24,15 +23,11 @@ test("pages use the width they have: no column capped short of the work area, si
     ".wiki-prose .md",
     // Rendered Markdown anywhere (a Drive report, a skill, the wiki), as a message's words already are.
     ".md",
-    // Lists (Threads, Aprovações, Notificações), Drive, tasks, the forum and a topic, routines, the team.
+    // Lists (Threads, Aprovações, Notificações), Drive, tasks, routines, the team.
     ".page--list",
     ".drive",
     ".issues",
     ".issue-description",
-    ".forum",
-    ".forum-topic",
-    ".forum-topic__main",
-    ".forum-th__goal",
     ".routines",
     ".page.team",
     // A task's page, proposals, an agent's memory, search results.

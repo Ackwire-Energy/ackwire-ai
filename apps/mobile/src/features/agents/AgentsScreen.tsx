@@ -31,6 +31,7 @@ import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
 import { usePresenceOf } from "../status/hooks";
 import { TaskManagerEntry } from "../task-manager/TaskManagerEntry";
+import { TeamEntry } from "../team/TeamEntry";
 import { openAgentDelete } from "./DeleteAgentScreen";
 import { agoOf, freeSections, plainRole, type TeamLine, teamLines } from "./logic";
 import { agoText, workTitle } from "./work";
@@ -86,6 +87,8 @@ export function AgentsScreen() {
       ) : null}
       {/* What every agent is doing, task by task, and a way to stop it (ADR 0128). */}
       {total > 0 ? <TaskManagerEntry /> : null}
+      {/* Equipe's lists, org chart and map (ADR 0148). */}
+      {total > 0 ? <TeamEntry /> : null}
       {waiting.length > 0 ? (
         <>
           <SectionHeader title={t("mobile.intentAgents.waitingSection")} count={waiting.length} />

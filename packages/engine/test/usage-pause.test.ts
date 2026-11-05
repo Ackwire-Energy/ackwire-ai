@@ -12,6 +12,7 @@ import {
   cancelRun,
   cancelUsageQueue,
   clearPlanLimits,
+  computerBrainUnavailable,
   continueRun,
   createAgent,
   createChannel,
@@ -30,9 +31,11 @@ import {
   noticeCategoryOf,
   overruledHere,
   postPersonMessage,
+  REPARK_STEADY_MS,
   RESUME_AFTER_MS,
   RESUME_GAP_MS,
   recoverStaleRuns,
+  storeOwnUsage as reportOwnUsage,
   resumeBudgetWaits,
   runRoutineNow,
   stopRun,
@@ -1597,4 +1600,207 @@ test("who asked withdrawing it closes it with no notice to them", async () => {
   const [note] = await notes(f, "plan_limit_wait");
   expect(note?.meta.usageWait).toMatchObject({ closed: { reason: "withdrawn", who: { name: "bia", userId: bia.id } } });
   expect(await noticesOf(f, "catch_up_closed_asker")).toHaveLength(0);
+});
+
+// ── A model's own limit, the region it needs, a reading with room, a wake into the same limit ──────────────────
+
+/** An OpenCode Go key account on a runner that knows accounts, its agent on `model`, the account read as `usage`. */
+async function goAgent(fx: Fixture, model: string, usage: PlanUsage) {
+  const machineId = await computerAgent(fx, { brainFallback: false, brainModel: model });
+  const accountId = crypto.randomUUID();
+  await fx.db.insert(schema.machineAccounts).values({
+    id: accountId,
+    orgId: fx.org.id,
+    machineId,
+    kind: "claude_code",
+    provider: "opencode",
+    label: "Plano Go",
+    status: "active",
+    createdBy: fx.owner.id,
+    usage,
+  });
+  await fx.db.update(schema.agents).set({ brainAccountId: accountId }).where(eq(schema.agents.id, fx.agent.id));
+  return { machineId, accountId };
+}
+
+const accountHandlers = (fx: Fixture, brain: Brain) =>
+  createJobHandlers({
+    ...fx.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => ({ ...statusOf(id), protocol: MACHINE_PROTOCOL_VERSION }) },
+    planLimitGraceMs: 50,
+  });
+
+const waitOf = (run: { transcript: unknown } | undefined) =>
+  (run?.transcript as { waitingForBrain?: Record<string, unknown> } | undefined)?.waitingForBrain;
+
+const accountUsage = async (fx: Fixture, id: string) =>
+  (await fx.db.select().from(schema.machineAccounts).where(eq(schema.machineAccounts.id, id)))[0]?.usage;
+
+test("a model's own limit on OpenCode Go waits for that model only, says so, and the account reads as having room", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const week = later(3 * 86_400_000).toISOString();
+  const reading: PlanUsage = {
+    windows: [
+      { kind: "five_hour", usedPercent: 0, resetsAt: later(5 * 3600_000).toISOString() },
+      { kind: "seven_day", usedPercent: 72, resetsAt: week },
+      { kind: "monthly", usedPercent: 67, resetsAt: later(20 * 86_400_000).toISOString() },
+    ],
+    source: "probe",
+    at: new Date().toISOString(),
+  };
+  const { machineId, accountId } = await goAgent(f, "deepseek-v4.1-flash", reading);
+  const { brain, seen } = scripted(() => [
+    { type: "limit" },
+    {
+      type: "error",
+      code: "plan_limit",
+      message: 'API Error: 429 {"error":{"type":"GoUsageLimitError","message":"Weekly usage limit reached"}}',
+      worked: false,
+    },
+  ]);
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, accountHandlers(f, brain));
+  expect(seen).toHaveLength(1);
+  const [run] = await runs(f);
+  expect(run?.status).toBe("waiting_input");
+  expect(waitOf(run)).toMatchObject({ scope: "model", model: "deepseek-v4.1-flash", resetsAt: week });
+  const [note] = await notes(f, "plan_model_limit_wait");
+  expect(note?.meta.bodyParams).toEqual({ plan: "OpenCode Go", model: "DeepSeek V4.1 Flash", agent: f.agent.name });
+  expect(note?.meta.usageWait).toMatchObject({ resetsAt: week });
+  // The model's limit is kept on its account, the account itself isn't at its limit.
+  const usage = await accountUsage(f, accountId);
+  expect(usage?.models?.["deepseek-v4.1-flash"]).toMatchObject({ until: week });
+  expect(usage?.limited).toBeUndefined();
+  const account = { id: accountId, label: "Plano Go", status: "active" as const, provider: "opencode" };
+  const status = { ...statusOf(machineId), protocol: MACHINE_PROTOCOL_VERSION };
+  expect(
+    computerBrainUnavailable("claude_code", machineId, status, Date.now(), account, true, usage, "glm-5.3"),
+  ).toBeNull();
+  expect(
+    computerBrainUnavailable("claude_code", machineId, status, Date.now(), account, true, usage, "deepseek-v4.1-flash"),
+  ).toMatchObject({ code: "plan_limit", scope: "model", resetsAt: week });
+  // Another model's turn and a reading with room leave it waiting for its own reset.
+  const key = usageWaitKey({ code: "plan_limit", machineId, kind: "claude_code", accountId });
+  expect(await wakePlanWaits(f.db, f.org.id, key, "glm-5.3")).toEqual([]);
+  await reportOwnUsage({ db: f.db, pubsub: f.pubsub }, f.org.id, machineId, {});
+  expect(await wakePlanWaits(f.db, f.org.id, key, null, Date.now(), { at: Date.now() + 60_000 })).toEqual([]);
+});
+
+test("a model that needs the Global region waits with no reset time and says what to turn on", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const reading: PlanUsage = {
+    windows: [{ kind: "five_hour", usedPercent: 0, resetsAt: later(5 * 3600_000).toISOString() }],
+    source: "probe",
+    at: new Date().toISOString(),
+  };
+  const { accountId } = await goAgent(f, "deepseek-v4.1-flash", reading);
+  const { brain } = scripted(() => [
+    {
+      type: "error",
+      code: "plan_limit",
+      message: "API Error: 429 Model deepseek-v4.1-flash is not allowed in this workspace's region",
+      worked: false,
+    },
+  ]);
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, accountHandlers(f, brain));
+  const [run] = await runs(f);
+  expect(waitOf(run)).toMatchObject({ scope: "region", model: "deepseek-v4.1-flash" });
+  expect(waitOf(run)?.resetsAt).toBeUndefined();
+  const [note] = await notes(f, "plan_model_region_wait");
+  expect(note?.meta.bodyParams).toMatchObject({ model: "DeepSeek V4.1 Flash" });
+  expect((note?.meta.usageWait as { resetsAt?: string } | undefined)?.resetsAt).toBeUndefined();
+  expect(note?.meta.usageWait).toBeDefined();
+  expect((await accountUsage(f, accountId))?.models?.["deepseek-v4.1-flash"]).toMatchObject({ region: true });
+});
+
+test("a full window of the OpenCode Go account is still the account's limit", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const reset = later(2 * 3600_000).toISOString();
+  const reading: PlanUsage = {
+    windows: [{ kind: "five_hour", usedPercent: 100, resetsAt: reset }],
+    source: "probe",
+    at: new Date().toISOString(),
+  };
+  await goAgent(f, "glm-5.3", reading);
+  const { brain, seen } = scripted(() => [{ type: "done", text: "nunca" }]);
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, accountHandlers(f, brain));
+  expect(seen).toHaveLength(0);
+  const [run] = await runs(f);
+  expect(waitOf(run)?.scope).toBeUndefined();
+  expect(waitOf(run)?.resetsAt).toBe(reset);
+  expect(await notes(f, "plan_limit_wait")).toHaveLength(1);
+});
+
+test("a fresh reading with room wakes the waits on the plan's limit, in line, before their reset", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const machineId = await computerAgent(f, { brainFallback: false });
+  const reset = later(4 * 3600_000).toISOString();
+  await storeOwnUsage(f, machineId, {
+    windows: [{ kind: "five_hour", usedPercent: 100, resetsAt: reset }],
+    source: "turn",
+    at: new Date().toISOString(),
+  });
+  const { brain, seen } = scripted(() => [{ type: "done", text: "Respondi." }]);
+  const handlers = handlersWith(f, brain);
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [run] = await runs(f);
+  expect(run?.status).toBe("waiting_input");
+  expect(waitOf(run)?.resetsAt).toBe(reset);
+  // A stale reading (taken before it parked) wakes nothing; a newer one with room does.
+  const deps = { db: f.db, pubsub: f.pubsub };
+  const usage = (used: number, at: Date) => ({
+    windows: [{ kind: "five_hour" as const, usedPercent: used, resetsAt: reset }],
+    source: "probe" as const,
+    at: at.toISOString(),
+  });
+  await reportOwnUsage(deps, f.org.id, machineId, { claude_code: usage(100, later(60_000)) });
+  expect((await resumeJob(f, run?.id ?? ""))?.dedupeKey).not.toContain("room_back");
+  await reportOwnUsage(deps, f.org.id, machineId, { claude_code: usage(2, later(-3600_000)) });
+  expect((await resumeJob(f, run?.id ?? ""))?.dedupeKey).not.toContain("room_back");
+  await reportOwnUsage(deps, f.org.id, machineId, { claude_code: usage(3, later(60_000)) });
+  const jobs = await f.db
+    .select()
+    .from(schema.outbox)
+    .where(and(eq(schema.outbox.kind, "agent_run.execute"), eq(schema.outbox.status, "pending")));
+  const back = jobs.find((j) => j.dedupeKey?.includes("room_back"));
+  expect(back?.payload.runId).toBe(run?.id);
+  expect(back?.nextAttemptAt.getTime()).toBeLessThan(Date.now() + 1000);
+  await drainOutbox(f.db, handlers, { now: later(1000) });
+  expect(seen).toHaveLength(1);
+  expect((await runs(f))[0]?.status).toBe("done");
+});
+
+test("a wait woken into the same limit backs off to its own reset, with no new note and no more wakes", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const machineId = await computerAgent(f, { brainFallback: false });
+  const reset = later(3600_000).toISOString();
+  const { brain, seen } = scripted(() => [
+    { type: "limit", resetsAt: reset },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ]);
+  const handlers = handlersWith(f, brain);
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [first] = await runs(f);
+  expect(waitOf(first)?.steady).toBeUndefined();
+  const key = usageWaitKey({ code: "plan_limit", machineId, kind: "claude_code" });
+  const model = (waitOf(first)?.model as string | null | undefined) ?? null;
+  expect(await wakePlanWaits(f.db, f.org.id, key, model)).toEqual([first?.id ?? ""]);
+  await drainOutbox(f.db, handlers);
+  // Its plan is still limited here: parked again at once, quietly, on its own timer.
+  expect(seen).toHaveLength(1);
+  const [again] = await runs(f);
+  expect(again?.status).toBe("waiting_input");
+  expect(waitOf(again)).toMatchObject({ steady: true, resetsAt: reset });
+  expect(await notes(f, "plan_limit_wait")).toHaveLength(1);
+  expect(await wakePlanWaits(f.db, f.org.id, key, model)).toEqual([]);
+  expect(Date.parse(String(waitOf(again)?.until))).toBeGreaterThanOrEqual(Date.parse(reset));
+  // Only for a while: a wait behind an unknown reset's head sleeps a day, so a later turn through still wakes it.
+  expect(await wakePlanWaits(f.db, f.org.id, key, model, Date.now() + REPARK_STEADY_MS + 1000)).toEqual([
+    first?.id ?? "",
+  ]);
 });

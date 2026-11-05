@@ -25,8 +25,6 @@ interface Stored {
   meta: Omit<Artifact, "canEdit" | "untrusted" | "audience">;
   /** `bytes`: an uploaded file's version. */
   versions: (ArtifactVersion & { content: ArtifactContent; bytes?: Blob })[];
-  /** Opened by id only (e.g. a forum synthesis), not in the Drive list. */
-  unlisted?: boolean;
   /** In the trash since then (30 days to restore). */
   deletedAt?: string;
   /** Deleted for good: gone from the trash too. */
@@ -154,32 +152,6 @@ export function createMockArtifacts(
         versions,
       });
     }
-    // The forum fake's synthesis document (test/fakes/forum.ts, "topic-onboarding").
-    const at = minutesAgo(now, 60 * 26);
-    list.push({
-      unlisted: true,
-      meta: {
-        id: "art-onboarding",
-        kind: "document",
-        title: "Síntese: onboarding em 5 minutos",
-        version: 1,
-        channelId: null,
-        threadId: null,
-        createdBy: agent(0),
-        updatedBy: agent(0),
-        createdAt: at,
-        updatedAt: at,
-      },
-      versions: [
-        {
-          version: 1,
-          author: agent(0),
-          note: null,
-          createdAt: at,
-          content: { kind: "document", markdown: "# Síntese\n\n1. Pular a escolha de chave\n2. Exemplo pronto" },
-        },
-      ],
-    });
     return list;
   });
   /** Like the server: the DM's other participant, the channel's name and privacy, else the whole workspace. */
@@ -216,7 +188,7 @@ export function createMockArtifacts(
     list: async (orgId, filters = {}) => {
       const q = filters.q?.trim().toLowerCase();
       const shown = (await store(orgId))
-        .filter((s) => !s.unlisted && !s.deletedAt)
+        .filter((s) => !s.deletedAt)
         .filter((s) => !filters.kind || s.meta.kind === filters.kind)
         .filter((s) => !filters.channelId || s.meta.channelId === filters.channelId)
         .filter(

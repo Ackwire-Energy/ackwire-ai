@@ -66,6 +66,9 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
         : guessed;
     return stepLabel(t, { ...activity, tool: row.target.id ?? "" });
   }
+  if (row.action === "agent.merged_without_asking") {
+    return t("audit.change.mergedWithoutAsking", { repo: row.target.id ?? "" });
+  }
   const [area = "", rest = ""] = row.action.split(".");
   if (area === "approval") {
     const status = (["approved", "refused", "expired"] as const).find((s) => s === rest);
@@ -160,7 +163,6 @@ const AREAS = [
   "mission",
   "thread",
   "channel",
-  "forum",
   "artifact",
   "agent",
   "machine",
@@ -195,12 +197,11 @@ export const auditHint = (row: AuditRow) =>
   auditStr(row.details.subject) ??
   auditStr(row.details.email);
 
-/** Where it happened: "#geral", "conversa privada", "fórum: …". */
+/** Where it happened: "#geral", "conversa privada". */
 export function auditWhere(t: TFunction, row: AuditRow) {
   const c = row.channel;
   if (!c) return null;
   if (c.kind === "dm") return t("audit.where.dm");
-  if (c.kind === "forum") return t("audit.where.forum", { name: c.name });
   return `#${c.name}`;
 }
 

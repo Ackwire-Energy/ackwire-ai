@@ -1,4 +1,4 @@
-import { keys, useAiAccounts, useSetShowActivity } from "@agenteschat/client";
+import { type AgentStyle, keys, useAiAccounts, useSetAgentStyle, useSetShowActivity } from "@agenteschat/client";
 import { authErrorText, errorText } from "@agenteschat/client/lib/errors";
 import { browserTimezone, isTimeZone, timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import {
@@ -43,7 +43,8 @@ import { useToast } from "@/lib/toast";
 import { LanguageSelect } from "./LanguageSelect";
 
 /**
- * Configurações › Sua conta: your profile in this workspace, your time zone, whether agents' work shows under their replies, opening the phone app and a password
+ * Configurações › Sua conta: your profile in this workspace, your time zone, whether agents' work shows under their replies,
+ * how agents talk to you (ADR 0147), opening the phone app and a password
  * for an account without one, your plans' limits (ADR 0063 §5), then what this device keeps for itself (theme,
  * language, sounds, the desktop app's menus), and last, deleting the account.
  */
@@ -55,6 +56,7 @@ export function AccountSection() {
   const api = useApi();
   const plans = ownPlanLines(t, useAiAccounts(org.id).data, dir.agents, me.user.id);
   const showActivity = useSetShowActivity(org.id);
+  const agentStyle = useSetAgentStyle(org.id);
   const toast = useToast();
   // Looking at your plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
@@ -104,6 +106,31 @@ export function AccountSection() {
               />
             }
           />
+          {/* A server from before the choice sends no `agentStyle` and can't keep one. */}
+          {org.agentStyle !== undefined && (
+            <PrefRow
+              id="account-agent-style"
+              icon="message"
+              label={t("settings.account.agentStyle")}
+              help={t("settings.account.agentStyleHelp")}
+              control={
+                <Segmented
+                  size="sm"
+                  label={t("settings.account.agentStyle")}
+                  value={org.agentStyle ?? "simple"}
+                  onValueChange={(v) =>
+                    agentStyle.mutate(v as AgentStyle, {
+                      onError: () => toast.show(t("settings.account.activityFailed")),
+                    })
+                  }
+                  options={[
+                    { value: "simple", label: t("settings.account.agentStyleSimple") },
+                    { value: "technical", label: t("settings.account.agentStyleTechnical") },
+                  ]}
+                />
+              }
+            />
+          )}
           <PrefRow
             id="account-phone"
             icon="phone"

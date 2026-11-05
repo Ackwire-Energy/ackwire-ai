@@ -1,6 +1,14 @@
 import OpenAI from "openai";
 import type { ChatCompletionCreateParamsStreaming } from "openai/resources/chat/completions";
-import { type ModelInfo, type ModelTier, modelInfo, setListedModels, type TokenPrices, usdToNanoUsd } from "./catalog";
+import {
+  isCustomModel,
+  type ModelInfo,
+  type ModelTier,
+  modelInfo,
+  setListedModels,
+  type TokenPrices,
+  usdToNanoUsd,
+} from "./catalog";
 import { openAIError } from "./openai";
 import {
   type ContentBlock,
@@ -28,11 +36,16 @@ export const OPENROUTER_API = "https://openrouter.ai/api/v1";
 const ATTRIBUTION = { "HTTP-Referer": "https://agentes.chat", "X-OpenRouter-Title": "agentes.chat" };
 
 /** An OpenRouter model id (`z-ai/glm-5.3`, `~z-ai/glm-latest`): the catalog's ids never have a slash. */
-export const isOpenRouterModel = (model: string) => model.includes("/");
+export const isOpenRouterModel = (model: string) => model.includes("/") && !isCustomModel(model);
 
-/** A model's provider: the catalog's or the list's, else OpenRouter's by the id's shape (its list not read yet). */
+/**
+ * A model's provider: a workspace endpoint's by its id, the catalog's or the list's, else OpenRouter's by the id's
+ * shape (its list not read yet).
+ */
 export const modelProvider = (model: string) =>
-  modelInfo(model)?.provider ?? (isOpenRouterModel(model) ? "openrouter" : undefined);
+  isCustomModel(model)
+    ? "custom"
+    : (modelInfo(model)?.provider ?? (isOpenRouterModel(model) ? "openrouter" : undefined));
 
 /**
  * The good picks, shown first: capable with tools and cheap. Each is a family's `~…-latest` alias, which follows the
@@ -392,9 +405,9 @@ function toMessages(request: ModelRequest, claude: boolean): Message[] {
   return out;
 }
 
-function toBody(request: ModelRequest) {
-  const claude = isClaude(request.model);
-  const reasoning = reasoningFor(request.effort, modelInfo(request.model));
+function toBody(request: ModelRequest, compatible: boolean) {
+  const claude = !compatible && isClaude(request.model);
+  const reasoning = compatible ? undefined : reasoningFor(request.effort, modelInfo(request.model));
   return {
     model: request.model,
     messages: toMessages(request, claude),
@@ -417,9 +430,11 @@ function toBody(request: ModelRequest) {
             json_schema: { name: "output", strict: true, schema: request.outputSchema },
           },
           // Only to an upstream provider that honors the schema.
-          provider: { require_parameters: true },
+          ...(compatible ? {} : { provider: { require_parameters: true } }),
         }
       : {}),
+    // Plain Chat Completions sends usage only when asked.
+    ...(compatible ? { stream_options: { include_usage: true } } : {}),
     // Claude's automatic caching also covers the growing conversation of a tool loop.
     ...(claude ? { cache_control: { type: "ephemeral" as const } } : {}),
   };
@@ -466,10 +481,16 @@ function statusError(status: number | undefined): ProviderError {
   return new ProviderError(`provider rejected the request (${status})`, false, status);
 }
 
-function routerError(error: unknown): ProviderError {
+function routerError(error: unknown, compatible: boolean): ProviderError {
   if (error instanceof OpenAI.APIConnectionError || error instanceof OpenAI.APIUserAbortError)
     return openAIError(error);
-  if (error instanceof OpenAI.APIError) return statusError(error.status ?? (Number(error.code) || undefined));
+  if (error instanceof OpenAI.APIError) {
+    const mapped = statusError(error.status ?? (Number(error.code) || undefined));
+    // A workspace's own endpoint: its admin reads the server's words to fix it (a model name, a missing feature).
+    return compatible && error.message
+      ? new ProviderError(`${mapped.message}: ${error.message.slice(0, 300)}`, mapped.retryable, mapped.status)
+      : mapped;
+  }
   return openAIError(error);
 }
 
@@ -489,10 +510,20 @@ function routerError(error: unknown): ProviderError {
  *   what was received (`ProviderError.partial`).
  */
 export function createOpenRouterProvider(
-  options: { maxRetries?: number /** Tests only: scripted transport. */; fetch?: typeof fetch } = {},
+  options: {
+    maxRetries?: number;
+    /** Outbound HTTP (tests: a scripted transport; a workspace endpoint: the guarded one). */
+    fetch?: typeof fetch;
+    /**
+     * Another server's Chat Completions (a workspace's own endpoint, ADR 0146): sent to `baseURL` with no
+     * OpenRouter attribution, routing, reasoning or cache markers, usage asked for, and its reported cost ignored.
+     */
+    compatible?: { id: string; baseURL: string };
+  } = {},
 ): ModelProvider {
+  const compatible = options.compatible;
   return {
-    id: "openrouter",
+    id: compatible?.id ?? "openrouter",
     async stream(input, { apiKey, onDelta }): Promise<ModelResult> {
       const request = laidOut(input);
       const partial: PartialUsage = {
@@ -511,13 +542,13 @@ export function createOpenRouterProvider(
       try {
         const client = new OpenAI({
           apiKey,
-          baseURL: OPENROUTER_API,
-          defaultHeaders: ATTRIBUTION,
+          baseURL: compatible?.baseURL ?? OPENROUTER_API,
+          ...(compatible ? {} : { defaultHeaders: ATTRIBUTION }),
           maxRetries: options.maxRetries ?? 2,
           fetch: options.fetch,
         });
         const stream = await client.chat.completions.create(
-          toBody(request) as unknown as ChatCompletionCreateParamsStreaming,
+          toBody(request, compatible !== undefined) as unknown as ChatCompletionCreateParamsStreaming,
           { signal: request.signal },
         );
         for await (const raw of stream) {
@@ -534,14 +565,21 @@ export function createOpenRouterProvider(
             onDelta(delta.content);
           }
           for (const tc of delta?.tool_calls ?? []) {
-            const i = tc.index ?? 0;
+            // Some compatible servers leave out `index`: a new id is a new call, else the last one goes on.
+            const byId = tc.id ? calls.findIndex((c) => c?.id === tc.id) : -1;
+            const i =
+              tc.index ?? (byId >= 0 ? byId : tc.id && calls.length > 0 ? calls.length : Math.max(calls.length - 1, 0));
             const at = calls[i] ?? { id: "", name: "", args: "" };
             calls[i] = at;
             if (tc.id) at.id = tc.id;
             if (tc.function?.name) at.name = tc.function.name;
-            if (tc.function?.arguments) {
-              at.args += tc.function.arguments;
-              partial.outputChars += tc.function.arguments.length;
+            // A few send the arguments as an object instead of JSON text.
+            const args = tc.function?.arguments as unknown;
+            const piece =
+              typeof args === "string" ? args : args && typeof args === "object" ? JSON.stringify(args) : "";
+            if (piece) {
+              at.args += piece;
+              partial.outputChars += piece.length;
             }
           }
           for (const d of delta?.reasoning_details ?? []) {
@@ -574,7 +612,7 @@ export function createOpenRouterProvider(
               : finish === "stop"
                 ? "end_turn"
                 : "other";
-        const cost = usage && costOf(usage);
+        const cost = usage && !compatible ? costOf(usage) : undefined;
         return {
           text,
           content,
@@ -595,7 +633,7 @@ export function createOpenRouterProvider(
           ? new ProviderError("request aborted", false)
           : error instanceof ProviderError
             ? error
-            : routerError(error);
+            : routerError(error, compatible !== undefined);
         if (partial.outputChars > 0 || usage) mapped.partial = { ...partial, ...(usage ? usageOf(usage) : {}) };
         throw mapped;
       }

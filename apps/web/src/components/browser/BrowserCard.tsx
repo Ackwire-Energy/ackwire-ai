@@ -1207,6 +1207,7 @@ export function BrowserCard({
         .join(" ")}
       style={framed ? frameStyle : undefined}
       role="group"
+      data-esc-layer={full ? "" : undefined}
       aria-label={t("browser.inCard.group", g)}
     >
       {!surface && !framed && <SkyStrip color={color} muted={inControl} moving={live_} />}
@@ -1347,7 +1348,7 @@ export function BrowserCard({
               <img ref={imgRef} src={src} alt={t("browser.live.page", g)} draggable={false} />
               {mark && <span key={mark.key} className="brw-mark" style={{ left: mark.x, top: mark.y }} />}
               {(sliding || scrolling) && (
-                <span className="brw-ac__capture" role="status">
+                <span className="brw-ac__capture" role="status" data-esc-layer="">
                   {sliding ? t("browser.inCard.touchHint") : t("browser.inCard.scrollHint")}
                 </span>
               )}

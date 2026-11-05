@@ -524,6 +524,7 @@ export function accountRoutes(deps: AppDeps) {
               logo: m.orgLogo ?? null,
               ...(m.start ? { start: m.start } : {}),
               showActivity: m.showActivity ?? false,
+              agentStyle: m.agentStyle ?? null,
               ...(m.standing
                 ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
                 : {}),

@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { resources } from "@agenteschat/i18n";
 import i18next, { type TFunction } from "i18next";
-import type { Agent, AgentAudience, AgentBrain, AiComputer, ComputerSetup, MachineAccount } from "../src/api/types";
+import type {
+  Agent,
+  AgentAudience,
+  AgentBrain,
+  AiComputer,
+  AiStatus,
+  ComputerSetup,
+  MachineAccount,
+} from "../src/api/types";
 import { setupView } from "../src/lib/computer";
 import { serverBody } from "../src/lib/message-body";
 import {
@@ -22,7 +30,11 @@ import {
   gateLine,
   gateRechecks,
   kindOf,
+  mayConnectAi,
+  type NoAiCard,
   noAiCardOf,
+  noAiLineKey,
+  noAiStatusKey,
   onlyOwnerReplies,
   ownSignInFor,
   PLAN_CHOICES,
@@ -30,6 +42,7 @@ import {
   type PlanGate,
   planGate,
   planGateWithoutAgent,
+  planLineFix,
   planMark,
   planOfAccount,
   planOfKind,
@@ -586,7 +599,7 @@ describe("a card whose plan's sign-in ended", () => {
     expect(noAiCardOf(meta("no_key"))?.signedOut).toBeUndefined();
     const t = ((key: string) => key) as unknown as TFunction;
     expect(serverBody(t, "…", meta("not_signed_in"))).toBe("chat.body.no_ai_signed_out");
-    expect(serverBody(t, "…", meta("cli_missing"))).toBe("chat.body.no_ai");
+    expect(serverBody(t, "…", meta("no_key"))).toBe("chat.body.no_ai");
   });
 
   test("Sign in again opens on the agent's own plan; with no plan left to sign in to, Connect at the card's step", () => {
@@ -692,9 +705,9 @@ describe("why a plan can't sign in yet, in plain words (`gateLine`)", () => {
     });
   });
 
-  test("a program not allowed there says who to ask, and waits for them", () => {
+  test("a program not allowed there says it's on our side, and looks again only when asked", () => {
     expect(line(off("tool_off"), "cloud")).toEqual({
-      text: "O Codex não está liberado no Computador da Acme. Peça ao suporte para liberar.",
+      text: "O Codex ainda não está liberado no Computador da Acme. Isso é do nosso lado: tente de novo mais tarde.",
       rechecks: false,
     });
   });
@@ -725,5 +738,102 @@ describe("why a plan can't sign in yet, in plain words (`gateLine`)", () => {
     for (const gate of [{ state: "ready" }, { state: "missing" }, { state: "loading" }] as const)
       expect(line(gate, "cloud")).toBeNull();
     expect(gateRechecks({ state: "locked", who: "computer" }, "cloud")).toBe(false);
+  });
+});
+
+describe("a card says the real cause, not that the agent has no AI", () => {
+  const instance = i18next.createInstance();
+  void instance.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });
+  const pt = instance.t.bind(instance) as TFunction;
+  const meta = (reason: string, extra: Record<string, unknown> = {}) => ({
+    bodyCode: "no_ai",
+    noAi: { agentId: "ada", forUserId: null, reason, intent: "task", runId: "r1", ...extra },
+  });
+  const card = (reason: string, extra?: Record<string, unknown>) => noAiCardOf(meta(reason, extra));
+
+  test("Connect is for who can: the agent's owner, who manages agents or keys, nobody else", () => {
+    const agent = { ownerUserId: "u1" };
+    expect(mayConnectAi(agent, "u1", { permissions: [] })).toBe(true);
+    expect(mayConnectAi(agent, "u2", { permissions: ["manage_agents"] })).toBe(true);
+    expect(mayConnectAi(agent, "u2", { permissions: ["manage_credentials"] })).toBe(true);
+    expect(mayConnectAi(agent, "u2", { permissions: ["post"] })).toBe(false);
+    expect(mayConnectAi(null, null, { permissions: [] })).toBe(false);
+    // The right hand: any member, for their own plan.
+    const lodi = { ownerUserId: "u1", builtin: "right_hand" as const };
+    expect(mayConnectAi(lodi, "u2", { permissions: [] })).toBe(true);
+    expect(mayConnectAi(lodi, null, { permissions: [] })).toBe(false);
+    expect(planLineFix("plan_not_shared", lodi, "u1", { permissions: [] })).toBe("connectMine");
+    expect(planLineFix("plan_limit", lodi, "u1", { permissions: [] })).toBe("useKey");
+    expect(planLineFix("plan_limit", lodi, "u2", { permissions: ["manage_agents"] })).toBe("useKey");
+    expect(planLineFix("plan_limit", lodi, "u2", { permissions: [] })).toBe("connectMine");
+    expect(planLineFix("plan_limit", null, "u2", { permissions: [] })).toBeNull();
+  });
+
+  test("its computer with no such CLI, or no computer: the card and the agent's note each say so", () => {
+    expect(card("cli_missing")?.missing).toBe("cli_missing");
+    expect(card("no_computer")?.missing).toBe("no_computer");
+    expect(card("no_key")?.missing).toBeUndefined();
+    expect(pt(noAiLineKey(card("cli_missing") as NoAiCard), { name: "Ada" })).toBe(
+      "Ada não vai responder: o programa da IA não está instalado no computador.",
+    );
+    expect(pt(noAiLineKey(card("no_computer") as NoAiCard), { name: "Ada" })).toBe(
+      "Ada não vai responder: a IA precisa de um computador e não há nenhum.",
+    );
+    expect(noAiLineKey(card("no_key") as NoAiCard)).toBe("noAi.agent");
+    expect(noAiLineKey(card("not_signed_in") as NoAiCard)).toBe("noAi.signedOut");
+    const status = (reason: AiStatus["agents"][number]["reason"]) =>
+      noAiStatusKey({ any: true, agents: [{ agentId: "a", state: "no_ai", reason }] }, "a");
+    expect(status("cli_missing")).toBe("noAi.cliMissing");
+    expect(status("not_signed_in")).toBe("noAi.signedOut");
+    expect(status("no_key")).toBe("noAi.agent");
+    expect(serverBody(pt, "…", meta("cli_missing"))).toBe(
+      "Ainda não consigo responder: o programa da minha IA não está instalado no meu computador.",
+    );
+    expect(serverBody(pt, "…", meta("no_computer"))).toBe(
+      "Ainda não consigo responder: minha IA precisa de um computador e não tenho nenhum.",
+    );
+  });
+
+  test("the right hand: a model's own limit or region, and commands off, each with its cause", () => {
+    expect(card("model_limit", { model: "Kimi K2" })).toMatchObject({ planLine: "model_limit", model: "Kimi K2" });
+    expect(pt("noAi.rightHand.model_limit", { name: "Lodi", model: "Kimi K2" })).toBe(
+      "Lodi não consegue responder agora: o Kimi K2 chegou ao limite dele no plano. Os outros modelos do plano continuam funcionando.",
+    );
+    expect(serverBody(pt, "…", meta("model_limit", { model: "Kimi K2" }))).toBe(
+      "Agora não consigo responder: o Kimi K2 chegou ao limite dele no meu plano.",
+    );
+    expect(serverBody(pt, "…", meta("model_region", { model: "GLM 5" }))).toBe(
+      "Não consigo responder: o GLM 5 precisa da região Global ligada no OpenCode (Settings\u00a0›\u00a0Privacy).",
+    );
+    expect(card("commands_off")?.planLine).toBe("commands_off");
+    expect(serverBody(pt, "…", meta("commands_off"))).toBe(
+      "Agora não consigo responder: os comandos estão desligados no computador do meu plano.",
+    );
+  });
+
+  test("a wait that doesn't pass by itself names its cause and who fixes it", () => {
+    const wait = (code: string) => ({
+      bodyCode: "brain_unavailable",
+      bodyParams: { brain: "Codex" },
+      brainUnavailable: { brain: "codex", code, machineId: "m1", agentId: "ada" },
+    });
+    expect(serverBody(pt, "…", wait("machine_paused"))).toBe(
+      "O computador em que o Codex roda está pausado. Respondo quando ele for retomado.",
+    );
+    for (const code of ["exec_disabled", "tool_off"])
+      expect(serverBody(pt, "…", wait(code))).toBe(
+        "O Codex está desligado no meu computador. Respondo quando quem cuida dele ligar.",
+      );
+    for (const code of ["runner_outdated", "codex_too_old"])
+      expect(serverBody(pt, "…", wait(code))).toBe(
+        "O programa no meu computador precisa ser atualizado para o Codex responder. Respondo assim que ele for atualizado.",
+      );
+    expect(serverBody(pt, "…", wait("plan_not_owner"))).toBe(
+      "O Codex pensaria com um plano que não é do meu dono, então não uso. Conecte a conta do meu dono na minha página.",
+    );
+    // Its computer gone still waits for it to come back.
+    expect(serverBody(pt, "…", wait("machine_offline"))).toBe(
+      "O Codex não está disponível agora. Respondo quando ele voltar.",
+    );
   });
 });

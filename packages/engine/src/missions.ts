@@ -1154,9 +1154,8 @@ export async function createMission(
     if (!theirs && root.authorUserId) rootAuthor = root.authorUserId;
   }
   if (!channelId) throw new ValidationError("Give the conversation (channelId) or the thread (threadId)");
-  const { channel, membership } = await requireChannelAccess(db, userId, orgId, channelId);
+  const { membership } = await requireChannelAccess(db, userId, orgId, channelId);
   if (!can(membership, "post") || !can(membership, "assign_work")) throw new ForbiddenError();
-  if (channel.kind === "forum") throw new ValidationError("Forum topics have no missions", "mission.invalid");
   const allowed = await eligibleChannelAgents(db, orgId, channelId, [input.agentId], { requesterUserId: userId });
   if (allowed.length === 0) {
     throw new ForbiddenError(

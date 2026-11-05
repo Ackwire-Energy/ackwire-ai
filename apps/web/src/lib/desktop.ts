@@ -45,7 +45,6 @@ const NOTICE_KINDS = [
   "agent_reply",
   "agent_question",
   "approval",
-  "forum_turn",
   "mission_stopped",
   "routine_failed",
   "run_failed",

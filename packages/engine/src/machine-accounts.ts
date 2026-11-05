@@ -57,7 +57,9 @@ import {
   SHARED_SIGN_INS,
   sharedSignIn,
 } from "@agenteschat/providers/plans";
+import { planWindows } from "@agenteschat/ui/plan-state";
 import { recordAudit } from "./audit";
+import { liveModelLimits } from "./brains/select";
 import { BRAIN_PLAN_NAMES } from "./brains/types";
 import { caches } from "./cache";
 import { claudeAuthMethodFor, claudeAuthPolicy } from "./claude-auth-policy";
@@ -72,8 +74,9 @@ import {
 } from "./machines";
 import { recordAccountFailure } from "./operator-events";
 import { can, requirePermission } from "./organizations";
+import { wakeOnRoom } from "./usage-pause";
 
-const { machineAccounts, agents, machines, users } = schema;
+const { machineAccounts, agents, machines, rightHandBrains, users } = schema;
 
 /*
  * Accounts of the computer brains on a connected computer (ADR 0041, ADR
@@ -260,28 +263,29 @@ export async function listMachineAccounts(
     )
     .orderBy(machineAccounts.createdAt, machineAccounts.id);
   if (rows.length === 0) return [];
-  const using = await deps.db
-    .select({ id: agents.id, name: agents.name, accountId: agents.brainAccountId })
-    .from(agents)
-    .where(
-      and(
-        eq(agents.orgId, orgId),
-        inArray(
-          agents.brainAccountId,
-          rows.map((r) => r.account.id),
-        ),
-        isNull(agents.archivedAt),
-      ),
-    )
-    .orderBy(agents.name);
-  return rows.map(({ account, ownerName }) =>
-    accountView(
+  const ids = rows.map((r) => r.account.id);
+  const [using, people] = await Promise.all([
+    deps.db
+      .select({ id: agents.id, name: agents.name, accountId: agents.brainAccountId })
+      .from(agents)
+      .where(and(eq(agents.orgId, orgId), inArray(agents.brainAccountId, ids), isNull(agents.archivedAt)))
+      .orderBy(agents.name),
+    // People's own AI for the team's right hand (ADR 0137 §11): their plan is its too, shown like any agent's.
+    deps.db
+      .select({ id: agents.id, name: agents.name, accountId: rightHandBrains.brainAccountId })
+      .from(rightHandBrains)
+      .innerJoin(agents, and(eq(agents.orgId, rightHandBrains.orgId), isNotNull(agents.builtin)))
+      .where(and(eq(rightHandBrains.orgId, orgId), inArray(rightHandBrains.brainAccountId, ids))),
+  ]);
+  return rows.map(({ account, ownerName }) => {
+    const on = [...using, ...people].filter((a) => a.accountId === account.id);
+    return accountView(
       account,
-      using.filter((a) => a.accountId === account.id),
+      on.filter((a, i) => on.findIndex((b) => b.id === a.id) === i),
       viewerId,
       ownerName,
-    ),
-  );
+    );
+  });
 }
 
 async function accountViewOf(db: Database, orgId: string, row: MachineAccountRow, viewerId: string) {
@@ -303,6 +307,13 @@ export async function releaseAgents(
   only?: readonly string[],
 ) {
   if (accountIds.length === 0 || only?.length === 0) return [];
+  // People's own AI for the right hand (ADR 0137 §11) goes too: their DM is back on the workspace's, not on a sign-in
+  // that waits for its runner to remove it.
+  if (!only) {
+    await db
+      .delete(rightHandBrains)
+      .where(and(eq(rightHandBrains.orgId, orgId), inArray(rightHandBrains.brainAccountId, accountIds)));
+  }
   const ownSignIn = sql`exists (select 1 from ${machines} m where m.id = "agents"."machine_id"
     and m.paired_by_user_id = "agents"."owner_user_id")`;
   const lent = sql`"agents"."brain_account_lent_by" is not null`;
@@ -333,7 +344,7 @@ export const forgetAgents = (orgId: string, ids: string[]) => {
 };
 
 /** The page that shows a machine's accounts refetches them (no emails in the event). */
-const publishAccountsChanged = (pubsub: PubSub | undefined, orgId: string, machineId: string) =>
+export const publishAccountsChanged = (pubsub: PubSub | undefined, orgId: string, machineId: string) =>
   publishMachineUpdated(pubsub, orgId, machineId, { accounts: true });
 
 /** These accounts are being removed: their agents are released now, the rows wait for the runner. */
@@ -571,7 +582,7 @@ async function settleAccount(
     return { row: gone ?? row, duplicate, released, changed: !signingIn };
   }
   // The runner says it when it knows it; one that just started doesn't yet (the last stays).
-  const usage = info.usage ? { usage: info.usage } : {};
+  const usage = info.usage ? { usage: accountReading(row.provider, row.usage, info.usage) } : {};
   if (signingIn) {
     // A login of an account its owner already has here (one per agent) takes that account's name.
     const label =
@@ -612,7 +623,25 @@ async function settleAccount(
     .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id)))
     .returning();
   const released = await unshare(db, orgId, row, shared, now);
-  return { row: fresh ?? row, released, changed: !same || usageMoved(row.usage, info.usage) };
+  const moved = usageMoved(row.usage, usage.usage);
+  if (moved && usage.usage) await wakeOnRoom(db, orgId, machine.id, kindOf(row), row.id, usage.usage, now.getTime());
+  return { row: fresh ?? row, released, changed: !same || moved };
+}
+
+/**
+ * The reading the runner reported for an account, as it is kept: the models still at a limit of their own stay (the
+ * engine keeps them, `noteModelLimit`), and on a plan whose models have their own limits a refusal with no window
+ * full is a model's (`refusalScope`), not the account's.
+ */
+function accountReading(provider: string | null, prev: PlanUsage | null | undefined, next: PlanUsage): PlanUsage {
+  const { limited, models: _, ...rest } = next;
+  const models = liveModelLimits(prev);
+  const perModel = planOf(provider)?.limitsPerModel === true;
+  return {
+    ...rest,
+    ...(limited && !(perModel && !planWindows(next).some((w) => w.used >= 100)) ? { limited } : {}),
+    ...(models ? { models } : {}),
+  };
 }
 
 /**
@@ -778,8 +807,12 @@ export async function storeOwnUsage(deps: MachineAccountDeps, orgId: string, mac
     .update(machines)
     .set({ executors: sql`${machines.executors} || ${JSON.stringify({ ownUsage: next })}::jsonb` })
     .where(where);
-  if (ACCOUNT_KINDS.some((k) => usageMoved(prev[k], next[k])))
-    await publishAccountsChanged(deps.pubsub, orgId, machineId);
+  const moved = ACCOUNT_KINDS.filter((k) => usageMoved(prev[k], next[k]));
+  for (const k of moved) {
+    const usage = own[k];
+    if (usage) await wakeOnRoom(deps.db, orgId, machineId, k, undefined, usage).catch(() => []);
+  }
+  if (moved.length) await publishAccountsChanged(deps.pubsub, orgId, machineId);
 }
 
 /**
@@ -1092,7 +1125,7 @@ export async function beginAccountLogin(
   const shared =
     protocol >= (kind === "codex" ? SHARED_CODEX_PROTOCOL : SHARED_ACCOUNTS_PROTOCOL) && sharedSignIn(kind, provider);
   const again = accountId !== undefined;
-  // A Claude subscription sign-in for all agents (ADR 0146): a new one takes the policy's method once, kept on its
+  // A Claude subscription sign-in for all agents (ADR 0149): a new one takes the policy's method once, kept on its
   // row; signing in again keeps the row's, whatever the policy says now (none known: the runner does as before).
   let method: ClaudeLoginMethod | undefined;
   if (kind === "claude_code" && provider === undefined && (again || shared)) {

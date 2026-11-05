@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { firstMentioned, parseMarkdown, tableAt } from "../src/lib/markdown";
+import { detailsAt, firstMentioned, parseMarkdown, readsAsPageTitle, tableAt } from "../src/lib/markdown";
 
 describe("mentions", () => {
   test("the first agent a text @mentions, as the backend reads it: any case, never an email", () => {
@@ -40,4 +40,70 @@ describe("tables", () => {
     expect(tableAt(["a | b", "c | d"], 0)).toBeNull();
     expect(parseMarkdown("a | b\nc | d").map((b) => b.type)).toEqual(["paragraph"]);
   });
+});
+
+describe("collapsed details (ADR 0147)", () => {
+  const text = [
+    "Falta dar acesso ao repositório.",
+    "<details>",
+    "<summary>Detalhes</summary>",
+    "",
+    "<details><summary>Mais</summary>",
+    "dentro",
+    "</details>",
+    "```",
+    "</details>",
+    "```",
+    "</details>",
+    "Depois.",
+  ].join("\n");
+
+  test("a block of its own, right under a sentence; one nested or fenced inside doesn't close it", () => {
+    const blocks = parseMarkdown(text, { breaks: true, details: true });
+    expect(blocks.map((b) => b.type)).toEqual(["paragraph", "details", "paragraph"]);
+    expect(blocks[1]).toEqual({
+      type: "details",
+      summary: "Detalhes",
+      body: "<details><summary>Mais</summary>\ndentro\n</details>\n```\n</details>\n```",
+    });
+  });
+
+  test("off by default (an editor keeps the source as written), and unclosed it runs to the end", () => {
+    expect(parseMarkdown(text).some((b) => b.type === "details")).toBe(false);
+    expect(detailsAt(["<details>", "linha"], 0)).toEqual({
+      details: { type: "details", summary: "", body: "linha" },
+      next: 2,
+    });
+    expect(detailsAt(["<details open>"], 0)).toBeNull();
+  });
+
+  test("on one line, as the prompt shows it, or closed at the end of its last line", () => {
+    const one = parseMarkdown(
+      "Feito.\n\n<details><summary>Detalhes</summary> O GitHub respondeu 404. </details>\nDepois.",
+      {
+        breaks: true,
+        details: true,
+      },
+    );
+    expect(one.map((b) => b.type)).toEqual(["paragraph", "details", "paragraph"]);
+    expect(one[1]).toEqual({ type: "details", summary: "Detalhes", body: "O GitHub respondeu 404." });
+    expect(detailsAt(["<details>", "<summary>Mais</summary>", "linha", "fim</details>", "fora"], 0)).toEqual({
+      details: { type: "details", summary: "Mais", body: "linha\nfim" },
+      next: 4,
+    });
+    expect(
+      detailsAt(["<details><summary>A</summary>", "<details><summary>B</summary>x</details>", "y</details>"], 0),
+    ).toEqual({
+      details: { type: "details", summary: "A", body: "<details><summary>B</summary>x</details>\ny" },
+      next: 3,
+    });
+  });
+});
+
+test("a [[link]] to no page reads as a page's name; a bracketed sentence doesn't", () => {
+  expect(readsAsPageTitle("Plano de férias")).toBe(true);
+  expect(readsAsPageTitle("Processos/Onboarding#Primeiro dia")).toBe(true);
+  expect(readsAsPageTitle("Ada está verificando os registros de recebimento e envio.")).toBe(false);
+  expect(readsAsPageTitle("Isso já foi resolvido?")).toBe(false);
+  expect(readsAsPageTitle("a".repeat(81))).toBe(false);
 });

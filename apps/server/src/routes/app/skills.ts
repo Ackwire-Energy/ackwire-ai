@@ -328,8 +328,7 @@ export function skillRoutes(deps: AppDeps) {
                 // Base64 of a zip holding all a skill keeps (text and scripts, plus its images and other files).
                 .max(Math.ceil(((SKILL_LIMITS.maxBytes + SKILL_LIMITS.assetBytes) * 4) / 3) + 1_000_000)
                 .openapi({
-                  description:
-                    "The skill folder as a zip, base64 (≤ 2 MB of text and scripts and 20 MB of other files unzipped).",
+                  description: `The skill folder as a zip, base64 (≤ ${SKILL_LIMITS.maxBytes / 1024 / 1024} MB of text and scripts and ${SKILL_LIMITS.assetBytes / 1024 / 1024} MB of other files unzipped).`,
                 }),
             }),
           ]),

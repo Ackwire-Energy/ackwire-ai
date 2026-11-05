@@ -67,37 +67,36 @@
   font-size: 12.5px;
   color: var(--faint);
 }
+/* A row's action: words only, as `.cq-link`; its height is the first line's, so the sentence and it share a middle. */
 .ag-rc__btn {
   flex: none;
   display: inline-flex;
   align-items: center;
   gap: 5px;
   min-height: var(--control-h-sm);
-  padding: 0 10px;
+  padding: 0;
   border: 0;
-  border-radius: var(--control-r-sm);
   background: none;
-  color: var(--ink);
+  color: var(--agent);
   font: inherit;
   font-weight: 600;
   font-size: 14px;
+  text-decoration: none;
+  white-space: nowrap;
   cursor: pointer;
-  transition:
-    background 0.15s,
-    transform 0.1s;
 }
 .ag-rc__btn:hover {
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-}
-.ag-rc__btn:active {
-  transform: scale(0.97);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .ag-rc__btn:disabled {
-  opacity: 0.55;
+  color: var(--faint);
+  text-decoration: none;
   cursor: default;
 }
 html:not([data-pointer]) .ag-rc__btn:focus-visible {
   outline: none;
+  border-radius: 4px;
   box-shadow: var(--focus-ring);
 }
 .ag-rc__time {
@@ -146,7 +145,7 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
   align-items: center;
   gap: 8px;
   min-height: 40px;
-  padding: 4px 6px 4px 12px;
+  padding: 4px 12px;
   font-size: 14px;
   color: var(--muted);
 }
@@ -162,7 +161,7 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
   align-items: flex-start;
   gap: 8px;
   min-height: 38px;
-  padding: 3px 6px 3px 12px;
+  padding: 3px 12px;
   border-top: 0.5px solid var(--line2);
   font-size: 13.5px;
   color: var(--ink2);
@@ -174,28 +173,36 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
 }
 .ag-rcg__it .ag-rc__btn {
   font-size: 13px;
+}
+.ag-rcg__it .ag-rc__btn:enabled {
   color: var(--muted);
 }
-.ag-rcg__it .ag-rc__btn:hover {
+.ag-rcg__it .ag-rc__btn:enabled:hover {
   color: var(--ink);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ag-rc__btn {
-    transition: none;
-  }
-}
-/* A webhook routine's address to copy: under the sentence, the button's own inset lined up with the text. */
+/* A webhook routine's address to copy: under the sentence, lined up with it. */
 .ag-rc__extra {
   display: flex;
-  margin: 4px 0 -2px -10px;
+  margin: 4px 0 -2px;
 }
 /* A hand-off by direct message: the two agents' pair row with the reach rows, no reply face to line up with. */
 .ag-rc--talk {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+/* With an action beside it: the pair row's height and type, right after its words (no room kept for the chevron). */
+.ag-rc--talk > .ag-rc__btn {
+  min-height: 26px;
+  font-size: 13px;
+}
+.ag-rc--talk:has(> .ag-rc__btn) {
+  gap: 2px;
+}
+.ag-rc--talk:has(> .ag-rc__btn) .consult-pair__chev {
+  display: none;
 }
 .ag-rcs .ag-rc--talk > .consult-pair {
   margin: 0;

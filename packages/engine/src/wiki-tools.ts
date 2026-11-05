@@ -1,4 +1,3 @@
-import { and, eq, schema } from "@agenteschat/db";
 import { type ActionRecord, actWithUndo } from "./agent-actions";
 import { cutText } from "./format";
 import { personBehindCall, wikiActorOfCall } from "./requester";
@@ -25,20 +24,6 @@ const failed = (error: unknown): ToolOutput => ({
 /** Shown when an agent tries to write without being asked. */
 export const WIKI_WRITE_REFUSAL =
   'Not allowed: write to the wiki only when a person asks in the current message ("save this to the wiki", "document…"; in Portuguese "salva isso na wiki", "documenta…"). Offer to save it instead.';
-
-/**
- * Who asked: the person behind the run (`authority.ts`). Forum turns, routines and agents' own
- * messages are nobody's request, so agents can't write the wiki on their own there.
- */
-async function requester(ctx: ToolContext): Promise<string | null> {
-  const [m] = await ctx.db
-    .select({ meta: schema.messages.meta })
-    .from(schema.messages)
-    .where(and(eq(schema.messages.id, ctx.triggerMessageId), eq(schema.messages.orgId, ctx.orgId)));
-  const forum = (m?.meta as { forum?: { kickoff?: boolean } } | undefined)?.forum;
-  if (forum?.kickoff) return null;
-  return personBehindCall(ctx);
-}
 
 /**
  * The receipt of a wiki edit (none when the text came out the same). Everyone in the channel sees it, so a restricted
@@ -79,7 +64,8 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
   const pageRef = { type: "string", minLength: 1, maxLength: 200, description: "Page title or slug" };
 
   async function writer(ctx: ToolContext): Promise<WikiActor | null> {
-    const userId = await requester(ctx);
+    // Routines and agents' own messages are nobody's request: agents never write the wiki on their own.
+    const userId = await personBehindCall(ctx);
     return userId ? { type: "agent", agentId: ctx.agentId, requestedByUserId: userId, channelId: ctx.channelId } : null;
   }
 

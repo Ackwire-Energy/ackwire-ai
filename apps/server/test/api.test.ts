@@ -78,6 +78,7 @@ describe("sign-up policy (self-host)", () => {
         standing: { state: "active", reason: null },
         start: { page: "home", channelId: null },
         showActivity: false,
+        agentStyle: null,
       },
     ] as never);
   });

@@ -7,6 +7,7 @@ export type RolePermission =
   | "administrator"
   | "post"
   | "create_channels"
+  | "mention_everyone"
   | "manage_channels"
   | "talk_to_agents"
   | "assign_work"

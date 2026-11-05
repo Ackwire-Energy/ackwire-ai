@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AudienceChip } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { useOpenAgentPanel } from "@/components/agent-panel-context";
+import { useAgentPanelShown, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { ComputerButton } from "@/components/computer/ComputerDialog";
 import { ErrorState } from "@/components/Loading";
 import { NavToggle } from "@/components/NavDrawer";
@@ -145,7 +145,7 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
         ...(rightHand && agent
           ? {
               composerLabel: `${t("channel.composerDm", { name })} · ${t("rightHand.composerHint")}`,
-              intro: <RightHandIntro agent={agent} />,
+              intro: <RightHandIntro agent={agent} channelId={dm.data.channelId} />,
             }
           : {}),
         dmAgentId: agent?.id,
@@ -179,6 +179,7 @@ function DmWho({
   children: ReactNode;
 }) {
   const openPanel = useOpenAgentPanel();
+  const shown = useAgentPanelShown();
   return (
     <div className="dm-who">
       {children}
@@ -187,6 +188,7 @@ function DmWho({
           type="button"
           className="profile-trigger dm-who__hit"
           aria-label={label}
+          aria-expanded={shown === agentId}
           onClick={() => openPanel?.(agentId)}
         />
       ) : userId ? (

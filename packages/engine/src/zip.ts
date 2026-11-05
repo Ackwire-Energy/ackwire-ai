@@ -31,20 +31,23 @@ export function listZip(buffer: Uint8Array): ZipListing[] {
       break;
     }
   }
-  if (eocd < 0) throw new ValidationError("Not a zip file");
+  if (eocd < 0) throw new ValidationError("Not a zip file", "skill.bad_zip");
   const count = view.getUint16(eocd + 10, true);
   let offset = view.getUint32(eocd + 16, true);
   // Past what these fields hold, writers (git archive among them) put their maximum here and the real values in a
   // zip64 record, whose locator sits just before: read as they are, they would list only the first 65,535 files.
   const zip64 = eocd >= 20 && view.getUint32(eocd - 20, true) === 0x07064b50;
   if (zip64 && (count === 0xffff || offset === 0xffffffff)) {
-    throw new ValidationError("Too many files to read (max 65,535)");
+    throw new ValidationError("Too many files to read (max 65,535)", "skill.too_many_files", {
+      files: "65,535+",
+      max: 65_535,
+    });
   }
   const decoder = new TextDecoder();
   const files: ZipListing[] = [];
   for (let n = 0; n < count; n++) {
     if (offset + 46 > buffer.length || view.getUint32(offset, true) !== 0x02014b50) {
-      throw new ValidationError("Corrupt zip (central directory)");
+      throw new ValidationError("Corrupt zip (central directory)", "skill.bad_zip");
     }
     const nameLength = view.getUint16(offset + 28, true);
     const path = decoder.decode(buffer.subarray(offset + 46, offset + 46 + nameLength));
@@ -66,18 +69,18 @@ export function listZip(buffer: Uint8Array): ZipListing[] {
 
 /** One file's bytes, inflated to exactly its declared size (so a zip bomb can't grow past what was checked). */
 export function inflateZipEntry(buffer: Uint8Array, entry: ZipListing): Uint8Array {
-  if (entry.flags & 0x1) throw new ValidationError("Encrypted zips are not supported");
+  if (entry.flags & 0x1) throw new ValidationError("Encrypted zips are not supported", "skill.bad_zip");
   const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   if (entry.local + 30 > buffer.length || view.getUint32(entry.local, true) !== 0x04034b50) {
-    throw new ValidationError("Corrupt zip (local header)");
+    throw new ValidationError("Corrupt zip (local header)", "skill.bad_zip");
   }
   const start = entry.local + 30 + view.getUint16(entry.local + 26, true) + view.getUint16(entry.local + 28, true);
   const raw = buffer.subarray(start, start + entry.compressed);
   let data: Uint8Array;
   if (entry.method === 0) data = raw;
   else if (entry.method === 8) data = new Uint8Array(inflateRawSync(raw, { maxOutputLength: Math.max(1, entry.size) }));
-  else throw new ValidationError(`Unsupported compression in ${entry.path}`);
-  if (data.byteLength !== entry.size) throw new ValidationError(`Corrupt zip entry ${entry.path}`);
+  else throw new ValidationError(`Unsupported compression in ${entry.path}`, "skill.bad_zip");
+  if (data.byteLength !== entry.size) throw new ValidationError(`Corrupt zip entry ${entry.path}`, "skill.bad_zip");
   return data;
 }
 

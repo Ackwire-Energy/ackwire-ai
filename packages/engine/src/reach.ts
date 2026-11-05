@@ -96,8 +96,8 @@ export async function reachOfMessage(db: Database, message: Pick<Message, "orgId
 
 /**
  * Of the agents outside a conversation a run's reply @names (handles), the ones `settleReach` will hand it to as a
- * note: those whoever is behind the run may talk to and that aren't in its chain, from any conversation but the forum
- * and the agents' DM. For them the mention is no unkept hand-off.
+ * note: those whoever is behind the run may talk to and that aren't in its chain, from any conversation but the
+ * agents' DM. For them the mention is no unkept hand-off.
  */
 export async function reachWillHand(
   db: Database,
@@ -105,7 +105,7 @@ export async function reachWillHand(
   channel: { kind: string; dmKey: string | null },
   handles: string[],
 ): Promise<string[]> {
-  if (handles.length === 0 || channel.kind === "forum" || isAgentOnlyDm(channel)) return [];
+  if (handles.length === 0 || isAgentOnlyDm(channel)) return [];
   const behind = { orgId: run.orgId, id: run.triggerMessageId, agentRunId: run.id, meta: {} };
   const { person } = await reachOfMessage(db, behind);
   const [rows, talks, chain] = await Promise.all([
@@ -183,7 +183,8 @@ export async function settleReach(
       }
       if (
         deps.gateway &&
-        (await agentAiState({ db, gateway: deps.gateway, machines: deps.machines }, a)).state === "no_ai"
+        (await agentAiState({ db, gateway: deps.gateway, machines: deps.machines }, a, undefined, person ?? undefined))
+          .state === "no_ai"
       ) {
         entries.push({ agentId: a.id, handle: a.handle, reason: "not_in_channel", noAi: true });
         continue;

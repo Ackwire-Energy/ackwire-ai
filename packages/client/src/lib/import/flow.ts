@@ -9,6 +9,7 @@ import type {
   ImportSkipReason,
   MigrationBundle,
 } from "../../api/types";
+import { forbiddenText } from "../errors";
 import { joinNames } from "../format";
 import {
   type AgentFile,
@@ -254,7 +255,7 @@ export function importFailureText(
   const network = step === "plan" || (step === "read" && from === "link");
   if (network && offline(cause)) return t("onboarding.import.errors.offline");
   if (cause instanceof ApiError && cause.status === 413) return t("onboarding.import.errors.tooBig");
-  if (cause instanceof ApiError && cause.status === 403) return t("common.notAllowed");
+  if (cause instanceof ApiError && cause.status === 403) return forbiddenText(t, cause);
   if (step === "plan" && cause instanceof ApiError && cause.status === 400) {
     return t("onboarding.import.errors.invalidBundle");
   }
@@ -266,7 +267,7 @@ export function importFailureText(
 export function importApplyErrorText(t: TFunction, error: unknown, offline: (e: unknown) => boolean) {
   if (offline(error)) return t("onboarding.import.errors.offline");
   if (error instanceof ApiError && error.status === 413) return t("onboarding.import.errors.tooBig");
-  if (error instanceof ApiError && error.status === 403) return t("common.notAllowed");
+  if (error instanceof ApiError && error.status === 403) return forbiddenText(t, error);
   if (error instanceof ApiError && error.code === "import.too_many_items") return t("onboarding.import.errors.tooMany");
   return t("onboarding.import.errors.apply");
 }

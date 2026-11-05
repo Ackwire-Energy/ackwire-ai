@@ -4,7 +4,8 @@
 // each line to the log.
 // The state file (read again for each request) is the desktop:
 //   { snapshot, boxes: { "<bus> <path>": box | null }, windows, hello, apps, jpeg (what a capture holds),
-//     crash: "<op>" (exits instead of answering), fail: { "<op>": { code, error } }, garbage: "<op>" }
+//     crash: "<op>" (exits instead of answering), fail: { "<op>": { code, error } }, garbage: "<op>",
+//     typing: true (an `input` goes on until SIGUSR1 stops it, as the real one's keys do) }
 // Boxes and windows the state doesn't give come from the snapshot.
 import { appendFileSync, readFileSync } from "node:fs";
 
@@ -14,6 +15,12 @@ log({ start: { env: process.env, cwd: process.cwd(), argv: process.argv.slice(4)
 
 const state = () => JSON.parse(readFileSync(stateFile, "utf8"));
 const out = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);
+let typing = null;
+process.on("SIGUSR1", () => {
+  log({ signal: "SIGUSR1" });
+  if (typing !== null) out({ id: typing, ok: false, code: "stopped", error: "a person took control" });
+  typing = null;
+});
 
 function answer(req, s) {
   const snap = s.snapshot;
@@ -69,6 +76,10 @@ process.stdin.on("data", (chunk) => {
     if (s.crash === req.op) process.exit(3);
     if (s.garbage === req.op) {
       process.stdout.write("this is not json\n");
+      continue;
+    }
+    if (s.typing && req.op === "input") {
+      typing = req.id;
       continue;
     }
     const failure = s.fail?.[req.op];

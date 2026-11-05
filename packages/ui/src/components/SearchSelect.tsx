@@ -1,6 +1,7 @@
 import { Popover as RPopover } from "radix-ui";
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { cx } from "../cx";
+import { EDGE_ROOM } from "../floating";
 import { matchesWords } from "../search";
 import { useFieldControl } from "./Field";
 import type { SelectOption } from "./Select";
@@ -163,7 +164,7 @@ export function SearchSelect<V extends string = string, O extends SelectOption<V
           </button>
         </RPopover.Trigger>
         <RPopover.Portal>
-          <RPopover.Content className="ac-menu ac-tz__menu" align="start" sideOffset={4}>
+          <RPopover.Content className="ac-menu ac-tz__menu" align="start" sideOffset={4} collisionPadding={EDGE_ROOM}>
             <div className="ac-tz__searchrow">
               <SearchField
                 size="sm"

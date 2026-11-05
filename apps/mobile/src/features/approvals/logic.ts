@@ -20,8 +20,14 @@ export {
 } from "@agenteschat/client/lib/approval-kind";
 export { approveAlwaysHint, approveAlwaysLabel } from "@agenteschat/client/lib/approval-words";
 
-/** The toast after "Aprovar sempre": the agent won't ask for this again, and where to undo it (its profile). */
-export function approveAlwaysToast(t: TFunction, name: string) {
+/**
+ * The toast after "Aprovar sempre": the agent won't ask for this again, and where to undo it (its profile). With
+ * `routine` ("Sempre nesta rotina"): that routine won't, and the place is its settings.
+ */
+export function approveAlwaysToast(t: TFunction, name: string, routine?: string | null) {
+  if (routine) {
+    return { title: t("approval.always.doneRoutine", { routine }), subtitle: t("approval.always.undoRoutine") };
+  }
   return { title: t("approval.always.done", { name }), subtitle: t(`mobile.approval.alwaysUndo${genderOf(name)}`) };
 }
 

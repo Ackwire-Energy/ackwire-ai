@@ -1,8 +1,8 @@
 # 0083. Groups of agents
 
-- Status: Accepted. Amended 2026-10-30: §4 and §5 (a person's lists show only the agents that answer them, unless they manage agents). Amended 2026-11-03: §4 and §5 (the sidebar's AGENTES part comes back with the groups, "Fixar no topo" in every section, §7)
+- Status: Accepted. Amended 2026-10-30: §4 and §5 (a person's lists show only the agents that answer them, unless they manage agents). Amended 2026-11-03: §4 and §5 (the sidebar's AGENTES part comes back with the groups, "Fixar no topo" in every section, §7). Amended 2026-11-04: groups are shown as setores with a color, an icon, a lead and a substitute, managed on Equipe › Setores (ADR 0148)
 - Date: 2026-10-30
-- Code: `packages/db/src/schema/agents.ts` (`agent_groups`, `agents.group_id`, `agents.group_position`), `packages/engine/src/agent-groups.ts`, `apps/server/src/routes/app/agents.ts`, `packages/client/src/lib/agent-groups.ts`, `apps/web/src/components/AgentGroups.tsx`, `apps/web/src/components/TeamGroups.tsx`, `apps/mobile/src/features/agents/AgentsScreen.tsx`; sidebar view and pins: `packages/engine/src/sidebar-items.ts` (`SidebarView`), `packages/client/src/lib/sidebar-view.ts`, `apps/web/src/components/Sidebar.tsx`, `apps/web/src/hooks/useSidebarPins.ts`, `apps/mobile/src/features/chats/pins.ts`
+- Code: `packages/db/src/schema/agents.ts` (`agent_groups`, `agents.group_id`, `agents.group_position`), `packages/engine/src/agent-groups.ts`, `apps/server/src/routes/app/agents.ts`, `packages/client/src/lib/agent-groups.ts`, `apps/web/src/components/AgentGroups.tsx`, `apps/web/src/components/team/TeamSectors.tsx`, `apps/mobile/src/features/agents/AgentsScreen.tsx`; sidebar view and pins: `packages/engine/src/sidebar-items.ts` (`SidebarView`), `packages/client/src/lib/sidebar-view.ts`, `apps/web/src/components/Sidebar.tsx`, `apps/web/src/hooks/useSidebarPins.ts`, `apps/mobile/src/features/chats/pins.ts`
 
 ## Context
 
@@ -36,3 +36,7 @@ A workspace with many agents (an import brings twenty or more, for several compa
 - Pins are ids the server doesn't check against channels, agents or people: the apps show only the ones the person still sees, and a stale one costs one of the five places until it is unpinned. Checking them would mean reading three tables on every save for no visible gain.
 - "Trabalhando primeiro" reorders as agents start and stop; a drop while it is on lands by what the person sees, which can differ from the workspace's order inside the group.
 - An import run twice makes its groups twice unless the importer looks for a group of the same name first (`listAgentGroups`).
+
+## Amendment (2026-11-04): groups are setores (ADR 0148)
+
+The groups are shown as setores ("departments" in English): the same rows, the same moves and the same permissions. Each one gains a color and an icon (the roles' sets, never sky), a lead and a substitute (`agent_groups.color`, `icon`, `lead_user_id`, `backup_user_id`, migration 0219, set with `PATCH …/agent-groups/{groupId}`). Equipe's "Grupos de agentes" card became Equipe › Setores, one card per setor. The sidebar's headers carry the setor's mark.

@@ -50,3 +50,19 @@ test("an agent's repositories: read, replace in order, refuse what isn't a repos
   });
   expect(JSON.stringify(listing)).not.toContain("ghp_");
 });
+
+test("where an agent merges without asking: read and replace; exact repositories only; its owner or an admin", async () => {
+  t = await createTestServer({ http });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const path = `/api/app/organizations/${orgId}/agents/${agentId}/merge-repositories`;
+
+  expect(await (await owner(path)).json()).toEqual({ repositories: [] });
+  const saved = await owner(path, { method: "PUT", json: { repositories: ["acme/app"] } });
+  expect(saved.status).toBe(200);
+  expect(await saved.json()).toEqual({ repositories: ["acme/app"] });
+  expect(await (await owner(path)).json()).toEqual({ repositories: ["acme/app"] });
+  expect((await owner(path, { method: "PUT", json: { repositories: ["acme/*"] } })).status).toBe(400);
+  expect((await browser(t)(path)).status).toBe(401);
+});

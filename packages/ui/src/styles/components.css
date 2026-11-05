@@ -1212,6 +1212,15 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   color: var(--attention);
   background: color-mix(in srgb, var(--attention) 18%, transparent);
 }
+/* A mentioned agent: its own tone, worked out per theme (`mentionTone`). */
+.ac-mention--agent {
+  color: var(--mention-ink);
+  background: var(--mention-bg);
+}
+[data-theme="dark"] .ac-mention--agent {
+  color: var(--mention-ink-dark);
+  background: var(--mention-bg-dark);
+}
 /* With Markdown blocks, the cursor follows the last block's text. */
 .ac-msg--streaming .ac-msg__text:has(> .md)::after {
   content: none;
@@ -1848,6 +1857,12 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   width: 32px;
   height: 32px;
   font-size: var(--text-sm);
+}
+/* The empty choice ("Sem responsável", any agent) leads with a glyph: in the middle of the faces' 32px column, so its
+   name starts where theirs do. */
+.ac-menu--select:has(.ac-menu__leading > .ac-avatar) .ac-menu__leading:has(> .ac-icon) {
+  justify-content: center;
+  width: 32px;
 }
 /* Two lines (a name and its description): the room above and below matches the sides, as a one-line row's does. */
 .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) {
@@ -5296,7 +5311,7 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   filter: brightness(1.14);
 }
 /* A mention on the bubble: a translucent chip, so it reads on the bubble's gray in both themes. */
-.ac-msg--own .ac-msg__text :is(.ac-mention, code:not(pre code)) {
+.ac-msg--own .ac-msg__text :is(.ac-mention:not(.ac-mention--agent), code:not(pre code)) {
   background: rgb(127 127 127 / 0.16);
 }
 /* Sending: the bubble waits, quieter; not sent: a danger outline, the words kept. */
@@ -7889,6 +7904,91 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
 }
 
 /*
+ * Every inner page's header (PageHeader): the title, 28px on a 40px line (the height of the page's buttons, so they
+ * centre on it), the page's line under it (always there, always one line), the buttons at the end of the title's line,
+ * then the page's bar. One shape and one height on every page, so a title and what follows start at the same place
+ * wherever you go.
+ */
+.ac-pagehead {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.ac-pagehead__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+.ac-pagehead__text {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.ac-pagehead__titleline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ac-pagehead__title {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.ac-pagehead__meta {
+  min-height: 20px;
+  margin: -2px 0 0;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ac-pagehead__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-left: auto;
+}
+.ac-pagehead__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  min-width: 0;
+}
+/* A phone: the buttons take their own row under the title, as wide as it, without their keys. */
+@media (max-width: 760px) {
+  .ac-pagehead__title {
+    font-size: 24px;
+    line-height: 36px;
+  }
+  .ac-pagehead__actions {
+    flex-basis: 100%;
+    min-height: 0;
+  }
+  .ac-pagehead__actions > .ac-btn:not(.ac-btn--icon) {
+    flex: 1 1 auto;
+  }
+  .ac-pagehead__actions .ac-btn__kbd {
+    display: none;
+  }
+}
+
+/*
  * List toolbars: Toolbar + SearchField + FilterChip / FilterToggle. One
  * shape from the control ruler: a list's row is compact (`--tool-h` 32, r10;
  * 40 r12 on touch), the field background and hairline; pressed or set =
@@ -8484,7 +8584,7 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
 }
 .ac-popover,
 .ac-menu--dropdown {
-  max-width: calc(100vw - 16px);
+  max-width: calc(100vw - 24px);
 }
 /* Narrow: the formatting buttons share one row with emoji, attach and send, and scroll sideways. */
 @media (max-width: 760px) {
@@ -8645,20 +8745,6 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
 .ac-crit-pixels {
   display: block;
   image-rendering: pixelated;
-}
-/* The forum's pixels (ForumPixels.tsx): the round track, stance lanes, convergence. */
-.ac-round-track,
-.ac-stance-lane,
-.ac-convergence {
-  display: block;
-  image-rendering: pixelated;
-  flex: none;
-}
-.ac-round-track--big {
-  height: auto;
-}
-.ac-round-track.is-clickable {
-  cursor: pointer;
 }
 /* An agent at work: a 4px dithered line along the bottom of its holder. */
 .ac-work-sweep {

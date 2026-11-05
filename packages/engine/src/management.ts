@@ -131,7 +131,7 @@ export async function updateOrgSettings(
   if (input.name !== undefined && input.name.trim() === "") throw new ValidationError("name can't be empty");
   for (const model of [input.routerModel, input.summaryModel]) {
     if (!model) continue;
-    const info = await modelInfoFor(db, model);
+    const info = await modelInfoFor(db, model, orgId);
     if (!info) throw new ValidationError(`Unknown model ${model}`);
     // Routing and summaries answer through a JSON schema.
     if (info.structuredOutput === false) throw new ValidationError(`${model} can't follow a JSON schema`);
@@ -140,7 +140,7 @@ export async function updateOrgSettings(
     for (const [tier, model] of Object.entries(tiers ?? {})) {
       if (!MODEL_TIERS.includes(tier as ModelTier)) throw new ValidationError(`autoModels has no tier ${tier}`);
       if (model === null) continue;
-      if ((await modelInfoFor(db, model))?.provider !== provider)
+      if ((await modelInfoFor(db, model, orgId))?.provider !== provider)
         throw new ValidationError(`autoModels.${provider}.${tier} must be one of ${provider}'s models`);
     }
   }

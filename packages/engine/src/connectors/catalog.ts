@@ -87,7 +87,10 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       ),
       "pr.read": s("Read pull requests", "List and read pull requests and their checks."),
       "pr.write": s("Open pull requests", "Open pull requests and comment on them."),
-      "pr.merge": s("Merge pull requests", "Merge a pull request. Always asks for approval."),
+      "pr.merge": s(
+        "Merge pull requests",
+        "Merge a pull request. Asks for approval, except in the repositories chosen on the agent's page.",
+      ),
       "issues.read": s("Read issues", "List and read GitHub issues."),
       "issues.write": s("Write issues", "Create issues and comment."),
       "actions.read": s("Read Actions", "List workflows and runs and read their jobs and logs."),

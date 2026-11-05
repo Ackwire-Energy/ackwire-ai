@@ -1,14 +1,6 @@
 import { and, asc, type Database, desc, eq, gte, inArray, lt, rowsOf, schema, sql } from "@agenteschat/db";
 
-export type SearchKind =
-  | "message"
-  | "context_item"
-  | "issue"
-  | "forum_topic"
-  | "forum_reply"
-  | "file"
-  | "wiki"
-  | "action";
+export type SearchKind = "message" | "context_item" | "issue" | "file" | "wiki" | "action";
 
 export interface SearchDocument {
   orgId: string;
@@ -100,7 +92,6 @@ const CARD_META_KEYS = [
   "questionId",
   "secretRequest",
   "actionCard",
-  "forumSuggestion",
   "browserHandoff",
   "missionPlan",
   "missionCommand",

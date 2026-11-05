@@ -30,7 +30,7 @@ import { type GrokBrainTurnRequest, handleGrokBrainTurn } from "./brain-grok";
 import { handleOpencodeBrainTurn, type OpencodeBrainTurnRequest } from "./brain-opencode";
 import { routeWithPlan } from "./brain-route";
 import { type BrowserManager, browserSetupText } from "./browser";
-import { commandApproval, ownBranches } from "./command-gate";
+import { allowedMerge, commandApproval, ownBranches } from "./command-gate";
 import type { DesktopManager } from "./desktop";
 import { type DesktopSessions, hostMemAvailable, MIN_FREE_BYTES } from "./desktop-session";
 import { RunnerError, toMachineError } from "./errors";
@@ -251,6 +251,8 @@ export interface HandlerContext {
   streams?: DataSockets;
   /** Protocol 21: the agents' use of their own desktops (ADR 0062); without it the runner refuses `desktop.look`… */
   desktopUse?: DesktopManager;
+  /** A person takes control of the agent's desktop: what the agent's pointer and keys are doing stops. */
+  desktopTaken?: (agentId: string) => void;
 }
 
 export interface RequestScope {
@@ -329,7 +331,9 @@ async function doExec(
   // our git proxy would refuse it anyway (`never`).
   const held = await commandApproval(command, { cwd, own: ownBranches(req.agent), how: ASK_AGAIN, script: true });
   if (held?.never) throw new RunnerError("not_allowed", held.message);
-  if (held && req.approved !== true) throw new RunnerError("approval_needed", held.message);
+  const merge =
+    held && req.approved !== true ? await allowedMerge(command, { cwd, repos: req.mergeRepos ?? [] }) : null;
+  if (held && req.approved !== true && !merge) throw new RunnerError("approval_needed", held.message);
   let env = secrets?.env;
   let redact = secrets;
   if (sealed && req.agent) {
@@ -339,7 +343,7 @@ async function doExec(
     env = { ...(env ?? {}), ...Object.fromEntries(keys.map((k) => [k.name, k.value])) };
     redact = await agentSecrets(ctx.secretsDir, req.agent);
   }
-  return runCommand({
+  const result = await runCommand({
     command,
     cwd,
     timeoutSeconds: clampInt(req.timeoutSeconds, 1, 24 * 3600, 60),
@@ -348,6 +352,7 @@ async function doExec(
     ...(env ? { env } : {}),
     ...(redact ? { redact: redact.redact, redactHold: redact.hold } : {}),
   });
+  return merge ? { ...result, merge } : result;
 }
 
 /**
@@ -725,10 +730,13 @@ async function handleStream(
       if (ctx.paused?.()) throw new RunnerError("paused", PAUSED);
       await ctx.desktops.ensure(agent);
     }
+    if (req.mode === "control") ctx.desktopTaken?.(agent.id);
     // A switch to control in place (protocol 30) is new work too, as a control stream's open is.
     await openDesktopStream(ctx.desktops, agent, req.mode, dial, (mode) => {
       requireTool(ctx, "desktop");
-      if (mode === "control" && ctx.paused?.()) throw new RunnerError("paused", PAUSED);
+      if (mode !== "control") return;
+      if (ctx.paused?.()) throw new RunnerError("paused", PAUSED);
+      ctx.desktopTaken?.(agent.id);
     });
   } else if (req.kind === "terminal") {
     requireTool(ctx, "terminal");

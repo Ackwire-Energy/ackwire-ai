@@ -55,7 +55,6 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
     "cancel_reminder",
     "schedule_action",
   ],
-  "forum:write": ["suggest_forum_topic", "open_forum_topic", "post_in_forum", "read_forum_topic"],
   "wiki:read": ["search_wiki", "read_wiki_page"],
   "wiki:write": ["create_wiki_page", "update_wiki_page", "link_to_wiki"],
   "vault:read": ["vault_list"],
@@ -71,6 +70,9 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
     "offer_approvals",
     "propose_member_changes",
     "offer_open_page",
+    "set_team_week",
+    "offer_answers",
+    "propose_team",
   ],
   "sandbox:run": [
     "run_code",
@@ -176,16 +178,6 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
     label: "Schedule an action",
     description: "Prepares a connected app's action for a set time. A person approves it now.",
   },
-  suggest_forum_topic: {
-    label: "Suggest forum topic",
-    description: "Suggests a discussion among agents. A person opens it.",
-  },
-  open_forum_topic: {
-    label: "Open forum topic",
-    description: "Takes a subject to a discussion among agents when a person asks.",
-  },
-  post_in_forum: { label: "Post in forum", description: "Posts in a topic outside its own turn." },
-  read_forum_topic: { label: "Read forum topic", description: "Reads a topic's goal and replies." },
   search_wiki: { label: "Search wiki", description: "Searches the organization's wiki pages." },
   read_wiki_page: { label: "Read wiki page", description: "Reads a whole wiki page." },
   create_wiki_page: { label: "Create wiki page", description: "Creates a page when someone asks." },
@@ -229,6 +221,14 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   propose_remove_agents: {
     label: "Propose archiving or deleting agents",
     description: "Posts one card listing the agents to archive or delete. A person who may applies it.",
+  },
+  offer_answers: {
+    label: "Ask with answers to tap",
+    description: "Posts a question with answers the person taps; each tap is their own message.",
+  },
+  propose_team: {
+    label: "Propose a team",
+    description: "Posts one card with several agents, their channels, routines and skills. A person creates it.",
   },
   propose_settings_change: {
     label: "Propose a teammate's settings",

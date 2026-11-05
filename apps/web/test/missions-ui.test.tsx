@@ -19,7 +19,7 @@ describe("Missões", () => {
     await settle();
     expect(router.state.location.search).toEqual({ tab: "missions" });
     expect(screen().getByRole("heading", { level: 1, name: "Missões" })).toBeTruthy();
-    expect(document.querySelector(".list-head__sub")?.textContent).toBe(
+    expect(document.querySelector(".ac-pagehead__meta")?.textContent).toBe(
       "Trabalho longo de um agente no computador dele, numa thread.",
     );
     expect(screen().getByText("Nenhuma missão ainda")).toBeTruthy();

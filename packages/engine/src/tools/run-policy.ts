@@ -17,7 +17,7 @@ import type { ToolDefinition } from "./types";
  *   webhook) feeds it, so it keeps the routine's bounds (below), plus the reply where it is (`here`), never
  *   `hand_off` nor a mission's tools; every write to a connected app asks a person.
  * - `routine`: nothing that speaks for someone (reactions, GIFs and stickers, questions, reminders,
- *   routines, events, forum, channels, secrets, permissions). It reports through `hand_off`. Otherwise it
+ *   routines, events, channels, secrets, permissions). It reports through `hand_off`. Otherwise it
  *   works as the agent (ADR 0109: one permission model, the agent's own): reads, the web and the browser,
  *   internal changes people can undo (issues, memory, wiki, Drive, Vault contacts, its own branches and pull
  *   requests, its computer); every write to a connected app asks a person, except the actions its creator allowed for its job
@@ -43,7 +43,10 @@ export type ToolKind =
   | { kind: "hand_off" }
   /** `pass`: ends the run without a message. */
   | { kind: "pass" }
-  /** `set_status` (the agent's own line next to its name, ADR 0084) and `withdraw_request` (its own open requests): nothing else. */
+  /**
+   * `set_status` (the agent's own line next to its name, ADR 0084), `withdraw_request` (its own open requests) and
+   * `set_reply_style` (how the person behind the run asked to be talked to, ADR 0147): nothing else.
+   */
   | { kind: "self" }
   /** Speaks in the run's own conversation (a reaction, a question, a card people act on). */
   | { kind: "here" }
@@ -95,8 +98,6 @@ const ELSEWHERE = new Set([
   "update_routine",
   "delete_routine",
   "run_routine_now",
-  "open_forum_topic",
-  "post_in_forum",
   "add_agent_to_channel",
   "create_channel",
   "request_secret",
@@ -121,7 +122,6 @@ const HERE = new Set([
   "start_poll",
   "ask_choices",
   "share_artifact",
-  "suggest_forum_topic",
   "propose_mission",
   "browser_ask_person",
   "desktop_ask_person",
@@ -133,6 +133,8 @@ const HERE = new Set([
   "propose_agent",
   "propose_settings_change",
   "propose_remove_agents",
+  "propose_team",
+  "offer_answers",
   "follow_up",
   "cancel_follow_up",
 ]);
@@ -141,7 +143,6 @@ const HERE = new Set([
 const READS = new Set([
   "list_routines",
   "list_reminders",
-  "read_forum_topic",
   "find_agent",
   "get_my_usage",
   "computer_status",
@@ -215,7 +216,8 @@ export function toolKind(tool: PolicyTool): ToolKind {
   if (tool.name === "hand_off") return { kind: "hand_off" };
   if (tool.name === "update_widget" && tool.scope === "") return { kind: "widget" };
   if (tool.name === "pass") return { kind: "pass" };
-  if (tool.name === "set_status" || tool.name === "withdraw_request") return { kind: "self" };
+  if (tool.name === "set_status" || tool.name === "withdraw_request" || tool.name === "set_reply_style")
+    return { kind: "self" };
   // Long work (ADR 0121): the run's own work only; who may go to the background is the tool source's.
   if (!tool.scope && SELF_WORK.has(tool.name)) return { kind: "self" };
   if (tool.name === "permission_prompt") return { kind: "computer" };
@@ -238,7 +240,7 @@ export function toolKind(tool: PolicyTool): ToolKind {
 
 export const REFUSALS = {
   routineElsewhere:
-    "This is a routine's background work: it can't manage routines or reminders, propose events, open forum topics, change channels, or ask for secrets or permissions. Put it in hand_off; the people decide.",
+    "This is a routine's background work: it can't manage routines or reminders, propose events, change channels, or ask for secrets or permissions. Put it in hand_off; the people decide.",
   routineAskUser:
     "This is a routine's background work: nobody is here to answer. Decide with your best judgement; if a person must decide, say so in hand_off.",
   routineReact: "This is a routine's background work: there is no message to react to. Just finish, or use hand_off.",
@@ -246,7 +248,7 @@ export const REFUSALS = {
     "This is a routine's background work: nobody is in its room to send a GIF or a sticker to. Just finish, or use hand_off.",
   routineHere: "This is a routine's background work in a room nobody reads: put it in hand_off; the people decide.",
   fedElsewhere:
-    "A routine's report or work started this, so you keep within what that routine may do: you can't manage routines or reminders, propose events, open forum topics, change channels, ask for secrets or permissions, or use this tool. Say it in your reply here; the people decide.",
+    "A routine's report or work started this, so you keep within what that routine may do: you can't manage routines or reminders, propose events, change channels, ask for secrets or permissions, or use this tool. Say it in your reply here; the people decide.",
   fedMission:
     "A routine's report or work started this, not the mission: say in your reply what you'd do; the people decide.",
   handOffOnly: "Only background work (a routine's run) hands off: just reply.",

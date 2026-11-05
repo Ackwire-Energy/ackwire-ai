@@ -34,7 +34,6 @@ import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { IssueWorkBlock } from "@/components/BackgroundWork";
 import { EditInPlace, useFocusAtEnd, useSavedFlash, useSent } from "@/components/EditInPlace";
-import { IssueForumCard, NewTopicDialog } from "@/components/Forum";
 import { IssueFiles, useIssueFileEntries } from "@/components/IssueFiles";
 import { useOrg } from "@/components/org-context";
 import { TaskConversationButton, TaskConversationPanel, TaskConversationSummary } from "@/components/TaskConversation";
@@ -88,7 +87,7 @@ export function IssuePage({ number }: { number: number }) {
   );
 }
 
-/** Where an issue came from: "a partir de uma mensagem no #eng" (a link), the forum, an agent, a webhook. */
+/** Where an issue came from: "a partir de uma mensagem no #eng" (a link), an agent, a webhook. */
 function useIssueSource(i: Issue) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -107,8 +106,6 @@ function useIssueSource(i: Issue) {
         />
       );
     }
-    case "forum":
-      return t("issues.fromForum");
     case "agent":
       return t("issues.fromAgent");
     case "webhook":
@@ -188,7 +185,7 @@ function IssueBarTitle({ issue: i }: { issue: Issue }) {
 /**
  * An issue's details, the same on its page and in the dialog (whose bar has the title): who made it and from where, the title, then tabs
  * (the agent's work, live steps or "stalled" with "Pedir para continuar"; "Pedir a um agente"; description,
- * criteria and who checked them; forum; discussion), and the aside with its fields and links. The title, the
+ * criteria and who checked them; sub-issues; discussion), and the aside with its fields and links. The title, the
  * description and the criteria are edited where they are, saved on leaving the field ("Salvo" by the source line).
  */
 export function IssueDetails({
@@ -252,7 +249,7 @@ export function IssueDetails({
               )}
             </DetailsSection>
             <IssueCriteria issue={i} onSaved={flashSaved} />
-            <IssueForum issue={i} />
+            <IssueSubIssues issue={i} />
             <DetailsSection title={t("issues.conversation.button")}>
               <TaskConversationSummary issue={i} onOpen={onConversation} />
             </DetailsSection>
@@ -510,86 +507,33 @@ function IssueCriteria({ issue: i, onSaved }: { issue: Issue; onSaved: () => voi
   );
 }
 
-/**
- * The forum around an issue: its sub-issues, the topics that evaluate
- * it ("Em avaliação no fórum" / "Avaliado", with the mini track) and, while
- * open, "Avaliar no fórum" (the new-topic dialog, prefilled, format plan).
- */
-function IssueForum({ issue: i }: { issue: Issue }) {
+/** An issue's sub-issues, with their state and who has them. */
+function IssueSubIssues({ issue: i }: { issue: Issue }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const actors = useActors();
-  const [evaluating, setEvaluating] = useState(false);
   const subs = i.subIssues ?? [];
-  const topics = i.forumTopics ?? [];
-  const requester = i.createdBy.type === "person" ? i.createdBy.id : null;
-  const requesterName = requester ? actors.name(i.createdBy) : "";
-  const g = agentGrammar(requesterName);
-  const originText = requester
-    ? t("forum.origin.issueBy", { number: i.number, name: requesterName, context: g.context })
-    : t("forum.origin.issue", { number: i.number });
-  const going = topics.some((x) => x.status === "open" || x.status === "stalled");
-  if (subs.length === 0 && topics.length === 0 && !isOpen(i)) return null;
+  if (subs.length === 0) return null;
   return (
-    <>
-      {subs.length > 0 && (
-        <DetailsSection title={t("forum.issue.subIssues", { count: subs.length })}>
-          <ul className="forum-subl">
-            {subs.map((s) => (
-              <li key={s.id}>
-                <Link to="/org/$orgId/issues/$number" params={{ orgId: org.id, number: String(s.number) }}>
-                  <span className="forum-subl__num">#{s.number}</span>
-                  <span className="forum-subl__tx">{s.title}</span>
-                  {s.assignee && (
-                    <span className="forum-subl__who">
-                      <ActorAvatar actor={s.assignee} name={actors.name(s.assignee)} size="xs" />
-                      {actors.name(s.assignee)}
-                    </span>
-                  )}
-                  <Chip icon={STATUS_ICON[s.status]}>{t(`issues.status.${s.status}`)}</Chip>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </DetailsSection>
-      )}
-      {(topics.length > 0 || (isOpen(i) && !going)) && (
-        <DetailsSection title={t("forum.issue.section")}>
-          {topics.map((x) => (
-            <IssueForumCard key={x.id} topicId={x.id} />
-          ))}
-          {isOpen(i) && !going && (
-            <div className="forum-evaluate">
-              <span className="forum-evaluate__t">
-                <b>
-                  <Icon name="message" size={16} />
-                  {t("forum.issue.evaluateTitle")}
-                </b>
-                <small>{t("forum.issue.evaluateText")}</small>
-              </span>
-              <Button size="sm" variant="primary" icon="message" onClick={() => setEvaluating(true)}>
-                {t("forum.issue.evaluate")}
-              </Button>
-            </div>
-          )}
-        </DetailsSection>
-      )}
-      <NewTopicDialog
-        open={evaluating}
-        onClose={() => setEvaluating(false)}
-        preset={{
-          title: i.title,
-          goal: i.description.trim().slice(0, 1000),
-          format: "plan",
-          rounds: 2,
-          agentIds: i.assignee?.type === "agent" ? [i.assignee.id] : [],
-          userIds: requester ? [requester] : [],
-          originIssueId: i.id,
-          originText,
-          heading: "fromIssue",
-        }}
-      />
-    </>
+    <DetailsSection title={t("issues.subIssues", { count: subs.length })}>
+      <ul className="issue-subl">
+        {subs.map((s) => (
+          <li key={s.id}>
+            <Link to="/org/$orgId/issues/$number" params={{ orgId: org.id, number: String(s.number) }}>
+              <span className="issue-subl__num">#{s.number}</span>
+              <span className="issue-subl__tx">{s.title}</span>
+              {s.assignee && (
+                <span className="issue-subl__who">
+                  <ActorAvatar actor={s.assignee} name={actors.name(s.assignee)} size="xs" />
+                  {actors.name(s.assignee)}
+                </span>
+              )}
+              <Chip icon={STATUS_ICON[s.status]}>{t(`issues.status.${s.status}`)}</Chip>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </DetailsSection>
   );
 }
 
@@ -760,10 +704,7 @@ function History({ activity, loaded }: { activity: IssueActivity[]; loaded: bool
       {activity.map((a) =>
         a.kind === "event" ? (
           <div key={a.id} className="issue-event small muted">
-            <Icon
-              name={a.event === "agent_asked" ? "agent" : a.textCode?.startsWith("forum_") ? "message" : "waiting"}
-              size={16}
-            />
+            <Icon name={a.event === "agent_asked" ? "agent" : "waiting"} size={16} />
             <span>
               <b className="issue-event__who">{actors.name(a.author)}</b> {issueEventText(t, a)}
               {a.auto && (

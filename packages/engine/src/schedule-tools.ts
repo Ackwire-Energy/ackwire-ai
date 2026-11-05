@@ -113,7 +113,7 @@ async function whereOf(ctx: ToolContext, r: RoutineView) {
     const channel = await getChannelCached(ctx.db, ctx.orgId, t.channelId);
     return channel?.kind === "channel" ? `#${channel.name}` : "a direct message";
   }
-  return t.type === "forum" ? "a forum topic" : t.type === "artifact" ? "a file in the Drive" : "a direct message";
+  return t.type === "artifact" ? "a file in the Drive" : "a direct message";
 }
 
 const sameText = (a: string, b: string) =>
@@ -593,7 +593,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             askAgent: input.ask_agent === true,
           });
           return {
-            content: `Scheduled reminder ${r.id} for ${when.description}. Confirm it to the person with that day, date, time and time zone, in their language.`,
+            content: `Scheduled reminder ${r.id} for ${when.description}. Confirm it to the person with that day, date, time and time zone, in their language; call it a reminder and say it shows in the calendar.`,
             data: { reminder: { id: r.id, at: r.at } },
           };
         } catch (error) {
@@ -783,8 +783,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
               // view only when nobody is.
               const visible = person
                 ? r.prompt !== null
-                : r.agentId === ctx.agentId ||
-                  (channelId ? readable.has(channelId) : r.target.type === "forum" || r.target.type === "artifact");
+                : r.agentId === ctx.agentId || (channelId ? readable.has(channelId) : r.target.type === "artifact");
               return routineLine(
                 r,
                 await whereOf(ctx, r),
@@ -803,7 +802,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "update_routine",
       description:
-        'Change a routine (id from list_routines) when the person asks: yours, or another agent\'s when the person may manage it. `title` renames it, `channel` moves where it reports ("manda no #general" — then nothing comes to the old conversation), `prompt` replaces its instructions, `schedule` its time ("dias úteis às 9h", "weekdays at 9am") or `trigger` what starts it (an email filter, a webhook with the HTTP `methods` it answers, or an event instead of a schedule), `report` when it speaks, `own_actions` what it does in connected apps without asking, `active` pauses or resumes it, `agent` hands it to another agent that should do the work. Only who created it, the agent\'s owner or an admin can change it; the person sees it with Undo.',
+        'Change a routine (id from list_routines) when the person asks: yours, or another agent\'s when the person may manage it. `title` renames it, `channel` moves where it reports ("manda no #general" — then nothing comes to the old conversation), `prompt` replaces its instructions (that routine\'s only: a person\'s rule that holds beyond it, a permission or where to send things, is `remember` kind rule), `schedule` its time ("dias úteis às 9h", "weekdays at 9am") or `trigger` what starts it (an email filter, a webhook with the HTTP `methods` it answers, or an event instead of a schedule), `report` when it speaks, `own_actions` what it does in connected apps without asking, `active` pauses or resumes it, `agent` hands it to another agent that should do the work. Only who created it, the agent\'s owner or an admin can change it; the person sees it with Undo.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -1078,8 +1077,8 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             const own = await ownRoutine(ctx, routineId);
             if (!own.row) return { content: own.error, isError: true };
             const target = own.row.target as RoutineTarget;
-            if (target.type === "forum" || (target.type === "conversation" && target.reminder)) {
-              return { content: `Routine ${routineId} doesn't run you (a reminder or a forum topic).`, isError: true };
+            if (target.type === "conversation" && target.reminder) {
+              return { content: `Routine ${routineId} doesn't run you (a reminder).`, isError: true };
             }
             const runAt = str(input.routine) ? own.row.nextRunAt : replaced?.runAt;
             if (!own.row.active || !runAt || runAt.getTime() <= Date.now()) {

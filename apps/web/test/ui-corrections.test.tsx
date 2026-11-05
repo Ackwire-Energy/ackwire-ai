@@ -48,8 +48,13 @@ describe("a message that mentions me", () => {
     const chips = [...row("m-me").querySelectorAll(".ac-mention")].map((c) => [c.textContent, c.className]);
     expect(chips).toEqual([
       ["@Walter", "ac-mention ac-mention--me"],
-      ["@Ada", "ac-mention"],
+      ["@Ada", "ac-mention ac-mention--agent"],
     ]);
+    // Ada's chip carries her tone for both themes; a person's has none.
+    const [walter, ada] = [...row("m-me").querySelectorAll<HTMLElement>(".ac-mention")];
+    expect(walter?.style.getPropertyValue("--mention-bg")).toBe("");
+    expect(ada?.style.getPropertyValue("--mention-bg")).toMatch(/^#[0-9a-f]{6}$/);
+    expect(ada?.style.getPropertyValue("--mention-ink-dark")).toMatch(/^#[0-9a-f]{6}$/);
     // m-1 mentions only Ada.
     expect(row("m-1").classList.contains("ac-msg--mentions-me")).toBe(false);
   });
@@ -68,6 +73,8 @@ describe("a message that mentions me", () => {
     expect(value(css, ".ac-mention", "padding")).toBe("0 4px");
     expect(value(css, ".ac-mention", "border-radius")).toBe("var(--radius-sm)");
     expect(value(css, ".ac-mention--me", "color")).toBe("var(--attention)");
+    expect(value(css, ".ac-mention--agent", "background")).toBe("var(--mention-bg)");
+    expect(value(css, '[data-theme="dark"] .ac-mention--agent', "color")).toBe("var(--mention-ink-dark)");
   });
 });
 

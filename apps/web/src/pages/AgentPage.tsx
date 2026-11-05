@@ -25,6 +25,7 @@ import { type RepoChoice, repoChoiceOf, repoListOf, reposText } from "@agentesch
 import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import {
   Button,
+  Card,
   colorKey,
   cx,
   Dialog,
@@ -32,6 +33,7 @@ import {
   EmptyState,
   Icon,
   normalizeAppearance,
+  PageHeader,
   TabPanel,
   Tabs,
 } from "@agenteschat/ui";
@@ -47,7 +49,7 @@ import { DeleteAgentDialog } from "@/components/DeleteAgentDialog";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useWidenAsk } from "@/components/ReachLines";
-import { RightHandSettingsSection } from "@/components/RightHandSettings";
+import { RightHandMineRow, RightHandSettingsSection } from "@/components/RightHandSettings";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMatchMedia } from "@/hooks/useMatchMedia";
 import {
@@ -98,7 +100,7 @@ export interface AgentPageProps {
   onNavigate: (tab: AgentTab, section?: AgentSection) => void;
   /** Shown in the panel beside its DM (like a thread's), not as a page: closes the panel. */
   onClose?: () => void;
-  /** The panel's overlay was clicked (a new number each time): close, asking first when something is unsaved. */
+  /** The panel was asked to close (a new number each time): close, asking first when something is unsaved. */
   closeRequest?: number;
 }
 
@@ -108,6 +110,13 @@ export function AgentPage(props: AgentPageProps) {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const agent = dir.agentById.get(props.agentId);
+  // Only the full profile edits, so only it asks before closing; every other view here closes on the request.
+  const full = Boolean(agent && !dir.loading && seesDetails(agent) && !isRightHand(agent));
+  const closeRef = useRef(props.onClose);
+  closeRef.current = full ? undefined : props.onClose;
+  useEffect(() => {
+    if (props.closeRequest) closeRef.current?.();
+  }, [props.closeRequest]);
   if (dir.loading) {
     return (
       <div className="page page--full">
@@ -126,16 +135,25 @@ export function AgentPage(props: AgentPageProps) {
   if (isRightHand(agent) && can(org, "manage_agents")) {
     return (
       <div className="page page--full">
-        <header className="page__header">
-          <h1 className="page-title">{agent.name}</h1>
-          <p className="muted">{t("settings.sectionText.right_hand")}</p>
-          {tellsNameStory(agent) && <p className="small muted">{t("rightHand.profile.nameStory")}</p>}
-        </header>
+        <PageHeader title={agent.name} meta={t("settings.sectionText.right_hand")} />
+        {tellsNameStory(agent) && <p className="small muted">{t("rightHand.profile.nameStory")}</p>}
         <RightHandSettingsSection />
       </div>
     );
   }
-  if (!seesDetails(agent) || isRightHand(agent)) return <AgentPublicCard agent={agent} onClose={props.onClose} />;
+  // Everyone else gives their own DM with it their plan (ADR 0137 §11).
+  if (isRightHand(agent)) {
+    return (
+      <AgentPublicCard agent={agent}>
+        <Card as="section" className="agp-card" aria-label={t("rightHand.settings.mine")}>
+          <div className="settings-rows">
+            <RightHandMineRow agent={agent} />
+          </div>
+        </Card>
+      </AgentPublicCard>
+    );
+  }
+  if (!seesDetails(agent)) return <AgentPublicCard agent={agent} />;
   return <AgentProfile key={agent.id} agent={agent} {...props} />;
 }
 
@@ -667,7 +685,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
       <div className={cx("page page--full agp", onClose && "agp--panel")} data-dirty={dirty || undefined}>
         <AgentHero
           onArchive={() => setArchiving(true)}
-          onClose={close}
+          panel={Boolean(onClose)}
           onExpand={
             onClose &&
             (() =>

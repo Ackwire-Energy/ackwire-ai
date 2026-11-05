@@ -632,7 +632,7 @@ describe("the agent's email rules", () => {
     expect(said).toEqual([
       "Esta caixa de email não está mais conectada. Conecte de novo em Conectores.",
       "“Enviar como” precisa ser um endereço desta caixa. Escolha outro.",
-      "Você não tem permissão para isso. Peça a um admin do workspace.",
+      "Você não tem permissão para isso.",
       "Não deu para salvar. Tente de novo.",
     ]);
   });

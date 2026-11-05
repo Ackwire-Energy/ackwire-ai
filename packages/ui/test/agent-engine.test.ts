@@ -3,6 +3,7 @@ import {
   AGENT_GRADIENTS,
   bodyPath,
   bodyTones,
+  contrastOf,
   customGradient,
   drawSleep,
   EYE_COLOR,
@@ -13,6 +14,7 @@ import {
   hsvToHex,
   inBody,
   luminance,
+  mentionTone,
   nearestPreset,
   pickerStart,
   SLEEP_SPOTS,
@@ -156,5 +158,30 @@ describe("a sleeping agent (paused until its plan or budget is back)", () => {
       expect(x).toBeGreaterThanOrEqual(14);
     }
     expect(SLEEP_SPOTS).toHaveLength(2);
+  });
+});
+
+describe("an agent's @mention tone", () => {
+  const colors = [...Object.keys(AGENT_GRADIENTS), "#ffff00", "#00ffff", "#ff0000", "#101010", "#808080", "#f0f0f0"];
+
+  test("passes WCAG AA in both themes, for every preset and for custom colors at the extremes", () => {
+    for (const color of colors) {
+      for (const dark of [false, true]) {
+        const { ink, background } = mentionTone(color, dark);
+        expect(contrastOf(ink, background)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  test("a light tint in the light theme, a dark one in the dark, and each agent keeps its own", () => {
+    expect(luminance(mentionTone("rose").background)).toBeGreaterThan(0.6);
+    expect(luminance(mentionTone("rose", true).background)).toBeLessThan(0.2);
+    expect(mentionTone("rose").background).not.toBe(mentionTone("teal").background);
+    expect(mentionTone("rose").ink).not.toBe(mentionTone("teal").ink);
+  });
+
+  test("contrastOf is the WCAG ratio", () => {
+    expect(contrastOf("#000000", "#ffffff")).toBeCloseTo(21);
+    expect(contrastOf("#ffffff", "#ffffff")).toBe(1);
   });
 });

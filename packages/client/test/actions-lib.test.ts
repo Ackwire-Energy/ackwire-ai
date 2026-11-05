@@ -143,6 +143,20 @@ describe("receipt sentence values", () => {
     expect(actionTextKey(unknown)).toBe("agentActions.other");
   });
 
+  test("a merge done without asking: its pull request, or the branch of a plain git merge, and nothing to undo", () => {
+    const pr = action({
+      kind: "pr.merged",
+      target: { type: "repository", id: "acme/app", title: "acme/app" },
+      params: { repo: "acme/app", number: 12 },
+    });
+    expect(actionTextValues(pr, t)).toEqual({ repo: "acme/app", number: "12" });
+    expect(actionTextKey(pr)).toBe("agentActions.pr.merged");
+    const branch = action({ ...pr, params: { repo: "acme/app", ref: "feature/x" } });
+    expect(actionTextValues(branch, t)).toEqual({ repo: "acme/app", ref: "feature/x", context: "branch" });
+    const now = Date.now();
+    expect(actionPhase(action({ ...pr, undoableUntil: new Date(now).toISOString() }), now)).toBe("settled");
+  });
+
   test("every kind the app knows has its own case (the default gives no values)", () => {
     const missing = AGENT_ACTION_KINDS.filter((kind) => !Object.keys(actionTextValues(action({ kind }), t)).length);
     expect(missing).toEqual([]);

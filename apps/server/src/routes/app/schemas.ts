@@ -1,6 +1,6 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
-import { AGENT_ACTION_KINDS, ONBOARDING_STEPS, STANDING_STATES, START_PAGES } from "@agenteschat/engine";
-import { CONTEXT_LIMITS, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
+import { AGENT_ACTION_KINDS, AGENT_STYLES, ONBOARDING_STEPS, STANDING_STATES, START_PAGES } from "@agenteschat/engine";
+import { CONTEXT_LIMITS, ENDPOINT_STYLES, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
 /** A last message that was only a GIF or a sticker (ADR 0091): the apps say which, translated, in its preview. */
@@ -106,6 +106,10 @@ export const Organization = z
       description:
         "In `GET /me`: whether you see what agents did under each reply (`PUT …/me/activity`), off by default. Absent elsewhere.",
     }),
+    agentStyle: z.enum(AGENT_STYLES).nullable().optional().openapi({
+      description:
+        "In `GET /me`: how agents talk to you here (`PUT …/me/agent-style`, ADR 0147): `simple` or `technical`; null until you pick, and agents talk simply. Absent elsewhere.",
+    }),
   })
   .openapi("Organization");
 
@@ -128,11 +132,51 @@ export const Invitation = z
   .object({ id: z.uuid(), email: z.string(), role: Role, roleIds: RoleIds, expiresAt: z.string() })
   .openapi("Invitation");
 
+/** Per million tokens, in US dollars, as people type prices. */
+export const EndpointPrices = z
+  .object({
+    input: z.number().min(0).max(10_000),
+    output: z.number().min(0).max(10_000),
+    cacheRead: z.number().min(0).max(10_000).optional().openapi({ description: "Absent: the input price." }),
+    cacheWrite: z.number().min(0).max(10_000).optional().openapi({ description: "Absent: the input price." }),
+  })
+  .openapi("EndpointPrices");
+
+export const EndpointModel = z
+  .object({
+    id: z.string().min(1).max(200).openapi({ description: "The id the endpoint takes." }),
+    label: z.string().max(120).optional(),
+    prices: EndpointPrices.optional().openapi({
+      description: "Absent: unpriced. Its calls are recorded with their tokens and cost 0, so no budget limits them.",
+    }),
+    check: z
+      .enum(["ok", "no_tools", "failed"])
+      .optional()
+      .openapi({ description: "The last test call: it called a tool, answered without one, or failed." }),
+  })
+  .openapi("EndpointModel");
+
+export const EndpointStyle = z.enum(ENDPOINT_STYLES).openapi("EndpointStyle", {
+  description: "The API the endpoint speaks: OpenAI's Chat Completions or Anthropic's Messages.",
+});
+
+export const EndpointCheck = z
+  .object({
+    model: z.string(),
+    check: z.enum(["ok", "no_tools", "failed"]),
+    error: z.string().optional().openapi({ description: "The server's words, when it failed." }),
+  })
+  .openapi("EndpointCheck");
+
 export const Credential = z
   .object({
     id: z.uuid(),
     provider: ProviderId,
     label: z.string(),
+    endpoint: z
+      .object({ style: EndpointStyle, baseURL: z.string(), models: z.array(EndpointModel) })
+      .optional()
+      .openapi({ description: "A workspace's own endpoint (`custom`, ADR 0146): its address, API and models." }),
     keyHint: z.string().openapi({ description: "Last 4 characters of the key. The key itself is never returned." }),
     workspaceIdHint: z
       .string()
@@ -233,6 +277,16 @@ export const PlanUsage = z
     limited: z.boolean().optional().openapi({ description: "The plan refused a request for its limit." }),
     source: z.enum(["turn", "probe"]),
     at: z.string().openapi({ description: "When the computer learned it." }),
+    models: z
+      .record(
+        z.string(),
+        z.object({ at: z.string(), until: z.string().optional(), region: z.literal(true).optional() }),
+      )
+      .optional()
+      .openapi({
+        description:
+          "Models at a limit of their own, by model id: until `until` (absent: unknown), or `region`: the model needs a region the account doesn't allow.",
+      }),
   })
   .openapi("PlanUsage", {
     description: "A plan's usage limits, as the CLI on the computer said them (no token is ever read).",
@@ -396,7 +450,7 @@ export const AgentAction = z
       .nullable()
       .openapi({ description: "The person the agent worked for: they, admins and the agent's owner may undo." }),
     target: z.object({
-      type: z.enum(["issue", "memory", "routine", "channel", "wiki_page", "thread", "skill", "agent"]),
+      type: z.enum(["issue", "memory", "routine", "channel", "wiki_page", "thread", "skill", "agent", "repository"]),
       id: z.string(),
       number: z.number().optional().openapi({ description: "Issues." }),
       title: z.string().optional().openapi({ description: "Issue, routine, page or thread title; channel name." }),
@@ -635,6 +689,14 @@ export const Model = z
     tier: ModelTier.optional().openapi({
       description: "The size Automático uses it for on its provider's key, by default.",
     }),
+    endpoint: z
+      .object({ credentialId: z.uuid(), name: z.string() })
+      .optional()
+      .openapi({ description: "A workspace endpoint's model (ADR 0146): whose credential, under what name." }),
+    unpriced: z
+      .boolean()
+      .optional()
+      .openapi({ description: "No prices known: its calls cost 0, so a budget can't count money for it." }),
   })
   .openapi("Model");
 
@@ -746,6 +808,21 @@ export const BrainMachine = z
 export const AgentBrain = z
   .object({
     agentId: z.uuid(),
+    scope: z.enum(["mine", "workspace"]).optional().openapi({
+      description:
+        "The team's right hand only (ADR 0137 §11): `mine`, the caller's own AI for their DM with it (`brain` `model` = none, their DM thinks with the workspace's); `workspace`, the one every DM thinks with while its person has none.",
+    }),
+    workspaceAi: z
+      .object({
+        brain: BrainKind,
+        ownerId: z.string().nullable(),
+        servesYou: z.boolean(),
+      })
+      .optional()
+      .openapi({
+        description:
+          "With `mine`: the workspace's AI, `model` for an API key, else the plan's brain and owner; `servesYou`, it thinks for the caller (a key, a plan whose owner lets it serve everyone, or theirs).",
+      }),
     brain: BrainKind,
     model: z.string().nullable().openapi({ description: "As stored; null = the brain's default." }),
     effectiveModel: z.string().nullable(),

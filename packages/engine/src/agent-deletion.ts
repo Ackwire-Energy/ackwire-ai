@@ -174,7 +174,7 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
   });
   invalidateOrg(orgId);
   // What it waited on people for (approvals, questions, handoffs, secrets) leaves their inboxes, as a closed source
-  // does. A turn in a forum topic it opened stays: the topic goes on without it.
+  // does.
   const waiting = await db
     .selectDistinct({ groupKey: notifications.groupKey })
     .from(notifications)

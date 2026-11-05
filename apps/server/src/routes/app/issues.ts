@@ -59,10 +59,7 @@ const Issue = z
     createdBy: Actor,
     source: z.record(z.string(), z.unknown()),
     channelId: z.uuid().nullable(),
-    parentIssueId: z
-      .uuid()
-      .nullable()
-      .openapi({ description: "The issue this one is a sub-issue of (a plan step from the forum)." }),
+    parentIssueId: z.uuid().nullable().openapi({ description: "The issue this one is a sub-issue of." }),
     pullRequests: z.array(z.object({ number: z.number(), url: z.string(), openedBy: Actor.nullable() })),
     artifacts: z.array(z.object({ id: z.uuid(), title: z.string(), createdBy: Actor })),
     work: z
@@ -107,9 +104,6 @@ const IssueDetail = Issue.extend({
   subIssues: z.array(
     z.object({ id: z.uuid(), number: z.number(), title: z.string(), status: Status, assignee: Actor.nullable() }),
   ),
-  forumTopics: z
-    .array(z.object({ id: z.uuid(), title: z.string(), status: z.string(), format: z.string() }))
-    .openapi({ description: 'Forum topics opened from this issue ("Avaliar no fórum"), oldest first.' }),
 }).openapi("IssueDetail");
 
 const Activity = z
@@ -201,7 +195,7 @@ export function issueRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/issues/{issueId}",
       tags,
       security,
-      summary: "An issue, with its sub-issues and the forum topics that evaluate it",
+      summary: "An issue, with its sub-issues",
       request: { params: IssueParams },
       responses: { 200: json(IssueDetail), ...errors },
     }),

@@ -86,11 +86,14 @@ describe("pricing", () => {
 
   test("every model's provider exists, and each provider has one recommended model", () => {
     for (const m of Object.values(MODEL_CATALOG)) expect(PROVIDER_IDS).toContain(m.provider);
-    const recommended = Object.keys(PROVIDERS).map((provider) =>
-      Object.entries(MODEL_CATALOG)
-        .filter(([, m]) => m.provider === provider && m.recommended)
-        .map(([id]) => id),
-    );
+    // A workspace's own endpoint has no catalog models.
+    const recommended = Object.keys(PROVIDERS)
+      .filter((p) => p !== "custom")
+      .map((provider) =>
+        Object.entries(MODEL_CATALOG)
+          .filter(([, m]) => m.provider === provider && m.recommended)
+          .map(([id]) => id),
+      );
     expect(recommended).toEqual([
       ["claude-sonnet-5-5"],
       ["gpt-6.1-sol"],
@@ -130,6 +133,7 @@ describe("pricing", () => {
       "glm-5.3-flash",
       "MiniMax-M3.1-Flash",
       null,
+      null,
     ]);
     const line = (provider: string) => MODEL_TIERS.map((tier) => modelForTier(provider, tier));
     expect(line("gemini")).toEqual(["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-4-argon"]);
@@ -149,10 +153,11 @@ describe("pricing", () => {
       "glm-5.3-flash",
       "MiniMax-M3",
       null,
+      null,
     ]);
     for (const provider of PROVIDER_IDS) {
       const picks = Object.values(MODEL_CATALOG).filter((m) => m.provider === provider && m.router);
-      expect(picks).toHaveLength(provider === "moonshot" || provider === "openrouter" ? 0 : 1);
+      expect(picks).toHaveLength(["moonshot", "openrouter", "custom"].includes(provider) ? 0 : 1);
     }
     // GLM-5.3 Flash can't stop thinking, Flash-Lite keeps a little, every other pick turns it off.
     expect(MODEL_CATALOG["glm-5.3-flash"]?.leastThinking).toBeUndefined();

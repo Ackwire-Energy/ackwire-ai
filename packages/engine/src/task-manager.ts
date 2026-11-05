@@ -1,9 +1,11 @@
 import { type Database, rowsOf, schema, sql } from "@agenteschat/db";
+import { CODING_PLANS, planModel } from "@agenteschat/providers/plans";
 import { computerQueue as lineOfComputer } from "./computer-queue";
 import { NotFoundError } from "./errors";
 import { replyExcerpt } from "./messages";
 import { can, requireActiveMembership } from "./organizations";
 import { pendingIds } from "./recovery";
+import { mayContinuePause } from "./usage-pause";
 
 /**
  * The task manager (ADR 0128): every task the caller may see, what each one uses right now, each agent's activity
@@ -47,6 +49,26 @@ export interface TaskNow {
 }
 
 export type TaskStatus = "queued" | "running" | "waiting_approval" | "waiting_input";
+
+/** What a `waiting_input` run waits on, as its transcript has it (`waitingForBrain`), for the apps to say why. */
+export interface TaskWait {
+  /** The wait's code: `usage_pause`, `plan_limit`, `budget`, `busy`, `work_queue`, or what keeps its computer away. */
+  code: string;
+  /** Runs with the same key wait on the same plan or budget (`usageWaitKey`). */
+  key: string | null;
+  /** The plan in words ("Claude"); null for a budget. */
+  plan: string | null;
+  /** A plan wait on a model's own limit or the region it needs: the model's name, and which. */
+  model: string | null;
+  scope: "model" | "region" | null;
+  /** Long work paused near a limit (`usage_pause`): how far along, and the plan's window. */
+  percent: number | null;
+  window: string | null;
+  /** When the limit resets; null when unknown. */
+  resetsAt: string | null;
+  /** The caller may press Continuar agora (`mayContinuePause`; the server checks again). */
+  canContinue: boolean;
+}
 
 export interface ManagedTask {
   runId: string;
@@ -99,6 +121,8 @@ export interface ManagedTask {
     /** When it should start, from the line's estimates; null with no basis. */
     estimatedStartAt: string | null;
   } | null;
+  /** Why a `waiting_input` run waits on no person's answer yet; null for any other run. */
+  wait: TaskWait | null;
 }
 
 /** A computer with work on it or a line for its room: the task manager's computers row and "Ver fila". */
@@ -168,14 +192,27 @@ type Row = {
   last_at: string | Date | null;
   steps: number | string | null;
   stopper_name: string | null;
-  wait_code: string | null;
-  wait_source: string | null;
+  wait: StoredWait | string | null;
+  wait_pause: { used?: number; window?: string } | string | null;
+  routine_creator: string | null;
   waiting_machine_id: string | null;
 };
+
+/** The fields of `waitingForBrain` (the executor's `Transcript`) the task manager says. */
+interface StoredWait {
+  code?: string;
+  source?: string;
+  plan?: string;
+  model?: string | null;
+  scope?: "model" | "region";
+  resetsAt?: string;
+  waitKey?: string;
+}
 
 const iso = (v: string | Date | null) => (v === null ? null : new Date(v).toISOString());
 const truthy = (v: boolean | string) => v === true || v === "t";
 const str = (v: unknown) => (typeof v === "string" && v ? v : null);
+const parsed = <T>(v: T | string | null): T | null => (typeof v === "string" ? (JSON.parse(v) as T) : v);
 
 /** The runs the caller sees, by status (`active`: still on; else ended since `since`). */
 async function visibleRuns(
@@ -199,8 +236,8 @@ async function visibleRuns(
         last.data as last_data, last.created_at as last_at,
         (select count(*) from ${agentRunSteps} s where s.run_id = r.id and s.kind = 'tool_call') as steps,
         su.name as stopper_name,
-        r.transcript->'waitingForBrain'->>'code' as wait_code,
-        r.transcript->'waitingForBrain'->>'source' as wait_source, r.waiting_machine_id
+        r.transcript->'waitingForBrain' as wait, pause.data as wait_pause, r.waiting_machine_id,
+        rt.created_by_user_id as routine_creator
       from ${agentRuns} r
       join ${channels} c on c.id = r.channel_id and c.org_id = ${orgId}::uuid
         and c.archived_at is null and c.kind in ('channel', 'dm')
@@ -227,6 +264,11 @@ async function visibleRuns(
         where s.run_id = r.id and s.kind = 'tool_call'
         order by s.seq desc limit 1
       ) last on ${which.active ? sql`true` : sql`false`}
+      left join lateral (
+        select s.data->'pause' as data from ${agentRunSteps} s
+        where s.run_id = r.id and s.kind = 'error' and s.data->>'reason' = 'usage_wait'
+        order by s.seq desc limit 1
+      ) pause on ${which.active ? sql`r.transcript->'waitingForBrain'->>'code' = 'usage_pause'` : sql`false`}
       where r.org_id = ${orgId}::uuid and ${status}
         and (
           exists (select 1 from ${channelMembers} cm
@@ -240,12 +282,38 @@ async function visibleRuns(
 
 /** What a run waiting on no person waits on (`waitingForBrain`: the executor's wait for its computer or plan). */
 function heldOf(r: Row): ManagedTask["held"] {
-  if (r.status !== "waiting_input" || !r.wait_code) return null;
-  if (r.wait_code === "busy") return "computer_busy";
-  if (r.wait_code === "plan_limit") return "plan";
-  if (r.wait_code === "budget") return "budget";
-  if (r.wait_code === "usage_pause") return r.wait_source === "budget" ? "budget" : "plan";
+  const wait = parsed(r.wait);
+  if (r.status !== "waiting_input" || !wait?.code) return null;
+  if (wait.code === "busy") return "computer_busy";
+  if (wait.code === "plan_limit") return "plan";
+  if (wait.code === "budget") return "budget";
+  if (wait.code === "usage_pause") return wait.source === "budget" ? "budget" : "plan";
   return "computer_offline";
+}
+
+/** The model of a wait on a model's own limit, by the name its plan gives it. */
+function waitModel(wait: StoredWait) {
+  if (!wait.scope) return null;
+  const plan = Object.values(CODING_PLANS).find((p) => p.name === wait.plan);
+  return plan ? planModel(plan, wait.model).label : (wait.model ?? null);
+}
+
+/** Why a run waits. How far a pause got is on its step, written even for a parked run with no card (a routine's). */
+function waitOf(r: Row): TaskWait | null {
+  const wait = parsed(r.wait);
+  if (r.status !== "waiting_input" || !wait?.code) return null;
+  const pause = parsed(r.wait_pause);
+  return {
+    code: wait.code,
+    key: str(wait.waitKey),
+    plan: str(wait.plan),
+    model: waitModel(wait),
+    scope: wait.scope ?? null,
+    percent: pause?.used ?? null,
+    window: str(pause?.window),
+    resetsAt: str(wait.resetsAt),
+    canContinue: false,
+  };
 }
 
 const planOf = (raw: { state: string }[] | string | null) => {
@@ -311,7 +379,21 @@ export async function taskManager(
     canStop: manages || r.requester_id === userId || r.owner_user_id === userId,
     held: heldOf(r),
     line: null,
+    wait: waitOf(r),
   }));
+  await Promise.all(
+    active.map(async (r, i) => {
+      const wait = tasks[i]?.wait;
+      if (wait?.code !== "usage_pause") return;
+      wait.canContinue = await mayContinuePause(db, userId, membership, {
+        run: { orgId, triggerMessageId: r.trigger_message_id },
+        requester: r.requester_id,
+        ownerUserId: r.owner_user_id,
+        routineId: r.routine_id,
+        routineCreatorId: r.routine_creator,
+      });
+    }),
+  );
   const waitingOn = [
     ...new Set(
       active.flatMap((r) => (heldOf(r) === "computer_busy" && r.waiting_machine_id ? [r.waiting_machine_id] : [])),

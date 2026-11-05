@@ -4,7 +4,19 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { proposalTarget, proposalTitle, proposerOf } from "@agenteschat/client/lib/proposals";
-import { Alert, Button, Card, Chip, Diff, diffLines, EmptyState, Field, Icon, Textarea } from "@agenteschat/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  Chip,
+  Diff,
+  diffLines,
+  EmptyState,
+  Field,
+  Icon,
+  PageHeader,
+  Textarea,
+} from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
@@ -93,12 +105,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
           {t("memory.title", agentGrammar(backAgent.name))}
         </Link>
       )}
-      <header className="page__header">
-        <h1 className="page-title">{t("proposals.title")}</h1>
-        <p className="page-sub" style={{ maxWidth: "64ch" }}>
-          {t("proposals.subtitle", { org: org.name })}
-        </p>
-      </header>
+      <PageHeader title={t("proposals.title")} meta={t("proposals.subtitle", { org: org.name })} />
 
       {proposals.isSuccess && list.length === 0 && <EmptyState icon="agent">{t("proposals.empty")}</EmptyState>}
 

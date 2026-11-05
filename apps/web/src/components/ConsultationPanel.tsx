@@ -15,6 +15,7 @@ import { useNow } from "@/components/missions/MissionBits";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useEscClose } from "@/hooks/useEscClose";
 
 /**
  * A question an agent asked another from this conversation, opened over it like a thread ("Theo ⇄ Iris", from its
@@ -47,6 +48,7 @@ export function ConsultationPanel({
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
+  useEscClose(onClose);
   const query = useConsultationConversation(org.id, channelId, consultationId);
   const c = query.data?.consultation;
   const list = query.data?.messages;
@@ -166,7 +168,7 @@ export function ConsultationPanel({
                 <div className="ac-consult__body ac-consult__body--inline consult-answer">
                   <small>{t("chat.consultation.answerOf", { name: to.name, context: to.context })}</small>
                   <div className="ac-consult__text">
-                    <MessageBody body={c.answer} resolveMention={dir.mentionName} />
+                    <MessageBody body={c.answer} resolveMention={dir.mentionName} mentionTone={dir.mentionTone} />
                   </div>
                 </div>
               )}

@@ -63,12 +63,10 @@ export async function continueRun(
       : new ForbiddenError("Only who asked, the agent's owner or an admin can continue it", "run.continue_forbidden");
 
   const notContinuable = () => new ConflictError("This task can't be continued", "run.not_continuable");
-  // A forum turn belongs to the topic's order (ADR 0022): it is never picked up by hand.
   const byPerson = stopped.status === "canceled" && Boolean(canceledBy(stopped.error));
   // Long work its AI provider cut off (ADR 0121): its end, posted home, is where it goes on from.
   const providerCut = stopped.status === "failed" && Boolean(stopped.workId) && providerFailure(stopped.error);
-  if (!(byPerson || providerCut || stopped.status === "done") || row.channelKind === "forum" || !stopped.transcript)
-    throw notContinuable();
+  if (!(byPerson || providerCut || stopped.status === "done") || !stopped.transcript) throw notContinuable();
   const [work] = stopped.workId
     ? await db.select().from(schema.agentWorks).where(eq(schema.agentWorks.id, stopped.workId))
     : [];
@@ -255,7 +253,7 @@ async function answerAnywayText(
 }
 
 /** A run error its AI provider caused (an error it returned, or no answer after the retries): worth another try. */
-export const PROVIDER_ERRORS = new Set(["run.provider_error", "run.provider_unavailable"]);
+export const PROVIDER_ERRORS = new Set(["run.provider_error", "run.provider_account", "run.provider_unavailable"]);
 export const providerFailure = (error: string | null) => PROVIDER_ERRORS.has(runErrorDetail(error)?.errorCode ?? "");
 
 /** The stop-and-send message left the stopped run's inbox before the restart (handed on already). */

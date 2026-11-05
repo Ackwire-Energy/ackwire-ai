@@ -22,14 +22,7 @@ export type ActivityFilter = "all" | "waiting" | "done";
  * agent's question, my turn at the table, an approval, then someone asking to join (nobody's work waits on it);
  * newest first within a kind.
  */
-const WAITING_ORDER: string[] = [
-  "browser_handoff",
-  "secret_request",
-  "agent_question",
-  "forum_turn",
-  "approval",
-  "join_request",
-];
+const WAITING_ORDER: string[] = ["browser_handoff", "secret_request", "agent_question", "approval", "join_request"];
 
 export const isVisible = (n: Pick<AppNotification, "doneAt" | "snoozedUntil">, now = Date.now()) =>
   !n.doneAt && !(n.snoozedUntil && new Date(n.snoozedUntil).getTime() > now);
@@ -119,7 +112,7 @@ export function subtitleOf(n: AppNotification, say: SayWords, mediaWord?: (kind:
     const origin = approvalOriginWords({ origin: l.origin });
     return [origin ? say(origin) : "", l.title ?? l.text ?? ""].filter(Boolean).join(" · ");
   }
-  if (n.kind === "issue_assigned" || n.kind === "forum_turn") return l.title ?? l.text ?? "";
+  if (n.kind === "issue_assigned") return l.title ?? l.text ?? "";
   return (l.text || word || l.text) ?? l.title ?? "";
 }
 

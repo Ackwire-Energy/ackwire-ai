@@ -22,7 +22,7 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Icon, PillButton, Text, useTheme, useToast } from "@/ui";
+import { Button, Icon, RowAction, Text, useTheme, useToast } from "@/ui";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { boldRuns } from "./actions";
@@ -69,9 +69,9 @@ function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: 
   return (
     <View style={[styles.one, { backgroundColor: colors.sunken }]}>
       <View style={[styles.tile, { backgroundColor: colors.raised }]}>
-        <Icon name={handed ? "chat" : "info"} size={14} color={colors.ink2} />
+        <Icon name={handed ? "chat" : "info"} size={16} color={colors.ink2} />
       </View>
-      <View style={styles.grow}>
+      <View style={[styles.grow, styles.tx]}>
         <Text variant="small" tone="ink2" numberOfLines={3} style={styles.oneText}>
           {runs.map((r, i) =>
             r.bold ? (
@@ -89,7 +89,7 @@ function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: 
           </Text>
         ) : null}
       </View>
-      {!handed && agent && e.userId ? <AllowTalkPill agent={agent} userId={e.userId} /> : null}
+      {!handed && agent && e.userId ? <AllowTalkAction agent={agent} userId={e.userId} /> : null}
     </View>
   );
 }
@@ -98,7 +98,7 @@ function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: 
  * "Deixar Ana falar com ele": lets `userId` talk to the agent, for its owner and who manages agents, when its
  * audience keeps them out (a routine's creator it couldn't reach). Nothing otherwise.
  */
-export function AllowTalkPill({ agent, userId }: { agent: Agent; userId: string }) {
+export function AllowTalkAction({ agent, userId }: { agent: Agent; userId: string }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const { org } = useOrg();
@@ -113,7 +113,7 @@ export function AllowTalkPill({ agent, userId }: { agent: Agent; userId: string 
     return null;
   const g = agentGrammar(agent.name);
   return (
-    <PillButton
+    <RowAction
       label={t("reach.allow", { person, context: g.context })}
       onPress={() => {
         if (save.busy || save.done) return;
@@ -128,7 +128,7 @@ export function AllowTalkPill({ agent, userId }: { agent: Agent; userId: string 
  * "Quero falar com ele": who manages agents (or owns it) lets themselves into an agent that keeps them out. Nothing
  * when it answers them already. On someone else's plan it asks first (`useWidenAsk`).
  */
-export function LetMeTalkPill({ agent }: { agent: Agent }) {
+export function LetMeTalkButton({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const { org } = useOrg();
@@ -140,10 +140,12 @@ export function LetMeTalkPill({ agent }: { agent: Agent }) {
   if (!audience) return null;
   const g = agentGrammar(agent.name);
   return (
-    <PillButton
+    <Button
+      variant="primary"
+      size="sm"
       label={t("reach.allowMe", g)}
+      disabled={save.busy || save.done}
       onPress={() => {
-        if (save.busy || save.done) return;
         tapHaptic();
         save.widen(audience, ask(audience), () => toast({ title: t("reach.allowedMe", g) }));
       }}
@@ -170,7 +172,7 @@ export function AgentLocked({ agent }: { agent: Agent }) {
       <Text variant="small" tone="muted" style={styles.lockedText}>
         {notice}
       </Text>
-      <LetMeTalkPill agent={agent} />
+      <LetMeTalkButton agent={agent} />
     </View>
   );
 }
@@ -217,10 +219,11 @@ const styles = StyleSheet.create({
   lockedText: { textAlign: "center" },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
+  // The tile, the first line and the action share one middle, as on the receipts; the sentence wraps under it.
   one: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+    alignItems: "flex-start",
+    gap: 8,
     minHeight: 50,
     paddingVertical: 9,
     paddingLeft: 12,
@@ -229,5 +232,6 @@ const styles = StyleSheet.create({
   },
   oneText: { fontSize: 14.5, lineHeight: 19 },
   detail: { marginTop: 2 },
-  tile: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  tx: { paddingTop: 6 },
+  tile: { width: 24, height: 24, marginTop: 4, borderRadius: 8, alignItems: "center", justifyContent: "center" },
 });

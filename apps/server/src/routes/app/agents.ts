@@ -1,10 +1,12 @@
 import {
   type AgentBrainSummary,
   type Agent as AgentRow,
+  adjustTeamAgent,
   agentBrainSummaries,
   agentBudgetsThisMonth,
   agentStatuses,
   agentView,
+  allowsPrivateEndpoints,
   applyAgentSetup,
   archiveAgent,
   askAgentProposal,
@@ -14,17 +16,22 @@ import {
   cancelUsageQueue,
   canTalkTo,
   canViewCost,
+  checkEndpoint,
   createAgent,
   createAgentFromProposal,
   createAgentGroup,
   createCredential,
   createProposedAgent,
   createProposedRoutine,
+  createTeam,
   decideCostlyProposal,
   deleteAgent,
   deleteAgentGroup,
   deleteCredential,
   denyAgentProposal,
+  denyTeam,
+  type EndpointNet,
+  endpointOrgsOf,
   getAgent,
   getAgentBrain,
   getAgentProposal,
@@ -34,7 +41,9 @@ import {
   listAgentGroups,
   listAgents,
   listCredentials,
+  listEndpoint,
   listFormerAgents,
+  listTeamTemplates,
   type Membership,
   moveAgentToGroup,
   NEW_AGENT_DEFAULTS,
@@ -43,7 +52,9 @@ import {
   oldHandlesByAgent,
   orgAiStatus,
   orgRouting,
+  pickerEndpoint,
   pickerModels,
+  proposeChannelMove,
   publishMachineAgentsChanged,
   requirePermission,
   revokeCredential,
@@ -53,10 +64,14 @@ import {
   setAgentAudience,
   setAgentBrain,
   speakerOf,
+  TEAM_TEMPLATES,
+  undoTeam,
   updateAgent,
   updateAgentGroup,
+  updateEndpointModels,
   usageQueue,
   usageSummary,
+  useTeamTemplate,
 } from "@agenteschat/engine";
 import { contextWindowOf, nanoUsdToUsd, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -66,13 +81,13 @@ import {
   body,
   createAppRouter,
   errors,
-  iso,
   json,
   noContent,
   OrgParams,
   requireSession,
   security,
 } from "./context";
+import { credentialOut, modelIn, modelOut } from "./credential-view";
 import {
   Agent,
   AgentAppearance,
@@ -87,6 +102,9 @@ import {
   CommandApproval,
   ContextLimit,
   Credential,
+  EndpointCheck,
+  EndpointModel,
+  EndpointStyle,
   FormerAgent,
   Model,
   NewAgentSetup,
@@ -95,6 +113,19 @@ import {
 } from "./schemas";
 
 const tags = ["Agents"];
+
+/** How this server reaches endpoints people type (ADR 0146). */
+const endpointNet = (deps: AppDeps): EndpointNet => ({
+  allowPrivate: allowsPrivateEndpoints(deps.config),
+  fetch: deps.extras?.http,
+  resolveHost: deps.extras?.resolveHost,
+});
+
+/** One test call per model of an endpoint, when this server has a model gateway. */
+const endpointChecks = (deps: AppDeps, userId: string, orgId: string, credentialId: string) => {
+  const gateway = deps.extras?.context?.gateway;
+  return gateway ? checkEndpoint(deps.db, gateway, userId, orgId, credentialId) : Promise.resolve([]);
+};
 
 /** An agent as this person may see it: its budget is money, so admins only (`seesCost`). */
 const toAgent = (
@@ -254,6 +285,82 @@ const AgentProposal = z
       "An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0081): the draft, the AI it suggests and what was decided.",
   });
 
+const TeamRoutine = z.object({
+  name: z.string(),
+  prompt: z.string(),
+  schedule: z.string(),
+  rule: z.record(z.string(), z.unknown()).nullable(),
+  cron: z.string(),
+  timezone: z.string(),
+  description: z.string(),
+  report: z.enum(["always", "when_new"]),
+  access: z.enum(["read", "act"]),
+});
+const TeamProposalCard = z
+  .object({
+    kind: z.literal("team_proposal"),
+    forUserId: z.string().nullable(),
+    params: z.object({
+      lead: z.string(),
+      agents: z.array(
+        z.object({
+          name: z.string(),
+          handle: z.string(),
+          role: z.string(),
+          line: z.string(),
+          instructions: z.string(),
+          appearance: AgentAppearance.nullable(),
+          channel: z.string(),
+          routines: z.array(TeamRoutine),
+          firstTask: z.string().nullable(),
+        }),
+      ),
+      newChannels: z.array(z.string()),
+      skills: z.array(
+        z.object({
+          name: z.string(),
+          title: z.string(),
+          description: z.string(),
+          body: z.string(),
+          agents: z.array(z.string()),
+        }),
+      ),
+      weekly: TeamRoutine.nullable(),
+      approvals: z.string(),
+      invite: z.array(z.string()),
+      template: z.string().optional(),
+    }),
+    state: z.enum(["pending", "creating", "created", "denied", "superseded", "undone"]),
+    decidedByUserId: z.string().nullable(),
+    decidedAt: z.string().nullable(),
+    expiresAt: z.string(),
+    created: z
+      .object({
+        agentIds: z.array(z.uuid()),
+        channelIds: z.array(z.uuid()),
+        routineIds: z.array(z.uuid()),
+        skillIds: z.array(z.uuid()),
+        skipped: z.array(z.enum(["skills", "weekly"])),
+        noAi: z.array(z.uuid()),
+      })
+      .optional(),
+    error: z
+      .object({
+        step: z.string(),
+        reason: z.string(),
+        status: z.number().int().optional(),
+        code: z.string().optional(),
+        params: z.record(z.string(), z.unknown()).optional(),
+      })
+      .nullable()
+      .optional(),
+    undoneAt: z.string().optional(),
+  })
+  .openapi("TeamProposalCard", {
+    description:
+      "The right hand's team card (`meta.actionCard`, ADR 0137 §10): several agents with their channels, routines and skills, created in one click.",
+  });
+
 /** Provider credentials, agents, usage and the model catalog. */
 export function agentRoutes(deps: AppDeps) {
   const { db, adapters } = deps;
@@ -269,7 +376,7 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Models agents can use, with prices",
       description:
-        "The catalog's models, then OpenRouter's (ADR 0087) while a workspace on this server has an OpenRouter key: its good picks first (`pick: true`), then the rest of its list (`pick: false`).",
+        "The catalog's models, then OpenRouter's (ADR 0087) while a workspace on this server has an OpenRouter key: its good picks first (`pick: true`), then the rest of its list (`pick: false`). Then the models of the signed-in person's workspaces' own endpoints (ADR 0146, `endpoint`).",
       responses: {
         200: json(
           z.object({
@@ -284,7 +391,7 @@ export function agentRoutes(deps: AppDeps) {
       c.json(
         {
           defaultModel: NEW_AGENT_DEFAULTS.model,
-          models: (await pickerModels(db)).map(([id, m]) => ({
+          models: (await pickerModels(db, await endpointOrgsOf(db, c.get("user").id))).map(([id, m]) => ({
             id,
             label: m.label,
             provider: m.provider,
@@ -293,6 +400,7 @@ export function agentRoutes(deps: AppDeps) {
             outputUsdPerMTok: pricesAt(m).output / 1000,
             ...(m.pick !== undefined ? { pick: m.pick } : {}),
             ...(m.tier ? { tier: m.tier } : {}),
+            ...pickerEndpoint(id, m),
           })),
         },
         200,
@@ -312,10 +420,7 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const rows = await listCredentials(db, c.get("user").id, c.req.valid("param").orgId);
-      return c.json(
-        { credentials: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString(), revokedAt: iso(r.revokedAt) })) },
-        200,
-      );
+      return c.json({ credentials: rows.map(credentialOut) }, 200);
     },
   );
 
@@ -327,14 +432,14 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Add a provider API key",
       description:
-        "The key is encrypted at rest and never returned by any endpoint. An OpenRouter key is checked with OpenRouter first, with no model call (ADR 0087): refused (`provider_key_invalid`) or a management key (`provider_key_management`) is never stored.",
+        "The key is encrypted at rest and never returned by any endpoint. An OpenRouter key is checked with OpenRouter first, with no model call (ADR 0087): refused (`provider_key_invalid`) or a management key (`provider_key_management`) is never stored. `custom` (ADR 0146) takes `endpoint`, may have no key, and answers with one test call per model (`checks`).",
       request: {
         params: OrgParams,
         body: body(
           z.object({
             provider: ProviderId,
             label: z.string().trim().min(1).max(80),
-            apiKey: z.string().min(8).max(500),
+            apiKey: z.string().max(500),
             workspaceId: z.string().max(128).nullable().optional().openapi({
               description:
                 "Claude Console workspace ID, for a key that works in more than one workspace (sent as `anthropic-workspace-id`).",
@@ -345,21 +450,92 @@ export function agentRoutes(deps: AppDeps) {
               .boolean()
               .optional()
               .openapi({ description: "Make it the workspace's default key in the same call (onboarding)." }),
+            endpoint: z
+              .object({ style: EndpointStyle, baseURL: z.string().min(1).max(500), models: z.array(EndpointModel) })
+              .optional()
+              .openapi({ description: "`custom` only: the endpoint's address, API and the models it offers." }),
           }),
         ),
       },
-      responses: { 201: json(Credential, "Created"), ...errors },
+      responses: {
+        201: json(Credential.extend({ checks: z.array(EndpointCheck).optional() }), "Created"),
+        ...errors,
+      },
     }),
     async (c) => {
+      const { orgId } = c.req.valid("param");
+      const { endpoint, ...input } = c.req.valid("json");
+      const userId = c.get("user").id;
       const row = await createCredential(
         db,
         adapters.keyWrapper,
-        c.get("user").id,
-        c.req.valid("param").orgId,
-        c.req.valid("json"),
-        { fetch: deps.extras?.http },
+        userId,
+        orgId,
+        { ...input, ...(endpoint ? { endpoint: { ...endpoint, models: endpoint.models.map(modelIn) } } : {}) },
+        { fetch: deps.extras?.http, net: endpointNet(deps) },
       );
-      return c.json({ ...row, createdAt: row.createdAt.toISOString(), revokedAt: iso(row.revokedAt) }, 201);
+      const checks = row.endpoint ? await endpointChecks(deps, userId, orgId, row.id) : undefined;
+      return c.json({ ...credentialOut(row), ...(checks ? { checks } : {}) }, 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/credentials/endpoint-models",
+      tags,
+      security,
+      summary: "What a workspace's own endpoint lists (ADR 0146), before it is saved (admins)",
+      description:
+        "Reads `GET {baseURL}/models` (Chat Completions) or `GET {baseURL}/v1/models` (Anthropic) with the key, which is not stored. On agentes.chat Cloud only public https addresses are reached (`url.https_required`, `url.internal`). A list the endpoint doesn't give comes back empty with `error`: the admin types ids instead.",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            style: EndpointStyle,
+            baseURL: z.string().min(1).max(500),
+            apiKey: z.string().max(500).optional(),
+          }),
+        ),
+      },
+      responses: {
+        200: json(
+          z.object({
+            baseURL: z.string().openapi({ description: "The address as it will be stored." }),
+            models: z.array(z.object({ id: z.string(), label: z.string().optional() })),
+            error: z.string().optional(),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) =>
+      c.json(
+        await listEndpoint(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json"), endpointNet(deps)),
+        200,
+      ),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/credentials/{credentialId}/models",
+      tags,
+      security,
+      summary: "Change an endpoint's models and prices, then test each again (admins, ADR 0146)",
+      request: {
+        params: OrgParams.extend({ credentialId: z.uuid() }),
+        body: body(z.object({ models: z.array(EndpointModel) })),
+      },
+      responses: { 200: json(z.object({ models: z.array(EndpointModel), checks: z.array(EndpointCheck) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, credentialId } = c.req.valid("param");
+      const userId = c.get("user").id;
+      await updateEndpointModels(db, userId, orgId, credentialId, c.req.valid("json").models.map(modelIn));
+      const checks = await endpointChecks(deps, userId, orgId, credentialId);
+      const saved = (await listCredentials(db, userId, orgId)).find((r) => r.id === credentialId);
+      return c.json({ models: (saved?.endpoint?.models ?? []).map(modelOut), checks }, 200);
     },
   );
 
@@ -464,7 +640,11 @@ export function agentRoutes(deps: AppDeps) {
                     "no_computer",
                     "cli_missing",
                     "computer_away",
+                    "computer_failed",
                     "plan_limit",
+                    "model_limit",
+                    "model_region",
+                    "commands_off",
                     "plan_not_shared",
                     "runner_outdated",
                     "plan_tools",
@@ -491,7 +671,7 @@ export function agentRoutes(deps: AppDeps) {
       await requirePermission(db, userId, orgId, "read");
       const status = aiStatusDeps(deps);
       const [ai, routing] = await Promise.all([
-        orgAiStatus(status, orgId),
+        orgAiStatus(status, orgId, userId),
         orgRouting(status, deps.extras?.router?.routing ?? null, orgId, userId),
       ]);
       return c.json({ ...ai, ...routing }, 200);
@@ -595,6 +775,9 @@ export function agentRoutes(deps: AppDeps) {
         "What it can do, as stable group keys (`drive`, `github`, `calendar`, `custom`…); empty without `seesDetails`.",
     }),
     busy: z.boolean().openapi({ description: "Working on something right now." }),
+    channelIds: z
+      .array(z.uuid())
+      .openapi({ description: "The channels it is in that the current person may see, in the sidebar's order." }),
     canTalk: z.boolean(),
     seesDetails: z.boolean().openapi({ description: "Whether the current person sees how it works." }),
   });
@@ -634,6 +817,39 @@ export function agentRoutes(deps: AppDeps) {
           consultations: team.consultations.map((x) => ({ ...x, createdAt: x.createdAt.toISOString() })),
         },
         200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/team/channel-move",
+      tags,
+      security,
+      summary:
+        "Propose moving an agent to another channel, as the team's right hand's settings card in the person's DM with it (ADR 0148); nothing changes until applied",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            agentId: z.uuid(),
+            fromChannelId: z.uuid().nullable(),
+            toChannelId: z.uuid(),
+            reason: z.string().trim().min(1).max(500),
+          }),
+        ),
+      },
+      responses: {
+        201: json(z.object({ channelId: z.uuid(), messageId: z.uuid(), rightHandId: z.uuid() }), "Created"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(
+        await proposeChannelMove({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, c.req.valid("json")),
+        201,
       );
     },
   );
@@ -852,6 +1068,163 @@ export function agentRoutes(deps: AppDeps) {
       return c.json(await askAgentProposal({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, messageId), 200);
     },
   );
+
+  const TeamParams = OrgParams.extend({ messageId: z.uuid() });
+  const TeamCardResult = z
+    .object({
+      card: TeamProposalCard,
+      noAi: z.array(z.uuid()).optional().openapi({
+        description: "Agents created with nothing to think with yet: the app opens Connect AI for them.",
+      }),
+    })
+    .openapi("TeamCardResult");
+  const teamDeps = () => ({ db, pubsub: adapters.pubsub, gateway: deps.extras?.context?.gateway });
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/team-proposals/{messageId}/create",
+      tags,
+      security,
+      summary: 'Create the whole team on the right hand\'s team card ("Criar o time", who may create agents)',
+      description:
+        "Its channels, agents, their channels and routines, its skills (admins) and the right hand's weekly check (who manages its routines), as you, in one transaction. A step that fails creates nothing: the card stays open with `error` (which step, and why). Created, the card carries `created` (for Desfazer and what was left out).",
+      request: { params: TeamParams },
+      responses: { 200: json(TeamCardResult), ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      return c.json(await createTeam(teamDeps(), c.get("user").id, orgId, messageId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/team-proposals/{messageId}/deny",
+      tags,
+      security,
+      summary: "Dismiss the right hand's team card (whoever it was for, or who may create agents)",
+      request: { params: TeamParams },
+      responses: { 200: json(TeamCardResult), ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      return c.json(await denyTeam(teamDeps(), c.get("user").id, orgId, messageId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/team-proposals/{messageId}/undo",
+      tags,
+      security,
+      summary: "Undo a team created from its card, within a day (whoever created it, or an admin)",
+      description:
+        "Its routines and skills go; its agents and the channels it created are archived. 409 `team_proposal.undo_expired` after a day.",
+      request: { params: TeamParams },
+      responses: { 200: json(TeamCardResult), ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      return c.json(await undoTeam(teamDeps(), c.get("user").id, orgId, messageId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/team-proposals/{messageId}/agents/{handle}",
+      tags,
+      security,
+      summary: 'Adjust one agent on an open team card before the team is created ("Ajustar")',
+      request: {
+        params: TeamParams.extend({ handle: z.string().min(1).max(32) }),
+        body: body(
+          z.object({
+            name: z.string().max(80).optional(),
+            role: z.string().max(200).optional(),
+            line: z.string().max(300).optional(),
+            instructions: z.string().max(50_000).optional(),
+            channel: z.string().max(81).optional(),
+            firstTask: z.string().max(500).optional(),
+          }),
+        ),
+      },
+      responses: { 200: json(TeamCardResult), ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId, handle } = c.req.valid("param");
+      return c.json(
+        await adjustTeamAgent(teamDeps(), c.get("user").id, orgId, messageId, handle, c.req.valid("json")),
+        200,
+      );
+    },
+  );
+
+  const TemplateView = z
+    .object({
+      id: z.enum(TEAM_TEMPLATES),
+      name: z.string(),
+      sub: z.string(),
+      description: z.string(),
+      team: TeamProposalCard.shape.params,
+    })
+    .openapi("TeamTemplate");
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/team-templates",
+      tags,
+      security,
+      summary: 'The team templates by business type ("Ver modelos de time"), in your language',
+      request: { params: OrgParams, query: z.object({ locale: z.string().max(20).optional() }) },
+      responses: { 200: json(z.object({ templates: z.array(TemplateView) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const context = deps.extras?.context;
+      const templates = await listTeamTemplates({ db, context }, c.get("user").id, orgId, c.req.valid("query").locale);
+      return c.json({ templates }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/team-templates/{templateId}/use",
+      tags,
+      security,
+      summary: "Post a template's team as the right hand's card in your DM with it (\"Usar este modelo\")",
+      description:
+        "No model call: the card, then the right hand's first question to fit it to the business (1 of 2), whose answer starts its turn.",
+      request: {
+        params: OrgParams.extend({ templateId: z.enum(TEAM_TEMPLATES) }),
+        body: { ...body(z.object({ locale: z.string().max(20).optional() })), required: false },
+      },
+      responses: { 200: json(z.object({ channelId: z.uuid(), messageId: z.uuid() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, templateId } = c.req.valid("param");
+      const context = deps.extras?.context;
+      const out = await useTeamTemplate(
+        { db, pubsub: adapters.pubsub, context },
+        c.get("user").id,
+        orgId,
+        templateId,
+        c.req.valid("json")?.locale,
+      );
+      return c.json(out, 200);
+    },
+  );
+
+  /** The team's right hand's AIs (ADR 0137 §11): the caller's own (the default) or the workspace's. */
+  const BrainScope = z.enum(["mine", "workspace"]).openapi({
+    description:
+      "The team's right hand only: `mine`, the caller's own AI for their DM with it (any member); `workspace`, what every DM thinks with while its person has none (admins). Ignored for other agents.",
+  });
 
   const AgentParams = OrgParams.extend({ agentId: z.uuid() });
 
@@ -1110,9 +1483,17 @@ export function agentRoutes(deps: AppDeps) {
         id: z.uuid(),
         name: z.string(),
         agentIds: z.array(z.uuid()).openapi({ description: "Its agents in order (archived ones left out)." }),
+        color: z.string().openapi({ description: "One of the roles' colors." }),
+        icon: z.string().openapi({ description: "One of the roles' icons." }),
+        leadUserId: z.string().nullable().openapi({ description: "Who leads the setor (ADR 0148)." }),
+        backupUserId: z.string().nullable().openapi({ description: "Who covers for the lead." }),
       }),
     ),
   });
+  const GroupLook = {
+    color: z.string().max(20).optional(),
+    icon: z.string().max(40).optional(),
+  };
   const GroupParams = OrgParams.extend({ groupId: z.uuid() });
   const GroupName = z.string().trim().min(1).max(80);
 
@@ -1141,7 +1522,7 @@ export function agentRoutes(deps: AppDeps) {
       summary: "Add a group after the others, with these agents in it in order (owners and admins)",
       request: {
         params: OrgParams,
-        body: body(z.object({ name: GroupName, agentIds: z.array(z.uuid()).max(200).optional() })),
+        body: body(z.object({ name: GroupName, agentIds: z.array(z.uuid()).max(200).optional(), ...GroupLook })),
       },
       responses: { 201: json(Groups, "Created"), ...errors },
     }),
@@ -1157,10 +1538,19 @@ export function agentRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/agent-groups/{groupId}",
       tags,
       security,
-      summary: "Rename a group, or move it among the groups (`index`) (owners and admins)",
+      summary:
+        "Rename a group, move it among the groups (`index`), or set its color, icon, lead or substitute (owners and admins)",
       request: {
         params: GroupParams,
-        body: body(z.object({ name: GroupName.optional(), index: z.number().int().min(0).optional() })),
+        body: body(
+          z.object({
+            name: GroupName.optional(),
+            index: z.number().int().min(0).optional(),
+            ...GroupLook,
+            leadUserId: z.string().min(1).max(200).nullable().optional(),
+            backupUserId: z.string().min(1).max(200).nullable().optional(),
+          }),
+        ),
       },
       responses: { 200: json(Groups), ...errors },
     }),
@@ -1255,13 +1645,14 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        '"Quem pensa" (ADR 0032): the model (API), Claude Code or Codex on its computer, the model and the fallback, with what its computer offers. An admin or the agent\'s owner.',
-      request: { params: AgentParams },
+        "\"Quem pensa\" (ADR 0032): the model (API), Claude Code or Codex on its computer, the model and the fallback, with what its computer offers. An admin or the agent's owner; the team's right hand's `mine`, any member.",
+      request: { params: AgentParams, query: z.object({ scope: BrainScope.optional() }) },
       responses: { 200: json(AgentBrain), ...errors },
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      return c.json(await getAgentBrain({ db }, c.get("user").id, orgId, agentId), 200);
+      const scope = c.req.valid("query").scope ?? "mine";
+      return c.json(await getAgentBrain({ db }, c.get("user").id, orgId, agentId, scope), 200);
     },
   );
 
@@ -1277,6 +1668,7 @@ export function agentRoutes(deps: AppDeps) {
         params: AgentParams,
         body: body(
           z.object({
+            scope: BrainScope.optional(),
             brain: BrainKind.optional(),
             model: z.string().max(80).nullable().optional().openapi({
               description:
@@ -1316,7 +1708,11 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const view = await setAgentBrain({ db }, c.get("user").id, orgId, agentId, c.req.valid("json"));
+      const input = c.req.valid("json");
+      const view = await setAgentBrain({ db }, c.get("user").id, orgId, agentId, {
+        ...input,
+        scope: input.scope ?? "mine",
+      });
       // Its computers hear which account each agent thinks with (system mode lends the folders by it), on every save:
       // the one an old plan was on may be none the view shows (the team's right hand, which is on no computer).
       await publishMachineAgentsChanged(adapters.pubsub, orgId);

@@ -59,6 +59,33 @@ const failed = (error: unknown): ToolOutput => ({
 
 export const LOAD_SKILL_TOOL = "load_skill";
 
+/** The files `load_skill` names one by one: the list goes into the conversation of every run that loads the skill. */
+const LISTED_FILES = 100;
+
+/** A skill's files for its agent, one a line. Past `LISTED_FILES`, the shallowest ones, and the rest as their folders. */
+function skillFileList(files: Awaited<ReturnType<typeof skillFilesOf>>) {
+  if (files.length === 0) return "(no files)";
+  const line = (f: (typeof files)[number]) => {
+    if (f.status === "stored") return `- ${f.path} (${f.mime}, ${formatBytes(f.size)})`;
+    if (f.status === "script") {
+      return `- ${f.path} (script: runs with run_skill_script if you have the code environment; its content is not shown)`;
+    }
+    return `- ${notKeptReason(f, files)}`;
+  };
+  if (files.length <= LISTED_FILES) return files.map(line).join("\n");
+  const depth = (path: string) => path.split("/").length;
+  const shallow = [...files].sort((a, b) => depth(a.path) - depth(b.path));
+  const folded = new Map<string, number>();
+  for (const f of shallow.slice(LISTED_FILES)) {
+    const folder = `${f.path.split("/").slice(0, -1).slice(0, 2).join("/") || "."}/`;
+    folded.set(folder, (folded.get(folder) ?? 0) + 1);
+  }
+  const folders = [...folded].map(
+    ([path, count]) => `- ${path} (${count} more, read_skill_file on this path lists them)`,
+  );
+  return [...shallow.slice(0, LISTED_FILES).map(line), ...folders].join("\n");
+}
+
 /**
  * Skills through the Tool Gateway (`skills:read`, on by default):
  * `load_skill` returns a skill's instructions and its files, and
@@ -113,18 +140,7 @@ export function createSkillToolSource(
             .update(schema.skills)
             .set({ useCount: sql`${schema.skills.useCount} + 1`, lastUsedAt: new Date() })
             .where(eq(schema.skills.id, skill.id));
-          const files = await skillFilesOf(ctx.db, skill);
-          const list = files.length
-            ? files
-                .map((f) => {
-                  if (f.status === "stored") return `- ${f.path} (${f.mime}, ${formatBytes(f.size)})`;
-                  if (f.status === "script") {
-                    return `- ${f.path} (script: runs with run_skill_script if you have the code environment; its content is not shown)`;
-                  }
-                  return `- ${notKeptReason(f, files)}`;
-                })
-                .join("\n")
-            : "(no files)";
+          const list = skillFileList(await skillFilesOf(ctx.db, skill));
           return {
             content: `Skill "${skill.name}" (v${skill.version}) loaded.\n\n${skill.body}\n\nFiles (read with read_skill_file):\n${list}`,
             data: { skill: { id: skill.id, name: skill.name, version: skill.version } },
@@ -137,7 +153,7 @@ export function createSkillToolSource(
     {
       name: "read_skill_file",
       description:
-        "Read a file of one of your skills (references, templates, examples, images): text comes as text, an image as an image you see; other files are saved to .skills/{name}/ on your computer, when you have one.",
+        "Read a file of one of your skills (references, templates, examples, images): text comes as text, an image as an image you see; other files are saved to .skills/{name}/ on your computer, when you have one. A path ending in / lists that folder.",
       scope: "skills:read",
       inputSchema: {
         type: "object",
@@ -153,6 +169,12 @@ export function createSkillToolSource(
           const skill = await agentSkillByName(ctx.db, ctx.orgId, ctx.agentId, str(input.name));
           if (!skill) return { content: `No skill named ${str(input.name)} is enabled for you.`, isError: true };
           const path = str(input.path);
+          if (path.endsWith("/")) {
+            const prefix = path === "./" ? "" : path;
+            const inside = (await skillFilesOf(ctx.db, skill)).filter((f) => f.path.startsWith(prefix));
+            const list = inside.map((f) => f.path).join("\n");
+            return { content: cutText(list, SKILL_LIMITS.fileReadChars) || `No files in ${path}` };
+          }
           const file = await skillFile(deps, skill, path);
           if (file.text) {
             const text = new TextDecoder().decode(file.data);

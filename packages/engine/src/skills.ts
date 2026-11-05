@@ -2,6 +2,7 @@ import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
+import { mapInBatches } from "./batches";
 import { activeConnections, type ConnectorDeps } from "./connectors/connections";
 import { type ErrorParams, ForbiddenError, NotFoundError, TooManyError, ValidationError } from "./errors";
 import { formatBytes } from "./format";
@@ -19,12 +20,14 @@ export type SkillRow = typeof skills.$inferSelect;
 /**
  * `maxBytes`: the text and scripts a skill keeps (past it the skill is refused). `assetBytes`: the images, PDFs and
  * other binary files it keeps, in folder order (past it the rest are only listed). `imageBytes`: the largest image
- * shown to a model (5 MB of base64, what the Claude API takes).
+ * shown to a model (5 MB of base64, what the Claude API takes). The first two sized for the largest skills published
+ * for other agents (design kits of about 1,600 files, 8 MB of text and scripts, 28 MB of images), with room to grow;
+ * a version is held in memory whole while it installs, so they bound that too.
  */
 export const SKILL_LIMITS = {
-  maxFiles: 200,
-  maxBytes: 2 * 1024 * 1024,
-  assetBytes: 20 * 1024 * 1024,
+  maxFiles: 3000,
+  maxBytes: 16 * 1024 * 1024,
+  assetBytes: 40 * 1024 * 1024,
   imageBytes: 3_750_000,
   bodyChars: 200_000,
   fileReadChars: 40_000,
@@ -117,7 +120,9 @@ function lineFields(yaml: string): Record<string, unknown> {
 export function parseSkillMarkdown(text: string): ParsedSkill {
   const src = text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
   const m = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(src);
-  if (!m) throw new ValidationError("SKILL.md needs a frontmatter block (--- name/description ---)");
+  if (!m) {
+    throw new ValidationError("SKILL.md needs a frontmatter block (--- name/description ---)", "skill.no_frontmatter");
+  }
   const lines = lineFields(m[1] ?? "");
   // Many published skills aren't valid YAML (`description: Use when: …`): they keep the line reading.
   const { name, description, ...metadata } = yamlFields(m[1] ?? "") ?? lines;
@@ -144,7 +149,9 @@ export function validateSkill(s: { name: string; description: string; body: stri
   }
   if (!s.description || s.description.length > 1024)
     throw new ValidationError("description: 1 to 1024 characters", "skill.invalid_description", { max: 1024 });
-  if (s.body.length > SKILL_LIMITS.bodyChars) throw new ValidationError("The skill body is too long");
+  if (s.body.length > SKILL_LIMITS.bodyChars) {
+    throw new ValidationError("The skill body is too long", "skill.body_too_long", { max: SKILL_LIMITS.bodyChars });
+  }
 }
 
 /** Scripts we keep (never shown to the model) so `run_skill_script` can run them on the agent's computer (ADR 0021). */
@@ -218,7 +225,7 @@ export function splitSkillFolder(files: SkillFileInput[]) {
     .filter((f) => f.path.startsWith(root) && !f.path.split("/").some((p) => p.startsWith(".") && p !== "."))
     .map((f) => ({ ...f, path: f.path.slice(root.length) }));
   const main = inRoot.find((f) => f.path.toLowerCase() === "skill.md");
-  if (!main) throw new ValidationError("No SKILL.md at the top of the skill folder");
+  if (!main) throw new ValidationError("No SKILL.md at the top of the skill folder", "skill.no_skill_md_zip");
   return { skillMd: new TextDecoder().decode(main.data), files: inRoot.filter((f) => f !== main) };
 }
 
@@ -428,19 +435,26 @@ export async function loadSkill(db: Database, orgId: string, id: string) {
   return s;
 }
 
+const MB = 1024 * 1024;
+
 /**
  * A skill whose files have these paths and sizes within the limits, refused as an upload is. Binaries (images, PDFs,
  * videos) count as files, not toward the size: past `SKILL_LIMITS.assetBytes` they are only listed.
  */
 function assertSkillSize(files: { path: string; size: number }[]) {
-  if (files.length > SKILL_LIMITS.maxFiles) {
-    throw new ValidationError(`Too many files (max ${SKILL_LIMITS.maxFiles})`, "skill.too_many_files", {
-      max: SKILL_LIMITS.maxFiles,
+  const { maxFiles, maxBytes } = SKILL_LIMITS;
+  if (files.length > maxFiles) {
+    throw new ValidationError(`This skill has ${files.length} files (max ${maxFiles})`, "skill.too_many_files", {
+      files: files.length,
+      max: maxFiles,
     });
   }
-  if (files.reduce((n, f) => n + (classifyFile(f.path).kind === "binary" ? 0 : f.size), 0) > SKILL_LIMITS.maxBytes) {
-    throw new ValidationError("The skill is too large (max 2 MB)", "skill.too_large", {
-      max: SKILL_LIMITS.maxBytes / 1024 / 1024,
+  const bytes = files.reduce((n, f) => n + (classifyFile(f.path).kind === "binary" ? 0 : f.size), 0);
+  if (bytes > maxBytes) {
+    const [size, max] = [Math.ceil((bytes / MB) * 10) / 10, maxBytes / MB];
+    throw new ValidationError(`This skill has ${size} MB of text and scripts (max ${max} MB)`, "skill.too_large", {
+      size,
+      max,
     });
   }
 }
@@ -479,6 +493,9 @@ async function planFiles(deps: SkillDeps, orgId: string, files: SkillFileInput[]
   return { location, files: planned };
 }
 
+/** Blob reads and writes at a time: one by one, a skill of thousands of files outlasts a request on object storage. */
+const BLOB_BATCH = 16;
+
 /** Stores a version's files: kept ones in the blob store, the rest only listed as ignored. */
 async function storeFiles(
   deps: SkillDeps,
@@ -486,13 +503,14 @@ async function storeFiles(
   version: number,
   { location, files }: Awaited<ReturnType<typeof planFiles>>,
 ) {
-  for (const { path, data, size, mime, status } of files) {
+  if (files.length === 0) return;
+  const rows = await mapInBatches(files, BLOB_BATCH, async ({ path, data, size, mime, status }) => {
     let blobKey: string | null = null;
     if (status !== "ignored") {
       blobKey = `${location.prefix}skills/${s.id}/v${version}/${path}`;
       await location.store.put(blobKey, data, { contentType: mime });
     }
-    await deps.db.insert(skillFiles).values({
+    return {
       orgId: s.orgId,
       skillId: s.id,
       version,
@@ -502,8 +520,9 @@ async function storeFiles(
       status,
       storageConfigId: status !== "ignored" ? location.storageConfigId : null,
       blobKey,
-    });
-  }
+    };
+  });
+  await deps.db.insert(skillFiles).values(rows);
 }
 
 /**
@@ -597,6 +616,7 @@ export async function saveSkill(
 
 /** Import from a zip of the skill folder (`SKILL.md` + files). */
 export async function importSkillZip(deps: SkillDeps, actorId: string, orgId: string, zip: Uint8Array) {
+  await requirePermission(deps.db, actorId, orgId, "manage_agents");
   const entries = listZip(zip).filter((e) => !e.symlink);
   return saveSkill(deps, actorId, orgId, {
     ...repositorySkill(
@@ -619,6 +639,9 @@ export interface GithubFetchDeps {
 export interface GithubFetchOptions {
   maxBytes: number;
   tooLarge: string;
+  /** The refusal's code and params, when the app has its own words for it. */
+  tooLargeCode?: string;
+  tooLargeParams?: ErrorParams;
   /** Redirects followed, each hop checked as the first request is. None by default: a redirect is refused. */
   redirects?: number;
   /** Over the whole exchange, body included (default 15 s). */
@@ -690,14 +713,15 @@ async function githubGet(
 /** A success's body, refused past `maxBytes` while it streams (codeload sends no length). */
 async function githubBody(res: Response, at: URL, options: GithubFetchOptions) {
   if (!res.ok) throw new ValidationError(`GitHub answered ${res.status} for ${at.pathname}`);
-  if (Number(res.headers.get("content-length") ?? 0) > options.maxBytes) throw new ValidationError(options.tooLarge);
+  const tooLarge = () => new ValidationError(options.tooLarge, options.tooLargeCode, options.tooLargeParams);
+  if (Number(res.headers.get("content-length") ?? 0) > options.maxBytes) throw tooLarge();
   const chunks: Uint8Array[] = [];
   let size = 0;
   try {
     if (res.body) {
       for await (const chunk of res.body) {
         size += chunk.byteLength;
-        if (size > options.maxBytes) throw new ValidationError(options.tooLarge);
+        if (size > options.maxBytes) throw tooLarge();
         chunks.push(chunk);
       }
     }
@@ -717,6 +741,8 @@ export async function fetchGithub(deps: GithubFetchDeps, url: string, accept: st
   return githubBody(res, at, options);
 }
 
+const notGithubLink = (message: string) => new ValidationError(message, "skill.not_github_link");
+
 /**
  * Where a GitHub URL points: a folder (the repository, or `/tree/{ref}/{path}`) or a file (`/blob/…` or
  * raw.githubusercontent), with its path decoded. No ref is the default branch (`HEAD`).
@@ -728,19 +754,19 @@ export function parseGithubUrl(url: string) {
     u = new URL(url);
     segments = u.pathname.split("/").filter(Boolean).map(decodeURIComponent);
   } catch {
-    throw new ValidationError("Unrecognized GitHub URL");
+    throw notGithubLink("Unrecognized GitHub URL");
   }
   if (u.hostname === "raw.githubusercontent.com") {
     const [owner, repo, ...rest] = segments;
     // GitHub's Raw button spells the branch out: `refs/heads/main/…`.
     const [ref, ...path] = rest[0] === "refs" && (rest[1] === "heads" || rest[1] === "tags") ? rest.slice(2) : rest;
-    if (!owner || !repo || !ref || path.length === 0) throw new ValidationError("Unrecognized GitHub URL");
+    if (!owner || !repo || !ref || path.length === 0) throw notGithubLink("Unrecognized GitHub URL");
     return { kind: "file" as const, owner, repo, ref, path: path.join("/") };
   }
-  if (u.hostname !== "github.com") throw new ValidationError("Only GitHub URLs can be imported for now");
+  if (u.hostname !== "github.com") throw notGithubLink("Only GitHub URLs can be imported for now");
   const [owner, name, mode, ref, ...rest] = segments;
   const repo = name?.replace(/\.git$/, "");
-  if (!owner || !repo) throw new ValidationError("Unrecognized GitHub URL");
+  if (!owner || !repo) throw notGithubLink("Unrecognized GitHub URL");
   if (mode === "blob" && ref) return { kind: "file" as const, owner, repo, ref, path: rest.join("/") };
   if (mode === "tree" && ref) return { kind: "folder" as const, owner, repo, ref, path: rest.join("/") };
   return { kind: "folder" as const, owner, repo, ref: "HEAD", path: "" };
@@ -752,6 +778,8 @@ type GithubTarget = ReturnType<typeof parseGithubUrl>;
 const ARCHIVE: GithubFetchOptions = {
   maxBytes: 50 * 1024 * 1024,
   tooLarge: "The repository is too large to download (max 50 MB). Upload the skill's folder as a .zip instead.",
+  tooLargeCode: "skill.repo_too_large",
+  tooLargeParams: { max: 50 },
   // github.com redirects to codeload.github.com, and first to the new name of a renamed repository.
   redirects: 3,
   timeoutMs: 60_000,
@@ -1050,7 +1078,7 @@ export interface SkillPick {
 
 /**
  * Import from a GitHub link, read by the backend from the repository's archive (only GitHub hosts, the SSRF guard
- * on every request, 200 files a skill and 2 MB of the text and scripts it keeps, binaries only listed): the skill
+ * on every request, within `SKILL_LIMITS`): the skill
  * folder it points at (a file's folder), or the one skill below it. A link that holds several answers with them to
  * pick from (`importPickedSkills`), nothing installed, and with those that can't be installed (past the limits, or a
  * SKILL.md that doesn't parse) apart, each with why; `list` answers so for one skill too. Installing a skill whose
@@ -1098,20 +1126,35 @@ export async function importPickedSkills(
 ) {
   await requirePermission(deps.db, actorId, orgId, "manage_agents");
   const link = await readGithubLink(deps, orgId, url);
-  // Every pick is checked before any is saved; a refusal names the skill's folder.
-  const skills = [...new Set(paths)].map((dir) => {
-    if (!link.found.has(dir)) throw new ValidationError(`That link holds no skill at ${dir}`);
+  /** A refusal names the skill's folder. */
+  const named = <T>(dir: string, read: () => T) => {
     try {
-      return link.skillAt(dir);
+      return read();
     } catch (err) {
       if (err instanceof ValidationError) throw new ValidationError(`${dir}: ${err.message}`, err.code, err.params);
       throw err;
     }
+  };
+  const dirs = [...new Set(paths)];
+  // Every pick's limits and text are checked before any is saved, by the SKILL.md alone: its files are inflated one
+  // skill at a time, since a small archive can declare the most a skill keeps for each of the 100 it may hold.
+  const names = dirs.map((dir) => {
+    if (!link.found.has(dir)) throw new ValidationError(`That link holds no skill at ${dir}`);
+    return named(dir, () => link.about(dir).name);
   });
-  const twin = skills.find((s, i) => skills.findIndex((other) => other.name === s.name) !== i);
-  if (twin) throw new ValidationError(`Two of the skills picked are named ${twin.name}. Pick one of them.`);
+  const twin = names.find((name, i) => names.indexOf(name) !== i);
+  if (twin) throw new ValidationError(`Two of the skills picked are named ${twin}. Pick one of them.`);
   const installed: SkillDetail[] = [];
-  for (const skill of skills) installed.push(await saveSkill(deps, actorId, orgId, skill));
+  for (const dir of dirs) {
+    installed.push(
+      await saveSkill(
+        deps,
+        actorId,
+        orgId,
+        named(dir, () => link.skillAt(dir)),
+      ),
+    );
+  }
   return installed;
 }
 
@@ -1641,12 +1684,11 @@ export async function skillFolderFiles(deps: SkillDeps, s: SkillRow, paths?: str
         paths ? inArray(skillFiles.path, paths) : undefined,
       ),
     );
-  const out: { path: string; status: SkillFileStatus; data: Uint8Array }[] = [];
-  for (const f of rows) {
-    if (f.status === "ignored" || !f.blobKey) continue;
+  const read = await mapInBatches(rows, BLOB_BATCH, async (f) => {
+    if (f.status === "ignored" || !f.blobKey) return null;
     const store = await deps.blobs.forConfig(s.orgId, f.storageConfigId);
     const object = await store.get(f.blobKey);
-    if (object) out.push({ path: f.path, status: f.status as SkillFileStatus, data: object.body });
-  }
-  return out;
+    return object ? { path: f.path, status: f.status as SkillFileStatus, data: object.body } : null;
+  });
+  return read.filter((f) => f !== null);
 }

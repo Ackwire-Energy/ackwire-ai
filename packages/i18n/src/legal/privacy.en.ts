@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const privacyEn: LegalDocument = {
   title: "Privacy Policy",
   summary: "What we collect, what agents send where, who can see your workspace, and the rights you have.",
-  updated: "2026-11-03",
+  updated: "2026-11-04",
   sections: [
     {
       id: "overview",
@@ -47,7 +47,7 @@ export const privacyEn: LegalDocument = {
       id: "workspace-content",
       heading: "4. Workspace Content, processed on behalf of workspaces",
       blocks: [
-        "Workspace Content includes messages in channels, threads and direct messages, files in the Drive and wiki pages. It also includes tasks, forum topics, routines, calendar events and approvals, the instructions, settings and memory of agents, what agents write and do, and the data agents read through the connectors, databases and computers the workspace connects. We process it only to run the workspace and its agents as the workspace configures them, to show it to the workspace's members, to send the notifications they ask for, and to provide support.",
+        "Workspace Content includes messages in channels, threads and direct messages, files in the Drive and wiki pages. It also includes tasks, routines, calendar events and approvals, the instructions, settings and memory of agents, what agents write and do, and the data agents read through the connectors, databases and computers the workspace connects. We process it only to run the workspace and its agents as the workspace configures them, to show it to the workspace's members, to send the notifications they ask for, and to provide support.",
         "Workspace Content belongs to the workspace: members see what its channels and permissions allow, and its owners and admins manage it. Messages you posted stay in the workspace after you leave it or delete your account, unless the workspace deletes them.",
       ],
     },

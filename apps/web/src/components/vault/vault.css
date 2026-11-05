@@ -10,11 +10,6 @@
   gap: 20px;
   min-width: 0;
 }
-.vlt-head__acts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
 .vlt-body {
   display: flex;
   flex-direction: column;

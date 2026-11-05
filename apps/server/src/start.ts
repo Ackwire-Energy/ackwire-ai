@@ -47,6 +47,7 @@ import {
 } from "@agenteschat/db";
 import {
   adoptRestoredOperatorEvents,
+  allowsPrivateEndpoints,
   composioUsageHook,
   createGifKey,
   createLocalKeyWrapper,
@@ -256,7 +257,8 @@ async function boot(
     modules,
     base,
     defaults,
-    createModelProviders(),
+    // A workspace's own model endpoint (ADR 0146): on agentes.chat Cloud every call connects only to public addresses.
+    createModelProviders({ endpointFetch: allowsPrivateEndpoints(config) ? undefined : publicHttpsFetch() }),
   );
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
   resolved = adapters;

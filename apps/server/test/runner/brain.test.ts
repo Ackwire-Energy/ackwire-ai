@@ -312,6 +312,16 @@ test("parser: today's limit wordings are plan limits, the server's throttle is n
   expect(throttle.rateLimit).toBeUndefined();
 });
 
+test("parser: OpenCode Go's 429 after Claude Code's retries is a plan limit that keeps the provider's words", () => {
+  const p = new ClaudeStreamParser();
+  p.beginTurn();
+  p.push(line({ type: "system", subtype: "api_retry", error: "rate_limit", error_status: 429 }));
+  const text = 'API Error: 429 {"error":{"type":"GoUsageLimitError","message":"Weekly usage limit reached"}}';
+  const r = p.push(line({ type: "result", subtype: "success", is_error: true, result: text }));
+  // The engine reads whose limit it is from these words (`refusalScope`).
+  expect(r.final).toMatchObject({ code: "plan_limit", message: text, worked: false });
+});
+
 test("parser: a plan limit says whether the turn used a tool before it was cut", () => {
   const p = new ClaudeStreamParser();
   const limited = () =>
@@ -1782,6 +1792,9 @@ test.if(posix)(
     await turn(3, "hi", on(3));
     expect(m.size).toBe(3);
     const left = m.process(AGENT.id, SESSION(1));
+    // The team's right hand thinks with several people's accounts: each of them stays.
+    m.keepAccount(OTHER, [ACCOUNT]);
+    expect(m.size).toBe(3);
     m.keepAccount(OTHER);
     await waitFor(() => left?.exited === true, 8000);
     expect(m.size).toBe(2);

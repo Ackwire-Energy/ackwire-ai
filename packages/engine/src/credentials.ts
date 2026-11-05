@@ -2,7 +2,11 @@ import type { KeyWrapper } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, isNull, schema, sql } from "@agenteschat/db";
 import {
   checkOpenRouterKey,
+  customModelOf,
+  customModelsOf,
+  type EndpointStyle,
   ensureOpenRouterModels,
+  isCustomModel,
   isKnownProvider,
   isOpenRouterModel,
   listedModels,
@@ -13,6 +17,15 @@ import {
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { openSecret, sealSecret } from "./crypto";
+import {
+  cleanEndpointModels,
+  ENDPOINT_NO_KEY,
+  type EndpointModel,
+  type EndpointNet,
+  endpointAddress,
+  loadEndpointModels,
+  type StoredEndpoint,
+} from "./endpoints";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { requirePermission } from "./organizations";
 
@@ -31,6 +44,8 @@ export interface CredentialSummary {
   workspaceIdHint: string | null;
   /** The workspace's default key (used by agents without their own key, router, summaries). */
   isDefault?: boolean;
+  /** A workspace endpoint's address, API style and models (`custom`, ADR 0146). Not secret. */
+  endpoint?: StoredEndpoint;
   createdAt: Date;
   revokedAt: Date | null;
 }
@@ -41,6 +56,7 @@ const summary = (row: typeof providerCredentials.$inferSelect): CredentialSummar
   label: row.label,
   keyHint: row.keyHint,
   workspaceIdHint: row.workspaceId ? row.workspaceId.slice(-6) : null,
+  ...(row.options?.endpoint ? { endpoint: row.options.endpoint } : {}),
   createdAt: row.createdAt,
   revokedAt: row.revokedAt,
 });
@@ -87,16 +103,28 @@ export async function openRouterInUse(db: Executor): Promise<boolean> {
   })) as boolean;
 }
 
-/** A model's entry, for a setting someone picks: OpenRouter's list is read first only while it is in use. */
-export async function modelInfoFor(db: Executor, model: string): Promise<ModelInfo | undefined> {
+/**
+ * A model's entry, for a setting someone picks: OpenRouter's list is read first only while it is in use. A workspace
+ * endpoint's model (ADR 0146) is found only for its own organization.
+ */
+export async function modelInfoFor(db: Executor, model: string, orgId?: string): Promise<ModelInfo | undefined> {
+  if (isCustomModel(model)) {
+    if (!orgId) return undefined;
+    await loadEndpointModels(db, orgId);
+    return customModelOf(orgId, model);
+  }
   if (isOpenRouterModel(model) && (await openRouterInUse(db))) await ensureOpenRouterModels(model);
   return modelInfo(model);
 }
 
-/** Every model for the pickers: the catalog's, then OpenRouter's, its list read first only while it is in use. */
-export async function pickerModels(db: Executor): Promise<[string, ModelInfo][]> {
+/**
+ * Every model for the pickers: the catalog's, then OpenRouter's (its list read first only while it is in use), then
+ * the endpoint models of `orgIds` (ADR 0146).
+ */
+export async function pickerModels(db: Executor, orgIds: readonly string[] = []): Promise<[string, ModelInfo][]> {
   if (await openRouterInUse(db)) await ensureOpenRouterModels();
-  return listedModels();
+  for (const orgId of orgIds) await loadEndpointModels(db, orgId);
+  return [...listedModels(), ...orgIds.flatMap((orgId) => customModelsOf(orgId))];
 }
 
 /**
@@ -127,14 +155,25 @@ export async function createCredential(
     project?: string | null;
     /** Make it the workspace's default key (onboarding does this in the same call). */
     makeDefault?: boolean;
+    /** `custom` only, and required there: the endpoint's address, API style and models (ADR 0146). */
+    endpoint?: { style: EndpointStyle; baseURL: string; models: EndpointModel[] };
   },
-  /** Outbound HTTP for the provider's key check (tests: a fake). */
-  opts: { fetch?: typeof fetch } = {},
+  /** Outbound HTTP for the provider's key check (tests: a fake); `net`: how endpoints may be reached. */
+  opts: { fetch?: typeof fetch; net?: EndpointNet } = {},
 ): Promise<CredentialSummary> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
   if (!isKnownProvider(input.provider)) throw new ValidationError(`Unknown provider ${input.provider}`);
-  const apiKey = input.apiKey.trim();
-  if (apiKey.length < 8) throw new ValidationError("apiKey looks too short");
+  const custom = input.provider === "custom";
+  if (custom !== Boolean(input.endpoint))
+    throw new ValidationError(custom ? "An endpoint needs its address and models" : "Only an endpoint has an address");
+  // A key-less server (a local Ollama) gets a word the SDKs accept.
+  const apiKey = input.apiKey.trim() || (custom ? ENDPOINT_NO_KEY : "");
+  if (apiKey.length < (custom ? 1 : 8)) throw new ValidationError("apiKey looks too short");
+  const endpoint: StoredEndpoint | undefined = input.endpoint && {
+    style: input.endpoint.style,
+    baseURL: await endpointAddress(input.endpoint.baseURL, input.endpoint.style, opts.net ?? { allowPrivate: false }),
+    models: cleanEndpointModels(input.endpoint.models),
+  };
   await checkKey(input.provider, apiKey, opts.fetch);
   const id = crypto.randomUUID();
   const sealed = await sealSecret(keyWrapper, apiKey, aadFor(orgId, id));
@@ -149,9 +188,9 @@ export async function createCredential(
         secretCiphertext: sealed.ciphertext,
         wrappedDataKey: sealed.wrappedDataKey,
         kekId: sealed.kekId,
-        keyHint: apiKey.slice(-4),
+        keyHint: apiKey === ENDPOINT_NO_KEY ? "" : apiKey.slice(-4),
         workspaceId: cleanWorkspaceId(input.workspaceId),
-        options: cleanOptions(input),
+        options: { ...cleanOptions(input), ...(endpoint ? { endpoint } : {}) },
         createdByUserId: actorId,
       })
       .returning();
@@ -180,9 +219,10 @@ function cleanOptions(input: { organization?: string | null; project?: string | 
   return out;
 }
 
-/** Forgets which credential is each provider's default for an org (after any key or settings change). */
+/** Forgets which credential is each provider's default for an org, and its endpoints (after any key or settings change). */
 export function invalidateDefaults(orgId: string) {
   caches.credentials.deletePrefix(`${orgId}:default:`);
+  caches.credentials.delete(`${orgId}:endpoints`);
 }
 
 /** Makes a key its provider's default (and the legacy single default), in the caller's transaction. */
@@ -311,7 +351,7 @@ export async function decryptCredential(
   provider: ProviderId;
   apiKey: string;
   workspaceId?: string;
-  options?: { organization?: string; project?: string };
+  options?: { organization?: string; project?: string; endpoint?: StoredEndpoint };
 } | null> {
   const row = await usableCredentialRow(db, orgId, credentialId);
   if (!row) return null;
@@ -369,6 +409,10 @@ export async function rotateCredential(
       kekId: sealed.kekId,
       keyHint: apiKey.slice(-4),
       ...values,
+      // An endpoint's address and models stay as they are.
+      ...(values.options && current.options.endpoint
+        ? { options: { ...values.options, endpoint: current.options.endpoint } }
+        : {}),
     })
     .where(
       and(

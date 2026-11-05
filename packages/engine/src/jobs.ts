@@ -51,7 +51,6 @@ import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { FOLLOW_UP_JOB, wakeFollowUp } from "./follow-through";
 import { cutText } from "./format";
-import { advanceForumTopic } from "./forum";
 import { FILE_JOIN_REQUEST_JOB, fileJoinRequest } from "./invite-requests";
 import { announceTaskConversation } from "./issues";
 import type { JevKey, JevKeySource } from "./jev-key";
@@ -102,6 +101,7 @@ import { runSkillUpdates, SKILL_UPDATES_JOB } from "./skill-updates";
 import type { SkillDeps } from "./skills";
 import { purgeOrgFiles, purgeUserFiles, runMigration, type StorageDeps } from "./storage";
 import { postStretchCard, STRETCH_JOB, type StretchHold } from "./stretch";
+import { postTeamWeek, TEAM_WEEK_JOB } from "./team-week";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
 import { runVaultSync, VAULT_SYNC_JOB, type VaultDeps } from "./vault";
@@ -160,7 +160,7 @@ export interface JobDeps extends RunExecutorDeps {
     info(message: string, data?: Record<string, unknown>): void;
     warn(message: string, data?: Record<string, unknown>): void;
   };
-  /** Drive (job `forum.advance` saves the forum synthesis). */
+  /** Drive (routines' reports, polls). */
   artifacts?: ArtifactDeps;
   /** Agents' computers: the hub and public URL missions use. */
   sandbox?: SandboxDeps | null;
@@ -570,8 +570,6 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           ...intent,
         });
       const where = await getChannelCached(deps.db, message.orgId, message.channelId);
-      // The forum moves by its own turns (ADR 0022): no mentions, router or DMs there.
-      if (where?.kind === "forum") return;
       // Addressed a mission's agent without the right to act there (ADR 0029): a suggestion, no run.
       if (message.meta.missionSuggestion) return routed("none", message.mentionedAgentIds, [], "mission_suggestion");
       // Someone who acts in a mission waiting to be concluded wrote in its thread: new work, active again.
@@ -849,14 +847,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     "routine.run": async (job) => {
       await executeRoutineRun(
-        { db: deps.db, pubsub: deps.pubsub, context: deps.context, artifacts: deps.artifacts },
+        { db: deps.db, pubsub: deps.pubsub, context: deps.context },
         String(job.payload.routineRunId),
-      );
-    },
-    "forum.advance": async (job) => {
-      await advanceForumTopic(
-        { db: deps.db, pubsub: deps.pubsub, artifacts: deps.artifacts },
-        String(job.payload.topicId),
       );
     },
     [VOICE_JOB]: async (job, ctx) => {
@@ -993,6 +985,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       );
     },
     // A person's monthly AI limit neared or reached (ADR 0141): the person hears 80%, who decides hears 100%.
+    [TEAM_WEEK_JOB]: async (job) => {
+      await postTeamWeek({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), job.payload);
+    },
     [PERSON_LIMIT_JOB]: async (job) => {
       await notifyPersonLimit({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), {
         personId: String(job.payload.personId),

@@ -209,22 +209,81 @@ export async function scrubRightHandReply(
 export const RIGHT_HAND_TURN = { mode: "chat" } as const;
 
 type ThinkingAgent = Pick<Agent, "orgId" | "brainAccountId" | "machineId"> &
-  Partial<Pick<Agent, "builtin" | "ownerUserId">>;
+  Partial<Pick<Agent, "builtin" | "ownerUserId" | "brain" | "brainModel" | "brainEffort" | "brainAccountLentBy">> &
+  Partial<Pick<Agent, "planForOthers" | "brainFallback" | "brainExtraUsage">>;
+
+/** A person's own AI for the right hand (§11): their row, null when their DM thinks with the workspace's. */
+export async function personalBrain(db: Executor, orgId: string, userId: string) {
+  const [row] = await db
+    .select()
+    .from(schema.rightHandBrains)
+    .where(and(eq(schema.rightHandBrains.orgId, orgId), eq(schema.rightHandBrains.userId, userId)));
+  return row ?? null;
+}
+
+/** The right hand with `person`'s own AI (§11) in place of the workspace's brain, when they chose one. */
+export async function withPersonalBrain<T extends ThinkingAgent>(
+  db: Executor,
+  agent: T,
+  person: string | null | undefined,
+): Promise<{ agent: T; own: boolean }> {
+  const own = person && isRightHand(agent) ? await personalBrain(db, agent.orgId, person) : null;
+  if (!own) return { agent, own: false };
+  return {
+    agent: {
+      ...agent,
+      brain: own.brain,
+      brainModel: own.brainModel,
+      brainEffort: own.brainEffort,
+      brainAccountId: own.brainAccountId,
+      brainAccountLentBy: own.brainAccountLentBy,
+      brainFallback: false,
+      brainExtraUsage: false,
+    },
+    own: true,
+  };
+}
 
 /**
  * An agent as its brain sees it. The right hand is on no computer and its owner is the workspace's (`followOwner`):
  * on a plan it thinks on the computer where that plan's account is signed in, and the plan is its owner's (who pays,
- * as for any agent, ADR 0059 §3). With no account it has no computer. Every other agent is itself.
+ * as for any agent, ADR 0059 §3). With no account it has no computer. `person`: whose DM the run answers; their own
+ * AI (§11) thinks for them in place of the workspace's, and serves them alone: their own plan, or one given to them
+ * with `use_others_plans`. Every other agent is itself.
  */
-export async function thinkingAgent<T extends ThinkingAgent>(db: Executor, agent: T): Promise<T> {
+export async function thinkingAgent<T extends ThinkingAgent>(
+  db: Executor,
+  agent: T,
+  person?: string | null,
+): Promise<T> {
   if (!isRightHand(agent)) return agent;
-  const [plan] = agent.brainAccountId
+  const { agent: base, own } = await withPersonalBrain(db, agent, person);
+  const [plan] = base.brainAccountId
     ? await db
         .select({ machineId: machineAccounts.machineId, ownerId: machineAccounts.createdBy })
         .from(machineAccounts)
-        .where(and(eq(machineAccounts.orgId, agent.orgId), eq(machineAccounts.id, agent.brainAccountId)))
+        .where(and(eq(machineAccounts.orgId, agent.orgId), eq(machineAccounts.id, base.brainAccountId)))
     : [];
-  return { ...agent, machineId: plan?.machineId ?? null, ownerUserId: plan?.ownerId ?? null };
+  const ownerUserId = plan?.ownerId ?? null;
+  return {
+    ...base,
+    machineId: plan?.machineId ?? null,
+    ownerUserId,
+    // "Atende outras pessoas" is the workspace's plan's switch: a person's own serves that person.
+    ...(own ? { planForOthers: base.brainAccountLentBy != null || ownerUserId === person } : {}),
+  };
+}
+
+/** The person whose own AI a right hand's run thinks with (`thinkingAgent`); null for any other agent's run. */
+export async function rightHandPerson(
+  db: Executor,
+  agent: { builtin?: string | null },
+  run: Pick<AgentRun, "orgId" | "id" | "triggerMessageId">,
+): Promise<string | null> {
+  if (!isRightHand(agent)) return null;
+  return personBehindCall({ db, orgId: run.orgId, runId: run.id, triggerMessageId: run.triggerMessageId }).catch(
+    () => null,
+  );
 }
 
 /**
@@ -259,15 +318,21 @@ export async function rightHandPlanRefusal(
 
 /**
  * The line its DM shows when its plan can't think (ADR 0137 §7): it never falls back to an API key, nor waits with a
- * spinner. Its computer asleep or paused, the plan at its limit, someone else's DM, or what any agent says.
+ * spinner. Its computer asleep or paused, the plan at its limit (or only its model's, or the region that model needs:
+ * `scope`), a plan that answers only its owner, a program to update or turned off there, the plan's CLI not
+ * installed, or what any agent says.
  */
-export function rightHandNoAiReason(code: string): NoAiReason {
+export function rightHandNoAiReason(code: string, scope?: "model" | "region"): NoAiReason {
   if (code === "machine_offline" || code === "machine_paused") return "computer_away";
-  if (code === "plan_limit") return "plan_limit";
-  if (code === "plan_not_shared") return "plan_not_shared";
-  if (code === "runner_outdated") return "runner_outdated";
+  if (code === "plan_limit")
+    return scope === "region" ? "model_region" : scope === "model" ? "model_limit" : "plan_limit";
+  if (code === "plan_not_shared" || code === "plan_not_owner") return "plan_not_shared";
+  if (code === "runner_outdated" || code === "codex_too_old") return "runner_outdated";
+  if (code === "exec_disabled" || code === "tool_off") return "commands_off";
   if (code === "tools_not_locked") return "plan_tools";
   if (code === "no_computer" || code === "no_session") return "no_computer";
-  if (code === "not_logged_in" || code === "plan_not_owner") return "not_signed_in";
-  return "cli_missing";
+  if (code === "not_logged_in") return "not_signed_in";
+  if (code === "cli_missing" || code.endsWith("_missing")) return "cli_missing";
+  // Only a failure that may pass is left (a retryable one): its card offers "Responder agora" once it can think.
+  return "computer_failed";
 }

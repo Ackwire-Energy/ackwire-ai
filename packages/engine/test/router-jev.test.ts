@@ -665,7 +665,7 @@ describe("the agent a person last talked to", () => {
       [t.ada, "Não consigo ver meu saldo por aqui.", 22],
     ];
     // Ada could do it too, but Theo is a clear pick, 0.3 over her (0.96 to 0.52).
-    const roadmap = await t.talk(talkWithAda, "resume a discussão de ontem no fórum e atualiza o roadmap", () => ({
+    const roadmap = await t.talk(talkWithAda, "resume a discussão de ontem no #produto e atualiza o roadmap", () => ({
       nouls: { "@theo": 0.9, "@ada": 0.55 },
       needs: 0.85,
       best: "theo",

@@ -75,7 +75,6 @@ import {
 } from "@agenteschat/client/lib/routines";
 import {
   Button,
-  Checkbox,
   CheckboxPill,
   Chip,
   cx,
@@ -93,6 +92,7 @@ import {
   InfoHint,
   Input,
   Menu,
+  PageHeader,
   RecurrencePicker,
   type RecurrenceRule,
   RunKey,
@@ -214,7 +214,6 @@ function useTargetLabel() {
       if (!c) return t("routines.inConversation");
       return t(target.threadId ? "routines.inThread" : "routines.inChannel", { channel: c.name });
     }
-    if (target.type === "forum") return t("routines.target.forumShort");
     if (target.type === "widget")
       return widgetTitle ? t("routines.target.widgetNamed", { title: widgetTitle }) : t("routines.target.widget");
     return t(target.type === "dm" ? "routines.target.dmShort" : "routines.target.artifactShort");
@@ -240,13 +239,11 @@ const targetIcon = (target: RoutineTarget): IconName =>
       ? target.threadId
         ? "reply"
         : "channel"
-      : target.type === "forum"
-        ? "members"
-        : target.type === "artifact"
-          ? "file"
-          : target.type === "widget"
-            ? "grid"
-            : "channel";
+      : target.type === "artifact"
+        ? "file"
+        : target.type === "widget"
+          ? "grid"
+          : "channel";
 
 /** The agent's look for the pixel pieces (color and eyes). */
 function useLook() {
@@ -258,7 +255,7 @@ function useLook() {
 }
 
 /** "Quando" in words, in the routine's zone (the zone shows only when it isn't mine). */
-function useWhen() {
+export function useWhen() {
   const { t, i18n } = useTranslation();
   const { me, org } = useOrg();
   const actors = useActors();
@@ -358,15 +355,15 @@ export function RoutinesPage() {
   return (
     <div className="page routines">
       <div className="routines__main">
-        <header className="routines-head">
-          <div>
-            <h1>{t("routines.title")}</h1>
-            <p className="routines-head__sub">{t("routines.subtitle")}</p>
-          </div>
-          <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-            {t("routines.new")}
-          </Button>
-        </header>
+        <PageHeader
+          title={t("routines.title")}
+          meta={t("routines.subtitle")}
+          actions={
+            <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+              {t("routines.new")}
+            </Button>
+          }
+        />
         {routines.isLoading && <LoadingCards count={3} />}
         {routines.isError && !routines.data && (
           <ErrorState error={routines.error} onRetry={() => void routines.refetch()} />
@@ -1143,7 +1140,7 @@ export function RoutineDetailsDialog({ routineId, onClose }: { routineId: string
 function useWhereHint() {
   const { org } = useOrg();
   const dms = useDms(org.id);
-  return (target: RoutineTarget): "thread" | "channel" | "dm" | "forum" | "artifact" | "widget" => {
+  return (target: RoutineTarget): "thread" | "channel" | "dm" | "artifact" | "widget" => {
     if (target.type !== "conversation") return target.type;
     if (dms.data?.some((d) => d.channelId === target.channelId)) return "dm";
     return target.threadId ? "thread" : "channel";
@@ -1603,8 +1600,8 @@ function AsideValue({ lead, label, line }: { lead?: ReactNode; label: ReactNode;
 
 /**
  * The routine's aside, sticky in the dialog as a task's: "No ar" (a switch, with what it means), then who does it,
- * when (the creation form's schedule and triggers, in a dialog of their own), where it delivers (a forum asks its
- * agents and rounds in that dialog), when it posts and where it runs, each changing at once; then its usage this
+ * when (the creation form's schedule and triggers, in a dialog of their own), where it delivers, when it posts and
+ * where it runs, each changing at once; then its usage this
  * week. Who can't change it sees the values.
  */
 function RoutineAside({
@@ -1630,7 +1627,7 @@ function RoutineAside({
   const whereHint = useWhereHint();
   const when = useWhen();
   const nextText = useNextText();
-  const [part, setPart] = useState<{ part: RoutinePart; target?: string } | null>(null);
+  const [part, setPart] = useState<RoutinePart | null>(null);
   const manage = r.canManage;
   // A widget's routine is paused or resumed here; its agent, schedule and target change from its widget.
   const edits = manage && !isWidgetRoutine(r);
@@ -1647,11 +1644,11 @@ function RoutineAside({
       value: a.id,
       label: a.name,
       description: a.role || undefined,
-      leading: actors.avatar({ type: "agent", id: a.id }),
+      leading: actors.avatar({ type: "agent", id: a.id }, "sm"),
     })),
     ...(actors.dir.agentById.has(r.agentId)
       ? []
-      : [{ value: r.agentId, label: actors.name(agent), description: undefined, leading: actors.avatar(agent) }]),
+      : [{ value: r.agentId, label: actors.name(agent), description: undefined, leading: actors.avatar(agent, "sm") }]),
   ];
   const choice = targetChoice(r.target);
   const channelList = channels.data ?? [];
@@ -1663,12 +1660,10 @@ function RoutineAside({
     ...channelList.map((c) => ({ value: c.id, label: `#${c.name}` })),
     { value: TARGET_DM, label: t("routines.target.dm"), description: hint("dm") },
     { value: TARGET_ARTIFACT, label: t("routines.target.artifact"), description: hint("artifact") },
-    { value: TARGET_FORUM, label: t("routines.target.forum"), description: hint("forum") },
   ];
   const pickTarget = (v: string) => {
     if (v === choice || v === TARGET_KEEP) return;
-    if (v === TARGET_FORUM) setPart({ part: "where", target: TARGET_FORUM });
-    else update({ target: targetInputOf(v) });
+    update({ target: targetInputOf(v) });
   };
   const reportLine = (v: RoutineReport) => t(`routines.panel.reportHint.${v}`);
   const reportHint = {
@@ -1729,7 +1724,7 @@ function RoutineAside({
               id={`rt-when-${r.id}`}
               className="ac-select__trigger"
               aria-haspopup="dialog"
-              onClick={() => setPart({ part: "when" })}
+              onClick={() => setPart("when")}
             >
               <span className="ac-select__value">
                 <AsideValue label={when(r)} line={isDoneOnce(r) ? undefined : nextText(r, now)} />
@@ -1747,17 +1742,7 @@ function RoutineAside({
         )
       )}
       {edits ? (
-        <Field
-          label={t("routines.panel.where")}
-          id={`rt-where-${r.id}`}
-          labelAside={
-            r.target.type === "forum" && (
-              <Button size="sm" variant="ghost" onClick={() => setPart({ part: "where" })}>
-                {t("routines.form.adjust")}
-              </Button>
-            )
-          }
-        >
+        <Field label={t("routines.panel.where")} id={`rt-where-${r.id}`}>
           <Select
             size="sm"
             className="routine-sel"
@@ -1816,16 +1801,7 @@ function RoutineAside({
       {runsOn &&
         shown(t("routines.panel.runsOn"), <AsideValue lead={<Icon name="computer" size={16} />} label={runsOn} />)}
       {usageText && shown(t("routines.panel.usage"), <span className="small muted">{usageText}</span>)}
-      {edits && part && (
-        <RoutineDialog
-          open
-          routine={r}
-          part={part.part}
-          initialTarget={part.target}
-          onSaved={onSaved}
-          onClose={() => setPart(null)}
-        />
-      )}
+      {edits && part && <RoutineDialog open routine={r} part={part} onSaved={onSaved} onClose={() => setPart(null)} />}
     </aside>
   );
 }
@@ -2123,10 +2099,8 @@ const PRESETS = [
 
 const TARGET_DM = "dm";
 const TARGET_ARTIFACT = "artifact";
-const TARGET_FORUM = "forum";
 /** Editing a routine made in the chat (a thread or DM): keep where it delivers. */
 const TARGET_KEEP = "keep";
-const FORUM_ROUNDS = ["1", "2", "3", "5"] as const;
 /** A part of a routine its page's aside opens in the form: when it runs, or where it delivers. */
 type RoutinePart = "when" | "where";
 const PART_FIELDS: Record<RoutinePart, (keyof RoutinePatch)[]> = { when: ["trigger"], where: ["target"] };
@@ -2137,7 +2111,6 @@ function targetChoice(target: RoutineTarget | undefined): string {
   if (target.type === "channel") return target.channelId;
   if (target.type === "dm") return TARGET_DM;
   if (target.type === "artifact") return TARGET_ARTIFACT;
-  if (target.type === "forum") return TARGET_FORUM;
   return TARGET_KEEP;
 }
 
@@ -2179,7 +2152,7 @@ const isUtc = (z: string) => z === "UTC" || z === "Etc/UTC";
 
 /**
  * "Nova rotina", and one part of a routine opened from its page's aside ("Quando": the trigger and the schedule;
- * "Onde entrega": the target with a forum's agents and rounds). A part starts from the routine and saves only what
+ * "Onde entrega": the target). A part starts from the routine and saves only what
  * changed in it; a routine still read in UTC (made before time zones) starts in my zone, with a hint to keep UTC.
  */
 function RoutineDialog({
@@ -2187,7 +2160,6 @@ function RoutineDialog({
   onClose,
   routine,
   part,
-  initialTarget,
   onSaved,
   onWebhook,
 }: {
@@ -2196,8 +2168,6 @@ function RoutineDialog({
   routine?: Routine;
   /** With `routine`: only this part of the form. */
   part?: RoutinePart;
-  /** Where it starts delivering (a forum picked in the aside, whose agents and rounds this part asks). */
-  initialTarget?: string;
   /** A part was saved. */
   onSaved?: () => void;
   /** It just became a webhook routine (made, or switched to one): its address is on its page, which opens. */
@@ -2213,19 +2183,11 @@ function RoutineDialog({
   const agents = actors.dir.agents;
   const editing = Boolean(routine);
   const shows = (p: RoutinePart) => !part || part === p;
-  const initialForum = routine?.target.type === "forum" ? routine.target : null;
   const myZone = actors.dir.memberById.get(me.user.id)?.timezone || browserTimezone() || "America/Sao_Paulo";
   const savedZone = zoneOf(routine);
   const wasUtc = editing && routine !== undefined && !isEventDriven(routine) && isUtc(savedZone);
   const [agentId, setAgentId] = useState(routine?.agentId ?? "");
-  const [target, setTarget] = useState(initialTarget ?? targetChoice(routine?.target));
-  // "Um tópico no fórum": which agents discuss, and how many rounds.
-  const [forumAgents, setForumAgents] = useState<string[]>(initialForum?.agentIds ?? []);
-  const [forumRounds, setForumRounds] = useState<(typeof FORUM_ROUNDS)[number]>(
-    (FORUM_ROUNDS as readonly string[]).includes(String(initialForum?.rounds))
-      ? (String(initialForum?.rounds) as (typeof FORUM_ROUNDS)[number])
-      : "3",
-  );
+  const [target, setTarget] = useState(targetChoice(routine?.target));
   const [prompt, setPrompt] = useState(routine?.prompt ?? "");
   const [name, setName] = useState(routine?.name ?? "");
   const [kind, setKind] = useState<"schedule" | "event" | "email" | "webhook" | "connector">(
@@ -2318,13 +2280,11 @@ function RoutineDialog({
         ? Boolean(email.accountId)
         : once || !phraseFailed);
   const targetValue = (): RoutineTargetInput =>
-    target === TARGET_FORUM
-      ? { type: "forum", agentIds: forumAgents.length > 0 ? forumAgents : [agentId], rounds: Number(forumRounds) }
-      : target === TARGET_DM
-        ? { type: "dm" }
-        : target === TARGET_ARTIFACT
-          ? { type: "artifact" }
-          : { type: "channel", channelId: target };
+    target === TARGET_DM
+      ? { type: "dm" }
+      : target === TARGET_ARTIFACT
+        ? { type: "artifact" }
+        : { type: "channel", channelId: target };
   const emailTrigger = () => ({
     type: "email" as const,
     accountId: email.accountId,
@@ -2360,13 +2320,7 @@ function RoutineDialog({
     if (name.trim() && name.trim() !== r.name) patch.name = name.trim();
     if (r.prompt !== null && prompt.trim() !== r.prompt) patch.prompt = prompt.trim();
     if (agentId !== r.agentId) patch.agentId = agentId;
-    const forumChanged =
-      target === TARGET_FORUM &&
-      r.target.type === "forum" &&
-      (JSON.stringify([...(forumAgents.length > 0 ? forumAgents : [agentId])].sort()) !==
-        JSON.stringify([...r.target.agentIds].sort()) ||
-        Number(forumRounds) !== (r.target.rounds ?? 3));
-    if (target !== TARGET_KEEP && (target !== targetChoice(r.target) || forumChanged)) patch.target = targetValue();
+    if (target !== TARGET_KEEP && target !== targetChoice(r.target)) patch.target = targetValue();
     const triggerChanged =
       kind === "connector"
         ? r.trigger.type !== "connector" ||
@@ -2497,7 +2451,6 @@ function RoutineDialog({
           ...(channels.data ?? []).map((c) => ({ value: c.id, label: `#${c.name}` })),
           { value: TARGET_DM, label: t("routines.target.dm") },
           { value: TARGET_ARTIFACT, label: t("routines.target.artifact") },
-          { value: TARGET_FORUM, label: t("routines.target.forum") },
         ]}
       />
     </Field>
@@ -2547,7 +2500,7 @@ function RoutineDialog({
                     value: a.id,
                     label: a.name,
                     description: a.role || undefined,
-                    leading: actors.avatar({ type: "agent", id: a.id }),
+                    leading: actors.avatar({ type: "agent", id: a.id }, "sm"),
                   }))}
                 />
               </Field>
@@ -2555,42 +2508,6 @@ function RoutineDialog({
             </div>
           ) : (
             part === "where" && targetField
-          )}
-          {shows("where") && target === TARGET_FORUM && (
-            <div className="routine-forum">
-              <span className="ac-field__label">{t("routines.form.forumAgents")}</span>
-              {agents.map((a) => {
-                const id = `nr-fa-${a.id}`;
-                return (
-                  <label key={a.id} htmlFor={id} className="scope-row">
-                    <Checkbox
-                      id={id}
-                      aria-label={a.name}
-                      checked={forumAgents.includes(a.id) || (forumAgents.length === 0 && a.id === agentId)}
-                      onCheckedChange={(on) =>
-                        setForumAgents((l) => {
-                          const base = l.length === 0 ? [agentId] : l;
-                          return on ? [...new Set([...base, a.id])] : base.filter((x) => x !== a.id);
-                        })
-                      }
-                    />
-                    <span className="scope-row__text" aria-hidden="true">
-                      <span className="ac-iconline">
-                        {actors.avatar({ type: "agent", id: a.id })}
-                        <span>{a.name}</span>
-                      </span>
-                    </span>
-                  </label>
-                );
-              })}
-              <span className="ac-field__label">{t("forum.form.rounds")}</span>
-              <Segmented
-                label={t("forum.form.rounds")}
-                value={forumRounds}
-                onValueChange={setForumRounds}
-                options={FORUM_ROUNDS.map((r) => ({ value: r, label: r }))}
-              />
-            </div>
           )}
           {!part && (
             <>
@@ -2778,14 +2695,33 @@ function RoutineDialog({
 /** What a routine does in connected apps without asking (the job its creator set it up for), or that it asks for each. */
 function OwnActions({ routine }: { routine: Routine | undefined }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const action = useRoutineAction(org.id);
   const own = routine?.ownActions ?? [];
   if (own.length === 0) return <p className="small muted">{t("routines.ownActions.none")}</p>;
   return (
     <>
       <ul className="routine-own" aria-label={t("routines.panel.ownActions")}>
-        {own.map((action) => (
-          <li key={action} title={action}>
-            {ownActionName(t, action)}
+        {own.map((name) => (
+          <li key={name} title={name}>
+            {ownActionName(t, name)}
+            {routine?.canManage && (
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                icon="close"
+                aria-label={t("routines.ownActions.remove", { action: ownActionName(t, name) })}
+                disabled={action.isPending}
+                onClick={() =>
+                  action.mutate({
+                    type: "update",
+                    id: routine.id,
+                    patch: { ownActions: own.filter((a) => a !== name) },
+                  })
+                }
+              />
+            )}
           </li>
         ))}
       </ul>

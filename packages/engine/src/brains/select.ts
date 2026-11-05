@@ -10,13 +10,13 @@ import {
 } from "@agenteschat/adapters";
 import { and, desc, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
 import { isAutoModel } from "@agenteschat/providers";
-import { claudeCodeModel, planOf } from "@agenteschat/providers/plans";
-import { planState } from "@agenteschat/ui/plan-state";
+import { claudeCodeModel, modelLimitOf, ownLimitsModel, planOf } from "@agenteschat/providers/plans";
+import { planState, planWindows } from "@agenteschat/ui/plan-state";
 import type { Agent } from "../agents";
 import type { MachineStatus } from "../machine-hub";
 import { pausedMessage } from "../machines";
 import { missionTurnFor } from "../missions-engine";
-import { isRightHand, rightHandPlanRefusal, thinkingAgent } from "../right-hand";
+import { isRightHand, rightHandPerson, rightHandPlanRefusal, thinkingAgent } from "../right-hand";
 import type { AgentRun } from "../runs";
 import { accountUnavailable, brainSessionId, claudeCodeAvailability, toolOff } from "./claude-code";
 import { codexVersionOk } from "./codex";
@@ -50,7 +50,7 @@ export function brainFor(
 /**
  * The brain a run thinks with (ADR 0053 §10): its own (`agent_runs.brain`, stored when the engine resolves
  * it and when a conversation run falls back), else the agent's until its first turn. Shared code (steering,
- * the talker, "Continuar", the forum budget) reads this, never the agent's stored brain alone.
+ * the talker, "Continuar") reads this, never the agent's stored brain alone.
  */
 export const runBrainOf = (run: { brain?: string | null }, agent?: { brain?: string | null } | null): BrainKind =>
   kindOf(run.brain ?? agent?.brain);
@@ -165,6 +165,81 @@ export function planLimitOf(
   return planLimitNow(limitKey(machineId, kind, accountId), usage, now);
 }
 
+/** The account's windows a refusal's words may name that come back on a fixed day for each model too (OpenCode Go's week and month). */
+const MODEL_WINDOW_WORDS: readonly [RegExp, "seven_day" | "monthly"][] = [
+  [/week/i, "seven_day"],
+  [/month/i, "monthly"],
+];
+
+export type RefusalScope = { scope: "account" } | { scope: "model" | "region"; resetsAt?: string };
+
+/**
+ * Whose limit a plan's refusal (`message`, the CLI's words) is. On a plan whose models have limits of their own, the
+ * model's, unless a window of the account is full (`usage`, the last reading): the region the model needs when its words
+ * say region, else its own limit, back when the account's window its words name resets (a 5-hour one is the model's own
+ * and its reset isn't known). Any other plan: the account's.
+ */
+export function refusalScope(
+  provider: string | null | undefined,
+  model: string | null | undefined,
+  message: string,
+  usage: PlanUsage | null | undefined,
+  now = Date.now(),
+): RefusalScope {
+  const m = ownLimitsModel(provider, model);
+  if (!m) return { scope: "account" };
+  if (m.needs === "globalRegion" && /region/i.test(message)) return { scope: "region" };
+  if (usage && planWindows(usage, now).some((w) => w.used >= 100)) return { scope: "account" };
+  const kind = MODEL_WINDOW_WORDS.find(([words]) => words.test(message))?.[1];
+  const at = kind ? usage?.windows.find((w) => w.kind === kind)?.resetsAt : undefined;
+  return { scope: "model", ...(at && Date.parse(at) > now ? { resetsAt: at } : {}) };
+}
+
+/** An account's models still at their own limit (`modelLimitOf`), for a reading that replaces the last one. */
+export function liveModelLimits(usage: PlanUsage | null | undefined, now = Date.now()) {
+  const kept = Object.entries(usage?.models ?? {}).filter(([model]) => modelLimitOf(usage?.models, model, now));
+  return kept.length ? Object.fromEntries(kept) : undefined;
+}
+
+/** Keeps a model's own limit on its account (`PlanUsage.models`); a reading with none yet starts empty. */
+export async function noteModelLimit(
+  db: Executor,
+  orgId: string,
+  accountId: string,
+  model: string,
+  limit: { until?: string; region?: true },
+  now = Date.now(),
+) {
+  const { machineAccounts } = schema;
+  const at = new Date(now).toISOString();
+  const entry = JSON.stringify({ [model]: { at, ...limit } });
+  const empty = JSON.stringify({ windows: [], source: "turn", at });
+  await db
+    .update(machineAccounts)
+    .set({
+      usage: sql`jsonb_set(coalesce(${machineAccounts.usage}, ${empty}::jsonb), '{models}',
+        coalesce(${machineAccounts.usage}->'models', '{}'::jsonb) || ${entry}::jsonb)`,
+    })
+    .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, accountId)));
+}
+
+/** A turn on the model went through: its own limit no longer holds. True when there was one. */
+export async function forgetModelLimit(db: Executor, orgId: string, accountId: string, model: string) {
+  const { machineAccounts } = schema;
+  const gone = await db
+    .update(machineAccounts)
+    .set({ usage: sql`${machineAccounts.usage} #- ${`{models,${model}}`}::text[]` })
+    .where(
+      and(
+        eq(machineAccounts.orgId, orgId),
+        eq(machineAccounts.id, accountId),
+        sql`${machineAccounts.usage}->'models' ? ${model}`,
+      ),
+    )
+    .returning({ id: machineAccounts.id });
+  return gone.length > 0;
+}
+
 /**
  * What the runner last said about the plan this run would think with: the account's usage, or the computer's own
  * sign-in's (`executors.ownUsage`). Read from the database, so every replica sees the same limit.
@@ -196,6 +271,8 @@ export interface BrainUnavailability {
   code: string;
   message: string;
   resetsAt?: string;
+  /** A `plan_limit` that is the model's own or the region it needs (`refusalScope`), not the account's. */
+  scope?: "model" | "region";
 }
 
 /**
@@ -214,6 +291,8 @@ export function computerBrainUnavailable(
   ownersPlan = true,
   /** What the runner last said about that plan (`storedPlanUsage`). */
   usage?: PlanUsage | null,
+  /** The model the turn would run (`BrainPlan.model`): on a plan whose models have their own limits, its own counts. */
+  model?: string,
 ): BrainUnavailability | null {
   if (kind === "model") return null;
   const name = BRAIN_NAMES[kind];
@@ -243,6 +322,18 @@ export function computerBrainUnavailable(
         ? `The ${name} account "${account.label}"${status ? ` on ${status.name}` : ""} reached its plan limit.`
         : `${name}${status ? ` on ${status.name}` : ""} reached its plan limit.`,
       ...(limited.until !== null ? { resetsAt: new Date(limited.until).toISOString() } : {}),
+    };
+  }
+  const own = ownLimitsModel(account?.provider, model);
+  const modelLimit = own ? modelLimitOf(usage?.models, own.id, now) : null;
+  if (own && modelLimit) {
+    return {
+      code: "plan_limit",
+      scope: modelLimit.region ? "region" : "model",
+      message: modelLimit.region
+        ? `${own.label} needs the Global region on in OpenCode (Settings › Privacy).`
+        : `${own.label} reached its own limit on the ${name} account "${account?.label ?? ""}".`,
+      ...(modelLimit.until !== null ? { resetsAt: new Date(modelLimit.until).toISOString() } : {}),
     };
   }
   // Paused by its owner (ADR 0036 §6): like offline, until the pause ends (a known end: try again then).
@@ -592,8 +683,8 @@ export async function resolveBrain(
   options: { fresh?: boolean; now?: Date; promptKey?: string } = {},
 ): Promise<BrainPlan> {
   const mission: MissionTurn | null = await missionTurnFor(deps.db, run).catch(() => null);
-  // The right hand on a plan: that plan's computer and owner (`thinkingAgent`).
-  const agent = await thinkingAgent(deps.db, given);
+  // The right hand: the AI of the person whose DM this is, else the workspace's; on a plan, its computer and owner.
+  const agent = await thinkingAgent(deps.db, given, await rightHandPerson(deps.db, given, run));
   const kind = brainFor(agent, run, mission);
   const base = mission ? { missionId: mission.missionId } : {};
   if (kind === "model") return { kind, ...base };
@@ -624,6 +715,7 @@ export async function resolveBrain(
           account,
           machineId ? await planIsOwners(deps.db, agent, machineId, account) : true,
           usage,
+          runs,
         ));
   // A mission's main session stays (its decisions, inbox and items point at it): `settingsChanged` brings the edit.
   const settingsChanged =

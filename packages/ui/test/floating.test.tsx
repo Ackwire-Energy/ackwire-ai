@@ -6,6 +6,7 @@ setupDom();
 import { act, fireEvent, render, within } from "@testing-library/react";
 import { useState } from "react";
 import { Dialog, DialogBody, Field, monthGrid, normalizeTime, Select, Token, timeOptions } from "../src";
+import { EDGE_ROOM } from "../src/floating";
 
 const body = () => within(document.body);
 const key = async (el: Element, k: string) => {
@@ -33,6 +34,25 @@ describe("floating layers", () => {
     expect(rule(".ac-dialog")).toContain("z-index: var(--z-dialog)");
     expect(rule(".ac-details")).toContain("z-index: var(--z-dialog)");
     expect(await css("index.css")).toContain('@import "./layers.css"');
+  });
+
+  test("every anchored layer keeps room from the viewport's edges", async () => {
+    const dir = new URL("../src/components/", import.meta.url).pathname;
+    // `=>` inside an attribute (an arrow function) doesn't end the tag.
+    const anchored =
+      /<(?:RPopover|DropdownMenu|RSelect|Tooltip|HoverCard|ContextMenu)\.(?:Sub)?Content\b(?:=>|[^>])*?>/gs;
+    let seen = 0;
+    for await (const name of new Bun.Glob("**/*.tsx").scan(dir)) {
+      for (const [tag] of (await Bun.file(dir + name).text()).matchAll(anchored)) {
+        seen++;
+        const pad = /collisionPadding=\{(EDGE_ROOM|\d+)\}/.exec(tag)?.[1];
+        const room = pad === "EDGE_ROOM" ? EDGE_ROOM : Number(pad ?? 0);
+        expect({ name, room: room >= EDGE_ROOM }).toEqual({ name, room: true });
+      }
+    }
+    expect(seen).toBeGreaterThanOrEqual(12);
+    expect(EDGE_ROOM).toBeGreaterThanOrEqual(8);
+    expect(await css("components.css")).toContain(`max-width: calc(100vw - ${2 * EDGE_ROOM}px)`);
   });
 
   test("a Select inside an open Dialog opens and picks an option", async () => {

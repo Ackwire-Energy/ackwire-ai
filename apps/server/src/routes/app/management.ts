@@ -1,6 +1,7 @@
 import {
   AGENT_MEDIA_LEVELS,
   AGENT_SORTS,
+  AGENT_STYLES,
   agentDetail,
   agentView,
   announceMembers,
@@ -11,6 +12,7 @@ import {
   cancelRun,
   canTalkTo,
   canViewCost,
+  continuePausedRuns,
   continueRun,
   GIF_RATINGS,
   getMembership,
@@ -37,6 +39,7 @@ import {
   mySidebarToolOrder,
   mySidebarView,
   orgOverview,
+  pickerEndpoint,
   pickerModels,
   queueInvitationEmail,
   requirePermission,
@@ -54,6 +57,7 @@ import {
   STOP_REASON_MAX,
   seesAgentDetails,
   setAgentChannels,
+  setAgentStyle,
   setInvitationRoles,
   setMyIssuesView,
   setMySidebarItem,
@@ -76,7 +80,8 @@ import {
 import { contextWindowOf, nanoUsdToUsd, PROVIDERS, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
-import { AgentAppearance, AgentAudience, Credential, ModelTier, ProviderId, Role, StartChoice } from "./schemas";
+import { credentialOut } from "./credential-view";
+import { AgentAppearance, AgentAudience, Credential, Model, ModelTier, ProviderId, Role, StartChoice } from "./schemas";
 
 const usd = (nano: number | null) => (nano === null ? null : nanoUsdToUsd(nano));
 const ModelId = z.string().max(100);
@@ -400,6 +405,23 @@ const ManagedTask = z
       .openapi({
         description: "Its place in its computer's line for room: people's turns first, then the longest wait.",
       }),
+    wait: z
+      .object({
+        code: z.string(),
+        key: z.string().nullable(),
+        plan: z.string().nullable(),
+        model: z.string().nullable(),
+        scope: z.enum(["model", "region"]).nullable(),
+        percent: z.number().int().nullable(),
+        window: z.string().nullable(),
+        resetsAt: z.string().nullable(),
+        canContinue: z.boolean(),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "Why a `waiting_input` run waits: its code, the plan or budget (`key` groups the runs on the same one), how far a pause got, when the limit resets, and whether you may press Continuar agora.",
+      }),
   })
   .openapi("ManagedTask");
 const EndedTask = z
@@ -677,6 +699,25 @@ export function managementRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const show = await setShowActivity(db, c.get("user").id, orgId, c.req.valid("json").show);
       return c.json({ show }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/agent-style",
+      tags: ["Members"],
+      security,
+      summary: "Choose how agents talk to you in this organization",
+      description:
+        "Yours, for every agent here (ADR 0147): `simple` (plain words, what to do first) or `technical` (paths, codes and ids welcome). Until you pick, agents talk simply. `GET /me` sends it with each organization (`agentStyle`).",
+      request: { params: OrgParams, body: body(z.object({ style: z.enum(AGENT_STYLES) })) },
+      responses: { 200: json(z.object({ style: z.enum(AGENT_STYLES) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const style = await setAgentStyle(db, c.get("user").id, orgId, c.req.valid("json").style);
+      return c.json({ style }, 200);
     },
   );
 
@@ -1140,7 +1181,7 @@ export function managementRoutes(deps: AppDeps) {
         c.req.valid("json"),
         { fetch: deps.extras?.http },
       );
-      return c.json({ ...row, createdAt: row.createdAt.toISOString(), revokedAt: iso(row.revokedAt) }, 200);
+      return c.json(credentialOut(row), 200);
     },
   );
 
@@ -1157,7 +1198,7 @@ export function managementRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, credentialId } = c.req.valid("param");
       const row = await makeDefaultCredential(db, c.get("user").id, orgId, credentialId);
-      return c.json({ ...row, createdAt: row.createdAt.toISOString(), revokedAt: iso(row.revokedAt) }, 200);
+      return c.json(credentialOut(row), 200);
     },
   );
 
@@ -1212,6 +1253,8 @@ export function managementRoutes(deps: AppDeps) {
                 tier: ModelTier.optional().openapi({
                   description: "The size Automático uses it for on its provider's key, by default.",
                 }),
+                endpoint: Model.shape.endpoint,
+                unpriced: Model.shape.unpriced,
               }),
             ),
             providers: z.array(
@@ -1230,7 +1273,7 @@ export function managementRoutes(deps: AppDeps) {
       const usable = (p: string) => Boolean(access.get(p)?.own || access.get(p)?.platform);
       return c.json(
         {
-          models: (await pickerModels(db)).map(([id, m]) => ({
+          models: (await pickerModels(db, [orgId])).map(([id, m]) => ({
             id,
             label: m.label,
             provider: m.provider,
@@ -1242,6 +1285,7 @@ export function managementRoutes(deps: AppDeps) {
             outputUsdPerMTok: pricesAt(m).output / 1000,
             ...(m.pick !== undefined ? { pick: m.pick } : {}),
             ...(m.tier ? { tier: m.tier } : {}),
+            ...pickerEndpoint(id, m),
           })),
           providers: providerIds.map((id) => ({
             id,
@@ -1558,6 +1602,33 @@ export function managementRoutes(deps: AppDeps) {
         ...(since ? { since: new Date(since) } : {}),
       });
       return c.json(view, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/task-manager/continue",
+      tags: ["Usage"],
+      security,
+      summary: "Continuar agora on several runs paused near a limit (ADR 0118): each goes on until that window resets",
+      description:
+        "For who may press it on each run's card or routine (`wait.canContinue`). Runs that moved on are skipped. Refused for every run, the first refusal comes back: 403 `run.answer_forbidden`, or 409 `run.continue_extra_off` / `run.continue_extra_used_up` when going on would pass the plan without paid extra usage.",
+      request: {
+        params: OrgParams,
+        body: {
+          required: true,
+          content: { "application/json": { schema: z.object({ runIds: z.array(z.uuid()).min(1).max(100) }) } },
+        },
+      },
+      responses: { 200: json(z.object({ continued: z.number().int() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const { runIds } = c.req.valid("json");
+      const out = await continuePausedRuns({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, runIds);
+      if (out.continued > 0) deps.wakeWorkers?.();
+      return c.json(out, 200);
     },
   );
 

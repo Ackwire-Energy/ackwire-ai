@@ -7,7 +7,6 @@ import { lineMachineOf, publishQueueChanged } from "./computer-queue";
 import { INBOX_JOB } from "./dispatch";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
-import { onForumRunFinished } from "./forum";
 import type { MachineHub } from "./machine-hub";
 import { cancelOrgTasks, type TaskCall } from "./machine-tasks";
 import { can, type Membership, requireActiveMembership } from "./organizations";
@@ -416,10 +415,6 @@ export async function stopRun(
       status: "canceled",
       ...passed,
     });
-    // A forum turn that never ran: the topic moves on.
-    if (channelKind === "forum") {
-      await onForumRunFinished({ db, pubsub: deps.pubsub }, orgId, run.channelId, run.id).catch(() => {});
-    }
     // It may have been answering another agent's question (ADR 0034): the asker hears it couldn't now, not when
     // the question expires. A running one is heard from its worker, once (`executor.ts`); a run its workspace
     // stopped hands nothing on.

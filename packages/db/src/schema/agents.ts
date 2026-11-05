@@ -7,6 +7,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -15,7 +16,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { machineAccounts, machines } from "./machines";
-import { organizations } from "./tenancy";
+import { organizationMembers, organizations } from "./tenancy";
 
 /**
  * API keys of model providers, owned by the organization (BYOK). Never
@@ -25,6 +26,19 @@ import { organizations } from "./tenancy";
  * (self-host: derived from AGENTES_SECRET; Cloud: a KMS key, via the
  * `KeyWrapper` adapter). Both ciphertexts are bound to (org_id, id).
  */
+/** A workspace's own model endpoint as its credential keeps it (ADR 0146). Prices in nano-USD per token. */
+export interface StoredEndpoint {
+  style: "openai" | "anthropic";
+  baseURL: string;
+  models: {
+    id: string;
+    label?: string;
+    prices?: { input: number; output: number; cacheRead: number; cacheWrite: number };
+    /** The last test call: answered and called a tool, answered without calling it, or failed. */
+    check?: "ok" | "no_tools" | "failed";
+  }[];
+}
+
 export const providerCredentials = pgTable(
   "provider_credentials",
   {
@@ -46,8 +60,14 @@ export const providerCredentials = pgTable(
      * `anthropic-workspace-id` for keys not scoped to a workspace. Not secret.
      */
     workspaceId: text(),
-    /** Other provider options sent with calls, e.g. OpenAI `{ organization, project }`. Not secret. */
-    options: jsonb().$type<{ organization?: string; project?: string }>().notNull().default({}),
+    /**
+     * Other provider options sent with calls, e.g. OpenAI `{ organization, project }`, or a workspace endpoint's
+     * address, API style and models (`custom`, ADR 0146). Not secret.
+     */
+    options: jsonb()
+      .$type<{ organization?: string; project?: string; endpoint?: StoredEndpoint }>()
+      .notNull()
+      .default({}),
     /** Last 4 characters of the key, so people can tell keys apart. */
     keyHint: text().notNull(),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
@@ -58,7 +78,8 @@ export const providerCredentials = pgTable(
 );
 
 /**
- * A named group of the workspace's agents, shared by everyone in it (ADR 0083): the sidebar's sections.
+ * A named group of the workspace's agents, shared by everyone in it (ADR 0083): the sidebar's sections. Shown as a
+ * setor (department, ADR 0148) with its color, icon, the person who leads it and their substitute.
  * An agent is in at most one (`agents.group_id`).
  */
 export const agentGroups = pgTable(
@@ -71,6 +92,14 @@ export const agentGroups = pgTable(
     name: text().notNull(),
     /** Order among the workspace's groups. */
     position: integer().notNull().default(0),
+    /** One of the roles' colors (`ROLE_COLORS`: the agents' colors but sky). */
+    color: text().notNull().default("graphite"),
+    /** One of the roles' icons (`ROLE_ICONS`). */
+    icon: text().notNull().default("person"),
+    /** Who leads the setor: its agents with no owner of their own report to them on the org chart. */
+    leadUserId: text().references(() => users.id, { onDelete: "set null" }),
+    /** Who covers for the lead. */
+    backupUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.orgId, t.position)],
@@ -129,6 +158,11 @@ export const agents = pgTable(
      * PRs an hour) and which agents it may call. Validated in code (`autonomySettings`); `{}` = the defaults.
      */
     autonomyBrakes: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    /**
+     * "Pode fazer merge sem perguntar": the repositories (`owner/name`) it merges in with no approval card, each merge
+     * audited and with a receipt. Its owner or an admin sets it; every other sensitive kind still asks.
+     */
+    mergeRepos: jsonb().$type<string[]>().notNull().default([]),
     /** Its look in the app (color, eyes, accessory from a fixed allow-list). Null = the default look. */
     appearance: jsonb().$type<{ color: string; eyes: string; accessory: string }>(),
     /**
@@ -343,3 +377,38 @@ export interface AgentSetup {
   /** Its Autonomia (`agents.mission_command_approval`); null: the default. */
   autonomy?: string | null;
 }
+
+/**
+ * Each person's own AI for the team's right hand (ADR 0137 §11): the plan their DM with it thinks with, theirs or one
+ * shared with them. No row: their DM thinks with the workspace's (the right hand's own `agents` row). It goes with the
+ * person's membership and with the account.
+ */
+export const rightHandBrains = pgTable(
+  "right_hand_brains",
+  {
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text().notNull(),
+    /** A computer brain (`claude_code`, `codex`…): an API key is the workspace's, never a person's. */
+    brain: text().notNull(),
+    brainModel: text(),
+    brainAccountId: uuid().notNull(),
+    /** Someone else's plan, given with `use_others_plans`: who gave it (themselves); its owner may take it back. */
+    brainAccountLentBy: text().references(() => users.id, { onDelete: "set null" }),
+    brainEffort: text(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.orgId, t.userId] }),
+    foreignKey({
+      columns: [t.orgId, t.userId],
+      foreignColumns: [organizationMembers.orgId, organizationMembers.userId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.orgId, t.brainAccountId],
+      foreignColumns: [machineAccounts.orgId, machineAccounts.id],
+    }).onDelete("cascade"),
+    index().on(t.orgId, t.brainAccountId),
+  ],
+);

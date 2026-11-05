@@ -647,7 +647,7 @@
     "noneForYou": "아직 나와 함께 일하는 에이전트가 없어요.",
     "noneForYouHint": "관리자에게 접근 권한을 요청하세요.",
     "freeSection": "대기 중",
-    "noGroupSection": "그룹 없음"
+    "noGroupSection": "부서 없음"
   },
   "agentEdit": {
     "missing": "이 에이전트는 더 이상 없어요.",
@@ -727,8 +727,6 @@
       "issue_assigned_other": "나에게 온 작업",
       "issue_comment_other": "{{names}}이(가) 작업에 댓글을 남겼어요",
       "issue_status_other": "{{names}}이(가) 작업을 변경했어요",
-      "forum_turn_other": "포럼에서 내 차례예요",
-      "forum_synthesis_other": "포럼 요약이 준비됐어요",
       "approval_other": "{{names}}이(가) 승인을 요청해요",
       "mission_finished_other": "미션 완료",
       "mission_stopped_other": "미션 중지됨",
@@ -999,7 +997,6 @@
     "loadFailed": "작업을 불러오지 못했어요.",
     "createdBy": "{{name}}이(가) 만듦",
     "fromMessage": "메시지에서",
-    "fromForum": "포럼에서",
     "fromAgent": "에이전트 요청에서",
     "fromWebhook": "{{provider}}에서",
     "workingFor_other": "{{count}}분째 작업 중",
@@ -1162,7 +1159,6 @@
     "kind": {
       "approval": "승인",
       "question": "질문",
-      "forum": "내 차례",
       "browser": "브라우저",
       "secret": "비밀 정보",
       "join": "멤버",
@@ -1274,7 +1270,6 @@
         "wiki": "Wiki",
         "skills": "스킬",
         "schedule": "루틴",
-        "forum": "포럼",
         "sandbox": "전용 컴퓨터",
         "browser": "브라우저",
         "setup": "워크스페이스 설정",
@@ -1947,5 +1942,9 @@
         "proposal": "대시보드"
       }
     }
+  },
+  "team": {
+    "entry": "목록, 조직도, 지도",
+    "mapHint": "에이전트를 다른 채널로 옮기려면 웹의 지도를 쓰거나 {{name}}과(와) 대화하세요."
   }
 }

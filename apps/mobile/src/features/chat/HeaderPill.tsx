@@ -25,6 +25,7 @@ const LEAD = 32;
 const GAP = 9;
 const TRAILING_GAP = 2;
 const HEIGHT = 44;
+const BORDER = StyleSheet.hairlineWidth;
 const MIN_WIDTH = 120;
 const WIDTH_SPRING = { stiffness: 300, damping: 30, mass: 1 };
 const LINE_SPRING = { stiffness: 260, damping: 26, mass: 1 };
@@ -104,7 +105,9 @@ export function HeaderPill({
   const [nameWidth, setNameWidth] = useState<number | null>(null);
   const [lineWidth, setLineWidth] = useState(0);
   const [trailingWidth, setTrailingWidth] = useState(0);
-  const chrome = PAD_LEFT + PAD_RIGHT + (lead ? LEAD + GAP : 0) + (trailing ? trailingWidth + GAP + TRAILING_GAP : 0);
+  // The hairline border is inside the pill's width too: without it a name sized to fit loses its last letters to "…".
+  const chrome =
+    PAD_LEFT + PAD_RIGHT + 2 * BORDER + (lead ? LEAD + GAP : 0) + (trailing ? trailingWidth + GAP + TRAILING_GAP : 0);
   const words = Math.max(nameWidth ?? 0, subtitle ? lineWidth : 0);
   const target = nameWidth === null ? null : Math.min(room, Math.max(MIN_WIDTH, chrome + words));
 
@@ -273,7 +276,7 @@ const styles = StyleSheet.create({
     paddingLeft: PAD_LEFT,
     paddingRight: PAD_RIGHT,
     borderRadius: HEIGHT / 2,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: BORDER,
     overflow: "hidden",
   },
   // The drawing keeps the room's width and reads the pill's as a uniform: no canvas resize during a spring.

@@ -21,6 +21,7 @@
     "refreshing": "Vernieuwen",
     "retry": "Opnieuw proberen",
     "unknownError": "Er ging iets mis. Probeer het opnieuw.",
+    "ourSide": "Er ging iets mis aan onze kant. Probeer het over een poosje opnieuw.",
     "signedOut": "Je sessie is verlopen. Log opnieuw in om verder te gaan.",
     "newVersion": "Er is een nieuwe versie van agentes.chat.",
     "reload": "Herladen",
@@ -41,7 +42,7 @@
     "today": "Vandaag",
     "yesterday": "Gisteren",
     "loadFailed": "Dit kon niet geladen worden. Controleer je verbinding en probeer het opnieuw.",
-    "notAllowed": "Je hebt hier geen toestemming voor. Vraag het aan een beheerder van de werkruimte.",
+    "notAllowed": "Je hebt hier geen toestemming voor.",
     "tooMany": "Te veel pogingen. Probeer het later opnieuw.",
     "offline": "Je bent offline. Controleer je verbinding en probeer het opnieuw.",
     "unreachable": "agentes.chat is nu niet bereikbaar. Probeer het zo opnieuw."
@@ -214,6 +215,12 @@
       "short": "kanalen maken",
       "say": "maakt kanalen"
     },
+    "mention_everyone": {
+      "title": "Iedereen noemen",
+      "desc": "Met @iedereen iedereen in een kanaal een melding sturen, mensen en agents.",
+      "short": "iedereen noemen",
+      "say": "noemt iedereen"
+    },
     "manage_channels": {
       "title": "Kanalen ordenen",
       "desc": "Hernoemen, archiveren, leden wijzigen en categorieën ordenen.",
@@ -298,6 +305,12 @@
       "short": "AI-sleutels",
       "say": "beheert AI-sleutels"
     },
+    "use_others_plans": {
+      "title": "Abonnementen van anderen gebruiken",
+      "desc": "De agents die je mag bewerken een abonnement geven dat iemand anders heeft gekoppeld. De eigenaar krijgt een e-mail en kan het terugnemen.",
+      "short": "abonnementen van anderen gebruiken",
+      "say": "gebruikt abonnementen van anderen"
+    },
     "edit_wiki": {
       "title": "De wiki bewerken",
       "desc": "Pagina's maken en wijzigen.",
@@ -357,12 +370,6 @@
       "desc": "Het abonnement, de kaart en de facturen.",
       "short": "facturatie",
       "say": "beheert de facturatie"
-    },
-    "use_others_plans": {
-      "title": "Abonnementen van anderen gebruiken",
-      "desc": "De agents die je mag bewerken een abonnement geven dat iemand anders heeft gekoppeld. De eigenaar krijgt een e-mail en kan het terugnemen.",
-      "short": "abonnementen van anderen gebruiken",
-      "say": "gebruikt abonnementen van anderen"
     }
   },
   "auth": {
@@ -953,7 +960,7 @@
       "theo": {
         "name": "Theo",
         "role": "PM",
-        "desc": "Organiseert taken en leidt het forum."
+        "desc": "Organiseert taken en houdt de roadmap bij."
       },
       "ada": {
         "name": "Ada",
@@ -1100,7 +1107,6 @@
     "agent_reply": "Een agent heeft geantwoord",
     "agent_question": "Een vraag voor jou",
     "approval": "Er wacht een goedkeuring op jou",
-    "forum_turn": "Jouw beurt om mee te denken",
     "mission_stopped": "Een missie is gestopt",
     "routine_failed": "Een routine is niet afgerond",
     "run_failed": "Een agent kon niet afronden",
@@ -1249,7 +1255,7 @@
     "category": {
       "waiting": {
         "title": "Wacht op jou",
-        "help": "Goedkeuringen, vragen van agents, jouw beurt in het forum, hulpvragen in de browser"
+        "help": "Goedkeuringen, vragen van agents, hulpvragen in de browser"
       },
       "replies": {
         "title": "Antwoorden van agents",
@@ -1320,7 +1326,6 @@
       "drive": "Bestanden, rapporten en tabellen",
       "routines": "Wat agents zelf doen, op tijd",
       "calendar": "Vergaderingen en deadlines",
-      "forum": "Als een besluit meerdere blikken nodig heeft",
       "team": "Wie is wie: mensen, agents en hun groepen"
     },
     "customizeSidebar": "Zijbalk aanpassen",
@@ -1392,7 +1397,6 @@
     "team": "Team",
     "calendar": "Agenda",
     "drive": "Drive",
-    "forum": "Forum",
     "members": "Leden",
     "channels": "Kanalen",
     "agents": "Agents",
@@ -1435,29 +1439,29 @@
     "unreadNotifications_other": "{{count}} ongelezen meldingen"
   },
   "agentGroups": {
-    "group": "Groep",
-    "none": "Geen groep",
-    "newGroup": "Nieuwe groep",
-    "newFromAgent": "Nieuwe groep…",
+    "group": "Afdeling",
+    "none": "Geen afdeling",
+    "newGroup": "Nieuwe afdeling",
+    "newFromAgent": "Nieuwe afdeling…",
     "nameLabel": "Naam",
-    "namePlaceholder": "Bijv. Product en marketing",
-    "create": "Groep maken",
-    "renameTitle": "Groep hernoemen",
-    "rename": "Hernoemen",
+    "namePlaceholder": "Bijv. Verkoop",
+    "create": "Afdeling maken",
+    "renameTitle": "Afdeling bewerken",
+    "rename": "Bewerken",
     "options": "Opties voor {{name}}",
     "moveUp": "Omhoog",
     "moveDown": "Omlaag",
-    "delete": "Groep verwijderen",
-    "deleteTitle": "Groep {{name}} verwijderen?",
+    "delete": "Afdeling verwijderen",
+    "deleteTitle": "De afdeling {{name}} verwijderen?",
     "deleteText": "De agents gaan terug naar Agents.",
     "dropHere": "Sleep agents hierheen",
-    "moved": "{{name}} zit nu in de groep {{group}}",
-    "movedOut": "{{name}} heeft de groep {{group}} verlaten",
+    "moved": "{{name}} zit nu in {{group}}",
+    "movedOut": "{{name}} heeft {{group}} verlaten",
     "undo": "Ongedaan maken"
   },
   "sidebarAgents": {
     "options": "Opties voor agents",
-    "add": "Nieuwe agent of groep",
+    "add": "Nieuwe agent of afdeling",
     "order": "Volgorde",
     "sort": {
       "workspace": "Die van de werkruimte",
@@ -1467,7 +1471,7 @@
     "showAll": "Agents tonen die niet met mij praten",
     "collapseAll": "Alles inklappen",
     "expandAll": "Alles uitklappen",
-    "organize": "Groepen ordenen in Team",
+    "organize": "Afdelingen ordenen in Team",
     "more_one": "Nog 1 agent in Team",
     "more_other": "Nog {{count}} agents in Team",
     "createFirst": "De eerste agent maken",
@@ -1479,8 +1483,8 @@
     "talksOnly": "praat alleen met {{name}}",
     "talksOnlyMore_one": "praat alleen met {{name}} en {{count}} ander",
     "talksOnlyMore_other": "praat alleen met {{name}} en {{count}} anderen",
-    "changeGroup": "Naar groep verplaatsen",
-    "newGroupWith": "Nieuwe groep met {{name}}",
+    "changeGroup": "Naar afdeling verplaatsen",
+    "newGroupWith": "Nieuwe afdeling met {{name}}",
     "dmsEmpty": "Je gesprekken met mensen verschijnen hier."
   },
   "sidebarPins": {
@@ -1506,59 +1510,106 @@
   },
   "team": {
     "title": "Team",
-    "groups": {
-      "title": "Agentgroepen"
+    "people_one": "{{count}} persoon",
+    "people_other": "{{count}} mensen",
+    "agents_one": "{{count}} agent",
+    "agents_other": "{{count}} agenten",
+    "sectorsCount_one": "{{count}} afdeling",
+    "sectorsCount_other": "{{count}} afdelingen",
+    "viewLabel": "Teamweergave",
+    "view": {
+      "list": "Lijst",
+      "chart": "Organogram",
+      "map": "Kaart",
+      "sectors": "Afdelingen",
+      "usage": "Beheer en gebruik"
     },
-    "subtitle_one": "{{count}} agent, gegroepeerd naar wie ervoor zorgt.",
-    "subtitle_other": "{{count}} agents, gegroepeerd naar wie voor elk zorgt.",
-    "working_one": "{{count}} nu aan het werk.",
-    "working_other": "{{count}} nu aan het werk.",
-    "skyLabel": "Agents gegroepeerd per verantwoordelijke. Tik op een agent om te zien wat hij doet.",
-    "tapHint": "Tik op een agent",
-    "asked": "{{from}} vroeg {{to}}",
     "noOwner": "Niemand verantwoordelijk",
-    "openAgent": "{{name}}, details bekijken",
-    "close": "Sluiten",
-    "details": "Details van {{name}}",
-    "of": "van {{name}}",
-    "does": "Wat hij doet",
-    "does_female": "Wat zij doet",
-    "canDo": "Wat hij kan",
-    "canDo_female": "Wat zij kan",
-    "onlyChat": "Alleen gesprekken",
     "workingNow": "Nu aan het werk",
     "available": "Beschikbaar",
-    "talk": "Praten",
-    "edit": "Bewerken",
-    "feedTitle": "Gesprekken tussen agents",
-    "feedWindow": "laatste 24 u",
-    "feedEmpty": "Geen agent vroeg in de laatste 24 u een andere om hulp.",
     "archived": "Gearchiveerd",
-    "consultation": {
-      "open": "Wacht op het antwoord",
-      "answered": "Beantwoord",
-      "expired": "Kreeg geen antwoord",
-      "failed": "Kreeg geen antwoord"
-    },
     "emptyTitle": "Nog geen agents",
     "empty": "Maak de eerste agent om het team op te bouwen.",
-    "cap": {
-      "drive": "Bestanden",
-      "issues": "Taken",
-      "calendar": "Agenda",
-      "schedule": "Routines",
-      "forum": "Forum",
-      "wiki": "Wiki",
-      "sandbox": "Computer",
-      "desktop": "Scherm",
-      "browser": "Browser",
-      "database": "Databases",
-      "github": "GitHub",
-      "sentry": "Sentry",
-      "linear": "Linear",
-      "mail": "E-mail",
-      "vault": "Vault",
-      "custom": "Tools van de werkruimte"
+    "list": {
+      "agents": "Agenten",
+      "people": "Mensen",
+      "search": "Zoeken op naam, rol of kanaal",
+      "filterLabel": "Agenten tonen",
+      "filter": {
+        "mine": "Mijn",
+        "working": "Nu aan het werk",
+        "waiting": "Wacht op jou",
+        "noOwner": "Niemand verantwoordelijk"
+      },
+      "groupBy": "Groeperen op",
+      "by": {
+        "sector": "Groeperen op: afdeling",
+        "owner": "Groeperen op: verantwoordelijke",
+        "none": "Niet groeperen"
+      },
+      "col": {
+        "agent": "Agent",
+        "role": "Rol",
+        "owner": "Verantwoordelijke",
+        "channels": "Waar hij is",
+        "now": "Nu",
+        "menu": "Opties",
+        "person": "Persoon",
+        "roles": "Rollen",
+        "caresFor": "Zorgt voor"
+      },
+      "noChannel": "In geen kanaal",
+      "none": "Geen agent gevonden."
+    },
+    "chart": {
+      "byLabel": "Organogram per",
+      "byPerson": "Per persoon",
+      "bySector": "Per afdeling",
+      "subPerson": "Elke agent onder de verantwoordelijke persoon, of onder het hoofd van zijn afdeling als hij er geen heeft.",
+      "subSector": "Elke afdeling met haar agenten. {{name}} werkt met iedereen.",
+      "workspace": "Werkruimte",
+      "responsible": "Verantwoordelijk: {{names}}"
+    },
+    "map": {
+      "lead": "Wie voor de agenten zorgt, in welke kanalen ze zitten, wat elk zelfstandig doet en wat op een persoon wacht. Stippellijnen zijn agenten die elkaar de afgelopen dag om hulp vroegen.",
+      "lodi": "Organiseert het team met jou",
+      "hint": "Sleep een agent naar een ander kanaal en {{name}} bereidt de wijziging voor zodat jij die toepast",
+      "proposed": "{{name}} heeft de wijziging voorbereid in je gesprek. Pas die daar toe.",
+      "open": "Openen",
+      "reasonMove": "{{agent}} van #{{from}} naar #{{to}} verplaatsen, vanaf de teamkaart.",
+      "reasonJoin": "{{agent}} toevoegen aan #{{to}}, vanaf de teamkaart.",
+      "waiting_one": "{{count}} verzoek wacht op goedkeuring",
+      "waiting_other": "{{count}} verzoeken wachten op goedkeuring",
+      "moreRoutines_one": "en nog {{count}} routine",
+      "moreRoutines_other": "en nog {{count}} routines",
+      "empty": "Nog geen agent zit in een kanaal.",
+      "others": "Andere kanalen"
+    },
+    "sectors": {
+      "lead": "Elke afdeling heeft een hoofd, een vervanger, haar agenten en hun kanalen en routines.",
+      "ask": "Praat met {{name}}",
+      "askText": "Help me het team in afdelingen in te delen.",
+      "leadLabel": "Hoofd",
+      "backupLabel": "Vervanger",
+      "leadOf": "Hoofd van {{name}}",
+      "backupOf": "Vervanger bij {{name}}",
+      "nobody": "Niemand",
+      "none": "Geen",
+      "channels": "Kanalen",
+      "routines": "Routines",
+      "leads": "Hoofd van {{name}}",
+      "covers": "Vervanger bij {{name}}",
+      "placeHint": "Sleep een agent naar een afdeling om hem daar te zetten.",
+      "gap": {
+        "noLead": "Nog geen hoofd. Kies wie voor deze afdeling zorgt.",
+        "noBackup": "Geen vervanger. Als het hoofd weg is, neemt niemand het over."
+      },
+      "emptyTitle": "Nog geen afdelingen",
+      "empty": "Afdelingen delen de agenten in per gebied, zoals Verkoop of Support. Ze verschijnen als secties in ieders lijsten."
+    },
+    "usage": {
+      "lead": "Wat elke persoon deze maand van de agenten gebruikt, en de limieten.",
+      "settings": "Ook in Instellingen"
     }
   },
   "sky": {
@@ -1776,8 +1827,8 @@
     "queued_other": "{{names}} staan in de rij voor de computer",
     "away_one": "{{names}} wacht op de computer",
     "away_other": "{{names}} wachten op de computer",
-    "plan_one": "{{names}} antwoordt als het abonnement opnieuw begint",
-    "plan_other": "{{names}} antwoorden als het abonnement opnieuw begint",
+    "plan_one": "{{names}} wacht op het abonnement",
+    "plan_other": "{{names}} wachten op het abonnement",
     "budget_one": "{{names}} antwoordt als het budget vernieuwt",
     "budget_other": "{{names}} antwoorden als het budget vernieuwt",
     "line_one": "{{names}} begint als ander werk klaar is",
@@ -1795,7 +1846,7 @@
       "outage": "De AI-aanbieder ligt eruit · probeert het zelf opnieuw",
       "queued": "In de rij voor de computer",
       "away": "Wacht op de computer",
-      "plan": "Antwoordt als het abonnement opnieuw begint",
+      "plan": "Wacht op het abonnement",
       "budget": "Antwoordt als het budget vernieuwt",
       "line": "Begint als ander werk klaar is",
       "canceled": "Geannuleerd",
@@ -1842,10 +1893,21 @@
         "import": "Mijn agents importeren",
         "form": "Het formulier invullen"
       },
+      "again": {
+        "question": "Wil je het team met mij samenstellen?",
+        "action": "Team samenstellen",
+        "message": "Help me het team samen te stellen."
+      },
       "next": {
         "question": "Het team is er. En nu?",
         "invite": "Mensen uitnodigen",
         "firstTask": "{{name}} een eerste taak geven"
+      },
+      "style": {
+        "question": "Hoe wil je dat ik met je praat?",
+        "text": "Het geldt voor alle agents, en je kunt het altijd wijzigen in je account.",
+        "simple": "Eenvoudig, zonder vaktaal",
+        "technical": "Technisch, met de details"
       },
       "firstTask": {
         "theo": "Maak het plan voor onze eerste week: wat doet ieder van ons eerst?",
@@ -1868,8 +1930,6 @@
       "name": "Naam en uiterlijk",
       "nameHelp": "In de zijbalk staat er altijd “{{label}}” bij.",
       "changeLook": "Uiterlijk wijzigen",
-      "ai": "AI en model",
-      "aiHelp": "Automatisch kiest het goedkoopste model dat het werk aankan.",
       "budget": "Maandbudget",
       "perMonth": "/maand",
       "budgetHelp": "Bij de limiet stopt hij en laat het weten, zoals elke agent.",
@@ -1877,12 +1937,27 @@
       "audienceHelp": "Wie erbuiten valt, ziet {{name}} niet in de zijbalk.",
       "lock": "{{name}} kan niet gearchiveerd of verwijderd worden. Hij plaatst niets zolang niemand met hem praat.",
       "audit": "Bekijk wat {{name}} deed",
-      "onPlan": "Claude-abonnement · {{account}}",
       "change": "Wijzigen",
       "planHelp": "De eigenaar van het abonnement betaalt. Is de computer ervan niet bereikbaar, dan zegt het gesprek dat en biedt het een API-sleutel aan.",
-      "plan": "Een abonnement",
-      "planOffer": "{{name}} kan met je abonnement denken in plaats van met een API-sleutel, op de computer waar het abonnement is ingelogd, zonder iets buiten deze workspace te bereiken.",
-      "usePlan": "Abonnement gebruiken"
+      "lookEdit": "Uiterlijk van {{name}} wijzigen",
+      "planOwner": "van {{owner}}",
+      "mine": "Jouw AI",
+      "mineHelp": "Jouw gesprek met {{name}} denkt met jouw abonnement of een abonnement dat met je gedeeld is, en alleen dat van jou.",
+      "connectMine": "Mijn abonnement koppelen",
+      "useWorkspace": "Die van de workspace gebruiken",
+      "fallbackKey": "Zonder eigen abonnement gebruikt het de API-sleutel van de workspace.",
+      "fallbackPlan": "Zonder eigen abonnement gebruikt het het abonnement van {{owner}}, dat iedereen antwoordt.",
+      "fallbackYours": "Zonder ander abonnement gebruikt het dat van de workspace, dat van jou is.",
+      "fallbackNone": "Zonder eigen abonnement kan {{name}} je niet antwoorden: het abonnement van de workspace antwoordt alleen {{owner}}.",
+      "workspace": "AI van de workspace",
+      "workspaceHelp": "Wie geen eigen abonnement heeft, praat via deze AI met {{name}}.",
+      "workspacePlan": "Abonnement van de workspace",
+      "workspacePlanHelp": "Een abonnement in plaats van de sleutel. Het antwoordt anderen alleen als de eigenaar dat toestaat.",
+      "noPlans": "Koppel een abonnement onder Jouw AI om het hier te gebruiken.",
+      "pickPlan": "Kies een abonnement",
+      "sharesOn": "Aan: wie geen eigen abonnement heeft, praat via dit abonnement met {{name}}.",
+      "sharesOff": "Uit: alleen {{owner}} praat erdoor. Wie geen eigen abonnement heeft, krijgt geen antwoord.",
+      "sharesOffYou": "Uit: alleen jij praat erdoor. Wie geen eigen abonnement heeft, krijgt geen antwoord."
     },
     "card": {
       "settings": "{{name}} · Instellingen",
@@ -1973,6 +2048,92 @@
       "notAllowed": "Je hebt geen toegang tot dit scherm"
     }
   },
+  "teamWeek": {
+    "title": "Teamweek",
+    "suggestions_one": "{{count}} suggestie",
+    "suggestions_other": "{{count}} suggesties",
+    "stat": {
+      "done": "taken gedaan",
+      "stuck": "liepen vast",
+      "waiting": "wachten op jou",
+      "budget": "van {{budget}} deze maand"
+    },
+    "worked": "Werkte",
+    "workedRuns_one": "{{name}} deed {{count}} klus in #{{channel}}",
+    "workedRuns_other": "{{name}} deed {{count}} klussen in #{{channel}}",
+    "workedTasks_one": "{{name}} sloot {{count}} taak",
+    "workedTasks_other": "{{name}} sloot {{count}} taken",
+    "improve": "Te verbeteren",
+    "approvals": {
+      "title_one": "{{count}} verzoek van {{name}} wacht op jou",
+      "title_other": "{{count}} verzoeken van {{name}} wachten op jou",
+      "line": "Wacht sinds {{since}}.",
+      "action": "Bekijken en goedkeuren",
+      "hide": "Verbergen"
+    },
+    "budget": {
+      "title": "Budget van {{name}}: {{from}} → {{to}}",
+      "line_one": "Stopte {{count}} keer bij de maandlimiet.",
+      "line_other": "Stopte {{count}} keer bij de maandlimiet."
+    },
+    "channel": {
+      "title": "{{name}} in #{{channel}} zetten",
+      "line": "{{name}} zit in geen enkel kanaal, dus niemand sprak het de hele week."
+    },
+    "unanswered": {
+      "title": "Een agent voor de vragen in #{{channel}}",
+      "line_one": "{{count}} vraag bleef deze week onbeantwoord in #{{channel}}.",
+      "line_other": "{{count}} vragen bleven deze week onbeantwoord in #{{channel}}.",
+      "action": "Een agent voorstellen",
+      "message": "Stel een agent voor die de vragen beantwoordt die deze week onbeantwoord bleven in #{{channel}}.",
+      "done": "Gevraagd aan {{name}}"
+    },
+    "routine": {
+      "title": "Routine van {{name}} elke dag om {{time}}",
+      "line_one": "Je vroeg dit deze week {{count}} keer: ‘{{text}}’",
+      "line_other": "Je vroeg dit deze week op {{count}} dagen: ‘{{text}}’",
+      "action": "Routine maken",
+      "done": "Routine gemaakt"
+    },
+    "stalled": {
+      "title": "Stappen staan stil in #{{number}} {{title}}",
+      "line_one": "Stap {{steps}} staat al {{hours}} u stil en wacht op #{{on}}.",
+      "line_other": "De stappen {{steps}} staan al {{hours}} u stil en wachten op #{{on}}.",
+      "action": "Parallel laten lopen",
+      "message": "@{{handle}} de stappen {{steps}} hoeven niet op #{{on}} te wachten. Ga er parallel mee verder.",
+      "messageNoAgent": "De stappen {{steps}} hoeven niet op #{{on}} te wachten. Ze kunnen parallel verder.",
+      "done": "Bericht verstuurd"
+    },
+    "applied": "Toegepast",
+    "undo": "Ongedaan maken",
+    "gone": "Geldt niet meer",
+    "applyAll_one": "Suggestie toepassen",
+    "applyAll_other": "Alle {{count}} toepassen",
+    "notNow": "Nu niet",
+    "dismissed": "Voorlopig verandert er niets. Vraag hier alles over de week.",
+    "change": "Wijzigen",
+    "every": {
+      "sun": "Elke zondag om {{time}}",
+      "mon": "Elke maandag om {{time}}",
+      "tue": "Elke dinsdag om {{time}}",
+      "wed": "Elke woensdag om {{time}}",
+      "thu": "Elke donderdag om {{time}}",
+      "fri": "Elke vrijdag om {{time}}",
+      "sat": "Elke zaterdag om {{time}}"
+    },
+    "off": "Uit",
+    "schedule": {
+      "title": "Wanneer hij komt",
+      "day": "Dag",
+      "hour": "Tijd",
+      "stop": "Niet meer ontvangen",
+      "start": "Weer ontvangen"
+    },
+    "settings": {
+      "label": "Teamweek",
+      "help": "Elke week vertelt {{name}} je in je DM hoe het team het deed en wat beter kan. Alleen admins krijgen hem."
+    }
+  },
   "routing": {
     "title": "Wie de agents kiest",
     "how": "Hoe agents worden gekozen",
@@ -1993,6 +2154,8 @@
     },
     "agent": "{{name}} antwoordt niet omdat hij geen AI gekoppeld heeft.",
     "agent_female": "{{name}} antwoordt niet omdat zij geen AI gekoppeld heeft.",
+    "cliMissing": "{{name}} antwoordt niet: het programma van de AI is niet op de computer geïnstalleerd.",
+    "noComputer": "{{name}} antwoordt niet: de AI heeft een computer nodig en die is er niet.",
     "signedOut": "{{name}} antwoordt niet omdat zijn AI is uitgelogd.",
     "signedOut_female": "{{name}} antwoordt niet omdat haar AI is uitgelogd.",
     "notSignedIn": {
@@ -2018,12 +2181,17 @@
     "action": "Koppelen",
     "locked": "Wie de AI van {{name}} koppelt: een beheerder, met een API-sleutel, of {{owner}}, met een eigen abonnement.",
     "lockedAdmins": "Alleen een beheerder kan een AI koppelen.",
+    "lockedOwner": "Alleen de eigenaar van de agent koppelt er een abonnement aan.",
     "rightHand": {
       "computer_away": "{{name}} kan nu niet antwoorden: de computer van het abonnement is niet bereikbaar.",
+      "computer_failed": "{{name}} kan nu niet antwoorden: de computer van het abonnement had een probleem.",
       "plan_limit": "{{name}} kan nu niet antwoorden: het abonnement heeft zijn limiet bereikt.",
-      "plan_not_shared": "{{name}} denkt met een abonnement dat alleen de eigenaar antwoordt. De eigenaar van het abonnement kan Antwoordt andere mensen aanzetten.",
+      "plan_not_shared": "Koppel je eigen abonnement om met {{name}} te praten: het abonnement van de workspace antwoordt alleen de eigenaar.",
       "runner_outdated": "{{name}} kan nu niet antwoorden: het programma op de computer van het abonnement heeft een update nodig.",
-      "plan_tools": "{{name}} stopte voordat het antwoordde: de AI van het abonnement op die computer biedt eigen tools aan.",
+      "plan_tools": "{{name}} stopte voordat het antwoordde: de AI van het abonnement op die computer bleef niet binnen de tools van agentes.chat.",
+      "model_limit": "{{name}} kan nu niet antwoorden: {{model}} heeft zijn eigen limiet in het abonnement bereikt. De andere modellen van het abonnement werken nog.",
+      "model_region": "{{name}} kan niet antwoorden: {{model}} heeft de regio Global nodig, aangezet in OpenCode (Settings › Privacy).",
+      "commands_off": "{{name}} kan nu niet antwoorden: opdrachten staan uit op de computer van het abonnement, en wie die beheert moet ze aanzetten.",
       "useKey": "API-sleutel gebruiken"
     },
     "receipt": "Niemand antwoordt: geen AI gekoppeld",
@@ -2232,6 +2400,8 @@
       "monthly": "van zijn maand"
     },
     "line": "Gaat {{when}} verder, als het abonnement opnieuw begint. Snelle antwoorden gaan door.",
+    "changeModel": "Model wijzigen",
+    "raiseBudget": "Budget verhogen",
     "lineUnknown": "Gaat verder zodra het abonnement opnieuw begint. Snelle antwoorden gaan door.",
     "lineBudget": "Gaat {{when}} verder, of eerder als het budget omhoog gaat. Snelle antwoorden gaan door.",
     "continue": "Nu doorgaan",
@@ -2414,6 +2584,7 @@
     },
     "memory": {
       "saved": "Opgeslagen in <b>geheugen</b>: {{text}}",
+      "saved_rule": "Opgeslagen in <b>mijn regels</b>: {{text}}",
       "updated": "<b>Geheugen</b> bijgewerkt: {{text}}",
       "forgotten": "Uit <b>geheugen</b> verwijderd: {{text}}"
     },
@@ -2445,6 +2616,10 @@
     },
     "agent": {
       "settings_changed": "Heb de instellingen van <b>{{agentName}}</b> gewijzigd"
+    },
+    "pr": {
+      "merged": "PR <b>#{{number}}</b> in <b>{{repo}}</b> gemerged",
+      "merged_branch": "<b>{{ref}}</b> in <b>{{repo}}</b> gemerged"
     },
     "other": "Iets gewijzigd",
     "copyWebhook": "Webhookadres kopiëren",
@@ -2723,7 +2898,7 @@
       "waiting_answer": "Wacht op een antwoord",
       "waiting_computer": "Wacht op de computer",
       "queued_computer": "In de rij voor de computer",
-      "waiting_plan": "Wacht tot het abonnement opnieuw begint",
+      "waiting_plan": "Wacht op het abonnement",
       "waiting_budget": "Wacht tot het budget opnieuw begint",
       "provider_down": "De AI-aanbieder ligt eruit · probeert het zelf opnieuw",
       "out_of_plan": "Planlimiet bereikt",
@@ -2750,6 +2925,7 @@
     "inChannel": "In dit kanaal",
     "inWorkspace": "In de werkruimte",
     "notInChannel": "niet in het kanaal",
+    "everyone": "Iedereen in dit gesprek, mensen en agents",
     "offer": "{{name}} zit niet in het kanaal en ziet de vermelding niet.",
     "add": "Toevoegen aan kanaal",
     "dismiss": "Niet nu",
@@ -3193,7 +3369,9 @@
       "browser": "Heeft je nodig in de browser",
       "desktop": "Heeft je nodig op de computer",
       "proposal": "Stelt een wijziging voor",
-      "agent": "Stelt een nieuwe agent voor"
+      "agent": "Stelt een nieuwe agent voor",
+      "team": "Stelt een team voor",
+      "firstTask": "Eerste taak"
     },
     "waitingYou": "wacht op jou",
     "waitingFor": "wacht op {{name}}",
@@ -3208,6 +3386,8 @@
       "desktop": "<b>{{name}}</b> heeft je nodig op de computer · {{what}}",
       "proposal": "<b>{{name}}</b> stelt een wijziging voor · {{what}}",
       "agent": "<b>{{name}}</b> stelt een nieuwe agent voor · {{what}}",
+      "team": "<b>{{name}}</b> stelt een team voor · {{what}}",
+      "firstTask": "<b>{{name}}</b> stelt een eerste taak voor · {{what}}",
       "more": "+{{count}}",
       "see": "Bekijken"
     }
@@ -3261,7 +3441,12 @@
       "done": "Goedgekeurd. {{name}} vraagt hier niet meer om.",
       "undoHere": "Ongedaan maken kan bij Tools en toegang, op de pagina van {{name}}.",
       "undoHere_female": "Ongedaan maken kan bij Tools en toegang, op de pagina van {{name}}.",
-      "open": "Openen"
+      "open": "Openen",
+      "routine": "Altijd in deze routine",
+      "thisRoutine": "deze routine",
+      "noteRoutine": "{{routine}} doet {{actions}} vanaf nu zelf, met elke waarde. Buiten deze routine blijft het vragen. Ongedaan maken: de instellingen van de routine.",
+      "doneRoutine": "Goedgekeurd. {{routine}} vraagt dit niet meer.",
+      "undoRoutine": "Ongedaan maken kan bij de instellingen van de routine."
     },
     "email": {
       "from": "Van",
@@ -3436,6 +3621,11 @@
   },
   "notifications": {
     "title": "Meldingen",
+    "planLent": {
+      "takeBack": "Terugnemen",
+      "takeBackAll": "Van alle agents terugnemen",
+      "done": "Je abonnement is terug"
+    },
     "docTitleUnread": "({{count}}) Meldingen",
     "summaryWaiting_one": "{{count}} ding wacht op jou",
     "summaryWaiting_other": "{{count}} dingen wachten op jou",
@@ -3481,17 +3671,6 @@
       "stoppedForF": "{{time}} gestopt",
       "stoppedForM": "{{time}} gestopt",
       "openThread": "Het gesprek openen",
-      "table": "heeft je aan tafel geroepen",
-      "roundWaits": "De ronde wacht {{time}}",
-      "yourTurn": "Ronde {{round}} van {{rounds}} · jij bent aan de beurt",
-      "yourTurnNoRound": "Jij bent aan de beurt",
-      "seatYou": "Jij",
-      "seatYours": "jouw beurt",
-      "seatSpoke": "heeft gesproken",
-      "seatPassed": "heeft gepast",
-      "seatLater": "straks",
-      "speak": "Spreek aan tafel",
-      "pass": "Je beurt overslaan",
       "approval": "vraagt om goedkeuring",
       "decide": "Beslissen bij Goedkeuringen",
       "wants": "<b>{{name}}</b> wil <b>{{action}}</b>",
@@ -3512,8 +3691,7 @@
         "draft": "een concept opslaan"
       },
       "resolved": "{{name}} heeft je antwoord gekregen en is weer aan het werk",
-      "resolved_female": "{{name}} heeft je antwoord gekregen en is weer aan het werk",
-      "resolvedForum": "Jouw beurt staat in de ronde"
+      "resolved_female": "{{name}} heeft je antwoord gekregen en is weer aan het werk"
     },
     "what": {
       "mention": "<b>{{name}}</b> heeft je vermeld",
@@ -3532,8 +3710,6 @@
       "issueComment_other": "<b>{{names}}</b> hebben gereageerd op een taak die je volgt",
       "issueStatus": "<b>{{name}}</b> heeft een taak verplaatst die je volgt",
       "issueDone": "<b>{{name}}</b> heeft een taak afgerond die je volgt",
-      "forumTurn": "<b>{{name}}</b> heeft je aan tafel geroepen",
-      "forumSynthesis": "<b>{{name}}</b> heeft de samenvatting van je onderwerp gepubliceerd",
       "approval": "<b>{{name}}</b> heeft om goedkeuring gevraagd",
       "missionFinished": "<b>{{name}}</b> heeft een missie afgerond",
       "missionStopped": "<b>{{name}}</b> heeft een missie gestopt",
@@ -3549,6 +3725,7 @@
       "agentUnreached": "Een routine kon <b>{{name}}</b> niet bereiken",
       "browserProfileRequest": "<b>{{name}}</b> vraagt om nog een browserprofiel voor <b>{{agent}}</b>",
       "desktopTaken": "<b>{{name}}</b> heeft het scherm van de computer van <b>{{agent}}</b> overgenomen",
+      "planLent": "<b>{{name}}</b> heeft je {{plan}}-abonnement aan <b>{{agent}}</b> gekoppeld",
       "routineWaitingPlan": "<b>{{name}}</b> wacht tot zijn abonnement wordt gereset om een routine uit te voeren",
       "planResetUnknown": "{{plan}} heeft niet gezegd wanneer de limiet wordt gereset. Het werk van <b>{{name}}</b> wacht nog.",
       "catchUpClosed_one": "<b>{{name}}</b> is terug en heeft {{count}} gesprek overgeslagen dat geen antwoord nodig had",
@@ -3581,8 +3758,7 @@
       "usageLimitReached": "<b>{{name}}</b> heeft de limiet van {{amount}} bereikt",
       "usageLimitRequest": "<b>{{name}}</b> heeft de limiet van {{amount}} bereikt en vraagt om meer",
       "usageLimitRaised": "<b>{{name}}</b> heeft je limiet voor deze maand verhoogd",
-      "usageLimitRefused": "<b>{{name}}</b> heeft je verzoek om meer gebruik afgewezen",
-      "planLent": "<b>{{name}}</b> heeft je {{plan}}-abonnement aan <b>{{agent}}</b> gekoppeld"
+      "usageLimitRefused": "<b>{{name}}</b> heeft je verzoek om meer gebruik afgewezen"
     },
     "usageLimit": {
       "runs_one": "{{count}} verzoek deze maand",
@@ -3600,7 +3776,6 @@
       "threadOnly": "Thread",
       "dm": "Direct bericht",
       "issue": "Taak #{{number}}",
-      "forum": "Forum",
       "mission": "Missie",
       "routine": "Routine",
       "approval": "Goedkeuring",
@@ -3657,7 +3832,6 @@
       "channel": "Antwoorden in #{{channel}}",
       "issue": "Reageren op #{{number}}",
       "issueNoNumber": "Reageren op de taak",
-      "forum": "Je standpunt in een of twee zinnen",
       "reply": "Antwoorden",
       "sends": "verstuurt",
       "closes": "sluit",
@@ -3685,9 +3859,6 @@
       "sent": "Antwoord verstuurd",
       "see": "Bekijken",
       "answered": "{{name}} heeft je antwoord gekregen",
-      "spoke": "Jouw beurt staat in de ronde",
-      "passed": "Je hebt je beurt overgeslagen",
-      "passedDetail": "De ronde gaat verder. De samenvatting komt hier binnen zodra die klaar is.",
       "decideThere": "Over deze aanvraag wordt beslist bij Goedkeuringen"
     },
     "calmTitle": "Je bent helemaal bij",
@@ -3696,12 +3867,7 @@
     "noneUnread": "Alles gelezen.",
     "noneHere": "Hier is voorlopig niets.",
     "noneDone": "Niets als afgerond gemarkeerd in de afgelopen 30 dagen.",
-    "more": "Meer tonen",
-    "planLent": {
-      "takeBack": "Terugnemen",
-      "takeBackAll": "Van alle agents terugnemen",
-      "done": "Je abonnement is terug"
-    }
+    "more": "Meer tonen"
   },
   "approvals": {
     "title": "Goedkeuringen",
@@ -4001,6 +4167,7 @@
         "accountMove": "In gebruik door {{agents}} · Hierheen verplaatsen",
         "accountAlso": "Ook gebruikt door {{agents}}",
         "accountOf": "Van {{name}}",
+        "accountOthers": "Abonnementen van anderen laten zien van wie ze zijn. De eigenaar krijgt een e-mail en kan het terugnemen.",
         "addAccount": "Account toevoegen",
         "signInAgain": "Opnieuw inloggen",
         "connectPlan": "Ander abonnement koppelen",
@@ -4160,8 +4327,7 @@
           "sendFailed": "Kon de code niet versturen. Controleer hem en probeer het opnieuw.",
           "done": "Het account {{account}} staat op {{computer}}. Klik op Gebruiken om op te slaan."
         },
-        "offCloud": "{{computer}} reageert niet",
-        "accountOthers": "Abonnementen van anderen laten zien van wie ze zijn. De eigenaar krijgt een e-mail en kan het terugnemen."
+        "offCloud": "{{computer}} reageert niet"
       },
       "computer": {
         "title": "Waar werkt {{name}}?",
@@ -4249,7 +4415,7 @@
       "machine": "Computer",
       "brain": "Wie denkt",
       "repos": "GitHub-repository's",
-      "group": "Groep",
+      "group": "Afdeling",
       "handle": "Vermeldingen"
     },
     "lines": {
@@ -4414,6 +4580,11 @@
       "cancel": "Annuleren",
       "forgotten": "Vergeten. Het staat in Gearchiveerd als je het terug wilt.",
       "saved": "Opgeslagen. Het telt nu als geverifieerd.",
+      "rules": "Regels van mensen",
+      "rulesNote": "Geldt bij al het werk voor wie de regel gaf, waar het verzoek ook vandaan komt. Regels van de eigenaar of een admin gelden voor iedereen.",
+      "ruleBy": "Van {{name}} · {{date}}",
+      "removeRule": "Verwijderen",
+      "ruleRemoved": "Regel verwijderd. Hij staat in Gearchiveerd als je hem terug wilt.",
       "playbook": "Hoe {{name}} werkt",
       "playbook_female": "Hoe {{name}} werkt",
       "playbookNote": "Werkwijzen die het voor zichzelf bewaart. Ze verschijnen niet in de chat. Wat het van buitenaf oppikte en nooit opnieuw gebruikte, verdwijnt vanzelf en blijft in Gearchiveerd.",
@@ -4476,6 +4647,7 @@
         "model_refused": "Het model weigerde te antwoorden.",
         "agent_archived": "De agent is gearchiveerd.",
         "provider_error": "De modelaanbieder gaf een fout: {{detail}}",
+        "provider_account": "De aanbieder heeft de sleutel geweigerd: die is misschien ongeldig, zonder tegoed of over het quotum.",
         "provider_unavailable": "De modelaanbieder reageerde niet: {{detail}}",
         "canceled": "Iemand heeft de taak gestopt.",
         "interrupted": "Onderbroken door een herstart van de server.",
@@ -4483,7 +4655,7 @@
         "credential_revoked": "De sleutel van deze agent is ingetrokken.",
         "credential_wrong_provider": "Het model is van {{modelProvider}}, maar de sleutel is van {{keyProvider}}.",
         "model_unlisted": "OpenRouter biedt {{model}} niet meer aan. Kies een ander model in de instellingen van de agent.",
-        "no_ai": "De agent heeft geen AI gekoppeld.",
+        "no_ai": "De agent had geen AI beschikbaar.",
         "person_limit": "Wie het vroeg, heeft de gebruikslimiet voor deze maand bereikt.",
         "org_paused": "De agents van de werkruimte zijn gepauzeerd.",
         "org_suspended": "De werkruimte is niet beschikbaar.",
@@ -4492,6 +4664,8 @@
         "computer_busy": "De computer bleef bezig met andere taken.",
         "computer_failed": "De computer liep tegen een probleem aan en stopte.",
         "computer_timeout": "De computer deed er te lang over om te antwoorden.",
+        "account_missing": "Het account dat voor deze agent gekozen is staat niet meer op zijn computer. Kies een ander in de instellingen van de agent of voeg het opnieuw toe.",
+        "our_error": "Er ging iets mis aan onze kant en de taak is gestopt. Vraag het over een poosje opnieuw.",
         "unknown": "Mislukt."
       }
     },
@@ -4612,13 +4786,15 @@
       "decision": "Besluit",
       "fact": "Feit",
       "preference": "Voorkeur",
-      "lesson": "Les"
+      "lesson": "Les",
+      "rule": "Regel"
     },
     "kindsLower": {
       "decision": "besluit",
       "fact": "feit",
       "preference": "voorkeur",
-      "lesson": "les"
+      "lesson": "les",
+      "rule": "regel"
     },
     "verified": "Geverifieerd",
     "unverified": "Niet geverifieerd",
@@ -4656,7 +4832,7 @@
   },
   "proposals": {
     "title": "Verbeteringsvoorstellen",
-    "subtitle": "Agents stellen wijzigingen voor in de instructies, rollen en toegang van het team, of in de context van {{org}}, als iemand erom vraagt of een les terugkomt. Er verandert niets tot iemand accepteert.",
+    "subtitle": "Wijzigingen die de agents voorstellen. Niets verandert zonder akkoord.",
     "list": "Voorstellen",
     "proposes": "<b>{{agent}}</b> stelt voor · {{target}}",
     "proposesMany": "<b>{{agent}}</b> stelt voor · instructies van {{count}} agents",
@@ -4790,8 +4966,8 @@
       "pm": {
         "name": "PM",
         "agent": "Theo",
-        "desc": "Organiseert taken, samenvattingen en het forum.",
-        "instructions": "Zoekt eerst dingen op (taken, threads, wiki, feedback) en vraagt alleen wat overblijft.\nOrganiseert taken, vat lange discussies samen en houdt de roadmap bij.\nPost elke vrijdag de samenvatting van de week op het forum."
+        "desc": "Organiseert taken en samenvattingen.",
+        "instructions": "Zoekt eerst dingen op (taken, threads, wiki, feedback) en vraagt alleen wat overblijft.\nOrganiseert taken, vat lange discussies samen en houdt de roadmap bij."
       },
       "support": {
         "name": "Support",
@@ -5317,10 +5493,6 @@
       "title": "Direct bericht met {{name}}",
       "text": "Directe berichten zijn er nog niet. Praat voorlopig met {{name}} in een kanaal."
     },
-    "forum": {
-      "title": "Forum",
-      "text": "Lange discussies en aankondigingen van de werkruimte komen hier."
-    },
     "search": {
       "title": "Zoeken in de werkruimte",
       "text": "Zoeken in berichten, taken en bestanden verschijnt hier.",
@@ -5384,7 +5556,7 @@
     },
     "github_pr_merge": {
       "label": "Pull requests mergen",
-      "description": "Een pull request mergen. Vraagt altijd om goedkeuring."
+      "description": "Een pull request mergen. Vraagt om goedkeuring, behalve in de repositories die op de pagina van de agent zijn gekozen."
     },
     "github_issues_read": {
       "label": "Issues lezen",
@@ -5449,10 +5621,6 @@
     "wiki_write": {
       "label": "In de wiki schrijven",
       "description": "Wikipagina's maken en bewerken, alleen als iemand erom vraagt."
-    },
-    "forum_write": {
-      "label": "Forum",
-      "description": "Forumonderwerpen openen, lezen en buiten de eigen beurt posten."
     },
     "schedule_write": {
       "label": "Plannen",
@@ -5736,8 +5904,9 @@
     "createdBy": "#{{number}} · gemaakt door {{name}}",
     "createdByShort": "Gemaakt door {{name}}",
     "fromMessage": "uit <0>een bericht in #{{channel}}</0>",
-    "fromForum": "uit een forumonderwerp",
     "fromAgent": "uit een verzoek aan een agent",
+    "subIssues_one": "Subtaken · {{count}}",
+    "subIssues_other": "Subtaken · {{count}}",
     "fromWebhook": "uit een event van {{provider}}",
     "description": "Beschrijving",
     "noDescription": "Geen beschrijving.",
@@ -5828,9 +5997,7 @@
       "artifact_linked": "heeft een bestand toegevoegd",
       "criterion_checked": "heeft het criterium \"{{text}}\" aangevinkt",
       "criterion_unchecked": "heeft het criterium \"{{text}}\" uitgevinkt",
-      "agent_asked": "heeft {{name}} gevraagd het te doen",
-      "forum_opened": "heeft het naar het forum gebracht: {{title}}",
-      "forum_evaluated": "heeft het resultaat van het forum teruggebracht: {{title}}"
+      "agent_asked": "heeft {{name}} gevraagd het te doen"
     }
   },
   "routines": {
@@ -5916,8 +6083,6 @@
     "widgetChip": "Dashboardwidget",
     "widgetFixed": "Wat hij toont, wanneer hij bijwerkt en wie ervoor zorgt, pas je aan in zijn widget.",
     "target": {
-      "forum": "Een forumonderwerp",
-      "forumShort": "Forum",
       "dm": "Mijn DM met de agent",
       "artifact": "Een document in de Drive",
       "dmShort": "DM",
@@ -6017,7 +6182,6 @@
         "thread": "Elke run antwoordt in dezelfde thread",
         "channel": "Iedereen in het kanaal ziet het",
         "dm": "Alleen jij ziet het",
-        "forum": "De agents overleggen in een forumonderwerp",
         "artifact": "Wordt een document in de Drive",
         "widget": "Werkt zijn widget bij, zonder bericht"
       },
@@ -6043,7 +6207,8 @@
     },
     "ownActions": {
       "hint": "Elke run doet dit in je gekoppelde apps zonder te vragen. Elke andere actie daar vraagt eerst een persoon om goedkeuring, en merge, deploy en rollback vragen dat altijd.",
-      "none": "In gekoppelde apps vraagt ze voor elke actie eerst een persoon om goedkeuring. Wil je dat ze haar werk zelf doet, vertel de agent in de chat welke acties ze mag doen."
+      "none": "In gekoppelde apps vraagt ze voor elke actie eerst een persoon om goedkeuring. Wil je dat ze haar werk zelf doet, vertel de agent in de chat welke acties ze mag doen.",
+      "remove": "Weer vragen vóór: {{action}}"
     },
     "ahead": {
       "approved": "Goedgekeurd · draait {{when}}",
@@ -6104,7 +6269,6 @@
       "keepUtc": "UTC houden",
       "adjust": "Aanpassen",
       "next": "Volgende",
-      "forumAgents": "Agents die overleggen",
       "agent": "Agent",
       "target": "Waar leveren",
       "what": "Wat te doen",
@@ -6209,7 +6373,7 @@
       "waiting": "Wacht tot iemand antwoordt",
       "waitingApproval": "Wacht op jouw goedkeuring",
       "waitingComputer": "Wacht op de computer",
-      "waitingPlan": "Wacht tot het abonnement opnieuw begint",
+      "waitingPlan": "Wacht op het abonnement",
       "waitingBudget": "Wacht tot het budget vernieuwt",
       "reported": "Heeft gemeld wat hij vond",
       "silent": "Niets nieuws, bleef stil",
@@ -6223,7 +6387,7 @@
       "previous_running": "Overgeslagen: de vorige draaide nog",
       "previous_waiting": "Overgeslagen: de vorige wachtte nog op iemand",
       "waiting_computer": "Overgeslagen: wacht op de computer van de agent",
-      "waiting_plan": "Overgeslagen: wacht tot het abonnement opnieuw begint",
+      "waiting_plan": "Overgeslagen: wacht op het abonnement",
       "waiting_budget": "Overgeslagen: wacht tot het budget opnieuw begint",
       "superseded": "Maakte plaats voor de volgende run",
       "stale": "Zijn moment gemist: de computer kwam te laat terug",
@@ -6255,13 +6419,17 @@
       "model_unlisted": "OpenRouter biedt het model niet meer aan",
       "agent_archived": "De agent is gearchiveerd",
       "interrupted": "Onderbroken door een herstart van de server",
-      "no_ai": "De agent heeft geen AI gekoppeld",
+      "no_ai": "De agent had geen AI beschikbaar",
       "person_limit": "Niet uitgevoerd: wie hem maakte, heeft de gebruikslimiet voor deze maand bereikt",
       "org_paused": "Niet gedraaid: de agents van de werkruimte waren gepauzeerd",
       "org_suspended": "Niet gedraaid: de werkruimte was niet beschikbaar",
       "org_deleting": "Niet gedraaid: de werkruimte werd verwijderd",
       "agent_paused": "Niet gedraaid: de agent was gepauzeerd",
-      "computer_busy": "De computer bleef bezig met andere taken"
+      "computer_busy": "De computer bleef bezig met andere taken",
+      "computer_failed": "De computer liep tegen een probleem aan en stopte",
+      "computer_timeout": "De computer deed er te lang over om te antwoorden",
+      "account_missing": "Het account van de agent staat niet meer op zijn computer",
+      "our_error": "Er ging iets mis aan onze kant"
     },
     "openInChat": "Openen in het gesprek",
     "stop": "Stoppen",
@@ -7216,6 +7384,49 @@
     "list": "Modellen",
     "picks": "{{provider}} · Goede keuzes"
   },
+  "endpoint": {
+    "option": "Andere provider",
+    "optionSub": "Compatibel met OpenAI of Claude: een gateway, Ollama, vLLM, LM Studio, LiteLLM",
+    "name": "Naam",
+    "namePlaceholder": "Mijn gateway",
+    "style": "API",
+    "styles": {
+      "openai": "OpenAI (Chat Completions)",
+      "anthropic": "Claude (Messages)"
+    },
+    "address": "Adres",
+    "addressHelp": "Het basisadres van de API, zoals {{example}}",
+    "key": "API-sleutel",
+    "keyHelp": "Laat leeg als de server geen sleutel vraagt.",
+    "fetch": "Modellen ophalen",
+    "listFailed": "De server gaf geen modellen ({{error}}). Typ hieronder het id van elk model.",
+    "choose": "Kies de modellen die agents mogen gebruiken",
+    "addModel": "Een model toevoegen",
+    "add": "Toevoegen",
+    "modelPlaceholder": "Model-id, zoals llama-4",
+    "modelInvalid": "Dat lijkt geen model-id.",
+    "priceIn": "{{model}}: invoerprijs",
+    "priceOut": "{{model}}: uitvoerprijs",
+    "priceInShort": "Invoer",
+    "priceOutShort": "Uitvoer",
+    "priceUnit": "US$ per miljoen tokens",
+    "priceBoth": "Vul invoer en uitvoer in, of geen van beide.",
+    "priceInvalid": "Gebruik een getal, zoals 0.50",
+    "unpriced": "Een model zonder prijzen kost niets in budgetten: alleen de tokens worden geteld.",
+    "save": "Opslaan en testen",
+    "saveModels": "Opslaan en opnieuw testen",
+    "testing": "Elk model wordt getest…",
+    "results": "Test van elk model",
+    "check": {
+      "ok": "Werkt, met tools",
+      "noTools": "Antwoordt, maar gebruikte geen tool. Agents hebben tools nodig om te werken.",
+      "failed": "Mislukt: {{error}}"
+    },
+    "done": "Klaar",
+    "models": "Modellen",
+    "modelsTitle": "Modellen van {{name}}",
+    "budgetUnpriced": "Het model van deze agent heeft geen prijs, dus het budget kan niet tellen wat het uitgeeft. De tokens worden geteld."
+  },
   "timezone": {
     "search": "Tijdzone zoeken",
     "searchPlaceholder": "Stad, land, UTC−3…",
@@ -7370,6 +7581,7 @@
       "person": "Mensen",
       "agent": "Agents",
       "routine": "Routines",
+      "reminder": "Herinneringen",
       "deadline": "Deadlines van taken"
     },
     "upcoming": "Binnenkort",
@@ -7389,6 +7601,7 @@
     "kind": {
       "event": "Afspraak",
       "routine": "Routine",
+      "reminder": "Herinnering",
       "deadline": "Deadline van taak"
     },
     "every": {
@@ -7401,6 +7614,10 @@
     "runs_other": "{{count}} runs in deze dagen.",
     "routineDetail": "Routine van {{agent}} · levert aan {{target}}.",
     "deadlineDetail": "De deadline van de taak.",
+    "reminderBy": "Ingesteld door {{name}}",
+    "reminderPosted": "Geplaatst door {{agent}} · {{target}}",
+    "cancelReminder": "Herinnering annuleren",
+    "reminderCancelled": "Herinnering geannuleerd",
     "openIssue": "Taak openen",
     "openRoutines": "Bekijken in Routines",
     "openRoutine": "Routine openen",
@@ -7545,6 +7762,8 @@
     "files": "Bestanden",
     "needsSandbox": "niet bewaard",
     "assetLimit": "Een skill bewaart tot {{max}} MB aan afbeeldingen en andere bestanden.",
+    "moreFiles_one": "En nog {{count}} bestand",
+    "moreFiles_other": "En nog {{count}} bestanden",
     "runsOnPc": "draait op de pc van de agent",
     "reinstall": "Installeer de skill opnieuw zodat agents dit bestand kunnen gebruiken.",
     "edit": "Bewerken",
@@ -7764,7 +7983,7 @@
         "updating": "{{program}} wordt bijgewerkt op {{computer}}. Dit verandert vanzelf als het klaar is.",
         "runnerOld": "Het agentes.chat-programma op {{computer}} is verouderd en een update is onderweg. Dit verandert vanzelf als het klaar is.",
         "execOff": "{{computer}} kan {{program}} nog niet uitvoeren. We zijn ermee bezig, en dit verandert vanzelf.",
-        "toolOff": "{{program}} is niet toegestaan op {{computer}}. Vraag de support om het toe te staan.",
+        "toolOff": "{{program}} is nog niet toegestaan op {{computer}}. Dat ligt aan ons: probeer het later opnieuw.",
         "preparing": "{{computer}} wordt klaargemaakt. Dit verandert vanzelf als het klaar is."
       }
     },
@@ -8118,7 +8337,6 @@
     "inviteKeywords": "uitnodigen uitnodiging uitnodigingen lid leden persoon mensen team invite invitation member people",
     "wikiPage": "wikipagina",
     "wikiNew": "Nieuwe wikipagina",
-    "forum": "forumonderwerp",
     "jump": "Ga naar…",
     "open": "Ga naar, of vraag een agent",
     "placeholder": "Ga naar, of vraag een agent…",
@@ -8134,513 +8352,6 @@
     "newConversation": "nieuw gesprek",
     "askLabel": "{{name}}, {{text}}",
     "empty": "Niets voor “{{q}}”."
-  },
-  "forum": {
-    "title": "Forum",
-    "subtitle": "Een vraag met een doel. De agents bespreken hem in rondes, één tegelijk, en sluiten af met een samenvatting.",
-    "guard": "Iedereen in de werkruimte kan het lezen. Elke beurt is een normale run: tools en goedkeuringen gelden.",
-    "new": "Nieuw onderwerp",
-    "filters": "Onderwerpen filteren",
-    "filter": {
-      "open": "In bespreking",
-      "done": "Afgerond",
-      "mine": "Van mij"
-    },
-    "listTitle": {
-      "open": "In bespreking",
-      "done": "Afgerond",
-      "mine": "Mijn onderwerpen"
-    },
-    "agentFilter": "Agents",
-    "agentCount_one": "{{count}} agent",
-    "agentCount_other": "{{count}} agents",
-    "search": "Zoeken in het forum",
-    "clearFilters": "Filters wissen",
-    "emptyFilter": "Geen onderwerpen die bij deze filters passen.",
-    "liveNow": "Nu in bespreking",
-    "needsYou": "Heeft jou nodig",
-    "status": {
-      "open": "In bespreking",
-      "stalled": "Vastgelopen",
-      "reopened": "Heropend",
-      "done": "Afgerond",
-      "canceled": "Geannuleerd"
-    },
-    "reopenedBy": "Heropend door {{name}}",
-    "roundOf": "ronde {{round}} van {{rounds}}",
-    "rounds_one": "{{count}} ronde",
-    "rounds_other": "{{count}} rondes",
-    "until": "tot {{when}}",
-    "noDeadline": "geen deadline",
-    "deadlineToday": "vandaag, {{time}}",
-    "deadlineTomorrow": "morgen, {{time}}",
-    "you": "{{name}} (jij)",
-    "empty": {
-      "title": "Nog geen onderwerpen",
-      "text": "Leg een lastige vraag voor aan de agents, om in rondes te bespreken. Dat kan ook vanuit de chat: “@agent neem dit mee naar het forum”."
-    },
-    "live": {
-      "writing": "{{name}} is aan het schrijven",
-      "reading": "{{name}} leest de discussie",
-      "yourTurn": "Jouw beurt",
-      "waiting": "Wachten op {{name}}",
-      "synthesis": "{{name}} schrijft de samenvatting",
-      "stalled": "Vastgelopen in de beurt van {{name}}",
-      "stalled_female": "Vastgelopen in de beurt van {{name}}",
-      "stalledSynthesis": "Vastgelopen bij de samenvatting",
-      "next": "volgende: {{name}}",
-      "thenSynthesis": "daarna: de samenvatting"
-    },
-    "need": {
-      "turnTitle": "Jouw beurt in “{{title}}”",
-      "turn": "Jouw beurt in ronde {{round}}. De ronde wacht op jou.",
-      "turnDeadline": "Jouw beurt in ronde {{round}}. Zeg je voor {{when}} niets, dan gaat de discussie zonder jou verder.",
-      "speak": "Nu spreken",
-      "issues_one": "De samenvatting stelt {{count}} taak voor. Die wordt pas aangemaakt als iemand hem goedkeurt.",
-      "issues_other": "De samenvatting stelt {{count}} taken voor. Die worden pas aangemaakt als iemand ze goedkeurt.",
-      "planIssues_one": "Het plan stelt {{count}} taak voor. Die wordt pas aangemaakt als iemand hem goedkeurt.",
-      "planIssues_other": "Het plan stelt {{count}} taken voor. Die worden pas aangemaakt als iemand ze goedkeurt.",
-      "subIssues_one": "Het plan stelt {{count}} subtaak voor in #{{number}}. Die wordt pas aangemaakt als iemand hem goedkeurt.",
-      "subIssues_other": "Het plan stelt {{count}} subtaken voor in #{{number}}. Die worden pas aangemaakt als iemand ze goedkeurt.",
-      "review": "Taken bekijken",
-      "budget": "{{name}} heeft geen budget meer en slaat zijn volgende beurten over.",
-      "budget_female": "{{name}} heeft geen budget meer en slaat haar volgende beurten over.",
-      "seeBudget": "Budget bekijken",
-      "stalled": "Vastgelopen: niemand spreekt tot iemand het hervat.",
-      "resume": "Hervatten"
-    },
-    "row": {
-      "canceled": "Geannuleerd, zonder samenvatting."
-    },
-    "origin": {
-      "direct": "Direct in het forum",
-      "agent": "{{name}}, #{{channel}}",
-      "agentNoChannel": "Geopend door {{name}}",
-      "suggestion": "voorgesteld door {{name}}",
-      "suggestionIn": "voorgesteld door {{name}} in #{{channel}}",
-      "issue": "Taak #{{number}}",
-      "issueBy": "Taak #{{number}} · gevraagd door {{name}}",
-      "issueBy_female": "Taak #{{number}} · gevraagd door {{name}}",
-      "routine": "Routine",
-      "conversation": "Een gesprek"
-    },
-    "track": {
-      "label_one": "{{count}} beurt van agents, {{rounds}}",
-      "label_other": "{{count}} beurten van agents, {{rounds}}",
-      "spoke": "Ronde {{round}} · {{name}} · {{stance}}",
-      "spokeNoStance": "Ronde {{round}} · {{name}}",
-      "person": "Ronde {{round}} · {{name}} deed mee",
-      "seat": "Ronde {{round}} · {{name}} sprak op volgorde",
-      "passed": "Ronde {{round}} · {{name}} paste",
-      "waiting": "De ronde wacht op {{name}}",
-      "waitingMe": "De ronde wacht op jou",
-      "seatPending": "Ronde {{round}} · beurt van {{name}}",
-      "live": "{{name}} is aan het schrijven",
-      "sleep": "Vastgelopen in de beurt van {{name}}",
-      "sleep_female": "Vastgelopen in de beurt van {{name}}",
-      "synthesis": "Samenvatting van {{name}}",
-      "synthesis_female": "Samenvatting van {{name}}",
-      "synthesisLive": "{{name}} schrijft de samenvatting",
-      "skipped": "Ronde {{round}} · {{name}} sprak niet",
-      "budget": "Ronde {{round}} · {{name}} overgeslagen: het budget van de agent is op",
-      "pending": "Ronde {{round}} · beurt van {{name}}",
-      "pending_female": "Ronde {{round}} · beurt van {{name}}",
-      "round": "Ronde {{n}}",
-      "roundShort": "R{{n}}",
-      "key": "Elke kolom is een beurt, in de kleur van wie sprak. De hoogte is de lengte van de beurt.",
-      "keyLive": "Het figuurtje is wie nu spreekt. De stippen zijn de resterende beurten.",
-      "keyDone": "Het brede blok aan het eind is de samenvatting.",
-      "keyClick": "Klik om naar de beurt te gaan."
-    },
-    "stance": {
-      "propose": "Stelt voor",
-      "agree": "Eens met {{name}}",
-      "agreeAny": "Eens",
-      "disagree": "Oneens met {{name}}",
-      "disagreeAny": "Oneens",
-      "shift": "Verandert van standpunt",
-      "ask": "Vraagt",
-      "askPeople": "Vraagt de mensen",
-      "reply": "Antwoordt {{name}}",
-      "replyAny": "Antwoordt",
-      "people": "de mensen"
-    },
-    "topic": {
-      "back": "Forum",
-      "goal": "Doel",
-      "responsible": "Verantwoordelijk",
-      "requestedBy": "Gevraagd door",
-      "reopenedFor": "heropend door {{name}} voor ronde {{round}}",
-      "conclude": "Afronden",
-      "concluding": "Afronden…",
-      "more": "Meer acties",
-      "copyLink": "Link kopiëren",
-      "linkCopied": "Link gekopieerd. Wie hem opent, leest het hele onderwerp.",
-      "editParticipants": "Deelnemers bewerken",
-      "cancel": "Onderwerp annuleren",
-      "notFound": "Onderwerp niet gevonden."
-    },
-    "table": {
-      "title": "De tafel",
-      "order": "spreken in deze volgorde, één keer per ronde",
-      "orderDone": "spraken in deze volgorde",
-      "writes": "schrijft de samenvatting",
-      "writesPlan": "schrijft het plan",
-      "seatedPerson": "persoon · aan tafel",
-      "next": "volgende",
-      "yourTurn": "Jouw beurt",
-      "waits": "de ronde wacht",
-      "writing": "schrijft",
-      "reading": "leest de discussie…",
-      "rereading": "leest de rondes nog eens…",
-      "writingSynthesis": "schrijft de samenvatting",
-      "stopped": "hier gestopt",
-      "broke": "geen budget meer, slaat de beurt over",
-      "wroteSynthesis": "schreef de samenvatting",
-      "spokeAt": "sprak om {{time}}",
-      "passed": "paste",
-      "notYet": "heeft nog niet gesproken",
-      "readsCanEnter": "leest mee en kan meedoen",
-      "entered": "deed mee in ronde {{round}}",
-      "sits": "aan tafel",
-      "orgReads": "de hele werkruimte leest mee"
-    },
-    "posts": {
-      "round": "Ronde {{n}}",
-      "startedWith": "begon met {{name}}",
-      "spokeCount": "{{said}} van {{total}} hebben gesproken",
-      "none": "{{name}} spreekt als eerste. De eerste ronde is begonnen.",
-      "person": "persoon",
-      "starts": "Ronde {{round}} begint hier",
-      "started": "Ronde {{round}} begon hier",
-      "last": "Dit was de laatste ronde: de bijdrage gaat mee in de samenvatting",
-      "askedRound": "Vroeg om een nieuwe ronde",
-      "inTurn": "Op hun beurt",
-      "reroundFrom": "Vanaf hier om een ronde vragen",
-      "replyTo": "Naar de bijdrage van {{name}}",
-      "budgetSkip": "{{name}} sloeg de beurt over: het budget van de agent is op.",
-      "passedTurn": "{{name}} paste.",
-      "didntSpeak_one": "{{names}} sprak niet in deze ronde.",
-      "didntSpeak_other": "{{names}} spraken niet in deze ronde.",
-      "stopped": "Midden in de beurt gestopt.",
-      "comments": "Reacties",
-      "afterSynthesis": "na de samenvatting"
-    },
-    "liveTurn": {
-      "writing": "schrijft · ronde {{round}}",
-      "reading": "leest de discussie · ronde {{round}}",
-      "synthesis": "schrijft de samenvatting",
-      "rereading": "leest de rondes nog eens",
-      "readingLine": "Leest de discussie…",
-      "waitsFor": "De ronde wacht op {{name}}, die aan tafel zit.",
-      "yourTurn": "Jouw beurt",
-      "yourTurnSub": "ronde {{round}} · de ronde wacht op jou",
-      "yourTurnPlaceholder": "Wat vind jij? De agents lezen het voor de volgende beurt.",
-      "pass": "Passen",
-      "send": "Versturen",
-      "deadline": "Zeg je voor {{when}} niets, dan gaat de discussie zonder jou verder.",
-      "passed": "Je hebt gepast. De ronde gaat deze keer zonder jou verder.",
-      "spoke": "Je sprak op je beurt. De ronde gaat verder in de volgorde van de tafel."
-    },
-    "stalled": {
-      "title": "Vastgelopen in de beurt van {{name}}",
-      "title_female": "Vastgelopen in de beurt van {{name}}",
-      "titleSynthesis": "Vastgelopen bij de samenvatting",
-      "stopped": "{{name}} heeft de beurt gestopt. Niemand spreekt tot iemand het hervat.",
-      "stoppedAnon": "De beurt is gestopt. Niemand spreekt tot iemand het hervat.",
-      "failed": "De beurt is mislukt. Probeer het opnieuw, of rond af met wat er gezegd is.",
-      "resume": "Hervatten",
-      "retry": "Opnieuw proberen",
-      "concludeNow": "Nu afronden",
-      "resumed": "Onderwerp hervat."
-    },
-    "closed": {
-      "canceled": "Geannuleerd, zonder samenvatting. De bijdragen blijven hier staan, zodat iedereen ze kan lezen.",
-      "synthesizing": "{{name}} schrijft de samenvatting. Niemand anders spreekt nog in dit onderwerp.",
-      "synthesizing_female": "{{name}} schrijft de samenvatting. Niemand anders spreekt nog in dit onderwerp."
-    },
-    "composer": {
-      "label": "Doe mee aan de discussie",
-      "placeholder": "Doe mee aan de discussie…",
-      "hint": "Je kunt op elk moment meedoen: de huidige beurt wordt afgemaakt en de volgende ronde begint bij jouw bijdrage.",
-      "hintLast": "Je kunt op elk moment meedoen: de huidige beurt wordt afgemaakt en in deze laatste ronde gaat je bijdrage direct de samenvatting in.",
-      "moreRound": "Nog een ronde vanaf jouw bijdrage",
-      "send": "Versturen",
-      "sent": "Je bijdrage staat erin: de volgende ronde begint ermee.",
-      "sentLast": "Je bijdrage gaat mee in de samenvatting.",
-      "commentLabel": "Reactie",
-      "commentPlaceholder": "Reageer…",
-      "comment": "Reageren",
-      "commentAndRound": "Reageren en om een ronde vragen",
-      "commented": "Reactie geplaatst. Het onderwerp blijft afgerond.",
-      "reround": "Om een nieuwe ronde vragen vanaf deze reactie",
-      "doneHint": "Het onderwerp is afgerond: een reactie heropent het niet, tenzij je om een ronde vraagt.",
-      "reroundHint": "De agents aan tafel antwoorden op je reactie in een nieuwe ronde en {{name}} herschrijft de samenvatting.",
-      "reroundHint_female": "De agents aan tafel antwoorden op je reactie in een nieuwe ronde en {{name}} herschrijft de samenvatting."
-    },
-    "newRound": {
-      "title": "Om een nieuwe ronde vragen",
-      "text": "Ronde {{round}} begint bij jouw reactie en het onderwerp wordt op jouw naam heropend.",
-      "textFrom": "Ronde {{round}} begint bij deze reactie en het onderwerp wordt op jouw naam heropend.",
-      "note": "Wat je wilt toevoegen",
-      "notePlaceholder": "Optioneel: waar de agents nog eens naar moeten kijken",
-      "defaultBody": "Ik heb vanaf deze reactie om een nieuwe ronde gevraagd.",
-      "who": "Wie antwoordt",
-      "whoHint": "in de volgorde van de tafel",
-      "speaksAt": "spreekt als {{n}}e",
-      "broke": "geen budget meer: slaat de beurt over",
-      "ok": "Om een ronde vragen",
-      "done": "Onderwerp heropend: ronde {{round}}."
-    },
-    "conclude": {
-      "title": "Het onderwerp afronden?",
-      "text": "Niemand begint nog een nieuwe beurt. Wat er gezegd is, wordt de samenvatting.",
-      "finishes": "{{name}} maakt zijn beurt af",
-      "finishes_female": "{{name}} maakt haar beurt af",
-      "finishesSub": "Het is nu hun beurt. Daarna spreekt niemand anders meer.",
-      "nobody": "Er schrijft nu niemand",
-      "nobodySub": "De samenvatting begint meteen.",
-      "writes": "{{name}} schrijft de samenvatting",
-      "writes_female": "{{name}} schrijft de samenvatting",
-      "writesSub": "Besluit, voor- en nadelen van elk, open vragen, volgende stappen en voorgestelde taken.",
-      "writesSubPlan": "Doel, wat erbij hoort en wat niet, stappen, risico's, hoe je meet en taken per stap.",
-      "goes": "Wordt een document in de Drive en gaat terug naar waar het vandaan kwam",
-      "goesSub": "Voorgestelde taken worden pas aangemaakt als iemand ze goedkeurt.",
-      "keep": "Verder bespreken",
-      "ok": "Afronden",
-      "done": "Wordt afgerond: de samenvatting verschijnt hier en in de Drive."
-    },
-    "cancel": {
-      "title": "Annuleren zonder samenvatting?",
-      "text": "Niemand spreekt nog en er gaat niets naar de Drive. De bijdragen blijven hier staan, zodat iedereen ze kan lezen.",
-      "keep": "Onderwerp houden",
-      "ok": "Onderwerp annuleren",
-      "done": "Onderwerp geannuleerd. De bijdragen blijven in het forum."
-    },
-    "side": {
-      "title": "Waar iedereen staat",
-      "titleDone": "Waar iedereen uitkwam",
-      "agree_one": "{{count}} van {{total}} is het eens",
-      "agree_other": "{{count}} van {{total}} zijn het eens",
-      "withProposal": "met het voorstel op tafel",
-      "withDecision": "met het besluit",
-      "askers_one": "{{names}} bleef met een vraag zitten",
-      "askers_other": "{{names}} bleven met een vraag zitten",
-      "agents": "Elke agent",
-      "notYet": "Heeft nog niet gesproken",
-      "firstWriting": "Schrijft de eerste beurt…",
-      "writingNow": "schrijft nu…",
-      "broke": "geen budget meer: slaat de beurt over",
-      "spoke": "sprak",
-      "laneKey": "Eén vakje per ronde. Omhoog: voor het voorstel op tafel. Omlaag: tegen. Midden: een vraag.",
-      "laneLabel": "{{name}}: {{list}}",
-      "laneEmpty": "{{name}}: geen beurten",
-      "laneRound": "ronde {{round}}: {{stance}}",
-      "laneLive": "ronde {{round}}: schrijft",
-      "details": "Details",
-      "rounds": "Rondes",
-      "roundsDone": "{{round}} van {{rounds}}",
-      "format": "Vorm",
-      "deadline": "Deadline",
-      "origin": "Herkomst",
-      "openedBy": "Geopend door",
-      "participants": "Deelnemers"
-    },
-    "format": {
-      "decision": "Besluit",
-      "plan": "Plan",
-      "decisionHint": "Een besluit, met de voor- en nadelen van elk, open vragen en volgende stappen.",
-      "planHint": "Een plan: wat erbij hoort en wat niet, stappen op volgorde met wie ze doet, risico's en hoe je meet. De stappen worden taken."
-    },
-    "formatLower": {
-      "decision": "besluit",
-      "plan": "plan"
-    },
-    "synthesis": {
-      "eyebrow": "Samenvatting",
-      "eyebrowPlan": "Plan",
-      "closed": "{{name}} heeft het onderwerp afgesloten",
-      "closed_female": "{{name}} heeft het onderwerp afgesloten",
-      "closedPlan": "{{name}} heeft het plan afgesloten",
-      "closedPlan_female": "{{name}} heeft het plan afgesloten",
-      "rewrote": "{{name}} heeft de samenvatting herschreven",
-      "rewrote_female": "{{name}} heeft de samenvatting herschreven",
-      "meta": "{{posts}} beurten van {{agents}} agents",
-      "metaPeople": "{{posts}} beurten van {{agents}} agents en van mensen",
-      "version": "versie {{n}}",
-      "versionN": "Versie {{n}}",
-      "decision": "Besluit",
-      "objective": "Doel",
-      "prosCons": "Voor- en nadelen van elk",
-      "why": "Waarom",
-      "openQuestions": "Open vragen",
-      "nextSteps": "Volgende stappen",
-      "forRequester": "Voor {{name}}:",
-      "forRequester_female": "Voor {{name}}:",
-      "inScope": "Wat erbij hoort",
-      "outOfScope": "Wat er niet bij hoort",
-      "steps": "Stappen, op volgorde",
-      "after": "na {{n}}",
-      "startNow": "kan nu beginnen",
-      "risks": "Risico's",
-      "metrics": "Hoe je meet",
-      "changes": "Versie {{n}} · wat er veranderde",
-      "showV": "Versie {{n}} bekijken",
-      "hideV": "Versie {{n}} verbergen",
-      "replaced": "vervangen na ronde {{round}}",
-      "none": "geen",
-      "issues": "Voorgestelde taken",
-      "subIssues": "Voorgestelde subtaken in #{{number}}",
-      "marked": "{{on}} van {{total}} aangevinkt",
-      "allCreated": "allemaal aangemaakt",
-      "goesTo": "gaat naar {{name}}",
-      "with": "met {{name}}",
-      "step": "stap {{n}}",
-      "approveTitle": "{{name}} stelt voor, een mens keurt goed",
-      "approveTitle_female": "{{name}} stelt voor, een mens keurt goed",
-      "approveText": "Zonder jou wordt er niets aangemaakt. Elke taak gaat al naar wie genoemd is.",
-      "approveTextPlan": "Elke stap wordt een subtaak, al met wie hem doet. Zonder jou wordt er niets aangemaakt.",
-      "create_one": "{{count}} taak aanmaken",
-      "create_other": "{{count}} taken aanmaken",
-      "createSub_one": "{{count}} subtaak aanmaken in #{{number}}",
-      "createSub_other": "{{count}} subtaken aanmaken in #{{number}}",
-      "created_one": "{{count}} taak aangemaakt.",
-      "created_other": "{{count}} taken aangemaakt.",
-      "createdSub_one": "{{count}} subtaak aangemaakt in #{{number}}.",
-      "createdSub_other": "{{count}} subtaken aangemaakt in #{{number}}.",
-      "wentTo": "Waar het naartoe ging",
-      "backIssue": "Gaat terug naar taak #{{number}}",
-      "backIssueDone": "Teruggegaan naar taak #{{number}}: plan + {{count}} subtaken",
-      "backChannel": "Teruggegaan naar het gesprek waar het vandaan kwam",
-      "backNone": "Blijft in het forum",
-      "saveWiki": "Opslaan in de wiki"
-    },
-    "form": {
-      "title": "Nieuw onderwerp",
-      "fromIssue": "Beoordelen in het forum",
-      "editSuggestion": "De suggestie bewerken",
-      "subtitle": "De agents spreken één voor één, in de volgorde van de tafel, en de eerste schrijft de samenvatting.",
-      "templatesText": "Begin met een sjabloon of vanaf nul. Je kunt alles aanpassen voordat je het opent.",
-      "tip": "Tip: in de chat opent “@agent neem dit mee naar het forum” ook een onderwerp.",
-      "templateMeta": "{{rounds}} · {{format}}",
-      "templates": {
-        "tech": {
-          "title": "Technisch besluit",
-          "text": "Kies een optie, met risico's en een plan.",
-          "goal": "Kies een optie en zeg waarom, met de risico's en de volgende stappen."
-        },
-        "review": {
-          "title": "Een voorstel beoordelen",
-          "text": "Vind de gaten en ga weg met wat er moet veranderen.",
-          "goal": "Lees het voorstel, wijs de gaten aan en ga weg met een lijst van wat er moet veranderen."
-        },
-        "brain": {
-          "title": "Brainstorm",
-          "text": "Verzamel ideeën en kies er 3 om te testen.",
-          "goal": "Verzamel ideeën, groepeer ze en kies de 3 beste om te testen."
-        },
-        "postmortem": {
-          "title": "Postmortem",
-          "text": "Wat er gebeurde, waarom, en wat er verandert.",
-          "goal": "Vertel wat er gebeurde, vind de oorzaak en zeg wat er verandert zodat het niet nog eens gebeurt."
-        },
-        "blank": {
-          "title": "Vanaf nul",
-          "text": "Schrijf de vraag en kies wie hem bespreekt."
-        }
-      },
-      "question": "Vraag",
-      "questionPlaceholder": "Bijv.: De outbox-wachtrij naar LISTEN/NOTIFY verhuizen?",
-      "origin": "Vanuit {{origin}}. Het resultaat gaat daarheen terug.",
-      "format": "Wat eruit komt",
-      "goal": "Doel",
-      "goalPlaceholder": "Bijv.: een besluit met de risico's en een uitrolplan.",
-      "table": "De tafel",
-      "tableHint": "in spreekvolgorde · sleep of gebruik de pijlen",
-      "personSeat": "persoon · de ronde wacht op deze beurt",
-      "addAgents": "Agents aan tafel zetten",
-      "add": "{{name}} aan tafel zetten",
-      "up": "{{name}} omhoog",
-      "down": "{{name}} omlaag",
-      "remove": "{{name}} verwijderen",
-      "unseat": "{{name}} van tafel halen",
-      "noTalk": "antwoordt jou niet",
-      "noTalkTitle": "{{name}} antwoordt jou niet",
-      "oneAgent": "Met één agent gebruik je een thread of “Vraag {{name}}” op de taak. Het forum is voor standpunten die kunnen botsen.",
-      "minAgents": "Kies minstens 2 agents voor een discussie.",
-      "people": "Mensen die een melding krijgen",
-      "peopleHint": "iedereen in de werkruimte kan het lezen",
-      "meAlways": "jij, krijgt altijd een melding",
-      "seatMe": "Ik zit aan tafel",
-      "seatMeHint": "wacht op mij in de rondes",
-      "seatOther": "{{name}} zit aan tafel",
-      "seatOtherHint": "de ronde wacht op deze beurt",
-      "rounds": "Rondes",
-      "deadline": "Deadline",
-      "deadlines": {
-        "none": "Geen deadline",
-        "today": "Vandaag, 18:00",
-        "tomorrow": "Morgen",
-        "friday": "Vrijdag"
-      },
-      "approvals": "Elke beurt is een normale run: goedkeuringen gelden.",
-      "create": "Onderwerp openen",
-      "open": "Forum openen",
-      "created": "Onderwerp geopend. {{name}} spreekt als eerste. Iedereen in de werkruimte kan het lezen."
-    },
-    "participantsDialog": {
-      "title": "Deelnemers",
-      "text": "{{agents}} agents aan tafel en {{people}}.",
-      "people_one": "{{count}} persoon krijgt een melding",
-      "people_other": "{{count}} mensen krijgen een melding",
-      "search": "Deelnemers zoeken",
-      "speaksAt": "spreekt als {{n}}e",
-      "entered": "deed mee aan de discussie",
-      "notified": "kreeg een melding en kan meedoen",
-      "org": "De hele werkruimte",
-      "orgReads": "leest het onderwerp",
-      "note": "Wijzigingen aan de tafel gelden vanaf de volgende ronde.",
-      "edit": "Bewerken",
-      "saved": "Deelnemers bijgewerkt."
-    },
-    "suggestion": {
-      "label": "Forumsuggestie",
-      "title": "Iets voor het forum?",
-      "by": "{{name}} stelt voor",
-      "edit": "Bewerken",
-      "table": "De tafel",
-      "open": "Forum openen",
-      "notNow": "Niet nu",
-      "note": "Alleen een mens kan het openen. Het staat op jouw naam.",
-      "opened": "Forum geopend",
-      "openedBy": "door {{name}}, vanuit dit gesprek",
-      "openedToast": "Forum geopend. Het staat op jouw naam.",
-      "dismissed": "{{name}} heeft de suggestie afgewezen.",
-      "dismissedMe": "Je hebt de suggestie afgewezen.",
-      "undo": "Ongedaan maken"
-    },
-    "card": {
-      "label": "Forumonderwerp",
-      "see": "Discussie bekijken"
-    },
-    "issue": {
-      "section": "Forum",
-      "evaluate": "Beoordelen in het forum",
-      "evaluateTitle": "Heeft meer dan één blik nodig",
-      "evaluateText": "Het forum is voor als wie beslist het oneens kan zijn. Het resultaat komt terug bij deze taak.",
-      "inForum": "Wordt beoordeeld in het forum",
-      "evaluated": "Beoordeeld in het forum",
-      "outPlan": "er komt een plan uit",
-      "outDecision": "er komt een besluit uit",
-      "subIssues_one": "Subtaken · {{count}}",
-      "subIssues_other": "Subtaken · {{count}}"
-    },
-    "notify": {
-      "your_turn": "Jouw beurt in “{{title}}”.",
-      "requested": "Er is op jouw verzoek een forum geopend: “{{title}}”.",
-      "concluded": "Het forum “{{title}}” is afgelopen.",
-      "open": "Openen"
-    }
   },
   "code": {
     "ranSummary_one": "{{count}} regel {{language}} uitgevoerd · uitvoer {{size}}",
@@ -9084,7 +8795,6 @@
     "saveNew": "De pagina {{title}} maken",
     "savedTo": "Opgeslagen in {{title}}.",
     "fromMessage": "uit een bericht in #{{channel}}",
-    "fromForum": "uit de samenvatting van het forum",
     "note": {
       "created": "maakte de pagina",
       "edited": "bewerkte",
@@ -9095,9 +8805,7 @@
       "moved": "verplaatst naar \"{{folder}}\"",
       "moved_root": "verplaatst naar het hoofdniveau",
       "saved_message": "sloeg een bericht op",
-      "saved_synthesis": "sloeg de samenvatting van het forum op",
       "created_from_message": "gemaakt uit een bericht",
-      "created_from_synthesis": "gemaakt uit de samenvatting van het forum",
       "imported": "geïmporteerd uit \"{{source}}\""
     }
   },
@@ -9252,6 +8960,9 @@
       "paidTraining": "De aanbieder kan verzoeken gebruiken om het model te trainen. Zet de toestemming aan in OpenCode.",
       "freeTraining": "Gratis. De aanbieder kan verzoeken gebruiken om het model te trainen. Zet de toestemming aan in OpenCode."
     },
+    "modelLimit": "{{model}} heeft zijn eigen limiet in dit abonnement bereikt en wordt {{when}} gereset. De andere modellen van het abonnement blijven werken.",
+    "modelLimitUnknown": "{{model}} heeft zijn eigen limiet in dit abonnement bereikt. De andere modellen van het abonnement blijven werken.",
+    "modelRegion": "{{model}} heeft de regio Global nodig in OpenCode (Settings › Privacy). De andere modellen van het abonnement blijven werken.",
     "modelHow": {
       "globalRegion": "Zet de regio Global aan in OpenCode, bij Settings › Privacy. Zonder die regio antwoordt dit model niet.",
       "paidTraining": "De aanbieder van dit model kan verzoeken gebruiken om het te trainen. Zet in OpenCode, bij Settings › Privacy, de toestemming voor betaalde modellen aan. Zonder die toestemming antwoordt dit model niet.",
@@ -9397,7 +9108,6 @@
       "wiki": "Wiki",
       "skills": "Skills",
       "schedule": "Herinneringen en routines",
-      "forum": "Forum",
       "sandbox": "Code uitvoeren",
       "browser": "Browser",
       "setup": "Werkruimte inrichten",
@@ -9431,9 +9141,6 @@
       },
       "schedule": {
         "write": "Maakt herinneringen en routines voor wie erom vroeg."
-      },
-      "forum": {
-        "write": "Opent onderwerpen, leest en plaatst berichten in het forum."
       },
       "sandbox": {
         "write": "Voert code uit op de computer van de agent."
@@ -9811,6 +9518,13 @@
     "failed": "Kon niet koppelen. Probeer het zo opnieuw."
   },
   "repos": {
+    "merge": {
+      "label": "Mag mergen zonder te vragen",
+      "none": "Geen repositories gekozen. Elke merge vraagt om goedkeuring.",
+      "help": "In deze repositories loopt een merge zonder goedkeuringskaart, komt in de audit en laat een bewijs achter in het gesprek. Al het andere gevoelige blijft vragen.",
+      "dialogTitle": "Waar {{name}} merget zonder te vragen",
+      "dialogDesc": "Alleen repositories die al gebruikt worden. Een merge ergens anders vraagt om goedkeuring."
+    },
     "label": "Welke repositories",
     "all": "Alle repositories",
     "allLower": "alle repositories",
@@ -11140,6 +10854,7 @@
   },
   "searchPage": {
     "title": "De werkruimte doorzoeken",
+    "subtitle": "Berichten, context en teamacties in je kanalen.",
     "label": "Zoeken",
     "placeholder": "Berichten, besluiten, samenvattingen…",
     "filter": "Type",
@@ -11303,7 +11018,8 @@
       "editorsExcludeYou": "Neem jezelf op bij de mensen die bewerken, om deze pagina te houden.",
       "titleTaken": "Er is al een pagina met de naam “{{title}}”.",
       "titleCharacters": "Een titel mag geen [ ] | of # bevatten.",
-      "titleNoLetters": "Een titel heeft letters of cijfers nodig."
+      "titleNoLetters": "Een titel heeft letters of cijfers nodig.",
+      "lockAdminsOnly": "Alleen beheerders vergrendelen pagina's."
     },
     "media": {
       "off": "GIF's en stickers staan uit in deze werkruimte.",
@@ -11321,11 +11037,15 @@
       "unknown": "Die rol bestaat niet meer.",
       "orderIncomplete": "De rollen zijn veranderd. Herlaad en probeer het opnieuw."
     },
+    "teamProposal": {
+      "undoExpired": "Er is meer dan een dag verstreken sinds dit team is gemaakt, dus het kan hier niet ongedaan worden gemaakt. Archiveer de agents op hun pagina's."
+    },
     "agentProposal": {
       "decided": "Iemand heeft al over dit voorstel beslist.",
       "expired": "Dit voorstel is verlopen: niemand heeft er binnen een dag over beslist.",
       "routineMade": "De routine van deze agent is al aangemaakt.",
-      "noRoutine": "Dit voorstel heeft geen routine om aan te maken."
+      "noRoutine": "Dit voorstel heeft geen routine om aan te maken.",
+      "notRequester": "Alleen wie erom vroeg, kan het versturen."
     },
     "approval": {
       "alwaysUnavailable": "Dit verzoek kan niet voorgoed goedgekeurd worden. Keur alleen dit verzoek goed."
@@ -11416,8 +11136,7 @@
       "rangeTooLong": "De context van een thread bevat maximaal {{max}} berichten.",
       "titleTooLong": "Een titel heeft maximaal {{max}} tekens.",
       "noContext": "Deze thread komt niet uit een reeks van een gesprek.",
-      "notUndoable": "Alleen een thread die van een reeks is gemaakt, kan ongedaan worden gemaakt.",
-      "forum": "Forumonderwerpen hebben geen threads."
+      "notUndoable": "Alleen een thread die van een reeks is gemaakt, kan ongedaan worden gemaakt."
     },
     "routine": {
       "tooFrequent": "Een routine draait hooguit elke 15 minuten. Kies een langere tussentijd.",
@@ -11428,20 +11147,28 @@
       "agentNotInChannel": "Voeg de agent eerst toe aan het gesprek.",
       "webhookPaused": "Zet de routine aan om hem te testen.",
       "continueExtraOff": "Het venster van dit abonnement is op en het lange werk van deze agent gebruikt geen betaald extra gebruik. Zet dat aan in de AI-instellingen om nu door te gaan, anders gaat hij verder na de reset.",
-      "continueExtraUsedUp": "Het venster van dit abonnement is op en het betaalde extra gebruik is ook op of niet beschikbaar. Hij gaat verder na de reset."
+      "continueExtraUsedUp": "Het venster van dit abonnement is op en het betaalde extra gebruik is ook op of niet beschikbaar. Hij gaat verder na de reset.",
+      "actionsNeedApprover": "Alleen de eigenaar van de agent of wie zijn acties goedkeurt, kan een routine zelfstandig laten handelen.",
+      "editorOnly": "Alleen wie de routine maakte, de eigenaar van de agent of een beheerder kan hem wijzigen.",
+      "widgetFixed": "Deze routine houdt een widget bij. Wijzig hem via de widget."
     },
     "run": {
       "notContinuable": "Dit antwoord kan niet meer voortgezet worden.",
       "agentBusy": "De agent is al bezig in dit gesprek. Wacht tot hij klaar is om door te gaan.",
       "continueForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan het voortzetten.",
-      "notRestartable": "Dit antwoord was al begonnen, dus het kan niet opnieuw beginnen. Stuur je bericht opnieuw."
+      "notRestartable": "Dit antwoord was al begonnen, dus het kan niet opnieuw beginnen. Stuur je bericht opnieuw.",
+      "cancelForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan het stoppen.",
+      "answerForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan dit doen.",
+      "stopReasonForbidden": "Alleen wie het stopte, kan zeggen waarom."
     },
     "artifact": {
       "fileTooLarge": "Het bestand is groter dan {{max}} MB, de limiet per bestand.",
       "notVersioned": "Een afbeelding, video of opname heeft geen versies. Stuur het als een nieuw bestand.",
       "fileRequired": "Kies een bestand om te uploaden.",
       "fileNameRequired": "Het bestand heeft een naam nodig.",
-      "notFound": "Dit bestand bestaat niet meer of je hebt geen toegang."
+      "notFound": "Dit bestand bestaat niet meer of je hebt geen toegang.",
+      "deleteForbidden": "Alleen wie het maakte, wie het de agent vroeg, de eigenaar van de agent of een beheerder kan dit verwijderen.",
+      "restoreForbidden": "Alleen wie het mocht verwijderen, kan het herstellen."
     },
     "machine": {
       "forbidden": "Alleen een beheerder, of wie de computer heeft gekoppeld, kan dat doen.",
@@ -11453,7 +11180,10 @@
       "targetNotFound": "Die computer bestaat niet meer. Kies een andere.",
       "targetSame": "De agents staan al op die computer.",
       "targetPaused": "Die computer is gepauzeerd. Kies een andere.",
-      "accountMethodUnsupported": "Deze computer kan Claude nog niet op deze manier koppelen. Werk het agentes.chat-programma erop bij, of gebruik een API-sleutel."
+      "accountMethodUnsupported": "Deze computer kan Claude nog niet op deze manier koppelen. Werk het agentes.chat-programma erop bij, of gebruik een API-sleutel.",
+      "offline": "{{name}} is nu offline. Probeer het opnieuw zodra hij terug is.",
+      "paused": "{{name}} is gepauzeerd: er start niets nieuws op tot hij wordt hervat.",
+      "timeout": "De computer antwoordde niet op tijd. Probeer het opnieuw."
     },
     "github": {
       "repoMissing": "De repository {{repo}} is privé of bestaat niet op GitHub.",
@@ -11467,8 +11197,14 @@
       "tooManySkills": "Deze link bevat meer dan {{max}} skills. Link een van de mappen ervan.",
       "invalidName": "De naam mag alleen kleine letters, cijfers en koppeltekens bevatten, tot {{max}} tekens.",
       "invalidDescription": "De beschrijving moet 1 tot {{max}} tekens hebben.",
-      "tooLarge": "De skill is te groot (max. {{max}} MB).",
-      "tooManyFiles": "De skill heeft te veel bestanden (max. {{max}}).",
+      "tooLarge": "Deze skill heeft {{size}} MB aan tekst en scripts, en de limiet is {{max}} MB.",
+      "tooManyFiles": "Deze skill heeft {{files}} bestanden, en de limiet is {{max}}.",
+      "repoTooLarge": "De repository is te groot om te downloaden (max. {{max}} MB). Upload de map van de skill als .zip.",
+      "noFrontmatter": "De SKILL.md heeft bovenaan een blok nodig met naam en beschrijving, tussen twee regels met ---.",
+      "bodyTooLong": "De SKILL.md is te lang (max. {{max}} tekens).",
+      "noSkillMdZip": "Geen SKILL.md bovenin de map van de zip.",
+      "notGithubLink": "Deze GitHub-link kunnen we niet lezen. Plak de link van een repository of een map daarin.",
+      "badZip": "We konden deze zip niet lezen. Pak de map van de skill opnieuw in, zonder wachtwoord.",
       "connectionGone": "De GitHub-koppeling die {{repo}} las, bestaat niet meer. Koppel GitHub opnieuw om deze skill bij te werken.",
       "linkHoldsSeveral": "De link bevat nu meerdere skills. Installeer deze opnieuw vanuit de eigen map.",
       "linkRenamed": "De link bevat nu de skill {{name}}.",
@@ -11476,8 +11212,23 @@
       "noPendingUpdate": "Er wacht geen update van deze skill."
     },
     "agentGroup": {
-      "notFound": "Deze groep bestaat niet meer.",
-      "tooMany": "Deze werkruimte heeft al {{max}} groepen. Verwijder er eerst een."
+      "notFound": "Deze afdeling bestaat niet meer.",
+      "tooMany": "Deze werkruimte heeft al {{max}} afdelingen. Verwijder er eerst een."
+    },
+    "rightHand": {
+      "permanent": "De rechterhand hoort bij de werkruimte en blijft buiten de kanalen. Een @vermelding bereikt hem in elk kanaal."
+    },
+    "agent": {
+      "ownerOrAdmin": "Alleen de eigenaar van de agent of een beheerder kan dit doen.",
+      "detailsHidden": "Alleen wie met {{agentName}} praat, ziet hoe het werkt.",
+      "extraOwnerOnly": "Alleen de eigenaar van de agent zet het betaalde extra gebruik van het abonnement aan of uit.",
+      "undoForbidden": "Alleen de persoon voor wie de agent werkte, zijn eigenaar of een beheerder kan dit ongedaan maken."
+    },
+    "account": {
+      "notOwner": "Alleen wie dit account of abonnement heeft gekoppeld, kan dit doen."
+    },
+    "channel": {
+      "membersForbidden": "Alleen wie het kanaal maakte of een beheerder kan mensen toevoegen of verwijderen."
     },
     "handle": {
       "invalid": "Een @ heeft {{min}} tot {{max}} kleine letters, cijfers, - of _.",
@@ -11718,7 +11469,7 @@
       },
       "saved": "{{name}} gebruikt nu {{computer}}."
     },
-    "lead": "Waar je agents werken: de computer van deze server en elke andere computer die je koppelt.",
+    "lead": "Waar je agents werken: deze server en elke computer die je koppelt.",
     "leadCloud": "Waar je agents werken: een computer alleen voor deze werkruimte, altijd aan.",
     "about": "Over deze computer",
     "how": "Zo werken computers",
@@ -12124,12 +11875,12 @@
       "unattended": "op eigen initiatief"
     },
     "where": {
-      "dm": "privégesprek",
-      "forum": "forum: {{name}}"
+      "dm": "privégesprek"
     },
     "system": "Systeem",
     "removed": "Verwijderd",
     "change": {
+      "mergedWithoutAsking": "Gemerged in {{repo}} zonder te vragen",
       "pattern": "{{verb}}: {{area}}",
       "approval": {
         "approved": "Een verzoek goedgekeurd",
@@ -12202,7 +11953,6 @@
         "mission": "een missie",
         "thread": "een thread",
         "channel": "een kanaal",
-        "forum": "een forumonderwerp",
         "artifact": "een bestand in Drive",
         "agent": "een agent",
         "machine": "een computer",
@@ -12304,25 +12054,25 @@
     },
     "sectionText": {
       "account": "Je profiel en hoe de app er voor jou uitziet.",
-      "notifications": "De inbox bewaart alles. Hier kies je wat je als melding bereikt, in deze werkruimte.",
+      "notifications": "Wat je hier als melding bereikt. De inbox bewaart alles.",
       "general": "Naam, tijdzone en wat elke agent over de werkruimte weet.",
-      "right_hand": "De assistent die met elke persoon het team samenstelt, in hun DM en met hun rechten.",
+      "right_hand": "De assistent die met ieder het team opbouwt, in hun DM.",
       "members": "Wie er in de werkruimte zit, en uitnodigingen.",
       "roles": "Wat iedereen kan doen. Rollen tellen op.",
-      "vault": "Wachtwoorden, sleutels en contactgegevens die je agenten gebruiken. Ze typen wachtwoorden en gebruiken sleutels zonder ze ooit te zien.",
+      "vault": "Wachtwoorden, sleutels en contacten van je agents. Wachtwoorden zien ze nooit.",
       "access": "Wat elke agent kan gebruiken: één niveau per connector.",
       "connectors": "Diensten en MCP-servers die één keer voor de hele werkruimte zijn gekoppeld.",
       "skills": "Markdown-instructies die agents openen als ze ze nodig hebben.",
       "keys": "Je abonnementen en de API-sleutels van de werkruimte.",
       "storage": "Waar de bestanden van de werkruimte staan.",
       "usage": "Hoeveel AI elke persoon en elke agent gebruikt, en de limieten van de maand.",
-      "audit": "Wat de agents buiten het gesprek deden en wat mensen wijzigden. Alleen beheerders zien het.",
-      "import": "Haal agents uit een andere app of werkruimte, en neem deze mee waarheen je wilt.",
-      "billing": "Het agentes.chat-abonnement, de kaart en de facturen van deze werkruimte staan op een pagina van ons, buiten de app.",
-      "media": "Wat mensen in een gesprek kunnen sturen, en wanneer agents een GIF of sticker sturen.",
+      "audit": "Wat agents buiten het gesprek deden en wat mensen veranderden.",
+      "import": "Haal agents uit een andere app of werkruimte, of neem deze mee.",
+      "billing": "Het abonnement, de kaart en de facturen, op een pagina van ons buiten de app.",
+      "media": "Wat je in een gesprek kunt sturen, en de gifs en stickers van de agents.",
       "voice": "Spraakberichten in gesprekken, en wie spraak omzet in tekst.",
-      "apps": "Vraag de agents van deze werkruimte om taken vanuit Claude, Cursor en andere apps.",
-      "approvals": "Wie voor je beslist als een agent iets vraagt dat op je goedkeuring wacht."
+      "apps": "Geef de agents taken vanuit Claude, Cursor en andere apps.",
+      "approvals": "Wie voor je beslist als een agent om je goedkeuring vraagt."
     },
     "title": "Instellingen",
     "account": {
@@ -12330,7 +12080,11 @@
       "device": "Op dit apparaat",
       "activity": "Laten zien wat agents deden onder elk antwoord",
       "activityHelp": "De tools die ze gebruikten en hoe lang het duurde. Terwijl ze werken, zie je nog steeds waar ze mee bezig zijn.",
-      "activityFailed": "Kon dat niet opslaan. Probeer het opnieuw."
+      "activityFailed": "Kon dat niet opslaan. Probeer het opnieuw.",
+      "agentStyle": "Hoe agents met je praten",
+      "agentStyleHelp": "Eenvoudig: wat er gebeurde en wat je moet doen, in een paar woorden. Technisch: met paden, codes en details.",
+      "agentStyleSimple": "Eenvoudig",
+      "agentStyleTechnical": "Technisch"
     },
     "orgTitle": "Werkruimte",
     "name": "Naam",
@@ -12636,7 +12390,7 @@
     },
     "card": {
       "title": "Je hebt je gebruikslimiet voor deze maand bereikt",
-      "text": "Hij wordt vernieuwd op {{date}}. Om nu door te gaan, vraag het een admin.",
+      "text": "Hij wordt vernieuwd op {{date}}. Om nu door te gaan, vraag om meer.",
       "ask": "Om meer vragen",
       "asked": "Verzoek verstuurd",
       "see": "Mijn gebruik bekijken",
@@ -12709,7 +12463,7 @@
   },
   "gallery": {
     "title": "Componentengalerij",
-    "subtitle": "Alleen voor ontwikkeling. De componenten van @agenteschat/ui met de statussen van de goedgekeurde schermen."
+    "subtitle": "Alleen voor ontwikkeling: de componenten van @agenteschat/ui."
   },
   "format": {
     "list": "{{names, list}}",
@@ -12953,8 +12707,6 @@
       "seconds": "{{n}} s",
       "minutes": "{{n}} min",
       "step": {
-        "openingForumTopic": "Een forumonderwerp geopend",
-        "postingInForum": "In het forum geschreven",
         "schedulingReminder": "Een herinnering gepland",
         "creatingRoutine": "Een routine gemaakt",
         "updatingRoutine": "Een routine gewijzigd",
@@ -13006,7 +12758,6 @@
         "writingWiki": "In de wiki geschreven",
         "readingWiki": "De wiki gelezen",
         "linkingWiki": "Een wikipagina gekoppeld",
-        "readingForum": "Het forum gelezen",
         "creatingChannel": "Een kanaal gemaakt",
         "offeringConnectAi": "Aangeboden een AI te koppelen",
         "offeringConnectApp": "Aangeboden een app te koppelen",
@@ -13025,7 +12776,6 @@
         "handingOff": "Een rapport geleverd",
         "recordingFindings": "De bevindingen genoteerd",
         "deliveringMission": "De missie opgeleverd",
-        "suggestingForumTopic": "Een forumonderwerp voorgesteld",
         "requestingAccess": "Om toegang gevraagd",
         "requestingSecret": "Om een geheim gevraagd",
         "queryingDatabase": "De database bevraagd",
@@ -13036,8 +12786,6 @@
       }
     },
     "activity": {
-      "openingForumTopic": "een forumonderwerp aan het openen",
-      "postingInForum": "in het forum aan het schrijven",
       "schedulingReminder": "een herinnering aan het plannen",
       "creatingRoutine": "een routine aan het maken",
       "updatingRoutine": "een routine aan het wijzigen",
@@ -13092,7 +12840,6 @@
       "writingWiki": "in de wiki aan het schrijven",
       "readingWiki": "de wiki aan het lezen",
       "linkingWiki": "een wikipagina aan het koppelen",
-      "readingForum": "het forum aan het lezen",
       "creatingChannel": "een kanaal aan het maken",
       "offeringConnectAi": "een AI klaar aan het zetten om te koppelen",
       "offeringConnectApp": "een app klaar aan het zetten om te koppelen",
@@ -13111,7 +12858,6 @@
       "handingOff": "een rapport aan het leveren",
       "recordingFindings": "de bevindingen aan het noteren",
       "deliveringMission": "de missie aan het opleveren",
-      "suggestingForumTopic": "een forumonderwerp aan het voorstellen",
       "requestingAccess": "om toegang aan het vragen",
       "requestingSecret": "om een geheim aan het vragen",
       "queryingDatabase": "de database aan het bevragen",
@@ -13159,6 +12905,7 @@
       },
       "autonomy_digest_one": "{{count}} melding leek bekend of onschuldig, dus ik heb er niet aan gewerkt:",
       "autonomy_digest_other": "{{count}} meldingen leken bekend of onschuldig, dus ik heb er niet aan gewerkt:",
+      "team_week": "Hoe de week van het team ging, {{from}} tot {{to}}",
       "autonomy_loop": "Ik ben er uit mezelf mee gestopt. Het kwam {{count}} keer op een dag terug ({{title}}). Zeg me hoe je wilt dat ik ermee omga.",
       "mission_plan": "Plan voor “{{title}}” op {{computer}}",
       "mission_planNoComputer": "Plan voor “{{title}}”",
@@ -13183,6 +12930,10 @@
       "machine_task_resume_waits": "{{computer}} is terug: “{{title}}” gaat verder waar het stopte zodra het project klaar is.",
       "machine_offline": "{{computer}} is offline gegaan.",
       "brain_unavailable": "{{brain}} kan nu niet antwoorden. Ik antwoord zodra het terug is.",
+      "brain_unavailable_paused": "De computer waarop {{brain}} draait is gepauzeerd. Ik antwoord zodra die wordt hervat.",
+      "brain_unavailable_commands_off": "{{brain}} staat uit op mijn computer. Ik antwoord zodra wie die beheert het aanzet.",
+      "brain_unavailable_outdated": "Het programma op mijn computer heeft een update nodig voordat {{brain}} kan antwoorden. Ik antwoord zodra het bijgewerkt is.",
+      "brain_unavailable_plan_owner": "{{brain}} zou denken met een abonnement dat niet van mijn eigenaar is, dus ik gebruik het niet. Koppel het account van mijn eigenaar op mijn pagina.",
       "provider_unavailable": "Mijn AI-aanbieder reageert nu niet. Ik antwoord zodra die terug is.",
       "brain_busy": "Mijn computer is nu bezig met andere taken. Ik antwoord zodra hij vrij is.",
       "brain_queued": "Ik sta nog in de rij voor de computer. Ik antwoord zodra hij ruimte heeft.",
@@ -13191,6 +12942,9 @@
       "plan_limit_cut_unknown": "Ik ben gestopt bij de limiet van het {{plan}}-abonnement. Ik ga verder waar ik was zodra de limiet reset.",
       "plan_limit_wait": "Het {{plan}}-abonnement heeft de limiet bereikt. Ik antwoord {{when}}, als de limiet is gereset.",
       "plan_limit_wait_unknown": "Het {{plan}}-abonnement heeft de limiet bereikt. Ik antwoord zodra de limiet reset.",
+      "plan_model_limit_wait": "{{model}} heeft zijn eigen limiet bij {{plan}} bereikt. De andere modellen van het abonnement blijven werken: kies een ander model voor {{agent}} of wacht tot het {{when}} wordt gereset.",
+      "plan_model_limit_wait_unknown": "{{model}} heeft zijn eigen limiet bij {{plan}} bereikt. De andere modellen van het abonnement blijven werken: kies een ander model voor {{agent}} of wacht tot het wordt gereset.",
+      "plan_model_region_wait": "Dit model ({{model}}) heeft de regio Global nodig in OpenCode (Settings › Privacy).",
       "budget_wait": "Mijn budget voor deze maand is op. Ik ga {{when}} verder, of eerder als een beheerder het verhoogt.",
       "usage_wait_canceled": "Geannuleerd. Het draait niet als de limiet opnieuw begint.",
       "usage_wait_archived": "Het draait niet: de agent is gearchiveerd.",
@@ -13209,14 +12963,20 @@
       "work_end_canceled": "Gestopt na {{minutes}} min.",
       "work_end_canceledBy": "Gestopt door {{name}} na {{minutes}} min.",
       "no_ai": "Ik kan nog niet antwoorden: ik heb geen AI gekoppeld.",
-      "person_limit": "Wie het vroeg, heeft de gebruikslimiet voor deze maand bereikt. Om nu door te gaan, vraag het een admin.",
+      "person_limit": "Wie het vroeg, heeft de gebruikslimiet voor deze maand bereikt.",
       "no_ai_signed_out": "Ik kan nog niet antwoorden: mijn AI is uitgelogd.",
       "no_ai_not_signed_in": "Ik kan nog niet antwoorden: {{brain}} is niet ingelogd op mijn computer.",
       "no_ai_computer_away": "Ik kan nu niet antwoorden: de computer van mijn abonnement is niet bereikbaar.",
+      "no_ai_computer_failed": "Ik kan nu niet antwoorden: de computer van mijn abonnement had een probleem.",
       "no_ai_plan_limit": "Ik kan nu niet antwoorden: het abonnement waarmee ik denk heeft zijn limiet bereikt.",
-      "no_ai_plan_not_shared": "Ik kan je via dit abonnement niet antwoorden: het antwoordt alleen de eigenaar.",
+      "no_ai_plan_not_shared": "Ik kan je niet antwoorden via het abonnement van de workspace: het antwoordt alleen de eigenaar. Koppel je eigen abonnement, dan antwoord ik.",
       "no_ai_runner_outdated": "Ik kan nu niet antwoorden: het programma op de computer van mijn abonnement heeft een update nodig.",
-      "no_ai_plan_tools": "Ik stopte voordat ik antwoordde: de AI van mijn abonnement op die computer biedt eigen tools aan.",
+      "no_ai_plan_tools": "Ik stopte voordat ik antwoordde: de AI van mijn abonnement op die computer bleef niet binnen de tools van agentes.chat.",
+      "no_ai_model_limit": "Ik kan nu niet antwoorden: {{model}} heeft zijn eigen limiet in mijn abonnement bereikt.",
+      "no_ai_model_region": "Ik kan niet antwoorden: {{model}} heeft de regio Global nodig, aangezet in OpenCode (Settings › Privacy).",
+      "no_ai_commands_off": "Ik kan nu niet antwoorden: opdrachten staan uit op de computer van mijn abonnement.",
+      "no_ai_cli_missing": "Ik kan nog niet antwoorden: het programma van mijn AI is niet geïnstalleerd op mijn computer.",
+      "no_ai_no_computer": "Ik kan nog niet antwoorden: mijn AI heeft een computer nodig en ik heb er geen.",
       "redacted": "[verwijderd: leek op inloggegevens of een sleutel]",
       "action_connect_ai": "AI koppelen",
       "action_connect_app": "{{name}} koppelen",
@@ -13227,6 +12987,7 @@
       "action_approvals": "Goedkeuringen die op jou wachten",
       "action_open_page": "Een scherm openen",
       "agent_proposal": "Nieuwe agent voorgesteld: {{name}}",
+      "team_proposal": "Stelde een team voor: {{names}}",
       "settings_proposal": "Stelde een wijziging voor {{names}} voor",
       "approval_request": "Goedkeuringsverzoek: {{title}}",
       "secret_request": "{{agent}} vroeg om een sleutel: {{name}}",
@@ -13252,10 +13013,7 @@
       },
       "interrupted": "Onderbroken door een herstart van de server. Vraag het opnieuw om verder te gaan.",
       "step_limit": "Mijn stappen waren op voordat ik klaar was.",
-      "stuck": "Ik liep vast en stopte voordat ik klaar was.",
-      "forum_suggestion": "Iets voor het forum? “{{title}}”",
-      "forum_concluded": "Het forum “{{title}}” is afgelopen. De samenvatting staat in het bestand hieronder.",
-      "forum_concluded_issues": "Het forum “{{title}}” is afgelopen. De samenvatting staat in het bestand hieronder, met voorgestelde taken om goed te keuren ({{count}})."
+      "stuck": "Ik liep vast en stopte voordat ik klaar was."
     }
   },
   "builtinTools": {
@@ -13398,22 +13156,6 @@
     "schedule_action": {
       "label": "Actie inplannen",
       "description": "Zet een actie van een gekoppelde app klaar voor een vast tijdstip. Een mens keurt het nu goed."
-    },
-    "suggest_forum_topic": {
-      "label": "Forumonderwerp voorstellen",
-      "description": "Stelt een discussie tussen agents voor. Een mens opent die."
-    },
-    "open_forum_topic": {
-      "label": "Forumonderwerp openen",
-      "description": "Brengt een onderwerp naar een discussie tussen agents."
-    },
-    "post_in_forum": {
-      "label": "Posten in forum",
-      "description": "Post in een onderwerp buiten de eigen beurt."
-    },
-    "read_forum_topic": {
-      "label": "Forumonderwerp lezen",
-      "description": "Leest het doel en de reacties van een onderwerp."
     },
     "search_wiki": {
       "label": "Wiki doorzoeken",
@@ -14473,6 +14215,7 @@
   },
   "taskManager": {
     "title": "Taakbeheer",
+    "subtitle": "Wat de agents nu doen en wat vandaag klaar is.",
     "nav": "Taakbeheer",
     "search": "Zoek een taak, agent of app",
     "working_one": "{{count}} bezig",
@@ -14508,6 +14251,35 @@
       "queued": "In de wachtrij",
       "stopping": "Stoppen…",
       "stopped": "Gestopt"
+    },
+    "wait": {
+      "pausedPlan": "Gepauzeerd: abonnement op {{percent}}% {{window}}",
+      "pausedBudget": "Gepauzeerd: budget op {{percent}}% van de maand",
+      "planLimit": "{{plan}}-abonnement op de limiet",
+      "modelLimit": "{{model}} op de limiet",
+      "modelRegion": "{{model}} heeft de regio Global nodig",
+      "modelRegionNext": "Zet die aan in OpenCode (Settings › Privacy)",
+      "budgetOut": "Budget van deze maand is op",
+      "workLine": "In de werkrij van de agent",
+      "workLineNext": "Begint als ander werk klaar is",
+      "computerWait": "Wacht op de computer",
+      "computerWaitNext": "Gaat verder als hij klaar is",
+      "computerOfflineNext": "Gaat verder als hij aanstaat",
+      "computerBusyNext": "Begint als er ruimte is",
+      "okNext": "Gaat verder zodra iemand goedkeurt",
+      "answerNext": "Gaat verder zodra iemand antwoordt",
+      "back": "Gaat {{when}} verder",
+      "whenRenews": "na de vernieuwing",
+      "whenSoon": "zo meteen"
+    },
+    "waitGroup": {
+      "routines_one": "{{count}} routine",
+      "routines_other": "{{count}} routines",
+      "pausedPlan": "{{what}} gepauzeerd: het {{plan}}-abonnement staat op {{percent}}% {{window}} en gaat {{when}} verder. De rest blijft voor de gesprekken.",
+      "pausedBudget": "{{what}} gepauzeerd: het maandbudget staat op {{percent}}% en gaat {{when}} verder. De rest blijft voor de gesprekken.",
+      "planLimit": "{{what}} wachten: het {{plan}}-abonnement heeft de limiet bereikt en gaat {{when}} verder.",
+      "modelLimit": "{{what}} wachten: {{model}} heeft de limiet bereikt en gaat {{when}} verder. De andere modellen van het abonnement blijven werken.",
+      "budgetOut": "{{what}} wachten: het budget van deze maand is op en gaat {{when}} verder."
     },
     "where": {
       "dm": "Direct bericht",
@@ -14822,7 +14594,7 @@
   },
   "dashboards": {
     "title": "Dashboards",
-    "subtitle": "Getallen en grafieken die de agents actueel houden, voor de werkruimte of alleen voor sommige rollen.",
+    "subtitle": "Getallen en grafieken die de agents actueel houden.",
     "sidebar": "Dashboards",
     "navWhat": "Getallen en grafieken die de agents actueel houden",
     "new": "Nieuw dashboard",
@@ -15040,5 +14812,205 @@
       "promptRequired": "Zeg wat de widget moet tonen.",
       "notTested": "Test hem eerst: de widget wordt gemaakt zodra de test lukt."
     }
+  },
+  "teamPlan": {
+    "start": {
+      "question": "Wat doet {{org}}? Daarmee stel ik een kant-en-klaar team samen, en jij controleert het alleen.",
+      "orWrite": "Of schrijf het hieronder op je eigen manier, in één zin.",
+      "footer": "Weet je al wat je wilt?",
+      "templates": "Teamsjablonen bekijken",
+      "presets": "Kant-en-klare agents"
+    },
+    "business": {
+      "agency": "Bureau",
+      "store": "Webwinkel",
+      "clinic": "Kliniek of praktijk",
+      "software": "Software en apps",
+      "support": "Klantenservice",
+      "services": "Dienstverlenend kantoor",
+      "other": "Iets anders"
+    },
+    "answered": "beantwoord",
+    "step": "Vraag {{step}} van {{of}}",
+    "send": "{{count}} versturen",
+    "card": {
+      "new": "nieuw",
+      "routines": "Routines",
+      "skills": "Skills",
+      "create": "Team maken",
+      "adjust": "Aanpassen",
+      "adjustName": "{{name}} aanpassen",
+      "map": "Als kaart bekijken",
+      "agents_one": "{{count}} agent",
+      "agents_other": "{{count}} agents",
+      "newChannels_one": "{{count}} nieuw kanaal",
+      "newChannels_other": "{{count}} nieuwe kanalen",
+      "routineCount_one": "{{count}} routine",
+      "routineCount_other": "{{count}} routines",
+      "weekly": "ik vertel je hier hoe de week van het team ging",
+      "failed": "Het team is niet gemaakt: {{step}} mislukte ({{reason}}). Er is niets aangemaakt, dus je kunt het opnieuw proberen.",
+      "retry": "Opnieuw proberen",
+      "onlyCreators": "Alleen wie agents maakt, maakt het team.",
+      "created": "Team gemaakt door {{name}}",
+      "createdYou": "Team gemaakt door jou",
+      "skillsWait": "De skills wachten op een admin.",
+      "weeklyWait": "Mijn weekoverzicht wacht op wie mijn routines beheert.",
+      "undone": "Team ongedaan gemaakt",
+      "dismissed": "Team weggegooid"
+    },
+    "firstTask": {
+      "suggestion": "suggestie",
+      "lead": "Eén korte taak per agent, zodat je ze vandaag allemaal aan het werk ziet.",
+      "open": "Openen met de taak",
+      "invite": "{{names}} uitnodigen",
+      "later": "Later"
+    },
+    "adjust": {
+      "title": "{{name}} aanpassen",
+      "name": "Naam",
+      "role": "Rol",
+      "line": "Wat hij doet",
+      "instructions": "Instructies",
+      "channel": "Kanaal",
+      "firstTask": "Eerste taak"
+    },
+    "map": {
+      "title": "Het team als kaart",
+      "people": "Mensen",
+      "reviewer": "{{name}} kijkt naar de week van het team",
+      "waits": "Wacht op je goedkeuring"
+    },
+    "templates": {
+      "title": "Teamsjablonen",
+      "lead": "Een kant-en-klaar team voor jouw soort bedrijf. Daarna past {{name}} het met je aan.",
+      "use": "Dit sjabloon gebruiken",
+      "none": "Geen van deze",
+      "noneSub": "Vertel wat je doet en {{name}} stelt het samen",
+      "tailor": "Daarna stel ik 2 vragen om het op jouw bedrijf af te stemmen."
+    },
+    "weekly": {
+      "name": "De week van het team"
+    }
+  },
+  "teamTemplates": {
+    "lead": "Een team voor {{org}}, elke agent in een eigen kanaal. Je kunt het aanpassen voordat je het maakt.",
+    "agency": {
+      "name": "Marketingbureau",
+      "sub": "Content, advertenties en klantenservice",
+      "desc": "Voor een bureau dat de content en campagnes van klanten verzorgt."
+    },
+    "store": {
+      "name": "Webwinkel",
+      "sub": "Bestellingen, voorraad en sociale media",
+      "desc": "Voor een winkel die online verkoopt en kopers antwoordt."
+    },
+    "clinic": {
+      "name": "Kliniek of praktijk",
+      "sub": "Afspraken via WhatsApp, facturen en nazorg",
+      "desc": "Voor een kliniek of praktijk die patiënten inplant en opvolgt."
+    },
+    "software": {
+      "name": "Software en apps",
+      "sub": "Support, facturen en code",
+      "desc": "Voor een bedrijf dat software verkoopt en zijn eigen klanten helpt."
+    },
+    "support": {
+      "name": "Klantenservice",
+      "sub": "Klantenwachtrij en antwoordenbank",
+      "desc": "Voor een team dat elke dag veel klanten antwoordt."
+    },
+    "services": {
+      "name": "Dienstverlenend kantoor",
+      "sub": "Boekhouding, advocatuur, advies",
+      "desc": "Voor een kantoor dat klanten inplant, voorstellen stuurt en factureert."
+    },
+    "agents": {
+      "iara": {
+        "role": "Klantenservice",
+        "line": "Beantwoordt klanten via WhatsApp en e-mail. Roept je als ze het niet weet.",
+        "routine": "Samenvatten wat onbeantwoord bleef",
+        "task": "Het laatste wachtende klantbericht beantwoorden"
+      },
+      "caio": {
+        "role": "Facturen",
+        "line": "Herinnert wie te laat betaalt en stuurt de herinnering na jouw ok.",
+        "routine": "Opsommen wie te laat betaalt",
+        "task": "Opsommen wie deze maand te laat is"
+      },
+      "ada": {
+        "role": "Dev",
+        "line": "Lost de bugs op die klanten melden en opent de PR.",
+        "routine": "De nieuwe bugs opsommen",
+        "task": "Kijken naar de laatste bug die een klant meldde"
+      },
+      "lia": {
+        "role": "Content",
+        "line": "Schrijft posts en scripts in de toon van het bedrijf en plant ze na jouw ok.",
+        "routine": "De posts van de week voorstellen",
+        "task": "Drie posts voor deze week voorstellen"
+      },
+      "theo": {
+        "role": "Verkoop",
+        "line": "Volgt iedereen op die een offerte vroeg en schrijft de voorstellen.",
+        "routine": "Opsommen wie een offerte vroeg en geen antwoord kreeg",
+        "task": "Opsommen wie deze week een offerte vroeg"
+      },
+      "nina": {
+        "role": "Agenda",
+        "line": "Plant, bevestigt en verzet afspraken en herinnert klanten de dag ervoor.",
+        "routine": "De afspraken van morgen bevestigen",
+        "task": "Mij de afspraken van morgen laten zien"
+      },
+      "otto": {
+        "role": "Bestellingen",
+        "line": "Volgt bestellingen en voorraad en waarschuwt wat opraakt.",
+        "routine": "Waarschuwen wat opraakt in de voorraad",
+        "task": "De bestellingen opsommen die nog op verzending wachten"
+      },
+      "bia": {
+        "role": "Antwoordenbank",
+        "line": "Houdt de antwoordenbank bij met wat het team antwoordt.",
+        "routine": "De bank bijwerken met de antwoorden van de week",
+        "task": "De 5 vragen opsommen die klanten het vaakst stellen"
+      }
+    },
+    "channels": {
+      "iara": "support",
+      "caio": "financien",
+      "ada": "eng",
+      "lia": "content",
+      "theo": "verkoop",
+      "nina": "agenda",
+      "otto": "bestellingen",
+      "bia": "support"
+    },
+    "skills": {
+      "voice": {
+        "name": "Tone of voice",
+        "line": "hoe het bedrijf met klanten praat"
+      },
+      "dunning": {
+        "name": "Herinneringsschema",
+        "line": "een herinnering op de vervaldag, dan op de 3e en 7e dag te laat"
+      },
+      "answers": {
+        "name": "Antwoordenbank",
+        "line": "de goedgekeurde antwoorden van het team op veelgestelde vragen"
+      },
+      "proposal": {
+        "name": "Opzet van een voorstel",
+        "line": "wat elk voorstel zegt, en in welke volgorde"
+      },
+      "schedule": {
+        "name": "Agendaregels",
+        "line": "tijden, pauzes en hoe ver vooruit je kunt boeken"
+      },
+      "review": {
+        "name": "Codereview",
+        "line": "wat je controleert voordat je een PR opent"
+      }
+    },
+    "approvals": "Wat naar klanten gaat, wacht op je goedkeuring. Je kunt het later vrijgeven, als je ze vertrouwt.",
+    "ask": "Ik heb het sjabloon {{name}} gebruikt. Om het op jouw bedrijf af te stemmen: **wat doet {{org}} anders?**"
   }
 }

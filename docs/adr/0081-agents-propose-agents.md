@@ -19,7 +19,7 @@ Creating an agent is a person's permission (`manage_agents`): an agent gets scop
 - It takes the draft: a name, an @handle, a role, what it does (the instructions), a look (the app's allow-list), the public channels it joins by name, its level (read or write) on the workspace's connected apps by catalog id or name, and one line for the person (`why`).
 - The draft is checked as the create-agent API checks an agent: a name of up to 80 characters, a handle of the right shape that no agent (archived ones too) or person has, a role of up to 200 characters, instructions of 1 to 50,000, a look from the allow-list. Channels are public ones only, because the card shows their names to everyone in the conversation; the person adds private ones while reviewing. Unknown channels and apps are refused with the ones that exist, so the agent can correct itself.
 - The card is `meta.actionCard` with `kind: "agent_proposal"` (`bodyCode: "agent_proposal"`), so it starts no run and counts toward the run's 3 cards.
-- It is posted only where someone who may create agents can open the conversation (`deciderCanOpen`): a public channel, which they may join, or a forum; a DM or a private channel only with one of them in it. Elsewhere (a member's DM with an agent, say) a card could never be decided, so nothing is posted and the tool tells the agent to send the person to an admin or owner.
+- It is posted only where someone who may create agents can open the conversation (`deciderCanOpen`): a public channel, which they may join; a DM or a private channel only with one of them in it. Elsewhere (a member's DM with an agent, say) a card could never be decided, so nothing is posted and the tool tells the agent to send the person to an admin or owner.
 
 ### 2. The AI it suggests
 
@@ -34,7 +34,7 @@ The card shows the suggestion made for the asker. The review screens read the pr
 ### 3. The card keeps its state
 
 - Unlike a Connect card, what a person decided can't come from live data, so the card holds it: `state` (`pending`, `creating`, `created`, `denied`), the agent made from it, who decided and when, and `expiresAt`, a day after it was posted, like an approval. "Expired" isn't stored: a pending card past it.
-- Only the decision routes write it, each with a conditional update on the state it expects, so two people deciding at once get one decision. `creating` holds the card while the agent is made and goes back to `pending` if that fails. A crash in between leaves it decided for good, as the forum's suggestions.
+- Only the decision routes write it, each with a conditional update on the state it expects, so two people deciding at once get one decision. `creating` holds the card while the agent is made and goes back to `pending` if that fails. A crash in between leaves it decided for good.
 - `agent.proposal.updated` on the channel carries the decision (the state, the agent made, who decided and when), never the draft: its instructions alone can be past a Postgres NOTIFY payload's limit (ADR 0010). Every app puts it on the card it already has.
 
 ### 4. Deciding

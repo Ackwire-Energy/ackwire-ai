@@ -6,7 +6,6 @@ import { executesHere, RUN_STALE_MS } from "./cancel";
 import { onConsultedRunFinished } from "./consultations";
 import { liveTurnOf, publishChannelEvent, publishMessageCreated } from "./events";
 import type { Transcript } from "./executor";
-import { onForumRunFinished } from "./forum";
 import { getMessage, insertMessage, messageView } from "./messages";
 import { enqueue } from "./outbox";
 import { closeRoutineRun } from "./routine-ledger";
@@ -243,7 +242,6 @@ async function resume(db: Database, run: AgentRun, at: SweepTime, ran: string[])
 /** Ends the run as failed, keeps what it wrote, and tells the channel (so the live row goes away). */
 async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: AgentRun, at: SweepTime) {
   const { db } = deps;
-  const [channel] = await db.select({ kind: channels.kind }).from(channels).where(eq(channels.id, run.channelId));
   const threadId = replyThreadOf(run);
   const t = (run.transcript ?? {}) as StoredTranscript;
   const said = (t.messages ?? [])
@@ -328,9 +326,6 @@ async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: Age
     runId: run.id,
     status: "failed",
   });
-  if (channel?.kind === "forum") {
-    await onForumRunFinished({ db, pubsub: deps.pubsub }, run.orgId, run.channelId, run.id).catch(() => {});
-  }
   // It was answering another agent: the asker hears it now instead of waiting for the question to expire.
   await onConsultedRunFinished({ db, pubsub: deps.pubsub }, run, "failed", INTERRUPTED_BY_RESTART).catch(() => {});
   // What was sent to it and not read gets a run of its own.
@@ -369,8 +364,7 @@ export async function activeRunsIn(db: Database, orgId: string, channelId: strin
       agentId: r.agent_id,
       channelId,
       status: r.status,
-      threadId:
-        (r.kind === "dm" || r.kind === "forum") && r.thread_root_id === r.trigger_message_id ? null : r.thread_root_id,
+      threadId: r.kind === "dm" && r.thread_root_id === r.trigger_message_id ? null : r.thread_root_id,
       triggerMessageId: r.trigger_message_id,
       startedAt: iso(r.started_at),
       heartbeatAt: iso(r.heartbeat_at),

@@ -201,7 +201,7 @@ export function Markdown({
   const message = variant === "message";
   const inline = (text: string, k: string) => renderInline(text, k, mention, wikiLink, embed, words, channel);
   // Parsed once per source (a streaming row re-renders every reveal frame); never mutated.
-  const all = useMemo(() => parseMarkdown(source, { breaks: message }), [source, message]);
+  const all = useMemo(() => parseMarkdown(source, { breaks: message, details: true }), [source, message]);
   const [first] = all;
   const parsed =
     title && first?.type === "heading" && first.level === 1 && first.text.trim() === title.trim() ? all.slice(1) : all;
@@ -278,6 +278,24 @@ export function Markdown({
         return embed ? embed(b.target, k, true) : <p key={k}>{inline(`[[${b.target}]]`, k)}</p>;
       case "rule":
         return <hr key={k} />;
+      case "details":
+        // Closed until the reader opens it (ADR 0147): what only some want to read.
+        return (
+          <details key={k} className="md__details">
+            <summary>{b.summary ? inline(b.summary, `${k}s`) : "…"}</summary>
+            <Markdown
+              source={b.body}
+              variant={variant}
+              mention={mention}
+              channel={channel}
+              wikiLink={wikiLink}
+              embed={embed}
+              words={words}
+              excerpt={excerpt}
+              bare
+            />
+          </details>
+        );
       case "table":
         return (
           <div key={k} className="md__table">

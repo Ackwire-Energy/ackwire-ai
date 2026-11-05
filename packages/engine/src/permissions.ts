@@ -6,13 +6,14 @@ import { type SQL, sql } from "@agenteschat/db";
  * delete the workspace). Agents never hold these: what an agent may do comes from its own scopes (Tool Gateway).
  * The apps draw the roles screen from `PERMISSION_AREAS` (sent by `GET …/roles`) and name each key with i18n.
  * `use_others_plans`: give any agent one may manage a plan someone else connected (ADR 0059 §3); administrators and
- * owners hold it, `everyone` doesn't, so no migration backfills it.
+ * owners hold it, `everyone` doesn't, so no migration backfills it. `mention_everyone` (Discord's "Mention @everyone"):
+ * `@todos` in any conversation but a DM mentions all its members, people and agents; the same holds for it.
  */
 export const PERMISSION_AREAS = [
   {
     id: "chat",
     use: ["post", "create_channels"],
-    keys: ["post", "create_channels", "manage_channels"],
+    keys: ["post", "create_channels", "mention_everyone", "manage_channels"],
   },
   {
     id: "agents",

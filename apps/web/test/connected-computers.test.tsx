@@ -279,9 +279,7 @@ describe("Configurações → Computadores", () => {
     expect(links).toContain("Computadores");
     expect(links).not.toContain("Sandbox");
     const body = document.querySelector(".settings__body") as HTMLElement;
-    expect(body.textContent).toContain(
-      "Onde os agentes trabalham: o computador deste servidor e qualquer outro computador que você conectar.",
-    );
+    expect(body.textContent).toContain("Onde os agentes trabalham: este servidor e outros que você conectar.");
     // No kinds side by side anymore, and never "in the cloud" here.
     expect(screen().queryByRole("region", { name: "Onde os agentes trabalham" })).toBeNull();
     expect(body.textContent).not.toMatch(/Na nuvem|No seu computador|Computador na nuvem/);
@@ -964,7 +962,9 @@ describe("agent page: which computer", () => {
     expect(errorText(t, new ApiError(413, "artifact.file_too_large", "too large"))).toBe(
       "O arquivo passa de 50 MB, o limite por arquivo.",
     );
-    expect(errorText(t, new ApiError(500, "boom", "Server exploded"))).toBe("Algo deu errado. Tente de novo.");
+    expect(errorText(t, new ApiError(500, "boom", "Server exploded"))).toBe(
+      "Algo deu errado do nosso lado. Tente de novo daqui a pouco.",
+    );
     const en = createI18n("en");
     expect(errorText(en.t.bind(en), new ApiError(400, "machine.pairing_invalid", "x"))).toBe(
       "Invalid, used or expired code. Generate another one.",

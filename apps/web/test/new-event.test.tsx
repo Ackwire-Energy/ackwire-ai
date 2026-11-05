@@ -155,7 +155,7 @@ describe("Calendário > Novo evento", () => {
     "week navigation and Novo evento",
     async () => {
       await go("calendar");
-      const label = () => document.querySelector(".cal-page__range")?.textContent;
+      const label = () => document.querySelector(".ac-pagehead__meta")?.textContent;
       // The week grid only: Próximos lists this week's daily until it ends, whatever week is shown.
       const daily = () =>
         within(screen().getByRole("region", { name: "Grade do calendário" })).queryByRole("button", {

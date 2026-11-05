@@ -9,8 +9,7 @@ import { MessageFiles } from "../files/MessageFiles";
 import { Face } from "../shared/Face";
 import { useColors, useConnection, useDirectory, useOrgId } from "../shared/hooks";
 
-const eventIcon = (a: IssueActivity): IconName =>
-  a.event === "agent_asked" ? "agent" : a.textCode?.startsWith("forum_") ? "chat" : "clock";
+const eventIcon = (a: IssueActivity): IconName => (a.event === "agent_asked" ? "agent" : "clock");
 
 /** "Atividade": what happened to the task, in order, with the comments between the events. */
 export function IssueActivityFeed({ issue }: { issue: Issue }) {

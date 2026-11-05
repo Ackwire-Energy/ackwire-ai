@@ -58,7 +58,6 @@ export const AREA_ORDER = [
   "wiki",
   "skills",
   "schedule",
-  "forum",
   "sandbox",
   "browser",
   "desktop",

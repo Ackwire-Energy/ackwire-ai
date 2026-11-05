@@ -1,10 +1,14 @@
+import type { MergeDone } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, schema } from "@agenteschat/db";
+import { recordAgentActions } from "../agent-actions";
 import { getAgent } from "../agents";
 import { recordAudit } from "../audit";
+import { fedByRoutine, runAuthorityById } from "../authority";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { can, requirePermission } from "../organizations";
+import type { ToolContext } from "../tools/types";
 
-const { agentRepositories: table } = schema;
+const { agentRepositories: table, agents } = schema;
 
 /**
  * The GitHub repositories an agent may use (`agent_repositories`): an
@@ -149,6 +153,116 @@ export async function setAgentRepositories(
     });
   });
   return list;
+}
+
+/** Where "merge without asking" is on, as chosen, whether or not the agent still reaches each repository. */
+async function chosenMergeRepos(db: Executor, orgId: string, agentId: string) {
+  const [row] = await db
+    .select({ repos: agents.mergeRepos })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), eq(agents.id, agentId)));
+  return row?.repos ?? [];
+}
+
+const inReach = (list: readonly string[], entry: string) => {
+  const [owner = "", repo = ""] = entry.split("/");
+  return repoInList(list, owner, repo);
+};
+
+/**
+ * The repositories this agent merges in without asking: what its owner or an admin chose, within its repositories
+ * now (one taken away from the agent stops at once). Read fresh on every merge: turning one off asks at once.
+ */
+export async function agentMergeRepos(db: Executor, orgId: string, agentId: string): Promise<string[]> {
+  const chosen = await chosenMergeRepos(db, orgId, agentId);
+  if (chosen.length === 0) return [];
+  const list = await agentRepositoryList(db, orgId, agentId);
+  return chosen.filter((entry) => inReach(list, entry));
+}
+
+/**
+ * Where this call may merge without asking: none outside a run (a mission keeps its own gates, and a receipt needs a
+ * run), nor in a run a routine's reading woke, where text nobody checked feeds it and every write asks a person
+ * (ADR 0053).
+ */
+export async function mergeReposOfCall(ctx: Pick<ToolContext, "db" | "orgId" | "agentId" | "runId">) {
+  if (!ctx.runId) return [];
+  const repos = await agentMergeRepos(ctx.db, ctx.orgId, ctx.agentId);
+  if (repos.length === 0) return repos;
+  const authority = await runAuthorityById(ctx.db, ctx.orgId, ctx.runId);
+  return authority.kind === "unattended" && fedByRoutine(authority) ? [] : repos;
+}
+
+/** `GET …/agents/{id}/merge-repositories` (who sees the agent's details). */
+export async function getAgentMergeRepositories(db: Database, actorId: string, orgId: string, agentId: string) {
+  await requirePermission(db, actorId, orgId, "read");
+  if (!(await getAgent(db, orgId, agentId))) throw new NotFoundError("Agent not found");
+  return agentMergeRepos(db, orgId, agentId);
+}
+
+/**
+ * `PUT …/agents/{id}/merge-repositories`: replaces the list. Its owner or an admin; exact repositories only (never a
+ * whole account), each one the agent may use. Audited.
+ */
+export async function setAgentMergeRepositories(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  agentId: string,
+  repositories: readonly string[],
+) {
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  const agent = await getAgent(db, orgId, agentId);
+  if (!agent) throw new NotFoundError("Agent not found");
+  if (!can(membership, "manage_agents") && agent.ownerUserId !== actorId) {
+    throw new ForbiddenError("Only an admin or the agent's owner can change where it merges without asking");
+  }
+  const { list, invalid } = cleanRepoList(repositories);
+  const whole = list.filter((entry) => entry.endsWith("/*"));
+  if (invalid.length + whole.length > 0) {
+    throw new ValidationError(`Not a repository (owner/name): ${[...invalid, ...whole].join(", ")}`);
+  }
+  const reach = await agentRepositoryList(db, orgId, agentId);
+  const outside = list.filter((entry) => !inReach(reach, entry));
+  if (outside.length > 0) throw new ValidationError(`The agent doesn't use ${outside.join(", ")}`);
+  if (list.length > MAX_AGENT_REPOSITORIES) {
+    throw new ValidationError(`At most ${MAX_AGENT_REPOSITORIES} repositories per agent`);
+  }
+  await db.transaction(async (tx) => {
+    await tx
+      .update(agents)
+      .set({ mergeRepos: list })
+      .where(and(eq(agents.orgId, orgId), eq(agents.id, agentId)));
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "agent.merge_repositories_changed",
+      target: { type: "agent", id: agentId },
+      details: { repositories: list },
+    });
+  });
+  return list;
+}
+
+/** A merge done without a card: its line in the audit, and its receipt under the agent's reply (nothing to undo). */
+export async function recordMergeDone(ctx: ToolContext, merge: MergeDone, tool: string) {
+  await recordAudit(ctx.db, {
+    orgId: ctx.orgId,
+    actor: { type: "agent", id: ctx.agentId },
+    action: "agent.merged_without_asking",
+    target: { type: "repository", id: merge.repo },
+    details: { pr: merge.pr, ref: merge.ref, tool },
+    runId: ctx.runId || null,
+    channelId: ctx.channelId || null,
+  });
+  await recordAgentActions(ctx.db, ctx, [
+    {
+      kind: "pr.merged",
+      target: { type: "repository", id: merge.repo, title: merge.repo },
+      params: { repo: merge.repo, ...(merge.pr ? { number: merge.pr } : {}), ...(merge.ref ? { ref: merge.ref } : {}) },
+      final: true,
+    },
+  ]);
 }
 
 /**

@@ -6,31 +6,17 @@
   min-height: 0;
   background: var(--bg);
 }
+/* The page's header (PageHeader) where every page's starts: the page's top and side room (`.page`). */
 .cal-page__header {
+  padding: 32px 24px 16px;
+}
+/* The bar under it: the way through the weeks, the view, working days. */
+.cal-page__tools {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 10px 12px;
-  padding: 16px 20px 12px;
-}
-.cal-page__title {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: 8px 12px;
   min-width: 0;
-  margin-right: 4px;
-}
-.cal-page__title .page-title {
-  margin: 0;
-}
-.cal-page__range {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink2);
-}
-.cal-page__spacer {
-  flex: 1 1 0;
 }
 .cal-page__new .ac-kbd {
   margin-left: 6px;
@@ -53,7 +39,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
-  padding: 0 20px 16px;
+  padding: 0 24px 16px;
 }
 .cal-page[data-panel] .cal-page__body {
   grid-template-columns: minmax(0, 1fr) 272px;
@@ -258,6 +244,11 @@ html:not([data-pointer]) .cal-week__daybtn:focus-visible {
 .cal-chip[data-source="routine"] {
   --cal-accent: var(--line2);
   /* At rest on the pressed face too (dark's --sunken is deeper): only the press marks the chosen one. */
+  background: var(--chosen-bg);
+  color: var(--ink2);
+  box-shadow: inset 3px 0 0 var(--cal-accent);
+}
+.cal-chip[data-source="reminder"] {
   background: var(--chosen-bg);
   color: var(--ink2);
   box-shadow: inset 3px 0 0 var(--cal-accent);
@@ -826,7 +817,9 @@ html:not([data-pointer]) .cal-mini__day:focus-visible {
   gap: 6px;
 }
 @media (max-width: 640px) {
-  .cal-page__header,
+  .cal-page__header {
+    padding: 20px 16px 12px;
+  }
   .cal-page__body {
     padding-left: 16px;
     padding-right: 16px;
@@ -848,10 +841,5 @@ html:not([data-pointer]) .cal-mini__day:focus-visible {
   }
   .cal-page[data-panel] .cal-side {
     overflow: visible;
-  }
-}
-@media (max-width: 640px) {
-  .cal-page__header {
-    padding-top: 12px;
   }
 }

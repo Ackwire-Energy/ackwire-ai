@@ -29,6 +29,7 @@ import {
   Menu,
   MenuRadioGroup,
   MenuSeparator,
+  PageHeader,
   SearchField,
   Segmented,
   Toolbar,
@@ -321,47 +322,47 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
     <div className={cx("page drive drive-drop", drop.over && "drive-drop--over")} {...drop.props}>
       {drop.over && <DropOverlay />}
       <div className="drive__main">
-        <header className="drive-head">
-          <div className="drive-head__text">
-            <div className="drive-head__title">
-              {trashOpen && (
-                <Button
-                  variant="ghost"
-                  iconOnly
-                  icon="chevronLeft"
-                  aria-label={t("artifacts.backToDrive")}
-                  title={t("artifacts.backToDrive")}
-                  onClick={() => setTrashOpen(false)}
-                />
-              )}
-              <h1>{trashOpen ? t("artifacts.trashTitle") : t("drive.title")}</h1>
-            </div>
-            <p className="drive-head__sub">{trashOpen ? t("artifacts.trashHint") : t("drive.subtitle")}</p>
-          </div>
-          {!trashOpen && (
-            <div className="drive-head__actions">
+        <PageHeader
+          title={trashOpen ? t("artifacts.trashTitle") : t("drive.title")}
+          meta={trashOpen ? t("artifacts.trashHint") : t("drive.subtitle")}
+          lead={
+            trashOpen && (
               <Button
                 variant="ghost"
-                icon="trash"
-                onClick={() => {
-                  setTrashOpen(true);
-                  setOpenId(null);
-                  setSelected(new Set());
-                }}
-              >
-                {t("artifacts.trash")}
-              </Button>
-              <UploadButton
-                size="md"
-                label={t("files.upload")}
-                busy={uploader.busy}
-                multiple
-                onFiles={upload}
-                variant="primary"
+                iconOnly
+                icon="chevronLeft"
+                aria-label={t("artifacts.backToDrive")}
+                title={t("artifacts.backToDrive")}
+                onClick={() => setTrashOpen(false)}
               />
-            </div>
-          )}
-        </header>
+            )
+          }
+          actions={
+            !trashOpen && (
+              <>
+                <Button
+                  variant="ghost"
+                  icon="trash"
+                  onClick={() => {
+                    setTrashOpen(true);
+                    setOpenId(null);
+                    setSelected(new Set());
+                  }}
+                >
+                  {t("artifacts.trash")}
+                </Button>
+                <UploadButton
+                  size="md"
+                  label={t("files.upload")}
+                  busy={uploader.busy}
+                  multiple
+                  onFiles={upload}
+                  variant="primary"
+                />
+              </>
+            )
+          }
+        />
 
         {trashOpen && <DriveTrash />}
         {remover.dialog}

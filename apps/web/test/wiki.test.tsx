@@ -726,8 +726,10 @@ describe("Obsidian vaults", () => {
 describe("the wiki's header", () => {
   test("one subtitle line, then one link to how the wiki works", async () => {
     await go("wiki");
-    const head = document.querySelector(".wiki-home__head") as HTMLElement;
-    expect(head.querySelector("p.muted")?.textContent).toBe("O que a empresa sabe, em páginas ligadas.");
+    const head = document.querySelector(".ac-pagehead") as HTMLElement;
+    expect(head.querySelector(".ac-pagehead__meta")?.textContent).toBe(
+      "O que a empresa sabe, em páginas ligadas. Como a wiki funciona",
+    );
     const how = within(head).getByRole("link", { name: "Como a wiki funciona" });
     expect(how.getAttribute("href")).toBe("https://agentes.chat/pt/docs/wiki");
     expect(how.getAttribute("target")).toBe("_blank");

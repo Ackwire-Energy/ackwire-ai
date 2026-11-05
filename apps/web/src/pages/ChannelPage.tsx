@@ -109,14 +109,15 @@ import { consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
-import { errorCode, errorText, restrictionLine, runErrorText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, restrictionLine, runErrorText, runFailureLine } from "@agenteschat/client/lib/errors";
+import { everyoneWord, isEveryoneMention, mentionsReader, offersEveryone } from "@agenteschat/client/lib/everyone";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
-import { capitalize, dayLabel, formatFullDate, formatTime, lowerFirst } from "@agenteschat/client/lib/format";
+import { capitalize, dayLabel, formatFullDate, formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf, taskConversationOf } from "@agenteschat/client/lib/issues";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
-import { hasWideBlock, mentionsHandle } from "@agenteschat/client/lib/markdown";
+import { hasWideBlock } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply, isMediaAlone, messageMediaOf, quoteText, textOrMedia } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import {
@@ -232,7 +233,7 @@ import { ActorAvatar, AgentAvatar, PersonAvatar } from "@/components/AgentAvatar
 import { AgentPanel } from "@/components/AgentPanel";
 import { ApprovalAsk, ApprovalGroupAsk } from "@/components/ApprovalAsk";
 import { InlineApproval } from "@/components/ApprovalItem";
-import { AgentPanelContext, useOpenAgentPanel } from "@/components/agent-panel-context";
+import { AgentPanelContext, AgentPanelShownContext, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { objectUrls } from "@/components/artifacts/FileView";
 import { MessageWorkLine } from "@/components/BackgroundWork";
@@ -263,7 +264,6 @@ import { DatePill, type DatePillHandle } from "@/components/DatePill";
 import { DeleteChannelDialog } from "@/components/DeleteChannelDialog";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { useArchiveChannelWithUndo } from "@/components/entity-menus";
-import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { InPlaceProvider } from "@/components/InPlace";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { ArrivalCard, useArrival } from "@/components/invite/Arrival";
@@ -300,7 +300,7 @@ import { MissionCommandCard } from "@/components/missions/MissionCommandCard";
 import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { NavToggle } from "@/components/NavDrawer";
 import { CHANNEL_NAME, ChannelAccessChoice, toChannelName } from "@/components/NewChannelDialog";
-import { KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
+import { FailedRunFix, KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
@@ -320,6 +320,7 @@ import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
 import { SearchResultsPanel } from "@/components/search/SearchResultsPanel";
 import { TeamChecks } from "@/components/TeamChecks";
+import { ReplyChips } from "@/components/TeamPlan";
 import { ToLatest } from "@/components/ToLatest";
 import { LiveTools, SavedTools } from "@/components/ToolCalls";
 import { AgentTasksPanel } from "@/components/tasks/AgentTasksPanel";
@@ -771,7 +772,9 @@ function ChannelView({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || draftRef.current.trim()) return;
       if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
-      if (!stopTarget) return;
+      // An Esc from a panel is that panel's, and one from the conversation beside a thread isn't the thread's.
+      const inPanel = e.target instanceof Element && Boolean(e.target.closest(".thread-panel"));
+      if (!stopTarget || inPanel !== Boolean(chrome?.panel)) return;
       e.preventDefault();
       stopRun(stopTarget);
     };
@@ -783,8 +786,25 @@ function ChannelView({
   // The header search's results, in the same panel (one panel at a time).
   const [searchOpen, setSearchOpen] = useState(false);
   // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place, at a tab when a card asks
-  // (its memory); one panel at a time.
-  const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab } | null>(null);
+  // (its memory); one panel at a time. Its opener again closes it (`close`, counted, so unsaved edits ask first).
+  const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab; close?: number } | null>(null);
+  // What had the focus when the profile opened: it gets it back when the panel closes.
+  const profileOpener = useRef<HTMLElement | null>(null);
+  const closeProfile = useCallback(() => {
+    setProfile(null);
+    const opener = profileOpener.current;
+    profileOpener.current = null;
+    // After the frame: a closing "Descartar e sair" dialog hands focus back when it unmounts, to a page that's gone.
+    requestAnimationFrame(() => {
+      if (opener?.isConnected) opener.focus();
+    });
+  }, []);
+  // The conversation stays in use beside the page: what would take the panel's place asks first over unsaved edits.
+  const profileKeeps = useCallback(() => {
+    if (!document.querySelector(".thread-panel [data-dirty]")) return false;
+    setProfile((open) => open && { ...open, close: (open.close ?? 0) + 1 });
+    return true;
+  }, []);
   // A question an agent asked another from here, opened from its line in the reply ("Theo ⇄ Iris"): one panel too.
   const [consultId, setConsultId] = useState<string | null>(null);
   // A DM with an agent: its tasks (ADR 0128), from the pill in the header; one panel too, any other one closes it.
@@ -793,19 +813,29 @@ function ChannelView({
     if (panel || profile || consultId || searchOpen) setTasksOpen(false);
   }, [panel, profile, consultId, searchOpen]);
   const toggleTasks = useCallback(() => {
+    if (profileKeeps()) return;
     setPanel(null);
     setProfile(null);
     setConsultId(null);
     setSearchOpen(false);
     setTasksOpen((open) => !open);
-  }, []);
+  }, [profileKeeps]);
   const outerPanel = useOpenAgentPanel();
-  const openAgentPanel = useCallback((agentId: string, tab?: AgentTab) => {
-    setPanel(null);
-    setSearchOpen(false);
-    setConsultId(null);
-    setProfile({ agentId, tab });
-  }, []);
+  const openAgentPanel = useCallback(
+    (agentId: string, tab?: AgentTab) => {
+      if (profileKeeps()) return;
+      setPanel(null);
+      setSearchOpen(false);
+      setConsultId(null);
+      const from = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setProfile((open) => {
+        if (open?.agentId === agentId && open.tab === tab) return { ...open, close: (open.close ?? 0) + 1 };
+        profileOpener.current = from;
+        return { agentId, tab };
+      });
+    },
+    [profileKeeps],
+  );
   // A sidebar row's settings button: the agent's page beside this conversation, or beside its own once it shows.
   useEffect(() => {
     if (chrome?.panel) return;
@@ -850,7 +880,11 @@ function ChannelView({
   }, [channel.id, chrome?.header]);
   // An agent mentioned from outside the channel: offer to add it.
   const [offer, setOffer] = useState<string | null>(null);
-  const mentionSearch = useMentionSearch(chrome?.task ? undefined : members.data);
+  const mentionSearch = useMentionSearch(
+    chrome?.task ? undefined : members.data,
+    chrome?.dmAgentId || chrome?.dmPersonId ? "dm" : "channel",
+    offersEveryone(org, Boolean(chrome?.dmAgentId || chrome?.dmPersonId)),
+  );
   const channelSearch = useChannelSearch();
   const composer = useRef<HTMLTextAreaElement>(null);
   const emojiPicker = useEmojiLabels();
@@ -1959,18 +1993,21 @@ function ChannelView({
     reply: thread
       ? () => composer.current?.focus()
       : (message) => {
+          if (profileKeeps()) return;
           setProfile(null);
           setConsultId(null);
           setSearchOpen(false);
           setPanel({ id: message.threadId ?? message.id, reply: true });
         },
     openThread: (id, focus) => {
+      if (profileKeeps()) return;
       setProfile(null);
       setConsultId(null);
       setSearchOpen(false);
       setPanel({ id, reply: false, focus });
     },
     openConsultation: (id) => {
+      if (profileKeeps()) return;
       setProfile(null);
       setPanel(null);
       setSearchOpen(false);
@@ -2021,6 +2058,7 @@ function ChannelView({
   const Tag = chrome?.panel ? "section" : "main";
   // Enter in the header search: its results in the panel, in place of any other.
   const openSearch = () => {
+    if (profileKeeps()) return;
     setPanel(null);
     setProfile(null);
     setConsultId(null);
@@ -2043,7 +2081,9 @@ function ChannelView({
             {/* A page's own header (a DM's) gets the agent's tasks for its pill (`AgentTasksPill`). */}
             {chrome?.header ? (
               <AgentTasksContext.Provider value={tasksControl}>
-                {typeof chrome.header === "function" ? chrome.header({ onSearch: openSearch }) : chrome.header}
+                <AgentPanelShownContext.Provider value={profile?.agentId ?? null}>
+                  {typeof chrome.header === "function" ? chrome.header({ onSearch: openSearch }) : chrome.header}
+                </AgentPanelShownContext.Provider>
               </AgentTasksContext.Provider>
             ) : (
               <ChannelHeader
@@ -2052,12 +2092,14 @@ function ChannelView({
                 queueMachine={queueMachine}
                 people={channelPeople}
                 agents={channelAgents}
-                // A thread in the members' place: the toggle closes it and shows the members.
-                membersOpen={!panel && membersColumn.open}
+                // A thread or an agent's page in the members' place: the toggle closes it and shows the members.
+                membersOpen={!panel && !profile && membersColumn.open}
                 onMembers={
-                  panel
+                  panel || profile
                     ? () => {
+                        if (profileKeeps()) return;
                         setPanel(null);
+                        setProfile(null);
                         if (!membersColumn.open) membersColumn.toggle();
                       }
                     : membersColumn.toggle
@@ -2336,6 +2378,7 @@ function ChannelView({
                             pickerLabels={mediaTabs?.labels}
                             id={`composer-${thread?.id ?? channel.id}`}
                             textareaRef={composer}
+                            keepsEsc={Boolean(stopTarget) && !chrome?.panel}
                             value={draft}
                             onChange={(v) => {
                               setDraft(v);
@@ -2441,9 +2484,17 @@ function ChannelView({
                   />
                 )}
               </div>
-              {/* A thread opens in the members' place, wider, and gives it back when it closes; the channel stays in use
-                  beside it (a phone: a sheet over it). */}
-              {panel ? (
+              {/* A thread or an agent's page opens in the members' place, wider, and gives it back when it closes; the
+                  channel stays in use beside it (a phone: a sheet over it). */}
+              {profile ? (
+                <AgentPanel
+                  key={`${profile.agentId}:${profile.tab ?? ""}`}
+                  agentId={profile.agentId}
+                  tab={profile.tab}
+                  closeRequest={profile.close}
+                  onClose={closeProfile}
+                />
+              ) : panel ? (
                 <aside className="thread-panel thread-panel--docked" aria-label={t("threads.side.label")}>
                   <ThreadPage
                     key={`${panel.id}:${panel.focus ?? ""}`}
@@ -2494,14 +2545,6 @@ function ChannelView({
             />
           )}
           {searchOpen && <SearchResultsPanel channelId={channel.id} onClose={() => setSearchOpen(false)} />}
-          {profile && (
-            <AgentPanel
-              key={`${profile.agentId}:${profile.tab ?? ""}`}
-              agentId={profile.agentId}
-              tab={profile.tab}
-              onClose={() => setProfile(null)}
-            />
-          )}
           {consultId && (
             <ConsultationPanel
               key={consultId}
@@ -3603,8 +3646,6 @@ export const TimelineMessage = memo(function TimelineMessage({
   const revealed = useRevealedText(live?.text ?? "", live?.status === "running" || live?.status === "thinking");
   const liveFailed = live?.status === "failed";
   const failedWhy = liveFailed ? runErrorText(t, live?.errorCode, live?.errorParams) : null;
-  // After "couldn't answer:", the sentence goes on: no capital, no final period.
-  const failedReason = failedWhy && lowerFirst(failedWhy.replace(/\.$/, ""), i18n.language);
   // Refused by the workspace's standing: its own words, not the server's English.
   const refusal = liveFailed ? restrictionLine(t, live?.errorCode, live?.errorParams) : null;
   const liveWaiting = live?.status === "waiting_approval";
@@ -3705,8 +3746,15 @@ export const TimelineMessage = memo(function TimelineMessage({
   const via = m.author.type === "person" ? appVia(m.meta) : null;
   const myHandle = dir.memberById.get(me.user.id)?.handle?.toLowerCase();
   const mentionsMe =
-    !!myHandle && !(m.author.type === "person" && m.author.id === me.user.id) && mentionsHandle(body, myHandle);
+    !(m.author.type === "person" && m.author.id === me.user.id) && mentionsReader({ body, meta: m.meta }, myHandle);
   const renderMention = (handle: string, key: string) => {
+    // The mention of everyone: the reader's own word, marked as a mention of them.
+    if (isEveryoneMention(m.meta, handle))
+      return (
+        <Mention key={key} className="ac-mention--me">
+          @{everyoneWord(i18n.language)}
+        </Mention>
+      );
     const a = dir.agentByHandle.get(handle.toLowerCase());
     const p = a ? undefined : dir.memberByHandle.get(handle.toLowerCase());
     if (!a && !p) return <Mention key={key}>@{handle}</Mention>;
@@ -3720,7 +3768,9 @@ export const TimelineMessage = memo(function TimelineMessage({
         label={t("profile.of", { name: shown })}
         className="profile-trigger--mention"
       >
-        <Mention className={isMe ? "ac-mention--me" : undefined}>@{shown}</Mention>
+        <Mention tone={dir.mentionTone(handle)} className={isMe ? "ac-mention--me" : undefined}>
+          @{shown}
+        </Mention>
       </ProfileTrigger>
     );
   };
@@ -3759,8 +3809,6 @@ export const TimelineMessage = memo(function TimelineMessage({
   const replyRun = mediaAfter ? null : m.agentRunId;
   // "Responder": the message this one quotes.
   const quoted = useMemo(() => replyOf(m.meta) ?? replyContext ?? null, [m.meta, replyContext]);
-  // An agent opened a forum topic from here: the topic card with "Ver discussão".
-  const forumTopicId = m.author.type === "agent" ? forumTopicOfMessage(meta) : null;
   // A mission's cards (ADR 0029): the plan, a decision, a review; a report says where it ran.
   const missionPlan = m.author.type === "agent" ? missionPlanOf(meta) : null;
   const missionDecision = m.author.type === "agent" && meta.missionDecision ? m : null;
@@ -3780,8 +3828,6 @@ export const TimelineMessage = memo(function TimelineMessage({
   );
   // The root of a mission in the channel: its work lives in its thread.
   const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.openThread !== undefined;
-  // An agent suggests a topic ("Vale um fórum?"): only a person opens it.
-  const forumSuggestion = m.author.type === "agent" ? forumSuggestionOf(meta) : null;
   // It asked other agents before answering: one row right before the reply, its run's questions (on the run's last
   // message here, or on its live row while it works) and the ones its `meta.consulted` names.
   const consulted = useMemo(() => (m.author.type === "agent" ? consultationsOf(m.meta) : []), [m.author.type, m.meta]);
@@ -3820,7 +3866,6 @@ export const TimelineMessage = memo(function TimelineMessage({
     question ||
     secretRequest ||
     missionCard ||
-    forumSuggestion ||
     issueWork;
   const feedback = !readOnly && m.author.type === "agent" && !card && !m.local && !live && !mediaAfter;
   const menu = useMessageMenu(m, channelName ?? "", {
@@ -4009,6 +4054,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                 <MessageBody
                   body={revealed}
                   resolveMention={dir.mentionName}
+                  mentionTone={dir.mentionTone}
                   live={!liveStopped}
                   accent={colorOf(agent)}
                 />
@@ -4016,7 +4062,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             ) : (
               opening.said && (
                 <MessageText key="said">
-                  <MessageBody body={opening.said} resolveMention={dir.mentionName} />
+                  <MessageBody body={opening.said} resolveMention={dir.mentionName} mentionTone={dir.mentionTone} />
                 </MessageText>
               )
             )}
@@ -4026,6 +4072,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                 <MessageBody
                   body={revealed}
                   resolveMention={dir.mentionName}
+                  mentionTone={dir.mentionTone}
                   live={!liveStopped}
                   accent={colorOf(agent)}
                 />
@@ -4037,15 +4084,13 @@ export const TimelineMessage = memo(function TimelineMessage({
                   <Icon name="alert" size={16} />
                   {/* A known code is said in words; the stored error (a computer's code) only on hover. */}
                   <span title={!refusal && failedWhy ? live.error : undefined}>
-                    {refusal
-                      ? t("channel.runRefused", { agent: name, reason: refusal })
-                      : live.errorCode === "run.computer_busy"
-                        ? t("channel.runBusy", { agent: name })
-                        : failedWhy || live.error
-                          ? t("channel.runFailed", { agent: name, reason: failedReason || live.error })
-                          : t("channel.runFailedNoReason", { agent: name })}
+                    {runFailureLine(t, name, { code: live.errorCode, params: live.errorParams }, i18n.language) ??
+                      (live.error
+                        ? t("channel.runFailed", { agent: name, reason: live.error })
+                        : t("channel.runFailedNoReason", { agent: name }))}
                   </span>
                 </p>
+                {live.agentId && <FailedRunFix code={live.errorCode} agentId={live.agentId} />}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -4079,7 +4124,7 @@ export const TimelineMessage = memo(function TimelineMessage({
           <Parts resetKey={m}>
             {keptSaid?.kind === "say" && (
               <MessageText key="said">
-                <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} />
+                <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} mentionTone={dir.mentionTone} />
               </MessageText>
             )}
             {routine && report && reportOpen && <RoutineReport text={report} />}
@@ -4089,7 +4134,6 @@ export const TimelineMessage = memo(function TimelineMessage({
               !approvalId &&
               // A secret request's card names the key itself: its fallback text ("Theo asked for a key") is for pushes.
               !secretRequest &&
-              !forumSuggestion &&
               !issueWork &&
               !waitNotice &&
               !noAi &&
@@ -4103,6 +4147,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                   <MessageBody
                     body={talk ? talk.lead : body}
                     resolveMention={dir.mentionName}
+                    mentionTone={dir.mentionTone}
                     renderMention={renderMention}
                     wikiLink={wikiLink}
                     channelRefs={channelRefsOf(m.meta)}
@@ -4201,7 +4246,6 @@ export const TimelineMessage = memo(function TimelineMessage({
                 enabled={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
               />
             )}
-            {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
             {missionPlan && <MissionPlanCard plan={missionPlan} />}
             {missionReview && <MissionReviewCard message={missionReview} />}
             {missionSetup && <MissionSetupCard setup={missionSetup} threadId={m.threadId ?? null} />}
@@ -4251,6 +4295,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
             {noAi && <NoAiCard message={m} />}
             {actionCard && <ActionCard message={m} />}
+            {m.author.type === "agent" && !m.local && m.meta?.replyChips ? <ReplyChips message={m} /> : null}
             {usageWait?.closed ? (
               <UsageWaitClosed message={m} wait={{ ...usageWait, closed: usageWait.closed }} />
             ) : (
@@ -4259,7 +4304,6 @@ export const TimelineMessage = memo(function TimelineMessage({
             {question && <QuestionCard question={question} />}
             {secretRequest && <SecretCard request={secretRequest} />}
             {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
-            {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
             {missionDecision && <MissionDecisionCard message={missionDecision} />}
             {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
             {missionCommand && <MissionCommandCard command={missionCommand} />}
@@ -4914,7 +4958,7 @@ function AddMembersDialog({
       setSelected(new Set());
     }
   }, [open]);
-  const rows = useMemberRows(q, exclude);
+  const rows = useMemberRows(q, exclude, undefined, { channel: true });
   // An address nobody here has: invite them to the workspace and this channel (ADR 0090).
   const invite = useInviteOffer(q);
   const inviteDialog = useInviteDialog();

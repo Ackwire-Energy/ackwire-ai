@@ -249,7 +249,7 @@ function CardConversation({ issue }: { issue: Issue }) {
           </Text>
         </View>
       ) : line.lastAt ? (
-        <Text variant="small" tone="faint" numberOfLines={1} style={styles.step}>
+        <Text variant="small" tone="faint" numberOfLines={1}>
           · {when.short(line.lastAt)}
         </Text>
       ) : null}
@@ -264,7 +264,8 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   title: { fontWeight: "600" },
   number: { fontWeight: "500" },
-  talk: { flexDirection: "row", alignItems: "center", gap: 8 },
+  // A narrow card wraps between the parts, never inside one.
+  talk: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 },
   overlap: { marginLeft: -4 },
   step: { flex: 1, minWidth: 0 },
   meta: { flexDirection: "row", alignItems: "center", columnGap: 8 },

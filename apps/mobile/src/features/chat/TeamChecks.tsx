@@ -3,7 +3,7 @@ import { targetKind, teamChecksOf } from "@agenteschat/client/lib/team-checks";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Icon, type IconName, PillButton, Text, useTheme } from "@/ui";
+import { Icon, type IconName, RowAction, Text, useTheme } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { chatHref } from "../links/logic";
@@ -55,7 +55,7 @@ function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
   return (
     <View style={[styles.one, { backgroundColor: colors.raised, borderColor: colors.line2 }]}>
       <View style={[styles.tile, { backgroundColor: colors.raised, boxShadow: shadows.e1 }]}>
-        <Icon name={ICONS[targetKind(target)]} size={14} color={colors.ink2} />
+        <Icon name={ICONS[targetKind(target)]} size={16} color={colors.ink2} />
       </View>
       <View style={[styles.grow, styles.tx]}>
         <Text variant="small" tone="ink2" style={styles.oneText}>
@@ -76,7 +76,7 @@ function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
         ) : null}
       </View>
       {channelId ? (
-        <PillButton
+        <RowAction
           label={t("teamChecks.open")}
           accessibilityRole="link"
           onPress={() => {
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   one: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 10,
+    gap: 8,
     minHeight: 50,
     paddingVertical: 9,
     paddingLeft: 12,
