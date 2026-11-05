@@ -855,7 +855,8 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
     overflow: "hidden",
   },
-  head: { flexDirection: "row", alignItems: "center", gap: 9, minHeight: 42, paddingLeft: 12, paddingRight: 10 },
+  // The block opens from here: 44 tall, a finger's target.
+  head: { flexDirection: "row", alignItems: "center", gap: 9, minHeight: 44, paddingLeft: 12, paddingRight: 10 },
   logos: { flexDirection: "row", alignItems: "center", flexShrink: 0 },
   stacked: { borderRadius: 7, borderWidth: 1.5 },
   overlap: { marginLeft: -7 },

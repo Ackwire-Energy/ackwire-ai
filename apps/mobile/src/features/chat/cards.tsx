@@ -36,7 +36,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Count, HoldButton, Icon, Text, useToast } from "@/ui";
+import { Button, Count, HoldButton, Icon, LineIcon, Text, useToast } from "@/ui";
 import { approvalAction, approvalRisk, approveAlwaysToast } from "../approvals/logic";
 import {
   ApprovalAheadLine,
@@ -340,7 +340,8 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
                         }}
                         accessibilityRole="button"
                         accessibilityState={{ expanded: open }}
-                        hitSlop={6}
+                        // An 18-point line: the slop gives "Show" the 44 a finger needs.
+                        hitSlop={{ top: 13, bottom: 13, left: 6, right: 6 }}
                         style={({ pressed }) => [styles.runMore, pressed && styles.pressed]}
                       >
                         <Text variant="footnote" tone="ink2" style={styles.bold}>
@@ -567,7 +568,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
               )}
               {origin ? (
                 <View style={styles.origin}>
-                  <Icon name="clock" size={13} color={c.muted} />
+                  <LineIcon variant="footnote" name="clock" size={13} color={c.muted} />
                   <Text variant="footnote" tone="muted" style={styles.grow}>
                     {origin}
                   </Text>
@@ -804,6 +805,8 @@ export function ThreadLink({ thread }: { thread: ThreadInfo }) {
       onPress={() => router.push(chatHref(thread.channelId, thread.id))}
       accessibilityRole="button"
       accessibilityLabel={t("mobile.chat.replies", { count: thread.replyCount })}
+      // A 36-point link under the message: the slop gives it the 44 a finger needs.
+      hitSlop={{ top: 4, bottom: 4 }}
       style={({ pressed }) => [styles.tlink, surface, pressed && styles.pressed]}
     >
       <View style={styles.faces}>
@@ -834,7 +837,7 @@ export function ThreadLink({ thread }: { thread: ThreadInfo }) {
 }
 
 const styles = StyleSheet.create({
-  grow: { flex: 1 },
+  grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
   bold: { fontWeight: "600" },
   flip: { transform: [{ rotate: "180deg" }] },
@@ -844,7 +847,8 @@ const styles = StyleSheet.create({
   items: { gap: 8, marginTop: 10 },
   item: { gap: 8, padding: 10, borderRadius: 12 },
   itemDone: { opacity: 0.7 },
-  itemRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  // The mark on the title's first line: centred on the whole item it floated beside a two-line title and its values.
+  itemRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   // A request's decision: one row under its values, left-aligned, every button the strip's height.
   itemActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   runMore: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", marginTop: 4 },

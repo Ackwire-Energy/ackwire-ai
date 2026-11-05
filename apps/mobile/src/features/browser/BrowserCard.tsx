@@ -398,7 +398,7 @@ export function BrowserCard({
               />
               {/* A take over asked for nothing: it only hands back. */}
               {handoff?.kind === "ask" ? (
-                <Pressable onPress={couldnt} accessibilityRole="button" hitSlop={6} style={styles.couldnt}>
+                <Pressable onPress={couldnt} accessibilityRole="button" hitSlop={8} style={styles.couldnt}>
                   <Text variant="small" tone="muted" style={styles.medium}>
                     {t("mobile.browser.live.couldnt")}
                   </Text>

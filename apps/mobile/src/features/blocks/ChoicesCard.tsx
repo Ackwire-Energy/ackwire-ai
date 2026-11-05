@@ -191,7 +191,8 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
             accessibilityRole="button"
             disabled={d.step === 0}
             onPress={() => setDraft(moveStep(d, -1))}
-            hitSlop={8}
+            // An 18-point line: 13 of slop around it gives the 44-point target.
+            hitSlop={13}
           >
             <Text variant="footnote" tone={d.step === 0 ? "faint" : "ink"} style={styles.bold}>
               {t("mobile.choices.back")}
@@ -212,7 +213,7 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
             accessibilityRole="button"
             disabled={d.step === questions.length - 1 || d.picks[d.step] === null}
             onPress={() => setDraft(moveStep(d, 1))}
-            hitSlop={8}
+            hitSlop={13}
           >
             <Text
               variant="footnote"
