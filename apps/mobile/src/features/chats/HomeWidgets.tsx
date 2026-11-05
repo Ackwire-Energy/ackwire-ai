@@ -30,7 +30,10 @@ export function HomeWidgets() {
   return (
     <View>
       {/* The tabs' own section header, with "Ver todos ›" as its way on: never a copy with other tones. */}
-      <SectionHeader title={title} action={{ label: t("dashboards.seeAll"), onPress: () => router.push("/dashboards") }} />
+      <SectionHeader
+        title={title}
+        action={{ label: t("dashboards.seeAll"), onPress: () => router.push("/dashboards") }}
+      />
       {widgets.length > 0 ? (
         <ScrollView
           horizontal
