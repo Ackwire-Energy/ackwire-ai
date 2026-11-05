@@ -243,7 +243,7 @@ const isBuiltIn = (tool: Pick<ToolDefinition, "scope" | "connectionId">) => tool
 /** `input` with the text under `from` moved to `to`; blank text stays, for the refusal to say `to` is missing. */
 function renamed(input: Record<string, unknown>, from: string, to: string) {
   const { [from]: value, ...rest } = input;
-  return to in input || typeof value !== "string" || !value.trim() ? input : { ...rest, [to]: value };
+  return typeof value !== "string" || !value.trim() || to in input ? input : { ...rest, [to]: value };
 }
 
 /**

@@ -184,6 +184,9 @@ describe("offer_connect_app", () => {
       expect(refused.isError).toBe(true);
       expect(refused.content).toStartWith("Invalid input:");
     }
+    // A provider's arguments can parse to something else than an object: refused the same, never a crash.
+    const text = await call(f, ctx, "offer_connect_app", "Outro." as unknown as Record<string, unknown>);
+    expect(text.content).toStartWith("Invalid input:");
     expect(await cards(f)).toHaveLength(1);
   });
 
