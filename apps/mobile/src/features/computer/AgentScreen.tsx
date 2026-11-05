@@ -6,7 +6,7 @@ import {
   desktopStatusState,
   desktopSwitch,
   handoffIsMine,
-  handoffTimeLeft,
+  handoffScreen,
   isWaitingHandoff,
   type LiveRun,
   type ScreenStep,
@@ -14,14 +14,15 @@ import {
   useApi,
   useBrowserHandoffActions,
 } from "@agenteschat/client";
-import { asksMe, liveSubLine } from "@agenteschat/client/lib/agent-computer";
+import { liveSubLine } from "@agenteschat/client/lib/agent-computer";
 import { computerName } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { bodyTones } from "@agenteschat/ui/agent/engine";
+import { can } from "@agenteschat/client/lib/permissions";
+import { type AgentColorName, bodyTones } from "@agenteschat/ui/agent/engine";
 import { Canvas, Fill, Shader, Skia } from "@shopify/react-native-skia";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AppState, Keyboard, type LayoutChangeEvent, StyleSheet, TextInput, View } from "react-native";
+import { AppState, Keyboard, type LayoutChangeEvent, StyleSheet, View } from "react-native";
 import {
   GestureDetector,
   useLongPressGesture,
@@ -50,16 +51,34 @@ import { readValue, STORED, writeValue } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import { rgba } from "@/sky/math";
 import { TRACKPAD_SHADER } from "@/sky/shaders";
-import { Button, Glass, haptics, Icon, IconButton, PressScale, Text, useReducedMotion, useTheme, useToast } from "@/ui";
+import {
+  Button,
+  Composer,
+  Glass,
+  haptics,
+  Icon,
+  IconButton,
+  PressScale,
+  type SendHow,
+  useReducedMotion,
+  useTheme,
+  useToast,
+} from "@/ui";
 import { useInfoHint } from "@/ui/InfoHint";
-import { type LiveKey, stepText } from "../browser/logic";
+import { useNotNow } from "../browser/HandoffCard";
+import type { LiveKey } from "../browser/logic";
 import { TypeBar } from "../browser/parts";
 import { useFinishHandoff } from "../browser/useFinishHandoff";
-import { useColors, useDirectory, useNow } from "../shared/hooks";
+import { AskButtons, AskCard, AskFoot, ExpiryLine } from "../chat/asks";
+import { mayStopRun } from "../chat/logic";
+import { AgentFace } from "../shared/Face";
+import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { successHaptic, tapHaptic } from "../shared/parts";
 import { useActiveWork } from "../shared/queries";
 import { Cover } from "./Cover";
+import { DOCK_HANG, DockDone, DockIcon, DockRule, DockText, EdgeDock } from "./EdgeDock";
+import { LiveTrail } from "./LiveTrail";
 import { PixelCursor } from "./PixelCursor";
 import {
   BUTTON,
@@ -179,7 +198,6 @@ export function AgentScreen({
   top: (sub: string, action: ReactNode, info?: ReactNode) => ReactNode;
 }) {
   const { t } = useTranslation();
-  const c = useColors();
   const insets = useSafeAreaInsets();
   const { org, orgId } = useOrg();
   const dir = useDirectory();
@@ -253,7 +271,6 @@ export function AgentScreen({
 
   const handoff = f?.handoff ?? null;
   const waiting = handoff && isWaitingHandoff(handoff, now) ? handoff : null;
-  const asked = waiting !== null && asksMe(waiting, userId);
   // Whose it is goes by ids, the same rule as the request's card: its owner and who controls computers may help too.
   const mine = waiting !== null && handoffIsMine(waiting, userId, agent?.ownerUserId, org);
   const ask = inControl && handoff?.kind === "ask";
@@ -313,17 +330,64 @@ export function AgentScreen({
         ? liveSubLine(t, f, { name, person, nowMs: now })
         : "";
 
-  const action = inControl ? (
-    <Button variant="secondary" size="sm" icon="check" label={doneLabel} onPress={handBack} />
-  ) : waiting && mine ? (
-    <Button variant="primary" size="sm" label={t("agentComputer.help")} loading={taking} onPress={() => void take()} />
-  ) : live && !status?.controllerUserId && !waiting && canTakeOver && words.mayTake ? (
-    <Button
-      variant="secondary"
-      size="sm"
+  // What can be done with the screen now, on the capsule across its bottom edge (sideways, the side dock has it):
+  // in control the keyboard, laying it down and the way out; watching, taking control.
+  const mayTake = live && !status?.controllerUserId && !waiting && canTakeOver && words.mayTake;
+  const dock = inControl ? (
+    <>
+      <DockIcon icon="keyboard" label={t("desktop.keyboard.label")} onPress={() => setTyping(true)} />
+      <DockIcon icon="expand" label={t("agentComputer.phone.turn")} onPress={sideways.lieDown} />
+      <DockRule />
+      {ask ? <DockText label={t("mobile.browser.live.couldnt")} onPress={couldnt} /> : null}
+      <DockDone label={doneLabel} onPress={handBack} />
+    </>
+  ) : mayTake ? (
+    <DockText
+      icon="person"
       label={words.browserOnly ? t("desktop.takeBrowser") : t("desktop.takeover")}
       loading={taking}
       onPress={() => void take()}
+    />
+  ) : null;
+  const docked = dock !== null && !wide;
+
+  // A request on this screen is the chat's request card, under the screen: Ajudar and Agora não for whom it asks.
+  const notNow = useNotNow(waiting);
+  const askCard = waiting ? (
+    <AskCard
+      id={waiting.id}
+      kind={handoffScreen(waiting) === "desktop" ? "desktop" : "browser"}
+      agentId={agentId}
+      waitsFor={
+        mine
+          ? "you"
+          : waiting.requestedForUserId
+            ? t("ask.waitingFor", { name: person(waiting.requestedForUserId) })
+            : null
+      }
+      lead={waiting.instructions}
+      expiry={waiting.expiresAt ? <ExpiryLine createdAt={waiting.createdAt} expiresAt={waiting.expiresAt} /> : null}
+      foot={
+        mine ? (
+          <AskFoot>
+            <AskButtons
+              primary={
+                <Button
+                  variant="primary"
+                  size="card"
+                  wide
+                  label={t("agentComputer.help")}
+                  loading={taking}
+                  onPress={() => void take()}
+                />
+              }
+              secondary={
+                <Button variant="secondary" size="card" wide label={t("approval.notNow")} onPress={notNow} />
+              }
+            />
+          </AskFoot>
+        ) : null
+      }
     />
   ) : null;
 
@@ -334,7 +398,7 @@ export function AgentScreen({
     else setLife((n) => n + 1);
     void view.desktopQ.refetch();
   };
-  const again = <Button variant="secondary" size="sm" label={t("desktop.retry")} onPress={retry} />;
+  const again = <DockText label={t("desktop.retry")} onPress={retry} />;
   const { color } = agentLook(agent);
   const tones = bodyTones(color);
   const opening = <Cover fill sky spinner color={color} text={t("agentComputer.state.opening", g)} />;
@@ -662,116 +726,108 @@ export function AgentScreen({
 
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.fill}>
-      {wide ? null : top(sub, action, inControl ? notice.button : undefined)}
+      {wide ? null : top(sub, null, inControl ? notice.button : undefined)}
       {inControl && !wide ? <View style={styles.notice}>{notice.text}</View> : null}
       {wide ? null : banner}
-      {waiting && !wide ? (
-        <View style={[styles.ask, { backgroundColor: c.sunken }]}>
-          <Text variant="small" tone="ink2">
-            {t(asked ? "agentComputer.ask.banner" : "agentComputer.ask.bannerOther", {
-              ...g,
-              ...(asked ? {} : { person: waiting.requestedForUserId ? person(waiting.requestedForUserId) : "" }),
-              ask: waiting.instructions,
-              time: handoffTimeLeft(t, waiting, now) ?? "",
-            })}
-          </Text>
-        </View>
-      ) : null}
-      <View
-        onLayout={onLayout}
-        style={[
-          styles.box,
-          inControl ? styles.fill : { aspectRatio: deskSize.width / deskSize.height, flexGrow: 0, flexShrink: 1 },
-          wide && styles.boxWide,
-        ]}
-        accessibilityRole="image"
-        accessibilityLabel={t("agentComputer.screen", g)}
-        accessibilityHint={wide ? t("agentComputer.phone.touchHint") : undefined}
-      >
-        <GestureDetector gesture={viewGestures}>
-          <Animated.View style={StyleSheet.absoluteFill} collapsable={false}>
-            <Animated.View
-              pointerEvents="none"
-              style={[{ width: deskSize.width, height: deskSize.height }, styles.frame, frame]}
-            >
-              <WebView
-                key={life}
-                ref={web}
-                source={{ uri: screenPageUrl(server, orgId, agentId) }}
-                originWhitelist={[new URL(server).origin]}
-                onShouldStartLoadWithRequest={(request) => screenPageStays(server, request.url)}
-                injectedJavaScriptBeforeContentLoaded={sessionCookieScript(lastCookie(), server)}
-                incognito
-                javaScriptEnabled
-                scrollEnabled={false}
-                bounces={false}
-                overScrollMode="never"
-                textInteractionEnabled={false}
-                androidLayerType="hardware"
-                style={styles.web}
-                onMessage={(e) => {
-                  const event = screenEvent(server, e.nativeEvent);
-                  if (!event) return;
-                  if (event.type === "ready") setReady(true);
-                  else if (event.type === "view") setPage(event.state);
-                  else if (event.type === "session") setSession(event.mode);
-                  else if (event.type === "size") setDeskSize({ width: event.width, height: event.height });
-                  else if (event.type === "changed") void view.desktopQ.refetch();
-                  else toast({ title: t("desktop.clipboard.tooLong", g), icon: "x" });
-                }}
-                onContentProcessDidTerminate={() => {
-                  setReady(false);
-                  setSession(null);
-                  setLife((n) => n + 1);
-                }}
-                onRenderProcessGone={() => {
-                  setReady(false);
-                  setSession(null);
-                  setLife((n) => n + 1);
-                }}
-              />
-            </Animated.View>
-            {inControl && !wide ? (
-              <Animated.View pointerEvents="none" style={[styles.cursor, pointer]}>
-                <PixelCursor />
+      {/* The screen and, across its bottom edge, the capsule (it hangs past the screen into this view's margin). */}
+      <View style={[inControl || wide ? styles.fill : styles.stage, docked && styles.docked]}>
+        <View
+          onLayout={onLayout}
+          style={[
+            styles.box,
+            inControl ? styles.fill : { aspectRatio: deskSize.width / deskSize.height, flexGrow: 0, flexShrink: 1 },
+            wide && styles.boxWide,
+          ]}
+          accessibilityRole="image"
+          accessibilityLabel={t("agentComputer.screen", g)}
+          accessibilityHint={wide ? t("agentComputer.phone.touchHint") : undefined}
+        >
+          <GestureDetector gesture={viewGestures}>
+            <Animated.View style={StyleSheet.absoluteFill} collapsable={false}>
+              <Animated.View
+                pointerEvents="none"
+                style={[{ width: deskSize.width, height: deskSize.height }, styles.frame, frame]}
+              >
+                <WebView
+                  key={life}
+                  ref={web}
+                  source={{ uri: screenPageUrl(server, orgId, agentId) }}
+                  originWhitelist={[new URL(server).origin]}
+                  onShouldStartLoadWithRequest={(request) => screenPageStays(server, request.url)}
+                  injectedJavaScriptBeforeContentLoaded={sessionCookieScript(lastCookie(), server)}
+                  incognito
+                  javaScriptEnabled
+                  scrollEnabled={false}
+                  bounces={false}
+                  overScrollMode="never"
+                  textInteractionEnabled={false}
+                  androidLayerType="hardware"
+                  style={styles.web}
+                  onMessage={(e) => {
+                    const event = screenEvent(server, e.nativeEvent);
+                    if (!event) return;
+                    if (event.type === "ready") setReady(true);
+                    else if (event.type === "view") setPage(event.state);
+                    else if (event.type === "session") setSession(event.mode);
+                    else if (event.type === "size") setDeskSize({ width: event.width, height: event.height });
+                    else if (event.type === "changed") void view.desktopQ.refetch();
+                    else toast({ title: t("desktop.clipboard.tooLong", g), icon: "x" });
+                  }}
+                  onContentProcessDidTerminate={() => {
+                    setReady(false);
+                    setSession(null);
+                    setLife((n) => n + 1);
+                  }}
+                  onRenderProcessGone={() => {
+                    setReady(false);
+                    setSession(null);
+                    setLife((n) => n + 1);
+                  }}
+                />
               </Animated.View>
-            ) : null}
-          </Animated.View>
-        </GestureDetector>
-        {lost ? (
-          cantShow
-        ) : switching && (live || shown === "connecting") ? (
-          <Cover
-            fill
-            clear
-            spinner
-            color={color}
-            text={switching === "taking" ? t("desktop.taking") : t("desktop.returning", g)}
-          />
-        ) : live ? (
-          asking && offer && askCover
-        ) : (
-          covers[shown]
-        )}
-        {wide ? (
-          <>
-            <Animated.View pointerEvents="none" style={[styles.spot, { borderColor: tones[3] }, spot]}>
-              <View style={[styles.spotFill, { backgroundColor: tones[3] }]} />
+              {inControl && !wide ? (
+                <Animated.View pointerEvents="none" style={[styles.cursor, pointer]}>
+                  <PixelCursor />
+                </Animated.View>
+              ) : null}
             </Animated.View>
-            <Animated.View pointerEvents="none" style={[styles.ring, { borderColor: tones[3] }, ring]} />
-            {banner ? <View style={[styles.wideBanner, { left: insets.left + 10 }]}>{banner}</View> : null}
-            <TouchDock
-              shown={dockShown}
-              right={insets.right + 10}
-              notice={notice}
-              onKeyboard={() => setTyping(true)}
-              onUpright={sideways.forced ? sideways.standUp : undefined}
-              onCouldnt={ask ? couldnt : undefined}
-              onDone={handBack}
-              doneLabel={doneLabel}
+          </GestureDetector>
+          {lost ? (
+            cantShow
+          ) : switching && (live || shown === "connecting") ? (
+            <Cover
+              fill
+              clear
+              spinner
+              color={color}
+              text={switching === "taking" ? t("desktop.taking") : t("desktop.returning", g)}
             />
-          </>
-        ) : null}
+          ) : live ? (
+            asking && offer && askCover
+          ) : (
+            covers[shown]
+          )}
+          {wide ? (
+            <>
+              <Animated.View pointerEvents="none" style={[styles.spot, { borderColor: tones[3] }, spot]}>
+                <View style={[styles.spotFill, { backgroundColor: tones[3] }]} />
+              </Animated.View>
+              <Animated.View pointerEvents="none" style={[styles.ring, { borderColor: tones[3] }, ring]} />
+              {banner ? <View style={[styles.wideBanner, { left: insets.left + 10 }]}>{banner}</View> : null}
+              <TouchDock
+                shown={dockShown}
+                right={insets.right + 10}
+                notice={notice}
+                onKeyboard={() => setTyping(true)}
+                onUpright={sideways.forced ? sideways.standUp : undefined}
+                onCouldnt={ask ? couldnt : undefined}
+                onDone={handBack}
+                doneLabel={doneLabel}
+              />
+            </>
+          ) : null}
+        </View>
+        {docked ? <EdgeDock>{dock}</EdgeDock> : null}
       </View>
       {inControl ? (
         typing ? (
@@ -797,16 +853,20 @@ export function AgentScreen({
               onHold={held}
               onWheel={wheeled}
               onEdge={haptics.firm}
-              onKeyboard={() => setTyping(true)}
-              onTurn={sideways.lieDown}
             />
-            {ask ? (
-              <Button variant="ghost" size="sm" label={t("mobile.browser.live.couldnt")} onPress={couldnt} />
-            ) : null}
           </View>
         )
       ) : (
-        <Watching agentId={agentId} name={name} steps={screenSteps(run?.work)} api={api} bottom={insets.bottom} />
+        <Watching
+          agentId={agentId}
+          name={name}
+          color={color}
+          run={run}
+          request={askCard}
+          steps={screenSteps(run?.work)}
+          api={api}
+          bottom={insets.bottom}
+        />
       )}
     </KeyboardAvoidingView>
   );
@@ -826,8 +886,6 @@ function Trackpad({
   onHold,
   onWheel,
   onEdge,
-  onKeyboard,
-  onTurn,
 }: {
   camera: Camera;
   /** The cursor's scale: it answers a click or a hold. */
@@ -841,9 +899,6 @@ function Trackpad({
   onWheel: (down: boolean) => void;
   /** The cursor just reached the desktop's edge. */
   onEdge: () => void;
-  onKeyboard: () => void;
-  /** Lies the view down: with the phone's rotation lock on, turning it won't. */
-  onTurn: () => void;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -1074,14 +1129,6 @@ function Trackpad({
           ) : null}
         </View>
       </GestureDetector>
-      {/* Beside the pad's gestures, not inside them: a press here never also taps the pad, which would click on the
-          screen where the cursor is and drop a selection there just as the keyboard opens to delete it. */}
-      <View style={styles.padTurn}>
-        <IconButton icon="expand" plate label={t("agentComputer.phone.turn")} onPress={onTurn} />
-      </View>
-      <View style={styles.padKeyboard}>
-        <IconButton icon="keyboard" plate label={t("desktop.keyboard.label")} onPress={onKeyboard} />
-      </View>
     </View>
   );
 }
@@ -1172,70 +1219,71 @@ function TypingBar({
   );
 }
 
-/** Under the screen while watching: what the agent does now, and a line to it while it works in a conversation. */
+/**
+ * Under the screen while watching: a request on it (the chat's card), what the agent does now (`LiveTrail`, the
+ * browser's trail live) and, while it works in a conversation, the chat's own composer to it there: join or stop
+ * and send, and its stop for whom may stop it.
+ */
 function Watching({
   agentId,
   name,
+  color,
+  run,
+  request,
   steps,
   api,
   bottom,
 }: {
   agentId: string;
   name: string;
+  color: AgentColorName;
+  run: LiveRun | null;
+  request: ReactNode;
   steps: ScreenStep[];
   api: ReturnType<typeof useApi>;
   bottom: number;
 }) {
   const { t } = useTranslation();
-  const c = useColors();
-  const { orgId } = useOrg();
+  const { org, orgId } = useOrg();
+  const meId = useMeId();
+  const dir = useDirectory();
   const toast = useToast();
+  const now = useNow(1000);
   const channelId = useActiveWork().find((w) => w.agentId === agentId)?.channelId ?? null;
-  const [text, setText] = useState("");
-  const send = () => {
-    const body = text.trim();
-    if (!body || !channelId) return;
-    tapHaptic();
-    setText("");
-    api.chat.post(orgId, channelId, { body }).catch(() => {
-      setText(body);
-      toast({ title: t("mobile.app.failed"), icon: "x" });
-    });
+  const failed = () => toast({ title: t("mobile.app.failed"), icon: "x" });
+  const send = (body: string, how: SendHow) => {
+    if (!body.trim() || !channelId) return;
+    const steer = how === "now" ? { steer: "now" as const } : {};
+    api.chat.post(orgId, channelId, { body: body.trim(), ...steer }).catch(failed);
   };
-  const recent = steps.slice(-4);
+  const atWork = run !== null && (run.status === "thinking" || run.status === "queued" || run.status === "running");
+  // Who may stop it here: its owner and who manages agents (the conversation's own rule also lets its asker).
+  const mayStop =
+    run !== null &&
+    mayStopRun(run, {
+      meId,
+      manageAgents: can(org, "manage_agents"),
+      agentOwnerId: dir.agentById.get(agentId)?.ownerUserId,
+      messages: [],
+    });
+  const stop = () => {
+    if (!run) return;
+    api.agents.cancelRun(orgId, run.runId).catch(failed);
+  };
   return (
-    <View style={[styles.under, { paddingBottom: bottom + 12 }]}>
-      {recent.length > 0 ? (
-        <View style={styles.steps}>
-          <Text variant="footnote" tone="muted" style={styles.bold}>
-            {t("agentComputer.phone.now")}
-          </Text>
-          {recent.map((step, i) => {
-            const latest = i === recent.length - 1;
-            return (
-              <View key={step.id} style={styles.step}>
-                <Icon name={latest ? "person" : "check"} size={15} color={latest ? c.ink : c.faint} />
-                <Text variant="small" tone={latest ? "ink" : "ink2"} numberOfLines={1} style={latest && styles.bold}>
-                  {stepText(t, step, step.screen)}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-      ) : null}
+    <View style={[styles.under, { paddingBottom: bottom + 8 }]}>
+      {request ? <View style={styles.request}>{request}</View> : null}
+      <LiveTrail steps={steps} color={color} now={now} />
       {channelId ? (
-        <View style={[styles.composer, { backgroundColor: c.raised, borderColor: c.line }]}>
-          <TextInput
-            value={text}
-            onChangeText={setText}
+        <View style={styles.composer}>
+          <Composer
             placeholder={t("agentComputer.phone.message", { name })}
-            placeholderTextColor={c.faint}
-            style={[styles.input, { color: c.ink }]}
-            returnKeyType="send"
-            onSubmitEditing={send}
-            submitBehavior="submit"
+            face={<AgentFace agentId={agentId} size={22} live={false} />}
+            working={
+              atWork ? (mayStop ? { stop: { label: t("mobile.chat.stopAgent", { name }), onStop: stop } } : {}) : null
+            }
+            onSend={send}
           />
-          <IconButton icon="send" plate label={t("mobile.browser.live.send")} disabled={!text.trim()} onPress={send} />
         </View>
       ) : null}
     </View>
@@ -1247,7 +1295,8 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   notice: { paddingHorizontal: 14 },
-  ask: { marginHorizontal: 12, marginBottom: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14 },
+  stage: { flexShrink: 1 },
+  docked: { marginBottom: DOCK_HANG + 12 },
   box: { marginHorizontal: 12, borderRadius: 18, overflow: "hidden", backgroundColor: "#101010" },
   boxWide: { marginHorizontal: 0, borderRadius: 0 },
   frame: { position: "absolute", left: 0, top: 0, transformOrigin: "left top" },
@@ -1271,8 +1320,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
-  padKeyboard: { position: "absolute", right: 10, bottom: 10 },
-  padTurn: { position: "absolute", left: 10, bottom: 10 },
   spot: {
     position: "absolute",
     left: -23,
@@ -1311,19 +1358,8 @@ const styles = StyleSheet.create({
   dockNotice: { position: "absolute", top: 70 },
   dockNoticeOpen: { width: 300, paddingHorizontal: 14, paddingBottom: 12, paddingTop: 8, borderRadius: 16 },
   typing: { flexDirection: "row", alignItems: "flex-end", gap: 8, paddingTop: 8 },
-  under: { flex: 1, paddingHorizontal: 14, paddingTop: 12, gap: 12 },
-  steps: { gap: 7 },
-  step: { flexDirection: "row", alignItems: "center", gap: 9 },
-  composer: {
-    marginTop: "auto",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    minHeight: 46,
-    borderRadius: 23,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingLeft: 16,
-    paddingRight: 6,
-  },
-  input: { flex: 1, fontSize: 16, paddingVertical: 8 },
+  under: { flex: 1, paddingTop: 4 },
+  request: { marginHorizontal: 12, marginBottom: 4 },
+  // The chat's composer, at the bottom with the chat's own side margins.
+  composer: { marginTop: "auto", paddingHorizontal: 10, paddingTop: 8 },
 });

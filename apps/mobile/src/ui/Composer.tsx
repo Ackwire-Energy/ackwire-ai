@@ -69,7 +69,8 @@ export interface ComposerProps {
   onSend: (text: string, how: SendHow) => void;
   /** Someone is working here (null otherwise). */
   working?: ComposerWorking | null;
-  onPlus: () => void;
+  /** The "+" for attachments and actions; left out where there are none (the agent's computer). */
+  onPlus?: () => void;
   /**
    * Pills above the field while it is empty; tapping one puts its `text` (default: the `label`) in the field
    * ("Pedir revisão do Caio" fills "Pede para o Caio revisar antes").
@@ -245,21 +246,22 @@ export function Composer({
         </Animated.View>
       ) : null}
       <View style={styles.row}>
-        {voice?.leading ?? (
-          <PressScale
-            to={0.9}
-            onPress={onPlus}
-            accessibilityRole="button"
-            accessibilityLabel={t("mobile.a11y.attach")}
-            style={[styles.plus, { boxShadow: `0px 0px 0px 0.5px ${colors.line2}, ${shadows.top}` }]}
-          >
-            <Glass style={styles.plusGlass} intensity={50}>
-              <View style={styles.center}>
-                <Icon name="plus" size={22} color={colors.ink2} />
-              </View>
-            </Glass>
-          </PressScale>
-        )}
+        {voice?.leading ??
+          (onPlus ? (
+            <PressScale
+              to={0.9}
+              onPress={onPlus}
+              accessibilityRole="button"
+              accessibilityLabel={t("mobile.a11y.attach")}
+              style={[styles.plus, { boxShadow: `0px 0px 0px 0.5px ${colors.line2}, ${shadows.top}` }]}
+            >
+              <Glass style={styles.plusGlass} intensity={50}>
+                <View style={styles.center}>
+                  <Icon name="plus" size={22} color={colors.ink2} />
+                </View>
+              </Glass>
+            </PressScale>
+          ) : null)}
         <View
           style={[
             styles.field,

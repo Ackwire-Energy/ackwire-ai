@@ -18,16 +18,19 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, IconButton, type IconName, Text, ToastHost, useToast } from "@/ui";
+import { Icon, IconButton, type IconName, Text, ToastHost, useToast } from "@/ui";
 import { BrowserCard } from "../browser/BrowserCard";
+import { HeaderPill } from "../chat/HeaderPill";
 import { openSwitchComputer } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
+import { AgentFace } from "../shared/Face";
 import { goBack } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { AgentScreen } from "./AgentScreen";
 import { Cover } from "./Cover";
+import { DockText } from "./EdgeDock";
 import { offersSwitch, type PhoneStage, phoneStage, setupSub } from "./logic";
 import { SetupWait } from "./SetupWait";
 import { useAgentComputer, useAgentRun } from "./useAgentComputer";
@@ -143,28 +146,21 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
       help={t("machines.pausedHint")}
     />
   ) : null;
+  // The conversation's own header: close, then the glass pill with the agent's face and sky, "Computador da Ada"
+  // and the line of what goes on; what taking control means (ⓘ) beside it.
+  const title = t("agentComputer.title", g);
   const top = (line: string, action?: ReactNode, info?: ReactNode) => (
     <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
       <IconButton icon="x" plate label={t("mobile.common.close")} onPress={goBack} />
-      <View style={styles.title}>
-        <Text variant="subhead" style={styles.bold} numberOfLines={1} accessibilityRole="header">
-          {t("agentComputer.title", g)}
-        </Text>
-        {line ? (
-          <View style={styles.line}>
-            <Text
-              variant="footnote"
-              tone="faint"
-              numberOfLines={1}
-              accessibilityLiveRegion="polite"
-              style={styles.lineText}
-            >
-              {line}
-            </Text>
-            {info}
-          </View>
-        ) : null}
-      </View>
+      <HeaderPill
+        lead={<AgentFace agentId={agentId} size={32} framed={false} mode={f?.working ? "run" : "idle"} />}
+        title={title}
+        subtitle={line || undefined}
+        color={agentLook(agent).color}
+        working={Boolean(f?.working)}
+        label={[title, line].filter(Boolean).join(", ")}
+      />
+      {info ? <View style={styles.info}>{info}</View> : null}
       {action}
     </View>
   );
@@ -246,12 +242,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
           help={t("agentComputer.state.offlineHelpPlain", g)}
           action={
             offersSwitch(f, manages, Boolean(outage)) ? (
-              <Button
-                variant="primary"
-                size="sm"
-                label={t("mobile.outage.switch")}
-                onPress={() => openSwitchComputer(machine.id)}
-              />
+              <DockText icon="swap" label={t("mobile.outage.switch")} onPress={() => openSwitchComputer(machine.id)} />
             ) : null
           }
         />
@@ -287,14 +278,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
           outdated ? t("agentComputer.state.outdated", { ...g, computer }) : t("agentComputer.state.unavailable", g)
         }
         help={outdated ? undefined : t("agentComputer.state.unavailableHelp")}
-        action={
-          <Button
-            variant="secondary"
-            size="sm"
-            label={t("desktop.retry")}
-            onPress={() => void view.desktopQ.refetch()}
-          />
-        }
+        action={<DockText label={t("desktop.retry")} onPress={() => void view.desktopQ.refetch()} />}
       />
     );
   }
@@ -335,12 +319,10 @@ function Banner({ icon, text, help, tone }: { icon: IconName; text: string; help
 }
 
 const styles = StyleSheet.create({
-  line: { flexDirection: "row", alignItems: "center", gap: 5 },
-  lineText: { flexShrink: 1 },
   screen: { flex: 1 },
   fill: { flex: 1 },
-  top: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingBottom: 10 },
-  title: { flex: 1, minWidth: 0 },
+  top: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingBottom: 10 },
+  info: { marginLeft: "auto" },
   bold: { fontWeight: "600" },
   grow: { flex: 1, minWidth: 0 },
   body: { paddingHorizontal: 12, gap: 12 },

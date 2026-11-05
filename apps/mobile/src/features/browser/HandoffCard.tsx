@@ -116,12 +116,10 @@ function HandoffAsk({
   const meId = useMeId();
   const dir = useDirectory();
   const toast = useToast();
-  const sheet = useSheet();
   const asks = useAskStore();
   const actions = useBrowserHandoffActions(orgId);
   const agent = dir.agentById.get(h.agentId);
   const name = agent?.name ?? "";
-  const g = genderOf(name);
   // Whose it is goes by ids (the same rule as the line above the composer); a name only says who, once it loads.
   // Someone else's: who it waits for in the header when known, no buttons here.
   const mine = meId !== null && handoffIsMine(h, meId, agent?.ownerUserId, org);
@@ -154,28 +152,7 @@ function HandoffAsk({
     );
   }, [claim, opensScreen, mine, h.id, h.status]);
 
-  // "Agora não": the agent hears it couldn't be done now, with the reason if one is given.
-  const notNow = () => {
-    tapHaptic();
-    sheet.open(
-      <PromptForm
-        title={t("mobile.browser.failed.title")}
-        intro={t(`mobile.browser.failed.intro${g}`, { name })}
-        placeholder={t("mobile.browser.failed.placeholder")}
-        submitLabel={t("mobile.browser.failed.send")}
-        allowEmpty
-        onSubmit={async (text) => {
-          sheet.close();
-          try {
-            await actions.failed(h.id, text.trim().slice(0, NOTE_MAX) || undefined);
-            asks?.settle(h.id);
-          } catch {
-            failed();
-          }
-        }}
-      />,
-    );
-  };
+  const notNow = useNotNow(h, () => asks?.settle(h.id));
 
   return (
     <AskCard
@@ -238,3 +215,40 @@ const styles = StyleSheet.create({
   peek: { aspectRatio: 16 / 10, borderRadius: 12, overflow: "hidden" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
 });
+
+/**
+ * "Agora não" on a request for help: the agent hears it couldn't be done now, with the reason if one is given. The
+ * chat's card and the agent's computer ask it the same way.
+ */
+export function useNotNow(h: BrowserHandoff | null, onDone?: () => void) {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const dir = useDirectory();
+  const toast = useToast();
+  const sheet = useSheet();
+  const actions = useBrowserHandoffActions(orgId);
+  const name = (h && dir.agentById.get(h.agentId)?.name) ?? "";
+  const g = genderOf(name);
+  return () => {
+    if (!h) return;
+    tapHaptic();
+    sheet.open(
+      <PromptForm
+        title={t("mobile.browser.failed.title")}
+        intro={t(`mobile.browser.failed.intro${g}`, { name })}
+        placeholder={t("mobile.browser.failed.placeholder")}
+        submitLabel={t("mobile.browser.failed.send")}
+        allowEmpty
+        onSubmit={async (text) => {
+          sheet.close();
+          try {
+            await actions.failed(h.id, text.trim().slice(0, NOTE_MAX) || undefined);
+            onDone?.();
+          } catch {
+            toast({ title: t("mobile.app.failed"), icon: "x" });
+          }
+        }}
+      />,
+    );
+  };
+}
