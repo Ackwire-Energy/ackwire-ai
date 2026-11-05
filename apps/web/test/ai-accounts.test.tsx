@@ -178,7 +178,7 @@ describe("Contas de IA", () => {
       );
       expect(shownText(dialog)).not.toContain("não respondeu");
       api.machines.beginAccountLogin = async () => {
-        throw new ApiError(409, "machine.offline", "The computer MacBook is offline.");
+        throw new ApiError(409, "account.runner_old", "The runner on MacBook is too old for accounts. Update it.");
       };
       await click(within(dialog).getByRole("button", { name: "Tentar de novo" }));
       await signIn();
