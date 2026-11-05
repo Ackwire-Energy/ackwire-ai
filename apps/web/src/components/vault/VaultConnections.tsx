@@ -19,6 +19,7 @@ import {
   Field,
   Input,
   List,
+  Locked,
   Menu,
   MenuItem,
   MenuSeparator,
@@ -138,74 +139,76 @@ function ConnectForm({
         void submit();
       }}
     >
-      {source.warning && <Alert tone="neutral">{words(t, `vault.source.${kind}.warning`, source.warning)}</Alert>}
-      {source.steps.map((step, i) => (
-        <Step
-          // biome-ignore lint/suspicious/noArrayIndexKey: the steps are fixed and numbered by their place
-          key={i}
-          n={i + 1}
-          side={
-            i === 0 && source.helpUrl ? (
-              <OpenPage href={source.helpUrl}>{t("vault.connections.open", { name: source.name })}</OpenPage>
-            ) : undefined
-          }
-        >
-          <StepTitle title={words(t, `vault.source.${kind}.step.${i + 1}`, step)} />
-        </Step>
-      ))}
-      <div className="vlt-connect__fields">
-        {shown.map((f) => (
-          <Field
-            key={f.id}
-            label={label(f)}
-            error={tried && f.required && !values[f.id]?.trim() ? t("vault.connections.required") : undefined}
+      <Locked when={busy}>
+        {source.warning && <Alert tone="neutral">{words(t, `vault.source.${kind}.warning`, source.warning)}</Alert>}
+        {source.steps.map((step, i) => (
+          <Step
+            // biome-ignore lint/suspicious/noArrayIndexKey: the steps are fixed and numbered by their place
+            key={i}
+            n={i + 1}
+            side={
+              i === 0 && source.helpUrl ? (
+                <OpenPage href={source.helpUrl}>{t("vault.connections.open", { name: source.name })}</OpenPage>
+              ) : undefined
+            }
           >
-            {f.kind === "choice" ? (
-              <Select
-                value={values[f.id]}
-                onValueChange={(v) => setValues((s) => ({ ...s, [f.id]: v }))}
-                options={(f.choices ?? []).map((c) => ({
-                  value: c.value,
-                  // A value that is a domain is its own name; a word (`self`) has a translation.
-                  label: /^\w+$/.test(c.value)
-                    ? words(t, `vault.source.${kind}.choice.${f.id}.${c.value}`, c.label)
-                    : c.label,
-                }))}
-              />
-            ) : (
-              <Input
-                type={INPUT_TYPE[f.kind]}
-                value={values[f.id] ?? ""}
-                placeholder={f.placeholder}
-                autoComplete="off"
-                spellCheck={false}
-                onChange={(e) => setValues((s) => ({ ...s, [f.id]: e.target.value }))}
-                data-1p-ignore
-              />
-            )}
-          </Field>
+            <StepTitle title={words(t, `vault.source.${kind}.step.${i + 1}`, step)} />
+          </Step>
         ))}
-        {!connection && (
-          <div className="ac-field">
-            <span className="ac-field__label">{t("vault.connections.for")}</span>
-            <Segmented<VaultScope>
-              label={t("vault.connections.for")}
-              value={scope}
-              disabled={!canManageTeam}
-              onValueChange={setScope}
-              options={[
-                { value: "team", label: t("vault.scope.team") },
-                { value: "personal", label: t("vault.scope.personal") },
-              ]}
-            />
-            <span className="ac-field__help">
-              {canManageTeam
-                ? t(scope === "team" ? "vault.connections.forTeam" : "vault.connections.forPersonal")
-                : t("vault.connections.teamLocked")}
-            </span>
-          </div>
-        )}
-      </div>
+        <div className="vlt-connect__fields">
+          {shown.map((f) => (
+            <Field
+              key={f.id}
+              label={label(f)}
+              error={tried && f.required && !values[f.id]?.trim() ? t("vault.connections.required") : undefined}
+            >
+              {f.kind === "choice" ? (
+                <Select
+                  value={values[f.id]}
+                  onValueChange={(v) => setValues((s) => ({ ...s, [f.id]: v }))}
+                  options={(f.choices ?? []).map((c) => ({
+                    value: c.value,
+                    // A value that is a domain is its own name; a word (`self`) has a translation.
+                    label: /^\w+$/.test(c.value)
+                      ? words(t, `vault.source.${kind}.choice.${f.id}.${c.value}`, c.label)
+                      : c.label,
+                  }))}
+                />
+              ) : (
+                <Input
+                  type={INPUT_TYPE[f.kind]}
+                  value={values[f.id] ?? ""}
+                  placeholder={f.placeholder}
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(e) => setValues((s) => ({ ...s, [f.id]: e.target.value }))}
+                  data-1p-ignore
+                />
+              )}
+            </Field>
+          ))}
+          {!connection && (
+            <div className="ac-field">
+              <span className="ac-field__label">{t("vault.connections.for")}</span>
+              <Segmented<VaultScope>
+                label={t("vault.connections.for")}
+                value={scope}
+                disabled={!canManageTeam}
+                onValueChange={setScope}
+                options={[
+                  { value: "team", label: t("vault.scope.team") },
+                  { value: "personal", label: t("vault.scope.personal") },
+                ]}
+              />
+              <span className="ac-field__help">
+                {canManageTeam
+                  ? t(scope === "team" ? "vault.connections.forTeam" : "vault.connections.forPersonal")
+                  : t("vault.connections.teamLocked")}
+              </span>
+            </div>
+          )}
+        </div>
+      </Locked>
       <span className="vlt-connect__acts">
         <Button type="submit" variant="primary" loading={busy} disabled={busy}>
           {connection ? t("vault.connections.reconnect") : t("vault.connections.connect")}

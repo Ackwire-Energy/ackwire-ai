@@ -9,6 +9,7 @@ import {
   Field,
   Icon,
   Input,
+  Locked,
   Menu,
   MenuHeading,
   MenuItem,
@@ -497,38 +498,40 @@ export function AddColumnDialog({
           create();
         }}
       >
-        <DialogBody>
-          <Field label={t("issues.columns.name")} id="ic-name">
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={40}
-              autoComplete="off"
-              placeholder={t("issues.columns.namePlaceholder")}
-            />
-          </Field>
-          <div className="issues-stagepick">
-            <span className="ac-field__label" id="ic-stage">
-              {t("issues.columns.stageQuestion")}
-            </span>
-            <OptionList
-              layout="tiles"
-              aria-labelledby="ic-stage"
-              value={stage ?? ("" as IssueStatus)}
-              onValueChange={setStage}
-              options={BOARD.map((s) => ({
-                value: s,
-                leading: <Icon name={STATUS_ICON[s]} size={16} />,
-                title: stageName(s),
-                description: t(`issues.columns.stageHint.${s}`),
-              }))}
-            />
-          </div>
-          <p className="issues-explain ac-iconline">
-            <Icon name="arrowRight" size={16} />
-            <span>{t(`issues.columns.stageExplain.${stage ?? "in_progress"}`)}</span>
-          </p>
-        </DialogBody>
+        <Locked when={action.isPending}>
+          <DialogBody>
+            <Field label={t("issues.columns.name")} id="ic-name">
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={40}
+                autoComplete="off"
+                placeholder={t("issues.columns.namePlaceholder")}
+              />
+            </Field>
+            <div className="issues-stagepick">
+              <span className="ac-field__label" id="ic-stage">
+                {t("issues.columns.stageQuestion")}
+              </span>
+              <OptionList
+                layout="tiles"
+                aria-labelledby="ic-stage"
+                value={stage ?? ("" as IssueStatus)}
+                onValueChange={setStage}
+                options={BOARD.map((s) => ({
+                  value: s,
+                  leading: <Icon name={STATUS_ICON[s]} size={16} />,
+                  title: stageName(s),
+                  description: t(`issues.columns.stageHint.${s}`),
+                }))}
+              />
+            </div>
+            <p className="issues-explain ac-iconline">
+              <Icon name="arrowRight" size={16} />
+              <span>{t(`issues.columns.stageExplain.${stage ?? "in_progress"}`)}</span>
+            </p>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onClose}>
             {t("issues.columns.cancel")}
@@ -623,49 +626,51 @@ function DeleteColumnDialog({
       width={480}
     >
       {n > 0 && (
-        <DialogBody>
-          <div className="issues-dests" role="radiogroup" aria-label={t("issues.columns.destinations")}>
-            {BOARD.map((s) => {
-              const cs = columnsOf(others, s);
-              if (cs.length === 0) return null;
-              return (
-                <div key={s} className="issues-dests__stage">
-                  <span>
-                    <Icon name={STATUS_ICON[s]} size={14} />
-                    {stageName(s)}
-                  </span>
-                  <div className="issues-dests__row">
-                    {cs.map((c) => (
-                      // biome-ignore lint/a11y/useSemanticElements: a choice button in a radio group
-                      <button
-                        key={c.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={dest === c.id}
-                        className="issues-dest"
-                        onClick={() => setDest(c.id)}
-                      >
-                        {title(c)}
-                      </button>
-                    ))}
+        <Locked when={action.isPending}>
+          <DialogBody>
+            <div className="issues-dests" role="radiogroup" aria-label={t("issues.columns.destinations")}>
+              {BOARD.map((s) => {
+                const cs = columnsOf(others, s);
+                if (cs.length === 0) return null;
+                return (
+                  <div key={s} className="issues-dests__stage">
+                    <span>
+                      <Icon name={STATUS_ICON[s]} size={14} />
+                      {stageName(s)}
+                    </span>
+                    <div className="issues-dests__row">
+                      {cs.map((c) => (
+                        // biome-ignore lint/a11y/useSemanticElements: a choice button in a radio group
+                        <button
+                          key={c.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={dest === c.id}
+                          className="issues-dest"
+                          onClick={() => setDest(c.id)}
+                        >
+                          {title(c)}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-          {to && to.stage !== col.stage && (
-            <p className="issues-explain ac-iconline">
-              <Icon name="arrowRight" size={16} />
-              <span>
-                {t("issues.columns.stageChange", {
-                  count: n,
-                  from: stageName(col.stage),
-                  to: stageName(to.stage),
-                })}
-              </span>
-            </p>
-          )}
-        </DialogBody>
+                );
+              })}
+            </div>
+            {to && to.stage !== col.stage && (
+              <p className="issues-explain ac-iconline">
+                <Icon name="arrowRight" size={16} />
+                <span>
+                  {t("issues.columns.stageChange", {
+                    count: n,
+                    from: stageName(col.stage),
+                    to: stageName(to.stage),
+                  })}
+                </span>
+              </p>
+            )}
+          </DialogBody>
+        </Locked>
       )}
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onClose}>

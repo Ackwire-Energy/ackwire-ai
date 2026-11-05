@@ -1,5 +1,15 @@
 import { keys } from "@agenteschat/client";
-import { Avatar, type AvatarProps, Button, cx, Dialog, DialogBody, DialogFooter, LogoMark } from "@agenteschat/ui";
+import {
+  Avatar,
+  type AvatarProps,
+  Button,
+  cx,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  Locked,
+  LogoMark,
+} from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -185,103 +195,109 @@ export function ImageCropDialog({
       closeLabel={t("common.close")}
       width={420}
     >
-      <DialogBody>
-        <input
-          ref={input}
-          type="file"
-          accept="image/*"
-          className="ac-visually-hidden"
-          aria-label={t("photo.pick")}
-          onChange={(e) => void choose(e.target.files?.[0])}
-        />
-        {url ? (
-          <div className="photo-crop">
-            <div
-              className="photo-crop__frame"
-              role="img"
-              aria-label={t("photo.preview")}
-              onPointerDown={(e: PointerEvent<HTMLDivElement>) => {
-                drag.current = { x: e.clientX, y: e.clientY, crop };
-                e.currentTarget.setPointerCapture?.(e.pointerId);
+      <Locked when={save.isPending || remove.isPending}>
+        <DialogBody>
+          <input
+            ref={input}
+            type="file"
+            accept="image/*"
+            className="ac-visually-hidden"
+            aria-label={t("photo.pick")}
+            onChange={(e) => void choose(e.target.files?.[0])}
+          />
+          {url ? (
+            <div className="photo-crop">
+              <div
+                className="photo-crop__frame"
+                role="img"
+                aria-label={t("photo.preview")}
+                onPointerDown={(e: PointerEvent<HTMLDivElement>) => {
+                  drag.current = { x: e.clientX, y: e.clientY, crop };
+                  e.currentTarget.setPointerCapture?.(e.pointerId);
+                }}
+                onPointerMove={(e) => {
+                  const d = drag.current;
+                  if (!d) return;
+                  setCrop(
+                    clampCrop(
+                      { ...d.crop, x: d.crop.x + e.clientX - d.x, y: d.crop.y + e.clientY - d.y },
+                      size.w,
+                      size.h,
+                    ),
+                  );
+                }}
+                onPointerUp={() => {
+                  drag.current = null;
+                }}
+              >
+                <img
+                  ref={img}
+                  src={url}
+                  alt=""
+                  draggable={false}
+                  onLoad={(e) => {
+                    const el = e.currentTarget;
+                    setSize({ w: el.naturalWidth, h: el.naturalHeight });
+                    // Centered to start.
+                    const s = coverScale(el.naturalWidth, el.naturalHeight);
+                    setCrop({
+                      zoom: 1,
+                      x: (VIEW_PX - el.naturalWidth * s) / 2,
+                      y: (VIEW_PX - el.naturalHeight * s) / 2,
+                    });
+                  }}
+                  style={
+                    size.w > 0
+                      ? {
+                          width: size.w * scale,
+                          height: size.h * scale,
+                          transform: `translate(${crop.x}px, ${crop.y}px)`,
+                        }
+                      : { width: "100%", height: "100%", objectFit: "cover" }
+                  }
+                />
+              </div>
+              <div className="row" style={{ gap: 6, justifyContent: "center" }}>
+                <Button size="sm" variant="ghost" onClick={() => zoomBy(-0.25)} disabled={crop.zoom <= 1}>
+                  {t("photo.zoomOut")}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => zoomBy(0.25)} disabled={crop.zoom >= MAX_ZOOM}>
+                  {t("photo.zoomIn")}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => input.current?.click()}>
+                  {t("photo.other")}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="photo-drop"
+              data-over={over || undefined}
+              onClick={() => input.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setOver(true);
               }}
-              onPointerMove={(e) => {
-                const d = drag.current;
-                if (!d) return;
-                setCrop(
-                  clampCrop(
-                    { ...d.crop, x: d.crop.x + e.clientX - d.x, y: d.crop.y + e.clientY - d.y },
-                    size.w,
-                    size.h,
-                  ),
-                );
-              }}
-              onPointerUp={() => {
-                drag.current = null;
+              onDragLeave={() => setOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setOver(false);
+                void choose(e.dataTransfer?.files?.[0]);
               }}
             >
-              <img
-                ref={img}
-                src={url}
-                alt=""
-                draggable={false}
-                onLoad={(e) => {
-                  const el = e.currentTarget;
-                  setSize({ w: el.naturalWidth, h: el.naturalHeight });
-                  // Centered to start.
-                  const s = coverScale(el.naturalWidth, el.naturalHeight);
-                  setCrop({ zoom: 1, x: (VIEW_PX - el.naturalWidth * s) / 2, y: (VIEW_PX - el.naturalHeight * s) / 2 });
-                }}
-                style={
-                  size.w > 0
-                    ? {
-                        width: size.w * scale,
-                        height: size.h * scale,
-                        transform: `translate(${crop.x}px, ${crop.y}px)`,
-                      }
-                    : { width: "100%", height: "100%", objectFit: "cover" }
-                }
-              />
-            </div>
-            <div className="row" style={{ gap: 6, justifyContent: "center" }}>
-              <Button size="sm" variant="ghost" onClick={() => zoomBy(-0.25)} disabled={crop.zoom <= 1}>
-                {t("photo.zoomOut")}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => zoomBy(0.25)} disabled={crop.zoom >= MAX_ZOOM}>
-                {t("photo.zoomIn")}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => input.current?.click()}>
-                {t("photo.other")}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="photo-drop"
-            data-over={over || undefined}
-            onClick={() => input.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setOver(true);
-            }}
-            onDragLeave={() => setOver(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setOver(false);
-              void choose(e.dataTransfer?.files?.[0]);
-            }}
-          >
-            {placeholder}
-            <span style={{ fontWeight: 600 }}>{t("photo.drop")}</span>
-            <span className="small muted">{t("photo.dropHelp")}</span>
-          </button>
-        )}
-        {error && (
-          <p className="small" role="alert" style={{ color: "var(--danger)", margin: 0 }}>
-            {error}
-          </p>
-        )}
-      </DialogBody>
+              {placeholder}
+              <span style={{ fontWeight: 600 }}>{t("photo.drop")}</span>
+              <span className="small muted">{t("photo.dropHelp")}</span>
+            </button>
+          )}
+          {error && (
+            <p className="small" role="alert" style={{ color: "var(--danger)", margin: 0 }}>
+              {error}
+            </p>
+          )}
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         {hasImage && !file && (
           <Button

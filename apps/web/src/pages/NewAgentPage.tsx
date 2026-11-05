@@ -64,6 +64,7 @@ import {
   InfoHint,
   Input,
   Kbd,
+  Locked,
   Logo,
   modKey,
   ProviderLogo,
@@ -1646,9 +1647,11 @@ function NewAgentFlow({
       <NewAgentRail index={index} reached={reached} total={total} onGo={goTo} done={false} onLeave={onClose} />
       <div className="newag__work">
         <main className="newag__main">
-          <div className="newag__content" key={step}>
-            {views[step]()}
-          </div>
+          <Locked when={create.isPending || deny.isPending}>
+            <div className="newag__content" key={step}>
+              {views[step]()}
+            </div>
+          </Locked>
           <div className="newag__foot">
             <span className="newag__hint" data-bad={footErrors.length > 0 || undefined}>
               {importing ? null : footErrors.length > 0 ? (
@@ -1661,7 +1664,13 @@ function NewAgentFlow({
               )}
             </span>
             {index > 0 || importing ? (
-              <Button variant="ghost" size="lg" icon="chevronLeft" onClick={back}>
+              <Button
+                variant="ghost"
+                size="lg"
+                icon="chevronLeft"
+                disabled={create.isPending || deny.isPending}
+                onClick={back}
+              >
                 {t("common.back")}
               </Button>
             ) : onClose ? (

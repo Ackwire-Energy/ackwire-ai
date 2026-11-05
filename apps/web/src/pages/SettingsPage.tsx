@@ -51,6 +51,7 @@ import {
   InfoHint,
   Input,
   List,
+  Locked,
   Meter,
   PageHeader,
   ProviderLogo,
@@ -985,52 +986,54 @@ export function KeyDialog({
             }
           }}
         >
-          <DialogBody>
-            {mode === "add" && providerSelect}
-            {mode === "add" && (
-              <Field label={t("settings.keyLabel")} id="key-label">
-                <Input
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  placeholder={t("settings.keyLabelPlaceholder", { provider: providerLabel(provider) })}
-                />
-              </Field>
-            )}
-            <Field
-              label={t("settings.keyValue")}
-              id="key-value-set"
-              error={error}
-              help={<KeySite provider={provider} />}
-            >
-              <Input
-                type="password"
-                autoComplete="off"
-                placeholder={providerOf(provider)?.placeholder}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-            </Field>
-            {mode === "add" && provider === "anthropic" && (
+          <Locked when={pending}>
+            <DialogBody>
+              {mode === "add" && providerSelect}
+              {mode === "add" && (
+                <Field label={t("settings.keyLabel")} id="key-label">
+                  <Input
+                    value={label}
+                    onChange={(e) => setLabel(e.target.value)}
+                    placeholder={t("settings.keyLabelPlaceholder", { provider: providerLabel(provider) })}
+                  />
+                </Field>
+              )}
               <Field
-                label={t("onboarding.anthropicWorkspace")}
-                id="key-ws-set"
-                hint={{
-                  name: t("common.about", { label: t("onboarding.anthropicWorkspace") }),
-                  text: t("onboarding.anthropicWorkspaceHelp"),
-                }}
+                label={t("settings.keyValue")}
+                id="key-value-set"
+                error={error}
+                help={<KeySite provider={provider} />}
               >
                 <Input
-                  value={workspaceId}
-                  onChange={(e) => setWorkspaceId(e.target.value)}
-                  placeholder={t("settings.workspaceIdPlaceholder")}
+                  type="password"
                   autoComplete="off"
+                  placeholder={providerOf(provider)?.placeholder}
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
                 />
               </Field>
-            )}
-          </DialogBody>
+              {mode === "add" && provider === "anthropic" && (
+                <Field
+                  label={t("onboarding.anthropicWorkspace")}
+                  id="key-ws-set"
+                  hint={{
+                    name: t("common.about", { label: t("onboarding.anthropicWorkspace") }),
+                    text: t("onboarding.anthropicWorkspaceHelp"),
+                  }}
+                >
+                  <Input
+                    value={workspaceId}
+                    onChange={(e) => setWorkspaceId(e.target.value)}
+                    placeholder={t("settings.workspaceIdPlaceholder")}
+                    autoComplete="off"
+                  />
+                </Field>
+              )}
+            </DialogBody>
+          </Locked>
           <DialogFooter>
             <Button onClick={onClose}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" disabled={pending}>
+            <Button type="submit" variant="primary" loading={pending}>
               {mode === "rotate" ? t("settings.rotate") : t("settings.saveKey")}
             </Button>
           </DialogFooter>
@@ -1127,23 +1130,25 @@ function DefaultBudgetCard() {
           );
         }}
       >
-        <Field
-          label={t("settings.defaultBudget")}
-          id="set-default-budget"
-          hint={{
-            name: t("common.about", { label: t("settings.defaultBudget") }),
-            text: t("settings.defaultBudgetHelp"),
-          }}
-          error={invalid ? t("agent.budgetInvalid") : undefined}
-        >
-          <Input
-            inputMode="decimal"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            readOnly={!editable}
-            disabled={saved === undefined}
-          />
-        </Field>
+        <Locked when={update.isPending}>
+          <Field
+            label={t("settings.defaultBudget")}
+            id="set-default-budget"
+            hint={{
+              name: t("common.about", { label: t("settings.defaultBudget") }),
+              text: t("settings.defaultBudgetHelp"),
+            }}
+            error={invalid ? t("agent.budgetInvalid") : undefined}
+          >
+            <Input
+              inputMode="decimal"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              readOnly={!editable}
+              disabled={saved === undefined}
+            />
+          </Field>
+        </Locked>
         {editable && (
           <Button type="submit" variant="primary" disabled={!dirty || update.isPending} loading={update.isPending}>
             {t("common.save")}

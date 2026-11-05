@@ -51,6 +51,7 @@ import {
   type IconName,
   Input,
   List,
+  Locked,
   Menu,
   MenuItem,
   MenuNote,
@@ -831,9 +832,11 @@ function InvitationRoles({
       closeLabel={t("common.close")}
       width={440}
     >
-      <DialogBody>
-        <RolesPicker roles={orgRoles} value={value} onChange={setValue} label={title} />
-      </DialogBody>
+      <Locked when={save.isPending}>
+        <DialogBody>
+          <RolesPicker roles={orgRoles} value={value} onChange={setValue} label={title} />
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
@@ -1009,41 +1012,43 @@ function SuggestDialog({ open, onClose, inviters }: { open: boolean; onClose: ()
       closeLabel={t("common.close")}
       width={480}
     >
-      <DialogBody>
-        <Field label={t("members.suggest.email")} id="suggest-email" error={error}>
-          <Input
-            type="email"
-            autoComplete="off"
-            value={email}
-            placeholder={t("members.emailsPlaceholder")}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setError(null);
-            }}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              e.preventDefault();
-              submit();
-            }}
-          />
-        </Field>
-        <Field
-          id="suggest-note"
-          label={
-            <>
-              {t("members.suggest.who")} <span className="invite-optional">{t("members.dialog.optional")}</span>
-            </>
-          }
-        >
-          <Textarea
-            rows={2}
-            maxLength={JOIN_NOTE_MAX}
-            value={note}
-            placeholder={t("members.suggest.whoPlaceholder")}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </Field>
-      </DialogBody>
+      <Locked when={suggest.isPending}>
+        <DialogBody>
+          <Field label={t("members.suggest.email")} id="suggest-email" error={error}>
+            <Input
+              type="email"
+              autoComplete="off"
+              value={email}
+              placeholder={t("members.emailsPlaceholder")}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                submit();
+              }}
+            />
+          </Field>
+          <Field
+            id="suggest-note"
+            label={
+              <>
+                {t("members.suggest.who")} <span className="invite-optional">{t("members.dialog.optional")}</span>
+              </>
+            }
+          >
+            <Textarea
+              rows={2}
+              maxLength={JOIN_NOTE_MAX}
+              value={note}
+              placeholder={t("members.suggest.whoPlaceholder")}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </Field>
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button variant="primary" loading={suggest.isPending} onClick={submit}>

@@ -1,5 +1,5 @@
 import type { VaultImportResult, VaultScope } from "@agenteschat/client";
-import { Button, Dialog, DialogBody, DialogFooter, Icon, Segmented, SettingNote } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Icon, Locked, Segmented, SettingNote } from "@agenteschat/ui";
 import { type DragEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
@@ -126,95 +126,95 @@ export function VaultImportDialog({
       closeLabel={t("common.close")}
       width={560}
     >
-      <DialogBody className="vlt-import">
-        {stage === "pick" && (
-          <>
-            <div className="vlt-drop" data-over={over || undefined}>
-              <button
-                type="button"
-                className="vlt-drop__area"
-                disabled={importer.busy}
-                onClick={() => input.current?.click()}
-                onDragEnter={(e) => stop(e) && setOver(true)}
-                onDragOver={(e) => {
-                  if (stop(e)) e.dataTransfer.dropEffect = "copy";
-                }}
-                onDragLeave={() => setOver(false)}
-                onDrop={(e) => {
-                  if (!stop(e)) return;
-                  setOver(false);
-                  void read(e.dataTransfer.files[0]);
-                }}
-              >
-                <span className="vlt-drop__icon">
-                  <Icon name="upload" size={20} />
-                </span>
-                <b>{importer.busy ? t("vault.import.reading") : t("vault.import.dropTitle")}</b>
-                <span>{t("vault.import.dropText")}</span>
-              </button>
-              <input
-                ref={input}
-                type="file"
-                accept=".csv,text/csv"
-                hidden
-                aria-label={t("vault.import.choose")}
-                onChange={(e) => {
-                  void read(e.target.files?.[0]);
-                  e.target.value = "";
-                }}
-              />
-            </div>
-            {error && (
-              <p className="ac-field__error" role="alert">
-                {error}
-              </p>
-            )}
-            <SettingNote icon="info">{t("vault.import.where")}</SettingNote>
-          </>
-        )}
-        {stage === "review" && preview && (
-          <>
-            <p className="vlt-import__file ac-iconline">
-              <Icon name="file" size={16} />
-              <span>
-                <b>{fileName}</b> · {t(`vault.import.format.${preview.format}`)}
-              </span>
-            </p>
-            <ImportCounts result={preview} />
-            {/* Where they go: a choice for who manages the Vault, a plain line for everyone else (always theirs). */}
-            {!canManageTeam && <SettingNote icon="lock">{t("vault.import.asPersonal")}</SettingNote>}
-            {canManageTeam && (
-              <div className="ac-field">
-                <span className="ac-field__label">{t("vault.import.as")}</span>
-                <Segmented<VaultScope>
-                  label={t("vault.import.as")}
-                  value={scope}
-                  disabled={importer.busy}
-                  onValueChange={pickScope}
-                  options={[
-                    { value: "personal", label: t("vault.scope.personal") },
-                    { value: "team", label: t("vault.scope.team") },
-                  ]}
+      <Locked when={importer.busy}>
+        <DialogBody className="vlt-import">
+          {stage === "pick" && (
+            <>
+              <div className="vlt-drop" data-over={over || undefined}>
+                <button
+                  type="button"
+                  className="vlt-drop__area"
+                  onClick={() => input.current?.click()}
+                  onDragEnter={(e) => stop(e) && setOver(true)}
+                  onDragOver={(e) => {
+                    if (stop(e)) e.dataTransfer.dropEffect = "copy";
+                  }}
+                  onDragLeave={() => setOver(false)}
+                  onDrop={(e) => {
+                    if (!stop(e)) return;
+                    setOver(false);
+                    void read(e.dataTransfer.files[0]);
+                  }}
+                >
+                  <span className="vlt-drop__icon">
+                    <Icon name="upload" size={20} />
+                  </span>
+                  <b>{importer.busy ? t("vault.import.reading") : t("vault.import.dropTitle")}</b>
+                  <span>{t("vault.import.dropText")}</span>
+                </button>
+                <input
+                  ref={input}
+                  type="file"
+                  accept=".csv,text/csv"
+                  hidden
+                  aria-label={t("vault.import.choose")}
+                  onChange={(e) => {
+                    void read(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
                 />
-                <span className="ac-field__help">
-                  {scope === "team" ? t("vault.import.asTeam") : t("vault.import.asPersonal")}
-                </span>
               </div>
-            )}
-            <SettingNote icon="alert">{t("vault.import.deleteFile")}</SettingNote>
-          </>
-        )}
-        {stage === "done" && result && (
-          <>
-            <p className="vlt-import__done ac-iconline">
-              <Icon name="check" size={18} />
-              <b>{t("vault.import.done", { count: result.added + result.updated })}</b>
-            </p>
-            <ImportCounts result={result} />
-            <SettingNote icon="alert">{t("vault.import.deleteFile")}</SettingNote>
-          </>
-        )}
-      </DialogBody>
+              {error && (
+                <p className="ac-field__error" role="alert">
+                  {error}
+                </p>
+              )}
+              <SettingNote icon="info">{t("vault.import.where")}</SettingNote>
+            </>
+          )}
+          {stage === "review" && preview && (
+            <>
+              <p className="vlt-import__file ac-iconline">
+                <Icon name="file" size={16} />
+                <span>
+                  <b>{fileName}</b> · {t(`vault.import.format.${preview.format}`)}
+                </span>
+              </p>
+              <ImportCounts result={preview} />
+              {/* Where they go: a choice for who manages the Vault, a plain line for everyone else (always theirs). */}
+              {!canManageTeam && <SettingNote icon="lock">{t("vault.import.asPersonal")}</SettingNote>}
+              {canManageTeam && (
+                <div className="ac-field">
+                  <span className="ac-field__label">{t("vault.import.as")}</span>
+                  <Segmented<VaultScope>
+                    label={t("vault.import.as")}
+                    value={scope}
+                    onValueChange={pickScope}
+                    options={[
+                      { value: "personal", label: t("vault.scope.personal") },
+                      { value: "team", label: t("vault.scope.team") },
+                    ]}
+                  />
+                  <span className="ac-field__help">
+                    {scope === "team" ? t("vault.import.asTeam") : t("vault.import.asPersonal")}
+                  </span>
+                </div>
+              )}
+              <SettingNote icon="alert">{t("vault.import.deleteFile")}</SettingNote>
+            </>
+          )}
+          {stage === "done" && result && (
+            <>
+              <p className="vlt-import__done ac-iconline">
+                <Icon name="check" size={18} />
+                <b>{t("vault.import.done", { count: result.added + result.updated })}</b>
+              </p>
+              <ImportCounts result={result} />
+              <SettingNote icon="alert">{t("vault.import.deleteFile")}</SettingNote>
+            </>
+          )}
+        </DialogBody>
+      </Locked>
       <DialogFooter>
         {stage === "done" ? (
           <Button variant="primary" onClick={onClose}>
@@ -223,17 +223,19 @@ export function VaultImportDialog({
         ) : (
           <>
             {stage === "review" && (
-              <Button
-                variant="ghost"
-                className="vlt-foot__start"
-                onClick={() => {
-                  setStage("pick");
-                  setCsv(null);
-                  setPreview(null);
-                }}
-              >
-                {t("vault.import.another")}
-              </Button>
+              <Locked when={importer.busy}>
+                <Button
+                  variant="ghost"
+                  className="vlt-foot__start"
+                  onClick={() => {
+                    setStage("pick");
+                    setCsv(null);
+                    setPreview(null);
+                  }}
+                >
+                  {t("vault.import.another")}
+                </Button>
+              </Locked>
             )}
             <Button onClick={onClose}>{t("common.cancel")}</Button>
             {stage === "review" && (

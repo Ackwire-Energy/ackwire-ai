@@ -12,6 +12,7 @@ import {
   DialogFooter,
   Field,
   Icon,
+  Locked,
   Menu,
   MenuItem,
   modKey,
@@ -157,7 +158,8 @@ export function NewIssueDialog({
           toast.show(t("issues.form.created", { number: issue.number }));
           if (another) {
             reset(true);
-            titleRef.current?.focus();
+            // After the form unlocks: a disabled field takes no focus.
+            requestAnimationFrame(() => titleRef.current?.focus());
           } else close();
         },
       },
@@ -253,242 +255,252 @@ export function NewIssueDialog({
       >
         {dropLayer}
         {fileInput}
-        {wide ? (
-          <DialogBody className="issue-new__wide">
-            <div className="issue-new__main">
+        <Locked when={action.isPending}>
+          {wide ? (
+            <DialogBody className="issue-new__wide">
+              <div className="issue-new__main">
+                <input
+                  ref={titleRef}
+                  className="issue-new__title issue-new__title--lg"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={t("issues.form.titleShort")}
+                  aria-label={t("issues.form.title")}
+                  autoFocus
+                />
+                <DetailsSection title={t("issues.description")}>
+                  <div className="issue-new__editor">
+                    <textarea
+                      ref={textRef}
+                      className="issue-new__text"
+                      rows={4}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder={t("issues.form.descriptionPlaceholder")}
+                      aria-label={t("issues.description")}
+                    />
+                    {files.items.some((f) => f.preview) && (
+                      <div className="issue-new__images">
+                        {files.items
+                          .filter((f) => f.preview)
+                          .map((f) => (
+                            <span key={f.key} className="issue-new__image" data-status={f.status}>
+                              <img src={f.preview} alt={f.name} />
+                              {f.status === "uploading" && <Spinner size={24} className="issue-new__image-state" />}
+                              <span className="issue-new__image-name small">{f.name}</span>
+                            </span>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                  <p className="issue-new__hint small muted">
+                    <Icon name="image" size={14} />
+                    {pasteHint}
+                  </p>
+                </DetailsSection>
+                <DetailsSection title={t("issues.criteria")} count={criteria.length || undefined}>
+                  <ul className="issue-new__criteria">
+                    {criteria.map((c, i) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: the list is edited in place, by position
+                      <li key={i} className="issue-new__criterion">
+                        <span className="issue-new__box" aria-hidden="true" />
+                        <input
+                          value={c}
+                          onChange={(e) => setCriteria((all) => all.map((x, j) => (j === i ? e.target.value : x)))}
+                          // Enter goes to the new-criterion line; only ⌘↵ or the button creates the task.
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter" || e.metaKey || e.ctrlKey) return;
+                            e.preventDefault();
+                            addRef.current?.focus();
+                          }}
+                          aria-label={t("issues.criteria")}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          iconOnly
+                          icon="close"
+                          aria-label={t("issues.form.removeCriterion")}
+                          onClick={() => setCriteria((all) => all.filter((_, j) => j !== i))}
+                        />
+                      </li>
+                    ))}
+                    <li className="issue-new__criterion issue-new__criterion--add">
+                      <Icon name="plus" size={16} />
+                      <input
+                        value={draftCriterion}
+                        onChange={(e) => setDraftCriterion(e.target.value)}
+                        ref={addRef}
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter" || e.metaKey || e.ctrlKey) return;
+                          e.preventDefault();
+                          if (!draftCriterion.trim()) return;
+                          setCriteria((all) => [...all, draftCriterion.trim()]);
+                          setDraftCriterion("");
+                        }}
+                        placeholder={t("issues.form.addCriterion")}
+                        aria-label={t("issues.form.addCriterion")}
+                      />
+                    </li>
+                  </ul>
+                </DetailsSection>
+                <DetailsSection
+                  title={t("issues.files.title")}
+                  count={files.items.length || undefined}
+                  actions={
+                    <Button size="sm" variant="ghost" icon="attach" onClick={pick}>
+                      {t("issues.files.add")}
+                    </Button>
+                  }
+                >
+                  <div className="issue-files__grid">
+                    {files.items.map((f) => (
+                      <PendingTile key={f.key} file={f} onRemove={() => files.remove(f.key)} />
+                    ))}
+                    <button type="button" className="issue-files__add" onClick={pick}>
+                      <Icon name="upload" />
+                      <b>{t("issues.files.add")}</b>
+                      <span>{t("issues.files.addHint")}</span>
+                    </button>
+                  </div>
+                </DetailsSection>
+              </div>
+              <aside className="issue-new__side" aria-label={t("issues.details")}>
+                <Field label={t("issues.form.assignee")} id="ni-who">
+                  <Select size="sm" value={assignee} onValueChange={setAssignee} options={actors.options(true)} />
+                </Field>
+                {todoColumns.length > 1 && (
+                  <Field label={t("issues.column")} id="ni-col">
+                    <Select
+                      size="sm"
+                      value={chosenColumn?.id}
+                      onValueChange={setColumn}
+                      options={todoColumns.map((c) => ({ value: c.id, label: columnTitle(c) }))}
+                    />
+                  </Field>
+                )}
+                <Field label={t("issues.form.priority")} id="ni-pri">
+                  <Select
+                    size="sm"
+                    value={priority}
+                    onValueChange={(v) => setPriority(v as IssuePriority)}
+                    options={PRIORITIES.map((p) => ({ value: p, label: priorityLabel(p) }))}
+                  />
+                </Field>
+                <Field label={t("issues.due")} id="ni-due">
+                  <DueDate value={due} onChange={setDue} />
+                </Field>
+                {agent && (
+                  <div className="issue-new__who">
+                    <ActorAvatar actor={{ type: "agent", id: agent.id }} name={agent.name} size="sm" />
+                    <span>{t("issues.form.agentStartsAll", agentGrammar(agent.name))}</span>
+                  </div>
+                )}
+              </aside>
+            </DialogBody>
+          ) : (
+            <DialogBody className="issue-new__quick">
               <input
                 ref={titleRef}
-                className="issue-new__title issue-new__title--lg"
+                className="issue-new__title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={t("issues.form.titleShort")}
                 aria-label={t("issues.form.title")}
                 autoFocus
               />
-              <DetailsSection title={t("issues.description")}>
-                <div className="issue-new__editor">
-                  <textarea
-                    ref={textRef}
-                    className="issue-new__text"
-                    rows={4}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder={t("issues.form.descriptionPlaceholder")}
-                    aria-label={t("issues.description")}
-                  />
-                  {files.items.some((f) => f.preview) && (
-                    <div className="issue-new__images">
-                      {files.items
-                        .filter((f) => f.preview)
-                        .map((f) => (
-                          <span key={f.key} className="issue-new__image" data-status={f.status}>
-                            <img src={f.preview} alt={f.name} />
-                            {f.status === "uploading" && <Spinner size={24} className="issue-new__image-state" />}
-                            <span className="issue-new__image-name small">{f.name}</span>
-                          </span>
-                        ))}
-                    </div>
-                  )}
-                </div>
-                <p className="issue-new__hint small muted">
-                  <Icon name="image" size={14} />
-                  {pasteHint}
+              <textarea
+                ref={textRef}
+                className="issue-new__text"
+                rows={5}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={t("issues.form.quickPlaceholder")}
+                aria-label={t("issues.form.description")}
+              />
+              {files.attachments && (
+                <div className="ac-composer__attachments issue-new__files">{files.attachments}</div>
+              )}
+              {quickCriteria.length > 0 && (
+                <p className="issue-new__hint small muted" aria-live="polite">
+                  <Icon name="checks" size={14} />
+                  {t("issues.form.criteriaFound", { count: quickCriteria.length })}
                 </p>
-              </DetailsSection>
-              <DetailsSection title={t("issues.criteria")} count={criteria.length || undefined}>
-                <ul className="issue-new__criteria">
-                  {criteria.map((c, i) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: the list is edited in place, by position
-                    <li key={i} className="issue-new__criterion">
-                      <span className="issue-new__box" aria-hidden="true" />
-                      <input
-                        value={c}
-                        onChange={(e) => setCriteria((all) => all.map((x, j) => (j === i ? e.target.value : x)))}
-                        // Enter goes to the new-criterion line; only ⌘↵ or the button creates the task.
-                        onKeyDown={(e) => {
-                          if (e.key !== "Enter" || e.metaKey || e.ctrlKey) return;
-                          e.preventDefault();
-                          addRef.current?.focus();
-                        }}
-                        aria-label={t("issues.criteria")}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        iconOnly
-                        icon="close"
-                        aria-label={t("issues.form.removeCriterion")}
-                        onClick={() => setCriteria((all) => all.filter((_, j) => j !== i))}
-                      />
-                    </li>
-                  ))}
-                  <li className="issue-new__criterion issue-new__criterion--add">
-                    <Icon name="plus" size={16} />
-                    <input
-                      value={draftCriterion}
-                      onChange={(e) => setDraftCriterion(e.target.value)}
-                      ref={addRef}
-                      onKeyDown={(e) => {
-                        if (e.key !== "Enter" || e.metaKey || e.ctrlKey) return;
-                        e.preventDefault();
-                        if (!draftCriterion.trim()) return;
-                        setCriteria((all) => [...all, draftCriterion.trim()]);
-                        setDraftCriterion("");
-                      }}
-                      placeholder={t("issues.form.addCriterion")}
-                      aria-label={t("issues.form.addCriterion")}
-                    />
-                  </li>
-                </ul>
-              </DetailsSection>
-              <DetailsSection
-                title={t("issues.files.title")}
-                count={files.items.length || undefined}
-                actions={
-                  <Button size="sm" variant="ghost" icon="attach" onClick={pick}>
-                    {t("issues.files.add")}
-                  </Button>
-                }
-              >
-                <div className="issue-files__grid">
-                  {files.items.map((f) => (
-                    <PendingTile key={f.key} file={f} onRemove={() => files.remove(f.key)} />
-                  ))}
-                  <button type="button" className="issue-files__add" onClick={pick}>
-                    <Icon name="upload" />
-                    <b>{t("issues.files.add")}</b>
-                    <span>{t("issues.files.addHint")}</span>
-                  </button>
-                </div>
-              </DetailsSection>
-            </div>
-            <aside className="issue-new__side" aria-label={t("issues.details")}>
-              <Field label={t("issues.form.assignee")} id="ni-who">
-                <Select size="sm" value={assignee} onValueChange={setAssignee} options={actors.options(true)} />
-              </Field>
-              {todoColumns.length > 1 && (
-                <Field label={t("issues.column")} id="ni-col">
-                  <Select
-                    size="sm"
-                    value={chosenColumn?.id}
-                    onValueChange={setColumn}
-                    options={todoColumns.map((c) => ({ value: c.id, label: columnTitle(c) }))}
-                  />
-                </Field>
               )}
-              <Field label={t("issues.form.priority")} id="ni-pri">
-                <Select
-                  size="sm"
-                  value={priority}
-                  onValueChange={(v) => setPriority(v as IssuePriority)}
-                  options={PRIORITIES.map((p) => ({ value: p, label: priorityLabel(p) }))}
-                />
-              </Field>
-              <Field label={t("issues.due")} id="ni-due">
-                <DueDate value={due} onChange={setDue} />
-              </Field>
-              {agent && (
-                <div className="issue-new__who">
-                  <ActorAvatar actor={{ type: "agent", id: agent.id }} name={agent.name} size="sm" />
-                  <span>{t("issues.form.agentStartsAll", agentGrammar(agent.name))}</span>
-                </div>
-              )}
-            </aside>
-          </DialogBody>
-        ) : (
-          <DialogBody className="issue-new__quick">
-            <input
-              ref={titleRef}
-              className="issue-new__title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={t("issues.form.titleShort")}
-              aria-label={t("issues.form.title")}
-              autoFocus
-            />
-            <textarea
-              ref={textRef}
-              className="issue-new__text"
-              rows={5}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={t("issues.form.quickPlaceholder")}
-              aria-label={t("issues.form.description")}
-            />
-            {files.attachments && <div className="ac-composer__attachments issue-new__files">{files.attachments}</div>}
-            {quickCriteria.length > 0 && (
-              <p className="issue-new__hint small muted" aria-live="polite">
-                <Icon name="checks" size={14} />
-                {t("issues.form.criteriaFound", { count: quickCriteria.length })}
-              </p>
-            )}
-            <div className="issue-new__props">
-              <Menu
-                label={t("issues.form.assignee")}
-                trigger={
-                  <Button
-                    size="sm"
-                    icon={chosen ? undefined : "person"}
-                    aria-label={
-                      chosen ? `${t("issues.form.assignee")}: ${actors.name(chosen)}` : t("issues.form.assignee")
-                    }
-                  >
-                    {chosen && <ActorAvatar actor={chosen} name={actors.name(chosen)} size="xs" />}
-                    {chosen ? actors.name(chosen) : t("issues.form.assignee")}
-                  </Button>
-                }
-              >
-                {actors.options(true, undefined, "xs").map((o) => (
-                  <MenuItem key={o.value} leading={o.leading} onSelect={() => setAssignee(o.value)}>
-                    {o.label}
-                  </MenuItem>
-                ))}
-              </Menu>
-              <Menu
-                label={t("issues.form.priority")}
-                trigger={
-                  <Button size="sm" icon="flag" aria-label={`${t("issues.form.priority")}: ${priorityLabel(priority)}`}>
-                    {priorityLabel(priority)}
-                  </Button>
-                }
-              >
-                {PRIORITIES.map((p) => (
-                  <MenuItem key={p} icon="flag" onSelect={() => setPriority(p)}>
-                    {priorityLabel(p)}
-                  </MenuItem>
-                ))}
-              </Menu>
-              <DueDate value={due} onChange={setDue} />
-              {todoColumns.length > 1 && chosenColumn && (
+              <div className="issue-new__props">
                 <Menu
-                  label={t("issues.column")}
+                  label={t("issues.form.assignee")}
                   trigger={
                     <Button
                       size="sm"
-                      icon="stageTodo"
-                      aria-label={`${t("issues.column")}: ${columnTitle(chosenColumn)}`}
+                      icon={chosen ? undefined : "person"}
+                      aria-label={
+                        chosen ? `${t("issues.form.assignee")}: ${actors.name(chosen)}` : t("issues.form.assignee")
+                      }
                     >
-                      {columnTitle(chosenColumn)}
+                      {chosen && <ActorAvatar actor={chosen} name={actors.name(chosen)} size="xs" />}
+                      {chosen ? actors.name(chosen) : t("issues.form.assignee")}
                     </Button>
                   }
                 >
-                  {todoColumns.map((c) => (
-                    <MenuItem key={c.id} icon="stageTodo" onSelect={() => setColumn(c.id)}>
-                      {columnTitle(c)}
+                  {actors.options(true, undefined, "xs").map((o) => (
+                    <MenuItem key={o.value} leading={o.leading} onSelect={() => setAssignee(o.value)}>
+                      {o.label}
                     </MenuItem>
                   ))}
                 </Menu>
-              )}
-            </div>
-            {agentNote}
-          </DialogBody>
-        )}
+                <Menu
+                  label={t("issues.form.priority")}
+                  trigger={
+                    <Button
+                      size="sm"
+                      icon="flag"
+                      aria-label={`${t("issues.form.priority")}: ${priorityLabel(priority)}`}
+                    >
+                      {priorityLabel(priority)}
+                    </Button>
+                  }
+                >
+                  {PRIORITIES.map((p) => (
+                    <MenuItem key={p} icon="flag" onSelect={() => setPriority(p)}>
+                      {priorityLabel(p)}
+                    </MenuItem>
+                  ))}
+                </Menu>
+                <DueDate value={due} onChange={setDue} />
+                {todoColumns.length > 1 && chosenColumn && (
+                  <Menu
+                    label={t("issues.column")}
+                    trigger={
+                      <Button
+                        size="sm"
+                        icon="stageTodo"
+                        aria-label={`${t("issues.column")}: ${columnTitle(chosenColumn)}`}
+                      >
+                        {columnTitle(chosenColumn)}
+                      </Button>
+                    }
+                  >
+                    {todoColumns.map((c) => (
+                      <MenuItem key={c.id} icon="stageTodo" onSelect={() => setColumn(c.id)}>
+                        {columnTitle(c)}
+                      </MenuItem>
+                    ))}
+                  </Menu>
+                )}
+              </div>
+              {agentNote}
+            </DialogBody>
+          )}
+        </Locked>
         <DialogFooter className="issue-new__foot">
           {wide ? (
             <span className="issue-new__grow small muted">{t("issues.form.createHint", { keys: `${mod}↵` })}</span>
           ) : (
             <span className="issue-new__again">
-              <Switch id="ni-again" checked={another} onCheckedChange={setAnother} />
+              <Locked when={action.isPending}>
+                <Switch id="ni-again" checked={another} onCheckedChange={setAnother} />
+              </Locked>
               <label htmlFor="ni-again">{t("issues.form.another")}</label>
             </span>
           )}
@@ -498,14 +510,16 @@ export function NewIssueDialog({
               {t("issues.form.cancel")}
             </Button>
           ) : (
-            <Button
-              type="button"
-              variant="ghost"
-              iconOnly
-              icon="attach"
-              aria-label={t("channel.attach")}
-              onClick={pick}
-            />
+            <Locked when={action.isPending}>
+              <Button
+                type="button"
+                variant="ghost"
+                iconOnly
+                icon="attach"
+                aria-label={t("channel.attach")}
+                onClick={pick}
+              />
+            </Locked>
           )}
           {createButton}
         </DialogFooter>

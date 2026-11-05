@@ -4,7 +4,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { computerKind, formatUserCode, locationText } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Alert, Button, Card, ComputerPortrait, EmptyState, Field, Input, Select } from "@agenteschat/ui";
+import { Alert, Button, Card, ComputerPortrait, EmptyState, Field, Input, Locked, Select } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -232,7 +232,7 @@ export function ConnectPage({ code }: { code: string }) {
               {t("connect.noOrgs")}
             </p>
           ) : (
-            <>
+            <Locked when={busy}>
               <Field label={t("connect.org")} id="connect-org" help={t("connect.orgHelp")}>
                 <Select
                   value={orgId}
@@ -243,7 +243,7 @@ export function ConnectPage({ code }: { code: string }) {
               <Field label={t("machines.name")} id="connect-name" help={t("machines.nameHelp")}>
                 <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
               </Field>
-            </>
+            </Locked>
           )}
           {error && <Alert>{error}</Alert>}
           <div className="connect-page__actions">

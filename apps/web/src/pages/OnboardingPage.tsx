@@ -4,7 +4,7 @@ import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { finishOnboarding, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
 import { browserTimezone, timezoneName } from "@agenteschat/client/lib/routines";
-import { Button, Field, Icon, Input, Logo } from "@agenteschat/ui";
+import { Button, Field, Icon, Input, Locked, Logo } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -213,95 +213,97 @@ export function OnboardingPage() {
             </div>
           </header>
 
-          <div className="onb__answer">
-            <div className="onb__ws">
-              <button
-                type="button"
-                className="onb__logo"
-                aria-label={logo ? t("onboarding.workspace.logoChange") : t("onboarding.workspace.logoPick")}
-                title={t("onboarding.workspace.logoHelp")}
-                onClick={() => setLogoOpen(true)}
-              >
-                {logo ? (
-                  <OrgMark logo={`data:${logo.contentType};base64,${logo.imageBase64}`} size={56} />
-                ) : savedLogo ? (
-                  <OrgMark logo={savedLogo} size={56} />
-                ) : org.trim() ? (
-                  <span className="onb__logo-letter">{org.trim().charAt(0).toUpperCase()}</span>
-                ) : (
-                  <Icon name="upload" />
-                )}
-              </button>
-              <Input
-                className="onb__big"
-                aria-label={t("onboarding.workspace.name")}
-                value={org}
-                onChange={(e) => setOrg(e.target.value)}
-                placeholder={t("onboarding.workspace.namePlaceholder")}
-                spellCheck={false}
-                autoFocus
-              />
-            </div>
-            {zoneOpen ? (
-              <Field
-                label={t("onboarding.workspace.timezone")}
-                id="org-zone"
-                hint={{
-                  name: t("common.about", { label: t("onboarding.workspace.timezone") }),
-                  text: t("onboarding.workspace.timezoneHelp"),
-                }}
-              >
-                <ZonePicker
-                  id="org-zone"
-                  value={zone}
-                  onChange={setZone}
-                  suggested={[browserTimezone() ?? "", "UTC"].filter(Boolean)}
-                />
-              </Field>
-            ) : (
-              <p className="onb__help">
-                {t("onboarding.workspace.zone", { zone: timezoneName(zone, i18n.language) })} ·{" "}
-                <button type="button" className="ac-link onb__link" onClick={() => setZoneOpen(true)}>
-                  {t("onboarding.workspace.zoneChange")}
+          <Locked when={busy}>
+            <div className="onb__answer">
+              <div className="onb__ws">
+                <button
+                  type="button"
+                  className="onb__logo"
+                  aria-label={logo ? t("onboarding.workspace.logoChange") : t("onboarding.workspace.logoPick")}
+                  title={t("onboarding.workspace.logoHelp")}
+                  onClick={() => setLogoOpen(true)}
+                >
+                  {logo ? (
+                    <OrgMark logo={`data:${logo.contentType};base64,${logo.imageBase64}`} size={56} />
+                  ) : savedLogo ? (
+                    <OrgMark logo={savedLogo} size={56} />
+                  ) : org.trim() ? (
+                    <span className="onb__logo-letter">{org.trim().charAt(0).toUpperCase()}</span>
+                  ) : (
+                    <Icon name="upload" />
+                  )}
                 </button>
-              </p>
-            )}
-            <ImageCropDialog
-              open={logoOpen}
-              onClose={() => setLogoOpen(false)}
-              title={t("orgLogo.title")}
-              help={t("orgLogo.help")}
-              placeholder={<OrgMark size={56} />}
-              hasImage={logo !== null || Boolean(savedLogo)}
-              removeLabel={t("orgLogo.remove")}
-              format="image/png"
-              save={async (image) => {
-                setLogo(image);
-                setLogoDirty(true);
-              }}
-              remove={async () => {
-                setLogo(null);
-                setLogoDirty(true);
-              }}
-              onSaved={() => setLogoOpen(false)}
-              onRemoved={() => setLogoOpen(false)}
-            />
-            {unpaidElsewhere && (
-              <>
-                <p className="onb__status ac-iconline" role="alert">
-                  <Icon name="pause" size={14} />
-                  <span>{t("standing.createUnpaid")}</span>
+                <Input
+                  className="onb__big"
+                  aria-label={t("onboarding.workspace.name")}
+                  value={org}
+                  onChange={(e) => setOrg(e.target.value)}
+                  placeholder={t("onboarding.workspace.namePlaceholder")}
+                  spellCheck={false}
+                  autoFocus
+                />
+              </div>
+              {zoneOpen ? (
+                <Field
+                  label={t("onboarding.workspace.timezone")}
+                  id="org-zone"
+                  hint={{
+                    name: t("common.about", { label: t("onboarding.workspace.timezone") }),
+                    text: t("onboarding.workspace.timezoneHelp"),
+                  }}
+                >
+                  <ZonePicker
+                    id="org-zone"
+                    value={zone}
+                    onChange={setZone}
+                    suggested={[browserTimezone() ?? "", "UTC"].filter(Boolean)}
+                  />
+                </Field>
+              ) : (
+                <p className="onb__help">
+                  {t("onboarding.workspace.zone", { zone: timezoneName(zone, i18n.language) })} ·{" "}
+                  <button type="button" className="ac-link onb__link" onClick={() => setZoneOpen(true)}>
+                    {t("onboarding.workspace.zoneChange")}
+                  </button>
                 </p>
-                {authConfig?.billingUrl && (
-                  <div className="row">
-                    <BillingLinkButton orgId={unpaidElsewhere} from="new_workspace" icon="external">
-                      {t("standing.billing.cta.payment")}
-                    </BillingLinkButton>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+              )}
+              <ImageCropDialog
+                open={logoOpen}
+                onClose={() => setLogoOpen(false)}
+                title={t("orgLogo.title")}
+                help={t("orgLogo.help")}
+                placeholder={<OrgMark size={56} />}
+                hasImage={logo !== null || Boolean(savedLogo)}
+                removeLabel={t("orgLogo.remove")}
+                format="image/png"
+                save={async (image) => {
+                  setLogo(image);
+                  setLogoDirty(true);
+                }}
+                remove={async () => {
+                  setLogo(null);
+                  setLogoDirty(true);
+                }}
+                onSaved={() => setLogoOpen(false)}
+                onRemoved={() => setLogoOpen(false)}
+              />
+              {unpaidElsewhere && (
+                <>
+                  <p className="onb__status ac-iconline" role="alert">
+                    <Icon name="pause" size={14} />
+                    <span>{t("standing.createUnpaid")}</span>
+                  </p>
+                  {authConfig?.billingUrl && (
+                    <div className="row">
+                      <BillingLinkButton orgId={unpaidElsewhere} from="new_workspace" icon="external">
+                        {t("standing.billing.cta.payment")}
+                      </BillingLinkButton>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </Locked>
 
           {inviteOnly && (
             <p className="onb__help onb__note ac-iconline" role="status">

@@ -14,6 +14,7 @@ import {
   DialogFooter,
   Field,
   Input,
+  Locked,
   RoleMark,
   Select,
   Token,
@@ -268,48 +269,50 @@ export function NewChannelDialog({
           if (!error && accessValid(access)) create.mutate();
         }}
       >
-        <DialogBody>
-          <Field
-            label={t("newChannel.name")}
-            id="ch-name"
-            help={t("newChannel.nameHelp", { name: name || "canal" })}
-            error={
-              touched || (name && error === "taken")
-                ? error === "invalid"
-                  ? t("newChannel.nameInvalid")
-                  : error === "taken"
-                    ? t("newChannel.nameTaken", { name })
-                    : undefined
-                : undefined
-            }
-          >
-            <Input
-              value={name}
-              onChange={(e) => setName(toChannelName(e.target.value))}
-              placeholder={t("newChannel.namePlaceholder")}
-              autoFocus
+        <Locked when={create.isPending}>
+          <DialogBody>
+            <Field
+              label={t("newChannel.name")}
+              id="ch-name"
+              help={t("newChannel.nameHelp", { name: name || "canal" })}
+              error={
+                touched || (name && error === "taken")
+                  ? error === "invalid"
+                    ? t("newChannel.nameInvalid")
+                    : error === "taken"
+                      ? t("newChannel.nameTaken", { name })
+                      : undefined
+                  : undefined
+              }
+            >
+              <Input
+                value={name}
+                onChange={(e) => setName(toChannelName(e.target.value))}
+                placeholder={t("newChannel.namePlaceholder")}
+                autoFocus
+              />
+            </Field>
+            <Field label={t("newChannel.topic")} id="ch-topic">
+              <Input
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder={t("newChannel.topicPlaceholder")}
+              />
+            </Field>
+            <Field label={t("channelCategories.category")} id="ch-category" help={t("channelCategories.categoryHelp")}>
+              <CategorySelect value={categoryId} onChange={setCategoryId} canCreate={can(org, "manage_channels")} />
+            </Field>
+            <ChannelAccessChoice value={access} onChange={setAccess} idPrefix="ch" showError={touched} />
+            <PeoplePicker
+              label={t("newChannel.members")}
+              searchLabel={t("newChannel.membersSearch")}
+              emptyText={(q) => t("newChannel.membersEmpty", { q })}
+              selected={selected}
+              onChange={setSelected}
+              channel
             />
-          </Field>
-          <Field label={t("newChannel.topic")} id="ch-topic">
-            <Input
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder={t("newChannel.topicPlaceholder")}
-            />
-          </Field>
-          <Field label={t("channelCategories.category")} id="ch-category" help={t("channelCategories.categoryHelp")}>
-            <CategorySelect value={categoryId} onChange={setCategoryId} canCreate={can(org, "manage_channels")} />
-          </Field>
-          <ChannelAccessChoice value={access} onChange={setAccess} idPrefix="ch" showError={touched} />
-          <PeoplePicker
-            label={t("newChannel.members")}
-            searchLabel={t("newChannel.membersSearch")}
-            emptyText={(q) => t("newChannel.membersEmpty", { q })}
-            selected={selected}
-            onChange={setSelected}
-            channel
-          />
-        </DialogBody>
+          </DialogBody>
+        </Locked>
         <DialogFooter bar note={t("newChannel.selected", { count: selected.size })}>
           <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button type="submit" variant="primary" disabled={create.isPending} loading={create.isPending}>

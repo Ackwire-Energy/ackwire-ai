@@ -91,6 +91,7 @@ import {
   type IconName,
   InfoHint,
   Input,
+  Locked,
   Menu,
   PageHeader,
   RecurrencePicker,
@@ -2470,220 +2471,222 @@ function RoutineDialog({
           submit();
         }}
       >
-        <DialogBody>
-          {!part && agents.length === 0 && <p className="small muted">{t("routines.form.noAgents")}</p>}
-          {!editing && !prompt.trim() && (
-            <fieldset className="routine-presets">
-              <legend className="ac-eyebrow">{t("routines.presets.title")}</legend>
-              <div className="routine-presets__list">
-                {PRESETS.map((p) => (
-                  <button key={p.key} type="button" className="routine-preset" onClick={() => applyPreset(p)}>
-                    <span className="routine-preset__icon" aria-hidden="true">
-                      <Icon name={p.icon} size={16} />
-                    </span>
-                    <span>
-                      <b>{t(`routines.presets.${p.key}.name`)}</b>
-                      <small>{t(`routines.presets.${p.key}.text`)}</small>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-          )}
-          {!part ? (
-            <div className="grid-fields">
-              <Field label={t("routines.form.agent")} id="nr-agent">
-                <Select
-                  value={agentId || undefined}
-                  onValueChange={setAgentId}
-                  options={agents.map((a) => ({
-                    value: a.id,
-                    label: a.name,
-                    description: a.role || undefined,
-                    leading: actors.avatar({ type: "agent", id: a.id }, "sm"),
-                  }))}
-                />
-              </Field>
-              {targetField}
-            </div>
-          ) : (
-            part === "where" && targetField
-          )}
-          {!part && (
-            <>
-              <Field
-                label={t("routines.form.what")}
-                id="nr-what"
-                error={touched && !prompt.trim() ? t("routines.form.required") : undefined}
-              >
-                <Textarea
-                  rows={3}
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder={t("routines.form.whatPlaceholder")}
-                />
-              </Field>
-              <Field label={t("routines.form.name")} id="nr-name">
-                <Input value={name} onChange={(e) => setName(e.target.value)} />
-              </Field>
-            </>
-          )}
-          {shows("when") && (
-            <>
-              <div className="routine-kind">
-                <span className="ac-field__label">{t("routines.form.when")}</span>
-                <Segmented
-                  label={t("routines.form.when")}
-                  value={kind}
-                  onValueChange={setKind}
-                  options={[
-                    { value: "schedule" as const, label: t("routines.form.kind.schedule") },
-                    { value: "event" as const, label: t("routines.form.kind.event") },
-                    ...(hasMail ? [{ value: "email" as const, label: t("routines.form.kind.email") }] : []),
-                    ...(hasMillionSend
-                      ? [{ value: "connector" as const, label: t("routines.form.kind.connector") }]
-                      : []),
-                    { value: "webhook" as const, label: t("routines.form.kind.webhook") },
-                  ]}
-                />
-              </div>
-              {kind === "email" && <EmailTriggerFields value={email} onChange={setEmail} />}
-              {kind === "connector" && <ConnectorTriggerFields value={connector} onChange={setConnector} />}
-              {kind === "webhook" &&
-                (routine?.trigger.type === "webhook" ? (
-                  <WebhookPanel routine={routine} runs={routine.recentRuns} />
-                ) : (
-                  <p className="routine-note small ac-iconline">
-                    <Icon name="link" size={14} />
-                    <span>{t("routines.webhook.newNote")}</span>
-                  </p>
-                ))}
-              {kind === "schedule" && (
-                <div className="routine-when">
-                  <div className="routine-when__head">
-                    <span className="routine-when__sentence" aria-live="polite">
-                      {ruleSentence(t, i18n.language, rule, new Date(), false)}
-                    </span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      icon="repeat"
-                      aria-expanded={pickerOpen}
-                      onClick={() => setPickerOpen((o) => !o)}
-                    >
-                      {t("routines.form.adjust")}
-                    </Button>
-                  </div>
-                  {!pickerOpen && upcoming.length > 0 && (
-                    <div className="ac-recur__upcoming">
-                      <span className="ac-recur__label">{t("routines.form.next")}</span>
-                      <ol>
-                        {upcoming.map((label) => (
-                          <li key={label} className="tabular">
-                            {label}
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  )}
-                  {pickerOpen && (
-                    <RecurrencePicker
-                      value={rule}
-                      onChange={pickRule}
-                      labels={recurrenceLabels(t, i18n.language, rule)}
-                      locale={i18n.language}
-                      upcoming={upcoming}
-                      hideTimezone
-                    />
-                  )}
+        <Locked when={action.isPending}>
+          <DialogBody>
+            {!part && agents.length === 0 && <p className="small muted">{t("routines.form.noAgents")}</p>}
+            {!editing && !prompt.trim() && (
+              <fieldset className="routine-presets">
+                <legend className="ac-eyebrow">{t("routines.presets.title")}</legend>
+                <div className="routine-presets__list">
+                  {PRESETS.map((p) => (
+                    <button key={p.key} type="button" className="routine-preset" onClick={() => applyPreset(p)}>
+                      <span className="routine-preset__icon" aria-hidden="true">
+                        <Icon name={p.icon} size={16} />
+                      </span>
+                      <span>
+                        <b>{t(`routines.presets.${p.key}.name`)}</b>
+                        <small>{t(`routines.presets.${p.key}.text`)}</small>
+                      </span>
+                    </button>
+                  ))}
                 </div>
-              )}
-              {kind === "schedule" && (
-                <>
-                  {!once && (
-                    <Field label={t("routines.form.frequency")} id="nr-when" error={phraseError()}>
-                      <Input
-                        value={phrase}
-                        onChange={(e) => typePhrase(e.target.value)}
-                        placeholder={t("recurrence.phrasePlaceholder")}
-                      />
-                    </Field>
-                  )}
-                  <Field label={t("routines.form.timezone")} id="nr-zone">
-                    <ZoneSelect value={zone} onChange={setZone} />
-                  </Field>
-                </>
-              )}
-              {kind === "schedule" && wasUtc && !isUtc(shownZone) && (
-                <p className="routine-utc-hint small ac-iconline">
-                  <Icon name="waiting" size={14} />
-                  <span>{t("routines.form.utcHint", { zone: timezoneName(shownZone, i18n.language) })}</span>
-                  <button type="button" className="ac-link" onClick={() => setZone("UTC")}>
-                    {t("routines.form.keepUtc")}
-                  </button>
-                </p>
-              )}
-              {kind !== "event" ? null : (
-                <Field
-                  label={t("routines.form.event")}
-                  id="nr-event"
-                  hint={{
-                    name: t("common.about", { label: t("routines.form.event") }),
-                    text: t("routines.form.eventHelp", { org: org.name }),
-                  }}
-                >
+              </fieldset>
+            )}
+            {!part ? (
+              <div className="grid-fields">
+                <Field label={t("routines.form.agent")} id="nr-agent">
                   <Select
-                    value={event}
-                    onValueChange={(v) => setEvent(v as RoutineEvent)}
-                    options={ROUTINE_EVENTS.map((e) => ({ value: e, label: t(`routines.event.${e}`) }))}
+                    value={agentId || undefined}
+                    onValueChange={setAgentId}
+                    options={agents.map((a) => ({
+                      value: a.id,
+                      label: a.name,
+                      description: a.role || undefined,
+                      leading: actors.avatar({ type: "agent", id: a.id }, "sm"),
+                    }))}
                   />
                 </Field>
-              )}
-              {busy && (
-                <p className="routine-note small ac-iconline" role="status">
-                  <Icon name="computer" size={14} />
-                  <span>{say(busy)}</span>
-                </p>
-              )}
-            </>
-          )}
-          {!part && (
-            <>
-              <div className="routine-kind">
-                <span className="ac-hintline">
-                  <span className="ac-field__label">{t("routines.form.report")}</span>
-                  <InfoHint name={t("common.about", { label: t("routines.form.report") })}>
-                    {t("routines.report.hint")}
-                  </InfoHint>
-                </span>
-                <Segmented
-                  label={t("routines.form.report")}
-                  value={report}
-                  onValueChange={setReport}
-                  options={(["always", "when_new"] as const).map((v) => ({
-                    value: v,
-                    label: t(`routines.report.${v}`),
-                  }))}
+                {targetField}
+              </div>
+            ) : (
+              part === "where" && targetField
+            )}
+            {!part && (
+              <>
+                <Field
+                  label={t("routines.form.what")}
+                  id="nr-what"
+                  error={touched && !prompt.trim() ? t("routines.form.required") : undefined}
+                >
+                  <Textarea
+                    rows={3}
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder={t("routines.form.whatPlaceholder")}
+                  />
+                </Field>
+                <Field label={t("routines.form.name")} id="nr-name">
+                  <Input value={name} onChange={(e) => setName(e.target.value)} />
+                </Field>
+              </>
+            )}
+            {shows("when") && (
+              <>
+                <div className="routine-kind">
+                  <span className="ac-field__label">{t("routines.form.when")}</span>
+                  <Segmented
+                    label={t("routines.form.when")}
+                    value={kind}
+                    onValueChange={setKind}
+                    options={[
+                      { value: "schedule" as const, label: t("routines.form.kind.schedule") },
+                      { value: "event" as const, label: t("routines.form.kind.event") },
+                      ...(hasMail ? [{ value: "email" as const, label: t("routines.form.kind.email") }] : []),
+                      ...(hasMillionSend
+                        ? [{ value: "connector" as const, label: t("routines.form.kind.connector") }]
+                        : []),
+                      { value: "webhook" as const, label: t("routines.form.kind.webhook") },
+                    ]}
+                  />
+                </div>
+                {kind === "email" && <EmailTriggerFields value={email} onChange={setEmail} />}
+                {kind === "connector" && <ConnectorTriggerFields value={connector} onChange={setConnector} />}
+                {kind === "webhook" &&
+                  (routine?.trigger.type === "webhook" ? (
+                    <WebhookPanel routine={routine} runs={routine.recentRuns} />
+                  ) : (
+                    <p className="routine-note small ac-iconline">
+                      <Icon name="link" size={14} />
+                      <span>{t("routines.webhook.newNote")}</span>
+                    </p>
+                  ))}
+                {kind === "schedule" && (
+                  <div className="routine-when">
+                    <div className="routine-when__head">
+                      <span className="routine-when__sentence" aria-live="polite">
+                        {ruleSentence(t, i18n.language, rule, new Date(), false)}
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        icon="repeat"
+                        aria-expanded={pickerOpen}
+                        onClick={() => setPickerOpen((o) => !o)}
+                      >
+                        {t("routines.form.adjust")}
+                      </Button>
+                    </div>
+                    {!pickerOpen && upcoming.length > 0 && (
+                      <div className="ac-recur__upcoming">
+                        <span className="ac-recur__label">{t("routines.form.next")}</span>
+                        <ol>
+                          {upcoming.map((label) => (
+                            <li key={label} className="tabular">
+                              {label}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                    {pickerOpen && (
+                      <RecurrencePicker
+                        value={rule}
+                        onChange={pickRule}
+                        labels={recurrenceLabels(t, i18n.language, rule)}
+                        locale={i18n.language}
+                        upcoming={upcoming}
+                        hideTimezone
+                      />
+                    )}
+                  </div>
+                )}
+                {kind === "schedule" && (
+                  <>
+                    {!once && (
+                      <Field label={t("routines.form.frequency")} id="nr-when" error={phraseError()}>
+                        <Input
+                          value={phrase}
+                          onChange={(e) => typePhrase(e.target.value)}
+                          placeholder={t("recurrence.phrasePlaceholder")}
+                        />
+                      </Field>
+                    )}
+                    <Field label={t("routines.form.timezone")} id="nr-zone">
+                      <ZoneSelect value={zone} onChange={setZone} />
+                    </Field>
+                  </>
+                )}
+                {kind === "schedule" && wasUtc && !isUtc(shownZone) && (
+                  <p className="routine-utc-hint small ac-iconline">
+                    <Icon name="waiting" size={14} />
+                    <span>{t("routines.form.utcHint", { zone: timezoneName(shownZone, i18n.language) })}</span>
+                    <button type="button" className="ac-link" onClick={() => setZone("UTC")}>
+                      {t("routines.form.keepUtc")}
+                    </button>
+                  </p>
+                )}
+                {kind !== "event" ? null : (
+                  <Field
+                    label={t("routines.form.event")}
+                    id="nr-event"
+                    hint={{
+                      name: t("common.about", { label: t("routines.form.event") }),
+                      text: t("routines.form.eventHelp", { org: org.name }),
+                    }}
+                  >
+                    <Select
+                      value={event}
+                      onValueChange={(v) => setEvent(v as RoutineEvent)}
+                      options={ROUTINE_EVENTS.map((e) => ({ value: e, label: t(`routines.event.${e}`) }))}
+                    />
+                  </Field>
+                )}
+                {busy && (
+                  <p className="routine-note small ac-iconline" role="status">
+                    <Icon name="computer" size={14} />
+                    <span>{say(busy)}</span>
+                  </p>
+                )}
+              </>
+            )}
+            {!part && (
+              <>
+                <div className="routine-kind">
+                  <span className="ac-hintline">
+                    <span className="ac-field__label">{t("routines.form.report")}</span>
+                    <InfoHint name={t("common.about", { label: t("routines.form.report") })}>
+                      {t("routines.report.hint")}
+                    </InfoHint>
+                  </span>
+                  <Segmented
+                    label={t("routines.form.report")}
+                    value={report}
+                    onValueChange={setReport}
+                    options={(["always", "when_new"] as const).map((v) => ({
+                      value: v,
+                      label: t(`routines.report.${v}`),
+                    }))}
+                  />
+                </div>
+                <div className="routine-own-actions">
+                  <span className="ac-field__label">{t("routines.panel.ownActions")}</span>
+                  <OwnActions routine={routine} />
+                </div>
+                <RoutineReachWarnings
+                  prompt={prompt}
+                  agentId={agentId || null}
+                  creatorUserId={routine?.createdByUserId}
                 />
-              </div>
-              <div className="routine-own-actions">
-                <span className="ac-field__label">{t("routines.panel.ownActions")}</span>
-                <OwnActions routine={routine} />
-              </div>
-              <RoutineReachWarnings
-                prompt={prompt}
-                agentId={agentId || null}
-                creatorUserId={routine?.createdByUserId}
-              />
-            </>
-          )}
-        </DialogBody>
+              </>
+            )}
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("routines.form.cancel")}
           </Button>
-          <Button type="submit" variant="primary" disabled={action.isPending || !agentId || !scheduleOk}>
+          <Button type="submit" variant="primary" disabled={!agentId || !scheduleOk} loading={action.isPending}>
             {editing ? t("routines.form.save") : t("routines.form.create")}
           </Button>
         </DialogFooter>

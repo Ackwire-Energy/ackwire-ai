@@ -14,6 +14,7 @@ import {
   EmptyState,
   Field,
   Icon,
+  Locked,
   PageHeader,
   Textarea,
 } from "@agenteschat/ui";
@@ -182,7 +183,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
               <div className="row">
                 <span className="ac-eyebrow spacer">{t("proposals.change", { target: targetLabel(current) })}</span>
                 {current.status === "pending" && current.canDecide && isText(current) && (
-                  <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)}>
+                  <Button variant="ghost" size="sm" disabled={decide.isPending} onClick={() => setEditing((v) => !v)}>
                     {editing ? t("proposals.viewDiff") : t("proposals.editFirst")}
                   </Button>
                 )}
@@ -196,7 +197,9 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                   }
                   id="prop-edit"
                 >
-                  <Textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} />
+                  <Locked when={decide.isPending || current.stale}>
+                    <Textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} />
+                  </Locked>
                 </Field>
               ) : (
                 <Diff

@@ -2,7 +2,7 @@ import { keys } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { matchesName } from "@agenteschat/client/lib/text";
-import { Button, Dialog, DialogBody, DialogFooter, Field, Icon, Input } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Field, Icon, Input, Locked } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -48,24 +48,26 @@ export function DeleteAgentsDialog({
           if (ready) onConfirm();
         }}
       >
-        <DialogBody>
-          <p>
-            <b>{names?.join(", ")}</b>
-          </p>
-          <ul className="agp-delete">
-            <li className="ac-iconline">
-              <Icon name="trash" size={16} />
-              <span>{t("agentPage.delete.goes")}</span>
-            </li>
-            <li className="ac-iconline">
-              <Icon name="message" size={16} />
-              <span>{t("agentPage.delete.stays")}</span>
-            </li>
-          </ul>
-          <Field label={t("agentPage.delete.typeName", { name: target })} id="agp-delete-names">
-            <Input value={typed} autoComplete="off" spellCheck={false} onChange={(e) => setTyped(e.target.value)} />
-          </Field>
-        </DialogBody>
+        <Locked when={pending}>
+          <DialogBody>
+            <p>
+              <b>{names?.join(", ")}</b>
+            </p>
+            <ul className="agp-delete">
+              <li className="ac-iconline">
+                <Icon name="trash" size={16} />
+                <span>{t("agentPage.delete.goes")}</span>
+              </li>
+              <li className="ac-iconline">
+                <Icon name="message" size={16} />
+                <span>{t("agentPage.delete.stays")}</span>
+              </li>
+            </ul>
+            <Field label={t("agentPage.delete.typeName", { name: target })} id="agp-delete-names">
+              <Input value={typed} autoComplete="off" spellCheck={false} onChange={(e) => setTyped(e.target.value)} />
+            </Field>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={close}>
             {t("common.cancel")}
@@ -132,25 +134,27 @@ export function DeleteAgentDialog({
           confirm();
         }}
       >
-        <DialogBody>
-          <ul className="agp-delete">
-            <li className="ac-iconline">
-              <Icon name="trash" size={16} />
-              <span>{t("agentPage.delete.goes")}</span>
-            </li>
-            <li className="ac-iconline">
-              <Icon name="message" size={16} />
-              <span>{t("agentPage.delete.stays")}</span>
-            </li>
-          </ul>
-          <Field
-            label={t("agentPage.delete.typeName", g)}
-            id="agp-delete-name"
-            error={purge.error ? errorText(t, purge.error) : undefined}
-          >
-            <Input value={typed} autoComplete="off" spellCheck={false} onChange={(e) => setTyped(e.target.value)} />
-          </Field>
-        </DialogBody>
+        <Locked when={purge.isPending}>
+          <DialogBody>
+            <ul className="agp-delete">
+              <li className="ac-iconline">
+                <Icon name="trash" size={16} />
+                <span>{t("agentPage.delete.goes")}</span>
+              </li>
+              <li className="ac-iconline">
+                <Icon name="message" size={16} />
+                <span>{t("agentPage.delete.stays")}</span>
+              </li>
+            </ul>
+            <Field
+              label={t("agentPage.delete.typeName", g)}
+              id="agp-delete-name"
+              error={purge.error ? errorText(t, purge.error) : undefined}
+            >
+              <Input value={typed} autoComplete="off" spellCheck={false} onChange={(e) => setTyped(e.target.value)} />
+            </Field>
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={close}>
             {t("common.cancel")}

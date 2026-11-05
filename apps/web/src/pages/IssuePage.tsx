@@ -18,6 +18,7 @@ import {
   DetailsSection,
   Field,
   Icon,
+  Locked,
   SavedNote,
   Select,
   TabPanel,
@@ -672,22 +673,17 @@ function AskAgent({ issue }: { issue: Issue }) {
         </span>
       </div>
       <div className="issue-ask__actions">
-        <Button
-          variant="agent"
-          icon="agent"
-          size="sm"
-          disabled={action.isPending}
-          loading={action.isPending}
-          onClick={() => ask(agent)}
-        >
-          {t("issues.askButton", { context: g.context, name: agent.name })}
-        </Button>
-        {others.slice(0, 3).map((a) => (
-          <button key={a.id} type="button" className="issue-ask__other" onClick={() => ask(a)}>
-            {avatar({ type: "agent", id: a.id }, "xs")}
-            {a.name}
-          </button>
-        ))}
+        <Locked when={action.isPending}>
+          <Button variant="agent" icon="agent" size="sm" loading={action.isPending} onClick={() => ask(agent)}>
+            {t("issues.askButton", { context: g.context, name: agent.name })}
+          </Button>
+          {others.slice(0, 3).map((a) => (
+            <button key={a.id} type="button" className="issue-ask__other" onClick={() => ask(a)}>
+              {avatar({ type: "agent", id: a.id }, "xs")}
+              {a.name}
+            </button>
+          ))}
+        </Locked>
       </div>
     </section>
   );

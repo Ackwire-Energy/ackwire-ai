@@ -1235,8 +1235,13 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .member-row--add:hover {
   color: var(--ink);
 }
+/* What a form brings of its own to a `Locked`, outside the kit's disabled looks. */
+.ac-locked:disabled :is(button, input, textarea):not([class^="ac-"], [class*=" ac-"], .ac-input-affix input) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 /* Above a footer's line, the add row keeps its air (last in the dialog, the list's own edge does). */
-.ac-dialog__list:not(:last-child):has(> .member-row--add:last-child) {
+.ac-dialog__list:is(:not(:last-child), .ac-locked:not(:last-child) > *):has(> .member-row--add:last-child) {
   padding-bottom: 16px;
 }
 html:not([data-pointer]) .member-row--add:focus-visible {

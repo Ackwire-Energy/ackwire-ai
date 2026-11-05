@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { bodyTones } from "../agent/engine.js";
 import { cx } from "../cx";
 import type { AgentColor } from "./AgentLook";
+import { useLocked } from "./Field";
 import { reduced, token } from "./RunPixels";
 
 export interface EffortStep<V extends string> {
@@ -85,7 +86,7 @@ export function EffortPixels<V extends string>({
   label,
   hint,
   color = "sky",
-  disabled,
+  disabled: off,
   className,
 }: {
   value: V;
@@ -98,6 +99,8 @@ export function EffortPixels<V extends string>({
   disabled?: boolean;
   className?: string;
 }) {
+  const locked = useLocked();
+  const disabled = off || locked;
   const canvas = useRef<HTMLCanvasElement>(null);
   const n = steps.length;
   const index = Math.max(

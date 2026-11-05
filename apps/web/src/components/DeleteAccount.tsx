@@ -2,7 +2,7 @@ import { type DeletionProofInput, useAccountDeletionPlan, useApi, useAuthConfig,
 import { type AccountDeletionLine, accountDeletionLines } from "@agenteschat/client/lib/deletion";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { settingUp } from "@agenteschat/client/lib/guards";
-import { Alert, Button, Dialog, DialogBody, DialogFooter, type IconName } from "@agenteschat/ui";
+import { Alert, Button, Dialog, DialogBody, DialogFooter, type IconName, Locked } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect } from "react";
@@ -83,81 +83,83 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
           if (ready && proof.ready && !del.isPending) del.mutate(proof.input);
         }}
       >
-        <DialogBody>
-          {plan.isError ? (
-            <ErrorState error={plan.error} onRetry={() => void plan.refetch()} />
-          ) : !data ? (
-            <LoadingLine width={320} />
-          ) : blockers.length > 0 ? (
-            <>
-              <h3 className="ac-card__title">{t("deleteAccount.blockers")}</h3>
-              <ul className="deletion-blockers">
-                {blockers.map((o) =>
-                  inSetup(o.id) ? (
-                    <DeletionLine key={o.id} icon="stageTodo">
-                      {t("deleteAccount.soleOwnerSettingUp", { name: o.name })}
-                      <span className="deletion-acts">
-                        <Link className="ac-link" to="/onboarding">
-                          {t("deleteAccount.finishSetup")}
-                        </Link>
-                        <Link className="ac-link" to="/onboarding" search={{ delete: 1 }}>
-                          {t("deleteAccount.deleteOrg", { name: o.name })}
-                        </Link>
-                      </span>
-                    </DeletionLine>
-                  ) : (
-                    <DeletionLine key={o.id} icon="stageTodo">
-                      {t("deleteAccount.soleOwner", { name: o.name })}
-                      <span className="deletion-acts">
-                        <Link
-                          className="ac-link"
-                          to="/org/$orgId/settings/$section"
-                          params={{ orgId: o.id, section: "members" }}
-                        >
-                          {t("deleteAccount.openPeople")}
-                        </Link>
-                        <Link
-                          className="ac-link"
-                          to="/org/$orgId/settings/$section"
-                          params={{ orgId: o.id, section: "general" }}
-                          search={{ delete: 1 }}
-                        >
-                          {t("deleteAccount.deleteOrg", { name: o.name })}
-                        </Link>
-                      </span>
-                    </DeletionLine>
-                  ),
-                )}
-              </ul>
-            </>
-          ) : (
-            <>
-              <ul className="deletion-lines">
-                {lines.map((line) => (
-                  <DeletionLine key={`${line.kind}:${line.text}`} icon={LINE_ICON[line.kind]}>
-                    {line.text}
-                    {line.links && (
-                      <span className="deletion-acts">
-                        {line.links.map((l) => (
+        <Locked when={del.isPending}>
+          <DialogBody>
+            {plan.isError ? (
+              <ErrorState error={plan.error} onRetry={() => void plan.refetch()} />
+            ) : !data ? (
+              <LoadingLine width={320} />
+            ) : blockers.length > 0 ? (
+              <>
+                <h3 className="ac-card__title">{t("deleteAccount.blockers")}</h3>
+                <ul className="deletion-blockers">
+                  {blockers.map((o) =>
+                    inSetup(o.id) ? (
+                      <DeletionLine key={o.id} icon="stageTodo">
+                        {t("deleteAccount.soleOwnerSettingUp", { name: o.name })}
+                        <span className="deletion-acts">
+                          <Link className="ac-link" to="/onboarding">
+                            {t("deleteAccount.finishSetup")}
+                          </Link>
+                          <Link className="ac-link" to="/onboarding" search={{ delete: 1 }}>
+                            {t("deleteAccount.deleteOrg", { name: o.name })}
+                          </Link>
+                        </span>
+                      </DeletionLine>
+                    ) : (
+                      <DeletionLine key={o.id} icon="stageTodo">
+                        {t("deleteAccount.soleOwner", { name: o.name })}
+                        <span className="deletion-acts">
                           <Link
-                            key={l.label}
                             className="ac-link"
                             to="/org/$orgId/settings/$section"
-                            params={{ orgId: l.orgId, section: l.section }}
+                            params={{ orgId: o.id, section: "members" }}
                           >
-                            {l.label}
+                            {t("deleteAccount.openPeople")}
                           </Link>
-                        ))}
-                      </span>
-                    )}
-                  </DeletionLine>
-                ))}
-              </ul>
-              <DeletionProofField proof={proof} />
-              {proof.alert && errorCode(del.error) !== "sole_owner" && <Alert>{errorText(t, del.error)}</Alert>}
-            </>
-          )}
-        </DialogBody>
+                          <Link
+                            className="ac-link"
+                            to="/org/$orgId/settings/$section"
+                            params={{ orgId: o.id, section: "general" }}
+                            search={{ delete: 1 }}
+                          >
+                            {t("deleteAccount.deleteOrg", { name: o.name })}
+                          </Link>
+                        </span>
+                      </DeletionLine>
+                    ),
+                  )}
+                </ul>
+              </>
+            ) : (
+              <>
+                <ul className="deletion-lines">
+                  {lines.map((line) => (
+                    <DeletionLine key={`${line.kind}:${line.text}`} icon={LINE_ICON[line.kind]}>
+                      {line.text}
+                      {line.links && (
+                        <span className="deletion-acts">
+                          {line.links.map((l) => (
+                            <Link
+                              key={l.label}
+                              className="ac-link"
+                              to="/org/$orgId/settings/$section"
+                              params={{ orgId: l.orgId, section: l.section }}
+                            >
+                              {l.label}
+                            </Link>
+                          ))}
+                        </span>
+                      )}
+                    </DeletionLine>
+                  ))}
+                </ul>
+                <DeletionProofField proof={proof} />
+                {proof.alert && errorCode(del.error) !== "sole_owner" && <Alert>{errorText(t, del.error)}</Alert>}
+              </>
+            )}
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {blockers.length > 0 ? t("common.close") : t("common.cancel")}

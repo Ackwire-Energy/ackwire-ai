@@ -23,6 +23,7 @@ import {
   InfoHint,
   Input,
   List,
+  Locked,
   ProviderLogo,
   SettingNote,
 } from "@agenteschat/ui";
@@ -142,24 +143,26 @@ export function JevSteps({
       <Step n={n + 2}>
         <StepTitle title={t("jev.steps.paste")} htmlFor={field} />
         <span className="agp-addacct__paste">
-          <Input
-            id={field}
-            type="password"
-            value={value}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={t("jev.steps.placeholder")}
-            // Settings opens the steps in place of the button pressed: the field takes the focus.
-            autoFocus={Boolean(onCancel)}
-            invalid={Boolean(error)}
-            aria-describedby={below}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter" || !onSave) return;
-              e.preventDefault();
-              if (key.length >= JEV_KEY_MIN && !saving) onSave();
-            }}
-          />
+          <Locked when={Boolean(saving)}>
+            <Input
+              id={field}
+              type="password"
+              value={value}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={t("jev.steps.placeholder")}
+              // Settings opens the steps in place of the button pressed: the field takes the focus.
+              autoFocus={Boolean(onCancel)}
+              invalid={Boolean(error)}
+              aria-describedby={below}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" || !onSave) return;
+                e.preventDefault();
+                if (key.length >= JEV_KEY_MIN && !saving) onSave();
+              }}
+            />
+          </Locked>
           {onSave && (
             <Button variant="primary" disabled={key.length < JEV_KEY_MIN} loading={saving} onClick={onSave}>
               {t("settings.saveKey")}

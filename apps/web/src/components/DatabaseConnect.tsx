@@ -34,6 +34,7 @@ import {
   Field,
   Icon,
   Input,
+  Locked,
   Segmented,
   Select,
 } from "@agenteschat/ui";
@@ -259,100 +260,106 @@ function ConnectStep({
         submit();
       }}
     >
-      <DialogBody className="cflow__body">
-        <p className="muted cflow__text">{t("database.connectText")}</p>
-        <Field label={t("database.providerLabel")} id="db-provider">
-          <Select
-            value={provider}
-            onValueChange={(v) => setProvider(v as DatabaseProvider)}
-            options={DATABASE_PROVIDERS.map((p) => ({ value: p, label: t(`database.provider.${p}`) }))}
-          />
-        </Field>
-        <Field label={t("connectFlow.name")} id="db-label" help={t("database.nameHelp")}>
-          <Input value={label} placeholder={t("database.namePlaceholder")} onChange={(e) => setLabel(e.target.value)} />
-        </Field>
-        <Field label={t("database.url")} id="db-url" help={t("database.urlHelp")} error={urlError}>
-          <Input
-            autoComplete="off"
-            data-1p-ignore
-            data-lpignore="true"
-            spellCheck={false}
-            value={url}
-            placeholder={t("database.urlPlaceholder")}
-            onChange={(e) => {
-              setUrl(e.target.value);
+      <Locked when={connect.isPending}>
+        <DialogBody className="cflow__body">
+          <p className="muted cflow__text">{t("database.connectText")}</p>
+          <Field label={t("database.providerLabel")} id="db-provider">
+            <Select
+              value={provider}
+              onValueChange={(v) => setProvider(v as DatabaseProvider)}
+              options={DATABASE_PROVIDERS.map((p) => ({ value: p, label: t(`database.provider.${p}`) }))}
+            />
+          </Field>
+          <Field label={t("connectFlow.name")} id="db-label" help={t("database.nameHelp")}>
+            <Input
+              value={label}
+              placeholder={t("database.namePlaceholder")}
+              onChange={(e) => setLabel(e.target.value)}
+            />
+          </Field>
+          <Field label={t("database.url")} id="db-url" help={t("database.urlHelp")} error={urlError}>
+            <Input
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
+              spellCheck={false}
+              value={url}
+              placeholder={t("database.urlPlaceholder")}
+              onChange={(e) => {
+                setUrl(e.target.value);
+                setError(null);
+              }}
+            />
+          </Field>
+          <ScopeFields
+            whole={whole}
+            prefix={prefix}
+            onScope={(v) => {
+              setScope(v);
               setError(null);
             }}
+            onPrefix={setPrefix}
           />
-        </Field>
-        <ScopeFields
-          whole={whole}
-          prefix={prefix}
-          onScope={(v) => {
-            setScope(v);
-            setError(null);
-          }}
-          onPrefix={setPrefix}
-        />
-        <ReadOnlyUserHelp provider={provider} database={dbName} wholeServer={whole} />
-        <p className="small muted mail-hint">
-          <Icon name="info" size={14} />
-          <span>{t("database.dedicated")}</span>
-        </p>
-        <details
-          className="cflow__more"
-          open={advanced}
-          onToggle={(e) => setAdvanced((e.currentTarget as HTMLDetailsElement).open)}
-        >
-          <summary>{t("mail.advanced")}</summary>
-          <div className="cflow__key">
-            <p className="small muted">{t("database.advancedText")}</p>
-            <div className="mail-host">
-              <Field label={t("database.host")} id="db-host">
-                <Input autoComplete="off" value={host} onChange={(e) => setHost(e.target.value)} />
+          <ReadOnlyUserHelp provider={provider} database={dbName} wholeServer={whole} />
+          <p className="small muted mail-hint">
+            <Icon name="info" size={14} />
+            <span>{t("database.dedicated")}</span>
+          </p>
+          <details
+            className="cflow__more"
+            open={advanced}
+            onToggle={(e) => setAdvanced((e.currentTarget as HTMLDetailsElement).open)}
+          >
+            <summary>{t("mail.advanced")}</summary>
+            <div className="cflow__key">
+              <p className="small muted">{t("database.advancedText")}</p>
+              <div className="mail-host">
+                <Field label={t("database.host")} id="db-host">
+                  <Input autoComplete="off" value={host} onChange={(e) => setHost(e.target.value)} />
+                </Field>
+                <Field label={t("mail.port")} id="db-port">
+                  <Input inputMode="numeric" value={port} onChange={(e) => setPort(e.target.value)} />
+                </Field>
+              </div>
+              <Field
+                label={t("database.database")}
+                id="db-database"
+                help={whole ? t("database.databaseOptional") : undefined}
+              >
+                <Input autoComplete="off" value={database} onChange={(e) => setDatabase(e.target.value)} />
               </Field>
-              <Field label={t("mail.port")} id="db-port">
-                <Input inputMode="numeric" value={port} onChange={(e) => setPort(e.target.value)} />
+              <Field label={t("mail.username")} id="db-username">
+                <Input autoComplete="off" value={username} onChange={(e) => setUsername(e.target.value)} />
+              </Field>
+              <Field label={t("database.password")} id="db-password" help={t("mail.passwordHelp")}>
+                <Input
+                  type="password"
+                  // "new-password": the browser must not fill a saved login into this form (it put the
+                  // person's email in the address field).
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </Field>
+              <Field
+                label={t("database.ssl")}
+                id="db-ssl"
+                help={sslmode === "disable" ? t("database.sslOffHelp") : undefined}
+              >
+                <Select
+                  value={sslmode}
+                  onValueChange={(v) => setSslmode(v === "disable" ? "disable" : "require")}
+                  options={[
+                    { value: "require", label: t("database.sslRequire") },
+                    { value: "disable", label: t("database.sslDisable") },
+                  ]}
+                />
               </Field>
             </div>
-            <Field
-              label={t("database.database")}
-              id="db-database"
-              help={whole ? t("database.databaseOptional") : undefined}
-            >
-              <Input autoComplete="off" value={database} onChange={(e) => setDatabase(e.target.value)} />
-            </Field>
-            <Field label={t("mail.username")} id="db-username">
-              <Input autoComplete="off" value={username} onChange={(e) => setUsername(e.target.value)} />
-            </Field>
-            <Field label={t("database.password")} id="db-password" help={t("mail.passwordHelp")}>
-              <Input
-                type="password"
-                // "new-password": the browser must not fill a saved login into this form (it put the
-                // person's email in the address field).
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </Field>
-            <Field
-              label={t("database.ssl")}
-              id="db-ssl"
-              help={sslmode === "disable" ? t("database.sslOffHelp") : undefined}
-            >
-              <Select
-                value={sslmode}
-                onValueChange={(v) => setSslmode(v === "disable" ? "disable" : "require")}
-                options={[
-                  { value: "require", label: t("database.sslRequire") },
-                  { value: "disable", label: t("database.sslDisable") },
-                ]}
-              />
-            </Field>
-          </div>
-        </details>
-        {error && <Alert>{t(`database.error.${error}`)}</Alert>}
-      </DialogBody>
+          </details>
+          {error && <Alert>{t(`database.error.${error}`)}</Alert>}
+        </DialogBody>
+      </Locked>
       <DialogFooter bar note={testing ?? t("connectFlow.nothingYet")}>
         <Button type="button" onClick={onClose}>
           {t("common.cancel")}
@@ -434,18 +441,20 @@ function ActionsStep({
   };
   return (
     <>
-      <DialogBody className="cflow__body tr-body">
-        {connection.canWrite && <Alert tone="neutral">{t("database.canWrite")}</Alert>}
-        <p className="muted cflow__text">{t("database.toolsLead", { name: connection.label })}</p>
-        <ToolReview
-          name={connection.label}
-          tools={tools}
-          state={state}
-          onChange={setState}
-          onMoved={(m) => toast.show(m)}
-        />
-        {update.isError && <Alert>{t("mail.actionsError")}</Alert>}
-      </DialogBody>
+      <Locked when={update.isPending}>
+        <DialogBody className="cflow__body tr-body">
+          {connection.canWrite && <Alert tone="neutral">{t("database.canWrite")}</Alert>}
+          <p className="muted cflow__text">{t("database.toolsLead", { name: connection.label })}</p>
+          <ToolReview
+            name={connection.label}
+            tools={tools}
+            state={state}
+            onChange={setState}
+            onMoved={(m) => toast.show(m)}
+          />
+          {update.isError && <Alert>{t("mail.actionsError")}</Alert>}
+        </DialogBody>
+      </Locked>
       <DialogFooter bar note={reviewNote(t, tools, state)}>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button variant="primary" disabled={update.isPending} loading={update.isPending} onClick={next}>
@@ -503,55 +512,59 @@ function WhoStep({
 
   return (
     <>
-      <DialogBody className="cflow__body">
-        {agents.isLoading ? (
-          <LoadingList count={3} />
-        ) : list.length === 0 ? (
-          <p className="muted">{t("connectFlow.noAgents")}</p>
-        ) : (
-          <>
-            <div className="cflow__all">
-              <span className="small muted">{t("connectFlow.all")}</span>
-              {DB_LEVELS.map((l) => (
-                <Button
-                  key={l}
-                  size="sm"
-                  variant="ghost"
-                  aria-label={t("connectFlow.allLevel", { level: levelLabel(l) })}
-                  onClick={() => setWho(Object.fromEntries(list.map((a) => [a.id, l])))}
-                >
-                  {levelLabel(l)}
-                </Button>
-              ))}
-            </div>
-            <ul className="cflow-agents">
-              {list.map((a) => (
-                <li key={a.id} className="cflow-agent">
-                  <AgentAvatar agentId={a.id} name={a.name} size="sm" />
-                  <span className="cflow-agent__name">
-                    <span>{a.name}</span>
-                    {a.role && <span className="small muted">{a.role}</span>}
-                  </span>
-                  <Segmented
+      <Locked when={grant.isPending}>
+        <DialogBody className="cflow__body">
+          {agents.isLoading ? (
+            <LoadingList count={3} />
+          ) : list.length === 0 ? (
+            <p className="muted">{t("connectFlow.noAgents")}</p>
+          ) : (
+            <>
+              <div className="cflow__all">
+                <span className="small muted">{t("connectFlow.all")}</span>
+                {DB_LEVELS.map((l) => (
+                  <Button
+                    key={l}
                     size="sm"
-                    label={t("connectFlow.levelOf", { name: a.name })}
-                    value={levelOf(a.id)}
-                    onValueChange={(l) => setWho((w) => ({ ...w, [a.id]: l }))}
-                    options={DB_LEVELS.map((l) => ({ value: l, label: levelLabel(l) }))}
-                  />
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-        <p className="small muted cflow__asks">
-          <Icon name="lock" />
-          {t("database.readOnly")}
-        </p>
-        <p className="small muted cflow__text">{t("database.whoLead")}</p>
-      </DialogBody>
+                    variant="ghost"
+                    aria-label={t("connectFlow.allLevel", { level: levelLabel(l) })}
+                    onClick={() => setWho(Object.fromEntries(list.map((a) => [a.id, l])))}
+                  >
+                    {levelLabel(l)}
+                  </Button>
+                ))}
+              </div>
+              <ul className="cflow-agents">
+                {list.map((a) => (
+                  <li key={a.id} className="cflow-agent">
+                    <AgentAvatar agentId={a.id} name={a.name} size="sm" />
+                    <span className="cflow-agent__name">
+                      <span>{a.name}</span>
+                      {a.role && <span className="small muted">{a.role}</span>}
+                    </span>
+                    <Segmented
+                      size="sm"
+                      label={t("connectFlow.levelOf", { name: a.name })}
+                      value={levelOf(a.id)}
+                      onValueChange={(l) => setWho((w) => ({ ...w, [a.id]: l }))}
+                      options={DB_LEVELS.map((l) => ({ value: l, label: levelLabel(l) }))}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <p className="small muted cflow__asks">
+            <Icon name="lock" />
+            {t("database.readOnly")}
+          </p>
+          <p className="small muted cflow__text">{t("database.whoLead")}</p>
+        </DialogBody>
+      </Locked>
       <DialogFooter bar>
-        <Button onClick={onBack}>{t("connectFlow.back")}</Button>
+        <Button disabled={grant.isPending} onClick={onBack}>
+          {t("connectFlow.back")}
+        </Button>
         <Button
           variant="primary"
           disabled={!agents.isSuccess || grant.isPending}
@@ -604,45 +617,49 @@ function RulesStep({
   const agent = agents.find((a) => a.id === agentId);
   return (
     <>
-      <DialogBody className="cflow__body">
-        <p className="muted cflow__text">{t("database.rulesLead", { name: connection.label })}</p>
-        {agents.length > 1 && (
-          <Segmented
-            size="sm"
-            label={t("mail.rulesAgent")}
-            value={agentId}
-            onValueChange={setAgentId}
-            options={agents.map((a) => ({ value: a.id, label: a.name }))}
-          />
-        )}
-        {agent && (
-          <AgentRules
-            key={agent.id}
-            agent={agent}
-            connection={connection}
-            policy={edits[agent.id]}
-            onChange={(policy) => setEdits((e) => ({ ...e, [agent.id]: policy }))}
-            others={agents.filter((a) => a.id !== agent.id)}
-            onCopy={(ids, policy) => {
-              const before = edits;
-              setEdits((e) => ({ ...e, ...Object.fromEntries(ids.map((id) => [id, policy])) }));
-              return () =>
-                setEdits((e) => {
-                  const next = { ...e };
-                  for (const id of ids) {
-                    const was = before[id];
-                    if (was) next[id] = was;
-                    else delete next[id];
-                  }
-                  return next;
-                });
-            }}
-          />
-        )}
-        {save.isError && <Alert>{t("mail.agent.saveError.unknown")}</Alert>}
-      </DialogBody>
+      <Locked when={save.isPending}>
+        <DialogBody className="cflow__body">
+          <p className="muted cflow__text">{t("database.rulesLead", { name: connection.label })}</p>
+          {agents.length > 1 && (
+            <Segmented
+              size="sm"
+              label={t("mail.rulesAgent")}
+              value={agentId}
+              onValueChange={setAgentId}
+              options={agents.map((a) => ({ value: a.id, label: a.name }))}
+            />
+          )}
+          {agent && (
+            <AgentRules
+              key={agent.id}
+              agent={agent}
+              connection={connection}
+              policy={edits[agent.id]}
+              onChange={(policy) => setEdits((e) => ({ ...e, [agent.id]: policy }))}
+              others={agents.filter((a) => a.id !== agent.id)}
+              onCopy={(ids, policy) => {
+                const before = edits;
+                setEdits((e) => ({ ...e, ...Object.fromEntries(ids.map((id) => [id, policy])) }));
+                return () =>
+                  setEdits((e) => {
+                    const next = { ...e };
+                    for (const id of ids) {
+                      const was = before[id];
+                      if (was) next[id] = was;
+                      else delete next[id];
+                    }
+                    return next;
+                  });
+              }}
+            />
+          )}
+          {save.isError && <Alert>{t("mail.agent.saveError.unknown")}</Alert>}
+        </DialogBody>
+      </Locked>
       <DialogFooter bar note={t("mail.rulesLater")}>
-        <Button onClick={onBack}>{t("connectFlow.back")}</Button>
+        <Button disabled={save.isPending} onClick={onBack}>
+          {t("connectFlow.back")}
+        </Button>
         <Button variant="primary" disabled={save.isPending} loading={save.isPending} onClick={() => save.mutate()}>
           {Object.keys(edits).length > 0 ? t("mail.rulesSave") : t("mail.rulesSkip")}
         </Button>
@@ -953,18 +970,20 @@ export function DatabaseScopeDialog({
             submit();
           }}
         >
-          <DialogBody className="cflow__body">
-            <ScopeFields
-              whole={whole}
-              prefix={prefix ?? connection?.databasePrefix ?? ""}
-              onScope={(v) => {
-                setScope(v);
-                setError(null);
-              }}
-              onPrefix={setPrefix}
-            />
-            {error && <Alert>{t(`database.error.${error}`)}</Alert>}
-          </DialogBody>
+          <Locked when={update.isPending}>
+            <DialogBody className="cflow__body">
+              <ScopeFields
+                whole={whole}
+                prefix={prefix ?? connection?.databasePrefix ?? ""}
+                onScope={(v) => {
+                  setScope(v);
+                  setError(null);
+                }}
+                onPrefix={setPrefix}
+              />
+              {error && <Alert>{t(`database.error.${error}`)}</Alert>}
+            </DialogBody>
+          </Locked>
           <DialogFooter>
             <Button type="button" onClick={close}>
               {t("common.cancel")}
@@ -1031,22 +1050,24 @@ export function DatabaseReconnectDialog({
           submit();
         }}
       >
-        <DialogBody className="cflow__body">
-          <Field
-            label={t("database.password")}
-            id="db-reconnect-password"
-            help={t("mail.passwordHelp")}
-            error={touched && !password ? t("database.passwordInvalid") : undefined}
-          >
-            <Input
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </Field>
-          {error && <Alert>{t(`database.error.${error}`)}</Alert>}
-        </DialogBody>
+        <Locked when={update.isPending}>
+          <DialogBody className="cflow__body">
+            <Field
+              label={t("database.password")}
+              id="db-reconnect-password"
+              help={t("mail.passwordHelp")}
+              error={touched && !password ? t("database.passwordInvalid") : undefined}
+            >
+              <Input
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </Field>
+            {error && <Alert>{t(`database.error.${error}`)}</Alert>}
+          </DialogBody>
+        </Locked>
         <DialogFooter>
           <Button type="button" onClick={close}>
             {t("common.cancel")}
