@@ -96,6 +96,7 @@ export function NewScreen() {
             onCancel={cancel}
             showCancel={searching}
             autoCorrect={false}
+            raised
           />
         </View>
         <View style={styles.lists}>

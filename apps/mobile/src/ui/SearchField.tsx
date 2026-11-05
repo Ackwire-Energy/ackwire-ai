@@ -26,6 +26,11 @@ export interface SearchFieldProps extends Omit<TextInputProps, "style"> {
   onCancel?: () => void;
   /** Forces the cancel button on or off; by default it shows while the field is focused or has words. */
   showCancel?: boolean;
+  /**
+   * On the grouped gray, the field is white with a hairline (the system's search over grouped lists): the default
+   * gray fill would sink into the gray around it.
+   */
+  raised?: boolean;
 }
 
 /** The search box: sunken, a magnifier, a clear button when there is text, and "Cancelar" with `onCancel`. */
@@ -36,6 +41,7 @@ export function SearchField({
   ref,
   onCancel,
   showCancel,
+  raised = false,
   onFocus,
   onBlur,
   ...rest
@@ -65,8 +71,9 @@ export function SearchField({
           minHeight: 42,
           paddingHorizontal: 12,
           borderRadius: 14,
-          // The system's fill (a gray at 10%), so the field shows on white and on the grouped gray alike.
-          backgroundColor: colors.plate,
+          // The system's fill (a gray at 10%) on white; white with a hairline on the grouped gray.
+          backgroundColor: raised ? colors.raised : colors.plate,
+          ...(raised ? { boxShadow: `0px 0px 0px 0.5px ${colors.line2}` } : {}),
         }}
       >
         <Icon name="search" size={18} color={colors.faint} />
