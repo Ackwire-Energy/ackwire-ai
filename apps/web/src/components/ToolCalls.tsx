@@ -224,7 +224,7 @@ export function LiveTools({
 }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
-  const items = toolItemsLive(work, stopped);
+  const items = toolItemsLive(work, stopped || done);
   const blockItems = useBlockItems(items);
   const logo = useCallLogo();
   const calls = toolCalls(items);

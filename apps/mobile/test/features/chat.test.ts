@@ -929,6 +929,15 @@ describe("an agent's turn as one block", () => {
     expect(turnShows({ ...fresh, work: [{ kind: "say", text: "Vou ler.", turn: 1 }] })).toBe(true);
   });
 
+  test("a call refused for its arguments: quiet once made right, plain when the run ends without it", () => {
+    const slip = { ...call("1", "offer_connect_app", false), failed: true, slip: true };
+    const made = turnItems(run({ runId: "r", work: [slip, call("2", "offer_connect_app", false)] }));
+    expect(made.map((x) => x.kind === "call" && x.line.state)).toEqual(["stop", "done"]);
+    expect(toolNow(turnItems(run({ runId: "r", work: [slip] })))?.state).toBe("run");
+    expect(toolNow(turnItems(run({ runId: "r", work: [slip] }), true))?.state).toBe("fail");
+    expect(toolNow(turnItems(run({ runId: "r", status: "failed", work: [slip] })))?.state).toBe("fail");
+  });
+
   test("the header word: thinking, working on steps, writing, stopped", () => {
     expect(turnPhase(run({ runId: "a" }))).toBe("thinking");
     expect(turnPhase(run({ runId: "b", tool: "sentry_list_issues" }))).toBe("working");

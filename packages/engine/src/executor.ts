@@ -163,7 +163,14 @@ import {
   PersonLimitError,
   ValidationError,
 } from "./errors";
-import { type ChannelEvent, liveTurns, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
+import {
+  type ChannelEvent,
+  type LiveTurn,
+  liveTurns,
+  type MemoryUpdate,
+  publishChannelEvent,
+  publishMessageCreated,
+} from "./events";
 import { FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
@@ -3677,6 +3684,7 @@ async function executeRunInner(
           },
           quiet: run.background,
           scrub: isRightHand(agent),
+          stretches: plan.kind === "claude_code",
         },
       );
       // "Stop and send" (`steer: "now"`) aborts only this model call: the loop goes on and reads the
@@ -3819,7 +3827,10 @@ async function executeRunInner(
               // The text it streams next is another model call's: never one reply with what it wrote before.
               deltas.toolEnded();
             },
-            onSteerRead: (uuids) => live.read(uuids),
+            onSteerRead: (uuids) => {
+              deltas.messageRead();
+              live.read(uuids);
+            },
             // The end of a wait for room, for the operator's analytics (`work-analytics.ts`): the turn's own first
             // step can come minutes later.
             onTaken: () => {
@@ -5122,6 +5133,11 @@ function createDeltaPublisher(
     quiet?: boolean;
     /** The right hand's (`scrubSignIns`): a sign-in or a key never shows, its last word held until it is whole. */
     scrub?: boolean;
+    /**
+     * Its brain reports every call it ran, our bridge's too, so a stretch has a known end (`agent.delta.from`). Claude
+     * Code alone does: the others leave our bridge's calls out, and text after one would pass for the stretch before it.
+     */
+    stretches?: boolean;
   },
 ) {
   let started = false;
@@ -5129,7 +5145,7 @@ function createDeltaPublisher(
   let all = "";
   /** What was published so far (always a prefix of what may be shown). */
   let shown = "";
-  const live = { turn: first.turn, text: "", from: 0 };
+  const live: LiveTurn = { turn: first.turn, text: "", from: 0, stretches: first.stretches };
   /** Length of `all` at the last send. */
   let sentUpTo = 0;
   /** When each piece arrived: [ms, length of `all` once it was added]. */
@@ -5184,6 +5200,7 @@ function createDeltaPublisher(
         text,
         turn: first.turn,
         at,
+        ...(first.stretches ? { from: live.from } : {}),
       };
       at += text.length;
       pending = pending.then(() => publishChannelEvent(pubsub, evt));
@@ -5213,6 +5230,15 @@ function createDeltaPublisher(
     /** A call the brain ran inside its turn ended (through the bridge or on its own): later text is a new stretch. */
     toolEnded() {
       breaks.push([Date.now(), all.length]);
+      if (!first.stretches) return;
+      send();
+      live.from = shown.length;
+      live.spoke = false;
+    },
+    /** A person's message was read: what it writes next opens a paragraph, as in the answer it posts (`joinText`). */
+    messageRead() {
+      const stretch = all.slice(breaks.at(-1)?.[1] ?? 0);
+      if (stretch.trim() && !stretch.endsWith("\n\n")) all += "\n\n";
     },
     /**
      * Everything streamed in this turn (kept when the run is canceled mid-stream), the stretches between the brain's

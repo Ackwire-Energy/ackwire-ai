@@ -1392,6 +1392,8 @@ export type ChannelEvent =
       turn?: number;
       /** Where `text` starts in its turn's text: past what arrived here, a piece was missed. */
       at?: number;
+      /** Where its stretch starts in the turn's text (a stretch: the text between two calls of a computer brain). */
+      from?: number;
     }
   | {
       type: "agent.run";

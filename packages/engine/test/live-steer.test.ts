@@ -16,7 +16,9 @@ import {
   createClaudeCodeBrain,
   createJobHandlers,
   drainOutbox,
+  executeToolForRun,
   listMessages,
+  liveTurnOf,
   type MachineStatus,
   postPersonMessage,
   type SteerMessage,
@@ -327,6 +329,96 @@ test("a message sent before the turn is steerable is handed to it as soon as it 
   const [run] = await fx.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("done");
   expect((run?.transcript as { request?: string } | null)?.request).toContain("e atualiza a doc");
+});
+
+test("text a brain kept back past a call's start goes out as that stretch's, and a message read mid-answer opens a paragraph", async () => {
+  f = await setup({
+    toolSources: [
+      {
+        name: "env",
+        tools: async () => [
+          {
+            name: "check_env",
+            description: "Check the environment",
+            scope: "",
+            inputSchema: { type: "object", properties: {}, additionalProperties: false },
+            execute: async () => ({ content: "ok" }),
+          },
+        ],
+      },
+    ],
+  });
+  const fx = f;
+  const machineId = await computerAgent(fx);
+  const events = fx.listen(fx.general.id);
+  const seen: (ReturnType<typeof liveTurnOf> | null)[] = [];
+  let runId = "";
+  const handed: SteerMessage[][] = [];
+  const sent = gate();
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run(_turn: BrainTurn, io: BrainIO) {
+      io.steerable?.(async (messages) => {
+        handed.push(messages);
+        return { status: "accepted", accepted: messages.map((m) => m.uuid) };
+      });
+      try {
+        const [row] = await fx.db.select().from(schema.agentRuns);
+        runId = row?.id ?? "";
+        const id = { orgId: fx.org.id, agentId: fx.agent.id, runId, machineId };
+        const pause = () => new Promise((r) => setTimeout(r, 5));
+        // As the runner does: the text's last characters wait for the next event, here the call's end.
+        yield { type: "text_delta", text: "Vou olhar o build.gra" };
+        await pause();
+        await executeToolForRun(fx.jobDeps, id, { id: "c-1", name: "check_env", input: {} });
+        seen.push(liveTurnOf(runId) ?? null);
+        yield { type: "text_delta", text: "dle primeiro." };
+        await pause();
+        seen.push(liveTurnOf(runId) ?? null);
+        yield { type: "tool_call", id: "c-1", name: "check_env", input: {}, executed: { content: "ok" } };
+        yield { type: "text_delta", text: "A resposta." };
+        await pause();
+        seen.push(liveTurnOf(runId) ?? null);
+        sent.open();
+        await waitUntil(() => handed.length > 0);
+        yield { type: "steer_read", uuids: handed[0]?.map((m) => m.uuid) ?? [] };
+        yield { type: "text_delta", text: "E sobre o recado." };
+        await pause();
+        seen.push(liveTurnOf(runId) ?? null);
+        yield { type: "done", text: "A resposta.\n\nE sobre o recado." };
+      } finally {
+        io.steerable?.(null);
+      }
+    },
+  };
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(fx, "@dev olha o build");
+  const drained = drainOutbox(fx.db, handlers);
+  await sent.promise;
+  await post(fx, "@dev e o recado?");
+  await drained;
+
+  const deltas = events.filter((e) => e.type === "agent.delta") as unknown as {
+    at: number;
+    from: number;
+    text: string;
+  }[];
+  const first = "Vou olhar o build.gradle primeiro.";
+  // The stretch each piece belongs to, past the call's start or not.
+  expect(deltas.map((d) => [d.from, d.text]).filter(([, text]) => String(text).trim())).toEqual([
+    [0, "Vou olhar o build.gra"],
+    [0, "dle primeiro."],
+    [first.length, "A resposta."],
+    [first.length, "\n\nE sobre o recado."],
+  ]);
+  expect(deltas.map((d) => d.text).join("")).toBe(`${first}A resposta.\n\nE sobre o recado.`);
+  // An app opening now never starts on the end of a text it can't see the start of.
+  expect(seen.map((l) => l?.text)).toEqual(["", "", "A resposta.", "A resposta.\n\nE sobre o recado."]);
+  expect(seen[1]?.at).toBe(first.length);
 });
 
 /** A queued run with one message in its inbox, and a listener for it that retries fast. */
