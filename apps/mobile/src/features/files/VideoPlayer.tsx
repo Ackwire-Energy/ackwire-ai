@@ -1,6 +1,6 @@
 import { useEventListener } from "expo";
 import { type VideoPlayer as Player, useVideoPlayer, VideoView } from "expo-video";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ComponentRef, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, type GestureResponderEvent, Pressable, StyleSheet, View } from "react-native";
 import { Glass, Icon, Text } from "@/ui";
@@ -273,7 +273,7 @@ function Track({
   onTouch: () => void;
 }) {
   const c = useColors();
-  const box = useRef<View>(null);
+  const box = useRef<ComponentRef<typeof View>>(null);
   const frame = useRef({ x: 0, width: 0 });
   const [drag, setDrag] = useState<number | null>(null);
   const at = (e: GestureResponderEvent) => {
