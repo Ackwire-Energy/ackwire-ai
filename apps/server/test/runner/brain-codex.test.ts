@@ -544,6 +544,14 @@ test("a chat turn (protocol 41): no user config nor rules, every feature that ad
   expect(args).toContain(`mcp_servers.${CODEX_MCP_SERVER}.required=true`);
 });
 
+test("a chat turn offers our bridge's tools outside code mode, whose host stays off", () => {
+  const args = codexTurnArgs({ cwd: "/c", lastFile: "/l.txt", runId: RUN, mcp: {}, chat: true });
+  const overrides = args.flatMap((a, i) => (args[i - 1] === "-c" ? [a] : []));
+  const disabled = args.flatMap((a, i) => (args[i - 1] === "--disable" ? [a] : []));
+  expect(overrides).toContain(`features.code_mode.direct_only_tool_namespaces=["mcp__${CODEX_MCP_SERVER}"]`);
+  expect(disabled).toContain("code_mode_host");
+});
+
 test("a chat turn's kill: anything but the model's words or our bridge's calls", () => {
   const item = (type: string, more: Record<string, unknown> = {}) => ({
     type: "item.started",
