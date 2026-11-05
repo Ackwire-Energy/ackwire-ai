@@ -17,6 +17,7 @@ import {
   type PartialUsage,
   ProviderError,
   type StopReason,
+  shortSaid,
   stableToolsFirst,
   systemText,
 } from "./types";
@@ -201,18 +202,39 @@ function fromResponse(response: Response): ModelResult {
   };
 }
 
+/**
+ * What an error body says. OpenRouter's own message is often only "Provider returned error": the upstream's words are
+ * in `metadata.raw`, as text or as its JSON body.
+ */
+export function saidIn(error: InstanceType<typeof OpenAI.APIError>) {
+  const body = error.error as { message?: unknown; metadata?: { raw?: unknown } } | undefined;
+  const raw = body?.metadata?.raw;
+  const upstream = typeof raw === "string" ? (/"message"\s*:\s*"([^"]+)"/.exec(raw)?.[1] ?? raw) : "";
+  return shortSaid(upstream || (typeof body?.message === "string" ? body.message : "")) || undefined;
+}
+
 /** An OpenAI SDK failure in the words every adapter uses (also OpenRouter's, which speaks through this SDK). */
 export function openAIError(error: unknown): ProviderError {
   if (error instanceof ProviderError) return error;
-  if (error instanceof OpenAI.RateLimitError) return new ProviderError("rate limited by provider", true, 429);
+  if (error instanceof OpenAI.RateLimitError)
+    return error.code === "insufficient_quota"
+      ? new ProviderError("no prepaid credit left at the provider", false, 429, undefined, saidIn(error))
+      : new ProviderError("rate limited by provider", true, 429);
   if (error instanceof OpenAI.AuthenticationError) return new ProviderError("invalid provider API key", false, 401);
   if (error instanceof OpenAI.PermissionDeniedError) return new ProviderError("provider denied access", false, 403);
   if (error instanceof OpenAI.InternalServerError) return new ProviderError("provider error", true, error.status);
+  if (error instanceof OpenAI.APIConnectionTimeoutError) return new ProviderError("provider timed out", true);
   if (error instanceof OpenAI.APIConnectionError) return new ProviderError("could not reach provider", true);
   if (error instanceof OpenAI.APIUserAbortError) return new ProviderError("request aborted", false);
   if (error instanceof OpenAI.APIError) {
     const status = error.status;
-    return new ProviderError(`provider rejected the request (${status ?? "?"})`, false, status);
+    return new ProviderError(
+      `provider rejected the request (${status ?? "?"})`,
+      false,
+      status,
+      undefined,
+      saidIn(error),
+    );
   }
   if (error instanceof OpenAI.OpenAIError || error instanceof SyntaxError) {
     return new ProviderError(`could not read the model's reply: ${error.message}`, true);

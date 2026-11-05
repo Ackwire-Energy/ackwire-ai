@@ -626,6 +626,9 @@ const KEY_FAILURES = new Set([
   "run.credential_revoked",
   "run.credential_wrong_provider",
   "run.provider_account",
+  "run.provider_no_credit",
+  "run.provider_invalid_key",
+  "run.provider_no_access",
 ]);
 
 /**
@@ -636,7 +639,8 @@ export function failedRunFix(
   code: string | null | undefined,
   who: { keys: boolean; admin: boolean; owner: boolean },
 ): "useKey" | "changeModel" | null {
-  if (code === "run.model_unlisted") return who.admin || who.owner ? "changeModel" : null;
+  if (code === "run.model_unlisted" || code === "run.provider_model_unavailable")
+    return who.admin || who.owner ? "changeModel" : null;
   return code && KEY_FAILURES.has(code) && who.keys ? "useKey" : null;
 }
 

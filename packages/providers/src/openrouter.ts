@@ -9,7 +9,7 @@ import {
   type TokenPrices,
   usdToNanoUsd,
 } from "./catalog";
-import { openAIError } from "./openai";
+import { openAIError, saidIn } from "./openai";
 import {
   type ContentBlock,
   estimateTokens,
@@ -486,6 +486,7 @@ function routerError(error: unknown, compatible: boolean): ProviderError {
     return openAIError(error);
   if (error instanceof OpenAI.APIError) {
     const mapped = statusError(error.status ?? (Number(error.code) || undefined));
+    mapped.said = saidIn(error);
     // A workspace's own endpoint: its admin reads the server's words to fix it (a model name, a missing feature).
     return compatible && error.message
       ? new ProviderError(`${mapped.message}: ${error.message.slice(0, 300)}`, mapped.retryable, mapped.status)

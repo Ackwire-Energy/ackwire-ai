@@ -137,16 +137,14 @@ export function workAnchorBody(t: TFunction, body: string, meta: Record<string, 
   return kept || body;
 }
 
-/** The AI provider's errors (`run.provider_error`, `run.provider_unavailable`): mirrors `PROVIDER_ERRORS` in the engine. */
-const PROVIDER_ERRORS = new Set(["run.provider_error", "run.provider_account", "run.provider_unavailable"]);
-
 /**
  * A work's end posted home after its AI provider failed (`meta.workEnd`): Continuar goes on from there, once (ADR 0121).
  * Null for any other message or once it was continued.
  */
 export function workContinuable(meta: Record<string, unknown> | undefined): { continuedRunId: string | null } | null {
   const end = meta?.workEnd as { status?: unknown; errorCode?: unknown; continuedRunId?: unknown } | undefined;
-  if (end?.status !== "failed" || typeof end.errorCode !== "string" || !PROVIDER_ERRORS.has(end.errorCode)) return null;
+  if (end?.status !== "failed" || typeof end.errorCode !== "string" || !end.errorCode.startsWith("run.provider_"))
+    return null;
   return { continuedRunId: typeof end.continuedRunId === "string" ? end.continuedRunId : null };
 }
 

@@ -23,8 +23,9 @@ scenario("S29", "a provider outage parks the run, which finishes when the provid
   expect((await w.runs("otto"))[0]?.status).not.toBe("failed");
   // The wait is said once, as the provider's (no question to a person), and stays one note while it lasts.
   await w.advance(2);
-  const notes = (await w.posts("otto")).filter((m) => m.meta.bodyCode === "provider_unavailable");
+  const notes = (await w.posts("otto")).filter((m) => m.meta.bodyCode === "provider_wait_down");
   expect(notes).toHaveLength(1);
+  expect(notes[0]?.meta.bodyParams).toEqual({ provider: "Claude", detail: "overloaded" });
   // Nobody reads the park as a wait on a person: hand-off lines, the agent's status and the message's receipt say the
   // provider is down.
   const [parked] = await w.db
@@ -48,6 +49,10 @@ scenario("S29", "a provider outage parks the run, which finishes when the provid
   await w.advance(60);
   expect((await w.runs("otto")).map((r) => r.status)).toEqual(["done"]);
   expect((await w.posts("otto")).at(-1)?.body).toContain("passou");
+  // Its note no longer says a wait is on, in the same place.
+  const after = (await w.posts("otto")).find((m) => m.id === notes[0]?.id);
+  expect(after?.meta.bodyCode).toBe("provider_back");
+  expect(after?.body).toBe("My AI is back.");
   await assertInvariants(w);
 });
 

@@ -3,6 +3,7 @@ import { resources } from "@agenteschat/i18n";
 import i18next, { type TFunction } from "i18next";
 import type { Message } from "../src/api/types";
 import { failedRunFix, runFailureLine } from "../src/lib/errors";
+import { serverBody } from "../src/lib/message-body";
 import { applyReceiptEvent, seedReceipt } from "../src/realtime/receipts";
 
 const handled = {
@@ -40,7 +41,11 @@ test("a failed run's one fix: a key for a missing, revoked or wrong one, another
   const everyone = { keys: true, admin: true, owner: true };
   for (const code of ["run.missing_credential", "run.credential_revoked", "run.credential_wrong_provider"])
     expect(failedRunFix(code, everyone)).toBe("useKey");
-  expect(failedRunFix("run.provider_account", everyone)).toBe("useKey");
+  for (const code of ["account", "no_credit", "invalid_key", "no_access"])
+    expect(failedRunFix(`run.provider_${code}`, everyone)).toBe("useKey");
+  expect(failedRunFix("run.provider_model_unavailable", everyone)).toBe("changeModel");
+  for (const code of ["rate_limit", "down", "timeout", "unreachable", "said"])
+    expect(failedRunFix(`run.provider_${code}`, everyone)).toBeNull();
   expect(failedRunFix("run.model_unlisted", everyone)).toBe("changeModel");
   expect(failedRunFix("run.computer_failed", everyone)).toBeNull();
   expect(failedRunFix(undefined, everyone)).toBeNull();
@@ -67,6 +72,21 @@ describe("a failed run as one line (runFailureLine)", () => {
     expect(runFailureLine(real, "Ada", { code: "run.account_missing" }, "pt-BR")).toContain(
       "a conta escolhida para este agente não está mais no computador dele",
     );
+  });
+
+  test("a provider's failure names it and keeps its name's capitals; a wait note says the same in the chat", () => {
+    const params = { provider: "OpenRouter", detail: "Insufficient credits" };
+    expect(runFailureLine(real, "Ada", { code: "run.provider_no_credit", params }, "pt-BR")).toBe(
+      "Ada não conseguiu responder: sem crédito no OpenRouter. Adicione crédito lá ou use outra chave",
+    );
+    expect(runFailureLine(real, "Ada", { code: "run.provider_said", params }, "pt-BR")).toBe(
+      "Ada não conseguiu responder: a resposta de OpenRouter: Insufficient credits",
+    );
+    const note = { bodyCode: "provider_wait_rate_limit", bodyParams: params };
+    expect(serverBody(real, "fallback", note)).toBe(
+      "OpenRouter está limitando os pedidos desta chave agora. Respondo assim que liberar.",
+    );
+    expect(serverBody(real, "fallback", { ...note, bodyCode: "provider_back" })).toBe("Minha IA voltou.");
   });
 
   test("a restriction in its own words, a busy computer, and nothing when no reason has words", () => {

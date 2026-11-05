@@ -12,8 +12,10 @@ import {
   outputTokensWithin,
   PROVIDER_IDS,
   PROVIDERS,
+  ProviderError,
   parseOpenRouterModels,
   pricesAt,
+  providerCause,
   routerModelOf,
   setOpenRouterModels,
   summedCostNanoUsd,
@@ -249,5 +251,44 @@ describe("fake provider", () => {
     await expect(
       fake.stream({ model: "m", system: "", messages: [], maxTokens: 1 }, { apiKey: "", onDelta: () => {} }),
     ).rejects.toThrow("boom");
+  });
+});
+
+describe("providerCause", () => {
+  const cause = (status: number | undefined, message: string, said?: string) =>
+    providerCause(new ProviderError(message, false, status, undefined, said));
+
+  test.each([
+    // OpenRouter
+    [402, "no prepaid credit left at the provider", "Insufficient credits", "no_credit"],
+    [403, "provider denied access", "Key limit exceeded (total limit)", "no_credit"],
+    [401, "invalid provider API key", "No auth credentials found", "invalid_key"],
+    [404, "provider rejected the request (404)", "No endpoints found for x/y.", "model_unavailable"],
+    [400, "provider rejected the request (400)", "x/y is not a valid model ID", "model_unavailable"],
+    [429, "rate limited by provider", "Rate limit exceeded: free-models-per-min", "rate_limit"],
+    [502, "provider error", "Provider returned error", "down"],
+    [503, "provider error", "No provider available", "down"],
+    [408, "provider error", "Timeout", "timeout"],
+    [403, "provider denied access", "Your input was flagged", "no_access"],
+    // OpenAI
+    [429, "no prepaid credit left at the provider", "You exceeded your current quota", "no_credit"],
+    [401, "invalid provider API key", "Incorrect API key provided", "invalid_key"],
+    [404, "provider rejected the request (404)", "The model `x` does not exist", "model_unavailable"],
+    [403, "provider denied access", "Country, region, or territory not supported", "no_access"],
+    [500, "provider error", undefined, "down"],
+    [undefined, "provider timed out", undefined, "timeout"],
+    [undefined, "could not reach provider", undefined, "unreachable"],
+    // Claude
+    [400, "provider rejected the request (400 invalid_request_error)", "Your credit balance is too low", "no_credit"],
+    [404, "provider rejected the request (404 not_found_error)", "model: claude-x", "model_unavailable"],
+    [529, "provider error", undefined, "down"],
+    [504, "provider error", undefined, "timeout"],
+  ] as const)("%s %s (%s) is %s", (status, message, said, expected) => {
+    expect(cause(status, message, said)).toBe(expected);
+  });
+
+  test("a refusal that names no cause stays the provider's to say", () => {
+    expect(cause(400, "provider rejected the request (400)", "tools: too many")).toBeNull();
+    expect(cause(undefined, "could not read the model's reply: the stream ended early")).toBeNull();
   });
 });

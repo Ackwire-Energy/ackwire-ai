@@ -137,11 +137,26 @@ export const MIN_OUTPUT_TOKENS = 256;
 
 const periodOf = (now: Date) => monthStartUtc(now).toISOString().slice(0, 10);
 
-/** A provider failure as it leaves the gateway: its words (a refused request keeps the API's) with credentials masked. */
-const masked = (error: unknown) =>
-  error instanceof ProviderError
-    ? new ProviderError(redactCredentials(error.message), error.retryable, error.status, error.partial)
-    : error;
+/**
+ * A provider failure as it leaves the gateway: its words (a refused request keeps the API's) with credentials masked,
+ * and who answered, on whose key.
+ */
+const masked = (error: unknown, provider: string, key: { credentialId: string | null; endpoint?: Endpoint }) => {
+  if (!(error instanceof ProviderError)) return error;
+  const out = new ProviderError(
+    redactCredentials(error.message),
+    error.retryable,
+    error.status,
+    error.partial,
+    error.said && redactCredentials(error.said),
+  );
+  // A workspace's own endpoint has no name of its own: people know it by its address.
+  out.provider = key.endpoint
+    ? redactCredentials(key.endpoint.baseURL.replace(/^https?:\/\//, "").split("/")[0] ?? "")
+    : provider;
+  out.platformKey = key.credentialId === null;
+  return out;
+};
 
 /**
  * The only way to call a model (docs/adr/0007, 0012). For every call:
@@ -733,7 +748,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         });
         if (personId && usage)
           await addPersonSpend(db, { orgId: agent.orgId, personId, amountNanoUsd: actual, at: now() });
-        throw masked(error);
+        throw masked(error, label(providerId), key);
       }
 
       const { record, spent, personSpent } = await settleCall({
@@ -869,7 +884,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       } catch (error) {
         const usage = error instanceof ProviderError ? await partialUsage(error, provider, request, key) : null;
         if (usage) await recordUsage(db, { ...base, model: call.model, usage, partial: true });
-        throw masked(error);
+        throw masked(error, label(providerId), key);
       }
       const record = await recordUsage(db, {
         ...base,

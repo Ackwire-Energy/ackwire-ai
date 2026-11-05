@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { cheapModelOf, costNanoUsd, createOpenAIProvider, MODEL_CATALOG, ProviderError } from "../src";
+import OpenAI from "openai";
+import { cheapModelOf, costNanoUsd, createOpenAIProvider, MODEL_CATALOG, openAIError, ProviderError } from "../src";
 
 const sse = (events: Record<string, unknown>[], tail = "") =>
   events.map((e, i) => `event: ${e.type}\ndata: ${JSON.stringify({ ...e, sequence_number: i })}\n\n`).join("") + tail;
@@ -305,5 +306,24 @@ describe("OpenAI adapter (Responses API, scripted transport)", () => {
     ).toBe(501_000_000);
     expect(cheapModelOf("openai")).toBe("gpt-6-luna");
     expect(cheapModelOf("anthropic")).toBe("claude-haiku-5-5");
+  });
+});
+
+describe("openAIError", () => {
+  const generated = (status: number, error: Record<string, unknown>) =>
+    OpenAI.APIError.generate(status, { error }, undefined, new Headers());
+
+  test("an empty quota is no rate limit: waiting won't bring it back", () => {
+    const quota = { code: "insufficient_quota", message: "You exceeded your current quota" };
+    expect(openAIError(generated(429, quota))).toMatchObject({ retryable: false, status: 429, said: quota.message });
+    expect(openAIError(generated(429, { message: "Slow down" }))).toMatchObject({ retryable: true, status: 429 });
+  });
+
+  test("a refusal keeps the API's words, and a timeout is told from a connection that failed", () => {
+    expect(openAIError(generated(400, { message: "tools: too many" }))).toMatchObject({ said: "tools: too many" });
+    expect(openAIError(new OpenAI.APIConnectionTimeoutError())).toMatchObject({ message: "provider timed out" });
+    expect(openAIError(new OpenAI.APIConnectionError({ message: "x" }))).toMatchObject({
+      message: "could not reach provider",
+    });
   });
 });

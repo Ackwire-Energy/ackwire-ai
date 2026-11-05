@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
-import { ASKS_NOTHING, drainOutbox, postPersonMessage } from "../src";
+import { ASKS_NOTHING, answerQuestion, drainOutbox, FOLLOW_UP_TOOL, postPersonMessage, wakeFollowUp } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
 /**
@@ -130,19 +130,174 @@ describe("ask_user that asks for nothing", () => {
     expect((await runs()).map((r) => r.status)).toEqual(["waiting_input"]);
   });
 
-  test("the judge failing posts the card (fail open)", async () => {
-    const { note } = CASES.en;
+  test("a promise repeated with nothing to ask ends the run: no card, nothing to skip", async () => {
+    const { note } = CASES.pt;
     f = await setup({
       askUser: true,
-      judge: (kind) => {
-        if (kind === "ask_check") throw new Error("judge unavailable");
-        return undefined;
-      },
-      reply: () => ({ chunks: [], toolUses: [{ name: "ask_user", input: { why: WHY, question: note } }] }),
+      judge: (kind, _id, state) =>
+        kind === "follow_through" ? "continue" : kind === "ask_check" ? askCheck(state) : undefined,
+      reply: () => ({ chunks: [note] }),
     });
     await say("@dev valeu");
     await drainOutbox(f.db, f.handlers);
-    expect((await questions()).map((q) => q.text)).toEqual([note]);
+    expect(await questions()).toHaveLength(0);
+    expect((await runs()).map((r) => r.status)).toEqual(["done"]);
+  });
+
+  test("the judge failing posts the card (fail open), but never one that says it needs nothing", async () => {
+    const asks = (question: string) => ({
+      askUser: true,
+      judge: (kind: string) => {
+        if (kind === "ask_check") throw new Error("judge unavailable");
+        return undefined;
+      },
+      reply: (req: ModelRequest) =>
+        lastText(req).includes("tool_result")
+          ? { chunks: [DONE] }
+          : { chunks: [], toolUses: [{ name: "ask_user", input: { why: WHY, question } }] },
+    });
+    f = await setup(asks(CASES.en.question));
+    await say("@dev valeu");
+    await drainOutbox(f.db, f.handlers);
+    expect((await questions()).map((q) => q.text)).toEqual([CASES.en.question]);
     expect((await runs()).map((r) => r.status)).toEqual(["waiting_input"]);
+    await f.close();
+    f = await setup(asks(CASES.en.note));
+    await say("@dev valeu");
+    await drainOutbox(f.db, f.handlers);
+    expect(await questions()).toHaveLength(0);
+    expect((await runs()).map((r) => r.status)).toEqual(["done"]);
+  });
+});
+
+describe("ask_user can't repeat itself", () => {
+  /** The run's questions in the order it asks them, then its answer. */
+  const asking = (texts: string[]) => {
+    let n = 0;
+    return (): { chunks: string[]; toolUses?: { name: string; input: Record<string, unknown> }[] } => {
+      const question = texts[n++];
+      return question
+        ? { chunks: [], toolUses: [{ name: "ask_user", input: { why: WHY, question } }] }
+        : { chunks: [DONE] };
+    };
+  };
+  const answer = async (body: string) => {
+    const [open] = (await questions()).filter((q) => q.status === "open");
+    await answerQuestion({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, open?.id as string, { text: body });
+    await drainOutbox(f.db, f.handlers);
+  };
+
+  test("the same question or nearly the same gets no card: the run reads what came of the first", async () => {
+    const first = "Posso publicar o aviso no canal geral agora mesmo ou prefere esperar até amanhã cedo?";
+    const again = "Posso publicar o aviso no canal geral agora mesmo, ou prefere esperar até amanhã bem cedo?";
+    f = await setup({ askUser: true, reply: asking([first, again]) });
+    await say("@dev posta o aviso");
+    await drainOutbox(f.db, f.handlers);
+    expect((await questions()).map((q) => q.status)).toEqual(["open"]);
+    await answer("agora");
+    expect((await questions()).map((q) => q.text)).toEqual([first]);
+    expect((await runs()).map((r) => r.status)).toEqual(["done"]);
+    const told = JSON.stringify(f.provider.calls.at(-1)?.request.messages);
+    expect(told).toContain("you already asked this in this run");
+    expect(told).toContain("The person answered: agora");
+  });
+
+  test("a different question in the same run is still asked", async () => {
+    const [a, b] = ["Qual ambiente: staging ou produção?", "Quem aprova o deploy de hoje?"];
+    f = await setup({ askUser: true, reply: asking([a, b]) });
+    await say("@dev faz o deploy");
+    await drainOutbox(f.db, f.handlers);
+    await answer("staging");
+    expect((await questions()).map((q) => q.text)).toEqual([a, b]);
+    expect((await runs()).map((r) => r.status)).toEqual(["waiting_input"]);
+  });
+
+  test("a note that says it needs nothing but asks something is a question", async () => {
+    const question = "Não preciso de nada do Portal, mas qual canal recebe o post?";
+    f = await setup({ askUser: true, reply: asking([question]) });
+    await say("@dev posta o aviso");
+    await drainOutbox(f.db, f.handlers);
+    expect((await questions()).map((q) => q.text)).toEqual([question]);
+  });
+});
+
+describe("a promise that rests on what an earlier run set", () => {
+  const LOOP = "A rolagem continua em segundo plano e eu volto às 11:20 com o resultado.";
+  const inThread = (body: string, threadId: string) =>
+    postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body, threadId });
+
+  test("a follow-up still to come keeps it: one reply, no nudge, no card", async () => {
+    f = await setup({
+      askUser: true,
+      followUps: true,
+      judge: (kind) => (kind === "follow_through" ? "continue" : undefined),
+      reply: (_request, call) =>
+        call === 1
+          ? {
+              chunks: [LOOP],
+              toolUses: [{ name: FOLLOW_UP_TOOL, input: { minutes: 13, note: "Ver a rolagem.", about: "a rolagem" } }],
+            }
+          : { chunks: [LOOP] },
+    });
+    const root = await say("Rolagem de hoje");
+    await inThread("@dev começa a rolagem", root.id);
+    await drainOutbox(f.db, f.handlers);
+    const before = f.provider.calls.length;
+    await inThread("@dev e aí?", root.id);
+    await drainOutbox(f.db, f.handlers);
+    expect(f.provider.calls.length).toBe(before + 1);
+    expect(await questions()).toHaveLength(0);
+    expect((await runs()).map((r) => r.status)).toEqual(["done", "done"]);
+  });
+
+  test("a follow-up that comes due with nothing left to do stays quiet", async () => {
+    f = await setup({
+      followUps: true,
+      reply: (_request, call) =>
+        call === 1
+          ? {
+              chunks: [LOOP],
+              toolUses: [{ name: FOLLOW_UP_TOOL, input: { minutes: 13, note: "Ver a rolagem.", about: "a rolagem" } }],
+            }
+          : { chunks: call === 2 ? [LOOP] : [] },
+    });
+    await say("@dev começa a rolagem");
+    await drainOutbox(f.db, f.handlers);
+    const before = (await agentPosts()).length;
+    const lines = (await f.db.select().from(schema.messages)).filter(
+      (m) => (m.meta.notice as { kind?: string } | undefined)?.kind === "follow_up",
+    );
+    await wakeFollowUp({ db: f.db, pubsub: f.pubsub }, f.org.id, lines[0]?.id as string);
+    await drainOutbox(f.db, f.handlers);
+    expect(f.provider.calls).toHaveLength(3);
+    expect(await agentPosts()).toHaveLength(before);
+    expect((await runs()).map((r) => r.status)).toEqual(["done", "done"]);
+  });
+
+  test("long work still running here keeps it too; once over, the promise is judged again", async () => {
+    f = await setup({
+      askUser: true,
+      judge: (kind) => (kind === "follow_through" ? "continue" : kind === "ask_check" ? "none" : undefined),
+      reply: () => ({ chunks: [LOOP] }),
+    });
+    await f.db.insert(schema.agentWorks).values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      anchorMessageId: Bun.randomUUIDv7(),
+      ownThread: true,
+      title: "rolagem",
+      status: "live",
+      how: "agent",
+      lastUpdateAt: new Date(),
+    });
+    await say("@dev e aí?");
+    await drainOutbox(f.db, f.handlers);
+    expect(f.provider.calls).toHaveLength(1);
+    await f.db.update(schema.agentWorks).set({ status: "done" });
+    await say("@dev e agora?");
+    await drainOutbox(f.db, f.handlers);
+    expect(f.provider.calls).toHaveLength(3);
+    expect(await questions()).toHaveLength(0);
   });
 });
