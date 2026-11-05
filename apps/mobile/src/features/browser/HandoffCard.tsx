@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, Text, useToast } from "@/ui";
+import { Button, LineIcon, Text, useToast } from "@/ui";
 import { AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -59,7 +59,12 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
     const ok = state === "done";
     return (
       <View style={[styles.done, surface]}>
-        <Icon name={ok ? "checkc" : state === "failed" ? "x" : "clock"} size={16} color={ok ? c.ok : c.muted} />
+        <LineIcon
+          name={ok ? "checkc" : state === "failed" ? "x" : "clock"}
+          variant="small"
+          size={16}
+          color={ok ? c.ok : c.muted}
+        />
         <Text variant="small" tone="muted" style={styles.grow}>
           {state === "failed" && h.note
             ? t("mobile.browser.card.failedNote", { note: h.note })
@@ -79,7 +84,7 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
         accessibilityRole="button"
         style={[styles.done, surface]}
       >
-        <Icon name="laptop" size={16} color={c.muted} />
+        <LineIcon name="laptop" variant="small" size={16} color={c.muted} />
         <Text variant="small" tone="muted" style={styles.grow}>
           {state === "mine"
             ? t("mobile.browser.live.inControl")
@@ -203,10 +208,11 @@ function ScreenPeek({ agentId }: { agentId: string }) {
 
 const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
+  // A line that wraps keeps its icon on the first.
   done: {
     marginTop: 12,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,

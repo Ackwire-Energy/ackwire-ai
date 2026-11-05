@@ -177,7 +177,7 @@ export function MachineScreen({ machineId }: { machineId: string }) {
           </Text>
         ))}
         {managed && m.networkTransition && (
-          <Text>
+          <Text variant="small" tone="muted" style={styles.center}>
             {t(m.networkTransition.state === "draining" ? "machines.egress.draining" : "machines.egress.restart", {
               when: new Date(m.networkTransition.deadline).toLocaleTimeString(),
             })}

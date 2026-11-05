@@ -16,7 +16,7 @@ import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Chip, Fuse, Icon, LineIcon, Text, useToast } from "@/ui";
+import { Button, Chip, Fuse, LineIcon, Text, useToast } from "@/ui";
 import { ConnectorIcon, IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
@@ -224,7 +224,7 @@ export function ApprovalEmailLetter({ email, full }: { email: ApprovalEmail; ful
       ) : null}
       {answers ? (
         <View style={[styles.answers, { backgroundColor: c.sunken, borderTopColor: c.line2 }]}>
-          <Icon name="reply" size={13} color={c.muted} />
+          <LineIcon name="reply" size={13} color={c.muted} variant="footnote" />
           <Text variant="footnote" tone="muted" style={styles.grow}>
             {answers}
           </Text>

@@ -14,7 +14,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, Text, useTheme } from "@/ui";
+import { Button, LineIcon, Text, useTheme } from "@/ui";
 import { UsageQueueSheet } from "../queue/UsageQueueSheet";
 import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
@@ -189,7 +189,7 @@ export function UsagePauseCard({ message: m }: { message: Message }) {
   return (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.row}>
-        <Icon name={done ? "check" : "pause"} size={16} color={colors.ink2} />
+        <LineIcon name={done ? "check" : "pause"} variant="subhead" size={16} color={colors.ink2} />
         <Text variant="subhead" style={styles.title}>
           {title}
         </Text>

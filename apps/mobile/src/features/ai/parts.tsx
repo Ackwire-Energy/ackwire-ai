@@ -12,6 +12,7 @@ import {
   Icon,
   type IconName,
   InfoHint,
+  LineIcon,
   ProviderLogo,
   Text,
   useTheme,
@@ -66,7 +67,14 @@ export function Note({
   const c = useColors();
   return (
     <View style={styles.note} accessibilityLiveRegion={live ? "polite" : undefined}>
-      {typeof icon === "string" ? <Icon name={icon} size={15} color={icon === "x" ? c.danger : c.muted} /> : icon}
+      {/* On the words' first line, where the eye reads it, never at the line's top. */}
+      {typeof icon === "string" ? (
+        <LineIcon name={icon} variant="small" size={15} color={icon === "x" ? c.danger : c.muted} />
+      ) : (
+        <LineIcon variant="small" size={15}>
+          {icon}
+        </LineIcon>
+      )}
       <Text variant="small" tone={icon === "x" ? "danger" : "muted"} style={styles.grow}>
         {children}
       </Text>

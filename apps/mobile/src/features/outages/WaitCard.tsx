@@ -4,7 +4,7 @@ import { brainUnavailableOf, waitCardState, waitsForComputer } from "@agentescha
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Button, Icon, LineIcon, ProviderLogo, Text } from "@/ui";
+import { Button, LineIcon, ProviderLogo, Text } from "@/ui";
 import { useColors, useEdition, useNow, useOrgId } from "../shared/hooks";
 import { waitCardText } from "./logic";
 import { openSwitchComputer } from "./OutageNotice";
@@ -73,7 +73,7 @@ function WaitCard({ card }: { card: NonNullable<ReturnType<typeof useBrainWait>>
   return (
     <View style={[styles.card, { backgroundColor: c.sunken }]}>
       <View style={styles.top} accessible accessibilityLabel={`${card.title}. ${card.body}`}>
-        <Icon name={card.done ? "check" : "clock"} size={16} color={card.done ? c.ok : c.amber} />
+        <LineIcon name={card.done ? "check" : "clock"} variant="callout" size={16} color={card.done ? c.ok : c.amber} />
         <Text variant="callout" tone="ink" style={styles.title} numberOfLines={2}>
           {card.title}
         </Text>
@@ -105,7 +105,8 @@ function WaitCard({ card }: { card: NonNullable<ReturnType<typeof useBrainWait>>
 
 const styles = StyleSheet.create({
   card: { gap: 8, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 16, marginTop: 4, maxWidth: 520 },
-  top: { flexDirection: "row", alignItems: "center", gap: 8 },
+  // A title on two lines keeps the icon on its first.
+  top: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, minWidth: 0, fontWeight: "600" },
   body: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   grow: { flex: 1, minWidth: 0 },

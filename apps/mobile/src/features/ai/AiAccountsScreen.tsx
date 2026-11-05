@@ -283,29 +283,28 @@ export function AiAccountsScreen() {
           </Card>
         ) : null}
         {again ? (
-          <Card>
-            <View style={styles.again}>
-              <View style={styles.againHead}>
-                <Text variant="callout" tone="ink" style={[styles.bold, styles.grow]}>
-                  {again.label}
-                </Text>
-                <Button size="sm" variant="ghost" label={t("common.back")} onPress={() => setAgain(null)} />
-              </View>
-              <AddAccount
-                machineId={again.machineId}
-                kind={again.kind}
-                computer={again.computer}
-                again={again.id}
-                email={again.email}
-                local={ai.data?.computers.find((x) => x.machineId === again.machineId)?.mine}
-                {...(signInProviderOf(again.provider) ? { provider: signInProviderOf(again.provider) } : {})}
-                onAdded={() => {
-                  setAgain(null);
-                  refetch();
-                }}
-              />
+          // On the page, not in a card: the steps draw their own.
+          <View style={styles.again}>
+            <View style={styles.againHead}>
+              <Text variant="callout" tone="ink" style={[styles.bold, styles.grow]}>
+                {again.label}
+              </Text>
+              <Button size="sm" variant="ghost" label={t("common.back")} onPress={() => setAgain(null)} />
             </View>
-          </Card>
+            <AddAccount
+              machineId={again.machineId}
+              kind={again.kind}
+              computer={again.computer}
+              again={again.id}
+              email={again.email}
+              local={ai.data?.computers.find((x) => x.machineId === again.machineId)?.mine}
+              {...(signInProviderOf(again.provider) ? { provider: signInProviderOf(again.provider) } : {})}
+              onAdded={() => {
+                setAgain(null);
+                refetch();
+              }}
+            />
+          </View>
         ) : null}
         <View style={styles.start}>
           <Button
@@ -446,6 +445,6 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   grow: { flex: 1, minWidth: 0 },
   start: { alignSelf: "flex-start" },
-  again: { padding: 14, gap: 12 },
-  againHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+  again: { gap: 12 },
+  againHead: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 2 },
 });

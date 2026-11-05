@@ -7,7 +7,7 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Button, Card, Chip, Icon, ProviderLogo, SheetScreen, Text, useToast } from "@/ui";
+import { Button, Card, Chip, Icon, LineIcon, ProviderLogo, SheetScreen, Text, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
@@ -175,7 +175,7 @@ function SwitchForm({
       </Card>
 
       <View style={[styles.hint, { backgroundColor: c.sunken }]}>
-        <Icon name="help" size={16} color={c.muted} />
+        <LineIcon name="help" variant="small" size={16} color={c.muted} />
         <Text variant="small" tone="muted" style={styles.grow}>
           {t("mobile.outage.sheet.hint", { computer: o.name })}
         </Text>
@@ -244,7 +244,13 @@ function TargetRow({
         {text.desc ? (
           <View style={styles.descLine}>
             {/* Only "Tem o Claude Code e o Codex" names the brains: each gets its maker's mark. */}
-            {x.enabled ? x.brains.map((b) => <ProviderLogo key={b} id={b} size="xs" />) : null}
+            {x.enabled
+              ? x.brains.map((b) => (
+                  <LineIcon key={b} variant="small" size={14}>
+                    <ProviderLogo id={b} size="xs" />
+                  </LineIcon>
+                ))
+              : null}
             <Text variant="small" tone="faint" numberOfLines={2} style={styles.shrink}>
               {text.desc}
             </Text>
@@ -267,7 +273,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   titleLine: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
-  descLine: { flexDirection: "row", alignItems: "center", gap: 5, minWidth: 0 },
+  // The marks stay on the first of its two lines.
+  descLine: { flexDirection: "row", alignItems: "flex-start", gap: 5, minWidth: 0 },
   off: { opacity: 0.5 },
   hint: { flexDirection: "row", gap: 8, padding: 12, borderRadius: 14 },
   acts: { gap: 8, marginTop: 4 },

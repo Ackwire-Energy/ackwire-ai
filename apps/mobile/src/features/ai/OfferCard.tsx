@@ -28,7 +28,7 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, type IconName, Text, useTheme } from "@/ui";
+import { Button, type IconName, LineIcon, Text, useTheme } from "@/ui";
 import { AskDone } from "../chat/asks";
 import { openPage } from "./parts";
 
@@ -254,7 +254,7 @@ function Shell({
   return (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.row}>
-        <Icon name={icon} size={16} color={colors.ink2} />
+        <LineIcon name={icon} variant="subhead" size={16} color={colors.ink2} />
         <Text variant="subhead" style={styles.title}>
           {title}
         </Text>
