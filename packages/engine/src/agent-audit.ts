@@ -181,7 +181,7 @@ export interface AuditRow {
   runId: string | null;
   channelId: string | null;
   /** Where it happened; null when there is no conversation or it was deleted. */
-  channel: { id: string; name: string; kind: "channel" | "dm" | "forum" } | null;
+  channel: { id: string; name: string; kind: "channel" | "dm" | "forum" | "task" } | null;
   onBehalfOf: { id: string; name: string | null } | null;
   outcome: schema.AuditOutcome | null;
   /** The approval a call waited for (or ran after), as it stands now: a `pending` row may be decided since. */

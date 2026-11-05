@@ -21,6 +21,7 @@ export type AppHref =
   | `/computer/${string}`
   | `/handoff/${string}`
   | `/issues/${number}`
+  | `/issues/${number}?m=${string}`
   | `/routines/${string}`
   | `/settings/computers/${string}`
   | `/settings/skills/${string}`
@@ -269,7 +270,9 @@ export function notificationHref(
     return `/mission/${s.missionId}`;
   // The forum has no screen in the app: the web's (`notificationWebPath`).
   if (s.topicId) return null;
-  if (s.issueNumber != null && Number.isSafeInteger(s.issueNumber)) return `/issues/${s.issueNumber}`;
+  // A reply in a task's conversation (ADR 0145): the task, which opens its conversation at that message.
+  if (s.issueNumber != null && Number.isSafeInteger(s.issueNumber))
+    return isSafeId(s.messageId) ? `/issues/${s.issueNumber}?m=${s.messageId}` : `/issues/${s.issueNumber}`;
   if (s.issueId) return "/issues";
   const channelId = s.channelId ?? s.dmId;
   if (isSafeId(channelId))

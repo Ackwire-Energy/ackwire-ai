@@ -14,8 +14,8 @@ import {
   waitsForWords,
 } from "@agenteschat/client/lib/activity";
 import { initialReveal, rebaseReveal, revealStep } from "@agenteschat/client/lib/reveal";
-import { barStep, formatDuration, waitStep } from "@agenteschat/client/lib/work";
-import { type AgentColorName, gradientOf } from "@agenteschat/ui/agent/engine";
+import { barStep, formatDuration } from "@agenteschat/client/lib/work";
+import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import {
   type ComponentRef,
   createContext,
@@ -77,7 +77,6 @@ import { type RowSight, rowsShown } from "./row-sight";
 import { TurnTools } from "./ToolCalls";
 import {
   fadeTail,
-  openerDelayMs,
   pruneMarks,
   type RevealMark,
   rememberTurn,
@@ -86,7 +85,6 @@ import {
   turnPhase,
   turnShows,
   WORD_FADE_MS,
-  waitDot,
   withOpacity,
 } from "./turn";
 
@@ -196,7 +194,7 @@ export const TurnRow = memo(function TurnRow({
   const items = turnItems(run);
   // The first thing it said opens the block, above its tools.
   const { said, lines } = turnOpener(items);
-  // At work with no words yet: the waiting row (its face, the pixels and what it does now), no name.
+  // At work with no words yet: no row of its own, the line above the composer says who, what, how long, and stops it.
   const waiting = waitsForWords(run);
   const wordsOnTop = !said && lines.length === 0;
   const now = useNow(1000);
@@ -218,16 +216,7 @@ export const TurnRow = memo(function TurnRow({
   useEffect(() => {
     rememberTurn(run.runId, { items, quotes, at: Date.now() });
   }, [run.runId, signature]);
-  // Just started and nothing of its own yet: it waits a moment, as a person would before answering.
   const [mountedAt] = useState(() => Date.now());
-  const [, wake] = useState(0);
-  const dueAt = (since ?? mountedAt) + openerDelayMs(run.runId);
-  const quiet = live && items.length === 0 && !run.text && Date.now() < dueAt;
-  useEffect(() => {
-    if (!quiet) return;
-    const timer = setTimeout(() => wake((n) => n + 1), Math.max(0, dueAt - Date.now()));
-    return () => clearTimeout(timer);
-  }, [quiet, dueAt]);
   // Drawn, the row tells the screen, which measures whether it shows: the line above the composer leaves this agent
   // out while it does (the row says its step, its time and its stop) and speaks for it once it doesn't.
   const sight = useContext(LiveRowsContext)?.sight;
@@ -235,20 +224,7 @@ export const TurnRow = memo(function TurnRow({
     (view: ComponentRef<typeof View> | null) => (view && sight ? sight.register(run.runId, view) : undefined),
     [sight, run.runId],
   );
-  if (quiet) return null;
-
-  if (waiting)
-    return (
-      <>
-        {pair}
-        <View ref={seen} collapsable={false} style={styles.msg}>
-          <View style={styles.avslot}>
-            <AgentFace agentId={run.agentId} size={34} mode="think" />
-          </View>
-          <WaitLine work={run.work} color={color} tail={<RunTail run={run} now={now} />} />
-        </View>
-      </>
-    );
+  if (waiting) return pair;
   return (
     <>
       {pair}
@@ -296,51 +272,6 @@ export const TurnRow = memo(function TurnRow({
     </>
   );
 });
-
-/**
- * The waiting row's body beside the face, centered on it (as the web's `.ac-wait`): three 4px pixels in the agent's
- * color lighting up in turn with a 2px hop (its light tone in the dark theme), then a muted line saying what it does
- * now (`waitStep`), each new one fading in, in one width (cut with "…", the whole step for screen readers), and
- * `tail` after it (its time and its stop). Reduce Motion: the pixels stand still at 60%, the line just swaps.
- */
-function WaitLine({ work, color, tail }: { work: LiveRun["work"]; color: AgentColorName; tail?: ReactNode }) {
-  const { t } = useTranslation();
-  const { scheme } = useTheme();
-  const reduced = useReducedMotion();
-  const time = useFrameTime(!reduced, 0);
-  const [light, deep] = gradientOf(color);
-  const step = waitStep(t, work);
-  return (
-    <View style={styles.wait}>
-      <View style={styles.waitWords} accessible accessibilityLiveRegion="polite" accessibilityLabel={step}>
-        <View style={styles.waitDots}>
-          {[0, 1, 2].map((i) => {
-            const d = waitDot(time, i, reduced);
-            return (
-              <View
-                key={i}
-                style={[
-                  styles.waitDot,
-                  {
-                    backgroundColor: scheme === "dark" ? light : deep,
-                    opacity: d.opacity,
-                    transform: [{ translateY: d.lift }],
-                  },
-                ]}
-              />
-            );
-          })}
-        </View>
-        <Animated.View key={step} entering={reduced ? undefined : FadeIn.duration(160)} style={styles.waitStep}>
-          <Text variant="footnote" tone="muted" numberOfLines={1}>
-            {step}
-          </Text>
-        </Animated.View>
-      </View>
-      {tail}
-    </View>
-  );
-}
 
 /**
  * The end of an agent's live row (the web's `RunTail`): "· 12 s" while it works and its stop when it is the run here
@@ -553,7 +484,7 @@ export function WorkingLine({
   const browsing = browsingRuns(runs)[0];
   const openBrowser = browsing && onOpenBrowser ? () => onOpenBrowser(browsing.agentId) : undefined;
   // "Ver" once its row is in the conversation (before that, there is nothing to go back to).
-  const seeable = away && turnShows(away, now) ? away : undefined;
+  const seeable = away && turnShows(away) ? away : undefined;
   const see = () => {
     if (!seeable) return;
     tapHaptic();
@@ -864,12 +795,6 @@ const styles = StyleSheet.create({
   msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
-  // Centered on the 34px face (its slot starts 2px down); face, pixels and words one step apart.
-  wait: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 11, height: 34, marginTop: 2 },
-  waitWords: { flexDirection: "row", alignItems: "center", gap: 11, flexShrink: 1, minWidth: 0 },
-  // One width whatever it says (a narrow screen gives way), cut with "…": its time and its stop never move under a
-  // finger as the step turns.
-  waitStep: { flexBasis: 200, flexGrow: 0, flexShrink: 1, minWidth: 0 },
   // The row's end: "· 12 s" and the stop. The clock keeps room for its seconds, and the stop never raises the line it
   // ends (24 points drawn in a 16-point line).
   tail: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
@@ -882,8 +807,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  waitDots: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
-  waitDot: { width: 4, height: 4 },
   who: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 3, minHeight: 19 },
   name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
   state: { flexDirection: "row", alignItems: "center", gap: 5, flexShrink: 0 },

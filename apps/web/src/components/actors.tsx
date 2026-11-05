@@ -19,7 +19,10 @@ export function useActors() {
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const name = (a: Actor) => dir.authorName({ type: a.type, id: a.id } as Parameters<typeof dir.authorName>[0]);
-  const avatar = (a: Actor, size: "xs" | "sm" = "xs") => <ActorAvatar size={size} actor={a} name={name(a)} />;
+  // Keyed by who it is: a list of faces (`.map(… avatar)`) needs no key of its own.
+  const avatar = (a: Actor, size: "xs" | "sm" = "xs") => (
+    <ActorAvatar key={actorKey(a)} size={size} actor={a} name={name(a)} />
+  );
   // The empty choice leads with a glyph as wide as the 18px faces, so every name starts on one edge.
   const none = <Icon name="person" size={18} className="muted" />;
   /** `current` (the value picked now) stays an option even when my lists leave that agent out. */

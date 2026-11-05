@@ -37,14 +37,15 @@ const LEAVE_MS = 340;
 const ESC = "Esc";
 
 /**
- * The island (ADR 0071 §9): a dark pill at the top of the work area with what reached me while I'm here, the face
- * of whoever called. Resting the pointer on it (or a click, or the keyboard) opens it with the whole text and the
+ * The island (ADR 0071 §9): a dark pill at the top of the window, centered on it, with what reached me while I'm
+ * here, the face of whoever called, and "Ver" (where it happened). Resting the pointer on it (or a click, or the keyboard) opens it with the whole text and the
  * answer right there; a notice leaves after a few seconds, and one waiting on me shrinks and stays until I decide.
  */
 export function NoticeIsland() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
+  const opener = useOpenNotice();
   const channels = useChannels(org.id);
   const channelName = useCallback((id: string) => channels.data?.find((c) => c.id === id)?.name ?? "", [channels.data]);
   const snap = useSyncExternalStore(island.subscribe, island.get, island.get);
@@ -168,36 +169,49 @@ export function NoticeIsland() {
             </div>
           </section>
         ) : (
-          <button
-            type="button"
-            className="ni__pill"
-            aria-expanded={false}
-            aria-label={t("island.expand")}
-            onClick={() => setOpen(true)}
-            onKeyDown={(e) => {
-              // Esc on the closed island puts it away: the waiting ones shrink, the rest leave.
-              if (e.key === "Escape") island.putAway();
-            }}
-          >
-            <Who n={lead.n} dir={dir} className="ni__face" />
-            <span className="ni__head">
-              <Headline n={lead.n} dir={dir} channelName={channelName} />
-            </span>
-            {!small && <Line n={lead.n} className="ni__line" />}
-            {others > 0 && (
-              <>
-                <span className="ni__faces" aria-hidden="true">
-                  {items
-                    .filter((i) => i !== lead)
-                    .slice(0, 2)
-                    .map((i) => (
-                      <Who key={i.n.id} n={i.n} dir={dir} className="ni__mini" />
-                    ))}
-                </span>
-                <CountBadge className="ni__count">+{others}</CountBadge>
-              </>
+          <div className="ni__bar">
+            <button
+              type="button"
+              className="ni__pill"
+              aria-expanded={false}
+              aria-label={t("island.expand")}
+              onClick={() => setOpen(true)}
+              onKeyDown={(e) => {
+                // Esc on the closed island puts it away: the waiting ones shrink, the rest leave.
+                if (e.key === "Escape") island.putAway();
+              }}
+            >
+              <Who n={lead.n} dir={dir} className="ni__face" />
+              <span className="ni__head">
+                <Headline n={lead.n} dir={dir} channelName={channelName} />
+              </span>
+              {!small && <Line n={lead.n} className="ni__line" />}
+              {others > 0 && (
+                <>
+                  <span className="ni__faces" aria-hidden="true">
+                    {items
+                      .filter((i) => i !== lead)
+                      .slice(0, 2)
+                      .map((i) => (
+                        <Who key={i.n.id} n={i.n} dir={dir} className="ni__mini" />
+                      ))}
+                  </span>
+                  <CountBadge className="ni__count">+{others}</CountBadge>
+                </>
+              )}
+            </button>
+            {opener.canOpen(lead.n) && (
+              <Button
+                size="sm"
+                className="ni__see"
+                // Resting on "Ver" never opens the island under the pointer: it goes where the notice happened.
+                onPointerEnter={() => clearTimeout(hover.current)}
+                onClick={() => opener.open(lead.n)}
+              >
+                {t("island.see")}
+              </Button>
             )}
-          </button>
+          </div>
         )}
       </div>
       {/* Read aloud as it arrives: who did what, and the line. */}
@@ -231,14 +245,33 @@ function Line({ n, className }: { n: AppNotification; className?: string }) {
   return line ? <span className={className}>{line}</span> : null;
 }
 
+/** Where a notice happened: whether it has a place to open, and opening it there (read, and off the island). */
+function useOpenNotice() {
+  const { org } = useOrg();
+  const act = useNotificationAction(org.id);
+  const openNotification = useNotificationOpener();
+  const openDetails = useContext(OpenDetailsContext);
+  const canOpen = (n: AppNotification) => Boolean(openTarget(n) || opensOnComputer(n) || opensConnectAi(n, undefined));
+  const open = (n: AppNotification) => {
+    if (!n.readAt) act.mutate({ type: "read", item: n, read: true });
+    island.settle(n.id);
+    // An approval opens in its dialog over the page I'm on (approve or refuse there); the rest, where it happened.
+    if (n.kind === "approval" && n.source.approvalId && openDetails) {
+      openDetails({ kind: "approval", id: n.source.approvalId });
+      return;
+    }
+    openNotification(n, org.id);
+  };
+  return { canOpen, open };
+}
+
 /** One notice on the open island: who and what, the whole line, and the answer right there. */
 function NoticeRow({ n, dir, channelName }: { n: AppNotification; dir: Dir; channelName: (id: string) => string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const act = useNotificationAction(org.id);
   const reply = useNotificationReply(org.id);
-  const openNotification = useNotificationOpener();
-  const openDetails = useContext(OpenDetailsContext);
+  const opener = useOpenNotice();
   const [typing, setTyping] = useState(false);
   const [draft, setDraft] = useState("");
   const [done, setDone] = useState<string | null>(null);
@@ -256,21 +289,12 @@ function NoticeRow({ n, dir, channelName }: { n: AppNotification; dir: Dir; chan
   const target = replyTarget(n);
   const waiting = n.waiting ? waitingCardOf(n) : null;
   const suggestions = n.kind === "agent_question" ? (n.latest.suggestions ?? []) : [];
-  const canOpen = Boolean(openTarget(n) || opensOnComputer(n) || opensConnectAi(n, undefined));
+  const canOpen = opener.canOpen(n);
 
   const read = () => {
     if (!n.readAt) act.mutate({ type: "read", item: n, read: true });
   };
-  const open = () => {
-    read();
-    island.settle(n.id);
-    // An approval opens in its dialog over the page I'm on (approve or refuse there); the rest, where it happened.
-    if (n.kind === "approval" && n.source.approvalId && openDetails) {
-      openDetails({ kind: "approval", id: n.source.approvalId });
-      return;
-    }
-    openNotification(n, org.id);
-  };
+  const open = () => opener.open(n);
   const answer = (text: string, choice = false) => {
     if (!target || !text.trim()) return;
     setFailed(false);

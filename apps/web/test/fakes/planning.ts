@@ -616,6 +616,34 @@ export function createMockPlanning(
         });
         return clone(i);
       },
+      // Like the server (ADR 0145): a channel of its own and a root message, made on first use; the chat fake holds them.
+      conversation: async (orgId, id) => {
+        const i = await findIssue(orgId, id);
+        if (!i.conversation) {
+          const root = {
+            id: mockId("msg"),
+            channelId: mockId("task"),
+            threadId: null,
+            author: { type: i.createdBy.type, id: i.createdBy.id },
+            body: `Task #${i.number}: ${i.title}`,
+            mentionedAgentIds: [],
+            agentRunId: null,
+            clientId: null,
+            meta: { taskConversation: { issueId: i.id, number: i.number, title: i.title } },
+            createdAt: i.createdAt,
+          };
+          (await ctx.lookup.messages?.(orgId))?.push(root);
+          i.conversation = {
+            channelId: root.channelId,
+            rootId: root.id,
+            count: 0,
+            lastAt: null,
+            participants: [],
+            working: false,
+          };
+        }
+        return { channelId: i.conversation.channelId, rootId: i.conversation.rootId };
+      },
       columns: async (orgId) => clone((await columnsOf(orgId)).columns),
       addColumn: async (orgId, input) => {
         record("issues.addColumn", input);

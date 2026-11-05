@@ -32,7 +32,7 @@ const cancels = (state: ReturnType<typeof seedState>) => state.calls.filter((c) 
 const esc = () => act(async () => fireEvent.keyDown(window, { key: "Escape" }));
 
 describe("Parar is immediate", () => {
-  test("the card above the box, its row out of view: its face, its name and step, 'Ver' once the row shows, its stop", async () => {
+  test("the card above the box, no row yet or its row out of view: its face, name, step and stop, 'Ver' once the row shows", async () => {
     const { state, ev } = await open((s) => {
       const ada = s.agents.find((a) => a.id === ADA_ID);
       if (ada) (ada as { appearance?: unknown }).appearance = { color: "amber", accessory: "hat" };
@@ -45,10 +45,15 @@ describe("Parar is immediate", () => {
     expect(bar.querySelector(".ac-avatar--agent")).not.toBeNull();
     expect(bar.querySelector(".ac-typing__text")?.textContent).toBe("Ada pensando…");
     expect(within(bar).queryByRole("button", { name: "Ver" })).toBeNull();
+    // No thinking row comes later either: still no "Ver" while it has no words.
     await act(() => new Promise((r) => setTimeout(r, 2100)));
-    // The row shows, out of view: the bar still speaks for it, with "Ver".
+    expect(within(bar).queryByRole("button", { name: "Ver" })).toBeNull();
+    expect(within(bar).getByRole("button", { name: "Parar" })).toBeTruthy();
+    // Its words bring its row, out of view: the bar still speaks for it, with "Ver".
+    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Olhando o login." });
+    await settle(3);
     expect(bar.querySelector(".ac-avatar--agent")).not.toBeNull();
-    expect(bar.querySelector(".ac-typing__text")?.textContent).toBe("Ada pensando…");
+    expect(bar.querySelector(".ac-typing__text")?.textContent).toBe("Ada escrevendo…");
     expect(within(bar).getByRole("button", { name: "Ver" })).toBeTruthy();
     // Its stop, one click, nothing asked.
     await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Parar" })));

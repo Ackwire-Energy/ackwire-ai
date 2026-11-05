@@ -119,6 +119,13 @@ describe("inbox items", () => {
     expect(
       notificationHref(notification({ id: "n", kind: "issue_comment", source: { issueId: "i1", issueNumber: 7 } })),
     ).toBe("/issues/7");
+    // A reply in its conversation (ADR 0145): the task, which opens its conversation at that message.
+    const messageId = "0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
+    expect(
+      notificationHref(
+        notification({ id: "n", kind: "issue_comment", source: { issueId: "i1", issueNumber: 7, messageId } }),
+      ),
+    ).toBe(`/issues/7?m=${messageId}`);
     expect(
       notificationHref(notification({ id: "n", kind: "issue_comment", source: { issueId: "i1", channelId: "c1" } })),
     ).toBe("/issues");

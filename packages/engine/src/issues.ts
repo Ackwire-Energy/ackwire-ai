@@ -18,20 +18,26 @@ import { getAgent } from "./agents";
 import { audienceError, canTalkTo, speakerFor } from "./audience";
 import { recordAudit } from "./audit";
 import { runAuthorityById } from "./authority";
-import { openDm } from "./dms";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishOrgEvent } from "./events";
 import { cutText } from "./format";
 import { boardColumns, columnForMove, columnOf, topRank } from "./issue-columns";
 import type { IssueWorkMeta } from "./issue-work";
-import { getMessage, insertMessage, messageView } from "./messages";
+import { getMessage, insertMessage, type MessageView, messageView, postPersonMessage } from "./messages";
 import { enqueueRunJob } from "./mission-runs";
-import { notifyIssueChanged, notifyIssueComment } from "./notification-producers";
+import { notifyIssueChanged } from "./notification-producers";
 import { can, getMembership, requireActiveMembership } from "./organizations";
 import { fireRoutineEvent } from "./routines";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
+import { admitTaskAgents } from "./task-access";
+import {
+  ensureTaskConversation,
+  type TaskConversationRef,
+  type TaskConversationSummary,
+  taskConversationSummaries,
+} from "./task-conversation";
 import { promptAnswer, promptPoll, toolDetail } from "./tool-detail";
-import { syncWikiLinks } from "./wiki-links";
+import { syncWikiLinks, withWikiLinks } from "./wiki-links";
 import { type WorkRow, type WorkView, workViews } from "./works";
 
 const { issues, issueActivity, issueCounters, channels, channelMembers, artifacts, agentRuns, agentRunSteps } = schema;
@@ -79,6 +85,8 @@ export interface IssueView {
   blocked: { reason: string; since: string; text?: string } | null;
   /** The agent's background work this card tracks (its plan, last update and line), newest. */
   backgroundWork: WorkView | null;
+  /** Its conversation (ADR 0145), once someone wrote or opened it: replies, who took part, an agent at work. */
+  conversation: TaskConversationSummary | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -214,9 +222,12 @@ async function canSee(
   channelId: string | null,
   /** The issue's assignee: an agent working on it from a DM sees what the person there sees. */
   assignee?: { type: string | null; id: string | null },
+  /** The issue's own conversation (ADR 0145): an agent there sees it (it joined only seeing it, or assigned). */
+  conversationChannelId?: string | null,
 ) {
   if (!channelId) return true;
   if (actor.type === "agent") {
+    if (conversationChannelId && actor.channelId === conversationChannelId) return true;
     if ((await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(channelId)) return true;
     if (assignee?.type !== "agent" || assignee.id !== actor.agentId) return false;
     const [row] = rowsOf<{ yes: boolean | string }>(
@@ -362,8 +373,11 @@ async function workOf(db: Database, rows: IssueRow[]): Promise<Map<string, Issue
 }
 
 async function views(db: Database, rows: IssueRow[]): Promise<IssueView[]> {
-  const work = await workOf(db, rows);
-  const works = await backgroundWorksOf(db, rows);
+  const [work, works, conversations] = await Promise.all([
+    workOf(db, rows),
+    backgroundWorksOf(db, rows),
+    taskConversationSummaries(db, rows),
+  ]);
   const ids = [...new Set(rows.flatMap((r) => r.artifactIds))];
   const files = ids.length
     ? await db
@@ -399,6 +413,7 @@ async function views(db: Database, rows: IssueRow[]): Promise<IssueView[]> {
     work: work.get(r.id) ?? null,
     blocked: r.blocked ?? null,
     backgroundWork: works.get(r.id) ?? null,
+    conversation: conversations.get(r.id) ?? null,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   }));
@@ -652,7 +667,17 @@ async function findVisible(db: Database, actor: IssueActor, orgId: string, where
         where.number !== undefined ? eq(issues.number, where.number) : undefined,
       ),
     );
-  if (!row || !(await canSee(db, actor, orgId, row.channelId, { type: row.assigneeType, id: row.assigneeId })))
+  if (
+    !row ||
+    !(await canSee(
+      db,
+      actor,
+      orgId,
+      row.channelId,
+      { type: row.assigneeType, id: row.assigneeId },
+      row.conversationChannelId,
+    ))
+  )
     throw new NotFoundError("Issue not found");
   return row;
 }
@@ -731,21 +756,27 @@ export async function recordIssueForumEvent(
       event,
       data,
     });
-    const comment = options.comment?.trim()
-      ? await addActivity(tx, issue, { kind: "comment", author, text: options.comment.trim().slice(0, 20_000) })
-      : null;
     const file = data.artifactId && !issue.artifactIds.includes(data.artifactId) ? data.artifactId : null;
     await tx
       .update(issues)
       .set({ updatedAt: new Date(), ...(file ? { artifactIds: [...issue.artifactIds, file] } : {}) })
       .where(eq(issues.id, issue.id));
-    return [a, ...(comment ? [comment] : [])];
+    return [a];
   });
   const activities = row.map(activityView);
   for (const activity of activities) {
     const e = { type: "issue.comment" as const, issueId: issue.id, activity };
     if (issue.channelId) await publishChannelEvent(deps.pubsub, { ...e, channelId: issue.channelId });
     else await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event: e });
+  }
+  // The summary and its link: a reply in the task's conversation (ADR 0145).
+  const comment = options.comment?.trim();
+  if (comment && deps.pubsub) {
+    const at = await ensureTaskConversation(deps.db, issue.id);
+    const who: IssueActor | { type: "agent"; agentId: string } =
+      author.type === "agent" ? { type: "agent", agentId: author.id } : { type: "person", userId: author.id };
+    const message = await postInConversation(deps, who, orgId, at, comment.slice(0, 20_000));
+    activities.push({ id: message.id, kind: "comment", author, text: message.body, createdAt: message.createdAt });
   }
   return activities;
 }
@@ -907,6 +938,10 @@ export async function updateIssue(
     return updated;
   });
   await linkRun(deps, actor, row);
+  // A new agent assignee joins the task's conversation (ADR 0145): a mention there reaches it.
+  if (patch.assignee?.type === "agent" && row.conversationChannelId) {
+    await admitTaskAgents(db, orgId, row.conversationChannelId, { ids: [patch.assignee.id] });
+  }
   const view = await one(db, (await reload(db, row)) ?? row);
   await announce(deps.pubsub, orgId, view, "issue.updated");
   // The inbox: a new assignee, a status change for whoever follows it.
@@ -1047,9 +1082,10 @@ async function ownFiles(db: Database, actor: IssueActor, orgId: string, attachme
   return ids.flatMap((id) => files.filter((f) => f.id === id));
 }
 /**
- * A comment by a person or an agent (agents report progress this way). It may
- * carry Drive files (uploaded from the comment box): they show on the comment
- * and are linked to the issue.
+ * A comment: a reply in the task's conversation (ADR 0145), on the chat's own path. A person's goes like any
+ * message there (a mention wakes the agent, receipts, the working line); an agent's (`comment_issue`, a reply
+ * mirrored from elsewhere) is its own message there. Drive files uploaded for it show on it and are linked to
+ * the issue. Notifications come from the message (`notifications.message`).
  */
 export async function commentIssue(
   deps: IssueDeps,
@@ -1058,32 +1094,115 @@ export async function commentIssue(
   issueId: string,
   text: string,
   options: { attachmentIds?: string[] } = {},
-) {
+): Promise<IssueActivityView> {
   const body = text.trim().slice(0, 20_000);
   if (!body && (options.attachmentIds ?? []).length === 0) throw new ValidationError("Comment is empty");
   const issue = await findVisible(deps.db, actor, orgId, { id: issueId });
   const files = await ownFiles(deps.db, actor, orgId, options.attachmentIds);
-  const row = await deps.db.transaction(async (tx) => {
-    const a = await addActivity(tx, issue, {
-      kind: "comment",
-      author: actorOf(actor),
-      text: body,
-      ...(files.length ? { data: { attachments: files } } : {}),
-    });
-    const linked = [...issue.artifactIds, ...files.map((f) => f.id).filter((id) => !issue.artifactIds.includes(id))];
-    await tx
-      .update(issues)
-      .set({ updatedAt: new Date(), ...(files.length ? { artifactIds: linked } : {}) })
-      .where(eq(issues.id, issue.id));
-    return a;
-  });
-  const view = activityView(row);
+  const conversation = await ensureTaskConversation(deps.db, issue.id);
+  const message = await postInConversation(
+    deps,
+    actor,
+    orgId,
+    conversation,
+    body,
+    files.map((f) => f.id),
+  );
+  const linked = [...issue.artifactIds, ...files.map((f) => f.id).filter((id) => !issue.artifactIds.includes(id))];
+  await deps.db
+    .update(issues)
+    .set({ updatedAt: new Date(), ...(files.length ? { artifactIds: linked } : {}) })
+    .where(eq(issues.id, issue.id));
   await linkRun(deps, actor, issue);
-  const event = { type: "issue.comment" as const, issueId: issue.id, activity: view };
-  if (issue.channelId) await publishChannelEvent(deps.pubsub, { ...event, channelId: issue.channelId });
-  else await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event });
-  if (body) await notifyIssueComment(deps, actorOf(actor), issue.id, row.id, body).catch(() => {});
+  return {
+    id: message.id,
+    kind: "comment",
+    author: actorOf(actor),
+    text: message.body,
+    ...(files.length ? { attachments: files } : {}),
+    createdAt: message.createdAt,
+  };
+}
+
+/** A reply in the task's conversation by a person (the chat's send) or an agent (its own message). */
+async function postInConversation(
+  deps: IssueDeps,
+  actor: IssueActor | { type: "agent"; agentId: string; runId?: string },
+  orgId: string,
+  at: TaskConversationRef,
+  body: string,
+  fileIds: string[] = [],
+): Promise<MessageView> {
+  if (!deps.pubsub) throw new Error("posting in a task's conversation needs pub/sub");
+  if (actor.type === "person") {
+    return postPersonMessage({ db: deps.db, pubsub: deps.pubsub }, actor.userId, orgId, at.channelId, {
+      body,
+      threadId: at.rootId,
+      ...(fileIds.length ? { attachments: fileIds } : {}),
+    });
+  }
+  const refs = fileIds.length
+    ? await deps.db
+        .select({ id: artifacts.id, version: artifacts.currentVersion, title: artifacts.title })
+        .from(artifacts)
+        .where(and(eq(artifacts.orgId, orgId), inArray(artifacts.id, fileIds)))
+    : [];
+  // It saw the task (the caller's check): later mentions of it there reach it.
+  await admitTaskAgents(deps.db, orgId, at.channelId, { ids: [actor.agentId] });
+  const message = await insertMessage(deps.db, {
+    orgId,
+    channelId: at.channelId,
+    threadId: at.rootId,
+    author: actor.runId
+      ? { type: "agent", agentId: actor.agentId, runId: actor.runId, hop: 1 }
+      : { type: "agent", agentId: actor.agentId, runId: null, hop: 1, stretchId: null },
+    body,
+    ...(refs.length ? { meta: { artifacts: fileIds.flatMap((id) => refs.filter((r) => r.id === id)) } } : {}),
+  });
+  const [view] = (await withWikiLinks(deps.db, orgId, [messageView(message)])) as [MessageView];
+  await publishMessageCreated(deps.pubsub, view);
   return view;
+}
+
+/**
+ * After a reply in a task's conversation (ADR 0145): its files are linked to the task (its Anexos), and whoever sees
+ * the task gets its card with the new count.
+ */
+export async function announceTaskConversation(deps: IssueDeps, orgId: string, messageId: string) {
+  const message = await getMessage(deps.db, orgId, messageId);
+  if (!message?.threadId) return;
+  const [issue] = await deps.db
+    .select()
+    .from(issues)
+    .where(and(eq(issues.orgId, orgId), eq(issues.conversationChannelId, message.channelId)));
+  if (!issue) return;
+  const attached = Array.isArray(message.meta.artifacts) ? (message.meta.artifacts as { id?: unknown }[]) : [];
+  const files = attached.flatMap((f) => (typeof f.id === "string" && !issue.artifactIds.includes(f.id) ? [f.id] : []));
+  const row = files.length
+    ? ((
+        await deps.db
+          .update(issues)
+          // Appended in SQL: another write to the list meanwhile keeps its own.
+          .set({
+            artifactIds: sql`${issues.artifactIds} || array(select x from unnest(${`{${files.join(",")}}`}::uuid[]) x
+              where not x = any(${issues.artifactIds}))`,
+          })
+          .where(eq(issues.id, issue.id))
+          .returning()
+      )[0] ?? issue)
+    : issue;
+  await announce(deps.pubsub, orgId, await one(deps.db, row), "issue.updated");
+}
+
+/** The task's conversation for whoever sees the task, made on first use (opening it, ADR 0145). */
+export async function openTaskConversation(
+  db: Database,
+  actor: IssueActor,
+  orgId: string,
+  issueId: string,
+): Promise<TaskConversationRef> {
+  const issue = await findVisible(db, actor, orgId, { id: issueId });
+  return ensureTaskConversation(db, issue.id);
 }
 
 /** "Turn into issue": a message becomes an issue that keeps its channel's visibility. */
@@ -1113,14 +1232,11 @@ export async function issueFromMessage(
 }
 
 /**
- * "Ask Ada to implement": assigns the agent and starts its work in the
- * requester's DM with it, as a thread whose root is a compact card
- * (`meta.issueWork`); the run starts on a short line in that thread. The
- * instructions never show in the chat: the run's context builds them from
- * the issue (`issueWorkBrief`). The issue stays the public record: progress
- * comments (`comment_issue`), the final reply mirrored as a comment, criteria,
- * PR, status. An issue made from a channel message gets one discreet line
- * there (`meta.issueTaken`); nothing else is posted in channels.
+ * "Ask Ada to implement": assigns the agent and starts its work in the task's own conversation (ADR 0145), where
+ * everyone who sees the task follows it and talks to it, on a short line from the person ("Please implement issue
+ * #N", `meta.issueWorkStart`). The instructions never show in the chat: the run's context builds them from the
+ * issue (`issueWorkBrief`). Criteria, PR and status stay on the issue. An issue made from a channel message gets one
+ * discreet line there (`meta.issueTaken`); nothing else is posted in channels.
  */
 export async function askAgentToImplement(
   deps: IssueDeps,
@@ -1136,25 +1252,17 @@ export async function askAgentToImplement(
   const issue = await findVisible(db, actor, orgId, { id: issueId });
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  // The person must be able to talk to the agent; the DM needs nothing else.
   if (!canTalkTo(agent, userId, await speakerFor(db, orgId, userId))) throw await audienceError(db, agent);
-  const dm = await openDm(db, userId, orgId, { agentId });
   const updated = await updateIssue(deps, actor, orgId, issue.id, { assignee: { type: "agent", id: agentId } });
+  const conversation = await ensureTaskConversation(db, issue.id);
+  await admitTaskAgents(db, orgId, conversation.channelId, { ids: [agentId] });
   const card: IssueWorkMeta = { issueId: issue.id, number: issue.number, title: issue.title, agentId };
-  const { root, start, runId } = await db.transaction(async (tx) => {
-    // The thread's root: the card (written directly, it routes to no agent).
-    const root = await insertMessage(tx, {
-      orgId,
-      channelId: dm.id,
-      author: { type: "person", userId },
-      body: `Issue #${issue.number}: ${issue.title}`.slice(0, 2_000),
-      meta: { issueWork: card },
-    });
-    // What starts the run, inside the thread: short and human (shown in the person's language).
+  const { start, runId } = await db.transaction(async (tx) => {
+    // What starts the run, in the conversation: short and human (shown in the person's language).
     const start = await insertMessage(tx, {
       orgId,
-      channelId: dm.id,
-      threadId: root.id,
+      channelId: conversation.channelId,
+      threadId: conversation.rootId,
       author: { type: "person", userId },
       body: `Please implement issue #${issue.number}.`,
       meta: {
@@ -1165,17 +1273,32 @@ export async function askAgentToImplement(
       },
     });
     const { run } = await enqueueRunJob(tx, start, agentId);
-    return { root, start, runId: run?.id ?? null };
+    return { start, runId: run?.id ?? null };
   });
-  await publishMessageCreated(pubsub, messageView(root));
   await publishMessageCreated(pubsub, messageView(start));
+  if (runId) {
+    await publishChannelEvent(pubsub, {
+      type: "agent.thinking",
+      channelId: conversation.channelId,
+      threadId: conversation.rootId,
+      agentId,
+      runId,
+    });
+  }
   await db.transaction(async (tx) => {
     await addActivity(tx, issue, {
       kind: "event",
       author: { type: "person", id: userId },
       text: `asked ${agent.name} to implement`,
       event: "agent_asked",
-      data: { agentId, agentName: agent.name, channelId: dm.id, messageId: root.id, threadId: root.id },
+      data: {
+        agentId,
+        agentName: agent.name,
+        channelId: conversation.channelId,
+        messageId: start.id,
+        threadId: conversation.rootId,
+        inConversation: true,
+      },
     });
     await recordAudit(tx, {
       orgId,
@@ -1216,13 +1339,21 @@ async function announceTaken(deps: IssueDeps, issue: IssueRow, card: IssueWorkMe
   await publishMessageCreated(deps.pubsub, messageView(line));
 }
 
-/** Mirrors an agent's final reply to the issue it was asked to implement (trigger `meta.issueId`). */
+/**
+ * An agent's reply to a task it was asked to implement (trigger `meta.issueId`) goes to the task's conversation,
+ * unless it was written there already (ADR 0145: where "Pedir ao" works now; older work threads lived in a DM).
+ */
 export async function mirrorReplyToIssue(
   deps: IssueDeps,
   run: { orgId: string; agentId: string; channelId: string },
   issueId: string,
   text: string,
 ) {
+  const [issue] = await deps.db
+    .select({ conversationChannelId: issues.conversationChannelId })
+    .from(issues)
+    .where(and(eq(issues.id, issueId), eq(issues.orgId, run.orgId)));
+  if (!issue || issue.conversationChannelId === run.channelId) return;
   await commentIssue(deps, { type: "agent", agentId: run.agentId, channelId: run.channelId }, run.orgId, issueId, text);
 }
 
@@ -1275,6 +1406,8 @@ export async function openTasksBrief(
           isNull(issues.channelId),
           inArray(issues.channelId, visible),
           seenFromDmSql(orgId, channelId, sql`${issues.channelId}`),
+          // From a task's own conversation: that task (ADR 0145).
+          eq(issues.conversationChannelId, channelId),
         ),
       ),
     )

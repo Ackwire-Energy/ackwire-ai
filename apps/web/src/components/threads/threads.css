@@ -848,7 +848,7 @@ html:not([data-pointer]) .thread-line:focus-visible {
   display: inline-flex;
   flex: none;
 }
-/* Agents are tiles of their own shape: they barely overlap, so none is cut. */
+/* Framed faces, agents and people one size: they barely overlap, so none is cut. */
 .thread-line__who .ac-avatar-stack > .ac-avatar + .ac-avatar {
   margin-left: -3px;
 }

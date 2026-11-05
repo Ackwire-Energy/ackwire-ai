@@ -382,6 +382,10 @@ describe("bottom anchoring", () => {
     const button = latest() as HTMLElement;
     expect(button.getAttribute("aria-label")).toBe("Ir para as mensagens mais recentes");
     expect(button.tabIndex).toBe(0);
+    // At the list's bottom edge: right after the messages, right before the composer and its working bar.
+    const dock = button.closest(".channel__latest") as HTMLElement;
+    expect(dock.previousElementSibling).toBe(log);
+    expect(dock.nextElementSibling?.className).toBe("channel__composer");
     const at = button.parentElement as HTMLElement;
     expect(at.querySelector(".channel__latest-count")).toBeNull();
     await push(socket, {

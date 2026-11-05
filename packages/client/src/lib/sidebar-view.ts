@@ -1,4 +1,5 @@
-import type { Agent, SidebarPins, SidebarView } from "../api/types";
+import type { Agent, AgentGroup, SidebarPins, SidebarView } from "../api/types";
+import { groupOf } from "./agent-groups";
 
 /** At most this many pinned rows on top of each section (`SIDEBAR_PIN_LIMIT`, packages/engine/src/sidebar-items.ts). */
 export const SIDEBAR_PIN_LIMIT = 5;
@@ -12,15 +13,18 @@ const NO_PINS: SidebarPins = { agents: [], channels: [], people: [] };
 
 /**
  * Day one ("Fixar no topo" never used nor dismissed): the person's own agents on top of AGENTES, the most recently
- * active first (`lastActive`: agent id → ISO time of its DM's last message), then by name, at most the limit.
+ * active first (`lastActive`: agent id → ISO time of its DM's last message), then by name, at most the limit. Only
+ * the ones in no group: a pin takes an agent out of its group, and these follow the DMs' activity, so a grouped agent
+ * pinned here jumped out of its group (and back) whenever its agents talked.
  */
 export function dayOnePins(
   agents: readonly Pick<Agent, "id" | "name" | "ownerUserId">[],
   myUserId: string,
   lastActive: ReadonlyMap<string, string> = new Map(),
+  groups: readonly AgentGroup[] = [],
 ): string[] {
   return agents
-    .filter((a) => a.ownerUserId === myUserId)
+    .filter((a) => a.ownerUserId === myUserId && !groupOf(groups, a.id))
     .sort(
       (a, b) => (lastActive.get(b.id) ?? "").localeCompare(lastActive.get(a.id) ?? "") || a.name.localeCompare(b.name),
     )

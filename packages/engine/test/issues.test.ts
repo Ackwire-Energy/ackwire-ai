@@ -24,7 +24,6 @@ import {
   listIssues,
   NEW_AGENT_DEFAULTS,
   NotFoundError,
-  openDm,
   postPersonMessage,
   searchVisible,
   setCriterion,
@@ -82,8 +81,9 @@ describe("issues", () => {
       "status_changed",
       "assigned",
       "criterion_checked",
-      "comment",
     ]);
+    // The comment is a reply in the task's conversation (ADR 0145), not an activity row.
+    expect((await getIssue(f.db, ana, f.org.id, { id: first.id })).conversation?.count).toBe(1);
     expect(activity[1]?.text).toBe("changed the status to In review");
     expect(activity[1]).toMatchObject({ textCode: "status_changed", textParams: { status: "in_review" } });
 
@@ -166,7 +166,7 @@ describe("issues", () => {
     expect((await listIssues(f.db, person(bia.id), f.org.id)).map((i) => i.id)).toEqual([fromGeneral.id]);
   });
 
-  test("asking an agent to implement: work in the requester's DM thread, instructions only in the run's context", async () => {
+  test("asking an agent to implement: work in the task's conversation, instructions only in the run's context", async () => {
     let step = 0;
     let system = "";
     f = await setup({
@@ -193,12 +193,13 @@ describe("issues", () => {
     const asked = await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
     expect(asked.assignee).toEqual({ type: "agent", id: f.agent.id });
 
-    // The DM with the agent: a root card and the start inside its thread; nothing in #general.
-    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    // The task's conversation: its root and the start inside its thread; nothing in #general or a DM.
+    const at = asked.conversation;
+    if (!at) throw new Error("no conversation");
     const all = await f.db.select().from(schema.messages);
-    expect(all.filter((m) => m.channelId === f.general.id)).toEqual([]);
-    const root = all.find((m) => m.channelId === dm.id && !m.threadId);
-    expect(root?.meta).toMatchObject({ issueWork: { issueId: issue.id, number: 1, title: "Login quebra" } });
+    expect(all.every((m) => m.channelId === at.channelId)).toBe(true);
+    const root = all.find((m) => m.id === at.rootId);
+    expect(root?.meta).toMatchObject({ taskConversation: { issueId: issue.id, number: 1, title: "Login quebra" } });
     const start = all.find((m) => m.threadId === root?.id && m.authorType === "person");
     expect(start?.meta).toMatchObject({ issueId: issue.id, bodyCode: "issue_work_start" });
     for (const m of [root, start]) {
@@ -207,23 +208,21 @@ describe("issues", () => {
       expect(m?.body).not.toContain("Safari não entra");
     }
     const [run] = await f.db.select().from(schema.agentRuns);
-    expect(run).toMatchObject({ channelId: dm.id, threadRootId: root?.id, triggerMessageId: start?.id });
+    expect(run).toMatchObject({ channelId: at.channelId, threadRootId: root?.id, triggerMessageId: start?.id });
 
     await drainOutbox(f.db, f.handlers);
-    // The run read its task from the issue (description, criteria, how to report).
+    // The run read its task from the issue (description, criteria, where it works).
     expect(system).toContain("Safari não entra.");
     expect(system).toContain("1. [ ] Funciona no Safari");
-    expect(system).toContain("comment_issue");
-    expect(system).toContain("private between you and the person who asked");
-    // Its reply stays in the DM thread; progress and the reply land on the issue.
+    expect(system).toContain("the task's own conversation");
+    // Progress (`comment_issue`) and the reply are both replies in the conversation, once each.
     const replies = (await f.db.select().from(schema.messages)).filter((m) => m.authorType === "agent");
-    expect(replies.map((m) => [m.channelId, m.threadId])).toEqual([[dm.id, root?.id ?? ""]]);
-    const activity = await listIssueActivity(f.db, person(f.owner.id), f.org.id, issue.id);
-    const comments = activity.filter((a) => a.kind === "comment").map((a) => [a.author.type, a.text]);
-    expect(comments).toEqual([
-      ["agent", "Comecei: reproduzi o bug."],
-      ["agent", "Corrigido no PR #7."],
+    expect(replies.map((m) => [m.channelId, m.threadId, m.body])).toEqual([
+      [at.channelId, root?.id ?? "", "Comecei: reproduzi o bug."],
+      [at.channelId, root?.id ?? "", "Corrigido no PR #7."],
     ]);
+    const activity = await listIssueActivity(f.db, person(f.owner.id), f.org.id, issue.id);
+    expect(activity.filter((a) => a.kind === "comment")).toEqual([]);
     const askedEvent = activity.find((a) => a.event === "agent_asked");
     expect(askedEvent?.textParams).toMatchObject({ threadId: root?.id });
   });
@@ -258,26 +257,26 @@ describe("issues", () => {
     expect(line[0]?.meta).toMatchObject({ issueTaken: { issueId: issue.id, number: 1 }, bodyCode: "issue_taken" });
     expect(added.filter((m) => m.channelId === f.general.id)).toEqual([]);
     await drainOutbox(f.db, f.handlers);
-    // Nobody answered the line; the agent (not in #secreto) still read and commented the issue from the DM.
+    // Nobody answered the line; the agent (not in #secreto) still read and commented the issue in its conversation.
     const runs = await f.db.select().from(schema.agentRuns);
     expect(runs).toHaveLength(1);
     expect(system).toContain("# Your task: issue #1");
-    // From the DM the agent sees the private issue, so it's among its open tasks there.
+    // From the task's conversation the agent sees the private issue, so it's among its open tasks there.
     expect(system).toContain("- #1 Checkout quebra (in_progress)");
-    const comments = (await listIssueActivity(f.db, person(f.owner.id), f.org.id, issue.id))
-      .filter((a) => a.kind === "comment")
-      .map((a) => a.text);
-    expect(comments).toEqual(["Vou olhar.", "Feito."]);
+    const at = (await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id })).conversation;
+    const replies = (await f.db.select().from(schema.messages))
+      .filter((m) => m.authorType === "agent" && m.channelId === at?.channelId)
+      .map((m) => m.body);
+    expect(replies).toEqual(["Vou olhar.", "Feito."]);
   });
 
   test("asking to implement a manual issue posts nothing in channels; an agent the person can't talk to refuses", async () => {
     f = await setup();
     const deps = { db: f.db, pubsub: f.pubsub };
     const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Sem origem" });
-    await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
+    const asked = await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
     const channelsWithMessages = new Set((await f.db.select().from(schema.messages)).map((m) => m.channelId));
-    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
-    expect([...channelsWithMessages]).toEqual([dm.id]);
+    expect([...channelsWithMessages]).toEqual([asked.conversation?.channelId ?? ""]);
     const bia = await addMember(f.db, f.org.id, "member", "Bia");
     await f.db
       .update(schema.agents)
@@ -393,21 +392,24 @@ describe("issues", () => {
     ]);
   });
 
-  test("every run in the issue's work thread works on it: a reply there, a computer task's end; a run elsewhere doesn't", async () => {
+  test("every run of the assignee in the task's conversation works on it: a reply there, a computer task's end; a run elsewhere doesn't", async () => {
     f = await setup();
     const deps = { db: f.db, pubsub: f.pubsub };
     const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Frete lento" });
-    await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
+    const at = (await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id)).conversation;
     await drainOutbox(f.db, f.handlers);
-    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
-    const root = (await f.db.select().from(schema.messages)).find((m) => m.channelId === dm.id && !m.threadId);
-    if (!root) throw new Error("no issue card");
+    if (!at) throw new Error("no conversation");
+    const dm = { id: at.channelId };
+    const root = { id: at.rootId };
     const runOf = async (messageId: string) =>
       (await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, messageId)))[0];
     // Moved back to "to do": the next run in its thread starts the work again.
     await updateIssue(deps, person(f.owner.id), f.org.id, issue.id, { status: "todo" });
 
-    const reply = await postPersonMessage(deps, f.owner.id, f.org.id, dm.id, { body: "e aí?", threadId: root.id });
+    const reply = await postPersonMessage(deps, f.owner.id, f.org.id, dm.id, {
+      body: "@dev e aí?",
+      threadId: root.id,
+    });
     await drainOutbox(f.db, f.handlers);
     expect((await runOf(reply.id))?.issueId).toBe(issue.id);
     expect((await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id })).status).toBe("in_progress");
@@ -433,21 +435,21 @@ describe("issues", () => {
     expect(await runOf(elsewhere.id)).toMatchObject({ status: "done", issueId: null });
   });
 
-  test("an issue handed to another agent: a run in the first one's work thread doesn't hide the new one's work", async () => {
+  test("an issue handed to another agent: a run of the first one in its conversation doesn't hide the new one's work", async () => {
     f = await setup();
     const deps = { db: f.db, pubsub: f.pubsub };
     const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Frete lento" });
-    await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
+    const at = (await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id)).conversation;
     await drainOutbox(f.db, f.handlers);
-    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
-    const root = (await f.db.select().from(schema.messages)).find((m) => m.channelId === dm.id && !m.threadId);
-    if (!root) throw new Error("no issue card");
+    if (!at) throw new Error("no conversation");
+    const dm = { id: at.channelId };
+    const root = { id: at.rootId };
     const qa = await createAgent(f.db, f.owner.id, f.org.id, { name: "QA", handle: "qa" }, NEW_AGENT_DEFAULTS);
     // QA's run stays queued, so it is live: only the reply below runs.
     const handed = await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, qa.id);
     expect(handed.work).toMatchObject({ agentId: qa.id, state: "running" });
 
-    const reply = await postPersonMessage(deps, f.owner.id, f.org.id, dm.id, { body: "e aí?", threadId: root.id });
+    const reply = await postPersonMessage(deps, f.owner.id, f.org.id, dm.id, { body: "@dev e aí?", threadId: root.id });
     const runOf = async () =>
       (await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, reply.id)))[0];
     await executeRun(f.jobDeps, (await runOf())?.id ?? "", { finalAttempt: true });

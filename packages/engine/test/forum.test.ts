@@ -26,6 +26,7 @@ import {
   listForumTopics,
   listIssueActivity,
   NotFoundError,
+  openTaskConversation,
   parseSuggestedIssues,
   parseSynthesis,
   passForumTurn,
@@ -572,9 +573,16 @@ describe("from issues, the chat and routines", () => {
     const activity = await listIssueActivity(f.db, person, f.org.id, issue.id);
     const evaluated = activity.find((a) => a.event === "forum_evaluated");
     expect(evaluated).toMatchObject({ textCode: "forum_evaluated", textParams: { topicId: topic.id } });
-    const comment = activity.find((a) => a.kind === "comment");
-    expect(comment?.text).toContain(`/forum/${topic.id}`);
-    expect(comment?.text).toContain("O botão fica ao lado do formulário.");
+    expect(activity.some((a) => a.kind === "comment")).toBe(false);
+    // The summary and its link: an agent's reply in the task's conversation (ADR 0145).
+    const at = await openTaskConversation(f.db, person, f.org.id, issue.id);
+    const replies = (
+      await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, at.channelId))
+    ).filter((m) => m.threadId === at.rootId);
+    expect(replies).toHaveLength(1);
+    expect(replies[0]).toMatchObject({ authorType: "agent" });
+    expect(replies[0]?.body).toContain(`/forum/${topic.id}`);
+    expect(replies[0]?.body).toContain("O botão fica ao lado do formulário.");
 
     const created = await createForumIssues(
       forum(),

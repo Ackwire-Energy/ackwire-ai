@@ -1125,6 +1125,8 @@ export const en = {
     otherAnswer: "Another answer",
     review: "Review",
     open: "Open",
+    /** On the closed island, at its end: opens where the notice happened. */
+    see: "View",
     dismiss: "Dismiss",
     send: "Send",
     placeholder: "Write your answer…",
@@ -5608,13 +5610,28 @@ export const en = {
       "{{name}} reads what she needs, comments the plan here and does it. Anything sensitive, like publishing, asks for your approval.",
     askButton: "Ask {{name}}",
     askSection: "Ask an agent",
-    asked: "Request sent. {{name}} posts progress here. Your conversation stays in your DM.",
+    asked: "Request sent. {{name}} works in the task's conversation, where everyone who sees the task follows along.",
     activity: "Activity",
     noActivity: "Nothing yet.",
     discussion: "Discussion",
+    /** A task's conversation (ADR 0145): a chat thread of its own, beside the task's details. */
+    conversation: {
+      /** The dialog's top bar button and the section's title. */
+      button: "Conversation",
+      toggle_one: "Conversation, {{count}} message",
+      toggle_other: "Conversation, {{count}} messages",
+      /** The panel's title. */
+      title: "Task conversation",
+      messages_one: "{{count}} message",
+      messages_other: "{{count}} messages",
+      open: "Open",
+      /** The summary line of a task nobody wrote in yet. */
+      start: "Talk about the task",
+      close: "Close the conversation",
+    },
     noComments: "No comments yet.",
     comment: "Comment on the task",
-    commentPlaceholder: "Comment · use @ to call an agent",
+    commentPlaceholder: "Comment on the task · use @ to call an agent",
     send: "Comment",
     details: "Task details",
     statusLabel: "Status",

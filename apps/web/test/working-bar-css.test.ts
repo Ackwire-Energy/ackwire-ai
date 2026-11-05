@@ -28,14 +28,15 @@ test("what ships keeps the bar above the composer one low width: the words take 
   // Its round buttons fit the low pill.
   expect(last(".ac-typing .stop-run", "height")).toBe("24px");
   expect(last(".ac-typing__browser.ac-btn", "height")).toBe("24px");
-  // An agent's step in the bar (its row out of view) and in its live row is as wide as its words, up to one width, so
-  // the time and the stop follow them; a narrow box still fits it.
-  expect(last(".ac-typing__step", "max-width")).toBe("260px");
+  // An agent's step in the bar is as wide as its words while the bar has room ("planos-concorrentes.md" whole), so
+  // the time and the stop follow them; only a bar out of room cuts it.
+  expect(last(".ac-typing__step", "max-width")).toBeUndefined();
   expect(last(".ac-typing__step", "min-width")).toBe("0");
-  expect(last(".ac-wait__step", "max-width")).toBe("340px");
-  expect(last(".ac-wait__step", "min-width")).toBe("0");
+  expect(last(".ac-typing__step", "flex")).toBe("0 auto");
   // Its step and someone typing beside it: the pill widens for both.
   expect(last(`${bar}[data-wide]`, "max-width")).toBe("640px");
+  // A task's conversation column: the bar spans its composer, no 440px stop short of the composer's edge.
+  expect(last(`:is(.ac-details__side,.issue-page__talk) .channel__composer>${bar}`, "max-width")).toBe("none");
   // The clock's figures are all one width (`ac-num`), so the seconds never nudge it.
   expect(last(".ac-num", "font-variant-numeric")).toBe("tabular-nums");
 });

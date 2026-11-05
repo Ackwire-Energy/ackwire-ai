@@ -52,7 +52,6 @@ import {
 } from "../../src/features/chat/logic";
 import {
   fadeTail,
-  openerDelayMs,
   outputTail,
   pruneMarks,
   recentTurn,
@@ -65,7 +64,6 @@ import {
   turnPhase,
   turnRuns,
   turnShows,
-  waitDot,
   withContinued,
   withOpacity,
 } from "../../src/features/chat/turn";
@@ -514,13 +512,12 @@ describe("working line", () => {
     // Two agents out of view: the line can't say whose time or stop.
     const both = workingEntries([ada, atlas], [], name);
     expect(awayRun(both, [ada, atlas], () => false)).toBeUndefined();
-    // The step keeps one width in the line and in the row, so the clock and the stop never move as it turns.
+    // The step keeps one width in the line, so the clock and the stop never move as it turns.
     const lines = await source("features/chat/LiveRows.tsx");
     expect(lines).toContain("barStep: { flexBasis: 150, flexGrow: 0, flexShrink: 1, minWidth: 0 },");
-    expect(lines).toContain("waitStep: { flexBasis: 200, flexGrow: 0, flexShrink: 1, minWidth: 0 },");
     // "Ver" only once its row is in the conversation, and then the stop after it, without a second rule.
     const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
-    expect(line).toContain("const seeable = away && turnShows(away, now) ? away : undefined;");
+    expect(line).toContain("const seeable = away && turnShows(away) ? away : undefined;");
     expect(line).toContain("<LineStop runs={stoppable} onStop={onStop} rule={!seeable} />");
   });
 
@@ -535,10 +532,12 @@ describe("working line", () => {
     expect(rowStopOf(runs, () => false)).toBeUndefined();
   });
 
-  test("the live row ends in its time and its stop, outside its spoken step so both stay reachable", async () => {
+  test("no thinking row: before its words the turn draws nothing (the line speaks); then its row ends in its time and stop", async () => {
     const lines = await source("features/chat/LiveRows.tsx");
-    const row = lines.slice(lines.indexOf("export const TurnRow"), lines.indexOf("function WaitLine("));
-    expect(row).toContain("<WaitLine work={run.work} color={color} tail={<RunTail run={run} now={now} />} />");
+    const row = lines.slice(lines.indexOf("export const TurnRow"), lines.indexOf("function RunTail("));
+    expect(row).toContain("if (waiting) return pair;");
+    expect(lines).not.toContain("WaitLine");
+    expect(lines).not.toContain("openerDelayMs");
     expect(row).toContain("{live ? <RunTail run={run} now={now} /> : null}");
     const tail = lines.slice(lines.indexOf("function RunTail("), lines.indexOf("function RevealText("));
     expect(tail).toContain("runElapsed(t, run, now)");
@@ -549,7 +548,7 @@ describe("working line", () => {
 
   test("once its words arrive, the block's header says the name and its start time, as on the web (no orbit)", async () => {
     const lines = await source("features/chat/LiveRows.tsx");
-    const row = lines.slice(lines.indexOf("export const TurnRow"), lines.indexOf("function WaitLine("));
+    const row = lines.slice(lines.indexOf("export const TurnRow"), lines.indexOf("function RunTail("));
     expect(row).toContain("when.time(new Date(since ?? mountedAt).toISOString())");
     expect(row).not.toContain("PixelOrbit");
   });
@@ -914,13 +913,12 @@ describe("an agent's turn as one block", () => {
     running,
   });
 
-  test("its block shows after a moment, or once it has something of its own (the line keeps its face till then)", () => {
+  test("its block shows once it has words of its own; steps alone stay in the line above the box", () => {
     const fresh = run({ runId: "a", status: "running", startedAt: 10_000 });
-    const due = 10_000 + openerDelayMs("a");
-    expect(turnShows(fresh, 10_500)).toBe(false);
-    expect(turnShows(fresh, due)).toBe(true);
-    expect(turnShows({ ...fresh, text: "Oi" }, 10_500)).toBe(true);
-    expect(turnShows({ ...fresh, work: [call("1", "sentry_list_issues", true)] }, 10_500)).toBe(true);
+    expect(turnShows(fresh)).toBe(false);
+    expect(turnShows({ ...fresh, work: [call("1", "sentry_list_issues", true)] })).toBe(false);
+    expect(turnShows({ ...fresh, text: "Oi" })).toBe(true);
+    expect(turnShows({ ...fresh, work: [{ kind: "say", text: "Vou ler.", turn: 1 }] })).toBe(true);
   });
 
   test("the header word: thinking, working on steps, writing, stopped", () => {
@@ -1029,19 +1027,6 @@ describe("an agent's turn as one block", () => {
       run({ runId: "d", work: [call("1", "sentry_list_issues", true)] }),
     ];
     expect(turnOrder(runs).map((r) => r.runId)).toEqual(["b", "c", "a", "d"]);
-  });
-
-  test("the waiting row's pixels light up in turn, 2px up, stepped; still at 60% with Reduce Motion", () => {
-    const at = (t: number) => [0, 1, 2].map((i) => waitDot(t, i));
-    expect(at(0)).toEqual([
-      { opacity: 1, lift: -2 },
-      { opacity: 0.3, lift: 0 },
-      { opacity: 0.3, lift: 0 },
-    ]);
-    expect(at(0.25).map((d) => d.opacity)).toEqual([0.6, 1, 0.3]);
-    expect(at(0.45).map((d) => d.opacity)).toEqual([0.3, 0.6, 1]);
-    expect(at(1.2)).toEqual(at(0));
-    expect(waitDot(0, 0, true)).toEqual({ opacity: 0.6, lift: 0 });
   });
 
   test("a stopped run's call that was running shows as stopped", () => {
