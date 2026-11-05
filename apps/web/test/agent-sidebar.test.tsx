@@ -186,6 +186,8 @@ describe("what the viewer sees", () => {
     const aside = side() as HTMLElement;
     expect(within(aside).getByRole("heading", { name: "Ada" })).toBeTruthy();
     expect(aside.querySelectorAll(".dm-side__sec")).toHaveLength(0);
+    // Its head has no computer, so one who may still watch keeps the header's way in.
+    expect(screen().queryByRole("button", { name: "Computador" })).toBeTruthy();
   });
 
   test("its right hand: no computer of its own, the viewer's plan for it", async () => {
@@ -272,6 +274,18 @@ describe("the picture's refresh", () => {
     await act(async () => window.dispatchEvent(new Event("focus")));
     await settle(6);
     expect(calls).toHaveBeenCalled();
+  });
+
+  test("a window that loses the focus keeps the last picture: only the asking stops", async () => {
+    widthIs(DM_SIDE_WIDE_QUERY);
+    await openDm();
+    const shown = () => (side() as HTMLElement).querySelector(".dm-side__screen img");
+    expect(shown()).toBeTruthy();
+    const focus = spyOn(document, "hasFocus").mockReturnValue(false);
+    await act(async () => window.dispatchEvent(new Event("blur")));
+    await settle(2);
+    expect(shown()).toBeTruthy();
+    focus.mockRestore();
   });
 
   test("its label: never live; a recent one says so, an older one its time", () => {

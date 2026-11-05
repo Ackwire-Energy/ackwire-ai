@@ -369,7 +369,9 @@ export interface DesktopPictureView {
 
 // ponytail: the agent's screen only, through `desktop.capture` (desktop use); a computer without screens, or a person
 // with its browser alone, shows the live view's button instead. `browser.capture` boxes every element, for a judge.
-const pictures = new TtlCache<DesktopPictureView>(PICTURE_TTL_MS, 500);
+// Few: a picture is hundreds of KB, and an expired one stays in memory until a newer one pushes it out.
+const pictures = new TtlCache<DesktopPictureView>(PICTURE_TTL_MS, 64);
+const capturing = new Map<string, Promise<DesktopPictureView>>();
 const pictureAudits = new TtlCache<true>(PICTURE_AUDIT_MS);
 
 /**
@@ -393,10 +395,21 @@ export async function desktopPicture(
   const served = await desktopTarget(db, ANYWHERE, orgId, agentId, "desktop");
   if ("refused" in served || !hub) return { picture: null, reason: "unavailable" };
   const key = `${orgId}:${agentId}`;
-  const kept = pictures.get(key);
-  if (kept) return kept;
-  const view = await capturePicture(hub, served);
-  pictures.set(key, view);
+  let view = pictures.get(key);
+  if (!view) {
+    // Those asking while a capture runs wait for it: the computer's queue is the agent's own too.
+    let capture = capturing.get(key);
+    if (!capture) {
+      capture = capturePicture(hub, served)
+        .then((taken) => {
+          pictures.set(key, taken);
+          return taken;
+        })
+        .finally(() => capturing.delete(key));
+      capturing.set(key, capture);
+    }
+    view = await capture;
+  }
   if (view.picture && !pictureAudits.get(`${userId}:${agentId}`)) {
     pictureAudits.set(`${userId}:${agentId}`, true);
     await recordAudit(db, {

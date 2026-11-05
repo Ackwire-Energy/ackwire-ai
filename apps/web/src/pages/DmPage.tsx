@@ -1,6 +1,6 @@
 import type { DmTarget } from "@agenteschat/client";
 import { keys } from "@agenteschat/client";
-import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
+import { audienceNotice, canTalk, seesDetails } from "@agenteschat/client/lib/audience";
 import { greetingSuggestions } from "@agenteschat/client/lib/chat";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
@@ -110,8 +110,9 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
       </DmWho>
       {/* Its tasks (ADR 0128), while it has any: they open in the side panel. */}
       {agent && <AgentTasksPill />}
-      {/* The sidebar has the computer: only a line of turns waiting for it still shows here. */}
-      {agent && !rightHand && <ComputerButton agent={agent} queueOnly={side?.docked} />}
+      {/* The sidebar has the computer: only a line of turns waiting for it still shows here. A viewer of its public
+          card gets the sidebar's head alone, so the way in stays for one who may still watch the computer. */}
+      {agent && !rightHand && <ComputerButton agent={agent} queueOnly={side?.docked && seesDetails(agent)} />}
       {/* The same field as a channel's, held to this DM. */}
       <HeaderSearch channelId={dm.data.channelId} onOpen={onSearch} dm />
       {side && (

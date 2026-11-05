@@ -989,6 +989,20 @@ describe("a picture of an agent's screen", () => {
     expect(audits[0]?.details).toMatchObject({ picture: true, seconds: 0 });
   });
 
+  test("everyone asking at once shares one capture, and each of them counts as watching", async () => {
+    await start();
+    const admin = await addMember(f.db, f.org.id, "admin", "bia");
+    const { hub, ops } = pictureHub(true);
+    const [mine, theirs] = await Promise.all([ask(hub, f.owner.id), ask(hub, admin.id)]);
+    expect(theirs).toEqual(mine);
+    expect(ops).toEqual(["desktop.session.status", "desktop.capture"]);
+    const audits = await f.db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.targetId, f.agent.id), eq(schema.auditLog.action, "desktop.watched")));
+    expect(audits.map((a) => a.actorId).sort()).toEqual([f.owner.id, admin.id].sort());
+  });
+
   test("a screen that isn't running stays off: no capture is asked of the computer", async () => {
     await start();
     const { hub, ops } = pictureHub(false);

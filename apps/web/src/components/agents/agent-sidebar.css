@@ -6,10 +6,19 @@
   padding: 0 0 24px;
 }
 .thread-panel.dm-side--float {
-  width: min(360px, calc(100% - 20px));
-  overflow-y: auto;
   background: var(--side);
   --presence-ring: var(--side);
+}
+/* Under this a panel is the whole screen, as a thread's is. */
+@media (min-width: 861px) {
+  .thread-panel.dm-side--float {
+    width: min(360px, calc(100% - 20px));
+  }
+}
+.dm-side__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 .channel__body:has(> .dm-side--float) {
   position: relative;
@@ -181,6 +190,9 @@ html:not([data-pointer]) .dm-side__screen:focus-visible {
   display: flex;
   gap: 6px;
   margin: 8px 0 10px;
+}
+.dm-side__acts:empty {
+  margin-top: 0;
 }
 .dm-side__acts .ac-btn:first-child {
   flex: 1;

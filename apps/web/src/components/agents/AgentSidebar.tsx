@@ -116,7 +116,7 @@ function FloatingSide({ onClose, children }: { onClose: () => void; children: Re
           title={t("common.close")}
           onClick={onClose}
         />
-        {children}
+        <div className="dm-side__scroll">{children}</div>
       </aside>
     </>
   );
@@ -191,10 +191,18 @@ function ComputerSection({ agent }: { agent: Agent }) {
   const active = useWindowActive();
   const view = useAgentComputer(agent, { poll: active ? STATUS_POLL_MS : false, runs: true });
   const f = view.facts;
-  const asks = asksPicture(active, view.desktop);
-  const shot = useDesktopPicture(org.id, agent.id, { enabled: asks, working: Boolean(f?.working) });
+  const running = asksPicture(true, view.desktop);
+  const shot = useDesktopPicture(org.id, agent.id, { enabled: active && running, working: Boolean(f?.working) });
   const nowMs = useNow(15_000);
-  if (view.forbidden || !view.ready || !f) return null;
+  if (view.forbidden) return null;
+  // Its place is kept: the sections under it are faster, and would jump down when it comes.
+  if (!view.ready || !f) {
+    return (
+      <Section title={t("agentComputer.button")}>
+        <div className="dm-side__noscreen" />
+      </Section>
+    );
+  }
   const now = new Date(nowMs);
   const g = agentGrammar(agent.name);
   const state = entryState(f, nowMs);
@@ -210,7 +218,8 @@ function ComputerSection({ agent }: { agent: Agent }) {
     emailPromised: false,
     now,
   });
-  const picture = asks ? shot.data?.picture : null;
+  // Out of focus none is asked, and the last stays with its time on it.
+  const picture = running ? shot.data?.picture : null;
   const stopped = state.kind === "available" && view.desktop?.available === true && !view.desktop.running;
   const using = state.kind === "working" ? last : undefined;
   const site = using?.screen === "browser" ? browserSiteUrl(null, view.steps) : null;
