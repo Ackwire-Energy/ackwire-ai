@@ -142,17 +142,6 @@ html:not([data-pointer]) .tp-chip:focus-visible {
   background: var(--info-well, var(--card-well));
   color: var(--ink);
 }
-.tp-adjust {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.tp-map {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
 .tp-map__people {
   display: flex;
   flex-wrap: wrap;
@@ -248,15 +237,6 @@ html:not([data-pointer]) .tp-gallery__item:focus-visible {
 .tp-gallery__title {
   margin: 0;
   font-size: 18px;
-}
-.tp-gallery__foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 16px;
-}
-.tp-gallery__foot > .small {
-  margin-right: auto;
 }
 @media (max-width: 760px) {
   .tp-gallery {

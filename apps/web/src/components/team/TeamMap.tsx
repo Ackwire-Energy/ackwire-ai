@@ -334,7 +334,7 @@ function MapCard({
       {(routines.length > 0 || waiting > 0) && (
         <ul className="team-map__facts">
           {routines.slice(0, CARD_ROUTINES).map((r) => (
-            <li key={r.id}>
+            <li key={r.id} className="ac-iconline">
               <Icon name="routines" size={14} />
               <span>
                 {when(r)} · {r.name}
@@ -345,7 +345,7 @@ function MapCard({
             <li className="muted">{t("team.map.moreRoutines", { count: routines.length - CARD_ROUTINES })}</li>
           )}
           {waiting > 0 && (
-            <li data-tone="waiting">
+            <li data-tone="waiting" className="ac-iconline">
               <Icon name="shield" size={14} />
               <span>{t("team.map.waiting", { count: waiting })}</span>
             </li>

@@ -18,7 +18,7 @@ import {
   teamStatus,
   teamUndoable,
 } from "@agenteschat/client/lib/team-plan";
-import { Button, Dialog, Field, Icon, Input, Spinner, Textarea } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Field, Icon, Input, Spinner, Textarea } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
@@ -491,38 +491,40 @@ function AdjustDialog({
       leading={<AgentAvatar name={v.name || agent.name} appearance={lookOf(agent)} size="md" />}
     >
       <form
-        className="tp-adjust"
+        style={{ display: "contents" }}
         onSubmit={(e) => {
           e.preventDefault();
           onSave(v);
         }}
       >
-        <Field label={t("teamPlan.adjust.name")}>
-          <Input value={v.name} onChange={set("name")} maxLength={80} required />
-        </Field>
-        <Field label={t("teamPlan.adjust.role")}>
-          <Input value={v.role} onChange={set("role")} maxLength={200} />
-        </Field>
-        <Field label={t("teamPlan.adjust.line")}>
-          <Input value={v.line} onChange={set("line")} maxLength={300} required />
-        </Field>
-        <Field label={t("teamPlan.adjust.channel")}>
-          <Input value={v.channel} onChange={set("channel")} maxLength={80} required />
-        </Field>
-        <Field label={t("teamPlan.adjust.instructions")}>
-          <Textarea value={v.instructions} onChange={set("instructions")} rows={5} />
-        </Field>
-        <Field label={t("teamPlan.adjust.firstTask")}>
-          <Input value={v.firstTask} onChange={set("firstTask")} maxLength={500} />
-        </Field>
-        <div className="ac-acts">
+        <DialogBody>
+          <Field label={t("teamPlan.adjust.name")}>
+            <Input value={v.name} onChange={set("name")} maxLength={80} required />
+          </Field>
+          <Field label={t("teamPlan.adjust.role")}>
+            <Input value={v.role} onChange={set("role")} maxLength={200} />
+          </Field>
+          <Field label={t("teamPlan.adjust.line")}>
+            <Input value={v.line} onChange={set("line")} maxLength={300} required />
+          </Field>
+          <Field label={t("teamPlan.adjust.channel")}>
+            <Input value={v.channel} onChange={set("channel")} maxLength={80} required />
+          </Field>
+          <Field label={t("teamPlan.adjust.instructions")}>
+            <Textarea value={v.instructions} onChange={set("instructions")} rows={5} />
+          </Field>
+          <Field label={t("teamPlan.adjust.firstTask")}>
+            <Input value={v.firstTask} onChange={set("firstTask")} maxLength={500} />
+          </Field>
+        </DialogBody>
+        <DialogFooter>
+          <Button type="button" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
           <Button type="submit" variant="primary" loading={saving}>
             {t("common.save")}
           </Button>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Dialog>
   );
@@ -545,7 +547,7 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
       closeLabel={t("common.close")}
       width={960}
     >
-      <div className="tp-map">
+      <DialogBody className="tp-map">
         <section className="tp-map__people" aria-label={t("teamPlan.map.people")}>
           {[me.user.name, ...plan.invite].map((p) => (
             <span key={p} className="tp-pill">
@@ -566,7 +568,7 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
                 <div key={a.handle} className="tp-map__agent">
                   <span className="ac-faceline">
                     <AgentAvatar name={a.name} appearance={lookOf(a)} size="sm" />
-                    <span>
+                    <span className="ac-captop">
                       <b>{a.name}</b> <span className="small muted">{a.role}</span>
                     </span>
                   </span>
@@ -584,7 +586,7 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
         {plan.weekly && lodi && (
           <p className="tp-map__lodi ac-faceline">
             <AgentAvatar agentId={lodi.id} name={lodi.name} size="sm" />
-            <span>{t("teamPlan.map.reviewer", { name: lodi.name })}</span>
+            <span className="ac-captop">{t("teamPlan.map.reviewer", { name: lodi.name })}</span>
           </p>
         )}
         {plan.approvals && (
@@ -595,7 +597,7 @@ export function TeamMapDialog({ plan, open, onClose }: { plan: TeamPlan; open: b
             </span>
           </p>
         )}
-      </div>
+      </DialogBody>
     </Dialog>
   );
 }
@@ -628,7 +630,7 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
         <TeamPlanBody plan={chosen.team} />
         <p className="small muted ac-faceline">
           {lodi && <AgentAvatar agentId={lodi.id} name={name} size="xs" />}
-          <span>{t("teamPlan.templates.tailor")}</span>
+          <span className="ac-captop">{t("teamPlan.templates.tailor")}</span>
         </p>
       </>
     );
@@ -642,54 +644,53 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
       closeLabel={t("common.close")}
       width={1040}
     >
-      <div className="tp-gallery">
-        <ul className="tp-gallery__list">
-          {templates.map((x) => (
-            <li key={x.id}>
+      <DialogBody>
+        <div className="tp-gallery">
+          <ul className="tp-gallery__list">
+            {templates.map((x) => (
+              <li key={x.id}>
+                <button
+                  type="button"
+                  className="tp-gallery__item"
+                  aria-pressed={x.id === chosen?.id}
+                  onClick={() => setPicked(x.id)}
+                >
+                  <span className="tp-gallery__faces" aria-hidden="true">
+                    {x.team.agents.map((a) => (
+                      <AgentAvatar key={a.handle} name={a.name} appearance={lookOf(a)} size="xs" />
+                    ))}
+                  </span>
+                  <span className="tp-gallery__text">
+                    <b>{x.name}</b>
+                    <small>{x.sub}</small>
+                  </span>
+                </button>
+              </li>
+            ))}
+            <li>
               <button
                 type="button"
                 className="tp-gallery__item"
-                aria-pressed={x.id === chosen?.id}
-                onClick={() => setPicked(x.id)}
+                onClick={() => {
+                  onClose();
+                  actions?.focusComposer();
+                }}
               >
                 <span className="tp-gallery__faces" aria-hidden="true">
-                  {x.team.agents.map((a) => (
-                    <AgentAvatar key={a.handle} name={a.name} appearance={lookOf(a)} size="xs" />
-                  ))}
+                  <Icon name="edit" size={16} />
                 </span>
                 <span className="tp-gallery__text">
-                  <b>{x.name}</b>
-                  <small>{x.sub}</small>
+                  <b>{t("teamPlan.templates.none")}</b>
+                  <small>{t("teamPlan.templates.noneSub", { name })}</small>
                 </span>
               </button>
             </li>
-          ))}
-          <li>
-            <button
-              type="button"
-              className="tp-gallery__item"
-              onClick={() => {
-                onClose();
-                actions?.focusComposer();
-              }}
-            >
-              <span className="tp-gallery__faces" aria-hidden="true">
-                <Icon name="edit" size={16} />
-              </span>
-              <span className="tp-gallery__text">
-                <b>{t("teamPlan.templates.none")}</b>
-                <small>{t("teamPlan.templates.noneSub", { name })}</small>
-              </span>
-            </button>
-          </li>
-        </ul>
-        <div className="tp-gallery__preview">{preview}</div>
-      </div>
-      <div className="tp-gallery__foot">
-        <span className="small muted">{chosen ? countsText(t, chosen.team) : ""}</span>
-        <Button variant="ghost" onClick={onClose}>
-          {t("common.cancel")}
-        </Button>
+          </ul>
+          <div className="tp-gallery__preview">{preview}</div>
+        </div>
+      </DialogBody>
+      <DialogFooter note={chosen ? countsText(t, chosen.team) : null}>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
           variant="primary"
           disabled={!chosen}
@@ -711,7 +712,7 @@ export function TeamTemplatesDialog({ open, onClose }: { open: boolean; onClose:
         >
           {t("teamPlan.templates.use")}
         </Button>
-      </div>
+      </DialogFooter>
     </Dialog>
   );
 }

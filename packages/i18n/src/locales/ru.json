@@ -7809,13 +7809,13 @@
   },
   "endpoint": {
     "option": "Другой провайдер",
-    "optionSub": "Совместимый с OpenAI или Anthropic: шлюз, Ollama, vLLM, LM Studio, LiteLLM",
+    "optionSub": "Совместимый с OpenAI или Claude: шлюз, Ollama, vLLM, LM Studio, LiteLLM",
     "name": "Название",
     "namePlaceholder": "Мой шлюз",
     "style": "API",
     "styles": {
       "openai": "OpenAI (Chat Completions)",
-      "anthropic": "Anthropic (Messages)"
+      "anthropic": "Claude (Messages)"
     },
     "address": "Адрес",
     "addressHelp": "Базовый адрес API, например {{example}}",

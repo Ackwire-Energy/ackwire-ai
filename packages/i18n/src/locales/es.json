@@ -7521,13 +7521,13 @@
   },
   "endpoint": {
     "option": "Otro proveedor",
-    "optionSub": "Compatible con OpenAI o Anthropic: un gateway, Ollama, vLLM, LM Studio, LiteLLM",
+    "optionSub": "Compatible con OpenAI o Claude: un gateway, Ollama, vLLM, LM Studio, LiteLLM",
     "name": "Nombre",
     "namePlaceholder": "Mi gateway",
     "style": "API",
     "styles": {
       "openai": "OpenAI (Chat Completions)",
-      "anthropic": "Anthropic (Messages)"
+      "anthropic": "Claude (Messages)"
     },
     "address": "Dirección",
     "addressHelp": "La dirección base de la API, como {{example}}",

@@ -7286,13 +7286,13 @@ export const ptBR = {
   },
   endpoint: {
     option: "Outro provedor",
-    optionSub: "Compatível com OpenAI ou Anthropic: um gateway, Ollama, vLLM, LM Studio, LiteLLM",
+    optionSub: "Compatível com OpenAI ou Claude: um gateway, Ollama, vLLM, LM Studio, LiteLLM",
     name: "Nome",
     namePlaceholder: "Meu gateway",
     style: "API",
     styles: {
       openai: "OpenAI (Chat Completions)",
-      anthropic: "Anthropic (Messages)",
+      anthropic: "Claude (Messages)",
     },
     address: "Endereço",
     addressHelp: "O endereço base da API, como {{example}}",

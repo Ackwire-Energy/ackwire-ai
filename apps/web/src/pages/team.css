@@ -430,13 +430,7 @@
   font-size: 13px;
 }
 .team-map__facts li {
-  display: flex;
-  align-items: flex-start;
   gap: 6px;
-}
-.team-map__facts li > :first-child {
-  flex: none;
-  margin-top: 2px;
 }
 .team-map__facts li[data-tone="waiting"] {
   color: var(--agent);

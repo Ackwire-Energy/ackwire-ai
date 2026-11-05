@@ -17566,7 +17566,7 @@
     "value": "Other provider"
   },
   "endpoint.optionSub": {
-    "value": "OpenAI- or Anthropic-compatible: a gateway, Ollama, vLLM, LM Studio, LiteLLM"
+    "value": "OpenAI- or Claude-compatible: a gateway, Ollama, vLLM, LM Studio, LiteLLM"
   },
   "endpoint.name": {
     "value": "Name"
@@ -17581,7 +17581,7 @@
     "value": "OpenAI (Chat Completions)"
   },
   "endpoint.styles.anthropic": {
-    "value": "Anthropic (Messages)"
+    "value": "Claude (Messages)"
   },
   "endpoint.address": {
     "value": "Address"

@@ -7574,13 +7574,13 @@
   },
   "endpoint": {
     "option": "Autre fournisseur",
-    "optionSub": "Compatible OpenAI ou Anthropic : une passerelle, Ollama, vLLM, LM Studio, LiteLLM",
+    "optionSub": "Compatible OpenAI ou Claude : une passerelle, Ollama, vLLM, LM Studio, LiteLLM",
     "name": "Nom",
     "namePlaceholder": "Ma passerelle",
     "style": "API",
     "styles": {
       "openai": "OpenAI (Chat Completions)",
-      "anthropic": "Anthropic (Messages)"
+      "anthropic": "Claude (Messages)"
     },
     "address": "Adresse",
     "addressHelp": "L'adresse de base de l'API, comme {{example}}",

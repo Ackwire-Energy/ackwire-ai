@@ -7003,13 +7003,13 @@
   },
   "endpoint": {
     "option": "Penyedia lain",
-    "optionSub": "Kompatibel dengan OpenAI atau Anthropic: gateway, Ollama, vLLM, LM Studio, LiteLLM",
+    "optionSub": "Kompatibel dengan OpenAI atau Claude: gateway, Ollama, vLLM, LM Studio, LiteLLM",
     "name": "Nama",
     "namePlaceholder": "Gateway saya",
     "style": "API",
     "styles": {
       "openai": "OpenAI (Chat Completions)",
-      "anthropic": "Anthropic (Messages)"
+      "anthropic": "Claude (Messages)"
     },
     "address": "Alamat",
     "addressHelp": "Alamat dasar API, seperti {{example}}",

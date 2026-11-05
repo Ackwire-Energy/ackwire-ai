@@ -6947,13 +6947,13 @@
   },
   "endpoint": {
     "option": "다른 제공자",
-    "optionSub": "OpenAI 또는 Anthropic 호환: 게이트웨이, Ollama, vLLM, LM Studio, LiteLLM",
+    "optionSub": "OpenAI 또는 Claude 호환: 게이트웨이, Ollama, vLLM, LM Studio, LiteLLM",
     "name": "이름",
     "namePlaceholder": "내 게이트웨이",
     "style": "API",
     "styles": {
       "openai": "OpenAI (Chat Completions)",
-      "anthropic": "Anthropic (Messages)"
+      "anthropic": "Claude (Messages)"
     },
     "address": "주소",
     "addressHelp": "API의 기본 주소, 예: {{example}}",

@@ -7168,13 +7168,13 @@ export const en = {
   },
   endpoint: {
     option: "Other provider",
-    optionSub: "OpenAI- or Anthropic-compatible: a gateway, Ollama, vLLM, LM Studio, LiteLLM",
+    optionSub: "OpenAI- or Claude-compatible: a gateway, Ollama, vLLM, LM Studio, LiteLLM",
     name: "Name",
     namePlaceholder: "My gateway",
     style: "API",
     styles: {
       openai: "OpenAI (Chat Completions)",
-      anthropic: "Anthropic (Messages)",
+      anthropic: "Claude (Messages)",
     },
     address: "Address",
     addressHelp: "The API's base address, like {{example}}",

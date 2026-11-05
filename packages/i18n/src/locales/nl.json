@@ -7325,13 +7325,13 @@
   },
   "endpoint": {
     "option": "Andere provider",
-    "optionSub": "Compatibel met OpenAI of Anthropic: een gateway, Ollama, vLLM, LM Studio, LiteLLM",
+    "optionSub": "Compatibel met OpenAI of Claude: een gateway, Ollama, vLLM, LM Studio, LiteLLM",
     "name": "Naam",
     "namePlaceholder": "Mijn gateway",
     "style": "API",
     "styles": {
       "openai": "OpenAI (Chat Completions)",
-      "anthropic": "Anthropic (Messages)"
+      "anthropic": "Claude (Messages)"
     },
     "address": "Adres",
     "addressHelp": "Het basisadres van de API, zoals {{example}}",

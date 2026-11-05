@@ -7844,13 +7844,13 @@
   },
   "endpoint": {
     "option": "Inny dostawca",
-    "optionSub": "Zgodny z OpenAI lub Anthropic: bramka, Ollama, vLLM, LM Studio, LiteLLM",
+    "optionSub": "Zgodny z OpenAI lub Claude: bramka, Ollama, vLLM, LM Studio, LiteLLM",
     "name": "Nazwa",
     "namePlaceholder": "Moja bramka",
     "style": "API",
     "styles": {
       "openai": "OpenAI (Chat Completions)",
-      "anthropic": "Anthropic (Messages)"
+      "anthropic": "Claude (Messages)"
     },
     "address": "Adres",
     "addressHelp": "Adres bazowy API, na przykład {{example}}",

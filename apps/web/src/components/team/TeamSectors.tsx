@@ -290,7 +290,7 @@ function SectorCard({
           {routines.length > 0 ? (
             <ul className="team-map__facts">
               {routines.slice(0, CARD_ROUTINES).map((r) => (
-                <li key={r.id}>
+                <li key={r.id} className="ac-iconline">
                   <Icon name="routines" size={14} />
                   <span>
                     {r.name} · {when(r)}

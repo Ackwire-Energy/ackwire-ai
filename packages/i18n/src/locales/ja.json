@@ -6954,13 +6954,13 @@
   },
   "endpoint": {
     "option": "その他のプロバイダー",
-    "optionSub": "OpenAI または Anthropic 互換: ゲートウェイ、Ollama、vLLM、LM Studio、LiteLLM",
+    "optionSub": "OpenAI または Claude 互換: ゲートウェイ、Ollama、vLLM、LM Studio、LiteLLM",
     "name": "名前",
     "namePlaceholder": "自分のゲートウェイ",
     "style": "API",
     "styles": {
       "openai": "OpenAI (Chat Completions)",
-      "anthropic": "Anthropic (Messages)"
+      "anthropic": "Claude (Messages)"
     },
     "address": "アドレス",
     "addressHelp": "API のベースアドレス (例: {{example}})",

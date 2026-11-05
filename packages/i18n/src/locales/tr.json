@@ -7222,13 +7222,13 @@
   },
   "endpoint": {
     "option": "Başka bir sağlayıcı",
-    "optionSub": "OpenAI veya Anthropic uyumlu: bir ağ geçidi, Ollama, vLLM, LM Studio, LiteLLM",
+    "optionSub": "OpenAI veya Claude uyumlu: bir ağ geçidi, Ollama, vLLM, LM Studio, LiteLLM",
     "name": "Ad",
     "namePlaceholder": "Ağ geçidim",
     "style": "API",
     "styles": {
       "openai": "OpenAI (Chat Completions)",
-      "anthropic": "Anthropic (Messages)"
+      "anthropic": "Claude (Messages)"
     },
     "address": "Adres",
     "addressHelp": "API'nin temel adresi, örneğin {{example}}",
