@@ -123,6 +123,11 @@ export function ProfileTrigger({
   const agentEntries = useAgentMenu();
   const personEntries = usePersonMenu();
   const button = useRef<HTMLButtonElement>(null);
+  // The trigger takes the focus before the card goes: what opens from the card (the agent's panel) gives it back there.
+  const leave = () => {
+    if (document.activeElement?.closest(".mcard__frame")) button.current?.focus();
+    card.close();
+  };
   const menu = entityMenu(() => {
     if (actor.type === "agent") {
       const agent = dir.agentById.get(actor.id);
@@ -157,9 +162,9 @@ export function ProfileTrigger({
         // A press inside a card the pointer opened keeps it (its menus and pickers open outside it).
         <div className="mcard__frame" onPointerDownCapture={() => card.open === "hover" && card.onOpenChange(true)}>
           {actor.type === "agent" ? (
-            <AgentCard agentId={actor.id} onDone={card.close} />
+            <AgentCard agentId={actor.id} onDone={leave} />
           ) : (
-            <PersonCard userId={actor.id} onDone={card.close} />
+            <PersonCard userId={actor.id} onDone={leave} />
           )}
         </div>
       )}

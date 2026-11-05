@@ -2,7 +2,6 @@ import { opensDetails } from "@agenteschat/client/lib/audience";
 import { useNavigate } from "@tanstack/react-router";
 import type { MouseEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useAgentPanelShown, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { requestAgentPanel, takeAgentPanel } from "@/lib/agent-panel-ask";
@@ -25,19 +24,12 @@ export function OpensAgent({
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const navigate = useNavigate();
-  const openPanel = useOpenAgentPanel();
-  const shown = useAgentPanelShown();
   const agent = dir.anyAgent(agentId);
   if (!agent || !opensDetails(agent)) return <>{children}</>;
   const open = (e: MouseEvent) => {
     if ((e.target as Element).closest(".ac-avatar__badge")) return;
     onOpen?.();
-    if (openPanel) {
-      // Its opener asked again closes the panel, and this picture only ever opens it.
-      if (shown !== agentId) openPanel(agentId);
-      return;
-    }
-    if (requestAgentPanel(agentId)) return;
+    if (requestAgentPanel(agentId, undefined, true)) return;
     takeAgentPanel();
     void navigate({ to: "/org/$orgId/agents/$agentId", params: { orgId: org.id, agentId } });
   };

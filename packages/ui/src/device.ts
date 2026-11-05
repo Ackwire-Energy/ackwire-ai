@@ -86,3 +86,6 @@ export const lastTabbable = (root: Element) =>
         el.checkVisibility?.({ checkVisibilityCSS: true }) !== false,
     )
     .at(-1);
+
+/** Whether something on the page holds the focus: what opened as an overlay closed keeps it, the overlay gives none back. */
+export const focusHeld = () => document.activeElement !== null && document.activeElement !== document.body;

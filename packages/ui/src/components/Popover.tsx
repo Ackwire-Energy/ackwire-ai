@@ -1,6 +1,7 @@
 import { Popover as RPopover } from "radix-ui";
 import type { ReactNode } from "react";
 import { cx } from "../cx";
+import { focusHeld } from "../device";
 import { EDGE_ROOM } from "../floating";
 import type { HoverCard } from "../hooks/useHoverCard";
 
@@ -73,7 +74,7 @@ export function Popover({
           }}
           // Each opening's own content: by the time one closes, `moveFocus` may already say how the next one opens.
           onCloseAutoFocus={(e) => {
-            if (e.currentTarget && keptFocus.has(e.currentTarget)) e.preventDefault();
+            if ((e.currentTarget && keptFocus.has(e.currentTarget)) || focusHeld()) e.preventDefault();
           }}
         >
           {children}

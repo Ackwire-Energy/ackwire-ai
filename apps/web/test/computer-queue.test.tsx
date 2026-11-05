@@ -104,8 +104,9 @@ describe("a computer's line", () => {
     const dialog = screen().getByRole("dialog", { name: "Fila de Studio" });
     await click(within(dialog).getByRole("button", { name: "Perfil de Atlas" }));
     await settle(6);
-    expect(screen().getByRole("complementary", { name: "Perfil do Atlas" })).toBeTruthy();
+    const panel = screen().getByRole("complementary", { name: "Perfil do Atlas" });
     expect(screen().queryByRole("dialog", { name: "Fila de Studio" })).toBeNull();
+    expect(panel.contains(document.activeElement)).toBe(true);
   });
 
   test("the header says who waits and opens the line in place: working now, in line, my request first", async () => {

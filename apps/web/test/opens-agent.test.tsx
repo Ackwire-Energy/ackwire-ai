@@ -54,7 +54,11 @@ const picture = (c: HTMLElement) =>
 const noDetails = (state = seedState()) => {
   if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
   const ada = state.agents.find((a) => a.id === ADA_ID);
-  if (ada) ada.seesDetails = false;
+  if (ada) {
+    ada.ownerUserId = "u-joao";
+    ada.audience = { mode: "owner", userIds: [] };
+    ada.seesDetails = false;
+  }
   return state;
 };
 
@@ -75,6 +79,30 @@ describe("the picture on an agent's card", () => {
     await click(picture(await openCard()) as HTMLElement);
     expect(panel()).toBeTruthy();
     expect(card()).toBeNull();
+  });
+
+  test("the panel keeps the focus, and gives it back to what opened the card", async () => {
+    await go(seedState());
+    const c = await openCard();
+    const trigger = screen()
+      .getAllByRole("button", PICTURE)
+      .find((b) => !b.hasAttribute("aria-hidden") && !c.contains(b)) as HTMLElement;
+    const button = picture(c) as HTMLElement;
+    button.focus();
+    await click(button);
+    expect(panel()?.contains(document.activeElement)).toBe(true);
+    await click(within(panel() as HTMLElement).getByRole("button", { name: "Fechar" }));
+    await act(() => new Promise((done) => requestAnimationFrame(done)));
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  test("unsaved edits in its open panel aren't asked about: the panel stays as it is", async () => {
+    await go(seedState());
+    await click(picture(await openCard()) as HTMLElement);
+    panel()?.querySelector(".thread-panel__page")?.setAttribute("data-dirty", "");
+    await click(picture(await openCard()) as HTMLElement);
+    expect(panel()).toBeTruthy();
+    expect(screen().queryByRole("alertdialog")).toBeNull();
   });
 
   test("its status dot opens nothing", async () => {
@@ -105,6 +133,19 @@ describe("the picture on an agent's card", () => {
       .find((b) => !b.hasAttribute("aria-hidden"));
     await click(trigger as HTMLElement);
     expect(picture(card() as HTMLElement)).toBeNull();
+  });
+});
+
+describe("the picture in a channel's details", () => {
+  test("opens the panel, and the dialog closes with what it was saving", async () => {
+    await go(seedState());
+    await click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" }));
+    const dialog = () => screen().queryByRole("dialog", { name: "#eng" });
+    await click(within(dialog() as HTMLElement).getByRole("button", { name: "Membros" }));
+    await click(within(dialog() as HTMLElement).getByRole("button", PICTURE));
+    expect(panel()).toBeTruthy();
+    expect(dialog()).toBeNull();
+    expect(panel()?.contains(document.activeElement)).toBe(true);
   });
 });
 
