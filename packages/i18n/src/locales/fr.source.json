@@ -4646,6 +4646,15 @@
   "rightHand.intro.start.form": {
     "value": "Fill in the form"
   },
+  "rightHand.intro.again.question": {
+    "value": "Want to build the team with me?"
+  },
+  "rightHand.intro.again.action": {
+    "value": "Build the team"
+  },
+  "rightHand.intro.again.message": {
+    "value": "Help me build the team."
+  },
   "rightHand.intro.next.question": {
     "value": "The team is here. What next?"
   },
@@ -18589,6 +18598,12 @@
   "skills.assetLimit": {
     "value": "A skill keeps up to {{max}} MB of images and other files."
   },
+  "skills.moreFiles": {
+    "value": {
+      "one": "And {{count}} more file",
+      "other": "And {{count}} more files"
+    }
+  },
   "skills.runsOnPc": {
     "value": "runs on the agent's PC"
   },
@@ -26754,10 +26769,28 @@
     "value": "The description must have 1 to {{max}} characters."
   },
   "errors.skill.tooLarge": {
-    "value": "The skill is too large (max {{max}} MB)."
+    "value": "This skill has {{size}} MB of text and scripts, and the limit is {{max}} MB."
   },
   "errors.skill.tooManyFiles": {
-    "value": "The skill has too many files (max {{max}})."
+    "value": "This skill has {{files}} files, and the limit is {{max}}."
+  },
+  "errors.skill.repoTooLarge": {
+    "value": "The repository is too large to download (max {{max}} MB). Upload the skill's folder as a .zip instead."
+  },
+  "errors.skill.noFrontmatter": {
+    "value": "The SKILL.md needs a block at the top with its name and description, between two --- lines."
+  },
+  "errors.skill.bodyTooLong": {
+    "value": "The SKILL.md is too long (max {{max}} characters)."
+  },
+  "errors.skill.noSkillMdZip": {
+    "value": "No SKILL.md at the top of the zip's folder."
+  },
+  "errors.skill.notGithubLink": {
+    "value": "That isn't a GitHub link we can read. Paste the link of a repository or of a folder in it."
+  },
+  "errors.skill.badZip": {
+    "value": "We couldn't read this zip. Zip the skill's folder again, with no password."
   },
   "errors.skill.connectionGone": {
     "value": "The GitHub connection that read {{repo}} is gone. Connect GitHub again to update this skill."

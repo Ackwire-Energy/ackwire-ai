@@ -360,7 +360,12 @@ describe("import", () => {
     expect(await importSkillFromUrl(deps, f.owner.id, f.org.id, url)).toEqual({
       choices: [{ path: "good", name: "good", description: "Funciona." }],
       skipped: [
-        { path: "logo", code: "skill.too_large", message: "The skill is too large (max 2 MB)", params: { max: 2 } },
+        {
+          path: "logo",
+          code: "skill.too_large",
+          message: "This skill has 16.1 MB of text and scripts (max 16 MB)",
+          params: { size: 16.1, max: 16 },
+        },
         {
           path: "long",
           code: "skill.invalid_description",
@@ -387,6 +392,63 @@ describe("import", () => {
     expect(refusal).toMatchObject({ code: "skill.too_many_skills" });
     // Every folder found looked up among those above it, never compared with each skill found before it.
     expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
+  test("a kit published for other agents installs: one skill in skills/<name>/, thousands of files, the rest of the repository left out", async () => {
+    f = await setup();
+    const blob = new Uint8Array(1_400_000);
+    const files: Record<string, string | Uint8Array> = {
+      "skills-main/README.md": "# Kit",
+      "skills-main/.claude-plugin/marketplace.json": "{}",
+      "skills-main/assets/wordmark.png": PNG,
+      "skills-main/examples/v2/coffee.webp": blob,
+      "skills-main/skills/kit/SKILL.md": "---\nname: kit\ndescription: >-\n  Dá bom gosto\n  às páginas.\n---\n# Kit",
+      "skills-main/skills/kit/scripts/consistency.mjs": "x".repeat(885_000),
+    };
+    for (let i = 0; i < 930; i++) files[`skills-main/skills/kit/assets/icons/i${i}.svg`] = "<svg/>".repeat(800);
+    for (let i = 0; i < 150; i++) files[`skills-main/skills/kit/assets/fx/c${i}/component.js`] = "y".repeat(10_000);
+    for (let i = 0; i < 20; i++) files[`skills-main/skills/kit/assets/photos/p${i}.webp`] = blob;
+    const deps = { ...skillDeps(), fetch: fakeGithub({ archive: zip(files) }).fetch };
+    const skill = await importSkillFromUrl(deps, f.owner.id, f.org.id, "https://github.com/acme/skills");
+    if ("choices" in skill) throw new Error("expected one skill installed");
+    expect(skill).toMatchObject({
+      name: "kit",
+      description: "Dá bom gosto às páginas.",
+      sourceUrl: "https://github.com/acme/skills/tree/HEAD/skills/kit",
+    });
+    expect(skill.files).toHaveLength(1101);
+    expect(skill.files.filter((x) => x.status === "ignored")).toEqual([]);
+    expect(skill.files.some((x) => /README|marketplace|coffee/.test(x.path))).toBe(false);
+  });
+
+  test("past the limits the refusal says the skill's own number; a repository past the archive's cap has its code", async () => {
+    f = await setup();
+    const url = "https://github.com/acme/skills";
+    const md = "---\nname: kit\ndescription: Grande.\n---\n# Kit";
+    const many: Record<string, string> = { "skills-main/SKILL.md": md };
+    for (let i = 1; i <= SKILL_LIMITS.maxFiles; i++) many[`skills-main/f${i}.md`] = "y";
+    await expect(
+      importSkillFromUrl(
+        { ...skillDeps(), fetch: fakeGithub({ archive: zip(many) }).fetch },
+        f.owner.id,
+        f.org.id,
+        url,
+      ),
+    ).rejects.toMatchObject({ code: "skill.too_many_files", params: { files: 3001, max: 3000 } });
+    const wide = { "skills-main/SKILL.md": md, "skills-main/big.md": "x".repeat(SKILL_LIMITS.maxBytes) };
+    await expect(
+      importSkillFromUrl(
+        { ...skillDeps(), fetch: fakeGithub({ archive: zip(wide) }).fetch },
+        f.owner.id,
+        f.org.id,
+        url,
+      ),
+    ).rejects.toMatchObject({ code: "skill.too_large", params: { size: 16.1, max: 16 } });
+    const archive = new Uint8Array(50 * 1024 * 1024 + 1);
+    await expect(
+      importSkillFromUrl({ ...skillDeps(), fetch: fakeGithub({ archive }).fetch }, f.owner.id, f.org.id, url),
+    ).rejects.toMatchObject({ code: "skill.repo_too_large", params: { max: 50 } });
+    expect(await listSkills(f.db, f.owner.id, f.org.id)).toEqual([]);
   });
 
   test("a repository archive past 65,535 files is refused, never read in part", async () => {
@@ -436,7 +498,7 @@ describe("import", () => {
     expect(await refusal("https://github.com/acme/skills", spent)).toMatchObject({ params: { count: 5 } });
   });
 
-  test("images and videos are kept apart from the 2 MB of text, up to 20 MB; past it they are only listed", async () => {
+  test("images and videos are kept apart from the text's limit, up to their own; past it they are only listed", async () => {
     f = await setup();
     // A repository shaped like a real one: a video and screenshots past 2 MB next to a little Markdown.
     const url = "https://github.com/acme/skills";
@@ -462,12 +524,12 @@ describe("import", () => {
       size: 670_000,
     });
 
-    const book = zip({ "skills-main/SKILL.md": SKILL_MD, "skills-main/book.md": "x".repeat(2_200_000) });
+    const book = zip({ "skills-main/SKILL.md": SKILL_MD, "skills-main/book.md": "x".repeat(SKILL_LIMITS.maxBytes) });
     await expect(
       importSkillFromUrl({ ...skillDeps(), fetch: fakeGithub({ archive: book }).fetch }, f.owner.id, f.org.id, url),
-    ).rejects.toThrow("too large");
+    ).rejects.toThrow("MB of text and scripts");
 
-    // The same in a zip: images past 20 MB in all are listed and never inflated, a big text file is refused.
+    // The same in a zip: images past the limit in all are listed and never inflated, a big text file is refused.
     const zipped = await importSkillZip(
       skillDeps(),
       f.owner.id,
@@ -487,9 +549,9 @@ describe("import", () => {
         skillDeps(),
         f.owner.id,
         f.org.id,
-        zip({ "SKILL.md": SKILL_MD, "book.md": "x".repeat(2_200_000) }),
+        zip({ "SKILL.md": SKILL_MD, "book.md": "x".repeat(SKILL_LIMITS.maxBytes) }),
       ),
-    ).rejects.toThrow("too large");
+    ).rejects.toThrow("MB of text and scripts");
   });
 });
 
@@ -767,7 +829,10 @@ describe("private repositories", () => {
       "https://github.com/acme/%2E%2E",
     ]) {
       const refusal = await refusalOf(importSkillFromUrl(deps, f.owner.id, f.org.id, url));
-      expect([url, ["github.repo_missing", "invalid_request"].includes(refusal?.code ?? "")]).toEqual([url, true]);
+      expect([url, ["github.repo_missing", "skill.not_github_link"].includes(refusal?.code ?? "")]).toEqual([
+        url,
+        true,
+      ]);
     }
     expect(github.requests.filter((r) => r.auth)).toEqual([]);
   });
@@ -905,7 +970,7 @@ describe("runtime", () => {
     );
     expect(steps[3]?.content).toContain("It is too large to show you here (max 3.6 MB).");
     expect(steps[4]).toMatchObject({ isError: true });
-    expect(steps[4]?.content).toContain("huge.webp (20.0 MB) was not kept: a skill keeps up to 20 MB of images");
+    expect(steps[4]?.content).toContain("huge.webp (40.0 MB) was not kept: a skill keeps up to 40 MB of images");
   });
 
   test("denying the tools hides them; other orgs never see the skill", async () => {

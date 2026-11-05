@@ -31,6 +31,9 @@ export const skillPickOf = (
 export const skippedSkillText = (t: TFunction, skipped: SkillSkipped) =>
   t("skills.pickSkipped", { reason: errorText(t, new ApiError(400, skipped.code, skipped.message, skipped.params)) });
 
+/** The files a skill's page lists: a skill can hold thousands, and its agents read them, not the person. */
+export const SKILL_FILES_SHOWN = 200;
+
 /** The picked skills' paths after checking (`on`) or unchecking these. */
 export function pickSkills(picked: ReadonlySet<string>, paths: string[], on: boolean): Set<string> {
   const next = new Set(picked);

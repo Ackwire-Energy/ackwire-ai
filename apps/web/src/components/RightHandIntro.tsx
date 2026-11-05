@@ -15,7 +15,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
-import { introCards, isRightHand, presetsLeft } from "@agenteschat/client/lib/right-hand";
+import { introCards, isRightHand, offersTeamSetup, presetsLeft } from "@agenteschat/client/lib/right-hand";
 import { answerAfter, BUSINESS_TYPES } from "@agenteschat/client/lib/team-plan";
 import { AgentSticker, Button, Icon, Message, MessageText, normalizeAppearance, WAVE_SECONDS } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -29,8 +29,11 @@ import { useConnectAi } from "@/components/ConnectAi";
 import { useChannelActions } from "@/components/channel-actions";
 import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { useOrg } from "@/components/org-context";
+import { AuthorStatus } from "@/components/Presence";
+import { ProfileTrigger } from "@/components/ProfileCard";
 import { RequestCard } from "@/components/RequestCard";
 import { AnswerChips, TeamTemplatesDialog } from "@/components/TeamPlan";
+import { TextAction } from "@/components/UsagePauseCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
@@ -40,8 +43,9 @@ import { useToast } from "@/lib/toast";
  * any AI is connected: its greeting, then the first card the workspace needs. No AI yet: Connect AI. An AI and no
  * agent besides it: how to start (the ready-made agents, describing the need, an import or the form). A team and
  * nobody else here yet: inviting people and the first task. Last, until the person picks, how agents talk to them
- * (ADR 0147). On the person's first visit, its waving sticker under the greeting, drawn as a sticker message is and
- * decorative (the greeting already says hello).
+ * (ADR 0147). Once the start card has stopped asking, a line to build the team with it, at any time. On the person's
+ * first visit, its waving sticker under the greeting, drawn as a sticker message is and decorative (the greeting
+ * already says hello). Its face and name open the profile card, as on any message.
  */
 export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: string }) {
   const { t, i18n } = useTranslation();
@@ -50,22 +54,40 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
   const status = useAiStatus(org.id);
   const members = useMembers(org.id);
   const connect = useConnectAi();
+  const actions = useChannelActions();
+  const messages = useMessages(org.id, channelId).data;
   const wave = useRightHandWave(org.id, agent.id);
   const team = dir.agents.filter((a) => !isRightHand(a));
   const teamHandles = team.map((a) => a.handle);
+  const noAi = aiStateOf(status.data, agent.id) === "no_ai";
+  const aiKnown = Boolean(status.data);
+  const createsAgents = can(org, "create_agents");
   const cards = introCards({
-    noAi: aiStateOf(status.data, agent.id) === "no_ai",
-    aiKnown: Boolean(status.data),
+    noAi,
+    aiKnown,
     teamHandles,
-    createsAgents: can(org, "create_agents"),
+    createsAgents,
     alone: (members.data?.length ?? 0) <= 1,
     askStyle: org.agentStyle === null,
   });
+  const answered = answerAfter(messages, null) !== null;
+  const profile = { actor: { type: "agent", id: agent.id }, label: t("profile.of", { name: agent.name }) } as const;
   return (
     <Message
       agent
-      avatar={<AgentAvatar agentId={agent.id} name={agent.name} />}
-      author={agent.name}
+      avatar={
+        <ProfileTrigger {...profile} decorative>
+          <AgentAvatar agentId={agent.id} name={agent.name} presence />
+        </ProfileTrigger>
+      }
+      author={
+        <>
+          <ProfileTrigger {...profile} className="profile-trigger--name">
+            {agent.name}
+          </ProfileTrigger>
+          <AuthorStatus actor={profile.actor} />
+        </>
+      }
       time={<time dateTime={agent.createdAt}>{formatTime(i18n.language, agent.createdAt)}</time>}
     >
       <MessageText>
@@ -105,6 +127,14 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
       )}
       {cards.includes("next") && team[0] && <NextCard agent={agent} first={team[0]} />}
       {cards.includes("style") && <StyleCard agent={agent} />}
+      {offersTeamSetup({ noAi, aiKnown, createsAgents, hasTeam: team.length > 0, answered }) && (
+        <p className="rh-intro__again small muted">
+          {t("rightHand.intro.again.question")}{" "}
+          <TextAction onClick={() => actions?.resend(t("rightHand.intro.again.message"))}>
+            {t("rightHand.intro.again.action")}
+          </TextAction>
+        </p>
+      )}
     </Message>
   );
 }

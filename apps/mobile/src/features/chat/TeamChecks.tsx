@@ -3,7 +3,7 @@ import { targetKind, teamChecksOf } from "@agenteschat/client/lib/team-checks";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Icon, type IconName, PillButton, Text, useTheme } from "@/ui";
+import { Icon, type IconName, RowAction, Text, useTheme } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { chatHref } from "../links/logic";
@@ -76,7 +76,7 @@ function Row({ check, selfId }: { check: TeamCheck; selfId: string | null }) {
         ) : null}
       </View>
       {channelId ? (
-        <PillButton
+        <RowAction
           label={t("teamChecks.open")}
           accessibilityRole="link"
           onPress={() => {

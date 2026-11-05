@@ -2,7 +2,14 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import type { DirectMessage } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
-import { firstVisitOf, introCards, presetsLeft, rightHandOf, tellsNameStory } from "@agenteschat/client/lib/right-hand";
+import {
+  firstVisitOf,
+  introCards,
+  offersTeamSetup,
+  presetsLeft,
+  rightHandOf,
+  tellsNameStory,
+} from "@agenteschat/client/lib/right-hand";
 import { STICKER_STILL_T, WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import { stickerFrame } from "../../src/agent/sticker";
 import { agentStarters, buildConversations, homeLayout, rightHandPin } from "../../src/features/chats/logic";
@@ -49,6 +56,17 @@ test("outside its audience there is no pin", () => {
   expect(canTalk(hidden)).toBe(false);
   const rows = buildConversations({ channels: [], dms: [dm(lodi, 1)], threads: [] });
   expect(rightHandPin(rows, canTalk(hidden) ? hidden : undefined)).toEqual({ pin: null, rows });
+});
+
+test("the way to build the team: from when the start card stops asking, for who may create agents, with an AI", () => {
+  const base = { noAi: false, aiKnown: true, createsAgents: true, hasTeam: true, answered: false };
+  expect(offersTeamSetup(base)).toBe(true);
+  expect(offersTeamSetup({ ...base, hasTeam: false, answered: true })).toBe(true);
+  // The start card still asks.
+  expect(offersTeamSetup({ ...base, hasTeam: false })).toBe(false);
+  expect(offersTeamSetup({ ...base, noAi: true })).toBe(false);
+  expect(offersTeamSetup({ ...base, aiKnown: false })).toBe(false);
+  expect(offersTeamSetup({ ...base, createsAgents: false })).toBe(false);
 });
 
 test("its greeting's cards: Connect AI, then how to start, then what next, then none", () => {

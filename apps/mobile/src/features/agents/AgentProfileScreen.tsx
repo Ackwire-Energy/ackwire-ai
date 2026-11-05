@@ -57,7 +57,7 @@ import {
 import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
-import { LetMeTalkPill } from "../chat/ReachLines";
+import { LetMeTalkButton } from "../chat/ReachLines";
 import { AgentComputerRow } from "../computer/AgentComputerRow";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
@@ -392,7 +392,7 @@ function Profile({ id }: { id: string }) {
               {details ? t("mobile.agent.cantTalk") : t("profile.detailsHidden", agentGrammar(name))}
             </Text>
           ) : null}
-          {agent ? <LetMeTalkPill agent={agent} /> : null}
+          {agent ? <LetMeTalkButton agent={agent} /> : null}
         </View>
 
         {rightHand && agent ? (

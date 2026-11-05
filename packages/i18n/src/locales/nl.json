@@ -1893,6 +1893,11 @@
         "import": "Mijn agents importeren",
         "form": "Het formulier invullen"
       },
+      "again": {
+        "question": "Wil je het team met mij samenstellen?",
+        "action": "Team samenstellen",
+        "message": "Help me het team samen te stellen."
+      },
       "next": {
         "question": "Het team is er. En nu?",
         "invite": "Mensen uitnodigen",
@@ -7756,6 +7761,8 @@
     "files": "Bestanden",
     "needsSandbox": "niet bewaard",
     "assetLimit": "Een skill bewaart tot {{max}} MB aan afbeeldingen en andere bestanden.",
+    "moreFiles_one": "En nog {{count}} bestand",
+    "moreFiles_other": "En nog {{count}} bestanden",
     "runsOnPc": "draait op de pc van de agent",
     "reinstall": "Installeer de skill opnieuw zodat agents dit bestand kunnen gebruiken.",
     "edit": "Bewerken",
@@ -11173,8 +11180,14 @@
       "tooManySkills": "Deze link bevat meer dan {{max}} skills. Link een van de mappen ervan.",
       "invalidName": "De naam mag alleen kleine letters, cijfers en koppeltekens bevatten, tot {{max}} tekens.",
       "invalidDescription": "De beschrijving moet 1 tot {{max}} tekens hebben.",
-      "tooLarge": "De skill is te groot (max. {{max}} MB).",
-      "tooManyFiles": "De skill heeft te veel bestanden (max. {{max}}).",
+      "tooLarge": "Deze skill heeft {{size}} MB aan tekst en scripts, en de limiet is {{max}} MB.",
+      "tooManyFiles": "Deze skill heeft {{files}} bestanden, en de limiet is {{max}}.",
+      "repoTooLarge": "De repository is te groot om te downloaden (max. {{max}} MB). Upload de map van de skill als .zip.",
+      "noFrontmatter": "De SKILL.md heeft bovenaan een blok nodig met naam en beschrijving, tussen twee regels met ---.",
+      "bodyTooLong": "De SKILL.md is te lang (max. {{max}} tekens).",
+      "noSkillMdZip": "Geen SKILL.md bovenin de map van de zip.",
+      "notGithubLink": "Deze GitHub-link kunnen we niet lezen. Plak de link van een repository of een map daarin.",
+      "badZip": "We konden deze zip niet lezen. Pak de map van de skill opnieuw in, zonder wachtwoord.",
       "connectionGone": "De GitHub-koppeling die {{repo}} las, bestaat niet meer. Koppel GitHub opnieuw om deze skill bij te werken.",
       "linkHoldsSeveral": "De link bevat nu meerdere skills. Installeer deze opnieuw vanuit de eigen map.",
       "linkRenamed": "De link bevat nu de skill {{name}}.",

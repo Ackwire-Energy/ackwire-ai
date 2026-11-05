@@ -75,6 +75,19 @@ export async function finishOnboarding(api: ApiClient, orgId: string) {
 export const presetsLeft = (teamHandles: readonly string[]) => PRESETS.filter((p) => !teamHandles.includes(p));
 
 /**
+ * Whether its greeting ends with the way to build the team with it, for whoever may create agents once an AI is there.
+ * Not while the start card still asks: with no team and nothing answered, that card is the way.
+ */
+export const offersTeamSetup = (s: {
+  noAi: boolean;
+  aiKnown: boolean;
+  createsAgents: boolean;
+  hasTeam: boolean;
+  /** The conversation has a message from the person: the start card reads it as its answer. */
+  answered: boolean;
+}) => s.aiKnown && !s.noAi && s.createsAgents && (s.hasTeam || s.answered);
+
+/**
  * The cards under the right hand's greeting at the top of its DM (ADR 0137): Connect AI while there is none. With one,
  * how to start (for whoever may create agents): with no agent yet, or, still alone, while the team is only ready-made
  * agents and some are left, each tile its own Criar. And, the team here and nobody else yet, what next. Last, once an AI is

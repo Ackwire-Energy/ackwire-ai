@@ -78,7 +78,7 @@ import {
 } from "./sandbox";
 import { requestSecretTool } from "./secret-request-tool";
 import { REQUEST_SECRET_TOOL, secretFilePaths } from "./secrets";
-import { agentSkillByName, type SkillDeps, skillFolderFiles } from "./skills";
+import { agentSkillByName, type SkillDeps, skillFilesOf, skillFolderFiles } from "./skills";
 import { maskSecrets } from "./tool-detail";
 import { MAX_RESULT_CHARS } from "./tools/gateway";
 import { WHY_MAX_CHARS } from "./tools/run-policy";
@@ -1055,8 +1055,8 @@ export function createSandboxToolSource(
         try {
           const skill = await agentSkillByName(ctx.db, ctx.orgId, ctx.agentId, str(input.skill));
           if (!skill) return { content: `No skill named ${str(input.skill)} is enabled for you.`, isError: true };
-          const files = await skillFolderFiles(skillDeps(ctx), skill);
-          const target = files.find((f) => f.path === toolPath(str(input.path), computerInfo));
+          const listed = await skillFilesOf(ctx.db, skill);
+          const target = listed.find((f) => f.path === toolPath(str(input.path), computerInfo));
           if (target?.status !== "script") {
             return { content: `${str(input.path)} is not a script of ${skill.name}.`, isError: true };
           }
@@ -1067,11 +1067,20 @@ export function createSandboxToolSource(
           const base = `.skills/${skill.name}`;
           const args = (Array.isArray(input.args) ? input.args : []).map((a) => quote(String(a))).join(" ");
           // A file past what one write to a computer carries (a big PDF) stays behind instead of failing every run.
-          const copied = files.filter((f) => f.data.byteLength <= MAX_INLINE_FILE_BYTES);
-          const left = files.filter((f) => f.data.byteLength > MAX_INLINE_FILE_BYTES).map((f) => f.path);
+          const left = listed
+            .filter((f) => f.status !== "ignored" && f.size > MAX_INLINE_FILE_BYTES)
+            .map((f) => f.path);
+          // Copied once a version: a skill can hold thousands of files, too many to write again on every run.
+          const copiedMark = `${base}/.copied-v${skill.version}`;
           const started = Date.now();
           const result = await run(ctx, async (computer) => {
-            for (const f of copied) await computer.provider.writeFile(computer.id, `${base}/${f.path}`, f.data);
+            if (!(await computer.provider.readFile(computer.id, copiedMark))) {
+              for (const f of await skillFolderFiles(skillDeps(ctx), skill)) {
+                if (f.data.byteLength > MAX_INLINE_FILE_BYTES) continue;
+                await computer.provider.writeFile(computer.id, `${base}/${f.path}`, f.data);
+              }
+              await computer.provider.writeFile(computer.id, copiedMark, new TextEncoder().encode(skill.name));
+            }
             const r = await execLive(ctx, computer, {
               command: scriptCommand(bin, `${base}/${target.path}`, args),
               timeoutSeconds: timeout,
