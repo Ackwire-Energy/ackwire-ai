@@ -3,7 +3,7 @@ import { Link, router } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, StyleSheet, View } from "react-native";
-import { Count, Icon, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
+import { Count, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
 import { workTitle } from "../agents/work";
 import type { RowAction } from "../categories/menus";
 import { agentIntro } from "../chat/intent";
@@ -43,7 +43,6 @@ export const ConversationRowView = memo(function ConversationRowView({
   onOpen,
   pinned = false,
   holdActions,
-  tinted = false,
 }: {
   row: ConversationRow;
   /** A hairline above (every row but the first). */
@@ -53,7 +52,7 @@ export const ConversationRowView = memo(function ConversationRowView({
   agent?: AgentRowState;
   /** A row on the home: its menu (Fixar no topo, a channel's Mover para…), given the row. */
   onHold?: (row: ConversationRow) => void;
-  /** On top of its section ("Fixar no topo"): a small pin where the unread count would be. */
+  /** On top of its section ("Fixar no topo"): said to screen readers; the order shows it, no mark. */
   pinned?: boolean;
   /** What the long press does, for screen readers. */
   holdLabel?: string;
@@ -67,8 +66,6 @@ export const ConversationRowView = memo(function ConversationRowView({
   onOpen?: () => void;
   /** The long press's actions for iOS's own menu under the preview (`onHold`'s sheet elsewhere). */
   holdActions?: (row: ConversationRow) => RowAction[];
-  /** On the agent blue's soft tint (the right hand's row, ADR 0137). */
-  tinted?: boolean;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -281,7 +278,6 @@ export const ConversationRowView = memo(function ConversationRowView({
       accessibilityRole="button"
       accessibilityLabel={a11y}
       divider={divider}
-      {...(tinted ? { background: c.agentSoft } : {})}
       unread={r.unread > 0}
       leading={leading}
       title={name}
@@ -295,13 +291,7 @@ export const ConversationRowView = memo(function ConversationRowView({
         ) : null
       }
       sub={line}
-      trailing={
-        badge > 0 ? (
-          <Count value={badge} max={99} inverted />
-        ) : pinned ? (
-          <Icon name="pin" size={14} color={c.faint} />
-        ) : null
-      }
+      trailing={badge > 0 ? <Count value={badge} max={99} inverted /> : null}
     />
   );
   if (!peeks || !peekHref) return row(open);

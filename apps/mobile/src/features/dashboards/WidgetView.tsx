@@ -36,6 +36,7 @@ import Animated, {
 import { CHROME_MAX_SCALE, Icon, PixelOrbit, PressScale, Text, useReducedMotion, useTheme } from "@/ui";
 import { Line } from "../chat/ChartCard";
 import { AgentFace } from "../shared/Face";
+import { useSurface } from "../shared/parts";
 import { DitherShape } from "./Dither";
 import { useAgentLook, useWidgetWords } from "./hooks";
 import {
@@ -119,7 +120,8 @@ export const WidgetBody = memo(function WidgetBody({
   if (status === "building") {
     return <BuildingSweep color={look.color} text={t("widgets.status.building", { name: look.name })} />;
   }
-  const dim = status === "updating" ? 0.45 : status === "failed" ? 0.5 : 1;
+  // On a board the data dims while it updates or failed; the home's strip says so on its title line instead.
+  const dim = compact ? 1 : status === "updating" ? 0.45 : status === "failed" ? 0.5 : 1;
   return (
     <View style={{ opacity: dim }}>
       <SpecBody spec={spec} color={look.color} big={big} bleed={bleed} compact={compact} />
@@ -197,7 +199,7 @@ function Kpi({
       {spec.delta || spec.note ? (
         <Text variant="footnote" tone="ink2" numberOfLines={compact ? 1 : 2}>
           {spec.delta ? (
-            <Text variant="footnote" style={[styles.strong, { color: spec.delta.up ? c.ok : c.warn }]}>
+            <Text variant="footnote" style={[styles.strong, { color: spec.delta.up ? c.ok : c.danger }]}>
               {spec.delta.text}
             </Text>
           ) : null}
@@ -583,15 +585,17 @@ export function WidgetCard({
   /** What a screen reader says for the whole card when it opens. */
   label?: string;
   /**
-   * The home's strip (ADR 0135 §15): every card as tall as the others (`COMPACT_HEIGHT`) on a sunken surface that
-   * shows on the screen's own background, the data small and clipped to it, the footer and the trend kept.
+   * The home's strip (ADR 0135 §15): every card as tall as the others (`COMPACT_HEIGHT`), the app's card, the data
+   * small and clipped to it, never dimmed; its state (updating, failed) a mark on the title line; the trend kept.
    */
   compact?: boolean;
 }) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
   const soft = useWidgetSurface();
-  const surface = compact ? [{ backgroundColor: c.sunken }, styles.compact] : soft;
+  const card = useSurface();
+  // The home's strip: the app's card (lit top, cut corner), as every card that stands on the page.
+  const surface = compact ? [card, styles.compact] : soft;
   const look = useAgentLook(w.agentId);
   // A 2-high (L) widget on a board draws its data big, as on its own screen.
   const large = big || isTall(w.h ?? 1);
@@ -599,6 +603,7 @@ export function WidgetCard({
   const drawn = body === undefined && (w.status === "ok" || w.status === "updating" || w.status === "failed");
   const bleed = drawn ? bleedSeries(w.spec, large) : null;
   const bleedHeight = compact ? 34 : w.spec?.kind === "line" ? (large ? 120 : 76) : large ? 72 : 48;
+  const foot = footer !== undefined ? footer : compact ? null : <WidgetFoot widget={w} />;
   const content = (
     <>
       {head === undefined ? (
@@ -607,6 +612,9 @@ export function WidgetCard({
           <Text variant="footnote" tone="muted" numberOfLines={large ? 2 : 1} style={[styles.title, styles.grow]}>
             {title}
           </Text>
+          {/* The strip has no footer: updating is its orbit, a failure its mark, on the title line. */}
+          {compact && w.status === "updating" ? <PixelOrbit color={look.color} size={12} /> : null}
+          {compact && w.status === "failed" ? <Icon name="info" size={13} color={c.warn} /> : null}
         </View>
       ) : (
         head
@@ -626,9 +634,9 @@ export function WidgetCard({
           body
         )}
       </View>
-      {footer === undefined ? <WidgetFoot widget={w} /> : footer}
+      {foot}
       {bleed ? (
-        <View style={[styles.bleedBox, w.status === "ok" ? null : styles.dim]}>
+        <View style={[styles.bleedBox, w.status === "ok" || compact ? null : styles.dim]}>
           <BleedLine values={bleed} color={look.color} height={bleedHeight} />
         </View>
       ) : null}

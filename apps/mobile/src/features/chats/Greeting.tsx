@@ -1,5 +1,6 @@
 import { useMe } from "@agenteschat/client";
 import { router } from "expo-router";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AgentAvatar, Button, Card, Icon, Sky, Text, WorkspaceSky } from "@/ui";
@@ -7,7 +8,6 @@ import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { firstName, greetingKey } from "../shared/logic";
 import { Tile, useSurface } from "../shared/parts";
-import { useHiddenAgents } from "../shared/queries";
 import { FIRST_AGENT_EXAMPLES } from "./examples";
 import { type FinishedItem, finishedKey, greetingLine } from "./now";
 
@@ -36,31 +36,30 @@ export function GreetingSky() {
 }
 
 /**
- * The greeting under Conversas' large title, scrolling away with the list: "Boa noite, Walter", then one short
- * line with the agents' own faces in it: what one finished (its face before its name; opens where it happened),
- * else who works now (their faces, working, before the count; opens Agentes; the list below says what each
- * does), else everyone's faces resting, eyes closed. Who works and who rests are the agents Agentes lists.
+ * The greeting under Conversas' large title, scrolling away with the list: "Boa noite, Ana", then, only when there
+ * is news, one short line with the agents' own faces in it: what one finished (its face before its name; opens where
+ * it happened), else who works now (their faces, working, before the count; opens Agentes; the list below says what
+ * each does). Nobody at work: the greeting alone. `after` follows on the sky (the right hand's field).
  */
 export function Greeting({
   working,
   finished,
   onFinishedPress,
+  after,
 }: {
   working: readonly string[];
   /** The newest thing an agent finished (null: nothing new). */
   finished: FinishedItem | null;
   /** Tapped what finished (it opens there and is taken off). */
   onFinishedPress?: (f: FinishedItem) => void;
+  /** Under it, on the sky: the way to ask the right hand (`RightHandAsk`). */
+  after?: ReactNode;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
-  const { hidden } = useHiddenAgents();
   const greeting = useGreeting();
   const line = greetingLine(finished, working.length);
-  const workingText =
-    line.kind === "working"
-      ? t("mobile.chats.workingNowLine", { count: line.working })
-      : t("mobile.chats.nobodyWorking");
+  const workingText = line.kind === "working" ? t("mobile.chats.workingNowLine", { count: line.working }) : "";
   const finishedName = line.kind === "finished" ? (dir.agentById.get(line.finished.agentId)?.name ?? "") : "";
   const finishedText =
     line.kind === "finished" ? t(finishedKey(line.finished), { what: line.finished.what ?? "" }) : "";
@@ -76,50 +75,46 @@ export function Greeting({
       </Text>
     </View>
   );
-  const resting = line.kind === "idle" ? dir.agents.filter((a) => !hidden.has(a.id)).map((a) => a.id) : [];
   return (
     <View style={styles.mini}>
       <Text variant="body" tone="ink2" numberOfLines={1}>
         {greeting}
       </Text>
-      <View style={styles.line}>
-        {line.kind === "finished" ? (
-          <Pressable
-            onPress={() => openFinished(line.finished)}
-            accessibilityRole="button"
-            accessibilityLabel={`${finishedName} ${finishedText}`}
-            hitSlop={8}
-            style={({ pressed }) => [styles.part, styles.shrink, pressed && styles.pressed]}
-          >
-            <AgentFace agentId={line.finished.agentId} size={FACE} framed />
-            <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
-              {finishedName ? (
-                <Text variant="footnote" tone="ink2" style={styles.bold}>
-                  {`${finishedName} `}
-                </Text>
-              ) : null}
-              {finishedText}
-            </Text>
-          </Pressable>
-        ) : line.kind === "working" ? (
-          <Pressable
-            onPress={openAgents}
-            accessibilityRole="button"
-            accessibilityLabel={workingText}
-            hitSlop={8}
-            style={({ pressed }) => [styles.shrink, pressed && styles.pressed]}
-          >
-            {workingPart}
-          </Pressable>
-        ) : (
-          <View style={styles.part}>
-            {resting.length > 0 ? <Faces ids={resting} mode="rest" /> : null}
-            <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
-              {workingText}
-            </Text>
-          </View>
-        )}
-      </View>
+      {/* Nobody at work and nothing new: the greeting alone (no line of sleeping faces). */}
+      {line.kind === "idle" ? null : (
+        <View style={styles.line}>
+          {line.kind === "finished" ? (
+            <Pressable
+              onPress={() => openFinished(line.finished)}
+              accessibilityRole="button"
+              accessibilityLabel={`${finishedName} ${finishedText}`}
+              hitSlop={8}
+              style={({ pressed }) => [styles.part, styles.shrink, pressed && styles.pressed]}
+            >
+              <AgentFace agentId={line.finished.agentId} size={FACE} framed />
+              <Text variant="footnote" tone="muted" numberOfLines={1} style={styles.shrink}>
+                {finishedName ? (
+                  <Text variant="footnote" tone="ink2" style={styles.bold}>
+                    {`${finishedName} `}
+                  </Text>
+                ) : null}
+                {finishedText}
+              </Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={openAgents}
+              accessibilityRole="button"
+              accessibilityLabel={workingText}
+              hitSlop={8}
+              style={({ pressed }) => [styles.shrink, pressed && styles.pressed]}
+            >
+              {workingPart}
+            </Pressable>
+          )}
+        </View>
+      )}
+      {after ? <View style={styles.after}>{after}</View> : null}
     </View>
   );
 }
@@ -208,6 +203,7 @@ export function FirstAgentEmpty() {
 const styles = StyleSheet.create({
   mini: { paddingHorizontal: 20, paddingBottom: 18 },
   line: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
+  after: { marginTop: 14, marginHorizontal: -4 },
   part: { flexDirection: "row", alignItems: "center", gap: 6 },
   shrink: { flexShrink: 1 },
   pressed: { opacity: 0.6 },
