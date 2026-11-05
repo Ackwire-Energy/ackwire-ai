@@ -1894,6 +1894,11 @@
         "import": "Meine Agenten importieren",
         "form": "Das Formular ausfüllen"
       },
+      "again": {
+        "question": "Willst du das Team mit mir aufbauen?",
+        "action": "Team aufbauen",
+        "message": "Hilf mir, das Team aufzubauen."
+      },
       "next": {
         "question": "Das Team ist da. Und jetzt?",
         "invite": "Leute einladen",
@@ -7707,6 +7712,8 @@
     "files": "Dateien",
     "needsSandbox": "nicht gespeichert",
     "assetLimit": "Ein Skill speichert bis zu {{max}} MB an Bildern und anderen Dateien.",
+    "moreFiles_one": "Und {{count}} weitere Datei",
+    "moreFiles_other": "Und {{count}} weitere Dateien",
     "runsOnPc": "läuft auf dem PC des Agenten",
     "reinstall": "Installiere den Skill neu, damit Agenten diese Datei nutzen können.",
     "edit": "Bearbeiten",
@@ -11120,8 +11127,14 @@
       "tooManySkills": "Dieser Link enthält mehr als {{max}} Skills. Verlinke einen seiner Ordner.",
       "invalidName": "Der Name darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten, bis zu {{max}} Zeichen.",
       "invalidDescription": "Die Beschreibung muss 1 bis {{max}} Zeichen haben.",
-      "tooLarge": "Der Skill ist zu groß (max. {{max}} MB).",
-      "tooManyFiles": "Der Skill hat zu viele Dateien (max. {{max}}).",
+      "tooLarge": "Dieser Skill hat {{size}} MB Text und Skripte, das Limit liegt bei {{max}} MB.",
+      "tooManyFiles": "Dieser Skill hat {{files}} Dateien, das Limit liegt bei {{max}}.",
+      "repoTooLarge": "Das Repository ist zu groß zum Herunterladen (max. {{max}} MB). Lade den Ordner des Skills stattdessen als .zip hoch.",
+      "noFrontmatter": "Die SKILL.md braucht oben einen Block mit Name und Beschreibung zwischen zwei ----Zeilen.",
+      "bodyTooLong": "Die SKILL.md ist zu lang (max. {{max}} Zeichen).",
+      "noSkillMdZip": "Keine SKILL.md oben im Ordner der Zip-Datei.",
+      "notGithubLink": "Diesen GitHub-Link können wir nicht lesen. Füge den Link zu einem Repository oder einem Ordner darin ein.",
+      "badZip": "Diese Zip-Datei können wir nicht lesen. Packe den Ordner des Skills neu, ohne Passwort.",
       "connectionGone": "Die GitHub-Verbindung, die {{repo}} gelesen hat, ist weg. Verbinde GitHub erneut, um diesen Skill zu aktualisieren.",
       "linkHoldsSeveral": "Sein Link enthält jetzt mehrere Skills. Installiere diesen erneut aus seinem eigenen Ordner.",
       "linkRenamed": "Sein Link enthält jetzt den Skill {{name}}.",
@@ -14052,6 +14065,35 @@
       "queued": "In der Warteschlange",
       "stopping": "Wird gestoppt…",
       "stopped": "Gestoppt"
+    },
+    "wait": {
+      "pausedPlan": "Pausiert: Abo bei {{percent}} % {{window}}",
+      "pausedBudget": "Pausiert: Budget bei {{percent}} % des Monats",
+      "planLimit": "{{plan}}-Abo am Limit",
+      "modelLimit": "{{model}} am Limit",
+      "modelRegion": "{{model}} braucht die Global-Region",
+      "modelRegionNext": "Schalte sie in OpenCode ein (Settings › Privacy)",
+      "budgetOut": "Monatsbudget aufgebraucht",
+      "workLine": "In der Arbeitsreihe des Agenten",
+      "workLineNext": "Startet, wenn andere Arbeit endet",
+      "computerWait": "Wartet auf den Computer",
+      "computerWaitNext": "Geht weiter, wenn er bereit ist",
+      "computerOfflineNext": "Geht weiter, wenn er an ist",
+      "computerBusyNext": "Startet, wenn Platz frei ist",
+      "okNext": "Geht weiter, sobald jemand freigibt",
+      "answerNext": "Geht weiter, sobald jemand antwortet",
+      "back": "Geht {{when}} weiter",
+      "whenRenews": "nach der Erneuerung",
+      "whenSoon": "gleich"
+    },
+    "waitGroup": {
+      "routines_one": "{{count}} Routine",
+      "routines_other": "{{count}} Routinen",
+      "pausedPlan": "{{what}} pausiert: Das {{plan}}-Abo steht bei {{percent}} % {{window}} und geht {{when}} weiter. Der Rest bleibt für die Unterhaltungen.",
+      "pausedBudget": "{{what}} pausiert: Das Monatsbudget steht bei {{percent}} % und geht {{when}} weiter. Der Rest bleibt für die Unterhaltungen.",
+      "planLimit": "{{what}} warten: Das {{plan}}-Abo hat sein Limit erreicht und geht {{when}} weiter.",
+      "modelLimit": "{{what}} warten: {{model}} hat sein Limit erreicht und geht {{when}} weiter. Die anderen Modelle des Abos funktionieren weiter.",
+      "budgetOut": "{{what}} warten: Das Monatsbudget ist aufgebraucht und geht {{when}} weiter."
     },
     "where": {
       "dm": "Direkte Unterhaltung",

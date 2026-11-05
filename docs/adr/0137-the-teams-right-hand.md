@@ -218,3 +218,7 @@ One AI for the whole workspace didn't fit a private DM per person. Lodi's plan w
 - An admin's own Lodi no longer depends on the workspace's plan, and an admin is never told only an admin can connect one.
 - A person's turns can run on a different account than a colleague's on the same computer at once, as the same agent's OS user in system mode. They are separate CLI sessions (each DM is its own, §1), and the accepted risk in §1 stands: that user holds more than one person's sign-in while it thinks.
 - A person's plan on a computer that is away says so (§7); it doesn't fall to the workspace's, which is for people with none.
+
+## Amendment (2026-11-05): the team can be built with it at any time (§10)
+
+The start card reads the conversation's first message as its answer and leaves once the team grows, so someone who wrote before connecting an AI, or came back later with agents already here, had no way in. For whoever may create agents, once an AI is there and the start card has stopped asking with no interview under way, the greeting ends with a line and a text action ("Montar o time") that sends their message. The interview is in its prompt in every DM, not only with no team: asked in words or by that line it runs, asks question 1 when it wasn't answered, and proposes around the agents already here.

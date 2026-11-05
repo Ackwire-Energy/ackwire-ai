@@ -6201,6 +6201,28 @@ export interface ManagedTask {
     /** When it should start (the line's estimate); null with no basis. */
     estimatedStartAt: string | null;
   } | null;
+  /** Why a `waiting_input` run waits (absent on an older server). */
+  wait?: TaskWait | null;
+}
+
+/** What a task waits on, in the words the apps need to say why. */
+export interface TaskWait {
+  /** `usage_pause`, `plan_limit`, `budget`, `busy`, `work_queue`, or what keeps its computer away. */
+  code: string;
+  /** Runs with the same key wait on the same plan or budget. */
+  key: string | null;
+  /** The plan in words ("Claude"); null for a budget. */
+  plan: string | null;
+  /** A wait on a model's own limit or the region it needs: the model's name, and which. */
+  model: string | null;
+  scope: "model" | "region" | null;
+  /** Paused near a limit: how far along, and the plan's window. */
+  percent: number | null;
+  window: string | null;
+  /** When the limit resets; null when unknown. */
+  resetsAt: string | null;
+  /** You may press Continuar agora. */
+  canContinue: boolean;
 }
 
 /** A computer with turns running or waiting for room (counts only). */

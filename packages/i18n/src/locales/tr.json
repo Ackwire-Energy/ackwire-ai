@@ -1890,6 +1890,11 @@
         "import": "Ajanlarımı içe aktar",
         "form": "Formu doldur"
       },
+      "again": {
+        "question": "Ekibi benimle kurmak ister misin?",
+        "action": "Ekibi kur",
+        "message": "Ekibi kurmama yardım et."
+      },
       "next": {
         "question": "Ekip geldi. Şimdi ne yapalım?",
         "invite": "Kişileri davet et",
@@ -7653,6 +7658,8 @@
     "files": "Dosyalar",
     "needsSandbox": "saklanmadı",
     "assetLimit": "Bir beceri en fazla {{max}} MB görsel ve başka dosya saklar.",
+    "moreFiles_one": "Ve {{count}} dosya daha",
+    "moreFiles_other": "Ve {{count}} dosya daha",
     "runsOnPc": "ajanın bilgisayarında çalışır",
     "reinstall": "Ajanların bu dosyayı kullanabilmesi için beceriyi yeniden yükleyin.",
     "edit": "Düzenle",
@@ -11056,8 +11063,14 @@
       "tooManySkills": "Bu bağlantıda {{max}} beceriden fazlası var. Klasörlerinden birinin bağlantısını verin.",
       "invalidName": "Ad küçük harf, rakam ve kısa çizgi içermeli, en fazla {{max}} karakter.",
       "invalidDescription": "Açıklama 1 ile {{max}} karakter arasında olmalı.",
-      "tooLarge": "Beceri çok büyük (en fazla {{max}} MB).",
-      "tooManyFiles": "Becerinin çok fazla dosyası var (en fazla {{max}}).",
+      "tooLarge": "Bu beceride {{size}} MB metin ve betik var, sınır {{max}} MB.",
+      "tooManyFiles": "Bu beceride {{files}} dosya var, sınır {{max}}.",
+      "repoTooLarge": "Depo indirmek için çok büyük (en fazla {{max}} MB). Becerinin klasörünü .zip olarak yükle.",
+      "noFrontmatter": "SKILL.md'nin en üstünde, iki --- satırı arasında adını ve açıklamasını içeren bir blok olmalı.",
+      "bodyTooLong": "SKILL.md çok uzun (en fazla {{max}} karakter).",
+      "noSkillMdZip": "Zip klasörünün en üstünde SKILL.md yok.",
+      "notGithubLink": "Bu GitHub bağlantısını okuyamıyoruz. Bir deponun veya içindeki bir klasörün bağlantısını yapıştır.",
+      "badZip": "Bu zip okunamadı. Becerinin klasörünü parolasız olarak yeniden sıkıştır.",
       "connectionGone": "{{repo}} deposunu okuyan GitHub bağlantısı artık yok. Bu beceriyi güncellemek için GitHub'ı yeniden bağlayın.",
       "linkHoldsSeveral": "Bağlantısında artık birden fazla beceri var. Bunu kendi klasöründen yeniden yükleyin.",
       "linkRenamed": "Bağlantısında artık {{name}} becerisi var.",
@@ -13982,6 +13995,35 @@
       "queued": "Sırada",
       "stopping": "Durduruluyor…",
       "stopped": "Durduruldu"
+    },
+    "wait": {
+      "pausedPlan": "Duraklatıldı: plan {{window}} %{{percent}} seviyesinde",
+      "pausedBudget": "Duraklatıldı: bütçe ayın %{{percent}} kadarında",
+      "planLimit": "{{plan}} planı sınırda",
+      "modelLimit": "{{model}} sınırda",
+      "modelRegion": "{{model}} için Global bölgesi gerekli",
+      "modelRegionNext": "OpenCode'da açın (Settings › Privacy)",
+      "budgetOut": "Bu ayın bütçesi bitti",
+      "workLine": "Ajanın iş sırasında",
+      "workLineNext": "Başka bir iş bitince başlar",
+      "computerWait": "Bilgisayarı bekliyor",
+      "computerWaitNext": "Hazır olunca devam eder",
+      "computerOfflineNext": "Açılınca devam eder",
+      "computerBusyNext": "Yer açılınca başlar",
+      "okNext": "Biri onaylayınca devam eder",
+      "answerNext": "Biri yanıtlayınca devam eder",
+      "back": "{{when}} devam eder",
+      "whenRenews": "sıfırlanınca",
+      "whenSoon": "birazdan"
+    },
+    "waitGroup": {
+      "routines_one": "{{count}} rutin",
+      "routines_other": "{{count}} rutin",
+      "pausedPlan": "{{what}} duraklatıldı: {{plan}} planı {{window}} %{{percent}} seviyesinde ve {{when}} devam eder. Kalan kısım konuşmalara ayrılır.",
+      "pausedBudget": "{{what}} duraklatıldı: aylık bütçe %{{percent}} seviyesinde ve {{when}} devam eder. Kalan kısım konuşmalara ayrılır.",
+      "planLimit": "{{what}} bekliyor: {{plan}} planı sınırına ulaştı ve {{when}} devam eder.",
+      "modelLimit": "{{what}} bekliyor: {{model}} sınırına ulaştı ve {{when}} devam eder. Planın diğer modelleri çalışmaya devam ediyor.",
+      "budgetOut": "{{what}} bekliyor: bu ayın bütçesi bitti ve {{when}} devam eder."
     },
     "where": {
       "dm": "Doğrudan mesaj",

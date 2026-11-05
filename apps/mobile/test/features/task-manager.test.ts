@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { EndedTask, ManagedTask } from "@agenteschat/client";
-import { taskProgram, taskTitle } from "@agenteschat/client/lib/task-manager";
+import { taskProgram, taskTitle, taskWaitGroups, taskWaitGroupText } from "@agenteschat/client/lib/task-manager";
 import {
   agentTasksHref,
   agentTasksOf,
@@ -12,10 +12,8 @@ import {
   endedText,
   groupLine,
   isHere,
-  lineStartText,
   rowState,
-  stateText,
-  taskStateText,
+  taskStateWords,
   taskSubline,
   tasksBadge,
   usingNow,
@@ -69,7 +67,8 @@ describe("a task's row (ADR 0128)", () => {
   test("its state: working, waiting on an ok or an answer, queued, and stopping once asked here", async () => {
     const t = await translator("pt-BR");
     const said = (over: Partial<ManagedTask>, stopping = NONE) =>
-      stateText(t, rowState(task({ runId: "r1", ...over }), stopping));
+      taskStateWords(t, "pt-BR", task({ runId: "r1", ...over }), rowState(task({ runId: "r1", ...over }), stopping), 0)
+        .state;
     expect(said({ status: "running" })).toBe("Trabalhando");
     expect(said({ status: "waiting_approval" })).toBe("Espera seu ok");
     expect(said({ status: "waiting_input" })).toBe("Espera resposta");
@@ -103,6 +102,9 @@ describe("a task's row (ADR 0128)", () => {
     });
     expect(groupLine(t, { working: 0, waiting: 2 })).toEqual({ mark: "waiting", text: "2 esperam você" });
     expect(groupLine(t, { working: 0, waiting: 0 })).toEqual({ mark: "queued", text: "Na fila" });
+    expect(groupLine(t, { working: 0, waiting: 0 }, "Pausada: plano a 95% da semana").text).toBe(
+      "Pausada: plano a 95% da semana",
+    );
   });
 });
 
@@ -253,11 +255,10 @@ describe("a computer's line (ADR 0128)", () => {
   test("a task waiting for room on its computer says its place, not just that the computer is full", async () => {
     const t = await translator("pt-BR");
     const inLine = task({ runId: "r1", status: "waiting_input", held: "computer_busy", line: full });
-    expect(taskStateText(t, inLine, rowState(inLine, NONE))).toBe("Na fila · 2º");
-    const noPlace = { ...inLine, line: null };
-    expect(taskStateText(t, noPlace, rowState(noPlace, NONE))).toBe("Computador cheio");
-    const working = task({ runId: "r2" });
-    expect(taskStateText(t, working, rowState(working, NONE))).toBe("Trabalhando");
+    const said = (x: ManagedTask) => taskStateWords(t, "pt-BR", x, rowState(x, NONE), now).state;
+    expect(said(inLine)).toBe("Na fila · 2º");
+    expect(said({ ...inLine, line: null })).toBe("Computador cheio");
+    expect(said(task({ runId: "r2" }))).toBe("Trabalhando");
   });
 
   test("a computer on the task manager: full with how many wait, or room, and how many run", async () => {
@@ -267,7 +268,7 @@ describe("a computer's line (ADR 0128)", () => {
     expect(computerLine(t, { working: 0, inLine: 0 })).toBe("Tem espaço");
   });
 
-  test("under its place, when it should start, in the computer line's words; nothing without an estimate", async () => {
+  test("under its place, when it should start, in the computer line's words; no made-up time without an estimate", async () => {
     const t = await translator("pt-BR");
     const soon = task({
       runId: "r1",
@@ -275,9 +276,53 @@ describe("a computer's line (ADR 0128)", () => {
       held: "computer_busy",
       line: { ...full, estimatedStartAt: "2026-11-02T14:03:00.000Z" },
     });
-    expect(lineStartText(t, soon, now)).toBe("começa em ~3 min");
-    expect(lineStartText(t, { ...soon, line: full }, now)).toBeNull();
-    expect(lineStartText(t, task({ runId: "r2" }), now)).toBeNull();
+    const next = (x: ManagedTask) => taskStateWords(t, "pt-BR", x, rowState(x, NONE), now).next;
+    expect(next(soon)).toBe("começa em ~3 min");
+    expect(next({ ...soon, line: full })).toBe("Começa quando tiver espaço");
+    expect(next(task({ runId: "r2" }))).toBeNull();
+  });
+});
+
+describe("why a task waits", () => {
+  const now = new Date(2026, 10, 5, 10, 0).getTime();
+  const resetsAt = new Date(2026, 10, 7, 18, 0).toISOString();
+  const wait = {
+    code: "usage_pause",
+    key: "plan:m1:claude_code:a1",
+    plan: "Claude",
+    model: null,
+    scope: null,
+    percent: 95,
+    window: "seven_day",
+    resetsAt,
+    canContinue: true,
+  };
+  const routine = (runId: string, canContinue: boolean) =>
+    task({
+      runId,
+      status: "waiting_input",
+      held: "plan",
+      background: true,
+      wait: { ...wait, canContinue },
+    });
+
+  test("the row says the same as the web's: what holds it, when it's back", async () => {
+    const t = await translator("pt-BR");
+    const paused = routine("r1", true);
+    expect(taskStateWords(t, "pt-BR", paused, rowState(paused, NONE), now)).toEqual({
+      state: "Pausada: plano a 95% da semana",
+      next: "Volta sáb às 18:00",
+    });
+  });
+
+  test("the line over rows on the same limit, and who may continue", async () => {
+    const t = await translator("pt-BR");
+    const [group] = taskWaitGroups([routine("r1", true), routine("r2", false)]);
+    if (!group) throw new Error("no group");
+    expect(taskWaitGroupText(t, "pt-BR", group, now)).toBe(
+      "2 rotinas pausadas: o plano do Claude está em 95% da semana e volta sáb às 18:00. O restante fica para as conversas.",
+    );
+    expect(group.continuable).toEqual(["r1"]);
   });
 });
 

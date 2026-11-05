@@ -46,7 +46,6 @@ import {
   tableHidden,
   threadFaces,
   threadTitleFrom,
-  toggleReaction,
   turnPhrase,
   workingEntries,
   workStepsOf,
@@ -645,14 +644,6 @@ describe("reactions", () => {
       { reaction: "🎉", emoji: "🎉", people: 0, agentIds: ["nina"], mine: false },
       { reaction: "+1", emoji: "👍", people: 2, agentIds: [], mine: true },
     ]);
-  });
-  test("toggling mine adds, removes and drops empty ones", () => {
-    const on = toggleReaction([], "🙌", "me");
-    expect(on).toEqual([{ reaction: "🙌", count: 1, userIds: ["me"], agentIds: [] }]);
-    expect(toggleReaction(on, "🙌", "me")).toEqual([]);
-    const shared = toggleReaction([{ reaction: "🙌", count: 1, userIds: ["ana"] }], "🙌", "me");
-    expect(shared[0]?.userIds).toEqual(["ana", "me"]);
-    expect(shared[0]?.count).toBe(2);
   });
 });
 

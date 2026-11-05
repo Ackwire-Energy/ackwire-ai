@@ -309,6 +309,30 @@ describe("Drive and skills", () => {
     expect(new TextDecoder().decode(runner.files.get("imports/vendas.csv"))).toBe("mês,total\r\nfev,2");
   });
 
+  test("load_skill names a large skill's shallowest files and folds the rest by folder, which read_skill_file lists", async () => {
+    f = await setup({ machines: true, skillTools: true, reply: () => ({ chunks: ["ok"] }) });
+    const files: Record<string, string> = {
+      "SKILL.md": "---\nname: kit\ndescription: Kit.\n---\nLeia.",
+      "ref.md": "#",
+    };
+    for (let i = 0; i < 120; i++) files[`assets/icons/i${i}.svg`] = "<svg/>";
+    const skill = await importSkillZip(
+      { db: f.db, blobs: f.artifactDeps.blobs },
+      f.owner.id,
+      f.org.id,
+      await zipOf(files),
+    );
+    await setAgentSkills(f.db, f.owner.id, f.org.id, f.agent.id, [{ skillId: skill.id, enabled: true }]);
+    const ctx = await runCtx();
+    const loaded = (await call(ctx, "load_skill", { name: "kit" })).content;
+    expect(loaded).toContain("- ref.md (text/markdown");
+    expect(loaded).toContain("- assets/icons/ (21 more, read_skill_file on this path lists them)");
+    expect(loaded.split("\n").filter((l) => l.startsWith("- "))).toHaveLength(101);
+    const listed = (await call(ctx, "read_skill_file", { name: "kit", path: "assets/icons/" })).content;
+    expect(listed.split("\n")).toHaveLength(120);
+    expect(listed).toContain("assets/icons/i119.svg");
+  });
+
   test("run_skill_script copies the skill and runs the script; read_skill_file still refuses it", async () => {
     f = await setup({ machines: true, skillTools: true, reply: () => ({ chunks: ["ok"] }) });
     const { runner } = await connectedComputer(f);
@@ -336,6 +360,7 @@ describe("Drive and skills", () => {
     expect(out).toMatchObject({ isError: false });
     expect(out.content).toContain("Not copied to .skills/graficos/ (over 5.0 MB each): manual.pdf.");
     expect([...runner.files.keys()].sort()).toEqual([
+      ".skills/graficos/.copied-v1",
       ".skills/graficos/logo.png",
       ".skills/graficos/ref.md",
       ".skills/graficos/scripts/plot.py",
@@ -345,6 +370,15 @@ describe("Drive and skills", () => {
       command: "python3 .skills/graficos/scripts/plot.py '--n' 'it'\\''s'",
     });
     expect((await call(ctx, "run_skill_script", { skill: "graficos", path: "ref.md" })).isError).toBe(true);
+    // The version is on the computer now: the next run writes its scripts alone, so one changed there never runs, and
+    // still says what stayed behind.
+    const writes = () => runner.sent.filter((s) => s.type === "request" && s.op === "write");
+    const before = writes().length;
+    runner.files.set(".skills/graficos/scripts/plot.py", new TextEncoder().encode("changed on the computer"));
+    const again = await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
+    expect(again.content).toContain("Not copied to .skills/graficos/ (over 5.0 MB each): manual.pdf.");
+    expect(writes().slice(before)).toMatchObject([{ path: ".skills/graficos/scripts/plot.py" }]);
+    expect(new TextDecoder().decode(runner.files.get(".skills/graficos/scripts/plot.py"))).not.toContain("changed");
   });
 });
 

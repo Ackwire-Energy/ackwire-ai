@@ -1820,6 +1820,11 @@
         "import": "Impor agen saya",
         "form": "Isi formulir"
       },
+      "again": {
+        "question": "Mau menyusun tim bersama saya?",
+        "action": "Susun tim",
+        "message": "Bantu saya menyusun tim."
+      },
       "next": {
         "question": "Timnya sudah datang. Lalu apa?",
         "invite": "Undang orang",
@@ -7422,6 +7427,7 @@
     "files": "File",
     "needsSandbox": "tidak disimpan",
     "assetLimit": "Satu skill menyimpan hingga {{max}} MB gambar dan file lain.",
+    "moreFiles_other": "Dan {{count}} file lagi",
     "runsOnPc": "berjalan di PC agen",
     "reinstall": "Pasang ulang skill agar agen bisa memakai file ini.",
     "edit": "Ubah",
@@ -10739,8 +10745,14 @@
       "tooManySkills": "Tautan ini memuat lebih dari {{max}} skill. Tautkan salah satu foldernya.",
       "invalidName": "Nama harus memakai huruf kecil, angka, dan tanda hubung, maksimal {{max}} karakter.",
       "invalidDescription": "Deskripsi harus terdiri dari 1 sampai {{max}} karakter.",
-      "tooLarge": "Skill terlalu besar (maks {{max}} MB).",
-      "tooManyFiles": "Skill punya terlalu banyak file (maks {{max}}).",
+      "tooLarge": "Skill ini punya {{size}} MB teks dan skrip, dan batasnya {{max}} MB.",
+      "tooManyFiles": "Skill ini punya {{files}} file, dan batasnya {{max}}.",
+      "repoTooLarge": "Repositori terlalu besar untuk diunduh (maks {{max}} MB). Unggah folder skill sebagai .zip saja.",
+      "noFrontmatter": "SKILL.md perlu blok di bagian atas berisi nama dan deskripsi, di antara dua baris ---.",
+      "bodyTooLong": "SKILL.md terlalu panjang (maks {{max}} karakter).",
+      "noSkillMdZip": "Tidak ada SKILL.md di bagian atas folder zip.",
+      "notGithubLink": "Tautan GitHub itu tidak bisa kami baca. Tempel tautan repositori atau salah satu foldernya.",
+      "badZip": "Zip ini tidak bisa kami baca. Kompres lagi folder skill, tanpa kata sandi.",
       "connectionGone": "Koneksi GitHub yang membaca {{repo}} sudah tidak ada. Hubungkan GitHub lagi untuk memperbarui skill ini.",
       "linkHoldsSeveral": "Tautannya sekarang berisi beberapa skill. Pasang skill ini lagi dari foldernya sendiri.",
       "linkRenamed": "Tautannya sekarang berisi skill {{name}}.",
@@ -13670,6 +13682,34 @@
       "queued": "Dalam antrean",
       "stopping": "Menghentikan…",
       "stopped": "Dihentikan"
+    },
+    "wait": {
+      "pausedPlan": "Dijeda: paket di {{percent}}% {{window}}",
+      "pausedBudget": "Dijeda: anggaran di {{percent}}% bulan ini",
+      "planLimit": "Paket {{plan}} mencapai batas",
+      "modelLimit": "{{model}} mencapai batas",
+      "modelRegion": "{{model}} butuh region Global",
+      "modelRegionNext": "Nyalakan di OpenCode (Settings › Privacy)",
+      "budgetOut": "Anggaran bulan ini habis",
+      "workLine": "Dalam antrean kerja agen",
+      "workLineNext": "Mulai saat pekerjaan lain selesai",
+      "computerWait": "Menunggu komputer",
+      "computerWaitNext": "Lanjut saat komputer siap",
+      "computerOfflineNext": "Lanjut saat komputer menyala",
+      "computerBusyNext": "Mulai saat ada tempat",
+      "okNext": "Lanjut saat ada yang menyetujui",
+      "answerNext": "Lanjut saat ada yang menjawab",
+      "back": "Lanjut {{when}}",
+      "whenRenews": "saat diperbarui",
+      "whenSoon": "sebentar lagi"
+    },
+    "waitGroup": {
+      "routines_other": "{{count}} rutinitas",
+      "pausedPlan": "{{what}} dijeda: paket {{plan}} di {{percent}}% {{window}} dan lanjut {{when}}. Sisanya untuk percakapan.",
+      "pausedBudget": "{{what}} dijeda: anggaran bulan ini di {{percent}}% dan lanjut {{when}}. Sisanya untuk percakapan.",
+      "planLimit": "{{what}} menunggu: paket {{plan}} mencapai batas dan lanjut {{when}}.",
+      "modelLimit": "{{what}} menunggu: {{model}} mencapai batas dan lanjut {{when}}. Model lain di paket tetap berfungsi.",
+      "budgetOut": "{{what}} menunggu: anggaran bulan ini habis dan lanjut {{when}}."
     },
     "where": {
       "dm": "Pesan langsung",

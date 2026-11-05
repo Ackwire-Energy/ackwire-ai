@@ -311,6 +311,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       taskManager: (orgId, since) =>
         request<TaskManagerView>(`${org(orgId)}/task-manager`, { query: since ? { since } : {} }),
       taskSteps: (orgId, runId) => request<TaskSteps>(`${org(orgId)}/task-manager/${enc(runId)}/steps`),
+      continueTasks: (orgId, runIds) =>
+        request<{ continued: number }>(`${org(orgId)}/task-manager/continue`, { json: { runIds } }),
     },
     mail: {
       providers: (orgId) => request<MailProviders>(`${org(orgId)}/mail/providers`),
