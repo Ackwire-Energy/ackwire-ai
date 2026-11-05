@@ -6,12 +6,17 @@ const ROOT = join(import.meta.dir, "../../..");
 const LAYOUT = join(ROOT, "apps/web/src/layout.css");
 const KIT = join(ROOT, "packages/ui/src/styles/components.css");
 
-/** The rules of every `@media` block for the phone layout (760px and under), in order, as one sheet. */
+/**
+ * The rules of every `@media` block where Settings' sections are the strip above the page (940px and under: tablets
+ * and phones) or the phone layout (760px and under), in order, as one sheet.
+ */
 const phoneRules = (css: string) =>
   [
     ...css
       .replace(/\/\*[\s\S]*?\*\//g, "")
-      .matchAll(/@media\s*\((?:max-width:\s*760px|width\s*<=\s*760px)\)\s*\{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g),
+      .matchAll(
+        /@media\s*\((?:max-width:\s*(?:760|940)px|width\s*<=\s*(?:760|940)px)\)\s*\{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g,
+      ),
   ]
     .map((m) => m[1] ?? "")
     .join("\n");
