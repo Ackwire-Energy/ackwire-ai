@@ -99,8 +99,6 @@ const WORKER_PING_MS = 10_000;
 const WORKER_BACKLOG_MAX = 64 * 1024 * 1024;
 /** A `push`'s or `pull`'s bytes cross the link in pieces of this size. */
 export const UPLOAD_CHUNK_BYTES = 1024 * 1024;
-/** A `pull` waits while this much of what was sent to its worker is unread, well under `WORKER_BACKLOG_MAX`. */
-const PULL_BACKLOG_BYTES = 8 * 1024 * 1024;
 /** A task the server never acknowledged is forgotten after this long. */
 const TASK_OWNER_KEEP_MS = 8 * 24 * 3600_000;
 /**
@@ -1055,12 +1053,12 @@ export class Supervisor {
     for (const s of [...w.shows.values()]) s.settle(new RunnerError("internal", message));
   }
 
-  private send(w: Worker, frame: ServerFrame | WorkerLinkFrame) {
-    if (w.ready) this.write(w, frame);
+  private send(w: Worker, frame: ServerFrame | WorkerLinkFrame, flushed?: () => void) {
+    if (w.ready) this.write(w, frame, flushed);
   }
 
   /** To the worker's process, also between two of its sessions. */
-  private write(w: Worker, frame: ServerFrame | WorkerLinkFrame) {
+  private write(w: Worker, frame: ServerFrame | WorkerLinkFrame, flushed?: () => void) {
     if (!w.proc) return;
     if (w.proc.stdin.writableLength > WORKER_BACKLOG_MAX) {
       this.opts.log(`[${w.user.user}] isn't reading what it is sent; stopping it`);
@@ -1071,7 +1069,7 @@ export class Supervisor {
     if (frame.type === "request" && frame.op === "browser.input" && this.opts.relayed) {
       this.opts.relayed.browserView.down += Buffer.byteLength(line);
     }
-    w.proc.stdin.write(line);
+    w.proc.stdin.write(line, flushed);
   }
 
   private welcome(w: Worker) {
@@ -1488,7 +1486,8 @@ export class Supervisor {
   /**
    * To the worker's `pull`, the file from the server this computer is paired with, with the machine token. As root,
    * this request takes the host's own route: an agent's goes through whatever its workspace routes agents through.
-   * Paced by what the worker has read, so a slow disk never reaches `WORKER_BACKLOG_MAX`.
+   * Each piece waits for the one before it to leave for the worker's pipe: under Bun a child's stdin always reports a
+   * `writableLength` of 0, and only a write's callback tells, so the file never piles up here.
    */
   private async pull(w: Worker, pullId: string) {
     const e = [...w.inflight.values()].find((x) => x.req.op === "pull" && x.req.pullId === pullId);
@@ -1516,11 +1515,14 @@ export class Supervisor {
         for await (const piece of res.body) {
           for (let at = 0; at < piece.byteLength; at += UPLOAD_CHUNK_BYTES) {
             const data = Buffer.from(piece.subarray(at, at + UPLOAD_CHUNK_BYTES)).toString("base64");
-            this.send(w, { type: "pull.chunk", pullId, data });
-            while (live() && (w.proc?.stdin.writableLength ?? 0) > PULL_BACKLOG_BYTES) await Bun.sleep(20);
+            let flushed = false;
+            this.send(w, { type: "pull.chunk", pullId, data }, () => {
+              flushed = true;
+            });
+            while (!flushed && live() && w.ready) await Bun.sleep(5);
+            // It stopped first (the disk filled, the bytes went past the size): leaving the loop closes the fetch.
+            if (!live()) return;
           }
-          // It stopped first (the disk filled, the bytes went past the size): leaving the loop closes the fetch.
-          if (!live()) return;
         }
       }
       this.send(w, { type: "pull.end", pullId });

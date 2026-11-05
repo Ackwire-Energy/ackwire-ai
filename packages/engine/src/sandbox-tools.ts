@@ -1068,28 +1068,37 @@ export function createSandboxToolSource(
           const base = `.skills/${skill.name}`;
           const args = (Array.isArray(input.args) ? input.args : []).map((a) => quote(String(a))).join(" ");
           // What an older runner can't receive (a big PDF) stays behind instead of failing every run.
-          let left: string[] = [];
+          let left = "";
           // A skill can hold thousands of files: copied once a version. Its scripts go on every run, so what runs (and
-          // what a person approved) is the skill's, whatever was written over them on the computer since. The mark
-          // is only left once nothing stayed behind, so a runner brought up to date gets those too.
-          const copiedMark = `${base}/.copied-whole-v${skill.version}`;
+          // what a person approved) is the skill's, whatever was written over them on the computer since.
+          const copiedMark = `${base}/.copied-v${skill.version}`;
+          // Files past a `write` have their own mark: a runner brought up to date gets them without the rest again.
+          const largeMark = `${base}/.copied-large-v${skill.version}`;
           const scripts = listed.filter((f) => f.status === "script").map((f) => f.path);
           const started = Date.now();
+          const mark = (path: string, c: ComputerHandle) =>
+            c.provider.writeFile(c.id, path, new TextEncoder().encode(skill.name));
           const result = await run(ctx, async (computer) => {
             const copied = await computer.provider.readFile(computer.id, copiedMark);
             const wanted = copied ? scripts : undefined;
             for (const f of await skillFolderFiles(skillDeps(ctx), skill, wanted, MAX_INLINE_FILE_BYTES)) {
               await computer.provider.writeFile(computer.id, `${base}/${f.path}`, f.data);
             }
-            const large = await skillFilesOver(ctx.db, skill, MAX_INLINE_FILE_BYTES, wanted);
-            if (await computer.provider.canPull(computer.id)) {
+            if (!copied) await mark(copiedMark, computer);
+            const large = await skillFilesOver(ctx.db, skill, MAX_INLINE_FILE_BYTES);
+            const refusal = large.length > 0 ? await computer.provider.pullRefusal(computer.id) : null;
+            if (refusal) {
+              left = `Not copied to ${base}/: ${large.map((f) => f.path).join(", ")}. ${refusal}`;
+            } else if (large.length > 0) {
               const pull = { ...skillDeps(ctx), publicUrl: deps.publicUrl };
-              for (const f of large) await copyToComputer(pull, ctx, computer, `${base}/${f.path}`, f);
-            } else {
-              left = large.map((f) => f.path);
+              const whole = await computer.provider.readFile(computer.id, largeMark);
+              for (const f of large) {
+                if (!whole || scripts.includes(f.path)) {
+                  await copyToComputer(pull, ctx, computer, `${base}/${f.path}`, f);
+                }
+              }
+              if (!whole) await mark(largeMark, computer);
             }
-            if (!copied && left.length === 0)
-              await computer.provider.writeFile(computer.id, copiedMark, new TextEncoder().encode(skill.name));
             const r = await execLive(ctx, computer, {
               command: scriptCommand(bin, `${base}/${target.path}`, args),
               timeoutSeconds: timeout,
@@ -1100,9 +1109,8 @@ export function createSandboxToolSource(
           });
           const seconds = Math.round((Date.now() - started) / 1000);
           const output = execOutput(`run_skill_script ${skill.name}/${target.path}`, result, seconds, timeout);
-          if (left.length === 0) return output;
-          const note = `Not copied to ${base}/ (over ${formatBytes(MAX_INLINE_FILE_BYTES)} each, which needs \`agentes-runner update\` on this computer): ${left.join(", ")}.`;
-          return { ...output, content: `${output.content}\n${note}` };
+          if (!left) return output;
+          return { ...output, content: `${output.content}\n${left}` };
         } catch (error) {
           return heldForApproval(error, "Not run") ?? failed(error);
         }

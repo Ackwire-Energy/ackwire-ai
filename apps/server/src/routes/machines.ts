@@ -30,6 +30,7 @@ import {
   setAgentComputerTarget,
   startDeviceCode,
   syncHostComputer,
+  UUID,
   ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
@@ -995,7 +996,7 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
       apiError(c, 413, "artifact.file_too_large", `The file is too large (max ${maxMb} MB)`, { maxMb });
     if (Number(c.req.header("content-length") ?? "0") > max) return tooLarge();
     const uploadId = c.req.param("uploadId");
-    if (!/^[0-9a-f-]{36}$/i.test(uploadId)) return apiError(c, 404, "upload.not_found", "Upload not found");
+    if (!UUID.test(uploadId)) return apiError(c, 404, "upload.not_found", "Upload not found");
     let name = "file";
     try {
       name = decodeURIComponent(c.req.header("x-agentes-file-name") ?? "") || "file";
@@ -1035,8 +1036,7 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
     const machine = token ? await authenticateMachine(db, token) : null;
     if (!machine) return apiError(c, 401, "machine.unauthorized", "This computer's token is not valid");
     const pullId = c.req.param("pullId");
-    if (!/^[0-9a-f-]{36}$/i.test(pullId))
-      return apiError(c, 404, "pull.not_found", "This file isn't waiting for this computer");
+    if (!UUID.test(pullId)) return apiError(c, 404, "pull.not_found", "This file isn't waiting for this computer");
     try {
       const file = await openFilePull(deps.extras?.artifacts ?? missingArtifacts(), pullId, machine.id);
       return new Response(file.body, {

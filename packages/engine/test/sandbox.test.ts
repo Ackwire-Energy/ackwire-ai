@@ -361,7 +361,8 @@ describe("Drive and skills", () => {
     expect(out).toMatchObject({ isError: false });
     expect(out.content).not.toContain("Not copied");
     expect([...runner.files.keys()].sort()).toEqual([
-      ".skills/graficos/.copied-whole-v1",
+      ".skills/graficos/.copied-large-v1",
+      ".skills/graficos/.copied-v1",
       ".skills/graficos/logo.png",
       ".skills/graficos/manual.pdf",
       ".skills/graficos/ref.md",
@@ -383,7 +384,7 @@ describe("Drive and skills", () => {
 
   test("an older runner: what it can't receive stays behind and is said, and comes once it is updated", async () => {
     f = await setup({ machines: true, skillTools: true, reply: () => ({ chunks: ["ok"] }) });
-    const { runner } = await connectedComputer(f, { protocol: FILE_PULL_PROTOCOL - 1 });
+    const { runner, paired } = await connectedComputer(f, { protocol: FILE_PULL_PROTOCOL - 1 });
     const md = "---\nname: graficos\ndescription: Faz gráficos.\n---\nRode scripts/plot.py.";
     const zip = await zipOf({
       "SKILL.md": md,
@@ -395,13 +396,33 @@ describe("Drive and skills", () => {
     const ctx = await runCtx();
     const out = await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
     expect(out).toMatchObject({ isError: false });
-    expect(out.content).toContain(
-      "Not copied to .skills/graficos/ (over 5.0 MB each, which needs `agentes-runner update` on this computer): manual.pdf.",
-    );
-    expect([...runner.files.keys()]).not.toContain(".skills/graficos/.copied-whole-v1");
+    const left =
+      "Not copied to .skills/graficos/: manual.pdf. The computer Build box needs an update to receive files over 5 MB. Its owner can run `agentes-runner update`.";
+    expect(out.content).toContain(left);
     expect((await call(ctx, "read_skill_file", { name: "graficos", path: "manual.pdf" })).content).toContain(
       "Not saved on your computer: The computer Build box needs an update to receive files over 5 MB. Its owner can run `agentes-runner update`.",
     );
+    // What it could take is there: the next run sends the scripts alone, and says again what stayed behind.
+    const writes = () => runner.sent.filter((s) => s.type === "request" && s.op === "write");
+    const before = writes().length;
+    const again = await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
+    expect(again.content).toContain(left);
+    expect(writes().slice(before)).toMatchObject([{ path: ".skills/graficos/scripts/plot.py" }]);
+
+    // Updated: what stayed behind comes, once, and the rest isn't copied again.
+    await runner.hello(paired.token, { protocol: FILE_PULL_PROTOCOL });
+    const pulls = () => runner.sent.filter((s) => s.type === "request" && s.op === "pull");
+    const updated = await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
+    expect(updated.content).not.toContain("Not copied");
+    expect(runner.files.get(".skills/graficos/manual.pdf")?.byteLength).toBe(MAX_INLINE_FILE_BYTES + 1);
+    expect(pulls()).toHaveLength(1);
+    expect(
+      writes()
+        .slice(before + 1)
+        .map((w) => w.path),
+    ).toEqual([".skills/graficos/scripts/plot.py", ".skills/graficos/.copied-large-v1"]);
+    await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
+    expect(pulls()).toHaveLength(1);
   });
 });
 

@@ -93,6 +93,10 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
       throw explain(error, await nameOf(id), path, tooLarge);
     }
   };
+  const pullRefusal = async (id: string) => {
+    const status = await hub.status(id);
+    return status && status.protocol < FILE_PULL_PROTOCOL ? pullUpdateText(status) : null;
+  };
   const execOn = async (
     id: string,
     request: ExecRequest,
@@ -190,12 +194,10 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
         `${path} is too large to send to the Drive (max ${MB(target.maxBytes)}).`,
       );
     },
-    async canPull(id) {
-      return ((await hub.status(id))?.protocol ?? 0) >= FILE_PULL_PROTOCOL;
-    },
+    pullRefusal,
     async pullFile(id, path, { signal, ...source }) {
-      const status = await hub.status(id);
-      if (status && status.protocol < FILE_PULL_PROTOCOL) throw new Error(pullUpdateText(status));
+      const refusal = await pullRefusal(id);
+      if (refusal) throw new Error(refusal);
       await guard(id, () => hub.call(id, { agent, op: "pull", path, ...source }, { signal }), path);
     },
   };

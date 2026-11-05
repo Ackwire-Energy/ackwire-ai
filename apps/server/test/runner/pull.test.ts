@@ -123,6 +123,15 @@ test("whatever goes wrong, the old file stays as it was and no half file is left
   }
 });
 
+test("a full disk says so, whether it fills before the first byte or during the copy", async () => {
+  const fullDisk = Object.assign(new Error("no space left"), { code: "ENOSPC" });
+  const { ws, ctx } = workspace(async () => {
+    throw fullDisk;
+  });
+  expect(await message(() => handleRequest(ctx, pull(), scope()))).toContain("the computer's disk is full");
+  expect(readdirSync(path.join(ws, "in"))).toEqual([]);
+});
+
 test("canceled: stops at once and leaves nothing", async () => {
   const stop = new AbortController();
   const { ws, ctx } = workspace(async (_url, init) => {

@@ -1273,6 +1273,42 @@ test("pull: root fetches its own request's URL with the machine token, once, and
   await pull;
 });
 
+test("pull: a piece waits for the one before it to leave for the worker's pipe", async () => {
+  const bytes = Buffer.alloc(2_500_000, 7);
+  const t = setup({ fetch: async () => new Response(bytes), server: "http://127.0.0.1:3000" });
+  t.sup.boot();
+  t.sup.attach();
+  const pullId = "11111111-1111-4111-8111-111111111111";
+  const url = "https://agentes.test/api/machines/pulls/1";
+  const req: MachineRequest = { op: "pull", path: "base.zip", url, pullId, size: bytes.length, agent: ANA };
+  const pull = handleRequest(t.ctx, req, scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const q = await requestOn(ana);
+  // As a real pipe does it: `writableLength` says nothing, and a write's callback comes when the bytes left.
+  const flushes: (() => void)[] = [];
+  const write = ana.stdin.write.bind(ana.stdin);
+  ana.stdin.write = ((line: string, flushed?: () => void) => {
+    if (flushed) flushes.push(flushed);
+    return write(line);
+  }) as typeof ana.stdin.write;
+  ana.send({ type: "pull.start", pullId });
+  await waitFor(() => ana.of("pull.chunk").length === 1);
+  await Bun.sleep(40);
+  expect(ana.of("pull.chunk")).toHaveLength(1);
+  flushes.shift()?.();
+  await waitFor(() => ana.of("pull.chunk").length === 2);
+  await Bun.sleep(40);
+  expect(ana.of("pull.chunk")).toHaveLength(2);
+  flushes.shift()?.();
+  await waitFor(() => ana.of("pull.chunk").length === 3);
+  flushes.shift()?.();
+  await waitFor(() => ana.of("pull.end").length === 1);
+  ana.send({ type: "result", id: q.id, ok: true, data: { size: bytes.length, sha256: "x" } });
+  await pull;
+});
+
 test("pull: the worker's end reads root's frames as a fetch, and a cut stream as a failure", async () => {
   const fromRoot = new PassThrough();
   const toRoot = new PassThrough();
@@ -1661,9 +1697,10 @@ test.if(posix)(
   "a real worker: its agent's folder, what the computer allows, uploads through the supervisor, new sessions",
   async () => {
     const puts: { url: string; init: RequestInit }[] = [];
+    const big = Buffer.from(Array.from({ length: 3_000_000 }, (_, i) => i % 251));
     const t = realWorkers({
       fetch: async (url, init) => {
-        if (init.method === "GET") return new Response("pulled", { status: 200 });
+        if (init.method === "GET") return new Response(big, { status: 200 });
         puts.push({ url, init });
         return new Response("{}", { status: 200 });
       },
@@ -1695,11 +1732,12 @@ test.if(posix)(
       path: "in/base.zip",
       url: "https://agentes.test/api/machines/pulls/4",
       pullId: "44444444-4444-4444-8444-444444444444",
-      size: 6,
+      size: big.length,
+      sha256: createHash("sha256").update(big).digest("hex"),
       agent: ANA,
     } as MachineRequest;
-    expect(await handleRequest(t.ctx, pull, scope().scope)).toMatchObject({ size: 6 });
-    expect(readFileSync(path.join(realpathSync(t.agentHome), "ana-a1b2c3d4", "in/base.zip"), "utf8")).toBe("pulled");
+    expect(await handleRequest(t.ctx, pull, scope().scope)).toMatchObject({ size: big.length });
+    expect(readFileSync(path.join(realpathSync(t.agentHome), "ana-a1b2c3d4", "in/base.zip")).equals(big)).toBe(true);
 
     // Commands turned off on the computer: the worker refuses them (its state comes before the next request).
     const off = { ...STATE.access.tools, commands: false };

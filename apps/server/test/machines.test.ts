@@ -1,15 +1,23 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
+import { readdirSync, readFileSync, realpathSync } from "node:fs";
+import path from "node:path";
+import { createDiskBlobStore } from "@agenteschat/adapters";
+import type { MachineRequest } from "@agenteschat/adapters/machine-protocol";
 import { schema } from "@agenteschat/db";
 import { ARTIFACT_LIMITS, createUpload, issueManagedMachine, setProvisioning } from "@agenteschat/engine";
+import { handleRequest } from "../runner/handlers";
 import { browser, createTestServer, listen, ORIGIN, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
+import { removeDirs, tempDir } from "./runner/helpers";
 
 let t: TestServer;
 let server: ReturnType<typeof listen> | null = null;
+const dirs: string[] = [];
 afterEach(async () => {
   if (server) await Promise.race([server.stop(true), Bun.sleep(500)]);
   server = null;
   await t.close();
+  removeDirs(dirs);
 });
 
 const RUNNER = { hostname: "box", os: "linux", arch: "x64", version: "0.1.0", protocol: 1, workspace: "/srv/agentes" };
@@ -213,6 +221,7 @@ test("pulls GET: machine token, its own pull only, the stored bytes once", async
   expect(wrong.status).toBe(404);
   expect(await code(wrong)).toBe("pull.not_found");
   expect((await get(a.token, "/api/machines/pulls/..%2F..%2Fsecret")).status).toBe(404);
+  expect((await get(a.token, `/api/machines/pulls/${"-".repeat(36)}`)).status).toBe(404);
 
   const res = await get(a.token);
   expect(res.status).toBe(200);
@@ -224,6 +233,63 @@ test("pulls GET: machine token, its own pull only, the stored bytes once", async
   expect(again.status).toBe(404);
   expect(await code(again)).toBe("pull.not_found");
 });
+
+test("a pull end to end: the route on a real socket, streamed from a disk store, to the runner's own code", async () => {
+  const { pair, orgId } = await start();
+  const a = await pair("A");
+  const dir = tempDir();
+  dirs.push(dir);
+  const ws = tempDir();
+  dirs.push(ws);
+  const disk = createDiskBlobStore(dir);
+  const { store, prefix, storageConfigId } = await t.engine.artifacts.blobs.forOrg(orgId);
+  store.stream = disk.stream;
+  const bytes = new Uint8Array(ARTIFACT_LIMITS.fileBytes);
+  for (let at = 0; at < bytes.length; at += 4099) bytes[at] = at % 251;
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const blobKey = `${prefix}big`;
+  await disk.put(blobKey, bytes, { contentType: "application/zip" });
+  const row = () =>
+    t.db
+      .insert(schema.machineFilePulls)
+      .values({
+        orgId,
+        machineId: a.machineId,
+        storageConfigId,
+        blobKey,
+        size: bytes.length,
+        expiresAt: new Date(Date.now() + 60_000),
+      })
+      .returning();
+  const [pull] = await row();
+  server = listen(t);
+  const url = `${ORIGIN}/api/machines/pulls/${pull?.id}`;
+  const ctx = {
+    workspaceReal: realpathSync(ws),
+    exec: false,
+    token: a.token,
+    server: `http://127.0.0.1:${server.port}`,
+  };
+  const req = { op: "pull", path: "in/big.zip", url, pullId: pull?.id, size: bytes.length, sha256 } as MachineRequest;
+  const scope = { signal: new AbortController().signal, output: () => {} };
+  expect(await handleRequest(ctx, req, scope)).toEqual({ size: bytes.length, sha256 });
+  expect(
+    createHash("sha256")
+      .update(readFileSync(path.join(ws, "in/big.zip")))
+      .digest("hex"),
+  ).toBe(sha256);
+  expect(readdirSync(path.join(ws, "in"))).toEqual(["big.zip"]);
+
+  // The same request again: the first fetch used it, and the file there stays whole.
+  await expect(handleRequest(ctx, req, scope)).rejects.toThrow("This file isn't waiting for this computer");
+  expect(readdirSync(path.join(ws, "in"))).toEqual(["big.zip"]);
+
+  // What was recorded no longer matches what is stored: refused, whatever the server sends.
+  const [other] = await row();
+  const wrong = { ...req, url: `${ORIGIN}/api/machines/pulls/${other?.id}`, pullId: other?.id, sha256: "0".repeat(64) };
+  await expect(handleRequest(ctx, wrong as MachineRequest, scope)).rejects.toThrow("it arrived damaged");
+  expect(readdirSync(path.join(ws, "in"))).toEqual(["big.zip"]);
+}, 60_000);
 
 test("uploads PUT: machine token, its own upload only, size refused before reading", async () => {
   const { pair, orgId, agentId, channelId } = await start();

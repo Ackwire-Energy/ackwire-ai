@@ -82,8 +82,8 @@ export interface ComputerChannel {
   pushFile(id: string, path: string, target: PushTarget): Promise<PushReceipt>;
   /** The computer fetches a stored file to `path` itself, for what `writeFile` can't carry. */
   pullFile(id: string, path: string, source: PullSource): Promise<void>;
-  /** Whether `pullFile` can work there (an older runner can't). */
-  canPull(id: string): Promise<boolean>;
+  /** Why `pullFile` can't work there (an older runner), for the agent; null when it can. */
+  pullRefusal(id: string): Promise<string | null>;
   /** Secrets for the agent (ADR 0027), kept by the computer itself. */
   secret(
     id: string,

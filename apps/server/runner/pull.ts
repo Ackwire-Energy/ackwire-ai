@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { chmod, open, rename, rm, stat } from "node:fs/promises";
+import { open, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import type { MachineReplies } from "@agenteschat/adapters/machine-protocol";
 import { errnoCode, RunnerError } from "./errors";
@@ -22,15 +22,17 @@ export interface PullOptions {
   signal?: AbortSignal;
 }
 
-const TRY_AGAIN = "Nothing was left there, so it can be tried again.";
+const TRY_AGAIN = "Nothing changed there, so it can be tried again.";
+
+const isDiskFull = (err: unknown) => ["ENOSPC", "EDQUOT"].includes(errnoCode(err) ?? "");
+const diskFull = () =>
+  new RunnerError("pull_failed", "the computer's disk is full. Free some space there, then try again.");
 
 /** Why a pull stopped, for people. */
 function pullError(err: unknown, canceled: boolean): RunnerError {
   if (canceled) return new RunnerError("internal", "Canceled");
   if (err instanceof RunnerError) return err;
-  if (errnoCode(err) === "ENOSPC") {
-    return new RunnerError("pull_failed", "the computer's disk is full. Free some space there, then try again.");
-  }
+  if (isDiskFull(err)) return diskFull();
   if (err instanceof Error && err.name === "TimeoutError") {
     return new RunnerError("pull_failed", `the copy took over 10 minutes, too long for this link. ${TRY_AGAIN}`);
   }
@@ -51,7 +53,9 @@ export async function pullFile(opts: PullOptions): Promise<MachineReplies["pull"
   const doFetch: FetchLike = opts.fetch ?? ((u, init) => fetch(u, init));
   const temp = path.join(path.dirname(opts.abs), `.agentes-pull-${randomUUID()}`);
   // `wx`: never through a link or over a file someone put at that name.
-  const file = await open(temp, "wx");
+  const file = await open(temp, "wx").catch((err: unknown) => {
+    throw isDiskFull(err) ? diskFull() : err;
+  });
   try {
     const res = await doFetch(url, {
       method: "GET",
@@ -71,10 +75,10 @@ export async function pullFile(opts: PullOptions): Promise<MachineReplies["pull"
     }
     const sha256 = hash.digest("hex");
     if (size !== opts.size || (opts.sha256 && opts.sha256.toLowerCase() !== sha256)) throw damaged;
-    await file.close();
     // Over an existing file: `write` keeps its permissions, and so does this.
     const before = await stat(opts.abs).catch(() => null);
-    if (before) await chmod(temp, before.mode & 0o7777);
+    if (before) await file.chmod(before.mode & 0o7777);
+    await file.close();
     await rename(temp, opts.abs);
     return { size, sha256 };
   } catch (err) {

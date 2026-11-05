@@ -1702,18 +1702,11 @@ export async function skillFolderFiles(deps: SkillDeps, s: SkillRow, paths?: str
 }
 
 /** The rest of what `skillFolderFiles` leaves out past `minBytes`, unread: these reach a computer by `copyToComputer`. */
-export async function skillFilesOver(db: Database, s: SkillRow, minBytes: number, paths?: string[]) {
+export async function skillFilesOver(db: Database, s: SkillRow, minBytes: number) {
   const rows = await db
     .select()
     .from(skillFiles)
-    .where(
-      and(
-        eq(skillFiles.skillId, s.id),
-        eq(skillFiles.version, s.version),
-        gt(skillFiles.size, minBytes),
-        paths ? inArray(skillFiles.path, paths) : undefined,
-      ),
-    );
+    .where(and(eq(skillFiles.skillId, s.id), eq(skillFiles.version, s.version), gt(skillFiles.size, minBytes)));
   return rows.flatMap((f) =>
     f.status === "ignored" || !f.blobKey
       ? []
