@@ -4,7 +4,8 @@
 // `signed-in` in that folder is the sign-in.
 // $FAKE_ACCOUNT_MODE: "silent" prints nothing and waits; "fail" refuses.
 // $FAKE_ACCOUNT_CODE: the Claude code it accepts (default "good-code").
-// $FAKE_ACCOUNT_LOG: one JSON line per run (args, the folder, `terminal` when it runs in one).
+// $FAKE_ACCOUNT_LOG: one JSON line per run (args, the folder, `terminal` when it runs in one, `authGroup` when
+// $FAKE_AUTH_GROUP is set: the test's stand-in for the auth egress prefix).
 // $FAKE_ACCOUNT_STATUS: "garbage" makes `auth status` answer no JSON; "org" adds the Claude organization.
 // $FAKE_ACCOUNT_STATUS_DELAY: `auth status` answers after that many ms (and logs `done` then).
 // `auth login --email <address>` signs in like `auth login` (the address is only the account
@@ -25,7 +26,11 @@ const home = (claude ? process.env.CLAUDE_CONFIG_DIR : process.env.CODEX_HOME) ?
 const marker = path.join(home, "signed-in");
 const mode = process.env.FAKE_ACCOUNT_MODE ?? "";
 const log = process.env.FAKE_ACCOUNT_LOG;
-if (log) appendFileSync(log, `${JSON.stringify({ args, home, ...(process.stdin.isTTY ? { terminal: true } : {}) })}\n`);
+if (log)
+  appendFileSync(
+    log,
+    `${JSON.stringify({ args, home, ...(process.stdin.isTTY ? { terminal: true } : {}), ...(process.env.FAKE_AUTH_GROUP ? { authGroup: true } : {}) })}\n`,
+  );
 
 const ESC = "\x1b";
 const CLAUDE_URL =

@@ -1703,6 +1703,11 @@ export interface RunnerInfo {
   size?: MachineSize;
   /** Protocol 46: the methods a new Claude sign-in for all agents can use here (`claudeLoginMethodsOf`). */
   claudeLoginMethods?: AuthMethod[];
+  /**
+   * Protocol 46 (system mode): root's Claude sign-in, status, sign-out and usage CLIs run in the `agentes-auth`
+   * group, which the computer's egress rules may route apart from the rest of root.
+   */
+  authEgressGroup?: true;
 }
 
 export interface FileEntry {
@@ -2550,6 +2555,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(Array.isArray(f.claudeLoginMethods)
           ? { claudeLoginMethods: AUTH_METHODS.filter((m) => (f.claudeLoginMethods as unknown[]).includes(m)) }
           : {}),
+        ...(f.authEgressGroup === true ? { authEgressGroup: true as const } : {}),
       };
     }
     case "browser.frame": {

@@ -428,6 +428,32 @@ export function ensureGitCacheUser(run: RunCommand = runSync): { uid: number; gi
   return { uid: Number(uid.output.trim()), gid: Number(gid.output.trim()) };
 }
 
+/**
+ * The group root's Claude sign-in, status, sign-out and usage children run as on a system-mode computer, so the
+ * computer's egress rules can route them (and nothing else of root) like the agents' traffic. Nobody is a member.
+ */
+export const AUTH_EGRESS_GROUP = "agentes-auth";
+const SETPRIV = "/usr/bin/setpriv";
+
+/**
+ * What goes before such a child (`setpriv --regid=<gid> --clear-groups --`), the group made the first time; null
+ * without `setpriv` or the group, and the child then runs as before.
+ */
+export function authEgressPrefix(run: RunCommand = runSync): string[] | null {
+  const gid = () => {
+    const r = run("getent", ["group", AUTH_EGRESS_GROUP]);
+    const n = Number(r.output.split(":")[2]);
+    return r.code === 0 && Number.isInteger(n) && n > 0 ? n : null;
+  };
+  if (run(SETPRIV, ["--version"]).code !== 0) return null;
+  let found = gid();
+  if (found === null) {
+    run("groupadd", ["--system", AUTH_EGRESS_GROUP]);
+    found = gid();
+  }
+  return found === null ? null : [SETPRIV, `--regid=${found}`, "--clear-groups", "--"];
+}
+
 /** Lets one agent's uid into one cached repository; false without `setfacl` (the clone then goes without the cache). */
 export const grantGitCache = (dir: string, uid: number, run: RunCommand = runSync) =>
   run("setfacl", ["-m", `u:${uid}:rx`, dir]).code === 0;

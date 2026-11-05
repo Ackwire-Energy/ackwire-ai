@@ -62,6 +62,7 @@ import {
   type AgentUser,
   AgentUsers,
   agentGid,
+  authEgressPrefix,
   denySchedulers,
   ensureGitCacheUser,
   GIT_CACHE_DIR,
@@ -329,8 +330,15 @@ export interface DaemonOptions {
   pairSleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   /** Tests (system mode): how agents' users are found and their workers started. */
   workers?: Pick<SupervisorOptions, "user" | "start">;
-  /** Tests (system mode): where the account folders are, and how one is handed to an agent's user. */
-  systemAccounts?: { root: string; chown: (file: string, uid: number, gid: number) => Promise<void> };
+  /**
+   * Tests (system mode): where the account folders are, how one is handed to an agent's user, and what goes before
+   * root's Claude CLIs (none when left out).
+   */
+  systemAccounts?: {
+    root: string;
+    chown: (file: string, uid: number, gid: number) => Promise<void>;
+    authEgress?: () => string[] | null;
+  };
 }
 
 export class RunnerDaemon implements RequestObserver {
@@ -429,10 +437,13 @@ export class RunnerDaemon implements RequestObserver {
     } catch {
       // an unreadable config starts unpaired
     }
-    const lent = system ? (opts.systemAccounts ?? { root: SYSTEM_ACCOUNTS_ROOT, chown: lchownTree }) : null;
+    const lent = system
+      ? (opts.systemAccounts ?? { root: SYSTEM_ACCOUNTS_ROOT, chown: lchownTree, authEgress: () => authEgressPrefix() })
+      : null;
     this.accounts = new AccountManager({
       root: lent?.root ?? path.join(opts.home, "accounts"),
       ...(lent ? { lending: { chown: lent.chown } } : {}),
+      ...(lent?.authEgress ? { authEgress: lent.authEgress } : {}),
       orgId: () => this.config?.orgId,
       log: opts.log,
       ...(opts.accountCommands ? { commands: opts.accountCommands } : {}),
@@ -1518,6 +1529,7 @@ export class RunnerDaemon implements RequestObserver {
       access,
       size: machineSize(workspaceReal),
       claudeLoginMethods: this.accounts.claudeLoginMethods(),
+      ...(this.accounts.authEgressGroup() ? { authEgressGroup: true as const } : {}),
     };
   }
 

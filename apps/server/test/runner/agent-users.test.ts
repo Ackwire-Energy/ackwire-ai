@@ -8,6 +8,7 @@ import {
   adbServerPort,
   agentGid,
   agentUserName,
+  authEgressPrefix,
   denySchedulers,
   readAgentUsers,
   systemLauncher,
@@ -393,6 +394,41 @@ test("an agent user's group, as the computer says it (`id -g`): never root's, ne
   expect(await errorCode(() => agentGid("ag-a1b2c3d4", answer(1, "id: 'ag-a1b2c3d4': no such user")))).toBe("internal");
   expect(await errorCode(() => agentGid("ag-a1b2c3d4", answer(0, "0")))).toBe("internal");
   expect(await errorCode(() => agentGid("ag-a1b2c3d4", answer(0, "21007 21008")))).toBe("internal");
+});
+
+test("the auth egress group: made once with groupadd, its gid in setpriv's prefix; none without setpriv or a gid", () => {
+  const fake = (o: { setpriv?: boolean; group?: string | null; made?: string | null }) => {
+    const calls: string[] = [];
+    let group = o.group ?? null;
+    const run: RunCommand = (file, args) => {
+      calls.push([file, ...args].join(" "));
+      if (file === "/usr/bin/setpriv") return { code: o.setpriv === false ? 127 : 0, output: "setpriv 2.39" };
+      if (file === "groupadd") {
+        group = o.made ?? null;
+        return { code: 0, output: "" };
+      }
+      return group === null ? { code: 2, output: "" } : { code: 0, output: group };
+    };
+    return { run, calls };
+  };
+  const PREFIX = ["/usr/bin/setpriv", "--regid=995", "--clear-groups", "--"];
+  const made = fake({ made: "agentes-auth:x:995:" });
+  expect(authEgressPrefix(made.run)).toEqual(PREFIX);
+  expect(made.calls).toEqual([
+    "/usr/bin/setpriv --version",
+    "getent group agentes-auth",
+    "groupadd --system agentes-auth",
+    "getent group agentes-auth",
+  ]);
+  const there = fake({ group: "agentes-auth:x:995:" });
+  expect(authEgressPrefix(there.run)).toEqual(PREFIX);
+  expect(there.calls).not.toContain("groupadd --system agentes-auth");
+  const noSetpriv = fake({ setpriv: false, group: "agentes-auth:x:995:" });
+  expect(authEgressPrefix(noSetpriv.run)).toBeNull();
+  expect(noSetpriv.calls).toEqual(["/usr/bin/setpriv --version"]);
+  expect(authEgressPrefix(fake({}).run)).toBeNull();
+  // Root's group never stands in.
+  expect(authEgressPrefix(fake({ group: "agentes-auth:x:0:" }).run)).toBeNull();
 });
 
 test("a privileged network hook rejects writable ancestors, symlinks and non-executables", () => {

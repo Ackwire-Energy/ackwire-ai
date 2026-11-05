@@ -170,7 +170,7 @@ function setup(over: Partial<AccountManagerOptions> = {}) {
         .trim()
         .split("\n")
         .filter(Boolean)
-        .map((l) => JSON.parse(l) as { args: string; home: string; terminal?: boolean });
+        .map((l) => JSON.parse(l) as { args: string; home: string; terminal?: boolean; authGroup?: true });
     } catch {
       return [];
     }
@@ -850,6 +850,58 @@ test("Claude Code 2.1.314's own setup-token screen, read in pieces: its link and
 });
 
 test.if(posix)(
+  "system mode: root's Claude sign-in, status and sign-out CLIs run behind the auth egress prefix, asked once; Codex's never",
+  async () => {
+    let asked = 0;
+    const lines: string[] = [];
+    const { m, runs } = setup({
+      lending: { chown: async () => {} },
+      // Stands in for `setpriv --regid=<gid> --clear-groups --`.
+      authEgress: () => {
+        asked++;
+        return ["/usr/bin/env", "FAKE_AUTH_GROUP=1"];
+      },
+      log: (l) => lines.push(l),
+    });
+    expect(m.authEgressGroup()).toBe(true);
+    const all = LOGIN(80);
+    await m.begin("claude_code", all, false, undefined, undefined, true);
+    const one = LOGIN(81);
+    const begun = await m.begin("claude_code", one);
+    const { aad, box } = await sealed(begun.publicKey as string, one, "good-code");
+    await m.code(one, aad, box);
+    await waitFor(() => m.status(one).state !== "waiting", 8000);
+    expect(m.status(one).state).toBe("done");
+    expect(await m.remove("claude_code", one)).toBe(true);
+    await m.begin("codex", LOGIN(82));
+    const ran = runs();
+    expect(ran.filter((r) => r.authGroup).map((r) => r.args)).toEqual([
+      "setup-token",
+      "auth login",
+      "auth status --json",
+      "auth logout",
+    ]);
+    expect(ran.filter((r) => !r.authGroup).map((r) => r.args)).toEqual(["login --device-auth"]);
+    expect(asked).toBe(1);
+    expect(lines.join("\n")).not.toContain("agentes-auth");
+  },
+  20_000,
+);
+
+test.if(posix)("system mode without the auth egress group: the CLIs run as before, said once in the log", async () => {
+  const lines: string[] = [];
+  const { m, runs } = setup({ lending: { chown: async () => {} }, authEgress: () => null, log: (l) => lines.push(l) });
+  expect(m.authEgressGroup()).toBe(false);
+  await m.begin("claude_code", LOGIN(83));
+  expect(m.authEgressGroup()).toBe(false);
+  expect(runs()).toEqual([expect.objectContaining({ args: "auth login" })]);
+  expect(runs()[0]?.authGroup).toBeUndefined();
+  expect(lines.filter((l) => l.includes("agentes-auth"))).toHaveLength(1);
+  // Not system mode: nothing is asked.
+  expect(setup().m.authEgressGroup()).toBe(false);
+});
+
+test.if(posix)(
   "system mode, Claude for all agents: setup-token signs in in a terminal, root keeps only its token (600), never lent",
   async () => {
     const lines: string[] = [];
@@ -1185,6 +1237,11 @@ test("protocol 46 on the wire: an account's method, an inconclusive status, Clau
     parseRunnerFrame(JSON.stringify({ type: "hello", token: "t", version: "1", protocol: 46, claudeLoginMethods }));
   expect(hello(["setup_token", "magic", "setup_token"])).toMatchObject({ claudeLoginMethods: ["setup_token"] });
   expect(hello("cli_login")).not.toHaveProperty("claudeLoginMethods");
+  const egress = (authEgressGroup: unknown) =>
+    parseRunnerFrame(JSON.stringify({ type: "hello", token: "t", version: "1", protocol: 46, authEgressGroup }));
+  expect(egress(true)).toMatchObject({ authEgressGroup: true });
+  expect(egress("yes")).not.toHaveProperty("authEgressGroup");
+  expect(egress(false)).not.toHaveProperty("authEgressGroup");
   // An older runner says nothing: what runners did before.
   expect(claudeLoginMethodsOf(undefined, true)).toEqual(["setup_token"]);
   expect(claudeLoginMethodsOf(undefined, false)).toEqual(["cli_login"]);

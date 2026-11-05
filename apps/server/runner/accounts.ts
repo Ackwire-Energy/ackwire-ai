@@ -1123,6 +1123,11 @@ export interface AccountManagerOptions {
   lending?: { chown: Chown };
   /** Tests: the platform (the Antigravity CLI signs in only on Linux here). */
   platform?: NodeJS.Platform;
+  /**
+   * System mode: what goes before each Claude CLI root runs on an account folder (`authEgressPrefix`), asked once;
+   * null: they run as before.
+   */
+  authEgress?: () => string[] | null;
 }
 
 /** The real `lending.chown`. */
@@ -1193,8 +1198,30 @@ export class AccountManager {
     this.log = opts.log ?? (() => {});
   }
 
-  private command(kind: AccountKind): string[] {
-    return this.opts.commands?.[kind] ?? [COMMAND[kind]];
+  /** `own`: the computer's own sign-in, which never goes through the auth egress group. */
+  private command(kind: AccountKind, own = false): string[] {
+    const command = this.opts.commands?.[kind] ?? [COMMAND[kind]];
+    const prefix = kind === "claude_code" && !own ? this.authPrefix() : null;
+    if (!prefix) return command;
+    // Resolved here: `setpriv` would look the CLI up on the PATH again, shared `bin/` included.
+    const [file, ...pre] = command;
+    return [...prefix, resolveCommand(file ?? "", process.env.PATH), ...pre];
+  }
+
+  private authEgressSaid: string[] | null | undefined;
+  private authPrefix(): string[] | null {
+    if (this.authEgressSaid === undefined) {
+      this.authEgressSaid = this.opts.authEgress?.() ?? null;
+      if (this.opts.authEgress && !this.authEgressSaid) {
+        this.log("no agentes-auth group or setpriv here: Claude sign-ins leave by the computer's own route");
+      }
+    }
+    return this.authEgressSaid;
+  }
+
+  /** Protocol 46 (`hello.authEgressGroup`): root's Claude CLIs on account folders run in the auth egress group. */
+  authEgressGroup(): boolean {
+    return this.authPrefix() !== null;
   }
 
   private dirOf(kind: AccountKind, id: string) {
@@ -2352,7 +2379,7 @@ export class AccountManager {
     }
     // A token makes model requests only: its usage comes from its turns.
     if (!own && (this.lentTo(target.kind, id) !== null || this.isShared(target.kind, id))) return null;
-    const probe = { command: this.command(target.kind), cwd: target.cwd, env: target.env, ...limits };
+    const probe = { command: this.command(target.kind, Boolean(own)), cwd: target.cwd, env: target.env, ...limits };
     // Cursor's CLI reports no plan usage: its turns' `usage` is all there is.
     // Nor does OpenCode's: its key's usage is on OpenCode's console. Grok Build shows its plan's only in its TUI.
     if (target.kind === "cursor" || target.kind === "opencode" || target.kind === "grok") return null;

@@ -600,6 +600,7 @@ export function createMachineHub(deps: MachineHubDeps) {
                 ...(frame.desktopUse ? { desktopUse: frame.desktopUse } : {}),
                 ...(system ? { mode: "system" as const } : {}),
                 ...(frame.claudeLoginMethods ? { claudeLoginMethods: frame.claudeLoginMethods } : {}),
+                ...(frame.authEgressGroup ? { authEgressGroup: true as const } : {}),
                 ...(Object.keys(ownUsage).length > 0 ? { ownUsage } : {}),
               },
             }
