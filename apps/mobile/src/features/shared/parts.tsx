@@ -19,11 +19,13 @@ import {
   LivePause,
   Text,
   ToggleSwitch,
+  textLineOf,
   useHeaderSlot,
   useScrollUnderPushedOptions,
   useTheme,
 } from "@/ui";
 import { withAlpha } from "@/ui/palette";
+import { leadBox } from "@/ui/type-scale";
 import { useColors } from "./hooks";
 
 /**
@@ -70,50 +72,73 @@ export interface ActionItem {
 /** The list of actions in a sheet: icon, label, a hint under it. */
 export function ActionList({ items }: { items: ActionItem[] }) {
   const c = useColors();
+  const { fontScale } = useWindowDimensions();
+  const line = textLineOf("body", fontScale);
   return (
     <Card>
-      {items.map((it, i) => (
-        <Pressable
-          key={it.key}
-          onPress={it.onPress}
-          disabled={it.disabled || !it.onPress}
-          accessibilityRole={it.checked === undefined ? "button" : "switch"}
-          {...(it.checked === undefined ? {} : { accessibilityState: { checked: it.checked } })}
-          accessibilityLabel={it.hint ? `${it.label}. ${it.hint}` : it.label}
-          style={({ pressed }) => [
-            styles.action,
-            i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
-            pressed && { backgroundColor: c.sunken },
-            it.disabled && { opacity: 0.5 },
-          ]}
-        >
-          {it.leading ?? (it.icon ? <Icon name={it.icon} size={20} color={it.danger ? c.danger : c.muted} /> : null)}
-          <View style={styles.actionText}>
-            <Text variant="body" tone={it.danger ? "danger" : "ink"} {...(it.oneLine ? { numberOfLines: 1 } : {})}>
-              {it.marks
-                ? markTerms(it.label, it.marks).map((part, k) =>
-                    part.mark ? (
-                      // biome-ignore lint/suspicious/noArrayIndexKey: segments of one fixed text
-                      <Text key={k} variant="body" style={{ backgroundColor: withAlpha(c.info, 0.22) }}>
-                        {part.text}
-                      </Text>
-                    ) : (
-                      part.text
-                    ),
-                  )
-                : it.label}
-            </Text>
-            {it.hint ? (
-              <Text variant="small" tone="faint" {...(it.oneLine ? { numberOfLines: 1 } : {})}>
-                {it.hint}
+      {items.map((it, i) => {
+        // A hint that may wrap: the icon and what is on the right stay on the label's line, not the row's middle.
+        const tall = Boolean(it.hint) && !it.oneLine;
+        const onLine = (size: number) => (tall ? leadBox(line, size) : null);
+        return (
+          <Pressable
+            key={it.key}
+            onPress={it.onPress}
+            disabled={it.disabled || !it.onPress}
+            accessibilityRole={it.checked === undefined ? "button" : "switch"}
+            {...(it.checked === undefined ? {} : { accessibilityState: { checked: it.checked } })}
+            accessibilityLabel={it.hint ? `${it.label}. ${it.hint}` : it.label}
+            style={({ pressed }) => [
+              styles.action,
+              tall && styles.actionTall,
+              i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
+              pressed && { backgroundColor: c.sunken },
+              it.disabled && { opacity: 0.5 },
+            ]}
+          >
+            {it.leading ??
+              (it.icon ? (
+                <View style={onLine(20)}>
+                  <Icon name={it.icon} size={20} color={it.danger ? c.danger : c.muted} />
+                </View>
+              ) : null)}
+            <View style={styles.actionText}>
+              <Text variant="body" tone={it.danger ? "danger" : "ink"} {...(it.oneLine ? { numberOfLines: 1 } : {})}>
+                {it.marks
+                  ? markTerms(it.label, it.marks).map((part, k) =>
+                      part.mark ? (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: segments of one fixed text
+                        <Text key={k} variant="body" style={{ backgroundColor: withAlpha(c.info, 0.22) }}>
+                          {part.text}
+                        </Text>
+                      ) : (
+                        part.text
+                      ),
+                    )
+                  : it.label}
               </Text>
+              {it.hint ? (
+                <Text variant="small" tone="faint" {...(it.oneLine ? { numberOfLines: 1 } : {})}>
+                  {it.hint}
+                </Text>
+              ) : null}
+            </View>
+            {it.code ? (
+              <View style={tall ? [styles.onLine, { minHeight: line.height }] : null}>
+                <Text style={[styles.mono, { color: c.faint }]}>{it.code}</Text>
+              </View>
             ) : null}
-          </View>
-          {it.code ? <Text style={[styles.mono, { color: c.faint }]}>{it.code}</Text> : null}
-          {it.trailing}
-          {it.checked === undefined ? null : <ToggleSwitch value={it.checked} />}
-        </Pressable>
-      ))}
+            {it.trailing ? (
+              <View style={tall ? [styles.onLine, { minHeight: line.height }] : null}>{it.trailing}</View>
+            ) : null}
+            {it.checked === undefined ? null : (
+              <View style={onLine(28)}>
+                <ToggleSwitch value={it.checked} />
+              </View>
+            )}
+          </Pressable>
+        );
+      })}
     </Card>
   );
 }
@@ -269,6 +294,8 @@ export const MONO = fonts.mono;
 const styles = StyleSheet.create({
   tile: { alignItems: "center", justifyContent: "center" },
   action: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
+  actionTall: { alignItems: "flex-start" },
+  onLine: { justifyContent: "center" },
   actionText: { flex: 1, minWidth: 0 },
   mono: { fontFamily: MONO, fontSize: 13 },
   headerTitle: { alignItems: Platform.OS === "ios" ? "center" : "flex-start", minWidth: 0 },

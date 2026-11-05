@@ -254,6 +254,8 @@ function WaitingCard({
           <Pressable
             onPress={openWaitingActivity}
             accessibilityRole="button"
+            // The line is 28 tall: the slop reaches over the card's bottom padding to a 44-point target.
+            hitSlop={{ top: 4, bottom: 12 }}
             style={({ pressed }) => [styles.more, { borderTopColor: c.line2 }, pressed && styles.pressed]}
           >
             {faces.length > 0 ? (
@@ -323,7 +325,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingTop: 8,
+    // As much under the hairline as the card's 9-point gap above it.
+    paddingTop: 9,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   faces: { flexDirection: "row" },

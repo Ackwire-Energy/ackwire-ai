@@ -243,6 +243,8 @@ function StatusEditor() {
               accessibilityRole="button"
               accessibilityState={{ selected: on }}
               accessibilityLabel={label}
+              // A 34-point suggestion: the slop makes its target 44.
+              hitSlop={{ top: 5, bottom: 5 }}
               style={({ pressed }) => [
                 styles.chip,
                 { backgroundColor: c.raised, boxShadow: shadows.e1 },

@@ -49,6 +49,11 @@ export function TaskManagerEntry() {
               {line}
             </Text>
           </View>
+        ) : !tasks.data ? (
+          // Its line's room while the tasks load, so the row doesn't grow under the finger when they come.
+          <Text variant="footnote" accessibilityElementsHidden importantForAccessibility="no">
+            {" "}
+          </Text>
         ) : null}
       </View>
       {sum.tasks > 0 ? <Count value={sum.tasks} size={15} weight={weights.medium} color={c.faint} /> : null}
