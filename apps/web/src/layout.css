@@ -9090,10 +9090,13 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   gap: 4px 16px;
   margin: 0;
 }
+/* A fact keeps to one line while the row has room; on a phone a long one (a plan's limits with its account) wraps
+   inside the page instead of running past it, its icon staying on the first line as an `.ac-iconline` lead. */
 .agp-number {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
   padding: 2px 4px;
   margin: 0 -4px;
   border: 0;
@@ -9102,8 +9105,17 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   color: var(--muted);
   font: inherit;
   font-size: 12.5px;
-  white-space: nowrap;
+  text-align: start;
   cursor: pointer;
+}
+.agp-number > .ac-icon:first-child {
+  align-self: flex-start;
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .agp-number > .ac-icon:first-child {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 .agp-number:hover {
   background: var(--plate, color-mix(in srgb, var(--ink) 6%, transparent));
@@ -9756,7 +9768,8 @@ html:not([data-pointer]) .agp-asks__see:focus-visible {
   flex-direction: column;
   gap: 8px;
 }
-/* An `.ac-faceline`: the title's capitals at the tile's top, the button in the row's middle. */
+/* An `.ac-faceline`: the title's capitals at the tile's top, the button centred on the title's line however long the
+   line under it runs. */
 .agp-attn {
   padding: 12px 14px;
   border-radius: 16px;
@@ -9772,8 +9785,13 @@ html:not([data-pointer]) .agp-asks__see:focus-visible {
 .agp-attn__t b {
   font-weight: 600;
 }
-.agp-attn > .ac-btn {
-  align-self: center;
+/* One line box as tall as the title's (15/22), with its rise (`ac-captop`): the button overflows it evenly, so it sits
+   centred on that line. */
+.agp-attn__tail {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 22px;
 }
 .agp-attn__t span {
   color: var(--muted);
@@ -9786,7 +9804,7 @@ html:not([data-pointer]) .agp-asks__see:focus-visible {
   padding: 0;
   list-style: none;
 }
-/* An `.ac-faceline`: the title's capitals at the tile's top, the time in the row's middle. */
+/* An `.ac-faceline`: the title's capitals at the tile's top, the time centred on the title's line. */
 .agp-li {
   min-width: 0;
   padding: 11px 0;
@@ -9818,9 +9836,15 @@ html:not([data-pointer]) .agp-asks__see:focus-visible {
   color: var(--ink2);
   font-size: 12.5px;
 }
-.agp-li__when {
+/* The title's line box (14/22) with its rise (`ac-captop`), the time centred in it. */
+.agp-li__tail {
+  display: flex;
   flex: none;
-  align-self: center;
+  align-items: center;
+  height: 22px;
+  font-size: 14px;
+}
+.agp-li__when {
   color: var(--muted);
   white-space: nowrap;
 }
@@ -9973,10 +9997,14 @@ html:not([data-pointer]) .agp-chipbtn:focus-visible {
 .agp-more:hover {
   color: var(--ink);
 }
+/* One line centres on its face; with a line under it (that can wrap) the name's capitals take the face's top. */
 .agp-person {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.agp-person:has(.ac-captop) {
+  align-items: flex-start;
 }
 .agp-person__t {
   display: flex;
@@ -10186,10 +10214,11 @@ html:not([data-pointer]) .agp-chipbtn:focus-visible {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+/* The time and the tokens sit on the title's first baseline (the smaller type pushed down 2px sat lower than it). */
 .agp-run {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: baseline;
   gap: 12px;
   padding: 11px 0;
   border-top: 1px solid var(--line);
@@ -10198,7 +10227,6 @@ html:not([data-pointer]) .agp-chipbtn:focus-visible {
   border-top: 0;
 }
 .agp-run time {
-  padding-top: 2px;
   color: var(--faint);
   font-size: 12.5px;
   white-space: nowrap;
@@ -10220,7 +10248,6 @@ html:not([data-pointer]) .agp-chipbtn:focus-visible {
   font-size: 12.5px;
 }
 .agp-run__r {
-  padding-top: 2px;
   color: var(--muted);
   font-size: 12.5px;
   white-space: nowrap;

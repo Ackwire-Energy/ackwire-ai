@@ -52,13 +52,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cmp-entry__dot {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--warn);
-}
 
 /* The dialog: up to 96vw × 94vh. Its words never end on a word alone. */
 .ac-dialog.cmp-dialog {

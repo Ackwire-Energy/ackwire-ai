@@ -462,7 +462,8 @@ export function OwnerValue({ member, meId }: { member: Member | undefined; meId:
         </span>
       )}
       <span className="agp-person__t">
-        <b>
+        {/* With the role under it the name takes the face's top; alone, it centres on the tile. */}
+        <b className={member ? "ac-captop" : undefined}>
           {member
             ? member.userId === meId
               ? t("newAgent.you", { name: member.name })
