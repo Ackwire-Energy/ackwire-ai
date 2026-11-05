@@ -170,6 +170,26 @@ describe("offer_connect_app", () => {
     expect(events).toContainEqual(expect.objectContaining({ type: "message.created", messageId: mcp?.id }));
   });
 
+  test("`reason` goes on the card as `why` only when it is the one line the call has", async () => {
+    f = await setup();
+    const ctx = await runFor(f, f.owner.id, "conecta um mcp");
+    const out = await call(f, ctx, "offer_connect_app", { reason: "Para ler as issues." });
+    expect(out.isError).toBeUndefined();
+    const [card] = await cards(f);
+    expect(card?.meta).toMatchObject({ actionCard: { params: { why: "Para ler as issues." } } });
+
+    // Never over a real `why`, an empty one included, and blank text is no reason at all.
+    for (const input of [{ why: "Esse.", reason: "Outro." }, { why: "", reason: "Outro." }, { reason: "  " }, {}]) {
+      const refused = await call(f, ctx, "offer_connect_app", input);
+      expect(refused.isError).toBe(true);
+      expect(refused.content).toStartWith("Invalid input:");
+    }
+    // A provider's arguments can parse to something else than an object: refused the same, never a crash.
+    const text = await call(f, ctx, "offer_connect_app", "Outro." as unknown as Record<string, unknown>);
+    expect(text.content).toStartWith("Invalid input:");
+    expect(await cards(f)).toHaveLength(1);
+  });
+
   test("a service by name, or a one-click server by its address, is the catalog's entry; unknown names and bad addresses are refused", async () => {
     f = await setup();
     const ctx = await runFor(f, f.owner.id, "conecta o linear");

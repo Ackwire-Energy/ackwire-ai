@@ -111,13 +111,13 @@ export function requestSecretTool(opts: {
               maxLength: 300,
               description: "What it is for, shown to the person",
             },
-            target: { enum: ["env", "file"] },
+            target: { enum: ["env", "file"], description: "env (default) or file" },
             path: { type: "string", maxLength: 300, description: "With target file: where it goes in your workspace" },
             site,
             username,
             code,
           },
-          required: ["name", "purpose", "target"],
+          required: ["name", "purpose"],
           additionalProperties: false,
         },
     describe: (input) => ({ title: `Ask for the secret ${str(input.name)}` }),
@@ -137,7 +137,8 @@ export function requestSecretTool(opts: {
             isError: true,
           };
         }
-        const file = !opts.browserOnly && input.target === "file";
+        const file =
+          !opts.browserOnly && (input.target === "file" || (input.target === undefined && Boolean(str(input.path))));
         const path = file ? pathInOwnFolder(opts.toolPath?.(str(input.path)) ?? "", ctx.agentId) : "";
         if (file && (!path || path === ".agentes" || path.startsWith(".agentes/") || isAbsoluteMachinePath(path))) {
           return { content: "With target file, give a path inside your workspace (e.g. .npmrc).", isError: true };

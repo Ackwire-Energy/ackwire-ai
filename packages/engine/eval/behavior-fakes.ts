@@ -424,10 +424,10 @@ export function fakeSecretRequestSource(): ToolSource {
       properties: {
         name: { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,63}$" },
         purpose: { type: "string", minLength: 1, maxLength: 300 },
-        target: { enum: ["env", "file"] },
+        target: { enum: ["env", "file"], description: "env (default) or file" },
         path: { type: "string", maxLength: 300 },
       },
-      required: ["name", "purpose", "target"],
+      required: ["name", "purpose"],
       additionalProperties: false,
     },
     execute: async (input) => ({ content: `The person was sent a secure card for ${String(input.name)}; it arrived.` }),

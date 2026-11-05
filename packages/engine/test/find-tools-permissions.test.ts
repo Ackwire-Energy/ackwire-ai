@@ -12,6 +12,7 @@ import {
   createOrganization,
   decideApproval,
   drainOutbox,
+  EVERY_TOOL,
   grantScopes,
   listApprovals,
   postPersonMessage,
@@ -86,6 +87,17 @@ test("find_tools names a tool the agent isn't allowed yet, with the permission t
   expect(given).toContain("- browser_open: Opens a website");
   const after = given.indexOf(NOT_YET);
   expect(after < 0 ? "" : given.slice(after)).not.toContain("browser_open");
+});
+
+test("with every tool listed, the input a search shows is never a blocked tool's", async () => {
+  await browserAgent();
+  const ctx = { ...(await runContext(f)), loadedGroups: [EVERY_TOOL] };
+  const text = await findTools(ctx, "open a web page");
+  expect(text).toContain(`  ${OPEN}\n`);
+  expect(text).not.toContain("Full address");
+
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  expect(await findTools(ctx, "open a web page")).toContain("Full address");
 });
 
 test("a tool an admin turned off by name is named as that, never as something to ask for", async () => {

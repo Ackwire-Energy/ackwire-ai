@@ -75,6 +75,12 @@ const reply = (req: ModelRequest) => {
     const instructions = "Entre no agentes.chat com a conta administradora; deixe o painel aberto para eu continuar.";
     return { chunks: [], toolUses: [{ name: "browser_ask_person", input: { instructions } }] };
   }
+  if (last.includes("guess the field"))
+    return { chunks: [], toolUses: [{ name: "browser_ask_person", input: { message: "Sign in to Stripe" } }] };
+  if (last.includes("two fields")) {
+    const input = { instructions: "Sign in to Stripe", message: "Sign in" };
+    return { chunks: [], toolUses: [{ name: "browser_ask_person", input }] };
+  }
   if (last.includes("sign in"))
     return { chunks: [], toolUses: [{ name: "browser_ask_person", input: { instructions: "Sign in to Stripe" } }] };
   if (last.includes("probe")) return { chunks: [], toolUses: [{ name: "browser_probe", input: {} }] };
@@ -165,6 +171,19 @@ async function runFor(userId: string) {
 }
 
 describe("browser_ask_person", () => {
+  test("`message` is taken as `instructions` when the call has no `instructions`; with both it is refused", async () => {
+    await start();
+    await post("@dev guess the field");
+    await drainOutbox(f.db, f.handlers);
+    expect(await handoffs()).toMatchObject([{ kind: "ask", status: "pending", instructions: "Sign in to Stripe" }]);
+    await f.db.delete(schema.browserHandoffs);
+
+    await post("@dev two fields");
+    await drainOutbox(f.db, f.handlers);
+    expect(await handoffs()).toEqual([]);
+    expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("Invalid input:");
+  });
+
   test("asks with a card and a waiting notification; Done resumes the run, which checks the page", async () => {
     await start();
     await post("@dev sign in please");
