@@ -30,7 +30,7 @@
 }
 .tm-logos > .tm-logo {
   border-radius: 7px;
-  outline: 2px solid var(--raised);
+  outline: 2px solid var(--tm-ground, var(--raised));
 }
 .tm-logos > .tm-logo + .tm-logo {
   margin-left: -4px;

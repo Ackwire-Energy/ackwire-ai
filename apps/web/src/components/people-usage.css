@@ -202,8 +202,10 @@ th.pu-num .pu-sort {
 .pu-now > .ac-iconline {
   gap: 6px;
 }
+/* Cut out of the card's own face (the kit's `--stack-ring`): inside the card `--surface-raised` is a step up, a lighter
+   ring in dark. */
 .pu-faces .ac-avatar {
-  outline: 2px solid var(--surface-raised);
+  outline: 2px solid var(--stack-ring, var(--surface-raised));
 }
 
 /* A month's use against its limit: the words, then the bar; amber from 80%, red at it. */

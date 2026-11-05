@@ -404,6 +404,7 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .consult-pair__row[aria-pressed="true"] {
+  --stack-ring: var(--agent-soft);
   background: var(--agent-soft);
 }
 .consult-pair__name {
@@ -425,8 +426,9 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
 .consult-pair__faces {
   flex: none;
 }
+/* Cut out of what is under them: the open row's blue too (the page's ring drew gray circles on it in dark). */
 .consult-pair__faces > .ac-avatar {
-  box-shadow: 0 0 0 1.5px var(--surface);
+  box-shadow: 0 0 0 1.5px var(--stack-ring, var(--surface));
 }
 .consult-pair__faces > .ac-avatar + .ac-avatar {
   margin-left: -5px;
@@ -891,6 +893,8 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
   overflow: hidden;
+  /* Faces stacked in its rows are cut out of its face, not the page's (the kit's `--stack-ring`). */
+  --stack-ring: var(--raised);
 }
 .page__header {
   display: flex;
@@ -4202,8 +4206,10 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   border-radius: 19px 19px 19px 5px;
   font-size: 22px;
   background: var(--raised);
+  /* Cut out of the sky by the dialog's own face (the kit's `--stack-ring`): inside the dialog `--surface-raised` is a
+     step up, a lighter halo in dark. */
   box-shadow:
-    0 0 0 4px var(--surface-raised),
+    0 0 0 4px var(--stack-ring, var(--surface-raised)),
     inset 0 0 0 1px var(--line2),
     var(--e1);
 }
@@ -8488,8 +8494,9 @@ html:not([data-pointer]) .newag__addrow:focus-visible {
   background: conic-gradient(from 200deg, #f58aa6, #f3c25c, #5fcf8b, #4cd0c0, #8cc3ff, #7d8bff, #ae8cf7, #f58aa6);
 }
 .newag__swatch[aria-pressed="true"] {
+  /* The gap is the face it sits on (the kit's `--stack-ring` on a card or dialog), not a step up. */
   box-shadow:
-    0 0 0 2px var(--raised),
+    0 0 0 2px var(--stack-ring, var(--raised)),
     0 0 0 4px var(--ink);
 }
 .newag__opts {
