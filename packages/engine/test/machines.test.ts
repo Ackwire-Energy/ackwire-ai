@@ -1067,8 +1067,7 @@ describe("tools on a connected machine", () => {
     );
     expect(away.content).not.toContain("runner");
     const folder = await call(ctx, "request_folder_access", { path: "/srv/site", reason: "the site" });
-    expect(folder).toMatchObject({ isError: true });
-    expect(folder.content).toContain("isn't answering right now. It usually comes back within minutes.");
+    expect(folder.content).toContain("Nobody can allow folders on Build box");
     expect(folder.content).not.toContain("runner");
   });
 
@@ -1156,6 +1155,17 @@ describe("secrets for a connected machine (ADR 0027)", () => {
       VALUE,
       secretAad({ requestId: view.id, orgId: f.org.id, name: view.name, target: view.target }),
     );
+
+  test("a secret's file written in full in the agent's folder is kept as the path it is there", async () => {
+    const id8 = () => f.agent.id.replace(/-/g, "").slice(0, 8);
+    const { row } = await asking({
+      target: "file",
+      get path() {
+        return `/home/ag-${id8()}/dev-${id8()}/.npmrc`;
+      },
+    });
+    expect(row.targetPath).toBe(".npmrc");
+  });
 
   test("the run waits on a card; only the person asked delivers; the value reaches the machine and nothing else", async () => {
     const { runner, row, paired } = await asking();
