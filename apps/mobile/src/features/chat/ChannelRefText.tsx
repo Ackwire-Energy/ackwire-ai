@@ -66,6 +66,7 @@ function ChannelCardSheet({ channelId, onDone }: { channelId: string; onDone: ()
   const orgId = useOrgId();
   const card = useChannelCard(orgId, channelId);
   const join = useJoinChannel(orgId, channelId);
+  const colors = useColors();
   const c = card.data;
   if (!c) {
     return card.isError ? (
@@ -73,7 +74,7 @@ function ChannelCardSheet({ channelId, onDone }: { channelId: string; onDone: ()
         {t("channelRefs.gone")}
       </Text>
     ) : (
-      <ActivityIndicator accessibilityLabel={t("channelRefs.loading")} />
+      <ActivityIndicator color={colors.faint} accessibilityLabel={t("channelRefs.loading")} />
     );
   }
   const openIt = () => {

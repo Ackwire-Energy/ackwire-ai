@@ -266,7 +266,7 @@ function ConnectionRow({
     <div className="ac-list__row connected-row vlt-conn">
       <VaultTile icon="lock" />
       <span className="list-col connected-row__text">
-        <span className="connected-row__name">
+        <span className="list-title ac-captop">
           <span>{c.label}</span>
           <StateChip connection={c} />
         </span>

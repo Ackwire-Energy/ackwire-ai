@@ -16,7 +16,7 @@ import { humanize } from "@agenteschat/client/lib/custom-tools";
 import type { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { builtinToolText } from "@agenteschat/client/lib/scopes";
-import { Card, Chip, Icon, type IconName, InfoHint, Segmented } from "@agenteschat/ui";
+import { Card, CardHeader, Chip, Icon, type IconName, Segmented } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { type ReactNode, useMemo, useState } from "react";
@@ -264,24 +264,24 @@ export function AccessMatrixSection() {
 
   return (
     <Card aria-labelledby="sec-access">
-      <div className="row" style={{ gap: 12 }}>
-        <div className="ac-hintline" style={{ flex: "1 1 280px" }}>
-          <h2 id="sec-access" className="ac-card__title">
-            {t("access.matrixTitle")}
-          </h2>
-          <InfoHint name={t("common.about", { label: t("access.matrixTitle") })}>{t("access.matrixHint")}</InfoHint>
-        </div>
-        <Segmented
-          size="sm"
-          label={t("access.kindLabel")}
-          value={kind}
-          onValueChange={setKind}
-          options={[
-            { value: "connector", label: t("access.kind.connectors") },
-            { value: "builtin", label: t("access.kind.builtin") },
-          ]}
-        />
-      </div>
+      <CardHeader
+        id="sec-access"
+        icon="agent"
+        title={t("access.matrixTitle")}
+        hint={{ name: t("common.about", { label: t("access.matrixTitle") }), text: t("access.matrixHint") }}
+        action={
+          <Segmented
+            size="sm"
+            label={t("access.kindLabel")}
+            value={kind}
+            onValueChange={setKind}
+            options={[
+              { value: "connector", label: t("access.kind.connectors") },
+              { value: "builtin", label: t("access.kind.builtin") },
+            ]}
+          />
+        }
+      />
       {access.unavailable && <p className="small muted">{t("access.unavailable")}</p>}
       {(agents.isLoading || (list.length > 0 && access.loading)) && (
         <LoadingList count={Math.min(Math.max(list.length, 2), 5)} trailing />

@@ -639,6 +639,8 @@ export function useCreateAgent(orgId: string) {
     mutationFn: (input: AgentInput) => api.agents.create(orgId, input),
     onSuccess: (_agent, input) => {
       void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      // The workspace's "N people · N agents" counts it at once (it kept "0 agents" until the next visit).
+      void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
       // Made from a card: the card says so (its conversation gets the change live too).
       if (input.proposal) void qc.invalidateQueries({ queryKey: keys.agentProposal(orgId, input.proposal) });
     },

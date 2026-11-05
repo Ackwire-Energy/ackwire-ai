@@ -273,8 +273,8 @@ function Versions({ artifact, onVersion }: { artifact: ArtifactDetail; onVersion
                 aria-current={current ? "true" : undefined}
                 onClick={() => onVersion(v.version === artifact.version ? undefined : v.version)}
               >
-                <span className="row" style={{ gap: 6 }}>
-                  <span style={{ fontWeight: 600 }}>
+                <span className="artifact-viewer__vhead">
+                  <span className="artifact-viewer__vname">
                     {t("artifacts.versionBy", {
                       version: v.version,
                       name: authorName(v.author),

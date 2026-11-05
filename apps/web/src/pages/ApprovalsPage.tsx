@@ -1019,7 +1019,7 @@ function ReviewHead({ approval: a, channel }: { approval: Approval; channel: str
         expression={p === "done" ? "happy" : undefined}
       />
       <div className="ap-review__headText">
-        <p className="ap-review__by">
+        <p className="ap-review__by ac-captop">
           <b>{name}</b> · {by}
         </p>
         <h2 className="ap-review__title" title={title}>

@@ -1215,7 +1215,12 @@ function Watching({
             return (
               <View key={step.id} style={styles.step}>
                 <Icon name={latest ? "person" : "check"} size={15} color={latest ? c.ink : c.faint} />
-                <Text variant="small" tone={latest ? "ink" : "ink2"} numberOfLines={1} style={latest && styles.bold}>
+                <Text
+                  variant="small"
+                  tone={latest ? "ink" : "ink2"}
+                  numberOfLines={1}
+                  style={[latest && styles.bold, styles.shrink]}
+                >
                   {stepText(t, step, step.screen)}
                 </Text>
               </View>
@@ -1243,6 +1248,7 @@ function Watching({
 }
 
 const styles = StyleSheet.create({
+  shrink: { flexShrink: 1 },
   fill: { flex: 1 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },

@@ -18,7 +18,8 @@ test("a settings row's title line is one text line, and one gap token sits under
   expect(last(top, ".list-title", "align-items")).toBe("center");
   expect(last(top, ".list-title:not(:last-child)", "margin-block-end")).toBe("var(--list-part-gap)");
   expect(last(top, ".connected-row", "row-gap")).toBe("var(--list-part-gap)");
-  // The leading icon or logo keeps its top on the name's line, however far the details wrap.
+  // The leading icon or logo keeps its top on the name's capitals (the name rises: `.ac-captop`), however far the
+  // details wrap.
   expect(last(top, ".connected-row", "align-items")).toBe("start");
   expect(last(top, ".app-row", "align-items")).toBe("flex-start");
   // Nothing else adds to the gap under the title: the details' column and the other lists' columns have none.
@@ -44,6 +45,7 @@ test("every settings list with a name and pills uses the shared title line", asy
     "components/GitHubAppPanel.tsx",
     "components/Machines.tsx",
     "components/AiApps.tsx",
+    "components/vault/VaultConnections.tsx",
   ]) {
     const source = await Bun.file(path.join(SRC, file)).text();
     expect(source).toContain('className="list-title');

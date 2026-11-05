@@ -18,7 +18,7 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, IconButton, type IconName, Text, ToastHost, useToast } from "@/ui";
+import { Button, IconButton, type IconName, LineIcon, Text, ToastHost, useToast } from "@/ui";
 import { BrowserCard } from "../browser/BrowserCard";
 import { openSwitchComputer } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
@@ -319,7 +319,7 @@ function Banner({ icon, text, help, tone }: { icon: IconName; text: string; help
   const c = useColors();
   return (
     <View style={[styles.banner, { backgroundColor: c.sunken }]} accessibilityRole="summary">
-      <Icon name={icon} size={18} color={tone === "warn" ? c.amber : c.muted} />
+      <LineIcon variant="small" name={icon} size={18} color={tone === "warn" ? c.amber : c.muted} />
       <View style={styles.grow}>
         <Text variant="small" tone="ink" style={styles.bold}>
           {text}
@@ -345,5 +345,6 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   body: { paddingHorizontal: 12, gap: 12 },
   flush: { marginTop: 0 },
-  banner: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, padding: 12 },
+  // The text and its help wrap: the icon stays on the first line instead of the block's middle.
+  banner: { flexDirection: "row", alignItems: "flex-start", gap: 10, borderRadius: 14, padding: 12 },
 });

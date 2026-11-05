@@ -14018,7 +14018,7 @@
     "value": "#{{number}} {{title}}"
   },
   "issues.empty": {
-    "value": "Create one, or ask in the chat: “Lia, create a task for this error”."
+    "value": "Create one, or ask an agent in a chat."
   },
   "issues.noResults": {
     "value": "No tasks match these filters."

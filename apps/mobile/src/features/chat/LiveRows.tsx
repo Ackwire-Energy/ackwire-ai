@@ -611,7 +611,8 @@ export function WorkingLine({
               onPress={see}
               accessibilityRole="button"
               accessibilityLabel={`${t("run.strip.see")} · ${lead?.name ?? ""}`}
-              hitSlop={8}
+              // A 16-point word in a 28-point pill: 14 above and below makes the 44 a finger needs.
+              hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
             >
               <Text variant="caption" tone="ink" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.ink}>
                 {t("run.strip.see")}

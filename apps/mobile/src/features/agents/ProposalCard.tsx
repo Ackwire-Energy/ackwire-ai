@@ -32,7 +32,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, Icon, Text, useTheme } from "@/ui";
+import { AgentAvatar, Button, Icon, LineIcon, Text, useTheme } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { askEndedAt } from "../chat/ask-store";
 import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
@@ -259,7 +259,7 @@ export function AgentProposalView({
               </>
             ) : sent ? (
               <View style={styles.sent}>
-                <Icon name="send" size={14} color={colors.muted} />
+                <LineIcon variant="small" name="send" size={14} color={colors.muted} />
                 <Text variant="small" tone="muted" style={styles.fill}>
                   {sent}
                 </Text>
@@ -429,12 +429,14 @@ function Lines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
 
 const styles = StyleSheet.create({
   card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "stretch" },
-  row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  fill: { flex: 1 },
+  // The 40-point face beside a name and a line that may wrap: at the top, level with the name.
+  row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  fill: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   lines: { gap: 4 },
   line: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   mark: { width: 16, height: 18, alignItems: "center", justifyContent: "center" },
   acts: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
-  sent: { flexDirection: "row", alignItems: "center", gap: 6 },
+  // Its words wrap: the icon stays on the first line.
+  sent: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
 });

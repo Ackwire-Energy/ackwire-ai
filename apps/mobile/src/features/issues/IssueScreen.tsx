@@ -31,7 +31,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { Button, Chip, Icon, IconButton, type IconName, PixelOrbit, Text, useToast } from "@/ui";
+import { Button, Chip, Icon, IconButton, type IconName, LineIcon, PixelOrbit, Text, useToast } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
 import { IssueWorkLine } from "../chat/WorkLine";
@@ -312,7 +312,7 @@ function WorkCard({ issue: i }: { issue: Issue }) {
     <View style={[styles.work, surface]}>
       <View style={styles.workHead}>
         <Face who={i.assignee} size={24} mode={state === "running" ? "run" : state === "stalled" ? "rest" : "idle"} />
-        <Text variant="body" style={styles.bold}>
+        <Text variant="body" numberOfLines={1} style={[styles.bold, styles.shrink]}>
           {name}
         </Text>
         <Text variant="body" tone="muted" style={styles.grow} numberOfLines={1}>
@@ -369,10 +369,18 @@ function WorkCard({ issue: i }: { issue: Issue }) {
         <View style={styles.steps}>
           {lines.map((l) => (
             <View key={l.key} style={styles.stepRow}>
+              {/* On the step's first line: a step that wraps had its mark centred between its lines. */}
               {l.going ? (
-                <PixelOrbit color={color} size={12} />
+                <LineIcon variant="small" size={12}>
+                  <PixelOrbit color={color} size={12} />
+                </LineIcon>
               ) : (
-                <Icon name={l.step.outcome === "refused" ? "x" : "checkc"} size={13} color={c.faint} />
+                <LineIcon
+                  variant="small"
+                  name={l.step.outcome === "refused" ? "x" : "checkc"}
+                  size={13}
+                  color={c.faint}
+                />
               )}
               <Text variant="small" tone={l.last ? "ink2" : "muted"} style={styles.grow}>
                 {l.text}
@@ -494,7 +502,7 @@ function LinkRow({
       accessibilityRole="link"
       style={({ pressed }) => [styles.link, pressed && { backgroundColor: c.sunken }]}
     >
-      {!first ? <View style={[styles.critLine, { backgroundColor: c.line }]} /> : null}
+      {!first ? <View style={[styles.critLine, styles.linkLine, { backgroundColor: c.line }]} /> : null}
       <View style={[styles.tile, { backgroundColor: c.sunken }]}>
         <Icon name={icon} size={16} color={c.muted} />
       </View>
@@ -812,12 +820,14 @@ const styles = StyleSheet.create({
   bigTitle: { marginVertical: 4 },
   number: { fontWeight: "500" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  work: { marginHorizontal: 16, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
+  work: { marginHorizontal: 16, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
   workHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   steps: { gap: 5 },
-  stepRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  stepRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   bold: { fontWeight: "600" },
   grow: { flex: 1, minWidth: 0 },
+  // A long name gives way to the state after it rather than pushing it off the card.
+  shrink: { flexShrink: 1 },
   groupTitle: { paddingTop: 22, paddingBottom: 7, paddingHorizontal: 20, letterSpacing: 0.4 },
   desc: { paddingHorizontal: 20 },
   card: { marginHorizontal: 16, borderRadius: 14, overflow: "hidden" },
@@ -826,6 +836,8 @@ const styles = StyleSheet.create({
   box: { width: 20, height: 20, borderRadius: 6, alignItems: "center", justifyContent: "center", marginTop: 1 },
   struck: { textDecorationLine: "line-through" },
   link: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10 },
+  // A link's hairline starts at its text (14 + the 30 tile + 10), not at a criterion's (after its 20 box).
+  linkLine: { left: 54 },
   pickerStage: { gap: 6 },
   pickerTitle: { paddingHorizontal: 4 },
   tile: { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },

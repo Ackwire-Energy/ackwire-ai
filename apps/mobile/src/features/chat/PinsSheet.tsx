@@ -46,6 +46,8 @@ export function PinnedBar({
       onPress={onOpen}
       accessibilityRole="button"
       accessibilityLabel={t("mobile.pins.bar", { count: list.length })}
+      // A 36-point bar: the slop reaches 44 into the conversation under it, never into the header above.
+      hitSlop={{ bottom: 8 }}
       style={({ pressed }) => [styles.bar, { borderBottomColor: c.line2, backgroundColor: pressed ? c.sunken : c.bg }]}
     >
       <Icon name="pin" size={14} color={c.faint} />

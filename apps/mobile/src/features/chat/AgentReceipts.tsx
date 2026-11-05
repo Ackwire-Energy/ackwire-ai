@@ -138,7 +138,8 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
         disabled={!hasAgents}
         accessibilityRole={hasAgents ? "button" : "text"}
         accessibilityLabel={label}
-        hitSlop={6}
+        // A 20-point line: 12 above and below gives it the 44-point target.
+        hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
         style={styles.row}
       >
         {line.faces.length > 0 ? (
@@ -242,7 +243,7 @@ export const ReceiptMark = memo(function ReceiptMark({
       entering={reduced ? undefined : FadeIn.duration(200)}
       accessibilityLiveRegion="polite"
     >
-      <Pressable onPress={say} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={styles.mark}>
+      <Pressable onPress={say} accessibilityRole="button" accessibilityLabel={label} hitSlop={14} style={styles.mark}>
         {view.kind === "seen" ? (
           <Face who={{ type: "person", id: view.personId }} size={16} live={false} />
         ) : view.kind === "steer" ? (

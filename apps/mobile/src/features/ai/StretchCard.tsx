@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, Text, useTheme } from "@/ui";
+import { Button, LineIcon, Text, useTheme } from "@/ui";
 import { AskDone } from "../chat/asks";
 import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
@@ -62,7 +62,7 @@ export function StretchCard({ message: m }: { message: Message }) {
   return (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.row}>
-        <Icon name="pause" size={16} color={colors.ink2} />
+        <LineIcon name="pause" variant="subhead" size={16} color={colors.ink2} />
         <Text variant="subhead" style={styles.title}>
           {stretchCardText(t, card, names)}
         </Text>

@@ -5588,7 +5588,7 @@
     "agentRole": "에이전트 · {{role}}",
     "pr": "PR #{{number}}",
     "open": "#{{number}} {{title}}",
-    "empty": "작업을 만들거나 채팅에서 요청하세요: “Lia, 이 오류로 작업 하나 만들어 줘”.",
+    "empty": "작업을 만들거나 채팅에서 에이전트에게 요청하세요.",
     "noResults": "이 필터와 일치하는 작업이 없어요.",
     "columnEmpty": "비어 있어요.",
     "form": {

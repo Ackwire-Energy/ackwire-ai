@@ -12,7 +12,7 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import { Button, SheetScreen } from "@/ui";
-import { useDirectory, useMeId } from "../shared/hooks";
+import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { ConnectAiFlow, type FlowView, viewOf } from "./ConnectAiSteps";
 import { openPage } from "./parts";
 
@@ -74,6 +74,7 @@ export function ConnectAiSheet() {
   const { orgId, org } = useOrg();
   const meId = useMeId();
   const dir = useDirectory();
+  const c = useColors();
   const status = useAiStatus(orgId);
   const params = useLocalSearchParams<{
     from?: string;
@@ -127,7 +128,7 @@ export function ConnectAiSheet() {
   return (
     <SheetScreen>
       {dir.loading || status.isPending ? (
-        <ActivityIndicator style={styles.loading} />
+        <ActivityIndicator color={c.faint} style={styles.loading} />
       ) : (
         <ConnectAiFlow
           view={view}

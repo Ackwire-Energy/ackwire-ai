@@ -113,7 +113,7 @@ function Mission({ id }: { id: string }) {
         <View style={styles.head}>
           <View style={styles.row}>
             <Icon name="target" size={15} color={c.muted} />
-            <Text variant="small" tone="muted" style={styles.bold}>
+            <Text variant="small" tone="muted" style={[styles.bold, styles.shrink]}>
               {channelName ? t("mobile.mission.in", { channel: channelName }) : t("mobile.mission.kind")}
             </Text>
           </View>

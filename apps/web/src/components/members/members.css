@@ -150,41 +150,22 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
   font-weight: 500;
   color: var(--muted);
 }
-/* What someone is doing wraps (two lines in practice) instead of being cut. */
+/* What someone is doing: one line under the name, ending in "…" (the row's title and the profile have it whole), so
+   the face, the name and the line share the row's middle like every face row in the sidebar. Wrapped, it left the
+   face hanging at the top beside a two-line block and the emoji off its words' line. */
 .members-side__line {
   display: block;
+  min-width: 0;
+  overflow: hidden;
   font-size: 12.5px;
   line-height: 16px;
   color: var(--muted);
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .members-side__line.status-line {
   display: flex;
-  align-items: flex-start;
-}
-/* The emoji on the first of the line's 16px lines, beside its words: not above them, nor between two wrapped lines
-   (`.status-line` centres a one-line status). */
-.members-side__line .status-line__emoji {
-  align-self: flex-start;
-  line-height: inherit;
-}
-/*
- * With a line under the name, the face's top is on the name's capitals (an `.ac-faceline` picture's place) however
- * far that line wraps: the name rises by the air above its capitals (9.5px is half its 19px line). A name alone stays
- * on the face's middle. The face stays where a centred row puts it (7px into the 46px row).
- */
-.members-side__inner:has(.members-side__line) {
-  align-items: flex-start;
-  padding-block: 7px;
-}
-.members-side__inner:has(.members-side__line) .members-side__name {
-  margin-block-start: calc(var(--cap-top) - 9.5px);
-}
-/* A written or automatic line too: wrapped, never cut. */
-.members-side__line .status-line__text {
-  overflow: visible;
-  white-space: normal;
+  align-items: center;
 }
 .members-side__work {
   color: var(--ink2);

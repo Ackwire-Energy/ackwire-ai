@@ -12,6 +12,7 @@ import {
   Icon,
   type IconName,
   InfoHint,
+  LineIcon,
   ProviderLogo,
   Text,
   useTheme,
@@ -66,7 +67,12 @@ export function Note({
   const c = useColors();
   return (
     <View style={styles.note} accessibilityLiveRegion={live ? "polite" : undefined}>
-      {typeof icon === "string" ? <Icon name={icon} size={15} color={icon === "x" ? c.danger : c.muted} /> : icon}
+      {/* On the note's first line: at the row's top the 15-point icon sat above the letters. */}
+      {typeof icon === "string" ? (
+        <LineIcon variant="small" name={icon} size={15} color={icon === "x" ? c.danger : c.muted} />
+      ) : (
+        icon
+      )}
       <Text variant="small" tone={icon === "x" ? "danger" : "muted"} style={styles.grow}>
         {children}
       </Text>
@@ -175,7 +181,7 @@ export function Step({
       {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
       <View style={[styles.n, { backgroundColor: state === "done" ? c.ok : state === "later" ? c.plate : c.ink }]}>
         {state === "done" ? (
-          <Icon name="check" size={12} color="#ffffff" />
+          <Icon name="check" size={12} color={c.bg} />
         ) : (
           <Text variant="caption" style={[styles.nText, { color: state === "later" ? c.faint : c.bg }]}>
             {n}
