@@ -905,12 +905,6 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .page__header-text > p {
   text-wrap: pretty;
 }
-.page__header--row {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px;
-}
 .page__header-text {
   flex: 1;
   min-width: 220px;
@@ -1096,12 +1090,6 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .channel__messages {
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent), var(--scroll-strip);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent), var(--scroll-strip);
-}
-.channel__status {
-  margin: 0 24px;
-  padding: 6px 12px;
-  font-size: 13px;
-  color: var(--ink-muted);
 }
 .channel__empty {
   margin: auto 16px;
@@ -2932,7 +2920,9 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   border-radius: 1px;
   background: var(--faint);
 }
-.md--message .md__task {
+/* A message's list has no indent to pull a task back into: its box starts on the text's edge. `.md` too, so this
+   outranks the wiki's `.md .md__task` pull-back further down, which a message (`md md--message`) also matches. */
+.md.md--message .md__task {
   margin-left: 0;
 }
 .md--message a.ac-link {
