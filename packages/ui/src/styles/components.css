@@ -6613,7 +6613,9 @@ html:not([data-pointer]) .ac-video__rail:focus-visible .ac-video__knob {
   align-self: center;
   width: 1px;
   height: 16px;
-  margin: 0 4px 0 2px;
+  /* The chip's edge is drawn, the next tool's glyph sits ~8px inside its button: the extra room on the left makes
+     the hairline look centred between them. */
+  margin: 0 0 0 8px;
   background: var(--line2);
 }
 .ac-composer--inline-pills .ac-composer__agent {
