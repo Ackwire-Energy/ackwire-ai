@@ -1246,6 +1246,9 @@
     "review": "Nakijken",
     "answer": "Antwoorden",
     "open": "Openen",
+    "toolsTitle": "Heeft tools gewijzigd die je hebt goedgekeurd",
+    "toolsWhy": "Agents blijven de goedgekeurde versie gebruiken tot je de nieuwe accepteert.",
+    "reviewChanges": "Wijzigingen bekijken",
     "clear": {
       "title": "Er wacht niets op je",
       "text": "Als een agent je nodig heeft, zie je dat hier als eerste."

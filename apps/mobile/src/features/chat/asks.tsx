@@ -380,8 +380,8 @@ export interface AskWell {
   more?: { label: string; content: ReactNode; open?: boolean; onToggle?: () => void } | null;
 }
 
-/** Each kind of request by its icon on the card's top line (amber while it waits on the person). */
-const ASK_ICON: Record<AskKind, IconName> = {
+/** Each kind of request by its icon on the card's top line (amber while it waits on the person); Atividade's too. */
+export const ASK_ICON: Record<AskKind, IconName> = {
   approval: "shield",
   secret: "key",
   question: "help",

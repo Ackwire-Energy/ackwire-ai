@@ -48,6 +48,7 @@ import {
   approvalHeadline,
   approvalTitleText,
   useApprovalSource,
+  useApproveNow,
   useCancelAhead,
   useOriginShort,
 } from "../approvals/parts";
@@ -504,41 +505,16 @@ function ApprovalGroupItem({
  */
 function ApprovalAsk({ approval: a }: { approval: Approval }) {
   const { t, i18n } = useTranslation();
-  const orgId = useOrgId();
   const dir = useDirectory();
   const c = useColors();
-  const toast = useToast();
   const asks = useAskStore();
-  const decide = useDecideApproval(orgId);
   const origin = useOriginShort(a);
   const name = dir.agentById.get(a.agentId)?.name ?? "";
-  const g = genderOf(name);
-  const high = approvalRisk(a) === "high";
   const ownerId = a.ownerUserId ?? dir.agentById.get(a.agentId)?.ownerUserId ?? null;
   const owner = approvalWaitsFor(a, ownerId ? dir.memberById.get(ownerId)?.name : undefined);
   const requester = requesterDecidesLine(t, a);
-  const approve = (always = false) =>
-    decide.mutate(
-      { id: a.id, decision: "approve", always },
-      {
-        onSuccess: () => {
-          if (!high) successHaptic();
-          asks?.settle(a.id);
-          toast({
-            ...(always
-              ? approveAlwaysToast(t, name)
-              : {
-                  title: t("mobile.approval.approved"),
-                  subtitle: a.runAt
-                    ? t("mobile.approval.approvedAhead", { when: nextLabel(i18n.language, a.runAt) })
-                    : t(`mobile.approval.approvedSub${g}`, { name }),
-                }),
-            agentId: a.agentId,
-          });
-        },
-        onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
-      },
-    );
+  // The same approving as Atividade's card: the haptic, the toast saying what follows.
+  const { approve, pending, high } = useApproveNow(a, () => asks?.settle(a.id));
   // An email says to whom and about what; a connector's detail is its raw call (`tool · key=value`), so its
   // values in words instead, the call under "Ver detalhes".
   const source = useApprovalSource(a);
@@ -607,11 +583,11 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
                     size="card"
                     icon="check"
                     label={approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")}
-                    disabled={decide.isPending}
+                    disabled={pending}
                     onPress={() => approve()}
                   />
                 )}
-                <ApproveAlwaysButton approval={a} disabled={decide.isPending} onPress={() => approve(true)} />
+                <ApproveAlwaysButton approval={a} disabled={pending} onPress={() => approve(true)} />
                 <Button
                   variant="secondary"
                   size="card"

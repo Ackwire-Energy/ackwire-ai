@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { AgentAccess, AppNotification, WorkingRun } from "@agenteschat/client";
 import { resources } from "@agenteschat/i18n";
 import i18next from "i18next";
@@ -76,6 +78,19 @@ describe("Atividade", () => {
     expect(s.waiting.map((n) => n.id)).toEqual(["tiktok-new", "notes", "question", "approval"]);
     expect(s.merged).toBe(2);
     expect(activitySections(items, "all", NOW).merged).toBe(0);
+  });
+
+  test("waiting cards speak the chat card's words, decide an approval on the card, count once", () => {
+    const screen = readFileSync(join(import.meta.dir, "../../src/features/activity/ActivityScreen.tsx"), "utf8");
+    // The kinds the chat asks keep the chat's words and icons ("Pede sua aprovação" with the shield).
+    expect(screen).toContain("label: t(`ask.kind.");
+    expect(screen).toContain("icon: ASK_ICON[ask]");
+    // One request this person may decide is decided on the card; the rest open where they are decided.
+    expect(screen).toContain("request?.canDecide && onCard <= 1 ? request : null");
+    expect(screen).toContain("decision={decidable ? <ApproveHere approval={decidable} /> : undefined}");
+    // How many wait is said once, on the section, not again on the filter.
+    expect(screen).toContain('<SectionHeader title={t("mobile.home.waiting")} count={waitingCount} />');
+    expect(screen).not.toContain("count: waitingCount");
   });
 
   test("the waiting filter shows only what waits", () => {

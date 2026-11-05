@@ -1246,6 +1246,9 @@
     "review": "İncele",
     "answer": "Yanıtla",
     "open": "Aç",
+    "toolsTitle": "Onayladığın araçları değiştirdi",
+    "toolsWhy": "Yenisini kabul edene kadar ajanlar onaylanan sürümü kullanır.",
+    "reviewChanges": "Değişiklikleri incele",
     "clear": {
       "title": "Sizi bekleyen bir şey yok",
       "text": "Bir ajanın size ihtiyacı olduğunda önce burada görünür."

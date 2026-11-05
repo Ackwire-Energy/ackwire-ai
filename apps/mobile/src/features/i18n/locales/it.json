@@ -1324,6 +1324,9 @@
     "review": "Rivedi",
     "answer": "Rispondi",
     "open": "Apri",
+    "toolsTitle": "Ha cambiato strumenti che hai approvato",
+    "toolsWhy": "Gli agenti usano la versione approvata finché non accetti quella nuova.",
+    "reviewChanges": "Rivedi le modifiche",
     "clear": {
       "title": "Niente ti aspetta",
       "text": "Quando un agente ha bisogno di te, compare prima qui."

@@ -9,7 +9,6 @@ import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withSpring
 import { CHROME_MAX_SCALE, Count, Icon, PressScale, systemText, Text, useTheme, weights } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
-import { fuseRemaining } from "../shared/logic";
 import { useSurface } from "../shared/parts";
 import { useWaitingApprovals } from "../shared/queries";
 import { WaitingCard } from "../shared/WaitingCard";
@@ -207,14 +206,7 @@ function WaitingOpenCard({
         title={item.title || undefined}
         onPress={review}
         accessibilityLabel={line}
-        expires={
-          minutes !== null && item.expiresAt && item.createdAt
-            ? {
-                remaining: fuseRemaining(item.createdAt, item.expiresAt, now),
-                label: t("mobile.approval.expiresIn", { count: minutes }),
-              }
-            : null
-        }
+        expires={minutes !== null && item.expiresAt ? { createdAt: item.createdAt, expiresAt: item.expiresAt } : null}
         action={{ label: t("mobile.chats.wait.review"), onPress: review }}
         footer={
           rest > 0 ? (

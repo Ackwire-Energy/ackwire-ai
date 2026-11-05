@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Fuse, Icon, type IconName, Sky, Text, weights } from "@/ui";
+import { Button, Icon, type IconName, Sky, Text, weights } from "@/ui";
+import { AskButtons, ExpiryLine } from "../chat/asks";
 import { AgentFace } from "./Face";
 import { useColors, useDirectory } from "./hooks";
 import { agentLook } from "./logic";
@@ -18,13 +19,16 @@ export interface WaitingCardProps {
   name?: string;
   kind: { icon: IconName; label: string };
   title?: string;
-  /** Under the title: why it was asked, what it costs, its own actions. */
+  /** Under the title: why it was asked in muted, then what it goes through (`WaitingSource`), what it costs. */
   children?: ReactNode;
-  /** Its deadline: the fuse's remaining share (0–1) and "expira em …". */
-  expires?: { remaining: number; label: string } | null;
-  /** Without a deadline: where and when ("#marketing · 19:58"). */
+  /** Its deadline: the amber fuse and the time left, at the top line's right (`ExpiryLine`). */
+  expires?: { createdAt?: string | null; expiresAt: string } | null;
+  /** Without a deadline, at the top line's right: where and when ("#marketing · 19:58"). */
   where?: string;
+  /** The one action, wide under the request. */
   action?: { label: string; onPress: () => void } | null;
+  /** The decision taken on the card itself (the chat's `AskButtons`), in place of `action`. */
+  decision?: ReactNode;
   onPress?: () => void;
   accessibilityLabel?: string;
   /** Under the card's foot, after a hairline ("e mais 2 esperando você"). */
@@ -32,10 +36,11 @@ export interface WaitingCardProps {
 }
 
 /**
- * One thing waiting on you, as Atividade and Conversas' strip show it: the card with its cut corner (square
- * bottom left, as the chat's blocks), the asking agent's sky faint across the top (gray when no agent asks), its face
- * with the name and the kind under it (the icon in amber, the waiting color), the request in words, then the fuse and
- * "expira em" (or where and when) and one tactile button.
+ * One thing waiting on you, as Atividade, Conversas' strip and an agent's profile show it, read as the chat's request
+ * card: the card with its cut corner (square bottom left, as the chat's blocks), the asking agent's sky faint across
+ * the top (gray when no agent asks), its face with the name and the kind under it (the icon in amber, the waiting
+ * color) and, at the right, the fuse to its deadline or where and when; then the request in words, why in muted, what
+ * it goes through on one quiet line, and the decision (or its one action) wide under it.
  */
 export function WaitingCard({
   agentId,
@@ -47,6 +52,7 @@ export function WaitingCard({
   expires,
   where,
   action,
+  decision,
   onPress,
   accessibilityLabel,
   footer,
@@ -55,6 +61,13 @@ export function WaitingCard({
   const dir = useDirectory();
   const surface = useSurface();
   const agent = agentId ? dir.agentById.get(agentId) : undefined;
+  const foot =
+    decision ??
+    (action ? (
+      <AskButtons
+        primary={<Button variant="primary" size="card" wide label={action.label} onPress={action.onPress} />}
+      />
+    ) : null);
   return (
     <View style={[styles.card, surface]}>
       <View style={styles.clip}>
@@ -88,6 +101,13 @@ export function WaitingCard({
                 </Text>
               </View>
             </View>
+            {expires ? (
+              <ExpiryLine createdAt={expires.createdAt} expiresAt={expires.expiresAt} />
+            ) : where ? (
+              <Text variant="footnote" tone="faint" numberOfLines={1} style={[styles.when, styles.where]}>
+                {where}
+              </Text>
+            ) : null}
           </View>
           {title ? (
             <Text variant="title" tone="ink" numberOfLines={3}>
@@ -96,26 +116,21 @@ export function WaitingCard({
           ) : null}
           {children}
         </Pressable>
-        {expires || where || action ? (
-          <View style={styles.ft}>
-            {expires ? (
-              <>
-                <Fuse color="amber" remaining={expires.remaining} style={styles.fuse} />
-                <Text variant="footnote" numberOfLines={1} style={[styles.when, styles.shrink, { color: c.amber }]}>
-                  {expires.label}
-                </Text>
-              </>
-            ) : where ? (
-              <Text variant="footnote" tone="faint" numberOfLines={1} style={[styles.when, styles.shrink]}>
-                {where}
-              </Text>
-            ) : null}
-            <View style={styles.grow} />
-            {action ? <Button variant="primary" size="sm" label={action.label} onPress={action.onPress} /> : null}
-          </View>
-        ) : null}
+        {foot ? <View style={styles.ft}>{foot}</View> : null}
         {footer ? <View style={[styles.footer, { borderTopColor: c.line2 }]}>{footer}</View> : null}
       </View>
+    </View>
+  );
+}
+
+/** What a waiting card's request goes through, on one quiet line as the chat's card says it: its mark, its details. */
+export function WaitingSource({ mark, text }: { mark: ReactNode; text: string }) {
+  return (
+    <View style={styles.source}>
+      <View style={styles.sourceMark}>{mark}</View>
+      <Text variant="footnote" tone="faint" numberOfLines={1} style={styles.grow}>
+        {text}
+      </Text>
     </View>
   );
 }
@@ -131,9 +146,14 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: 16, paddingTop: 14, gap: 8 },
   hd: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 2 },
   kind: { flexDirection: "row", alignItems: "center", gap: 4 },
-  ft: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 12 },
-  fuse: { flex: 0, width: 90 },
+  // The source line as the chat's card draws it: its mark, its details faint on one line.
+  source: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "stretch", minHeight: 24 },
+  sourceMark: { flexShrink: 0 },
+  // The decision under the request, as the chat card's foot (its 8 + 4 points above).
+  ft: { paddingHorizontal: 16, paddingTop: 12 },
   when: { fontVariant: ["tabular-nums"] },
+  // Where and when never take the name's room: at most half the line.
+  where: { flexShrink: 1, maxWidth: "50%" },
   footer: { marginTop: 12, marginHorizontal: 16, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
   semibold: { fontWeight: weights.semibold },
   medium: { fontWeight: weights.medium },

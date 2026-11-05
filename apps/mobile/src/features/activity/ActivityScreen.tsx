@@ -1,24 +1,29 @@
 import {
   type AppNotification,
+  type Approval,
   type Routine,
   useAiStatus,
   useNotificationAction,
   useNotifications,
   useRoutines,
 } from "@agenteschat/client";
-import { approvalTitle } from "@agenteschat/client/lib/approval-words";
+import { approvalSummary, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { timeLeft } from "@agenteschat/client/lib/format";
 import { mediaWord } from "@agenteschat/client/lib/media";
 import { usageLimitLine } from "@agenteschat/client/lib/person-usage";
 import { router, useLocalSearchParams } from "expo-router";
+import type { TFunction } from "i18next";
 import { Fragment, memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
 import {
+  Button,
   Filters,
+  HoldButton,
   Icon,
+  type IconName,
   LargeTitleScreen,
   LIST_AVATAR,
   LIST_INSET,
@@ -30,18 +35,21 @@ import {
   Text,
 } from "@/ui";
 import { openPage } from "../ai/parts";
-import { ApprovalWhy } from "../approvals/parts";
+import { approvalAction } from "../approvals/logic";
+import { ApprovalMark, ApprovalWhy, useApprovalSource, useApproveNow } from "../approvals/parts";
+import type { AskKind } from "../chat/ask-store";
+import { ASK_ICON, AskButtons } from "../chat/asks";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { dashboardWaitingCard } from "../dashboards/logic";
 import { notificationHref, notificationWebPath, routineHref } from "../links/logic";
 import { ChangeRequestCard } from "../right-hand/SettingsCard";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
-import { agentLook, fuseRemaining } from "../shared/logic";
-import { Tile, useSurface } from "../shared/parts";
+import { agentLook } from "../shared/logic";
+import { Tile } from "../shared/parts";
 import { useWaitingApprovals } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
-import { WaitingCard } from "../shared/WaitingCard";
+import { WaitingCard, WaitingSource } from "../shared/WaitingCard";
 import { UsageLimitActions } from "../usage/people";
 import {
   type ActivityFilter,
@@ -54,16 +62,16 @@ import {
   type SayWords,
   subtitleOf,
   upcomingDay,
+  type WaitingCardKind,
   waitingCardOf,
 } from "./logic";
 import { useNoticeTitle } from "./noticeTitle";
 
 /**
- * Atividade: on the grouped gray, what waits on you on top as cards (who asks,
- * the kind, the exact request, the deadline and one button: Revisar or Responder), or, with nothing
- * waiting, "Nada esperando você" and the next real event (a routine's next run); then the rest by day in
- * white inset cards. Swipe a row right to mark read or unread, left for "Feito". Tapping opens where it
- * happened.
+ * Atividade: what waits on you on top as the chat's request cards (who asks, the kind, the deadline, the exact
+ * request, why, and the decision on the card), or, with nothing waiting, "Nada esperando você" and the next real
+ * event (a routine's next run); then the rest by day as loose rows. How many wait is said once, on the section. Swipe
+ * a row right to mark read or unread, left for "Feito". Tapping opens where it happened.
  */
 export function ActivityScreen() {
   const { t } = useTranslation();
@@ -92,7 +100,8 @@ export function ActivityScreen() {
       <Filters
         items={[
           { key: "all", label: t("mobile.activity.filter.all") },
-          { key: "waiting", label: t("mobile.activity.filter.waiting"), count: waitingCount },
+          // The count is the section's, once.
+          { key: "waiting", label: t("mobile.activity.filter.waiting") },
           { key: "done", label: t("mobile.activity.filter.done") },
         ]}
         value={filter}
@@ -135,9 +144,11 @@ export function ActivityScreen() {
 }
 
 /**
- * One thing waiting on you (`WaitingCard`): who asks and the kind (amber, the waiting color), the exact request in
- * words, the fuse and "expira em" (requests) or where and when, and one button: Revisar or Responder. The
- * whole card opens it too.
+ * One thing waiting on you, as the chat's request card (`WaitingCard`): who asks and the kind in the chat's words
+ * and icons (amber, the waiting color), the deadline or where and when at the right, the exact request in words, why
+ * in muted, what it goes through on one quiet line, and the decision on the card: an approval decided here
+ * (Aprovar or Agora não), a server's changed tools opening their review, a question Responder. The whole card opens
+ * it too.
  */
 function WaitingCardView({ item: n }: { item: AppNotification }) {
   const { t } = useTranslation();
@@ -154,6 +165,8 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const request = waitingApprovals.find((a) => a.id === n.source.approvalId);
   // One notification per approval card: how many on it still wait for you.
   const onCard = request?.messageId ? waitingApprovals.filter((a) => a.messageId === request.messageId).length : 0;
+  // Decided here when it stands for one request this person may decide; a card of several opens where they are.
+  const decidable = card.kind === "approval" && request?.canDecide && onCard <= 1 ? request : null;
   // Someone asking to join: who asked (the first names, how many in all), with their faces.
   const join = card.kind === "join" ? joinRequestLine(t, n) : null;
   const notice = useNoticeTitle(n);
@@ -166,9 +179,9 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
         ? join.text
         : card.kind === "limit"
           ? notice.title
-          : // The server's name in words, as the web says it; the tools themselves are in its review.
+          : // The server is named over it, so the title says only what it did; its tools are on the line below.
             card.kind === "tools"
-            ? t("connectors.toolChanges.notice", { name: n.source.label ?? "" })
+            ? t("mobile.activityNow.toolsTitle")
             : (dash?.title ?? card.title);
   // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
@@ -178,14 +191,18 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const actor = n.actors[0];
   const who = actor ? { type: actor.type === "agent" ? "agent" : "person", id: actor.id } : null;
   const name = dir.nameOf(who);
-  const kind = dash ? dash.kind : t(`mobile.activityNow.kind.${card.kind}`);
+  const kind = dash ? { icon: "chart" as const, label: dash.kind } : kindOf(t, card.kind, n.source.screen);
   const left = card.expiresAt ? timeLeft(t, card.expiresAt, new Date(now)) : null;
-  // The server is already named in the title.
+  // The server is already named over the title.
   const place = card.kind === "tools" ? null : placeOf(n);
   const where = [place ? t("mobile.chats.waitIn", { where: place }) : null, when.short(n.updatedAt)]
     .filter(Boolean)
     .join(" · ");
-  const button = dash ? t("mobile.activityNow.open") : t(`mobile.activityNow.${card.action}`);
+  const button = dash
+    ? t("mobile.activityNow.open")
+    : card.kind === "tools"
+      ? t("mobile.activityNow.reviewChanges")
+      : t(`mobile.activityNow.${card.action}`);
   const open = () => {
     if (n.readAt === null) act.mutate({ type: "read", item: n, read: true });
     if (href) router.push(href);
@@ -207,29 +224,38 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
     ) : card.kind === "tools" ? (
       <ConnectorIcon def={null} label={n.source.label ?? ""} size={36} />
     ) : null;
+  const tools = card.kind === "tools" ? n.latest.title : null;
   return (
     <WaitingCard
       agentId={who?.type === "agent" ? who.id : null}
       leading={leading}
       name={name || (card.kind === "tools" ? (n.source.label ?? "") : "")}
-      kind={{ icon: dash ? "chart" : KIND_ICON[card.kind], label: kind }}
+      kind={kind}
       title={title}
       onPress={href || web ? open : undefined}
-      accessibilityLabel={[name, kind, title].filter(Boolean).join(", ")}
-      expires={
-        left !== null && card.expiresAt
-          ? {
-              remaining: fuseRemaining(n.createdAt, card.expiresAt, now),
-              label: t("approval.expiresDetail", { time: left }),
-            }
-          : null
-      }
+      accessibilityLabel={[name, kind.label, title].filter(Boolean).join(", ")}
+      expires={left !== null && card.expiresAt ? { createdAt: n.createdAt, expiresAt: card.expiresAt } : null}
       where={where}
+      decision={decidable ? <ApproveHere approval={decidable} /> : undefined}
       action={(href || web) && card.kind !== "limit" ? { label: button, onPress: open } : null}
     >
       {/* Who asked while nobody watched, then why (ADR 0053 §8), as on the request itself. */}
       {card.kind === "approval" ? (
         <ApprovalWhy approval={{ origin: n.latest.origin ?? null, why: n.latest.text ?? null }} name={name} />
+      ) : null}
+      {card.kind === "approval" && request && onCard <= 1 ? <ApprovalSource approval={request} /> : null}
+      {card.kind === "tools" ? (
+        <>
+          <Text variant="small" tone="muted">
+            {t("mobile.activityNow.toolsWhy")}
+          </Text>
+          {tools ? (
+            <WaitingSource
+              mark={<ConnectorIcon def={null} label={n.source.label ?? ""} size={20} />}
+              text={tools.split(", ").join(" · ")}
+            />
+          ) : null}
+        </>
       ) : null}
       {card.kind === "limit" ? (
         <>
@@ -243,74 +269,138 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   );
 }
 
-const KIND_ICON = {
-  approval: "wait",
-  question: "help",
-  browser: "globe",
-  secret: "lock",
-  join: "members",
-  tools: "bolt",
-  limit: "chart",
-} as const;
+/**
+ * Each kind in the chat request card's words and icons ("Pede sua aprovação" with the shield, "Pergunta", "Precisa de
+ * você no navegador" or "no computador"); what the chat never asks keeps Atividade's (Membros, Ferramentas, Limite).
+ */
+function kindOf(t: TFunction, kind: WaitingCardKind, screen?: string): { icon: IconName; label: string } {
+  const ask: AskKind | null =
+    kind === "approval" || kind === "question" || kind === "secret"
+      ? kind
+      : kind === "browser"
+        ? screen === "desktop"
+          ? "desktop"
+          : "browser"
+        : null;
+  if (ask) return { icon: ASK_ICON[ask], label: t(`ask.kind.${ask}`) };
+  return { icon: OWN_ICON[kind as keyof typeof OWN_ICON], label: t(`mobile.activityNow.kind.${kind}`) };
+}
 
-/** Faces of the crew drawn over "Nada esperando você". */
+const OWN_ICON = { join: "members", tools: "bolt", limit: "chart" } as const;
+
+/**
+ * The request's decision on the card, as the chat's: Aprovar (held to approve when it is high risk) and Agora não,
+ * which asks why on the request's own screen.
+ */
+function ApproveHere({ approval: a }: { approval: Approval }) {
+  const { t } = useTranslation();
+  const { approve, pending, high } = useApproveNow(a);
+  return (
+    <AskButtons
+      primary={
+        high ? (
+          <HoldButton
+            size="card"
+            label={t("mobile.approval.hold")}
+            holdLabel={t("mobile.approval.holding")}
+            onConfirm={() => approve()}
+          />
+        ) : (
+          <Button
+            variant="primary"
+            size="card"
+            wide
+            icon="check"
+            label={approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")}
+            disabled={pending}
+            onPress={() => approve()}
+          />
+        )
+      }
+      secondary={
+        <Button
+          variant="secondary"
+          size="card"
+          wide
+          label={t("approval.notNow")}
+          onPress={() => router.push(`/approval/${a.id}?mode=refuse`)}
+        />
+      }
+    />
+  );
+}
+
+/** What the request goes through, as the chat's card says it: an email's to and subject, else the app and its call. */
+function ApprovalSource({ approval: a }: { approval: Approval }) {
+  const { i18n } = useTranslation();
+  const source = useApprovalSource(a);
+  const detail = a.email
+    ? [a.email.to.join(", "), a.email.subject].filter(Boolean).join(" · ")
+    : !a.connector
+      ? a.detail
+      : [source.name, approvalSummary(a, i18n.language)].filter(Boolean).join(" · ");
+  return detail ? <WaitingSource mark={<ApprovalMark approval={a} size={20} />} text={detail} /> : null;
+}
+
+/** Faces of the crew over "Nada esperando você". */
 const CREW = 3;
 
 /**
- * Nothing waits on you (`.allok`): a bit of sky with the crew, "Nada esperando você", one calm line, and the
- * next real event when there is one (a routine's next run: who, what, when).
+ * Nothing waits on you, right on the page: a band of sky with the crew, "Nada esperando você" and one calm line, then
+ * the next real event as one line (a routine's next run: its agent, its name and when), which opens the routine.
  */
 function AllClear() {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const c = useColors();
   const dir = useDirectory();
-  const surface = useSurface();
   const routines = useRoutines(orgId);
   const crew = dir.agents.slice(0, CREW);
   const next = useMemo(() => nextRoutine<Routine>(routines.data ?? []), [routines.data]);
   const nextAgent = next ? dir.agentById.get(next.agentId) : undefined;
   return (
-    <View style={[styles.clear, surface]}>
+    <View style={styles.clear}>
       <View style={styles.clearSky}>
-        <Sky color={agentLook(crew[0]).color} depth={0.8} surface="raised" style={StyleSheet.absoluteFill} />
+        <Sky color={agentLook(crew[0]).color} depth={0.8} style={[StyleSheet.absoluteFill, styles.clearSkyTint]} />
         <View style={styles.crew}>
-          {crew.map((a, i) => (
-            <AgentFace key={a.id} agentId={a.id} size={i === 0 ? 46 : 40} live={false} />
+          {crew.map((a) => (
+            <AgentFace key={a.id} agentId={a.id} size={36} live={false} />
           ))}
         </View>
       </View>
-      <Text variant="display2" accessibilityRole="header" style={styles.clearTitle}>
+      <Text variant="title2" accessibilityRole="header" style={styles.clearTitle}>
         {t("mobile.activityNow.clear.title")}
       </Text>
       <Text variant="small" tone="muted" style={styles.clearText}>
         {t("mobile.activityNow.clear.text")}
       </Text>
       {next ? (
-        // The routine opens on a tap (Rotinas).
         <Pressable
           onPress={() => router.push(routineHref(next.id))}
           accessibilityRole="button"
-          style={({ pressed }) => [styles.next, { backgroundColor: c.sunken }, pressed && styles.wpressed]}
+          style={({ pressed }) => [styles.next, pressed && styles.wpressed]}
         >
-          {nextAgent ? <AgentFace agentId={nextAgent.id} size={26} live={false} /> : <Tile icon="clock" size={26} />}
-          <View style={styles.grow}>
-            <Text variant="small" tone="ink2" numberOfLines={1}>
-              {t("mobile.activityNow.next.title", { name: next.name })}
-            </Text>
-            <NextWhen routine={next} agent={nextAgent?.name ?? ""} />
+          <View style={styles.nextMark}>
+            {nextAgent ? (
+              <AgentFace agentId={nextAgent.id} size={16} live={false} />
+            ) : (
+              <Icon name="clock" size={16} color={c.faint} />
+            )}
           </View>
+          <Text variant="small" tone="ink2" numberOfLines={1} style={[styles.grow, styles.bold]}>
+            {t("mobile.activityNow.next.title", { name: next.name })}
+          </Text>
+          <NextWhen routine={next} />
         </Pressable>
       ) : null}
     </View>
   );
 }
 
-/** "Rotina da Iris · hoje às 18:00". */
-function NextWhen({ routine, agent }: { routine: Pick<Routine, "nextRunAt">; agent: string }) {
+/** When the next run is, at the line's end: "hoje às 18:00", "amanhã às 9:00", "qua, 12 nov às 9:00". */
+function NextWhen({ routine }: { routine: Pick<Routine, "nextRunAt"> }) {
   const { t } = useTranslation();
   const when = useWhen();
-  const c = useColors();
   if (!routine.nextRunAt) return null;
   const iso = routine.nextRunAt;
   const day = upcomingDay(iso);
@@ -327,14 +417,9 @@ function NextWhen({ routine, agent }: { routine: Pick<Routine, "nextRunAt">; age
             time,
           });
   return (
-    <View style={styles.nextWhen}>
-      <Icon name="clock" size={12} color={c.faint} />
-      <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
-        {agent
-          ? t("mobile.activityNow.next.routineOf", { agent, when: date })
-          : t("mobile.activityNow.next.routine", { when: date })}
-      </Text>
-    </View>
+    <Text variant="footnote" tone="faint" numberOfLines={1} style={styles.nextWhen}>
+      {date}
+    </Text>
   );
 }
 
@@ -481,22 +566,17 @@ const styles = StyleSheet.create({
   faces: { flexDirection: "row" },
   overlap: { marginLeft: -6 },
   grow: { flex: 1, minWidth: 0 },
-  shrink: { flexShrink: 1 },
-  clear: { marginHorizontal: 16, marginTop: 4, borderRadius: 26, overflow: "hidden", padding: 20, paddingTop: 0 },
-  clearSky: { height: 108, marginHorizontal: -20, alignItems: "center", justifyContent: "flex-end", paddingBottom: 10 },
-  crew: { flexDirection: "row", alignItems: "flex-end", gap: 16 },
-  clearTitle: { textAlign: "center" },
-  clearText: { textAlign: "center", marginTop: 6 },
-  next: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginTop: 14,
-    padding: 10,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-  },
-  nextWhen: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 1 },
+  // Nothing waiting, on the page itself: the sky band edge to edge, its crew, the words, the next event's line.
+  clear: { marginTop: 2, paddingBottom: 6 },
+  clearSky: { height: 84, alignItems: "center", justifyContent: "flex-end", paddingBottom: 6 },
+  clearSkyTint: { opacity: 0.7 },
+  crew: { flexDirection: "row", alignItems: "flex-end", gap: 14 },
+  clearTitle: { textAlign: "center", marginTop: 10, paddingHorizontal: 16 },
+  clearText: { textAlign: "center", marginTop: 4, paddingHorizontal: 16 },
+  // One event line: the 16-point mark on the first line, the words, when at the end.
+  next: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 24, marginTop: 14, paddingHorizontal: 16 },
+  nextMark: { width: 16, alignItems: "center" },
+  nextWhen: { flexShrink: 0, fontVariant: ["tabular-nums"] },
   stack: { width: LIST_AVATAR, height: LIST_AVATAR },
   back: { position: "absolute", top: 0, left: 0 },
   front: { position: "absolute", right: -2, bottom: -2, padding: 2 },

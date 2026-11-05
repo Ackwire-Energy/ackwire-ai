@@ -67,7 +67,7 @@ import { openRightHandSettings } from "../right-hand/SettingsScreen";
 import { useConnectedById } from "../settings/hooks";
 import { agentBadgeInset } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId, useWhen } from "../shared/hooks";
-import { agentLook, fuseRemaining, genderOf } from "../shared/logic";
+import { agentLook, genderOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
 import { PushedHeader } from "../shared/parts";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
@@ -380,14 +380,7 @@ function Profile({ id }: { id: string }) {
             agentId={id}
             kind={{ icon: "shield", label: t("ask.kind.approval") }}
             title={approvalTitle(t, waitingNow)}
-            expires={
-              left
-                ? {
-                    remaining: fuseRemaining(waitingNow.createdAt, waitingNow.expiresAt, now),
-                    label: t("approval.expiresDetail", { time: left }),
-                  }
-                : null
-            }
+            expires={left ? { createdAt: waitingNow.createdAt, expiresAt: waitingNow.expiresAt } : null}
             action={{ label: t("mobile.chats.wait.review"), onPress: review }}
             onPress={review}
             accessibilityLabel={[t("ask.kind.approval"), approvalTitle(t, waitingNow)].join(", ")}

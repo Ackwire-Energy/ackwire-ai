@@ -4,6 +4,7 @@ import {
   useCancelApproval,
   useCatalog,
   useCustomServers,
+  useDecideApproval,
 } from "@agenteschat/client";
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
@@ -18,15 +19,18 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Button, Chip, Fuse, Icon, LineIcon, Text, useToast } from "@/ui";
 import { ConnectorIcon, IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
-import { useColors, useNow, useOrgId } from "../shared/hooks";
-import { fuseRemaining, minutesLeft } from "../shared/logic";
+import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
+import { fuseRemaining, genderOf, minutesLeft } from "../shared/logic";
+import { successHaptic } from "../shared/parts";
 import {
+  approvalRisk,
   approvalSaid,
   approvalTable,
   approvalTraits,
   approveAlwaysHint,
   approveAlwaysLabel,
   approveAlwaysOffered,
+  approveAlwaysToast,
 } from "./logic";
 
 /**
@@ -99,6 +103,45 @@ export function useApprovalSource(a: Approval) {
         ? connectorName(t, def)
         : a.connector;
   return { kind: "connector" as const, name, def, image: custom?.image };
+}
+
+/**
+ * Approving a request where it shows (the conversation's card, Atividade's): a success haptic unless it was held to
+ * approve (a high-risk one already buzzed), then a toast saying what follows (or that it failed); `onApproved` lets
+ * the card's place know it is settled.
+ */
+export function useApproveNow(a: Approval, onApproved?: () => void) {
+  const { t, i18n } = useTranslation();
+  const orgId = useOrgId();
+  const dir = useDirectory();
+  const toast = useToast();
+  const decide = useDecideApproval(orgId);
+  const name = dir.agentById.get(a.agentId)?.name ?? "";
+  const g = genderOf(name);
+  const high = approvalRisk(a) === "high";
+  const approve = (always = false) =>
+    decide.mutate(
+      { id: a.id, decision: "approve", always },
+      {
+        onSuccess: () => {
+          if (!high) successHaptic();
+          onApproved?.();
+          toast({
+            ...(always
+              ? approveAlwaysToast(t, name)
+              : {
+                  title: t("mobile.approval.approved"),
+                  subtitle: a.runAt
+                    ? t("mobile.approval.approvedAhead", { when: nextLabel(i18n.language, a.runAt) })
+                    : t(`mobile.approval.approvedSub${g}`, { name }),
+                }),
+            agentId: a.agentId,
+          });
+        },
+        onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+      },
+    );
+  return { approve, pending: decide.isPending, high };
 }
 
 /** The app a request goes through, as a mark on a tile (`useApprovalSource`); its name is read aloud. */
