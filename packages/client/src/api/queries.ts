@@ -29,6 +29,7 @@ import {
   upsertInPages,
   withServerCounts,
 } from "../lib/notifications";
+import { setMyReaction } from "../lib/reactions";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
 import { firstVisitOf } from "../lib/right-hand";
@@ -76,6 +77,7 @@ import type {
   AuditQuery,
   AuditRow,
   BlockState,
+  BrainScope,
   CalendarEventInput,
   CalendarEventPatch,
   CardDelegate,
@@ -1709,6 +1711,7 @@ export function useDecideApproval(orgId: string) {
       cacheApproval(qc, orgId, approval);
       void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
       if (always) void qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, approval.agentId) });
+      if (always && approval.approveAlways?.routineId) void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
     },
   });
 }
@@ -1957,6 +1960,26 @@ export const useAgentRepos = (orgId: string, agentId: string, enabled = true) =>
     retry: false,
   });
 };
+
+/** Where the agent merges with no approval card ("Pode fazer merge sem perguntar"). */
+export const useAgentMergeRepos = (orgId: string, agentId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentMergeRepos(orgId, agentId),
+    queryFn: () => api.repositories.merge(orgId, agentId),
+    enabled,
+    retry: false,
+  });
+};
+
+export function useSetAgentMergeRepos(orgId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (repositories: string[]) => api.repositories.setMerge(orgId, agentId, repositories),
+    onSuccess: (repositories) => qc.setQueryData(keys.agentMergeRepos(orgId, agentId), repositories),
+  });
+}
 
 export function useRemoveGitHubApp(orgId: string) {
   const api = useApi();
@@ -2826,10 +2849,28 @@ export function useToggleReaction(orgId: string, messageId: string) {
   const api = useApi();
   const onAgentReaction = useAgentReaction();
   const qc = useQueryClient();
+  const meId = useMe().data?.user.id;
+  const mutationKey = ["reaction", orgId, messageId];
+  const queryKey = keys.reactions(orgId, messageId);
   return useMutation({
+    mutationKey,
     mutationFn: ({ reaction, on }: { reaction: string; on: boolean }) =>
       on ? api.chat.react(orgId, messageId, reaction) : api.chat.unreact(orgId, messageId, reaction),
-    onSuccess: (reactions) => applyReactions(qc, orgId, messageId, reactions, onAgentReaction),
+    // The pill shows at once; a refused reaction goes back to what was there.
+    onMutate: ({ reaction, on }) => {
+      if (!meId) return undefined;
+      void qc.cancelQueries({ queryKey });
+      const before = knownReactions(qc, orgId, messageId);
+      applyReactions(qc, orgId, messageId, setMyReaction(before, reaction, meId, on), onAgentReaction);
+      return { before };
+    },
+    onError: (_error, _input, context) => {
+      if (context) qc.setQueryData(queryKey, context.before);
+    },
+    // An earlier answer mustn't undo a later tap (👍 then 👎 is two calls): only the last one in flight is the truth.
+    onSuccess: (reactions) => {
+      if (qc.isMutating({ mutationKey }) <= 1) applyReactions(qc, orgId, messageId, reactions, onAgentReaction);
+    },
   });
 }
 
@@ -3999,11 +4040,18 @@ export function useSaveSandboxSettings(orgId: string) {
  * "Quem pensa" (its owner or an admin; members don't load it). `pollMs`: asked again this often where no event
  * keeps it current (the onboarding opens no socket).
  */
-export const useAgentBrain = (orgId: string, agentId: string, enabled = true, pollMs: number | false = false) => {
+export const useAgentBrain = (
+  orgId: string,
+  agentId: string,
+  enabled = true,
+  pollMs: number | false = false,
+  /** The team's right hand's workspace AI (admins), under the same key so every invalidation reaches it. */
+  scope?: BrainScope,
+) => {
   const api = useApi();
   return useQuery({
-    queryKey: keys.agentBrain(orgId, agentId),
-    queryFn: () => api.agents.brain(orgId, agentId),
+    queryKey: scope ? [...keys.agentBrain(orgId, agentId), scope] : keys.agentBrain(orgId, agentId),
+    queryFn: () => api.agents.brain(orgId, agentId, scope),
     enabled,
     retry: false,
     refetchInterval: pollMs,
@@ -5379,6 +5427,22 @@ export function useStopTasks(orgId: string) {
   });
 }
 
+/** Continuar agora on runs paused near a limit (the task manager's line over them). */
+export function useContinueTasks(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runIds: string[]) => {
+      if (!api.working?.continueTasks) throw new Error("This server can't continue tasks yet");
+      return api.working.continueTasks(orgId, runIds);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.taskManager(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.working(orgId) });
+    },
+  });
+}
+
 /** "Dizer por quê" after stopping a task: the agent reads it (only who stopped it, once). */
 export function useStopReason(orgId: string) {
   const api = useApi();
@@ -5416,6 +5480,7 @@ export function useReminderAction(orgId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.reminders(orgId) });
       void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
     },
   });
 }

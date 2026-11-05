@@ -83,6 +83,7 @@ export * from "./context/learned-skills";
 export * from "./context/outcomes";
 export * from "./context/proposals";
 export * from "./context/reflect";
+export * from "./context/rules";
 export * from "./context/summaries";
 export * from "./context/tools";
 export * from "./continue-run";

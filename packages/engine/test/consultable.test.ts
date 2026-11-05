@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
+import { systemText } from "@agenteschat/providers";
 import {
   answersAgentsOnly,
   approverIds,
@@ -91,11 +92,17 @@ const invoke = (ctx: ToolContext, name: string, input: Record<string, unknown>) 
   return f.tools.invoke(ctx, { toolUseId: `tu_${crypto.randomUUID()}`, name, input });
 };
 
+/** The system prompt of the run answering in the agents' DM. */
+const agentsDmPrompt = () =>
+  f.provider.calls
+    .map((c) => systemText(c.request.system))
+    .find((s) => s.includes("A private conversation between agents"));
+
 const ask = (ctx: ToolContext) => invoke(ctx, "ask_agent", { agent: "@nino", question: "A fatura 812 foi paga?" });
 
 describe("other agents can consult it", () => {
   test("on: it answers the agent that asked, in their DM; nothing of it reaches the person", async () => {
-    f = await setup({ askAgent: true, chatTools: true, reply: () => ({ chunks: ["Paga em 3/11."] }) });
+    f = await setup({ askAgent: true, askUser: true, chatTools: true, reply: () => ({ chunks: ["Paga em 3/11."] }) });
     const { lia, nino } = await world();
     const ctx = await devRunFor(lia.id, "@dev a fatura 812 foi paga?");
     expect(await ask(ctx)).toMatchObject({ output: { content: expect.stringContaining("Asked @nino") } });
@@ -117,6 +124,17 @@ describe("other agents can consult it", () => {
     expect(await invoke(ninoCtx, "send_dm", { person: "lia", text: "Paga." })).toMatchObject({
       output: { isError: true, content: expect.stringContaining("You were consulted by another agent") },
     });
+    // Nobody would see a question card: it is refused, and its prompt never offers to ask Lia.
+    expect(
+      await invoke(ninoCtx, "ask_user", {
+        why: "Há duas faturas com o número 812, uma de março e outra de abril, e a resposta muda com isso.",
+        question: "Qual fatura?",
+      }),
+    ).toMatchObject({
+      output: { isError: true, content: expect.stringContaining("No person reads this conversation") },
+    });
+    expect(agentsDmPrompt()).toContain("Still missing: say in your answer exactly what");
+    expect(agentsDmPrompt()).not.toContain("ask lia with `ask_user`");
 
     // Where Lia reads: the consultation's state, never Nino's words (the list, the panel, the trail on Dev's reply).
     const [listed] = await consultationsIn(f.db, f.org.id, f.general.id);
@@ -142,6 +160,7 @@ describe("other agents can consult it", () => {
     expect((await consultationOrigin(f.db, f.org.id, runId))?.channelId).toBe(f.general.id);
     await drainOutbox(f.db, f.handlers);
     expect((await consultationsIn(f.db, f.org.id, f.general.id))[0]?.answer).toBe("Paga.");
+    expect(agentsDmPrompt()).toContain("Still missing: ask ana with `ask_user`");
   });
 
   test("off: refused with the line that says why and how to open it", async () => {

@@ -2,12 +2,18 @@ import type { Message } from "@agenteschat/client";
 import { useAiStatus, useAuthConfig } from "@agenteschat/client";
 import { withoutApiKeys } from "@agenteschat/client/lib/api-key-text";
 import { billingHoldOf } from "@agenteschat/client/lib/billing";
+import { failedRunFix } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   aiStateOf,
+  mayConnectAi,
   NO_AI,
   noAiCardOf,
+  noAiLineKey,
+  noAiStatusKey,
   opensByItself,
+  planLineFix,
+  planLinePasses,
   planOfKind,
   type RightHandPlanLine,
   signInAgainPlan,
@@ -15,6 +21,7 @@ import {
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Chip, Dialog, DialogFooter, Icon, InfoHint } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { type ConnectAiRequest, useConnectAi } from "@/components/ConnectAi";
@@ -35,23 +42,26 @@ import "./no-ai.css";
  */
 export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgentId?: string }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const status = useAiStatus(org.id);
   const connect = useConnectAi();
   if (!status.data || !connect) return null;
   if (dmAgentId) {
     if (aiStateOf(status.data, dmAgentId) !== "no_ai") return null;
-    const name = dir.agentById.get(dmAgentId)?.name ?? t("channel.unknownAgent");
+    const agent = dir.agentById.get(dmAgentId);
+    const name = agent?.name ?? t("channel.unknownAgent");
     return (
       <div className="noai-banner" role="status">
         <span className="noai-banner__text ac-iconline">
           <Icon name="plug" size={16} />
-          <b>{t("noAi.agent", agentGrammar(name))}</b>
+          <b>{t(noAiStatusKey(status.data, dmAgentId), agentGrammar(name))}</b>
         </span>
-        <Button size="sm" onClick={() => connect.open({ agentId: dmAgentId })}>
-          {t("noAi.action")}
-        </Button>
+        {mayConnectAi(agent, me.user.id, org) && (
+          <Button size="sm" onClick={() => connect.open({ agentId: dmAgentId })}>
+            {t("noAi.action")}
+          </Button>
+        )}
       </div>
     );
   }
@@ -91,7 +101,8 @@ export function NoAiCard({ message }: { message: Message }) {
   const connect = useConnectAi();
   const card = noAiCardOf(message.meta);
   if (!card) return null;
-  if (card.planLine) return <PlanLineCard message={message} agentId={card.agentId} line={card.planLine} />;
+  if (card.planLine)
+    return <PlanLineCard message={message} agentId={card.agentId} line={card.planLine} model={card.model} />;
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const again = signInAgainPlan(card, agent);
@@ -103,15 +114,14 @@ export function NoAiCard({ message }: { message: Message }) {
   const ready = state !== undefined && state !== "no_ai" && answer !== "still_missing";
   // The same people as "Continuar": who asked, the agent's owner or an admin.
   const mayAnswer = card.forUserId === me.user.id || agent?.ownerUserId === me.user.id || can(org, "manage_agents");
+  const owner = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name.split(" ")[0] : undefined;
   const title = answering
     ? t("noAi.card.answering", { name })
     : ready
       ? t("noAi.card.connected", { name })
       : answer === "still_missing"
         ? t("noAi.card.stillMissing", { name })
-        : card.own
-          ? t(`noAi.notSignedIn.${card.own}`, agentGrammar(name))
-          : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(name));
+        : t(noAiLineKey(card), agentGrammar(name));
   const action =
     !connect || answering ? null : ready || answer === "pending" ? (
       mayAnswer && (
@@ -119,6 +129,8 @@ export function NoAiCard({ message }: { message: Message }) {
           {t("noAi.card.answerNow")}
         </Button>
       )
+    ) : !mayConnectAi(agent, me.user.id, org) ? (
+      <span className="small muted">{owner ? t("noAi.locked", { name, owner }) : t("noAi.lockedAdmins")}</span>
     ) : (
       <Button
         size="sm"
@@ -150,22 +162,34 @@ export function NoAiCard({ message }: { message: Message }) {
  * The team's right hand on a plan that can't think now (ADR 0137 §7): one plain line saying why, with the way to an API
  * key, and before the workspace's plan is paid, the way to pay. Once it can think again: "Responder agora".
  */
-function PlanLineCard({ message, agentId, line }: { message: Message; agentId: string; line: RightHandPlanLine }) {
+function PlanLineCard({
+  message,
+  agentId,
+  line,
+  model,
+}: {
+  message: Message;
+  agentId: string;
+  line: RightHandPlanLine;
+  model?: string;
+}) {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const status = useAiStatus(org.id);
   const connect = useConnectAi();
-  const name = dir.agentById.get(agentId)?.name ?? t("channel.unknownAgent");
-  const ready = aiStateOf(status.data, agentId) === "ready" && line === "computer_away";
+  const agent = dir.agentById.get(agentId);
+  const name = agent?.name ?? t("channel.unknownAgent");
+  const ready = aiStateOf(status.data, agentId) === "ready" && planLinePasses(line);
   // Before the workspace's plan is paid it has no computer: whoever pays sees the way to.
   const billingUrl = useAuthConfig().data?.billingUrl;
   const hold = can(org, "manage_billing") && billingUrl ? billingHoldOf(org.standing) : null;
+  const fix = planLineFix(line, agent, me.user.id, org);
   return (
     <div className="waitcard" data-done={ready || undefined}>
       <span className="waitcard__top ac-iconline">
         <Icon name={ready ? "check" : "plug"} size={16} />
-        <span>{ready ? t("noAi.card.connected", { name }) : t(`noAi.rightHand.${line}`, { name })}</span>
+        <span>{ready ? t("noAi.card.connected", { name }) : t(`noAi.rightHand.${line}`, { name, model })}</span>
       </span>
       {connect && (
         <span className="waitcard__acts">
@@ -180,14 +204,56 @@ function PlanLineCard({ message, agentId, line }: { message: Message; agentId: s
                   {t(`standing.billing.cta.${hold}`)}
                 </BillingLinkButton>
               )}
-              <Button size="sm" onClick={() => connect.open({ agentId, intent: "api_key", from: message.id })}>
-                {t("noAi.rightHand.useKey")}
-              </Button>
+              {/* The workspace's plan serves only its owner: the person's own plan answers them (ADR 0137 §11). */}
+              {fix === "connectMine" ? (
+                <Button size="sm" onClick={() => connect.open({ agentId, from: message.id })}>
+                  {t("rightHand.settings.connectMine")}
+                </Button>
+              ) : fix === "useKey" ? (
+                <Button size="sm" onClick={() => connect.open({ agentId, intent: "api_key", from: message.id })}>
+                  {t("noAi.rightHand.useKey")}
+                </Button>
+              ) : (
+                <span className="small muted">{t("noAi.lockedAdmins")}</span>
+              )}
             </>
           )}
         </span>
       )}
     </div>
+  );
+}
+
+/**
+ * Beside a failed run's reason: the one thing that fixes it, for who can do it, a key (the Connect dialog) or another
+ * model (its AI settings).
+ */
+export function FailedRunFix({ code, agentId }: { code: string | undefined; agentId: string }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const connect = useConnectAi();
+  const fix = failedRunFix(code, {
+    keys: can(org, "manage_credentials"),
+    admin: can(org, "manage_agents"),
+    owner: dir.agentById.get(agentId)?.ownerUserId === me.user.id,
+  });
+  if (fix === "useKey" && connect)
+    return (
+      <Button size="sm" onClick={() => connect.open({ agentId, intent: "api_key" })}>
+        {t("noAi.rightHand.useKey")}
+      </Button>
+    );
+  if (fix !== "changeModel") return null;
+  return (
+    <Link
+      to="/org/$orgId/agents/$agentId"
+      params={{ orgId: org.id, agentId }}
+      search={{ tab: "settings", sec: "brain" }}
+      className="ac-btn ac-btn--sm"
+    >
+      {t("usageCard.changeModel")}
+    </Link>
   );
 }
 

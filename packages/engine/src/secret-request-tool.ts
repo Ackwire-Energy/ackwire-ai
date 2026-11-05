@@ -1,5 +1,5 @@
 import { isReservedSecretName } from "@agenteschat/adapters";
-import { and, eq, isNull, schema } from "@agenteschat/db";
+import { and, eq, gt, isNull, ne, or, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { type ComputerHandle, requireComputerManager } from "./sandbox";
 import {
@@ -77,7 +77,7 @@ export function requestSecretTool(opts: {
     name: REQUEST_SECRET_TOOL,
     description: [
       opts.browserOnly
-        ? "Ask the person who asked you for a password or code to sign in on a site in your browser. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you, and it will only ever be typed on that one site (`site`, the login page's address). Never ask for passwords or codes in a normal message. `name` is UPPER_SNAKE_CASE. Give `username` when you know the account, and `code` for a one-time code. Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Type it with `browser_type_secret`. Look in the Vault first (`vault_list`) when you have it: a saved login needs no request."
+        ? "Ask the person who asked you for a password or code to sign in on a site in your browser, and whenever they ask to send one privately. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you, and it will only ever be typed on that one site (`site`, the login page's address). Never ask for passwords or codes in a normal message. `name` is UPPER_SNAKE_CASE. Give `username` when you know the account, and `code` for a one-time code. Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Type it with `browser_type_secret`."
         : "Ask the person who asked you for a secret your computer needs: a token or password for a CLI, the code that finishes a sign-in, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or codes in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` (an environment variable in your commands) or `file` (a path in your workspace, e.g. `.npmrc` or `.env`, written with mode 600). For a site your browser signs in to, give `site` (and `username` when you know it, or `code` for a one-time code). Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Use it by name, never print it. Look in the Vault first (`vault_list`) when you have it: a saved login or key needs no request.",
       AGAIN,
     ].join(" "),
@@ -159,6 +159,47 @@ export function requestSecretTool(opts: {
           return {
             content: `\`code\` takes \`digits\`, from ${CODE_DIGITS.min} to ${CODE_DIGITS.max}.`,
             isError: true,
+          };
+        }
+        // Once per key and run: a person writing while the run waits on the card made agents ask again, a second
+        // card for the same key, answered twice. The open one is waited on again; one this run was already given
+        // isn't asked for until it was tried (a refused key's replacement goes on below).
+        const mine = await ctx.db
+          .select({
+            id: schema.secretRequests.id,
+            status: schema.secretRequests.status,
+            replaces: schema.secretRequests.replaces,
+            deliveredAt: schema.secretRequests.deliveredAt,
+          })
+          .from(schema.secretRequests)
+          .where(
+            and(
+              eq(schema.secretRequests.runId, ctx.runId),
+              eq(schema.secretRequests.name, name),
+              sql`${schema.secretRequests.site} is not distinct from ${origin}`,
+              sql`${schema.secretRequests.targetPath} is not distinct from ${file ? path : null}`,
+              // Open: not past its deadline. Given: still on the computer.
+              or(
+                and(eq(schema.secretRequests.status, "pending"), gt(schema.secretRequests.expiresAt, sql`now()`)),
+                and(
+                  eq(schema.secretRequests.status, "delivered"),
+                  isNull(schema.secretRequests.removedAt),
+                  secretStillHeld(),
+                ),
+              ),
+            ),
+          );
+        const pending = mine.find((r) => r.status === "pending");
+        if (pending) {
+          return {
+            content: `This is the same request for ${name} that is still open: waiting for the person's answer to it.`,
+            waitForSecret: { requestId: pending.id },
+          };
+        }
+        const given = mine.find((r) => r.status === "delivered" && !r.replaces && r.deliveredAt);
+        if (given?.deliveredAt && !(await triedSince(ctx, given.deliveredAt))) {
+          return {
+            content: `${name} was already delivered to your computer in this task: use it by name, don't ask again.`,
           };
         }
         const open = await ctx.db
@@ -264,6 +305,24 @@ export function requestSecretTool(opts: {
       }
     },
   };
+}
+
+/** Whether the run called a tool other than `request_secret` after `since` (so a key given then could have been refused). */
+async function triedSince(ctx: ToolContext, since: Date) {
+  const steps = schema.agentRunSteps;
+  const [call] = await ctx.db
+    .select({ id: steps.id })
+    .from(steps)
+    .where(
+      and(
+        eq(steps.runId, ctx.runId),
+        eq(steps.kind, "tool_call"),
+        gt(steps.createdAt, since),
+        ne(sql`${steps.data}->>'name'`, REQUEST_SECRET_TOOL),
+      ),
+    )
+    .limit(1);
+  return call !== undefined;
 }
 
 /** `code.digits` as the request keeps it, or null when it isn't a whole number of boxes the card can show. */

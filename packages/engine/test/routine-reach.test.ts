@@ -3,10 +3,13 @@ import { asc, eq, schema } from "@agenteschat/db";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
+  type Brain,
+  bridgeToolsFor,
   consultationOrigin,
   createAgent,
   createArtifact,
   createChannel,
+  createJobHandlers,
   drainOutbox,
   grantScopes,
   openDm,
@@ -19,7 +22,8 @@ import {
 } from "../src";
 import { openRoutineRoom } from "../src/routine-room";
 import { addMember, type Fixture, setup } from "./fixtures";
-import { briefs, channelRoutine, fire, messagesIn, routineDeps } from "./routine-fixtures";
+import { pairMachine, RUNNER } from "./machine-fixtures";
+import { briefs, channelRoutine, fire, messagesIn, minutesFromNow, routineDeps } from "./routine-fixtures";
 import { fakeGithub } from "./tool-fixtures";
 
 /**
@@ -536,4 +540,56 @@ test("what a routine handed off lands where it reports even while its run is sti
   expect(delivered?.runs.map((r) => [r.agentId, r.channelId])).toEqual([[f.agent.id, f.general.id]]);
   const [after] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, background.id));
   expect(after?.pendingMessageIds).toEqual([]);
+});
+
+test("a scheduled routine's run on Claude Code lists ask_agent and tell_agent, in its turn and through the bridge", async () => {
+  f = await setup({
+    handOff: true,
+    askAgent: true,
+    reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["ok"] }),
+  });
+  await agentIn(f, "Iris", "iris");
+  const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+    name: "MacBook",
+    ...RUNNER,
+    exec: true,
+  });
+  await f.db
+    .update(schema.agents)
+    .set({ machineId: paired.machineId, brain: "claude_code" })
+    .where(eq(schema.agents.id, f.agent.id));
+  const seen: { turn: string[]; bridge: string[] } = { turn: [], bridge: [] };
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run(turn) {
+      seen.turn = turn.tools.map((t) => t.name);
+      const id = { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId: paired.machineId };
+      seen.bridge = (await bridgeToolsFor({ db: f.db, pubsub: f.pubsub, tools: f.tools }, id)).map((t) => t.name);
+      yield { type: "done", text: "Nada novo." };
+    },
+  };
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: {
+      status: async (id) => ({
+        id,
+        orgId: f.org.id,
+        name: "MacBook",
+        online: true,
+        execAllowed: true,
+        os: "darwin",
+        protocol: RUNNER.protocol,
+        executors: { claude: { version: "2.1.316", loggedIn: true }, detectedAt: new Date().toISOString() },
+      }),
+    },
+  });
+  const routine = await channelRoutine(f, { access: "act" });
+  await fire(f, routine.id, minutesFromNow(-1), "schedule");
+  await drainOutbox(f.db, handlers);
+
+  const [run] = await runsOf(f);
+  expect([run?.background, run?.brain, run?.status]).toEqual([true, "claude_code", "done"]);
+  for (const names of [seen.turn, seen.bridge])
+    expect(names).toEqual(expect.arrayContaining(["ask_agent", "tell_agent"]));
 });

@@ -242,6 +242,8 @@ export interface ExistingUsed {
   account?: MachineAccount;
   /** On a plan: it answers only its owner (ADR 0059 §5). */
   onlyOwner: boolean;
+  /** The team's right hand's own AI for the person (ADR 0137 §11): it serves them alone, so no switch. */
+  personal?: boolean;
 }
 
 /**
@@ -315,13 +317,21 @@ export function ExistingRows({
         ...(move ? { moveAccount: true } : {}),
         ...(toEveryone ? { onlyOwner: false } : {}),
       });
-      return { label: a.label, choice: planOfAccount(a), account: a, onlyOwner: next.onlyOwner };
+      return {
+        label: a.label,
+        choice: planOfAccount(a),
+        account: a,
+        onlyOwner: next.onlyOwner,
+        personal: next.scope === "mine",
+      };
     });
   // The workspace's model on that key: the agent's model where the key runs it, else Automático, which follows the key.
   const pickKey = (key: Credential) =>
     save(async () => {
       const fits = keyRuns(key, dir.agentById.get(agent.id)?.model, models.data?.models ?? []);
       if (view.brain !== "model") await api.agents.setBrain(org.id, agent.id, { brain: "model" });
+      // The team's right hand: a key is the workspace's AI, so everyone without their own thinks with it.
+      if (view.scope === "mine") await api.agents.setBrain(org.id, agent.id, { scope: "workspace", brain: "model" });
       await api.agents.update(org.id, agent.id, { credentialId: key.id, ...(fits ? {} : { model: AUTO }) });
       return { label: key.label, choice: "key", onlyOwner: false };
     });
@@ -428,7 +438,7 @@ export function ExistingThinks({ agent, used }: { agent: PlanAgent; used: Existi
       {a?.kind === "antigravity" && geminiPersonal(a) && (
         <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
       )}
-      {a && (
+      {a && !used.personal && (
         <div className="ac-card__foot ac-iconline ai-panel__replies">
           <Icon name={on ? "audienceEveryone" : "audienceOwner"} size={14} />
           <PlanReplies
@@ -868,21 +878,23 @@ function PlanSteps({
   );
   // The sign-in in play: one just made, the computer's own chosen here, or what the agent already thinks with.
   const signIn = own?.chosen || ownSaved ? OWN_SIGN_IN : view?.brain === kind ? view : undefined;
-  // Who the agents answer, once for the plan, as its foot: its icon says it, its switch changes it.
-  const foot = (
-    <div className="ac-card__foot ac-iconline ai-panel__replies">
-      <Icon name={replyAll ? "audienceEveryone" : "audienceOwner"} size={14} />
-      <PlanReplies
-        agent={everyone || everyAgent ? null : agent.name}
-        on={replyAll}
-        onChange={(on) => void replyToEveryone(on)}
-        brain={kind}
-        plan={account?.plan ?? (signIn ? signInPlan(signIn, gates.row, kind) : null)}
-        coding={planOf(choice)}
-        disabled={replying}
-      />
-    </div>
-  );
+  // Who the agents answer, once for the plan, as its foot: its icon says it, its switch changes it. The team's right
+  // hand's own AI for the person serves them alone: no switch.
+  const foot =
+    view?.scope === "mine" ? null : (
+      <div className="ac-card__foot ac-iconline ai-panel__replies">
+        <Icon name={replyAll ? "audienceEveryone" : "audienceOwner"} size={14} />
+        <PlanReplies
+          agent={everyone || everyAgent ? null : agent.name}
+          on={replyAll}
+          onChange={(on) => void replyToEveryone(on)}
+          brain={kind}
+          plan={account?.plan ?? (signIn ? signInPlan(signIn, gates.row, kind) : null)}
+          coding={planOf(choice)}
+          disabled={replying}
+        />
+      </div>
+    );
 
   if (gates.failed)
     return (
@@ -1258,7 +1270,7 @@ function GateWait({
       <SettingNote icon="lock">
         {gate.who === "computer"
           ? t("connectAi.accountsLocked", { name: pairer ?? "", computer })
-          : t("noAi.lockedAdmins")}
+          : t("noAi.lockedOwner")}
       </SettingNote>
     );
   }

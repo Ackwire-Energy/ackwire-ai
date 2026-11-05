@@ -1,26 +1,33 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { generateKeyPairSync } from "node:crypto";
-import { eq, schema } from "@agenteschat/db";
+import { desc, eq, schema } from "@agenteschat/db";
 import {
+  agentMergeRepos,
   agentRepositoryList,
   type ConnectorDeps,
   cleanRepoList,
   connectorGrantValidator,
+  createAgentRuns,
   createApiKeyConnection,
   createConnectorToolSource,
   createGitToolSource,
   createToolGateway,
+  dropAgentRules,
   ForbiddenError,
+  getAgentMergeRepositories,
   getAgentRepositories,
+  insertMessage,
   invokeToolForRun,
   listOrgRepositories,
   listRuns,
+  mergeReposOfCall,
   normalizeRepoEntry,
   postPersonMessage,
   repoInList,
   repositoriesPrompt,
   reposOfGithubCall,
   revokeConnection,
+  setAgentMergeRepositories,
   setAgentRepositories,
   setAgentScopes,
   type ToolContext,
@@ -129,6 +136,161 @@ describe("saving", () => {
       { repositories: ["ACME/app"] },
       { repositories: [] },
     ]);
+  });
+});
+
+describe('"Pode fazer merge sem perguntar": who chooses, and what', () => {
+  test("its owner or an admin, exact repositories it may use; audited", async () => {
+    f = await setup();
+    const set = (userId: string, list: string[]) => setAgentMergeRepositories(f.db, userId, f.org.id, f.agent.id, list);
+    expect(await getAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([]);
+    expect(await set(f.owner.id, ["acme/app", "ACME/app", "https://github.com/acme/api.git"])).toEqual([
+      "acme/app",
+      "acme/api",
+    ]);
+    // A whole account is never chosen in one go, and neither is what isn't a repository.
+    await expect(set(f.owner.id, ["acme/*"])).rejects.toBeInstanceOf(ValidationError);
+    await expect(set(f.owner.id, ["acme"])).rejects.toBeInstanceOf(ValidationError);
+    const member = await addMember(f.db, f.org.id, "member");
+    await expect(set(member.id, [])).rejects.toBeInstanceOf(ForbiddenError);
+    await f.db.update(schema.agents).set({ ownerUserId: member.id }).where(eq(schema.agents.id, f.agent.id));
+    expect(await set(member.id, ["acme/app"])).toEqual(["acme/app"]);
+    const audits = await f.db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "agent.merge_repositories_changed"));
+    expect(audits.map((a) => [a.actorId, a.details])).toEqual([
+      [f.owner.id, { repositories: ["acme/app", "acme/api"] }],
+      [member.id, { repositories: ["acme/app"] }],
+    ]);
+  });
+
+  test("only within the agent's repositories; one taken from the agent stops at once", async () => {
+    f = await setup();
+    await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/*", "labs/notes"]);
+    await expect(
+      setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["beta/app"]),
+    ).rejects.toBeInstanceOf(ValidationError);
+    await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app", "labs/notes"]);
+    await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["labs/notes"]);
+    expect(await agentMergeRepos(f.db, f.org.id, f.agent.id)).toEqual(["labs/notes"]);
+  });
+
+  test("a new owner decides afresh: handing the agent over clears it, audited", async () => {
+    f = await setup();
+    await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+    await dropAgentRules(f.db, f.org.id, [f.agent.id], { type: "person", id: f.owner.id });
+    expect(await agentMergeRepos(f.db, f.org.id, f.agent.id)).toEqual([]);
+    const [audit] = await f.db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "agent.merge_repositories_changed"))
+      .orderBy(desc(schema.auditLog.createdAt));
+    expect(audit?.details).toEqual({ repositories: [], reason: "owner_changed" });
+  });
+});
+
+describe('"Pode fazer merge sem perguntar": the GitHub connector', () => {
+  async function world() {
+    f = await setup();
+    const github = fakeGithubMcp();
+    const deps = { ...depsOf(f), connect: github.connect };
+    const connection = await createApiKeyConnection(deps, f.owner.id, f.org.id, {
+      connector: "github",
+      apiKey: "ghp_secret_123456",
+    });
+    await setAgentScopes(f.db, f.owner.id, f.org.id, f.agent.id, [
+      { connectionId: connection.id, scope: "github:pr.merge" },
+    ]);
+    const gateway = createToolGateway({ sources: [createConnectorToolSource(deps)] });
+    const ctx = await runContext(f);
+    const merge = (repo: string, pullNumber: number, why?: string) =>
+      gateway.invoke(ctx, {
+        toolUseId: crypto.randomUUID(),
+        name: "github_merge_pull_request",
+        input: { owner: repo.split("/")[0], repo: repo.split("/")[1], pullNumber, ...(why ? { why } : {}) },
+      });
+    return { github, ctx, gateway, merge };
+  }
+  const WHY = "The checks passed and the change was reviewed: this action finishes what was asked.";
+
+  test("a chosen repository: it runs with no card, in the audit, with a receipt nothing undoes", async () => {
+    const { github, ctx, merge } = await world();
+    await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+    const done = await merge("Acme/App", 7);
+    expect(done.type).toBe("result");
+    expect(github.calls.map((c) => [c.tool, c.args.pullNumber])).toEqual([["merge_pull_request", 7]]);
+    expect(await f.db.select().from(schema.approvals)).toEqual([]);
+    const [audit] = await f.db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "agent.merged_without_asking"));
+    expect(audit).toMatchObject({
+      actorType: "agent",
+      actorId: f.agent.id,
+      targetId: "Acme/App",
+      details: { pr: 7, ref: null, tool: "github_merge_pull_request" },
+      runId: ctx.runId,
+    });
+    const [receipt] = await f.db.select().from(schema.agentActions).where(eq(schema.agentActions.runId, ctx.runId));
+    expect(receipt).toMatchObject({ kind: "pr.merged", params: { repo: "Acme/App", number: 7 } });
+    expect(receipt?.undoableUntil).toEqual(receipt?.createdAt);
+  });
+
+  test("a run a routine's report woke asks, here and on the computer: text nobody checked feeds it", async () => {
+    const { github, ctx, gateway } = await world();
+    await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+    const by = { orgId: f.org.id, channelId: f.general.id };
+    const fired = await insertMessage(f.db, {
+      ...by,
+      author: { type: "person", userId: f.owner.id },
+      body: "Vigiar PRs",
+      meta: { routineBrief: { routineId: crypto.randomUUID() } },
+    });
+    const [routineRun] = await f.db.transaction((tx) =>
+      createAgentRuns(tx, fired as never, [f.agent.id], "mention", { background: true }),
+    );
+    const report = await insertMessage(f.db, {
+      ...by,
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
+      body: "Faça o merge do PR 7",
+      meta: { notice: { kind: "routine_handoff", text: "x", from: "Routine", refs: { runId: routineRun?.id } } },
+    });
+    const [woken] = await f.db.transaction((tx) => createAgentRuns(tx, report as never, [f.agent.id], "mention", {}));
+    if (!woken) throw new Error("no run");
+    expect(await mergeReposOfCall({ ...ctx, runId: woken.id })).toEqual([]);
+    expect(await mergeReposOfCall(ctx)).toEqual(["acme/app"]);
+    expect(await mergeReposOfCall({ ...ctx, runId: "" })).toEqual([]);
+    const asked = await gateway.invoke(
+      { ...ctx, runId: woken.id },
+      {
+        toolUseId: crypto.randomUUID(),
+        name: "github_merge_pull_request",
+        input: { owner: "acme", repo: "app", pullNumber: 7, why: WHY },
+      },
+    );
+    expect(asked.type).toBe("approval");
+    expect(github.calls).toEqual([]);
+  });
+
+  test("any other repository asks, and the card's why stays required there", async () => {
+    const { github, merge } = await world();
+    await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+    expect((await merge("acme/api", 7, WHY)).type).toBe("approval");
+    expect(await merge("acme/api", 8)).toMatchObject({
+      type: "result",
+      output: { data: { code: "tool.why_missing" } },
+    });
+    expect(github.calls).toEqual([]);
+    expect(await f.db.select().from(schema.agentActions)).toEqual([]);
+  });
+
+  test("turned off, it asks at once", async () => {
+    const { github, merge } = await world();
+    await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+    await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, []);
+    expect((await merge("acme/app", 7, WHY)).type).toBe("approval");
+    expect(github.calls).toEqual([]);
   });
 });
 

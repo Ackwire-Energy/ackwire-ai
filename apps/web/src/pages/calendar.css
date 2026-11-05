@@ -262,6 +262,11 @@ html:not([data-pointer]) .cal-week__daybtn:focus-visible {
   color: var(--ink2);
   box-shadow: inset 3px 0 0 var(--cal-accent);
 }
+.cal-chip[data-source="reminder"] {
+  background: var(--chosen-bg);
+  color: var(--ink2);
+  box-shadow: inset 3px 0 0 var(--cal-accent);
+}
 .cal-chip[data-source="deadline"] {
   --cal-accent: var(--warn);
 }

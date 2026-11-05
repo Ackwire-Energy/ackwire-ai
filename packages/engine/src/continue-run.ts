@@ -253,7 +253,7 @@ async function answerAnywayText(
 }
 
 /** A run error its AI provider caused (an error it returned, or no answer after the retries): worth another try. */
-export const PROVIDER_ERRORS = new Set(["run.provider_error", "run.provider_unavailable"]);
+export const PROVIDER_ERRORS = new Set(["run.provider_error", "run.provider_account", "run.provider_unavailable"]);
 export const providerFailure = (error: string | null) => PROVIDER_ERRORS.has(runErrorDetail(error)?.errorCode ?? "");
 
 /** The stop-and-send message left the stopped run's inbox before the restart (handed on already). */

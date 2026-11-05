@@ -183,7 +183,8 @@ export async function settleReach(
       }
       if (
         deps.gateway &&
-        (await agentAiState({ db, gateway: deps.gateway, machines: deps.machines }, a)).state === "no_ai"
+        (await agentAiState({ db, gateway: deps.gateway, machines: deps.machines }, a, undefined, person ?? undefined))
+          .state === "no_ai"
       ) {
         entries.push({ agentId: a.id, handle: a.handle, reason: "not_in_channel", noAi: true });
         continue;

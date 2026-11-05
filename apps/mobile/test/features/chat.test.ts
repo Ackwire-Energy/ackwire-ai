@@ -22,6 +22,7 @@ import {
   markedParts,
   markName,
   mayStopRun,
+  mentionTint,
   mergeTimeline,
   missionCardRef,
   missionPlanOf,
@@ -45,7 +46,6 @@ import {
   tableHidden,
   threadFaces,
   threadTitleFrom,
-  toggleReaction,
   turnPhrase,
   workingEntries,
   workStepsOf,
@@ -644,14 +644,6 @@ describe("reactions", () => {
       { reaction: "🎉", emoji: "🎉", people: 0, agentIds: ["nina"], mine: false },
       { reaction: "+1", emoji: "👍", people: 2, agentIds: [], mine: true },
     ]);
-  });
-  test("toggling mine adds, removes and drops empty ones", () => {
-    const on = toggleReaction([], "🙌", "me");
-    expect(on).toEqual([{ reaction: "🙌", count: 1, userIds: ["me"], agentIds: [] }]);
-    expect(toggleReaction(on, "🙌", "me")).toEqual([]);
-    const shared = toggleReaction([{ reaction: "🙌", count: 1, userIds: ["ana"] }], "🙌", "me");
-    expect(shared[0]?.userIds).toEqual(["ana", "me"]);
-    expect(shared[0]?.count).toBe(2);
   });
 });
 
@@ -1366,5 +1358,18 @@ describe("reading a conversation", () => {
   test("a thread view marks only its thread read, never its channel", () => {
     expect(readMark("c1", "t1")).toEqual({ kind: "thread", id: "t1" });
     expect(readMark("c1", null)).toEqual({ kind: "channel", id: "c1" });
+  });
+});
+
+describe("an agent's @mention", () => {
+  const agents = [{ handle: "Theo", previousHandles: ["teo"], appearance: { color: "rose" } }, { handle: "ada" }];
+
+  test("takes the agent's tone per theme, sky with no look; a person or an unknown handle gets none", () => {
+    const light = mentionTint("theo", agents, "light");
+    expect(light?.backgroundColor).toMatch(/^#[0-9a-f]{6}$/);
+    expect(mentionTint("theo", agents, "dark")?.backgroundColor).not.toBe(light?.backgroundColor);
+    expect(mentionTint("ada", agents, "light")?.color).not.toBe(light?.color);
+    expect(mentionTint("maria", agents, "light")).toBeUndefined();
+    expect(mentionTint("teo", agents, "light")).toEqual(light);
   });
 });

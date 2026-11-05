@@ -311,6 +311,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       taskManager: (orgId, since) =>
         request<TaskManagerView>(`${org(orgId)}/task-manager`, { query: since ? { since } : {} }),
       taskSteps: (orgId, runId) => request<TaskSteps>(`${org(orgId)}/task-manager/${enc(runId)}/steps`),
+      continueTasks: (orgId, runIds) =>
+        request<{ continued: number }>(`${org(orgId)}/task-manager/continue`, { json: { runIds } }),
     },
     mail: {
       providers: (orgId) => request<MailProviders>(`${org(orgId)}/mail/providers`),
@@ -782,7 +784,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             json: { channels },
           })
         ).channels,
-      brain: (orgId, agentId) => request<AgentBrain>(`${org(orgId)}/agents/${enc(agentId)}/brain`),
+      brain: (orgId, agentId, scope) =>
+        request<AgentBrain>(`${org(orgId)}/agents/${enc(agentId)}/brain${scope ? `?scope=${scope}` : ""}`),
       setBrain: (orgId, agentId, input) =>
         request<AgentBrain>(`${org(orgId)}/agents/${enc(agentId)}/brain`, { method: "PUT", json: input }),
       brainMachines: async (orgId) =>
@@ -1642,6 +1645,16 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       set: async (orgId, agentId, repositories) =>
         (
           await request<{ repositories: string[] }>(`${org(orgId)}/agents/${enc(agentId)}/repositories`, {
+            method: "PUT",
+            json: { repositories },
+          })
+        ).repositories,
+      merge: async (orgId, agentId) =>
+        (await request<{ repositories: string[] }>(`${org(orgId)}/agents/${enc(agentId)}/merge-repositories`))
+          .repositories,
+      setMerge: async (orgId, agentId, repositories) =>
+        (
+          await request<{ repositories: string[] }>(`${org(orgId)}/agents/${enc(agentId)}/merge-repositories`, {
             method: "PUT",
             json: { repositories },
           })

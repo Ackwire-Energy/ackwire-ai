@@ -158,6 +158,14 @@ describe("the right hand's team setup tools", () => {
     expect(prompt).toContain(TEAM_INTERVIEW);
     expect(prompt).toContain("ONE propose_team card");
   });
+
+  test("with a team too: asked to build or redo it in its DM, it runs the interview", async () => {
+    f = await setup({ rightHand: true });
+    const lodi = await lodiOf(f);
+    const dm = { orgId: f.org.id, agent: lodi, personId: f.owner.id, inDm: true };
+    expect(await rightHandPrompt({ db: f.db }, dm)).toContain(TEAM_INTERVIEW);
+    expect(await rightHandPrompt({ db: f.db }, { ...dm, inDm: false })).not.toContain(TEAM_INTERVIEW);
+  });
 });
 
 describe("the team card", () => {

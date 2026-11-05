@@ -5,11 +5,12 @@ import { QueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import i18next from "i18next";
 import { ApiError, type Approval, type ApprovalEmail, cacheApproval, keys } from "../src/index";
-import { aheadPhase, emailTitleWords } from "../src/lib/approval-kind";
+import { aheadPhase, approveAlwaysOffered, emailTitleWords } from "../src/lib/approval-kind";
 import { approvalOriginShort } from "../src/lib/approval-origin";
 import {
   actionName,
   aheadEndLine,
+  alwaysRoutineName,
   approvalGroupWaitsFor,
   approvalRuleServer,
   approvalRuleWords,
@@ -18,6 +19,7 @@ import {
   approvalValues,
   approvalWaitsFor,
   approveAlwaysHint,
+  approveAlwaysLabel,
   approveAlwaysWords,
   ownActionName,
   requesterDecidesLine,
@@ -290,5 +292,48 @@ describe("approvals an agent asked of named people (ADR 0126)", () => {
     expect(line({ status: "approved", decidedByUserId: "bia" })).toBe("approval.requesterDecides");
     expect(line({ status: "approved", decidedByUserId: "carla" })).toBeNull();
     expect(line({ approvers: { ...asked, requesterDecides: false } })).toBeNull();
+  });
+});
+
+describe('"Sempre nesta rotina" on a routine\'s card', () => {
+  const routine = async (code: "pt-BR" | "en") => {
+    const i18n = i18next.createInstance();
+    await i18n.init({ lng: code, resources, interpolation: { escapeValue: false } });
+    return i18n.t.bind(i18n) as unknown as TFunction;
+  };
+  const kind = { tool: "composio_exec", actions: ["GMAIL_SEND_EMAIL"], routineId: "r1" };
+  const card = {
+    status: "pending",
+    canDecide: true,
+    approveAlways: kind,
+    tool: "composio_exec",
+    scope: "gmail:send",
+    origin: { kind: "routine", routineId: "r1", routineName: "Resumo da semana" },
+  } as Pick<Approval, "status" | "canDecide" | "approveAlways" | "tool" | "scope" | "origin">;
+
+  test("its button, and what it covers and where it's undone, in the person's language", async () => {
+    const pt = await routine("pt-BR");
+    expect(approveAlwaysLabel(pt, card)).toBe("Sempre nesta rotina");
+    expect(approveAlwaysHint(pt, card, "Ada")).toBe(
+      "Resumo da semana faz Enviar e-mail (Gmail) sozinha de agora em diante, com qualquer valor. Fora desta rotina continua pedindo. Para desfazer: configurações da rotina.",
+    );
+    const en = await routine("en");
+    expect(approveAlwaysLabel(en, card)).toBe("Always in this routine");
+    expect(approveAlwaysHint(en, card, "Ada")).toContain("To undo: the routine's settings.");
+  });
+
+  test("a routine's name that isn't known reads as this routine; any other card has none", async () => {
+    const pt = await routine("pt-BR");
+    expect(alwaysRoutineName(pt, { ...card, origin: null })).toBe("esta rotina");
+    expect(alwaysRoutineName(pt, card)).toBe("Resumo da semana");
+    expect(alwaysRoutineName(pt, { ...card, approveAlways: { tool: "t", actions: [] } })).toBeNull();
+  });
+
+  test("a send counts: it is a routine's job, and the server already left out what never is", () => {
+    expect(approveAlwaysOffered(card)).toBe(true);
+    expect(approveAlwaysOffered({ ...card, canDecide: false })).toBe(false);
+    expect(approveAlwaysOffered({ ...card, status: "approved" })).toBe(false);
+    // Plain "Aprovar sempre" keeps its rule: what is high risk is never approved for good.
+    expect(approveAlwaysOffered({ ...card, approveAlways: { tool: "t", actions: [] } })).toBe(false);
   });
 });

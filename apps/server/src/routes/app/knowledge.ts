@@ -44,6 +44,7 @@ const KINDS = [
   "entity_profile",
   "note",
   "lesson",
+  "rule",
 ] as const;
 const SEARCH_KINDS = ["message", "context_item", "issue", "file", "wiki", "action"] as const;
 

@@ -45,6 +45,7 @@ import {
   StopTaskButton,
   TaskMark,
   TaskStateChip,
+  TaskWaitLines,
   taskAge,
   taskSub,
   UsingNow,
@@ -90,16 +91,6 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
   const [panel, setPanel] = useState<string | null>(null);
   // The computer whose line is open ("Ver fila"): the line's own dialog, as a conversation's header opens it.
   const [queueOf, setQueueOf] = useState<string | null>(null);
-  // Esc closes the panel, like a thread's; an Escape a dialog over it took is the dialog's alone.
-  useEffect(() => {
-    if (!panel) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[role="dialog"]')) return;
-      setPanel(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [panel]);
 
   const all = view.data?.tasks ?? [];
   const activity = view.data?.activity;
@@ -344,7 +335,10 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
           ) : card ? (
             <TaskTable>
               {tasksOf(shown, card).length > 0 ? (
-                <ul className="tm-list">{tasksOf(shown, card).map((task) => row(task, "agent"))}</ul>
+                <>
+                  <TaskWaitLines tasks={tasksOf(shown, card)} />
+                  <ul className="tm-list">{tasksOf(shown, card).map((task) => row(task, "agent"))}</ul>
+                </>
               ) : (
                 <p className="tm-none">{t("taskManager.free")}</p>
               )}
@@ -355,6 +349,7 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
                 <TaskSection
                   title={t("taskManager.sections.asked")}
                   count={grouped.groups.reduce((n, g) => n + g.tasks.length, 0)}
+                  tasks={grouped.groups.flatMap((g) => g.tasks)}
                 >
                   {grouped.groups.map((g) => (
                     <Fragment key={g.agentId}>
@@ -395,7 +390,11 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
                 </TaskSection>
               )}
               {grouped.background.length > 0 && (
-                <TaskSection title={t("taskManager.sections.background")} count={grouped.background.length}>
+                <TaskSection
+                  title={t("taskManager.sections.background")}
+                  count={grouped.background.length}
+                  tasks={grouped.background}
+                >
                   {grouped.background.map((task) => row(task, "flat"))}
                 </TaskSection>
               )}
@@ -471,23 +470,34 @@ function TaskTable({ children }: { children: ReactNode }) {
   );
 }
 
-/** "Pedidas por pessoas 6", "Rotinas em segundo plano 2": a section of the table. */
-function TaskSection({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+/** "Pedidas por pessoas 6", "Rotinas em segundo plano 2": a section of the table, what its rows wait on over them. */
+function TaskSection({
+  title,
+  count,
+  tasks,
+  children,
+}: {
+  title: string;
+  count: number;
+  tasks: ManagedTask[];
+  children: ReactNode;
+}) {
   return (
     <section className="tm-section" aria-label={title}>
       <h3 className="tm-sec">
         {title}
         <span className="tm-sec__count">{count}</span>
       </h3>
+      <TaskWaitLines tasks={tasks} />
       <ul className="tm-list">{children}</ul>
     </section>
   );
 }
 
 /**
- * One task: what it is (the whole row picks it), its state, what it uses now, its time (shaded as it grows), where it
- * runs and Parar. `grouped` sits under its agent's row; `flat` (a routine's background run) shows its agent's face;
- * `agent` is the list of one agent's tasks (its card chosen).
+ * One task: what it is (the whole row picks it), its state, what it uses now, its time (shaded as it grows, but not on
+ * a wait with a known reason: that isn't stuck), where it runs and Parar. `grouped` sits under its agent's row; `flat`
+ * (a routine's background run) shows its agent's face; `agent` is the list of one agent's tasks (its card chosen).
  */
 function TaskRow({
   task,
@@ -538,7 +548,7 @@ function TaskRow({
         {look === "flat" ? face : <TaskMark task={task} />}
         <span className="tm-name">
           <button type="button" className="tm-hit" aria-pressed={selected} onClick={onSelect}>
-            {title}
+            <span className="tm-hit__text">{title}</span>
           </button>
           <small>{sub}</small>
         </span>
@@ -549,7 +559,10 @@ function TaskRow({
       <span className="tm-cell tm-cell--use">
         <UsingNow task={task} />
       </span>
-      <span className="tm-cell tm-cell--time ac-num" style={{ "--h": heatOf(age) } as CSSProperties}>
+      <span
+        className="tm-cell tm-cell--time ac-num"
+        style={{ "--h": taskState(task) === "waiting" ? 0 : heatOf(age) } as CSSProperties}
+      >
         {taskClock(age)}
       </span>
       <span className="tm-cell tm-cell--where">
@@ -563,10 +576,10 @@ function TaskRow({
             onClick={() => onQueue(machine.id)}
           >
             <Icon name="computer" size={14} />
-            <span className="tm-ellipsis">{machine.name}</span>
+            <span>{machine.name}</span>
           </button>
         ) : (
-          <span className="tm-ellipsis">{t("taskManager.servers")}</span>
+          t("taskManager.servers")
         )}
       </span>
       <span className="tm-cell tm-cell--act">
@@ -608,12 +621,15 @@ function AgentRow({
   const { t } = useTranslation();
   // Waiting beats queued, working beats both (someone waits on it while it works on something else).
   const working = group.tasks.find((task) => taskState(task) === "working");
+  const held = group.tasks.find((task) => taskState(task) === "waiting");
   const state = working ? (
     <TaskStateChip task={working} />
   ) : group.waiting > 0 ? (
     <Chip tone="waiting" lead={<WaitMark />}>
       {t("taskManager.waiting", { count: group.waiting })}
     </Chip>
+  ) : held ? (
+    <TaskStateChip task={held} />
   ) : (
     <Chip icon="clock">{t("taskManager.state.queued")}</Chip>
   );

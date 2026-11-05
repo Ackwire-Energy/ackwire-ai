@@ -5,12 +5,14 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useEscClose } from "@/hooks/useEscClose";
 import { AgentPage } from "@/pages/AgentPage";
 
 /**
- * The agent's page in the panel beside the conversation, over an overlay that dims it. Its ×, Esc inside it, a click
- * on the overlay and its opener again (`closeRequest`, a new number each time) close it, asking first when something
- * is unsaved. It takes the focus when it opens, so Esc and Tab start there.
+ * The agent's page docked beside the conversation, in the threads panel's place (the conversation stays in use, never
+ * dimmed; a phone or a narrow body: the whole screen). Its ×, Esc (`useEscClose`) and its opener again (`closeRequest`,
+ * a new number each time) close it, asking first when something is unsaved. It takes the focus when it opens, so Esc
+ * and Tab start there.
  */
 export function AgentPanel({
   agentId,
@@ -30,53 +32,38 @@ export function AgentPanel({
   const [place, setPlace] = useState<{ tab: AgentTab; section?: AgentSection }>({ tab: tab ?? "overview" });
   const [closeRequest, setCloseRequest] = useState(0);
   const request = () => setCloseRequest((n) => n + 1);
+  useEscClose(request);
   useEffect(() => {
     if (asked) setCloseRequest((n) => n + 1);
   }, [asked]);
   const self = useRef<HTMLElement>(null);
   useEffect(() => self.current?.focus({ preventScroll: true }), []);
   return (
-    <>
-      <button
-        type="button"
-        className="thread-panel__scrim"
-        tabIndex={-1}
+    <aside
+      ref={self}
+      tabIndex={-1}
+      className="thread-panel thread-panel--docked thread-panel--wide"
+      aria-label={t("agentPage.panel.label", agentGrammar(name))}
+    >
+      <Button
+        size="sm"
+        iconOnly
+        icon="close"
+        className="agp-glass thread-panel__close"
         aria-label={t("common.close")}
+        title={t("common.close")}
         onClick={request}
       />
-      <aside
-        ref={self}
-        tabIndex={-1}
-        className="thread-panel thread-panel--wide"
-        aria-label={t("agentPage.panel.label", agentGrammar(name))}
-        onKeyDown={(e) => {
-          // A field's Esc and an open dialog's or menu's (which mark it handled) are theirs.
-          if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[role="dialog"]')) return;
-          if (e.target instanceof Element && e.target.closest("input, textarea, [contenteditable='true']")) return;
-          e.preventDefault();
-          request();
-        }}
-      >
-        <Button
-          size="sm"
-          iconOnly
-          icon="close"
-          className="agp-glass thread-panel__close"
-          aria-label={t("common.close")}
-          title={t("common.close")}
-          onClick={request}
+      <div className="thread-panel__page">
+        <AgentPage
+          agentId={agentId}
+          tab={place.tab}
+          section={place.section}
+          onNavigate={(tab, section) => setPlace({ tab, section })}
+          onClose={onClose}
+          closeRequest={closeRequest}
         />
-        <div className="thread-panel__page">
-          <AgentPage
-            agentId={agentId}
-            tab={place.tab}
-            section={place.section}
-            onNavigate={(tab, section) => setPlace({ tab, section })}
-            onClose={onClose}
-            closeRequest={closeRequest}
-          />
-        </div>
-      </aside>
-    </>
+      </div>
+    </aside>
   );
 }

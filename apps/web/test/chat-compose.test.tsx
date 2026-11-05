@@ -72,6 +72,24 @@ describe("reactions on any message", () => {
     expect(within(article("o login está devolvendo 401")).queryByRole("group", { name: "Reações" })).toBeNull();
   });
 
+  test("the pill shows before the server answers, and comes off when it refuses", async () => {
+    const api = createFakeApi(seedState());
+    let refuse: (error: Error) => void = () => {};
+    api.chat.react = () => new Promise((_resolve, reject) => (refuse = reject));
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(6);
+    await act(async () => r.sockets.last().open());
+    await settle(2);
+    const msg = article("o login está devolvendo 401");
+    const bar = within(msg).getByRole("toolbar", { name: "Ações da mensagem de João" });
+    await pickEmoji(within(bar).getByRole("button", { name: "Reagir" }), "party popper");
+    const pills = () => within(article("o login está devolvendo 401")).queryByRole("group", { name: "Reações" });
+    expect(within(pills() as HTMLElement).getByRole("button", { name: "você reagiu com 🎉" })).toBeTruthy();
+    await act(async () => refuse(new Error("no")));
+    await settle(2);
+    expect(pills()).toBeNull();
+  });
+
   test("👍 from the picker on an agent's reply is the +1 feedback; 👎 replaces it", async () => {
     const { state } = await open();
     const reply = article("Achei a causa");

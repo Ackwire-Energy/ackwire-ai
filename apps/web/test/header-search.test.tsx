@@ -59,6 +59,18 @@ const seeded = () => {
 };
 
 describe("the header search (Discord's)", () => {
+  test("Esc in the box closes the results and keeps the words", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
+    await settle(6);
+    await typeIn("zebra");
+    await enter();
+    expect(results()).toBeTruthy();
+    await act(async () => fireEvent.keyDown(box(), { key: "Escape" }));
+    await settle(2);
+    expect(results()).toBeNull();
+    expect(box().value).toBe("zebra");
+  });
+
   test("focused: the filters with an example, the rest folded under Mais filtros; de: lists agents, then people", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
     await settle(6);

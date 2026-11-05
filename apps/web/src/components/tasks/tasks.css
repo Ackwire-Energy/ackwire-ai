@@ -68,6 +68,57 @@
   color: var(--faint);
 }
 
+/* A wait's state: what holds the task and what comes next, wrapped whole, never cut. */
+.tm-state {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--faint);
+}
+.tm-state__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tm-state__text b {
+  font-weight: 600;
+  color: var(--ink2);
+}
+.tm-state[data-wait] b {
+  color: var(--attention);
+}
+.tm-state__text small {
+  font-size: 12px;
+}
+
+/* Over rows waiting on the same limit: why, once, and Continuar agora for who may press it. */
+.tm-waitline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--plate-soft);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink2);
+}
+.tm-waitline__text {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.tm-waitline__text > .ac-icon {
+  color: var(--faint);
+}
+
+.tm-agentpanel .tm-waitline {
+  border-top: 0;
+  border-radius: var(--radius-item);
+}
+
 /* "Parar": a row's button with the stop square; a danger tint only on hover, as the chat's own stop. */
 .tm-stop.ac-btn {
   flex: none;
@@ -369,8 +420,7 @@
   gap: 6px;
   min-width: 0;
 }
-.tm-taskcard__title b,
-.tm-taskcard__label small {
+.tm-taskcard__title b {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

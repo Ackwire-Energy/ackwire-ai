@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { AgentBrain, Credential, MachineAccount, PlanUsage } from "@agenteschat/client";
 import { newAgentStart } from "@agenteschat/client/lib/agent-setup";
 import { accountTitle, ownSignInTitle } from "@agenteschat/client/lib/ai-accounts";
@@ -408,7 +410,7 @@ describe("the agent's AI", () => {
   test("a card whose plan's sign-in ended: the agent says so, and Entrar de novo opens on its own plan", async () => {
     const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
     const [card, sheet] = await Promise.all([read("NoAiCard.tsx"), read("ConnectAi.tsx")]);
-    expect(card).toContain('t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(name))');
+    expect(card).toContain("t(noAiLineKey(card), agentGrammar(name))");
     // The plan the client tests pin (`signInAgainPlan`): ChatGPT for a Codex agent, never Claude's page.
     expect(card).toContain("const again = signInAgainPlan(card, agent);");
     expect(card).toContain('t(again ? "agentPage.work.brain.signInAgain" : "noAi.action")');
@@ -435,7 +437,7 @@ describe("the agent's AI", () => {
     // A plan's page waits for the computer's row for ChatGPT too, not only Claude (`ownSignInFor`).
     expect(connect).toContain("brain: view && (ai.data || !(isPlanId(choice) || view.ownSignIn)) ? view : undefined,");
     // Its card: what isn't signed in and where to connect, and Conectar on that CLI's plan.
-    expect(card).toMatch(/t\(`noAi\.notSignedIn\.\$\{card\.own\}`, agentGrammar\(name\)\)/);
+    expect(card).toContain("t(noAiLineKey(card), agentGrammar(name))");
     expect(card).toContain("const plan = card.own ? planOfKind(card.own) : again;");
     const pt = await translator("pt-BR");
     expect(pt("noAi.notSignedIn.codex", { context: "female", name: "Ada" })).toBe(
@@ -967,4 +969,12 @@ test("a Cursor sign-in on the phone: its own steps, or its API key when chosen, 
   expect(signInKey(undefined, "cursor", true)).toEqual({ plan: CURSOR_KEY_PLAN, provider: "cursor" });
   expect(signInKey(undefined, "claude_code", true).plan).toBeUndefined();
   expect(signInKey("zai", "claude_code", false)).toEqual({ plan: planOf("zai") as never, provider: "zai" });
+});
+
+describe("Seus planos' rows", () => {
+  test("a list row has the same room at its top and bottom as at its sides", () => {
+    const row = readFileSync(join(import.meta.dir, "../../src/ui/Row.tsx"), "utf8");
+    expect(row).toContain("padding: 14,");
+    expect(row).not.toContain("paddingVertical");
+  });
 });

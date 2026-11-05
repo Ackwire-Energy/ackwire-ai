@@ -148,7 +148,7 @@ test("the words: the check's refusals, and Better Auth's by status and code befo
   const tEn = Object.assign((key: string) => key, { lng: "en" }) as unknown as typeof t;
   expect(authErrorText(tEn, { status: 400, message: "Password too short" })).toBe("Password too short");
   expect(authErrorText(t, { status: 400, message: "Password too short" })).toBe("Password too short");
-  expect(authErrorText(tEn, { status: 500, message: "Internal Server Error" })).toBe("common.unknownError");
+  expect(authErrorText(tEn, { status: 500, message: "Internal Server Error" })).toBe("common.ourSide");
 });
 
 test("a limit with no words of its own reads as too many tries, never the server's English", () => {

@@ -23,6 +23,7 @@ import {
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import {
+  alwaysRoutineName,
   approvalGroupWaitsFor,
   approvalSummary,
   approvalWaitsFor,
@@ -221,7 +222,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
           asks?.settle(a.id);
           const also = approveAlwaysAlso(items, a);
           if (also.length) all.mutate({ ids: also, decision: "approve" }, { onSuccess: () => settle(also) });
-          toast({ ...approveAlwaysToast(t, name), agentId: a.agentId });
+          toast({ ...approveAlwaysToast(t, name, alwaysRoutineName(t, a)), agentId: a.agentId });
         },
         onError: failed,
       },
@@ -521,7 +522,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
           asks?.settle(a.id);
           toast({
             ...(always
-              ? approveAlwaysToast(t, name)
+              ? approveAlwaysToast(t, name, alwaysRoutineName(t, a))
               : {
                   title: t("mobile.approval.approved"),
                   subtitle: a.runAt

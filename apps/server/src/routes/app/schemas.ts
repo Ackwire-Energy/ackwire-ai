@@ -277,6 +277,16 @@ export const PlanUsage = z
     limited: z.boolean().optional().openapi({ description: "The plan refused a request for its limit." }),
     source: z.enum(["turn", "probe"]),
     at: z.string().openapi({ description: "When the computer learned it." }),
+    models: z
+      .record(
+        z.string(),
+        z.object({ at: z.string(), until: z.string().optional(), region: z.literal(true).optional() }),
+      )
+      .optional()
+      .openapi({
+        description:
+          "Models at a limit of their own, by model id: until `until` (absent: unknown), or `region`: the model needs a region the account doesn't allow.",
+      }),
   })
   .openapi("PlanUsage", {
     description: "A plan's usage limits, as the CLI on the computer said them (no token is ever read).",
@@ -440,7 +450,7 @@ export const AgentAction = z
       .nullable()
       .openapi({ description: "The person the agent worked for: they, admins and the agent's owner may undo." }),
     target: z.object({
-      type: z.enum(["issue", "memory", "routine", "channel", "wiki_page", "thread", "skill", "agent"]),
+      type: z.enum(["issue", "memory", "routine", "channel", "wiki_page", "thread", "skill", "agent", "repository"]),
       id: z.string(),
       number: z.number().optional().openapi({ description: "Issues." }),
       title: z.string().optional().openapi({ description: "Issue, routine, page or thread title; channel name." }),
@@ -790,6 +800,21 @@ export const BrainMachine = z
 export const AgentBrain = z
   .object({
     agentId: z.uuid(),
+    scope: z.enum(["mine", "workspace"]).optional().openapi({
+      description:
+        "The team's right hand only (ADR 0137 §11): `mine`, the caller's own AI for their DM with it (`brain` `model` = none, their DM thinks with the workspace's); `workspace`, the one every DM thinks with while its person has none.",
+    }),
+    workspaceAi: z
+      .object({
+        brain: BrainKind,
+        ownerId: z.string().nullable(),
+        servesYou: z.boolean(),
+      })
+      .optional()
+      .openapi({
+        description:
+          "With `mine`: the workspace's AI, `model` for an API key, else the plan's brain and owner; `servesYou`, it thinks for the caller (a key, a plan whose owner lets it serve everyone, or theirs).",
+      }),
     brain: BrainKind,
     model: z.string().nullable().openapi({ description: "As stored; null = the brain's default." }),
     effectiveModel: z.string().nullable(),

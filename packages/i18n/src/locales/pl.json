@@ -21,6 +21,7 @@
     "refreshing": "Odświeżanie",
     "retry": "Spróbuj ponownie",
     "unknownError": "Coś poszło nie tak. Spróbuj ponownie.",
+    "ourSide": "Coś poszło nie tak po naszej stronie. Spróbuj ponownie za chwilę.",
     "signedOut": "Twoja sesja wygasła. Zaloguj się ponownie, aby kontynuować.",
     "newVersion": "Jest nowa wersja agentes.chat.",
     "reload": "Odśwież",
@@ -41,7 +42,7 @@
     "today": "Dzisiaj",
     "yesterday": "Wczoraj",
     "loadFailed": "Nie udało się tego wczytać. Sprawdź połączenie i spróbuj ponownie.",
-    "notAllowed": "Nie masz do tego uprawnień. Poproś administratora przestrzeni roboczej.",
+    "notAllowed": "Nie masz do tego uprawnień.",
     "tooMany": "Zbyt wiele prób. Spróbuj później.",
     "offline": "Jesteś offline. Sprawdź połączenie i spróbuj ponownie.",
     "unreachable": "Nie można teraz połączyć się z agentes.chat. Spróbuj za chwilę."
@@ -223,6 +224,12 @@
       "desc": "Otwartych lub prywatnych.",
       "short": "tworzenie kanałów",
       "say": "tworzy kanały"
+    },
+    "mention_everyone": {
+      "title": "Wzmianka o wszystkich",
+      "desc": "Pisanie @wszyscy, żeby powiadomić wszystkich na kanale, osoby i agentów.",
+      "short": "wzmianka o wszystkich",
+      "say": "wspomina wszystkich"
     },
     "manage_channels": {
       "title": "Porządkowanie kanałów",
@@ -1960,10 +1967,10 @@
     "away_few": "{{names}} czekają na komputer",
     "away_many": "{{names}} czekają na komputer",
     "away_other": "{{names}} czekają na komputer",
-    "plan_one": "{{names}} odpowie, gdy plan się odnowi",
-    "plan_few": "{{names}} odpowiedzą, gdy plan się odnowi",
-    "plan_many": "{{names}} odpowiedzą, gdy plan się odnowi",
-    "plan_other": "{{names}} odpowiedzą, gdy plan się odnowi",
+    "plan_one": "{{names}} czeka na plan",
+    "plan_few": "{{names}} czekają na plan",
+    "plan_many": "{{names}} czekają na plan",
+    "plan_other": "{{names}} czekają na plan",
     "budget_one": "{{names}} odpowie, gdy budżet się odnowi",
     "budget_few": "{{names}} odpowiedzą, gdy budżet się odnowi",
     "budget_many": "{{names}} odpowiedzą, gdy budżet się odnowi",
@@ -1987,7 +1994,7 @@
       "outage": "Dostawca AI nie działa · ponowi sam",
       "queued": "W kolejce do komputera",
       "away": "Czeka na komputer",
-      "plan": "Odpowie, gdy plan się odnowi",
+      "plan": "Czeka na plan",
       "budget": "Odpowie, gdy budżet się odnowi",
       "line": "Zacznie, gdy skończy się inna praca",
       "canceled": "Anulowano",
@@ -2034,6 +2041,11 @@
         "import": "Zaimportuj moich agentów",
         "form": "Wypełnij formularz"
       },
+      "again": {
+        "question": "Chcesz zbudować zespół ze mną?",
+        "action": "Zbuduj zespół",
+        "message": "Pomóż mi zbudować zespół."
+      },
       "next": {
         "question": "Zespół jest już na miejscu. Co dalej?",
         "invite": "Zaproś ludzi",
@@ -2066,8 +2078,6 @@
       "name": "Nazwa i wygląd",
       "nameHelp": "Na pasku bocznym zawsze widnieje jako „{{label}}”.",
       "changeLook": "Zmień wygląd",
-      "ai": "AI i model",
-      "aiHelp": "Automatycznie wybiera najtańszy model, który da radę.",
       "budget": "Budżet miesięczny",
       "perMonth": "/mies.",
       "budgetHelp": "Gdy dojdzie do limitu, zatrzymuje się i daje znać, jak każdy agent.",
@@ -2075,12 +2085,27 @@
       "audienceHelp": "Osoba spoza tej grupy nie widzi {{name}} na pasku bocznym.",
       "lock": "{{name}} nie da się zarchiwizować ani usunąć. Nic nie publikuje, dopóki nikt do niego nie napisze.",
       "audit": "Zobacz, co zrobił {{name}}",
-      "onPlan": "Plan Claude · {{account}}",
       "change": "Zmień",
       "planHelp": "Płaci właściciel planu. Gdy jego komputer jest niedostępny, rozmowa o tym mówi i proponuje klucz API.",
-      "plan": "Plan",
-      "planOffer": "{{name}} może myśleć z twoim planem zamiast z kluczem API, na komputerze, na którym plan jest zalogowany, bez sięgania poza ten workspace.",
-      "usePlan": "Użyj planu"
+      "lookEdit": "Zmień wygląd: {{name}}",
+      "planOwner": "od: {{owner}}",
+      "mine": "Twoja AI",
+      "mineHelp": "Twoja rozmowa z {{name}} myśli z Twoim planem lub udostępnionym Ci planem, i tylko Twoja.",
+      "connectMine": "Połącz mój plan",
+      "useWorkspace": "Użyj AI workspace'u",
+      "fallbackKey": "Bez własnego planu korzysta z klucza API workspace'u.",
+      "fallbackPlan": "Bez własnego planu korzysta z planu użytkownika {{owner}}, który odpowiada wszystkim.",
+      "fallbackYours": "Bez innego planu korzysta z planu workspace'u, który jest Twój.",
+      "fallbackNone": "Bez własnego planu {{name}} nie może Ci odpowiedzieć: plan workspace'u odpowiada tylko użytkownikowi {{owner}}.",
+      "workspace": "AI workspace'u",
+      "workspaceHelp": "Osoby bez własnego planu rozmawiają z {{name}} przez tę AI.",
+      "workspacePlan": "Plan workspace'u",
+      "workspacePlanHelp": "Plan zamiast klucza. Odpowiada innym tylko wtedy, gdy pozwala na to jego właściciel.",
+      "noPlans": "Połącz plan w sekcji Twoja AI, aby użyć go tutaj.",
+      "pickPlan": "Wybierz plan",
+      "sharesOn": "Włączone: osoby bez własnego planu rozmawiają z {{name}} przez ten plan.",
+      "sharesOff": "Wyłączone: tylko {{owner}} rozmawia przez ten plan. Osoby bez własnego planu nie dostaną odpowiedzi.",
+      "sharesOffYou": "Wyłączone: tylko Ty rozmawiasz przez ten plan. Osoby bez własnego planu nie dostaną odpowiedzi."
     },
     "card": {
       "settings": "{{name}} · Ustawienia",
@@ -2303,6 +2328,8 @@
     },
     "agent": "{{name}} nie odpowie, bo nie ma podłączonego AI.",
     "agent_female": "{{name}} nie odpowie, bo nie ma podłączonego AI.",
+    "cliMissing": "{{name}} nie odpowie: program AI nie jest zainstalowany na komputerze.",
+    "noComputer": "{{name}} nie odpowie: AI potrzebuje komputera, a nie ma żadnego.",
     "signedOut": "{{name}} nie odpowie, bo jego AI jest wylogowane.",
     "signedOut_female": "{{name}} nie odpowie, bo jej AI jest wylogowane.",
     "notSignedIn": {
@@ -2322,12 +2349,17 @@
     "action": "Podłącz",
     "locked": "Kto podłącza AI agenta {{name}}: administrator, kluczem API, albo {{owner}}, własnym planem.",
     "lockedAdmins": "AI może podłączyć tylko administrator.",
+    "lockedOwner": "Plan dla agenta łączy tylko jego właściciel.",
     "rightHand": {
       "computer_away": "{{name}} nie może teraz odpowiedzieć: komputer planu jest niedostępny.",
+      "computer_failed": "{{name}} nie może teraz odpowiedzieć: komputer planu miał problem.",
       "plan_limit": "{{name}} nie może teraz odpowiedzieć: plan osiągnął limit.",
-      "plan_not_shared": "{{name}} myśli z planem, który odpowiada tylko swojemu właścicielowi.",
+      "plan_not_shared": "Połącz własny plan, aby rozmawiać z {{name}}: plan workspace'u odpowiada tylko swojemu właścicielowi.",
       "runner_outdated": "{{name}} nie może teraz odpowiedzieć: program na komputerze planu wymaga aktualizacji.",
-      "plan_tools": "{{name}} zatrzymał się przed odpowiedzią: AI planu na tym komputerze oferuje własne narzędzia.",
+      "plan_tools": "{{name}} zatrzymał się przed odpowiedzią: AI planu na tym komputerze nie pozostała przy narzędziach agentes.chat.",
+      "model_limit": "{{name}} nie może teraz odpowiedzieć: {{model}} osiągnął własny limit w planie. Pozostałe modele planu nadal działają.",
+      "model_region": "{{name}} nie może odpowiedzieć: {{model}} wymaga włączonego regionu Global w OpenCode (Settings › Privacy).",
+      "commands_off": "{{name}} nie może teraz odpowiedzieć: polecenia są wyłączone na komputerze planu i osoba, która się nim opiekuje, musi je włączyć.",
       "useKey": "Użyj klucza API"
     },
     "receipt": "Nikt nie odpowie: brak podłączonego AI",
@@ -2532,6 +2564,8 @@
       "monthly": "z miesiąca"
     },
     "line": "Wznowi {{when}}, gdy plan się odnowi. Szybkie odpowiedzi działają dalej.",
+    "changeModel": "Zmień model",
+    "raiseBudget": "Zwiększ budżet",
     "lineUnknown": "Wznowi, gdy tylko plan się odnowi. Szybkie odpowiedzi działają dalej.",
     "lineBudget": "Wznowi {{when}} albo wcześniej, jeśli budżet wzrośnie. Szybkie odpowiedzi działają dalej.",
     "continue": "Kontynuuj teraz",
@@ -2727,6 +2761,7 @@
     },
     "memory": {
       "saved": "Zapisano w <b>pamięci</b>: {{text}}",
+      "saved_rule": "Zapisano w <b>moich zasadach</b>: {{text}}",
       "updated": "Zaktualizowano <b>pamięć</b>: {{text}}",
       "forgotten": "Usunięto z <b>pamięci</b>: {{text}}"
     },
@@ -2758,6 +2793,10 @@
     },
     "agent": {
       "settings_changed": "Zmieniono ustawienia <b>{{agentName}}</b>"
+    },
+    "pr": {
+      "merged": "Scalono PR <b>#{{number}}</b> w <b>{{repo}}</b>",
+      "merged_branch": "Scalono <b>{{ref}}</b> w <b>{{repo}}</b>"
     },
     "other": "Wprowadzono zmianę",
     "copyWebhook": "Kopiuj adres webhooka",
@@ -3050,7 +3089,7 @@
       "waiting_answer": "Czeka na odpowiedź",
       "waiting_computer": "Czeka na komputer",
       "queued_computer": "W kolejce do komputera",
-      "waiting_plan": "Czeka na odnowienie planu",
+      "waiting_plan": "Czeka na plan",
       "waiting_budget": "Czeka na odnowienie budżetu",
       "provider_down": "Dostawca AI nie działa · ponowi sam",
       "out_of_plan": "Limit planu wyczerpany",
@@ -3077,6 +3116,7 @@
     "inChannel": "Na tym kanale",
     "inWorkspace": "W przestrzeni roboczej",
     "notInChannel": "spoza kanału",
+    "everyone": "Wszyscy w tej rozmowie, osoby i agenci",
     "offer": "{{name}} nie jest na kanale i nie zobaczy wzmianki.",
     "add": "Dodaj do kanału",
     "dismiss": "Nie teraz",
@@ -3638,7 +3678,12 @@
       "done": "Zatwierdzono. {{name}} już nie będzie o to pytać.",
       "undoHere": "Aby to cofnąć, przejdź do sekcji Narzędzia i dostęp na stronie agenta {{name}}.",
       "undoHere_female": "Aby to cofnąć, przejdź do sekcji Narzędzia i dostęp na stronie agentki {{name}}.",
-      "open": "Otwórz"
+      "open": "Otwórz",
+      "routine": "Zawsze w tej rutynie",
+      "thisRoutine": "ta rutyna",
+      "noteRoutine": "{{routine}}: od teraz {{actions}} bez pytania, z dowolnymi wartościami. Poza tą rutyną nadal pyta. Aby cofnąć: ustawienia rutyny.",
+      "doneRoutine": "Zatwierdzono. {{routine}}: już nie zapyta o to.",
+      "undoRoutine": "Aby to cofnąć, przejdź do ustawień rutyny."
     },
     "email": {
       "from": "Od",
@@ -4849,6 +4894,11 @@
       "cancel": "Anuluj",
       "forgotten": "Zapomniano. Jest w Archiwum, jeśli zechcesz to przywrócić.",
       "saved": "Zapisano. Teraz liczy się jako zweryfikowane.",
+      "rules": "Zasady od ludzi",
+      "rulesNote": "Obowiązują w całej pracy dla osoby, która dała każdą z nich, skądkolwiek przyjdzie prośba. Zasady opiekuna lub admina obowiązują wszystkich.",
+      "ruleBy": "Od {{name}} · {{date}}",
+      "removeRule": "Usuń",
+      "ruleRemoved": "Zasada usunięta. Jest w Archiwum, jeśli zechcesz ją przywrócić.",
       "playbook": "Jak pracuje {{name}}",
       "playbook_female": "Jak pracuje {{name}}",
       "playbookNote": "Sposoby pracy, które zachowuje dla siebie. Nie pojawiają się na czacie. To, co przejął z zewnątrz i nigdy więcej nie użył, znika samo i zostaje w Zarchiwizowanych.",
@@ -4919,6 +4969,7 @@
         "model_refused": "Model odmówił odpowiedzi.",
         "agent_archived": "Agent został zarchiwizowany.",
         "provider_error": "Dostawca modelu zwrócił błąd: {{detail}}",
+        "provider_account": "Dostawca odrzucił klucz: może być nieprawidłowy, bez środków albo ponad limit.",
         "provider_unavailable": "Dostawca modelu nie odpowiedział: {{detail}}",
         "canceled": "Ktoś zatrzymał zadanie.",
         "interrupted": "Przerwane przez restart serwera.",
@@ -4926,7 +4977,7 @@
         "credential_revoked": "Klucz tego agenta został unieważniony.",
         "credential_wrong_provider": "Model jest od {{modelProvider}}, ale klucz od {{keyProvider}}.",
         "model_unlisted": "OpenRouter nie oferuje już {{model}}. Wybierz inny model w ustawieniach agenta.",
-        "no_ai": "Agent nie ma połączonego AI.",
+        "no_ai": "Agent nie miał dostępnej AI.",
         "person_limit": "Osoba, która prosiła, osiągnęła limit użycia w tym miesiącu.",
         "org_paused": "Agenci przestrzeni roboczej są wstrzymani.",
         "org_suspended": "Przestrzeń robocza jest niedostępna.",
@@ -4935,6 +4986,8 @@
         "computer_busy": "Komputer był zajęty innymi zadaniami.",
         "computer_failed": "Komputer napotkał problem i się zatrzymał.",
         "computer_timeout": "Komputer zbyt długo nie odpowiadał.",
+        "account_missing": "Konta wybranego dla tego agenta nie ma już na jego komputerze. Wybierz inne w ustawieniach agenta albo dodaj je ponownie.",
+        "our_error": "Coś poszło nie tak po naszej stronie i zadanie się zatrzymało. Poproś ponownie za chwilę.",
         "unknown": "Błąd."
       }
     },
@@ -5054,13 +5107,15 @@
       "decision": "Decyzja",
       "fact": "Fakt",
       "preference": "Preferencja",
-      "lesson": "Lekcja"
+      "lesson": "Lekcja",
+      "rule": "Zasada"
     },
     "kindsLower": {
       "decision": "decyzja",
       "fact": "fakt",
       "preference": "preferencja",
-      "lesson": "lekcja"
+      "lesson": "lekcja",
+      "rule": "zasada"
     },
     "verified": "Zweryfikowane",
     "unverified": "Niezweryfikowane",
@@ -5856,7 +5911,7 @@
     },
     "github_pr_merge": {
       "label": "Scalanie pull requestów",
-      "description": "Scalanie pull requesta. Zawsze prosi o zatwierdzenie."
+      "description": "Scalanie pull requesta. Prosi o zatwierdzenie, z wyjątkiem repozytoriów wybranych na stronie agenta."
     },
     "github_issues_read": {
       "label": "Czytanie zgłoszeń",
@@ -6520,7 +6575,8 @@
     },
     "ownActions": {
       "hint": "Każde uruchomienie robi to w twoich połączonych aplikacjach bez pytania. Każda inna akcja w nich najpierw prosi osobę o zgodę, a merge, deploy i rollback zawsze o nią proszą.",
-      "none": "W połączonych aplikacjach przed każdą akcją prosi osobę o zgodę. Żeby wykonywała swoją pracę sama, powiedz agentowi na czacie, jakie akcje może wykonywać."
+      "none": "W połączonych aplikacjach przed każdą akcją prosi osobę o zgodę. Żeby wykonywała swoją pracę sama, powiedz agentowi na czacie, jakie akcje może wykonywać.",
+      "remove": "Znowu pytaj przed: {{action}}"
     },
     "ahead": {
       "approved": "Zatwierdzone · uruchomi się {{when}}",
@@ -6697,7 +6753,7 @@
       "waiting": "Czeka na czyjąś odpowiedź",
       "waitingApproval": "Czeka na twoje zatwierdzenie",
       "waitingComputer": "Czeka na komputer",
-      "waitingPlan": "Czeka na odnowienie planu",
+      "waitingPlan": "Czeka na plan",
       "waitingBudget": "Czeka na odnowienie budżetu",
       "reported": "Przekazano, co znalazła",
       "silent": "Nic nowego, bez wiadomości",
@@ -6711,7 +6767,7 @@
       "previous_running": "Pominięto: poprzednie uruchomienie wciąż trwało",
       "previous_waiting": "Pominięto: poprzednie uruchomienie wciąż czekało na kogoś",
       "waiting_computer": "Pominięto: czeka na komputer agenta",
-      "waiting_plan": "Pominięto: czeka na odnowienie planu",
+      "waiting_plan": "Pominięto: czeka na plan",
       "waiting_budget": "Pominięto: czeka na odnowienie budżetu",
       "superseded": "Ustąpiło miejsca następnemu uruchomieniu",
       "stale": "Przegapiona pora: komputer wrócił za późno",
@@ -6743,13 +6799,17 @@
       "model_unlisted": "OpenRouter nie oferuje już tego modelu",
       "agent_archived": "Agent został zarchiwizowany",
       "interrupted": "Przerwane przez restart serwera",
-      "no_ai": "Agent nie ma podłączonej AI",
+      "no_ai": "Agent nie miał dostępnej AI",
       "person_limit": "Nie uruchomiono: twórca osiągnął limit użycia w tym miesiącu",
       "org_paused": "Nie uruchomiono: agenci przestrzeni roboczej byli wstrzymani",
       "org_suspended": "Nie uruchomiono: przestrzeń robocza była niedostępna",
       "org_deleting": "Nie uruchomiono: przestrzeń robocza była usuwana",
       "agent_paused": "Nie uruchomiono: agent był wstrzymany",
-      "computer_busy": "Komputer był zajęty innymi zadaniami"
+      "computer_busy": "Komputer był zajęty innymi zadaniami",
+      "computer_failed": "Komputer napotkał problem i się zatrzymał",
+      "computer_timeout": "Komputer zbyt długo nie odpowiadał",
+      "account_missing": "Konta agenta nie ma już na jego komputerze",
+      "our_error": "Coś poszło nie tak po naszej stronie"
     },
     "openInChat": "Otwórz w rozmowie",
     "stop": "Zatrzymaj",
@@ -8053,6 +8113,7 @@
       "person": "Osoby",
       "agent": "Agenci",
       "routine": "Rutyny",
+      "reminder": "Przypomnienia",
       "deadline": "Terminy zadań"
     },
     "upcoming": "Nadchodzące",
@@ -8072,6 +8133,7 @@
     "kind": {
       "event": "Wydarzenie",
       "routine": "Rutyna",
+      "reminder": "Przypomnienie",
       "deadline": "Termin zadania"
     },
     "every": {
@@ -8086,6 +8148,10 @@
     "runs_other": "{{count}} uruchomienia w tych dniach.",
     "routineDetail": "Rutyna agenta {{agent}} · dostarcza do: {{target}}.",
     "deadlineDetail": "Termin zadania.",
+    "reminderBy": "Ustawione przez: {{name}}",
+    "reminderPosted": "Opublikuje: {{agent}} · {{target}}",
+    "cancelReminder": "Anuluj przypomnienie",
+    "reminderCancelled": "Przypomnienie anulowane",
     "openIssue": "Otwórz zadanie",
     "openRoutines": "Zobacz w Rutynach",
     "openRoutine": "Otwórz rutynę",
@@ -8238,6 +8304,10 @@
     "files": "Pliki",
     "needsSandbox": "nie zapisano",
     "assetLimit": "Umiejętność przechowuje do {{max}} MB obrazów i innych plików.",
+    "moreFiles_one": "I jeszcze {{count}} plik",
+    "moreFiles_few": "I jeszcze {{count}} pliki",
+    "moreFiles_many": "I jeszcze {{count}} plików",
+    "moreFiles_other": "I jeszcze {{count}} pliku",
     "runsOnPc": "działa na komputerze agenta",
     "reinstall": "Zainstaluj umiejętność ponownie, aby agenci mogli używać tego pliku.",
     "edit": "Edytuj",
@@ -8463,7 +8533,7 @@
         "updating": "{{program}} jest aktualizowany na komputerze {{computer}}. To zmieni się samo, gdy skończy.",
         "runnerOld": "Program agentes.chat na komputerze {{computer}} jest nieaktualny, a aktualizacja jest w drodze. To zmieni się samo, gdy się skończy.",
         "execOff": "{{computer}} nie może jeszcze uruchomić programu {{program}}. Zajmujemy się tym, a to zmieni się samo.",
-        "toolOff": "{{program}} nie jest dozwolony na komputerze {{computer}}. Poproś pomoc techniczną o zezwolenie.",
+        "toolOff": "{{program}} nie jest jeszcze dozwolony na {{computer}}. To po naszej stronie: spróbuj ponownie później.",
         "preparing": "{{computer}} się przygotowuje. To zmieni się samo, gdy skończy."
       }
     },
@@ -9499,6 +9569,9 @@
       "paidTraining": "Dostawca może używać zapytań do trenowania modelu. Włącz to uprawnienie w OpenCode.",
       "freeTraining": "Darmowy. Dostawca może używać zapytań do trenowania modelu. Włącz to uprawnienie w OpenCode."
     },
+    "modelLimit": "{{model}} osiągnął własny limit w tym planie i odnowi się {{when}}. Pozostałe modele planu działają dalej.",
+    "modelLimitUnknown": "{{model}} osiągnął własny limit w tym planie. Pozostałe modele planu działają dalej.",
+    "modelRegion": "{{model}} wymaga włączonego regionu Global w OpenCode (Settings › Privacy). Pozostałe modele planu działają dalej.",
     "modelHow": {
       "globalRegion": "Włącz region Global w OpenCode, w Settings › Privacy. Bez tego ten model nie odpowiada.",
       "paidTraining": "Dostawca tego modelu może używać zapytań do jego trenowania. W OpenCode, w Settings › Privacy, włącz uprawnienie dla płatnych modeli. Bez tego ten model nie odpowiada.",
@@ -10093,6 +10166,13 @@
     "failed": "Nie udało się połączyć. Spróbuj ponownie za chwilę."
   },
   "repos": {
+    "merge": {
+      "label": "Może scalać bez pytania",
+      "none": "Nie wybrano repozytoriów. Każde scalanie prosi o zatwierdzenie.",
+      "help": "W tych repozytoriach scalanie odbywa się bez karty zatwierdzenia, trafia do audytu i zostawia potwierdzenie w rozmowie. Wszystko inne, co wrażliwe, nadal pyta.",
+      "dialogTitle": "Gdzie {{name}} scala bez pytania",
+      "dialogDesc": "Tylko repozytoria, których już używa. Scalanie gdzie indziej prosi o zatwierdzenie."
+    },
     "label": "Które repozytoria",
     "all": "Wszystkie repozytoria",
     "allLower": "wszystkie repozytoria",
@@ -11669,7 +11749,8 @@
       "editorsExcludeYou": "Dodaj siebie do osób, które edytują, żeby zachować tę stronę.",
       "titleTaken": "Strona „{{title}}” już istnieje.",
       "titleCharacters": "Tytuł nie może zawierać [ ] | ani #.",
-      "titleNoLetters": "Tytuł musi zawierać litery lub cyfry."
+      "titleNoLetters": "Tytuł musi zawierać litery lub cyfry.",
+      "lockAdminsOnly": "Tylko administratorzy blokują strony."
     },
     "media": {
       "off": "GIF-y i naklejki są wyłączone w tej przestrzeni roboczej.",
@@ -11694,7 +11775,8 @@
       "decided": "Ktoś już zdecydował o tej propozycji.",
       "expired": "Ta propozycja wygasła: nikt o niej nie zdecydował w ciągu doby.",
       "routineMade": "Rutyna tego agenta została już utworzona.",
-      "noRoutine": "Ta propozycja nie zawiera rutyny do utworzenia."
+      "noRoutine": "Ta propozycja nie zawiera rutyny do utworzenia.",
+      "notRequester": "Wysłać może tylko osoba, która o to prosiła."
     },
     "approval": {
       "alwaysUnavailable": "Tej prośby nie można zatwierdzić na stałe. Zatwierdź tylko tę jedną."
@@ -11796,20 +11878,28 @@
       "agentNotInChannel": "Najpierw dodaj agenta do rozmowy.",
       "webhookPaused": "Włącz rutynę, żeby ją przetestować.",
       "continueExtraOff": "Okno tego planu jest wykorzystane, a długa praca tego agenta nie korzysta z płatnego dodatkowego użycia. Włącz je w jego ustawieniach AI, żeby kontynuować teraz, albo agent wznowi pracę po resecie.",
-      "continueExtraUsedUp": "Okno tego planu jest wykorzystane, a jego płatne dodatkowe użycie się skończyło lub jest niedostępne. Praca zostanie wznowiona po resecie."
+      "continueExtraUsedUp": "Okno tego planu jest wykorzystane, a jego płatne dodatkowe użycie się skończyło lub jest niedostępne. Praca zostanie wznowiona po resecie.",
+      "actionsNeedApprover": "Tylko właściciel agenta albo osoba zatwierdzająca jego działania może pozwolić rutynie działać samodzielnie.",
+      "editorOnly": "Zmienić rutynę może tylko osoba, która ją utworzyła, właściciel agenta albo administrator.",
+      "widgetFixed": "Ta rutyna aktualizuje widżet. Zmień ją z poziomu widżetu."
     },
     "run": {
       "notContinuable": "Tej odpowiedzi nie można już kontynuować.",
       "agentBusy": "Agent już pracuje w tej rozmowie. Poczekaj, aż skończy, żeby kontynuować.",
       "continueForbidden": "Kontynuować może tylko osoba, która prosiła, właściciel agenta albo administrator.",
-      "notRestartable": "Ta odpowiedź już się zaczęła, więc nie może zacząć się od nowa. Wyślij swoją wiadomość ponownie."
+      "notRestartable": "Ta odpowiedź już się zaczęła, więc nie może zacząć się od nowa. Wyślij swoją wiadomość ponownie.",
+      "cancelForbidden": "Zatrzymać może tylko osoba, która prosiła, właściciel agenta albo administrator.",
+      "answerForbidden": "Może to zrobić tylko osoba, która prosiła, właściciel agenta albo administrator.",
+      "stopReasonForbidden": "Tylko osoba, która zatrzymała, może podać powód."
     },
     "artifact": {
       "fileTooLarge": "Plik przekracza {{max}} MB, czyli limit na plik.",
       "notVersioned": "Obraz, wideo ani nagranie nie mają wersji. Wyślij jako nowy plik.",
       "fileRequired": "Wybierz plik do przesłania.",
       "fileNameRequired": "Plik musi mieć nazwę.",
-      "notFound": "Ten plik już nie istnieje albo nie masz do niego dostępu."
+      "notFound": "Ten plik już nie istnieje albo nie masz do niego dostępu.",
+      "deleteForbidden": "Usunąć to może tylko osoba, która to utworzyła, osoba, która poprosiła agenta, właściciel agenta albo administrator.",
+      "restoreForbidden": "Przywrócić to może tylko osoba, która mogła to usunąć."
     },
     "machine": {
       "forbidden": "Może to zrobić tylko administrator albo osoba, która podłączyła komputer.",
@@ -11820,7 +11910,10 @@
       "targetOffline": "Ten komputer przeszedł w tryb offline. Wybierz inny.",
       "targetNotFound": "Ten komputer już nie istnieje. Wybierz inny.",
       "targetSame": "Agenci są już na tym komputerze.",
-      "targetPaused": "Ten komputer jest wstrzymany. Wybierz inny."
+      "targetPaused": "Ten komputer jest wstrzymany. Wybierz inny.",
+      "offline": "{{name}} jest teraz offline. Spróbuj ponownie, gdy wróci.",
+      "paused": "{{name}} jest wstrzymany: nic nowego na nim nie ruszy, dopóki nie zostanie wznowiony.",
+      "timeout": "Komputer nie odpowiedział na czas. Spróbuj ponownie."
     },
     "github": {
       "repoMissing": "Repozytorium {{repo}} jest prywatne albo nie istnieje na GitHub.",
@@ -11836,8 +11929,14 @@
       "tooManySkills": "Ten link zawiera więcej niż {{max}} umiejętności. Podaj link do jednego z jego folderów.",
       "invalidName": "Nazwa może zawierać małe litery, cyfry i myślniki, maksymalnie {{max}} znaków.",
       "invalidDescription": "Opis musi mieć od 1 do {{max}} znaków.",
-      "tooLarge": "Umiejętność jest za duża (maks. {{max}} MB).",
-      "tooManyFiles": "Umiejętność ma za dużo plików (maks. {{max}}).",
+      "tooLarge": "Ta umiejętność ma {{size}} MB tekstu i skryptów, a limit to {{max}} MB.",
+      "tooManyFiles": "Ta umiejętność ma tyle plików: {{files}}, a limit to {{max}}.",
+      "repoTooLarge": "Repozytorium jest za duże, żeby je pobrać (maks. {{max}} MB). Prześlij folder umiejętności jako .zip.",
+      "noFrontmatter": "SKILL.md musi mieć na górze blok z nazwą i opisem, między dwiema liniami ---.",
+      "bodyTooLong": "SKILL.md jest za długi (maks. {{max}} znaków).",
+      "noSkillMdZip": "Brak pliku SKILL.md na górze folderu w zipie.",
+      "notGithubLink": "Nie możemy odczytać tego linku do GitHub. Wklej link do repozytorium lub folderu w nim.",
+      "badZip": "Nie udało się odczytać tego zipa. Spakuj folder umiejętności jeszcze raz, bez hasła.",
       "connectionGone": "Połączenie z GitHub, które odczytało {{repo}}, już nie istnieje. Połącz ponownie GitHub, żeby zaktualizować tę umiejętność.",
       "linkHoldsSeveral": "Pod linkiem jest teraz kilka umiejętności. Zainstaluj tę ponownie z jej własnego folderu.",
       "linkRenamed": "Pod linkiem jest teraz umiejętność {{name}}.",
@@ -11847,6 +11946,21 @@
     "agentGroup": {
       "notFound": "Ten dział już nie istnieje.",
       "tooMany": "Ta przestrzeń robocza ma już {{max}} działów. Najpierw usuń jeden."
+    },
+    "rightHand": {
+      "permanent": "Prawa ręka jest częścią przestrzeni roboczej i nie dołącza do kanałów. @wzmianka przywoła ją w każdym z nich."
+    },
+    "agent": {
+      "ownerOrAdmin": "Może to zrobić tylko właściciel agenta albo administrator.",
+      "detailsHidden": "Tylko osoby rozmawiające z {{agentName}} widzą, jak to działa.",
+      "extraOwnerOnly": "Tylko właściciel agenta włącza lub wyłącza płatne dodatkowe użycie planu.",
+      "undoForbidden": "Cofnąć to może tylko osoba, dla której agent pracował, jego właściciel albo administrator."
+    },
+    "account": {
+      "notOwner": "Może to zrobić tylko osoba, która połączyła to konto lub plan."
+    },
+    "channel": {
+      "membersForbidden": "Dodawać i usuwać osoby może tylko twórca kanału albo administrator."
     },
     "handle": {
       "invalid": "@ ma od {{min}} do {{max}} znaków: małe litery, cyfry, - lub _.",
@@ -12527,6 +12641,7 @@
     "system": "System",
     "removed": "Usunięte",
     "change": {
+      "mergedWithoutAsking": "Scalono w {{repo}} bez pytania",
       "pattern": "{{verb}} {{area}}",
       "approval": {
         "approved": "Zatwierdzono prośbę",
@@ -13058,7 +13173,7 @@
     },
     "card": {
       "title": "Osiągnięto Twój limit użycia w tym miesiącu",
-      "text": "Odnawia się {{date}}. Aby kontynuować teraz, poproś admina.",
+      "text": "Odnawia się {{date}}. Aby kontynuować teraz, poproś o więcej.",
       "ask": "Poproś o więcej",
       "asked": "Prośba wysłana",
       "see": "Zobacz moje użycie",
@@ -13620,6 +13735,10 @@
       "machine_task_resume_waits": "{{computer}} wrócił: „{{title}}” wznowi się tam, gdzie się zatrzymało, gdy projekt będzie gotowy.",
       "machine_offline": "{{computer}} jest offline.",
       "brain_unavailable": "{{brain}} nie może teraz odpowiedzieć. Odpowiem, gdy wróci.",
+      "brain_unavailable_paused": "Komputer, na którym działa {{brain}}, jest wstrzymany. Odpowiem, gdy zostanie wznowiony.",
+      "brain_unavailable_commands_off": "{{brain}} jest wyłączony na moim komputerze. Odpowiem, gdy osoba, która się nim opiekuje, go włączy.",
+      "brain_unavailable_outdated": "Program na moim komputerze wymaga aktualizacji, zanim {{brain}} będzie mógł odpowiedzieć. Odpowiem, gdy tylko zostanie zaktualizowany.",
+      "brain_unavailable_plan_owner": "{{brain}} myślałby z planem, który nie należy do mojego właściciela, więc go nie używam. Podłącz konto mojego właściciela na mojej stronie.",
       "provider_unavailable": "Mój dostawca AI teraz nie odpowiada. Odpowiem, gdy tylko wróci.",
       "brain_busy": "Mój komputer jest teraz zajęty innymi zadaniami. Odpowiem, gdy tylko się zwolni.",
       "brain_queued": "Wciąż czekam w kolejce do komputera. Odpowiem, gdy tylko zwolni się miejsce.",
@@ -13628,6 +13747,9 @@
       "plan_limit_cut_unknown": "Praca zatrzymana na limicie planu {{plan}}. Wrócę do niej w tym samym miejscu, gdy tylko limit się odnowi.",
       "plan_limit_wait": "Plan {{plan}} osiągnął limit. Odpowiem {{when}}, gdy się odnowi.",
       "plan_limit_wait_unknown": "Plan {{plan}} osiągnął limit. Odpowiem, gdy tylko się odnowi.",
+      "plan_model_limit_wait": "{{model}} osiągnął własny limit w {{plan}}. Pozostałe modele planu działają dalej: zmień model agenta {{agent}} albo poczekaj, aż się odnowi {{when}}.",
+      "plan_model_limit_wait_unknown": "{{model}} osiągnął własny limit w {{plan}}. Pozostałe modele planu działają dalej: zmień model agenta {{agent}} albo poczekaj, aż się odnowi.",
+      "plan_model_region_wait": "Ten model ({{model}}) wymaga włączonego regionu Global w OpenCode (Settings › Privacy).",
       "budget_wait": "Skończył mi się budżet na ten miesiąc. Będę kontynuować {{when}} albo wcześniej, jeśli administrator go zwiększy.",
       "usage_wait_canceled": "Anulowano. Nie uruchomi się, gdy limit się odnowi.",
       "usage_wait_archived": "Nie uruchomi się: agent został zarchiwizowany.",
@@ -13646,14 +13768,20 @@
       "work_end_canceled": "Zatrzymano po {{minutes}} min.",
       "work_end_canceledBy": "Zatrzymane przez: {{name}} po {{minutes}} min.",
       "no_ai": "Nie mogę jeszcze odpowiadać: nie mam połączonego AI.",
-      "person_limit": "Osoba, która prosiła, osiągnęła limit użycia w tym miesiącu. Aby kontynuować teraz, poproś admina.",
+      "person_limit": "Osoba, która prosiła, osiągnęła limit użycia w tym miesiącu.",
       "no_ai_signed_out": "Nie mogę jeszcze odpowiadać: moje AI jest wylogowane.",
       "no_ai_not_signed_in": "Nie mogę jeszcze odpowiadać: {{brain}} nie jest zalogowany na moim komputerze.",
       "no_ai_computer_away": "Nie mogę teraz odpowiedzieć: komputer mojego planu jest niedostępny.",
+      "no_ai_computer_failed": "Nie mogę teraz odpowiedzieć: komputer mojego planu miał problem.",
       "no_ai_plan_limit": "Nie mogę teraz odpowiedzieć: plan, z którym myślę, osiągnął limit.",
-      "no_ai_plan_not_shared": "Nie mogę ci odpowiedzieć przez ten plan: odpowiada tylko swojemu właścicielowi.",
+      "no_ai_plan_not_shared": "Nie mogę Ci odpowiedzieć przez plan workspace'u: odpowiada tylko swojemu właścicielowi. Połącz własny plan, a odpowiem.",
       "no_ai_runner_outdated": "Nie mogę teraz odpowiedzieć: program na komputerze mojego planu wymaga aktualizacji.",
-      "no_ai_plan_tools": "Zatrzymałem się przed odpowiedzią: AI mojego planu na tym komputerze oferuje własne narzędzia.",
+      "no_ai_plan_tools": "Zatrzymałem się przed odpowiedzią: AI mojego planu na tym komputerze nie pozostała przy narzędziach agentes.chat.",
+      "no_ai_model_limit": "Nie mogę teraz odpowiedzieć: {{model}} osiągnął własny limit w moim planie.",
+      "no_ai_model_region": "Nie mogę odpowiedzieć: {{model}} wymaga włączonego regionu Global w OpenCode (Settings › Privacy).",
+      "no_ai_commands_off": "Nie mogę teraz odpowiedzieć: polecenia są wyłączone na komputerze mojego planu.",
+      "no_ai_cli_missing": "Jeszcze nie mogę odpowiedzieć: program mojego AI nie jest zainstalowany na moim komputerze.",
+      "no_ai_no_computer": "Jeszcze nie mogę odpowiedzieć: moje AI potrzebuje komputera, a nie mam żadnego.",
       "redacted": "[usunięto: wyglądało na dane logowania lub klucz]",
       "action_connect_ai": "Połącz AI",
       "action_connect_app": "Połącz {{name}}",
@@ -14912,6 +15040,37 @@
       "queued": "W kolejce",
       "stopping": "Zatrzymywanie…",
       "stopped": "Zatrzymane"
+    },
+    "wait": {
+      "pausedPlan": "Wstrzymane: plan na {{percent}}% {{window}}",
+      "pausedBudget": "Wstrzymane: budżet na {{percent}}% miesiąca",
+      "planLimit": "Plan {{plan}} na limicie",
+      "modelLimit": "{{model}} na limicie",
+      "modelRegion": "{{model}} wymaga regionu Global",
+      "modelRegionNext": "Włącz go w OpenCode (Settings › Privacy)",
+      "budgetOut": "Budżet na ten miesiąc się skończył",
+      "workLine": "W kolejce prac agenta",
+      "workLineNext": "Zacznie się, gdy skończy się inna praca",
+      "computerWait": "Czeka na komputer",
+      "computerWaitNext": "Wznowi, gdy będzie gotowy",
+      "computerOfflineNext": "Wznowi, gdy się włączy",
+      "computerBusyNext": "Zacznie się, gdy będzie miejsce",
+      "okNext": "Wznowi, gdy ktoś zatwierdzi",
+      "answerNext": "Wznowi, gdy ktoś odpowie",
+      "back": "Wznowi {{when}}",
+      "whenRenews": "po odnowieniu",
+      "whenSoon": "za chwilę"
+    },
+    "waitGroup": {
+      "routines_one": "{{count}} rutyna",
+      "routines_few": "{{count}} rutyny",
+      "routines_many": "{{count}} rutyn",
+      "routines_other": "{{count}} rutyny",
+      "pausedPlan": "Wstrzymane ({{what}}): plan {{plan}} jest na {{percent}}% {{window}} i wznowi {{when}}. Reszta zostaje na rozmowy.",
+      "pausedBudget": "Wstrzymane ({{what}}): budżet miesiąca jest na {{percent}}% i wznowi {{when}}. Reszta zostaje na rozmowy.",
+      "planLimit": "Czekają ({{what}}): plan {{plan}} osiągnął limit i wznowi {{when}}.",
+      "modelLimit": "Czekają ({{what}}): {{model}} osiągnął limit i wznowi {{when}}. Pozostałe modele planu działają dalej.",
+      "budgetOut": "Czekają ({{what}}): budżet na ten miesiąc się skończył i wznowi {{when}}."
     },
     "where": {
       "dm": "Wiadomość bezpośrednia",

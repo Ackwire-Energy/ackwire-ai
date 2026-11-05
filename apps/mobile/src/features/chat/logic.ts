@@ -11,8 +11,9 @@ import type {
 import { agentProposalOf, costlyProposalOf, stretchCardOf } from "@agenteschat/client/lib/action-cards";
 import { type ActivityEntry, barEntries, type barWords, markedPieces, markInk } from "@agenteschat/client/lib/activity";
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
+import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
-import { detailsAt, type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
+import { detailsAt, MENTION, type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import { messageMediaOf } from "@agenteschat/client/lib/media";
 import {
   answeredNotices,
@@ -30,8 +31,9 @@ import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines"
 import { secretRequestOf } from "@agenteschat/client/lib/secret-requests";
 import { usagePauseCardOf } from "@agenteschat/client/lib/usage-pause";
 import { voiceOf } from "@agenteschat/client/lib/voice";
+import { mentionTone } from "@agenteschat/ui/agent/engine";
 import type { TFunction } from "i18next";
-import { previewOf } from "../shared/logic";
+import { agentLook, previewOf } from "../shared/logic";
 import { continuesReply } from "./media";
 
 /**
@@ -526,23 +528,6 @@ export const hangsUnder = (
   Boolean(messageMediaOf(m.meta)) ||
   Boolean(issueWorkOf(m.meta));
 
-/** Toggle my reaction: the new list as the server will see it (optimistic). */
-export function toggleReaction(
-  reactions: ReactionCount[] | undefined,
-  reaction: string,
-  meId: string,
-): ReactionCount[] {
-  const list = reactions ?? [];
-  const hit = list.find((r) => r.reaction === reaction);
-  if (!hit) return [...list, { reaction, count: 1, userIds: [meId], agentIds: [] }];
-  const mine = hit.userIds.includes(meId);
-  const userIds = mine ? hit.userIds.filter((u) => u !== meId) : [...hit.userIds, meId];
-  const next = { ...hit, userIds, count: Math.max(0, hit.count + (mine ? -1 : 1)) };
-  return next.count === 0 && (next.agentIds?.length ?? 0) === 0
-    ? list.filter((r) => r.reaction !== reaction)
-    : list.map((r) => (r.reaction === reaction ? next : r));
-}
-
 // ── Pins ─────────────────────────────────────────────────────────────────────
 
 /** "Fixadas": one entry per message, the latest pin first (the server's order, kept even if events raced). */
@@ -664,7 +649,17 @@ export function tableHidden(x: number, frame: number, total: number): { left: bo
   return { left: x > 1, right: frame > 0 && x + frame < total - 1 };
 }
 
-const MENTION = /(^|[^\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31})(?![\w@-])/g;
+/** A mentioned agent's chip in its own tone (`mentionTone`); none for a person or an unknown handle. */
+export function mentionTint(
+  handle: string,
+  agents: readonly { handle: string; previousHandles?: string[]; appearance?: unknown }[],
+  scheme: "light" | "dark",
+) {
+  const agent = agentsByAnyHandle(agents).get(handle.toLowerCase());
+  if (!agent) return undefined;
+  const tone = mentionTone(agentLook(agent).color, scheme === "dark");
+  return { color: tone.ink, backgroundColor: tone.background };
+}
 
 /** `#channel` references, then @mentions in the words between them. */
 function mentions(text: string, out: Inline[], kind: "text" | "bold" | "italic") {

@@ -2,7 +2,7 @@ import type { AgentMailbox, MailAccount, MailPolicy } from "@agenteschat/client"
 import { ApiError, useAgentMail, useMailAccounts, useSetAgentMail } from "@agenteschat/client";
 import type { Level } from "@agenteschat/client/lib/access-levels";
 import { canTalk } from "@agenteschat/client/lib/audience";
-import { knownErrorText } from "@agenteschat/client/lib/errors";
+import { forbiddenText, knownErrorText } from "@agenteschat/client/lib/errors";
 import {
   choiceOf,
   defaultPolicy,
@@ -178,8 +178,9 @@ function MailboxRow({
         },
         onError: (e) =>
           setError(
-            knownErrorText(t, e) ??
-              t(e instanceof ApiError && e.status === 403 ? "common.notAllowed" : "mail.agent.saveError.unknown"),
+            e instanceof ApiError && e.status === 403
+              ? forbiddenText(t, e)
+              : (knownErrorText(t, e) ?? t("mail.agent.saveError.unknown")),
           ),
       },
     );

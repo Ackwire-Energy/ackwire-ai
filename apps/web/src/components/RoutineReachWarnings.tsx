@@ -45,7 +45,7 @@ function Warning({ agent, creator }: { agent: Agent; creator: string }) {
   return (
     <div className="ag-rc">
       <span className="ag-rc__ic" aria-hidden="true">
-        <Icon name="info" size={14} />
+        <Icon name="info" size={16} />
       </span>
       <span className="ag-rc__tx">
         <span className="ag-rc__sentence">

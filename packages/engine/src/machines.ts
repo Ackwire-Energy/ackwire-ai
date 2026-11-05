@@ -506,6 +506,7 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
       appearance: agents.appearance,
       brain: agents.brain,
       account: agents.brainAccountId,
+      builtin: agents.builtin,
       locale: users.locale,
     })
     .from(agents)
@@ -514,20 +515,42 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
       and(
         eq(agents.orgId, orgId),
         isNull(agents.archivedAt),
-        // The team's right hand on a plan signed in here (ADR 0137 §1): its user holds that sign-in while it thinks.
+        // The team's right hand on a plan signed in here (ADR 0137 §1, §11: the workspace's or a person's own): its
+        // user holds those sign-ins while it thinks.
         or(
           eq(agents.machineId, machineId),
           and(
             eq(agents.builtin, RIGHT_HAND),
-            sql`exists (select 1 from ${schema.machineAccounts} ma
-              where ma.id = ${agents.brainAccountId} and ma.org_id = ${agents.orgId} and ma.machine_id = ${machineId}::uuid)`,
+            or(
+              sql`exists (select 1 from ${schema.machineAccounts} ma
+                where ma.id = ${agents.brainAccountId} and ma.org_id = ${agents.orgId} and ma.machine_id = ${machineId}::uuid)`,
+              sql`exists (select 1 from ${schema.rightHandBrains} rb join ${schema.machineAccounts} ma
+                on ma.org_id = rb.org_id and ma.id = rb.brain_account_id
+                where rb.org_id = ${agents.orgId} and ma.machine_id = ${machineId}::uuid)`,
+            ),
           ),
         ),
       ),
     )
     .orderBy(agents.createdAt);
+  const personal = rows.some((a) => a.builtin === RIGHT_HAND)
+    ? await db
+        .select({ id: schema.rightHandBrains.brainAccountId })
+        .from(schema.rightHandBrains)
+        .innerJoin(
+          schema.machineAccounts,
+          and(
+            eq(schema.machineAccounts.orgId, schema.rightHandBrains.orgId),
+            eq(schema.machineAccounts.id, schema.rightHandBrains.brainAccountId),
+          ),
+        )
+        .where(and(eq(schema.rightHandBrains.orgId, orgId), eq(schema.machineAccounts.machineId, machineId)))
+    : [];
   return rows.map((a) => {
-    const account = lentAccount(a);
+    const own = a.builtin === RIGHT_HAND ? lentAccount(a) : null;
+    const extra = a.builtin === RIGHT_HAND ? [...new Set(personal.map((p) => p.id))].filter((id) => id !== own) : [];
+    // The right hand off any workspace plan here thinks only with people's own: the first is its frame's account.
+    const account = a.builtin === RIGHT_HAND ? (own ?? extra.shift() ?? null) : lentAccount(a);
     return {
       id: a.id,
       handle: a.handle,
@@ -538,6 +561,7 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
         : {}),
       // System mode keeps an account's folder with this agent's user only while it thinks with it.
       ...(account ? { account } : {}),
+      ...(extra.length > 0 ? { accounts: extra } : {}),
     };
   });
 }

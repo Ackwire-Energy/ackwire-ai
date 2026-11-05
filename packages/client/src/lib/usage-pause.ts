@@ -121,6 +121,21 @@ export function usageWaitOf(meta: Record<string, unknown> | null | undefined): U
   };
 }
 
+/**
+ * The way out of a wait, on the agent's page, for a note whose wait isn't only time: another model for a model's own
+ * limit or the region it needs (its owner or an admin), a higher limit for a spent budget (an admin). Null for a plan's
+ * limit, which only time ends, and for anyone who couldn't do it.
+ */
+export function usageWaitFix(
+  meta: Record<string, unknown> | null | undefined,
+  who: { admin: boolean; owner: boolean },
+) {
+  const code = meta?.bodyCode;
+  if (code === "budget_wait") return who.admin ? ("raiseBudget" as const) : null;
+  const model = typeof code === "string" && code.startsWith("plan_model_");
+  return model && (who.admin || who.owner) ? ("changeModel" as const) : null;
+}
+
 const CLOSED_REASONS = new Set(["solved", "withdrawn", "task_canceled", "mixed"]);
 
 function closedOf(raw: unknown): CatchUpClosed | null {

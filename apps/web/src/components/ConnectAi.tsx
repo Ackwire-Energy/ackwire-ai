@@ -8,6 +8,7 @@ import {
   useCredentials,
   useMachines,
 } from "@agenteschat/client";
+import { listsExisting } from "@agenteschat/client/lib/ai-accounts";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -178,8 +179,8 @@ function ConnectAiDialog({
   const api = useApi();
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
   const mayAddKey = can(org, "manage_credentials");
-  // The team's right hand thinks on the plan of whoever gives it one (ADR 0137 §1): theirs to connect, as an admin.
-  const mine = dir.agents.filter((a) => a.ownerUserId === me.user.id || (isRightHand(a) && can(org, "manage_agents")));
+  // The team's right hand thinks with each person's own AI (ADR 0137 §11): everyone's to connect for their DM.
+  const mine = dir.agents.filter((a) => a.ownerUserId === me.user.id || isRightHand(a));
   // An agent's card names whom to choose from. Opened for one agent, it is for that agent alone: the title names it,
   // so no For offers another. Anywhere else every agent of the viewer's stays a choice.
   const named = request.agentIds?.length ? request.agentIds : null;
@@ -223,7 +224,7 @@ function ConnectAiDialog({
   const aimed = { agents, hasAi, asked: request.agentId, picked: pickedTarget };
   // With no set, the agent whose computer the panel reads, "All agents" too (they're on that one's computer).
   const reader = heldReader ?? defaultTarget({ ...aimed, set: [] });
-  const theirs = one !== undefined && one.ownerUserId !== me.user.id && !(rightHand && can(org, "manage_agents"));
+  const theirs = one !== undefined && one.ownerUserId !== me.user.id && !rightHand;
   // The one agent the dialog is for: what the person already has comes first for it while it has no AI. An admin sees
   // the accounts of someone else's agent, locked, and may give it a workspace key (ADR 0041 §4).
   const mayUseKeys = can(org, "manage_agents");
@@ -273,9 +274,11 @@ function ConnectAiDialog({
       { provider: draft.provider, label: providerLabel(draft.provider), apiKey: draft.apiKey.trim() },
       {
         onSuccess: async (key) => {
-          // The right hand on a plan asked for a key ("Usar uma chave de API"): it thinks with this one from now on.
-          if (one && rightHand && one.brain?.kind !== "model") {
+          // The right hand asked for a key ("Usar uma chave de API"): the workspace's AI from now on, and the person's
+          // own DM goes back to it.
+          if (one && rightHand) {
             await api.agents.setBrain(org.id, one.id, { brain: "model" }).catch(() => null);
+            await api.agents.setBrain(org.id, one.id, { scope: "workspace", brain: "model" }).catch(() => null);
             await api.agents.update(org.id, one.id, { credentialId: key.id }).catch(() => null);
             void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
           }
@@ -331,8 +334,7 @@ function ConnectAiDialog({
             // Kept while a row's sign-in is open: its panel, under that row, says when it's done.
             have={(held) =>
               forAgent &&
-              // The right hand on a plan that can't think now: the workspace's keys, a click from it.
-              (login || noAi(forAgent.id) || rightHand) && (
+              (login || listsExisting(dir.agentById.get(forAgent.id), noAi(forAgent.id))) && (
                 <ExistingRows
                   gates={gates}
                   agent={forAgent}

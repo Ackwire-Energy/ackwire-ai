@@ -115,6 +115,27 @@ export function luminance(hex) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+/** WCAG contrast ratio of two "#rrggbb" (1 to 21). */
+export function contrastOf(a, b) {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/**
+ * An agent's @mention chip in a theme: a solid tint of its color, so the chip reads the same on a page, a row or a
+ * bubble, and its own color pushed toward black (or white in the dark) until the text passes WCAG AA on that tint.
+ */
+export function mentionTone(color, dark = false) {
+  const [top, bottom] = gradientOf(color);
+  const background = dark ? mixHex("#181817", bottom, 0.34) : mixHex("#ffffff", bottom, 0.16);
+  const base = dark ? top : bottom;
+  let ink = base;
+  for (let k = 0.05; k <= 1 && contrastOf(ink, background) < 4.5; k += 0.05) {
+    ink = mixHex(base, dark ? "#ffffff" : "#000000", k);
+  }
+  return { background, ink };
+}
+
 /**
  * A custom color's [top, bottom], built like the presets: the bottom is the color itself, its lightness held
  * between graphite's and a level where the white eyes and text still read (luminance ≤ 0.28, about 3:1 against

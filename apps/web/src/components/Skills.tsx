@@ -31,6 +31,7 @@ import {
   hiddenRepoOf,
   hiddenRepoText,
   pickSkills,
+  SKILL_FILES_SHOWN,
   SKILL_UPDATE_TOAST,
   type SkillPendingView,
   type SkillText,
@@ -1125,11 +1126,14 @@ export function SkillSheet({
           <nav className="skill-sheet__files" aria-label={t("skills.files")}>
             <h3 className="ac-eyebrow">{t("skills.files")}</h3>
             <ul>
-              {s.files.map((f) => (
+              {s.files.slice(0, SKILL_FILES_SHOWN).map((f) => (
                 <li key={f.path}>
                   <FileEntry file={f} />
                 </li>
               ))}
+              {s.files.length > SKILL_FILES_SHOWN && (
+                <li className="small muted">{t("skills.moreFiles", { count: s.files.length - SKILL_FILES_SHOWN })}</li>
+              )}
             </ul>
           </nav>
         </div>

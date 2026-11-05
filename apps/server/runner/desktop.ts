@@ -96,8 +96,8 @@ const SETTLE: HelperSettle = { lateMs: 400, quietMs: 120, capMs: 2000 };
 const APP_SETTLE: HelperSettle = { ...SETTLE, windowMs: 10_000 };
 /** A helper request unanswered this long is a helper that hangs (its own calls give up within seconds). */
 const REQUEST_MS = 30_000;
-/** Keys go 12 ms apart, plus xdotool's own time: what each typed character may add to a request's time. */
-const MS_PER_CHARACTER = 40;
+/** Keys go at a person's pace, about 85 ms apart (`typing_delays` in the helper): what each typed character may add to a request's time. */
+const MS_PER_CHARACTER = 120;
 /** A desktop just started: its session's accessibility bus comes up within seconds. */
 const SESSION_READY_MS = 20_000;
 const SESSION_POLL_MS = 300;
@@ -342,6 +342,8 @@ interface Use {
   failures: number;
   /** The hash of the last capture whose text `desktop.text` read. */
   read?: string;
+  /** A person took control during the `act` under way. */
+  taken?: boolean;
 }
 
 /** Where an action lands: a point, and the element of the last look it is on. */
@@ -440,8 +442,14 @@ const HELPER_CODES: readonly HelperErrorCode[] = [
   "stale",
   "failed",
   "mismatch",
+  "stopped",
   "internal",
 ];
+
+const tookOver = () =>
+  bad(
+    "A person took control of your desktop, so this stopped where it was. What it typed so far stays there: don't type it again, look at the screen before going on.",
+  );
 
 /** The helper's refusal as the agent reads it; a gone element is named by its ref, in the plan's words. */
 function helperError(err: HelperFailure, ref?: string): RunnerError {
@@ -450,6 +458,8 @@ function helperError(err: HelperFailure, ref?: string): RunnerError {
       return ref ? staleRef(ref) : new RunnerError("not_found", `stale: ${err.message}`);
     case "mismatch":
       return bad("the text didn't come out as written");
+    case "stopped":
+      return tookOver();
     case "failed":
     case "bad_request":
       return bad(err.message);
@@ -466,6 +476,7 @@ class Helper {
   private next = 1;
   private pending: {
     id: number;
+    op: HelperOp;
     resolve: (data: unknown) => void;
     reject: (err: Error) => void;
     timer: ReturnType<typeof setTimeout>;
@@ -516,9 +527,14 @@ class Helper {
         () => this.violation(`no answer to ${op} in ${Math.round(timeoutMs / 1000)} s`),
         timeoutMs,
       );
-      this.pending = { id, resolve, reject, timer };
+      this.pending = { id, op, resolve, reject, timer };
       this.child.stdin.write(`${JSON.stringify({ ...body, id, op })}\n`);
     });
+  }
+
+  /** Its `input` under way, if any, stops at its next key or step. It reads no request until that one is done. */
+  stopInput() {
+    if (this.pending?.op === "input") this.child.kill("SIGUSR1");
   }
 
   /** Stops it (stdin closed and SIGTERM: it removes its own files), SIGKILL when it doesn't go. */
@@ -628,7 +644,18 @@ export class DesktopManager {
     where: DesktopWhere,
   ): Promise<MachineReplies["desktop.act"]> {
     const a = parseAction(action);
-    return this.serial(agent, (use) => this.actNow(use, a, settle, where));
+    return this.serial(agent, (use) => {
+      use.taken = false;
+      return this.actNow(use, a, settle, where);
+    });
+  }
+
+  /** A person took control of the agent's desktop: its keys and pointer path under way stop at the next key or step. */
+  stopInput(agentId: string) {
+    const use = this.uses.get(agentId);
+    if (!use) return;
+    use.taken = true;
+    use.helper?.stopInput();
   }
 
   /** The screen (or a region of it) as a JPEG, with the last look's elements. */
@@ -879,6 +906,7 @@ export class DesktopManager {
 
   /** Sends input steps; `settled`: whether the screen settled before the wait's cap (with a settle). */
   private async input(use: Use, steps: HelperStep[], spec: HelperSettle | null, ref?: string) {
+    if (use.taken) throw tookOver();
     let typed = 0;
     let paused = 0;
     for (const s of steps) {

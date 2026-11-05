@@ -96,6 +96,7 @@ export const SUMMARY_ORDER: readonly RolePermission[] = [
   "manage_billing",
   "create_agents",
   "manage_channels",
+  "mention_everyone",
   "manage_routines",
   "review_memory",
   "invite_people",

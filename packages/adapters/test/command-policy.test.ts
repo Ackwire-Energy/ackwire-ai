@@ -12,12 +12,14 @@ import {
   forbiddenHint,
   forbiddenReason,
   type GitPush,
+  githubRepo,
   gitPushes,
   heldPush,
   INLINE_CODE_DENY_RULES,
   inlineCode,
   isProxyUrl,
   localVerdict,
+  loneMerge,
   MISSION_DENY_RULES,
   normalizedCommand,
   outboundCallProblem,
@@ -1156,4 +1158,100 @@ describe('the kind "Aprovar sempre" keeps for a command', () => {
       expect([command, commandKind(command)]).toEqual([command, null]);
     }
   });
+});
+
+describe("loneMerge: the merge a computer may run without a person", () => {
+  const merge = (repo: string | null, pr: number, dir = ".") => ({ dir, repo, pr, ref: null });
+
+  test("gh pr merge reads its repository wherever gh takes it", () => {
+    expect(loneMerge("gh pr merge 12 --squash -R acme/app")).toEqual(merge("acme/app", 12));
+    expect(loneMerge("gh -R acme/app pr merge 12")).toEqual(merge("acme/app", 12));
+    expect(loneMerge("gh pr -Racme/app merge 12")).toEqual(merge("acme/app", 12));
+    expect(loneMerge("gh pr merge 12 --repo=https://github.com/acme/app.git")).toEqual(merge("acme/app", 12));
+    expect(loneMerge("gh pr merge https://github.com/acme/app/pull/12 --rebase")).toEqual(merge("acme/app", 12));
+    expect(loneMerge("gh pr merge 12 --subject 'fix: x' -b body")).toEqual(merge(null, 12));
+  });
+
+  test("a script: comments, set -e and a cd joined by && keep it one merge, in that folder", () => {
+    expect(loneMerge("#!/bin/bash\nset -euo pipefail\n\ngh pr merge 12\n")).toEqual(merge(null, 12));
+    expect(loneMerge("#!/bin/bash\nset -eu\n\n# ship it\ngh pr merge 12\n")).toEqual(merge(null, 12));
+    expect(loneMerge("cd work/app && gh pr merge 12")).toEqual(merge(null, 12, "work/app"));
+    expect(loneMerge("cd /srv/app && cd sub && gh pr merge 12")).toEqual(merge(null, 12, "/srv/app/sub"));
+  });
+
+  test("git merge names a branch, in the folder -C or cd says", () => {
+    const local = { repo: null, pr: null, ref: "feature/x" };
+    expect(loneMerge("git merge feature/x")).toEqual({ ...local, dir: "." });
+    expect(loneMerge("git merge --no-ff -m 'join' feature/x")).toEqual({ ...local, dir: "." });
+    expect(loneMerge("cd app && git -C sub merge --ff-only feature/x")).toEqual({ ...local, dir: "app/sub" });
+  });
+
+  test.each([
+    ["another program in the script", "gh pr merge 12 && vercel deploy --prod"],
+    ["a command before it", "git fetch && gh pr merge 12"],
+    ["a command after it: the exit code isn't the merge's", "gh pr merge 12 && cd x"],
+    ["two merges", "gh pr merge 12 && gh pr merge 13"],
+    ["a loop", "for n in 1 2; do gh pr merge $n; done"],
+    ["a variable", "gh pr merge $N"],
+    ["a pipe", "gh pr merge 12 | tee out"],
+    ["a redirection", "gh pr merge 12 > out"],
+    ["|| runs it when the cd failed", "cd app || gh pr merge 12"],
+    ["; runs it when the cd failed", "cd app; gh pr merge 12"],
+    ["a cd to the home or the last folder", "cd ~/app && gh pr merge 12"],
+    ["a path to the program", "/tmp/gh pr merge 12"],
+    ["a wrapper", "env GH_REPO=a/b gh pr merge 12"],
+    ["an env assignment", "GH_REPO=a/b gh pr merge 12"],
+    ["bypassing branch protection", "gh pr merge 12 --admin"],
+    ["deleting the branch", "gh pr merge 12 --squash --delete-branch"],
+    ["deleting the branch, short", "gh pr merge 12 -d"],
+    ["merging later", "gh pr merge 12 --auto"],
+    ["another host", "gh pr merge 12 --hostname ghe.acme.com"],
+    ["another host's repository", "gh pr merge 12 -R ghe.acme.com/acme/app"],
+    ["no pull request named", "gh pr merge"],
+    ["a branch name for gh", "gh pr merge feature/x"],
+    ["two repositories", "gh pr merge 12 -R a/b -R c/d"],
+    ["a URL against -R", "gh pr merge https://github.com/a/b/pull/1 -R c/d"],
+    ["-R as another option's value", "gh pr merge 12 --subject -Rgood/repo --admin"],
+    [
+      "what follows a quote that a comment line closes",
+      'gh pr merge 12 --body "\n# " ; vercel deploy --prod ; echo "\n"',
+    ],
+    ["what follows a value the shell reads as a comment", 'gh pr merge 12 --body # -t "\nvercel deploy --prod\n"'],
+    ["what follows a line's end the indent hid", "gh pr merge 12 --body \\  \nvercel deploy --prod"],
+    ["#12: the shell drops it and -R, and gh merges the folder's branch", "gh pr merge --squash #12 -R acme/app"],
+    ["git config in front", "git -c core.sshCommand=x merge feature"],
+    ["git merge --abort", "git merge --abort"],
+    ["two branches", "git merge a b"],
+    ["not a merge", "gh pr view 12"],
+    ["a push", "git push origin main"],
+  ])("waits for a person: %s", (_why, command) => {
+    expect(loneMerge(command)).toBeNull();
+  });
+
+  test("-R as another option's value names no repository", () => {
+    expect(loneMerge("gh pr merge 12 --subject -Rgood/repo")).toEqual(merge(null, 12));
+  });
+});
+
+describe("githubRepo", () => {
+  test.each([
+    ["acme/app", "acme/app"],
+    ["https://github.com/acme/app.git", "acme/app"],
+    ["git@github.com:acme/app.git", "acme/app"],
+    ["ssh://git@github.com/acme/app", "acme/app"],
+    ["github.com/acme/app", "acme/app"],
+    [
+      "https://agentes.example/api/git/0190f000-0000-7000-8000-000000000001/0190f000-0000-7000-8000-000000000002/acme/app.git",
+      "acme/app",
+    ],
+  ])("%s", (url, repo) => {
+    expect(githubRepo(url)).toBe(repo);
+  });
+
+  test.each(["https://gitlab.com/acme/app.git", "ghe.acme.com/acme/app", "acme", "a/b/c", ""])(
+    "not GitHub: %s",
+    (url) => {
+      expect(githubRepo(url)).toBeNull();
+    },
+  );
 });

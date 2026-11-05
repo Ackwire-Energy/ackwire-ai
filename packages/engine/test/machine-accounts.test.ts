@@ -36,6 +36,7 @@ import {
   MachineOfflineError,
   type MachineStatus,
   NotFoundError,
+  noteModelLimit,
   refreshAiAccounts,
   removeMachineAccount,
   removeMember,
@@ -1352,6 +1353,33 @@ test("plan usage: stored with the account, kept when the runner doesn't know it 
   await runner.hello([account()], PLAN_USAGE_PROTOCOL);
   const [view] = await listMachineAccounts({ db: f.db }, f.org.id, machineId, f.owner.id);
   expect(view?.usage).toEqual(usage(41, "2030-01-01T10:06:00.000Z"));
+});
+
+test("an OpenCode Go reading keeps the models at their own limits, and a refusal with no window full isn't the account's", async () => {
+  f = await setup();
+  const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-a" });
+  hubs.push(hub);
+  const { token } = await ownedMachine(PLAN_USAGE_PROTOCOL);
+  const runner = connectedRunner(hub, token);
+  const account = (u: PlanUsage): RunnerAccountInfo => ({
+    id: CLAUDE_ID,
+    kind: "claude_code",
+    loggedIn: true,
+    provider: "opencode",
+    keyHint: "oc_sk_…f4ke",
+    usage: u,
+  });
+  await runner.hello([account(usage(40))], PLAN_USAGE_PROTOCOL);
+  const until = new Date(Date.now() + 86_400_000).toISOString();
+  await noteModelLimit(f.db, f.org.id, CLAUDE_ID, "deepseek-v4.1-flash", { until });
+  await runner.changed([account({ ...usage(41, "2030-01-01T10:06:00.000Z"), limited: true })]);
+  const kept = (await accountRow(CLAUDE_ID))?.usage;
+  expect(kept?.limited).toBeUndefined();
+  expect(kept?.windows[0]?.usedPercent).toBe(41);
+  expect(kept?.models?.["deepseek-v4.1-flash"]?.until).toBe(until);
+  // A full window is the account's limit, whatever model refused.
+  await runner.changed([account({ ...usage(100, "2030-01-01T10:07:00.000Z"), limited: true })]);
+  expect((await accountRow(CLAUDE_ID))?.usage?.limited).toBe(true);
 });
 
 test("the computer's own sign-ins' usage: by brain, kept across hello, in the agent's brain view", async () => {

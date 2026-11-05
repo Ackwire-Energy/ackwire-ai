@@ -138,7 +138,7 @@ export function workAnchorBody(t: TFunction, body: string, meta: Record<string, 
 }
 
 /** The AI provider's errors (`run.provider_error`, `run.provider_unavailable`): mirrors `PROVIDER_ERRORS` in the engine. */
-const PROVIDER_ERRORS = new Set(["run.provider_error", "run.provider_unavailable"]);
+const PROVIDER_ERRORS = new Set(["run.provider_error", "run.provider_account", "run.provider_unavailable"]);
 
 /**
  * A work's end posted home after its AI provider failed (`meta.workEnd`): Continuar goes on from there, once (ADR 0121).

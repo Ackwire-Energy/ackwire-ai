@@ -155,6 +155,26 @@ describe("the right hand elsewhere", () => {
     expect(wrapper?.parentElement?.classList.contains("ac-msg__text")).toBe(true);
   });
 
+  test("its greeting's name opens the profile card, as any message's; its face is the same trigger for the mouse", async () => {
+    await go(withRightHand(seedState()), `dm/agent/${LODI_ID}`);
+    const greeting = [...document.querySelectorAll(".ac-msg")].find((m) =>
+      m.textContent?.includes("Oi, eu sou o Lodi"),
+    );
+    expect(greeting?.querySelector(".ac-msg__avatar .profile-trigger")).toBeTruthy();
+    const name = greeting?.querySelector(".profile-trigger--name") as HTMLElement;
+    expect(name.getAttribute("aria-label")).toBe("Perfil de Lodi");
+    await click(name);
+    expect(document.querySelector(".profile-card")?.textContent).toContain("Lodi");
+  });
+
+  test("with a team, or the start card answered by another message, its greeting still ends with the way to build the team", async () => {
+    const state = withRightHand(seedState());
+    seedDm(state, { type: "agent", id: LODI_ID }, { body: "oi, tudo bem?" });
+    await go(state, `dm/agent/${LODI_ID}`);
+    await click(screen().getByRole("button", { name: "Montar o time" }));
+    expect(state.messages.some((m) => m.body === "Me ajuda a montar o time.")).toBe(true);
+  });
+
   test("on the first visit it waves under its greeting, once: the visit marks its DM read, so the next has no wave", async () => {
     const state = withRightHand(seedState());
     state.dms.push({
@@ -194,7 +214,7 @@ describe("the right hand elsewhere", () => {
 
   test("Mudar visual: the face and the choices in the dialog's body, Cancelar and Salvar in its footer", async () => {
     await go(withRightHand(seedState()), "settings/right_hand");
-    await click(screen().getByRole("button", { name: "Mudar visual" }));
+    await click(screen().getByRole("button", { name: "Mudar o visual do Lodi" }));
     const dialog = screen().getByRole("dialog", { name: "Mudar visual" });
     const body = dialog.querySelector(":scope > .ac-dialog__body") as HTMLElement;
     expect(body.querySelector(".rh-set__face")).not.toBeNull();

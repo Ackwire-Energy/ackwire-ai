@@ -383,6 +383,24 @@ describe("no AI connected: above the composer", () => {
 });
 
 describe("the agent's no-AI card", () => {
+  test("its computer with no such CLI, or no computer: the card says that, not that it has no AI", async () => {
+    await open(withCard({ reason: "cli_missing" }));
+    expect(cardRow().textContent).toContain(
+      "Ada não vai responder: o programa da IA não está instalado no computador.",
+    );
+    expect(cardRow().textContent).not.toContain("não tem uma IA");
+    expect(within(cardRow()).getByRole("button", { name: "Conectar" })).toBeTruthy();
+  });
+
+  test("the right hand at its model's own limit names the model, with the way to an API key", async () => {
+    await open(withCard({ reason: "model_limit", model: "Kimi K2" }));
+    expect(cardRow().textContent).toContain(
+      "Ada não consegue responder agora: o Kimi K2 chegou ao limite dele no plano. Os outros modelos do plano continuam funcionando.",
+    );
+    expect(cardRow().textContent).not.toContain("o plano chegou ao limite");
+    expect(within(cardRow()).getByRole("button", { name: "Usar uma chave de API" })).toBeTruthy();
+  });
+
   test("in place of its text, with Connect at the step the message asked for; a key saved there answers by itself", async () => {
     const state = withCard({ intent: "api_key", provider: "openai" });
     await open(state);
@@ -659,15 +677,19 @@ describe("the agent's no-AI card", () => {
     const state = withCard();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await open(state);
-    // Not who asked: no "it answers your message" line.
-    await click(within(cardRow()).getByRole("button", { name: "Conectar" }));
-    const box = dialog("Conectar uma IA para a Ada") as HTMLElement;
-    expect(box.textContent).toContain(
+    // No Conectar that leads nowhere: the card itself says who can.
+    expect(cardRow().textContent).toContain(
       "Quem conecta a IA de Ada: um admin, com uma chave de API, ou João, com o próprio plano.",
     );
-    // A member adds no API key either.
-    await click(option(box, /^Chave de API/));
-    expect(box.textContent).toContain("Uma chave de API, só um admin adiciona.");
+    expect(within(cardRow()).queryByRole("button", { name: "Conectar" })).toBeNull();
+  });
+
+  test("the right hand's plan line offers a key only to who can add one", async () => {
+    const state = withCard({ reason: "plan_limit" });
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    await open(state);
+    expect(cardRow().textContent).toContain("Só um admin pode conectar uma IA.");
+    expect(within(cardRow()).queryByRole("button", { name: "Usar uma chave de API" })).toBeNull();
   });
 });
 

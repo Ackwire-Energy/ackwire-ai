@@ -150,10 +150,20 @@ describe("receipts", () => {
     const m = await post(f, "@dev hi");
     await drainOutbox(f.db, f.handlers);
     expect((await receiptOf(f, m.id))?.handled).toEqual([
-      { agentId: f.agent.id, runId: expect.any(String), status: "failed" },
+      expect.objectContaining({
+        agentId: f.agent.id,
+        runId: expect.any(String),
+        status: "failed",
+        errorCode: "run.model_refused",
+      }),
     ]);
     expect(events).toContainEqual(
-      expect.objectContaining({ type: "message.handled", messageId: m.id, status: "failed" }),
+      expect.objectContaining({
+        type: "message.handled",
+        messageId: m.id,
+        status: "failed",
+        errorCode: "run.model_refused",
+      }),
     );
   });
 });

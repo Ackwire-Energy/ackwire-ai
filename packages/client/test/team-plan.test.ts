@@ -142,7 +142,5 @@ test("a failed try names its step, with a known reason in the reader's words and
   const taken = { step: "Caio", reason: "@caio is already taken", status: 409, code: "agent.handle_taken" };
   expect(teamFailureText(t, taken)).toContain('"step":"Caio"');
   expect(teamFailureText(t, taken)).toContain("newAgent.errors.handleTaken");
-  expect(teamFailureText(t, { step: "#eng", reason: "Something went wrong", status: 500 })).toContain(
-    "common.unknownError",
-  );
+  expect(teamFailureText(t, { step: "#eng", reason: "Something went wrong", status: 500 })).toContain("common.ourSide");
 });

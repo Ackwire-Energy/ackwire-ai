@@ -100,6 +100,8 @@ export async function findCandidates(db: Executor, input: NewContextItem, limit 
         isNull(contextItems.supersededBy),
         input.agentId ? eq(contextItems.agentId, input.agentId) : isNull(contextItems.agentId),
         eq(contextItems.scopeType, input.scopeType),
+        // A rule holds by its giver (`rulesForPerson`): the same words from someone else are their own rule.
+        input.kind === "rule" ? eq(contextItems.createdById, input.createdById ?? "") : undefined,
       ),
     )
     .orderBy(desc(contextItems.updatedAt))

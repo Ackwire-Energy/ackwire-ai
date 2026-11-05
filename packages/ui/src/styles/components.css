@@ -1212,6 +1212,15 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   color: var(--attention);
   background: color-mix(in srgb, var(--attention) 18%, transparent);
 }
+/* A mentioned agent: its own tone, worked out per theme (`mentionTone`). */
+.ac-mention--agent {
+  color: var(--mention-ink);
+  background: var(--mention-bg);
+}
+[data-theme="dark"] .ac-mention--agent {
+  color: var(--mention-ink-dark);
+  background: var(--mention-bg-dark);
+}
 /* With Markdown blocks, the cursor follows the last block's text. */
 .ac-msg--streaming .ac-msg__text:has(> .md)::after {
   content: none;
@@ -5302,7 +5311,7 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   filter: brightness(1.14);
 }
 /* A mention on the bubble: a translucent chip, so it reads on the bubble's gray in both themes. */
-.ac-msg--own .ac-msg__text :is(.ac-mention, code:not(pre code)) {
+.ac-msg--own .ac-msg__text :is(.ac-mention:not(.ac-mention--agent), code:not(pre code)) {
   background: rgb(127 127 127 / 0.16);
 }
 /* Sending: the bubble waits, quieter; not sent: a danger outline, the words kept. */

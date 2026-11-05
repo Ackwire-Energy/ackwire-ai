@@ -337,6 +337,7 @@ export function SearchBox({
           className="search-box__input"
           type="search"
           role="combobox"
+          data-esc-free=""
           aria-label={t("searchPage.label")}
           aria-expanded={Boolean(shown)}
           aria-controls={listId}

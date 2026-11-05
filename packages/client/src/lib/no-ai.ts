@@ -15,7 +15,9 @@ import { ownSignInReady } from "./ai-accounts";
 import { answersOthers, audienceOf } from "./audience";
 import { type SetupView, setupPending } from "./computer";
 import { toolOffReason } from "./machines";
+import { can } from "./permissions";
 import { CODING_PLANS, isPlanId, loginPerAgent, PLAN_IDS, type PlanId } from "./plans";
+import { isRightHand } from "./right-hand";
 
 /**
  * No AI connected (ADR 0061): an agent's card when it can't answer, and the Connect step a person who
@@ -43,17 +45,34 @@ export interface NoAiCard {
   own?: MachineAccountKind;
   /**
    * The team's right hand on a plan (ADR 0137 §7): why that plan can't think now, said as one line with the way to an
-   * API key (its computer away, the plan at its limit, a plan that answers only its owner, a runner to update there,
-   * the plan's CLI offering tools of its own).
+   * API key (its computer away or with a problem, the plan at its limit or its model's own, the region that model needs, commands off
+   * there, a plan that answers only its owner, a runner to update there, the plan's CLI offering tools of its own).
    */
   planLine?: RightHandPlanLine;
+  /** With `model_limit` and `model_region`: the model's name. */
+  model?: string;
+  /** Not "no AI": its computer has no such CLI installed, or it has no computer at all. */
+  missing?: "cli_missing" | "no_computer";
 }
 
 /** Why the right hand's plan can't think for this message (`NoAiCard.planLine`). */
-export type RightHandPlanLine = "computer_away" | "plan_limit" | "plan_not_shared" | "runner_outdated" | "plan_tools";
+export type RightHandPlanLine =
+  | "computer_away"
+  | "computer_failed"
+  | "plan_limit"
+  | "model_limit"
+  | "model_region"
+  | "commands_off"
+  | "plan_not_shared"
+  | "runner_outdated"
+  | "plan_tools";
 export const RIGHT_HAND_PLAN_LINES: ReadonlySet<string> = new Set<RightHandPlanLine>([
   "computer_away",
+  "computer_failed",
   "plan_limit",
+  "model_limit",
+  "model_region",
+  "commands_off",
   "plan_not_shared",
   "runner_outdated",
   "plan_tools",
@@ -88,7 +107,71 @@ export function noAiCardOf(meta: Record<string, unknown> | null | undefined): No
     ...(typeof o.reason === "string" && RIGHT_HAND_PLAN_LINES.has(o.reason)
       ? { planLine: o.reason as RightHandPlanLine }
       : {}),
+    ...(typeof o.model === "string" && o.model ? { model: o.model } : {}),
+    ...(o.reason === "cli_missing" || o.reason === "no_computer" ? { missing: o.reason } : {}),
   };
+}
+
+/** A plan line that passes by itself: once the agent can think again, its card offers "Responder agora". */
+export const planLinePasses = (line: RightHandPlanLine | undefined) =>
+  line === "computer_away" || line === "computer_failed";
+
+/**
+ * The key of a card's line while the agent still can't think (`agentGrammar(name)` fills it): the computer's own
+ * sign-in of that CLI missing, its sign-in ended, its computer with no such CLI, no computer, else no AI at all.
+ */
+export const noAiLineKey = (card: Pick<NoAiCard, "own" | "signedOut" | "missing">) =>
+  card.own
+    ? (`noAi.notSignedIn.${card.own}` as const)
+    : card.signedOut
+      ? "noAi.signedOut"
+      : card.missing === "cli_missing"
+        ? "noAi.cliMissing"
+        : card.missing === "no_computer"
+          ? "noAi.noComputer"
+          : "noAi.agent";
+
+type ConnectingAgent = { ownerUserId?: string | null; builtin?: "right_hand" | null };
+
+/** Who can set an agent's own AI: its owner (a plan), who manages agents (a workspace key) or keys. */
+const maySetAgentAi = (
+  agent: ConnectingAgent | null | undefined,
+  meId: string | null | undefined,
+  org: Parameters<typeof can>[0],
+) => (!!meId && agent?.ownerUserId === meId) || can(org, "manage_agents") || can(org, "manage_credentials");
+
+/**
+ * Who can do something about an agent with no AI: who sets its AI, and on the right hand any member, for their own
+ * plan (ADR 0137 §11). Anyone else reads who can (`noAi.locked`) in place of a Connect that leads nowhere. Mirrors
+ * `ConnectAiDialog`.
+ */
+export const mayConnectAi = (
+  agent: ConnectingAgent | null | undefined,
+  meId: string | null | undefined,
+  org: Parameters<typeof can>[0],
+) => (!!meId && isRightHand(agent)) || maySetAgentAi(agent, meId, org);
+
+/**
+ * The way out of a plan line for this person: their own plan when the workspace's doesn't serve them, or when a key
+ * isn't theirs to set (an API key is always the workspace's, §11), else an API key. Null: neither is theirs to do.
+ */
+export function planLineFix(
+  line: RightHandPlanLine,
+  agent: ConnectingAgent | null | undefined,
+  meId: string | null | undefined,
+  org: Parameters<typeof can>[0],
+): "connectMine" | "useKey" | null {
+  if (!mayConnectAi(agent, meId, org)) return null;
+  return line === "plan_not_shared" || !maySetAgentAi(agent, meId, org) ? "connectMine" : "useKey";
+}
+
+/** The key of an agent's line from its AI status, for a banner with no card (`noAiLineKey`). */
+export function noAiStatusKey(status: AiStatus | undefined, agentId: string) {
+  const reason = status?.agents.find((a) => a.agentId === agentId)?.reason;
+  return noAiLineKey({
+    signedOut: reason === "not_signed_in",
+    ...(reason === "cli_missing" || reason === "no_computer" ? { missing: reason } : {}),
+  });
 }
 
 /**
@@ -321,7 +404,7 @@ export const gateDims = (gate: PlanGate) => gate.state === "missing" || gate.sta
 /**
  * The gate passes by itself, with nothing for the person to do: the computer reconnecting, or (the Cloud's, which is
  * ours) its programs being installed or updated there. The panel asks again while it shows, as events may not say it.
- * A program not allowed there waits for someone, as do all of self-host's (their computers are people's own).
+ * A program not allowed there is ours to allow, and all of self-host's wait for someone (their computers are people's own).
  */
 export const gateRechecks = (gate: PlanGate, edition: Edition | null) =>
   gate.state === "offline" || (edition === "cloud" && gate.state === "unsupported" && gate.reason !== "tool_off");
@@ -340,7 +423,8 @@ const CLOUD_REASON = {
 /**
  * Why a plan's panel can't sign in yet, in plain words, with what happens next: an offline computer, or a reason the
  * plan can't sign in there (`unsupported`). On the Cloud the computer is ours, so the line says what it's doing (a
- * program being installed or updated, a restart) and that it comes back by itself (`rechecks`), or who to ask. Null
+ * program being installed or updated, a restart) and that it comes back by itself (`rechecks`), or that it's on our
+ * side. Null
  * for any other gate. `computer`: its name as the panel says it; `machine`: its row, for the way to allow a program
  * on a self-hosted one.
  */

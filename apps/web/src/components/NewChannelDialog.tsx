@@ -307,6 +307,7 @@ export function NewChannelDialog({
             emptyText={(q) => t("newChannel.membersEmpty", { q })}
             selected={selected}
             onChange={setSelected}
+            channel
           />
         </DialogBody>
         <DialogFooter bar note={t("newChannel.selected", { count: selected.size })}>

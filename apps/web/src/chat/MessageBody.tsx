@@ -7,7 +7,7 @@ import { type ChannelRenderer, Markdown, type MentionRenderer, type WikiLinkRend
 
 /**
  * Renders a message body as safe Markdown (bold, italic, `code`, ```blocks```,
- * lists, links, line breaks) with neutral @mentions (people and agents alike) and #channel links.
+ * lists, links, line breaks) with @mentions (neutral, an agent's in its tone) and #channel links.
  * React elements only: HTML in a message is shown as text.
  *
  * `live` (an agent's answer still streaming): the finished blocks render once
@@ -19,6 +19,7 @@ import { type ChannelRenderer, Markdown, type MentionRenderer, type WikiLinkRend
 export function MessageBody({
   body,
   resolveMention,
+  mentionTone,
   renderMention,
   wikiLink,
   channelRefs,
@@ -28,6 +29,8 @@ export function MessageBody({
 }: {
   body: string;
   resolveMention?: (handle: string) => string | null;
+  /** The mentioned agent's color: its chip takes that tone. */
+  mentionTone?: (handle: string) => AgentColor | undefined;
   /** Replaces the plain chip (e.g. a chip that opens the profile card). */
   renderMention?: (handle: string, key: string) => ReactNode;
   /** `[[Título]]`: wiki link chips (with a preview on hover). */
@@ -43,8 +46,14 @@ export function MessageBody({
 }) {
   const mention = useCallback(
     (handle: string, key: string) =>
-      renderMention ? renderMention(handle, key) : <Mention key={key}>@{resolveMention?.(handle) ?? handle}</Mention>,
-    [resolveMention, renderMention],
+      renderMention ? (
+        renderMention(handle, key)
+      ) : (
+        <Mention key={key} tone={mentionTone?.(handle)}>
+          @{resolveMention?.(handle) ?? handle}
+        </Mention>
+      ),
+    [resolveMention, mentionTone, renderMention],
   );
   const channel = useCallback<ChannelRenderer>(
     (name, text, key) => <ChannelRef key={key} name={name} text={text} refs={channelRefs} />,

@@ -70,6 +70,8 @@ export interface MessageReceipt {
   mentionNeeded?: true;
   /** The author's own plan is picking who answers, until the decision. */
   picking?: true;
+  /** Agent id → why its run failed, as a run's error is worded (`runErrorText`). */
+  failures?: Record<string, { code: string; params?: Record<string, string> }>;
   /** The list receipts last seeded: the same read seeded again changes nothing. */
   server?: MessageReceipts;
 }
@@ -145,6 +147,19 @@ function set(
     ? current.agents.map(([id, p]) => [id, id === agentId ? phase : p] as [string, ReceiptPhase])
     : [...current.agents, [agentId, phase] as [string, ReceiptPhase]];
   return { ...state, [messageId]: { ...current, agents } };
+}
+
+/** Why an agent's run failed, kept beside its phase. */
+function withFailure(
+  state: ReceiptsState,
+  messageId: string,
+  agentId: string,
+  failure: { errorCode?: string; errorParams?: Record<string, string> },
+): ReceiptsState {
+  const receipt = state[messageId];
+  if (!failure.errorCode || !receipt) return state;
+  const why = { code: failure.errorCode, ...(failure.errorParams ? { params: failure.errorParams } : {}) };
+  return { ...state, [messageId]: { ...receipt, failures: { ...receipt.failures, [agentId]: why } } };
 }
 
 /**
@@ -226,6 +241,7 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
       const follows = existing.runOf?.[h.agentId];
       if (RANK[phase] < RANK.handled || (follows && h.runId && h.runId !== follows)) continue;
       next = linkRun(set(next, message.id, h.agentId, phase), message.id, h.runId, h.agentId);
+      next = withFailure(next, message.id, h.agentId, h);
     }
     return withMentions({ ...next, [message.id]: { ...(next[message.id] ?? existing), server: r } });
   }
@@ -243,6 +259,7 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
         h.reason === NO_AI ? "no_ai" : phaseOf(h.status, h.outage, h.computer, h.passed, h.usage),
       );
       next = linkRun(next, message.id, h.runId, h.agentId);
+      next = withFailure(next, message.id, h.agentId, h);
     }
     // Receipts come from the router's decision: "nobody picked it" is final. A read with none (the router is
     // still on it) keeps "Picking who answers", and a `message.routing` after it still counts.
@@ -342,15 +359,20 @@ export function applyReceiptEvent(
         state[event.messageId]?.runOf?.[event.agentId] !== event.runId,
       );
     case "message.handled":
-      return set(
-        linkRun(state, event.messageId, event.runId, event.agentId),
+      return withFailure(
+        set(
+          linkRun(state, event.messageId, event.runId, event.agentId),
+          event.messageId,
+          event.agentId,
+          event.reason === NO_AI
+            ? "no_ai"
+            : event.status
+              ? phaseOf(event.status, event.outage, event.computer, event.passed, event.usage)
+              : "handled",
+        ),
         event.messageId,
         event.agentId,
-        event.reason === NO_AI
-          ? "no_ai"
-          : event.status
-            ? phaseOf(event.status, event.outage, event.computer, event.passed, event.usage)
-            : "handled",
+        event,
       );
     case "agent.run.steered": {
       // Went into the agent's task in progress: that agent is on it (a "stop" ends it).

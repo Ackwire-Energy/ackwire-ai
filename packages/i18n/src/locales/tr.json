@@ -21,6 +21,7 @@
     "refreshing": "Yenileniyor",
     "retry": "Tekrar dene",
     "unknownError": "Bir şeyler ters gitti. Tekrar deneyin.",
+    "ourSide": "Bizim tarafımızda bir şeyler ters gitti. Birazdan tekrar deneyin.",
     "signedOut": "Oturumunuz sona erdi. Devam etmek için tekrar giriş yapın.",
     "newVersion": "agentes.chat'in yeni bir sürümü çıktı.",
     "reload": "Yeniden yükle",
@@ -41,7 +42,7 @@
     "today": "Bugün",
     "yesterday": "Dün",
     "loadFailed": "Bu yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.",
-    "notAllowed": "Bunun için izniniz yok. Bir çalışma alanı yöneticisine sorun.",
+    "notAllowed": "Bunun için izniniz yok.",
     "tooMany": "Çok fazla deneme yapıldı. Daha sonra tekrar deneyin.",
     "offline": "Çevrimdışısınız. Bağlantınızı kontrol edip tekrar deneyin.",
     "unreachable": "agentes.chat'e şu anda ulaşılamıyor. Birazdan tekrar deneyin."
@@ -213,6 +214,12 @@
       "desc": "Açık veya özel.",
       "short": "kanal oluşturma",
       "say": "kanal oluşturur"
+    },
+    "mention_everyone": {
+      "title": "Herkesi anma",
+      "desc": "Bir kanaldaki herkese, kişilere ve ajanlara @herkes ile haber verme.",
+      "short": "herkesi anma",
+      "say": "herkesi anar"
     },
     "manage_channels": {
       "title": "Kanalları düzenleme",
@@ -1817,8 +1824,8 @@
     "queued_other": "{{names}} bilgisayar için sırada",
     "away_one": "{{names}} bilgisayarı bekliyor",
     "away_other": "{{names}} bilgisayarı bekliyor",
-    "plan_one": "{{names}} plan sıfırlanınca yanıtlayacak",
-    "plan_other": "{{names}} plan sıfırlanınca yanıtlayacak",
+    "plan_one": "{{names}} planı bekliyor",
+    "plan_other": "{{names}} planı bekliyor",
     "budget_one": "{{names}} bütçe yenilenince yanıtlayacak",
     "budget_other": "{{names}} bütçe yenilenince yanıtlayacak",
     "line_one": "{{names}} başka bir iş bitince başlar",
@@ -1836,7 +1843,7 @@
       "outage": "Yapay zeka sağlayıcısı çalışmıyor · kendi kendine yeniden deniyor",
       "queued": "Bilgisayar için sırada",
       "away": "Bilgisayarı bekliyor",
-      "plan": "Plan sıfırlanınca yanıtlayacak",
+      "plan": "Planı bekliyor",
       "budget": "Bütçe yenilenince yanıtlayacak",
       "line": "Başka bir iş bitince başlar",
       "canceled": "İptal edildi",
@@ -1883,6 +1890,11 @@
         "import": "Ajanlarımı içe aktar",
         "form": "Formu doldur"
       },
+      "again": {
+        "question": "Ekibi benimle kurmak ister misin?",
+        "action": "Ekibi kur",
+        "message": "Ekibi kurmama yardım et."
+      },
       "next": {
         "question": "Ekip geldi. Şimdi ne yapalım?",
         "invite": "Kişileri davet et",
@@ -1915,8 +1927,6 @@
       "name": "Ad ve görünüm",
       "nameHelp": "Kenar çubuğunda hep “{{label}}” olarak görünür.",
       "changeLook": "Görünümü değiştir",
-      "ai": "Yapay zekâ ve model",
-      "aiHelp": "Otomatik, işi görecek en ucuz modeli seçer.",
       "budget": "Aylık bütçe",
       "perMonth": "/ay",
       "budgetHelp": "Sınıra ulaşınca her ajan gibi durur ve haber verir.",
@@ -1924,12 +1934,27 @@
       "audienceHelp": "Bunun dışındaki kişi kenar çubuğunda {{name}} adını görmez.",
       "lock": "{{name}} arşivlenemez ve silinemez. Biri onunla konuşmadıkça hiçbir şey paylaşmaz.",
       "audit": "{{name}} neler yaptı, gör",
-      "onPlan": "Claude planı · {{account}}",
       "change": "Değiştir",
       "planHelp": "Ücreti planın sahibi öder. Planın bilgisayarına ulaşılamadığında konuşma bunu söyler ve bir API anahtarı önerir.",
-      "plan": "Bir plan",
-      "planOffer": "{{name}}, API anahtarı yerine planınızla düşünebilir. Planın oturum açtığı bilgisayarda çalışır ve bu çalışma alanının dışına ulaşmaz.",
-      "usePlan": "Plan kullan"
+      "lookEdit": "{{name}} görünümünü değiştir",
+      "planOwner": "sahibi: {{owner}}",
+      "mine": "Yapay zekân",
+      "mineHelp": "{{name}} ile konuşman, kendi planınla ya da seninle paylaşılan bir planla düşünür, yalnızca seninki.",
+      "connectMine": "Planımı bağla",
+      "useWorkspace": "Çalışma alanınınkini kullan",
+      "fallbackKey": "Kendi planın yoksa çalışma alanının API anahtarını kullanır.",
+      "fallbackPlan": "Kendi planın yoksa herkese yanıt veren {{owner}} planını kullanır.",
+      "fallbackYours": "Başka plan yoksa senin olan çalışma alanı planını kullanır.",
+      "fallbackNone": "Kendi planın yoksa {{name}} sana yanıt veremez: çalışma alanının planı yalnızca {{owner}} için yanıt verir.",
+      "workspace": "Çalışma alanı yapay zekâsı",
+      "workspaceHelp": "Kendi planı olmayanlar {{name}} ile bu yapay zekâ üzerinden konuşur.",
+      "workspacePlan": "Çalışma alanı planı",
+      "workspacePlanHelp": "Anahtarın yerine bir plan. Başkalarına yalnızca sahibi izin verirse yanıt verir.",
+      "noPlans": "Burada kullanmak için Yapay zekân bölümünden bir plan bağla.",
+      "pickPlan": "Plan seç",
+      "sharesOn": "Açık: kendi planı olmayanlar {{name}} ile bu plan üzerinden konuşur.",
+      "sharesOff": "Kapalı: bu plan üzerinden yalnızca {{owner}} konuşur. Kendi planı olmayanlar yanıt alamaz.",
+      "sharesOffYou": "Kapalı: bu plan üzerinden yalnızca sen konuşursun. Kendi planı olmayanlar yanıt alamaz."
     },
     "card": {
       "settings": "{{name}} · Ayarlar",
@@ -2126,6 +2151,8 @@
     },
     "agent": "{{name}} yanıt vermeyecek çünkü bağlı bir yapay zekası yok.",
     "agent_female": "{{name}} yanıt vermeyecek çünkü bağlı bir yapay zekası yok.",
+    "cliMissing": "{{name}} yanıt vermeyecek: yapay zekânın programı bilgisayarda kurulu değil.",
+    "noComputer": "{{name}} yanıt vermeyecek: yapay zekânın bir bilgisayara ihtiyacı var ama hiç yok.",
     "signedOut": "{{name}} yanıt vermeyecek çünkü yapay zekasının oturumu kapandı.",
     "signedOut_female": "{{name}} yanıt vermeyecek çünkü yapay zekasının oturumu kapandı.",
     "notSignedIn": {
@@ -2145,12 +2172,17 @@
     "action": "Bağla",
     "locked": "{{name}} için yapay zekayı kim bağlar: API anahtarıyla bir yönetici ya da kendi planıyla {{owner}}.",
     "lockedAdmins": "Yapay zekayı yalnızca bir yönetici bağlayabilir.",
+    "lockedOwner": "Ajana planı yalnızca sahibi bağlar.",
     "rightHand": {
       "computer_away": "{{name}} şu an yanıt veremiyor: planın bilgisayarına ulaşılamıyor.",
+      "computer_failed": "{{name}} şu an yanıt veremiyor: planın bilgisayarında bir sorun oldu.",
       "plan_limit": "{{name}} şu an yanıt veremiyor: plan sınırına ulaştı.",
-      "plan_not_shared": "{{name}}, yalnızca sahibine yanıt veren bir planla düşünüyor.",
+      "plan_not_shared": "{{name}} ile konuşmak için kendi planını bağla: çalışma alanının planı yalnızca sahibine yanıt verir.",
       "runner_outdated": "{{name}} şu an yanıt veremiyor: planın bilgisayarındaki programın güncellenmesi gerekiyor.",
-      "plan_tools": "{{name}} yanıt vermeden durdu: o bilgisayardaki planın yapay zekâsı kendi araçlarını sunuyor.",
+      "plan_tools": "{{name}} yanıt vermeden durdu: o bilgisayardaki planın yapay zekâsı agentes.chat araçlarıyla sınırlı kalmadı.",
+      "model_limit": "{{name}} şu an yanıt veremiyor: {{model}} plandaki kendi sınırına ulaştı. Planın diğer modelleri çalışmaya devam ediyor.",
+      "model_region": "{{name}} yanıt veremiyor: {{model}} için OpenCode'da Global bölgesinin açık olması gerekiyor (Settings › Privacy).",
+      "commands_off": "{{name}} şu an yanıt veremiyor: planın bilgisayarında komutlar kapalı ve bilgisayarla ilgilenen kişinin bunları açması gerekiyor.",
       "useKey": "API anahtarı kullan"
     },
     "receipt": "Kimse yanıt vermeyecek: bağlı yapay zeka yok",
@@ -2355,6 +2387,8 @@
       "monthly": "ayının"
     },
     "line": "{{when}}, plan sıfırlanınca devam eder. Hızlı yanıtlar sürer.",
+    "changeModel": "Modeli değiştir",
+    "raiseBudget": "Bütçeyi artır",
     "lineUnknown": "Plan sıfırlanır sıfırlanmaz devam eder. Hızlı yanıtlar sürer.",
     "lineBudget": "{{when}} ya da bütçe artarsa daha erken devam eder. Hızlı yanıtlar sürer.",
     "continue": "Şimdi devam et",
@@ -2536,6 +2570,7 @@
     },
     "memory": {
       "saved": "<b>Belleğe</b> kaydettim: {{text}}",
+      "saved_rule": "<b>Kurallarıma</b> kaydettim: {{text}}",
       "updated": "<b>Belleği</b> güncelledim: {{text}}",
       "forgotten": "<b>Bellekten</b> kaldırdım: {{text}}"
     },
@@ -2567,6 +2602,10 @@
     },
     "agent": {
       "settings_changed": "<b>{{agentName}}</b> ayarlarını değiştirdim"
+    },
+    "pr": {
+      "merged": "<b>{{repo}}</b> içindeki <b>#{{number}}</b> PR'ını birleştirdim",
+      "merged_branch": "<b>{{ref}}</b> dalını <b>{{repo}}</b> içine birleştirdim"
     },
     "other": "Bir değişiklik yaptım",
     "copyWebhook": "Webhook adresini kopyala",
@@ -2845,7 +2884,7 @@
       "waiting_answer": "Yanıt bekliyor",
       "waiting_computer": "Bilgisayarı bekliyor",
       "queued_computer": "Bilgisayar için sırada",
-      "waiting_plan": "Planın sıfırlanmasını bekliyor",
+      "waiting_plan": "Planı bekliyor",
       "waiting_budget": "Bütçenin sıfırlanmasını bekliyor",
       "provider_down": "Yapay zeka sağlayıcısı çalışmıyor · kendi kendine yeniden deniyor",
       "out_of_plan": "Plan limiti doldu",
@@ -2872,6 +2911,7 @@
     "inChannel": "Bu kanalda",
     "inWorkspace": "Çalışma alanında",
     "notInChannel": "kanalda değil",
+    "everyone": "Bu konuşmadaki herkes, kişiler ve ajanlar",
     "offer": "{{name}} kanalda değil ve bahsetmeyi görmeyecek.",
     "add": "Kanala ekle",
     "dismiss": "Şimdi değil",
@@ -3386,7 +3426,12 @@
       "pushTo": "{{repo}} içinde {{branch}} dalına gönder",
       "done": "Onaylandı. {{name}} bunu bir daha sormayacak.",
       "undoHere": "Geri almak için {{name}} sayfasındaki Araçlar ve erişim bölümüne gidin.",
-      "open": "Aç"
+      "open": "Aç",
+      "routine": "Bu rutinde her zaman",
+      "thisRoutine": "bu rutin",
+      "noteRoutine": "{{routine}} bundan sonra {{actions}} işlemini her değerle kendi başına yapar. Bu rutinin dışında sormaya devam eder. Geri almak için: rutinin ayarları.",
+      "doneRoutine": "Onaylandı. {{routine}} bunu bir daha sormaz.",
+      "undoRoutine": "Geri almak için rutinin ayarlarına gidin."
     },
     "email": {
       "from": "Kimden",
@@ -4483,6 +4528,11 @@
       "cancel": "İptal",
       "forgotten": "Unutuldu. Geri isterseniz Arşivlenenler bölümünde.",
       "saved": "Kaydedildi. Artık doğrulanmış sayılıyor.",
+      "rules": "Kişilerin verdiği kurallar",
+      "rulesNote": "Kuralı verenin tüm işlerinde, istek nereden gelirse gelsin geçerlidir. Sorumlunun veya bir yöneticinin kuralları herkes için geçerlidir.",
+      "ruleBy": "{{name}} · {{date}}",
+      "removeRule": "Kaldır",
+      "ruleRemoved": "Kural kaldırıldı. Geri isterseniz Arşivlenenler bölümünde.",
       "playbook": "{{name}} nasıl çalışır",
       "playbookNote": "Kendisi için sakladığı çalışma yolları. Sohbette görünmezler. Dışarıdan edinip bir daha kullanmadığı kendiliğinden çıkar ve Arşivlenenler'de kalır.",
       "details": "Teknik ayrıntılar",
@@ -4544,6 +4594,7 @@
         "model_refused": "Model yanıt vermeyi reddetti.",
         "agent_archived": "Ajan arşivlendi.",
         "provider_error": "Model sağlayıcısı bir hata döndürdü: {{detail}}",
+        "provider_account": "Sağlayıcı anahtarı reddetti: geçersiz olabilir, kredisi veya kotası bitmiş olabilir.",
         "provider_unavailable": "Model sağlayıcısı yanıt vermedi: {{detail}}",
         "canceled": "Biri görevi durdurdu.",
         "interrupted": "Sunucu yeniden başlatıldığı için kesildi.",
@@ -4551,7 +4602,7 @@
         "credential_revoked": "Bu ajanın anahtarı iptal edildi.",
         "credential_wrong_provider": "Model {{modelProvider}} sağlayıcısına ait, ama anahtar {{keyProvider}} sağlayıcısına ait.",
         "model_unlisted": "OpenRouter artık {{model}} sunmuyor. Ajanın ayarlarından başka bir model seçin.",
-        "no_ai": "Ajana bağlı bir yapay zeka yok.",
+        "no_ai": "Ajanın kullanılabilir bir yapay zekâsı yoktu.",
         "person_limit": "İsteyen kişi bu ayki kullanım limitine ulaştı.",
         "org_paused": "Çalışma alanının ajanları duraklatıldı.",
         "org_suspended": "Çalışma alanı kullanılamıyor.",
@@ -4560,6 +4611,8 @@
         "computer_busy": "Bilgisayar başka görevlerle meşgul kaldı.",
         "computer_failed": "Bilgisayar bir sorunla karşılaştı ve durdu.",
         "computer_timeout": "Bilgisayarın yanıt vermesi çok uzun sürdü.",
+        "account_missing": "Bu ajan için seçilen hesap artık bilgisayarında değil. Ajanın ayarlarından başka bir hesap seçin ya da yeniden ekleyin.",
+        "our_error": "Bizim tarafımızda bir şeyler ters gitti ve görev durdu. Birazdan yeniden isteyin.",
         "unknown": "Başarısız oldu."
       }
     },
@@ -4662,13 +4715,15 @@
       "decision": "Karar",
       "fact": "Bilgi",
       "preference": "Tercih",
-      "lesson": "Ders"
+      "lesson": "Ders",
+      "rule": "Kural"
     },
     "kindsLower": {
       "decision": "karar",
       "fact": "bilgi",
       "preference": "tercih",
-      "lesson": "ders"
+      "lesson": "ders",
+      "rule": "kural"
     },
     "verified": "Doğrulandı",
     "unverified": "Doğrulanmadı",
@@ -5418,7 +5473,7 @@
     },
     "github_pr_merge": {
       "label": "Pull request birleştirme",
-      "description": "Bir pull request'i birleştirme. Her zaman onay ister."
+      "description": "Bir pull request'i birleştirme. Ajanın sayfasında seçilen depolar dışında onay ister."
     },
     "github_issues_read": {
       "label": "Issue okuma",
@@ -6060,7 +6115,8 @@
     },
     "ownActions": {
       "hint": "Her çalıştırma bunları bağlı uygulamalarında sormadan yapar. Oradaki diğer her işlem önce bir kişinin onayını ister, merge, deploy ve rollback ise her zaman onay ister.",
-      "none": "Bağlı uygulamalarda her işlemden önce bir kişinin onayını ister. İşini kendisi yapması için sohbette ajana hangi işlemleri yapabileceğini söyle."
+      "none": "Bağlı uygulamalarda her işlemden önce bir kişinin onayını ister. İşini kendisi yapması için sohbette ajana hangi işlemleri yapabileceğini söyle.",
+      "remove": "Şundan önce yine sor: {{action}}"
     },
     "ahead": {
       "approved": "Onaylandı · {{when}} çalışır",
@@ -6225,7 +6281,7 @@
       "waiting": "Birinin yanıt vermesi bekleniyor",
       "waitingApproval": "Onayınız bekleniyor",
       "waitingComputer": "Bilgisayar bekleniyor",
-      "waitingPlan": "Planın sıfırlanması bekleniyor",
+      "waitingPlan": "Planı bekliyor",
       "waitingBudget": "Bütçenin yenilenmesi bekleniyor",
       "reported": "Bulduklarını bildirdi",
       "silent": "Yeni bir şey yok, sessiz kaldı",
@@ -6239,7 +6295,7 @@
       "previous_running": "Atlandı: önceki hâlâ çalışıyordu",
       "previous_waiting": "Atlandı: önceki hâlâ birini bekliyordu",
       "waiting_computer": "Atlandı: ajanın bilgisayarı bekleniyor",
-      "waiting_plan": "Atlandı: planın sıfırlanması bekleniyor",
+      "waiting_plan": "Atlandı: plan bekleniyor",
       "waiting_budget": "Atlandı: bütçenin sıfırlanması bekleniyor",
       "superseded": "Yerini sonraki çalıştırmaya bıraktı",
       "stale": "Zamanını kaçırdı: bilgisayar çok geç geri geldi",
@@ -6271,13 +6327,17 @@
       "model_unlisted": "OpenRouter artık bu modeli sunmuyor",
       "agent_archived": "Ajan arşivlendi",
       "interrupted": "Sunucu yeniden başlatıldığı için kesildi",
-      "no_ai": "Ajanın bağlı yapay zekası yok",
+      "no_ai": "Ajanın kullanılabilir bir yapay zekâsı yoktu",
       "person_limit": "Çalışmadı: oluşturan kişi bu ayki kullanım limitine ulaştı",
       "org_paused": "Çalışmadı: çalışma alanının ajanları duraklatılmıştı",
       "org_suspended": "Çalışmadı: çalışma alanı kullanılamıyordu",
       "org_deleting": "Çalışmadı: çalışma alanı siliniyordu",
       "agent_paused": "Çalışmadı: ajan duraklatılmıştı",
-      "computer_busy": "Bilgisayar başka görevlerle meşgul kaldı"
+      "computer_busy": "Bilgisayar başka görevlerle meşgul kaldı",
+      "computer_failed": "Bilgisayar bir sorunla karşılaştı ve durdu",
+      "computer_timeout": "Bilgisayarın yanıt vermesi çok uzun sürdü",
+      "account_missing": "Ajanın hesabı artık bilgisayarında değil",
+      "our_error": "Bizim tarafımızda bir şeyler ters gitti"
     },
     "openInChat": "Konuşmada aç",
     "stop": "Durdur",
@@ -7417,6 +7477,7 @@
       "person": "Kişiler",
       "agent": "Ajanlar",
       "routine": "Rutinler",
+      "reminder": "Hatırlatıcılar",
       "deadline": "Görev bitiş tarihleri"
     },
     "upcoming": "Yaklaşanlar",
@@ -7436,6 +7497,7 @@
     "kind": {
       "event": "Etkinlik",
       "routine": "Rutin",
+      "reminder": "Hatırlatıcı",
       "deadline": "Görev bitiş tarihi"
     },
     "every": {
@@ -7448,6 +7510,10 @@
     "runs_other": "Bu günlerde {{count}} çalıştırma.",
     "routineDetail": "{{agent}} ajanının rutini · {{target}} hedefine teslim eder.",
     "deadlineDetail": "Görevin bitiş tarihi.",
+    "reminderBy": "Oluşturan: {{name}}",
+    "reminderPosted": "Paylaşan: {{agent}} · {{target}}",
+    "cancelReminder": "Hatırlatıcıyı iptal et",
+    "reminderCancelled": "Hatırlatıcı iptal edildi",
     "openIssue": "Görevi aç",
     "openRoutines": "Rutinlerde gör",
     "openRoutine": "Rutini aç",
@@ -7592,6 +7658,8 @@
     "files": "Dosyalar",
     "needsSandbox": "saklanmadı",
     "assetLimit": "Bir beceri en fazla {{max}} MB görsel ve başka dosya saklar.",
+    "moreFiles_one": "Ve {{count}} dosya daha",
+    "moreFiles_other": "Ve {{count}} dosya daha",
     "runsOnPc": "ajanın bilgisayarında çalışır",
     "reinstall": "Ajanların bu dosyayı kullanabilmesi için beceriyi yeniden yükleyin.",
     "edit": "Düzenle",
@@ -7803,7 +7871,7 @@
         "updating": "{{program}}, {{computer}} üzerinde güncelleniyor. Bittiğinde bu kendiliğinden değişir.",
         "runnerOld": "{{computer}} üzerindeki agentes.chat programı eski ve güncelleme yolda. Bittiğinde bu kendiliğinden değişir.",
         "execOff": "{{computer}} henüz {{program}} çalıştıramıyor. İlgileniyoruz, bu kendiliğinden değişir.",
-        "toolOff": "{{program}}, {{computer}} üzerinde izinli değil. İzin vermesi için destek ekibine yazın.",
+        "toolOff": "{{program}}, {{computer}} üzerinde henüz izinli değil. Bu bizim tarafımızda: daha sonra yeniden dene.",
         "preparing": "{{computer}} hazırlanıyor. Bittiğinde bu kendiliğinden değişir."
       }
     },
@@ -8761,6 +8829,9 @@
       "paidTraining": "Sağlayıcı, istekleri modeli eğitmek için kullanabilir. İzni OpenCode'da açın.",
       "freeTraining": "Ücretsiz. Sağlayıcı, istekleri modeli eğitmek için kullanabilir. İzni OpenCode'da açın."
     },
+    "modelLimit": "{{model}} bu planda kendi sınırına ulaştı ve {{when}} sıfırlanıyor. Planın diğer modelleri çalışmaya devam ediyor.",
+    "modelLimitUnknown": "{{model}} bu planda kendi sınırına ulaştı. Planın diğer modelleri çalışmaya devam ediyor.",
+    "modelRegion": "{{model}} için OpenCode'da Global bölgesinin açık olması gerekiyor (Settings › Privacy). Planın diğer modelleri çalışmaya devam ediyor.",
     "modelHow": {
       "globalRegion": "OpenCode'da Settings › Privacy altında Global bölgesini açın. Bu olmadan bu model yanıt vermez.",
       "paidTraining": "Bu modelin sağlayıcısı, istekleri modeli eğitmek için kullanabilir. OpenCode'da Settings › Privacy altında ücretli modeller için izni açın. Bu olmadan bu model yanıt vermez.",
@@ -9315,6 +9386,13 @@
     "failed": "Bağlanılamadı. Biraz sonra tekrar deneyin."
   },
   "repos": {
+    "merge": {
+      "label": "Sormadan birleştirebilir",
+      "none": "Depo seçilmedi. Her birleştirme onay ister.",
+      "help": "Bu depolarda birleştirme onay kartı olmadan çalışır, denetim kaydına geçer ve konuşmaya bir makbuz bırakır. Diğer tüm hassas işlemler sormaya devam eder.",
+      "dialogTitle": "{{name}} nerede sormadan birleştirir",
+      "dialogDesc": "Yalnızca zaten kullandığı depolar. Başka bir yerdeki birleştirme onay ister."
+    },
     "label": "Hangi depolar",
     "all": "Tüm depolar",
     "allLower": "tüm depolar",
@@ -10807,7 +10885,8 @@
       "editorsExcludeYou": "Bu sayfayı korumak için kendinizi de düzenleyen kişiler arasına ekleyin.",
       "titleTaken": "“{{title}}” adında bir sayfa zaten var.",
       "titleCharacters": "Başlıkta [ ] | veya # olamaz.",
-      "titleNoLetters": "Başlıkta harf veya rakam olmalı."
+      "titleNoLetters": "Başlıkta harf veya rakam olmalı.",
+      "lockAdminsOnly": "Sayfaları yalnızca yöneticiler kilitler."
     },
     "media": {
       "off": "Bu çalışma alanında GIF'ler ve çıkartmalar kapalı.",
@@ -10832,7 +10911,8 @@
       "decided": "Bu öneri hakkında zaten biri karar verdi.",
       "expired": "Bu önerinin süresi doldu: bir gün içinde kimse karar vermedi.",
       "routineMade": "Bu ajanın rutini zaten oluşturuldu.",
-      "noRoutine": "Bu önerinin oluşturacağı bir rutin yok."
+      "noRoutine": "Bu önerinin oluşturacağı bir rutin yok.",
+      "notRequester": "Bunu yalnızca isteyen kişi gönderebilir."
     },
     "approval": {
       "alwaysUnavailable": "Bu istek kalıcı olarak onaylanamaz. Yalnızca bunu onaylayın."
@@ -10934,20 +11014,28 @@
       "agentNotInChannel": "Önce ajanı konuşmaya ekleyin.",
       "webhookPaused": "Test etmek için rutini açın.",
       "continueExtraOff": "Bu planın kullanım dönemi doldu ve bu ajanın uzun işleri ücretli ek kullanımı kullanmıyor. Hemen devam etmek için bunu yapay zeka ayarlarından açın, yoksa sıfırlamadan sonra kaldığı yerden sürer.",
-      "continueExtraUsedUp": "Bu planın kullanım dönemi doldu ve ücretli ek kullanımı da bitti ya da kullanılamıyor. Sıfırlamadan sonra kaldığı yerden sürer."
+      "continueExtraUsedUp": "Bu planın kullanım dönemi doldu ve ücretli ek kullanımı da bitti ya da kullanılamıyor. Sıfırlamadan sonra kaldığı yerden sürer.",
+      "actionsNeedApprover": "Bir rutinin kendi başına hareket etmesine yalnızca ajanın sahibi veya eylemlerini onaylayan kişi izin verebilir.",
+      "editorOnly": "Rutini yalnızca oluşturan kişi, ajanın sahibi veya bir yönetici değiştirebilir.",
+      "widgetFixed": "Bu rutin bir widget'ı güncel tutar. Widget'ından değiştirin."
     },
     "run": {
       "notContinuable": "Bu yanıta artık devam edilemez.",
       "agentBusy": "Ajan bu konuşmada zaten çalışıyor. Devam etmek için bitirmesini bekleyin.",
       "continueForbidden": "Buna yalnızca isteyen kişi, ajanın sahibi veya bir yönetici devam ettirebilir.",
-      "notRestartable": "Bu yanıt zaten başlamıştı, yeniden başlayamaz. Mesajınızı tekrar gönderin."
+      "notRestartable": "Bu yanıt zaten başlamıştı, yeniden başlayamaz. Mesajınızı tekrar gönderin.",
+      "cancelForbidden": "Bunu yalnızca isteyen kişi, ajanın sahibi veya bir yönetici durdurabilir.",
+      "answerForbidden": "Bunu yalnızca isteyen kişi, ajanın sahibi veya bir yönetici yapabilir.",
+      "stopReasonForbidden": "Nedenini yalnızca durduran kişi söyleyebilir."
     },
     "artifact": {
       "fileTooLarge": "Dosya, dosya başına sınır olan {{max}} MB'ı aşıyor.",
       "notVersioned": "Bir görselin, videonun veya kaydın sürümü olmaz. Yeni bir dosya olarak gönder.",
       "fileRequired": "Yüklenecek bir dosya seçin.",
       "fileNameRequired": "Dosyanın bir adı olmalı.",
-      "notFound": "Bu dosya artık yok ya da erişiminiz yok."
+      "notFound": "Bu dosya artık yok ya da erişiminiz yok.",
+      "deleteForbidden": "Bunu yalnızca oluşturan kişi, ajandan isteyen kişi, ajanın sahibi veya bir yönetici silebilir.",
+      "restoreForbidden": "Bunu yalnızca silebilecek kişi geri yükleyebilir."
     },
     "machine": {
       "forbidden": "Bunu yalnızca bir yönetici veya bilgisayarı bağlayan kişi yapabilir.",
@@ -10958,7 +11046,10 @@
       "targetOffline": "O bilgisayar çevrimdışı oldu. Başka birini seçin.",
       "targetNotFound": "O bilgisayar artık yok. Başka birini seçin.",
       "targetSame": "Ajanlar zaten o bilgisayarda.",
-      "targetPaused": "O bilgisayar duraklatıldı. Başka birini seçin."
+      "targetPaused": "O bilgisayar duraklatıldı. Başka birini seçin.",
+      "offline": "{{name}} şu an çevrimdışı. Geri geldiğinde tekrar deneyin.",
+      "paused": "{{name}} duraklatıldı: devam ettirilene kadar üzerinde yeni bir şey başlamaz.",
+      "timeout": "Bilgisayar zamanında yanıt vermedi. Tekrar deneyin."
     },
     "github": {
       "repoMissing": "{{repo}} deposu gizli ya da GitHub'da yok.",
@@ -10972,8 +11063,14 @@
       "tooManySkills": "Bu bağlantıda {{max}} beceriden fazlası var. Klasörlerinden birinin bağlantısını verin.",
       "invalidName": "Ad küçük harf, rakam ve kısa çizgi içermeli, en fazla {{max}} karakter.",
       "invalidDescription": "Açıklama 1 ile {{max}} karakter arasında olmalı.",
-      "tooLarge": "Beceri çok büyük (en fazla {{max}} MB).",
-      "tooManyFiles": "Becerinin çok fazla dosyası var (en fazla {{max}}).",
+      "tooLarge": "Bu beceride {{size}} MB metin ve betik var, sınır {{max}} MB.",
+      "tooManyFiles": "Bu beceride {{files}} dosya var, sınır {{max}}.",
+      "repoTooLarge": "Depo indirmek için çok büyük (en fazla {{max}} MB). Becerinin klasörünü .zip olarak yükle.",
+      "noFrontmatter": "SKILL.md'nin en üstünde, iki --- satırı arasında adını ve açıklamasını içeren bir blok olmalı.",
+      "bodyTooLong": "SKILL.md çok uzun (en fazla {{max}} karakter).",
+      "noSkillMdZip": "Zip klasörünün en üstünde SKILL.md yok.",
+      "notGithubLink": "Bu GitHub bağlantısını okuyamıyoruz. Bir deponun veya içindeki bir klasörün bağlantısını yapıştır.",
+      "badZip": "Bu zip okunamadı. Becerinin klasörünü parolasız olarak yeniden sıkıştır.",
       "connectionGone": "{{repo}} deposunu okuyan GitHub bağlantısı artık yok. Bu beceriyi güncellemek için GitHub'ı yeniden bağlayın.",
       "linkHoldsSeveral": "Bağlantısında artık birden fazla beceri var. Bunu kendi klasöründen yeniden yükleyin.",
       "linkRenamed": "Bağlantısında artık {{name}} becerisi var.",
@@ -10983,6 +11080,21 @@
     "agentGroup": {
       "notFound": "Bu departman artık yok.",
       "tooMany": "Bu çalışma alanında zaten {{max}} departman var. Önce birini silin."
+    },
+    "rightHand": {
+      "permanent": "Sağ kol çalışma alanının bir parçasıdır ve kanalların dışında kalır. Bir @bahsetme onu herhangi bir kanalda çağırır."
+    },
+    "agent": {
+      "ownerOrAdmin": "Bunu yalnızca ajanın sahibi veya bir yönetici yapabilir.",
+      "detailsHidden": "Nasıl çalıştığını yalnızca {{agentName}} ile konuşanlar görür.",
+      "extraOwnerOnly": "Planın ücretli ek kullanımını yalnızca ajanın sahibi açıp kapatabilir.",
+      "undoForbidden": "Bunu yalnızca ajanın çalıştığı kişi, sahibi veya bir yönetici geri alabilir."
+    },
+    "account": {
+      "notOwner": "Bunu yalnızca bu hesabı veya planı bağlayan kişi yapabilir."
+    },
+    "channel": {
+      "membersForbidden": "Kişi ekleyip çıkarmayı yalnızca kanalı oluşturan kişi veya bir yönetici yapabilir."
     },
     "handle": {
       "invalid": "Bir @ adı {{min}} ile {{max}} arasında küçük harf, rakam, - veya _ içerir.",
@@ -11634,6 +11746,7 @@
     "system": "Sistem",
     "removed": "Kaldırıldı",
     "change": {
+      "mergedWithoutAsking": "{{repo}} içinde sormadan birleştirdi",
       "pattern": "{{verb}}: {{area}}",
       "approval": {
         "approved": "Bir isteği onayladı",
@@ -12143,7 +12256,7 @@
     },
     "card": {
       "title": "Bu ayki kullanım limitine ulaştın",
-      "text": "{{date}} tarihinde yenilenir. Şimdi devam etmek için bir yöneticiye sor.",
+      "text": "{{date}} tarihinde yenilenir. Şimdi devam etmek için daha fazla iste.",
       "ask": "Daha fazla iste",
       "asked": "İstek gönderildi",
       "see": "Kullanımımı gör",
@@ -12671,6 +12784,10 @@
       "machine_task_resume_waits": "{{computer}} geri döndü: “{{title}}”, proje hazır olunca kaldığı yerden devam eder.",
       "machine_offline": "{{computer}} çevrimdışı oldu.",
       "brain_unavailable": "{{brain}} şu anda yanıt veremiyor. Geri gelince yanıt vereceğim.",
+      "brain_unavailable_paused": "{{brain}} uygulamasının çalıştığı bilgisayar duraklatıldı. Devam ettirilince yanıtlayacağım.",
+      "brain_unavailable_commands_off": "{{brain}} bilgisayarımda kapalı. Bilgisayarla ilgilenen kişi açınca yanıtlayacağım.",
+      "brain_unavailable_outdated": "{{brain}}'ın yanıt verebilmesi için bilgisayarımdaki programın güncellenmesi gerekiyor. Güncellenir güncellenmez yanıt vereceğim.",
+      "brain_unavailable_plan_owner": "{{brain}}, sahibime ait olmayan bir planla düşünecekti, bu yüzden kullanmıyorum. Sayfamda sahibimin hesabını bağlayın.",
       "provider_unavailable": "Yapay zeka sağlayıcım şu anda yanıt vermiyor. Geri gelir gelmez yanıt vereceğim.",
       "brain_busy": "Bilgisayarım şu anda başka görevlerle meşgul. Boşalır boşalmaz yanıt vereceğim.",
       "brain_queued": "Hâlâ bilgisayar için sıradayım. Yer açılır açılmaz yanıt vereceğim.",
@@ -12679,6 +12796,9 @@
       "plan_limit_cut_unknown": "{{plan}} planının sınırında durdum. Sıfırlanır sıfırlanmaz kaldığım yerden devam edeceğim.",
       "plan_limit_wait": "{{plan}} planı sınırına ulaştı. Sıfırlandığında, {{when}}, yanıt vereceğim.",
       "plan_limit_wait_unknown": "{{plan}} planı sınırına ulaştı. Sıfırlanır sıfırlanmaz yanıt vereceğim.",
+      "plan_model_limit_wait": "{{model}}, {{plan}} üzerinde kendi sınırına ulaştı. Planın diğer modelleri çalışmaya devam ediyor: {{agent}} için modeli değiştirin veya sıfırlanmasını bekleyin ({{when}}).",
+      "plan_model_limit_wait_unknown": "{{model}}, {{plan}} üzerinde kendi sınırına ulaştı. Planın diğer modelleri çalışmaya devam ediyor: {{agent}} için modeli değiştirin veya sıfırlanmasını bekleyin.",
+      "plan_model_region_wait": "Bu model ({{model}}) için OpenCode'da Global bölgesinin açık olması gerekiyor (Settings › Privacy).",
       "budget_wait": "Bu ayki bütçem bitti. {{when}} devam edeceğim, bir yönetici artırırsa daha erken.",
       "usage_wait_canceled": "İptal edildi. Sınır sıfırlanınca çalışmayacak.",
       "usage_wait_archived": "Çalışmayacak: ajan arşivlendi.",
@@ -12697,14 +12817,20 @@
       "work_end_canceled": "{{minutes}} dk sonra durduruldu.",
       "work_end_canceledBy": "{{minutes}} dk sonra {{name}} durdurdu.",
       "no_ai": "Henüz yanıt veremiyorum: bağlı bir yapay zekam yok.",
-      "person_limit": "İsteyen kişi bu ayki kullanım limitine ulaştı. Şimdi devam etmek için bir yöneticiye sor.",
+      "person_limit": "İsteyen kişi bu ayki kullanım limitine ulaştı.",
       "no_ai_signed_out": "Henüz yanıt veremiyorum: yapay zekamın oturumu kapalı.",
       "no_ai_not_signed_in": "Henüz yanıt veremiyorum: bilgisayarımda {{brain}} oturumu açık değil.",
       "no_ai_computer_away": "Şu an yanıt veremiyorum: planımın bilgisayarına ulaşılamıyor.",
+      "no_ai_computer_failed": "Şu an yanıt veremiyorum: planımın bilgisayarında bir sorun oldu.",
       "no_ai_plan_limit": "Şu an yanıt veremiyorum: düşündüğüm plan sınırına ulaştı.",
-      "no_ai_plan_not_shared": "Bu planla size yanıt veremiyorum: yalnızca sahibine yanıt veriyor.",
+      "no_ai_plan_not_shared": "Sana çalışma alanının planı üzerinden yanıt veremiyorum: yalnızca sahibine yanıt veriyor. Kendi planını bağlarsan yanıt veririm.",
       "no_ai_runner_outdated": "Şu an yanıt veremiyorum: planımın bilgisayarındaki programın güncellenmesi gerekiyor.",
-      "no_ai_plan_tools": "Yanıt vermeden durdum: o bilgisayarda planımın yapay zekâsı kendi araçlarını sunuyor.",
+      "no_ai_plan_tools": "Yanıt vermeden durdum: o bilgisayardaki planımın yapay zekâsı agentes.chat araçlarıyla sınırlı kalmadı.",
+      "no_ai_model_limit": "Şu an yanıt veremiyorum: {{model}} planımdaki kendi sınırına ulaştı.",
+      "no_ai_model_region": "Yanıt veremiyorum: {{model}} için OpenCode'da Global bölgesinin açık olması gerekiyor (Settings › Privacy).",
+      "no_ai_commands_off": "Şu an yanıt veremiyorum: planımın bilgisayarında komutlar kapalı.",
+      "no_ai_cli_missing": "Henüz yanıt veremiyorum: yapay zekamın programı bilgisayarımda kurulu değil.",
+      "no_ai_no_computer": "Henüz yanıt veremiyorum: yapay zekamın bir bilgisayara ihtiyacı var ve hiç bilgisayarım yok.",
       "redacted": "[kaldırıldı: bir oturum açma bilgisi ya da anahtar gibi görünüyordu]",
       "action_connect_ai": "Yapay zeka bağla",
       "action_connect_app": "{{name}} bağla",
@@ -13869,6 +13995,35 @@
       "queued": "Sırada",
       "stopping": "Durduruluyor…",
       "stopped": "Durduruldu"
+    },
+    "wait": {
+      "pausedPlan": "Duraklatıldı: plan {{window}} %{{percent}} seviyesinde",
+      "pausedBudget": "Duraklatıldı: bütçe ayın %{{percent}} kadarında",
+      "planLimit": "{{plan}} planı sınırda",
+      "modelLimit": "{{model}} sınırda",
+      "modelRegion": "{{model}} için Global bölgesi gerekli",
+      "modelRegionNext": "OpenCode'da açın (Settings › Privacy)",
+      "budgetOut": "Bu ayın bütçesi bitti",
+      "workLine": "Ajanın iş sırasında",
+      "workLineNext": "Başka bir iş bitince başlar",
+      "computerWait": "Bilgisayarı bekliyor",
+      "computerWaitNext": "Hazır olunca devam eder",
+      "computerOfflineNext": "Açılınca devam eder",
+      "computerBusyNext": "Yer açılınca başlar",
+      "okNext": "Biri onaylayınca devam eder",
+      "answerNext": "Biri yanıtlayınca devam eder",
+      "back": "{{when}} devam eder",
+      "whenRenews": "sıfırlanınca",
+      "whenSoon": "birazdan"
+    },
+    "waitGroup": {
+      "routines_one": "{{count}} rutin",
+      "routines_other": "{{count}} rutin",
+      "pausedPlan": "{{what}} duraklatıldı: {{plan}} planı {{window}} %{{percent}} seviyesinde ve {{when}} devam eder. Kalan kısım konuşmalara ayrılır.",
+      "pausedBudget": "{{what}} duraklatıldı: aylık bütçe %{{percent}} seviyesinde ve {{when}} devam eder. Kalan kısım konuşmalara ayrılır.",
+      "planLimit": "{{what}} bekliyor: {{plan}} planı sınırına ulaştı ve {{when}} devam eder.",
+      "modelLimit": "{{what}} bekliyor: {{model}} sınırına ulaştı ve {{when}} devam eder. Planın diğer modelleri çalışmaya devam ediyor.",
+      "budgetOut": "{{what}} bekliyor: bu ayın bütçesi bitti ve {{when}} devam eder."
     },
     "where": {
       "dm": "Doğrudan mesaj",

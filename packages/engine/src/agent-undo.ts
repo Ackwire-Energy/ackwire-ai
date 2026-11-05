@@ -169,6 +169,7 @@ async function setMemory(
     }
   });
   caches.contextPresence.delete(`${orgId}:`);
+  caches.contextPresence.deletePrefix(`${orgId}:rules:`);
   for (const c of changes) {
     const item = await memoryItem(deps.db, orgId, c.id);
     if (item) await announceMessageMemories(deps, orgId, item).catch(() => {});
