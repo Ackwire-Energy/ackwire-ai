@@ -67,6 +67,7 @@ import {
   reconcileConsults,
   reconcileRuns,
   refreshMission,
+  refreshRepliedThread,
   retargetProvisional,
   runsInChannel,
   type SocketFactory,
@@ -741,6 +742,12 @@ export function applyTaskEvent(qc: ReturnType<typeof useQueryClient>, orgId: str
 /** A tab away at least this long reads its open conversation again when it comes back (a quick switch doesn't). */
 export const RESYNC_AFTER_HIDDEN_MS = 10_000;
 
+/**
+ * Events already applied. A thread open beside its channel is a second view of that channel, and every listener gets
+ * the same event object: applied twice, a tool call shows twice and its output doubles.
+ */
+const handledEvents = new WeakSet<ChannelEvent>();
+
 /** Subscribes to a channel while mounted: live runs + message cache updates. */
 export function useChannelRealtime(orgId: string, channelId: string, enabled: boolean) {
   const { connection, streams } = useRealtime();
@@ -783,6 +790,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
   useEffect(() => {
     if (!connection || !enabled) return;
     return connection.subscribe(channelId, (event) => {
+      if (handledEvents.has(event)) return;
+      handledEvents.add(event);
       streams.apply(event);
       applyMembershipEvent(qc, orgId, event);
       if (event.type === "approval.created" || event.type === "approval.decided") {
@@ -853,11 +862,9 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         }
         // A new top-level message may get agent replies in its thread: start watching it.
         if (event.message) startThreadCache(qc, orgId, event.message);
-        // A reply: the thread lists (count, last reply, who is in it) behind the channel's thread lines. An agent's
-        // sticker after its reply (ADR 0091) changes none of them.
-        if ((event.message ? event.message.threadId : event.threadId) && !isMediaAfterReply(event.message?.meta)) {
-          void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
-        }
+        // A reply: its thread line and header. An agent's sticker after its reply (ADR 0091) changes neither.
+        const threadId = event.message ? event.message.threadId : event.threadId;
+        if (threadId && !isMediaAfterReply(event.message?.meta)) refreshRepliedThread(qc, orgId, threadId);
       }
     });
   }, [connection, enabled, orgId, channelId, qc, streams, api]);

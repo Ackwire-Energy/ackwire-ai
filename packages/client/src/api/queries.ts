@@ -1138,9 +1138,8 @@ export function useAddChannelMember(orgId: string) {
 }
 
 /**
- * Puts a message in the right cache: the channel list, or its thread (a thread's list starts with its root
- * when a channel list here has it). Replaces the optimistic copy (same `clientId`), which always waits in the
- * channel list (a thread may not be loaded yet): a reply's copy is removed
+ * Puts a message in the right cache: the channel list, or its thread. Replaces the optimistic copy (same
+ * `clientId`), which always waits in the channel list (a thread may not be loaded yet): a reply's copy is removed
  * from there too, or it would stay "sending…" next to the real one.
  */
 export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: string, message: Message) {
@@ -1149,12 +1148,24 @@ export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: strin
   const withoutLocal = (list: Message[] | undefined) =>
     message.clientId ? list?.filter((m) => !(m.local && m.clientId === message.clientId)) : list;
   if (message.threadId && message.clientId) qc.setQueryData<Message[]>(channelKey, withoutLocal);
-  // A thread's first list holds its root, as the server lists it: a panel opened on it shows the root.
-  const started = !message.threadId || qc.getQueryData(key) !== undefined;
+  // A thread no one read yet stays unread: a list started by one reply would pass for the whole thread, and open
+  // without the replies before it. A read on its way may have missed this one, which it keeps (`withLocalCopies`).
+  const query = qc.getQueryCache().find({ queryKey: key, exact: true });
+  if (message.threadId && query?.state.data === undefined && query?.state.fetchStatus !== "fetching") return;
+  // While that read is on its way, the root stands in as `useThreadMessages` shows it.
   const root = message.threadId ? cachedTopLevel(qc, orgId, message.threadId, message.channelId) : undefined;
   qc.setQueryData<Message[]>(key, (list) => upsertMessage(withoutLocal(list) ?? (root && [root]), message));
-  // Its root in no list here (an older thread): the reply alone must not pass for the whole thread.
-  if (!started && !root) void qc.invalidateQueries({ queryKey: key, exact: true, refetchType: "none" });
+}
+
+/** A reply landed: the lists behind the thread lines, and that thread's header (count, last reply, who is in it). */
+export function refreshRepliedThread(qc: ReturnType<typeof useQueryClient>, orgId: string, threadId: string) {
+  void qc.invalidateQueries({
+    queryKey: keys.threads(orgId),
+    predicate: (q) => q.queryKey[3] !== "one" || q.queryKey[4] === threadId,
+  });
+  // A task's conversation: its count and last line on the task's dialog.
+  if (qc.getQueryData<ThreadInfo>(keys.threadInfo(orgId, threadId))?.channelKind === "task")
+    void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
 }
 
 /**
@@ -1218,6 +1229,8 @@ export async function catchUpChannel(
       .flatMap(([, data]) => (Array.isArray(data) ? data.map((m) => m.id) : [])),
   );
   for (const m of read) if (!known.has(m.id)) cacheMessage(qc, orgId, m);
+  // The thread lines and the open thread's header count replies this read may have just added.
+  void qc.invalidateQueries({ queryKey: keys.threads(orgId) });
   return read;
 }
 
@@ -4641,6 +4654,9 @@ export function useThreadMessages(orgId: string, channelId: string | undefined, 
     },
     enabled: Boolean(channelId),
     staleTime: 30_000,
+    // Every opening reads it: a reply heard live keeps the list looking fresh while it may lack what was said when
+    // this channel wasn't listened to.
+    refetchOnMount: "always",
   });
 }
 

@@ -40,6 +40,7 @@ import {
   type ReceiptsState,
   reconcileConsults,
   reconcileRuns,
+  refreshRepliedThread,
   runsInChannel,
   type SecretRequest,
   type StreamsState,
@@ -221,19 +222,20 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "agent.consultation":
       void qc.invalidateQueries({ queryKey: keys.consultations(orgId, channelId) });
       break;
-    case "message.created":
+    case "message.created": {
       if (event.message) cacheMessage(qc, orgId, event.message);
       else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
       // A new top-level message may get agent replies in its thread: start that list.
       if (event.message) startThreadCache(qc, orgId, event.message);
-      // A reply: its root's "2 respostas" link comes from the channel's thread list, which counts it. An agent's
-      // sticker or GIF after its reply (ADR 0091) changes none of them.
-      if (event.message?.threadId && !isMediaAfterReply(event.message.meta))
-        void qc.invalidateQueries({ queryKey: ["org", orgId, "threads", "channel", channelId] });
+      // A reply: its root's "2 respostas" link and the thread's header. An agent's sticker or GIF after its reply
+      // (ADR 0091) changes neither. Too big for its event, it still says its thread.
+      const threadId = event.message ? event.message.threadId : event.threadId;
+      if (threadId && !isMediaAfterReply(event.message?.meta)) refreshRepliedThread(qc, orgId, threadId);
       // The conversation list's last line and unread.
       void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
       void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
       break;
+    }
     // A DM between people: the other one read it ("Visto" moves).
     case "channel.read":
       cacheDmRead(qc, orgId, event);

@@ -8,8 +8,10 @@ import {
   keys,
   messagesQuery,
   outbox,
+  refreshRepliedThread,
   startThreadCache,
 } from "../src/index";
+import { withLocalCopies } from "../src/lib/timeline";
 
 const msg = (over: Partial<Message>): Message => ({
   id: "m",
@@ -33,8 +35,6 @@ test("a reply that starts a thread replaces its 'sending…' copy (which waits i
   cacheMessage(qc, "o1", msg({ id: "real", threadId: "root", clientId: "k1" }));
 
   expect(qc.getQueryData<Message[]>(keys.messages("o1", "c1"))?.map((m) => m.id)).toEqual(["root"]);
-  // The thread's list starts with its root, as the server lists it.
-  expect(qc.getQueryData<Message[]>(keys.thread("o1", "c1", "root"))?.map((m) => m.id)).toEqual(["root", "real"]);
 });
 
 test("a new top-level message starts its thread's list with itself; a list already there stays", () => {
@@ -51,16 +51,51 @@ test("a new top-level message starts its thread's list with itself; a list alrea
   expect(qc.getQueryData(keys.thread("o1", "c1", "r2"))).toBeUndefined();
 });
 
-test("a live reply to an older thread: its root from the older pages; with no root here, the list stays to be read", () => {
+test("a live reply to a thread nobody read starts no list: one reply must not pass for the whole thread", () => {
   const qc = new QueryClient();
+  qc.setQueryData(keys.messages("o1", "c1"), [msg({ id: "root" })]);
+  cacheMessage(qc, "o1", msg({ id: "r1", threadId: "root" }));
+  expect(qc.getQueryData(keys.thread("o1", "c1", "root"))).toBeUndefined();
+});
+
+test("a live reply while the thread's first read is on its way: under its root, and that read keeps it", async () => {
+  const qc = new QueryClient();
+  const root = msg({ id: "old" });
+  const reply = msg({ id: "r1", threadId: "old", createdAt: "2026-10-16T04:25:00.000Z" });
   qc.setQueryData(keys.messages("o1", "c1"), [msg({ id: "new" })]);
-  qc.setQueryData(keys.olderPages("o1", "c1"), { pages: [msg({ id: "old" })], done: false });
-  cacheMessage(qc, "o1", msg({ id: "r1", threadId: "old" }));
-  expect(qc.getQueryData<Message[]>(keys.thread("o1", "c1", "old"))?.map((m) => m.id)).toEqual(["old", "r1"]);
-  expect(qc.getQueryState(keys.thread("o1", "c1", "old"))?.isInvalidated).toBe(false);
-  cacheMessage(qc, "o1", msg({ id: "r2", threadId: "gone" }));
-  expect(qc.getQueryData<Message[]>(keys.thread("o1", "c1", "gone"))?.map((m) => m.id)).toEqual(["r2"]);
-  expect(qc.getQueryState(keys.thread("o1", "c1", "gone"))?.isInvalidated).toBe(true);
+  qc.setQueryData(keys.olderPages("o1", "c1"), { pages: [root], done: false });
+  let answer = (_: Message[]) => {};
+  const read = new Promise<Message[]>((resolve) => {
+    answer = resolve;
+  });
+  const key = keys.thread("o1", "c1", "old");
+  const reading = qc.fetchQuery({
+    queryKey: key,
+    queryFn: async ({ client, queryKey }) => {
+      const start = client.getQueryData<Message[]>(queryKey);
+      return withLocalCopies(await read, client.getQueryData<Message[]>(queryKey), () => false, start);
+    },
+  });
+  cacheMessage(qc, "o1", reply);
+  expect(qc.getQueryData<Message[]>(key)?.map((m) => m.id)).toEqual(["old", "r1"]);
+  answer([root]);
+  await reading;
+  expect(qc.getQueryData<Message[]>(key)?.map((m) => m.id)).toEqual(["old", "r1"]);
+});
+
+test("a reply refreshes the thread lists and its own thread's header, no other; a task's also its count", () => {
+  const qc = new QueryClient();
+  const stale = (key: readonly unknown[]) => qc.getQueryState(key)?.isInvalidated;
+  const line = keys.channelThreads("o1", "c1", "all");
+  const mine = keys.threadInfo("o1", "t1");
+  const other = keys.threadInfo("o1", "t2");
+  const task = keys.issues("o1");
+  for (const key of [line, mine, other, task]) qc.setQueryData(key, {});
+  refreshRepliedThread(qc, "o1", "t1");
+  expect([stale(line), stale(mine), stale(other), stale(task)]).toEqual([true, true, false, false]);
+  qc.setQueryData(mine, { channelKind: "task" });
+  refreshRepliedThread(qc, "o1", "t1");
+  expect(stale(task)).toBe(true);
 });
 
 test("reading a conversation again (after a reconnect) keeps my messages still sending or waiting to go out, not one the server refused", async () => {
