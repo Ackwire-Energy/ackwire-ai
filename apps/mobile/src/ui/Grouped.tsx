@@ -194,7 +194,7 @@ function Row({
         </View>
       ) : value ? (
         <View style={[styles.value, line ? { minHeight: line.height, justifyContent: "center" } : null]}>
-          <Text variant="callout" tone="faint" numberOfLines={1}>
+          <Text variant="callout" tone="faint" numberOfLines={1} style={styles.shrink}>
             {value}
           </Text>
         </View>
