@@ -27,7 +27,9 @@ import {
   DiffView,
   EmptyState,
   fieldText,
+  Icon,
   IconButton,
+  LineIcon,
   Row,
   SearchField,
   SectionHeader,
@@ -266,9 +268,7 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
             { backgroundColor: c.ink, bottom: insets.bottom + 18, opacity: pressed ? 0.85 : 1 },
           ]}
         >
-          <Text variant="title2" style={[styles.fabPlus, { color: c.bg }]}>
-            +
-          </Text>
+          <Icon name="plus" size={18} color={c.bg} />
           <Text variant="callout" style={[styles.fabText, { color: c.bg }]}>
             {t("wiki.newPage")}
           </Text>
@@ -547,8 +547,10 @@ function WikiPage({ slug }: { slug: string }) {
               <Text variant="display2" accessibilityRole="header">
                 {p.title}
               </Text>
-              <View style={styles.byline}>
-                <Face who={p.updatedBy} size={18} />
+              <View style={styles.pageByline}>
+                <LineIcon variant="footnote" size={18}>
+                  <Face who={p.updatedBy} size={18} />
+                </LineIcon>
                 <Text variant="footnote" tone="faint" style={styles.grow}>
                   {by} · {relativeTime(t, i18n.language, p.updatedAt)} · v{p.version}
                 </Text>
@@ -869,23 +871,25 @@ const styles = StyleSheet.create({
   pin: { width: 210, borderRadius: 16, padding: 14, gap: 5 },
   pressed: { opacity: 0.85 },
   byline: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  // The page's line can wrap: the face sits on its first line.
+  pageByline: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 2 },
+  // On the buttons' ruler (48, `Button` md), its icon as theirs (18).
   fab: {
     position: "absolute",
     right: 18,
-    height: 52,
-    borderRadius: 26,
+    height: 48,
+    borderRadius: 24,
     paddingLeft: 16,
     paddingRight: 20,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     shadowColor: "#000",
     shadowOpacity: 0.25,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
-  fabPlus: { lineHeight: 26 },
   barRight: { flexDirection: "row", alignItems: "center", gap: 2 },
   barWord: { paddingHorizontal: 10, height: 36, justifyContent: "center" },
   barWordText: { fontWeight: "600" },

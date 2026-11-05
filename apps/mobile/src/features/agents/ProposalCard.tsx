@@ -411,7 +411,8 @@ function Lines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
             <View style={styles.fill}>
               <Text variant="footnote" tone="ink2">
                 {text}
-                {who ? <Text style={{ color: colors.attention }}>{` · ${who}`}</Text> : null}
+                {/* Someone else gives it: it doesn't wait on the viewer, so no amber. */}
+                {who ? <Text style={{ color: colors.muted }}>{` · ${who}`}</Text> : null}
               </Text>
               {l.kind === "routine" && draft.routine ? (
                 <Text variant="footnote" tone="muted" numberOfLines={2}>

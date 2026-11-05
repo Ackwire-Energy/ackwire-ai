@@ -19,7 +19,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, DiffView, haptics, Icon, Text, ToggleSwitch, useTheme, useToast } from "@/ui";
+import { Button, Chip, DiffView, haptics, Icon, LineIcon, Text, ToggleSwitch, useTheme, useToast } from "@/ui";
 import { boldRuns } from "../chat/actions";
 import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
 import { markName } from "../chat/logic";
@@ -164,7 +164,7 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
                 more: change,
               }
             : firstLine
-              ? { tile: <IconTile name="file" size={32} />, title: firstLine.text, more: change }
+              ? { tile: <IconTile name="file" size={20} />, title: firstLine.text, more: change }
               : null
         }
         body={
@@ -213,7 +213,7 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
   const card = (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.head}>
-        <Icon name="doc" size={16} color={colors.ink2} />
+        <LineIcon name="doc" size={16} color={colors.ink2} variant="subhead" />
         <Text variant="subhead" tone="ink2" style={styles.fill}>
           {runs.map((r, i) =>
             r.bold ? (

@@ -7,7 +7,6 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { Button, Chip, Count, Icon, PixelStop, Text, weights } from "@/ui";
 import { useOpenQueue } from "../queue/QueueSheet";
-import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider } from "../shared/SheetHost";
@@ -16,8 +15,8 @@ import { lineStartText, type Place, rowState, taskStateText } from "./logic";
 import { StopButton, StopConfirm, TaskMark, UsingLine, useAgentColor } from "./parts";
 
 /**
- * An agent's tasks (ADR 0128), pushed from its DM's header the way a thread opens: how many it has now and how many
- * wait on you, three wells (Agora, Esperam você, Feitas hoje), then its tasks (people's first, then its routines'),
+ * An agent's tasks (ADR 0128), pushed from its DM's header the way a thread opens: three wells (Agora, Esperam você,
+ * Feitas hoje), then its tasks (people's first, then its routines'),
  * the ones asked in that conversation tagged "aqui", each with its state, what it uses now and "Parar"; a task opens
  * its own screen. At the end, "Abrir no gerenciador" and "Parar todas", which asks first, in place. A task waiting for
  * room on its computer opens that computer's line in a sheet ("Ver fila"), as the conversation's bar opens it.
@@ -43,8 +42,6 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
   const count = view?.rows.length ?? 0;
   const waiting = view?.waiting ?? 0;
   const stoppable = view?.stoppable ?? [];
-  const waitingText = waiting > 0 ? t("taskManager.waiting", { count: waiting }) : null;
-  const sub = [t("taskManager.agentPanel.now", { count }), waitingText].filter(Boolean).join(" · ");
   return (
     <PushedLargeTitle
       title={t("taskManager.agentTasks", { name })}
@@ -63,12 +60,7 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
         </View>
       ) : (
         <>
-          <View style={styles.head}>
-            <AgentFace agentId={agentId} size={28} mode={view && view.working > 0 ? "run" : "idle"} />
-            <Text variant="subhead" tone="muted" numberOfLines={1} style={styles.shrink}>
-              {sub}
-            </Text>
-          </View>
+          {/* The three numbers are said once, here (no line above repeating them). */}
           <View style={styles.wells}>
             <Well label={t("taskManager.agentPanel.wells.now")} value={count} />
             <Well label={t("taskManager.agentPanel.wells.waiting")} value={waiting} />
@@ -243,7 +235,6 @@ const TEXT_INSET = 42;
 const styles = StyleSheet.create({
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
-  head: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 20, paddingBottom: 12 },
   wells: { flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingBottom: 12 },
   // The app's "tato com canto": round, the bottom left corner small.
   well: {

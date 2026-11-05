@@ -29,6 +29,7 @@ import {
   Text,
   weights,
 } from "@/ui";
+import { CollapsibleSection } from "../chats/HomeSection";
 import { useOpenQueue } from "../queue/QueueSheet";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
@@ -188,28 +189,21 @@ function TaskManager() {
               ))}
             </>
           ) : null}
-          <Pressable
-            onPress={() => setEndedOpen((o) => !o)}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: endedOpen }}
-            hitSlop={4}
-            style={({ pressed }) => [styles.endedToggle, pressed && styles.pressed]}
+          {/* The same folding header as the other lists' sections (title, count, the chevron at the right). */}
+          <CollapsibleSection
+            title={t("taskManager.ended.title")}
+            count={ended.length}
+            collapsed={!endedOpen}
+            onToggle={() => setEndedOpen((o) => !o)}
           >
-            <Icon name={endedOpen ? "chev" : "right"} size={14} color={c.muted} />
-            <Text variant="small" tone="muted" style={styles.semibold}>
-              {t("taskManager.ended.title")}
-            </Text>
-            <Count value={ended.length} size={15} weight={weights.medium} color={c.faint} />
-          </Pressable>
-          {endedOpen ? (
-            ended.length > 0 ? (
+            {ended.length > 0 ? (
               ended.map((e, i) => <EndedRow key={e.runId} task={e} divider={i > 0} meId={meId} />)
             ) : (
               <Text variant="footnote" tone="faint" style={styles.none}>
                 {t("taskManager.ended.none")}
               </Text>
-            )
-          ) : null}
+            )}
+          </CollapsibleSection>
         </>
       )}
     </PushedLargeTitle>
@@ -486,7 +480,6 @@ const styles = StyleSheet.create({
   semibold: { fontWeight: weights.semibold },
   medium: { fontWeight: weights.medium },
   num: { fontVariant: ["tabular-nums"] },
-  pressed: { opacity: 0.6 },
   confirm: { paddingLeft: TASK_INSET, paddingRight: 16, paddingBottom: 12 },
   task: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 11, paddingRight: 16 },
   indented: { paddingLeft: TASK_INSET },
@@ -496,14 +489,6 @@ const styles = StyleSheet.create({
   agentDivider: { left: 14 },
   taskDivider: { left: TASK_INSET },
   flatDivider: { left: FLAT_INSET },
-  endedToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 20,
-    paddingTop: 22,
-    paddingBottom: 10,
-  },
   none: { paddingHorizontal: 20, paddingBottom: 12 },
   end: { alignItems: "flex-end", gap: 2, maxWidth: 130 },
   computer: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 16 },

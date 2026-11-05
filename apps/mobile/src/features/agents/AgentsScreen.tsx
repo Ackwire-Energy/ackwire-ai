@@ -130,6 +130,8 @@ export function AgentsScreen() {
               leading={<AgentFace agentId={a.id} size={50} mode="rest" live={false} />}
               title={a.name}
               sub={a.role.trim() || null}
+              // One line, as every other agent's row above.
+              subLines={1}
             />
           ))}
         </>

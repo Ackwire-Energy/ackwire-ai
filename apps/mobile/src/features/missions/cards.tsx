@@ -256,10 +256,11 @@ export function ReviewCardView({ review: r, mission }: { review: MissionReview; 
   if (r.status !== "pending") {
     return (
       <View style={[styles.done, surface]}>
-        <Icon
+        <LineIcon
           name={r.status === "approved" ? "check" : "reply"}
           size={16}
           color={r.status === "approved" ? c.ok : c.muted}
+          variant="small"
         />
         <Text variant="small" tone="muted" style={styles.grow}>
           {r.status === "approved"
@@ -420,7 +421,11 @@ export function DecisionCardView({ decision: d, mission }: { decision: MissionDe
                 pressed && styles.pressed,
               ]}
             >
-              {on ? <Icon name="check" size={16} color={c.bg} /> : null}
+              {on ? (
+                <View style={styles.optCheck}>
+                  <LineIcon name="check" size={16} color={c.bg} variant="body" />
+                </View>
+              ) : null}
               <Text variant="body" style={[styles.optText, { color: on ? c.bg : c.ink }]}>
                 {o}
               </Text>
@@ -467,11 +472,11 @@ export function PlanCard({ missionId, goal }: { missionId: string; goal: string 
         accessibilityRole="button"
         style={[styles.done, surface]}
       >
-        <Icon name="check" size={16} color={c.ok} />
+        <LineIcon name="check" size={16} color={c.ok} variant="small" />
         <Text variant="small" tone="muted" style={styles.grow} numberOfLines={2}>
           {t("mobile.mission.plan.started", { title: m.title || goal })}
         </Text>
-        <Icon name="right" size={16} color={c.faint} />
+        <LineIcon name="right" size={16} color={c.faint} variant="small" />
       </Pressable>
     );
   }
@@ -595,7 +600,8 @@ const FINDING_ICON = { read: "search", data: "chart", decision: "help" } as cons
 
 /**
  * What the agent found before proposing: what it read (search), numbers
- * it saw (chart) and the one decision left for the person (help), highlighted. Refs are mono chips.
+ * it saw (chart) and the one decision left for the person (help), in ink and bold: no band behind it, the card
+ * holds no plate of its own. Refs are mono chips.
  */
 function Findings({ findings }: { findings: MissionFinding[] }) {
   const { t } = useTranslation();
@@ -607,7 +613,7 @@ function Findings({ findings }: { findings: MissionFinding[] }) {
         return (
           <View
             key={`${f.kind}:${String(i)}`}
-            style={[styles.fdRow, open && [styles.fdOpen, { backgroundColor: colors.sunken }]]}
+            style={styles.fdRow}
             accessible
             accessibilityLabel={`${t(`missions.findings.${f.kind}`)}: ${f.text}`}
           >
@@ -652,26 +658,29 @@ const styles = StyleSheet.create({
   summary: { marginBottom: 10 },
   log: { padding: 10, borderRadius: 12, marginBottom: 10 },
   acts: { flexDirection: "row", gap: 8, marginTop: 4 },
+  // A line that can wrap: its marks sit on the first line (`LineIcon`).
   done: {
     marginTop: 8,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 16,
   },
   opts: { gap: 6 },
-  opt: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 13 },
+  // "Recommended" on the option's first line (its baseline) when the option wraps; the check on that line too.
+  opt: { flexDirection: "row", alignItems: "baseline", gap: 10, padding: 12, borderRadius: 13 },
+  optCheck: { alignSelf: "flex-start" },
   optText: { flex: 1, fontWeight: "500" },
-  planRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 },
+  // The step's number on its first line's baseline, never centered beside two lines.
+  planRow: { flexDirection: "row", alignItems: "baseline", gap: 10, paddingVertical: 4 },
   n: { width: 16, alignItems: "flex-end" },
   more: { paddingLeft: 26, paddingBottom: 8 },
   inv: { marginTop: 8, padding: 14, borderRadius: 20 },
   invTitle: { marginTop: 5, marginBottom: 10, fontSize: 17, lineHeight: 22 },
   fd: { gap: 7, marginBottom: 12 },
   fdRow: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
-  fdOpen: { padding: 8, marginHorizontal: -8, borderRadius: 12 },
   refs: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4 },
   ref: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, maxWidth: "100%" },
   plHead: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, marginBottom: 4 },

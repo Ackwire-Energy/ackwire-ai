@@ -385,7 +385,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
               ) : null}
               {busy ? (
                 <View style={styles.note}>
-                  <Icon name="laptop" size={14} color={c.muted} />
+                  <LineIcon name="laptop" size={14} color={c.muted} variant="footnote" />
                   <Text variant="footnote" tone="muted" style={styles.shrink}>
                     {say(busy)}
                   </Text>

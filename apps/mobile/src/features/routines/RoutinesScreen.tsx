@@ -137,18 +137,16 @@ function RoutineList() {
               onChange={(k) => setAgentId(k || null)}
             />
           ) : null}
+          {/* No count on these headers: the status choices above already say how many are live and paused. */}
           {sections.live.length > 0 ? (
             <>
-              <SectionHeader
-                title={status === "paused" ? t("routines.groupPaused") : t("routines.groupLive")}
-                count={sections.live.length}
-              />
+              <SectionHeader title={status === "paused" ? t("routines.groupPaused") : t("routines.groupLive")} />
               {rows(sections.live)}
             </>
           ) : null}
           {sections.paused.length > 0 ? (
             <>
-              <SectionHeader title={t("routines.groupPaused")} count={sections.paused.length} />
+              <SectionHeader title={t("routines.groupPaused")} />
               {rows(sections.paused)}
             </>
           ) : null}

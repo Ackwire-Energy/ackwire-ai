@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ComputerIcon, ComputerPortrait, useComputerKind } from "@/computer/ComputerPortrait";
-import { Button, Card, Chip, Count, Icon, IconButton, PixelOrbit, PlanTrack, Section, Text } from "@/ui";
+import { Button, Card, Chip, Count, Icon, IconButton, LineIcon, PixelOrbit, PlanTrack, Section, Text } from "@/ui";
 import { ThreadOptions } from "../chat/sheets";
 import { chatHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
@@ -131,7 +131,7 @@ function Mission({ id }: { id: string }) {
               .join(" · ")}
           </Text>
           {m.branch ? (
-            <View style={styles.row}>
+            <View style={[styles.row, styles.baseline]}>
               <Text style={[styles.mono, styles.shrink, { color: c.muted }]} numberOfLines={1}>
                 {m.branch}
               </Text>
@@ -215,7 +215,9 @@ function Mission({ id }: { id: string }) {
                   key={s.id}
                   style={[styles.sess, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }]}
                 >
-                  <ComputerPortrait kind={computer} state={m.machine?.online === false ? "offline" : "online"} />
+                  <View style={styles.portrait}>
+                    <ComputerPortrait kind={computer} state={m.machine?.online === false ? "offline" : "online"} />
+                  </View>
                   <View style={styles.grow}>
                     <Text variant="body" style={styles.bold} numberOfLines={2}>
                       {s.mode === "setup" ? t("mobile.mission.setupTitle") : s.title}
@@ -263,17 +265,20 @@ function Mission({ id }: { id: string }) {
                     i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
                   ]}
                 >
-                  <View style={styles.st}>
-                    {it.status === "done" ? (
-                      <Icon name="check" size={18} color={c.ok} />
-                    ) : it.status === "doing" ? (
-                      <PixelOrbit color={color} size={14} />
-                    ) : it.status === "waiting_you" ? (
-                      <Icon name="clock" size={18} color={c.muted} />
-                    ) : (
-                      <Icon name="circle" size={18} color={c.faint} />
-                    )}
-                  </View>
+                  {/* On the item's first line, however many lines it takes. */}
+                  <LineIcon variant="body" size={18}>
+                    <View style={styles.st}>
+                      {it.status === "done" ? (
+                        <Icon name="check" size={18} color={c.ok} />
+                      ) : it.status === "doing" ? (
+                        <PixelOrbit color={color} size={14} />
+                      ) : it.status === "waiting_you" ? (
+                        <Icon name="clock" size={18} color={c.muted} />
+                      ) : (
+                        <Icon name="circle" size={18} color={c.faint} />
+                      )}
+                    </View>
+                  </LineIcon>
                   <View style={styles.grow}>
                     <Text
                       variant="body"
@@ -328,6 +333,8 @@ const styles = StyleSheet.create({
   head: { paddingHorizontal: 20, gap: 4 },
   progCard: { marginHorizontal: 16, marginTop: 16 },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
+  // Two sizes of text on one line: they share a baseline.
+  baseline: { alignItems: "baseline" },
   title: { marginTop: 4 },
   bold: { fontWeight: "600" },
   grow: { flex: 1 },
@@ -338,12 +345,14 @@ const styles = StyleSheet.create({
   btn: { flexDirection: "row", paddingHorizontal: 16, marginTop: 16 },
   stack: { gap: 8 },
   setup: { paddingHorizontal: 16, marginTop: 8 },
-  sess: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  // The time on the title's first line (its baseline), never centered beside two lines; the portrait centered.
+  sess: { flexDirection: "row", alignItems: "baseline", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  portrait: { alignSelf: "center" },
   caret: { width: 2, height: 12 },
   meta: { alignItems: "flex-end", gap: 4, maxWidth: 110 },
   mono: { fontFamily: MONO, fontSize: 12 },
-  planRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
-  st: { width: 22, alignItems: "center" },
+  planRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  st: { width: 22, height: 18, alignItems: "center", justifyContent: "center" },
   dec: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
   decText: { fontWeight: "500" },
 });

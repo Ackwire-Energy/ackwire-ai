@@ -12,7 +12,7 @@ import { router } from "expo-router";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Chip, Icon, PixelOrbit, Text } from "@/ui";
+import { Button, Chip, Icon, LineIcon, PixelOrbit, Text } from "@/ui";
 import { routineHref, widgetHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNamesComputers } from "../shared/hooks";
@@ -184,7 +184,8 @@ export const RoutineRow = memo(function RoutineRow({
       }}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }, done && styles.done]}
     >
-      {divider ? <View style={[styles.divider, { backgroundColor: c.line }]} /> : null}
+      {/* The lists' hairline (`ListRow`'s tone), not the lighter card line. */}
+      {divider ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
       <View style={styles.top}>
         <AgentFace agentId={r.agentId} size={AVATAR} live={live} mode={running ? "run" : paused ? "rest" : "idle"} />
         <View style={styles.main}>
@@ -214,9 +215,7 @@ export const RoutineRow = memo(function RoutineRow({
       </View>
       <View style={styles.below}>
         <View style={styles.when}>
-          <View style={styles.whenIcon}>
-            <Icon name={whenIcon(r)} size={14} color={c.muted} />
-          </View>
+          <LineIcon name={whenIcon(r)} size={14} color={c.muted} variant="subhead" />
           <View style={styles.grow}>
             <Text variant="subhead" tone={paused ? "muted" : "ink2"} numberOfLines={2}>
               {whenText(r)}
@@ -259,7 +258,6 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4 },
   below: { marginLeft: AVATAR + GAP, gap: 8 },
   when: { flexDirection: "row", alignItems: "flex-start", gap: 7 },
-  whenIcon: { paddingTop: 2 },
   runs: { flexDirection: "row", alignItems: "center", gap: 10 },
   bold: { fontWeight: "600" },
 });
