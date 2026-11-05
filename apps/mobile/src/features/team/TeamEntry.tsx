@@ -1,40 +1,27 @@
 import { useAgentGroups } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
-import { Icon, Text } from "@/ui";
-import { useColors, useOrgId } from "../shared/hooks";
+import { ListRow } from "@/ui";
+import { useOrgId } from "../shared/hooks";
 import { Tile } from "../shared/parts";
 
-/** Agentes' way into Equipe (ADR 0148): its name and how many setores the team has. */
+/**
+ * Agentes' way into Equipe (ADR 0148): a row of the list itself (its 50 pt face column, its name and line), saying
+ * how many setores the team has, never a row of its own insets and sizes.
+ */
 export function TeamEntry() {
   const { t } = useTranslation();
-  const c = useColors();
   const groups = useAgentGroups(useOrgId()).data ?? [];
   const line = groups.length > 0 ? t("team.sectorsCount", { count: groups.length }) : t("mobile.team.entry");
   return (
-    <Pressable
+    <ListRow
       onPress={() => router.push("/team")}
       accessibilityRole="button"
       accessibilityLabel={[t("team.title"), line].join(", ")}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
-    >
-      <Tile icon="members" size={36} />
-      <View style={styles.text}>
-        <Text variant="callout" numberOfLines={1} style={styles.bold}>
-          {t("team.title")}
-        </Text>
-        <Text variant="footnote" tone="muted" numberOfLines={1}>
-          {line}
-        </Text>
-      </View>
-      <Icon name="right" size={15} color={c.faint} />
-    </Pressable>
+      leading={<Tile icon="members" size={50} />}
+      title={t("team.title")}
+      sub={line}
+      subLines={1}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingLeft: 22, paddingRight: 16 },
-  text: { flex: 1, minWidth: 0, gap: 2 },
-  bold: { fontWeight: "600" },
-});
