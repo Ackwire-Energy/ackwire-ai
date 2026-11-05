@@ -262,7 +262,8 @@ describe("own message styles", () => {
     // It may grow to the row but stays as wide as what it holds: a small table never sits in a wide empty bubble.
     expect(r.get(".ac-msg--own.ac-msg--wide > .ac-msg__body")).not.toContain("flex:");
     expect(r.get(".ac-msg--own.ac-msg--wide .ac-msg__text")).toBeUndefined();
-    expect(r.get(".ac-msg--own > .ac-msg__body")).toContain("--own-max: min(70%, 640px)");
+    // 70% of a wide row; a narrow column (a thread beside the chat) lets it take the row up to 400px.
+    expect(r.get(".ac-msg--own > .ac-msg__body")).toContain("--own-max: max(min(70%, 640px), min(100%, 400px))");
     expect(r.get(".ac-msg--own.ac-msg--failed .ac-msg__text")).toContain("var(--danger)");
   });
 });

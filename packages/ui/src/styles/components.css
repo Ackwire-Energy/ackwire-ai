@@ -3670,7 +3670,20 @@ html:not([data-pointer]) .ac-date__day:focus-visible {
   font-size: 13px;
   color: var(--ink);
 }
+/* Never wider than the list: a long one (an e-mail address on a phone or in the agent's panel) ends in "…", its ✕
+   still in reach, instead of running out of its card. */
+.ac-tokens > li {
+  min-width: 0;
+  max-width: 100%;
+}
+.ac-token {
+  box-sizing: border-box;
+  max-width: 100%;
+}
 .ac-token__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 /* One that stays (no ✕): even on both sides. */
@@ -5282,8 +5295,10 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 .ac-msg--own[data-menu-open="true"] {
   background: none;
 }
+/* 70% of the row where it is wide; in a narrow column (a thread or a task's conversation beside the chat, ~250px
+   after the 96px) that left the bubble ~170px, so up to 400px it may take the row, as on a narrow window (below). */
 .ac-msg--own > .ac-msg__body {
-  --own-max: min(70%, 640px);
+  --own-max: max(min(70%, 640px), min(100%, 400px));
   position: relative;
   flex: 0 1 auto;
   max-width: var(--own-max);
@@ -6689,11 +6704,16 @@ html:not([data-pointer]) .ac-video__rail:focus-visible .ac-video__knob {
 .ac-composer__tools--format .ac-btn + .ac-composer__send {
   margin-left: auto;
 }
+/* As wide as its buttons where there is room; narrower (a thread or a task's conversation beside the chat, a phone),
+   it keeps the line with emoji, attach and send and scrolls sideways. A basis of its full width wrapped it onto a
+   line of its own in any composer under ~500px, the other buttons on a second one; `max-width` keeps it from
+   growing past its buttons, send's auto margin takes the rest. */
 .ac-composer__format {
   display: flex;
   align-items: center;
   gap: 2px;
-  flex: 0 1 auto;
+  flex: 1 1 0;
+  max-width: max-content;
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -8669,15 +8689,11 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
 .ac-emoji__scroll {
   max-height: max(140px, calc(var(--radix-popover-content-available-height, 100vh) - 110px));
 }
+/* A select's too: its rows' descriptions wrap instead of running it off a phone's screen. */
 .ac-popover,
-.ac-menu--dropdown {
+.ac-menu--dropdown,
+.ac-menu--select {
   max-width: calc(100vw - 24px);
-}
-/* Narrow: the formatting buttons share one row with emoji, attach and send, and scroll sideways. */
-@media (max-width: 760px) {
-  .ac-composer__format {
-    flex: 1 1 0;
-  }
 }
 @media (max-width: 640px) {
   /* The time sits mid-row: anchor its tooltip to the message row instead, so it never runs past the screen. */
@@ -9328,13 +9344,16 @@ html:not([data-pointer]) .ac-effort:focus-visible .ac-effort__ramp {
   font-weight: 600;
   font-size: 14px;
 }
+/* Too narrow for the words beside a wide end (a choice of three on a phone or in the agent's panel), the end goes
+   under them, on the same side, instead of squeezing them to a word a line or running out of the card. */
 .ac-setrow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  gap: 8px 16px;
 }
 .ac-setrow__text {
-  flex: 1;
+  flex: 1 1 220px;
   min-width: 0;
 }
 .ac-setrow__title {
@@ -9356,6 +9375,8 @@ label.ac-setrow__title {
   align-items: center;
   gap: 8px;
   flex: none;
+  max-width: 100%;
+  margin-left: auto;
 }
 .ac-setmore__toggle {
   display: flex;
