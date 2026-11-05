@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useApi } from "../api/context";
 import { keys } from "../api/keys";
-import type { BrowserHandoff, DesktopStatus } from "../api/types";
+import type { BrowserHandoff, DesktopPictureView, DesktopStatus } from "../api/types";
 import { handoffScreen } from "../browser";
 import { type SocketBase, socketUrl } from "../realtime/connection";
 
@@ -212,6 +212,33 @@ export const useDesktopStatus = (
     enabled: options.enabled ?? true,
     retry: false,
     refetchInterval: options.poll ?? false,
+  });
+};
+
+/** How often the picture of an agent's screen is asked again while it works there. */
+export const PICTURE_WORKING_MS = 5_000;
+/** While nothing moves there, or there is no picture to show. */
+export const PICTURE_IDLE_MS = 30_000;
+
+/**
+ * Whether the picture is asked at all: only while it is on the person's screen, and of a screen that runs, so nobody
+ * looking at a DM ever starts a stopped one.
+ */
+export const asksPicture = (shown: boolean, status: Pick<DesktopStatus, "available" | "running"> | null) =>
+  shown && status?.available === true && status.running;
+
+export const pictureRefreshMs = (working: boolean, last: DesktopPictureView | undefined) =>
+  working && last?.picture ? PICTURE_WORKING_MS : PICTURE_IDLE_MS;
+
+/** A recent picture of the agent's screen, never a stream: see `asksPicture` for `enabled`. */
+export const useDesktopPicture = (orgId: string, agentId: string, options: { enabled: boolean; working: boolean }) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentDesktopPicture(orgId, agentId),
+    queryFn: () => api.desktop.picture(orgId, agentId),
+    enabled: options.enabled,
+    retry: false,
+    refetchInterval: (q) => pictureRefreshMs(options.working, q.state.data),
   });
 };
 

@@ -5,7 +5,7 @@ setupDom();
 
 import type { Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, comfortable, createFakeApi, ENG_ID, NOW, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -27,7 +27,7 @@ const said = (id: string, who: string, body: string, minutes: number, extra: Par
   }) as Message;
 
 async function open(messages: Message[]) {
-  await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState({ messages })) });
+  await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(comfortable(seedState({ messages }))) });
   await settle(10);
 }
 
@@ -377,7 +377,7 @@ describe("a message I send keeps its size when the server has it", () => {
 
   test("sending and sent: the same row, the same parts, the time in the sending state's box; nothing scrolls", async () => {
     let release = () => {};
-    const state = seedState({ messages: [said("j1", "u-joao", "Bom dia!", 10)] });
+    const state = comfortable(seedState({ messages: [said("j1", "u-joao", "Bom dia!", 10)] }));
     state.holdPosts = new Promise<void>((r) => {
       release = r;
     });

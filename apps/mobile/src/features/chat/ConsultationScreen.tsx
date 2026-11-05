@@ -13,6 +13,7 @@ import { FocusLive, goBack, PushedHeader } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { consultLineLabel } from "./ConsultGroup";
 import { requestComposerText } from "./composer-request";
+import { RowLookContext, useConversationLook } from "./look";
 import { MessageRow } from "./MessageRow";
 import { MessageText } from "./MessageText";
 
@@ -42,6 +43,7 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
   const dir = useDirectory();
   const c = useColors();
   const when = useWhen();
+  const look = useConversationLook(false);
   const insets = useSafeAreaInsets();
   const query = useConsultationConversation(orgId, channelId, consultationId && channelId ? consultationId : null);
   // DMs aren't in the list: no channel name there.
@@ -86,15 +88,17 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
             </Text>
           </View>
         ) : null}
-        {list.map((m, i) => (
-          <MessageRow
-            key={m.id}
-            message={m}
-            grouped={groupsWith(list[i - 1], m.author, m.createdAt)}
-            meId={meId}
-            readOnly
-          />
-        ))}
+        <RowLookContext.Provider value={look}>
+          {list.map((m, i) => (
+            <MessageRow
+              key={m.id}
+              message={m}
+              grouped={groupsWith(list[i - 1], m.author, m.createdAt)}
+              meId={meId}
+              readOnly
+            />
+          ))}
+        </RowLookContext.Provider>
         {q?.status === "answered" && q.answer && !said ? (
           <View style={[styles.answer, styles.pad]}>
             <Text variant="caption" tone="faint" style={styles.bold}>

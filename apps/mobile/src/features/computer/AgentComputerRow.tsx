@@ -1,12 +1,20 @@
-import { isWaitingHandoff, useBrowserHandoffActions } from "@agenteschat/client";
-import { entryKind, entryLine, entryPortrait, entryState } from "@agenteschat/client/lib/agent-computer";
+import {
+  asksPicture,
+  isWaitingHandoff,
+  PICTURE_IDLE_MS,
+  useBrowserHandoffActions,
+  useDesktopPicture,
+} from "@agenteschat/client";
+import { entryKind, entryLine, entryPortrait, entryState, pictureWhen } from "@agenteschat/client/lib/agent-computer";
 import { computerName } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { router } from "expo-router";
+import { Image } from "expo-image";
+import { router, useIsFocused } from "expo-router";
 import { useTranslation } from "react-i18next";
+import { Pressable, StyleSheet } from "react-native";
 import { ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg } from "@/providers/org";
-import { Button, Card, Row, Section, useToast } from "@/ui";
+import { Button, Card, Row, Section, Text, useToast } from "@/ui";
 import { useDirectory, useNow } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { phoneEntryButton } from "./logic";
@@ -18,8 +26,8 @@ export const openComputer = (agentId: string) => router.push(`/computer/${agentI
 
 /**
  * "Computador" on the agent's profile, as the web's entry: the computer's portrait, "Computador da Ada", the
- * same status line and Abrir, or Ajudar on a request of the agent's for this person. Only for whoever
- * may watch the computer, the wait included. The row never opens a stream.
+ * same status line and Abrir, or Ajudar on a request of the agent's for this person, under a recent picture of its
+ * screen while one runs. Only for whoever may watch the computer, the wait included. The row never opens a stream.
  */
 export function AgentComputerRow({ agentId }: { agentId: string }) {
   const { t, i18n } = useTranslation();
@@ -27,9 +35,12 @@ export function AgentComputerRow({ agentId }: { agentId: string }) {
   const dir = useDirectory();
   const toast = useToast();
   const actions = useBrowserHandoffActions(orgId);
-  const view = useAgentComputer(agentId);
+  const focused = useIsFocused();
+  const view = useAgentComputer(agentId, focused ? PICTURE_IDLE_MS : false);
   const wait = useSetupWait(view.setup);
   const f = view.facts;
+  const asks = asksPicture(focused, view.desktopQ.data ?? null);
+  const shot = useDesktopPicture(orgId, agentId, { enabled: asks, working: Boolean(f?.working) });
   // A request's minutes left move on too. While the computer is on its way, the time every other line reads.
   const requestNow = useNow(f?.handoff && isWaitingHandoff(f.handoff) ? 15_000 : 60_000);
   // Only for whoever may watch it; nothing while that loads, never one edition's words before the other's.
@@ -65,8 +76,23 @@ export function AgentComputerRow({ agentId }: { agentId: string }) {
       });
     }
   };
+  const picture = asks ? shot.data?.picture : null;
   return (
     <Section title={t("agentComputer.button")}>
+      {picture ? (
+        <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={t("agentComputer.openOf", g)}>
+          <Image
+            source={{ uri: `data:image/jpeg;base64,${picture.data}` }}
+            contentFit="cover"
+            contentPosition="left top"
+            style={styles.picture}
+            accessible={false}
+          />
+          <Text variant="caption" tone="muted" style={styles.when}>
+            {pictureWhen(t, i18n.language, picture.capturedAt, new Date(now))}
+          </Text>
+        </Pressable>
+      ) : null}
       <Card>
         <Row
           leading={<ComputerPortrait kind={entryKind(f.edition, view.machine)} state={entryPortrait(state, f.setup)} />}
@@ -85,3 +111,8 @@ export function AgentComputerRow({ agentId }: { agentId: string }) {
     </Section>
   );
 }
+
+const styles = StyleSheet.create({
+  picture: { width: "100%", aspectRatio: 16 / 10, borderRadius: 12 },
+  when: { marginTop: 6, marginBottom: 10 },
+});

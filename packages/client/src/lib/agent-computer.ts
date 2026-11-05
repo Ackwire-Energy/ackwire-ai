@@ -208,6 +208,10 @@ export function entryLine(t: TFunction, s: EntryState, w: EntryWords): string {
   }
 }
 
+/** A picture of the screen is never live: "Agora há pouco" while it is under a minute old, then its time. */
+export const pictureWhen = (t: TFunction, locale: string, capturedAt: string, now: Date) =>
+  now.getTime() - Date.parse(capturedAt) < 60_000 ? t("agentComputer.pictureNow") : clockAt(locale, capturedAt, now);
+
 /**
  * The dialog's sub-line while its stage is live (`agentComputer.sub.*`, `desktop.sub.*`): who holds the computer, then
  * the agent at work. The hold, the pause and a request waiting each have a banner over the stage that says them, so

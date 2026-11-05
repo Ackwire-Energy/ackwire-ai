@@ -694,7 +694,10 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const answerText = current.answer ?? "";
   return (
     <>
-      <MessageText>{current.text}</MessageText>
+      {/* A row's name and time stay on its own words: this one follows them. */}
+      <MessageText opens={false} closes={false}>
+        {current.text}
+      </MessageText>
       <RequestDone done label={t("question.group", { agent: name })}>
         {current.withdrawn ? (
           t("question.withdrawn", agentGrammar(name))

@@ -212,7 +212,14 @@ export {
   MenuOverlayItem,
   MenuOverlaySeparator,
 } from "./components/MenuOverlay";
-export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";
+export {
+  DayDivider,
+  Message,
+  type MessageLook,
+  MessageLookContext,
+  type MessageProps,
+  MessageText,
+} from "./components/Message";
 export { stopPlayback } from "./components/media-playback";
 export { OptionList, type OptionListItem, type OptionListProps } from "./components/OptionList";
 export { PageHeader, type PageHeaderProps } from "./components/PageHeader";

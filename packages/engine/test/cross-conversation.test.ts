@@ -82,7 +82,7 @@ describe("work done in other conversations", () => {
     const copies = (await f.db.select().from(schema.artifacts)).filter((a) => a.channelId === f.general.id);
     expect(copies.map((a) => a.title)).toEqual(["Relatório semanal de visitas"]);
     const reply = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).at(-1);
-    expect(reply?.meta.artifacts).toEqual([{ id: copies[0]?.id, version: 1 }]);
+    expect(reply?.meta.artifacts).toEqual([{ id: copies[0]?.id, version: 1, title: "Relatório semanal de visitas" }]);
     const audit = await f.db.select().from(schema.auditLog);
     expect(audit.find((a) => a.action === "artifact.shared")).toMatchObject({
       actorType: "agent",

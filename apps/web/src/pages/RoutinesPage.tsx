@@ -168,7 +168,7 @@ const isRunning = (r: Routine) => r.state === "running";
 const isAtWork = (r: Routine) =>
   isRunning(r) || r.state === "waiting_person" || r.state === "waiting_computer" || r.state === "usage_paused";
 /** A one-off that already fired (or was cancelled): no switch, no "Rodar agora", nothing left to run. */
-const hasFired = (r: Routine) => r.trigger.type === "once" && !r.active;
+export const hasFired = (r: Routine) => r.trigger.type === "once" && !r.active;
 /** A one-off that fired and whose run ended: shown muted, under "Concluídos" (while its run works, it is live). */
 export const isDoneOnce = (r: Routine) => hasFired(r) && !isAtWork(r);
 /** Paused: inactive and not a one-off (a fired one-off is done, or live while its run works). */
@@ -564,7 +564,7 @@ function useNextText() {
 }
 
 /** Pause, resume, run, stop, the one-tap fixes and delete: one place for the toasts they say. */
-function useRoutineControls(r: Routine) {
+export function useRoutineControls(r: Routine) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const actors = useActors();

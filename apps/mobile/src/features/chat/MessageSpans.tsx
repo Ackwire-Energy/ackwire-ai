@@ -23,11 +23,14 @@ export function Spans({
   inline,
   channelRefs,
   everyone = false,
+  ink,
 }: {
   inline: Inline[];
   channelRefs?: Record<string, string>;
   /** The message mentions everyone (`meta.mentionsEveryone`): its word shows in the reader's language. */
   everyone?: boolean;
+  /** Over a solid bubble: a mention's color and plate in place of its own. */
+  ink?: string | undefined;
 }) {
   const c = useColors();
   const myHandle = useMyHandle();
@@ -77,9 +80,11 @@ export function Spans({
                 key={key}
                 style={[
                   styles.bold,
-                  all || s.text.slice(1).toLowerCase() === myHandle
-                    ? { color: c.amber, backgroundColor: `${c.amber}2e` }
-                    : (mentionTint(s.text.slice(1), agents, scheme) ?? { color: c.ink }),
+                  ink
+                    ? { color: ink, backgroundColor: "rgba(0,0,0,0.16)" }
+                    : all || s.text.slice(1).toLowerCase() === myHandle
+                      ? { color: c.amber, backgroundColor: `${c.amber}2e` }
+                      : (mentionTint(s.text.slice(1), agents, scheme) ?? { color: c.ink }),
                 ]}
               >
                 {all ? `@${everyoneWord(i18n.language)}` : s.text}

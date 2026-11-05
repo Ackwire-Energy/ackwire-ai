@@ -606,6 +606,9 @@ test("the desktop's REST: its state for who may watch it, nothing to turn on or 
     controlRefusal: null,
     held: false,
   });
+  // Its picture is for the same people; asking for one never starts anything.
+  expect((await api("/desktop/picture")).status).toBe(200);
+  expect(runner.requests).not.toContain("desktop.session.start");
   // It stays on: no route turns it on or off (the browser still closes).
   expect((await api("/desktop/start", { json: {} })).status).toBe(404);
   expect((await api("/desktop/stop", { json: {} })).status).toBe(404);
@@ -629,8 +632,9 @@ test("the desktop's REST: its state for who may watch it, nothing to turn on or 
   // A member the agent's work doesn't involve sees nothing of it.
   const ana = await invite("ana@example.com", "member");
   expect((await ana(`/api/app/organizations/${org.orgId}/agents/${org.agentId}/desktop`)).status).toBe(403);
+  expect((await ana(`/api/app/organizations/${org.orgId}/agents/${org.agentId}/desktop/picture`)).status).toBe(403);
   runner.ws.close();
-});
+}, 30_000);
 
 test("a runner from before desktops stayed on refuses one that isn't running: the server starts it and opens again", async () => {
   const { owner, machine, desktop } = await seeded();
