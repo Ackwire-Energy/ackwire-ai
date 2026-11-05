@@ -468,7 +468,7 @@ function WorkingNow({ issues, onOpen }: { issues: Issue[]; onOpen: (n: number) =
                 expression={stall ? "closed" : undefined}
               />
               <span className="issues-now__text">
-                <span className="issues-now__who">
+                <span className="issues-now__who ac-captop">
                   {name} · #{i.number} ·{" "}
                   {stall
                     ? t("issues.work.stalled", { when: relativeTime(t, i18n.language, w.since) })

@@ -2941,6 +2941,10 @@ html:not([data-pointer]) .ac-back:focus-visible {
   flex: 1;
   min-width: 0;
 }
+/* The buttons (32px, 40px on touch) centred on that first line (28px), not hung from its top. */
+.ac-details__bar--titled > .ac-details__actions {
+  height: 28px;
+}
 .ac-details__heading {
   display: flex;
   align-items: flex-start;

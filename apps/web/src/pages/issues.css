@@ -473,13 +473,14 @@ html:not([data-pointer]) .issue-card:focus-visible {
   line-height: 1.4;
   color: var(--muted);
 }
+/* Neutral words with the tone on the icon only, as the card's other states; the icon stays on the first line. */
 .issue-card__blocked {
-  align-self: flex-start;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--warn-soft);
-  color: var(--warn);
+  gap: 6px;
+  color: var(--ink2);
   font-weight: 600;
+}
+.issue-card__blocked > .ac-icon {
+  color: var(--warn);
 }
 .issue-card__plan {
   display: flex;
@@ -939,11 +940,13 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   text-decoration: line-through;
   text-decoration-color: var(--line2);
 }
+/* On the criterion's first line (the row's 22px line), however many lines the criterion takes. */
 .issue-criterion__by {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   flex: none;
+  height: 22px;
   font-size: 11.5px;
   color: var(--faint);
 }
@@ -982,9 +985,14 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   line-height: 28px;
   letter-spacing: -0.01em;
 }
+/* "Saved" on the title's first line (28px), not centred on a title that wraps. */
 .issue-bartitle__saved {
   flex: none;
-  align-self: center;
+  height: 28px;
+}
+/* The bar's buttons centre on that line too (the shared titled bar does the same). */
+.ac-details__bar:has(.issue-bartitle) > .ac-details__actions {
+  height: 28px;
 }
 /* "✓ Salvo" (SavedNote) at the end of the source line. */
 .issue-details__saved {
@@ -1116,10 +1124,15 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   box-shadow: inset 0 0 0 1.5px var(--line2);
   padding-bottom: 12px;
 }
+/* The face and Stop on the title's first line (`.ac-iconline`), when the title wraps too. */
 .issue-work__head {
+  gap: 10px;
+}
+.issue-work__tail {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
+  height: 22px;
 }
 .issue-work__text {
   flex: 1;
@@ -1194,6 +1207,13 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   color: #fff;
 }
 
+/* Background work in a task's details (IssueWorkBlock): its line starts on the panel's own gap and spans the
+   column as the sections do (in a conversation it keeps the message card's width and its air above). */
+.issue-work-block > .ac-workline {
+  margin-top: 0;
+  max-width: none;
+}
+
 /* "Pedir a um agente". */
 .issue-ask {
   display: flex;
@@ -1203,9 +1223,8 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   border-radius: 16px;
   box-shadow: inset 0 0 0 1.5px var(--line2);
 }
+/* The face on the title's first line (`.ac-iconline`). */
 .issue-ask__row {
-  display: flex;
-  align-items: flex-start;
   gap: 12px;
 }
 .issue-ask__text {
@@ -1247,10 +1266,9 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
 }
 
 /* Activity events. */
-/* Events sit on the comments' avatar column: the icon centered under a 36px avatar, the words beside it. */
+/* Events sit on the comments' avatar column: the icon centered under a 36px avatar, the words beside it; the icon
+   stays on the first line when the words wrap (`.ac-iconline`). */
 .issue-event {
-  display: flex;
-  align-items: center;
   gap: 18px;
   padding: 4px 4px 4px 10px;
 }
@@ -1411,12 +1429,13 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   gap: 0;
   padding: 0;
 }
+/* The dialog's room on every side, so the hairline between the form and its fields has the same air on both. */
 .issue-new__main {
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
-  padding: 0 24px 24px 20px;
+  padding: 0 var(--dialog-pad) var(--dialog-pad);
 }
 .issue-new__side {
   position: sticky;
@@ -1425,7 +1444,7 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 4px 20px 20px;
+  padding: 4px var(--dialog-pad) var(--dialog-pad);
   border-left: 1px solid var(--line);
 }
 .issue-new__editor {
@@ -1520,9 +1539,8 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   border-radius: 5px;
   box-shadow: inset 0 0 0 1.5px var(--line-strong);
 }
+/* The face on the sentence's first line (`.ac-iconline`). */
 .issue-new__who {
-  display: flex;
-  align-items: flex-start;
   gap: 10px;
   padding: 12px;
   border-radius: var(--radius-lg);
@@ -1715,6 +1733,10 @@ html:not([data-pointer]) .issue-files__add:focus-visible {
 }
 .issue-files__row:last-child {
   border-bottom: 0;
+}
+/* Download reaches out by its plate: its icon ends on the hairline's edge, as the name starts on it. */
+.issue-files__row > .ac-btn--ghost:last-child {
+  margin-inline-end: calc(-1 * var(--ghost-plate));
 }
 .issue-files__open {
   display: flex;
