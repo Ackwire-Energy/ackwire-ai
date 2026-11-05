@@ -13,6 +13,7 @@ import {
   parseAccess,
   parsePause,
 } from "@agenteschat/adapters/machine-protocol";
+import { realFoldersFor } from "./access";
 import { agentAccountHome, grantOf, lentAccounts } from "./accounts";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
@@ -20,6 +21,7 @@ import { BrowserManager, type BrowserManagerOptions, launchChrome } from "./brow
 import type { BrowserPorts } from "./browser-ports";
 import { type Dial, RunnerConnection, type SocketHandlers } from "./connection";
 import { DEFAULT_LIMITS, machineOs, prepareWorkspace } from "./daemon";
+import { type DelegatedBridge, DelegatedTools, delegatedTask, parseBridge, type ToolNotice } from "./delegated-tools";
 import { DesktopManager, type DesktopManagerOptions } from "./desktop";
 import { RUNNER_VERSION, RunnerError, toMachineError } from "./errors";
 import type { CacheFill, CloneSlots } from "./git";
@@ -129,6 +131,10 @@ export class WorkerLink {
    * else whether an idle CLI of this agent's closed.
    */
   onReclaim: (ask: { spare?: string; peek: boolean }) => Promise<BrainReclaimed> = async () => ({ closed: false });
+  /** A delegated CLI's bridge, or its end. */
+  onBridge: (bridge: DelegatedBridge) => void = () => {};
+  onTurnCancel: (session: string) => void = () => {};
+  onTurnDetach: (session: string) => void = () => {};
   /** The supervisor is gone (stdin closed). */
   onEnd: () => void = () => {};
 
@@ -234,6 +240,17 @@ export class WorkerLink {
             );
         }
         return;
+      case "bridge.token": {
+        const bridge = parseBridge(f);
+        if (bridge) this.onBridge(bridge);
+        return;
+      }
+      case "turn.cancel":
+        if (typeof f.session === "string") this.onTurnCancel(f.session);
+        return;
+      case "turn.detach":
+        if (typeof f.session === "string") this.onTurnDetach(f.session);
+        return;
       case "browser.show": {
         const agent = f.agent as Partial<AgentScope> | undefined;
         if (typeof f.showId === "string" && typeof agent?.id === "string" && typeof agent.handle === "string") {
@@ -244,6 +261,14 @@ export class WorkerLink {
       default:
         this.session?.onMessage(line);
     }
+  }
+
+  bridgeReady(process: string) {
+    this.write(JSON.stringify({ type: "bridge.ready", process } satisfies WorkerLinkFrame));
+  }
+
+  toolNotice(notice: ToolNotice) {
+    this.write(JSON.stringify({ type: "tool.notice", ...notice } satisfies WorkerLinkFrame));
   }
 
   /** `agent-browser` downloads first, for that click. */
@@ -468,9 +493,39 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     },
     log,
   });
+  // Claude Code's own tools for a CLI root runs on a shared sign-in: nothing here until root opens a bridge.
+  const delegatedRuns = new Map<string, McpTaskInfo>();
+  const delegated = new DelegatedTools({
+    secrets: () => agentSecrets(secretsDir, { id: o.agentId, handle: "agent" }),
+    onNotice: (notice) => link.toolNotice(notice),
+    ...(cli ? { spawn: cli } : {}),
+    log,
+  });
+  link.onBridge = (bridge) => {
+    const { token } = bridge;
+    if (token === null || bridge.agent.id !== o.agentId) {
+      delegatedRuns.delete(bridge.process);
+      return;
+    }
+    void Promise.all([
+      agentWorkspace(workspaceReal, bridge.agent),
+      realFoldersFor(state.access, o.agentId),
+      agentSecrets(secretsDir, bridge.agent),
+    ]).then(
+      ([folder, grants, secrets]) => {
+        const where = { folder, grants, runnerHome: home, ...(secrets ? { redact: secrets.redact } : {}) };
+        delegatedRuns.set(bridge.process, delegatedTask({ ...bridge, token }, delegated, where));
+        link.bridgeReady(bridge.process);
+      },
+      (err: unknown) => log(`delegated tools: ${err instanceof Error ? err.message : String(err)}`),
+    );
+  };
+  link.onTurnCancel = (session) => delegated.cancel(session);
+  link.onTurnDetach = (session) => delegated.detach(session);
   const mcp = new McpBridge({
     socketPath,
-    task: (taskId) => tasks.mcpTask(taskId) ?? brains.mcpTask(taskId) ?? codexRuns.get(taskId) ?? null,
+    task: (taskId) =>
+      tasks.mcpTask(taskId) ?? brains.mcpTask(taskId) ?? codexRuns.get(taskId) ?? delegatedRuns.get(taskId) ?? null,
     log,
   });
   await mcp
@@ -633,6 +688,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   tasks.close();
   brains.close();
   codexApp.close();
+  delegated.close();
   await browser.close().catch(() => undefined);
   link.traffic(browser.takeTraffic());
   await mcp.close().catch(() => undefined);

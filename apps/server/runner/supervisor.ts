@@ -40,6 +40,7 @@ import type { AccountGrant } from "./accounts";
 import { type AgentUser, readAgentUsers, systemLauncher } from "./agent-users";
 import { type BindPolicyOptions, ensureBrowserBindPolicy } from "./browser-bind-policy";
 import { backoffDelay } from "./connection";
+import type { DelegatedBridge, ToolNotice } from "./delegated-tools";
 import { DESKTOP_USE_OPS } from "./desktop";
 import { SHOW_MS } from "./desktop-browser";
 import { errnoCode, NetworkChangingError, RunnerError, toMachineError } from "./errors";
@@ -238,6 +239,16 @@ export type WorkerLinkFrame =
   | { type: "usage"; kind: AccountKind; account: string; info: unknown }
   /** From the worker: its Codex refreshed the ChatGPT sign-in root keeps for all agents (`watchCodexAuth`). */
   | { type: "codex.auth"; account: string; auth: string }
+  /** To the worker: a delegated CLI's bridge, again for each turn; a null `token` closes it (`delegated-tools.ts`). */
+  | ({ type: "bridge.token" } & DelegatedBridge)
+  /** From the worker: that bridge is open; the CLI's relay may dial. */
+  | { type: "bridge.ready"; process: string }
+  /** To the worker: the calls in progress in a delegated session end, their process groups with them. */
+  | { type: "turn.cancel"; session: string }
+  /** To the worker: the commands in progress in a delegated session answer now and go on in the background. */
+  | { type: "turn.detach"; session: string }
+  /** From the worker: a delegated session's background shell started or ended. */
+  | ({ type: "tool.notice" } & ToolNotice)
   /** From the worker: its process `pid`, held until the answer, into the agent's slice for `kind` (`scope-gate.ts`). */
   | { type: "scope.enter"; enterId: string; pid: number; kind: ScopeKind }
   /** To the worker: it is there, or why not (it starts where it is either way). */

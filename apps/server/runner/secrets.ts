@@ -11,7 +11,7 @@ import {
 import { originOf } from "./browser";
 import { errnoCode, RunnerError } from "./errors";
 import { touchesGitInternals } from "./git-guard";
-import { agentFolderName, normalizeRequestPath, resolveInWorkspace } from "./paths";
+import { agentFolderName, isInside, normalizeRequestPath, resolveInWorkspace } from "./paths";
 import { runnerVault } from "./vault";
 
 /**
@@ -581,6 +581,15 @@ export async function agentSecrets(root: string | undefined, agent: AgentScope |
     hold: Math.max(0, ...values.map((s) => s.value.length - 1)),
     redact: (text: string) => redactSecrets(text, values),
   };
+}
+
+/** `abs` is one of the agent's secret files (`files`, relative to its folder), or a folder that holds one. */
+export async function holdsSecretFile(workspaceReal: string, files: readonly string[], abs: string) {
+  for (const file of files) {
+    const held = await resolveInWorkspace(workspaceReal, file).catch(() => null);
+    if (held && (held.abs === abs || isInside(abs, held.abs))) return true;
+  }
+  return false;
 }
 
 /**

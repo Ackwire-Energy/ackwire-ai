@@ -39,11 +39,11 @@ import { type CacheFill, type CloneSlots, gitSync } from "./git";
 import { isGitInternalPath, touchesGitInternals } from "./git-guard";
 import { type McpTaskInfo, redactDeep } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
-import { agentWorkspace, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
+import { agentWorkspace, isInside, resolveForAgent } from "./paths";
 import { type FetchLike, pushPath } from "./push";
 import { openDesktopStream } from "./rfb";
 import type { Spawn } from "./scope-gate";
-import { agentSecrets, handleSecret } from "./secrets";
+import { agentSecrets, handleSecret, holdsSecretFile } from "./secrets";
 import type { DataSockets } from "./streams";
 import type { TaskManager } from "./tasks";
 import type { Terminals } from "./terminal";
@@ -359,12 +359,8 @@ async function refuseSecretFile(ctx: HandlerContext, secrets: Secrets, requested
   if (inBrowserProfile(target.abs)) {
     throw new RunnerError("bad_request", `${requested} holds your browser's logins. It stays on this computer.`);
   }
-  if (!secrets || secrets.files.length === 0) return;
-  for (const file of secrets.files) {
-    const held = await resolveInWorkspace(ctx.workspaceReal, file).catch(() => null);
-    if (held && (held.abs === target.abs || isInside(target.abs, held.abs))) {
-      throw new RunnerError("bad_request", `${requested} holds a secret. It stays on this computer.`);
-    }
+  if (secrets && (await holdsSecretFile(ctx.workspaceReal, secrets.files, target.abs))) {
+    throw new RunnerError("bad_request", `${requested} holds a secret. It stays on this computer.`);
   }
 }
 
