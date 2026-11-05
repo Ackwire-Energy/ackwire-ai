@@ -86,8 +86,8 @@ describe("Contas de IA", () => {
     const add = within(screen().getByRole("region", { name: "Chaves de provedor" })).getByRole("button", {
       name: "Adicionar chave",
     });
-    expect(connect.parentElement?.querySelector("h2")?.textContent).toBe("Seus planos");
-    expect(add.parentElement?.querySelector("h2")?.textContent).toBe("Chaves de provedor");
+    expect(connect.closest(".ac-card__head")?.querySelector("h2")?.textContent).toBe("Seus planos");
+    expect(add.closest(".ac-card__head")?.querySelector("h2")?.textContent).toBe("Chaves de provedor");
     expect(connect.className).toBe(add.className);
     await act(async () => fireEvent.click(connect));
     await settle(4);

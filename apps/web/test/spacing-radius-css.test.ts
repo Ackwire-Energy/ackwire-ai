@@ -152,12 +152,15 @@ test("a button inside a field is as far from its end as from its top and bottom,
   // The composer's tools: one room at both ends and under them, its send button the card's corner less it.
   expect(last(kit, ".ac-composer__tools", "padding")).toBe("4px var(--space-2) var(--space-2)");
   expect(last(kit, ".ac-composer__send", "border-radius")).toBe("var(--control-r-sm)");
-  // The password field's eye: 12px around a 32px button in a 56px field (r16).
+  // The password field's eye: a 32px button in the ruler's 48px field, as far from its end as from its top and
+  // bottom, its corner the field's less that room.
   const auth = topLevel(await read(join(SRC, "components/auth.css")));
-  expect(last(auth, ".auth__big.ac-input", "height")).toBe("56px");
-  expect(last(auth, ".auth__big.ac-input", "border-radius")).toBe("16px");
-  expect(last(auth, ".auth__eye.ac-btn", "right")).toBe("12px");
-  expect(last(auth, ".auth__eye.ac-btn", "border-radius")).toBe("4px");
+  expect(last(auth, ".auth__big.ac-input", "height")).toBe("var(--control-h-lg)");
+  expect(last(auth, ".auth__big.ac-input", "border-radius")).toBe("var(--control-r-lg)");
+  expect(last(auth, ".auth__eye.ac-btn", "right")).toBe("calc((var(--control-h-lg) - var(--control-h-sm)) / 2)");
+  expect(last(auth, ".auth__eye.ac-btn", "border-radius")).toBe(
+    "calc(var(--control-r-lg) - (var(--control-h-lg) - var(--control-h-sm)) / 2)",
+  );
 });
 
 test("every hairline between a card's rows, and over its foot, has one step of room on each side", async () => {
