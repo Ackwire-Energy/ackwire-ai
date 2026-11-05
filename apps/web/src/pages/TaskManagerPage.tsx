@@ -24,6 +24,7 @@ import {
   EmptyState,
   Icon,
   type IconName,
+  PageHeader,
   PixelSpinner,
   PixelStop,
   SearchField,
@@ -201,11 +202,11 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
 
   return (
     <div className="page page--list tm">
-      <header className="list-head">
-        <div>
-          <h1>{t("taskManager.title")}</h1>
-          {(summary.working > 0 || summary.waiting > 0) && (
-            <p className="list-head__sub tm-sum">
+      <PageHeader
+        title={t("taskManager.title")}
+        meta={
+          summary.working > 0 || summary.waiting > 0 ? (
+            <span className="tm-sum">
               {summary.working > 0 && (
                 <span className="tm-sum__item">
                   <PixelSpinner size={14} />
@@ -218,20 +219,24 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
                   {t("taskManager.waiting", { count: summary.waiting })}
                 </span>
               )}
-            </p>
-          )}
-        </div>
-        <div className="list-head__acts tm-search">
-          <SearchField
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onClear={() => setQ("")}
-            clearLabel={t("filters.clearSearch")}
-            placeholder={t("taskManager.search")}
-            aria-label={t("taskManager.search")}
-          />
-        </div>
-      </header>
+            </span>
+          ) : (
+            t("taskManager.subtitle")
+          )
+        }
+        actions={
+          <div className="tm-search">
+            <SearchField
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onClear={() => setQ("")}
+              clearLabel={t("filters.clearSearch")}
+              placeholder={t("taskManager.search")}
+              aria-label={t("taskManager.search")}
+            />
+          </div>
+        }
+      />
 
       {view.isLoading && <LoadingList count={4} avatar={false} />}
       {view.isError && !view.data && <ErrorState error={view.error} onRetry={() => void view.refetch()} />}

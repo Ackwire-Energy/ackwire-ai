@@ -20,6 +20,7 @@ import {
   Menu,
   MenuItem,
   MenuSeparator,
+  PageHeader,
   Textarea,
   useDarkTheme,
   widgetTileVars,
@@ -148,73 +149,76 @@ function Board({
     });
   return (
     <div className="page page--list dashboards db-page">
-      <header className="db-head">
+      <div className="db-head">
         <BackCrumb />
-        <div className="db-head__row">
-          <h1>{title}</h1>
-          <div className="db-acts">
-            {board.canManage && !isHome && (
-              <Button
-                size="sm"
-                icon={board.audience === "workspace" ? "globe" : "lock"}
-                onClick={() => setSharing(true)}
+        <PageHeader
+          title={title}
+          meta={board.about || t("dashboards.subtitle")}
+          actions={
+            <>
+              {board.canManage && !isHome && (
+                <Button
+                  size="sm"
+                  icon={board.audience === "workspace" ? "globe" : "lock"}
+                  onClick={() => setSharing(true)}
+                >
+                  {t("dashboards.share.action")}
+                </Button>
+              )}
+              {board.canEdit && (
+                <BoardActionsPill
+                  label={title}
+                  arranging={arranging}
+                  onArrange={empty ? undefined : () => setArranging((a) => !a)}
+                  onAdd={() => setAdding(true)}
+                />
+              )}
+              <Menu
+                label={t("widgets.menu.label")}
+                align="end"
+                trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={t("widgets.menu.label")} />}
               >
-                {t("dashboards.share.action")}
-              </Button>
-            )}
-            {board.canEdit && (
-              <BoardActionsPill
-                label={title}
-                arranging={arranging}
-                onArrange={empty ? undefined : () => setArranging((a) => !a)}
-                onAdd={() => setAdding(true)}
-              />
-            )}
-            <Menu
-              label={t("widgets.menu.label")}
-              align="end"
-              trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={t("widgets.menu.label")} />}
-            >
-              {!(isHome && onHome) && (
-                <MenuItem icon="home" onSelect={toggleHome}>
-                  {onHome ? t("dashboards.stopOnHome") : t("dashboards.useOnHome")}
-                </MenuItem>
-              )}
-              {board.canEdit && !isHome && (
-                <MenuItem icon="edit" onSelect={() => setRenaming(true)}>
-                  {t("dashboards.rename")}
-                </MenuItem>
-              )}
-              {board.canManage && !isHome && (
-                <MenuItem icon="pin" onSelect={() => setPinned(!board.pinned)}>
-                  {board.pinned ? t("dashboards.unpin") : t("dashboards.pinTop")}
-                </MenuItem>
-              )}
-              {board.canManage && !isHome && <MenuSeparator />}
-              {board.canManage && !isHome && (
-                <MenuItem icon="trash" danger onSelect={() => setDeleting(true)}>
-                  {t("dashboards.delete.action")}
-                </MenuItem>
-              )}
-            </Menu>
+                {!(isHome && onHome) && (
+                  <MenuItem icon="home" onSelect={toggleHome}>
+                    {onHome ? t("dashboards.stopOnHome") : t("dashboards.useOnHome")}
+                  </MenuItem>
+                )}
+                {board.canEdit && !isHome && (
+                  <MenuItem icon="edit" onSelect={() => setRenaming(true)}>
+                    {t("dashboards.rename")}
+                  </MenuItem>
+                )}
+                {board.canManage && !isHome && (
+                  <MenuItem icon="pin" onSelect={() => setPinned(!board.pinned)}>
+                    {board.pinned ? t("dashboards.unpin") : t("dashboards.pinTop")}
+                  </MenuItem>
+                )}
+                {board.canManage && !isHome && <MenuSeparator />}
+                {board.canManage && !isHome && (
+                  <MenuItem icon="trash" danger onSelect={() => setDeleting(true)}>
+                    {t("dashboards.delete.action")}
+                  </MenuItem>
+                )}
+              </Menu>
+            </>
+          }
+        >
+          <div className="db-meta">
+            <VisibilityChip board={board} />
+            <OwnerLine owner={board.owner} mine={board.mine} />
+            <span className="db-dot" aria-hidden="true">
+              ·
+            </span>
+            <span>{t("dashboards.meta.widgets", { count })}</span>
+            <span className="db-dot" aria-hidden="true">
+              ·
+            </span>
+            <span>
+              {t("dashboards.meta.updated", { when: relativeTime(t, i18n.language, board.updatedAt, new Date(now)) })}
+            </span>
           </div>
-        </div>
-        {board.about && <p className="list-head__sub">{board.about}</p>}
-        <div className="db-meta">
-          <VisibilityChip board={board} />
-          <OwnerLine owner={board.owner} mine={board.mine} />
-          <span className="db-dot" aria-hidden="true">
-            ·
-          </span>
-          <span>{t("dashboards.meta.widgets", { count })}</span>
-          <span className="db-dot" aria-hidden="true">
-            ·
-          </span>
-          <span>
-            {t("dashboards.meta.updated", { when: relativeTime(t, i18n.language, board.updatedAt, new Date(now)) })}
-          </span>
-        </div>
-      </header>
+        </PageHeader>
+      </div>
       <ProposalBanner board={board} />
       {empty ? (
         <div className="db-empty" style={widgetTileVars(colorOf(artAgent), dark)}>

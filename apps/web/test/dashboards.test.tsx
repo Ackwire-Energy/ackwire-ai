@@ -223,7 +223,7 @@ describe("a board's page", () => {
     const more = () =>
       screen()
         .getAllByRole("button", { name: "Mais" })
-        .find((b) => b.closest(".db-acts")) as Element;
+        .find((b) => b.closest(".ac-pagehead__actions")) as Element;
     const pick = async (item: string) => {
       const trigger = more();
       (trigger as HTMLElement).focus();
@@ -266,7 +266,7 @@ describe("a board on Início (ADR 0135 §18)", () => {
     const s = await open(`/org/${ORG_ID}/dashboards/dash-m`, metas);
     const trigger = screen()
       .getAllByRole("button", { name: "Mais" })
-      .find((b) => b.closest(".db-acts")) as HTMLElement;
+      .find((b) => b.closest(".ac-pagehead__actions")) as HTMLElement;
     trigger.focus();
     await key(trigger, "Enter");
     await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Usar no Início" }));

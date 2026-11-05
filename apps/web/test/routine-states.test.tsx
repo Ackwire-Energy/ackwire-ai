@@ -599,7 +599,7 @@ describe("Rotinas: the form's two plain questions", () => {
     expect(empty.querySelector(".ac-empty__title")?.textContent).toBe("Nenhuma rotina ainda");
     expect(empty.querySelector(".ac-empty__text")).toBeNull();
     expect(within(empty).getByRole("button", { name: "Nova rotina" })).toBeTruthy();
-    expect(document.querySelector(".routines-head")?.querySelectorAll("p")).toHaveLength(1);
+    expect(document.querySelector(".ac-pagehead")?.querySelectorAll("p")).toHaveLength(1);
   });
 
   test("Quando posta, sent with the routine; no access choice", async () => {

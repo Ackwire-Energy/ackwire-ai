@@ -3,7 +3,7 @@ import { keys, useWikiPage, useWikiReads, useWikiTree } from "@agenteschat/clien
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { outlineOf, type WikiFolder, wikiSlug, wikiTree } from "@agenteschat/client/lib/wiki";
-import { Button, EmptyState, Icon, Kbd, SearchField } from "@agenteschat/ui";
+import { Button, EmptyState, Icon, Kbd, PageHeader, SearchField } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -426,32 +426,33 @@ function HomeHead({ onNew, onImport, onNav }: { onNew: () => void; onImport: () 
   const { t } = useTranslation();
   const { org } = useOrg();
   return (
-    <header className="wiki-home__head">
-      <div>
-        <h1 className="wiki-home__title">{t("wiki.homeTitle", { org: org.name })}</h1>
-        <p className="muted">{t("wiki.subtitle")}</p>
-        <p className="small">
-          <HelpLink slug="wiki">{t("wiki.how")}</HelpLink>
-        </p>
-      </div>
-      <div className="wiki-home__acts">
-        <Button size="sm" variant="ghost" icon="menu" className="wiki__navbtn" onClick={onNav}>
-          {t("wiki.tree")}
-        </Button>
-        {can(org, "edit_wiki") && (
-          <>
-            <Button size="sm" onClick={onImport}>
-              <ObsidianMark size={16} />
-              {t("wiki.import.short")}
-            </Button>
-            <Button size="sm" variant="primary" icon="plus" onClick={onNew}>
-              {t("wiki.new")}
-              <Kbd>N</Kbd>
-            </Button>
-          </>
-        )}
-      </div>
-    </header>
+    <PageHeader
+      title={t("wiki.homeTitle", { org: org.name })}
+      meta={
+        <>
+          {t("wiki.subtitle")} <HelpLink slug="wiki">{t("wiki.how")}</HelpLink>
+        </>
+      }
+      actions={
+        <>
+          <Button variant="ghost" icon="menu" className="wiki__navbtn" onClick={onNav}>
+            {t("wiki.tree")}
+          </Button>
+          {can(org, "edit_wiki") && (
+            <>
+              <Button onClick={onImport}>
+                <ObsidianMark size={16} />
+                {t("wiki.import.short")}
+              </Button>
+              <Button variant="primary" icon="plus" onClick={onNew}>
+                {t("wiki.new")}
+                <Kbd>N</Kbd>
+              </Button>
+            </>
+          )}
+        </>
+      }
+    />
   );
 }
 

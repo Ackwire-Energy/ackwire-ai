@@ -4869,8 +4869,7 @@ export const ptBR = {
   },
   proposals: {
     title: "Propostas de melhoria",
-    subtitle:
-      "Os agentes propõem mudanças nas instruções, no papel e no acesso do time, ou no contexto da {{org}}, quando alguém pede ou quando uma lição se repete. Nada muda sem alguém aceitar.",
+    subtitle: "O que os agentes propõem mudar no time. Nada muda sem alguém aceitar.",
     list: "Propostas",
     proposes: "<b>{{agent}}</b> propõe · {{target}}",
     proposesMany: "<b>{{agent}}</b> propõe · instruções de {{count}} agentes",
@@ -10540,6 +10539,7 @@ export const ptBR = {
   },
   searchPage: {
     title: "Buscar no workspace",
+    subtitle: "Mensagens, contexto e ações do time nos canais em que você está.",
     label: "Buscar",
     placeholder: "Mensagens, decisões, resumos…",
     filter: "Tipo",
@@ -11125,7 +11125,7 @@ export const ptBR = {
       state: { online: "online", paused: "pausado", offline: "offline" },
       saved: "{{name}} agora usa {{computer}}.",
     },
-    lead: "Onde os agentes trabalham: o computador deste servidor e qualquer outro computador que você conectar.",
+    lead: "Onde os agentes trabalham: este servidor e outros que você conectar.",
     leadCloud: "Onde os agentes trabalham: um computador só deste workspace, sempre ligado.",
     /** The workspace computer's page ends with its help page's link. */
     about: "Sobre este computador",
@@ -11724,26 +11724,25 @@ export const ptBR = {
     },
     sectionText: {
       account: "Seu perfil e como o app fica para você.",
-      notifications: "A caixa de notificações guarda tudo. Aqui você escolhe o que chega como aviso, neste workspace.",
+      notifications: "O que chega como aviso neste workspace. A caixa guarda tudo.",
       general: "Nome, fuso e o que todo agente sabe do workspace.",
-      right_hand: "O assistente que monta o time com cada pessoa, na DM dela e com as permissões dela.",
+      right_hand: "O assistente que monta o time com cada pessoa, na DM dela.",
       members: "Quem está no workspace e os convites.",
       roles: "O que cada pessoa pode fazer. Papéis se somam.",
-      vault:
-        "Senhas, chaves e dados de contato que seus agentes usam. Eles digitam senhas e usam chaves sem nunca vê-las.",
+      vault: "Senhas, chaves e contatos dos agentes. Senhas eles nunca veem.",
       access: "O que cada agente pode usar: um nível por conector.",
       connectors: "Serviços e servidores MCP conectados uma vez para o workspace inteiro.",
       skills: "Instruções em Markdown que os agentes abrem quando precisam.",
       keys: "Seus planos e as chaves de API do workspace.",
       storage: "Onde ficam os arquivos do workspace.",
       usage: "Quanto cada pessoa e cada agente usa de IA, e os limites do mês.",
-      audit: "O que os agentes fizeram fora da conversa e o que as pessoas mudaram. Só admins veem.",
-      import: "Traga agentes de outro app ou de outro workspace, e leve este para onde quiser.",
-      billing: "O plano do agentes.chat deste workspace, o cartão e as faturas ficam numa página nossa, fora do app.",
-      media: "O que dá para mandar na conversa, e quando os agentes mandam um GIF ou uma figurinha.",
+      audit: "O que os agentes fizeram fora da conversa e o que as pessoas mudaram.",
+      import: "Traga agentes de outro app ou workspace, e leve este para onde quiser.",
+      billing: "O plano, o cartão e as faturas, numa página nossa fora do app.",
+      media: "O que dá para mandar na conversa, e os GIFs e figurinhas dos agentes.",
       voice: "Mensagens de voz nas conversas, e quem transforma a voz em texto.",
-      apps: "Peça tarefas aos agentes deste workspace pelo Claude, Cursor e outros apps.",
-      approvals: "Quem decide por você quando um agente pede algo que espera a sua aprovação.",
+      apps: "Peça tarefas aos agentes pelo Claude, Cursor e outros apps.",
+      approvals: "Quem decide por você quando um agente pede a sua aprovação.",
     },
     title: "Configurações",
     account: {
@@ -12109,7 +12108,7 @@ export const ptBR = {
   },
   gallery: {
     title: "Galeria de componentes",
-    subtitle: "Só em desenvolvimento. Os componentes de @agenteschat/ui com os estados das telas aprovadas.",
+    subtitle: "Só em desenvolvimento: os componentes de @agenteschat/ui.",
   },
   format: {
     list: "{{names, list}}",
@@ -13984,6 +13983,8 @@ export const ptBR = {
   },
   taskManager: {
     title: "Gerenciador de tarefas",
+    /** Under the title when no agent is working or waiting on you. */
+    subtitle: "O que os agentes fazem agora e o que terminou hoje.",
     nav: "Gerenciador",
     search: "Buscar tarefa, agente ou programa",
     working_one: "{{count}} trabalhando",
@@ -14321,7 +14322,7 @@ export const ptBR = {
   // Painéis (ADR 0135).
   dashboards: {
     title: "Painéis",
-    subtitle: "Números e gráficos que os agentes mantêm em dia, para o workspace ou só para alguns papéis.",
+    subtitle: "Números e gráficos que os agentes mantêm em dia.",
     sidebar: "Painéis",
     navWhat: "Números e gráficos que os agentes mantêm em dia",
     new: "Novo painel",

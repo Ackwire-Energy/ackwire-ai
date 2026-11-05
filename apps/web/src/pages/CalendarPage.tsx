@@ -31,6 +31,7 @@ import {
   Kbd,
   ListRow,
   offsetMinutes,
+  PageHeader,
   Popover,
   Segmented,
   Toolbar,
@@ -307,48 +308,64 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
 
   return (
     <div className="cal-page" data-panel={panel || undefined}>
-      <header className="cal-page__header">
-        <div className="cal-page__title">
-          <h1 className="page-title">{t("calendar.title")}</h1>
-          <span className="cal-page__range" aria-live="polite">
-            {rangeLabel(i18n.language, view, days, focus)}
-          </span>
-        </div>
-        {/* biome-ignore lint/a11y/useSemanticElements: prev / today / next as one compact group */}
-        <div className="cal-nav" role="group" aria-label={t("calendar.nav")}>
-          <Button
+      <PageHeader
+        className="cal-page__header"
+        title={t("calendar.title")}
+        meta={rangeLabel(i18n.language, view, days, focus)}
+        metaLive
+        actions={
+          <>
+            <Button
+              variant="ghost"
+              iconOnly
+              icon="sidebar"
+              aria-label={panel ? t("calendar.hidePanel") : t("calendar.showPanel")}
+              aria-expanded={panel}
+              onClick={() => setPanel((p) => !p)}
+            />
+            <Button variant="primary" icon="plus" className="cal-page__new" onClick={() => newAt(focus)}>
+              {t("calendar.new")}
+              <Kbd aria-hidden="true">N</Kbd>
+            </Button>
+          </>
+        }
+      >
+        <div className="cal-page__tools">
+          {/* biome-ignore lint/a11y/useSemanticElements: prev / today / next as one compact group */}
+          <div className="cal-nav" role="group" aria-label={t("calendar.nav")}>
+            <Button
+              size="sm"
+              variant="ghost"
+              iconOnly
+              icon="chevronLeft"
+              aria-label={t(`calendar.prev.${view}`)}
+              onClick={() => setFocus((f) => stepFocus(view, f, -1))}
+            />
+            <Button size="sm" variant="ghost" onClick={() => setFocus(startOfDay(today))}>
+              {t("calendar.today")}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              iconOnly
+              icon="chevronRight"
+              aria-label={t(`calendar.next.${view}`)}
+              onClick={() => setFocus((f) => stepFocus(view, f, 1))}
+            />
+          </div>
+          <Segmented
+            label={t("calendar.view")}
             size="sm"
-            variant="ghost"
-            iconOnly
-            icon="chevronLeft"
-            aria-label={t(`calendar.prev.${view}`)}
-            onClick={() => setFocus((f) => stepFocus(view, f, -1))}
+            value={view}
+            onValueChange={setView}
+            options={VIEWS.map((v) => ({ value: v, label: t(`calendar.views.${v}`) }))}
           />
-          <Button size="sm" variant="ghost" onClick={() => setFocus(startOfDay(today))}>
-            {t("calendar.today")}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            iconOnly
-            icon="chevronRight"
-            aria-label={t(`calendar.next.${view}`)}
-            onClick={() => setFocus((f) => stepFocus(view, f, 1))}
-          />
+          {view === "week" && (
+            <FilterToggle pressed={businessOnly} onPressedChange={setBusinessOnly}>
+              {t("calendar.businessDays")}
+            </FilterToggle>
+          )}
         </div>
-        <Segmented
-          label={t("calendar.view")}
-          size="sm"
-          value={view}
-          onValueChange={setView}
-          options={VIEWS.map((v) => ({ value: v, label: t(`calendar.views.${v}`) }))}
-        />
-        {view === "week" && (
-          <FilterToggle pressed={businessOnly} onPressedChange={setBusinessOnly}>
-            {t("calendar.businessDays")}
-          </FilterToggle>
-        )}
-        <span className="cal-page__spacer" />
         {!panel && (
           <Popover
             label={t("calendar.filters")}
@@ -363,20 +380,7 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
             {filterChips}
           </Popover>
         )}
-        <Button
-          size="sm"
-          variant="ghost"
-          iconOnly
-          icon="sidebar"
-          aria-label={panel ? t("calendar.hidePanel") : t("calendar.showPanel")}
-          aria-expanded={panel}
-          onClick={() => setPanel((p) => !p)}
-        />
-        <Button variant="primary" icon="plus" className="cal-page__new" onClick={() => newAt(focus)}>
-          {t("calendar.new")}
-          <Kbd aria-hidden="true">N</Kbd>
-        </Button>
-      </header>
+      </PageHeader>
       <div className="cal-page__body">
         <div className="cal-page__main">
           {range.isError && !range.data && <ErrorState error={range.error} onRetry={() => void range.refetch()} />}

@@ -52,6 +52,7 @@ import {
   Input,
   List,
   Meter,
+  PageHeader,
   ProviderLogo,
   Select,
   Switch,
@@ -199,21 +200,20 @@ export function SettingsPage({
       </nav>
       <div className="settings__body">
         {current !== "members" && current !== "general" && current !== "roles" && current !== "vault" && (
-          <header className="page__header">
-            <h2 className="page-title">{sectionName(current)}</h2>
-            {current !== "computers" ? (
-              <p className="muted" style={{ margin: 0 }}>
-                {t(`settings.sectionText.${current}`)}
-              </p>
-            ) : edition ? (
-              <p className="muted" style={{ margin: 0 }}>
-                {edition === "cloud" ? t("computers.leadCloud") : t("computers.lead")}
-              </p>
-            ) : setup.isError ? null : (
-              // Never one edition's words before the server says which this is (the section says if it couldn't).
-              <LoadingLine width={320} />
-            )}
-          </header>
+          <PageHeader
+            level={2}
+            title={sectionName(current)}
+            meta={
+              current !== "computers" ? (
+                t(`settings.sectionText.${current}`)
+              ) : edition ? (
+                t(edition === "cloud" ? "computers.leadCloud" : "computers.lead")
+              ) : setup.isError ? null : (
+                // Never one edition's words before the server says which this is (the section says if it couldn't).
+                <LoadingLine width={320} />
+              )
+            }
+          />
         )}
         {current === "account" && <AccountSection />}
         {current === "notifications" && <NoticePrefsSection />}
@@ -348,22 +348,21 @@ function GeneralSection() {
 
   return (
     <>
-      <header className="page__header page__header--row">
-        <div className="page__header-text">
-          <h2 className="page-title">{t("settings.section.general")}</h2>
-          <p className="muted" style={{ margin: 0 }}>
-            {t("settings.sectionText.general")}
-          </p>
-        </div>
-        <span className="settings__saved" data-on={saved || undefined} role="status">
-          {saved && (
-            <>
-              <Icon name="check" size={16} />
-              {t("settings.savedShort")}
-            </>
-          )}
-        </span>
-      </header>
+      <PageHeader
+        level={2}
+        title={t("settings.section.general")}
+        meta={t("settings.sectionText.general")}
+        actions={
+          <span className="settings__saved" data-on={saved || undefined} role="status">
+            {saved && (
+              <>
+                <Icon name="check" size={16} />
+                {t("settings.savedShort")}
+              </>
+            )}
+          </span>
+        }
+      />
       {!editable && <p className="page__note">{t("settings.readOnly")}</p>}
 
       <Card aria-label={t("settings.orgTitle")}>

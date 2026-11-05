@@ -4804,8 +4804,7 @@ export const en = {
   },
   proposals: {
     title: "Improvement proposals",
-    subtitle:
-      "Agents propose changes to the team's instructions, roles and access, or to the {{org}} context, when someone asks or a lesson repeats. Nothing changes until someone accepts.",
+    subtitle: "Changes the agents propose. Nothing changes until someone accepts.",
     list: "Proposals",
     proposes: "<b>{{agent}}</b> proposes · {{target}}",
     proposesMany: "<b>{{agent}}</b> proposes · {{count}} agents' instructions",
@@ -10400,6 +10399,7 @@ export const en = {
   },
   searchPage: {
     title: "Search the workspace",
+    subtitle: "Messages, context and team actions in the channels you're in.",
     label: "Search",
     placeholder: "Messages, decisions, summaries…",
     filter: "Type",
@@ -10993,7 +10993,7 @@ export const en = {
       state: { online: "online", paused: "paused", offline: "offline" },
       saved: "{{name}} now uses {{computer}}.",
     },
-    lead: "Where your agents work: this server's computer and any other computer you connect.",
+    lead: "Where your agents work: this server and any computer you connect.",
     leadCloud: "Where your agents work: a computer just for this workspace, always on.",
     about: "About this computer",
     how: "How computers work",
@@ -11595,27 +11595,25 @@ export const en = {
     },
     sectionText: {
       account: "Your profile and how the app looks for you.",
-      notifications:
-        "The inbox keeps everything. Here you choose what reaches you as a notification, in this workspace.",
+      notifications: "What reaches you as an alert here. The inbox keeps everything.",
       general: "Name, time zone and what every agent knows about the workspace.",
-      right_hand: "The assistant that builds the team with each person, in their DM and with their permissions.",
+      right_hand: "The assistant that builds the team with each person, in their DM.",
       members: "Who is in the workspace, and invitations.",
       roles: "What each person can do. Roles add up.",
-      vault:
-        "Passwords, keys and contact details your agents use. They type passwords and use keys without ever seeing them.",
+      vault: "Your agents' passwords, keys and contacts. They never see a password.",
       access: "What each agent can use: one level per connector.",
       connectors: "Services and MCP servers connected once for the whole workspace.",
       skills: "Markdown instructions agents open when they need them.",
       keys: "Your plans and the workspace's API keys.",
       storage: "Where the workspace's files live.",
       usage: "How much AI each person and each agent uses, and the month's limits.",
-      audit: "What the agents did outside the conversation and what people changed. Only admins see it.",
-      import: "Bring agents from another app or workspace, and take this one wherever you want.",
-      billing: "This workspace's agentes.chat plan, card and invoices are on a page of ours, outside the app.",
-      media: "What people can send in a conversation, and when agents send a GIF or a sticker.",
+      audit: "What agents did outside the conversation and what people changed.",
+      import: "Bring agents from another app or workspace, or take this one along.",
+      billing: "The plan, card and invoices, on a page of ours outside the app.",
+      media: "What can be sent in a conversation, and the agents' GIFs and stickers.",
       voice: "Voice messages in conversations, and who turns voice into text.",
-      apps: "Ask this workspace's agents for tasks from Claude, Cursor and other apps.",
-      approvals: "Who decides for you when an agent asks for something that waits for your approval.",
+      apps: "Ask the agents for tasks from Claude, Cursor and other apps.",
+      approvals: "Who decides for you when an agent asks for your approval.",
     },
     title: "Settings",
     account: {
@@ -11969,7 +11967,7 @@ export const en = {
   },
   gallery: {
     title: "Component gallery",
-    subtitle: "Development only. The @agenteschat/ui components with the states of the approved screens.",
+    subtitle: "Development only: the @agenteschat/ui components.",
   },
   format: {
     // i18next's `list` format: Intl.ListFormat in the language ("Ada, Atlas, and Theo", "Ada、Atlas、Theo"). Keep as is.
@@ -13709,6 +13707,8 @@ export const en = {
   },
   taskManager: {
     title: "Task manager",
+    /** Under the title when no agent is working or waiting on you. */
+    subtitle: "What the agents are doing now and what ended today.",
     nav: "Task manager",
     search: "Search a task, agent or app",
     working_one: "{{count}} working",
@@ -14051,7 +14051,7 @@ export const en = {
   // Dashboards (ADR 0135): the boards' page, a board, its dialogs. The web and the phone add their own keys here.
   dashboards: {
     title: "Dashboards",
-    subtitle: "Numbers and charts the agents keep up to date, for the workspace or only some roles.",
+    subtitle: "Numbers and charts the agents keep up to date.",
     sidebar: "Dashboards",
     /** Its line in the sidebar's More menu. */
     navWhat: "Numbers and charts the agents keep up to date",

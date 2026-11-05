@@ -41,7 +41,7 @@ describe("finding the settings", () => {
     await settle(6);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/connectors`);
     // The section's own title (the connectors card has a "Conectores" heading too).
-    expect(document.querySelector(".settings__body > .page__header h2")?.textContent).toBe("Conectores e MCPs");
+    expect(document.querySelector(".settings__body > .ac-pagehead h2")?.textContent).toBe("Conectores e MCPs");
   });
 
   test("the workspace menu lists my workspaces (this one marked) and a digit opens an option", async () => {

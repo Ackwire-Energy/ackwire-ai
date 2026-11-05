@@ -92,6 +92,7 @@ import {
   InfoHint,
   Input,
   Menu,
+  PageHeader,
   RecurrencePicker,
   type RecurrenceRule,
   RunKey,
@@ -354,15 +355,15 @@ export function RoutinesPage() {
   return (
     <div className="page routines">
       <div className="routines__main">
-        <header className="routines-head">
-          <div>
-            <h1>{t("routines.title")}</h1>
-            <p className="routines-head__sub">{t("routines.subtitle")}</p>
-          </div>
-          <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-            {t("routines.new")}
-          </Button>
-        </header>
+        <PageHeader
+          title={t("routines.title")}
+          meta={t("routines.subtitle")}
+          actions={
+            <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+              {t("routines.new")}
+            </Button>
+          }
+        />
         {routines.isLoading && <LoadingCards count={3} />}
         {routines.isError && !routines.data && (
           <ErrorState error={routines.error} onRetry={() => void routines.refetch()} />

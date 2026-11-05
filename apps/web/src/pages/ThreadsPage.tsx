@@ -18,6 +18,7 @@ import {
   Menu,
   MenuItem,
   MenuSeparator,
+  PageHeader,
   SearchField,
   Segmented,
   Toolbar,
@@ -134,20 +135,19 @@ export function ThreadsPage({ initialTab, initialChannel }: { initialTab?: Threa
   return (
     <div className="page page--list threads">
       <div className="threads__main">
-        <header className="list-head">
-          <div>
-            <h1>{missions ? t("missions.title") : t("threads.title")}</h1>
-            <p className="list-head__sub">{missions ? t("missions.subtitle") : t("threads.subtitle")}</p>
-          </div>
-          <Button
-            size="sm"
-            variant={missions ? "primary" : "default"}
-            icon={missions ? "plus" : "flag"}
-            onClick={() => setNewMission(true)}
-          >
-            {t("missions.new.open")}
-          </Button>
-        </header>
+        <PageHeader
+          title={missions ? t("missions.title") : t("threads.title")}
+          meta={missions ? t("missions.subtitle") : t("threads.subtitle")}
+          actions={
+            <Button
+              variant={missions ? "primary" : "default"}
+              icon={missions ? "plus" : "flag"}
+              onClick={() => setNewMission(true)}
+            >
+              {t("missions.new.open")}
+            </Button>
+          }
+        />
         <div className="threads-tabs">
           <Segmented
             label={t("threads.tabsLabel")}

@@ -21,27 +21,6 @@
   gap: 18px;
 }
 
-/* ── Header and toolbar ─────────────────────────────────────────────────── */
-.issues-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: flex-end;
-  justify-content: space-between;
-}
-.issues-head h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: var(--font-display-weight, 300);
-  font-size: clamp(30px, 4vw, 40px);
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-}
-.issues-head__sub {
-  margin: 6px 0 0;
-  color: var(--muted);
-}
-
 /* ── Agents working now ─────────────────────────────────────────────────── */
 .issues-now {
   display: flex;
@@ -1294,12 +1273,6 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
   }
 }
 @media (max-width: 720px) {
-  .issues-head > .ac-btn {
-    width: 100%;
-  }
-  .issues-head > .ac-btn .ac-btn__kbd {
-    display: none;
-  }
   .issues-board {
     --cw: 78vw;
   }

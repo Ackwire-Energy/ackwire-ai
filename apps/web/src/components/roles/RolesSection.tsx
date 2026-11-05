@@ -55,6 +55,7 @@ import {
   Input,
   Menu,
   MenuItem,
+  PageHeader,
   RoleMark,
   Segmented,
   Switch,
@@ -183,19 +184,18 @@ function RoleList({ roles, people, onOpen }: { roles: OrgRole[]; people: Person[
 
   return (
     <div className="roles">
-      <header className="page__header page__header--row">
-        <div className="page__header-text">
-          <h2 className="page-title">{t("settings.section.roles")}</h2>
-          <p className="muted" style={{ margin: 0 }}>
-            {t("settings.sectionText.roles")}
-          </p>
-        </div>
-        {manages && (
-          <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-            {t("rolesPage.create")}
-          </Button>
-        )}
-      </header>
+      <PageHeader
+        level={2}
+        title={t("settings.section.roles")}
+        meta={t("settings.sectionText.roles")}
+        actions={
+          manages && (
+            <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+              {t("rolesPage.create")}
+            </Button>
+          )
+        }
+      />
       <Card className="roles-list" aria-label={t("settings.section.roles")}>
         <div className="roles-line">
           <button type="button" className="roles-row" onClick={() => onOpen(OWNER_ID)}>
