@@ -56,9 +56,11 @@ import {
   TOOL_NAMES,
   writeAgents,
 } from "./access";
+import { accountSelfCheck, SELF_CHECK_EVERY_MS } from "./account-check";
 import { AccountManager, lchownTree, SYSTEM_ACCOUNTS_ROOT } from "./accounts";
 import { ActivityLog } from "./activity";
 import {
+  AccountUsers,
   type AgentUser,
   AgentUsers,
   agentGid,
@@ -221,6 +223,7 @@ export function configFromGrant(
     ...(prev?.networkMark ? { networkMark: prev.networkMark } : {}),
     ...(prev?.networkDrainSeconds ? { networkDrainSeconds: prev.networkDrainSeconds } : {}),
     ...(prev?.networkRevision !== undefined ? { networkRevision: prev.networkRevision } : {}),
+    ...(prev?.claudeSharedLogin ? { claudeSharedLogin: prev.claudeSharedLogin } : {}),
     ...(prev?.maxConcurrentTasks ? { maxConcurrentTasks: prev.maxConcurrentTasks } : {}),
     ...(prev?.taskMaxSeconds ? { taskMaxSeconds: prev.taskMaxSeconds } : {}),
     ...(prev?.brainIdleMinutes ? { brainIdleMinutes: prev.brainIdleMinutes } : {}),
@@ -339,6 +342,9 @@ export interface DaemonOptions {
     chown: (file: string, uid: number, gid: number) => Promise<void>;
     authEgress?: () => string[] | null;
   };
+  /** Tests (system mode): the sign-ins' users, and the self-check that opens Claude's own login for all agents. */
+  accountUsers?: Pick<AccountUsers, "sweep" | "stopScopes" | "sweepAgent" | "launcher" | "remove" | "ensure" | "room">;
+  selfCheck?: () => Promise<string | null>;
 }
 
 export class RunnerDaemon implements RequestObserver {
@@ -406,6 +412,10 @@ export class RunnerDaemon implements RequestObserver {
   private readonly now: () => number;
   /** The computer brains' accounts (ADR 0041): machine-wide, kept across pairings and sessions. */
   readonly accounts: AccountManager;
+  /** System mode: each Claude login for all agents has its own OS user. */
+  private readonly accountUsers: NonNullable<DaemonOptions["accountUsers"]> | null;
+  /** The self-check's last answer: null passed, a string why not. Undefined until it ran; only with the switch on. */
+  private sharedLoginBlocked: string | null | undefined;
   /** The agents' desktops (ADR 0058): they outlive sessions and this process. */
   readonly desktops: DesktopSessions;
   /** Terminals people open as an agent (ADR 0058 §6). */
@@ -440,10 +450,21 @@ export class RunnerDaemon implements RequestObserver {
     const lent = system
       ? (opts.systemAccounts ?? { root: SYSTEM_ACCOUNTS_ROOT, chown: lchownTree, authEgress: () => authEgressPrefix() })
       : null;
+    const accountUsers = system ? (opts.accountUsers ?? new AccountUsers({ home: opts.home, log: opts.log })) : null;
+    this.accountUsers = accountUsers;
     this.accounts = new AccountManager({
       root: lent?.root ?? path.join(opts.home, "accounts"),
       ...(lent ? { lending: { chown: lent.chown } } : {}),
       ...(lent?.authEgress ? { authEgress: lent.authEgress } : {}),
+      ...(accountUsers
+        ? {
+            sharedLogin: {
+              ready: () => this.sharedLoginBlocked === null && this.stored?.claudeSharedLogin !== undefined,
+              launcher: (id: string) => accountUsers.launcher(id),
+              remove: (id: string) => accountUsers.remove(id),
+            },
+          }
+        : {}),
       orgId: () => this.config?.orgId,
       log: opts.log,
       ...(opts.accountCommands ? { commands: opts.accountCommands } : {}),
@@ -486,6 +507,23 @@ export class RunnerDaemon implements RequestObserver {
     if (!agentUser) return runnerUser(this.opts.home, await this.agentFolder(agent), agent);
     const u = agentUser(agent);
     return systemDesktopUser(systemLauncher(u), { uid: u.uid, gid: agentGid(u.user) });
+  }
+
+  /**
+   * Claude's own login for all agents is offered only while this says so. `hello` carries the answer, so a new one
+   * reaches the server with a new connection; with the switch on it changes rarely, and turns resume from there.
+   */
+  private async checkSharedLogin() {
+    const users = this.accountUsers;
+    const config = this.stored;
+    if (!users || !config?.claudeSharedLogin) return;
+    const before = this.sharedLoginBlocked;
+    this.sharedLoginBlocked = await (
+      this.opts.selfCheck?.() ??
+      accountSelfCheck({ config, users, home: this.opts.home, relay: this.self.command[0] ?? "" })
+    ).catch((err: unknown) => (err instanceof Error ? err.message : String(err)));
+    if (this.sharedLoginBlocked) this.opts.log(`Claude's own login for all agents: ${this.sharedLoginBlocked}`);
+    if (this.sharedLoginBlocked !== before) this.session?.connection.reconnect();
   }
 
   /**
@@ -570,6 +608,13 @@ export class RunnerDaemon implements RequestObserver {
       this.opts.log(`config.json can't be read: ${err instanceof Error ? err.message : String(err)}`);
     }
     this.applyStored(stored, null, true);
+    if (this.accountUsers) {
+      this.accountUsers.sweep();
+      void this.checkSharedLogin();
+      const check = setInterval(() => void this.checkSharedLogin(), SELF_CHECK_EVERY_MS);
+      check.unref?.();
+      this.timers.push(check);
+    }
     if (this.opts.watch !== false) {
       this.stopWatch = watchConfig(this.opts.home, (text) => this.onConfigFile(text));
       const expiry = setInterval(() => this.expireRequests(), 60_000);
@@ -724,6 +769,7 @@ export class RunnerDaemon implements RequestObserver {
     const nextPause = pauseOf(next, this.now());
     if (!initial && JSON.stringify(prev?.paused ?? null) !== JSON.stringify(next?.paused ?? null)) {
       this.send({ type: "runner.state", paused: nextPause });
+      if (nextPause.paused) for (const u of readAgentUsers(this.opts.home)) this.accountUsers?.stopScopes(u.uid);
       this.record({
         kind: "pause",
         summary: nextPause.paused
@@ -1118,6 +1164,7 @@ export class RunnerDaemon implements RequestObserver {
           : {
               prepareExisting: (existing: AgentUser[]) => prepareAgents(existing, prepare, policy, log),
             }),
+        stopAccountScopes: (uid) => this.accountUsers?.stopScopes(uid),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
         grant: (kind, accountId) => this.accounts.grant(kind, accountId),
         usage: (kind, accountId, info) =>
@@ -1529,6 +1576,9 @@ export class RunnerDaemon implements RequestObserver {
       access,
       size: machineSize(workspaceReal),
       claudeLoginMethods: this.accounts.claudeLoginMethods(),
+      ...(this.sharedLoginBlocked && this.stored?.claudeSharedLogin
+        ? { claudeLoginBlocked: this.sharedLoginBlocked }
+        : {}),
       ...(this.accounts.authEgressGroup() ? { authEgressGroup: true as const } : {}),
     };
   }
@@ -1646,6 +1696,16 @@ export class RunnerDaemon implements RequestObserver {
         if (a.account && uid) lent.set(a.account, uid);
       }
       void this.accounts.keepLent(lent).catch(() => undefined);
+      const here = new Set(list.map((a) => a.id));
+      const gone = this.agents.filter((a) => !here.has(a.id)).map((a) => a.id);
+      for (const u of readAgentUsers(this.opts.home)) {
+        if (!gone.includes(u.id)) continue;
+        try {
+          this.accountUsers?.sweepAgent(u);
+        } catch (err) {
+          this.opts.log(`${u.user}: couldn't clear it from its sign-ins (${err instanceof Error ? err.message : err})`);
+        }
+      }
     }
     // Desktops stay on, so one whose agent left (archived, moved) would hold its display and memory for good; the
     // others take their agent's current name and handle.

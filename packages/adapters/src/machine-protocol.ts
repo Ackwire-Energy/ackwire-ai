@@ -1703,6 +1703,8 @@ export interface RunnerInfo {
   size?: MachineSize;
   /** Protocol 46: the methods a new Claude sign-in for all agents can use here (`claudeLoginMethodsOf`). */
   claudeLoginMethods?: AuthMethod[];
+  /** Why this computer doesn't list `cli_login` for all agents though it was switched on (its self-check's answer). */
+  claudeLoginBlocked?: string;
   /**
    * Protocol 46 (system mode): root's Claude sign-in, status, sign-out and usage CLIs run in the `agentes-auth`
    * group, which the computer's egress rules may route apart from the rest of root.
@@ -2555,6 +2557,7 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(Array.isArray(f.claudeLoginMethods)
           ? { claudeLoginMethods: AUTH_METHODS.filter((m) => (f.claudeLoginMethods as unknown[]).includes(m)) }
           : {}),
+        ...(isString(f.claudeLoginBlocked) ? { claudeLoginBlocked: f.claudeLoginBlocked.slice(0, 300) } : {}),
         ...(f.authEgressGroup === true ? { authEgressGroup: true as const } : {}),
       };
     }

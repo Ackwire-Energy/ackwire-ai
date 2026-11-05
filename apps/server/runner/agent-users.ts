@@ -1,6 +1,8 @@
-import { appendFileSync, chmodSync, lstatSync, readFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { appendFileSync, chmodSync, lstatSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
-import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
+import { AGENT_WORKER_HOMES } from "@agenteschat/adapters/command-policy";
+import { type AgentScope, isAccountId } from "@agenteschat/adapters/machine-protocol";
 import { isAgentUid } from "./config";
 import { RunnerError } from "./errors";
 import { readJson, writeJson } from "./json-file";
@@ -9,6 +11,7 @@ import { agentId8 } from "./paths";
 import {
   AGENT_RAM_ROOT,
   AGENT_TMP_ROOT,
+  agentCategorySlice,
   agentSlice,
   agentTmp,
   type RunCommand,
@@ -16,7 +19,7 @@ import {
   scopeOomPolicy,
   systemdBooted,
 } from "./service";
-import { joinShared, SHARED_BIN_ENV, SHARED_LINK, type SharedSpec } from "./shared-folder";
+import { joinShared, SHARED_BIN_ENV, SHARED_LINK, SHARED_ROOT, type SharedSpec } from "./shared-folder";
 
 /**
  * System mode: every agent works as its own OS user, `ag-<first 8 of its id>`,
@@ -245,7 +248,8 @@ export class AgentUsers {
     if (existing && (existing.uid < first || existing.uid > last || rows.some((r) => r.uid === existing.uid))) {
       throw new RunnerError("internal", `${user} already exists on this computer with uid ${existing.uid}`);
     }
-    const uid = existing?.uid ?? freeUid(this.opts.range, new Set([...passwd, ...rows].map((r) => r.uid)));
+    const taken = [...passwd, ...rows, ...readAccountUsers(this.opts.home)];
+    const uid = existing?.uid ?? freeUid(this.opts.range, new Set(taken.map((r) => r.uid)));
     const added = { id, user, uid };
     // Listed first: a useradd that fails leaves the uid this agent's, and the next request retries it.
     writeJson(file, [...rows, added]);
@@ -361,8 +365,12 @@ export function systemLauncher(
 }
 
 /** Root executes this hook before dropping privileges. Every path component must remain root-controlled. */
-export function trustedNetworkLauncher(file: string, stat = lstatSync): string[] {
-  if (!path.isAbsolute(file) || file.includes("\0")) throw new Error("The network launcher must be an absolute path");
+export const trustedNetworkLauncher = (file: string, stat = lstatSync) =>
+  trustedRootFile(file, "network launcher", stat);
+
+/** `file` when it and every folder above it are root's alone, none of them a link. */
+export function trustedRootFile(file: string, what: string, stat = lstatSync): string[] {
+  if (!path.isAbsolute(file) || file.includes("\0")) throw new Error(`The ${what} must be an absolute path`);
   let current = path.resolve(file);
   while (true) {
     const info = stat(current);
@@ -372,7 +380,7 @@ export function trustedNetworkLauncher(file: string, stat = lstatSync): string[]
       info.isSymbolicLink() ||
       (current === path.resolve(file) ? !info.isFile() || (info.mode & 0o111) === 0 : !info.isDirectory())
     ) {
-      throw new Error("The network launcher and its parent directories must be owned and writable only by root");
+      throw new Error(`The ${what} and its parent directories must be owned and writable only by root`);
     }
     const parent = path.dirname(current);
     if (parent === current) break;
@@ -435,25 +443,375 @@ export function ensureGitCacheUser(run: RunCommand = runSync): { uid: number; gi
 export const AUTH_EGRESS_GROUP = "agentes-auth";
 const SETPRIV = "/usr/bin/setpriv";
 
-/**
- * What goes before such a child (`setpriv --regid=<gid> --clear-groups --`), the group made the first time; null
- * without `setpriv` or the group, and the child then runs as before.
- */
-export function authEgressPrefix(run: RunCommand = runSync): string[] | null {
+/** That group's id, the group made the first time; null when it can't be. */
+function authEgressGid(run: RunCommand): number | null {
   const gid = () => {
     const r = run("getent", ["group", AUTH_EGRESS_GROUP]);
     const n = Number(r.output.split(":")[2]);
     return r.code === 0 && Number.isInteger(n) && n > 0 ? n : null;
   };
+  const found = gid();
+  if (found !== null) return found;
+  run("groupadd", ["--system", AUTH_EGRESS_GROUP]);
+  return gid();
+}
+
+/**
+ * What goes before such a child (`setpriv --regid=<gid> --clear-groups --`); null without `setpriv` or the group, and
+ * the child then runs as before.
+ */
+export function authEgressPrefix(run: RunCommand = runSync): string[] | null {
   if (run(SETPRIV, ["--version"]).code !== 0) return null;
-  let found = gid();
-  if (found === null) {
-    run("groupadd", ["--system", AUTH_EGRESS_GROUP]);
-    found = gid();
-  }
+  const found = authEgressGid(run);
   return found === null ? null : [SETPRIV, `--regid=${found}`, "--clear-groups", "--"];
 }
 
 /** Lets one agent's uid into one cached repository; false without `setfacl` (the clone then goes without the cache). */
 export const grantGitCache = (dir: string, uid: number, run: RunCommand = runSync) =>
   run("setfacl", ["-m", `u:${uid}:rx`, dir]).code === 0;
+
+/**
+ * A Claude login of the CLI's own that serves several agents: one system user per sign-in, `agc-<first 8 of its id>`,
+ * is the only owner of that sign-in's `CLAUDE_CONFIG_DIR`, and every Claude CLI on it runs as that user. Its primary group is `agentes-auth`, which the computer's egress rules already route strictly and
+ * which grants no file. `<runner home>/account-users.json` lists them as `[{ id, user, uid }]`; a row outlives its
+ * user, so a uid is never given out twice.
+ */
+export const ACCOUNT_USERS_FILE = "account-users.json";
+export const ACCOUNT_STORES = "/var/lib/agentes-claude";
+/** Outside the default agent range. Its last uid is left out for the self-check's stand-in agent (`PROBE_AGENT_UID`). */
+export const ACCOUNT_UID_RANGE: [number, number] = [30000, 30998];
+export const PROBE_AGENT_UID = 30999;
+/** The `run/` and scope name of what runs for no agent: sign-in, status, usage, sign-out. */
+const PROBE_ROOM = "probe";
+const ACCOUNT_USER_NAME = /^agc-[a-z0-9]{8}$/;
+
+export interface AccountUser {
+  id: string;
+  user: string;
+  uid: number;
+  gid: number;
+}
+
+export const accountUserName = (accountId: string) => `agc-${agentId8(accountId)}`;
+
+const isAccountRow = (v: unknown): v is Omit<AccountUser, "gid"> => {
+  const r = v as Partial<AccountUser> | null;
+  return isAccountId(r?.id) && typeof r?.user === "string" && ACCOUNT_USER_NAME.test(r.user) && isAgentUid(r.uid);
+};
+
+/** The sign-ins' users, retired ones too; a row that isn't well formed is left out. */
+export function readAccountUsers(home: string): Omit<AccountUser, "gid">[] {
+  const v = readJson<unknown>(path.join(home, ACCOUNT_USERS_FILE));
+  return Array.isArray(v) ? v.filter(isAccountRow).map(({ id, user, uid }) => ({ id, user, uid })) : [];
+}
+
+/** What holds agents' data. Claude's mount view hides them all; a turn's cwd must lie under one but the stores. */
+const AGENT_DATA_ROOTS = ["/home", SHARED_ROOT, AGENT_WORKER_HOMES, GIT_CACHE_DIR];
+export const ACCOUNT_MASKED_ROOTS = [...AGENT_DATA_ROOTS, ACCOUNT_STORES];
+
+const inside = (root: string, p: string) => p.startsWith(`${root}/`);
+export const underMaskedRoot = (p: string) => ACCOUNT_MASKED_ROOTS.some((root) => inside(root, p));
+
+/**
+ * Runs as root in the CLI's new mount namespace (`$1` the sign-in, `$2` its room under `run/`, `$3` the path the CLI
+ * should see as its cwd, empty for its room). The temporary folders are new and in memory: unlike `PRIVATE_TMP`'s,
+ * nothing an agent wrote is in them. The masks hide every agent's data; the sign-in's own folders come back through a
+ * bind taken before its parent is masked. The cwd is a new path in a mask, so no link an agent planted is followed,
+ * with this room's empty folder bound on it: nothing an agent can write lies above or below the CLI.
+ * `ulimit -c 0` and not systemd-run's LimitCORE: a scope has no exec settings and refuses that property.
+ */
+const ACCOUNT_VIEW = [
+  "set -e",
+  "ulimit -c 0",
+  `v=${ACCOUNT_STORES}`,
+  'a="$v/$1"',
+  'r="$2"',
+  'c="$3"',
+  "shift 3",
+  "t=mode=1777,nosuid,nodev,size=50%,nr_inodes=1m",
+  'mount -t tmpfs -o "$t" agentes-account-tmp /tmp',
+  'mount -t tmpfs -o "$t" agentes-account-tmp /var/tmp',
+  'mount -t tmpfs -o "$t" agentes-account-tmp /dev/shm',
+  'if [ "$(stat -c %a /run/lock 2>/dev/null)" = 1777 ]; then mount -t tmpfs -o "$t" agentes-account-tmp /run/lock; fi',
+  "mkdir /tmp/.a",
+  'mount --bind "$a" /tmp/.a',
+  `for m in ${ACCOUNT_MASKED_ROOTS.join(" ")}; do`,
+  '  if [ -d "$m" ]; then mount -t tmpfs -o mode=0755,nosuid,nodev,size=1m agentes-account-view "$m"; fi',
+  "done",
+  'mkdir -p "$a/config" "$a/run/$r"',
+  'mount --bind /tmp/.a/config "$a/config"',
+  'mount --bind "/tmp/.a/run/$r" "$a/run/$r"',
+  'if [ -n "$c" ]; then',
+  '  mkdir -p "$c"',
+  '  mount --bind "/tmp/.a/cwd/$r" "$c"',
+  "else",
+  '  c="$a/run/$r"',
+  "fi",
+  "umount /tmp/.a",
+  "rmdir /tmp/.a",
+  'cd "$c"',
+  'exec "$@"',
+].join("\n");
+
+/**
+ * A turn's cwd when root may build it: a plain absolute path under the agent's home or one of its grants, inside a
+ * mask. The worker resolved it as the agent, so this is a check of what came from the agent's side.
+ */
+export function accountCwd(cwd: string, agent: AgentUser, grants: readonly string[] = []): string {
+  const allowed = [agentHome(agent.user), ...grants].some((root) => cwd === root || inside(root, cwd));
+  if (
+    !path.isAbsolute(cwd) ||
+    path.normalize(cwd) !== cwd ||
+    cwd.endsWith("/") ||
+    cwd.includes("\0") ||
+    !allowed ||
+    !AGENT_DATA_ROOTS.some((root) => inside(root, cwd))
+  ) {
+    throw new RunnerError("not_allowed", "That folder can't be used with this sign-in");
+  }
+  return cwd;
+}
+
+const accountScope = (room: string | number) => `agentes-account-${room}`;
+
+/**
+ * Runs a command as the sign-in's user in its mount view (`ACCOUNT_VIEW`). With an agent: in that agent's cli slice and
+ * network, at `cwd`. Without one (sign-in, status, usage, sign-out): on the computer's own network, where the group
+ * routes it, in the sign-in's probe room. A named scope, so `stopAccountScopes` finds these and leaves the agent's own
+ * processes in the slice alone. Every step execs the next, so the process spawned is the CLI itself and root's
+ * signals reach it. `home` is `run/<room>`: a folder that exists outside the view too, for spawn's cwd.
+ */
+export function accountLauncher(
+  account: AccountUser,
+  agent: AgentUser | null,
+  cwd: string | null = null,
+  grants: readonly string[] = [],
+): Launcher {
+  const room = agent ? String(agent.uid) : PROBE_ROOM;
+  const stand = agent ? accountCwd(cwd ?? "", agent, grants) : "";
+  const store = path.join(ACCOUNT_STORES, account.id);
+  const run = path.join(store, "run", room);
+  return {
+    prefix: [
+      "/usr/bin/systemd-run",
+      "--quiet",
+      "--scope",
+      "--collect",
+      `--unit=${accountScope(room)}-${randomBytes(4).toString("hex")}`,
+      ...(agent ? [`--slice=${agentCategorySlice(agent.uid, "cli")}`] : []),
+      "--",
+      "/usr/bin/unshare",
+      "--mount",
+      "--propagation",
+      "slave",
+      "--",
+      "/bin/sh",
+      "-c",
+      ACCOUNT_VIEW,
+      "sh",
+      account.id,
+      room,
+      stand,
+      ...(agent ? networkPrefix(agent) : []),
+      SETPRIV,
+      "--no-new-privs",
+      "--bounding-set=-net_admin,-net_raw",
+      "--",
+      SETPRIV,
+      `--reuid=${account.uid}`,
+      `--regid=${account.gid}`,
+      "--clear-groups",
+      "--",
+    ],
+    env: {
+      HOME: path.join(run, "home"),
+      USER: account.user,
+      LOGNAME: account.user,
+      SHELL: AGENT_SHELL,
+      PATH: AGENT_PATH,
+      LANG: "C.UTF-8",
+      TMPDIR: "/tmp",
+      CLAUDE_CONFIG_DIR: path.join(store, "config"),
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
+      DISABLE_AUTOUPDATER: "1",
+    },
+    home: run,
+  };
+}
+
+export class AccountUsers {
+  private readonly ready = new Map<string, AccountUser>();
+  /** Rooms already made by this process, as `<account>/<room>`. */
+  private readonly rooms = new Set<string>();
+
+  constructor(
+    private readonly opts: {
+      home: string;
+      /** Tests: `ACCOUNT_STORES`. */
+      root?: string;
+      run?: RunCommand;
+      etc?: string;
+      log?: (line: string) => void;
+    },
+  ) {}
+
+  private store(id: string) {
+    return path.join(this.opts.root ?? ACCOUNT_STORES, id);
+  }
+
+  /** The sign-in's user and folders, made the first time; a user an older runner left behind is taken back. */
+  ensure(id: string): AccountUser {
+    const known = this.ready.get(id);
+    if (known) return known;
+    if (!isAccountId(id)) throw new RunnerError("bad_request", "Invalid account id");
+    const passwd = parsePasswd(this.run("getent", ["passwd"]));
+    const row = this.listed(id, accountUserName(id), passwd);
+    const gid = authEgressGid(this.opts.run ?? runSync);
+    if (gid === null) throw new RunnerError("internal", `The group ${AUTH_EGRESS_GROUP} couldn't be made here`);
+    const entry = passwd.find((e) => e.name === row.user);
+    if (!entry) {
+      this.run("useradd", [
+        "--system",
+        "--uid",
+        String(row.uid),
+        "--gid",
+        AUTH_EGRESS_GROUP,
+        "--no-create-home",
+        "--home-dir",
+        this.store(id),
+        "--shell",
+        "/usr/sbin/nologin",
+        row.user,
+      ]);
+    } else if (entry.uid !== row.uid) {
+      throw new RunnerError(
+        "internal",
+        `${row.user} has uid ${entry.uid} on this computer, not ${row.uid} as ${ACCOUNT_USERS_FILE} says`,
+      );
+    }
+    denySchedulers(row.user, this.opts.etc);
+    const user = { ...row, gid };
+    const store = this.store(id);
+    // Each parent is root's, so the sign-in's user can't swap what `install` works on.
+    for (const dir of [path.dirname(store), store, `${store}/run`, `${store}/cwd`]) this.folder(dir, "0711");
+    this.folder(`${store}/config`, "0700", user);
+    this.ready.set(id, user);
+    return user;
+  }
+
+  /**
+   * `run/<room>` (and for an agent `cwd/<room>`). Root writes what is in `run/`; the sign-in's user reads it through an
+   * ACL, since its only group is the one all sign-ins share. Its HOME there is its own and stays empty of anything root
+   * or an agent wrote.
+   */
+  room(user: AccountUser, room: number | "probe") {
+    const key = `${user.id}/${room}`;
+    if (this.rooms.has(key)) return;
+    const store = this.store(user.id);
+    const dir = `${store}/run/${room}`;
+    this.folder(dir, "0750");
+    this.run("setfacl", ["-m", `u:${user.uid}:rx,d:u:${user.uid}:rx`, dir]);
+    this.folder(`${dir}/home`, "0700", user);
+    if (room !== PROBE_ROOM) this.folder(`${store}/cwd/${room}`, "0700", user);
+    this.rooms.add(key);
+  }
+
+  /** How root runs what serves no agent on this sign-in (`accountLauncher`), its user and room made first. */
+  launcher(id: string): Launcher {
+    const user = this.ensure(id);
+    this.room(user, PROBE_ROOM);
+    return accountLauncher(user, null);
+  }
+
+  /** The sign-in is gone: its processes, its store and its user. Its row stays, so its uid is never used again. */
+  remove(id: string) {
+    const row = readAccountUsers(this.opts.home).find((r) => r.id === id);
+    if (row) this.kill(row.uid);
+    rmSync(this.store(id), { recursive: true, force: true });
+    if (row) {
+      // 6: no such user. Forced: a process killed just now may not be gone yet.
+      const r = (this.opts.run ?? runSync)("userdel", ["--force", row.user]);
+      if (r.code !== 0 && r.code !== 6) this.opts.log?.(`userdel ${row.user} failed (${r.code}): ${r.output}`);
+    }
+    this.ready.delete(id);
+    for (const key of this.rooms) if (key.startsWith(`${id}/`)) this.rooms.delete(key);
+  }
+
+  /** The runner just started: no CLI of a sign-in survives it, and turns resume from their sessions. */
+  sweep() {
+    for (const { uid } of readAccountUsers(this.opts.home)) this.kill(uid);
+  }
+
+  /** The agent's CLIs on every sign-in stop (`stopAccountScopes`); nothing runs where there are no sign-ins. */
+  stopScopes(uid: number) {
+    if (readAccountUsers(this.opts.home).length > 0) stopAccountScopes(uid, this.opts.run);
+  }
+
+  /**
+   * The agent left this computer: what every sign-in holds for it goes. Its transcripts are the `projects/` folders
+   * named after a path with its user in it; one on a path it shared stays. Only root and the sign-in's user write
+   * in these folders, and `rmSync` follows no link.
+   */
+  sweepAgent(agent: Pick<AgentUser, "user" | "uid">) {
+    this.stopScopes(agent.uid);
+    const slug = new RegExp(`(^|-)${agent.user}(-|$)`);
+    for (const { id } of readAccountUsers(this.opts.home)) {
+      const store = this.store(id);
+      const projects = path.join(store, "config", "projects");
+      let names: string[] = [];
+      try {
+        names = readdirSync(projects);
+      } catch {
+        // no transcripts here
+      }
+      const gone = [`${store}/cwd/${agent.uid}`, `${store}/run/${agent.uid}`];
+      gone.push(...names.filter((n) => slug.test(n)).map((n) => path.join(projects, n)));
+      for (const dir of gone) rmSync(dir, { recursive: true, force: true });
+      this.rooms.delete(`${id}/${agent.uid}`);
+    }
+  }
+
+  private kill(uid: number) {
+    (this.opts.run ?? runSync)("pkill", ["-KILL", "-U", String(uid)]);
+  }
+
+  private folder(dir: string, mode: string, owner?: AccountUser) {
+    const [uid, gid] = owner ? [owner.uid, owner.gid] : [0, 0];
+    this.run("install", ["-d", "-m", mode, "-o", String(uid), "-g", String(gid), dir]);
+  }
+
+  private listed(id: string, user: string, passwd: PasswdEntry[]) {
+    const file = path.join(this.opts.home, ACCOUNT_USERS_FILE);
+    const rows = readAccountUsers(this.opts.home);
+    const row = rows.find((r) => r.id === id);
+    if (row) return row;
+    if (rows.some((r) => r.user === user)) {
+      throw new RunnerError("internal", `Another sign-in on this computer already has the user ${user}`);
+    }
+    const [first, last] = ACCOUNT_UID_RANGE;
+    const existing = passwd.find((e) => e.name === user);
+    if (existing && (existing.uid < first || existing.uid > last || rows.some((r) => r.uid === existing.uid))) {
+      throw new RunnerError("internal", `${user} already exists on this computer with uid ${existing.uid}`);
+    }
+    const taken = [...passwd, ...rows, ...readAgentUsers(this.opts.home)];
+    const uid = existing?.uid ?? freeUid(ACCOUNT_UID_RANGE, new Set(taken.map((r) => r.uid)));
+    const added = { id, user, uid };
+    // Listed first: a useradd that fails leaves the uid this sign-in's, and the next request retries it.
+    writeJson(file, [...rows, added]);
+    return added;
+  }
+
+  private run(file: string, args: string[]): string {
+    const r = (this.opts.run ?? runSync)(file, args);
+    if (r.code !== 0) throw new RunnerError("internal", `${file} failed (${r.code}): ${r.output.slice(0, 500)}`);
+    return r.output;
+  }
+}
+
+/**
+ * Stops the CLIs root launched for this agent (`accountLauncher`). They run as a sign-in's user, so nothing that stops
+ * an agent by its uid reaches them.
+ */
+export function stopAccountScopes(uid: number, run: RunCommand = runSync) {
+  run("systemctl", ["stop", "--no-block", `${accountScope(uid)}-*.scope`]);
+}

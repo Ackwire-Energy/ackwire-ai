@@ -1,16 +1,24 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { writeAgents } from "../../runner/access";
+import { accountSelfCheck, type SelfCheck } from "../../runner/account-check";
 import {
+  ACCOUNT_USERS_FILE,
+  AccountUsers,
   AGENT_USERS_FILE,
   AgentUsers,
+  accountCwd,
+  accountLauncher,
   adbServerPort,
   agentGid,
   agentUserName,
   authEgressPrefix,
   denySchedulers,
+  readAccountUsers,
   readAgentUsers,
+  stopAccountScopes,
   systemLauncher,
   trustedNetworkLauncher,
 } from "../../runner/agent-users";
@@ -475,3 +483,460 @@ test("a configured routing mark drops network capabilities even without a namesp
   expect(scoped.indexOf("/usr/bin/setpriv")).toBeLessThan(scoped.indexOf("/usr/sbin/runuser"));
   expect(systemLauncher({ ...user, networkMark: undefined }, false).prefix[0]).toBe("/usr/sbin/runuser");
 });
+
+// ── A Claude login for several agents: the sign-in's own user ────────────────
+
+const ADA_LOGIN = "0193aaaa-0000-7000-8000-000000000001";
+const LIA_LOGIN = "0193bbbb-0000-7000-8000-000000000002";
+const AUTH_GID = 997;
+
+function accountSetup(users?: OsUser[]) {
+  const home = tempDir("account-users-");
+  dirs.push(home);
+  const root = path.join(home, "stores");
+  const os = fakeOs(users);
+  const run: RunCommand = (file, args) =>
+    file === "getent" && args[0] === "group" ? { code: 0, output: `agentes-auth:x:${AUTH_GID}:` } : os.run(file, args);
+  return { home, root, os, accounts: new AccountUsers({ home, root, run, etc: home }) };
+}
+
+test("a sign-in's user: outside the agents' range, the auth group only, no shell, listed, and no cron or at", () => {
+  const { home, root, os, accounts } = accountSetup([
+    { name: "root", uid: 0, comment: "root" },
+    { name: "someone", uid: 30000, comment: "" },
+  ]);
+  // A uid an agent has, or one a removed sign-in had, is never handed out.
+  writeFileSync(path.join(home, AGENT_USERS_FILE), JSON.stringify([{ id: "x", user: "ag-xxxxxxxx", uid: 30001 }]));
+  writeFileSync(
+    path.join(home, ACCOUNT_USERS_FILE),
+    JSON.stringify([{ id: LIA_LOGIN, user: "agc-0193bbbb", uid: 30002 }]),
+  );
+
+  const user = accounts.ensure(ADA_LOGIN);
+  expect(user).toEqual({ id: ADA_LOGIN, user: "agc-0193aaaa", uid: 30003, gid: AUTH_GID });
+  const store = path.join(root, ADA_LOGIN);
+  expect(os.calls).toEqual([
+    "getent passwd",
+    `useradd --system --uid 30003 --gid agentes-auth --no-create-home --home-dir ${store} --shell /usr/sbin/nologin agc-0193aaaa`,
+    `install -d -m 0711 -o 0 -g 0 ${root}`,
+    `install -d -m 0711 -o 0 -g 0 ${store}`,
+    `install -d -m 0711 -o 0 -g 0 ${store}/run`,
+    `install -d -m 0711 -o 0 -g 0 ${store}/cwd`,
+    `install -d -m 0700 -o 30003 -g ${AUTH_GID} ${store}/config`,
+  ]);
+  expect(readFileSync(path.join(home, "cron.deny"), "utf8")).toBe("agc-0193aaaa\n");
+  expect(readAccountUsers(home).map((r) => r.uid)).toEqual([30002, 30003]);
+
+  const made = os.calls.length;
+  expect(accounts.ensure(ADA_LOGIN)).toEqual(user);
+  expect(os.calls).toHaveLength(made);
+});
+
+test("a sign-in's user: an older runner's is taken back, anything else with its name is refused", async () => {
+  const left = accountSetup([{ name: "agc-0193aaaa", uid: 30007, comment: "" }]);
+  expect(left.accounts.ensure(ADA_LOGIN).uid).toBe(30007);
+  expect(left.os.calls.join("\n")).not.toContain("useradd");
+
+  const other = accountSetup([{ name: "agc-0193aaaa", uid: 1000, comment: "" }]);
+  expect(await errorCode(() => other.accounts.ensure(ADA_LOGIN))).toBe("internal");
+  expect(await errorCode(() => other.accounts.ensure("../../etc"))).toBe("bad_request");
+});
+
+test("agents never get the uid of a sign-in that is gone", () => {
+  const { home, os } = setup();
+  writeFileSync(
+    path.join(home, ACCOUNT_USERS_FILE),
+    JSON.stringify([{ id: ADA_LOGIN, user: "agc-0193aaaa", uid: 21000 }]),
+  );
+  const users = new AgentUsers({ home, range: RANGE, run: os.run, etc: home });
+  expect(users.ensure(ANA).uid).toBe(21001);
+});
+
+test("a room: root writes, the sign-in's user only reads through an ACL (its group is every sign-in's), once", () => {
+  const { root, os, accounts } = accountSetup();
+  const user = accounts.ensure(ADA_LOGIN);
+  os.calls.length = 0;
+  accounts.room(user, 21000);
+  accounts.room(user, 21000);
+  const store = path.join(root, ADA_LOGIN);
+  expect(os.calls).toEqual([
+    `install -d -m 0750 -o 0 -g 0 ${store}/run/21000`,
+    `setfacl -m u:30000:rx,d:u:30000:rx ${store}/run/21000`,
+    `install -d -m 0700 -o 30000 -g ${AUTH_GID} ${store}/run/21000/home`,
+    `install -d -m 0700 -o 30000 -g ${AUTH_GID} ${store}/cwd/21000`,
+  ]);
+});
+
+const AGC = { id: ADA_LOGIN, user: "agc-0193aaaa", uid: 30000, gid: AUTH_GID };
+const AGENT = { id: ANA.id, user: "ag-a1b2c3d4", uid: 21000 };
+const CWD = "/home/ag-a1b2c3d4/ana-a1b2c3d4";
+
+test("the account launcher: the agent's cli slice, the view, its network hook, then the sign-in's user", () => {
+  const { prefix, env, home } = accountLauncher(AGC, { ...AGENT, networkLauncher: "/usr/bin/true" }, CWD);
+  const c = prefix.indexOf("-c");
+  const unit = prefix[4] as string;
+  expect(unit).toMatch(/^--unit=agentes-account-21000-[0-9a-f]{8}$/);
+  expect(prefix.slice(0, c + 1).filter((a) => a !== unit)).toEqual([
+    "/usr/bin/systemd-run",
+    "--quiet",
+    "--scope",
+    "--collect",
+    `--slice=${agentCategorySlice(21000, "cli")}`,
+    "--",
+    "/usr/bin/unshare",
+    "--mount",
+    "--propagation",
+    "slave",
+    "--",
+    "/bin/sh",
+    "-c",
+  ]);
+  expect(prefix.slice(c + 2)).toEqual([
+    "sh",
+    ADA_LOGIN,
+    "21000",
+    CWD,
+    "/usr/bin/true",
+    "21000",
+    "--",
+    "/usr/bin/setpriv",
+    "--no-new-privs",
+    "--bounding-set=-net_admin,-net_raw",
+    "--",
+    "/usr/bin/setpriv",
+    "--reuid=30000",
+    `--regid=${AUTH_GID}`,
+    "--clear-groups",
+    "--",
+  ]);
+  // A scope has no exec settings: systemd-run would refuse the property and no CLI would ever start.
+  expect(prefix.join(" ")).not.toContain("LimitCORE");
+  expect(prefix[c + 1]).toContain("ulimit -c 0");
+  const store = `/var/lib/agentes-claude/${ADA_LOGIN}`;
+  expect(home).toBe(`${store}/run/21000`);
+  expect(env).toEqual({
+    HOME: `${store}/run/21000/home`,
+    USER: "agc-0193aaaa",
+    LOGNAME: "agc-0193aaaa",
+    SHELL: "/bin/bash",
+    PATH: "/usr/local/bin:/usr/bin:/bin",
+    LANG: "C.UTF-8",
+    TMPDIR: "/tmp",
+    CLAUDE_CONFIG_DIR: `${store}/config`,
+    CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
+    DISABLE_AUTOUPDATER: "1",
+  });
+});
+
+test("the account launcher for no agent: its own probe room, no slice, no network hook, no cwd of an agent", () => {
+  const { prefix, home } = accountLauncher(AGC, null);
+  expect(prefix.join(" ")).not.toContain("--slice");
+  expect(prefix[4]).toMatch(/^--unit=agentes-account-probe-/);
+  expect(prefix.slice(prefix.indexOf("sh"), prefix.indexOf("sh") + 4)).toEqual(["sh", ADA_LOGIN, "probe", ""]);
+  expect(home).toEndWith("/run/probe");
+});
+
+test("root builds a cwd only inside what it masks, under the agent's home or a grant, as a plain path", async () => {
+  expect(accountCwd(CWD, AGENT)).toBe(CWD);
+  expect(accountCwd("/srv/agentes/shared/app", AGENT, ["/srv/agentes/shared"])).toBe("/srv/agentes/shared/app");
+  for (const bad of [
+    "relative/path",
+    "/home/ag-a1b2c3d4/../ag-b2c3d4e5",
+    "/home/ag-a1b2c3d4/a/",
+    "/home/ag-b2c3d4e5/theirs",
+    "/srv/agentes/shared/app",
+    "/var/lib/agentes-claude/x",
+    "",
+  ]) {
+    expect(await errorCode(() => accountCwd(bad, AGENT))).toBe("not_allowed");
+  }
+  // A grant outside the masks would have root mkdir and mount on the real path.
+  expect(await errorCode(() => accountCwd("/opt/app", AGENT, ["/opt"]))).toBe("not_allowed");
+  expect(await errorCode(() => accountLauncher(AGC, AGENT, "/etc"))).toBe("not_allowed");
+});
+
+test.if(process.platform !== "win32")(
+  "the view: staged before the masks, every agent root masked, only this sign-in's folders back, the cwd last",
+  () => {
+    const { prefix } = accountLauncher(AGC, AGENT, CWD);
+    const script = prefix[prefix.indexOf("-c") + 1] as string;
+    const stubs = [
+      'say() { echo "$*"; }',
+      'mount() { say mount "$@"; }',
+      'umount() { say umount "$@"; }',
+      'mkdir() { say mkdir "$@"; }',
+      'rmdir() { say rmdir "$@"; }',
+      'cd() { say cd "$@"; }',
+      "stat() { echo 1777; }",
+      // Every root exists, as on a real computer.
+      "test() { return 0; }",
+    ].join("\n");
+    const body = script.replace('[ -d "$m" ]', "test");
+    const r = spawnSync("/bin/sh", ["-c", `${stubs}\n${body}`, "sh", ADA_LOGIN, "21000", CWD, "/bin/echo", "ran"], {
+      encoding: "utf8",
+    });
+    expect(r.status).toBe(0);
+    const a = `/var/lib/agentes-claude/${ADA_LOGIN}`;
+    const tmp = (at: string) =>
+      `mount -t tmpfs -o mode=1777,nosuid,nodev,size=50%,nr_inodes=1m agentes-account-tmp ${at}`;
+    const mask = (at: string) => `mount -t tmpfs -o mode=0755,nosuid,nodev,size=1m agentes-account-view ${at}`;
+    expect(r.stdout.trim().split("\n")).toEqual([
+      tmp("/tmp"),
+      tmp("/var/tmp"),
+      tmp("/dev/shm"),
+      tmp("/run/lock"),
+      "mkdir /tmp/.a",
+      `mount --bind ${a} /tmp/.a`,
+      mask("/home"),
+      mask("/srv/agentes"),
+      mask("/var/lib/agentes-runner-agents"),
+      mask("/var/cache/agentes-git"),
+      mask("/var/lib/agentes-claude"),
+      `mkdir -p ${a}/config ${a}/run/21000`,
+      `mount --bind /tmp/.a/config ${a}/config`,
+      `mount --bind /tmp/.a/run/21000 ${a}/run/21000`,
+      `mkdir -p ${CWD}`,
+      `mount --bind /tmp/.a/cwd/21000 ${CWD}`,
+      "umount /tmp/.a",
+      "rmdir /tmp/.a",
+      `cd ${CWD}`,
+      "ran",
+    ]);
+  },
+);
+
+test("removing a sign-in: its processes, store and user go, its uid stays taken", () => {
+  const { home, root, os, accounts } = accountSetup();
+  const { uid } = accounts.ensure(ADA_LOGIN);
+  const store = path.join(root, ADA_LOGIN);
+  mkdirSync(path.join(store, "config"), { recursive: true });
+  os.calls.length = 0;
+  accounts.remove(ADA_LOGIN);
+  expect(os.calls).toEqual([`pkill -KILL -U ${uid}`, "userdel --force agc-0193aaaa"]);
+  expect(existsSync(store)).toBe(false);
+  expect(readAccountUsers(home).map((r) => r.uid)).toEqual([uid]);
+  // The fake keeps the name in passwd: the row alone says which uid is this sign-in's.
+  expect(accounts.ensure(ADA_LOGIN).uid).toBe(uid);
+  expect(accounts.ensure(LIA_LOGIN).uid).toBe(uid + 1);
+});
+
+test("the runner's start ends what its sign-ins' users left running; scopes stop only where there are sign-ins", () => {
+  const { os, accounts } = accountSetup();
+  accounts.sweep();
+  accounts.stopScopes(21000);
+  expect(os.calls).toEqual([]);
+  const a = accounts.ensure(ADA_LOGIN);
+  const b = accounts.ensure(LIA_LOGIN);
+  os.calls.length = 0;
+  accounts.sweep();
+  accounts.stopScopes(21000);
+  expect(os.calls).toEqual([
+    `pkill -KILL -U ${a.uid}`,
+    `pkill -KILL -U ${b.uid}`,
+    "systemctl stop --no-block agentes-account-21000-*.scope",
+  ]);
+  const calls: string[] = [];
+  stopAccountScopes(21001, (file, args) => {
+    calls.push([file, ...args].join(" "));
+    return { code: 0, output: "" };
+  });
+  expect(calls).toEqual(["systemctl stop --no-block agentes-account-21001-*.scope"]);
+});
+
+test("an agent that left: its rooms and transcripts go from every sign-in, a shared path's stay", () => {
+  const { root, accounts } = accountSetup();
+  const stores = [ADA_LOGIN, LIA_LOGIN].map((id) => {
+    accounts.ensure(id);
+    return path.join(root, id);
+  });
+  const projects = [
+    "-home-ag-a1b2c3d4",
+    "-home-ag-a1b2c3d4-ana-a1b2c3d4",
+    "-var-lib-agentes-runner-agents-ag-a1b2c3d4",
+    "-home-ag-b2c3d4e5-bia-b2c3d4e5",
+    "-home-ag-a1b2c3d4x",
+    "-srv-agentes-shared-app",
+  ];
+  for (const store of stores) {
+    for (const dir of ["cwd/21000", "run/21000/1", "cwd/21001", ...projects.map((p) => `config/projects/${p}`)]) {
+      mkdirSync(path.join(store, dir), { recursive: true });
+    }
+  }
+  accounts.sweepAgent(AGENT);
+  for (const store of stores) {
+    expect(existsSync(path.join(store, "cwd/21000"))).toBe(false);
+    expect(existsSync(path.join(store, "run/21000"))).toBe(false);
+    expect(existsSync(path.join(store, "cwd/21001"))).toBe(true);
+    expect(projects.filter((p) => existsSync(path.join(store, "config/projects", p)))).toEqual([
+      "-home-ag-b2c3d4e5-bia-b2c3d4e5",
+      "-home-ag-a1b2c3d4x",
+      "-srv-agentes-shared-app",
+    ]);
+  }
+});
+
+// ── The self-check ────────────────────────────────────────────────────────────
+
+const FAKE_CLAUDE = path.join(import.meta.dir, "fake-claude.mjs");
+const SWITCH = { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "A" as const };
+const rootOwned = (() => ({
+  uid: 0,
+  mode: 0o755,
+  isSymbolicLink: () => false,
+  isFile: () => true,
+  isDirectory: () => true,
+})) as unknown as NonNullable<SelfCheck["stat"]>;
+
+function selfCheck(over: Partial<SelfCheck> = {}, os: Partial<Record<string, { code: number; output: string }>> = {}) {
+  const home = tempDir("account-check-");
+  dirs.push(home);
+  const launched: (string | null | undefined)[] = [];
+  const calls: string[] = [];
+  const run: RunCommand = (file, args) => {
+    calls.push([file, ...args].join(" "));
+    if (args.includes("--version")) return os.version ?? { code: 0, output: "2.1.310 (Claude Code)" };
+    if (file === "pgrep") return os.pgrep ?? { code: 0, output: "4242" };
+    if (file === "/usr/bin/setpriv") return os.setpriv ?? { code: 0, output: "" };
+    if (file === "nft") return os.nft ?? { code: 0, output: '{"nftables":[{"counter":{"bytes":5}}]}' };
+    return { code: 1, output: "" };
+  };
+  const rooms: number[] = [];
+  const check: SelfCheck = {
+    config: { mode: "system", claudeSharedLogin: SWITCH, server: "https://app.example.com" },
+    users: {
+      ensure: (id) => ({ id, user: "agc-00000000", uid: 30000, gid: AUTH_GID }),
+      room: (_u, room) => void rooms.push(room as number),
+    },
+    home,
+    relay: process.execPath,
+    cli: ["/usr/bin/env", process.execPath, FAKE_CLAUDE],
+    systemd: true,
+    run,
+    stat: rootOwned,
+    launcher: (_a, agent, cwd) => {
+      launched.push(cwd);
+      return {
+        prefix: agent?.networkLauncher ? ["/usr/bin/env", "ROUTED=1"] : [],
+        env: {
+          PATH: process.env.PATH ?? "",
+          ...(process.env.FAKE_CLAUDE_EXTRA_TOOL ? { FAKE_CLAUDE_EXTRA_TOOL: process.env.FAKE_CLAUDE_EXTRA_TOOL } : {}),
+        },
+        home,
+      };
+    },
+    ...over,
+  };
+  return { check, calls, launched, rooms, home };
+}
+
+test.if(process.platform !== "win32")(
+  "the self-check passes only with every barrier tried: the CLI, its tools, and an agent's user refused",
+  async () => {
+    const { check, calls, launched, rooms } = selfCheck();
+    expect(await accountSelfCheck(check)).toBeNull();
+    expect(rooms).toEqual([30999]);
+    expect(launched).toEqual(["/home/ag-00000000/probe"]);
+    const agent = calls.find((c) => c.startsWith("/usr/bin/setpriv")) ?? "";
+    expect(agent).toContain("--reuid=30999 --regid=30999 --clear-groups --");
+    expect(agent).toEndWith(" sh /var/lib/agentes-claude/00000000-0000-4000-8000-000000000000 4242");
+  },
+);
+
+test("the self-check says why: off, no systemd, an untrusted path, a version nobody validated", async () => {
+  const off = selfCheck();
+  off.check.config = { mode: "system" };
+  expect(await accountSelfCheck(off.check)).toContain("off");
+  expect(await accountSelfCheck(selfCheck({ systemd: false }).check)).toContain("systemd");
+  const writable = (() => ({ ...(rootOwned as unknown as () => object)(), mode: 0o777 })) as unknown;
+  expect(await accountSelfCheck(selfCheck({ stat: writable as SelfCheck["stat"] }).check)).toContain("Claude CLI");
+  const old = selfCheck({}, { version: { code: 0, output: "2.1.299 (Claude Code)" } });
+  expect(await accountSelfCheck(old.check)).toContain("2.1.299");
+  const newer = selfCheck({}, { version: { code: 0, output: "2.1.321 (Claude Code)" } });
+  expect(await accountSelfCheck(newer.check)).toContain("2.1.321");
+  expect(await accountSelfCheck(selfCheck({}, { version: { code: 127, output: "" } }).check)).toContain("no version");
+});
+
+test.if(process.platform !== "win32")(
+  "the self-check fails on a built-in tool the CLI keeps, a process it can't find, or an agent that reached anything",
+  async () => {
+    process.env.FAKE_CLAUDE_EXTRA_TOOL = "Bash";
+    try {
+      expect(await accountSelfCheck(selfCheck().check)).toContain("Bash");
+    } finally {
+      delete process.env.FAKE_CLAUDE_EXTRA_TOOL;
+    }
+    expect(await accountSelfCheck(selfCheck({}, { pgrep: { code: 1, output: "" } }).check)).toContain("process");
+    expect(await accountSelfCheck(selfCheck({}, { setpriv: { code: 1, output: "" } }).check)).toContain("reached");
+    const dead = selfCheck({ launcher: () => ({ prefix: ["/usr/bin/false"], env: {}, home: "/" }) });
+    expect(await accountSelfCheck(dead.check)).toContain("didn't start");
+  },
+);
+
+test.if(process.platform !== "win32")(
+  "the agent's probe counts only a refusal: a path that is there, or isn't, is no pass",
+  async () => {
+    const store = tempDir("account-store-");
+    dirs.push(store);
+    mkdirSync(path.join(store, "config"));
+    let code = -1;
+    const { check } = selfCheck();
+    const real = check.run as RunCommand;
+    check.run = (file, args) => {
+      if (file !== "/usr/bin/setpriv") return real(file, args);
+      const sh = args.slice(args.indexOf("--") + 1);
+      code = spawnSync(sh[0] as string, [...sh.slice(1, -2), store, "1"]).status ?? -1;
+      return { code, output: "" };
+    };
+    expect(await accountSelfCheck(check)).toContain("reached");
+    expect(code).not.toBe(0);
+  },
+);
+
+test.if(process.platform !== "win32")(
+  "the self-check with a network hook: revision 3, a real agent's route, and no byte outside the relay",
+  async () => {
+    const network = { networkLauncher: "/usr/bin/true", networkRevision: 3 };
+    const config = { mode: "system" as const, claudeSharedLogin: SWITCH, server: "https://app.example.com" };
+    const older = selfCheck();
+    older.check.config = { ...config, ...network, networkRevision: 2 };
+    expect(await accountSelfCheck(older.check)).toContain("older");
+
+    const empty = selfCheck();
+    empty.check.config = { ...config, ...network };
+    expect(await accountSelfCheck(empty.check)).toContain("No agent");
+
+    const ran: string[][] = [];
+    const routed = selfCheck({
+      exec: async (argv) => {
+        ran.push(argv);
+        return true;
+      },
+    });
+    routed.check.config = { ...config, ...network };
+    writeFileSync(path.join(routed.home, AGENT_USERS_FILE), JSON.stringify([AGENT]));
+    expect(await accountSelfCheck(routed.check)).toBeNull();
+    expect(routed.rooms).toEqual([30999, 21000]);
+    expect(routed.launched).toEqual(["/home/ag-00000000/probe", "/home/ag-a1b2c3d4/probe"]);
+    expect(ran[0]?.slice(0, 3)).toEqual(["/usr/bin/env", "ROUTED=1", "/usr/bin/curl"]);
+    expect(ran[0]?.at(-1)).toBe("https://app.example.com/api/machines/ip");
+
+    const blocked = selfCheck({ exec: async () => false });
+    blocked.check.config = { ...config, ...network };
+    writeFileSync(path.join(blocked.home, AGENT_USERS_FILE), JSON.stringify([AGENT]));
+    expect(await accountSelfCheck(blocked.check)).toContain("no way out");
+
+    let bytes = 0;
+    const leaked = selfCheck({
+      exec: async () => {
+        bytes = 100;
+        return true;
+      },
+    });
+    const real = leaked.check.run as RunCommand;
+    leaked.check.run = (file, args) =>
+      file === "nft" ? { code: 0, output: `{"nftables":[{"counter":{"bytes":${bytes}}}]}` } : real(file, args);
+    leaked.check.config = { ...config, ...network };
+    writeFileSync(path.join(leaked.home, AGENT_USERS_FILE), JSON.stringify([AGENT]));
+    expect(await accountSelfCheck(leaked.check)).toContain("outside the relay");
+  },
+);

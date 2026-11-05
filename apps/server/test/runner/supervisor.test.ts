@@ -18,7 +18,7 @@ import { sealSecret, secretAad, vaultAad } from "@agenteschat/adapters/secret-bo
 import type { AccountManager } from "../../runner/accounts";
 import { AGENT_USERS_FILE, type AgentUser, systemLauncher } from "../../runner/agent-users";
 import { BrowserManager } from "../../runner/browser";
-import { writeConfig } from "../../runner/config";
+import { type StoredConfig, writeConfig } from "../../runner/config";
 import type { Dial, Socket, SocketHandlers } from "../../runner/connection";
 import { RunnerDaemon } from "../../runner/daemon";
 import { DesktopSessions } from "../../runner/desktop-session";
@@ -2433,6 +2433,107 @@ test.if(posix)(
     }
   },
 );
+
+test.if(posix)(
+  "a system-mode runner lists Claude's own login only once its switch is on and its self-check passed",
+  async () => {
+    const run = async (claudeSharedLogin: unknown, verdict: string | null) => {
+      const home = newHome();
+      const ws = tempDir("root-ws-");
+      dirs.push(ws);
+      writeConfig(
+        {
+          server: "https://agentes.test",
+          machineId: "m1",
+          name: "box",
+          token: "agm_machine_token_never_shown_123456",
+          workspace: ws,
+          mode: "system",
+          agentUidRange: [21000, 21099],
+          ...(claudeSharedLogin ? { claudeSharedLogin } : {}),
+        } as StoredConfig,
+        home,
+      );
+      const sockets: FakeSocket[] = [];
+      let swept = 0;
+      let checks = 0;
+      const daemon = new RunnerDaemon({
+        probeEgress: async () => null,
+        home,
+        mode: "start",
+        log: () => {},
+        watch: false,
+        executors: () => ({}),
+        self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+        caffeinate: false,
+        dial: (_url, handlers) => {
+          const s = new FakeSocket(handlers);
+          sockets.push(s);
+          queueMicrotask(() => handlers.onOpen());
+          return s;
+        },
+        workers: { user: userOf, start: (user) => new FakeWorker(user) },
+        accountUsers: {
+          sweep: () => void swept++,
+          stopScopes: () => {},
+          sweepAgent: () => {},
+          launcher: () => ({ prefix: [], env: {}, home }),
+          remove: () => {},
+          ensure: () => {
+            throw new Error("no user here");
+          },
+          room: () => {},
+        },
+        selfCheck: async () => {
+          checks++;
+          return verdict;
+        },
+      });
+      daemon.start();
+      return { daemon, sockets, swept: () => swept, checks: () => checks };
+    };
+    const hellos = (sockets: FakeSocket[]) =>
+      sockets.flatMap((s) => s.of("hello")) as { claudeLoginMethods?: string[]; claudeLoginBlocked?: string }[];
+
+    const off = await run(undefined, null);
+    await waitFor(() => hellos(off.sockets).length === 1);
+    expect(off.swept()).toBe(1);
+    expect(off.checks()).toBe(0);
+    expect(hellos(off.sockets)[0]).toMatchObject({ claudeLoginMethods: ["setup_token"] });
+    expect(hellos(off.sockets)[0]).not.toHaveProperty("claudeLoginBlocked");
+    await off.daemon.stop();
+
+    const on = { minVersion: "2.1.300", maxVersion: "2.1.320", refresh: "A" };
+    const passed = await run(on, null);
+    await waitFor(
+      () => hellos(passed.sockets).at(-1)?.claudeLoginMethods?.toString() === "setup_token,cli_login",
+      8000,
+    );
+    expect(passed.daemon.accounts.claudeLoginMethods()).toEqual(["setup_token", "cli_login"]);
+    await passed.daemon.stop();
+
+    const failed = await run(on, "The Claude CLI kept a tool of its own (Bash)");
+    await waitFor(() => failed.checks() === 1 && hellos(failed.sockets).length >= 1);
+    expect(failed.daemon.accounts.claudeLoginMethods()).toEqual(["setup_token"]);
+    failed.daemon.reconnect();
+    await waitFor(() => hellos(failed.sockets).at(-1)?.claudeLoginBlocked !== undefined, 8000);
+    expect(hellos(failed.sockets).at(-1)?.claudeLoginBlocked).toContain("Bash");
+    await failed.daemon.stop();
+  },
+  20_000,
+);
+
+test("a worker that stops or retires takes what root launched for its agent on a sign-in with it", async () => {
+  const stopped: number[] = [];
+  const { sup, workers } = setup({ stopAccountScopes: (uid) => void stopped.push(uid) });
+  const pending = sup.run({ op: "exec", command: "x", agent: ANA } as never, scope().scope);
+  await waitFor(() => workers.length === 1);
+  const ana = workers[0] as FakeWorker;
+  ana.hello();
+  sup.retireNetworkAgent(ANA.id, "network changed");
+  await pending.catch(() => undefined);
+  expect(stopped).toEqual([ana.user.uid]);
+});
 
 test.if(posix)(
   "a single-user runner: Browser clicked on an agent's desktop opens that agent's own browser here, unless paused",

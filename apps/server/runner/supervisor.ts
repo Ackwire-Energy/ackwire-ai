@@ -311,6 +311,8 @@ export interface SupervisorOptions {
    * one whose folder is lent instead.
    */
   grant?: (kind: AccountKind, accountId: string) => Promise<AccountGrant | null>;
+  /** What root launched for this agent on a sign-in with its own user: no stop by uid reaches it. */
+  stopAccountScopes?: (uid: number) => void;
   /** A turn's plan usage, for its account (`AccountManager.noteRateLimit`, `noteCodexRateLimits`). */
   usage?: (kind: AccountKind, accountId: string, info: unknown) => void;
   /** A refreshed ChatGPT sign-in root keeps for all agents (`AccountManager.keepCodexAuth`). */
@@ -742,6 +744,7 @@ export class Supervisor {
     const proc = w.proc;
     w.networkRetiring = true;
     w.ready = false;
+    this.opts.stopAccountScopes?.(w.user.uid);
     this.endSession(w, why);
     this.endShows(w, why);
     for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("dropped", why));
@@ -998,6 +1001,7 @@ export class Supervisor {
     w.ready = false;
     w.browserLeaseAt = 0;
     w.browserStreaming = false;
+    this.opts.stopAccountScopes?.(w.user.uid);
     this.endSession(
       w,
       "The agent's worker on this computer stopped while this ran: it may have stopped partway or finished. Check before running it again.",
