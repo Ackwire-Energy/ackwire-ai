@@ -108,6 +108,7 @@ import {
   Tabs,
   Textarea,
   Toolbar,
+  useAutoGrow,
   zonedInstant,
 } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -1473,6 +1474,8 @@ function RoutinePrompt({ routine: r, onSaved }: { routine: Routine; onSaved: () 
   const sent = useSent<string>(r.prompt ?? "");
   const prompt = sent.pending ?? r.prompt ?? "";
   const ref = useFocusAtEnd<HTMLTextAreaElement>(draft !== null);
+  // As tall as its text where the engine can't size it from CSS (`field-sizing`, which the Mac app's WebKit lacks).
+  useAutoGrow(ref, draft ?? "", draft !== null);
   if (!r.canSeeDetails || r.prompt === null) return <p className="small muted">{t("routines.detailsHidden")}</p>;
   if (isWidgetRoutine(r))
     return (
