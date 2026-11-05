@@ -12,7 +12,8 @@
 // steering, background tasks), "ECHOKEY" answers with $ANTHROPIC_AUTH_TOKEN and "ECHOTOKEN" with
 // the OAuth token it holds (as an agent's shell could print them), "ECHOSPLIT" with that token in two
 // deltas, each 150 ms before the next line, "KEY401" is refused by the endpoint and retries for good
-// (as Claude Code 2.1.310 does, ten times with backoff). Control requests: `initialize`, and `get_usage`
+// (as Claude Code 2.1.310 does, ten times with backoff), "ASKCONTROL" asks for an elicitation on stdout and answers
+// with what it got back, "ECHOSHAPE" prints a token-shaped text in two deltas. Control requests: `initialize`, and `get_usage`
 // as $FAKE_CLAUDE_USAGE says ("" a Max plan's windows, "signed_out", "error",
 // "hang": never).
 // With `--json-schema` it is a route (`brain.route`): the prompt on stdin, one JSON result whose
@@ -138,6 +139,10 @@ if (flag("--resume") && process.env.FAKE_CLAUDE_NO_SESSION) {
   process.stderr.write(`No conversation found with session ID: ${session}\n`);
   process.exit(1);
 }
+if (flag("--session-id") && process.env.FAKE_CLAUDE_SESSION_TAKEN) {
+  process.stderr.write(`Session ID ${session} is already in use.\n`);
+  process.exit(1);
+}
 const out = (o) => process.stdout.write(`${JSON.stringify({ ...o, session_id: session })}\n`);
 // $FAKE_CLAUDE_VERSION: the version its init line says (logs only).
 const version = process.env.FAKE_CLAUDE_VERSION;
@@ -184,6 +189,7 @@ let turns = 0;
 const queue = [];
 let wake = null;
 let closed = false;
+let controlAnswer = null;
 const rl = createInterface({ input: process.stdin });
 rl.on("line", (line) => {
   let control = null;
@@ -191,6 +197,11 @@ rl.on("line", (line) => {
     control = JSON.parse(line);
   } catch {}
   if (control?.type === "control_request") return answerControl(control);
+  if (control?.type === "control_response") {
+    controlAnswer = control.response;
+    wake?.();
+    return;
+  }
   queue.push(line);
   try {
     lifecycleOf(JSON.parse(line).uuid, "queued");
@@ -307,6 +318,14 @@ async function answer(line) {
     await sleep(20);
     process.exit(3);
   }
+  if (prompt.includes("ASKCONTROL")) {
+    out({
+      type: "control_request",
+      request_id: "c1",
+      request: { subtype: "elicitation", message: "Paste your token" },
+    });
+    if (!controlAnswer) await waitForLine(3000);
+  }
   if (prompt.includes("SLOW")) await sleep(300);
   if (prompt.includes("COMPACT")) out({ type: "system", subtype: "compact_boundary", parent_tool_use_id: null });
   if (prompt.includes("RATE")) {
@@ -361,14 +380,16 @@ async function answer(line) {
       ? [`token ${heldToken} `, "printed"]
       : prompt.includes("ECHOSPLIT")
         ? [`token ${heldToken?.slice(0, half)}`, `${heldToken?.slice(half)} printed`]
-        : ["Hello ", "world"];
+        : prompt.includes("ECHOSHAPE")
+          ? ["token sk-ant-o", "at01-fakefakefake1234 printed"]
+          : ["Hello ", "world"];
   for (const text of said) {
     out({
       type: "stream_event",
       event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
       parent_tool_use_id: null,
     });
-    if (prompt.includes("ECHOSPLIT")) await sleep(150);
+    if (prompt.includes("ECHOSPLIT") || prompt.includes("ECHOSHAPE")) await sleep(150);
   }
   out({ type: "assistant", message: { content: [{ type: "text", text: "Hello world" }] }, parent_tool_use_id: null });
   if (prompt.includes("PWTOOL")) {
@@ -414,9 +435,14 @@ async function answer(line) {
     subtype: "success",
     is_error: false,
     result:
-      prompt.includes("ECHOKEY") || prompt.includes("ECHOTOKEN") || prompt.includes("ECHOSPLIT")
+      prompt.includes("ECHOKEY") ||
+      prompt.includes("ECHOTOKEN") ||
+      prompt.includes("ECHOSPLIT") ||
+      prompt.includes("ECHOSHAPE")
         ? said.join("")
-        : `echo ${turns}: ${prompt}${steered}`,
+        : prompt.includes("ASKCONTROL")
+          ? `control ${controlAnswer?.subtype}: ${controlAnswer?.error}`
+          : `echo ${turns}: ${prompt}${steered}`,
     usage: { input_tokens: 10, cache_read_input_tokens: 5, cache_creation_input_tokens: 1, output_tokens: 7 },
     modelUsage: { [flag("--model") ?? "claude-sonnet"]: { inputTokens: 10, outputTokens: 7 } },
     ...(read.length && resultUuids ? { user_message_uuid: read.at(-1), user_message_uuids: read } : {}),

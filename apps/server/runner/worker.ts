@@ -12,10 +12,11 @@ import {
   type MachineErrorCode,
   parseAccess,
   parsePause,
+  type TurnContext,
 } from "@agenteschat/adapters/machine-protocol";
 import { realFoldersFor } from "./access";
 import { agentAccountHome, grantOf, lentAccounts } from "./accounts";
-import { BrainManager } from "./brain";
+import { BrainManager, turnContext } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager, type BrowserManagerOptions, launchChrome } from "./browser";
 import type { BrowserPorts } from "./browser-ports";
@@ -133,6 +134,9 @@ export class WorkerLink {
   onReclaim: (ask: { spare?: string; peek: boolean }) => Promise<BrainReclaimed> = async () => ({ closed: false });
   /** A delegated CLI's bridge, or its end. */
   onBridge: (bridge: DelegatedBridge) => void = () => {};
+  onTurnPrepare: (ask: { agent: AgentScope; cwd?: string; text: boolean }) => Promise<TurnContext> = async () => {
+    throw new RunnerError("not_allowed", "This worker serves no turn of root's");
+  };
   onTurnCancel: (session: string) => void = () => {};
   onTurnDetach: (session: string) => void = () => {};
   /** The supervisor is gone (stdin closed). */
@@ -245,6 +249,22 @@ export class WorkerLink {
         if (bridge) this.onBridge(bridge);
         return;
       }
+      case "turn.prepare": {
+        const agent = f.agent as Partial<AgentScope> | undefined;
+        if (typeof f.prepareId !== "string" || typeof agent?.id !== "string" || typeof agent.handle !== "string")
+          return;
+        const prepareId = f.prepareId.slice(0, 64);
+        const ask = {
+          agent: agent as AgentScope,
+          ...(typeof f.cwd === "string" ? { cwd: f.cwd } : {}),
+          text: f.text === true,
+        };
+        void this.onTurnPrepare(ask).then(
+          (context) => this.write(JSON.stringify({ type: "turn.context", prepareId, ...context })),
+          (err: unknown) => this.write(JSON.stringify({ type: "turn.context", prepareId, error: toMachineError(err) })),
+        );
+        return;
+      }
       case "turn.cancel":
         if (typeof f.session === "string") this.onTurnCancel(f.session);
         return;
@@ -263,8 +283,10 @@ export class WorkerLink {
     }
   }
 
-  bridgeReady(process: string) {
-    this.write(JSON.stringify({ type: "bridge.ready", process } satisfies WorkerLinkFrame));
+  bridgeReady(process: string, error?: string) {
+    this.write(
+      JSON.stringify({ type: "bridge.ready", process, ...(error ? { error } : {}) } satisfies WorkerLinkFrame),
+    );
   }
 
   toolNotice(notice: ToolNotice) {
@@ -501,24 +523,40 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     ...(cli ? { spawn: cli } : {}),
     log,
   });
-  link.onBridge = (bridge) => {
+  const openBridge = async (bridge: DelegatedBridge) => {
     const { token } = bridge;
     if (token === null || bridge.agent.id !== o.agentId) {
       delegatedRuns.delete(bridge.process);
       return;
     }
-    void Promise.all([
+    if (bridge.socketPath) await mcp.listenForRelays(bridge.socketPath);
+    const [folder, grants, secrets] = await Promise.all([
       agentWorkspace(workspaceReal, bridge.agent),
       realFoldersFor(state.access, o.agentId),
       agentSecrets(secretsDir, bridge.agent),
-    ]).then(
-      ([folder, grants, secrets]) => {
-        const where = { folder, grants, runnerHome: home, ...(secrets ? { redact: secrets.redact } : {}) };
-        delegatedRuns.set(bridge.process, delegatedTask({ ...bridge, token }, delegated, where));
-        link.bridgeReady(bridge.process);
-      },
-      (err: unknown) => log(`delegated tools: ${err instanceof Error ? err.message : String(err)}`),
+    ]);
+    const where = { folder, grants, runnerHome: home, ...(secrets ? { redact: secrets.redact } : {}) };
+    delegatedRuns.set(bridge.process, delegatedTask({ ...bridge, token }, delegated, where));
+    link.bridgeReady(bridge.process);
+  };
+  // In order: a turn's frame must not land after the next turn's, which would leave its tools with no run.
+  let bridging: Promise<void> = Promise.resolve();
+  link.onBridge = (bridge) => {
+    bridging = bridging.then(() =>
+      openBridge(bridge).catch((err: unknown) => {
+        const said = err instanceof Error ? err.message : String(err);
+        log(`delegated tools: ${said}`);
+        link.bridgeReady(bridge.process, said);
+      }),
     );
+  };
+  link.onTurnPrepare = async ({ agent, cwd, text }) => {
+    if (agent.id !== o.agentId) throw new RunnerError("not_allowed", "This worker serves another agent");
+    const [folder, grants] = await Promise.all([
+      agentWorkspace(workspaceReal, agent),
+      realFoldersFor(state.access, o.agentId),
+    ]);
+    return turnContext({ folder, grants, ...(cwd ? { cwd } : {}), text });
   };
   link.onTurnCancel = (session) => delegated.cancel(session);
   link.onTurnDetach = (session) => delegated.detach(session);

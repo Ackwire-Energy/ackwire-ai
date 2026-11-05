@@ -13,6 +13,8 @@ export interface ClaudeSharedLogin {
   minVersion: string;
   maxVersion: string;
   refresh: "A" | "B";
+  /** `B`: the name in the CLI's config folder that says a refresh is under way, as validation found it. */
+  refreshLock?: string;
 }
 
 /** What `pair` writes and `start` reads (`~/.agentes-runner/config.json`, mode 600). */
@@ -157,10 +159,13 @@ function parsePaused(v: unknown): RunnerConfig["paused"] {
 }
 
 function parseClaudeSharedLogin(v: unknown): ClaudeSharedLogin | undefined {
-  const { minVersion, maxVersion, refresh } = (v ?? {}) as Partial<Record<keyof ClaudeSharedLogin, unknown>>;
+  const { minVersion, maxVersion, refresh, refreshLock } = (v ?? {}) as Partial<
+    Record<keyof ClaudeSharedLogin, unknown>
+  >;
   const version = (s: unknown): s is string => typeof s === "string" && /^\d+\.\d+\.\d+$/.test(s);
   if (!version(minVersion) || !version(maxVersion) || (refresh !== "A" && refresh !== "B")) return undefined;
-  return { minVersion, maxVersion, refresh };
+  const lock = typeof refreshLock === "string" && /^[\w.-]{1,64}$/.test(refreshLock) ? { refreshLock } : {};
+  return { minVersion, maxVersion, refresh, ...lock };
 }
 
 /** The file's fields, checked one by one (unknown or malformed ones are dropped). Null when there is no file. */

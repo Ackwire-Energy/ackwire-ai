@@ -20,6 +20,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import { redactSecrets } from "@agenteschat/adapters/secret-box";
 import { realFoldersFor } from "./access";
+import type { AccountBrains } from "./account-brains";
 import type { AccountFolders, AccountGrant, AccountManager } from "./accounts";
 import { type BrainManager, brainKey } from "./brain";
 import { type AntigravityBrainTurnRequest, handleAntigravityBrainTurn } from "./brain-antigravity";
@@ -189,6 +190,8 @@ export interface HandlerContext {
   cacheFill?: CacheFill;
   /** Brain turns (protocol 8); without it the runner refuses `brain.turn`. */
   brains?: BrainManager;
+  /** System mode: the turns of Claude sign-ins several agents share, which never reach a worker. */
+  accountBrains?: AccountBrains;
   /**
    * A brain turn found no room: closes one idle warm CLI on this computer (any agent's in system mode), least
    * recently used first, `spare` (the waiting turn's own session, `brainKey`) last, never one mid-turn or
@@ -513,6 +516,12 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
     }
     // An op this runner doesn't know (`OP_ROUTES` has no row) goes nowhere.
     if (OP_ROUTES[req.op] !== "agent") throw new RunnerError("bad_request", `Unknown op ${String(req.op)}`);
+    const hosted = ctx.accountBrains;
+    if (hosted?.takes(req)) return doHostedTurn(ctx, hosted, req, scope);
+    if (req.op === "brain.steer" && hosted?.brains.hosts(String(req.runId))) {
+      return doBrainSteer({ ...ctx, brains: hosted.brains }, req);
+    }
+    hosted?.refusesHere(req);
     const out = await ctx.workers.run(req, scope);
     // The account's folder is root's to mark: what the worker's turn found out is told here.
     if (req.op === "brain.turn") signedOut(ctx, req, (out as Partial<MachineReplies["brain.turn"]> | null)?.final);
@@ -984,6 +993,24 @@ async function doBrainTurn(
     ...(ctx.grants && !chat ? { grants: ctx.grants } : {}),
     ...(ctx.grant ? { grant: ctx.grant } : {}),
   });
+  signedOut(ctx, req, final);
+  scope.emit?.({ type: "brain.done", runId });
+  return { runId, final };
+}
+
+/** `brain.turn` on a Claude sign-in several agents share: root runs its CLI (`account-brains.ts`). */
+async function doHostedTurn(
+  ctx: HandlerContext,
+  hosted: AccountBrains,
+  req: Extract<MachineRequest, { op: "brain.turn" }>,
+  scope: RequestScope,
+): Promise<MachineReplies["brain.turn"]> {
+  requireTool(ctx, "claude");
+  if (!req.agent) throw new RunnerError("bad_request", "A brain turn belongs to an agent");
+  const runId = requireString(req.runId, "runId");
+  const final = await hosted.turn(req, req.agent, scope, (event) =>
+    scope.emit?.({ type: "brain.event", runId, event }),
+  );
   signedOut(ctx, req, final);
   scope.emit?.({ type: "brain.done", runId });
   return { runId, final };

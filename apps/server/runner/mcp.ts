@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { EventEmitter } from "node:events";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { createConnection, createServer, type Server, type Socket } from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -242,6 +242,9 @@ export const MCP_CUT_OFF =
  */
 export class McpBridge {
   private server: Server | null = null;
+  private relays: { path: string; server: Server } | null = null;
+  /** The relays' connections, which stay open: closing a server waits for them. */
+  private readonly sessions = new Set<Socket>();
   private send: ((frame: RunnerFrame) => void) | null = null;
   private readonly pending = new Map<
     string,
@@ -280,18 +283,43 @@ export class McpBridge {
   /** Starts listening (a stale socket file from a previous runner is removed first). */
   async listen() {
     if (this.server) return;
-    if (process.platform !== "win32" && existsSync(this.opts.socketPath)) rmSync(this.opts.socketPath, { force: true });
+    this.server = await this.open(this.opts.socketPath);
+  }
+
+  /**
+   * A delegated CLI's way in: its relay runs as the sign-in's user, who can't reach `socketPath`. The socket is open to
+   * anyone who can enter its folder, so root sets access on that folder alone: root never touches a path in it, which
+   * the agent could swap for a link.
+   */
+  async listenForRelays(socketPath: string) {
+    if (this.relays?.path === socketPath) return;
+    await this.closeRelays();
+    this.relays = { path: socketPath, server: await this.open(socketPath) };
+    chmodSync(socketPath, 0o666);
+  }
+
+  private async closeRelays() {
+    const relays = this.relays;
+    this.relays = null;
+    for (const socket of this.sessions) socket.destroy();
+    if (!relays) return;
+    await new Promise<void>((resolve) => relays.server.close(() => resolve()));
+    rmSync(relays.path, { force: true });
+  }
+
+  private async open(socketPath: string) {
+    if (process.platform !== "win32" && existsSync(socketPath)) rmSync(socketPath, { force: true });
     const server = createServer((socket) => this.serve(socket));
     const events = server as unknown as EventEmitter;
     await new Promise<void>((resolve, reject) => {
       events.once("error", reject);
-      server.listen(this.opts.socketPath, () => {
+      server.listen(socketPath, () => {
         events.off("error", reject);
         resolve();
       });
     });
     events.on("error", (err: Error) => this.opts.log?.(`mcp endpoint: ${err.message}`));
-    this.server = server;
+    return server;
   }
 
   /**
@@ -519,6 +547,8 @@ export class McpBridge {
       return;
     }
     const { delegated } = info;
+    this.sessions.add(socket);
+    socket.once("close", () => this.sessions.delete(socket));
     const input = new PassThrough({ encoding: "utf8" });
     input.write(rest);
     socket.pipe(input);
@@ -549,6 +579,7 @@ export class McpBridge {
     this.waiting.clear();
     const server = this.server;
     this.server = null;
+    await this.closeRelays();
     if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
     if (process.platform !== "win32") rmSync(this.opts.socketPath, { force: true });
   }
@@ -1294,12 +1325,17 @@ export const CHAT_DENIED_TOOLS = [
  * servers): anything but our bridge (`mcp__agentes__…`, server `agentes`) is a breach, and so is an `init` without
  * the lists. A tool a new version adds that `--tools ""` doesn't take away stops the turn before it can run.
  */
-export function chatToolsBreach(init: Record<string, unknown>): string | null {
+export const chatToolsBreach = (init: Record<string, unknown>) => toolsBreach(init, []);
+
+/** The same for a delegated CLI, which keeps ToolSearch to load our tools and nothing else of its own. */
+export const delegatedToolsBreach = (init: Record<string, unknown>) => toolsBreach(init, ["ToolSearch"]);
+
+function toolsBreach(init: Record<string, unknown>, own: readonly string[]): string | null {
   const version = typeof init.claude_code_version === "string" ? ` ${init.claude_code_version.slice(0, 40)}` : "";
   if (!Array.isArray(init.tools) || !Array.isArray(init.mcp_servers)) {
     return `Claude Code${version} didn't list its tools, so the turn stopped before it began.`;
   }
-  const tools = init.tools.filter((t) => typeof t !== "string" || !t.startsWith("mcp__agentes__"));
+  const tools = init.tools.filter((t) => typeof t !== "string" || !(t.startsWith("mcp__agentes__") || own.includes(t)));
   const servers = init.mcp_servers.filter((s) => (s as { name?: unknown } | null)?.name !== "agentes");
   if (tools.length === 0 && servers.length === 0) return null;
   const names = [

@@ -478,6 +478,8 @@ export const grantGitCache = (dir: string, uid: number, run: RunCommand = runSyn
  */
 export const ACCOUNT_USERS_FILE = "account-users.json";
 export const ACCOUNT_STORES = "/var/lib/agentes-claude";
+/** Each agent's relay socket for the CLIs on its sign-ins: outside every mask of `ACCOUNT_VIEW`. */
+const ACCOUNT_BRIDGES = "/run/agentes-bridge";
 /** Outside the default agent range. Its last uid is left out for the self-check's stand-in agent (`PROBE_AGENT_UID`). */
 export const ACCOUNT_UID_RANGE: [number, number] = [30000, 30998];
 export const PROBE_AGENT_UID = 30999;
@@ -647,8 +649,9 @@ export class AccountUsers {
   constructor(
     private readonly opts: {
       home: string;
-      /** Tests: `ACCOUNT_STORES`. */
+      /** Tests: `ACCOUNT_STORES`, `ACCOUNT_BRIDGES`. */
       root?: string;
+      bridges?: string;
       run?: RunCommand;
       etc?: string;
       log?: (line: string) => void;
@@ -714,6 +717,31 @@ export class AccountUsers {
     this.folder(`${dir}/home`, "0700", user);
     if (room !== PROBE_ROOM) this.folder(`${store}/cwd/${room}`, "0700", user);
     this.rooms.add(key);
+  }
+
+  /**
+   * Where the agent's worker listens for this sign-in's relays: a folder of the agent's own that the sign-in's user may
+   * only enter. Root's parent, so what the ACL lands on is that folder and no link the agent left.
+   */
+  bridge(user: AccountUser, agent: AgentUser): string {
+    const key = `${user.id}/bridge/${agent.uid}`;
+    const dir = path.join(this.opts.bridges ?? ACCOUNT_BRIDGES, String(agent.uid));
+    if (!this.rooms.has(key)) {
+      this.run("install", ["-d", "-m", "0711", "-o", "0", "-g", "0", path.dirname(dir)]);
+      this.run("install", [
+        "-d",
+        "-m",
+        "0700",
+        "-o",
+        String(agent.uid),
+        "-g",
+        String(agentGid(agent.user, this.opts.run)),
+        dir,
+      ]);
+      this.run("setfacl", ["-m", `u:${user.uid}:x`, dir]);
+      this.rooms.add(key);
+    }
+    return path.join(dir, "mcp.sock");
   }
 
   /** How root runs what serves no agent on this sign-in (`accountLauncher`), its user and room made first. */

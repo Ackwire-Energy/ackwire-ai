@@ -1584,6 +1584,23 @@ function sharedLoginSetup(ready = true, over: Partial<AccountManagerOptions> = {
   return { ...made, store, removed, state };
 }
 
+test.if(posix)("whether a turn may run on a shared CLI login, from root's markers alone", async () => {
+  const ACCOUNT_ID = "0193eeee-0000-7000-8000-000000000001";
+  const { m, root, state } = sharedLoginSetup();
+  const marker = (name: string) => path.join(root, "claude_code", `${ACCOUNT_ID}.${name}`);
+  mkdirSync(path.join(root, "claude_code"), { recursive: true });
+  expect(m.isCliShared("claude_code", ACCOUNT_ID)).toBe(false);
+  writeFileSync(marker("method"), "cli_shared");
+  expect(m.isCliShared("claude_code", ACCOUNT_ID)).toBe(true);
+  expect(m.isCliShared("claude_code", "../../etc/passwd")).toBe(false);
+  expect(m.cliSharedState(ACCOUNT_ID)).toBe("ready");
+  writeFileSync(marker("invalid"), "");
+  expect(m.cliSharedState(ACCOUNT_ID)).toBe("signed_out");
+  state.ready = false;
+  expect(m.cliSharedState(ACCOUNT_ID)).toBe("off");
+  expect(m.sharedCommand(["/usr/bin/env"]).length).toBeGreaterThan(0);
+});
+
 test.if(posix)(
   "Claude's own login for all agents: only with the self-check, every CLI as the sign-in's user, nothing kept by root",
   async () => {

@@ -496,8 +496,12 @@ function accountSetup(users?: OsUser[]) {
   const root = path.join(home, "stores");
   const os = fakeOs(users);
   const run: RunCommand = (file, args) =>
-    file === "getent" && args[0] === "group" ? { code: 0, output: `agentes-auth:x:${AUTH_GID}:` } : os.run(file, args);
-  return { home, root, os, accounts: new AccountUsers({ home, root, run, etc: home }) };
+    file === "getent" && args[0] === "group"
+      ? { code: 0, output: `agentes-auth:x:${AUTH_GID}:` }
+      : file === "id"
+        ? { code: 0, output: "21042" }
+        : os.run(file, args);
+  return { home, root, os, accounts: new AccountUsers({ home, root, bridges: "/run/test-bridges", run, etc: home }) };
 }
 
 test("a sign-in's user: outside the agents' range, the auth group only, no shell, listed, and no cron or at", () => {
@@ -564,6 +568,20 @@ test("a room: root writes, the sign-in's user only reads through an ACL (its gro
     `setfacl -m u:30000:rx,d:u:30000:rx ${store}/run/21000`,
     `install -d -m 0700 -o 30000 -g ${AUTH_GID} ${store}/run/21000/home`,
     `install -d -m 0700 -o 30000 -g ${AUTH_GID} ${store}/cwd/21000`,
+  ]);
+});
+
+test("the relay's folder: the agent's, entered by the sign-in's user; root touches nothing inside it", () => {
+  const { accounts, os } = accountSetup();
+  const user = accounts.ensure(ADA_LOGIN);
+  os.calls.length = 0;
+  const agent = { id: ANA.id, user: "ag-a1b2c3d4", uid: 21000 };
+  expect(accounts.bridge(user, agent)).toBe("/run/test-bridges/21000/mcp.sock");
+  expect(accounts.bridge(user, agent)).toBe("/run/test-bridges/21000/mcp.sock");
+  expect(os.calls).toEqual([
+    "install -d -m 0711 -o 0 -g 0 /run/test-bridges",
+    "install -d -m 0700 -o 21000 -g 21042 /run/test-bridges/21000",
+    "setfacl -m u:30000:x /run/test-bridges/21000",
   ]);
 });
 
@@ -846,6 +864,9 @@ test("the self-check says why: off, no systemd, an untrusted path, a version nob
   const off = selfCheck();
   off.check.config = { mode: "system" };
   expect(await accountSelfCheck(off.check)).toContain("off");
+  const noLock = selfCheck();
+  noLock.check.config = { ...noLock.check.config, claudeSharedLogin: { ...SWITCH, refresh: "B" } };
+  expect(await accountSelfCheck(noLock.check)).toContain("refreshLock");
   expect(await accountSelfCheck(selfCheck({ systemd: false }).check)).toContain("systemd");
   const writable = (() => ({ ...(rootOwned as unknown as () => object)(), mode: 0o777 })) as unknown;
   expect(await accountSelfCheck(selfCheck({ stat: writable as SelfCheck["stat"] }).check)).toContain("Claude CLI");

@@ -1297,8 +1297,24 @@ export class AccountManager {
   }
 
   /** Claude's own login for all agents: the CLI's store is its own user's. */
-  private isCliShared(kind: AccountKind, id: string) {
-    return this.opts.lending !== undefined && this.rawMethod(kind, id) === CLI_SHARED;
+  isCliShared(kind: AccountKind, id: string) {
+    return this.opts.lending !== undefined && isAccountId(id) && this.rawMethod(kind, id) === CLI_SHARED;
+  }
+
+  /**
+   * Whether a turn may run on such a sign-in now. `off`: the switch went off or the self-check failed, and no CLI runs
+   * on its store. `signed_out`: the provider refused it, until it signs in again.
+   */
+  cliSharedState(id: string): "ready" | "off" | "signed_out" {
+    if (!this.opts.sharedLogin?.ready()) return "off";
+    return existsSync(this.marker("claude_code", id, "invalid")) ? "signed_out" : "ready";
+  }
+
+  /** The argv of the Claude CLI behind `prefix`. A missing CLI must fail to start, not exit 127 behind the launcher. */
+  sharedCommand(prefix: readonly string[]): string[] {
+    const [file, ...pre] = this.opts.commands?.claude_code ?? [COMMAND.claude_code];
+    const cli = resolveCommand(file ?? "", process.env.PATH);
+    return isExecutable(cli) ? [...prefix, cli, ...pre] : [cli, ...pre];
   }
 
   /** The Claude CLI as the sign-in's own user, with the runner's proxies as root's own CLIs have them. */
@@ -1307,10 +1323,7 @@ export class AccountManager {
     if (!l) throw new RunnerError("unsupported", "This computer can't run this Claude sign-in");
     const env: NodeJS.ProcessEnv = { ...l.env };
     for (const k of NETWORK_ENV) if (process.env[k]) env[k] = process.env[k];
-    const [file, ...pre] = this.opts.commands?.claude_code ?? [COMMAND.claude_code];
-    const cli = resolveCommand(file ?? "", process.env.PATH);
-    // As in `command`: a missing CLI must fail to start, not exit 127 behind the launcher.
-    return { command: isExecutable(cli) ? [...l.prefix, cli, ...pre] : [cli, ...pre], env, cwd: l.home };
+    return { command: this.sharedCommand(l.prefix), env, cwd: l.home };
   }
 
   /**

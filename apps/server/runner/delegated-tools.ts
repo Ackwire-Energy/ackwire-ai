@@ -15,7 +15,13 @@ import {
   SECRET_READ_DENY_RULES,
   simpleCommands,
 } from "@agenteschat/adapters/command-policy";
-import { type AgentScope, allowedBy, type McpToolInfo, ruleMatches } from "@agenteschat/adapters/machine-protocol";
+import {
+  type AgentScope,
+  allowedBy,
+  type McpToolInfo,
+  ruleMatches,
+  type ToolNotice,
+} from "@agenteschat/adapters/machine-protocol";
 import { exitCodeOf, formatBytes, killTree, runCommand } from "./exec";
 import { resolveCommand } from "./executors";
 import { touchesGitInternals } from "./git-guard";
@@ -268,18 +274,8 @@ export const PLAN_DELEGATED_TOOLS: readonly McpToolInfo[] = DELEGATED_TOOLS.filt
   (t) => t !== EDIT_TOOL && t !== WRITE_TOOL,
 );
 
-export type ShellStatus = "running" | "completed" | "failed" | "killed";
-
-/** A background shell started or ended (`tool.notice`): the brain counts it as work, and says so to the model. */
-export interface ToolNotice {
-  session: string;
-  shellId: string;
-  status: ShellStatus;
-  exitCode?: number;
-  /** The call's description, or its command. */
-  summary: string;
-  outputFile: string;
-}
+export type { ToolNotice };
+export type ShellStatus = ToolNotice["status"];
 
 /** What a delegated CLI's tools may do, from root (`bridge.token`). */
 export interface DelegatedScope {
@@ -295,6 +291,8 @@ export interface DelegatedScope {
   /** What a person allowed for the whole mission. */
   allow?: readonly string[];
   runnerHome?: string;
+  /** A `chat` turn: none of these tools, only the server's. */
+  chat?: boolean;
 }
 
 /** `agentSecrets`' answer: what commands get, and what no result may show. */
@@ -495,7 +493,7 @@ export class DelegatedTools {
   surface(scope: DelegatedScope): DelegatedSurface {
     const s = this.sessionOf(scope);
     return {
-      tools: scope.profile === "plan" ? PLAN_DELEGATED_TOOLS : DELEGATED_TOOLS,
+      tools: scope.chat ? [] : scope.profile === "plan" ? PLAN_DELEGATED_TOOLS : DELEGATED_TOOLS,
       scope: this.commandScope(s),
       profile: scope.profile,
       ...(scope.branches?.length ? { branches: scope.branches } : {}),
@@ -688,7 +686,7 @@ export class DelegatedTools {
     const shell = await this.start(r, command, description);
     const timeout = optionalNumber(r.args, "timeout");
     if (flag(r.args, "run_in_background")) {
-      this.toBackground(r.s, shell);
+      this.toBackground(r.s, shell, false);
       if (timeout) {
         setTimeout(() => this.stop(shell), Math.min(Math.max(timeout, 1), BACKGROUND_MAX_MS)).unref();
       }
@@ -716,7 +714,7 @@ export class DelegatedTools {
       return fail(CANCELED);
     }
     if (shell.status === "running") {
-      this.toBackground(r.s, shell);
+      this.toBackground(r.s, shell, true);
       const opening =
         ending === "detach"
           ? `Command was moved to the background (ID: ${shell.id}) so that a message that arrived while it was running can reach you; it was not interrupted.`
@@ -811,12 +809,12 @@ export class DelegatedTools {
     setTimeout(() => killTree(shell.child, "SIGKILL"), STOP_GRACE_MS).unref();
   }
 
-  private toBackground(s: Session, shell: Shell) {
+  private toBackground(s: Session, shell: Shell, moved: boolean) {
     shell.background = true;
-    this.notice(s, shell);
+    this.notice(s, shell, moved);
   }
 
-  private notice(s: Session, shell: Shell) {
+  private notice(s: Session, shell: Shell, moved = false) {
     const notice: ToolNotice = {
       session: s.scope.session,
       shellId: shell.id,
@@ -824,6 +822,7 @@ export class DelegatedTools {
       ...(shell.exitCode === undefined ? {} : { exitCode: shell.exitCode }),
       summary: shell.summary,
       outputFile: shell.file,
+      ...(moved ? { moved } : {}),
     };
     // In order: root counts a shell from its start to its end.
     this.notices = this.notices
@@ -1320,6 +1319,10 @@ export interface DelegatedBridge {
   /** The turn in progress and its server token: none between turns. */
   runId?: string;
   serverToken?: string;
+  /** Where the worker listens for the relay: a folder only this agent and its sign-ins' users can enter. */
+  socketPath?: string;
+  /** A `chat` turn (`DelegatedScope.chat`). */
+  chat?: true;
 }
 
 const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : undefined);
@@ -1344,6 +1347,8 @@ export function parseBridge(f: Record<string, unknown>): DelegatedBridge | null 
     ...(allow ? { allow } : {}),
     ...(typeof f.runId === "string" ? { runId: f.runId } : {}),
     ...(typeof f.serverToken === "string" ? { serverToken: f.serverToken } : {}),
+    ...(typeof f.socketPath === "string" && path.isAbsolute(f.socketPath) ? { socketPath: f.socketPath } : {}),
+    ...(f.chat === true ? { chat: true as const } : {}),
   };
 }
 
@@ -1372,6 +1377,7 @@ export function delegatedTask(
       ...(bridge.branches ? { branches: bridge.branches } : {}),
       ...(bridge.allow ? { allow: bridge.allow } : {}),
       ...(runnerHome ? { runnerHome } : {}),
+      ...(bridge.chat ? { chat: true } : {}),
     }),
   };
 }

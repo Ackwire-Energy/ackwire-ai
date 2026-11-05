@@ -80,6 +80,7 @@ function directBytes(uid: number, run: RunCommand): number {
 export async function accountSelfCheck(c: SelfCheck): Promise<string | null> {
   const spec = c.config.claudeSharedLogin;
   if (!spec) return "The feature is off";
+  if (spec.refresh === "B" && !spec.refreshLock) return "Refresh mode B needs the name of the CLI's lock (refreshLock)";
   const run = c.run ?? runSync;
   const launcher = c.launcher ?? accountLauncher;
   if (!(c.systemd ?? systemdBooted())) return "It needs systemd";

@@ -49,6 +49,7 @@ import {
   checkFolder,
   parseAgents,
   readAgents,
+  realFoldersFor,
   reduceAccess,
   removeFolder,
   setFolderAgents,
@@ -56,6 +57,7 @@ import {
   TOOL_NAMES,
   writeAgents,
 } from "./access";
+import { AccountBrains } from "./account-brains";
 import { accountSelfCheck, SELF_CHECK_EVERY_MS } from "./account-check";
 import { AccountManager, lchownTree, SYSTEM_ACCOUNTS_ROOT } from "./accounts";
 import { ActivityLog } from "./activity";
@@ -289,6 +291,8 @@ interface Session {
   workspaceReal: string;
   tasks: TaskManager;
   brains: BrainManager;
+  /** System mode: the CLIs of Claude sign-ins several agents share, run by root. */
+  accountBrains: AccountBrains | null;
   codexApp: CodexAppServers;
   mcp: McpBridge;
   browser: BrowserManager;
@@ -343,7 +347,10 @@ export interface DaemonOptions {
     authEgress?: () => string[] | null;
   };
   /** Tests (system mode): the sign-ins' users, and the self-check that opens Claude's own login for all agents. */
-  accountUsers?: Pick<AccountUsers, "sweep" | "stopScopes" | "sweepAgent" | "launcher" | "remove" | "ensure" | "room">;
+  accountUsers?: Pick<
+    AccountUsers,
+    "sweep" | "stopScopes" | "sweepAgent" | "launcher" | "remove" | "ensure" | "room" | "bridge"
+  >;
   selfCheck?: () => Promise<string | null>;
 }
 
@@ -816,6 +823,7 @@ export class RunnerDaemon implements RequestObserver {
         maxProcesses: paired.brainMaxProcesses ?? DEFAULT_LIMITS.brainMaxProcesses,
       };
       this.session.brains.setLimits(brainLimits);
+      this.session.accountBrains?.brains.setLimits(brainLimits);
       this.session.codexApp.setLimits(brainLimits);
       this.session.supervisor?.stateChanged();
     }
@@ -1053,6 +1061,7 @@ export class RunnerDaemon implements RequestObserver {
     });
     let supervisor: Supervisor | null = null;
     let agentUser: Session["agentUser"] = null;
+    let accountBrains: AccountBrains | null = null;
     if (config.mode === "system") {
       const range = config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE;
       const users = new AgentUsers({ home, range, ...(sharedSpec && this.shared ? { shared: sharedSpec, log } : {}) });
@@ -1165,6 +1174,7 @@ export class RunnerDaemon implements RequestObserver {
               prepareExisting: (existing: AgentUser[]) => prepareAgents(existing, prepare, policy, log),
             }),
         stopAccountScopes: (uid) => this.accountUsers?.stopScopes(uid),
+        toolNotice: (agentId, notice) => accountBrains?.toolNotice(agentId, notice),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
         grant: (kind, accountId) => this.accounts.grant(kind, accountId),
         usage: (kind, accountId, info) =>
@@ -1184,6 +1194,20 @@ export class RunnerDaemon implements RequestObserver {
         relayed: this.relayed,
         log,
       });
+      if (this.accountUsers) {
+        accountBrains = new AccountBrains({
+          root: path.join(home, "account-brains"),
+          accounts: this.accounts,
+          users: this.accountUsers,
+          workers: supervisor,
+          grants: (agentId) => realFoldersFor(this.access(), agentId),
+          relay: this.self.command,
+          shared: () => this.stored?.claudeSharedLogin,
+          idleMs: (config.brainIdleMinutes ?? DEFAULT_LIMITS.brainIdleMinutes) * 60_000,
+          maxProcesses: config.brainMaxProcesses ?? DEFAULT_LIMITS.brainMaxProcesses,
+          log,
+        });
+      }
     }
     // Agents working as this runner's user: what their browsers' first command would install is installed now (in
     // system mode, the installer shares it with every agent).
@@ -1201,8 +1225,11 @@ export class RunnerDaemon implements RequestObserver {
       gitCache: path.join(home, "git-cache"),
       tasks,
       brains,
-      // System mode: root runs no turns; its agents' CLIs are their workers'.
-      reclaimBrains: supervisor ? (spare) => supervisor.reclaimBrains(spare) : (spare) => brains.reclaimIdle(spare),
+      ...(accountBrains ? { accountBrains } : {}),
+      // System mode: root runs only the CLIs of sign-ins several agents share; the others are their workers'.
+      reclaimBrains: supervisor
+        ? (spare) => accountBrains?.reclaim(spare) ?? supervisor.reclaimBrains(spare)
+        : (spare) => brains.reclaimIdle(spare),
       codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp },
       paused: () => this.stopping || this.pauseState().paused,
       // A config written later without the mode never turns a system session back into one that does agents' work.
@@ -1306,6 +1333,7 @@ export class RunnerDaemon implements RequestObserver {
       workspaceReal,
       tasks,
       brains,
+      accountBrains,
       codexApp,
       mcp,
       browser,
@@ -1510,6 +1538,7 @@ export class RunnerDaemon implements RequestObserver {
     await s.supervisor?.close();
     s.tasks.close();
     s.brains.close();
+    s.accountBrains?.brains.close();
     s.codexApp.close();
     await s.browser.close().catch(() => undefined);
     await s.mcp.close().catch(() => undefined);
@@ -1698,6 +1727,9 @@ export class RunnerDaemon implements RequestObserver {
       void this.accounts.keepLent(lent).catch(() => undefined);
       const here = new Set(list.map((a) => a.id));
       const gone = this.agents.filter((a) => !here.has(a.id)).map((a) => a.id);
+      const hosted = this.session?.accountBrains?.brains;
+      for (const a of list) hosted?.keepAccount(a.account ?? null, a.id);
+      for (const id of gone) hosted?.keepAccount(null, id);
       for (const u of readAgentUsers(this.opts.home)) {
         if (!gone.includes(u.id)) continue;
         try {

@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 46;
+export const MACHINE_PROTOCOL_VERSION = 47;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -521,6 +521,14 @@ export const VAULT_PROTOCOL = 45;
  * runner's missing `claudeLoginMethods` as `claudeLoginMethodsOf` says.
  */
 export const CLAUDE_AUTH_PROTOCOL = 46;
+/**
+ * From this protocol on: a system-mode runner may list `cli_login` in `claudeLoginMethods`. Its turns on such a sign-in
+ * run in root, as the sign-in's own OS user, with no tool of the CLI's that touches files or runs code; each agent's
+ * worker serves those tools over its bridge. Root and worker speak of them on their link: `bridge.token`, `turn.cancel`
+ * and `turn.detach` from root, `turn.context` (`TurnContext`) and `tool.notice` (`ToolNotice`) from the worker. Nothing
+ * changes on the server's side of the wire: an older runner just never lists the method.
+ */
+export const CLAUDE_SHARED_PROTOCOL = 47;
 /**
  * Protocol 45 (ADR 0144 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
  * only, from the moment it got it (never across its own restart). The server counts a `site` delivery older than this
@@ -3381,4 +3389,58 @@ export function parseBrowserInputEvent(v: unknown): BrowserInputEvent | null {
     default:
       return null;
   }
+}
+
+/** What a worker answers about a turn its root hosts: where it runs, as the agent's own user resolved it. */
+export interface TurnContext {
+  /** The agent's folder. */
+  folder: string;
+  cwd: string;
+  /** The folder's CLAUDE.md and AGENTS.md, and its git state: root reads nothing of the agent's. */
+  text?: string;
+}
+
+const TURN_TEXT_MAX = 64_000;
+const absolutePath = (v: unknown): v is string =>
+  typeof v === "string" && v.startsWith("/") && v.length <= 4096 && !v.includes("\0");
+
+/** A worker's `turn.context`. It runs as the uid the agent's code runs as: only what fits goes on. */
+export function parseTurnContext(f: Record<string, unknown>): TurnContext | null {
+  if (!absolutePath(f.folder) || !absolutePath(f.cwd)) return null;
+  return {
+    folder: f.folder,
+    cwd: f.cwd,
+    ...(typeof f.text === "string" ? { text: f.text.slice(0, TURN_TEXT_MAX) } : {}),
+  };
+}
+
+/** A delegated session's background shell started or ended (`tool.notice`), for the CLI on that session. */
+export interface ToolNotice {
+  session: string;
+  shellId: string;
+  status: "running" | "completed" | "failed" | "killed";
+  exitCode?: number;
+  /** The call's description, or its command. */
+  summary: string;
+  outputFile: string;
+  /** Running since a call was moved to the background: its turn waits for it, as for Claude Code's own. */
+  moved?: true;
+}
+
+/** A worker's `tool.notice`, clipped. Its text reaches the model as the session's own tool did. */
+export function parseToolNotice(f: Record<string, unknown>): ToolNotice | null {
+  const { session, shellId, status, exitCode, summary, outputFile, moved } = f;
+  if (typeof session !== "string" || !session || session.length > 64) return null;
+  if (typeof shellId !== "string" || !/^[\w-]{1,64}$/.test(shellId)) return null;
+  if (status !== "running" && status !== "completed" && status !== "failed" && status !== "killed") return null;
+  if (typeof summary !== "string" || !absolutePath(outputFile)) return null;
+  return {
+    session,
+    shellId,
+    status,
+    ...(Number.isInteger(exitCode) ? { exitCode: exitCode as number } : {}),
+    summary: summary.slice(0, 200),
+    outputFile,
+    ...(moved === true ? { moved } : {}),
+  };
 }
