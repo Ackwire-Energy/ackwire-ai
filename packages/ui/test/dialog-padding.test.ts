@@ -70,7 +70,11 @@ describe("dialog padding", () => {
       for (const [part, sides, token] of EDGES) {
         // The part is what the rule styles (its last compound), not an ancestor of it; a combinator inside `:has(…)` or
         // `:not(…)` doesn't start a compound (`.ac-dialog__body:has(+ .ac-dialog__foot--bar)` styles the body).
-        const last = selector.replace(/\((?:[^()]|\([^()]*\))*\)/g, "()").split(/[\s>+~]+/).pop() ?? "";
+        const last =
+          selector
+            .replace(/\((?:[^()]|\([^()]*\))*\)/g, "()")
+            .split(/[\s>+~]+/)
+            .pop() ?? "";
         if (!part.test(last)) continue;
         for (const side of sides) {
           const value = pad[side];
