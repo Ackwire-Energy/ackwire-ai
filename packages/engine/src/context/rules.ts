@@ -1,6 +1,7 @@
 import { and, type Executor, eq, isNull, schema } from "@agenteschat/db";
 import { decidesAgentApprovals } from "../approval-rules";
 import { type AuthorityRun, type RunAuthority, runAuthority } from "../authority";
+import { caches, rulesPresenceKey } from "../cache";
 import { cutText } from "../format";
 import { routineCreatorOf } from "../requester";
 
@@ -14,6 +15,27 @@ const RULE_CHARS = 600;
  * routine that feeds it. Never message text: another agent's "they approved" names nobody here.
  */
 export const ruleReaderOf = (authority: RunAuthority) => authority.personId ?? routineCreatorOf(authority);
+
+const activeRulesOf = (orgId: string, agentId: string) =>
+  and(
+    eq(contextItems.orgId, orgId),
+    eq(contextItems.agentId, agentId),
+    eq(contextItems.kind, "rule"),
+    eq(contextItems.status, "active"),
+    eq(contextItems.createdByKind, "person"),
+    isNull(contextItems.supersededBy),
+  );
+
+/** Most agents hold no rule: their runs pay one cached lookup, no statement on the hot path. */
+const holdsRules = (db: Executor, orgId: string, agentId: string) =>
+  caches.contextPresence.getOrLoad(rulesPresenceKey(orgId, agentId), async () => {
+    const [row] = await db
+      .select({ id: contextItems.id })
+      .from(contextItems)
+      .where(activeRulesOf(orgId, agentId))
+      .limit(1);
+    return Boolean(row);
+  });
 
 /**
  * The rules people gave this agent that hold in a run for `personId` (ADR 0120, rules people gave): their own,
@@ -33,16 +55,7 @@ export async function rulesForPerson(
     })
     .from(contextItems)
     .leftJoin(users, eq(users.id, contextItems.createdById))
-    .where(
-      and(
-        eq(contextItems.orgId, input.orgId),
-        eq(contextItems.agentId, input.agentId),
-        eq(contextItems.kind, "rule"),
-        eq(contextItems.status, "active"),
-        eq(contextItems.createdByKind, "person"),
-        isNull(contextItems.supersededBy),
-      ),
-    )
+    .where(activeRulesOf(input.orgId, input.agentId))
     .orderBy(contextItems.createdAt)
     .limit(30);
   const givers = [...new Set(rows.map((r) => r.by ?? ""))];
@@ -63,6 +76,7 @@ export async function rulesForRun(
   run: AuthorityRun,
   agent: { id: string; ownerUserId: string | null },
 ): Promise<{ text: string; itemIds: string[] }> {
+  if (!(await holdsRules(db, run.orgId, agent.id))) return { text: "", itemIds: [] };
   const authority = await runAuthority(db, run);
   const rules = await rulesForPerson(db, {
     orgId: run.orgId,

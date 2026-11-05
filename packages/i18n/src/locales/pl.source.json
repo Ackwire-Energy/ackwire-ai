@@ -26366,6 +26366,9 @@
   "errors.wiki.titleNoLetters": {
     "value": "A title needs letters or numbers."
   },
+  "errors.wiki.lockAdminsOnly": {
+    "value": "Only admins lock pages."
+  },
   "errors.media.off": {
     "value": "GIFs and stickers are off in this workspace."
   },
@@ -26416,6 +26419,9 @@
   },
   "errors.agentProposal.noRoutine": {
     "value": "This proposal has no routine to create."
+  },
+  "errors.agentProposal.notRequester": {
+    "value": "Only the person who asked for it can send it."
   },
   "errors.approval.alwaysUnavailable": {
     "value": "This request can't be approved for good. Approve just this one."
@@ -26663,6 +26669,15 @@
   "errors.routine.continueExtraUsedUp": {
     "value": "This plan's window is used up and its paid extra usage is used up or unavailable. It picks up after the reset."
   },
+  "errors.routine.actionsNeedApprover": {
+    "value": "Only the agent's owner or someone who approves its actions can let a routine act on its own."
+  },
+  "errors.routine.editorOnly": {
+    "value": "Only who created the routine, the agent's owner or an admin can change it."
+  },
+  "errors.routine.widgetFixed": {
+    "value": "This routine keeps a widget up to date. Change it from its widget."
+  },
   "errors.run.notContinuable": {
     "value": "This answer can't be continued anymore."
   },
@@ -26674,6 +26689,15 @@
   },
   "errors.run.notRestartable": {
     "value": "This answer had already started, so it can't start over. Send your message again."
+  },
+  "errors.run.cancelForbidden": {
+    "value": "Only who asked, the agent's owner or an admin can stop it."
+  },
+  "errors.run.answerForbidden": {
+    "value": "Only who asked, the agent's owner or an admin can do this."
+  },
+  "errors.run.stopReasonForbidden": {
+    "value": "Only who stopped it can say why."
   },
   "errors.artifact.fileTooLarge": {
     "value": "The file is over {{max}} MB, the limit per file."
@@ -26689,6 +26713,12 @@
   },
   "errors.artifact.notFound": {
     "value": "This file no longer exists or you don't have access."
+  },
+  "errors.artifact.deleteForbidden": {
+    "value": "Only who created it, who asked the agent, the agent's owner or an admin can delete this."
+  },
+  "errors.artifact.restoreForbidden": {
+    "value": "Only who could delete it can restore it."
   },
   "errors.machine.forbidden": {
     "value": "Only an admin, or whoever connected the computer, can do that."
@@ -26782,6 +26812,24 @@
   },
   "errors.rightHand.permanent": {
     "value": "The right hand is part of the workspace and stays out of channels. An @mention reaches it in any of them."
+  },
+  "errors.agent.ownerOrAdmin": {
+    "value": "Only the agent's owner or an admin can do this."
+  },
+  "errors.agent.detailsHidden": {
+    "value": "Only who talks to {{agentName}} sees how it works."
+  },
+  "errors.agent.extraOwnerOnly": {
+    "value": "Only the agent's owner turns its plan's paid extra usage on or off."
+  },
+  "errors.agent.undoForbidden": {
+    "value": "Only the person the agent worked for, its owner or an admin can undo this."
+  },
+  "errors.account.notOwner": {
+    "value": "Only the person who connected this account or plan can do this."
+  },
+  "errors.channel.membersForbidden": {
+    "value": "Only the channel's creator or an admin can add or remove people."
   },
   "errors.handle.invalid": {
     "value": "An @ has {{min}} to {{max}} lowercase letters, numbers, - or _."

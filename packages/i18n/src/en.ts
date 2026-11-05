@@ -10534,6 +10534,7 @@ export const en = {
       titleTaken: "There's already a page called “{{title}}”.",
       titleCharacters: "A title can't have [ ] | or #.",
       titleNoLetters: "A title needs letters or numbers.",
+      lockAdminsOnly: "Only admins lock pages.",
     },
     media: {
       off: "GIFs and stickers are off in this workspace.",
@@ -10560,6 +10561,7 @@ export const en = {
       expired: "This proposal expired: nobody decided it in a day.",
       routineMade: "This agent's routine was already created.",
       noRoutine: "This proposal has no routine to create.",
+      notRequester: "Only the person who asked for it can send it.",
     },
     approval: {
       alwaysUnavailable: "This request can't be approved for good. Approve just this one.",
@@ -10666,12 +10668,19 @@ export const en = {
         "This plan's window is used up and this agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now, or it picks up after the reset.",
       continueExtraUsedUp:
         "This plan's window is used up and its paid extra usage is used up or unavailable. It picks up after the reset.",
+      actionsNeedApprover:
+        "Only the agent's owner or someone who approves its actions can let a routine act on its own.",
+      editorOnly: "Only who created the routine, the agent's owner or an admin can change it.",
+      widgetFixed: "This routine keeps a widget up to date. Change it from its widget.",
     },
     run: {
       notContinuable: "This answer can't be continued anymore.",
       agentBusy: "The agent is already working in this conversation. Wait for it to finish to continue.",
       continueForbidden: "Only who asked, the agent's owner or an admin can continue it.",
       notRestartable: "This answer had already started, so it can't start over. Send your message again.",
+      cancelForbidden: "Only who asked, the agent's owner or an admin can stop it.",
+      answerForbidden: "Only who asked, the agent's owner or an admin can do this.",
+      stopReasonForbidden: "Only who stopped it can say why.",
     },
     artifact: {
       fileTooLarge: "The file is over {{max}} MB, the limit per file.",
@@ -10679,6 +10688,8 @@ export const en = {
       fileRequired: "Choose a file to upload.",
       fileNameRequired: "The file needs a name.",
       notFound: "This file no longer exists or you don't have access.",
+      deleteForbidden: "Only who created it, who asked the agent, the agent's owner or an admin can delete this.",
+      restoreForbidden: "Only who could delete it can restore it.",
     },
     machine: {
       forbidden: "Only an admin, or whoever connected the computer, can do that.",
@@ -10722,6 +10733,18 @@ export const en = {
     rightHand: {
       permanent:
         "The right hand is part of the workspace and stays out of channels. An @mention reaches it in any of them.",
+    },
+    agent: {
+      ownerOrAdmin: "Only the agent's owner or an admin can do this.",
+      detailsHidden: "Only who talks to {{agentName}} sees how it works.",
+      extraOwnerOnly: "Only the agent's owner turns its plan's paid extra usage on or off.",
+      undoForbidden: "Only the person the agent worked for, its owner or an admin can undo this.",
+    },
+    account: {
+      notOwner: "Only the person who connected this account or plan can do this.",
+    },
+    channel: {
+      membersForbidden: "Only the channel's creator or an admin can add or remove people.",
     },
     handle: {
       invalid: "An @ has {{min}} to {{max}} lowercase letters, numbers, - or _.",

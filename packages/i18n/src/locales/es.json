@@ -11293,7 +11293,8 @@
       "editorsExcludeYou": "Inclúyete entre las personas que editan, para conservar esta página.",
       "titleTaken": "Ya hay una página llamada “{{title}}”.",
       "titleCharacters": "Un título no puede tener [ ] | ni #.",
-      "titleNoLetters": "Un título necesita letras o números."
+      "titleNoLetters": "Un título necesita letras o números.",
+      "lockAdminsOnly": "Solo los admins bloquean páginas."
     },
     "media": {
       "off": "Los GIF y stickers están desactivados en este espacio de trabajo.",
@@ -11318,7 +11319,8 @@
       "decided": "Alguien ya decidió esta propuesta.",
       "expired": "Esta propuesta venció: nadie la decidió en un día.",
       "routineMade": "La rutina de este agente ya se creó.",
-      "noRoutine": "Esta propuesta no tiene una rutina para crear."
+      "noRoutine": "Esta propuesta no tiene una rutina para crear.",
+      "notRequester": "Solo quien lo pidió puede enviarlo."
     },
     "approval": {
       "alwaysUnavailable": "Este pedido no se puede aprobar para siempre. Aprueba solo este."
@@ -11420,20 +11422,28 @@
       "agentNotInChannel": "Primero agrega el agente a la conversación.",
       "webhookPaused": "Activa la rutina para probarla.",
       "continueExtraOff": "La ventana de este plan se agotó y el trabajo largo de este agente no usa uso extra pagado. Actívalo en su configuración de IA para continuar ahora, o seguirá después del reinicio.",
-      "continueExtraUsedUp": "La ventana de este plan se agotó y su uso extra pagado se agotó o no está disponible. Seguirá después del reinicio."
+      "continueExtraUsedUp": "La ventana de este plan se agotó y su uso extra pagado se agotó o no está disponible. Seguirá después del reinicio.",
+      "actionsNeedApprover": "Solo el dueño del agente o quien aprueba sus acciones puede dejar que una rutina actúe por su cuenta.",
+      "editorOnly": "Solo quien creó la rutina, el dueño del agente o un admin puede cambiarla.",
+      "widgetFixed": "Esta rutina mantiene un widget actualizado. Cámbiala desde su widget."
     },
     "run": {
       "notContinuable": "Esta respuesta ya no se puede continuar.",
       "agentBusy": "El agente ya está trabajando en esta conversación. Espera a que termine para continuar.",
       "continueForbidden": "Solo quien lo pidió, el dueño del agente o un admin puede continuarla.",
-      "notRestartable": "Esta respuesta ya había empezado, así que no puede empezar de nuevo. Envía tu mensaje otra vez."
+      "notRestartable": "Esta respuesta ya había empezado, así que no puede empezar de nuevo. Envía tu mensaje otra vez.",
+      "cancelForbidden": "Solo quien lo pidió, el dueño del agente o un admin puede detenerlo.",
+      "answerForbidden": "Solo quien lo pidió, el dueño del agente o un admin puede hacer esto.",
+      "stopReasonForbidden": "Solo quien lo detuvo puede decir por qué."
     },
     "artifact": {
       "fileTooLarge": "El archivo supera los {{max}} MB, el límite por archivo.",
       "notVersioned": "Una imagen, un video o una grabación no tiene versiones. Envíala como un archivo nuevo.",
       "fileRequired": "Elige un archivo para subir.",
       "fileNameRequired": "El archivo necesita un nombre.",
-      "notFound": "Este archivo ya no existe o no tienes acceso."
+      "notFound": "Este archivo ya no existe o no tienes acceso.",
+      "deleteForbidden": "Solo quien lo creó, quien se lo pidió al agente, el dueño del agente o un admin puede eliminar esto.",
+      "restoreForbidden": "Solo quien podía eliminarlo puede restaurarlo."
     },
     "machine": {
       "forbidden": "Solo un admin, o quien conectó la computadora, puede hacer eso.",
@@ -11476,6 +11486,18 @@
     },
     "rightHand": {
       "permanent": "La mano derecha forma parte del espacio de trabajo y queda fuera de los canales. Una @mención la llama en cualquiera de ellos."
+    },
+    "agent": {
+      "ownerOrAdmin": "Solo el dueño del agente o un admin puede hacer esto.",
+      "detailsHidden": "Solo quien habla con {{agentName}} ve cómo funciona.",
+      "extraOwnerOnly": "Solo el dueño del agente activa o desactiva el uso extra pagado del plan.",
+      "undoForbidden": "Solo la persona para quien trabajó el agente, su dueño o un admin puede deshacer esto."
+    },
+    "account": {
+      "notOwner": "Solo quien conectó esta cuenta o plan puede hacer esto."
+    },
+    "channel": {
+      "membersForbidden": "Solo quien creó el canal o un admin puede agregar o quitar personas."
     },
     "handle": {
       "invalid": "Un @ tiene de {{min}} a {{max}} minúsculas, números, - o _.",

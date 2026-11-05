@@ -10878,7 +10878,8 @@
       "editorsExcludeYou": "Bu sayfayı korumak için kendinizi de düzenleyen kişiler arasına ekleyin.",
       "titleTaken": "“{{title}}” adında bir sayfa zaten var.",
       "titleCharacters": "Başlıkta [ ] | veya # olamaz.",
-      "titleNoLetters": "Başlıkta harf veya rakam olmalı."
+      "titleNoLetters": "Başlıkta harf veya rakam olmalı.",
+      "lockAdminsOnly": "Sayfaları yalnızca yöneticiler kilitler."
     },
     "media": {
       "off": "Bu çalışma alanında GIF'ler ve çıkartmalar kapalı.",
@@ -10903,7 +10904,8 @@
       "decided": "Bu öneri hakkında zaten biri karar verdi.",
       "expired": "Bu önerinin süresi doldu: bir gün içinde kimse karar vermedi.",
       "routineMade": "Bu ajanın rutini zaten oluşturuldu.",
-      "noRoutine": "Bu önerinin oluşturacağı bir rutin yok."
+      "noRoutine": "Bu önerinin oluşturacağı bir rutin yok.",
+      "notRequester": "Bunu yalnızca isteyen kişi gönderebilir."
     },
     "approval": {
       "alwaysUnavailable": "Bu istek kalıcı olarak onaylanamaz. Yalnızca bunu onaylayın."
@@ -11005,20 +11007,28 @@
       "agentNotInChannel": "Önce ajanı konuşmaya ekleyin.",
       "webhookPaused": "Test etmek için rutini açın.",
       "continueExtraOff": "Bu planın kullanım dönemi doldu ve bu ajanın uzun işleri ücretli ek kullanımı kullanmıyor. Hemen devam etmek için bunu yapay zeka ayarlarından açın, yoksa sıfırlamadan sonra kaldığı yerden sürer.",
-      "continueExtraUsedUp": "Bu planın kullanım dönemi doldu ve ücretli ek kullanımı da bitti ya da kullanılamıyor. Sıfırlamadan sonra kaldığı yerden sürer."
+      "continueExtraUsedUp": "Bu planın kullanım dönemi doldu ve ücretli ek kullanımı da bitti ya da kullanılamıyor. Sıfırlamadan sonra kaldığı yerden sürer.",
+      "actionsNeedApprover": "Bir rutinin kendi başına hareket etmesine yalnızca ajanın sahibi veya eylemlerini onaylayan kişi izin verebilir.",
+      "editorOnly": "Rutini yalnızca oluşturan kişi, ajanın sahibi veya bir yönetici değiştirebilir.",
+      "widgetFixed": "Bu rutin bir widget'ı güncel tutar. Widget'ından değiştirin."
     },
     "run": {
       "notContinuable": "Bu yanıta artık devam edilemez.",
       "agentBusy": "Ajan bu konuşmada zaten çalışıyor. Devam etmek için bitirmesini bekleyin.",
       "continueForbidden": "Buna yalnızca isteyen kişi, ajanın sahibi veya bir yönetici devam ettirebilir.",
-      "notRestartable": "Bu yanıt zaten başlamıştı, yeniden başlayamaz. Mesajınızı tekrar gönderin."
+      "notRestartable": "Bu yanıt zaten başlamıştı, yeniden başlayamaz. Mesajınızı tekrar gönderin.",
+      "cancelForbidden": "Bunu yalnızca isteyen kişi, ajanın sahibi veya bir yönetici durdurabilir.",
+      "answerForbidden": "Bunu yalnızca isteyen kişi, ajanın sahibi veya bir yönetici yapabilir.",
+      "stopReasonForbidden": "Nedenini yalnızca durduran kişi söyleyebilir."
     },
     "artifact": {
       "fileTooLarge": "Dosya, dosya başına sınır olan {{max}} MB'ı aşıyor.",
       "notVersioned": "Bir görselin, videonun veya kaydın sürümü olmaz. Yeni bir dosya olarak gönder.",
       "fileRequired": "Yüklenecek bir dosya seçin.",
       "fileNameRequired": "Dosyanın bir adı olmalı.",
-      "notFound": "Bu dosya artık yok ya da erişiminiz yok."
+      "notFound": "Bu dosya artık yok ya da erişiminiz yok.",
+      "deleteForbidden": "Bunu yalnızca oluşturan kişi, ajandan isteyen kişi, ajanın sahibi veya bir yönetici silebilir.",
+      "restoreForbidden": "Bunu yalnızca silebilecek kişi geri yükleyebilir."
     },
     "machine": {
       "forbidden": "Bunu yalnızca bir yönetici veya bilgisayarı bağlayan kişi yapabilir.",
@@ -11060,6 +11070,18 @@
     },
     "rightHand": {
       "permanent": "Sağ kol çalışma alanının bir parçasıdır ve kanalların dışında kalır. Bir @bahsetme onu herhangi bir kanalda çağırır."
+    },
+    "agent": {
+      "ownerOrAdmin": "Bunu yalnızca ajanın sahibi veya bir yönetici yapabilir.",
+      "detailsHidden": "Nasıl çalıştığını yalnızca {{agentName}} ile konuşanlar görür.",
+      "extraOwnerOnly": "Planın ücretli ek kullanımını yalnızca ajanın sahibi açıp kapatabilir.",
+      "undoForbidden": "Bunu yalnızca ajanın çalıştığı kişi, sahibi veya bir yönetici geri alabilir."
+    },
+    "account": {
+      "notOwner": "Bunu yalnızca bu hesabı veya planı bağlayan kişi yapabilir."
+    },
+    "channel": {
+      "membersForbidden": "Kişi ekleyip çıkarmayı yalnızca kanalı oluşturan kişi veya bir yönetici yapabilir."
     },
     "handle": {
       "invalid": "Bir @ adı {{min}} ile {{max}} arasında küçük harf, rakam, - veya _ içerir.",

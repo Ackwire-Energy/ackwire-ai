@@ -11005,7 +11005,8 @@
       "editorsExcludeYou": "Neem jezelf op bij de mensen die bewerken, om deze pagina te houden.",
       "titleTaken": "Er is al een pagina met de naam “{{title}}”.",
       "titleCharacters": "Een titel mag geen [ ] | of # bevatten.",
-      "titleNoLetters": "Een titel heeft letters of cijfers nodig."
+      "titleNoLetters": "Een titel heeft letters of cijfers nodig.",
+      "lockAdminsOnly": "Alleen beheerders vergrendelen pagina's."
     },
     "media": {
       "off": "GIF's en stickers staan uit in deze werkruimte.",
@@ -11030,7 +11031,8 @@
       "decided": "Iemand heeft al over dit voorstel beslist.",
       "expired": "Dit voorstel is verlopen: niemand heeft er binnen een dag over beslist.",
       "routineMade": "De routine van deze agent is al aangemaakt.",
-      "noRoutine": "Dit voorstel heeft geen routine om aan te maken."
+      "noRoutine": "Dit voorstel heeft geen routine om aan te maken.",
+      "notRequester": "Alleen wie erom vroeg, kan het versturen."
     },
     "approval": {
       "alwaysUnavailable": "Dit verzoek kan niet voorgoed goedgekeurd worden. Keur alleen dit verzoek goed."
@@ -11132,20 +11134,28 @@
       "agentNotInChannel": "Voeg de agent eerst toe aan het gesprek.",
       "webhookPaused": "Zet de routine aan om hem te testen.",
       "continueExtraOff": "Het venster van dit abonnement is op en het lange werk van deze agent gebruikt geen betaald extra gebruik. Zet dat aan in de AI-instellingen om nu door te gaan, anders gaat hij verder na de reset.",
-      "continueExtraUsedUp": "Het venster van dit abonnement is op en het betaalde extra gebruik is ook op of niet beschikbaar. Hij gaat verder na de reset."
+      "continueExtraUsedUp": "Het venster van dit abonnement is op en het betaalde extra gebruik is ook op of niet beschikbaar. Hij gaat verder na de reset.",
+      "actionsNeedApprover": "Alleen de eigenaar van de agent of wie zijn acties goedkeurt, kan een routine zelfstandig laten handelen.",
+      "editorOnly": "Alleen wie de routine maakte, de eigenaar van de agent of een beheerder kan hem wijzigen.",
+      "widgetFixed": "Deze routine houdt een widget bij. Wijzig hem via de widget."
     },
     "run": {
       "notContinuable": "Dit antwoord kan niet meer voortgezet worden.",
       "agentBusy": "De agent is al bezig in dit gesprek. Wacht tot hij klaar is om door te gaan.",
       "continueForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan het voortzetten.",
-      "notRestartable": "Dit antwoord was al begonnen, dus het kan niet opnieuw beginnen. Stuur je bericht opnieuw."
+      "notRestartable": "Dit antwoord was al begonnen, dus het kan niet opnieuw beginnen. Stuur je bericht opnieuw.",
+      "cancelForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan het stoppen.",
+      "answerForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan dit doen.",
+      "stopReasonForbidden": "Alleen wie het stopte, kan zeggen waarom."
     },
     "artifact": {
       "fileTooLarge": "Het bestand is groter dan {{max}} MB, de limiet per bestand.",
       "notVersioned": "Een afbeelding, video of opname heeft geen versies. Stuur het als een nieuw bestand.",
       "fileRequired": "Kies een bestand om te uploaden.",
       "fileNameRequired": "Het bestand heeft een naam nodig.",
-      "notFound": "Dit bestand bestaat niet meer of je hebt geen toegang."
+      "notFound": "Dit bestand bestaat niet meer of je hebt geen toegang.",
+      "deleteForbidden": "Alleen wie het maakte, wie het de agent vroeg, de eigenaar van de agent of een beheerder kan dit verwijderen.",
+      "restoreForbidden": "Alleen wie het mocht verwijderen, kan het herstellen."
     },
     "machine": {
       "forbidden": "Alleen een beheerder, of wie de computer heeft gekoppeld, kan dat doen.",
@@ -11187,6 +11197,18 @@
     },
     "rightHand": {
       "permanent": "De rechterhand hoort bij de werkruimte en blijft buiten de kanalen. Een @vermelding bereikt hem in elk kanaal."
+    },
+    "agent": {
+      "ownerOrAdmin": "Alleen de eigenaar van de agent of een beheerder kan dit doen.",
+      "detailsHidden": "Alleen wie met {{agentName}} praat, ziet hoe het werkt.",
+      "extraOwnerOnly": "Alleen de eigenaar van de agent zet het betaalde extra gebruik van het abonnement aan of uit.",
+      "undoForbidden": "Alleen de persoon voor wie de agent werkte, zijn eigenaar of een beheerder kan dit ongedaan maken."
+    },
+    "account": {
+      "notOwner": "Alleen wie dit account of abonnement heeft gekoppeld, kan dit doen."
+    },
+    "channel": {
+      "membersForbidden": "Alleen wie het kanaal maakte of een beheerder kan mensen toevoegen of verwijderen."
     },
     "handle": {
       "invalid": "Een @ heeft {{min}} tot {{max}} kleine letters, cijfers, - of _.",

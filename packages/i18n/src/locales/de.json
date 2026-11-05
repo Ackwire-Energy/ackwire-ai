@@ -10942,7 +10942,8 @@
       "editorsExcludeYou": "Nimm dich selbst unter die Personen auf, die bearbeiten, um diese Seite zu behalten.",
       "titleTaken": "Es gibt schon eine Seite namens „{{title}}“.",
       "titleCharacters": "Ein Titel darf kein [ ] | oder # enthalten.",
-      "titleNoLetters": "Ein Titel braucht Buchstaben oder Zahlen."
+      "titleNoLetters": "Ein Titel braucht Buchstaben oder Zahlen.",
+      "lockAdminsOnly": "Nur Admins sperren Seiten."
     },
     "media": {
       "off": "GIFs und Sticker sind in diesem Workspace ausgeschaltet.",
@@ -10967,7 +10968,8 @@
       "decided": "Über diesen Vorschlag hat schon jemand entschieden.",
       "expired": "Dieser Vorschlag ist abgelaufen: Niemand hat innerhalb eines Tages entschieden.",
       "routineMade": "Die Routine dieses Agenten wurde schon erstellt.",
-      "noRoutine": "Dieser Vorschlag hat keine Routine zum Erstellen."
+      "noRoutine": "Dieser Vorschlag hat keine Routine zum Erstellen.",
+      "notRequester": "Nur wer darum gebeten hat, kann es senden."
     },
     "approval": {
       "alwaysUnavailable": "Diese Anfrage kann nicht dauerhaft freigegeben werden. Gib nur diese eine frei."
@@ -11069,20 +11071,28 @@
       "agentNotInChannel": "Füg den Agent zuerst zur Unterhaltung hinzu.",
       "webhookPaused": "Schalte die Routine ein, um sie zu testen.",
       "continueExtraOff": "Das Zeitfenster dieses Abos ist aufgebraucht, und die lange Arbeit dieses Agenten nutzt keine bezahlte Zusatznutzung. Schalte sie in seinen KI-Einstellungen ein, um jetzt weiterzumachen, sonst geht es nach dem Zurücksetzen weiter.",
-      "continueExtraUsedUp": "Das Zeitfenster dieses Abos ist aufgebraucht, und seine bezahlte Zusatznutzung ist aufgebraucht oder nicht verfügbar. Es geht nach dem Zurücksetzen weiter."
+      "continueExtraUsedUp": "Das Zeitfenster dieses Abos ist aufgebraucht, und seine bezahlte Zusatznutzung ist aufgebraucht oder nicht verfügbar. Es geht nach dem Zurücksetzen weiter.",
+      "actionsNeedApprover": "Nur der Inhaber des Agenten oder wer seine Aktionen genehmigt, kann eine Routine selbstständig handeln lassen.",
+      "editorOnly": "Nur wer die Routine erstellt hat, der Inhaber des Agenten oder ein Admin kann sie ändern.",
+      "widgetFixed": "Diese Routine hält ein Widget aktuell. Ändere sie über das Widget."
     },
     "run": {
       "notContinuable": "Diese Antwort kann nicht mehr fortgesetzt werden.",
       "agentBusy": "Der Agent arbeitet schon in dieser Unterhaltung. Warte, bis er fertig ist, um weiterzumachen.",
       "continueForbidden": "Nur wer gefragt hat, der Inhaber des Agenten oder ein Admin kann fortsetzen.",
-      "notRestartable": "Diese Antwort hatte schon begonnen und kann nicht neu starten. Sende deine Nachricht noch einmal."
+      "notRestartable": "Diese Antwort hatte schon begonnen und kann nicht neu starten. Sende deine Nachricht noch einmal.",
+      "cancelForbidden": "Nur wer gefragt hat, der Inhaber des Agenten oder ein Admin kann das stoppen.",
+      "answerForbidden": "Nur wer gefragt hat, der Inhaber des Agenten oder ein Admin kann das tun.",
+      "stopReasonForbidden": "Nur wer gestoppt hat, kann den Grund angeben."
     },
     "artifact": {
       "fileTooLarge": "Die Datei ist größer als {{max}} MB, das Limit pro Datei.",
       "notVersioned": "Ein Bild, ein Video oder eine Aufnahme hat keine Versionen. Sende es als neue Datei.",
       "fileRequired": "Wähl eine Datei zum Hochladen.",
       "fileNameRequired": "Die Datei braucht einen Namen.",
-      "notFound": "Diese Datei gibt es nicht mehr, oder du hast keinen Zugriff."
+      "notFound": "Diese Datei gibt es nicht mehr, oder du hast keinen Zugriff.",
+      "deleteForbidden": "Nur wer es erstellt hat, wer den Agenten gefragt hat, der Inhaber des Agenten oder ein Admin kann das löschen.",
+      "restoreForbidden": "Nur wer es löschen durfte, kann es wiederherstellen."
     },
     "machine": {
       "forbidden": "Das kann nur ein Admin oder die Person, die den Computer verbunden hat.",
@@ -11124,6 +11134,18 @@
     },
     "rightHand": {
       "permanent": "Die rechte Hand gehört zum Workspace und bleibt außerhalb der Kanäle. Eine @Erwähnung erreicht sie in jedem davon."
+    },
+    "agent": {
+      "ownerOrAdmin": "Nur der Inhaber des Agenten oder ein Admin kann das tun.",
+      "detailsHidden": "Nur wer mit {{agentName}} spricht, sieht, wie es funktioniert.",
+      "extraOwnerOnly": "Nur der Inhaber des Agenten schaltet die bezahlte Zusatznutzung des Abos ein oder aus.",
+      "undoForbidden": "Nur die Person, für die der Agent gearbeitet hat, sein Inhaber oder ein Admin kann das rückgängig machen."
+    },
+    "account": {
+      "notOwner": "Nur wer dieses Konto oder Abo verbunden hat, kann das tun."
+    },
+    "channel": {
+      "membersForbidden": "Nur wer den Kanal erstellt hat oder ein Admin kann Personen hinzufügen oder entfernen."
     },
     "handle": {
       "invalid": "Ein @ hat {{min}} bis {{max}} Kleinbuchstaben, Zahlen, - oder _.",

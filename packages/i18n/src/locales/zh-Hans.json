@@ -10571,7 +10571,8 @@
       "editorsExcludeYou": "请把你自己加入可编辑的成员中，才能保留此页面的编辑权。",
       "titleTaken": "已经有一个名为“{{title}}”的页面。",
       "titleCharacters": "标题不能包含 [ ] | 或 #。",
-      "titleNoLetters": "标题需要包含字母或数字。"
+      "titleNoLetters": "标题需要包含字母或数字。",
+      "lockAdminsOnly": "只有管理员可以锁定页面。"
     },
     "media": {
       "off": "此工作区已关闭 GIF 和贴纸。",
@@ -10596,7 +10597,8 @@
       "decided": "已经有人对这条建议做出了决定。",
       "expired": "这条建议已过期：一天内没有人做出决定。",
       "routineMade": "这个智能体的例行工作已经创建。",
-      "noRoutine": "这条建议没有可创建的例行工作。"
+      "noRoutine": "这条建议没有可创建的例行工作。",
+      "notRequester": "只有提出请求的人可以发送。"
     },
     "approval": {
       "alwaysUnavailable": "这个请求不能永久批准，只能批准这一次。"
@@ -10698,20 +10700,28 @@
       "agentNotInChannel": "请先把智能体添加到对话中。",
       "webhookPaused": "请开启例行工作后再测试。",
       "continueExtraOff": "这个套餐的时间窗口额度已用完，而这个智能体的长时间工作没有启用付费额外用量。在它的 AI 设置中开启后即可立即继续，否则会在额度重置后继续。",
-      "continueExtraUsedUp": "这个套餐的时间窗口额度已用完，付费额外用量也已用完或不可用。它会在额度重置后继续。"
+      "continueExtraUsedUp": "这个套餐的时间窗口额度已用完，付费额外用量也已用完或不可用。它会在额度重置后继续。",
+      "actionsNeedApprover": "只有智能体负责人或批准其操作的人可以让例行工作自行执行。",
+      "editorOnly": "只有例行工作的创建者、智能体负责人或管理员可以修改它。",
+      "widgetFixed": "这项例行工作负责保持小组件最新。请从小组件修改。"
     },
     "run": {
       "notContinuable": "这个回答已无法继续。",
       "agentBusy": "智能体已在这段对话中工作，请等它完成后再继续。",
       "continueForbidden": "只有提问者、智能体负责人或管理员可以让它继续。",
-      "notRestartable": "这个回答已经开始，无法重新开始。请重新发送你的消息。"
+      "notRestartable": "这个回答已经开始，无法重新开始。请重新发送你的消息。",
+      "cancelForbidden": "只有提问者、智能体负责人或管理员可以停止它。",
+      "answerForbidden": "只有提问者、智能体负责人或管理员可以执行此操作。",
+      "stopReasonForbidden": "只有停止它的人可以说明原因。"
     },
     "artifact": {
       "fileTooLarge": "文件超过 {{max}} MB，这是单个文件的上限。",
       "notVersioned": "图片、视频或录音没有版本。请作为新文件发送。",
       "fileRequired": "请选择要上传的文件。",
       "fileNameRequired": "文件需要一个名称。",
-      "notFound": "这个文件已不存在，或你无权访问。"
+      "notFound": "这个文件已不存在，或你无权访问。",
+      "deleteForbidden": "只有创建者、向智能体提出请求的人、智能体负责人或管理员可以删除它。",
+      "restoreForbidden": "只有可以删除它的人才能恢复它。"
     },
     "machine": {
       "forbidden": "只有管理员或连接这台电脑的人可以执行此操作。",
@@ -10752,6 +10762,18 @@
     },
     "rightHand": {
       "permanent": "得力助手属于整个工作区，不加入频道。在任何频道 @提及它即可叫到它。"
+    },
+    "agent": {
+      "ownerOrAdmin": "只有智能体负责人或管理员可以执行此操作。",
+      "detailsHidden": "只有与 {{agentName}} 对话的人可以看到它的工作方式。",
+      "extraOwnerOnly": "只有智能体负责人可以开启或关闭套餐的付费额外用量。",
+      "undoForbidden": "只有智能体为其工作的人、智能体负责人或管理员可以撤销此操作。"
+    },
+    "account": {
+      "notOwner": "只有连接此账号或套餐的人可以执行此操作。"
+    },
+    "channel": {
+      "membersForbidden": "只有频道创建者或管理员可以添加或移除成员。"
     },
     "handle": {
       "invalid": "@ 名称需为 {{min}} 到 {{max}} 个小写字母、数字、- 或 _。",

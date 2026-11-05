@@ -10562,7 +10562,8 @@
       "editorsExcludeYou": "Sertakan dirimu di antara orang yang mengedit, supaya halaman ini tetap bisa kamu kelola.",
       "titleTaken": "Sudah ada halaman bernama “{{title}}”.",
       "titleCharacters": "Judul tidak boleh berisi [ ] | atau #.",
-      "titleNoLetters": "Judul harus berisi huruf atau angka."
+      "titleNoLetters": "Judul harus berisi huruf atau angka.",
+      "lockAdminsOnly": "Hanya Admin yang bisa mengunci halaman."
     },
     "media": {
       "off": "GIF dan stiker dinonaktifkan di ruang kerja ini.",
@@ -10587,7 +10588,8 @@
       "decided": "Seseorang sudah memutuskan usulan ini.",
       "expired": "Usulan ini kedaluwarsa: tidak ada yang memutuskannya dalam sehari.",
       "routineMade": "Rutinitas agen ini sudah dibuat.",
-      "noRoutine": "Usulan ini tidak punya rutinitas untuk dibuat."
+      "noRoutine": "Usulan ini tidak punya rutinitas untuk dibuat.",
+      "notRequester": "Hanya orang yang memintanya yang bisa mengirimnya."
     },
     "approval": {
       "alwaysUnavailable": "Permintaan ini tidak bisa disetujui untuk seterusnya. Setujui yang ini saja."
@@ -10689,20 +10691,28 @@
       "agentNotInChannel": "Tambahkan agen ke percakapan dulu.",
       "webhookPaused": "Aktifkan rutinitas untuk mengujinya.",
       "continueExtraOff": "Jatah periode paket ini sudah habis dan pekerjaan panjang agen ini tidak memakai pemakaian tambahan berbayar. Aktifkan itu di pengaturan AI-nya untuk melanjutkan sekarang, atau agen melanjutkan setelah reset.",
-      "continueExtraUsedUp": "Jatah periode paket ini sudah habis dan pemakaian tambahan berbayarnya juga habis atau tidak tersedia. Agen melanjutkan setelah reset."
+      "continueExtraUsedUp": "Jatah periode paket ini sudah habis dan pemakaian tambahan berbayarnya juga habis atau tidak tersedia. Agen melanjutkan setelah reset.",
+      "actionsNeedApprover": "Hanya pemilik agen atau orang yang menyetujui tindakannya yang bisa membiarkan rutinitas bertindak sendiri.",
+      "editorOnly": "Hanya pembuat rutinitas, pemilik agen, atau Admin yang bisa mengubahnya.",
+      "widgetFixed": "Rutinitas ini menjaga widget tetap terbaru. Ubah dari widget-nya."
     },
     "run": {
       "notContinuable": "Jawaban ini sudah tidak bisa dilanjutkan.",
       "agentBusy": "Agen sedang bekerja di percakapan ini. Tunggu sampai selesai untuk melanjutkan.",
       "continueForbidden": "Hanya orang yang meminta, pemilik agen, atau Admin yang bisa melanjutkannya.",
-      "notRestartable": "Jawaban ini sudah dimulai, jadi tidak bisa diulang dari awal. Kirim lagi pesanmu."
+      "notRestartable": "Jawaban ini sudah dimulai, jadi tidak bisa diulang dari awal. Kirim lagi pesanmu.",
+      "cancelForbidden": "Hanya orang yang meminta, pemilik agen, atau Admin yang bisa menghentikannya.",
+      "answerForbidden": "Hanya orang yang meminta, pemilik agen, atau Admin yang bisa melakukan ini.",
+      "stopReasonForbidden": "Hanya orang yang menghentikannya yang bisa menyebut alasannya."
     },
     "artifact": {
       "fileTooLarge": "File melebihi {{max}} MB, batas per file.",
       "notVersioned": "Gambar, video, atau rekaman tidak punya versi. Kirim sebagai file baru.",
       "fileRequired": "Pilih file untuk diunggah.",
       "fileNameRequired": "File harus punya nama.",
-      "notFound": "File ini sudah tidak ada atau kamu tidak punya akses."
+      "notFound": "File ini sudah tidak ada atau kamu tidak punya akses.",
+      "deleteForbidden": "Hanya pembuatnya, orang yang meminta ke agen, pemilik agen, atau Admin yang bisa menghapus ini.",
+      "restoreForbidden": "Hanya orang yang bisa menghapusnya yang bisa memulihkannya."
     },
     "machine": {
       "forbidden": "Hanya Admin, atau orang yang menghubungkan komputer, yang bisa melakukan itu.",
@@ -10743,6 +10753,18 @@
     },
     "rightHand": {
       "permanent": "Tangan kanan adalah bagian dari ruang kerja dan tetap di luar kanal. Sebuah @sebutan menjangkaunya di kanal mana pun."
+    },
+    "agent": {
+      "ownerOrAdmin": "Hanya pemilik agen atau Admin yang bisa melakukan ini.",
+      "detailsHidden": "Hanya orang yang berbicara dengan {{agentName}} yang bisa melihat cara kerjanya.",
+      "extraOwnerOnly": "Hanya pemilik agen yang bisa menyalakan atau mematikan penggunaan ekstra berbayar pada paket.",
+      "undoForbidden": "Hanya orang yang dibantu agen, pemiliknya, atau Admin yang bisa membatalkan ini."
+    },
+    "account": {
+      "notOwner": "Hanya orang yang menghubungkan akun atau paket ini yang bisa melakukan ini."
+    },
+    "channel": {
+      "membersForbidden": "Hanya pembuat kanal atau Admin yang bisa menambahkan atau menghapus orang."
     },
     "handle": {
       "invalid": "@ terdiri dari {{min}} sampai {{max}} huruf kecil, angka, - atau _.",

@@ -111,17 +111,19 @@ describe("a failed request in the person's words (errorText)", () => {
     expect(errorText(pt, new ApiError(400, "missing_credential", missing))).toBe(missing);
   });
 
-  test("a 403: the engine's own why, else that they can't; never an 'ask an admin' guess", () => {
+  test("a 403: a code's own line, else that they can't; never the server's words or an 'ask an admin' guess", () => {
     const why = "Only the channel's creator or an admin can add members";
-    expect(errorText(pt, new ApiError(403, "forbidden", why))).toBe(why);
-    expect(errorText(pt, new ApiError(403, "forbidden", "You don't have permission to do this"))).toBe(
+    expect(errorText(pt, new ApiError(403, "channel.members_forbidden", why))).toBe("errors.channel.membersForbidden");
+    expect(errorText(pt, new ApiError(403, "account.not_owner", "Only the account's owner can rename it"))).toBe(
+      "errors.account.notOwner",
+    );
+    expect(errorText(pt, new ApiError(403, "run.cancel_forbidden", "x"))).toBe("errors.run.cancelForbidden");
+    expect(errorText(pt, new ApiError(403, "channel.post_denied", "x"))).toBe("channel.perms.readOnlyComposer");
+    expect(errorText(pt, new ApiError(403, "forbidden", why))).toBe("common.notAllowed");
+    expect(errorText(pt, new ApiError(403, "agent.no_words_yet", "This agent can't be added to a channel"))).toBe(
       "common.notAllowed",
     );
     expect(errorText(pt, new ApiError(403, "bad_origin", "Cross-origin request refused"))).toBe("common.notAllowed");
-    expect(errorText(pt, new ApiError(403, "channel.post_denied", "x"))).toBe("channel.perms.readOnlyComposer");
-    // A code the app has no words for keeps the server's why.
-    const coded = "This agent can't be added to a channel";
-    expect(errorText(pt, new ApiError(403, "agent.no_words_yet", coded))).toBe(coded);
   });
 
   test("a runner's internal failure is for the log: the person reads it's on our side", () => {

@@ -17,7 +17,7 @@ import {
 import { setsCredential } from "@agenteschat/ui/names";
 import { getAgent } from "../agents";
 import { agentIdsSeen, isPlaybook, readsPlaybook, seesAgentDetails } from "../audience";
-import { caches } from "../cache";
+import { caches, rulesPresenceKey } from "../cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { type Judge, triesToChangePermissions } from "../judge";
 import { can, type Membership, requirePermission } from "../organizations";
@@ -248,6 +248,7 @@ export async function insertContextItem(tx: Executor, input: NewContextItem): Pr
   if (!row) throw new Error("context item insert returned nothing");
   await enqueueIndex(tx, { orgId: input.orgId, kind: "context_item", sourceId: row.id });
   caches.contextPresence.delete(`${input.orgId}:`);
+  if (row.kind === "rule" && row.agentId) caches.contextPresence.delete(rulesPresenceKey(row.orgId, row.agentId));
   return row;
 }
 

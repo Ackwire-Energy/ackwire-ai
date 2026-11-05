@@ -13088,7 +13088,7 @@ html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
 .rh-set__face-edit:hover .ac-avatar {
   filter: brightness(1.06);
 }
-.rh-set__face-edit:focus-visible {
+html:not([data-pointer]) .rh-set__face-edit:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

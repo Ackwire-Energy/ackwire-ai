@@ -8,6 +8,7 @@ import {
   createFakeJudge,
   drainOutbox,
   editContextItem,
+  enableCaches,
   ForbiddenError,
   insertMessage,
   openDm,
@@ -329,5 +330,31 @@ describe("rules people gave", () => {
     expect((await give(carol.id)).action).toBe("created");
     expect((await give(carol.id)).action).toBe("merged");
     expect((await rules()).map((r) => r.createdById).sort()).toEqual([bob.id, carol.id].sort());
+  });
+
+  test("with caches on, an agent remembered as holding no rule follows the first one at once", async () => {
+    f = await setup();
+    enableCaches();
+    try {
+      const ctx = await runFor(f.agent.id, f.owner.id, "go");
+      const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, ctx.runId));
+      if (!run) throw new Error("no run");
+      const agent = { id: f.agent.id, ownerUserId: f.owner.id };
+      expect((await rulesForRun(f.db, run, agent)).text).toBe("");
+      await consolidateItem(f.db, {
+        orgId: f.org.id,
+        kind: "rule",
+        scopeType: "agent",
+        scopeId: f.agent.id,
+        agentId: f.agent.id,
+        content: RULE,
+        channelIds: [],
+        createdByKind: "person",
+        createdById: f.owner.id,
+      });
+      expect((await rulesForRun(f.db, run, agent)).text).toContain("Ofertas da Vila");
+    } finally {
+      enableCaches(false);
+    }
   });
 });

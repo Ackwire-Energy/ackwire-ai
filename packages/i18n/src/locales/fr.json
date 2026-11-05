@@ -11363,7 +11363,8 @@
       "editorsExcludeYou": "Incluez-vous parmi les personnes qui modifient, pour garder cette page.",
       "titleTaken": "Une page s'appelle déjà « {{title}} ».",
       "titleCharacters": "Un titre ne peut pas contenir [ ] | ou #.",
-      "titleNoLetters": "Un titre doit contenir des lettres ou des chiffres."
+      "titleNoLetters": "Un titre doit contenir des lettres ou des chiffres.",
+      "lockAdminsOnly": "Seuls les admins verrouillent les pages."
     },
     "media": {
       "off": "Les GIF et les stickers sont désactivés dans cet espace de travail.",
@@ -11388,7 +11389,8 @@
       "decided": "Quelqu'un a déjà tranché cette proposition.",
       "expired": "Cette proposition a expiré : personne n'a tranché en un jour.",
       "routineMade": "La routine de cet agent a déjà été créée.",
-      "noRoutine": "Cette proposition n'a aucune routine à créer."
+      "noRoutine": "Cette proposition n'a aucune routine à créer.",
+      "notRequester": "Seule la personne qui l'a demandé peut l'envoyer."
     },
     "approval": {
       "alwaysUnavailable": "Cette demande ne peut pas être approuvée définitivement. Approuvez seulement celle-ci."
@@ -11490,20 +11492,28 @@
       "agentNotInChannel": "Ajoutez d'abord l'agent à la conversation.",
       "webhookPaused": "Activez la routine pour la tester.",
       "continueExtraOff": "La fenêtre de cet abonnement est épuisée et le travail long de cet agent n'utilise pas l'usage supplémentaire payant. Activez-le dans ses paramètres IA pour continuer maintenant, sinon il reprendra après la réinitialisation.",
-      "continueExtraUsedUp": "La fenêtre de cet abonnement est épuisée et son usage supplémentaire payant est épuisé ou indisponible. Il reprendra après la réinitialisation."
+      "continueExtraUsedUp": "La fenêtre de cet abonnement est épuisée et son usage supplémentaire payant est épuisé ou indisponible. Il reprendra après la réinitialisation.",
+      "actionsNeedApprover": "Seuls le responsable de l'agent ou une personne qui approuve ses actions peuvent laisser une routine agir seule.",
+      "editorOnly": "Seuls la personne qui a créé la routine, le responsable de l'agent ou un admin peuvent la modifier.",
+      "widgetFixed": "Cette routine tient un widget à jour. Modifiez-la depuis son widget."
     },
     "run": {
       "notContinuable": "Cette réponse ne peut plus être poursuivie.",
       "agentBusy": "L'agent travaille déjà dans cette conversation. Attendez qu'il ait fini pour continuer.",
       "continueForbidden": "Seuls la personne qui a demandé, le responsable de l'agent ou un admin peuvent la poursuivre.",
-      "notRestartable": "Cette réponse avait déjà commencé, elle ne peut donc pas repartir de zéro. Renvoyez votre message."
+      "notRestartable": "Cette réponse avait déjà commencé, elle ne peut donc pas repartir de zéro. Renvoyez votre message.",
+      "cancelForbidden": "Seuls la personne qui a demandé, le responsable de l'agent ou un admin peuvent l'arrêter.",
+      "answerForbidden": "Seuls la personne qui a demandé, le responsable de l'agent ou un admin peuvent faire cela.",
+      "stopReasonForbidden": "Seule la personne qui l'a arrêté peut dire pourquoi."
     },
     "artifact": {
       "fileTooLarge": "Le fichier dépasse {{max}} Mo, la limite par fichier.",
       "notVersioned": "Une image, une vidéo ou un enregistrement n’a pas de versions. Envoie-le comme un nouveau fichier.",
       "fileRequired": "Choisissez un fichier à importer.",
       "fileNameRequired": "Le fichier doit avoir un nom.",
-      "notFound": "Ce fichier n'existe plus ou vous n'y avez pas accès."
+      "notFound": "Ce fichier n'existe plus ou vous n'y avez pas accès.",
+      "deleteForbidden": "Seuls la personne qui l'a créé, celle qui l'a demandé à l'agent, le responsable de l'agent ou un admin peuvent supprimer ceci.",
+      "restoreForbidden": "Seule une personne qui pouvait le supprimer peut le restaurer."
     },
     "machine": {
       "forbidden": "Seul un admin, ou la personne qui a connecté l'ordinateur, peut faire cela.",
@@ -11546,6 +11556,18 @@
     },
     "rightHand": {
       "permanent": "Le bras droit fait partie de l'espace de travail et reste hors des canaux. Une @mention le joint dans n'importe lequel."
+    },
+    "agent": {
+      "ownerOrAdmin": "Seuls le responsable de l'agent ou un admin peuvent faire cela.",
+      "detailsHidden": "Seules les personnes qui parlent à {{agentName}} voient comment cela fonctionne.",
+      "extraOwnerOnly": "Seul le responsable de l'agent active ou désactive l'usage supplémentaire payant de l'abonnement.",
+      "undoForbidden": "Seuls la personne pour qui l'agent a travaillé, son responsable ou un admin peuvent annuler cela."
+    },
+    "account": {
+      "notOwner": "Seule la personne qui a connecté ce compte ou cet abonnement peut faire cela."
+    },
+    "channel": {
+      "membersForbidden": "Seuls la personne qui a créé le canal ou un admin peuvent ajouter ou retirer des personnes."
     },
     "handle": {
       "invalid": "Un @ contient de {{min}} à {{max}} lettres minuscules, chiffres, - ou _.",

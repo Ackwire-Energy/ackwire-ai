@@ -10667,6 +10667,7 @@ export const ptBR = {
       titleTaken: "Já existe uma página “{{title}}”.",
       titleCharacters: "O título não pode ter [ ] | ou #.",
       titleNoLetters: "O título precisa de letras ou números.",
+      lockAdminsOnly: "Só admins trancam páginas.",
     },
     /** GIFs and stickers (ADR 0091). */
     media: {
@@ -10694,6 +10695,7 @@ export const ptBR = {
       expired: "Esta proposta expirou: ninguém decidiu em um dia.",
       routineMade: "A rotina deste agente já foi criada.",
       noRoutine: "Esta proposta não tem rotina para criar.",
+      notRequester: "Só quem pediu pode enviar.",
     },
     approval: {
       alwaysUnavailable: "Este pedido não pode ser aprovado para sempre. Aprove só este.",
@@ -10801,12 +10803,18 @@ export const ptBR = {
         "A janela deste plano acabou e o trabalho longo deste agente não usa o uso extra pago. Ligue isso nas configurações de IA dele para continuar agora, ou ele retoma depois que o limite renovar.",
       continueExtraUsedUp:
         "A janela deste plano acabou e o uso extra pago dele acabou ou não está disponível. Ele retoma depois que o limite renovar.",
+      actionsNeedApprover: "Só o dono do agente ou quem aprova as ações dele pode deixar uma rotina agir sozinha.",
+      editorOnly: "Só quem criou a rotina, o dono do agente ou um admin pode mudá-la.",
+      widgetFixed: "Esta rotina mantém um widget atualizado. Mude pelo widget.",
     },
     run: {
       notContinuable: "Esta resposta não pode mais ser continuada.",
       agentBusy: "O agente já está trabalhando nesta conversa. Espere ele terminar para continuar.",
       continueForbidden: "Só quem pediu, o dono do agente ou um admin pode continuar.",
       notRestartable: "Esta resposta já tinha começado, então não dá para recomeçar. Mande a mensagem de novo.",
+      cancelForbidden: "Só quem pediu, o dono do agente ou um admin pode parar.",
+      answerForbidden: "Só quem pediu, o dono do agente ou um admin pode fazer isso.",
+      stopReasonForbidden: "Só quem parou pode dizer o motivo.",
     },
     artifact: {
       fileTooLarge: "O arquivo passa de {{max}} MB, o limite por arquivo.",
@@ -10814,6 +10822,8 @@ export const ptBR = {
       fileRequired: "Escolha um arquivo para enviar.",
       fileNameRequired: "O arquivo precisa de um nome.",
       notFound: "Este arquivo não existe mais ou você não tem acesso.",
+      deleteForbidden: "Só quem criou, quem pediu ao agente, o dono do agente ou um admin pode apagar isto.",
+      restoreForbidden: "Só quem poderia apagar pode restaurar.",
     },
     machine: {
       forbidden: "Só um admin, ou quem conectou o computador, pode fazer isso.",
@@ -10858,6 +10868,18 @@ export const ptBR = {
     rightHand: {
       permanent:
         "O braço direito faz parte do workspace e fica fora dos canais. Uma @menção o chama em qualquer um deles.",
+    },
+    agent: {
+      ownerOrAdmin: "Só o dono do agente ou um admin pode fazer isso.",
+      detailsHidden: "Só quem conversa com {{agentName}} vê como funciona.",
+      extraOwnerOnly: "Só o dono do agente liga ou desliga o uso extra pago do plano.",
+      undoForbidden: "Só a pessoa para quem o agente trabalhou, o dono dele ou um admin pode desfazer isso.",
+    },
+    account: {
+      notOwner: "Só quem conectou esta conta ou plano pode fazer isso.",
+    },
+    channel: {
+      membersForbidden: "Só quem criou o canal ou um admin pode adicionar ou remover pessoas.",
     },
     handle: {
       invalid: "O @ tem de {{min}} a {{max}} letras minúsculas, números, - ou _.",

@@ -21,6 +21,15 @@ const KNOWN = {
   "channel.permission_forbidden": "channel.perms.forbidden",
   "agent.handle_taken": "newAgent.errors.handleTaken",
   "agent.right_hand_permanent": "errors.rightHand.permanent",
+  "agent.not_owner": "errors.agent.ownerOrAdmin",
+  "usage_queue.cancel_forbidden": "errors.agent.ownerOrAdmin",
+  "agent.details_hidden": "errors.agent.detailsHidden",
+  "brain.extra_owner_only": "errors.agent.extraOwnerOnly",
+  "action.not_allowed": "errors.agent.undoForbidden",
+  "account.not_owner": "errors.account.notOwner",
+  "channel.members_forbidden": "errors.channel.membersForbidden",
+  "agent_proposal.not_requester": "errors.agentProposal.notRequester",
+  "proposal.not_requester": "errors.agentProposal.notRequester",
   "agent_proposal.decided": "errors.agentProposal.decided",
   "approval.always_unavailable": "errors.approval.alwaysUnavailable",
   "agent_proposal.expired": "errors.agentProposal.expired",
@@ -38,6 +47,8 @@ const KNOWN = {
   "artifact.file_required": "errors.artifact.fileRequired",
   "artifact.file_name_required": "errors.artifact.fileNameRequired",
   "artifact.not_found": "errors.artifact.notFound",
+  "artifact.delete_forbidden": "errors.artifact.deleteForbidden",
+  "artifact.restore_forbidden": "errors.artifact.restoreForbidden",
   "machine.forbidden": "errors.machine.forbidden",
   "machine.not_found": "errors.machine.notFound",
   "machine.name_required": "errors.machine.nameRequired",
@@ -98,12 +109,18 @@ const KNOWN = {
   "run.not_continuable": "errors.run.notContinuable",
   "run.agent_busy": "errors.run.agentBusy",
   "run.continue_forbidden": "errors.run.continueForbidden",
+  "run.cancel_forbidden": "errors.run.cancelForbidden",
+  "run.answer_forbidden": "errors.run.answerForbidden",
+  "run.stop_reason_forbidden": "errors.run.stopReasonForbidden",
   "run.not_restartable": "errors.run.notRestartable",
   "routine.too_frequent": "errors.routine.tooFrequent",
   "routine.too_many": "errors.routine.tooMany",
   "routine.creator_cannot_post": "errors.routine.creatorCannotPost",
   "routine.take_over_no_access": "errors.routine.takeOverNoAccess",
   "routine.act_take_over": "errors.routine.actTakeOver",
+  "routine.actions_need_approver": "errors.routine.actionsNeedApprover",
+  "routine.editor_only": "errors.routine.editorOnly",
+  "routine.widget_fixed": "errors.routine.widgetFixed",
   "routine.agent_not_in_channel": "errors.routine.agentNotInChannel",
   "routine.webhook_paused": "errors.routine.webhookPaused",
   "routine.continue_extra_off": "errors.routine.continueExtraOff",
@@ -115,6 +132,8 @@ const KNOWN = {
   "wiki.audience_excludes_you": "errors.wiki.audienceExcludesYou",
   "wiki.audience_wider_than_folder": "errors.wiki.audienceWiderThanFolder",
   "wiki.edit_limited": "errors.wiki.editLimited",
+  "wiki.locked": "wiki.lockedHint",
+  "wiki.lock_admins_only": "errors.wiki.lockAdminsOnly",
   "wiki.editors_exclude_you": "errors.wiki.editorsExcludeYou",
   "role.name_required": "errors.role.nameRequired",
   "role.name_long": "errors.role.nameLong",
@@ -482,20 +501,13 @@ function untranslatedText(t: TFunction, error: ApiError): string {
   return told && error.message ? error.message : t("common.ourSide");
 }
 
-/** `ForbiddenError`'s message when it says nothing more (mirrors packages/engine errors.ts). */
-const FORBIDDEN_DEFAULT = "You don't have permission to do this";
-
 /**
- * A 403 in the person's words: a code the app knows, else the server's own sentence of why, coded or not ("Only the
- * channel's creator or an admin can add members"), else that they can't do this. Never "ask an admin": the person may
- * be one, and the refusal may not be about their role. `bad_origin`'s words are for a developer.
+ * A 403 in the person's words: a code the app knows, else that they can't do this, never the server's sentence (a
+ * code with a why worth saying gets a line in `KNOWN`). Never "ask an admin": the person may be one, and the refusal
+ * may not be about their role.
  */
-export function forbiddenText(t: TFunction, error: ApiError, locale?: string): string {
-  const known = knownErrorText(t, error, locale);
-  if (known) return known;
-  const own = error.code !== "bad_origin" && error.message && error.message !== FORBIDDEN_DEFAULT;
-  return own ? error.message : t("common.notAllowed");
-}
+export const forbiddenText = (t: TFunction, error: ApiError, locale?: string): string =>
+  knownErrorText(t, error, locale) ?? t("common.notAllowed");
 
 /**
  * A sign-in, sign-up or reset Better Auth refused (`{ status, code, message }`, a block's kind on agentes.chat Cloud)
