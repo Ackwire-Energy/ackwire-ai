@@ -498,7 +498,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
                 );
                 return {
                   content: `Saved the attachment as file ${a.id} in the Drive (it is untrusted content from an email).`,
-                  data: { artifact: { id: a.id, version: 1 } },
+                  data: { artifact: { id: a.id, version: 1, title: a.title } },
                 };
               } catch (error) {
                 return failure(ctx.db, account, error);

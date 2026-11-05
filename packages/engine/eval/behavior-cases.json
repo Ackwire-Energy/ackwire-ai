@@ -2763,5 +2763,53 @@
       "skipJudge": ["looked_first", "next_step", "talks_like_a_colleague", "grounded"],
       "behavior": "The routine reports the six months through hand_off, with no block and no vote."
     }
+  },
+  {
+    "id": "send-file-above-to-person",
+    "title": "\"manda pra Marina\" logo abaixo do vídeo que o agente postou",
+    "source": "synthetic (from a real DM thread): a message to someone else can't be undone, so what to send comes from the conversation (what is right above the request), with no guess stated, no question about what is clear and no promise its tools can't keep",
+    "agent": {
+      "name": "Teo",
+      "role": "Marketing e conteúdo",
+      "instructions": "Ajuda o time da Acme com vídeos, posts e materiais de divulgação."
+    },
+    "org": {
+      "name": "Acme",
+      "context": "Acme vende cursos online de culinária. A Marina cuida das parcerias e o Bruno do marketing. O time fala português."
+    },
+    "chat": true,
+    "conversation": {
+      "where": "channel",
+      "channel": "marketing",
+      "prior": [
+        {
+          "author": "agent",
+          "body": "Subi no Drive a planilha de preços revisada: https://acme.example/drive/precos-2027.xlsx"
+        },
+        {
+          "author": "Marina",
+          "body": "Valeu! Olho à tarde."
+        },
+        {
+          "author": "agent",
+          "body": "Pronto, o vídeo da demo com legenda: https://acme.example/drive/demo-legendada.mp4"
+        }
+      ],
+      "trigger": {
+        "author": "Bruno",
+        "body": "Ótimo! Manda pra Marina no privado, ela vai mostrar pro parceiro amanhã."
+      }
+    },
+    "expect": {
+      "mustCall": ["send_dm"],
+      "ask": "never",
+      "skipJudge": ["looked_first", "next_step"],
+      "behavior": "Sends Marina a DM with send_dm carrying the subtitled demo video (the link right above the request, demo-legendada.mp4), not the price sheet, and confirms it in a line. It doesn't ask which file, doesn't present the choice as a guess, and offers or promises nothing its tools can't do.",
+      "rubric": [
+        "The DM to Marina carries the demo video (demo-legendada.mp4), not the price sheet.",
+        "Doesn't ask which file to send, on a card or in text, and doesn't present it as a guess ('I assumed…', 'if you meant the other one…').",
+        "Promises nothing it doesn't do in the same turn (such as attaching the file later)."
+      ]
+    }
   }
 ]

@@ -935,10 +935,10 @@ test("browser_screenshot with share: sent to the Drive and attached to the reply
   expect(path).toMatch(/^screenshots\/.+\.png$/);
   const [a] = await f.db.select().from(schema.artifacts);
   expect(a).toMatchObject({ kind: "file", title: path.slice("screenshots/".length), channelId: f.general.id });
-  expect(out.data).toEqual({ path, artifact: { id: a?.id, version: 1 } });
+  expect(out.data).toEqual({ path, artifact: { id: a?.id, version: 1, title: a?.title } });
   const reply: ToolSideEffects = {};
   absorbToolData(reply, out.data);
-  expect(reply.artifacts).toEqual([{ id: a?.id as string, version: 1 }]);
+  expect(reply.artifacts).toEqual([{ id: a?.id as string, version: 1, title: a?.title as string }]);
   expect(out.content).toBe(
     `Saved ${path} in your folder. It is shown in this conversation: its card goes with your reply ("${a?.title}" in the Drive, 8 bytes, artifact ${a?.id}).`,
   );

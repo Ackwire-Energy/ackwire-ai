@@ -129,7 +129,7 @@ describe("live blocks", () => {
     const row = await ask("@dev simula o desconto");
     expect(row).toMatchObject({ kind: "block", inDrive: false, untrusted: true, channelId: f.general.id });
     const reply = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).at(-1);
-    expect(reply?.meta.artifacts).toEqual([{ id: row.id, version: 1 }]);
+    expect(reply?.meta.artifacts).toEqual([{ id: row.id, version: 1, title: row.title }]);
     const shown = await getArtifact(f.artifactDeps, person(f.owner.id), f.org.id, row.id);
     expect(shown.content).toEqual({ kind: "block", html: BLOCK, subtitle: "Dados de hoje" });
     expect(await listArtifacts(f.db, person(f.owner.id), f.org.id)).toEqual([]);
