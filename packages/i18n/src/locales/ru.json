@@ -9593,6 +9593,26 @@
     "startsIn": "начнёт через ~{{n}} мин",
     "startsAfter": "начнёт, когда {{after}} закончит",
     "left": "осталось ~{{n}} мин",
+    "overdue": "дольше обычного",
+    "openTask": "Открыть задачу",
+    "fill": {
+      "agent_one": "{{count}} от агента",
+      "agent_few": "{{count}} от агентов",
+      "agent_many": "{{count}} от агентов",
+      "agent_other": "{{count}} от агентов",
+      "person_one": "{{count}} для человека",
+      "person_few": "{{count}} для людей",
+      "person_many": "{{count}} для людей",
+      "person_other": "{{count}} для людей",
+      "routine_one": "{{count}} регулярная задача",
+      "routine_few": "{{count}} регулярные задачи",
+      "routine_many": "{{count}} регулярных задач",
+      "routine_other": "{{count}} регулярные задачи",
+      "work_one": "{{count}} долгая работа",
+      "work_few": "{{count}} долгие работы",
+      "work_many": "{{count}} долгих работ",
+      "work_other": "{{count}} долгие работы"
+    },
     "who": "{{name}}",
     "away": "Нет на связи {{time}}",
     "purpose": {
@@ -9608,11 +9628,11 @@
       "yourDm": "ваши личные сообщения",
       "dm": "личные сообщения с {{name}}",
       "thread": "ветка в #{{name}}",
+      "agents": "разговор между агентами",
       "private": "закрытый разговор"
     },
     "live": {
       "nextEta": "Ждёт компьютер. Следующий в очереди, примерно через {{n}} мин",
-      "nextAfter": "Ждёт компьютер. Следующий в очереди, когда {{after}} закончит",
       "next": "Ждёт компьютер. Следующий в очереди",
       "waiting": "Ждёт компьютер",
       "behind": "В очереди, {{nth}}. После: {{names}}",
@@ -13390,6 +13410,7 @@
       "waitingAgents": "{{name}} передал часть работы и ждёт ответа"
     },
     "consultPair": {
+      "took": "заняло {{time}}",
       "asking": "спрашивает",
       "working": "работает",
       "waitingApproval": "ждёт одобрения",
@@ -15027,6 +15048,24 @@
     "tasks_many": "{{count}} задач",
     "tasks_other": "{{count}} задачи",
     "free": "Без задач",
+    "hiddenTasks_one": "{{count}} задача, которую вы не видите",
+    "hiddenTasks_few": "{{count}} задачи, которые вы не видите",
+    "hiddenTasks_many": "{{count}} задач, которые вы не видите",
+    "hiddenTasks_other": "{{count}} задачи, которые вы не видите",
+    "hiddenLine_one": "Ещё {{count}} задача в разговорах, которые вы не видите.",
+    "hiddenLine_few": "Ещё {{count}} задачи в разговорах, которые вы не видите.",
+    "hiddenLine_many": "Ещё {{count}} задач в разговорах, которые вы не видите.",
+    "hiddenLine_other": "Ещё {{count}} задачи в разговорах, которые вы не видите.",
+    "helpers_one": "{{count}} помощник",
+    "helpers_few": "{{count}} помощника",
+    "helpers_many": "{{count}} помощников",
+    "helpers_other": "{{count}} помощника",
+    "delegated": {
+      "fromPerson": "началось с: {{name}}",
+      "fromYou": "началось с вас",
+      "fromRoutine": "началось с регулярной задачи {{name}}",
+      "stopNote": "Если вы остановите задачу, {{name}} узнает об этом и сам не попросит снова."
+    },
     "columns": {
       "task": "Задача",
       "state": "Состояние",
@@ -15036,6 +15075,7 @@
     },
     "sections": {
       "asked": "По просьбе людей",
+      "delegated": "Запрошены агентами",
       "background": "Регулярные задачи в фоне"
     },
     "state": {
@@ -15109,6 +15149,11 @@
       "openManager": "Открыть в диспетчере задач"
     },
     "confirm": {
+      "chainTitle_one": "Остановить {{name}} и {{count}} помощника?",
+      "chainTitle_few": "Остановить {{name}} и {{count}} помощников?",
+      "chainTitle_many": "Остановить {{name}} и {{count}} помощников?",
+      "chainTitle_other": "Остановить {{name}} и {{count}} помощников?",
+      "chainBody": "Сделанное сохранится, и все об этом узнают.",
       "title_one": "Остановить {{count}} задачу агента {{name}}?",
       "title_few": "Остановить {{count}} задачи агента {{name}}?",
       "title_many": "Остановить {{count}} задач агента {{name}}?",

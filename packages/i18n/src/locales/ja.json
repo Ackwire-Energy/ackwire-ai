@@ -8587,6 +8587,14 @@
     "startsIn": "約{{n}}分後に開始",
     "startsAfter": "{{after}}が終わると開始",
     "left": "残り約{{n}}分",
+    "overdue": "いつもより長くかかっています",
+    "openTask": "タスクを開く",
+    "fill": {
+      "agent_other": "エージェントからの依頼{{count}}件",
+      "person_other": "人からの依頼{{count}}件",
+      "routine_other": "{{count}}件のルーティン",
+      "work_other": "長い作業{{count}}件"
+    },
     "who": "{{name}}",
     "away": "{{time}}離脱中",
     "purpose": {
@@ -8602,11 +8610,11 @@
       "yourDm": "あなたのDM",
       "dm": "{{name}}とのDM",
       "thread": "#{{name}}のスレッド",
+      "agents": "エージェント同士の会話",
       "private": "非公開の会話"
     },
     "live": {
       "nextEta": "コンピューター待ち。次の番です。約{{n}}分後",
-      "nextAfter": "コンピューター待ち。{{after}}が終わると次の番です",
       "next": "コンピューター待ち。次の番です",
       "waiting": "コンピューター待ち",
       "behind": "待ち行列の{{nth}}。{{names}}の後",
@@ -12115,6 +12123,7 @@
       "waitingAgents": "{{name}}は一部を引き継ぎ、返事を待っています"
     },
     "consultPair": {
+      "took": "{{time}}かかりました",
       "asking": "質問中",
       "working": "作業中",
       "waitingApproval": "承認待ち",
@@ -13647,6 +13656,15 @@
     "agentTasks": "{{name}}のタスク",
     "tasks_other": "{{count}}件のタスク",
     "free": "対応可能",
+    "hiddenTasks_other": "表示できないタスク{{count}}件",
+    "hiddenLine_other": "表示できない会話に、ほかに{{count}}件のタスクがあります。",
+    "helpers_other": "手伝い{{count}}件",
+    "delegated": {
+      "fromPerson": "{{name}}さんから始まりました",
+      "fromYou": "あなたから始まりました",
+      "fromRoutine": "ルーティン「{{name}}」から始まりました",
+      "stopNote": "止めると{{name}}に伝わり、自分からは依頼し直しません。"
+    },
     "columns": {
       "task": "タスク",
       "state": "状態",
@@ -13656,6 +13674,7 @@
     },
     "sections": {
       "asked": "人からの依頼",
+      "delegated": "エージェントの依頼",
       "background": "バックグラウンドのルーティン"
     },
     "state": {
@@ -13726,6 +13745,8 @@
       "openManager": "タスクマネージャーで開く"
     },
     "confirm": {
+      "chainTitle_other": "{{name}}と手伝い{{count}}件を止めますか？",
+      "chainBody": "終わった分は残り、全員に伝わります。",
       "title_other": "{{name}}の{{count}}件のタスクを停止しますか？",
       "body": "ここまでの作業は残ります。{{name}}には、あなたが停止したことが伝わります。",
       "short": "{{name}}には、あなたが停止したことが伝わります。",

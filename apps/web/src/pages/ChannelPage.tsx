@@ -142,7 +142,7 @@ import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
-import { tasksOf, todayStart } from "@agenteschat/client/lib/task-manager";
+import { hiddenCount, tasksOf, todayStart } from "@agenteschat/client/lib/task-manager";
 import { holdsText } from "@agenteschat/client/lib/text";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
 import { buildTimeline, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
@@ -2670,6 +2670,7 @@ function ChannelView({
                 channelId={channel.id}
                 tasks={agentTasks}
                 ended={taskView.data?.ended ?? []}
+                hidden={hiddenCount(taskView.data?.hidden, tasksAgentId)}
                 onClose={() => setTasksOpen(false)}
               />
             )}

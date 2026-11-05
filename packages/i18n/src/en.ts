@@ -8815,6 +8815,21 @@ export const en = {
     /** {{after}} is `queue.who`: the agent's name, with an article where the language needs one. */
     startsAfter: "starts once {{after}} finishes",
     left: "~{{n}} min left",
+    /** A turn past its typical length: no estimate is honest. */
+    overdue: "past its usual time",
+    /** A row of the line, for who sees that work. */
+    openTask: "Open task",
+    /** What fills the computer now, joined into one line. */
+    fill: {
+      agent_one: "{{count}} asked by an agent",
+      agent_other: "{{count}} asked by agents",
+      person_one: "{{count}} for a person",
+      person_other: "{{count}} for people",
+      routine_one: "{{count}} routine",
+      routine_other: "{{count}} routines",
+      work_one: "{{count}} long job",
+      work_other: "{{count}} long jobs",
+    },
     /** An agent's name inside a sentence ("once Ada finishes"). Keep {{name}}; add an article only if your language needs one. */
     who: "{{name}}",
     /** The outage card's pill beside the time, {{time}} like "3 min". */
@@ -8833,12 +8848,12 @@ export const en = {
       yourDm: "your DM",
       dm: "DM with {{name}}",
       thread: "a thread in #{{name}}",
+      agents: "a conversation between agents",
       private: "a private conversation",
     },
     /** The waiting agent's live row, where "thinking" shows otherwise. */
     live: {
       nextEta: "Waiting for the computer. Next up, in about {{n}} min",
-      nextAfter: "Waiting for the computer. Next up, once {{after}} finishes",
       next: "Waiting for the computer. Next up",
       /** Before the line knows its turn, or while it can't say where it is. */
       waiting: "Waiting for the computer",
@@ -12163,6 +12178,8 @@ export const en = {
      * names while a question is out or once it went unanswered, lowercase, then the time.
      */
     consultPair: {
+      /** The row of a closed ask: from the ask to what came back, waits included. */
+      took: "took {{time}}",
       asking: "asking",
       /** Work handed off (`tell_agent`), still on it. */
       working: "working on it",
@@ -13823,8 +13840,28 @@ export const en = {
     tasks_one: "{{count}} task",
     tasks_other: "{{count}} tasks",
     free: "Free",
+    /** An agent's card: its tasks the viewer may not see, counted. */
+    hiddenTasks_one: "{{count}} task you can't see",
+    hiddenTasks_other: "{{count}} tasks you can't see",
+    /** Under the title: what the viewer may not see, counted. */
+    hiddenLine_one: "{{count}} more task in conversations you don't see.",
+    hiddenLine_other: "{{count}} more tasks in conversations you don't see.",
+    /** A task that asked other agents, on its row. */
+    helpers_one: "{{count}} helper",
+    helpers_other: "{{count}} helpers",
+    /** Work one agent asked of another: what started the chain. */
+    delegated: {
+      fromPerson: "started by {{name}}",
+      fromYou: "started by you",
+      fromRoutine: "started by the routine {{name}}",
+      stopNote: "If you stop it, {{name}} is told you did and won't ask again on its own.",
+    },
     columns: { task: "Task", state: "State", using: "Using now", time: "Time", computer: "Runs on" },
-    sections: { asked: "Asked by people", background: "Routines in the background" },
+    sections: {
+      asked: "Asked by people",
+      delegated: "Asked by agents",
+      background: "Routines in the background",
+    },
     state: {
       working: "Working",
       ok: "Waits for your ok",
@@ -13895,6 +13932,10 @@ export const en = {
       openManager: "Open in the task manager",
     },
     confirm: {
+      /** One task and the agents it asked, stopped together. */
+      chainTitle_one: "Stop {{name}} and {{count}} helper?",
+      chainTitle_other: "Stop {{name}} and {{count}} helpers?",
+      chainBody: "What's done stays, and they are all told.",
       title_one: "Stop the task of {{name}}?",
       title_other: "Stop the {{count}} tasks of {{name}}?",
       body: "What was already done stays, and {{name}} is told that you stopped it.",

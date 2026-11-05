@@ -21868,6 +21868,36 @@
   "queue.left": {
     "value": "~{{n}} min left"
   },
+  "queue.overdue": {
+    "value": "past its usual time"
+  },
+  "queue.openTask": {
+    "value": "Open task"
+  },
+  "queue.fill.agent": {
+    "value": {
+      "one": "{{count}} asked by an agent",
+      "other": "{{count}} asked by agents"
+    }
+  },
+  "queue.fill.person": {
+    "value": {
+      "one": "{{count}} for a person",
+      "other": "{{count}} for people"
+    }
+  },
+  "queue.fill.routine": {
+    "value": {
+      "one": "{{count}} routine",
+      "other": "{{count}} routines"
+    }
+  },
+  "queue.fill.work": {
+    "value": {
+      "one": "{{count}} long job",
+      "other": "{{count}} long jobs"
+    }
+  },
   "queue.who": {
     "value": "{{name}}"
   },
@@ -21904,14 +21934,14 @@
   "queue.where.thread": {
     "value": "a thread in #{{name}}"
   },
+  "queue.where.agents": {
+    "value": "a conversation between agents"
+  },
   "queue.where.private": {
     "value": "a private conversation"
   },
   "queue.live.nextEta": {
     "value": "Waiting for the computer. Next up, in about {{n}} min"
-  },
-  "queue.live.nextAfter": {
-    "value": "Waiting for the computer. Next up, once {{after}} finishes"
   },
   "queue.live.next": {
     "value": "Waiting for the computer. Next up"
@@ -30520,6 +30550,9 @@
   "chat.consultGroup.waitingAgents": {
     "value": "{{name}} handed part of it on and is waiting to hear back"
   },
+  "chat.consultPair.took": {
+    "value": "took {{time}}"
+  },
   "chat.consultPair.asking": {
     "value": "asking"
   },
@@ -34142,6 +34175,36 @@
   "taskManager.free": {
     "value": "Free"
   },
+  "taskManager.hiddenTasks": {
+    "value": {
+      "one": "{{count}} task you can't see",
+      "other": "{{count}} tasks you can't see"
+    }
+  },
+  "taskManager.hiddenLine": {
+    "value": {
+      "one": "{{count}} more task in conversations you don't see.",
+      "other": "{{count}} more tasks in conversations you don't see."
+    }
+  },
+  "taskManager.helpers": {
+    "value": {
+      "one": "{{count}} helper",
+      "other": "{{count}} helpers"
+    }
+  },
+  "taskManager.delegated.fromPerson": {
+    "value": "started by {{name}}"
+  },
+  "taskManager.delegated.fromYou": {
+    "value": "started by you"
+  },
+  "taskManager.delegated.fromRoutine": {
+    "value": "started by the routine {{name}}"
+  },
+  "taskManager.delegated.stopNote": {
+    "value": "If you stop it, {{name}} is told you did and won't ask again on its own."
+  },
   "taskManager.columns.task": {
     "value": "Task"
   },
@@ -34159,6 +34222,9 @@
   },
   "taskManager.sections.asked": {
     "value": "Asked by people"
+  },
+  "taskManager.sections.delegated": {
+    "value": "Asked by agents"
   },
   "taskManager.sections.background": {
     "value": "Routines in the background"
@@ -34330,6 +34396,15 @@
   },
   "taskManager.actions.openManager": {
     "value": "Open in the task manager"
+  },
+  "taskManager.confirm.chainTitle": {
+    "value": {
+      "one": "Stop {{name}} and {{count}} helper?",
+      "other": "Stop {{name}} and {{count}} helpers?"
+    }
+  },
+  "taskManager.confirm.chainBody": {
+    "value": "What's done stays, and they are all told."
   },
   "taskManager.confirm.title": {
     "value": {

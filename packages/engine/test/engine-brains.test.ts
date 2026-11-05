@@ -3231,14 +3231,54 @@ test("only the head of the computer's line asks it: an agent's run waits behind 
   expect(next).toHaveLength(1);
 });
 
+test("the right hand never waits behind the line: its turn goes to the computer past a person's run in it", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f, { builtin: "right_hand" });
+  // It thinks on the computer of the plan it was given.
+  const [plan] = await f.db
+    .insert(schema.machineAccounts)
+    .values({
+      id: Bun.randomUUIDv7(),
+      orgId: f.org.id,
+      machineId,
+      kind: "claude_code",
+      label: "plan",
+      status: "active",
+      createdBy: f.owner.id,
+      shared: true,
+    })
+    .returning();
+  await f.db.update(schema.agents).set({ brainAccountId: plan?.id }).where(eq(schema.agents.id, f.agent.id));
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Pronto." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id, { protocol: MACHINE_PROTOCOL_VERSION }) },
+  });
+  const other = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Rio", handle: "rio", role: "Dev", instructions: "You build.", credentialId: f.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  const ahead = await personAhead(f, machineId, other.id);
+  await post(f, "@dev o que está rodando?");
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(1);
+  const own = (await f.db.select().from(schema.agentRuns)).find((r) => r.id !== ahead.id);
+  expect(own?.status).toBe("done");
+  expect(own?.transcript).not.toHaveProperty("waitingForBrain");
+});
+
 /** A person's run already waiting for room on this computer, ahead of anything that comes now. */
-async function personAhead(fx: Fixture, machineId: string) {
+async function personAhead(fx: Fixture, machineId: string, agentId = fx.agent.id) {
   const id = Bun.randomUUIDv7();
   const [run] = await fx.db
     .insert(schema.agentRuns)
     .values({
       orgId: fx.org.id,
-      agentId: fx.agent.id,
+      agentId,
       channelId: fx.general.id,
       threadRootId: id,
       triggerMessageId: id,

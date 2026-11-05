@@ -65,7 +65,7 @@ export function useTaskStop() {
       for (const id of runIds) next.delete(id);
       return next;
     });
-  const stop = (runIds: string[], reason?: string) => {
+  const stop = (runIds: string[], reason?: string, chain?: boolean) => {
     if (runIds.length === 0) return;
     const why = reason?.trim() || undefined;
     playSound("stop");
@@ -73,7 +73,7 @@ export function useTaskStop() {
     if (why) setSaid((was) => new Map([...was, ...runIds.map((id) => [id, why] as const)]));
     for (const id of runIds) live.stopping(id, me.user.id);
     mutation.mutate(
-      { runIds, reason: why },
+      { runIds, reason: why, ...(chain ? { chain } : {}) },
       {
         onSuccess: (out) => {
           if (out.failed === 0) return;
@@ -417,11 +417,13 @@ function ReasonInput({
 
 /**
  * "Parar tudo de Dev": a card under the button with the agent's face, what happens ("O que já foi feito fica guardado,
- * e Dev fica sabendo"), an optional reason the agent reads, Cancelar and "Parar 3".
+ * e Dev fica sabendo"), an optional reason the agent reads, Cancelar and "Parar 3". `helpers`: one task and the agents
+ * it asked, stopped together ("Parar Dev e 3 ajudantes?").
  */
 export function StopAllConfirm({
   agentId,
   runIds,
+  helpers = 0,
   open,
   onOpenChange,
   onStop,
@@ -429,6 +431,7 @@ export function StopAllConfirm({
 }: {
   agentId: string;
   runIds: string[];
+  helpers?: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onStop: (runIds: string[], reason: string) => void;
@@ -442,8 +445,10 @@ export function StopAllConfirm({
   useEffect(() => {
     if (!open) setReason("");
   }, [open]);
-  const count = runIds.length;
-  const title = t("taskManager.confirm.title", { count, name });
+  const count = runIds.length + helpers;
+  const title = helpers
+    ? t("taskManager.confirm.chainTitle", { count: helpers, name })
+    : t("taskManager.confirm.title", { count, name });
   const confirm = () => {
     onOpenChange(false);
     onStop(runIds, reason);
@@ -462,7 +467,7 @@ export function StopAllConfirm({
         <AgentAvatar agentId={agentId} name={name} size="sm" />
         <div className="tm-confirm__text">
           <b>{title}</b>
-          <p>{t("taskManager.confirm.body", { name })}</p>
+          <p>{helpers ? t("taskManager.confirm.chainBody") : t("taskManager.confirm.body", { name })}</p>
         </div>
       </div>
       <ReasonInput
@@ -491,11 +496,13 @@ export function StopAllConfirm({
 export function StopAllInline({
   agentId,
   runIds,
+  helpers = 0,
   onCancel,
   onStop,
 }: {
   agentId: string;
   runIds: string[];
+  helpers?: number;
   onCancel: () => void;
   onStop: (runIds: string[], reason: string) => void;
 }) {
@@ -504,15 +511,17 @@ export function StopAllInline({
   const dir = useDirectory(org.id);
   const name = dir.anyAgent(agentId)?.name ?? t("channel.unknownAgent");
   const [reason, setReason] = useState("");
-  const count = runIds.length;
-  const title = t("taskManager.confirm.title", { count, name });
+  const count = runIds.length + helpers;
+  const title = helpers
+    ? t("taskManager.confirm.chainTitle", { count: helpers, name })
+    : t("taskManager.confirm.title", { count, name });
   const confirm = () => onStop(runIds, reason);
   return (
     <div className="tm-cfm" role="alertdialog" aria-label={title}>
       <span className="tm-cfm__text">
         <AgentSpinner agentId={agentId} size={14} />
         <span>
-          <b>{title}</b> {t("taskManager.confirm.short", { name })}
+          <b>{title}</b> {helpers ? t("taskManager.confirm.chainBody") : t("taskManager.confirm.short", { name })}
         </span>
       </span>
       <span className="tm-cfm__acts">

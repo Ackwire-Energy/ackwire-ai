@@ -331,7 +331,15 @@ const QueuePurpose = z
       "What the turn is for, never its content: answering a person, asked by another agent, a routine, or long work. Ids are null when the author is gone.",
   });
 
-const QueueWhere = z.object({ channelId: z.uuid(), threadId: z.uuid().nullable() });
+const QueueWhere = z.object({
+  channelId: z.uuid(),
+  threadId: z.uuid().nullable(),
+  agents: z.boolean().openapi({ description: "Two agents' private conversation, said only to who may see that work." }),
+});
+const QueueAccess = {
+  canOpen: z.boolean().openapi({ description: "You see this run in the task manager: the row opens it." }),
+  canStop: z.boolean().openapi({ description: "You may stop it." }),
+};
 
 const ComputerQueue = z
   .object({
@@ -346,8 +354,10 @@ const ComputerQueue = z
         startedAt: z.string().openapi({ description: "When this turn asked the computer." }),
         estimatedEndAt: z.string().nullable().openapi({
           description:
-            "Start plus the agent's median computer turn (else the workspace's), never sooner than 30 s from now; null with no basis.",
+            "Start plus the agent's median computer turn (else the workspace's), never sooner than 30 s from now; null with no basis, or past it.",
         }),
+        overdue: z.boolean().openapi({ description: "Past its typical turn: there is no honest end to give." }),
+        ...QueueAccess,
       }),
     ),
     waiting: z.array(
@@ -363,6 +373,7 @@ const ComputerQueue = z
           description:
             "Who it waits for: for the head, the running turn expected to end first; behind it, the agents ahead in line.",
         }),
+        ...QueueAccess,
       }),
     ),
   })

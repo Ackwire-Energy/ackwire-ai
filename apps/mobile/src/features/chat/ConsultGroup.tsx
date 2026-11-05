@@ -16,9 +16,9 @@ import {
   openableConsultation,
   pairItemOf,
 } from "@agenteschat/client/lib/consult-group";
+import { consultTimeText } from "@agenteschat/client/lib/consultations";
 import { namesText } from "@agenteschat/client/lib/format";
 import type { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { formatLineTime } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import type { TFunction } from "i18next";
@@ -181,7 +181,7 @@ export function ConsultPairRow({
         ) : null}
         {pair.seconds !== null ? (
           <Text variant="footnote" tone="faint" style={styles.time}>
-            {formatLineTime(i18n.language, pair.seconds * 1000)}
+            {consultTimeText(t, i18n.language, live, pair.seconds)}
           </Text>
         ) : null}
       </Pressable>

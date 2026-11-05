@@ -4203,19 +4203,31 @@ export type QueuePurpose =
 export interface QueueWhere {
   channelId: string;
   threadId: string | null;
+  /** Two agents' private conversation, said only to who may see that work. */
+  agents?: boolean;
 }
 
-export interface QueueWorking {
+/** What you may do with a row of the line (absent on an older server: nothing). */
+export interface QueueAccess {
+  /** You see it in the task manager: the row opens it. */
+  canOpen?: boolean;
+  /** You may stop it. */
+  canStop?: boolean;
+}
+
+export interface QueueWorking extends QueueAccess {
   runId: string;
   agentId: string;
   purpose: QueuePurpose;
   where: QueueWhere;
   startedAt: string;
-  /** An estimate (the agent's typical turn), never exact; null with no basis. */
+  /** An estimate (the agent's typical turn), never exact; null with no basis or past it. */
   estimatedEndAt: string | null;
+  /** Past its typical turn: there is no honest end to give. */
+  overdue?: boolean;
 }
 
-export interface QueueWaiting {
+export interface QueueWaiting extends QueueAccess {
   runId: string;
   agentId: string;
   purpose: QueuePurpose;
@@ -6185,6 +6197,12 @@ export interface TaskNow {
   at: string;
 }
 
+/** Who asked a task in agents' private conversation, and what started the chain. */
+export interface TaskDelegation {
+  agentId: string;
+  origin: { kind: "person"; userId: string; name: string } | { kind: "routine"; name: string } | { kind: "agent" };
+}
+
 /** One task in the task manager (`GET …/task-manager`, ADR 0128): a run still on. No cost. */
 export interface ManagedTask {
   runId: string;
@@ -6193,6 +6211,8 @@ export interface ManagedTask {
   channelKind: "channel" | "dm";
   /** Null for a DM (and a routine's room). */
   channelName: string | null;
+  /** A conversation only agents are in: nobody can open it, its steps say what happens there. */
+  betweenAgents?: boolean;
   /** Null: the main timeline. */
   threadId: string | null;
   status: "queued" | "running" | "waiting_approval" | "waiting_input";
@@ -6207,6 +6227,10 @@ export interface ManagedTask {
   plan: { done: number; total: number } | null;
   /** Who asked (a person); null for another agent, a routine or an event. */
   requester: { userId: string; name: string } | null;
+  /** Another agent asked it, in their private conversation (absent on an older server). */
+  delegation?: TaskDelegation | null;
+  /** What it asked of other agents and is still on or not started, all the way down. */
+  helpers?: number;
   /** `model`, `claude_code`, `codex`, `cursor`; null before its first turn. */
   brain: string | null;
   /** The agent's computer. */
@@ -6267,6 +6291,7 @@ export interface EndedTask {
   channelId: string;
   channelKind: "channel" | "dm";
   channelName: string | null;
+  betweenAgents?: boolean;
   threadId: string | null;
   status: "done" | "failed" | "canceled";
   label: string | null;
@@ -6284,9 +6309,20 @@ export interface TaskSteps {
   steps: RunStep[];
 }
 
+/** The workspace's work you may not see: how much, never what. */
+export interface HiddenTasks {
+  total: number;
+  /** Of them, running now. */
+  working: number;
+  /** Per agent: its tasks still on. */
+  byAgent: Record<string, number>;
+}
+
 export interface TaskManagerView {
   tasks: ManagedTask[];
   ended: EndedTask[];
+  /** Absent on an older server. */
+  hidden?: HiddenTasks;
   /** Computers with turns running or waiting for room (absent on an older server). */
   computers?: ComputerSummary[];
   /** Per agent with work in the last hour: tool calls per minute, 60 points, oldest first. */

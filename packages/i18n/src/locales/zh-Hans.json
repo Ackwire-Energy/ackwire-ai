@@ -8654,6 +8654,14 @@
     "startsIn": "约 {{n}} 分钟后开始",
     "startsAfter": "{{after}} 完成后开始",
     "left": "还剩约 {{n}} 分钟",
+    "overdue": "比平时久",
+    "openTask": "打开任务",
+    "fill": {
+      "agent_other": "{{count}} 个由智能体发起",
+      "person_other": "{{count}} 个为人处理",
+      "routine_other": "{{count}} 项例行工作",
+      "work_other": "{{count}} 项长时间工作"
+    },
     "who": "{{name}}",
     "away": "离开 {{time}}",
     "purpose": {
@@ -8669,11 +8677,11 @@
       "yourDm": "你的私信",
       "dm": "与 {{name}} 的私信",
       "thread": "#{{name}} 中的一个话题",
+      "agents": "智能体之间的对话",
       "private": "私密对话"
     },
     "live": {
       "nextEta": "正在等待电脑。下一个就是它，约 {{n}} 分钟后",
-      "nextAfter": "正在等待电脑。{{after}} 完成后就轮到它",
       "next": "正在等待电脑。下一个就是它",
       "waiting": "正在等待电脑",
       "behind": "排队中，第 {{nth}}。在 {{names}} 之后",
@@ -12180,6 +12188,7 @@
       "waitingAgents_female": "{{name}} 把部分工作交了出去，正在等待回复"
     },
     "consultPair": {
+      "took": "用了 {{time}}",
       "asking": "提问中",
       "working": "处理中",
       "waitingApproval": "等待批准",
@@ -13824,6 +13833,15 @@
     "agentTasks": "{{name}} 的任务",
     "tasks_other": "{{count}} 个任务",
     "free": "空闲",
+    "hiddenTasks_other": "{{count}} 个你看不到的任务",
+    "hiddenLine_other": "你看不到的对话里还有 {{count}} 个任务。",
+    "helpers_other": "{{count}} 个协助者",
+    "delegated": {
+      "fromPerson": "由 {{name}} 发起",
+      "fromYou": "由你发起",
+      "fromRoutine": "由例行工作 {{name}} 发起",
+      "stopNote": "停止后，{{name}} 会收到通知，不会自行再次请求。"
+    },
     "columns": {
       "task": "任务",
       "state": "状态",
@@ -13833,6 +13851,7 @@
     },
     "sections": {
       "asked": "成员的请求",
+      "delegated": "智能体发起",
       "background": "后台例行工作"
     },
     "state": {
@@ -13903,6 +13922,8 @@
       "openManager": "在任务管理器中打开"
     },
     "confirm": {
+      "chainTitle_other": "停止 {{name}} 和 {{count}} 个协助者？",
+      "chainBody": "已完成的内容会保留，大家都会收到通知。",
       "title_other": "要停止 {{name}} 的 {{count}} 个任务吗？",
       "body": "已完成的部分会保留，{{name}} 也会知道是你停止的。",
       "short": "{{name}} 会知道是你停止的。",

@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import type { ComputerQueue, Message, QueuePurpose, QueueWaiting, QueueWorking } from "../api/types";
 import type { MessageReceipt, ReceiptPhase, ReceiptsState } from "../realtime/receipts";
-import { namesText, ordinalForm } from "./format";
+import { joinNames, namesText, ordinalForm } from "./format";
 import { agentGrammar } from "./grammar";
 
 /**
@@ -57,6 +57,15 @@ export function queueView(queue: ComputerQueue, viewerId: string): QueueView {
   };
 }
 
+/** What fills the computer now: "5 asked by agents, 2 routines", or null with nothing on it. */
+export function queueFillText(t: TFunction, working: readonly Pick<QueueWorking, "purpose">[]) {
+  const parts = (["agent", "person", "routine", "work"] as const).flatMap((kind) => {
+    const count = working.filter((w) => w.purpose.kind === kind).length;
+    return count > 0 ? [t(`queue.fill.${kind}`, { count })] : [];
+  });
+  return parts.length ? joinNames(parts, t) : null;
+}
+
 /** "Computer · 9 waiting", or "Computer" while nothing waits. */
 export const queueButtonText = (t: TFunction, queue: ComputerQueue | null | undefined) =>
   queue?.waiting.length ? t("queue.button", { count: queue.waiting.length }) : t("queue.buttonIdle");
@@ -102,10 +111,13 @@ export function queuePurposeText(t: TFunction, p: QueuePurpose, names: QueueName
 export type QueuePlace =
   | { kind: "channel"; name: string; thread: boolean }
   | { kind: "dm"; mine: boolean; withName?: string }
+  /** Two agents' private conversation, for who may see that work. */
+  | { kind: "agents" }
   | { kind: "hidden" };
 
-/** "#dev", "a thread in #dev", "your DM", "DM with Theo", "a private conversation". */
+/** "#dev", "a thread in #dev", "your DM", "DM with Theo", "a talk between agents", "a private conversation". */
 export function queueWhereText(t: TFunction, place: QueuePlace) {
+  if (place.kind === "agents") return t("queue.where.agents");
   if (place.kind === "channel") return place.thread ? t("queue.where.thread", { name: place.name }) : `#${place.name}`;
   if (place.kind === "dm") {
     if (place.mine) return t("queue.where.yourDm");
@@ -114,9 +126,14 @@ export function queueWhereText(t: TFunction, place: QueuePlace) {
   return t("queue.where.private");
 }
 
-/** A working row's time: "~2 min left", or null with no basis. */
-export const queueLeftText = (t: TFunction, w: QueueWorking, now: number) =>
-  w.estimatedEndAt ? t("queue.left", { n: etaMinutes(w.estimatedEndAt, now) }) : null;
+/**
+ * A working row's time: "~2 min left", "past its usual time" (no estimate is honest then), or null with no basis. A
+ * line nobody waits in isn't asked again, so an estimate can pass while the dialog is open.
+ */
+export function queueLeftText(t: TFunction, w: QueueWorking, now: number) {
+  if (w.overdue || (w.estimatedEndAt && Date.parse(w.estimatedEndAt) <= now)) return t("queue.overdue");
+  return w.estimatedEndAt ? t("queue.left", { n: etaMinutes(w.estimatedEndAt, now) }) : null;
+}
 
 /** A waiting row's time: "starts ~3 min", "starts once Ada finishes", or null. */
 export function queueStartText(
@@ -131,8 +148,8 @@ export function queueStartText(
 }
 
 /**
- * The waiting agent's live row: "Waiting for the computer. Next up, in about 1 min", "… Next up, once Ada finishes",
- * "In line, 4th. After Ada, Kai and Ravi". Null when the run isn't in this computer's line.
+ * The waiting agent's live row: "Waiting for the computer. Next up, in about 1 min" when the line can say when, else
+ * "… Next up" alone, or "In line, 4th. After Ada, Kai and Ravi". Null when the run isn't in this computer's line.
  */
 export function queueLiveText(
   t: TFunction,
@@ -147,8 +164,6 @@ export function queueLiveText(
   const { context } = agentGrammar(agentName(w.agentId) ?? "");
   if (w.position === 1) {
     if (w.estimatedStartAt) return t("queue.live.nextEta", { n: etaMinutes(w.estimatedStartAt, now), context });
-    const after = w.after[0] ? agentName(w.after[0]) : undefined;
-    if (after) return t("queue.live.nextAfter", { after: t("queue.who", agentGrammar(after)), context });
     return t("queue.live.next", { context });
   }
   const names = w.after.flatMap((id) => agentName(id) ?? []);

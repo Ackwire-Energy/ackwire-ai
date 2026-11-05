@@ -5441,14 +5441,16 @@ export function useTaskSteps(orgId: string, runId: string | null, pollMs: number
 /**
  * "Parar" from the task manager or the chat's strip (ADR 0128): stops each task (with the reason the agent reads)
  * and refreshes the lists. Stopping several (an agent's "Parar todas") stops them one by one; one refused doesn't
- * keep the others running.
+ * keep the others running. `chain`: what each asked of other agents stops with it.
  */
 export function useStopTasks(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { runIds: string[]; reason?: string }) => {
-      const results = await Promise.allSettled(input.runIds.map((id) => api.agents.cancelRun(orgId, id, input.reason)));
+    mutationFn: async (input: { runIds: string[]; reason?: string; chain?: boolean }) => {
+      const results = await Promise.allSettled(
+        input.runIds.map((id) => api.agents.cancelRun(orgId, id, input.reason, input.chain)),
+      );
       const failed = results.filter((r) => r.status === "rejected").length;
       if (failed === results.length && failed > 0) throw (results[0] as PromiseRejectedResult).reason;
       return { stopped: results.length - failed, failed };

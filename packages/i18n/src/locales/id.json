@@ -8641,6 +8641,14 @@
     "startsIn": "mulai ~{{n}} mnt lagi",
     "startsAfter": "mulai setelah {{after}} selesai",
     "left": "sisa ~{{n}} mnt",
+    "overdue": "lebih lama dari biasanya",
+    "openTask": "Buka tugas",
+    "fill": {
+      "agent_other": "{{count}} diminta agen",
+      "person_other": "{{count}} untuk orang",
+      "routine_other": "{{count}} rutinitas",
+      "work_other": "{{count}} kerja panjang"
+    },
     "who": "{{name}}",
     "away": "Pergi {{time}}",
     "purpose": {
@@ -8656,11 +8664,11 @@
       "yourDm": "DM kamu",
       "dm": "DM dengan {{name}}",
       "thread": "thread di #{{name}}",
+      "agents": "percakapan antar agen",
       "private": "percakapan pribadi"
     },
     "live": {
       "nextEta": "Menunggu komputer. Giliran berikutnya, sekitar {{n}} mnt lagi",
-      "nextAfter": "Menunggu komputer. Giliran berikutnya setelah {{after}} selesai",
       "next": "Menunggu komputer. Giliran berikutnya",
       "waiting": "Menunggu komputer",
       "behind": "Dalam antrean, ke-{{nth}}. Setelah {{names}}",
@@ -12169,6 +12177,7 @@
       "waitingAgents": "{{name}} menyerahkan sebagian dan sedang menunggu kabar"
     },
     "consultPair": {
+      "took": "butuh {{time}}",
       "asking": "bertanya",
       "working": "sedang mengerjakan",
       "waitingApproval": "menunggu persetujuan",
@@ -13749,6 +13758,15 @@
     "agentTasks": "Tugas {{name}}",
     "tasks_other": "{{count}} tugas",
     "free": "Luang",
+    "hiddenTasks_other": "{{count}} tugas yang tidak kamu lihat",
+    "hiddenLine_other": "{{count}} tugas lagi di percakapan yang tidak kamu lihat.",
+    "helpers_other": "{{count}} pembantu",
+    "delegated": {
+      "fromPerson": "dimulai oleh {{name}}",
+      "fromYou": "dimulai olehmu",
+      "fromRoutine": "dimulai oleh rutinitas {{name}}",
+      "stopNote": "Kalau kamu menghentikannya, {{name}} diberi tahu dan tidak akan meminta lagi sendiri."
+    },
     "columns": {
       "task": "Tugas",
       "state": "Status",
@@ -13758,6 +13776,7 @@
     },
     "sections": {
       "asked": "Diminta oleh orang",
+      "delegated": "Diminta agen",
       "background": "Rutinitas di latar belakang"
     },
     "state": {
@@ -13828,6 +13847,8 @@
       "openManager": "Buka di pengelola tugas"
     },
     "confirm": {
+      "chainTitle_other": "Hentikan {{name}} dan {{count}} pembantu?",
+      "chainBody": "Yang sudah selesai tetap tersimpan, dan semuanya diberi tahu.",
       "title_other": "Hentikan {{count}} tugas {{name}}?",
       "body": "Yang sudah dikerjakan tetap tersimpan, dan {{name}} diberi tahu bahwa kamu menghentikannya.",
       "short": "{{name}} diberi tahu bahwa kamu menghentikannya.",

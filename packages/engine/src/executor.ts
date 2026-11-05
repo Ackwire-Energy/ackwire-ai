@@ -3705,10 +3705,14 @@ async function executeRunInner(
         transcript.roomAsked ??=
           !people && (run.background || (await personAskedLately(db, run.orgId, runStretchOf(run))));
         if (options.lineSince) transcript.roomOrderSince ??= options.lineSince;
-        const behind = await roomGate(db, run, roomMachine, {
-          rank: people ? 0 : transcript.roomAsked ? 1 : 2,
-          since: transcript.roomOrderSince ?? transcript.roomWaitSince ?? Date.now(),
-        });
+        // The right hand is how people find out what the line is doing: it never waits behind it. Its turn is
+        // locked down, so the runner lets it in on a lower floor (`admit`).
+        const behind = isRightHand(agent)
+          ? null
+          : await roomGate(db, run, roomMachine, {
+              rank: people ? 0 : transcript.roomAsked ? 1 : 2,
+              since: transcript.roomOrderSince ?? transcript.roomWaitSince ?? Date.now(),
+            });
         if (behind) {
           const handled = await brainUnavailable({
             code: "busy",

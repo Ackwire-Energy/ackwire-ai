@@ -25,7 +25,12 @@ export function TaskManagerEntry() {
   const list = tasks.data?.tasks ?? [];
   const sum = agentSummary(list);
   const lead = list.find((x) => taskState(x) === "working");
-  const line = !tasks.data ? null : sum.tasks === 0 ? t("taskManager.empty.title") : groupLine(t, sum).text;
+  const hidden = tasks.data?.hidden;
+  const line = !tasks.data
+    ? null
+    : sum.tasks === 0 && !hidden?.total
+      ? t("taskManager.empty.title")
+      : groupLine(t, { ...sum, working: sum.working + (hidden?.working ?? 0) }).text;
   return (
     <Pressable
       onPress={() => router.push("/task-manager")}

@@ -14,6 +14,7 @@ import {
   type QueueRow,
   queueAllStartedText,
   queueButtonText,
+  queueFillText,
   queueLeftText,
   queuePurposeText,
   queueStartText,
@@ -21,9 +22,10 @@ import {
   queueView,
   queueWhereText,
 } from "@agenteschat/client/lib/computer-queue";
-import { useCallback, useMemo } from "react";
+import { router } from "expo-router";
+import { type ReactNode, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Button, CHROME_MAX_SCALE, Chip, Count, Icon, type IconName, PressScale, Text } from "@/ui";
 import { useComputerSays, useWatchableComputer } from "../chat/DmComputerButton";
 import { openComputer } from "../computer/AgentComputerRow";
@@ -31,6 +33,8 @@ import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { useSheet } from "../shared/SheetHost";
+import { useStopper } from "../task-manager/hooks";
+import { StopButton } from "../task-manager/parts";
 import { machineOfAgents, queuePlace } from "./logic";
 
 /** The line of the computer these agents share (the first one's), live; nothing while none has a computer. */
@@ -95,7 +99,8 @@ export function DmQueueButton({ agentId, ...props }: { agentId: string; queue: C
 /**
  * A computer's line, as on the web's dialog: how full it is and when the next starts, "Working now" (every turn
  * running: what for, where, for how long, the time left) and "In line" (the order, who asked, the estimated start;
- * my own request marked "You go first"), and the rule that keeps it. What a turn is for, never its content.
+ * my own request marked "You go first"), and the rule that keeps it. What a turn is for, never its content; a row
+ * opens its task and stops it for who may.
  */
 export function QueueSheet({ machineId, computer }: { machineId: string; computer?: OpenComputerProps }) {
   const { t } = useTranslation();
@@ -105,6 +110,16 @@ export function QueueSheet({ machineId, computer }: { machineId: string; compute
   const q = useMachineQueue(orgId, machineId);
   const now = useNow(30_000);
   const words = useQueueWords();
+  const { stopping, stop } = useStopper();
+  const sheet = useSheet();
+  const act: RowActions = {
+    stopping,
+    stop: (runId) => stop([runId], undefined, true),
+    open: (runId) => {
+      sheet.close();
+      router.push(`/task-manager/${runId}` as const);
+    },
+  };
   if (!q.data) {
     return q.isError ? (
       <Text tone="muted">{t("mobile.app.failed")}</Text>
@@ -114,6 +129,7 @@ export function QueueSheet({ machineId, computer }: { machineId: string; compute
   }
   const view = queueView(q.data, meId ?? "");
   const allStarted = queueAllStartedText(t, view, now);
+  const fill = queueFillText(t, view.working);
   return (
     <>
       <View accessible accessibilityRole="header" accessibilityLabel={t("queue.label", { name: q.data.name })}>
@@ -121,6 +137,11 @@ export function QueueSheet({ machineId, computer }: { machineId: string; compute
       </View>
       <View style={styles.group}>
         <GroupHead title={t("queue.workingNow", { n: view.working.length })} />
+        {fill ? (
+          <Text variant="small" tone="ink2">
+            {fill}
+          </Text>
+        ) : null}
         {view.working.length === 0 ? (
           <Text variant="small" tone="muted">
             {t("queue.nothingWorking")}
@@ -128,7 +149,7 @@ export function QueueSheet({ machineId, computer }: { machineId: string; compute
         ) : (
           <View style={styles.rows}>
             {view.working.map((w) => (
-              <WorkingRow key={w.runId} row={w} words={words} now={now} />
+              <WorkingRow key={w.runId} row={w} words={words} now={now} act={act} />
             ))}
           </View>
         )}
@@ -138,7 +159,7 @@ export function QueueSheet({ machineId, computer }: { machineId: string; compute
           <GroupHead title={t("queue.inLine", { n: view.waiting.length })} aside={allStarted} />
           <View style={styles.rows}>
             {view.waiting.map((w) => (
-              <WaitingRow key={w.runId} row={w} words={words} now={now} />
+              <WaitingRow key={w.runId} row={w} words={words} now={now} act={act} />
             ))}
           </View>
         </View>
@@ -204,6 +225,13 @@ function useQueueWords() {
 
 type Words = ReturnType<typeof useQueueWords>;
 
+/** What a row does for who may: opens its task, stops it. */
+interface RowActions {
+  stopping: ReadonlySet<string>;
+  stop: (runId: string) => void;
+  open: (runId: string) => void;
+}
+
 function GroupHead({ title, aside }: { title: string; aside?: string | null }) {
   return (
     <View style={styles.head}>
@@ -219,33 +247,90 @@ function GroupHead({ title, aside }: { title: string; aside?: string | null }) {
   );
 }
 
-function WorkingRow({ row: w, words, now }: { row: QueueRow<QueueWorking>; words: Words; now: number }) {
+/** A line of the sheet, opening its task where the viewer sees it, with its stop beside it. */
+function ActiveLine({
+  row,
+  act,
+  children,
+}: {
+  row: { runId: string; canOpen?: boolean; canStop?: boolean };
+  act: RowActions;
+  children: ReactNode;
+}) {
   const { t } = useTranslation();
-  const elapsed = durationText(t, Math.max(0, now - Date.parse(w.startedAt)));
   return (
-    <QueueLine
-      agentId={w.agentId}
-      position={null}
-      name={words.agentName(w.agentId)}
-      line={`${words.line(w)} · ${elapsed}`}
-      time={queueLeftText(t, w, now)}
-      mine={w.mine}
-    />
+    <View style={styles.active}>
+      <Pressable
+        onPress={() => act.open(row.runId)}
+        disabled={!row.canOpen}
+        accessibilityRole={row.canOpen ? "button" : undefined}
+        accessibilityHint={row.canOpen ? t("queue.openTask") : undefined}
+        style={styles.grow}
+      >
+        {children}
+      </Pressable>
+      {row.canStop ? (
+        <StopButton
+          label={t("taskManager.actions.stop")}
+          stopping={act.stopping.has(row.runId)}
+          onPress={() => act.stop(row.runId)}
+        />
+      ) : null}
+    </View>
   );
 }
 
-function WaitingRow({ row: w, words, now }: { row: QueueRow<QueueWaiting>; words: Words; now: number }) {
+function WorkingRow({
+  row: w,
+  words,
+  now,
+  act,
+}: {
+  row: QueueRow<QueueWorking>;
+  words: Words;
+  now: number;
+  act: RowActions;
+}) {
+  const { t } = useTranslation();
+  const elapsed = durationText(t, Math.max(0, now - Date.parse(w.startedAt)));
+  return (
+    <ActiveLine row={w} act={act}>
+      <QueueLine
+        agentId={w.agentId}
+        position={null}
+        name={words.agentName(w.agentId)}
+        line={`${words.line(w)} · ${elapsed}`}
+        time={queueLeftText(t, w, now)}
+        mine={w.mine}
+      />
+    </ActiveLine>
+  );
+}
+
+function WaitingRow({
+  row: w,
+  words,
+  now,
+  act,
+}: {
+  row: QueueRow<QueueWaiting>;
+  words: Words;
+  now: number;
+  act: RowActions;
+}) {
   const { t } = useTranslation();
   return (
-    <QueueLine
-      agentId={w.agentId}
-      position={w.position}
-      name={words.agentName(w.agentId)}
-      line={words.line(w)}
-      time={queueStartText(t, w, words.names.agent, now)}
-      mine={w.mine}
-      first={w.mine && w.people}
-    />
+    <ActiveLine row={w} act={act}>
+      <QueueLine
+        agentId={w.agentId}
+        position={w.position}
+        name={words.agentName(w.agentId)}
+        line={words.line(w)}
+        time={queueStartText(t, w, words.names.agent, now)}
+        mine={w.mine}
+        first={w.mine && w.people}
+      />
+    </ActiveLine>
   );
 }
 
@@ -324,6 +409,8 @@ const styles = StyleSheet.create({
   rows: { marginHorizontal: -8, gap: 2 },
   // The face (20) on the first line (small, 20 tall).
   row: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 8, borderRadius: 12 },
+  active: { flexDirection: "row", alignItems: "center", gap: 4 },
+  grow: { flex: 1, minWidth: 0 },
   text: { flex: 1, minWidth: 0 },
   l1: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 20 },
   name: { fontWeight: "600", flexShrink: 1 },

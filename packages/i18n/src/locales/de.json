@@ -8961,6 +8961,18 @@
     "startsIn": "startet in ~{{n}} Min.",
     "startsAfter": "startet, sobald {{after}} fertig ist",
     "left": "noch ~{{n}} Min.",
+    "overdue": "dauert länger als üblich",
+    "openTask": "Aufgabe öffnen",
+    "fill": {
+      "agent_one": "{{count}} von einem Agenten angefragt",
+      "agent_other": "{{count}} von Agenten angefragt",
+      "person_one": "{{count}} für eine Person",
+      "person_other": "{{count}} für Personen",
+      "routine_one": "{{count}} Routine",
+      "routine_other": "{{count}} Routinen",
+      "work_one": "{{count}} lange Arbeit",
+      "work_other": "{{count}} lange Arbeiten"
+    },
     "who": "{{name}}",
     "away": "Weg seit {{time}}",
     "purpose": {
@@ -8976,11 +8988,11 @@
       "yourDm": "deine DM",
       "dm": "DM mit {{name}}",
       "thread": "ein Thread in #{{name}}",
+      "agents": "ein Gespräch zwischen Agenten",
       "private": "eine private Unterhaltung"
     },
     "live": {
       "nextEta": "Wartet auf den Computer. Als Nächstes dran, in etwa {{n}} Min.",
-      "nextAfter": "Wartet auf den Computer. Als Nächstes dran, sobald {{after}} fertig ist",
       "next": "Wartet auf den Computer. Als Nächstes dran",
       "waiting": "Wartet auf den Computer",
       "behind": "In der Warteschlange, {{nth}}. Nach {{names}}",
@@ -12582,6 +12594,7 @@
       "waitingAgents": "{{name}} hat einen Teil weitergegeben und wartet auf Rückmeldung"
     },
     "consultPair": {
+      "took": "dauerte {{time}}",
       "asking": "fragt",
       "working": "arbeitet daran",
       "waitingApproval": "wartet auf Freigabe",
@@ -14133,6 +14146,18 @@
     "tasks_one": "{{count}} Aufgabe",
     "tasks_other": "{{count}} Aufgaben",
     "free": "Frei",
+    "hiddenTasks_one": "{{count}} Aufgabe, die du nicht siehst",
+    "hiddenTasks_other": "{{count}} Aufgaben, die du nicht siehst",
+    "hiddenLine_one": "{{count}} weitere Aufgabe in Gesprächen, die du nicht siehst.",
+    "hiddenLine_other": "{{count}} weitere Aufgaben in Gesprächen, die du nicht siehst.",
+    "helpers_one": "{{count}} Helfer",
+    "helpers_other": "{{count}} Helfer",
+    "delegated": {
+      "fromPerson": "begonnen von {{name}}",
+      "fromYou": "von dir begonnen",
+      "fromRoutine": "von der Routine {{name}} begonnen",
+      "stopNote": "Wenn du sie stoppst, erfährt {{name}} das und fragt nicht von selbst noch einmal."
+    },
     "columns": {
       "task": "Aufgabe",
       "state": "Status",
@@ -14142,6 +14167,7 @@
     },
     "sections": {
       "asked": "Von Personen beauftragt",
+      "delegated": "Von Agenten angefragt",
       "background": "Routinen im Hintergrund"
     },
     "state": {
@@ -14213,6 +14239,9 @@
       "openManager": "Im Task-Manager öffnen"
     },
     "confirm": {
+      "chainTitle_one": "{{name}} und {{count}} Helfer stoppen?",
+      "chainTitle_other": "{{name}} und {{count}} Helfer stoppen?",
+      "chainBody": "Was schon erledigt ist, bleibt, und alle erfahren es.",
       "title_one": "Die Aufgabe von {{name}} stoppen?",
       "title_other": "Die {{count}} Aufgaben von {{name}} stoppen?",
       "body": "Was schon erledigt ist, bleibt erhalten, und {{name}} erfährt, dass du sie gestoppt hast.",

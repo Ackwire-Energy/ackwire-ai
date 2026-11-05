@@ -8962,6 +8962,21 @@ export const ptBR = {
     startsIn: "começa em ~{{n}} min",
     startsAfter: "começa quando {{after}} terminar",
     left: "faltam ~{{n}} min",
+    /** A turn past its typical length: no estimate is honest. */
+    overdue: "passou do normal",
+    /** A row of the line, for who sees that work. */
+    openTask: "Abrir tarefa",
+    /** What fills the computer now, joined into one line. */
+    fill: {
+      agent_one: "{{count}} pedida por agente",
+      agent_other: "{{count}} pedidas por agentes",
+      person_one: "{{count}} para uma pessoa",
+      person_other: "{{count}} para pessoas",
+      routine_one: "{{count}} rotina",
+      routine_other: "{{count}} rotinas",
+      work_one: "{{count}} trabalho longo",
+      work_other: "{{count}} trabalhos longos",
+    },
     who: "o {{name}}",
     who_female: "a {{name}}",
     away: "Fora há {{time}}",
@@ -8978,13 +8993,12 @@ export const ptBR = {
       yourDm: "sua DM",
       dm: "DM com {{name}}",
       thread: "uma thread em #{{name}}",
+      agents: "uma conversa entre agentes",
       private: "uma conversa privada",
     },
     live: {
       nextEta: "Aguardando o computador. É o próximo, em cerca de {{n}} min",
       nextEta_female: "Aguardando o computador. É a próxima, em cerca de {{n}} min",
-      nextAfter: "Aguardando o computador. É o próximo quando {{after}} terminar",
-      nextAfter_female: "Aguardando o computador. É a próxima quando {{after}} terminar",
       next: "Aguardando o computador. É o próximo",
       next_female: "Aguardando o computador. É a próxima",
       waiting: "Aguardando o computador",
@@ -12311,6 +12325,8 @@ export const ptBR = {
      * names while a question is out or once it went unanswered, lowercase, then the time.
      */
     consultPair: {
+      /** The row of a closed ask: from the ask to what came back, waits included. */
+      took: "levou {{time}}",
       asking: "perguntando",
       /** Work handed off (`tell_agent`), still on it. */
       working: "trabalhando",
@@ -14096,8 +14112,28 @@ export const ptBR = {
     tasks_one: "{{count}} tarefa",
     tasks_other: "{{count}} tarefas",
     free: "Livre",
+    /** An agent's card: its tasks the viewer may not see, counted. */
+    hiddenTasks_one: "{{count}} tarefa que você não vê",
+    hiddenTasks_other: "{{count}} tarefas que você não vê",
+    /** Under the title: what the viewer may not see, counted. */
+    hiddenLine_one: "Mais {{count}} tarefa em conversas que você não vê.",
+    hiddenLine_other: "Mais {{count}} tarefas em conversas que você não vê.",
+    /** A task that asked other agents, on its row. */
+    helpers_one: "{{count}} ajudante",
+    helpers_other: "{{count}} ajudantes",
+    /** Work one agent asked of another: what started the chain. */
+    delegated: {
+      fromPerson: "começou com {{name}}",
+      fromYou: "começou com você",
+      fromRoutine: "começou na rotina {{name}}",
+      stopNote: "Se parar, {{name}} fica sabendo que você parou e não pede de novo por conta própria.",
+    },
     columns: { task: "Tarefa", state: "Estado", using: "Usando agora", time: "Tempo", computer: "Onde roda" },
-    sections: { asked: "Pedidas por pessoas", background: "Rotinas em segundo plano" },
+    sections: {
+      asked: "Pedidas por pessoas",
+      delegated: "Pedidas por agentes",
+      background: "Rotinas em segundo plano",
+    },
     state: {
       working: "Trabalhando",
       ok: "Espera seu ok",
@@ -14168,6 +14204,10 @@ export const ptBR = {
       openManager: "Abrir no gerenciador",
     },
     confirm: {
+      /** One task and the agents it asked, stopped together. */
+      chainTitle_one: "Parar {{name}} e {{count}} ajudante?",
+      chainTitle_other: "Parar {{name}} e {{count}} ajudantes?",
+      chainBody: "O que já foi feito fica guardado, e todos ficam sabendo.",
       title_one: "Parar a tarefa de {{name}}?",
       title_other: "Parar as {{count}} tarefas de {{name}}?",
       body: "O que já foi feito fica guardado, e {{name}} fica sabendo que você parou.",

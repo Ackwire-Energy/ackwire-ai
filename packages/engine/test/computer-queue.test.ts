@@ -30,8 +30,42 @@ test("estimates: each running turn ends at start + its agent's median, never soo
     [],
     typical,
   );
-  expect(ends).toEqual([NOW + 4 * MIN, NOW + QUEUE_END_FLOOR_MS, NOW + 3 * MIN]);
+  expect(ends).toEqual([NOW + 4 * MIN, null, NOW + 3 * MIN]);
   expect(estimateQueue(NOW, [{ agentId: "x", startedAt: NOW }], [], { byAgent: {}, org: null }).ends).toEqual([null]);
+  // A turn about to reach its typical length still gets the floor: it is not past it.
+  const nearly = estimateQueue(NOW, [{ agentId: "kai", startedAt: NOW - 2 * MIN + 5_000 }], [], typical);
+  expect(nearly.ends).toEqual([NOW + QUEUE_END_FLOOR_MS]);
+});
+
+test("estimates: a turn past its typical length gives no end, and nobody behind it gets a start from it", () => {
+  const typical = { byAgent: { ada: 2 * MIN, kai: 3 * MIN }, org: null };
+  const past = estimateQueue(
+    NOW,
+    [{ agentId: "ada", startedAt: NOW - 33 * MIN }],
+    [
+      { agentId: "kai", people: true },
+      { agentId: "kai", people: false },
+    ],
+    typical,
+  );
+  expect(past).toMatchObject({ ends: [null], overdue: [true], starts: [null, null] });
+  // Who the head waits for is still known; what isn't is when.
+  expect(past.after[0]).toEqual(["ada"]);
+
+  // A slot that frees at a known time serves the line first; only what falls behind the unknown one has no start.
+  const mixed = estimateQueue(
+    NOW,
+    [
+      { agentId: "ada", startedAt: NOW - 33 * MIN },
+      { agentId: "kai", startedAt: NOW - MIN },
+    ],
+    [{ agentId: "ada", people: true }],
+    typical,
+  );
+  expect(mixed).toMatchObject({ overdue: [true, false], starts: [NOW + 2 * MIN] });
+
+  // With no basis at all it isn't overdue: it has nothing to be past.
+  expect(estimateQueue(NOW, [{ agentId: "x", startedAt: 0 }], [], { byAgent: {}, org: null }).overdue).toEqual([false]);
 });
 
 test("estimates: the line takes slots as they free, agents' turns spaced, a person's not", () => {
@@ -196,7 +230,8 @@ test("a computer's queue: working turns and the line in roomHead's order, purpos
     runId: working.id,
     agentId: nova.id,
     purpose: { kind: "person", userId: f.owner.id },
-    where: { channelId: f.general.id, threadId: null },
+    where: { channelId: f.general.id, threadId: null, agents: false },
+    overdue: false,
     startedAt: new Date(now - MIN).toISOString(),
     // 3 min median from its start.
     estimatedEndAt: new Date(now + 2 * MIN).toISOString(),
@@ -218,7 +253,11 @@ test("a computer's queue: working turns and the line in roomHead's order, purpos
 
   // Any member reads it; another workspace's computer is not found.
   const member = await addMember(f.db, f.org.id, "member", "bia");
-  expect((await computerQueue(f.db, member.id, f.org.id, machineId, now)).waiting).toHaveLength(3);
+  const seen = await computerQueue(f.db, member.id, f.org.id, machineId, now);
+  expect(seen.waiting).toHaveLength(3);
+  // What a row lets its reader do follows who reads it.
+  expect(q.waiting[0]).toMatchObject({ canOpen: true, canStop: true });
+  expect(seen.working[0]).toMatchObject({ canOpen: false, canStop: false, where: { agents: false } });
   const stranger = await addUser(f.db, "eve");
   await expect(computerQueue(f.db, stranger.id, f.org.id, machineId, now)).rejects.toThrow();
   await expect(computerQueue(f.db, f.owner.id, f.org.id, crypto.randomUUID(), now)).rejects.toThrow(

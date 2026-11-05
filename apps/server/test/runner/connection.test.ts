@@ -20,7 +20,14 @@ import {
 } from "../../runner/connection";
 import { MIN_FREE_BYTES } from "../../runner/desktop-session";
 import { RunnerError } from "../../runner/errors";
-import { MAX_IN_FLIGHT, RequestRunner, TURN_BYTES, TURN_SETTLE_MS, TURNS_WITHOUT_MEMORY } from "../../runner/handlers";
+import {
+  LOCKED_TURN_MIN_FREE_BYTES,
+  MAX_IN_FLIGHT,
+  RequestRunner,
+  TURN_BYTES,
+  TURN_SETTLE_MS,
+  TURNS_WITHOUT_MEMORY,
+} from "../../runner/handlers";
 import { removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
@@ -388,6 +395,53 @@ test("requests run concurrently up to the ceiling; beyond it the runner answers 
   await Promise.all([...started, view]);
   expect(sent.length).toBe(3);
   expect(runner.size).toBe(0);
+});
+
+test("a locked-down turn goes past the room check down to its own floor, and a little past the count where memory isn't known", async () => {
+  const ws = tempDir();
+  dirs.push(ws);
+  const sent: { id: string; ok: boolean; error?: { code: string } }[] = [];
+  const pending: Promise<void>[] = [];
+  let free: number | null = MIN_FREE_BYTES - 1;
+  const runner = new RequestRunner(
+    { workspaceReal: ws, exec: true, token: "agm_x" },
+    (f) => sent.push(f as unknown as (typeof sent)[number]),
+    () => {},
+    (_ctx, _req, scope) =>
+      new Promise((_, reject) => {
+        scope.signal.addEventListener("abort", () => reject(new RunnerError("internal", "Canceled")));
+      }),
+    { memAvailable: () => free, now: () => 1_000_000 },
+  );
+  const turn = (id: string, locked: boolean) => {
+    const req = { op: "brain.turn", runId: id, ...(locked ? { permissions: { mode: "chat" } } : {}) };
+    pending.push(runner.start(id, req as unknown as MachineRequest));
+  };
+  const refused = () => sent.filter((f) => !f.ok).map((f) => f.id);
+
+  // Below the floor everyone else keeps: the agents' turn waits, the locked-down one runs.
+  turn("work", false);
+  turn("lodi", true);
+  expect(refused()).toEqual(["work"]);
+  expect(runner.size).toBe(1);
+
+  // A computer about to run out turns it away too, and what it just admitted counts.
+  free = LOCKED_TURN_MIN_FREE_BYTES + TURN_BYTES - 1;
+  turn("lodi2", true);
+  expect(refused()).toEqual(["work", "lodi2"]);
+
+  // Where memory isn't known room is a count of turns: it doesn't count against it.
+  free = null;
+  for (let i = 0; i < TURNS_WITHOUT_MEMORY - 1; i++) turn(`c${i}`, false);
+  turn("over", false);
+  turn("lodi3", true);
+  expect(refused()).toEqual(["work", "lodi2", "over"]);
+  // A bound still: a turn it can't measure is no reason to run any number of them.
+  turn("lodi4", true);
+  turn("lodi5", true);
+  expect(refused()).toEqual(["work", "lodi2", "over", "lodi5"]);
+  runner.close();
+  await Promise.allSettled(pending);
 });
 
 test("a brain turn starts only while the computer has room; recent ones count until they grow; elsewhere a count", async () => {
