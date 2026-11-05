@@ -5,12 +5,17 @@ import {
   type AccountKind,
   type AccountLoginState,
   ANTIGRAVITY_PROTOCOL,
+  type AuthMethod,
   accountCodeAad,
+  CLAUDE_AUTH_PROTOCOL,
+  type ClaudeLoginMethod,
   CURSOR_KEY_PROVIDER,
   CURSOR_PROTOCOL,
+  claudeLoginMethodsOf,
   GROK_PROTOCOL,
   isAccountId,
   isAccountKind,
+  isClaudeLoginMethod,
   isLoginEmail,
   MAX_MACHINE_ACCOUNTS,
   type MachineReplies,
@@ -52,6 +57,7 @@ import {
 import { recordAudit } from "./audit";
 import { BRAIN_PLAN_NAMES } from "./brains/types";
 import { caches } from "./cache";
+import { claudeAuthMethodFor, claudeAuthPolicy } from "./claude-auth-policy";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import {
@@ -113,6 +119,8 @@ export interface MachineAccountView {
   email: string | null;
   plan: string | null;
   status: MachineAccountStatus;
+  /** False: the computer's last look at its status said nothing for sure (protocol 46); `status` is the last known. */
+  statusKnown: boolean;
   /** Whose it is; null: nobody's (its person was deleted, or the desktop app signed it in where nobody paired). */
   ownerId: string | null;
   ownerName: string | null;
@@ -199,6 +207,7 @@ function accountView(
     email: mine ? row.email : null,
     plan: row.plan,
     status: statusOf(row.status),
+    statusKnown: !row.statusUnknown,
     ownerId: row.createdBy,
     ownerName,
     mine,
@@ -452,6 +461,29 @@ interface Settled {
 }
 
 /**
+ * What a report says of how an account signs in and whether it is signed in (protocol 46). An inconclusive look
+ * (`statusUnknown`) leaves a listed account's status as it was; the method and Claude's organization stay as last
+ * known when the report doesn't say them.
+ */
+function reportedState(
+  info: RunnerAccountInfo,
+  row?: Pick<MachineAccountRow, "status" | "authMethod" | "providerOrgId" | "orgName">,
+) {
+  const listed = row?.status === "active" || row?.status === "signed_out";
+  return {
+    status: (info.statusUnknown && listed
+      ? row.status
+      : info.loggedIn
+        ? "active"
+        : "signed_out") as MachineAccountStatus,
+    statusUnknown: info.statusUnknown === true,
+    authMethod: info.authMethod ?? row?.authMethod ?? null,
+    providerOrgId: info.providerOrgId ?? row?.providerOrgId ?? null,
+    orgName: info.orgName ?? row?.orgName ?? null,
+  };
+}
+
+/**
  * What the runner says about an account whose row exists: a sign-in started
  * from the app finishes (named by `defaultAccountLabel`, audited for its owner, who
  * never changes), a known one is refreshed. `dedupe` (the person who signed
@@ -481,7 +513,8 @@ async function settleAccount(
   const email = info.email ?? row.email;
   const plan = info.plan ?? row.plan;
   const keyHint = info.keyHint ?? row.keyHint;
-  const status: MachineAccountStatus = info.loggedIn ? "active" : "signed_out";
+  const state = reportedState(info, row);
+  const { status } = state;
   const shared = info.shared === true;
   const signingIn = row.status === "signing_in";
   // Signed in again as another account (an email other than its own, or one its owner already has here where an
@@ -532,7 +565,7 @@ async function settleAccount(
       defaultAccountLabel(kindOf(row), await takenLabels(db, orgId, row.createdBy, row.id), row.provider);
     const [done] = await db
       .update(machineAccounts)
-      .set({ email, plan, keyHint, status, label, shared, ...usage, updatedAt: now })
+      .set({ email, plan, keyHint, ...state, label, shared, ...usage, updatedAt: now })
       .where(
         and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id), eq(machineAccounts.status, "signing_in")),
       )
@@ -553,11 +586,15 @@ async function settleAccount(
     plan === row.plan &&
     keyHint === row.keyHint &&
     status === row.status &&
-    shared === row.shared;
+    shared === row.shared &&
+    state.statusUnknown === row.statusUnknown &&
+    state.authMethod === row.authMethod &&
+    state.providerOrgId === row.providerOrgId &&
+    state.orgName === row.orgName;
   if (same && !info.usage) return { row, released: [], changed: false };
   const [fresh] = await db
     .update(machineAccounts)
-    .set({ email, plan, keyHint, status, shared, ...usage, updatedAt: now })
+    .set({ email, plan, keyHint, ...state, shared, ...usage, updatedAt: now })
     .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, row.id)))
     .returning();
   const released = await unshare(db, orgId, row, shared, now);
@@ -659,7 +696,7 @@ export async function syncMachineAccounts(
             email: a.email ?? null,
             plan: a.plan ?? null,
             keyHint: a.keyHint ?? null,
-            status: a.loggedIn ? "active" : "signed_out",
+            ...reportedState(a),
             usage: a.usage ?? null,
             shared: a.shared === true,
           })
@@ -679,7 +716,7 @@ export async function syncMachineAccounts(
                 email: a.email ?? elsewhere.email,
                 plan: a.plan ?? elsewhere.plan,
                 keyHint: a.keyHint ?? elsewhere.keyHint,
-                status: a.loggedIn ? "active" : "signed_out",
+                ...reportedState(a, elsewhere),
                 shared: a.shared === true,
                 ...(a.usage ? { usage: a.usage } : {}),
                 updatedAt: now,
@@ -975,8 +1012,9 @@ export async function beginAccountLogin(
   }
   const plan = planOf(provider);
   const { machine } = await memberMachine(deps.db, userId, orgId, machineId);
+  let existing: MachineAccountRow | null = null;
   if (accountId !== undefined) {
-    const existing = await getListedAccount(deps.db, orgId, machine.id, accountId);
+    existing = await getListedAccount(deps.db, orgId, machine.id, accountId);
     if (!existing || existing.kind !== kind || (existing.provider ?? undefined) !== provider) {
       throw new ValidationError("That account isn't on this computer", "account.invalid");
     }
@@ -1005,6 +1043,28 @@ export async function beginAccountLogin(
   const shared =
     protocol >= (kind === "codex" ? SHARED_CODEX_PROTOCOL : SHARED_ACCOUNTS_PROTOCOL) && sharedSignIn(kind, provider);
   const again = accountId !== undefined;
+  // A Claude subscription sign-in for all agents (ADR 0145): a new one takes the policy's method once, kept on its
+  // row; signing in again keeps the row's, whatever the policy says now (none known: the runner does as before).
+  let method: ClaudeLoginMethod | undefined;
+  if (kind === "claude_code" && provider === undefined && (again || shared)) {
+    const system = machine.executors?.mode === "system";
+    const kept = existing?.authMethod;
+    method = again
+      ? isClaudeLoginMethod(kept)
+        ? kept
+        : undefined
+      : claudeAuthMethodFor(await claudeAuthPolicy(deps.db), orgId, system);
+    const said = protocol >= CLAUDE_AUTH_PROTOCOL ? machine.executors?.claudeLoginMethods : undefined;
+    if (!again && method === "cli_login" && !claudeLoginMethodsOf(said, system).includes("cli_login")) {
+      throw new ConflictError(
+        "This computer's runner can't use Claude's own login for all agents yet. Update its runner, or ask support.",
+        "account.method_unsupported",
+        { name: machine.name },
+      );
+    }
+  }
+  // How it signs in, where nothing else can happen: a key, or a CLI's own sign-in.
+  const authMethod: AuthMethod = plan || cliKey ? "api_key" : (method ?? "cli_login");
   const loginId = again ? accountId : crypto.randomUUID();
   const expiresAt = new Date(Date.now() + ACCOUNT_LOGIN_TTL_MS).toISOString();
   if (!again) {
@@ -1017,6 +1077,7 @@ export async function beginAccountLogin(
       status: "signing_in",
       createdBy: userId,
       provider: plan || cliKey || enterprise ? provider : null,
+      authMethod,
     });
   }
   const fail = async () => {
@@ -1034,6 +1095,7 @@ export async function beginAccountLogin(
       ...(email ? { email } : {}),
       ...(plan || cliKey || enterprise ? { provider } : {}),
       ...(shared ? { shared: true } : {}),
+      ...(method && protocol >= CLAUDE_AUTH_PROTOCOL ? { method } : {}),
     });
   } catch (error) {
     await fail();

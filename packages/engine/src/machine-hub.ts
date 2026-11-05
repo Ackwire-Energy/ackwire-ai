@@ -580,8 +580,14 @@ export function createMachineHub(deps: MachineHubDeps) {
         // Protocol 7: which coding CLIs it has (an older runner says nothing: kept as unknown).
         // Protocol 12: whether it can run the agent browser (ADR 0040), kept with what it found; protocol 18:
         // the same for the agents' desktops and the terminal, and whether each agent is its own OS user (ADR 0058);
-        // protocol 21: whether agents can use their desktops (ADR 0062).
-        ...(frame.executors || frame.browser || frame.desktop || frame.terminal || frame.desktopUse
+        // protocol 21: whether agents can use their desktops (ADR 0062); protocol 46: which Claude sign-ins for all
+        // agents it can make (an older runner says nothing: `claudeLoginMethodsOf` reads that).
+        ...(frame.executors ||
+        frame.browser ||
+        frame.desktop ||
+        frame.terminal ||
+        frame.desktopUse ||
+        frame.claudeLoginMethods
           ? {
               executors: {
                 // A runner that hasn't looked yet leaves the CLIs out: the last ones stored stand.
@@ -593,6 +599,7 @@ export function createMachineHub(deps: MachineHubDeps) {
                 ...(frame.terminal ? { terminal: frame.terminal } : {}),
                 ...(frame.desktopUse ? { desktopUse: frame.desktopUse } : {}),
                 ...(system ? { mode: "system" as const } : {}),
+                ...(frame.claudeLoginMethods ? { claudeLoginMethods: frame.claudeLoginMethods } : {}),
                 ...(Object.keys(ownUsage).length > 0 ? { ownUsage } : {}),
               },
             }

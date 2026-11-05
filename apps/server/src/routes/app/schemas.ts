@@ -708,6 +708,10 @@ export const MachineAccount = z
       .nullable()
       .openapi({ description: "`pro`, `max`, `ultra`, `team`, `enterprise`… from what the CLI says." }),
     status: z.enum(["active", "signed_out"]),
+    statusKnown: z.boolean().openapi({
+      description:
+        "False: the computer's last look at its sign-in said nothing for sure (runner protocol 46); `status` is the last known.",
+    }),
     ownerId: z.string().nullable().openapi({ description: "Whose account it is; null: nobody's." }),
     ownerName: z.string().nullable(),
     mine: z.boolean().openapi({ description: "The caller owns it: only they rename it or choose it for an agent." }),

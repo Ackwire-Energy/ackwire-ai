@@ -56,6 +56,7 @@ export * from "./channel-deletion";
 export * from "./channel-permissions";
 export * from "./channels";
 export * from "./chat-tools";
+export * from "./claude-auth-policy";
 export * from "./computer-queue";
 export * from "./connector-triggers";
 export * from "./connector-usage";

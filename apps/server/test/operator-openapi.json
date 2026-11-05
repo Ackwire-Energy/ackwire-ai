@@ -3,7 +3,7 @@
   "info": {
     "title": "agentes.chat operator API",
     "version": "test",
-    "description": "Workspace and account lookups, workspace standing, billing holds and limits (ADR 0079), the events feed and review blocks, the workspaces' computers from an external provisioner, who may sign up (the waiting list and early-access invitations, ADR 0078), and how connectors are used (ADR 0103), for the people who run this instance (ADR 0056)."
+    "description": "Workspace and account lookups, workspace standing, billing holds and limits (ADR 0079), the events feed and review blocks, the workspaces' computers from an external provisioner, who may sign up (the waiting list and early-access invitations, ADR 0078), how new Claude sign-ins for all agents are made (ADR 0145), and how connectors are used (ADR 0103), for the people who run this instance (ADR 0056)."
   },
   "servers": [
     {
@@ -2124,6 +2124,151 @@
           }
         },
         "required": ["from", "to", "bucket", "totals", "series", "more", "orgId", "agents"]
+      },
+      "OperatorClaudeAuth": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/OperatorClaudeAuthPolicy"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "connections": {
+                "type": "object",
+                "properties": {
+                  "cli_login": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "setup_token": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "api_key": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "unknown": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": ["cli_login", "setup_token", "api_key", "unknown"],
+                "description": "Claude subscription connections people have now (signed in or signed out), by how they sign in; `unknown`: their computer never said."
+              }
+            },
+            "required": ["connections"]
+          }
+        ]
+      },
+      "OperatorClaudeLoginMethod": {
+        "type": "string",
+        "enum": ["cli_login", "setup_token"],
+        "description": "What NEW Claude sign-ins for all agents use on computers where each agent is its own OS user, in the workspaces `rollout` covers (`setup_token` in the others). Elsewhere they always use Claude's own login."
+      },
+      "OperatorClaudeAuthPolicy": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/OperatorClaudeAuthInput"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "changedAt": {
+                "type": ["string", "null"],
+                "description": "When it last changed; null: never."
+              }
+            },
+            "required": ["changedAt"]
+          }
+        ]
+      },
+      "OperatorClaudeAuthInput": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/OperatorClaudeLoginMethod"
+          },
+          "rollout": {
+            "type": "string",
+            "enum": ["selected", "all"],
+            "description": "`selected`: only the workspaces in `orgIds`. `all`: every workspace."
+          },
+          "orgIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 500,
+            "description": "Deduplicated; each must exist."
+          }
+        },
+        "required": ["method", "rollout", "orgIds"]
+      },
+      "OperatorOrgClaudeAuth": {
+        "type": "object",
+        "properties": {
+          "effective": {
+            "type": "object",
+            "properties": {
+              "method": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/OperatorClaudeLoginMethod"
+                  },
+                  {
+                    "description": "`setup_token`: `claude setup-token`'s long-lived token, kept by the computer's runner. `cli_login`: Claude's own login, kept and refreshed by Claude Code in the connection's folder."
+                  }
+                ]
+              }
+            },
+            "required": ["method"],
+            "description": "What a new Claude sign-in for all agents uses on the workspace's computers where each agent is its own OS user."
+          },
+          "policy": {
+            "$ref": "#/components/schemas/OperatorClaudeAuthPolicy"
+          },
+          "machines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "system": {
+                  "type": "boolean",
+                  "description": "Each agent is its own OS user there."
+                },
+                "protocol": {
+                  "type": "integer"
+                },
+                "claudeLoginMethods": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OperatorAuthMethod"
+                  },
+                  "description": "What a new Claude sign-in for all agents can use there: what its runner said (protocol 46), else what older runners do."
+                },
+                "supportsSelected": {
+                  "type": "boolean",
+                  "description": "It can use the method the policy gives it now; else such a sign-in there is refused."
+                }
+              },
+              "required": ["id", "name", "system", "protocol", "claudeLoginMethods", "supportsSelected"]
+            }
+          }
+        },
+        "required": ["effective", "policy", "machines"]
+      },
+      "OperatorAuthMethod": {
+        "type": "string",
+        "enum": ["cli_login", "setup_token", "api_key"]
       }
     },
     "parameters": {}
@@ -4218,6 +4363,140 @@
           },
           "401": {
             "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/claude-auth": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "How new Claude sign-ins for all agents are made",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorClaudeAuth"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Choose how new Claude sign-ins for all agents are made",
+        "description": "Takes effect for sign-ins started after it, with no restart; every connection keeps the method it was made with. Setting the current policy changes nothing. A workspace that doesn't exist is refused (400 `claude_auth.unknown_org`).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorClaudeAuthInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorClaudeAuth"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/claude-auth": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "How new Claude sign-ins for all agents are made in the workspace, and on each of its computers",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorOrgClaudeAuth"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No workspace with this id",
             "content": {
               "application/json": {
                 "schema": {

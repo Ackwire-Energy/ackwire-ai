@@ -5260,6 +5260,8 @@ export interface MachineAccount {
   /** `pro`, `max`, `ultra`, `team`… from what the CLI says (`planWordOf` names it). */
   plan: string | null;
   status: "active" | "signed_out";
+  /** False: the computer's last look at its sign-in said nothing for sure; `status` is the last known (older servers leave it out). */
+  statusKnown?: boolean;
   /** Whose it is (the person who signed it in); null: nobody's. */
   ownerId: string | null;
   ownerName: string | null;
