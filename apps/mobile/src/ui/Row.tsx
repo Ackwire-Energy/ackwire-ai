@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { Icon } from "./Icon";
 import { Text } from "./Text";
 import { useTheme } from "./theme";
+
+/** The leading column: a tile or face of up to 36 pt, centered in it. */
+const LEAD = 36;
 
 export interface RowProps {
   leading?: ReactNode;
@@ -50,27 +53,31 @@ export function Row({
           style={{
             position: "absolute",
             top: 0,
-            left: leading ? 58 : 14,
+            left: leading ? 14 + LEAD + 12 : 14,
             right: 0,
-            height: 1,
-            backgroundColor: colors.line,
+            height: StyleSheet.hairlineWidth,
+            backgroundColor: colors.line2,
           }}
         />
       ) : null}
-      {leading}
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text variant="title" numberOfLines={1}>
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text variant="small" numberOfLines={subtitleLines}>
-            {subtitle}
+      {/* One column for whatever leads (a 30 or 36 tile or face): the text and the hairline above start together. */}
+      {leading ? <View style={{ width: LEAD, alignItems: "center" }}>{leading}</View> : null}
+      {/* The time sits on the title's baseline, never centered beside a title and a two-line subtitle. */}
+      <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "baseline", gap: 12 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text variant="title" numberOfLines={1}>
+            {title}
           </Text>
-        ) : null}
-        {below}
+          {subtitle ? (
+            <Text variant="small" numberOfLines={subtitleLines}>
+              {subtitle}
+            </Text>
+          ) : null}
+          {below}
+        </View>
+        {meta ? <View style={{ alignItems: "flex-end", gap: 5 }}>{meta}</View> : null}
       </View>
-      {meta ? <View style={{ alignItems: "flex-end", gap: 5 }}>{meta}</View> : null}
-      {chevron ? <Icon name="right" size={16} color={colors.faint} /> : null}
+      {chevron ? <Icon name="right" size={15} color={colors.faint} /> : null}
     </View>
   );
   if (!onPress) return body(false);
