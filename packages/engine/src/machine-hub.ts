@@ -278,10 +278,14 @@ export interface MachineHubDeps {
  */
 export const BRAIN_IDLE_TIMEOUT_MS = 15 * 60_000;
 
-/** Default time a request may take: a command's own timeout plus slack; an upload 5.5 minutes; the rest 2 minutes. */
+/**
+ * Default time a request may take: a command's own timeout plus slack; an upload 5.5 minutes; a pull 10.5 (the
+ * runner's own limit is 10, and says why); the rest 2 minutes.
+ */
 export function requestTimeoutMs(request: MachineRequest) {
   if (request.op === "exec") return (request.timeoutSeconds + 30) * 1000;
   if (request.op === "push") return 330_000;
+  if (request.op === "pull") return 630_000;
   // A clone of a big repository on a slow link: its own deadline plus slack.
   if (request.op === "git.sync") return (Math.max(1, request.timeoutSeconds) + 30) * 1000;
   // A brain turn may wait on a person (a command approval) for up to 30 minutes, more than once.

@@ -17,6 +17,7 @@ import {
   listMachines,
   moveAgentsFromMachine,
   NotFoundError,
+  openFilePull,
   PROVISIONING_REASONS,
   PROVISIONING_STATES,
   PROVISIONING_STEPS,
@@ -1020,6 +1021,32 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
         },
       );
       return c.json({ ok: true, artifactId: artifact.id, version: artifact.shownVersion }, 200);
+    } catch (error) {
+      const mapped = domainErrorResponse(error, c);
+      if (mapped) return mapped;
+      throw error;
+    }
+  });
+
+  // The bytes of a file this machine was told to fetch (`pull`), straight from storage.
+  api.get("/machines/pulls/:pullId", async (c) => {
+    const auth = c.req.header("authorization") ?? "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+    const machine = token ? await authenticateMachine(db, token) : null;
+    if (!machine) return apiError(c, 401, "machine.unauthorized", "This computer's token is not valid");
+    const pullId = c.req.param("pullId");
+    if (!/^[0-9a-f-]{36}$/i.test(pullId))
+      return apiError(c, 404, "pull.not_found", "This file isn't waiting for this computer");
+    try {
+      const file = await openFilePull(deps.extras?.artifacts ?? missingArtifacts(), pullId, machine.id);
+      return new Response(file.body, {
+        status: 200,
+        headers: {
+          "content-type": "application/octet-stream",
+          "content-length": String(file.size),
+          "x-content-type-options": "nosniff",
+        },
+      });
     } catch (error) {
       const mapped = domainErrorResponse(error, c);
       if (mapped) return mapped;

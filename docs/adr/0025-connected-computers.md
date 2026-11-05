@@ -35,6 +35,18 @@ A new provider is a lifecycle adapter; the runner already covers the channel.
 
 Channels without `pushFile` (Daytona) fall back on the server: a folder is zipped inside the computer with `python3 -m zipfile`, then the server reads the file with `readFile` and stores it itself. Both paths end in the same `completeUpload`.
 
+### 2a. `pullFile`: the machine fetches the bytes (protocol 46)
+
+Addendum 2026-11-05. Chat and the Drive take files up to 50 MB, while a `write` carries 5 MB (base64 in one JSON frame), so a file people could send couldn't reach the agent's computer. Past that size the computer now fetches the file itself, the mirror of `pushFile`.
+
+- **Who decides.** The tool's own read check runs first. `copyToComputer` (`file-pulls.ts`) then makes a `machine_file_pulls` row naming that machine, that stored object (so that version) and an expiry of 5 minutes, and sends op `pull` with the URL, size and SHA-256. Small files stay on `write`. Every stored file goes through it: `import_file`, `read_skill_file`, `run_skill_script`.
+- **One fetch.** `GET /api/machines/pulls/{id}` takes the machine token and deletes the row as it answers, in one statement, so it holds across replicas and a second fetch finds nothing. A row names its own object: nothing in the request can point at another file, and used, expired, unknown and another machine's pulls get the same 404.
+- **Storage.** The answer streams from `BlobStore.stream` (S3 and disk). Postgres storage has no stream and is read whole, as its downloads are. The server streams from S3 rather than handing out a signed URL, so a computer only ever talks to our host, which it can always reach.
+- **On the computer.** `write`'s path rules are one function (`writeTarget`), so `pull` can't drift from them. The bytes go to a temporary file beside the target and rename over it once the size and hash match, so a cut connection leaves the target as it was. The limit is 10 minutes, which 50 MB fits at about 0.7 Mbit/s. A skill's file has no recorded hash and is checked by size.
+- **System mode (ADR 0057).** As with `push`, no worker holds the token: root makes the request, to the URL in the server's request and never one a worker names, and the bytes cross the link in pieces, paced by what the worker has read. Root's request also takes the host's own route, so it doesn't pass through whatever the workspace routes agents' traffic through, and doesn't count as theirs.
+- **Older runners.** `canPull` reads the protocol. Up to 5 MB nothing changes. Past that the agent reads the cause and the way out, and `run_skill_script` still runs, naming what stayed behind.
+- `read_file` keeps its 5 MB: what it reads goes into a model's context.
+
 ### 3. Binary files in the Drive
 
 A new artifact kind `file` (migration adds the enum value): any bytes, with the original name, MIME type, size and SHA-256 in the version row.
@@ -138,7 +150,7 @@ Runner protocol 7 (`EXECUTORS_PROTOCOL`, runner 0.7.0):
 - `POST …/machines/pairings` `{ name }` → `{ code, expiresAt, installCommand }`.
 - `PATCH …/machines/{id}` `{ name }`; `DELETE …/machines/{id}` (the person who paired it or an admin).
 - `PUT …/agents/{agentId}/computer/target` `{ machineId: uuid | null }`.
-- No session (machine token or code): `POST /api/machines/pair`, WebSocket `/api/machines/connect`, `PUT /api/machines/uploads/{uploadId}`, `GET /api/machines/install.sh`.
+- No session (machine token or code): `POST /api/machines/pair`, WebSocket `/api/machines/connect`, `PUT /api/machines/uploads/{uploadId}`, `GET /api/machines/pulls/{pullId}`, `GET /api/machines/install.sh`.
 
 ## Consequences
 

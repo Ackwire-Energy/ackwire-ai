@@ -47,6 +47,16 @@ export interface PushTarget {
   maxBytes: number;
 }
 
+/** What a computer fetches (`pullFile`): a one-use URL of ours, authenticated by the computer's own token. */
+export interface PullSource {
+  /** Absolute URL of our file endpoint (`GET`). */
+  url: string;
+  pullId: string;
+  size: number;
+  sha256?: string;
+  signal?: AbortSignal;
+}
+
 /** What a computer sent: the uploaded name (`report.pdf`, or `folder.zip`), size, SHA-256 (hex) and type. */
 export type PushReceipt = MachineReplies["push"];
 
@@ -70,6 +80,10 @@ export interface ComputerChannel {
   listFiles(id: string, path: string, depth?: number): Promise<SandboxFile[]>;
   /** The computer sends a file (a folder: zipped) straight to `target`, so the bytes never pass through the model. */
   pushFile(id: string, path: string, target: PushTarget): Promise<PushReceipt>;
+  /** The computer fetches a stored file to `path` itself, for what `writeFile` can't carry. */
+  pullFile(id: string, path: string, source: PullSource): Promise<void>;
+  /** Whether `pullFile` can work there (an older runner can't). */
+  canPull(id: string): Promise<boolean>;
   /** Secrets for the agent (ADR 0027), kept by the computer itself. */
   secret(
     id: string,

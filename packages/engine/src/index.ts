@@ -110,6 +110,7 @@ export * from "./errors";
 export * from "./events";
 export * from "./executor";
 export * from "./exports";
+export * from "./file-pulls";
 export * from "./follow-through";
 export * from "./follows";
 export * from "./gateway";

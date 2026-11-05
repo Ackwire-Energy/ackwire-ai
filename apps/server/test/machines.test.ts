@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
+import { schema } from "@agenteschat/db";
 import { ARTIFACT_LIMITS, createUpload, issueManagedMachine, setProvisioning } from "@agenteschat/engine";
 import { browser, createTestServer, listen, ORIGIN, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -182,6 +183,46 @@ test("install.sh is served without a session, never cached", async () => {
   const script = await res.text();
   expect(script).toStartWith("#!/bin/sh");
   expect(script).toContain(ORIGIN);
+});
+
+test("pulls GET: machine token, its own pull only, the stored bytes once", async () => {
+  const { pair, orgId } = await start();
+  const a = await pair("A");
+  const b = await pair("B");
+  const { store, prefix, storageConfigId } = await t.engine.artifacts.blobs.forOrg(orgId);
+  const blobKey = `${prefix}pull-test`;
+  await store.put(blobKey, new TextEncoder().encode("%PDF-1.4 hello"), { contentType: "application/pdf" });
+  const [pull] = await t.db
+    .insert(schema.machineFilePulls)
+    .values({
+      orgId,
+      machineId: a.machineId,
+      storageConfigId,
+      blobKey,
+      size: 14,
+      expiresAt: new Date(Date.now() + 60_000),
+    })
+    .returning();
+  const url = `/api/machines/pulls/${pull?.id}`;
+  const get = (token: string, path = url) => runnerCall(path, { headers: { authorization: `Bearer ${token}` } });
+  const code = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
+
+  expect((await runnerCall(url)).status).toBe(401);
+  expect((await get("agm_nope")).status).toBe(401);
+  const wrong = await get(b.token);
+  expect(wrong.status).toBe(404);
+  expect(await code(wrong)).toBe("pull.not_found");
+  expect((await get(a.token, "/api/machines/pulls/..%2F..%2Fsecret")).status).toBe(404);
+
+  const res = await get(a.token);
+  expect(res.status).toBe(200);
+  expect(await res.text()).toBe("%PDF-1.4 hello");
+  expect(res.headers.get("content-type")).toBe("application/octet-stream");
+  expect(res.headers.get("content-length")).toBe("14");
+  expect(res.headers.get("cache-control")).toBe("no-store");
+  const again = await get(a.token);
+  expect(again.status).toBe(404);
+  expect(await code(again)).toBe("pull.not_found");
 });
 
 test("uploads PUT: machine token, its own upload only, size refused before reading", async () => {

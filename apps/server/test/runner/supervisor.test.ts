@@ -1227,6 +1227,90 @@ test("worker sessions follow the server's: they end when it drops and are welcom
   expect(ana.of("worker.state")[2]).toMatchObject({ paused: { paused: true, until: null } });
 });
 
+test("pull: root fetches its own request's URL with the machine token, once, and paces the bytes to the worker", async () => {
+  const gets: { url: string; init: RequestInit }[] = [];
+  const bytes = Buffer.alloc(2_500_000, 7);
+  const fetch: FetchLike = async (url, init) => {
+    gets.push({ url, init });
+    return new Response(bytes, { status: 200 });
+  };
+  const t = setup({ fetch, server: "http://127.0.0.1:3000" });
+  t.sup.boot();
+  t.sup.attach();
+  const pullId = "11111111-1111-4111-8111-111111111111";
+  const url = "https://agentes.test/api/machines/pulls/1";
+  const req: MachineRequest = { op: "pull", path: "base.zip", url, pullId, size: bytes.length, agent: ANA };
+  const pull = handleRequest(t.ctx, req, scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const q = await requestOn(ana);
+  expect(q).toMatchObject({ op: "pull", pullId });
+
+  // Only for a request it holds, and the address is the request's: the frame has no say in it.
+  ana.send({ type: "pull.start", pullId: "nobody" });
+  await waitFor(() => ana.of("pull.end").length === 1);
+  expect(ana.of("pull.end")[0]).toEqual({
+    type: "pull.end",
+    pullId: "nobody",
+    error: "No pull is waiting for this file",
+  });
+  ana.send({ type: "pull.start", pullId, url: "https://evil.test/steal" });
+  await waitFor(() => ana.of("pull.end").length === 2);
+  expect(gets.map((g) => g.url)).toEqual(["http://127.0.0.1:3000/api/machines/pulls/1"]);
+  expect(gets[0]?.init.headers).toEqual({ authorization: "Bearer agm_machine" });
+  expect(ana.of("pull.head")).toEqual([{ type: "pull.head", pullId, status: 200 }]);
+  const pieces = ana.of("pull.chunk") as unknown as { data: string }[];
+  expect(pieces.length).toBeGreaterThanOrEqual(3);
+  expect(Buffer.concat(pieces.map((p) => Buffer.from(p.data, "base64"))).equals(bytes)).toBe(true);
+  expect(ana.of("pull.end")[1]).toEqual({ type: "pull.end", pullId });
+
+  // Once per request.
+  ana.send({ type: "pull.start", pullId });
+  await waitFor(() => ana.of("pull.end").length === 3);
+  expect(gets).toHaveLength(1);
+  ana.send({ type: "result", id: q.id, ok: true, data: { size: bytes.length, sha256: "x" } });
+  await pull;
+});
+
+test("pull: the worker's end reads root's frames as a fetch, and a cut stream as a failure", async () => {
+  const fromRoot = new PassThrough();
+  const toRoot = new PassThrough();
+  const link = new WorkerLink(fromRoot, toRoot);
+  const said: Record<string, unknown>[] = [];
+  readLines(
+    toRoot,
+    1 << 20,
+    (line) => said.push(JSON.parse(line)),
+    () => {},
+  );
+  const frame = (f: Record<string, unknown>) => fromRoot.write(`${JSON.stringify(f)}\n`);
+  const headers = (pullId: string) => ({ "x-agentes-pull-id": pullId });
+
+  const whole = link.fetch("ignored", { method: "GET", headers: headers("p1") });
+  await waitFor(() => said.length === 1);
+  expect(said[0]).toEqual({ type: "pull.start", pullId: "p1" });
+  frame({ type: "pull.head", pullId: "p1", status: 200 });
+  frame({ type: "pull.chunk", pullId: "p1", data: Buffer.from("olá ").toString("base64") });
+  frame({ type: "pull.chunk", pullId: "p1", data: Buffer.from("mundo").toString("base64") });
+  frame({ type: "pull.end", pullId: "p1" });
+  expect(await (await whole).text()).toBe("olá mundo");
+
+  const cut = link.fetch("ignored", { method: "GET", headers: headers("p2") });
+  frame({ type: "pull.head", pullId: "p2", status: 200 });
+  frame({ type: "pull.end", pullId: "p2", error: "socket closed" });
+  expect((await cut).text()).rejects.toThrow("socket closed");
+
+  const refused = link.fetch("ignored", { method: "GET", headers: headers("p3") });
+  frame({ type: "pull.end", pullId: "p3", error: "No pull is waiting for this file" });
+  expect(refused).rejects.toThrow("No pull is waiting");
+
+  const stop = new AbortController();
+  const stopped = link.fetch("ignored", { method: "GET", headers: headers("p4"), signal: stop.signal });
+  stop.abort(new Error("Canceled"));
+  expect(stopped).rejects.toThrow("Canceled");
+});
+
 test("push: the worker's bytes go out from here with the machine token, only to the server it is paired with", async () => {
   const puts: { url: string; init: RequestInit }[] = [];
   const fetch: FetchLike = async (url, init) => {
@@ -1579,6 +1663,7 @@ test.if(posix)(
     const puts: { url: string; init: RequestInit }[] = [];
     const t = realWorkers({
       fetch: async (url, init) => {
+        if (init.method === "GET") return new Response("pulled", { status: 200 });
         puts.push({ url, init });
         return new Response("{}", { status: 200 });
       },
@@ -1604,6 +1689,17 @@ test.if(posix)(
       [url, "Bearer agm_machine"],
     ]);
     expect(Buffer.from(puts[0]?.init.body as Uint8Array).toString()).toBe("olá");
+
+    const pull = {
+      op: "pull",
+      path: "in/base.zip",
+      url: "https://agentes.test/api/machines/pulls/4",
+      pullId: "44444444-4444-4444-8444-444444444444",
+      size: 6,
+      agent: ANA,
+    } as MachineRequest;
+    expect(await handleRequest(t.ctx, pull, scope().scope)).toMatchObject({ size: 6 });
+    expect(readFileSync(path.join(realpathSync(t.agentHome), "ana-a1b2c3d4", "in/base.zip"), "utf8")).toBe("pulled");
 
     // Commands turned off on the computer: the worker refuses them (its state comes before the next request).
     const off = { ...STATE.access.tools, commands: false };

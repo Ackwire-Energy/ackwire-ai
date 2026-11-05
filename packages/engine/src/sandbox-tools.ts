@@ -26,7 +26,7 @@ import {
   createArtifact,
   diffToPatch,
   getArtifact,
-  readFileArtifact,
+  storedFileOfArtifact,
   tableToCsv,
   updateArtifact,
 } from "./artifacts";
@@ -34,6 +34,7 @@ import { recordAudit } from "./audit";
 import { fedByRoutine, runAuthorityById } from "./authority";
 import { sniffModelImage } from "./avatars";
 import { publishChannelEvent } from "./events";
+import { copyToComputer } from "./file-pulls";
 import { cutText, formatBytes, textOfBytes } from "./format";
 import { mergeReposOfCall } from "./git/repos";
 import { isAbsoluteMachinePath, requestFolderAccess } from "./machine-access";
@@ -78,7 +79,7 @@ import {
 } from "./sandbox";
 import { requestSecretTool } from "./secret-request-tool";
 import { REQUEST_SECRET_TOOL, secretFilePaths } from "./secrets";
-import { agentSkillByName, type SkillDeps, skillFilesOf, skillFolderFiles } from "./skills";
+import { agentSkillByName, type SkillDeps, skillFilesOf, skillFilesOver, skillFolderFiles } from "./skills";
 import { maskSecrets } from "./tool-detail";
 import { MAX_RESULT_CHARS } from "./tools/gateway";
 import { WHY_MAX_CHARS } from "./tools/run-policy";
@@ -1011,11 +1012,11 @@ export function createSandboxToolSource(
           const file = fileOfArtifact(a);
           if (!file) {
             // An uploaded file: its bytes as they are, under its original name.
-            const raw = await readFileArtifact(deps.artifacts, actorOf(ctx), ctx.orgId, a.id);
+            const raw = await storedFileOfArtifact(deps.artifacts, actorOf(ctx), ctx.orgId, a.id);
             const path = toolPath(str(input.path), computerInfo) || `imports/${cleanFileName(raw.name)}`;
-            await run(ctx, (c) => c.provider.writeFile(c.id, path, raw.bytes));
+            await run(ctx, (c) => copyToComputer({ ...deps.artifacts, publicUrl: deps.publicUrl }, ctx, c, path, raw));
             return {
-              content: `Copied "${a.title}" (v${raw.version}, ${raw.name}) to ${path} (${formatBytes(raw.bytes.byteLength)}).`,
+              content: `Copied "${a.title}" (v${raw.version}, ${raw.name}) to ${path} (${formatBytes(raw.size)}).`,
             };
           }
           const path = toolPath(str(input.path), computerInfo) || `imports/${slug(a.title)}.${file.ext}`;
@@ -1066,22 +1067,28 @@ export function createSandboxToolSource(
           const timeout = timeoutOf(input, execTimeout, maxTimeout);
           const base = `.skills/${skill.name}`;
           const args = (Array.isArray(input.args) ? input.args : []).map((a) => quote(String(a))).join(" ");
-          // A file past what one write to a computer carries (a big PDF) stays behind instead of failing every run.
-          const left = listed
-            .filter((f) => f.status !== "ignored" && f.size > MAX_INLINE_FILE_BYTES)
-            .map((f) => f.path);
+          // What an older runner can't receive (a big PDF) stays behind instead of failing every run.
+          let left: string[] = [];
           // A skill can hold thousands of files: copied once a version. Its scripts go on every run, so what runs (and
-          // what a person approved) is the skill's, whatever was written over them on the computer since.
-          const copiedMark = `${base}/.copied-v${skill.version}`;
+          // what a person approved) is the skill's, whatever was written over them on the computer since. The mark
+          // is only left once nothing stayed behind, so a runner brought up to date gets those too.
+          const copiedMark = `${base}/.copied-whole-v${skill.version}`;
           const scripts = listed.filter((f) => f.status === "script").map((f) => f.path);
           const started = Date.now();
           const result = await run(ctx, async (computer) => {
             const copied = await computer.provider.readFile(computer.id, copiedMark);
-            for (const f of await skillFolderFiles(skillDeps(ctx), skill, copied ? scripts : undefined)) {
-              if (f.data.byteLength > MAX_INLINE_FILE_BYTES) continue;
+            const wanted = copied ? scripts : undefined;
+            for (const f of await skillFolderFiles(skillDeps(ctx), skill, wanted, MAX_INLINE_FILE_BYTES)) {
               await computer.provider.writeFile(computer.id, `${base}/${f.path}`, f.data);
             }
-            if (!copied)
+            const large = await skillFilesOver(ctx.db, skill, MAX_INLINE_FILE_BYTES, wanted);
+            if (await computer.provider.canPull(computer.id)) {
+              const pull = { ...skillDeps(ctx), publicUrl: deps.publicUrl };
+              for (const f of large) await copyToComputer(pull, ctx, computer, `${base}/${f.path}`, f);
+            } else {
+              left = large.map((f) => f.path);
+            }
+            if (!copied && left.length === 0)
               await computer.provider.writeFile(computer.id, copiedMark, new TextEncoder().encode(skill.name));
             const r = await execLive(ctx, computer, {
               command: scriptCommand(bin, `${base}/${target.path}`, args),
@@ -1094,7 +1101,7 @@ export function createSandboxToolSource(
           const seconds = Math.round((Date.now() - started) / 1000);
           const output = execOutput(`run_skill_script ${skill.name}/${target.path}`, result, seconds, timeout);
           if (left.length === 0) return output;
-          const note = `Not copied to ${base}/ (over ${formatBytes(MAX_INLINE_FILE_BYTES)} each): ${left.join(", ")}.`;
+          const note = `Not copied to ${base}/ (over ${formatBytes(MAX_INLINE_FILE_BYTES)} each, which needs \`agentes-runner update\` on this computer): ${left.join(", ")}.`;
           return { ...output, content: `${output.content}\n${note}` };
         } catch (error) {
           return heldForApproval(error, "Not run") ?? failed(error);

@@ -76,8 +76,8 @@ export interface PushOptions {
   resolve?: (p: string) => Promise<Resolved>;
 }
 
-/** What the upload's error body says, for people. */
-async function serverMessage(res: Response): Promise<string> {
+/** What an error body of ours says, for people. */
+export async function serverMessage(res: Response): Promise<string> {
   const text = await res.text().catch(() => "");
   try {
     const body = JSON.parse(text) as { error?: { message?: unknown } | string; message?: unknown };

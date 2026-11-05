@@ -40,6 +40,7 @@ import { isGitInternalPath, touchesGitInternals } from "./git-guard";
 import { type McpTaskInfo, redactDeep } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
 import { agentWorkspace, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
+import { pullFile } from "./pull";
 import { type FetchLike, pushPath } from "./push";
 import { openDesktopStream } from "./rfb";
 import type { Spawn } from "./scope-gate";
@@ -86,6 +87,7 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "write",
   "list",
   "push",
+  "pull",
   "task.start",
   "brain.turn",
   "brain.route",
@@ -116,6 +118,7 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   write: "agent",
   list: "agent",
   push: "agent",
+  pull: "agent",
   // Keys and staged boxes stay in the root supervisor until DB-committed activation.
   secret: "machine",
   account: "machine",
@@ -399,6 +402,26 @@ async function doRead(
   return { base64: data.toString("base64"), size: data.byteLength };
 }
 
+/** Where a file op may put `requested`, its parent folders made. */
+async function writeTarget(ctx: HandlerContext, requested: string) {
+  // A repository's git dir is the runner's own git's settings (`git.sync`, `mission.worktree` run
+  // without the "commands" switch): never written by a file op (`git-guard.ts`).
+  const gitInternal = () =>
+    new RunnerError("bad_request", `${requested} is inside a .git folder. Files there can't be written this way.`);
+  if (isGitInternalPath(requested)) throw gitInternal();
+  const first = await resolvePath(ctx, requested);
+  if (first.rel === "") throw new RunnerError("bad_request", "Can't write over the workspace folder");
+  if (touchesGitInternals(requested, first.abs)) throw gitInternal();
+  if (!first.exists) await mkdir(path.dirname(first.abs), { recursive: true });
+  // Check again now that the parents exist (nothing raced us outside).
+  const target = await resolvePath(ctx, requested);
+  if (touchesGitInternals(requested, target.abs)) throw gitInternal();
+  if (target.exists && (await stat(target.abs)).isDirectory()) {
+    throw new RunnerError("bad_request", `${requested} is a folder`);
+  }
+  return target;
+}
+
 async function doWrite(
   ctx: HandlerContext,
   req: Extract<MachineRequest, { op: "write" }>,
@@ -411,22 +434,7 @@ async function doWrite(
   if (data.byteLength > MAX_INLINE_FILE_BYTES) {
     throw new RunnerError("too_large", `Files sent inline are limited to ${MAX_INLINE_FILE_BYTES} bytes`);
   }
-  const requested = requireString(req.path, "path");
-  // A repository's git dir is the runner's own git's settings (`git.sync`, `mission.worktree` run
-  // without the "commands" switch): never written by a file op (`git-guard.ts`).
-  const gitInternal = () =>
-    new RunnerError("bad_request", `${requested} is inside a .git folder. Files there can't be written this way.`);
-  if (isGitInternalPath(requested)) throw gitInternal();
-  const first = await resolvePath(ctx, requested);
-  if (first.rel === "") throw new RunnerError("bad_request", "Can't write over the workspace folder");
-  if (touchesGitInternals(requested, first.abs)) throw gitInternal();
-  if (!first.exists) await mkdir(path.dirname(first.abs), { recursive: true });
-  // Check again now that the parents exist (nothing raced us outside).
-  const target = await resolvePath(ctx, req.path);
-  if (touchesGitInternals(requested, target.abs)) throw gitInternal();
-  if (target.exists && (await stat(target.abs)).isDirectory()) {
-    throw new RunnerError("bad_request", `${req.path} is a folder`);
-  }
+  const target = await writeTarget(ctx, requireString(req.path, "path"));
   await writeFile(target.abs, data);
   return { size: data.byteLength };
 }
@@ -644,6 +652,18 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
         fetch: ctx.fetch,
         signal: scope.signal,
         resolve: (p) => resolvePath(ctx, p),
+      });
+    case "pull":
+      return pullFile({
+        abs: (await writeTarget(ctx, requireString(req.path, "path"))).abs,
+        token: ctx.token,
+        ...(ctx.server ? { server: ctx.server } : {}),
+        url: requireString(req.url, "url"),
+        pullId: requireString(req.pullId, "pullId"),
+        size: clampInt(req.size, 0, Number.MAX_SAFE_INTEGER, 0),
+        ...(typeof req.sha256 === "string" ? { sha256: req.sha256 } : {}),
+        fetch: ctx.fetch,
+        signal: scope.signal,
       });
     default:
       throw new RunnerError("bad_request", `Unknown op ${(req as { op: string }).op}`);
@@ -1257,6 +1277,7 @@ function describeOp(req: MachineRequest): string {
     case "write":
     case "list":
     case "push":
+    case "pull":
       return `${req.op} ${String(req.path ?? "") || "."}`;
     case "secret":
       // Never the value: the action and the name or request.
