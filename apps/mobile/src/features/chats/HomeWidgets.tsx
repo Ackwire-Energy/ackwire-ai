@@ -2,7 +2,7 @@ import { useHomeBoard, type Widget } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Icon, Text } from "@/ui";
+import { Icon, SectionHeader, Text } from "@/ui";
 import { newWidgetHref } from "../dashboards/BoardScreen";
 import { HOME, widgetsInOrder } from "../dashboards/logic";
 import { WidgetPeek } from "../dashboards/WidgetPeek";
@@ -29,23 +29,8 @@ export function HomeWidgets() {
   const add = () => router.push(newWidgetHref(home.chosenId ?? HOME));
   return (
     <View>
-      <View style={styles.head}>
-        <Text variant="small" tone="ink" style={styles.title} accessibilityRole="header" numberOfLines={1}>
-          {title}
-        </Text>
-        <View style={styles.grow} />
-        <Pressable
-          onPress={() => router.push("/dashboards")}
-          accessibilityRole="button"
-          hitSlop={8}
-          style={({ pressed }) => [styles.more, pressed && styles.pressed]}
-        >
-          <Text variant="small" tone="muted" style={styles.medium}>
-            {t("dashboards.seeAll")}
-          </Text>
-          <Icon name="right" size={15} color={c.muted} />
-        </Pressable>
-      </View>
+      {/* The tabs' own section header, with "Ver todos ›" as its way on: never a copy with other tones. */}
+      <SectionHeader title={title} action={{ label: t("dashboards.seeAll"), onPress: () => router.push("/dashboards") }} />
       {widgets.length > 0 ? (
         <ScrollView
           horizontal
@@ -88,11 +73,6 @@ export function HomeWidgets() {
 const GAP = 10;
 
 const styles = StyleSheet.create({
-  head: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 8 },
-  title: { fontWeight: "600", flexShrink: 1 },
-  grow: { flex: 1 },
-  more: { flexDirection: "row", alignItems: "center", gap: 2 },
-  pressed: { opacity: 0.6 },
   medium: { fontWeight: "500" },
   strip: { paddingHorizontal: 16, gap: GAP, paddingBottom: 4 },
   item: { width: STRIP_WIDGET },

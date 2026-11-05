@@ -43,9 +43,10 @@ export function SectionHeader({ title, count, action }: SectionHeaderProps) {
 }
 
 const styles = StyleSheet.create({
-  h: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 8 },
+  // The count and the way on sit on the title's baseline: on its first line when a long title wraps.
+  h: { flexDirection: "row", alignItems: "baseline", gap: 8, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 8 },
   title: { fontWeight: "600", flexShrink: 1 },
-  action: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 2, flexShrink: 1, minWidth: 0 },
+  action: { marginLeft: "auto", flexDirection: "row", alignItems: "baseline", gap: 2, flexShrink: 1, minWidth: 0 },
   actionText: { fontWeight: weights.medium, flexShrink: 1 },
   pressed: { opacity: 0.6 },
 });
