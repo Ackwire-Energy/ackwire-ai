@@ -2,11 +2,12 @@ import { useHomeBoard, type Widget } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Icon, SectionHeader, Text } from "@/ui";
+import { Icon, Text } from "@/ui";
 import { newWidgetHref } from "../dashboards/BoardScreen";
 import { HOME, widgetsInOrder } from "../dashboards/logic";
 import { WidgetPeek } from "../dashboards/WidgetPeek";
 import { useColors, useOrgId } from "../shared/hooks";
+import { CollapsibleSection } from "./HomeSection";
 
 /** A widget's width on the strip: two and a bit show, so it reads as one that scrolls. */
 const STRIP_WIDGET = 156;
@@ -16,7 +17,7 @@ const STRIP_WIDGET = 156;
  * Home") and "See all", which pushes Dashboards; then its widgets small, side by side, on a strip that scrolls
  * sideways. Tapping one opens it. With none yet, one card asks for a widget (when the person edits that board).
  */
-export function HomeWidgets() {
+export function HomeWidgets({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { t } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
@@ -27,14 +28,10 @@ export function HomeWidgets() {
   const widgets: Widget[] = board ? widgetsInOrder(board.widgets) : [];
   const canAdd = Boolean(board?.canEdit);
   const add = () => router.push(newWidgetHref(home.chosenId ?? HOME));
+  // A section of Conversas like the others: its header hides the widgets (remembered on this phone) and shows them.
   return (
-    <View>
-      {/* The tabs' own section header, with "Ver todos ›" as its way on: never a copy with other tones. */}
-      <SectionHeader
-        title={title}
-        action={{ label: t("dashboards.seeAll"), onPress: () => router.push("/dashboards") }}
-      />
-      {widgets.length > 0 ? (
+    <CollapsibleSection title={title} count={widgets.length} collapsed={collapsed} onToggle={onToggle}>
+      {widgets.length > 0 || !canAdd ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -52,6 +49,18 @@ export function HomeWidgets() {
               />
             </View>
           ))}
+          {/* "Ver todos" ends the strip: Dashboards, where every board and widget is. */}
+          <Pressable
+            onPress={() => router.push("/dashboards")}
+            accessibilityRole="button"
+            accessibilityLabel={t("dashboards.seeAll")}
+            style={({ pressed }) => [styles.all, { backgroundColor: c.sunken }, pressed && styles.pressed]}
+          >
+            <Text variant="small" tone="muted" style={styles.medium}>
+              {t("dashboards.seeAll")}
+            </Text>
+            <Icon name="right" size={15} color={c.muted} />
+          </Pressable>
         </ScrollView>
       ) : canAdd ? (
         <Pressable
@@ -69,7 +78,7 @@ export function HomeWidgets() {
           </Text>
         </Pressable>
       ) : null}
-    </View>
+    </CollapsibleSection>
   );
 }
 
@@ -77,7 +86,17 @@ const GAP = 10;
 
 const styles = StyleSheet.create({
   medium: { fontWeight: "500" },
-  strip: { paddingHorizontal: 16, gap: GAP, paddingBottom: 4 },
+  // Room above and below: the cards' hairline and shadow are never cut by the strip's edge.
+  strip: { paddingHorizontal: 16, gap: GAP, paddingTop: 4, paddingBottom: 6 },
+  all: {
+    width: 104,
+    borderRadius: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+  },
+  pressed: { opacity: 0.7 },
   item: { width: STRIP_WIDGET },
   empty: {
     flexDirection: "row",

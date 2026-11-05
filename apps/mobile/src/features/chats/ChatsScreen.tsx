@@ -171,7 +171,7 @@ function Home() {
       {failed || empty || list.loading ? null : (
         <>
           {/* Início's widgets, and the way to Dashboards ("See all"), not a tab (ADR 0135 §15). */}
-          <HomeWidgets />
+          <HomeWidgets collapsed={collapsed.includes("widgets")} onToggle={() => toggle("widgets")} />
           <FirstSteps collapsed={collapsed} onToggle={toggle} />
         </>
       )}

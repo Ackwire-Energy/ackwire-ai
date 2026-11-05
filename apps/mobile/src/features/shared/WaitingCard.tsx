@@ -124,10 +124,10 @@ export function WaitingCard({
 }
 
 /** What a waiting card's request goes through, on one quiet line as the chat's card says it: its mark, its details. */
-export function WaitingSource({ mark, text }: { mark: ReactNode; text: string }) {
+export function WaitingSource({ mark, text }: { mark?: ReactNode; text: string }) {
   return (
     <View style={styles.source}>
-      <View style={styles.sourceMark}>{mark}</View>
+      {mark ? <View style={styles.sourceMark}>{mark}</View> : null}
       <Text variant="footnote" tone="faint" numberOfLines={1} style={styles.grow}>
         {text}
       </Text>

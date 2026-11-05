@@ -164,6 +164,18 @@ export function ActivityScreen() {
  * (Aprovar or Agora não), a server's changed tools opening their review, a question Responder. The whole card opens
  * it too.
  */
+/**
+ * Where a notice opens. A server's changed tools open its Ferramentas; a notice from before notices named their
+ * server finds it by its name among the changes waiting (once the server names them all, by id alone).
+ */
+function useNoticeHref(n: AppNotification, ai: Parameters<typeof notificationHref>[1]) {
+  const { org, orgId } = useOrg();
+  const unnamed = n.kind === "connector_tool_changed" && !n.source.connectionId;
+  const changes = useToolChanges(orgId, unnamed && can(org, "manage_connectors")).data;
+  const id = unnamed ? changes?.find((c) => c.connectionLabel === n.source.label)?.connectionId : undefined;
+  return id ? `/connectors/tools?id=${id}` : notificationHref(n, ai);
+}
+
 function WaitingCardView({ item: n }: { item: AppNotification }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -199,7 +211,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
             : (dash?.title ?? card.title);
   // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
-  const href = notificationHref(n, ai);
+  const href = useNoticeHref(n, ai);
   // No screen of its own in the app (the workspace's billing hold): its page on the web, so a tap is never a dead end.
   const web = href ? null : notificationWebPath(n, orgId);
   const actor = n.actors[0];
@@ -264,10 +276,8 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
             {t("mobile.activityNow.toolsWhy")}
           </Text>
           {tools ? (
-            <WaitingSource
-              mark={<ConnectorIcon def={null} label={n.source.label ?? ""} size={20} />}
-              text={tools.split(", ").join(" · ")}
-            />
+            // The server's mark already leads the card: the tools that changed, on their own.
+            <WaitingSource text={tools.split(", ").join(" · ")} />
           ) : null}
         </>
       ) : null}
@@ -450,7 +460,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
   const act = useNotificationAction(orgId);
   // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
-  const href = notificationHref(n, ai);
+  const href = useNoticeHref(n, ai);
   // No screen of its own in the app (the workspace's billing hold): its page on the web, so a tap is never a dead end.
   const web = href ? null : notificationWebPath(n, orgId);
   const unread = n.readAt === null;

@@ -79,9 +79,10 @@ export function QueueButton({
       hitSlop={4}
       style={styles.button}
     >
-      <Icon name={icon} size={20} color={c.ink2} />
-      <View style={styles.badge} pointerEvents="none">
-        <Count value={queue.waiting.length} size={10} inverted max={99} />
+      {/* The count beside the icon, as the tasks' button beside it: a badge on a 20 pt icon covered it. */}
+      <View style={styles.counted}>
+        <Icon name={icon} size={18} color={c.ink2} />
+        <Count value={queue.waiting.length} size={15} color={c.ink2} max={99} />
       </View>
     </PressScale>
   );
@@ -311,8 +312,8 @@ export function QueueLine({
 
 const styles = StyleSheet.create({
   loading: { marginVertical: 24 },
-  button: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  badge: { position: "absolute", top: 2, right: 0 },
+  button: { height: 40, borderRadius: 20 },
+  counted: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10 },
   head: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: 8 },
   headTitle: { fontWeight: "600", flexShrink: 1 },
   // 16 between groups, on each side of the line (the sheet's own gap is 12).
