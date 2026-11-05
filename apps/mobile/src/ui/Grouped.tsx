@@ -6,6 +6,9 @@ import { Text } from "./Text";
 import { ToggleSwitch } from "./Toggle";
 import { useTheme } from "./theme";
 
+/** The leading column of a row with a face or a mark: whatever leads is centered in it. */
+const LEAD = 32;
+
 /**
  * Settings as on the iPhone: grouped inset lists, radius 14, hairlines inset to
  * the text, an uppercase faint header above and a faint footer below. With no
@@ -28,7 +31,7 @@ export function GroupedList({ children }: { children?: ReactNode }) {
                   marginLeft: (child.props as { icon?: unknown; leading?: unknown }).icon
                     ? 54
                     : (child.props as { leading?: unknown }).leading
-                      ? 58
+                      ? 14 + LEAD + 12
                       : 14,
                 },
               ]}
@@ -154,7 +157,8 @@ function Row({
           <Icon name={icon} size={16} color={danger ? c.danger : c.ink2} />
         </View>
       ) : null}
-      {leading}
+      {/* One column for whatever leads (a 26 to 36 face, a mark): the text, and the hairline above, start at 58. */}
+      {leading ? <View style={styles.lead}>{leading}</View> : null}
       <View style={styles.grow}>
         <Text variant="body" numberOfLines={labelLines} style={{ color: tone }}>
           {label}
@@ -296,6 +300,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   tile: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  lead: { width: LEAD, alignItems: "center", justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
   value: { flexShrink: 1, maxWidth: "50%" },
   valued: { flexDirection: "row", alignItems: "center", gap: 6 },
