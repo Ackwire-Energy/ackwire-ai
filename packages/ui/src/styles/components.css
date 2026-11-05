@@ -9464,7 +9464,7 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 }
 .ac-facts__item {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: 32px minmax(0, 1fr);
   grid-template-rows: auto auto;
   column-gap: 10px;
   align-items: center;
@@ -9476,11 +9476,30 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   padding-left: 0;
   border-left: 0;
 }
+/* The icon in a pixel frame as tall as label and value: a 16×16 grid of 2px cells, one cell thick, the corners
+   stepped in by one cell. The frame is a mask over the line color, so it takes the item's tone. */
 .ac-facts__icon {
+  --fact-frame: var(--line2);
+  position: relative;
   grid-row: 1 / span 2;
   display: grid;
   place-items: center;
+  width: 32px;
+  height: 32px;
   color: var(--muted);
+}
+.ac-facts__icon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--fact-frame);
+  -webkit-mask: var(--fact-frame-mask) center / 32px 32px no-repeat;
+  mask: var(--fact-frame-mask) center / 32px 32px no-repeat;
+  --fact-frame-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Cpath d='M2 0h12v1H2zM2 15h12v1H2zM0 2h1v12H0zM15 2h1v12h-1zM1 1h1v1H1zM14 1h1v1h-1zM1 14h1v1H1zM14 14h1v1h-1z'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+.ac-facts__icon > * {
+  position: relative;
 }
 .ac-facts__label {
   font-size: 11.5px;
@@ -9503,6 +9522,12 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 }
 .ac-facts__item--done :is(.ac-facts__icon, .ac-facts__value) {
   color: var(--success);
+}
+.ac-facts__item--waiting .ac-facts__icon {
+  --fact-frame: color-mix(in srgb, var(--attention) 45%, transparent);
+}
+.ac-facts__item--done .ac-facts__icon {
+  --fact-frame: color-mix(in srgb, var(--success) 45%, transparent);
 }
 
 /* ── Step track: a run's steps in one row, nodes joined by a line, a short label and the time under each ── */
