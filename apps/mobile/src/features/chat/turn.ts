@@ -31,6 +31,16 @@ export function turnItems(
   return toolItemsLive(r.work ?? [], over);
 }
 
+/** What a saved reply's kept work depends on: a line's state and count, and how much of a line said has arrived. */
+export const turnSignature = (items: readonly ToolItem[]) =>
+  items
+    .map((x) =>
+      x.kind === "call"
+        ? `${x.key}:${x.line.state}${x.line.count}`
+        : `${x.key}:${x.kind === "say" ? x.text.length : ""}`,
+    )
+    .join("|");
+
 /**
  * Its block is in the conversation (as `TurnRow` draws it): words of its own. Until then there is no row, and the
  * line above the box speaks for it (its face, what it does now, its time and its stop).

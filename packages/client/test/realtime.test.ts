@@ -372,8 +372,30 @@ describe("live agent runs (streaming)", () => {
 
     test("a stretch that arrives whole after its call: it shows from its start, and the next never glues to it", () => {
       const s = play([tool("t1"), ended("t1"), piece(0, 0, 0, "Vou olhar."), piece(1, 10, 10, "Pronto.")]);
-      expect(said(s)).toEqual(["Vou olhar."]);
-      expect(s.runs.r1?.text).toBe("Pronto.");
+      expect(s.runs.r1?.text).toBe("Vou olhar.\n\nPronto.");
+    });
+
+    test("stretches around the brain's own tools (no line of theirs): one text in order, no line left behind", () => {
+      const s = play([piece(0, 0, 0, "Vou olhar. "), piece(1, 11, 11, "Achei."), piece(2, 17, 17, "Pronto.")]);
+      expect(s.runs.r1?.text).toBe("Vou olhar.\n\nAchei.\n\nPronto.");
+      expect(said(s)).toEqual([]);
+    });
+
+    test("back from a hole around a call: what still comes of the stretch never joins its line over the hole", () => {
+      let s = play([piece(0, 0, 0, head), piece(1, 40, 0, "xx"), tool("t1")]);
+      s = reconcileRuns(s, "c1", [
+        {
+          runId: "r1",
+          agentId: "atlas",
+          channelId: "c1",
+          threadId: "m1",
+          status: "running" as const,
+          live: { turn: 1, at: 42, text: "" },
+        },
+      ]);
+      s = play([piece(2, 42, 0, tail)], s);
+      expect(said(s)).toEqual([head]);
+      expect(s.runs.r1?.text).toBe("");
     });
 
     test("a message read mid-answer: the answer stays where it is and goes on, one text from its start", () => {

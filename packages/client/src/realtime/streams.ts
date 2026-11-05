@@ -440,7 +440,8 @@ const spoken = (r: LiveRun): LiveWork => ({
   kind: "say",
   text: r.text.trimStart(),
   ...(r.turn !== undefined ? { turn: r.turn } : {}),
-  ...(r.textFrom !== undefined ? { from: r.textFrom } : {}),
+  // Past a hole, what still comes of this stretch wouldn't continue what it holds.
+  ...(r.textFrom !== undefined && !r.gap ? { from: r.textFrom } : {}),
 });
 
 /** `agent.narration`, the turn's final word: adds what the agent said, or replaces the line of the same turn. */
@@ -772,15 +773,20 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
           ...turnPatch,
         });
       }
-      // The next stretch with the last one still here (it came whole, after its call): one text with it would glue them.
-      const next = Boolean(
-        !gap && sameTurn && from !== undefined && from > (current?.textFrom ?? from) && current?.text.trim(),
-      );
+      // The next stretch with the last one still here: a call that shows no line of its own (the brain's own tools) or
+      // text that came whole after its call. A line here would land below the body, and stay after the reply.
+      const said = current?.text.trimEnd();
+      const next = !gap && sameTurn && from !== undefined && from > (current?.textFrom ?? from) && said;
       return upsert(state, event, {
         status: "running",
-        text: gap ? (sameTurn ? (current?.text ?? "") : "") : (next ? "" : (current?.text ?? "")) + fresh,
+        text: gap
+          ? sameTurn
+            ? (current?.text ?? "")
+            : ""
+          : next
+            ? `${said}\n\n${fresh.trimStart()}`
+            : (current?.text ?? "") + fresh,
         lastSeq: event.seq,
-        ...(next && current ? { work: [...(current.work ?? []), spoken(current)] } : {}),
         ...turnPatch,
       });
     }

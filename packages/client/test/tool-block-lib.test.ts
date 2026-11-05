@@ -293,6 +293,18 @@ describe("a call refused for its arguments", () => {
     expect(states(failedAgain)).toEqual(["fail", "fail"]);
   });
 
+  test("live: refused twice in a row, no red while it is still at it; red for both if it ends there", () => {
+    const twice = [call("1", offer, { failed: true, slip: true }), call("2", offer, { failed: true, slip: true })];
+    expect(states(toolItemsLive(twice))).toEqual(["stop", "run"]);
+    expect(states(toolItemsLive(twice, true))).toEqual(["fail", "fail"]);
+    expect(states(toolItemsLive([...twice, call("3", offer)]))).toEqual(["stop", "stop", "done"]);
+  });
+
+  test("live: a retry the run's end cut short made nothing right", () => {
+    const cut = [call("1", offer, { failed: true, slip: true }), call("2", offer, { running: true })];
+    expect(states(toolItemsLive(cut, true))).toEqual(["fail", "stop"]);
+  });
+
   test("live: a real failure is an error whatever came after", () => {
     expect(states(toolItemsLive([call("1", offer, { failed: true }), call("2", offer)]))).toEqual(["fail", "done"]);
   });

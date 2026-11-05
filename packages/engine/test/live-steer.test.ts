@@ -421,6 +421,44 @@ test("text a brain kept back past a call's start goes out as that stretch's, and
   expect(seen[1]?.at).toBe(first.length);
 });
 
+test("a stretch's last word held back while it could still grow goes out with it when the call ends", async () => {
+  f = await setup();
+  const fx = f;
+  await computerAgent(fx);
+  const events = fx.listen(fx.general.id);
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run() {
+      // A last "N" could still become the silence word, so it waits; the call ending says the stretch is over.
+      yield { type: "text_delta", text: "Vou seguir o plano N" };
+      yield { type: "tool_call", id: "c-1", name: "Bash", input: {}, executed: { content: "ok" } };
+      yield { type: "text_delta", text: "Pronto." };
+      yield { type: "done", text: "Pronto." };
+    },
+  };
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(fx, "@dev segue o plano");
+  await drainOutbox(fx.db, handlers);
+  const deltas = events.filter((e) => e.type === "agent.delta") as unknown as { from: number; text: string }[];
+  const first = "Vou seguir o plano N";
+  expect(
+    deltas
+      .filter((d) => d.from === 0)
+      .map((d) => d.text)
+      .join(""),
+  ).toBe(first);
+  expect(
+    deltas
+      .filter((d) => d.from === first.length)
+      .map((d) => d.text)
+      .join(""),
+  ).toBe("Pronto.");
+});
+
 /** A queued run with one message in its inbox, and a listener for it that retries fast. */
 async function inboxRun(fx: Fixture) {
   await post(fx, "@dev roda os testes");

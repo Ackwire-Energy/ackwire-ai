@@ -5231,7 +5231,8 @@ function createDeltaPublisher(
     toolEnded() {
       breaks.push([Date.now(), all.length]);
       if (!first.stretches) return;
-      send();
+      // The stretch is over, so what waited for its last word to grow is whole, and starts no later text.
+      send(true);
       live.from = shown.length;
       live.spoke = false;
     },

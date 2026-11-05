@@ -504,7 +504,7 @@ const sameLine = (a: ToolLine, b: Activity & { tool: string }) =>
  * The live work as the block's items: a call followed by the same kind of call (no code, nothing said in
  * between, neither failed) is one line counting both, so five browser steps read "Usou o navegador ×5".
  * Reactions and tool lookups are left out (`UNLISTED`), as in `workFromSteps`. `stopped`: the run is over, so the call
- * still running shows as stopped. A call refused for its arguments reads as still at it until the agent's next call,
+ * still running shows as stopped. A call refused for its arguments reads as still at it while the agent tries again,
  * and quietly once one of the same tool works; an error only if the run ends or moves on without that.
  */
 export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
@@ -524,8 +524,9 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
     const a = toolActivity(w.tool, w.connector, w.detail, w);
     if (UNLISTED.has(a.kind)) return;
     const later = listed.slice(listed.indexOf(w) + 1);
-    const trying = w.slip === true && !stopped && later.length === 0;
-    const slip = trying || (w.slip === true && madeRight(w, later));
+    const atIt = !stopped && later.every((c) => c.slip && c.tool === w.tool);
+    const trying = w.slip === true && atIt && later.length === 0;
+    const slip = w.slip === true && (atIt || madeRight(w, stopped ? later.filter((c) => !c.running) : later));
     // Held (it waits on a person, so it never ran) reads like a call stopped before it ended.
     const state: ToolState =
       trying || (w.running && !stopped)
