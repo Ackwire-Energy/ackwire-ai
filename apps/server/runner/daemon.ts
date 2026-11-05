@@ -1517,6 +1517,7 @@ export class RunnerDaemon implements RequestObserver {
       paused: this.pauseState(),
       access,
       size: machineSize(workspaceReal),
+      claudeLoginMethods: this.accounts.claudeLoginMethods(),
     };
   }
 

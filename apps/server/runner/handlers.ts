@@ -920,6 +920,7 @@ async function handleAccount(
         req.email === undefined ? undefined : requireString(req.email, "email"),
         req.provider === undefined ? undefined : requireString(req.provider, "provider"),
         req.shared === true,
+        req.method === undefined ? undefined : requireString(req.method, "method"),
       );
     case "code":
       if (typeof req.box !== "object" || req.box === null) throw new RunnerError("bad_request", "box is required");

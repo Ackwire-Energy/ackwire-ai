@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 45;
+export const MACHINE_PROTOCOL_VERSION = 46;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -513,6 +513,15 @@ export const ANTIGRAVITY_PROTOCOL = 44;
  */
 export const VAULT_PROTOCOL = 45;
 /**
+ * From this protocol on: how each account signs in. Accounts carry `authMethod` (from what the runner keeps beside
+ * and in the folder, never guessed), `statusUnknown` when the last look at their status said nothing for sure, and
+ * Claude's `providerOrgId` / `orgName`; `hello` says which methods a new Claude sign-in for all agents can use here
+ * (`claudeLoginMethods`); `begin` may name the `method` of a Claude subscription sign-in; a turn's `error` may say
+ * its `cause` and the provider's `httpStatus`. The server sends `method` to no older runner, and reads an older
+ * runner's missing `claudeLoginMethods` as `claudeLoginMethodsOf` says.
+ */
+export const CLAUDE_AUTH_PROTOCOL = 46;
+/**
  * Protocol 45 (ADR 0144 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
  * only, from the moment it got it (never across its own restart). The server counts a `site` delivery older than this
  * as gone too: it doesn't tell the agent it holds it, nor list it on the agent's page.
@@ -585,6 +594,59 @@ export const isBrainEffort = (v: unknown): v is BrainEffort =>
 export const isContextTokens = (v: unknown): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= 50_000 && v <= 10_000_000;
 
+/**
+ * How an account signs in (protocol 46). `cli_login`: the CLI's own sign-in, kept and refreshed by the CLI in the
+ * folder. `setup_token`: `claude setup-token`'s long-lived token, kept by root and handed to each turn. `api_key`: a
+ * pasted key (a coding plan's, Cursor's, OpenCode's).
+ */
+export type AuthMethod = "cli_login" | "setup_token" | "api_key";
+export const AUTH_METHODS: readonly AuthMethod[] = ["cli_login", "setup_token", "api_key"];
+export const isAuthMethod = (v: unknown): v is AuthMethod => AUTH_METHODS.some((m) => m === v);
+/** The methods a `begin` may name (a key account names its `provider` instead). */
+export type ClaudeLoginMethod = Exclude<AuthMethod, "api_key">;
+export const isClaudeLoginMethod = (v: unknown): v is ClaudeLoginMethod => v === "cli_login" || v === "setup_token";
+/**
+ * What a new Claude sign-in for all agents can use on a computer: what its runner said (protocol 46), else what
+ * runners did before saying it (`claude setup-token` in system mode, the CLI's own sign-in elsewhere).
+ */
+export const claudeLoginMethodsOf = (said: readonly AuthMethod[] | undefined, system: boolean): AuthMethod[] =>
+  said ? [...said] : [system ? "setup_token" : "cli_login"];
+
+/** Why a provider refused or failed a turn (protocol 46), as far as the runner could tell from the CLI. */
+export type ProviderFailureCause =
+  | "auth_rejected"
+  | "account_disabled"
+  | "quota"
+  | "billing"
+  | "provider_transient"
+  | "network"
+  | "unknown";
+export const PROVIDER_FAILURE_CAUSES: readonly ProviderFailureCause[] = [
+  "auth_rejected",
+  "account_disabled",
+  "quota",
+  "billing",
+  "provider_transient",
+  "network",
+  "unknown",
+];
+export const isProviderFailureCause = (v: unknown): v is ProviderFailureCause =>
+  PROVIDER_FAILURE_CAUSES.some((c) => c === v);
+
+/** Claude's organization id (`claude auth status --json` `orgId`), when it is a short word. */
+export const providerOrgIdOf = (v: unknown): string | undefined =>
+  typeof v === "string" && /^[\w-]{1,64}$/.test(v) ? v : undefined;
+/** Claude's organization name, control characters out and cut to 120. */
+export const providerOrgNameOf = (v: unknown): string | undefined => {
+  if (typeof v !== "string") return undefined;
+  const name = v
+    .replace(/\p{Cc}/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+  return name || undefined;
+};
+
 /** An account on the machine, as the runner sees it (`hello.accounts`, `account` replies). No secrets. */
 export interface RunnerAccountInfo {
   id: string;
@@ -602,6 +664,16 @@ export interface RunnerAccountInfo {
   keyHint?: string;
   /** Protocol 29: it thinks for several of its owner's agents at once. */
   shared?: boolean;
+  /** Protocol 46: how it signs in, when the runner knows for sure. */
+  authMethod?: AuthMethod;
+  /**
+   * Protocol 46: the last look at its status was inconclusive (the CLI timed out, didn't start or answered nothing
+   * readable); `loggedIn` is then the last conclusive answer the runner knew.
+   */
+  statusUnknown?: true;
+  /** Protocol 46: the Claude organization it signed in to (no secret). */
+  providerOrgId?: string;
+  orgName?: string;
 }
 
 /** A plan's usage window: how much of it is used (0–100) and when it resets. */
@@ -663,6 +735,9 @@ export type AccountRequest =
    * `email` (Claude Code): which account to sign in to (`claude auth login --email`), only if `isLoginEmail`;
    * an older runner leaves it out. Protocol 20, `provider`: a coding plan's key account (Claude Code), no CLI.
    * Protocol 29, `shared`: one sign-in for every agent of its owner there (`SHARED_ACCOUNTS_PROTOCOL`).
+   * Protocol 46, `method` (a Claude subscription sign-in only): `setup_token` in system mode for all agents, or
+   * `cli_login`; a runner that can't do it refuses (`unsupported`) and never signs in another way, and `again` on an
+   * account that signs in another way is refused too. Absent: as before.
    */
   | {
       action: "begin";
@@ -672,6 +747,7 @@ export type AccountRequest =
       email?: string;
       provider?: string;
       shared?: boolean;
+      method?: ClaudeLoginMethod;
     }
   | { action: "code"; loginId: string; aad: string; box: WireSecretBox }
   | { action: "status"; loginId: string }
@@ -1281,7 +1357,16 @@ export type WireBrainEvent =
    * `worked`: on a `plan_limit`, whether the turn used any tool before it was cut (an older runner leaves it out:
    * the engine counts that as worked).
    */
-  | { type: "error"; code: string; message: string; retryable?: boolean; worked?: boolean }
+  | {
+      type: "error";
+      code: string;
+      message: string;
+      retryable?: boolean;
+      worked?: boolean;
+      /** Protocol 46: why the provider refused or failed it, and its HTTP status when the CLI said one. */
+      cause?: ProviderFailureCause;
+      httpStatus?: number;
+    }
   /** Protocol 15: messages handed with `brain.steer` that the turn read (their `uuid`s). */
   | { type: "steer_read"; uuids: string[] };
 
@@ -1616,6 +1701,8 @@ export interface RunnerInfo {
   ownUsage?: OwnPlanUsage;
   /** Protocol 22: how big the computer is. */
   size?: MachineSize;
+  /** Protocol 46: the methods a new Claude sign-in for all agents can use here (`claudeLoginMethodsOf`). */
+  claudeLoginMethods?: AuthMethod[];
 }
 
 export interface FileEntry {
@@ -2000,6 +2087,11 @@ export type MachineErrorCode =
    * push to the default branch, a deploy); the message says why and what the agent can do. Nothing ran.
    */
   | "approval_needed"
+  /**
+   * Protocol 46: this runner can't do it the way it was asked (a Claude sign-in `method` it can't use here); the
+   * message says why. Older servers read it like `internal`.
+   */
+  | "unsupported"
   | "bad_request"
   | "internal";
 
@@ -2242,6 +2334,8 @@ export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
     const usage = parsePlanUsage(a.usage);
     const provider = isPlanProviderWord(a.provider) ? a.provider : undefined;
     const keyHint = isString(a.keyHint) && /^[\x21-\x7e]{1,4}$/.test(a.keyHint) ? a.keyHint : undefined;
+    const providerOrgId = providerOrgIdOf(a.providerOrgId);
+    const orgName = providerOrgNameOf(a.orgName);
     out.push({
       id: a.id,
       kind: a.kind,
@@ -2252,6 +2346,10 @@ export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
       ...(provider ? { provider } : {}),
       ...(keyHint ? { keyHint } : {}),
       ...(a.shared === true ? { shared: true } : {}),
+      ...(isAuthMethod(a.authMethod) ? { authMethod: a.authMethod } : {}),
+      ...(a.statusUnknown === true ? { statusUnknown: true as const } : {}),
+      ...(providerOrgId ? { providerOrgId } : {}),
+      ...(orgName ? { orgName } : {}),
     });
   }
   return out;
@@ -2365,6 +2463,10 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
         message: (isString(v.message) ? v.message : "").slice(0, BRAIN_LIMITS.message),
         ...(typeof v.retryable === "boolean" ? { retryable: v.retryable } : {}),
         ...(typeof v.worked === "boolean" ? { worked: v.worked } : {}),
+        ...(isProviderFailureCause(v.cause) ? { cause: v.cause } : {}),
+        ...(Number.isInteger(v.httpStatus) && (v.httpStatus as number) >= 100 && (v.httpStatus as number) <= 599
+          ? { httpStatus: v.httpStatus as number }
+          : {}),
       };
     case "steer_read": {
       if (!Array.isArray(v.uuids)) return null;
@@ -2445,6 +2547,9 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
         ...(f.mode === "system" ? { mode: "system" as const } : {}),
         ...(isObject(f.ownUsage) ? { ownUsage: parseOwnUsage(f.ownUsage) } : {}),
         ...(size ? { size } : {}),
+        ...(Array.isArray(f.claudeLoginMethods)
+          ? { claudeLoginMethods: AUTH_METHODS.filter((m) => (f.claudeLoginMethods as unknown[]).includes(m)) }
+          : {}),
       };
     }
     case "browser.frame": {
