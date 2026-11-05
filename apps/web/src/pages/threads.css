@@ -75,6 +75,11 @@ html:not([data-pointer]) .threads-group__head button:focus-visible {
 .threads-group__chev {
   transition: transform 0.15s;
 }
+@media (prefers-reduced-motion: reduce) {
+  .threads-group__chev {
+    transition: none;
+  }
+}
 .threads-group__head [aria-expanded="false"] .threads-group__chev {
   transform: rotate(-90deg);
 }
@@ -187,14 +192,15 @@ html:not([data-pointer]) .thread-row__name:focus-visible {
   justify-content: flex-end;
   min-width: 0;
 }
+/* A button, not a label: a small control of the ruler (32, r10), not a pill. */
 .thread-row__resolved {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 22px;
-  padding: 0 var(--space-2);
+  height: var(--control-h-sm);
+  padding: 0 var(--control-px-sm);
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: var(--control-r-sm);
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--line2);
   font: inherit;
@@ -266,6 +272,13 @@ html:not([data-pointer]) .thread-row__resolved:focus-visible {
 
 /* Narrower: the last line drops under the title, then the people column goes. */
 @container threads (max-width: 1000px) {
+  /* Two lines beside the 28px face: a face line. The face on the row's top, the name's capitals on its top edge (the
+     kit's `.ac-captop` rise on the name's 20px line), and the state and time centred on the name's line (whose middle
+     the rise puts at the capitals' top), not on the row's. 3px more on top keeps a 32px "Resolved" inside the row. */
+  .thread-row {
+    align-items: start;
+    padding-top: 11px;
+  }
   .thread-row__title {
     flex-direction: column;
     align-items: stretch;
@@ -273,9 +286,12 @@ html:not([data-pointer]) .thread-row__resolved:focus-visible {
   }
   .thread-row__name {
     max-width: 100%;
+    line-height: 20px;
+    margin-top: calc(var(--cap-top) - 10px);
   }
   .thread-row__end {
     grid-template-columns: 168px 64px;
+    translate: 0 calc(var(--cap-top) - 50%);
   }
   .thread-row__who {
     display: none;
@@ -287,11 +303,13 @@ html:not([data-pointer]) .thread-row__resolved:focus-visible {
     align-items: start;
     padding: 10px 12px;
   }
+  /* Under the words now, on a line of its own. */
   .thread-row__end {
     grid-column: 2;
     display: flex;
     justify-content: space-between;
     gap: 8px;
+    translate: none;
   }
   .thread-row__state {
     justify-content: flex-start;

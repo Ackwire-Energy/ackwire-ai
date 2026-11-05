@@ -4695,10 +4695,24 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
 .ac-menu__separator {
   margin: 4px var(--menu-item-px);
 }
+/*
+ * Its words can wrap and can carry a second line: the icon and the buttons stay on the first line, not the middle of
+ * the toast. The icon and the words keep the room a small button takes (32, 40 on touch), so a one-line toast is as
+ * tall as before and its first line runs through the buttons' middle.
+ */
 .ac-toast {
-  align-items: center;
+  --toast-line-pad: calc((var(--control-h-sm) - 20px) / 2);
+  align-items: flex-start;
   gap: 12px;
   padding: 12px 14px 12px 12px;
+}
+@media (pointer: coarse) {
+  .ac-toast {
+    --toast-line-pad: calc((var(--control-h-md) - 20px) / 2);
+  }
+}
+.ac-toast > :is(.ac-icon, .ac-toast__text) {
+  margin-block: var(--toast-line-pad);
 }
 /* Each tone's soft glow from the right edge over the glass, as the sidebar's chosen row has (layout.css,
    `.sidebar__item[data-status="active"]::before`); its icon in the tone. After the glass rules: their `background`
