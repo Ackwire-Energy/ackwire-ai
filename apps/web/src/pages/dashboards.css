@@ -207,7 +207,26 @@ html:not([data-pointer]) .db-card:focus-visible {
 .db-proposal__acts {
   display: flex;
   flex: none;
-  gap: 6px;
+  gap: 8px;
+}
+/* With its buttons: the face and the buttons on the title's line, not the middle of the title, the audience and the
+   why under it. The words keep the room a small button takes (32, 40 on touch), as a toast's do, so the title's line
+   runs through the buttons' middle. */
+.db-proposal:has(> .db-proposal__acts) {
+  --db-line-pad: calc((var(--control-h-sm) - 22px) / 2);
+  align-items: flex-start;
+}
+@media (pointer: coarse) {
+  .db-proposal:has(> .db-proposal__acts) {
+    --db-line-pad: calc((var(--control-h-md) - 22px) / 2);
+  }
+}
+.db-proposal:has(> .db-proposal__acts) > .db-proposal__text {
+  margin-top: var(--db-line-pad);
+}
+/* The 24px face's middle on the 22px line's. */
+.db-proposal:has(> .db-proposal__acts) > :first-child {
+  margin-top: calc(var(--db-line-pad) - 1px);
 }
 @media (max-width: 760px) {
   .db-proposal {
@@ -949,7 +968,7 @@ html:not([data-pointer]) :is(.nw-sug, .nw-pick, .nw-alert__sugs button):focus-vi
 .nw-fail__acts {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 /* Pin from the chat: the blocks agents sent, one to choose. */
 .nw-picks {

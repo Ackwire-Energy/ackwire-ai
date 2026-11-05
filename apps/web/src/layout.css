@@ -529,7 +529,7 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 .waitcard__acts > .ac-chip {
   font-size: var(--control-fs-sm);
@@ -4428,7 +4428,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   grid-column: 2;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 @container (width > 720px) {
   .connected-row:not(:has(> .connected-row__actions)) {
@@ -7600,10 +7600,11 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
     translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
   }
 }
-/* The button stays in the middle of the lines, as a card head's action does. To the row it is one line tall, the rest
-   of it overhanging evenly, so a one-line hold keeps its strip. */
+/* The button on the first line, with the lead, however many lines the words take under it (a button in the middle of
+   the lines read as belonging to none). To the row it is one line tall, the rest of it overhanging evenly, so a
+   one-line hold keeps its strip. */
 .hold-banner > .outage__acts {
-  align-self: center;
+  align-self: flex-start;
   margin-block: calc(11px - var(--control-h-sm) / 2);
 }
 /* Where to write for help: the address reads as part of the sentence. */
@@ -10802,7 +10803,7 @@ html:not([data-pointer]) .msg-mem:focus-visible {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin-top: 10px;
 }
 .msg-mem__actions--end {
@@ -13225,7 +13226,7 @@ html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
 .tool-change__actions {
   display: flex;
   flex-shrink: 0;
-  gap: var(--space-1);
+  gap: var(--space-2);
 }
 .tool-change__details {
   display: grid;

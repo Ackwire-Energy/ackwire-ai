@@ -529,17 +529,31 @@
     grid-row: 1;
     margin: calc(11px - var(--cap-mid) - var(--control-h-sm) / 2) -12px 0 0;
   }
+  /* The buttons end the notice at its right edge, under the × (as the notice island's do), not under the words where
+     the main one read as part of the text. */
   .outage__acts {
     grid-column: 2 / -1;
     grid-row: 2;
     flex-wrap: wrap;
+    justify-content: flex-end;
   }
   /* A hold's button has a row of its own here: it takes its whole height. */
   .hold-banner > .outage__acts {
     margin-block: 0;
   }
-  /* A ghost shows only its words: they start where the words above start. */
-  .outage__acts > .ac-btn--ghost:first-child {
+  /* A ghost shows only its words: at the end they stop on the padding line, where the × above stops. */
+  .outage__acts > .ac-btn--ghost:last-child {
+    margin-right: -12px;
+  }
+  /* The setup notice's faces end that row, across from its button: the button stays under the words, its words
+     starting where they start. */
+  .setup-notice .outage__acts {
+    justify-content: flex-start;
+  }
+  .setup-notice .outage__acts > .ac-btn--ghost:last-child {
+    margin-right: 0;
+  }
+  .setup-notice .outage__acts > .ac-btn--ghost:first-child {
     margin-left: -12px;
   }
 }

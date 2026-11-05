@@ -179,7 +179,7 @@
 .wd__alert-acts {
   display: flex;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 8px;
 }
 .wd__to {
   display: inline-flex;
@@ -199,7 +199,7 @@
 .wn-acts {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 /* ── "Pin to a dashboard" ──────────────────────────────────────────────── */

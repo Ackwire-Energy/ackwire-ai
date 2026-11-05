@@ -611,7 +611,7 @@ html:not([data-pointer]) .wiki-minigraph:focus-visible {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 .wiki-top__status {
   display: inline-flex;

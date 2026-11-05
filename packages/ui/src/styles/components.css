@@ -1206,16 +1206,25 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   font-size: 14px;
   line-height: 20px;
 }
-/* An error line with its × after it: the × stays out of the .ac-iconline, centred on the whole line. */
+/*
+ * An error line with its fix and its × after it, out of the .ac-iconline: they stay on the reason's first line, not the
+ * middle of a reason that wraps. The words start as far down as a small button (32, 40 on touch) centres a line, so a
+ * one-line error is as tall as before and its first line runs through the buttons' middle.
+ */
 .ac-msg__error-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   margin: 2px 0 0;
 }
 .ac-msg__error-row > .ac-msg__error {
   min-width: 0;
-  margin: 0;
+  margin: calc((var(--control-h-sm) - 20px) / 2) 0 0;
+}
+@media (pointer: coarse) {
+  .ac-msg__error-row > .ac-msg__error {
+    margin-top: calc((var(--control-h-md) - 20px) / 2);
+  }
 }
 .ac-mention {
   color: var(--ink);

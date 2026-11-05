@@ -234,7 +234,7 @@
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 .tm-cfm__acts > .tm-why {

@@ -1356,7 +1356,7 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--line);
