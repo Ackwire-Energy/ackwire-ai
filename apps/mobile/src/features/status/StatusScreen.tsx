@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
   chipsRow: { marginHorizontal: -16 },
   chips: { gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
   chip: {
-    height: 34,
+    minHeight: 34,
     paddingHorizontal: 13,
     borderRadius: 17,
     borderWidth: 1.5,

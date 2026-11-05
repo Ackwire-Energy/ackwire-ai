@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   name: { fontWeight: "600" },
   mark: { textDecorationLine: "underline" },
   // A button, so a rounded rectangle rather than a pill; 26 tall with 9 of slop: the 44-point target.
-  add: { height: 26, paddingHorizontal: 10, borderRadius: 8 },
+  add: { minHeight: 26, paddingHorizontal: 10, borderRadius: 8 },
   addIn: { alignItems: "center", justifyContent: "center" },
   addText: { fontWeight: "600" },
 });

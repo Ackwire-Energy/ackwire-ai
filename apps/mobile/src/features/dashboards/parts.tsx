@@ -530,10 +530,18 @@ const styles = StyleSheet.create({
   proposalTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   proposalActions: { flexDirection: "row", justifyContent: "flex-end", flexWrap: "wrap", gap: 8 },
   chips: { gap: 6, paddingHorizontal: 16 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, height: 34, paddingHorizontal: 12, borderRadius: 17 },
+  // Min heights: with a large text size the label grows past them instead of being clipped.
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 34, paddingHorizontal: 12, borderRadius: 17 },
   segments: { paddingHorizontal: 16 },
   roles: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingLeft: 54, paddingRight: 14, paddingBottom: 12 },
-  roleChip: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 12, borderRadius: 16 },
+  roleChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 32,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
   faded: { opacity: 0.35 },
   exposure: { flexDirection: "row", alignItems: "flex-start", gap: 6, paddingLeft: 16, paddingTop: 10 },
   // GroupedFooter's paddingTop.
