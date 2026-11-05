@@ -4154,6 +4154,15 @@
   "channel.quoteOf": {
     "value": "Reply to {{name}}: {{excerpt}}. See the message"
   },
+  "channel.quoteGone": {
+    "value": "Original message deleted"
+  },
+  "channel.replyingTo": {
+    "value": "Replying to {{name}}"
+  },
+  "channel.cancelReply": {
+    "value": "Cancel reply"
+  },
   "channel.emoji": {
     "value": "Emoji"
   },
@@ -26557,6 +26566,9 @@
   },
   "errors.wiki.lockAdminsOnly": {
     "value": "Only admins lock pages."
+  },
+  "errors.replyGone": {
+    "value": "The message you were replying to isn't here anymore."
   },
   "errors.media.off": {
     "value": "GIFs and stickers are off in this workspace."

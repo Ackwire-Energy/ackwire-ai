@@ -1653,6 +1653,9 @@
     "linkCopied": "Tautan disalin.",
     "reply": "Balas",
     "quoteOf": "Balasan untuk {{name}}: {{excerpt}}. Lihat pesannya",
+    "quoteGone": "Pesan asli dihapus",
+    "replyingTo": "Membalas {{name}}",
+    "cancelReply": "Batalkan balasan",
     "emoji": "Emoji",
     "uploading": "mengunggah…",
     "uploadFailed": "tidak terunggah",
@@ -10574,6 +10577,7 @@
       "titleNoLetters": "Judul harus berisi huruf atau angka.",
       "lockAdminsOnly": "Hanya Admin yang bisa mengunci halaman."
     },
+    "replyGone": "Pesan yang kamu balas sudah tidak ada.",
     "media": {
       "off": "GIF dan stiker dinonaktifkan di ruang kerja ini.",
       "notFound": "GIF itu sudah tidak tersedia. Pilih yang lain.",

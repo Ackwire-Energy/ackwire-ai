@@ -551,7 +551,7 @@ export function chatRoutes(deps: AppDeps) {
             threadId: z.uuid().nullable().optional(),
             replyTo: z.uuid().nullable().optional().openapi({
               description:
-                "Quote reply: a message of this channel. Stored as `meta.replyTo` ({ messageId, threadId, author, authorName, excerpt, mediaKind? }); `mediaKind` (`gif` or `sticker`) when the quoted message has one (ADR 0091), so a quote of a GIF or sticker with no text still says what it was.",
+                "Quote reply: a message of this channel and, from a thread, of that thread. Stored as `meta.replyTo` ({ messageId, threadId, author, authorName, excerpt, mediaKind?, deleted? }), `deleted` once the original is gone; `mediaKind` (`gif` or `sticker`) when the quoted message has one (ADR 0091), so a quote of a GIF or sticker with no text still says what it was.",
             }),
             media: z
               .discriminatedUnion("kind", [

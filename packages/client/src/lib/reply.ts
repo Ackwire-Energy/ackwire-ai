@@ -30,6 +30,7 @@ export function replyOf(meta: Record<string, unknown> | undefined): ReplyRef | n
     authorName: typeof o.authorName === "string" ? o.authorName : "",
     excerpt: o.excerpt,
     ...(media ? { media } : {}),
+    ...(o.deleted === true ? { deleted: true } : {}),
   };
 }
 

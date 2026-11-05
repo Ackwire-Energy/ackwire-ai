@@ -133,6 +133,8 @@ export interface ReplyRef {
   excerpt: string;
   /** The quoted message's GIF, sticker (ADR 0091) or voice (ADR 0100): a quote of one with no text still says what it was. */
   mediaKind?: MessageMedia["kind"] | "voice";
+  /** The original is gone (`withGoneQuotes`, when listed): its words and author go with it. */
+  deleted?: true;
 }
 
 export const REPLY_EXCERPT_LENGTH = 200;
@@ -1024,7 +1026,7 @@ export async function postPersonMessage(
     clientId?: string | null;
     /** Server-side attachments (e.g. `{ issueId }` when asking an agent to implement an issue). */
     meta?: Record<string, unknown>;
-    /** Quote reply: the message this one answers (same channel). Stored as `meta.replyTo`. */
+    /** Quote reply: the message this one answers (same channel; in a thread, that thread). Stored as `meta.replyTo`. */
     replyTo?: string | null;
     /** Files (artifact ids) uploaded for this message, or files of this channel. Stored as `meta.artifacts`. */
     attachments?: string[];
@@ -1057,7 +1059,7 @@ export async function postPersonMessage(
   if (resent) return resendView(deps, orgId, resent);
   // Quote, files and media: checked and resolved here, so the run's context reads them from the meta (no query there).
   const [replyTo, files, media] = await Promise.all([
-    input.replyTo ? replyRefFor(deps.db, orgId, channelId, input.replyTo) : null,
+    input.replyTo ? replyRefFor(deps.db, orgId, channelId, input.replyTo, input.threadId) : null,
     input.attachments?.length ? attachmentRefsFor(deps.db, userId, orgId, channelId, input.attachments) : null,
     input.media ? resolveMedia(deps, orgId, input.media) : null,
   ]);
@@ -1347,8 +1349,17 @@ async function resolveMedia(
   return { kind: "sticker", agentId: agent.id, mood: input.mood };
 }
 
-/** The quoted message (one statement, with its author's name): it must be a live message of this channel. */
-async function replyRefFor(db: Database, orgId: string, channelId: string, messageId: string): Promise<ReplyRef> {
+/**
+ * The quoted message (one statement, with its author's name): a live message of this channel and, from a thread, of
+ * that thread. The main timeline stays open to the channel: it shows the agents' replies, which live in their threads.
+ */
+async function replyRefFor(
+  db: Database,
+  orgId: string,
+  channelId: string,
+  messageId: string,
+  threadId?: string | null,
+): Promise<ReplyRef> {
   const [row] = await db
     .select({
       id: messages.id,
@@ -1367,8 +1378,9 @@ async function replyRefFor(db: Database, orgId: string, channelId: string, messa
     .leftJoin(schema.users, eq(schema.users.id, messages.authorUserId))
     .leftJoin(agents, eq(agents.id, messages.authorAgentId))
     .where(and(eq(messages.id, messageId), eq(messages.orgId, orgId)));
-  if (!row || row.deletedAt || row.channelId !== channelId) {
-    throw new ValidationError("replyTo must be a message of this channel", "message.reply_not_found");
+  const elsewhere = threadId && row?.id !== threadId && row?.threadId !== threadId;
+  if (!row || row.deletedAt || row.channelId !== channelId || elsewhere) {
+    throw new ValidationError("replyTo must be a message of this conversation", "message.reply_not_found");
   }
   const person = row.authorType === "person";
   const media = mediaOf(row.meta);
@@ -1629,5 +1641,23 @@ async function withReceipts(db: Database, orgId: string, list: Message[]): Promi
       ...longWorkOf(m, works),
     };
   });
-  return withDeletedArtifacts(db, orgId, await withWikiLinks(db, orgId, views));
+  return withGoneQuotes(db, orgId, await withDeletedArtifacts(db, orgId, await withWikiLinks(db, orgId, views)));
+}
+
+/** A quote of a message deleted since keeps only that: the words saved with it go when the original does. */
+async function withGoneQuotes(db: Database, orgId: string, views: MessageView[]): Promise<MessageView[]> {
+  const quoteOf = (v: MessageView) => v.meta.replyTo as ReplyRef | undefined;
+  const ids = [...new Set(views.flatMap((v) => quoteOf(v)?.messageId ?? []))];
+  if (ids.length === 0) return views;
+  const live = await db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(and(eq(messages.orgId, orgId), inArray(messages.id, ids), isNull(messages.deletedAt)));
+  const alive = new Set(live.map((m) => m.id));
+  return views.map((v) => {
+    const quote = quoteOf(v);
+    if (!quote || alive.has(quote.messageId)) return v;
+    const { mediaKind: _gone, ...kept } = quote;
+    return { ...v, meta: { ...v.meta, replyTo: { ...kept, authorName: "", excerpt: "", deleted: true } } };
+  });
 }

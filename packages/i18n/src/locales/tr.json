@@ -1711,6 +1711,9 @@
     "linkCopied": "Bağlantı kopyalandı.",
     "reply": "Yanıtla",
     "quoteOf": "{{name}} kişisine yanıt: {{excerpt}}. Mesajı gör",
+    "quoteGone": "Orijinal mesaj silindi",
+    "replyingTo": "{{name}} yanıtlanıyor",
+    "cancelReply": "Yanıtı iptal et",
     "emoji": "Emoji",
     "uploading": "yükleniyor…",
     "uploadFailed": "yüklenmedi",
@@ -10891,6 +10894,7 @@
       "titleNoLetters": "Başlıkta harf veya rakam olmalı.",
       "lockAdminsOnly": "Sayfaları yalnızca yöneticiler kilitler."
     },
+    "replyGone": "Yanıtladığın mesaj artık burada değil.",
     "media": {
       "off": "Bu çalışma alanında GIF'ler ve çıkartmalar kapalı.",
       "notFound": "O GIF artık kullanılamıyor. Başka birini seçin.",

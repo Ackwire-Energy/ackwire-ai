@@ -1711,6 +1711,9 @@
     "linkCopied": "Link kopiert.",
     "reply": "Antworten",
     "quoteOf": "Antwort an {{name}}: {{excerpt}}. Nachricht ansehen",
+    "quoteGone": "Ursprüngliche Nachricht gelöscht",
+    "replyingTo": "Antwort an {{name}}",
+    "cancelReply": "Antwort abbrechen",
     "emoji": "Emoji",
     "uploading": "wird hochgeladen…",
     "uploadFailed": "wurde nicht hochgeladen",
@@ -10955,6 +10958,7 @@
       "titleNoLetters": "Ein Titel braucht Buchstaben oder Zahlen.",
       "lockAdminsOnly": "Nur Admins sperren Seiten."
     },
+    "replyGone": "Die Nachricht, auf die du geantwortet hast, ist nicht mehr da.",
     "media": {
       "off": "GIFs und Sticker sind in diesem Workspace ausgeschaltet.",
       "notFound": "Dieses GIF ist nicht mehr verfügbar. Wähl ein anderes.",

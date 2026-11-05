@@ -5959,47 +5959,37 @@ html:not([data-pointer]) .composer-reply__close:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-/* "Respondendo a Ana" (quote reply) at the top of the composer card: who and the quoted line. */
+/* "Respondendo a Ana" at the top of the composer card; its × or Esc drops it. */
 .composer-quote {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 6px 6px 10px;
+  gap: 6px;
+  padding: 4px 4px 4px 10px;
   border-radius: var(--radius-item);
   background: var(--sunken);
+  font-size: 12.5px;
+  line-height: 18px;
   color: var(--muted);
 }
 .composer-quote > .ac-icon {
   flex: none;
 }
-.composer-quote__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-  font-size: 12.5px;
-  line-height: 17px;
-}
 .composer-quote__who {
+  flex: 1;
+  min-width: 0;
   font-weight: 600;
   color: var(--ink2);
 }
-.composer-quote__excerpt {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* The quote above a reply: a neutral strip; opens the original. */
+/* The line above a reply (`.ac-msg__reply`): face, @name and one line of what it answers; opens the original. */
 .msg-quote {
   display: flex;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
+  gap: 5px;
   max-width: 100%;
-  margin: 4px 0 2px;
-  padding: 3px 10px;
+  min-height: 20px;
+  padding: 0;
   border: 0;
-  border-radius: var(--radius-item);
-  background: var(--sunken);
+  background: none;
   font: inherit;
   font-size: 13px;
   line-height: 18px;
@@ -6014,16 +6004,34 @@ html:not([data-pointer]) .msg-quote:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+.msg-quote .ac-avatar {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  font-size: 8px;
+}
 .msg-quote__who {
   flex: none;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 600;
   color: var(--ink2);
+}
+.ac-msg__text .msg-quote__who {
+  color: inherit;
 }
 .msg-quote__excerpt {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.msg-quote--gone {
+  width: fit-content;
+  font-style: italic;
+  cursor: default;
 }
 /* A picker or menu open from the hover bar keeps the bar on screen. */
 .ac-msg__actions:has([aria-expanded="true"]) {

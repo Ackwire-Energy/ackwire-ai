@@ -16,7 +16,8 @@ export interface ChannelActions {
   channelAgents: Agent[];
   /**
    * "Responder": in a channel, that message's thread opens in the panel beside it (a reply there
-   * starts the thread); in a thread view, the composer.
+   * starts the thread); in a thread view, the next message answers this one ("Respondendo a Ana"). Absent where
+   * nothing can be written.
    */
   reply?: (message: MessageType) => void;
   /**

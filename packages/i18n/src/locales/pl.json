@@ -1827,6 +1827,9 @@
     "linkCopied": "Skopiowano link.",
     "reply": "Odpowiedz",
     "quoteOf": "Odpowiedź do {{name}}: {{excerpt}}. Zobacz wiadomość",
+    "quoteGone": "Pierwotna wiadomość została usunięta",
+    "replyingTo": "Odpowiadasz: {{name}}",
+    "cancelReply": "Anuluj odpowiedź",
     "emoji": "Emoji",
     "uploading": "przesyłanie…",
     "uploadFailed": "nie został przesłany",
@@ -11755,6 +11758,7 @@
       "titleNoLetters": "Tytuł musi zawierać litery lub cyfry.",
       "lockAdminsOnly": "Tylko administratorzy blokują strony."
     },
+    "replyGone": "Wiadomości, na którą odpowiadasz, już tu nie ma.",
     "media": {
       "off": "GIF-y i naklejki są wyłączone w tej przestrzeni roboczej.",
       "notFound": "Ten GIF nie jest już dostępny. Wybierz inny.",

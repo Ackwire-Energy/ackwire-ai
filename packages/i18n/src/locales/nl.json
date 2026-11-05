@@ -1711,6 +1711,9 @@
     "linkCopied": "Link gekopieerd.",
     "reply": "Beantwoorden",
     "quoteOf": "Antwoord op {{name}}: {{excerpt}}. Bekijk het bericht",
+    "quoteGone": "Oorspronkelijk bericht verwijderd",
+    "replyingTo": "Antwoord aan {{name}}",
+    "cancelReply": "Antwoord annuleren",
     "emoji": "Emoji",
     "uploading": "uploaden…",
     "uploadFailed": "is niet geüpload",
@@ -11018,6 +11021,7 @@
       "titleNoLetters": "Een titel heeft letters of cijfers nodig.",
       "lockAdminsOnly": "Alleen beheerders vergrendelen pagina's."
     },
+    "replyGone": "Het bericht waarop je reageerde is er niet meer.",
     "media": {
       "off": "GIF's en stickers staan uit in deze werkruimte.",
       "notFound": "Die GIF is niet meer beschikbaar. Kies een andere.",

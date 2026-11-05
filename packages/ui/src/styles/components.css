@@ -960,6 +960,7 @@ textarea.ac-input {
  */
 .ac-msg__avatar,
 .ac-msg__gutter,
+.ac-msg__reply,
 .ac-msg__head,
 .ac-msg__aside,
 .ac-msg__foot,
@@ -986,6 +987,49 @@ textarea.ac-input {
   --sunken: var(--msg-well);
   --surface-sunken: var(--msg-well);
   --card-well: var(--msg-well);
+}
+/* A reply's line above its row: the curve leaves over the face and ends at the quote, in line with the name. */
+.ac-msg:has(> .ac-msg__reply) {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.ac-msg > .ac-msg__reply {
+  --reply-face: 36px;
+  --reply-gap: var(--space-3);
+  position: relative;
+  flex: 0 0 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  padding-left: calc(var(--reply-face) + var(--reply-gap));
+}
+.ac-msg > .ac-msg__reply::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: -1px;
+  left: calc(var(--reply-face) / 2 - 1px);
+  width: calc(var(--reply-face) / 2 + var(--reply-gap) - 5px);
+  border-top: 2px solid var(--line2);
+  border-left: 2px solid var(--line2);
+  border-top-left-radius: 7px;
+}
+.ac-msg--own > .ac-msg__reply {
+  display: flex;
+  justify-content: flex-end;
+  padding-left: 0;
+}
+.ac-msg--own > .ac-msg__reply::before {
+  display: none;
+}
+/* Inside a bubble, on top of its words: a plate of its ink, so it reads on any bubble's color. */
+.ac-msg__text > .ac-msg__reply {
+  margin-bottom: 4px;
+}
+.ac-msg__text > .ac-msg__reply .msg-quote {
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: inherit;
 }
 /* The face is 36px in the feed, the sidebar's size. */
 .ac-msg__avatar,
@@ -1015,7 +1059,7 @@ textarea.ac-input {
   visibility: hidden;
 }
 .ac-msg--grouped:hover .ac-msg__gutter-time,
-.ac-msg--grouped:focus-within .ac-msg__gutter-time {
+html:not([data-pointer]) .ac-msg--grouped:focus-within .ac-msg__gutter-time {
   visibility: visible;
 }
 .ac-msg__body {
@@ -1052,7 +1096,11 @@ textarea.ac-input {
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
-/* Details behind the time (date, model, tokens, cost): a tooltip on hover or focus, never in the header */
+/*
+ * Details behind the time (date, model, tokens, cost): a tooltip on hover or focus, never in the header. Focus counts
+ * for the keys only (`data-pointer`): a panel or a dialog closing with Esc hands the focus back by script, which a
+ * browser calls :focus-visible after any key.
+ */
 .ac-msg__time--details,
 .ac-msg__gutter-time {
   position: relative;
@@ -1086,7 +1134,7 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   pointer-events: none;
 }
 .ac-msg__time--details:hover .ac-msg__tip,
-.ac-msg__time--details:focus-visible .ac-msg__tip,
+html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
 .ac-msg__gutter-time:hover .ac-msg__tip,
 .ac-msg__own-time:hover .ac-msg__tip {
   visibility: visible;
@@ -1101,7 +1149,7 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
       visibility 0s linear 120ms;
   }
   .ac-msg__time--details:hover .ac-msg__tip,
-  .ac-msg__time--details:focus-visible .ac-msg__tip,
+  html:not([data-pointer]) .ac-msg__time--details:focus-visible .ac-msg__tip,
   .ac-msg__gutter-time:hover .ac-msg__tip,
   .ac-msg__own-time:hover .ac-msg__tip {
     transform: none;
@@ -3085,7 +3133,7 @@ html:not([data-pointer]) .ac-navcard:focus-visible {
   pointer-events: none;
 }
 .ac-msg:hover .ac-msg__actions,
-.ac-msg:focus-within .ac-msg__actions,
+html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 .ac-msg__actions[data-open="true"] {
   opacity: 1;
   pointer-events: auto;
@@ -5180,7 +5228,7 @@ html:not([data-pointer]) .ac-hint:focus-visible {
     transform 0.16s var(--out);
 }
 .ac-msg:hover .ac-msg__actions,
-.ac-msg:focus-within .ac-msg__actions,
+html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 .ac-msg__actions[data-open="true"],
 .ac-msg__actions:has([aria-expanded="true"]) {
   transform: translateY(-50%);
@@ -5430,7 +5478,7 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   }
 }
 /* Keyboard focus in my row opens its time's details: its head is hidden, so nothing else would. */
-.ac-msg--own:has(:focus-visible) .ac-msg__own-time > .ac-msg__tip {
+html:not([data-pointer]) .ac-msg--own:has(:focus-visible) .ac-msg__own-time > .ac-msg__tip {
   visibility: visible;
   opacity: 1;
 }
@@ -7241,7 +7289,7 @@ html:not([data-pointer]) .ac-gif:focus-visible {
   color: var(--ink);
 }
 .ac-msg:hover .ac-react--add,
-.ac-msg:focus-within .ac-react--add,
+html:not([data-pointer]) .ac-msg:focus-within .ac-react--add,
 .ac-react--add[aria-expanded="true"] {
   opacity: 1;
 }
@@ -8535,10 +8583,13 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   .ac-msg__actions {
     right: 8px;
   }
-  /* The time's details: on a tap of the time, not only on hover. */
+  /* The time's details and a note's reason: on a tap, not only on hover. */
   .ac-msg__time--details:focus .ac-msg__tip {
     visibility: visible;
     opacity: 1;
+  }
+  .ac-msg__note:focus .ac-msg__note-tip {
+    display: block;
   }
   .ac-emoji__cell:hover {
     transform: none;
@@ -9464,7 +9515,7 @@ html:not([data-pointer]) .ac-msg__note:focus-visible {
   display: none;
 }
 .ac-msg__note:hover .ac-msg__note-tip,
-.ac-msg__note:focus .ac-msg__note-tip {
+html:not([data-pointer]) .ac-msg__note:focus-visible .ac-msg__note-tip {
   display: block;
 }
 @media (prefers-reduced-motion: no-preference) {

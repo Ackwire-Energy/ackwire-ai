@@ -81,6 +81,18 @@ describe("timeline", () => {
     expect(mergeTimeline([a, c], [[b, a]]).map((m) => m.id)).toEqual(["a", "b", "c"]);
   });
 
+  test("a reply to a message starts its own block, and the next one groups under it", () => {
+    const quote = { replyTo: { messageId: "1", excerpt: "oi", author: { type: "person", id: "u" } } };
+    const rows = buildRows([message({ id: "1" }), message({ id: "2", meta: quote }), message({ id: "3" })]).flatMap(
+      (r) => (r.kind === "message" ? [[r.message.id, r.grouped]] : []),
+    );
+    expect(rows).toEqual([
+      ["1", false],
+      ["2", false],
+      ["3", true],
+    ]);
+  });
+
   test("same author within 5 minutes groups; a day starts a new group; cards stand alone", () => {
     const rows = buildRows([
       message({ id: "1", createdAt: "2026-10-16T12:00:00.000Z" }),

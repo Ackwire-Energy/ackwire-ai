@@ -1699,6 +1699,9 @@ export const en = {
     linkCopied: "Link copied.",
     reply: "Reply",
     quoteOf: "Reply to {{name}}: {{excerpt}}. See the message",
+    quoteGone: "Original message deleted",
+    replyingTo: "Replying to {{name}}",
+    cancelReply: "Cancel reply",
     emoji: "Emoji",
     uploading: "uploading…",
     uploadFailed: "was not uploaded",
@@ -10546,6 +10549,7 @@ export const en = {
       titleNoLetters: "A title needs letters or numbers.",
       lockAdminsOnly: "Only admins lock pages.",
     },
+    replyGone: "The message you were replying to isn't here anymore.",
     media: {
       off: "GIFs and stickers are off in this workspace.",
       notFound: "That GIF isn't available anymore. Pick another one.",

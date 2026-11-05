@@ -835,7 +835,9 @@ describe("Message aside and foot", () => {
     // (built-css.test.ts in the web app checks the built stylesheet keeps it).
     expect(value(bar, "transform")).toBe("translateY(calc(-50% + 4px))");
     expect(value(".ac-msg:hover .ac-msg__actions", "transform")).toBe("translateY(-50%)");
-    expect(value(".ac-msg:focus-within .ac-msg__actions", "transform")).toBe("translateY(-50%)");
+    expect(value("html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions", "transform")).toBe(
+      "translateY(-50%)",
+    );
     expect(bodies(bar)).not.toMatch(/(^|;)\s*(bottom|translate):/);
     // Its middle on the row's top edge, grouped or not: half of it in the gap above, never over the first line.
     expect(value(bar, "top")).toBe("0");

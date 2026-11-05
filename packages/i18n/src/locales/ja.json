@@ -1653,6 +1653,9 @@
     "linkCopied": "リンクをコピーしました。",
     "reply": "返信",
     "quoteOf": "{{name}}への返信: {{excerpt}}。メッセージを見る",
+    "quoteGone": "元のメッセージは削除されました",
+    "replyingTo": "{{name}} に返信中",
+    "cancelReply": "返信をキャンセル",
     "emoji": "絵文字",
     "uploading": "アップロード中…",
     "uploadFailed": "アップロードされませんでした",
@@ -10520,6 +10523,7 @@
       "titleNoLetters": "タイトルには文字か数字が必要です。",
       "lockAdminsOnly": "ページをロックできるのは管理者だけです。"
     },
+    "replyGone": "返信先のメッセージはもうありません。",
     "media": {
       "off": "このワークスペースではGIFとステッカーがオフになっています。",
       "notFound": "そのGIFはもう利用できません。別のものを選んでください。",

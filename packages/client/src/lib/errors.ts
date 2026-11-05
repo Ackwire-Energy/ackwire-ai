@@ -228,6 +228,7 @@ const KNOWN = {
   "wiki.title_empty_slug": "errors.wiki.titleNoLetters",
   // GIFs and stickers (ADR 0091): off in the workspace (or no GIF search on this server), a GIF gone, or the GIF
   // search not answering.
+  "message.reply_not_found": "errors.replyGone",
   "message.media_off": "errors.media.off",
   "message.media_not_found": "errors.media.notFound",
   "gifs.off": "errors.media.gifsOff",

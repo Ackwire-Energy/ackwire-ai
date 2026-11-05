@@ -66,6 +66,56 @@ test("replyTo must be a live message of the same channel (and org)", async () =>
   await expect(post("oi", { replyTo: gone.id })).rejects.toMatchObject({ code: "message.reply_not_found" });
 });
 
+test("from a thread, the quote is of that thread: its root or a reply, never another conversation", async () => {
+  f = await setup();
+  const root = await post("o login caiu");
+  const reply = await post("desde as 9h", { threadId: root.id });
+  const other = await post("outro assunto");
+  const stray = await post("noutra thread", { threadId: other.id });
+  expect((await post("a raiz", { threadId: root.id, replyTo: root.id })).meta.replyTo).toMatchObject({
+    messageId: root.id,
+  });
+  expect((await post("a resposta", { threadId: root.id, replyTo: reply.id })).meta.replyTo).toMatchObject({
+    messageId: reply.id,
+    threadId: root.id,
+  });
+  for (const id of [other.id, stray.id]) {
+    await expect(post("oi", { threadId: root.id, replyTo: id })).rejects.toMatchObject({
+      code: "message.reply_not_found",
+    });
+  }
+  // The main timeline shows the agents' replies, which live in their threads: it stays open to the channel.
+  expect((await post("na linha do tempo", { replyTo: stray.id })).meta.replyTo).toMatchObject({ messageId: stray.id });
+});
+
+test("a quote of a message deleted since keeps only that: its words and author go with it", async () => {
+  f = await setup();
+  const root = await post("vai sumir");
+  const reply = await post("sobre isso", { replyTo: root.id });
+  const kept = await post("fica", { replyTo: reply.id });
+  await f.db.update(schema.messages).set({ deletedAt: new Date() }).where(eq(schema.messages.id, root.id));
+  const listed = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+  expect(listed.find((m) => m.id === reply.id)?.meta.replyTo).toMatchObject({
+    messageId: root.id,
+    deleted: true,
+    authorName: "",
+    excerpt: "",
+  });
+  expect(listed.find((m) => m.id === kept.id)?.meta.replyTo).not.toHaveProperty("deleted");
+});
+
+test("an agent reading a thread sees which message each reply answers", async () => {
+  f = await setup();
+  const root = await post("o deploy falhou");
+  const first = await post("o token expira em 15 minutos", { threadId: root.id });
+  await post("olha o refresh", { threadId: root.id });
+  const trigger = await post("@dev e isso?", { threadId: root.id, replyTo: first.id });
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
+  if (!run) throw new Error("no run");
+  const ctx = await buildRunContext(f.db, run, f.agent, { maxMessages: 30 });
+  expect(JSON.stringify(ctx.messages)).toContain(`(replying to ${f.owner.name}: \\"o token expira em 15 minutos\\")`);
+});
+
 test("attachments: own uploads or files of the channel become meta.artifacts; files alone are a message", async () => {
   f = await setup();
   const mine = await createFileArtifact(f.artifactDeps, { type: "person", userId: f.owner.id }, f.org.id, {

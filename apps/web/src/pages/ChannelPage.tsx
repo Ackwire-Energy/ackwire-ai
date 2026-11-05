@@ -354,6 +354,7 @@ import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { selectingIn } from "@/lib/context-menu";
 import { desktopPlatform, useDocumentTitle } from "@/lib/desktop";
 import { holdOnScreen } from "@/lib/island";
+import { useThreadPanel } from "@/lib/open-param";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
 import {
@@ -499,7 +500,21 @@ function highlightMessage(scroller: HTMLElement | null, messageId: string) {
   return true;
 }
 
-/** The quote above a reply: who and one line; opens the original. */
+/** "Respondendo a Ana" on top of the composer; its × or Esc drops it. Marked so Esc goes here before the panel. */
+function QuoteBar({ name, onCancel }: { name: string; onCancel: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="composer-quote" data-esc-layer="">
+      <Icon name="reply" size={16} />
+      <span className="composer-quote__who">{t("channel.replyingTo", { name })}</span>
+      <button type="button" className="composer-reply__close" aria-label={t("channel.cancelReply")} onClick={onCancel}>
+        <Icon name="close" size={14} />
+      </button>
+    </div>
+  );
+}
+
+/** The line above a reply: face, name and one line of what it answers; opens the original, or says it is gone. */
 function QuotedMessage({ reply }: { reply: ReplyRef }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -513,6 +528,7 @@ function QuotedMessage({ reply }: { reply: ReplyRef }) {
   const name = known || reply.authorName || dir.authorName(reply.author);
   // A quoted GIF or sticker has no words: its word stands for it (ADR 0091).
   const excerpt = quoteText(t, reply);
+  if (reply.deleted) return <span className="msg-quote msg-quote--gone">{t("channel.quoteGone")}</span>;
   return (
     <button
       type="button"
@@ -520,8 +536,11 @@ function QuotedMessage({ reply }: { reply: ReplyRef }) {
       aria-label={t("channel.quoteOf", { name, excerpt })}
       onClick={() => actions?.jumpTo?.(reply.messageId)}
     >
+      {reply.author.id ? (
+        <ActorAvatar actor={{ type: reply.author.type, id: reply.author.id }} name={name} size="xs" />
+      ) : null}
       <span className="msg-quote__who" aria-hidden="true">
-        {name}
+        @{name}
       </span>
       <span className="msg-quote__excerpt" aria-hidden="true">
         {excerpt}
@@ -794,7 +813,22 @@ function ChannelView({
     return () => window.removeEventListener("keydown", onKey);
   });
   // The thread open in the panel beside the channel ("Responder", a thread's line); `reply`: to its composer.
-  const [panel, setPanel] = useState<{ id: string; reply: boolean; focus?: string } | null>(null);
+  const [panel, setPanel] = useThreadPanel(!thread);
+  // "Responder" in a thread view: the next message from here answers this one (`meta.replyTo`).
+  const [quote, setQuote] = useState<MessageType | null>(null);
+  // Before the panel's Esc, whose close the bar holds back (`data-esc-layer`), and before the composer's, which stops
+  // an agent: spent here, they see it taken.
+  useEffect(() => {
+    if (!quote) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+      e.preventDefault();
+      setQuote(null);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [quote]);
   // The header search's results, in the same panel (one panel at a time).
   const [searchOpen, setSearchOpen] = useState(false);
   // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place, at a tab when a card asks
@@ -831,7 +865,7 @@ function ChannelView({
     setConsultId(null);
     setSearchOpen(false);
     setTasksOpen((open) => !open);
-  }, [profileKeeps]);
+  }, [profileKeeps, setPanel]);
   const outerPanel = useOpenAgentPanel();
   const openAgentPanel = useCallback(
     (agentId: string, tab?: AgentTab) => {
@@ -846,7 +880,7 @@ function ChannelView({
         return { agentId, tab };
       });
     },
-    [profileKeeps],
+    [profileKeeps, setPanel],
   );
   // A sidebar row's settings button: the agent's page beside this conversation, or beside its own once it shows.
   useEffect(() => {
@@ -979,7 +1013,8 @@ function ChannelView({
     // quando a conexão voltar" (`useSendWaiting`).
     onFailed: (error) => {
       const code = errorCode(error);
-      if (code?.startsWith("thread.") || code?.startsWith("message.media_")) toast.show(errorText(t, error), "error");
+      if (code?.startsWith("thread.") || code?.startsWith("message.media_") || code === "message.reply_not_found")
+        toast.show(errorText(t, error), "error");
     },
   });
   const { send, retry } = sendHelpers(post);
@@ -1805,7 +1840,8 @@ function ChannelView({
     }
     toBottom(true);
     setDraft("");
-    const meta = localMeta(null, "", attached);
+    const meta = localMeta(quote, quote ? dir.authorName(quote.author) : "", attached);
+    setQuote(null);
     // From the thread panel or page: the reply makes it a "Responder" thread (out of the channel's timeline).
     if (thread && chrome?.openThread) meta[OPEN_THREAD] = true;
     // "Parar e mandar" (⌘↵): the agent drops the step it is on and reads this now.
@@ -1817,7 +1853,8 @@ function ChannelView({
   const sendMediaNow = useRef<(media: MessageMedia) => void>(() => {});
   sendMediaNow.current = (media) => {
     toBottom(true);
-    const meta: Record<string, unknown> = { media };
+    const meta: Record<string, unknown> = { ...localMeta(quote, quote ? dir.authorName(quote.author) : "", []), media };
+    setQuote(null);
     if (thread && chrome?.openThread) meta[OPEN_THREAD] = true;
     send("", thread ? thread.id : null, meta);
   };
@@ -1838,12 +1875,13 @@ function ChannelView({
           },
           onTake: ({ blob, durationMs, peaks }) => {
             toBottom(true);
+            setQuote(null);
             void sendVoice({
               blob,
               durationMs,
               peaks,
               threadId: thread ? thread.id : null,
-              replyTo: null,
+              replyTo: quote?.id ?? null,
               language: i18n.language.split("-")[0] ?? null,
             });
           },
@@ -2049,10 +2087,13 @@ function ChannelView({
       if (stick.current && Date.now() >= autoScrollUntil.current) follow();
     },
     channelAgents,
-    // "Responder": in a thread view everything already goes to the thread; in a channel, the message's
-    // thread opens in the panel (a reply there starts it).
+    // "Responder": in a thread view the next message answers this one (there are no threads in a thread); in a
+    // channel, the message's thread opens in the panel (a reply there starts it).
     reply: thread
-      ? () => composer.current?.focus()
+      ? (message) => {
+          setQuote(message);
+          composer.current?.focus();
+        }
       : (message) => {
           if (profileKeeps()) return;
           setProfile(null);
@@ -2090,6 +2131,8 @@ function ChannelView({
     },
   };
   const inThread = Boolean(thread);
+  // A thread with no composer (archived, read only here) has nothing for "Responder" to do.
+  const replies = !thread || !(chrome?.composerReplacement || chrome?.locked || channel.can?.post === false);
   const actions = useMemo<ChannelActions>(() => {
     const now = () => latestActions.current;
     return {
@@ -2099,7 +2142,7 @@ function ChannelView({
       focusComposer: () => now().focusComposer(),
       followBottom: () => now().followBottom(),
       channelAgents,
-      reply: (message) => now().reply(message),
+      reply: replies ? (message) => now().reply(message) : undefined,
       // A thread view has no panel: its links go to the thread's page.
       openThread: inThread ? undefined : (id, focus) => now().openThread(id, focus),
       // In a thread view the question opens in place, inside the reply's block.
@@ -2108,7 +2151,7 @@ function ChannelView({
       jumpTo: (messageId) => now().jumpTo(messageId),
       replyToMission: (missionId, label) => now().replyToMission(missionId, label),
     };
-  }, [channelAgents, inThread]);
+  }, [channelAgents, inThread, replies]);
 
   // A DM with an agent: the agent's chip sits in the composer's toolbar row.
   const agentDm = Boolean(chrome?.dmAgentId) && !thread;
@@ -2422,6 +2465,17 @@ function ChannelView({
                         ) : (
                           <>
                             <Composer
+                              header={
+                                quote ? (
+                                  <QuoteBar
+                                    name={dir.authorName(quote.author)}
+                                    onCancel={() => {
+                                      setQuote(null);
+                                      composer.current?.focus();
+                                    }}
+                                  />
+                                ) : undefined
+                              }
                               attachments={
                                 files.length > 0
                                   ? files.map((f) => (
@@ -2578,6 +2632,10 @@ function ChannelView({
                       reply={panel.reply}
                       focusMessageId={panel.focus}
                       onClose={() => setPanel(null)}
+                      onGone={() => {
+                        setPanel(null, { replace: true });
+                        toast.show(t("threads.view.notFoundTitle"));
+                      }}
                       onSeeInChannel={(messageId, channelId) => {
                         if (channelId !== channel.id) return false;
                         setPanel(null);
@@ -4030,6 +4088,7 @@ export const TimelineMessage = memo(function TimelineMessage({
         own={own}
         run={run}
         bare={waiting || !(leadShown || bodyShown)}
+        quote={quoted ? <QuotedMessage reply={quoted} /> : undefined}
         nameColor={dir.nameColorOf(m.author)}
         waiting={waiting}
         entering={entering && !replacesLive}
@@ -4241,7 +4300,6 @@ export const TimelineMessage = memo(function TimelineMessage({
               </MessageText>
             )}
             {routine && report && reportOpen && <RoutineReport text={report} />}
-            {quoted && <QuotedMessage reply={quoted} />}
             {bodyShown && (
               <MessageText key="body" opens={!leadShown} style={workOver ? { opacity: 0.6 } : undefined}>
                 <MessageBody

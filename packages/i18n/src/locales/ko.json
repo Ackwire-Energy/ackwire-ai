@@ -1653,6 +1653,9 @@
     "linkCopied": "링크를 복사했어요.",
     "reply": "답장",
     "quoteOf": "{{name}}에게 답장: {{excerpt}}. 메시지 보기",
+    "quoteGone": "원본 메시지가 삭제되었습니다",
+    "replyingTo": "{{name}}님에게 답장 중",
+    "cancelReply": "답장 취소",
     "emoji": "이모지",
     "uploading": "업로드 중…",
     "uploadFailed": "업로드되지 않았어요",
@@ -10513,6 +10516,7 @@
       "titleNoLetters": "제목에는 글자나 숫자가 있어야 해요.",
       "lockAdminsOnly": "관리자만 페이지를 잠글 수 있어요."
     },
+    "replyGone": "답장하려던 메시지가 더 이상 없습니다.",
     "media": {
       "off": "이 워크스페이스에서는 GIF와 스티커가 꺼져 있어요.",
       "notFound": "그 GIF는 더 이상 사용할 수 없어요. 다른 걸 고르세요.",

@@ -36,6 +36,7 @@ import { missionSetupOf } from "@agenteschat/client/lib/missions";
 import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { reachHandoffs } from "@agenteschat/client/lib/reach";
+import { replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { appVia } from "@agenteschat/client/lib/via";
 import { voiceOf } from "@agenteschat/client/lib/voice";
@@ -105,6 +106,7 @@ import {
 import { lookRows, useRowLook } from "./look";
 import { MemoryMarks } from "./MemoryMark";
 import { MessageText } from "./MessageText";
+import { QuoteAbove, QuotePlate } from "./QuoteLine";
 import { ReachLines } from "./ReachLines";
 import { Receipts } from "./Receipts";
 import { SecretCard } from "./SecretCard";
@@ -133,6 +135,7 @@ export const MessageRow = memo(function MessageRow({
   thread,
   onLongPress,
   onRetry,
+  onQuote,
   receipt,
   seenBy,
   readOnly = false,
@@ -154,6 +157,8 @@ export const MessageRow = memo(function MessageRow({
   /** Absent where it is read only. */
   onLongPress?: (m: Message) => void;
   onRetry?: (m: Message) => void;
+  /** A tap on what it answers: the original, in this conversation. */
+  onQuote?: (messageId: string) => void;
   /** The agents' receipt its mark shows: the latest person's message's, on it or on its turn's first row. */
   receipt?: MessageReceipt;
   /** A DM between people: who read this message, my latest. */
@@ -330,6 +335,7 @@ export const MessageRow = memo(function MessageRow({
         ? nameInk(roleColor as AgentColorName, scheme === "dark")
         : undefined;
   const solidInk = bubbled && look.tone === "strong" ? ON_SOLID : undefined;
+  const quote = replyOf(meta);
   const myHandle = useMyHandle();
   const mentionsMe = !mine && mentionsReader({ body, meta }, myHandle);
 
@@ -407,6 +413,7 @@ export const MessageRow = memo(function MessageRow({
           { backgroundColor: (bubbled && look.fill) || c.bubble },
         ]}
       >
+        {quote ? <QuotePlate reply={quote} onJump={onQuote} {...(solidInk ? { ink: solidInk } : {})} /> : null}
         <View style={bubbled ? styles.bubbleLine : undefined}>
           <MessageText
             body={body}
@@ -449,6 +456,8 @@ export const MessageRow = memo(function MessageRow({
             </Text>
           </View>
         ) : null}
+        {/* With no words there is no bubble to hold it. */}
+        {quote && (!body || voiceOf(meta) || choiceReply) ? <QuotePlate reply={quote} onJump={onQuote} /> : null}
         {lead}
         {body && media ? (
           <View style={styles.meFiles}>
@@ -612,6 +621,7 @@ export const MessageRow = memo(function MessageRow({
   return (
     <>
       {pair}
+      {quote && !inBubble ? <QuoteAbove look={look} reply={quote} onJump={onQuote} /> : null}
       <Pressable
         onLongPress={press}
         delayLongPress={380}
@@ -621,6 +631,7 @@ export const MessageRow = memo(function MessageRow({
           bubbled && lookRows.bubblesRow,
           compact && lookRows.compactRow,
           grouped && styles.cont,
+          quote && !inBubble && styles.replied,
           mentionsMe && { backgroundColor: `${c.amber}17`, borderLeftWidth: 2, borderLeftColor: c.amber },
           pressed && press && { backgroundColor: c.sunken },
         ]}
@@ -640,6 +651,7 @@ export const MessageRow = memo(function MessageRow({
               {reportOpened}
               <View style={[lookRows.bubble, OTHER_RUN[run], { backgroundColor: c.bubble }]}>
                 {!grouped && (look.names || tagged) ? who(true) : null}
+                {quote ? <QuotePlate reply={quote} onJump={onQuote} /> : null}
                 {opener}
                 <View style={styles.bubbleLine}>
                   {words}
@@ -1075,6 +1087,7 @@ const styles = StyleSheet.create({
   // Readable turns: more room between turns, a quieter name and time.
   msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
   cont: { paddingTop: 0, marginTop: 0 },
+  replied: { paddingTop: 2, marginTop: 0 },
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
   choiceReply: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 2 },
