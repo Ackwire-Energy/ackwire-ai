@@ -45,7 +45,6 @@ export function changedOnly(lines: DiffLine[], context = 1): DiffLine[] {
   return out;
 }
 
-
 /** A schema with its keys sorted, as lines: two versions differ here only when their content does. */
 function schemaLines(value: unknown): string[] {
   const sorted = (v: unknown): unknown =>
