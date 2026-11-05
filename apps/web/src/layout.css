@@ -2919,7 +2919,9 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   border-radius: 1px;
   background: var(--faint);
 }
-.md--message .md__task {
+/* A message's list has no indent to pull a task back into: its box starts on the text's edge. `.md` too, so this
+   outranks the wiki's `.md .md__task` pull-back further down, which a message (`md md--message`) also matches. */
+.md.md--message .md__task {
   margin-left: 0;
 }
 .md--message a.ac-link {
