@@ -90,7 +90,6 @@ export function ListRow({
           ) : (
             <View style={styles.shrink}>{title}</View>
           )}
-          <View style={styles.grow} />
           {time ? (
             <Text
               variant="small"
@@ -136,11 +135,12 @@ const styles = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5, marginLeft: -3 },
   avatar: { width: LIST_AVATAR, height: LIST_AVATAR, alignItems: "center", justifyContent: "center" },
   tx: { flex: 1, minWidth: 0, gap: 2 },
-  l1: { flexDirection: "row", alignItems: "center", gap: 6 },
+  // The time sits on the name's baseline, on its first line when it wraps: never centered beside two lines.
+  l1: { flexDirection: "row", alignItems: "baseline", gap: 6 },
   l2: { flexDirection: "row", alignItems: "center", gap: 10 },
   grow: { flex: 1, minWidth: 0 },
   shrink: { flexShrink: 1 },
   unreadName: { fontWeight: weights.bold },
-  time: { flexShrink: 0 },
+  time: { flexShrink: 0, marginLeft: "auto" },
   unreadTime: { fontWeight: weights.medium },
 });

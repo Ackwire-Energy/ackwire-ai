@@ -333,8 +333,16 @@ export function AgentScreen({
   // What can be done with the screen now, on the capsule across its bottom edge (sideways, the side dock has it):
   // in control the keyboard, laying it down and the way out; watching, taking control.
   const mayTake = live && !status?.controllerUserId && !waiting && canTakeOver && words.mayTake;
+  // What taking control means, behind an ⓘ (ADR 0076): it leads the capsule, as on the sideways dock, and its words
+  // open under the header.
+  const notice = useInfoHint({
+    name: t("common.about", { label: t("desktop.session.check") }),
+    text: `${t("desktop.control.notice", g)}${f?.edition === "cloud" ? ` ${t("desktop.session.screening")}` : ""}`,
+    variant: "footnote",
+  });
   const dock = inControl ? (
     <>
+      <View style={styles.dockInfo}>{notice.button}</View>
       <DockIcon icon="keyboard" label={t("desktop.keyboard.label")} onPress={() => setTyping(true)} />
       <DockIcon icon="expand" label={t("agentComputer.phone.turn")} onPress={sideways.lieDown} />
       <DockRule />
@@ -717,16 +725,9 @@ export function AgentScreen({
     setBoxSize({ width, height });
   };
 
-  // What taking control means, behind an ⓘ beside "Você no controle", as on the web (ADR 0076).
-  const notice = useInfoHint({
-    name: t("common.about", { label: t("desktop.session.check") }),
-    text: `${t("desktop.control.notice", g)}${f?.edition === "cloud" ? ` ${t("desktop.session.screening")}` : ""}`,
-    variant: "footnote",
-  });
-
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.fill}>
-      {wide ? null : top(sub, null, inControl ? notice.button : undefined)}
+      {wide ? null : top(sub, null)}
       {inControl && !wide ? <View style={styles.notice}>{notice.text}</View> : null}
       {wide ? null : banner}
       {/* The screen and, across its bottom edge, the capsule (it hangs past the screen into this view's margin). */}

@@ -9,12 +9,12 @@ import {
 } from "@agenteschat/client";
 import { approvalSummary, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
-import { timeLeft } from "@agenteschat/client/lib/format";
+import { timeLeft, upperFirst } from "@agenteschat/client/lib/format";
 import { mediaWord } from "@agenteschat/client/lib/media";
 import { usageLimitLine } from "@agenteschat/client/lib/person-usage";
 import { router, useLocalSearchParams } from "expo-router";
 import type { TFunction } from "i18next";
-import { Fragment, memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
@@ -429,7 +429,7 @@ function NextWhen({ routine }: { routine: Pick<Routine, "nextRunAt"> }) {
  * left for "Feito"; tapping opens where it happened.
  */
 const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppNotification; divider: boolean }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const c = useColors();
   const when = useWhen();
@@ -461,6 +461,12 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
             .filter(Boolean)
             .join(" ");
   const time = when.short(n.updatedAt);
+  // As Conversas' rows: line 1 who (the names alone, one line, the time on their baseline), line 2 what they did and
+  // where. A sentence that doesn't open with the names (or has none) is line 1 itself, on one line too.
+  const [lead = "", did = ""] = parts;
+  const byNames = !failed && !restriction && parts.length === 2 && lead.trim() === "" && Boolean(names);
+  const action = byNames ? upperFirst(did.trim(), i18n.language) : "";
+  const second = byNames ? [action, sub].filter(Boolean).join(" · ") : sub;
 
   // The swipe taps on its own (SwipeRow); VoiceOver's actions call these too.
   const toggleRead = () => act.mutate({ type: "read", item: n, read: unread });
@@ -514,24 +520,11 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
             ]}
             onAccessibilityAction={(e) => (e.nativeEvent.actionName === "read" ? toggleRead() : done())}
             dot={unread}
+            unread={unread}
             leading={leading}
-            title={
-              <Text variant="body" tone={unread ? "ink" : "ink2"} numberOfLines={2}>
-                {parts.map((part, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one fixed sentence
-                  <Fragment key={i}>
-                    {i > 0 ? (
-                      <Text variant="body" tone="ink" style={styles.bold}>
-                        {names}
-                      </Text>
-                    ) : null}
-                    {part}
-                  </Fragment>
-                ))}
-              </Text>
-            }
+            title={byNames ? names : title}
             time={time}
-            sub={sub || null}
+            sub={second || null}
             subLines={restriction ? 0 : undefined}
           />
         </View>
