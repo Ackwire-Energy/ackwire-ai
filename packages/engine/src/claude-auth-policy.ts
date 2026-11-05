@@ -50,8 +50,8 @@ export async function claudeAuthPolicy(db: Executor): Promise<ClaudeAuthPolicy> 
 }
 
 /**
- * Sets the policy: workspaces deduplicated, each one that exists (`claude_auth.unknown_org` otherwise). Setting
- * the current one changes nothing, `changedAt` included.
+ * Sets the policy: workspaces deduplicated, each new one existing (`claude_auth.unknown_org` otherwise), one
+ * already listed but deleted since dropped. Setting the current one changes nothing, `changedAt` included.
  */
 export async function setClaudeAuthPolicy(db: Database, input: unknown, now = new Date()) {
   const parsed = ClaudeAuthPolicyInput.safeParse(input);
@@ -62,17 +62,20 @@ export async function setClaudeAuthPolicy(db: Database, input: unknown, now = ne
     );
   }
   const { method, rollout } = parsed.data;
-  const orgIds = [...new Set(parsed.data.orgIds.map((id) => id.toLowerCase()))].sort();
-  if (orgIds.length > 0) {
-    const found = await db
-      .select({ id: organizations.id })
-      .from(organizations)
-      .where(inArray(organizations.id, orgIds));
-    if (found.length !== orgIds.length) {
-      throw new ValidationError("A workspace in the list doesn't exist", "claude_auth.unknown_org");
-    }
-  }
   const current = await claudeAuthPolicy(db);
+  const asked = [...new Set(parsed.data.orgIds.map((id) => id.toLowerCase()))];
+  const found = new Set(
+    asked.length > 0
+      ? (
+          await db.select({ id: organizations.id }).from(organizations).where(inArray(organizations.id, asked))
+        ).map((o) => o.id)
+      : [],
+  );
+  // A listed workspace deleted since (no foreign key on the array) drops out; only a new id must exist.
+  if (asked.some((id) => !found.has(id) && !current.orgIds.includes(id))) {
+    throw new ValidationError("A workspace in the list doesn't exist", "claude_auth.unknown_org");
+  }
+  const orgIds = asked.filter((id) => found.has(id)).sort();
   const same =
     current.method === method &&
     current.rollout === rollout &&

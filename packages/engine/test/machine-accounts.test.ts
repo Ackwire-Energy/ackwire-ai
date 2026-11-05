@@ -1796,6 +1796,23 @@ test("the Claude sign-in policy: no row is setup-token for the listed workspaces
   );
   expect((await claudeAuthPolicy(f.db)).changedAt).toEqual(at);
 
+  // A listed workspace deleted since drops out of the next change; a new id still must exist.
+  const [gone] = await f.db.insert(schema.organizations).values({ name: "Beta" }).returning();
+  const [added] = await f.db.insert(schema.organizations).values({ name: "Gama" }).returning();
+  const goneId = gone?.id ?? "";
+  const addedId = added?.id ?? "";
+  await setClaudeAuthPolicy(f.db, { method: "cli_login", rollout: "selected", orgIds: [f.org.id, goneId] });
+  await f.db.delete(schema.organizations).where(eq(schema.organizations.id, goneId));
+  const kept = await setClaudeAuthPolicy(f.db, {
+    method: "cli_login",
+    rollout: "selected",
+    orgIds: [f.org.id, goneId, addedId],
+  });
+  expect(kept.orgIds).toEqual([f.org.id, addedId].sort());
+  await expect(
+    setClaudeAuthPolicy(f.db, { method: "cli_login", rollout: "selected", orgIds: [f.org.id, goneId] }),
+  ).rejects.toMatchObject({ code: "claude_auth.unknown_org" });
+
   const other = "0193dddd-0000-4000-8000-0000000000fe";
   const listed = { method: "cli_login" as const, rollout: "selected" as const, orgIds: [f.org.id] };
   expect(claudeAuthMethodFor(listed, f.org.id, true)).toBe("cli_login");
