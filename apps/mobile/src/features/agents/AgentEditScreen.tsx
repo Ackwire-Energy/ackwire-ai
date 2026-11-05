@@ -11,7 +11,17 @@ import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, EmptyState, fieldText, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import {
+  AgentAvatar,
+  EmptyState,
+  fieldText,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  Text,
+  useToast,
+} from "@/ui";
 import { useWidenAsk } from "../chat/ReachLines";
 import { useFailed } from "../routines/hooks";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -21,7 +31,7 @@ import { BrakesSection } from "./BrakesSection";
 import { openAgentDelete } from "./DeleteAgentScreen";
 import { type AgentDraft, agentChanges, editableFields, fullLook } from "./edit";
 import { ErrorLine, HandleInput } from "./HandleInput";
-import { LookPicker } from "./LookPicker";
+import { LookList } from "./LookPicker";
 import { RoleInput } from "./RoleInput";
 
 /** Opens "Editar" for an agent. */
@@ -31,7 +41,8 @@ export const openAgentEdit = (id: string) => router.push({ pathname: "/agent-edi
  * "Editar agente", as the web's Configurações › Identidade and Instruções: name, its @ (Menções, which follows a
  * new name until typed), role, look and instructions for admins; the look only for
  * the agent's own person (the server's rules). One Salvar. The team's right hand (ADR 0137) is its name, @ and look
- * only: its instructions are the product's, and it is never archived or deleted.
+ * only: its instructions are the product's, and it is never archived or deleted. On the grouped gray, in the same
+ * groups, headers and fields as "Create agent".
  */
 export function AgentEditScreen({ id }: { id: string }) {
   const { t } = useTranslation();
@@ -109,23 +120,25 @@ export function AgentEditScreen({ id }: { id: string }) {
       onError: failed,
     });
   };
-  const field = [styles.field, fieldText("body"), { backgroundColor: c.raised, color: c.ink, borderColor: c.line }];
+  const field = [styles.field, fieldText("body"), { color: c.ink }];
+  // What only an admin changes, read where its field would be.
   const readOnly = (label: string, value: string) => (
     <>
-      <Text variant="footnote" tone="faint">
-        {label}
-      </Text>
-      <Text variant="body" tone="ink2">
-        {value || t("agentPage.none")}
-      </Text>
+      <GroupedHeader>{label}</GroupedHeader>
+      <GroupedList>
+        <Text variant="body" tone="ink2" selectable style={styles.field}>
+          {value || t("agentPage.none")}
+        </Text>
+      </GroupedList>
     </>
   );
 
   return (
-    <View style={[styles.fill, { backgroundColor: c.bg }]}>
+    <View style={[styles.fill, { backgroundColor: c.grouped }]}>
       <PushedHeader
         title={t("agent.edit")}
         solid={false}
+        grouped
         action={{
           label: t("common.save"),
           onPress: () => void save(),
@@ -147,58 +160,66 @@ export function AgentEditScreen({ id }: { id: string }) {
 
         {fields.has("name") ? (
           <>
-            <Text variant="footnote" tone="faint">
-              {t("agent.nameLabel")}
-            </Text>
-            <TextInput
-              value={draft.name}
-              onChangeText={(v) => set("name", v)}
-              maxLength={32}
-              autoCorrect={false}
-              placeholder={t("newAgent.namePlaceholder")}
-              placeholderTextColor={c.faint}
-              accessibilityLabel={t("agent.nameLabel")}
-              style={field}
-            />
-            <Text variant="footnote" tone="faint">
-              {nameMissing
-                ? t("newAgent.errors.nameRequired")
-                : moved && !handleIssue
+            <GroupedHeader>{t("agent.nameLabel")}</GroupedHeader>
+            <GroupedList>
+              <TextInput
+                value={draft.name}
+                onChangeText={(v) => set("name", v)}
+                maxLength={32}
+                autoCorrect={false}
+                placeholder={t("newAgent.namePlaceholder")}
+                placeholderTextColor={c.faint}
+                accessibilityLabel={t("agent.nameLabel")}
+                style={field}
+              />
+            </GroupedList>
+            {nameMissing ? (
+              <View style={styles.foot}>
+                <ErrorLine text={t("newAgent.errors.nameRequired")} />
+              </View>
+            ) : (
+              <GroupedFooter>
+                {moved && !handleIssue
                   ? t("agent.handleMoves", { handle: draft.handle, old: agent.handle })
                   : t("agent.identityHelp")}
-            </Text>
-            <Text variant="footnote" tone="faint" style={styles.gapTop}>
-              {t("agent.handleLabel")}
-            </Text>
-            <HandleInput
-              value={draft.handle}
-              onChangeText={(v) => set("handle", cleanHandle(v))}
-              label={t("agent.handleLabel")}
-            />
-            {handleIssue ? <ErrorLine text={handleIssue} /> : null}
+              </GroupedFooter>
+            )}
+            <GroupedHeader>{t("agent.handleLabel")}</GroupedHeader>
+            <GroupedList>
+              <HandleInput
+                value={draft.handle}
+                onChangeText={(v) => set("handle", cleanHandle(v))}
+                label={t("agent.handleLabel")}
+                grouped
+              />
+            </GroupedList>
+            {handleIssue ? (
+              <View style={styles.foot}>
+                <ErrorLine text={handleIssue} />
+              </View>
+            ) : null}
           </>
         ) : (
           readOnly(t("agent.nameLabel"), agent.name)
         )}
 
         {rightHand ? null : fields.has("role") ? (
-          <RoleInput value={draft.role} onChangeText={(v) => set("role", v)} placeholder={t("agent.roleHelp")} />
+          <RoleInput
+            value={draft.role}
+            onChangeText={(v) => set("role", v)}
+            placeholder={t("agent.roleHelp")}
+            grouped
+          />
         ) : (
-          <View style={styles.gapTop}>{readOnly(t("agent.roleLabel"), agent.role)}</View>
+          readOnly(t("agent.roleLabel"), agent.role)
         )}
 
-        {fields.has("look") ? (
-          <View style={styles.section}>
-            <Text variant="title" accessibilityRole="header">
-              {t("newAgent.look")}
-            </Text>
-            <LookPicker look={draft.look} onChange={(look) => set("look", look)} />
-          </View>
-        ) : null}
+        {fields.has("look") ? <LookList look={draft.look} onChange={(look) => set("look", look)} /> : null}
 
         {/* Only an audience that leaves someone out has anyone to be consulted for. */}
         {!rightHand && offersConsultable(draft.audience, onPlan) ? (
-          <View style={styles.section}>
+          <>
+            <View style={styles.gap} />
             <GroupedList>
               <GroupedRow
                 icon="agent"
@@ -215,21 +236,21 @@ export function AgentEditScreen({ id }: { id: string }) {
                 }
               />
             </GroupedList>
-          </View>
+          </>
         ) : null}
 
         {rightHand ? (
-          <Text variant="footnote" tone="faint" style={styles.section}>
-            {t("rightHand.settings.lock", agentGrammar(agent.name))}
-          </Text>
+          <>
+            <View style={styles.gap} />
+            <GroupedFooter>{t("rightHand.settings.lock", agentGrammar(agent.name))}</GroupedFooter>
+          </>
         ) : (
           <>
             <BrakesSection agent={agent} />
 
-            <View style={styles.section}>
-              <Text variant="title" accessibilityRole="header">
-                {t("agent.instructions")}
-              </Text>
+            <GroupedHeader>{t("agent.instructions")}</GroupedHeader>
+            {/* The list draws the field's surface (radius 14, raised), as on "Create agent". */}
+            <GroupedList>
               {fields.has("instructions") ? (
                 <TextArea
                   value={draft.instructions}
@@ -238,24 +259,22 @@ export function AgentEditScreen({ id }: { id: string }) {
                   accessibilityLabel={t("agent.instructions")}
                   minHeight={180}
                   scrollEnabled={false}
+                  style={styles.bare}
                 />
               ) : (
-                <Text variant="body" tone="ink2" selectable>
+                <Text variant="body" tone="ink2" selectable style={styles.field}>
                   {agent.instructions || t("agentPage.none")}
                 </Text>
               )}
-              {!fields.has("name") ? (
-                <Text variant="footnote" tone="faint">
-                  {t("mobile.agentEdit.adminsOnly")}
-                </Text>
-              ) : null}
-            </View>
+            </GroupedList>
+            {!fields.has("name") ? <GroupedFooter>{t("mobile.agentEdit.adminsOnly")}</GroupedFooter> : null}
           </>
         )}
 
         {/* Deleting for good asks for its name on a screen of its own (ADR 0082). */}
         {admin && !rightHand ? (
-          <View style={styles.section}>
+          <>
+            <View style={styles.gap} />
             <GroupedList>
               <GroupedRow
                 icon="x"
@@ -267,18 +286,20 @@ export function AgentEditScreen({ id }: { id: string }) {
                 onPress={() => openAgentDelete(id)}
               />
             </GroupedList>
-          </View>
+          </>
         ) : null}
       </KeyboardAwareScrollView>
     </View>
   );
 }
 
+// "Create agent"'s numbers: the page's 16 pt sides, a field row of a group, the gap between groups with no header.
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  form: { paddingHorizontal: 18, paddingBottom: 48, gap: 8 },
+  form: { paddingHorizontal: 16, paddingBottom: 48 },
   hero: { alignItems: "center", gap: 6, paddingVertical: 12 },
-  field: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 12 },
-  gapTop: { marginTop: 10, gap: 8 },
-  section: { marginTop: 22, gap: 10 },
+  field: { minHeight: 50, paddingHorizontal: 14, paddingVertical: 12 },
+  bare: { borderWidth: 0, borderRadius: 0, backgroundColor: "transparent" },
+  foot: { paddingTop: 7, paddingHorizontal: 16 },
+  gap: { height: 22 },
 });

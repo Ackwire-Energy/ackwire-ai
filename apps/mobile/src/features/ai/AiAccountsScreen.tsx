@@ -29,7 +29,7 @@ import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Button, Card, Chip, InfoHint, ProviderLogo, Row, Text, useToast } from "@/ui";
+import { Button, GroupedList, GroupedRow, InfoHint, ProviderLogo, Text, useToast } from "@/ui";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { PushedHeader } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
@@ -220,14 +220,15 @@ export function AiAccountsScreen() {
             {t("aiAccounts.page.empty")}
           </Text>
         ) : null}
+        {/* Settings' own groups on the grouped gray: the mark in the 32 pt column, the hairline from the text on. */}
         {own.length > 0 ? (
-          <Card>
+          <GroupedList>
             {own.map((o) => (
-              <Row
+              <GroupedRow
                 key={o.key}
                 leading={<ProviderLogo id={o.kind} size="sm" />}
-                title={ownSignInTitle(t, o)}
-                subtitle={t("aiAccounts.page.ownOn", { computer: o.computer })}
+                label={ownSignInTitle(t, o)}
+                sub={t("aiAccounts.page.ownOn", { computer: o.computer })}
                 below={
                   o.usage ? (
                     <View style={styles.below}>
@@ -237,10 +238,10 @@ export function AiAccountsScreen() {
                 }
               />
             ))}
-          </Card>
+          </GroupedList>
         ) : null}
         {rows.length > 0 ? (
-          <Card>
+          <GroupedList>
             {rows.map((a) => {
               const plan = planOf(a.provider);
               const out = a.status === "signed_out";
@@ -252,12 +253,12 @@ export function AiAccountsScreen() {
                   : t("aiAccounts.page.noAgent"),
               ].filter(Boolean);
               return (
-                <Row
+                <GroupedRow
                   key={a.id}
                   leading={<ProviderLogo id={a.provider ?? a.kind} size="sm" off={out} />}
-                  title={accountTitle(a)}
-                  subtitle={facts.join(" · ")}
-                  chevron
+                  label={accountTitle(a)}
+                  sub={facts.join(" · ")}
+                  more
                   onPress={() => actions(a)}
                   below={
                     out || a.usage || (plan && !plan.usage) ? (
@@ -280,7 +281,7 @@ export function AiAccountsScreen() {
                 />
               );
             })}
-          </Card>
+          </GroupedList>
         ) : null}
         {again ? (
           // On the page, not in a card: the steps draw their own.
@@ -397,22 +398,22 @@ function KeysSection({ locale }: { locale: string }) {
         </Text>
       ) : null}
       {live.length > 0 ? (
-        <Card>
+        <GroupedList>
           {live.map((k) => {
             const isDefault = settings.data?.defaultCredentialId === k.id;
             return (
-              <Row
+              <GroupedRow
                 key={k.id}
                 leading={<ProviderLogo id={k.provider} size="sm" />}
-                title={k.label}
-                subtitle={`${providerLabel(k.provider)} · ${t("settings.keyEndsIn", { hint: k.keyHint })} · ${t("settings.keyAdded", { when: relativeTime(t, locale, k.createdAt) })}`}
-                meta={isDefault ? <Chip icon="check" label={t("settings.default")} /> : undefined}
-                chevron
+                label={k.label}
+                sub={`${providerLabel(k.provider)} · ${t("settings.keyEndsIn", { hint: k.keyHint })} · ${t("settings.keyAdded", { when: relativeTime(t, locale, k.createdAt) })}`}
+                value={isDefault ? t("settings.default") : undefined}
+                more
                 onPress={() => actions(k, isDefault)}
               />
             );
           })}
-        </Card>
+        </GroupedList>
       ) : null}
       {live.some((k) => settings.data?.defaultCredentialId === k.id) ? (
         <Text variant="small" tone="faint">
@@ -434,7 +435,8 @@ function KeysSection({ locale }: { locale: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  in: { paddingHorizontal: 18, paddingTop: 8, gap: 12 },
+  // The settings screens' side margin: the groups on the same 16 pt edge as everywhere else.
+  in: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   sectionHead: { gap: 4, paddingHorizontal: 2 },
   keysHead: { marginTop: 18 },
   below: { gap: 8, marginTop: 6 },

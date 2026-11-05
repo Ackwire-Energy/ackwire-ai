@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WorkspaceSky } from "@/sky/Sky";
-import { Count, Icon, type IconName, Text, weights } from "@/ui";
+import { Icon, type IconName, SectionHeader, Text } from "@/ui";
 import { CoverBarBackdrop, CoverParallax, useCoverScroll } from "@/ui/cover";
 import { useColors } from "./hooks";
 import { PushedHeader, Tile } from "./parts";
@@ -70,22 +70,14 @@ export function CoverPage({
   );
 }
 
-/** A section's head, as Conversas' ("Agentes 4"): the title and its count, faint. */
+/** A section's head: the Chats tab's own `SectionHeader` ("Agents 4"), so both pages' sections sit the same. */
 export function PageSection({ title, count }: { title: string; count?: number | undefined }) {
-  const c = useColors();
-  return (
-    <View style={styles.section}>
-      <Text variant="small" tone="ink" style={styles.sectionTitle} accessibilityRole="header" numberOfLines={1}>
-        {title}
-      </Text>
-      {count !== undefined ? <Count value={count} size={15} weight={weights.medium} color={c.faint} /> : null}
-    </View>
-  );
+  return <SectionHeader title={title} {...(count !== undefined ? { count } : {})} />;
 }
 
 /**
  * A loose row, as Conversas' (the hairline starts at the text): a tile, the label, a value, the chevron. With
- * `below` the tile stays at the top with the label; the chevron stays in the middle, as the system's.
+ * `below` the tile and the chevron stay in the row's middle, as a GroupedRow's.
  */
 export function PageRow({
   icon,
@@ -118,10 +110,7 @@ export function PageRow({
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
     >
       {divider ? <View style={[styles.rowLine, { backgroundColor: c.line2 }]} /> : null}
-      {lead ? (
-        // Beside a row that grows under its label (a plan's meter), the tile stays with the label, at the top.
-        <View style={below ? styles.top : undefined}>{lead}</View>
-      ) : null}
+      {lead}
       <View style={styles.grow}>
         <Text variant="body" tone={danger ? "danger" : "ink"} numberOfLines={1}>
           {label}
@@ -148,15 +137,6 @@ const styles = StyleSheet.create({
   band: { paddingHorizontal: 20, paddingBottom: 18 },
   faceLine: { flexDirection: "row", alignItems: "center", gap: 14 },
   acts: { flexDirection: "row", gap: 8, marginTop: 16 },
-  section: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingTop: 22,
-    paddingHorizontal: 20,
-    paddingBottom: 6,
-  },
-  sectionTitle: { fontWeight: "600", flexShrink: 1 },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -168,5 +148,4 @@ const styles = StyleSheet.create({
   // From the text column: 20 + the 36 tile + 13.
   rowLine: { position: "absolute", top: 0, right: 0, left: 69, height: StyleSheet.hairlineWidth },
   value: { maxWidth: "45%" },
-  top: { alignSelf: "flex-start" },
 });

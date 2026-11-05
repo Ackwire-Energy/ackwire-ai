@@ -23,6 +23,7 @@ import {
   auditWhere,
   TOOL_CALL,
 } from "@agenteschat/client/lib/audit";
+import { humanize } from "@agenteschat/client/lib/custom-tools";
 import { formatTime, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
@@ -366,7 +367,10 @@ function askedOf(t: TFunction, row: AuditRow) {
   return null;
 }
 
-/** What was sent or kept, a field a row: its name, then its value (a hidden one says so, with a lock). */
+/**
+ * What was sent or kept, a field a row: its name in words ("Issue number", never `issue_number`, as the approval
+ * card says it), then its value (a hidden one says so, with a lock).
+ */
 function KeyValues({ entries }: { entries: [string, unknown][] }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -376,7 +380,7 @@ function KeyValues({ entries }: { entries: [string, unknown][] }) {
         v === AUDIT_HIDDEN ? (
           <GroupedRow
             key={k}
-            label={k}
+            label={humanize(k)}
             below={
               <View style={styles.outcome}>
                 <LineIcon name="lock" size={13} color={c.faint} variant="caption" />
@@ -387,7 +391,7 @@ function KeyValues({ entries }: { entries: [string, unknown][] }) {
             }
           />
         ) : (
-          <GroupedRow key={k} label={k} sub={auditValueText(v)} subLines={6} />
+          <GroupedRow key={k} label={humanize(k)} sub={auditValueText(v)} subLines={6} />
         ),
       )}
     </GroupedList>
@@ -395,7 +399,8 @@ function KeyValues({ entries }: { entries: [string, unknown][] }) {
 }
 
 const styles = StyleSheet.create({
-  note: { paddingHorizontal: 16, paddingTop: 12 },
+  // The other settings screens' note: on the groups' edge, not indented past it.
+  note: { paddingHorizontal: 4, paddingTop: 10 },
   loading: { marginTop: 24 },
   end: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 3 },
   outcome: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },

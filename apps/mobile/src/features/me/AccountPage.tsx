@@ -20,6 +20,7 @@ import {
   PersonAvatar,
   SearchField,
   Text,
+  useTheme,
   useToast,
 } from "@/ui";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
@@ -346,6 +347,11 @@ export function ZoneList({
         { header: t("mobile.me.zone.all") },
         ...options.rest,
       ];
+  // A group starts after a header (or the top) and ends before the next one (or the end).
+  const edge = (i: number) => {
+    const row = rows[i];
+    return row === undefined || "header" in row;
+  };
 
   return (
     <View style={[styles.fill, { backgroundColor: c.grouped }]}>
@@ -376,11 +382,17 @@ export function ZoneList({
           </>
         }
         ListEmptyComponent={<GroupedFooter>{t("mobile.me.zone.none")}</GroupedFooter>}
-        renderItem={({ item }) =>
+        renderItem={({ item, index }) =>
           "header" in item ? (
             <GroupedHeader>{item.header}</GroupedHeader>
           ) : (
-            <ZoneRow option={item} checked={item.zone === value} onPress={() => onPick(item.zone)} />
+            <ZoneRow
+              option={item}
+              checked={item.zone === value}
+              first={edge(index - 1)}
+              last={edge(index + 1)}
+              onPress={() => onPick(item.zone)}
+            />
           )
         }
       />
@@ -388,12 +400,37 @@ export function ZoneList({
   );
 }
 
-/** One zone (rows of the long list are flat: a hairline under each, no card per group). */
-function ZoneRow({ option, checked, onPress }: { option: ZoneOption; checked: boolean; onPress: () => void }) {
-  const c = useColors();
+/**
+ * One zone, a row of a GroupedList drawn piece by piece so the long list stays virtualized: the group's corners on its
+ * first and last row, the hairline from the text on, and the group's shadow kept to its sides where two rows meet.
+ */
+function ZoneRow({
+  option,
+  checked,
+  first,
+  last,
+  onPress,
+}: {
+  option: ZoneOption;
+  checked: boolean;
+  first: boolean;
+  last: boolean;
+  onPress: () => void;
+}) {
+  const { colors: c, shadows } = useTheme();
   return (
-    <View style={[styles.zoneRow, { backgroundColor: c.raised, borderBottomColor: c.line2 }]}>
-      <GroupedRow label={option.name} value={option.offsetLabel} checked={checked} onPress={onPress} />
+    <View style={[styles.zoneClip, first && styles.zoneClipFirst, last && styles.zoneClipLast]}>
+      <View
+        style={[
+          styles.zoneRow,
+          first && styles.zoneFirst,
+          last && styles.zoneLast,
+          { backgroundColor: c.raised, boxShadow: first ? `${shadows.e1}, ${shadows.top}` : shadows.e1 },
+        ]}
+      >
+        {first ? null : <View style={[styles.zoneDivider, { backgroundColor: c.line2 }]} />}
+        <GroupedRow label={option.name} value={option.offsetLabel} checked={checked} onPress={onPress} />
+      </View>
     </View>
   );
 }
@@ -408,5 +445,13 @@ const styles = StyleSheet.create({
   gapBig: { height: 22 },
   search: { paddingTop: 4, paddingBottom: 8 },
   zoneList: { paddingHorizontal: 16 },
-  zoneRow: { borderBottomWidth: StyleSheet.hairlineWidth },
+  // Room for the shadow beside the rows (and above and below the group), cut where two rows meet: no line across.
+  zoneClip: { overflow: "hidden", marginHorizontal: -6, paddingHorizontal: 6 },
+  zoneClipFirst: { marginTop: -6, paddingTop: 6 },
+  zoneClipLast: { marginBottom: -6, paddingBottom: 6 },
+  // GroupedList's numbers: radius 14, the hairline inset 14 to the text.
+  zoneRow: { overflow: "hidden" },
+  zoneFirst: { borderTopLeftRadius: 14, borderTopRightRadius: 14 },
+  zoneLast: { borderBottomLeftRadius: 14, borderBottomRightRadius: 14 },
+  zoneDivider: { height: StyleSheet.hairlineWidth, marginLeft: 14 },
 });

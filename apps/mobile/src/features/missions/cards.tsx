@@ -172,16 +172,15 @@ export function SetupFailedCard({
           {t("mobile.mission.setup.lostText", { branch: lostBranch ?? m?.branch ?? "" })}
         </Text>
       ) : null}
+      {/* The log flat in the card (never a plate in a card), in mono: it is the command's own output. */}
       {tail ? (
-        <View style={[styles.log, { backgroundColor: colors.sunken }]}>
-          <RNText
-            numberOfLines={8}
-            maxFontSizeMultiplier={CHROME_MAX_SCALE}
-            style={{ fontFamily: fonts.mono, fontSize: 12, lineHeight: 17, color: colors.ink2 }}
-          >
-            {tail}
-          </RNText>
-        </View>
+        <RNText
+          numberOfLines={8}
+          maxFontSizeMultiplier={CHROME_MAX_SCALE}
+          style={[styles.log, { fontFamily: fonts.mono, color: colors.ink2 }]}
+        >
+          {tail}
+        </RNText>
       ) : null}
       {state === "preparing" ? (
         <View style={styles.row}>
@@ -656,7 +655,7 @@ const styles = StyleSheet.create({
   ft: { marginTop: 8, gap: 6 },
   askcard: { marginTop: 8, padding: 12, borderRadius: 16 },
   summary: { marginBottom: 10 },
-  log: { padding: 10, borderRadius: 12, marginBottom: 10 },
+  log: { fontSize: 12, lineHeight: 17, marginBottom: 10 },
   acts: { flexDirection: "row", gap: 8, marginTop: 4 },
   // A line that can wrap: its marks sit on the first line (`LineIcon`).
   done: {

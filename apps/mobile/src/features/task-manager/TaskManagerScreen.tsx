@@ -211,8 +211,9 @@ function TaskManager() {
 }
 
 /**
- * An agent's row and, open, its tasks under it: the chevron, its face, its name and count, how its tasks stand
- * ("1 trabalhando · 1 espera você") and "Parar N" when it has more than one to stop, which asks first, in place.
+ * An agent's row and, open, its tasks under it: the chevron, its face, its name and count (unless the line under it
+ * says it), how its tasks stand ("1 trabalhando · 1 espera você") and "Parar N" when it has more than one to stop,
+ * which asks first, in place.
  */
 function AgentGroup({
   group,
@@ -254,6 +255,8 @@ function AgentGroup({
     transform: [{ rotate: withTiming(open ? "0deg" : "-90deg", { duration: 200 }) }],
   }));
   const several = group.stoppable.length > 1;
+  // All working or all waiting on you: the line under the name already says how many ("2 working").
+  const counted = group.tasks.length === group.working || group.tasks.length === group.waiting;
   return (
     <View>
       <Pressable
@@ -273,7 +276,7 @@ function AgentGroup({
             <Text variant="callout" numberOfLines={1} style={[styles.semibold, styles.shrink]}>
               {name}
             </Text>
-            <Count value={group.tasks.length} size={15} weight={weights.medium} color={c.faint} />
+            {counted ? null : <Count value={group.tasks.length} size={15} weight={weights.medium} color={c.faint} />}
           </View>
           <View style={styles.row}>
             <TaskMark state={mark} color={color} />

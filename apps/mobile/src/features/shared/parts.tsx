@@ -7,9 +7,9 @@ import { needsHeaderBlur } from "@/lib/nav";
 import {
   BarPressable,
   Button,
-  Card,
   coverBarOptions,
   fonts,
+  GroupedList,
   HeaderCapsule,
   HeaderSlot,
   type HeaderSlotStore,
@@ -67,54 +67,70 @@ export interface ActionItem {
   onPress?: () => void;
 }
 
-/** The list of actions in a sheet: icon, label, a hint under it. */
+/**
+ * The list of actions in a sheet, a GroupedList (sheets sit on the grouped gray): an icon or a face in GroupedRow's
+ * 32 pt column, the label, a hint under it; the text and the hairline above start together at 58.
+ */
 export function ActionList({ items }: { items: ActionItem[] }) {
   const c = useColors();
   return (
-    <Card>
-      {items.map((it, i) => (
-        <Pressable
+    <GroupedList>
+      {items.map((it) => (
+        <ActionRow
           key={it.key}
-          onPress={it.onPress}
-          disabled={it.disabled || !it.onPress}
-          accessibilityRole={it.checked === undefined ? "button" : "switch"}
-          {...(it.checked === undefined ? {} : { accessibilityState: { checked: it.checked } })}
-          accessibilityLabel={it.hint ? `${it.label}. ${it.hint}` : it.label}
-          style={({ pressed }) => [
-            styles.action,
-            i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line },
-            pressed && { backgroundColor: c.sunken },
-            it.disabled && { opacity: 0.5 },
-          ]}
-        >
-          {it.leading ?? (it.icon ? <Icon name={it.icon} size={20} color={it.danger ? c.danger : c.muted} /> : null)}
-          <View style={styles.actionText}>
-            <Text variant="body" tone={it.danger ? "danger" : "ink"} {...(it.oneLine ? { numberOfLines: 1 } : {})}>
-              {it.marks
-                ? markTerms(it.label, it.marks).map((part, k) =>
-                    part.mark ? (
-                      // biome-ignore lint/suspicious/noArrayIndexKey: segments of one fixed text
-                      <Text key={k} variant="body" style={{ backgroundColor: withAlpha(c.info, 0.22) }}>
-                        {part.text}
-                      </Text>
-                    ) : (
-                      part.text
-                    ),
-                  )
-                : it.label}
-            </Text>
-            {it.hint ? (
-              <Text variant="small" tone="faint" {...(it.oneLine ? { numberOfLines: 1 } : {})}>
-                {it.hint}
-              </Text>
-            ) : null}
-          </View>
-          {it.code ? <Text style={[styles.mono, { color: c.faint }]}>{it.code}</Text> : null}
-          {it.trailing}
-          {it.checked === undefined ? null : <ToggleSwitch value={it.checked} />}
-        </Pressable>
+          item={it}
+          // `leading`, as a GroupedRow's: GroupedList starts the hairline after its column.
+          leading={
+            it.leading ?? (it.icon ? <Icon name={it.icon} size={20} color={it.danger ? c.danger : c.muted} /> : null)
+          }
+        />
       ))}
-    </Card>
+    </GroupedList>
+  );
+}
+
+/** One action, on a GroupedRow's numbers: 14 pt sides, the 32 pt leading column, 12 apart, 50 tall at least. */
+function ActionRow({ item: it, leading }: { item: ActionItem; leading: ReactNode }) {
+  const c = useColors();
+  return (
+    <Pressable
+      onPress={it.onPress}
+      disabled={it.disabled || !it.onPress}
+      accessibilityRole={it.checked === undefined ? "button" : "switch"}
+      {...(it.checked === undefined ? {} : { accessibilityState: { checked: it.checked } })}
+      accessibilityLabel={it.hint ? `${it.label}. ${it.hint}` : it.label}
+      style={({ pressed }) => [
+        styles.action,
+        pressed && { backgroundColor: c.sunken },
+        it.disabled && { opacity: 0.5 },
+      ]}
+    >
+      {leading ? <View style={styles.actionLead}>{leading}</View> : null}
+      <View style={styles.actionText}>
+        <Text variant="body" tone={it.danger ? "danger" : "ink"} {...(it.oneLine ? { numberOfLines: 1 } : {})}>
+          {it.marks
+            ? markTerms(it.label, it.marks).map((part, k) =>
+                part.mark ? (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: segments of one fixed text
+                  <Text key={k} variant="body" style={{ backgroundColor: withAlpha(c.info, 0.22) }}>
+                    {part.text}
+                  </Text>
+                ) : (
+                  part.text
+                ),
+              )
+            : it.label}
+        </Text>
+        {it.hint ? (
+          <Text variant="footnote" tone="faint" {...(it.oneLine ? { numberOfLines: 1 } : {})}>
+            {it.hint}
+          </Text>
+        ) : null}
+      </View>
+      {it.code ? <Text style={[styles.mono, { color: c.faint }]}>{it.code}</Text> : null}
+      {it.trailing}
+      {it.checked === undefined ? null : <ToggleSwitch value={it.checked} />}
+    </Pressable>
   );
 }
 
@@ -268,7 +284,15 @@ export const MONO = fonts.mono;
 
 const styles = StyleSheet.create({
   tile: { alignItems: "center", justifyContent: "center" },
-  action: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
+  action: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minHeight: 50,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  actionLead: { width: 32, alignItems: "center", justifyContent: "center" },
   actionText: { flex: 1, minWidth: 0 },
   mono: { fontFamily: MONO, fontSize: 13 },
   headerTitle: { alignItems: Platform.OS === "ios" ? "center" : "flex-start", minWidth: 0 },

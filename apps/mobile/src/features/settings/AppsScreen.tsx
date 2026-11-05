@@ -125,5 +125,6 @@ export function AppsScreen() {
 
 const styles = StyleSheet.create({
   loading: { marginTop: 32 },
-  note: { paddingHorizontal: 16, paddingTop: 16 },
+  // The other settings screens' note: on the groups' edge, not indented past it.
+  note: { paddingHorizontal: 4, paddingTop: 10 },
 });

@@ -12,11 +12,11 @@ import { approvalNews, JOIN_REASON_MAX } from "@agenteschat/client/lib/join-requ
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
 import { sortRoles } from "@agenteschat/client/lib/roles";
-import { type ReactNode, useState } from "react";
+import { Fragment, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Share, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, GroupedList, GroupedRow, InfoHint, PersonAvatar, SheetScreen, Text, useToast } from "@/ui";
+import { Button, Chip, GroupedRow, InfoHint, PersonAvatar, SheetScreen, Text, useToast } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { successHaptic, useSurface } from "../shared/parts";
@@ -100,6 +100,7 @@ function RequestCard({
 }) {
   const { t, i18n } = useTranslation();
   const { orgId } = useOrg();
+  const c = useColors();
   const surface = useSurface();
   const chips = requestChips(t, i18n.language, r);
   const toast = useToast();
@@ -212,17 +213,20 @@ function RequestCard({
                   {t("mobile.joinRequests.roles")}
                 </Text>
               </InfoHint>
-              <GroupedList>
-                {roles.map((role) => (
-                  <GroupedRow
-                    key={role.id}
-                    label={role.name}
-                    toggle={roleIds.includes(role.id)}
-                    disabled={busy}
-                    onPress={() => flip(role.id)}
-                  />
+              {/* Flat in the card (never a card in a card): the rows' text on the card's own 16 pt edge. */}
+              <View style={styles.rows}>
+                {roles.map((role, i) => (
+                  <Fragment key={role.id}>
+                    {i > 0 ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
+                    <GroupedRow
+                      label={role.name}
+                      toggle={roleIds.includes(role.id)}
+                      disabled={busy}
+                      onPress={() => flip(role.id)}
+                    />
+                  </Fragment>
                 ))}
-              </GroupedList>
+              </View>
             </View>
           ) : null}
           <View style={styles.acts}>
@@ -274,5 +278,8 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   field: { gap: 6 },
+  // A grouped row pads its text 14: pulled out by as much, the text meets the card's 16.
+  rows: { marginHorizontal: -14 },
+  divider: { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
   acts: { flexDirection: "row", gap: 8 },
 });
