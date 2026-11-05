@@ -119,6 +119,8 @@ test("another tool changing on the same server replaces the waiting notice inste
   await notifyToolChanged({ db: f.db }, connection, [{ name: "list_articles", fingerprint: "b" }]);
   const open = (await w.notices()).filter((n) => n.doneAt === null);
   expect(open.map((n) => n.latest)).toEqual([{ title: "list_articles" }]);
+  // It names the server, so the apps open that server's tools.
+  expect(open[0]?.source).toEqual({ label: "Notes", connectionId: w.id });
   expect(await w.notices()).toHaveLength(2);
 });
 

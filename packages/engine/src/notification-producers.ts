@@ -1457,7 +1457,7 @@ export async function notifyToolChanged(
     kind: "connector_tool_changed",
     groupKey,
     waiting: true,
-    source: { label: connection.label },
+    source: { label: connection.label, connectionId: connection.id },
     latest: { title: tools.map((t) => t.name).join(", ") },
   });
 }

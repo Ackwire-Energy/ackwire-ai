@@ -3,7 +3,7 @@ import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
 import { namesText } from "@agenteschat/client/lib/format";
 import { upcomingRoutines } from "@agenteschat/client/lib/home";
 import { mediaKindOf } from "@agenteschat/client/lib/media";
-import { askersOf, runFailedGroupOf } from "@agenteschat/client/lib/notifications";
+import { askersOf, oneToolChangePerServer, runFailedGroupOf } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
 import type { TFunction } from "i18next";
 import { daysAgo } from "../shared/logic";
@@ -44,21 +44,25 @@ export function dayGroupOf(iso: string, now = new Date()): DayGroup {
   return "older";
 }
 
-/** The screen's sections: waiting first, then the rest by day (empty groups left out). */
+/**
+ * The screen's sections: waiting first, then the rest by day (empty groups left out). A server's repeated "changed
+ * tools" notices are one card; `merged` is how many that left out, to take from the server's waiting count.
+ */
 export function activitySections(
   items: AppNotification[],
   filter: ActivityFilter,
   now = new Date(),
-): { waiting: AppNotification[]; days: [DayGroup, AppNotification[]][] } {
+): { waiting: AppNotification[]; days: [DayGroup, AppNotification[]][]; merged: number } {
   if (filter === "done") {
     const done = items.filter((n) => n.doneAt);
-    return { waiting: [], days: byDay(done, (n) => n.doneAt ?? n.updatedAt, now) };
+    return { waiting: [], days: byDay(done, (n) => n.doneAt ?? n.updatedAt, now), merged: 0 };
   }
-  const visible = items.filter((n) => isVisible(n, now.getTime()));
+  const { items: visible, merged } = oneToolChangePerServer(items.filter((n) => isVisible(n, now.getTime())));
   const waiting = sortWaiting(visible.filter((n) => n.waiting));
-  if (filter === "waiting") return { waiting, days: [] };
+  if (filter === "waiting") return { waiting, days: [], merged };
   return {
     waiting,
+    merged,
     days: byDay(
       visible.filter((x) => !x.waiting),
       (n) => n.updatedAt,

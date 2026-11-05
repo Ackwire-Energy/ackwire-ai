@@ -242,8 +242,10 @@ export function notificationHref(
   if (n.kind === "invitation_accepted") return "/me/members";
   // Who approves for whom (ADR 0139): Perfil › Aprovações, where it is set and declined.
   if (n.kind === "approval_cover" || n.kind === "right_hand_paused") return "/me/approvals";
-  // A server changed approved tools: accepted in Conectores.
-  if (n.kind === "connector_tool_changed") return "/connectors";
+  // A server changed approved tools: accepted on that server's Ferramentas (Conectores for notices from before they
+  // named it).
+  if (n.kind === "connector_tool_changed")
+    return isSafeId(s.connectionId) ? `/connectors/tools?id=${s.connectionId}` : "/connectors";
   // An update of a skill from its link: the skill's page, where what waits is applied.
   if (n.kind === "skill_update") return isSafeId(s.skillId) ? `/settings/skills/${s.skillId}` : "/settings/skills";
   if (n.kind === "machine_connected")

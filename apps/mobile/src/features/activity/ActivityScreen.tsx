@@ -78,7 +78,9 @@ export function ActivityScreen() {
   const list = useNotifications(orgId, filter);
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const counts = list.data?.pages[0]?.counts;
-  const { waiting, days } = activitySections(items, filter);
+  const { waiting, days, merged } = activitySections(items, filter);
+  // The server counts each repeated notice of a server; the screen shows them as one card.
+  const waitingCount = Math.max(waiting.length, (counts?.waiting ?? waiting.length) - merged);
   const pull = usePullRefresh(list.refetch);
   const header = useTabHeader();
   return (
@@ -90,7 +92,7 @@ export function ActivityScreen() {
       <Filters
         items={[
           { key: "all", label: t("mobile.activity.filter.all") },
-          { key: "waiting", label: t("mobile.activity.filter.waiting"), count: counts?.waiting ?? waiting.length },
+          { key: "waiting", label: t("mobile.activity.filter.waiting"), count: waitingCount },
           { key: "done", label: t("mobile.activity.filter.done") },
         ]}
         value={filter}
@@ -98,7 +100,7 @@ export function ActivityScreen() {
       />
       {waiting.length > 0 ? (
         <>
-          <SectionHeader title={t("mobile.home.waiting")} count={counts?.waiting ?? waiting.length} />
+          <SectionHeader title={t("mobile.home.waiting")} count={waitingCount} />
           <View style={styles.cards}>
             {waiting.map((n) => (
               <WaitingCardView key={n.id} item={n} />

@@ -63,6 +63,21 @@ describe("Atividade", () => {
     ]);
   });
 
+  test("a server's repeated changed-tools notices are one card, the newest; the count drops by the rest", () => {
+    const tools = (id: string, hours: number, source: AppNotification["source"]) =>
+      notification({ id, kind: "connector_tool_changed", waiting: true, updatedAt: ago(hours), source });
+    const repeated = [
+      tools("tiktok-old", 30, { label: "TikTok" }),
+      tools("tiktok-new", 26, { label: "TikTok" }),
+      tools("tiktok-older", 40, { label: "TikTok" }),
+      tools("notes", 28, { label: "Notes", connectionId: "c2" }),
+    ];
+    const s = activitySections([...items, ...repeated], "all", NOW);
+    expect(s.waiting.map((n) => n.id)).toEqual(["tiktok-new", "notes", "question", "approval"]);
+    expect(s.merged).toBe(2);
+    expect(activitySections(items, "all", NOW).merged).toBe(0);
+  });
+
   test("the waiting filter shows only what waits", () => {
     const s = activitySections(items, "waiting", NOW);
     expect(s.waiting).toHaveLength(2);
