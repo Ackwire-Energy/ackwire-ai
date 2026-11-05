@@ -421,7 +421,8 @@ function ConnectedNote({ name }: { name: string }) {
         entering={reducedMotion ? undefined : ZoomIn.springify().damping(12)}
         style={[styles.badge, { backgroundColor: colors.ok }]}
       >
-        <Icon name="check" size={16} color="#ffffff" />
+        {/* The page's own color on the green: white on dark's light green was hard to read. */}
+        <Icon name="check" size={16} color={colors.bg} />
       </Animated.View>
       <View style={styles.grow}>
         <Text variant="body" style={styles.bold}>

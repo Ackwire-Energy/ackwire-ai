@@ -155,7 +155,7 @@ export function useVoiceComposer(input: Omit<VoiceTarget, "allowed"> & { enabled
         style={[styles.button, holding && { backgroundColor: c.danger }, micStyle]}
       >
         <View style={styles.center}>
-          <Icon name="mic" size={21} color={holding ? "#fff" : c.muted} />
+          <Icon name="mic" size={21} color={holding ? c.bg : c.muted} />
         </View>
       </Animated.View>
     </GestureDetector>
