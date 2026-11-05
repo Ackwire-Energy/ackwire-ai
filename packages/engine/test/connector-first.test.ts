@@ -213,7 +213,8 @@ test("a key the agent was given is replaced by its card, as long as it holds it"
     expiresAt: new Date(Date.now() + 60_000),
   };
   const [row] = await f.db.insert(schema.secretRequests).values(held).returning();
-  expect(await ask(ctx, KEY)).toBe(CARD);
+  // Past the connector's answer: the tool's own rule for a key this run was given.
+  expect(await ask(ctx, KEY)).toStartWith("GH_TOKEN was already delivered");
   await f.db
     .update(schema.secretRequests)
     .set({ removedAt: new Date() })

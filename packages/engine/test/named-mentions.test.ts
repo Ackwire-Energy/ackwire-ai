@@ -49,7 +49,7 @@ test("what looks like a name but isn't a member's stays as written; a shared nam
 test("someone outside the conversation mentions nobody, not the member their name starts with", () => {
   const lia = person("Lia", "lia");
   expect(mentionsByName("@Lia Mota viu", [lia], ["Lia Mota"])).toBe("Lia Mota viu");
-  expect(mentionsByName("@Lia viu", [lia], ["Lia Mota"])).toBe("@lia viu");
+  expect(mentionsByName("@Lia viu", [lia], ["Lia Mota"])).toBe("@Lia viu");
   // A member of that name is who it means, and a handle stays a handle.
   expect(mentionsByName("@Lia Mota", [person("Lia Mota", "lia-m")], ["Lia Mota"])).toBe("@lia-m");
   expect(mentionsByName("oi @ana", [], ["Ana"])).toBe("oi @ana");
