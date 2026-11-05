@@ -389,6 +389,12 @@
   }
 }
 
+/* Its own page in the desktop app: the workspace is the window less its title bar (desktop.css), so the rail and the
+   preview fill that area, not the whole window, and their foot doesn't sink under its edge. */
+html[data-desktop] .shell .newag:not(.newag-dialog > *) {
+  --onb-h: calc(100dvh - var(--titlebar-h));
+}
+
 /*
  * The card's review, over the conversation (`NewAgentPage` with `onClose`): the flow in a dialog as tall as the window
  * allows, scrolling inside it. `--onb-h` is that height, which the flow's rail, preview and steps fill as they fill the

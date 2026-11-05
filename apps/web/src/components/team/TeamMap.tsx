@@ -195,7 +195,7 @@ export function TeamMap({ team }: { team: Team }) {
                 <span key={id} className="team-node team-node--person" data-map-person={id}>
                   <PersonAvatar id={id} name={m?.name ?? ""} size="sm" presence />
                   <span className="team-node__text">
-                    <b>{m?.name}</b>
+                    <b className="ac-captop">{m?.name}</b>
                     <span className="muted">{m ? t(`roles.${m.role}`) : ""}</span>
                   </span>
                 </span>
@@ -274,7 +274,7 @@ export function TeamMap({ team }: { team: Team }) {
           >
             <AgentAvatar agentId={look.lodi.id} name={look.lodi.name} size="sm" />
             <span className="team-node__text">
-              <b>{look.lodi.name}</b>
+              <b className="ac-captop">{look.lodi.name}</b>
               <span className="muted">{t("team.map.lodi")}</span>
             </span>
           </Link>
@@ -326,7 +326,7 @@ function MapCard({
       >
         <AgentAvatar agentId={agent.id} name={agent.name} size="md" />
         <span className="team-node__text">
-          <b>{agent.name}</b>
+          <b className={agent.role ? "ac-captop" : undefined}>{agent.name}</b>
           {agent.role && <span className="muted">{agent.role}</span>}
         </span>
       </Link>
