@@ -6239,7 +6239,7 @@ button.ac-voice__play:active {
 }
 .ac-video--tile .ac-video__media {
   width: auto;
-  min-width: 220px;
+  min-width: min(220px, 100%);
   max-width: 100%;
   max-height: 320px;
 }
@@ -6546,6 +6546,27 @@ button.ac-voice__play:active {
 .ac-video--tile .ac-video__total {
   display: none;
 }
+/* The bar fits the player's width, wherever it is (a chat column, a dialog, a phone): the timeline keeps its room and
+   the extras leave from the least needed, the total time, then the speed and the sound, then the clock. */
+.ac-video__bar {
+  container: ac-video-bar / inline-size;
+}
+@container ac-video-bar (max-width: 360px) {
+  .ac-video__total {
+    display: none;
+  }
+}
+@container ac-video-bar (max-width: 280px) {
+  .ac-video__speed,
+  .ac-video__sound {
+    display: none;
+  }
+}
+@container ac-video-bar (max-width: 200px) {
+  .ac-video__time {
+    display: none;
+  }
+}
 @media (hover: none) {
   .ac-video__volume {
     display: none;
@@ -6592,7 +6613,9 @@ html:not([data-pointer]) .ac-video__rail:focus-visible .ac-video__knob {
   align-self: center;
   width: 1px;
   height: 16px;
-  margin: 0 4px 0 2px;
+  /* The chip's edge is drawn, the next tool's glyph sits ~8px inside its button: the extra room on the left makes
+     the hairline look centred between them. */
+  margin: 0 0 0 8px;
   background: var(--line2);
 }
 .ac-composer--inline-pills .ac-composer__agent {

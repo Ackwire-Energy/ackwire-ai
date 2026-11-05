@@ -9038,6 +9038,8 @@ export const en = {
     thousand: "k",
     building: "Putting it together…",
     openBig: "Open large",
+    showAll: "Show all",
+    showLess: "Show less",
     keep: "Keep in Drive",
     kept: "Kept in Drive",
     inDrive: "In Drive",

@@ -302,7 +302,16 @@ html:not([data-pointer]) .drive-row:has(.drive-hit:focus-visible) {
   z-index: var(--z-lifted);
 }
 
-/* Details (in the shared details dialog). */
+/* Details (in the shared details dialog). A video plays in the preview's place: as wide as the dialog, 16:9 (other
+   shapes letterboxed), never taller than most of the window. */
+.drive-details__video.ac-video--viewer {
+  flex: none;
+  height: auto;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  max-height: 62vh;
+  border-radius: var(--radius-lg);
+}
 .drive-details__actions {
   display: flex;
   flex-wrap: wrap;

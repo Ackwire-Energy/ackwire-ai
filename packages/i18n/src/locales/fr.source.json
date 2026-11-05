@@ -22423,6 +22423,12 @@
   "blocks.openBig": {
     "value": "Open large"
   },
+  "blocks.showAll": {
+    "value": "Show all"
+  },
+  "blocks.showLess": {
+    "value": "Show less"
+  },
   "blocks.keep": {
     "value": "Keep in Drive"
   },
