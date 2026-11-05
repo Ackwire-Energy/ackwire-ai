@@ -6,10 +6,12 @@ import {
   useNotificationAction,
   useNotifications,
   useRoutines,
+  useToolChanges,
 } from "@agenteschat/client";
 import { approvalSummary, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { timeLeft, upperFirst } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
 import { mediaWord } from "@agenteschat/client/lib/media";
 import { usageLimitLine } from "@agenteschat/client/lib/person-usage";
 import { router, useLocalSearchParams } from "expo-router";
@@ -18,6 +20,7 @@ import { memo, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
+import { useOrg } from "@/providers/org";
 import {
   Button,
   Filters,
@@ -86,9 +89,20 @@ export function ActivityScreen() {
   const list = useNotifications(orgId, filter);
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const counts = list.data?.pages[0]?.counts;
-  const { waiting, days, merged } = activitySections(items, filter);
-  // The server counts each repeated notice of a server; the screen shows them as one card.
-  const waitingCount = Math.max(waiting.length, (counts?.waiting ?? waiting.length) - merged);
+  // What waits on a connector admin among changed tools: a server's card shows only while one of its tools waits.
+  const manages = can(useOrg().org, "manage_connectors");
+  const changes = useToolChanges(orgId, manages).data;
+  const pending = useMemo(
+    () =>
+      changes
+        ? { ids: new Set(changes.map((c) => c.connectionId)), labels: new Set(changes.map((c) => c.connectionLabel)) }
+        : null,
+    [changes],
+  );
+  const { waiting, days, merged, settled } = activitySections(items, filter, undefined, pending);
+  // The server counts each repeated notice of a server, and one with nothing left to review; the screen shows one
+  // card, or none.
+  const waitingCount = Math.max(waiting.length, (counts?.waiting ?? waiting.length) - merged - settled);
   const pull = usePullRefresh(list.refetch);
   const header = useTabHeader();
   return (
