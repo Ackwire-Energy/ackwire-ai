@@ -266,6 +266,11 @@ html:not([data-pointer]) .rq__more:focus-visible {
   max-width: var(--msg-card-w);
   margin-top: 2px;
 }
+/* Right under the name it is the message's words, not a card: a message with a request stacks its body with the
+   cards' 8px gap (`stacked`), which pulled the line away from the name; it sits 2px under it, as a text does. */
+.ac-msg__head + .rq-done {
+  margin-top: -6px;
+}
 .rq-done__line {
   display: flex;
   align-items: center;
