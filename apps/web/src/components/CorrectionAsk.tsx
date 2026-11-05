@@ -83,10 +83,11 @@ export function CorrectionAsk({ message, agentName }: { message: Message; agentN
           aria-label={t("correctionAsk.label")}
           maxLength={2000}
         />
-        <Button type="submit" variant="primary" size="sm">
+        {/* The field's height (40px): a field and its buttons are one row of the ruler. */}
+        <Button type="submit" variant="primary">
           {t("correctionAsk.send")}
         </Button>
-        <Button size="sm" variant="ghost" onClick={dismiss}>
+        <Button variant="ghost" onClick={dismiss}>
           {t("correctionAsk.notNow")}
         </Button>
       </div>

@@ -166,7 +166,7 @@ html:not([data-pointer]) .brw-site button:focus-visible {
 }
 .brw-use__acts {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
 .brw-confirm {
@@ -904,9 +904,6 @@ html:not([data-pointer]) .brw-ac__stage[tabindex]:focus-visible {
 .brw-tfield__tool[aria-pressed="true"] {
   color: var(--ink);
   background: var(--sunken);
-}
-.brw-tfield__send {
-  border-radius: 50%;
 }
 .brw-keycaps {
   position: absolute;
