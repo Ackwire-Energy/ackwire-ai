@@ -370,12 +370,15 @@ describe("Drive and skills", () => {
       command: "python3 .skills/graficos/scripts/plot.py '--n' 'it'\\''s'",
     });
     expect((await call(ctx, "run_skill_script", { skill: "graficos", path: "ref.md" })).isError).toBe(true);
-    // The version is on the computer now: the next run writes nothing, and still says what stayed behind.
-    const writes = () => runner.sent.filter((s) => s.type === "request" && s.op === "write").length;
-    const before = writes();
+    // The version is on the computer now: the next run writes its scripts alone, so one changed there never runs, and
+    // still says what stayed behind.
+    const writes = () => runner.sent.filter((s) => s.type === "request" && s.op === "write");
+    const before = writes().length;
+    runner.files.set(".skills/graficos/scripts/plot.py", new TextEncoder().encode("changed on the computer"));
     const again = await call(ctx, "run_skill_script", { skill: "graficos", path: "scripts/plot.py" });
     expect(again.content).toContain("Not copied to .skills/graficos/ (over 5.0 MB each): manual.pdf.");
-    expect(writes()).toBe(before);
+    expect(writes().slice(before)).toMatchObject([{ path: ".skills/graficos/scripts/plot.py" }]);
+    expect(new TextDecoder().decode(runner.files.get(".skills/graficos/scripts/plot.py"))).not.toContain("changed");
   });
 });
 

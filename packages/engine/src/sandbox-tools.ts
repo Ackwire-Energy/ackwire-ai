@@ -1070,17 +1070,19 @@ export function createSandboxToolSource(
           const left = listed
             .filter((f) => f.status !== "ignored" && f.size > MAX_INLINE_FILE_BYTES)
             .map((f) => f.path);
-          // Copied once a version: a skill can hold thousands of files, too many to write again on every run.
+          // A skill can hold thousands of files: copied once a version. Its scripts go on every run, so what runs (and
+          // what a person approved) is the skill's, whatever was written over them on the computer since.
           const copiedMark = `${base}/.copied-v${skill.version}`;
+          const scripts = listed.filter((f) => f.status === "script").map((f) => f.path);
           const started = Date.now();
           const result = await run(ctx, async (computer) => {
-            if (!(await computer.provider.readFile(computer.id, copiedMark))) {
-              for (const f of await skillFolderFiles(skillDeps(ctx), skill)) {
-                if (f.data.byteLength > MAX_INLINE_FILE_BYTES) continue;
-                await computer.provider.writeFile(computer.id, `${base}/${f.path}`, f.data);
-              }
-              await computer.provider.writeFile(computer.id, copiedMark, new TextEncoder().encode(skill.name));
+            const copied = await computer.provider.readFile(computer.id, copiedMark);
+            for (const f of await skillFolderFiles(skillDeps(ctx), skill, copied ? scripts : undefined)) {
+              if (f.data.byteLength > MAX_INLINE_FILE_BYTES) continue;
+              await computer.provider.writeFile(computer.id, `${base}/${f.path}`, f.data);
             }
+            if (!copied)
+              await computer.provider.writeFile(computer.id, copiedMark, new TextEncoder().encode(skill.name));
             const r = await execLive(ctx, computer, {
               command: scriptCommand(bin, `${base}/${target.path}`, args),
               timeoutSeconds: timeout,

@@ -514,9 +514,6 @@ html:not([data-pointer]) .rh-intro__preset:focus-visible {
   font-size: 12px;
 }
 @media (max-width: 760px) {
-  .rh-intro__again {
-    margin: 8px 0 0;
-  }
   .rh-intro__presets {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

@@ -16,7 +16,7 @@ import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import { introCards, isRightHand, offersTeamSetup, presetsLeft } from "@agenteschat/client/lib/right-hand";
-import { answerAfter, BUSINESS_TYPES } from "@agenteschat/client/lib/team-plan";
+import { answerAfter, BUSINESS_TYPES, startCardPassed } from "@agenteschat/client/lib/team-plan";
 import { AgentSticker, Button, Icon, Message, MessageText, normalizeAppearance, WAVE_SECONDS } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -70,7 +70,6 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
     alone: (members.data?.length ?? 0) <= 1,
     askStyle: org.agentStyle === null,
   });
-  const answered = answerAfter(messages, null) !== null;
   const profile = { actor: { type: "agent", id: agent.id }, label: t("profile.of", { name: agent.name }) } as const;
   return (
     <Message
@@ -127,7 +126,13 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
       )}
       {cards.includes("next") && team[0] && <NextCard agent={agent} first={team[0]} />}
       {cards.includes("style") && <StyleCard agent={agent} />}
-      {offersTeamSetup({ noAi, aiKnown, createsAgents, hasTeam: team.length > 0, answered }) && (
+      {offersTeamSetup({
+        noAi,
+        aiKnown,
+        createsAgents,
+        hasTeam: team.length > 0,
+        cardPassed: startCardPassed(messages),
+      }) && (
         <p className="rh-intro__again small muted">
           {t("rightHand.intro.again.question")}{" "}
           <TextAction onClick={() => actions?.resend(t("rightHand.intro.again.message"))}>

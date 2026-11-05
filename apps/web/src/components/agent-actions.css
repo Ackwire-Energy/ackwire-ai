@@ -173,9 +173,11 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
 }
 .ag-rcg__it .ag-rc__btn {
   font-size: 13px;
+}
+.ag-rcg__it .ag-rc__btn:enabled {
   color: var(--muted);
 }
-.ag-rcg__it .ag-rc__btn:hover {
+.ag-rcg__it .ag-rc__btn:enabled:hover {
   color: var(--ink);
 }
 

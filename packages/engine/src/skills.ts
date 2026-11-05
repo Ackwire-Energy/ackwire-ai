@@ -616,6 +616,7 @@ export async function saveSkill(
 
 /** Import from a zip of the skill folder (`SKILL.md` + files). */
 export async function importSkillZip(deps: SkillDeps, actorId: string, orgId: string, zip: Uint8Array) {
+  await requirePermission(deps.db, actorId, orgId, "manage_agents");
   const entries = listZip(zip).filter((e) => !e.symlink);
   return saveSkill(deps, actorId, orgId, {
     ...repositorySkill(
@@ -1125,20 +1126,35 @@ export async function importPickedSkills(
 ) {
   await requirePermission(deps.db, actorId, orgId, "manage_agents");
   const link = await readGithubLink(deps, orgId, url);
-  // Every pick is checked before any is saved; a refusal names the skill's folder.
-  const skills = [...new Set(paths)].map((dir) => {
-    if (!link.found.has(dir)) throw new ValidationError(`That link holds no skill at ${dir}`);
+  /** A refusal names the skill's folder. */
+  const named = <T>(dir: string, read: () => T) => {
     try {
-      return link.skillAt(dir);
+      return read();
     } catch (err) {
       if (err instanceof ValidationError) throw new ValidationError(`${dir}: ${err.message}`, err.code, err.params);
       throw err;
     }
+  };
+  const dirs = [...new Set(paths)];
+  // Every pick's limits and text are checked before any is saved, by the SKILL.md alone: its files are inflated one
+  // skill at a time, since a small archive can declare the most a skill keeps for each of the 100 it may hold.
+  const names = dirs.map((dir) => {
+    if (!link.found.has(dir)) throw new ValidationError(`That link holds no skill at ${dir}`);
+    return named(dir, () => link.about(dir).name);
   });
-  const twin = skills.find((s, i) => skills.findIndex((other) => other.name === s.name) !== i);
-  if (twin) throw new ValidationError(`Two of the skills picked are named ${twin.name}. Pick one of them.`);
+  const twin = names.find((name, i) => names.indexOf(name) !== i);
+  if (twin) throw new ValidationError(`Two of the skills picked are named ${twin}. Pick one of them.`);
   const installed: SkillDetail[] = [];
-  for (const skill of skills) installed.push(await saveSkill(deps, actorId, orgId, skill));
+  for (const dir of dirs) {
+    installed.push(
+      await saveSkill(
+        deps,
+        actorId,
+        orgId,
+        named(dir, () => link.skillAt(dir)),
+      ),
+    );
+  }
   return installed;
 }
 

@@ -76,16 +76,16 @@ export const presetsLeft = (teamHandles: readonly string[]) => PRESETS.filter((p
 
 /**
  * Whether its greeting ends with the way to build the team with it, for whoever may create agents once an AI is there.
- * Not while the start card still asks: with no team and nothing answered, that card is the way.
+ * Not while the start card still asks, or its interview runs: with no team, those are the way.
  */
 export const offersTeamSetup = (s: {
   noAi: boolean;
   aiKnown: boolean;
   createsAgents: boolean;
   hasTeam: boolean;
-  /** The conversation has a message from the person: the start card reads it as its answer. */
-  answered: boolean;
-}) => s.aiKnown && !s.noAi && s.createsAgents && (s.hasTeam || s.answered);
+  /** `startCardPassed`. */
+  cardPassed: boolean;
+}) => s.aiKnown && !s.noAi && s.createsAgents && (s.hasTeam || s.cardPassed);
 
 /**
  * The cards under the right hand's greeting at the top of its DM (ADR 0137): Connect AI while there is none. With one,

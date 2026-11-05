@@ -10,6 +10,7 @@ import {
   rightHandOf,
   tellsNameStory,
 } from "@agenteschat/client/lib/right-hand";
+import { startCardPassed } from "@agenteschat/client/lib/team-plan";
 import { STICKER_STILL_T, WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import { stickerFrame } from "../../src/agent/sticker";
 import { agentStarters, buildConversations, homeLayout, rightHandPin } from "../../src/features/chats/logic";
@@ -59,14 +60,29 @@ test("outside its audience there is no pin", () => {
 });
 
 test("the way to build the team: from when the start card stops asking, for who may create agents, with an AI", () => {
-  const base = { noAi: false, aiKnown: true, createsAgents: true, hasTeam: true, answered: false };
+  const base = { noAi: false, aiKnown: true, createsAgents: true, hasTeam: true, cardPassed: false };
   expect(offersTeamSetup(base)).toBe(true);
-  expect(offersTeamSetup({ ...base, hasTeam: false, answered: true })).toBe(true);
+  expect(offersTeamSetup({ ...base, hasTeam: false, cardPassed: true })).toBe(true);
   // The start card still asks.
   expect(offersTeamSetup({ ...base, hasTeam: false })).toBe(false);
   expect(offersTeamSetup({ ...base, noAi: true })).toBe(false);
   expect(offersTeamSetup({ ...base, aiKnown: false })).toBe(false);
   expect(offersTeamSetup({ ...base, createsAgents: false })).toBe(false);
+});
+
+test("the start card passed only when the message it took as its answer started no interview", () => {
+  const at = (id: string, type: "person" | "agent", meta: Record<string, unknown> | null = null) => ({
+    id,
+    createdAt: `2026-11-05T10:00:0${id}.000Z`,
+    author: { type, id },
+    body: id,
+    meta,
+  });
+  expect(startCardPassed(undefined)).toBe(false);
+  expect(startCardPassed([at("1", "agent")] as never)).toBe(false);
+  expect(startCardPassed([at("1", "person")] as never)).toBe(true);
+  const asked = at("2", "agent", { replyChips: { choices: ["a"], step: 2, of: 3 } });
+  expect(startCardPassed([at("1", "person"), asked] as never)).toBe(false);
 });
 
 test("its greeting's cards: Connect AI, then how to start, then what next, then none", () => {
