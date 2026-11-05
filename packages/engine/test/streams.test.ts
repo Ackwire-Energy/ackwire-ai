@@ -61,6 +61,7 @@ function brokerFor(
     onReady?: StreamBrokerDeps["onReady"];
     onClosed?: StreamBrokerDeps["onClosed"];
     limits?: StreamBrokerDeps["limits"];
+    claim?: StreamBrokerDeps["claim"];
   } = {},
 ) {
   const requests: MachineRequest[] = [];
@@ -90,6 +91,7 @@ function brokerFor(
     onClosed: options.onClosed,
     recheck: options.recheck,
     limits: options.limits,
+    claim: options.claim,
   });
   broker = created;
   return { broker: created, requests, runners };
@@ -199,6 +201,41 @@ describe("the broker", () => {
     broker.accept(silent.socket);
     await until(() => silent.closed !== null, "the hello timeout");
     expect(silent.closed?.code).toBe(STREAM_CLOSE.late);
+  });
+
+  test("a data socket naming no stream of its own goes to whoever claims it: an agent browser's live view", async () => {
+    f = await setup();
+    const machine = await paired();
+    const got: (string | Uint8Array)[] = [];
+    let ended = 0;
+    const claims: { id: string; machineId: string }[] = [];
+    const VIEW = "B".repeat(43);
+    const { broker } = brokerFor(machine, {
+      claim: (id, machineId) => {
+        claims.push({ id, machineId });
+        return id === VIEW ? { data: (d) => void got.push(d), closed: () => void ended++ } : null;
+      },
+    });
+    const dial = async (streamId: string) => {
+      const socket = fakeSocket();
+      const link = broker.accept(socket.socket);
+      await broker.fromRunner(link, JSON.stringify({ type: "stream.hello", token: machine.token, streamId }));
+      return { socket, link };
+    };
+    expect((await dial("A".repeat(43))).socket.closed?.code).toBe(STREAM_CLOSE.notFound);
+    const view = await dial(VIEW);
+    expect(view.socket.closed).toBeNull();
+    expect(view.socket.sent).toEqual(['{"type":"stream.ready"}']);
+    expect(claims.at(-1)).toEqual({ id: VIEW, machineId: machine.machineId });
+    await broker.fromRunner(view.link, new Uint8Array([1, 2, 3]));
+    expect(got).toEqual([new Uint8Array([1, 2, 3])]);
+    broker.runnerClosed(view.link, STREAM_CLOSE.normal);
+    expect(ended).toBe(1);
+    // The server stopping closes a claimed socket and tells whoever claimed it.
+    const again = await dial(VIEW);
+    broker.stop();
+    expect(again.socket.closed?.code).toBe(STREAM_CLOSE.restarting);
+    expect(ended).toBe(2);
   });
 
   test("onReady: once per stream, once its data socket is ready; never for one that got none", async () => {

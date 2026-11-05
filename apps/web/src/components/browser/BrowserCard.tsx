@@ -88,6 +88,7 @@ import { useOrg } from "../org-context";
 import { ComputerSky, colorOf } from "../Sky";
 import { useComputerEdition } from "../WorkspaceComputer";
 import { AddressBar } from "./AddressBar";
+import { frameUrl, useFrameSrc } from "./frame-src";
 import { requestBrowserCard, useBrowserCardRequest } from "./open";
 import { SiteIcon, siteName } from "./SiteIcon";
 import "./browser.css";
@@ -624,6 +625,7 @@ export function BrowserCard({
 
   // What is shown of the page: nothing while it is closed, opening or hidden (only a stale frame is held).
   const frame = closed || opening || hidden ? null : live.frame;
+  const src = useFrameSrc(frame);
   // Only a page that was clicked into takes the wheel (a native listener: the conversation's scroll is
   // stopped only then); anywhere else the wheel scrolls the conversation.
   const wheelTo = useRef<(e: globalThis.WheelEvent) => void>(() => {});
@@ -706,7 +708,8 @@ export function BrowserCard({
     kept.current = null;
     return () => {
       const { still: last, inControl: control } = leaving.current;
-      kept.current = last ? { src: `data:image/jpeg;base64,${last.data}`, control } : null;
+      const src = last ? frameUrl(last) : null;
+      kept.current = src ? { src, control } : null;
     };
   }, [kept]);
   useEffect(() => {
@@ -955,7 +958,6 @@ export function BrowserCard({
     );
   }
 
-  const src = frame ? `data:image/jpeg;base64,${frame.data}` : null;
   const lastStep = steps.at(-1);
   // The page as last seen, for the title: none while closed, opening or hidden.
   const pic = closed || opening || hidden ? null : (frame ?? still);

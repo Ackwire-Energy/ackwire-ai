@@ -1,16 +1,21 @@
+import { randomBytes } from "node:crypto";
 import {
   type AgentScope,
-  BROWSER_FRAME_WINDOW,
   BROWSER_LIMITS,
+  BROWSER_VIEW_PROTOCOL,
   type BrowserInputEvent,
   type BrowserStreamMode,
+  decodeBrowserFrame,
+  encodeBrowserFrame,
   type RunnerFrame,
+  STREAM_CLOSE,
 } from "@agenteschat/adapters";
 import { and, eq, inArray, schema } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { type MachineHub, MachineRequestError } from "../machine-hub";
 import { getMachineById, machineOnline } from "../machines";
+import type { ClaimedStream, StreamSocket } from "../streams";
 import {
   agentBrowserLink,
   agentUsesScreen,
@@ -67,6 +72,22 @@ const KEEPALIVE_PARALLEL = 5;
 export const STREAM_STOP_DELAY_MS = 10_000;
 /** A person's input is gathered this long and sent to the computer as one batch. */
 export const INPUT_BATCH_MS = 25;
+/** How long the runner gets to dial a live view's socket; meanwhile, and without one, frames come as before. */
+const VIEW_OPEN_MS = 15_000;
+/** What the server answers each frame of a live view's socket with: the runner may send one more. */
+const VIEW_ACK = JSON.stringify({ type: "ack" });
+
+/**
+ * A frame as bytes for the people watching on a frame socket (ADR 0040 §7.1): the checked header and the JPEG, made
+ * once per frame whoever watches.
+ */
+export function browserFrameBytes(frame: BrowserFrame): Uint8Array {
+  frame.bytes ??= encodeBrowserFrame(
+    { seq: frame.seq, metadata: frame.metadata },
+    new Uint8Array(Buffer.from(frame.data, "base64")),
+  );
+  return frame.bytes;
+}
 /**
  * This live view carries the browser alone: other screens' handoffs never switch its stream, and hide it
  * only while they show the same window (`shared`). An event naming no screen is the browser's
@@ -184,10 +205,23 @@ export interface LiveViewer {
   busy?(): boolean;
 }
 
+/** A live view's own socket from the computer (protocol 46, ADR 0040 §7.1). */
+interface LiveView {
+  /** The `streamId` its data socket names. */
+  id: string;
+  /** Its data socket, once the runner dialed it. */
+  socket: StreamSocket | null;
+  /** A frame came on it: the same pictures on the machine socket are stragglers from before it. */
+  framed: boolean;
+  closed: boolean;
+}
+
 interface AgentLive {
   orgId: string;
   machineId: string;
   handle: string;
+  /** The running stream's own socket from the computer; null: its frames come on the machine socket. */
+  view: LiveView | null;
   viewers: Set<LiveViewer>;
   unsubscribe: Map<LiveViewer, () => void>;
   /** The mode the runner was last asked for; null = not streaming. */
@@ -222,7 +256,7 @@ const hiddenFrom = (state: Pick<AgentLive, "controllerUserId" | "shared">, userI
 };
 
 export interface BrowserLiveDeps extends Omit<HandoffDeps, "live"> {
-  hub: Pick<MachineHub, "call" | "isLocal"> & Partial<Pick<MachineHub, "sendBrowserHandoff">>;
+  hub: Pick<MachineHub, "call" | "isLocal"> & Partial<Pick<MachineHub, "sendBrowserHandoff" | "localProtocol">>;
   graceMs?: number;
   accessRecheckMs?: number;
   /** Tests: how long the stream outlives its last viewer (`STREAM_STOP_DELAY_MS`). */
@@ -313,6 +347,62 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     if (live.get(agentId) === state) live.delete(agentId);
   };
 
+  /** Live views waiting for their data socket or open, by the `streamId` the runner's socket names. */
+  const views = new Map<string, { agentId: string; machineId: string; view: LiveView }>();
+
+  /**
+   * The stream's own socket from the computer (protocol 46, ADR 0040 §7.1): its frames come there as bytes, in a
+   * window, and never delay the machine socket's commands. A runner that can't (an older one, a socket on another
+   * replica, a refusal) goes on sending them on the machine socket, as before.
+   */
+  function openView(agentId: string, state: AgentLive, agent: AgentScope) {
+    closeView(state);
+    const protocol = deps.hub.localProtocol?.(state.machineId) ?? null;
+    if (protocol === null || protocol < BROWSER_VIEW_PROTOCOL) return;
+    const view: LiveView = { id: randomBytes(32).toString("base64url"), socket: null, framed: false, closed: false };
+    state.view = view;
+    views.set(view.id, { agentId, machineId: state.machineId, view });
+    void deps.hub
+      .call(
+        state.machineId,
+        { op: "browser.view.open", streamId: view.id, agent, ...profileOp(agentId) },
+        { timeoutMs: VIEW_OPEN_MS },
+      )
+      .catch((error) => {
+        if (state.view !== view) return;
+        deps.log?.warn("browser live view socket failed", { agentId, error: String(error) });
+        closeView(state);
+      });
+  }
+
+  /** The stream's own socket goes (the stream stopped, or a new one starts with its own). */
+  function closeView(state: AgentLive) {
+    const view = state.view;
+    if (!view) return;
+    state.view = null;
+    view.closed = true;
+    views.delete(view.id);
+    try {
+      view.socket?.close(STREAM_CLOSE.normal, "the stream stopped");
+    } catch {
+      // already closed
+    }
+  }
+
+  /** A frame of the agent's running stream, from either socket of its computer: to the viewers here. */
+  function received(state: AgentLive, frame: BrowserFrame) {
+    const first = !state.frame;
+    const { url, title } = frame.metadata;
+    if (url) state.page = { url, ...(title ? { title } : {}) };
+    state.frame = frame;
+    if (state.viewers.size > 0) relay.publish(frame.agentId, frame);
+    // The page shows at last for the person in control watching it: their control holds from now.
+    const controller = state.controllerUserId;
+    if (first && state.handoff && controller && [...state.viewers].some((v) => v.userId === controller)) {
+      void touchFor(frame.agentId, state.handoff.id, controller, true).catch(() => {});
+    }
+  }
+
   async function syncNow(agentId: string, state: AgentLive, stopNow: boolean) {
     const mode = wanted(state);
     if (mode !== null) cancelStop(state);
@@ -330,25 +420,23 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       state.page = null;
       state.frame = null;
     }
+    const fresh = state.mode === null;
     state.mode = mode;
     try {
-      if (mode === null)
+      if (mode === null) {
+        closeView(state);
         await deps.hub.call(state.machineId, { op: "browser.stream.stop", agent, ...profileOp(agentId) });
-      else {
-        // `window` (protocol 46, ADR 0040 §7.1): an older runner ignores it and sends every frame.
-        await deps.hub.call(state.machineId, {
-          op: "browser.stream.start",
-          mode,
-          window: BROWSER_FRAME_WINDOW,
-          agent,
-          ...profileOp(agentId),
-        });
+      } else {
+        // Not waited on: the first frames come on the machine socket until the view's own socket is there.
+        if (fresh) openView(agentId, state, agent);
+        await deps.hub.call(state.machineId, { op: "browser.stream.start", mode, agent, ...profileOp(agentId) });
         broadcastStatus(agentId, state);
       }
     } catch (error) {
       // Stopping a stream that is already gone is fine; a stream that can't start is told to the viewers.
       if (mode === null) return;
       state.mode = null;
+      closeView(state);
       // An older runner says `bad_request` for a closed browser: still `unavailable`, with its message.
       const closed = error instanceof MachineRequestError && error.code === "browser_closed";
       // Closed by a restart that is opening it again: its end starts the stream, the views keep waiting.
@@ -547,6 +635,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     for (const unsubscribe of old.unsubscribe.values()) unsubscribe();
     old.unsubscribe.clear();
     old.viewers.clear();
+    closeView(old);
     if (old.mode !== null) {
       old.mode = null;
       void deps.hub
@@ -689,6 +778,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
           handle: agent.handle,
           viewers: new Set(),
           unsubscribe: new Map(),
+          view: null,
           mode: null,
           controllerUserId: null,
           handoff: null,
@@ -919,27 +1009,64 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     },
 
     /** What the machine hub hands over: frames and the end of a stream, from the machine holding them. */
+    /**
+     * A runner's data socket naming a live view's id (`StreamBrokerDeps.claim`, ADR 0040 §7.1): its frames, as bytes,
+     * go to the viewers here, each acknowledged so the runner may send one more. Null when no view of that computer
+     * waits for it.
+     */
+    claimView(streamId: string, machineId: string, socket: StreamSocket): ClaimedStream | null {
+      const entry = views.get(streamId);
+      if (!entry || entry.machineId !== machineId || entry.view.closed || entry.view.socket) return null;
+      const { agentId, view } = entry;
+      view.socket = socket;
+      return {
+        data(data) {
+          if (view.closed || typeof data === "string") return;
+          // Acknowledged whatever it holds: a frame dropped here must not keep the window shut.
+          try {
+            socket.send(VIEW_ACK);
+          } catch {
+            // its close ends the view
+          }
+          const frame = decodeBrowserFrame(data);
+          const state = live.get(agentId);
+          if (!frame || !state || state.view !== view) return;
+          view.framed = true;
+          const { seq, metadata, jpeg } = frame;
+          received(state, {
+            agentId,
+            seq,
+            metadata,
+            data: Buffer.from(jpeg.buffer, jpeg.byteOffset, jpeg.byteLength).toString("base64"),
+            bytes: encodeBrowserFrame({ seq, metadata }, jpeg),
+          });
+        },
+        closed() {
+          if (view.closed) return;
+          view.closed = true;
+          views.delete(streamId);
+          const state = live.get(agentId);
+          // Its frames come on the machine socket again: the runner goes back to it by itself.
+          if (state?.view === view) state.view = null;
+        },
+      };
+    },
+
     hubHooks: {
       frame(machineId: string, frame: Extract<RunnerFrame, { type: "browser.frame" }>) {
         const state = live.get(frame.agentId);
         // Only from the agent's own computer.
         if (!state || state.machineId !== machineId) return;
-        const first = !state.frame;
-        const { url, title } = frame.metadata;
-        if (url) state.page = { url, ...(title ? { title } : {}) };
-        state.frame = { agentId: frame.agentId, seq: frame.seq, data: frame.data, metadata: frame.metadata };
-        if (state.viewers.size > 0) relay.publish(frame.agentId, state.frame);
-        // The page shows at last for the person in control watching it: their control holds from now.
-        const controller = state.controllerUserId;
-        if (first && state.handoff && controller && [...state.viewers].some((v) => v.userId === controller)) {
-          void touchFor(frame.agentId, state.handoff.id, controller, true).catch(() => {});
-        }
+        // Its own socket brings the pictures now: one still on the machine socket was sent before it.
+        if (state.view?.framed) return;
+        received(state, { agentId: frame.agentId, seq: frame.seq, data: frame.data, metadata: frame.metadata });
       },
       streamEnded(machineId: string, frame: Extract<RunnerFrame, { type: "browser.stream.ended" }>) {
         const state = live.get(frame.agentId);
         if (!state || state.machineId !== machineId) return;
         cancelStop(state);
         state.mode = null;
+        closeView(state);
         // A restart's own stop: its views keep waiting for the page, it isn't a Parar.
         if (frame.reason === "stopped" && restarting.has(frame.agentId)) return;
         broadcast(state, {
@@ -972,6 +1099,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
           if (state.machineId !== machineId) continue;
           cancelStop(state);
           state.mode = null;
+          closeView(state);
           broadcast(state, { type: "browser.unavailable", agentId, reason: "reconnecting" });
         }
       },

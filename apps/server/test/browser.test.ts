@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { MachineRequest } from "@agenteschat/adapters";
+import { decodeBrowserFrame, type MachineRequest } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import { BROWSER_SCOPE, grantScopes, MachineRequestError } from "@agenteschat/engine";
-import { createViewerPacer, parseBrowserClientFrame } from "../src/realtime/browser";
+import { createViewerPacer, parseBrowserClientFrame, parseFrameSocketMessage } from "../src/realtime/browser";
 import { parseClientFrame } from "../src/realtime/ws";
 import { browser, createTestServer, listen, ORIGIN, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -25,6 +25,18 @@ describe("parseBrowserClientFrame: frame windows", () => {
       agentId: AGENT,
     });
     expect(parseBrowserClientFrame(JSON.stringify({ type: "browser.ack", agentId: "dev" }))).toBeNull();
+    // Frames on their own socket come in a window: only with acks.
+    expect(
+      parseBrowserClientFrame(JSON.stringify({ type: "browser.watch", agentId: AGENT, acks: true, frames: true })),
+    ).toEqual({ type: "browser.watch", agentId: AGENT, acks: true, frames: true });
+    expect(parseBrowserClientFrame(JSON.stringify({ type: "browser.watch", agentId: AGENT, frames: true }))).toEqual({
+      type: "browser.watch",
+      agentId: AGENT,
+    });
+    // A frame socket takes only an ack.
+    expect(parseFrameSocketMessage('{"type":"ack"}')).toEqual({ type: "ack" });
+    expect(parseFrameSocketMessage('{"type":"input"}')).toBeNull();
+    expect(parseFrameSocketMessage(Buffer.from('{"type":"ack"}'))).toBeNull();
   });
 });
 
@@ -370,6 +382,91 @@ describe("live view socket", () => {
       await Promise.race([server.stop(true), Bun.sleep(500)]);
     }
   });
+  test("a client that answers frames gets them on a socket of their own, as bytes, in a window", async () => {
+    const { owner, org } = await seeded();
+    const server = listen(t);
+    const live = t.engine.browserLive;
+    const watch = live.watch;
+    const held: { viewer: Parameters<typeof watch>[0] | null } = { viewer: null };
+    live.watch = async (v) => {
+      held.viewer = v;
+      return () => {
+        held.viewer = null;
+      };
+    };
+    const opened = (socket: WebSocket) =>
+      new Promise<void>((resolve, reject) => {
+        socket.onopen = () => resolve();
+        socket.onerror = () => reject(new Error("refused"));
+      });
+    try {
+      const frames: Record<string, unknown>[] = [];
+      const ws = new WebSocket(`ws://127.0.0.1:${server.port}/api/ws?orgId=${org.orgId}`, {
+        headers: { cookie: owner.cookie(), origin: ORIGIN },
+      } as unknown as string[]);
+      ws.onmessage = (e) => frames.push(JSON.parse(String(e.data)) as Record<string, unknown>);
+      await opened(ws);
+      const until = async (pred: (f: Record<string, unknown>) => boolean) => {
+        for (let i = 0; i < 100 && !frames.some(pred); i++) await Bun.sleep(20);
+        return frames.find(pred);
+      };
+      await until((f) => f.type === "ready");
+      ws.send(JSON.stringify({ type: "browser.watch", agentId: org.agentId, acks: true, frames: true }));
+      const ticket = (await until((f) => f.type === "browser.frames"))?.ticket;
+      if (typeof ticket !== "string") throw new Error("no ticket");
+      const jpeg = new Uint8Array([0xff, 0xd8, 1, 2, 0xff, 0xd9]);
+      const picture = (seq: number) => ({
+        type: "browser.frame" as const,
+        agentId: org.agentId,
+        seq,
+        data: Buffer.from(jpeg).toString("base64"),
+        metadata: { deviceWidth: 1280, deviceHeight: 800 },
+      });
+      // Before the frame socket is open, a picture comes here as base64.
+      held.viewer?.send(picture(1));
+      const first = await until((f) => f.type === "browser.frame");
+      expect(first).toMatchObject({ seq: 1, data: Buffer.from(jpeg).toString("base64") });
+      expect(first).not.toHaveProperty("bytes");
+      ws.send(JSON.stringify({ type: "browser.ack", agentId: org.agentId, seq: 1 }));
+
+      const got: Uint8Array[] = [];
+      const pictures = new WebSocket(`ws://127.0.0.1:${server.port}/api/browser/frames?ticket=${ticket}`);
+      pictures.binaryType = "arraybuffer";
+      pictures.onmessage = (e) => got.push(new Uint8Array(e.data as ArrayBuffer));
+      await opened(pictures);
+      // A ticket opens one socket, once.
+      const reused = new WebSocket(`ws://127.0.0.1:${server.port}/api/browser/frames?ticket=${ticket}`);
+      expect(
+        await opened(reused).then(
+          () => "open",
+          () => "refused",
+        ),
+      ).toBe("refused");
+      for (const seq of [2, 3, 4, 5]) held.viewer?.send(picture(seq));
+      const seqs = () => got.map((bytes) => decodeBrowserFrame(bytes)?.seq);
+      for (let i = 0; i < 100 && got.length < 2; i++) await Bun.sleep(10);
+      await Bun.sleep(30);
+      // Two on their way; 4 was replaced by 5 while the window was full.
+      expect(seqs()).toEqual([2, 3]);
+      expect([...(decodeBrowserFrame(got[0] as Uint8Array)?.jpeg ?? [])]).toEqual([...jpeg]);
+      pictures.send(JSON.stringify({ type: "ack" }));
+      for (let i = 0; i < 100 && got.length < 3; i++) await Bun.sleep(10);
+      expect(seqs()).toEqual([2, 3, 5]);
+      // None of them came on the realtime socket.
+      expect(frames.filter((f) => f.type === "browser.frame")).toHaveLength(1);
+      // Unwatching ends the view, and its frame socket closes.
+      const closed = new Promise<number>((resolve) => {
+        pictures.onclose = (e) => resolve(e.code);
+      });
+      ws.send(JSON.stringify({ type: "browser.unwatch", agentId: org.agentId }));
+      expect(await closed).toBe(1000);
+      ws.close();
+    } finally {
+      live.watch = watch;
+      await Promise.race([server.stop(true), Bun.sleep(500)]);
+    }
+  });
+
   test("input frames enter the live view in the order they came, even when a later one's checks end first", async () => {
     const { owner, org } = await seeded();
     const server = listen(t);

@@ -39,6 +39,7 @@ import {
 import type { AccountGrant } from "./accounts";
 import { type AgentUser, readAgentUsers, systemLauncher } from "./agent-users";
 import { type BindPolicyOptions, ensureBrowserBindPolicy } from "./browser-bind-policy";
+import type { BrowserViews } from "./browser-views";
 import { backoffDelay } from "./connection";
 import { DESKTOP_USE_OPS } from "./desktop";
 import { SHOW_MS } from "./desktop-browser";
@@ -298,6 +299,8 @@ export interface SupervisorOptions {
   server: string;
   /** A frame for the server; false while it is offline. */
   send: (frame: RunnerFrame) => boolean;
+  /** Protocol 46: the agents' browsers' live views, where a viewed agent's frames go instead (ADR 0040 §7.1). */
+  views?: Pick<BrowserViews, "push" | "end">;
   state: () => WorkerState;
   log: (line: string) => void;
   fetch?: FetchLike;
@@ -628,12 +631,6 @@ export class Supervisor {
     if (!w?.ready) return;
     this.send(w, { type: "task.ack", taskId });
     this.disown(taskId);
-  }
-
-  /** `browser.ack` (protocol 46): to the worker whose agent's frame it was; a worker that went sends no more frames. */
-  browserAck(frame: Extract<ServerFrame, { type: "browser.ack" }>) {
-    const w = this.workers.get(frame.agentId);
-    if (w?.ready) this.send(w, frame);
   }
 
   /** `browser.handoff`: to the agent's worker, and kept for a session that says hello later. */
@@ -1163,8 +1160,12 @@ export class Supervisor {
       }
       case "browser.frame":
       case "browser.stream.ended":
-        if (f.agentId === w.user.id) w.browserStreaming = f.type === "browser.frame";
-        if (f.agentId === w.user.id && this.opts.send(f) && f.type === "browser.frame" && this.opts.relayed) {
+        if (f.agentId !== w.user.id) return;
+        w.browserStreaming = f.type === "browser.frame";
+        // Its live view's socket counts what it sends (`DataSockets`, as `browserView`).
+        if (f.type === "browser.frame" && this.opts.views?.push(f)) return;
+        if (f.type === "browser.stream.ended") this.opts.views?.end(f.agentId);
+        if (this.opts.send(f) && f.type === "browser.frame" && this.opts.relayed) {
           this.opts.relayed.browserView.up += Buffer.byteLength(line);
         }
         return;

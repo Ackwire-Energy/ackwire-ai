@@ -251,22 +251,6 @@ test("tasks: hello carries the journal, each welcome re-sends unacknowledged tas
   await run;
 });
 
-test("browser.ack (protocol 46) reaches the browser: one more frame of that agent may go", async () => {
-  const acks: unknown[] = [];
-  const { sockets, connection } = setup({ onBrowserAck: (frame) => acks.push(frame) });
-  const run = connection.run();
-  await waitFor(() => sockets.length === 1);
-  const s = sock(sockets, 0);
-  s.handlers.onOpen();
-  s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25_000 });
-  s.frame({ type: "browser.ack", agentId: "a1", seq: 7 });
-  // Malformed: no agent.
-  s.handlers.onMessage(JSON.stringify({ type: "browser.ack", seq: 8 }));
-  expect(acks).toEqual([{ type: "browser.ack", agentId: "a1", seq: 7 }]);
-  connection.stop();
-  await run;
-});
-
 test("refused: outdated exits 3, replaced exits 0", async () => {
   for (const [reason, exitCode] of [
     ["outdated", 3],

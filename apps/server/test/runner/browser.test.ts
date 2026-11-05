@@ -41,7 +41,6 @@ import {
   domainAllowed,
   dragDelay,
   findChrome,
-  frameWindowOf,
   type InputState,
   isWebPage,
   jpegSize,
@@ -2172,72 +2171,6 @@ test.if(posix)("the stream relays frames with the page's URL, changes mode, and 
   expect(socket.closed).toBe(true);
   expect(t.frames.at(-1)).toEqual({ type: "browser.stream.ended", agentId: dev.id, reason: "stopped" });
   expect(await t.manager.streamStop(dev)).toEqual({ stopped: false });
-});
-
-const frameSeqs = (frames: RunnerFrame[]) => frames.flatMap((f) => (f.type === "browser.frame" ? [f.seq] : []));
-
-test.if(posix)(
-  "with the server's window, at most that many frames are on their way and only the newest waits",
-  async () => {
-    const t = setup();
-    await t.act("open", ["https://shop.example.com"]);
-    expect(await t.manager.streamStart(dev, "watch", 2)).toEqual({ mode: "watch" });
-    const socket = t.sockets[0] as FakeSocket;
-    const frame = (seq: number) =>
-      socket.push({ type: "frame", seq, data: "/9j/AAA", metadata: { deviceWidth: 1280, deviceHeight: 720 } });
-    for (const seq of [1, 2, 3, 4]) frame(seq);
-    // 3 never goes: 4 came while the window was still full.
-    expect(frameSeqs(t.frames)).toEqual([1, 2]);
-    t.manager.frameAck(dev.id);
-    expect(frameSeqs(t.frames)).toEqual([1, 2, 4]);
-    // Acknowledgements with nothing waiting free the window for what comes next.
-    t.manager.frameAck(dev.id);
-    t.manager.frameAck(dev.id);
-    frame(5);
-    frame(6);
-    expect(frameSeqs(t.frames)).toEqual([1, 2, 4, 5, 6]);
-    // Another agent's acknowledgement, or one for no stream, changes nothing.
-    t.manager.frameAck("someone-else");
-    frame(7);
-    expect(frameSeqs(t.frames)).toEqual([1, 2, 4, 5, 6]);
-    await t.manager.streamStop(dev);
-  },
-);
-
-test.if(posix)("a full window with no acknowledgement for a while sends the newest frame anyway", async () => {
-  const t = setup({ frameStallMs: 5 });
-  await t.act("open", ["https://shop.example.com"]);
-  await t.manager.streamStart(dev, "watch", 1);
-  const socket = t.sockets[0] as FakeSocket;
-  for (const seq of [1, 2, 3]) {
-    socket.push({ type: "frame", seq, data: "/9j/AAA", metadata: { deviceWidth: 1280, deviceHeight: 720 } });
-  }
-  expect(frameSeqs(t.frames)).toEqual([1]);
-  await waitFor(() => frameSeqs(t.frames).length === 2);
-  expect(frameSeqs(t.frames)).toEqual([1, 3]);
-  await t.manager.streamStop(dev);
-});
-
-test.if(posix)("without a window (an older server) every frame goes, as before", async () => {
-  const t = setup();
-  await t.act("open", ["https://shop.example.com"]);
-  await t.manager.streamStart(dev, "watch");
-  const socket = t.sockets[0] as FakeSocket;
-  for (const seq of [1, 2, 3, 4]) {
-    socket.push({ type: "frame", seq, data: "/9j/AAA", metadata: { deviceWidth: 1280, deviceHeight: 720 } });
-  }
-  expect(frameSeqs(t.frames)).toEqual([1, 2, 3, 4]);
-  await t.manager.streamStop(dev);
-});
-
-test("a server's window is a small whole number of frames; anything else sends every frame", () => {
-  expect(frameWindowOf(2)).toBe(2);
-  expect(frameWindowOf(50)).toBe(8);
-  expect(frameWindowOf(0)).toBe(0);
-  expect(frameWindowOf(-1)).toBe(0);
-  expect(frameWindowOf(1.5)).toBe(0);
-  expect(frameWindowOf("2")).toBe(0);
-  expect(frameWindowOf(undefined)).toBe(0);
 });
 
 test.if(posix)("system mode refuses an agent-browser stream that fell back to an unassigned port", async () => {

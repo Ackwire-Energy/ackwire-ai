@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import {
   channelTopic,
   chatActivityTopic,
@@ -15,7 +16,9 @@ import { and, type Database, eq, inArray, isNotNull, isNull, or, schema, sql } f
 import {
   activityAudience,
   announcePresence,
+  type BrowserFrame,
   type BrowserLive,
+  browserFrameBytes,
   closedRefusal,
   closesWorkspace,
   ForbiddenError,
@@ -34,11 +37,14 @@ import type { Auth, SessionUser } from "../auth";
 import type { Logger } from "../logger";
 import { allowedOrigins, requestOriginAllowed } from "../routes/app/context";
 import {
+  BROWSER_FRAMES_PATH,
   BROWSER_INPUT_PER_SECOND,
   type BrowserClientFrame,
   createViewerPacer,
+  FRAME_TICKET_MS,
   MAX_WATCHED_BROWSERS,
   parseBrowserClientFrame,
+  parseFrameSocketMessage,
   type ViewerPacer,
 } from "./browser";
 import type { MachineSocketData, MachineSockets } from "./machines";
@@ -104,15 +110,29 @@ export interface BrowserSocketData {
   browsers: Map<string, () => void>;
   /** Their frame windows, for clients that answer each frame (`browser.ack`, ADR 0040 §7.1). */
   browserPacers: Map<string, ViewerPacer>;
+  /** Their frame sockets (`/api/browser/frames`), where the pictures go as bytes instead of on this socket. */
+  frameSockets: Map<string, Bun.ServerWebSocket<FrameSocketData>>;
+}
+
+/**
+ * A frame socket of one watched browser (ADR 0040 §7.1): opened with a ticket the person's realtime socket got, it
+ * carries that view's pictures as bytes, and the person's `{"type":"ack"}` for each one drawn.
+ */
+export interface FrameSocketData {
+  kind: "browser.frames";
+  owner: Bun.ServerWebSocket<BrowserSocketData>;
+  agentId: string;
 }
 
 /** Every socket of the server: browsers (`/api/ws`), runners (`/api/machines/connect`) and streams (ADR 0058). */
-export type SocketData = BrowserSocketData | MachineSocketData | StreamSocketData;
+export type SocketData = BrowserSocketData | MachineSocketData | StreamSocketData | FrameSocketData;
 
 type BrowserSocket = Bun.ServerWebSocket<BrowserSocketData>;
 type MachineSocket = Bun.ServerWebSocket<MachineSocketData>;
 type StreamSocket = Bun.ServerWebSocket<StreamSocketData>;
 const isMachine = (ws: Bun.ServerWebSocket<SocketData>): ws is MachineSocket => ws.data.kind === "machine";
+const isFrames = (ws: Bun.ServerWebSocket<SocketData>): ws is Bun.ServerWebSocket<FrameSocketData> =>
+  ws.data.kind === "browser.frames";
 const isStream = (ws: Bun.ServerWebSocket<SocketData>): ws is StreamSocket =>
   ws.data.kind === "stream.viewer" || ws.data.kind === "stream.data";
 
@@ -346,6 +366,49 @@ export function createRealtime(deps: RealtimeDeps) {
 
   /** Placeholders of browser views still starting (`browser.watch` in flight). */
   const startingBrowsers = new WeakSet<() => void>();
+  /** Frame socket tickets (ADR 0040 §7.1): each opens one socket, once, for the view it was given to. */
+  const frameTickets = new Map<
+    string,
+    { owner: BrowserSocket; agentId: string; pacer: ViewerPacer; expires: number }
+  >();
+
+  /**
+   * `GET /api/browser/frames?ticket=`: a watched browser's frame socket. The ticket is the whole check: only the
+   * person's own realtime socket got it, for one view, for `FRAME_TICKET_MS`; a view that ended takes no socket.
+   */
+  function upgradeFrames(req: Request, server: Bun.Server<SocketData>): Response | undefined {
+    const ticket = new URL(req.url).searchParams.get("ticket") ?? "";
+    const held = frameTickets.get(ticket);
+    frameTickets.delete(ticket);
+    if (!held || held.expires <= Date.now()) return new Response("Unknown or expired ticket", { status: 403 });
+    const { owner, agentId, pacer } = held;
+    if (owner.readyState !== 1 || owner.data.browserPacers.get(agentId) !== pacer) {
+      return new Response("That view ended", { status: 410 });
+    }
+    const data: FrameSocketData = { kind: "browser.frames", owner, agentId };
+    return server.upgrade(req, { data }) ? undefined : new Response("WebSocket upgrade failed", { status: 400 });
+  }
+
+  const frameSocket = {
+    open(socket: Bun.ServerWebSocket<FrameSocketData>) {
+      const { owner, agentId } = socket.data;
+      // The view ended while it opened.
+      if (owner.readyState !== 1 || !owner.data.browserPacers.has(agentId)) return socket.close(1000, "the view ended");
+      const old = owner.data.frameSockets.get(agentId);
+      owner.data.frameSockets.set(agentId, socket);
+      old?.close(1000, "replaced");
+    },
+    message(socket: Bun.ServerWebSocket<FrameSocketData>, raw: string | Buffer) {
+      const { owner, agentId } = socket.data;
+      if (owner.data.frameSockets.get(agentId) !== socket) return;
+      if (parseFrameSocketMessage(raw)?.type === "ack") owner.data.browserPacers.get(agentId)?.ack();
+    },
+    close(socket: Bun.ServerWebSocket<FrameSocketData>) {
+      const { owner, agentId } = socket.data;
+      // Its pictures go on the realtime socket again, in the same window.
+      if (owner.data.frameSockets.get(agentId) === socket) owner.data.frameSockets.delete(agentId);
+    },
+  };
 
   /** An agent's browser on this socket (ADR 0040): watch, stop watching, a person's input. */
   async function browserMessage(ws: BrowserSocket, frame: BrowserClientFrame): Promise<void> {
@@ -380,14 +443,25 @@ export function createRealtime(deps: RealtimeDeps) {
     // Before the watch: it sends the status and the newest frame at once.
     ws.data.browserPacers.get(agentId)?.close();
     const deliver = (message: { type: string }) => {
-      if (ws.readyState === 1) send(ws, message);
+      if (ws.readyState !== 1) return;
+      if (message.type !== "browser.frame") return send(ws, message);
+      const picture = message as { type: "browser.frame" } & BrowserFrame;
+      // Its own socket takes the picture as bytes; this one only as base64, never with the bytes.
+      const frames = ws.data.frameSockets.get(agentId);
+      if (frames?.readyState === 1) return void frames.send(browserFrameBytes(picture));
+      const { bytes: _, ...json } = picture;
+      send(ws, json);
     };
-    const pacer = frame.acks ? createViewerPacer(deliver) : null;
+    const watching = frame.type === "browser.watch" ? frame : null;
+    const pacer = watching?.acks ? createViewerPacer(deliver) : null;
     if (pacer) ws.data.browserPacers.set(agentId, pacer);
     else ws.data.browserPacers.delete(agentId);
     const ended = () => {
       pacer?.close();
       if (ws.data.browserPacers.get(agentId) === pacer) ws.data.browserPacers.delete(agentId);
+      const frames = ws.data.frameSockets.get(agentId);
+      ws.data.frameSockets.delete(agentId);
+      frames?.close(1000, "the view ended");
     };
     try {
       const profileId = profileIdOfKey(agentId);
@@ -421,6 +495,14 @@ export function createRealtime(deps: RealtimeDeps) {
     // Closed or unwatched while it was starting: stop at once.
     if (ws.readyState !== 1 || ws.data.browsers.get(agentId) !== starting) return stop();
     ws.data.browsers.set(agentId, stop);
+    // A client that answers frames takes them on a socket of their own (ADR 0040 §7.1), opened with this ticket.
+    if (pacer && watching?.frames) {
+      const ticket = randomBytes(24).toString("base64url");
+      const now = Date.now();
+      for (const [old, t] of frameTickets) if (t.expires <= now) frameTickets.delete(old);
+      frameTickets.set(ticket, { owner: ws, agentId, pacer, expires: now + FRAME_TICKET_MS });
+      send(ws, { type: "browser.frames", agentId, ticket });
+    }
   }
 
   const realtime = {
@@ -438,6 +520,7 @@ export function createRealtime(deps: RealtimeDeps) {
     ): Response | Promise<Response | undefined> | undefined {
       const path = new URL(req.url).pathname;
       if (path === realtime.path) return realtime.upgrade(req, server);
+      if (path === BROWSER_FRAMES_PATH && deps.browserLive) return upgradeFrames(req, server);
       if (deps.machines && path === deps.machines.path) {
         return deps.machines.upgrade(req, server as unknown as Bun.Server<MachineSocketData>);
       }
@@ -466,6 +549,7 @@ export function createRealtime(deps: RealtimeDeps) {
         pending: new Map(),
         browsers: new Map(),
         browserPacers: new Map(),
+        frameSockets: new Map(),
       };
       return server.upgrade(req, { data }) ? undefined : new Response("WebSocket upgrade failed", { status: 400 });
     },
@@ -475,6 +559,7 @@ export function createRealtime(deps: RealtimeDeps) {
       maxPayloadLength: MAX_FRAME_BYTES,
       idleTimeout: 120,
       async open(socket: Bun.ServerWebSocket<SocketData>) {
+        if (isFrames(socket)) return frameSocket.open(socket);
         if (isMachine(socket)) return deps.machines?.open(socket);
         if (isStream(socket)) return deps.streams?.open(socket);
         const ws = socket as BrowserSocket;
@@ -558,6 +643,7 @@ export function createRealtime(deps: RealtimeDeps) {
         send(ws, { type: "ready", orgId: ws.data.orgId, userId: ws.data.user.id });
       },
       async message(socket: Bun.ServerWebSocket<SocketData>, raw: string | Buffer): Promise<void> {
+        if (isFrames(socket)) return frameSocket.message(socket, raw);
         if (isMachine(socket)) return deps.machines?.message(socket, raw);
         if (isStream(socket)) return deps.streams?.message(socket, raw);
         const ws = socket as BrowserSocket;
@@ -635,6 +721,7 @@ export function createRealtime(deps: RealtimeDeps) {
         send(ws, { type: "subscribed", channelId });
       },
       async close(socket: Bun.ServerWebSocket<SocketData>, code: number) {
+        if (isFrames(socket)) return frameSocket.close(socket);
         if (isMachine(socket)) return deps.machines?.close(socket);
         if (isStream(socket)) return deps.streams?.close(socket, code);
         const ws = socket as BrowserSocket;

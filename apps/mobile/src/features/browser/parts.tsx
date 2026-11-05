@@ -2,6 +2,7 @@ import {
   ApiError,
   type BrowserFrame,
   type BrowserInputEvent,
+  browserFrameDataUrl,
   createBrowserLiveConnection,
   createTouchInput,
   frameMetadata,
@@ -102,7 +103,7 @@ export function FrameView({
     <GestureDetector gesture={gesture}>
       <View style={styles.frame} onLayout={onLayout} accessible accessibilityLabel={t("mobile.browser.live.page")}>
         <Image
-          source={{ uri: `data:image/jpeg;base64,${frame.data}` }}
+          source={{ uri: browserFrameDataUrl(frame) ?? undefined }}
           style={StyleSheet.absoluteFill}
           resizeMode="contain"
           fadeDuration={0}

@@ -494,6 +494,8 @@ export function buildEngine(o: EngineOptions) {
     },
     recheck: (stream) => recheckStream(db, stream),
     reauthorize: (stream, mode) => reauthorizeStream(db, stream, mode),
+    // An agent browser's live view has a data socket of its own too (ADR 0040 §7.1).
+    claim: (streamId, machineId, socket) => browserLive.claimView(streamId, machineId, socket),
     onReady: sessions ? (stream) => sessions.ready(stream) : undefined,
     onClosed: (stream) => Promise.all([streamClosed(db, stream), sessions?.closed(stream)]),
     log: o.log,

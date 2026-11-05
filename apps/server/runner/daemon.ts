@@ -74,6 +74,7 @@ import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
 import { ensureBrowserBindPolicy, prepareAgents } from "./browser-bind-policy";
+import { BrowserViews } from "./browser-views";
 import {
   accessToStore,
   configPath,
@@ -965,10 +966,17 @@ export class RunnerDaemon implements RequestObserver {
     const daemon = this;
     // Frames go out on whatever connection this session has at the time (it reconnects by itself).
     let live: RunnerConnection | null = null;
+    // The live views of the agents' browsers (ADR 0040 §7.1): a viewed agent's frames go on a socket of their own.
+    const views = new BrowserViews({ dial: (streamId) => streams.dial(streamId, "browserView") });
+    const toServer = (frame: RunnerFrame): boolean => {
+      if (frame.type === "browser.frame" && views.push(frame)) return true;
+      if (frame.type === "browser.stream.ended") views.end(frame.agentId);
+      return live?.send(frame) ?? false;
+    };
     const browser = new BrowserManager({
       home,
       log,
-      send: (frame) => live?.send(frame) ?? false,
+      send: toServer,
       secret: (agent, name) => secretValue(secretsDir, agent, name),
       onChange: () => queueMicrotask(() => this.browsersChanged()),
       desktops: this.desktops,
@@ -1123,6 +1131,7 @@ export class RunnerDaemon implements RequestObserver {
         token: config.token,
         server: config.server,
         send: (frame) => live?.send(frame) ?? false,
+        views,
         state: () => this.workerState(),
         relayed: this.relayed,
         log,
@@ -1207,12 +1216,12 @@ export class RunnerDaemon implements RequestObserver {
       onAgents: (raw) => this.setAgents(raw),
       onBrowserHandoff: (frame) =>
         supervisor ? supervisor.handoff(frame) : browser.setHandoff(frame.agentId, frame.handoff),
-      onBrowserAck: (frame) => (supervisor ? supervisor.browserAck(frame) : browser.frameAck(frame.agentId)),
       onState: (state) => {
         // Offline: frames have nowhere to go; the server starts the live view again when it is back.
         if (state !== "online") {
           this.observeEgress = false;
           browser.stopStreams();
+          views.closeAll();
           // What it said about people's turns is stale; it says again on reconnect.
           browser.clearHandoffs();
         }
@@ -1261,6 +1270,7 @@ export class RunnerDaemon implements RequestObserver {
       mcp,
       browser,
       streams,
+      browserViews: views,
       desktopUse,
       connection,
       supervisor,

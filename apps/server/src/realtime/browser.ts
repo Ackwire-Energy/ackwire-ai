@@ -1,19 +1,20 @@
-import {
-  BROWSER_FRAME_WINDOW,
-  BROWSER_LIMITS,
-  type BrowserInputEvent,
-  parseBrowserInputEvent,
-} from "@agenteschat/adapters";
+import { BROWSER_LIMITS, BROWSER_VIEW, type BrowserInputEvent, parseBrowserInputEvent } from "@agenteschat/adapters";
 
 /**
  * The agent browser's live view on `/api/ws` (ADR 0040 §7). Client frames:
  *
- * - `{"type":"browser.watch","agentId","acks"?:true}`: start getting that
- *   agent's browser (checked like the HTTP routes: `requireBrowserAccess`).
- *   `acks`: this client answers each `browser.frame` it drew with
- *   `{"type":"browser.ack","agentId","seq"}`, and gets frames in a window
- *   (`createViewerPacer`, ADR 0040 §7.1). Without it (older apps), frames are
- *   only skipped while its socket is backed up.
+ * - `{"type":"browser.watch","agentId","acks"?:true,"frames"?:true}`: start
+ *   getting that agent's browser (checked like the HTTP routes:
+ *   `requireBrowserAccess`). `acks`: this client answers each `browser.frame`
+ *   it drew with `{"type":"browser.ack","agentId","seq"}`, and gets frames in
+ *   a window (`createViewerPacer`, ADR 0040 §7.1). Without it (older apps),
+ *   frames are only skipped while its socket is backed up. `frames` (with
+ *   `acks`): the server answers `{"type":"browser.frames","agentId","ticket"}`
+ *   and the client opens `GET /api/browser/frames?ticket=` (once, within
+ *   `FRAME_TICKET_MS`): from then on that view's pictures come there as bytes
+ *   (`encodeBrowserFrame`: version, header length, JSON header, JPEG), and
+ *   the client answers each one it drew there with `{"type":"ack"}`. While it
+ *   isn't open (or after it closed) they come here as before.
  * - `{"type":"browser.unwatch","agentId"}`.
  * - `{"type":"browser.input","agentId","events":[…]}`: only from the person
  *   in control of the open handoff; events as `BrowserInputEvent` (mouse,
@@ -37,10 +38,25 @@ import {
  * `not_in_control`, `rate_limited`).
  */
 export type BrowserClientFrame =
-  | { type: "browser.watch"; agentId: string; acks?: true }
+  | { type: "browser.watch"; agentId: string; acks?: true; frames?: true }
   | { type: "browser.unwatch"; agentId: string }
   | { type: "browser.ack"; agentId: string }
   | { type: "browser.input"; agentId: string; events: BrowserInputEvent[] };
+
+/** A watched browser's frame socket (ADR 0040 §7.1), opened with a ticket from `browser.frames`. */
+export const BROWSER_FRAMES_PATH = "/api/browser/frames";
+/** How long a frame socket's ticket opens it. */
+export const FRAME_TICKET_MS = 30_000;
+
+/** What a person sends on a frame socket: only `{"type":"ack"}`, one per picture drawn. Null for anything else. */
+export function parseFrameSocketMessage(raw: string | Buffer): { type: "ack" } | null {
+  if (typeof raw !== "string" || raw.length > 64) return null;
+  try {
+    return (JSON.parse(raw) as { type?: unknown } | null)?.type === "ack" ? { type: "ack" } : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Largest browser client frame: a batch of input events with a pasted text. */
 export const MAX_BROWSER_CLIENT_FRAME = BROWSER_LIMITS.inputText * 2 + 64 * 1024;
@@ -59,10 +75,23 @@ export function parseBrowserClientFrame(raw: string | Buffer): BrowserClientFram
   // Cheap test before parsing: every other client frame is small and never says "browser.".
   if (!text.includes('"browser.')) return null;
   try {
-    const frame = JSON.parse(text) as { type?: unknown; agentId?: unknown; events?: unknown; acks?: unknown };
+    const frame = JSON.parse(text) as {
+      type?: unknown;
+      agentId?: unknown;
+      events?: unknown;
+      acks?: unknown;
+      frames?: unknown;
+    };
     if (typeof frame.agentId !== "string" || !UUID.test(frame.agentId)) return null;
     if (frame.type === "browser.watch") {
-      return { type: frame.type, agentId: frame.agentId, ...(frame.acks === true ? { acks: true as const } : {}) };
+      const acks = frame.acks === true;
+      return {
+        type: frame.type,
+        agentId: frame.agentId,
+        ...(acks ? { acks: true as const } : {}),
+        // Frames on their own socket come in a window: only for a client that answers them.
+        ...(acks && frame.frames === true ? { frames: true as const } : {}),
+      };
     }
     if (frame.type === "browser.unwatch" || frame.type === "browser.ack") {
       return { type: frame.type, agentId: frame.agentId };
@@ -81,8 +110,8 @@ export function parseBrowserClientFrame(raw: string | Buffer): BrowserClientFram
   return null;
 }
 
-/** A full window with no `browser.ack` for this long sends the newest frame anyway (a hidden tab draws nothing). */
-export const VIEWER_ACK_STALL_MS = 5000;
+/** A full window with no ack for this long sends the newest frame anyway (a hidden tab draws nothing). */
+export const VIEWER_ACK_STALL_MS = BROWSER_VIEW.stallMs;
 
 export interface ViewerPacer<M extends { type: string } = { type: string }> {
   /** A live-view message to the viewer: frames in the window, everything else at once. */
@@ -107,7 +136,7 @@ export function createViewerPacer<M extends { type: string }>(
     timers?: { setTimeout(fn: () => void, ms: number): unknown; clearTimeout(id: unknown): void };
   } = {},
 ): ViewerPacer<M> {
-  const window = opts.window ?? BROWSER_FRAME_WINDOW;
+  const window = opts.window ?? BROWSER_VIEW.window;
   const timers = opts.timers ?? {
     setTimeout: (fn: () => void, ms: number) => setTimeout(fn, ms),
     clearTimeout: (id: unknown) => clearTimeout(id as ReturnType<typeof setTimeout>),

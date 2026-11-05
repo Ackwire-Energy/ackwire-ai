@@ -114,9 +114,14 @@ export interface BrowserPage {
 export interface BrowserFrame {
   agentId: string;
   seq: number;
-  /** Base64 JPEG. */
+  /** Base64 JPEG, for the viewers on the realtime socket (older apps). */
   data: string;
   metadata: BrowserFrameMetadata;
+  /**
+   * The same frame as bytes for a viewer's frame socket (`encodeBrowserFrame`, ADR 0040 §7.1), made once for all
+   * of them by `browserFrameBytes`. Never sent as JSON.
+   */
+  bytes?: Uint8Array;
 }
 
 /** Someone watching an agent's browser: gets frames, newest first (stale ones are dropped). */

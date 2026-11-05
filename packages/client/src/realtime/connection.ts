@@ -1,4 +1,5 @@
 import type { ChannelEvent, UserEvent } from "../api/types";
+import { decodeBrowserFrameBytes } from "../browser/frame-bytes";
 import { type BrowserWatcher, createBrowserWatches } from "../browser/watches";
 import { steerStore } from "./steer";
 
@@ -19,9 +20,12 @@ import { steerStore } from "./steer";
  * - when a notification names a message in a channel listened to here whose `message.created` never came
  *   (`MISSED_MESSAGE_GRACE_MS` later), subscribes that channel anew: the server's `subscribed` has every screen
  *   catch up (`onSubscribed`), and a subscription the server lost without a word is made again.
- * - watches agents' browsers with `acks` and answers each `browser.frame` once it could be drawn (`browser.ack`,
- *   after the next animation frame): the server keeps only a couple of frames on their way to this socket, so a slow
- *   link or a busy page shows the newest picture instead of a backlog (ADR 0040 §7.1).
+ * - watches agents' browsers with `acks` and `frames` (ADR 0040 §7.1): each watched browser's pictures come as
+ *   bytes on a frame socket of their own (`/api/browser/frames`, opened with the ticket `browser.frames` brings),
+ *   so a picture never holds up a message; each one is answered once it could be drawn (after the next animation
+ *   frame), and the server keeps only a couple on their way, so a slow link or a busy page shows the newest
+ *   picture instead of a backlog. Until that socket is open, or after it closed, they come here as base64 and are
+ *   answered with `browser.ack`.
  */
 
 export type ServerFrame =
@@ -35,6 +39,9 @@ export type ServerFrame =
   | { type: "event"; scope: "user" | "org"; event: UserEvent }
   /** The agent browser's live view (ADR 0040): `browser.frame`, `browser.status`, … (see `browser/live.ts`). */
   | { type: `browser.${string}`; agentId: string; [key: string]: unknown };
+
+/** A watched browser's frame socket (ADR 0040 §7.1): opened with a ticket from `browser.frames`. */
+export const BROWSER_FRAMES_PATH = "/api/browser/frames";
 
 export type ConnectionStatus = "idle" | "connecting" | "open" | "reconnecting" | "closed";
 
@@ -90,6 +97,12 @@ export function realtimeUrl(base: SocketBase, orgId: string) {
   return socketUrl(base, "/api/ws", { orgId });
 }
 
+/** A frame socket's URL on the same server as the realtime socket `url`. */
+export function framesUrl(url: string, ticket: string) {
+  const m = /^(wss?:\/\/[^/?#]+)/i.exec(url);
+  return `${m ? m[1] : ""}${BROWSER_FRAMES_PATH}?ticket=${encodeURIComponent(ticket)}`;
+}
+
 /** "https://app.agentes.chat/x" → { protocol: "https:", host: "app.agentes.chat" } (no `URL`: React Native's is partial). */
 function originOf(base: string): { protocol: string; host: string } {
   const m = /^([a-z][a-z0-9+.-]*:)\/\/([^/?#]+)/i.exec(base.trim());
@@ -120,6 +133,8 @@ export class RealtimeConnection {
   private readonly errorListeners = new Set<(code: string, channelId?: string) => void>();
   private readonly userListeners = new Set<(event: UserEvent) => void>();
   private readonly browserListeners = new Set<(frame: Record<string, unknown>) => void>();
+  /** Each watched browser's frame socket, by agent. */
+  private readonly frameSockets = new Map<string, SocketLike>();
   private readonly browserWatches = createBrowserWatches({
     send: (frame) => this.sendBrowserFrame(frame),
     timers: {
@@ -165,6 +180,7 @@ export class RealtimeConnection {
   stop() {
     this.stopped = true;
     this.clearTimers();
+    this.closeFrameSockets();
     const socket = this.socket;
     this.socket = null;
     if (socket) {
@@ -260,16 +276,71 @@ export class RealtimeConnection {
 
   /** Sends a live-view frame (`browser.watch`, `browser.unwatch`, `browser.input`); dropped while not connected. */
   sendBrowserFrame(frame: { type: `browser.${string}`; agentId: string; [key: string]: unknown }) {
-    // Every watch from this socket says it answers frames: `handle` does, for every view of that agent at once.
-    this.send(frame.type === "browser.watch" ? { ...frame, acks: true } : frame);
+    // Every watch from this socket answers frames and takes them on their own socket: `handle` does both, for
+    // every view of that agent at once. A view that goes takes its frame socket with it.
+    if (frame.type === "browser.unwatch") this.closeFrameSocket(frame.agentId);
+    this.send(frame.type === "browser.watch" ? { ...frame, acks: true, frames: true } : frame);
   }
 
-  /** A frame went to the views: answered once they could draw it (a hidden tab draws nothing, so it answers late). */
-  private ackBrowserFrame(agentId: string, seq: unknown) {
-    const ack = () => this.send({ type: "browser.ack", agentId, ...(typeof seq === "number" ? { seq } : {}) });
+  /** Runs `fn` once the views could draw what they just got (a hidden tab draws nothing, so it runs late). */
+  private afterDraw(fn: () => void) {
     const nextFrame = (globalThis as { requestAnimationFrame?: (fn: () => void) => unknown }).requestAnimationFrame;
-    if (typeof nextFrame === "function") nextFrame(ack);
-    else ack();
+    if (typeof nextFrame === "function") nextFrame(fn);
+    else fn();
+  }
+
+  /** A frame from the realtime socket went to the views: answered here once they could draw it. */
+  private ackBrowserFrame(agentId: string, seq: unknown) {
+    this.afterDraw(() => this.send({ type: "browser.ack", agentId, ...(typeof seq === "number" ? { seq } : {}) }));
+  }
+
+  /**
+   * `browser.frames`: the ticket for a watched browser's frame socket. Its bytes go to the views as frames with
+   * `jpeg`, each answered there once drawn. A new ticket (the view started again) replaces the socket.
+   */
+  private openFrameSocket(agentId: string, ticket: string) {
+    this.closeFrameSocket(agentId);
+    let socket: SocketLike;
+    try {
+      socket = this.options.createSocket(framesUrl(this.options.url, ticket));
+    } catch {
+      return;
+    }
+    (socket as { binaryType?: string }).binaryType = "arraybuffer";
+    this.frameSockets.set(agentId, socket);
+    socket.onmessage = (ev) => {
+      if (this.frameSockets.get(agentId) !== socket) return;
+      const data = ev.data;
+      const decoded = data instanceof ArrayBuffer || data instanceof Uint8Array ? decodeBrowserFrameBytes(data) : null;
+      if (!decoded) return;
+      const frame = { type: "browser.frame", agentId, ...decoded };
+      for (const l of this.browserListeners) l(frame);
+      this.afterDraw(() => {
+        if (socket.readyState === OPEN) socket.send(JSON.stringify({ type: "ack" }));
+      });
+    };
+    socket.onerror = () => {
+      // `onclose` follows.
+    };
+    // Its frames come on the realtime socket again meanwhile; the next watch brings a new ticket.
+    socket.onclose = () => {
+      if (this.frameSockets.get(agentId) === socket) this.frameSockets.delete(agentId);
+    };
+  }
+
+  private closeFrameSocket(agentId: string) {
+    const socket = this.frameSockets.get(agentId);
+    if (!socket) return;
+    this.frameSockets.delete(agentId);
+    socket.onmessage = null;
+    socket.onclose = null;
+    try {
+      socket.close(1000, "unwatched");
+    } catch {}
+  }
+
+  private closeFrameSockets() {
+    for (const agentId of [...this.frameSockets.keys()]) this.closeFrameSocket(agentId);
   }
 
   /**
@@ -343,12 +414,19 @@ export class RealtimeConnection {
   private lost() {
     this.socket = null;
     this.clearTimers();
+    // The server forgot this socket's views: their frame sockets go, and the watches made again bring new ones.
+    this.closeFrameSockets();
     if (!this.stopped) this.scheduleReconnect();
   }
 
   private handle(frame: ServerFrame | null) {
     if (!frame) return;
     if (frame.type.startsWith("browser.") || (frame.type === "error" && typeof frame.agentId === "string")) {
+      if (frame.type === "browser.frames" && typeof frame.agentId === "string") {
+        const ticket = (frame as { ticket?: unknown }).ticket;
+        if (typeof ticket === "string") this.openFrameSocket(frame.agentId, ticket);
+        return;
+      }
       for (const l of this.browserListeners) l(frame as Record<string, unknown>);
       if (frame.type === "browser.frame" && typeof frame.agentId === "string") {
         this.ackBrowserFrame(frame.agentId, (frame as { seq?: unknown }).seq);

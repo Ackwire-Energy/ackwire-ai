@@ -60,10 +60,21 @@ export interface Stream extends StreamInput {
   closed: boolean;
 }
 
+/**
+ * A data socket that serves something else than a person's stream: an agent browser's live view (ADR 0040 §7.1),
+ * claimed by its id through `claim`. It hears what the runner sends, and its socket's end.
+ */
+export interface ClaimedStream {
+  data(data: string | Uint8Array): void;
+  closed(): void;
+}
+
 /** A data socket the runner opened: its stream once its hello named one. */
 export interface RunnerLink {
   readonly socket: StreamSocket;
   stream: Stream | null;
+  /** Claimed by another part of the server (`claim`), not a person's stream. */
+  claimed?: ClaimedStream;
   /** Its hello is being checked. */
   authing: boolean;
   closed: boolean;
@@ -83,6 +94,11 @@ export interface StreamBrokerDeps {
   recheck?(stream: Stream): Promise<{ refused: number; reason: string } | null>;
   /** Whether a desktop stream may go on in `mode` (`switchWhere`): null, else its close. */
   reauthorize?(stream: Stream, mode: DesktopMode): Promise<{ refused: number; reason: string } | null>;
+  /**
+   * A hello naming no stream of the broker's: another part of the server may take that data socket (an agent
+   * browser's live view, ADR 0040 §7.1) once its machine is known. Null leaves it unknown.
+   */
+  claim?(streamId: string, machineId: string, socket: StreamSocket): ClaimedStream | null;
   /** A stream got its data socket (session screening starts), once. */
   onReady?(stream: Stream): unknown;
   /** A stream that got its data socket ended (the audit). */
@@ -124,6 +140,8 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
   const streams = new Map<string, OpenStream>();
   /** Data sockets that haven't named their stream yet. */
   const waiting = new Set<RunnerLink>();
+  /** Data sockets another part of the server took (`claim`). */
+  const claimed = new Set<RunnerLink>();
 
   const quietly = (fn: () => void) => {
     try {
@@ -246,6 +264,17 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
     if (link.closed) return;
     if (!machine) return endLink(link, STREAM_CLOSE.badToken, "bad token");
     const s = streams.get(hello.streamId);
+    if (!s) {
+      const taker = deps.claim?.(hello.streamId, machine.id, link.socket) ?? null;
+      if (taker && !link.closed) {
+        waiting.delete(link);
+        link.claimed = taker;
+        claimed.add(link);
+        quietly(() => link.socket.send(JSON.stringify({ type: "stream.ready" })));
+        return;
+      }
+      taker?.closed();
+    }
     // Ended, served by another data socket, or never sent to a computer.
     if (!s || s.runner || !s.machineId) return endLink(link, STREAM_CLOSE.notFound, "unknown stream");
     if (s.machineId !== machine.id) return endLink(link, STREAM_CLOSE.badToken, "another computer's stream");
@@ -420,6 +449,7 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
     /** A frame from the runner: first its `stream.hello`, then the bytes (and a terminal's `exit`). */
     async fromRunner(link: RunnerLink, data: string | Uint8Array) {
       if (link.closed) return;
+      if (link.claimed) return link.claimed.data(data);
       if (link.stream) {
         const s = streams.get(link.stream.id);
         if (!s) return;
@@ -451,6 +481,11 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
       if (link.timer) clearTimeout(link.timer);
       link.timer = null;
       waiting.delete(link);
+      if (link.claimed) {
+        claimed.delete(link);
+        link.claimed.closed();
+        return;
+      }
       if (link.stream) {
         const ended = code === STREAM_CLOSE.normal ? code : STREAM_CLOSE.unreachable;
         close(link.stream, ended, "the computer closed the stream");
@@ -506,6 +541,11 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
     stop() {
       for (const s of [...streams.values()]) close(s, STREAM_CLOSE.restarting, "server restarting");
       for (const link of [...waiting]) endLink(link, STREAM_CLOSE.restarting, "server restarting");
+      for (const link of [...claimed]) {
+        claimed.delete(link);
+        quietly(() => link.socket.close(STREAM_CLOSE.restarting, "server restarting"));
+        link.claimed?.closed();
+      }
     },
   };
 }

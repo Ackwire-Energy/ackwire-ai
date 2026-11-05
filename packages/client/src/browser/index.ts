@@ -10,6 +10,7 @@ import { isBlankPage } from "../lib/sites";
 import type { LiveWork } from "../realtime/streams";
 import { noteHandoffPlace } from "./held";
 
+export * from "./frame-bytes";
 export * from "./held";
 export * from "./input";
 export * from "./live";

@@ -30,6 +30,7 @@ import { type GrokBrainTurnRequest, handleGrokBrainTurn } from "./brain-grok";
 import { handleOpencodeBrainTurn, type OpencodeBrainTurnRequest } from "./brain-opencode";
 import { routeWithPlan } from "./brain-route";
 import { type BrowserManager, browserSetupText } from "./browser";
+import type { BrowserViews } from "./browser-views";
 import { allowedMerge, commandApproval, ownBranches } from "./command-gate";
 import type { DesktopManager } from "./desktop";
 import { type DesktopSessions, hostMemAvailable, MIN_FREE_BYTES } from "./desktop-session";
@@ -73,6 +74,7 @@ export const RECLAIM_MS = 5_000;
  */
 const PEOPLE_OPS: ReadonlySet<string> = new Set([
   "stream.open",
+  "browser.view.open",
   "desktop.session.status",
   "desktop.session.stop",
   "desktop.text",
@@ -147,6 +149,8 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "desktop.session.stop": "machine",
   "desktop.session.status": "machine",
   "stream.open": "machine",
+  // The live view's data socket is the process's that holds the server connection (only it has the token).
+  "browser.view.open": "machine",
   // The helper runs as the agent's own user, in its worker; the worker asks the supervisor for the desktop.
   "desktop.look": "agent",
   "desktop.act": "agent",
@@ -249,6 +253,8 @@ export interface HandlerContext {
   terminals?: Terminals;
   /** Protocol 18: where `stream.open` dials its data socket; without it the runner refuses streams. */
   streams?: DataSockets;
+  /** Protocol 46: the live views of the agents' browsers (`browser.view.open`, ADR 0040 §7.1). */
+  browserViews?: BrowserViews;
   /** Protocol 21: the agents' use of their own desktops (ADR 0062); without it the runner refuses `desktop.look`… */
   desktopUse?: DesktopManager;
   /** A person takes control of the agent's desktop: what the agent's pointer and keys are doing stops. */
@@ -511,6 +517,8 @@ async function scrubbed(ctx: HandlerContext, req: MachineRequest, err: unknown):
 async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: RequestScope): Promise<unknown> {
   // Protocol 9: paused by the owner. What already runs finishes; status, output and cancel still answer.
   if ((NEW_WORK_OPS.has(req.op) || workStream(req)) && ctx.paused?.()) throw new RunnerError("paused", PAUSED);
+  // Protocol 46: an agent's (or a profile's) live view socket, this process's in every mode (ADR 0040 §7.1).
+  if (req.op === "browser.view.open") return openBrowserView(ctx, req);
   // Protocol 34: a browser profile's session, never an agent's worker or folder (ADR 0110).
   if (req.profile || req.op === "browser.profile.delete") return handleProfileBrowser(ctx, req, scope);
   if (ctx.systemMode?.() && OP_ROUTES[req.op] !== "machine") {
@@ -811,7 +819,7 @@ async function handleBrowser(
       return browser.warm(req.agent, ctx.workspaceReal, onDesktop(ctx, req));
     case "browser.stream.start":
       requireTool(ctx, "browser");
-      return browser.streamStart(req.agent, req.mode, req.window);
+      return browser.streamStart(req.agent, req.mode);
     case "browser.input":
       requireTool(ctx, "browser");
       return browser.input(req.agent, Array.isArray(req.events) ? req.events : []);
@@ -847,6 +855,26 @@ const PROFILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  * (`profile:<id>`), its folder is under the runner's home, and its Chrome is always headless; `agent` only says who
  * acts. Single mode only: in system mode a profile needs an OS user of its own (phase 2), so it is refused.
  */
+/**
+ * `browser.view.open` (protocol 46): the data socket of an agent's live view, or a browser profile's (its frames
+ * carry `profile:<id>` where an agent's id would be). Dialed here, whichever process runs that browser: in system
+ * mode root's, which passes the worker's frames on to it.
+ */
+async function openBrowserView(
+  ctx: HandlerContext,
+  req: Extract<MachineRequest, { op: "browser.view.open" }>,
+): Promise<MachineReplies["browser.view.open"]> {
+  if (!ctx.browserViews) throw new RunnerError("browser_unavailable", "This runner has no live view for browsers");
+  requireTool(ctx, "browser");
+  const profileId = req.profile?.id;
+  if (profileId !== undefined && (typeof profileId !== "string" || !PROFILE_ID.test(profileId))) {
+    throw new RunnerError("bad_request", "Which browser profile?");
+  }
+  const key = typeof profileId === "string" ? profileKey(profileId) : String(req.agent?.id ?? "");
+  if (!key || !isStreamId(req.streamId)) throw new RunnerError("bad_request", "A live view needs an agent and its id");
+  return ctx.browserViews.open(key, req.streamId);
+}
+
 async function handleProfileBrowser(ctx: HandlerContext, req: MachineRequest, scope: RequestScope) {
   if (ctx.systemMode?.()) throw new RunnerError("not_allowed", PROFILES_SYSTEM_MODE);
   const browser = ctx.browser;
@@ -896,7 +924,7 @@ async function handleProfileBrowser(ctx: HandlerContext, req: MachineRequest, sc
       return browser.warm(agent, folder, false);
     case "browser.stream.start":
       requireTool(ctx, "browser");
-      return browser.streamStart(agent, req.mode, req.window);
+      return browser.streamStart(agent, req.mode);
     case "browser.input":
       requireTool(ctx, "browser");
       return browser.input(agent, Array.isArray(req.events) ? req.events : []);
@@ -1309,6 +1337,8 @@ function describeOp(req: MachineRequest): string {
       return `browser.stream.start (${String(req.mode ?? "")})`;
     case "browser.input":
       return `browser.input ${Array.isArray(req.events) ? req.events.length : 0} events`;
+    case "browser.view.open":
+      return "browser.view.open";
     case "stream.open":
       return req.kind === "terminal"
         ? `stream.open terminal ${String(req.cols)}×${String(req.rows)}`

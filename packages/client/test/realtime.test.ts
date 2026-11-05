@@ -51,24 +51,69 @@ describe("RealtimeConnection", () => {
     expect(() => realtimeUrl("agentes.chat", "o1")).toThrow();
   });
 
-  test("watches agents' browsers saying it answers frames, and answers each frame once, after the views got it", async () => {
-    const { factory, last } = fakeSockets();
-    const conn = new RealtimeConnection({ url: "ws://x/api/ws?orgId=o", createSocket: factory, pingMs: 0 });
-    const views: unknown[] = [];
+  test("watches agents' browsers answering frames: on the realtime socket, then on their own frame socket", async () => {
+    const { factory, sockets } = fakeSockets();
+    const conn = new RealtimeConnection({
+      url: "wss://app.example.com/api/ws?orgId=o",
+      createSocket: factory,
+      pingMs: 0,
+    });
+    const views: Record<string, unknown>[] = [];
     conn.onBrowserFrame((frame) => views.push(frame));
     conn.onBrowserFrame(() => {});
     conn.start();
-    const socket = last();
+    const socket = sockets[0] as (typeof sockets)[number];
     socket.open();
     const release = conn.browserWatcher.acquire("a1");
-    expect(socket.sent).toEqual([{ type: "browser.watch", agentId: "a1", acks: true }]);
+    expect(socket.sent).toEqual([{ type: "browser.watch", agentId: "a1", acks: true, frames: true }]);
+    // A frame on the realtime socket: answered once, after the views got it (at the next animation frame where
+    // there is one, at once otherwise).
     socket.push({ type: "browser.frame", agentId: "a1", seq: 9, data: "/9j/", metadata: {} });
     socket.push({ type: "browser.status", agentId: "a1", mode: "watch" });
-    // After the next animation frame where there is one (a browser), at once otherwise.
     for (let i = 0; i < 20 && socket.sent.length < 2; i++) await Bun.sleep(5);
     expect(views).toHaveLength(2);
     expect(socket.sent.slice(1)).toEqual([{ type: "browser.ack", agentId: "a1", seq: 9 }]);
+
+    // The ticket for its own socket: opened on the same server; its bytes reach the views as frames with `jpeg`.
+    socket.push({ type: "browser.frames", agentId: "a1", ticket: "t/1" });
+    const frames = sockets[1] as (typeof sockets)[number];
+    expect(frames.url).toBe("wss://app.example.com/api/browser/frames?ticket=t%2F1");
+    frames.open();
+    const head = new TextEncoder().encode(
+      JSON.stringify({ seq: 10, metadata: { deviceWidth: 1280, deviceHeight: 800 } }),
+    );
+    const bytes = new Uint8Array(5 + head.byteLength + 3);
+    bytes[0] = 1;
+    new DataView(bytes.buffer).setUint32(1, head.byteLength);
+    bytes.set(head, 5);
+    bytes.set([0xff, 0xd8, 7], 5 + head.byteLength);
+    frames.onmessage?.({ data: bytes.buffer });
+    for (let i = 0; i < 20 && frames.sent.length < 1; i++) await Bun.sleep(5);
+    expect(views.at(-1)).toMatchObject({ type: "browser.frame", agentId: "a1", seq: 10 });
+    expect([...((views.at(-1)?.jpeg as Uint8Array) ?? [])]).toEqual([0xff, 0xd8, 7]);
+    expect(frames.sent).toEqual([{ type: "ack" }]);
+    // Not answered twice: nothing more on the realtime socket.
+    expect(socket.sent).toHaveLength(2);
+
+    // The last view leaves: its frame socket goes with the unwatch.
     release();
+    for (let i = 0; i < 400 && !frames.closed; i++) await Bun.sleep(5);
+    expect(frames.closed).toBe(true);
+    conn.stop();
+  });
+
+  test("a lost realtime socket takes the frame sockets with it", () => {
+    const { factory, sockets } = fakeSockets();
+    const conn = new RealtimeConnection({ url: "ws://x/api/ws?orgId=o", createSocket: factory, pingMs: 0 });
+    conn.start();
+    const socket = sockets[0] as (typeof sockets)[number];
+    socket.open();
+    conn.browserWatcher.acquire("a1");
+    socket.push({ type: "browser.frames", agentId: "a1", ticket: "t1" });
+    const frames = sockets[1] as (typeof sockets)[number];
+    expect(frames.url).toBe("ws://x/api/browser/frames?ticket=t1");
+    socket.drop();
+    expect(frames.closed).toBe(true);
     conn.stop();
   });
 

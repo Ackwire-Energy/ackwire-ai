@@ -1,5 +1,6 @@
 import {
   type BrowserHandoff,
+  browserFrameDataUrl,
   browserSteps,
   handoffFuse,
   handoffTimeLeft,
@@ -270,7 +271,7 @@ export function BrowserCard({
             <View style={[styles.thumb, { backgroundColor: c.sunken, borderColor: c.line }]}>
               {live.frame ? (
                 <Image
-                  source={{ uri: `data:image/jpeg;base64,${live.frame.data}` }}
+                  source={{ uri: browserFrameDataUrl(live.frame) ?? undefined }}
                   style={StyleSheet.absoluteFill}
                   resizeMode="cover"
                   fadeDuration={0}

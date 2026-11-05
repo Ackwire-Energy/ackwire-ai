@@ -19,11 +19,17 @@ export interface BrowserFrameMetadata {
   title?: string;
 }
 
+/**
+ * One picture of the page: as base64 when it came on the realtime socket (`data`), as the JPEG's bytes when it came
+ * on the view's own frame socket (`jpeg`, ADR 0040 §7.1). Exactly one of them is there.
+ */
 export interface BrowserFrame {
   agentId: string;
   seq: number;
   /** Base64 JPEG. */
-  data: string;
+  data?: string;
+  /** The JPEG's bytes. */
+  jpeg?: Uint8Array;
   metadata: BrowserFrameMetadata;
 }
 
@@ -123,13 +129,14 @@ export function parseBrowserLiveMessage(v: unknown): BrowserLiveMessage | null {
   switch (v.type) {
     case "browser.frame": {
       const m = v.metadata;
-      if (typeof v.data !== "string" || !num(v.seq) || !isObject(m) || !num(m.deviceWidth) || !num(m.deviceHeight))
-        return null;
+      const picture =
+        typeof v.data === "string" ? { data: v.data } : v.jpeg instanceof Uint8Array ? { jpeg: v.jpeg } : null;
+      if (!picture || !num(v.seq) || !isObject(m) || !num(m.deviceWidth) || !num(m.deviceHeight)) return null;
       return {
         type: "browser.frame",
         agentId: v.agentId,
         seq: v.seq as number,
-        data: v.data,
+        ...picture,
         metadata: {
           deviceWidth: m.deviceWidth as number,
           deviceHeight: m.deviceHeight as number,
