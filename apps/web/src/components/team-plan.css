@@ -84,9 +84,11 @@ html:not([data-pointer]) .tp-chip:focus-visible {
 .tp-body .tp-agents {
   margin-top: 0;
 }
+/* The face at the top, the name's capitals on its top edge (`ac-captop`), the channel and "Adjust" centred on the
+   name's line however long the description runs. */
 .tp-agent {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   padding: 10px 12px;
   border-radius: 12px 12px 12px 4px;
@@ -103,6 +105,20 @@ html:not([data-pointer]) .tp-chip:focus-visible {
 .tp-agent__line {
   color: var(--ink2, var(--ink));
   overflow-wrap: anywhere;
+}
+/* One line box as tall as the name's, the same rise: what is taller than it overflows evenly, so it sits centred on
+   that line. */
+.tp-agent__tail {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 20px;
+  line-height: 20px;
+}
+/* The map's rows are one line: the face and the words share a centre. */
+.tp-map .ac-faceline {
+  align-items: center;
 }
 .tp-pill {
   display: inline-flex;
@@ -186,9 +202,10 @@ html:not([data-pointer]) .tp-chip:focus-visible {
   padding: 0;
   list-style: none;
 }
+/* The faces (`ac-iconline`) sit on the name's line, so a subtitle that wraps hangs under the name. */
 .tp-gallery__item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   width: 100%;
   padding: 10px 12px;
