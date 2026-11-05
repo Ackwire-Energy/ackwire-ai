@@ -2230,6 +2230,9 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-dialog__title {
   margin: 0;
   flex: 1;
+  /* A long word (an address, a file's name) wraps inside the head instead of pushing the close out. */
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 18px;
   line-height: 24px;
   font-weight: 650;
@@ -2301,6 +2304,11 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-dialog__foot--bar {
   padding: 12px var(--dialog-pad) var(--dialog-pad);
   border-top: 1px solid var(--line);
+}
+/* Over that line, the body ends as far above it as the buttons start under it (it kept only its 4px of room for focus
+   rings). */
+.ac-dialog__body:has(+ .ac-dialog__foot--bar) {
+  padding-bottom: 12px;
 }
 .ac-dialog__foot-note {
   flex: 1;
@@ -4699,10 +4707,24 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
 .ac-menu__separator {
   margin: 4px var(--menu-item-px);
 }
+/*
+ * Its words can wrap and can carry a second line: the icon and the buttons stay on the first line, not the middle of
+ * the toast. The icon and the words keep the room a small button takes (32, 40 on touch), so a one-line toast is as
+ * tall as before and its first line runs through the buttons' middle.
+ */
 .ac-toast {
-  align-items: center;
+  --toast-line-pad: calc((var(--control-h-sm) - 20px) / 2);
+  align-items: flex-start;
   gap: 12px;
   padding: 12px 14px 12px 12px;
+}
+@media (pointer: coarse) {
+  .ac-toast {
+    --toast-line-pad: calc((var(--control-h-md) - 20px) / 2);
+  }
+}
+.ac-toast > :is(.ac-icon, .ac-toast__text) {
+  margin-block: var(--toast-line-pad);
 }
 /* Each tone's soft glow from the right edge over the glass, as the sidebar's chosen row has (layout.css,
    `.sidebar__item[data-status="active"]::before`); its icon in the tone. After the glass rules: their `background`

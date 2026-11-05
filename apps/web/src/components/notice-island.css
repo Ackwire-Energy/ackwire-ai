@@ -217,8 +217,11 @@ html:not([data-pointer]) .ni__pill:focus-visible {
   min-width: 0;
   padding-right: 26px;
 }
-.ni__title {
+/* Its reset at no weight, so the rise to the face's top (`.ac-captop`) wins it. */
+:where(.ni__title) {
   margin: 0;
+}
+.ni__title {
   font-size: 14px;
   line-height: 1.35;
   color: var(--ink-muted);
@@ -243,8 +246,8 @@ html:not([data-pointer]) .ni__pill:focus-visible {
   gap: 6px;
   margin-top: 10px;
 }
-/* Choices can be whole sentences: each grows with its text and wraps inside the card, a pill while it is one line
-   and a rounded box once it takes more. */
+/* Choices can be whole sentences: each grows with its text and wraps inside the card. They are buttons, so the
+   ruler's small corner (30% of 32), not a pill. */
 .ni__choice {
   all: unset;
   box-sizing: border-box;
@@ -252,9 +255,9 @@ html:not([data-pointer]) .ni__pill:focus-visible {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
-  min-height: 32px;
+  min-height: var(--control-h-sm);
   padding: 6px 14px;
-  border-radius: 16px;
+  border-radius: var(--control-r-sm);
   font-size: 13.5px;
   font-weight: 650;
   line-height: normal;
@@ -352,6 +355,8 @@ html:not([data-pointer]) .ni__choice:focus-visible {
   .ni,
   .ni--leaving,
   .ni__pill > *,
+  .ni__pill > *:not(.ni__line),
+  .ni__see.ac-btn,
   .ni__item {
     animation: none;
   }

@@ -193,7 +193,7 @@ function OrgLine({ org }: { org: OrgFacts }) {
         </span>
       )}
       <div className="invite__org-text">
-        <b className="invite__org-name ac-captop">{org.name}</b>
+        <b className={cx("invite__org-name", (org.by || crew) && "ac-captop")}>{org.name}</b>
         {org.by && <span>{t("invite.from", { name: org.by })}</span>}
         {crew && (
           <span className="invite__crew">

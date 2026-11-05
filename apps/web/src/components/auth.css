@@ -92,15 +92,26 @@
     transform: translateY(8px);
   }
 }
+/* Reduced motion: they fade in where they stand. */
+@media (prefers-reduced-motion: reduce) {
+  @starting-style {
+    .auth__bubble,
+    .auth__step,
+    .auth__fix {
+      transform: none;
+    }
+  }
+}
 .auth__field {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
+/* The screen's one field is its main control: the ruler's 48 (as onboarding's), above the 48 button that sends it. */
 .auth__big.ac-input {
-  height: 56px;
+  height: var(--control-h-lg);
   padding: 0 18px;
-  border-radius: 16px;
+  border-radius: var(--control-r-lg);
   font-size: 17px;
 }
 .auth__pass {
@@ -109,14 +120,14 @@
   align-items: center;
 }
 .auth__pass .auth__big.ac-input {
-  padding-right: 56px;
+  padding-right: calc(var(--control-h-lg) - (var(--control-h-lg) - var(--control-h-sm)) / 2);
 }
-/* As far from the field's end as from its top and bottom (56 less the button's 32, halved), its corner the field's 16
+/* As far from the field's end as from its top and bottom (48 less the button's 32, halved), its corner the field's 14
    less that room. */
 .auth__eye.ac-btn {
   position: absolute;
-  right: 12px;
-  border-radius: 4px;
+  right: calc((var(--control-h-lg) - var(--control-h-sm)) / 2);
+  border-radius: calc(var(--control-r-lg) - (var(--control-h-lg) - var(--control-h-sm)) / 2);
 }
 .auth__who {
   display: inline-flex;
@@ -159,9 +170,9 @@
 }
 .auth__fix {
   align-self: flex-start;
-  height: 28px;
+  height: var(--control-h-sm);
   padding: 0 10px;
-  border-radius: 9px;
+  border-radius: var(--control-r-sm);
   background: var(--surface-sunken);
   box-shadow: inset 0 0 0 1px var(--line);
   font-size: 13px;
@@ -176,8 +187,9 @@
 }
 .auth__quiet {
   align-self: center;
-  padding: 6px 10px;
-  border-radius: 9px;
+  height: var(--control-h-sm);
+  padding: 0 10px;
+  border-radius: var(--control-r-sm);
   background: none;
   font-size: 13px;
   font-weight: 500;
@@ -281,11 +293,11 @@ html:not([data-pointer]) .auth__quiet:focus-visible {
   padding: 10px 0 2px;
 }
 .auth__codeValue {
-  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--font-mono);
   font-size: 28px;
   font-weight: 700;
   letter-spacing: 0.14em;
-  color: var(--text);
+  color: var(--ink);
 }
 .auth__fine a {
   color: var(--muted);

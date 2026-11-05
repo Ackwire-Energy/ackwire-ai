@@ -321,7 +321,7 @@ function NoticeRow({ n, dir, channelName }: { n: AppNotification; dir: Dir; chan
     <li className="ni__item">
       <Who n={n} dir={dir} className="ni__face" />
       <div className="ni__body">
-        <p className="ni__title">
+        <p className="ni__title ac-captop">
           <Headline n={n} dir={dir} channelName={channelName} />
         </p>
         <Line n={n} className="ni__text" />

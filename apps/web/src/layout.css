@@ -2849,9 +2849,13 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   overflow-y: auto;
   border-bottom: 1px solid var(--line);
 }
-/* Last in a dialog's body, the footer's line closes the list: one line there, not two. */
+/* Last in a dialog's body, the footer's line closes the list: one line there, not two, and the list meets it (the kit's
+   room over a footer's line is for a body that ends in words or fields). */
 .ac-dialog__body > .people-picker:last-child .people-picker__results {
   border-bottom: 0;
+}
+.ac-dialog__body:has(> .people-picker:last-child):has(+ .ac-dialog__foot--bar) {
+  padding-bottom: 4px;
 }
 
 /*
@@ -11180,8 +11184,8 @@ html[data-menu-overlay] .shell {
   font-size: 12px;
 }
 /*
- * Faces in the full list: as tall as a name and a one-line role together (20px + 16px), centred on the text beside
- * them (a name alone, or a name over a role of one or two lines), with 3px over and under (42px rows).
+ * Faces in the full list: as tall as a name and a one-line role together (20px + 16px), with 3px over and under (42px
+ * rows). A name alone centres on its face; a name over a role is a face line (below).
  */
 .sidebar:not([data-rail="true"]) .sidebar__item > .ac-avatar--sm {
   width: 36px;
@@ -11195,6 +11199,46 @@ html[data-menu-overlay] .shell {
 }
 .sidebar:not([data-rail="true"]) .sidebar__item-text > .sidebar__item-label {
   line-height: 20px;
+}
+/*
+ * A face beside a name over a role (an agent, the right hand): the role wraps to two lines and what an agent is on
+ * wraps in full, so the row is a face line (`.ac-faceline`). The face keeps the row's top, the name's capitals rise to
+ * its top edge (the kit's `.ac-captop` rise), and what ends the row (the count, the pin, the lock, "waiting", "New")
+ * stays on the name's line instead of the middle of two or three lines. `--name-rise` is that rise worked out in the
+ * row's own type, so the smaller pieces at its end rise by the same pixels.
+ */
+@property --name-rise {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+.sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) {
+  --name-rise: calc(var(--cap-top) - 10px);
+  align-items: flex-start;
+}
+.sidebar:not([data-rail="true"])
+  .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role)
+  > .sidebar__item-text
+  > .sidebar__item-label {
+  margin-top: var(--name-rise);
+}
+/* Each end piece in a box of the name's 20px line, centred in it. */
+.sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) > .sidebar__item-meta {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  margin-top: var(--name-rise);
+}
+.sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) > .sidebar__unread {
+  margin-top: calc(var(--name-rise) + (20px - 18px) / 2);
+}
+/* Its hover buttons on the name's line too (3px of padding, then the line's middle, which the rise puts at the
+   capitals' top), measured in the row's 14px type. */
+.sidebar:not([data-rail="true"])
+  .sidebar__row:has(> .sidebar__item > .sidebar__item-text > .sidebar__item-role)
+  > .sidebar__row-acts {
+  top: calc(3px + var(--cap-top));
+  font-size: 14px;
 }
 .sidebar:not([data-rail="true"]) .sidebar__item > .sidebar__more-chevron {
   width: 16px;
@@ -11797,9 +11841,11 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
 .sidebar__more-item[data-status="active"] {
   background: var(--surface-sunken);
 }
+/* Its count on the name's 20px line, not the middle of the name and the line under it. */
 .sidebar__more-item > :is(.ac-count, .ac-countchip) {
   margin-left: auto;
-  align-self: center;
+  align-self: flex-start;
+  margin-top: calc((20px - var(--count-h, 20px)) / 2);
 }
 /* The tool opened from More stays in sight under it. */
 .sidebar__more-active {

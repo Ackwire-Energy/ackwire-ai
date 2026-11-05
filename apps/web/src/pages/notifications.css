@@ -465,6 +465,12 @@ html:not([data-pointer]) .nt-sug button:focus-visible {
 .nt-l1:only-child {
   margin-top: 3px;
 }
+/* With a line under it, the headline's capitals start at the face's top (the kit's `.ac-captop` rise on its 22px
+   line), as a chat name does; its chips and time rise with it. */
+.nt-l1:not(:only-child) {
+  line-height: 22px;
+  margin-top: calc(var(--cap-top) - 11px);
+}
 .nt-what {
   min-width: 0;
   white-space: nowrap;
@@ -1081,6 +1087,12 @@ html:not([data-pointer]) .nt-nb:focus-visible {
   .nt-item,
   .nt-wi,
   .nt-item::after,
+  /* As specific as the rules that start them: a media query adds no weight. */
+  .nt-item.is-new,
+  .nt-wi.is-new,
+  .nt-item.is-new::after,
+  .nt-item.is-pulse,
+  .nt-nb[data-tip]:hover::after,
   .nt-acts,
   .nt-nb,
   .nt-nb::after,
