@@ -202,9 +202,10 @@ html:not([data-pointer]) .tp-chip:focus-visible {
   padding: 0;
   list-style: none;
 }
+/* The faces (`ac-iconline`) sit on the name's line, so a subtitle that wraps hangs under the name. */
 .tp-gallery__item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   width: 100%;
   padding: 10px 12px;

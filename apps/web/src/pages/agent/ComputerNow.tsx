@@ -85,7 +85,7 @@ export function ComputerNow() {
           <span className="cmp-entry__line">
             {state.kind === "held" && <Icon name="pause" size={14} />}
             {state.kind === "problem" && <Icon name="alert" size={14} />}
-            {state.kind === "needsOther" && <span className="cmp-entry__dot" aria-hidden="true" />}
+            {state.kind === "needsOther" && <Icon name="clock" size={14} />}
             <span>{line}</span>
           </span>
         </span>
