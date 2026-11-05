@@ -38,6 +38,7 @@ import { usd } from "@/components/AgentFields";
 import { stepText } from "@/components/browser/BrowserCard";
 import { useAgentComputer } from "@/components/computer/facts";
 import { useOpenComputer } from "@/components/computer/open";
+import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { StatusLine } from "@/components/Presence";
 import { RightHandMineRow } from "@/components/RightHandSettings";
@@ -158,7 +159,9 @@ function AgentHead({ agent }: { agent: Agent }) {
         <AgentCover color={colorOf(agent)} busy={busy} />
       </div>
       <span className="dm-side__face">
-        <AgentAvatar agentId={agent.id} name={agent.name} size="lg" />
+        <OpensAgent agentId={agent.id}>
+          <AgentAvatar agentId={agent.id} name={agent.name} size="lg" />
+        </OpensAgent>
       </span>
       <h2 className="dm-side__name">{agent.name}</h2>
       <p className="dm-side__role">{role}</p>

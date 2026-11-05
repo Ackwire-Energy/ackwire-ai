@@ -29,7 +29,7 @@ import { requestComposerText } from "../chat/composer-request";
 import { MESSAGE_STICKER } from "../chat/media";
 import { useOpenDm } from "../new/useOpenDm";
 import { useFailed } from "../routines/hooks";
-import { AgentFace } from "../shared/Face";
+import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic, useSurface } from "../shared/parts";
@@ -69,7 +69,9 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
   return (
     <View style={styles.intro}>
       <View style={styles.head}>
-        <AgentFace agentId={agent.id} size={36} />
+        <OpensAgent agentId={agent.id}>
+          <AgentFace agentId={agent.id} size={36} />
+        </OpensAgent>
         <Text variant="body" style={styles.bold}>
           {agent.name}
         </Text>

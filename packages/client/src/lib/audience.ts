@@ -64,6 +64,10 @@ export const canTalk = (agent: Pick<Agent, "canTalk"> | undefined) => agent?.can
  */
 export const seesDetails = (agent: { seesDetails?: boolean } | undefined) => agent?.seesDetails !== false;
 
+/** Whether its picture leads to its details: not an agent no longer in the team, nor for who sees only its public card. */
+export const opensDetails = (agent: { seesDetails?: boolean; former?: unknown } | undefined) =>
+  Boolean(agent) && !agent?.former && seesDetails(agent);
+
 /**
  * Whether my lists and pickers show the agent: every agent for who manages agents, who arrange the team (the lock
  * says who it answers), only the ones that answer me for everyone else. From the server's `canTalk` (the agent's

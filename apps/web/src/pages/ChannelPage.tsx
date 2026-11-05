@@ -312,6 +312,7 @@ import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { NavToggle } from "@/components/NavDrawer";
 import { CHANNEL_NAME, ChannelAccessChoice, toChannelName } from "@/components/NewChannelDialog";
 import { FailedRunFix, KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
+import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
@@ -855,16 +856,18 @@ function ChannelView({
     },
     [profileKeeps],
   );
-  // A sidebar row's settings button: the agent's page beside this conversation, or beside its own once it shows.
+  // A sidebar row's settings button, an agent's picture: its page beside this conversation, or beside its own once it
+  // shows.
+  const shownAgent = profile?.agentId;
   useEffect(() => {
     if (chrome?.panel) return;
     const open = () => {
       const ask = takeAgentPanel();
-      if (ask) openAgentPanel(ask.agentId, ask.tab);
+      if (ask && !(ask.keep && ask.agentId === shownAgent)) openAgentPanel(ask.agentId, ask.tab);
     };
     open();
     return onAgentPanel(open);
-  }, [chrome?.panel, openAgentPanel]);
+  }, [chrome?.panel, openAgentPanel, shownAgent]);
   // "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano").
   const [missionReply, setMissionReply] = useState<{ missionId: string; label: string } | null>(null);
   // `/summary` and `/plan`: a card only I see, under the conversation.
@@ -2608,7 +2611,7 @@ function ChannelView({
                 )}
               </div>
             </Tag>
-            {!chrome && membersColumn.sheet && (
+            {!chrome && !profile && membersColumn.sheet && (
               <MembersSheet
                 channel={channel}
                 isMember={isMember}
@@ -4702,6 +4705,11 @@ function ChannelDetails({
       api.chat.setAutoReply(org.id, channel.id, agentId, on),
     onSuccess: refresh,
   });
+  const leave = () => {
+    saveTopic();
+    saveName();
+    onOpenChange(false);
+  };
   const needle = q.trim().toLowerCase();
   const all = (roster.data ?? []).map((m) => ({
     key: `${m.type}-${m.id}`,
@@ -4740,7 +4748,9 @@ function ChannelDetails({
       {agents.length > 0 && group(t("channelMembers.agents"), agentCount)}
       {agents.map((r) => (
         <div key={r.key} className="member-row">
-          <ActorAvatar actor={{ type: "agent", id: r.id }} size="sm" name={r.name} />
+          <OpensAgent agentId={r.id} onOpen={leave}>
+            <ActorAvatar actor={{ type: "agent", id: r.id }} size="sm" name={r.name} />
+          </OpensAgent>
           <span className="list-col">
             <span style={{ fontWeight: 600 }}>{r.name}</span>
             <span className="small muted">
@@ -4853,13 +4863,7 @@ function ChannelDetails({
       <Dialog
         open={open && !adding && !removing && !goingPublic && !deleting}
         width={editable ? 760 : 600}
-        onOpenChange={(o) => {
-          if (!o) {
-            saveTopic();
-            saveName();
-          }
-          onOpenChange(o);
-        }}
+        onOpenChange={(o) => (o ? onOpenChange(o) : leave())}
         subtitle={t("channel.detailsSub", {
           category: categoryName,
           visibility: t(ACCESS_LABEL[accessOf(channel).mode]),
