@@ -1418,6 +1418,8 @@ export function consultationWait(run: {
 }): ConsultationWait | null {
   if (run.status === "waiting_approval") return "approval";
   if (run.status === "waiting_input") return run.waitingMachineId ? "computer" : run.outage ? "outage" : "input";
+  // Asking its computer from the line it still waits (`computerWaitOf`).
+  if (run.status === "running" && run.waitingMachineId) return "computer";
   return run.handedOn && isTerminal(run.status as AgentRun["status"]) ? "agents" : null;
 }
 

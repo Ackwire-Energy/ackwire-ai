@@ -8414,6 +8414,7 @@
     "stuck": "行き詰まったため停止しました",
     "steer": {
       "waiting": "{{name}}は次の区切りで読みます",
+      "computer": "{{name}}はコンピューターが使えるようになったら読みます",
       "now": "{{name}}が手を止めて読んでいます",
       "delivered": "{{name}}が受け取りました",
       "held": "{{name}}はあなたの判断のあとに読みます",
@@ -8607,6 +8608,7 @@
       "nextEta": "コンピューター待ち。次の番です。約{{n}}分後",
       "nextAfter": "コンピューター待ち。{{after}}が終わると次の番です",
       "next": "コンピューター待ち。次の番です",
+      "waiting": "コンピューター待ち",
       "behind": "待ち行列の{{nth}}。{{names}}の後",
       "position": "待ち行列の{{nth}}"
     },
@@ -12040,6 +12042,8 @@
     "autoUpdate": "まだ作業中です（{{duration}}）。",
     "autoUpdateNow": "現在: {{now}}。",
     "statusReply": "まだ作業中です({{duration}})。このステップのあとでメッセージを読みます。",
+    "statusReplyQueued": "コンピューターを待っています({{duration}})。順番が来たらメッセージを読みます。",
+    "statusReplyAway": "コンピューターが戻るのを待っています。戻り次第メッセージを読みます。",
     "status": {
       "one": "作業中: {{subject}}",
       "oneUntitled": "バックグラウンドで作業中",
@@ -12167,7 +12171,9 @@
       "show": "表示",
       "hide": "隠す",
       "talker": "作業中に",
-      "talkerTip": "進行中のタスクを止めずに返信しました。"
+      "talkerTip": "進行中のタスクを止めずに返信しました。",
+      "talkerWaiting": "待機中に",
+      "talkerWaitingTip": "タスクが待っている間に返信しました。"
     },
     "joined": {
       "label": "自ら参加",

@@ -307,6 +307,7 @@
     },
     "steer": {
       "waiting": "{{name}} 会在下次暂停时读取",
+      "computer": "{{name}} 拿到电脑后会阅读",
       "now": "{{name}} 停下来读取了",
       "delivered": "{{name}} 已收到",
       "held": "{{name}} 会在你做出决定后读取",

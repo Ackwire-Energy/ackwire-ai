@@ -8407,6 +8407,7 @@
     "stuck": "막혀서 중지됐어요",
     "steer": {
       "waiting": "{{name}}이(가) 다음 쉬는 지점에서 읽어요",
+      "computer": "{{name}}이(가) 컴퓨터를 쓰게 되면 읽어요",
       "now": "{{name}}이(가) 멈추고 읽고 있어요",
       "delivered": "{{name}}이(가) 받았어요",
       "held": "{{name}}이(가) 내 결정 후에 읽어요",
@@ -8600,6 +8601,7 @@
       "nextEta": "컴퓨터를 기다리는 중. 다음 차례, 약 {{n}}분 후",
       "nextAfter": "컴퓨터를 기다리는 중. {{after}} 작업이 끝나면 다음 차례",
       "next": "컴퓨터를 기다리는 중. 다음 차례",
+      "waiting": "컴퓨터를 기다리는 중",
       "behind": "대기열 {{nth}}. {{names}} 다음",
       "position": "대기열 {{nth}}"
     },
@@ -12031,6 +12033,8 @@
     "autoUpdate": "아직 작업 중이에요({{duration}}).",
     "autoUpdateNow": "지금: {{now}}.",
     "statusReply": "아직 작업 중입니다({{duration}}). 이 단계가 끝나면 메시지를 읽겠습니다.",
+    "statusReplyQueued": "컴퓨터를 기다리는 중입니다({{duration}}). 제 차례가 되면 메시지를 읽겠습니다.",
+    "statusReplyAway": "컴퓨터가 돌아오기를 기다리는 중입니다. 돌아오는 대로 메시지를 읽겠습니다.",
     "status": {
       "one": "작업 중: {{subject}}",
       "oneUntitled": "백그라운드에서 작업 중",
@@ -12158,7 +12162,9 @@
       "show": "보기",
       "hide": "숨기기",
       "talker": "작업하면서",
-      "talkerTip": "진행 중인 작업을 멈추지 않고 답했어요."
+      "talkerTip": "진행 중인 작업을 멈추지 않고 답했어요.",
+      "talkerWaiting": "기다리면서",
+      "talkerWaitingTip": "작업이 기다리는 동안 답했어요."
     },
     "joined": {
       "label": "참여함",

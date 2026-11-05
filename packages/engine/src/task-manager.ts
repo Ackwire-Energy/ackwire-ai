@@ -5,6 +5,7 @@ import { NotFoundError } from "./errors";
 import { replyExcerpt } from "./messages";
 import { can, requireActiveMembership } from "./organizations";
 import { pendingIds } from "./recovery";
+import { shownStatusSql } from "./runs";
 import { mayContinuePause } from "./usage-pause";
 
 /**
@@ -227,7 +228,7 @@ async function visibleRuns(
     : sql`r.status in ('done', 'failed', 'canceled') and r.finished_at >= ${which.since.toISOString()}::timestamptz`;
   const limit = which.active ? TASK_MANAGER_MAX : TASK_MANAGER_ENDED_MAX;
   return rowsOf<Row>(
-    await db.execute(sql`select r.id, r.agent_id, r.channel_id, r.status, r.thread_root_id, r.trigger_message_id,
+    await db.execute(sql`select r.id, r.agent_id, r.channel_id, ${shownStatusSql} as status, r.thread_root_id, r.trigger_message_id,
         r.started_at, r.created_at, r.finished_at, r.error, c.kind, c.name, t.title, root.body as root_body,
         array_to_json(r.pending_message_ids) as pending, r.background, r.brain,
         a.owner_user_id, a.machine_id, mc.name as machine_name,
@@ -236,7 +237,8 @@ async function visibleRuns(
         last.data as last_data, last.created_at as last_at,
         (select count(*) from ${agentRunSteps} s where s.run_id = r.id and s.kind = 'tool_call') as steps,
         su.name as stopper_name,
-        r.transcript->'waitingForBrain' as wait, pause.data as wait_pause, r.waiting_machine_id,
+        coalesce(r.transcript->'waitingForBrain', case when r.status = 'running' and r.waiting_machine_id is not null
+          then '{"code":"busy"}'::jsonb end) as wait, pause.data as wait_pause, r.waiting_machine_id,
         rt.created_by_user_id as routine_creator
       from ${agentRuns} r
       join ${channels} c on c.id = r.channel_id and c.org_id = ${orgId}::uuid
@@ -425,8 +427,8 @@ export async function taskManager(
   return { tasks, ended: endedTasks, computers, activity: await agentActivity(db, orgId, now) };
 }
 
-const IN_LINE = sql`r.status = 'waiting_input' and r.waiting_machine_id is not null
-  and r.transcript->'waitingForBrain'->>'code' = 'busy'`;
+const IN_LINE = sql`r.waiting_machine_id is not null and (r.status = 'running'
+  or (r.status = 'waiting_input' and r.transcript->'waitingForBrain'->>'code' = 'busy'))`;
 /** The computer a running turn is on: the one it asked for room (`roomAsk`), as the line's view counts it. */
 const RUNS_ON = sql`r.transcript->'roomAsk'->>'machineId'`;
 
@@ -457,7 +459,8 @@ async function computerSummaries(db: Database, orgId: string): Promise<ComputerS
   const rows = rowsOf<{ id: string; name: string; working: number | string; in_line: number | string }>(
     await db.execute(sql`select m.id, m.name,
         (select count(*) from ${agentRuns} r join ${agents} a on a.id = r.agent_id
-          where r.org_id = ${orgId}::uuid and r.status = 'running' and ${RUNS_ON} = m.id::text) as working,
+          where r.org_id = ${orgId}::uuid and r.status = 'running'
+            and r.waiting_machine_id is null and ${RUNS_ON} = m.id::text) as working,
         (select count(*) from ${agentRuns} r
           where r.org_id = ${orgId}::uuid and ${IN_LINE} and r.waiting_machine_id = m.id) as in_line
       from ${machines} m

@@ -9082,6 +9082,7 @@
     "stuck": "Se detuvo porque se trabó",
     "steer": {
       "waiting": "{{name}} lo lee en la próxima pausa",
+      "computer": "{{name}} lo lee cuando tenga la computadora",
       "now": "{{name}} se detuvo para leerlo",
       "delivered": "{{name}} lo recibió",
       "held": "{{name}} lo lee después de tu decisión",
@@ -9277,6 +9278,7 @@
       "nextEta": "Esperando la computadora. Es el siguiente, en unos {{n}} min",
       "nextAfter": "Esperando la computadora. Es el siguiente cuando {{after}} termine",
       "next": "Esperando la computadora. Es el siguiente",
+      "waiting": "Esperando la computadora",
       "behind": "En la cola, {{nth}}. Después de {{names}}",
       "position": "En la cola, {{nth}}"
     },
@@ -12889,6 +12891,8 @@
     "autoUpdate": "Sigo en ello ({{duration}}).",
     "autoUpdateNow": "Ahora: {{now}}.",
     "statusReply": "Sigo con esto ({{duration}}). Leo tu mensaje después de este paso.",
+    "statusReplyQueued": "Esperando la computadora ({{duration}}). Leo tu mensaje cuando llegue mi turno.",
+    "statusReplyAway": "Esperando a que vuelva mi computadora. Leo tu mensaje en cuanto vuelva.",
     "status": {
       "one": "Trabajando en: {{subject}}",
       "oneUntitled": "Trabajando en segundo plano",
@@ -13022,7 +13026,9 @@
       "show": "Mostrar",
       "hide": "Ocultar",
       "talker": "mientras trabajaba",
-      "talkerTip": "Respondió sin detener la tarea en curso."
+      "talkerTip": "Respondió sin detener la tarea en curso.",
+      "talkerWaiting": "mientras espera",
+      "talkerWaitingTip": "Respondió mientras la tarea espera."
     },
     "joined": {
       "label": "se sumó",

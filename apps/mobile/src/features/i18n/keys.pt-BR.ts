@@ -332,6 +332,7 @@ export const featureKeysPtBR = {
     },
     steer: {
       waiting: "{{name}} lê na próxima pausa",
+      computer: "{{name}} lê quando conseguir o computador",
       now: "{{name}} parou para ler",
       delivered: "{{name}} recebeu",
       held: "{{name}} lê depois da sua decisão",

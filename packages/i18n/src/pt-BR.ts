@@ -8778,6 +8778,7 @@ export const ptBR = {
     stuck: "Parou porque travou",
     steer: {
       waiting: "{{name}} lê na próxima pausa",
+      computer: "{{name}} lê quando conseguir o computador",
       now: "{{name}} parou para ler",
       delivered: "{{name}} recebeu",
       held: "{{name}} lê depois da sua decisão",
@@ -8986,6 +8987,7 @@ export const ptBR = {
       nextAfter_female: "Aguardando o computador. É a próxima quando {{after}} terminar",
       next: "Aguardando o computador. É o próximo",
       next_female: "Aguardando o computador. É a próxima",
+      waiting: "Aguardando o computador",
       behind: "Na fila, {{nth}}. Depois de {{names}}",
       position: "Na fila, {{nth}}",
     },
@@ -12216,6 +12218,8 @@ export const ptBR = {
     autoUpdateNow: "Agora: {{now}}.",
     /** A linha do próprio servidor quando uma pessoa escreve a um agente trabalhando e a resposta rápida não sai (ADR 0131). */
     statusReply: "Ainda trabalhando nisso ({{duration}}). Leio sua mensagem depois deste passo.",
+    statusReplyQueued: "Aguardando o computador ({{duration}}). Leio sua mensagem quando chegar minha vez.",
+    statusReplyAway: "Aguardando meu computador voltar. Leio sua mensagem assim que ele voltar.",
     status: {
       one: "Trabalhando em: {{subject}}",
       oneUntitled: "Trabalhando em segundo plano",
@@ -12381,6 +12385,8 @@ export const ptBR = {
       hide: "Ocultar",
       talker: "enquanto trabalha",
       talkerTip: "Respondeu sem parar a tarefa em andamento.",
+      talkerWaiting: "enquanto espera",
+      talkerWaitingTip: "Respondeu enquanto a tarefa espera.",
     },
     /** Next to the time on a reply of an agent nobody called. */
     joined: {

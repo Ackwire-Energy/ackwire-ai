@@ -321,6 +321,7 @@
     },
     "steer": {
       "waiting": "{{name}} bir sonraki arada okuyacak",
+      "computer": "{{name}} bilgisayarı alınca okuyacak",
       "now": "{{name}} okumak için durdu",
       "delivered": "{{name}} aldı",
       "held": "{{name}} kararınızdan sonra okuyacak",

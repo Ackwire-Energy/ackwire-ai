@@ -9166,6 +9166,7 @@
     "stuck": "Fermata perché si era bloccata",
     "steer": {
       "waiting": "{{name}} lo legge alla prossima pausa",
+      "computer": "{{name}} lo legge quando ha il computer",
       "now": "{{name}} si è fermato per leggerlo",
       "delivered": "{{name}} l'ha ricevuto",
       "held": "{{name}} lo legge dopo la tua decisione",
@@ -9361,6 +9362,7 @@
       "nextEta": "In attesa del computer. È il prossimo, tra circa {{n}} min",
       "nextAfter": "In attesa del computer. È il prossimo quando {{after}} finisce",
       "next": "In attesa del computer. È il prossimo",
+      "waiting": "In attesa del computer",
       "behind": "In coda, {{nth}}. Dopo {{names}}",
       "position": "In coda, {{nth}}"
     },
@@ -12963,6 +12965,8 @@
     "autoUpdate": "Ancora al lavoro ({{duration}}).",
     "autoUpdateNow": "Ora: {{now}}.",
     "statusReply": "Ci sto ancora lavorando ({{duration}}). Leggo il tuo messaggio dopo questo passaggio.",
+    "statusReplyQueued": "Sono in attesa del computer ({{duration}}). Leggo il tuo messaggio quando tocca a me.",
+    "statusReplyAway": "Aspetto che il mio computer torni. Leggo il tuo messaggio appena torna.",
     "status": {
       "one": "Al lavoro su: {{subject}}",
       "oneUntitled": "Al lavoro in background",
@@ -13107,7 +13111,9 @@
       "show": "Mostra",
       "hide": "Nascondi",
       "talker": "mentre lavora",
-      "talkerTip": "Ha risposto senza fermare l'attività in corso."
+      "talkerTip": "Ha risposto senza fermare l'attività in corso.",
+      "talkerWaiting": "mentre aspetta",
+      "talkerWaitingTip": "Ha risposto mentre l'attività aspetta."
     },
     "joined": {
       "label": "si è unito",

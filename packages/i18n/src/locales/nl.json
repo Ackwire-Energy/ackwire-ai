@@ -8853,6 +8853,7 @@
     "stuck": "Gestopt omdat hij vastliep",
     "steer": {
       "waiting": "{{name}} leest het bij de volgende pauze",
+      "computer": "{{name}} leest het zodra de computer vrij is",
       "now": "{{name}} stopte om het te lezen",
       "delivered": "{{name}} heeft het ontvangen",
       "held": "{{name}} leest het na jouw besluit",
@@ -9048,6 +9049,7 @@
       "nextEta": "Wacht op de computer. Is de volgende, over ongeveer {{n}} min",
       "nextAfter": "Wacht op de computer. Is de volgende zodra {{after}} klaar is",
       "next": "Wacht op de computer. Is de volgende",
+      "waiting": "Wacht op de computer",
       "behind": "In de wachtrij, {{nth}}. Na {{names}}",
       "position": "In de wachtrij, {{nth}}"
     },
@@ -12563,6 +12565,8 @@
     "autoUpdate": "Nog mee bezig ({{duration}}).",
     "autoUpdateNow": "Nu: {{now}}.",
     "statusReply": "Ik ben er nog mee bezig ({{duration}}). Ik lees je bericht na deze stap.",
+    "statusReplyQueued": "Ik wacht op de computer ({{duration}}). Ik lees je bericht zodra ik aan de beurt ben.",
+    "statusReplyAway": "Ik wacht tot mijn computer terug is. Ik lees je bericht zodra hij terug is.",
     "status": {
       "one": "Bezig met: {{subject}}",
       "oneUntitled": "Bezig op de achtergrond",
@@ -12704,7 +12708,9 @@
       "show": "Tonen",
       "hide": "Verbergen",
       "talker": "tijdens het werk",
-      "talkerTip": "Antwoordde zonder de lopende taak te stoppen."
+      "talkerTip": "Antwoordde zonder de lopende taak te stoppen.",
+      "talkerWaiting": "tijdens het wachten",
+      "talkerWaitingTip": "Antwoordde terwijl de taak wacht."
     },
     "joined": {
       "label": "deed mee",

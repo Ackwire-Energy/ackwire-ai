@@ -758,6 +758,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
     const resync = () => {
       void reconcileChannelRuns(api, streams, orgId, channelId);
       catchUpLists(api, qc, streams, orgId, channelId);
+      // The lines of its computers too: a `computer.queue` it missed leaves a wait's place unsaid.
+      void qc.invalidateQueries({ queryKey: [...keys.machines(orgId), "queue"] });
     };
     const offSubscribed = connection.onSubscribed((id) => {
       if (id === channelId) resync();

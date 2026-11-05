@@ -307,8 +307,8 @@ export interface AgentToolEvent {
 
 export interface StreamsState {
   runs: Record<string, LiveRun>;
-  /** Runs whose final message arrived: late deltas for them are ignored. */
-  finished: Record<string, true>;
+  /** Runs heard to stop, and when: late deltas for them are ignored. */
+  finished: Record<string, number>;
   /** A routine's runs working in the background: never a row, never "trabalhando" (`isBackgroundEvent`). */
   background?: Record<string, true>;
   /** Runs whose message came without its body (too big for its event): it is on its way over HTTP. */
@@ -466,13 +466,18 @@ export function applyChannelEvent(state: StreamsState, event: StreamEvent, now =
 function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
   switch (event.type) {
     case "agent.run.steered": {
+      // It joined a run under way, one that may be waiting with no row of its own: no new reply comes, so no
+      // "pensando…" for it. By channel: the guess may still hang off the optimistic message.
+      const s = event.agentId
+        ? settleAfterRun(state, { agentId: event.agentId, channelId: event.channelId, threadId: null })
+        : state;
       // Only noted here: it shows in the work once read (`agent.run.read`), under the message until then.
-      const r = state.runs[event.runId];
-      if (!r) return state;
-      if (event.stop) return { ...state, runs: { ...state.runs, [event.runId]: { ...r, stopping: true } } };
-      if (!event.now || r.steerNow?.includes(event.messageId)) return state;
+      const r = s.runs[event.runId];
+      if (!r) return s;
+      if (event.stop) return { ...s, runs: { ...s.runs, [event.runId]: { ...r, stopping: true } } };
+      if (!event.now || r.steerNow?.includes(event.messageId)) return s;
       const steerNow = [...(r.steerNow ?? []), event.messageId];
-      return { ...state, runs: { ...state.runs, [event.runId]: { ...r, steerNow } } };
+      return { ...s, runs: { ...s.runs, [event.runId]: { ...r, steerNow } } };
     }
     case "agent.run.read": {
       const r = state.runs[event.runId];
@@ -765,7 +770,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
 
 function finish(state: StreamsState, runId: string): StreamsState {
   const { [runId]: _done, ...runs } = state.runs;
-  return { ...state, runs, finished: { ...state.finished, [runId]: true } };
+  return { ...state, runs, finished: { ...state.finished, [runId]: Date.now() } };
 }
 
 /**
@@ -824,7 +829,13 @@ export function reconcileRuns(
     s = finish(s, r.runId);
   }
   for (const a of active) {
-    if (!known.has(a.runId) || a.channelId !== channelId || s.finished[a.runId]) continue;
+    if (!known.has(a.runId) || a.channelId !== channelId) continue;
+    // Heard to stop, yet listed by a read asked since: it stopped to wait, and went on while we weren't listening.
+    const stopped = s.finished[a.runId];
+    if (stopped) {
+      if (stopped >= askedAt || a.status === "waiting_approval") continue;
+      s = reopen(s, a.runId);
+    }
     const startedAt = a.startedAt ? Date.parse(a.startedAt) : undefined;
     const heartbeat = a.heartbeatAt ? Date.parse(a.heartbeatAt) : undefined;
     const r = s.runs[a.runId];

@@ -9467,6 +9467,7 @@
     "stuck": "Zatrzymane, bo utknęło",
     "steer": {
       "waiting": "{{name}} przeczyta to przy następnej przerwie",
+      "computer": "{{name}} przeczyta to, gdy dostanie komputer",
       "now": "{{name}} przerywa, żeby to przeczytać",
       "delivered": "{{name}}: odebrane",
       "held": "{{name}} przeczyta to po twojej decyzji",
@@ -9663,6 +9664,7 @@
       "nextEta": "Czeka na komputer. Następny w kolejce, za około {{n}} min",
       "nextAfter": "Czeka na komputer. Następny w kolejce, gdy {{after}} skończy",
       "next": "Czeka na komputer. Następny w kolejce",
+      "waiting": "Czeka na komputer",
       "behind": "W kolejce, {{nth}}. Po: {{names}}",
       "position": "W kolejce, {{nth}}"
     },
@@ -13363,6 +13365,8 @@
     "autoUpdate": "Wciąż nad tym pracuję ({{duration}}).",
     "autoUpdateNow": "Teraz: {{now}}.",
     "statusReply": "Nadal nad tym pracuję ({{duration}}). Przeczytam twoją wiadomość po tym kroku.",
+    "statusReplyQueued": "Czekam na komputer ({{duration}}). Przeczytam twoją wiadomość, gdy przyjdzie moja kolej.",
+    "statusReplyAway": "Czekam, aż mój komputer wróci. Przeczytam twoją wiadomość, gdy tylko wróci.",
     "status": {
       "one": "Pracuje nad: {{subject}}",
       "oneUntitled": "Pracuje w tle",
@@ -13510,7 +13514,9 @@
       "show": "Pokaż",
       "hide": "Ukryj",
       "talker": "w trakcie pracy",
-      "talkerTip": "Odpowiedź bez przerywania trwającego zadania."
+      "talkerTip": "Odpowiedź bez przerywania trwającego zadania.",
+      "talkerWaiting": "w trakcie czekania",
+      "talkerWaitingTip": "Odpowiedź w czasie, gdy zadanie czeka."
     },
     "joined": {
       "label": "dołącza do rozmowy",

@@ -308,7 +308,8 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
       handled: mine.map((r) => ({
         agentId: r.agentId,
         runId: r.id,
-        status: r.status,
+        // Asking its computer from the line it still waits, as `computer` says.
+        status: r.computer === "queued" ? ("waiting_input" as const) : r.status,
         ...(r.error === NO_AI ? { reason: NO_AI } : {}),
         ...(r.status === "failed" && r.error !== NO_AI ? runErrorDetail(r.error) : {}),
         ...(r.outage ? { outage: true as const } : {}),
