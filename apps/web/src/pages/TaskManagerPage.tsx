@@ -9,6 +9,7 @@ import {
   delegationText,
   endedState,
   groupTasks,
+  helpersOf,
   hiddenCount,
   taskClock,
   taskState,
@@ -75,7 +76,16 @@ const LINE_POINTS = 30;
  * `agent`: that agent's card chosen as the page opens (`?agent=`, from its tasks' panel in a DM); `task`: that task's
  * panel open (`?task=`, from a row of a computer's line).
  */
-export function TaskManagerPage({ agent, task: openRun }: { agent?: string; task?: string }) {
+export function TaskManagerPage({
+  agent,
+  task: openRun,
+  onTaskClosed,
+}: {
+  agent?: string;
+  task?: string;
+  /** `task`'s panel closed: the address forgets it, so a row of the line opens it again. */
+  onTaskClosed?: () => void;
+}) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
@@ -211,6 +221,7 @@ export function TaskManagerPage({ agent, task: openRun }: { agent?: string; task
   const working = summary.working + (hidden?.working ?? 0);
   const heading = card ? t("taskManager.agentTasks", { name: nameOf(card) }) : t("taskManager.now");
   const barRunIds = selAgent ? stoppableOf(selAgent) : [];
+  const barHelpers = helpersOf(all.filter((task) => barRunIds.includes(task.runId)));
   const stopTool =
     selTask?.canStop && !stopping.has(selTask.runId) && selTask.helpers ? (
       stopChain(
@@ -229,9 +240,10 @@ export function TaskManagerPage({ agent, task: openRun }: { agent?: string; task
       <StopAllConfirm
         agentId={selAgent}
         runIds={barRunIds}
+        helpers={barHelpers}
         open={confirm === "bar"}
         onOpenChange={(open) => setConfirm(open ? "bar" : null)}
-        onStop={(runIds, reason) => stop(runIds, reason)}
+        onStop={(runIds, reason) => stop(runIds, reason, barHelpers > 0)}
         trigger={
           <Button size="sm" variant="ghost" className="tm-tool-stop">
             <PixelStop size={12} />
@@ -424,9 +436,10 @@ export function TaskManagerPage({ agent, task: openRun }: { agent?: string; task
                             <StopAllConfirm
                               agentId={g.agentId}
                               runIds={g.stoppable}
+                              helpers={g.helpers}
                               open={confirm === `row:${g.agentId}`}
                               onOpenChange={(open) => setConfirm(open ? `row:${g.agentId}` : null)}
-                              onStop={(runIds, reason) => stop(runIds, reason)}
+                              onStop={(runIds, reason) => stop(runIds, reason, g.helpers > 0)}
                               trigger={
                                 <Button size="sm" className="tm-stop">
                                   <PixelStop size={12} />
@@ -527,7 +540,10 @@ export function TaskManagerPage({ agent, task: openRun }: { agent?: string; task
             said={said.get(panel)}
             now={now}
             onStop={() => stop([panel], undefined, Boolean(all.find((task) => task.runId === panel)?.helpers))}
-            onClose={() => setPanel(null)}
+            onClose={() => {
+              setPanel(null);
+              onTaskClosed?.();
+            }}
           />,
           document.querySelector(".shell") ?? document.body,
         )}

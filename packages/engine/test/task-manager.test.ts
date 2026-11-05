@@ -96,6 +96,33 @@ describe("work agents asked of each other (ADR 0128)", () => {
     expect((await taskManager(f.db, member.id, f.org.id)).tasks.map((t) => t.runId)).toContain(helper.id);
   });
 
+  test("a note no run took yet counts as a helper: a stop takes its wake too", async () => {
+    f = await setup();
+    const { infra, asker } = await delegated();
+    await sendNote(f.db, {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: asker.id,
+      hop: 1,
+      targetAgentId: infra.id,
+      body: "Vê a fila também",
+      chain: [f.agent.id],
+      deferStart: true,
+    });
+    const view = await taskManager(f.db, f.owner.id, f.org.id);
+    expect(view.tasks.find((t) => t.runId === asker.id)?.helpers).toBe(2);
+  });
+
+  test("an agent with no owner: its work still counts for who may not see it", async () => {
+    f = await setup();
+    const { infra, helper } = await delegated();
+    await f.db.update(schema.agents).set({ ownerUserId: null }).where(eq(schema.agents.id, infra.id));
+    const member = await addMember(f.db, f.org.id, "member", "bia");
+    const theirs = await taskManager(f.db, member.id, f.org.id);
+    expect(theirs.tasks.find((t) => t.runId === helper.id)).toBeUndefined();
+    expect(theirs.hidden.byAgent[infra.id]).toBe(1);
+  });
+
   test("the chain of a routine says the routine; what ended there stays listed for who sees it", async () => {
     f = await setup();
     const { helper } = await delegated();

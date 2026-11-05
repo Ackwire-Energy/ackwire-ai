@@ -14,9 +14,14 @@ export const Route = createFileRoute("/org/$orgId/task-manager")({
   }),
   component: function TaskManagerRoute() {
     const { agent, task } = Route.useSearch();
+    const navigate = Route.useNavigate();
     return (
       <Main>
-        <TaskManagerPage agent={agent} task={task} />
+        <TaskManagerPage
+          agent={agent}
+          task={task}
+          onTaskClosed={() => void navigate({ search: { agent, task: undefined }, replace: true })}
+        />
       </Main>
     );
   },

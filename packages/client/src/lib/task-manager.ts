@@ -303,7 +303,13 @@ export interface AgentTasks {
   waiting: number;
   /** Tasks it can stop now (not already stopping on this screen). */
   stoppable: string[];
+  /** What those asked of other agents, still on: it stops with them. */
+  helpers: number;
 }
+
+/** How many runs these tasks asked of other agents, still on. */
+export const helpersOf = (tasks: readonly Pick<ManagedTask, "helpers">[]) =>
+  tasks.reduce((n, t) => n + (t.helpers ?? 0), 0);
 
 /** Tasks in groups by `keyOf`, oldest group first, each group oldest first. */
 function tasksBy(tasks: ManagedTask[], keyOf: (task: ManagedTask) => string, stopping: ReadonlySet<string>) {
@@ -311,12 +317,14 @@ function tasksBy(tasks: ManagedTask[], keyOf: (task: ManagedTask) => string, sto
   for (const task of tasks) byAgent.set(keyOf(task), [...(byAgent.get(keyOf(task)) ?? []), task]);
   const groups: AgentTasks[] = [...byAgent].map(([agentId, list]) => {
     const sorted = [...list].sort((a, b) => taskSince(a) - taskSince(b));
+    const stoppable = sorted.filter((t) => t.canStop && !stopping.has(t.runId));
     return {
       agentId,
       tasks: sorted,
       working: sorted.filter((t) => taskState(t) === "working").length,
       waiting: sorted.filter((t) => waitsOnPerson(t)).length,
-      stoppable: sorted.filter((t) => t.canStop && !stopping.has(t.runId)).map((t) => t.runId),
+      stoppable: stoppable.map((t) => t.runId),
+      helpers: helpersOf(stoppable),
     };
   });
   return groups.sort((a, b) => taskSince(a.tasks[0] as ManagedTask) - taskSince(b.tasks[0] as ManagedTask));

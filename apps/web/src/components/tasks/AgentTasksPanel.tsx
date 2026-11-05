@@ -3,6 +3,7 @@ import { TASK_MANAGER_POLL_MS, useTaskSteps } from "@agenteschat/client";
 import {
   agentCardLine,
   agentSummary,
+  helpersOf,
   linePlace,
   taskState,
   taskTitle,
@@ -165,10 +166,11 @@ export function AgentTasksPanel({
             <StopAllInline
               agentId={agentId}
               runIds={stoppable}
+              helpers={helpersOf(tasks.filter((task) => stoppable.includes(task.runId)))}
               onCancel={() => setConfirming(false)}
               onStop={(runIds, reason) => {
                 setConfirming(false);
-                stop(runIds, reason);
+                stop(runIds, reason, helpersOf(tasks) > 0);
               }}
             />
           ) : (

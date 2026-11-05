@@ -226,7 +226,14 @@ export async function cancelRun(
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can stop it", "run.cancel_forbidden");
 
   // Loaded here: consultations stop their runs through this module.
-  const helpers = options.chain ? await (await import("./consultations")).stopHelpers(deps, userId, orgId, runId) : [];
+  const helpers = options.chain
+    ? await (await import("./consultations")).stopHelpers(deps, userId, orgId, runId, options.reason)
+    : [];
+  // It ended as the person pressed stop, but what it asked was still on: that stopped, and its agent reads so.
+  if (helpers.length > 0 && isTerminal(row.run.status)) {
+    await tellAgentStopped(deps, row.run, row.run.status, userId, options.reason, helpers).catch(() => null);
+    return { id: row.run.id, status: row.run.status, previousStatus: row.run.status };
+  }
   // The agent's owner or an admin decides for the whole conversation; who asked, only for what they sent.
   const forAll = row.ownerUserId === userId || can(membership, "manage_agents");
   const stopped = await stopRun(

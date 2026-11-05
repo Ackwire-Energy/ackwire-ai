@@ -6202,7 +6202,7 @@ export interface ManagedTask {
   requester: { userId: string; name: string } | null;
   /** Another agent asked it, in their private conversation (absent on an older server). */
   delegation?: TaskDelegation | null;
-  /** Runs still on that it asked of other agents, all the way down. */
+  /** What it asked of other agents and is still on or not started, all the way down. */
   helpers?: number;
   /** `model`, `claude_code`, `codex`, `cursor`; null before its first turn. */
   brain: string | null;

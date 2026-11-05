@@ -1,6 +1,7 @@
 import type { ManagedTask } from "@agenteschat/client";
 import {
   agentCardLine,
+  helpersOf,
   hiddenCount,
   linePlace,
   taskSince,
@@ -51,6 +52,7 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
   const hidden = hiddenCount(query.data?.hidden, agentId);
   const waiting = view?.waiting ?? 0;
   const stoppable = view?.stoppable ?? [];
+  const helpers = helpersOf((view?.rows ?? []).map((r) => r.task).filter((task) => stoppable.includes(task.runId)));
   const waitingText = waiting > 0 ? t("taskManager.waiting", { count: waiting }) : null;
   const sub = [t("taskManager.agentPanel.now", { count }), waitingText].filter(Boolean).join(" · ");
   return (
@@ -107,10 +109,11 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
               <StopConfirm
                 agentId={agentId}
                 count={stoppable.length}
+                helpers={helpers}
                 onCancel={() => setAsking(false)}
                 onStop={(reason) => {
                   setAsking(false);
-                  stop(stoppable, reason);
+                  stop(stoppable, reason, helpers > 0);
                 }}
               />
             </View>

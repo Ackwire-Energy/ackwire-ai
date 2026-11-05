@@ -114,7 +114,7 @@ export function QueueSheet({ machineId, computer }: { machineId: string; compute
   const sheet = useSheet();
   const act: RowActions = {
     stopping,
-    stop: (runId) => stop([runId]),
+    stop: (runId) => stop([runId], undefined, true),
     open: (runId) => {
       sheet.close();
       router.push(`/task-manager/${runId}` as const);

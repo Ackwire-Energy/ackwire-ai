@@ -762,6 +762,22 @@ describe("work agents asked of each other", () => {
     expect(stopCalls(state)).toEqual([["r-boss", undefined, "chain"]]);
   });
 
+  test("an agent's Parar 2 takes what its tasks asked of others with them", async () => {
+    const view = chain();
+    view.tasks.push(task({ runId: "r-boss2", agentId: ATLAS_ID, label: "Ver o deploy", requester: null }));
+    const state = seedState({ taskManager: view });
+    await open(state, "task-manager");
+    const row = screen().getByRole("button", { name: "Atlas" }).closest(".tm-row") as HTMLElement;
+    await click(within(row).getByRole("button", { name: "Parar 2" }));
+    const ask = screen().getByRole("dialog", { name: "Parar Atlas e 1 ajudante?" });
+    await click(within(ask).getByRole("button", { name: "Parar 3" }));
+    await settle(4);
+    expect(stopCalls(state).sort()).toEqual([
+      ["r-boss", undefined, "chain"],
+      ["r-boss2", undefined, "chain"],
+    ]);
+  });
+
   test("work out of sight: the page counts it, the agent's card isn't free, and nothing says what it is", async () => {
     const view = chain();
     view.tasks = view.tasks.filter((x) => x.runId === "r-boss");
@@ -820,11 +836,22 @@ describe("the line's dialog", () => {
     expect(within(dialog).getAllByRole("button", { name: /^Abrir tarefa/ })).toHaveLength(1);
     await click(within(dialog).getByRole("button", { name: "Parar: Ada" }));
     await settle(4);
-    expect(stopCalls(state)).toEqual([["r-link"]]);
+    // A row doesn't know what its run asked of others: that stops with it.
+    expect(stopCalls(state)).toEqual([["r-link", undefined, "chain"]]);
     await click(within(dialog).getByRole("button", { name: "Abrir tarefa: Ada" }));
     await settle(6);
     expect(router.state.location.search).toEqual({ task: "r-link" });
     expect(screen().queryByRole("dialog", { name: "Fila de MacBook" })).toBeNull();
+
+    // Closed, the address forgets it: the same row opens it again.
+    await act(async () => fireEvent.keyDown(window, { key: "Escape" }));
+    await settle(4);
+    expect(document.querySelector(".tm-panel")).toBeNull();
+    expect(router.state.location.search).toEqual({});
+    await seeLine();
+    await click(screen().getByRole("button", { name: "Abrir tarefa: Ada" }));
+    await settle(6);
+    expect(document.querySelector(".tm-panel")).toBeTruthy();
   });
 });
 

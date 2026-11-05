@@ -1,6 +1,7 @@
-import { and, type Database, eq, inArray, isNotNull, rowsOf, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, inArray, rowsOf, schema, sql } from "@agenteschat/db";
 import { CODING_PLANS, planModel } from "@agenteschat/providers/plans";
 import { runAuthorityById } from "./authority";
+import { TtlCache } from "./cache";
 import { computerQueue as lineOfComputer, seesRunSql } from "./computer-queue";
 import { isAgentOnlyDm } from "./dms";
 import { NotFoundError } from "./errors";
@@ -107,7 +108,7 @@ export interface ManagedTask {
   requester: { userId: string; name: string } | null;
   /** Another agent asked it, in their private conversation. */
   delegation: TaskDelegation | null;
-  /** Runs still on that it asked of other agents, all the way down: stopping it with them is one action. */
+  /** What it asked of other agents and is still on or not started, all the way down: they stop with it in one action. */
   helpers: number;
   /** The brain it thinks with (`model`, `claude_code`, `codex`, `cursor`); null before its first turn. */
   brain: string | null;
@@ -334,44 +335,44 @@ async function hiddenTasks(db: Database, userId: string, orgId: string, manages:
   };
 }
 
+// ponytail: per-process, a minute stale at most: the list asks again every few seconds for every viewer.
+const originCache = new TtlCache<TaskDelegation["origin"]>(60_000);
+
+/** What started a run's chain. */
+const originOf = (db: Database, orgId: string, runId: string) =>
+  originCache.getOrLoad(runId, async (): Promise<TaskDelegation["origin"]> => {
+    const a = await runAuthorityById(db, orgId, runId);
+    if (a.kind === "person") {
+      const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, a.personId));
+      return { kind: "person", userId: a.personId, name: person?.name ?? "" };
+    }
+    return a.brief ? { kind: "routine", name: a.brief.name } : { kind: "agent" };
+  });
+
 /** Who asked each run of agents' private conversations and what started its chain, by run id. */
 async function delegationsOf(db: Database, orgId: string, rows: Row[]) {
   const asked = rows.filter((r) => betweenAgents(r) && r.asker_agent_id);
-  const authorities = await Promise.all(asked.map((r) => runAuthorityById(db, orgId, r.id)));
-  const people = [...new Set(authorities.flatMap((a) => (a.kind === "person" ? [a.personId] : [])))];
-  const named = people.length
-    ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, people))
-    : [];
-  const nameOf = new Map(named.map((u) => [u.id, u.name]));
+  const origins = await Promise.all(asked.map((r) => originOf(db, orgId, r.id)));
   return new Map(
-    asked.map((r, i): [string, TaskDelegation] => {
-      const a = authorities[i];
-      const origin: TaskDelegation["origin"] =
-        a?.kind === "person"
-          ? { kind: "person", userId: a.personId, name: nameOf.get(a.personId) ?? "" }
-          : a?.brief
-            ? { kind: "routine", name: a.brief.name }
-            : { kind: "agent" };
-      return [r.id, { agentId: r.asker_agent_id as string, origin }];
-    }),
+    asked.map((r, i): [string, TaskDelegation] => [
+      r.id,
+      { agentId: r.asker_agent_id as string, origin: origins[i] as TaskDelegation["origin"] },
+    ]),
   );
 }
 
-/** The workspace's open asks as edges, by the run that asked: who each run waits on. */
+/**
+ * The workspace's open asks as edges, by the run that asked: the run each waits on, or the ask itself while no run took
+ * it yet (`waking`: its wake waits for room, or a stretch holds it). A stop takes those too.
+ */
 async function openAsks(db: Database, orgId: string) {
   const rows = await db
-    .select({ asker: agentConsultations.askerRunId, target: agentConsultations.targetRunId })
+    .select({ id: agentConsultations.id, asker: agentConsultations.askerRunId, target: agentConsultations.targetRunId })
     .from(agentConsultations)
-    .where(
-      and(
-        eq(agentConsultations.orgId, orgId),
-        eq(agentConsultations.status, "open"),
-        isNotNull(agentConsultations.targetRunId),
-      ),
-    );
+    .where(and(eq(agentConsultations.orgId, orgId), eq(agentConsultations.status, "open")));
   const edges = new Map<string, string[]>();
-  for (const r of rows) if (r.target) edges.set(r.asker, [...(edges.get(r.asker) ?? []), r.target]);
-  return edges;
+  for (const r of rows) edges.set(r.asker, [...(edges.get(r.asker) ?? []), r.target ?? r.id]);
+  return { edges, waking: rows.flatMap((r) => (r.target ? [] : [r.id])) };
 }
 
 /** Of these runs, the ones still on. */
@@ -472,14 +473,15 @@ export async function taskManager(
   const manages = can(membership, "manage_agents");
   const now = options.now ?? new Date();
   const since = options.since ?? new Date(now.getTime() - 24 * 3600_000);
-  const [active, ended, hidden, edges] = await Promise.all([
+  const [active, ended, hidden, asks] = await Promise.all([
     visibleRuns(db, userId, orgId, manages, { active: true }),
     visibleRuns(db, userId, orgId, manages, { active: false, since }),
     hiddenTasks(db, userId, orgId, manages),
     openAsks(db, orgId),
   ]);
   const delegations = await delegationsOf(db, orgId, active);
-  const on = await runsStillOn(db, orgId, [...edges.values()].flat());
+  const { edges, waking } = asks;
+  const on = new Set([...(await runsStillOn(db, orgId, [...edges.values()].flat())), ...waking]);
   const where = (r: Row) => ({
     channelId: r.channel_id,
     channelKind: r.kind,

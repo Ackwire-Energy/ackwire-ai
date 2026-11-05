@@ -178,7 +178,7 @@ function TaskManager() {
                   onCancel={() => setAsking(null)}
                   onStopAll={(reason) => {
                     setAsking(null);
-                    stop(g.stoppable, reason);
+                    stop(g.stoppable, reason, g.helpers > 0);
                   }}
                   onStop={stopOne}
                   stopping={stopping}
@@ -353,7 +353,13 @@ function AgentGroup({
       </Pressable>
       {asking ? (
         <View style={styles.confirm}>
-          <StopConfirm agentId={group.agentId} count={group.stoppable.length} onCancel={onCancel} onStop={onStopAll} />
+          <StopConfirm
+            agentId={group.agentId}
+            count={group.stoppable.length}
+            helpers={flat ? 0 : group.helpers}
+            onCancel={onCancel}
+            onStop={onStopAll}
+          />
         </View>
       ) : null}
       {open

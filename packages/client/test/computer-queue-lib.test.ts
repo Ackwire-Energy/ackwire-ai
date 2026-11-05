@@ -148,6 +148,8 @@ test("rows: what each turn is for, never its content, where, and its estimate", 
   // Past its typical length no estimate is honest, however it reads.
   expect(queueLeftText(pt, { ...turn, estimatedEndAt: null, overdue: true }, NOW)).toBe("passou do normal");
   expect(queueLeftText(en, { ...turn, estimatedEndAt: null }, NOW)).toBeNull();
+  // An estimate that passed while the dialog stayed open: nobody asked the line again.
+  expect(queueLeftText(pt, { ...turn, estimatedEndAt: new Date(NOW - 1).toISOString() }, NOW)).toBe("passou do normal");
   expect(queueStartText(en, queue.waiting[1] as never, agentName, NOW)).toBe("starts ~3 min");
   expect(queueStartText(pt, { ...queue.waiting[0], estimatedStartAt: null } as never, agentName, NOW)).toBe(
     "começa quando a Ada terminar",

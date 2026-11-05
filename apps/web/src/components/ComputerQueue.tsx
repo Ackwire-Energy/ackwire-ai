@@ -236,7 +236,7 @@ function QueueLists({
                 row={w}
                 name={agentName(w.agentId)}
                 onOpen={() => open(w.runId)}
-                onStop={() => stop([w.runId])}
+                onStop={() => stop([w.runId], undefined, true)}
                 stopping={stopping.has(w.runId)}
               >
                 <span className="cq__l1">
@@ -269,7 +269,7 @@ function QueueLists({
                   row={w}
                   name={agentName(w.agentId)}
                   onOpen={() => open(w.runId)}
-                  onStop={() => stop([w.runId])}
+                  onStop={() => stop([w.runId], undefined, true)}
                   stopping={stopping.has(w.runId)}
                 >
                   <span className="cq__l1">

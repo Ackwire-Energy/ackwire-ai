@@ -236,16 +236,17 @@ const agentsOnlySql = (kind: SQL, dmKey: SQL) =>
 /**
  * Who sees a run's work, for a select naming its columns: the members of its conversation and, for work no person is
  * a member of (a routine's background run, two agents' private conversation), admins (`manage_agents`) and the agent's
- * owner. Other people's DMs stay theirs. The task manager, a task's steps and the rows of the line read it.
+ * owner. Other people's DMs stay theirs. The task manager, a task's steps and the rows of the line read it. Never
+ * NULL: an agent with no owner would make it so, and `not` of that drops the run from the hidden counts too.
  */
 export const seesRunSql = (
   run: { channelId: SQL; kind: SQL; dmKey: SQL; background: SQL; ownerUserId: SQL },
   userId: string,
   orgId: string,
   manages: boolean,
-) => sql<boolean>`(exists (select 1 from ${channelMembers} cm
+) => sql<boolean>`coalesce(exists (select 1 from ${channelMembers} cm
     where cm.org_id = ${orgId}::uuid and cm.channel_id = ${run.channelId} and cm.user_id = ${userId})
-  or ((${run.background} or ${agentsOnlySql(run.kind, run.dmKey)}) and (${manages} or ${run.ownerUserId} = ${userId})))`;
+  or ((${run.background} or ${agentsOnlySql(run.kind, run.dmKey)}) and (${manages} or ${run.ownerUserId} = ${userId})), false)`;
 
 /** A running turn's estimated end is never sooner than this from now: an estimate never reads as "any second". */
 export const QUEUE_END_FLOOR_MS = 30_000;

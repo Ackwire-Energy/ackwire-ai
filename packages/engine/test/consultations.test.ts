@@ -1017,6 +1017,19 @@ describe("ask_agent", () => {
     expect((await consultations())[0]?.status).toBe("open");
   });
 
+  test("a provider that stays down: the outage's own clock counts, not its last look", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { target } = await asked();
+    const sweep = new Date(Date.now() + CONSULTATION_TTL_MS + 1000);
+    await park(target.id, { outage: { since: sweep.getTime() - CONSULTATION_HUNG_MS, n: 4, waitId: "w" } });
+    await f.db
+      .update(schema.agentRuns)
+      .set({ updatedAt: new Date(sweep.getTime() - 60_000) })
+      .where(eq(schema.agentRuns.id, target.id));
+    expect(await expireConsultations({ db: f.db }, sweep)).toBe(1);
+    expect((await consultations())[0]?.answer).toContain("its AI provider stayed down");
+  });
+
   test("a colleague waiting on a person has no such limit: its card has its own deadline", async () => {
     f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
     const { target } = await asked();
@@ -1045,7 +1058,10 @@ describe("ask_agent", () => {
     await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, asker.id));
     const calls = f.provider.calls.length;
 
-    await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, asker.id, { chain: true });
+    await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, asker.id, {
+      chain: true,
+      reason: "Mudou a prioridade",
+    });
 
     expect((await consultations())[0]).toMatchObject({ status: "failed" });
     expect((await consultations())[0]?.reportedAt).not.toBeNull();
@@ -1062,6 +1078,88 @@ describe("ask_agent", () => {
       .where(sql`${schema.messages.meta}->'notice'->>'kind' = 'run_stopped'`);
     expect(notices).toHaveLength(2);
     expect(notices.find((n) => n.channelId === f.general.id)?.body).toContain(`What you asked of @${infra.handle}`);
+    for (const n of notices) expect(n.body).toContain("Their reason, in their words: «Mudou a prioridade»");
+  });
+});
+
+describe("stopping a chain, at its edges (ADR 0128)", () => {
+  /** @dev asked @infra, whose run never ran. */
+  async function asked() {
+    const infra = await addInfra();
+    const handlers: JobHandlers = {
+      ...f.handlers,
+      "agent_run.execute": async (job, ctx) => {
+        const [run] = await f.db
+          .select({ agentId: schema.agentRuns.agentId })
+          .from(schema.agentRuns)
+          .where(eq(schema.agentRuns.id, String(job.payload.runId)));
+        if (run?.agentId === infra.id) return;
+        await f.handlers["agent_run.execute"]?.(job, ctx);
+      },
+    };
+    await post("@dev deploy staging");
+    await drainOutbox(f.db, handlers);
+    const all = await runs();
+    const target = all.find((r) => r.agentId === infra.id);
+    const asker = all.find((r) => r.agentId === f.agent.id);
+    if (!target || !asker) throw new Error("no runs");
+    return { infra, handlers, target, asker };
+  }
+
+  test("the run asked ended as the stop came: what it asked still stops, and its agent reads that", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { infra, target, asker } = await asked();
+    expect((await runs()).find((r) => r.id === asker.id)?.status).toBe("done");
+
+    const out = await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, asker.id, { chain: true });
+
+    expect(out.status).toBe("done");
+    expect((await runs()).find((r) => r.id === target.id)?.status).toBe("canceled");
+    const told = await f.db
+      .select({ body: schema.messages.body })
+      .from(schema.messages)
+      .where(
+        sql`${schema.messages.meta}->'notice'->>'kind' = 'run_stopped' and ${schema.messages.channelId} = ${f.general.id}`,
+      );
+    expect(told[0]?.body).toContain(`What you asked of @${infra.handle} stopped with it`);
+  });
+
+  test("nothing left to stop under a run that ended: it says so", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { asker, target } = await asked();
+    await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, target.id));
+    await f.db.update(schema.agentConsultations).set({ status: "answered" });
+    await expect(
+      cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, asker.id, { chain: true }),
+    ).rejects.toMatchObject({ code: "run_finished" });
+  });
+
+  test("a helper someone else's ask still waits on goes on, and so does what it asked", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { target, asker } = await asked();
+    await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, asker.id));
+    const [ask] = await consultations();
+    if (!ask) throw new Error("no ask");
+    // Another run of @dev waits on @infra's run too, and that run asked @dev's other run something.
+    const other = Bun.randomUUIDv7();
+    await f.db
+      .insert(schema.agentRuns)
+      .values({ ...asker, id: other, triggerMessageId: ask.messageId, status: "running" });
+    const row = (over: Partial<typeof ask>) => ({ ...ask, id: Bun.randomUUIDv7(), ...over });
+    await f.db
+      .insert(schema.agentConsultations)
+      .values([
+        row({ askerRunId: other, waitId: `async:${Bun.randomUUIDv7()}` }),
+        row({ askerRunId: target.id, targetRunId: other, waitId: `async:${Bun.randomUUIDv7()}` }),
+      ]);
+
+    await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, asker.id, { chain: true });
+
+    const after = await runs();
+    expect(after.find((r) => r.id === asker.id)?.status).toBe("canceled");
+    expect(after.find((r) => r.id === target.id)?.status).not.toBe("canceled");
+    expect(after.find((r) => r.id === other)?.status).toBe("running");
+    expect((await consultations()).filter((c) => c.status === "open")).toHaveLength(2);
   });
 });
 
@@ -1108,6 +1206,22 @@ describe("a hand-off held for room (ADR 0131 §7)", () => {
     await startNoteRun(f.db, sent.message, infra.id);
     const run = (await runs()).find((r) => r.agentId === infra.id);
     expect((await consultations())[0]).toMatchObject({ status: "open", targetRunId: run?.id });
+  });
+
+  test("it holds up no other hand-off: what came back is reported, naming the one that waits", async () => {
+    f = await setup({ askAgent: true, reply: () => ({ chunks: ["ok"] }) });
+    const { infra, asker } = await deferred();
+    const [held] = await consultations();
+    if (!held) throw new Error("no row");
+    await f.db
+      .insert(schema.agentConsultations)
+      .values({ ...held, id: Bun.randomUUIDv7(), status: "answered", answer: "Feito.", answeredAt: new Date() });
+
+    const reported = await reportHandOffs({ db: f.db, pubsub: f.pubsub }, asker);
+
+    expect(reported).toHaveLength(1);
+    const meta = reported[0]?.message.meta as { notice?: { refs: Record<string, string> } } | undefined;
+    expect(meta?.notice?.refs.pending).toBe(`@${infra.handle}`);
   });
 
   test("past the limit it ends with why, and its wake never starts a run whose answer would go nowhere", async () => {

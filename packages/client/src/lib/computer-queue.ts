@@ -126,9 +126,12 @@ export function queueWhereText(t: TFunction, place: QueuePlace) {
   return t("queue.where.private");
 }
 
-/** A working row's time: "~2 min left", "past its usual time" (no estimate is honest then), or null with no basis. */
+/**
+ * A working row's time: "~2 min left", "past its usual time" (no estimate is honest then), or null with no basis. A
+ * line nobody waits in isn't asked again, so an estimate can pass while the dialog is open.
+ */
 export function queueLeftText(t: TFunction, w: QueueWorking, now: number) {
-  if (w.overdue) return t("queue.overdue");
+  if (w.overdue || (w.estimatedEndAt && Date.parse(w.estimatedEndAt) <= now)) return t("queue.overdue");
   return w.estimatedEndAt ? t("queue.left", { n: etaMinutes(w.estimatedEndAt, now) }) : null;
 }
 

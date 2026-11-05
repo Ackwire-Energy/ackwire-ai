@@ -397,7 +397,7 @@ test("requests run concurrently up to the ceiling; beyond it the runner answers 
   expect(runner.size).toBe(0);
 });
 
-test("a locked-down turn goes past the room check down to its own floor, and past the count where memory isn't known", async () => {
+test("a locked-down turn goes past the room check down to its own floor, and a little past the count where memory isn't known", async () => {
   const ws = tempDir();
   dirs.push(ws);
   const sent: { id: string; ok: boolean; error?: { code: string } }[] = [];
@@ -436,6 +436,10 @@ test("a locked-down turn goes past the room check down to its own floor, and pas
   turn("over", false);
   turn("lodi3", true);
   expect(refused()).toEqual(["work", "lodi2", "over"]);
+  // A bound still: a turn it can't measure is no reason to run any number of them.
+  turn("lodi4", true);
+  turn("lodi5", true);
+  expect(refused()).toEqual(["work", "lodi2", "over", "lodi5"]);
   runner.close();
   await Promise.allSettled(pending);
 });

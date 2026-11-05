@@ -496,11 +496,13 @@ export function StopAllConfirm({
 export function StopAllInline({
   agentId,
   runIds,
+  helpers = 0,
   onCancel,
   onStop,
 }: {
   agentId: string;
   runIds: string[];
+  helpers?: number;
   onCancel: () => void;
   onStop: (runIds: string[], reason: string) => void;
 }) {
@@ -509,15 +511,17 @@ export function StopAllInline({
   const dir = useDirectory(org.id);
   const name = dir.anyAgent(agentId)?.name ?? t("channel.unknownAgent");
   const [reason, setReason] = useState("");
-  const count = runIds.length;
-  const title = t("taskManager.confirm.title", { count, name });
+  const count = runIds.length + helpers;
+  const title = helpers
+    ? t("taskManager.confirm.chainTitle", { count: helpers, name })
+    : t("taskManager.confirm.title", { count, name });
   const confirm = () => onStop(runIds, reason);
   return (
     <div className="tm-cfm" role="alertdialog" aria-label={title}>
       <span className="tm-cfm__text">
         <AgentSpinner agentId={agentId} size={14} />
         <span>
-          <b>{title}</b> {t("taskManager.confirm.short", { name })}
+          <b>{title}</b> {helpers ? t("taskManager.confirm.chainBody") : t("taskManager.confirm.short", { name })}
         </span>
       </span>
       <span className="tm-cfm__acts">

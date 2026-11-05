@@ -611,12 +611,12 @@ const ACTIVE_RUN = ["queued", "running", "waiting_approval", "waiting_input"] as
 const wakeJobs = () => [INBOX_JOB, LATER_JOB];
 
 /** For a select naming a consultation: its wake still waits to start a run. */
-const wakeWaitsSql = (row: SQL) => sql<boolean>`exists (select 1 from ${outbox} o where o.org_id = ${row}.org_id
-  and o.kind in (${sql.join(
+const wakeWaitsSql = (row: SQL) => sql<boolean>`exists (select 1 from ${outbox} wake where wake.org_id = ${row}.org_id
+  and wake.kind in (${sql.join(
     wakeJobs().map((k) => sql`${k}`),
     sql`, `,
-  )}) and o.status in ('pending', 'processing')
-  and o.payload ->> 'messageId' = ${row}.message_id::text and o.payload ->> 'agentId' = ${row}.target_agent_id::text)`;
+  )}) and wake.status in ('pending', 'processing')
+  and wake.payload ->> 'messageId' = ${row}.message_id::text and wake.payload ->> 'agentId' = ${row}.target_agent_id::text)`;
 
 /** Nobody waits on this ask anymore: its wake never starts a run whose result would go nowhere. */
 async function dropWake(db: Executor, row: Pick<AgentConsultationRow, "orgId" | "messageId" | "targetAgentId">) {
@@ -1166,8 +1166,8 @@ async function settleOwed(
 /**
  * Report once (ADR 0095): the results of the notes run `asker` sent come back together, once none of them is still
  * being worked on (queued or running, not started yet, its run ended but the row not closed yet, or waiting on what
- * its colleague handed on). One waiting on a person or its computer holds up no one: the wake names it
- * (`refs.pending`). One claim after each close commits, so the last closer sees every row closed, and row locks with
+ * its colleague handed on). One waiting on a person or its computer, or whose wake waits for room, holds up no one: the
+ * wake names it (`refs.pending`). One claim after each close commits, so the last closer sees every row closed, and row locks with
  * `reported_at` keep a second claim from taking them again: exactly one wake. Oldest first, every notice but the last
  * is only written; the last wakes the agent, and a run of its already at work there that takes it reads the earlier
  * ones with it. Only for a run in a person's conversation (an agents' DM hands back instead).
@@ -1187,7 +1187,7 @@ export async function reportHandOffs(deps: Pick<Deps, "db" | "pubsub">, asker: A
           sql`not exists (select 1 from ${agentConsultations} o left join ${agentRuns} t on t.id = o.target_run_id
             where o.org_id = ${asker.orgId}::uuid and o.asker_run_id = ${asker.id}::uuid
               and o.kind = 'note' and o.status = 'open'
-              and (t.id is null or t.status not in ('waiting_approval', 'waiting_input')
+              and ((t.id is null and not ${wakeWaitsSql(sql`o`)}) or t.status not in ('waiting_approval', 'waiting_input')
                 or exists (select 1 from ${agentConsultations} s where s.asker_run_id = t.id and s.status = 'open')))`,
         ),
       )
@@ -1858,6 +1858,7 @@ function stuckOn(target: { status: string | null; code: string | null; outage: b
 /** Since when a run waits for its computer, plan or provider, in ms: the wait's own clock, else the run's last change. */
 const waitSinceSql = sql<string>`coalesce((${agentRuns.transcript}->>'roomWaitSince')::bigint,
   (${agentRuns.transcript}->'waitingForBrain'->>'since')::bigint,
+  (${agentRuns.transcript}->'outage'->>'since')::bigint,
   (extract(epoch from ${agentRuns.updatedAt}) * 1000)::bigint)`;
 
 /**
@@ -1877,7 +1878,7 @@ export async function expireConsultations(deps: { db: Database; pubsub?: PubSub 
       code: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
       outage: outageParkedSql,
       since: waitSinceSql,
-      wake: wakeWaitsSql(sql`${agentConsultations}`),
+      wake: sql<boolean>`(${agentConsultations.targetRunId} is null and ${wakeWaitsSql(sql`${agentConsultations}`)})`,
     })
     .from(agentConsultations)
     .leftJoin(agentRuns, eq(agentRuns.id, agentConsultations.targetRunId))
@@ -1938,6 +1939,7 @@ export async function stopHelpers(
   userId: string,
   orgId: string,
   runId: string,
+  reason?: string,
 ) {
   const { db } = deps;
   const below = new Set<string>();
@@ -1976,29 +1978,24 @@ export async function stopHelpers(
         .update(agentRuns)
         .set({ pendingMessageIds: sql`array_remove(${agentRuns.pendingMessageIds}, ${row.messageId}::uuid)` })
         .where(eq(agentRuns.id, id));
-      if (id !== runId && !below.has(id)) {
-        below.add(id);
-        level.push(id);
-      }
+      // A run another ask still waits on goes on, and so does what it asked.
+      if (id === runId || below.has(id) || (await stillWaitedOn(db, orgId, id))) continue;
+      below.add(id);
+      level.push(id);
     }
   }
   for (const id of below) {
     const stopped = await stopUnwantedRun(deps, orgId, id, { type: "person", id: userId });
     if (!stopped) continue;
     handles.add(`@${await handleOf(db, orgId, stopped.run.agentId)}`);
-    await tellAgentStopped(deps, stopped.run, stopped.previous, userId).catch(() => null);
+    await tellAgentStopped(deps, stopped.run, stopped.previous, userId, reason).catch(() => null);
   }
   return [...handles];
 }
 
-/** Nobody waits for this consulted run anymore (every consultation on it closed): it stops, approvals and all. */
-async function stopUnwantedRun(
-  deps: { db: Database; pubsub?: PubSub },
-  orgId: string,
-  runId: string,
-  actor: Parameters<typeof stopRun>[4] = { type: "system", reason: "consultation_expired" },
-) {
-  const [stillWaited] = await deps.db
+/** An ask is still open on this run. */
+async function stillWaitedOn(db: Executor, orgId: string, runId: string) {
+  const [open] = await db
     .select({ id: agentConsultations.id })
     .from(agentConsultations)
     .where(
@@ -2009,7 +2006,17 @@ async function stopUnwantedRun(
       ),
     )
     .limit(1);
-  if (stillWaited) return null;
+  return Boolean(open);
+}
+
+/** Nobody waits for this consulted run anymore (every consultation on it closed): it stops, approvals and all. */
+async function stopUnwantedRun(
+  deps: { db: Database; pubsub?: PubSub },
+  orgId: string,
+  runId: string,
+  actor: Parameters<typeof stopRun>[4] = { type: "system", reason: "consultation_expired" },
+) {
+  if (await stillWaitedOn(deps.db, orgId, runId)) return null;
   const [run] = await deps.db
     .select()
     .from(agentRuns)

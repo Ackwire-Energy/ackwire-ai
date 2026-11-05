@@ -68,6 +68,8 @@ export const TURN_BYTES = 0.6e9;
  * filled the computer, so it runs while the rest waits, and only a computer about to run out turns it away.
  */
 export const LOCKED_TURN_MIN_FREE_BYTES = TURN_BYTES + 0.3e9;
+/** Where memory isn't known: how many locked-down turns may run past `TURNS_WITHOUT_MEMORY`. */
+export const LOCKED_TURNS_PAST_COUNT = 2;
 /** A CLI takes seconds to grow: a turn admitted this recently isn't in the memory reading yet, so it is counted. */
 export const TURN_SETTLE_MS = 30_000;
 /** How long a turn without room may wait while idle warm CLIs close for it, before `no_slot`. */
@@ -1386,7 +1388,7 @@ export class RequestRunner {
    * `TURN_SETTLE_MS` will still take, leaves `MIN_FREE_BYTES` (1.5 GiB, the floor desktops keep). The
    * floor is more than the biggest thing a turn grows into (a computer-use agent, about 1.4 GB with its screen
    * and browser), so the one admitted last still fits whole. Where the memory isn't known, a count instead. `locked`:
-   * a locked-down turn, on its own floor and past the count.
+   * a locked-down turn, on its own floor and a little past the count.
    */
   private admit(locked = false): boolean {
     const now = (this.admission.now ?? Date.now)();
@@ -1394,7 +1396,9 @@ export class RequestRunner {
     const free = this.memAvailable();
     const floor = locked ? LOCKED_TURN_MIN_FREE_BYTES : MIN_FREE_BYTES;
     const room =
-      free === null ? locked || this.turns < TURNS_WITHOUT_MEMORY : free - this.admitted.length * TURN_BYTES >= floor;
+      free === null
+        ? this.turns < TURNS_WITHOUT_MEMORY + (locked ? LOCKED_TURNS_PAST_COUNT : 0)
+        : free - this.admitted.length * TURN_BYTES >= floor;
     if (room) this.admitted.push(now);
     return room;
   }

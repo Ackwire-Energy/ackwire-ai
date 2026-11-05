@@ -389,7 +389,7 @@ const ManagedTask = z
     helpers: z
       .number()
       .int()
-      .openapi({ description: "Runs still on that it asked of other agents, all the way down." }),
+      .openapi({ description: "What it asked of other agents and is still on or not started, all the way down." }),
     brain: z.string().nullable(),
     machine: z.object({ id: z.uuid(), name: z.string() }).nullable(),
     now: z
