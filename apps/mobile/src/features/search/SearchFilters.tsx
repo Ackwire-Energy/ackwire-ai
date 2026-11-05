@@ -21,13 +21,16 @@ import {
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Button, Filters, Icon, Text } from "@/ui";
+import { Button, Filters, Icon, SectionHeader, Text } from "@/ui";
 import { Note } from "../ai/parts";
 import { Face } from "../shared/Face";
 import { useColors, useOrgId, useWhen } from "../shared/hooks";
 import { previewOf } from "../shared/logic";
 import { ActionList, Tile } from "../shared/parts";
 import { hitHref } from "./logic";
+
+/** One size for every result's face or tile, in the search tab and in a conversation's search. */
+export const RESULT_LEAD = 34;
 
 /** The filters on the box (ADR 0123): each a pill with its ×. */
 export function FilterChips({ chips, onRemove }: { chips: SearchChip[]; onRemove: (chip: SearchChip) => void }) {
@@ -81,27 +84,23 @@ export function SearchOptions({
   const { t } = useTranslation();
   return (
     <View>
-      <Text variant="label" accessibilityRole="header" style={styles.head}>
-        {t("searchPage.options")}
-      </Text>
+      <SectionHeader title={t("searchPage.options")} />
       <Filters
         items={ops.map((op) => ({ key: op, label: `${words.ops[op]}:` }))}
         value=""
         onChange={(op) => onInsert(`${words.ops[op as keyof SearchWords["ops"]]}:`)}
       />
       {recent.length > 0 ? (
-        <View style={[styles.res, styles.group]}>
-          <View style={styles.groupTitle}>
-            <Text variant="label" accessibilityRole="header">
-              {t("searchPage.recent")}
-            </Text>
-            <Pressable onPress={onClearRecent} accessibilityRole="button" hitSlop={8}>
-              <Text tone="faint">{t("searchPage.clearRecent")}</Text>
-            </Pressable>
-          </View>
-          <ActionList
-            items={recent.map((r) => ({ key: r, icon: "clock", label: r, onPress: () => onPickRecent(r) }))}
+        <View>
+          <SectionHeader
+            title={t("searchPage.recent")}
+            action={{ label: t("searchPage.clearRecent"), onPress: onClearRecent, chevron: false }}
           />
+          <View style={styles.list}>
+            <ActionList
+              items={recent.map((r) => ({ key: r, icon: "clock", label: r, onPress: () => onPickRecent(r) }))}
+            />
+          </View>
         </View>
       ) : null}
     </View>
@@ -168,14 +167,14 @@ export function OperatorPicker({
               : // Dates are typed (`before:2026-10-01`), the format is the hint.
                 [];
   return (
-    <View style={styles.group}>
-      <Text variant="label" accessibilityRole="header" style={styles.head}>
-        {t(`searchPage.option.${op}`)}
-      </Text>
+    <View>
+      <SectionHeader title={t(`searchPage.option.${op}`)} />
       {items.length > 0 ? (
-        <ActionList items={items} />
+        <View style={styles.list}>
+          <ActionList items={items} />
+        </View>
       ) : (
-        <Text tone="faint" style={styles.head}>
+        <Text tone="faint" style={styles.hint}>
           {op === "in"
             ? t("searchPage.noPlace")
             : op === "from" || op === "mentions"
@@ -253,30 +252,34 @@ export function FilteredResults({
         </View>
         {hits.isLoading ? <ActivityIndicator color={c.muted} style={styles.empty} /> : null}
         {hits.isError && !hits.data ? (
-          <View style={styles.group}>
+          <View style={[styles.list, styles.failed]}>
             <Note icon="x">{t("common.loadFailed")}</Note>
             <Button size="sm" variant="secondary" label={t("common.retry")} onPress={() => void hits.refetch()} />
           </View>
         ) : null}
         {groupHitsByPlace(list).map((g) => (
-          <View key={g.key} style={styles.group}>
-            <Text variant="label" accessibilityRole="header" style={styles.groupTitle}>
-              {g.thread ? threadName(g.thread.title, g.channelId) : placeName(g.channelId)}
-            </Text>
-            <ActionList
-              items={g.hits.map((h) => ({
-                key: h.sourceId,
-                leading: h.author ? <Face who={h.author} size={34} live={false} /> : <Tile icon="chat" size={34} />,
-                label: previewOf(hitText(t, h)),
-                marks: terms,
-                hint: [h.author?.name, when.short(h.createdAt)].filter(Boolean).join(" · "),
-                onPress: () => {
-                  onOpen();
-                  if (onPick) onPick(h);
-                  else router.push(hitHref(h));
-                },
-              }))}
-            />
+          <View key={g.key}>
+            <SectionHeader title={g.thread ? threadName(g.thread.title, g.channelId) : placeName(g.channelId)} />
+            <View style={styles.list}>
+              <ActionList
+                items={g.hits.map((h) => ({
+                  key: h.sourceId,
+                  leading: h.author ? (
+                    <Face who={h.author} size={RESULT_LEAD} live={false} />
+                  ) : (
+                    <Tile icon="chat" size={RESULT_LEAD} />
+                  ),
+                  label: previewOf(hitText(t, h)),
+                  marks: terms,
+                  hint: [h.author?.name, when.short(h.createdAt)].filter(Boolean).join(" · "),
+                  onPress: () => {
+                    onOpen();
+                    if (onPick) onPick(h);
+                    else router.push(hitHref(h));
+                  },
+                }))}
+              />
+            </View>
           </View>
         ))}
         {hits.isSuccess && list.length === 0 ? (
@@ -294,24 +297,20 @@ export function FilteredResults({
 const styles = StyleSheet.create({
   chips: { gap: 6, paddingHorizontal: 16, paddingBottom: 8 },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 32, paddingHorizontal: 12, borderRadius: 999 },
-  head: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 },
-  res: { paddingHorizontal: 16, paddingTop: 2 },
-  group: { marginTop: 14, gap: 8 },
-  groupTitle: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    paddingHorizontal: 4,
-  },
+  // The operator's empty state, at the headers' text column.
+  hint: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 },
+  // The section headers run edge to edge (their text at 20); the lists under them keep the 16-point margin.
+  res: { paddingTop: 2 },
+  list: { paddingHorizontal: 16 },
+  failed: { marginTop: 14, gap: 8 },
   bar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
-    paddingHorizontal: 4,
+    paddingHorizontal: 20,
     paddingTop: 8,
   },
   clear: { flexDirection: "row", alignItems: "center", gap: 4 },
-  empty: { textAlign: "center", paddingVertical: 40 },
+  empty: { textAlign: "center", paddingVertical: 40, paddingHorizontal: 16 },
 });

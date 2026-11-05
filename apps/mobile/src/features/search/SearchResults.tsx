@@ -7,7 +7,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Filters, Text, useToast } from "@/ui";
+import { Filters, SectionHeader, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useDirectory, useOrgId, useWhen } from "../shared/hooks";
@@ -22,6 +22,7 @@ import {
   searchCounts,
   searchResults,
 } from "./logic";
+import { RESULT_LEAD } from "./SearchFilters";
 
 const ACTION_ICON = { newConversation: "compose", newTask: "target", newAgent: "agent" } as const;
 
@@ -104,7 +105,7 @@ export function SearchResults({ q }: { q: string }) {
               items={[
                 ...r.agents.map((a) => ({
                   key: `a:${a.id}`,
-                  leading: <AgentFace agentId={a.id} size={38} live={false} />,
+                  leading: <AgentFace agentId={a.id} size={RESULT_LEAD} live={false} />,
                   label: a.name,
                   oneLine: true,
                   ...(a.role ? { hint: a.role } : {}),
@@ -112,7 +113,7 @@ export function SearchResults({ q }: { q: string }) {
                 })),
                 ...r.dms.map((d) => ({
                   key: `d:${d.channelId}`,
-                  leading: <Face who={{ type: d.with.type, id: d.with.id }} size={38} live={false} />,
+                  leading: <Face who={{ type: d.with.type, id: d.with.id }} size={RESULT_LEAD} live={false} />,
                   label: d.with.name,
                   oneLine: true,
                   ...(d.lastMessage
@@ -129,7 +130,7 @@ export function SearchResults({ q }: { q: string }) {
                 })),
                 ...r.channels.map((ch) => ({
                   key: `c:${ch.id}`,
-                  leading: <Tile icon="hash" size={38} />,
+                  leading: <Tile icon="hash" size={RESULT_LEAD} />,
                   label: ch.name,
                   oneLine: true,
                   ...(ch.topic ? { hint: ch.topic } : {}),
@@ -148,9 +149,9 @@ export function SearchResults({ q }: { q: string }) {
                 return {
                   key: h.sourceId,
                   leading: h.author ? (
-                    <AgentFace agentId={h.author.id} size={34} live={false} />
+                    <AgentFace agentId={h.author.id} size={RESULT_LEAD} live={false} />
                   ) : (
-                    <Tile icon="reply" size={34} />
+                    <Tile icon="reply" size={RESULT_LEAD} />
                   ),
                   label: previewOf(h.snippet || h.title),
                   hint: [
@@ -174,7 +175,7 @@ export function SearchResults({ q }: { q: string }) {
                 const where = channelName(channelId);
                 return {
                   key: h.sourceId,
-                  leading: <Tile icon="chat" size={34} />,
+                  leading: <Tile icon="chat" size={RESULT_LEAD} />,
                   label: previewOf(hitText(t, h) || h.title),
                   hint: [where ? t("mobile.chats.waitIn", { where: `#${where}` }) : null, when.short(h.createdAt)]
                     .filter(Boolean)
@@ -192,7 +193,7 @@ export function SearchResults({ q }: { q: string }) {
                 const where = channelName(h.channelIds[0]);
                 return {
                   key: h.sourceId,
-                  leading: <Tile icon="doc" size={34} />,
+                  leading: <Tile icon="doc" size={RESULT_LEAD} />,
                   label: h.title || t("mobile.chat.file"),
                   hint: [where ? t("mobile.chats.waitIn", { where: `#${where}` }) : null, when.short(h.createdAt)]
                     .filter(Boolean)
@@ -213,21 +214,21 @@ export function SearchResults({ q }: { q: string }) {
   );
 }
 
-/** A group of results under its title; its count is on the group's filter chip above, said once. */
+/**
+ * A group of results under the app's section header (its title at the screen's 20, the list at 16); its count is on
+ * the group's filter chip above, said once.
+ */
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <View style={styles.group}>
-      <Text variant="label" accessibilityRole="header" style={styles.groupTitle}>
-        {title}
-      </Text>
-      {children}
+    <View>
+      <SectionHeader title={title} />
+      <View style={styles.list}>{children}</View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  res: { paddingHorizontal: 16, paddingTop: 2 },
-  group: { marginTop: 14, gap: 8 },
-  groupTitle: { paddingHorizontal: 4 },
-  empty: { textAlign: "center", paddingVertical: 40 },
+  res: { paddingTop: 2 },
+  list: { paddingHorizontal: 16 },
+  empty: { textAlign: "center", paddingVertical: 40, paddingHorizontal: 16 },
 });

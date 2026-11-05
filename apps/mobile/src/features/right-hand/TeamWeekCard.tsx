@@ -30,7 +30,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, LineIcon, Text } from "@/ui";
+import { Button, LineIcon, Text } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
@@ -99,9 +99,11 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
     }
   };
   const { stats } = card;
-  const stat = (value: string, label: string, warn = false) => (
-    <View key={label} style={[styles.stat, { backgroundColor: c.sunken }]}>
-      <Text variant="title" style={[styles.statValue, warn ? { color: c.amber } : null]} numberOfLines={1}>
+  // Flat on the card, two by two. Amber only for what waits on the person; "stuck" counts the week's failed runs
+  // (the server's `failed`), errors, so red.
+  const stat = (value: string, label: string, color?: string) => (
+    <View key={label} style={styles.stat}>
+      <Text variant="title" style={[styles.statValue, color ? { color } : null]} numberOfLines={1}>
         {value}
       </Text>
       <Text variant="caption" tone="muted">
@@ -125,8 +127,8 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
         </View>
         <View style={styles.stats}>
           {stat(String(stats.done), t("teamWeek.stat.done"))}
-          {stat(String(stats.stuck), t("teamWeek.stat.stuck"), stats.stuck > 0)}
-          {stat(String(stats.waiting), t("teamWeek.stat.waiting"), stats.waiting > 0)}
+          {stat(String(stats.stuck), t("teamWeek.stat.stuck"), stats.stuck > 0 ? c.danger : undefined)}
+          {stat(String(stats.waiting), t("teamWeek.stat.waiting"), stats.waiting > 0 ? c.amber : undefined)}
           {stat(names.usd(stats.spentNanoUsd), t("teamWeek.stat.budget", { budget: names.usd(stats.budgetNanoUsd) }))}
         </View>
         {card.worked.length > 0 ? (
@@ -135,8 +137,8 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
               {t("teamWeek.worked")}
             </Text>
             {card.worked.map((w) => (
-              <View key={`${w.kind}:${w.agentId}`} style={styles.worked}>
-                <LineIcon name="check" size={14} color={c.ok} variant="footnote" />
+              <View key={`${w.kind}:${w.agentId}`} style={styles.line}>
+                <LineIcon name="check" size={16} color={c.ok} variant="footnote" />
                 <Text variant="footnote" tone="ink" style={styles.fill}>
                   {w.kind === "runs"
                     ? t("teamWeek.workedRuns", {
@@ -159,9 +161,10 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
             <Text variant="caption" tone="muted" style={styles.semibold}>
               {t("teamWeek.improve")}
             </Text>
-            {rows.map(({ row, state, text }) => (
+            {rows.map(({ row, state, text }, i) => (
               <Fix
                 key={row.id}
+                divider={i > 0}
                 message={message}
                 row={row}
                 state={state}
@@ -176,7 +179,7 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
             ))}
           </View>
         ) : null}
-        <View style={[styles.foot, { borderTopColor: c.line }]}>
+        <View style={[styles.foot, { borderTopColor: c.line2 }]}>
           {!dismissed && bulk.length > 0 ? (
             <Button
               variant="primary"
@@ -213,6 +216,7 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
 }
 
 function Fix({
+  divider,
   message,
   row,
   state,
@@ -224,6 +228,8 @@ function Fix({
   busy,
   onApply,
 }: {
+  /** A hairline above it: every fix but the first. */
+  divider: boolean;
   message: Message;
   row: TeamWeekRow;
   state: "open" | "done" | "gone";
@@ -248,20 +254,21 @@ function Fix({
     receipt && !receipt.undoneAt && receipt.undoableUntil && Date.parse(receipt.undoableUntil) > Date.now();
   const done = state !== "open";
   return (
-    <View
-      style={[
-        styles.fix,
-        done ? { borderColor: c.line, borderWidth: StyleSheet.hairlineWidth } : { backgroundColor: c.sunken },
-      ]}
-    >
+    // A flat row on the card, divided by a hairline (never a plate or a box in a card).
+    <View style={[styles.fix, divider && [styles.divided, { borderTopColor: c.line2 }]]}>
       <View style={styles.fixTop}>
-        {agentId ? (
-          <AgentFace agentId={agentId} size={32} live={false} />
-        ) : (
-          <View style={[styles.tile, { backgroundColor: c.raised }]}>
-            <Icon name={row.kind === "unanswered" ? "help" : row.kind === "stalled" ? "issue" : "clock"} size={16} />
-          </View>
-        )}
+        <View style={styles.lead}>
+          {agentId ? (
+            <AgentFace agentId={agentId} size={32} live={false} />
+          ) : (
+            <LineIcon
+              name={row.kind === "unanswered" ? "help" : row.kind === "stalled" ? "issue" : "clock"}
+              size={16}
+              color={c.muted}
+              variant="small"
+            />
+          )}
+        </View>
         <View style={styles.fill}>
           <Text variant="small" tone={done ? "muted" : "ink"} style={styles.semibold}>
             {title}
@@ -273,10 +280,12 @@ function Fix({
       </View>
       {state === "done" ? (
         <View style={styles.doneRow}>
-          <Icon name="check" size={14} color={c.ok} />
-          <Text variant="footnote" tone="ok" style={[styles.semibold, styles.fill]}>
-            {receipt?.undoneAt ? t("rightHand.card.undone") : doneText}
-          </Text>
+          <View style={[styles.line, styles.fill]}>
+            <LineIcon name="check" size={16} color={c.ok} variant="footnote" />
+            <Text variant="footnote" tone="ok" style={[styles.semibold, styles.fill]}>
+              {receipt?.undoneAt ? t("rightHand.card.undone") : doneText}
+            </Text>
+          </View>
           {undoable ? (
             <Button
               variant="ghost"
@@ -326,22 +335,19 @@ const styles = StyleSheet.create({
   },
   head: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8 },
   semibold: { fontWeight: "600" },
-  stats: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
-  stat: { flexBasis: "47%", flexGrow: 1, padding: 10, borderRadius: 12, borderBottomLeftRadius: 4, gap: 2 },
+  stats: { flexDirection: "row", flexWrap: "wrap", rowGap: 12, columnGap: 8, marginTop: 12 },
+  stat: { flexBasis: "47%", flexGrow: 1, gap: 2 },
   statValue: { fontVariant: ["tabular-nums"] },
   section: { marginTop: 16, gap: 8 },
-  worked: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  // An icon on the first line of the words beside it.
+  line: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   fill: { flex: 1, minWidth: 0 },
-  fix: { padding: 12, borderRadius: 12, borderBottomLeftRadius: 4, gap: 10 },
+  fix: { gap: 10 },
+  // 12 above the hairline (with the section's gap) and 12 under it.
+  divided: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   fixTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  tile: {
-    width: 32,
-    height: 32,
-    borderRadius: 9,
-    borderBottomLeftRadius: 3,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  // One column for whatever leads (a face, or an icon on the title's first line): the words start at one place.
+  lead: { width: 32, alignItems: "center" },
   doneRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   foot: {
     marginTop: 14,

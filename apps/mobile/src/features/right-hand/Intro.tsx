@@ -22,7 +22,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { StickerCanvas } from "@/agent/StickerCanvas";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, type IconName, LineIcon, Text } from "@/ui";
+import { AgentAvatar, Button, Icon, type IconName, LineIcon, Text } from "@/ui";
 import { fullLook } from "../agents/edit";
 import { openConnectAi } from "../ai/NoAiCard";
 import { requestComposerText } from "../chat/composer-request";
@@ -159,8 +159,9 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
       ) : null}
       {presetsOpen ? (
         <>
-          <View style={styles.presets}>
-            {left.map((p) => {
+          {/* Flat rows on the card, divided by hairlines: a tap makes that agent (its "+" says so). */}
+          <View>
+            {left.map((p, i) => {
               const name = t(`onboarding.presets.${p}.name`);
               return (
                 <Pressable
@@ -174,8 +175,8 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
                   accessibilityLabel={t("rightHand.intro.start.createOne", { name })}
                   style={({ pressed }) => [
                     styles.preset,
-                    { borderColor: c.line2 },
-                    pressed && { backgroundColor: c.sunken },
+                    i > 0 && [styles.divided, { borderTopColor: c.line2 }],
+                    pressed && styles.pressed,
                   ]}
                 >
                   <AgentAvatar agent={fullLook(PRESET_LOOK[p])} size={28} name={name} live={false} />
@@ -187,6 +188,7 @@ function StartCard({ channelId, left, first }: { channelId: string; left: readon
                       {t(`onboarding.presets.${p}.role`)}
                     </Text>
                   </View>
+                  <Icon name="plus" size={16} color={c.faint} />
                 </Pressable>
               );
             })}
@@ -348,15 +350,8 @@ const styles = StyleSheet.create({
   card: { marginTop: 6, borderRadius: 16, padding: 14, gap: 10 },
   // A question that wraps keeps its icon on its first line.
   cardHead: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  presets: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  preset: {
-    flexBasis: "47%",
-    flexGrow: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 8,
-  },
+  // A ready-made agent to make: at least 44 points to tap.
+  preset: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 44, paddingVertical: 8 },
+  divided: { borderTopWidth: StyleSheet.hairlineWidth },
+  pressed: { opacity: 0.6 },
 });

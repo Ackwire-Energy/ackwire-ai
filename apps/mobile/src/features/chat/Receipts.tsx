@@ -23,7 +23,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Icon, PillButton, Text, useLivePaused, useTheme, useToast } from "@/ui";
+import { LineIcon, PillButton, Text, useLivePaused, useToast } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -127,7 +127,9 @@ function ReceiptList({
     const { a, v } = rows[0] as { a: AgentAction; v: ReceiptView };
     return (
       <View style={[styles.one, styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
-        <IconTile kind={a} />
+        <View style={styles.oneTx}>
+          <LineIcon name={receiptIcon(a.kind)} size={16} color={c.muted} variant="small" text={styles.oneText} />
+        </View>
         <View style={[styles.grow, styles.oneTx]}>
           <Sentence action={a} channelId={m.channelId} struck={v.struck} size="one" />
           <OwnActions action={a} />
@@ -158,10 +160,8 @@ function ReceiptList({
         ) : null}
       </View>
       {rows.map(({ a, v }) => (
-        <View key={a.id} style={[styles.it, { borderTopColor: c.line }]}>
-          <View style={styles.itIcon}>
-            <Icon name={receiptIcon(a.kind)} size={14} color={c.muted} />
-          </View>
+        <View key={a.id} style={[styles.it, { borderTopColor: c.line2 }]}>
+          <LineIcon name={receiptIcon(a.kind)} size={16} color={c.muted} variant="footnote" />
           <View style={styles.grow}>
             <Sentence action={a} channelId={m.channelId} struck={v.struck} size="item" />
             <OwnActions action={a} />
@@ -170,15 +170,6 @@ function ReceiptList({
           <RowButton view={v} onUndo={() => undo(a)} onRedo={() => redo(a)} />
         </View>
       ))}
-    </View>
-  );
-}
-
-function IconTile({ kind: a }: { kind: AgentAction }) {
-  const { colors, shadows } = useTheme();
-  return (
-    <View style={[styles.tile, { backgroundColor: colors.raised, boxShadow: shadows.e1 }]}>
-      <Icon name={receiptIcon(a.kind)} size={14} color={colors.ink2} />
     </View>
   );
 }
@@ -374,12 +365,13 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 16,
     borderBottomLeftRadius: 4,
   },
-  // The tile, the sentence's first line and the 32px pill share one middle; the sentence wraps under it.
+  // The 16-point icon (as the conversation's event lines), the sentence's first line and the 32px pill share one
+  // middle; the sentence wraps under it.
   one: {
     marginTop: 12,
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 10,
+    gap: 8,
     minHeight: 50,
     paddingVertical: 9,
     paddingLeft: 12,
@@ -387,7 +379,6 @@ const styles = StyleSheet.create({
   },
   oneTx: { paddingTop: 6 },
   oneText: { fontSize: 14.5, lineHeight: 19 },
-  tile: { width: 24, height: 24, marginTop: 4, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   undoneBy: { marginTop: 2 },
   copyHook: { alignSelf: "flex-start", marginTop: 6, paddingVertical: 2 },
   room: { opacity: 0 },
@@ -401,5 +392,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  itIcon: { height: 18, justifyContent: "center" },
 });

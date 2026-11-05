@@ -8,8 +8,11 @@ import { weights } from "./type-scale";
 export interface SectionHeaderProps {
   title: string;
   count?: number;
-  /** A way on at the header's right ("Gerenciador de tarefas ›"), as Meu Início's "Ver todos ›". */
-  action?: { label: string; onPress: () => void } | null;
+  /**
+   * A way on at the header's right ("Gerenciador de tarefas ›"), as Meu Início's "Ver todos ›". `chevron: false`
+   * for an act done in place (the recent searches' "Clear"): it goes nowhere, so it has no chevron.
+   */
+  action?: { label: string; onPress: () => void; chevron?: boolean } | null;
 }
 
 /**
@@ -35,7 +38,7 @@ export function SectionHeader({ title, count, action }: SectionHeaderProps) {
           <Text variant="small" tone="faint" numberOfLines={1} style={styles.actionText}>
             {action.label}
           </Text>
-          <Icon name="right" size={15} color={colors.faint} />
+          {action.chevron === false ? null : <Icon name="right" size={15} color={colors.faint} />}
         </Pressable>
       ) : null}
     </View>

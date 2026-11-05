@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BackHandler, Keyboard, StyleSheet, type TextInputInstance, View } from "react-native";
 import { STORED } from "@/lib/storage";
-import { LargeTitleScreen, SearchField, Text } from "@/ui";
+import { LargeTitleScreen, SearchField, SectionHeader } from "@/ui";
 import { ConversationRowView } from "../chats/ConversationRowView";
 import { kindOf } from "../chats/logic";
 import { useOrgId } from "../shared/hooks";
@@ -152,9 +152,7 @@ export function SearchScreen() {
           />
           {list.rows.length > 0 ? (
             <View>
-              <Text variant="label" accessibilityRole="header" style={styles.head}>
-                {t("mobile.find.recent")}
-              </Text>
+              <SectionHeader title={t("mobile.find.recent")} />
               {list.rows
                 .filter((r) => kindOf(r) !== "threads")
                 .slice(0, RECENT)
@@ -171,5 +169,4 @@ export function SearchScreen() {
 
 const styles = StyleSheet.create({
   search: { paddingHorizontal: 16, paddingBottom: 10 },
-  head: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
 });

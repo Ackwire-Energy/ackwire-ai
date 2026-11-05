@@ -22,7 +22,7 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Icon, PillButton, Text, useTheme, useToast } from "@/ui";
+import { LineIcon, PillButton, Text, useTheme, useToast } from "@/ui";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { boldRuns } from "./actions";
@@ -68,8 +68,14 @@ function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: 
   if (talk) return <ConsultPairRow askerId={authorId} channelId={channelId} items={[talk]} inline />;
   return (
     <View style={[styles.one, { backgroundColor: colors.sunken }]}>
-      <View style={[styles.tile, { backgroundColor: colors.raised }]}>
-        <Icon name={handed ? "chat" : "info"} size={14} color={colors.ink2} />
+      <View style={styles.tx}>
+        <LineIcon
+          name={handed ? "chat" : "info"}
+          size={16}
+          color={colors.muted}
+          variant="small"
+          text={styles.oneText}
+        />
       </View>
       <View style={[styles.grow, styles.tx]}>
         <Text variant="small" tone="ink2" numberOfLines={3} style={styles.oneText}>
@@ -217,12 +223,12 @@ const styles = StyleSheet.create({
   lockedText: { textAlign: "center" },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  // As the team checks' line (TeamChecks): the tile, the first line and the pill share one middle, also when the
-  // words take three lines.
+  // As the team checks' line (TeamChecks): the 16-point icon, the first line and the pill share one middle, also when
+  // the words take three lines.
   one: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 10,
+    gap: 8,
     minHeight: 50,
     paddingVertical: 9,
     paddingLeft: 12,
@@ -232,5 +238,4 @@ const styles = StyleSheet.create({
   tx: { paddingTop: 6 },
   oneText: { fontSize: 14.5, lineHeight: 19 },
   detail: { marginTop: 2 },
-  tile: { width: 24, height: 24, marginTop: 4, borderRadius: 8, alignItems: "center", justifyContent: "center" },
 });

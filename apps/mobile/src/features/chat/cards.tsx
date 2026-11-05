@@ -239,9 +239,10 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
   };
   const head = (run: Approval[]) =>
     t("approval.run.head", { count: run.length, name, what: run[0] ? approvalTitleText(t, run[0]) : "" });
-  const item = (a: Approval, inRun: boolean) => (
+  const item = (a: Approval, inRun: boolean, divider: boolean) => (
     <ApprovalGroupItem
       key={a.id}
+      divider={divider}
       approval={a}
       lead={leadItem}
       name={name}
@@ -310,7 +311,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
               title: head(single),
               more: {
                 label: t("approval.run.show"),
-                content: <View style={styles.items}>{single.map((a) => item(a, true))}</View>,
+                content: <View style={styles.nested}>{single.map((a) => item(a, true, true))}</View>,
                 open: opened.has(keys[0] ?? ""),
                 onToggle: () => toggle(keys[0]),
               },
@@ -325,13 +326,15 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
             {runs.map((run, i) => {
               const [lead] = run;
               if (!lead) return null;
-              if (run.length < 2) return item(lead, false);
+              if (run.length < 2) return item(lead, false, i > 0);
               const key = keys[i] ?? lead.id;
               const open = opened.has(key);
               return (
-                <View key={key} style={[styles.item, { backgroundColor: c.sunken }]}>
+                <View key={key} style={[styles.item, i > 0 && [styles.divided, { borderTopColor: c.line2 }]]}>
                   <View style={styles.itemRow}>
-                    <ApprovalMark approval={lead} size={24} />
+                    <LineIcon variant="subhead" size={24}>
+                      <ApprovalMark approval={lead} size={24} />
+                    </LineIcon>
                     <View style={styles.grow}>
                       <Text variant="subhead" tone="ink" style={styles.bold}>
                         {head(run)}
@@ -356,7 +359,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
                     </View>
                   </View>
                   {decide(run, t("approval.run.approve"), true)}
-                  {open ? <View style={styles.items}>{run.map((a) => item(a, true))}</View> : null}
+                  {open ? run.map((a) => item(a, true, true)) : null}
                 </View>
               );
             })}
@@ -380,6 +383,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
  * how it ended once decided.
  */
 function ApprovalGroupItem({
+  divider,
   approval: a,
   lead,
   name,
@@ -388,6 +392,8 @@ function ApprovalGroupItem({
   onApprove,
   onAlways,
 }: {
+  /** A hairline above it: every item but the card's first. */
+  divider: boolean;
   approval: Approval;
   lead: Approval;
   name: string;
@@ -412,9 +418,11 @@ function ApprovalGroupItem({
   const own = itemOwnWords(a, lead);
   const scheduled = aheadPhase(a) === "scheduled" && a.runAt;
   return (
-    <View style={[styles.item, { backgroundColor: c.sunken }, !pending && styles.itemDone]}>
+    <View style={[styles.item, divider && [styles.divided, { borderTopColor: c.line2 }], !pending && styles.itemDone]}>
       <View style={styles.itemRow}>
-        <ApprovalMark approval={a} size={24} />
+        <LineIcon variant="subhead" size={24}>
+          <ApprovalMark approval={a} size={24} />
+        </LineIcon>
         <View style={styles.grow}>
           <Text variant="subhead" tone="ink" numberOfLines={2} style={styles.bold}>
             {approvalTitleText(t, a)}
@@ -822,11 +830,16 @@ const styles = StyleSheet.create({
   flip: { transform: [{ rotate: "180deg" }] },
   pressed: { opacity: 0.85 },
   origin: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
-  // Requests sharing one card: each a well of its own, decided ones quieter.
+  // Requests sharing one card: flat rows divided by hairlines (never a plate in a card), decided ones quieter.
   items: { gap: 8, marginTop: 10 },
-  item: { gap: 8, padding: 10, borderRadius: 12 },
+  // A run's requests, unfolded under it or in the card's well: each with its hairline above.
+  nested: { gap: 8 },
+  item: { gap: 8 },
+  // 12 above the hairline (with the list's gap) and 12 under it.
+  divided: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   itemDone: { opacity: 0.7 },
-  itemRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  // The mark on the title's first line.
+  itemRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   // A request's decision: one row under its values, left-aligned, every button the strip's height.
   itemActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   runMore: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", marginTop: 4 },
