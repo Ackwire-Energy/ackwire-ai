@@ -12,6 +12,7 @@ import { COMPACT_QUERY } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { SearchBox } from "@/components/search/SearchBox";
 import { useMatchMedia } from "@/hooks/useMatchMedia";
+import { DM_SIDE_NARROW_QUERY } from "@/hooks/useMembersColumn";
 import { useModalSheet } from "@/hooks/useModalSheet";
 import { useHeaderSearch } from "@/hooks/useWorkspaceSearch";
 
@@ -26,6 +27,7 @@ export function HeaderSearch({ channelId, onOpen, dm }: { channelId: string; onO
   const { org } = useOrg();
   const ws = useHeaderSearch();
   const phone = useMatchMedia(COMPACT_QUERY);
+  const narrow = useMatchMedia(DM_SIDE_NARROW_QUERY);
   const [sheet, setSheet] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -63,7 +65,11 @@ export function HeaderSearch({ channelId, onOpen, dm }: { channelId: string; onO
       className="channel__search"
       inputRef={sheetBox ? undefined : input}
       autoFocus={sheetBox}
-      placeholder={dm ? t("searchPage.searchHere") : t("searchPage.header.placeholder", { org: org.name })}
+      placeholder={
+        dm
+          ? t(narrow ? "searchPage.label" : "searchPage.searchHere")
+          : t("searchPage.header.placeholder", { org: org.name })
+      }
       chips={held ? held.slice(1) : ws.chips}
       onChipsChange={held && place ? (chips) => ws.setChips(inDmOnly(chips, place)) : ws.setChips}
       ops={dm ? DM_SEARCH_OPS : undefined}

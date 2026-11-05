@@ -33506,6 +33506,48 @@
   "desktop.browserOnly.role": {
     "value": "Your role gives you {{name}}'s browser, not the whole computer"
   },
+  "agentSide.label": {
+    "value": "Details"
+  },
+  "agentSide.show": {
+    "value": "Show details"
+  },
+  "agentSide.hide": {
+    "value": "Hide details"
+  },
+  "agentSide.seeAll": {
+    "value": "See all"
+  },
+  "agentSide.thinks": {
+    "value": "How it thinks"
+  },
+  "agentSide.thinksWith": {
+    "value": "Thinks with"
+  },
+  "agentSide.owner": {
+    "value": "Owner"
+  },
+  "agentSide.usage": {
+    "value": "This month"
+  },
+  "agentSide.spentOf": {
+    "value": "{{spent}} of {{limit}}"
+  },
+  "agentSide.tasks": {
+    "value": "Recent tasks"
+  },
+  "agentSide.usingBrowser": {
+    "value": "Using Chrome"
+  },
+  "agentSide.usingScreen": {
+    "value": "Using the computer"
+  },
+  "agentSide.screenOff": {
+    "value": "The screen is off"
+  },
+  "agentSide.screenOffHelp": {
+    "value": "It turns on when someone watches."
+  },
   "agentComputer.title": {
     "value": "{{name}}'s computer"
   },
@@ -33520,6 +33562,9 @@
   },
   "agentComputer.button": {
     "value": "Computer"
+  },
+  "agentComputer.pictureNow": {
+    "value": "A moment ago"
   },
   "agentComputer.choose": {
     "value": "Choose a computer"

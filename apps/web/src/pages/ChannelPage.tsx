@@ -234,6 +234,7 @@ import { AgentPanel } from "@/components/AgentPanel";
 import { ApprovalAsk, ApprovalGroupAsk } from "@/components/ApprovalAsk";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { AgentPanelContext, AgentPanelShownContext, useOpenAgentPanel } from "@/components/agent-panel-context";
+import { AgentSidebar } from "@/components/agents/AgentSidebar";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { objectUrls } from "@/components/artifacts/FileView";
 import { MessageWorkLine } from "@/components/BackgroundWork";
@@ -341,7 +342,7 @@ import { BarAlsoTyping, BarPhrase, BarStep, ConsultClock, WorkingStack } from "@
 import { useChannelSearch } from "@/hooks/useChannelSearch";
 import { useComposerDraft } from "@/hooks/useComposerDraft";
 import { useDirectory } from "@/hooks/useDirectory";
-import { useMembersColumn } from "@/hooks/useMembersColumn";
+import { useDmSidebar, useMembersColumn } from "@/hooks/useMembersColumn";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
 import { TYPED_VALUES } from "@/i18n";
@@ -397,10 +398,18 @@ const useSecond = (active: boolean) => useSyncExternalStore(active ? secondClock
 /** Live statuses of a run still at work on its conversation (a new message steers into it). */
 const WORKING: ReadonlySet<string> = new Set(["thinking", "queued", "running", "waiting_approval"]);
 
+/** The sidebar of a DM with an agent, as its header's toggle reads it. */
+export interface DmSideControl {
+  open: boolean;
+  /** It sits beside the chat (not over it, not given up to a thread or the agent's page). */
+  docked: boolean;
+  toggle: () => void;
+}
+
 /** Header and empty state of a channel, or of a DM (same layout). */
 export interface ChannelChrome {
-  /** A page's own header; a function gets the header search's way into its results (a DM's). */
-  header?: ReactNode | ((h: { onSearch: () => void }) => ReactNode);
+  /** A page's own header; a function gets the header search's way into its results and the sidebar (a DM's). */
+  header?: ReactNode | ((h: { onSearch: () => void; side: DmSideControl | null }) => ReactNode);
   emptyText?: string;
   /** Composer label/placeholder target, e.g. "Ada" instead of "#eng". */
   composerTarget?: string;
@@ -858,6 +867,7 @@ function ChannelView({
   }, [draftKey]);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const membersColumn = useMembersColumn();
+  const dmSidebar = useDmSidebar();
   // Opened from a sidebar row's "Adicionar pessoas ou agentes": straight to adding, and closing that closes it all.
   const [addFirst, setAddFirst] = useState(false);
   // The members column's "Adicionar pessoa ou agente": the details' add flow alone, as from a sidebar row.
@@ -2064,6 +2074,22 @@ function ChannelView({
     setConsultId(null);
     setSearchOpen(true);
   };
+  // A thread or an agent's page in the column's place: its toggle closes that and shows the column.
+  const toggleColumn = (column: { open: boolean; toggle: () => void }) => {
+    if (!panel && !profile) return column.toggle();
+    if (profileKeeps()) return;
+    setPanel(null);
+    setProfile(null);
+    if (!column.open) column.toggle();
+  };
+  const side: DmSideControl | null =
+    agentDm && dmAgent
+      ? {
+          open: !panel && !profile && dmSidebar.open,
+          docked: !panel && !profile && dmSidebar.column,
+          toggle: () => toggleColumn(dmSidebar),
+        }
+      : null;
   // It takes over from the conversation's skeleton (`ChannelSkeleton`): no second entrance of the whole view.
   const [continues] = useState(skeletonOnScreen);
 
@@ -2082,7 +2108,7 @@ function ChannelView({
             {chrome?.header ? (
               <AgentTasksContext.Provider value={tasksControl}>
                 <AgentPanelShownContext.Provider value={profile?.agentId ?? null}>
-                  {typeof chrome.header === "function" ? chrome.header({ onSearch: openSearch }) : chrome.header}
+                  {typeof chrome.header === "function" ? chrome.header({ onSearch: openSearch, side }) : chrome.header}
                 </AgentPanelShownContext.Provider>
               </AgentTasksContext.Provider>
             ) : (
@@ -2092,18 +2118,8 @@ function ChannelView({
                 queueMachine={queueMachine}
                 people={channelPeople}
                 agents={channelAgents}
-                // A thread or an agent's page in the members' place: the toggle closes it and shows the members.
                 membersOpen={!panel && !profile && membersColumn.open}
-                onMembers={
-                  panel || profile
-                    ? () => {
-                        if (profileKeeps()) return;
-                        setPanel(null);
-                        setProfile(null);
-                        if (!membersColumn.open) membersColumn.toggle();
-                      }
-                    : membersColumn.toggle
-                }
+                onMembers={() => toggleColumn(membersColumn)}
                 onDetails={() => setDetailsOpen(true)}
                 onSearch={openSearch}
               />
@@ -2510,6 +2526,8 @@ function ChannelView({
                     }}
                   />
                 </aside>
+              ) : side && dmAgent && (side.docked || dmSidebar.sheet) ? (
+                <AgentSidebar agent={dmAgent} onClose={dmSidebar.sheet ? dmSidebar.closeSheet : undefined} />
               ) : (
                 !chrome &&
                 membersColumn.column && (

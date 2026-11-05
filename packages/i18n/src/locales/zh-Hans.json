@@ -13635,6 +13635,22 @@
       "role": "你的角色只能使用 {{name}} 的浏览器，不能使用整台电脑"
     }
   },
+  "agentSide": {
+    "label": "详情",
+    "show": "显示详情",
+    "hide": "隐藏详情",
+    "seeAll": "查看全部",
+    "thinks": "思考方式",
+    "thinksWith": "使用的模型",
+    "owner": "负责人",
+    "usage": "本月",
+    "spentOf": "{{spent}} / {{limit}}",
+    "tasks": "最近的任务",
+    "usingBrowser": "正在使用 Chrome",
+    "usingScreen": "正在使用电脑",
+    "screenOff": "屏幕已关闭",
+    "screenOffHelp": "有人观看时屏幕会打开。"
+  },
   "agentComputer": {
     "title": "{{name}} 的电脑",
     "title_female": "{{name}} 的电脑",
@@ -13642,6 +13658,7 @@
     "openOf": "打开 {{name}} 的电脑",
     "help": "帮助",
     "button": "电脑",
+    "pictureNow": "刚刚",
     "choose": "选择电脑",
     "status": {
       "available": "空闲 · 无人使用",

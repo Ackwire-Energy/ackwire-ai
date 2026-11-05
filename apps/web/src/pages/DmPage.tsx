@@ -1,12 +1,10 @@
 import type { DmTarget } from "@agenteschat/client";
-import { keys, useModels } from "@agenteschat/client";
+import { keys } from "@agenteschat/client";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
-import { brainLine } from "@agenteschat/client/lib/brain";
 import { greetingSuggestions } from "@agenteschat/client/lib/chat";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { apiProviderOf, isAuto } from "@agenteschat/client/lib/providers";
 import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
-import { Avatar, BrainIcon, ProviderLogo } from "@agenteschat/ui";
+import { Avatar, BrainIcon, Button, ProviderLogo } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,9 +21,10 @@ import { LetMeTalkButton } from "@/components/ReachLines";
 import { RightHandIntro } from "@/components/RightHandIntro";
 import { HeaderSearch } from "@/components/search/HeaderSearch";
 import { AgentTasksPill } from "@/components/tasks/AgentTasksPanel";
+import { useAgentThinks } from "@/hooks/useAgentThinks";
 import { useDirectory } from "@/hooks/useDirectory";
 import { rightHandSeen } from "@/lib/storage";
-import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
+import { ChannelPage, ChannelSkeleton, type DmSideControl } from "./ChannelPage";
 
 /** A direct message with an agent or a person: the channel layout with its own header and empty state. */
 export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMessageId?: string }) {
@@ -34,7 +33,6 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
   const api = useApi();
   const qc = useQueryClient();
   const dir = useDirectory(org.id);
-  const models = useModels();
   const kind = "agentId" in target ? "agent" : "person";
   const id = "agentId" in target ? target.agentId : target.userId;
   const dm = useQuery({
@@ -55,6 +53,7 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
   const person = "userId" in target ? dir.memberById.get(target.userId) : undefined;
   const name = agent?.name ?? person?.name ?? "";
   const rightHand = isRightHand(agent);
+  const thinks = useAgentThinks(agent);
   // Its DM is open, from its row or any other way in: its row's "Novo" goes.
   useEffect(() => {
     if (rightHand) rightHandSeen.mark(rightHandSeenKey(me.user.id, org.id));
@@ -72,20 +71,9 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
   if (!dm.data || dir.loading) return <ChannelSkeleton dm={kind} />;
 
   const owner = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
-  const model = !agent
-    ? ""
-    : isAuto(agent.model)
-      ? t("brain.auto.label")
-      : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
-  // Who thinks: on a plan, the model by the plan that pays for it ("Sonnet pelo plano do Claude"), else the API model.
-  const thinks = agent
-    ? brainLine(t, agent.brain, model, { owner: owner?.name.split(" ")[0], agents: dir.agents })
-    : null;
-  // The API's maker when it thinks through a key.
-  const thinksMark = thinks?.mark ?? (agent ? apiProviderOf(agent.model, models.data?.models ?? []) : undefined);
   const role = agent ? agent.role || `@${agent.handle}` : "";
   // The right hand (ADR 0137) says what it is and whose permissions it acts with, never an owner.
-  const header = ({ onSearch }: { onSearch: () => void }) => (
+  const header = ({ onSearch, side }: { onSearch: () => void; side: DmSideControl | null }) => (
     <header className="channel__header">
       <NavToggle />
       <DmWho agentId={agent?.id} userId={person?.userId} label={t("profile.of", { name })}>
@@ -106,8 +94,8 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
                 <>
                   {" · "}
                   <span className="channel__brain ac-iconline">
-                    {thinksMark ? (
-                      <ProviderLogo id={thinksMark} size="xs" />
+                    {thinks.mark ? (
+                      <ProviderLogo id={thinks.mark} size="xs" />
                     ) : (
                       <BrainIcon kind={thinks.kind} size={14} />
                     )}
@@ -122,9 +110,23 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
       </DmWho>
       {/* Its tasks (ADR 0128), while it has any: they open in the side panel. */}
       {agent && <AgentTasksPill />}
-      {agent && !rightHand && <ComputerButton agent={agent} />}
-      {/* Search stays the last on the right, as in a channel: the same field, held to this DM. */}
+      {/* The sidebar has the computer: only a line of turns waiting for it still shows here. */}
+      {agent && !rightHand && <ComputerButton agent={agent} queueOnly={side?.docked} />}
+      {/* The same field as a channel's, held to this DM. */}
       <HeaderSearch channelId={dm.data.channelId} onOpen={onSearch} dm />
+      {side && (
+        <Button
+          size="sm"
+          variant="ghost"
+          iconOnly
+          icon="sidebar"
+          className="dm-side-toggle"
+          aria-label={t("agentSide.label")}
+          aria-pressed={side.open}
+          title={t(side.open ? "agentSide.hide" : "agentSide.show")}
+          onClick={side.toggle}
+        />
+      )}
     </header>
   );
   return (
