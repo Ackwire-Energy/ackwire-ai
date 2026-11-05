@@ -13921,7 +13921,6 @@
       "goBadAddress": "Eso no parece una dirección. Prueba ejemplo.com.",
       "goFailed": "El sitio no se abrió. Revisa la dirección.",
       "backTitle": "Devolverle el control a {{name}}",
-      "doneTitle": "Listo. ¿Una nota para {{name}}?",
       "backLabel": "Nota para {{name}}",
       "backPlaceholder": "Opcional: ¿algo que {{name}} deba saber?",
       "addNote": "Dejar una nota"

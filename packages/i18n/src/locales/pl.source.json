@@ -32752,9 +32752,6 @@
   "browser.inCard.backTitle": {
     "value": "Hand back to {{name}}"
   },
-  "browser.inCard.doneTitle": {
-    "value": "Done. A note for {{name}}?"
-  },
   "browser.inCard.backLabel": {
     "value": "Note for {{name}}"
   },

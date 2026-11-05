@@ -77,7 +77,7 @@
  * there can see (the keys after it in control), or the run's steps while the agent works, under the screen and under a
  * cover it opens from by itself. The wait and a cover that stays until someone acts have no line: they take its room,
  * as far from the window's foot as from its sides. What comes over or under the screen (a banner, the request being
- * helped with, the hand-back note) takes the screen's room, never the window's: the stage shrinks the screen inside
+ * helped with, the hand-back bar) takes the screen's room, never the window's: the stage shrinks the screen inside
  * it, keeping its shape.
  */
 .ac-dialog.cmp-dialog:where(:has(.dsk, .cmp-stage, .cmp-prep, .brw-ac.is-surface)) {
@@ -170,8 +170,9 @@
  * Full screen on the agent's screen: its screen alone, as large as the display allows, on its own ground. The page
  * stays the full-screen element (useFullScreen); only the layout changes. The body's boxes step aside, so the screen
  * and what floats over it share one grid: the screen spans it; the head (a bar), a banner, the request being helped
- * with and the line under the screen float at the top, centred, in that order. The stage and the screen restate
- * their size container, which the phone's sheet turns off.
+ * with and the line under the screen float at the top, centred, in that order. The hand-back bar has the last row, so
+ * the screen ends over it and its foot stays in sight. The stage and the screen restate their size container, which
+ * the phone's sheet turns off.
  */
 /* The take-control head: its icon centred on the title and the line under it together. */
 .cmp-dialog .ac-dialog__lead:has(+ .ac-dialog__titles) {
@@ -180,7 +181,7 @@
 }
 .ac-dialog.cmp-dialog.is-screen-only {
   display: grid;
-  grid-template: auto auto auto auto 1fr / minmax(0, 1fr);
+  grid-template: auto auto auto auto 1fr auto / minmax(0, 1fr);
   background: var(--screen-bg);
   box-shadow: none;
 }
@@ -194,7 +195,7 @@
 }
 /* Isolated: a cover over the screen (z-index 5) stays under the bar. */
 .cmp-dialog.is-screen-only .dsk-stage {
-  grid-area: 1 / 1 / -1 / -1;
+  grid-area: 1 / 1 / 6 / -1;
   container-type: size;
   isolation: isolate;
   border-radius: 0;
@@ -252,6 +253,12 @@
 }
 .cmp-dialog.is-screen-only .dsk-line {
   grid-row: 4;
+}
+.cmp-dialog.is-screen-only .brw-ac__back {
+  grid-area: 6 / 1;
+  padding: 8px calc(12px + env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px))
+    calc(12px + env(safe-area-inset-left, 0px));
+  background: var(--surface-raised);
 }
 /* Hidden after a while (useBar); what floats under the head also while the head alone came back. */
 .cmp-dialog.is-bar-hidden > .ac-dialog__head,
@@ -311,28 +318,15 @@
   z-index: 1;
 }
 /*
- * Take control's and Hand back's icons keep the pill's padding by their ink and sit on its words' capitals' middle (the
- * kit's `--lead-air`, `--lead-rise`): the person leaves 3.4 of its 20 units before it and its ink's middle is 0.4
- * under its box's, and the check leaves 4.7, on its box's middle.
+ * Take control's icon keeps the pill's padding by its ink and sits on its words' capitals' middle (the kit's
+ * `--lead-air`, `--lead-rise`): the person leaves 3.4 of its 20 units before it and its ink's middle is 0.4 under its
+ * box's. Raised, it shows its ring and shadow about 1.5 px past its box (the kit's `--e1`), where a glyph beside it
+ * shows nothing past its ink: the row's gaps keep that much more room on its sides, so they read even.
  */
 .cmp-acts > .cmp-take {
   --lead-air: calc(var(--control-icon-sm) * 3.4 / 20);
   --lead-rise: calc(var(--control-icon-sm) * 0.4 / 20 + var(--cap-mid));
-}
-.cmp-acts > .cmp-back {
-  --lead-air: calc(var(--control-icon-sm) * 4.7 / 20);
-  --lead-rise: var(--cap-mid);
-}
-/*
- * Raised, they show their ring and shadow about 1.5 px past their box (the kit's `--e1`, the primary's blur), where a
- * glyph beside them shows nothing past its ink: the row's gaps keep that much more room on their sides, so they read
- * even. On a dark ground the primary's shadow shows nothing, only its edge, about 1 px past its box as drawn.
- */
-.cmp-acts > :is(.cmp-take, .cmp-back) {
   margin-inline: 1.5px;
-}
-[data-theme="dark"] .cmp-acts > .cmp-back {
-  margin-inline: 1px;
 }
 .cmp-sub:empty::before {
   content: "\00a0";
@@ -464,6 +458,10 @@
 .cmp-body .brw-ac__foot {
   border-top: 0;
   padding: 8px 0 0;
+}
+/* Its 8 px over it are the column's gap. */
+.cmp-body .brw-ac__back {
+  padding-top: 0;
 }
 
 /* A cover's portrait of the computer, over its words. */
@@ -740,9 +738,7 @@
 /*
  * A phone: the body takes the head's 16 px inset. The head keeps one row and one height, watching or in control: the
  * name and the line under it on a line each beside the controls (the face steps aside, as the title names the agent),
- * a take over's Hand back in words where they fit (a check alone reads as Done; `useHandBack` folds it to a give-back
- * arrow where they don't), and any other action with an icon its icon alone, in the middle of its square, its words,
- * hidden, still its name.
+ * and an action with an icon its icon alone, in the middle of its square, its words, hidden, still its name.
  */
 @media (max-width: 640px) {
   .cmp-body {
@@ -760,11 +756,11 @@
   .cmp-dialog .ac-dialog__sub:has(> .cmp-said) {
     white-space: normal;
   }
-  .cmp-acts > .ac-btn:has(> .ac-icon):not(.cmp-words) {
+  .cmp-acts > .ac-btn:has(> .ac-icon) {
     width: var(--control-h-sm);
     padding: 0;
   }
-  .cmp-acts > .ac-btn:not(.cmp-words) .cmp-act-label {
+  .cmp-acts > .ac-btn .cmp-act-label {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -772,20 +768,13 @@
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
-  .cmp-acts > .cmp-words > .ac-icon {
-    display: none;
-  }
-  .cmp-acts > :is(.cmp-take, .cmp-back) {
+  .cmp-acts > .cmp-take {
     --lead-air: initial;
     --lead-rise: initial;
   }
-  /* "I couldn't" shows its circle alone, which leaves 2.7 of its icon's 20 units on each side, as the arrows do. */
-  .cmp-acts > .cmp-couldnt {
-    --glyph-air: calc(var(--control-icon-sm) * 2.7 / 20);
-  }
 }
 @media (max-width: 640px) and (pointer: coarse) {
-  .cmp-acts > .ac-btn:has(> .ac-icon):not(.cmp-words) {
+  .cmp-acts > .ac-btn:has(> .ac-icon) {
     width: var(--control-h-md);
   }
 }

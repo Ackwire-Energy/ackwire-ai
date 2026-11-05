@@ -13456,7 +13456,6 @@
       "goBadAddress": "Bu bir adres gibi görünmüyor. ornek.com deneyin.",
       "goFailed": "Site açılmadı. Adresi kontrol edin.",
       "backTitle": "{{name}} ajanına geri ver",
-      "doneTitle": "Bitti. {{name}} için bir not?",
       "backLabel": "{{name}} için not",
       "backPlaceholder": "İsteğe bağlı: {{name}} ajanının bilmesi gereken bir şey var mı?",
       "addNote": "Not bırak"

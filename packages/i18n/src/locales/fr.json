@@ -14045,8 +14045,6 @@
       "goFailed": "Le site ne s'est pas ouvert. Vérifiez l'adresse.",
       "backTitle": "Rendre la main à {{name}}",
       "backTitle_female": "Rendre la main à {{name}}",
-      "doneTitle": "C'est fait. Une note pour {{name}} ?",
-      "doneTitle_female": "C'est fait. Une note pour {{name}} ?",
       "backLabel": "Note pour {{name}}",
       "backLabel_female": "Note pour {{name}}",
       "backPlaceholder": "Facultatif : quelque chose que {{name}} devrait savoir ?",

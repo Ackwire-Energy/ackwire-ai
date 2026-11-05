@@ -13039,7 +13039,6 @@
       "goBadAddress": "주소가 아닌 것 같아요. example.com 형식으로 입력해 보세요.",
       "goFailed": "사이트가 열리지 않았어요. 주소를 확인하세요.",
       "backTitle": "{{name}}에게 돌려주기",
-      "doneTitle": "완료했어요. {{name}}에게 남길 메모가 있나요?",
       "backLabel": "{{name}}에게 남길 메모",
       "backPlaceholder": "선택 사항: {{name}}이(가) 알아야 할 게 있나요?",
       "addNote": "메모 남기기"

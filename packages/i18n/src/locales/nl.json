@@ -13637,8 +13637,6 @@
       "goFailed": "De site ging niet open. Controleer het adres.",
       "backTitle": "Teruggeven aan {{name}}",
       "backTitle_female": "Teruggeven aan {{name}}",
-      "doneTitle": "Klaar. Een notitie voor {{name}}?",
-      "doneTitle_female": "Klaar. Een notitie voor {{name}}?",
       "backLabel": "Notitie voor {{name}}",
       "backLabel_female": "Notitie voor {{name}}",
       "backPlaceholder": "Optioneel: iets wat {{name}} moet weten?",

@@ -13347,8 +13347,6 @@ export const ptBR = {
       goFailed: "O site não abriu. Confira o endereço.",
       backTitle: "Devolver ao {{name}}",
       backTitle_female: "Devolver à {{name}}",
-      doneTitle: "Pronto. Algum recado para o {{name}}?",
-      doneTitle_female: "Pronto. Algum recado para a {{name}}?",
       backLabel: "Recado para o {{name}}",
       backLabel_female: "Recado para a {{name}}",
       backPlaceholder: "Opcional: o que o {{name}} precisa saber?",

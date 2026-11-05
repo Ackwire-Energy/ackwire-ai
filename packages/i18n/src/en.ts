@@ -13143,7 +13143,6 @@ export const en = {
       goBadAddress: "That doesn't look like an address. Try example.com.",
       goFailed: "The site didn't open. Check the address.",
       backTitle: "Hand back to {{name}}",
-      doneTitle: "Done. A note for {{name}}?",
       backLabel: "Note for {{name}}",
       backPlaceholder: "Optional: anything {{name}} should know?",
       /** Handing back: opens the optional note. */

@@ -94,7 +94,7 @@ describe("a help request opens the agent's browser in its card", () => {
     expect(document.querySelector(".brw-rq--settled")?.textContent).toContain("pediu ajuda · expirou");
   }, 15_000);
 
-  test("Abrir aqui takes control in place: Pronto in the header, on touch the app's own text field, no page change", async () => {
+  test("Abrir aqui takes control in place: Pronto under the page, on touch the app's own text field, no page change", async () => {
     onTouch();
     const { state, handoff } = seedRequest();
     const api = createFakeApi(state);
@@ -119,10 +119,10 @@ describe("a help request opens the agent's browser in its card", () => {
     const card = document.querySelector(".brw-ac") as HTMLElement;
     expect(card.classList.contains("is-open")).toBe(true);
     expect(card.classList.contains("is-control")).toBe(true);
-    // The request is the frame's title, with Pronto in its top; the request above says who is helping.
+    // The request is the frame's title, with nothing to end it in its top; the request above says who is helping.
     const top = card.querySelector(".brw-mf__top") as HTMLElement;
     expect(top.querySelector("b")?.textContent).toBe("Entrar no painel com a conta de teste");
-    expect(within(top).getByRole("button", { name: "Pronto" })).toBeTruthy();
+    expect(within(top).queryByRole("button", { name: "Pronto" })).toBeNull();
     const field = within(card).getByRole("textbox", { name: "Texto para a página" }) as HTMLInputElement;
     // Nothing marked yet: the field says where to start, the line before it only its pointer.
     expect(field.placeholder).toBe("Toque num campo da página e digite aqui");
@@ -131,8 +131,15 @@ describe("a help request opens the agent's browser in its card", () => {
     expect(card.querySelector(".brw-go")?.nextElementSibling?.classList.contains("brw-ac__body")).toBe(true);
     expect(within(card).getByRole("textbox", { name: "Endereço do site" })).toBeTruthy();
     expect(within(card).queryByRole("button", { name: "Abrir um site" })).toBeNull();
-    // Desistir next to Pronto (the old "Não consegui" under the field is gone).
-    expect(within(top).getByRole("button", { name: "Desistir" })).toBeTruthy();
+    // The bar under the field, always there: Desistir beside Pronto, the main one on the right, nothing to go back from.
+    const row = card.querySelector(".brw-type + .brw-ac__back") as HTMLElement;
+    expect(card.lastElementChild === row).toBe(true);
+    expect([...row.querySelectorAll("button")].map((b) => b.textContent)).toEqual([
+      "Deixar um recado",
+      "Desistir",
+      "Pronto",
+    ]);
+    expect(row.textContent).toContain("Devolver à Ada");
     expect(within(card).queryByRole("button", { name: "Não consegui" })).toBeNull();
     expect(document.querySelector(".brw-rq")?.textContent).toContain("Você está ajudando · neste card");
 
@@ -154,16 +161,20 @@ describe("a help request opens the agent's browser in its card", () => {
     expect(card.textContent).toContain("O que aconteceu?");
     const why = within(card).getByPlaceholderText("Conte com suas palavras") as HTMLTextAreaElement;
     expect([why.getAttribute("rows"), why.className]).toEqual(["1", "ac-input brw-ac__note"]);
+    expect(card.querySelector(".brw-ac__back")).toBeNull();
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Voltar" })));
 
-    // Pronto is one quiet row: Ada asked nothing, so no note field until "Deixar um recado", and Pronto has the focus.
-    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Pronto" })));
-    expect(card.textContent).toContain("Pronto. Algum recado para a Ada?");
+    // Ada asked nothing, so no note field until "Deixar um recado".
     expect(within(card).queryByRole("textbox", { name: "Recado para a Ada" })).toBeNull();
-    const row = card.querySelector(".brw-ac__back") as HTMLElement;
-    expect(document.activeElement === within(row).getByRole("button", { name: "Pronto" })).toBe(true);
+    const foot = card.querySelector(".brw-ac__back") as HTMLElement;
     // The word for Ada (Enter sends), then it hands back: the card folds away.
-    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Deixar um recado" })));
+    await act(async () => fireEvent.click(within(foot).getByRole("button", { name: "Deixar um recado" })));
+    // Opened by mistake, Esc closes it while it's empty, and it opens again.
+    await act(async () =>
+      fireEvent.keyDown(within(card).getByRole("textbox", { name: "Recado para a Ada" }), { key: "Escape" }),
+    );
+    expect(within(card).queryByRole("textbox", { name: "Recado para a Ada" })).toBeNull();
+    await act(async () => fireEvent.click(within(foot).getByRole("button", { name: "Deixar um recado" })));
     const note = within(card).getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
     expect(document.activeElement === note).toBe(true);
     // The same note as on the screen: one line in the middle of its field that grows as it wraps, with no grip.
@@ -215,7 +226,7 @@ describe("a help request opens the agent's browser in its card", () => {
     expect(screens.at(-1)).toContain("mode=control");
   });
 
-  test("with a mouse: no text bar (keys go to the page), the address bar with Colar on top, Devolver asks for a note", async () => {
+  test("with a mouse: no text bar (keys go to the page), the address bar with Colar on top, one click on Devolver hands back", async () => {
     const { state, handoff } = seedRequest();
     const active: BrowserHandoff = { ...handoff, kind: "takeover", status: "active", controllerUserId: "u-walter" };
     const api = createFakeApi(state);
@@ -232,19 +243,23 @@ describe("a help request opens the agent's browser in its card", () => {
     expect(within(bar).getByRole("button", { name: "Colar" }).getAttribute("title")).toBe(
       "Colar na página o que você copiou",
     );
-    await act(async () => fireEvent.click(within(top).getByRole("button", { name: "Devolver" })));
     expect(card.textContent).toContain("Devolver à Ada");
     expect(within(card).queryByRole("textbox", { name: "Recado para a Ada" })).toBeNull();
     expect(within(card).getByRole("button", { name: "Deixar um recado" })).toBeTruthy();
     expect(within(top).queryByRole("button", { name: "Devolver" })).toBeNull();
-    // A quick hand back: Devolver alone, no note.
-    const row = card.querySelector(".brw-ac__back") as HTMLElement;
+    // The last of the card, so nothing of it covers the page; a take over has one way out, and nothing else closes it.
+    const row = card.lastElementChild as HTMLElement;
+    expect(row.classList.contains("brw-ac__back")).toBe(true);
+    expect(within(row).queryByRole("button", { name: "Voltar" })).toBeNull();
+    expect(within(row).queryByRole("button", { name: "Desistir" })).toBeNull();
+    expect(row.contains(document.activeElement)).toBe(false);
+    expect(state.calls.filter((c) => c.method === "browser.done")).toEqual([]);
     await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Devolver" })));
     await settle(4);
     expect(state.calls.filter((c) => c.method === "browser.done").map((c) => c.args)).toEqual([[ORG_ID, HANDOFF_ID]]);
   });
 
-  test("a request that asked the person something opens the hand back with its note", async () => {
+  test("a request that asked the person something has its note open, with the keys still on the page", async () => {
     const { state, handoff } = seedRequest();
     const asked: BrowserHandoff = {
       ...handoff,
@@ -257,10 +272,12 @@ describe("a help request opens the agent's browser in its card", () => {
     await renderPage(<BrowserCard agentId={ADA_ID} name="Ada" handoff={asked} canTakeOver />, { api, org: true });
     await settle(6);
     const card = document.querySelector(".brw-ac") as HTMLElement;
-    await act(async () => fireEvent.click(within(card).getAllByRole("button", { name: "Pronto" })[0] as HTMLElement));
     const note = within(card).getByRole("textbox", { name: "Recado para a Ada" });
-    expect(document.activeElement === note).toBe(true);
+    expect(document.activeElement === note).toBe(false);
     expect(within(card).queryByRole("button", { name: "Deixar um recado" })).toBeNull();
+    // The answer is its reason to be open: Esc leaves it.
+    await act(async () => fireEvent.keyDown(note, { key: "Escape" }));
+    expect(within(card).getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
   });
 });
 

@@ -14049,8 +14049,6 @@
       "goFailed": "Il sito non si è aperto. Controlla l'indirizzo.",
       "backTitle": "Restituisci a {{name}}",
       "backTitle_female": "Restituisci a {{name}}",
-      "doneTitle": "Fatto. Una nota per {{name}}?",
-      "doneTitle_female": "Fatto. Una nota per {{name}}?",
       "backLabel": "Nota per {{name}}",
       "backLabel_female": "Nota per {{name}}",
       "backPlaceholder": "Facoltativo: c'è qualcosa che {{name}} deve sapere?",

@@ -13102,7 +13102,6 @@
       "goBadAddress": "Itu sepertinya bukan alamat. Coba example.com.",
       "goFailed": "Situs tidak terbuka. Periksa alamatnya.",
       "backTitle": "Kembalikan ke {{name}}",
-      "doneTitle": "Selesai. Ada catatan untuk {{name}}?",
       "backLabel": "Catatan untuk {{name}}",
       "backPlaceholder": "Opsional: ada yang perlu diketahui {{name}}?",
       "addNote": "Tinggalkan catatan"

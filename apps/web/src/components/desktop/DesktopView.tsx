@@ -29,7 +29,7 @@ import { Cover } from "../browser/BrowserCard";
 import { AskActions, HandBackFoot, useAskControl } from "../computer/control";
 import { CantShowCover, ScreenNotice } from "../computer/covers";
 import { Egress } from "../computer/Egress";
-import { DialogHead, FullButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
+import { DialogHead, FullButton, useDialogHead, useSayFailed } from "../computer/head";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { DesktopLink } from "./link";
@@ -108,7 +108,6 @@ export function DesktopView({
   const [view, setView] = useState<DesktopViewState>("connecting");
   const [round, setRound] = useState(0);
   const [gaveUp, setGaveUp] = useState(false);
-  const [handingBack, setHandingBack] = useState(false);
   // Control opening over the last picture it watched, or watching again over the last one in control.
   const [taking, setTaking] = useState(false);
   const [returning, setReturning] = useState(false);
@@ -375,7 +374,6 @@ export function DesktopView({
   }, []);
   useEffect(() => {
     if (inControl) return;
-    setHandingBack(false);
     setGot(null);
     unsay();
     // Its field goes with control, and a field removed while focused may get no blur.
@@ -385,8 +383,8 @@ export function DesktopView({
   // button leaves the browser's focus on it, where Space would toggle it and Esc would reach nothing.
   // biome-ignore lint/correctness/useExhaustiveDependencies: full screen's changes move the keys too
   useEffect(() => {
-    if (inControl && !touch && !handingBack) keysRef.current?.focus({ preventScroll: true });
-  }, [head?.full, inControl, touch, handingBack]);
+    if (inControl && !touch) keysRef.current?.focus({ preventScroll: true });
+  }, [head?.full, inControl, touch]);
 
   const shown: DesktopViewState = blocked ?? view;
   const live = shown === "live";
@@ -437,10 +435,10 @@ export function DesktopView({
     );
   const finish = () => {
     if (!handoff) return;
+    head?.setFull(false);
     const words = backNote.trim();
     actions.done.mutate(words ? { handoffId: handoff.id, note: words } : handoff.id, {
       onSuccess: () => {
-        setHandingBack(false);
         setBackNote("");
         onSettled?.();
       },
@@ -453,7 +451,6 @@ export function DesktopView({
   };
 
   const handBackLabel = handoff?.kind === "ask" ? t("browser.inCard.done") : t("browser.inCard.handBack");
-  const back = useHandBack(handoff?.kind !== "ask");
   // Over a cover the head says nothing the cover says (opening, the pause, why not): only who holds the screen.
   const sub = inControl
     ? asked
@@ -543,37 +540,6 @@ export function DesktopView({
       )}
     </>
   );
-  const controlActs = (
-    <>
-      {asked && (
-        <Button
-          size="sm"
-          variant="ghost"
-          icon="block"
-          className="cmp-couldnt ac-btn--glyph"
-          loading={actions.failed.isPending}
-          onClick={giveUp}
-        >
-          <span className="cmp-act-label">{t("browser.inCard.couldnt")}</span>
-        </Button>
-      )}
-      {!handingBack && (
-        <Button
-          size="sm"
-          variant="primary"
-          icon={back.icon}
-          className={back.className}
-          onClick={() => {
-            // The note opens in the dialog, never over the full-screen screen.
-            head?.setFull(false);
-            setHandingBack(true);
-          }}
-        >
-          <span className="cmp-act-label">{handBackLabel}</span>
-        </Button>
-      )}
-    </>
-  );
 
   return (
     <div className={cx("dsk", inControl && "is-control", final && "is-final")} data-state={shown}>
@@ -581,8 +547,8 @@ export function DesktopView({
         sub={withAgentFace(sub, name, agentId)}
         actions={
           <>
-            {inControl ? controlActs : watchActs}
-            {(live || inControl || shown === "hidden") && !handingBack && <FullButton />}
+            {!inControl && watchActs}
+            {(live || inControl || shown === "hidden") && <FullButton />}
           </>
         }
       />
@@ -659,62 +625,68 @@ export function DesktopView({
           )
         )}
       </div>
-      {inControl &&
-        (handingBack ? (
-          <HandBackFoot
-            title={handoff?.kind === "ask" ? t("browser.inCard.doneTitle", g) : t("browser.inCard.backTitle", g)}
-            label={handBackLabel}
-            grammar={g}
-            note={backNote}
-            onNote={setBackNote}
-            noteFirst={handoffWantsWords(handoff)}
-            pending={actions.done.isPending}
-            onBack={finish}
-            onCancel={() => setHandingBack(false)}
-          />
-        ) : (
-          <div className="dsk-line">
-            {touch && (
-              <Button
-                size="sm"
-                icon="keyboard"
-                aria-pressed={typing}
-                // The field keeps its focus, so the phone's keyboard stays up.
-                onPointerDown={(e) => e.preventDefault()}
-                onClick={() => (typing ? keysRef.current?.blur() : keysRef.current?.focus({ preventScroll: true }))}
+      {inControl && (
+        <div className="dsk-line">
+          {touch && (
+            <Button
+              size="sm"
+              icon="keyboard"
+              aria-pressed={typing}
+              // The field keeps its focus, so the phone's keyboard stays up.
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => (typing ? keysRef.current?.blur() : keysRef.current?.focus({ preventScroll: true }))}
+            >
+              {t("desktop.keyboard.label")}
+            </Button>
+          )}
+          {said ? (
+            <span
+              key={said.at}
+              className={cx("dsk-said ac-iconline", said.error && "is-error")}
+              role={said.error ? "alert" : "status"}
+            >
+              <Icon name={said.error ? "alert" : "check"} size={14} />
+              <span>{said.text}</span>
+            </span>
+          ) : got === null ? (
+            controlLine
+          ) : (
+            <span className="dsk-got" role="status">
+              <span className="muted">{t("desktop.clipboard.got", g)}</span>
+              <q>{quoteExcerpt(got, 120)}</q>
+              <button
+                type="button"
+                className="ac-link"
+                // The keys stay on the screen's field.
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => void copyGot(got)}
               >
-                {t("desktop.keyboard.label")}
+                {t("desktop.clipboard.copy")}
+              </button>
+            </span>
+          )}
+          <Egress machine={machine} compact />
+        </div>
+      )}
+      {inControl && (
+        <HandBackFoot
+          title={t("browser.inCard.backTitle", g)}
+          label={handBackLabel}
+          grammar={g}
+          note={backNote}
+          onNote={setBackNote}
+          noteFirst={handoffWantsWords(handoff)}
+          pending={actions.done.isPending}
+          onBack={finish}
+          other={
+            asked && (
+              <Button size="sm" variant="ghost" loading={actions.failed.isPending} onClick={giveUp}>
+                {t("browser.inCard.couldnt")}
               </Button>
-            )}
-            {said ? (
-              <span
-                key={said.at}
-                className={cx("dsk-said ac-iconline", said.error && "is-error")}
-                role={said.error ? "alert" : "status"}
-              >
-                <Icon name={said.error ? "alert" : "check"} size={14} />
-                <span>{said.text}</span>
-              </span>
-            ) : got === null ? (
-              controlLine
-            ) : (
-              <span className="dsk-got" role="status">
-                <span className="muted">{t("desktop.clipboard.got", g)}</span>
-                <q>{quoteExcerpt(got, 120)}</q>
-                <button
-                  type="button"
-                  className="ac-link"
-                  // The keys stay on the screen's field.
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => void copyGot(got)}
-                >
-                  {t("desktop.clipboard.copy")}
-                </button>
-              </span>
-            )}
-            <Egress machine={machine} compact />
-          </div>
-        ))}
+            )
+          }
+        />
+      )}
       {/* Watching, under the screen and the covers it opens from by itself, so the window's foot is as deep as its
           sides and the screen opens in place. The ⓘ (what may be checked in control) comes with control;
           full screen keeps no line. */}
