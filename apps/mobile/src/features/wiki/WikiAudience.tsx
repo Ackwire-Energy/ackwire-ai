@@ -171,7 +171,8 @@ function Form({
   );
   const agents = dir.agents.filter((a) => wikiRowCap(cap.agents, cap.agentRows[a.id]) !== "none");
   return (
-    <View style={[styles.fill, { backgroundColor: c.bg }]}>
+    // Who sees and edits, as every access screen: groups on the grouped gray.
+    <View style={[styles.fill, { backgroundColor: c.grouped }]}>
       <PushedHeader
         title={t("wiki.audience")}
         solid={false}

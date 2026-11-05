@@ -40,7 +40,7 @@ export function ChatTargets({
           <ActionList
             items={found.agents.map((a) => ({
               key: a.id,
-              leading: <AgentFace agentId={a.id} size={38} live={false} presence ring={c.raised} />,
+              leading: <AgentFace agentId={a.id} size={32} live={false} presence ring={c.raised} />,
               label: a.name,
               ...(a.role ? { hint: a.role } : {}),
               trailing: chevron,
@@ -57,7 +57,7 @@ export function ChatTargets({
           <ActionList
             items={found.people.map((p) => ({
               key: p.userId,
-              leading: <Face who={{ type: "person", id: p.userId }} size={38} presence ring={c.raised} />,
+              leading: <Face who={{ type: "person", id: p.userId }} size={32} presence ring={c.raised} />,
               label: p.name,
               trailing: chevron,
               onPress: () => onPerson(p.userId),
