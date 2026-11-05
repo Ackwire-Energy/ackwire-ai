@@ -293,4 +293,11 @@ describe("the secret card on the phone", () => {
     expect(card).toContain('if (!pending) setValue("");');
     expect(card).toContain('t("secret.seeNewer")');
   });
+
+  test("where it goes and whose account wrap: only a well with a way to read the rest is cut", () => {
+    const asks = source("asks.tsx");
+    const well = asks.slice(asks.indexOf("{well ? ("), asks.indexOf("{well.more ? ("));
+    expect(well.match(/numberOfLines=\{well\.more \? \d : undefined\}/g)).toHaveLength(2);
+    expect(well.match(/numberOfLines/g)).toHaveLength(2);
+  });
 });

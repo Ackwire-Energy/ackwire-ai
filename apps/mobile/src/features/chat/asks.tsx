@@ -460,11 +460,11 @@ export function AskCard({
           <View style={[styles.well, { backgroundColor: c.sunken }]}>
             <View style={styles.tile}>{well.tile}</View>
             <View style={styles.wellText}>
-              <Text variant="small" tone="ink" numberOfLines={2} style={styles.wellTitle}>
+              <Text variant="small" tone="ink" numberOfLines={well.more ? 2 : undefined} style={styles.wellTitle}>
                 {well.title}
               </Text>
               {well.detail ? (
-                <Text variant="footnote" tone="muted" numberOfLines={3}>
+                <Text variant="footnote" tone="muted" numberOfLines={well.more ? 3 : undefined}>
                   {well.detail}
                 </Text>
               ) : null}

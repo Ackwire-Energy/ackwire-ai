@@ -1,6 +1,7 @@
 import {
   type BrowserHandoff,
   drivesOnDesktop,
+  HANDOFF_OVER,
   handoffIsMine,
   handoffScreen,
   useBrowserHandoff,
@@ -126,7 +127,10 @@ function HandoffAsk({
   // Someone else's: who it waits for in the header when known, no buttons here.
   const mine = meId !== null && handoffIsMine(h, meId, agent?.ownerUserId, org);
   const asked = h.requestedForUserId ? dir.memberById.get(h.requestedForUserId)?.name : undefined;
-  const failed = () => toast({ title: t("mobile.app.failed"), icon: "x" });
+  // It ended meanwhile: the card settles on its own (`useBrowserHandoffMutations`), with nothing to tell.
+  const failed = (err: unknown) => {
+    if ((err as { code?: string }).code !== HANDOFF_OVER) toast({ title: t("mobile.app.failed"), icon: "x" });
+  };
 
   const take = async () => {
     tapHaptic();
@@ -135,8 +139,8 @@ function HandoffAsk({
       await actions.takeControl(h.id);
       asks?.settle(h.id);
       if (opensScreen) router.push(`/computer/${h.agentId}`);
-    } catch {
-      failed();
+    } catch (err) {
+      failed(err);
     }
   };
   // A push or the inbox opened this request: it takes the control once (first one wins), when it is the person's.
@@ -169,8 +173,8 @@ function HandoffAsk({
           try {
             await actions.failed(h.id, text.trim().slice(0, NOTE_MAX) || undefined);
             asks?.settle(h.id);
-          } catch {
-            failed();
+          } catch (err) {
+            failed(err);
           }
         }}
       />,
