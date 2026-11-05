@@ -1643,11 +1643,11 @@ function RoutineAside({
       value: a.id,
       label: a.name,
       description: a.role || undefined,
-      leading: actors.avatar({ type: "agent", id: a.id }),
+      leading: actors.avatar({ type: "agent", id: a.id }, "sm"),
     })),
     ...(actors.dir.agentById.has(r.agentId)
       ? []
-      : [{ value: r.agentId, label: actors.name(agent), description: undefined, leading: actors.avatar(agent) }]),
+      : [{ value: r.agentId, label: actors.name(agent), description: undefined, leading: actors.avatar(agent, "sm") }]),
   ];
   const choice = targetChoice(r.target);
   const channelList = channels.data ?? [];
@@ -2499,7 +2499,7 @@ function RoutineDialog({
                     value: a.id,
                     label: a.name,
                     description: a.role || undefined,
-                    leading: actors.avatar({ type: "agent", id: a.id }),
+                    leading: actors.avatar({ type: "agent", id: a.id }, "sm"),
                   }))}
                 />
               </Field>

@@ -464,7 +464,6 @@ function TaskTable({ children }: { children: ReactNode }) {
         <span>{t("taskManager.columns.using")}</span>
         <span className="tm-cell--time">{t("taskManager.columns.time")}</span>
         <span className="tm-cell--where">{t("taskManager.columns.computer")}</span>
-        <span />
       </div>
       {children}
     </div>

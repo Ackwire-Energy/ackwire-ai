@@ -144,8 +144,9 @@ html:not([data-pointer]) .tm-card:focus-visible {
   position: relative;
   display: grid;
   /* Estado and Onde roda get the room their words need first (whole on one line from 950px), then Tarefa and Usando
-     agora share what's left. Short of that the words wrap; under the sum of the minimums the rows stack (below). */
-  grid-template-columns: minmax(200px, 2fr) minmax(136px, 256px) minmax(96px, 1fr) 84px minmax(100px, 184px) 128px;
+     agora share what's left. Short of that the words wrap; under the sum of the minimums the rows stack (below). No
+     column for the buttons: they show over the row's end (`.tm-cell--act`), so Onde roda has their room. */
+  grid-template-columns: minmax(200px, 2fr) minmax(136px, 256px) minmax(96px, 1fr) 84px minmax(100px, 312px);
   align-items: stretch;
   min-height: 52px;
   border-top: 1px solid var(--line);
@@ -217,9 +218,24 @@ html:not([data-pointer]) .tm-row:has(.tm-hit:focus-visible) {
   overflow: visible;
 }
 .tm-cell--act {
+  --tm-act-bg: var(--surface-raised);
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+  z-index: 2;
   justify-content: flex-end;
   gap: 4px;
+  padding-left: 28px;
   padding-right: 12px;
+  /* The row's own background under the buttons, fading in from the left over the text they cover. */
+  background: linear-gradient(var(--tm-act-bg), var(--tm-act-bg)), var(--surface-raised);
+  mask-image: linear-gradient(to right, transparent, #000 28px);
+}
+.tm-list > .tm-row:hover > .tm-cell--act {
+  --tm-act-bg: var(--plate-soft);
+}
+.tm-list > .tm-row[data-selected] > .tm-cell--act {
+  --tm-act-bg: var(--chosen-bg);
 }
 
 /* A row's name: the whole row picks it (its button reaches every edge); the buttons on it stay on top. */
@@ -301,13 +317,15 @@ html:not([data-pointer]) .tm-twist:focus-visible {
 .tm-twist[aria-expanded="false"] > .ac-icon {
   transform: rotate(-90deg);
 }
-/* With a pointer, a task's Parar shows on its row's hover, choice or focus (an agent's "Parar 2" always). */
-.tm-cell--act > * {
+/* With a pointer, a task's buttons show on its row's hover, choice or focus (an agent's "Parar 2" always; a Parar
+   already stopping stays). Hidden, they leave the computer's name whole. */
+.tm-cell--act {
   transition: opacity 0.12s;
 }
 @media (hover: hover) {
-  .tm-row:not(.tm-row--agent, :hover, [data-selected], :focus-within) .tm-cell--act > :not(:disabled) {
+  .tm-row:not(.tm-row--agent, :hover, [data-selected], :focus-within) .tm-cell--act:not(:has(> :disabled)) {
     opacity: 0;
+    pointer-events: none;
   }
 }
 
@@ -433,8 +451,12 @@ html:not([data-pointer]) .tm-more:focus-visible {
     padding-left: calc(var(--tm-indent) + var(--tm-lead));
   }
   .tm-cell--act {
+    position: static;
     grid-row: 1 / span 4;
     grid-column: 2;
+    padding-left: 0;
+    background: none;
+    mask-image: none;
   }
   .tm-row:not(.tm-row--ended) > .tm-cell--time,
   .tm-cell--where:empty,

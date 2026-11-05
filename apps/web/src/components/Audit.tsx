@@ -58,12 +58,12 @@ export function AuditSection({ agent }: { agent?: string }) {
   const open = rows.find((r) => r.id === openId) ?? null;
 
   const agentOptions = [
-    // A glyph as wide as the 18px faces, so every name starts on one edge.
+    // A glyph the list centres in the faces' 32px column, so every name starts on one edge.
     { value: ANY, label: t("audit.anyAgent"), leading: <Icon name="members" size={18} className="muted" /> },
     ...dir.agents.map((a) => ({
       value: a.id,
       label: a.name,
-      leading: <AgentAvatar agentId={a.id} name={a.name} size="xs" />,
+      leading: <AgentAvatar agentId={a.id} name={a.name} size="sm" />,
     })),
   ];
 

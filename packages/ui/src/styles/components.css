@@ -1858,6 +1858,12 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   height: 32px;
   font-size: var(--text-sm);
 }
+/* The empty choice ("Sem responsável", any agent) leads with a glyph: in the middle of the faces' 32px column, so its
+   name starts where theirs do. */
+.ac-menu--select:has(.ac-menu__leading > .ac-avatar) .ac-menu__leading:has(> .ac-icon) {
+  justify-content: center;
+  width: 32px;
+}
 /* Two lines (a name and its description): the room above and below matches the sides, as a one-line row's does. */
 .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) {
   padding-block: var(--menu-item-px);
