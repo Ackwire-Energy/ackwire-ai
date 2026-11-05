@@ -22,7 +22,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { StickerCanvas } from "@/agent/StickerCanvas";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, Icon, type IconName, Text } from "@/ui";
+import { AgentAvatar, Button, type IconName, LineIcon, Text } from "@/ui";
 import { fullLook } from "../agents/edit";
 import { openConnectAi } from "../ai/NoAiCard";
 import { requestComposerText } from "../chat/composer-request";
@@ -322,8 +322,8 @@ function IntroCard({
   const surface = useSurface();
   return (
     <View style={[styles.card, surface]}>
-      <View style={styles.head}>
-        <Icon name={icon} size={16} color={c.ink2} />
+      <View style={styles.cardHead}>
+        <LineIcon name={icon} size={16} color={c.ink2} variant="subhead" />
         <Text variant="subhead" style={[styles.bold, styles.fill]}>
           {title}
         </Text>
@@ -346,6 +346,8 @@ const styles = StyleSheet.create({
   sticker: { width: MESSAGE_STICKER, height: MESSAGE_STICKER, marginTop: 4 },
   fill: { flex: 1, minWidth: 0 },
   card: { marginTop: 6, borderRadius: 16, padding: 14, gap: 10 },
+  // A question that wraps keeps its icon on its first line.
+  cardHead: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   presets: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   preset: {
     flexBasis: "47%",

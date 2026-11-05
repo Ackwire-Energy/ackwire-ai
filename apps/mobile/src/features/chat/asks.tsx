@@ -43,7 +43,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import { Sky } from "@/sky/Sky";
-import { CHROME_MAX_SCALE, Fuse, Icon, type IconName, Text, useReducedMotion, useTheme } from "@/ui";
+import { CHROME_MAX_SCALE, Fuse, Icon, type IconName, LineIcon, Text, useReducedMotion, useTheme } from "@/ui";
 import { approvalTitleText } from "../approvals/parts";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
@@ -389,6 +389,8 @@ export const ASK_ICON: Record<AskKind, IconName> = {
   desktop: "laptop",
   proposal: "pen",
   agent: "agent",
+  team: "members",
+  firstTask: "target",
 };
 
 /**
@@ -449,9 +451,11 @@ export function AskCard({
           {well.detail || well.more?.label}
         </Text>
         {well.more ? (
-          <View style={open ? styles.flip : undefined}>
-            <Icon name="chev" size={13} color={c.faint} />
-          </View>
+          <LineIcon variant="footnote" size={13}>
+            <View style={open ? styles.flip : undefined}>
+              <Icon name="chev" size={13} color={c.faint} />
+            </View>
+          </LineIcon>
         ) : null}
       </>
     ) : null;
@@ -491,7 +495,7 @@ export function AskCard({
                 accessibilityHint={well.more.label}
                 accessibilityState={{ expanded: open }}
                 hitSlop={6}
-                style={({ pressed }) => [styles.source, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.source, open && styles.sourceOpen, pressed && styles.pressed]}
               >
                 {source}
               </Pressable>
@@ -767,6 +771,8 @@ const styles = StyleSheet.create({
   why: { marginTop: -4 },
   // The thing it is about, one quiet line: its mark, its details, the chevron when it opens more.
   source: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "stretch", minHeight: 24 },
+  // Open, its details take up to three lines: the mark and the chevron stay on the first.
+  sourceOpen: { alignItems: "flex-start" },
   sourceMark: { flexShrink: 0 },
   pressed: { opacity: 0.7 },
   flip: { transform: [{ rotate: "180deg" }] },

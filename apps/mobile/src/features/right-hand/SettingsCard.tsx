@@ -24,7 +24,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, Text } from "@/ui";
+import { Button, Icon, LineIcon, Text } from "@/ui";
 import { openAgentDelete } from "../agents/DeleteAgentScreen";
 import { AgentProposalView } from "../agents/ProposalCard";
 import { DelegateUndo } from "../agents/RightHandDelegate";
@@ -249,7 +249,7 @@ function SettingsRow({
     />
   ) : asked ? (
     <View style={styles.sent}>
-      <Icon name="send" size={14} color={c.muted} />
+      <LineIcon name="send" size={14} color={c.muted} variant="small" />
       <Text variant="small" tone="muted" style={styles.fill}>
         {asked}
       </Text>
@@ -313,9 +313,12 @@ function SettingsRow({
 }
 
 const styles = StyleSheet.create({
-  done: { flexDirection: "row", alignItems: "center", gap: 8 },
+  // From the top: the decided line opens 8 under it and is 20 tall, so a 36 button's middle is that line's; centered,
+  // it sat 4 above the line, and beside the line's opened details it drifted down.
+  done: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   fill: { flex: 1, minWidth: 0 },
-  sent: { flexDirection: "row", alignItems: "center", gap: 6 },
+  // The icon on the first line when whom it went to wraps.
+  sent: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   lines: { gap: 6 },
   line: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 },
   field: { fontWeight: "500", minWidth: 96 },

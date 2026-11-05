@@ -87,13 +87,15 @@ export function FirstDay({
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
               >
                 {i > 0 ? <View style={[styles.sep, { backgroundColor: c.line2 }]} /> : null}
-                <View style={[styles.tile, { backgroundColor: c.sunken }]}>
+                <View style={styles.mark}>
                   <Icon name={a.icon} size={18} color={c.ink2} />
                 </View>
                 <Text variant="callout" tone="ink" style={[styles.grow, styles.ask]}>
                   {text}
                 </Text>
-                <Icon name="send" size={16} color={c.faint} />
+                <View style={styles.send}>
+                  <Icon name="send" size={16} color={c.faint} />
+                </View>
               </Pressable>
             );
           })}
@@ -120,15 +122,18 @@ const styles = StyleSheet.create({
   p: { marginTop: 6, textAlign: "center", lineHeight: 21 },
   h3: { fontWeight: "600", paddingHorizontal: 4, paddingTop: 18, paddingBottom: 8 },
   card: { borderRadius: 20, overflow: "hidden" },
+  // The channel's suggestions' rows (ChannelHello): a 28 mark (no tile inside the card), the first line's middle on
+  // its middle when a suggestion wraps (28 against a 21 line), the send icon there too.
   row: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 12,
-    minHeight: 58,
+    minHeight: 52,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
-  sep: { position: "absolute", top: 0, left: 62, right: 0, height: StyleSheet.hairlineWidth },
-  tile: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
-  ask: { fontWeight: "500" },
+  sep: { position: "absolute", top: 0, left: 54, right: 0, height: StyleSheet.hairlineWidth },
+  mark: { width: 28, height: 28, alignItems: "center", justifyContent: "center" },
+  ask: { fontWeight: "500", marginTop: 3 },
+  send: { marginTop: 6 },
 });

@@ -607,7 +607,7 @@ export function WidgetCard({
   const content = (
     <>
       {head === undefined ? (
-        <View style={styles.head}>
+        <View style={[styles.head, large ? styles.headTop : null]}>
           <AgentFace agentId={w.agentId} size={16} live={false} />
           <Text variant="footnote" tone="muted" numberOfLines={large ? 2 : 1} style={[styles.title, styles.grow]}>
             {title}
@@ -715,6 +715,8 @@ const styles = StyleSheet.create({
   cardIn: { gap: 10, flexGrow: 1 },
   cardInCompact: { gap: 6 },
   head: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
+  // A big card's title may take two lines: the 16 face on the first (its line is 16 tall).
+  headTop: { alignItems: "flex-start" },
   title: { fontSize: 12.5, lineHeight: 16, fontWeight: "600", letterSpacing: 0.1 },
   body: { flexGrow: 1, minWidth: 0 },
   num: { fontSize: 30, lineHeight: 34, fontWeight: "700", letterSpacing: -0.9, fontVariant: ["tabular-nums"] },

@@ -36,9 +36,8 @@ export function IssueWorkCard({ work, authorId }: { work: IssueWorkRef; authorId
       style={({ pressed }) => [styles.card, surface, pressed && styles.pressed]}
     >
       <View style={styles.head}>
-        <View style={[styles.ic, { backgroundColor: c.sunken }]}>
-          <Icon name="issue" size={15} color={c.ink2} />
-        </View>
+        {/* The icon alone: no tile inside the card. */}
+        <Icon name="issue" size={16} color={c.ink2} />
         <Text variant="small" tone="muted" style={styles.grow} numberOfLines={1}>
           {asker ? t("chat.issueWork.askedBy", { name: asker }) : t("chat.issueWork.asked")} #{work.number}
         </Text>
@@ -72,10 +71,10 @@ export function IssueTakenLine({ message }: { message: Message }) {
       accessibilityRole="link"
       style={({ pressed }) => [styles.line, pressed && styles.pressed]}
     >
-      <LineIcon name="issue" size={13} color={c.faint} variant="caption" />
-      <Text variant="caption" tone="faint" style={styles.grow}>
+      <LineIcon name="issue" size={16} color={c.faint} variant="small" />
+      <Text variant="small" tone="faint" style={styles.grow}>
         {t("chat.issueWork.taken", { name })}{" "}
-        <Text variant="caption" tone="muted">
+        <Text variant="small" tone="muted">
           #{taken.number} · {taken.title}
         </Text>{" "}
         · {when.time(message.createdAt)}
@@ -86,19 +85,19 @@ export function IssueTakenLine({ message }: { message: Message }) {
 
 const styles = StyleSheet.create({
   card: { marginTop: 8, padding: 14, borderRadius: 20, gap: 8 },
-  head: { flexDirection: "row", alignItems: "center", gap: 10 },
-  ic: { width: 28, height: 28, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  head: { flexDirection: "row", alignItems: "center", gap: 8 },
   grow: { flex: 1, flexShrink: 1 },
   title: { fontWeight: "600" },
   foot: { flexDirection: "row", alignItems: "center", gap: 4 },
   bold: { fontWeight: "600" },
   pressed: { opacity: 0.85 },
+  // An event line at the messages' words (MessageRow: 14 + 34 + 11 = 59): the 16-point mark, the words in 15/20.
   line: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 6,
+    gap: 8,
     marginVertical: 4,
-    paddingLeft: 56,
+    paddingLeft: 59,
     paddingRight: 16,
   },
 });

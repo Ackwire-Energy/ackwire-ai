@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { sealSecret } from "@/lib/secret-box";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, CodeInput, haptics, Icon, Segmented, Text, ToggleSwitch, useToast } from "@/ui";
+import { Button, Chip, CodeInput, haptics, Icon, LineIcon, Segmented, Text, ToggleSwitch, useToast } from "@/ui";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -263,7 +263,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
               </Text>
             ) : null}
             <View style={styles.note}>
-              <Icon name="lock" size={13} color={c.muted} />
+              <LineIcon name="lock" size={13} color={c.muted} variant="footnote" />
               <Text variant="footnote" tone="muted" style={styles.grow}>
                 {code ? t("mobile.vault.card.codeNote") : t("secret.private")}
               </Text>

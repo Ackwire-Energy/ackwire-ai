@@ -183,12 +183,9 @@ export function FirstAgentEmpty() {
               key={ex.key}
               onPress={() => newAgent(t(`mobile.chats.first.example.${ex.key}.what`))}
               accessibilityRole="button"
-              style={({ pressed }) => [
-                styles.idea,
-                i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line2 },
-                pressed && { backgroundColor: c.sunken },
-              ]}
+              style={({ pressed }) => [styles.idea, pressed && { backgroundColor: c.sunken }]}
             >
+              {i > 0 ? <View style={[styles.sep, { backgroundColor: c.line2 }]} /> : null}
               <Tile icon={ex.icon} />
               <View style={styles.grow}>
                 <Text variant="callout" style={styles.bold}>
@@ -232,6 +229,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     minHeight: 56,
   },
+  // Between rows, inset to the text (14 + the 36 tile + 12), as every list's hairline.
+  sep: { position: "absolute", top: 0, left: 62, right: 0, height: StyleSheet.hairlineWidth },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
 });

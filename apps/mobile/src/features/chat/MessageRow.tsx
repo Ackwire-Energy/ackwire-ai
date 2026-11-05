@@ -48,6 +48,7 @@ import {
   Count,
   Icon,
   InkOrbit,
+  LineIcon,
   PixelStopped,
   PressScale,
   ProviderLogo,
@@ -786,7 +787,7 @@ function ChoiceReply({ text }: { text: string }) {
   const c = useColors();
   return (
     <View style={styles.choiceReply}>
-      <Icon name="check" size={13} color={c.muted} />
+      <LineIcon name="check" size={13} color={c.muted} variant="footnote" />
       <Text variant="footnote" tone="ink" style={[styles.medium, styles.shrink]}>
         {text}
       </Text>
@@ -948,7 +949,8 @@ const styles = StyleSheet.create({
   cont: { paddingTop: 0, marginTop: 0 },
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
-  choiceReply: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 2 },
+  // A long pick wraps: the check stays on its first line.
+  choiceReply: { flexDirection: "row", alignItems: "flex-start", gap: 6, paddingVertical: 2 },
   // Wraps on a narrow phone: a routine's tag and "Ver relatório" go to the next line instead of off the edge.
   who: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 8, rowGap: 3, marginBottom: 3 },
   // A person's name line keeps room at its end for the receipt's mark, with or without one, so a mark that comes

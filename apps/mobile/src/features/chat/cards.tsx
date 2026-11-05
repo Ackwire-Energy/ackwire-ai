@@ -35,7 +35,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Count, HoldButton, Icon, Text, useToast } from "@/ui";
+import { Button, Count, HoldButton, Icon, LineIcon, Text, useToast } from "@/ui";
 import { approvalAction, approvalRisk, approveAlwaysToast } from "../approvals/logic";
 import {
   ApprovalAheadLine,
@@ -548,7 +548,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
               )}
               {origin ? (
                 <View style={styles.origin}>
-                  <Icon name="clock" size={13} color={c.muted} />
+                  <LineIcon name="clock" size={13} color={c.muted} variant="footnote" />
                   <Text variant="footnote" tone="muted" style={styles.grow}>
                     {origin}
                   </Text>

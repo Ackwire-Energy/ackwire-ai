@@ -2,7 +2,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import Animated, { FadeInDown, FadeOut } from "react-native-reanimated";
-import { Button, Icon, InfoHint, Text, useReducedMotion } from "@/ui";
+import { Button, InfoHint, LineIcon, Text, useReducedMotion } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { useColors, useDirectory } from "../shared/hooks";
 import type { NoAiBannerView } from "./no-ai-banner";
@@ -27,23 +27,25 @@ export function NoAiBanner({ banner }: { banner: NoAiBannerView }) {
       accessibilityLiveRegion="polite"
       style={[styles.banner, { backgroundColor: c.sunken }]}
     >
-      <Icon name="bolt" size={15} color={c.ink2} />
-      <View style={styles.text}>
-        {banner.kind === "agent" ? (
-          <Text variant="small" tone="ink2" style={styles.strong}>
-            {t("noAi.agent", agentGrammar(name))}
-          </Text>
-        ) : banner.askInChat ? (
-          <InfoHint name={t("common.about", { label: action })} text={t("noAi.banner.orgHint")} variant="small">
+      <View style={styles.lead}>
+        <LineIcon name="bolt" size={15} color={c.ink2} variant="small" />
+        <View style={styles.text}>
+          {banner.kind === "agent" ? (
+            <Text variant="small" tone="ink2" style={styles.strong}>
+              {t("noAi.agent", agentGrammar(name))}
+            </Text>
+          ) : banner.askInChat ? (
+            <InfoHint name={t("common.about", { label: action })} text={t("noAi.banner.orgHint")} variant="small">
+              <Text variant="small" tone="ink2" style={styles.strong}>
+                {t("noAi.banner.org")}
+              </Text>
+            </InfoHint>
+          ) : (
             <Text variant="small" tone="ink2" style={styles.strong}>
               {t("noAi.banner.org")}
             </Text>
-          </InfoHint>
-        ) : (
-          <Text variant="small" tone="ink2" style={styles.strong}>
-            {t("noAi.banner.org")}
-          </Text>
-        )}
+          )}
+        </View>
       </View>
       <Button variant="secondary" size="sm" label={action} onPress={connect} />
     </Animated.View>
@@ -66,6 +68,8 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 10,
     borderBottomLeftRadius: 3,
   },
+  // The bolt on the words' first line when they wrap beside the button (which stays centered).
+  lead: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "flex-start", gap: 8 },
   text: { flex: 1, minWidth: 0 },
   strong: { fontWeight: "600" },
 });

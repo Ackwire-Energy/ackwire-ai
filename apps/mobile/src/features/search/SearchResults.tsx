@@ -7,7 +7,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Count, Filters, Text, useToast } from "@/ui";
+import { Filters, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useDirectory, useOrgId, useWhen } from "../shared/hooks";
@@ -99,13 +99,14 @@ export function SearchResults({ q }: { q: string }) {
           </Group>
         ) : null}
         {words && r.agents.length + r.channels.length + r.dms.length > 0 ? (
-          <Group title={t("mobile.find.conversations")} count={r.agents.length + r.channels.length + r.dms.length}>
+          <Group title={t("mobile.find.conversations")}>
             <ActionList
               items={[
                 ...r.agents.map((a) => ({
                   key: `a:${a.id}`,
                   leading: <AgentFace agentId={a.id} size={38} live={false} />,
                   label: a.name,
+                  oneLine: true,
                   ...(a.role ? { hint: a.role } : {}),
                   onPress: () => router.push(`/agent/${a.id}`),
                 })),
@@ -113,6 +114,7 @@ export function SearchResults({ q }: { q: string }) {
                   key: `d:${d.channelId}`,
                   leading: <Face who={{ type: d.with.type, id: d.with.id }} size={38} live={false} />,
                   label: d.with.name,
+                  oneLine: true,
                   ...(d.lastMessage
                     ? {
                         hint: previewBody(
@@ -129,6 +131,7 @@ export function SearchResults({ q }: { q: string }) {
                   key: `c:${ch.id}`,
                   leading: <Tile icon="hash" size={38} />,
                   label: ch.name,
+                  oneLine: true,
                   ...(ch.topic ? { hint: ch.topic } : {}),
                   onPress: () => router.push(chatHref(ch.id)),
                 })),
@@ -137,7 +140,7 @@ export function SearchResults({ q }: { q: string }) {
           </Group>
         ) : null}
         {r.team.length > 0 ? (
-          <Group title={t("searchPage.kinds.action")} count={r.team.length}>
+          <Group title={t("searchPage.kinds.action")}>
             <ActionList
               items={r.team.map((h) => {
                 const channelId = h.channelIds[0] ?? "";
@@ -164,7 +167,7 @@ export function SearchResults({ q }: { q: string }) {
           </Group>
         ) : null}
         {r.messages.length > 0 ? (
-          <Group title={t("mobile.find.messages")} count={r.messages.length}>
+          <Group title={t("mobile.find.messages")}>
             <ActionList
               items={r.messages.map((h) => {
                 const channelId = h.channelIds[0] ?? "";
@@ -183,7 +186,7 @@ export function SearchResults({ q }: { q: string }) {
           </Group>
         ) : null}
         {r.files.length > 0 ? (
-          <Group title={t("mobile.find.files")} count={r.files.length}>
+          <Group title={t("mobile.find.files")}>
             <ActionList
               items={r.files.map((h) => {
                 const where = channelName(h.channelIds[0]);
@@ -210,15 +213,13 @@ export function SearchResults({ q }: { q: string }) {
   );
 }
 
-function Group({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
+/** A group of results under its title; its count is on the group's filter chip above, said once. */
+function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View style={styles.group}>
-      <View style={styles.groupTitle}>
-        <Text variant="label" accessibilityRole="header">
-          {title}
-        </Text>
-        {count !== undefined ? <Count value={count} size={14} /> : null}
-      </View>
+      <Text variant="label" accessibilityRole="header" style={styles.groupTitle}>
+        {title}
+      </Text>
       {children}
     </View>
   );
@@ -227,6 +228,6 @@ function Group({ title, count, children }: { title: string; count?: number; chil
 const styles = StyleSheet.create({
   res: { paddingHorizontal: 16, paddingTop: 2 },
   group: { marginTop: 14, gap: 8 },
-  groupTitle: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4 },
+  groupTitle: { paddingHorizontal: 4 },
   empty: { textAlign: "center", paddingVertical: 40 },
 });

@@ -185,24 +185,26 @@ function Form({ agent }: { agent: Agent }) {
       )}
 
       <GroupedHeader>{t("rightHand.settings.budget")}</GroupedHeader>
-      <View style={[styles.budget, { backgroundColor: c.raised }]}>
-        <Text variant="body" tone="muted">
-          US$
-        </Text>
-        <TextInput
-          value={budget}
-          onChangeText={setBudget}
-          onEndEditing={saveBudget}
-          keyboardType="decimal-pad"
-          placeholder={t("rightHand.value.budgetDefault")}
-          placeholderTextColor={c.faint}
-          accessibilityLabel={t("rightHand.settings.budget")}
-          style={[styles.amount, fieldText("body"), { color: c.ink }]}
-        />
-        <Text variant="body" tone="muted">
-          {t("rightHand.settings.perMonth")}
-        </Text>
-      </View>
+      <GroupedList>
+        <View style={styles.budget}>
+          <Text variant="body" tone="muted">
+            US$
+          </Text>
+          <TextInput
+            value={budget}
+            onChangeText={setBudget}
+            onEndEditing={saveBudget}
+            keyboardType="decimal-pad"
+            placeholder={t("rightHand.value.budgetDefault")}
+            placeholderTextColor={c.faint}
+            accessibilityLabel={t("rightHand.settings.budget")}
+            style={[styles.amount, fieldText("body"), { color: c.ink }]}
+          />
+          <Text variant="body" tone="muted">
+            {t("rightHand.settings.perMonth")}
+          </Text>
+        </View>
+      </GroupedList>
       <GroupedFooter>{t("rightHand.settings.budgetHelp", g)}</GroupedFooter>
 
       <TeamWeekRows name={agent.name} />
@@ -251,6 +253,7 @@ function TeamWeekRows({ name }: { name: string }) {
   return (
     <>
       <GroupedHeader>{t("teamWeek.settings.label")}</GroupedHeader>
+      {/* The day and the hour are rows of the switch's group, as any settings group. */}
       <GroupedList>
         <GroupedRow
           icon="clock"
@@ -258,23 +261,23 @@ function TeamWeekRows({ name }: { name: string }) {
           toggle={!prefs.off}
           onPress={() => save({ off: !prefs.off })}
         />
-      </GroupedList>
-      {prefs.off ? null : (
-        <>
+        {prefs.off ? null : (
           <Pills
             label={t("teamWeek.schedule.day")}
             value={prefs.day}
             options={[1, 2, 3, 4, 5, 6, 0].map((d) => ({ value: d, label: dayText(locale, d) }))}
             onPick={(day) => save({ day })}
           />
+        )}
+        {prefs.off ? null : (
           <Pills
             label={t("teamWeek.schedule.hour")}
             value={prefs.hour}
             options={Array.from({ length: 24 }, (_, h) => ({ value: h, label: hourText(locale, h) }))}
             onPick={(hour) => save({ hour })}
           />
-        </>
-      )}
+        )}
+      </GroupedList>
       <GroupedFooter>{t("teamWeek.settings.help", agentGrammar(name))}</GroupedFooter>
     </>
   );
@@ -294,11 +297,7 @@ function Pills({
 }) {
   const c = useColors();
   return (
-    <View
-      accessibilityRole="radiogroup"
-      accessibilityLabel={label}
-      style={[styles.pills, { backgroundColor: c.raised }]}
-    >
+    <View accessibilityRole="radiogroup" accessibilityLabel={label} style={styles.pills}>
       <Text variant="footnote" tone="muted" style={styles.pillsLabel}>
         {label}
       </Text>
@@ -325,17 +324,12 @@ function Pills({
 }
 
 const styles = StyleSheet.create({
-  pills: { borderRadius: 14, padding: 12, marginTop: 8, gap: 8 },
+  // Inside a group: its rows' 14 sides.
+  pills: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
   pillsLabel: { fontWeight: "600" },
   pillRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   pill: { minHeight: 32, paddingHorizontal: 12, borderRadius: 12, borderBottomLeftRadius: 4, justifyContent: "center" },
-  budget: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    minHeight: 48,
-  },
+  // One row of a group: GroupedRow's 50 high and 14 sides.
+  budget: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, minHeight: 50 },
   amount: { flex: 1, paddingVertical: 12 },
 });

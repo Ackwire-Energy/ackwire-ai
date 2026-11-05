@@ -59,14 +59,14 @@ export function EventLine({ message, fold }: { message: Message; fold?: ConsultN
   return (
     <View style={styles.line}>
       <View style={styles.head}>
-        <LineIcon name={line.icon} size={13} color={c.faint} variant="caption" />
-        <Text variant="caption" tone="faint" style={styles.grow}>
+        <LineIcon name={line.icon} size={16} color={c.faint} variant="small" />
+        <Text variant="small" tone="faint" style={styles.grow}>
           {t(line.key, line.values)} · {when.time(message.createdAt)}
           {line.text ? (
             <>
               {" · "}
               <Text
-                variant="caption"
+                variant="small"
                 tone="muted"
                 style={styles.toggle}
                 onPress={() => setOpen((o) => !o)}
@@ -90,11 +90,12 @@ export function EventLine({ message, fold }: { message: Message; fold?: ConsultN
 }
 
 const styles = StyleSheet.create({
-  // Aligned with the messages' words (MessageRow: 14 + 34 avatar + 11 gap ≈ 56), like `IssueTakenLine`.
-  line: { marginVertical: 4, paddingLeft: 56, paddingRight: 16 },
-  head: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  // Aligned with the messages' words (MessageRow: 14 + 34 avatar + 11 gap = 59), like `IssueTakenLine`; an event line
+  // as a decided request's (`AskDone`): the 16-point mark on the first line, the words in 15/20.
+  line: { marginVertical: 4, paddingLeft: 59, paddingRight: 16 },
+  head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   grow: { flex: 1, flexShrink: 1 },
   toggle: { fontWeight: "600" },
   // The text itself, under the line, aligned with the words (not the icon).
-  body: { marginTop: 4, marginLeft: 19, paddingLeft: 10, borderLeftWidth: 2 },
+  body: { marginTop: 4, marginLeft: 24, paddingLeft: 10, borderLeftWidth: 2 },
 });

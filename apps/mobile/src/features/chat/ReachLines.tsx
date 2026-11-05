@@ -71,7 +71,7 @@ function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: 
       <View style={[styles.tile, { backgroundColor: colors.raised }]}>
         <Icon name={handed ? "chat" : "info"} size={14} color={colors.ink2} />
       </View>
-      <View style={styles.grow}>
+      <View style={[styles.grow, styles.tx]}>
         <Text variant="small" tone="ink2" numberOfLines={3} style={styles.oneText}>
           {runs.map((r, i) =>
             r.bold ? (
@@ -217,9 +217,11 @@ const styles = StyleSheet.create({
   lockedText: { textAlign: "center" },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
+  // As the team checks' line (TeamChecks): the tile, the first line and the pill share one middle, also when the
+  // words take three lines.
   one: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
     minHeight: 50,
     paddingVertical: 9,
@@ -227,7 +229,8 @@ const styles = StyleSheet.create({
     paddingRight: 10,
     borderRadius: 16,
   },
+  tx: { paddingTop: 6 },
   oneText: { fontSize: 14.5, lineHeight: 19 },
   detail: { marginTop: 2 },
-  tile: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  tile: { width: 24, height: 24, marginTop: 4, borderRadius: 8, alignItems: "center", justifyContent: "center" },
 });

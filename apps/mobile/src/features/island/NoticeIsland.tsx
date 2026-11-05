@@ -25,7 +25,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import { setIslandLive } from "@/lib/push";
 import { serverUrl } from "@/lib/server";
 import { useRealtime } from "@/providers/realtime";
-import { haptics, Icon, type IconName, Text, useTheme } from "@/ui";
+import { haptics, Icon, type IconName, LineIcon, Text, useTheme } from "@/ui";
 import { variantStyle } from "@/ui/Text";
 import { useNoticeTitle } from "../activity/noticeTitle";
 import { openPage } from "../ai/parts";
@@ -245,7 +245,12 @@ function Title({ n, lines }: { n: AppNotification; lines: number }) {
       {parts.map((part, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one fixed sentence
         <Fragment key={i}>
-          {i > 0 ? <Text style={styles.names}>{names}</Text> : null}
+          {/* The sentence's own size: a bare Text is body (17) inside this 15. */}
+          {i > 0 ? (
+            <Text variant="subhead" style={styles.names}>
+              {names}
+            </Text>
+          ) : null}
           {part}
         </Fragment>
       ))}
@@ -419,8 +424,8 @@ function IslandRow({ n, onOpened }: { n: AppNotification; onOpened: () => void }
         ) : null}
         {done ? (
           <View style={styles.done} accessibilityLiveRegion="polite">
-            <Icon name="check" size={16} color="#7ee2a8" />
-            <Text variant="footnote" style={styles.doneText}>
+            <LineIcon name="check" size={16} color="#7ee2a8" variant="footnote" />
+            <Text variant="footnote" style={[styles.doneText, styles.grow]}>
               {done}
             </Text>
           </View>
@@ -617,7 +622,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.1)",
   },
   input: { flex: 1, minWidth: 0, color: WHITE, paddingVertical: 6 },
-  done: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
+  // The check on the first line when an answer's words wrap.
+  done: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 10 },
   doneText: { color: "#7ee2a8", fontWeight: "600" },
   failed: { color: "#ff8a80", marginTop: 6 },
   x: { position: "absolute", top: 14, right: 12, padding: 4 },

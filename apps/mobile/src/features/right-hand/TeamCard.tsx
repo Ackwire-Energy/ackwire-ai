@@ -33,7 +33,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, fieldText, Icon, Sheet, Text } from "@/ui";
+import { AgentAvatar, Button, fieldText, Icon, LineIcon, Sheet, Text } from "@/ui";
 import { fullLook } from "../agents/edit";
 import { openConnectAi } from "../ai/NoAiCard";
 import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
@@ -199,7 +199,7 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
           </Text>
           {teamRoutines(plan).map(({ agent, routine }) => (
             <View key={`${agent?.handle ?? "weekly"}-${routine.name}`} style={styles.line}>
-              <Icon name="clock" size={14} color={c.muted} />
+              <LineIcon name="clock" size={14} color={c.muted} variant="small" />
               <Text variant="small" style={styles.fill}>
                 <Text variant="small" style={styles.bold}>
                   {proposedRoutineWhen(t, i18n.language, routine)}
@@ -220,7 +220,7 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
           </Text>
           {plan.skills.map((s) => (
             <View key={s.name} style={styles.line}>
-              <Icon name="doc" size={14} color={c.muted} />
+              <LineIcon name="doc" size={14} color={c.muted} variant="small" />
               <Text variant="small" style={styles.fill}>
                 <Text variant="small" style={styles.bold}>
                   {s.title}
@@ -233,7 +233,7 @@ function TeamRows({ plan, onAdjust }: { plan: TeamPlan; onAdjust?: (a: TeamAgent
       ) : null}
       {plan.approvals ? (
         <View style={[styles.note, { backgroundColor: c.sunken }]}>
-          <Icon name="shield" size={14} color={c.muted} />
+          <LineIcon name="shield" size={14} color={c.muted} variant="small" />
           <Text variant="small" style={styles.fill}>
             {plan.approvals}
           </Text>
@@ -298,13 +298,10 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
             </>
           }
           foot={
-            <AskFoot
-              expiry={
-                <Text variant="caption" tone="muted">
-                  {countsText(t, plan)}
-                </Text>
-              }
-            >
+            <AskFoot>
+              <Text variant="caption" tone="muted">
+                {countsText(t, plan)}
+              </Text>
               {decides ? (
                 <Button
                   variant="primary"
@@ -373,7 +370,6 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
         <AskDone
           done
           words={`${by ? t("teamPlan.card.created", { name: by }) : t("teamPlan.card.createdYou")}: ${names}`}
-          at={card.decidedAt}
           more={
             undoable
               ? {
@@ -412,7 +408,6 @@ function TeamCardView({ message: m, card }: { message: Message; card: TeamPropos
               ? "teamPlan.card.dismissed"
               : "approval.expired",
       )}: ${names}`}
-      at={card.undoneAt ?? card.decidedAt}
     />
   );
 }
@@ -605,15 +600,16 @@ export function TeamMapSheet({ plan, open, onClose }: { plan: TeamPlan; open: bo
         {teamColumns(plan).map((col) => (
           <View key={col.channel} style={[styles.mapCol, { borderColor: c.line2 }]}>
             <View style={styles.line}>
-              <Icon name="hash" size={14} color={c.muted} />
-              <Text variant="body" style={styles.bold}>
+              <LineIcon name="hash" size={14} color={c.muted} />
+              {/* "Novo" inside the name's line, on its baseline. */}
+              <Text variant="body" style={[styles.bold, styles.fill]}>
                 {col.channel}
+                {col.fresh ? (
+                  <Text variant="caption" style={[styles.bold, { color: c.info }]}>
+                    {` ${t("teamPlan.card.new")}`}
+                  </Text>
+                ) : null}
               </Text>
-              {col.fresh ? (
-                <Text variant="caption" style={[styles.bold, { color: c.info }]}>
-                  {t("teamPlan.card.new")}
-                </Text>
-              ) : null}
             </View>
             {col.agents.map((a) => (
               <View key={a.handle} style={styles.agentHead}>

@@ -133,6 +133,7 @@ export function OperatorPicker({
           leading: <Face who={a} size={30} live={false} />,
           label: a.name,
           ...(a.handle ? { hint: `@${a.handle}` } : {}),
+          oneLine: true,
           onPress: () => onPick({ op, actor: a }, rest),
         }))
       : op === "in"
@@ -140,6 +141,7 @@ export function OperatorPicker({
             key: p.id,
             leading: <Tile icon={p.dm ? "chat" : "hash"} size={30} />,
             label: p.dm ? t("searchPage.dm", { name: p.name }) : p.name,
+            oneLine: true,
             onPress: () => onPick({ op, place: p }, rest),
           }))
         : op === "has"

@@ -23,6 +23,7 @@ import {
   GroupedRow,
   Icon,
   type IconName,
+  LineIcon,
   Segmented,
   Text,
   useTheme,
@@ -495,10 +496,10 @@ export function AudienceFields({
         </>
       )}
       <View style={styles.exposure}>
-        <Icon name="shield" size={14} color={c.faint} />
-        <View style={styles.grow}>
-          <GroupedFooter>{t("widgets.exposure")}</GroupedFooter>
-        </View>
+        <LineIcon name="shield" size={14} color={c.faint} variant="footnote" />
+        <Text variant="footnote" tone="faint" style={styles.grow}>
+          {t("widgets.exposure")}
+        </Text>
       </View>
     </>
   );
@@ -509,7 +510,8 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   semibold: { fontWeight: "600" },
   thumb: { width: THUMB_W, height: THUMB_H, borderRadius: 10, overflow: "hidden" },
-  boardRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, paddingVertical: 10 },
+  // GroupedRow's 14 sides and 12 gap.
+  boardRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
   titleLine: { flexDirection: "row", alignItems: "center", gap: 5 },
   audience: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 },
   role: { flexDirection: "row", alignItems: "center", gap: 4 },
@@ -529,5 +531,6 @@ const styles = StyleSheet.create({
   roles: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingLeft: 54, paddingRight: 14, paddingBottom: 12 },
   roleChip: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 12, borderRadius: 16 },
   faded: { opacity: 0.35 },
-  exposure: { flexDirection: "row", alignItems: "flex-start", gap: 6, paddingLeft: 16, paddingTop: 10 },
+  // A footer (GroupedFooter's 7 over it, 16 sides) with its icon on the first line, the words right after it.
+  exposure: { flexDirection: "row", alignItems: "flex-start", gap: 6, paddingTop: 7, paddingHorizontal: 16 },
 });

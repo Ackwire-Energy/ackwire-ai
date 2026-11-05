@@ -47,9 +47,9 @@ export function StoppedLine({ message, notice }: { message: Message; notice: Sto
   return (
     <View style={styles.line}>
       <View style={styles.head}>
-        <LineIcon name="stop" size={13} color={c.faint} variant="caption" />
-        <Text variant="caption" tone="faint" style={styles.grow}>
-          <Text variant="caption" tone="muted" style={styles.bold}>
+        <LineIcon name="stop" size={16} color={c.faint} variant="small" />
+        <Text variant="small" tone="faint" style={styles.grow}>
+          <Text variant="small" tone="muted" style={styles.bold}>
             {who}
           </Text>
           {` · ${when.time(message.createdAt)}`}
@@ -59,7 +59,7 @@ export function StoppedLine({ message, notice }: { message: Message; notice: Sto
             <>
               {" · "}
               <Text
-                variant="caption"
+                variant="small"
                 tone="muted"
                 style={styles.bold}
                 onPress={() => setWriting(true)}
@@ -98,9 +98,9 @@ export function StoppedLine({ message, notice }: { message: Message; notice: Sto
 
 const styles = StyleSheet.create({
   // Aligned with the messages' words, as the other automatic lines (`EventLine`).
-  line: { marginVertical: 4, paddingLeft: 56, paddingRight: 16 },
-  head: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  line: { marginVertical: 4, paddingLeft: 59, paddingRight: 16 },
+  head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  form: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8, marginLeft: 19 },
+  form: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8, marginLeft: 24 },
 });

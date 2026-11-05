@@ -30,7 +30,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, Text } from "@/ui";
+import { Button, Icon, LineIcon, Text } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
@@ -136,7 +136,7 @@ function WeekCard({ message, card }: { message: Message; card: TeamWeekCard }) {
             </Text>
             {card.worked.map((w) => (
               <View key={`${w.kind}:${w.agentId}`} style={styles.worked}>
-                <Icon name="check" size={14} color={c.ok} />
+                <LineIcon name="check" size={14} color={c.ok} variant="footnote" />
                 <Text variant="footnote" tone="ink" style={styles.fill}>
                   {w.kind === "runs"
                     ? t("teamWeek.workedRuns", {
