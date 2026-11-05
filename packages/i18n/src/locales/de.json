@@ -13583,7 +13583,6 @@
       "goBadAddress": "Das sieht nicht nach einer Adresse aus. Versuch example.com.",
       "goFailed": "Die Website ließ sich nicht öffnen. Prüf die Adresse.",
       "backTitle": "An {{name}} zurückgeben",
-      "doneTitle": "Fertig. Eine Notiz für {{name}}?",
       "backLabel": "Notiz für {{name}}",
       "backPlaceholder": "Optional: Gibt es etwas, das {{name}} wissen sollte?",
       "addNote": "Notiz hinterlassen"

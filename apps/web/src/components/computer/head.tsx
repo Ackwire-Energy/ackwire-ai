@@ -1,8 +1,7 @@
-import { Button, type IconName } from "@agenteschat/ui";
+import { Button } from "@agenteschat/ui";
 import { createContext, type ReactNode, useContext } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { useMatchMedia } from "@/hooks/useMatchMedia";
 import { useToast } from "@/lib/toast";
 
 /**
@@ -44,20 +43,6 @@ export function useSayFailed() {
   const head = useDialogHead();
   const toast = useToast();
   return (text: string) => (head ? head.say(text) : toast.show(text, "error"));
-}
-
-/** A phone this narrow has no room for Hand back's words beside the name. */
-const NO_ROOM_FOR_WORDS = "(max-width: 360px)";
-
-/**
- * Hand back's icon and classes in the head. A check alone reads as Done, so on a phone a take over's keeps its words
- * (`.cmp-words`), and where they don't fit it folds to a give-back arrow, its words still its name (computer.css).
- * A request's Done keeps its check.
- */
-export function useHandBack(takeover: boolean): { icon: IconName; className: string } {
-  const narrow = useMatchMedia(NO_ROOM_FOR_WORDS);
-  if (!takeover) return { icon: "check", className: "cmp-back" };
-  return narrow ? { icon: "undo", className: "cmp-back" } : { icon: "check", className: "cmp-back cmp-words" };
 }
 
 /** Puts a sub-line and actions in the dialog's head. */

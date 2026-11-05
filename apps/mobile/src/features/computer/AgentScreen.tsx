@@ -258,8 +258,11 @@ export function AgentScreen({
   const mine = waiting !== null && handoffIsMine(waiting, userId, agent?.ownerUserId, org);
   const ask = inControl && handoff?.kind === "ask";
   const doneLabel = ask ? t("mobile.browser.live.done") : t("mobile.browser.live.handBack");
-  const { handBack, couldnt, finishing } = useFinishHandoff(inControl ? handoff : null, name, doneLabel, () =>
-    view.desktopQ.refetch(),
+  const { handBack, leaveNote, couldnt, finishing } = useFinishHandoff(
+    inControl ? handoff : null,
+    name,
+    doneLabel,
+    () => view.desktopQ.refetch(),
   );
   // Taking or handing back, the last picture stays under what is happening, as on the web: never a cold cover.
   const switching = desktopSwitch({
@@ -314,7 +317,7 @@ export function AgentScreen({
         : "";
 
   const action = inControl ? (
-    <Button variant="secondary" size="sm" icon="check" label={doneLabel} onPress={handBack} />
+    <Button variant="secondary" size="sm" icon="check" label={doneLabel} loading={finishing} onPress={handBack} />
   ) : waiting && mine ? (
     <Button variant="primary" size="sm" label={t("agentComputer.help")} loading={taking} onPress={() => void take()} />
   ) : live && !status?.controllerUserId && !waiting && canTakeOver && words.mayTake ? (
@@ -767,6 +770,7 @@ export function AgentScreen({
               onKeyboard={() => setTyping(true)}
               onUpright={sideways.forced ? sideways.standUp : undefined}
               onCouldnt={ask ? couldnt : undefined}
+              onNote={leaveNote}
               onDone={handBack}
               doneLabel={doneLabel}
             />
@@ -800,9 +804,12 @@ export function AgentScreen({
               onKeyboard={() => setTyping(true)}
               onTurn={sideways.lieDown}
             />
-            {ask ? (
-              <Button variant="ghost" size="sm" label={t("mobile.browser.live.couldnt")} onPress={couldnt} />
-            ) : null}
+            <View style={styles.ways}>
+              <Button variant="ghost" size="sm" label={t("browser.inCard.addNote")} onPress={leaveNote} />
+              {ask ? (
+                <Button variant="ghost" size="sm" label={t("mobile.browser.live.couldnt")} onPress={couldnt} />
+              ) : null}
+            </View>
           </View>
         )
       ) : (
@@ -1094,6 +1101,7 @@ function TouchDock({
   onKeyboard,
   onUpright,
   onCouldnt,
+  onNote,
   onDone,
   doneLabel,
 }: {
@@ -1105,6 +1113,7 @@ function TouchDock({
   onUpright?: () => void;
   /** The agent asked for help and this person can't. */
   onCouldnt?: () => void;
+  onNote: () => void;
   onDone: () => void;
   doneLabel: string;
 }) {
@@ -1119,6 +1128,7 @@ function TouchDock({
           <IconButton icon="keyboard" label={t("desktop.keyboard.label")} onPress={onKeyboard} />
           {onUpright ? <IconButton icon="expand" label={t("agentComputer.phone.upright")} onPress={onUpright} /> : null}
           {onCouldnt ? <IconButton icon="x" label={t("mobile.browser.live.couldnt")} onPress={onCouldnt} /> : null}
+          <IconButton icon="compose" label={t("browser.inCard.addNote")} onPress={onNote} />
           <PressScale
             to={0.9}
             onPress={onDone}
@@ -1271,6 +1281,7 @@ const styles = StyleSheet.create({
   // Take control, and Cancelar under it, as the web's stacked question (`.brw-dim__acts`).
   askActs: { alignItems: "center", gap: 4 },
   control: { paddingHorizontal: 12, paddingTop: 10, gap: 8 },
+  ways: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8 },
   pad: {
     height: PAD_HEIGHT,
     borderRadius: 18,

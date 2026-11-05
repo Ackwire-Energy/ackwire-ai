@@ -13216,8 +13216,6 @@
       "goFailed": "网站没有打开。请检查地址。",
       "backTitle": "交还给 {{name}}",
       "backTitle_female": "交还给 {{name}}",
-      "doneTitle": "完成。要给 {{name}} 留句话吗？",
-      "doneTitle_female": "完成。要给 {{name}} 留句话吗？",
       "backLabel": "给 {{name}} 的备注",
       "backLabel_female": "给 {{name}} 的备注",
       "backPlaceholder": "可选：有什么需要 {{name}} 知道的吗？",

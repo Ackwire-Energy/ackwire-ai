@@ -13105,7 +13105,6 @@
       "goBadAddress": "アドレスではないようです。example.comのように入力してください。",
       "goFailed": "サイトが開きませんでした。アドレスを確認してください。",
       "backTitle": "{{name}}に返す",
-      "doneTitle": "完了しました。{{name}}へのメモはありますか？",
       "backLabel": "{{name}}へのメモ",
       "backPlaceholder": "任意: {{name}}に伝えておくことはありますか？",
       "addNote": "メモを残す"

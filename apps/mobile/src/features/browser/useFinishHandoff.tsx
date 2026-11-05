@@ -1,22 +1,21 @@
 import { type BrowserHandoff, handoffWantsWords, useBrowserHandoffActions } from "@agenteschat/client";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, useToast } from "@/ui";
 import { useOrgId } from "../shared/hooks";
 import { genderOf } from "../shared/logic";
-import { PromptForm, SheetTitle } from "../shared/PromptForm";
+import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { FAILED_REASONS, NOTE_MAX } from "./logic";
 
 /**
- * Ending a person's turn on an agent's browser or screen: Pronto or Devolver and "Não consegui", each a sheet with what
- * the person wants the agent to know, which it reads as their own words. Pronto or Devolver is one button with "Deixar
- * um recado" under it, the note open from the start only where the request asked the person something
- * (`handoffWantsWords`). `doneLabel`: the word the turn ends with. `finishing`: from the answer until `after` (the
- * screen's status read again) settles, so a switch cover never sees the old mode in between.
+ * Ending a person's turn on an agent's browser or screen. Pronto or Devolver hands back at once, and `leaveNote` is the
+ * same with a sheet for what the person wants the agent to know, which it reads as their own words. Where the request
+ * asked the person something (`handoffWantsWords`) Pronto opens that sheet, or the answer would be lost. "Não consegui"
+ * is a sheet too. `doneLabel`: the word the turn ends with. `finishing`: from the answer until `after` (the screen's
+ * status read again) settles, so a switch cover never sees the old mode in between.
  */
 export function useFinishHandoff(
   handoff: BrowserHandoff | null | undefined,
@@ -46,20 +45,28 @@ export function useFinishHandoff(
       setFinishing(false);
     }
   };
-  const handBack = () => {
+  const leaveNote = () => {
     tapHaptic();
     sheet.open(
-      <HandBackSheet
-        title={t(handoff?.kind === "ask" ? "browser.inCard.doneTitle" : "browser.inCard.backTitle", agentGrammar(name))}
-        name={name}
-        doneLabel={doneLabel}
-        noteFirst={handoffWantsWords(handoff)}
-        onDone={async (text) => {
+      <PromptForm
+        title={t("mobile.browser.done.title")}
+        intro={t(`mobile.browser.done.intro${g}`, { name })}
+        placeholder={t("mobile.browser.done.placeholder")}
+        submitLabel={doneLabel}
+        icon="check"
+        allowEmpty
+        onSubmit={async (text) => {
           sheet.close();
           await finish(true, text);
         }}
       />,
     );
+  };
+  const handBack = () => {
+    if (finishing) return;
+    if (handoffWantsWords(handoff)) return leaveNote();
+    tapHaptic();
+    void finish(true);
   };
   const couldnt = () => {
     tapHaptic();
@@ -92,54 +99,7 @@ export function useFinishHandoff(
       </PromptForm>,
     );
   };
-  return { handBack, couldnt, finishing };
-}
-
-function HandBackSheet({
-  title,
-  name,
-  doneLabel,
-  noteFirst,
-  onDone,
-}: {
-  title: string;
-  name: string;
-  doneLabel: string;
-  noteFirst: boolean;
-  onDone: (text?: string) => Promise<void>;
-}) {
-  const { t } = useTranslation();
-  const [writing, setWriting] = useState(noteFirst);
-  const [busy, setBusy] = useState(false);
-  if (writing)
-    return (
-      <PromptForm
-        title={t("mobile.browser.done.title")}
-        intro={t(`mobile.browser.done.intro${genderOf(name)}`, { name })}
-        placeholder={t("mobile.browser.done.placeholder")}
-        submitLabel={doneLabel}
-        icon="check"
-        allowEmpty
-        onSubmit={onDone}
-      />
-    );
-  return (
-    <>
-      <SheetTitle title={title} />
-      <Button
-        variant="primary"
-        wide
-        icon="check"
-        label={doneLabel}
-        loading={busy}
-        onPress={() => {
-          setBusy(true);
-          void onDone().finally(() => setBusy(false));
-        }}
-      />
-      <Button variant="text" label={t("browser.inCard.addNote")} onPress={() => setWriting(true)} />
-    </>
-  );
+  return { handBack, leaveNote, couldnt, finishing };
 }
 
 const styles = StyleSheet.create({

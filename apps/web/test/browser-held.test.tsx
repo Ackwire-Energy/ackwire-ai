@@ -43,10 +43,12 @@ describe("Assumir: the card stays the control while the agent waits", () => {
     const call = state.calls.find((c) => c.method === "browser.takeover");
     expect(call?.args).toEqual([ORG_ID, ADA_ID, "r-held"]);
     expect(cards()).toHaveLength(1);
-    // In control the frame turns graphite and Devolver sits in its top.
+    // In control the frame turns graphite and Devolver sits under the page, not in its top.
     expect(cards()[0]?.classList.contains("is-control")).toBe(true);
     const top = cards()[0]?.querySelector(".brw-mf__top") as HTMLElement;
-    expect(within(top).getByRole("button", { name: "Devolver" })).toBeTruthy();
+    expect(within(top).queryByRole("button", { name: "Devolver" })).toBeNull();
+    const foot = cards()[0]?.querySelector(".brw-ac__back") as HTMLElement;
+    expect(within(foot).getByRole("button", { name: "Devolver" })).toBeTruthy();
 
     // The agent pauses (waiting for the hand back) and says so: the live row goes, its message lands.
     await ev({ type: "agent.run", ...run, status: "waiting_input" });
@@ -65,7 +67,7 @@ describe("Assumir: the card stays the control while the agent waits", () => {
       },
     });
     await settle(4);
-    // Still there, still mine, open: one card (not two), Devolver in its header (a take over, not a request).
+    // Still there, still mine, open: one card (not two), Devolver under the page (a take over, not a request).
     expect(cards()).toHaveLength(1);
     const card = cards()[0] as HTMLElement;
     expect(card.classList.contains("is-control")).toBe(true);
@@ -73,8 +75,7 @@ describe("Assumir: the card stays the control while the agent waits", () => {
     expect(within(card).queryByRole("button", { name: "Pronto" })).toBeNull();
     expect(card.closest("article")?.textContent).toContain("Uma pessoa pegou o controle");
 
-    // Devolver offers an optional word to the agent, then hands back: the card goes with the take over.
-    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Devolver" })));
+    // An optional word to the agent, then Devolver hands back: the card goes with the take over.
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Deixar um recado" })));
     const note = within(card).getByRole("textbox", { name: "Recado para a Ada" });
     await act(async () => fireEvent.change(note, { target: { value: "Entrei com a conta de teste" } }));
@@ -129,14 +130,13 @@ describe("Assumir: the card stays the control while the agent waits", () => {
     const card = cards()[0] as HTMLElement;
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Assumir" })));
     await settle(3);
-    // Devolver opens the optional note, whose own Devolver hands back.
-    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Devolver" })));
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Devolver" })));
     await settle(3);
     expect(state.calls.some((c) => c.method === "browser.done")).toBe(true);
     expect(cards()).toHaveLength(1);
     expect(cards()[0]).toBe(card);
     expect(card.classList.contains("is-control")).toBe(false);
+    expect(card.querySelector(".brw-ac__back")).toBeNull();
     expect(card.classList.contains("is-open")).toBe(true);
     expect(within(card).getByRole("button", { name: "Assumir" })).toBeTruthy();
   });

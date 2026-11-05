@@ -14518,8 +14518,6 @@
       "goFailed": "Strona się nie otworzyła. Sprawdź adres.",
       "backTitle": "Oddaj agentowi {{name}}",
       "backTitle_female": "Oddaj agentce {{name}}",
-      "doneTitle": "Gotowe. Notatka dla {{name}}?",
-      "doneTitle_female": "Gotowe. Notatka dla {{name}}?",
       "backLabel": "Notatka dla {{name}}",
       "backLabel_female": "Notatka dla {{name}}",
       "backPlaceholder": "Opcjonalnie: czy {{name}} powinien coś wiedzieć?",

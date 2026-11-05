@@ -82,7 +82,7 @@ import { useToast } from "@/lib/toast";
 import { useBrowserLive, useConnectionStatus, useStreams } from "@/realtime/context";
 import { AgentWho } from "../AgentAvatar";
 import { AskActions, HandBackFoot, useAskControl } from "../computer/control";
-import { DialogHead, FullButton, FullScreenButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
+import { DialogHead, FullButton, FullScreenButton, useDialogHead, useSayFailed } from "../computer/head";
 import { useOpenComputer } from "../computer/open";
 import { PASTE_MAX_BYTES, pasteBytes } from "../desktop/paste";
 import { useOrg } from "../org-context";
@@ -94,6 +94,8 @@ import { SiteIcon, siteName } from "./SiteIcon";
 import "./browser.css";
 
 const FAIL_REASONS = ["code", "password", "blocked"] as const;
+/** The reason goes before it, in the 1000 the server takes. */
+const FAIL_NOTE_MAX = 900;
 /** The scroll hint goes this long after the wheel's last tick. */
 const SCROLL_HINT_IDLE_MS = 1200;
 const KEYS = ["Tab", "Enter", "Backspace", "Escape"] as const;
@@ -441,8 +443,6 @@ export function BrowserCard({
   useEffect(() => {
     if (problem) sayFailed(t(problem));
   }, [live.errors]);
-  // A chat card's Hand back keeps its check and words: only the dialog's head folds it.
-  const back = useHandBack(surface && handoff?.kind === "takeover");
   const controllerName = controller ? (dir.memberById.get(controller)?.name ?? t("channel.unknownPerson")) : "";
   // The computer the browser runs on: the request's, else the one this agent works on.
   const machine = (machines.data ?? []).find((m) =>
@@ -456,7 +456,6 @@ export function BrowserCard({
   const [failing, setFailing] = useState(false);
   const [reason, setReason] = useState<(typeof FAIL_REASONS)[number] | null>(null);
   const [note, setNote] = useState("");
-  const [handingBack, setHandingBack] = useState(false);
   const [backNote, setBackNote] = useState("");
   const [confirmStop, setConfirmStop] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
@@ -688,7 +687,7 @@ export function BrowserCard({
   useEffect(() => {
     if (inControl) return;
     setCapturing(false);
-    setHandingBack(false);
+    setFailing(false);
   }, [inControl]);
   // Control ending, or the page going (closed, opening, someone else's) before its pointers lifted, lets go of them:
   // the next press starts fresh.
@@ -766,7 +765,6 @@ export function BrowserCard({
     if (profile) {
       profileActions.handback.mutate(profile.id, {
         onSuccess: () => {
-          setHandingBack(false);
           setHandedProfile(true);
           onSettled?.();
         },
@@ -777,7 +775,6 @@ export function BrowserCard({
     const words = backNote.trim();
     actions.done.mutate(words ? { handoffId: handoff.id, note: words } : handoff.id, {
       onSuccess: () => {
-        setHandingBack(false);
         setBackNote("");
         fold();
         onSettled?.();
@@ -794,6 +791,7 @@ export function BrowserCard({
       {
         onSuccess: () => {
           setFailing(false);
+          setBackNote("");
           fold();
           onSettled?.();
         },
@@ -1080,37 +1078,6 @@ export function BrowserCard({
       </>
     ))
   );
-  const controlActs = (
-    <>
-      {ask && (
-        <Button
-          size="sm"
-          variant="ghost"
-          {...(surface ? { icon: "block" as const, className: "cmp-couldnt ac-btn--glyph" } : {})}
-          onClick={() => {
-            setHandingBack(false);
-            setFailing(true);
-          }}
-        >
-          <span className="cmp-act-label">{surface ? t("browser.inCard.couldnt") : t("browser.inCard.giveUp")}</span>
-        </Button>
-      )}
-      {!handingBack && (
-        <Button
-          size="sm"
-          variant="primary"
-          icon={back.icon}
-          className={back.className}
-          onClick={() => {
-            setFailing(false);
-            setHandingBack(true);
-          }}
-        >
-          <span className="cmp-act-label">{handBackLabel}</span>
-        </Button>
-      )}
-    </>
-  );
   const seeWhole = onDesktop && !full && (
     <Button
       size="sm"
@@ -1233,7 +1200,6 @@ export function BrowserCard({
           {inControl ? (
             // The page takes the person's clicks: full screen sits here, not over it.
             <span className="brw-mf__acts">
-              {controlActs}
               {seeWhole}
               {!blocker && <FullScreenButton full={full} onToggle={() => setFull(true)} />}
             </span>
@@ -1268,7 +1234,7 @@ export function BrowserCard({
             sub={withAgentFace(surfaceSub, name, agentId)}
             actions={
               <>
-                {inControl ? controlActs : watchActs}
+                {!inControl && watchActs}
                 {!blocker && <FullButton />}
               </>
             }
@@ -1284,7 +1250,7 @@ export function BrowserCard({
             </span>
           </button>
           <span className="brw-ac__acts">
-            {inControl ? controlActs : watchActs}
+            {!inControl && watchActs}
             {seeWhole}
             {!blocker && <FullScreenButton full={full} onToggle={() => setFull((v) => !v)} />}
             {!full && (
@@ -1423,7 +1389,7 @@ export function BrowserCard({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={t("browser.live.failPlaceholder")}
-              maxLength={900}
+              maxLength={FAIL_NOTE_MAX}
             />
             <div className="brw-ac__row">
               <span className="brw-grow" />
@@ -1435,23 +1401,6 @@ export function BrowserCard({
               </Button>
             </div>
           </div>
-        ) : handingBack ? (
-          <HandBackFoot
-            title={
-              profile
-                ? t("browser.profiles.backTitle", { name: profile.name })
-                : handoff?.kind === "ask"
-                  ? t("browser.inCard.doneTitle", g)
-                  : t("browser.inCard.backTitle", g)
-            }
-            label={handBackLabel}
-            grammar={g}
-            {...(profile ? {} : { note: backNote, onNote: setBackNote })}
-            noteFirst={handoffWantsWords(handoff)}
-            pending={profile ? profileActions.handback.isPending : actions.done.isPending}
-            onBack={finish}
-            onCancel={() => setHandingBack(false)}
-          />
         ) : touch ? (
           // One quiet field like the message composer: where the text goes, the field, Senha, Teclas, a site, send.
           <div className="brw-ac__foot brw-type">
@@ -1533,6 +1482,32 @@ export function BrowserCard({
             </label>
           </div>
         ) : null)}
+      {inControl && !failing && (
+        <HandBackFoot
+          title={profile ? t("browser.profiles.backTitle", { name: profile.name }) : t("browser.inCard.backTitle", g)}
+          label={handBackLabel}
+          grammar={g}
+          {...(profile ? {} : { note: backNote, onNote: setBackNote })}
+          noteFirst={handoffWantsWords(handoff)}
+          pending={profile ? profileActions.handback.isPending : actions.done.isPending}
+          onBack={finish}
+          other={
+            ask && (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={actions.done.isPending}
+                onClick={() => {
+                  setNote((words) => words || backNote.slice(0, FAIL_NOTE_MAX));
+                  setFailing(true);
+                }}
+              >
+                {surface ? t("browser.inCard.couldnt") : t("browser.inCard.giveUp")}
+              </Button>
+            )
+          }
+        />
+      )}
       {otherInControl && !hidden && (
         <div className="brw-ac__foot">
           <span className="small muted">{t("browser.inCard.otherHelp", { person: controllerName })}</span>
