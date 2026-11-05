@@ -6,8 +6,8 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AgentAvatar, Button, GroupedHeader, GroupedList, GroupedRow, Icon, Sheet, Text } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { AGENT_ACCESSORIES, AGENT_COLORS, AGENT_EYES } from "../shared/logic";
-import { tapHaptic } from "../shared/parts";
 import { SheetTitle } from "../shared/PromptForm";
+import { tapHaptic } from "../shared/parts";
 import { ColorSheet } from "./ColorSheet";
 import { type FullLook, shuffleLook } from "./edit";
 

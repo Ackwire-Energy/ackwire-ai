@@ -7,22 +7,14 @@ import {
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
 import { type ToolChangeDiff, toolChangeDiff, toolChangeSummary } from "@agenteschat/client/lib/tool-changes";
+import { diffLines } from "@agenteschat/ui/diff";
 import { router } from "expo-router";
 import { type ReactNode, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import {
-  Button,
-  DiffView,
-  GroupedFooter,
-  GroupedHeader,
-  GroupedList,
-  GroupedRow,
-  Text,
-  useToast,
-} from "@/ui";
+import { Button, DiffView, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
 import { errorHaptic, goBack, PushedHeader, successHaptic } from "../shared/parts";
 
@@ -93,7 +85,7 @@ export function ChangedTools({ connectionId, name }: { connectionId: string; nam
 /** A changed tool: its name, what changed in a few words; a tap opens the change, where it is accepted. */
 function ChangeRow({ change }: { change: ToolChange }) {
   const { t } = useTranslation();
-  const diff = useMemo(() => toolChangeDiff(change), [change]);
+  const diff = useMemo(() => toolChangeDiff(change, diffLines), [change]);
   return (
     <GroupedRow
       label={change.toolName}
@@ -117,7 +109,7 @@ export function ToolChangeScreen({ connectionId, toolName }: { connectionId: str
   const accept = useAcceptToolChange(orgId);
   const { changes, loading } = useConnectionToolChanges(connectionId);
   const change = changes.find((x) => x.toolName === toolName) ?? null;
-  const diff = useMemo(() => (change ? toolChangeDiff(change) : null), [change]);
+  const diff = useMemo(() => (change ? toolChangeDiff(change, diffLines) : null), [change]);
   const take = () => {
     if (!change) return;
     accept.mutate(change, {
@@ -135,11 +127,7 @@ export function ToolChangeScreen({ connectionId, toolName }: { connectionId: str
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader title={toolName} {...(change ? { subtitle: change.connectionLabel } : {})} solid={false} grouped />
-      <ScrollView
-        style={styles.screen}
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.page}
-      >
+      <ScrollView style={styles.screen} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.page}>
         {loading ? (
           <ActivityIndicator color={c.muted} />
         ) : diff ? (
@@ -196,7 +184,7 @@ function ChangeDetails({ diff }: { diff: ToolChangeDiff }) {
       ) : null}
       {diff.schema ? (
         <View>
-          {diff.fields.length > 0 ? null : <GroupedHeader>{t("connectors.toolChanges.input")}</GroupedHeader>}
+          {diff.fields.length === 0 ? <GroupedHeader>{t("connectors.toolChanges.input")}</GroupedHeader> : null}
           <DiffView lines={diff.schema} />
         </View>
       ) : null}

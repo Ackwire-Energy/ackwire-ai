@@ -1,10 +1,10 @@
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import {
   HORIZON_CELL as CELL,
-  HORIZON_WAVE as WAVE,
   horizonCrest,
   horizonHeight,
   horizonTones,
+  HORIZON_WAVE as WAVE,
 } from "@agenteschat/ui/sky/horizon";
 import { bayerAt } from "@agenteschat/ui/sky/math";
 import { Canvas, Path, Skia } from "@shopify/react-native-skia";

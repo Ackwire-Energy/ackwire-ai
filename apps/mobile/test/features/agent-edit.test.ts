@@ -224,8 +224,7 @@ describe("creating an agent on the phone", () => {
 
   test("Create agent on the grouped gray: the step said once, presets as checked rows, a level picked from a list", async () => {
     // The screens are components the tests can't render: what they wire in, as text.
-    const read = (f: string) =>
-      Bun.file(new URL(`../../src/features/agents/${f}`, import.meta.url).pathname).text();
+    const read = (f: string) => Bun.file(new URL(`../../src/features/agents/${f}`, import.meta.url).pathname).text();
     const [screen, look] = await Promise.all([read("NewAgentScreen.tsx"), read("LookPicker.tsx")]);
     // Not in the header's subtitle: once, under the bar ("2 of 4 · Who it is").
     expect(screen).not.toContain("newAgent.stepOf");

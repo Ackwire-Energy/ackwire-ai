@@ -71,7 +71,11 @@ const useLevelWord = () => {
 
 /** The system's choice of a level (an action sheet on iOS, a dialog on Android). */
 function pickLevel(title: string, cancel: string, word: (l: LevelState) => string, choose: (l: Level) => void) {
-  chooseAction(title, LEVELS.map((l) => ({ label: word(l), onPress: () => choose(l) })), cancel);
+  chooseAction(
+    title,
+    LEVELS.map((l) => ({ label: word(l), onPress: () => choose(l) })),
+    cancel,
+  );
 }
 
 /** "Todos os agentes": picking a level saves it for every agent, one by one. */

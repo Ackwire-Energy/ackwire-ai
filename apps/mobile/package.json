@@ -76,7 +76,9 @@
   "expo": {
     "autolinking": {
       "ios": {
-        "buildFromSource": ["ExpoVideo"]
+        "buildFromSource": [
+          "ExpoVideo"
+        ]
       }
     }
   }

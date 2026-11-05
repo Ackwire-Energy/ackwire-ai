@@ -2,7 +2,7 @@ import type { ToolChange } from "@agenteschat/client";
 import { useAcceptConnectionToolChanges, useAcceptToolChange, useToolChanges } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { type ToolChangeDiff, toolChangeDiff, toolChangeSummary } from "@agenteschat/client/lib/tool-changes";
-import { Button, Diff } from "@agenteschat/ui";
+import { Button, Diff, diffLines } from "@agenteschat/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/lib/toast";
@@ -104,7 +104,7 @@ function ToolRow({ orgId, change }: { orgId: string; change: ToolChange }) {
   const toast = useToast();
   const accept = useAcceptToolChange(orgId);
   const [open, setOpen] = useState(false);
-  const diff = useMemo(() => toolChangeDiff(change), [change]);
+  const diff = useMemo(() => toolChangeDiff(change, diffLines), [change]);
   const detailsId = `tool-change-${change.connectionId}-${change.toolName}`;
   return (
     <li className="tool-change">

@@ -32,8 +32,8 @@ import {
 } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
-import { useSurface } from "../shared/parts";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
+import { useSurface } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { openConnection } from "./ConnectionScreen";
 import { ConnectorIcon } from "./ConnectorIcon";

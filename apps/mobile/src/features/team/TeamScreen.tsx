@@ -9,8 +9,8 @@ import { chatHref } from "../links/logic";
 import { useOpenDm } from "../new/useOpenDm";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
-import { Tile, useSurface } from "../shared/parts";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
+import { Tile, useSurface } from "../shared/parts";
 import { teamSections } from "./logic";
 
 /** The org chart's faces: the right hand and the people at 40, their agents at 30, the lines through their centers. */

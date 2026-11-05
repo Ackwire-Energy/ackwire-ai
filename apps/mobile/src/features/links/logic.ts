@@ -29,6 +29,7 @@ export type AppHref =
   | "/routines"
   | "/issues"
   | "/connectors"
+  | `/connectors/tools?id=${string}`
   | "/me/members"
   | "/me/approvals"
   | "/settings/computers"

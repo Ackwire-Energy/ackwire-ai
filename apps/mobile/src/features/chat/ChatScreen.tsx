@@ -1396,11 +1396,7 @@ function Chat({
         subtitle={dmLine ?? dmDoing ?? subtitle}
         color={dmAgentId ? agentLook(dmAgent).color : undefined}
         working={Boolean(dmDoing)}
-        extraActions={
-          (dmAgentId ? 1 : 0) +
-          (queueShown ? 1 : 0) +
-          (agentTasks ? tasksBadge(agentTasks).room : 0)
-        }
+        extraActions={(dmAgentId ? 1 : 0) + (queueShown ? 1 : 0) + (agentTasks ? tasksBadge(agentTasks).room : 0)}
         onPress={dmAgentId ? () => router.push(`/agent/${dmAgentId}`) : openOptions}
         {...hold}
         label={

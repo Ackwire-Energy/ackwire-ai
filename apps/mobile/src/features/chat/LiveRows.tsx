@@ -565,19 +565,17 @@ export function WorkingLine({
           </Text>
         ) : null}
         {seeable ? (
-          <>
-            <Pressable
-              onPress={see}
-              accessibilityRole="button"
-              accessibilityLabel={`${t("run.strip.see")} · ${lead?.name ?? ""}`}
-              hitSlop={8}
-              style={({ pressed }) => pressed && styles.pressed}
-            >
-              <Text variant="caption" tone="ink" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.ink}>
-                {t("run.strip.see")}
-              </Text>
-            </Pressable>
-          </>
+          <Pressable
+            onPress={see}
+            accessibilityRole="button"
+            accessibilityLabel={`${t("run.strip.see")} · ${lead?.name ?? ""}`}
+            hitSlop={8}
+            style={({ pressed }) => pressed && styles.pressed}
+          >
+            <Text variant="caption" tone="ink" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.ink}>
+              {t("run.strip.see")}
+            </Text>
+          </Pressable>
         ) : null}
         {/* No stop here: the composer's, right under the line, is the one stop (two side by side read as noise). */}
       </Animated.View>

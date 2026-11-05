@@ -8,24 +8,11 @@ import {
   useMailAction,
 } from "@agenteschat/client";
 import { mailActionsChanged, mailActionsFrom, mailReviewTools } from "@agenteschat/client/lib/mail";
-import {
-  type ReviewTool,
-  reviewDecisions,
-  reviewToolsOf,
-} from "@agenteschat/client/lib/tool-review";
+import { type ReviewTool, reviewDecisions, reviewToolsOf } from "@agenteschat/client/lib/tool-review";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import {
-  Button,
-  GroupedFooter,
-  GroupedHeader,
-  GroupedList,
-  GroupedRow,
-  Icon,
-  SearchField,
-  Text,
-} from "@/ui";
+import { Button, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Icon, SearchField, Text } from "@/ui";
 import { chooseAction } from "../settings/parts";
 import { useColors, useOrgId } from "../shared/hooks";
 import { errorHaptic, successHaptic } from "../shared/parts";
@@ -177,7 +164,9 @@ function ServerReview({
     <>
       {server.toolsError ? <Problem text={t("toolReview.unreadable", { reason: server.toolsError })} /> : null}
       {tools.length === 0 ? (
-        server.toolsError ? null : <GroupedFooter>{t("toolReview.noTools")}</GroupedFooter>
+        server.toolsError ? null : (
+          <GroupedFooter>{t("toolReview.noTools")}</GroupedFooter>
+        )
       ) : (
         <ToolList tools={tools} levelOf={(x) => chosenLevel(state, x)} review={{ state, onChange: setState }} />
       )}

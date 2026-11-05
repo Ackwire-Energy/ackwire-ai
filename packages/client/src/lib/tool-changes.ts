@@ -1,7 +1,14 @@
-import { type DiffLine, diffLines } from "@agenteschat/ui/diff";
 import type { TFunction } from "i18next";
 import type { ToolChange } from "../api/types";
 import { inputFields } from "./custom-tools";
+
+/** A line of a before/after diff, as the design system's `diffLines` gives it (each app passes that in). */
+export interface DiffLine {
+  kind: "same" | "add" | "del";
+  text: string;
+}
+/** Two lists of lines diffed line by line: this package stays platform-neutral, so the app hands it its differ. */
+export type LineDiff = (before: string[], after: string[]) => DiffLine[];
 
 /*
  * What a connected server changed in an approved tool (ADR 0117), cut down to the changes: shared by the web's
@@ -38,7 +45,6 @@ export function changedOnly(lines: DiffLine[], context = 1): DiffLine[] {
   return out;
 }
 
-const diffText = (before: string, after: string) => changedOnly(diffLines(textUnits(before), textUnits(after)));
 
 /** A schema with its keys sorted, as lines: two versions differ here only when their content does. */
 function schemaLines(value: unknown): string[] {
@@ -79,8 +85,9 @@ export interface ToolChangeDiff {
 }
 
 /** What a server changed in an approved tool, cut down to the changes (ADR 0117). */
-export function toolChangeDiff(change: Pick<ToolChange, "before" | "after">): ToolChangeDiff {
+export function toolChangeDiff(change: Pick<ToolChange, "before" | "after">, diffLines: LineDiff): ToolChangeDiff {
   const { before, after } = change;
+  const diffText = (was: string, now: string) => changedOnly(diffLines(textUnits(was), textUnits(now)));
   const description = before.description === after.description ? null : diffText(before.description, after.description);
   const oldFields = new Map(inputFields(before.inputSchema).map((f) => [f.name, f]));
   const newFields = new Map(inputFields(after.inputSchema).map((f) => [f.name, f]));

@@ -48,10 +48,11 @@ export function GroupedList({ children }: { children?: ReactNode }) {
                   {
                     backgroundColor: c.line2,
                     // A tile and a face share one leading column, so the text and its hairline start at one place.
-                    marginLeft: (child.props as { icon?: unknown; leading?: unknown }).icon ||
-                    (child.props as { leading?: unknown }).leading
-                      ? 14 + LEAD + 12
-                      : 14,
+                    marginLeft:
+                      (child.props as { icon?: unknown; leading?: unknown }).icon ||
+                      (child.props as { leading?: unknown }).leading
+                        ? 14 + LEAD + 12
+                        : 14,
                   },
                 ]}
               />

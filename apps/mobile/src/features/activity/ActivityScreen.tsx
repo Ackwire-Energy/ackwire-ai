@@ -11,8 +11,8 @@ import {
 import { approvalSummary, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { timeLeft, upperFirst } from "@agenteschat/client/lib/format";
-import { can } from "@agenteschat/client/lib/permissions";
 import { mediaWord } from "@agenteschat/client/lib/media";
+import { can } from "@agenteschat/client/lib/permissions";
 import { usageLimitLine } from "@agenteschat/client/lib/person-usage";
 import { router, useLocalSearchParams } from "expo-router";
 import type { TFunction } from "i18next";
@@ -446,11 +446,7 @@ function AllClear() {
 }
 
 /** When the next run is: "hoje às 18:00", "amanhã às 9:00", "qua, 12 nov às 9:00". */
-function nextRunWords(
-  t: ReturnType<typeof useTranslation>["t"],
-  when: ReturnType<typeof useWhen>,
-  iso: string,
-): string {
+function nextRunWords(t: TFunction, when: ReturnType<typeof useWhen>, iso: string): string {
   const day = upcomingDay(iso);
   const time = when.time(iso);
   const date =

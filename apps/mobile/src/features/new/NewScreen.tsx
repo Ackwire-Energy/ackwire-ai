@@ -200,13 +200,7 @@ function CreateList({ items }: { items: CreateItem[] }) {
       <GroupedHeader>{t("mobile.new.create")}</GroupedHeader>
       <GroupedList>
         {create.map((item) => (
-          <GroupedRow
-            key={item}
-            leading={<TintTile {...CREATE_LOOK[item]} />}
-            {...spec[item]}
-            subLines={2}
-            chevron
-          />
+          <GroupedRow key={item} leading={<TintTile {...CREATE_LOOK[item]} />} {...spec[item]} subLines={2} chevron />
         ))}
       </GroupedList>
     </>

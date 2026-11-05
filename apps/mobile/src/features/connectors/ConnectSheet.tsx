@@ -589,69 +589,69 @@ function ConnectStep({
               <Button variant="text" size="sm" label={t("common.back")} onPress={() => setPhase("address")} />
             </View>
           ) : null}
-      {mode === "signIn" ? (
-        <Button
-          variant="primary"
-          wide
-          label={
-            busy
-              ? t("mobile.connectors.working")
-              : viaComposio
-                ? t("connectFlow.continueInComposio")
-                : t("mobile.connectors.signIn", { name: shownName })
-          }
-          disabled={busy}
-          onPress={() => void signIn()}
-        />
-      ) : (
-        <>
-          <View style={styles.fieldBox}>
-            <InfoHint
-              name={t("common.about", { label: keyLabel })}
-              text={t("mobile.connectors.keyHelp")}
-              variant="footnote"
-            >
-              <Text variant="footnote" tone="faint">
-                {keyLabel}
-              </Text>
-            </InfoHint>
-            <View style={styles.keyRow}>
-              <TextInput
-                value={key}
-                onChangeText={setKey}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                accessibilityLabel={keyLabel}
-                style={[field, styles.grow]}
+          {mode === "signIn" ? (
+            <Button
+              variant="primary"
+              wide
+              label={
+                busy
+                  ? t("mobile.connectors.working")
+                  : viaComposio
+                    ? t("connectFlow.continueInComposio")
+                    : t("mobile.connectors.signIn", { name: shownName })
+              }
+              disabled={busy}
+              onPress={() => void signIn()}
+            />
+          ) : (
+            <>
+              <View style={styles.fieldBox}>
+                <InfoHint
+                  name={t("common.about", { label: keyLabel })}
+                  text={t("mobile.connectors.keyHelp")}
+                  variant="footnote"
+                >
+                  <Text variant="footnote" tone="faint">
+                    {keyLabel}
+                  </Text>
+                </InfoHint>
+                <View style={styles.keyRow}>
+                  <TextInput
+                    value={key}
+                    onChangeText={setKey}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    accessibilityLabel={keyLabel}
+                    style={[field, styles.grow]}
+                  />
+                  <Pressable
+                    onPress={() => void Clipboard.getStringAsync().then((v) => setKey(v.trim()))}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("mobile.connectors.paste")}
+                    // 40 tall beside the field: 44 to the finger.
+                    hitSlop={4}
+                    style={({ pressed }) => [
+                      styles.paste,
+                      { borderColor: c.line },
+                      pressed ? { backgroundColor: c.sunken } : null,
+                    ]}
+                  >
+                    <Text variant="small" style={styles.bold}>
+                      {t("mobile.connectors.paste")}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+              <Button
+                variant="primary"
+                wide
+                label={busy ? t("mobile.connectors.working") : t("mobile.connectors.connect")}
+                disabled={busy}
+                onPress={() => void submitKey()}
               />
-              <Pressable
-                onPress={() => void Clipboard.getStringAsync().then((v) => setKey(v.trim()))}
-                accessibilityRole="button"
-                accessibilityLabel={t("mobile.connectors.paste")}
-                // 40 tall beside the field: 44 to the finger.
-                hitSlop={4}
-                style={({ pressed }) => [
-                  styles.paste,
-                  { borderColor: c.line },
-                  pressed ? { backgroundColor: c.sunken } : null,
-                ]}
-              >
-                <Text variant="small" style={styles.bold}>
-                  {t("mobile.connectors.paste")}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-          <Button
-            variant="primary"
-            wide
-            label={busy ? t("mobile.connectors.working") : t("mobile.connectors.connect")}
-            disabled={busy}
-            onPress={() => void submitKey()}
-          />
-        </>
-      )}
+            </>
+          )}
           {/* The other way in, as words under the button, only where both exist (a server asked for a key). */}
           {!viaComposio && (how === "either" || (byAddress && mode === "key")) ? (
             <Button

@@ -119,7 +119,7 @@ export function capabilityLines(
 ): { text: string; asks: boolean; said?: boolean }[] {
   const base = `connectors.can.${safeId(def.id)}`;
   if (exists(`${base}.1`)) {
-    const lines = (["1", "2", "3"] as const)
+    const lines: { text: string; asks: boolean; said?: boolean }[] = (["1", "2", "3"] as const)
       .filter((n) => exists(`${base}.${n}`))
       .map((n) => ({ text: tr(`${base}.${n}`), asks: false }));
     // Our own line for what asks already says it asks ("… sempre pedem sua aprovação"): `said`, nothing to add.

@@ -22,7 +22,7 @@ import {
   smoothPath,
 } from "@agenteschat/ui/sky/chart";
 import { Canvas, Path, Rect, Skia } from "@shopify/react-native-skia";
-import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ComponentRef, memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type LayoutChangeEvent, StyleSheet, View } from "react-native";
 import Animated, {
@@ -332,8 +332,8 @@ function Bars({ spec, color, big }: { spec: BarsWidgetSpec; color: AgentColorNam
 
 /**
  * The home's strip: the columns alone, as tall as the card has room for and standing on the card's bottom edge (the
- * card runs them down to it, as a trend); what they count is a quiet word above them, starting where the title does. Their values and
- * labels are on the widget's screen (the card is one button named by its title).
+ * card runs them down to it, as a trend); what they count is a quiet word above them, starting where the title does.
+ * Their values and labels are on the widget's screen (the card is one button named by its title).
  */
 function CompactBars({ spec, color }: { spec: BarsWidgetSpec; color: AgentColorName }) {
   const { colors: c, scheme } = useTheme();
@@ -667,7 +667,7 @@ export function WidgetCard({
   // (it already runs along the foot), not on the big preview, not while it builds.
   const horizon = Boolean(onPress) && !big && drawn && !bleed;
   const [frame, setFrame] = useState({ width: 0, height: 0 });
-  const frameRef = useRef<View>(null);
+  const frameRef = useRef<ComponentRef<typeof View>>(null);
   // Where the card stands on the screen: cards side by side continue one wave, as on the web.
   const [waveX, setWaveX] = useState(0);
   const [bodyTop, setBodyTop] = useState(0);

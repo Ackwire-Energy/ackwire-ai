@@ -389,9 +389,7 @@ export function AgentScreen({
                   onPress={() => void take()}
                 />
               }
-              secondary={
-                <Button variant="secondary" size="card" wide label={t("approval.notNow")} onPress={notNow} />
-              }
+              secondary={<Button variant="secondary" size="card" wide label={t("approval.notNow")} onPress={notNow} />}
             />
           </AskFoot>
         ) : null
