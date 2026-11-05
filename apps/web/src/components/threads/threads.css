@@ -73,6 +73,7 @@ html:not([data-pointer]) .thread-marker__open:focus-visible {
   font-size: 13.5px;
   color: var(--ink2);
 }
+/* The icon sits flat on the card (no tile of its own inside it), in the 28px box its words line up with. */
 .thread-stub__icon {
   width: 28px;
   height: 28px;
@@ -80,8 +81,6 @@ html:not([data-pointer]) .thread-marker__open:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
-  background: var(--sunken);
   color: var(--ink2);
 }
 .thread-stub__text {
@@ -267,11 +266,14 @@ html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {
 .consult-answer {
   margin: 4px 12px 8px var(--thread-indent, 64px);
 }
-/* Who is in it, in front of the title (the generic thread mark only when nobody is known). */
+/* Who is in it, in front of the title (the generic thread mark only when nobody is known). Its 24px faces are no
+   taller than the title's line, so they centre on that first line, not on the title and its meta together. */
 .thread-head__who {
   flex: none;
   display: inline-flex;
   align-items: center;
+  align-self: flex-start;
+  height: 24px;
   color: var(--faint);
 }
 /* "DM com Theo · 4 respostas · há 2 min": the place may shorten, the count and time never do. */
@@ -843,6 +845,21 @@ html:not([data-pointer]) .thread-line:focus-visible {
 .thread-line b {
   color: var(--ink);
   font-weight: 650;
+}
+/* In a narrow column (the thread panel, a phone) the line never runs past its plate: the time gives way first, then
+   the count, each ending in "…"; the faces and what it needs keep their width. */
+.thread-line > b,
+.thread-line__when,
+.thread-line__when > time {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.thread-line__state {
+  flex: none;
+}
+.thread-line__when {
+  flex-shrink: 2;
 }
 .thread-line__who {
   display: inline-flex;

@@ -5813,6 +5813,19 @@ html:not([data-pointer]) .ac-react:focus-visible {
   color: var(--ink2);
   border: 0;
   white-space: nowrap;
+  /* A long name or label never runs past the composer: the pill shrinks to its row and its words end in "…"
+     (`.ac-composer__pill-text`), its face, icon and × kept whole. */
+  min-width: 0;
+  max-width: 100%;
+}
+.ac-composer__pill > :not(.ac-composer__pill-text),
+.ac-composer__agent > :not(.ac-composer__pill-text) {
+  flex: none;
+}
+.ac-composer__pill-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ac-composer__agent {
   padding-left: 4px;
