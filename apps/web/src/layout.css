@@ -1753,6 +1753,19 @@ html:not([data-pointer]) .artifact-card__open:focus-visible {
 .artifact-viewer__versions .ac-navcard {
   width: 100%;
 }
+/* "v3 · Theo · 2h" wraps in the narrow column; "Current" stays on its first line (the chip is the line's height). */
+.artifact-viewer__vhead {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.artifact-viewer__vname {
+  min-width: 0;
+  font-weight: 600;
+}
+.artifact-viewer__vhead > .ac-chip {
+  flex: none;
+}
 .artifact-html {
   width: 100%;
   min-height: 480px;
@@ -1816,14 +1829,23 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
 .artifact-file__head {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: 12px;
   min-width: 0;
+}
+/* The path gives way ("…"), never the counts. */
+.artifact-file__head > span {
+  flex: none;
 }
 .artifact-ln {
   flex: 0 0 32px;
   text-align: right;
   color: var(--ink-muted);
   user-select: none;
+}
+/* The switch keeps its own width in the column. */
+.artifact-diff__mode {
+  align-self: flex-start;
 }
 .artifact-split__row {
   display: grid;
@@ -6986,6 +7008,13 @@ html:not([data-pointer]) .file-row__open:focus-visible {
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
 }
+/* A PDF's box is its sheet's final height from the start: "Loading the preview…" and a failure sit in its middle, and
+   the page doesn't jump when the sheet arrives. */
+.file-view__preview--pdf {
+  box-sizing: border-box;
+  height: calc(max(320px, calc(100vh - 200px)) + 24px);
+  align-items: center;
+}
 /* A picture: the dialog closer to the window's edges with a tighter head, the viewer at its full height and the
    picture's stage taking all of it (the zoom bar floats over the stage). Phones keep the full-screen sheet. */
 @media (min-width: 641px) {
@@ -7149,7 +7178,7 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
 }
 .file-view__pdf {
   width: 100%;
-  height: max(320px, calc(100vh - 200px));
+  height: 100%;
   border: 0;
   border-radius: var(--radius-sm);
   background: var(--surface-raised);

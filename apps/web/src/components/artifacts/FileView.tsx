@@ -229,7 +229,7 @@ export function FileView({
   return (
     <div className={kind === "image" && canPreview ? "file-view file-view--image" : "file-view"}>
       {canPreview && (
-        <div className="file-view__preview">
+        <div className={kind === "pdf" ? "file-view__preview file-view__preview--pdf" : "file-view__preview"}>
           {failed ? (
             <p className="small muted">{t("files.previewFailed")}</p>
           ) : !url ? (
