@@ -447,12 +447,9 @@ const AiAccountPage = z
         machineId: z.uuid(),
         machineName: z.string(),
         kind: z.string(),
-        provider: z
-          .string()
-          .nullable()
-          .openapi({
-            description: "A coding plan's id, `cursor` or `zen` (keys), `enterprise`; null: the CLI's own sign-in.",
-          }),
+        provider: z.string().nullable().openapi({
+          description: "A coding plan's id, `cursor` or `zen` (keys), `enterprise`; null: the CLI's own sign-in.",
+        }),
         authMethod: z.string().nullable(),
         label: z.string(),
         plan: z.string().nullable(),
