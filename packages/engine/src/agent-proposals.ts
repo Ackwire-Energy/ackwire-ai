@@ -769,9 +769,9 @@ export async function createProposedAgent(
         ...(delegated ? { monthlyBudgetNanoUsd: delegated.budgetNanoUsd } : {}),
       },
       NEW_AGENT_DEFAULTS,
-      { via: found.proposedBy },
+      { via: found.proposedBy, pubsub: deps.pubsub },
     );
-    if (draft.appearance) agent = await setAgentAppearance(deps.db, userId, orgId, agent.id, draft.appearance);
+    if (draft.appearance) agent = await setAgentAppearance(deps.db, userId, orgId, agent.id, draft.appearance, deps);
   } catch (error) {
     await setCard(deps.db, found.message, found.before, "creating");
     throw error;

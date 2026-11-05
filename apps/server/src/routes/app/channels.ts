@@ -211,7 +211,7 @@ export function channelRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, channelId } = c.req.valid("param");
-      await unarchiveChannel(db, c.get("user").id, orgId, channelId);
+      await unarchiveChannel(db, c.get("user").id, orgId, channelId, opts);
       return c.body(null, 204);
     },
   );

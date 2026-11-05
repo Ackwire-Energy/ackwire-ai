@@ -242,7 +242,10 @@ const SETUP_FIELDS = [
   "machineId",
 ] as const;
 
-/** Every channel's members and roster (the members column, the channel's details): read again. */
+const isAgentPart = (k: readonly unknown[], orgId: string, part: string) =>
+  k[0] === "org" && k[1] === orgId && k[2] === "agent" && k[4] === part && k.length === 5;
+
+/** Every channel's members, roster and hover card (the members column, the channel's details): read again. */
 const refreshChannelMembers = (qc: QueryClient, orgId: string, channelId?: string) =>
   qc.invalidateQueries({
     predicate: ({ queryKey: k }) =>
@@ -250,14 +253,40 @@ const refreshChannelMembers = (qc: QueryClient, orgId: string, channelId?: strin
       k[1] === orgId &&
       k[2] === "channel" &&
       (channelId === undefined || k[3] === channelId) &&
-      (k[4] === "members" || k[4] === "roster") &&
+      (k[4] === "members" || k[4] === "roster" || k[4] === "card") &&
       k.length === 5,
   });
 
+const askedFor = new WeakMap<QueryClient, Set<string>>();
+
+/**
+ * A channel's list read from the server names someone the app's directory lacks (an agent made a moment ago, a person
+ * who just joined): the directory is read again, or their row would go missing with no trace. Once per id, so someone
+ * nobody can name costs one read, not one per read of the list. A directory not loaded yet will have them when it is.
+ */
+export function readUnknownMembers(
+  qc: QueryClient,
+  orgId: string,
+  members: readonly { type: "person" | "agent"; id: string }[],
+) {
+  const agents = qc.getQueryData<Agent[]>(keys.agents(orgId));
+  const people = qc.getQueryData<Member[]>(keys.members(orgId));
+  const asked = askedFor.get(qc) ?? new Set();
+  askedFor.set(qc, asked);
+  const unknown = (m: (typeof members)[number]) => {
+    const known = m.type === "agent" ? agents?.some((a) => a.id === m.id) : people?.some((p) => p.userId === m.id);
+    if (known !== false || asked.has(`${orgId}:${m.id}`)) return false;
+    asked.add(`${orgId}:${m.id}`);
+    return true;
+  };
+  const missing = members.filter(unknown);
+  if (missing.some((m) => m.type === "agent")) void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+  if (missing.some((m) => m.type === "person")) void qc.invalidateQueries({ queryKey: keys.members(orgId) });
+}
+
 /**
  * `channel.member_added` / `_removed` / `_updated`, from anyone: the channel's members column and details read their
- * lists again, and someone the app doesn't know yet (an agent made a moment ago, a person who just joined) has the
- * workspace's people or agents read too, so their row has a name and a face.
+ * lists again (and that read asks for whoever the app doesn't know yet, `readUnknownMembers`).
  */
 export function applyMembershipEvent(qc: QueryClient, orgId: string, event: ChannelEvent): boolean {
   if (
@@ -267,14 +296,6 @@ export function applyMembershipEvent(qc: QueryClient, orgId: string, event: Chan
   )
     return false;
   void refreshChannelMembers(qc, orgId, event.channelId);
-  if (event.type === "channel.member_added") {
-    const known =
-      event.member.type === "agent"
-        ? qc.getQueryData<Agent[]>(keys.agents(orgId))?.some((a) => a.id === event.member.id)
-        : qc.getQueryData<Member[]>(keys.members(orgId))?.some((m) => m.userId === event.member.id);
-    if (!known)
-      void qc.invalidateQueries({ queryKey: event.member.type === "agent" ? keys.agents(orgId) : keys.members(orgId) });
-  }
   return true;
 }
 
@@ -291,10 +312,27 @@ export function applyMembershipEvent(qc: QueryClient, orgId: string, event: Chan
  * joined or left, a role changed, ADR 0085, or a person's name, handle or photo) refetches the people, Members, each
  * channel's roster, the roles, `me`, the agents, the
  * routines (roles decide whom an agent answers) and the channels (roles decide which ones are listed, ADR 0125), and the pages of the agents it names (their owner or brain changed
- * when someone left). Returns whether the
+ * when someone left). `agents.changed` and `channels.changed` (the team, or the channels and who is in them) read
+ * again every list that shows them, open or cached, whoever changed them and however. Returns whether the
  * event was one of these.
  */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
+  if (event.type === "agents.changed") {
+    // Under `agents`: the former ones. The DMs name each agent as the server knows it.
+    for (const key of [keys.agents(orgId), keys.dms(orgId), keys.team(orgId), keys.overview(orgId)])
+      void qc.invalidateQueries({ queryKey: key });
+    // Each channel's roster names them too, and so does an agent's open page.
+    void refreshChannelMembers(qc, orgId);
+    void qc.invalidateQueries({ predicate: (q) => isAgentPart(q.queryKey, orgId, "detail") });
+    return true;
+  }
+  if (event.type === "channels.changed") {
+    void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+    void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
+    void refreshChannelMembers(qc, orgId);
+    void qc.invalidateQueries({ predicate: (q) => isAgentPart(q.queryKey, orgId, "channels") });
+    return true;
+  }
   if (event.type === "org.members") {
     // Who is in which channel follows who is in the workspace (a newcomer joins #general and the invited channels).
     void refreshChannelMembers(qc, orgId);

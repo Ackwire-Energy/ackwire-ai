@@ -1,4 +1,4 @@
-import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
+import { type BlobStoreResolver, holdEvents, type PubSub } from "@agenteschat/adapters";
 import {
   and,
   asc,
@@ -32,7 +32,7 @@ import { caches } from "../cache";
 import { sha256 } from "../crypto";
 import { publishDelivery } from "../delivery";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
-import { publishUserEvent } from "../events";
+import { publishAgentsChanged, publishUserEvent } from "../events";
 import { cutText } from "../format";
 import type { Judge } from "../judge";
 import { notify, resolveNotifications } from "../notifications";
@@ -366,6 +366,7 @@ export async function decideProposal(
     await checkPermissionText(options.judge, orgId, options.finalText);
   }
   const blobs = options.blobs && p.skillPath ? await pinBlobs(options.blobs, orgId) : options.blobs;
+  const events = holdEvents(options.pubsub);
   const decided = await db.transaction(async (tx) => {
     const as = tx as unknown as Database;
     let status: Proposal["status"] = decision === "accept" ? "accepted" : "rejected";
@@ -392,7 +393,7 @@ export async function decideProposal(
         : [];
       if (!agent) status = "stale";
       else if (p.target === "agent_settings") {
-        if (!(await applySettings({ db: as, pubsub: options.pubsub }, actorId, p, agent))) status = "stale";
+        if (!(await applySettings({ db: as, pubsub: events.pubsub }, actorId, p, agent))) status = "stale";
         else {
           const card = await cardOf(tx, p);
           if (card) await recordSettingsReceipt(tx, p, actorId, card, agent.name, UNDO_WINDOW_MS);
@@ -440,6 +441,8 @@ export async function decideProposal(
     }
     return row;
   });
+  if (decided.status === "accepted" && decided.agentId) await publishAgentsChanged(events.pubsub, orgId);
+  await events.flush();
   // Deleting closes its missions and stops its work on its computer, which can't run inside the decision's
   // transaction; failing, the row is open again so someone can retry.
   if (decided.status === "accepted" && decided.agentId && deletes(decided)) {

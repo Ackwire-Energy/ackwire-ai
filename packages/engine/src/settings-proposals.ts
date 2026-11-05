@@ -110,11 +110,20 @@ async function setValue(
     case "model":
       return void (await updateAgent(db, actorId, orgId, agentId, { model: String(value) }, { pubsub }));
     case "budget":
-      return void (await updateAgent(db, actorId, orgId, agentId, { monthlyBudgetNanoUsd: value as number | null }));
+      return void (await updateAgent(
+        db,
+        actorId,
+        orgId,
+        agentId,
+        { monthlyBudgetNanoUsd: value as number | null },
+        { pubsub },
+      ));
     case "owner":
       return void (await updateAgent(db, actorId, orgId, agentId, { ownerUserId: value as string | null }, { pubsub }));
     case "archive":
-      return value ? archiveAgent(db, actorId, orgId, agentId) : unarchiveAgent(db, actorId, orgId, agentId);
+      return value
+        ? archiveAgent(db, actorId, orgId, agentId, pubsub)
+        : unarchiveAgent(db, actorId, orgId, agentId, { pubsub });
     // Deleting stops its work and closes its missions outside the decision's transaction (`decideProposal`).
     case "delete":
       return;

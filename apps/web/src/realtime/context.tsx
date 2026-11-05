@@ -461,6 +461,10 @@ export function RealtimeProvider({
       void qc.invalidateQueries({ queryKey: keys.me });
       void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
+      // The agents and channels made, renamed or removed meanwhile.
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
       // The groups of agents someone changed meanwhile.
       void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
       // The Vault, whose `vault.changed` may have come while offline (ADR 0144).

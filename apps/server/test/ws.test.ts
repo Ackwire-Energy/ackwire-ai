@@ -462,3 +462,26 @@ test("a new message reaches the other members' sockets as `channel.activity` (no
   a.ws.close();
   o.ws.close();
 });
+
+test("a socket subscribed to no channel hears of the agents and channels the workspace makes, ids left out", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const c = connect(wsUrl(orgId), { origin: ORIGIN, cookie: owner.cookie() });
+  await c.opened;
+  await c.next((f) => f.type === "ready");
+  const heard = (type: string) => c.next((f) => (f.event as { type?: string } | undefined)?.type === type);
+
+  const made = await owner(`/api/app/organizations/${orgId}/channels`, { json: { name: "vendas" } });
+  expect(made.status).toBe(201);
+  const channel = await heard("channels.changed");
+  expect(channel).toEqual({ type: "event", scope: "org", event: { type: "channels.changed" } });
+
+  const agent = await owner(`/api/app/organizations/${orgId}/agents/${agentId}`, {
+    method: "PATCH",
+    json: { appearance: { color: "violet", eyes: "round", accessory: "headset" } },
+  });
+  expect(agent.status).toBe(200);
+  expect(await heard("agents.changed")).toEqual({ type: "event", scope: "org", event: { type: "agents.changed" } });
+  c.ws.close();
+});
