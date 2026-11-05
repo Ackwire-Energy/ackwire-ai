@@ -123,7 +123,7 @@ export const WidgetBody = memo(function WidgetBody({
   // On a board the data dims while it updates or failed; the home's strip says so on its title line instead.
   const dim = compact ? 1 : status === "updating" ? 0.45 : status === "failed" ? 0.5 : 1;
   return (
-    <View style={{ opacity: dim }}>
+    <View style={[{ opacity: dim }, compact && styles.fill]}>
       <SpecBody spec={spec} color={look.color} big={big} bleed={bleed} compact={compact} />
     </View>
   );
@@ -148,7 +148,7 @@ function SpecBody({
     case "goal":
       return <Goal spec={spec} color={color} big={big} />;
     case "bars":
-      return <Bars spec={spec} color={color} big={big} />;
+      return compact ? <CompactBars spec={spec} color={color} /> : <Bars spec={spec} color={color} big={big} />;
     case "line":
       return <LineBody spec={spec} color={color} big={big} bleed={bleed} />;
     case "list":
@@ -320,6 +320,60 @@ function Bars({ spec, color, big }: { spec: BarsWidgetSpec; color: AgentColorNam
         ))}
       </View>
       <Note text={spec.note} />
+    </View>
+  );
+}
+
+/**
+ * The home's strip: the columns alone, as tall as the card has room for and standing on a hairline, so none is cut
+ * at the card's bottom; what they count is a quiet word above them, starting where the title does. Their values and
+ * labels are on the widget's screen (the card is one button named by its title).
+ */
+function CompactBars({ spec, color }: { spec: BarsWidgetSpec; color: AgentColorName }) {
+  const { colors: c, scheme } = useTheme();
+  const tones = widgetTones(color, scheme === "dark");
+  const [box, setBox] = useState({ width: 0, height: 0 });
+  const n = spec.values.length;
+  const gap = n > 8 ? 3 : 6;
+  const slot = n > 0 ? Math.max(0, (box.width - gap * (n - 1)) / n) : 0;
+  const bw = Math.min(28, slot);
+  // Inside the hairline under them.
+  const room = Math.max(0, box.height - 1);
+  const max = Math.max(0, ...spec.values) || 1;
+  const unit = spec.unit?.trim();
+  return (
+    <View style={[styles.fill, styles.compactBars]}>
+      {unit ? (
+        <Text variant="caption" tone="faint" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+          {unit}
+        </Text>
+      ) : null}
+      <View
+        onLayout={(e) =>
+          setBox({ width: Math.round(e.nativeEvent.layout.width), height: Math.round(e.nativeEvent.layout.height) })
+        }
+        style={[styles.fill, styles.barsCompact, { gap, borderBottomColor: c.line2 }]}
+      >
+        {bw > 1 && room > 4
+          ? spec.values.map((v, i) => {
+              const h = Math.max(3, Math.round((Math.max(0, v) / max) * room));
+              const alert = spec.alertIndex === i;
+              return (
+                // biome-ignore lint/suspicious/noArrayIndexKey: the bars of one widget, in order
+                <Canvas key={i} style={{ width: bw, height: h }}>
+                  <DitherShape
+                    width={bw}
+                    height={h}
+                    shape={topRoundedPath(0.75, 0.75, bw - 1.5, h - 0.75, 4)}
+                    outline={topRoundedPath(0.75, 0.75, bw - 1.5, h - 0.75, 4, false)}
+                    fill={tones.fill}
+                    stroke={alert ? c.warn : tones.stroke}
+                  />
+                </Canvas>
+              );
+            })
+          : null}
+      </View>
     </View>
   );
 }
@@ -762,6 +816,15 @@ const styles = StyleSheet.create({
   bleed: { width: "100%" },
   dim: { opacity: 0.45 },
   compact: { height: COMPACT_HEIGHT, flexGrow: 0, gap: 6 },
+  fill: { flex: 1, minHeight: 0 },
+  compactBars: { gap: 6 },
+  // The first column starts where the title does and the last ends at the card's edge.
+  barsCompact: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   bodyCompact: { flex: 1, minHeight: 0, minWidth: 0, overflow: "hidden" },
   numCompact: { fontSize: 24, lineHeight: 28, letterSpacing: -0.6 },
   rowCompact: { paddingVertical: 3 },
