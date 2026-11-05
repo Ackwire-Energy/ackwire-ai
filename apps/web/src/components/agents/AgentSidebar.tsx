@@ -261,9 +261,11 @@ function ComputerSection({ agent }: { agent: Agent }) {
           </span>
         </button>
       ) : (
-        <div className="dm-side__noscreen">
-          <ComputerPortrait kind={entryKind(f.edition, view.machine)} state={entryPortrait(state, f.setup)} />
-        </div>
+        shows && (
+          <div className="dm-side__noscreen">
+            <ComputerPortrait kind={entryKind(f.edition, view.machine)} state={entryPortrait(state, f.setup)} />
+          </div>
+        )
       )}
       <p className="dm-side__using">
         <b>

@@ -80,6 +80,15 @@ const openDm = async ({ state = seedState(), desktop, forbidden, agentId = ADA_I
   return { api, calls };
 };
 
+describe("the computer section", () => {
+  test("a computer with nothing to show gets its one line, no empty picture", async () => {
+    widthIs(DM_SIDE_WIDE_QUERY);
+    await openDm({ desktop: { available: false, reason: "desktop_unavailable", running: false } });
+    expect(side()?.textContent).toContain("Não dá para mostrar agora");
+    expect(side()?.querySelector(".dm-side__noscreen")).toBeNull();
+  });
+});
+
 describe("the toggle", () => {
   test("open by default on a wide window; closing it is remembered per person, and Computador comes back", async () => {
     widthIs(DM_SIDE_WIDE_QUERY);
