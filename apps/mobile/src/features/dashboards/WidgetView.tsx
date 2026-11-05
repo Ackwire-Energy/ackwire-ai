@@ -331,8 +331,8 @@ function Bars({ spec, color, big }: { spec: BarsWidgetSpec; color: AgentColorNam
 }
 
 /**
- * The home's strip: the columns alone, as tall as the card has room for and standing on a hairline, so none is cut
- * at the card's bottom; what they count is a quiet word above them, starting where the title does. Their values and
+ * The home's strip: the columns alone, as tall as the card has room for and standing on the card's bottom edge (the
+ * card runs them down to it, as a trend); what they count is a quiet word above them, starting where the title does. Their values and
  * labels are on the widget's screen (the card is one button named by its title).
  */
 function CompactBars({ spec, color }: { spec: BarsWidgetSpec; color: AgentColorName }) {
@@ -343,8 +343,7 @@ function CompactBars({ spec, color }: { spec: BarsWidgetSpec; color: AgentColorN
   const gap = n > 8 ? 3 : 6;
   const slot = n > 0 ? Math.max(0, (box.width - gap * (n - 1)) / n) : 0;
   const bw = Math.min(28, slot);
-  // Inside the hairline under them.
-  const room = Math.max(0, box.height - 1);
+  const room = box.height;
   const max = Math.max(0, ...spec.values) || 1;
   const unit = spec.unit?.trim();
   return (
@@ -358,7 +357,7 @@ function CompactBars({ spec, color }: { spec: BarsWidgetSpec; color: AgentColorN
         onLayout={(e) =>
           setBox({ width: Math.round(e.nativeEvent.layout.width), height: Math.round(e.nativeEvent.layout.height) })
         }
-        style={[styles.fill, styles.barsCompact, { gap, borderBottomColor: c.line2 }]}
+        style={[styles.fill, styles.barsCompact, { gap }]}
       >
         {bw > 1 && room > 4
           ? spec.values.map((v, i) => {
@@ -716,7 +715,7 @@ export function WidgetCard({
       )}
       {above}
       <View
-        style={compact ? styles.bodyCompact : styles.body}
+        style={compact ? [styles.bodyCompact, w.spec?.kind === "bars" && styles.toEdge] : styles.body}
         onLayout={horizon ? (e) => setBodyTop(e.nativeEvent.layout.y) : undefined}
       >
         {body === undefined ? (
@@ -865,14 +864,11 @@ const styles = StyleSheet.create({
   compact: { height: COMPACT_HEIGHT, flexGrow: 0, gap: 6 },
   fill: { flex: 1, minHeight: 0 },
   compactBars: { gap: 6 },
-  // The first column starts where the title does and the last ends at the card's edge.
-  barsCompact: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
+  // The first column starts where the title does and the last ends where it would; all stand on the card's edge.
+  barsCompact: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
   bodyCompact: { flex: 1, minHeight: 0, minWidth: 0, overflow: "hidden" },
+  // The strip's columns run down to the card's bottom edge, as a trend does: the card's padding cancelled there.
+  toEdge: { marginBottom: -PAD_Y },
   numCompact: { fontSize: 24, lineHeight: 28, letterSpacing: -0.6 },
   rowCompact: { paddingVertical: 3 },
 });
