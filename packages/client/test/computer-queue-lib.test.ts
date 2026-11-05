@@ -246,6 +246,7 @@ test("the fan-out strip: under an agent's message, once two called agents starte
 
 test("a conversation shows one wait per run, from the receipts alone, leaving a fan-out to its strip", () => {
   const person = { type: "person", id: "u1" } as const;
+  const none = () => false;
   const inLine = (runId: string, agentId = "ada"): MessageReceipt => ({
     routed: true,
     agents: [[agentId, "queued"]],
@@ -258,13 +259,13 @@ test("a conversation shows one wait per run, from the receipts alone, leaving a 
     { id: "m3", author: person },
   ];
   // Two messages went into one run; a third started a run of its own.
-  expect(conversationWaits(messages, { m1: inLine("r1"), m2: inLine("r1"), m3: inLine("r2", "kai") })).toEqual([
+  expect(conversationWaits(messages, { m1: inLine("r1"), m2: inLine("r1"), m3: inLine("r2", "kai") }, none)).toEqual([
     { agentId: "ada", runId: "r1" },
     { agentId: "kai", runId: "r2" },
   ]);
   // Started, or heard of with no run yet.
-  expect(conversationWaits(messages, { m1: { ...inLine("r1"), agents: [["ada", "claimed"]] } })).toEqual([]);
-  expect(conversationWaits(messages, { m1: { routed: true, agents: [["ada", "queued"]] } })).toEqual([
+  expect(conversationWaits(messages, { m1: { ...inLine("r1"), agents: [["ada", "claimed"]] } }, none)).toEqual([]);
+  expect(conversationWaits(messages, { m1: { routed: true, agents: [["ada", "queued"]] } }, none)).toEqual([
     { agentId: "ada", runId: null },
   ]);
   const fan: MessageReceipt = {
@@ -275,7 +276,9 @@ test("a conversation shows one wait per run, from the receipts alone, leaving a 
     ],
     runOf: { ada: "r1", kai: "r2" },
   };
-  expect(conversationWaits([{ id: "m1", author: { type: "agent", id: "rio" } }], { m1: fan })).toEqual([]);
+  expect(conversationWaits([{ id: "m1", author: { type: "agent", id: "rio" } }], { m1: fan }, none)).toEqual([]);
+  // A live row says the run works: a receipt that missed it leaving the line is no second row.
+  expect(conversationWaits(messages, { m1: inLine("r1"), m2: inLine("r1") }, (id) => id === "r1")).toEqual([]);
 });
 
 test("the status note of an agent waiting for its computer says that, never that it works", () => {

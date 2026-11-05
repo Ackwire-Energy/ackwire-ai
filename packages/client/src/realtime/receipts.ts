@@ -290,6 +290,16 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
   return withMentions(next);
 }
 
+/**
+ * A read of messages. `before`: the receipts when it was asked for; one that hasn't changed since takes the read as it
+ * is (`seedReceipt`), so a run that moved while nobody listened reads as it is now.
+ */
+export function seedReceipts(state: ReceiptsState, messages: readonly Message[], before?: ReceiptsState) {
+  let next = state;
+  for (const m of messages) next = seedReceipt(next, m, before !== undefined && next[m.id] === before[m.id]);
+  return next;
+}
+
 /** The client's guess right after an explicit @mention or an agent DM (not confirmed; times out). */
 export function guessReceipt(state: ReceiptsState, messageId: string, agentIds: string[]): ReceiptsState {
   let next = state;
@@ -413,12 +423,14 @@ export function applyReceiptEvent(
       return setForRun(state, event.question.runId, event.threadId, event.question.agentId, "claimed", true);
     case "message.created": {
       const m = event.message;
-      // An agent's sticker after its reply (ADR 0091) answers nobody: a newer message's receipt stays.
+      // An agent's sticker after its reply (ADR 0091) answers nobody: a newer message's receipt stays. Neither does its
+      // note that it still waits for its computer.
       if (
         m?.author?.type === "agent" &&
         m.author.id &&
         m.threadId &&
         !m.meta?.approvalId &&
+        !m.meta?.brainUnavailable &&
         !isMediaAfterReply(m.meta)
       ) {
         return setForRun(state, m.agentRunId, m.threadId, m.author.id, "handled");

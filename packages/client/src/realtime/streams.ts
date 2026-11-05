@@ -307,8 +307,8 @@ export interface AgentToolEvent {
 
 export interface StreamsState {
   runs: Record<string, LiveRun>;
-  /** Runs whose final message arrived: late deltas for them are ignored. */
-  finished: Record<string, true>;
+  /** Runs heard to stop, and when: late deltas for them are ignored. */
+  finished: Record<string, number>;
   /** A routine's runs working in the background: never a row, never "trabalhando" (`isBackgroundEvent`). */
   background?: Record<string, true>;
   /** Runs whose message came without its body (too big for its event): it is on its way over HTTP. */
@@ -770,7 +770,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
 
 function finish(state: StreamsState, runId: string): StreamsState {
   const { [runId]: _done, ...runs } = state.runs;
-  return { ...state, runs, finished: { ...state.finished, [runId]: true } };
+  return { ...state, runs, finished: { ...state.finished, [runId]: Date.now() } };
 }
 
 /**
@@ -829,7 +829,13 @@ export function reconcileRuns(
     s = finish(s, r.runId);
   }
   for (const a of active) {
-    if (!known.has(a.runId) || a.channelId !== channelId || s.finished[a.runId]) continue;
+    if (!known.has(a.runId) || a.channelId !== channelId) continue;
+    // Heard to stop, yet listed by a read asked since: it stopped to wait, and went on while we weren't listening.
+    const stopped = s.finished[a.runId];
+    if (stopped) {
+      if (stopped >= askedAt || a.status === "waiting_approval") continue;
+      s = reopen(s, a.runId);
+    }
     const startedAt = a.startedAt ? Date.parse(a.startedAt) : undefined;
     const heartbeat = a.heartbeatAt ? Date.parse(a.heartbeatAt) : undefined;
     const r = s.runs[a.runId];

@@ -184,12 +184,14 @@ export interface ConversationWait {
 
 /**
  * The waits for a computer a conversation shows, one per run however many messages went into it: what the receipts
- * say, so a read of the line that hasn't heard of the run, or lost it, never takes one away. The agents of a message
- * with a fan-out strip are left to the strip.
+ * say, so a read of the line that hasn't heard of the run, or lost it, never takes one away. A run with a live row
+ * (`hasRow`) left the line whatever a receipt that missed it says. The agents of a message with a fan-out strip are
+ * left to the strip.
  */
 export function conversationWaits(
   messages: readonly Pick<Message, "id" | "author">[],
   receipts: ReceiptsState,
+  hasRow: (runId: string) => boolean,
 ): ConversationWait[] {
   const waits = new Map<string, ConversationWait>();
   for (const m of messages) {
@@ -198,7 +200,7 @@ export function conversationWaits(
     if (queued.length === 0 || fanShows(m, fanOutOf(receipt), receipt)) continue;
     for (const [agentId] of queued) {
       const runId = receipt?.runOf?.[agentId] ?? null;
-      waits.set(runId ?? agentId, { agentId, runId });
+      if (!runId || !hasRow(runId)) waits.set(runId ?? agentId, { agentId, runId });
     }
   }
   return [...waits.values()];

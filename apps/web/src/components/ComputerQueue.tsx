@@ -257,7 +257,7 @@ const sameWaits = (a: ConversationWait[], b: ConversationWait[]) =>
  * waits, and its computer's line only adds to it.
  */
 export function QueueWaitTurns({ channelId, messages }: { channelId: string; messages: readonly Message[] }) {
-  const waits = useLive((s) => conversationWaits(messages, s.receipts), sameWaits);
+  const waits = useLive((s) => conversationWaits(messages, s.receipts, (id) => id in s.streams.runs), sameWaits);
   return (
     <>
       {waits.map((w) => (

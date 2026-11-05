@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { ChannelEvent, Message } from "@agenteschat/client";
+import type { ActiveRun, ChannelEvent, Message } from "@agenteschat/client";
 import {
   applyChannelEvent,
   applyReceiptEvent,
@@ -9,8 +9,10 @@ import {
   expireTyping,
   receiptTicks,
   receiptView,
+  reconcileRuns,
   runsInChannel,
   seedReceipt,
+  seedReceipts,
   stopTyping,
   TYPING_TTL_MS,
   typingIn,
@@ -736,6 +738,76 @@ describe("a run waiting for its computer", () => {
       },
     } as Message);
     expect(receiptView(s.m1).status).toEqual({ kind: "queued", agents: ["nova"] });
+  });
+
+  test("it got the computer while nobody listened: a list asked since brings its row back, an older one doesn't", () => {
+    const where = { channelId: "c1", threadId: "m1", agentId: "nova", runId: "r1" };
+    let s = applyChannelEvent(emptyStreams, { type: "agent.thinking", ...where } as unknown as ChannelEvent);
+    s = applyChannelEvent(s, {
+      type: "agent.run",
+      ...where,
+      status: "waiting_input",
+      computer: "queued",
+    } as unknown as ChannelEvent);
+    expect(s.runs.r1).toBeUndefined();
+    const active = [
+      { ...where, status: "running", triggerMessageId: "m1", startedAt: null, heartbeatAt: null, background: false },
+    ] as unknown as ActiveRun[];
+    const heard = Date.now();
+    expect(reconcileRuns(s, "c1", active, heard, heard - 1_000).runs.r1).toBeUndefined();
+    expect(reconcileRuns(s, "c1", active, heard + 1_000, heard + 1_000).runs.r1?.status).toBe("thinking");
+  });
+
+  test("a read asked before anything else moved says where a run went while nobody listened", () => {
+    const listed = (status: string, computer?: string) =>
+      ({
+        ...person,
+        receipts: {
+          seenBy: ["nova"],
+          pickedBy: ["nova"],
+          handled: [{ agentId: "nova", runId: "r1", status, ...(computer ? { computer } : {}) }],
+          blocked: [],
+        },
+      }) as Message;
+    const inLine = seedReceipts({}, [listed("waiting_input", "queued")]);
+    expect(receiptView(inLine.m1).status).toEqual({ kind: "queued", agents: ["nova"] });
+    // The same read with no `before` only ends runs; with it, the run working now reads as working.
+    expect(receiptView(seedReceipts(inLine, [listed("running")]).m1).status?.kind).toBe("queued");
+    expect(receiptView(seedReceipts(inLine, [listed("running")], inLine).m1).status?.kind).toBe("claimed");
+  });
+
+  test("still in line after ten minutes in a thread: the note it posts is no answer, its wait stays", () => {
+    let s = applyReceiptEvent(seedReceipt({}, person), {
+      type: "message.claimed",
+      channelId: "c1",
+      messageId: "m1",
+      agentId: "nova",
+      runId: "r1",
+    } as unknown as ChannelEvent);
+    const parked = {
+      type: "agent.run",
+      channelId: "c1",
+      threadId: "t1",
+      agentId: "nova",
+      runId: "r1",
+      status: "waiting_input",
+      computer: "queued",
+    } as unknown as ChannelEvent;
+    s = applyReceiptEvent(s, parked);
+    s = applyReceiptEvent(s, {
+      type: "message.created",
+      channelId: "c1",
+      message: {
+        id: "note",
+        channelId: "c1",
+        threadId: "t1",
+        agentRunId: "r1",
+        author: { type: "agent", id: "nova" },
+        meta: { brainUnavailable: { code: "busy" } },
+      },
+    } as unknown as ChannelEvent);
+    s = applyReceiptEvent(s, parked);
+    expect(s.m1?.agents).toContainEqual(["nova", "queued"]);
   });
 
   test('a message that joins a run in line has no "pensando…" of its own, even on the optimistic id', () => {

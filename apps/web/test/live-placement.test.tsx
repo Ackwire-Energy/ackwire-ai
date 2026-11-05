@@ -183,7 +183,7 @@ describe("stale runs: reconcile with the server", () => {
     ];
     s = reconcileRuns(s, "c", active, 10_000, 5_000);
     expect(Object.keys(s.runs).sort()).toEqual(["fresh", "new"]);
-    expect(s.finished.old).toBe(true);
+    expect(s.finished.old).toBeTruthy();
     expect(s.runs.new?.status).toBe("thinking");
   });
 
