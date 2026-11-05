@@ -38,10 +38,13 @@
   flex-direction: column;
   gap: 26px;
 }
+/* A head with a hint (private files): on a narrow page the hint drops to a line of its own rather than wrapping beside the
+   title, so the lock, title and count stay on one centred line. */
 .drive-group__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 0 8px;
   min-height: 24px;
   margin: 0 2px 10px;
   color: var(--ink2);
@@ -163,10 +166,13 @@ html:not([data-pointer]) .drive-row:has(.drive-hit:focus-visible) {
 .drive-check {
   position: relative;
   z-index: var(--z-lifted);
+  /* On its own, not beside a label: no nudge onto a text line, so it centres in its row or on the kind tag. */
+  margin: 0;
 }
+/* Its middle on the kind tag's (top 15px, 24px tall): the 18px box 3px lower. */
 .drive-card .drive-check {
   position: absolute;
-  top: 15px;
+  top: 18px;
   left: 15px;
   box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.2);
   opacity: 0;
@@ -269,10 +275,19 @@ html:not([data-pointer]) .drive-row:has(.drive-hit:focus-visible) {
   display: flex;
   align-items: center;
   gap: 5px;
+  min-width: 0;
   font-size: 12.5px;
   color: var(--faint);
   white-space: nowrap;
+}
+.drive-row__sub > .ac-icon {
+  flex: none;
+}
+/* The kind (and, on a phone, who and when) in one box: a flex line clips its loose text without the "…". */
+.drive-row__subtext {
+  min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 .drive-row__mobile {
   display: none;
@@ -329,10 +344,8 @@ html:not([data-pointer]) .drive-row:has(.drive-hit:focus-visible) {
   font-size: 12px;
   color: var(--muted);
 }
-.drive-author {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.drive-author > span {
+  min-width: 0;
 }
 .drive-author b,
 .drive-author small {
@@ -398,6 +411,12 @@ html:not([data-pointer]) .drive-row:has(.drive-hit:focus-visible) {
   gap: 8px;
   font-weight: 600;
   font-size: 13.5px;
+}
+/* "View" on the first line: a box the line's height, the 32px button centred in it. */
+.drive-versions__tail {
+  display: flex;
+  align-items: center;
+  height: 22px;
 }
 .drive-versions__note {
   margin-top: 1px;
@@ -544,6 +563,10 @@ html:not([data-pointer]) button.drive-where:focus-visible {
   font-size: 14px;
   font-weight: 600;
 }
+/* The × reaches out by its plate, so its icon stands on the card's padding line as the spinner does on the left. */
+.drive-uploads__head > .ac-btn--ghost {
+  margin-inline-end: calc(-1 * var(--ghost-plate));
+}
 .drive-uploads ul {
   margin: 0;
   padding: 0;
@@ -655,6 +678,15 @@ html:not([data-pointer]) button.drive-where:focus-visible {
   font-size: 12.5px;
   color: var(--faint);
 }
+.drive-trash__text small > .ac-avatar {
+  flex: none;
+}
+/* The words in a box of their own: a flex line clips its loose text without the "…". */
+.drive-trash__by {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 @media (prefers-reduced-motion: no-preference) {
   .drive-group {
@@ -714,7 +746,7 @@ html:not([data-pointer]) button.drive-where:focus-visible {
     border-radius: 16px;
   }
   .drive-card .drive-check {
-    top: 11px;
+    top: 14px;
     left: 11px;
   }
   .drive-card__where {

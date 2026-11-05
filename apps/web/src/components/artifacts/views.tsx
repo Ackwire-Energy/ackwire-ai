@@ -1,6 +1,6 @@
 import type { ArtifactContent, ArtifactDiffFile } from "@agenteschat/client";
 import { parsePatch, patchCounts, sideBySide, sortRows } from "@agenteschat/client/lib/artifacts";
-import { Button, Icon, Input } from "@agenteschat/ui";
+import { Button, Icon, Input, Segmented } from "@agenteschat/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChoicesCard } from "@/components/blocks/ChoicesCard";
@@ -130,14 +130,15 @@ export function DiffView({ files }: { files: ArtifactDiffFile[] }) {
   const [mode, setMode] = useState<"unified" | "split">("unified");
   return (
     <div className="stack-4" style={{ gap: 16 }}>
-      {/* biome-ignore lint/a11y/useSemanticElements: a pair of toggle buttons */}
-      <div className="row" role="group" aria-label={t("artifacts.diffView")} style={{ gap: 4 }}>
-        {(["unified", "split"] as const).map((m) => (
-          <Button key={m} size="sm" variant="ghost" aria-pressed={mode === m} onClick={() => setMode(m)}>
-            {t(`artifacts.${m}`)}
-          </Button>
-        ))}
-      </div>
+      {/* One view of the diff at a time: the app's switch for that. */}
+      <Segmented
+        size="sm"
+        className="artifact-diff__mode"
+        label={t("artifacts.diffView")}
+        value={mode}
+        onValueChange={setMode}
+        options={(["unified", "split"] as const).map((m) => ({ value: m, label: t(`artifacts.${m}`) }))}
+      />
       {files.map((f) => (
         <FileDiff key={f.path} file={f} mode={mode} />
       ))}
