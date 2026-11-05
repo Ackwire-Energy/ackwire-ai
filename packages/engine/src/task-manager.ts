@@ -321,7 +321,7 @@ async function visibleRuns(
 /** The tasks still on that `visibleRuns` leaves out, as counts: the computers' rows count them all. */
 async function hiddenTasks(db: Database, userId: string, orgId: string, manages: boolean): Promise<HiddenTasks> {
   const rows = rowsOf<{ agent_id: string; n: number | string; working: number | string }>(
-    await db.execute(sql`select r.agent_id, count(*) as n, count(*) filter (where r.status = 'running') as working
+    await db.execute(sql`select r.agent_id, count(*) as n, count(*) filter (where ${shownStatusSql} = 'running') as working
       from ${agentRuns} r
       join ${channels} c on c.id = r.channel_id and c.org_id = ${orgId}::uuid
       join ${agents} a on a.id = r.agent_id and a.org_id = ${orgId}::uuid

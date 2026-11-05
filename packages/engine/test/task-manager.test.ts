@@ -96,6 +96,22 @@ describe("work agents asked of each other (ADR 0128)", () => {
     expect((await taskManager(f.db, member.id, f.org.id)).tasks.map((t) => t.runId)).toContain(helper.id);
   });
 
+  test("hidden work asking its computer from the line counts as waiting, not working", async () => {
+    f = await setup();
+    const { infra, helper } = await delegated();
+    const [machine] = await f.db.insert(schema.machines).values({ orgId: f.org.id, name: "Mac" }).returning();
+    const member = await addMember(f.db, f.org.id, "member", "bia");
+    const hide = (waitingMachineId: string | null) =>
+      f.db.update(schema.agentRuns).set({ status: "running", waitingMachineId }).where(eq(schema.agentRuns.id, helper.id));
+
+    await hide(machine?.id ?? null);
+    const asking = (await taskManager(f.db, member.id, f.org.id)).hidden;
+    expect(asking.byAgent[infra.id]).toBe(1);
+    await hide(null);
+    const working = (await taskManager(f.db, member.id, f.org.id)).hidden;
+    expect(working.working).toBe(asking.working + 1);
+  });
+
   test("a note no run took yet counts as a helper: a stop takes its wake too", async () => {
     f = await setup();
     const { infra, asker } = await delegated();

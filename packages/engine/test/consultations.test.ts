@@ -1005,6 +1005,29 @@ describe("ask_agent", () => {
     expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("stayed in line for room");
   });
 
+  test("a sweep that finds it asking from the line reads the wait it is", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { target } = await asked();
+    const [machine] = await f.db.insert(schema.machines).values({ orgId: f.org.id, name: "Mac" }).returning();
+    const sweep = new Date(Date.now() + CONSULTATION_TTL_MS + 1000);
+    await f.db
+      .update(schema.agentRuns)
+      .set({
+        status: "running",
+        waitingMachineId: machine?.id,
+        transcript: {
+          messages: [],
+          postedUpTo: 0,
+          postedCount: 0,
+          deltaSeq: 0,
+          roomWaitSince: sweep.getTime() - CONSULTATION_HUNG_MS,
+        },
+      })
+      .where(eq(schema.agentRuns.id, target.id));
+    expect(await expireConsultations({ db: f.db }, sweep)).toBe(1);
+    expect((await consultations())[0]?.answer).toContain("it stayed in line for room on its computer");
+  });
+
   test("a turn that worked for hours and only now waits for room isn't hung: the wait's own clock counts", async () => {
     f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
     const { target } = await asked();

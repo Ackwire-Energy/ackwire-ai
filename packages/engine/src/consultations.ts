@@ -1846,12 +1846,19 @@ export async function announceConsultationChange(
 const EXTEND_BEFORE_MS = 2 * 60_000;
 
 /** What holds a colleague that isn't moving, as the asking agent reads it; null while it works or waits on a person. */
-function stuckOn(target: { status: string | null; code: string | null; outage: boolean }) {
+function stuckOn(target: {
+  status: string | null;
+  code: string | null;
+  outage: boolean;
+  waitingMachineId: string | null;
+}) {
   if (target.status === null) return "it never got to start";
-  if (target.status !== "waiting_input") return null;
+  // Asking its computer from the line it still waits (`computerWaitOf`).
+  const asking = target.status === "running" && target.waitingMachineId !== null;
+  if (target.status !== "waiting_input" && !asking) return null;
   if (target.outage) return "its AI provider stayed down";
+  if (asking || target.code === "busy") return "it stayed in line for room on its computer";
   if (target.code === null) return null;
-  if (target.code === "busy") return "it stayed in line for room on its computer";
   if (target.code === "work_queue") return "it stayed behind its own long work";
   if (USAGE_WAIT_CODES.has(target.code)) return "it stayed at its plan's or budget's limit";
   return "its computer stayed away";
@@ -1879,6 +1886,7 @@ export async function expireConsultations(deps: { db: Database; pubsub?: PubSub 
       handedOn: handedOnSql,
       code: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
       outage: outageParkedSql,
+      waitingMachineId: agentRuns.waitingMachineId,
       since: waitSinceSql,
       wake: sql<boolean>`(${agentConsultations.targetRunId} is null and ${wakeWaitsSql(sql`${agentConsultations}`)})`,
     })
@@ -1893,9 +1901,9 @@ export async function expireConsultations(deps: { db: Database; pubsub?: PubSub 
     .limit(200);
   let closed = 0;
   const announced = new Set<string>();
-  for (const { row, target, handedOn, code, outage, since, wake } of rows) {
+  for (const { row, target, handedOn, code, outage, waitingMachineId, since, wake } of rows) {
     const started = target ? Number(since) : row.createdAt.getTime();
-    const stuck = target || wake ? stuckOn({ status: target, code, outage: Boolean(outage) }) : null;
+    const stuck = target || wake ? stuckOn({ status: target, code, outage: Boolean(outage), waitingMachineId }) : null;
     if (stuck && now.getTime() - started >= CONSULTATION_HUNG_MS) {
       const hours = CONSULTATION_HUNG_MS / 3600_000;
       const why = `${stuck} for over ${hours} hours, so it was stopped and nothing more will come of it. Ask again later, or tell the person what is missing`;
