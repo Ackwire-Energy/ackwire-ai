@@ -24,8 +24,6 @@ export function missionRunner(hub: MachineHub, hello: Record<string, unknown> = 
   const started: TaskStartRequest[] = [];
   const files = new Map<string, string>();
   const canceled: string[] = [];
-  /** How `push` fails. */
-  const pushes: { refusal?: { code: string; message: string } } = {};
   /** What `task.output` answers, per task. */
   const outputs = new Map<string, string[]>();
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
@@ -67,9 +65,6 @@ export function missionRunner(hub: MachineHub, hello: Record<string, unknown> = 
           files.set(frame.path, Buffer.from(frame.base64, "base64").toString("utf8"));
           return ok({ size: frame.base64.length });
         }
-        if (frame.op === "push" && pushes.refusal) {
-          return void reply({ type: "result", id: frame.id, ok: false, error: pushes.refusal });
-        }
         return ok({});
       }, 1);
     },
@@ -85,7 +80,6 @@ export function missionRunner(hub: MachineHub, hello: Record<string, unknown> = 
     files,
     canceled,
     outputs,
-    pushes,
     close: () => hub.close(conn),
     frame: (frame: Record<string, unknown>) => reply(frame),
     hello: (token: string) =>

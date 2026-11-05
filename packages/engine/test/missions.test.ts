@@ -92,6 +92,8 @@ function missionRunner(hub: MachineHub) {
   const canceled: string[] = [];
   /** `mission.worktree` requests (ADR 0044). */
   const worktree: Extract<Request, { op: "mission.worktree" }>[] = [];
+  /** How `push` fails. */
+  const pushes: { refusal?: { code: string; message: string } } = {};
   /** What `task.output` answers, per task. */
   const outputs = new Map<string, string[]>();
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
@@ -147,6 +149,9 @@ function missionRunner(hub: MachineHub) {
           files.set(frame.path, Buffer.from(frame.base64, "base64").toString("utf8"));
           return ok({ size: frame.base64.length });
         }
+        if (frame.op === "push" && pushes.refusal) {
+          return void reply({ type: "result", id: frame.id, ok: false, error: pushes.refusal });
+        }
         return ok({});
       }, 1);
     },
@@ -163,6 +168,7 @@ function missionRunner(hub: MachineHub) {
     canceled,
     worktree,
     outputs,
+    pushes,
     close: () => hub.close(conn),
     frame: (frame: Record<string, unknown>) => reply(frame),
     hello: (token: string) => hub.message(conn, JSON.stringify({ type: "hello", token, ...RUNNER, exec: true })),
