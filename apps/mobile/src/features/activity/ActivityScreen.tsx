@@ -217,7 +217,8 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
             {name}
           </Text>
         ) : null}
-        <View style={styles.grow} />
+        {/* With nobody to lead it (a server changed tools), the kind leads the card instead of hanging right. */}
+        {who || join || name ? <View style={styles.grow} /> : null}
         <View style={styles.kind}>
           <Icon name={dash ? "chart" : KIND_ICON[card.kind]} size={13} color={c.amber} />
           <Text variant="footnote" style={[styles.semibold, { color: c.amber }]}>
@@ -393,7 +394,10 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
       ? usageLimitLine(t, n)
       : failed
         ? failed.sub
-        : [emojisOf(n).join(" "), [line, placeOf(n)].filter(Boolean).join(" · ")].filter(Boolean).join(" ");
+        : // A widget's or routine's name is often its line too: said once ("Assinaturas hoje", not twice).
+          [emojisOf(n).join(" "), [...new Set([line, placeOf(n)].filter(Boolean))].join(" · ")]
+            .filter(Boolean)
+            .join(" ");
   const time = when.short(n.updatedAt);
 
   // The swipe taps on its own (SwipeRow); VoiceOver's actions call these too.
