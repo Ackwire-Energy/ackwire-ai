@@ -137,10 +137,11 @@ html:not([data-pointer]) .issues-now__card:focus-visible {
 }
 
 /* ── Toolbar end: "Exibição" and "Mais opções" ──────────────────────────── */
+/* The toolbar's own gap between its buttons. */
 .issues-tools {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
 }
 .issues-display__trigger.ac-btn {
   gap: 6px;
@@ -1240,14 +1241,15 @@ html:not([data-pointer]) .issues-dest:focus-visible {
   align-items: center;
   gap: 6px;
 }
+/* A compact control of the ruler (32px, its radius), beside the small button it follows. */
 .issue-ask__other {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
+  height: var(--control-h-sm);
   padding: 0 10px 0 6px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--control-r-sm);
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
   color: var(--ink2);
