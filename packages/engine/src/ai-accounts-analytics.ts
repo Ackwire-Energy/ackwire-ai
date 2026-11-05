@@ -19,6 +19,12 @@ const asDate = (v: string | Date) => new Date(v);
 export const AI_ACCOUNTS_RECENT_FAILURES = 50;
 export const AI_ACCOUNT_STATUSES = ["active", "signed_out", "signing_in", "removing"] as const;
 
+/**
+ * A removed computer keeps its accounts for when it comes back (ADR 0041), but nobody can use them meanwhile: every
+ * count and the list leave them out. `exists`, so no join repeats an account.
+ */
+export const onLiveMachine = sql`exists (select 1 from ${machines} where ${machines.orgId} = ${ma.orgId}
+  and ${machines.id} = ${ma.machineId} and ${machines.deletedAt} is null)`;
 const listed = sql`${ma.status} in ('active', 'signed_out')`;
 const known = sql`${ma.email} is not null and ${ma.providerOrgId} is not null`;
 
@@ -76,7 +82,8 @@ export async function operatorAiAccounts(db: Database, query: { from: string; to
           sql`${ma.kind} || ':' || lower(${ma.email}) || ':' || ${ma.providerOrgId}`,
         ),
       })
-      .from(ma),
+      .from(ma)
+      .where(onLiveMachine),
     db
       .select({
         kind: ma.kind,
@@ -89,7 +96,7 @@ export async function operatorAiAccounts(db: Database, query: { from: string; to
         usedLast7d: howMany(since(7 * DAY_MS)),
       })
       .from(ma)
-      .where(listed)
+      .where(and(listed, onLiveMachine))
       .groupBy(ma.kind, ma.provider, method),
     db
       .select({ n: howMany(), workspaces: howMany(undefined, pc.orgId) })
@@ -134,7 +141,7 @@ export async function operatorAiAccounts(db: Database, query: { from: string; to
     db
       .select({ day, authMethod: method, count: howMany() })
       .from(ma)
-      .where(and(listed, gte(ma.createdAt, r.start), lt(ma.createdAt, r.end)))
+      .where(and(listed, onLiveMachine, gte(ma.createdAt, r.start), lt(ma.createdAt, r.end)))
       .groupBy(day, method)
       .orderBy(day, method),
     db.select({ at: sql<Date | null>`min(${operatorEvents.createdAt})`.mapWith(asDate) }).from(operatorEvents),
@@ -222,7 +229,7 @@ export interface OperatorAiAccountQuery {
   status?: (typeof AI_ACCOUNT_STATUSES)[number];
 }
 
-/** AI accounts on the computers, newest first, in keyset pages. */
+/** AI accounts on the computers not removed, newest first, in keyset pages. */
 export async function operatorListAiAccounts(db: Database, query: OperatorAiAccountQuery) {
   const after = query.cursor ? decodeCursor(query.cursor, AiAccountCursor) : null;
   const rows = await db
@@ -243,7 +250,8 @@ export async function operatorListAiAccounts(db: Database, query: OperatorAiAcco
       ownerId: ma.createdBy,
       // A scalar count per listed row: a join would repeat the account once per agent.
       agents: sql<number>`(select count(*) from ${agents}
-        where ${agents.orgId} = ${ma.orgId} and ${agents.brainAccountId} = ${ma.id})`.mapWith(Number),
+        where ${agents.orgId} = ${ma.orgId} and ${agents.brainAccountId} = ${ma.id}
+        and ${agents.archivedAt} is null)`.mapWith(Number),
       createdAt: createdAtMs,
       lastUsedAt: ma.lastUsedAt,
       lastSuccessAt: ma.lastSuccessAt,
@@ -259,6 +267,7 @@ export async function operatorListAiAccounts(db: Database, query: OperatorAiAcco
     .innerJoin(machines, and(eq(machines.orgId, ma.orgId), eq(machines.id, ma.machineId)))
     .where(
       and(
+        isNull(machines.deletedAt),
         query.orgId ? eq(ma.orgId, query.orgId) : undefined,
         query.kind ? eq(ma.kind, query.kind) : undefined,
         query.authMethod === "unknown"

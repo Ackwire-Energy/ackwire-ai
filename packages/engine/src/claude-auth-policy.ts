@@ -6,6 +6,7 @@ import {
 } from "@agenteschat/adapters";
 import { and, asc, count, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { z } from "zod";
+import { onLiveMachine } from "./ai-accounts-analytics";
 import { ValidationError } from "./errors";
 
 /**
@@ -119,6 +120,7 @@ export async function operatorClaudeAuth(db: Executor) {
           eq(machineAccounts.kind, "claude_code"),
           isNull(machineAccounts.provider),
           inArray(machineAccounts.status, ["active", "signed_out"]),
+          onLiveMachine,
         ),
       )
       .groupBy(machineAccounts.authMethod),

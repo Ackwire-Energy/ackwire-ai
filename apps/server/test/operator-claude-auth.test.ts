@@ -45,6 +45,7 @@ beforeAll(async () => {
     ])
     .returning({ id: schema.machines.id });
   machineIds = { system: machines[0]?.id ?? "", old: machines[1]?.id ?? "", own: machines[2]?.id ?? "" };
+  const gone = machines[3]?.id ?? "";
   const account = (id: string, over: Partial<typeof schema.machineAccounts.$inferInsert>) => ({
     id,
     orgId: ada,
@@ -60,11 +61,12 @@ beforeAll(async () => {
     account("0193eeee-0000-4000-8000-000000000002", { authMethod: "setup_token", status: "signed_out" }),
     account("0193eeee-0000-4000-8000-000000000003", { authMethod: "cli_login", machineId: machineIds.own }),
     account("0193eeee-0000-4000-8000-000000000004", {}),
-    // Not counted: a sign-in in progress, a tombstone, a plan's key, ChatGPT.
+    // Not counted: a sign-in in progress, a tombstone, a plan's key, ChatGPT, one on a removed computer.
     account("0193eeee-0000-4000-8000-000000000005", { authMethod: "setup_token", status: "signing_in" }),
     account("0193eeee-0000-4000-8000-000000000006", { authMethod: "setup_token", status: "removing" }),
     account("0193eeee-0000-4000-8000-000000000007", { authMethod: "api_key", provider: "zai" }),
     account("0193eeee-0000-4000-8000-000000000008", { authMethod: "cli_login", kind: "codex" }),
+    account("0193eeee-0000-4000-8000-000000000009", { authMethod: "setup_token", machineId: gone }),
   ]);
 });
 

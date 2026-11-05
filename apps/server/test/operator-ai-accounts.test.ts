@@ -37,7 +37,7 @@ beforeAll(async () => {
       { orgId: lia, name: "Gone", executors: signedIn, deletedAt: new Date() },
     ])
     .returning({ id: schema.machines.id });
-  const [box, mac, liaBox] = m.map((r) => r.id);
+  const [box, mac, liaBox, gone] = m.map((r) => r.id);
   const now = Date.now();
   const account = (n: number, over: Partial<typeof schema.machineAccounts.$inferInsert>) => ({
     id: id(n),
@@ -86,17 +86,28 @@ beforeAll(async () => {
       kind: "grok",
       email: "lia@example.com",
     }),
+    // On a removed computer: kept for its return, counted and listed nowhere.
+    account(10, {
+      orgId: lia,
+      machineId: gone ?? "",
+      authMethod: "setup_token",
+      email: "lia@example.com",
+      providerOrgId: "org-lia",
+      lastUsedAt: new Date(now - HOUR),
+      createdAt: new Date("2026-10-07T10:00:00Z"),
+    }),
   ]);
-  // Three agents on one shared account: still one connection.
+  // Three agents on one shared account: still one connection. An archived fourth thinks with nothing.
   await t.db
     .insert(schema.agents)
     .values(
-      [1, 2, 3].map((n) => ({
+      [1, 2, 3, 4].map((n) => ({
         orgId: ada,
         name: `Agent ${n}`,
         handle: `agent${n}`,
         model: "x",
         brainAccountId: id(1),
+        ...(n === 4 ? { archivedAt: new Date() } : {}),
       })),
     );
   const credential = (orgId: string, provider: string, revokedAt: Date | null = null) => ({
@@ -145,7 +156,7 @@ async function ok<T = Record<string, unknown>>(res: Response) {
   return (await res.json()) as T;
 }
 const code = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
-const PRIVATE = ["ada@example.com", "Ada@Example.com", "lia@example.com", "9xyz", "abcd", "org-ada"];
+const PRIVATE = ["ada@example.com", "Ada@Example.com", "lia@example.com", "9xyz", "abcd", "org-ada", "org-lia"];
 
 test("both reads need the token", async () => {
   expect((await get(`/analytics/ai-accounts?${RANGE}`, "Bearer wrong")).status).toBe(401);
