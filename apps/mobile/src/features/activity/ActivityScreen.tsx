@@ -376,57 +376,67 @@ const CREW = 3;
 function AllClear() {
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const c = useColors();
   const dir = useDirectory();
   const routines = useRoutines(orgId);
   const crew = dir.agents.slice(0, CREW);
   const next = useMemo(() => nextRoutine<Routine>(routines.data ?? []), [routines.data]);
   const nextAgent = next ? dir.agentById.get(next.agentId) : undefined;
+  const when = useWhen();
+  const date = next?.nextRunAt ? nextRunWords(t, when, next.nextRunAt) : null;
   return (
-    <View style={styles.clear}>
-      <View style={styles.clearSky}>
-        <Sky color={agentLook(crew[0]).color} depth={0.8} style={[StyleSheet.absoluteFill, styles.clearSkyTint]} />
-        <View style={styles.crew}>
-          {crew.map((a) => (
-            <AgentFace key={a.id} agentId={a.id} size={36} live={false} />
-          ))}
-        </View>
-      </View>
-      <Text variant="title2" accessibilityRole="header" style={styles.clearTitle}>
-        {t("mobile.activityNow.clear.title")}
-      </Text>
-      <Text variant="small" tone="muted" style={styles.clearText}>
-        {t("mobile.activityNow.clear.text")}
-      </Text>
-      {next ? (
-        <Pressable
-          onPress={() => router.push(routineHref(next.id))}
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.next, pressed && styles.wpressed]}
-        >
-          <View style={styles.nextMark}>
-            {nextAgent ? (
-              <AgentFace agentId={nextAgent.id} size={16} live={false} />
-            ) : (
-              <Icon name="clock" size={16} color={c.faint} />
-            )}
+    <>
+      <View style={styles.clear}>
+        <View style={styles.clearSky}>
+          <Sky color={agentLook(crew[0]).color} depth={0.8} style={[StyleSheet.absoluteFill, styles.clearSkyTint]} />
+          <View style={styles.crew}>
+            {crew.map((a) => (
+              <AgentFace key={a.id} agentId={a.id} size={36} live={false} />
+            ))}
           </View>
-          <Text variant="small" tone="ink2" numberOfLines={1} style={[styles.grow, styles.bold]}>
-            {t("mobile.activityNow.next.title", { name: next.name })}
-          </Text>
-          <NextWhen routine={next} />
-        </Pressable>
+        </View>
+        <Text variant="title2" accessibilityRole="header" style={styles.clearTitle}>
+          {t("mobile.activityNow.clear.title")}
+        </Text>
+        <Text variant="small" tone="muted" style={styles.clearText}>
+          {t("mobile.activityNow.clear.text")}
+        </Text>
+      </View>
+      {/* The next run as a row of the list below it: who, the routine's name on one line, and when. */}
+      {next ? (
+        <>
+          <SectionHeader title={t("routines.panel.nexts")} />
+          <ListRow
+            onPress={() => router.push(routineHref(next.id))}
+            accessibilityRole="button"
+            leading={
+              nextAgent ? (
+                <AgentFace agentId={nextAgent.id} size={LIST_AVATAR - 2} live={false} />
+              ) : (
+                <Tile icon="clock" size={LIST_AVATAR} />
+              )
+            }
+            title={next.name}
+            sub={
+              date
+                ? nextAgent
+                  ? t("mobile.activityNow.next.routineOf", { agent: nextAgent.name, when: date })
+                  : t("mobile.activityNow.next.routine", { when: date })
+                : null
+            }
+            subLines={1}
+          />
+        </>
       ) : null}
-    </View>
+    </>
   );
 }
 
-/** When the next run is, at the line's end: "hoje às 18:00", "amanhã às 9:00", "qua, 12 nov às 9:00". */
-function NextWhen({ routine }: { routine: Pick<Routine, "nextRunAt"> }) {
-  const { t } = useTranslation();
-  const when = useWhen();
-  if (!routine.nextRunAt) return null;
-  const iso = routine.nextRunAt;
+/** When the next run is: "hoje às 18:00", "amanhã às 9:00", "qua, 12 nov às 9:00". */
+function nextRunWords(
+  t: ReturnType<typeof useTranslation>["t"],
+  when: ReturnType<typeof useWhen>,
+  iso: string,
+): string {
   const day = upcomingDay(iso);
   const time = when.time(iso);
   const date =
@@ -440,11 +450,7 @@ function NextWhen({ routine }: { routine: Pick<Routine, "nextRunAt"> }) {
               .replace(/\./g, ""),
             time,
           });
-  return (
-    <Text variant="footnote" tone="faint" numberOfLines={1} style={styles.nextWhen}>
-      {date}
-    </Text>
-  );
+  return date;
 }
 
 /**
@@ -591,9 +597,6 @@ const styles = StyleSheet.create({
   clearTitle: { textAlign: "center", marginTop: 10, paddingHorizontal: 16 },
   clearText: { textAlign: "center", marginTop: 4, paddingHorizontal: 16 },
   // One event line: the 16-point mark on the first line, the words, when at the end.
-  next: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 24, marginTop: 14, paddingHorizontal: 16 },
-  nextMark: { width: 16, alignItems: "center" },
-  nextWhen: { flexShrink: 0, fontVariant: ["tabular-nums"] },
   stack: { width: LIST_AVATAR, height: LIST_AVATAR },
   back: { position: "absolute", top: 0, left: 0 },
   front: { position: "absolute", right: -2, bottom: -2, padding: 2 },
