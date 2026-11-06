@@ -1,0 +1,28 @@
+<!-- check.ts lays this out before any screen: each rule must catch its bad-* and leave its good-* alone. -->
+<style>
+  .box { border: 1px solid #000; width: 400px; margin: 8px; }
+  .inline { display: flex; align-items: center; }
+</style>
+<div class="box bad-edge inline" style="height: 40px; justify-content: space-between"><span>Row</span><span class="ac-btn" style="height: 36px">Abrir</span></div>
+<div class="box good-edge inline" style="height: 60px; padding: 0 12px; justify-content: space-between"><span>Row</span><span class="ac-btn" style="height: 36px">Abrir</span></div>
+
+<span class="ac-token bad-pad" style="display: inline-flex; border: 1px solid #000; padding: 0 20px 0 4px">suporte@acme.com</span>
+<span class="ac-token good-pad" style="display: inline-flex; border: 1px solid #000; padding: 0 10px">suporte@acme.com</span>
+
+<div class="bad-clipped" style="width: 60px; overflow: hidden; white-space: nowrap">Um texto bem mais longo que a caixa dele</div>
+<div class="good-clipped" style="width: 60px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis">Um texto bem mais longo que a caixa dele</div>
+
+<div class="inline" style="width: 200px; height: 30px"><div class="bad-overlap" style="width: 120px; flex: none">Um texto</div><div style="margin-left: 0; width: 120px; flex: none; transform: translateX(-60px)">Outro texto</div></div>
+<div class="inline" style="width: 300px; height: 30px"><div class="good-overlap" style="width: 120px; flex: none">Um texto</div><div style="width: 120px; flex: none">Outro texto</div></div>
+
+<div class="inline" style="width: 140px"><span class="bad-wordwrap" style="flex: 1 1 0; min-width: 0">Merge deploy rollback sempre pedem aprovação</span><span style="flex: none; width: 90px">Cancelar</span></div>
+<div class="inline" style="width: 500px"><span class="good-wordwrap" style="flex: 1 1 0; min-width: 0">Merge deploy rollback sempre pedem aprovação</span><span style="flex: none; width: 90px">Cancelar</span></div>
+
+<div class="bad-viewport" style="position: relative; left: 1250px; width: 100px">Fora da tela</div>
+<div class="good-viewport" style="width: 100px">Dentro da tela</div>
+
+<span class="ac-btn--icon bad-plate" style="display: inline-flex; width: 32px; height: 32px; align-items: flex-start"><svg width="16" height="16"><path d="M0 0h16v16H0z"/></svg></span>
+<span class="ac-btn--icon good-plate" style="display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center"><svg width="16" height="16"><path d="M0 0h16v16H0z"/></svg></span>
+
+<div class="ac-form bad-stack" style="display: flex; flex-direction: column; gap: 16px; width: 200px"><div>Um</div><div style="margin-top: 12px">Dois</div></div>
+<div class="ac-form good-stack" style="display: flex; flex-direction: column; gap: 16px; width: 200px"><div>Um</div><div>Dois</div></div>

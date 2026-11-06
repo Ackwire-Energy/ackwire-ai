@@ -121,6 +121,10 @@ html:not([data-pointer]) .tp-chip:focus-visible {
   height: 20px;
   line-height: 20px;
 }
+/* A button here reaches past that line: it doesn't rise with the words, and stays as far from the tile's edges as its padding. */
+.tp-agent__tail:has(> .ac-btn:not(.ac-btn--ghost)) {
+  margin-block: 6px;
+}
 /* The map's rows are one line: the face and the words share a centre. */
 .tp-map .ac-faceline {
   align-items: center;

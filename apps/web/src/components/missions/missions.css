@@ -1599,8 +1599,9 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 .mi-cmd-item__code[data-all] {
   display: block;
 }
+/* As a dialog's footer note: beside the buttons while it fits on one line, on a line of its own above them when not. */
 .mi-cmd-why {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   font-size: 13px;
   color: var(--ink-muted);

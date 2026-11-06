@@ -281,11 +281,7 @@ html:not([data-pointer]) .cq__open:focus-visible {
   margin-right: auto;
   font-weight: 600;
 }
-/* On a phone the dialog's footer note takes a row of its own; "Trocar a IA" is a few words, so it shares one with the button. */
 @media (max-width: 640px) {
-  .cq-dialog .ac-dialog__foot-note {
-    flex-basis: auto;
-  }
   /* The question on its own line, its two answers together under it. */
   .cq-confirm {
     justify-content: flex-end;

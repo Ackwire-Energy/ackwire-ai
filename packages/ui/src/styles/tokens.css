@@ -122,6 +122,8 @@
   --space-4: 16px;
   --space-6: 24px;
   --space-8: 32px;
+  /* The least a button with a plate stands from the edges of its row or card. */
+  --action-clear: 8px;
   /* Above and below the words of a card's list row (a settings row, a role, a limit) and of the card's foot, so every
      hairline between them sits as far from the words on each side. */
   --row-py: var(--space-3);

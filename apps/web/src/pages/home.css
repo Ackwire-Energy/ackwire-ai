@@ -119,23 +119,15 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   line-height: 18px;
   color: var(--muted);
 }
-/* The button sits on the first line, beside the title: centred on its 20px line, and with the title's rise to the
-   face's top when a line follows it (RowBody puts `.ac-captop` on it then; the rise is measured in the button's 13px
-   type, within half a pixel of the title's). */
+/* The button is centred on the face, which keeps it inside the row's padding however the text beside it rises. */
 .home-row__act {
   align-self: start;
-  margin-top: calc((20px - var(--control-h-sm)) / 2);
-}
-.home-row:has(> .home-row__text > .ac-captop) > .home-row__act {
-  margin-top: calc((20px - var(--control-h-sm)) / 2 + var(--cap-top) - 10px);
+  margin-top: calc((32px - var(--control-h-sm)) / 2);
 }
 /* Touch grows a small button to 40px. */
 @media (pointer: coarse) {
   .home-row__act {
-    margin-top: calc((20px - var(--control-h-md)) / 2);
-  }
-  .home-row:has(> .home-row__text > .ac-captop) > .home-row__act {
-    margin-top: calc((20px - var(--control-h-md)) / 2 + var(--cap-top) - 10px);
+    margin-top: calc((32px - var(--control-h-md)) / 2);
   }
 }
 /* A system face (a computer, a request to join): the same 32px tile as a person's. */

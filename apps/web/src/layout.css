@@ -269,7 +269,7 @@ p {
   align-items: center;
   gap: 10px;
   min-height: 44px;
-  padding: 6px 10px 6px 16px;
+  padding: var(--action-clear) 10px var(--action-clear) 16px;
 }
 .outage + .outage {
   border-top: 1px solid var(--line);
@@ -6078,6 +6078,7 @@ html:not([data-pointer]) .save-wiki__page:focus-visible {
   place-items: center;
   width: 18px;
   height: 18px;
+  padding: 0;
   border: 0;
   border-radius: 5px;
   background: transparent;
@@ -8276,8 +8277,13 @@ html:not([data-pointer]) .onb__step:focus-visible {
   box-shadow: var(--e2), var(--top);
   box-sizing: border-box;
 }
+/* As a dialog's footer note: beside the buttons while it fits on one line, on a line of its own above them when not. */
+.newag__foot:has(> .newag__hint) {
+  flex-wrap: wrap;
+}
 .newag__hint {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 6px;
   min-width: 0;
@@ -9717,14 +9723,14 @@ html:not([data-pointer]) .agp-tabs .ac-tab:focus-visible {
   gap: 16px;
   min-width: 0;
 }
-/* 12px above and below, as the attention tiles (`.agp-attn`): a head with a button (a 32px row) reaches 6px into
-   the padding, so the title still sits 12px in. The foot meets the card's edge, so it pulls 12px, not --card-pad. */
+/* 12px above and below, as the attention tiles (`.agp-attn`): a head with a button (a 32px row) reaches into the padding
+   as far as `--action-clear` lets it. The foot meets the card's edge, so it pulls 12px, not --card-pad. */
 .agp-card.ac-card {
   gap: 12px;
   padding-block: 12px;
 }
 .agp-card > .ac-card__head:first-child:has(.ac-card__action .ac-btn) {
-  margin-block: -6px -2px;
+  margin-block: calc(var(--action-clear) - var(--row-py)) -2px;
 }
 .agp-card > .ac-card__foot {
   margin-bottom: -12px;
@@ -9980,13 +9986,19 @@ html:not([data-pointer]) .agp-asks__see:focus-visible {
 .agp-attn__t b {
   font-weight: 600;
 }
-/* One line box as tall as the title's (15/22), with its rise (`ac-captop`): the button overflows it evenly, so it sits
-   centred on that line. */
+/* One line box as tall as the title's (15/22): the button overflows it evenly, and the tile's padding keeps it clear of
+   the edge, as `.ac-captail` does in a row. */
 .agp-attn__tail {
   display: flex;
   flex: none;
   align-items: center;
   height: 22px;
+  margin-block: calc((var(--control-h-sm) + 2 * var(--action-clear) - 22px - 2 * var(--row-py)) / 2);
+}
+@media (pointer: coarse) {
+  .agp-attn__tail {
+    margin-block: calc((var(--control-h-md) + 2 * var(--action-clear) - 22px - 2 * var(--row-py)) / 2);
+  }
 }
 .agp-attn__t span {
   color: var(--muted);
@@ -10624,8 +10636,13 @@ html:not([data-pointer]) .agp-subnav__item:focus-visible {
     transform: none;
   }
 }
+/* As a dialog's footer note: beside the buttons while it fits on one line, on a line of its own above them when not. */
+.agp-savebar:has(> .agp-savebar__hint) {
+  flex-wrap: wrap;
+}
 .agp-savebar__hint {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -12717,13 +12734,24 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 }
 /* Its two actions (an account already there): one under the other when they don't fit, and a long email ends in "…"
    (the note above says it whole). */
-.ai-panel__row > .ac-acts {
+.ai-panel__row > .ac-acts,
+.ai-panel > .ac-acts {
   flex-wrap: wrap;
   row-gap: 8px;
   min-width: 0;
 }
 .ai-panel__row > .ac-acts > .ac-btn {
   max-width: 100%;
+}
+/* A long action on a phone takes two lines rather than run past the panel's edge. */
+@media (max-width: 640px) {
+  .ai-panel__row > .ac-btn {
+    max-width: 100%;
+    height: auto;
+    min-height: var(--control-h-sm);
+    padding-block: 6px;
+    white-space: normal;
+  }
 }
 /* A sign-in that didn't end signed in: what to do next goes under the note's words, 22px in (its 14px icon and 8px
    gap), as a step's button goes under its words. Before the plan's panel's rules, whose text column wins there. */

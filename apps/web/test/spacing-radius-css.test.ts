@@ -144,9 +144,9 @@ test("a button inside a field is as far from its end as from its top and bottom,
   expect(last(kit, ".ac-searchfield__clear", "right")).toBe("var(--in)");
   expect(last(kit, ".ac-filter__clear", "margin-right")).toBe("var(--in)");
   // A token's ✕: 4px around a 20px circle in a 28px pill, 2px around 18px (r2) in a 22px one (r4).
-  expect(last(kit, ".ac-token", "padding")).toBe("0 4px 0 6px");
+  expect(last(kit, ".ac-token", "padding")).toBe("0 var(--token-px)");
   expect(last(kit, ".ac-token__remove", "height")).toBe("20px");
-  expect(last(kit, ".ac-token--sm", "padding")).toBe("0 2px 0 6px");
+  expect(last(kit, ".ac-token--sm", "--token-px")).toBe("6px");
   expect(last(kit, ".ac-token--sm", "border-radius")).toBe("var(--radius-xs)");
   expect(last(kit, ".ac-token--sm .ac-token__remove", "border-radius")).toBe("var(--radius-cut)");
   // The composer's tools: one room at both ends and under them, its send button the card's corner less it.
