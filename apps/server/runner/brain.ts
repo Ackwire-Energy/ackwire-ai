@@ -595,14 +595,16 @@ export class ClaudeStreamParser {
           },
         };
       }
+      const cause = said.cause ?? this.failure.cause ?? "unknown";
       return {
         events,
         final: {
           type: "error",
           code: "claude_failed",
           message: (text || `Claude Code ended with ${str(ev.subtype) || "an error"}`).slice(0, BRAIN_LIMITS.message),
-          retryable: false,
-          cause: said.cause ?? this.failure.cause ?? "unknown",
+          // The CLI already retried its own calls; a network or provider outage may pass, so the server tries later.
+          retryable: cause === "network" || cause === "provider_transient",
+          cause,
           ...http,
         },
       };
