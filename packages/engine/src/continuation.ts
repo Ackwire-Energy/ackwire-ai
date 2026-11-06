@@ -339,7 +339,7 @@ export interface TurnEnd {
   openRequest?: string;
   /** Something durable brings it back (`wakesLater`), read only when the judgment would run. */
   wakesLater(): Promise<boolean>;
-  /** Whatever run set it, something brings it back to this conversation (`comesBackHere`), read on a `continue`. */
+  /** Whatever run set it, something brings it back to this conversation (`comesBackHere`), read on a repeated promise. */
   comesBack?(): Promise<boolean>;
   /** The judgment; null when the workspace has no judge. */
   verdict: (() => Promise<ContinuationVerdict>) | null;
@@ -392,10 +392,6 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
   // A hand-off by mention to an agent that isn't here is an unkept hand-off: it goes on and hands it over.
   if (verdict === "continue" && t.unreached && canNudge)
     return { outcome: "continue", rule: "unreached", verdict, nudge: t.unreached };
-  // A promise that rests on what an earlier run set (a follow-up, a reminder, work still running) is kept: telling it
-  // to act or to ask only makes it say so again.
-  if (verdict === "continue" && t.kind === "conversation" && (await t.comesBack?.().catch(() => false)))
-    return { outcome: "waiting", rule: "wakes_later" };
   // Asking means waiting (ADR 0131 §1): a reply that ends asking the person whether to go on waits for their answer,
   // never pushed into going ahead. A secret asked in the chat and an unkept hand-off keep their rules above; one told
   // to ask (`askPending`) still becomes its question card below.
@@ -410,8 +406,11 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
         verdict,
         nudge: t.kind === "agents_dm" ? FOLLOW_THROUGH_NUDGE_DM : FOLLOW_THROUGH_NUDGE,
       };
-    // Promising again without acting: a person is asked what it needs instead.
     if (t.kind !== "conversation") return { outcome: "done", rule: "cap", verdict };
+    // Promising again without acting: what an earlier run set brings it back (a follow-up, a reminder, work still
+    // running), and it rests on that. Only now: any wake here, however far off, would otherwise excuse a new promise.
+    if (await t.comesBack?.().catch(() => false)) return { outcome: "waiting", rule: "wakes_later" };
+    // Nothing does: a person is asked what it needs instead.
   }
   // It said it couldn't with ways left: once more with its means, while it still acts between nudges.
   if (verdict === "untried") {

@@ -1,7 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, desc, type Executor, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
 import { routineBriefOfRun } from "./background";
-import { SAME_ITEM_SIMILARITY, similarity } from "./context/items";
+import { sameSentence } from "./context/items";
 import { deliverNotice, publishDelivery } from "./delivery";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
@@ -263,12 +263,13 @@ async function holdUntried(deps: HandOffDeps, ctx: ToolContext, text: string): P
 export type AskVerdict = "findable" | "secret" | "person" | "none";
 
 /**
- * Says it needs nothing, with no question in it: a card over this keeps a person from nothing. The judge reads that in
- * any language; this list holds when it fails, when there is none, and when it calls the note a person's to answer.
+ * Says it needs nothing, with no question and no "nothing but your ok" in it: a card over this keeps a person from
+ * nothing. The judge reads that in any language; this list holds when it fails, when there is none, and when it calls
+ * the note a person's to answer.
  * ponytail: the common wordings of pt, en, es, fr, de and it; other languages rest on the judge alone.
  */
 const SAYS_NEEDS_NOTHING =
-  /n[ãa]o preciso de (?:mais )?nada|i (?:don'?t|do not) need anything|i need nothing|no necesito (?:nada|más nada)|je n'ai besoin de rien|ich brauche (?:gerade |jetzt |momentan )?nichts|non ho bisogno di nulla/i;
+  /(?:n[ãa]o preciso de (?:mais )?nada|i (?:don'?t|do not) need anything|i need nothing|no necesito (?:nada|más nada)|je n'ai besoin de rien|ich brauche (?:gerade |jetzt |momentan )?nichts|non ho bisogno di nulla)(?![^.!\n]*[\s,](?:al[ée]m|exceto|salvo|s[óo]|apenas|but|except|besides|other than|just|only|excepto|s[óo]lo|m[áa]s|sauf|seulement|d'autre|au(?:ß|ss)er|nur|tranne|oltre)[\s,])/i;
 
 export const saysNeedsNothing = (text: string) => !/[?？]/.test(text) && SAYS_NEEDS_NOTHING.test(text);
 
@@ -357,8 +358,9 @@ export async function repeatedAsk(db: Executor, run: { id: string; orgId: string
     )
     .orderBy(desc(schema.agentQuestions.createdAt))
     .limit(RECENT_QUESTIONS);
-  const same = asked.find((q) => similarity(q.text, text) >= SAME_ITEM_SIMILARITY);
+  const same = asked.find((q) => sameSentence(q.text, text));
   if (!same) return null;
+  if (same.status === "open") return "Not asked: you already asked this and it is still open. Wait for the answer.";
   // Loaded here, as `questions.ts` loads this file.
   const { questionResult } = await import("./questions");
   return `Not asked: you already asked this in this run. ${questionResult(same).content}`;

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { ASKS_NOTHING, answerQuestion, drainOutbox, FOLLOW_UP_TOOL, postPersonMessage, wakeFollowUp } from "../src";
+import { repeatedAsk, saysNeedsNothing } from "../src/hand-off";
 import { type Fixture, setup } from "./fixtures";
 
 /**
@@ -212,6 +213,54 @@ describe("ask_user can't repeat itself", () => {
     expect((await runs()).map((r) => r.status)).toEqual(["waiting_input"]);
   });
 
+  test.each([
+    [
+      "one word apart",
+      "Aprovo o orçamento do projeto de reforma da loja 3?",
+      "Aprovo o orçamento do projeto de reforma da loja 4?",
+    ],
+    [
+      "the same words the other way",
+      "Apago o arquivo antigo e mantenho o novo?",
+      "Apago o arquivo novo e mantenho o antigo?",
+    ],
+    [
+      "long, and apart only at the end",
+      `Ao abrir a planilha de custos do trimestre, ${"a coluna de notas e as datas de cada entrega ".repeat(6)}batem com o contrato da Acme?`,
+      `Ao abrir a planilha de custos do trimestre, ${"a coluna de notas e as datas de cada entrega ".repeat(6)}batem com o pedido da Zeta?`,
+    ],
+  ])("a real, different question is still asked: %s", async (_, a, b) => {
+    f = await setup({ askUser: true, reply: asking([a, b]) });
+    await say("@dev confere pra mim");
+    await drainOutbox(f.db, f.handlers);
+    await answer("sim");
+    expect((await questions()).map((q) => q.text)).toEqual([a, b]);
+  });
+
+  test("a question still open reads as open, not as one nobody answered", async () => {
+    const asked = "Qual ambiente: staging ou produção?";
+    f = await setup({ askUser: true, reply: asking([asked]) });
+    await say("@dev faz o deploy");
+    await drainOutbox(f.db, f.handlers);
+    const [run] = await runs();
+    const told = await repeatedAsk(f.db, { id: run?.id as string, orgId: f.org.id }, asked);
+    expect(told).toContain("still open");
+    expect(told).not.toContain("24 hours");
+  });
+
+  test("needing nothing but something is a need, in any of the words", () => {
+    for (const text of [
+      "Não preciso de nada além do seu ok para publicar.",
+      "Não preciso de nada seu, só do arquivo final.",
+      "I don't need anything but your approval to ship it.",
+      "No necesito nada más que tu visto bueno.",
+      "Ich brauche nichts außer deiner Freigabe.",
+    ])
+      expect(saysNeedsNothing(text)).toBe(false);
+    expect(saysNeedsNothing("Não preciso de nada seu. A rolagem continua e volto às 11:20")).toBe(true);
+    expect(saysNeedsNothing("I don't need anything from you. It keeps running and I'm back at 11:20.")).toBe(true);
+  });
+
   test("a note that says it needs nothing but asks something is a question", async () => {
     const question = "Não preciso de nada do Portal, mas qual canal recebe o post?";
     f = await setup({ askUser: true, reply: asking([question]) });
@@ -226,7 +275,7 @@ describe("a promise that rests on what an earlier run set", () => {
   const inThread = (body: string, threadId: string) =>
     postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body, threadId });
 
-  test("a follow-up still to come keeps it: one reply, no nudge, no card", async () => {
+  test("a follow-up still to come keeps a repeated promise: told once, one post, no card", async () => {
     f = await setup({
       askUser: true,
       followUps: true,
@@ -245,7 +294,7 @@ describe("a promise that rests on what an earlier run set", () => {
     const before = f.provider.calls.length;
     await inThread("@dev e aí?", root.id);
     await drainOutbox(f.db, f.handlers);
-    expect(f.provider.calls.length).toBe(before + 1);
+    expect(f.provider.calls.length).toBe(before + 2);
     expect(await questions()).toHaveLength(0);
     expect((await runs()).map((r) => r.status)).toEqual(["done", "done"]);
   });
@@ -274,7 +323,7 @@ describe("a promise that rests on what an earlier run set", () => {
     expect((await runs()).map((r) => r.status)).toEqual(["done", "done"]);
   });
 
-  test("long work still running here keeps it too; once over, the promise is judged again", async () => {
+  test("a new promise beside long work is still told to act; once told, the wake keeps it", async () => {
     f = await setup({
       askUser: true,
       judge: (kind) => (kind === "follow_through" ? "continue" : kind === "ask_check" ? "none" : undefined),
@@ -291,13 +340,10 @@ describe("a promise that rests on what an earlier run set", () => {
       how: "agent",
       lastUpdateAt: new Date(),
     });
-    await say("@dev e aí?");
+    await say("@dev traduz esse texto");
     await drainOutbox(f.db, f.handlers);
-    expect(f.provider.calls).toHaveLength(1);
-    await f.db.update(schema.agentWorks).set({ status: "done" });
-    await say("@dev e agora?");
-    await drainOutbox(f.db, f.handlers);
-    expect(f.provider.calls).toHaveLength(3);
+    expect(f.provider.calls).toHaveLength(2);
+    expect(JSON.stringify(f.provider.calls[1]?.request.messages)).toContain("You ended saying you would do more");
     expect(await questions()).toHaveLength(0);
   });
 });
