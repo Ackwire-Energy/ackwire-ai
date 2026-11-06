@@ -271,7 +271,7 @@ jobs:
       needs.changes.outputs.shared == 'true' || needs.changes.outputs.web == 'true' ||
       needs.changes.outputs.mobile == 'true' || needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       SHARED: ${{ needs.changes.outputs.shared }}
       WEB: ${{ needs.changes.outputs.web }}
@@ -285,7 +285,8 @@ jobs:
       # About 3 minutes on a runner (2026-10-20).
       - name: Test (web and design system)
         if: env.SHARED == 'true' || env.WEB == 'true'
-        timeout-minutes: 10
+        # The whole suite takes about 10 minutes on one runner now (3320 tests, 612 s on 2026-11-06).
+        timeout-minutes: 15
         run: bun test apps/web packages/ui 2>&1 | tee test.log
       # The "Novo evento" dialog tests once aborted the whole DOM process (exit 134), so the main run
       # skips them (RUN_NEW_EVENT) and they run alone here. Alone they pass, so a failure is real.
