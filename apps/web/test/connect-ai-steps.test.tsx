@@ -917,12 +917,12 @@ describe("Conectar uma IA: one picker, plans first", () => {
     const options = fakeAgentBrain(ADA_ID).options.map((o) =>
       o.kind === "codex" ? { ...o, available: false, reason: "not_installed" as const } : o,
     );
-    const { dialog, tile } = await connect({
+    const { dialog, choose } = await connect({
       computers: [{ ...MAC, machineId: "managed_1", name: "Computador da Acme" }],
       setup: { state: "ready", machineId: "managed_1", since: "2026-01-01T00:00:00.000Z" },
       brain: { computer: { machineId: "managed_1", name: "Computador da Acme", online: true }, options },
     });
-    await click(tile("ChatGPT"));
+    await choose("ChatGPT");
     const panel = within(dialog).getByRole("region", { name: "Seu plano do ChatGPT" });
     expect(panel.textContent).toContain("não vai mudar sozinho");
     expect(panel.textContent).not.toContain("sendo instalado");
@@ -1053,7 +1053,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     const panel = within(dialog).getByRole("region", { name: "Chave de API" });
     await type(within(panel).getByLabelText("Cole aqui"), "sk-ant-api03-abcdefghijklmnop");
     await click(within(panel).getByRole("button", { name: "Salvar chave" }));
-    expect(within(panel).getByLabelText<HTMLInputElement>("Cole aqui").disabled).toBe(true);
+    expect(within(panel).getByLabelText("Cole aqui").closest("fieldset[disabled]")).not.toBeNull();
     expect(aiSelect(dialog, "Provedor").hasAttribute("disabled")).toBe(true);
     expect(payWith(dialog, "Com um plano").hasAttribute("disabled")).toBe(true);
   });
