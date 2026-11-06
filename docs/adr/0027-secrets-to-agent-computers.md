@@ -98,3 +98,9 @@ The agent has a shell on its computer, so it can read a secret it was given. We 
 - **Paste it in the chat.** What happens today: stored, shown and sent to the model. Rejected.
 - **An organization vault on our server, injected at exec time** (like ADR 0007). Simpler, and right for secrets the organization manages (it may come later as "segredos da organização"), but the server sees the plaintext. That isn't acceptable for personal credentials and is forbidden for Claude sign-ins.
 - **A form served by the computer itself** (a Daytona preview URL, straight from browser to computer). It bypasses our server entirely, but it only exists for Daytona, not for connected machines, and every computer would need to run a small web server. We keep that direct path only for the interactive terminal.
+
+## Addendum: connectors first
+
+A key for a service we connect natively is the wrong first move: it leaves the connector's scopes, the approvals and the git proxy behind. The Tool Gateway decides this before the card (`tools/connector-first.ts`), from the connector catalog: a `request_secret` naming such a service (its variable, its site, or the purpose of a variable that says nothing) opens no card. It answers in one line with the way in, by how the agent stands with the service: its tools, `request_permission` for a connection it lacks, `offer_connect_app` for one the workspace hasn't, or how an admin does it.
+
+What goes on as before: a service this server can't connect, a one-time code, a file of the project (`.env`, `.npmrc`), a key the agent already holds (given or in the Vault), and a key a person asked for. That last one is checked, not trusted: the agent repeats the call with `person_said`, and those words must be in a person's recent message in the conversation.

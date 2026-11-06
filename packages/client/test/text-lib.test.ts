@@ -140,6 +140,13 @@ test("holdsText: the same words, spacing aside, never a word cut in the middle",
   expect(holdsText("Outra coisa.", "Vou ver.")).toBe(false);
 });
 
+test("holdsText: a long piece of the text is in it even where it was cut mid-word", () => {
+  const whole =
+    "Se você me passar o `build.gradle`, eu respondo com base neles. Quando o acesso for liberado, eu retomo.";
+  expect(holdsText(whole, whole.slice(whole.indexOf("dle`")))).toBe(true);
+  expect(holdsText(whole, whole.slice(0, whole.indexOf("eles.")))).toBe(true);
+});
+
 test("a name that looks like a password: no space, a digit and a symbol; real names never", () => {
   for (const name of ["Fake#Pass1", "S3nh@forte", " hunter2!xyz ", "P4ss#word", "كلمة١٢٣$سر"])
     expect(looksLikePassword(name)).toBe(true);

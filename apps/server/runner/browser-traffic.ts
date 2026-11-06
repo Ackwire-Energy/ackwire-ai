@@ -34,7 +34,10 @@ import { urlCarries } from "./vault";
  * then (ones that attached since the last guard too), and the runner types only
  * then. An error in answer leaves that session unpaused, so the guard isn't
  * ready, unless the session is gone. Only while armed: nothing is paused
- * otherwise.
+ * otherwise. A dedicated worker has no `Fetch` of its own ("'Fetch.enable' wasn't
+ * found"), and what it requests pauses on its page's session (measured on Chrome
+ * for Testing 155 and 157, nested workers too): it isn't asked. reCAPTCHA starts
+ * one, so a sign-in page with it could never be guarded otherwise.
  */
 
 const AUTO_ATTACH = {
@@ -197,7 +200,9 @@ export function countChromeTraffic(
     show: (url) => send("Page.navigate", { url }, sessionId),
   });
   let first = 0;
-  const targets = () => [...sessions.keys()].filter((id) => id !== "");
+  /** Dedicated workers: no `Fetch` to enable there. */
+  const workers = new Set<string>();
+  const targets = () => [...sessions.keys()].filter((id) => id !== "" && !workers.has(id));
   const live = () => guards.filter((g) => g.until > Date.now());
   const disarm = () => {
     guards = [];
@@ -308,9 +313,10 @@ export function countChromeTraffic(
         if (!sessionId && target.type === "page" && typeof target.targetId === "string") {
           pages.set(p.sessionId, target.targetId);
         }
+        if (target.type === "worker") workers.add(p.sessionId);
         send("Network.enable", NETWORK, p.sessionId);
         // A page or frame that opens while a password is guarded is guarded too; the next guard waits for it.
-        if (fetchOn) enableFetchOn(p.sessionId);
+        if (fetchOn && target.type !== "worker") enableFetchOn(p.sessionId);
         send("Target.setAutoAttach", AUTO_ATTACH_RELATED, p.sessionId);
         return;
       }
@@ -337,6 +343,7 @@ export function countChromeTraffic(
         if (typeof p.sessionId === "string") {
           sessions.delete(p.sessionId);
           pages.delete(p.sessionId);
+          workers.delete(p.sessionId);
           fetchStates.delete(p.sessionId);
         }
         return;

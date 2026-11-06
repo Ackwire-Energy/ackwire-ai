@@ -31,6 +31,8 @@ export interface WorkItem extends Activity {
   hint?: string | null;
   /** Why it failed: the first line of the tool's error. */
   why?: string | null;
+  /** It failed because its arguments were refused: the tool never ran. */
+  slip?: boolean;
   /** A refused command: the refusal's code, which `toolWhy` says in the person's words. */
   refusal?: string | null;
   /** No result: it never ran (it waited on a person, or the run stopped first). */
@@ -142,6 +144,13 @@ export function workSteps(w: WorkMeta, skip: (name: string) => boolean = () => f
   return w.calls.reduce((n, c) => (skip(c.name) && typeof c.n === "number" ? n - c.n : n), w.steps);
 }
 
+/** How the Tool Gateway answers a call whose arguments it refuses (`tools/gateway.ts`). */
+const SLIP = "Invalid input:";
+
+/** Refused for its arguments, then made right: a later call of the same tool worked (or is at it). No failure for people. */
+const madeRight = (slip: { tool: string }, later: { tool: string; failed?: boolean; held?: boolean }[]) =>
+  later.some((c) => c.tool === slip.tool && !c.failed && !c.held);
+
 const DRIVE: ActivityKind[] = ["readingDrive", "writingDrive", "exportingFile", "importingFile"];
 const time = (iso: string) => new Date(iso).getTime();
 
@@ -232,6 +241,7 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
       tool: name,
       ms,
       failed,
+      ...(failed && content.startsWith(SLIP) ? { slip: true } : {}),
       count: 1,
       hint: toolHint(name, a, detail),
       why,
@@ -470,6 +480,8 @@ export interface ToolLine extends Activity {
   ms: number | null;
   count: number;
   why: string | null;
+  /** Refused for its arguments and made right, or being made right: quiet, its own line. */
+  slip?: boolean;
   /** A refused command: the refusal's code (`toolWhy` says it in the person's words). */
   refusal?: string | null;
   input: string | null;
@@ -491,11 +503,15 @@ const sameLine = (a: ToolLine, b: Activity & { tool: string }) =>
 /**
  * The live work as the block's items: a call followed by the same kind of call (no code, nothing said in
  * between, neither failed) is one line counting both, so five browser steps read "Usou o navegador ×5".
- * Reactions and tool lookups are left out (`UNLISTED`), as in `workFromSteps`. `stopped`: the run was stopped, so the
- * call still running shows as stopped.
+ * Reactions and tool lookups are left out (`UNLISTED`), as in `workFromSteps`. `stopped`: the run is over, so the call
+ * still running shows as stopped. A call refused for its arguments reads as still at it while the agent tries again,
+ * and quietly once one of the same tool works; an error only if the run ends or moves on without that.
  */
 export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
   const items: ToolItem[] = [];
+  const listed = work.flatMap((w) =>
+    w.kind === "call" && !UNLISTED.has(toolActivity(w.tool, w.connector, w.detail, w).kind) ? [w] : [],
+  );
   work.forEach((w, i) => {
     if (w.kind === "say") {
       items.push({ kind: "say", key: `say-${i}`, text: w.text });
@@ -507,8 +523,19 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
     }
     const a = toolActivity(w.tool, w.connector, w.detail, w);
     if (UNLISTED.has(a.kind)) return;
+    const later = listed.slice(listed.indexOf(w) + 1);
+    const atIt = !stopped && later.every((c) => c.slip && c.tool === w.tool);
+    const trying = w.slip === true && atIt && later.length === 0;
+    const slip = w.slip === true && (atIt || madeRight(w, stopped ? later.filter((c) => !c.running) : later));
     // Held (it waits on a person, so it never ran) reads like a call stopped before it ended.
-    const state: ToolState = w.running ? (stopped ? "stop" : "run") : w.failed ? "fail" : w.held ? "stop" : "done";
+    const state: ToolState =
+      trying || (w.running && !stopped)
+        ? "run"
+        : w.running || slip || (w.held && !w.failed)
+          ? "stop"
+          : w.failed
+            ? "fail"
+            : "done";
     const hasCode = Boolean(w.code) || w.output.length > 0;
     const prev = items[items.length - 1];
     const autoApproved = w.autoApproved ?? null;
@@ -516,6 +543,8 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
       prev?.kind === "call" &&
       !hasCode &&
       state !== "fail" &&
+      !slip &&
+      !prev.line.slip &&
       !autoApproved &&
       !prev.line.autoApproved &&
       sameLine(prev.line, { ...a, tool: w.tool })
@@ -537,6 +566,7 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
         ms: w.ms ?? null,
         count: 1,
         why: w.why ? plainWhy(w.why) : null,
+        ...(slip ? { slip: true } : {}),
         refusal: w.refusal ?? null,
         input: w.command ?? null,
         result: null,
@@ -551,31 +581,35 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
 
 /** A saved run's work (`workFromSteps`) as the block's items, the narration where it was said. */
 export function toolItemsSaved(work: Work): ToolItem[] {
-  return work.steps.flatMap((s, i): ToolItem[] => [
-    ...work.narration.filter((n) => n.at === i).map((n) => ({ kind: "say" as const, key: n.key, text: n.text })),
-    {
-      kind: "call",
-      key: s.key,
-      line: {
+  return work.steps.flatMap((s, i): ToolItem[] => {
+    const slip = s.slip === true && madeRight(s, work.steps.slice(i + 1));
+    return [
+      ...work.narration.filter((n) => n.at === i).map((n) => ({ kind: "say" as const, key: n.key, text: n.text })),
+      {
+        kind: "call",
         key: s.key,
-        kind: s.kind,
-        ...(s.app ? { app: s.app } : {}),
-        ...(s.service ? { service: s.service } : {}),
-        ...(s.icon ? { icon: s.icon } : {}),
-        tool: s.tool,
-        state: s.failed ? "fail" : s.held ? "stop" : "done",
-        hint: s.hint ?? null,
-        ms: s.ms,
-        count: s.count,
-        why: s.why ?? null,
-        refusal: s.refusal ?? null,
-        input: s.input ?? null,
-        result: s.result ?? null,
-        ...(s.autoApproved ? { autoApproved: s.autoApproved } : {}),
-        ...(s.code ? { code: s.code, output: s.output ?? [] } : {}),
+        line: {
+          key: s.key,
+          kind: s.kind,
+          ...(s.app ? { app: s.app } : {}),
+          ...(s.service ? { service: s.service } : {}),
+          ...(s.icon ? { icon: s.icon } : {}),
+          tool: s.tool,
+          state: slip ? "stop" : s.failed ? "fail" : s.held ? "stop" : "done",
+          ...(slip ? { slip: true } : {}),
+          hint: s.hint ?? null,
+          ms: s.ms,
+          count: s.count,
+          why: s.why ?? null,
+          refusal: s.refusal ?? null,
+          input: s.input ?? null,
+          result: s.result ?? null,
+          ...(s.autoApproved ? { autoApproved: s.autoApproved } : {}),
+          ...(s.code ? { code: s.code, output: s.output ?? [] } : {}),
+        },
       },
-    },
-  ]);
+    ];
+  });
 }
 
 const linesOf = (items: ToolItem[]) => items.flatMap((i) => (i.kind === "call" ? [i.line] : []));

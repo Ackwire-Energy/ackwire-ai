@@ -60,6 +60,7 @@ import {
   type BrainPlan,
   type BrainUnavailability,
   bindingReset,
+  brainSpeedFor,
   forgetModelLimit,
   forgetPlanLimit,
   mayFallBack,
@@ -119,7 +120,12 @@ import {
 } from "./catch-up-triage";
 import { REACT_TOOL } from "./chat-tools";
 import { kickRoomQueue, publishQueueChanged, roomGate, roomHead } from "./computer-queue";
-import { announceConsultationChange, answersOpen, onConsultedRunFinished } from "./consultations";
+import {
+  announceConsultationChange,
+  answersOpen,
+  consultedInBackground,
+  onConsultedRunFinished,
+} from "./consultations";
 import {
   buildRunContext,
   type ContextBlock,
@@ -163,7 +169,14 @@ import {
   PersonLimitError,
   ValidationError,
 } from "./errors";
-import { type ChannelEvent, liveTurns, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
+import {
+  type ChannelEvent,
+  type LiveTurn,
+  liveTurns,
+  type MemoryUpdate,
+  publishChannelEvent,
+  publishMessageCreated,
+} from "./events";
 import { FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
@@ -533,6 +546,8 @@ export interface Transcript {
   request?: string;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
   fallback?: { from: BrainKind; code: string; message: string; resetsAt?: string };
+  /** Fast was refused on a turn of this run, which went on at standard speed (`meta.speedFallback`). */
+  speedFallback?: boolean;
   /**
    * The computer brain is unavailable and nothing can stand in: the run waits for the computer. A usage wait
    * (`USAGE_WAIT_CODES`: the plan's limit, the agent's budget) has no computer to wait for: `machineId` is empty,
@@ -892,6 +907,8 @@ async function executeRunInner(
   // A job for one wait for the computer (back, grace, plan reset, room): only while the run still waits on it.
   // Another job may have resumed it already; running it again would run the run twice.
   let askingForRoom = false;
+  /** The computer whose line it asks from: the run stays in that line until a turn is taken (`leaveLine`). */
+  let lineMachine: string | null = null;
   if (options.wait) {
     const [row] = await db
       .select({
@@ -955,9 +972,10 @@ async function executeRunInner(
       const late = row.code === "budget" || row.source === "budget" ? "waiting_budget_late" : "waiting_plan_late";
       if (await missStaleRoutineRun({ db, pubsub: deps.pubsub }, runId, new Date(), late)) return;
     }
-    // Asking a busy computer again: nothing says it works until a turn starts (its first words do), or the
-    // conversation would flash "thinking" every few seconds while it waits.
+    // Asking a busy computer again: nothing says it works until a turn starts (`leaveLine`), or the conversation would
+    // flash "thinking" every few seconds while it waits.
     askingForRoom = row.code === "busy";
+    lineMachine = askingForRoom ? row.machineId : null;
     // Only the head of the computer's line asks it (`computer-queue.ts`); the others look again later, without
     // claiming.
     if (askingForRoom && row.machineId) {
@@ -1011,6 +1029,10 @@ async function executeRunInner(
         .set({ heartbeatAt: new Date() })
         .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "running")));
       if (options.owned && !(await options.owned())) return;
+      // Its machine kept: the worker died asking from the line. This job asks again, or the run would read as waiting
+      // all through the turn it gets.
+      lineMachine = run.waitingMachineId;
+      askingForRoom = lineMachine !== null;
     }
     if (run.status === "waiting_approval" || run.status === "waiting_input") {
       const stored = run.transcript as unknown as Transcript | null;
@@ -1019,7 +1041,13 @@ async function executeRunInner(
       // Decided while the computer turn that asked still runs: its job resumes the run when that turn ends
       // (`suspendedByBridge`), so the brain's session never takes two turns at once.
       if (stored?.pending?.calls.some((c) => c.inTurn) && (await runJobElsewhere(db, run.id, options.jobId))) return;
-      const resumed = await transitionRun(db, run.id, run.status, "running");
+      const resumed = await transitionRun(
+        db,
+        run.id,
+        run.status,
+        "running",
+        lineMachine ? { waitingMachineId: lineMachine } : {},
+      );
       if (!resumed) return;
       run = resumed;
       backFromWait = true;
@@ -1230,6 +1258,31 @@ async function executeRunInner(
     ...(usage ? { usage } : {}),
     ...(error ? { error, ...runErrorDetail(error) } : {}),
   });
+  /**
+   * The ask from the line worked (a computer took the turn, or the model stands in): the run leaves the line, and the
+   * conversation hears now what `askingForRoom` held back. A turn can open with a tool, so no word of it may come.
+   * A run's first turn starts its clock here: minutes in line are no minutes of work.
+   */
+  const leaveLine = async () => {
+    const machineId = lineMachine;
+    if (!machineId) return;
+    lineMachine = null;
+    await db
+      .update(agentRuns)
+      .set({ waitingMachineId: null, ...(run.turns === 0 ? { startedAt: new Date() } : {}) })
+      .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "running")));
+    await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, ...bg });
+    await publishChannelEvent(deps.pubsub, {
+      type: "message.claimed",
+      channelId: run.channelId,
+      messageId: run.triggerMessageId,
+      agentId: run.agentId,
+      runId: run.id,
+    });
+    await publishChannelEvent(deps.pubsub, event("running"));
+    await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
+    await publishQueueChanged(deps.pubsub, run.orgId, machineId);
+  };
   /** Writes that don't need to finish before the model call (steps, usage log); flushed after it. */
   let deferred: Promise<unknown> = Promise.resolve();
   const later = (write: () => Promise<unknown>) => {
@@ -1533,6 +1586,13 @@ async function executeRunInner(
   // Asked to implement an issue: each answer it posts is also a comment on it (a resumed run's too).
   const issueId = triggerMessage?.meta.issueId;
   const viaRoutine = (runMeta.viaRoutine as { id: string; name: string } | undefined) ?? null;
+  // Nobody is waiting on this run: Fast would spend the plan for no one (`brainSpeedFor`).
+  const unattended =
+    viaRoutine !== null ||
+    Boolean(triggerMessage?.meta?.routine ?? triggerMessage?.meta?.viaRoutine ?? issueId ?? run.issueId) ||
+    (agent.brainSpeed === "fast" &&
+      triggerMessage?.authorType === "agent" &&
+      (await consultedInBackground(db, run.orgId, run.id)));
   // Woken by a routine's report (ADR 0053 §7): its message carries the routine, and the routine run links to it.
   const report = routineReportTagOf(triggerMessage);
   // Who must answer (reply-policy.ts): a run nobody called by name may pass; a background run never posts.
@@ -2678,6 +2738,7 @@ async function executeRunInner(
       mayFallBack(agent, run) &&
       (await deps.gateway.hasModelCredential(thinker).catch(() => false))
     ) {
+      await leaveLine();
       t.fallback = { from, code: u.code, message: u.message, ...(u.resetsAt ? { resetsAt: u.resetsAt } : {}) };
       // On "Automático" the API answers with the model and effort chosen for this run.
       const autoEffort = isAutoModel(agent.model) ? t.autoModel?.effort : undefined;
@@ -3540,7 +3601,7 @@ async function executeRunInner(
     ) {
       // Meanwhile a computer brain's checkouts get synced for its first turn (used only if that turn is the same).
       if (plan.kind !== "model" && plan.session && deps.prepareCode && computerTurns === 0 && !nextPrompt) {
-        const early = brainTurnOf(run, thinker, transcript, tools, triggerText, plan);
+        const early = brainTurnOf(run, thinker, transcript, tools, triggerText, plan, { unattended });
         const prepare = deps.prepareCode;
         const machineId = plan.session.machineId;
         // Not for Codex on a runner that never uses its checkouts (`CodexBrain`): a sync nobody reads.
@@ -3564,7 +3625,7 @@ async function executeRunInner(
       const over = await Promise.race([waiting.then(() => true), Bun.sleep(PREWARM_PROBE_MS).then(() => false)]);
       const warming =
         !over && deps.prewarm && brain instanceof ModelBrain
-          ? brain.prewarm(brainTurnOf(run, thinker, transcript, tools, triggerText, plan))
+          ? brain.prewarm(brainTurnOf(run, thinker, transcript, tools, triggerText, plan, { unattended }))
           : null;
       const warmedAt = Date.now();
       await waiting;
@@ -3632,9 +3693,10 @@ async function executeRunInner(
 
       // A shared computer's line (`roomGate`): its first turn waits behind the runs ahead, and agents' turns are spaced.
       const roomMachine = plan.kind !== "model" ? (plan.session?.machineId ?? agent.machineId ?? null) : null;
+      if (!roomMachine) await leaveLine();
       /**
        * Where its admission is told: at once for a run that never waited (after the transcript holding `roomAsk` is
-       * saved), at its first delta for the head of the line, which the runner may still refuse (no flicker per ask).
+       * saved), when a computer takes the turn for the head of the line (`leaveLine`), which it may still refuse.
        */
       let admitted: { machineId: string; fromLine: boolean } | null = null;
       if (roomMachine && computerTurns === 0) {
@@ -3672,11 +3734,12 @@ async function executeRunInner(
           event: { type: "agent.typing", ...where },
           onFirst: () => {
             deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id });
-            if (admitted?.fromLine)
+            if (admitted?.fromLine && !askingForRoom)
               void publishQueueChanged(deps.pubsub, run.orgId, admitted.machineId).catch(() => {});
           },
           quiet: run.background,
           scrub: isRightHand(agent),
+          stretches: plan.kind === "claude_code",
         },
       );
       // "Stop and send" (`steer: "now"`) aborts only this model call: the loop goes on and reads the
@@ -3765,6 +3828,7 @@ async function executeRunInner(
           brain,
           // Memory and wiki once per run: its first turn, or a session started afresh.
           brainTurnOf(run, thinker, transcript, turnTools, prompt, turnPlan, {
+            unattended,
             found: computerTurns === 0 || !turnPlan.session?.resume,
             personId,
             // Synced during the quiet window for this very turn; where it starts is picked again from its words now
@@ -3819,12 +3883,20 @@ async function executeRunInner(
               // The text it streams next is another model call's: never one reply with what it wrote before.
               deltas.toolEnded();
             },
-            onSteerRead: (uuids) => live.read(uuids),
+            onSteerRead: (uuids) => {
+              deltas.messageRead();
+              live.read(uuids);
+            },
+            onSpeedFallback: (message) => {
+              transcript.speedFallback = true;
+              later(() => addRunStep(db, run, "context", { speedFallback: message }));
+            },
             // The end of a wait for room, for the operator's analytics (`work-analytics.ts`): the turn's own first
             // step can come minutes later.
-            onTaken: () => {
+            onTaken: async () => {
               if (transcript.roomWaitSince !== undefined)
                 later(() => addRunStep(db, run, "context", { roomFound: true }));
+              await leaveLine().catch(() => {});
             },
           },
           // Before anything reads the inbox again (the next step, a failure's redispatch): what the turn
@@ -4689,9 +4761,11 @@ function brainTurnOf(
   tools: ToolDefinition[],
   trigger: string,
   plan: BrainPlan,
-  options: { found?: boolean; code?: Promise<CodeSetup | null>; personId?: string | null } = {},
+  options: { found?: boolean; code?: Promise<CodeSetup | null>; personId?: string | null; unattended?: boolean } = {},
 ): ComputerTurn {
   const model = plan.kind === "model" ? agent.model : plan.model;
+  // Refused once in this run, its other turns don't ask again.
+  const speed = t.speedFallback ? undefined : brainSpeedFor(agent, plan, run, options.unattended === true);
   const turnParts = () => {
     if (plan.kind === "model") return undefined;
     // The turn that starts the session taking over from a lost one reads why, whole; its later turns don't.
@@ -4742,6 +4816,7 @@ function brainTurnOf(
     ...(plan.session ? { session: t.sessionLost ? { ...plan.session, ownFolder: true } : plan.session } : {}),
     ...(plan.account ? { account: plan.account } : {}),
     ...(plan.effort ? { effort: plan.effort } : {}),
+    ...(speed ? { speed } : {}),
     ...(agent.contextTokens ? { contextTokens: agent.contextTokens } : {}),
     trigger,
     ...(options.code ? { code: options.code } : {}),
@@ -4822,8 +4897,10 @@ async function thinkOnce(
     onExecuted?(call: { id: string; name: string; input: unknown; result?: ToolResult }): void;
     /** Messages handed to the turn mid-turn that it read (live steering). */
     onSteerRead?(uuids: string[]): void;
-    /** The brain's first event that isn't an error: a computer had room for the turn. */
-    onTaken?(): void;
+    /** The brain's first event that isn't an error: a computer had room for the turn. Done before that event is read. */
+    onTaken?(): void | Promise<void>;
+    /** Fast failed and the turn answered at standard speed. */
+    onSpeedFallback?(message: string): void;
   } = {},
 ): Promise<BrainStep> {
   let text: string | null = null;
@@ -4861,7 +4938,7 @@ async function thinkOnce(
     const event: BrainEvent = next.value;
     if (!taken && event.type !== "error") {
       taken = true;
-      hooks.onTaken?.();
+      await hooks.onTaken?.();
     }
     if (event.type === "text_delta") onDelta(event.text);
     else if (event.type === "tool_call") {
@@ -4895,6 +4972,7 @@ async function thinkOnce(
         event.worked,
       );
     } else if (event.type === "steer_read") hooks.onSteerRead?.(event.uuids);
+    else if (event.type === "speed_fallback") hooks.onSpeedFallback?.(event.message);
     // `event.session`: computer brains keep a stable session per conversation (`brainSessionId`); nothing to store.
     else if (event.type === "done") text = event.text;
   }
@@ -5122,6 +5200,11 @@ function createDeltaPublisher(
     quiet?: boolean;
     /** The right hand's (`scrubSignIns`): a sign-in or a key never shows, its last word held until it is whole. */
     scrub?: boolean;
+    /**
+     * Its brain reports every call it ran, our bridge's too, so a stretch has a known end (`agent.delta.from`). Claude
+     * Code alone does: the others leave our bridge's calls out, and text after one would pass for the stretch before it.
+     */
+    stretches?: boolean;
   },
 ) {
   let started = false;
@@ -5129,7 +5212,7 @@ function createDeltaPublisher(
   let all = "";
   /** What was published so far (always a prefix of what may be shown). */
   let shown = "";
-  const live = { turn: first.turn, text: "", from: 0 };
+  const live: LiveTurn = { turn: first.turn, text: "", from: 0, stretches: first.stretches };
   /** Length of `all` at the last send. */
   let sentUpTo = 0;
   /** When each piece arrived: [ms, length of `all` once it was added]. */
@@ -5184,6 +5267,7 @@ function createDeltaPublisher(
         text,
         turn: first.turn,
         at,
+        ...(first.stretches ? { from: live.from } : {}),
       };
       at += text.length;
       pending = pending.then(() => publishChannelEvent(pubsub, evt));
@@ -5213,6 +5297,16 @@ function createDeltaPublisher(
     /** A call the brain ran inside its turn ended (through the bridge or on its own): later text is a new stretch. */
     toolEnded() {
       breaks.push([Date.now(), all.length]);
+      if (!first.stretches) return;
+      // The stretch is over, so what waited for its last word to grow is whole, and starts no later text.
+      send(true);
+      live.from = shown.length;
+      live.spoke = false;
+    },
+    /** A person's message was read: what it writes next opens a paragraph, as in the answer it posts (`joinText`). */
+    messageRead() {
+      const stretch = all.slice(breaks.at(-1)?.[1] ?? 0);
+      if (stretch.trim() && !stretch.endsWith("\n\n")) all += "\n\n";
     },
     /**
      * Everything streamed in this turn (kept when the run is canceled mid-stream), the stretches between the brain's
@@ -5300,9 +5394,18 @@ const DONE_TEXT = "Done.";
 const withCode = (meta: Record<string, unknown> | undefined, code: ReturnType<typeof bodyCode> | undefined) =>
   code ? { ...(meta ?? {}), ...code } : meta;
 
-/** The quiet note on a reply the model brain gave for an unavailable computer brain (`meta.brainFallback`). */
+/**
+ * The quiet notes on a reply: the model brain gave it for an unavailable computer brain (`meta.brainFallback`), or
+ * Fast was refused and it came at standard speed (`meta.speedFallback`, the apps say so under the reply).
+ */
 const withFallback = (t: Transcript, meta: Record<string, unknown> | undefined) =>
-  t.fallback ? { ...(meta ?? {}), brainFallback: t.fallback } : meta;
+  t.fallback || t.speedFallback
+    ? {
+        ...(meta ?? {}),
+        ...(t.fallback ? { brainFallback: t.fallback } : {}),
+        ...(t.speedFallback ? { speedFallback: true } : {}),
+      }
+    : meta;
 
 /**
  * The conversation a "Continuar" run starts from: the stopped run's messages (what it wrote

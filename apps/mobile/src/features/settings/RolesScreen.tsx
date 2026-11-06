@@ -326,7 +326,7 @@ function RolePage({ role, people }: { role: OrgRole; people: Person[] }) {
               onPress={() =>
                 confirmAction({
                   title: t("rolesPage.deleteTitle", { name }),
-                  text: t("rolesPage.deleteText"),
+                  text: t("common.joinSentences", { a: t("rolesPage.deleteText"), b: t("common.cantUndo") }),
                   action: t("rolesPage.delete"),
                   cancel: t("common.cancel"),
                   onConfirm: () =>

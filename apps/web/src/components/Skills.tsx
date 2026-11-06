@@ -22,7 +22,7 @@ import {
 import { fromConnection, itemName } from "@agenteschat/client/lib/connected";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { SKILL_ASSET_MB } from "@agenteschat/client/lib/files";
-import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
+import { relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   changedByText,
@@ -39,6 +39,7 @@ import {
   skillPendingViews,
   skillPickOf,
   skillRefusalText,
+  skillRemovalText,
   skillSourceViaText,
   skillUpdateErrorText,
   skillUpdateWords,
@@ -1146,17 +1147,7 @@ export function SkillSheet({
           open={removing}
           onOpenChange={setRemoving}
           title={t("skills.removeTitle", { name: s.name })}
-          description={
-            users.length > 0
-              ? t("skills.removeAgents", {
-                  count: users.length,
-                  names: joinNames(
-                    users.map((a) => a.name),
-                    t,
-                  ),
-                })
-              : t("skills.removeNone")
-          }
+          description={skillRemovalText(t, users)}
           closeLabel={t("common.close")}
           width={440}
         >

@@ -5,6 +5,7 @@
   "common": {
     "close": "닫기",
     "joinSentences": "{{a}} {{b}}",
+    "cantUndo": "되돌릴 수 없어요.",
     "removeName": "{{name}} 삭제",
     "about": "{{label}} 정보",
     "previousMonth": "이전 달",
@@ -1327,6 +1328,7 @@
     "addPasswordReauth": "비밀번호를 추가하려면 다시 로그인하세요.",
     "yourWorkspaces": "내 워크스페이스",
     "youAreHere": "현재 위치",
+    "createdOn": "{{date}}에 만듦",
     "newWorkspace": "새 워크스페이스",
     "wiki": "Wiki",
     "settings": "설정",
@@ -4014,6 +4016,12 @@
           "high": "어려운 작업에서 더 생각해요. 더 느리고 비용이 더 들어요.",
           "max": "최대한 생각해요. 훨씬 느리고 비용도 더 들어요."
         },
+        "speed": "속도",
+        "speeds": {
+          "standard": "표준",
+          "fast": "빠름"
+        },
+        "speedText": "대화에서 더 빨리 답하고 요금제를 2.5배 빨리 소진해요. 루틴과 긴 작업은 표준 속도로 유지돼요.",
         "modelLine": {
           "opus": "가장 뛰어나요. 요금제를 더 빨리 소진해요.",
           "sonnet": "균형 잡힌 모델이에요. 거의 모든 일에 좋아요.",
@@ -4036,10 +4044,13 @@
           "contents": {
             "model": "컨텍스트 창",
             "auto": "컨텍스트 창과 답하는 대상",
-            "fixed": "사고 수준, 컨텍스트 창, 답하는 대상"
+            "fixed": "사고 수준, 컨텍스트 창, 답하는 대상",
+            "autoSpeed": "속도, 컨텍스트 창, 답하는 대상",
+            "fixedSpeed": "사고 수준, 속도, 컨텍스트 창, 답하는 대상"
           },
           "allDefault": "모두 기본값",
           "effort": "사고 수준: {{level}}",
+          "speed": "속도: 빠름",
           "context": "컨텍스트: {{size}}",
           "sharing": "다른 사람에게도 답해요",
           "waits": "컴퓨터를 기다려요"
@@ -4473,7 +4484,7 @@
       "audience": "대화할 수 있는 사람",
       "channels": "채널",
       "computer": "컴퓨터",
-      "danger": "보관",
+      "danger": "보관 또는 삭제",
       "keySafe": "키는 서버에 암호화되어 보관돼요. 아무도 볼 수 없어요.",
       "spentOf": "{{month}} 지출, {{amount}} 중",
       "spentOfDefault": "{{month}} 지출, {{amount}} 중(워크스페이스 기본값)",
@@ -7454,6 +7465,7 @@
     "removeTitle": "{{name}}을(를) 삭제할까요?",
     "removeAgents_other": "{{names}}이(가) 이 스킬을 사용하고 있어서 더 이상 쓸 수 없게 돼요.",
     "removeNone": "이 스킬을 사용하는 에이전트가 없어요.",
+    "removeGone": "워크스페이스에서 빠지고, 되돌릴 수 없어요.",
     "removed": "{{name}}을(를) 삭제했어요.",
     "agentTitle": "스킬",
     "agentSubtitle": "{{name}}이(가) 필요할 때 열 수 있는 것이에요.",
@@ -8189,7 +8201,7 @@
     "noAccessText": "일부 사람만 볼 수 있는 페이지예요. 필요하면 Wiki 담당자에게 요청하세요.",
     "delete": "휴지통으로 이동",
     "deleteTitle": "{{title}}을(를) 휴지통으로 옮길까요?",
-    "deleteText": "이 페이지로 연결된 링크는 “만들 페이지”가 돼요. 나중에 복원할 수 있어요.",
+    "deleteText": "이 페이지로 연결된 링크는 “만들 페이지”가 돼요. 아직 앱에서는 복원할 수 없어요.",
     "deleted": "{{title}}을(를) 휴지통으로 옮겼어요.",
     "noBacklinksHint": "아직 이 페이지로 연결된 페이지가 없어요. 다른 페이지에 [[{{title}}]]을(를) 적어 보세요.",
     "allVersions": "버전 {{count}}개 모두 보기",
@@ -8395,6 +8407,7 @@
     "stuck": "막혀서 중지됐어요",
     "steer": {
       "waiting": "{{name}}이(가) 다음 쉬는 지점에서 읽어요",
+      "computer": "{{name}}이(가) 컴퓨터를 쓰게 되면 읽어요",
       "now": "{{name}}이(가) 멈추고 읽고 있어요",
       "delivered": "{{name}}이(가) 받았어요",
       "held": "{{name}}이(가) 내 결정 후에 읽어요",
@@ -8588,6 +8601,7 @@
       "nextEta": "컴퓨터를 기다리는 중. 다음 차례, 약 {{n}}분 후",
       "nextAfter": "컴퓨터를 기다리는 중. {{after}} 작업이 끝나면 다음 차례",
       "next": "컴퓨터를 기다리는 중. 다음 차례",
+      "waiting": "컴퓨터를 기다리는 중",
       "behind": "대기열 {{nth}}. {{names}} 다음",
       "position": "대기열 {{nth}}"
     },
@@ -12019,6 +12033,8 @@
     "autoUpdate": "아직 작업 중이에요({{duration}}).",
     "autoUpdateNow": "지금: {{now}}.",
     "statusReply": "아직 작업 중입니다({{duration}}). 이 단계가 끝나면 메시지를 읽겠습니다.",
+    "statusReplyQueued": "컴퓨터를 기다리는 중입니다({{duration}}). 제 차례가 되면 메시지를 읽겠습니다.",
+    "statusReplyAway": "컴퓨터가 돌아오기를 기다리는 중입니다. 돌아오는 대로 메시지를 읽겠습니다.",
     "status": {
       "one": "작업 중: {{subject}}",
       "oneUntitled": "백그라운드에서 작업 중",
@@ -12049,6 +12065,10 @@
     "working": "백그라운드"
   },
   "chat": {
+    "speedFallback": {
+      "text": "ChatGPT가 이 계정이나 모델에서 빠른 속도를 거부해서 이 답변은 표준 속도로 왔어요.",
+      "action": "에이전트 열기"
+    },
     "usageWhen": {
       "at": "{{time}}",
       "on": "{{day}} {{time}}",
@@ -12142,7 +12162,9 @@
       "show": "보기",
       "hide": "숨기기",
       "talker": "작업하면서",
-      "talkerTip": "진행 중인 작업을 멈추지 않고 답했어요."
+      "talkerTip": "진행 중인 작업을 멈추지 않고 답했어요.",
+      "talkerWaiting": "기다리면서",
+      "talkerWaitingTip": "작업이 기다리는 동안 답했어요."
     },
     "joined": {
       "label": "참여함",
@@ -13064,6 +13086,8 @@
       "paste": "붙여넣기",
       "pasteHint": "복사한 내용을 페이지에 붙여넣기",
       "pasteBlocked": "브라우저가 복사한 내용을 읽지 못하게 했어요. 페이지에서 {{keys}}를 사용하세요.",
+      "inputLost": "페이지에 전달되지 않아 아무것도 클릭되거나 입력되지 않았어요. 다시 시도해 주세요.",
+      "noField": "페이지에서 입력란이 선택되지 않아 입력되지 않았어요. 입력란을 선택하고 다시 입력해 주세요.",
       "goLabel": "사이트 주소",
       "goPlaceholder": "example.com 같은 주소를 입력하세요",
       "go": "열기",
@@ -13072,7 +13096,6 @@
       "goBadAddress": "주소가 아닌 것 같아요. example.com 형식으로 입력해 보세요.",
       "goFailed": "사이트가 열리지 않았어요. 주소를 확인하세요.",
       "backTitle": "{{name}}에게 돌려주기",
-      "doneTitle": "완료했어요. {{name}}에게 남길 메모가 있나요?",
       "backLabel": "{{name}}에게 남길 메모",
       "backPlaceholder": "선택 사항: {{name}}이(가) 알아야 할 게 있나요?",
       "addNote": "메모 남기기"
@@ -13128,6 +13151,7 @@
     "suspendedFor": "이 워크스페이스는 정지됐어요: {{reason}}",
     "bannerSub": "여기서 계속 읽고 쓸 수 있어요. 보류 중에는 에이전트가 답하거나 일하지 않아요.",
     "label": "워크스페이스 상태",
+    "row": "사용할 수 없음",
     "screen": {
       "title": "이 워크스페이스는 사용할 수 없어요",
       "text": "대화와 에이전트가 지금은 닫혀 있어요.",
@@ -13215,8 +13239,11 @@
   },
   "deleting": {
     "title": "{{name}}을(를) 삭제하는 중이에요",
-    "text": "{{by}}님이 {{date}}에 삭제했어요. {{due}}에 영구적으로 삭제돼요.",
-    "textLate": "{{by}}님이 {{date}}에 삭제했어요.",
+    "text": "이 워크스페이스는 이미 삭제되는 중이에요. 아무것도 안 해도 돼요. {{date}}에 사라져요.",
+    "textLate": "이 워크스페이스는 이미 삭제되는 중이에요. 아무것도 안 해도 돼요.",
+    "by": "{{by}}님이 {{date}}에 삭제했어요.",
+    "row": "삭제 중, {{date}}에 사라져요",
+    "rowLate": "삭제 중",
     "someone": "누군가",
     "restore": "워크스페이스 복원",
     "membersOnly": "소유자만 복원할 수 있어요.",
@@ -13226,10 +13253,19 @@
     "menu": "계정 삭제",
     "card": {
       "text": "모든 워크스페이스에서 나가고 계정이 영구적으로 삭제돼요.",
-      "button": "계정 삭제…"
+      "button": "계정 삭제…",
+      "oneWorkspace": "이 워크스페이스만 삭제하고 싶나요? 일반에 있어요.",
+      "leaveWorkspace": "이 워크스페이스에서만 나가고 싶나요? 멤버에 있어요."
     },
-    "title": "계정을 삭제할까요?",
-    "closes_other": "{{names}}은(는) 지금 닫히고 {{date}}에 영구적으로 삭제돼요. 그곳에는 나 혼자만 있어요.",
+    "title": "계정 전체를 삭제할까요?",
+    "intro": "워크스페이스 하나가 아니라 계정 전체를 삭제해요. 되돌릴 수 없어요.",
+    "whole": "계정 전체",
+    "oneWorkspace": "워크스페이스 하나만 삭제하고 싶나요? 계정은 그대로예요.",
+    "closes": "{{name}}은(는) 지금 닫혀요. 그곳에는 나 혼자만 있어서 {{date}}에 영구적으로 삭제돼요.",
+    "closesWith": "{{name}}은(는) {{what}}과(와) 함께 지금 닫혀요. 그곳에는 나 혼자만 있어서 {{date}}에 영구적으로 삭제돼요.",
+    "closesEmpty": "{{name}}은(는) 지금 닫혀요. 에이전트도 메시지도 없어요. 그곳에는 나 혼자만 있어서 {{date}}에 영구적으로 삭제돼요.",
+    "agentCount_other": "에이전트 {{value}}개",
+    "messageCount_other": "메시지 {{value}}개",
     "leaves": "{{names}}에서 나가요.",
     "messages": "내 메시지는 이름 없이 워크스페이스에 남아요.",
     "computers_other": "{{name}}에 연결된 내 컴퓨터가 제거돼요: {{computers}}.",

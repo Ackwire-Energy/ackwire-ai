@@ -305,7 +305,7 @@ test("the GET guard is ready only once Chrome answered Fetch.enable on every ses
   await c.attached;
   cdp.attach("page-1");
   cdp.event("Target.attachedToTarget", { sessionId: "frame-1", targetInfo: { type: "iframe" } }, "page-1");
-  cdp.event("Target.attachedToTarget", { sessionId: "worker-1", targetInfo: { type: "worker" } }, "page-1");
+  cdp.event("Target.attachedToTarget", { sessionId: "worker-1", targetInfo: { type: "shared_worker" } }, "page-1");
   const sent = (method: string) => cdp.sent.filter((m) => m.method === method);
   let ready: boolean | null = null;
   const first = c.guard(["hunter2-first value"], 60_000, () => {});
@@ -388,6 +388,32 @@ test("a session that answers Fetch.enable with an error isn't paused: the guard 
   expect(enables().map((m) => m.sessionId)).toEqual(["page-1", "frame-1", "frame-1"]);
   cdp.reply(enables()[2]?.id ?? 0);
   expect(await again.ready).toBe(true);
+  c.close();
+});
+
+test("a dedicated worker has no Fetch of its own and doesn't hold the guard back: its requests pause on its page", async () => {
+  const { c, cdp } = counter();
+  cdp.onopen?.();
+  cdp.reply(1);
+  await c.attached;
+  cdp.attach("page-1");
+  cdp.event("Target.attachedToTarget", { sessionId: "worker-1", targetInfo: { type: "worker" } }, "page-1");
+  const enables = () => cdp.sent.filter((m) => m.method === "Fetch.enable");
+  const guard = c.guard(["hunter2-page with a worker"], 60_000, () => {});
+  for (const m of enables()) {
+    const noFetch = m.sessionId === "worker-1";
+    cdp.onmessage?.({
+      data: JSON.stringify(
+        noFetch
+          ? { id: m.id, error: { code: -32601, message: "'Fetch.enable' wasn't found" } }
+          : { id: m.id, result: {} },
+      ),
+    });
+  }
+  expect(await guard.ready).toBe(true);
+  // One that opens while the guard is armed isn't asked either.
+  cdp.event("Target.attachedToTarget", { sessionId: "worker-2", targetInfo: { type: "worker" } }, "page-1");
+  expect(enables().map((m) => m.sessionId)).toEqual(["page-1"]);
   c.close();
 });
 

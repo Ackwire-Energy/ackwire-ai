@@ -377,7 +377,7 @@ describe("the agent's computer, from the app's own pieces", () => {
     // Taking control, the keyboard, laying it down and the way out: on the capsule, never loose in a corner.
     expect(screen).toContain("{docked ? <EdgeDock>{dock}</EdgeDock> : null}");
     expect(screen).not.toContain("styles.padTurn");
-    expect(screen).toContain("<DockDone label={doneLabel} onPress={handBack} />");
+    expect(screen).toContain("<DockDone label={doneLabel} loading={finishing} onPress={handBack} />");
     // The request for help: the chat's card with Ajudar and Agora não, not a gray line over the screen.
     expect(screen).toContain("<AskCard");
     expect(screen).not.toContain("agentComputer.ask.banner");

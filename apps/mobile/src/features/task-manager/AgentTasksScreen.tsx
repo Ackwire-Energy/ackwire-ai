@@ -8,6 +8,7 @@ import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
 import { Button, Chip, Count, Icon, PixelStop, Text, useReducedMotion, weights } from "@/ui";
 import { useOpenQueue } from "../queue/QueueSheet";
+import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useNow, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { SheetHostProvider } from "../shared/SheetHost";
@@ -51,6 +52,11 @@ function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) 
   return (
     <PushedLargeTitle
       title={t("taskManager.agentTasks", { name })}
+      right={
+        <OpensAgent agentId={agentId}>
+          <AgentFace agentId={agentId} size={28} mode={view && view.working > 0 ? "run" : "idle"} />
+        </OpensAgent>
+      }
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
       {query.isLoading ? (

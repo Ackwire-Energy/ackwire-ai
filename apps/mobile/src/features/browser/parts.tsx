@@ -5,6 +5,7 @@ import {
   createBrowserLiveConnection,
   createTouchInput,
   frameMetadata,
+  inputProblem,
   keyEvents,
   PASTE_MAX_BYTES,
   pasteBytes,
@@ -355,6 +356,8 @@ export interface LiveState {
   retry: () => void;
   /** The app's own socket is open: only then can a page come (its "reconnecting" isn't the computer's). */
   online: boolean;
+  /** The last of a person's clicks or keys that didn't reach the page: a new object each time. */
+  lost: { words: NonNullable<ReturnType<typeof inputProblem>> } | null;
 }
 
 /**
@@ -370,6 +373,7 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
   const [handoff, setHandoff] = useState<{ controllerUserId: string | null } | null | undefined>(undefined);
   const [hidden, setHidden] = useState(false);
   const [online, setOnline] = useState(false);
+  const [lost, setLost] = useState<LiveState["lost"]>(null);
   const liveRef = useRef<ReturnType<typeof createBrowserLiveConnection> | null>(null);
 
   useEffect(() => {
@@ -398,6 +402,10 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
       onError: (code) => {
         if (code === "forbidden" || code === "not_found") setUnavailable("forbidden");
         else if (code === "too_many_browsers") setUnavailable("tooMany");
+        else {
+          const words = inputProblem(code);
+          if (words) setLost({ words });
+        }
       },
     });
     liveRef.current = live;
@@ -430,7 +438,7 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
     liveRef.current?.sendInput(events);
   }, []);
   const retry = useCallback(() => liveRef.current?.retry(), []);
-  return { frame, unavailable, controllerUserId, handoff, hidden, sendInput, retry, online };
+  return { frame, unavailable, controllerUserId, handoff, hidden, sendInput, retry, online, lost };
 }
 
 /** The field's height and its round buttons: the send button sits concentric in its pill end. */

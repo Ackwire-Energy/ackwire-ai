@@ -8,6 +8,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { ErrorState, LoadingList } from "@/components/Loading";
+import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { TaskStepsBlock } from "@/components/ToolCalls";
@@ -115,8 +116,10 @@ export function TaskPanel({
       />
       <aside className="thread-panel tm-panel" aria-label={title}>
         <header className="channel__header thread-head thread-head--panel">
-          <span className="thread-head__who" aria-hidden="true">
-            <AgentAvatar agentId={source.agentId} name={name} size="sm" />
+          <span className="thread-head__who">
+            <OpensAgent agentId={source.agentId}>
+              <AgentAvatar agentId={source.agentId} name={name} size="sm" />
+            </OpensAgent>
           </span>
           <div className="thread-head__text">
             <h2 className="channel__title thread-title">

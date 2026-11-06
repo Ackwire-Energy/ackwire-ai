@@ -336,6 +336,105 @@ describe("live agent runs (streaming)", () => {
   const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "atlas" };
   const delta = (seq: number, text: string): ChannelEvent => ({ type: "agent.delta", ...base, seq, text });
 
+  describe("a turn with several stretches of text (a computer brain's: one turn, many model calls)", () => {
+    type Ev = Parameters<typeof applyChannelEvent>[1];
+    const piece = (seq: number, at: number, from: number, text: string) =>
+      ({ type: "agent.delta", ...base, seq, turn: 1, at, from, text }) as Ev;
+    const tool = (id: string) => ({ type: "agent.tool", ...base, tool: "offer_connect_app", toolUseId: id }) as Ev;
+    const ended = (id: string, failed = false) =>
+      ({ type: "agent.tool", ...base, tool: null, toolUseId: id, ...(failed ? { failed } : {}) }) as Ev;
+    const read = { type: "agent.run.read", ...base, messageIds: ["m9"] } as Ev;
+    const play = (events: Ev[], from = emptyStreams) => events.reduce((s, e) => applyChannelEvent(s, e), from);
+    const said = (s: typeof emptyStreams) => (s.runs.r1?.work ?? []).flatMap((w) => (w.kind === "say" ? [w.text] : []));
+    const head = "Se você me passar o `build.gra";
+    const tail = "dle`, eu respondo com base neles.";
+
+    test("a call starts before the end of its text arrives: the end joins its line, nothing starts mid-word", () => {
+      // The brain keeps its last characters back (a secret can't leave in pieces) until the call ends; the call's
+      // start comes from the bridge, so it overtakes them.
+      const s = play([piece(0, 0, 0, head), tool("t1"), ended("t1", true), piece(1, head.length, 0, tail), tool("t2")]);
+      expect(said(s)).toEqual([head + tail]);
+      expect(s.runs.r1?.text).toBe("");
+      // A message read at the call's end doesn't change it either.
+      expect(said(play([ended("t2"), read], s))).toEqual([head + tail]);
+    });
+
+    test("each stretch keeps its own line: a later one never takes an earlier one's place", () => {
+      const s = play([
+        piece(0, 0, 0, "Vou olhar o repo."),
+        tool("t1"),
+        ended("t1"),
+        piece(1, 17, 17, "Sem acesso."),
+        tool("t2"),
+      ]);
+      expect(said(s)).toEqual(["Vou olhar o repo.", "Sem acesso."]);
+    });
+
+    test("a stretch that arrives whole after its call: it shows from its start, and the next never glues to it", () => {
+      const s = play([tool("t1"), ended("t1"), piece(0, 0, 0, "Vou olhar."), piece(1, 10, 10, "Pronto.")]);
+      expect(s.runs.r1?.text).toBe("Vou olhar.\n\nPronto.");
+    });
+
+    test("stretches around the brain's own tools (no line of theirs): one text in order, no line left behind", () => {
+      const s = play([piece(0, 0, 0, "Vou olhar. "), piece(1, 11, 11, "Achei."), piece(2, 17, 17, "Pronto.")]);
+      expect(s.runs.r1?.text).toBe("Vou olhar.\n\nAchei.\n\nPronto.");
+      expect(said(s)).toEqual([]);
+    });
+
+    test("back from a hole around a call: what still comes of the stretch never joins its line over the hole", () => {
+      let s = play([piece(0, 0, 0, head), piece(1, 40, 0, "xx"), tool("t1")]);
+      s = reconcileRuns(s, "c1", [
+        {
+          runId: "r1",
+          agentId: "atlas",
+          channelId: "c1",
+          threadId: "m1",
+          status: "running" as const,
+          live: { turn: 1, at: 42, text: "" },
+        },
+      ]);
+      s = play([piece(2, 42, 0, tail)], s);
+      expect(said(s)).toEqual([head]);
+      expect(s.runs.r1?.text).toBe("");
+    });
+
+    test("a message read mid-answer: the answer stays where it is and goes on, one text from its start", () => {
+      const first = "A resposta inteira.\n\n";
+      const s = play([piece(0, 0, 0, first), read, piece(1, first.length, 0, "E sobre o seu recado.")]);
+      expect(s.runs.r1?.text).toBe("A resposta inteira.\n\nE sobre o seu recado.");
+      expect(s.runs.r1?.status).toBe("running");
+      expect(s.runs.r1?.work).toEqual([{ kind: "steer", messageId: "m9" }]);
+    });
+
+    test("a brain that doesn't say when its calls end (no `from`): its next text is the body, its lines all stay", () => {
+      const plain = (seq: number, at: number, text: string) =>
+        ({ type: "agent.delta", ...base, seq, turn: 1, at, text }) as Ev;
+      let s = play([plain(0, 0, "Vou olhar."), tool("t1"), ended("t1"), plain(1, 10, "Sem acesso.")]);
+      expect(s.runs.r1?.text).toBe("Sem acesso.");
+      s = play([tool("t2"), ended("t2"), plain(2, 21, "Pronto.")], s);
+      expect(said(s)).toEqual(["Vou olhar.", "Sem acesso."]);
+      expect(s.runs.r1?.text).toBe("Pronto.");
+    });
+
+    test("opened during a call: the end of a text it never saw the start of never shows, the next stretch does", () => {
+      const active = [
+        {
+          runId: "r1",
+          agentId: "atlas",
+          channelId: "c1",
+          threadId: "m1",
+          status: "running" as const,
+          live: { turn: 1, at: 30, text: "" },
+        },
+      ];
+      let s = reconcileRuns(emptyStreams, "c1", active);
+      s = play([piece(4, 30, 0, tail)], s);
+      expect(s.runs.r1?.text).toBe("");
+      s = play([piece(5, 30 + tail.length, 30 + tail.length, "Pronto.")], s);
+      expect(s.runs.r1?.text).toBe("Pronto.");
+    });
+  });
+
   test("a piece of the text that never arrived: no glued text, what came before stays, it goes on from the next turn", () => {
     const piece = (seq: number, turn: number, at: number, text: string): ChannelEvent => ({
       type: "agent.delta",

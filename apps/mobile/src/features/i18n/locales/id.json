@@ -307,6 +307,7 @@
     },
     "steer": {
       "waiting": "{{name}} membacanya di jeda berikutnya",
+      "computer": "{{name}} membacanya saat mendapat komputer",
       "now": "{{name}} berhenti untuk membacanya",
       "delivered": "{{name}} sudah menerimanya",
       "held": "{{name}} membacanya setelah kamu memutuskan",
@@ -912,8 +913,6 @@
     }
   },
   "delete": {
-    "title": "Hapus akunmu",
-    "intro": "Ini tidak bisa dibatalkan.",
     "goes": {
       "account": "Akunmu, aksesmu, dan sesimu akan hilang.",
       "orgs": "Ruang kerja yang anggotanya hanya kamu akan dihapus.",

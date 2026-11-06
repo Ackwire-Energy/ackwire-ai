@@ -87,6 +87,7 @@ import {
   turnOpener,
   turnPhase,
   turnShows,
+  turnSignature,
   WORD_FADE_MS,
   withOpacity,
 } from "./turn";
@@ -219,10 +220,10 @@ export const TurnRow = memo(function TurnRow({
   const quotes = Object.fromEntries(
     items.flatMap((x) => (x.kind === "steer" ? [[x.messageId, bodyOf(x.messageId) ?? ""]] : [])),
   );
-  const signature = items.map((x) => `${x.key}:${x.kind === "call" ? `${x.line.state}${x.line.count}` : ""}`).join("|");
+  const signature = turnSignature(items);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `signature` stands for the items and their quotes
   useEffect(() => {
-    rememberTurn(run.runId, { items, quotes, at: Date.now() });
+    rememberTurn(run.runId, { items: turnItems(run, true), quotes, at: Date.now() });
   }, [run.runId, signature]);
   const [mountedAt] = useState(() => Date.now());
   // Drawn, the row tells the screen, which measures whether it shows: the line above the composer leaves this agent

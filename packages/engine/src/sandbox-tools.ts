@@ -36,9 +36,9 @@ import { sniffModelImage } from "./avatars";
 import { publishChannelEvent } from "./events";
 import { cutText, formatBytes, textOfBytes } from "./format";
 import { mergeReposOfCall } from "./git/repos";
-import { isAbsoluteMachinePath, requestFolderAccess } from "./machine-access";
+import { fullMachinePath, pathInOwnFolder, requestFolderAccess } from "./machine-access";
 import { MachineRequestError } from "./machine-hub";
-import { notAllowedMessage, requestVaultKey, vaultUpdateText } from "./machine-provider";
+import { foldersFixedMessage, notAllowedMessage, requestVaultKey, vaultUpdateText } from "./machine-provider";
 import {
   enqueueWake,
   formatDuration,
@@ -360,9 +360,11 @@ export function computerSentence(info: ComputerInfo) {
     info.folders.length > 0
       ? `Besides your own folder, its owner allowed you these folders (use their absolute paths): ${info.folders.slice(0, 20).join(", ")}.`
       : "",
-    info.protocol >= ACCESS_PROTOCOL
-      ? "Paths outside your folder (and those) are refused; ask for another folder with request_folder_access."
-      : "",
+    info.protocol < ACCESS_PROTOCOL
+      ? ""
+      : info.managed
+        ? `Paths outside your folder${info.execAllowed ? ", your home (to read)" : ""}${info.folders.length > 0 ? " and those" : ""} are refused.`
+        : "Paths outside your folder (and those) are refused; ask for another folder with request_folder_access.",
     info.execAllowed
       ? "When asked about something on it, find out yourself before answering: run the tool's CLI in a non-interactive form (--help, --json, -p) or a tool made for that question (e.g. `npx ccusage` sums Claude Code's token use and cost from its local session logs). A command that only works interactively is not a dead end: look for another way to the same data. Never read or show credential files, tokens, keys or .env files, even when you can reach them. Hand work back to the person only when it truly needs them (a sign-in, a password, a screen only they can see), and then say exactly what to do."
       : "",
@@ -377,12 +379,7 @@ export function computerSentence(info: ComputerInfo) {
  * checks it against the folders allowed for this agent (`not_allowed`).
  */
 export function toolPath(raw: string, info: ComputerInfo): string {
-  const path = raw.trim();
-  if (info.kind === "machine" && info.protocol >= ACCESS_PROTOCOL && isAbsoluteMachinePath(path)) {
-    if (path.replace(/\\/g, "/").split("/").includes("..")) throw new Error(`invalid path: ${raw}`);
-    return path;
-  }
-  return workspacePath(raw);
+  return (info.kind === "machine" && info.protocol >= ACCESS_PROTOCOL && fullMachinePath(raw)) || workspacePath(raw);
 }
 
 /** What the model sees from a command: exit code first (it is the line kept in "Recent actions"). */
@@ -581,7 +578,8 @@ export function createSandboxToolSource(
   /** A file that holds a secret (or a folder with one) never leaves the computer through the file tools. */
   const refuseSecretPath = async (ctx: ToolContext, computer: ComputerHandle, path: string) => {
     const held = await secretFilePaths(ctx.db, ctx.orgId, ctx.agentId, computer.machineId);
-    const hit = held.find((f) => f === path || path === "" || f.startsWith(`${path}/`));
+    const inFolder = pathInOwnFolder(path, ctx.agentId);
+    const hit = held.find((f) => f === inFolder || inFolder === "" || f.startsWith(`${inFolder}/`));
     if (hit) throw new Error(`${path || "The workspace"} holds a secret (${hit}); it stays on the computer.`);
   };
 
@@ -1235,7 +1233,7 @@ export function createSandboxToolSource(
           }
           if (error instanceof MachineRequestError && error.code === "not_allowed") {
             return {
-              content: `Not started: ${notAllowedMessage(info.name, error.message)}`,
+              content: `Not started: ${notAllowedMessage(info.name, error.message, undefined, info.managed)}`,
               isError: true,
               data: { code: "machine.not_allowed" },
             };
@@ -1386,7 +1384,9 @@ export function createSandboxToolSource(
    */
   const folderAccessTool = (info: Extract<ComputerInfo, { kind: "machine" }>): ToolDefinition => ({
     name: "request_folder_access",
-    description: `Ask the owner of the connected computer "${info.name}" to let you use a folder outside your own folder (a project, documents). They answer on that computer; only they can allow it. Give its absolute path and a short reason in the people's language. Returns at once: if it is already allowed you can use it now; otherwise you are woken in this conversation when they answer, so tell the people you asked and end your turn (don't retry or wait).`,
+    description: info.managed
+      ? `Nobody can allow folders on "${info.name}": this only says so.`
+      : `Ask the owner of the connected computer "${info.name}" to let you use a folder outside your own folder (a project, documents). They answer on that computer; only they can allow it. Give its absolute path and a short reason in the people's language. Returns at once: if it is already allowed you can use it now; otherwise you are woken in this conversation when they answer, so tell the people you asked and end your turn (don't retry or wait).`,
     scope: SANDBOX_SCOPE,
     inputSchema: {
       type: "object",
@@ -1399,6 +1399,7 @@ export function createSandboxToolSource(
     },
     describe: (input) => ({ title: `Ask for the folder ${str(input.path)}`, detail: str(input.reason).slice(0, 500) }),
     async execute(input, ctx) {
+      if (info.managed) return { content: foldersFixedMessage(info.name) };
       try {
         const result = await requestFolderAccess(
           { db: ctx.db, pubsub: deps.pubsub, hub: hubOf() },

@@ -321,6 +321,7 @@
     },
     "steer": {
       "waiting": "{{name}} liest es bei der nächsten Pause",
+      "computer": "{{name}} liest es, sobald der Computer frei ist",
       "now": "{{name}} hat angehalten, um es zu lesen",
       "delivered": "{{name}} hat es erhalten",
       "held": "{{name}} liest es nach deiner Entscheidung",
@@ -983,8 +984,6 @@
     }
   },
   "delete": {
-    "title": "Dein Konto löschen",
-    "intro": "Das lässt sich nicht rückgängig machen.",
     "goes": {
       "account": "Dein Konto, dein Zugriff und deine Sitzungen sind weg.",
       "orgs": "Workspaces, in denen du das einzige Mitglied bist, werden gelöscht.",

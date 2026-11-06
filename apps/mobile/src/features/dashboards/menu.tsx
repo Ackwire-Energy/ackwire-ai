@@ -65,22 +65,26 @@ export function useBoardMenu(board: Dashboard | undefined) {
       },
     );
   const confirmDelete = () =>
-    Alert.alert(t("dashboards.delete.title", { title }), t("dashboards.delete.text"), [
-      { text: t("mobile.common.cancel"), style: "cancel" },
-      {
-        text: t("dashboards.delete.confirm"),
-        style: "destructive",
-        onPress: () =>
-          remove.mutate(board.id, {
-            onSuccess: () => {
-              successHaptic();
-              toast({ title: t("dashboards.delete.done", { title }) });
-              goBack();
-            },
-            onError: failed,
-          }),
-      },
-    ]);
+    Alert.alert(
+      t("dashboards.delete.title", { title }),
+      t("common.joinSentences", { a: t("dashboards.delete.text"), b: t("common.cantUndo") }),
+      [
+        { text: t("mobile.common.cancel"), style: "cancel" },
+        {
+          text: t("dashboards.delete.confirm"),
+          style: "destructive",
+          onPress: () =>
+            remove.mutate(board.id, {
+              onSuccess: () => {
+                successHaptic();
+                toast({ title: t("dashboards.delete.done", { title }) });
+                goBack();
+              },
+              onError: failed,
+            }),
+        },
+      ],
+    );
   const all: Record<BoardMenuKey, Omit<MenuItem, "key">> = {
     home: { icon: "home", label: t("dashboards.useOnHome"), run: () => showOnHome(home ? null : board.id) },
     unhome: { icon: "home", label: t("dashboards.stopOnHome"), run: () => showOnHome(null) },

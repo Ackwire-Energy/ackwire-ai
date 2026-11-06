@@ -29,7 +29,7 @@ export function DockIcon({ icon, label, onPress }: { icon: IconName; label: stri
   return <IconButton icon={icon} label={label} onPress={onPress} />;
 }
 
-/** An action in words on the capsule ("Assumir o controle", "Não consegui"). */
+/** An action in words on the capsule ("Assumir o controle", "Tentar de novo"). */
 export function DockText({
   label,
   icon,
@@ -67,19 +67,33 @@ export function DockText({
 }
 
 /** The way out of control, in ink: "Pronto" when the agent asked, "Devolver" when the person took it. */
-export function DockDone({ label, onPress }: { label: string; onPress: () => void }) {
+export function DockDone({
+  label,
+  onPress,
+  loading = false,
+}: {
+  label: string;
+  onPress: () => void;
+  loading?: boolean;
+}) {
   const { colors } = useTheme();
   return (
     <PressScale
       to={0.92}
       fill={false}
       onPress={onPress}
+      disabled={loading}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ busy: loading }}
       style={[styles.pill, { backgroundColor: colors.ink }]}
       contentStyle={styles.pillIn}
     >
-      <Icon name="check" size={17} color={colors.bg} />
+      {loading ? (
+        <ActivityIndicator size="small" color={colors.bg} />
+      ) : (
+        <Icon name="check" size={17} color={colors.bg} />
+      )}
       <Text variant="small" style={[styles.label, { color: colors.bg }]} numberOfLines={1}>
         {label}
       </Text>

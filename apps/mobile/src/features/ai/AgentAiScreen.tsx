@@ -2,7 +2,7 @@ import type { AgentBrain, AgentBrainInput, MachineAccount } from "@agenteschat/c
 import { keys, useAgentBrain, useAiAccounts, useApi, useMachines, useModels } from "@agenteschat/client";
 import { accountChoices, ownSignInListed, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
-import { advancedContents } from "@agenteschat/client/lib/brain-advanced";
+import { advancedContents, viewSpeedFits } from "@agenteschat/client/lib/brain-advanced";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -308,7 +308,11 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
               <GroupedList>
                 <GroupedRow
                   label={t("agentPage.work.brain.advanced.title")}
-                  sub={advancedContents(t, { kind: view.brain, autoModel: isAuto(view.effectiveModel) })}
+                  sub={advancedContents(t, {
+                    kind: view.brain,
+                    autoModel: isAuto(view.effectiveModel),
+                    speed: viewSpeedFits(view),
+                  })}
                   chevron
                   onPress={() => openAgentAdvanced(agentId)}
                 />

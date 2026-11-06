@@ -20,7 +20,7 @@ import { openAgentAi } from "../ai/AgentAiScreen";
 import { AnswerAnywayButton, DontRunButton } from "../ai/UsagePauseCard";
 import { chatHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
-import { AgentFace } from "../shared/Face";
+import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
@@ -105,7 +105,11 @@ export function UsageQueueSheet({ agentId, tab: initialTab = "queued" }: { agent
     <>
       <SheetTitle
         // Asleep while it waits on the limit, at work once it picks up.
-        leading={<AgentFace agentId={agentId} size={32} mode={resuming ? "run" : queue.reason ? "sleep" : "idle"} />}
+        leading={
+          <OpensAgent agentId={agentId}>
+            <AgentFace agentId={agentId} size={32} mode={resuming ? "run" : queue.reason ? "sleep" : "idle"} />
+          </OpensAgent>
+        }
         title={usageQueueTitle(t, i18n.language, agent, queue, new Date(now))}
         hint={shared || undefined}
       />

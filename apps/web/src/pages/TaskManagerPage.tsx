@@ -36,6 +36,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { Sparkline } from "@/components/ChartBlock";
 import { QueueDialog } from "@/components/ComputerQueue";
 import { ErrorState, LoadingList } from "@/components/Loading";
+import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { WaitMark } from "@/components/RequestCard";
 import { colorOf } from "@/components/Sky";
@@ -546,7 +547,11 @@ function TaskRow({
   const age = taskAge(task, now);
   const machine = task.machine;
   // A routine's run shows its agent's face (its section has no agent rows); a person's task, its state's mark.
-  const face = <AgentAvatar agentId={task.agentId} name={agentName} size="xs" />;
+  const face = (
+    <OpensAgent agentId={task.agentId}>
+      <AgentAvatar agentId={task.agentId} name={agentName} size="xs" />
+    </OpensAgent>
+  );
   return (
     <li className="tm-row" data-look={look} data-selected={selected || undefined}>
       <span className="tm-cell tm-cell--name">
@@ -650,7 +655,9 @@ function AgentRow({
         >
           <Icon name="chevronDown" size={14} />
         </button>
-        <AgentAvatar agentId={group.agentId} name={name} size="sm" />
+        <OpensAgent agentId={group.agentId}>
+          <AgentAvatar agentId={group.agentId} name={name} size="sm" />
+        </OpensAgent>
         <span className="tm-name">
           <button type="button" className="tm-hit" aria-pressed={selected} onClick={onSelect}>
             {name}
@@ -695,25 +702,32 @@ function AgentCard({
   const { t } = useTranslation();
   const { waiting } = agentSummary(tasks);
   return (
-    <button type="button" className="tm-card ac-card ac-card--interactive" aria-pressed={pressed} onClick={onPress}>
+    <div className="tm-card ac-card ac-card--interactive" data-pressed={pressed || undefined}>
       <span className="tm-card__head">
         {agentId ? (
-          <AgentAvatar agentId={agentId} name={name} size="sm" />
+          <OpensAgent agentId={agentId}>
+            <AgentAvatar agentId={agentId} name={name} size="sm" />
+          </OpensAgent>
         ) : (
           <span className="tm-card__n ac-num" aria-hidden="true">
             {tasks.length}
           </span>
         )}
-        <span className="tm-card__text">
+        <button
+          type="button"
+          className="tm-card__text"
+          aria-pressed={pressed}
+          title={waiting > 0 ? t("taskManager.waiting", { count: waiting }) : undefined}
+          onClick={onPress}
+        >
           <b>{name}</b>
           <small>{tasks.length > 0 ? t("taskManager.tasks", { count: tasks.length }) : t("taskManager.free")}</small>
-        </span>
+        </button>
         {waiting > 0 && (
           <Chip
             tone="waiting"
             lead={<WaitMark />}
             className="tm-card__wait"
-            title={t("taskManager.waiting", { count: waiting })}
             aria-label={t("taskManager.waiting", { count: waiting })}
           >
             {waiting}
@@ -721,7 +735,7 @@ function AgentCard({
         )}
       </span>
       <Sparkline values={line} color={color} label={lineLabel} />
-    </button>
+    </div>
   );
 }
 
@@ -745,7 +759,9 @@ function EndedRow({ task, agentName, meId }: { task: EndedTask; agentName: strin
   return (
     <li className="tm-row tm-row--ended">
       <span className="tm-cell tm-cell--name">
-        <AgentAvatar agentId={task.agentId} name={agentName} size="xs" />
+        <OpensAgent agentId={task.agentId}>
+          <AgentAvatar agentId={task.agentId} name={agentName} size="xs" />
+        </OpensAgent>
         <span className="tm-name">
           <span className="tm-name__title">{taskTitle(t, task)}</span>
           <small>{`${agentName} · ${taskWhere(t, task)}`}</small>

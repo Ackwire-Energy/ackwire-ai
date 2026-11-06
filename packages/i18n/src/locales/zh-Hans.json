@@ -5,6 +5,7 @@
   "common": {
     "close": "关闭",
     "joinSentences": "{{a}}{{b}}",
+    "cantUndo": "此操作无法撤销。",
     "removeName": "移除 {{name}}",
     "about": "关于“{{label}}”",
     "previousMonth": "上个月",
@@ -1327,6 +1328,7 @@
     "addPasswordReauth": "请重新登录后再设置密码。",
     "yourWorkspaces": "你的工作区",
     "youAreHere": "你在这里",
+    "createdOn": "创建于 {{date}}",
     "newWorkspace": "新建工作区",
     "wiki": "Wiki",
     "settings": "设置",
@@ -4040,6 +4042,12 @@
           "high": "在难题上思考更多，更慢，费用也更高。",
           "max": "尽可能深入思考，慢得多，也贵得多。"
         },
+        "speed": "速度",
+        "speeds": {
+          "standard": "标准",
+          "fast": "快速"
+        },
+        "speedText": "在对话中回复更快，套餐额度消耗速度为 2.5 倍。例行工作和长任务仍按标准速度。",
         "modelLine": {
           "opus": "能力最强，套餐额度消耗更快。",
           "sonnet": "均衡，几乎适合所有场景。",
@@ -4062,10 +4070,13 @@
           "contents": {
             "model": "上下文窗口",
             "auto": "上下文窗口和回复对象",
-            "fixed": "投入程度、上下文窗口和回复对象"
+            "fixed": "投入程度、上下文窗口和回复对象",
+            "autoSpeed": "速度、上下文窗口和回复对象",
+            "fixedSpeed": "投入程度、速度、上下文窗口和回复对象"
           },
           "allDefault": "全部为默认",
           "effort": "投入程度：{{level}}",
+          "speed": "速度：快速",
           "context": "上下文：{{size}}",
           "sharing": "回复其他成员",
           "waits": "等待电脑"
@@ -4511,7 +4522,7 @@
       "audience": "谁可以对话",
       "channels": "频道",
       "computer": "电脑",
-      "danger": "归档",
+      "danger": "归档或删除",
       "keySafe": "密钥加密保存在服务器上，任何人都看不到。",
       "spentOf": "{{month}}已花费，共 {{amount}}",
       "spentOfDefault": "{{month}}已花费，共 {{amount}}（工作区默认值）",
@@ -7509,6 +7520,7 @@
     "removeTitle": "移除 {{name}}？",
     "removeAgents_other": "{{names}} 正在使用这个技能，移除后将无法再使用。",
     "removeNone": "没有智能体使用这个技能。",
+    "removeGone": "它会从工作区移除，此操作无法撤销。",
     "removed": "已移除 {{name}}。",
     "agentTitle": "技能",
     "agentSubtitle": "{{name}} 在需要时可以打开的内容。",
@@ -8264,7 +8276,7 @@
     "noAccessText": "它只对部分人开放。如有需要，请询问负责 Wiki 的人。",
     "delete": "移到回收站",
     "deleteTitle": "将 {{title}} 移到回收站？",
-    "deleteText": "指向它的链接会变成“待创建的页面”。之后可以恢复。",
+    "deleteText": "指向它的链接会变成“待创建的页面”。目前还不能在应用里恢复。",
     "deleted": "{{title}} 已移到回收站。",
     "noBacklinksHint": "还没有页面链接到这里。在其他页面中写下 [[{{title}}]] 即可。",
     "allVersions": "查看全部 {{count}} 个版本",
@@ -8468,6 +8480,7 @@
     "stuck": "因卡住而停止",
     "steer": {
       "waiting": "{{name}} 会在下次暂停时阅读",
+      "computer": "{{name}} 拿到电脑后会阅读",
       "now": "{{name}} 停下来阅读了",
       "delivered": "{{name}} 已收到",
       "held": "{{name}} 会在你做出决定后阅读",
@@ -8662,6 +8675,7 @@
       "nextEta": "正在等待电脑。下一个就是它，约 {{n}} 分钟后",
       "nextAfter": "正在等待电脑。{{after}} 完成后就轮到它",
       "next": "正在等待电脑。下一个就是它",
+      "waiting": "正在等待电脑",
       "behind": "排队中，第 {{nth}}。在 {{names}} 之后",
       "position": "排队中，第 {{nth}}"
     },
@@ -12085,6 +12099,8 @@
     "autoUpdate": "仍在进行中（{{duration}}）。",
     "autoUpdateNow": "当前：{{now}}。",
     "statusReply": "仍在处理中（{{duration}}）。完成这一步后我会读你的消息。",
+    "statusReplyQueued": "正在等待电脑（{{duration}}）。轮到我时我会读你的消息。",
+    "statusReplyAway": "正在等我的电脑恢复。电脑一恢复我就读你的消息。",
     "status": {
       "one": "正在处理：{{subject}}",
       "oneUntitled": "正在后台工作",
@@ -12115,6 +12131,10 @@
     "working": "后台进行中"
   },
   "chat": {
+    "speedFallback": {
+      "text": "ChatGPT 拒绝了此账号或模型的快速模式，因此这条回复以标准速度发送。",
+      "action": "打开智能体"
+    },
     "usageWhen": {
       "at": "{{time}}",
       "on": "{{day}} {{time}}",
@@ -12219,7 +12239,9 @@
       "show": "显示",
       "hide": "隐藏",
       "talker": "工作间隙",
-      "talkerTip": "在不中断进行中任务的情况下作了回复。"
+      "talkerTip": "在不中断进行中任务的情况下作了回复。",
+      "talkerWaiting": "等待期间",
+      "talkerWaitingTip": "在任务等待期间作了回复。"
     },
     "joined": {
       "label": "主动加入",
@@ -13182,6 +13204,8 @@
       "paste": "粘贴",
       "pasteHint": "把你复制的内容粘贴到页面",
       "pasteBlocked": "浏览器不允许读取你复制的内容。请在页面上使用 {{keys}}。",
+      "inputLost": "操作没有传到页面，所以没有点击或输入任何内容。请重试。",
+      "noField": "页面上没有选中输入框，所以没有输入内容。请选中输入框后重新输入。",
       "goLabel": "网站地址",
       "goPlaceholder": "输入地址，例如 example.com",
       "go": "打开",
@@ -13192,8 +13216,6 @@
       "goFailed": "网站没有打开。请检查地址。",
       "backTitle": "交还给 {{name}}",
       "backTitle_female": "交还给 {{name}}",
-      "doneTitle": "完成。要给 {{name}} 留句话吗？",
-      "doneTitle_female": "完成。要给 {{name}} 留句话吗？",
       "backLabel": "给 {{name}} 的备注",
       "backLabel_female": "给 {{name}} 的备注",
       "backPlaceholder": "可选：有什么需要 {{name}} 知道的吗？",
@@ -13253,6 +13275,7 @@
     "suspendedFor": "此工作区已被停用：{{reason}}",
     "bannerSub": "你仍然可以在这里阅读和发消息。暂停期间，智能体不会回答或工作。",
     "label": "工作区状态",
+    "row": "不可用",
     "screen": {
       "title": "此工作区不可用",
       "text": "它的对话和智能体暂时关闭。",
@@ -13340,8 +13363,11 @@
   },
   "deleting": {
     "title": "{{name}} 正在删除中",
-    "text": "{{by}} 于 {{date}} 删除了它，将于 {{due}} 永久删除。",
-    "textLate": "{{by}} 于 {{date}} 删除了它。",
+    "text": "此工作区已在删除中。你无需做任何事，它将于 {{date}} 消失。",
+    "textLate": "此工作区已在删除中。你无需做任何事。",
+    "by": "{{by}} 于 {{date}} 删除了它。",
+    "row": "正在删除，{{date}} 消失",
+    "rowLate": "正在删除",
     "someone": "有人",
     "restore": "恢复工作区",
     "membersOnly": "只有所有者可以恢复它。",
@@ -13351,10 +13377,19 @@
     "menu": "删除账号",
     "card": {
       "text": "你会退出所有工作区，账号将被永久删除。",
-      "button": "删除账号…"
+      "button": "删除账号…",
+      "oneWorkspace": "只想删除这个工作区？在“常规”里。",
+      "leaveWorkspace": "只想退出这个工作区？在“成员”里。"
     },
-    "title": "删除你的账号？",
-    "closes_other": "{{names}} 现在关闭，并将于 {{date}} 永久删除。那里只有你一个人。",
+    "title": "删除你的整个账号？",
+    "intro": "这会删除你的整个账号，而不只是一个工作区。此操作无法撤销。",
+    "whole": "你的整个账号",
+    "oneWorkspace": "只想删除一个工作区？你的账号会保留。",
+    "closes": "{{name}} 现在关闭。那里只有你一个人，所以将于 {{date}} 永久删除。",
+    "closesWith": "{{name}} 现在关闭，其中有 {{what}}。那里只有你一个人，所以将于 {{date}} 永久删除。",
+    "closesEmpty": "{{name}} 现在关闭，其中没有智能体和消息。那里只有你一个人，所以将于 {{date}} 永久删除。",
+    "agentCount_other": "{{value}} 个智能体",
+    "messageCount_other": "{{value}} 条消息",
     "leaves": "你将退出 {{names}}。",
     "messages": "你的消息会留在工作区中，但不再显示你的名字。",
     "computers_other": "你连接到 {{name}} 的电脑将被移除：{{computers}}。",

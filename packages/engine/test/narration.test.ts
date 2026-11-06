@@ -103,6 +103,8 @@ test("a 3-call tool loop: narration goes to steps and live events, the message i
     [2, "Go não está instalado. Vou tentar o compilador C."],
     [3, "Não dá para compilar aqui: faltam Go e gcc no computador."],
   ]);
+  // Only a brain that says when each call ended marks its stretches.
+  expect(deltas.some((d) => "from" in d)).toBe(false);
   const seqs = deltas.map((d) => d.seq);
   expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
   expect(new Set(seqs).size).toBe(seqs.length);

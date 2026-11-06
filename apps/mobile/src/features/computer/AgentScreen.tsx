@@ -275,8 +275,11 @@ export function AgentScreen({
   const mine = waiting !== null && handoffIsMine(waiting, userId, agent?.ownerUserId, org);
   const ask = inControl && handoff?.kind === "ask";
   const doneLabel = ask ? t("mobile.browser.live.done") : t("mobile.browser.live.handBack");
-  const { handBack, couldnt, finishing } = useFinishHandoff(inControl ? handoff : null, name, doneLabel, () =>
-    view.desktopQ.refetch(),
+  const { handBack, leaveNote, couldnt, finishing } = useFinishHandoff(
+    inControl ? handoff : null,
+    name,
+    doneLabel,
+    () => view.desktopQ.refetch(),
   );
   // Taking or handing back, the last picture stays under what is happening, as on the web: never a cold cover.
   const switching = desktopSwitch({
@@ -331,7 +334,7 @@ export function AgentScreen({
         : "";
 
   // What can be done with the screen now, on the capsule across its bottom edge (sideways, the side dock has it):
-  // in control the keyboard, laying it down and the way out; watching, taking control.
+  // in control the keyboard, laying it down, a note and the way out; watching, taking control.
   const mayTake = live && !status?.controllerUserId && !waiting && canTakeOver && words.mayTake;
   // What taking control means, behind an ⓘ (ADR 0076): it leads the capsule, as on the sideways dock, and its words
   // open under the header.
@@ -345,9 +348,10 @@ export function AgentScreen({
       <View style={styles.dockInfo}>{notice.button}</View>
       <DockIcon icon="keyboard" label={t("desktop.keyboard.label")} onPress={() => setTyping(true)} />
       <DockIcon icon="expand" label={t("agentComputer.phone.turn")} onPress={sideways.lieDown} />
+      {ask ? <DockIcon icon="x" label={t("mobile.browser.live.couldnt")} onPress={couldnt} /> : null}
+      <DockIcon icon="compose" label={t("browser.inCard.addNote")} onPress={leaveNote} />
       <DockRule />
-      {ask ? <DockText label={t("mobile.browser.live.couldnt")} onPress={couldnt} /> : null}
-      <DockDone label={doneLabel} onPress={handBack} />
+      <DockDone label={doneLabel} loading={finishing} onPress={handBack} />
     </>
   ) : mayTake ? (
     <DockText
@@ -820,6 +824,7 @@ export function AgentScreen({
                 onKeyboard={() => setTyping(true)}
                 onUpright={sideways.forced ? sideways.standUp : undefined}
                 onCouldnt={ask ? couldnt : undefined}
+                onNote={leaveNote}
                 onDone={handBack}
                 doneLabel={doneLabel}
               />
@@ -1140,6 +1145,7 @@ function TouchDock({
   onKeyboard,
   onUpright,
   onCouldnt,
+  onNote,
   onDone,
   doneLabel,
 }: {
@@ -1151,6 +1157,7 @@ function TouchDock({
   onUpright?: () => void;
   /** The agent asked for help and this person can't. */
   onCouldnt?: () => void;
+  onNote: () => void;
   onDone: () => void;
   doneLabel: string;
 }) {
@@ -1165,6 +1172,7 @@ function TouchDock({
           <IconButton icon="keyboard" label={t("desktop.keyboard.label")} onPress={onKeyboard} />
           {onUpright ? <IconButton icon="expand" label={t("agentComputer.phone.upright")} onPress={onUpright} /> : null}
           {onCouldnt ? <IconButton icon="x" label={t("mobile.browser.live.couldnt")} onPress={onCouldnt} /> : null}
+          <IconButton icon="compose" label={t("browser.inCard.addNote")} onPress={onNote} />
           <PressScale
             to={0.9}
             onPress={onDone}

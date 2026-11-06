@@ -335,6 +335,7 @@
     },
     "steer": {
       "waiting": "{{name}} lo lee en la próxima pausa",
+      "computer": "{{name}} lo lee cuando tenga la computadora",
       "now": "{{name}} se detuvo para leerlo",
       "delivered": "{{name}} lo recibió",
       "held": "{{name}} lo lee después de tu decisión",
@@ -1054,8 +1055,6 @@
     }
   },
   "delete": {
-    "title": "Eliminar tu cuenta",
-    "intro": "No se puede deshacer.",
     "goes": {
       "account": "Tu cuenta, tu acceso y tus sesiones desaparecen.",
       "orgs": "Se eliminan los espacios de trabajo donde eres el único miembro.",

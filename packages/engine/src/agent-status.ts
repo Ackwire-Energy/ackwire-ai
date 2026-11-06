@@ -213,10 +213,16 @@ export async function loadAgentStatuses(
   );
   const ms = now.getTime();
   // A running run without a recent heartbeat lost its worker: it doesn't count (recovery takes it within a minute).
-  const alive = open.filter(
-    (r) =>
-      r.status !== "running" || ms - (r.heartbeatAt ?? r.startedAt ?? r.updatedAt).getTime() < AGENT_HEARTBEAT_FRESH_MS,
-  );
+  const alive = open
+    .filter(
+      (r) =>
+        r.status !== "running" ||
+        ms - (r.heartbeatAt ?? r.startedAt ?? r.updatedAt).getTime() < AGENT_HEARTBEAT_FRESH_MS,
+    )
+    // Asking its computer from the line it still waits (`computerWaitOf`): no "working" for the ask.
+    .map((r) =>
+      r.status === "running" && r.waitingMachineId ? { ...r, status: "waiting_input" as const, waitCode: "busy" } : r,
+    );
   const runById = new Map(alive.map((r) => [r.id, r]));
   const lastAt = new Map(last.map((r) => [r.agentId, r.at ? new Date(r.at) : null]));
   return list.map((a) => {

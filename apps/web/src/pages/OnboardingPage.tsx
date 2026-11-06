@@ -1,4 +1,5 @@
 import { ApiError, keys, meQuery, useAuthConfig } from "@agenteschat/client";
+import { accountOutOfReach } from "@agenteschat/client/lib/deletion";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
@@ -137,19 +138,13 @@ export function OnboardingPage() {
         <span className="onb__brand">
           <Logo size={22} />
         </span>
-        {/* Until it's finished this is the only screen: the ways out of the workspace and of the account are here. */}
+        {/* Until it's finished this is the only screen: the way out of the workspace is here, and of the account for
+            someone with no other workspace that opens. */}
         {created && (
           <button type="button" className="onb__signout" onClick={() => setDeleting(1)}>
             {t("onboarding.deleteLink")}
           </button>
         )}
-        <DeleteAccountEntry
-          trigger={(openIt) => (
-            <button type="button" className="onb__signout" onClick={openIt}>
-              {t("deleteAccount.menu")}
-            </button>
-          )}
-        />
         <button
           type="button"
           className="onb__signout"
@@ -161,6 +156,18 @@ export function OnboardingPage() {
         >
           {t("auth.signOut")}
         </button>
+        {me.data && accountOutOfReach(me.data.organizations) && (
+          <div className="onb__account">
+            <span className="onb__account-title">{t("deleteAccount.whole")}</span>
+            <DeleteAccountEntry
+              trigger={(openIt) => (
+                <button type="button" className="onb__signout" onClick={openIt}>
+                  {t("deleteAccount.menu")}
+                </button>
+              )}
+            />
+          </div>
+        )}
         {created && (
           <DeleteWorkspaceDialog
             org={{ id: created.orgId, name: mine?.name ?? org.trim() }}

@@ -321,6 +321,7 @@
     },
     "steer": {
       "waiting": "{{name}} leest het bij de volgende pauze",
+      "computer": "{{name}} leest het zodra de computer vrij is",
       "now": "{{name}} stopte om het te lezen",
       "delivered": "{{name}} heeft het ontvangen",
       "held": "{{name}} leest het na jouw beslissing",
@@ -983,8 +984,6 @@
     }
   },
   "delete": {
-    "title": "Je account verwijderen",
-    "intro": "Dit kan niet ongedaan worden.",
     "goes": {
       "account": "Je account, je toegang en je sessies verdwijnen.",
       "orgs": "Werkruimtes waarin jij het enige lid bent, worden verwijderd.",

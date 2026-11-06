@@ -256,6 +256,84 @@ describe("the block's lines", () => {
   });
 });
 
+describe("a call refused for its arguments", () => {
+  const offer = "offer_connect_app";
+  const lines = (items: ToolItem[]) => items.flatMap((i) => (i.kind === "call" ? [i.line] : []));
+  const states = (items: ToolItem[]) => lines(items).map((l) => l.state);
+  const at = (s: number) => new Date(Date.UTC(2026, 10, 5, 10, 0, s)).toISOString();
+  /** A call's two steps: `content` is what the tool answered, an error when `isError`. */
+  const steps = (seq: number, name: string, content: string, isError = false) => [
+    { seq, kind: "tool_call", data: { toolUseId: `t${seq}`, name, input: {} }, createdAt: at(seq) },
+    { seq: seq + 1, kind: "tool_result", data: { toolUseId: `t${seq}`, isError, content }, createdAt: at(seq + 1) },
+  ];
+  const slip = "Invalid input: input.why: required";
+
+  test("live: made right by its next call, the head is that call's and the slip stays a quiet line", () => {
+    const items = toolItemsLive([call("1", offer, { failed: true, slip: true }), call("2", offer, { running: true })]);
+    expect(states(items)).toEqual(["stop", "run"]);
+    const done = toolItemsLive([call("1", offer, { failed: true, slip: true }), call("2", offer)]);
+    expect(states(done)).toEqual(["stop", "done"]);
+    expect(toolNow(done)?.state).toBe("done");
+  });
+
+  test("live: right after the refusal it reads as still at it, never as an error", () => {
+    const items = toolItemsLive([call("1", offer, { failed: true, slip: true })]);
+    expect(toolNow(items)?.state).toBe("run");
+    expect(toolPhrase(t, toolNow(items) as NonNullable<ReturnType<typeof toolNow>>)).not.toContain("erred");
+  });
+
+  test("live: never made right, it shows plainly: the run ended, or it went on to something else", () => {
+    expect(states(toolItemsLive([call("1", offer, { failed: true, slip: true })], true))).toEqual(["fail"]);
+    const other = toolItemsLive([call("1", offer, { failed: true, slip: true }), call("2", "create_issue")]);
+    expect(states(other)).toEqual(["fail", "done"]);
+    const failedAgain = toolItemsLive([
+      call("1", offer, { failed: true, slip: true }),
+      call("2", offer, { failed: true }),
+    ]);
+    expect(states(failedAgain)).toEqual(["fail", "fail"]);
+  });
+
+  test("live: refused twice in a row, no red while it is still at it; red for both if it ends there", () => {
+    const twice = [call("1", offer, { failed: true, slip: true }), call("2", offer, { failed: true, slip: true })];
+    expect(states(toolItemsLive(twice))).toEqual(["stop", "run"]);
+    expect(states(toolItemsLive(twice, true))).toEqual(["fail", "fail"]);
+    expect(states(toolItemsLive([...twice, call("3", offer)]))).toEqual(["stop", "stop", "done"]);
+  });
+
+  test("live: a retry the run's end cut short made nothing right", () => {
+    const cut = [call("1", offer, { failed: true, slip: true }), call("2", offer, { running: true })];
+    expect(states(toolItemsLive(cut, true))).toEqual(["fail", "stop"]);
+  });
+
+  test("live: a real failure is an error whatever came after", () => {
+    expect(states(toolItemsLive([call("1", offer, { failed: true }), call("2", offer)]))).toEqual(["fail", "done"]);
+  });
+
+  test("saved: made right, a quiet line that still opens on what it was told; the summary counts both", () => {
+    const items = toolItemsSaved(
+      workFromSteps([...steps(1, offer, slip, true), ...steps(3, offer, "Posted the card.")]),
+    );
+    expect(states(items)).toEqual(["stop", "done"]);
+    expect(lines(items)[0]?.result).toBe(slip);
+    expect(toolNow(items)?.state).toBe("done");
+    expect(toolCalls(items)).toBe(2);
+  });
+
+  test("saved: never made right, or a real failure, shows plainly", () => {
+    expect(states(toolItemsSaved(workFromSteps(steps(1, offer, slip, true))))).toEqual(["fail"]);
+    const other = [...steps(1, offer, slip, true), ...steps(3, "create_issue", "Created.")];
+    expect(states(toolItemsSaved(workFromSteps(other)))).toEqual(["fail", "done"]);
+    const real = [...steps(1, offer, "The catalog is down.", true), ...steps(3, offer, "Posted the card.")];
+    expect(states(toolItemsSaved(workFromSteps(real)))).toEqual(["fail", "done"]);
+  });
+
+  test("the end says it was a slip, and the row keeps it", () => {
+    let s = applyChannelEvent(emptyStreams, start("a", offer));
+    s = applyChannelEvent(s, { ...end("a", true), slip: true } as Ev);
+    expect(s.runs.r1?.work?.[0]).toMatchObject({ kind: "call", failed: true, slip: true });
+  });
+});
+
 describe("a computer command (its permission check)", () => {
   const at = (s: number) => new Date(Date.UTC(2026, 9, 30, 10, 0, s)).toISOString();
   const lines = (items: ReturnType<typeof toolItemsLive>) => items.flatMap((i) => (i.kind === "call" ? [i.line] : []));

@@ -1,7 +1,7 @@
 import { Dialog as RDialog } from "radix-ui";
 import { Children, type CSSProperties, type ReactNode, type RefObject, useEffect, useRef } from "react";
 import { cx } from "../cx";
-import { lastTabbable } from "../device";
+import { focusHeld, lastTabbable } from "../device";
 import { Button } from "./Button";
 import { SearchField } from "./Toolbar";
 
@@ -115,7 +115,8 @@ export function Dialog({
           onSubmit={(e) => e.stopPropagation()}
           onCloseAutoFocus={(e) => {
             const target = returnTo.current;
-            if (target?.isConnected) {
+            if (focusHeld()) e.preventDefault();
+            else if (target?.isConnected) {
               e.preventDefault();
               target.focus();
             }

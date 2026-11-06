@@ -361,6 +361,42 @@ test("browser_do runs a sign-in across pages, checks what it expects and stops w
   );
 });
 
+test("browser_do takes the fields a model guesses: `value` on a fill, `text` on a select, `action` for `do`", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  b.s.respond = () => page('- textbox "Email" [ref=e3]\n- combobox "Plan" [ref=e4]\n- button "Save" [ref=e7]');
+  const sent = b.since();
+  const out = await b.call("browser_do", {
+    steps: [
+      { do: "open", url: "https://shop.example/" },
+      { do: "fill", target: "e3", value: "ana@acme.example" },
+      { do: "select", target: "e4", text: "Pro" },
+      { action: "click", target: "e7" },
+    ],
+  });
+  expect(out.isError).toBeUndefined();
+  expect(out.content).toContain("Done: all 4 steps.");
+  const ran = sent().map((c) => [c.command, ...c.args]);
+  expect(ran).toContainEqual(["fill", "@e3", "ana@acme.example"]);
+  expect(ran).toContainEqual(["select", "@e4", "Pro"]);
+  expect(ran).toContainEqual(["click", "@e7"]);
+
+  // The real field wins, empty too: a fill with `text: ""` clears the box.
+  const emptied = b.since();
+  await b.call("browser_do", { steps: [{ do: "fill", target: "e3", text: "", value: "ignored" }] });
+  expect(emptied().map((c) => [c.command, ...c.args])).toContainEqual(["fill", "@e3", ""]);
+  const blank = await b.call("browser_do", { steps: [{ do: "select", target: "e4", value: " ", text: "Pro" }] });
+  expect(blank.content).toContain("say which option (`value`)");
+
+  // A step that has `do`, or an `action` with nothing in it, is no alias: refused for what it is.
+  const both = await b.call("browser_do", { steps: [{ do: "click", action: "hover", target: "e7" }] });
+  expect(both).toMatchObject({ isError: true });
+  expect(both.content).toStartWith("Invalid input:");
+  const empty = await b.call("browser_do", { steps: [{ action: "", target: "e7" }] });
+  expect(empty.content).toStartWith("Invalid input:");
+  expect(empty.content).toContain("do");
+});
+
 test("a person who takes the browser and gives it back within a step stops the plan, and reading comes first", async () => {
   const b = await browserSetup();
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);

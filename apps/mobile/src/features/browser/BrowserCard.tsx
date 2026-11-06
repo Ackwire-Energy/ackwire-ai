@@ -44,8 +44,8 @@ const LOG_LINES = 3;
  * color on top, the site's letter and host, and what the agent does now. Open, the same card shows the page live with the last steps; Assumir (or Abrir on a request)
  * turns it into control right there: the request as the title, Pronto in the header, the app's own
  * field ("Digite aqui", Senha for saved passwords) and Não consegui; a take over ends with Devolver.
- * Pronto and Devolver take an optional note. Nothing leaves the conversation. The page streams only
- * while the card is open, the agent works or I'm in control; while someone else is, it stays theirs.
+ * Pronto and Devolver hand back at once, with a note if the person leaves one. Nothing leaves the conversation. The
+ * page streams only while the card is open, the agent works or I'm in control; while someone else is, it stays theirs.
  */
 export function BrowserCard({
   agentId,
@@ -146,6 +146,10 @@ export function BrowserCard({
     watching && live.online && !live.hidden && waitsForPage(live.unavailable) && !(live.frame && !live.unavailable);
   const stuck = useBrowserStuck(waitingForPage, attempt);
   const note = pageNoteOf(live.unavailable, live.hidden, mine, stuck);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: said each time, also when a try that failed fails again
+  useEffect(() => {
+    if (mine && live.lost) toast({ title: t(live.lost.words), icon: "x" });
+  }, [live.lost]);
   // Full screen its header says who is in control, so the page says only why it hides, as the web's does.
   const hiddenNote = surface
     ? t("browser.inCard.hiddenHelp", agentGrammar(name))
@@ -298,7 +302,14 @@ export function BrowserCard({
             ) : null}
           </View>
           {mine && handoff ? (
-            <Button variant="secondary" size="sm" icon="check" label={doneLabel} onPress={handBack} />
+            <Button
+              variant="secondary"
+              size="sm"
+              icon="check"
+              label={doneLabel}
+              loading={finishing.finishing}
+              onPress={handBack}
+            />
           ) : waiting ? (
             <Button variant="primary" size="sm" label={t("mobile.browser.card.open")} onPress={answer} />
           ) : (
@@ -393,19 +404,33 @@ export function BrowserCard({
                   toast({ title: t("desktop.clipboard.tooLong", agentGrammar(name)), icon: "x" }),
                 )}
               />
-              {/* A take over asked for nothing: it only hands back. */}
-              {handoff?.kind === "ask" ? (
-                <Pressable
-                  onPress={couldnt}
-                  accessibilityRole="button"
-                  hitSlop={8}
-                  style={({ pressed }) => [styles.couldnt, pressed && styles.pressedWord]}
-                >
-                  <Text variant="small" tone="muted" style={styles.medium}>
-                    {t("mobile.browser.live.couldnt")}
-                  </Text>
-                </Pressable>
-              ) : null}
+              {/* A profile goes back to its agents, not to one. A take over asked for nothing: it only hands back. */}
+              <View style={styles.ways}>
+                {profile ? null : (
+                  <Pressable
+                    onPress={finishing.leaveNote}
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.way, pressed && styles.pressedWord]}
+                  >
+                    <Text variant="small" tone="muted" style={styles.medium}>
+                      {t("browser.inCard.addNote")}
+                    </Text>
+                  </Pressable>
+                )}
+                {handoff?.kind === "ask" ? (
+                  <Pressable
+                    onPress={couldnt}
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.way, pressed && styles.pressedWord]}
+                  >
+                    <Text variant="small" tone="muted" style={styles.medium}>
+                      {t("mobile.browser.live.couldnt")}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
           ) : helper ? (
             live.hidden ? null : (
@@ -495,7 +520,8 @@ const styles = StyleSheet.create({
   centerText: { textAlign: "center" },
   overlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.35)" },
   control: { padding: 10, gap: 8 },
-  couldnt: { alignSelf: "center", paddingVertical: 4 },
+  ways: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 16 },
+  way: { paddingVertical: 4 },
   note: { paddingHorizontal: 12, paddingVertical: 10 },
   log: { paddingHorizontal: 12, paddingVertical: 6 },
   step: { flexDirection: "row", alignItems: "center", paddingVertical: 6 },

@@ -811,8 +811,17 @@ describe("the agent's AI", () => {
       accounts: [],
       account: null,
     };
-    const now = { effort: "high" as const, contextTokens: null, onlyOwner: true, fallback: true };
+    const now = {
+      effort: "high" as const,
+      speed: "standard" as const,
+      contextTokens: null,
+      onlyOwner: true,
+      fallback: true,
+    };
     expect(setupWords(t, "pt-BR", view, { apiKey: true, now })).toBe("Opus pelo plano do Claude · Esforço alto");
+    expect(setupWords(t, "pt-BR", view, { apiKey: true, now: { ...now, speed: "fast" } })).toBe(
+      "Opus pelo plano do Claude · Esforço alto · Velocidade rápida",
+    );
     // On a coding plan, its own model; everything at its default says nothing more.
     const glm = { ...view, effectiveModel: "sonnet", accounts: [account("glm", { provider: "zai" })], account: "glm" };
     expect(setupWords(t, "pt-BR", glm, { apiKey: true, now: { ...now, effort: "medium" } })).toBe(
@@ -822,6 +831,14 @@ describe("the agent's AI", () => {
     expect(setupWords(t, "pt-BR", { ...view, autonomy: "never" }, { apiKey: true, now })).toBe(
       "Opus pelo plano do Claude · Esforço alto · Autonomia: Não pergunta",
     );
+    const advanced = await Bun.file(
+      new URL("../../src/features/ai/AgentAdvancedScreen.tsx", import.meta.url).pathname,
+    ).text();
+    // Velocidade as on the web: only where it fits, read-only for who can't edit, saved at once.
+    expect(advanced).toContain("{viewSpeedFits(view) ? (");
+    expect(advanced).toContain('t("agentPage.work.brain.speedText")');
+    expect(advanced).toContain("disabled={!view.canEdit}");
+    expect(advanced).toContain('speed: viewSpeedFits(view) ? view.speed : "standard"');
     const setup = await Bun.file(
       new URL("../../src/features/ai/AgentSetupScreen.tsx", import.meta.url).pathname,
     ).text();

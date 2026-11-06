@@ -120,7 +120,15 @@ async function pendingRequest(db: Executor, requestId: string) {
 export interface ConsentView {
   request: { id: string; expiresAt: string; access: { requested: AppScope[] }; client: Omit<AppIdentity, "cursor"> };
   account: { name: string; email: string };
-  workspaces: { id: string; name: string; logo: string | null; paused: boolean; current: boolean }[];
+  workspaces: {
+    id: string;
+    name: string;
+    logo: string | null;
+    paused: boolean;
+    current: boolean;
+    createdAt?: string;
+    deletion?: { dueAt: string };
+  }[];
 }
 
 /** What the consent page shows (`GET /api/app/authorize/{req}`). */
@@ -147,6 +155,8 @@ export async function consentView(deps: OauthDeps, userId: string, requestId: st
       logo: m.orgLogo ?? null,
       paused: !!workRefusal(m.standing),
       current: i === 0,
+      createdAt: m.orgCreatedAt?.toISOString(),
+      ...(m.standing?.deletionDueAt ? { deletion: { dueAt: m.standing.deletionDueAt.toISOString() } } : {}),
     })),
   };
 }

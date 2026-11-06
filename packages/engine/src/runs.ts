@@ -30,7 +30,25 @@ export const passedSql = sql<boolean>`((${agentRuns.status} = 'done' and ${agent
 export const computerWaitSql = sql<"queued" | "away" | "line" | null>`(case when ${agentRuns.status} = 'waiting_input'
   and ${agentRuns.waitingMachineId} is not null then (case when ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'busy'
   then 'queued' else 'away' end)
+  when ${agentRuns.status} = 'running' and ${agentRuns.waitingMachineId} is not null then 'queued'
   when ${agentRuns.status} = 'waiting_input' and ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'work_queue' then 'line' end)`;
+
+/**
+ * `computerWaitSql` for a loaded run, for its computer only. The head of a computer's line asks for room by claiming
+ * its run: `running` with its machine kept is that ask, until the computer takes the turn. Nothing changed for anyone
+ * reading: it still waits.
+ */
+export function computerWaitOf(run: Pick<AgentRun, "status" | "waitingMachineId" | "transcript">) {
+  if (!run.waitingMachineId) return null;
+  if (run.status === "running") return "queued" as const;
+  if (run.status !== "waiting_input") return null;
+  const wait = (run.transcript as { waitingForBrain?: { code?: string } } | null)?.waitingForBrain;
+  return wait?.code === "busy" ? ("queued" as const) : ("away" as const);
+}
+
+/** `r.status` as people read it (`computerWaitOf`), for a raw select over `agent_runs r`. */
+export const shownStatusSql = sql`(case when r.status = 'running' and r.waiting_machine_id is not null
+  then 'waiting_input' else r.status end)`;
 
 /**
  * For a select over `agent_runs`: waiting on its plan's limit (`plan`) or its budget (`budget`), long work paused near
@@ -198,7 +216,7 @@ export async function transitionRun(
     replyMessageId?: string;
     /** A plain object, or `storedTranscript` (keeps what the bridge left on the row). */
     transcript?: Record<string, unknown> | SQL;
-    /** Waiting for this computer to come back (ADR 0032 §5); cleared by any move out of `waiting_input`. */
+    /** Waiting for this computer (ADR 0032 §5), or asking it from its line; cleared by any move that doesn't name it. */
     waitingMachineId?: string | null;
   } = {},
 ): Promise<AgentRun | null> {
@@ -214,7 +232,7 @@ export async function transitionRun(
         : {}),
       ...(isTerminal(to) ? { finishedAt: now } : {}),
       // Only a run waiting for its computer keeps the machine it waits for.
-      ...(to === "waiting_input" ? {} : { waitingMachineId: null }),
+      waitingMachineId: null,
       ...patch,
     })
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, from)))

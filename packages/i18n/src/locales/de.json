@@ -5,6 +5,7 @@
   "common": {
     "close": "Schließen",
     "joinSentences": "{{a}} {{b}}",
+    "cantUndo": "Das lässt sich nicht rückgängig machen.",
     "removeName": "{{name}} entfernen",
     "about": "Über {{label}}",
     "previousMonth": "Vorheriger Monat",
@@ -1363,6 +1364,7 @@
     "addPasswordReauth": "Melde dich erneut an, um ein Passwort festzulegen.",
     "yourWorkspaces": "Deine Workspaces",
     "youAreHere": "Du bist hier",
+    "createdOn": "Erstellt am {{date}}",
     "newWorkspace": "Neuer Workspace",
     "wiki": "Wiki",
     "settings": "Einstellungen",
@@ -4172,6 +4174,12 @@
           "high": "Denkt bei schweren Aufgaben mehr nach. Langsamer und teurer.",
           "max": "Denkt so viel wie möglich nach. Viel langsamer und teurer."
         },
+        "speed": "Geschwindigkeit",
+        "speeds": {
+          "standard": "Standard",
+          "fast": "Schnell"
+        },
+        "speedText": "Antwortet in Unterhaltungen schneller und verbraucht das Abo 2,5× so schnell. Routinen und lange Aufgaben bleiben beim Standard.",
         "modelLine": {
           "opus": "Das leistungsstärkste. Verbraucht das Abo schneller.",
           "sonnet": "Ausgewogen. Gut für fast alles.",
@@ -4194,10 +4202,13 @@
           "contents": {
             "model": "Kontextfenster",
             "auto": "Kontextfenster und wem er antwortet",
-            "fixed": "Aufwand, Kontextfenster und wem er antwortet"
+            "fixed": "Aufwand, Kontextfenster und wem er antwortet",
+            "autoSpeed": "Geschwindigkeit, Kontextfenster und wem er antwortet",
+            "fixedSpeed": "Aufwand, Geschwindigkeit, Kontextfenster und wem er antwortet"
           },
           "allDefault": "Alles Standard",
           "effort": "Aufwand: {{level}}",
+          "speed": "Geschwindigkeit: schnell",
           "context": "Kontext: {{size}}",
           "sharing": "Antwortet anderen Personen",
           "waits": "Wartet auf den Computer"
@@ -4653,7 +4664,7 @@
       "audience": "Wer schreiben darf",
       "channels": "Kanäle",
       "computer": "Computer",
-      "danger": "Archivieren",
+      "danger": "Archivieren oder löschen",
       "keySafe": "Der Schlüssel bleibt verschlüsselt auf dem Server. Niemand sieht ihn.",
       "spentOf": "im {{month}} ausgegeben, von {{amount}}",
       "spentOfDefault": "im {{month}} ausgegeben, von {{amount}} (Standard des Workspace)",
@@ -7798,6 +7809,7 @@
     "removeAgents_one": "{{names}} nutzt diesen Skill und verliert den Zugriff darauf.",
     "removeAgents_other": "{{names}} nutzen diesen Skill und verlieren den Zugriff darauf.",
     "removeNone": "Kein Agent nutzt diesen Skill.",
+    "removeGone": "Er verlässt den Workspace, und das lässt sich nicht rückgängig machen.",
     "removed": "{{name}} entfernt.",
     "agentTitle": "Skills",
     "agentSubtitle": "Was {{name}} bei Bedarf öffnen kann.",
@@ -8548,7 +8560,7 @@
     "noAccessText": "Sie ist nur für bestimmte Personen. Wenn du sie brauchst, frag die Person, die sich um das Wiki kümmert.",
     "delete": "In den Papierkorb",
     "deleteTitle": "{{title}} in den Papierkorb verschieben?",
-    "deleteText": "Links darauf werden zu „Seite erstellen“. Du kannst sie später wiederherstellen.",
+    "deleteText": "Links darauf werden zu „Seite erstellen“. In der App lässt sie sich noch nicht wiederherstellen.",
     "deleted": "{{title}} in den Papierkorb verschoben.",
     "noBacklinksHint": "Noch verlinkt keine Seite hierher. Schreib [[{{title}}]] in eine andere.",
     "allVersions": "Alle {{count}} Versionen ansehen",
@@ -8775,6 +8787,7 @@
     "stuck": "Gestoppt, weil er feststeckte",
     "steer": {
       "waiting": "{{name}} liest es bei der nächsten Pause",
+      "computer": "{{name}} liest es, sobald der Computer frei ist",
       "now": "{{name}} hat angehalten, um es zu lesen",
       "delivered": "{{name}} hat es bekommen",
       "held": "{{name}} liest es nach deiner Entscheidung",
@@ -8969,6 +8982,7 @@
       "nextEta": "Wartet auf den Computer. Als Nächstes dran, in etwa {{n}} Min.",
       "nextAfter": "Wartet auf den Computer. Als Nächstes dran, sobald {{after}} fertig ist",
       "next": "Wartet auf den Computer. Als Nächstes dran",
+      "waiting": "Wartet auf den Computer",
       "behind": "In der Warteschlange, {{nth}}. Nach {{names}}",
       "position": "In der Warteschlange, {{nth}}"
     },
@@ -12494,6 +12508,8 @@
     "autoUpdate": "Noch dran ({{duration}}).",
     "autoUpdateNow": "Gerade: {{now}}.",
     "statusReply": "Ich arbeite noch daran ({{duration}}). Ich lese deine Nachricht nach diesem Schritt.",
+    "statusReplyQueued": "Ich warte auf den Computer ({{duration}}). Ich lese deine Nachricht, sobald ich dran bin.",
+    "statusReplyAway": "Ich warte darauf, dass mein Computer zurückkommt. Ich lese deine Nachricht, sobald er wieder da ist.",
     "status": {
       "one": "Arbeitet an: {{subject}}",
       "oneUntitled": "Arbeitet im Hintergrund",
@@ -12524,6 +12540,10 @@
     "working": "Im Hintergrund"
   },
   "chat": {
+    "speedFallback": {
+      "text": "ChatGPT hat die schnelle Geschwindigkeit für dieses Konto oder Modell abgelehnt. Diese Antwort kam deshalb in Standardgeschwindigkeit.",
+      "action": "Agent öffnen"
+    },
     "usageWhen": {
       "at": "um {{time}}",
       "on": "{{day}} um {{time}}",
@@ -12620,7 +12640,9 @@
       "show": "Anzeigen",
       "hide": "Ausblenden",
       "talker": "während der Arbeit",
-      "talkerTip": "Hat geantwortet, ohne die laufende Aufgabe zu unterbrechen."
+      "talkerTip": "Hat geantwortet, ohne die laufende Aufgabe zu unterbrechen.",
+      "talkerWaiting": "beim Warten",
+      "talkerWaitingTip": "Hat geantwortet, während die Aufgabe wartet."
     },
     "joined": {
       "label": "hat sich eingeschaltet",
@@ -13551,6 +13573,8 @@
       "paste": "Einfügen",
       "pasteHint": "Das Kopierte in die Seite einfügen",
       "pasteBlocked": "Dein Browser hat die Seite nicht lesen lassen, was du kopiert hast. Nutze {{keys}} auf der Seite.",
+      "inputLost": "Das ist nicht auf der Seite angekommen, es wurde also nichts geklickt oder getippt. Versuch es noch einmal.",
+      "noField": "Auf der Seite ist kein Feld ausgewählt, das wurde also nicht getippt. Wähle das Feld aus und tippe noch einmal.",
       "goLabel": "Adresse der Website",
       "goPlaceholder": "Gib eine Adresse ein, z. B. example.com",
       "go": "Öffnen",
@@ -13559,7 +13583,6 @@
       "goBadAddress": "Das sieht nicht nach einer Adresse aus. Versuch example.com.",
       "goFailed": "Die Website ließ sich nicht öffnen. Prüf die Adresse.",
       "backTitle": "An {{name}} zurückgeben",
-      "doneTitle": "Fertig. Eine Notiz für {{name}}?",
       "backLabel": "Notiz für {{name}}",
       "backPlaceholder": "Optional: Gibt es etwas, das {{name}} wissen sollte?",
       "addNote": "Notiz hinterlassen"
@@ -13615,6 +13638,7 @@
     "suspendedFor": "Dieser Workspace ist gesperrt: {{reason}}",
     "bannerSub": "Du kannst hier weiterhin lesen und schreiben. Agenten antworten und arbeiten nicht, solange er angehalten ist.",
     "label": "Status des Workspace",
+    "row": "Nicht verfügbar",
     "screen": {
       "title": "Dieser Workspace ist nicht verfügbar",
       "text": "Seine Unterhaltungen und Agenten sind vorerst geschlossen.",
@@ -13702,8 +13726,11 @@
   },
   "deleting": {
     "title": "{{name}} wird gelöscht",
-    "text": "{{by}} hat ihn am {{date}} gelöscht. Endgültig weg ist er am {{due}}.",
-    "textLate": "{{by}} hat ihn am {{date}} gelöscht.",
+    "text": "Dieser Workspace wird bereits gelöscht. Du musst nichts tun, er verschwindet am {{date}}.",
+    "textLate": "Dieser Workspace wird bereits gelöscht. Du musst nichts tun.",
+    "by": "{{by}} hat ihn am {{date}} gelöscht.",
+    "row": "Wird gelöscht, weg am {{date}}",
+    "rowLate": "Wird gelöscht",
     "someone": "Jemand",
     "restore": "Workspace wiederherstellen",
     "membersOnly": "Nur ein Inhaber kann ihn wiederherstellen.",
@@ -13713,11 +13740,21 @@
     "menu": "Konto löschen",
     "card": {
       "text": "Du verlässt jeden Workspace und dein Konto wird endgültig gelöscht.",
-      "button": "Konto löschen…"
+      "button": "Konto löschen…",
+      "oneWorkspace": "Möchtest du nur diesen Workspace löschen? Das geht unter Allgemein.",
+      "leaveWorkspace": "Möchtest du nur diesen Workspace verlassen? Das geht unter Mitglieder."
     },
-    "title": "Dein Konto löschen?",
-    "closes_one": "{{names}} wird jetzt geschlossen und am {{date}} endgültig gelöscht. Du bist dort die einzige Person.",
-    "closes_other": "{{names}} werden jetzt geschlossen und am {{date}} endgültig gelöscht. Du bist dort die einzige Person.",
+    "title": "Dein ganzes Konto löschen?",
+    "intro": "Damit löschst du dein ganzes Konto, nicht nur einen Workspace. Das lässt sich nicht rückgängig machen.",
+    "whole": "Dein ganzes Konto",
+    "oneWorkspace": "Möchtest du nur einen Workspace löschen? Dein Konto bleibt.",
+    "closes": "{{name}} wird jetzt geschlossen. Du bist dort die einzige Person, also wird er am {{date}} endgültig gelöscht.",
+    "closesWith": "{{name}} wird jetzt geschlossen, mit {{what}}. Du bist dort die einzige Person, also wird er am {{date}} endgültig gelöscht.",
+    "closesEmpty": "{{name}} wird jetzt geschlossen, ohne Agenten oder Nachrichten. Du bist dort die einzige Person, also wird er am {{date}} endgültig gelöscht.",
+    "agentCount_one": "{{value}} Agenten",
+    "agentCount_other": "{{value}} Agenten",
+    "messageCount_one": "{{value}} Nachricht",
+    "messageCount_other": "{{value}} Nachrichten",
     "leaves": "Du verlässt {{names}}.",
     "messages": "Deine Nachrichten bleiben ohne deinen Namen in den Workspaces.",
     "computers_one": "Dein mit {{name}} verbundener Computer wird daraus entfernt: {{computers}}.",

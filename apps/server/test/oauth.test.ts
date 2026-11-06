@@ -373,6 +373,19 @@ describe("consent", () => {
       .where(eq(schema.organizations.id, second.organization.id));
     const view = (await (await ana(`/api/app/authorize/${req}`)).json()) as { workspaces: { paused: boolean }[] };
     expect(view.workspaces.map((w) => w.paused)).toEqual([true]);
+    const dueAt = new Date(Date.now() + 86_400_000);
+    await t.db
+      .update(schema.organizations)
+      .set({ deletionDueAt: dueAt })
+      .where(eq(schema.organizations.id, second.organization.id));
+    const closing = (await (await ana(`/api/app/authorize/${req}`)).json()) as {
+      workspaces: { deletion?: { dueAt: string } }[];
+    };
+    expect(closing.workspaces[0]?.deletion?.dueAt).toBe(dueAt.toISOString());
+    await t.db
+      .update(schema.organizations)
+      .set({ deletionDueAt: null })
+      .where(eq(schema.organizations.id, second.organization.id));
     const paused = await ana(`/api/app/authorize/${req}`, {
       json: { decision: "allow", orgId: second.organization.id },
     });

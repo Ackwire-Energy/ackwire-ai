@@ -324,6 +324,8 @@ export const featureKeysEn = {
     },
     steer: {
       waiting: "{{name}} reads it at the next pause",
+      /** Sent to an agent waiting for its computer: it has no pause, it reads it once it gets the computer. */
+      computer: "{{name}} reads it when it gets the computer",
       now: "{{name}} stopped to read it",
       delivered: "{{name}} got it",
       held: "{{name}} reads it after your decision",
@@ -1000,8 +1002,6 @@ export const featureKeysEn = {
     },
   },
   delete: {
-    title: "Delete your account",
-    intro: "There's no undo.",
     goes: {
       account: "Your account, your access and your sessions are gone.",
       /** A server from before the preflight, which says what it closes. */

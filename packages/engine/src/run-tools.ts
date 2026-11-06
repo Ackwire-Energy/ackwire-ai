@@ -368,6 +368,7 @@ export interface RunToolScope {
 /** How a call ended, as its `agent.tool` end says it. */
 type ChipEnd = {
   failed?: boolean;
+  slip?: boolean;
   held?: boolean;
   why?: string;
   refusal?: string;
@@ -378,6 +379,7 @@ type ChipEnd = {
 /** The end's fields that say something. */
 const endFields = (end: ChipEnd) => ({
   ...(end.failed ? { failed: true } : {}),
+  ...(end.slip ? { slip: true } : {}),
   ...(end.held ? { held: true } : {}),
   ...(end.why ? { why: end.why } : {}),
   ...(end.refusal ? { refusal: end.refusal } : {}),
@@ -494,7 +496,11 @@ export async function invokeWithChip(
           ? { held: true }
           : prompt
             ? promptEnd(outcome.output)
-            : { failed: outcome.output.isError === true, autoApproved: outcome.autoApproved },
+            : {
+                failed: outcome.output.isError === true,
+                slip: outcome.output.isError === true && codeOf(outcome.output.content) === "tool.invalid_input",
+                autoApproved: outcome.autoApproved,
+              },
       );
       // An action approved ahead went out (or couldn't): its cards, Aprovações and its routine's page show it.
       if (outcome.type === "result" && outcome.ran && deps.pubsub) {

@@ -170,6 +170,9 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
 .members-side__line.status-line:not(.ac-iconline) {
   align-items: center;
 }
+.members-side__line.status-line > :first-child {
+  translate: none;
+}
 .members-side__work {
   color: var(--ink2);
 }

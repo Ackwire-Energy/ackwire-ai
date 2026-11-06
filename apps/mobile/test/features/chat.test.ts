@@ -64,6 +64,7 @@ import {
   turnPhase,
   turnRuns,
   turnShows,
+  turnSignature,
   withContinued,
   withOpacity,
 } from "../../src/features/chat/turn";
@@ -927,6 +928,21 @@ describe("an agent's turn as one block", () => {
     expect(turnShows({ ...fresh, work: [call("1", "sentry_list_issues", true)] })).toBe(false);
     expect(turnShows({ ...fresh, text: "Oi" })).toBe(true);
     expect(turnShows({ ...fresh, work: [{ kind: "say", text: "Vou ler.", turn: 1 }] })).toBe(true);
+  });
+
+  test("a call refused for its arguments: quiet once made right, plain when the run ends without it", () => {
+    const slip = { ...call("1", "offer_connect_app", false), failed: true, slip: true };
+    const made = turnItems(run({ runId: "r", work: [slip, call("2", "offer_connect_app", false)] }));
+    expect(made.map((x) => x.kind === "call" && x.line.state)).toEqual(["stop", "done"]);
+    expect(toolNow(turnItems(run({ runId: "r", work: [slip] })))?.state).toBe("run");
+    expect(toolNow(turnItems(run({ runId: "r", work: [slip] }), true))?.state).toBe("fail");
+    expect(toolNow(turnItems(run({ runId: "r", status: "failed", work: [slip] })))?.state).toBe("fail");
+  });
+
+  test("the end of what it said reaching its line changes what the saved reply keeps", () => {
+    const said = (text: string) =>
+      turnSignature(turnItems(run({ runId: "r", work: [{ kind: "say", text, turn: 1 }] })));
+    expect(said("Se você me passar o `build.gradle`")).not.toBe(said("Se você me pa"));
   });
 
   test("the header word: thinking, working on steps, writing, stopped", () => {

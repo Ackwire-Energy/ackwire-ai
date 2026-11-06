@@ -33,7 +33,7 @@ import { isMediaAfterReply, messageMediaOf } from "@agenteschat/client/lib/media
 import { memberRoleColor } from "@agenteschat/client/lib/member-groups";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { missionSetupOf } from "@agenteschat/client/lib/missions";
-import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notices";
+import { isTalkerReply, routineReportText, talkerWaited } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { reachHandoffs } from "@agenteschat/client/lib/reach";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
@@ -113,6 +113,7 @@ import { MessageText } from "./MessageText";
 import { ReachLines } from "./ReachLines";
 import { Receipts } from "./Receipts";
 import { SecretCard } from "./SecretCard";
+import { SpeedFallbackLine } from "./StoppedLine";
 import { TeamChecks } from "./TeamChecks";
 import { SavedTools, TurnTools } from "./ToolCalls";
 import { recentTurn, stepLimitOf, stoppedOf, turnOpener } from "./turn";
@@ -547,9 +548,9 @@ export const MessageRow = memo(function MessageRow({
           tone="faint"
           numberOfLines={1}
           style={styles.shrink}
-          accessibilityHint={t("chat.notice.talkerTip")}
+          accessibilityHint={t(talkerWaited(meta) ? "chat.notice.talkerWaitingTip" : "chat.notice.talkerTip")}
         >
-          {t("chat.notice.talker")}
+          {t(talkerWaited(meta) ? "chat.notice.talkerWaiting" : "chat.notice.talker")}
         </Text>
       ) : null}
       {helping ? <HelpingTag consultation={helping} channelId={m.channelId} /> : null}
@@ -703,6 +704,7 @@ export const MessageRow = memo(function MessageRow({
           ) : null}
           {media ? <ChatMedia media={media} liveId={m.id} /> : null}
           {voiceOf(meta) ? <VoiceMessage message={m} /> : null}
+          {isAgent && meta?.speedFallback === true ? <SpeedFallbackLine message={m} /> : null}
           {(stopped || atLimit || providerCut) && m.agentRunId ? (
             <StoppedLine
               message={m}

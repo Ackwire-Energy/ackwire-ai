@@ -221,7 +221,7 @@ export const words: EmailWords = {
   },
   deletionCode: {
     subjectWorkspace: (code) => `워크스페이스 삭제 코드: ${code}`,
-    subjectAccount: (code) => `계정 삭제 코드: ${code}`,
+    subjectAccount: (code) => `계정 전체 삭제 코드: ${code}`,
     preheader: "agentes.chat에 입력해서 확인하세요. 10분 동안 유효해요.",
     headline: "인증 코드",
     workspace: (org) => [
@@ -232,7 +232,7 @@ export const words: EmailWords = {
     account: (email) => [
       "이 코드를 입력하면 계정 ",
       { b: email },
-      "이(가) 삭제돼요. 바로 삭제되고, 나만 있는 워크스페이스도 함께 닫혀요.",
+      " 전체가 삭제돼요. 워크스페이스 하나만 삭제되는 게 아니에요. 바로 삭제되고, 나만 있는 워크스페이스도 함께 닫혀요.",
     ],
     support: (address) => [
       "10분 동안 유효하고, 이 코드 없이는 아무것도 삭제되지 않아요. 본인이 아니라면 공유하지 말고 ",

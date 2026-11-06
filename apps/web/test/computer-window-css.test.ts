@@ -84,11 +84,8 @@ test("the head's controls ship on the name's capitals, full screen's bar's in it
   expect(head).toContain("margin-top:calc((24px-var(--cmp-button))/2-var(--title-cap-mid,var(--cap-mid)))");
   const bar = await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-dialog.is-screen-only .ac-dialog__acts");
   expect(bar).toContain("margin-top:calc((24px+18px-var(--cmp-button))/2)");
-  expect(await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-acts > :is(.cmp-take, .cmp-back)")).toContain(
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, ".cmp-acts > .cmp-take", undefined, ["--lead-rise"])).toContain(
     "margin-inline:1.5px",
-  );
-  expect(await ships(COMPUTER, `src/${COMPUTER}`, '[data-theme="dark"] .cmp-acts > .cmp-back')).toContain(
-    "margin-inline:1px",
   );
   // On the full-screen sheet they stand as far under its edge as its sides are in (the dialog's inset, a phone's 16):
   // the head's top holds the half of them that rises past the name's 24 px line and the capitals' lift.

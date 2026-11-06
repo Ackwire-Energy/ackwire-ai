@@ -296,7 +296,10 @@ export function useRoutineMenu(r: Routine, from: "list" | "screen", onDeleted?: 
   const remove = () =>
     Alert.alert(
       t("routines.deleteTitle", { name: title }),
-      isRunning(r) ? t("routines.deleteBodyRunning") : t("routines.deleteBody"),
+      t("common.joinSentences", {
+        a: isRunning(r) ? t("routines.deleteBodyRunning") : t("routines.deleteBody"),
+        b: t("common.cantUndo"),
+      }),
       [
         { text: t("mobile.common.cancel"), style: "cancel" },
         {

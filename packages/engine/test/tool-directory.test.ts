@@ -1,9 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
 import { asc, schema } from "@agenteschat/db";
 import {
+  compactSchema,
   createToolGateway,
   DIRECTORY_MAX_TOOLS,
   describeCapabilities,
+  EVERY_TOOL,
   grantScopes,
   postPersonMessage,
   presentTools,
@@ -253,6 +255,80 @@ async function vegaGateway(executed: string[]) {
   };
   return { tools, ctx, call };
 }
+
+/** A built-in tool with a required field, for what a search shows of it. */
+const noteTool = (name: string, more: Partial<ToolDefinition> = {}): ToolDefinition => ({
+  name,
+  description: "Writes a zebra note.",
+  inputSchema: { type: "object", properties: { body: { type: "string" } }, required: ["body"] },
+  scope: "",
+  execute: async () => ({ content: "noted" }),
+  ...more,
+});
+
+const INPUT_LINE = /\n {2}input: /g;
+
+test("with every tool listed, find_tools shows the input of its best 3 matches, `why` included; other runs have the schema already", async () => {
+  f = await setup();
+  const tools = createToolGateway({
+    sources: [
+      {
+        name: "fake",
+        tools: async () => [
+          noteTool("note_a", { sensitive: true }),
+          ...["note_b", "note_c", "note_d", "note_e"].map((n) => noteTool(n)),
+        ],
+      },
+    ],
+  });
+  const ctx = await ctxOf(f);
+  const find = async (loadedGroups: string[]) => {
+    const r = await tools.invoke(
+      { ...ctx, loadedGroups },
+      { toolUseId: `tu_${Math.random()}`, name: "find_tools", input: { query: "zebra why" } },
+    );
+    return r.type === "result" ? r.output.content : "";
+  };
+  const every = await find([EVERY_TOOL]);
+  expect(every).toStartWith('Already in your tool list for "zebra why"');
+  expect(every.match(INPUT_LINE)).toHaveLength(3);
+  expect(every).toContain('- note_a: Writes a zebra note.\n  input: {"required":["body","why"],');
+  const input = '\n  input: {"required":["body"],"type":"object","properties":{"body":{"type":"string"}}}';
+  expect(every).toContain(`- note_c: Writes a zebra note.${input}`);
+  expect(every).toEndWith("- note_e: Writes a zebra note.");
+  expect(await find([])).not.toContain("input:");
+});
+
+test("with every tool listed, a listed tool under a better match shows its input too", async () => {
+  f = await setup();
+  const big = tiktokTools([]).map((t, i) =>
+    i === 0 ? { ...t, description: `${t.description} zebra zebra zebra` } : t,
+  );
+  const tools = createToolGateway({
+    sources: [{ name: "fake", tools: async () => [noteTool("note_a"), ...big] }],
+  });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: TIKTOK, scope: "tiktok:read" }]);
+  const r = await tools.invoke(
+    { ...(await ctxOf(f)), loadedGroups: [EVERY_TOOL] },
+    { toolUseId: "tu_1", name: "find_tools", input: { query: "zebra" } },
+  );
+  const text = r.type === "result" ? r.output.content : "";
+  expect(text).toContain("- tiktok_ad_get: ");
+  expect(text).toContain(
+    '- note_a (already in your tool list: call it directly): Writes a zebra note.\n  input: {"required":["body"]',
+  );
+});
+
+test("a schema over the cut keeps what is required", () => {
+  const properties = Object.fromEntries(
+    Array.from({ length: 60 }, (_, i) => [`field_${i}`, { type: "string", description: "A long enough field." }]),
+  );
+  const text = compactSchema({ type: "object", properties, required: ["inbox_id"], additionalProperties: false });
+  expect(text).toStartWith('{"required":["inbox_id"],"type":"object"');
+  expect(text).toEndWith("…");
+  expect(text.length).toBeLessThanOrEqual(1_501);
+  expect(compactSchema({ type: "object", properties: {} })).toBe('{"type":"object","properties":{}}');
+});
 
 test("a big connector's directory takes the prefix its tools have; the names it had before still run", async () => {
   const shown = presentTools(vegaTools([]));

@@ -5,6 +5,7 @@
   "common": {
     "close": "Fermer",
     "joinSentences": "{{a}} {{b}}",
+    "cantUndo": "Cette action est définitive.",
     "removeName": "Retirer {{name}}",
     "about": "À propos de {{label}}",
     "previousMonth": "Mois précédent",
@@ -1399,6 +1400,7 @@
     "addPasswordReauth": "Reconnectez-vous pour ajouter un mot de passe.",
     "yourWorkspaces": "Vos espaces de travail",
     "youAreHere": "Vous êtes ici",
+    "createdOn": "Créé le {{date}}",
     "newWorkspace": "Nouvel espace de travail",
     "wiki": "Wiki",
     "settings": "Paramètres",
@@ -4321,6 +4323,12 @@
           "high": "Réfléchit davantage sur les tâches difficiles. Plus lent et plus cher.",
           "max": "Réfléchit autant que possible. Bien plus lent et plus cher."
         },
+        "speed": "Vitesse",
+        "speeds": {
+          "standard": "Standard",
+          "fast": "Rapide"
+        },
+        "speedText": "Répond plus vite dans les conversations et consomme l'abonnement 2,5× plus vite. Les routines et les tâches longues restent en standard.",
         "modelLine": {
           "opus": "Le plus performant. Consomme l'abonnement plus vite.",
           "sonnet": "Équilibré. Convient à presque tout.",
@@ -4343,10 +4351,13 @@
           "contents": {
             "model": "Fenêtre de contexte",
             "auto": "Fenêtre de contexte et à qui il répond",
-            "fixed": "Effort, fenêtre de contexte et à qui il répond"
+            "fixed": "Effort, fenêtre de contexte et à qui il répond",
+            "autoSpeed": "Vitesse, fenêtre de contexte et à qui il répond",
+            "fixedSpeed": "Effort, vitesse, fenêtre de contexte et à qui il répond"
           },
           "allDefault": "Tout par défaut",
           "effort": "Effort : {{level}}",
+          "speed": "Vitesse : rapide",
           "context": "Contexte : {{size}}",
           "sharing": "Répond aux autres personnes",
           "waits": "Attend l'ordinateur"
@@ -4836,7 +4847,7 @@
       "audience": "Qui peut parler",
       "channels": "Canaux",
       "computer": "Ordinateur",
-      "danger": "Archiver",
+      "danger": "Archiver ou supprimer",
       "keySafe": "La clé reste chiffrée sur le serveur. Personne ne la voit.",
       "spentOf": "dépensé en {{month}}, sur {{amount}}",
       "spentOfDefault": "dépensé en {{month}}, sur {{amount}} (valeur par défaut de l'espace de travail)",
@@ -8110,6 +8121,7 @@
     "removeAgents_many": "{{names}} utilisent cette compétence et n'y auront plus accès.",
     "removeAgents_other": "{{names}} utilisent cette compétence et n'y auront plus accès.",
     "removeNone": "Aucun agent n'utilise cette compétence.",
+    "removeGone": "Elle quitte l'espace de travail, et cette action est définitive.",
     "removed": "{{name}} retirée.",
     "agentTitle": "Compétences",
     "agentSubtitle": "Ce que {{name}} peut ouvrir au besoin.",
@@ -8890,7 +8902,7 @@
     "noAccessText": "Elle est réservée à certaines personnes. Si vous en avez besoin, demandez à la personne qui s'occupe du wiki.",
     "delete": "Mettre à la corbeille",
     "deleteTitle": "Mettre {{title}} à la corbeille ?",
-    "deleteText": "Les liens vers elle deviennent « page à créer ». Vous pourrez la restaurer plus tard.",
+    "deleteText": "Les liens vers elle deviennent « page à créer ». Vous ne pouvez pas encore la restaurer depuis l'app.",
     "deleted": "{{title}} mise à la corbeille.",
     "noBacklinksHint": "Aucune page ne pointe encore ici. Écrivez [[{{title}}]] dans une autre.",
     "allVersions": "Voir les {{count}} versions",
@@ -9138,6 +9150,7 @@
     "stuck": "Arrêté car il était bloqué",
     "steer": {
       "waiting": "{{name}} le lira à la prochaine pause",
+      "computer": "{{name}} le lira dès qu'il aura l'ordinateur",
       "now": "{{name}} s'est arrêté pour le lire",
       "delivered": "{{name}} l'a reçu",
       "held": "{{name}} le lira après votre décision",
@@ -9335,6 +9348,7 @@
       "nextEta": "En attente de l'ordinateur. Passe ensuite, dans environ {{n}} min",
       "nextAfter": "En attente de l'ordinateur. Passe ensuite, quand {{after}} aura fini",
       "next": "En attente de l'ordinateur. Passe ensuite",
+      "waiting": "En attente de l'ordinateur",
       "behind": "Dans la file, {{nth}}. Après {{names}}",
       "position": "Dans la file, {{nth}}"
     },
@@ -12947,6 +12961,8 @@
     "autoUpdate": "Toujours dessus ({{duration}}).",
     "autoUpdateNow": "En ce moment : {{now}}.",
     "statusReply": "Je suis toujours dessus ({{duration}}). Je lis votre message après cette étape.",
+    "statusReplyQueued": "J'attends l'ordinateur ({{duration}}). Je lis votre message dès que c'est mon tour.",
+    "statusReplyAway": "J'attends que mon ordinateur revienne. Je lis votre message dès son retour.",
     "status": {
       "one": "Travaille sur : {{subject}}",
       "oneUntitled": "Travaille en arrière-plan",
@@ -12977,6 +12993,10 @@
     "working": "En arrière-plan"
   },
   "chat": {
+    "speedFallback": {
+      "text": "ChatGPT a refusé la vitesse Rapide pour ce compte ou ce modèle, cette réponse est donc arrivée en standard.",
+      "action": "Ouvrir l'agent"
+    },
     "usageWhen": {
       "at": "à {{time}}",
       "on": "{{day}} à {{time}}",
@@ -13087,7 +13107,9 @@
       "show": "Afficher",
       "hide": "Masquer",
       "talker": "en travaillant",
-      "talkerTip": "A répondu sans interrompre la tâche en cours."
+      "talkerTip": "A répondu sans interrompre la tâche en cours.",
+      "talkerWaiting": "en attendant",
+      "talkerWaitingTip": "A répondu pendant que la tâche attend."
     },
     "joined": {
       "label": "s'est joint",
@@ -14068,6 +14090,8 @@
       "paste": "Coller",
       "pasteHint": "Coller dans la page ce que vous avez copié",
       "pasteBlocked": "Votre navigateur n’a pas laissé lire ce que vous avez copié. Utilisez {{keys}} sur la page.",
+      "inputLost": "Cela n'a pas atteint la page : rien n'a été cliqué ni saisi. Réessaie.",
+      "noField": "Aucun champ n'est sélectionné sur la page : rien n'a été saisi. Sélectionne le champ et saisis à nouveau.",
       "goLabel": "Adresse du site",
       "goPlaceholder": "Saisissez une adresse, comme exemple.com",
       "go": "Ouvrir",
@@ -14078,8 +14102,6 @@
       "goFailed": "Le site ne s'est pas ouvert. Vérifiez l'adresse.",
       "backTitle": "Rendre la main à {{name}}",
       "backTitle_female": "Rendre la main à {{name}}",
-      "doneTitle": "C'est fait. Une note pour {{name}} ?",
-      "doneTitle_female": "C'est fait. Une note pour {{name}} ?",
       "backLabel": "Note pour {{name}}",
       "backLabel_female": "Note pour {{name}}",
       "backPlaceholder": "Facultatif : quelque chose que {{name}} devrait savoir ?",
@@ -14139,6 +14161,7 @@
     "suspendedFor": "Cet espace de travail est suspendu : {{reason}}",
     "bannerSub": "Vous pouvez toujours lire et écrire ici. Les agents ne répondent pas et ne travaillent pas pendant la suspension.",
     "label": "État de l'espace de travail",
+    "row": "Indisponible",
     "screen": {
       "title": "Cet espace de travail est indisponible",
       "text": "Ses conversations et ses agents sont fermés pour le moment.",
@@ -14226,8 +14249,11 @@
   },
   "deleting": {
     "title": "{{name}} est en cours de suppression",
-    "text": "{{by}} l'a supprimé le {{date}}. Il disparaîtra définitivement le {{due}}.",
-    "textLate": "{{by}} l'a supprimé le {{date}}.",
+    "text": "Cet espace de travail est déjà en cours de suppression. Vous n'avez rien à faire, il disparaît le {{date}}.",
+    "textLate": "Cet espace de travail est déjà en cours de suppression. Vous n'avez rien à faire.",
+    "by": "{{by}} l'a supprimé le {{date}}.",
+    "row": "En cours de suppression, disparaît le {{date}}",
+    "rowLate": "En cours de suppression",
     "someone": "Quelqu'un",
     "restore": "Restaurer l'espace de travail",
     "membersOnly": "Seul un propriétaire peut le restaurer.",
@@ -14237,12 +14263,23 @@
     "menu": "Supprimer le compte",
     "card": {
       "text": "Vous quittez tous les espaces de travail et votre compte est supprimé définitivement.",
-      "button": "Supprimer le compte…"
+      "button": "Supprimer le compte…",
+      "oneWorkspace": "Vous voulez supprimer seulement cet espace de travail ? C'est dans Général.",
+      "leaveWorkspace": "Vous voulez quitter seulement cet espace de travail ? C'est dans Membres."
     },
-    "title": "Supprimer votre compte ?",
-    "closes_one": "{{names}} ferme maintenant et sera supprimé définitivement le {{date}}. Vous êtes la seule personne à y être.",
-    "closes_many": "{{names}} ferment maintenant et seront supprimés définitivement le {{date}}. Vous êtes la seule personne à y être.",
-    "closes_other": "{{names}} ferment maintenant et seront supprimés définitivement le {{date}}. Vous êtes la seule personne à y être.",
+    "title": "Supprimer tout votre compte ?",
+    "intro": "Cela supprime tout votre compte, pas seulement un espace de travail. Cette action est définitive.",
+    "whole": "Tout votre compte",
+    "oneWorkspace": "Vous voulez supprimer un seul espace de travail ? Votre compte reste.",
+    "closes": "{{name}} ferme maintenant. Vous êtes la seule personne à y être, il sera donc supprimé définitivement le {{date}}.",
+    "closesWith": "{{name}} ferme maintenant, avec {{what}}. Vous êtes la seule personne à y être, il sera donc supprimé définitivement le {{date}}.",
+    "closesEmpty": "{{name}} ferme maintenant, sans agents ni messages. Vous êtes la seule personne à y être, il sera donc supprimé définitivement le {{date}}.",
+    "agentCount_one": "{{value}} agent",
+    "agentCount_many": "{{value}} agents",
+    "agentCount_other": "{{value}} agents",
+    "messageCount_one": "{{value}} message",
+    "messageCount_many": "{{value}} messages",
+    "messageCount_other": "{{value}} messages",
     "leaves": "Vous quittez {{names}}.",
     "messages": "Vos messages restent dans les espaces de travail, sans votre nom.",
     "computers_one": "Votre ordinateur connecté à {{name}} en est retiré : {{computers}}.",

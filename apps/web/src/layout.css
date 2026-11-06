@@ -2973,6 +2973,18 @@ html:not([data-pointer]) .profile-trigger:focus-visible {
 .profile-trigger--name:hover {
   text-decoration: underline;
 }
+/* An agent's picture that opens its details (`OpensAgent`): the picture's size, above a row's stretched press. */
+.opens-agent.profile-trigger {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: none;
+  width: fit-content;
+  border-radius: var(--radius-agent);
+}
+.opens-agent .ac-avatar__badge {
+  cursor: default;
+}
 .profile-card {
   --menu-pad: var(--space-2);
   width: 300px;
@@ -7638,6 +7650,9 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
 .suspended-page__others > h2 {
   flex-basis: 100%;
 }
+.suspended-page__account {
+  margin-top: 32px;
+}
 .computers-empty {
   display: flex;
   flex-wrap: wrap;
@@ -9349,6 +9364,11 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   font-size: 13px;
   font-weight: 600;
   color: var(--ink2);
+}
+.agp-brainfield__hint {
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--muted);
 }
 /* The account and its plan's usage in one outline: the meters hang under the account's picker, on a sunken band. */
 .agp-acct {
@@ -13268,7 +13288,8 @@ html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
   width: var(--control-h-md);
   height: var(--control-h-md);
 }
-.rh-set__face-edit:hover .ac-avatar {
+.rh-set__face-edit:hover .ac-avatar,
+.opens-agent:hover .ac-avatar {
   filter: brightness(1.06);
 }
 html:not([data-pointer]) .rh-set__face-edit:focus-visible {

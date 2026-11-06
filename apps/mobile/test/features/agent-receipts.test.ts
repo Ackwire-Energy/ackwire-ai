@@ -361,7 +361,9 @@ describe("the agents' receipt line under a person's message", () => {
 
   test("my message sent into a task at work wears that first; in a DM between people, who read it", () => {
     const read = { runId: "r1", agentId: "ada", state: "read" as const };
-    expect(markOf(read, null, routed({}).m1)).toEqual({ kind: "steer", agentId: "ada", state: "read" });
+    expect(markOf(read, null, routed({}).m1)).toEqual({ kind: "steer", agentId: "ada", state: "read", words: "read" });
+    const line: MessageReceipt = { routed: true, agents: [["ada", "queued"]] };
+    expect(markOf({ ...read, state: "waiting" }, null, line)).toMatchObject({ state: "waiting", words: "computer" });
     expect(markOf(null, "u2", undefined)).toEqual({ kind: "seen", personId: "u2" });
     expect(markOf(null, null, undefined)).toBeNull();
   });
@@ -373,8 +375,12 @@ describe("the agents' receipt line under a person's message", () => {
       kind: "steer",
       agentId: "ada",
       state,
+      words: state,
     });
     expect(markLabel(en, steer("waiting"), names)).toBe("Ada reads it at the next pause");
+    expect(markLabel(en, { kind: "steer", agentId: "ada", state: "waiting", words: "computer" }, names)).toBe(
+      "Ada reads it when it gets the computer",
+    );
     expect(markLabel(en, steer("held"), names)).toBe("Ada reads it after your decision");
     expect(markLabel(pt, steer("now"), names)).toBe("Ada parou para ler");
     expect(markLabel(pt, steer("read"), names)).toBe("Ada leu");

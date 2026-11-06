@@ -773,6 +773,9 @@
   "chat.steer.waiting": {
     "value": "{{name}} reads it at the next pause"
   },
+  "chat.steer.computer": {
+    "value": "{{name}} reads it when it gets the computer"
+  },
   "chat.steer.now": {
     "value": "{{name}} stopped to read it"
   },
@@ -2417,12 +2420,6 @@
   },
   "me.zone.none": {
     "value": "No time zone by that name"
-  },
-  "delete.title": {
-    "value": "Delete your account"
-  },
-  "delete.intro": {
-    "value": "There's no undo."
   },
   "delete.goes.account": {
     "value": "Your account, your access and your sessions are gone."

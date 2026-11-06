@@ -13,6 +13,7 @@ import type {
 import {
   keys,
   useAgentRepos,
+  useMachines,
   useMission,
   useMissionAct,
   useMissionControl,
@@ -1137,6 +1138,8 @@ export function TaskNoticeLine({ message }: { message: Message }) {
   // A folder request to this very Mac (agentes for Mac): answered in the menu bar, one click away (ADR 0036).
   const asked = (message.meta as { machineAccess?: { machineId?: unknown } } | null)?.machineAccess?.machineId;
   const here = useIsThisMac(org.id, typeof asked === "string" ? asked : "");
+  // A note from before the workspace's own computer stopped taking requests: nobody can run its command there.
+  const managed = useMachines(org.id).data?.some((m) => m.id === asked && m.kind === "managed");
   if (!notice) return null;
   // A folder request (ADR 0036 §8): the server sends `path` and `computer`; the agent is the note's author.
   const author =
@@ -1170,7 +1173,7 @@ export function TaskNoticeLine({ message }: { message: Message }) {
           <ShowRequestsButton />
         </span>
       )}
-      {notice.code === "machine_access_requested" && p.command && !here && (
+      {notice.code === "machine_access_requested" && p.command && !here && !managed && (
         <span className="mi-evt__command">
           <span className="small muted">{t("missions.notice.access_command")}</span>
           <CommandBlock command={p.command} />
