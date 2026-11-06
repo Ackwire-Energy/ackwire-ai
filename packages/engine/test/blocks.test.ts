@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
+import type { BlockSpec } from "@agenteschat/ui/blocks/spec";
 import {
   addChannelMember,
   BLOCK_MANUAL,
@@ -37,7 +38,7 @@ const last = (req: ModelRequest) => JSON.stringify(req.messages.at(-1)?.content)
 const person = (userId: string) => ({ type: "person" as const, userId });
 
 const BLOCK = '<ac-slider name="x" label="X" min="0" max="10"></ac-slider>';
-const SPEC = {
+const SPEC: BlockSpec = {
   data: { custo: 40 },
   compute: { margem: "(preco - custo) / preco * 100" },
   parts: [
@@ -60,7 +61,10 @@ function agent(req: ModelRequest) {
     return {
       chunks: [],
       toolUses: [
-        { name: "show_block", input: { title: "Preço", spec: { parts: [{ type: "stat", label: "X", value: "lucro" }] } } },
+        {
+          name: "show_block",
+          input: { title: "Preço", spec: { parts: [{ type: "stat", label: "X", value: "lucro" }] } },
+        },
       ],
     };
   }
@@ -225,7 +229,10 @@ describe("live blocks", () => {
     });
     expect(() => validateContent({ kind: "block", spec: { parts: [{ type: "script" }] } })).toThrow(ValidationError);
     expect(() =>
-      validateContent({ kind: "block", spec: { data: { n: 1 }, parts: [{ type: "stat", label: "X", value: "sum(n)" }] } }),
+      validateContent({
+        kind: "block",
+        spec: { data: { n: 1 }, parts: [{ type: "stat", label: "X", value: "sum(n)" }] },
+      }),
     ).toThrow("sum() needs a list");
     expect(() => validateContent({ kind: "block", spec: SPEC, html: BLOCK })).toThrow("a spec or html, not both");
   });

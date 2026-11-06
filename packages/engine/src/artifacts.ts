@@ -1,7 +1,13 @@
 import { createHash } from "node:crypto";
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, gte, inArray, isNull, or, rowsOf, schema, sql } from "@agenteschat/db";
-import { type BlockSpec, BlockSpecError, blockSpecText, dryRunBlock, parseBlockSpec } from "@agenteschat/ui/blocks/spec";
+import {
+  type BlockSpec,
+  BlockSpecError,
+  blockSpecText,
+  dryRunBlock,
+  parseBlockSpec,
+} from "@agenteschat/ui/blocks/spec";
 import { type AgentsDmReads, agentsDmReads, readerOfRun } from "./agents-dm-reads";
 import { recordAudit } from "./audit";
 import { runAuthorityById } from "./authority";
@@ -490,15 +496,15 @@ function excerptOf(content: ArtifactContent): string {
           ? blockSpecText(content.spec)
           : content.kind === "html" || content.kind === "block"
             ? (content.html ?? "").replace(/<[^>]+>/g, " ")
-          : content.kind === "poll"
-            ? [content.question, ...content.options].join("\n")
-            : content.kind === "choices"
-              ? choicesText(content.questions)
-              : content.kind === "diagram"
-                ? content.mermaid
-                : content.kind === "table"
-                  ? [content.columns.join(" "), ...content.rows.map((r) => r.join(" "))].join("\n")
-                  : content.files.map((f) => f.path).join("\n");
+            : content.kind === "poll"
+              ? [content.question, ...content.options].join("\n")
+              : content.kind === "choices"
+                ? choicesText(content.questions)
+                : content.kind === "diagram"
+                  ? content.mermaid
+                  : content.kind === "table"
+                    ? [content.columns.join(" "), ...content.rows.map((r) => r.join(" "))].join("\n")
+                    : content.files.map((f) => f.path).join("\n");
   return s.replace(/\s+/g, " ").trim().slice(0, 20_000);
 }
 

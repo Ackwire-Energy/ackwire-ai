@@ -104,10 +104,7 @@ describe("a block's spec", () => {
     wrong({ parts: [] }, "parts must be a list of parts");
     wrong({ parts: [{ type: "iframe" }] }, 'parts[0]: type "iframe" is not a part');
     wrong({ parts: [{ type: "stat", label: "X", value: "nada" }] }, 'parts[0].value: there is no value "nada"');
-    wrong(
-      { parts: [{ type: "text", text: "Oi {quem}" }] },
-      'parts[0].text: there is no value "quem"',
-    );
+    wrong({ parts: [{ type: "text", text: "Oi {quem}" }] }, 'parts[0].text: there is no value "quem"');
     wrong(
       {
         parts: [
@@ -117,7 +114,10 @@ describe("a block's spec", () => {
       },
       'the name "a" is used twice',
     );
-    wrong({ compute: { b: "a + 1", a: "1" }, parts: [{ type: "text", text: "x" }] }, 'compute.b: there is no value "a"');
+    wrong(
+      { compute: { b: "a + 1", a: "1" }, parts: [{ type: "text", text: "x" }] },
+      'compute.b: there is no value "a"',
+    );
     wrong({ parts: [{ type: "slider", name: "a", label: "A", min: 5, max: 1 }] }, "max must be more than min");
     wrong({ parts: [{ type: "actions", buttons: [{ label: "Nada" }] }] }, "needs set or draw");
     expect(() => parseBlockSpec({ parts: [{ type: "stat", label: "X", value: "a +" }] })).toThrow(BlockSpecError);
@@ -158,18 +158,36 @@ describe("a block's spec", () => {
 
   test("charts, tables and cards that are choices", () => {
     const spec = parseBlockSpec({
-      data: { lojas: [{ nome: "Centro", venda: 120 }, { nome: "Batel", venda: 80 }] },
+      data: {
+        lojas: [
+          { nome: "Centro", venda: 120 },
+          { nome: "Batel", venda: 80 },
+        ],
+      },
       parts: [
         { type: "choice", name: "plano", options: ["A", "B"] },
         { type: "chart", chart: "bar", label: "Vendas", data: "map(lojas, l => {label: l.nome, value: l.venda})" },
-        { type: "table", columns: [{ label: "Loja", key: "nome" }, { label: "Venda", key: "venda", format: "brl" }], rows: "lojas" },
+        {
+          type: "table",
+          columns: [
+            { label: "Loja", key: "nome" },
+            { label: "Venda", key: "venda", format: "brl" },
+          ],
+          rows: "lojas",
+        },
         { type: "card", label: "Plano B", name: "plano", value: "B", parts: [{ type: "note", text: "Mais caro" }] },
       ],
     });
     const view = viewBlock(compileBlock(spec), {}, words);
     expect(view.parts[0]).toMatchObject({ kind: "choice", value: "A" });
     expect(view.parts[1]).toMatchObject({ kind: "chart", labels: ["Centro", "Batel"], values: [120, 80] });
-    expect(view.parts[2]).toMatchObject({ kind: "table", rows: [["Centro", "R$ 120"], ["Batel", "R$ 80"]] });
+    expect(view.parts[2]).toMatchObject({
+      kind: "table",
+      rows: [
+        ["Centro", "R$ 120"],
+        ["Batel", "R$ 80"],
+      ],
+    });
     expect(view.parts[3]).toMatchObject({ kind: "card", pick: { name: "plano", value: "B" }, selected: false });
     expect(viewBlock(compileBlock(spec), { plano: "B" }, words).parts[3]).toMatchObject({ selected: true });
   });

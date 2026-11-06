@@ -66,11 +66,11 @@ export function SpecBlock({
   }, [raw]);
   const values = useBlockValues(org.id, id, version);
   const reply = useBlockReply(org.id, id);
-  const words: BlockWords = { locale: i18n.language, thousand: t("blocks.thousand") };
+  const thousand = t("blocks.thousand");
+  const words = useMemo<BlockWords>(() => ({ locale: i18n.language, thousand }), [i18n.language, thousand]);
   const view = useMemo(
     () => (compiled ? viewBlock(compiled, values.state, words) : null),
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `words` follows the language
-    [compiled, values.state, i18n.language],
+    [compiled, values.state, words],
   );
   const [sent, setSent] = useState<Sent | null>(keptOf(blockKey).sent ?? null);
   const [open, setOpen] = useState(keptOf(blockKey).open ?? false);
@@ -188,9 +188,10 @@ function Parts({ parts, values }: { parts: BlockViewPart[]; values: Values }) {
 function Part({ part: p, values }: { part: BlockViewPart; values: Values }) {
   const id = useId();
   const set = (raw: unknown) => {
-    if (!("name" in p)) return;
+    const name = "name" in p ? p.name : undefined;
+    if (typeof name !== "string") return;
     const v = inputValue(p, raw);
-    if (v !== undefined) values.set({ [p.name]: v });
+    if (v !== undefined) values.set({ [name]: v });
   };
   switch (p.kind) {
     case "heading":
@@ -438,8 +439,13 @@ function BlockChart({ part }: { part: Extract<BlockViewPart, { kind: "chart" }> 
   return (
     <figure className="spec-block__chart">
       {part.label && <figcaption className="spec-block__title">{part.label}</figcaption>}
-      <ChartView spec={part.chart === "pie" ? { ...spec, series: [{ name: "", values: part.values.map((v) => Math.max(0, v)) }] } : spec} />
+      <ChartView
+        spec={
+          part.chart === "pie"
+            ? { ...spec, series: [{ name: "", values: part.values.map((v) => Math.max(0, v)) }] }
+            : spec
+        }
+      />
     </figure>
   );
 }
-

@@ -9165,7 +9165,7 @@
     "retry": "Yeniden iste",
     "retryText": "Bu blok burada açılmadı. Yeniden gönderebilir misiniz?",
     "pageTitle": "Kendi kodu olan blok",
-    "pageBody": "Uygulamadan ayrı çalışır; hesabına ya da internete erişemez.",
+    "pageBody": "Uygulamadan ayrı çalışır. Hesabına ya da internete erişemez.",
     "runPage": "Bloğu aç",
     "someone": "Biri",
     "pollCloses": "Kapanış: {{time}}",

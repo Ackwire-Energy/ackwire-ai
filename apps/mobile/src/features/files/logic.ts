@@ -221,8 +221,16 @@ export function shareSource(a: Pick<ArtifactDetail, "kind" | "title" | "content"
     case "diagram":
       return { from: "text", text: c.mermaid, name, mime: "text/plain" };
     case "html":
-    case "block":
       return { from: "text", text: c.html, name, mime: "text/html" };
+    case "block":
+      return c.spec
+        ? {
+            from: "text",
+            text: JSON.stringify(c.spec, null, 2),
+            name: safeFileName(withExtension(a.title, "json")),
+            mime: "application/json",
+          }
+        : { from: "text", text: c.html ?? "", name, mime: "text/html" };
     case "poll":
       return { from: "text", text: [c.question, ...c.options].join("\n"), name, mime: "text/plain" };
     case "choices":

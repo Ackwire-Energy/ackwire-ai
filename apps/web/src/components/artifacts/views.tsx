@@ -44,13 +44,7 @@ export function ArtifactContentView({
     case "block":
       if (!source) return null;
       return content.spec ? (
-        <SpecBlock
-          id={source.id}
-          version={source.version}
-          spec={content.spec}
-          agentId={source.agentId ?? ""}
-          big
-        />
+        <SpecBlock id={source.id} version={source.version} spec={content.spec} agentId={source.agentId ?? ""} big />
       ) : (
         <LiveBlock
           id={source.id}

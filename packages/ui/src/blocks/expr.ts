@@ -558,7 +558,12 @@ const FUNCTIONS: Record<string, (c: FnContext) => Value> = {
     if (typeof v === "string") return v.toLowerCase().includes(toText(x).toLowerCase());
     return list(v, "includes").some((y) => equal(y, x));
   },
-  join: (c) => capText(list(c.arg(0), "join").map(toText).join(c.count > 1 ? toText(c.arg(1)) : ", ")),
+  join: (c) =>
+    capText(
+      list(c.arg(0), "join")
+        .map(toText)
+        .join(c.count > 1 ? toText(c.arg(1)) : ", "),
+    ),
   if: (c) => (truthy(c.arg(0)) ? c.arg(1) : c.count > 2 ? c.arg(2) : null),
 };
 

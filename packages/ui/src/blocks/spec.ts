@@ -237,7 +237,8 @@ class Checker {
     }
     for (const name of this.implicit) {
       // A button or a card sets state; fixed data never changes.
-      if (data && Object.hasOwn(data, name)) throw new BlockSpecError(`"${name}" is in data, which no button or card can set`);
+      if (data && Object.hasOwn(data, name))
+        throw new BlockSpecError(`"${name}" is in data, which no button or card can set`);
       declared.add(name);
     }
     // Names a formula may read: everything above, then each computed value once it is computed.
@@ -269,7 +270,8 @@ class Checker {
   private values(v: unknown, at: string): Record<string, Value> | undefined {
     if (v === undefined || v === null) return undefined;
     if (!isObject(v)) throw new BlockSpecError(`${at} must be an object of name: value`);
-    for (const k of Object.keys(v)) if (!BLOCK_NAME.test(k)) throw new BlockSpecError(`${at}: "${k}" is not a valid name`);
+    for (const k of Object.keys(v))
+      if (!BLOCK_NAME.test(k)) throw new BlockSpecError(`${at}: "${k}" is not a valid name`);
     return JSON.parse(JSON.stringify(v)) as Record<string, Value>;
   }
 
@@ -314,7 +316,8 @@ class Checker {
   }
 
   private name(v: unknown, at: string): string {
-    if (typeof v !== "string" || !BLOCK_NAME.test(v)) throw new BlockSpecError(`${at}: needs a name (letters, digits, _)`);
+    if (typeof v !== "string" || !BLOCK_NAME.test(v))
+      throw new BlockSpecError(`${at}: needs a name (letters, digits, _)`);
     return v;
   }
 
@@ -514,7 +517,12 @@ class Checker {
       }
       case "more": {
         const label = this.text(raw.label, `${at}.label`, L.label, false);
-        return { ...base, type, ...(label ? { label } : {}), parts: this.partList(raw.parts, `${at}.parts`, depth + 1) };
+        return {
+          ...base,
+          type,
+          ...(label ? { label } : {}),
+          parts: this.partList(raw.parts, `${at}.parts`, depth + 1),
+        };
       }
       case "row":
         return { ...base, type, parts: this.partList(raw.parts, `${at}.parts`, depth + 1) };
@@ -619,7 +627,8 @@ class Checker {
   }
 
   private drawOptions(v: unknown, at: string): string[] {
-    if (!Array.isArray(v) || v.length < 2 || v.length > 100) throw new BlockSpecError(`${at} must list 2 to 100 options`);
+    if (!Array.isArray(v) || v.length < 2 || v.length > 100)
+      throw new BlockSpecError(`${at} must list 2 to 100 options`);
     return v.map((o, i) => this.text(o, `${at}[${i}]`, 200));
   }
 
@@ -657,9 +666,15 @@ export interface BlockWords {
 }
 
 /** A value written for a person: the formats of the kit, and "–" for nothing. */
-export function formatBlockValue(v: Value | undefined, format: string | undefined, unit: string | undefined, words: BlockWords) {
+export function formatBlockValue(
+  v: Value | undefined,
+  format: string | undefined,
+  unit: string | undefined,
+  words: BlockWords,
+) {
   if (v === undefined || v === null || (typeof v === "number" && !Number.isFinite(v))) return "–";
-  const num = (x: number, digits = 1) => new Intl.NumberFormat(words.locale, { maximumFractionDigits: digits }).format(x);
+  const num = (x: number, digits = 1) =>
+    new Intl.NumberFormat(words.locale, { maximumFractionDigits: digits }).format(x);
   const asNumber = typeof v === "number" ? v : toNumber(v);
   const numeric = typeof v === "number" || (format && format !== "number" && Number.isFinite(asNumber));
   if (numeric && format && format !== "number") {
@@ -676,7 +691,16 @@ export function formatBlockValue(v: Value | undefined, format: string | undefine
 export type BlockViewPart = { key: string } & (
   | { kind: "heading" | "text" | "note"; text: string }
   | { kind: "list"; items: string[] }
-  | { kind: "slider"; name: string; label: string; min: number; max: number; step: number; value: number; shown: string }
+  | {
+      kind: "slider";
+      name: string;
+      label: string;
+      min: number;
+      max: number;
+      step: number;
+      value: number;
+      shown: string;
+    }
   | { kind: "choice"; name: string; label: string; options: string[]; value: string | null }
   | {
       kind: "field";
@@ -766,7 +790,8 @@ export function compileBlock(spec: BlockSpec): CompiledBlock {
       else if (p.type === "choice") defaults[p.name] = p.value === undefined ? (p.options[0] ?? null) : p.value;
       else if (p.type === "field") defaults[p.name] = p.value ?? "";
       else if (p.type === "switch") defaults[p.name] = p.value === true;
-      else if (p.type === "card" && p.name && !(p.name in defaults)) defaults[p.name] = p.selected ? (p.value ?? null) : null;
+      else if (p.type === "card" && p.name && !(p.name in defaults))
+        defaults[p.name] = p.selected ? (p.value ?? null) : null;
       else if (p.type === "actions") {
         for (const b of p.buttons) {
           for (const n of Object.keys(b.set ?? {})) if (!(n in defaults)) defaults[n] = null;
@@ -908,7 +933,13 @@ export function viewBlock(compiled: CompiledBlock, state: Record<string, unknown
         const v = toNumber(read(p.value, `${key}.value`));
         const max = p.max === undefined ? 100 : toNumber(read(p.max, `${key}.max`));
         const share = max > 0 && Number.isFinite(v) ? Math.min(1, Math.max(0, v / max)) : 0;
-        return { key, kind: "progress", label: p.label ?? "", share, text: formatBlockValue(v, p.format, p.unit, words) };
+        return {
+          key,
+          kind: "progress",
+          label: p.label ?? "",
+          share,
+          text: formatBlockValue(v, p.format, p.unit, words),
+        };
       }
       case "chart": {
         let points: { label: string; value: number }[] = [];
@@ -920,7 +951,10 @@ export function viewBlock(compiled: CompiledBlock, state: Record<string, unknown
               .map((x) => ({ label: toText(x.label ?? null), value: toNumber(x.value ?? null) }));
           } else if (d !== null) errors.push(`${key}.data: must give a list of {label, value}`);
         } else {
-          points = (p.items ?? []).map((x, i) => ({ label: x.label, value: toNumber(read(x.value, `${key}.items.${i}`)) }));
+          points = (p.items ?? []).map((x, i) => ({
+            label: x.label,
+            value: toNumber(read(x.value, `${key}.items.${i}`)),
+          }));
         }
         points = points.filter((x) => Number.isFinite(x.value)).slice(0, BLOCK_LIMITS.chartPoints);
         return {
@@ -978,7 +1012,8 @@ export function viewBlock(compiled: CompiledBlock, state: Record<string, unknown
           }
           let draw: BlockViewButton["draw"] = null;
           if (b.draw) {
-            const opts = typeof b.draw.options === "string" ? read(b.draw.options, `${k}.draw.options`) : b.draw.options;
+            const opts =
+              typeof b.draw.options === "string" ? read(b.draw.options, `${k}.draw.options`) : b.draw.options;
             const list = Array.isArray(opts) ? opts.map(toText).filter(Boolean).slice(0, 100) : [];
             if (list.length >= 2) draw = { name: b.draw.name, options: list };
           }

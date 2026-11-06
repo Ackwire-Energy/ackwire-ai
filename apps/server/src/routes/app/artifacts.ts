@@ -82,7 +82,9 @@ const Content = z
     FileContent,
     z.object({
       kind: z.literal("block"),
-      spec: z.record(z.string(), z.unknown()).optional().openapi({
+      // Checked by the engine (`parseBlockSpec`); typed loosely here, since the spec's own type nests too deep for zod.
+      spec: z.any().optional().openapi({
+        type: "object",
         description: "The block's parts, data and formulas, drawn by the apps (ADR 0113). Either this or html.",
       }),
       html: z

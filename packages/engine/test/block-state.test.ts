@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { desc, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
+import type { BlockSpec } from "@agenteschat/ui/blocks/spec";
 import {
   addChannelMember,
   blockShows,
@@ -26,7 +27,7 @@ afterEach(async () => {
 const WHEEL = `<ac-result label="Sorteado" bind="nome"></ac-result>
 <ac-actions><button onclick="agentes.draw('nome', ['Bento', 'Luna'])">Girar</button></ac-actions>`;
 
-const PRICE = {
+const PRICE: BlockSpec = {
   data: { custo: 40 },
   compute: { margem: "(preco - custo) / preco * 100", serie: "map(range(3), m => {label: 'M' + m, value: m})" },
   parts: [

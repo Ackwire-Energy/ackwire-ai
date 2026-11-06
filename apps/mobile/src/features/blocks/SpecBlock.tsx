@@ -83,11 +83,11 @@ export function SpecBlock({
   }, [raw]);
   const values = useBlockValues(orgId, id, version);
   const reply = useBlockReply(orgId, id);
-  const words: BlockWords = { locale: i18n.language, thousand: t("mobile.blocks.thousand") };
+  const thousand = t("mobile.blocks.thousand");
+  const words = useMemo<BlockWords>(() => ({ locale: i18n.language, thousand }), [i18n.language, thousand]);
   const view = useMemo(
     () => (compiled ? viewBlock(compiled, values.state, words) : null),
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `words` follows the language
-    [compiled, values.state, i18n.language],
+    [compiled, values.state, words],
   );
   const [sent, setSent] = useState<Sent | null>(keptOf(blockKey).sent ?? null);
   const [open, setOpen] = useState(keptOf(blockKey).open ?? false);
@@ -205,9 +205,10 @@ function Parts({ parts, values, accent }: { parts: BlockViewPart[]; values: Valu
 function Part({ part: p, values, accent }: { part: BlockViewPart; values: Values; accent: AgentColorName }) {
   const c = useColors();
   const set = (raw: unknown) => {
-    if (!("name" in p)) return;
+    const name = "name" in p ? p.name : undefined;
+    if (typeof name !== "string") return;
     const v = inputValue(p, raw);
-    if (v !== undefined) values.set({ [p.name]: v });
+    if (v !== undefined) values.set({ [name]: v });
   };
   switch (p.kind) {
     case "heading":
@@ -605,7 +606,10 @@ function Result({ label, text, change }: { label: string; text: string; change: 
     }
     if (!drawnAt || reduced) return;
     y.value = withSequence(withTiming(-28, { duration: 0 }), withSpring(0, { stiffness: 260, damping: 14 }));
-    fade.value = withSequence(withTiming(0, { duration: 0 }), withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) }));
+    fade.value = withSequence(
+      withTiming(0, { duration: 0 }),
+      withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) }),
+    );
     haptics.success();
   }, [drawnAt]);
   const rolled = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }], opacity: fade.value }));
@@ -634,7 +638,9 @@ function BlockChart({ part, accent }: { part: Extract<BlockViewPart, { kind: "ch
     ...(part.unit ? { unit: part.unit } : {}),
   };
   const enough =
-    part.chart === "bar" ? values.length >= 1 : values.length >= 2 && (part.chart !== "pie" || values.some((v) => v > 0));
+    part.chart === "bar"
+      ? values.length >= 1
+      : values.length >= 2 && (part.chart !== "pie" || values.some((v) => v > 0));
   if (!enough) return null;
   return (
     <View>
