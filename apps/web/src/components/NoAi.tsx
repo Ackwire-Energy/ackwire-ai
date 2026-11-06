@@ -19,13 +19,14 @@ import {
   signInAgainPlan,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Chip, Dialog, DialogFooter, Icon, InfoHint } from "@agenteschat/ui";
+import { Button, Chip, Dialog, DialogFooter, EventPillAction, Icon, InfoHint } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { type ConnectAiRequest, useConnectAi } from "@/components/ConnectAi";
 import { useOrg } from "@/components/org-context";
+import { RequestDone } from "@/components/RequestCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 import { useChannelEvents } from "@/realtime/context";
@@ -91,7 +92,8 @@ export function NoAiBanner({ agentIds, dmAgentId }: { agentIds: string[]; dmAgen
 
 /**
  * The agent's card in the conversation (`meta.noAi`): it won't answer, with Connect at the step the message
- * asked for. Once its agent has an AI: "Responder agora" (it answers by itself when connected from here).
+ * asked for. Once its agent has an AI, a decided request's pill with "Answer now" (it answers by itself when connected
+ * from here).
  */
 export function NoAiCard({ message }: { message: Message }) {
   const { t } = useTranslation();
@@ -122,35 +124,45 @@ export function NoAiCard({ message }: { message: Message }) {
       : answer === "still_missing"
         ? t("noAi.card.stillMissing", { name })
         : t(noAiLineKey(card), agentGrammar(name));
-  const action =
-    !connect || answering ? null : ready || answer === "pending" ? (
-      mayAnswer && (
-        <Button size="sm" variant="primary" loading={answer === "pending"} onClick={() => connect.answer(message.id)}>
-          {t("noAi.card.answerNow")}
-        </Button>
-      )
-    ) : !mayConnectAi(agent, me.user.id, org) ? (
-      <span className="small muted">{owner ? t("noAi.locked", { name, owner }) : t("noAi.lockedAdmins")}</span>
-    ) : (
-      <Button
-        size="sm"
-        onClick={() =>
-          connect.open({
-            intent: card.intent,
-            provider: card.provider,
-            agentId: card.agentId,
-            from: message.id,
-            ...(plan ? { plan } : {}),
-          })
+  // Its agent has an AI now (or is answering): a decided request, one pill with "Responder agora" in it.
+  if (ready || answering || answer === "pending")
+    return (
+      <RequestDone
+        done
+        label={title}
+        action={
+          connect && !answering && mayAnswer ? (
+            <EventPillAction disabled={answer === "pending"} onClick={() => connect.answer(message.id)}>
+              {t("noAi.card.answerNow")}
+            </EventPillAction>
+          ) : undefined
         }
       >
-        {t(again ? "agentPage.work.brain.signInAgain" : "noAi.action")}
-      </Button>
+        {title}
+      </RequestDone>
     );
+  const action = !connect ? null : !mayConnectAi(agent, me.user.id, org) ? (
+    <span className="small muted">{owner ? t("noAi.locked", { name, owner }) : t("noAi.lockedAdmins")}</span>
+  ) : (
+    <Button
+      size="sm"
+      onClick={() =>
+        connect.open({
+          intent: card.intent,
+          provider: card.provider,
+          agentId: card.agentId,
+          from: message.id,
+          ...(plan ? { plan } : {}),
+        })
+      }
+    >
+      {t(again ? "agentPage.work.brain.signInAgain" : "noAi.action")}
+    </Button>
+  );
   return (
-    <div className="waitcard" data-done={ready || answering || undefined}>
+    <div className="waitcard">
       <span className="waitcard__top ac-iconline">
-        <Icon name={ready || answering ? "check" : "plug"} size={16} />
+        <Icon name="plug" size={16} />
         <span>{title}</span>
       </span>
       {action && <span className="waitcard__acts">{action}</span>}
@@ -185,38 +197,45 @@ function PlanLineCard({
   const billingUrl = useAuthConfig().data?.billingUrl;
   const hold = can(org, "manage_billing") && billingUrl ? billingHoldOf(org.standing) : null;
   const fix = planLineFix(line, agent, me.user.id, org);
+  // It can think again: a decided request, one pill with "Responder agora" in it.
+  if (ready)
+    return (
+      <RequestDone
+        done
+        label={t("noAi.card.connected", { name })}
+        action={
+          connect ? (
+            <EventPillAction onClick={() => connect.answer(message.id)}>{t("noAi.card.answerNow")}</EventPillAction>
+          ) : undefined
+        }
+      >
+        {t("noAi.card.connected", { name })}
+      </RequestDone>
+    );
   return (
-    <div className="waitcard" data-done={ready || undefined}>
+    <div className="waitcard">
       <span className="waitcard__top ac-iconline">
-        <Icon name={ready ? "check" : "plug"} size={16} />
-        <span>{ready ? t("noAi.card.connected", { name }) : t(`noAi.rightHand.${line}`, { name, model })}</span>
+        <Icon name="plug" size={16} />
+        <span>{t(`noAi.rightHand.${line}`, { name, model })}</span>
       </span>
       {connect && (
         <span className="waitcard__acts">
-          {ready ? (
-            <Button size="sm" variant="primary" onClick={() => connect.answer(message.id)}>
-              {t("noAi.card.answerNow")}
+          {hold && (
+            <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
+              {t(`standing.billing.cta.${hold}`)}
+            </BillingLinkButton>
+          )}
+          {/* The workspace's plan serves only its owner: the person's own plan answers them (ADR 0137 §11). */}
+          {fix === "connectMine" ? (
+            <Button size="sm" onClick={() => connect.open({ agentId, from: message.id })}>
+              {t("rightHand.settings.connectMine")}
+            </Button>
+          ) : fix === "useKey" ? (
+            <Button size="sm" onClick={() => connect.open({ agentId, intent: "api_key", from: message.id })}>
+              {t("noAi.rightHand.useKey")}
             </Button>
           ) : (
-            <>
-              {hold && (
-                <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
-                  {t(`standing.billing.cta.${hold}`)}
-                </BillingLinkButton>
-              )}
-              {/* The workspace's plan serves only its owner: the person's own plan answers them (ADR 0137 §11). */}
-              {fix === "connectMine" ? (
-                <Button size="sm" onClick={() => connect.open({ agentId, from: message.id })}>
-                  {t("rightHand.settings.connectMine")}
-                </Button>
-              ) : fix === "useKey" ? (
-                <Button size="sm" onClick={() => connect.open({ agentId, intent: "api_key", from: message.id })}>
-                  {t("noAi.rightHand.useKey")}
-                </Button>
-              ) : (
-                <span className="small muted">{t("noAi.lockedAdmins")}</span>
-              )}
-            </>
+            <span className="small muted">{t("noAi.lockedAdmins")}</span>
           )}
         </span>
       )}

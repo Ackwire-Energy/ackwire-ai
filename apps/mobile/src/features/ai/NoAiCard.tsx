@@ -16,7 +16,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, LineIcon, Text, useTheme } from "@/ui";
+import { Button, EventPillAction, LineIcon, Text, useTheme } from "@/ui";
+import { AskDone } from "../chat/asks";
 import { useDirectory, useMeId } from "../shared/hooks";
 
 type Answer = "pending" | "answering" | "still_missing";
@@ -47,8 +48,9 @@ export const openConnectAi = (
 };
 
 /**
- * The web's no-AI card under an agent's "não tenho uma IA" reply (`meta.noAi`): Conectar opens the key sheet,
- * and once the agent has an AI, Responder agora has it answer what it couldn't (who asked, its owner or an admin).
+ * The web's no-AI card under an agent's "I have no AI" reply (`meta.noAi`): Connect opens the key sheet, and once the
+ * agent has an AI, a decided request's pill with "Answer now" has it answer what it couldn't (who asked, its owner or
+ * an admin).
  */
 export function NoAiCard({ message: m }: { message: Message }) {
   const { t } = useTranslation();
@@ -100,15 +102,33 @@ export function NoAiCard({ message: m }: { message: Message }) {
       setAnswer(code === "ai.still_missing" ? "still_missing" : null);
     }
   };
+  // Its agent has an AI now (or is answering): a decided request, one pill with "Answer now" in it.
+  if (answering || (!planLine && (ready || answer === "pending")))
+    return (
+      <AskDone
+        done
+        words={title}
+        actions={
+          !answering && mayAnswer ? (
+            <EventPillAction
+              key="answer"
+              label={t("noAi.card.answerNow")}
+              loading={answer === "pending"}
+              onPress={() => void answerNow()}
+            />
+          ) : null
+        }
+      />
+    );
   return (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.top}>
-        <LineIcon name={ready || answering ? "check" : "bolt"} variant="subhead" size={16} color={colors.ink2} />
+        <LineIcon name="bolt" variant="subhead" size={16} color={colors.ink2} />
         <Text variant="subhead" style={styles.title}>
           {title}
         </Text>
       </View>
-      {answering ? null : planLine ? (
+      {planLine ? (
         fix ? (
           <Button
             variant="secondary"
@@ -125,16 +145,6 @@ export function NoAiCard({ message: m }: { message: Message }) {
         ) : (
           locked
         )
-      ) : ready || answer === "pending" ? (
-        mayAnswer ? (
-          <Button
-            variant="primary"
-            size="sm"
-            label={t("noAi.card.answerNow")}
-            disabled={answer === "pending"}
-            onPress={() => void answerNow()}
-          />
-        ) : null
       ) : !mayConnect ? (
         locked
       ) : (
