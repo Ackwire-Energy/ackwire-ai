@@ -227,6 +227,7 @@ export async function buildTeamWeek(
     await db.execute(sql`select assignee_id as agent_id, count(*) as n from issues
       where org_id = ${w.orgId} and status = 'done' and assignee_type = 'agent'
         and updated_at >= ${start}::timestamptz and updated_at < ${end}::timestamptz
+        and (channel_id is null or exists (select 1 from channels c where c.id = issues.channel_id and ${visible}))
       group by assignee_id order by n desc limit 1`),
   );
   const worked: TeamWeekHighlight[] = [
