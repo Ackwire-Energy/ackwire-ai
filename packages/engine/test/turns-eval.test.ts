@@ -102,8 +102,8 @@ const size = (r: ModelRequest) =>
  * gave (`remember` kind rule, ADR 0120), the private card for passwords and codes and @todos, once two more rules
  * stopped repeating others, and 45,669 with a send to someone else settled from the conversation before it goes
  * (no assumption on what can't be undone), nothing offered or promised beyond the list and files on `send_dm`, 45,475
- * with `request_permission` down to one reason (`why`) and the task board on by default; the ceiling leaves a little
- * room.
+ * with `request_permission` down to one reason (`why`) and the task board on by default, 45,803 with `ask_user`'s
+ * `person` and the rule that what is said in a DM stays there; the ceiling leaves a little room.
  */
 const OI_CEILING_CHARS = 45_900;
 

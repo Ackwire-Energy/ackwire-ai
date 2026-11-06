@@ -521,6 +521,12 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           const { trust, person, outside } = await learnTrust(ctx);
           const rule = input.kind === "rule";
           const said = (rule || input.basis !== "found") && person !== null && (await triggerAuthor(ctx)) === person;
+          // "Everywhere" from a DM reaches this person's runs only: what they said there never reads in someone else's.
+          const [here] = await ctx.db
+            .select({ kind: schema.channels.kind })
+            .from(schema.channels)
+            .where(and(eq(schema.channels.orgId, ctx.orgId), eq(schema.channels.id, ctx.channelId)));
+          const theirsAlone = !rule && input.everywhere === true && said && here?.kind === "dm";
           // A rule's authority is the person who wrote this run's message: another agent's or a page's words give none.
           if (rule && !said) return { content: NOT_THEIR_RULE, isError: true };
           // The permission judge can be absent or fail open: a run that read a page, a mail or an app makes no rule.
@@ -532,8 +538,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               kind: (["fact", "preference", "decision", "note", "rule"].includes(str(input.kind))
                 ? str(input.kind)
                 : "fact") as "fact" | "preference" | "decision" | "note" | "rule",
-              scopeType: "agent",
-              scopeId: ctx.agentId,
+              scopeType: theirsAlone ? "person" : "agent",
+              scopeId: theirsAlone ? person : ctx.agentId,
               agentId: ctx.agentId,
               title: str(input.title),
               subject: str(input.key).trim() || str(input.title) || content.slice(0, 120),

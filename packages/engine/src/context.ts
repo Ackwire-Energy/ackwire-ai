@@ -747,6 +747,11 @@ export async function buildRunContext(
             ${channel.kind !== "channel" ? sql`` : sql`and ${sameConversation}`})
           and exists (select 1 from channel_members m
             where m.channel_id = r.channel_id and m.user_id = ${workedFor ?? ""})
+          -- Everyone here reads the reply: what stayed in a DM or a private channel shows only if they are all there too.
+          and ((c.kind = 'channel' and c.visibility = 'public') or not exists (
+            select 1 from channel_members here where here.channel_id = ${run.channelId}::uuid and here.user_id is not null
+              and not exists (select 1 from channel_members there
+                where there.channel_id = r.channel_id and there.user_id = here.user_id)))
         order by s.created_at desc limit 30)`),
   );
   // A result read from outside never shows here (ADR 0117): only that the tool read it.
@@ -926,6 +931,7 @@ export async function buildRunContext(
           options.toolsAvailable
             ? '- You work in several conversations (channels, DMs, threads). "In the DM", "in private" or "over in #channel" (in Portuguese "no privado", "na DM", "lá no #canal") point to one of them, not to where you should answer: find what they mean in "Your recent work" or with `list_artifacts` (`createdByMe`) before saying you have no record of it, and bring a file here with `share_artifact`. Never say you only answer in this channel or can\'t see the DM. To post in another channel, use `post_message` (told to continue there or out of a thread: at once, with `move_here`); to tell a person in private, use `send_dm`: never say you can\'t message people. When someone asks for a PDF of a document, share it: its card has "Download PDF".'
             : "",
+          "- What a person tells you in a DM stays in that DM: never repeat it or hint at it to anyone else or anywhere else unless they tell you to.",
           '- Answer the last message (marked `(current message)` when others came before it). Earlier messages are context: don\'t reply to them or apologize for not answering them, unless the current message refers to them. When the current message only calls you (just your @handle or name, or a nudge like "and?" / "e aí?"), it points at the same person\'s message just before it: answer that one.',
           "- Reply with the message text only, without an author prefix. Mention another agent with @handle only when you need it to act.",
         ]
@@ -1647,8 +1653,8 @@ const ORIGIN_QUOTE = 300;
  * Why the agent sent its messages here from another conversation (`meta.agentDm` of `send_dm`, `meta.postedFrom` of
  * `post_message`), one line each, so "where did he ask?" has an answer: who asked and where, with the request quoted
  * and linked when `requester` (whom this run answers) is in that conversation and, unless it is a public channel, so is
- * everyone here (the reply is read by all of them); otherwise who asked, and the channel only when it is public
- * (ADR 0017: a private conversation's name never reaches someone outside it).
+ * everyone here (the reply is read by all of them); otherwise who asked (never from a DM), and the channel only when
+ * it is public (ADR 0017: a private conversation's name never reaches someone outside it).
  */
 async function originNotes(
   db: Database,
@@ -1690,7 +1696,8 @@ async function originNotes(
   for (const [id, originId] of from) {
     const o = origins.get(originId);
     if (!o) continue;
-    const who = o.who.replace(/ \(@[^)]*\)$/, "");
+    // Who asked in a DM stays in that DM, as what they said there does.
+    const who = member.has(o.channelId) || o.channelKind !== "dm" ? o.who.replace(/ \(@[^)]*\)$/, "") : "Someone";
     if (member.has(o.channelId)) {
       const said = o.body.replace(/\s+/g, " ").trim();
       const quote = said.length > ORIGIN_QUOTE ? `${cutText(said, ORIGIN_QUOTE).trimEnd()}…` : said;

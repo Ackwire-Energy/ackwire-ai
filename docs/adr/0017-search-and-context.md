@@ -49,3 +49,20 @@ the agent sent a message because of another (`send_dm`'s `meta.agentDm`, `post_m
 `fromMessageId`), that origin message alone may be read, quoted and linked when the person behind the run is in its
 conversation and, unless it is a public channel, so is every person in the conversation the agent speaks in; otherwise
 its later runs learn only who asked, and the channel only when it is public.
+
+## Addendum (2026-11-06): what a person says in a DM stays in that DM
+
+An agent's reply in a channel is read by everyone there, so a DM reaches a conversation only as far as code lets it:
+
+- "Your recent work with X in other conversations" lists a DM's or a private channel's work only when every person in
+  the conversation is in it too, the rule `originNotes` already followed. A public channel's work always shows. Files
+  still come when the person asks (`list_artifacts`, `share_artifact`).
+- The origin note of a message sent from a DM names nobody to someone outside that DM: "Someone asked…".
+- `remember` with `everywhere` in a DM saves a person-scoped item: it reaches that person's runs, in any conversation,
+  and no one else's. Elsewhere it stays agent-wide.
+- `send_dm` no longer tells the agent to say who asked and why when the asking was in a DM, and one line in the prompt
+  states the rule.
+
+Not enforced by code: what the model itself writes in a `send_dm` or `post_message` from a DM, a person's `rule` (it
+holds for all the agent's work when its giver decides the agent's approvals, so its text reads in others' runs), and
+what a computer brain keeps in its own files. Those rest on the prompt line.
