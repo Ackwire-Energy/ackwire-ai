@@ -3,6 +3,7 @@ import { ROUTINE_TEMPLATES, templateRule } from "@agenteschat/client/lib/routine
 import {
   type ConnectorListingEntry,
   connectorListing,
+  EVENT_WEBHOOK,
   normalizeRule,
   ruleToCron,
   type ScheduleRule,
@@ -23,4 +24,9 @@ test("the server takes every template's schedule as it is", () => {
     const rule = templateRule(x, { start: "2026-11-06", timezone: "America/Sao_Paulo" }) as ScheduleRule;
     expect({ key: x.key, cron: ruleToCron(normalizeRule(rule)) === null }).toEqual({ key: x.key, cron: false });
   }
+});
+
+test("no template waits on a webhook, which nobody can set up from the app", () => {
+  const waiting = ROUTINE_TEMPLATES.filter((x) => x.kind === "event" && EVENT_WEBHOOK[x.event]).map((x) => x.key);
+  expect(waiting).toEqual([]);
 });

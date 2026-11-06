@@ -6310,6 +6310,9 @@
       "needsApps": "Heeft een van deze apps nodig: {{apps}}",
       "needsMailbox": "Heeft een gekoppelde mailbox nodig",
       "connectFirst": "Koppel hem zodat de routine werkt.",
+      "fillBlank": "Vervang eerst de tekst tussen haakjes.",
+      "replaceTitle": "Wat je schreef vervangen door dit sjabloon?",
+      "replaceConfirm": "Vervangen",
       "areas": {
         "team": "Team en dagritme",
         "sales": "Verkoop en klanten",
@@ -6338,7 +6341,7 @@
       "leads": {
         "name": "Nieuwe CRM-contacten",
         "text": "Werkdagen om 9:00, wie er binnenkwam en met wie je begint.",
-        "prompt": "Bekijk in het CRM de contacten die sinds gisteren zijn binnengekomen. Zeg wie het meest belooft en stel per contact de volgende stap voor."
+        "prompt": "Bekijk in het CRM de contacten die sinds de vorige keer zijn binnengekomen. Zeg wie het meest belooft en stel per contact de volgende stap voor."
       },
       "stalled": {
         "name": "Stilstaande deals",
@@ -6387,13 +6390,13 @@
       },
       "revenue": {
         "name": "Verkoop van gisteren",
-        "text": "Werkdagen om 8:00, de verkoop tegenover het weekgemiddelde.",
+        "text": "Elke dag om 8:00, de verkoop tegenover het weekgemiddelde.",
         "prompt": "Bekijk hoeveel we gisteren verkochten en vergelijk dat met het gemiddelde van de afgelopen 7 dagen. Zeg of iets afwijkt."
       },
       "failed": {
         "name": "Betaalproblemen",
         "text": "Werkdagen om 10:00, weigeringen en geschillen.",
-        "prompt": "Bekijk geweigerde betalingen, terugbetalingen en geschillen sinds gisteren. Noem ze met het bedrag en de klant."
+        "prompt": "Bekijk geweigerde betalingen, terugbetalingen en geschillen sinds de vorige keer. Noem ze met het bedrag en de klant."
       },
       "monthClose": {
         "name": "Maandafsluiting",
@@ -6403,7 +6406,7 @@
       "sheet": {
         "name": "Spreadsheet controleren",
         "text": "Werkdagen om 11:00, gaten en vreemde cijfers.",
-        "prompt": "Controleer deze spreadsheet: (zeg welke). Wijs op lege velden, afwijkende waarden en wat er sinds gisteren veranderde."
+        "prompt": "Controleer deze spreadsheet: (zeg welke). Wijs op lege velden, afwijkende waarden en wat er sinds de vorige keer veranderde."
       },
       "page": {
         "name": "Pagina in de gaten houden",
@@ -6425,15 +6428,10 @@
         "text": "Maandag om 8:30, vrije dagen en reizen.",
         "prompt": "Bekijk in de agenda de vrije dagen en reizen van deze week. Noem ze per dag en zeg wat waargenomen moet worden."
       },
-      "deploy": {
-        "name": "Elke deploy nakijken",
-        "text": "Als een deploy klaar is, een samenvatting in gewone woorden.",
-        "prompt": "Lees wat er in deze deploy zit. Vat het voor het team in gewone woorden samen en zeg wat er getest moet worden."
-      },
       "digest": {
         "name": "Dagelijkse samenvatting van het kanaal",
         "text": "Op werkdagen om 9:00, wat er gisteren gebeurde.",
-        "prompt": "Vat samen wat er gisteren in het kanaal gebeurde: verzoeken, wat is opgelost en wat onbeantwoord bleef."
+        "prompt": "Vat samen wat er sinds de vorige samenvatting in het kanaal gebeurde: verzoeken, wat is opgelost en wat onbeantwoord bleef."
       },
       "errors": {
         "name": "Nieuwe fouten in de gaten houden",
@@ -6442,8 +6440,8 @@
       },
       "prs": {
         "name": "Nieuwe PR's reviewen",
-        "text": "Als er een PR opent, leest de agent hem en geeft commentaar.",
-        "prompt": "Lees de diff van de nieuwe PR, wijs op risico's en zeg wat je met de hand moet testen."
+        "text": "Werkdagen om 9:00 en 14:00 leest de agent nieuwe PR's en wijst op risico's.",
+        "prompt": "Bekijk de PR's die sinds de vorige keer zijn geopend. Lees elke diff, wijs op risico's en zeg wat je met de hand moet testen."
       },
       "week": {
         "name": "Weekafsluiting",

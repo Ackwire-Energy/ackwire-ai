@@ -43,7 +43,12 @@ import {
 } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
-import { type RoutineTemplateOption, templateRule } from "@agenteschat/client/lib/routine-templates";
+import {
+  blankLeft,
+  ownWords,
+  type RoutineTemplateOption,
+  templateRule,
+} from "@agenteschat/client/lib/routine-templates";
 import {
   busyOnComputer,
   healthWords,
@@ -2227,8 +2232,9 @@ function RoutineDialog({
   const [target, setTarget] = useState(targetChoice(routine?.target));
   const [prompt, setPrompt] = useState(routine?.prompt ?? "");
   const [name, setName] = useState(routine?.name ?? "");
-  // The starting point picked, by its key.
-  const [template, setTemplate] = useState<string>();
+  // The starting point picked, and one waiting for the person's ok to write over their words.
+  const [template, setTemplate] = useState<RoutineTemplateOption>();
+  const [replacing, setReplacing] = useState<RoutineTemplateOption>();
   const [kind, setKind] = useState<"schedule" | "event" | "email" | "webhook" | "connector">(
     routine?.trigger.type === "event" ||
       routine?.trigger.type === "email" ||
@@ -2416,7 +2422,7 @@ function RoutineDialog({
   };
   /** A starting point fills the form; everything in it stays the person's to change. */
   const applyTemplate = (o: RoutineTemplateOption) => {
-    setTemplate(o.value);
+    setTemplate(o);
     setPrompt(o.prompt);
     setName(o.label);
     setReport(o.report);
@@ -2424,12 +2430,13 @@ function RoutineDialog({
     if (o.template.kind === "event") setEvent(o.template.event);
     if (o.template.kind === "schedule") pickRule(templateRule(o.template, rule));
   };
+  const unfilled = blankLeft(prompt, template);
   const becameWebhook = (saved: Routine | undefined) => {
     if (saved?.trigger.type === "webhook") onWebhook?.(saved);
   };
   const submit = () => {
     setTouched(true);
-    if ((!part && !prompt.trim()) || !agentId || !scheduleOk) return;
+    if ((!part && !prompt.trim()) || unfilled || !agentId || !scheduleOk) return;
     if (routine) {
       const all = changes(routine);
       // A part sends only its own fields (a prompt stored with spaces around it is not a change of "Quando").
@@ -2515,7 +2522,12 @@ function RoutineDialog({
         <Locked when={action.isPending}>
           <DialogBody>
             {!part && agents.length === 0 && <p className="small muted">{t("routines.form.noAgents")}</p>}
-            {!editing && <RoutineTemplateSelect value={template} onPick={applyTemplate} />}
+            {!editing && (
+              <RoutineTemplateSelect
+                value={template?.value}
+                onPick={(o) => (ownWords(prompt, template) ? setReplacing(o) : applyTemplate(o))}
+              />
+            )}
             {!part ? (
               <div className="grid-fields">
                 <Field label={t("routines.form.agent")} id="nr-agent">
@@ -2540,7 +2552,15 @@ function RoutineDialog({
                 <Field
                   label={t("routines.form.what")}
                   id="nr-what"
-                  error={touched && !prompt.trim() ? t("routines.form.required") : undefined}
+                  error={
+                    !touched
+                      ? undefined
+                      : !prompt.trim()
+                        ? t("routines.form.required")
+                        : unfilled
+                          ? t("routines.presets.fillBlank")
+                          : undefined
+                  }
                 >
                   <Textarea
                     rows={3}
@@ -2715,6 +2735,26 @@ function RoutineDialog({
           </Button>
         </DialogFooter>
       </form>
+      <Dialog
+        open={replacing !== undefined}
+        onOpenChange={(o) => !o && setReplacing(undefined)}
+        title={t("routines.presets.replaceTitle")}
+        closeLabel={t("common.close")}
+        width={440}
+      >
+        <DialogFooter>
+          <Button onClick={() => setReplacing(undefined)}>{t("common.cancel")}</Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              if (replacing) applyTemplate(replacing);
+              setReplacing(undefined);
+            }}
+          >
+            {t("routines.presets.replaceConfirm")}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </Dialog>
   );
 }

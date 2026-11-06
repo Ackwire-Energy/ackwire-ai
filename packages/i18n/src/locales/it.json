@@ -6494,6 +6494,9 @@
       "needsApps": "Serve una di queste app: {{apps}}",
       "needsMailbox": "Serve una casella email collegata",
       "connectFirst": "Collegala perché la routine funzioni.",
+      "fillBlank": "Prima sostituisci il testo tra parentesi.",
+      "replaceTitle": "Sostituire quello che hai scritto con questo modello?",
+      "replaceConfirm": "Sostituisci",
       "areas": {
         "team": "Team e routine del giorno",
         "sales": "Vendite e clienti",
@@ -6522,7 +6525,7 @@
       "leads": {
         "name": "Nuovi contatti del CRM",
         "text": "Nei giorni feriali alle 9, chi è arrivato e da chi partire.",
-        "prompt": "Guarda nel CRM i contatti arrivati da ieri. Di' chi sembra più promettente e suggerisci il prossimo passo per ognuno."
+        "prompt": "Guarda nel CRM i contatti arrivati dall'ultima volta. Di' chi sembra più promettente e suggerisci il prossimo passo per ognuno."
       },
       "stalled": {
         "name": "Trattative ferme",
@@ -6571,13 +6574,13 @@
       },
       "revenue": {
         "name": "Vendite di ieri",
-        "text": "Nei giorni feriali alle 8, le vendite rispetto alla media settimanale.",
+        "text": "Ogni giorno alle 8, le vendite rispetto alla media settimanale.",
         "prompt": "Guarda quanto abbiamo venduto ieri e confrontalo con la media degli ultimi 7 giorni. Di' se qualcosa è fuori dal normale."
       },
       "failed": {
         "name": "Problemi di pagamento",
         "text": "Nei giorni feriali alle 10, rifiuti e contestazioni.",
-        "prompt": "Guarda i pagamenti rifiutati, i rimborsi e le contestazioni da ieri. Elenca ognuno con l'importo e il cliente."
+        "prompt": "Guarda i pagamenti rifiutati, i rimborsi e le contestazioni dall'ultima volta. Elenca ognuno con l'importo e il cliente."
       },
       "monthClose": {
         "name": "Chiusura del mese",
@@ -6587,7 +6590,7 @@
       "sheet": {
         "name": "Controllare un foglio di calcolo",
         "text": "Nei giorni feriali alle 11, vuoti e numeri strani.",
-        "prompt": "Controlla questo foglio di calcolo: (di' quale). Segnala campi vuoti, valori fuori dal normale e cosa è cambiato da ieri."
+        "prompt": "Controlla questo foglio di calcolo: (di' quale). Segnala campi vuoti, valori fuori dal normale e cosa è cambiato dall'ultima volta."
       },
       "page": {
         "name": "Tenere d'occhio una pagina",
@@ -6609,15 +6612,10 @@
         "text": "Il lunedì alle 8:30, permessi e viaggi.",
         "prompt": "Guarda nel calendario i permessi e i viaggi di questa settimana. Elencali per giorno e di' cosa va coperto."
       },
-      "deploy": {
-        "name": "Controllare ogni deploy",
-        "text": "Quando finisce un deploy, un riepilogo in parole semplici.",
-        "prompt": "Leggi cosa è entrato in questo deploy. Riassumilo per il team in parole semplici e di' cosa testare."
-      },
       "digest": {
         "name": "Riepilogo giornaliero del canale",
         "text": "Nei giorni feriali alle 9, cosa è successo ieri.",
-        "prompt": "Riassumi cosa è successo ieri nel canale: richieste, cosa è stato risolto e cosa è rimasto senza risposta."
+        "prompt": "Riassumi cosa è successo nel canale dall'ultimo riassunto: richieste, cosa è stato risolto e cosa è rimasto senza risposta."
       },
       "errors": {
         "name": "Tieni d'occhio i nuovi errori",
@@ -6626,8 +6624,8 @@
       },
       "prs": {
         "name": "Rivedi le nuove PR",
-        "text": "Quando si apre una PR, l'agente la legge e la commenta.",
-        "prompt": "Leggi il diff della nuova PR, segnala i rischi e indica cosa testare a mano."
+        "text": "Nei giorni feriali alle 9 e alle 14, l'agente legge le nuove PR e segnala i rischi.",
+        "prompt": "Guarda le PR aperte dall'ultima volta. Leggi ogni diff, segnala i rischi e indica cosa testare a mano."
       },
       "week": {
         "name": "Bilancio della settimana",

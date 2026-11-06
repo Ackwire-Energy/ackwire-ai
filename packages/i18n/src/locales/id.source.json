@@ -15187,6 +15187,15 @@
   "routines.presets.connectFirst": {
     "value": "Connect it so the routine can work."
   },
+  "routines.presets.fillBlank": {
+    "value": "Replace the text in brackets first."
+  },
+  "routines.presets.replaceTitle": {
+    "value": "Replace what you wrote with this template?"
+  },
+  "routines.presets.replaceConfirm": {
+    "value": "Replace"
+  },
   "routines.presets.areas.team": {
     "value": "Team and daily routine"
   },
@@ -15245,7 +15254,7 @@
     "value": "Weekdays at 9am, who came in and who to call first."
   },
   "routines.presets.leads.prompt": {
-    "value": "Check the CRM for contacts added since yesterday. Say who looks most promising and suggest the next step for each."
+    "value": "Check the CRM for contacts added since last time. Say who looks most promising and suggest the next step for each."
   },
   "routines.presets.stalled.name": {
     "value": "Stalled deals"
@@ -15332,7 +15341,7 @@
     "value": "Yesterday's sales"
   },
   "routines.presets.revenue.text": {
-    "value": "Weekdays at 8am, sales against the weekly average."
+    "value": "Every day at 8am, sales against the weekly average."
   },
   "routines.presets.revenue.prompt": {
     "value": "Check how much we sold yesterday and compare it with the average of the last 7 days. Say if anything looks unusual."
@@ -15344,7 +15353,7 @@
     "value": "Weekdays at 10am, declined charges and disputes."
   },
   "routines.presets.failed.prompt": {
-    "value": "Check declined payments, refunds and disputes since yesterday. List each one with the amount and the customer."
+    "value": "Check declined payments, refunds and disputes since last time. List each one with the amount and the customer."
   },
   "routines.presets.monthClose.name": {
     "value": "Month-end summary"
@@ -15362,7 +15371,7 @@
     "value": "Weekdays at 11am, gaps and odd numbers."
   },
   "routines.presets.sheet.prompt": {
-    "value": "Check this spreadsheet: (say which one). Point out empty fields, unusual values and what changed since yesterday."
+    "value": "Check this spreadsheet: (say which one). Point out empty fields, unusual values and what changed since last time."
   },
   "routines.presets.page.name": {
     "value": "Watch a web page"
@@ -15400,15 +15409,6 @@
   "routines.presets.away.prompt": {
     "value": "Check the calendar for time off and trips this week. List them by day and say what needs covering."
   },
-  "routines.presets.deploy.name": {
-    "value": "Check every deploy"
-  },
-  "routines.presets.deploy.text": {
-    "value": "When a deploy finishes, a summary in plain words."
-  },
-  "routines.presets.deploy.prompt": {
-    "value": "Read what went into this deploy. Summarize it for the team in plain words and say what to test."
-  },
   "routines.presets.digest.name": {
     "value": "Daily channel digest"
   },
@@ -15416,7 +15416,7 @@
     "value": "Weekdays at 9am, what happened yesterday."
   },
   "routines.presets.digest.prompt": {
-    "value": "Summarize what happened yesterday in the channel: requests, what got solved and what was left unanswered."
+    "value": "Summarize what happened in the channel since the last digest: requests, what got solved and what was left unanswered."
   },
   "routines.presets.errors.name": {
     "value": "Watch for new errors"
@@ -15431,10 +15431,10 @@
     "value": "Review new PRs"
   },
   "routines.presets.prs.text": {
-    "value": "When a PR opens, the agent reads it and comments."
+    "value": "Weekdays at 9am and 2pm, the agent reads new PRs and points out risks."
   },
   "routines.presets.prs.prompt": {
-    "value": "Read the new PR's diff, point out risks and say what to test by hand."
+    "value": "Check the PRs opened since last time. Read each diff, point out risks and say what to test by hand."
   },
   "routines.presets.week.name": {
     "value": "Week wrap-up"

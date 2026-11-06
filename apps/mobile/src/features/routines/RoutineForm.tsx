@@ -12,13 +12,18 @@ import {
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { splitAddresses } from "@agenteschat/client/lib/mail";
 import { routineReachWarnings } from "@agenteschat/client/lib/reach";
-import { type RoutineTemplateOption, templateRule } from "@agenteschat/client/lib/routine-templates";
+import {
+  blankLeft,
+  ownWords,
+  type RoutineTemplateOption,
+  templateRule,
+} from "@agenteschat/client/lib/routine-templates";
 import { busyOnComputer, runsPerDay } from "@agenteschat/client/lib/routine-view";
 import { timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import { router } from "expo-router";
 import { type ReactNode, useDeferredValue, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import {
@@ -286,14 +291,20 @@ function Form({ routine }: { routine: Routine | undefined }) {
       : d.kind === "email"
         ? Boolean(d.email.accountId) && !fromBad
         : !phraseFailed);
+  const [template, setTemplate] = useState<RoutineTemplateOption>();
+  const unfilled = blankLeft(d.prompt, template);
   const ready =
-    !action.isPending && Boolean(d.agentId) && (promptHidden || d.prompt.trim().length > 0) && scheduleOk && !parsing;
+    !action.isPending &&
+    Boolean(d.agentId) &&
+    (promptHidden || d.prompt.trim().length > 0) &&
+    !unfilled &&
+    scheduleOk &&
+    !parsing;
 
-  const [template, setTemplate] = useState<string>();
   /** A starting point fills the form; everything in it stays the person's to change. */
   const applyTemplate = (o: RoutineTemplateOption) => {
     const picked = o.template;
-    setTemplate(o.value);
+    setTemplate(o);
     setPhrase("");
     setPhraseTyped(false);
     setD((x) => ({
@@ -305,6 +316,13 @@ function Form({ routine }: { routine: Routine | undefined }) {
       ...(picked.kind === "event" ? { event: picked.event } : {}),
       ...(picked.kind === "schedule" ? { rule: templateRule(picked, x.rule) } : {}),
     }));
+  };
+  const pickTemplate = (o: RoutineTemplateOption) => {
+    if (!ownWords(d.prompt, template)) return applyTemplate(o);
+    Alert.alert(t("routines.presets.replaceTitle"), undefined, [
+      { text: t("mobile.common.cancel"), style: "cancel" },
+      { text: t("routines.presets.replaceConfirm"), style: "destructive", onPress: () => applyTemplate(o) },
+    ]);
   };
 
   /**
@@ -386,7 +404,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
       >
         <Locked when={action.isPending}>
           {agents.length === 0 && !dir.loading ? <GroupedFooter>{t("routines.form.noAgents")}</GroupedFooter> : null}
-          {!editing ? <TemplatePicker value={template} onPick={applyTemplate} /> : null}
+          {!editing ? <TemplatePicker value={template?.value} onPick={pickTemplate} /> : null}
 
           <GroupedHeader>{t("routines.form.agent")}</GroupedHeader>
           <GroupedList>
@@ -452,6 +470,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
               minHeight={110}
             />
           )}
+          {unfilled ? <GroupedFooter>{t("routines.presets.fillBlank")}</GroupedFooter> : null}
           <GroupedHeader>{editing ? t("routines.form.title") : t("routines.form.name")}</GroupedHeader>
           <TextArea
             value={d.name}

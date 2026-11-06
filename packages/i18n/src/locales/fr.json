@@ -6490,6 +6490,9 @@
       "needsApps": "Nécessite une de ces apps : {{apps}}",
       "needsMailbox": "Nécessite une boîte mail connectée",
       "connectFirst": "Connectez-la pour que la routine fonctionne.",
+      "fillBlank": "Remplacez d'abord le texte entre parenthèses.",
+      "replaceTitle": "Remplacer ce que vous avez écrit par ce modèle ?",
+      "replaceConfirm": "Remplacer",
       "areas": {
         "team": "Équipe et routine du jour",
         "sales": "Ventes et clients",
@@ -6518,7 +6521,7 @@
       "leads": {
         "name": "Nouveaux contacts du CRM",
         "text": "Les jours ouvrés à 9 h, qui est arrivé et par qui commencer.",
-        "prompt": "Regardez dans le CRM les contacts arrivés depuis hier. Dites lesquels semblent les plus prometteurs et proposez la prochaine étape pour chacun."
+        "prompt": "Regardez dans le CRM les contacts arrivés depuis la dernière fois. Dites lesquels semblent les plus prometteurs et proposez la prochaine étape pour chacun."
       },
       "stalled": {
         "name": "Affaires à l'arrêt",
@@ -6567,13 +6570,13 @@
       },
       "revenue": {
         "name": "Ventes d'hier",
-        "text": "Les jours ouvrés à 8 h, les ventes face à la moyenne de la semaine.",
+        "text": "Tous les jours à 8 h, les ventes face à la moyenne de la semaine.",
         "prompt": "Regardez combien nous avons vendu hier et comparez à la moyenne des 7 derniers jours. Dites si quelque chose sort de l'ordinaire."
       },
       "failed": {
         "name": "Problèmes de paiement",
         "text": "Les jours ouvrés à 10 h, refus et litiges.",
-        "prompt": "Regardez les paiements refusés, les remboursements et les litiges depuis hier. Listez chacun avec le montant et le client."
+        "prompt": "Regardez les paiements refusés, les remboursements et les litiges depuis la dernière fois. Listez chacun avec le montant et le client."
       },
       "monthClose": {
         "name": "Clôture du mois",
@@ -6583,7 +6586,7 @@
       "sheet": {
         "name": "Vérifier un tableur",
         "text": "Les jours ouvrés à 11 h, les trous et les chiffres étranges.",
-        "prompt": "Vérifiez ce tableur : (dites lequel). Signalez les champs vides, les valeurs inhabituelles et ce qui a changé depuis hier."
+        "prompt": "Vérifiez ce tableur : (dites lequel). Signalez les champs vides, les valeurs inhabituelles et ce qui a changé depuis la dernière fois."
       },
       "page": {
         "name": "Surveiller une page",
@@ -6605,15 +6608,10 @@
         "text": "Le lundi à 8 h 30, congés et déplacements.",
         "prompt": "Regardez dans le calendrier les congés et déplacements de cette semaine. Listez-les par jour et dites ce qui doit être couvert."
       },
-      "deploy": {
-        "name": "Vérifier chaque déploiement",
-        "text": "À la fin d'un déploiement, un résumé en mots simples.",
-        "prompt": "Lisez ce qui est entré dans ce déploiement. Résumez-le pour l'équipe en mots simples et dites quoi tester."
-      },
       "digest": {
         "name": "Résumé quotidien du canal",
         "text": "Les jours ouvrés à 9 h, ce qui s'est passé la veille.",
-        "prompt": "Résume ce qui s'est passé hier dans le canal : les demandes, ce qui a été résolu et ce qui est resté sans réponse."
+        "prompt": "Résume ce qui s'est passé dans le canal depuis le dernier résumé : les demandes, ce qui a été résolu et ce qui est resté sans réponse."
       },
       "errors": {
         "name": "Surveiller les nouvelles erreurs",
@@ -6622,8 +6620,8 @@
       },
       "prs": {
         "name": "Relire les nouvelles PR",
-        "text": "Quand une PR s'ouvre, l'agent la lit et la commente.",
-        "prompt": "Lis le diff de la nouvelle PR, signale les risques et dis quoi tester à la main."
+        "text": "Les jours ouvrés à 9 h et 14 h, l'agent lit les nouvelles PR et signale les risques.",
+        "prompt": "Regardez les PR ouvertes depuis la dernière fois. Lisez chaque diff, signalez les risques et dites quoi tester à la main."
       },
       "week": {
         "name": "Bilan de la semaine",

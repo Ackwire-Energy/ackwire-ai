@@ -635,6 +635,26 @@ describe("issues", () => {
     expect(row?.assignee).toEqual({ type: "agent", id: f.agent.id });
   });
 
+  test("list_issues shows each due date, so a late-tasks routine reads them from the list", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const ctx = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: crypto.randomUUID(),
+      channelId: f.general.id,
+      threadRootId: crypto.randomUUID(),
+      triggerMessageId: crypto.randomUUID(),
+    };
+    await createIssue(deps, person(f.owner.id), f.org.id, { title: "Com prazo", dueDate: "2026-10-20" });
+    await createIssue(deps, person(f.owner.id), f.org.id, { title: "Sem prazo" });
+    const list = (await createIssueToolSource(deps).tools(ctx)).find((t) => t.name === "list_issues");
+    const { content } = (await list?.execute({}, ctx)) ?? { content: "" };
+    expect(content).toContain("Com prazo due 2026-10-20 id=");
+    expect(content).toMatch(/Sem prazo id=/);
+  });
+
   test("update_issue links only an https pull request; any other address is refused", async () => {
     f = await setup();
     const deps = { db: f.db, pubsub: f.pubsub };

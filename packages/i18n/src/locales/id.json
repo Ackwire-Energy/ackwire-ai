@@ -6071,6 +6071,9 @@
       "needsApps": "Butuh salah satu aplikasi ini: {{apps}}",
       "needsMailbox": "Butuh kotak surat yang terhubung",
       "connectFirst": "Hubungkan agar rutinitas berjalan.",
+      "fillBlank": "Ganti dulu teks di dalam tanda kurung.",
+      "replaceTitle": "Ganti tulisan Anda dengan templat ini?",
+      "replaceConfirm": "Ganti",
       "areas": {
         "team": "Tim dan rutinitas harian",
         "sales": "Penjualan dan pelanggan",
@@ -6099,7 +6102,7 @@
       "leads": {
         "name": "Kontak CRM baru",
         "text": "Hari kerja pukul 9, siapa yang masuk dan mulai dari siapa.",
-        "prompt": "Periksa di CRM kontak yang masuk sejak kemarin. Katakan siapa yang paling menjanjikan dan sarankan langkah berikutnya untuk masing-masing."
+        "prompt": "Periksa di CRM kontak yang masuk sejak terakhir kali. Katakan siapa yang paling menjanjikan dan sarankan langkah berikutnya untuk masing-masing."
       },
       "stalled": {
         "name": "Kesepakatan macet",
@@ -6148,13 +6151,13 @@
       },
       "revenue": {
         "name": "Penjualan kemarin",
-        "text": "Hari kerja pukul 8, penjualan dibanding rata-rata mingguan.",
+        "text": "Setiap hari pukul 8, penjualan dibanding rata-rata mingguan.",
         "prompt": "Periksa berapa penjualan kemarin dan bandingkan dengan rata-rata 7 hari terakhir. Katakan jika ada yang tidak biasa."
       },
       "failed": {
         "name": "Masalah pembayaran",
         "text": "Hari kerja pukul 10, penolakan dan sengketa.",
-        "prompt": "Periksa pembayaran yang ditolak, pengembalian dana, dan sengketa sejak kemarin. Daftarkan masing-masing dengan jumlah dan pelanggannya."
+        "prompt": "Periksa pembayaran yang ditolak, pengembalian dana, dan sengketa sejak terakhir kali. Daftarkan masing-masing dengan jumlah dan pelanggannya."
       },
       "monthClose": {
         "name": "Tutup bulan",
@@ -6164,7 +6167,7 @@
       "sheet": {
         "name": "Periksa spreadsheet",
         "text": "Hari kerja pukul 11, celah dan angka aneh.",
-        "prompt": "Periksa spreadsheet ini: (sebutkan yang mana). Tunjukkan kolom kosong, nilai tidak biasa, dan yang berubah sejak kemarin."
+        "prompt": "Periksa spreadsheet ini: (sebutkan yang mana). Tunjukkan kolom kosong, nilai tidak biasa, dan yang berubah sejak terakhir kali."
       },
       "page": {
         "name": "Pantau halaman web",
@@ -6186,15 +6189,10 @@
         "text": "Senin pukul 8.30, cuti dan perjalanan.",
         "prompt": "Periksa di kalender cuti dan perjalanan minggu ini. Daftarkan per hari dan katakan apa yang perlu digantikan."
       },
-      "deploy": {
-        "name": "Periksa setiap deploy",
-        "text": "Saat deploy selesai, ringkasan dengan kata sederhana.",
-        "prompt": "Baca apa yang masuk dalam deploy ini. Ringkas untuk tim dengan kata sederhana dan katakan apa yang perlu diuji."
-      },
       "digest": {
         "name": "Ringkasan harian kanal",
         "text": "Hari kerja pukul 9 pagi, apa yang terjadi kemarin.",
-        "prompt": "Ringkas apa yang terjadi kemarin di kanal: permintaan, apa yang sudah selesai, dan apa yang belum dijawab."
+        "prompt": "Ringkas apa yang terjadi di kanal sejak ringkasan terakhir: permintaan, apa yang sudah selesai, dan apa yang belum dijawab."
       },
       "errors": {
         "name": "Pantau error baru",
@@ -6203,8 +6201,8 @@
       },
       "prs": {
         "name": "Tinjau PR baru",
-        "text": "Saat PR dibuka, agen membacanya dan memberi komentar.",
-        "prompt": "Baca diff PR baru, tunjukkan risikonya, dan sebutkan apa yang perlu diuji manual."
+        "text": "Hari kerja pukul 9 dan pukul 2 siang, agen membaca PR baru dan menunjukkan risikonya.",
+        "prompt": "Periksa PR yang dibuka sejak terakhir kali. Baca setiap diff, tunjukkan risikonya, dan sebutkan apa yang perlu diuji manual."
       },
       "week": {
         "name": "Rangkuman minggu ini",

@@ -1,6 +1,7 @@
 import { BUSINESS_DAYS, type RecurrenceRule, type Weekday } from "@agenteschat/ui/recurrence";
 import type { TFunction } from "i18next";
 import type { ConnectorDef, RoutineEvent, RoutineReport } from "../api/types";
+import { type ConnectedItem, connectedIds } from "./connected";
 import { connectorName } from "./scopes";
 
 /** "Começar de um modelo" in sections, plain work first and technology last, for people who aren't technical. */
@@ -24,6 +25,7 @@ const weekdays = (...times: string[]): TemplateRule => ({
   byWeekday: BUSINESS_DAYS,
   times,
 });
+const everyDay = (time: string): TemplateRule => ({ freq: "daily", interval: 1, times: [time] });
 const weekly = (day: Weekday, time: string): TemplateRule => ({
   freq: "weekly",
   interval: 1,
@@ -46,11 +48,14 @@ export type RoutineTemplate = {
   report?: RoutineReport;
   /** What it can't work without. */
   apps?: readonly string[];
+  /** Its prompt has a part in brackets only the person can write. */
+  blank?: true;
 } & ({ kind: "schedule"; rule: TemplateRule } | { kind: "event"; event: RoutineEvent } | { kind: "email" });
 
 /**
  * Starting points for "Nova rotina", each area's together (the select's sections are runs of one area). Their words
  * are `routines.presets.{key}` in i18n; a schedule is a rule, not a phrase, so it means the same in every language.
+ * None waits on a GitHub or Sentry event: their webhooks can't be set up from the app, so it would never run.
  */
 export const ROUTINE_TEMPLATES = [
   { key: "digest", area: "team", kind: "schedule", rule: weekdays("09:00") },
@@ -75,7 +80,7 @@ export const ROUTINE_TEMPLATES = [
     report: "always",
     apps: ANALYTICS,
   },
-  { key: "revenue", area: "finance", kind: "schedule", rule: weekdays("08:00"), report: "always", apps: PAYMENTS },
+  { key: "revenue", area: "finance", kind: "schedule", rule: everyDay("08:00"), report: "always", apps: PAYMENTS },
   { key: "failed", area: "finance", kind: "schedule", rule: weekdays("10:00"), apps: PAYMENTS },
   {
     key: "monthClose",
@@ -85,8 +90,8 @@ export const ROUTINE_TEMPLATES = [
     report: "always",
     apps: PAYMENTS,
   },
-  { key: "sheet", area: "ops", kind: "schedule", rule: weekdays("11:00"), apps: SHEETS },
-  { key: "page", area: "ops", kind: "schedule", rule: { freq: "daily", interval: 1, times: ["09:00"] } },
+  { key: "sheet", area: "ops", kind: "schedule", rule: weekdays("11:00"), apps: SHEETS, blank: true },
+  { key: "page", area: "ops", kind: "schedule", rule: everyDay("09:00"), blank: true },
   { key: "newTask", area: "ops", kind: "event", event: "issue.created", report: "always" },
   { key: "pulse", area: "people", kind: "schedule", rule: weekly("TH", "16:00"), report: "always" },
   { key: "away", area: "people", kind: "schedule", rule: weekly("MO", "08:30"), apps: ["google-calendar"] },
@@ -97,8 +102,7 @@ export const ROUTINE_TEMPLATES = [
     rule: { freq: "hourly", interval: 1, times: ["00:00"] },
     apps: ["sentry"],
   },
-  { key: "prs", area: "tech", kind: "event", event: "github.pr_opened", report: "always", apps: ["github"] },
-  { key: "deploy", area: "tech", kind: "event", event: "deploy.succeeded", report: "always", apps: ["github"] },
+  { key: "prs", area: "tech", kind: "schedule", rule: weekdays("09:00", "14:00"), apps: ["github"] },
 ] as const satisfies readonly RoutineTemplate[];
 
 export type RoutineTemplateItem = (typeof ROUTINE_TEMPLATES)[number];
@@ -117,9 +121,10 @@ export interface RoutineTemplateOption {
   /** What a routine made from it must have, in words; null for one that needs nothing. */
   needs: string | null;
   group: string;
-  /** Searched besides the name: its line and what it needs. */
+  /** Searched besides the name: its line, what it needs and its instructions. */
   keywords: string;
   prompt: string;
+  blank: boolean;
   report: RoutineReport;
   /** The apps it can use on this server, each with its mark. */
   apps: ConnectorDef[];
@@ -146,6 +151,7 @@ export function routineTemplateOptions(t: TFunction, catalog: ConnectorDef[] | u
     if (catalog && wanted.length > 0 && apps.length === 0) return [];
     const text = t(`routines.presets.${template.key}.text`);
     const needs = needsText(t, template, apps);
+    const prompt = t(`routines.presets.${template.key}.prompt`);
     return [
       {
         value: template.key,
@@ -153,8 +159,9 @@ export function routineTemplateOptions(t: TFunction, catalog: ConnectorDef[] | u
         text,
         needs,
         group: t(`routines.presets.areas.${template.area}`),
-        keywords: `${text} ${needs ?? ""}`,
-        prompt: t(`routines.presets.${template.key}.prompt`),
+        keywords: `${text} ${needs ?? ""} ${prompt}`,
+        prompt,
+        blank: "blank" in template,
         report: "report" in template ? template.report : "when_new",
         apps,
         template,
@@ -162,3 +169,17 @@ export function routineTemplateOptions(t: TFunction, catalog: ConnectorDef[] | u
     ];
   });
 }
+
+/** Whether none of a template's apps works here: not connected, or connected and waiting for Reconectar. */
+export function noAppWorks(apps: ConnectorDef[], items: ConnectedItem[]) {
+  const working = connectedIds(items.filter((i) => !i.needsReconnect));
+  return apps.every((d) => !working.has(d.id));
+}
+
+/** Whether the form's instructions are the person's own words, which a template must not write over unasked. */
+export const ownWords = (prompt: string, template: Pick<RoutineTemplateOption, "prompt"> | undefined) =>
+  prompt.trim() !== "" && prompt.trim() !== template?.prompt.trim();
+
+/** Whether the template's part in brackets is still there to fill: such a routine would have nothing to work on. */
+export const blankLeft = (prompt: string, template: Pick<RoutineTemplateOption, "prompt" | "blank"> | undefined) =>
+  Boolean(template?.blank) && prompt.trim() === template?.prompt.trim();

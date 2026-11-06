@@ -6221,6 +6221,9 @@
       "needsApps": "Bu uygulamalardan biri gerekli: {{apps}}",
       "needsMailbox": "Bağlı bir e-posta kutusu gerekli",
       "connectFirst": "Rutinin çalışması için bağlayın.",
+      "fillBlank": "Önce parantez içindeki metni değiştirin.",
+      "replaceTitle": "Yazdıklarınızı bu şablonla değiştirmek istiyor musunuz?",
+      "replaceConfirm": "Değiştir",
       "areas": {
         "team": "Ekip ve günlük düzen",
         "sales": "Satış ve müşteriler",
@@ -6249,7 +6252,7 @@
       "leads": {
         "name": "Yeni CRM kişileri",
         "text": "Hafta içi saat 9'da, kim geldi, kimden başlanmalı.",
-        "prompt": "CRM'de dünden beri eklenen kişilere bakın. En umut verici olanları söyleyin ve her biri için sonraki adımı önerin."
+        "prompt": "CRM'de son seferden beri eklenen kişilere bakın. En umut verici olanları söyleyin ve her biri için sonraki adımı önerin."
       },
       "stalled": {
         "name": "Duran fırsatlar",
@@ -6298,13 +6301,13 @@
       },
       "revenue": {
         "name": "Dünkü satışlar",
-        "text": "Hafta içi saat 8'de, satışlar haftalık ortalamayla karşılaştırmalı.",
+        "text": "Her gün saat 8'de, satışlar haftalık ortalamayla karşılaştırmalı.",
         "prompt": "Dün ne kadar sattığımıza bakın ve son 7 günün ortalamasıyla karşılaştırın. Olağan dışı bir şey varsa söyleyin."
       },
       "failed": {
         "name": "Ödeme sorunları",
         "text": "Hafta içi saat 10'da, retler ve itirazlar.",
-        "prompt": "Dünden beri reddedilen ödemelere, iadelere ve itirazlara bakın. Her birini tutarı ve müşterisiyle listeleyin."
+        "prompt": "Son seferden beri reddedilen ödemelere, iadelere ve itirazlara bakın. Her birini tutarı ve müşterisiyle listeleyin."
       },
       "monthClose": {
         "name": "Ay kapanışı",
@@ -6314,7 +6317,7 @@
       "sheet": {
         "name": "Tablo kontrolü",
         "text": "Hafta içi saat 11'de, boşluklar ve tuhaf rakamlar.",
-        "prompt": "Şu tabloyu kontrol edin: (hangisi olduğunu yazın). Boş alanları, olağan dışı değerleri ve dünden beri değişenleri belirtin."
+        "prompt": "Şu tabloyu kontrol edin: (hangisi olduğunu yazın). Boş alanları, olağan dışı değerleri ve son seferden beri değişenleri belirtin."
       },
       "page": {
         "name": "Bir sayfayı izleyin",
@@ -6336,15 +6339,10 @@
         "text": "Pazartesi 08.30'da, izinler ve seyahatler.",
         "prompt": "Takvimde bu haftanın izinlerine ve seyahatlerine bakın. Güne göre listeleyin ve neyin karşılanması gerektiğini söyleyin."
       },
-      "deploy": {
-        "name": "Her dağıtımı kontrol edin",
-        "text": "Bir dağıtım bitince, sade sözlerle bir özet.",
-        "prompt": "Bu dağıtıma nelerin girdiğini okuyun. Ekip için sade sözlerle özetleyin ve neyin test edileceğini söyleyin."
-      },
       "digest": {
         "name": "Günlük kanal özeti",
         "text": "Hafta içi saat 9'da, dün olanlar.",
-        "prompt": "Kanalda dün olanları özetle: istekler, çözülenler ve yanıtsız kalanlar."
+        "prompt": "Kanalda son özetten beri olanları özetle: istekler, çözülenler ve yanıtsız kalanlar."
       },
       "errors": {
         "name": "Yeni hataları izle",
@@ -6353,8 +6351,8 @@
       },
       "prs": {
         "name": "Yeni PR'ları incele",
-        "text": "Bir PR açıldığında ajan onu okur ve yorum yapar.",
-        "prompt": "Yeni PR'ın diff'ini oku, riskleri belirt ve elle neyin test edilmesi gerektiğini söyle."
+        "text": "Hafta içi saat 9 ve 14'te ajan yeni PR'ları okur ve riskleri belirtir.",
+        "prompt": "Son seferden beri açılan PR'lara bakın. Her birinin diff'ini okuyun, riskleri belirtin ve elle neyin test edilmesi gerektiğini söyleyin."
       },
       "week": {
         "name": "Hafta kapanışı",

@@ -1,6 +1,7 @@
 import { useCatalog, useConnections, useCustomServers } from "@agenteschat/client";
-import { connectedIds, connectedItems } from "@agenteschat/client/lib/connected";
+import { connectedItems } from "@agenteschat/client/lib/connected";
 import {
+  noAppWorks,
   type RoutineTemplateArea,
   type RoutineTemplateOption,
   routineTemplateOptions,
@@ -60,11 +61,11 @@ export function TemplatePicker({
   const needsApps = Boolean(chosen?.apps.length);
   const connections = useConnections(orgId, needsApps);
   const servers = useCustomServers(orgId, needsApps);
-  const connected =
-    connections.data && servers.data
-      ? connectedIds(connectedItems(connections.data, servers.data, catalog ?? []))
-      : null;
-  const missing = connected !== null && chosen?.apps.every((d) => !connected.has(d.id));
+  const missing =
+    chosen &&
+    connections.data &&
+    servers.data &&
+    noAppWorks(chosen.apps, connectedItems(connections.data, servers.data, catalog ?? []));
   return (
     <>
       <GroupedHeader>{t("routines.presets.title")}</GroupedHeader>

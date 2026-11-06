@@ -6318,6 +6318,9 @@ export const ptBR = {
       needsApps: "Precisa de um destes apps: {{apps}}",
       needsMailbox: "Precisa de uma caixa de email conectada",
       connectFirst: "Conecte para a rotina funcionar.",
+      fillBlank: "Troque o texto entre parênteses primeiro.",
+      replaceTitle: "Trocar o que você escreveu por este modelo?",
+      replaceConfirm: "Trocar",
       /** The select's sections, by work rather than by tool. */
       areas: {
         team: "Equipe e rotina do dia",
@@ -6351,7 +6354,7 @@ export const ptBR = {
         name: "Novos contatos do CRM",
         text: "Dias úteis às 9h, quem chegou e por quem começar.",
         prompt:
-          "Veja no CRM os contatos que entraram desde ontem. Diga quem parece mais promissor e sugira o próximo passo de cada um.",
+          "Veja no CRM os contatos que entraram desde a última vez. Diga quem parece mais promissor e sugira o próximo passo de cada um.",
       },
       stalled: {
         name: "Negócios parados",
@@ -6407,14 +6410,14 @@ export const ptBR = {
       },
       revenue: {
         name: "Vendas de ontem",
-        text: "Dias úteis às 8h, as vendas contra a média da semana.",
+        text: "Todo dia às 8h, as vendas contra a média da semana.",
         prompt: "Veja quanto vendemos ontem e compare com a média dos últimos 7 dias. Diga se algo saiu do normal.",
       },
       failed: {
         name: "Pagamentos com problema",
         text: "Dias úteis às 10h, recusas e contestações.",
         prompt:
-          "Veja os pagamentos recusados, os reembolsos e as contestações desde ontem. Liste cada um com o valor e o cliente.",
+          "Veja os pagamentos recusados, os reembolsos e as contestações desde a última vez. Liste cada um com o valor e o cliente.",
       },
       monthClose: {
         name: "Fechamento do mês",
@@ -6425,7 +6428,7 @@ export const ptBR = {
         name: "Conferir uma planilha",
         text: "Dias úteis às 11h, lacunas e números estranhos.",
         prompt:
-          "Confira esta planilha: (diga qual). Aponte campos vazios, valores fora do normal e o que mudou desde ontem.",
+          "Confira esta planilha: (diga qual). Aponte campos vazios, valores fora do normal e o que mudou desde a última vez.",
       },
       page: {
         name: "Vigiar uma página",
@@ -6449,15 +6452,11 @@ export const ptBR = {
         text: "Segunda às 8h30, folgas e viagens.",
         prompt: "Veja na agenda as folgas e viagens desta semana. Liste por dia e diga o que precisa de cobertura.",
       },
-      deploy: {
-        name: "Conferir cada deploy",
-        text: "Quando um deploy terminar, um resumo em palavras simples.",
-        prompt: "Leia o que entrou neste deploy. Resuma para a equipe em palavras simples e diga o que testar.",
-      },
       digest: {
         name: "Resumo diário de um canal",
         text: "Dias úteis às 9h, o que aconteceu ontem.",
-        prompt: "Resuma o que aconteceu ontem no canal: pedidos, o que foi resolvido e o que ficou sem resposta.",
+        prompt:
+          "Resuma o que aconteceu no canal desde o último resumo: pedidos, o que foi resolvido e o que ficou sem resposta.",
       },
       errors: {
         name: "Vigiar erros novos",
@@ -6467,8 +6466,9 @@ export const ptBR = {
       },
       prs: {
         name: "Revisar PRs novos",
-        text: "Quando abrir um PR, o agente lê e comenta.",
-        prompt: "Leia o diff do PR novo, aponte riscos e diga o que testar à mão.",
+        text: "Dias úteis às 9h e às 14h, o agente lê os PRs novos e aponta riscos.",
+        prompt:
+          "Veja os PRs abertos desde a última vez. Leia o diff de cada um, aponte riscos e diga o que testar à mão.",
       },
       week: {
         name: "Fechamento da semana",

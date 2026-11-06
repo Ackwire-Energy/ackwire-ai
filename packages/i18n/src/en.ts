@@ -6234,6 +6234,9 @@ export const en = {
       needsApps: "Needs one of these apps: {{apps}}",
       needsMailbox: "Needs a connected mailbox",
       connectFirst: "Connect it so the routine can work.",
+      fillBlank: "Replace the text in brackets first.",
+      replaceTitle: "Replace what you wrote with this template?",
+      replaceConfirm: "Replace",
       /** The select's sections, by work rather than by tool. */
       areas: {
         team: "Team and daily routine",
@@ -6265,7 +6268,7 @@ export const en = {
         name: "New CRM contacts",
         text: "Weekdays at 9am, who came in and who to call first.",
         prompt:
-          "Check the CRM for contacts added since yesterday. Say who looks most promising and suggest the next step for each.",
+          "Check the CRM for contacts added since last time. Say who looks most promising and suggest the next step for each.",
       },
       stalled: {
         name: "Stalled deals",
@@ -6322,7 +6325,7 @@ export const en = {
       },
       revenue: {
         name: "Yesterday's sales",
-        text: "Weekdays at 8am, sales against the weekly average.",
+        text: "Every day at 8am, sales against the weekly average.",
         prompt:
           "Check how much we sold yesterday and compare it with the average of the last 7 days. Say if anything looks unusual.",
       },
@@ -6330,7 +6333,7 @@ export const en = {
         name: "Payment problems",
         text: "Weekdays at 10am, declined charges and disputes.",
         prompt:
-          "Check declined payments, refunds and disputes since yesterday. List each one with the amount and the customer.",
+          "Check declined payments, refunds and disputes since last time. List each one with the amount and the customer.",
       },
       monthClose: {
         name: "Month-end summary",
@@ -6342,7 +6345,7 @@ export const en = {
         name: "Check a spreadsheet",
         text: "Weekdays at 11am, gaps and odd numbers.",
         prompt:
-          "Check this spreadsheet: (say which one). Point out empty fields, unusual values and what changed since yesterday.",
+          "Check this spreadsheet: (say which one). Point out empty fields, unusual values and what changed since last time.",
       },
       page: {
         name: "Watch a web page",
@@ -6366,16 +6369,11 @@ export const en = {
         text: "Mondays at 8:30am, time off and trips.",
         prompt: "Check the calendar for time off and trips this week. List them by day and say what needs covering.",
       },
-      deploy: {
-        name: "Check every deploy",
-        text: "When a deploy finishes, a summary in plain words.",
-        prompt: "Read what went into this deploy. Summarize it for the team in plain words and say what to test.",
-      },
       digest: {
         name: "Daily channel digest",
         text: "Weekdays at 9am, what happened yesterday.",
         prompt:
-          "Summarize what happened yesterday in the channel: requests, what got solved and what was left unanswered.",
+          "Summarize what happened in the channel since the last digest: requests, what got solved and what was left unanswered.",
       },
       errors: {
         name: "Watch for new errors",
@@ -6385,8 +6383,8 @@ export const en = {
       },
       prs: {
         name: "Review new PRs",
-        text: "When a PR opens, the agent reads it and comments.",
-        prompt: "Read the new PR's diff, point out risks and say what to test by hand.",
+        text: "Weekdays at 9am and 2pm, the agent reads new PRs and points out risks.",
+        prompt: "Check the PRs opened since last time. Read each diff, point out risks and say what to test by hand.",
       },
       week: {
         name: "Week wrap-up",

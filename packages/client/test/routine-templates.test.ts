@@ -3,7 +3,11 @@ import { en, ptBR } from "@agenteschat/i18n";
 import { nextOccurrences } from "@agenteschat/ui/recurrence";
 import type { TFunction } from "i18next";
 import type { ConnectorDef } from "../src/api/types";
+import type { ConnectedItem } from "../src/lib/connected";
 import {
+  blankLeft,
+  noAppWorks,
+  ownWords,
   ROUTINE_TEMPLATE_AREAS,
   ROUTINE_TEMPLATES,
   routineTemplateOptions,
@@ -67,9 +71,39 @@ describe("the options", () => {
     expect(option("digest", catalog)?.needs).toBeNull();
   });
 
-  test("what it needs and its line are searched too", () => {
-    expect(option("errors", [def("sentry", "Sentry")])?.keywords).toContain("Sentry");
-    expect(option("errors", [def("sentry", "Sentry")])?.keywords).toContain("routines.presets.errors.text");
+  test("what it needs, its line and its instructions are searched too", () => {
+    const keywords = option("errors", [def("sentry", "Sentry")])?.keywords;
+    expect(keywords).toContain("Sentry");
+    expect(keywords).toContain("routines.presets.errors.text");
+    expect(keywords).toContain("routines.presets.errors.prompt");
+  });
+
+  test("what a chosen template lacks: an app that needs Reconectar works no more than one never connected", () => {
+    const sentry = def("sentry", "Sentry");
+    const item = (id: string, needsReconnect = false) => ({ def: def(id, id), needsReconnect }) as ConnectedItem;
+    expect(noAppWorks([sentry], [])).toBe(true);
+    expect(noAppWorks([sentry], [item("sentry", true)])).toBe(true);
+    expect(noAppWorks([sentry], [item("sentry")])).toBe(false);
+    expect(noAppWorks([sentry, def("github", "GitHub")], [item("github")])).toBe(false);
+  });
+
+  test("a template asks before writing over the person's words, and an untouched one doesn't", () => {
+    const picked = { prompt: "Do this", blank: false };
+    expect(ownWords("", undefined)).toBe(false);
+    expect(ownWords("  ", picked)).toBe(false);
+    expect(ownWords("Do this ", picked)).toBe(false);
+    expect(ownWords("My own words", undefined)).toBe(true);
+    expect(ownWords("Do this and that", picked)).toBe(true);
+  });
+
+  test("a part in brackets holds the routine back until the person changes it", () => {
+    const page = { prompt: "Open (paste it here)", blank: true };
+    expect(blankLeft("Open (paste it here)", page)).toBe(true);
+    expect(blankLeft("Open example.com", page)).toBe(false);
+    expect(blankLeft("Do this", { prompt: "Do this", blank: false })).toBe(false);
+    expect(blankLeft("Do this", undefined)).toBe(false);
+    expect(option("sheet", undefined)?.blank).toBe(true);
+    expect(option("late", undefined)?.blank).toBe(false);
   });
 
   test("an app that can't connect here isn't offered, and a template with none left leaves the list", () => {

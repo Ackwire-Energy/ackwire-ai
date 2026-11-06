@@ -6679,6 +6679,9 @@
       "needsApps": "Wymaga jednej z tych aplikacji: {{apps}}",
       "needsMailbox": "Wymaga połączonej skrzynki e-mail",
       "connectFirst": "Połącz ją, aby rutyna działała.",
+      "fillBlank": "Najpierw zastąp tekst w nawiasie.",
+      "replaceTitle": "Zastąpić to, co napisano, tym szablonem?",
+      "replaceConfirm": "Zastąp",
       "areas": {
         "team": "Zespół i rytm dnia",
         "sales": "Sprzedaż i klienci",
@@ -6707,7 +6710,7 @@
       "leads": {
         "name": "Nowe kontakty w CRM",
         "text": "W dni robocze o 9:00, kto doszedł i od kogo zacząć.",
-        "prompt": "Sprawdź w CRM kontakty dodane od wczoraj. Powiedz, kto wygląda najbardziej obiecująco, i zaproponuj następny krok dla każdego."
+        "prompt": "Sprawdź w CRM kontakty dodane od ostatniego razu. Powiedz, kto wygląda najbardziej obiecująco, i zaproponuj następny krok dla każdego."
       },
       "stalled": {
         "name": "Zastoje w transakcjach",
@@ -6756,13 +6759,13 @@
       },
       "revenue": {
         "name": "Wczorajsza sprzedaż",
-        "text": "W dni robocze o 8:00, sprzedaż na tle średniej tygodnia.",
+        "text": "Codziennie o 8:00, sprzedaż na tle średniej tygodnia.",
         "prompt": "Sprawdź, ile sprzedaliśmy wczoraj, i porównaj to ze średnią z ostatnich 7 dni. Powiedz, czy coś odbiega od normy."
       },
       "failed": {
         "name": "Problemy z płatnościami",
         "text": "W dni robocze o 10:00, odmowy i spory.",
-        "prompt": "Sprawdź odrzucone płatności, zwroty i spory od wczoraj. Wypisz każdą pozycję z kwotą i klientem."
+        "prompt": "Sprawdź odrzucone płatności, zwroty i spory od ostatniego razu. Wypisz każdą pozycję z kwotą i klientem."
       },
       "monthClose": {
         "name": "Zamknięcie miesiąca",
@@ -6772,7 +6775,7 @@
       "sheet": {
         "name": "Sprawdzenie arkusza",
         "text": "W dni robocze o 11:00, braki i dziwne liczby.",
-        "prompt": "Sprawdź ten arkusz: (powiedz który). Wskaż puste pola, nietypowe wartości i to, co zmieniło się od wczoraj."
+        "prompt": "Sprawdź ten arkusz: (powiedz który). Wskaż puste pola, nietypowe wartości i to, co zmieniło się od ostatniego razu."
       },
       "page": {
         "name": "Obserwacja strony",
@@ -6794,15 +6797,10 @@
         "text": "W poniedziałki o 8:30, wolne dni i wyjazdy.",
         "prompt": "Sprawdź w kalendarzu wolne dni i wyjazdy w tym tygodniu. Wypisz je według dni i powiedz, co wymaga zastępstwa."
       },
-      "deploy": {
-        "name": "Sprawdzanie każdego wdrożenia",
-        "text": "Gdy wdrożenie się skończy, podsumowanie prostymi słowami.",
-        "prompt": "Przeczytaj, co weszło do tego wdrożenia. Podsumuj to dla zespołu prostymi słowami i powiedz, co przetestować."
-      },
       "digest": {
         "name": "Codzienne podsumowanie kanału",
         "text": "W dni robocze o 9:00, co wydarzyło się wczoraj.",
-        "prompt": "Podsumuj, co wydarzyło się wczoraj na kanale: prośby, co zostało rozwiązane i co zostało bez odpowiedzi."
+        "prompt": "Podsumuj, co wydarzyło się na kanale od ostatniego podsumowania: prośby, co zostało rozwiązane i co zostało bez odpowiedzi."
       },
       "errors": {
         "name": "Pilnuj nowych błędów",
@@ -6811,8 +6809,8 @@
       },
       "prs": {
         "name": "Przeglądaj nowe PR",
-        "text": "Gdy pojawi się PR, agent go czyta i komentuje.",
-        "prompt": "Przeczytaj diff nowego PR, wskaż ryzyka i powiedz, co przetestować ręcznie."
+        "text": "W dni robocze o 9:00 i 14:00 agent czyta nowe PR i wskazuje ryzyka.",
+        "prompt": "Sprawdź PR otwarte od ostatniego razu. Przeczytaj każdy diff, wskaż ryzyka i powiedz, co przetestować ręcznie."
       },
       "week": {
         "name": "Podsumowanie tygodnia",

@@ -6439,6 +6439,9 @@
       "needsApps": "Necesita una de estas apps: {{apps}}",
       "needsMailbox": "Necesita un buzón de correo conectado",
       "connectFirst": "Conéctala para que la rutina funcione.",
+      "fillBlank": "Primero cambia el texto entre paréntesis.",
+      "replaceTitle": "¿Cambiar lo que escribiste por esta plantilla?",
+      "replaceConfirm": "Cambiar",
       "areas": {
         "team": "Equipo y rutina del día",
         "sales": "Ventas y clientes",
@@ -6467,7 +6470,7 @@
       "leads": {
         "name": "Nuevos contactos del CRM",
         "text": "Días laborables a las 9, quién llegó y por quién empezar.",
-        "prompt": "Revisa en el CRM los contactos que entraron desde ayer. Di quién parece más prometedor y sugiere el siguiente paso de cada uno."
+        "prompt": "Revisa en el CRM los contactos que entraron desde la última vez. Di quién parece más prometedor y sugiere el siguiente paso de cada uno."
       },
       "stalled": {
         "name": "Negocios parados",
@@ -6516,13 +6519,13 @@
       },
       "revenue": {
         "name": "Ventas de ayer",
-        "text": "Días laborables a las 8, las ventas frente a la media semanal.",
+        "text": "Todos los días a las 8, las ventas frente a la media semanal.",
         "prompt": "Revisa cuánto vendimos ayer y compáralo con la media de los últimos 7 días. Di si algo salió de lo normal."
       },
       "failed": {
         "name": "Pagos con problemas",
         "text": "Días laborables a las 10, rechazos y disputas.",
-        "prompt": "Revisa los pagos rechazados, los reembolsos y las disputas desde ayer. Enumera cada uno con el importe y el cliente."
+        "prompt": "Revisa los pagos rechazados, los reembolsos y las disputas desde la última vez. Enumera cada uno con el importe y el cliente."
       },
       "monthClose": {
         "name": "Cierre del mes",
@@ -6532,7 +6535,7 @@
       "sheet": {
         "name": "Revisar una hoja de cálculo",
         "text": "Días laborables a las 11, huecos y números raros.",
-        "prompt": "Revisa esta hoja de cálculo: (di cuál). Señala campos vacíos, valores fuera de lo normal y lo que cambió desde ayer."
+        "prompt": "Revisa esta hoja de cálculo: (di cuál). Señala campos vacíos, valores fuera de lo normal y lo que cambió desde la última vez."
       },
       "page": {
         "name": "Vigilar una página",
@@ -6554,15 +6557,10 @@
         "text": "Lunes a las 8:30, días libres y viajes.",
         "prompt": "Revisa en el calendario los días libres y los viajes de esta semana. Enuméralos por día y di qué necesita cobertura."
       },
-      "deploy": {
-        "name": "Revisar cada deploy",
-        "text": "Cuando termine un deploy, un resumen en palabras simples.",
-        "prompt": "Lee lo que entró en este deploy. Resúmelo para el equipo en palabras simples y di qué probar."
-      },
       "digest": {
         "name": "Resumen diario del canal",
         "text": "Días hábiles a las 9, lo que pasó ayer.",
-        "prompt": "Resume lo que pasó ayer en el canal: pedidos, lo que se resolvió y lo que quedó sin respuesta."
+        "prompt": "Resume lo que pasó en el canal desde el último resumen: pedidos, lo que se resolvió y lo que quedó sin respuesta."
       },
       "errors": {
         "name": "Vigilar errores nuevos",
@@ -6571,8 +6569,8 @@
       },
       "prs": {
         "name": "Revisar PRs nuevos",
-        "text": "Cuando se abre un PR, el agente lo lee y comenta.",
-        "prompt": "Lee el diff del PR nuevo, señala los riesgos y di qué probar a mano."
+        "text": "Días laborables a las 9 y a las 14, el agente lee los PRs nuevos y señala riesgos.",
+        "prompt": "Revisa los PRs abiertos desde la última vez. Lee cada diff, señala los riesgos y di qué probar a mano."
       },
       "week": {
         "name": "Cierre de la semana",

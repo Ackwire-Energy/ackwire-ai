@@ -760,7 +760,7 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 .routine-needs {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   color: var(--ink2);
 }

@@ -56,7 +56,7 @@ async function assigneeNames(deps: IssueDeps, ctx: ToolContext, list: IssueView[
 const line = (i: IssueView, names: Map<string, string>) =>
   `#${i.number} [${i.status}] ${i.title}${
     i.assignee ? ` (assignee: ${names.get(i.assignee.id) ?? `${i.assignee.type} ${i.assignee.id}`})` : ""
-  } id=${i.id}`;
+  }${i.dueDate ? ` due ${i.dueDate}` : ""} id=${i.id}`;
 
 /** One issue's line with its assignee's name. */
 const lineOf = async (deps: IssueDeps, ctx: ToolContext, i: IssueView) => line(i, await assigneeNames(deps, ctx, [i]));
