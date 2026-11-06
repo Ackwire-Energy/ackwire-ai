@@ -98,8 +98,9 @@ function KeptAnswer({ message, kept, children }: { message: Message; kept: boole
   if (!starts) return children;
   return (
     <span className="ac-receipt__words">
-      <span>{t("receipts.picking")}</span>
-      {answer !== "pending" && answer !== "answering" && (
+      {answer === "pending" || answer === "answering" ? (
+        <span>{t("receipts.picking")}</span>
+      ) : (
         <ReceiptAction>
           <button type="button" className="ac-receipt__action" onClick={() => void connect?.answer(message.id)}>
             {t("noAi.card.answerNow")}

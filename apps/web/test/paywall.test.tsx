@@ -186,6 +186,15 @@ describe("after the plan", () => {
     expect(calls(state, "chat.answerNow").map((c) => c.args)).toEqual([[ORG_ID, "m-mine"]]);
   });
 
+  test("that start refused, the line promises nothing and the button stays", async () => {
+    const state = seedState({ aiStatus: ready(ADA_ID) });
+    state.answerNowError = new ApiError(403, "No", "forbidden");
+    state.messages.push(keptHere("u-walter"));
+    await open(state);
+    expect(document.body.textContent).not.toContain("Escolhendo quem responde");
+    expect(screen().getByRole("button", { name: "Responder agora" })).toBeTruthy();
+  });
+
   test("anyone else's, or with no AI yet, stays the line with Conectar", async () => {
     const other = seedState({ aiStatus: ready(ADA_ID) });
     other.messages.push(keptHere("u-other"));
