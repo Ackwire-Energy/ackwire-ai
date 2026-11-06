@@ -123,13 +123,15 @@ export function Locked({ when, children }: { when: boolean; children: ReactNode 
   const outer = useLocked();
   const box = useRef<HTMLFieldSetElement>(null);
   const focused = useRef<HTMLElement | null>(null);
-  useLayoutEffect(() => {
+  // Read while rendering: by a layout effect Chromium has already taken the focus off a disabled control.
+  if (when && !focused.current) {
     const active = document.activeElement;
-    if (when) {
-      focused.current = active instanceof HTMLElement && box.current?.contains(active) ? active : null;
-      return;
-    }
-    if (!active || active === document.body) focused.current?.focus();
+    if (active instanceof HTMLElement && box.current?.contains(active)) focused.current = active;
+  }
+  useLayoutEffect(() => {
+    if (when) return;
+    const active = document.activeElement;
+    if (!active || active === document.body) focused.current?.focus({ preventScroll: true });
     focused.current = null;
   }, [when]);
   return (

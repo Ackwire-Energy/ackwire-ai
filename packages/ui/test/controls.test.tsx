@@ -4,7 +4,7 @@ import { setupDom } from "../testing/dom";
 setupDom();
 
 import { act, fireEvent, render, within } from "@testing-library/react";
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import {
   Checkbox,
   CheckboxPill,
@@ -54,6 +54,27 @@ describe("Locked", () => {
     rerender(form(true));
     input.blur();
     rerender(form(false));
+    expect(document.activeElement === input).toBe(true);
+  });
+
+  test("focus comes back from a browser that drops it as the lock commits, before any layout effect, as Chromium does", () => {
+    const Drops = ({ when }: { when: boolean }) => {
+      useLayoutEffect(() => {
+        if (when && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      }, [when]);
+      return <Input aria-label="Recado" />;
+    };
+    const dropping = (when: boolean) => (
+      <Locked when={when}>
+        <Drops when={when} />
+      </Locked>
+    );
+    const { container, rerender } = render(dropping(false));
+    const input = container.querySelector("input") as HTMLInputElement;
+    input.focus();
+    rerender(dropping(true));
+    expect(document.activeElement === input).toBe(false);
+    rerender(dropping(false));
     expect(document.activeElement === input).toBe(true);
   });
 
