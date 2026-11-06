@@ -1830,7 +1830,7 @@
     "composerHint": "tak ada yang berubah tanpa Anda",
     "intro": {
       "greeting": "Halo, saya {{name}}. Saya menyusun tim bersama Anda.",
-      "lead": "Saya membuat agen, menghubungkan aplikasi, dan mengundang orang. Tidak ada yang berubah tanpa klik Anda, dan saya hanya melakukan apa yang bisa Anda lakukan.",
+      "lead": "Saya membuat agen, menghubungkan aplikasi, dan mengundang orang. Tidak ada yang berubah tanpa permintaan Anda, dan saya hanya melakukan apa yang bisa Anda lakukan.",
       "heldLead": "Pilih bidang usahamu dan timnya muncul di sini. Agen mulai bekerja setelah workspace punya paket agentes.chat.",
       "connect": {
         "title": "Hubungkan AI untuk tim",
@@ -1949,6 +1949,8 @@
         "audience": "Hanya admin dan penanggung jawabnya yang mengubah siapa yang bicara dengannya",
         "channels": "Hanya admin dan penanggung jawabnya yang mengubah kanalnya",
         "ai_account": "Hanya pemilik akun yang memberikannya",
+        "name": "Hanya admin yang mengganti nama agen",
+        "look": "Hanya admin dan penanggung jawabnya yang mengubah tampilannya",
         "many": "Hanya admin yang membuat perubahan ini"
       }
     },
@@ -1959,9 +1961,12 @@
       "owner": "Penanggung jawab",
       "audience": "Siapa yang bisa bicara",
       "archive": "Status",
-      "channel": "Kanal"
+      "channel": "Kanal",
+      "name": "Nama",
+      "look": "Tampilan"
     },
     "value": {
+      "lookDefault": "Tampilan bawaan",
       "none": "Tidak ada",
       "budgetDefault": "Bawaan workspace",
       "anAccount": "Sebuah akun AI",
@@ -2580,7 +2585,10 @@
       "updated": "Memperbaiki skill <b>{{name}}</b>"
     },
     "agent": {
-      "settings_changed": "Mengubah pengaturan <b>{{agentName}}</b>"
+      "settings_changed": "Mengubah pengaturan <b>{{agentName}}</b>",
+      "settings_changed_instructions": "Mengubah instruksi <b>{{agentName}}</b>",
+      "settings_changed_role": "Mengubah peran <b>{{agentName}}</b>",
+      "settings_changed_apps": "Mengubah aplikasi <b>{{agentName}}</b>"
     },
     "pr": {
       "merged": "Merge PR <b>#{{number}}</b> di <b>{{repo}}</b>",

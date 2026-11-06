@@ -1999,6 +1999,8 @@ export type ProposalSettingField =
   | "channel_add"
   | "channel_remove"
   | "reply_mode"
+  | "name"
+  | "look"
   | "archive"
   | "delete";
 
@@ -2006,7 +2008,7 @@ export type ProposalSettingField =
  * One line of a settings card: `model` a model id; `ai_account` `{ brain, accountId }`; `budget` nano-USD a month or
  * null (the workspace's default); `owner` a user id; `audience` `{ mode, userIds, roleIds }`; `channel_add` /
  * `channel_remove` / `reply_mode` its seat in `channelId` (null: not in it, else whether it answers without a
- * mention); `archive` true. `label`: the server's names for ids.
+ * mention); `name` its name; `look` `{ color, eyes, accessory }`; `archive` true. `label`: the server's names for ids.
  */
 export interface ProposalSettingLine {
   field: ProposalSettingField;
@@ -2742,7 +2744,8 @@ export interface AgentActionTarget {
  * - `wiki.page_created` / `wiki.page_edited`: `title`, `slug`
  * - `thread.renamed`: `from`, `to`; `thread.closed`: `title`
  * - `agent.settings_changed` (ADR 0137): `agentName`, `fields`, `proposalId` (the right hand's card, applied by the
- *   person who clicked: Undo puts each setting back)
+ *   person who clicked: Undo puts each setting back; or one row applied at once from what they asked, `fields` then
+ *   `instructions`, `role` or `apps`, ADR 0092 §5)
  */
 export type AgentActionParams = Record<string, string | number | boolean | null | string[] | ApiRule>;
 

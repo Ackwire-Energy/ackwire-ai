@@ -22,7 +22,7 @@ import { agentsByHandle, handleOf } from "../agents";
 import { type AgentsDmReads, agentsDmReads, readerOfRun } from "../agents-dm-reads";
 import { runAuthorityById, UUID } from "../authority";
 import { caches } from "../cache";
-import { isChannelMember, peopleAllIn } from "../channels";
+import { isChannelMember, peopleAllIn, personReach } from "../channels";
 import { personAgentDmKey } from "../dms";
 import type { MemoryUpdate } from "../events";
 import { cutText } from "../format";
@@ -32,7 +32,8 @@ import { quietNoticeSql } from "../notices";
 import { can, getMembership } from "../organizations";
 import { personWords, runReadOutsideById, UNASKED_DESTINATION, unaskedDestination } from "../outside";
 import { personBehindCall, wikiActorOfCall } from "../requester";
-import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible } from "../search";
+import { rightHandReader } from "../right-hand";
+import { agentSearchChannels, agentVisibleChannels, indexSource, searchForUser, searchVisible } from "../search";
 import { closedRefusal } from "../standing";
 import { noAgentText } from "../team";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
@@ -53,7 +54,7 @@ import {
   supersede,
 } from "./items";
 import { kindFamily, overlap } from "./judgments";
-import { learnTrust } from "./learn";
+import { learnTrust, ownWords } from "./learn";
 import { CARD_MAX_AGENTS, ownerDecides, type Proposal, proposeChange } from "./proposals";
 import { type ContextDeps, ensureThreadSummary, judgeOf, memoryJudging } from "./summaries";
 
@@ -103,8 +104,13 @@ function toolCallText(messages: ModelMessage[], id: string): string | null {
  * but search in the agents' DM also reads the agent's DM with the person its run acts for.
  */
 export function createContextToolSource(deps: ContextDeps): ToolSource {
-  const visible = (ctx: { db: Database; orgId: string; agentId: string; channelId: string }) =>
-    agentSearchChannels(ctx.db, ctx.orgId, ctx.agentId, ctx.channelId);
+  /** The right hand in a person's DM reads what they may (ADR 0137 §13); anywhere else, the rule above. */
+  const visible = async (ctx: ToolContext) => {
+    const reader = await rightHandReader(ctx);
+    return reader
+      ? personReach(ctx.db, ctx.orgId, reader)
+      : agentSearchChannels(ctx.db, ctx.orgId, ctx.agentId, ctx.channelId);
+  };
 
   const tools: ToolDefinition[] = [
     {
@@ -129,19 +135,27 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         additionalProperties: false,
       },
       async execute(input, ctx) {
-        const [channels, person] = await Promise.all([visible(ctx), personRequester(ctx)]);
+        const [channels, person, reader] = await Promise.all([
+          visible(ctx),
+          personRequester(ctx),
+          rightHandReader(ctx),
+        ]);
         const dm = await agentsDmReads(ctx.db, ctx.orgId, ctx.channelId, () => readerOfCall(ctx));
         // Only where no person reads the answer: a channel never gets what someone said in their DM.
         const theirDm = dm ? await dmWithRunPerson(ctx) : null;
         const kinds = Array.isArray(input.kinds) ? (input.kinds as never[]) : undefined;
+        const limit = typeof input.limit === "number" ? input.limit : 8;
         const [found, steps] = await Promise.all([
-          searchVisible(deps, {
-            orgId: ctx.orgId,
-            text: str(input.query),
-            visibleChannelIds: theirDm && !channels.includes(theirDm) ? [...channels, theirDm] : channels,
-            kinds,
-            limit: typeof input.limit === "number" ? input.limit : 8,
-          }).then(async (found) => wikiHitsForAgent(ctx.db, await wikiActorOfCall(ctx), found)),
+          (reader
+            ? searchForUser(deps, reader, ctx.orgId, { text: str(input.query), kinds, limit, reach: channels })
+            : searchVisible(deps, {
+                orgId: ctx.orgId,
+                text: str(input.query),
+                visibleChannelIds: theirDm && !channels.includes(theirDm) ? [...channels, theirDm] : channels,
+                kinds,
+                limit,
+              })
+          ).then(async (found) => wikiHitsForAgent(ctx.db, await wikiActorOfCall(ctx), found)),
           kinds ? [] : ownPastSteps(ctx.db, ctx.orgId, ctx.agentId, ctx.runId, channels, str(input.query), dm),
         ]);
         if (found.length === 0 && steps.length === 0) return { content: "No results." };
@@ -691,7 +705,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "propose_instruction_change",
       description:
-        "When a person asks to change how agents work, propose it: your instructions (my_instructions), other agents' (agents: with their handles, all on one card), or what every agent should know now and later (org_context). Add a rule with change. To change or remove existing text, put the exact text in replaces and the new text in change (empty removes it). With target agents you can also give an agent a new role (roles) and turn an app on or off for it (access: a connected app by its name, or a built-in area such as browser:use; your own apps go through request_permission). Nothing changes until a person who may make that change accepts it. Instructions: the agent's owner or someone who reviews memory. A role or an app: an admin who manages agents, or the agent's owner for an app only turned off. The org context: someone who reviews memory. Never tell the person only they can make the change: propose it. Not for routines: a change to what a routine does ('a rotina', 'when a new error comes in…') is `update_routine`.",
+        "When a person asks to change how agents work, propose it: your instructions (my_instructions), other agents' (agents: with their handles, all on one card), or what every agent should know now and later (org_context). Add a rule with change. To change or remove existing text, put the exact text in replaces and the new text in change (empty removes it). With target agents you can also give an agent a new role (roles) and turn an app on or off for it (access: a connected app by its name, or a built-in area such as browser:use; your own apps go through request_permission). When the person who asked may make the change and this turn read nothing from outside, it applies at once with Undo; else a person who may accepts it. Instructions: the agent's owner or someone who reviews memory. A role or an app: an admin who manages agents, or the agent's owner for an app only turned off. The org context: someone who reviews memory. Never tell the person only they can make the change: propose it. Not for routines: a change to what a routine does ('a rotina', 'when a new error comes in…') is `update_routine`.",
       scope: "memory:write",
       inputSchema: {
         type: "object",
@@ -778,7 +792,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             agent: a.agent,
             line: { ...(apps.found.get(a.app) as { id: string; label: string }), on: a.on === true },
           }));
-          const { proposals, skipped } = await proposeChange(deps, {
+          const { proposals, applied, skipped } = await proposeChange(deps, {
             orgId: ctx.orgId,
             agentId: ctx.agentId,
             target: target === "org_context" ? "org_context" : "agent_instructions",
@@ -789,9 +803,15 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             access: lines.map((l) => ({ agentId: idOf(l.agent), lines: [l.line] })),
             rationale: str(input.reason),
             requesterId: requester,
+            atOnce: (await ownWords(ctx)) === requester ? ctx : undefined,
           });
+          const done = applied.length
+            ? `Applied ${applied.length} of it at once: the person sees it with Undo under your reply, so say it is done. `
+            : "";
+          const left = skipped.length ? ` Left off the card: ${skipped.join(" ")}` : "";
           const [first] = proposals;
-          if (!first) return fail(`Nothing to propose. ${skipped.join(" ")}`);
+          if (!first)
+            return applied.length ? { content: `${done}${left}` } : fail(`Nothing to propose. ${skipped.join(" ")}`);
           const decides = proposals.filter((p) => p.canDecide).length;
           const made =
             proposals.length === 1
@@ -804,19 +824,15 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               : decides === 0
                 ? `${proposals.length === 1 ? "it waits" : "they wait"} for ${rest}.`
                 : `the person who asked can accept some right here, the rest wait for ${rest}.`;
-          return memoryResult(
-            ctx,
-            `${made}; ${who}${skipped.length ? ` Left off the card: ${skipped.join(" ")}` : ""}`,
-            {
-              action: "proposed",
-              itemId: first.id,
-              text: proposalSummary(replaces === undefined || change.trim() ? change : `− ${replaces}`, roles, lines),
-              requestedByUserId: requester,
-              proposalId: first.id,
-              proposalIds: proposals.map((p) => p.id),
-              canDecide: decides > 0,
-            },
-          );
+          return memoryResult(ctx, `${done}${made}; ${who}${left}`, {
+            action: "proposed",
+            itemId: first.id,
+            text: proposalSummary(replaces === undefined || change.trim() ? change : `− ${replaces}`, roles, lines),
+            requestedByUserId: requester,
+            proposalId: first.id,
+            proposalIds: proposals.map((p) => p.id),
+            canDecide: decides > 0,
+          });
         } catch (error) {
           return { content: error instanceof Error ? error.message : "Could not propose", isError: true };
         }
@@ -1001,7 +1017,7 @@ async function changeableItem(ctx: ToolContext, id: string, requester: string | 
  * Saved, changed and forgotten memories are receipts with Undo instead
  * (`agent_actions`, ADR 0037 round 2).
  */
-function memoryResult(ctx: ToolContext, content: string, update: MemoryUpdate) {
+export function memoryResult(ctx: ToolContext, content: string, update: MemoryUpdate) {
   return {
     content,
     data: {

@@ -1901,7 +1901,7 @@
     "composerHint": "sen olmadan hiçbir şey değişmez",
     "intro": {
       "greeting": "Merhaba, ben {{name}}. Ekibi seninle birlikte kuruyorum.",
-      "lead": "Ajanları oluşturur, uygulamaları bağlar ve kişileri davet ederim. Sen tıklamadan hiçbir şey değişmez ve yalnızca senin yapabildiklerini yaparım.",
+      "lead": "Ajanları oluşturur, uygulamaları bağlar ve kişileri davet ederim. Sen istemeden hiçbir şey değişmez ve yalnızca senin yapabildiklerini yaparım.",
       "heldLead": "İşletmenin ne yaptığını seç, ekip burada belirsin. Çalışma alanının agentes.chat planı olunca ajanlar çalışmaya başlar.",
       "connect": {
         "title": "Ekip için bir yapay zeka bağla",
@@ -2020,6 +2020,8 @@
         "audience": "Onunla kimin konuşacağını yalnızca yöneticiler ve sorumlusu değiştirir",
         "channels": "Kanallarını yalnızca yöneticiler ve sorumlusu değiştirir",
         "ai_account": "Yalnızca hesabın sahibi verebilir",
+        "name": "Bir ajanın adını yalnızca yöneticiler değiştirir",
+        "look": "Görünümünü yalnızca yöneticiler ve sorumlusu değiştirir",
         "many": "Bu değişiklikleri yalnızca yöneticiler yapar"
       }
     },
@@ -2030,9 +2032,12 @@
       "owner": "Sorumlu",
       "audience": "Kimler konuşabilir",
       "archive": "Durum",
-      "channel": "Kanal"
+      "channel": "Kanal",
+      "name": "Ad",
+      "look": "Görünüm"
     },
     "value": {
+      "lookDefault": "Varsayılan görünüm",
       "none": "Yok",
       "budgetDefault": "Çalışma alanı varsayılanı",
       "anAccount": "Bir yapay zekâ hesabı",
@@ -2658,7 +2663,10 @@
       "updated": "<b>{{name}}</b> becerisini düzelttim"
     },
     "agent": {
-      "settings_changed": "<b>{{agentName}}</b> ayarlarını değiştirdim"
+      "settings_changed": "<b>{{agentName}}</b> ayarlarını değiştirdim",
+      "settings_changed_instructions": "<b>{{agentName}}</b> talimatlarını değiştirdim",
+      "settings_changed_role": "<b>{{agentName}}</b> rolünü değiştirdim",
+      "settings_changed_apps": "<b>{{agentName}}</b> uygulamalarını değiştirdim"
     },
     "pr": {
       "merged": "<b>{{repo}}</b> içindeki <b>#{{number}}</b> PR'ını birleştirdim",

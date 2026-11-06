@@ -196,6 +196,8 @@ export function SettingChange({ p }: { p: Proposal }) {
 }
 
 export const isText = (p: Proposal) => p.target.type === "agent_instructions" || p.target.type === "org_context";
+/** What shows a diff: a text, or a skill's, which is taken as proposed (it has no Editar). */
+const hasDiff = (p: Proposal) => isText(p) || p.target.type === "skill";
 
 /**
  * A proposal the agent made in the chat (`message.meta.proposalId`, or a card of one): the Propostas diff with
@@ -236,7 +238,7 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
   // Waiting: a request card, the change behind "Ver a mudança" (a text is edited there before accepting).
   if (pending) {
     const before = new Set(p.before.split("\n"));
-    const firstNew = isText(p)
+    const firstNew = hasDiff(p)
       ? p.after
           .split("\n")
           .find((line) => line.trim() && !before.has(line))
@@ -259,10 +261,10 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
           ),
           title: target,
           detail: p.target.type === "agent_role" ? t("proposals.roleLine", { from: p.before, to: p.after }) : firstNew,
-          ...(isText(p) ? { more: t("ask.seeChange") } : {}),
+          ...(hasDiff(p) ? { more: t("ask.seeChange") } : {}),
         }}
         details={
-          isText(p) ? (
+          hasDiff(p) ? (
             <>
               {editing ? (
                 <Field label={t("proposals.finalText")} id={`inline-prop-${p.id}`}>
@@ -272,7 +274,7 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
                 diff
               )}
               <div className="ac-acts">
-                {p.canDecide && (
+                {p.canDecide && isText(p) && (
                   <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)}>
                     {editing ? t("proposals.viewDiff") : t("inlineProposal.edit")}
                   </Button>
@@ -331,7 +333,7 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
       what={<b>{proposalTitle(t, p, org.name, agentName)}</b>}
       rows={[p]}
     >
-      {isText(p) ? diff : <SettingChange p={p} />}
+      {hasDiff(p) ? diff : <SettingChange p={p} />}
       <div className="ac-acts">
         <ProposalsLink agentId={p.agentId} />
       </div>

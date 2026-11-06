@@ -101,11 +101,11 @@ async function setup(options: Parameters<typeof baseSetup>[0] = {}) {
 }
 
 /** A run of the agent in `general`, answering a person's message (a routine's when `background`). */
-async function personRun(body = "@dev do it", background = false, meta?: Record<string, unknown>) {
+async function personRun(body = "@dev do it", background = false, meta?: Record<string, unknown>, userId = f.owner.id) {
   const msg = await insertMessage(f.db, {
     orgId: f.org.id,
     channelId: f.general.id,
-    author: { type: "person", userId: f.owner.id },
+    author: { type: "person", userId },
     body,
     meta,
   });
@@ -545,7 +545,13 @@ describe("agents learn on their own (ADR 0120)", () => {
     expect((await fix("frozen")).content).toContain("A person locked this skill");
     expect((await fix("handbook")).content).toBe("Updated handbook (v2).");
     await setSkillSettings(f.db, f.owner.id, f.org.id, { agentsImprove: false });
-    const proposed = await invoke(work, "update_skill", { name: "handbook", body: "# handbook\n1. Another step." });
+    const member = await addMember(f.db, f.org.id, "member");
+    const { run: memberRun } = await personRun("@dev fix the handbook", false, undefined, member.id);
+    await step(memberRun, "load_skill", { name: "handbook" }, "loaded");
+    const proposed = await invoke(memberRun, "update_skill", {
+      name: "handbook",
+      body: "# handbook\n1. Another step.",
+    });
     expect(proposed.content).toContain("Agents don't change this skill by themselves here");
     const [proposal] = await f.db.select().from(schema.contextProposals);
     expect([proposal?.target, proposal?.access?.[0]?.label, proposal?.proposedText]).toEqual([

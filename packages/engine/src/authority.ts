@@ -1,4 +1,4 @@
-import { and, type Executor, eq, schema } from "@agenteschat/db";
+import { and, type Executor, eq, gte, inArray, schema, sql } from "@agenteschat/db";
 import { caches, cachesEnabled } from "./cache";
 import { getMembership } from "./organizations";
 import { type RoutineBrief, routineBriefOf } from "./routine-brief";
@@ -207,6 +207,39 @@ export async function runChain(
     id = returnsTo(m.meta) ?? m.agentRunId ?? (await routinePostRun(db, { orgId, ...m }));
   }
   return id ? null : { agentIds: [...seen], runIds, rootMessageId: null };
+}
+
+/**
+ * Whether someone else wrote into a run of the chain while it worked (`meta.steeredRunIds`): a person other than
+ * `forUserId`, or an agent whose message isn't theirs. Their words reached the run outside the request it roots in.
+ */
+export async function steeredByOthers(db: Executor, orgId: string, forUserId: string, runIds: string[]) {
+  const runs = await db
+    .select({ channelId: agentRuns.channelId, createdAt: agentRuns.createdAt })
+    .from(agentRuns)
+    .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.id, runIds)));
+  if (runs.length === 0) return false;
+  const since = new Date(Math.min(...runs.map((r) => r.createdAt.getTime())));
+  const written = await db
+    .select({ id: messages.id, authorType: messages.authorType, authorUserId: messages.authorUserId })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, orgId),
+        inArray(messages.channelId, [...new Set(runs.map((r) => r.channelId))]),
+        gte(messages.createdAt, since),
+        sql`${messages.meta} -> 'steeredRunIds' ?| ${`{${runIds.join(",")}}`}::text[]`,
+      ),
+    );
+  for (const m of written) {
+    if (m.authorType === "person") {
+      if (m.authorUserId !== forUserId) return true;
+      continue;
+    }
+    const root = await messageRoot(db, orgId, m.id);
+    if (root.kind !== "person" || root.personId !== forUserId) return true;
+  }
+  return false;
 }
 
 /** The person behind a message (see `messageRoot`), or null. */

@@ -4,7 +4,7 @@ import { isAutoModel } from "@agenteschat/providers";
 import { type AgentProposalCard, agentProposalOf, createProposedAgent } from "./agent-proposals";
 import { type Agent, archiveAgent, getAgent } from "./agents";
 import { recordAudit } from "./audit";
-import { messageRoot, runChain } from "./authority";
+import { messageRoot, runChain, steeredByOthers } from "./authority";
 import { autoModelFor, autoProvider, orgAutoModels } from "./auto-model";
 import { isComputerBrain } from "./brains/types";
 import { decideProposal, type SettingsProposalCard, settingsCardOf } from "./context/proposals";
@@ -246,39 +246,6 @@ async function allOpen(db: Database, orgId: string, ids: string[]) {
       ),
     );
   return rows.length === new Set(ids).size;
-}
-
-/**
- * Whether someone else wrote into a run of the chain while it worked (`meta.steeredRunIds`): a person other than
- * `forUserId`, or an agent whose message isn't theirs. Their words reached the run outside the request it roots in.
- */
-async function steeredByOthers(db: Database, orgId: string, forUserId: string, runIds: string[]) {
-  const runs = await db
-    .select({ channelId: schema.agentRuns.channelId, createdAt: schema.agentRuns.createdAt })
-    .from(schema.agentRuns)
-    .where(and(eq(schema.agentRuns.orgId, orgId), inArray(schema.agentRuns.id, runIds)));
-  if (runs.length === 0) return false;
-  const since = new Date(Math.min(...runs.map((r) => r.createdAt.getTime())));
-  const written = await db
-    .select({ id: messages.id, authorType: messages.authorType, authorUserId: messages.authorUserId })
-    .from(messages)
-    .where(
-      and(
-        eq(messages.orgId, orgId),
-        inArray(messages.channelId, [...new Set(runs.map((r) => r.channelId))]),
-        gte(messages.createdAt, since),
-        sql`${messages.meta} -> 'steeredRunIds' ?| ${`{${runIds.join(",")}}`}::text[]`,
-      ),
-    );
-  for (const m of written) {
-    if (m.authorType === "person") {
-      if (m.authorUserId !== forUserId) return true;
-      continue;
-    }
-    const root = await messageRoot(db, orgId, m.id);
-    if (root.kind !== "person" || root.personId !== forUserId) return true;
-  }
-  return false;
 }
 
 const providerOf = async (db: Database, agent: Agent, model: string) =>

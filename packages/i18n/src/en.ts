@@ -1907,7 +1907,7 @@ export const en = {
     /** The top of its DM, drawn by the app (no model): its greeting and the first card the workspace needs. */
     intro: {
       greeting: "Hi, I'm {{name}}. I'll build the team with you.",
-      lead: "I create the agents, connect the apps and invite the people. Nothing changes without your click, and I only do what you can do.",
+      lead: "I create the agents, connect the apps and invite the people. Nothing changes unless you ask, and I only do what you can do.",
       /** In place of `lead` on a billing hold: the team costs no model call, and the plan is said up front. */
       heldLead:
         "Pick what your business does and the team shows up here. The agents start working once the workspace has an agentes.chat plan.",
@@ -2042,6 +2042,8 @@ export const en = {
         audience: "Only admins and its owner change who talks to it",
         channels: "Only admins and its owner change its channels",
         ai_account: "Only the account's owner gives it",
+        name: "Only admins rename an agent",
+        look: "Only admins and its owner change its look",
         many: "Only admins make these changes",
       },
     },
@@ -2053,8 +2055,11 @@ export const en = {
       audience: "Who can talk",
       archive: "Status",
       channel: "Channel",
+      name: "Name",
+      look: "Look",
     },
     value: {
+      lookDefault: "The default look",
       none: "None",
       budgetDefault: "Workspace default",
       anAccount: "An AI account",
@@ -2705,6 +2710,10 @@ export const en = {
     /** A teammate's settings changed from the right hand's card, by the person who clicked Aplicar (ADR 0137). */
     agent: {
       settings_changed: "Changed the settings of <b>{{agentName}}</b>",
+      /** One change applied at once from what the person asked (ADR 0092 §5). */
+      settings_changed_instructions: "Changed the instructions of <b>{{agentName}}</b>",
+      settings_changed_role: "Changed the role of <b>{{agentName}}</b>",
+      settings_changed_apps: "Changed the apps of <b>{{agentName}}</b>",
     },
     /** A merge the agent did without asking, in a repository its owner or an admin chose. Nothing undoes it. */
     pr: {

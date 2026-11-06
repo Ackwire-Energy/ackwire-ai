@@ -1977,7 +1977,7 @@
     "composerHint": "nulla cambia senza di te",
     "intro": {
       "greeting": "Ciao, sono {{name}}. Costruisco il team con te.",
-      "lead": "Creo gli agenti, collego le app e invito le persone. Nulla cambia senza il tuo clic, e faccio solo quello che puoi fare tu.",
+      "lead": "Creo gli agenti, collego le app e invito le persone. Nulla cambia se non lo chiedi, e faccio solo quello che puoi fare tu.",
       "heldLead": "Scegli di cosa si occupa la tua azienda e il team appare qui. Gli agenti iniziano a lavorare quando il workspace ha un piano agentes.chat.",
       "connect": {
         "title": "Collega un’IA per il team",
@@ -2096,6 +2096,8 @@
         "audience": "Solo gli admin e il responsabile cambiano chi gli parla",
         "channels": "Solo gli admin e il responsabile cambiano i suoi canali",
         "ai_account": "Solo il proprietario dell’account lo assegna",
+        "name": "Solo gli admin rinominano un agente",
+        "look": "Solo gli admin e il responsabile cambiano il suo aspetto",
         "many": "Solo gli admin fanno queste modifiche"
       }
     },
@@ -2106,9 +2108,12 @@
       "owner": "Responsabile",
       "audience": "Chi può parlare",
       "archive": "Stato",
-      "channel": "Canale"
+      "channel": "Canale",
+      "name": "Nome",
+      "look": "Aspetto"
     },
     "value": {
+      "lookDefault": "L'aspetto predefinito",
       "none": "Nessuno",
       "budgetDefault": "Predefinito del workspace",
       "anAccount": "Un account di IA",
@@ -2765,7 +2770,10 @@
       "updated": "Ho corretto la skill <b>{{name}}</b>"
     },
     "agent": {
-      "settings_changed": "Ho cambiato le impostazioni di <b>{{agentName}}</b>"
+      "settings_changed": "Ho cambiato le impostazioni di <b>{{agentName}}</b>",
+      "settings_changed_instructions": "Ho cambiato le istruzioni di <b>{{agentName}}</b>",
+      "settings_changed_role": "Ho cambiato il ruolo di <b>{{agentName}}</b>",
+      "settings_changed_apps": "Ho cambiato le app di <b>{{agentName}}</b>"
     },
     "pr": {
       "merged": "Ho fatto il merge della PR <b>#{{number}}</b> in <b>{{repo}}</b>",

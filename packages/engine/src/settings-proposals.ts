@@ -1,9 +1,12 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, isNull, schema } from "@agenteschat/db";
+import { accessInputOf, replaceableGrants, setAgentAccess } from "./access";
 import { type Agent, archiveAgent, getAgent, unarchiveAgent, updateAgent, validateAgentFields } from "./agents";
+import { setAgentAppearance, validateAppearance } from "./appearance";
 import { audienceOf, setAgentAudience } from "./audience";
 import { setAgentBrain } from "./brain-settings";
 import { isComputerBrain } from "./brains/types";
+import { invalidateOrg } from "./cache";
 import { addChannelMember, removeChannelMember, setChannelAgentAutoReply } from "./channels";
 import { sha256 } from "./crypto";
 import { NotFoundError } from "./errors";
@@ -14,10 +17,16 @@ import { maySql } from "./permissions";
 import { isRightHand } from "./right-hand";
 import { canonicalJson } from "./tools/json-schema";
 
-const { agentActions, channelMembers, channels, contextProposals, machineAccounts, organizationMembers } = schema;
+const { agentActions, agents, channelMembers, channels, contextProposals, machineAccounts, organizationMembers } =
+  schema;
 
 export type SettingLine = schema.ProposedSettingLine;
 export type SettingField = SettingLine["field"];
+/**
+ * What a receipt can put back: a setting, or a change of an instructions, role or apps row applied at once
+ * (`applyAsked`). Those three stay cards of their own, never lines of a settings card.
+ */
+export type ReceiptLine = Omit<SettingLine, "field"> & { field: SettingField | "instructions" | "role" | "apps" };
 type Proposal = typeof contextProposals.$inferSelect;
 
 /**
@@ -37,6 +46,8 @@ export const SETTING_GROUP: Record<SettingField, "admin" | "admin_or_owner" | "a
   channel_add: "admin_or_owner",
   channel_remove: "admin_or_owner",
   reply_mode: "admin_or_owner",
+  name: "admin",
+  look: "admin_or_owner",
   ai_account: "account",
 };
 
@@ -50,6 +61,8 @@ const ORDER: SettingField[] = [
   "channel_add",
   "channel_remove",
   "reply_mode",
+  "name",
+  "look",
   "archive",
   "delete",
 ];
@@ -62,12 +75,26 @@ interface AccountValue {
   accountId: string | null;
 }
 
+/** An agent's grants in one order, however they were last written: what an apps receipt compares. */
+export const agentApps = async (db: Executor, orgId: string, agentId: string) =>
+  (await replaceableGrants(db, orgId, agentId)).sort((a, b) => canonicalJson(a).localeCompare(canonicalJson(b)));
+
 /**
  * A setting's value now. A channel line's value is the agent's seat there: null when it isn't in it, else whether it
  * answers without a mention (`autoReply`), so adding, removing and the reply mode read and write the same thing.
  */
-async function valueNow(db: Executor, agent: Agent, line: Pick<SettingLine, "field" | "channelId">) {
+async function valueNow(db: Executor, agent: Agent, line: Pick<ReceiptLine, "field" | "channelId">) {
   switch (line.field) {
+    case "instructions":
+      return agent.instructions;
+    case "role":
+      return agent.role;
+    case "apps":
+      return agentApps(db, agent.orgId, agent.id);
+    case "name":
+      return agent.name;
+    case "look":
+      return agent.appearance;
     case "model":
       return agent.model;
     case "budget":
@@ -103,11 +130,39 @@ async function setValue(
   actorId: string,
   orgId: string,
   agentId: string,
-  line: Pick<SettingLine, "field" | "channelId">,
+  line: Pick<ReceiptLine, "field" | "channelId">,
   value: unknown,
 ) {
   const { db, pubsub } = deps;
   switch (line.field) {
+    // Its owner may undo what its owner may decide, without managing agents.
+    case "instructions":
+      await db
+        .update(agents)
+        .set({ instructions: String(value), updatedAt: new Date() })
+        .where(eq(agents.id, agentId));
+      return invalidateOrg(orgId);
+    case "role":
+      return void (await updateAgent(db, actorId, orgId, agentId, { role: String(value) }, { pubsub }));
+    case "apps":
+      return void (await setAgentAccess(
+        db,
+        actorId,
+        orgId,
+        agentId,
+        accessInputOf(value as Awaited<ReturnType<typeof agentApps>>),
+      ));
+    case "name":
+      return void (await updateAgent(db, actorId, orgId, agentId, { name: String(value) }, { pubsub }));
+    case "look":
+      return void (await setAgentAppearance(
+        db,
+        actorId,
+        orgId,
+        agentId,
+        value as Parameters<typeof setAgentAppearance>[4],
+        { pubsub },
+      ));
     case "model":
       return void (await updateAgent(db, actorId, orgId, agentId, { model: String(value) }, { pubsub }));
     case "budget":
@@ -208,6 +263,9 @@ export async function settingsDeciders(db: Database, p: Proposal): Promise<strin
   return [...ids];
 }
 
+/** What a card may change on the right hand: what its Settings let admins change. */
+const RIGHT_HAND_SETTINGS: ReadonlySet<SettingField> = new Set(["model", "budget", "audience", "name", "look"]);
+
 /** What a target's lines ask for, before `from` is read: `to`, and the channel for a channel line. */
 export type WantedLine = Omit<SettingLine, "from">;
 
@@ -231,7 +289,7 @@ export async function settingLines(
     const key = `${w.field}:${w.channelId ?? ""}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    if (isRightHand(agent) && w.field !== "model" && w.field !== "budget" && w.field !== "audience") {
+    if (isRightHand(agent) && !RIGHT_HAND_SETTINGS.has(w.field)) {
       skipped.push(`You can't change your own ${w.field.replace("_", " ")}: it is part of the workspace.`);
       continue;
     }
@@ -241,11 +299,13 @@ export async function settingLines(
       continue;
     }
     const from = await valueNow(db, agent, w);
-    if (same(from, w.to)) {
+    // As it is stored, so Undo finds what it left.
+    const to = w.field === "look" ? validateAppearance(w.to as Parameters<typeof validateAppearance>[0]) : w.to;
+    if (same(from, to)) {
       skipped.push(`${who} already has that ${w.field.replace("_", " ")}.`);
       continue;
     }
-    lines.push({ ...w, from });
+    lines.push({ ...w, to, from });
   }
   return { lines, skipped };
 }
@@ -253,6 +313,15 @@ export async function settingLines(
 /** Why a line can't be proposed (null: it can). */
 async function refusal(db: Database, orgId: string, requesterId: string, agent: Agent, w: WantedLine) {
   switch (w.field) {
+    case "name":
+      return String(w.to).trim() ? null : "a name can't be empty.";
+    case "look":
+      try {
+        validateAppearance(w.to as Parameters<typeof validateAppearance>[0]);
+      } catch (error) {
+        return error instanceof Error ? error.message : "that look can't be drawn";
+      }
+      return null;
     case "model":
       if (isComputerBrain(agent.brain)) return "it thinks on a computer, whose model is picked under Quem pensa.";
       try {
@@ -392,7 +461,9 @@ export async function revertSettings(
   direction: "undo" | "redo",
   changedSince: () => Error,
 ) {
-  const lines = ((a.params as { lines?: SettingLine[] }).lines ?? []).slice();
+  // An instructions, role or apps row keeps its texts off the receipt everyone in the conversation reads.
+  const kept = (a.before as { lines?: ReceiptLine[] } | null)?.lines;
+  const lines = (kept ?? (a.params as { lines?: ReceiptLine[] }).lines ?? []).slice();
   const steps = direction === "undo" ? lines.reverse() : lines;
   const agent = await getAgent(deps.db, a.orgId, a.targetId);
   if (!agent) throw new NotFoundError("The agent is gone", "action.target_gone");

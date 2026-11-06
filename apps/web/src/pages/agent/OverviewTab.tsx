@@ -9,7 +9,7 @@ import {
 } from "@agenteschat/client";
 import { audienceSummary } from "@agenteschat/client/lib/audience";
 import { formatMonth, formatPercent, formatUsd, whenAt } from "@agenteschat/client/lib/format";
-import { proposalTitle } from "@agenteschat/client/lib/proposals";
+import { pendingOnAgent, proposalTitle } from "@agenteschat/client/lib/proposals";
 import { excerpt } from "@agenteschat/client/lib/text";
 import { Avatar, Button, Card, Chip, Icon, Meter, PlanMeter } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
@@ -46,9 +46,7 @@ export function OverviewTab() {
   const usage = useUsage(org.id);
   const items = useConnectedById();
   const repoSuffix = useRepoSuffix();
-  const pending = (proposals.data ?? []).filter(
-    (p) => p.agentId === agent.id && p.status === "pending" && p.target.type === "agent_instructions",
-  );
+  const pending = pendingOnAgent(proposals.data ?? [], agent.id);
   const approvals = detail.data?.pendingApprovals ?? 0;
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
   const levels = saved.levels ?? {};

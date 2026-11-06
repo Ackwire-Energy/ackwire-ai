@@ -20,6 +20,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
+import { pendingOnAgent } from "@agenteschat/client/lib/proposals";
 import { isAuto } from "@agenteschat/client/lib/providers";
 import { type RepoChoice, repoChoiceOf, repoListOf, reposText } from "@agenteschat/client/lib/repos";
 import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
@@ -616,9 +617,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
 
   /* ---------- Tabs ---------- */
 
-  const pending = (proposals.data ?? []).filter(
-    (p) => p.agentId === agent.id && p.status === "pending" && p.target.type === "agent_instructions",
-  ).length;
+  const pending = pendingOnAgent(proposals.data ?? [], agent.id).length;
   const failures =
     viewer === "member" ? 0 : (runs.data ?? []).filter((r) => r.status === "failed" && thisMonth(r.createdAt)).length;
   const tabLabel = (id: AgentTab): ReactNode => {

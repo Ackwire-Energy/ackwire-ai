@@ -1901,7 +1901,7 @@ export const ptBR = {
     intro: {
       greeting: "Oi, eu sou o {{name}}. Monto o time com você.",
       greeting_female: "Oi, eu sou a {{name}}. Monto o time com você.",
-      lead: "Crio os agentes, conecto os apps e convido as pessoas. Nada muda sem o seu clique, e eu faço só o que você pode fazer.",
+      lead: "Crio os agentes, conecto os apps e convido as pessoas. Nada muda sem você pedir, e eu faço só o que você pode fazer.",
       heldLead:
         "Escolha o que a sua empresa faz e o time aparece aqui. Os agentes começam a trabalhar quando o workspace tiver um plano do agentes.chat.",
       connect: {
@@ -2043,6 +2043,8 @@ export const ptBR = {
         channels: "Só admins e o responsável mudam os canais dele",
         channels_female: "Só admins e o responsável mudam os canais dela",
         ai_account: "Só o dono da conta a escolhe",
+        name: "Só admins mudam o nome de um agente",
+        look: "Só admins e o responsável mudam a aparência",
         many: "Só admins fazem essas mudanças",
       },
     },
@@ -2054,8 +2056,11 @@ export const ptBR = {
       audience: "Quem conversa",
       archive: "Situação",
       channel: "Canal",
+      name: "Nome",
+      look: "Aparência",
     },
     value: {
+      lookDefault: "A aparência padrão",
       none: "Nenhum",
       budgetDefault: "Padrão do workspace",
       anAccount: "Uma conta de IA",
@@ -2712,6 +2717,9 @@ export const ptBR = {
     },
     agent: {
       settings_changed: "Mudei as configurações de <b>{{agentName}}</b>",
+      settings_changed_instructions: "Mudei as instruções de <b>{{agentName}}</b>",
+      settings_changed_role: "Mudei o papel de <b>{{agentName}}</b>",
+      settings_changed_apps: "Mudei os apps de <b>{{agentName}}</b>",
     },
     pr: {
       merged: "Fiz o merge do PR <b>#{{number}}</b> em <b>{{repo}}</b>",

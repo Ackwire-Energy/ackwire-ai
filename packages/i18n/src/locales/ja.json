@@ -1830,7 +1830,7 @@
     "composerHint": "あなたなしでは何も変わりません",
     "intro": {
       "greeting": "こんにちは、{{name}}です。あなたと一緒にチームを作ります。",
-      "lead": "エージェントを作り、アプリを接続し、メンバーを招待します。あなたがクリックしない限り何も変わらず、あなたにできることだけを行います。",
+      "lead": "エージェントを作り、アプリを接続し、メンバーを招待します。あなたが頼まない限り何も変わらず、あなたにできることだけを行います。",
       "heldLead": "事業の内容を選ぶと、ここにチームが表示されます。ワークスペースにagentes.chatのプランがあると、エージェントが作業を始めます。",
       "connect": {
         "title": "チームのAIを接続",
@@ -1949,6 +1949,8 @@
         "audience": "話せる人を変えられるのは管理者と責任者だけです",
         "channels": "チャンネルを変えられるのは管理者と責任者だけです",
         "ai_account": "割り当てられるのはアカウントの持ち主だけです",
+        "name": "エージェントの名前を変えられるのは管理者だけです",
+        "look": "見た目を変えられるのは管理者と責任者だけです",
         "many": "これらの変更ができるのは管理者だけです"
       }
     },
@@ -1959,9 +1961,12 @@
       "owner": "責任者",
       "audience": "話せる人",
       "archive": "状態",
-      "channel": "チャンネル"
+      "channel": "チャンネル",
+      "name": "名前",
+      "look": "見た目"
     },
     "value": {
+      "lookDefault": "標準の見た目",
       "none": "なし",
       "budgetDefault": "ワークスペースの既定",
       "anAccount": "AIアカウント",
@@ -2569,7 +2574,10 @@
       "updated": "スキル<b>{{name}}</b>を修正しました"
     },
     "agent": {
-      "settings_changed": "<b>{{agentName}}</b>の設定を変更しました"
+      "settings_changed": "<b>{{agentName}}</b>の設定を変更しました",
+      "settings_changed_instructions": "<b>{{agentName}}</b>の指示を変更しました",
+      "settings_changed_role": "<b>{{agentName}}</b>の役割を変更しました",
+      "settings_changed_apps": "<b>{{agentName}}</b>のアプリを変更しました"
     },
     "pr": {
       "merged": "<b>{{repo}}</b>のPR <b>#{{number}}</b>をマージしました",

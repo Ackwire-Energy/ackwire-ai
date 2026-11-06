@@ -164,8 +164,11 @@ export function actionTextValues(
     case "skill.created":
     case "skill.updated":
       return { name: str(p.name) || title };
-    case "agent.settings_changed":
-      return { agentName: str(p.agentName) || title };
+    case "agent.settings_changed": {
+      const [only] = fields;
+      const applied = fields.length === 1 && (only === "instructions" || only === "role" || only === "apps");
+      return { agentName: str(p.agentName) || title, ...(applied ? { context: only } : {}) };
+    }
     case "pr.merged":
       return p.number
         ? { repo: str(p.repo), number: str(p.number) }

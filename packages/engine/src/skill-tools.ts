@@ -2,8 +2,9 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, eq, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { recordAgentActions } from "./agent-actions";
 import { sniffModelImage } from "./avatars";
-import { learnTrust } from "./context/learn";
+import { learnTrust, ownWords } from "./context/learn";
 import { changeSkillAsAgent } from "./context/learned-skills";
+import { memoryResult } from "./context/tools";
 import { publishMessageCreated } from "./events";
 import { copyToComputer, type StoredFile } from "./file-pulls";
 import { cutText, formatBytes } from "./format";
@@ -252,18 +253,37 @@ export function createSkillToolSource(
               }))
             : [];
           if (files.length > 10) return { content: "At most 10 files at a time.", isError: true };
+          const { trust, person } = await learnTrust(ctx);
+          const words = await ownWords(ctx);
+          const decides = !!words && can(await getMembership(ctx.db, words, ctx.orgId), "manage_agents");
           const change = await changeSkillAsAgent(
             { db: ctx.db, pubsub: deps.pubsub, judge: deps.judge, blobs: deps.blobs },
             ctx,
             str(input.name),
             { body: typeof input.body === "string" ? input.body : undefined, files },
-            (await learnTrust(ctx)).trust,
+            trust,
+            { person, decides },
           );
           const waits = change.scripts.length
             ? ` ${change.scripts.join(", ")} run${change.scripts.length === 1 ? "s" : ""} as code, so that change waits for a person who manages agents (a proposal).`
             : "";
+          const membership = person ? await getMembership(ctx.db, person, ctx.orgId) : null;
+          /** With a person behind the run its card sits under the reply; with nobody, the deciders' inbox row is the way in. */
+          const carded = (content: string) => {
+            const [first] = change.proposalIds;
+            if (!person || !first) return { content };
+            return memoryResult(ctx, content, {
+              action: "proposed",
+              itemId: first,
+              text: str(input.name),
+              requestedByUserId: person,
+              proposalId: first,
+              proposalIds: change.proposalIds,
+              canDecide: can(membership, "manage_agents"),
+            });
+          };
           if (change.action === "updated")
-            return { content: `Updated ${change.skill?.name} (v${change.skill?.version}).${waits}` };
+            return carded(`Updated ${change.skill?.name} (v${change.skill?.version}).${waits}`);
           if (change.action === "unchanged") return { content: "Nothing changed: it is the same." };
           const why =
             change.why === "outside"
@@ -273,9 +293,9 @@ export function createSkillToolSource(
                 : change.why === "locked"
                   ? "A person locked this skill, so the change is a proposal"
                   : "The change is a proposal";
-          return {
-            content: `${why} (${change.proposalIds.join(", ")}): someone who manages agents accepts it.${waits} Use your fix in this turn.`,
-          };
+          return carded(
+            `${why} (${change.proposalIds.join(", ")}): someone who manages agents accepts it on the card under your reply.${waits} Use your fix in this turn.`,
+          );
         } catch (error) {
           return failed(error);
         }

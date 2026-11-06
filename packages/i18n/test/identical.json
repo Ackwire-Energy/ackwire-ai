@@ -1021,6 +1021,7 @@
       "recurrence.wd.SA.short",
       "recurrence.wd.SU.short",
       "rightHand.field.archive",
+      "rightHand.field.name",
       "roles.admin",
       "rolesPage.administrator",
       "rolesPage.name",

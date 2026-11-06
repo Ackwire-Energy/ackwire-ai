@@ -1829,7 +1829,7 @@
     "composerHint": "没有你，什么都不会变",
     "intro": {
       "greeting": "你好，我是 {{name}}。我和你一起组建团队。",
-      "lead": "我创建智能体、连接应用、邀请成员。没有你的点击，什么都不会变，而且我只做你能做的事。",
+      "lead": "我创建智能体、连接应用、邀请成员。没有你的要求，什么都不会变，而且我只做你能做的事。",
       "heldLead": "选择你的公司业务，团队就会出现在这里。工作区有 agentes.chat 套餐后，智能体就会开始工作。",
       "connect": {
         "title": "为团队连接 AI",
@@ -1948,6 +1948,8 @@
         "audience": "只有管理员和负责人能更改谁能和它交谈",
         "channels": "只有管理员和负责人能更改它的频道",
         "ai_account": "只有账户所有者能分配它",
+        "name": "只有管理员能重命名智能体",
+        "look": "只有管理员和负责人能更改它的外观",
         "many": "只有管理员能做这些更改"
       }
     },
@@ -1958,9 +1960,12 @@
       "owner": "负责人",
       "audience": "谁能交谈",
       "archive": "状态",
-      "channel": "频道"
+      "channel": "频道",
+      "name": "名称",
+      "look": "外观"
     },
     "value": {
+      "lookDefault": "默认外观",
       "none": "无",
       "budgetDefault": "工作区默认",
       "anAccount": "一个 AI 账户",
@@ -2570,7 +2575,10 @@
       "updated": "修正了技能 <b>{{name}}</b>"
     },
     "agent": {
-      "settings_changed": "更改了 <b>{{agentName}}</b> 的设置"
+      "settings_changed": "更改了 <b>{{agentName}}</b> 的设置",
+      "settings_changed_instructions": "更改了 <b>{{agentName}}</b> 的指令",
+      "settings_changed_role": "更改了 <b>{{agentName}}</b> 的角色",
+      "settings_changed_apps": "更改了 <b>{{agentName}}</b> 的应用"
     },
     "pr": {
       "merged": "已合并 <b>{{repo}}</b> 的 PR <b>#{{number}}</b>",

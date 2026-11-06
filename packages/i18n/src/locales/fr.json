@@ -1981,7 +1981,7 @@
     "composerHint": "rien ne change sans vous",
     "intro": {
       "greeting": "Bonjour, je suis {{name}}. Je monte l’équipe avec vous.",
-      "lead": "Je crée les agents, je connecte les applications et j’invite les personnes. Rien ne change sans votre clic, et je ne fais que ce que vous pouvez faire.",
+      "lead": "Je crée les agents, je connecte les applications et j’invite les personnes. Rien ne change sans votre demande, et je ne fais que ce que vous pouvez faire.",
       "heldLead": "Choisissez ce que fait votre entreprise et l'équipe apparaît ici. Les agents se mettent au travail dès que le workspace a un abonnement agentes.chat.",
       "connect": {
         "title": "Connecter une IA pour l’équipe",
@@ -2100,6 +2100,8 @@
         "audience": "Seuls les admins et son responsable changent qui lui parle",
         "channels": "Seuls les admins et son responsable changent ses canaux",
         "ai_account": "Seul le propriétaire du compte l’attribue",
+        "name": "Seuls les admins renomment un agent",
+        "look": "Seuls les admins et son responsable changent son apparence",
         "many": "Seuls les admins font ces changements"
       }
     },
@@ -2110,9 +2112,12 @@
       "owner": "Responsable",
       "audience": "Qui peut parler",
       "archive": "Statut",
-      "channel": "Canal"
+      "channel": "Canal",
+      "name": "Nom",
+      "look": "Apparence"
     },
     "value": {
+      "lookDefault": "L'apparence par défaut",
       "none": "Aucun",
       "budgetDefault": "Par défaut du workspace",
       "anAccount": "Un compte d’IA",
@@ -2764,7 +2769,10 @@
       "updated": "J'ai corrigé la compétence <b>{{name}}</b>"
     },
     "agent": {
-      "settings_changed": "J'ai modifié les paramètres de <b>{{agentName}}</b>"
+      "settings_changed": "J'ai modifié les paramètres de <b>{{agentName}}</b>",
+      "settings_changed_instructions": "J'ai modifié les instructions de <b>{{agentName}}</b>",
+      "settings_changed_role": "J'ai modifié le rôle de <b>{{agentName}}</b>",
+      "settings_changed_apps": "J'ai modifié les apps de <b>{{agentName}}</b>"
     },
     "pr": {
       "merged": "J'ai mergé la PR <b>#{{number}}</b> dans <b>{{repo}}</b>",

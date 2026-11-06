@@ -2,6 +2,7 @@ import type { ErrorTags } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, isNull, lte, or, schema, sql } from "@agenteschat/db";
 import { modelInfo } from "@agenteschat/providers";
 import { recordAgentActions } from "../agent-actions";
+import { steeredByOthers } from "../authority";
 import { callLine, type LearnSignal, type RunCall, runCalls } from "../continuation";
 import { cutText, cutTextEnd } from "../format";
 import { agentBudgetState } from "../gateway";
@@ -119,6 +120,25 @@ export async function learnTrust(ctx: Pick<ToolContext, "orgId" | "runId" | "tri
   ]);
   const outside = relayed || calls.some(readsOutside);
   return { trust: person && !outside ? ("high" as const) : ("low" as const), person, outside };
+}
+
+/**
+ * The person whose own words this run answers, when it may act on them with no card (ADR 0092 §5, amended): it is high
+ * trust, the message that started it is theirs (not a colleague's or a notice's) and nobody else wrote into it while it
+ * worked. Null otherwise. Only says whose words: what that person may decide is the caller's to check.
+ */
+export async function ownWords(
+  ctx: Pick<ToolContext, "orgId" | "runId" | "triggerMessageId"> & { db: Database },
+): Promise<string | null> {
+  if (!ctx.runId) return null;
+  const { trust, person } = await learnTrust(ctx);
+  if (trust !== "high" || !person) return null;
+  const [trigger] = await ctx.db
+    .select({ authorUserId: messages.authorUserId })
+    .from(messages)
+    .where(and(eq(messages.orgId, ctx.orgId), eq(messages.id, ctx.triggerMessageId)));
+  if (trigger?.authorUserId !== person) return null;
+  return (await steeredByOthers(ctx.db, ctx.orgId, person, [ctx.runId])) ? null : person;
 }
 
 // ── At turn end ──────────────────────────────────────────────────────────────

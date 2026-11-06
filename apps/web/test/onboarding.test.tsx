@@ -100,7 +100,7 @@ describe("the top of Lodi's DM", () => {
     await openDm(state);
     expect(document.body.textContent).toContain(GREETING);
     expect(document.body.textContent).toContain(
-      "Crio os agentes, conecto os apps e convido as pessoas. Nada muda sem o seu clique, e eu faço só o que você pode fazer.",
+      "Crio os agentes, conecto os apps e convido as pessoas. Nada muda sem você pedir, e eu faço só o que você pode fazer.",
     );
     expect(screen().getByText("Conectar uma IA para o time")).toBeTruthy();
     expect(button("Conectar")).toBeTruthy();

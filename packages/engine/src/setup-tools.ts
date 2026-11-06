@@ -1,7 +1,7 @@
 import { holdEvents, type PubSub } from "@agenteschat/adapters";
 import { and, count, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { isKnownProvider, PROVIDERS } from "@agenteschat/providers";
-import { actWithUndo } from "./agent-actions";
+import { actWithUndo, publishMessageActions } from "./agent-actions";
 import {
   AGENT_PROPOSAL_CARD,
   type AgentProposalCard,
@@ -21,7 +21,8 @@ import { findMember } from "./chat-tools";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
 import { connectorListing, type ServerCatalog } from "./connectors/listing";
 import { MCP_PRESETS, presetForServer } from "./connectors/presets";
-import { proposeSettings, type SettingsProposalCard } from "./context/proposals";
+import { ownWords } from "./context/learn";
+import { decideProposal, proposeSettings, type SettingsProposalCard } from "./context/proposals";
 import type { ContextDeps } from "./context/summaries";
 import { publishMessageCreated } from "./events";
 import { insertMessage, messageView } from "./messages";
@@ -33,7 +34,7 @@ import { queueRightHandLook } from "./right-hand-approvals";
 import { bodyCode } from "./run-tools";
 import { replyThreadOf } from "./runs";
 import { REPORT_SCHEMA, SCHEDULE_INPUT } from "./schedule-tools";
-import type { WantedLine } from "./settings-proposals";
+import { deletes, type WantedLine } from "./settings-proposals";
 import { noAgentText } from "./team";
 import { teamTools } from "./team-proposals";
 import { SET_TEAM_WEEK_TOOL, setTeamWeekPrefs } from "./team-week";
@@ -1201,6 +1202,8 @@ interface SettingsChangeInput {
   join?: unknown;
   leave?: unknown;
   replies?: unknown;
+  name?: unknown;
+  look?: unknown;
   archive?: unknown;
 }
 
@@ -1290,19 +1293,24 @@ async function wantedLines(ctx: ToolContext, change: SettingsChangeInput): Promi
   for (const r of replies)
     if (!names(change.join).some((n) => channelOf(n)?.id === channelOf(str(r.channel))?.id))
       seat("reply_mode", str(r.channel), r.without_mention === true);
+  if (typeof change.name === "string")
+    lines.push({ field: "name", to: change.name.trim(), label: { to: change.name } });
+  if (change.look) lines.push({ field: "look", to: change.look });
   if (change.archive === true) lines.push({ field: "archive", to: true });
   return lines;
 }
 
 /**
  * `propose_settings_change` (ADR 0137, amending 0092 §5): a teammate's settings as one card in this conversation,
- * one row per agent and whoever decides it. Nothing changes until someone who may clicks Aplicar.
+ * one row per agent and whoever decides it, applied by who clicks Aplicar. Rows the person who asked may decide, in
+ * their own words (`ownWords`), apply as the card is posted: it shows them done with Desfazer. Never an agent's own row
+ * (ADR 0139: an agent raising its own budget is the person's), nor deleting, which has no Undo.
  */
 function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
   return {
     name: PROPOSE_SETTINGS_TOOL,
     description:
-      "Propose changing teammates' settings with one card in this conversation: the model, the AI account it thinks with, its monthly budget, its owner, who may talk to it, the channels it joins or leaves and whether it answers there without a mention, or archiving it. Whoever may make each change applies it from the card as themselves, and a change the person who asked can't make they send from the card to whoever may. Nothing changes until someone clicks: never say it is done. Instructions, a role or apps go through propose_instruction_change.",
+      "Change teammates' settings with one card in this conversation: the model, the AI account it thinks with, its monthly budget, its owner, who may talk to it, the channels it joins or leaves and whether it answers there without a mention, its name, its look, or archiving it. A change the person who asked may make, with nothing read from outside this turn, applies at once with Undo. Any other waits on the card for who may make it, and one they can't make they send from there. The result says which: never say it is done before it does. Instructions, a role or apps go through propose_instruction_change.",
     scope: SETUP_SCOPE,
     inputSchema: {
       type: "object",
@@ -1354,6 +1362,17 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
                   additionalProperties: false,
                 },
               },
+              name: { type: "string", minLength: 1, maxLength: 80 },
+              look: {
+                type: "object",
+                properties: {
+                  color: { type: "string", description: `${AGENT_LOOK.colors.join(", ")}, or #rrggbb.` },
+                  eyes: { enum: [...AGENT_LOOK.eyes] },
+                  accessory: { enum: [...AGENT_LOOK.accessories] },
+                },
+                required: ["color", "eyes"],
+                additionalProperties: false,
+              },
               archive: { type: "boolean", description: "True: archive it (it stops working; Undo brings it back)." },
             },
             required: ["agent"],
@@ -1389,6 +1408,7 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
         }
         const full = await cardsLeft(ctx);
         if (full) return full;
+        const atOnce = (await ownWords(ctx)) === forUserId;
         const { proposals, skipped } = await proposeSettings(
           { db: ctx.db },
           {
@@ -1416,17 +1436,35 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
           body: `Proposed a change to ${who}: ${str(input.reason).trim()}`,
           meta: { ...bodyCode(SETTINGS_PROPOSAL_CARD, { names: who }), actionCard: card },
         });
+        // Before the card is announced, so it reads as done from its first frame; its receipts need the message.
+        const open: typeof proposals = [];
+        for (const p of proposals) {
+          const now = atOnce && p.canDecide && !deletes(p) && p.agentId !== ctx.agentId;
+          const done =
+            now &&
+            (await decideProposal(ctx.db, forUserId, ctx.orgId, p.id, "accept", { pubsub: deps.pubsub }).then(
+              () => true,
+              () => false,
+            ));
+          if (!done) open.push(p);
+        }
         if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(message));
-        await queueRightHandLook(ctx.db, ctx.orgId, message.id, forUserId);
-        const decides = proposals.filter((p) => p.canDecide).length;
+        if (open.length < proposals.length)
+          await publishMessageActions({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, message.id);
+        if (open.length > 0) await queueRightHandLook(ctx.db, ctx.orgId, message.id, forUserId);
+        const decides = open.filter((p) => p.canDecide).length;
+        const applied = open.length < proposals.length;
+        const rest = applied ? "the rest" : "it";
         const whoDecides =
-          decides === proposals.length
-            ? "the person who asked applies it from the card."
-            : decides === 0
-              ? "the person who asked can't apply it: the card lets them send it to whoever may."
-              : "the person who asked applies some rows; the card lets them send the rest to whoever may.";
+          open.length === 0
+            ? ""
+            : decides === open.length
+              ? `the person who asked applies ${rest} from the card.`
+              : decides === 0
+                ? `the person who asked can't apply ${rest}: the card lets them send it to whoever may.`
+                : "the person who asked applies some rows; the card lets them send the rest to whoever may.";
         return {
-          content: `Posted the card for ${who}; ${whoDecides} Nothing has changed yet.${skipped.length ? ` Left off the card: ${skipped.join(" ")}` : ""}`,
+          content: `Posted the card for ${who}; ${applied ? "applied at once, with Undo on the card, so say it is done. " : ""}${whoDecides}${applied ? "" : " Nothing has changed yet."}${skipped.length ? ` Left off the card: ${skipped.join(" ")}` : ""}`,
           data: { actionCard: { messageId: message.id } },
         };
       } catch (error) {

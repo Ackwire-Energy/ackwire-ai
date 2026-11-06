@@ -24,7 +24,7 @@ import {
   setAgentAccess,
   withAccessLines,
 } from "../access";
-import { UNDO_WINDOW_MS } from "../agent-actions";
+import { recordAgentActions, UNDO_WINDOW_MS } from "../agent-actions";
 import { type AgentDeletionDeps, deleteAgent } from "../agent-deletion";
 import { type Agent, getAgent, updateAgent } from "../agents";
 import { audienceNotice, canTalkTo, seesAgentDetails, speakerFor } from "../audience";
@@ -44,9 +44,11 @@ import { isRightHand } from "../right-hand";
 import { deliverNoticeToRun } from "../run-resume";
 import { userVisibleChannels } from "../search";
 import {
+  agentApps,
   applySettings,
   deletes,
   maySettle,
+  type ReceiptLine,
   recordSettingsReceipt,
   type SettingLine,
   settingLines,
@@ -56,6 +58,7 @@ import {
 } from "../settings-proposals";
 import { editedByAgents, pinBlobs, runsCode, skillFolderFiles, writeSkillBody, writeSkillChange } from "../skills";
 import { ALL_TOOLS } from "../tools/scopes";
+import type { ToolContext } from "../tools/types";
 import {
   type ContextItem,
   checkContent,
@@ -708,6 +711,8 @@ export async function proposeSkillChange(
     skill: { id: string; name: string; body: string };
     body: string;
     file?: { path: string; text: string };
+    /** The person behind the run: the card is in front of them, so their inbox row isn't needed. */
+    requesterId?: string | null;
   },
 ): Promise<Proposal | null> {
   checkContent(input.body);
@@ -736,6 +741,7 @@ export async function proposeSkillChange(
     .values({
       ...row,
       proposedByAgentId: input.agentId,
+      requestedByUserId: input.requesterId ?? null,
       rationale: input.file
         ? `A change to ${input.file.path} of the skill ${input.skill.name} from using it.`
         : `A fix to the skill ${input.skill.name} from using it.`,
@@ -1098,9 +1104,10 @@ async function cardAgents(
  * rule added to its own or other agents' instructions or to the org context
  * (or exact text swapped or removed there), and other agents' roles and apps.
  * One row per agent and kind of change, for one card; the agent never edits
- * any of them, a person who may make that change accepts each. Only agents
- * the person who asked can talk to; the text is checked once. What can't be
- * proposed is left off, with why in `skipped` (English, for the agent).
+ * any of them, a person who may make that change accepts each, or with `atOnce`
+ * the person who asked, as it is made (`applyAsked`). Only agents the person who
+ * asked can talk to; the text is checked once. What can't be proposed is left
+ * off, with why in `skipped` (English, for the agent).
  */
 export async function proposeChange(
   deps: { db: Database; pubsub?: PubSub; judge?: Judge },
@@ -1118,8 +1125,10 @@ export async function proposeChange(
     access?: { agentId: string; lines: AccessLine[] }[];
     rationale: string;
     requesterId: string;
+    /** The run, when the person who asked may have what they decide applied now (`ownWords`). */
+    atOnce?: ToolContext;
   },
-): Promise<{ proposals: (Proposal & { canDecide: boolean })[]; skipped: string[] }> {
+): Promise<{ proposals: (Proposal & { canDecide: boolean })[]; applied: Proposal[]; skipped: string[] }> {
   const { db } = deps;
   const { orgId, change, replaces } = input;
   const roles = input.roles ?? [];
@@ -1213,15 +1222,57 @@ export async function proposeChange(
       skipped.push("This same change is already waiting for a person's decision: no need to propose it again.");
     else fresh.push(row);
   }
-  if (fresh.length === 0) return { proposals: [], skipped: [...new Set(skipped)] };
+  if (fresh.length === 0) return { proposals: [], applied: [], skipped: [...new Set(skipped)] };
   const { added, removed } = rowsChange(fresh);
   checkContent(added.join("\n"));
   await checkPermissionText(deps.judge, orgId, [...added, ...removed.map((l) => `Removes: ${l}`)].join("\n"));
   const proposals = await db.insert(contextProposals).values(fresh).returning();
-  await announce(deps, proposals);
   const out: (Proposal & { canDecide: boolean })[] = [];
-  for (const p of proposals) out.push({ ...p, canDecide: await mayDecide(db, input.requesterId, p) });
-  return { proposals: out, skipped };
+  const applied: Proposal[] = [];
+  for (const p of proposals) {
+    const canDecide = await mayDecide(db, input.requesterId, p);
+    if (canDecide && input.atOnce && (await applyAsked(deps, input.atOnce, input.requesterId, p))) applied.push(p);
+    else out.push({ ...p, canDecide });
+  }
+  await announce(deps, out);
+  return { proposals: out, applied, skipped };
+}
+
+/** The field a receipt names for a row applied at once. */
+const RECEIPT_FIELD = { agent_instructions: "instructions", agent_role: "role", agent_access: "apps" } as const;
+
+/**
+ * Applies one row now, as the person who asked, with a receipt and Undo in place of a card (ADR 0092 §5, amended): the
+ * caller checked `ownWords`. False when it can't be (it goes on as a card). The texts stay off the receipt's params,
+ * which everyone in the conversation reads.
+ */
+async function applyAsked(
+  deps: { db: Database; pubsub?: PubSub; judge?: Judge },
+  ctx: ToolContext,
+  requesterId: string,
+  p: Proposal,
+) {
+  if (p.target !== "agent_instructions" && p.target !== "agent_role" && p.target !== "agent_access") return false;
+  const [before, target] = [await getAgent(deps.db, p.orgId, p.agentId ?? ""), RECEIPT_FIELD[p.target]];
+  if (!before) return false;
+  const apps = () => agentApps(deps.db, p.orgId, before.id);
+  const from = target === "apps" ? await apps() : target === "role" ? before.role : before.instructions;
+  try {
+    await decideProposal(deps.db, requesterId, p.orgId, p.id, "accept", deps);
+  } catch (error) {
+    if (error instanceof ConflictError) return false;
+    throw error;
+  }
+  const line: ReceiptLine = { field: target, from, to: target === "apps" ? await apps() : p.proposedText };
+  await recordAgentActions(deps.db, ctx, [
+    {
+      kind: "agent.settings_changed",
+      target: { type: "agent", id: before.id, title: before.name },
+      params: { proposalId: p.id, agentName: before.name, fields: [target] },
+      before: { lines: [line] },
+    },
+  ]);
+  return true;
 }
 
 /** `meta.actionCard` of the right hand's settings card (ADR 0137): its rows, read live (`GET …/proposals?ids=`). */
